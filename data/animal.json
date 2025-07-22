@@ -1,1 +1,33 @@
+[
+  {
+    "id": 1,
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "birthDate": "2022-01-10",
+    "lastCalving": "2024-04-01",
+    "productionStatus": "حلاب",
+    "milkDays": 110,
+    "milkDaily": 22,
+    "milkWeekly": 154,
+    "milkSeason": 1800,
+    "reproStatus": "عشار",
+    "pregnancyDays": 90,
+    "healthStatus": "سليمة"
+  },
+  {
+    "id": 2,
+    "type": "جاموسة",
+    "breed": "مصري",
+    "birthDate": "2021-08-15",
+    "lastCalving": "2024-03-20",
+    "productionStatus": "جاف",
+    "milkDays": 40,
+    "milkDaily": 0,
+    "milkWeekly": 0,
+    "milkSeason": 1500,
+    "reproStatus": "مفتوحة",
+    "pregnancyDays": 0,
+    "healthStatus": "تحتاج متابعة"
+  }
+]
 
