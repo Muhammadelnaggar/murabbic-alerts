@@ -1,1 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة المتابعة - البطاقات الذكية للحيوانات</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+    .cow-card {
+      background-color: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .cow-card h3 {
+      margin-top: 0;
+    }
+    .section {
+      margin-bottom: 10px;
+    }
+    .section h4 {
+      margin-bottom: 6px;
+      color: #333;
+      border-bottom: 1px solid #ccc;
+    }
+    .section p {
+      margin: 4px 0;
+    }
+    .actions button {
+      margin-left: 8px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .details { background-color: #007bff; color: white; }
+    .alerts { background-color: #ffc107; color: black; }
+    .track { background-color: #28a745; color: white; }
+  </style>
+</head>
+<body>
+  <h2>📋 لوحة المتابعة - بطاقات الحيوانات</h2>
+
+  <div id="cards-container"></div>
+
+  <script>
+    fetch('/api/animals')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('cards-container');
+        data.forEach(animal => {
+          const card = document.createElement('div');
+          card.className = 'cow-card';
+          card.innerHTML = `
+            <h3>🐄 الحيوان رقم ${animal.id}</h3>
+            <div class="section">
+              <h4>📌 بيانات أساسية</h4>
+              <p><strong>النوع:</strong> ${animal.type}</p>
+              <p><strong>السلالة:</strong> ${animal.breed}</p>
+              <p><strong>تاريخ الميلاد:</strong> ${animal.birthDate}</p>
+              <p><strong>تاريخ آخر ولادة:</strong> ${animal.lastCalving}</p>
+            </div>
+            <div class="section">
+              <h4>🍼 الإنتاج</h4>
+              <p><strong>الحالة الإنتاجية:</strong> ${animal.productionStatus}</p>
+              <p><strong>عدد أيام الحليب:</strong> ${animal.milkDays}</p>
+              <p><strong>إنتاج اللبن اليومي:</strong> ${animal.milkDaily} لتر</p>
+              <p><strong>إنتاج اللبن الأسبوعي:</strong> ${animal.milkWeekly} لتر</p>
+              <p><strong>إنتاج اللبن في الموسم:</strong> ${animal.milkSeason} لتر</p>
+            </div>
+            <div class="section">
+              <h4>🤰 التناسل</h4>
+              <p><strong>الحالة التناسلية:</strong> ${animal.reproStatus}</p>
+              <p><strong>عدد أيام العشار:</strong> ${animal.pregnancyDays}</p>
+            </div>
+            <div class="section">
+              <h4>🩺 الحالة الصحية</h4>
+              <p><strong>الحالة الصحية:</strong> ${animal.healthStatus}</p>
+            </div>
+            <div class="actions">
+              <button class="details">تفاصيل</button>
+              <button class="alerts">تنبيهات</button>
+              <button class="track">متابعة</button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      })
+      .catch(err => console.error('فشل تحميل بيانات الحيوانات:', err));
+  </script>
+</body>
+</html>
 
