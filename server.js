@@ -32,3 +32,13 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ السيرفر شغّال – http://localhost:${PORT}`);
 });
+// 🚀 API لجلب بيانات الحيوانات
+app.get('/api/animals', (req, res) => {
+  const animalsFile = path.join(__dirname, 'data', 'animals.json');
+  fs.readFile(animalsFile, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'فشل تحميل بيانات الحيوانات' });
+
+    const animals = JSON.parse(data);
+    res.json(animals);
+  });
+});
