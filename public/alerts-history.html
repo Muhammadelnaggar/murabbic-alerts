@@ -38,11 +38,18 @@
   </div>
 
   <script>
-    fetch('/data/alerts.json')
+    // المستخدم الحالي (تجريبي)
+    const userId = 1;
+
+    fetch(`/alerts/${userId}`)
       .then(res => res.json())
       .then(data => {
         const container = document.getElementById('alertsContainer');
-        data.forEach(alert => {
+        if (!data.alerts || data.alerts.length === 0) {
+          container.innerHTML = '<p>لا توجد تنبيهات حالياً.</p>';
+          return;
+        }
+        data.alerts.forEach(alert => {
           const card = document.createElement('div');
           card.className = 'alert-card';
           card.innerHTML = `
@@ -54,9 +61,9 @@
         });
       })
       .catch(err => {
+        console.error('فشل في تحميل التنبيهات:', err);
         document.getElementById('alertsContainer').innerHTML = '<p>تعذر تحميل التنبيهات.</p>';
       });
   </script>
 </body>
 </html>
-
