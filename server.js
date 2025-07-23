@@ -4,14 +4,39 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public')); // ملفات HTML و CSS
+app.use(express.static('public'));
 
 const alertsPath = path.join(__dirname, 'data', 'alerts.json');
+const eventsPath = path.join(__dirname, 'data', 'events.json');
 
-// ✅ جلب تنبيهات مستخدم معيّن
+// ✅ استقبال حدث جديد وحفظه
+app.post('/events', (req, res) => {
+  const newEvent = req.body;
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'فشل في قراءة ملف الأحداث' });
+
+    let events = [];
+    try {
+      events = JSON.parse(data);
+    } catch (e) {
+      return res.status(500).json({ error: 'فشل في تحويل البيانات من JSON' });
+    }
+
+    newEvent.id = events.length + 1;
+    newEvent.timestamp = new Date().toISOString();
+    events.push(newEvent);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), err => {
+      if (err) return res.status(500).json({ error: 'فشل في حفظ الحدث' });
+      res.json({ status: 'ok', message: 'تم حفظ الحدث بنجاح' });
+    });
+  });
+});
+
+// ✅ جلب التنبيهات حسب المستخدم
 app.get('/alerts/:user_id', (req, res) => {
   const userId = parseInt(req.params.user_id);
-
   fs.readFile(alertsPath, 'utf8', (err, data) => {
     if (err) return res.status(500).json({ error: 'فشل تحميل التنبيهات' });
 
@@ -32,42 +57,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ السيرفر شغّال – http://localhost:${PORT}`);
 });
-// 🚀 API لجلب بيانات الحيوانات
-app.get('/api/animals', (req, res) => {
-  const animalsFile = path.join(__dirname, 'data', 'animals.json');
-  fs.readFile(animalsFile, 'utf8', (err, data) => {
-    if (err) return res.status(500).json({ error: 'فشل تحميل بيانات الحيوانات' });
 
-    const animals = JSON.parse(data);
-    res.json(animals);
-  });
-});
-app.use(express.static('public'));
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-
-const app = express();
-app.use(express.json());
-app.use(express.static('public'));
-
-const animalsPath = path.join(__dirname, 'data', 'animals.json');
-
-// ✅ جلب بيانات حيوان برقم معين
-app.get('/animal/:id', (req, res) => {
-  const animalId = parseInt(req.params.id);
-  fs.readFile(animalsPath, 'utf8', (err, data) => {
-    if (err) return res.status(500).json({ error: 'فشل تحميل البيانات' });
-
-    const animals = JSON.parse(data);
-    const animal = animals.find(a => a.id === animalId);
-    if (!animal) return res.status(404).json({ error: 'الحيوان غير موجود' });
-
-    res.json(animal);
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ السيرفر شغّال على http://localhost:${PORT}`);
-});
