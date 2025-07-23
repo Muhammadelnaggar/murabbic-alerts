@@ -2,104 +2,103 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>إدخال حدث جديد</title>
+  <title>تسجيل حدث جديد</title>
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f7f7f7;
-      padding: 20px;
+      background-color: #f9f9f9;
+      padding: 30px;
     }
     h1 {
       color: #333;
     }
     form {
-      background-color: #fff;
+      background: #fff;
       padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       max-width: 500px;
       margin: auto;
     }
     label {
       display: block;
-      margin-bottom: 10px;
-      font-weight: bold;
+      margin: 15px 0 5px;
     }
     input, select, textarea {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 15px;
+      padding: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
     button {
+      margin-top: 20px;
+      padding: 10px 20px;
       background-color: #28a745;
       color: white;
-      padding: 10px 15px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #218838;
-    }
   </style>
 </head>
 <body>
-  <h1>📌 إدخال حدث جديد للحيوان</h1>
+  <h1>تسجيل حدث جديد للحيوان</h1>
   <form id="eventForm">
-    <label for="animal_id">رقم الحيوان:</label>
-    <input type="number" id="animal_id" name="animal_id" required>
+    <label for="animalId">رقم الحيوان:</label>
+    <input type="number" id="animalId" name="animalId" required>
 
-    <label for="event_type">نوع الحدث:</label>
-    <select id="event_type" name="event_type" required>
-      <option value="">-- اختر --</option>
-      <option value="تلقيح">تلقيح</option>
-      <option value="تشخيص">تشخيص</option>
+    <label for="eventType">نوع الحدث:</label>
+    <select id="eventType" name="eventType" required>
       <option value="ولادة">ولادة</option>
-      <option value="بيع">بيع</option>
-      <option value="مشيمة">نزول المشيمة</option>
-      <option value="مرض">مرض</option>
+      <option value="تلقيح">تلقيح</option>
+      <option value="تشخيص حمل">تشخيص حمل</option>
       <option value="علاج">علاج</option>
+      <option value="تجفيف">تجفيف</option>
+      <option value="بيع">بيع</option>
     </select>
 
-    <label for="event_date">تاريخ الحدث:</label>
-    <input type="date" id="event_date" name="event_date" required>
+    <label for="eventDate">تاريخ الحدث:</label>
+    <input type="date" id="eventDate" name="eventDate" required>
 
     <label for="notes">ملاحظات:</label>
     <textarea id="notes" name="notes" rows="3"></textarea>
 
-    <button type="submit">حفظ الحدث</button>
+    <button type="submit">إضافة الحدث</button>
   </form>
 
   <script>
     document.getElementById('eventForm').addEventListener('submit', function(e) {
       e.preventDefault();
 
-      const event = {
-        animal_id: parseInt(document.getElementById('animal_id').value),
-        event_type: document.getElementById('event_type').value,
-        date: document.getElementById('event_date').value,
-        notes: document.getElementById('notes').value.trim()
+      const eventData = {
+        animalId: parseInt(document.getElementById('animalId').value),
+        eventType: document.getElementById('eventType').value,
+        eventDate: document.getElementById('eventDate').value,
+        notes: document.getElementById('notes').value
       };
 
       fetch('/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event)
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(eventData)
       })
       .then(res => res.json())
       .then(data => {
-        alert('✅ تم حفظ الحدث بنجاح!');
+        alert('تم تسجيل الحدث بنجاح ✅');
         document.getElementById('eventForm').reset();
       })
       .catch(err => {
-        alert('❌ حدث خطأ أثناء الحفظ.');
+        alert('حدث خطأ، حاول مرة أخرى ❌');
         console.error(err);
       });
     });
   </script>
 </body>
 </html>
+
+ 
+   
 
