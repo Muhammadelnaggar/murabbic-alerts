@@ -1,46 +1,53 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <title>لوحة المتابعة - روابط ذكية</title>
+  <meta charset="UTF-8" />
+  <title>لوحة المتابعة - مربيك</title>
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f2f5;
+      background-color: #f5f5f5;
       padding: 30px;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .actions {
+      margin-top: 30px;
       text-align: center;
     }
-    h1 {
-      margin-bottom: 40px;
-    }
-    .nav-link {
-      display: block;
-      background-color: #fff;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      padding: 15px;
-      margin: 10px auto;
-      width: 300px;
-      text-decoration: none;
-      color: #333;
-      font-size: 18px;
-      transition: all 0.3s ease-in-out;
-    }
-    .nav-link:hover {
-      background-color: #007bff;
+
+    .actions button {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin: 10px;
+      background-color: #28a745;
       color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .actions button:hover {
+      background-color: #218838;
     }
   </style>
 </head>
 <body>
-  <h1>📊 لوحة المتابعة</h1>
-  <a class="nav-link" href="/cow-card.html">📋 بطاقات الحيوانات</a>
-  <a class="nav-link" href="/alerts-history.html">📁 التنبيهات السابقة</a>
-  <a class="nav-link" href="/add-animal.html">➕ إضافة حيوان</a>
-  <a class="nav-link" href="/delete-animal.html">🗑️ حذف حيوان</a>
-  <a class="nav-link" href="/birth-animal.html">🎉 ولادة حيوان</a>
-  <a class="nav-link" href="/sell-animal.html">💰 بيع حيوان</a>
+
+  <h1>👨‍🌾 لوحة المتابعة - مربيك</h1>
+
+  <div class="actions">
+    <button onclick="location.href='cow-card.html'">📋 عرض بطاقات الحيوانات</button>
+    <button onclick="location.href='alerts.html'">🔔 التنبيهات</button>
+    <button onclick="location.href='event.html'">➕ تسجيل حدث جديد</button>
+  </div>
+
 </body>
 </html>
+
