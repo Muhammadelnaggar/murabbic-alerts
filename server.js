@@ -43,3 +43,31 @@ app.get('/api/animals', (req, res) => {
   });
 });
 app.use(express.static('public'));
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+
+const animalsPath = path.join(__dirname, 'data', 'animals.json');
+
+// ✅ جلب بيانات حيوان برقم معين
+app.get('/animal/:id', (req, res) => {
+  const animalId = parseInt(req.params.id);
+  fs.readFile(animalsPath, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'فشل تحميل البيانات' });
+
+    const animals = JSON.parse(data);
+    const animal = animals.find(a => a.id === animalId);
+    if (!animal) return res.status(404).json({ error: 'الحيوان غير موجود' });
+
+    res.json(animal);
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ السيرفر شغّال على http://localhost:${PORT}`);
+});
