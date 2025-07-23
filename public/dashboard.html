@@ -1,54 +1,88 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>لوحة المتابعة - مربيك</title>
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f5f5f5;
-      padding: 30px;
-      margin: 0;
+      background-color: #f9f9f9;
+      padding: 20px;
     }
 
-    h1 {
-      text-align: center;
-      color: #2c3e50;
-    }
-
-    .actions {
-      margin-top: 30px;
-      text-align: center;
-    }
-
-    .actions button {
-      padding: 12px 20px;
-      font-size: 16px;
-      margin: 10px;
-      background-color: #28a745;
+    header {
+      background-color: #4CAF50;
       color: white;
+      padding: 15px;
+      text-align: center;
+      border-radius: 8px;
+    }
+
+    .dashboard-section {
+      margin-top: 30px;
+    }
+
+    .dashboard-section h2 {
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .dashboard-links a, .dashboard-buttons button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      text-align: center;
+      text-decoration: none;
       border: none;
       border-radius: 5px;
+      font-size: 16px;
       cursor: pointer;
     }
 
-    .actions button:hover {
-      background-color: #218838;
+    .dashboard-links a:hover, .dashboard-buttons button:hover {
+      background-color: #0056b3;
+    }
+
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #888;
     }
   </style>
 </head>
 <body>
 
-  <h1>👨‍🌾 لوحة المتابعة - مربيك</h1>
+  <header>
+    <h1>👨‍🌾 مرحباً بك في مربيك</h1>
+    <p>لوحة متابعة الأبقار والجاموس</p>
+  </header>
 
-  <div class="actions">
-    <button onclick="location.href='cow-card.html'">📋 عرض بطاقات الحيوانات</button>
-    <button onclick="location.href='alerts.html'">🔔 التنبيهات</button>
-    <button onclick="location.href='events.html'">➕ تسجيل حدث جديد</button>
-
+  <div class="dashboard-section dashboard-links">
+    <h2>📋 المهام الأساسية</h2>
+    <a href="animal.html">➕ إضافة حيوان جديد</a>
+    <a href="cow-card.html">📇 بطاقات الحيوانات</a>
+    <a href="alerts.html">🔔 التنبيهات</a>
+    <a href="events.html">📅 تسجيل حدث جديد</a>
   </div>
+
+  <div class="dashboard-section dashboard-buttons">
+    <h2>📈 تحكم سريع</h2>
+    <button onclick="location.href='event_birth.html'">🍼 تسجيل ولادة</button>
+    <button onclick="location.href='event_insemination.html'">📍 تسجيل تلقيح</button>
+    <button onclick="location.href='event_vaccination.html'">💉 تسجيل تحصين</button>
+    <button onclick="location.href='event_treatment.html'">💊 تسجيل علاج</button>
+    <button onclick="location.href='event_diagnosis.html'">🩺 تسجيل تشخيص</button>
+  </div>
+
+  <footer>
+    &copy; 2025 مربيك - الذكاء الصناعي في خدمة المربي
+  </footer>
 
 </body>
 </html>
 
+ 
