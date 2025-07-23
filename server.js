@@ -42,3 +42,4 @@ app.get('/api/animals', (req, res) => {
     res.json(animals);
   });
 });
+app.use(express.static('public'));
