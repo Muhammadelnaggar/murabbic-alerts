@@ -136,6 +136,48 @@ app.post('/events/milk', (req, res) => {
     });
   });
 });
+// 🐄 تسجيل حدث تجفيف
+app.post('/events/dry', (req, res) => {
+  const {
+    animalId,
+    date,
+    pregnancyConfirmed,
+    udderTreatment
+  } = req.body;
+
+  if (pregnancyConfirmed !== "عشار") {
+    return res.status(400).json({ error: "لا يمكن تجفيف حيوان غير عشار" });
+  }
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    let events = [];
+    if (!err && data) {
+      events = JSON.parse(data);
+    }
+
+    const newEvent = {
+      id: events.length + 1,
+      type: "تجفيف",
+      animalId,
+      date,
+      pregnancyConfirmed,
+      udderTreatment,
+      timestamp: new Date().toISOString()
+    };
+
+    events.push(newEvent);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
+      if (err) {
+        console.error('❌ فشل في حفظ حدث التجفيف:', err);
+        return res.status(500).send('خطأ في الحفظ');
+      }
+
+      console.log('✅ تم تسجيل حدث التجفيف:', newEvent);
+      res.status(200).json({ status: 'ok' });
+    });
+  });
+});
 
 // ✅ تسجيل حدث ولادة
 app.post('/events', (req, res) => {
