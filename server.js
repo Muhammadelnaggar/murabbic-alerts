@@ -3,42 +3,55 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(express.urlencoded({ extended: true })); // دعم بيانات form
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
 
 const eventsPath = path.join(__dirname, 'data', 'events.json');
 
-// ✅ استقبال البيانات من نموذج تسجيل الحدث
-app.post('/api/events', (req, res) => {
-  const { animalId, eventType, eventDate } = req.body;
+// ✅ تسجيل حدث ولادة
+app.post('/events', (req, res) => {
+  const {
+    animalId,
+    birthDate,
+    birthEase,
+    calfGender,
+    calfId,
+    calfFate
+  } = req.body;
 
-  // تحميل الأحداث الحالية من الملف
   fs.readFile(eventsPath, 'utf8', (err, data) => {
     let events = [];
     if (!err && data) {
-      events = JSON.parse(data);
+      try {
+        events = JSON.parse(data);
+      } catch (e) {
+        console.error('❌ خطأ في قراءة ملف الأحداث:', e);
+      }
     }
 
     const newEvent = {
       id: events.length + 1,
+      type: "ولادة",
       animalId,
-      eventType,
-      eventDate,
+      birthDate,
+      birthEase,
+      calfGender,
+      calfId,
+      calfFate,
       timestamp: new Date().toISOString()
     };
 
     events.push(newEvent);
 
-    // حفظ التحديثات
     fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
       if (err) {
         console.error('❌ فشل في حفظ الحدث:', err);
-        return res.status(500).send('خطأ في الحفظ');
+        return res.status(500).json({ error: 'خطأ في الحفظ' });
       }
 
-      console.log('✅ تم تسجيل الحدث:', newEvent);
-      res.redirect('/events.html'); // إعادة توجيه المستخدم بعد التسجيل
+      console.log('✅ تم تسجيل حدث الولادة:', newEvent);
+      res.status(200).json({ success: true });
     });
   });
 });
