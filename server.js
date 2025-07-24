@@ -99,6 +99,39 @@ app.post('/events', (req, res) => {
     });
   });
 });
+// ✅ استقبال بيانات مرض
+app.post('/events/disease', (req, res) => {
+  const { animalId, diseaseDate, diseaseName, notes } = req.body;
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    let events = [];
+    if (!err && data) {
+      events = JSON.parse(data);
+    }
+
+    const newDisease = {
+      id: events.length + 1,
+      type: "مرض",
+      animalId,
+      diseaseDate,
+      diseaseName,
+      notes,
+      timestamp: new Date().toISOString()
+    };
+
+    events.push(newDisease);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
+      if (err) {
+        console.error('❌ فشل في حفظ المرض:', err);
+        return res.status(500).send('فشل في الحفظ');
+      }
+
+      console.log('✅ تم تسجيل المرض:', newDisease);
+      res.status(200).json({ status: 'ok' });
+    });
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
