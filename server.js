@@ -52,6 +52,48 @@ app.post('/events/insemination', (req, res) => {
     });
   });
 });
+// ✅ تسجيل حدث تحصين
+app.post('/events/vaccine', (req, res) => {
+  const {
+    animalId,
+    vaccineDate,
+    vaccineType,
+    vaccineName,
+    veterinarian,
+    notes
+  } = req.body;
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    let events = [];
+    if (!err && data) {
+      events = JSON.parse(data);
+    }
+
+    const newEvent = {
+      id: events.length + 1,
+      type: "تحصين",
+      animalId,
+      vaccineDate,
+      vaccineType,
+      vaccineName,
+      veterinarian,
+      notes,
+      timestamp: new Date().toISOString()
+    };
+
+    events.push(newEvent);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
+      if (err) {
+        console.error("❌ فشل في حفظ التحصين:", err);
+        return res.status(500).send("فشل في حفظ التحصين");
+      }
+
+      console.log("✅ تم تسجيل التحصين:", newEvent);
+      res.status(200).send("OK");
+    });
+  });
+});
 
 // ✅ تسجيل حدث ولادة
 app.post('/events', (req, res) => {
