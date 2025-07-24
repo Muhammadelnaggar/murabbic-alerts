@@ -53,8 +53,8 @@
   <h2>💉 تسجيل التحصين</h2>
 
   <form id="vaccinationForm">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+    <label for="animalIds">أرقام الحيوانات (افصل بين كل رقم بفاصلة أو سطر جديد)</label>
+    <textarea id="animalIds" name="animalIds" rows="3" required></textarea>
 
     <label for="vaccineDate">تاريخ التحصين</label>
     <input type="date" id="vaccineDate" name="vaccineDate" required>
@@ -91,9 +91,13 @@
     document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
       e.preventDefault();
 
-      const data = {
+      const animalIds = this.animalIds.value
+        .split(/[\n,]+/)
+        .map(id => id.trim())
+        .filter(id => id !== "");
+
+      const commonData = {
         type: "تحصين",
-        animalId: this.animalId.value,
         vaccineDate: this.vaccineDate.value,
         vaccineType: this.vaccineType.value,
         vaccineName: this.vaccineName.value,
@@ -101,23 +105,32 @@
         notes: this.notes.value
       };
 
-      const res = await fetch("/events/vaccine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      let allSuccess = true;
 
-      if (res.ok) {
-        alert("✅ تم تسجيل التحصين بنجاح");
+      for (const animalId of animalIds) {
+        const data = { ...commonData, animalId };
+
+        const res = await fetch("/events/vaccine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+          allSuccess = false;
+          console.error(`❌ فشل تسجيل الحيوان رقم ${animalId}`);
+        }
+      }
+
+      if (allSuccess) {
+        alert("✅ تم تسجيل جميع التحصينات بنجاح");
         this.reset();
         this.vaccineDate.valueAsDate = new Date();
       } else {
-        alert("❌ فشل في تسجيل التحصين");
+        alert("⚠️ تم تسجيل بعض التحصينات، وفشل البعض الآخر. راجع الكونسول.");
       }
     });
   </script>
 
 </body>
 </html>
-
-
