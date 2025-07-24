@@ -1,1 +1,123 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل التحصين</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input, select, button, textarea {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>💉 تسجيل التحصين</h2>
+
+  <form id="vaccinationForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="vaccineDate">تاريخ التحصين</label>
+    <input type="date" id="vaccineDate" name="vaccineDate" required>
+
+    <label for="vaccineType">نوع التحصين</label>
+    <select id="vaccineType" name="vaccineType" required>
+      <option value="جرعة أولية">جرعة أولية</option>
+      <option value="جرعة منشطة">جرعة منشطة</option>
+    </select>
+
+    <label for="vaccineName">اسم التحصين</label>
+    <select id="vaccineName" name="vaccineName" required>
+      <option value="الحمي القلاعية">الحمي القلاعية</option>
+      <option value="التهاب الجلد العقدي">التهاب الجلد العقدي</option>
+      <option value="التسمم الدموي (حمي النقل)">التسمم الدموي (حمي النقل)</option>
+      <option value="تحصين اسهال العجول للامهات">تحصين اسهال العجول للامهات</option>
+      <option value="الكلوستريديا (اللاهوائيات)">الكلوستريديا (اللاهوائيات)</option>
+      <option value="حمي الثلاث ايام">حمي الثلاث ايام</option>
+      <option value="التهاب الضرع">التهاب الضرع</option>
+    </select>
+
+    <label for="veterinarian">اسم الطبيب البيطري</label>
+    <input type="text" id="veterinarian" name="veterinarian">
+
+    <label for="notes">ملاحظات إضافية</label>
+    <textarea id="notes" name="notes" rows="3"></textarea>
+
+    <button type="submit">💾 تسجيل</button>
+  </form>
+
+  <script>
+    document.getElementById("vaccineDate").valueAsDate = new Date();
+
+    document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        type: "تحصين",
+        animalId: this.animalId.value,
+        vaccineDate: this.vaccineDate.value,
+        vaccineType: this.vaccineType.value,
+        vaccineName: this.vaccineName.value,
+        veterinarian: this.veterinarian.value,
+        notes: this.notes.value
+      };
+
+      const res = await fetch("/events/vaccine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل التحصين بنجاح");
+        this.reset();
+        this.vaccineDate.valueAsDate = new Date();
+      } else {
+        alert("❌ فشل في تسجيل التحصين");
+      }
+    });
+  </script>
+
+</body>
+</html>
+
 
