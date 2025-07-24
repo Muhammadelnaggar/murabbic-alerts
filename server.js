@@ -94,6 +94,48 @@ app.post('/events/vaccine', (req, res) => {
     });
   });
 });
+// 🥛 تسجيل إنتاج اللبن اليومي
+app.post('/events/milk', (req, res) => {
+  const {
+    animalId,
+    date,
+    morning,
+    noon,
+    evening,
+    total
+  } = req.body;
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    let events = [];
+    if (!err && data) {
+      events = JSON.parse(data);
+    }
+
+    const newEvent = {
+      id: events.length + 1,
+      type: "إنتاج اللبن اليومي",
+      animalId,
+      date,
+      morning,
+      noon,
+      evening,
+      total,
+      timestamp: new Date().toISOString()
+    };
+
+    events.push(newEvent);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
+      if (err) {
+        console.error('❌ فشل في حفظ إنتاج اللبن:', err);
+        return res.status(500).send('خطأ في الحفظ');
+      }
+
+      console.log('✅ تم تسجيل إنتاج اللبن:', newEvent);
+      res.status(200).json({ status: 'ok' });
+    });
+  });
+});
 
 // ✅ تسجيل حدث ولادة
 app.post('/events', (req, res) => {
