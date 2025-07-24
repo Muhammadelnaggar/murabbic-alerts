@@ -52,6 +52,45 @@ app.post('/events/insemination', (req, res) => {
     });
   });
 });
+// 📆 تحضير للولادة
+app.post('/events/calving-prep', (req, res) => {
+  const {
+    animalId,
+    expectedDate,
+    preparationsDone,
+    date
+  } = req.body;
+
+  fs.readFile(eventsPath, 'utf8', (err, data) => {
+    let events = [];
+    if (!err && data) {
+      events = JSON.parse(data);
+    }
+
+    const newEvent = {
+      id: events.length + 1,
+      type: "تحضير للولادة",
+      animalId,
+      expectedDate,
+      preparationsDone,
+      date,
+      timestamp: new Date().toISOString()
+    };
+
+    events.push(newEvent);
+
+    fs.writeFile(eventsPath, JSON.stringify(events, null, 2), (err) => {
+      if (err) {
+        console.error('❌ فشل في حفظ حدث التحضير للولادة:', err);
+        return res.status(500).send('خطأ في الحفظ');
+      }
+
+      console.log('✅ تم تسجيل حدث التحضير للولادة:', newEvent);
+      res.status(200).json({ status: 'ok' });
+    });
+  });
+});
+
 // ✅ تسجيل حدث تحصين
 app.post('/events/vaccine', (req, res) => {
   const {
