@@ -1,1 +1,108 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل حيوان جديد</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input, select, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h2>📋 تسجيل حيوان جديد</h2>
+
+  <form id="animalForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="type">النوع</label>
+    <select id="type" name="type">
+      <option value="بقرة">بقرة</option>
+      <option value="جاموسة">جاموسة</option>
+    </select>
+
+    <label for="breed">السلالة</label>
+    <input type="text" id="breed" name="breed" required>
+
+    <label for="birthDate">تاريخ الميلاد</label>
+    <input type="date" id="birthDate" name="birthDate" required>
+
+    <label for="status">الحالة الإنتاجية</label>
+    <select id="status" name="status">
+      <option value="جافة">جافة</option>
+      <option value="تحضير">تحضير</option>
+      <option value="حلاب">حلاب</option>
+    </select>
+
+    <button type="submit">💾 تسجيل الحيوان</button>
+  </form>
+
+  <script>
+    document.getElementById("animalForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        animalId: this.animalId.value,
+        type: this.type.value,
+        breed: this.breed.value,
+        birthDate: this.birthDate.value,
+        status: this.status.value
+      };
+
+      const res = await fetch("/api/animals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل الحيوان بنجاح");
+        this.reset();
+      } else {
+        alert("❌ فشل في تسجيل الحيوان");
+      }
+    });
+  </script>
+</body>
+</html>
 
