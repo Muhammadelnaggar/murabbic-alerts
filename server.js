@@ -104,6 +104,23 @@ function registerEvent(eventData, res) {
     });
   });
 }
+// ✅ إرجاع قائمة الحيوانات
+app.get('/api/animals', (req, res) => {
+  fs.readFile(animalsPath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('❌ فشل في قراءة animal.json:', err);
+      return res.status(500).json({ error: 'خطأ في قراءة بيانات الحيوانات' });
+    }
+
+    try {
+      const animals = JSON.parse(data || '[]');
+      res.status(200).json(animals);
+    } catch (e) {
+      console.error('❌ JSON غير صالح:', e);
+      res.status(500).json({ error: 'بيانات غير صالحة' });
+    }
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
