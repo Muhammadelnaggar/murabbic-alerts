@@ -2,33 +2,32 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>الحيوانات المسجلة</title>
+  <title>قائمة الحيوانات</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
       direction: rtl;
-      padding: 20px;
-      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      padding: 40px;
     }
 
     h2 {
       text-align: center;
-      margin-bottom: 30px;
       color: #2c3e50;
+      margin-bottom: 20px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      background: white;
-      border-radius: 6px;
-      overflow: hidden;
+      background-color: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     th, td {
       padding: 12px;
-      border-bottom: 1px solid #ddd;
       text-align: center;
+      border-bottom: 1px solid #ddd;
     }
 
     th {
@@ -45,43 +44,54 @@
 
   <h2>📋 قائمة الحيوانات المسجلة</h2>
 
-  <table id="animalTable">
+  <table>
     <thead>
       <tr>
         <th>رقم الحيوان</th>
         <th>النوع</th>
         <th>السلالة</th>
         <th>الإنتاجية</th>
-        <th>التناسلية</th>
+        <th>الحالة التناسلية</th>
         <th>آخر تلقيح</th>
         <th>آخر ولادة</th>
-        <th>إنتاج اللبن</th>
+        <th>إنتاج اللبن اليومي</th>
       </tr>
     </thead>
-    <tbody>
-      <!-- سيتم تعبئته تلقائيًا -->
+    <tbody id="animalTableBody">
+      <tr><td colspan="8">⏳ جاري التحميل...</td></tr>
     </tbody>
   </table>
 
   <script>
-    fetch('/api/animals')
+    fetch("/api/animals")
       .then(res => res.json())
-      .then(data => {
-        const tbody = document.querySelector('#animalTable tbody');
-        data.forEach(animal => {
-          const row = document.createElement('tr');
+      .then(animals => {
+        const tbody = document.getElementById("animalTableBody");
+        tbody.innerHTML = "";
+
+        if (animals.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='8'>لا توجد بيانات حالياً</td></tr>";
+        }
+
+        animals.forEach(animal => {
+          const row = document.createElement("tr");
           row.innerHTML = `
-            <td>${animal.animalNumber || '-'}</td>
-            <td>${animal.type || '-'}</td>
-            <td>${animal.breed || '-'}</td>
-            <td>${animal.productionStatus || '-'}</td>
-            <td>${animal.reproductionStatus || '-'}</td>
-            <td>${animal.lastInseminationDate || '-'}</td>
-            <td>${animal.lastCalvingDate || '-'}</td>
-            <td>${animal.dailyMilkProduction || '-'}</td>
+            <td>${animal.animalId || ''}</td>
+            <td>${animal.animalType || ''}</td>
+            <td>${animal.breed || ''}</td>
+            <td>${animal.productionStatus || ''}</td>
+            <td>${animal.reproductiveStatus || ''}</td>
+            <td>${animal.lastInsemination || '-'}</td>
+            <td>${animal.lastCalving || '-'}</td>
+            <td>${animal.dailyMilk || '-'}</td>
           `;
           tbody.appendChild(row);
         });
+      })
+      .catch(err => {
+        document.getElementById("animalTableBody").innerHTML =
+          "<tr><td colspan='8'>⚠️ فشل في تحميل البيانات</td></tr>";
+        console.error("فشل في تحميل الحيوانات:", err);
       });
   </script>
 
