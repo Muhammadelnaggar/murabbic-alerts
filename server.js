@@ -90,6 +90,50 @@ app.post('/events/calving-prep', (req, res) => {
     });
   });
 });
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+const animalsPath = path.join(__dirname, 'data', 'animal.json');
+
+// ✅ حفظ بيانات الحيوان الجديد
+app.post('/api/animals', (req, res) => {
+  const newAnimal = req.body;
+
+  fs.readFile(animalsPath, 'utf8', (err, data) => {
+    let animals = [];
+    if (!err && data) {
+      try {
+        animals = JSON.parse(data);
+      } catch (e) {
+        animals = [];
+      }
+    }
+
+    newAnimal.id = animals.length + 1; // توليد ID تلقائي
+    animals.push(newAnimal);
+
+    fs.writeFile(animalsPath, JSON.stringify(animals, null, 2), (err) => {
+      if (err) {
+        console.error('❌ خطأ في الحفظ:', err);
+        return res.status(500).send('فشل في حفظ الحيوان');
+      }
+
+      console.log('✅ تم تسجيل الحيوان:', newAnimal);
+      res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
+    });
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ السيرفر يعمل على http://localhost:${PORT}`);
+});
 
 // ✅ تسجيل حدث تحصين
 app.post('/events/vaccine', (req, res) => {
