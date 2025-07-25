@@ -1,33 +1,33 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>قائمة الحيوانات</title>
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f8;
+      background-color: #f9f9f9;
       padding: 40px;
     }
 
     h2 {
       text-align: center;
       color: #2c3e50;
-      margin-bottom: 20px;
+      margin-bottom: 30px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       background-color: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
     th, td {
       padding: 12px;
       text-align: center;
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid #eee;
     }
 
     th {
@@ -38,6 +38,12 @@
     tr:hover {
       background-color: #f1f1f1;
     }
+
+    .empty {
+      text-align: center;
+      color: #888;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -47,14 +53,14 @@
   <table>
     <thead>
       <tr>
-        <th>رقم الحيوان</th>
+        <th>الرقم</th>
         <th>النوع</th>
         <th>السلالة</th>
         <th>الإنتاجية</th>
-        <th>الحالة التناسلية</th>
-        <th>آخر تلقيح</th>
+        <th>التناسلية</th>
         <th>آخر ولادة</th>
-        <th>إنتاج اللبن اليومي</th>
+        <th>لبن يومي</th>
+        <th>الحالة الصحية</th>
       </tr>
     </thead>
     <tbody id="animalTableBody">
@@ -69,21 +75,22 @@
         const tbody = document.getElementById("animalTableBody");
         tbody.innerHTML = "";
 
-        if (animals.length === 0) {
-          tbody.innerHTML = "<tr><td colspan='8'>لا توجد بيانات حالياً</td></tr>";
+        if (!animals.length) {
+          tbody.innerHTML = "<tr><td colspan='8' class='empty'>لا توجد بيانات حالياً</td></tr>";
+          return;
         }
 
         animals.forEach(animal => {
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td>${animal.animalId || ''}</td>
-            <td>${animal.animalType || ''}</td>
-            <td>${animal.breed || ''}</td>
-            <td>${animal.productionStatus || ''}</td>
-            <td>${animal.reproductiveStatus || ''}</td>
-            <td>${animal.lastInsemination || '-'}</td>
+            <td>${animal.id}</td>
+            <td>${animal.type || '-'}</td>
+            <td>${animal.breed || '-'}</td>
+            <td>${animal.productionStatus || '-'}</td>
+            <td>${animal.reproStatus || '-'}</td>
             <td>${animal.lastCalving || '-'}</td>
-            <td>${animal.dailyMilk || '-'}</td>
+            <td>${animal.milkDaily || 0} لتر</td>
+            <td>${animal.healthStatus || '-'}</td>
           `;
           tbody.appendChild(row);
         });
@@ -91,10 +98,9 @@
       .catch(err => {
         document.getElementById("animalTableBody").innerHTML =
           "<tr><td colspan='8'>⚠️ فشل في تحميل البيانات</td></tr>";
-        console.error("فشل في تحميل الحيوانات:", err);
+        console.error("❌ فشل في تحميل الحيوانات:", err);
       });
   </script>
 
 </body>
 </html>
-
