@@ -2,10 +2,38 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>مرحبًا بك في مربيك</title>
+  <title>مربيك | جاري التحميل...</title>
+  <style>
+    body {
+      background-color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      flex-direction: column;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    img {
+      width: 160px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: #2c3e50;
+      font-size: 24px;
+    }
+  </style>
+  <script>
+    // الانتقال بعد 3 ثوانٍ إلى الصفحة الرئيسية
+    setTimeout(() => {
+      window.location.href = "dashboard.html";
+    }, 3000);
+  </script>
 </head>
 <body>
-  <h1>👋 أهلاً بك في تطبيق مربيك!</h1>
-  <p>هذا هو الصفحة الرئيسية، والتطبيق يعمل بنجاح على Render 🎉</p>
+  <img src="images/logo.png" alt="شعار مربيك">
+  <h1>جارٍ تحميل تطبيق مربيك...</h1>
 </body>
 </html>
