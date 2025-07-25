@@ -8,7 +8,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 const eventsPath = path.join(__dirname, 'data', 'events.json');
-const animalsPath = path.join(__dirname, 'data', 'animal.json');
+const animalsPath = path.join(__dirname, 'data', 'animals.json');
 
 // 🐮 تسجيل حيوان جديد
 app.post('/api/animals', (req, res) => {
