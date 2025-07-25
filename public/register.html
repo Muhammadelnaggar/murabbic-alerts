@@ -1,87 +1,30 @@
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-  <meta charset="UTF-8" />
-  <title>مربي جديد</title>
-  <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f8ff;
-      padding: 40px;
-      max-width: 400px;
-      margin: auto;
-      text-align: center;
+<script>
+  document.getElementById("registerForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const username = this.username.value;
+    const phone = this.phone.value;
+    const password = this.password.value;
+    const confirmPassword = this.confirmPassword.value;
+
+    if (password !== confirmPassword) {
+      alert("❌ كلمة المرور غير متطابقة");
+      return;
     }
 
-    .logo {
-      width: 120px;
-      margin-bottom: 20px;
+    const data = { username, phone, password };
+
+    const res = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (res.ok) {
+      alert("✅ تم إنشاء الحساب بنجاح");
+      window.location.href = "add-animal.html";  // ✅ التوجيه التلقائي هنا
+    } else {
+      alert("❌ حدث خطأ أثناء إنشاء الحساب");
     }
-
-    h2 {
-      color: #2c3e50;
-      margin-bottom: 20px;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    input {
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-
-    button {
-      padding: 12px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      font-size: 16px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
-    .login-link {
-      margin-top: 15px;
-      font-size: 14px;
-    }
-
-    .login-link a {
-      color: #007bff;
-      text-decoration: none;
-    }
-
-    .login-link a:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-
-  <img src="images/logo.png" alt="شعار مربيك" class="logo" />
-  <h2>مربي جديد</h2>
-
-  <form id="registerForm">
-    <input type="text" name="username" placeholder="الاسم الكامل" required>
-    <input type="tel" name="phone" placeholder="رقم الهاتف" required>
-    <input type="password" name="password" placeholder="كلمة المرور" required>
-    <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور" required>
-    <button type="submit">👤 إنشاء حساب مربي</button>
-  </form>
-
-  <div class="login-link">
-    لديك حساب بالفعل؟ <a href="login.html">سجل الدخول من هنا</a>
-  </div>
-
-</body>
-</html>
+  });
+</script>
