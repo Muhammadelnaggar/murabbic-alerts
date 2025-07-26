@@ -1,52 +1,89 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>قائمة الحيوانات</title>
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f9f9f9;
-      padding: 30px;
+      padding: 20px;
     }
+
     h2 {
       text-align: center;
       color: #2c3e50;
+      font-size: 20px;
     }
+
+    label, select {
+      display: inline-block;
+      margin: 10px 5px;
+      font-size: 14px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+
     table {
       width: 100%;
+      min-width: 600px;
       border-collapse: collapse;
-      margin-top: 20px;
     }
+
     th, td {
-      padding: 10px;
+      padding: 8px;
       border: 1px solid #ccc;
       text-align: center;
+      font-size: 14px;
     }
+
     th {
       background-color: #eee;
     }
-    input, select {
-      padding: 8px;
-      margin-bottom: 10px;
-      font-size: 14px;
-    }
+
     button {
       padding: 6px 10px;
-      font-size: 14px;
+      font-size: 13px;
       margin: 2px;
       border: none;
       border-radius: 4px;
       cursor: pointer;
     }
+
     .edit-btn {
       background-color: #ffc107;
       color: #000;
     }
+
     .delete-btn {
       background-color: #dc3545;
       color: #fff;
+    }
+
+    @media (max-width: 768px) {
+      h2 {
+        font-size: 18px;
+      }
+
+      label, select {
+        width: 100%;
+        margin: 5px 0;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      button {
+        font-size: 12px;
+        padding: 5px 8px;
+      }
     }
   </style>
 </head>
@@ -67,21 +104,23 @@
     <option value="جاف">جاف</option>
   </select>
 
-  <table id="animalsTable">
-    <thead>
-      <tr>
-        <th>الرقم</th>
-        <th>النوع</th>
-        <th>السلالة</th>
-        <th>الحالة الإنتاجية</th>
-        <th>الحالة التناسلية</th>
-        <th>إنتاج اللبن اليومي</th>
-        <th>تعديل</th>
-        <th>حذف</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="table-wrapper">
+    <table id="animalsTable">
+      <thead>
+        <tr>
+          <th>الرقم</th>
+          <th>النوع</th>
+          <th>السلالة</th>
+          <th>الحالة الإنتاجية</th>
+          <th>الحالة التناسلية</th>
+          <th>إنتاج اللبن اليومي</th>
+          <th>تعديل</th>
+          <th>حذف</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
     async function fetchAnimals() {
@@ -127,14 +166,23 @@
     }
 
     function editAnimal(id) {
-      alert('🔧 جاري تنفيذ تعديل للحيوان رقم ' + id);
-      // يمكنك إعادة التوجيه لصفحة تعديل لاحقًا
+      window.location.href = `edit-animal.html?id=${id}`;
     }
 
     function deleteAnimal(id) {
       if (confirm('❗ هل أنت متأكد من حذف الحيوان؟')) {
-        alert('🚫 تم حذف الحيوان رقم ' + id + ' (غير مفعل فعليًا بعد).');
-        // هنا يمكنك استدعاء DELETE API لاحقًا
+        fetch(`/api/animals/${id}`, {
+          method: 'DELETE'
+        })
+        .then(res => {
+          if (res.ok) {
+            alert('✅ تم حذف الحيوان بنجاح');
+            fetchAnimals();
+          } else {
+            alert('❌ فشل في الحذف');
+          }
+        })
+        .catch(() => alert('⚠️ خطأ في الاتصال بالسيرفر'));
       }
     }
 
