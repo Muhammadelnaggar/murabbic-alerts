@@ -121,6 +121,25 @@ app.get('/api/animals', (req, res) => {
     }
   });
 });
+// 📢 استرجاع التنبيهات حسب رقم المستخدم
+const alertsPath = path.join(__dirname, 'data', 'alerts.json');
+
+app.get('/alerts/:id', (req, res) => {
+  const userId = parseInt(req.params.id);
+  
+  fs.readFile(alertsPath, 'utf8', (err, data) => {
+    if (err) return res.status(500).send('فشل في قراءة التنبيهات');
+
+    let alertsData = JSON.parse(data);
+    const userAlerts = alertsData.find(user => user.id === userId);
+
+    if (!userAlerts) {
+      return res.status(404).json({ alerts: [] });
+    }
+
+    res.json(userAlerts);
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
