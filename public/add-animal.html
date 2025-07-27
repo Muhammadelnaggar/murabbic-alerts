@@ -181,6 +181,55 @@
       } else {
         alert('❌ فشل في التسجيل');
       }
+      <script>
+  document.querySelector("form").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const animalId = document.querySelector("input[name='animalId']").value;
+    const type = document.querySelector("select[name='type']").value;
+    const productionStatus = document.querySelector("select[name='productionStatus']").value;
+    const reproductiveStatus = document.querySelector("select[name='reproductiveStatus']").value;
+    const lastCalvingDate = document.querySelector("input[name='lastCalvingDate']").value;
+    const userId = localStorage.getItem("user_id");
+
+    if (!userId) {
+      alert("❌ لا يوجد مستخدم مسجل. الرجاء تسجيل الدخول أولاً.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/animals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          animalId,
+          type,
+          productionStatus,
+          reproductiveStatus,
+          lastCalvingDate,
+          userId: parseInt(userId)
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("فشل في حفظ الحيوان");
+      }
+
+      const again = confirm("✅ تم تسجيل الحيوان بنجاح.\nهل تريد تسجيل حيوان آخر؟");
+
+      if (again) {
+        window.location.reload(); // يسجل حيوان جديد
+      } else {
+        window.location.href = "events.html"; // تسجيل الأحداث
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("❌ حدث خطأ أثناء التسجيل");
+    }
+  });
+</script>
+
     });
   </script>
 </body>
