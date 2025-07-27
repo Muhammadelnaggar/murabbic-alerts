@@ -1,53 +1,66 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>مربي جديد</title>
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f8ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f0f8ff;
+      direction: rtl;
     }
 
     .container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .form-box {
       background-color: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       width: 100%;
       max-width: 400px;
     }
 
-    .container img {
-      width: 120px;
-      margin-bottom: 20px;
+    .form-box img {
+      width: 80px;
+      margin: 0 auto 20px;
+      display: block;
     }
 
-    .container h2 {
+    h2 {
+      text-align: center;
       margin-bottom: 20px;
-      color: #2c3e50;
+      color: #2e7d32;
     }
 
     input {
       width: 100%;
       padding: 12px;
       margin-bottom: 15px;
-      border: 1px solid #ccc;
       border-radius: 6px;
+      border: 1px solid #ccc;
       font-size: 16px;
     }
 
     button {
       width: 100%;
       padding: 12px;
-      background-color: #007bff;
+      background-color: #2e7d32;
       color: white;
       border: none;
       font-size: 16px;
@@ -56,16 +69,17 @@
     }
 
     button:hover {
-      background-color: #0056b3;
+      background-color: #1b5e20;
     }
 
     .login-link {
+      text-align: center;
       margin-top: 15px;
       font-size: 14px;
     }
 
     .login-link a {
-      color: #007bff;
+      color: #2e7d32;
       text-decoration: none;
     }
 
@@ -75,75 +89,61 @@
   </style>
 </head>
 <body>
+
   <div class="container">
-    <img src="images/logo.png" alt="شعار مربيك">
-    <h2>مربي جديد</h2>
+    <div class="form-box">
+      <img src="images/logo.png" alt="شعار مربيك">
+      <h2>مربي جديد</h2>
 
-    <form id="registerForm">
-      <input type="text" name="username" placeholder="الاسم الكامل" required>
-      <input type="tel" name="phone" placeholder="رقم الهاتف" required>
-      <input type="password" name="password" placeholder="كلمة المرور" required>
-      <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور" required>
-      <button type="submit">👤 إنشاء حساب</button>
-    </form>
+      <form id="registerForm">
+        <input type="text" name="username" placeholder="الاسم الكامل" required />
+        <input type="tel" name="phone" placeholder="رقم الهاتف" required />
+        <input type="password" name="password" placeholder="كلمة المرور" required />
+        <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور" required />
+        <button type="submit">إنشاء حساب 👤</button>
+      </form>
 
-    <div class="login-link">
-      لديك حساب؟ <a href="login.html">سجّل الدخول</a>
+      <div class="login-link">
+        لديك حساب؟ <a href="login.html">سجّل الدخول</a>
+      </div>
     </div>
   </div>
 
   <script>
-    document.getElementById("registerForm").addEventListener("submit", function (e) {
+    document.getElementById("registerForm").addEventListener("submit", async function (e) {
       e.preventDefault();
 
+      const fullName = this.username.value;
+      const phone = this.phone.value;
       const password = this.password.value;
-      const confirmPassword = this.confirmPassword.value;
+      const confirm = this.confirmPassword.value;
 
-      if (password !== confirmPassword) {
+      if (password !== confirm) {
         alert("❌ كلمتا المرور غير متطابقتين");
         return;
       }
 
-      // هنا تقدر تبعت البيانات للسيرفر
-      alert("✅ تم إنشاء الحساب بنجاح (اختبار فقط)");
-      window.location.href = "add-animal.html"; // تحويل بعد التسجيل
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: fullName, phone, password })
+        });
+
+        if (!res.ok) {
+          alert("فشل في إنشاء الحساب");
+          return;
+        }
+
+        const data = await res.json();
+        localStorage.setItem("user_id", data.user.id);
+        window.location.href = "login.html";
+      } catch (err) {
+        console.error(err);
+        alert("حدث خطأ أثناء التسجيل");
+      }
     });
   </script>
 
-<script>
-  document.querySelector("form").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const fullName = document.querySelector("input[name='username']").value;
-    const phone = document.querySelector("input[name='phone']").value;
-    const password = document.querySelector("input[name='password']").value;
-    const confirm = document.querySelector("input[name='confirmPassword']").value;
-
-    if (password !== confirm) {
-      alert("كلمة المرور غير متطابقة");
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fullName, phone, password })
-      });
-
-      if (!res.ok) {
-        throw new Error("فشل في إنشاء الحساب");
-      }
-
-      const data = await res.json();
-      localStorage.setItem("user_id", data.user.id);
-      window.location.href = "/add-animal.html";
-
-    } catch (err) {
-      console.error(err);
-      alert("حدث خطأ أثناء إنشاء الحساب");
-    }
-  });
-</script>
 </body>
 </html>
