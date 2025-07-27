@@ -132,7 +132,8 @@
         const data = await res.json();
         localStorage.setItem("user_id", data.user.id);
         alert("✅ تم إنشاء الحساب بنجاح!");
-        window.location.href = "add-animal.html";
+        window.location.href = "login.html";
+
 
       } catch (err) {
         console.error(err);
