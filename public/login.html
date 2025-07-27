@@ -1,86 +1,131 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل الدخول - مربيك</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل الدخول</title>
   <style>
+    * { box-sizing: border-box; }
     body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f0f2f5;
       direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f8ff;
-      padding: 40px;
-      max-width: 400px;
-      margin: auto;
-      text-align: center;
-    }
-
-    img {
-      width: 120px;
-      margin-bottom: 20px;
-    }
-
-    h2 {
-      color: #2c3e50;
-      margin-bottom: 20px;
-    }
-
-    form {
       display: flex;
-      flex-direction: column;
-      gap: 15px;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
-
+    .container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 380px;
+    }
+    h2 {
+      text-align: center;
+      color: #1565c0;
+      margin-bottom: 20px;
+    }
+    label {
+      font-size: 15px;
+      margin-bottom: 5px;
+      display: block;
+    }
     input {
-      padding: 12px;
-      border: 1px solid #ccc;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
       border-radius: 6px;
-      font-size: 16px;
+      border: 1px solid #ccc;
+      font-size: 15px;
     }
-
     button {
+      width: 100%;
       padding: 12px;
-      background-color: #007bff;
+      background-color: #1565c0;
       color: white;
       border: none;
-      font-size: 16px;
       border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
     }
-
     button:hover {
-      background-color: #0056b3;
+      background-color: #0d47a1;
     }
-
-    .signup-link {
-      margin-top: 15px;
+    .register-link {
+      text-align: center;
+      margin-top: 10px;
       font-size: 14px;
     }
-
-    .signup-link a {
+    .register-link a {
       color: #007bff;
       text-decoration: none;
-    }
-
-    .signup-link a:hover {
-      text-decoration: underline;
     }
   </style>
 </head>
 <body>
 
-  <img src="images/logo.png" alt="شعار مربيك">
-  <h2>تسجيل الدخول</h2>
+  <div class="container">
+    <h2>🔐 تسجيل الدخول</h2>
+    <form id="loginForm" autocomplete="off">
+      <label for="phone">رقم الهاتف:</label>
+      <input type="tel" name="phone" autocomplete="off" required />
 
-  <form id="loginForm">
-    <input type="tel" name="phone" placeholder="رقم الهاتف" required>
-    <input type="password" name="password" placeholder="كلمة المرور" required>
-    <button type="submit">🔐 دخول</button>
-  </form>
+      <label for="password">كلمة المرور:</label>
+      <input type="password" name="password" autocomplete="new-password" required />
 
-  <div class="signup-link">
-    ليس لديك حساب؟ <a href="register.html">سجل كمربي جديد</a>
+      <button type="submit">➡️ دخول</button>
+    </form>
+
+    <div class="register-link">
+      ليس لديك حساب؟ <a href="register.html">إنشاء حساب جديد</a>
+    </div>
   </div>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const phone = this.phone.value.trim();
+      const password = this.password.value;
+
+      if (!phone || !password) {
+        alert("❌ الرجاء إدخال رقم الهاتف وكلمة المرور");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, password })
+        });
+
+        if (!res.ok) throw new Error("فشل تسجيل الدخول");
+
+        const data = await res.json();
+        localStorage.setItem("user_id", data.user.id);
+        alert("✅ تم تسجيل الدخول بنجاح!");
+        window.location.href = "dashboard.html";
+
+      } catch (err) {
+        console.error(err);
+        alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة");
+      }
+    });
+
+    window.onload = () => {
+      document.querySelector("input[name='phone']").value = "";
+      document.querySelector("input[name='password']").value = "";
+    }
+  </script>
 
 </body>
 </html>
+
 
