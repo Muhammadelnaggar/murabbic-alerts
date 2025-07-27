@@ -142,6 +142,38 @@ app.get('/alerts/:id', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const usersPath = path.join(__dirname, 'data', 'users.json');
+
+// ✅ إنشاء حساب جديد
+app.post('/api/users', (req, res) => {
+  const { name, phone, password } = req.body;
+
+  if (!name || !phone || !password) {
+    return res.status(400).json({ error: "البيانات ناقصة" });
+  }
+
+  fs.readFile(usersPath, 'utf8', (err, data) => {
+    let users = [];
+    if (!err && data) {
+      try { users = JSON.parse(data); } catch (e) { users = []; }
+    }
+
+    const newUser = {
+      id: users.length + 1,
+      name,
+      phone,
+      password  // ملاحظة: مستقبلاً يُفضل تشفير الباسورد
+    };
+
+    users.push(newUser);
+
+    fs.writeFile(usersPath, JSON.stringify(users, null, 2), (err) => {
+      if (err) return res.status(500).send("فشل في حفظ المستخدم");
+      res.json({ message: "تم إنشاء الحساب", user: newUser });
+    });
+  });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ السيرفر يعمل على http://localhost:${PORT}`);
 });
