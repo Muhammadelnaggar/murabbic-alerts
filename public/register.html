@@ -72,18 +72,18 @@
 
   <div class="container">
     <h2>✍️ تسجيل حساب جديد</h2>
-    <form id="registerForm">
+    <form id="registerForm" autocomplete="off">
       <label for="name">الاسم:</label>
-      <input type="text" name="name" required />
+      <input type="text" name="name" autocomplete="off" required />
 
       <label for="phone">رقم الهاتف:</label>
-      <input type="tel" name="phone" required />
+      <input type="tel" name="phone" autocomplete="off" required />
 
       <label for="password">كلمة المرور:</label>
-      <input type="password" name="password" required />
+      <input type="password" name="password" autocomplete="new-password" required />
 
       <label for="confirm">تأكيد كلمة المرور:</label>
-      <input type="password" name="confirm" required />
+      <input type="password" name="confirm" autocomplete="new-password" required />
 
       <button type="submit">📲 إنشاء الحساب</button>
     </form>
@@ -94,6 +94,14 @@
   </div>
 
   <script>
+    window.onload = () => {
+      const form = document.getElementById("registerForm");
+      form.name.value = "";
+      form.phone.value = "";
+      form.password.value = "";
+      form.confirm.value = "";
+    }
+
     document.getElementById("registerForm").addEventListener("submit", async function (e) {
       e.preventDefault();
 
@@ -131,14 +139,6 @@
         alert("❌ حدث خطأ أثناء التسجيل");
       }
     });
-
-    // تفريغ الحقول عند تحميل الصفحة
-    window.onload = () => {
-      document.querySelector("input[name='name']").value = "";
-      document.querySelector("input[name='phone']").value = "";
-      document.querySelector("input[name='password']").value = "";
-      document.querySelector("input[name='confirm']").value = "";
-    }
   </script>
 
 </body>
