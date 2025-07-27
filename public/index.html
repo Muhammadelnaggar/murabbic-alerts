@@ -1,53 +1,134 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>مرحبًا بك في مربيك</title>
+  <title>مربي جديد</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
-      background-color: #e8f5e9;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      direction: rtl;
       display: flex;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      margin: 0;
+    }
+
+    .form-container {
+      background-color: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
     }
 
     img {
-      width: 150px;
+      width: 100px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
       margin-bottom: 20px;
+      color: #333;
     }
 
-    h1 {
-      color: #2e7d32;
-      font-size: 28px;
-    }
-
-    p {
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
       font-size: 16px;
-      color: #555;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #1b5e20;
+    }
+
+    .login-link {
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .login-link a {
+      color: #2e7d32;
+      text-decoration: none;
+    }
+
+    .login-link a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
 
-  <img src="images/logo.png" alt="شعار مربيك" />
-  <h1>مرحبًا بك في مربيك</h1>
-  <p>جاري تحميل التطبيق...</p>
+  <div class="form-container">
+    <img src="images/logo.png" alt="شعار مربيك">
+    <h2>مربي جديد</h2>
+
+    <form id="registerForm">
+      <input type="text" name="username" placeholder="الاسم الكامل" required />
+      <input type="tel" name="phone" placeholder="رقم الهاتف" required />
+      <input type="password" name="password" placeholder="كلمة المرور" required />
+      <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور" required />
+      <button type="submit">إنشاء حساب 👤</button>
+    </form>
+
+    <div class="login-link">
+      لديك حساب؟ <a href="login.html">سجّل الدخول</a>
+    </div>
+  </div>
 
   <script>
-    setTimeout(() => {
-      const userId = localStorage.getItem("user_id");
-      if (userId) {
-        window.location.href = "dashboard.html"; // أو animal-list.html
-      } else {
-        window.location.href = "register.html";
+    document.getElementById("registerForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const fullName = this.username.value;
+      const phone = this.phone.value;
+      const password = this.password.value;
+      const confirm = this.confirmPassword.value;
+
+      if (password !== confirm) {
+        alert("❌ كلمتا المرور غير متطابقتين");
+        return;
       }
-    }, 3000);
+
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: fullName, phone, password })
+        });
+
+        if (!res.ok) {
+          alert("فشل في إنشاء الحساب");
+          return;
+        }
+
+        const data = await res.json();
+        localStorage.setItem("user_id", data.user.id);
+        window.location.href = "login.html";
+      } catch (err) {
+        console.error(err);
+        alert("حدث خطأ أثناء التسجيل");
+      }
+    });
   </script>
 
 </body>
