@@ -17,11 +17,20 @@
       align-items: center;
       height: 100vh;
       text-align: center;
+      overflow: hidden;
     }
 
     img {
       width: 140px;
       margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeIn 2s ease-in-out forwards;
+    }
+
+    h1, p {
+      opacity: 0;
+      animation: fadeIn 2s ease-in-out forwards;
+      animation-delay: 1s;
     }
 
     h1 {
@@ -34,6 +43,11 @@
       font-size: 16px;
       color: #555;
     }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -45,7 +59,8 @@
   <script>
     setTimeout(() => {
       const userId = localStorage.getItem("user_id");
-      if (userId) {
+
+      if (userId && userId !== "null") {
         window.location.href = "dashboard.html";
       } else {
         window.location.href = "register.html";
