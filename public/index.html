@@ -1,75 +1,57 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>مربيك</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>مرحبًا بك في مربيك</title>
   <style>
     body {
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #e0f7fa, #ffffff);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    #splash {
-      text-align: center;
-      animation: fadeIn 2s ease-in-out;
-    }
-
-    #splash img {
-      width: 160px;
-      animation: zoomIn 1.5s ease-in-out;
-    }
-
-    #splash h1 {
+      background-color: #e8f5e9;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    img {
+      width: 150px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: #2e7d32;
       font-size: 28px;
-      color: #004d40;
-      margin-top: 20px;
-      opacity: 0;
-      animation: fadeInText 1s ease-in-out forwards;
-      animation-delay: 1s;
     }
 
-    @keyframes zoomIn {
-      from {
-        transform: scale(0.6);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-
-    @keyframes fadeInText {
-      to {
-        opacity: 1;
-      }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    p {
+      font-size: 16px;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <div id="splash">
-    <img src="images/logo.png" alt="شعار مربيك">
-    <h1>مرحبًا بك في مربيك</h1>
-  </div>
+
+  <img src="images/logo.png" alt="شعار مربيك" />
+  <h1>مرحبًا بك في مربيك</h1>
+  <p>جاري تحميل التطبيق...</p>
 
   <script>
     setTimeout(() => {
-      window.location.href = "register.html"; // أو dashboard.html حسب حالة المستخدم
+      const userId = localStorage.getItem("user_id");
+      if (userId) {
+        window.location.href = "dashboard.html"; // أو animal-list.html
+      } else {
+        window.location.href = "register.html";
+      }
     }, 3000);
   </script>
+
 </body>
 </html>
+
+
 
