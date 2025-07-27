@@ -57,6 +57,15 @@
     button:hover {
       background-color: #1b5e20;
     }
+    .login-link {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .login-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -73,17 +82,35 @@
       <label for="password">كلمة المرور:</label>
       <input type="password" name="password" required />
 
+      <label for="confirm">تأكيد كلمة المرور:</label>
+      <input type="password" name="confirm" required />
+
       <button type="submit">📲 إنشاء الحساب</button>
     </form>
+
+    <div class="login-link">
+      لديك حساب؟ <a href="login.html">سجّل الدخول</a>
+    </div>
   </div>
 
   <script>
     document.getElementById("registerForm").addEventListener("submit", async function (e) {
       e.preventDefault();
 
-      const name = this.name.value;
-      const phone = this.phone.value;
+      const name = this.name.value.trim();
+      const phone = this.phone.value.trim();
       const password = this.password.value;
+      const confirm = this.confirm.value;
+
+      if (!name || !phone || !password || !confirm) {
+        alert("❌ الرجاء ملء جميع الحقول");
+        return;
+      }
+
+      if (password !== confirm) {
+        alert("❌ كلمتا المرور غير متطابقتين");
+        return;
+      }
 
       try {
         const res = await fetch("/api/users", {
@@ -104,9 +131,15 @@
         alert("❌ حدث خطأ أثناء التسجيل");
       }
     });
+
+    // تفريغ الحقول عند تحميل الصفحة
+    window.onload = () => {
+      document.querySelector("input[name='name']").value = "";
+      document.querySelector("input[name='phone']").value = "";
+      document.querySelector("input[name='password']").value = "";
+      document.querySelector("input[name='confirm']").value = "";
+    }
   </script>
 
 </body>
 </html>
-
-
