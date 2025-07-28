@@ -1,130 +1,103 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل الدخول</title>
   <style>
     body {
-      font-family: sans-serif;
-      background-color: #f0f2f5;
-      padding: 20px;
+      font-family: 'Arial', sans-serif;
+      direction: rtl;
+      background-color: #f4f4f4;
       display: flex;
       justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
-
     .container {
       background-color: white;
-      padding: 20px;
-      border-radius: 12px;
+      padding: 2rem;
+      border-radius: 10px;
       box-shadow: 0 0 10px #ccc;
-      width: 100%;
-      max-width: 400px;
+      width: 350px;
     }
-
     h2 {
       text-align: center;
-      color: #333;
+      margin-bottom: 1rem;
     }
-
-    label {
-      display: block;
-      margin-top: 15px;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-
-    input {
+    input, button {
       width: 100%;
       padding: 10px;
-      border-radius: 6px;
+      margin-bottom: 10px;
+      border-radius: 5px;
       border: 1px solid #ccc;
     }
-
     button {
-      margin-top: 20px;
-      width: 100%;
-      padding: 12px;
       background-color: #007bff;
       color: white;
       border: none;
-      font-size: 16px;
-      border-radius: 6px;
       cursor: pointer;
     }
-
+    button:hover {
+      background-color: #0056b3;
+    }
+    .error {
+      color: red;
+      text-align: center;
+      margin-bottom: 10px;
+    }
     .link {
       text-align: center;
-      margin-top: 15px;
-    }
-
-    .link a {
-      color: #28a745;
-      text-decoration: none;
-    }
-
-    .message {
       margin-top: 10px;
-      text-align: center;
-      color: red;
+    }
+    .link a {
+      color: green;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>تسجيل الدخول</h2>
-
-    <label for="phone">رقم الهاتف</label>
-    <input type="tel" id="phone" required />
-
-    <label for="password">كلمة المرور</label>
-    <input type="password" id="password" required />
-
-    <button id="loginBtn">دخول</button>
-
-    <div class="message" id="message"></div>
-
+    <div id="error" class="error"></div>
+    <input type="text" id="phone" placeholder="رقم الهاتف" required />
+    <input type="password" id="password" placeholder="كلمة المرور" required />
+    <button onclick="login()">دخول</button>
     <div class="link">
-      <a href="register.html">ليس لديك حساب؟ سجل الآن</a>
+      ليس لديك حساب؟ <a href="register.html">سجل الآن</a>
     </div>
   </div>
 
   <script>
-    const loginBtn = document.getElementById('loginBtn');
-    const message = document.getElementById('message');
-
-    loginBtn.addEventListener('click', () => {
+    async function login() {
       const phone = document.getElementById('phone').value.trim();
       const password = document.getElementById('password').value.trim();
-      message.textContent = '';
+      const errorDiv = document.getElementById('error');
 
       if (!phone || !password) {
-        message.textContent = 'يرجى إدخال رقم الهاتف وكلمة المرور.';
+        errorDiv.textContent = "يرجى إدخال رقم الهاتف وكلمة المرور.";
         return;
       }
 
-      fetch('http://192.168.1.5:3000/api/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
-          message.textContent = 'رقم الهاتف أو كلمة المرور غير صحيحة.';
+      try {
+        const response = await fetch('https://murabbic-alerts.onrender.com/api/users/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          localStorage.setItem('user', JSON.stringify(result.user));
+          window.location.href = 'add-animal.html';
         } else {
-          // حفظ المستخدم في localStorage
-          localStorage.setItem('user', JSON.stringify(data.user));
-          alert('✅ تم تسجيل الدخول بنجاح');
-          window.location.href = 'dashboard.html';
+          errorDiv.textContent = result.error || "حدث خطأ أثناء تسجيل الدخول.";
         }
-      })
-      .catch(err => {
-        console.error(err);
-        message.textContent = 'حدث خطأ أثناء تسجيل الدخول.';
-      });
-    });
+      } catch (err) {
+        errorDiv.textContent = "فشل الاتصال بالخادم. حاول مرة أخرى.";
+      }
+    }
   </script>
 </body>
 </html>
-
