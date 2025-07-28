@@ -49,9 +49,9 @@
 </head>
 <body>
   <h2>تسجيل الدخول إلى Murabbik</h2>
-  <form id="loginForm">
-    <input type="text" id="phone" placeholder="رقم الهاتف" required />
-    <input type="password" id="password" placeholder="كلمة المرور" required />
+  <form id="loginForm" autocomplete="off">
+    <input type="text" id="phone" name="phone" placeholder="رقم الهاتف" required autocomplete="off" />
+    <input type="password" id="password" name="password" placeholder="كلمة المرور" required autocomplete="off" />
     <button type="submit">تسجيل الدخول</button>
     <a href="register.html">ليس لديك حساب؟ سجل الآن</a>
   </form>
@@ -64,6 +64,11 @@
 
       const phone = document.getElementById("phone").value.trim();
       const password = document.getElementById("password").value.trim();
+
+      if (!phone || !password) {
+        alert("برجاء إدخال رقم الهاتف وكلمة المرور.");
+        return;
+      }
 
       try {
         const res = await fetch("https://murabbic-alerts.onrender.com/api/users/login", {
@@ -79,6 +84,16 @@
           localStorage.setItem("userPhone", phone);
           localStorage.setItem("userId", data.userId || "");
 
-          // 🧼 مسح الحقول فقط
-          document.getElementById("phone").value = "";
-          docume
+          // 🧭 التوجيه بعد الدخول
+          window.location.href = "add-animal.html";
+        } else {
+          alert(data.message || "فشل تسجيل الدخول، تأكد من البيانات.");
+        }
+      } catch (err) {
+        console.error("Login error:", err);
+        alert("حدث خطأ أثناء تسجيل الدخول.");
+      }
+    });
+  </script>
+</body>
+</html>
