@@ -1,83 +1,74 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تسجيل حيوان جديد</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل الحيوان</title>
   <style>
     body {
       font-family: 'Arial', sans-serif;
-      background-color: #f0f8ff;
+      direction: rtl;
+      background-color: #f9f9f9;
       padding: 20px;
-    }
-    .container {
-      max-width: 600px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     h2 {
       text-align: center;
-      color: #2e7d32;
+    }
+    form {
+      max-width: 500px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
     }
     label {
       display: block;
-      margin-top: 15px;
-      font-weight: bold;
+      margin-top: 10px;
     }
-    select, input, button {
+    select, input[type="text"], input[type="number"], input[type="date"] {
       width: 100%;
-      padding: 10px;
+      padding: 8px;
       margin-top: 5px;
-      border-radius: 6px;
+      border-radius: 5px;
       border: 1px solid #ccc;
     }
     button {
-      background-color: #2e7d32;
+      margin-top: 15px;
+      padding: 10px;
+      width: 100%;
+      background-color: #28a745;
       color: white;
-      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
       cursor: pointer;
-      margin-top: 20px;
     }
     button:hover {
-      background-color: #1b5e20;
-    }
-    .dual-buttons {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .hidden {
-      display: none;
+      background-color: #218838;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>تسجيل حيوان جديد</h2>
-    <form id="animalForm">
-      <label>رقم الحيوان*</label>
-      <input type="text" id="animalId" required>
+  <h2>تسجيل حيوان جديد</h2>
+  <form id="animalForm" onsubmit="submitAnimal(event)">
+    <label>رقم الحيوان*:
+      <input type="text" id="animalId" required />
+    </label>
 
-      <label>نوع الحيوان*</label>
+    <label>نوع الحيوان*:
       <select id="animalType" required onchange="updateBreedOptions()">
         <option value="">اختر</option>
         <option value="بقرة">بقرة</option>
         <option value="جاموسة">جاموسة</option>
       </select>
+    </label>
 
-      <label>السلالة*</label>
+    <label>السلالة*:
       <select id="breed" required></select>
+    </label>
 
-      <label>تاريخ الميلاد (اختياري)</label>
-      <input type="date" id="birthDate">
-
-      <label>تاريخ آخر ولادة*</label>
-      <input type="date" id="lastCalvingDate" required>
-
-      <label>الحالة التناسلية*</label>
+    <label>الحالة التناسلية*:
       <select id="reproductiveStatus" required onchange="toggleInseminationDate()">
         <option value="">اختر</option>
         <option value="حديثة الولادة">حديثة الولادة</option>
@@ -86,100 +77,108 @@
         <option value="عشار">عشار</option>
         <option value="اجهاض">اجهاض</option>
       </select>
+    </label>
 
-      <div id="inseminationDateField" class="hidden">
-        <label>تاريخ آخر تلقيح</label>
-        <input type="date" id="inseminationDate">
-      </div>
+    <div id="inseminationDateDiv" style="display:none;">
+      <label>تاريخ آخر تلقيح:
+        <input type="date" id="inseminationDate" />
+      </label>
+    </div>
 
-      <label>الحالة الإنتاجية*</label>
-      <select id="productionStatus" required onchange="toggleMilkField()">
+    <label>الحالة الإنتاجية*:
+      <select id="productionStatus" required onchange="toggleMilkInput()">
         <option value="">اختر</option>
         <option value="حلاب">حلاب</option>
         <option value="جاف">جاف</option>
       </select>
+    </label>
 
-      <div id="milkField" class="hidden">
-        <label>إنتاج الحليب اليومي (لتر)</label>
-        <input type="number" id="milkProduction" min="0" step="0.1">
-      </div>
+    <div id="milkAmountDiv" style="display:none;">
+      <label>إنتاج الحليب اليومي (لتر):
+        <input type="number" id="milkAmount" />
+      </label>
+    </div>
 
-      <div class="dual-buttons">
-        <button type="button" onclick="submitAnimal(true)">تسجيل حيوان آخر</button>
-        <button type="button" onclick="submitAnimal(false)">التالي (تسجيل حدث)</button>
-      </div>
-    </form>
-  </div>
+    <label>تاريخ الميلاد (اختياري):
+      <input type="date" id="birthDate" />
+    </label>
+
+    <label>تاريخ آخر ولادة*:
+      <input type="date" id="lastBirthDate" required />
+    </label>
+
+    <button type="submit">تسجيل الحيوان</button>
+  </form>
 
   <script>
     function updateBreedOptions() {
       const type = document.getElementById("animalType").value;
       const breed = document.getElementById("breed");
       breed.innerHTML = "";
+
       if (type === "بقرة") {
-        ["خليط", "هولشتاين", "جيرسي", "سيمنتال", "مونبليار", "أخرى"].forEach(opt => {
-          const option = document.createElement("option");
-          option.value = opt;
-          option.textContent = opt;
-          breed.appendChild(option);
+        ["خليط", "هولشتاين", "جيرسي", "سيمنتال", "مونبليار", "أخرى"].forEach(val => {
+          const opt = document.createElement("option");
+          opt.value = val;
+          opt.textContent = val;
+          breed.appendChild(opt);
         });
       } else if (type === "جاموسة") {
-        ["مصري", "ايطالي مصري", "هندي مصري"].forEach(opt => {
-          const option = document.createElement("option");
-          option.value = opt;
-          option.textContent = opt;
-          breed.appendChild(option);
+        ["مصري", "إيطالي مصري", "هندي مصري"].forEach(val => {
+          const opt = document.createElement("option");
+          opt.value = val;
+          opt.textContent = val;
+          breed.appendChild(opt);
         });
       }
     }
 
     function toggleInseminationDate() {
-      const value = document.getElementById("reproductiveStatus").value;
-      document.getElementById("inseminationDateField").classList.toggle("hidden", value !== "ملقحة");
+      const val = document.getElementById("reproductiveStatus").value;
+      document.getElementById("inseminationDateDiv").style.display = val === "ملقحة" ? "block" : "none";
     }
 
-    function toggleMilkField() {
-      const value = document.getElementById("productionStatus").value;
-      document.getElementById("milkField").classList.toggle("hidden", value !== "حلاب");
+    function toggleMilkInput() {
+      const val = document.getElementById("productionStatus").value;
+      document.getElementById("milkAmountDiv").style.display = val === "حلاب" ? "block" : "none";
     }
 
-    async function submitAnimal(addAnother) {
-      const data = {
-        tag: document.getElementById("animalId").value,
+    async function submitAnimal(event) {
+      event.preventDefault();
+
+      const animal = {
+        id: document.getElementById("animalId").value.trim(),
         type: document.getElementById("animalType").value,
         breed: document.getElementById("breed").value,
-        reproductive_status: document.getElementById("reproductiveStatus").value,
-        insemination_date: document.getElementById("inseminationDate").value || null,
-        production_status: document.getElementById("productionStatus").value,
-        milk_production: document.getElementById("milkProduction").value || null,
-        birth_date: document.getElementById("birthDate").value || null,
-        last_calving_date: document.getElementById("lastCalvingDate").value,
-        user_id: 1
+        reproductiveStatus: document.getElementById("reproductiveStatus").value,
+        inseminationDate: document.getElementById("inseminationDate").value,
+        productionStatus: document.getElementById("productionStatus").value,
+        milkAmount: document.getElementById("milkAmount").value,
+        birthDate: document.getElementById("birthDate").value,
+        lastBirthDate: document.getElementById("lastBirthDate").value
       };
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
+        const res = await fetch('https://murabbic-alerts.onrender.com/api/animals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(animal)
         });
 
         if (res.ok) {
-          alert("✅ تم تسجيل الحيوان بنجاح");
-          if (addAnother) {
+          const again = confirm("تم التسجيل بنجاح. هل تريد تسجيل حيوان آخر؟");
+          if (again) {
             document.getElementById("animalForm").reset();
-            updateBreedOptions();
-            toggleInseminationDate();
-            toggleMilkField();
+            document.getElementById("inseminationDateDiv").style.display = "none";
+            document.getElementById("milkAmountDiv").style.display = "none";
           } else {
             window.location.href = "add-event.html";
           }
         } else {
-          alert("❌ حدث خطأ أثناء التسجيل");
+          alert("فشل في تسجيل الحيوان.");
         }
       } catch (err) {
-        alert("❌ فشل في الاتصال بالخادم");
-        console.error(err);
+        alert("فشل الاتصال بالخادم.");
       }
     }
   </script>
