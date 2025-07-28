@@ -50,8 +50,9 @@
 <body>
   <h2>تسجيل الدخول إلى Murabbik</h2>
   <form id="loginForm" autocomplete="off">
-    <input type="text" id="phone" name="phone" placeholder="رقم الهاتف" required autocomplete="off" />
-    <input type="password" id="password" name="password" placeholder="كلمة المرور" required autocomplete="off" />
+    <!-- استخدم أسماء غريبة لمنع التعبئة التلقائية -->
+    <input type="text" id="phone" name="user_phone_input" placeholder="رقم الهاتف" required autocomplete="off" />
+    <input type="password" id="password" name="user_pass_input" placeholder="كلمة المرور" required autocomplete="new-password" />
     <button type="submit">تسجيل الدخول</button>
     <a href="register.html">ليس لديك حساب؟ سجل الآن</a>
   </form>
@@ -74,24 +75,22 @@
         const res = await fetch("https://murabbic-alerts.onrender.com/api/users/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, password }),
+          body: JSON.stringify({ phone, password }), // تأكد إن دي نفس المفاتيح اللي السيرفر بيتعامل معاها
         });
 
         const data = await res.json();
 
         if (res.ok) {
-          // ✅ تخزين بيانات المستخدم الحالي
           localStorage.setItem("userPhone", phone);
           localStorage.setItem("userId", data.userId || "");
 
-          // 🧭 التوجيه بعد الدخول
           window.location.href = "add-animal.html";
         } else {
-          alert(data.message || "فشل تسجيل الدخول، تأكد من البيانات.");
+          alert(data.message || "فشل تسجيل الدخول، تأكد من رقم الهاتف وكلمة المرور.");
         }
       } catch (err) {
         console.error("Login error:", err);
-        alert("حدث خطأ أثناء تسجيل الدخول.");
+        alert("حدث خطأ أثناء الاتصال بالسيرفر.");
       }
     });
   </script>
