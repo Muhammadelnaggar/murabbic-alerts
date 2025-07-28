@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تسجيل حدث جديد</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #fdfdfd;
+      padding: 30px;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .event-button {
+      height: 150px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background-color: #ffffff;
+      border: 2px solid #28a745;
+      color: #28a745;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .event-button:hover {
+      background-color: #28a745;
+      color: white;
+    }
+
+    .event-button img {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>📅 تسجيل حدث جديد</h2>
+
+  <div class="button-grid">
+    <button class="event-button" onclick="window.location.href='birth.html'">
+      <img src="images/birth.png" alt="ولادة">
+      ولادة
+    </button>
+    <button class="event-button" onclick="window.location.href='insemination.html'">
+      <img src="images/insemination.png" alt="تلقيح">
+      تلقيح
+    </button>
+  <button class="event-button" onclick="window.location.href='disease.html'">
+  <img src="images/diagnosis.png" alt="الأمراض">
+  الأمراض
+</button>
+
+    </button>
+    <button class="event-button" onclick="window.location.href='vaccination.html'">
+      <img src="images/vaccine.png" alt="تحصين">
+      تحصين
+    </button>
+    <button class="event-button" onclick="window.location.href='daily-milk.html'">
+      <img src="images/milk.png" alt="إنتاج اللبن">
+      إنتاج اللبن اليومي
+    </button>
+    <button class="event-button" onclick="window.location.href='feed.html'">
+      <img src="images/feed.png" alt="تغذية">
+      تغذية
+    </button>
+    <button class="event-button" onclick="window.location.href='dry-off.html'">
+      <img src="images/dry.png" alt="تجفيف">
+      تجفيف
+    </button>
+    <button class="event-button" onclick="window.location.href='pre-calving.html'">
+      <img src="images/prebirth.png" alt="تحضير للولادة">
+      تحضير للولادة
+    </button>
+  </div>
+
+</body>
+</html>

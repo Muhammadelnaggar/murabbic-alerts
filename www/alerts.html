@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تنبيهات الأبقار</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      direction: rtl;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .alert {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-right: 5px solid #ff9800;
+      box-shadow: 0 0 5px #ccc;
+    }
+    .title {
+      font-weight: bold;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    .message {
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>📢 تنبيهات الأبقار الخاصة بك</h1>
+  <div id="alertsContainer">...جاري تحميل التنبيهات</div>
+
+  <script>
+    fetch('/alerts/1')
+      .then(response => response.json())
+      .then(data => {
+        const container = document.getElementById('alertsContainer');
+        container.innerHTML = ''; // مسح "جاري التحميل"
+
+        if (data.alerts.length === 0) {
+          container.innerHTML = '<p>لا توجد تنبيهات حالياً.</p>';
+          return;
+        }
+
+        data.alerts.forEach(alert => {
+          const alertDiv = document.createElement('div');
+          alertDiv.classList.add('alert');
+
+          alertDiv.innerHTML = `
+            <div class="title">${alert.title}</div>
+            <div class="message">${alert.message}</div>
+          `;
+
+          container.appendChild(alertDiv);
+        });
+      })
+      .catch(error => {
+        document.getElementById('alertsContainer').innerHTML = 'حدث خطأ في تحميل التنبيهات.';
+        console.error('Error fetching alerts:', error);
+      });
+  </script>
+</body>
+</html>
+
