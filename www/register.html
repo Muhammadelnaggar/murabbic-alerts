@@ -3,26 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل مستخدم جديد</title>
+  <title>تسجيل حساب جديد</title>
   <style>
     body {
       font-family: 'Arial', sans-serif;
-      background-color: #f7f7f7;
-      padding: 20px;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
     }
     .container {
       max-width: 400px;
-      margin: auto;
-      background: #fff;
+      margin: 50px auto;
+      background: white;
       padding: 20px;
       border-radius: 12px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     h2 {
       text-align: center;
-      color: #2e7d32;
+      color: green;
     }
-    input, button {
+    input {
       width: 100%;
       padding: 10px;
       margin: 8px 0;
@@ -30,18 +31,25 @@
       border: 1px solid #ccc;
     }
     button {
-      background-color: #2e7d32;
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background-color: green;
       color: white;
-      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
-    }
-    button:hover {
-      background-color: #1b5e20;
     }
     .message {
       text-align: center;
       margin-top: 10px;
+    }
+    .error {
       color: red;
+    }
+    .success {
+      color: green;
     }
     .link {
       text-align: center;
@@ -49,19 +57,19 @@
     }
     .link a {
       text-decoration: none;
-      color: #2e7d32;
+      color: green;
       font-weight: bold;
     }
   </style>
 </head>
 <body>
-
   <div class="container">
     <h2>تسجيل مستخدم جديد</h2>
     <form id="registerForm">
       <input type="text" id="name" placeholder="الاسم بالكامل" required />
       <input type="tel" id="phone" placeholder="رقم الهاتف" required />
       <input type="password" id="password" placeholder="كلمة المرور" required />
+      <input type="password" id="confirmPassword" placeholder="تأكيد كلمة المرور" required />
       <button type="submit">تسجيل</button>
       <div class="message" id="message"></div>
     </form>
@@ -79,9 +87,17 @@
 
       const name = document.getElementById('name').value.trim();
       const phone = document.getElementById('phone').value.trim();
-      const password = document.getElementById('password').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
 
       message.textContent = '';
+      message.className = 'message';
+
+      if (password !== confirmPassword) {
+        message.textContent = '❌ كلمتا المرور غير متطابقتين';
+        message.classList.add('error');
+        return;
+      }
 
       try {
         const res = await fetch('https://murabbic-alerts.onrender.com/api/users', {
@@ -93,22 +109,22 @@
         const result = await res.json();
 
         if (res.ok) {
-          message.textContent = '✅ تم إنشاء الحساب بنجاح. سيتم تحويلك لتسجيل الدخول...';
-          message.style.color = 'green';
+          message.textContent = '✅ تم إنشاء الحساب بنجاح، سيتم تحويلك...';
+          message.classList.add('success');
           form.reset();
           setTimeout(() => {
             window.location.href = 'login.html';
           }, 2000);
         } else {
           message.textContent = result.error || '❌ حدث خطأ أثناء التسجيل.';
-          message.style.color = 'red';
+          message.classList.add('error');
         }
       } catch (err) {
-        message.textContent = '❌ فشل الاتصال بالخادم.';
         console.error(err);
+        message.textContent = '❌ فشل الاتصال بالخادم.';
+        message.classList.add('error');
       }
     });
   </script>
-
 </body>
 </html>
