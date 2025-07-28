@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>التنبيهات السابقة</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #fff8f0;
+      padding: 30px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .alert-card {
+      border: 1px solid #ccc;
+      background-color: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .alert-card h3 {
+      margin: 0 0 10px;
+      color: #d9534f;
+    }
+    .alert-card p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🕓 التنبيهات السابقة</h1>
+  <div id="alertsContainer">
+    <!-- يتم ملء هذه المنطقة تلقائياً بالتنبيهات -->
+  </div>
+
+  <script>
+    // المستخدم الحالي (تجريبي)
+    const userId = 1;
+
+    fetch(`/alerts/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('alertsContainer');
+        if (!data.alerts || data.alerts.length === 0) {
+          container.innerHTML = '<p>لا توجد تنبيهات حالياً.</p>';
+          return;
+        }
+        data.alerts.forEach(alert => {
+          const card = document.createElement('div');
+          card.className = 'alert-card';
+          card.innerHTML = `
+            <h3>🔔 ${alert.title}</h3>
+            <p><strong>التاريخ:</strong> ${alert.date}</p>
+            <p><strong>الوصف:</strong> ${alert.message}</p>
+          `;
+          container.appendChild(card);
+        });
+      })
+      .catch(err => {
+        console.error('فشل في تحميل التنبيهات:', err);
+        document.getElementById('alertsContainer').innerHTML = '<p>تعذر تحميل التنبيهات.</p>';
+      });
+  </script>
+</body>
+</html>

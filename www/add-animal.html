@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل حيوان جديد</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f0f8ff;
+      direction: rtl;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 {
+      text-align: center;
+      color: #2e7d32;
+      margin-bottom: 20px;
+    }
+    label {
+      font-size: 15px;
+      margin-bottom: 5px;
+      display: block;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>🐄 تسجيل حيوان جديد</h2>
+    <form id="animalForm">
+      <label for="animalId">رقم/اسم الحيوان:</label>
+      <input type="text" name="animalId" required />
+
+      <label for="type">النوع:</label>
+      <select name="type" required>
+        <option value="">اختر</option>
+        <option value="بقرة">بقرة</option>
+        <option value="جاموسة">جاموسة</option>
+      </select>
+
+      <label for="productionStatus">الحالة الإنتاجية:</label>
+      <select name="productionStatus" required>
+        <option value="">اختر</option>
+        <option value="منتجة">منتجة</option>
+        <option value="جافة">جافة</option>
+      </select>
+
+      <label for="reproductiveStatus">الحالة التناسلية:</label>
+      <select name="reproductiveStatus" required>
+        <option value="">اختر</option>
+        <option value="عشار">عشار</option>
+        <option value="فارغة">فارغة</option>
+        <option value="تم تلقيحها">تم تلقيحها</option>
+      </select>
+
+      <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
+      <input type="date" name="lastCalvingDate" required />
+
+      <button type="submit">➕ تسجيل الحيوان</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById("animalForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const animalId = this.animalId.value;
+      const type = this.type.value;
+      const productionStatus = this.productionStatus.value;
+      const reproductiveStatus = this.reproductiveStatus.value;
+      const lastCalvingDate = this.lastCalvingDate.value;
+      const userId = localStorage.getItem("user_id");
+
+      if (!userId) {
+        alert("❌ لا يوجد مستخدم مسجل. الرجاء تسجيل الدخول أولاً.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/animals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            animalId,
+            type,
+            productionStatus,
+            reproductiveStatus,
+            lastCalvingDate,
+            userId: parseInt(userId)
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("فشل في حفظ الحيوان");
+        }
+
+        const again = confirm("✅ تم تسجيل الحيوان بنجاح.
+هل تريد تسجيل حيوان آخر؟");
+
+        if (again) {
+          window.location.reload();
+        } else {
+          window.location.href = "events.html";
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert("❌ حدث خطأ أثناء التسجيل");
+      }
+    });
+  </script>
+
+</body>
+</html>

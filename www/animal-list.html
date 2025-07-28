@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>قائمة الحيوانات</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+      font-size: 20px;
+    }
+
+    label, select {
+      display: inline-block;
+      margin: 10px 5px;
+      font-size: 14px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 600px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #eee;
+    }
+
+    button {
+      padding: 6px 10px;
+      font-size: 13px;
+      margin: 2px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .edit-btn {
+      background-color: #ffc107;
+      color: #000;
+    }
+
+    .delete-btn {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    @media (max-width: 768px) {
+      h2 {
+        font-size: 18px;
+      }
+
+      label, select {
+        width: 100%;
+        margin: 5px 0;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      button {
+        font-size: 12px;
+        padding: 5px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>🐄 قائمة الحيوانات المسجلة</h2>
+
+  <label for="typeFilter">نوع الحيوان:</label>
+  <select id="typeFilter">
+    <option value="">الكل</option>
+    <option value="بقرة">بقرة</option>
+    <option value="جاموسة">جاموسة</option>
+  </select>
+
+  <label for="statusFilter">الحالة الإنتاجية:</label>
+  <select id="statusFilter">
+    <option value="">الكل</option>
+    <option value="حلاب">حلاب</option>
+    <option value="جاف">جاف</option>
+  </select>
+
+  <div class="table-wrapper">
+    <table id="animalsTable">
+      <thead>
+        <tr>
+          <th>الرقم</th>
+          <th>النوع</th>
+          <th>السلالة</th>
+          <th>الحالة الإنتاجية</th>
+          <th>الحالة التناسلية</th>
+          <th>إنتاج اللبن اليومي</th>
+          <th>تعديل</th>
+          <th>حذف</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    async function fetchAnimals() {
+      const res = await fetch('/api/animals');
+      const animals = await res.json();
+      renderTable(animals);
+    }
+
+    function renderTable(data) {
+      const tableBody = document.querySelector('#animalsTable tbody');
+      tableBody.innerHTML = '';
+
+      data.forEach(animal => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${animal.id}</td>
+          <td>${animal.type}</td>
+          <td>${animal.breed}</td>
+          <td>${animal.productionStatus}</td>
+          <td>${animal.reproStatus}</td>
+          <td>${animal.milkDaily || 0}</td>
+          <td><button class="edit-btn" onclick="editAnimal(${animal.id})">تعديل</button></td>
+          <td><button class="delete-btn" onclick="deleteAnimal(${animal.id})">حذف</button></td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function filterAnimals() {
+      const type = document.getElementById('typeFilter').value;
+      const status = document.getElementById('statusFilter').value;
+
+      fetch('/api/animals')
+        .then(res => res.json())
+        .then(data => {
+          const filtered = data.filter(animal => {
+            return (!type || animal.type === type) && (!status || animal.productionStatus === status);
+          });
+          renderTable(filtered);
+        });
+    }
+
+    function editAnimal(id) {
+      window.location.href = `edit-animal.html?id=${id}`;
+    }
+
+    function deleteAnimal(id) {
+      if (confirm('❗ هل أنت متأكد من حذف الحيوان؟')) {
+        fetch(`/api/animals/${id}`, {
+          method: 'DELETE'
+        })
+        .then(res => {
+          if (res.ok) {
+            alert('✅ تم حذف الحيوان بنجاح');
+            fetchAnimals();
+          } else {
+            alert('❌ فشل في الحذف');
+          }
+        })
+        .catch(() => alert('⚠️ خطأ في الاتصال بالسيرفر'));
+      }
+    }
+
+    document.getElementById('typeFilter').addEventListener('change', filterAnimals);
+    document.getElementById('statusFilter').addEventListener('change', filterAnimals);
+
+    fetchAnimals();
+  </script>
+</body>
+</html>
