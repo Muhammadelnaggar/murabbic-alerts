@@ -1,12 +1,13 @@
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
-const cors = require('cors');
-app.use(cors());
 const PORT = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('www')); // تأكد أن مجلد www هو المستخدم
@@ -105,7 +106,7 @@ app.get('/alerts/:id', (req, res) => {
   });
 });
 
-// === تشغيل الخادم على IP المحلي لربطه بالموبايل ===
+// === تشغيل الخادم على IP المحلي ===
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running at http://192.168.1.5:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
