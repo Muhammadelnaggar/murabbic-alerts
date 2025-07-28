@@ -3,13 +3,15 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
+const cors = require('cors');
+app.use(cors());
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static('www')); // تأكد أن مجلد www هو المستخدم
 
-// === Paths ===
+// === مسارات البيانات ===
 const dataDir = path.join(__dirname, 'data');
 const usersPath = path.join(dataDir, 'users.json');
 const animalsPath = path.join(dataDir, 'animals.json');
@@ -30,11 +32,16 @@ app.post('/api/users', (req, res) => {
       try { users = JSON.parse(data); } catch (e) {}
     }
 
+    const existing = users.find(u => u.phone === phone);
+    if (existing) {
+      return res.status(409).json({ error: "رقم الهاتف مستخدم مسبقًا" });
+    }
+
     const newUser = {
       id: users.length + 1,
       name,
       phone,
-      password // ملاحظة: مستقبلاً يفضل تشفيره
+      password
     };
 
     users.push(newUser);
@@ -98,7 +105,7 @@ app.get('/alerts/:id', (req, res) => {
   });
 });
 
-// === بدء الخادم ===
-app.listen(PORT, () => {
-  console.log(`✅ Server is running on port ${PORT}`);
+// === تشغيل الخادم على IP المحلي لربطه بالموبايل ===
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running at http://192.168.1.5:${PORT}`);
 });
