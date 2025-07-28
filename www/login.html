@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تسجيل الدخول</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f0f2f5;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      background-color: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px #ccc;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .link {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    .link a {
+      color: #28a745;
+      text-decoration: none;
+    }
+
+    .message {
+      margin-top: 10px;
+      text-align: center;
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>تسجيل الدخول</h2>
+
+    <label for="phone">رقم الهاتف</label>
+    <input type="tel" id="phone" required />
+
+    <label for="password">كلمة المرور</label>
+    <input type="password" id="password" required />
+
+    <button id="loginBtn">دخول</button>
+
+    <div class="message" id="message"></div>
+
+    <div class="link">
+      <a href="register.html">ليس لديك حساب؟ سجل الآن</a>
+    </div>
+  </div>
+
+  <script>
+    const loginBtn = document.getElementById('loginBtn');
+    const message = document.getElementById('message');
+
+    loginBtn.addEventListener('click', () => {
+      const phone = document.getElementById('phone').value.trim();
+      const password = document.getElementById('password').value.trim();
+      message.textContent = '';
+
+      if (!phone || !password) {
+        message.textContent = 'يرجى إدخال رقم الهاتف وكلمة المرور.';
+        return;
+      }
+
+      fetch('http://192.168.1.5:3000/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          message.textContent = 'رقم الهاتف أو كلمة المرور غير صحيحة.';
+        } else {
+          // حفظ المستخدم في localStorage
+          localStorage.setItem('user', JSON.stringify(data.user));
+          alert('✅ تم تسجيل الدخول بنجاح');
+          window.location.href = 'dashboard.html';
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        message.textContent = 'حدث خطأ أثناء تسجيل الدخول.';
+      });
+    });
+  </script>
+</body>
+</html>
+

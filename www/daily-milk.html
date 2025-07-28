@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل إنتاج اللبن اليومي</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input, select, button, textarea {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🥛 تسجيل إنتاج اللبن اليومي</h2>
+
+  <form id="milkForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="milkDate">تاريخ الإنتاج</label>
+    <input type="date" id="milkDate" name="milkDate" required>
+
+    <label for="morning">الكمية صباحًا (لتر)</label>
+    <input type="number" id="morning" name="morning" step="0.1" min="0" required>
+
+    <label for="noon">الكمية ظهرًا (لتر)</label>
+    <input type="number" id="noon" name="noon" step="0.1" min="0" required>
+
+    <label for="evening">الكمية مساءً (لتر)</label>
+    <input type="number" id="evening" name="evening" step="0.1" min="0" required>
+
+    <label for="total">الإجمالي اليومي (لتر)</label>
+    <input type="number" id="total" name="total" readonly>
+
+    <button type="submit">💾 تسجيل</button>
+  </form>
+
+  <script>
+    const morning = document.getElementById("morning");
+    const noon = document.getElementById("noon");
+    const evening = document.getElementById("evening");
+    const total = document.getElementById("total");
+
+    const updateTotal = () => {
+      const m = parseFloat(morning.value) || 0;
+      const n = parseFloat(noon.value) || 0;
+      const e = parseFloat(evening.value) || 0;
+      total.value = (m + n + e).toFixed(1);
+    };
+
+    morning.addEventListener("input", updateTotal);
+    noon.addEventListener("input", updateTotal);
+    evening.addEventListener("input", updateTotal);
+
+    document.getElementById("milkDate").valueAsDate = new Date();
+
+    document.getElementById("milkForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        type: "إنتاج اللبن اليومي",
+        animalId: this.animalId.value,
+        date: this.milkDate.value,
+        morning: parseFloat(this.morning.value),
+        noon: parseFloat(this.noon.value),
+        evening: parseFloat(this.evening.value),
+        total: parseFloat(this.total.value)
+      };
+
+      const res = await fetch("/events/milk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل إنتاج اللبن اليومي");
+        this.reset();
+        this.milkDate.valueAsDate = new Date();
+        updateTotal();
+      } else {
+        alert("❌ فشل في تسجيل الإنتاج");
+      }
+    });
+  </script>
+
+</body>
+</html>
+

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة المتابعة</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #fdfdfd;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .card button {
+      padding: 14px;
+      font-size: 18px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .card button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🐄 لوحة المتابعة الذكية</h2>
+
+  <div class="card">
+    <button onclick="location.href='cow-card.html'">📋 عرض بيانات الحيوانات</button>
+    <button onclick="location.href='alerts.html'">🔔 عرض التنبيهات</button>
+    <button onclick="location.href='events.html'">📝 تسجيل حدث جديد</button>
+  </div>
+
+</body>
+</html>

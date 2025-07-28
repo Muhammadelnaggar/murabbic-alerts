@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل ولادة</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input, select, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🍼 تسجيل حدث ولادة</h2>
+
+  <form id="birthForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="birthDate">تاريخ الولادة</label>
+    <input type="date" id="birthDate" name="birthDate" required>
+
+    <label for="birthEase">سهولة الولادة</label>
+    <select id="birthEase" name="birthEase">
+      <option value="سهلة">سهلة</option>
+      <option value="عسرة">عسرة</option>
+    </select>
+
+    <label for="calfGender">جنس العجل</label>
+    <select id="calfGender" name="calfGender">
+      <option value="ذكر">ذكر</option>
+      <option value="أنثى">أنثى</option>
+    </select>
+
+    <label for="calfId">رقم العجل</label>
+    <input type="text" id="calfId" name="calfId" required>
+
+    <label for="calfFate">مصير العجل</label>
+    <select id="calfFate" name="calfFate">
+      <option value="تربية">تربية</option>
+      <option value="بيع">بيع</option>
+    </select>
+
+    <button type="submit">💾 تسجيل</button>
+  </form>
+
+  <script>
+    // تعيين تاريخ اليوم تلقائيًا
+    document.getElementById("birthDate").valueAsDate = new Date();
+
+    document.getElementById("birthForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        type: "ولادة",
+        animalId: this.animalId.value,
+        birthDate: this.birthDate.value,
+        birthEase: this.birthEase.value,
+        calfGender: this.calfGender.value,
+        calfId: this.calfId.value,
+        calfFate: this.calfFate.value,
+      };
+
+      const res = await fetch("/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل حدث الولادة بنجاح");
+        this.reset();
+        this.birthDate.valueAsDate = new Date();
+      } else {
+        alert("❌ فشل في تسجيل الحدث");
+      }
+    });
+  </script>
+
+</body>
+</html>
+

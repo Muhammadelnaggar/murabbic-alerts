@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تحضير للولادة</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input, select, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #17a2b8;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #138496;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🐮 تحضير للولادة</h2>
+
+  <form id="preCalvingForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="expectedDate">تاريخ الولادة المتوقع</label>
+    <input type="date" id="expectedDate" name="expectedDate" required>
+
+    <label for="preparationsDone">تم التحضير؟</label>
+    <select id="preparationsDone" name="preparationsDone" required>
+      <option value="">اختر...</option>
+      <option value="نعم">نعم</option>
+      <option value="لا">لا</option>
+    </select>
+
+    <button type="submit">💾 تسجيل</button>
+  </form>
+
+  <script>
+    document.getElementById("preCalvingForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        type: "تحضير للولادة",
+        animalId: this.animalId.value,
+        expectedDate: this.expectedDate.value,
+        preparationsDone: this.preparationsDone.value,
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      const res = await fetch("/events/calving-prep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل التحضير للولادة بنجاح");
+        this.reset();
+      } else {
+        alert("❌ فشل في تسجيل التحضير");
+      }
+    });
+  </script>
+
+</body>
+</html>
+
