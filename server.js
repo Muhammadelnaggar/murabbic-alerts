@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('www'));
+app.use(express.static(path.join(__dirname, 'www')));
 
 // === مسارات ملفات البيانات ===
 const dataDir = path.join(__dirname, 'data');
@@ -81,6 +81,11 @@ app.get('/alerts/:id', (req, res) => {
 
   const userAlerts = alerts.filter(a => a.user_id === userId);
   res.json({ alerts: userAlerts });
+});
+
+// === توجيه افتراضي لملف index.html عند زيارة /
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'www', 'index.html'));
 });
 
 // === تشغيل السيرفر ===
