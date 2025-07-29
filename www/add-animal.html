@@ -1,33 +1,32 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل حيوان جديد - Murabbik</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل حيوان جديد</title>
   <style>
     body {
-      font-family: 'Arial', sans-serif;
       direction: rtl;
-      background-color: #f0f0f0;
+      font-family: 'Arial', sans-serif;
+      background-color: #f2f2f2;
       padding: 20px;
       text-align: center;
     }
     form {
       background-color: #fff;
       padding: 20px;
+      border-radius: 15px;
+      max-width: 600px;
       margin: auto;
-      max-width: 500px;
-      border-radius: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     input, select, button {
-      display: block;
       width: 100%;
       padding: 12px;
       margin-bottom: 15px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
       font-size: 1em;
+      border-radius: 10px;
+      border: 1px solid #ccc;
     }
     button {
       background-color: #28a745;
@@ -39,32 +38,101 @@
     button:hover {
       background-color: #218838;
     }
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
+
   <h2>تسجيل حيوان جديد</h2>
+
   <form id="animalForm">
-    <input type="text" id="name" placeholder="اسم الحيوان" required />
-    <input type="text" id="number" placeholder="رقم التعريف" required />
+    <input type="text" id="number" placeholder="رقم الحيوان" required>
+
     <select id="type" required>
       <option value="">نوع الحيوان</option>
       <option value="بقرة">بقرة</option>
       <option value="جاموسة">جاموسة</option>
     </select>
-    <input type="date" id="birthDate" placeholder="تاريخ الميلاد" required />
+
+    <select id="breed" required>
+      <option value="">السلالة</option>
+    </select>
+
+    <select id="productionStatus" required>
+      <option value="">الحالة الإنتاجية</option>
+      <option value="حلاب">حلاب</option>
+      <option value="جاف">جاف</option>
+    </select>
+
+    <input type="number" id="milkProduction" placeholder="إنتاج اللبن اليومي (كجم)" class="hidden">
+
+    <select id="reproductiveStatus" required>
+      <option value="">الحالة التناسلية</option>
+      <option value="حديث الولادة">حديث الولادة</option>
+      <option value="ملقحة">ملقحة</option>
+      <option value="مفتوحة">مفتوحة</option>
+      <option value="عشار">عشار</option>
+      <option value="اجهاض">اجهاض</option>
+    </select>
+
+    <input type="date" id="lastInseminationDate" placeholder="تاريخ آخر تلقيح" class="hidden">
+
+    <input type="date" id="birthDate" placeholder="تاريخ الميلاد (اختياري)">
+
+    <input type="date" id="lastCalvingDate" placeholder="تاريخ آخر ولادة" required>
+
     <button type="submit">تسجيل الحيوان</button>
   </form>
 
   <script>
-    const form = document.getElementById("animalForm");
+    const form = document.getElementById('animalForm');
+    const typeSelect = document.getElementById('type');
+    const breedSelect = document.getElementById('breed');
+    const productionStatus = document.getElementById('productionStatus');
+    const milkProduction = document.getElementById('milkProduction');
+    const reproductiveStatus = document.getElementById('reproductiveStatus');
+    const lastInseminationDate = document.getElementById('lastInseminationDate');
 
-    form.addEventListener("submit", async (e) => {
+    typeSelect.addEventListener('change', () => {
+      const type = typeSelect.value;
+      breedSelect.innerHTML = '<option value="">السلالة</option>';
+      if (type === 'بقرة') {
+        ['خليط', 'هولشتاين', 'جيرسي', 'مونبليار', 'سيمينتال', 'أخرى'].forEach(b =>
+          breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+        );
+      } else if (type === 'جاموسة') {
+        ['مصري', 'هجين إيطالي', 'هجين هندي'].forEach(b =>
+          breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+        );
+      }
+    });
+
+    productionStatus.addEventListener('change', () => {
+      milkProduction.classList.toggle('hidden', productionStatus.value !== 'حلاب');
+      if (productionStatus.value !== 'حلاب') milkProduction.value = '';
+    });
+
+    reproductiveStatus.addEventListener('change', () => {
+      lastInseminationDate.classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
+      if (reproductiveStatus.value !== 'ملقحة') lastInseminationDate.value = '';
+    });
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const name = document.getElementById("name").value.trim();
-      const number = document.getElementById("number").value.trim();
-      const type = document.getElementById("type").value;
-      const birthDate = document.getElementById("birthDate").value;
+      const animal = {
+        number: document.getElementById('number').value.trim(),
+        type: typeSelect.value,
+        breed: breedSelect.value,
+        productionStatus: productionStatus.value,
+        milkProduction: milkProduction.value || null,
+        reproductiveStatus: reproductiveStatus.value,
+        lastInseminationDate: lastInseminationDate.value || null,
+        birthDate: document.getElementById('birthDate').value || null,
+        lastCalvingDate: document.getElementById('lastCalvingDate').value
+      };
 
       const userPhone = localStorage.getItem("userPhone");
       if (!userPhone) {
@@ -77,28 +145,31 @@
         const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            number,
-            type,
-            birthDate,
-            ownerPhone: userPhone
-          }),
+          body: JSON.stringify({ ...animal, ownerPhone: userPhone }),
         });
 
         const data = await res.json();
 
         if (res.ok) {
-          alert("تم تسجيل الحيوان بنجاح.");
-          form.reset(); // 🟢 كان بيفرغ النموذج تلقائياً
+          const addMore = confirm("تم تسجيل الحيوان بنجاح.\nهل تريد تسجيل حيوان آخر؟");
+          if (addMore) {
+            form.reset();
+            milkProduction.classList.add('hidden');
+            lastInseminationDate.classList.add('hidden');
+            breedSelect.innerHTML = '<option value="">السلالة</option>';
+          } else {
+            window.location.href = 'add-event.html';
+          }
         } else {
-          alert(data.message || "حدث خطأ أثناء تسجيل الحيوان.");
+          alert(data.message || "حدث خطأ أثناء التسجيل.");
         }
       } catch (err) {
-        console.error("Error:", err);
+        console.error(err);
         alert("حدث خطأ في الاتصال بالخادم.");
       }
     });
   </script>
+
 </body>
 </html>
+
