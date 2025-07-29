@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل حيوان جديد</title>
   <style>
     body {
@@ -45,140 +45,144 @@
 </head>
 <body>
 
-  <h2>تسجيل حيوان جديد</h2>
+<h2>تسجيل حيوان جديد</h2>
 
-  <form id="animalForm">
-    <input type="text" id="number" placeholder="رقم الحيوان" required>
+<form id="animalForm">
+  <input type="text" id="number" placeholder="رقم الحيوان" required />
 
-    <select id="type" required>
-      <option value="">نوع الحيوان</option>
-      <option value="بقرة">بقرة</option>
-      <option value="جاموسة">جاموسة</option>
-    </select>
+  <select id="type" required>
+    <option value="">نوع الحيوان</option>
+    <option value="بقرة">بقرة</option>
+    <option value="جاموسة">جاموسة</option>
+  </select>
 
-    <select id="breed" required>
-      <option value="">السلالة</option>
-    </select>
+  <select id="breed" required>
+    <option value="">السلالة</option>
+  </select>
 
-    <select id="productionStatus" required>
-      <option value="">الحالة الإنتاجية</option>
-      <option value="حلاب">حلاب</option>
-      <option value="جاف">جاف</option>
-    </select>
+  <select id="productionStatus" required>
+    <option value="">الحالة الإنتاجية</option>
+    <option value="حلاب">حلاب</option>
+    <option value="جاف">جاف</option>
+  </select>
 
-    <input type="number" id="milkProduction" placeholder="إنتاج اللبن اليومي (كجم)" class="hidden">
+  <input type="number" id="milkProduction" placeholder="إنتاج اللبن اليومي (كجم)" class="hidden" />
 
-    <select id="reproductiveStatus" required>
-      <option value="">الحالة التناسلية</option>
-      <option value="حديث الولادة">حديث الولادة</option>
-      <option value="ملقحة">ملقحة</option>
-      <option value="مفتوحة">مفتوحة</option>
-      <option value="عشار">عشار</option>
-      <option value="اجهاض">اجهاض</option>
-    </select>
-<p id="inseminationLabel" class="hidden" style="text-align:right;font-weight:bold;">تاريخ آخر تلقيح:</p>
+  <select id="reproductiveStatus" required>
+    <option value="">الحالة التناسلية</option>
+    <option value="حديث الولادة">حديث الولادة</option>
+    <option value="ملقحة">ملقحة</option>
+    <option value="مفتوحة">مفتوحة</option>
+    <option value="عشار">عشار</option>
+    <option value="اجهاض">اجهاض</option>
+  </select>
 
-    <input type="date" id="lastInseminationDate" placeholder="تاريخ آخر تلقيح" class="hidden">
-<p style="text-align:right;font-weight:bold;">تاريخ الميلاد (اختياري):</p>
+  <p id="inseminationLabel" class="hidden" style="text-align:right;font-weight:bold;">تاريخ آخر تلقيح:</p>
+  <input type="date" id="lastInseminationDate" class="hidden"/>
 
-    <input type="date" id="birthDate" placeholder="تاريخ الميلاد (اختياري)">
-<p style="text-align:right;font-weight:bold;">تاريخ آخر ولادة:</p>
+  <p style="text-align:right;font-weight:bold;">تاريخ الميلاد (اختياري):</p>
+  <input type="date" id="birthDate" />
 
-    <input type="date" id="lastCalvingDate" placeholder="تاريخ آخر ولادة" required>
+  <p style="text-align:right;font-weight:bold;">تاريخ آخر ولادة:</p>
+  <input type="date" id="lastCalvingDate" required />
 
-    <button type="submit">تسجيل الحيوان</button>
-  </form>
+  <button type="submit">تسجيل الحيوان</button>
+</form>
 
-  <script>
-    const form = document.getElementById('animalForm');
-    const typeSelect = document.getElementById('type');
-    const breedSelect = document.getElementById('breed');
-    const productionStatus = document.getElementById('productionStatus');
-    const milkProduction = document.getElementById('milkProduction');
-    const reproductiveStatus = document.getElementById('reproductiveStatus');
-    const lastInseminationDate = document.getElementById('lastInseminationDate');
+<script>
+  const form = document.getElementById('animalForm');
+  const typeSelect = document.getElementById('type');
+  const breedSelect = document.getElementById('breed');
+  const productionStatus = document.getElementById('productionStatus');
+  const milkProduction = document.getElementById('milkProduction');
+  const reproductiveStatus = document.getElementById('reproductiveStatus');
+  const lastInseminationDate = document.getElementById('lastInseminationDate');
 
-    typeSelect.addEventListener('change', () => {
-      const type = typeSelect.value;
-      breedSelect.innerHTML = '<option value="">السلالة</option>';
-      if (type === 'بقرة') {
-        ['خليط', 'هولشتاين', 'جيرسي', 'مونبليار', 'سيمينتال', 'أخرى'].forEach(b =>
-          breedSelect.innerHTML += `<option value="${b}">${b}</option>`
-        );
-      } else if (type === 'جاموسة') {
-        ['مصري', 'هجين إيطالي', 'هجين هندي'].forEach(b =>
-          breedSelect.innerHTML += `<option value="${b}">${b}</option>`
-        );
+  // تعبئة السلالة عند تغيير النوع
+  typeSelect.addEventListener('change', () => {
+    const type = typeSelect.value;
+    breedSelect.innerHTML = '<option value="">السلالة</option>';
+    if (type === 'بقرة') {
+      ['خليط', 'هولشتاين', 'جيرسي', 'مونبليار', 'سيمينتال', 'أخرى'].forEach(b =>
+        breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+      );
+    } else if (type === 'جاموسة') {
+      ['مصري', 'هجين إيطالي', 'هجين هندي'].forEach(b =>
+        breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+      );
+    }
+  });
+
+  // عند تحميل الصفحة: تعبئة السلالات لو النوع متحدد
+  window.addEventListener("DOMContentLoaded", () => {
+    const type = typeSelect.value;
+    if (type === 'بقرة') {
+      ['خليط', 'هولشتاين', 'جيرسي', 'مونبليار', 'سيمينتال', 'أخرى'].forEach(b =>
+        breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+      );
+    } else if (type === 'جاموسة') {
+      ['مصري', 'هجين إيطالي', 'هجين هندي'].forEach(b =>
+        breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+      );
+    }
+  });
+
+  productionStatus.addEventListener('change', () => {
+    milkProduction.classList.toggle('hidden', productionStatus.value !== 'حلاب');
+    if (productionStatus.value !== 'حلاب') milkProduction.value = '';
+  });
+
+  reproductiveStatus.addEventListener('change', () => {
+    lastInseminationDate.classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
+    document.getElementById('inseminationLabel').classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
+    if (reproductiveStatus.value !== 'ملقحة') lastInseminationDate.value = '';
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const animal = {
+      number: document.getElementById('number').value.trim(),
+      type: typeSelect.value,
+      breed: breedSelect.value,
+      productionStatus: productionStatus.value,
+      milkProduction: milkProduction.value || null,
+      reproductiveStatus: reproductiveStatus.value,
+      lastInseminationDate: lastInseminationDate.value || null,
+      birthDate: document.getElementById('birthDate').value || null,
+      lastCalvingDate: document.getElementById('lastCalvingDate').value
+    };
+
+    const userPhone = localStorage.getItem("userPhone");
+    if (!userPhone) {
+      alert("برجاء تسجيل الدخول أولاً.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    try {
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...animal, ownerPhone: userPhone })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("تم تسجيل الحيوان بنجاح.");
+        setTimeout(() => {
+          window.location.href = "add-event.html";
+        }, 500);
+      } else {
+        alert(data.message || "حدث خطأ أثناء التسجيل.");
       }
-    });
-
-    productionStatus.addEventListener('change', () => {
-      milkProduction.classList.toggle('hidden', productionStatus.value !== 'حلاب');
-      if (productionStatus.value !== 'حلاب') milkProduction.value = '';
-    });
-
-    reproductiveStatus.addEventListener('change', () => {
-      lastInseminationDate.classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
-      if (reproductiveStatus.value !== 'ملقحة') lastInseminationDate.value = '';
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const animal = {
-        number: document.getElementById('number').value.trim(),
-        type: typeSelect.value,
-        breed: breedSelect.value,
-        productionStatus: productionStatus.value,
-        milkProduction: milkProduction.value || null,
-        reproductiveStatus: reproductiveStatus.value,
-        lastInseminationDate: lastInseminationDate.value || null,
-        birthDate: document.getElementById('birthDate').value || null,
-        lastCalvingDate: document.getElementById('lastCalvingDate').value
-      };
-
-      const userPhone = localStorage.getItem("userPhone");
-      if (!userPhone) {
-        alert("برجاء تسجيل الدخول أولاً.");
-        window.location.href = "login.html";
-        return;
-      }
-
-      try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...animal, ownerPhone: userPhone }),
-        });
-
-        const data = await res.json();
-
-       if (res.ok) {
-  alert("تم تسجيل الحيوان بنجاح.");
-
-  // إخفاء العناصر الشرطية فقط
-  milkProduction.classList.add('hidden');
-  lastInseminationDate.classList.add('hidden');
-  document.getElementById("inseminationLabel")?.classList.add('hidden');
-
-  // ✅ لا نلمس breedSelect ولا نعمل reset
-  // ✅ لا نعيد تحميل السلالات — نوجّه فورًا
-
-  setTimeout(() => {
-    window.location.href = "add-event.html";
-  }, 500);
-}
-
-          }
-        } else {
-          alert(data.message || "حدث خطأ أثناء التسجيل.");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("حدث خطأ في الاتصال بالخادم.");
-      }
-    });
-  </script>
+    } catch (err) {
+      console.error(err);
+      alert("حدث خطأ في الاتصال بالخادم.");
+    }
+  });
+</script>
 
 </body>
 </html>
