@@ -153,15 +153,22 @@
 
         const data = await res.json();
 
-        if (res.ok) {
-          const addMore = confirm("تم تسجيل الحيوان بنجاح.\nهل تريد تسجيل حيوان آخر؟");
-          if (addMore) {
-            form.reset();
-            milkProduction.classList.add('hidden');
-            lastInseminationDate.classList.add('hidden');
-            breedSelect.innerHTML = '<option value="">السلالة</option>';
-          } else {
-            window.location.href = 'add-event.html';
+       if (res.ok) {
+  alert("تم تسجيل الحيوان بنجاح.");
+
+  // إخفاء العناصر الشرطية فقط
+  milkProduction.classList.add('hidden');
+  lastInseminationDate.classList.add('hidden');
+  document.getElementById("inseminationLabel")?.classList.add('hidden');
+
+  // ✅ لا نلمس breedSelect ولا نعمل reset
+  // ✅ لا نعيد تحميل السلالات — نوجّه فورًا
+
+  setTimeout(() => {
+    window.location.href = "add-event.html";
+  }, 500);
+}
+
           }
         } else {
           alert(data.message || "حدث خطأ أثناء التسجيل.");
