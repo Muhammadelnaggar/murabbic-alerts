@@ -153,13 +153,16 @@
 
         const data = await res.json();
 
-      if (res.ok) {
-  alert("تم تسجيل الحيوان بنجاح.");
-  setTimeout(() => {
-    window.location.href = "add-event.html";
-  }, 500);
-}
-
+        if (res.ok) {
+          const addMore = confirm("تم تسجيل الحيوان بنجاح.\nهل تريد تسجيل حيوان آخر؟");
+          if (addMore) {
+            form.reset();
+            milkProduction.classList.add('hidden');
+            lastInseminationDate.classList.add('hidden');
+            breedSelect.innerHTML = '<option value="">السلالة</option>';
+          } else {
+            window.location.href = 'add-event.html';
+          }
         } else {
           alert(data.message || "حدث خطأ أثناء التسجيل.");
         }
@@ -172,4 +175,3 @@
 
 </body>
 </html>
-
