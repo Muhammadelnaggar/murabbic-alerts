@@ -69,6 +69,27 @@ app.post('/api/animals', (req, res) => {
   fs.writeFileSync(animalsPath, JSON.stringify(animals, null, 2));
   res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
 });
+// === تسجيل حدث (مثل الولادة) ===
+app.post('/api/events', (req, res) => {
+  const event = req.body;
+
+  if (!event || !event.type || !event.animalId) {
+    return res.status(400).json({ error: 'بيانات الحدث ناقصة' });
+  }
+
+  const eventsPath = path.join(dataDir, 'events.json');
+  let events = [];
+
+  if (fs.existsSync(eventsPath)) {
+    events = JSON.parse(fs.readFileSync(eventsPath, 'utf8') || '[]');
+  }
+
+  event.id = events.length + 1;
+  events.push(event);
+
+  fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
+  res.status(200).json({ message: '✅ تم تسجيل الحدث بنجاح', event });
+});
 
 // === استرجاع تنبيهات المستخدم ===
 app.get('/alerts/:id', (req, res) => {
