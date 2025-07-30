@@ -3,26 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <title>تسجيل ولادة</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f9f9f9;
-      padding: 30px;
-      max-width: 600px;
-      margin: auto;
+      padding: 20px;
+      margin: 0;
     }
 
     h2 {
       text-align: center;
       color: #2c3e50;
+      margin-bottom: 30px;
     }
 
     form {
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      margin-top: 30px;
+      gap: 15px;
+      max-width: 500px;
+      margin: auto;
     }
 
     label {
@@ -34,6 +36,7 @@
       border-radius: 6px;
       border: 1px solid #ccc;
       font-size: 16px;
+      box-sizing: border-box;
     }
 
     button {
@@ -45,6 +48,12 @@
 
     button:hover {
       background-color: #218838;
+    }
+
+    @media (max-width: 600px) {
+      form {
+        padding: 0 10px;
+      }
     }
   </style>
 </head>
@@ -84,7 +93,6 @@
   </form>
 
   <script>
-    // تعيين تاريخ اليوم تلقائيًا
     document.getElementById("birthDate").valueAsDate = new Date();
 
     document.getElementById("birthForm").addEventListener("submit", async function(e) {
@@ -100,22 +108,36 @@
         calfFate: this.calfFate.value,
       };
 
-      const res = await fetch("/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      try {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
 
-      if (res.ok) {
-        alert("✅ تم تسجيل حدث الولادة بنجاح");
-        this.reset();
-        this.birthDate.valueAsDate = new Date();
-      } else {
-        alert("❌ فشل في تسجيل الحدث");
+        if (res.ok) {
+          alert("✅ تم تسجيل حدث الولادة بنجاح");
+          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+          if (anotherEvent) {
+            this.reset();
+            this.birthDate.valueAsDate = new Date();
+          } else {
+            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+            if (anotherAnimal) {
+              window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
+            }
+          }
+        } else {
+          alert("❌ فشل في تسجيل الحدث");
+        }
+      } catch (err) {
+        alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
+        console.error(err);
       }
     });
   </script>
 
 </body>
 </html>
-
