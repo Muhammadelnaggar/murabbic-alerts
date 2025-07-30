@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -122,24 +123,22 @@
         if (res.ok) {
           alert("✅ تم تسجيل حدث الولادة بنجاح");
 
-          // ⚡️ سيناريو الإبحار المتفق عليه:
-          const wantsAnotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
-          if (wantsAnotherEvent) {
-            form.reset();
-            birthDateInput.valueAsDate = new Date();
-            return;
-          }
-
-          const wantsAnotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-          if (wantsAnotherAnimal) {
-            window.location.href = "add-animal.html";
+          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+          if (anotherEvent) {
+            window.location.href = "add-event.html";
           } else {
-            window.location.href = "dashboard.html";
+            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+            if (anotherAnimal) {
+              window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
+            }
           }
 
         } else {
           alert("❌ فشل في تسجيل الحدث: " + (result?.error || ''));
         }
+
       } catch (error) {
         console.error("⚠️ خطأ:", error);
         alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
