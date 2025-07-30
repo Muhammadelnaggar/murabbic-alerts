@@ -89,7 +89,6 @@
       <option value="بيع">بيع</option>
     </select>
 
-    <!-- ✅ زر التسجيل الصحيح -->
     <button type="submit">💾 تسجيل</button>
   </form>
 
@@ -98,7 +97,7 @@
     const birthDateInput = document.getElementById("birthDate");
     birthDateInput.valueAsDate = new Date();
 
-    form.addEventListener("submit", async function(e) {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const data = {
@@ -123,25 +122,24 @@
         if (res.ok) {
           alert("✅ تم تسجيل حدث الولادة بنجاح");
 
-          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
-          if (anotherEvent) {
-            alert("🟢 اختار تسجيل حدث آخر");
+          // ⚡️ سيناريو الإبحار المتفق عليه:
+          const wantsAnotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+          if (wantsAnotherEvent) {
             form.reset();
             birthDateInput.valueAsDate = new Date();
+            return;
+          }
+
+          const wantsAnotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+          if (wantsAnotherAnimal) {
+            window.location.href = "add-animal.html";
           } else {
-            alert("🟡 اختار عدم تسجيل حدث آخر");
-            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-            if (anotherAnimal) {
-              window.location.href = "add-animal.html";
-            } else {
-              window.location.href = "dashboard.html";
-            }
+            window.location.href = "dashboard.html";
           }
 
         } else {
           alert("❌ فشل في تسجيل الحدث: " + (result?.error || ''));
         }
-
       } catch (error) {
         console.error("⚠️ خطأ:", error);
         alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
