@@ -2,54 +2,62 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>مربي جديد؟</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0ffe0; /* أصفر كناري باهت */
-      padding: 30px;
+      font-family: 'Arial', sans-serif;
+      background-color: #f5ffd9; /* أصفر كناري فاتح */
       margin: 0;
+      padding: 0;
+      direction: rtl;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
     }
 
     h2 {
-      text-align: center;
+      margin-bottom: 20px;
       color: black;
-      margin-bottom: 25px;
     }
 
     form {
-      max-width: 400px;
-      margin: auto;
       display: flex;
       flex-direction: column;
       gap: 15px;
-      background-color: #ffffff;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0, 128, 0, 0.2);
     }
 
     label {
+      text-align: right;
       font-weight: bold;
       color: black;
     }
 
     input {
       padding: 10px;
-      font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 6px;
+      font-size: 16px;
     }
 
     button {
-      padding: 12px;
-      font-size: 18px;
       background-color: #28a745; /* أخضر */
       color: white;
       border: none;
+      padding: 12px;
       border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
     }
 
@@ -58,77 +66,73 @@
     }
 
     .login-link {
-      text-align: center;
       margin-top: 15px;
+      font-size: 14px;
+      color: black;
     }
 
     .login-link a {
-      text-decoration: none;
-      color: black;
-      font-weight: bold;
-    }
-
-    .login-link a:hover {
+      color: #000;
       text-decoration: underline;
     }
   </style>
 </head>
 <body>
-
-  <h2>مربي جديد؟</h2>
-
-  <form id="registerForm">
-    <label for="name">الاسم</label>
-    <input type="text" id="name" name="name" required />
-
-    <label for="phone">رقم الهاتف</label>
-    <input type="text" id="phone" name="phone" required />
-
-    <label for="password">كلمة المرور</label>
-    <input type="password" id="password" name="password" required />
-
-    <button type="submit">تسجيل</button>
-
+  <div class="container">
+    <h2>مربي جديد؟</h2>
+    <form id="registerForm">
+      <div>
+        <label for="name">الاسم</label>
+        <input type="text" id="name" name="name" required />
+      </div>
+      <div>
+        <label for="phone">رقم الهاتف</label>
+        <input type="tel" id="phone" name="phone" required />
+      </div>
+      <div>
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" name="password" required />
+      </div>
+      <div>
+        <label for="confirmPassword">تأكيد كلمة المرور</label>
+        <input type="password" id="confirmPassword" required />
+      </div>
+      <button type="submit">تسجيل</button>
+    </form>
     <div class="login-link">
-      <a href="login.html">مربي خبرة؟ ادخل حسابك</a>
+      مربي خبرة؟ <a href="login.html">ادخل حسابك</a>
     </div>
-  </form>
+  </div>
 
   <script>
-    const form = document.getElementById("registerForm");
-
-    form.addEventListener("submit", async (e) => {
+    const form = document.getElementById('registerForm');
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const data = {
-        name: form.name.value,
-        phone: form.phone.value,
-        password: form.password.value,
-      };
+      const name = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
 
-      try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
+      if (password !== confirmPassword) {
+        alert("كلمة المرور وتأكيدها غير متطابقين");
+        return;
+      }
 
-        const result = await res.json();
+      const response = await fetch('https://murabbic-alerts.onrender.com/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, password })
+      });
 
-        if (res.ok) {
-          alert("✅ تم التسجيل بنجاح");
-          window.location.href = "login.html";
-        } else {
-          alert("❌ فشل في التسجيل: " + (result?.error || ""));
-        }
-      } catch (err) {
-        console.error(err);
-        alert("⚠️ حدث خطأ في الاتصال بالخادم");
+      const result = await response.json();
+      if (response.ok) {
+        alert(result.message);
+        window.location.href = "login.html";
+      } else {
+        alert(result.error || 'حدث خطأ أثناء التسجيل');
       }
     });
   </script>
-
 </body>
 </html>
-
-
