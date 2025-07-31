@@ -1,47 +1,137 @@
-<script>
-  document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const rawInput = document.getElementById("animalIds").value;
-
-    // نحاول تقسيم الإدخالات سواء كانت مفصولة بفواصل أو أسطر
-    const ids = rawInput
-      .split(/[\n,]+/)
-      .map(id => id.replace(/[^\d]/g, '').trim())
-      .filter(id => id.length > 0);
-
-    const commonData = {
-      date: document.getElementById("date").value,
-      vaccineType: document.getElementById("vaccineType").value,
-      doseType: document.getElementById("doseType").value,
-      vetName: document.getElementById("vetName").value
-    };
-
-    let successCount = 0;
-
-    for (let animalId of ids) {
-      const data = { ...commonData, animalId };
-
-      try {
-        const response = await fetch("https://murabbic-alerts.onrender.com/api/vaccinations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          successCount++;
-        }
-      } catch (error) {
-        console.error(`❌ فشل في تسجيل الحيوان ${animalId}:`, error);
-      }
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل تحصين جماعي</title>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #fffde7;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
     }
 
-    alert(`✅ تم تسجيل التحصين لـ ${successCount} من ${ids.length} حيوان بنجاح`);
-    document.getElementById("vaccinationForm").reset();
-  });
-</script>
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
 
+    label {
+      display: block;
+      margin-top: 15px;
+      color: #2e7d32;
+      font-weight: bold;
+      font-size: 16px;
+    }
 
+    textarea, input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 5px;
+      border: 1px solid #2e7d32;
+      border-radius: 8px;
+      font-size: 16px;
+    }
 
+    button {
+      background-color: #2e7d32;
+      color: white;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      margin-top: 25px;
+      width: 100%;
+      font-size: 18px;
+      cursor: pointer;
+    }
 
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📋 تسجيل تحصين جماعي</h1>
+
+  <form id="vaccinationForm">
+    <label for="animalIds">أرقام الحيوانات (رقم في كل سطر أو مفصول بفاصلة):</label>
+    <textarea id="animalIds" rows="4" required></textarea>
+
+    <label for="date">التاريخ:</label>
+    <input type="date" id="date" required>
+
+    <label for="vaccineType">نوع التحصين:</label>
+    <select id="vaccineType" required>
+      <option value="">-- اختر نوع التحصين --</option>
+      <option>الإجهاض المعدي</option>
+      <option>تسمم دموي</option>
+      <option>كلوستريديا (لاهوائيات)</option>
+      <option>التهاب الضرع</option>
+      <option>المجموعة التنفسية (Cattle Master)</option>
+      <option>حُمى الثلاث أيام</option>
+      <option>التهاب الجلد العقدي</option>
+      <option>الحُمى القلاعية</option>
+      <option>الباستريلا (حمى النقل)</option>
+    </select>
+
+    <label for="doseType">نوع الجرعة:</label>
+    <select id="doseType" required>
+      <option value="">-- اختر نوع الجرعة --</option>
+      <option>مبدئية</option>
+      <option>منشطة</option>
+    </select>
+
+    <label for="vetName">اسم الطبيب (اختياري):</label>
+    <input type="text" id="vetName">
+
+    <button type="submit">تسجيل التحصين الجماعي</button>
+  </form>
+
+  <script>
+    document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const animalIdsRaw = document.getElementById("animalIds").value;
+      const ids = animalIdsRaw
+        .split(/[\n,]+/)
+        .map(id => id.replace(/[^\d]/g, '').trim())
+        .filter(id => id.length > 0);
+
+      const commonData = {
+        date: document.getElementById("date").value,
+        vaccineType: document.getElementById("vaccineType").value,
+        doseType: document.getElementById("doseType").value,
+        vetName: document.getElementById("vetName").value
+      };
+
+      let successCount = 0;
+
+      for (let id of ids) {
+        const data = { ...commonData, animalId: id };
+
+        try {
+          const response = await fetch("https://murabbic-alerts.onrender.com/api/vaccinations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+          });
+
+          if (response.ok) {
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`❌ خطأ عند تسجيل الحيوان ${id}:`, error);
+        }
+      }
+
+      alert(`✅ تم تسجيل التحصين لـ ${successCount} من ${ids.length} حيوان بنجاح`);
+      document.getElementById("vaccinationForm").reset();
+    });
+  </script>
+
+</body>
+</html>
