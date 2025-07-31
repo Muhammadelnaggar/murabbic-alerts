@@ -72,6 +72,14 @@
 <body>
 
   <h1>🐄 قطيعك المسجل</h1>
+  <input
+  type="text"
+  id="searchInput"
+  placeholder="🔍 ابحث برقم الحيوان أو النوع أو السلالة..."
+  onkeyup="filterTable()"
+  style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 20px; border: 2px solid #2e7d32; border-radius: 8px;"
+/>
+
 <div class="table-container">
   <table>
     <thead>
@@ -125,6 +133,17 @@
     }
 
     loadAnimals();
+    function filterTable() {
+  const input = document.getElementById("searchInput");
+  const filter = input.value.toLowerCase();
+  const rows = document.querySelectorAll("#animalTable tr");
+
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(filter) ? "" : "none";
+  });
+}
+
   </script>
 
 </body>
