@@ -11,6 +11,27 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
+const fs = require('fs');
+const path = require('path');
+
+// هذا الجزء يجيب كل الحيوانات المسجلة
+app.get('/api/animals', (req, res) => {
+  const filePath = path.join(__dirname, 'data', 'animals.json');
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('❌ فشل في قراءة ملف الحيوانات:', err);
+      return res.status(500).json({ error: 'فشل في قراءة البيانات' });
+    }
+
+    try {
+      const animals = JSON.parse(data);
+      res.json(animals);
+    } catch (parseError) {
+      console.error('❌ خطأ في تحليل ملف JSON:', parseError);
+      res.status(500).json({ error: 'خطأ في البيانات' });
+    }
+  });
+});
 
 // === مسارات ملفات البيانات ===
 const dataDir = path.join(__dirname, 'data');
