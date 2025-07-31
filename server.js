@@ -11,8 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
-const fs = require('fs');
-const path = require('path');
+
 
 // هذا الجزء يجيب كل الحيوانات المسجلة
 app.get('/api/animals', (req, res) => {
