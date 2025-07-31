@@ -12,8 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
 
-const fs = require('fs');
-const path = require('path');
+
 
 // POST route to save insemination event
 app.post('/api/inseminations', (req, res) => {
