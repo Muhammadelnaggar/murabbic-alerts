@@ -104,91 +104,72 @@
     </div>
   </div>
 
-  <script>
-    const apiUrl = "https://murabbic-alerts.onrender.com";
-    const form = document.getElementById("registerForm");
+ <script>
+  const apiUrl = "https://murabbic-alerts.onrender.com";
+  const form = document.getElementById("registerForm");
 
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault();
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
 
-      const name = document.getElementById("name").value.trim();
-      const phone = document.getElementById("phone").value.trim();
-      const password = document.getElementById("password").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
+    const name = document.getElementById("name").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
 
-      if (password !== confirmPassword) {
-        alert("كلمة المرور وتأكيدها غير متطابقين");
+    if (!name || !phone || !password || !confirmPassword) {
+      alert("❗ جميع الحقول مطلوبة");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      alert("❗ كلمة المرور وتأكيدها غير متطابقين");
+      return;
+    }
+
+    try {
+      // تسجيل مستخدم جديد
+      const res = await fetch(`${apiUrl}/api/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          alert("❗ رقم الهاتف مستخدم مسبقًا");
+        } else {
+          alert(data.error || "❗ حدث خطأ أثناء التسجيل");
+        }
         return;
       }
 
-      try {
-        // إرسال البيانات لتسجيل المستخدم
-        const res = await fetch(`${apiUrl}/api/users`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, phone, password })
-        });
+      // تسجيل الدخول التلقائي
+      const loginRes = await fetch(`${apiUrl}/api/users/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password })
+      });
 
-        const data = await res.json();
+      const loginData = await loginRes.json();
 
-if (!res.ok) {
-  if (res.status === 409) {
-    alert("رقم الهاتف مستخدم مسبقًا");
-  } else {
-    alert(data.error || "حدث خطأ أثناء التسجيل");
-  }
-  return;
-}
-
-
-        if (!res.ok) {
-          alert(data.error || "حدث خطأ أثناء التسجيل");
-          return;
-        }
-const loginRes = await fetch(`${apiUrl}/api/users/login`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ phone, password })
-});
-
-const loginData = await loginRes.json();
-
-if (!loginRes.ok) {
-  alert("تم التسجيل لكن فشل تسجيل الدخول");
-  return;
-}
-
-// حفظ بيانات المستخدم
-localStorage.setItem("user", JSON.stringify(loginData.user));
-
-alert("تم التسجيل والدخول بنجاح");
-window.location.href = "add-animal.html";
-
-        // تسجيل الدخول التلقائي
-        const loginRes = await fetch(`${apiUrl}/api/users/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, password })
-        });
-
-        const loginData = await loginRes.json();
-
-        if (!loginRes.ok) {
-          alert("تم التسجيل لكن فشل تسجيل الدخول");
-          return;
-        }
-
-        // حفظ بيانات المستخدم
-        localStorage.setItem("user", JSON.stringify(loginData.user));
-
-        alert("تم التسجيل والدخول بنجاح");
-        window.location.href = "add-animal.html";
-
-      } catch (err) {
-        console.error(err);
-        alert("حدث خطأ في الاتصال بالخادم");
+      if (!loginRes.ok) {
+        alert("✅ تم التسجيل لكن فشل تسجيل الدخول");
+        return;
       }
-    });
-  </script>
+
+      // حفظ وتوجيه
+      localStorage.setItem("user", JSON.stringify(loginData.user));
+      alert("✅ تم التسجيل والدخول بنجاح");
+      window.location.href = "add-animal.html";
+
+    } catch (err) {
+      console.error(err);
+      alert("❌ حدث خطأ في الاتصال بالخادم");
+    }
+  });
+</script>
+
 </body>
 </html>
