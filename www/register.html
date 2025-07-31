@@ -6,23 +6,22 @@
   <title>مربي جديد؟</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
       font-family: 'Arial', sans-serif;
       background: linear-gradient(to bottom right, #eeffdd, #fffedc);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      margin: 0;
     }
 
     .container {
-      background-color: white;
+      background: white;
       padding: 30px 25px;
       border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
       max-width: 400px;
-      width: 100%;
+      width: 90%;
     }
 
     h2 {
@@ -106,37 +105,61 @@
   </div>
 
   <script>
-    document.getElementById('registerForm').addEventListener('submit', function(e) {
+    const apiUrl = "https://murabbic-alerts.onrender.com";
+    const form = document.getElementById("registerForm");
+
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
 
-      const name = document.getElementById('name').value.trim();
-      const phone = document.getElementById('phone').value.trim();
-      const password = document.getElementById('password').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const password = document.getElementById("password").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
 
       if (password !== confirmPassword) {
-        alert('كلمتا المرور غير متطابقتين');
+        alert("كلمة المرور وتأكيدها غير متطابقين");
         return;
       }
 
-      fetch('https://murabbic-alerts.onrender.com/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, password })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
-          alert(data.error);
-        } else {
-          alert('تم التسجيل بنجاح');
-          window.location.href = 'add-animal.html';
+      try {
+        // إرسال البيانات لتسجيل المستخدم
+        const res = await fetch(`${apiUrl}/api/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, phone, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || "حدث خطأ أثناء التسجيل");
+          return;
         }
-      })
-      .catch(err => {
-        alert('حدث خطأ أثناء التسجيل');
+
+        // تسجيل الدخول التلقائي
+        const loginRes = await fetch(`${apiUrl}/api/users/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, password })
+        });
+
+        const loginData = await loginRes.json();
+
+        if (!loginRes.ok) {
+          alert("تم التسجيل لكن فشل تسجيل الدخول");
+          return;
+        }
+
+        // حفظ بيانات المستخدم
+        localStorage.setItem("user", JSON.stringify(loginData.user));
+
+        alert("تم التسجيل والدخول بنجاح");
+        window.location.href = "add-animal.html";
+
+      } catch (err) {
         console.error(err);
-      });
+        alert("حدث خطأ في الاتصال بالخادم");
+      }
     });
   </script>
 </body>
