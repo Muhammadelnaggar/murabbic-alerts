@@ -131,6 +131,16 @@
 
         const data = await res.json();
 
+if (!res.ok) {
+  if (res.status === 409) {
+    alert("رقم الهاتف مستخدم مسبقًا");
+  } else {
+    alert(data.error || "حدث خطأ أثناء التسجيل");
+  }
+  return;
+}
+
+
         if (!res.ok) {
           alert(data.error || "حدث خطأ أثناء التسجيل");
           return;
