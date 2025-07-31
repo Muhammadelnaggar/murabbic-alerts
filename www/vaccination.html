@@ -96,7 +96,11 @@
       e.preventDefault();
 
       const animalIdsRaw = document.getElementById("animalIds").value;
-      const animalIds = animalIdsRaw.split(/[\n,]+/).map(id => id.trim()).filter(id => id);
+     const ids = document.getElementById("animalIds").value
+  .split(/\n+/) // كل سطر يمثل رقم حيوان
+  .map(id => id.replace(/[^\d]/g, '').trim()) // إزالة أي فواصل أو رموز
+  .filter(id => id);
+
 
       const commonData = {
         date: document.getElementById("date").value,
