@@ -12,8 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
 
-const fs = require("fs");
-const path = require("path");
+
 
 // إنشاء مجلد data إذا لم يكن موجودًا
 const dataDir = path.join(__dirname, "data");
