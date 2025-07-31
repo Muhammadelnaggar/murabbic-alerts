@@ -12,6 +12,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
 
+const fs = require('fs');
+const path = require('path');
+
+// POST route to save insemination event
+app.post('/api/inseminations', (req, res) => {
+  const newInsemination = req.body;
+  const filePath = path.join(__dirname, 'data', 'inseminations.json');
+
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('خطأ في قراءة ملف التلقيحات:', err);
+      return res.status(500).json({ error: 'فشل في قراءة البيانات' });
+    }
+
+    let inseminations = [];
+    try {
+      inseminations = JSON.parse(data);
+    } catch (parseErr) {
+      console.error('خطأ في تحويل البيانات:', parseErr);
+    }
+
+    inseminations.push(newInsemination);
+
+    fs.writeFile(filePath, JSON.stringify(inseminations, null, 2), (err) => {
+      if (err) {
+        console.error('خطأ في حفظ بيانات التلقيح:', err);
+        return res.status(500).json({ error: 'فشل في حفظ التلقيح' });
+      }
+
+      res.status(200).json({ message: 'تم حفظ التلقيح بنجاح' });
+    });
+  });
+});
 
 // هذا الجزء يجيب كل الحيوانات المسجلة
 app.get('/api/animals', (req, res) => {
