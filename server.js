@@ -12,6 +12,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
 
+const fs = require("fs");
+const path = require("path");
+
+// إنشاء مجلد data إذا لم يكن موجودًا
+const dataDir = path.join(__dirname, "data");
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir);
+}
+
+// نقطة النهاية لتسجيل التحصينات
+app.post("/api/vaccinations", (req, res) => {
+  const vaccination = req.body;
+  const filePath = path.join(dataDir, "vaccinations.json");
+
+  // تحميل الملف أو تهيئة مصفوفة جديدة
+  let vaccinations = [];
+  if (fs.existsSync(filePath)) {
+    vaccinations = JSON.parse(fs.readFileSync(filePath));
+  }
+
+  // حفظ التحصين الجديد
+  vaccinations.push(vaccination);
+  fs.writeFileSync(filePath, JSON.stringify(vaccinations, null, 2));
+
+  res.status(200).json({ message: "✅ تم حفظ التحصين بنجاح" });
+});
 
 
 // POST route to save insemination event
