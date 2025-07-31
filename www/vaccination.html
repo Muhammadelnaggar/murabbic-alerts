@@ -2,135 +2,135 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل التحصين</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل تحصين جماعي</title>
   <style>
     body {
       direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f9f9f9;
-      padding: 30px;
-      max-width: 600px;
-      margin: auto;
+      background-color: #fffde7;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
     }
 
-    h2 {
+    h1 {
       text-align: center;
-      color: #2c3e50;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      margin-top: 30px;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 20px;
     }
 
     label {
+      display: block;
+      margin-top: 15px;
+      color: #2e7d32;
       font-weight: bold;
+      font-size: 16px;
     }
 
-    input, select, button, textarea {
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
+    textarea, input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 5px;
+      border: 1px solid #2e7d32;
+      border-radius: 8px;
       font-size: 16px;
     }
 
     button {
-      background-color: #007bff;
+      background-color: #2e7d32;
       color: white;
+      padding: 14px;
       border: none;
+      border-radius: 10px;
+      margin-top: 25px;
+      width: 100%;
+      font-size: 18px;
       cursor: pointer;
     }
 
     button:hover {
-      background-color: #0056b3;
+      background-color: #1b5e20;
     }
   </style>
 </head>
 <body>
 
-  <h2>💉 تسجيل التحصين</h2>
+  <h1>📋 تسجيل تحصين جماعي</h1>
 
   <form id="vaccinationForm">
-    <label for="animalIds">أرقام الحيوانات (افصل بين كل رقم بفاصلة أو سطر جديد)</label>
-    <textarea id="animalIds" name="animalIds" rows="3" required></textarea>
+    <label for="animalIds">أرقام الحيوانات (رقم في كل سطر أو مفصول بفاصلة):</label>
+    <textarea id="animalIds" rows="4" required></textarea>
 
-    <label for="vaccineDate">تاريخ التحصين</label>
-    <input type="date" id="vaccineDate" name="vaccineDate" required>
+    <label for="date">التاريخ:</label>
+    <input type="date" id="date" required>
 
-    <label for="vaccineType">نوع التحصين</label>
-    <select id="vaccineType" name="vaccineType" required>
-      <option value="جرعة أولية">جرعة أولية</option>
-      <option value="جرعة منشطة">جرعة منشطة</option>
+    <label for="vaccineType">نوع التحصين:</label>
+    <select id="vaccineType" required>
+      <option value="">-- اختر نوع التحصين --</option>
+      <option>الإجهاض المعدي</option>
+      <option>تسمم دموي</option>
+      <option>كلوستريديا (لاهوائيات)</option>
+      <option>التهاب الضرع</option>
+      <option>المجموعة التنفسية (Cattle Master)</option>
+      <option>حُمى الثلاث أيام</option>
+      <option>التهاب الجلد العقدي</option>
+      <option>الحُمى القلاعية</option>
+      <option>الباستريلا (حمى النقل)</option>
     </select>
 
-    <label for="vaccineName">اسم التحصين</label>
-    <select id="vaccineName" name="vaccineName" required>
-      <option value="الحمي القلاعية">الحمي القلاعية</option>
-      <option value="التهاب الجلد العقدي">التهاب الجلد العقدي</option>
-      <option value="التسمم الدموي (حمي النقل)">التسمم الدموي (حمي النقل)</option>
-      <option value="تحصين اسهال العجول للامهات">تحصين اسهال العجول للامهات</option>
-      <option value="الكلوستريديا (اللاهوائيات)">الكلوستريديا (اللاهوائيات)</option>
-      <option value="حمي الثلاث ايام">حمي الثلاث ايام</option>
-      <option value="التهاب الضرع">التهاب الضرع</option>
+    <label for="doseType">نوع الجرعة:</label>
+    <select id="doseType" required>
+      <option value="">-- اختر نوع الجرعة --</option>
+      <option>مبدئية</option>
+      <option>منشطة</option>
     </select>
 
-    <label for="veterinarian">اسم الطبيب البيطري</label>
-    <input type="text" id="veterinarian" name="veterinarian">
+    <label for="vetName">اسم الطبيب (اختياري):</label>
+    <input type="text" id="vetName">
 
-    <label for="notes">ملاحظات إضافية</label>
-    <textarea id="notes" name="notes" rows="3"></textarea>
-
-    <button type="submit">💾 تسجيل</button>
+    <button type="submit">تسجيل التحصين الجماعي</button>
   </form>
 
   <script>
-    document.getElementById("vaccineDate").valueAsDate = new Date();
-
     document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
       e.preventDefault();
 
-      const animalIds = this.animalIds.value
-        .split(/[\n,]+/)
-        .map(id => id.trim())
-        .filter(id => id !== "");
+      const animalIdsRaw = document.getElementById("animalIds").value;
+      const animalIds = animalIdsRaw.split(/[\n,]+/).map(id => id.trim()).filter(id => id);
 
       const commonData = {
-        type: "تحصين",
-        vaccineDate: this.vaccineDate.value,
-        vaccineType: this.vaccineType.value,
-        vaccineName: this.vaccineName.value,
-        veterinarian: this.veterinarian.value,
-        notes: this.notes.value
+        date: document.getElementById("date").value,
+        vaccineType: document.getElementById("vaccineType").value,
+        doseType: document.getElementById("doseType").value,
+        vetName: document.getElementById("vetName").value
       };
 
-      let allSuccess = true;
+      let successCount = 0;
 
-      for (const animalId of animalIds) {
-        const data = { ...commonData, animalId };
+      for (let id of animalIds) {
+        const data = { ...commonData, animalId: id };
 
-        const res = await fetch("/events/vaccine", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
+        try {
+          const response = await fetch("https://murabbic-alerts.onrender.com/api/vaccinations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+          });
 
-        if (!res.ok) {
-          allSuccess = false;
-          console.error(`❌ فشل تسجيل الحيوان رقم ${animalId}`);
+          if (response.ok) {
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`❌ خطأ عند تسجيل الحيوان ${id}:`, error);
         }
       }
 
-      if (allSuccess) {
-        alert("✅ تم تسجيل جميع التحصينات بنجاح");
-        this.reset();
-        this.vaccineDate.valueAsDate = new Date();
-      } else {
-        alert("⚠️ تم تسجيل بعض التحصينات، وفشل البعض الآخر. راجع الكونسول.");
-      }
+      alert(`✅ تم تسجيل التحصين لـ ${successCount} من ${animalIds.length} حيوان بنجاح`);
+      document.getElementById("vaccinationForm").reset();
     });
   </script>
 
 </body>
 </html>
+
+ 
