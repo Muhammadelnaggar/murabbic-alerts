@@ -126,48 +126,50 @@
       return;
     }
 
-    try {
-      // تسجيل مستخدم جديد
-      const res = await fetch(`${apiUrl}/api/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, password })
-      });
+ try {
+  // إرسال البيانات لتسجيل المستخدم
+  const res = await fetch(`${apiUrl}/api/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, phone, password })
+  });
 
-      const data = await res.json();
+  const data = await res.json();
 
-      if (!res.ok) {
-        if (res.status === 409) {
-          alert("❗ رقم الهاتف مستخدم مسبقًا");
-        } else {
-          alert(data.error || "❗ حدث خطأ أثناء التسجيل");
-        }
-        return;
-      }
-
-      // تسجيل الدخول التلقائي
-      const loginRes = await fetch(`${apiUrl}/api/users/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password })
-      });
-
-      const loginData = await loginRes.json();
-
-      if (!loginRes.ok) {
-        alert("✅ تم التسجيل لكن فشل تسجيل الدخول");
-        return;
-      }
-
-      // حفظ وتوجيه
-      localStorage.setItem("user", JSON.stringify(loginData.user));
-      alert("✅ تم التسجيل والدخول بنجاح");
-      window.location.href = "add-animal.html";
-
-    } catch (err) {
-      console.error(err);
-      alert("❌ حدث خطأ في الاتصال بالخادم");
+  if (!res.ok) {
+    if (res.status === 409) {
+      alert("رقم الهاتف مستخدم مسبقًا");
+    } else {
+      alert(data.error || "حدث خطأ أثناء التسجيل");
     }
+    return; // 🛑 إيقاف التنفيذ تمامًا لو فيه خطأ
+  }
+
+  // ✅ تسجيل الدخول التلقائي
+  const loginRes = await fetch(`${apiUrl}/api/users/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, password })
+  });
+
+  const loginData = await loginRes.json();
+
+  if (!loginRes.ok) {
+    alert("تم التسجيل لكن فشل تسجيل الدخول");
+    return;
+  }
+
+  // ✅ حفظ بيانات المستخدم
+  localStorage.setItem("user", JSON.stringify(loginData.user));
+
+  alert("تم التسجيل والدخول بنجاح");
+  window.location.href = "add-animal.html";
+  
+} catch (err) {
+  console.error(err);
+  alert("حدث خطأ في الاتصال بالخادم");
+}
+
   });
 </script>
 
