@@ -1,98 +1,115 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <title>تسجيل حدث جديد</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل حدث</title>
   <style>
     body {
       direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #fdfdfd;
-      padding: 30px;
-      max-width: 800px;
-      margin: auto;
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
     }
 
-    h2 {
-      color: #2c3e50;
-      margin-bottom: 20px;
+    h1 {
       text-align: center;
-    }
-
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 20px;
-      margin-top: 30px;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 30px;
     }
 
     .event-button {
-      height: 150px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      background-color: #ffffff;
-      border: 2px solid #28a745;
-      color: #28a745;
+      display: block;
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      font-size: 20px;
+      font-weight: bold;
+      color: #2e7d32;
+      border: 2px solid #2e7d32;
+      background-color: transparent;
       border-radius: 12px;
       cursor: pointer;
       transition: 0.3s;
     }
 
     .event-button:hover {
-      background-color: #28a745;
+      background-color: #2e7d32;
       color: white;
     }
 
-    .event-button img {
-      width: 40px;
-      height: 40px;
-      margin-bottom: 10px;
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 22px;
+      }
+
+      .event-button {
+        font-size: 18px;
+        padding: 12px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <h2>📅 تسجيل حدث جديد</h2>
+  <h1>📝 سجل حدث جديد</h1>
 
-  <div class="button-grid">
-    <button class="event-button" onclick="window.location.href='birth.html'">
-      <img src="images/birth.png" alt="ولادة">
-      ولادة
-    </button>
-    <button class="event-button" onclick="window.location.href='insemination.html'">
-      <img src="images/insemination.png" alt="تلقيح">
-      تلقيح
-    </button>
-  <button class="event-button" onclick="window.location.href='disease.html'">
-  <img src="images/diagnosis.png" alt="الأمراض">
-  الأمراض
-</button>
+  <!-- زر الولادة (محفوظ كما هو) -->
+  <button class="event-button" onclick="location.href='birth.html'">الولادة</button>
 
-    </button>
-    <button class="event-button" onclick="window.location.href='vaccination.html'">
-      <img src="images/vaccine.png" alt="تحصين">
-      تحصين
-    </button>
-    <button class="event-button" onclick="window.location.href='daily-milk.html'">
-      <img src="images/milk.png" alt="إنتاج اللبن">
-      إنتاج اللبن اليومي
-    </button>
-    <button class="event-button" onclick="window.location.href='feed.html'">
-      <img src="images/feed.png" alt="تغذية">
-      تغذية
-    </button>
-    <button class="event-button" onclick="window.location.href='dry-off.html'">
-      <img src="images/dry.png" alt="تجفيف">
-      تجفيف
-    </button>
-    <button class="event-button" onclick="window.location.href='pre-calving.html'">
-      <img src="images/prebirth.png" alt="تحضير للولادة">
-      تحضير للولادة
-    </button>
-  </div>
+  <!-- باقي الأحداث -->
+  <button class="event-button" onclick="handleEvent('التلقيح')">التلقيح</button>
+  <button class="event-button" onclick="handleEvent('التحصين')">التحصين</button>
+  <button class="event-button" onclick="handleEvent('الأمراض')">الأمراض</button>
+  <button class="event-button" onclick="handleEvent('التجفيف')">التجفيف</button>
+  <button class="event-button" onclick="handleEvent('تحضير للولادة')">تحضير للولادة</button>
+  <button class="event-button" onclick="handleEvent('إنتاج اللبن اليومي')">إنتاج اللبن اليومي</button>
+  <button class="event-button" onclick="handleEvent('التغذية')">التغذية</button>
+
+  <script>
+    async function handleEvent(eventType) {
+      const animalId = localStorage.getItem('currentAnimalId');
+      if (!animalId) {
+        alert("لم يتم تحديد الحيوان. يرجى تسجيل حيوان أولاً.");
+        return;
+      }
+
+      const eventData = {
+        animalId,
+        type: eventType,
+        date: new Date().toISOString()
+      };
+
+      try {
+        const response = await fetch('https://murabbic-alerts.onrender.com/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventData)
+        });
+
+        if (response.ok) {
+          const wantAnother = confirm("✅ تم تسجيل الحدث بنجاح.\nهل تريد تسجيل أحداث أخرى؟");
+          if (wantAnother) {
+            // لا شيء: يبقى على الصفحة
+          } else {
+            const wantAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+            if (wantAnimal) {
+              window.location.href = 'add-animal.html';
+            } else {
+              window.location.href = 'dashboard.html';
+            }
+          }
+        } else {
+          alert("❌ فشل في تسجيل الحدث، حاول مرة أخرى.");
+        }
+      } catch (error) {
+        alert("❌ حدث خطأ أثناء الاتصال بالخادم.");
+        console.error(error);
+      }
+    }
+  </script>
 
 </body>
 </html>
+
