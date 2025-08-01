@@ -2,109 +2,133 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل تجفيف</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تجفيف الحيوان</title>
   <style>
     body {
       direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f9f9f9;
-      padding: 30px;
-      max-width: 600px;
-      margin: auto;
+      background-color: #fffde7;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
     }
 
-    h2 {
+    h1 {
       text-align: center;
-      color: #2c3e50;
+      color: #2e7d32;
+      margin-bottom: 20px;
     }
 
     form {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      margin-top: 30px;
+      background-color: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 500px;
+      margin: auto;
     }
 
     label {
+      display: block;
+      margin-top: 15px;
       font-weight: bold;
     }
 
-    input, select, button {
+    input, select {
+      width: 100%;
       padding: 10px;
-      border-radius: 6px;
+      margin-top: 5px;
+      border-radius: 5px;
       border: 1px solid #ccc;
-      font-size: 16px;
     }
 
     button {
-      background-color: #007bff;
+      background-color: #388e3c;
       color: white;
+      padding: 12px;
       border: none;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #0056b3;
+      border-radius: 6px;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
+  <h1>📄 تسجيل تجفيف الحيوان</h1>
 
-  <h2>🐄 تسجيل حدث تجفيف</h2>
+  <form onsubmit="submitDryOff(event)">
+    <label for="animal-id">رقم الحيوان:</label>
+    <input type="text" id="animal-id" required />
 
-  <form id="dryForm">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+    <label for="date">تاريخ التجفيف:</label>
+    <input type="date" id="date" required />
 
-    <label for="pregnancyConfirmed">تأكيد العشار</label>
-    <select id="pregnancyConfirmed" name="pregnancyConfirmed" required>
-      <option value="">اختر...</option>
+    <label for="reason">سبب التجفيف:</label>
+    <select id="reason" required>
+      <option value="">-- اختر --</option>
+      <option value="طبيعي">طبيعي</option>
+      <option value="اضطراري">اضطراري</option>
+    </select>
+
+    <label for="pregnancy">تأكيد الحمل:</label>
+    <select id="pregnancy" required>
+      <option value="">-- اختر --</option>
       <option value="عشار">عشار</option>
       <option value="فارغة">فارغة</option>
     </select>
 
-    <label for="udderTreatment">علاج الضرع الجاف</label>
-    <select id="udderTreatment" name="udderTreatment" required>
-      <option value="">اختر...</option>
-      <option value="تم">تم</option>
-      <option value="لم يتم">لم يتم</option>
+    <label for="antibiotics">تم استخدام محاقن التجفيف؟</label>
+    <select id="antibiotics" required>
+      <option value="">-- اختر --</option>
+      <option value="نعم">نعم</option>
+      <option value="لا">لا</option>
     </select>
 
-    <button type="submit">💾 تسجيل</button>
+    <button type="submit">💾 تسجيل التجفيف</button>
   </form>
 
   <script>
-    document.getElementById("dryForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
+    function submitDryOff(event) {
+      event.preventDefault();
 
-      if (this.pregnancyConfirmed.value !== "عشار") {
-        alert("❌ لا يمكن تجفيف الحيوان إذا لم يكن عشارًا.");
+      const data = {
+        animalId: document.getElementById("animal-id").value,
+        date: document.getElementById("date").value,
+        reason: document.getElementById("reason").value,
+        pregnancy: document.getElementById("pregnancy").value,
+        antibiotics: document.getElementById("antibiotics").value
+      };
+
+      if (!data.animalId || !data.date || !data.reason || !data.pregnancy || !data.antibiotics) {
+        alert("يرجى ملء جميع الحقول المطلوبة.");
         return;
       }
 
-      const data = {
-        type: "تجفيف",
-        animalId: this.animalId.value,
-        date: new Date().toISOString().split('T')[0],
-        pregnancyConfirmed: this.pregnancyConfirmed.value,
-        udderTreatment: this.udderTreatment.value
-      };
-
-      const res = await fetch("/events/dry", {
+      fetch("https://murabbic-alerts.onrender.com/api/dryoffs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
+      })
+      .then(res => {
+        if (res.ok) {
+          if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+            window.location.href = "add-event.html";
+          } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+            window.location.href = "add-animal.html";
+          } else {
+            localStorage.removeItem("isNewUser");
+            localStorage.removeItem("lastAnimalId");
+            window.location.href = "dashboard.html";
+          }
+        } else {
+          alert("حدث خطأ أثناء الحفظ.");
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("تعذر الاتصال بالخادم.");
       });
-
-      if (res.ok) {
-        alert("✅ تم تسجيل حدث التجفيف بنجاح");
-        this.reset();
-      } else {
-        alert("❌ فشل في تسجيل التجفيف");
-      }
-    });
+    }
   </script>
-
 </body>
 </html>
-
