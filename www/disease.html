@@ -114,5 +114,40 @@
     <button class="disease-button">ابتلاع جسم معدني</button>
     <button class="disease-button">اجهاض</button>
   </div>
+
+  <script>
+    document.querySelectorAll('.disease-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const animalId = document.getElementById('animal-id').value;
+        const date = document.getElementById('date').value;
+        const disease = button.textContent;
+
+        if (!animalId || !date) {
+          alert("برجاء إدخال رقم الحيوان والتاريخ أولاً");
+          return;
+        }
+
+        fetch('https://murabbic-alerts.onrender.com/api/diseases', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            animalId,
+            date,
+            disease
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          alert(`✅ تم تسجيل الحالة: ${disease}`);
+        })
+        .catch(err => {
+          console.error(err);
+          alert("حدث خطأ أثناء التسجيل، حاول مرة أخرى");
+        });
+      });
+    });
+  </script>
 </body>
 </html>
