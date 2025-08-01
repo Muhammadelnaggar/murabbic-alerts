@@ -38,6 +38,27 @@ app.post("/api/vaccinations", (req, res) => {
   res.status(200).json({ message: "✅ تم حفظ التحصين بنجاح" });
 });
 
+// تسجيل الحالات الصحية
+app.post('/api/diseases', (req, res) => {
+  const filePath = path.join(dataDir, 'diseases.json');
+  const newRecord = req.body;
+
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    let records = [];
+    if (!err && data) {
+      records = JSON.parse(data);
+    }
+    records.push(newRecord);
+
+    fs.writeFile(filePath, JSON.stringify(records, null, 2), err => {
+      if (err) {
+        res.status(500).json({ message: 'فشل في حفظ البيانات' });
+      } else {
+        res.status(200).json({ message: 'تم حفظ الحالة الصحية بنجاح' });
+      }
+    });
+  });
+});
 
 // POST route to save insemination event
 app.post('/api/inseminations', (req, res) => {
