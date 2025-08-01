@@ -57,6 +57,23 @@
       }
     }
   </style>
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const isNewUser = localStorage.getItem("isNewUser") === "true";
+    const lastAnimalId = localStorage.getItem("lastAnimalId");
+
+    if (isNewUser && lastAnimalId) {
+      const input = document.getElementById("animal-id");
+      if (input) {
+        input.value = lastAnimalId;
+        input.readOnly = true;
+      } else {
+        console.warn("حقل animal-id غير موجود!");
+      }
+    }
+  });
+</script>
+
 </head>
 <body>
 
