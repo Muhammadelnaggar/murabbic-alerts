@@ -89,6 +89,21 @@
       width: 90%;
       max-width: 500px;
     }
+
+    .options-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .options-box label {
+      background: #dcedc8;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #8bc34a;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -109,12 +124,18 @@
 
   <div id="form-section" class="form-section">
     <h3 id="form-title">تفاصيل المرض</h3>
+
+    <div id="extra-options"></div>
+
     <label for="notes">ملاحظات:</label>
     <input type="text" id="notes" name="notes">
+
     <label for="vet">الطبيب المعالج:</label>
     <input type="text" id="vet" name="vet">
+
     <label for="followup">المتابعة:</label>
     <input type="text" id="followup" name="followup">
+
     <button onclick="submitGenericDisease()">تسجيل الحالة</button>
   </div>
 
@@ -128,6 +149,7 @@
     const diseaseButtonsDiv = document.getElementById("disease-buttons");
     const formSection = document.getElementById("form-section");
     const formTitle = document.getElementById("form-title");
+    const extraOptionsDiv = document.getElementById("extra-options");
     let selectedDisease = "";
 
     diseases.forEach(disease => {
@@ -138,6 +160,45 @@
         selectedDisease = disease;
         formTitle.innerText = `تفاصيل ${disease}`;
         formSection.style.display = "block";
+        extraOptionsDiv.innerHTML = "";
+
+        if (disease === "التهاب ضرع") {
+          extraOptionsDiv.innerHTML = `
+            <label>الربع المصاب:</label>
+            <div class="options-box">
+              <label><input type="checkbox" value="أمام شمال"> أمام شمال</label>
+              <label><input type="checkbox" value="أمام يمين"> أمام يمين</label>
+              <label><input type="checkbox" value="خلف يمين"> خلف يمين</label>
+              <label><input type="checkbox" value="خلف شمال"> خلف شمال</label>
+            </div>
+            <label>نوع الالتهاب:</label>
+            <select id="mastitis-type">
+              <option value="">-- اختر --</option>
+              <option value="عادي">عادي</option>
+              <option value="مائي">مائي</option>
+            </select>
+          `;
+        } else if (disease === "عرج") {
+          extraOptionsDiv.innerHTML = `
+            <label>الحافر المصاب:</label>
+            <div class="options-box">
+              <label><input type="checkbox" value="أمام شمال"> أمام شمال</label>
+              <label><input type="checkbox" value="أمام يمين"> أمام يمين</label>
+              <label><input type="checkbox" value="خلف يمين"> خلف يمين</label>
+              <label><input type="checkbox" value="خلف شمال"> خلف شمال</label>
+            </div>
+            <label>نوع العرج:</label>
+            <select id="lameness-type">
+              <option value="">-- اختر --</option>
+              <option value="قرحة">قرحة</option>
+              <option value="تعفن حافر">تعفن حافر</option>
+              <option value="خراج الحافر">خراج الحافر</option>
+              <option value="جسم معدني">جسم معدني</option>
+              <option value="التهاب ما بين الأظلاف">التهاب ما بين الأظلاف</option>
+              <option value="التهاب الصفائح الحساسة">التهاب الصفائح الحساسة</option>
+            </select>
+          `;
+        }
       };
       diseaseButtonsDiv.appendChild(btn);
     });
@@ -154,13 +215,26 @@
         return;
       }
 
+      let extra = {};
+
+      if (selectedDisease === "التهاب ضرع") {
+        const quarters = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
+        const mastitisType = document.getElementById("mastitis-type").value;
+        extra = { quarters, mastitisType };
+      } else if (selectedDisease === "عرج") {
+        const legs = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
+        const lamenessType = document.getElementById("lameness-type").value;
+        extra = { legs, lamenessType };
+      }
+
       const data = {
         animalId,
         date,
         disease: selectedDisease,
         notes,
         vet,
-        followup
+        followup,
+        ...extra
       };
 
       fetch("https://murabbic-alerts.onrender.com/api/diseases", {
