@@ -220,10 +220,18 @@
       if (selectedDisease === "التهاب ضرع") {
         const quarters = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
         const mastitisType = document.getElementById("mastitis-type").value;
+        if (!mastitisType) {
+          alert("يرجى اختيار نوع الالتهاب.");
+          return;
+        }
         extra = { quarters, mastitisType };
       } else if (selectedDisease === "عرج") {
         const legs = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
         const lamenessType = document.getElementById("lameness-type").value;
+        if (!lamenessType) {
+          alert("يرجى اختيار نوع العرج.");
+          return;
+        }
         extra = { legs, lamenessType };
       }
 
