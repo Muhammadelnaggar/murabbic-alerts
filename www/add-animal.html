@@ -170,6 +170,8 @@
       const data = await res.json();
 
       if (res.ok) {
+        localStorage.setItem("lastAnimalId", animal.animalId);
+
         alert("تم تسجيل الحيوان بنجاح.");
         setTimeout(() => {
           window.location.href = "add-event.html";
