@@ -22,6 +22,33 @@
       font-size: 24px;
     }
 
+    .animal-info {
+      width: 90%;
+      max-width: 500px;
+      padding: 10px 20px;
+      background-color: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+
+    .animal-info label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #2e7d32;
+    }
+
+    .animal-info input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
     .button-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -43,7 +70,7 @@
       cursor: pointer;
       transition: background-color 0.3s;
       width: 100%;
-      height: 60px;
+      height: 100px;
       box-sizing: border-box;
     }
 
@@ -54,6 +81,18 @@
 </head>
 <body>
   <h1>اختر الحالة الصحية</h1>
+
+  <div class="animal-info">
+    <label for="animal-id">رقم الحيوان:</label>
+    <input type="text" id="animal-id" name="animal-id">
+
+    <label for="animal-type">نوع الحيوان:</label>
+    <input type="text" id="animal-type" name="animal-type" disabled>
+
+    <label for="date">التاريخ:</label>
+    <input type="date" id="date" name="date">
+  </div>
+
   <div class="button-grid">
     <button class="disease-button">التهاب ضرع</button>
     <button class="disease-button">عرج</button>
