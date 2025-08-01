@@ -83,8 +83,28 @@
     <label for="animalType">نوع الحيوان:</label>
     <input type="text" id="animalType" name="animalType" readonly>
 
-    <label for="diagnosis">التشخيص:</label>
-    <input type="text" id="diagnosis" name="diagnosis" required>
+   <label for="diagnosis">التشخيص:</label>
+<input list="diagnosisList" id="diagnosis" name="diagnosis" required placeholder="ابحث أو اختر من القائمة">
+<datalist id="diagnosisList">
+  <option value="التهاب ضرع">
+  <option value="عرج">
+  <option value="التهاب رئوي">
+  <option value="لكمة كرش">
+  <option value="حموضة">
+  <option value="التهاب عين">
+  <option value="حمي قلاعية">
+  <option value="التهاب الجلد العقدي">
+  <option value="حمي الثلاث ايام">
+  <option value="اسهال">
+  <option value="تسمم">
+  <option value="امساك">
+  <option value="التهاب رحم">
+  <option value="انقلاب رحم">
+  <option value="انقلاب مهبل">
+  <option value="طفيليات خارجية">
+  <option value="طفيليات داخلية">
+</datalist>
+
 
     <div id="mastitisFields" class="conditional">
       <label>تحديد الربع المصاب:</label>
