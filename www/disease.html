@@ -77,6 +77,17 @@
     .disease-button:hover {
       background-color: #c5e1a5;
     }
+
+    .form-section {
+      display: none;
+      background: #f9fbe7;
+      padding: 15px;
+      margin-top: 10px;
+      border: 1px solid #cddc39;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 500px;
+    }
   </style>
 </head>
 <body>
@@ -94,8 +105,8 @@
   </div>
 
   <div class="button-grid">
-    <button class="disease-button" onclick="submitDisease('التهاب ضرع')">التهاب ضرع</button>
-    <button class="disease-button" onclick="submitDisease('عرج')">عرج</button>
+    <button class="disease-button" onclick="showForm('mastitis')">التهاب ضرع</button>
+    <button class="disease-button" onclick="showForm('lameness')">عرج</button>
     <button class="disease-button" onclick="submitDisease('التهاب رئوي')">التهاب رئوي</button>
     <button class="disease-button" onclick="submitDisease('لكمة كرش')">لكمة كرش</button>
     <button class="disease-button" onclick="submitDisease('حموضة')">حموضة</button>
@@ -115,6 +126,44 @@
     <button class="disease-button" onclick="submitDisease('اجهاض')">اجهاض</button>
   </div>
 
+  <div id="mastitis-form" class="form-section">
+    <h3>تفاصيل التهاب الضرع</h3>
+    <label>الربع المصاب:</label>
+    <select id="mastitis-quarter">
+      <option value="1">1 - أمام شمال</option>
+      <option value="2">2 - أمام يمين</option>
+      <option value="3">3 - خلف يمين</option>
+      <option value="4">4 - خلف شمال</option>
+    </select>
+    <label>نوع الالتهاب:</label>
+    <select id="mastitis-type">
+      <option value="عادي">عادي</option>
+      <option value="مائي">مائي</option>
+    </select>
+    <button onclick="submitMastitis()">تسجيل التهاب الضرع</button>
+  </div>
+
+  <div id="lameness-form" class="form-section">
+    <h3>تفاصيل العرج</h3>
+    <label>الرجل المصابة:</label>
+    <select id="lameness-leg">
+      <option value="1">1 - أمام شمال</option>
+      <option value="2">2 - أمام يمين</option>
+      <option value="3">3 - خلف يمين</option>
+      <option value="4">4 - خلف شمال</option>
+    </select>
+    <label>نوع العرج:</label>
+    <select id="lameness-type">
+      <option value="قرحة">قرحة</option>
+      <option value="تعفن حافر">تعفن حافر</option>
+      <option value="جسم معدني">جسم معدني</option>
+      <option value="خراج الحافر">خراج الحافر</option>
+      <option value="التهاب ما بين الأظلاف">التهاب ما بين الأظلاف</option>
+      <option value="التهاب الصفائح الحساسة">التهاب الصفائح الحساسة</option>
+    </select>
+    <button onclick="submitLameness()">تسجيل العرج</button>
+  </div>
+
   <script>
     function submitDisease(disease) {
       const animalId = document.getElementById("animal-id").value;
@@ -125,9 +174,7 @@
       }
       fetch("https://murabbic-alerts.onrender.com/api/diseases", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ animalId, date, disease })
       })
       .then(response => {
@@ -135,6 +182,64 @@
           alert("✅ تم تسجيل المرض بنجاح");
         } else {
           alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+        }
+      });
+    }
+
+    function showForm(type) {
+      document.getElementById("mastitis-form").style.display = "none";
+      document.getElementById("lameness-form").style.display = "none";
+      if (type === "mastitis") {
+        document.getElementById("mastitis-form").style.display = "block";
+      } else if (type === "lameness") {
+        document.getElementById("lameness-form").style.display = "block";
+      }
+    }
+
+    function submitMastitis() {
+      const animalId = document.getElementById("animal-id").value;
+      const date = document.getElementById("date").value;
+      const disease = "التهاب ضرع";
+      const notes = `الربع المصاب: ${document.getElementById("mastitis-quarter").value}, نوع الالتهاب: ${document.getElementById("mastitis-type").value}`;
+      if (!animalId || !date) {
+        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+        return;
+      }
+      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalId, date, disease, notes })
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("✅ تم تسجيل التهاب الضرع بنجاح");
+          document.getElementById("mastitis-form").style.display = "none";
+        } else {
+          alert("حدث خطأ أثناء التسجيل.");
+        }
+      });
+    }
+
+    function submitLameness() {
+      const animalId = document.getElementById("animal-id").value;
+      const date = document.getElementById("date").value;
+      const disease = "عرج";
+      const notes = `الرجل المصابة: ${document.getElementById("lameness-leg").value}, نوع العرج: ${document.getElementById("lameness-type").value}`;
+      if (!animalId || !date) {
+        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+        return;
+      }
+      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animalId, date, disease, notes })
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("✅ تم تسجيل العرج بنجاح");
+          document.getElementById("lameness-form").style.display = "none";
+        } else {
+          alert("حدث خطأ أثناء التسجيل.");
         }
       });
     }
