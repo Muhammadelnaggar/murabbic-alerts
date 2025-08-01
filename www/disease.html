@@ -179,40 +179,59 @@
       <label><input type="radio" name="lamenessType" value="التهاب الصفائح الحساسة"> التهاب الصفائح الحساسة</label>
     </div>
   </div>
+<script>
+  function showOptions(type, label) {
+    document.querySelectorAll('.options-container').forEach(el => {
+      el.style.display = 'none';
+    });
+    const target = document.getElementById(`${type}-options`);
+    if (target) {
+      target.style.display = 'flex';
+    }
+  }
 
-  <script>
-    function showOptions(type, label) {
-      document.querySelectorAll('.options-container').forEach(el => {
-        el.style.display = 'none';
-      });
-      const target = document.getElementById(`${type}-options`);
-      if (target) {
-        target.style.display = 'flex';
-      }
+  function submitDisease(disease) {
+    const animalId = document.getElementById("animal-id").value;
+    const date = document.getElementById("date").value;
+
+    if (!animalId || !date) {
+      alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+      return;
     }
 
-    function submitDisease(disease) {
-      const animalId = document.getElementById("animal-id").value;
-      const date = document.getElementById("date").value;
-      if (!animalId || !date) {
-        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
-        return;
-      }
-      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ animalId, date, disease })
+    let details = {};
+
+    if (disease === "التهاب ضرع") {
+      const quarters = Array.from(document.querySelectorAll('input[name="quarter"]:checked')).map(el => el.value);
+      const mastitisType = document.querySelector('input[name="mastitisType"]:checked')?.value;
+      details = { quarters, mastitisType };
+    } else if (disease === "عرج") {
+      const hooves = Array.from(document.querySelectorAll('input[name="hoof"]:checked')).map(el => el.value);
+      const lamenessType = document.querySelector('input[name="lamenessType"]:checked')?.value;
+      details = { hooves, lamenessType };
+    }
+
+    fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        animalId,
+        date,
+        disease,
+        details
       })
-      .then(response => {
-        if (response.ok) {
-          alert("✅ تم تسجيل المرض بنجاح");
-        } else {
-          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
-        }
-      });
-    }
-  </script>
+    })
+    .then(response => {
+      if (response.ok) {
+        alert("✅ تم تسجيل المرض بنجاح");
+      } else {
+        alert("❌ حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+      }
+    });
+  }
+</script>
+
 </body>
 </html>
