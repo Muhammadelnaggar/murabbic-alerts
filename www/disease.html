@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل الحالة الصحية</title>
+  <title>الحالة الصحية</title>
   <style>
     body {
       direction: rtl;
@@ -19,208 +19,52 @@
       margin-bottom: 20px;
     }
 
-    label {
-      display: block;
-      margin-top: 15px;
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .disease-btn {
+      background-color: #aeea00;
       color: #2e7d32;
-      font-weight: bold;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      font-size: 16px;
-      border: 1px solid #2e7d32;
-      border-radius: 8px;
-    }
-
-    .checkbox-group {
-      display: flex;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
-
-    .checkbox-group label {
-      flex: 1 1 45%;
-      margin-top: 10px;
-    }
-
-    button {
-      margin-top: 25px;
-      width: 100%;
-      background-color: #2e7d32;
-      color: white;
-      padding: 14px;
-      font-size: 18px;
-      border: none;
+      border: 2px solid #2e7d32;
       border-radius: 10px;
+      padding: 15px 10px;
+      font-size: 16px;
+      font-weight: bold;
       cursor: pointer;
+      transition: background-color 0.2s;
     }
 
-    button:hover {
-      background-color: #1b5e20;
-    }
-
-    .conditional {
-      display: none;
-      margin-top: 15px;
-      padding: 10px;
-      border: 1px dashed #2e7d32;
-      border-radius: 8px;
-      background-color: #f1f8e9;
+    .disease-btn:hover {
+      background-color: #cddc39;
     }
   </style>
 </head>
 <body>
 
-  <h1>📋 تسجيل الحالة الصحية</h1>
+  <h1>🩺 اختر الحالة الصحية</h1>
 
-  <form id="diseaseForm">
-    <label for="animalId">رقم الحيوان:</label>
-    <input type="text" id="animalId" name="animalId" required>
-
-    <label for="animalType">نوع الحيوان:</label>
-    <input type="text" id="animalType" name="animalType" readonly>
-
-   <label for="diagnosis">التشخيص:</label>
-<input list="diagnosisList" id="diagnosis" name="diagnosis" required placeholder="ابحث أو اختر من القائمة">
-<datalist id="diagnosisList">
-  <option value="التهاب ضرع">
-  <option value="عرج">
-  <option value="التهاب رئوي">
-  <option value="لكمة كرش">
-  <option value="حموضة">
-  <option value="التهاب عين">
-  <option value="حمي قلاعية">
-  <option value="التهاب الجلد العقدي">
-  <option value="حمي الثلاث ايام">
-  <option value="اسهال">
-  <option value="تسمم">
-  <option value="امساك">
-  <option value="التهاب رحم">
-  <option value="انقلاب رحم">
-  <option value="انقلاب مهبل">
-  <option value="طفيليات خارجية">
-  <option value="طفيليات داخلية">
-</datalist>
-
-
-    <div id="mastitisFields" class="conditional">
-      <label>تحديد الربع المصاب:</label>
-      <div class="checkbox-group">
-        <label><input type="checkbox" name="quarters" value="1"> 1 - أمام شمال</label>
-        <label><input type="checkbox" name="quarters" value="2"> 2 - أمام يمين</label>
-        <label><input type="checkbox" name="quarters" value="3"> 3 - خلف يمين</label>
-        <label><input type="checkbox" name="quarters" value="4"> 4 - خلف شمال</label>
-      </div>
-      <label for="mastitisType">نوع الالتهاب:</label>
-      <select id="mastitisType" name="mastitisType">
-        <option value="">-- اختر --</option>
-        <option value="عادي">عادي</option>
-        <option value="مائي">مائي</option>
-      </select>
-    </div>
-
-    <div id="lamenessFields" class="conditional">
-      <label>تحديد الحافر المصاب:</label>
-      <select id="hoof" name="hoof">
-        <option value="">-- اختر الحافر المصاب --</option>
-        <option value="أمام شمال">أمام شمال</option>
-        <option value="أمام يمين">أمام يمين</option>
-        <option value="خلف شمال">خلف شمال</option>
-        <option value="خلف يمين">خلف يمين</option>
-      </select>
-
-      <label for="hoofType">نوع العرج:</label>
-      <select id="hoofType" name="hoofType">
-        <option value="">-- اختر النوع --</option>
-        <option>قرحة</option>
-        <option>تعفن حافر</option>
-        <option>جسم معدني</option>
-        <option>خراج الحافر</option>
-        <option>التهاب ما بين الأظلاف</option>
-        <option>التهاب الصفائح الحساسة</option>
-      </select>
-    </div>
-
-    <label for="treatment">العلاج الموصوف:</label>
-    <textarea id="treatment" name="treatment" rows="2"></textarea>
-
-    <label for="vet">الطبيب البيطري المعالج:</label>
-    <input type="text" id="vet" name="vet">
-
-    <label for="followup">المتابعة:</label>
-    <textarea id="followup" name="followup" rows="2"></textarea>
-
-    <button type="submit">تسجيل الحالة الصحية</button>
-  </form>
-
-  <script>
-    const animalIdInput = document.getElementById("animalId");
-    const animalTypeInput = document.getElementById("animalType");
-    const diagnosisInput = document.getElementById("diagnosis");
-    const mastitisFields = document.getElementById("mastitisFields");
-    const lamenessFields = document.getElementById("lamenessFields");
-
-    // تحديد نوع الحيوان تلقائيًا من الرقم
-    animalIdInput.addEventListener("input", function () {
-      const id = animalIdInput.value.trim();
-      if (id.startsWith("1")) {
-        animalTypeInput.value = "بقرة";
-      } else if (id.startsWith("2")) {
-        animalTypeInput.value = "جاموسة";
-      } else {
-        animalTypeInput.value = "";
-      }
-    });
-
-    // إظهار الحقول الخاصة حسب التشخيص
-    diagnosisInput.addEventListener("input", function () {
-      const diagnosis = diagnosisInput.value.trim();
-      mastitisFields.style.display = (diagnosis.includes("ضرع")) ? "block" : "none";
-      lamenessFields.style.display = (diagnosis.includes("عرج")) ? "block" : "none";
-    });
-
-    // إرسال البيانات
-    document.getElementById("diseaseForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-      const data = {
-        animalId: animalIdInput.value,
-        animalType: animalTypeInput.value,
-        diagnosis: diagnosisInput.value,
-        treatment: document.getElementById("treatment").value,
-        vet: document.getElementById("vet").value,
-        followup: document.getElementById("followup").value,
-        quarters: Array.from(document.querySelectorAll('input[name="quarters"]:checked')).map(cb => cb.value),
-        mastitisType: document.getElementById("mastitisType").value,
-        hoof: document.getElementById("hoof").value,
-        hoofType: document.getElementById("hoofType").value
-      };
-
-      try {
-        const response = await fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          alert("✅ تم تسجيل الحالة الصحية بنجاح");
-          document.getElementById("diseaseForm").reset();
-          animalTypeInput.value = "";
-          mastitisFields.style.display = "none";
-          lamenessFields.style.display = "none";
-        } else {
-          alert("❌ فشل في تسجيل الحالة");
-        }
-      } catch (error) {
-        alert("⚠️ فشل الاتصال بالخادم");
-        console.error(error);
-      }
-    });
-  </script>
+  <div class="button-grid">
+    <button class="disease-btn">التهاب ضرع</button>
+    <button class="disease-btn">عرج</button>
+    <button class="disease-btn">التهاب رئوي</button>
+    <button class="disease-btn">لكمة كرش</button>
+    <button class="disease-btn">حموضة</button>
+    <button class="disease-btn">التهاب عين</button>
+    <button class="disease-btn">حمي قلاعية</button>
+    <button class="disease-btn">التهاب الجلد العقدي</button>
+    <button class="disease-btn">حمي الثلاث ايام</button>
+    <button class="disease-btn">اسهال</button>
+    <button class="disease-btn">تسمم</button>
+    <button class="disease-btn">امساك</button>
+    <button class="disease-btn">التهاب رحم</button>
+    <button class="disease-btn">انقلاب رحم</button>
+    <button class="disease-btn">انقلاب مهبل</button>
+    <button class="disease-btn">طفيليات خارجية</button>
+    <button class="disease-btn">طفيليات داخلية</button>
+  </div>
 
 </body>
 </html>
