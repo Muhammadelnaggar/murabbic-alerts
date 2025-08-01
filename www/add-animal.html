@@ -170,6 +170,15 @@
       const data = await res.json();
 
       if (res.ok) {
+          const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...animal, ownerPhone: userPhone })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
         alert("تم تسجيل الحيوان بنجاح.");
         setTimeout(() => {
           window.location.href = "add-event.html";
