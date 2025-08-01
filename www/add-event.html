@@ -1,195 +1,57 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تسجيل الحالة الصحية</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل حدث</title>
   <style>
     body {
       direction: rtl;
-      background-color: #fffce6;
+      background-color: #fff9db;
       font-family: 'Arial', sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding: 20px;
     }
 
     h1 {
+      text-align: center;
       color: #2e7d32;
-      margin: 20px 0 10px;
-      font-size: 24px;
+      font-size: 26px;
+      margin-bottom: 30px;
     }
 
-    .animal-info {
-      width: 90%;
-      max-width: 500px;
-      padding: 10px 20px;
-      background-color: #f1f8e9;
-      border: 1px solid #c5e1a5;
-      border-radius: 10px;
-      margin-bottom: 15px;
-      box-sizing: border-box;
-    }
-
-    .animal-info label {
+    .event-button {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #2e7d32;
-    }
-
-    .animal-info input {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      box-sizing: border-box;
-    }
-
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 12px;
-      width: 90%;
-      max-width: 500px;
-      padding: 20px;
-      justify-items: center;
-    }
-
-    .disease-button {
+      padding: 15px;
+      margin: 10px 0;
       background-color: #aeea00;
       color: #000;
+      font-size: 18px;
       border: 2px solid #558b2f;
       border-radius: 10px;
-      padding: 15px;
-      text-align: center;
-      font-size: 16px;
       cursor: pointer;
-      transition: background-color 0.3s;
-      width: 100%;
-      height: 100px;
-      box-sizing: border-box;
     }
 
-    .disease-button:hover {
+    .event-button:hover {
       background-color: #c5e1a5;
-    }
-
-    .options-container {
-      display: none;
-      flex-direction: column;
-      margin-top: 15px;
-      width: 90%;
-      max-width: 500px;
-    }
-
-    .option-title {
-      font-weight: bold;
-      color: #2e7d32;
-      margin-bottom: 5px;
-    }
-
-    .checkboxes {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .checkboxes label {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background-color: #f1f8e9;
-      padding: 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
     }
   </style>
 </head>
 <body>
-  <h1>اختر الحالة الصحية</h1>
 
-  <div class="animal-info">
-    <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" name="animal-id">
+  <h1>📋 تسجيل حدث</h1>
 
-    <label for="animal-type">نوع الحيوان:</label>
-    <input type="text" id="animal-type" name="animal-type" disabled>
+  <button class="event-button" onclick="window.location.href='birth.html'">الولادة</button>
+  <button class="event-button" onclick="window.location.href='insemination.html'">التلقيح</button>
+  <button class="event-button" onclick="window.location.href='vaccination.html'">التحصين</button>
+  <button class="event-button" onclick="window.location.href='disease.html'">الحالة الصحية</button>
+  <button class="event-button" onclick="window.location.href='drying.html'">تجفيف</button>
+  <button class="event-button" onclick="window.location.href='pre-delivery.html'">تحضير للولادة</button>
+  <button class="event-button" onclick="window.location.href='milk.html'">إنتاج اللبن اليومي</button>
+  <button class="event-button" onclick="window.location.href='feeding.html'">التغذية</button>
 
-    <label for="date">التاريخ:</label>
-    <input type="date" id="date" name="date">
-  </div>
-
-  <div class="button-grid">
-    <button class="disease-button" onclick="showOptions('mastitis')">التهاب ضرع</button>
-    <button class="disease-button" onclick="showOptions('lameness')">عرج</button>
-    <button class="disease-button">التهاب رئوي</button>
-    <button class="disease-button">لكمة كرش</button>
-    <button class="disease-button">حموضة</button>
-    <button class="disease-button">التهاب عين</button>
-    <button class="disease-button">حمي قلاعية</button>
-    <button class="disease-button">التهاب الجلد العقدي</button>
-    <button class="disease-button">حمي الثلاث ايام</button>
-    <button class="disease-button">اسهال</button>
-    <button class="disease-button">تسمم</button>
-    <button class="disease-button">امساك</button>
-    <button class="disease-button">التهاب رحم</button>
-    <button class="disease-button">انقلاب رحم</button>
-    <button class="disease-button">انقلاب مهبل</button>
-    <button class="disease-button">طفيليات خارجية</button>
-    <button class="disease-button">طفيليات داخلية</button>
-    <button class="disease-button">ابتلاع جسم معدني</button>
-    <button class="disease-button">اجهاض</button>
-  </div>
-
-  <div id="mastitis-options" class="options-container">
-    <div class="option-title">اختر الربع المصاب:</div>
-    <div class="checkboxes">
-      <label><input type="checkbox" name="quarter" value="1"> 1: أمام شمال</label>
-      <label><input type="checkbox" name="quarter" value="2"> 2: أمام يمين</label>
-      <label><input type="checkbox" name="quarter" value="3"> 3: خلف يمين</label>
-      <label><input type="checkbox" name="quarter" value="4"> 4: خلف شمال</label>
-    </div>
-    <div class="option-title">نوع الالتهاب:</div>
-    <div class="checkboxes">
-      <label><input type="radio" name="mastitisType" value="عادي"> عادي</label>
-      <label><input type="radio" name="mastitisType" value="مائي"> مائي</label>
-    </div>
-  </div>
-
-  <div id="lameness-options" class="options-container">
-    <div class="option-title">اختر الحافر المصاب:</div>
-    <div class="checkboxes">
-      <label><input type="checkbox" name="hoof" value="1"> 1: أمام شمال</label>
-      <label><input type="checkbox" name="hoof" value="2"> 2: أمام يمين</label>
-      <label><input type="checkbox" name="hoof" value="3"> 3: خلف يمين</label>
-      <label><input type="checkbox" name="hoof" value="4"> 4: خلف شمال</label>
-    </div>
-    <div class="option-title">نوع العرج:</div>
-    <div class="checkboxes">
-      <label><input type="radio" name="lamenessType" value="قرحة"> قرحة</label>
-      <label><input type="radio" name="lamenessType" value="تعفن حافر"> تعفن حافر</label>
-      <label><input type="radio" name="lamenessType" value="جسم معدني"> جسم معدني</label>
-      <label><input type="radio" name="lamenessType" value="خراج الحافر"> خراج الحافر</label>
-      <label><input type="radio" name="lamenessType" value="التهاب ما بين الأظلاف"> التهاب ما بين الأظلاف</label>
-      <label><input type="radio" name="lamenessType" value="التهاب الصفائح الحساسة"> التهاب الصفائح الحساسة</label>
-    </div>
-  </div>
-
-  <script>
-    function showOptions(type) {
-      document.getElementById("mastitis-options").style.display = "none";
-      document.getElementById("lameness-options").style.display = "none";
-
-      if (type === "mastitis") {
-        document.getElementById("mastitis-options").style.display = "flex";
-      } else if (type === "lameness") {
-        document.getElementById("lameness-options").style.display = "flex";
-      }
-    }
-  </script>
 </body>
 </html>
+
+
+
