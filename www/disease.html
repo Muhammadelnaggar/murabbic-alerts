@@ -126,23 +126,23 @@
   <div class="button-grid">
     <button class="disease-button" onclick="showOptions('mastitis')">التهاب ضرع</button>
     <button class="disease-button" onclick="showOptions('lameness')">عرج</button>
-    <button class="disease-button">التهاب رئوي</button>
-    <button class="disease-button">لكمة كرش</button>
-    <button class="disease-button">حموضة</button>
-    <button class="disease-button">التهاب عين</button>
-    <button class="disease-button">حمي قلاعية</button>
-    <button class="disease-button">التهاب الجلد العقدي</button>
-    <button class="disease-button">حمي الثلاث ايام</button>
-    <button class="disease-button">اسهال</button>
-    <button class="disease-button">تسمم</button>
-    <button class="disease-button">امساك</button>
-    <button class="disease-button">التهاب رحم</button>
-    <button class="disease-button">انقلاب رحم</button>
-    <button class="disease-button">انقلاب مهبل</button>
-    <button class="disease-button">طفيليات خارجية</button>
-    <button class="disease-button">طفيليات داخلية</button>
-    <button class="disease-button">ابتلاع جسم معدني</button>
-    <button class="disease-button">اجهاض</button>
+    <button class="disease-button" onclick="showOptions('pneumonia')">التهاب رئوي</button>
+    <button class="disease-button" onclick="showOptions('rumen')">لكمة كرش</button>
+    <button class="disease-button" onclick="showOptions('acidosis')">حموضة</button>
+    <button class="disease-button" onclick="showOptions('eye')">التهاب عين</button>
+    <button class="disease-button" onclick="showOptions('footmouth')">حمي قلاعية</button>
+    <button class="disease-button" onclick="showOptions('skin')">التهاب الجلد العقدي</button>
+    <button class="disease-button" onclick="showOptions('three-days')">حمي الثلاث ايام</button>
+    <button class="disease-button" onclick="showOptions('diarrhea')">اسهال</button>
+    <button class="disease-button" onclick="showOptions('toxicity')">تسمم</button>
+    <button class="disease-button" onclick="showOptions('constipation')">امساك</button>
+    <button class="disease-button" onclick="showOptions('metritis')">التهاب رحم</button>
+    <button class="disease-button" onclick="showOptions('uterine-prolapse')">انقلاب رحم</button>
+    <button class="disease-button" onclick="showOptions('vaginal-prolapse')">انقلاب مهبل</button>
+    <button class="disease-button" onclick="showOptions('external-parasites')">طفيليات خارجية</button>
+    <button class="disease-button" onclick="showOptions('internal-parasites')">طفيليات داخلية</button>
+    <button class="disease-button" onclick="showOptions('metal-body')">ابتلاع جسم معدني</button>
+    <button class="disease-button" onclick="showOptions('abortion')">اجهاض</button>
   </div>
 
   <div id="mastitis-options" class="options-container">
@@ -179,51 +179,41 @@
     </div>
   </div>
 
- <script>
-  function showOptions(type) {
-    // أخفِ كل الحاويات أولاً
-    document.querySelectorAll('.options-container').forEach(el => {
-      el.style.display = 'none';
-    });
-
-    // أظهر الحاوية المرتبطة إذا كانت موجودة
-    const target = document.getElementById(`${type}-options`);
-    if (target) {
-      target.style.display = 'flex';
-    }
-
-    // لو المرض لا يحتاج تفاصيل (باقي الأمراض)، نسجل اسمه مباشرة هنا
-    if (!target) {
-      const animalId = document.getElementById("animal-id").value;
-      const date = document.getElementById("date").value;
-      const disease = document.querySelector(`button[onclick="showOptions('${type}')"]`).innerText;
-
-      if (!animalId || !date) {
-        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
-        return;
-      }
-
-      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          animalId,
-          date,
-          disease
-        })
-      })
-      .then(response => {
-        if (response.ok) {
-          alert("✅ تم تسجيل المرض بنجاح");
-        } else {
-          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
-        }
+  <script>
+    function showOptions(type) {
+      document.querySelectorAll('.options-container').forEach(el => {
+        el.style.display = 'none';
       });
-    }
-  }
-</script>
 
+      const target = document.getElementById(`${type}-options`);
+      if (target) {
+        target.style.display = 'flex';
+      } else {
+        const animalId = document.getElementById("animal-id").value;
+        const date = document.getElementById("date").value;
+        const disease = document.querySelector(`button[onclick="showOptions('${type}')"]`).innerText;
+
+        if (!animalId || !date) {
+          alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+          return;
+        }
+
+        fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ animalId, date, disease })
+        })
+        .then(response => {
+          if (response.ok) {
+            alert("✅ تم تسجيل المرض بنجاح");
+          } else {
+            alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+          }
+        });
+      }
+    }
+  </script>
 </body>
 </html>
