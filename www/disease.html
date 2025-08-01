@@ -179,17 +179,51 @@
     </div>
   </div>
 
-  <script>
-    function showOptions(type) {
-      document.getElementById("mastitis-options").style.display = "none";
-      document.getElementById("lameness-options").style.display = "none";
+ <script>
+  function showOptions(type) {
+    // أخفِ كل الحاويات أولاً
+    document.querySelectorAll('.options-container').forEach(el => {
+      el.style.display = 'none';
+    });
 
-      if (type === "mastitis") {
-        document.getElementById("mastitis-options").style.display = "flex";
-      } else if (type === "lameness") {
-        document.getElementById("lameness-options").style.display = "flex";
-      }
+    // أظهر الحاوية المرتبطة إذا كانت موجودة
+    const target = document.getElementById(`${type}-options`);
+    if (target) {
+      target.style.display = 'flex';
     }
-  </script>
+
+    // لو المرض لا يحتاج تفاصيل (باقي الأمراض)، نسجل اسمه مباشرة هنا
+    if (!target) {
+      const animalId = document.getElementById("animal-id").value;
+      const date = document.getElementById("date").value;
+      const disease = document.querySelector(`button[onclick="showOptions('${type}')"]`).innerText;
+
+      if (!animalId || !date) {
+        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+        return;
+      }
+
+      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          animalId,
+          date,
+          disease
+        })
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("✅ تم تسجيل المرض بنجاح");
+        } else {
+          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+        }
+      });
+    }
+  }
+</script>
+
 </body>
 </html>
