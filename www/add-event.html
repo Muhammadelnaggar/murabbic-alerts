@@ -1,117 +1,195 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل حدث</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الحالة الصحية</title>
   <style>
     body {
       direction: rtl;
-      background-color: #fff9db;
+      background-color: #fffce6;
       font-family: 'Arial', sans-serif;
-      padding: 20px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     h1 {
-      text-align: center;
       color: #2e7d32;
-      font-size: 26px;
-      margin-bottom: 30px;
+      margin: 20px 0 10px;
+      font-size: 24px;
     }
 
-    .event-button {
+    .animal-info {
+      width: 90%;
+      max-width: 500px;
+      padding: 10px 20px;
+      background-color: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+
+    .animal-info label {
       display: block;
-      width: 100%;
-      padding: 15px;
-      margin: 10px 0;
-      font-size: 20px;
+      margin-bottom: 5px;
       font-weight: bold;
       color: #2e7d32;
-      border: 2px solid #2e7d32;
-      background-color: transparent;
-      border-radius: 12px;
+    }
+
+    .animal-info input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      width: 90%;
+      max-width: 500px;
+      padding: 20px;
+      justify-items: center;
+    }
+
+    .disease-button {
+      background-color: #aeea00;
+      color: #000;
+      border: 2px solid #558b2f;
+      border-radius: 10px;
+      padding: 15px;
+      text-align: center;
+      font-size: 16px;
       cursor: pointer;
-      transition: 0.3s;
+      transition: background-color 0.3s;
+      width: 100%;
+      height: 100px;
+      box-sizing: border-box;
     }
 
-    .event-button:hover {
-      background-color: #2e7d32;
-      color: white;
+    .disease-button:hover {
+      background-color: #c5e1a5;
     }
 
-    @media (max-width: 600px) {
-      h1 {
-        font-size: 22px;
-      }
+    .options-container {
+      display: none;
+      flex-direction: column;
+      margin-top: 15px;
+      width: 90%;
+      max-width: 500px;
+    }
 
-      .event-button {
-        font-size: 18px;
-        padding: 12px;
-      }
+    .option-title {
+      font-weight: bold;
+      color: #2e7d32;
+      margin-bottom: 5px;
+    }
+
+    .checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background-color: #f1f8e9;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
   </style>
 </head>
 <body>
+  <h1>اختر الحالة الصحية</h1>
 
-  <h1>📝 سجل حدث جديد</h1>
+  <div class="animal-info">
+    <label for="animal-id">رقم الحيوان:</label>
+    <input type="text" id="animal-id" name="animal-id">
 
-  <!-- زر الولادة (محفوظ كما هو) -->
-  <button class="event-button" onclick="location.href='birth.html'">الولادة</button>
+    <label for="animal-type">نوع الحيوان:</label>
+    <input type="text" id="animal-type" name="animal-type" disabled>
 
-  <!-- باقي الأحداث -->
- <button class="event-button" onclick="location.href='insemination.html'">التلقيح</button>
+    <label for="date">التاريخ:</label>
+    <input type="date" id="date" name="date">
+  </div>
 
-  <button class="event-button" onclick="location.href='vaccination.html'">التحصين</button>
-  <button class="event-button" onclick="window.location.href='disease.html'">الأمراض</button>
+  <div class="button-grid">
+    <button class="disease-button" onclick="showOptions('mastitis')">التهاب ضرع</button>
+    <button class="disease-button" onclick="showOptions('lameness')">عرج</button>
+    <button class="disease-button">التهاب رئوي</button>
+    <button class="disease-button">لكمة كرش</button>
+    <button class="disease-button">حموضة</button>
+    <button class="disease-button">التهاب عين</button>
+    <button class="disease-button">حمي قلاعية</button>
+    <button class="disease-button">التهاب الجلد العقدي</button>
+    <button class="disease-button">حمي الثلاث ايام</button>
+    <button class="disease-button">اسهال</button>
+    <button class="disease-button">تسمم</button>
+    <button class="disease-button">امساك</button>
+    <button class="disease-button">التهاب رحم</button>
+    <button class="disease-button">انقلاب رحم</button>
+    <button class="disease-button">انقلاب مهبل</button>
+    <button class="disease-button">طفيليات خارجية</button>
+    <button class="disease-button">طفيليات داخلية</button>
+    <button class="disease-button">ابتلاع جسم معدني</button>
+    <button class="disease-button">اجهاض</button>
+  </div>
 
-  <button class="event-button" onclick="handleEvent('التجفيف')">التجفيف</button>
-  <button class="event-button" onclick="handleEvent('تحضير للولادة')">تحضير للولادة</button>
-  <button class="event-button" onclick="handleEvent('إنتاج اللبن اليومي')">إنتاج اللبن اليومي</button>
-  <button class="event-button" onclick="handleEvent('التغذية')">التغذية</button>
+  <div id="mastitis-options" class="options-container">
+    <div class="option-title">اختر الربع المصاب:</div>
+    <div class="checkboxes">
+      <label><input type="checkbox" name="quarter" value="1"> 1: أمام شمال</label>
+      <label><input type="checkbox" name="quarter" value="2"> 2: أمام يمين</label>
+      <label><input type="checkbox" name="quarter" value="3"> 3: خلف يمين</label>
+      <label><input type="checkbox" name="quarter" value="4"> 4: خلف شمال</label>
+    </div>
+    <div class="option-title">نوع الالتهاب:</div>
+    <div class="checkboxes">
+      <label><input type="radio" name="mastitisType" value="عادي"> عادي</label>
+      <label><input type="radio" name="mastitisType" value="مائي"> مائي</label>
+    </div>
+  </div>
+
+  <div id="lameness-options" class="options-container">
+    <div class="option-title">اختر الحافر المصاب:</div>
+    <div class="checkboxes">
+      <label><input type="checkbox" name="hoof" value="1"> 1: أمام شمال</label>
+      <label><input type="checkbox" name="hoof" value="2"> 2: أمام يمين</label>
+      <label><input type="checkbox" name="hoof" value="3"> 3: خلف يمين</label>
+      <label><input type="checkbox" name="hoof" value="4"> 4: خلف شمال</label>
+    </div>
+    <div class="option-title">نوع العرج:</div>
+    <div class="checkboxes">
+      <label><input type="radio" name="lamenessType" value="قرحة"> قرحة</label>
+      <label><input type="radio" name="lamenessType" value="تعفن حافر"> تعفن حافر</label>
+      <label><input type="radio" name="lamenessType" value="جسم معدني"> جسم معدني</label>
+      <label><input type="radio" name="lamenessType" value="خراج الحافر"> خراج الحافر</label>
+      <label><input type="radio" name="lamenessType" value="التهاب ما بين الأظلاف"> التهاب ما بين الأظلاف</label>
+      <label><input type="radio" name="lamenessType" value="التهاب الصفائح الحساسة"> التهاب الصفائح الحساسة</label>
+    </div>
+  </div>
 
   <script>
-    async function handleEvent(eventType) {
-      const animalId = localStorage.getItem('currentAnimalId');
-      if (!animalId) {
-        alert("لم يتم تحديد الحيوان. يرجى تسجيل حيوان أولاً.");
-        return;
-      }
+    function showOptions(type) {
+      document.getElementById("mastitis-options").style.display = "none";
+      document.getElementById("lameness-options").style.display = "none";
 
-      const eventData = {
-        animalId,
-        type: eventType,
-        date: new Date().toISOString()
-      };
-
-      try {
-        const response = await fetch('https://murabbic-alerts.onrender.com/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(eventData)
-        });
-
-        if (response.ok) {
-          const wantAnother = confirm("✅ تم تسجيل الحدث بنجاح.\nهل تريد تسجيل أحداث أخرى؟");
-          if (wantAnother) {
-            // لا شيء: يبقى على الصفحة
-          } else {
-            const wantAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-            if (wantAnimal) {
-              window.location.href = 'add-animal.html';
-            } else {
-              window.location.href = 'dashboard.html';
-            }
-          }
-        } else {
-          alert("❌ فشل في تسجيل الحدث، حاول مرة أخرى.");
-        }
-      } catch (error) {
-        alert("❌ حدث خطأ أثناء الاتصال بالخادم.");
-        console.error(error);
+      if (type === "mastitis") {
+        document.getElementById("mastitis-options").style.display = "flex";
+      } else if (type === "lameness") {
+        document.getElementById("lameness-options").style.display = "flex";
       }
     }
   </script>
-
 </body>
 </html>
-
