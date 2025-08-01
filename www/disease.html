@@ -2,74 +2,73 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الحالة الصحية</title>
   <style>
     body {
       direction: rtl;
-      background-color: #fffde7;
+      background-color: #fffef5;
       font-family: 'Arial', sans-serif;
       padding: 20px;
+      margin: 0;
     }
 
     h1 {
       text-align: center;
       color: #2e7d32;
-      font-size: 24px;
-      margin-bottom: 20px;
+      font-size: 26px;
+      margin-bottom: 30px;
     }
 
     .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
     }
 
-    .disease-btn {
+    .disease-button {
       background-color: #aeea00;
-      color: #2e7d32;
-      border: 2px solid #2e7d32;
-      border-radius: 10px;
-      padding: 15px 10px;
-      font-size: 16px;
+      color: #1b5e20;
+      border: none;
+      padding: 15px 25px;
+      font-size: 18px;
       font-weight: bold;
+      border-radius: 12px;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: transform 0.2s ease, background-color 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      min-width: 140px;
     }
 
-    .disease-btn:hover {
-      background-color: #cddc39;
+    .disease-button:hover {
+      background-color: #c5e1a5;
+      transform: scale(1.05);
     }
   </style>
 </head>
 <body>
-
-  <h1>🩺 اختر الحالة الصحية</h1>
-
-  <div class="scrollable-container">
+  <h1>اختر الحالة الصحية 🩺</h1>
   <div class="button-grid">
-    <!-- الأزرار -->
+    <button class="disease-button">التهاب ضرع</button>
+    <button class="disease-button">عرج</button>
+    <button class="disease-button">التهاب رئوي</button>
+    <button class="disease-button">لكمة كرش</button>
+    <button class="disease-button">حموضة</button>
+    <button class="disease-button">التهاب عين</button>
+    <button class="disease-button">حمي قلاعية</button>
+    <button class="disease-button">حمي الثلاث أيام</button>
+    <button class="disease-button">التهاب الجلد العقدي</button>
+    <button class="disease-button">اسهال</button>
+    <button class="disease-button">تسمم</button>
+    <button class="disease-button">امساك</button>
+    <button class="disease-button">التهاب رحم</button>
+    <button class="disease-button">انقلاب رحم</button>
+    <button class="disease-button">انقلاب مهبل</button>
+    <button class="disease-button">طفيليات خارجية</button>
+    <button class="disease-button">طفيليات داخلية</button>
+    <button class="disease-button">ابتلاع جسم معدني</button>
+    <button class="disease-button">اجهاض</button>
   </div>
-</div>
-
-    <button class="disease-btn">التهاب ضرع</button>
-    <button class="disease-btn">عرج</button>
-    <button class="disease-btn">التهاب رئوي</button>
-    <button class="disease-btn">لكمة كرش</button>
-    <button class="disease-btn">حموضة</button>
-    <button class="disease-btn">التهاب عين</button>
-    <button class="disease-btn">حمي قلاعية</button>
-    <button class="disease-btn">التهاب الجلد العقدي</button>
-    <button class="disease-btn">حمي الثلاث ايام</button>
-    <button class="disease-btn">اسهال</button>
-    <button class="disease-btn">تسمم</button>
-    <button class="disease-btn">امساك</button>
-    <button class="disease-btn">التهاب رحم</button>
-    <button class="disease-btn">انقلاب رحم</button>
-    <button class="disease-btn">انقلاب مهبل</button>
-    <button class="disease-btn">طفيليات خارجية</button>
-    <button class="disease-btn">طفيليات داخلية</button>
-  </div>
-
 </body>
 </html>
