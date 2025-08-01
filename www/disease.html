@@ -77,36 +77,6 @@
     .disease-button:hover {
       background-color: #c5e1a5;
     }
-
-    .options-container {
-      display: none;
-      flex-direction: column;
-      margin-top: 15px;
-      width: 90%;
-      max-width: 500px;
-    }
-
-    .option-title {
-      font-weight: bold;
-      color: #2e7d32;
-      margin-bottom: 5px;
-    }
-
-    .checkboxes {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .checkboxes label {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background-color: #f1f8e9;
-      padding: 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
   </style>
 </head>
 <body>
@@ -124,9 +94,8 @@
   </div>
 
   <div class="button-grid">
-   <button class="disease-button" onclick="submitDisease('التهاب ضرع')">التهاب ضرع</button>
-<button class="disease-button" onclick="submitDisease('عرج')">عرج</button>
-
+    <button class="disease-button" onclick="submitDisease('التهاب ضرع')">التهاب ضرع</button>
+    <button class="disease-button" onclick="submitDisease('عرج')">عرج</button>
     <button class="disease-button" onclick="submitDisease('التهاب رئوي')">التهاب رئوي</button>
     <button class="disease-button" onclick="submitDisease('لكمة كرش')">لكمة كرش</button>
     <button class="disease-button" onclick="submitDisease('حموضة')">حموضة</button>
@@ -146,92 +115,29 @@
     <button class="disease-button" onclick="submitDisease('اجهاض')">اجهاض</button>
   </div>
 
-  <div id="mastitis-options" class="options-container">
-    <div class="option-title">اختر الربع المصاب:</div>
-    <div class="checkboxes">
-      <label><input type="checkbox" name="quarter" value="1"> 1: أمام شمال</label>
-      <label><input type="checkbox" name="quarter" value="2"> 2: أمام يمين</label>
-      <label><input type="checkbox" name="quarter" value="3"> 3: خلف يمين</label>
-      <label><input type="checkbox" name="quarter" value="4"> 4: خلف شمال</label>
-    </div>
-    <div class="option-title">نوع الالتهاب:</div>
-    <div class="checkboxes">
-      <label><input type="radio" name="mastitisType" value="عادي"> عادي</label>
-      <label><input type="radio" name="mastitisType" value="مائي"> مائي</label>
-    </div>
-  </div>
-
-  <div id="lameness-options" class="options-container">
-    <div class="option-title">اختر الحافر المصاب:</div>
-    <div class="checkboxes">
-      <label><input type="checkbox" name="hoof" value="1"> 1: أمام شمال</label>
-      <label><input type="checkbox" name="hoof" value="2"> 2: أمام يمين</label>
-      <label><input type="checkbox" name="hoof" value="3"> 3: خلف يمين</label>
-      <label><input type="checkbox" name="hoof" value="4"> 4: خلف شمال</label>
-    </div>
-    <div class="option-title">نوع العرج:</div>
-    <div class="checkboxes">
-      <label><input type="radio" name="lamenessType" value="قرحة"> قرحة</label>
-      <label><input type="radio" name="lamenessType" value="تعفن حافر"> تعفن حافر</label>
-      <label><input type="radio" name="lamenessType" value="جسم معدني"> جسم معدني</label>
-      <label><input type="radio" name="lamenessType" value="خراج الحافر"> خراج الحافر</label>
-      <label><input type="radio" name="lamenessType" value="التهاب ما بين الأظلاف"> التهاب ما بين الأظلاف</label>
-      <label><input type="radio" name="lamenessType" value="التهاب الصفائح الحساسة"> التهاب الصفائح الحساسة</label>
-    </div>
-  </div>
-<script>
-  function showOptions(type, label) {
-    document.querySelectorAll('.options-container').forEach(el => {
-      el.style.display = 'none';
-    });
-    const target = document.getElementById(`${type}-options`);
-    if (target) {
-      target.style.display = 'flex';
-    }
-  }
-
-  function submitDisease(disease) {
-    const animalId = document.getElementById("animal-id").value;
-    const date = document.getElementById("date").value;
-
-    if (!animalId || !date) {
-      alert("من فضلك أدخل رقم الحيوان والتاريخ.");
-      return;
-    }
-
-    let details = {};
-
-    if (disease === "التهاب ضرع") {
-      const quarters = Array.from(document.querySelectorAll('input[name="quarter"]:checked')).map(el => el.value);
-      const mastitisType = document.querySelector('input[name="mastitisType"]:checked')?.value;
-      details = { quarters, mastitisType };
-    } else if (disease === "عرج") {
-      const hooves = Array.from(document.querySelectorAll('input[name="hoof"]:checked')).map(el => el.value);
-      const lamenessType = document.querySelector('input[name="lamenessType"]:checked')?.value;
-      details = { hooves, lamenessType };
-    }
-
-    fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        animalId,
-        date,
-        disease,
-        details
-      })
-    })
-    .then(response => {
-      if (response.ok) {
-        alert("✅ تم تسجيل المرض بنجاح");
-      } else {
-        alert("❌ حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+  <script>
+    function submitDisease(disease) {
+      const animalId = document.getElementById("animal-id").value;
+      const date = document.getElementById("date").value;
+      if (!animalId || !date) {
+        alert("من فضلك أدخل رقم الحيوان والتاريخ.");
+        return;
       }
-    });
-  }
-</script>
-
+      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ animalId, date, disease })
+      })
+      .then(response => {
+        if (response.ok) {
+          alert("✅ تم تسجيل المرض بنجاح");
+        } else {
+          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+        }
+      });
+    }
+  </script>
 </body>
 </html>
