@@ -38,7 +38,6 @@
   </style>
 </head>
 
-<!-- ✅ حمل رقم الحيوان عند فتح الصفحة -->
 <body onload="loadAnimalId()">
 
   <h1>📋 تسجيل حدث</h1>
@@ -46,7 +45,6 @@
   <label for="animal-id">رقم الحيوان:</label>
   <input type="text" id="animal-id" name="animal-id" required />
 
-  <!-- ✅ جميع الأزرار تستخدم دالة goTo -->
   <button class="event-button" onclick="goTo('birth.html')">الولادة</button>
   <button class="event-button" onclick="goTo('insemination.html')">التلقيح</button>
   <button class="event-button" onclick="goTo('vaccination.html')">التحصين</button>
@@ -56,7 +54,6 @@
   <button class="event-button" onclick="goTo('daily-milk.html')">إنتاج اللبن اليومي</button>
   <button class="event-button" onclick="goTo('feeding.html')">التغذية</button>
 
-  <!-- ✅ السكربت الذكي في آخر الصفحة -->
   <script>
     function loadAnimalId() {
       const animalId = localStorage.getItem("lastAnimalId") || "";
@@ -69,9 +66,15 @@
         alert("من فضلك أدخل رقم الحيوان أولاً");
         return;
       }
-      localStorage.setItem("lastAnimalId", animalId); // تأكيد التخزين
+      localStorage.setItem("lastAnimalId", animalId);
       window.location.href = `${page}?animal-id=${animalId}`;
     }
+
+    // 👇 إضافة مهمة جدًا لإزالة التركيز من أي زر عند تحميل الصفحة
+    window.onload = () => {
+      loadAnimalId();
+      document.activeElement.blur();
+    };
   </script>
 
 </body>
