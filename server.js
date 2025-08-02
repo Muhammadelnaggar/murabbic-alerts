@@ -39,10 +39,13 @@ app.post("/api/vaccinations", (req, res) => {
 });
 app.post("/api/dryoffs", (req, res) => {
   const newData = req.body;
+  console.log("🚀 بيانات التجفيف المستلمة:", newData); // ✅ سطر التتبع
+
   const filePath = path.join(dataDir, "dryoffs.json");
   saveData(filePath, newData);
   res.status(201).json({ message: "تم حفظ التجفيف بنجاح" });
 });
+
 
 // تسجيل الحالات الصحية
 app.post('/api/diseases', (req, res) => {
