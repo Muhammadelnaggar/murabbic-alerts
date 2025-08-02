@@ -112,11 +112,14 @@
         milking3
       };
 
-      fetch("https://murabbic-alerts.onrender.com/api/milk", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+     fetch("https://murabbic-alerts.onrender.com/api/dailymilk", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(data),
+})
+
         body: JSON.stringify(milkData)
       })
         .then(response => {
@@ -137,3 +140,4 @@
 
 </body>
 </html>
+
