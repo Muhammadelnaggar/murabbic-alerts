@@ -38,13 +38,30 @@ app.post("/api/vaccinations", (req, res) => {
   res.status(200).json({ message: "✅ تم حفظ التحصين بنجاح" });
 });
 app.post("/api/dryoffs", (req, res) => {
-  const newData = req.body;
-  console.log("🚀 بيانات التجفيف المستلمة:", newData); // ✅ سطر التتبع
+  try {
+    const newData = req.body;
+    console.log("📦 البيانات المستلمة:", newData);
 
-  const filePath = path.join(dataDir, "dryoffs.json");
-  saveData(filePath, newData);
-  res.status(201).json({ message: "تم حفظ التجفيف بنجاح" });
+    const filePath = path.join(dataDir, "dryoffs.json");
+
+    // اقرأ الملف الحالي
+    let existing = [];
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath);
+      existing = raw.length > 0 ? JSON.parse(raw) : [];
+    }
+
+    existing.push(newData);
+    fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
+
+    res.status(201).json({ message: "تم حفظ التجفيف بنجاح" });
+
+  } catch (err) {
+    console.error("❌ خطأ أثناء حفظ التجفيف:", err);
+    res.status(500).json({ error: "فشل الحفظ", details: err.message });
+  }
 });
+
 
 
 // تسجيل الحالات الصحية
