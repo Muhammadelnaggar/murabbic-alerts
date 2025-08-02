@@ -1,117 +1,91 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>بطاقة الحيوان</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f6fff8;
-      padding: 30px;
-    }
-
-    .cow-card {
-      border: 2px solid #90caf9;
-      border-radius: 10px;
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
       padding: 20px;
-      background-color: #ffffff;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      max-width: 700px;
-      margin: auto;
-    }
-
-    h1 {
-      text-align: center;
       color: #2e7d32;
     }
-
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
     .section {
-      margin-top: 20px;
+      margin-bottom: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      background-color: #eafbe7;
     }
-
-    .section h3 {
-      color: #1565c0;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 5px;
-    }
-
-    .field {
-      margin-bottom: 10px;
-    }
-
-    .field label {
+    .label {
       font-weight: bold;
-      display: inline-block;
-      width: 180px;
+      margin-bottom: 5px;
+      display: block;
     }
-
-    .field span {
-      color: #333;
+    .value {
+      margin-bottom: 10px;
+    }
+    .animal-image {
+      width: 100%;
+      max-width: 300px;
+      border: 2px solid #2e7d32;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    a {
+      display: block;
+      text-align: center;
+      padding: 10px;
+      background-color: #2e7d32;
+      color: white;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-  <div class="cow-card">
-    <h1>📄 بطاقة الحيوان رقم <span id="animalId">...</span></h1>
+  <h1>📋 بطاقة الحيوان رقم (0001) - جاموسة</h1>
+  <img class="animal-image" src="placeholder.jpg" alt="صورة الحيوان" />
 
-    <div class="section">
-      <h3>🧬 معلومات أساسية</h3>
-      <div class="field"><label>النوع:</label><span id="type"></span></div>
-      <div class="field"><label>السلالة:</label><span id="breed"></span></div>
-      <div class="field"><label>تاريخ الميلاد:</label><span id="dob"></span></div>
-      <div class="field"><label>تاريخ آخر ولادة:</label><span id="lastCalving"></span></div>
-    </div>
+  <div class="section">
+    <span class="label">📅 عدد أيام الحليب:</span>
+    <span class="value">125 يوم</span>
 
-    <div class="section">
-      <h3>🚼 الحالة التناسلية والإنتاجية</h3>
-      <div class="field"><label>الحالة التناسلية:</label><span id="reproduction"></span></div>
-      <div class="field"><label>الحالة الإنتاجية:</label><span id="production"></span></div>
-      <div class="field"><label>عدد أيام الحليب:</label><span id="milkDays"></span></div>
-      <div class="field"><label>عدد أيام العشار:</label><span id="pregnancyDays"></span></div>
-    </div>
-
-    <div class="section">
-      <h3>🥛 إنتاج اللبن</h3>
-      <div class="field"><label>اليومي:</label><span id="milkDaily"></span> لتر</div>
-      <div class="field"><label>الأسبوعي:</label><span id="milkWeekly"></span> لتر</div>
-      <div class="field"><label>في الموسم:</label><span id="milkSeason"></span> لتر</div>
-    </div>
-
-    <div class="section">
-      <h3>🩺 الحالة الصحية</h3>
-      <div class="field"><label>الحالة:</label><span id="health"></span></div>
-    </div>
+    <span class="label">📈 إنتاج اللبن:</span>
+    <span class="value">25 لتر/يوميًا</span>
+    <span class="value">760 لتر/شهريًا</span>
+    <span class="value">4500 لتر/موسميًا</span>
+    <img src="milk-graph-placeholder.png" alt="رسم بياني لإنتاج اللبن" style="width:100%; max-width:400px;"/>
   </div>
 
-  <script>
-    // التجريب باستخدام بيانات ثابتة إلى أن نربط بقاعدة البيانات
-    const sampleAnimal = {
-      id: 12,
-      type: "بقرة",
-      breed: "هولشتين",
-      dob: "2022-04-15",
-      lastCalving: "2024-07-01",
-      reproduction: "عشار",
-      production: "حلاب",
-      milkDays: 22,
-      pregnancyDays: 45,
-      milkDaily: 14,
-      milkWeekly: 98,
-      milkSeason: 2450,
-      health: "جيدة"
-    };
+  <div class="section">
+    <span class="label">🤰 عمر العشار:</span>
+    <span class="value">150 يوم</span>
 
-    for (const key in sampleAnimal) {
-      const element = document.getElementById(key);
-      if (element) {
-        element.textContent = sampleAnimal[key];
-      }
-    }
-  </script>
+    <span class="label">🎯 تاريخ الولادة المتوقع:</span>
+    <span class="value">2025-11-12</span>
+  </div>
+
+  <div class="section">
+    <span class="label">💊 آخر حالة صحية:</span>
+    <span class="value">علاج التهاب ضرع بتاريخ 2025-07-25</span>
+    <span class="value">تحصين حمى قلاعية بتاريخ 2025-07-18</span>
+    <span class="value">تقليم حوافر بتاريخ 2025-06-12</span>
+  </div>
+
+  <div class="section">
+    <span class="label">🧬 الحالة التناسلية:</span>
+    <span class="value">عشار في الشهر الخامس</span>
+  </div>
+
+  <a href="dashboard.html">🔙 العودة إلى غرفة التحكم</a>
 
 </body>
 </html>
-
