@@ -76,7 +76,6 @@
   </form>
 
   <script>
-    // تحميل رقم الحيوان تلقائيًا من localStorage
     const lastAnimalId = localStorage.getItem("lastAnimalId");
     if (lastAnimalId) {
       document.getElementById("animalId").value = lastAnimalId;
@@ -104,9 +103,11 @@
 
         if (!response.ok) throw new Error("فشل في تسجيل البيانات");
 
-        alert("✅ تم تسجيل إنتاج اللبن بنجاح");
-        document.getElementById("milk-form").reset();
-        document.getElementById("animalId").value = lastAnimalId;
+        alert("✅ تم تسجيل إنتاج اللبن بنجاح.");
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 500);
+
       } catch (error) {
         console.error(error);
         alert("❌ حدث خطأ في الاتصال بالخادم");
@@ -116,5 +117,3 @@
 
 </body>
 </html>
-
-   
