@@ -111,33 +111,32 @@
         milking2,
         milking3
       };
-
-     fetch("https://murabbic-alerts.onrender.com/api/dailymilk", {
+fetch("https://murabbic-alerts.onrender.com/api/dailymilk", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
   },
-  body: JSON.stringify(data),
+  body: JSON.stringify(milkData)
 })
+  .then(response => {
+    if (!response.ok) throw new Error("فشل التسجيل");
+    return response.json();
+  })
+  .then(data => {
+    alert("✅ تم تسجيل إنتاج اللبن بنجاح");
+    document.getElementById("milk-form").reset();
+    document.getElementById("animalId").value = animalId;
+  })
+  .catch(error => {
+    alert("❌ فشل الاتصال بالخادم");
+    console.error(error);
+  });
 
-        body: JSON.stringify(milkData)
-      })
-        .then(response => {
-          if (!response.ok) throw new Error("فشل التسجيل");
-          return response.json();
-        })
-        .then(data => {
-          alert("✅ تم تسجيل إنتاج اللبن بنجاح");
-          document.getElementById("milk-form").reset();
-          document.getElementById("animalId").value = animalId; // إعادة تعيين رقم الحيوان بعد التفريغ
-        })
-        .catch(error => {
-          alert("❌ فشل الاتصال بالخادم");
-          console.error(error);
         });
     });
   </script>
 
 </body>
 </html>
+
 
