@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>غرفة التحكم - مربيك</title>
+  <title>لوحة التحكم - مربيك</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     body {
@@ -11,77 +11,65 @@
       padding: 20px;
       color: #1b5e20;
     }
-
     h1 {
       text-align: center;
       font-size: 28px;
+      font-weight: bold;
       margin-bottom: 30px;
-      color: #2e7d32;
     }
-
-    .grid {
+    .dashboard {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 15px;
     }
-
     .card {
       background-color: #eafbe7;
-      border: 2px solid #a5d6a7;
-      border-radius: 12px;
       padding: 20px;
+      border-radius: 12px;
       text-align: center;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: bold;
       cursor: pointer;
-      transition: transform 0.2s ease;
+      border: 2px solid #c5e1a5;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
-
     .card:hover {
-      transform: scale(1.05);
       background-color: #dcedc8;
     }
-
     .icon {
-      font-size: 28px;
+      font-size: 30px;
       margin-bottom: 10px;
+      display: block;
     }
   </style>
 </head>
 <body>
-
-  <h1>🤍 غرفة التحكم - مزارعك في عينيك</h1>
-
-  <div class="grid">
-    <div class="card" onclick="location.href='animal-list.html'">
-      <div class="icon">🐄</div>
-      قائمة الحيوانات
-    </div>
+  <h1>📊 لوحة التحكم - مربيك</h1>
+  <div class="dashboard">
     <div class="card" onclick="location.href='add-animal.html'">
-      <div class="icon">➕</div>
-      إضافة حيوان جديد
+      <span class="icon">➕</span>تسجيل حيوان جديد
+    </div>
+    <div class="card" onclick="location.href='animal-list.html'">
+      <span class="icon">📋</span>قائمة الحيوانات
     </div>
     <div class="card" onclick="location.href='add-event.html'">
-      <div class="icon">📈</div>
-      تسجيل حدث
+      <span class="icon">🗓️</span>تسجيل الأحداث
     </div>
-    <div class="card" onclick="location.href='murabbic-alerts.html'">
-      <div class="icon">⚠️</div>
-      التنبيهات الذكية
+    <div class="card" onclick="location.href='alerts.html'">
+      <span class="icon">🔔</span>التنبيهات الذكية
     </div>
-    <div class="card" onclick="location.href='milk-reports.html'">
-      <div class="icon">📊</div>
-      تقارير اللبن
+    <div class="card" onclick="location.href='cow-card.html'">
+      <span class="icon">🆔</span>البطاقة الذكية
     </div>
-    <div class="card" onclick="location.href='camera-eval.html'">
-      <div class="icon">📷</div>
-      تقييم بالكاميرا
+    <div class="card" onclick="location.href='daily-milk.html'">
+      <span class="icon">🥛</span>إنتاج اللبن اليومي
     </div>
-    <div class="card" onclick="location.href='settings.html'">
-      <div class="icon">⚙️</div>
-      إعدادات الحساب
+    <div class="card" onclick="location.href='evaluation.html'">
+      <span class="icon">📈</span>تقييم الحيوانات
+    </div>
+    <div class="card" onclick="location.href='smart-feeding.html'">
+      <span class="icon">🍽️</span>التغذية الذكية
     </div>
   </div>
-
 </body>
 </html>
