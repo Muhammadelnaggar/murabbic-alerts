@@ -59,6 +59,33 @@ app.post('/api/closeups', (req, res) => {
     res.status(200).json({ message: '✅ تم حفظ التحضير للولادة بنجاح' });
   });
 });
+// === تسجيل إنتاج اللبن اليومي ===
+app.post('/api/milks', (req, res) => {
+  const filePath = path.join(__dirname, 'data', 'milks.json');
+  const newMilkEntry = req.body;
+
+  // تأكد من وجود رقم الحيوان والتاريخ
+  if (!newMilkEntry.animalNumber || !newMilkEntry.date) {
+    return res.status(400).json({ error: 'رقم الحيوان أو التاريخ ناقص' });
+  }
+
+  let records = [];
+  if (fs.existsSync(filePath)) {
+    const data = fs.readFileSync(filePath, 'utf8');
+    records = data ? JSON.parse(data) : [];
+  }
+
+  records.push(newMilkEntry);
+
+  fs.writeFile(filePath, JSON.stringify(records, null, 2), err => {
+    if (err) {
+      console.error("❌ فشل في حفظ بيانات اللبن:", err);
+      return res.status(500).json({ message: 'فشل في حفظ البيانات' });
+    }
+
+    res.status(200).json({ message: '✅ تم حفظ إنتاج اللبن بنجاح' });
+  });
+});
 
 app.post("/api/dryoffs", (req, res) => {
   try {
