@@ -2,152 +2,97 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>قائمة الحيوانات</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>قائمة الحيوانات</title>
   <style>
     body {
-      .table-container {
-  overflow-x: auto;
-  width: 100%;
-}
-
-      direction: rtl;
       font-family: 'Arial', sans-serif;
-      background-color: #ffffff;
+      background-color: #fff9db;
+      direction: rtl;
       padding: 20px;
     }
 
     h1 {
       text-align: center;
       color: #2e7d32;
-      font-size: 24px;
       margin-bottom: 20px;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 30px;
+    .animal-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
     }
 
-    th, td {
-      border: 1px solid #2e7d32;
-      padding: 10px;
-      text-align: center;
-      font-size: 16px;
-    }
-
-    th {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    button {
-      padding: 6px 12px;
-      background-color: transparent;
+    .animal-card {
+      background-color: #ffffff;
       border: 2px solid #2e7d32;
-      border-radius: 6px;
-      color: #2e7d32;
-      font-weight: bold;
-      cursor: pointer;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
 
-    button:hover {
+    .animal-card h3 {
+      color: #2e7d32;
+      margin: 0 0 10px;
+    }
+
+    .animal-card p {
+      margin: 5px 0;
+    }
+
+    .animal-card button {
       background-color: #2e7d32;
       color: white;
+      border: none;
+      padding: 8px 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 48%;
     }
 
-    @media (max-width: 600px) {
-      th, td {
-        font-size: 14px;
-        padding: 8px;
-      }
-
-      button {
-        font-size: 14px;
-      }
+    .animal-card button + button {
+      margin-right: 4%;
     }
   </style>
 </head>
 <body>
+  <h1>📋 قائمة الحيوانات المسجلة</h1>
+  <div class="animal-list" id="animalList"></div>
 
-  <h1>🐄 قطيعك المسجل</h1>
-  <input
-  type="text"
-  id="searchInput"
-  placeholder="🔍 ابحث برقم الحيوان أو النوع أو السلالة..."
-  onkeyup="filterTable()"
-  style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 20px; border: 2px solid #2e7d32; border-radius: 8px;"
-/>
-
-<div class="table-container">
-  <table>
-    <thead>
-      <tr>
-        <th>رقم الحيوان</th>
-        <th>النوع</th>
-        <th>السلالة</th>
-        <th>الإنتاجية</th>
-        <th>التناسلية</th>
-        <th>عرض</th>
-      </tr>
-    </thead>
-    <tbody id="animalTable">
-      <!-- الصفوف تظهر هنا -->
-    </tbody>
-  </table>
-</div>
   <script>
-    async function loadAnimals() {
-      try {
-        const response = await fetch('https://murabbic-alerts.onrender.com/api/animals');
-        const animals = await response.json();
+    const userPhone = localStorage.getItem("userPhone");
 
-        const table = document.getElementById('animalTable');
-        table.innerHTML = '';
+    fetch("https://murabbic-alerts.onrender.com/api/animals")
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById("animalList");
+        const animals = data.filter(a => a.ownerPhone === userPhone);
+
+        if (animals.length === 0) {
+          container.innerHTML = '<p>لا يوجد حيوانات مسجلة بعد.</p>';
+          return;
+        }
 
         animals.forEach(animal => {
-          const row = document.createElement('tr');
-
-          row.innerHTML = `
-            <td>${animal.number || '-'}</td>
-            <td>${animal.type || '-'}</td>
-            <td>${animal.breed || '-'}</td>
-            <td>${animal.productionStatus || '-'}</td>
-            <td>${animal.reproductionStatus || '-'}</td>
-            <td><button onclick="viewAnimal('${animal.id}')">عرض البطاقة</button></td>
+          const card = document.createElement("div");
+          card.className = "animal-card";
+          card.innerHTML = `
+            <h3>الحيوان رقم: ${animal.number}</h3>
+            <p>النوع: ${animal.type}</p>
+            <p>الحالة الإنتاجية: ${animal.productionStatus}</p>
+            <p>الحالة التناسلية: ${animal.reproductiveStatus}</p>
+            <button onclick="location.href='cow-card.html?number=${animal.number}'">عرض الكارت</button>
+            <button onclick="location.href='add-event.html'">تسجيل حدث</button>
           `;
-
-          table.appendChild(row);
+          container.appendChild(card);
         });
-
-      } catch (error) {
-        console.error(error);
-        alert('⚠️ حدث خطأ أثناء تحميل القطيع.');
-      }
-    }
-
-    function viewAnimal(id) {
-      localStorage.setItem('currentAnimalId', id);
-      window.location.href = 'cow-card.html';
-    }
-
-    loadAnimals();
-    function filterTable() {
-  const input = document.getElementById("searchInput");
-  const filter = input.value.toLowerCase();
-  const rows = document.querySelectorAll("#animalTable tr");
-
-  rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(filter) ? "" : "none";
-  });
-}
-
+      })
+      .catch(err => {
+        console.error("فشل في تحميل الحيوانات:", err);
+        document.getElementById("animalList").innerHTML = "<p>حدث خطأ أثناء تحميل البيانات.</p>";
+      });
   </script>
-
 </body>
 </html>
-
-
-
