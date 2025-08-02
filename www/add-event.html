@@ -19,22 +19,6 @@
       margin-bottom: 30px;
     }
 
-    label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 8px;
-      color: #33691e;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 20px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 16px;
-    }
-
     .event-button {
       display: block;
       width: 100%;
@@ -53,54 +37,42 @@
     }
   </style>
 </head>
-<body>
+
+<!-- ✅ حمل رقم الحيوان عند فتح الصفحة -->
+<body onload="loadAnimalId()">
 
   <h1>📋 تسجيل حدث</h1>
 
   <label for="animal-id">رقم الحيوان:</label>
   <input type="text" id="animal-id" name="animal-id" required />
 
-  <button class="event-button" onclick="window.location.href='birth.html'">الولادة</button>
-  <button class="event-button" onclick="window.location.href='insemination.html'">التلقيح</button>
-  <button class="event-button" onclick="window.location.href='vaccination.html'">التحصين</button>
-  <button class="event-button" onclick="window.location.href='disease.html'">الحالة الصحية</button>
-  <button class="event-button" onclick="window.location.href='drying.html'">تجفيف</button>
-  <button class="event-button" onclick="window.location.href='close-up.html'">تحضير للولادة</button>
-  <button class="event-button" onclick="goToMilk()">إنتاج اللبن اليومي</button>
-  <button class="event-button" onclick="window.location.href='feeding.html'">التغذية</button>
+  <!-- ✅ جميع الأزرار تستخدم دالة goTo -->
+  <button class="event-button" onclick="goTo('birth.html')">الولادة</button>
+  <button class="event-button" onclick="goTo('insemination.html')">التلقيح</button>
+  <button class="event-button" onclick="goTo('vaccination.html')">التحصين</button>
+  <button class="event-button" onclick="goTo('disease.html')">الحالة الصحية</button>
+  <button class="event-button" onclick="goTo('drying.html')">تجفيف</button>
+  <button class="event-button" onclick="goTo('close-up.html')">تحضير للولادة</button>
+  <button class="event-button" onclick="goTo('daily-milk.html')">إنتاج اللبن اليومي</button>
+  <button class="event-button" onclick="goTo('feeding.html')">التغذية</button>
 
+  <!-- ✅ السكربت الذكي في آخر الصفحة -->
   <script>
-    function goToMilk() {
+    function loadAnimalId() {
+      const animalId = localStorage.getItem("lastAnimalId") || "";
+      document.getElementById("animal-id").value = animalId;
+    }
+
+    function goTo(page) {
       const animalId = document.getElementById("animal-id").value.trim();
       if (!animalId) {
-        alert("من فضلك أدخل رقم الحيوان أولًا");
+        alert("من فضلك أدخل رقم الحيوان أولاً");
         return;
       }
-
-      localStorage.setItem("lastAnimalId", animalId);
-      window.location.href = `daily-milk.html?animal-id=${animalId}`;
+      localStorage.setItem("lastAnimalId", animalId); // تأكيد التخزين
+      window.location.href = `${page}?animal-id=${animalId}`;
     }
-    <script>
-  // إظهار رقم الحيوان تلقائيًا لو متسجل
-  const lastAnimalId = localStorage.getItem("lastAnimalId");
-  if (lastAnimalId) {
-    document.getElementById("animal-id").value = lastAnimalId;
-  }
-
-  function goToMilk() {
-    const animalId = document.getElementById("animal-id").value.trim();
-    if (!animalId) {
-      alert("من فضلك أدخل رقم الحيوان أولًا");
-      return;
-    }
-
-    localStorage.setItem("lastAnimalId", animalId);
-    window.location.href = `daily-milk.html?animal-id=${animalId}`;
-  }
-</script>
-
   </script>
 
 </body>
 </html>
-
