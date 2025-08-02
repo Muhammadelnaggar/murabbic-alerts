@@ -170,7 +170,8 @@
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem("lastAnimalId", animal.animalId);
+       localStorage.setItem("lastAnimalId", animal.number);
+
 
         alert("تم تسجيل الحيوان بنجاح.");
         setTimeout(() => {
@@ -188,3 +189,4 @@
 
 </body>
 </html>
+
