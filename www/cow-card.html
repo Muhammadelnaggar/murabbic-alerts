@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>إنتاج اللبن اليومي</title>
+  <title>بطاقة الحيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -17,24 +17,12 @@
       font-size: 24px;
       margin-bottom: 20px;
     }
-    label {
-      display: block;
-      margin: 10px 0 5px;
-      font-weight: bold;
-    }
-    input[type="text"], input[type="date"], input[type="number"] {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #2e7d32;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      font-size: 16px;
-    }
-    .milking-box {
+    .section {
       background-color: #eafbe7;
       padding: 15px;
       border-radius: 10px;
       margin-bottom: 20px;
+      line-height: 1.8;
     }
     button {
       width: 100%;
@@ -46,125 +34,104 @@
       border-radius: 10px;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #1b5e20;
-    }
     canvas {
       margin-top: 30px;
       background-color: #fff;
       border: 1px solid #ccc;
       border-radius: 10px;
     }
+    .photo-button {
+      float: left;
+      font-size: 14px;
+      padding: 5px 10px;
+      background-color: #aed581;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
-  <h1>📈 إنتاج اللبن اليومي</h1>
+  <h1>بطاقة الحيوان رقم (<span id="animalId"></span>) - <span id="animalType"></span></h1>
+  <button class="photo-button">📷 صورة الحيوان</button>
 
-  <form id="milk-form">
-    <label for="animalId">🐄 رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" readonly />
+  <div class="section" id="milkSection">
+    <strong>📅 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>☑️ إنتاج اللبن:</strong><br>
+    <span id="milkTotal"></span><br>
+    <canvas id="milkChart" width="400" height="200"></canvas>
+  </div>
 
-    <label for="date">📅 التاريخ</label>
-    <input type="date" id="date" name="date" required />
+  <div class="section">
+    <strong>👶 عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
+    <strong>📅 تاريخ الولادة المتوقع:</strong> <span id="expectedDate"></span>
+  </div>
 
-    <div class="milking-box">
-      <label for="milking1">🥛 الحلبة الأولى</label>
-      <input type="number" id="milking1" name="milking1" placeholder="باللتر" min="0" />
+  <div class="section">
+    <strong>💊 آخر حالة صحية:</strong><br>
+    <span id="healthSummary"></span>
+  </div>
 
-      <label for="milking2">🥛 الحلبة الثانية</label>
-      <input type="number" id="milking2" name="milking2" placeholder="باللتر" min="0" />
+  <div class="section">
+    <strong>🔍 الحالة التناسلية:</strong><br>
+    <span id="reproduction"></span>
+  </div>
 
-      <label for="milking3">🥛 الحلبة الثالثة</label>
-      <input type="number" id="milking3" name="milking3" placeholder="باللتر" min="0" />
-    </div>
-
-    <button type="submit">🗓️ تسجيل الإنتاج</button>
-  </form>
-
-  <canvas id="milkChart" width="400" height="200"></canvas>
+  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
 
   <script>
-    const lastAnimalId = localStorage.getItem("lastAnimalId");
-    if (lastAnimalId) {
-      document.getElementById("animalId").value = lastAnimalId;
-    }
+    const animalId = localStorage.getItem("lastAnimalId");
+    document.getElementById("animalId").textContent = animalId;
 
-    document.getElementById("milk-form").addEventListener("submit", async function (event) {
-      event.preventDefault();
+    // محاكاة بيانات من السيرفر:
+    const animalData = {
+      type: "جاموسة",
+      milkDays: 125,
+      milkTotal: "25 لتر يوميًا / 760 لتر شهريًا / 4500 لتر موسميًا",
+      pregnancyAge: 150,
+      expectedDate: "2025-11-12",
+      healthSummary: "علاج التهاب ضرع بتاریخ 25-07-2025. تحصين حمى قلاعية بتاریخ 18-07-2025. تقليم حوافر بتاریخ 2025-12-06.",
+      reproduction: "عشار في الشهر الخامس",
+      chart: [
+        { date: "2025-07-01", total: 23 },
+        { date: "2025-07-02", total: 24 },
+        { date: "2025-07-03", total: 25 },
+        { date: "2025-07-04", total: 26 },
+        { date: "2025-07-05", total: 25 }
+      ]
+    };
 
-      const milkData = {
-        animalId: document.getElementById("animalId").value,
-        date: document.getElementById("date").value,
-        milking1: document.getElementById("milking1").value,
-        milking2: document.getElementById("milking2").value,
-        milking3: document.getElementById("milking3").value
-      };
+    document.getElementById("animalType").textContent = animalData.type;
+    document.getElementById("milkDays").textContent = animalData.milkDays;
+    document.getElementById("milkTotal").textContent = animalData.milkTotal;
+    document.getElementById("pregnancyAge").textContent = animalData.pregnancyAge;
+    document.getElementById("expectedDate").textContent = animalData.expectedDate;
+    document.getElementById("healthSummary").textContent = animalData.healthSummary;
+    document.getElementById("reproduction").textContent = animalData.reproduction;
 
-      try {
-        const response = await fetch("https://murabbic-alerts.onrender.com/api/dailymilk", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(milkData)
-        });
-
-        if (!response.ok) throw new Error("فشل في تسجيل البيانات");
-
-        alert("✅ تم تسجيل إنتاج اللبن بنجاح.");
-        setTimeout(() => {
-          window.location.href = "dashboard.html";
-        }, 500);
-
-      } catch (error) {
-        console.error(error);
-        alert("❌ حدث خطأ في الاتصال بالخادم");
+    new Chart(document.getElementById('milkChart'), {
+      type: 'line',
+      data: {
+        labels: animalData.chart.map(e => e.date),
+        datasets: [{
+          label: 'الإنتاج اليومي (لتر)',
+          data: animalData.chart.map(e => e.total),
+          backgroundColor: 'rgba(76, 175, 80, 0.2)',
+          borderColor: '#4caf50',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+            labels: { font: { size: 14 } }
+          }
+        }
       }
     });
-
-    async function drawChart() {
-      try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/dailymilk");
-        const data = await res.json();
-
-        const animalId = localStorage.getItem("lastAnimalId");
-        const filtered = data.filter(entry => entry.animalId === animalId);
-
-        const labels = filtered.map(e => e.date);
-        const totals = filtered.map(e =>
-          Number(e.milking1 || 0) + Number(e.milking2 || 0) + Number(e.milking3 || 0)
-        );
-
-        new Chart(document.getElementById('milkChart'), {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'الإنتاج اليومي (لتر)',
-              data: totals,
-              backgroundColor: 'rgba(76, 175, 80, 0.2)',
-              borderColor: '#4caf50',
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: true,
-                labels: { font: { size: 14 } }
-              }
-            }
-          }
-        });
-      } catch (err) {
-        console.error("فشل تحميل بيانات الرسم البياني", err);
-      }
-    }
-
-    drawChart();
   </script>
-
 </body>
 </html>
