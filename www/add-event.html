@@ -80,7 +80,27 @@
       localStorage.setItem("lastAnimalId", animalId);
       window.location.href = `daily-milk.html?animal-id=${animalId}`;
     }
+    <script>
+  // إظهار رقم الحيوان تلقائيًا لو متسجل
+  const lastAnimalId = localStorage.getItem("lastAnimalId");
+  if (lastAnimalId) {
+    document.getElementById("animal-id").value = lastAnimalId;
+  }
+
+  function goToMilk() {
+    const animalId = document.getElementById("animal-id").value.trim();
+    if (!animalId) {
+      alert("من فضلك أدخل رقم الحيوان أولًا");
+      return;
+    }
+
+    localStorage.setItem("lastAnimalId", animalId);
+    window.location.href = `daily-milk.html?animal-id=${animalId}`;
+  }
+</script>
+
   </script>
 
 </body>
 </html>
+
