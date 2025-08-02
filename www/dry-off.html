@@ -51,6 +51,22 @@
       width: 100%;
       margin-top: 20px;
     }
+    .option-group {
+  display: flex;
+  gap: 15px;
+  margin-top: 8px;
+  margin-bottom: 15px;
+}
+
+.option-group label {
+  background-color: #dcedc8;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid #8bc34a;
+  cursor: pointer;
+  font-size: 16px;
+}
+
   </style>
 </head>
 <body>
@@ -63,26 +79,26 @@
     <label for="date">تاريخ التجفيف:</label>
     <input type="date" id="date" required />
 
-    <label for="reason">سبب التجفيف:</label>
-    <select id="reason" required>
-      <option value="">-- اختر --</option>
-      <option value="طبيعي">طبيعي</option>
-      <option value="اضطراري">اضطراري</option>
-    </select>
+  <label>سبب التجفيف:</label>
+<div class="option-group">
+  <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
+  <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
+</div>
 
-    <label for="pregnancy">تأكيد الحمل:</label>
-    <select id="pregnancy" required>
-      <option value="">-- اختر --</option>
-      <option value="عشار">عشار</option>
-      <option value="فارغة">فارغة</option>
-    </select>
 
-    <label for="antibiotics">تم استخدام محاقن التجفيف؟</label>
-    <select id="antibiotics" required>
-      <option value="">-- اختر --</option>
-      <option value="نعم">نعم</option>
-      <option value="لا">لا</option>
-    </select>
+   <label>تأكيد الحمل:</label>
+<div class="option-group">
+  <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
+  <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
+</div>
+
+
+   <label>تم استخدام محاقن التجفيف؟</label>
+<div class="option-group">
+  <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
+  <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
+</div>
+
 
     <button type="submit">💾 تسجيل التجفيف</button>
   </form>
@@ -94,9 +110,10 @@
       const data = {
         animalId: document.getElementById("animal-id").value,
         date: document.getElementById("date").value,
-        reason: document.getElementById("reason").value,
-        pregnancy: document.getElementById("pregnancy").value,
-        antibiotics: document.getElementById("antibiotics").value
+       reason: document.querySelector('input[name="reason"]:checked')?.value,
+pregnancy: document.querySelector('input[name="pregnancy"]:checked')?.value,
+antibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
+
       };
 
       if (!data.animalId || !data.date || !data.reason || !data.pregnancy || !data.antibiotics) {
