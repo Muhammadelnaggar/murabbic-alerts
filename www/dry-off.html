@@ -103,31 +103,28 @@
     <button type="submit">💾 تسجيل التجفيف</button>
   </form>
 
-  <script>
-    function submitDryOff(event) {
-      event.preventDefault();
+ <script>
+  function submitDryOff(event) {
+    event.preventDefault();
 
-      const data = {
-        animalId: document.getElementById("animal-id").value,
-        date: document.getElementById("date").value,
-       reason: document.querySelector('input[name="reason"]:checked')?.value,
-pregnancy: document.querySelector('input[name="pregnancy"]:checked')?.value,
-antibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
+    const data = {
+      animalId: document.getElementById("animal-id").value,
+      date: document.getElementById("date").value,
+      reason: document.querySelector('input[name="reason"]:checked')?.value,
+      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
+      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value
+    };
 
-      };
+    fetch("https://murabbic-alerts.onrender.com/api/dryoffs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(res => {
+      if (res.ok) {
+        const isNewUser = localStorage.getItem("isNewUser") === "true";
 
-      if (!data.animalId || !data.date || !data.reason || !data.pregnancy || !data.antibiotics) {
-        alert("يرجى ملء جميع الحقول المطلوبة.");
-        return;
-      }
-
-      fetch("https://murabbic-alerts.onrender.com/api/dryoffs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(res => {
-        if (res.ok) {
+        if (isNewUser) {
           if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
             window.location.href = "add-event.html";
           } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
@@ -138,14 +135,18 @@ antibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
             window.location.href = "dashboard.html";
           }
         } else {
-          alert("حدث خطأ أثناء الحفظ.");
+          window.location.href = "dashboard.html";
         }
-      })
-      .catch(err => {
-        console.error(err);
-        alert("تعذر الاتصال بالخادم.");
-      });
-    }
-  </script>
+      } else {
+        alert("❌ حدث خطأ أثناء الحفظ.");
+      }
+    })
+    .catch(err => {
+      console.error("❌ خطأ:", err);
+      alert("فشل الاتصال بالخادم.");
+    });
+  }
+</script>
+
 </body>
 </html>
