@@ -86,7 +86,7 @@
   <script>
     const buttons = document.querySelectorAll('.disease-btn');
     buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const animalId = document.getElementById('animalId').value;
         const animalType = document.getElementById('animalType').value;
         const eventDate = document.getElementById('eventDate').value;
@@ -104,23 +104,22 @@
           disease
         };
 
-        fetch('https://murabbic-alerts.onrender.com/api/diseases', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        })
-        .then(response => {
+        try {
+          const response = await fetch('https://murabbic-alerts.onrender.com/api/diseases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+
           if (!response.ok) throw new Error('فشل في تسجيل الحالة');
-          return response.json();
-        })
-        .then(result => {
+
+          const result = await response.json();
           alert('✅ تم تسجيل الحالة الصحية بنجاح');
           window.location.href = 'treatment-followup.html';
-        })
-        .catch(err => {
+        } catch (err) {
           console.error(err);
           alert('حدث خطأ أثناء التسجيل');
-        });
+        }
       });
     });
   </script>
