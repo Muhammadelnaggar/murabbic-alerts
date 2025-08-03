@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>بطاقة الحيوان</title>
+  <title>بطاقة الجاموسة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -11,138 +10,132 @@
       direction: rtl;
       font-family: 'Arial', sans-serif;
       background-color: #fffde9;
-      padding: 20px;
       margin: 0;
+      padding: 0;
+    }
+
+    .card {
+      max-width: 400px;
+      margin: 0 auto;
+      background-color: #f1f8e9;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
     h1 {
       text-align: center;
-      color: #2e7d32;
-      font-size: 24px;
-      margin-bottom: 20px;
+      color: #33691e;
+      font-size: 22px;
+      margin-bottom: 15px;
     }
 
-    .card {
-      background-color: #f9fbe7;
-      border: 2px solid #8bc34a;
-      border-radius: 15px;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .card p {
-      font-size: 18px;
+    .section {
+      background-color: #e8f5e9;
+      border: 1px solid #c5e1a5;
+      border-radius: 10px;
+      padding: 10px 15px;
       margin: 10px 0;
-      color: #333;
+    }
+
+    .section p {
+      margin: 6px 0;
+      font-size: 15px;
+      color: #2e7d32;
     }
 
     .label {
-      color: #33691e;
       font-weight: bold;
     }
 
     canvas {
-      margin-top: 20px;
-      width: 100%;
+      margin-top: 15px;
     }
 
     .back-button {
       display: block;
-      margin: 30px auto 0;
-      text-align: center;
-      background-color: #43a047;
+      margin: 20px auto 0;
+      background-color: #4caf50;
       color: white;
-      padding: 10px 20px;
+      padding: 10px;
       font-size: 16px;
+      text-align: center;
       text-decoration: none;
       border-radius: 8px;
-    }
-
-    .not-found {
-      color: #b71c1c;
-      text-align: center;
-      font-size: 20px;
+      width: 90%;
     }
   </style>
 </head>
 <body>
+  <div class="card">
+    <h1>بطاقة الجاموسة رقم (001)</h1>
 
-<h1 id="cardTitle">جارٍ تحميل البطاقة...</h1>
+    <div class="section">
+      <p><span class="label">📅 تاريخ الميلاد:</span> 01-12-2023</p>
+      <p><span class="label">🗓️ موسم الحليب:</span> الموسم الأول 2024</p>
+      <p><span class="label">📆 عدد أيام الحليب:</span> 125 يوم</p>
+      <p><span class="label">✅ إنتاج اللبن:</span></p>
+      <p><span class="label">25 لتر/يومياً – 760 لتر شهرياً – 4500 لتر موسمياً</span></p>
+      <canvas id="milkChart" width="300" height="200"></canvas>
+    </div>
 
-<div class="card" id="cardContent"></div>
-<canvas id="milkChart"></canvas>
+    <div class="section">
+      <p><span class="label">🐣 عمر الحمل:</span> 150 يوم</p>
+      <p><span class="label">🍼 تاريخ الولادة المتوقع:</span> 12-11-2025</p>
+    </div>
 
-<p id="notFound" class="not-found" style="display:none;">لم يتم العثور على الحيوان المطلوب.</p>
+    <div class="section">
+      <p><span class="label">💊 آخر حالة صحية:</span></p>
+      <p>علاج التهاب ضرع بتاريخ 2025-07-25، تحصين حمى ثلاثية بتاريخ 2025-07-25</p>
+      <p>فلاغة حمى تنفسية بتاريخ 2025-07-18</p>
+    </div>
 
-<a href="animal-list.html" class="back-button">🔙 الرجوع لقائمة القطيع</a>
+    <button class="back-button" onclick="window.location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
+  </div>
 
-<script>
-  const urlParams = new URLSearchParams(window.location.search);
-  const animalNumber = urlParams.get('number');
-
-  fetch('https://murabbic-alerts.onrender.com/api/animals')
-    .then(res => res.json())
-    .then(data => {
-      const animal = data.find(a => a.number === animalNumber);
-
-      if (!animal) {
-        document.getElementById('notFound').style.display = 'block';
-        document.getElementById('cardTitle').style.display = 'none';
-        return;
-      }
-
-      document.getElementById('cardTitle').textContent =
-        animal.type === 'بقرة' ? `بطاقة البقرة رقم ${animal.number}` : `بطاقة الجاموسة رقم ${animal.number}`;
-
-      document.getElementById('cardContent').innerHTML = `
-        <p><span class="label">السلالة:</span> ${animal.breed}</p>
-        <p><span class="label">الحالة الإنتاجية:</span> ${animal.productionStatus}</p>
-        <p><span class="label">الحالة التناسلية:</span> ${animal.reproductiveStatus}</p>
-        <p><span class="label">تاريخ الميلاد:</span> ${animal.birthDate || '---'}</p>
-        <p><span class="label">آخر ولادة:</span> ${animal.lastCalvingDate || '---'}</p>
-      `;
-
-      if (animal.milkProduction && animal.milkProduction.length) {
-        const days = Array.from({ length: animal.milkProduction.length }, (_, i) => `يوم ${i + 1}`);
-        const ctx = document.getElementById('milkChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: days,
-            datasets: [{
-              label: 'إنتاج اللبن اليومي (لتر)',
-              data: animal.milkProduction,
-              borderColor: '#2e7d32',
-              borderWidth: 2,
-              fill: false,
-              tension: 0.3,
-              pointRadius: 3
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: true
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true
-              }
+  <script>
+    const ctx = document.getElementById('milkChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['2025-03-01','2025-04-01','2025-05-01','2025-06-01','2025-07-01'],
+        datasets: [{
+          label: 'إنتاج اللبن التراكمي (لتر)',
+          data: [750, 1500, 3000, 4100, 4500],
+          borderColor: '#2e7d32',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+            labels: {
+              color: '#33691e'
             }
           }
-        });
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: '#33691e'
+            }
+          },
+          x: {
+            ticks: {
+              color: '#33691e'
+            }
+          }
+        }
       }
-    })
-    .catch(error => {
-      document.getElementById('notFound').style.display = 'block';
-      document.getElementById('cardTitle').style.display = 'none';
-      console.error('❌ فشل تحميل البيانات:', error);
     });
-</script>
-
+  </script>
 </body>
 </html>
+
+
