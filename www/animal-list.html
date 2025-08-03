@@ -20,6 +20,36 @@
       margin-bottom: 15px;
     }
 
+    .controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .controls input {
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      min-width: 150px;
+    }
+
+    .controls button {
+      padding: 8px 12px;
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .controls button:hover {
+      background-color: #388e3c;
+    }
+
     .table-wrapper {
       overflow-x: auto;
       background: #fefefc;
@@ -81,11 +111,18 @@
       border-radius: 8px;
       text-decoration: none;
     }
-
   </style>
 </head>
 <body>
   <h1>📋 قائمة الحيوانات المسجلة</h1>
+
+  <div class="controls">
+    <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
+    <button onclick="filterType('بقرة')">🐄 الأبقار</button>
+    <button onclick="filterType('جاموسة')">🐃 الجاموس</button>
+    <button onclick="resetFilter()">عرض الكل</button>
+  </div>
+
   <div class="table-wrapper">
     <table id="animalTable">
       <thead>
@@ -105,31 +142,37 @@
   </div>
 
   <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
-
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
   <script>
-  fetch('https://murabbic-alerts.onrender.com/api/animals')
-    .then(res => res.json())
-    .then(data => {
+    let animalsData = [];
+
+    fetch('https://murabbic-alerts.onrender.com/api/animals')
+      .then(res => res.json())
+      .then(data => {
+        animalsData = data;
+        renderTable(data);
+      })
+      .catch(error => {
+        document.getElementById('noData').style.display = 'block';
+        console.error('❌ فشل تحميل البيانات:', error);
+      });
+
+    function renderTable(data) {
       const tbody = document.getElementById('animalBody');
       const noData = document.getElementById('noData');
+      tbody.innerHTML = '';
 
       if (!data || data.length === 0) {
         noData.style.display = 'block';
         return;
+      } else {
+        noData.style.display = 'none';
       }
 
       data.forEach(animal => {
         const tr = document.createElement('tr');
-
-        // لون الصف حسب النوع
-        if (animal.type === "بقرة") {
-          tr.style.backgroundColor = "#fff9c4"; // أصفر
-        } else if (animal.type === "جاموسة") {
-          tr.style.backgroundColor = "#e0e0e0"; // رمادي
-        }
-
+        tr.style.backgroundColor = animal.type === 'بقرة' ? '#fffde7' : '#eeeeee';
         tr.innerHTML = `
           <td>${animal.number || ''}</td>
           <td>${animal.type || ''}</td>
@@ -144,30 +187,27 @@
         `;
         tbody.appendChild(tr);
       });
-    })
-    .catch(error => {
-      document.getElementById('noData').style.display = 'block';
-      console.error('❌ فشل تحميل البيانات:', error);
-    });
-
-  function viewCard(animalNumber) {
-    window.location.href = `cow-card.html?number=${animalNumber}`;
-  }
-</script>
-
-
-      })
-      .catch(error => {
-        document.getElementById('noData').style.display = 'block';
-        console.error('❌ فشل تحميل البيانات:', error);
-      });
+    }
 
     function viewCard(animalNumber) {
       window.location.href = `cow-card.html?number=${animalNumber}`;
     }
+
+    document.getElementById('searchNumber').addEventListener('input', function() {
+      const query = this.value.trim();
+      const filtered = animalsData.filter(a => a.number.includes(query));
+      renderTable(filtered);
+    });
+
+    function filterType(type) {
+      const filtered = animalsData.filter(a => a.type === type);
+      renderTable(filtered);
+    }
+
+    function resetFilter() {
+      renderTable(animalsData);
+      document.getElementById('searchNumber').value = '';
+    }
   </script>
 </body>
 </html>
-
-
-
