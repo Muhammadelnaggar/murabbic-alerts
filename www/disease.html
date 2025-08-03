@@ -252,6 +252,8 @@
      .then(res => {
   if (res.ok) {
     const isNewUser = localStorage.getItem("isNewUser") === "true";
+    alert("✅ تم تسجيل الحالة الصحية بنجاح");
+    window.location.href = "treatment-followup.html";
 
     if (isNewUser) {
       if (confirm("✅ تم تسجيل الحالة بنجاح\nهل تريد تسجيل مرض آخر؟")) {
@@ -285,3 +287,4 @@
 </html>
 
        
+
