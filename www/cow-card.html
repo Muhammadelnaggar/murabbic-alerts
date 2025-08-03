@@ -1,165 +1,177 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>بطاقة الحيوان</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
+      background-color: #fff9db;
       font-family: 'Arial', sans-serif;
-      direction: rtl;
-      background-color: #fffde9;
       padding: 20px;
-    }
-
-    .card {
-      background-color: #e9f5e9;
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      max-width: 600px;
-      margin: auto;
-    }
-
-    .card h2 {
-      text-align: center;
-      color: #2e7d32;
-      margin-bottom: 20px;
-    }
-
-    .section {
-      background-color: #f4fff4;
-      padding: 10px 15px;
-      border-radius: 10px;
-      margin-bottom: 15px;
-    }
-
-    .section strong {
       color: #1b5e20;
     }
-
-    canvas {
-      max-width: 100%;
-    }
-
-    .back-button {
-      display: block;
+    h1 {
       text-align: center;
-      margin-top: 30px;
+      font-size: 30px;
+      font-weight: bold;
+      margin-bottom: 20px;
     }
-
-    .back-button button {
-      background-color: #4caf50;
+    .section {
+      background-color: #eafbe7;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      line-height: 1.8;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2e7d32;
       color: white;
-      padding: 10px 25px;
+      font-size: 18px;
       border: none;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: 10px;
       cursor: pointer;
     }
-
-    .back-button button:hover {
-      background-color: #388e3c;
+    canvas {
+      margin-top: 30px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+    }
+    .photo-button {
+      float: left;
+      font-size: 14px;
+      padding: 5px 10px;
+      background-color: #aed581;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .title {
+      font-size: 26px;
+      color: #2e7d32;
+      font-weight: bold;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-
-<div class="card" id="card">
-  <h2 id="title">بطاقة الحيوان</h2>
+  <h1 class="title">بطاقة الحيوان رقم (<span id="animalId"></span>)</h1>
+  <button class="photo-button">📷 صورة الحيوان</button>
 
   <div class="section">
-    <strong>تاريخ الميلاد:</strong> <span id="birthDate"></span><br>
-    <strong>الموسم الحالي:</strong> <span id="season"></span>
+    <strong>📅 تاريخ الميلاد:</strong> <span id="birthDate"></span><br>
+    <strong>🧮 الموسم الحالي:</strong> <span id="season"></span>
   </div>
 
-  <div class="section">
-    <strong>عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
-    <strong>إنتاج اللبن:</strong> ✅<br>
+  <div class="section" id="milkSection">
+    <strong>📅 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>☑️ إنتاج اللبن:</strong><br>
     <span id="milkTotal"></span>
-    <canvas id="milkChart" height="300"></canvas>
+    <canvas id="milkChart" width="400" height="200"></canvas>
   </div>
 
   <div class="section">
-    <strong>عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
-    <strong>تاريخ الولادة المتوقع:</strong> <span id="expectedCalving"></span>
+    <strong>👶 عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
+    <strong>📅 تاريخ الولادة المتوقع:</strong> <span id="expectedDate"></span>
   </div>
 
   <div class="section">
-    <strong>آخر حالة صحية:</strong><br>
-    <span id="lastHealth"></span>
+    <strong>💊 آخر حالة صحية:</strong><br>
+    <span id="healthSummary"></span>
   </div>
-</div>
 
-<div class="back-button">
-  <button onclick="window.location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
-</div>
+  <div class="section">
+    <strong>🔍 الحالة التناسلية:</strong><br>
+    <span id="reproduction"></span>
+  </div>
 
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const number = params.get("number");
+  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
 
-  async function loadAnimal() {
-    const res = await fetch('data/animals.json');
-    const animals = await res.json();
-    const animal = animals.find(a => a.number === number);
+  <script>
+    async function fetchData() {
+      const params = new URLSearchParams(window.location.search);
+      const number = params.get("number");
+      document.getElementById("animalId").textContent = number;
 
-    if (!animal) {
-      document.getElementById("card").innerHTML = "<h2>❌ الحيوان غير موجود</h2>";
-      return;
-    }
+      const [animals, milk, events] = await Promise.all([
+        fetch("animals.json").then(res => res.json()),
+        fetch("milk.json").then(res => res.json()),
+        fetch("events.json").then(res => res.json())
+      ]);
 
-    document.getElementById("title").textContent = `${animal.type} رقم (${animal.number})`;
-    document.getElementById("birthDate").textContent = animal.birthDate || '---';
-    document.getElementById("season").textContent = animal.milkSeason || '---';
+      const animal = animals.find(a => a.number === number);
+      if (!animal) return alert("لم يتم العثور على الحيوان.");
 
-    const milkDays = animal.milkDays || 0;
-    document.getElementById("milkDays").textContent = milkDays;
-    const daily = animal.milkPerDay || 0;
-    const monthly = daily * 30;
-    const seasonal = daily * milkDays;
-    document.getElementById("milkTotal").textContent = `${daily} لتر يوميًا / ${monthly} لتر شهريًا / ${seasonal} لتر موسميًا`;
+      const birthDate = animal.birthDate || "غير مسجل";
+      const season = animal.season || "غير محدد";
+      const reproduction = animal.reproductiveStatus || "غير مسجل";
 
-    // رسم الرسم البياني
-    const ctx = document.getElementById('milkChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: animal.milkGraph?.map((_, i) => `يوم ${i + 1}`) || [],
-        datasets: [{
-          label: 'إنتاج اللبن (لتر)',
-          data: animal.milkGraph || [],
-          borderColor: '#2e7d32',
-          backgroundColor: '#c8e6c9',
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
+      document.getElementById("birthDate").textContent = birthDate;
+      document.getElementById("season").textContent = season;
+      document.getElementById("reproduction").textContent = reproduction;
+
+      // عدد أيام الحليب
+      const lastCalving = new Date(animal.lastCalvingDate);
+      const milkDays = Math.floor((new Date() - lastCalving) / (1000 * 60 * 60 * 24));
+      document.getElementById("milkDays").textContent = milkDays;
+
+      // إنتاج اللبن
+      const milkData = milk.filter(m => m.number === number);
+      const milkTotal = milkData.at(-1)?.total || "---";
+      document.getElementById("milkTotal").textContent = `${milkTotal} لتر`;
+
+      new Chart(document.getElementById('milkChart'), {
+        type: 'line',
+        data: {
+          labels: milkData.map(e => e.date),
+          datasets: [{
+            label: 'إنتاج اللبن (لتر)',
+            data: milkData.map(e => e.total),
+            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+            borderColor: '#4caf50',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
               display: true,
-              text: 'اللترات'
+              labels: { font: { size: 14 } }
             }
           },
-          x: {
-            title: {
-              display: true,
-              text: 'تاريخ اليوم'
-            }
+          scales: {
+            x: { title: { display: true, text: 'تاريخ' } },
+            y: { title: { display: true, text: 'اللتر' }, beginAtZero: true }
           }
         }
+      });
+
+      // عمر العشار وتاريخ الولادة المتوقع
+      let pregnancyAge = "---", expectedDate = "---";
+      if (reproduction.includes("عشار") && animal.lastInseminationDate) {
+        const insemination = new Date(animal.lastInseminationDate);
+        pregnancyAge = Math.floor((new Date() - insemination) / (1000 * 60 * 60 * 24));
+        const expected = new Date(insemination);
+        expected.setDate(expected.getDate() + 280);
+        expectedDate = expected.toISOString().split("T")[0];
       }
-    });
+      document.getElementById("pregnancyAge").textContent = pregnancyAge;
+      document.getElementById("expectedDate").textContent = expectedDate;
 
-    document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '---';
-    document.getElementById("expectedCalving").textContent = animal.expectedCalvingDate || '---';
-    document.getElementById("lastHealth").textContent = animal.lastHealth || 'لا توجد بيانات صحية';
-  }
+      // آخر حالة صحية
+      const healthEvents = events.filter(e => e.number === number && e.type === "مرض");
+      const latest = healthEvents.at(-1);
+      document.getElementById("healthSummary").textContent = latest ? `${latest.diagnosis} بتاريخ ${latest.date}` : "لا يوجد";
+    }
 
-  loadAnimal();
-</script>
+    fetchData();
+  </script>
 </body>
 </html>
