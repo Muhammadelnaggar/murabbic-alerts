@@ -120,22 +120,53 @@
           return;
         }
 
-        data.forEach(animal => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${animal.number || ''}</td>
-            <td>${animal.type || ''}</td>
-            <td>${animal.breed || ''}</td>
-            <td>${animal.productionStatus || ''}</td>
-            <td>${animal.reproductiveStatus || ''}</td>
-            <td>${animal.birthDate || '---'}</td>
-            <td>${animal.lastCalvingDate || '---'}</td>
-            <td>
-              <button class="button" onclick="viewCard('${animal.number}')">عرض البطاقة 📄</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
+       <script>
+  fetch('https://murabbic-alerts.onrender.com/api/animals')
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById('animalBody');
+      const noData = document.getElementById('noData');
+
+      if (!data || data.length === 0) {
+        noData.style.display = 'block';
+        return;
+      }
+
+      data.forEach(animal => {
+        const tr = document.createElement('tr');
+
+        // لون الصف حسب نوع الحيوان
+        if (animal.type === "بقرة") {
+          tr.style.backgroundColor = "#fff9c4"; // أصفر فاتح
+        } else if (animal.type === "جاموسة") {
+          tr.style.backgroundColor = "#e0e0e0"; // رمادي فاتح
+        }
+
+        tr.innerHTML = `
+          <td>${animal.number || ''}</td>
+          <td>${animal.type || ''}</td>
+          <td>${animal.breed || ''}</td>
+          <td>${animal.productionStatus || ''}</td>
+          <td>${animal.reproductiveStatus || ''}</td>
+          <td>${animal.birthDate || '---'}</td>
+          <td>${animal.lastCalvingDate || '---'}</td>
+          <td>
+            <button class="button" onclick="viewCard('${animal.number}')">عرض البطاقة 📄</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    })
+    .catch(error => {
+      document.getElementById('noData').style.display = 'block';
+      console.error('❌ فشل تحميل البيانات:', error);
+    });
+
+  function viewCard(animalNumber) {
+    window.location.href = `cow-card.html?number=${animalNumber}`;
+  }
+</script>
+
       })
       .catch(error => {
         document.getElementById('noData').style.display = 'block';
@@ -148,4 +179,5 @@
   </script>
 </body>
 </html>
+
 
