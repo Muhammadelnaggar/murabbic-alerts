@@ -1,95 +1,165 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
   <title>بطاقة الحيوان</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      direction: rtl;
       font-family: 'Arial', sans-serif;
+      direction: rtl;
       background-color: #fffde9;
-      margin: 0;
       padding: 20px;
     }
+
     .card {
-      max-width: 400px;
-      margin: auto;
-      background-color: #f1f8e9;
-      padding: 20px;
+      background-color: #e9f5e9;
       border-radius: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      margin: auto;
     }
-    h1 {
+
+    .card h2 {
       text-align: center;
-      color: #33691e;
-      font-size: 20px;
+      color: #2e7d32;
+      margin-bottom: 20px;
+    }
+
+    .section {
+      background-color: #f4fff4;
+      padding: 10px 15px;
+      border-radius: 10px;
       margin-bottom: 15px;
     }
-    .section {
-      background-color: #e8f5e9;
-      border: 1px solid #c5e1a5;
-      border-radius: 10px;
-      padding: 10px;
-      margin-bottom: 10px;
+
+    .section strong {
+      color: #1b5e20;
     }
-    .section p {
-      font-size: 14px;
-      margin: 6px 0;
-      color: #2e7d32;
-    }
+
     canvas {
-      margin-top: 10px;
-      width: 100%;
+      max-width: 100%;
+    }
+
+    .back-button {
+      display: block;
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    .back-button button {
+      background-color: #4caf50;
+      color: white;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .back-button button:hover {
+      background-color: #388e3c;
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1 id="title">تحميل البطاقة...</h1>
-    <div id="info" class="section"></div>
-    <canvas id="milkChart" height="200"></canvas>
+
+<div class="card" id="card">
+  <h2 id="title">بطاقة الحيوان</h2>
+
+  <div class="section">
+    <strong>تاريخ الميلاد:</strong> <span id="birthDate"></span><br>
+    <strong>الموسم الحالي:</strong> <span id="season"></span>
   </div>
 
-  <script>
-    const number = new URLSearchParams(window.location.search).get('number');
+  <div class="section">
+    <strong>عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>إنتاج اللبن:</strong> ✅<br>
+    <span id="milkTotal"></span>
+    <canvas id="milkChart" height="300"></canvas>
+  </div>
 
-    fetch('https://murabbic-alerts.onrender.com/api/animals')
-      .then(r => r.json())
-      .then(data => {
-        const animal = data.find(a => a.number === number);
-        if (!animal) {
-          document.getElementById('title').textContent = "لم يتم العثور على الحيوان";
-          return;
-        }
+  <div class="section">
+    <strong>عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
+    <strong>تاريخ الولادة المتوقع:</strong> <span id="expectedCalving"></span>
+  </div>
 
-        document.getElementById('title').textContent = `${animal.type} رقم (${animal.number})`;
-        document.getElementById('info').innerHTML = `
-          <p>📅 تاريخ الميلاد: ${animal.birthDate || 'غير مسجل'}</p>
-          <p>🥛 الإنتاج اليومي: ${animal.dailyMilk || '---'} لتر</p>
-        `;
+  <div class="section">
+    <strong>آخر حالة صحية:</strong><br>
+    <span id="lastHealth"></span>
+  </div>
+</div>
 
-        new Chart(document.getElementById('milkChart'), {
-          type: 'line',
-          data: {
-            labels: ['يوم 1','2','3','4','5'],
-            datasets: [{
-              label: 'إنتاج اللبن (لتر)',
-              data: animal.milkCurve || [5, 7, 9, 8, 10],
-              borderColor: '#2e7d32',
-              fill: false,
-              tension: 0.3
-            }]
+<div class="back-button">
+  <button onclick="window.location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const number = params.get("number");
+
+  async function loadAnimal() {
+    const res = await fetch('data/animals.json');
+    const animals = await res.json();
+    const animal = animals.find(a => a.number === number);
+
+    if (!animal) {
+      document.getElementById("card").innerHTML = "<h2>❌ الحيوان غير موجود</h2>";
+      return;
+    }
+
+    document.getElementById("title").textContent = `${animal.type} رقم (${animal.number})`;
+    document.getElementById("birthDate").textContent = animal.birthDate || '---';
+    document.getElementById("season").textContent = animal.milkSeason || '---';
+
+    const milkDays = animal.milkDays || 0;
+    document.getElementById("milkDays").textContent = milkDays;
+    const daily = animal.milkPerDay || 0;
+    const monthly = daily * 30;
+    const seasonal = daily * milkDays;
+    document.getElementById("milkTotal").textContent = `${daily} لتر يوميًا / ${monthly} لتر شهريًا / ${seasonal} لتر موسميًا`;
+
+    // رسم الرسم البياني
+    const ctx = document.getElementById('milkChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: animal.milkGraph?.map((_, i) => `يوم ${i + 1}`) || [],
+        datasets: [{
+          label: 'إنتاج اللبن (لتر)',
+          data: animal.milkGraph || [],
+          borderColor: '#2e7d32',
+          backgroundColor: '#c8e6c9',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'اللترات'
+            }
           },
-          options: { responsive: true }
-        });
-      })
-      .catch(err => {
-        document.getElementById('title').textContent = "حدث خطأ في التحميل";
-        console.error(err);
-      });
-  </script>
+          x: {
+            title: {
+              display: true,
+              text: 'تاريخ اليوم'
+            }
+          }
+        }
+      }
+    });
+
+    document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '---';
+    document.getElementById("expectedCalving").textContent = animal.expectedCalvingDate || '---';
+    document.getElementById("lastHealth").textContent = animal.lastHealth || 'لا توجد بيانات صحية';
+  }
+
+  loadAnimal();
+</script>
 </body>
 </html>
