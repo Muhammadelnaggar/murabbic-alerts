@@ -3,284 +3,126 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تسجيل الحالة الصحية</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       direction: rtl;
-      background-color: #fffce6;
       font-family: 'Arial', sans-serif;
+      background-color: #f9fbe7;
       margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    h1 {
-      color: #2e7d32;
-      margin: 20px 0 10px;
-      font-size: 24px;
-    }
-
-    .animal-info {
-      width: 90%;
-      max-width: 500px;
-      padding: 10px 20px;
-      background-color: #f1f8e9;
-      border: 1px solid #c5e1a5;
-      border-radius: 10px;
-      margin-bottom: 15px;
-      box-sizing: border-box;
-    }
-
-    .animal-info label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #2e7d32;
-    }
-
-    .animal-info input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      box-sizing: border-box;
-    }
-
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 12px;
-      width: 90%;
-      max-width: 500px;
       padding: 20px;
-      justify-items: center;
     }
-
-    .disease-button {
-      background-color: #aeea00;
-      color: #000;
-      border: 2px solid #558b2f;
-      border-radius: 10px;
-      padding: 15px;
+    h1 {
       text-align: center;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.3s;
+      color: #33691e;
+      margin-bottom: 20px;
+      font-size: 26px;
+    }
+    .form-group {
+      background-color: #f1f8e9;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+    }
+    input[type="text"], input[type="date"] {
       width: 100%;
-      height: 100px;
+      padding: 10px;
+      font-size: 18px;
+      margin-top: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
       box-sizing: border-box;
     }
-
-    .disease-button:hover {
-      background-color: #c5e1a5;
-    }
-
-    .form-section {
-      display: none;
-      background: #f9fbe7;
-      padding: 15px;
-      margin-top: 10px;
-      border: 1px solid #cddc39;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-    }
-
-    .options-box {
+    #disease-buttons {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 12px;
+      justify-content: center;
     }
-
-    .options-box label {
-      background: #dcedc8;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid #8bc34a;
+    .disease-btn {
+      flex: 1 1 40%;
+      background-color: #ccff00;
+      border: none;
+      border-radius: 10px;
+      padding: 18px;
+      font-size: 20px;
+      font-weight: bold;
       cursor: pointer;
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <h1>اختر الحالة الصحية</h1>
 
-  <div class="animal-info">
-    <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" name="animal-id">
+  <div class="form-group">
+    <label for="animalId">رقم الحيوان:</label>
+    <input type="text" id="animalId" name="animalId" required>
 
-    <label for="animal-type">نوع الحيوان:</label>
-    <input type="text" id="animal-type" name="animal-type" disabled>
+    <label for="animalType">نوع الحيوان:</label>
+    <input type="text" id="animalType" name="animalType" required>
 
-    <label for="date">التاريخ:</label>
-    <input type="date" id="date" name="date">
+    <label for="eventDate">التاريخ:</label>
+    <input type="date" id="eventDate" name="eventDate" required>
   </div>
 
-  <div class="button-grid" id="disease-buttons"></div>
-
-  <div id="form-section" class="form-section">
-    <h3 id="form-title">تفاصيل المرض</h3>
-
-    <div id="extra-options"></div>
-
-    <label for="notes">ملاحظات:</label>
-    <input type="text" id="notes" name="notes">
-
-    <label for="vet">الطبيب المعالج:</label>
-    <input type="text" id="vet" name="vet">
-
-    <label for="followup">المتابعة:</label>
-    <input type="text" id="followup" name="followup">
-
-    <button onclick="submitGenericDisease()">تسجيل الحالة</button>
+  <div id="disease-buttons">
+    <button class="disease-btn">عرج</button>
+    <button class="disease-btn">التهاب ضرع</button>
+    <button class="disease-btn">لكمة كرش</button>
+    <button class="disease-btn">التهاب رئوي</button>
+    <button class="disease-btn">التهاب عين</button>
+    <button class="disease-btn">حمى</button>
+    <button class="disease-btn">اسهال دموي</button>
+    <button class="disease-btn">حبس مشيمة</button>
   </div>
 
   <script>
-    const diseases = [
-      "التهاب ضرع", "عرج", "التهاب رئوي", "لكمة كرش", "حموضة",
-      "التهاب عين", "التواء المعدة", "احتباس مشيمة", "نفاخ", "حمى اللبن",
-      "ارتفاع حرارة", "نزلة معوية", "التهاب رحم"
-    ];
+    const buttons = document.querySelectorAll('.disease-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const animalId = document.getElementById('animalId').value;
+        const animalType = document.getElementById('animalType').value;
+        const eventDate = document.getElementById('eventDate').value;
+        const disease = btn.textContent.trim();
 
-    const diseaseButtonsDiv = document.getElementById("disease-buttons");
-    const formSection = document.getElementById("form-section");
-    const formTitle = document.getElementById("form-title");
-    const extraOptionsDiv = document.getElementById("extra-options");
-    let selectedDisease = "";
-
-    diseases.forEach(disease => {
-      const btn = document.createElement("button");
-      btn.className = "disease-button";
-      btn.innerText = disease;
-      btn.onclick = () => {
-        selectedDisease = disease;
-        formTitle.innerText = `تفاصيل ${disease}`;
-        formSection.style.display = "block";
-        extraOptionsDiv.innerHTML = "";
-
-        if (disease === "التهاب ضرع") {
-          extraOptionsDiv.innerHTML = `
-            <label>الربع المصاب:</label>
-            <div class="options-box">
-              <label><input type="checkbox" value="أمام شمال"> أمام شمال</label>
-              <label><input type="checkbox" value="أمام يمين"> أمام يمين</label>
-              <label><input type="checkbox" value="خلف يمين"> خلف يمين</label>
-              <label><input type="checkbox" value="خلف شمال"> خلف شمال</label>
-            </div>
-            <label>نوع الالتهاب:</label>
-            <select id="mastitis-type">
-              <option value="">-- اختر --</option>
-              <option value="عادي">عادي</option>
-              <option value="مائي">مائي</option>
-            </select>
-          `;
-        } else if (disease === "عرج") {
-          extraOptionsDiv.innerHTML = `
-            <label>الحافر المصاب:</label>
-            <div class="options-box">
-              <label><input type="checkbox" value="أمام شمال"> أمام شمال</label>
-              <label><input type="checkbox" value="أمام يمين"> أمام يمين</label>
-              <label><input type="checkbox" value="خلف يمين"> خلف يمين</label>
-              <label><input type="checkbox" value="خلف شمال"> خلف شمال</label>
-            </div>
-            <label>نوع العرج:</label>
-            <select id="lameness-type">
-              <option value="">-- اختر --</option>
-              <option value="قرحة">قرحة</option>
-              <option value="تعفن حافر">تعفن حافر</option>
-              <option value="خراج الحافر">خراج الحافر</option>
-              <option value="جسم معدني">جسم معدني</option>
-              <option value="التهاب ما بين الأظلاف">التهاب ما بين الأظلاف</option>
-              <option value="التهاب الصفائح الحساسة">التهاب الصفائح الحساسة</option>
-            </select>
-          `;
+        if (!animalId || !animalType || !eventDate) {
+          alert('يرجى إدخال كل البيانات.');
+          return;
         }
-      };
-      diseaseButtonsDiv.appendChild(btn);
+
+        const data = {
+          animalId,
+          animalType,
+          date: eventDate,
+          disease
+        };
+
+        fetch('https://murabbic-alerts.onrender.com/api/diseases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        })
+        .then(response => {
+          if (!response.ok) throw new Error('فشل في تسجيل الحالة');
+          return response.json();
+        })
+        .then(result => {
+          alert('✅ تم تسجيل الحالة الصحية بنجاح');
+          window.location.href = 'treatment-followup.html';
+        })
+        .catch(err => {
+          console.error(err);
+          alert('حدث خطأ أثناء التسجيل');
+        });
+      });
     });
-
-    function submitGenericDisease() {
-      const animalId = document.getElementById("animal-id").value;
-      const date = document.getElementById("date").value;
-      const notes = document.getElementById("notes").value;
-      const vet = document.getElementById("vet").value;
-      const followup = document.getElementById("followup").value;
-
-      if (!animalId || !date || !selectedDisease) {
-        alert("يرجى إدخال رقم الحيوان والتاريخ واختيار المرض.");
-        return;
-      }
-
-      let extra = {};
-
-      if (selectedDisease === "التهاب ضرع") {
-        const quarters = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
-        const mastitisType = document.getElementById("mastitis-type").value;
-        if (!mastitisType) {
-          alert("يرجى اختيار نوع الالتهاب.");
-          return;
-        }
-        extra = { quarters, mastitisType };
-      } else if (selectedDisease === "عرج") {
-        const legs = Array.from(document.querySelectorAll("#extra-options input[type='checkbox']:checked")).map(cb => cb.value);
-        const lamenessType = document.getElementById("lameness-type").value;
-        if (!lamenessType) {
-          alert("يرجى اختيار نوع العرج.");
-          return;
-        }
-        extra = { legs, lamenessType };
-      }
-
-      const data = {
-        animalId,
-        date,
-        disease: selectedDisease,
-        notes,
-        vet,
-        followup,
-        ...extra
-      };
-
-      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-     .then(res => {
-  if (res.ok) {
-    const isNewUser = localStorage.getItem("isNewUser") === "true";
-
-    if (isNewUser) {
-      if (confirm("✅ تم تسجيل الحالة بنجاح\nهل تريد تسجيل مرض آخر؟")) {
-        formSection.style.display = "none";
-        document.getElementById("notes").value = "";
-        document.getElementById("vet").value = "";
-        document.getElementById("followup").value = "";
-        document.getElementById("extra-options").innerHTML = "";
-        document.getElementById("form-title").innerText = "تفاصيل المرض";
-        document.getElementById("disease-buttons").scrollIntoView({ behavior: 'smooth' });
-      } else if (confirm("هل تريد تسجيل حدث آخر؟")) {
-        window.location.href = "add-event.html";
-      } else if (confirm("هل تريد تسجيل حيوان جديد؟")) {
-        window.location.href = "add-animal.html";
-      } else {
-        localStorage.removeItem("isNewUser");
-        window.location.href = "dashboard.html";
-      }
-    } else {
-      window.location.href = "dashboard.html";
-    }
-
-  } else {
-    alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
-  }
-});
-
-    }
   </script>
 </body>
 </html>
