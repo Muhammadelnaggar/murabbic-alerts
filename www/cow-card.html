@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
-  <title>بطاقة الجاموسة</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>بطاقة الحيوان</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -11,131 +12,84 @@
       font-family: 'Arial', sans-serif;
       background-color: #fffde9;
       margin: 0;
-      padding: 0;
+      padding: 20px;
     }
-
     .card {
       max-width: 400px;
-      margin: 0 auto;
+      margin: auto;
       background-color: #f1f8e9;
       padding: 20px;
       border-radius: 15px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
     h1 {
       text-align: center;
       color: #33691e;
-      font-size: 22px;
+      font-size: 20px;
       margin-bottom: 15px;
     }
-
     .section {
       background-color: #e8f5e9;
       border: 1px solid #c5e1a5;
       border-radius: 10px;
-      padding: 10px 15px;
-      margin: 10px 0;
+      padding: 10px;
+      margin-bottom: 10px;
     }
-
     .section p {
+      font-size: 14px;
       margin: 6px 0;
-      font-size: 15px;
       color: #2e7d32;
     }
-
-    .label {
-      font-weight: bold;
-    }
-
     canvas {
-      margin-top: 15px;
-    }
-
-    .back-button {
-      display: block;
-      margin: 20px auto 0;
-      background-color: #4caf50;
-      color: white;
-      padding: 10px;
-      font-size: 16px;
-      text-align: center;
-      text-decoration: none;
-      border-radius: 8px;
-      width: 90%;
+      margin-top: 10px;
+      width: 100%;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>بطاقة الجاموسة رقم (001)</h1>
-
-    <div class="section">
-      <p><span class="label">📅 تاريخ الميلاد:</span> 01-12-2023</p>
-      <p><span class="label">🗓️ موسم الحليب:</span> الموسم الأول 2024</p>
-      <p><span class="label">📆 عدد أيام الحليب:</span> 125 يوم</p>
-      <p><span class="label">✅ إنتاج اللبن:</span></p>
-      <p><span class="label">25 لتر/يومياً – 760 لتر شهرياً – 4500 لتر موسمياً</span></p>
-      <canvas id="milkChart" width="300" height="200"></canvas>
-    </div>
-
-    <div class="section">
-      <p><span class="label">🐣 عمر الحمل:</span> 150 يوم</p>
-      <p><span class="label">🍼 تاريخ الولادة المتوقع:</span> 12-11-2025</p>
-    </div>
-
-    <div class="section">
-      <p><span class="label">💊 آخر حالة صحية:</span></p>
-      <p>علاج التهاب ضرع بتاريخ 2025-07-25، تحصين حمى ثلاثية بتاريخ 2025-07-25</p>
-      <p>فلاغة حمى تنفسية بتاريخ 2025-07-18</p>
-    </div>
-
-    <button class="back-button" onclick="window.location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
+    <h1 id="title">تحميل البطاقة...</h1>
+    <div id="info" class="section"></div>
+    <canvas id="milkChart" height="200"></canvas>
   </div>
 
   <script>
-    const ctx = document.getElementById('milkChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['2025-03-01','2025-04-01','2025-05-01','2025-06-01','2025-07-01'],
-        datasets: [{
-          label: 'إنتاج اللبن التراكمي (لتر)',
-          data: [750, 1500, 3000, 4100, 4500],
-          borderColor: '#2e7d32',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.3,
-          pointRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            display: true,
-            labels: {
-              color: '#33691e'
-            }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              color: '#33691e'
-            }
-          },
-          x: {
-            ticks: {
-              color: '#33691e'
-            }
-          }
+    const number = new URLSearchParams(window.location.search).get('number');
+
+    fetch('https://murabbic-alerts.onrender.com/api/animals')
+      .then(r => r.json())
+      .then(data => {
+        const animal = data.find(a => a.number === number);
+        if (!animal) {
+          document.getElementById('title').textContent = "لم يتم العثور على الحيوان";
+          return;
         }
-      }
-    });
+
+        document.getElementById('title').textContent = `${animal.type} رقم (${animal.number})`;
+        document.getElementById('info').innerHTML = `
+          <p>📅 تاريخ الميلاد: ${animal.birthDate || 'غير مسجل'}</p>
+          <p>🥛 الإنتاج اليومي: ${animal.dailyMilk || '---'} لتر</p>
+        `;
+
+        new Chart(document.getElementById('milkChart'), {
+          type: 'line',
+          data: {
+            labels: ['يوم 1','2','3','4','5'],
+            datasets: [{
+              label: 'إنتاج اللبن (لتر)',
+              data: animal.milkCurve || [5, 7, 9, 8, 10],
+              borderColor: '#2e7d32',
+              fill: false,
+              tension: 0.3
+            }]
+          },
+          options: { responsive: true }
+        });
+      })
+      .catch(err => {
+        document.getElementById('title').textContent = "حدث خطأ في التحميل";
+        console.error(err);
+      });
   </script>
 </body>
 </html>
-
-
