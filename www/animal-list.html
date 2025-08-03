@@ -52,7 +52,8 @@
   <button id="back-button" onclick="location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
 
   <script>
-    fetch('/animals')
+    fetch('https://murabbic-alerts.onrender.com/api/animals')
+
       .then(res => res.json())
       .then(data => {
         if (!data || data.length === 0) {
@@ -93,3 +94,4 @@
   </script>
 </body>
 </html>
+
