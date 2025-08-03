@@ -2,95 +2,149 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>قائمة الحيوانات</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      direction: rtl;
-      background-color: #fff9db;
       font-family: 'Arial', sans-serif;
-      padding: 20px;
+      background-color: #fffde9;
+      direction: rtl;
+      padding: 10px;
+      margin: 0;
     }
+
     h1 {
-      color: green;
+      color: #2e7d32;
       text-align: center;
+      font-size: 22px;
+      margin-bottom: 15px;
     }
+
+    .table-wrapper {
+      overflow-x: auto;
+      background: #fefefc;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+      margin-bottom: 20px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      min-width: 700px;
     }
+
     th, td {
-      border: 1px solid #888;
       padding: 10px;
       text-align: center;
+      border: 1px solid #cddc39;
+      font-size: 15px;
     }
+
     th {
-      background-color: #c8e6c9;
+      background-color: #dcedc8;
+      color: #33691e;
     }
-    button {
-      padding: 6px 10px;
-      background-color: #2e7d32;
+
+    tr:nth-child(even) {
+      background-color: #f9fbe7;
+    }
+
+    .button {
+      padding: 5px 10px;
+      background-color: #43a047;
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
+      font-size: 14px;
     }
-    #back-button {
+
+    .button:hover {
+      background-color: #388e3c;
+    }
+
+    .no-data {
+      text-align: center;
+      color: #c62828;
       margin-top: 30px;
-      display: block;
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      background-color: #4caf50;
+      font-size: 18px;
     }
+
+    .back-button {
+      display: block;
+      text-align: center;
+      background-color: #4caf50;
+      color: white;
+      font-size: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+
   </style>
 </head>
 <body>
   <h1>📋 قائمة الحيوانات المسجلة</h1>
-  <div id="animal-table-container"></div>
-  <button id="back-button" onclick="location.href='dashboard.html'">🔙 عودة إلى غرفة التحكم</button>
+  <div class="table-wrapper">
+    <table id="animalTable">
+      <thead>
+        <tr>
+          <th>رقم الحيوان</th>
+          <th>النوع</th>
+          <th>السلالة</th>
+          <th>الإنتاج</th>
+          <th>الحالة التناسلية</th>
+          <th>تاريخ الميلاد</th>
+          <th>تاريخ آخر ولادة</th>
+          <th>البطاقة</th>
+        </tr>
+      </thead>
+      <tbody id="animalBody"></tbody>
+    </table>
+  </div>
+
+  <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
+
+  <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
   <script>
     fetch('https://murabbic-alerts.onrender.com/api/animals')
-
       .then(res => res.json())
       .then(data => {
+        const tbody = document.getElementById('animalBody');
+        const noData = document.getElementById('noData');
+
         if (!data || data.length === 0) {
-          document.getElementById('animal-table-container').innerHTML = '<p style="text-align:center; color:#c00">لا يوجد حيوانات مسجلة بعد.</p>';
+          noData.style.display = 'block';
           return;
         }
 
-        let tableHTML = '<table><thead><tr>' +
-          '<th>رقم الحيوان</th>' +
-          '<th>النوع</th>' +
-          '<th>السلالة</th>' +
-          '<th>الإنتاج</th>' +
-          '<th>الحالة التناسلية</th>' +
-          '<th>تاريخ الميلاد</th>' +
-          '<th>تاريخ آخر ولادة</th>' +
-          '<th>📄 البطاقة</th>' +
-          '</tr></thead><tbody>';
-
         data.forEach(animal => {
-          tableHTML += `<tr>
-            <td>${animal.id}</td>
-            <td>${animal.type}</td>
-            <td>${animal.breed}</td>
-            <td>${animal.productionStatus}${animal.milkProduction ? ' - ' + animal.milkProduction + ' كجم' : ''}</td>
-            <td>${animal.reproductiveStatus}${animal.lastInseminationDate ? ' - ' + animal.lastInseminationDate : ''}</td>
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${animal.number || ''}</td>
+            <td>${animal.type || ''}</td>
+            <td>${animal.breed || ''}</td>
+            <td>${animal.productionStatus || ''}</td>
+            <td>${animal.reproductiveStatus || ''}</td>
             <td>${animal.birthDate || '---'}</td>
-            <td>${animal.lastCalvingDate}</td>
-            <td><button onclick="location.href='cow-card.html?id=${animal.id}'">عرض البطاقة</button></td>
-          </tr>`;
+            <td>${animal.lastCalvingDate || '---'}</td>
+            <td>
+              <button class="button" onclick="viewCard('${animal.number}')">عرض البطاقة 📄</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
         });
-
-        tableHTML += '</tbody></table>';
-        document.getElementById('animal-table-container').innerHTML = tableHTML;
       })
       .catch(error => {
-        document.getElementById('animal-table-container').innerHTML = '<p style="color:red">حدث خطأ أثناء تحميل البيانات.</p>';
+        document.getElementById('noData').style.display = 'block';
+        console.error('❌ فشل تحميل البيانات:', error);
       });
+
+    function viewCard(animalNumber) {
+      window.location.href = `cow-card.html?number=${animalNumber}`;
+    }
   </script>
 </body>
 </html>
