@@ -1,28 +1,11 @@
-[[
+[
   {
     "number": "001",
     "type": "جاموسة",
     "breed": "مصري",
     "productionStatus": "حلاب",
     "reproductiveStatus": "عشار",
-    "birthDate": "2023-01-01"
-  },
-  {
-    "number": "002",
-    "type": "بقرة",
-    "breed": "هولشتاين",
-    "productionStatus": "جاف",
-    "reproductiveStatus": "مفتوحة",
-    "birthDate": "2022-10-15"
-  },
-  {
-    "number": "003",
-    "type": "جاموسة",
-    "breed": "هجين إيطالي",
-    "productionStatus": "حلاب",
-    "reproductiveStatus": "ملقحة",
-    "birthDate": "2023-05-22"
+    "birthDate": "2023-01-01",
+    "lastCalvingDate": "2024-05-01"
   }
 ]
-]
- 
