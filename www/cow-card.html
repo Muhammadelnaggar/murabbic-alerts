@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>بطاقة الحيوان</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       direction: rtl;
@@ -25,7 +26,7 @@
       border: 2px solid #8bc34a;
       border-radius: 15px;
       padding: 20px;
-      max-width: 500px;
+      max-width: 600px;
       margin: auto;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
@@ -39,6 +40,11 @@
     .label {
       color: #33691e;
       font-weight: bold;
+    }
+
+    canvas {
+      margin-top: 20px;
+      width: 100%;
     }
 
     .back-button {
@@ -64,9 +70,8 @@
 
 <h1 id="cardTitle">جارٍ تحميل البطاقة...</h1>
 
-<div class="card" id="cardContent">
-  <!-- سيتم تعبئة البيانات هنا -->
-</div>
+<div class="card" id="cardContent"></div>
+<canvas id="milkChart"></canvas>
 
 <p id="notFound" class="not-found" style="display:none;">لم يتم العثور على الحيوان المطلوب.</p>
 
@@ -87,10 +92,10 @@
         return;
       }
 
-      const cardTitle = animal.type === 'بقرة' ? `بطاقة البقرة رقم ${animal.number}` : `بطاقة الجاموسة رقم ${animal.number}`;
-      document.getElementById('cardTitle').textContent = cardTitle;
+      document.getElementById('cardTitle').textContent =
+        animal.type === 'بقرة' ? `بطاقة البقرة رقم ${animal.number}` : `بطاقة الجاموسة رقم ${animal.number}`;
 
-      const content = `
+      document.getElementById('cardContent').innerHTML = `
         <p><span class="label">السلالة:</span> ${animal.breed}</p>
         <p><span class="label">الحالة الإنتاجية:</span> ${animal.productionStatus}</p>
         <p><span class="label">الحالة التناسلية:</span> ${animal.reproductiveStatus}</p>
@@ -98,7 +103,38 @@
         <p><span class="label">آخر ولادة:</span> ${animal.lastCalvingDate || '---'}</p>
       `;
 
-      document.getElementById('cardContent').innerHTML = content;
+      if (animal.milkProduction && animal.milkProduction.length) {
+        const days = Array.from({ length: animal.milkProduction.length }, (_, i) => `يوم ${i + 1}`);
+        const ctx = document.getElementById('milkChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: days,
+            datasets: [{
+              label: 'إنتاج اللبن اليومي (لتر)',
+              data: animal.milkProduction,
+              borderColor: '#2e7d32',
+              borderWidth: 2,
+              fill: false,
+              tension: 0.3,
+              pointRadius: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }
     })
     .catch(error => {
       document.getElementById('notFound').style.display = 'block';
@@ -109,4 +145,3 @@
 
 </body>
 </html>
-
