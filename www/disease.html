@@ -249,47 +249,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
       })
-     .then(res => {
-  if (res.ok) {
-    const isNewUser = localStorage.getItem("isNewUser") === "true";
-
-    if (isNewUser) {
-      if (confirm("✅ تم تسجيل الحالة بنجاح\nهل تريد تسجيل مرض آخر؟")) {
-        formSection.style.display = "none";
-        document.getElementById("notes").value = "";
-        document.getElementById("vet").value = "";
-        document.getElementById("followup").value = "";
-        document.getElementById("extra-options").innerHTML = "";
-        document.getElementById("form-title").innerText = "تفاصيل المرض";
-        document.getElementById("disease-buttons").scrollIntoView({ behavior: 'smooth' });
-      } else if (confirm("هل تريد تسجيل حدث آخر؟")) {
-        window.location.href = "add-event.html";
-      } else if (confirm("هل تريد تسجيل حيوان جديد؟")) {
-        window.location.href = "add-animal.html";
-      } else {
-        localStorage.removeItem("isNewUser");
-        window.location.href = "dashboard.html";
-      }
-    } else {
-      window.location.href = "dashboard.html";
-    }
-
-  } else {
-    alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
-  }
-});
-
+      .then(res => {
+        if (res.ok) {
+          alert("✅ تم تسجيل الحالة بنجاح");
+          window.location.href = "treatment-followup.html";
+        } else {
+          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+        }
+      });
     }
   </script>
 </body>
 </html>
-
-
-
-
-
-       
-
-
-
-
