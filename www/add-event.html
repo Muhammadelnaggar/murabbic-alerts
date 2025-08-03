@@ -83,18 +83,18 @@
   <form id="eventForm">
     <label>نوع الحدث:</label>
     <div class="button-group" id="eventTypeGroup">
-      <button type="button" data-value="ولادة">👶 ولادة</button>
-      <button type="button" data-value="تلقيح">📅 تلقيح</button>
-      <button type="button" data-value="تحصين">💉 تحصين</button>
-      <button type="button" data-value="تجفيف">🚫 تجفيف</button>
-      <button type="button" data-value="تحضير للولادة">🍼 تحضير للولادة</button>
-      <button type="button" data-value="إنتاج اللبن اليومي">🥛 إنتاج اللبن اليومي</button>
-      <button type="button" data-value="تغذية">🌿 تغذية</button>
-      <button type="button" data-value="تشخيص الحمل">🧪 تشخيص الحمل</button>
-      <button type="button" data-value="التشخيص">🔬 التشخيص</button>
-      <button type="button" data-value="العلاج والمتابعة">💊 العلاج والمتابعة</button>
-      <button type="button" data-value="تقليم الحوافر">🦶 تقليم الحوافر</button>
-      <button type="button" data-value="برامج وإجراءات">📋 برامج وإجراءات</button>
+      <button type="button" data-value="ولادة" data-page="birth.html">👶 ولادة</button>
+      <button type="button" data-value="تلقيح" data-page="insemination.html">📅 تلقيح</button>
+      <button type="button" data-value="تحصين" data-page="vaccination.html">💉 تحصين</button>
+      <button type="button" data-value="تجفيف" data-page="dry-off.html">🚫 تجفيف</button>
+      <button type="button" data-value="تحضير للولادة" data-page="close-up.html">🍼 تحضير للولادة</button>
+      <button type="button" data-value="إنتاج اللبن اليومي" data-page="Daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+      <button type="button" data-value="تغذية" data-page="nutrition.html">🌿 تغذية</button>
+      <button type="button" data-value="تشخيص الحمل" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+      <button type="button" data-value="التشخيص" data-page="disease.html">🔬 التشخيص</button>
+      <button type="button" data-value="العلاج والمتابعة" data-page="treatment-followup.html">💊 العلاج والمتابعة</button>
+      <button type="button" data-value="تقليم الحوافر" data-page="trimming.html">🦶 تقليم الحوافر</button>
+      <button type="button" data-value="برامج وإجراءات" data-page="protocols.html">📋 برامج وإجراءات</button>
     </div>
     <input type="hidden" id="eventType" name="eventType" value="">
 
@@ -108,6 +108,10 @@
         eventTypeButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('eventType').value = btn.getAttribute('data-value');
+        const page = btn.getAttribute('data-page');
+        if (page) {
+          window.location.href = page;
+        }
       });
     });
 
