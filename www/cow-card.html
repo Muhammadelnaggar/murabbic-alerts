@@ -3,58 +3,64 @@
 <head>
   <meta charset="UTF-8" />
   <title>بطاقة الحيوان</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      background-color: #fff9db;
+      background-color: #fffde7;
       font-family: 'Arial', sans-serif;
-      padding: 20px;
+      padding: 15px;
+      margin: 0;
       color: #1b5e20;
     }
     h1 {
       text-align: center;
-      font-size: 30px;
-      font-weight: bold;
-      margin-bottom: 20px;
+      font-size: 26px;
+      margin-bottom: 10px;
     }
     .section {
-      background-color: #eafbe7;
+      background-color: #e8f5e9;
       padding: 15px;
       border-radius: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+      font-size: 16px;
       line-height: 1.8;
     }
+    .section strong {
+      color: #2e7d32;
+    }
     button {
+      display: block;
       width: 100%;
       padding: 12px;
+      font-size: 18px;
       background-color: #2e7d32;
       color: white;
-      font-size: 18px;
       border: none;
       border-radius: 10px;
       cursor: pointer;
+      margin-top: 20px;
     }
     canvas {
-      margin-top: 30px;
       background-color: #fff;
       border: 1px solid #ccc;
       border-radius: 10px;
+      margin-top: 10px;
+      max-width: 100%;
     }
     .photo-button {
-      float: left;
-      font-size: 14px;
-      padding: 5px 10px;
       background-color: #aed581;
-      border: none;
+      padding: 5px 10px;
       border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      float: left;
       cursor: pointer;
+      margin-bottom: 10px;
     }
     .title {
-      font-size: 26px;
-      color: #2e7d32;
       font-weight: bold;
-      margin-bottom: 10px;
+      color: #33691e;
     }
   </style>
 </head>
@@ -67,111 +73,12 @@
     <strong>🧮 الموسم الحالي:</strong> <span id="season"></span>
   </div>
 
-  <div class="section" id="milkSection">
-    <strong>📅 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
-    <strong>☑️ إنتاج اللبن:</strong><br>
+  <div class="section">
+    <strong>📈 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>🍼 إنتاج اللبن:</strong><br>
     <span id="milkTotal"></span>
     <canvas id="milkChart" width="400" height="200"></canvas>
   </div>
 
   <div class="section">
-    <strong>👶 عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
-    <strong>📅 تاريخ الولادة المتوقع:</strong> <span id="expectedDate"></span>
-  </div>
-
-  <div class="section">
-    <strong>💊 آخر حالة صحية:</strong><br>
-    <span id="healthSummary"></span>
-  </div>
-
-  <div class="section">
-    <strong>🔍 الحالة التناسلية:</strong><br>
-    <span id="reproduction"></span>
-  </div>
-
-  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
-
-  <script>
-    async function fetchData() {
-      const params = new URLSearchParams(window.location.search);
-      const number = params.get("number");
-      document.getElementById("animalId").textContent = number;
-
-      const [animals, milk, events] = await Promise.all([
-        fetch("animals.json").then(res => res.json()),
-        fetch("milk.json").then(res => res.json()),
-        fetch("events.json").then(res => res.json())
-      ]);
-
-      const animal = animals.find(a => a.number === number);
-      if (!animal) return alert("لم يتم العثور على الحيوان.");
-
-      const birthDate = animal.birthDate || "غير مسجل";
-      const season = animal.season || "غير محدد";
-      const reproduction = animal.reproductiveStatus || "غير مسجل";
-
-      document.getElementById("birthDate").textContent = birthDate;
-      document.getElementById("season").textContent = season;
-      document.getElementById("reproduction").textContent = reproduction;
-
-      // عدد أيام الحليب
-      const lastCalving = new Date(animal.lastCalvingDate);
-      const milkDays = Math.floor((new Date() - lastCalving) / (1000 * 60 * 60 * 24));
-      document.getElementById("milkDays").textContent = milkDays;
-
-      // إنتاج اللبن
-      const milkData = milk.filter(m => m.number === number);
-      const milkTotal = milkData.at(-1)?.total || "---";
-      document.getElementById("milkTotal").textContent = `${milkTotal} لتر`;
-
-      new Chart(document.getElementById('milkChart'), {
-        type: 'line',
-        data: {
-          labels: milkData.map(e => e.date),
-          datasets: [{
-            label: 'إنتاج اللبن (لتر)',
-            data: milkData.map(e => e.total),
-            backgroundColor: 'rgba(76, 175, 80, 0.2)',
-            borderColor: '#4caf50',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              display: true,
-              labels: { font: { size: 14 } }
-            }
-          },
-          scales: {
-            x: { title: { display: true, text: 'تاريخ' } },
-            y: { title: { display: true, text: 'اللتر' }, beginAtZero: true }
-          }
-        }
-      });
-
-      // عمر العشار وتاريخ الولادة المتوقع
-      let pregnancyAge = "---", expectedDate = "---";
-      if (reproduction.includes("عشار") && animal.lastInseminationDate) {
-        const insemination = new Date(animal.lastInseminationDate);
-        pregnancyAge = Math.floor((new Date() - insemination) / (1000 * 60 * 60 * 24));
-        const expected = new Date(insemination);
-        expected.setDate(expected.getDate() + 280);
-        expectedDate = expected.toISOString().split("T")[0];
-      }
-      document.getElementById("pregnancyAge").textContent = pregnancyAge;
-      document.getElementById("expectedDate").textContent = expectedDate;
-
-      // آخر حالة صحية
-      const healthEvents = events.filter(e => e.number === number && e.type === "مرض");
-      const latest = healthEvents.at(-1);
-      document.getElementById("healthSummary").textContent = latest ? `${latest.diagnosis} بتاريخ ${latest.date}` : "لا يوجد";
-    }
-
-    fetchData();
-  </script>
-</body>
-</html>
+    <strong>🤰 عمر العشار:</strong> <span id="pregnancyAge"></s
