@@ -4,27 +4,269 @@
     "type": "جاموسة",
     "breed": "مصري",
     "productionStatus": "حلاب",
-    "reproductiveStatus": "عشار",
-    "birthDate": "2023-01-01",
-    "lastCalvingDate": "2024-05-01"
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-02-15",
+    "lastCalvingDate": "2024-02-01"
   },
   {
     "number": "002",
     "type": "بقرة",
     "breed": "هولشتاين",
-    "productionStatus": "جاف",
-    "reproductiveStatus": "مفتوحة",
-    "birthDate": "2022-10-12",
-    "lastCalvingDate": "2023-11-10"
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-03-15",
+    "lastCalvingDate": "2024-03-01"
   },
   {
     "number": "003",
     "type": "جاموسة",
-    "breed": "هجين إيطالي",
+    "breed": "مصري",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-04-15",
+    "lastCalvingDate": "2024-04-01"
+  },
+  {
+    "number": "004",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-05-15",
+    "lastCalvingDate": "2024-05-01"
+  },
+  {
+    "number": "005",
+    "type": "جاموسة",
+    "breed": "مصري",
     "productionStatus": "حلاب",
     "reproductiveStatus": "ملقحة",
-    "birthDate": "2021-07-22",
-    "lastCalvingDate": "2023-12-01"
+    "birthDate": "2022-06-15",
+    "lastCalvingDate": "2024-06-01"
   },
-  ...
+  {
+    "number": "006",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-07-15",
+    "lastCalvingDate": "2024-01-01"
+  },
+  {
+    "number": "007",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-08-15",
+    "lastCalvingDate": "2024-02-01"
+  },
+  {
+    "number": "008",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-09-15",
+    "lastCalvingDate": "2024-03-01"
+  },
+  {
+    "number": "009",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-10-15",
+    "lastCalvingDate": "2024-04-01"
+  },
+  {
+    "number": "010",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-11-15",
+    "lastCalvingDate": "2024-05-01"
+  },
+  {
+    "number": "011",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-12-15",
+    "lastCalvingDate": "2024-06-01"
+  },
+  {
+    "number": "012",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-01-15",
+    "lastCalvingDate": "2024-01-01"
+  },
+  {
+    "number": "013",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-02-15",
+    "lastCalvingDate": "2024-02-01"
+  },
+  {
+    "number": "014",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-03-15",
+    "lastCalvingDate": "2024-03-01"
+  },
+  {
+    "number": "015",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-04-15",
+    "lastCalvingDate": "2024-04-01"
+  },
+  {
+    "number": "016",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-05-15",
+    "lastCalvingDate": "2024-05-01"
+  },
+  {
+    "number": "017",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-06-15",
+    "lastCalvingDate": "2024-06-01"
+  },
+  {
+    "number": "018",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-07-15",
+    "lastCalvingDate": "2024-01-01"
+  },
+  {
+    "number": "019",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-08-15",
+    "lastCalvingDate": "2024-02-01"
+  },
+  {
+    "number": "020",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-09-15",
+    "lastCalvingDate": "2024-03-01"
+  },
+  {
+    "number": "021",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-10-15",
+    "lastCalvingDate": "2024-04-01"
+  },
+  {
+    "number": "022",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-11-15",
+    "lastCalvingDate": "2024-05-01"
+  },
+  {
+    "number": "023",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-12-15",
+    "lastCalvingDate": "2024-06-01"
+  },
+  {
+    "number": "024",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-01-15",
+    "lastCalvingDate": "2024-01-01"
+  },
+  {
+    "number": "025",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-02-15",
+    "lastCalvingDate": "2024-02-01"
+  },
+  {
+    "number": "026",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-03-15",
+    "lastCalvingDate": "2024-03-01"
+  },
+  {
+    "number": "027",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-04-15",
+    "lastCalvingDate": "2024-04-01"
+  },
+  {
+    "number": "028",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "مفتوحة",
+    "birthDate": "2022-05-15",
+    "lastCalvingDate": "2024-05-01"
+  },
+  {
+    "number": "029",
+    "type": "جاموسة",
+    "breed": "مصري",
+    "productionStatus": "حلاب",
+    "reproductiveStatus": "ملقحة",
+    "birthDate": "2022-06-15",
+    "lastCalvingDate": "2024-06-01"
+  },
+  {
+    "number": "030",
+    "type": "بقرة",
+    "breed": "هولشتاين",
+    "productionStatus": "جاف",
+    "reproductiveStatus": "عشار",
+    "birthDate": "2022-07-15",
+    "lastCalvingDate": "2024-01-01"
+  }
 ]
