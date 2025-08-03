@@ -2,83 +2,157 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>بطاقة الحيوان</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بطاقة الجاموسة</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      background-color: #fffde7;
+      background-color: #fff9db;
       font-family: 'Arial', sans-serif;
-      padding: 15px;
-      margin: 0;
+      padding: 20px;
       color: #1b5e20;
     }
     h1 {
       text-align: center;
-      font-size: 26px;
-      margin-bottom: 10px;
+      font-size: 30px;
+      font-weight: bold;
+      margin-bottom: 20px;
     }
     .section {
-      background-color: #e8f5e9;
+      background-color: #eafbe7;
       padding: 15px;
       border-radius: 10px;
-      margin-bottom: 15px;
-      font-size: 16px;
+      margin-bottom: 20px;
       line-height: 1.8;
     }
-    .section strong {
-      color: #2e7d32;
-    }
     button {
-      display: block;
       width: 100%;
       padding: 12px;
-      font-size: 18px;
       background-color: #2e7d32;
       color: white;
+      font-size: 18px;
       border: none;
       border-radius: 10px;
       cursor: pointer;
-      margin-top: 20px;
     }
     canvas {
+      margin-top: 30px;
       background-color: #fff;
       border: 1px solid #ccc;
       border-radius: 10px;
-      margin-top: 10px;
-      max-width: 100%;
     }
     .photo-button {
-      background-color: #aed581;
-      padding: 5px 10px;
-      border-radius: 8px;
-      border: none;
-      font-size: 14px;
       float: left;
+      font-size: 14px;
+      padding: 5px 10px;
+      background-color: #aed581;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
-      margin-bottom: 10px;
     }
     .title {
+      font-size: 26px;
+      color: #2e7d32;
       font-weight: bold;
-      color: #33691e;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <h1 class="title">بطاقة الحيوان رقم (<span id="animalId"></span>)</h1>
+
+  <h1 class="title">بطاقة الجاموسة رقم (<span id="animalId"></span>)</h1>
   <button class="photo-button">📷 صورة الحيوان</button>
 
   <div class="section">
     <strong>📅 تاريخ الميلاد:</strong> <span id="birthDate"></span><br>
-    <strong>🧮 الموسم الحالي:</strong> <span id="season"></span>
+    <strong>🧮 موسم الحليب:</strong> <span id="season"></span>
   </div>
 
-  <div class="section">
-    <strong>📈 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
-    <strong>🍼 إنتاج اللبن:</strong><br>
+  <div class="section" id="milkSection">
+    <strong>📅 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>☑️ إنتاج اللبن:</strong><br>
     <span id="milkTotal"></span>
     <canvas id="milkChart" width="400" height="200"></canvas>
   </div>
 
   <div class="section">
-    <strong>🤰 عمر العشار:</strong> <span id="pregnancyAge"></s
+    <strong>👶 عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
+    <strong>📅 تاريخ الولادة المتوقع:</strong> <span id="expectedDate"></span>
+  </div>
+
+  <div class="section">
+    <strong>💊 آخر حالة صحية:</strong><br>
+    <span id="healthSummary"></span>
+  </div>
+
+  <div class="section">
+    <strong>🔍 الحالة التناسلية:</strong><br>
+    <span id="reproduction"></span>
+  </div>
+
+  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
+
+  <script>
+    const animalId = localStorage.getItem("lastAnimalId");
+    document.getElementById("animalId").textContent = animalId;
+
+    const animalData = {
+      type: "جاموسة",
+      birthDate: "2023-12-01",
+      season: "الموسم الأول 2024",
+      milkDays: 125,
+      milkTotal: "25 لتر يوميًا / 760 لتر شهريًا / 4500 لتر موسميًا",
+      pregnancyAge: 150,
+      expectedDate: "2025-11-12",
+      healthSummary: "علاج التهاب ضرع بتاریخ 25-07-2025. تحصين حمى قلاعية بتاریخ 18-07-2025. تقليم حوافر بتاریخ 2025-12-06.",
+      reproduction: "عشار في الشهر الخامس",
+      chart: [
+        { date: "2025-03-01", total: 22 },
+        { date: "2025-04-01", total: 24 },
+        { date: "2025-05-01", total: 25 },
+        { date: "2025-06-01", total: 26 },
+        { date: "2025-07-01", total: 25 }
+      ]
+    };
+
+    document.getElementById("birthDate").textContent = animalData.birthDate;
+    document.getElementById("season").textContent = animalData.season;
+    document.getElementById("milkDays").textContent = animalData.milkDays;
+    document.getElementById("milkTotal").textContent = animalData.milkTotal;
+    document.getElementById("pregnancyAge").textContent = animalData.pregnancyAge;
+    document.getElementById("expectedDate").textContent = animalData.expectedDate;
+    document.getElementById("healthSummary").textContent = animalData.healthSummary;
+    document.getElementById("reproduction").textContent = animalData.reproduction;
+
+    new Chart(document.getElementById('milkChart'), {
+      type: 'line',
+      data: {
+        labels: animalData.chart.map(e => e.date),
+        datasets: [{
+          label: 'إنتاج اللبن التراكمي (لتر)',
+          data: animalData.chart.map(e => e.total),
+          backgroundColor: 'rgba(76, 175, 80, 0.2)',
+          borderColor: '#4caf50',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+            labels: { font: { size: 14 } }
+          }
+        },
+        scales: {
+          x: { title: { display: true, text: 'تاريخ اليوم' } },
+          y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+  
