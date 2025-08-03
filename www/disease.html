@@ -244,13 +244,20 @@
         ...extra
       };
 
-      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-     .then(res => {
+     fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(data)
+})
+.then(res => {
   if (res.ok) {
+    alert("✅ تم تسجيل الحالة الصحية بنجاح");
+    window.location.href = "treatment-followup.html";
+  } else {
+    alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+  }
+})
+
     const isNewUser = localStorage.getItem("isNewUser") === "true";
     alert("✅ تم تسجيل الحالة الصحية بنجاح");
     window.location.href = "treatment-followup.html";
@@ -287,4 +294,5 @@
 </html>
 
        
+
 
