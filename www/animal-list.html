@@ -109,18 +109,6 @@
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
   <script>
-    fetch('https://murabbic-alerts.onrender.com/api/animals')
-      .then(res => res.json())
-      .then(data => {
-        const tbody = document.getElementById('animalBody');
-        const noData = document.getElementById('noData');
-
-        if (!data || data.length === 0) {
-          noData.style.display = 'block';
-          return;
-        }
-
-       <script>
   fetch('https://murabbic-alerts.onrender.com/api/animals')
     .then(res => res.json())
     .then(data => {
@@ -135,11 +123,11 @@
       data.forEach(animal => {
         const tr = document.createElement('tr');
 
-        // لون الصف حسب نوع الحيوان
+        // لون الصف حسب النوع
         if (animal.type === "بقرة") {
-          tr.style.backgroundColor = "#fff9c4"; // أصفر فاتح
+          tr.style.backgroundColor = "#fff9c4"; // أصفر
         } else if (animal.type === "جاموسة") {
-          tr.style.backgroundColor = "#e0e0e0"; // رمادي فاتح
+          tr.style.backgroundColor = "#e0e0e0"; // رمادي
         }
 
         tr.innerHTML = `
@@ -167,6 +155,7 @@
   }
 </script>
 
+
       })
       .catch(error => {
         document.getElementById('noData').style.display = 'block';
@@ -179,5 +168,6 @@
   </script>
 </body>
 </html>
+
 
 
