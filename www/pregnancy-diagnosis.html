@@ -123,8 +123,8 @@
           const diffTime = today - lastDate;
           daysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         }
-
-        activateSection(reproductiveStatus, lastInseminationDaysAgo);
+       activateSection(reproductiveStatus, lastInseminationDaysAgo);
+       diagnosisDateInput.valueAsDate = new Date();
 
       } else {
         sonarSection.classList.add("hidden");
