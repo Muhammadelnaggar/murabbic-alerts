@@ -37,6 +37,30 @@ app.post("/api/vaccinations", (req, res) => {
 
   res.status(200).json({ message: "✅ تم حفظ التحصين بنجاح" });
 });
+// داخل serve.js
+app.post("/api/pregnancy-diagnosis", (req, res) => {
+  const newDiagnosis = req.body;
+
+  const filePath = path.join(dataDir, "pregnancy-diagnosis.json");
+  fs.readFile(filePath, "utf8", (err, data) => {
+    let diagnoses = [];
+    if (!err && data) {
+      diagnoses = JSON.parse(data);
+    }
+
+    diagnoses.push(newDiagnosis);
+
+    fs.writeFile(filePath, JSON.stringify(diagnoses, null, 2), (err) => {
+      if (err) {
+        console.error("❌ فشل في حفظ التشخيص:", err);
+        res.status(500).json({ success: false });
+      } else {
+        res.json({ success: true });
+      }
+    });
+  });
+});
+
 // تسجيل تحضير الولادة
 app.post('/api/sensors', (req, res) => {
   const filePath = path.join(dataDir, 'sensor-readings.json');
