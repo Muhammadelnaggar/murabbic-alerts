@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -119,49 +118,59 @@
   </form>
 
   <script>
-  document.getElementById("diagnosisDate").valueAsDate = new Date();
+    const animalIdInput = document.getElementById("animalId");
+    const diagnosisDateInput = document.getElementById("diagnosisDate");
+    const ultrasound = document.getElementById("ultrasound");
+    const manual = document.getElementById("manual");
+    const confirm120 = document.getElementById("confirm120");
+    const dryoff = document.getElementById("dryoff");
 
-  const animalIdInput = document.getElementById("animalId");
-  const diagnosisDateInput = document.getElementById("diagnosisDate");
+    diagnosisDateInput.valueAsDate = new Date();
 
-  const ultrasound = document.getElementById("ultrasound");
-  const manual = document.getElementById("manual");
-  const confirm120 = document.getElementById("confirm120");
-  const dryoff = document.getElementById("dryoff");
+    function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
+      document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
-  function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
-    document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
-
-    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
-      ultrasound.classList.add("active");
+      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
+        ultrasound.classList.add("active");
+      }
+      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
+        manual.classList.add("active");
+      }
+      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
+        confirm120.classList.add("active");
+      }
+      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
+        dryoff.classList.add("active");
+      }
     }
-    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
-      manual.classList.add("active");
-    }
-    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
-      confirm120.classList.add("active");
-    }
-    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
-      dryoff.classList.add("active");
-    }
-  }
 
-  animalIdInput.addEventListener("change", () => {
-    fetch("/data/animal.json")
-      .then(res => res.json())
-      .then(data => {
-        const animal = data.find(a => a.animalId === animalIdInput.value);
-        if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+    animalIdInput.addEventListener("change", () => {
+      fetch("/data/animal.json")
+        .then(res => res.json())
+        .then(data => {
+          const animal = data.find(a => a.animalId === animalIdInput.value);
+          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
 
-        const reproductiveStatus = animal.reproductiveStatus;
-        const lastDate = new Date(animal.lastInseminationDate);
-        const today = new Date(diagnosisDateInput.value);
-        const diffTime = today - lastDate;
-        const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const reproductiveStatus = animal.reproductiveStatus;
+          const lastDate = new Date(animal.lastInseminationDate);
+          const today = new Date(diagnosisDateInput.value);
+          const diffTime = today - lastDate;
+          const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        activateSection(reproductiveStatus, lastInseminationDaysAgo);
-      });
-  });
-</script>
+          activateSection(reproductiveStatus, lastInseminationDaysAgo);
+        });
+    });
+
+    // تفعيل تلقائي إذا وُجد animalId في رابط الصفحة
+    window.addEventListener("load", () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("animalId");
+      if (id) {
+        animalIdInput.value = id;
+        diagnosisDateInput.valueAsDate = new Date();
+        animalIdInput.dispatchEvent(new Event("change"));
+      }
+    });
+  </script>
 </body>
 </html>
