@@ -1,1 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العلاج والمتابعة</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #fffde7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2e7d32;
+      margin-bottom: 20px;
+    }
+
+    .section {
+      background-color: #f1f8e9;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+      color: #2e7d32;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .radio-group {
+      margin-top: 10px;
+    }
+
+    .radio-group label {
+      display: block;
+      margin: 8px 0;
+      font-weight: normal;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: #2e7d32;
+      color: white;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>💊 العلاج والمتابعة</h2>
+
+  <form id="treatmentForm">
+
+    <!-- القسم الأول: بيانات الحيوان -->
+    <div class="section">
+      <label for="animalId">رقم الحيوان</label>
+      <input type="text" id="animalId" name="animalId" readonly>
+
+      <label for="treatmentDate">تاريخ العلاج</label>
+      <input type="date" id="treatmentDate" name="treatmentDate" readonly>
+    </div>
+
+    <!-- القسم الثاني: العلاج والطبيب المعالج -->
+    <div class="section">
+      <label for="treatment">العلاج الموصوف</label>
+      <textarea id="treatment" name="treatment" required></textarea>
+
+      <label for="vetName">الطبيب البيطري المعالج (اختياري)</label>
+      <input type="text" id="vetName" name="vetName">
+    </div>
+
+    <!-- القسم الثالث: المتابعة -->
+    <div class="section">
+      <label>نتيجة المتابعة بعد 3 أيام</label>
+      <div class="radio-group">
+        <label><input type="radio" name="followUp" value="تم الشفاء" required> ✅ تم الشفاء</label>
+        <label><input type="radio" name="followUp" value="ساءت الحالة"> ❌ ساءت الحالة</label>
+      </div>
+    </div>
+
+    <button type="submit">📤 تسجيل</button>
+  </form>
+
+  <script>
+    // تعبئة رقم الحيوان والتاريخ تلقائيًا
+    document.getElementById("animalId").value = localStorage.getItem("currentAnimalId") || "غير محدد";
+    document.getElementById("treatmentDate").valueAsDate = new Date();
+
+    document.getElementById("treatmentForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        animalId: document.getElementById("animalId").value,
+        treatmentDate: document.getElementById("treatmentDate").value,
+        treatment: document.getElementById("treatment").value,
+        vetName: document.getElementById("vetName").value,
+        followUpResult: document.querySelector('input[name="followUp"]:checked').value,
+        timestamp: new Date().toISOString()
+      };
+
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/treatments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل العلاج والمتابعة بنجاح");
+        window.location.href = "dashboard.html";
+      } else {
+        const msg = await res.text();
+        alert("❌ حدث خطأ أثناء التسجيل:\n" + msg);
+      }
+    });
+  </script>
+
+</body>
+</html>
 
