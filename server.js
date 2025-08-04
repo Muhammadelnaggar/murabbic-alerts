@@ -38,6 +38,26 @@ app.post("/api/vaccinations", (req, res) => {
   res.status(200).json({ message: "✅ تم حفظ التحصين بنجاح" });
 });
 // تسجيل تحضير الولادة
+app.post('/api/sensors', (req, res) => {
+  const filePath = path.join(dataDir, 'sensor-readings.json');
+  const newEntry = req.body;
+
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    let readings = [];
+    if (!err && data) readings = JSON.parse(data);
+    readings.push(newEntry);
+
+    fs.writeFile(filePath, JSON.stringify(readings, null, 2), err => {
+      if (err) {
+        console.error('خطأ في حفظ قراءة الحساس:', err);
+        res.status(500).send('فشل في الحفظ');
+      } else {
+        res.status(200).send('✅ تم تسجيل قراءة الحساس');
+      }
+    });
+  });
+});
+
 app.post('/api/closeups', (req, res) => {
   const filePath = path.join(__dirname, 'data', 'closeups.json');
   const newRecord = req.body;
