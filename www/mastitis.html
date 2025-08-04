@@ -1,1 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل التهاب الضرع</title>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #fffce6;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
+
+    form {
+      max-width: 500px;
+      margin: auto;
+      background-color: #f1f8e9;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #c5e1a5;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+      color: #2e7d32;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
+    .options-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .options-box label {
+      background: #dcedc8;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #8bc34a;
+      cursor: pointer;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px;
+      width: 100%;
+      background-color: #aeea00;
+      border: 2px solid #558b2f;
+      color: #000;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #c5e1a5;
+    }
+  </style>
+</head>
+<body>
+  <h1>تسجيل التهاب الضرع</h1>
+
+  <form id="mastitis-form">
+    <label for="animal-id">رقم الحيوان:</label>
+    <input type="text" id="animal-id" name="animal-id" required>
+
+    <label for="date">تاريخ التشخيص:</label>
+    <input type="date" id="date" name="date" required>
+
+    <label>الربع المصاب:</label>
+    <div class="options-box">
+      <label><input type="checkbox" name="quarters" value="أمام شمال"> أمام شمال</label>
+      <label><input type="checkbox" name="quarters" value="أمام يمين"> أمام يمين</label>
+      <label><input type="checkbox" name="quarters" value="خلف يمين"> خلف يمين</label>
+      <label><input type="checkbox" name="quarters" value="خلف شمال"> خلف شمال</label>
+    </div>
+
+    <label for="mastitis-type">نوع الالتهاب:</label>
+    <select id="mastitis-type" name="mastitis-type" required>
+      <option value="">-- اختر --</option>
+      <option value="عادي">عادي</option>
+      <option value="مائي">مائي</option>
+    </select>
+
+    <button type="submit">تسجيل الحالة</button>
+  </form>
+
+  <script>
+    document.getElementById("mastitis-form").addEventListener("submit", function(event) {
+      event.preventDefault();
+
+      const animalId = document.getElementById("animal-id").value;
+      const date = document.getElementById("date").value;
+      const mastitisType = document.getElementById("mastitis-type").value;
+      const quarters = Array.from(document.querySelectorAll("input[name='quarters']:checked")).map(cb => cb.value);
+
+      if (!animalId || !date || !mastitisType || quarters.length === 0) {
+        alert("يرجى ملء جميع الحقول المطلوبة.");
+        return;
+      }
+
+      const data = {
+        animalId,
+        date,
+        disease: "التهاب ضرع",
+        mastitisType,
+        quarters
+      };
+
+      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(res => {
+        if (res.ok) {
+          alert("✅ تم تسجيل الحالة بنجاح");
+          window.location.href = "treatment-followup.html";
+        } else {
+          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
 
