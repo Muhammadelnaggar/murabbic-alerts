@@ -23,10 +23,6 @@
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 25px;
-      display: none;
-    }
-    fieldset.active {
-      display: block;
     }
     legend {
       font-weight: bold;
@@ -120,43 +116,7 @@
   <script>
     const animalIdInput = document.getElementById("animalId");
     const diagnosisDateInput = document.getElementById("diagnosisDate");
-    const ultrasound = document.getElementById("ultrasound");
-    const manual = document.getElementById("manual");
-    const confirm120 = document.getElementById("confirm120");
-    const dryoff = document.getElementById("dryoff");
-
     diagnosisDateInput.valueAsDate = new Date();
-
-    function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
-      document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
-
-      if (reproductiveStatus === "ملقحة") {
-        if (lastInseminationDaysAgo >= 30 && lastInseminationDaysAgo < 45) ultrasound.classList.add("active");
-        else if (lastInseminationDaysAgo >= 45 && lastInseminationDaysAgo < 120) manual.classList.add("active");
-      }
-
-      if (reproductiveStatus === "عشار") {
-        if (lastInseminationDaysAgo >= 120 && lastInseminationDaysAgo < 200) confirm120.classList.add("active");
-        else if (lastInseminationDaysAgo >= 200) dryoff.classList.add("active");
-      }
-    }
-
-    animalIdInput.addEventListener("change", () => {
-      fetch("/data/animal.json")
-        .then(res => res.json())
-        .then(data => {
-          const animal = data.find(a => a.animalId === animalIdInput.value);
-          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
-
-          const reproductiveStatus = animal.reproductiveStatus;
-          const lastDate = new Date(animal.lastInseminationDate);
-          const today = new Date(diagnosisDateInput.value);
-          const diffTime = today - lastDate;
-          const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-          activateSection(reproductiveStatus, lastInseminationDaysAgo);
-        });
-    });
 
     window.addEventListener("load", () => {
       const params = new URLSearchParams(window.location.search);
@@ -164,7 +124,20 @@
       if (id) {
         animalIdInput.value = id;
         diagnosisDateInput.valueAsDate = new Date();
-        animalIdInput.dispatchEvent(new Event("change"));
+        fetch("/data/animal.json")
+          .then(res => res.json())
+          .then(data => {
+            const animal = data.find(a => a.animalId === id);
+            if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+
+            const reproductiveStatus = animal.reproductiveStatus;
+            const lastDate = new Date(animal.lastInseminationDate);
+            const today = new Date(diagnosisDateInput.value);
+            const diffTime = today - lastDate;
+            const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            document.querySelectorAll("fieldset").forEach(fs => fs.classList.add("active"));
+          });
       }
     });
   </script>
