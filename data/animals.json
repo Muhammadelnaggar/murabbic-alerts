@@ -4,9 +4,11 @@
     "type": "جاموسة",
     "breed": "مصري",
     "birthDate": "2023-01-11",
-    "lastCalvingDate": "2024-01-11",
+    "lastCalvingDate": "2025-01-11",
     "productionStatus": "حلاب",
-    "reproductiveStatus": "عشار",
+    "reproductiveStatus": "ملقحة",
+    "lastInseminationDate": "2025-07-05"
+
     "dailyMilk": 19,
     "milkCurve": [
       25.6,
