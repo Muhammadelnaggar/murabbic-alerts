@@ -1,1 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تشخيص الحمل</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+      color: #1b5e20;
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 30px;
+      color: #2e7d32;
+    }
+    fieldset {
+      border: 2px solid #2e7d32;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 25px;
+    }
+    legend {
+      font-weight: bold;
+      font-size: 18px;
+      color: #2e7d32;
+      padding: 0 10px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input[type="text"], input[type="date"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .radio-group {
+      margin: 10px 0;
+    }
+    .radio-group label {
+      display: inline-block;
+      margin-left: 15px;
+      font-weight: normal;
+    }
+    button {
+      background-color: #2e7d32;
+      color: white;
+      padding: 14px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      width: 100%;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #27642a;
+    }
+  </style>
+</head>
+<body>
+  <h1>تشخيص الحمل</h1>
+  <form id="diagnosisForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="diagnosisDate">تاريخ التشخيص</label>
+    <input type="date" id="diagnosisDate" name="diagnosisDate" required>
+
+    <fieldset>
+      <legend>تشخيص بالسونار (بعد 30 يوم من آخر تلقيح)</legend>
+      <div class="radio-group">
+        <label><input type="radio" name="result" value="عشار"> عشار</label>
+        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>تشخيص يدوي (بعد 45 يوم من آخر تلقيح)</legend>
+      <div class="radio-group">
+        <label><input type="radio" name="result" value="عشار"> عشار</label>
+        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>تأكيد الحمل عند 120 يوم</legend>
+      <div class="radio-group">
+        <label><input type="radio" name="result" value="عشار"> عشار</label>
+        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>تأكيد الحمل للتجفيف عند 200 يوم</legend>
+      <div class="radio-group">
+        <label><input type="radio" name="result" value="عشار"> عشار</label>
+        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+      </div>
+    </fieldset>
+
+    <label for="vet">اسم الطبيب البيطري (اختياري)</label>
+    <input type="text" id="vet" name="vet">
+
+    <button type="submit">تسجيل التشخيص</button>
+  </form>
+
+  <script>
+    document.getElementById("diagnosisDate").valueAsDate = new Date();
+
+    document.getElementById("diagnosisForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const selectedResult = document.querySelector('input[name="result"]:checked');
+      if (!selectedResult) {
+        alert("❌ يرجى اختيار نتيجة التشخيص");
+        return;
+      }
+
+      const data = {
+        animalId: document.getElementById("animalId").value,
+        diagnosisDate: document.getElementById("diagnosisDate").value,
+        result: selectedResult.value,
+        vet: document.getElementById("vet").value
+      };
+
+      fetch("https://murabbic-alerts.onrender.com/api/pregnancy-diagnosis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(response => {
+        if (response.success) {
+          // تحديث بيانات الحيوان في animal-list و cow-card (مثلاً عبر التخزين المحلي)
+          let animals = JSON.parse(localStorage.getItem("animals")) || [];
+          const index = animals.findIndex(a => a.animalId === data.animalId);
+          if (index !== -1) {
+            animals[index].pregnancyDiagnosis = {
+              date: data.diagnosisDate,
+              result: data.result
+            };
+            localStorage.setItem("animals", JSON.stringify(animals));
+          }
+
+          alert("✅ تم تسجيل التشخيص بنجاح");
+          if (confirm("هل تريد تسجيل حدث آخر؟")) {
+            window.location.href = "add-event.html";
+          } else {
+            if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+              window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
+            }
+          }
+        } else {
+          alert("❌ لم يتم التسجيل بنجاح");
+        }
+      })
+      .then(res => {
+        if (res.ok) {
+          alert("✅ تم تسجيل التشخيص بنجاح");
+          if (confirm("هل تريد تسجيل حدث آخر؟")) {
+            window.location.href = "add-event.html";
+          } else {
+            if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+              window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
+            }
+          }
+        } else {
+          alert("❌ حدث خطأ أثناء التسجيل");
+        }
+      })
+      .catch(error => {
+        console.error("Error:", error);
+        alert("❌ تعذر الاتصال بالخادم");
+      });
+    });
+  </script>
+</body>
+</html>
 
