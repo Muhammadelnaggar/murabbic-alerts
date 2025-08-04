@@ -74,7 +74,7 @@
 </head>
 <body>
   <h2>تسجيل حدث التلقيح</h2>
-  <form>
+  <form id="inseminationForm">
     <label>رقم الحيوان:</label>
     <input type="text" id="animalId" required />
 
@@ -101,5 +101,17 @@
 
     <button type="submit">تسجيل الحدث</button>
   </form>
+
+  <script>
+    document.getElementById("inseminationDate").valueAsDate = new Date();
+
+    document.getElementById("inseminationForm").addEventListener("submit", function(event) {
+      event.preventDefault();
+
+      // simulate successful submission then redirect
+      alert("✅ تم تسجيل حدث التلقيح بنجاح");
+      window.location.href = "dashboard.html";
+    });
+  </script>
 </body>
 </html>
