@@ -396,6 +396,9 @@ app.get('/alerts/:id', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'index.html'));
 });
+app.get("/data/animal.json", (req, res) => {
+  res.sendFile(path.join(dataDir, "animal.json"));
+});
 
 // === تشغيل السيرفر ===
 app.listen(PORT, '0.0.0.0', () => {
