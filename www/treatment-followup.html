@@ -108,12 +108,10 @@
   <button onclick="submitTreatment()">تسجيل</button>
 
   <script>
-    // إدخال تلقائي للتاريخ
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('treatmentDate').value = today;
     document.getElementById('animalId').value = localStorage.getItem('currentAnimalId') || '';
 
-    // تفعيل المتابعة بعد 3 أيام
     window.addEventListener('DOMContentLoaded', () => {
       const savedDate = new Date(localStorage.getItem('treatmentStartDate') || today);
       const now = new Date();
@@ -141,6 +139,7 @@
 
       console.log("✅ تم تسجيل العلاج والمتابعة:", data);
       alert("✅ تم حفظ العلاج والمتابعة بنجاح");
+      window.location.href = "dashboard.html";
     }
   </script>
 </body>
