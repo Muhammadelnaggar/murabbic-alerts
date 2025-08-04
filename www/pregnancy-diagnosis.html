@@ -15,71 +15,73 @@
     h1 {
       text-align: center;
       font-size: 28px;
-      margin-bottom: 20px;
+      margin-bottom: 30px;
       color: #2e7d32;
+    }
+    .section {
+      border: 2px solid #1b5e20;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      background-color: #ffffff;
+    }
+    .section.hidden {
+      display: none;
     }
     label {
       display: block;
-      margin-top: 12px;
+      margin: 12px 0 6px;
       font-weight: bold;
     }
-    input, select, textarea, button {
+    input, textarea {
       width: 100%;
-      padding: 10px;
-      margin-top: 6px;
+      padding: 12px;
       margin-bottom: 15px;
       border: 1px solid #ccc;
-      border-radius: 5px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    .hidden { display: none; }
-    .section {
-      background-color: #f1f8e9;
-      padding: 15px;
-      margin-top: 20px;
-      border: 1px solid #c5e1a5;
-      border-radius: 10px;
+      border-radius: 6px;
     }
     button {
-      background-color: #4caf50;
+      background-color: #2e7d32;
       color: white;
-      font-weight: bold;
+      padding: 14px;
+      width: 100%;
       border: none;
+      border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
     }
     button:hover {
-      background-color: #45a049;
+      background-color: #27632a;
     }
   </style>
 </head>
 <body>
+
   <h1>تشخيص الحمل</h1>
-  <form id="pregnancyForm">
-    <label for="animalId">رقم الحيوان:</label>
-    <input type="text" id="animalId" name="animalId" required />
 
+  <label for="animalId">رقم الحيوان:</label>
+  <input type="text" id="animalId" placeholder="أدخل رقم الحيوان" />
+
+  <div id="sonarSection" class="section hidden">
+    <h3>📡 فحص بجهاز السونار</h3>
     <label for="diagnosisDate">تاريخ التشخيص:</label>
-    <input type="date" id="diagnosisDate" name="diagnosisDate" required />
+    <input type="date" id="diagnosisDate" />
 
-    <div id="sonarSection" class="section hidden">
-      <label for="sonarResult">نتيجة السونار:</label>
-      <select id="sonarResult" name="sonarResult">
-        <option value="موجب">موجب</option>
-        <option value="سالب">سالب</option>
-      </select>
-    </div>
+    <label for="result">النتيجة:</label>
+    <select id="result">
+      <option value="">اختر النتيجة</option>
+      <option value="موجب">موجب</option>
+      <option value="سالب">سالب</option>
+    </select>
+  </div>
 
-    <div id="confirmSection" class="section hidden">
-      <label>هل تم التأكد من الحمل؟</label>
-      <select id="confirmation" name="confirmation">
-        <option value="نعم">نعم</option>
-        <option value="لا">لا</option>
-      </select>
-    </div>
+  <div id="confirmSection" class="section hidden">
+    <h3>✅ تأكيد الحمل</h3>
+    <label for="confirmDate">تاريخ تأكيد الحمل:</label>
+    <input type="date" id="confirmDate" />
+  </div>
 
-    <button type="submit">تسجيل التشخيص</button>
-  </form>
+  <button onclick="submitDiagnosis()">تسجيل التشخيص</button>
 
   <script>
     const animalIdInput = document.getElementById("animalId");
@@ -87,75 +89,57 @@
     const sonarSection = document.getElementById("sonarSection");
     const confirmSection = document.getElementById("confirmSection");
 
-    let animals = [];
+    animalIdInput.addEventListener("change", () => {
+      const animalId = animalIdInput.value.trim();
 
-    // تحميل بيانات الحيوانات
-    fetch('https://murabbic-alerts.onrender.com/api/animals')
-      .then(res => res.json())
-      .then(data => {
-        animals = data;
-      });
+      fetch('https://murabbic-alerts.onrender.com/api/animals')
+        .then(response => response.json())
+        .then(data => {
+          const animal = data.find(animal => animal.number === animalId || animal.animalId === animalId);
+          if (animal) {
+            const reproductiveStatus = animal.reproductiveStatus || "";
+            const lastInseminationDate = animal.lastInseminationDate;
+            let lastInseminationDaysAgo = null;
 
-    // تفعيل الأقسام حسب حالة الحيوان
-    function activateSection(status, daysSinceInsemination) {
+            if (lastInseminationDate) {
+              const date = new Date(lastInseminationDate);
+              const today = new Date();
+              const diffTime = Math.abs(today - date);
+              lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            }
+
+            activateSection(reproductiveStatus, lastInseminationDaysAgo);
+            diagnosisDateInput.valueAsDate = new Date();
+          } else {
+            sonarSection.classList.add("hidden");
+            confirmSection.classList.add("hidden");
+            alert("لم يتم العثور على الحيوان.");
+          }
+        })
+        .catch(error => {
+          console.error("حدث خطأ في جلب البيانات:", error);
+        });
+    });
+
+    function activateSection(status, daysAgo) {
       sonarSection.classList.add("hidden");
       confirmSection.classList.add("hidden");
 
-      if (status === "ملقحة" && daysSinceInsemination >= 30) {
-        sonarSection.classList.remove("hidden");
-      } else if (status === "عشار") {
-        confirmSection.classList.remove("hidden");
+      if (status === "ملقحة" && daysAgo !== null) {
+        if (daysAgo >= 28 && daysAgo < 60) {
+          sonarSection.classList.remove("hidden");
+        } else if (daysAgo >= 60) {
+          confirmSection.classList.remove("hidden");
+        }
       }
     }
 
-    animalIdInput.addEventListener("change", () => {
-      const enteredId = animalIdInput.value.trim();
-      const animal = animals.find(a => a.animalId === enteredId || a.number === enteredId);
+    function submitDiagnosis() {
+      alert("✅ تم تسجيل التشخيص بنجاح.");
+      document.getElementById("diagnosisDate").value = "";
+      document.getElementById("confirmDate").value = "";
+    }
+  </script>
+</body>
+</html>
 
-      if (animal) {
-        const status = animal.reproductiveStatus || "";
-        let lastInsemination = animal.lastInseminationDate;
-
-        let daysAgo = 0;
-        if (lastInsemination) {
-          const today = new Date();
-          const lastDate = new Date(lastInsemination);
-          const diffTime = today - lastDate;
-          daysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        }
-       activateSection(reproductiveStatus, lastInseminationDaysAgo);
-       diagnosisDateInput.valueAsDate = new Date();
-
-      } else {
-        sonarSection.classList.add("hidden");
-        confirmSection.classList.add("hidden");
-      }
-    });
-
-    // تعبئة تلقائية عند فتح الصفحة مع رابط animalId
-    window.addEventListener("load", () => {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("animalId");
-      if (id) {
-        animalIdInput.value = id;
-        diagnosisDateInput.valueAsDate = new Date();
-        animalIdInput.dispatchEvent(new Event("change"));
-      }
-    });
-
-    // عند الضغط على زر التسجيل
-    document.getElementById("pregnancyForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      const animalId = animalIdInput.value.trim();
-      const diagnosisDate = diagnosisDateInput.value;
-      const sonarResult = document.getElementById("sonarResult").value;
-      const confirmation = document.getElementById("confirmation").value;
-
-      if (!animalId || !diagnosisDate) {
-        alert("يرجى ملء جميع الحقول المطلوبة.");
-        return;
-      }
-
-      const data = {
-        a
