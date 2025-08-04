@@ -57,7 +57,8 @@ app.post('/api/sensors', (req, res) => {
       return res.status(500).send('❌ خطأ في تحليل ملف الحيوانات');
     }
 
-    const found = animals.find(animal => animal.animalId == newEntry.animalId);
+    const found = animals.find(animal => animal.number == newEntry.animalId);
+
 
     if (!found) {
       return res.status(404).send(`❌ الحيوان برقم ${newEntry.animalId} غير موجود في النظام`);
