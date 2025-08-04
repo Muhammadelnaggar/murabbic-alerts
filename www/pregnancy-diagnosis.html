@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -120,8 +121,9 @@
   <script>
     document.getElementById("diagnosisDate").valueAsDate = new Date();
 
-    // تحديد النوع النشط فقط والباقي يظهر غير نشط
-    const reproductiveStatus = "عشار"; // مثال
+    // تحديد النوع النشط فقط بناءً على رقم الحيوان
+    const animalIdInput = document.getElementById("animalId");
+    const diagnosisDateInput = document.getElementById("diagnosisDate"); // مثال
     const lastInseminationDaysAgo = 200; // مثال
 
     const ultrasound = document.getElementById("ultrasound");
@@ -129,7 +131,36 @@
     const confirm120 = document.getElementById("confirm120");
     const dryoff = document.getElementById("dryoff");
 
-    // جميع الأقسام نشطة، والذكاء الصناعي يبرز القسم المناسب تلقائيًا
+    // تحميل البيانات من animal.json بعد إدخال رقم الحيوان
+    animalIdInput.addEventListener("change", () => {
+      fetch("/data/animal.json")
+        .then(res => res.json())
+        .then(data => {
+          const animal = data.find(a => a.animalId === animalIdInput.value);
+          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+
+          const reproductiveStatus = animal.reproductiveStatus;
+          const lastDate = new Date(animal.lastInseminationDate);
+          const today = new Date(diagnosisDateInput.value);
+          const diffTime = Math.abs(today - lastDate);
+          const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+          document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
+
+          if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
+            document.getElementById("ultrasound").classList.add("active");
+          }
+          if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
+            document.getElementById("manual").classList.add("active");
+          }
+          if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
+            document.getElementById("confirm120").classList.add("active");
+          }
+          if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
+            document.getElementById("dryoff").classList.add("active");
+          }
+        });
+    });
     if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
       ultrasound.classList.add("active");
     }
