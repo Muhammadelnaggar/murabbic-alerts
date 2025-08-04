@@ -105,12 +105,36 @@
   <script>
     document.getElementById("inseminationDate").valueAsDate = new Date();
 
-    document.getElementById("inseminationForm").addEventListener("submit", function(event) {
+    document.getElementById("inseminationForm").addEventListener("submit", async function(event) {
       event.preventDefault();
 
-      // simulate successful submission then redirect
-      alert("✅ تم تسجيل حدث التلقيح بنجاح");
-      window.location.href = "dashboard.html";
+      const data = {
+        animalId: document.getElementById("animalId").value,
+        inseminationDate: document.getElementById("inseminationDate").value,
+        bullName: document.getElementById("bullName").value,
+        heatTime: document.querySelector('input[name="heatTime"]:checked').value,
+        inseminationTime: document.querySelector('input[name="inseminationTime"]:checked').value,
+        technicianName: document.getElementById("technicianName").value
+      };
+
+      try {
+        const response = await fetch("https://murabbic-alerts.onrender.com/api/inseminations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+          alert("✅ تم تسجيل حدث التلقيح بنجاح");
+          window.location.href = "dashboard.html";
+        } else {
+          const message = await response.text();
+          alert("❌ فشل في التسجيل:\n" + message);
+        }
+      } catch (error) {
+        alert("❌ حدث خطأ أثناء الاتصال بالخادم");
+        console.error(error);
+      }
     });
   </script>
 </body>
