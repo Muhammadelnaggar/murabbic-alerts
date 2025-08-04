@@ -23,10 +23,10 @@
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 25px;
+      display: none;
     }
     fieldset.active {
-      opacity: 1;
-      pointer-events: auto;
+      display: block;
     }
     legend {
       font-weight: bold;
@@ -130,17 +130,14 @@
     function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
       document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
-      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
-        ultrasound.classList.add("active");
+      if (reproductiveStatus === "ملقحة") {
+        if (lastInseminationDaysAgo >= 30 && lastInseminationDaysAgo < 45) ultrasound.classList.add("active");
+        else if (lastInseminationDaysAgo >= 45 && lastInseminationDaysAgo < 120) manual.classList.add("active");
       }
-      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
-        manual.classList.add("active");
-      }
-      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
-        confirm120.classList.add("active");
-      }
-      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
-        dryoff.classList.add("active");
+
+      if (reproductiveStatus === "عشار") {
+        if (lastInseminationDaysAgo >= 120 && lastInseminationDaysAgo < 200) confirm120.classList.add("active");
+        else if (lastInseminationDaysAgo >= 200) dryoff.classList.add("active");
       }
     }
 
@@ -161,7 +158,6 @@
         });
     });
 
-    // تفعيل تلقائي إذا وُجد animalId في رابط الصفحة
     window.addEventListener("load", () => {
       const params = new URLSearchParams(window.location.search);
       const id = params.get("animalId");
