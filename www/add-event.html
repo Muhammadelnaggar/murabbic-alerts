@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -17,29 +18,6 @@
       font-size: 28px;
       margin-bottom: 30px;
       color: #2e7d32;
-    }
-    label {
-      display: block;
-      margin: 12px 0 6px;
-      font-weight: bold;
-    }
-    input, textarea {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 18px;
-      box-sizing: border-box;
-    }
-    .checkbox {
-      display: flex;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-    .checkbox input {
-      width: auto;
-      margin-left: 10px;
     }
     .button-group {
       display: flex;
@@ -63,63 +41,38 @@
       background-color: #2e7d32;
       color: white;
     }
-    button[type="submit"] {
-      width: 100%;
-      padding: 16px;
-      background-color: #2e7d32;
-      color: white;
-      font-size: 20px;
-      font-weight: bold;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
   </style>
 </head>
 <body>
   <h1>تسجيل حدث</h1>
 
   <form id="eventForm">
-    <label>نوع الحدث:</label>
     <div class="button-group" id="eventTypeGroup">
-      <button type="button" data-value="ولادة" data-page="birth.html">👶 ولادة</button>
-      <button type="button" data-value="تلقيح" data-page="insemination.html">📅 تلقيح</button>
-      <button type="button" data-value="تحصين" data-page="vaccination.html">💉 تحصين</button>
-      <button type="button" data-value="تجفيف" data-page="dry-off.html">🚫 تجفيف</button>
-      <button type="button" data-value="تحضير للولادة" data-page="close-up.html">🍼 تحضير للولادة</button>
-      <button type="button" data-value="إنتاج اللبن اليومي" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-      <button type="button" data-value="تغذية" data-page="nutrition.html">🌿 تغذية</button>
-      <button type="button" data-value="تشخيص الحمل" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-      <button type="button" data-value="التشخيص" data-page="disease.html">🔬 التشخيص</button>
-      <button type="button" data-value="العلاج والمتابعة" data-page="treatment-followup.html">💊 العلاج والمتابعة</button>
-      <button type="button" data-value="تقليم الحوافر" data-page="trimming.html">🦶 تقليم الحوافر</button>
-      <button type="button" data-value="برامج وإجراءات" data-page="protocols.html">📋 برامج وإجراءات</button>
+      <button type="button" data-page="birth.html">👶 ولادة</button>
+      <button type="button" data-page="insemination.html">📅 تلقيح</button>
+      <button type="button" data-page="vaccination.html">💉 تحصين</button>
+      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+      <button type="button" data-page="disease.html">🔬 التشخيص</button>
+      <button type="button" data-page="treatment-followup.html">💊 العلاج والمتابعة</button>
+      <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+      <button type="button" data-page="protocols.html">📋 برامج وإجراءات</button>
     </div>
-    <input type="hidden" id="eventType" name="eventType" value="">
-
-    <button type="submit">💾 حفظ الحدث</button>
   </form>
 
   <script>
-    const eventTypeButtons = document.querySelectorAll('#eventTypeGroup button');
-    eventTypeButtons.forEach(btn => {
+    const buttons = document.querySelectorAll('#eventTypeGroup button');
+    buttons.forEach(btn => {
       btn.addEventListener('click', () => {
-        eventTypeButtons.forEach(b => b.classList.remove('active'));
+        buttons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById('eventType').value = btn.getAttribute('data-value');
         const page = btn.getAttribute('data-page');
-        if (page) {
-          window.location.href = page;
-        }
+        if (page) window.location.href = page;
       });
-    });
-
-    document.getElementById('eventForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      alert('📌 تم حفظ الحدث بنجاح (مثال)!');
     });
   </script>
 </body>
 </html>
-
