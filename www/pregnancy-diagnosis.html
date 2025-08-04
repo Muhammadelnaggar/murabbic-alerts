@@ -23,10 +23,6 @@
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 25px;
-      display: none;
-    }
-    fieldset.active {
-      display: block;
     }
     legend {
       font-weight: bold;
@@ -122,59 +118,29 @@
     const diagnosisDateInput = document.getElementById("diagnosisDate");
     diagnosisDateInput.valueAsDate = new Date();
 
-    const ultrasound = document.getElementById("ultrasound");
-    const manual = document.getElementById("manual");
-    const confirm120 = document.getElementById("confirm120");
-    const dryoff = document.getElementById("dryoff");
-
-    function activateSection(status, daysAgo) {
-      ultrasound.classList.remove("active");
-      manual.classList.remove("active");
-      confirm120.classList.remove("active");
-      dryoff.classList.remove("active");
-
-      if (status === "ملقحة") {
-        if (daysAgo >= 30 && daysAgo < 45) ultrasound.classList.add("active");
-        else if (daysAgo >= 45 && daysAgo < 120) manual.classList.add("active");
-      } else if (status === "عشار") {
-        if (daysAgo >= 120 && daysAgo < 200) confirm120.classList.add("active");
-        else if (daysAgo >= 200) dryoff.classList.add("active");
-      }
-    }
-
-    function fetchAndActivate(id) {
-      fetch("https://murabbic-alerts.onrender.com/data/animal.json")
-        .then(res => res.json())
-        .then(data => {
-          const animal = data.find(a => a.animalId === id);
-          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
-          const status = animal.reproductiveStatus;
-          const lastDate = new Date(animal.lastInseminationDate);
-          const today = new Date(diagnosisDateInput.value);
-          const daysAgo = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-          activateSection(status, daysAgo);
-        });
-    }
-
-    animalIdInput.addEventListener("change", () => {
-      const id = animalIdInput.value.trim();
-      if (id) fetchAndActivate(id);
-    });
-
     window.addEventListener("load", () => {
       const params = new URLSearchParams(window.location.search);
       const id = params.get("animalId");
       if (id) {
         animalIdInput.value = id;
         diagnosisDateInput.valueAsDate = new Date();
-        fetchAndActivate(id);
-      }
-    });
+        fetch("/data/animal.json")
+          .then(res => res.json())
+          .then(data => {
+            const animal = data.find(a => a.animalId === id);
+            if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
 
-    document.getElementById("diagnosisForm").addEventListener("submit", function(event) {
-      event.preventDefault();
-      alert("✅ تم تسجيل التشخيص بنجاح");
+            const reproductiveStatus = animal.reproductiveStatus;
+            const lastDate = new Date(animal.lastInseminationDate);
+            const today = new Date(diagnosisDateInput.value);
+            const diffTime = today - lastDate;
+            const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            document.querySelectorAll("fieldset").forEach(fs => fs.classList.add("active"));
+          });
+      }
     });
   </script>
 </body>
 </html>
+ 
