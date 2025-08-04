@@ -137,23 +137,29 @@
     <input type="hidden" id="diseaseName" name="diseaseName" required>
   </form>
 
-  <script>
-    document.getElementById("diseaseDate").valueAsDate = new Date();
+ <script>
+  document.getElementById("diseaseDate").valueAsDate = new Date();
 
-    const buttons = document.querySelectorAll('#diseaseButtons button');
-    const hiddenInput = document.getElementById('diseaseName');
+  const buttons = document.querySelectorAll('#diseaseButtons button');
+  const hiddenInput = document.getElementById('diseaseName');
 
-    buttons.forEach(button => {
-      if (!button.onclick) {
-        button.addEventListener('click', () => {
-          buttons.forEach(b => b.classList.remove('selected'));
-          button.classList.add('selected');
-          hiddenInput.value = button.dataset.name;
-          alert('✅ تم اختيار المرض: ' + button.dataset.name);
-        });
-      }
-    });
-  </script>
+  buttons.forEach(button => {
+    const disease = button.dataset.name;
+
+    // إذا لم يكن الزر خاصًا بـ "التهاب ضرع" أو "عرج"، اربطه بالعلاج
+    if (disease !== "التهاب ضرع" && disease !== "عرج") {
+      button.addEventListener('click', () => {
+        // تعيين القيمة وتأكيد الاختيار
+        hiddenInput.value = disease;
+        alert('✅ تم اختيار المرض: ' + disease);
+        // الانتقال إلى صفحة العلاج والمتابعة
+        window.location.href = 'treatment-followup.html';
+      });
+    }
+  });
+</script>
+
 
 </body>
 </html>
+
