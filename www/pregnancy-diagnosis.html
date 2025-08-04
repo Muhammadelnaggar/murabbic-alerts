@@ -124,7 +124,6 @@
     // تحديد النوع النشط فقط بناءً على رقم الحيوان
     const animalIdInput = document.getElementById("animalId");
     const diagnosisDateInput = document.getElementById("diagnosisDate"); // مثال
-    const lastInseminationDaysAgo = 200; // مثال
 
     const ultrasound = document.getElementById("ultrasound");
     const manual = document.getElementById("manual");
@@ -147,18 +146,10 @@
 
           document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
-          if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
-            document.getElementById("ultrasound").classList.add("active");
-          }
-          if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
-            document.getElementById("manual").classList.add("active");
-          }
-          if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
-            document.getElementById("confirm120").classList.add("active");
-          }
-          if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
-            document.getElementById("dryoff").classList.add("active");
-          }
+          
+          
+          
+          
         });
     });
     if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
