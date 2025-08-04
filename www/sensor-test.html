@@ -1,1 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>اختبار الحساسات - Murabbik</title>
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #fff9db;
+      padding: 30px;
+      max-width: 600px;
+      margin: auto;
+    }
+    h2 {
+      text-align: center;
+      color: #2e7d32;
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin-top: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #2e7d32;
+      color: white;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #256b2f;
+    }
+  </style>
+</head>
+<body>
+  <h2>📡 إرسال قراءة حساس يدويًا</h2>
+
+  <form id="sensorForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
+
+    <label for="sensorType">نوع الحساس</label>
+    <select id="sensorType" name="sensorType" required>
+      <option value="">اختر النوع</option>
+      <option value="temperature">درجة الحرارة</option>
+      <option value="milk">إنتاج اللبن</option>
+      <option value="rumination">اجترار</option>
+      <option value="motion">الحركة</option>
+    </select>
+
+    <label for="value">القيمة</label>
+    <input type="number" id="value" name="value" step="any" required>
+
+    <label for="unit">الوحدة</label>
+    <input type="text" id="unit" name="unit" placeholder="°C / L / دقيقة ...">
+
+    <button type="submit">📤 إرسال القراءة</button>
+  </form>
+
+  <script>
+    document.getElementById("sensorForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        animalId: document.getElementById("animalId").value,
+        sensorType: document.getElementById("sensorType").value,
+        value: parseFloat(document.getElementById("value").value),
+        unit: document.getElementById("unit").value || "",
+        timestamp: new Date().toISOString()
+      };
+
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/sensors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم إرسال القراءة بنجاح");
+        this.reset();
+      } else {
+        const msg = await res.text();
+        alert("❌ فشل في الإرسال:\n" + msg);
+      }
+    });
+  </script>
+</body>
+</html>
 
