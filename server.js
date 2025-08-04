@@ -83,6 +83,47 @@ app.post('/api/dailymilk', (req, res) => {
   });
 });
 
+// تسجيل التهاب الضرع
+app.post('/api/mastitis', (req, res) => {
+  const mastitisPath = path.join(dataDir, 'mastitis.json');
+  const newEntry = req.body;
+
+  fs.readFile(mastitisPath, 'utf8', (err, data) => {
+    let entries = [];
+    if (!err && data) entries = JSON.parse(data);
+    entries.push(newEntry);
+
+    fs.writeFile(mastitisPath, JSON.stringify(entries, null, 2), err => {
+      if (err) {
+        console.error('خطأ في الحفظ:', err);
+        res.status(500).send('فشل في حفظ البيانات');
+      } else {
+        res.status(200).send('تم حفظ التهاب الضرع بنجاح');
+      }
+    });
+  });
+});
+
+// تسجيل العرج
+app.post('/api/lameness', (req, res) => {
+  const lamenessPath = path.join(dataDir, 'lameness.json');
+  const newEntry = req.body;
+
+  fs.readFile(lamenessPath, 'utf8', (err, data) => {
+    let entries = [];
+    if (!err && data) entries = JSON.parse(data);
+    entries.push(newEntry);
+
+    fs.writeFile(lamenessPath, JSON.stringify(entries, null, 2), err => {
+      if (err) {
+        console.error('خطأ في الحفظ:', err);
+        res.status(500).send('فشل في حفظ البيانات');
+      } else {
+        res.status(200).send('تم حفظ حالة العرج بنجاح');
+      }
+    });
+  });
+});
 
 app.post("/api/dryoffs", (req, res) => {
   try {
