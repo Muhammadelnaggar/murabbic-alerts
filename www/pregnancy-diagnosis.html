@@ -24,6 +24,10 @@
       padding: 15px;
       margin-bottom: 25px;
     }
+    fieldset.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
     legend {
       font-weight: bold;
       font-size: 18px;
@@ -75,7 +79,7 @@
     <label for="diagnosisDate">تاريخ التشخيص</label>
     <input type="date" id="diagnosisDate" name="diagnosisDate" required>
 
-    <fieldset>
+    <fieldset id="ultrasound">
       <legend>تشخيص بالسونار (بعد 30 يوم من آخر تلقيح)</legend>
       <div class="radio-group">
         <label><input type="radio" name="result" value="عشار"> عشار</label>
@@ -83,7 +87,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="manual">
       <legend>تشخيص يدوي (بعد 45 يوم من آخر تلقيح)</legend>
       <div class="radio-group">
         <label><input type="radio" name="result" value="عشار"> عشار</label>
@@ -91,7 +95,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="confirm120">
       <legend>تأكيد الحمل عند 120 يوم</legend>
       <div class="radio-group">
         <label><input type="radio" name="result" value="عشار"> عشار</label>
@@ -99,7 +103,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="dryoff">
       <legend>تأكيد الحمل للتجفيف عند 200 يوم</legend>
       <div class="radio-group">
         <label><input type="radio" name="result" value="عشار"> عشار</label>
@@ -116,77 +120,25 @@
   <script>
     document.getElementById("diagnosisDate").valueAsDate = new Date();
 
-    document.getElementById("diagnosisForm").addEventListener("submit", function(e) {
-      e.preventDefault();
+    // تحديد النوع النشط فقط والباقي يظهر غير نشط
+    const reproductiveStatus = "عشار"; // مثال
+    const lastInseminationDaysAgo = 200; // مثال
 
-      const selectedResult = document.querySelector('input[name="result"]:checked');
-      if (!selectedResult) {
-        alert("❌ يرجى اختيار نتيجة التشخيص");
-        return;
-      }
+    const ultrasound = document.getElementById("ultrasound");
+    const manual = document.getElementById("manual");
+    const confirm120 = document.getElementById("confirm120");
+    const dryoff = document.getElementById("dryoff");
 
-      const data = {
-        animalId: document.getElementById("animalId").value,
-        diagnosisDate: document.getElementById("diagnosisDate").value,
-        result: selectedResult.value,
-        vet: document.getElementById("vet").value
-      };
-
-      fetch("https://murabbic-alerts.onrender.com/api/pregnancy-diagnosis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(res => res.json())
-      .then(response => {
-        if (response.success) {
-          // تحديث بيانات الحيوان في animal-list و cow-card (مثلاً عبر التخزين المحلي)
-          let animals = JSON.parse(localStorage.getItem("animals")) || [];
-          const index = animals.findIndex(a => a.animalId === data.animalId);
-          if (index !== -1) {
-            animals[index].pregnancyDiagnosis = {
-              date: data.diagnosisDate,
-              result: data.result
-            };
-            localStorage.setItem("animals", JSON.stringify(animals));
-          }
-
-          alert("✅ تم تسجيل التشخيص بنجاح");
-          if (confirm("هل تريد تسجيل حدث آخر؟")) {
-            window.location.href = "add-event.html";
-          } else {
-            if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-              window.location.href = "add-animal.html";
-            } else {
-              window.location.href = "dashboard.html";
-            }
-          }
-        } else {
-          alert("❌ لم يتم التسجيل بنجاح");
-        }
-      })
-      .then(res => {
-        if (res.ok) {
-          alert("✅ تم تسجيل التشخيص بنجاح");
-          if (confirm("هل تريد تسجيل حدث آخر؟")) {
-            window.location.href = "add-event.html";
-          } else {
-            if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-              window.location.href = "add-animal.html";
-            } else {
-              window.location.href = "dashboard.html";
-            }
-          }
-        } else {
-          alert("❌ حدث خطأ أثناء التسجيل");
-        }
-      })
-      .catch(error => {
-        console.error("Error:", error);
-        alert("❌ تعذر الاتصال بالخادم");
-      });
-    });
-  </script>
-</body>
-</html>
-
+    // جميع الأقسام نشطة، والذكاء الصناعي يبرز القسم المناسب تلقائيًا
+    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
+      ultrasound.classList.add("active");
+    }
+    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 45) {
+      manual.classList.add("active");
+    }
+    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 120) {
+      confirm120.classList.add("active");
+    }
+    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
+      dryoff.classList.add("active");
+    }
