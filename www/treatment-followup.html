@@ -112,38 +112,64 @@
     <button type="submit">📤 تسجيل</button>
   </form>
 
-  <script>
-    // تعبئة رقم الحيوان والتاريخ تلقائيًا
-    document.getElementById("animalId").value = localStorage.getItem("currentAnimalId") || "غير محدد";
-    document.getElementById("treatmentDate").valueAsDate = new Date();
+ <script>
+  // تعبئة رقم الحيوان والتاريخ تلقائيًا
+  const animalId = localStorage.getItem("currentAnimalId") || "غير محدد";
+  const today = new Date();
+  const treatmentDate = today.toISOString().split("T")[0];
 
-    document.getElementById("treatmentForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
+  document.getElementById("animalId").value = animalId;
+  document.getElementById("treatmentDate").value = treatmentDate;
 
-      const data = {
-        animalId: document.getElementById("animalId").value,
-        treatmentDate: document.getElementById("treatmentDate").value,
-        treatment: document.getElementById("treatment").value,
-        vetName: document.getElementById("vetName").value,
-        followUpResult: document.querySelector('input[name="followUp"]:checked').value,
-        timestamp: new Date().toISOString()
-      };
+  // تعطيل أزرار المتابعة لو لم يمر 3 أيام
+  const radioButtons = document.querySelectorAll('input[name="followUp"]');
+  const storedDate = localStorage.getItem("treatmentStartDate");
 
-      const res = await fetch("https://murabbic-alerts.onrender.com/api/treatments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+  if (storedDate) {
+    const diffDays = Math.floor((today - new Date(storedDate)) / (1000 * 60 * 60 * 24));
+    if (diffDays < 3) {
+      radioButtons.forEach(rb => rb.disabled = true);
+    }
+  } else {
+    // حفظ تاريخ العلاج في localStorage لأول مرة
+    localStorage.setItem("treatmentStartDate", treatmentDate);
+    radioButtons.forEach(rb => rb.disabled = true); // خامل في أول يوم
+  }
 
-      if (res.ok) {
-        alert("✅ تم تسجيل العلاج والمتابعة بنجاح");
-        window.location.href = "dashboard.html";
-      } else {
-        const msg = await res.text();
-        alert("❌ حدث خطأ أثناء التسجيل:\n" + msg);
-      }
+  // معالجة النموذج
+  document.getElementById("treatmentForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const selected = document.querySelector('input[name="followUp"]:checked');
+    if (!selected) {
+      alert("❗ يرجى اختيار نتيجة المتابعة بعد مرور 3 أيام على الأقل.");
+      return;
+    }
+
+    const data = {
+      animalId: animalId,
+      treatmentDate: treatmentDate,
+      treatment: document.getElementById("treatment").value,
+      vetName: document.getElementById("vetName").value,
+      followUpResult: selected.value,
+      timestamp: new Date().toISOString()
+    };
+
+    const res = await fetch("https://murabbic-alerts.onrender.com/api/treatments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
     });
-  </script>
+
+    if (res.ok) {
+      alert("✅ تم تسجيل العلاج والمتابعة بنجاح");
+      window.location.href = "dashboard.html";
+    } else {
+      const msg = await res.text();
+      alert("❌ حدث خطأ أثناء التسجيل:\n" + msg);
+    }
+  });
+</script>
 
 </body>
 </html>
