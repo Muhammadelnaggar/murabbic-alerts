@@ -16,7 +16,7 @@
     h2 {
       text-align: center;
       color: #2c3e50;
-      font-size: 22px;
+      font-size: 24px;
       margin-bottom: 20px;
     }
 
@@ -28,22 +28,22 @@
 
     label {
       font-weight: bold;
-      font-size: 16px;
+      font-size: 18px;
     }
 
     input, button {
-      padding: 10px;
-      border-radius: 6px;
+      padding: 14px;
+      border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 16px;
+      font-size: 18px;
       width: 100%;
       box-sizing: border-box;
     }
 
     .disease-buttons {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
     }
 
     .disease-buttons button {
@@ -51,7 +51,36 @@
       color: black;
       border: none;
       cursor: pointer;
+      font-size: 18px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
+
+    .disease-buttons button::before {
+      font-size: 20px;
+    }
+
+    .disease-buttons button[data-name="التهاب ضرع"]::before { content: "\1F9EC"; }     /* 🧬 */
+    .disease-buttons button[data-name="التهاب رئوي"]::before { content: "\1F4A8"; }     /* 💨 */
+    .disease-buttons button[data-name="عرج"]::before { content: "\1F9BF"; }            /* 🦿 */
+    .disease-buttons button[data-name="اسهال"]::before { content: "\1F4A9"; }           /* 💩 */
+    .disease-buttons button[data-name="التهاب سرة"]::before { content: "\1FAC0"; }      /* 🫀 */
+    .disease-buttons button[data-name="انقلاب منفحة"]::before { content: "\1F300"; }   /* 🌀 */
+    .disease-buttons button[data-name="ابتلاع جسم معدني"]::before { content: "\1F52A"; }/* 🔪 */
+    .disease-buttons button[data-name="التهاب جلد عقدي"]::before { content: "\1F9B7"; }/* 🦷 */
+    .disease-buttons button[data-name="حمي قلاعية"]::before { content: "\1F975"; }     /* 🥵 */
+    .disease-buttons button[data-name="حمل الثلاث ايام"]::before { content: "\1F432"; }/* 🐲 */
+    .disease-buttons button[data-name="تسمم دموي"]::before { content: "\1FA78"; }      /* 🩸 */
+    .disease-buttons button[data-name="لكمة كرش"]::before { content: "\1F4AA"; }        /* 💪 */
+    .disease-buttons button[data-name="اجهاد حراري"]::before { content: "\1F975"; }    /* 🥵 */
+    .disease-buttons button[data-name="التهاب العين"]::before { content: "\1F441"; }    /* 👁 */
+    .disease-buttons button[data-name="طفيليات دم"]::before { content: "\1F52C"; }      /* 🔬 */
+    .disease-buttons button[data-name="حمي اللبن"]::before { content: "\1F95B"; }       /* 🥛 */
+    .disease-buttons button[data-name="نقص ماغنسيوم"]::before { content: "\2695"; }    /* ⚕ */
+    .disease-buttons button[data-name="نقص فوسفور"]::before { content: "\1F321"; }      /* 🌡 */
 
     .disease-buttons button.selected {
       border: 2px solid #2c3e50;
@@ -64,6 +93,7 @@
       color: white;
       border: none;
       cursor: pointer;
+      font-size: 18px;
     }
 
     button[type="submit"]:hover {
@@ -104,7 +134,6 @@
       <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
     </div>
 
-    <!-- حقل مخفي لحفظ اسم المرض -->
     <input type="hidden" id="diseaseName" name="diseaseName" required>
   </form>
 
