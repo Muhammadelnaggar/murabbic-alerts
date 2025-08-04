@@ -40,23 +40,54 @@ app.post("/api/vaccinations", (req, res) => {
 // تسجيل تحضير الولادة
 app.post('/api/sensors', (req, res) => {
   const filePath = path.join(dataDir, 'sensor-readings.json');
+  const animalsPath = path.join(dataDir, 'animals.json');
   const newEntry = req.body;
 
-  fs.readFile(filePath, 'utf8', (err, data) => {
-    let readings = [];
-    if (!err && data) readings = JSON.parse(data);
-    readings.push(newEntry);
+  // التحقق من وجود الحيوان أولًا
+  fs.readFile(animalsPath, 'utf8', (err, animalData) => {
+    if (err) {
+      console.error('❌ خطأ في قراءة ملف الحيوانات:', err);
+      return res.status(500).send('خطأ في قراءة قاعدة بيانات الحيوانات');
+    }
 
-    fs.writeFile(filePath, JSON.stringify(readings, null, 2), err => {
-      if (err) {
-        console.error('خطأ في حفظ قراءة الحساس:', err);
-        res.status(500).send('فشل في الحفظ');
-      } else {
-        res.status(200).send('✅ تم تسجيل قراءة الحساس');
+    let animals = [];
+    try {
+      animals = JSON.parse(animalData);
+    } catch (e) {
+      return res.status(500).send('❌ خطأ في تحليل ملف الحيوانات');
+    }
+
+    const found = animals.find(animal => animal.animalId == newEntry.animalId);
+
+    if (!found) {
+      return res.status(404).send(`❌ الحيوان برقم ${newEntry.animalId} غير موجود في النظام`);
+    }
+
+    // حفظ قراءة الحساس بعد التحقق
+    fs.readFile(filePath, 'utf8', (err, data) => {
+      let readings = [];
+      if (!err && data) {
+        try {
+          readings = JSON.parse(data);
+        } catch (e) {
+          readings = [];
+        }
       }
+
+      readings.push(newEntry);
+
+      fs.writeFile(filePath, JSON.stringify(readings, null, 2), err => {
+        if (err) {
+          console.error('خطأ في حفظ قراءة الحساس:', err);
+          res.status(500).send('فشل في الحفظ');
+        } else {
+          res.status(200).send('✅ تم ربط و تسجيل قراءة الحساس بنجاح');
+        }
+      });
     });
   });
 });
+
 
 app.post('/api/closeups', (req, res) => {
   const filePath = path.join(__dirname, 'data', 'closeups.json');
