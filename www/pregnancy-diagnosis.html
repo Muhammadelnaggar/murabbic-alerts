@@ -119,39 +119,19 @@
   </form>
 
   <script>
-    document.getElementById("diagnosisDate").valueAsDate = new Date();
+  document.getElementById("diagnosisDate").valueAsDate = new Date();
 
-    // تحديد النوع النشط فقط بناءً على رقم الحيوان
-    const animalIdInput = document.getElementById("animalId");
-    const diagnosisDateInput = document.getElementById("diagnosisDate"); // مثال
+  const animalIdInput = document.getElementById("animalId");
+  const diagnosisDateInput = document.getElementById("diagnosisDate");
 
-    const ultrasound = document.getElementById("ultrasound");
-    const manual = document.getElementById("manual");
-    const confirm120 = document.getElementById("confirm120");
-    const dryoff = document.getElementById("dryoff");
+  const ultrasound = document.getElementById("ultrasound");
+  const manual = document.getElementById("manual");
+  const confirm120 = document.getElementById("confirm120");
+  const dryoff = document.getElementById("dryoff");
 
-    // تحميل البيانات من animal.json بعد إدخال رقم الحيوان
-    animalIdInput.addEventListener("change", () => {
-      fetch("/data/animal.json")
-        .then(res => res.json())
-        .then(data => {
-          const animal = data.find(a => a.animalId === animalIdInput.value);
-          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+  function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
+    document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
-          const reproductiveStatus = animal.reproductiveStatus;
-          const lastDate = new Date(animal.lastInseminationDate);
-          const today = new Date(diagnosisDateInput.value);
-          const diffTime = Math.abs(today - lastDate);
-          const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-          document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
-
-          
-          
-          
-          
-        });
-    });
     if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo === 30) {
       ultrasound.classList.add("active");
     }
@@ -164,3 +144,24 @@
     if (reproductiveStatus === "عشار" && lastInseminationDaysAgo === 200) {
       dryoff.classList.add("active");
     }
+  }
+
+  animalIdInput.addEventListener("change", () => {
+    fetch("/data/animal.json")
+      .then(res => res.json())
+      .then(data => {
+        const animal = data.find(a => a.animalId === animalIdInput.value);
+        if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+
+        const reproductiveStatus = animal.reproductiveStatus;
+        const lastDate = new Date(animal.lastInseminationDate);
+        const today = new Date(diagnosisDateInput.value);
+        const diffTime = today - lastDate;
+        const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        activateSection(reproductiveStatus, lastInseminationDaysAgo);
+      });
+  });
+</script>
+</body>
+</html>
