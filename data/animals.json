@@ -1,23 +1,12 @@
 [
   {
-    "number": "001",
-    "type": "جاموسة",
-    "breed": "مصري",
-    "birthDate": "2023-01-11",
-    "lastCalvingDate": "2025-01-11",
-    "productionStatus": "حلاب",
+    "animalId": "001",
     "reproductiveStatus": "ملقحة",
-    "lastInseminationDate": "2025-07-05"
+    "lastInseminationDate": "2025-06-25"
+  }
+]
 
-    "dailyMilk": 19,
-    "milkCurve": [
-      25.6,
-      23.4,
-      23.3,
-      26.0,
-      22.2
-    ],
-    "healthNotes": "تم علاج التهاب الضرع بتاريخ 2024-01-11"
+ 
   },
   {
     "number": "002",
