@@ -1,1 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>تسجيل التغذية</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+      color: #2e7d32;
+    }
+    h1 {
+      text-align: center;
+      font-size: 26px;
+      color: #1b5e20;
+      margin-bottom: 20px;
+    }
+    form {
+      background-color: #f1f8e9;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 700px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      font-weight: bold;
+      margin-top: 15px;
+      display: block;
+    }
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px;
+      font-size: 18px;
+      margin-top: 5px;
+      border: 1px solid #a5d6a7;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      margin-top: 15px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #c8e6c9;
+      font-size: 16px;
+    }
+    th {
+      background-color: #dcedc8;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: #43a047;
+      color: white;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #388e3c;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌿 تسجيل التغذية اليومية</h1>
+  <form id="nutrition-form">
+    <label for="animalId">رقم الحيوان:</label>
+    <input type="text" id="animalId" required readonly />
+
+    <label for="nutritionDate">تاريخ التغذية:</label>
+    <input type="date" id="nutritionDate" required />
+
+    <h3>المالئ:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>المالئ</th>
+          <th>الكمية (كجم/يوم)</th>
+        </tr>
+      </thead>
+      <tbody id="roughage-table">
+        <tr>
+          <td>
+            <select id="roughageType">
+              <option>برسيم</option>
+              <option>دريس حجازي</option>
+              <option>دريس بلدي</option>
+              <option>سيلاج الذرة</option>
+              <option>سيلاج السورجوم</option>
+              <option>برسيم حجازي</option>
+              <option>تبن قمح</option>
+              <option>قش أرز</option>
+              <option>راي</option>
+            </select>
+          </td>
+          <td><input type="number" id="roughageAmount" min="0" step="0.1" required /></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>المركزات:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>الخامة</th>
+          <th>الكمية (كجم/يوم)</th>
+        </tr>
+      </thead>
+      <tbody id="concentrates-table">
+        <tr>
+          <td>
+            <select class="concentrate-type">
+              <option>ذرة</option><option>صويا</option><option>مستخلص قطن</option><option>كسب قطن</option>
+              <option>كسب كتان</option><option>رده</option><option>نخالة</option><option>جنين الذرة</option>
+              <option>جلوتوفيد</option><option>جلوتين فيد</option><option>شعير</option><option>قمح</option><option>كسر أرز</option>
+            </select>
+          </td>
+          <td><input type="number" class="concentrate-amount" min="0" step="0.1" /></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>الإضافات:</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>الإضافة</th>
+          <th>الكمية (كجم/يوم)</th>
+        </tr>
+      </thead>
+      <tbody id="additives-table">
+        <tr>
+          <td>
+            <select class="additive-type">
+              <option>ملح طعام</option><option>بيكربونات الصوديوم</option><option>أكسيد الماغنسيوم</option><option>حجر جيري</option>
+              <option>دهون محمية</option><option>مولاس</option><option>فيناس</option><option>كلوريد الماغنسيوم</option>
+              <option>سلفات الماغنسيوم</option><option>كلوريد الأمونيوم</option>
+            </select>
+          </td>
+          <td><input type="number" class="additive-amount" min="0" step="0.01" /></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <label for="totalWeight">⚖️ إجمالي وزن العليقة (كجم):</label>
+    <input type="number" id="totalWeight" readonly />
+
+    <button type="submit">💾 تسجيل التغذية</button>
+  </form>
+</body>
+</html>
 
