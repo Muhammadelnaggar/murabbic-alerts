@@ -133,16 +133,27 @@
         localStorage.setItem("diseaseDate", diseaseDate);
         localStorage.setItem("lastDiseaseName", disease);
 
-        if (disease === "التهاب ضرع") {
-          window.location.href = `mastitis.html?animalId=${animalId}&date=${diseaseDate}`;
-        } else if (disease === "عرج") {
-          window.location.href = `lameness.html?animalId=${animalId}&date=${diseaseDate}`;
-        } else {
-          window.location.href = `treatment-followup.html?animalId=${animalId}&date=${diseaseDate}`;
-        }
-      });
+      if (disease !== "التهاب ضرع" && disease !== "عرج") {
+  button.addEventListener('click', () => {
+    const animalId = document.getElementById("animalId").value.trim();
+    const date = document.getElementById("diseaseDate").value;
+
+    if (!animalId || !date) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+      return;
+    }
+
+    hiddenInput.value = disease;
+    localStorage.setItem("lastDiseaseName", disease);
+
+    alert('✅ تم اختيار المرض: ' + disease);
+    window.location.href = `treatment-followup.html?animalId=${animalId}&date=${date}`;
+  });
+}
+
     });
   </script>
 
 </body>
 </html>
+
