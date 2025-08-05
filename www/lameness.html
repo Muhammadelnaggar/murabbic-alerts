@@ -132,6 +132,21 @@
     }
   });
 </script>
+<script>
+  window.addEventListener("load", () => {
+    const params = new URLSearchParams(window.location.search);
+    const animalId = params.get("animalId");
+    const date = params.get("date");
+
+    if (animalId) {
+      document.getElementById("animalId").value = animalId;
+    }
+
+    if (date) {
+      document.getElementById("lamenessDate").value = date;
+    }
+  });
+</script>
 
 </body>
 </html>
