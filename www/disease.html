@@ -12,25 +12,21 @@
       padding: 20px;
       margin: 0;
     }
-
     h2 {
       text-align: center;
       color: #2c3e50;
       font-size: 24px;
       margin-bottom: 20px;
     }
-
     form {
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
-
     label {
       font-weight: bold;
       font-size: 18px;
     }
-
     input, button {
       padding: 14px;
       border-radius: 8px;
@@ -39,13 +35,11 @@
       width: 100%;
       box-sizing: border-box;
     }
-
     .disease-buttons {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 12px;
     }
-
     .disease-buttons button {
       background-color: #8bc34a;
       color: black;
@@ -58,36 +52,32 @@
       justify-content: center;
       gap: 8px;
     }
-
     .disease-buttons button::before {
       font-size: 20px;
     }
-
-    .disease-buttons button[data-name="التهاب ضرع"]::before { content: "\1F9EC"; }     /* 🧬 */
-    .disease-buttons button[data-name="التهاب رئوي"]::before { content: "\1F4A8"; }     /* 💨 */
-    .disease-buttons button[data-name="عرج"]::before { content: "\1F9BF"; }            /* 🦿 */
-    .disease-buttons button[data-name="اسهال"]::before { content: "\1F4A9"; }           /* 💩 */
-    .disease-buttons button[data-name="التهاب سرة"]::before { content: "\1FAC0"; }      /* 🫀 */
-    .disease-buttons button[data-name="انقلاب منفحة"]::before { content: "\1F300"; }   /* 🌀 */
-    .disease-buttons button[data-name="ابتلاع جسم معدني"]::before { content: "\1F52A"; }/* 🔪 */
-    .disease-buttons button[data-name="التهاب جلد عقدي"]::before { content: "\1F9B7"; }/* 🦷 */
-    .disease-buttons button[data-name="حمي قلاعية"]::before { content: "\1F975"; }     /* 🥵 */
-    .disease-buttons button[data-name="حمل الثلاث ايام"]::before { content: "\1F432"; }/* 🐲 */
-    .disease-buttons button[data-name="تسمم دموي"]::before { content: "\1FA78"; }      /* 🩸 */
-    .disease-buttons button[data-name="لكمة كرش"]::before { content: "\1F4AA"; }        /* 💪 */
-    .disease-buttons button[data-name="اجهاد حراري"]::before { content: "\1F975"; }    /* 🥵 */
-    .disease-buttons button[data-name="التهاب العين"]::before { content: "\1F441"; }    /* 👁 */
-    .disease-buttons button[data-name="طفيليات دم"]::before { content: "\1F52C"; }      /* 🔬 */
-    .disease-buttons button[data-name="حمي اللبن"]::before { content: "\1F95B"; }       /* 🥛 */
-    .disease-buttons button[data-name="نقص ماغنسيوم"]::before { content: "\2695"; }    /* ⚕ */
-    .disease-buttons button[data-name="نقص فوسفور"]::before { content: "\1F321"; }      /* 🌡 */
-
+    .disease-buttons button[data-name="التهاب ضرع"]::before { content: "\1F9EC"; }
+    .disease-buttons button[data-name="التهاب رئوي"]::before { content: "\1F4A8"; }
+    .disease-buttons button[data-name="عرج"]::before { content: "\1F9BF"; }
+    .disease-buttons button[data-name="اسهال"]::before { content: "\1F4A9"; }
+    .disease-buttons button[data-name="التهاب سرة"]::before { content: "\1FAC0"; }
+    .disease-buttons button[data-name="انقلاب منفحة"]::before { content: "\1F300"; }
+    .disease-buttons button[data-name="ابتلاع جسم معدني"]::before { content: "\1F52A"; }
+    .disease-buttons button[data-name="التهاب جلد عقدي"]::before { content: "\1F9B7"; }
+    .disease-buttons button[data-name="حمي قلاعية"]::before { content: "\1F975"; }
+    .disease-buttons button[data-name="حمل الثلاث ايام"]::before { content: "\1F432"; }
+    .disease-buttons button[data-name="تسمم دموي"]::before { content: "\1FA78"; }
+    .disease-buttons button[data-name="لكمة كرش"]::before { content: "\1F4AA"; }
+    .disease-buttons button[data-name="اجهاد حراري"]::before { content: "\1F975"; }
+    .disease-buttons button[data-name="التهاب العين"]::before { content: "\1F441"; }
+    .disease-buttons button[data-name="طفيليات دم"]::before { content: "\1F52C"; }
+    .disease-buttons button[data-name="حمي اللبن"]::before { content: "\1F95B"; }
+    .disease-buttons button[data-name="نقص ماغنسيوم"]::before { content: "\2695"; }
+    .disease-buttons button[data-name="نقص فوسفور"]::before { content: "\1F321"; }
     .disease-buttons button.selected {
       border: 2px solid #2c3e50;
       background-color: #558b2f;
       color: white;
     }
-
     button[type="submit"] {
       background-color: #dc3545;
       color: white;
@@ -95,7 +85,6 @@
       cursor: pointer;
       font-size: 18px;
     }
-
     button[type="submit"]:hover {
       background-color: #c82333;
     }
@@ -103,41 +92,41 @@
 </head>
 <body>
 
-  <h2>🩺 تسجيل الأمراض</h2>
+<h2>🩺 تسجيل الأمراض</h2>
 
-  <form id="diseaseForm">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+<form id="diseaseForm">
+  <label for="animalId">رقم الحيوان</label>
+  <input type="text" id="animalId" name="animalId" required>
 
-    <label for="diseaseDate">تاريخ التشخيص</label>
-    <input type="date" id="diseaseDate" name="diseaseDate" required>
+  <label for="diseaseDate">تاريخ التشخيص</label>
+  <input type="date" id="diseaseDate" name="diseaseDate" required>
 
-    <label>اختر المرض</label>
-    <div class="disease-buttons" id="diseaseButtons">
-      <button type="button" data-name="التهاب ضرع" onclick="location.href='mastitis.html'">التهاب ضرع</button>
-      <button type="button" data-name="التهاب رئوي">التهاب رئوي</button>
-      <button type="button" data-name="عرج" onclick="location.href='lameness.html'">عرج</button>
-      <button type="button" data-name="اسهال">اسهال</button>
-      <button type="button" data-name="التهاب سرة">التهاب سرة</button>
-      <button type="button" data-name="انقلاب منفحة">انقلاب منفحة</button>
-      <button type="button" data-name="ابتلاع جسم معدني">ابتلاع جسم معدني</button>
-      <button type="button" data-name="التهاب جلد عقدي">التهاب جلد عقدي</button>
-      <button type="button" data-name="حمي قلاعية">حمي قلاعية</button>
-      <button type="button" data-name="حمل الثلاث ايام">حمل الثلاث ايام</button>
-      <button type="button" data-name="تسمم دموي">تسمم دموي</button>
-      <button type="button" data-name="لكمة كرش">لكمة كرش</button>
-      <button type="button" data-name="اجهاد حراري">اجهاد حراري</button>
-      <button type="button" data-name="التهاب العين">التهاب العين</button>
-      <button type="button" data-name="طفيليات دم">طفيليات دم</button>
-      <button type="button" data-name="حمي اللبن">حمي اللبن</button>
-      <button type="button" data-name="نقص ماغنسيوم">نقص ماغنسيوم</button>
-      <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
-    </div>
+  <label>اختر المرض</label>
+  <div class="disease-buttons" id="diseaseButtons">
+    <button type="button" data-name="التهاب ضرع" onclick="goToMastitis()">التهاب ضرع</button>
+    <button type="button" data-name="التهاب رئوي">التهاب رئوي</button>
+    <button type="button" data-name="عرج" onclick="goToLameness()">عرج</button>
+    <button type="button" data-name="اسهال">اسهال</button>
+    <button type="button" data-name="التهاب سرة">التهاب سرة</button>
+    <button type="button" data-name="انقلاب منفحة">انقلاب منفحة</button>
+    <button type="button" data-name="ابتلاع جسم معدني">ابتلاع جسم معدني</button>
+    <button type="button" data-name="التهاب جلد عقدي">التهاب جلد عقدي</button>
+    <button type="button" data-name="حمي قلاعية">حمي قلاعية</button>
+    <button type="button" data-name="حمل الثلاث ايام">حمل الثلاث ايام</button>
+    <button type="button" data-name="تسمم دموي">تسمم دموي</button>
+    <button type="button" data-name="لكمة كرش">لكمة كرش</button>
+    <button type="button" data-name="اجهاد حراري">اجهاد حراري</button>
+    <button type="button" data-name="التهاب العين">التهاب العين</button>
+    <button type="button" data-name="طفيليات دم">طفيليات دم</button>
+    <button type="button" data-name="حمي اللبن">حمي اللبن</button>
+    <button type="button" data-name="نقص ماغنسيوم">نقص ماغنسيوم</button>
+    <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
+  </div>
 
-    <input type="hidden" id="diseaseName" name="diseaseName" required>
-  </form>
+  <input type="hidden" id="diseaseName" name="diseaseName" required>
+</form>
 
- <script>
+<script>
   document.getElementById("diseaseDate").valueAsDate = new Date();
 
   const buttons = document.querySelectorAll('#diseaseButtons button');
@@ -146,24 +135,31 @@
   buttons.forEach(button => {
     const disease = button.dataset.name;
 
-    // إذا لم يكن الزر خاصًا بـ "التهاب ضرع" أو "عرج"، اربطه بالعلاج
     if (disease !== "التهاب ضرع" && disease !== "عرج") {
       button.addEventListener('click', () => {
-        // تعيين القيمة وتأكيد الاختيار
+        const animalId = document.getElementById("animalId").value.trim();
+        const date = document.getElementById("diseaseDate").value;
+
+        if (!animalId || !date) {
+          alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+          return;
+        }
+
         hiddenInput.value = disease;
+
         localStorage.setItem("lastDiseaseName", disease);
+        localStorage.setItem("animalId", animalId);
+        localStorage.setItem("diseaseDate", date);
 
         alert('✅ تم اختيار المرض: ' + disease);
-        // الانتقال إلى صفحة العلاج والمتابعة
         window.location.href = 'treatment-followup.html';
       });
     }
   });
-</script>
-<script>
+
   function getInputs() {
     const animalId = document.getElementById("animalId").value.trim();
-    const date = document.getElementById("diagnosisDate").value;
+    const date = document.getElementById("diseaseDate").value;
     return { animalId, date };
   }
 
@@ -173,6 +169,8 @@
       alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
       return;
     }
+    localStorage.setItem("animalId", animalId);
+    localStorage.setItem("diseaseDate", date);
     window.location.href = `mastitis.html?animalId=${animalId}&date=${date}`;
   }
 
@@ -182,13 +180,11 @@
       alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
       return;
     }
+    localStorage.setItem("animalId", animalId);
+    localStorage.setItem("diseaseDate", date);
     window.location.href = `lameness.html?animalId=${animalId}&date=${date}`;
   }
 </script>
 
-
 </body>
 </html>
-
-
-
