@@ -19,6 +19,46 @@ const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
 }
+app.post('/api/calvings', (req, res) => {
+  const calving = req.body;
+
+  if (!calving.animalId || !calving.calvingDate) {
+    return res.status(400).json({ error: '❌ بيانات الولادة غير مكتملة' });
+  }
+
+  // حفظ الحدث في events.json
+  const eventsPath = path.join(dataDir, 'events.json');
+  let events = [];
+
+  if (fs.existsSync(eventsPath)) {
+    events = JSON.parse(fs.readFileSync(eventsPath, 'utf8') || '[]');
+  }
+
+  calving.type = "ولادة";
+  calving.id = events.length + 1;
+  events.push(calving);
+  fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
+
+  // تحديث ملف animals.json
+  const animalsPath = path.join(dataDir, 'animals.json');
+  let animals = [];
+
+  if (fs.existsSync(animalsPath)) {
+    animals = JSON.parse(fs.readFileSync(animalsPath, 'utf8') || '[]');
+  }
+
+  const animal = animals.find(a => a.number === calving.animalId);
+  if (animal) {
+    animal.lastCalvingDate = calving.calvingDate;
+    animal.reproductiveStatus = "حديث الولادة";
+    animal.dailyMilkProduction = 0;
+    delete animal.lastInseminationDate;
+  }
+
+  fs.writeFileSync(animalsPath, JSON.stringify(animals, null, 2));
+
+  res.status(200).json({ message: "✅ تم تسجيل حدث الولادة وتحديث بيانات الحيوان" });
+});
 
 // نقطة النهاية لتسجيل التحصينات
 app.post("/api/vaccinations", (req, res) => {
