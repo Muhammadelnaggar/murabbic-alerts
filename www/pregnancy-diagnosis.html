@@ -123,15 +123,16 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const data = {
-        animalId: animalIdInput.value.trim(),
-        diagnosisDate: diagnosisDateInput.value,
-        result: resultInput.value,
-        vet: vetInput.value.trim()
-      };
+     const data = {
+  animalId: animalIdInput.value.trim(),
+  diagnosisDate: diagnosisDateInput.value,
+  result: resultInput.value,
+  vet: vetInput.value.trim(),
+  type: "تشخيص حمل"
+};
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/pregnancy-diagnosis", {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
