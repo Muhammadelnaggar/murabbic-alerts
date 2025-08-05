@@ -122,13 +122,15 @@
     });
 
     function submitTreatment() {
-      const data = {
-        animalId: document.getElementById('animalId').value,
-        treatmentDate: document.getElementById('treatmentDate').value,
-        treatmentDescription: document.getElementById('treatmentDescription').value,
-        veterinarian: document.getElementById('veterinarian').value,
-        followup: document.querySelector('input[name="followup"]:checked')?.value || "غير مفعلة"
-      };
+     const data = {
+  animalId: document.getElementById('animalId').value,
+  date: document.getElementById('treatmentDate').value,
+  type: "علاج",
+  treatmentDescription: document.getElementById('treatmentDescription').value,
+  veterinarian: document.getElementById('veterinarian').value,
+  followup: document.querySelector('input[name="followup"]:checked')?.value || "غير مفعلة"
+};
+
 
       if (data.followup === "ساءت الحالة") {
         const nextFollowup = new Date();
@@ -137,10 +139,23 @@
         alert("❗ حالة الحيوان ساءت. سيتم تحديد متابعة أخرى بعد 3 أيام.");
       }
 
-      console.log("✅ تم تسجيل العلاج والمتابعة:", data);
-      alert("✅ تم حفظ العلاج والمتابعة بنجاح");
-      window.location.href = "dashboard.html";
-    }
+      try {
+  const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  if (res.ok) {
+    alert("✅ تم حفظ العلاج والمتابعة بنجاح");
+    window.location.href = "dashboard.html";
+  } else {
+    alert("حدث خطأ أثناء الحفظ. حاول مرة أخرى.");
+  }
+} catch (err) {
+  alert("فشل الاتصال بالخادم");
+}
+
   </script>
 </body>
 </html>
