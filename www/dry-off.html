@@ -107,15 +107,16 @@
   function submitDryOff(event) {
     event.preventDefault();
 
-    const data = {
-      animalId: document.getElementById("animal-id").value,
-      date: document.getElementById("date").value,
-      reason: document.querySelector('input[name="reason"]:checked')?.value,
-      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
-      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value
-    };
+   const data = {
+        animalId: document.getElementById("animal-id").value,
+        dryOffDate: document.getElementById("date").value,
+        reason: document.querySelector('input[name="reason"]:checked')?.value,
+        pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
+        usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
+        type: "تجفيف" // ✅ ضروري لتصنيف الحدث
+      };
 
-    fetch("https://murabbic-alerts.onrender.com/api/dryoffs", {
+    fetch("https://murabbic-alerts.onrender.com/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
@@ -150,3 +151,4 @@
 
 </body>
 </html>
+
