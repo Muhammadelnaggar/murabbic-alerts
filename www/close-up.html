@@ -75,14 +75,16 @@
     document.getElementById("closeup-form").addEventListener("submit", async function (e) {
       e.preventDefault();
 
-      const data = {
-        animalId: document.getElementById("animal-id").value,
-        ration: document.querySelector('input[name="ration"]:checked')?.value,
-        anionicSalts: document.querySelector('input[name="anionicSalts"]:checked')?.value,
-      };
+     const data = {
+  animalId: document.getElementById("animal-id").value,
+  ration: document.querySelector('input[name="ration"]:checked')?.value,
+  anionicSalts: document.querySelector('input[name="anionicSalts"]:checked')?.value,
+ type: "تحضير للولادة"
+};
+
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/closeups", {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
@@ -116,3 +118,4 @@
 
 </body>
 </html>
+
