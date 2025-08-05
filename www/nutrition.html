@@ -157,5 +157,71 @@
 
     <button type="submit">💾 تسجيل التغذية</button>
   </form>
+<script>
+  // تحميل رقم الحيوان من localStorage
+  document.getElementById("animalId").value = localStorage.getItem("lastAnimalId") || "";
+
+  // عند إرسال النموذج
+  document.getElementById("nutrition-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const animalId = document.getElementById("animalId").value;
+    const nutritionDate = document.getElementById("nutritionDate").value;
+    const roughageType = document.getElementById("roughageType").value;
+    const roughageAmount = parseFloat(document.getElementById("roughageAmount").value) || 0;
+
+    // قراءة المركزات
+    const concentrates = [];
+    document.querySelectorAll(".concentrate-type").forEach((select, index) => {
+      const amount = parseFloat(document.querySelectorAll(".concentrate-amount")[index].value);
+      if (!isNaN(amount) && amount > 0) {
+        concentrates.push({ ingredient: select.value, amount });
+      }
+    });
+
+    // قراءة الإضافات
+    const additives = [];
+    document.querySelectorAll(".additive-type").forEach((select, index) => {
+      const amount = parseFloat(document.querySelectorAll(".additive-amount")[index].value);
+      if (!isNaN(amount) && amount > 0) {
+        additives.push({ name: select.value, amount });
+      }
+    });
+
+    const totalWeight = roughageAmount +
+      concentrates.reduce((sum, c) => sum + c.amount, 0) +
+      additives.reduce((sum, a) => sum + a.amount, 0);
+
+    document.getElementById("totalWeight").value = totalWeight.toFixed(2);
+
+    const data = {
+      animalId,
+      nutritionDate,
+      roughage: { type: roughageType, amount: roughageAmount },
+      concentrates,
+      additives,
+      totalWeight,
+      type: "تغذية"
+    };
+
+    try {
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم تسجيل التغذية بنجاح");
+        window.location.href = "dashboard.html";
+      } else {
+        alert("❌ حدث خطأ أثناء الحفظ.");
+      }
+    } catch (err) {
+      console.error("❌ فشل الاتصال بالخادم:", err);
+      alert("فشل الاتصال بالخادم.");
+    }
+  });
+</script>
 </body>
 </html>
