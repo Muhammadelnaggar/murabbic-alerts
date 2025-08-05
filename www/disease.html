@@ -12,21 +12,25 @@
       padding: 20px;
       margin: 0;
     }
+
     h2 {
       text-align: center;
       color: #2c3e50;
       font-size: 24px;
       margin-bottom: 20px;
     }
+
     form {
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
+
     label {
       font-weight: bold;
       font-size: 18px;
     }
+
     input, button {
       padding: 14px;
       border-radius: 8px;
@@ -35,11 +39,13 @@
       width: 100%;
       box-sizing: border-box;
     }
+
     .disease-buttons {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 12px;
     }
+
     .disease-buttons button {
       background-color: #8bc34a;
       color: black;
@@ -52,9 +58,11 @@
       justify-content: center;
       gap: 8px;
     }
+
     .disease-buttons button::before {
       font-size: 20px;
     }
+
     .disease-buttons button[data-name="التهاب ضرع"]::before { content: "\1F9EC"; }
     .disease-buttons button[data-name="التهاب رئوي"]::before { content: "\1F4A8"; }
     .disease-buttons button[data-name="عرج"]::before { content: "\1F9BF"; }
@@ -73,11 +81,13 @@
     .disease-buttons button[data-name="حمي اللبن"]::before { content: "\1F95B"; }
     .disease-buttons button[data-name="نقص ماغنسيوم"]::before { content: "\2695"; }
     .disease-buttons button[data-name="نقص فوسفور"]::before { content: "\1F321"; }
+
     .disease-buttons button.selected {
       border: 2px solid #2c3e50;
       background-color: #558b2f;
       color: white;
     }
+
     button[type="submit"] {
       background-color: #dc3545;
       color: white;
@@ -85,6 +95,7 @@
       cursor: pointer;
       font-size: 18px;
     }
+
     button[type="submit"]:hover {
       background-color: #c82333;
     }
@@ -103,9 +114,9 @@
 
   <label>اختر المرض</label>
   <div class="disease-buttons" id="diseaseButtons">
-    <button type="button" data-name="التهاب ضرع" onclick="goToMastitis()">التهاب ضرع</button>
+    <button type="button" data-name="التهاب ضرع">التهاب ضرع</button>
     <button type="button" data-name="التهاب رئوي">التهاب رئوي</button>
-    <button type="button" data-name="عرج" onclick="goToLameness()">عرج</button>
+    <button type="button" data-name="عرج">عرج</button>
     <button type="button" data-name="اسهال">اسهال</button>
     <button type="button" data-name="التهاب سرة">التهاب سرة</button>
     <button type="button" data-name="انقلاب منفحة">انقلاب منفحة</button>
@@ -122,68 +133,40 @@
     <button type="button" data-name="نقص ماغنسيوم">نقص ماغنسيوم</button>
     <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
   </div>
-
-  <input type="hidden" id="diseaseName" name="diseaseName" required>
 </form>
 
 <script>
   document.getElementById("diseaseDate").valueAsDate = new Date();
 
   const buttons = document.querySelectorAll('#diseaseButtons button');
-  const hiddenInput = document.getElementById('diseaseName');
 
   buttons.forEach(button => {
-    const disease = button.dataset.name;
+    button.addEventListener('click', () => {
+      const disease = button.dataset.name;
+      const animalId = document.getElementById("animalId").value.trim();
+      const date = document.getElementById("diseaseDate").value;
 
-    if (disease !== "التهاب ضرع" && disease !== "عرج") {
-      button.addEventListener('click', () => {
-        const animalId = document.getElementById("animalId").value.trim();
-        const date = document.getElementById("diseaseDate").value;
+      if (!animalId || !date) {
+        alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+        return;
+      }
 
-        if (!animalId || !date) {
-          alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-          return;
-        }
+      // حفظ البيانات
+      localStorage.setItem("animalId", animalId);
+      localStorage.setItem("diseaseDate", date);
+      localStorage.setItem("lastDiseaseName", disease);
 
-        hiddenInput.value = disease;
-
-        localStorage.setItem("lastDiseaseName", disease);
-        localStorage.setItem("animalId", animalId);
-        localStorage.setItem("diseaseDate", date);
-
+      // تحديد الصفحة المناسبة
+      if (disease === "التهاب ضرع") {
+        window.location.href = 'mastitis.html';
+      } else if (disease === "عرج") {
+        window.location.href = 'lameness.html';
+      } else {
         alert('✅ تم اختيار المرض: ' + disease);
         window.location.href = 'treatment-followup.html';
-      });
-    }
+      }
+    });
   });
-
-  function getInputs() {
-    const animalId = document.getElementById("animalId").value.trim();
-    const date = document.getElementById("diseaseDate").value;
-    return { animalId, date };
-  }
-
-  function goToMastitis() {
-    const { animalId, date } = getInputs();
-    if (!animalId || !date) {
-      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-      return;
-    }
-    localStorage.setItem("animalId", animalId);
-    localStorage.setItem("diseaseDate", date);
-    window.location.href = `mastitis.html?animalId=${animalId}&date=${date}`;
-  }
-
-  function goToLameness() {
-    const { animalId, date } = getInputs();
-    if (!animalId || !date) {
-      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-      return;
-    }
-    localStorage.setItem("animalId", animalId);
-    localStorage.setItem("diseaseDate", date);
-    window.location.href = `lameness.html?animalId=${animalId}&date=${date}`;
-  }
 </script>
 
 </body>
