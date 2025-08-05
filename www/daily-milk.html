@@ -98,15 +98,15 @@
       event.preventDefault();
 
       const animalId = document.getElementById("animalId").value;
-      const date = document.getElementById("date").value;
+      const milkdate = document.getElementById("date").value;
       const milking1 = document.getElementById("milking1").value;
       const milking2 = document.getElementById("milking2").value;
       const milking3 = document.getElementById("milking3").value;
-
+      
       const milkData = { animalId, date, milking1, milking2, milking3 };
-
+      type: "إنتاج اللبن اليومي"
       try {
-        const response = await fetch("https://murabbic-alerts.onrender.com/api/dailymilk", {
+        const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -126,3 +126,4 @@
   </script>
 </body>
 </html>
+
