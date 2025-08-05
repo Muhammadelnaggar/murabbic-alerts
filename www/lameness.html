@@ -100,16 +100,20 @@
     <button type="submit">تسجيل الحالة</button>
   </form>
 
-  <script>
-    document.getElementById("lamenessDate").valueAsDate = new Date();
+ <script>
+  document.getElementById("lamenessDate").valueAsDate = new Date();
 
-    document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
+  document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
 
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
 
-      const res = await fetch("https://murabbic-alerts.onrender.com/api/lameness", {
+    // أضف نوع الحدث
+    data.type = "عرج";
+
+    try {
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
@@ -122,7 +126,12 @@
       } else {
         alert("❌ فشل في تسجيل الحالة");
       }
-    });
-  </script>
+    } catch (err) {
+      alert("⚠️ فشل الاتصال بالخادم");
+      console.error(err);
+    }
+  });
+</script>
+
 </body>
 </html>
