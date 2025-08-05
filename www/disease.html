@@ -160,9 +160,35 @@
     }
   });
 </script>
+<script>
+  function getInputs() {
+    const animalId = document.getElementById("animalId").value.trim();
+    const date = document.getElementById("diagnosisDate").value;
+    return { animalId, date };
+  }
+
+  function goToMastitis() {
+    const { animalId, date } = getInputs();
+    if (!animalId || !date) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+      return;
+    }
+    window.location.href = `mastitis.html?animalId=${animalId}&date=${date}`;
+  }
+
+  function goToLameness() {
+    const { animalId, date } = getInputs();
+    if (!animalId || !date) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+      return;
+    }
+    window.location.href = `lameness.html?animalId=${animalId}&date=${date}`;
+  }
+</script>
 
 
 </body>
 </html>
+
 
 
