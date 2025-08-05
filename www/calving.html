@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -63,28 +62,27 @@
     const lastAnimalId = localStorage.getItem("lastAnimalId");
 
     if (isNewUser && lastAnimalId) {
-      const input = document.getElementById("animal-id");
+      const input = document.getElementById("animalId");
       if (input) {
         input.value = lastAnimalId;
         input.readOnly = true;
       } else {
-        console.warn("حقل animal-id غير موجود!");
+        console.warn("حقل animalId غير موجود!");
       }
     }
   });
-</script>
-
+  </script>
 </head>
 <body>
 
   <h2>🍼 تسجيل حدث ولادة</h2>
 
-  <form id="birthForm">
+  <form id="calvingForm">
     <label for="animalId">رقم الحيوان</label>
     <input type="text" id="animalId" name="animalId" required>
 
-    <label for="birthDate">تاريخ الولادة</label>
-    <input type="date" id="birthDate" name="birthDate" required>
+    <label for="calvingDate">تاريخ الولادة</label>
+    <input type="date" id="calvingDate" name="calvingDate" required>
 
     <label for="birthEase">سهولة الولادة</label>
     <select id="birthEase" name="birthEase">
@@ -111,9 +109,9 @@
   </form>
 
   <script>
-    const form = document.getElementById("birthForm");
-    const birthDateInput = document.getElementById("birthDate");
-    birthDateInput.valueAsDate = new Date();
+    const form = document.getElementById("calvingForm");
+    const calvingDateInput = document.getElementById("calvingDate");
+    calvingDateInput.valueAsDate = new Date();
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -121,7 +119,7 @@
       const data = {
         type: "ولادة",
         animalId: form.animalId.value,
-        birthDate: form.birthDate.value,
+        calvingDate: form.calvingDate.value,
         birthEase: form.birthEase.value,
         calfGender: form.calfGender.value,
         calfId: form.calfId.value,
@@ -162,6 +160,6 @@
       }
     });
   </script>
-
 </body>
 </html>
+
