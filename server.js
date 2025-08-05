@@ -425,7 +425,7 @@ app.post('/api/events', (req, res) => {
       const index = animals.findIndex(a => a.number == event.animalId);
 
       if (index !== -1) {
-        animals[index].lastCalvingDate = event.birthDate;
+        animals[index].lastCalvingDate = event.calvingDate;
         animals[index].reproductiveStatus = "حديث الولادة";
         animals[index].dailyMilkProduction = 0;
 
