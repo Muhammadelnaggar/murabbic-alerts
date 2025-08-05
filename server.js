@@ -358,6 +358,7 @@ app.post('/api/animals', (req, res) => {
   res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
 });
 // === تسجيل حدث (مثل الولادة) ===
+// تسجيل حدث مثل الولادة + تحديث ذكي للحيوان
 app.post('/api/events', (req, res) => {
   const event = req.body;
 
@@ -366,18 +367,40 @@ app.post('/api/events', (req, res) => {
   }
 
   const eventsPath = path.join(dataDir, 'events.json');
-  let events = [];
+  const animalsPath = path.join(dataDir, 'animals.json');
 
+  // 1. تسجيل الحدث في ملف events.json
+  let events = [];
   if (fs.existsSync(eventsPath)) {
     events = JSON.parse(fs.readFileSync(eventsPath, 'utf8') || '[]');
   }
-
   event.id = events.length + 1;
   events.push(event);
-
   fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
-  res.status(200).json({ message: '✅ تم تسجيل الحدث بنجاح', event });
+
+  // 2. تعديل بيانات الحيوان إذا كان الحدث "ولادة"
+  if (event.type === "ولادة") {
+    if (fs.existsSync(animalsPath)) {
+      let animals = JSON.parse(fs.readFileSync(animalsPath, 'utf8') || '[]');
+      const index = animals.findIndex(a => a.number == event.animalId);
+
+      if (index !== -1) {
+        animals[index].lastCalvingDate = event.birthDate;
+        animals[index].reproductiveStatus = "حديث الولادة";
+        animals[index].dailyMilkProduction = 0;
+
+        if (animals[index].lastInseminationDate) {
+          delete animals[index].lastInseminationDate;
+        }
+
+        fs.writeFileSync(animalsPath, JSON.stringify(animals, null, 2));
+      }
+    }
+  }
+
+  res.status(200).json({ message: '✅ تم تسجيل الحدث وتحديث بيانات الحيوان بنجاح', event });
 });
+
 
 // === استرجاع تنبيهات المستخدم ===
 app.get('/alerts/:id', (req, res) => {
