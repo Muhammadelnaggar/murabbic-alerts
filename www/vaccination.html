@@ -101,12 +101,14 @@
         .map(id => id.replace(/[^\d]/g, '').trim())
         .filter(id => id.length > 0);
 
-      const commonData = {
-        date: document.getElementById("date").value,
-        vaccineType: document.getElementById("vaccineType").value,
-        doseType: document.getElementById("doseType").value,
-        vetName: document.getElementById("vetName").value
-      };
+     const commonData = {
+  date: document.getElementById("date").value,
+  vaccineType: document.getElementById("vaccineType").value,
+  doseType: document.getElementById("doseType").value,
+  veterinarianName: document.getElementById("vetName").value,
+  type: "تحصين" // ✅ هنا أضفنا نوع الحدث
+};
+
 
       let successCount = 0;
 
@@ -114,7 +116,7 @@
         const data = { ...commonData, animalId: id };
 
         try {
-          const response = await fetch("https://murabbic-alerts.onrender.com/api/vaccinations", {
+          const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
@@ -135,3 +137,4 @@
 
 </body>
 </html>
+
