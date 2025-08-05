@@ -151,6 +151,8 @@
       button.addEventListener('click', () => {
         // تعيين القيمة وتأكيد الاختيار
         hiddenInput.value = disease;
+        localStorage.setItem("lastDiseaseName", disease);
+
         alert('✅ تم اختيار المرض: ' + disease);
         // الانتقال إلى صفحة العلاج والمتابعة
         window.location.href = 'treatment-followup.html';
@@ -162,4 +164,5 @@
 
 </body>
 </html>
+
 
