@@ -109,10 +109,10 @@
   </form>
 
   <script>
-    document.getElementById("mastitis-form").addEventListener("submit", function(event) {
+    document.getElementById("mastitis-form").addEventListener("submit", async function(event) {
       event.preventDefault();
 
-      const animalId = document.getElementById("animal-id").value;
+      const animalId = document.getElementById("animal-id").value.trim();
       const date = document.getElementById("date").value;
       const mastitisType = document.getElementById("mastitis-type").value;
       const quarters = Array.from(document.querySelectorAll("input[name='quarters']:checked")).map(cb => cb.value);
@@ -125,26 +125,32 @@
       const data = {
         animalId,
         date,
-        disease: "التهاب ضرع",
+        type: "التهاب الضرع",
         mastitisType,
         quarters
       };
 
-      fetch("https://murabbic-alerts.onrender.com/api/diseases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(res => {
+      try {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
         if (res.ok) {
           alert("✅ تم تسجيل الحالة بنجاح");
           window.location.href = "treatment-followup.html";
         } else {
           alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
         }
-      });
+      } catch (err) {
+        alert("فشل الاتصال بالخادم");
+        console.error(err);
+      }
     });
   </script>
 </body>
 </html>
+
+   
 
