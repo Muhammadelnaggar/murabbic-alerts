@@ -55,6 +55,9 @@
   <form id="closeup-form">
     <label for="animal-id">رقم الحيوان:</label>
     <input type="text" id="animal-id" name="animal-id" required />
+    
+  <label for="date">تاريخ التحضير:</label>
+<input type="date" id="date" required>
 
     <label>عليقة التحضير:</label>
     <div class="radio-group">
@@ -79,7 +82,9 @@
   animalId: document.getElementById("animal-id").value,
   ration: document.querySelector('input[name="ration"]:checked')?.value,
   anionicSalts: document.querySelector('input[name="anionicSalts"]:checked')?.value,
- type: "تحضير للولادة"
+  closeUpDate: document.getElementById("date").value,
+     
+  type: "تحضير للولادة"
 };
 
 
@@ -118,4 +123,5 @@
 
 </body>
 </html>
+
 
