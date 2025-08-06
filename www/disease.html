@@ -112,48 +112,41 @@
     </div>
   </form>
 
-  <script>
-    document.getElementById("diseaseDate").valueAsDate = new Date();
+ <script>
+  document.getElementById("diseaseDate").valueAsDate = new Date();
 
-    const buttons = document.querySelectorAll('#diseaseButtons button');
+  const buttons = document.querySelectorAll('#diseaseButtons button');
 
-    buttons.forEach(button => {
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      const animalId = document.getElementById("animalId").value.trim();
+      const date = document.getElementById("diseaseDate").value;
       const disease = button.dataset.name;
 
-      button.addEventListener('click', () => {
-        const animalId = document.getElementById("animalId").value.trim();
-        const diseaseDate = document.getElementById("diseaseDate").value;
+      if (!animalId || !date) {
+        alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
+        return;
+      }
 
-        if (!animalId || !diseaseDate) {
-          alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-          return;
-        }
+      localStorage.setItem("animalId", animalId);
+      localStorage.setItem("diseaseDate", date);
+      localStorage.setItem("lastDiseaseName", disease);
 
-        localStorage.setItem("animalId", animalId);
-        localStorage.setItem("diseaseDate", diseaseDate);
-        localStorage.setItem("lastDiseaseName", disease);
-
-      if (disease !== "التهاب ضرع" && disease !== "عرج") {
-  button.addEventListener('click', () => {
-    const animalId = document.getElementById("animalId").value.trim();
-    const date = document.getElementById("diseaseDate").value;
-
-    if (!animalId || !date) {
-      alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-      return;
-    }
-
-    hiddenInput.value = disease;
-    localStorage.setItem("lastDiseaseName", disease);
-
-    alert('✅ تم اختيار المرض: ' + disease);
-    window.location.href = `treatment-followup.html?animalId=${animalId}&date=${date}`;
-  });
-}
-
+      // التوجيه حسب نوع المرض
+      if (disease === "التهاب ضرع") {
+        window.location.href = "mastitis.html";
+      } else if (disease === "عرج") {
+        window.location.href = "lameness.html";
+      } else {
+        alert("✅ تم اختيار المرض: " + disease);
+        window.location.href = `treatment-followup.html?animalId=${animalId}&date=${date}`;
+      }
     });
-  </script>
+  });
+</script>
+
 
 </body>
 </html>
+
 
