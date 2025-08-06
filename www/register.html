@@ -26,16 +26,14 @@
       width: 90%;
     }
 
-h2 {
-  text-align: center;
-  color: #28a745; /* أخضر */
-  font-size: 26px;
-  font-weight: bold;
-  font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  margin-bottom: 25px;
-}
-
-
+    h2 {
+      text-align: center;
+      color: #28a745;
+      font-size: 26px;
+      font-weight: bold;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin-bottom: 25px;
+    }
 
     label {
       display: block;
@@ -44,7 +42,12 @@ h2 {
       color: black;
     }
 
-    input {
+    .required-star::after {
+      content: " *";
+      color: red;
+    }
+
+    input, select {
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -90,17 +93,32 @@ h2 {
   <div class="container">
     <h2>مربي جديد؟</h2>
     <form id="registerForm">
-      <label for="name">الاسم</label>
+      <label for="name" class="required-star">الاسم الكامل</label>
       <input type="text" id="name" name="name" required />
 
-      <label for="phone">رقم الهاتف</label>
+      <label for="phone" class="required-star">رقم الهاتف</label>
       <input type="tel" id="phone" name="phone" required />
 
-      <label for="password">كلمة المرور</label>
+      <label for="password" class="required-star">كلمة المرور</label>
       <input type="password" id="password" name="password" required />
 
-      <label for="confirmPassword">تأكيد كلمة المرور</label>
+      <label for="confirmPassword" class="required-star">تأكيد كلمة المرور</label>
       <input type="password" id="confirmPassword" required />
+
+      <label for="userType" class="required-star">نوع المستخدم</label>
+      <select id="userType" name="userType" required>
+        <option value="">-- اختر النوع --</option>
+        <option value="مربي">مربي</option>
+        <option value="مهندس إنتاج">مهندس إنتاج</option>
+        <option value="طبيب بيطري">طبيب بيطري</option>
+        <option value="طالب">طالب</option>
+      </select>
+
+      <label for="governorate" class="required-star">المحافظة</label>
+      <input type="text" id="governorate" name="governorate" required />
+
+      <label for="email">البريد الإلكتروني (اختياري)</label>
+      <input type="email" id="email" name="email" />
 
       <button type="submit">تسجيل</button>
     </form>
@@ -121,9 +139,12 @@ h2 {
     const phone = document.getElementById("phone").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
+    const userType = document.getElementById("userType").value;
+    const governorate = document.getElementById("governorate").value;
+    const email = document.getElementById("email").value.trim();
 
-    if (!name || !phone || !password || !confirmPassword) {
-      alert("❗ جميع الحقول مطلوبة");
+    if (!name || !phone || !password || !confirmPassword || !userType || !governorate) {
+      alert("❗ جميع الحقول مطلوبة ما عدا البريد الإلكتروني");
       return;
     }
 
@@ -132,34 +153,41 @@ h2 {
       return;
     }
 
- try {
-  // إرسال البيانات لتسجيل المستخدم
-  const res = await fetch(`${apiUrl}/api/users`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, phone, password })
-  });
+    const user = {
+      name,
+      phone,
+      password,
+      userType,
+      governorate,
+      email,
+      registrationDate: new Date().toISOString()
+    };
 
-  const data = await res.json();
+    try {
+      const res = await fetch(`${apiUrl}/api/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user)
+      });
 
-  if (!res.ok) {
-    if (res.status === 409) {
-      alert("رقم الهاتف مستخدم مسبقًا");
-    } else {
-      alert(data.error || "حدث خطأ أثناء التسجيل");
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          alert("رقم الهاتف مستخدم مسبقًا");
+        } else {
+          alert(data.error || "حدث خطأ أثناء التسجيل");
+        }
+        return;
+      }
+
+      alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
+      window.location.href = "login.html";
+
+    } catch (err) {
+      console.error(err);
+      alert("حدث خطأ في الاتصال بالخادم");
     }
-    return; // 🛑 إيقاف التنفيذ تمامًا لو فيه خطأ
-  }
-
-alert("تم التسجيل بنجاح، الرجاء تسجيل الدخول");
-window.location.href = "login.html";
-
-  
-} catch (err) {
-  console.error(err);
-  alert("حدث خطأ في الاتصال بالخادم");
-}
-
   });
 </script>
 
