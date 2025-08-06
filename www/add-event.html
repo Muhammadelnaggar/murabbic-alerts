@@ -67,18 +67,27 @@
   </form>
 
   <script>
+    const animalId = localStorage.getItem("lastAnimalId");
+
+if (!animalId) {
+  alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+  window.location.href = "add-animal.html";
+}
+
     const buttons = document.querySelectorAll('#eventTypeGroup button');
     buttons.forEach(btn => {
       btn.addEventListener('click', () => {
         buttons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const page = btn.getAttribute('data-page');
-        if (page) window.location.href = page;
+       if (page) window.location.href = `${page}?animalId=${animalId}`;
+
       });
     });
   </script>
 </body>
 </html>
+
 
 
 
