@@ -109,8 +109,11 @@
     const formData = new FormData(this);
     const data = Object.fromEntries(formData.entries());
 
-    // أضف نوع الحدث
+     // أضف نوع الحدث والتتبع الذكي
     data.type = "عرج";
+    data.isSmartAlert = true;
+    data.alertRule = "lameness-recheck";
+
 
     try {
       const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
