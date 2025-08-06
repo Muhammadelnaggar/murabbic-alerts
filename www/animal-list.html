@@ -135,6 +135,7 @@
           <th>تاريخ الميلاد</th>
           <th>تاريخ آخر ولادة</th>
           <th>البطاقة</th>
+          <th>تسجيل حدث</th>
         </tr>
       </thead>
       <tbody id="animalBody"></tbody>
@@ -150,8 +151,9 @@
     fetch('https://murabbic-alerts.onrender.com/api/animals')
       .then(res => res.json())
       .then(data => {
-        animalsData = data;
-        renderTable(data);
+        const userId = localStorage.getItem("userId");
+        animalsData = data.filter(a => a.userId === userId);
+        renderTable(animalsData);
       })
       .catch(error => {
         document.getElementById('noData').style.display = 'block';
@@ -184,6 +186,9 @@
           <td>
             <button class="button" onclick="viewCard('${animal.number}')">عرض البطاقة 📄</button>
           </td>
+          <td>
+            <button class="button" onclick="goToAddEvent('${animal.animalId}')">تسجيل حدث 📋</button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -191,6 +196,15 @@
 
     function viewCard(animalNumber) {
       window.location.href = `cow-card.html?number=${animalNumber}`;
+    }
+
+    function goToAddEvent(animalId) {
+      if (!animalId) {
+        alert("❗ لا يوجد animalId لهذا الحيوان.");
+        return;
+      }
+      localStorage.setItem("lastAnimalId", animalId);
+      window.location.href = "add-event.html";
     }
 
     document.getElementById('searchNumber').addEventListener('input', function() {
@@ -211,3 +225,6 @@
   </script>
 </body>
 </html>
+
+
+
