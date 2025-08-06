@@ -43,17 +43,18 @@
     button:hover {
       background-color: #1b5e20;
     }
-    ul {
-      list-style-type: none;
-      padding: 0;
+    .animal-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-top: -10px;
       margin-bottom: 20px;
     }
-    ul li {
-      background-color: #e8f5e9;
-      padding: 8px;
-      margin-bottom: 5px;
-      border-radius: 6px;
+    .animal-tags .tag {
+      background-color: #c8e6c9;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 16px;
     }
     .hint {
       color: #555;
@@ -76,7 +77,7 @@
     <input type="text" id="animalId" placeholder="اكتب رقم الحيوان واضغط Enter">
     <div class="hint">💡 يمكنك إدخال مجموعة من الحيوانات بكتابة رقم كل حيوان والضغط على Enter بعد كل رقم.</div>
     <div id="feedback" class="feedback"></div>
-    <ul id="animalList"></ul>
+    <div class="animal-tags" id="animalList"></div>
 
     <label for="date">تاريخ بدء البروتوكول (اليوم 0):</label>
     <input type="date" id="date" required>
@@ -102,10 +103,10 @@
         const id = animalInput.value.trim();
         if (id !== "" && !animalIds.includes(id)) {
           animalIds.push(id);
-          const li = document.createElement("li");
-          li.textContent = id;
-          li.style.backgroundColor = "#c8e6c9";
-          animalList.appendChild(li);
+          const span = document.createElement("span");
+          span.textContent = id;
+          span.className = "tag";
+          animalList.appendChild(span);
           animalInput.value = "";
           animalInput.focus();
           feedback.textContent = `✅ تم إضافة الحيوان رقم ${id}`;
