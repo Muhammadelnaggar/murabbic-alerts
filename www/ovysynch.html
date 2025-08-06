@@ -55,6 +55,17 @@
       padding: 8px 12px;
       border-radius: 20px;
       font-size: 16px;
+      position: relative;
+      cursor: pointer;
+    }
+    .animal-tags .tag::after {
+      content: "✖";
+      font-size: 14px;
+      color: #2e7d32;
+      margin-right: 8px;
+      position: absolute;
+      left: 6px;
+      top: 3px;
     }
     .hint {
       color: #555;
@@ -75,7 +86,7 @@
   <form id="ovsynchForm">
     <label for="animalId">رقم الحيوان:</label>
     <input type="text" id="animalId" placeholder="اكتب رقم الحيوان واضغط Enter">
-    <div class="hint">💡 يمكنك إدخال مجموعة من الحيوانات بكتابة رقم كل حيوان والضغط على Enter بعد كل رقم.</div>
+    <div class="hint">💡 يمكنك إدخال مجموعة من الحيوانات بكتابة رقم كل حيوان والضغط على Enter بعد كل رقم. لحذف رقم اضغط عليه.</div>
     <div id="feedback" class="feedback"></div>
     <div class="animal-tags" id="animalList"></div>
 
@@ -106,6 +117,10 @@
           const span = document.createElement("span");
           span.textContent = id;
           span.className = "tag";
+          span.onclick = function () {
+            animalList.removeChild(span);
+            animalIds = animalIds.filter(x => x !== id);
+          };
           animalList.appendChild(span);
           animalInput.value = "";
           animalInput.focus();
