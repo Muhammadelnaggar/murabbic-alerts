@@ -112,7 +112,8 @@
     </div>
   </form>
 
- <script>
+<script>
+  // تعيين التاريخ تلقائيًا
   document.getElementById("diseaseDate").valueAsDate = new Date();
 
   const buttons = document.querySelectorAll('#diseaseButtons button');
@@ -128,6 +129,7 @@
         return;
       }
 
+      // حفظ البيانات في التخزين المحلي
       localStorage.setItem("animalId", animalId);
       localStorage.setItem("diseaseDate", date);
       localStorage.setItem("lastDiseaseName", disease);
@@ -138,7 +140,7 @@
       } else if (disease === "عرج") {
         window.location.href = "lameness.html";
       } else {
-        alert("✅ تم اختيار المرض: " + disease);
+        alert('✅ تم اختيار المرض: ' + disease);
         window.location.href = `treatment-followup.html?animalId=${animalId}&date=${date}`;
       }
     });
@@ -146,7 +148,9 @@
 </script>
 
 
+
 </body>
 </html>
+
 
 
