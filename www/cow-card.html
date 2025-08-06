@@ -95,61 +95,71 @@
 
   <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const number = params.get("number") || localStorage.getItem("lastAnimalId");
-    document.getElementById("animalId").textContent = number;
+ <script>
+  const BASE_URL = 'https://murabbic-alerts.onrender.com';
 
-    fetch('https://murabbic-alerts.onrender.com/api/animals')
-      .then(res => res.ok ? res.json() : Promise.reject('فشل الاتصال بالسيرفر'))
-      .then(data => {
-        const animal = data.find(a => a.number === number);
-        if (!animal) return alert("❌ لم يتم العثور على الحيوان.");
+  const params = new URLSearchParams(window.location.search);
+  const number = params.get("number") || localStorage.getItem("lastAnimalId");
 
-        document.getElementById("birthDate").textContent = animal.birthDate || '-';
-        document.getElementById("season").textContent = animal.season || '-';
-        document.getElementById("milkDays").textContent = animal.milkDays || '-';
-        document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
-        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
-        document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
-        document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
-        document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+  if (!number) {
+    alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+    window.location.href = "animal-list.html";
+  }
 
-        const chartData = animal.milkCurve?.map((v, i) => ({
-          date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
-          total: v
-        })) || [];
+  document.getElementById("animalId").textContent = number;
 
-        new Chart(document.getElementById('milkChart'), {
-          type: 'line',
-          data: {
-            labels: chartData.map(e => e.date),
-            datasets: [{
-              label: 'إنتاج اللبن التراكمي (لتر)',
-              data: chartData.map(e => e.total),
-              backgroundColor: 'rgba(76, 175, 80, 0.2)',
-              borderColor: '#4caf50',
-              borderWidth: 2,
-              tension: 0.3,
-              fill: true
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: true,
-                labels: { font: { size: 14 } }
-              }
-            },
-            scales: {
-              x: { title: { display: true, text: 'الشهر' } },
-              y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+  fetch(`${BASE_URL}/api/animals`)
+    .then(res => res.ok ? res.json() : Promise.reject('فشل الاتصال بالسيرفر'))
+    .then(data => {
+      const animal = data.find(a => a.number === number);
+      if (!animal) return alert("❌ لم يتم العثور على الحيوان.");
+
+      document.getElementById("birthDate").textContent = animal.birthDate || '-';
+      document.getElementById("season").textContent = animal.season || '-';
+      document.getElementById("milkDays").textContent = animal.milkDays || '-';
+      document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
+      document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
+      document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
+      document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
+      document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+
+      const chartData = animal.milkCurve?.map((v, i) => ({
+        date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
+        total: v
+      })) || [];
+
+      new Chart(document.getElementById('milkChart'), {
+        type: 'line',
+        data: {
+          labels: chartData.map(e => e.date),
+          datasets: [{
+            label: 'إنتاج اللبن التراكمي (لتر)',
+            data: chartData.map(e => e.total),
+            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+            borderColor: '#4caf50',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { font: { size: 14 } }
             }
+          },
+          scales: {
+            x: { title: { display: true, text: 'الشهر' } },
+            y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
           }
-        });
-      })
-      .catch(err => alert('⚠️ حدث خطأ في تحميل البيانات: ' + err));
-  </script>
+        }
+      });
+    })
+    .catch(err => alert('⚠️ حدث خطأ في تحميل البيانات: ' + err));
+</script>
+
 </body>
 </html>
+
