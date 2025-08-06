@@ -113,8 +113,14 @@
         reason: document.querySelector('input[name="reason"]:checked')?.value,
         pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
         usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
-        type: "تجفيف" // ✅ ضروري لتصنيف الحدث
+        type: "تجفيف" // ✅ ضروري لتصنيف الحدث,
+        isSmartAlert: true,
+        alertRule: "تجفيف"
       };
+if (!data.animalId || !data.dryOffDate) {
+  alert("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولاً");
+  return;
+}
 
     fetch("https://murabbic-alerts.onrender.com/api/events", {
       method: "POST",
@@ -151,4 +157,5 @@
 
 </body>
 </html>
+
 
