@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل تحصين جماعي</title>
+  <title>تسجيل تحصين</title>
   <style>
     body {
       direction: rtl;
@@ -55,11 +56,14 @@
 </head>
 <body>
 
-  <h1>📋 تسجيل تحصين جماعي</h1>
+  <h1>📋 تسجيل تحصين</h1>
 
   <form id="vaccinationForm">
-    <label for="animalIds">أرقام الحيوانات (رقم في كل سطر أو مفصول بفاصلة):</label>
-    <textarea id="animalIds" rows="4" required></textarea>
+    <label for="animalId">رقم الحيوان (للتحصين الفردي):</label>
+    <input type="text" id="animalId" name="animalId">
+
+    <label for="animalIds">أرقام الحيوانات (للتحصين الجماعي - رقم في كل سطر أو مفصول بفاصلة):</label>
+    <textarea id="animalIds" rows="3"></textarea>
 
     <label for="date">التاريخ:</label>
     <input type="date" id="date" required>
@@ -88,27 +92,38 @@
     <label for="vetName">اسم الطبيب (اختياري):</label>
     <input type="text" id="vetName">
 
-    <button type="submit">تسجيل التحصين الجماعي</button>
+    <button type="submit">تسجيل التحصين</button>
   </form>
 
   <script>
     document.getElementById("vaccinationForm").addEventListener("submit", async function(e) {
       e.preventDefault();
 
-      const animalIdsRaw = document.getElementById("animalIds").value;
-      const ids = animalIdsRaw
-        .split(/[\n,]+/)
-        .map(id => id.replace(/[^\d]/g, '').trim())
-        .filter(id => id.length > 0);
+      const singleId = document.getElementById("animalId").value.trim();
+      const groupIdsRaw = document.getElementById("animalIds").value;
+      let ids = [];
 
-     const commonData = {
-  date: document.getElementById("date").value,
-  vaccineType: document.getElementById("vaccineType").value,
-  doseType: document.getElementById("doseType").value,
-  veterinarianName: document.getElementById("vetName").value,
-  type: "تحصين" // ✅ هنا أضفنا نوع الحدث
-};
+      if (singleId !== "") {
+        ids = [singleId];
+      } else {
+        ids = groupIdsRaw
+          .split(/[\n,]+/)
+          .map(id => id.replace(/[^\d]/g, '').trim())
+          .filter(id => id.length > 0);
+      }
 
+      if (ids.length === 0) {
+        alert("يرجى إدخال رقم حيوان واحد على الأقل");
+        return;
+      }
+
+      const commonData = {
+        date: document.getElementById("date").value,
+        vaccineType: document.getElementById("vaccineType").value,
+        doseType: document.getElementById("doseType").value,
+        veterinarianName: document.getElementById("vetName").value,
+        type: "تحصين"
+      };
 
       let successCount = 0;
 
@@ -130,11 +145,16 @@
         }
       }
 
-      alert(`✅ تم تسجيل التحصين لـ ${successCount} من ${ids.length} حيوان بنجاح`);
-      document.getElementById("vaccinationForm").reset();
+      const again = confirm(`✅ تم تسجيل التحصين لـ ${successCount} من ${ids.length} حيوان بنجاح.
+
+هل تريد تسجيل تحصين آخر؟`);
+      if (again) {
+        document.getElementById("vaccinationForm").reset();
+      } else {
+        window.location.href = "dashboard.html";
+      }
     });
   </script>
 
 </body>
 </html>
-
