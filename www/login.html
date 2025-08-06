@@ -1,96 +1,132 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل الدخول - Murabbik</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Arial', sans-serif;
-      direction: rtl;
-      background-color: #f8f8f8;
-      padding: 20px;
-      text-align: center;
+      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
     }
-    form {
-      background-color: #fff;
-      padding: 20px;
-      margin: auto;
-      max-width: 400px;
+    .container {
+      background: white;
+      padding: 30px;
       border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 90%;
     }
-    input, button {
+    h2 {
+      text-align: center;
+      color: #28a745;
+      font-size: 26px;
+      font-weight: bold;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin-bottom: 25px;
+    }
+    label {
       display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: black;
+    }
+    input {
       width: 100%;
-      padding: 12px;
+      padding: 10px;
       margin-bottom: 15px;
-      border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 1em;
+      border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
     }
     button {
-      background-color: #1e90ff;
+      width: 100%;
+      background-color: #28a745;
       color: white;
-      font-weight: bold;
       border: none;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 6px;
       cursor: pointer;
     }
     button:hover {
-      background-color: #0d74d1;
+      background-color: #218838;
     }
-    a {
-      color: #1e90ff;
+    .register-link {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+    .register-link a {
+      color: #2c7a33;
       text-decoration: none;
-      display: block;
-      margin-top: 10px;
+      font-weight: bold;
+    }
+    .register-link a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
-  <h2>تسجيل الدخول إلى Murabbik</h2>
-  <form id="loginForm" autocomplete="off">
-    <!-- استخدم أسماء غريبة لمنع التعبئة التلقائية -->
-    <input type="text" id="phone" name="user_phone_input" placeholder="رقم الهاتف" required autocomplete="off" />
-    <input type="password" id="password" name="user_pass_input" placeholder="كلمة المرور" required autocomplete="new-password" />
-    <button type="submit">تسجيل الدخول</button>
-    <a href="register.html">ليس لديك حساب؟ سجل الآن</a>
-  </form>
+  <div class="container">
+    <h2>تسجيل الدخول</h2>
+    <form id="loginForm">
+      <label for="phone">رقم الهاتف</label>
+      <input type="tel" id="phone" name="phone" required />
+
+      <label for="password">كلمة المرور</label>
+      <input type="password" id="password" name="password" required />
+
+      <button type="submit">دخول</button>
+    </form>
+
+    <div class="register-link">
+      <a href="register.html">مربي جديد؟ سجل هنا</a>
+    </div>
+  </div>
 
   <script>
+    const apiUrl = "https://murabbic-alerts.onrender.com";
     const form = document.getElementById("loginForm");
 
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
 
       const phone = document.getElementById("phone").value.trim();
-      const password = document.getElementById("password").value.trim();
+      const password = document.getElementById("password").value;
 
       if (!phone || !password) {
-        alert("برجاء إدخال رقم الهاتف وكلمة المرور.");
+        alert("يرجى إدخال رقم الهاتف وكلمة المرور");
         return;
       }
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/users/login", {
+        const res = await fetch(`${apiUrl}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, password }), // تأكد إن دي نفس المفاتيح اللي السيرفر بيتعامل معاها
+          body: JSON.stringify({ phone, password })
         });
 
         const data = await res.json();
 
-        if (res.ok) {
-          localStorage.setItem("userPhone", phone);
-          localStorage.setItem("userId", data.userId || "");
-
-          window.location.href = "add-animal.html";
-        } else {
-          alert(data.message || "فشل تسجيل الدخول، تأكد من رقم الهاتف وكلمة المرور.");
+        if (!res.ok) {
+          alert(data.error || "فشل في تسجيل الدخول");
+          return;
         }
+
+        localStorage.setItem("userId", data.userId);
+        alert("✅ تم تسجيل الدخول بنجاح");
+        window.location.href = "dashboard.html";
       } catch (err) {
-        console.error("Login error:", err);
-        alert("حدث خطأ أثناء الاتصال بالسيرفر.");
+        console.error(err);
+        alert("حدث خطأ في الاتصال بالخادم");
       }
     });
   </script>
