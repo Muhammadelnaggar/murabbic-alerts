@@ -60,13 +60,13 @@
 
   <form id="vaccinationForm">
     <label for="animalId">رقم الحيوان (للتحصين الفردي):</label>
-    <input type="text" id="animalId" name="animalId">
+    <input type="text" id="animalId" name="animalId" style="font-size: 16px; padding: 10px; height: 45px;">
 
     <label for="animalIds">أرقام الحيوانات (للتحصين الجماعي - رقم في كل سطر أو مفصول بفاصلة):</label>
-    <textarea id="animalIds" rows="3"></textarea>
+    <textarea id="animalIds" rows="4" style="resize: vertical;"></textarea>
 
     <label for="date">التاريخ:</label>
-    <input type="date" id="date" required>
+    <input type="date" id="date" required style="font-size: 16px; padding: 10px; height: 45px;">
 
     <label for="vaccineType">نوع التحصين:</label>
     <select id="vaccineType" required>
@@ -89,7 +89,7 @@
     </div>
 
     <label for="vetName">اسم الطبيب (اختياري):</label>
-    <input type="text" id="vetName">
+    <input type="text" id="vetName" style="font-size: 16px; padding: 10px; height: 45px;">
 
     <button type="submit">تسجيل التحصين</button>
   </form>
