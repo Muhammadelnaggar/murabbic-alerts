@@ -153,7 +153,9 @@
       return;
     }
 
+    const userId = crypto.randomUUID();
     const user = {
+      userId,
       name,
       phone,
       password,
@@ -181,6 +183,7 @@
         return;
       }
 
+      localStorage.setItem("userId", userId);
       alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
