@@ -82,12 +82,11 @@
       <option>الباستريلا (حمى النقل)</option>
     </select>
 
-    <label for="doseType">نوع الجرعة:</label>
-    <select id="doseType" required>
-      <option value="">-- اختر نوع الجرعة --</option>
-      <option>مبدئية</option>
-      <option>منشطة</option>
-    </select>
+    <label>نوع الجرعة:</label>
+    <div class="radio-group">
+      <label><input type="radio" name="doseType" value="مبدئية" required> مبدئية</label>
+      <label><input type="radio" name="doseType" value="منشطة"> منشطة</label>
+    </div>
 
     <label for="vetName">اسم الطبيب (اختياري):</label>
     <input type="text" id="vetName">
