@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بروتوكول تزامن التبويض</title>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #f0fdf4;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+      margin-bottom: 30px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 5px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: #2e7d32;
+      color: white;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1b5e20;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin-top: -10px;
+      margin-bottom: 20px;
+    }
+    ul li {
+      background-color: #e8f5e9;
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 6px;
+    }
+    .hint {
+      color: #555;
+      font-size: 14px;
+      margin-top: -10px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📅 بروتوكول تزامن التبويض والتلقيح الإجباري</h1>
+  <form id="ovsynchForm">
+    <label for="animalId">رقم الحيوان:</label>
+    <input type="text" id="animalId" placeholder="اكتب رقم الحيوان واضغط Enter">
+    <div class="hint">💡 يمكنك إدخال مجموعة من الحيوانات بكتابة رقم كل حيوان والضغط على Enter بعد كل رقم.</div>
+    <ul id="animalList"></ul>
+
+    <label for="date">تاريخ بدء البروتوكول (اليوم 0):</label>
+    <input type="date" id="date" required>
+
+    <label for="vetName">اسم الطبيب (اختياري):</label>
+    <input type="text" id="vetName">
+
+    <label for="notes">ملاحظات:</label>
+    <textarea id="notes" rows="3"></textarea>
+
+    <button type="submit">تسجيل البروتوكول</button>
+  </form>
+
+  <script>
+    const animalInput = document.getElementById("animalId");
+    const animalList = document.getElementById("animalList");
+    let animalIds = [];
+
+    animalInput.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const id = animalInput.value.trim();
+        if (id !== "" && !animalIds.includes(id)) {
+          animalIds.push(id);
+          const li = document.createElement("li");
+          li.textContent = id;
+          animalList.appendChild(li);
+          animalInput.value = "";
+        }
+      }
+    });
+
+    document.getElementById("ovsynchForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      if (animalIds.length === 0) {
+        alert("يرجى إدخال رقم حيوان واحد على الأقل.");
+        return;
+      }
+
+      const baseDate = document.getElementById("date").value;
+      const vet = document.getElementById("vetName").value;
+      const notes = document.getElementById("notes").value;
+
+      let successCount = 0;
+      for (let id of animalIds) {
+        const events = [
+          { offset: 0,  label: "نصف جرعة GNRH" },
+          { offset: 7,  label: "جرعة بروستاجلاندين" },
+          { offset: 9,  label: "نصف جرعة GNRH الثانية" },
+          { offset: 10, label: "موعد التلقيح الإجباري" }
+        ];
+
+        for (let event of events) {
+          const date = new Date(baseDate);
+          date.setDate(date.getDate() + event.offset);
+          const payload = {
+            animalId: id,
+            date: date.toISOString().split("T")[0],
+            veterinarianName: vet,
+            notes: `مرحلة: ${event.label}${notes ? ' - ' + notes : ''}`,
+            type: "بروتوكول تزامن التبويض"
+          };
+
+          try {
+            const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+
+            if (response.ok) successCount++;
+          } catch (err) {
+            console.error("خطأ في التسجيل:", err);
+          }
+        }
+      }
+
+      const again = confirm(`✅ تم تسجيل ${successCount} مرحلة من بروتوكولات التزامن بنجاح لجميع الحيوانات.\n\nهل تريد تسجيل بروتوكول آخر؟`);
+      if (again) {
+        document.getElementById("ovsynchForm").reset();
+        animalIds = [];
+        animalList.innerHTML = "";
+      } else {
+        window.location.href = "add-event.html";
+      }
+    });
+  </script>
+</body>
+</html>
