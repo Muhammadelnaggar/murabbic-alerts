@@ -160,7 +160,9 @@
             date: date.toISOString().split("T")[0],
             veterinarianName: vet,
             notes: `مرحلة: ${event.label}${notes ? ' - ' + notes : ''}`,
-            type: "بروتوكول تزامن التبويض"
+            type: "بروتوكول تزامن التبويض",
+            isSmartAlert: true,
+            alertRule: event.lable
           };
 
           try {
