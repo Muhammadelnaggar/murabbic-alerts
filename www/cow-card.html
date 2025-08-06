@@ -98,7 +98,9 @@
  <script>
   const BASE_URL = 'https://murabbic-alerts.onrender.com';
 
- 
+  const params = new URLSearchParams(window.location.search);
+  const number = params.get("number") || localStorage.getItem("lastAnimalId");
+
   if (!number) {
     alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
     window.location.href = "animal-list.html";
@@ -160,5 +162,7 @@
 
 </body>
 </html>
+
+ 
 
 
