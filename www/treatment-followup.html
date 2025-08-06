@@ -1,3 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العلاج والمتابعة</title>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #f9f9f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
+
+    .section {
+      background-color: #ffffff;
+      border: 2px solid #8bc34a;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 6px;
+      font-size: 18px;
+    }
+
+    input[type="text"], input[type="date"] {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background-color: #f1f8e9;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 30px;
+      margin-top: 10px;
+    }
+
+    .radio-group label {
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="radio"]:disabled + span {
+      color: gray;
+    }
+
+    button {
+      background-color: #2e7d32;
+      color: white;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+  <h2>💊 العلاج والمتابعة</h2>
+
+  <div class="section">
+    <label>رقم الحيوان</label>
+    <input type="text" id="animalId" disabled>
+
+    <label>تاريخ العلاج</label>
+    <input type="date" id="treatmentDate" disabled>
+  </div>
+
+  <div class="section">
+    <label>العلاج الموصوف</label>
+    <input type="text" id="treatmentDescription">
+
+    <label>الطبيب البيطري المعالج</label>
+    <input type="text" id="veterinarian">
+  </div>
+
+  <div class="section">
+    <label>المتابعة (تُفعل تلقائيًا بعد 3 أيام)</label>
+    <div class="radio-group">
+      <label><input type="radio" name="followup" value="تم الشفاء" disabled><span>تم الشفاء</span></label>
+      <label><input type="radio" name="followup" value="ساءت الحالة" disabled><span>ساءت الحالة</span></label>
+    </div>
+  </div>
+
+  <button onclick="submitTreatment()">تسجيل</button>
+
 <script>
   // قراءة رقم الحيوان والتاريخ من الرابط
   const params = new URLSearchParams(window.location.search);
@@ -58,3 +167,6 @@
     }
   }
 </script>
+
+</body>
+</html>
