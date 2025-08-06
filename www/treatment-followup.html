@@ -108,57 +108,82 @@
   <button onclick="submitTreatment()">تسجيل</button>
 
   <script>
-    const today = new Date().toISOString().split('T')[0];
+  
+  // قراءة رقم الحيوان والتاريخ من الرابط
+  const params = new URLSearchParams(window.location.search);
+  const animalId = params.get("animalId");
+  const date = params.get("date");
+
+  // التأكد من وجودهم ثم تعبئتهم في النموذج تلقائيًا (لو في عناصر بهذا id)
+  window.onload = () => {
+    if (animalId && document.getElementById("animalId")) {
+      document.getElementById("animalId").value = animalId;
+    }
+
+    if (date && document.getElementById("diagnosisDate")) {
+      document.getElementById("diagnosisDate").value = date;
+    }
+  };
+<script>
+  // قراءة رقم الحيوان والتاريخ من الرابط (لو موجودين)
+  const params = new URLSearchParams(window.location.search);
+  const passedAnimalId = params.get("animalId");
+  const passedDate = params.get("date");
+
+  const today = new Date().toISOString().split('T')[0];
+
+  window.addEventListener('DOMContentLoaded', () => {
+    // تعبئة التاريخ الافتراضي
     document.getElementById('treatmentDate').value = today;
-    document.getElementById('animalId').value = localStorage.getItem('currentAnimalId') || '';
 
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedDate = new Date(localStorage.getItem('treatmentStartDate') || today);
-      const now = new Date();
-      const diff = Math.floor((now - savedDate) / (1000 * 60 * 60 * 24));
-      if (diff >= 3) {
-        document.querySelectorAll('input[type="radio"]').forEach(r => r.disabled = false);
-      }
-    });
+    // تعبئة رقم الحيوان تلقائيًا من الرابط أو من localStorage
+    document.getElementById('animalId').value =
+      passedAnimalId || localStorage.getItem('currentAnimalId') || '';
 
-   async function submitTreatment() {
-  // الكود هنا
-}
-
-     const data = {
-  animalId: document.getElementById('animalId').value,
-  date: document.getElementById('treatmentDate').value,
-  type: "علاج",
-  treatmentDescription: document.getElementById('treatmentDescription').value,
-  veterinarian: document.getElementById('veterinarian').value,
-  followup: document.querySelector('input[name="followup"]:checked')?.value || "غير مفعلة"
-};
-
-
-      if (data.followup === "ساءت الحالة") {
-        const nextFollowup = new Date();
-        nextFollowup.setDate(nextFollowup.getDate() + 3);
-        localStorage.setItem('treatmentStartDate', nextFollowup.toISOString());
-        alert("❗ حالة الحيوان ساءت. سيتم تحديد متابعة أخرى بعد 3 أيام.");
-      }
-
-      try {
-  const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
+    // تفعيل خيارات المتابعة بعد 3 أيام
+    const savedDate = new Date(localStorage.getItem('treatmentStartDate') || today);
+    const now = new Date();
+    const diff = Math.floor((now - savedDate) / (1000 * 60 * 60 * 24));
+    if (diff >= 3) {
+      document.querySelectorAll('input[name="followup"]').forEach(r => r.disabled = false);
+    }
   });
 
-  if (res.ok) {
-    alert("✅ تم حفظ العلاج والمتابعة بنجاح");
-    window.location.href = "dashboard.html";
-  } else {
-    alert("حدث خطأ أثناء الحفظ. حاول مرة أخرى.");
-  }
-} catch (err) {
-  alert("فشل الاتصال بالخادم");
-}
+  async function submitTreatment() {
+    const data = {
+      animalId: document.getElementById('animalId').value,
+      date: document.getElementById('treatmentDate').value,
+      type: "علاج ومتابعة",
+      treatmentDescription: document.getElementById('treatmentDescription').value,
+      veterinarian: document.getElementById('veterinarian').value,
+      followup: document.querySelector('input[name="followup"]:checked')?.value || "غير مفعلة"
+    };
 
-  </script>
+    if (data.followup === "ساءت الحالة") {
+      const nextFollowup = new Date();
+      nextFollowup.setDate(nextFollowup.getDate() + 3);
+      localStorage.setItem('treatmentStartDate', nextFollowup.toISOString());
+      alert("❗ حالة الحيوان ساءت. سيتم تحديد متابعة أخرى بعد 3 أيام.");
+    }
+
+    try {
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert("✅ تم حفظ العلاج والمتابعة بنجاح");
+        window.location.href = "dashboard.html";
+      } else {
+        alert("حدث خطأ أثناء الحفظ. حاول مرة أخرى.");
+      }
+    } catch (err) {
+      alert("فشل الاتصال بالخادم");
+    }
+  }
+</script>
+
 </body>
 </html>
