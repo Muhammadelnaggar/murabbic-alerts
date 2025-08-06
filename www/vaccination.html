@@ -126,8 +126,13 @@
 
       let successCount = 0;
 
-      for (let id of ids) {
-        const data = { ...commonData, animalId: id };
+    for (let id of ids) {
+  const data = {
+    ...commonData,
+    animalId: id,
+    isSmartAlert: true,
+    alertRule: "vaccination-next-dose-reminder"
+  };
 
         try {
           const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
@@ -157,3 +162,4 @@
 
 </body>
 </html>
+
