@@ -4,21 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل الدخول</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
   <style>
     body {
       direction: rtl;
-      font-family: 'Arial', sans-serif;
-      background-color: #f2f2f2;
+      font-family: 'Cairo', 'Arial', sans-serif;
+      background: linear-gradient(to bottom right, #ffffcc, #eeffdd); /* أصفر كناري وأخضر فاتح */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
       padding: 20px;
-      text-align: center;
     }
     form {
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 15px;
+      background-color: #ffffff;
+      padding: 30px 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
       max-width: 400px;
-      margin: auto;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      width: 90%;
+      text-align: center;
+    }
+    h2 {
+      color: #28a745;
+      font-size: 28px;
+      margin-bottom: 25px;
     }
     input, button {
       width: 100%;
@@ -27,16 +38,17 @@
       font-size: 1em;
       border-radius: 10px;
       border: 1px solid #ccc;
+      box-sizing: border-box;
     }
     button {
-      background-color: #007bff;
+      background-color: #28a745;
       color: white;
       font-weight: bold;
       border: none;
       cursor: pointer;
     }
     button:hover {
-      background-color: #0056b3;
+      background-color: #218838;
     }
   </style>
   <script type="module">
@@ -79,7 +91,6 @@
             localStorage.setItem("userPhone", userData.phone);
             alert("✅ تم تسجيل الدخول بنجاح");
 
-            // بعد أول تسجيل دخول، تحقق إذا كان هناك حيوانات مسجلة لهذا المستخدم
             const animalsRef = collection(db, "animals");
             const animalQuery = query(animalsRef, where("ownerPhone", "==", userData.phone));
             const animalSnapshot = await getDocs(animalQuery);
@@ -102,8 +113,8 @@
   </script>
 </head>
 <body>
-  <h2>تسجيل الدخول</h2>
   <form id="loginForm">
+    <h2>تسجيل الدخول</h2>
     <input type="text" id="phone" placeholder="رقم الهاتف" required />
     <input type="password" id="password" placeholder="كلمة المرور" required />
     <button type="submit">دخول</button>
