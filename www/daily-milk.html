@@ -92,6 +92,7 @@
     const lastAnimalId = localStorage.getItem("lastAnimalId");
     if (lastAnimalId) {
       document.getElementById("animalId").value = lastAnimalId;
+      document.getElementById("date").value = new Date().toISOString().split("T")[0];
     }
 
     document.getElementById("milk-form").addEventListener("submit", async function(event) {
@@ -130,8 +131,18 @@ const milkData = {
 
         if (!response.ok) throw new Error("فشل التسجيل");
 
-        alert("✅ تم تسجيل إنتاج اللبن بنجاح");
-        window.location.href = "dashboard.html";
+      if (!response.ok) throw new Error("فشل التسجيل");
+
+alert("✅ تم تسجيل إنتاج اللبن بنجاح");
+
+if (confirm("هل تريد تسجيل حدث آخر؟")) {
+  window.location.href = "add-event.html";
+} else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+  window.location.href = "add-animal.html";
+} else {
+  window.location.href = "dashboard.html";
+}
+
       } catch (error) {
         console.error(error);
         alert("❌ حدث خطأ أثناء الاتصال بالخادم");
@@ -140,6 +151,7 @@ const milkData = {
   </script>
 </body>
 </html>
+
 
 
 
