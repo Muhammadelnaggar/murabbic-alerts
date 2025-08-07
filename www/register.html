@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>مربي جديد؟</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
-
   <style>
     body {
       font-family: 'Arial', sans-serif;
@@ -16,7 +15,6 @@
       min-height: 100vh;
       margin: 0;
     }
-
     .container {
       background: white;
       padding: 30px 25px;
@@ -25,7 +23,6 @@
       max-width: 400px;
       width: 90%;
     }
-
     h2 {
       text-align: center;
       color: #28a745;
@@ -34,19 +31,16 @@
       font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin-bottom: 25px;
     }
-
     label {
       display: block;
       margin-bottom: 5px;
       font-weight: bold;
       color: black;
     }
-
     .required-star::after {
       content: " *";
       color: red;
     }
-
     input, select {
       width: 100%;
       padding: 10px;
@@ -56,7 +50,6 @@
       font-size: 16px;
       box-sizing: border-box;
     }
-
     button {
       width: 100%;
       background-color: #28a745;
@@ -67,23 +60,19 @@
       border-radius: 6px;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #218838;
     }
-
     .login-link {
       text-align: center;
       margin-top: 15px;
       font-size: 14px;
     }
-
     .login-link a {
       color: #2c7a33;
       text-decoration: none;
       font-weight: bold;
     }
-
     .login-link a:hover {
       text-decoration: underline;
     }
@@ -137,22 +126,29 @@
     </div>
   </div>
 
-<script>
-  const apiUrl = "https://murabbic-alerts.onrender.com";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
   const form = document.getElementById("registerForm");
   const countrySelect = document.getElementById("country");
   const governorateSelect = document.getElementById("governorate");
 
   const regionsByCountry = {
-    "مصر": [
-      "القاهرة", "الجيزة", "الإسكندرية", "المنوفية", "الدقهلية", "الشرقية", "كفر الشيخ",
-      "الغربية", "البحيرة", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا",
-      "الأقصر", "أسوان", "البحر الأحمر", "شمال سيناء", "جنوب سيناء", "الوادي الجديد", "مطروح"
-    ],
-    "السعودية": [
-      "الرياض", "مكة", "المدينة", "القصيم", "الشرقية", "عسير", "تبوك",
-      "حائل", "نجران", "جازان", "الباحة", "الجوف", "الحدود الشمالية"
-    ]
+    "مصر": ["القاهرة", "الجيزة", "الإسكندرية", "المنوفية", "الدقهلية", "الشرقية", "كفر الشيخ", "الغربية", "البحيرة", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "شمال سيناء", "جنوب سيناء", "الوادي الجديد", "مطروح"],
+    "السعودية": ["الرياض", "مكة", "المدينة", "القصيم", "الشرقية", "عسير", "تبوك", "حائل", "نجران", "جازان", "الباحة", "الجوف", "الحدود الشمالية"]
   };
 
   countrySelect.addEventListener("change", () => {
@@ -190,44 +186,33 @@
       return;
     }
 
-    const user = {
-      name,
-      phone,
-      password,
-      userType,
-      country,
-      governorate,
-      email,
-      registrationDate: new Date().toISOString()
-    };
-
     try {
-      const res = await fetch(`${apiUrl}/api/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 409) {
-          alert("رقم الهاتف مستخدم مسبقًا");
-        } else {
-          alert(data.error || "حدث خطأ أثناء التسجيل");
-        }
+      const snapshot = await getDocs(collection(db, "users"));
+      const existing = snapshot.docs.find(doc => doc.data().phone === phone);
+      if (existing) {
+        alert("❗ رقم الهاتف مسجل بالفعل");
         return;
       }
+
+      await addDoc(collection(db, "users"), {
+        fullName: name,
+        phone,
+        password,
+        userType,
+        country,
+        governorate,
+        email,
+        createdAt: serverTimestamp()
+      });
 
       alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
     } catch (err) {
       console.error(err);
-      alert("حدث خطأ في الاتصال بالخادم");
+      alert("❌ حدث خطأ أثناء التسجيل");
     }
   });
 </script>
-
 </body>
 </html>
