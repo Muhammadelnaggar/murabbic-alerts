@@ -80,11 +80,16 @@
     </select>
 
     <label for="productionStatus">الحالة الإنتاجية:</label>
-    <select id="productionStatus" required>
+    <select id="productionStatus" required onchange="toggleMilkField()">
       <option value="">اختر الحالة</option>
       <option value="حلاب">حلاب</option>
       <option value="جاف">جاف</option>
     </select>
+
+    <div id="milkField" style="display:none;">
+      <label for="dailyMilk">إنتاج اللبن اليومي (لتر):</label>
+      <input type="number" id="dailyMilk" placeholder="اكتب كمية اللبن">
+    </div>
 
     <label for="reproductiveStatus">الحالة التناسلية:</label>
     <select id="reproductiveStatus" required>
@@ -124,6 +129,21 @@
         option.textContent = b;
         breedSelect.appendChild(option);
       });
+    }
+
+    function toggleMilkField() {
+      const productionStatus = document.getElementById("productionStatus").value;
+      const milkField = document.getElementById("milkField");
+      const dailyMilkInput = document.getElementById("dailyMilk");
+
+      if (productionStatus === "حلاب") {
+        milkField.style.display = "block";
+        dailyMilkInput.required = true;
+      } else {
+        milkField.style.display = "none";
+        dailyMilkInput.required = false;
+        dailyMilkInput.value = "";
+      }
     }
 
     document.getElementById("animalForm").addEventListener("submit", function(e) {
