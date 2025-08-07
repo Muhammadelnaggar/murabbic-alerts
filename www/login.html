@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تسجيل الدخول</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
@@ -92,8 +92,32 @@
     </div>
   </div>
 
-  <script>
-    const apiUrl = "https://murabbic-alerts.onrender.com";
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+  authDomain: "murabbik.firebaseapp.com",
+  projectId: "murabbik",
+  storageBucket: "murabbik.firebasestorage.app",
+  messagingSenderId: "402719243568",
+  appId: "1:402719243568:web:631114a260d23202dd5cf5"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     const form = document.getElementById("loginForm");
 
     form.addEventListener("submit", async function (e) {
@@ -108,29 +132,29 @@
       }
 
       try {
-       const res = await fetch(`${apiUrl}/api/users/login`, {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("phone", "==", phone), where("password", "==", password));
+        const snapshot = await getDocs(q);
 
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, password })
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          alert(data.error || "فشل في تسجيل الدخول");
+        if (snapshot.empty) {
+          alert("رقم الهاتف أو كلمة المرور غير صحيحة");
           return;
         }
 
-        localStorage.setItem("userId", data.userId);
+        let userData;
+        snapshot.forEach((doc) => {
+          userData = { id: doc.id, ...doc.data() };
+        });
+
+        localStorage.setItem("userId", userData.id);
         alert("✅ تم تسجيل الدخول بنجاح");
         window.location.href = "dashboard.html";
+
       } catch (err) {
         console.error(err);
-        alert("حدث خطأ في الاتصال بالخادم");
+        alert("حدث خطأ أثناء الاتصال بقاعدة البيانات");
       }
     });
   </script>
 </body>
 </html>
-
