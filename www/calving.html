@@ -2,21 +2,22 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل ولادة</title>
+  <title>تسجيل حدث ولادة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       direction: rtl;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f9f9f9;
+      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
       padding: 20px;
       margin: 0;
     }
 
     h2 {
       text-align: center;
-      color: #2c3e50;
+      color: #2e7d32;
       margin-bottom: 30px;
+      font-size: 26px;
     }
 
     form {
@@ -25,10 +26,15 @@
       gap: 15px;
       max-width: 500px;
       margin: auto;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
 
     label {
       font-weight: bold;
+      color: #1b5e20;
     }
 
     input, select, button {
@@ -39,36 +45,75 @@
       box-sizing: border-box;
     }
 
+    .radio-group {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    .radio-group label {
+      margin-left: 10px;
+      font-weight: normal;
+    }
+
     button {
-      background-color: #28a745;
+      background-color: #2e7d32;
       color: white;
       border: none;
       cursor: pointer;
+      transition: background-color 0.3s;
     }
 
     button:hover {
-      background-color: #218838;
+      background-color: #1a6324;
     }
 
     @media (max-width: 600px) {
       form {
-        padding: 0 10px;
+        padding: 10px;
       }
+      .radio-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    #calfCardModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    #calfCardContent {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
   </style>
   <script>
   document.addEventListener("DOMContentLoaded", () => {
     const isNewUser = localStorage.getItem("isNewUser") === "true";
     const lastAnimalId = localStorage.getItem("lastAnimalId");
+    const lastEventDate = localStorage.getItem("lastEventDate") || new Date().toISOString().split("T")[0];
 
-    if (isNewUser && lastAnimalId) {
-      const input = document.getElementById("animalId");
-      if (input) {
-        input.value = lastAnimalId;
-        input.readOnly = true;
-      } else {
-        console.warn("حقل animalId غير موجود!");
-      }
+    const animalInput = document.getElementById("animalId");
+    const dateInput = document.getElementById("calvingDate");
+
+    if (animalInput && lastAnimalId) {
+      animalInput.value = lastAnimalId;
+      animalInput.readOnly = true;
+    }
+
+    if (dateInput) {
+      dateInput.value = lastEventDate;
     }
   });
   </script>
@@ -84,54 +129,72 @@
     <label for="calvingDate">تاريخ الولادة</label>
     <input type="date" id="calvingDate" name="calvingDate" required>
 
-    <label for="birthEase">سهولة الولادة</label>
-    <select id="birthEase" name="birthEase">
-      <option value="سهلة">سهلة</option>
-      <option value="عسرة">عسرة</option>
-    </select>
+    <label>سهولة الولادة</label>
+    <div class="radio-group">
+      <label><input type="radio" name="birthEase" value="سهلة" checked> سهلة</label>
+      <label><input type="radio" name="birthEase" value="عسرة"> عسرة</label>
+    </div>
 
-    <label for="calfGender">جنس العجل</label>
-    <select id="calfGender" name="calfGender">
-      <option value="ذكر">ذكر</option>
-      <option value="أنثى">أنثى</option>
-    </select>
+    <label>جنس العجل</label>
+    <div class="radio-group">
+      <label><input type="radio" name="calfGender" value="ذكر" checked> ذكر</label>
+      <label><input type="radio" name="calfGender" value="أنثى"> أنثى</label>
+    </div>
 
     <label for="calfId">رقم العجل</label>
     <input type="text" id="calfId" name="calfId" required>
 
-    <label for="calfFate">مصير العجل</label>
-    <select id="calfFate" name="calfFate">
-      <option value="تربية">تربية</option>
-      <option value="بيع">بيع</option>
-    </select>
+    <label>مصير العجل</label>
+    <div class="radio-group">
+      <label><input type="radio" name="calfFate" value="تربية" checked> تربية</label>
+      <label><input type="radio" name="calfFate" value="بيع"> بيع</label>
+    </div>
 
     <button type="submit">💾 تسجيل</button>
   </form>
 
+  <div id="calfCardModal">
+    <div id="calfCardContent">
+      <h3 style="text-align:center; color:#2e7d32;">📋 بطاقة العجل رقم <span id="cardNumber"></span></h3>
+      <ul style="list-style: none; padding: 0; font-size: 18px;">
+        <li><strong>النوع:</strong> <span id="cardType"></span></li>
+        <li><strong>الجنس:</strong> <span id="cardGender"></span></li>
+        <li><strong>السلالة:</strong> <span id="cardBreed"></span></li>
+        <li><strong>الحالة التناسلية:</strong> <span id="cardRepro"></span></li>
+        <li><strong>تاريخ الميلاد:</strong> <span id="cardDOB"></span></li>
+        <li><strong>رقم المستخدم:</strong> <span id="cardOwner"></span></li>
+        <li><strong>رقم الأم:</strong> <span id="cardMother"></span></li>
+        <li><strong>رقم الأب:</strong> <span id="cardFather">غير مسجل</span></li>
+      </ul>
+      <button onclick="document.getElementById('calfCardModal').style.display='none'">🆗 إغلاق</button>
+    </div>
+  </div>
+
   <script>
     const form = document.getElementById("calvingForm");
-    const calvingDateInput = document.getElementById("calvingDate");
-    calvingDateInput.valueAsDate = new Date();
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      const gender = form.querySelector('input[name="calfGender"]:checked').value;
+      const birthEase = form.querySelector('input[name="birthEase"]:checked').value;
+      const fate = form.querySelector('input[name="calfFate"]:checked').value;
+      const calfNumber = form.calfId.value;
 
       const data = {
         type: "ولادة",
         animalId: form.animalId.value,
         calvingDate: form.calvingDate.value,
-        birthEase: form.birthEase.value,
-        calfGender: form.calfGender.value,
-        calfId: form.calfId.value,
-        calfFate: form.calfFate.value,
+        birthEase: birthEase,
+        calfGender: gender,
+        calfId: calfNumber,
+        calfFate: fate,
         isSmartAlert: true,
         alertRule: "ولادة"
-
       };
 
       try {
-       const res = await fetch("https://murabbic-alerts.onrender.com/api/calvings", {
-
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
@@ -140,17 +203,58 @@
         const result = await res.json();
 
         if (res.ok) {
-          alert("✅ تم تسجيل حدث الولادة بنجاح");
+          if (fate === "تربية") {
+            const motherId = form.animalId.value;
+            const motherRes = await fetch(`https://murabbic-alerts.onrender.com/api/animals/${motherId}`);
+            const mother = await motherRes.json();
 
-          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
-          if (anotherEvent) {
-            window.location.href = "add-event.html";
+            const calfAnimal = {
+              number: calfNumber,
+              type: "عجل",
+              gender: gender,
+              breed: mother?.breed || "غير محدد",
+              productionStatus: "عجل",
+              reproductiveStatus: "حديث الولادة",
+              lastCalvingDate: form.calvingDate.value,
+              userId: localStorage.getItem("userId"),
+              motherId: motherId,
+              fatherId: null
+            };
+
+            if ((gender === "ذكر" && !calfNumber.startsWith("1000")) || (gender === "أنثى" && !calfNumber.startsWith("2000"))) {
+              alert("⚠️ يجب أن يبدأ رقم العجل بـ 1000 للذكر أو 2000 للأنثى لتمييزه عن باقي القطيع.");
+              return;
+            }
+
+            await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(calfAnimal)
+            });
+
+            document.getElementById("cardNumber").textContent = calfNumber;
+            document.getElementById("cardType").textContent = "عجل";
+            document.getElementById("cardGender").textContent = gender;
+            document.getElementById("cardBreed").textContent = calfAnimal.breed;
+            document.getElementById("cardRepro").textContent = calfAnimal.reproductiveStatus;
+            document.getElementById("cardDOB").textContent = form.calvingDate.value;
+            document.getElementById("cardOwner").textContent = calfAnimal.userId;
+            document.getElementById("cardMother").textContent = motherId;
+            document.getElementById("cardFather").textContent = calfAnimal.fatherId || "غير مسجل";
+
+            document.getElementById("calfCardModal").style.display = "flex";
           } else {
-            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-            if (anotherAnimal) {
-              window.location.href = "add-animal.html";
+            alert("✅ تم تسجيل حدث الولادة بنجاح");
+            const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+            if (anotherEvent) {
+              window.location.href = "add-event.html";
             } else {
-              window.location.href = "dashboard.html";
+              const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+              if (anotherAnimal) {
+                window.location.href = "add-animal.html";
+              } else {
+                window.location.href = "dashboard.html";
+              }
             }
           }
 
@@ -166,6 +270,3 @@
   </script>
 </body>
 </html>
-
-
-
