@@ -7,19 +7,15 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const dataDir = path.join(__dirname, "data");
-
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir);
+  }
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
 
 
-
-// إنشاء مجلد data إذا لم يكن موجودًا
-const dataDir = path.join(__dirname, "data");
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir);
-}
 app.post('/api/calvings', (req, res) => {
   const calving = req.body;
 
