@@ -153,17 +153,16 @@
       return;
     }
 
-    const userId = crypto.randomUUID();
-    const user = {
-      userId,
-      name,
-      phone,
-      password,
-      userType,
-      governorate,
-      email,
-      registrationDate: new Date().toISOString()
-    };
+   const user = {
+  name,
+  phone,
+  password,
+  userType,
+  governorate,
+  email,
+  registrationDate: new Date().toISOString()
+};
+
 
     try {
       const res = await fetch(`${apiUrl}/api/users`, {
@@ -183,7 +182,8 @@
         return;
       }
 
-      localStorage.setItem("userId", userId);
+      window.location.href = "login.html";
+
       alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
@@ -196,3 +196,4 @@
 
 </body>
 </html>
+
