@@ -1,0 +1,19 @@
+// www/firebase.js
+
+// تحميل مكتبات Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// إعدادات Firebase - استبدلها بالقيم الحقيقية من مشروعك
+const firebaseConfig = {
+  apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+  authDomain: "murabbik.firebaseapp.com",
+  projectId: "murabbik",
+  storageBucket: "murabbik.appspot.com",
+  messagingSenderId: "402719243568",
+  appId: "1:402719243568:web:631114a260d23202dd5cf5"
+};
+
+// تهيئة Firebase
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
