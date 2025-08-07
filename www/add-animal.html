@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل الدخول</title>
+  <title>تسجيل حيوان جديد</title>
   <style>
     body {
       direction: rtl;
@@ -16,11 +17,11 @@
       background-color: #fff;
       padding: 20px;
       border-radius: 15px;
-      max-width: 400px;
+      max-width: 600px;
       margin: auto;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 12px;
       margin-bottom: 15px;
@@ -29,19 +30,22 @@
       border: 1px solid #ccc;
     }
     button {
-      background-color: #007bff;
+      background-color: #28a745;
       color: white;
       font-weight: bold;
       border: none;
       cursor: pointer;
     }
     button:hover {
-      background-color: #0056b3;
+      background-color: #218838;
+    }
+    .hidden {
+      display: none;
     }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
@@ -56,46 +60,109 @@
     const db = getFirestore(app);
 
     window.addEventListener("DOMContentLoaded", () => {
-      const form = document.getElementById("loginForm");
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const phone = document.getElementById("phone").value.trim();
-        const password = document.getElementById("password").value.trim();
+      const form = document.getElementById('animalForm');
+      const typeSelect = document.getElementById('type');
+      const breedSelect = document.getElementById('breed');
+      const productionStatus = document.getElementById('productionStatus');
+      const milkProduction = document.getElementById('milkProduction');
+      const reproductiveStatus = document.getElementById('reproductiveStatus');
+      const lastInseminationDate = document.getElementById('lastInseminationDate');
 
-        if (!phone || !password) {
-          alert("يرجى إدخال رقم الهاتف وكلمة المرور.");
+      typeSelect.addEventListener('change', () => {
+        const type = typeSelect.value;
+        breedSelect.innerHTML = '<option value="">السلالة</option>';
+        if (type === 'بقرة') {
+          ['خليط', 'هولشتاين', 'جيرسي', 'مونبليار', 'سيمينتال', 'أخرى'].forEach(b =>
+            breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+          );
+        } else if (type === 'جاموسة') {
+          ['مصري', 'هجين إيطالي', 'هجين هندي'].forEach(b =>
+            breedSelect.innerHTML += `<option value="${b}">${b}</option>`
+          );
+        }
+      });
+
+      productionStatus.addEventListener('change', () => {
+        milkProduction.classList.toggle('hidden', productionStatus.value !== 'حلاب');
+        if (productionStatus.value !== 'حلاب') milkProduction.value = '';
+      });
+
+      reproductiveStatus.addEventListener('change', () => {
+        lastInseminationDate.classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
+        document.getElementById('inseminationLabel').classList.toggle('hidden', reproductiveStatus.value !== 'ملقحة');
+        if (reproductiveStatus.value !== 'ملقحة') lastInseminationDate.value = '';
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const animal = {
+          number: document.getElementById('number').value.trim(),
+          type: typeSelect.value,
+          breed: breedSelect.value,
+          productionStatus: productionStatus.value,
+          milkProduction: milkProduction.value || null,
+          reproductiveStatus: reproductiveStatus.value,
+          lastInseminationDate: lastInseminationDate.value || null,
+          birthDate: document.getElementById('birthDate').value || null,
+          lastCalvingDate: document.getElementById('lastCalvingDate').value,
+          createdAt: serverTimestamp()
+        };
+
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          alert("برجاء تسجيل الدخول أولاً.");
+          window.location.href = "login.html";
           return;
         }
 
         try {
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("phone", "==", phone), where("password", "==", password));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
-            const userData = userDoc.data();
-            localStorage.setItem("userId", userDoc.id);
-            localStorage.setItem("userPhone", userData.phone);
-            alert("✅ تم تسجيل الدخول بنجاح");
-            window.location.href = "add-animal.html";
-          } else {
-            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
-          }
+          const animalsRef = collection(db, "animals");
+          await addDoc(animalsRef, { ...animal, userId });
+          alert("✅ تم تسجيل الحيوان بنجاح");
+          localStorage.setItem("lastAnimalId", animal.number);
+          window.location.href = "add-event.html";
         } catch (err) {
           console.error(err);
-          alert("حدث خطأ أثناء تسجيل الدخول.");
+          alert("حدث خطأ أثناء الحفظ في قاعدة البيانات.");
         }
       });
     });
   </script>
 </head>
 <body>
-  <h2>تسجيل الدخول</h2>
-  <form id="loginForm">
-    <input type="text" id="phone" placeholder="رقم الهاتف" required />
-    <input type="password" id="password" placeholder="كلمة المرور" required />
-    <button type="submit">دخول</button>
+  <h2>تسجيل حيوان جديد</h2>
+  <form id="animalForm">
+    <input type="text" id="number" placeholder="رقم الحيوان" required />
+    <select id="type" required>
+      <option value="">نوع الحيوان</option>
+      <option value="بقرة">بقرة</option>
+      <option value="جاموسة">جاموسة</option>
+    </select>
+    <select id="breed" required>
+      <option value="">السلالة</option>
+    </select>
+    <select id="productionStatus" required>
+      <option value="">الحالة الإنتاجية</option>
+      <option value="حلاب">حلاب</option>
+      <option value="جاف">جاف</option>
+    </select>
+    <input type="number" id="milkProduction" placeholder="إنتاج اللبن اليومي (كجم)" class="hidden" />
+    <select id="reproductiveStatus" required>
+      <option value="">الحالة التناسلية</option>
+      <option value="حديث الولادة">حديث الولادة</option>
+      <option value="ملقحة">ملقحة</option>
+      <option value="مفتوحة">مفتوحة</option>
+      <option value="عشار">عشار</option>
+      <option value="اجهاض">اجهاض</option>
+    </select>
+    <p id="inseminationLabel" class="hidden" style="text-align:right;font-weight:bold;">تاريخ آخر تلقيح:</p>
+    <input type="date" id="lastInseminationDate" class="hidden"/>
+    <p style="text-align:right;font-weight:bold;">تاريخ الميلاد (اختياري):</p>
+    <input type="date" id="birthDate" />
+    <p style="text-align:right;font-weight:bold;">تاريخ آخر ولادة:</p>
+    <input type="date" id="lastCalvingDate" required />
+    <button type="submit">تسجيل الحيوان</button>
   </form>
 </body>
 </html>
