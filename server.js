@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
+  const usersPath = path.join(dataDir, 'users.json');
   }
 app.use(cors());
 app.use(express.json());
@@ -339,7 +340,7 @@ app.get('/api/animals', (req, res) => {
 
 // === مسارات ملفات البيانات ===
 
-const usersPath = path.join(dataDir, 'users.json');
+
 const animalsPath = path.join(dataDir, 'animals.json');
 const alertsPath = path.join(dataDir, 'alerts.json');
 
