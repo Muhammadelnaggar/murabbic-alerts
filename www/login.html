@@ -92,10 +92,9 @@
             alert("✅ تم تسجيل الدخول بنجاح");
 
             const animalsRef = collection(db, "animals");
-            const animalQuery = query(animalsRef, where("ownerPhone", "==", userData.phone));
+            const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
             const animalSnapshot = await getDocs(animalQuery);
 
-            // فقط المستخدم الجديد يذهب لتسجيل حيوان
             if (animalSnapshot.empty) {
               window.location.href = "add-animal.html";
             } else {
