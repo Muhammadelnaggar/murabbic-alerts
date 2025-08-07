@@ -1,19 +1,46 @@
-// www/firebase.js
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>اختبار Firebase</title>
+</head>
+<body>
+  <h2>🔥 اختبار الاتصال بـ Firebase Firestore</h2>
+  <button id="sendData">أرسل بيانات اختبار</button>
 
-// تحميل مكتبات Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <script type="module">
+    // استيراد Firebase من CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// إعدادات Firebase - استبدلها بالقيم الحقيقية من مشروعك
-const firebaseConfig = {
-  apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
-  authDomain: "murabbik.firebaseapp.com",
-  projectId: "murabbik",
-  storageBucket: "murabbik.appspot.com",
-  messagingSenderId: "402719243568",
-  appId: "1:402719243568:web:631114a260d23202dd5cf5"
-};
+    // إعدادات Firebase - ضع القيم الخاصة بك هنا
+    const firebaseConfig = {
+      apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-// تهيئة Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+    // تهيئة التطبيق وقاعدة البيانات
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // عند الضغط على الزر
+    document.getElementById("sendData").addEventListener("click", async () => {
+      try {
+        const docRef = await addDoc(collection(db, "testCollection"), {
+          name: "مستخدم تجريبي",
+          time: new Date().toISOString()
+        });
+        alert("✅ تم الإرسال! ID: " + docRef.id);
+      } catch (e) {
+        console.error("❌ فشل الإرسال", e);
+        alert("حدث خطأ أثناء الإرسال");
+      }
+    });
+  </script>
+</body>
+</html>
