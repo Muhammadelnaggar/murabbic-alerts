@@ -114,8 +114,17 @@
         <option value="طالب">طالب</option>
       </select>
 
-      <label for="governorate" class="required-star">المحافظة</label>
-      <input type="text" id="governorate" name="governorate" required />
+      <label for="country" class="required-star">الدولة</label>
+      <select id="country" name="country" required>
+        <option value="">-- اختر الدولة --</option>
+        <option value="مصر">مصر</option>
+        <option value="السعودية">السعودية</option>
+      </select>
+
+      <label for="governorate" class="required-star">المنطقة / المحافظة</label>
+      <select id="governorate" name="governorate" required>
+        <option value="">-- اختر المحافظة --</option>
+      </select>
 
       <label for="email">البريد الإلكتروني (اختياري)</label>
       <input type="email" id="email" name="email" />
@@ -128,9 +137,36 @@
     </div>
   </div>
 
- <script>
+<script>
   const apiUrl = "https://murabbic-alerts.onrender.com";
   const form = document.getElementById("registerForm");
+  const countrySelect = document.getElementById("country");
+  const governorateSelect = document.getElementById("governorate");
+
+  const regionsByCountry = {
+    "مصر": [
+      "القاهرة", "الجيزة", "الإسكندرية", "المنوفية", "الدقهلية", "الشرقية", "كفر الشيخ",
+      "الغربية", "البحيرة", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا",
+      "الأقصر", "أسوان", "البحر الأحمر", "شمال سيناء", "جنوب سيناء", "الوادي الجديد", "مطروح"
+    ],
+    "السعودية": [
+      "الرياض", "مكة", "المدينة", "القصيم", "الشرقية", "عسير", "تبوك",
+      "حائل", "نجران", "جازان", "الباحة", "الجوف", "الحدود الشمالية"
+    ]
+  };
+
+  countrySelect.addEventListener("change", () => {
+    const selectedCountry = countrySelect.value;
+    governorateSelect.innerHTML = `<option value="">-- اختر المحافظة --</option>`;
+    if (regionsByCountry[selectedCountry]) {
+      regionsByCountry[selectedCountry].forEach(region => {
+        const option = document.createElement("option");
+        option.value = region;
+        option.textContent = region;
+        governorateSelect.appendChild(option);
+      });
+    }
+  });
 
   form.addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -140,10 +176,11 @@
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
     const userType = document.getElementById("userType").value;
+    const country = document.getElementById("country").value;
     const governorate = document.getElementById("governorate").value;
     const email = document.getElementById("email").value.trim();
 
-    if (!name || !phone || !password || !confirmPassword || !userType || !governorate) {
+    if (!name || !phone || !password || !confirmPassword || !userType || !country || !governorate) {
       alert("❗ جميع الحقول مطلوبة ما عدا البريد الإلكتروني");
       return;
     }
@@ -153,16 +190,16 @@
       return;
     }
 
-   const user = {
-  name,
-  phone,
-  password,
-  userType,
-  governorate,
-  email,
-  registrationDate: new Date().toISOString()
-};
-
+    const user = {
+      name,
+      phone,
+      password,
+      userType,
+      country,
+      governorate,
+      email,
+      registrationDate: new Date().toISOString()
+    };
 
     try {
       const res = await fetch(`${apiUrl}/api/users`, {
@@ -182,7 +219,6 @@
         return;
       }
 
-
       alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
@@ -195,5 +231,3 @@
 
 </body>
 </html>
-
-
