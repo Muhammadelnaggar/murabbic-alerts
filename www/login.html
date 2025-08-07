@@ -95,11 +95,11 @@
             const animalQuery = query(animalsRef, where("ownerPhone", "==", userData.phone));
             const animalSnapshot = await getDocs(animalQuery);
 
-            const isNewUser = userData.isNewUser;
-            if (!animalSnapshot.empty || isNewUser === false) {
-              window.location.href = "dashboard.html";
-            } else {
+            // فقط المستخدم الجديد يذهب لتسجيل حيوان
+            if (animalSnapshot.empty) {
               window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
             }
 
           } else {
