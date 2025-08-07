@@ -92,7 +92,7 @@
     </div>
 
     <label for="reproductiveStatus">الحالة التناسلية:</label>
-    <select id="reproductiveStatus" required>
+    <select id="reproductiveStatus" required onchange="toggleInseminationField()">
       <option value="">اختر الحالة</option>
       <option value="حديث الولادة">حديث الولادة</option>
       <option value="ملقحة">ملقحة</option>
@@ -107,8 +107,10 @@
     <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
     <input type="date" id="lastCalvingDate" required>
 
-    <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
-    <input type="date" id="lastInseminationDate" required>
+    <div id="inseminationField" style="display:none;">
+      <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
+      <input type="date" id="lastInseminationDate">
+    </div>
 
     <button type="submit">📥 تسجيل الحيوان</button>
   </form>
@@ -143,6 +145,21 @@
         milkField.style.display = "none";
         dailyMilkInput.required = false;
         dailyMilkInput.value = "";
+      }
+    }
+
+    function toggleInseminationField() {
+      const status = document.getElementById("reproductiveStatus").value;
+      const field = document.getElementById("inseminationField");
+      const input = document.getElementById("lastInseminationDate");
+
+      if (status === "ملقحة" || status === "عشار") {
+        field.style.display = "block";
+        input.required = true;
+      } else {
+        field.style.display = "none";
+        input.required = false;
+        input.value = "";
       }
     }
 
