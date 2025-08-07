@@ -103,59 +103,72 @@
     <button type="submit">💾 تسجيل التجفيف</button>
   </form>
 
- <script>
+<script>
+  window.onload = function () {
+    const storedAnimalId = localStorage.getItem("lastAnimalId");
+    if (storedAnimalId) {
+      document.getElementById("animal-id").value = storedAnimalId;
+      document.getElementById("animal-id").readOnly = true;
+    } else {
+      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+      window.location.href = "add-animal.html";
+    }
+  };
+
   function submitDryOff(event) {
     event.preventDefault();
 
-   const data = {
-        animalId: document.getElementById("animal-id").value,
-        dryOffDate: document.getElementById("date").value,
-        reason: document.querySelector('input[name="reason"]:checked')?.value,
-        pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
-        usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
-        type: "تجفيف" // ✅ ضروري لتصنيف الحدث,
-        isSmartAlert: true,
-        alertRule: "تجفيف"
-      };
-if (!data.animalId || !data.dryOffDate) {
-  alert("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولاً");
-  return;
-}
+    const data = {
+      animalId: document.getElementById("animal-id").value,
+      dryOffDate: document.getElementById("date").value,
+      reason: document.querySelector('input[name="reason"]:checked')?.value,
+      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
+      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
+      type: "تجفيف",
+      isSmartAlert: true,
+      alertRule: "تجفيف"
+    };
+
+    if (!data.animalId || !data.dryOffDate) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولاً");
+      return;
+    }
 
     fetch("https://murabbic-alerts.onrender.com/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     })
-    .then(res => {
-      if (res.ok) {
-        const isNewUser = localStorage.getItem("isNewUser") === "true";
-
-        if (isNewUser) {
-          if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-            window.location.href = "add-event.html";
-          } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-            window.location.href = "add-animal.html";
+      .then(res => {
+        if (res.ok) {
+          const isNewUser = localStorage.getItem("isNewUser") === "true";
+          if (isNewUser) {
+            if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+              window.location.href = "add-event.html";
+            } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+              window.location.href = "add-animal.html";
+            } else {
+              localStorage.removeItem("isNewUser");
+              localStorage.removeItem("lastAnimalId");
+              window.location.href = "dashboard.html";
+            }
           } else {
-            localStorage.removeItem("isNewUser");
-            localStorage.removeItem("lastAnimalId");
             window.location.href = "dashboard.html";
           }
         } else {
-          window.location.href = "dashboard.html";
+          alert("❌ حدث خطأ أثناء الحفظ.");
         }
-      } else {
-        alert("❌ حدث خطأ أثناء الحفظ.");
-      }
-    })
-    .catch(err => {
-      console.error("❌ خطأ:", err);
-      alert("فشل الاتصال بالخادم.");
-    });
+      })
+      .catch(err => {
+        console.error("❌ خطأ:", err);
+        alert("فشل الاتصال بالخادم.");
+      });
   }
 </script>
 
+
 </body>
 </html>
+
 
 
