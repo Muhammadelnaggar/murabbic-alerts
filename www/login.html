@@ -9,7 +9,7 @@
     body {
       direction: rtl;
       font-family: 'Cairo', 'Arial', sans-serif;
-      background: linear-gradient(to bottom right, #ffffcc, #eeffdd); /* أصفر كناري وأخضر فاتح */
+      background: linear-gradient(to bottom right, #ffffcc, #eeffdd);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -95,7 +95,8 @@
             const animalQuery = query(animalsRef, where("ownerPhone", "==", userData.phone));
             const animalSnapshot = await getDocs(animalQuery);
 
-            if (!animalSnapshot.empty) {
+            const isNewUser = userData.isNewUser;
+            if (!animalSnapshot.empty || isNewUser === false) {
               window.location.href = "dashboard.html";
             } else {
               window.location.href = "add-animal.html";
