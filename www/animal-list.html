@@ -145,20 +145,32 @@
   <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     let animalsData = [];
 
-    fetch('https://murabbic-alerts.onrender.com/api/animals')
-      .then(res => res.json())
-      .then(data => {
-        const userId = localStorage.getItem("userId");
-        animalsData = data.filter(a => a.userId === userId);
-        renderTable(animalsData);
-      })
-      .catch(error => {
-        document.getElementById('noData').style.display = 'block';
-        console.error('❌ فشل تحميل البيانات:', error);
-      });
+    const userId = localStorage.getItem("userId");
+
+    const animalsRef = collection(db, "animals");
+    const q = query(animalsRef, where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    const data = snapshot.docs.map(doc => doc.data());
+    animalsData = data;
+    renderTable(animalsData);
 
     function renderTable(data) {
       const tbody = document.getElementById('animalBody');
@@ -194,11 +206,11 @@
       });
     }
 
-    function viewCard(animalNumber) {
+    window.viewCard = function(animalNumber) {
       window.location.href = `cow-card.html?number=${animalNumber}`;
     }
 
-    function goToAddEvent(animalId) {
+    window.goToAddEvent = function(animalId) {
       if (!animalId) {
         alert("❗ لا يوجد animalId لهذا الحيوان.");
         return;
@@ -213,18 +225,15 @@
       renderTable(filtered);
     });
 
-    function filterType(type) {
+    window.filterType = function(type) {
       const filtered = animalsData.filter(a => a.type === type);
       renderTable(filtered);
     }
 
-    function resetFilter() {
+    window.resetFilter = function() {
       renderTable(animalsData);
       document.getElementById('searchNumber').value = '';
     }
   </script>
 </body>
 </html>
-
-
-
