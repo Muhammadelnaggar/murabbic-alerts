@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -69,14 +68,16 @@
     <input type="text" id="animalNumber" required>
 
     <label for="animalType">نوع الحيوان:</label>
-    <select id="animalType" required>
+    <select id="animalType" required onchange="updateBreedOptions()">
       <option value="">اختر النوع</option>
       <option value="بقرة">بقرة</option>
       <option value="جاموسة">جاموسة</option>
     </select>
 
     <label for="breed">السلالة:</label>
-    <input type="text" id="breed" required>
+    <select id="breed" required>
+      <option value="">اختر السلالة</option>
+    </select>
 
     <label for="productionStatus">الحالة الإنتاجية:</label>
     <select id="productionStatus" required>
@@ -108,6 +109,23 @@
   </form>
 
   <script>
+    const cowBreeds = ["خليط", "هولشتاين", "جيرسي", "مونبليار", "سيمينتال", "أخرى"];
+    const buffaloBreeds = ["مصري", "هجين إيطالي", "هجين هندي"];
+
+    function updateBreedOptions() {
+      const animalType = document.getElementById("animalType").value;
+      const breedSelect = document.getElementById("breed");
+      breedSelect.innerHTML = '<option value="">اختر السلالة</option>';
+
+      const breeds = animalType === "بقرة" ? cowBreeds : animalType === "جاموسة" ? buffaloBreeds : [];
+      breeds.forEach(b => {
+        const option = document.createElement("option");
+        option.value = b;
+        option.textContent = b;
+        breedSelect.appendChild(option);
+      });
+    }
+
     document.getElementById("animalForm").addEventListener("submit", function(e) {
       e.preventDefault();
       alert("✅ تم تسجيل الحيوان بنجاح.");
