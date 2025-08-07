@@ -84,7 +84,7 @@
 
   <form id="diseaseForm">
     <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+   <input type="text" id="animalId" name="animalId" readonly>
 
     <label for="diseaseDate">تاريخ التشخيص</label>
     <input type="date" id="diseaseDate" name="diseaseDate" required>
@@ -113,6 +113,14 @@
   </form>
 
 <script>
+  const storedAnimalId = localStorage.getItem("lastAnimalId");
+if (storedAnimalId) {
+  document.getElementById("animalId").value = storedAnimalId;
+} else {
+  alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+  window.location.href = "add-animal.html";
+}
+
   // تعيين التاريخ تلقائيًا
   document.getElementById("diseaseDate").valueAsDate = new Date();
 
@@ -151,6 +159,7 @@
 
 </body>
 </html>
+
 
 
 
