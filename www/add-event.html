@@ -10,53 +10,74 @@
       direction: rtl;
       background-color: #fff9db;
       font-family: 'Arial', sans-serif;
-      padding: 20px;
+      padding: 10px;
+      margin: 0;
       color: #1b5e20;
     }
     h1 {
       text-align: center;
-      font-size: 28px;
-      margin-bottom: 30px;
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #2e7d32;
+    }
+    .animal-info, .date-info {
+      text-align: center;
+      font-size: 18px;
+      margin-bottom: 10px;
       color: #2e7d32;
     }
     .warning {
       text-align: center;
-      font-size: 20px;
+      font-size: 16px;
       color: #c62828;
-      margin-bottom: 20px;
-      display: none;
+      margin-bottom: 10px;
+    }
+    .form-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 10px 0 20px;
+    }
+    .form-fields input {
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .button-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 20px;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
     }
     .button-group button {
-      flex: 1 1 45%;
-      padding: 18px;
+      padding: 15px;
       background-color: #a5d6a7;
       border: none;
       border-radius: 10px;
-      font-size: 20px;
+      font-size: 16px;
       font-weight: bold;
       cursor: pointer;
       text-align: center;
+      transition: background-color 0.3s, color 0.3s;
     }
-    .button-group button.active {
+    .button-group button.active,
+    .button-group button:hover {
       background-color: #2e7d32;
       color: white;
-    }
-    .disabled {
-      opacity: 0.5;
-      pointer-events: none;
     }
   </style>
 </head>
 <body>
   <h1>تسجيل حدث</h1>
-  <div class="warning" id="noAnimalWarning">⚠️ لم يتم تحديد الحيوان! قم بتسجيل حيوان أولاً.</div>
+  <div class="animal-info" id="animalInfo"></div>
+  <div class="date-info" id="dateInfo"></div>
+  <div class="form-fields">
+    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
+    <input type="date" id="eventDateInput" required />
+  </div>
+  <div class="warning" id="noAnimalWarning"></div>
 
   <form id="eventForm">
     <div class="button-group" id="eventTypeGroup">
@@ -77,24 +98,36 @@
   </form>
 
   <script>
-    const animalId = localStorage.getItem("lastAnimalId");
+    const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+    const animalInfo = document.getElementById("animalInfo");
+    const dateInfo = document.getElementById("dateInfo");
     const warning = document.getElementById("noAnimalWarning");
     const group = document.getElementById("eventTypeGroup");
 
-    if (!animalId || animalId.trim() === "") {
-      warning.style.display = "block";
-      group.classList.add("disabled");
-    } else {
-      const buttons = document.querySelectorAll('#eventTypeGroup button');
-      buttons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          buttons.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          const page = btn.getAttribute('data-page');
-          if (page) window.location.href = `${page}?animalId=${animalId}`;
-        });
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+
+    document.getElementById("animalIdInput").value = storedAnimalId;
+    document.getElementById("eventDateInput").value = formattedDate;
+    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${storedAnimalId || 'غير محدد'}`;
+    dateInfo.textContent = `📅 التاريخ الحالي: ${today.toLocaleDateString('ar-EG')}`;
+
+    const buttons = document.querySelectorAll('#eventTypeGroup button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const animalId = document.getElementById("animalIdInput").value.trim();
+        const eventDate = document.getElementById("eventDateInput").value.trim();
+        if (!animalId || !eventDate) {
+          warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+          return;
+        }
+        warning.textContent = "";
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const page = btn.getAttribute('data-page');
+        if (page) window.location.href = `${page}?animalId=${animalId}&date=${eventDate}`;
       });
-    }
+    });
   </script>
 </body>
 </html>
