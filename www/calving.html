@@ -1,204 +1,275 @@
+
+
+   
 <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>إضافة حيوان</title>
+  <title>تسجيل حدث ولادة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: 'Cairo', sans-serif;
-      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
       direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
       padding: 20px;
       margin: 0;
     }
-    h1 {
+
+    h2 {
       text-align: center;
       color: #2e7d32;
+      margin-bottom: 30px;
       font-size: 26px;
-      margin-bottom: 25px;
-      font-weight: bold;
     }
+
     form {
-      max-width: 550px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-width: 500px;
       margin: auto;
-      background-color: #ffffff;
-      padding: 25px;
-      border-radius: 15px;
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
+
     label {
-      display: block;
-      margin-top: 15px;
       font-weight: bold;
-      color: #2e7d32;
+      color: #1b5e20;
     }
+
     input, select, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 6px;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
       font-size: 16px;
-      border: 1px solid #cddc39;
-      border-radius: 8px;
       box-sizing: border-box;
     }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #8bc34a;
-      box-shadow: 0 0 5px #cddc39;
+
+    .radio-group {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
     }
+
+    .radio-group label {
+      margin-left: 10px;
+      font-weight: normal;
+    }
+
     button {
-      background-color: #43a047;
-      color: white;
-      margin-top: 25px;
-      font-weight: bold;
-      border: none;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
       background-color: #2e7d32;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #1a6324;
+    }
+
+    @media (max-width: 600px) {
+      form {
+        padding: 10px;
+      }
+      .radio-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    #calfCardModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    #calfCardContent {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
   </style>
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const isNewUser = localStorage.getItem("isNewUser") === "true";
+    const lastAnimalId = localStorage.getItem("lastAnimalId");
+    const lastEventDate = localStorage.getItem("lastEventDate") || new Date().toISOString().split("T")[0];
+
+    const animalInput = document.getElementById("animalId");
+    const dateInput = document.getElementById("calvingDate");
+
+    if (animalInput && lastAnimalId) {
+      animalInput.value = lastAnimalId;
+      animalInput.readOnly = true;
+    }
+
+    if (dateInput) {
+      dateInput.value = lastEventDate;
+    }
+  });
+  </script>
 </head>
 <body>
-  <h1>➕ إضافة حيوان جديد</h1>
-  <form id="animalForm">
-    <label for="animalNumber">رقم الحيوان:</label>
-    <input type="text" id="animalNumber" required>
 
-    <label for="animalType">نوع الحيوان:</label>
-    <select id="animalType" required onchange="updateBreedOptions()">
-      <option value="">اختر النوع</option>
-      <option value="بقرة">بقرة</option>
-      <option value="جاموسة">جاموسة</option>
-    </select>
+  <h2>🍼 تسجيل حدث ولادة</h2>
 
-    <label for="breed">السلالة:</label>
-    <select id="breed" required>
-      <option value="">اختر السلالة</option>
-    </select>
+  <form id="calvingForm">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
 
-    <label for="productionStatus">الحالة الإنتاجية:</label>
-    <select id="productionStatus" required onchange="toggleMilkField()">
-      <option value="">اختر الحالة</option>
-      <option value="حلاب">حلاب</option>
-      <option value="جاف">جاف</option>
-    </select>
+    <label for="calvingDate">تاريخ الولادة</label>
+    <input type="date" id="calvingDate" name="calvingDate" required>
 
-    <div id="milkField" style="display:none;">
-      <label for="dailyMilk">إنتاج اللبن اليومي (لتر):</label>
-      <input type="number" id="dailyMilk" placeholder="اكتب كمية اللبن">
+    <label>سهولة الولادة</label>
+    <div class="radio-group">
+      <label><input type="radio" name="birthEase" value="سهلة" checked> سهلة</label>
+      <label><input type="radio" name="birthEase" value="عسرة"> عسرة</label>
     </div>
 
-    <label for="reproductiveStatus">الحالة التناسلية:</label>
-    <select id="reproductiveStatus" required onchange="toggleInseminationField()">
-      <option value="">اختر الحالة</option>
-      <option value="فارغة">فارغة</option>
-      <option value="حديث الولادة">حديث الولادة</option>
-      <option value="ملقحة">ملقحة</option>
-      <option value="عشار">عشار</option>
-      <option value="مفتوحة">مفتوحة</option>
-      <option value="إجهاض">إجهاض</option>
-    </select>
-
-    <label for="birthDate">تاريخ الميلاد (اختياري):</label>
-    <input type="date" id="birthDate">
-
-    <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
-    <input type="date" id="lastCalvingDate" required>
-
-    <div id="inseminationField" style="display:none;">
-      <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
-      <input type="date" id="lastInseminationDate">
+    <label>جنس العجل</label>
+    <div class="radio-group">
+      <label><input type="radio" name="calfGender" value="ذكر" checked> ذكر</label>
+      <label><input type="radio" name="calfGender" value="أنثى"> أنثى</label>
     </div>
 
-    <button type="submit">📥 تسجيل الحيوان</button>
+    <label for="calfId">رقم العجل</label>
+    <input type="text" id="calfId" name="calfId" required>
+
+    <label>مصير العجل</label>
+    <div class="radio-group">
+      <label><input type="radio" name="calfFate" value="تربية" checked> تربية</label>
+      <label><input type="radio" name="calfFate" value="بيع"> بيع</label>
+    </div>
+
+    <button type="submit">💾 تسجيل</button>
   </form>
 
+  <div id="calfCardModal">
+    <div id="calfCardContent">
+      <h3 style="text-align:center; color:#2e7d32;">📋 بطاقة العجل رقم <span id="cardNumber"></span></h3>
+      <ul style="list-style: none; padding: 0; font-size: 18px;">
+        <li><strong>النوع:</strong> <span id="cardType"></span></li>
+        <li><strong>الجنس:</strong> <span id="cardGender"></span></li>
+        <li><strong>السلالة:</strong> <span id="cardBreed"></span></li>
+        <li><strong>الحالة التناسلية:</strong> <span id="cardRepro"></span></li>
+        <li><strong>تاريخ الميلاد:</strong> <span id="cardDOB"></span></li>
+        <li><strong>رقم المستخدم:</strong> <span id="cardOwner"></span></li>
+        <li><strong>رقم الأم:</strong> <span id="cardMother"></span></li>
+        <li><strong>رقم الأب:</strong> <span id="cardFather">غير مسجل</span></li>
+      </ul>
+      <button onclick="document.getElementById('calfCardModal').style.display='none'">🆗 إغلاق</button>
+    </div>
+  </div>
+
   <script>
-    const cowBreeds = ["خليط", "هولشتاين", "جيرسي", "مونبليار", "سيمينتال", "أخرى"];
-    const buffaloBreeds = ["مصري", "هجين إيطالي", "هجين هندي"];
+    const form = document.getElementById("calvingForm");
 
-    function updateBreedOptions() {
-      const animalType = document.getElementById("animalType").value;
-      const breedSelect = document.getElementById("breed");
-      breedSelect.innerHTML = '<option value="">اختر السلالة</option>';
-      const breeds = animalType === "بقرة" ? cowBreeds : animalType === "جاموسة" ? buffaloBreeds : [];
-      breeds.forEach(b => {
-        const option = document.createElement("option");
-        option.value = b;
-        option.textContent = b;
-        breedSelect.appendChild(option);
-      });
-    }
-
-    function toggleMilkField() {
-      const productionStatus = document.getElementById("productionStatus").value;
-      const milkField = document.getElementById("milkField");
-      const dailyMilkInput = document.getElementById("dailyMilk");
-      if (productionStatus === "حلاب") {
-        milkField.style.display = "block";
-        dailyMilkInput.required = true;
-      } else {
-        milkField.style.display = "none";
-        dailyMilkInput.required = false;
-        dailyMilkInput.value = "";
-      }
-    }
-
-    function toggleInseminationField() {
-      const status = document.getElementById("reproductiveStatus").value;
-      const field = document.getElementById("inseminationField");
-      const input = document.getElementById("lastInseminationDate");
-      if (status === "ملقحة" || status === "عشار" || status === "فارغة") {
-        field.style.display = "block";
-        input.required = true;
-      } else {
-        field.style.display = "none";
-        input.required = false;
-        input.value = "";
-      }
-    }
-
-    document.getElementById("animalForm").addEventListener("submit", async function(e) {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      const gender = form.querySelector('input[name="calfGender"]:checked').value;
+      const birthEase = form.querySelector('input[name="birthEase"]:checked').value;
+      const fate = form.querySelector('input[name="calfFate"]:checked').value;
+      const calfNumber = form.calfId.value;
+
       const data = {
-        number: document.getElementById("animalNumber").value,
-        type: document.getElementById("animalType").value,
-        breed: document.getElementById("breed").value,
-        productionStatus: document.getElementById("productionStatus").value,
-        dailyMilk: document.getElementById("dailyMilk").value || null,
-        reproductiveStatus: document.getElementById("reproductiveStatus").value,
-        birthDate: document.getElementById("birthDate").value || null,
-        lastCalvingDate: document.getElementById("lastCalvingDate").value,
-        lastInseminationDate: document.getElementById("lastInseminationDate").value || null,
-        userId: localStorage.getItem("userId")
+        type: "ولادة",
+        animalId: form.animalId.value,
+        calvingDate: form.calvingDate.value,
+        birthEase: birthEase,
+        calfGender: gender,
+        calfId: calfNumber,
+        calfFate: fate,
+        isSmartAlert: true,
+        alertRule: "ولادة"
       };
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
+          body: JSON.stringify(data),
         });
 
+        const result = await res.json();
+
         if (res.ok) {
-          alert("✅ تم تسجيل الحيوان بنجاح.");
-          localStorage.setItem("lastAnimalId", data.number);
-          localStorage.setItem("lastEventDate", new Date().toISOString().split("T")[0]);
-          window.location.href = "add-event.html";
+          if (fate === "تربية") {
+            const motherId = form.animalId.value;
+            const motherRes = await fetch(`https://murabbic-alerts.onrender.com/api/animals/${motherId}`);
+            const mother = await motherRes.json();
+
+            const calfAnimal = {
+              number: calfNumber,
+              type: "عجل",
+              gender: gender,
+              breed: mother?.breed || "غير محدد",
+              productionStatus: "عجل",
+              reproductiveStatus: "حديث الولادة",
+              lastCalvingDate: form.calvingDate.value,
+              userId: localStorage.getItem("userId"),
+              motherId: motherId,
+              fatherId: null
+            };
+
+            if ((gender === "ذكر" && !calfNumber.startsWith("1000")) || (gender === "أنثى" && !calfNumber.startsWith("2000"))) {
+              alert("⚠️ يجب أن يبدأ رقم العجل بـ 1000 للذكر أو 2000 للأنثى لتمييزه عن باقي القطيع.");
+              return;
+            }
+
+            await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(calfAnimal)
+            });
+
+            document.getElementById("cardNumber").textContent = calfNumber;
+            document.getElementById("cardType").textContent = "عجل";
+            document.getElementById("cardGender").textContent = gender;
+            document.getElementById("cardBreed").textContent = calfAnimal.breed;
+            document.getElementById("cardRepro").textContent = calfAnimal.reproductiveStatus;
+            document.getElementById("cardDOB").textContent = form.calvingDate.value;
+            document.getElementById("cardOwner").textContent = calfAnimal.userId;
+            document.getElementById("cardMother").textContent = motherId;
+            document.getElementById("cardFather").textContent = calfAnimal.fatherId || "غير مسجل";
+
+            document.getElementById("calfCardModal").style.display = "flex";
+          } else {
+            alert("✅ تم تسجيل حدث الولادة بنجاح");
+            const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+            if (anotherEvent) {
+              window.location.href = "add-event.html";
+            } else {
+              const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+              if (anotherAnimal) {
+                window.location.href = "add-animal.html";
+              } else {
+                window.location.href = "dashboard.html";
+              }
+            }
+          }
+
         } else {
-          const result = await res.json();
-          alert("❌ فشل في التسجيل: " + (result?.error || ""));
+          alert("❌ فشل في تسجيل الحدث: " + (result?.error || ''));
         }
-      } catch (err) {
-        alert("❌ حدث خطأ أثناء الاتصال بالخادم.");
-        console.error(err);
+
+      } catch (error) {
+        console.error("⚠️ خطأ:", error);
+        alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
       }
     });
   </script>
 </body>
 </html>
-
