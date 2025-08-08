@@ -5,18 +5,9 @@
   <title>تحضير للولادة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script type="module">
-    // ✅ استيراد Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-  apiKey: "AIzaSyChRC0diqEcrdL9MK1NCjxHqWK_H1wPu1E",
-  authDomain: "murabbik.firebaseapp.com",
-  projectId: "murabbik",
-  storageBucket: "murabbik.appspot.com",
-  messagingSenderId: "402719243568",
-  appId: "1:402719243568:web:631114a260d23202dd5cf5"
-};
+    import { firebaseConfig } from './config.js';
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
