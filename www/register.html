@@ -128,11 +128,10 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
     authDomain: "murabbik.firebaseapp.com",
     projectId: "murabbik",
     storageBucket: "murabbik.appspot.com",
@@ -142,7 +141,6 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const auth = getAuth(app);
 
   const form = document.getElementById("registerForm");
   const countrySelect = document.getElementById("country");
@@ -169,16 +167,16 @@
   form.addEventListener("submit", async function (e) {
     e.preventDefault();
 
-    const fullName = document.getElementById("name").value.trim();
+    const name = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
     const userType = document.getElementById("userType").value;
     const country = document.getElementById("country").value;
     const governorate = document.getElementById("governorate").value;
-    const email = document.getElementById("email").value.trim() || `${phone}@murabbik.com`; // بديل لو الإيميل فارغ
+    const email = document.getElementById("email").value.trim();
 
-    if (!fullName || !phone || !password || !confirmPassword || !userType || !country || !governorate) {
+    if (!name || !phone || !password || !confirmPassword || !userType || !country || !governorate) {
       alert("❗ جميع الحقول مطلوبة ما عدا البريد الإلكتروني");
       return;
     }
@@ -189,14 +187,17 @@
     }
 
     try {
-      // إنشاء الحساب
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      const snapshot = await getDocs(collection(db, "users"));
+      const existing = snapshot.docs.find(doc => doc.data().phone === phone);
+      if (existing) {
+        alert("❗ رقم الهاتف مسجل بالفعل");
+        return;
+      }
 
-      // كتابة البيانات في Firestore باستخدام uid
-      await setDoc(doc(db, "users", uid), {
-        fullName,
+      await addDoc(collection(db, "users"), {
+        fullName: name,
         phone,
+        password,
         userType,
         country,
         governorate,
@@ -204,22 +205,23 @@
         createdAt: serverTimestamp()
       });
 
-      alert("✅ تم التسجيل بنجاح! الرجاء تسجيل الدخول");
+      alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        alert("❗ هذا البريد الإلكتروني مستخدم من قبل");
-      } else {
-        alert("❌ فشل في التسجيل: " + err.message);
-      }
+      alert("❌ حدث خطأ أثناء التسجيل");
     }
   });
-
 </script>
 </body>
 </html>
+ 
+
+
+   
+
+    
 
 
 
