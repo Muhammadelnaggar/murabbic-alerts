@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>مربي جديد؟</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet" />
+  <title>تسجيل مربي جديد</title>
   <style>
-    /* نفس التنسيق السابق */
     body {
       font-family: Arial, sans-serif;
       background: linear-gradient(to bottom right, #eeffdd, #fffedc);
@@ -18,113 +16,59 @@
     }
     .container {
       background: white;
-      padding: 30px 25px;
+      padding: 30px;
       border-radius: 12px;
       box-shadow: 0 0 15px rgba(0,0,0,0.1);
       max-width: 400px;
       width: 90%;
     }
-    h2 {
-      text-align: center;
-      color: #28a745;
-      font-size: 26px;
-      font-weight: bold;
-      font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin-bottom: 25px;
+    label, input, select, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+      font-size: 16px;
     }
     label {
-      display: block;
-      margin-bottom: 5px;
       font-weight: bold;
-      color: black;
-    }
-    .required-star::after {
-      content: " *";
-      color: red;
+      margin-bottom: 5px;
     }
     input, select {
-      width: 100%;
       padding: 10px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
       border-radius: 6px;
-      font-size: 16px;
+      border: 1px solid #ccc;
       box-sizing: border-box;
     }
     button {
-      width: 100%;
       background-color: #28a745;
       color: white;
       border: none;
       padding: 12px;
-      font-size: 16px;
       border-radius: 6px;
       cursor: pointer;
     }
     button:hover {
       background-color: #218838;
     }
-    .login-link {
-      text-align: center;
-      margin-top: 15px;
-      font-size: 14px;
-    }
-    .login-link a {
-      color: #2c7a33;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    .login-link a:hover {
-      text-decoration: underline;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>مربي جديد؟</h2>
+    <h2>تسجيل مربي جديد</h2>
     <form id="registerForm">
-      <label for="name" class="required-star">الاسم الكامل</label>
-      <input type="text" id="name" name="name" required />
+      <label for="name">الاسم الكامل *</label>
+      <input type="text" id="name" required />
 
-      <label for="phone" class="required-star">رقم الهاتف</label>
-      <input type="tel" id="phone" name="phone" required />
+      <label for="phone">رقم الهاتف *</label>
+      <input type="tel" id="phone" required />
 
-      <label for="password" class="required-star">كلمة المرور</label>
-      <input type="password" id="password" name="password" required minlength="4" />
+      <label for="password">كلمة المرور *</label>
+      <input type="password" id="password" required minlength="4" />
 
-      <label for="confirmPassword" class="required-star">تأكيد كلمة المرور</label>
+      <label for="confirmPassword">تأكيد كلمة المرور *</label>
       <input type="password" id="confirmPassword" required minlength="4" />
-
-      <label for="userType" class="required-star">نوع المستخدم</label>
-      <select id="userType" name="userType" required>
-        <option value="">-- اختر النوع --</option>
-        <option value="مربي">مربي</option>
-        <option value="مهندس إنتاج">مهندس إنتاج</option>
-        <option value="طبيب بيطري">طبيب بيطري</option>
-        <option value="طالب">طالب</option>
-      </select>
-
-      <label for="country" class="required-star">الدولة</label>
-      <select id="country" name="country" required>
-        <option value="">-- اختر الدولة --</option>
-        <option value="مصر">مصر</option>
-        <option value="السعودية">السعودية</option>
-      </select>
-
-      <label for="governorate" class="required-star">المنطقة / المحافظة</label>
-      <select id="governorate" name="governorate" required>
-        <option value="">-- اختر المحافظة --</option>
-      </select>
-
-      <label for="email">البريد الإلكتروني (اختياري)</label>
-      <input type="email" id="email" name="email" />
 
       <button type="submit">تسجيل</button>
     </form>
-
-    <div class="login-link">
-      <a href="login.html">مربي خبرة؟ ادخل حسابك</a>
-    </div>
   </div>
 
 <script type="module">
@@ -144,88 +88,61 @@
   const db = getFirestore(app);
 
   const form = document.getElementById("registerForm");
-  const countrySelect = document.getElementById("country");
-  const governorateSelect = document.getElementById("governorate");
 
-  const regionsByCountry = {
-    "مصر": ["القاهرة", "الجيزة", "الإسكندرية", "المنوفية", "الدقهلية", "الشرقية", "كفر الشيخ", "الغربية", "البحيرة", "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "شمال سيناء", "جنوب سيناء", "الوادي الجديد", "مطروح"],
-    "السعودية": ["الرياض", "مكة", "المدينة", "القصيم", "الشرقية", "عسير", "تبوك", "حائل", "نجران", "جازان", "الباحة", "الجوف", "الحدود الشمالية"]
-  };
-
-  countrySelect.addEventListener("change", () => {
-    const selectedCountry = countrySelect.value;
-    governorateSelect.innerHTML = `<option value="">-- اختر المحافظة --</option>`;
-    if (regionsByCountry[selectedCountry]) {
-      regionsByCountry[selectedCountry].forEach(region => {
-        const option = document.createElement("option");
-        option.value = region;
-        option.textContent = region;
-        governorateSelect.appendChild(option);
-      });
-    }
-  });
-
-  form.addEventListener("submit", async function (e) {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const fullName = document.getElementById("name").value.trim();
+    const name = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
-    const userType = document.getElementById("userType").value;
-    const country = document.getElementById("country").value;
-    const governorate = document.getElementById("governorate").value;
-    const email = document.getElementById("email").value.trim();
 
-    if (!fullName || !phone || !password || !confirmPassword || !userType || !country || !governorate) {
-      alert("❗ جميع الحقول مطلوبة ما عدا البريد الإلكتروني");
+    if (!name || !phone || !password || !confirmPassword) {
+      alert("جميع الحقول مطلوبة");
       return;
     }
 
     if (password.length < 4) {
-      alert("❗ كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
+      alert("كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("❗ كلمة المرور وتأكيدها غير متطابقين");
+      alert("كلمة المرور وتأكيدها غير متطابقين");
       return;
     }
 
     try {
-      // نتأكد ما فيش مستخدم بنفس رقم الهاتف
+      // تحقق من عدم تكرار رقم الهاتف
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("phone", "==", phone));
       const querySnapshot = await getDocs(q);
-
       if (!querySnapshot.empty) {
-        alert("❗ رقم الهاتف مسجل بالفعل");
+        alert("رقم الهاتف مسجل بالفعل");
         return;
       }
 
-      // إضافة المستخدم الجديد
+      // إضافة المستخدم
       await addDoc(usersRef, {
-        fullName,
+        fullName: name,
         phone,
         password,
-        userType,
-        country,
-        governorate,
-        email,
         createdAt: serverTimestamp()
       });
 
-      alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
+      alert("تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
-    } catch (err) {
-      console.error(err);
-      alert("❌ حدث خطأ أثناء التسجيل");
+    } catch (error) {
+      console.error("خطأ في التسجيل:", error);
+      alert("حدث خطأ أثناء التسجيل، حاول مرة أخرى");
     }
   });
 </script>
 </body>
 </html>
+
+     
 
 
 
