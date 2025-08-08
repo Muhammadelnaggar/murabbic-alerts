@@ -4,6 +4,79 @@
   <meta charset="UTF-8" />
   <title>تحضير للولادة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script type="module">
+    // ✅ استيراد Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+  apiKey: "AIzaSyChRC0diqEcrdL9MK1NCjxHqWK_H1wPu1E",
+  authDomain: "murabbik.firebaseapp.com",
+  projectId: "murabbik",
+  storageBucket: "murabbik.appspot.com",
+  messagingSenderId: "402719243568",
+  appId: "1:402719243568:web:631114a260d23202dd5cf5"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("closeup-form");
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const userId = localStorage.getItem("userId");
+        const animalId = document.getElementById("animal-id").value.trim();
+        const closeUpDate = document.getElementById("date").value;
+        const ration = document.querySelector('input[name="ration"]:checked')?.value;
+        const anionicSalts = document.querySelector('input[name="anionicSalts"]:checked')?.value;
+
+        if (!userId || !animalId || !closeUpDate || !ration || !anionicSalts) {
+          alert("يرجى ملء جميع الحقول المطلوبة.");
+          return;
+        }
+
+        const eventData = {
+          userId,
+          animalId,
+          date: closeUpDate,
+          ration,
+          anionicSalts,
+          type: "تحضير للولادة",
+          isSmartAlert: true,
+          alertRule: "close-up-preparation",
+          timestamp: serverTimestamp()
+        };
+
+        try {
+          await addDoc(collection(db, "events"), eventData);
+
+          const isNewUser = localStorage.getItem("isNewUser") === "true";
+
+          if (isNewUser) {
+            if (confirm("✅ تم حفظ التحضير بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+              window.location.href = "add-event.html";
+            } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+              window.location.href = "add-animal.html";
+            } else {
+              localStorage.removeItem("isNewUser");
+              localStorage.removeItem("lastAnimalId");
+              window.location.href = "dashboard.html";
+            }
+          } else {
+            alert("✅ تم حفظ الحدث بنجاح.");
+            window.location.href = "dashboard.html";
+          }
+        } catch (error) {
+          console.error("خطأ في حفظ الحدث:", error);
+          alert("❌ فشل في حفظ البيانات.");
+        }
+      });
+    });
+  </script>
+
   <style>
     body {
       direction: rtl;
@@ -24,7 +97,7 @@
       font-weight: bold;
     }
 
-    input[type="text"] {
+    input[type="text"], input[type="date"] {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
@@ -54,10 +127,10 @@
 
   <form id="closeup-form">
     <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" name="animal-id" required />
-    
-  <label for="date">تاريخ التحضير:</label>
-<input type="date" id="date" required>
+    <input type="text" id="animal-id" required />
+
+    <label for="date">تاريخ التحضير:</label>
+    <input type="date" id="date" required />
 
     <label>عليقة التحضير:</label>
     <div class="radio-group">
@@ -74,56 +147,5 @@
     <button type="submit" class="submit-button">تسجيل التحضير</button>
   </form>
 
-  <script>
-    document.getElementById("closeup-form").addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-     const data = {
-  animalId: document.getElementById("animal-id").value,
-  ration: document.querySelector('input[name="ration"]:checked')?.value,
-  anionicSalts: document.querySelector('input[name="anionicSalts"]:checked')?.value,
-  closeUpDate: document.getElementById("date").value,
-  type: "تحضير للولادة",
-  isSmartAlert: true,
-  alertRule: "تحضير للولادة"
-};
-
-
-      try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-
-        if (res.ok) {
-          const isNewUser = localStorage.getItem("isNewUser") === "true";
-
-          if (isNewUser) {
-            if (confirm("✅ تم حفظ التحضير بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-              window.location.href = "add-event.html";
-            } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-              window.location.href = "add-animal.html";
-            } else {
-              localStorage.removeItem("isNewUser");
-              localStorage.removeItem("lastAnimalId");
-              window.location.href = "dashboard.html";
-            }
-          } else {
-            window.location.href = "dashboard.html";
-          }
-        } else {
-          alert("❌ حدث خطأ أثناء الحفظ.");
-        }
-      } catch (err) {
-        console.error("❌ فشل الاتصال بالخادم:", err);
-        alert("فشل في الاتصال بالخادم.");
-      }
-    });
-  </script>
-
 </body>
 </html>
-
-
-
