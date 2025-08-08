@@ -131,4 +131,5 @@ dist
 
 # Replit debugger
 .breakpoints
+www/js/firebase-config.js
 
