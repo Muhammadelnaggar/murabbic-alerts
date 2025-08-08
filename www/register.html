@@ -6,7 +6,7 @@
   <title>مربي جديد؟</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet" />
   <style>
-    /* التنسيق كما هو */
+    /* نفس التنسيق السابق */
     body {
       font-family: Arial, sans-serif;
       background: linear-gradient(to bottom right, #eeffdd, #fffedc);
@@ -90,10 +90,10 @@
       <input type="tel" id="phone" name="phone" required />
 
       <label for="password" class="required-star">كلمة المرور</label>
-      <input type="password" id="password" name="password" required minlength="6" />
+      <input type="password" id="password" name="password" required minlength="4" />
 
       <label for="confirmPassword" class="required-star">تأكيد كلمة المرور</label>
-      <input type="password" id="confirmPassword" required minlength="6" />
+      <input type="password" id="confirmPassword" required minlength="4" />
 
       <label for="userType" class="required-star">نوع المستخدم</label>
       <select id="userType" name="userType" required>
@@ -128,12 +128,20 @@
   </div>
 
 <script type="module">
-  import { app } from './js/firebase-config.js';
-  import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+
+  const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const auth = getAuth(app);
 
   const form = document.getElementById("registerForm");
   const countrySelect = document.getElementById("country");
@@ -167,16 +175,15 @@
     const userType = document.getElementById("userType").value;
     const country = document.getElementById("country").value;
     const governorate = document.getElementById("governorate").value;
-    const emailInput = document.getElementById("email").value.trim();
-    const email = emailInput !== "" ? emailInput : `${phone}@murabbik.com`; // بديل لو الإيميل فارغ
+    const email = document.getElementById("email").value.trim();
 
     if (!fullName || !phone || !password || !confirmPassword || !userType || !country || !governorate) {
       alert("❗ جميع الحقول مطلوبة ما عدا البريد الإلكتروني");
       return;
     }
 
-    if (password.length < 6) {
-      alert("❗ كلمة المرور يجب أن تكون 6 أحرف أو أكثر");
+    if (password.length < 4) {
+      alert("❗ كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
       return;
     }
 
@@ -186,14 +193,21 @@
     }
 
     try {
-      // إنشاء الحساب
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      // نتأكد ما فيش مستخدم بنفس رقم الهاتف
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("phone", "==", phone));
+      const querySnapshot = await getDocs(q);
 
-      // كتابة البيانات في Firestore باستخدام uid
-      await setDoc(doc(db, "users", uid), {
+      if (!querySnapshot.empty) {
+        alert("❗ رقم الهاتف مسجل بالفعل");
+        return;
+      }
+
+      // إضافة المستخدم الجديد
+      await addDoc(usersRef, {
         fullName,
         phone,
+        password,
         userType,
         country,
         governorate,
@@ -201,18 +215,20 @@
         createdAt: serverTimestamp()
       });
 
-      alert("✅ تم التسجيل بنجاح! الرجاء تسجيل الدخول");
+      alert("✅ تم التسجيل بنجاح، الرجاء تسجيل الدخول");
       window.location.href = "login.html";
 
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        alert("❗ هذا البريد الإلكتروني مستخدم من قبل");
-      } else {
-        alert("❌ فشل في التسجيل: " + err.message);
-      }
+      alert("❌ حدث خطأ أثناء التسجيل");
     }
   });
 </script>
 </body>
 </html>
+
+
+
+
+
+
