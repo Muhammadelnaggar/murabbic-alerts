@@ -8,7 +8,7 @@ const firebaseConfig = {
   projectId: "murabbik",
   storageBucket: "murabbik.firebasestorage.app",
   messagingSenderId: "402719243568",
-  appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  appId: "1:402719243568:web:6b05a3c62e8bfa86dd5cf5"
 };
 
 const app = initializeApp(firebaseConfig);
