@@ -63,6 +63,14 @@
       font-size: 20px;
       cursor: pointer;
     }
+
+    #confirmationMsg {
+      display: none;
+      text-align: center;
+      color: green;
+      font-weight: bold;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
@@ -100,61 +108,67 @@
     <button type="submit">تسجيل الحالة</button>
   </form>
 
- <script>
-  document.getElementById("lamenessDate").valueAsDate = new Date();
+  <p id="confirmationMsg">✅ تم تسجيل حالة العرج بنجاح! جاري الانتقال...</p>
 
-  document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
+  <script>
+    document.getElementById("lamenessDate").valueAsDate = new Date();
 
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
+    document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
 
-    // أضف نوع الحدث والتتبع الذكي
-    data.type = "عرج";
-    data.isSmartAlert = true;
-    data.alertRule = "lameness-recheck";
+      const formData = new FormData(this);
+      const data = Object.fromEntries(formData.entries());
 
-    try {
-      const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      data.type = "عرج";
+      data.isSmartAlert = true;
+      data.alertRule = "lameness-recheck";
 
-      if (res.ok) {
-        alert("✅ تم تسجيل حالة العرج بنجاح");
-        this.reset();
-        document.getElementById("lamenessDate").valueAsDate = new Date();
+      try {
+        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
 
-        // تمرير animalId و date في الرابط للصفحة التالية
-        const animalId = data.animalId || document.getElementById("animalId").value;
-        const eventDate = data.lamenessDate || document.getElementById("lamenessDate").value;
-        window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
-      } else {
-        alert("❌ فشل في تسجيل الحالة");
+        if (res.ok) {
+          // إظهار رسالة التأكيد
+          const msg = document.getElementById("confirmationMsg");
+          msg.style.display = "block";
+
+          // تعطيل زر التسجيل مؤقتًا
+          this.querySelector("button[type='submit']").disabled = true;
+
+          // الانتقال بعد 3 ثواني مع تمرير بيانات رقم الحيوان والتاريخ
+          const animalId = data.animalId || document.getElementById("animalId").value;
+          const eventDate = data.lamenessDate || document.getElementById("lamenessDate").value;
+
+          setTimeout(() => {
+            window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
+          }, 3000);
+        } else {
+          alert("❌ فشل في تسجيل الحالة");
+        }
+      } catch (err) {
+        alert("⚠️ فشل الاتصال بالخادم");
+        console.error(err);
       }
-    } catch (err) {
-      alert("⚠️ فشل الاتصال بالخادم");
-      console.error(err);
-    }
-  });
-</script>
+    });
 
-<script>
-  window.addEventListener("load", () => {
-    const params = new URLSearchParams(window.location.search);
-    const animalId = params.get("animalId");
-    const date = params.get("date");
+    // تعيين القيم القادمة من الرابط تلقائيًا للحقلين
+    window.addEventListener("load", () => {
+      const params = new URLSearchParams(window.location.search);
+      const animalId = params.get("animalId");
+      const date = params.get("date");
 
-    if (animalId) {
-      document.getElementById("animalId").value = animalId;
-    }
+      if (animalId) {
+        document.getElementById("animalId").value = animalId;
+      }
 
-    if (date) {
-      document.getElementById("lamenessDate").value = date;
-    }
-  });
-</script>
+      if (date) {
+        document.getElementById("lamenessDate").value = date;
+      }
+    });
+  </script>
 
 </body>
 </html>
