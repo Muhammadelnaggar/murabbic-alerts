@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تسجيل التهاب الضرع</title>
   <style>
     body {
@@ -85,17 +85,17 @@
 
   <form id="mastitis-form">
     <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" name="animal-id" required>
+    <input type="text" id="animal-id" name="animal-id" required />
 
     <label for="date">تاريخ التشخيص:</label>
-    <input type="date" id="date" name="date" required>
+    <input type="date" id="date" name="date" required />
 
     <label>الربع المصاب:</label>
     <div class="options-box">
-      <label><input type="checkbox" name="quarters" value="أمام شمال"> أمام شمال</label>
-      <label><input type="checkbox" name="quarters" value="أمام يمين"> أمام يمين</label>
-      <label><input type="checkbox" name="quarters" value="خلف يمين"> خلف يمين</label>
-      <label><input type="checkbox" name="quarters" value="خلف شمال"> خلف شمال</label>
+      <label><input type="checkbox" name="quarters" value="أمام شمال" /> أمام شمال</label>
+      <label><input type="checkbox" name="quarters" value="أمام يمين" /> أمام يمين</label>
+      <label><input type="checkbox" name="quarters" value="خلف يمين" /> خلف يمين</label>
+      <label><input type="checkbox" name="quarters" value="خلف شمال" /> خلف شمال</label>
     </div>
 
     <label for="mastitis-type">نوع الالتهاب:</label>
@@ -108,8 +108,37 @@
     <button type="submit">تسجيل الحالة</button>
   </form>
 
-  <script>
-    document.getElementById("mastitis-form").addEventListener("submit", async function(event) {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ملء الحقول برقم الحيوان والتاريخ القادم من رابط صفحة الأحداث
+    window.addEventListener("load", () => {
+      const params = new URLSearchParams(window.location.search);
+      const animalId = params.get("animalId");
+      const date = params.get("date");
+
+      if (animalId) {
+        document.getElementById("animal-id").value = animalId;
+      }
+      if (date) {
+        document.getElementById("date").value = date;
+      }
+    });
+
+    document.getElementById("mastitis-form").addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const animalId = document.getElementById("animal-id").value.trim();
@@ -124,49 +153,26 @@
 
       const data = {
         animalId,
-        date,
-        type: "التهاب الضرع",
+        diseaseDate: date,
+        diseaseName: "التهاب الضرع",
         mastitisType,
-        quarters
+        quarters,
+        type: "مرض",
+        isSmartAlert: true,
+        alertRule: "مرض",
+        createdAt: serverTimestamp()
       };
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-
-        if (res.ok) {
-          alert("✅ تم تسجيل الحالة بنجاح");
-          window.location.href = "treatment-followup.html";
-        } else {
-          alert("حدث خطأ أثناء التسجيل. حاول مرة أخرى");
-        }
+        await addDoc(collection(db, "events"), data);
+        alert("✅ تم تسجيل الحالة بنجاح");
+        window.location.href = "treatment-followup.html";
       } catch (err) {
         alert("فشل الاتصال بالخادم");
         console.error(err);
       }
     });
   </script>
-  <script>
-  window.addEventListener("load", () => {
-    const params = new URLSearchParams(window.location.search);
-    const animalId = params.get("animalId");
-    const date = params.get("date");
-
-    if (animalId) {
-      document.getElementById("animal-id").value = animalId;
-    }
-
-    if (date) {
-      document.getElementById("date").value = date;
-    }
-  });
-</script>
 
 </body>
 </html>
-
-   
-
