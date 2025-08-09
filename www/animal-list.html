@@ -266,7 +266,8 @@ window.viewCard = function(animalNumber) {
 
     document.getElementById('searchNumber').addEventListener('input', function() {
       const query = this.value.trim();
-      const filtered = animalsData.filter(a => a.number.includes(query));
+     const filtered = animalsData.filter(a => a.number && a.number.includes(query));
+
       renderTable(filtered);
     });
 
@@ -291,5 +292,6 @@ window.viewCard = function(animalNumber) {
   </script>
 </body>
 </html>
+
 
 
