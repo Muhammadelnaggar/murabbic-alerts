@@ -242,7 +242,7 @@
       });
     }
 window.viewCard = function(animalNumber) {
-  window.location.href = `cow-card.html?number=${animalNumber}`;
+window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
 }
 
 
@@ -293,6 +293,7 @@ window.viewCard = function(animalNumber) {
   </script>
 </body>
 </html>
+
 
 
 
