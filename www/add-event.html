@@ -1,5 +1,6 @@
+
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <title>تسجيل حدث</title>
@@ -115,16 +116,19 @@
     const animalInfo = document.getElementById("animalInfo");
     const dateInfo = document.getElementById("dateInfo");
     const warning = document.getElementById("noAnimalWarning");
-    const group = document.getElementById("eventTypeGroup");
 
     const today = new Date();
     const formattedDate = today.toISOString().split("T")[0];
 
+    // تعبئة الحقول رقم الحيوان والتاريخ
     document.getElementById("animalIdInput").value = storedAnimalId;
     document.getElementById("eventDateInput").value = formattedDate;
+
+    // عرض رقم الحيوان والتاريخ بشكل واضح
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${storedAnimalId || 'غير محدد'}`;
     dateInfo.textContent = `📅 التاريخ الحالي: ${today.toLocaleDateString('ar-EG')}`;
 
+    // ربط الأحداث بأزرار الصفحات مع التحقق
     const buttons = document.querySelectorAll('#eventTypeGroup button');
     buttons.forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -140,6 +144,7 @@
         try {
           const eventType = btn.textContent.trim();
 
+          // حفظ الحدث في قاعدة Firestore
           await addDoc(collection(db, "events"), {
             animalId,
             eventDate,
@@ -147,11 +152,13 @@
             createdAt: serverTimestamp()
           });
 
+          // تحديث رقم الحيوان في localStorage
           localStorage.setItem("lastAnimalId", animalId);
 
+          // التوجيه للصفحة المناسبة مع تمرير البيانات
           const page = btn.getAttribute('data-page');
           if (page) {
-            window.location.href = `${page}?animalId=${animalId}&date=${eventDate}`;
+            window.location.href = `${page}?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
           }
         } catch (error) {
           console.error("خطأ أثناء تسجيل الحدث:", error);
@@ -162,4 +169,3 @@
   </script>
 </body>
 </html>
-
