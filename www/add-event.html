@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -73,12 +72,11 @@
   <h1>تسجيل حدث</h1>
   <div class="animal-info" id="animalInfo"></div>
   <div class="date-info" id="dateInfo"></div>
+  <div class="warning" id="noAnimalWarning"></div>
   <div class="form-fields">
     <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
     <input type="date" id="eventDateInput" required />
   </div>
-  <div class="warning" id="noAnimalWarning"></div>
-
   <form id="eventForm">
     <div class="button-group" id="eventTypeGroup">
       <button type="button" data-page="calving.html">👶 ولادة</button>
@@ -97,7 +95,22 @@
     </div>
   </form>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
     const animalInfo = document.getElementById("animalInfo");
     const dateInfo = document.getElementById("dateInfo");
@@ -114,18 +127,36 @@
 
     const buttons = document.querySelectorAll('#eventTypeGroup button');
     buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const animalId = document.getElementById("animalIdInput").value.trim();
         const eventDate = document.getElementById("eventDateInput").value.trim();
+
         if (!animalId || !eventDate) {
           warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
           return;
         }
         warning.textContent = "";
-        buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const page = btn.getAttribute('data-page');
-        if (page) window.location.href = `${page}?animalId=${animalId}&date=${eventDate}`;
+
+        try {
+          const eventType = btn.textContent.trim();
+
+          await addDoc(collection(db, "events"), {
+            animalId,
+            eventDate,
+            eventType,
+            createdAt: serverTimestamp()
+          });
+
+          localStorage.setItem("lastAnimalId", animalId);
+
+          const page = btn.getAttribute('data-page');
+          if (page) {
+            window.location.href = `${page}?animalId=${animalId}&date=${eventDate}`;
+          }
+        } catch (error) {
+          console.error("خطأ أثناء تسجيل الحدث:", error);
+          warning.textContent = "حدث خطأ أثناء تسجيل الحدث. حاول مرة أخرى.";
+        }
       });
     });
   </script>
