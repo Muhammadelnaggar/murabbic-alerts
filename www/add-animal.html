@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <title>إضافة حيوان</title>
@@ -8,7 +8,6 @@
     body {
       font-family: 'Cairo', sans-serif;
       background: linear-gradient(to bottom right, #eeffdd, #fffedc);
-      direction: rtl;
       padding: 20px;
       margin: 0;
     }
@@ -16,7 +15,7 @@
       text-align: center;
       color: #2e7d32;
       font-size: 26px;
-      margin-bottom: 25px;
+      margin-bottom: 15px;
       font-weight: bold;
     }
     form {
@@ -54,9 +53,26 @@
       font-weight: bold;
       border: none;
       transition: background-color 0.3s ease;
+      cursor: pointer;
     }
     button:hover {
       background-color: #2e7d32;
+    }
+    #msg {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+      display: none;
+    }
+    #msg.success {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+    #msg.error {
+      background-color: #f8d7da;
+      color: #842029;
     }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
@@ -64,8 +80,10 @@
 <body>
   <h1>➕ إضافة حيوان جديد</h1>
   <form id="animalForm">
+    <div id="msg"></div>
+
     <label for="animalNumber">رقم الحيوان:</label>
-    <input type="text" id="animalNumber" required>
+    <input type="text" id="animalNumber" required />
 
     <label for="animalType">نوع الحيوان:</label>
     <select id="animalType" required onchange="updateBreedOptions()">
@@ -88,7 +106,7 @@
 
     <div id="milkField" style="display:none;">
       <label for="dailyMilk">إنتاج اللبن اليومي (لتر):</label>
-      <input type="number" id="dailyMilk" placeholder="اكتب كمية اللبن">
+      <input type="number" id="dailyMilk" placeholder="اكتب كمية اللبن" />
     </div>
 
     <label for="reproductiveStatus">الحالة التناسلية:</label>
@@ -102,20 +120,35 @@
     </select>
 
     <label for="birthDate">تاريخ الميلاد (اختياري):</label>
-    <input type="date" id="birthDate">
+    <input type="date" id="birthDate" />
 
     <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
-    <input type="date" id="lastCalvingDate" required>
+    <input type="date" id="lastCalvingDate" required />
 
     <div id="inseminationField" style="display:none;">
       <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
-      <input type="date" id="lastInseminationDate">
+      <input type="date" id="lastInseminationDate" />
     </div>
 
     <button type="submit">📥 تسجيل الحيوان</button>
   </form>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     const cowBreeds = ["خليط", "هولشتاين", "جيرسي", "مونبليار", "سيمينتال", "أخرى"];
     const buffaloBreeds = ["مصري", "هجين إيطالي", "هجين هندي"];
 
@@ -163,11 +196,73 @@
       }
     }
 
-    document.getElementById("animalForm").addEventListener("submit", function(e) {
+    const form = document.getElementById("animalForm");
+    const msgDiv = document.getElementById("msg");
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      alert("✅ تم تسجيل الحيوان بنجاح.");
-      window.location.href = "add-event.html";
+      msgDiv.style.display = "none";
+
+      // قراءة القيم
+      const animalNumber = document.getElementById("animalNumber").value.trim();
+      const animalType = document.getElementById("animalType").value;
+      const breed = document.getElementById("breed").value;
+      const productionStatus = document.getElementById("productionStatus").value;
+      const dailyMilk = document.getElementById("dailyMilk").value.trim();
+      const reproductiveStatus = document.getElementById("reproductiveStatus").value;
+      const birthDate = document.getElementById("birthDate").value;
+      const lastCalvingDate = document.getElementById("lastCalvingDate").value;
+      const lastInseminationDate = document.getElementById("lastInseminationDate").value;
+
+      // التحقق من وجود userId في localStorage
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        msgDiv.textContent = "خطأ: لا يوجد مستخدم مسجل. يرجى تسجيل الدخول.";
+        msgDiv.className = "error";
+        msgDiv.style.display = "block";
+        return;
+      }
+
+      try {
+        const animalData = {
+          animalNumber,
+          animalType,
+          breed,
+          productionStatus,
+          dailyMilk: productionStatus === "حلاب" ? Number(dailyMilk) : null,
+          reproductiveStatus,
+          birthDate: birthDate || null,
+          lastCalvingDate,
+          lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationDate : null,
+          userId,
+          createdAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "animals"), animalData);
+
+        msgDiv.textContent = "✅ تم تسجيل الحيوان بنجاح.";
+        msgDiv.className = "success";
+        msgDiv.style.display = "block";
+
+        form.reset();
+        document.getElementById("milkField").style.display = "none";
+        document.getElementById("inseminationField").style.display = "none";
+
+        setTimeout(() => {
+          window.location.href = "add-event.html";
+        }, 2000);
+
+      } catch (error) {
+        console.error("خطأ في تسجيل الحيوان:", error);
+        msgDiv.textContent = "حدث خطأ أثناء تسجيل الحيوان. حاول مرة أخرى.";
+        msgDiv.className = "error";
+        msgDiv.style.display = "block";
+      }
     });
   </script>
 </body>
 </html>
+
+
+
+
