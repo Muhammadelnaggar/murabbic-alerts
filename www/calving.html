@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <title>تسجيل حدث ولادة</title>
@@ -69,40 +69,25 @@
       background-color: #1a6324;
     }
 
-    @media (max-width: 600px) {
-      form {
-        padding: 10px;
-      }
-      .radio-group {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
-
-    #calfCardModal {
+    #msg {
       display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-
-    #calfCardContent {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      max-width: 400px;
-      width: 90%;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      background-color: #d1e7dd;
+      color: #0f5132;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: bold;
+      max-width: 500px;
+      margin: 10px auto;
     }
   </style>
 </head>
 <body>
 
   <h2>🍼 تسجيل حدث ولادة</h2>
+
+  <div id="msg"></div>
 
   <form id="calvingForm">
     <label for="animalId">رقم الحيوان</label>
@@ -135,23 +120,6 @@
     <button type="submit">💾 تسجيل</button>
   </form>
 
-  <div id="calfCardModal">
-    <div id="calfCardContent">
-      <h3 style="text-align:center; color:#2e7d32;">📋 بطاقة العجل رقم <span id="cardNumber"></span></h3>
-      <ul style="list-style: none; padding: 0; font-size: 18px;">
-        <li><strong>النوع:</strong> <span id="cardType"></span></li>
-        <li><strong>الجنس:</strong> <span id="cardGender"></span></li>
-        <li><strong>السلالة:</strong> <span id="cardBreed"></span></li>
-        <li><strong>الحالة التناسلية:</strong> <span id="cardRepro"></span></li>
-        <li><strong>تاريخ الميلاد:</strong> <span id="cardDOB"></span></li>
-        <li><strong>رقم المستخدم:</strong> <span id="cardOwner"></span></li>
-        <li><strong>رقم الأم:</strong> <span id="cardMother"></span></li>
-        <li><strong>رقم الأب:</strong> <span id="cardFather">غير مسجل</span></li>
-      </ul>
-      <button onclick="document.getElementById('calfCardModal').style.display='none'">🆗 إغلاق</button>
-    </div>
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -169,6 +137,7 @@
     const db = getFirestore(app);
 
     const form = document.getElementById("calvingForm");
+    const msgDiv = document.getElementById("msg");
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -192,66 +161,23 @@
           createdAt: serverTimestamp()
         });
 
-        if (fate === "تربية") {
-          const motherId = form.animalId.value;
-          const motherRes = await fetch(`https://murabbic-alerts.onrender.com/api/animals/${motherId}`);
-          const mother = await motherRes.json();
+        // عرض رسالة التأكيد داخل الصفحة
+        msgDiv.textContent = "✅ تم تسجيل حدث الولادة بنجاح";
+        msgDiv.style.display = "block";
 
-          const calfAnimal = {
-            number: calfNumber,
-            type: "عجل",
-            gender: gender,
-            breed: mother?.breed || "غير محدد",
-            productionStatus: "عجل",
-            reproductiveStatus: "حديث الولادة",
-            lastCalvingDate: form.calvingDate.value,
-            userId: localStorage.getItem("userId"),
-            motherId: motherId,
-            fatherId: null
-          };
-
-          if ((gender === "ذكر" && !calfNumber.startsWith("1000")) || (gender === "أنثى" && !calfNumber.startsWith("2000"))) {
-            alert("⚠️ يجب أن يبدأ رقم العجل بـ 1000 للذكر أو 2000 للأنثى لتمييزه عن باقي القطيع.");
-            return;
-          }
-
-          await fetch("https://murabbic-alerts.onrender.com/api/animals", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(calfAnimal)
-          });
-
-          document.getElementById("cardNumber").textContent = calfNumber;
-          document.getElementById("cardType").textContent = "عجل";
-          document.getElementById("cardGender").textContent = gender;
-          document.getElementById("cardBreed").textContent = calfAnimal.breed;
-          document.getElementById("cardRepro").textContent = calfAnimal.reproductiveStatus;
-          document.getElementById("cardDOB").textContent = form.calvingDate.value;
-          document.getElementById("cardOwner").textContent = calfAnimal.userId;
-          document.getElementById("cardMother").textContent = motherId;
-          document.getElementById("cardFather").textContent = calfAnimal.fatherId || "غير مسجل";
-
-          document.getElementById("calfCardModal").style.display = "flex";
-        } else {
-          alert("✅ تم تسجيل حدث الولادة بنجاح");
-          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
-          if (anotherEvent) {
-            window.location.href = "add-event.html";
-          } else {
-            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-            if (anotherAnimal) {
-              window.location.href = "add-animal.html";
-            } else {
-              window.location.href = "dashboard.html";
-            }
-          }
-        }
+        // تأخير 3 ثواني ثم التوجيه للصفحة التالية
+        setTimeout(() => {
+          msgDiv.style.display = "none";
+          window.location.href = "add-event.html"; // عدل حسب الصفحة التي تريد التوجيه إليها
+        }, 3000);
 
       } catch (error) {
         console.error("⚠️ خطأ:", error);
-        alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
+        msgDiv.textContent = "❌ حدث خطأ أثناء تسجيل الحدث";
+        msgDiv.style.display = "block";
       }
     });
   </script>
+
 </body>
 </html>
