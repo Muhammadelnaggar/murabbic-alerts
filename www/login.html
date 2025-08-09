@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -56,7 +56,7 @@
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
       authDomain: "murabbik.firebaseapp.com",
       projectId: "murabbik",
       storageBucket: "murabbik.appspot.com",
@@ -67,10 +67,20 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // دالة تشفير كلمة المرور
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("loginForm");
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
+
         const phone = document.getElementById("phone").value.trim();
         const password = document.getElementById("password").value.trim();
 
@@ -81,29 +91,39 @@
 
         try {
           const usersRef = collection(db, "users");
-          const q = query(usersRef, where("phone", "==", phone), where("password", "==", password));
+          const q = query(usersRef, where("phone", "==", phone));
           const querySnapshot = await getDocs(q);
 
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
-            const userData = userDoc.data();
-            localStorage.setItem("userId", userDoc.id);
-            localStorage.setItem("userPhone", userData.phone);
-            alert("✅ تم تسجيل الدخول بنجاح");
-
-            const animalsRef = collection(db, "animals");
-            const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
-            const animalSnapshot = await getDocs(animalQuery);
-
-            if (animalSnapshot.empty) {
-              window.location.href = "add-animal.html";
-            } else {
-              window.location.href = "dashboard.html";
-            }
-
-          } else {
+          if (querySnapshot.empty) {
             alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
+            return;
           }
+
+          const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data();
+
+          const hashedInputPassword = await hashPassword(password);
+
+          if (hashedInputPassword !== userData.password) {
+            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
+            return;
+          }
+
+          // تسجيل الدخول ناجح
+          localStorage.setItem("userId", userDoc.id);
+          localStorage.setItem("userPhone", userData.phone);
+          alert("✅ تم تسجيل الدخول بنجاح");
+
+          const animalsRef = collection(db, "animals");
+          const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
+          const animalSnapshot = await getDocs(animalQuery);
+
+          if (animalSnapshot.empty) {
+            window.location.href = "add-animal.html";
+          } else {
+            window.location.href = "dashboard.html";
+          }
+
         } catch (err) {
           console.error(err);
           alert("حدث خطأ أثناء تسجيل الدخول.");
