@@ -12,14 +12,12 @@
       padding: 10px;
       margin: 0;
     }
-
     h1 {
       color: #2e7d32;
       text-align: center;
       font-size: 22px;
       margin-bottom: 15px;
     }
-
     .controls {
       display: flex;
       justify-content: center;
@@ -27,7 +25,6 @@
       gap: 10px;
       margin-bottom: 20px;
     }
-
     .controls input, .controls select {
       padding: 8px;
       font-size: 14px;
@@ -35,7 +32,6 @@
       border: 1px solid #ccc;
       min-width: 150px;
     }
-
     .controls button {
       padding: 8px 12px;
       background-color: #4caf50;
@@ -45,11 +41,9 @@
       cursor: pointer;
       font-size: 14px;
     }
-
     .controls button:hover {
       background-color: #388e3c;
     }
-
     .table-wrapper {
       overflow-x: auto;
       background: #fefefc;
@@ -57,29 +51,24 @@
       box-shadow: 0 0 5px #ccc;
       margin-bottom: 20px;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       min-width: 950px;
     }
-
     th, td {
       padding: 10px;
       text-align: center;
       border: 1px solid #cddc39;
       font-size: 15px;
     }
-
     th {
       background-color: #dcedc8;
       color: #33691e;
     }
-
     tr:nth-child(even) {
       background-color: #f9fbe7;
     }
-
     .button {
       padding: 5px 10px;
       background-color: #43a047;
@@ -89,26 +78,21 @@
       cursor: pointer;
       font-size: 14px;
     }
-
     .button:hover {
       background-color: #388e3c;
     }
-
     .delete-button {
       background-color: #c62828;
     }
-
     .delete-button:hover {
       background-color: #b71c1c;
     }
-
     .no-data {
       text-align: center;
       color: #c62828;
       margin-top: 30px;
       font-size: 18px;
     }
-
     .back-button {
       display: block;
       text-align: center;
@@ -172,7 +156,7 @@
     import { getFirestore, collection, query, where, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyChRCOdiqEcrdL9MK1NCjxHqWK_H1wPu1E",
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
       authDomain: "murabbik.firebaseapp.com",
       projectId: "murabbik",
       storageBucket: "murabbik.appspot.com",
@@ -186,16 +170,28 @@
     let animalsData = [];
     const userId = localStorage.getItem("userId");
 
-    const animalsRef = collection(db, "animals");
-    const q = query(animalsRef, where("userId", "==", userId));
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    animalsData = data;
-    updateTypeOptions();
-    renderTable(animalsData);
+    async function loadAnimals() {
+      if (!userId) {
+        alert("❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.");
+        window.location.href = "login.html";
+        return;
+      }
+
+      const animalsRef = collection(db, "animals");
+      const q = query(animalsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      animalsData = data;
+
+      updateTypeOptions();
+      renderTable(animalsData);
+    }
+
+    loadAnimals();
 
     function updateTypeOptions() {
       const typeSelector = document.getElementById("typeSelector");
+      typeSelector.innerHTML = '<option value="">عرض النوع</option>'; // تنظيف القائمة قبل الإضافة
       const types = [...new Set(animalsData.map(a => a.type))];
       types.forEach(type => {
         const option = document.createElement("option");
@@ -238,7 +234,7 @@
           <td>${animal.birthDate || '---'}</td>
           <td>${animal.lastCalvingDate || '---'}</td>
           <td><button class="button" onclick="viewCard('${animal.number}')">📄</button></td>
-          <td><button class="button" onclick="goToAddEvent('${animal.animalId}')">📋</button></td>
+          <td><button class="button" onclick="goToAddEvent('${animal.number}')">📋</button></td>
           <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
         `;
         tbody.appendChild(tr);
@@ -249,12 +245,8 @@
       window.location.href = `cow-card.html?number=${animalNumber}`;
     }
 
-    window.goToAddEvent = function(animalId) {
-      if (!animalId) {
-        alert("❗ لا يوجد animalId لهذا الحيوان.");
-        return;
-      }
-      localStorage.setItem("lastAnimalId", animalId);
+    window.goToAddEvent = function(animalNumber) {
+      localStorage.setItem("lastAnimalId", animalNumber);
       window.location.href = "add-event.html";
     }
 
