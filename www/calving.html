@@ -1,6 +1,5 @@
 
 
-   
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -101,25 +100,6 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
   </style>
-  <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const isNewUser = localStorage.getItem("isNewUser") === "true";
-    const lastAnimalId = localStorage.getItem("lastAnimalId");
-    const lastEventDate = localStorage.getItem("lastEventDate") || new Date().toISOString().split("T")[0];
-
-    const animalInput = document.getElementById("animalId");
-    const dateInput = document.getElementById("calvingDate");
-
-    if (animalInput && lastAnimalId) {
-      animalInput.value = lastAnimalId;
-      animalInput.readOnly = true;
-    }
-
-    if (dateInput) {
-      dateInput.value = lastEventDate;
-    }
-  });
-  </script>
 </head>
 <body>
 
@@ -173,7 +153,22 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     const form = document.getElementById("calvingForm");
 
     form.addEventListener("submit", async (e) => {
@@ -184,92 +179,27 @@
       const fate = form.querySelector('input[name="calfFate"]:checked').value;
       const calfNumber = form.calfId.value;
 
-      const data = {
-        type: "ولادة",
-        animalId: form.animalId.value,
-        calvingDate: form.calvingDate.value,
-        birthEase: birthEase,
-        calfGender: gender,
-        calfId: calfNumber,
-        calfFate: fate,
-        isSmartAlert: true,
-        alertRule: "ولادة"
-      };
-
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+        await addDoc(collection(db, "events"), {
+          type: "ولادة",
+          animalId: form.animalId.value,
+          calvingDate: form.calvingDate.value,
+          birthEase: birthEase,
+          calfGender: gender,
+          calfId: calfNumber,
+          calfFate: fate,
+          isSmartAlert: true,
+          alertRule: "ولادة",
+          createdAt: serverTimestamp()
         });
 
-        const result = await res.json();
+        if (fate === "تربية") {
+          const motherId = form.animalId.value;
+          const motherRes = await fetch(`https://murabbic-alerts.onrender.com/api/animals/${motherId}`);
+          const mother = await motherRes.json();
 
-        if (res.ok) {
-          if (fate === "تربية") {
-            const motherId = form.animalId.value;
-            const motherRes = await fetch(`https://murabbic-alerts.onrender.com/api/animals/${motherId}`);
-            const mother = await motherRes.json();
-
-            const calfAnimal = {
-              number: calfNumber,
-              type: "عجل",
-              gender: gender,
-              breed: mother?.breed || "غير محدد",
-              productionStatus: "عجل",
-              reproductiveStatus: "حديث الولادة",
-              lastCalvingDate: form.calvingDate.value,
-              userId: localStorage.getItem("userId"),
-              motherId: motherId,
-              fatherId: null
-            };
-
-            if ((gender === "ذكر" && !calfNumber.startsWith("1000")) || (gender === "أنثى" && !calfNumber.startsWith("2000"))) {
-              alert("⚠️ يجب أن يبدأ رقم العجل بـ 1000 للذكر أو 2000 للأنثى لتمييزه عن باقي القطيع.");
-              return;
-            }
-
-            await fetch("https://murabbic-alerts.onrender.com/api/animals", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(calfAnimal)
-            });
-
-            document.getElementById("cardNumber").textContent = calfNumber;
-            document.getElementById("cardType").textContent = "عجل";
-            document.getElementById("cardGender").textContent = gender;
-            document.getElementById("cardBreed").textContent = calfAnimal.breed;
-            document.getElementById("cardRepro").textContent = calfAnimal.reproductiveStatus;
-            document.getElementById("cardDOB").textContent = form.calvingDate.value;
-            document.getElementById("cardOwner").textContent = calfAnimal.userId;
-            document.getElementById("cardMother").textContent = motherId;
-            document.getElementById("cardFather").textContent = calfAnimal.fatherId || "غير مسجل";
-
-            document.getElementById("calfCardModal").style.display = "flex";
-          } else {
-            alert("✅ تم تسجيل حدث الولادة بنجاح");
-            const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
-            if (anotherEvent) {
-              window.location.href = "add-event.html";
-            } else {
-              const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
-              if (anotherAnimal) {
-                window.location.href = "add-animal.html";
-              } else {
-                window.location.href = "dashboard.html";
-              }
-            }
-          }
-
-        } else {
-          alert("❌ فشل في تسجيل الحدث: " + (result?.error || ''));
-        }
-
-      } catch (error) {
-        console.error("⚠️ خطأ:", error);
-        alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
-      }
-    });
-  </script>
-</body>
-</html>
+          const calfAnimal = {
+            number: calfNumber,
+            type: "عجل",
+            gender: gender,
+            breed: mother?.br
