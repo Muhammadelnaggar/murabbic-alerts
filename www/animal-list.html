@@ -178,4 +178,119 @@
       }
 
       const animalsRef = collection(db, "animals");
-      const q = query(anim
+      const q = query(animalsRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      animalsData = data;
+
+      updateTypeOptions();
+      renderTable(animalsData);
+    }
+
+    loadAnimals();
+
+    function updateTypeOptions() {
+      const typeSelector = document.getElementById("typeSelector");
+      typeSelector.innerHTML = '<option value="">عرض النوع</option>'; // تنظيف القائمة قبل الإضافة
+      const types = [...new Set(animalsData.map(a => a.type))];
+      types.forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type === "بقرة" ? "🐄 الأبقار" : "🐃 الجاموس";
+        typeSelector.appendChild(option);
+      });
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('animalBody');
+      const noData = document.getElementById('noData');
+      tbody.innerHTML = '';
+
+      if (!data || data.length === 0) {
+        noData.style.display = 'block';
+        return;
+      } else {
+        noData.style.display = 'none';
+      }
+
+      data.forEach(animal => {
+        const tr = document.createElement('tr');
+        tr.style.backgroundColor = animal.type === 'بقرة' ? '#fffde7' : '#eeeeee';
+
+        const daysInMilk = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : '---';
+        const pregnantDays = animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
+        const inseminatedDays = animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
+
+        tr.innerHTML = `
+          <td>${animal.number || ''}</td>
+          <td>${animal.type || ''}</td>
+          <td>${animal.breed || ''}</td>
+          <td>${animal.productionStatus || '---'}</td>
+          <td>${daysInMilk}</td>
+          <td>${animal.reproductiveStatus || ''}</td>
+          <td>${inseminatedDays}</td>
+          <td>${animal.dailyMilkProduction || '---'}</td>
+          <td>${pregnantDays}</td>
+          <td>${animal.birthDate || '---'}</td>
+          <td>${animal.lastCalvingDate || '---'}</td>
+          <td><button class="button" onclick="viewCard('${animal.number}')">📄</button></td>
+          <td><button class="button" onclick="goToAddEvent('${animal.number}')">📋</button></td>
+          <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+window.viewCard = function(animalNumber) {
+  window.location.href = `cow-card.html?number=${animalNumber}`;
+}
+
+
+
+    window.goToAddEvent = function(animalNumber) {
+      localStorage.setItem("lastAnimalId", animalNumber);
+      window.location.href = "add-event.html";
+    }
+
+    window.deleteAnimal = async function(animalDocId) {
+      if (confirm("هل أنت متأكد من حذف الحيوان؟")) {
+        try {
+          await deleteDoc(doc(db, "animals", animalDocId));
+          animalsData = animalsData.filter(a => a.id !== animalDocId);
+          renderTable(animalsData);
+        } catch (err) {
+          alert("فشل في حذف الحيوان.");
+          console.error(err);
+        }
+      }
+    }
+
+    document.getElementById('searchNumber').addEventListener('input', function() {
+      const query = this.value.trim();
+     const filtered = animalsData.filter(a => a.number && a.number.includes(query));
+
+      renderTable(filtered);
+    });
+
+    window.filterType = function(type) {
+      if (!type) return renderTable(animalsData);
+      const filtered = animalsData.filter(a => a.type === type);
+      renderTable(filtered);
+    }
+
+    window.filterReproductiveStatus = function(status) {
+      if (!status) return renderTable(animalsData);
+      const filtered = animalsData.filter(a => a.reproductiveStatus === status);
+      renderTable(filtered);
+    }
+
+    window.resetFilter = function() {
+      renderTable(animalsData);
+      document.getElementById('searchNumber').value = '';
+      document.getElementById('filterReproductive').value = '';
+      document.getElementById('typeSelector').value = '';
+    }
+  </script>
+</body>
+</html>
+
+
