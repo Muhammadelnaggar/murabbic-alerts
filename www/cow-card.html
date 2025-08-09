@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>بطاقة الحيوان</title>
+  <title>بطاقة الجاموسة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -63,7 +63,7 @@
 </head>
 <body>
 
-  <h1 class="title">بطاقة الحيوان رقم (<span id="animalNumber"></span>)</h1>
+  <h1 class="title">بطاقة الجاموسة رقم (<span id="animalId"></span>)</h1>
   <button class="photo-button">📷 صورة الحيوان</button>
 
   <div class="section">
@@ -93,99 +93,93 @@
     <span id="reproduction"></span>
   </div>
 
-  <button onclick="window.location.href='animal-list.html'">🔙 العودة إلى قائمة الحيوانات</button>
+  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-    authDomain: "murabbik.firebaseapp.com",
-    projectId: "murabbik",
-    storageBucket: "murabbik.appspot.com",
-    messagingSenderId: "402719243568",
-    appId: "1:402719243568:web:631114a260d23202dd5cf5"
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  // قراءة id من الرابط
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
+    // الحصول على المعرف من الرابط
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
 
-  if (!id) {
-    alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
-    window.location.href = "animal-list.html";
-  }
+    if (!id) {
+      alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+      window.location.href = "animal-list.html";
+    } else {
+      async function loadAnimal() {
+        const docRef = doc(db, "animals", id);
+        const docSnap = await getDoc(docRef);
 
-  async function loadAnimal() {
-    try {
-      const docRef = doc(db, "animals", id);
-      const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          alert("❌ لم يتم العثور على بيانات الحيوان.");
+          window.location.href = "animal-list.html";
+          return;
+        }
 
-      if (!docSnap.exists()) {
-        alert("❌ لم يتم العثور على بيانات الحيوان.");
-        window.location.href = "animal-list.html";
-        return;
+        const animal = docSnap.data();
+
+        document.getElementById("animalId").textContent = animal.animalNumber || id;
+        document.getElementById("birthDate").textContent = animal.birthDate || '-';
+        document.getElementById("season").textContent = animal.season || '-';
+        document.getElementById("milkDays").textContent = animal.milkDays || '-';
+        document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
+        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
+        document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
+        document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
+        document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+
+        // رسم الرسم البياني إن وجد
+        const chartData = animal.milkCurve?.map((v, i) => ({
+          date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
+          total: v
+        })) || [];
+
+        new Chart(document.getElementById('milkChart'), {
+          type: 'line',
+          data: {
+            labels: chartData.map(e => e.date),
+            datasets: [{
+              label: 'إنتاج اللبن التراكمي (لتر)',
+              data: chartData.map(e => e.total),
+              backgroundColor: 'rgba(76, 175, 80, 0.2)',
+              borderColor: '#4caf50',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true,
+                labels: { font: { size: 14 } }
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: 'الشهر' } },
+              y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+            }
+          }
+        });
       }
 
-      const animal = docSnap.data();
-
-      document.getElementById("animalId").textContent = animal.animalNumber || "";
-      document.getElementById("birthDate").textContent = animal.birthDate || "-";
-      document.getElementById("season").textContent = animal.season || "-";
-      document.getElementById("milkDays").textContent = animal.milkDays || "-";
-      document.getElementById("milkTotal").textContent = animal.milkTotal || "-";
-      document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || "-";
-      document.getElementById("expectedDate").textContent = animal.expectedDate || "-";
-      document.getElementById("healthSummary").textContent = animal.healthNotes || "-";
-      document.getElementById("reproduction").textContent = animal.reproductiveStatus || "-";
-
-      // رسم البياني (مثل ما هو)
-      const chartData = animal.milkCurve?.map((v, i) => ({
-        date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
-        total: v
-      })) || [];
-
-      new Chart(document.getElementById('milkChart'), {
-        type: 'line',
-        data: {
-          labels: chartData.map(e => e.date),
-          datasets: [{
-            label: 'إنتاج اللبن التراكمي (لتر)',
-            data: chartData.map(e => e.total),
-            backgroundColor: 'rgba(76, 175, 80, 0.2)',
-            borderColor: '#4caf50',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              display: true,
-              labels: { font: { size: 14 } }
-            }
-          },
-          scales: {
-            x: { title: { display: true, text: 'الشهر' } },
-            y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
-          }
-        }
-      });
-
-    } catch (error) {
-      alert("⚠️ حدث خطأ في تحميل بيانات الحيوان.");
-      console.error(error);
+      loadAnimal();
     }
-  }
-
-  loadAnimal();
-</script>
+  </script>
 
 </body>
 </html>
