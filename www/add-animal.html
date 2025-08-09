@@ -258,7 +258,8 @@
 
         await addDoc(collection(db, "animals"), animalData);
 
-        msgDiv.textContent = "✅ تم تسجيل الحيوان بنجاح.";
+        alert("✅ تم تسجيل الحيوان بنجاح.");
+
         msgDiv.className = "success";
         msgDiv.style.display = "block";
         console.log("تم عرض رسالة تأكيد التسجيل"); // 5
@@ -282,5 +283,6 @@
   </script>
 </body>
 </html>
+
 
 
