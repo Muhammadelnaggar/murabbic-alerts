@@ -86,7 +86,7 @@
     <input type="text" id="animalNumber" required />
 
     <label for="animalType">نوع الحيوان:</label>
-    <select id="animalType" required onchange="updateBreedOptions()">
+    <select id="animalType" required>
       <option value="">اختر النوع</option>
       <option value="بقرة">بقرة</option>
       <option value="جاموسة">جاموسة</option>
@@ -98,7 +98,7 @@
     </select>
 
     <label for="productionStatus">الحالة الإنتاجية:</label>
-    <select id="productionStatus" required onchange="toggleMilkField()">
+    <select id="productionStatus" required>
       <option value="">اختر الحالة</option>
       <option value="حلاب">حلاب</option>
       <option value="جاف">جاف</option>
@@ -110,7 +110,7 @@
     </div>
 
     <label for="reproductiveStatus">الحالة التناسلية:</label>
-    <select id="reproductiveStatus" required onchange="toggleInseminationField()">
+    <select id="reproductiveStatus" required>
       <option value="">اختر الحالة</option>
       <option value="حديث الولادة">حديث الولادة</option>
       <option value="ملقحة">ملقحة</option>
@@ -157,7 +157,13 @@
       const breedSelect = document.getElementById("breed");
       breedSelect.innerHTML = '<option value="">اختر السلالة</option>';
 
-      const breeds = animalType === "بقرة" ? cowBreeds : animalType === "جاموسة" ? buffaloBreeds : [];
+      let breeds = [];
+      if (animalType === "بقرة") {
+        breeds = cowBreeds;
+      } else if (animalType === "جاموسة") {
+        breeds = buffaloBreeds;
+      }
+
       breeds.forEach(b => {
         const option = document.createElement("option");
         option.value = b;
@@ -182,19 +188,31 @@
     }
 
     function toggleInseminationField() {
-      const status = document.getElementById("reproductiveStatus").value;
-      const field = document.getElementById("inseminationField");
-      const input = document.getElementById("lastInseminationDate");
+      const reproductiveStatus = document.getElementById("reproductiveStatus").value;
+      const inseminationField = document.getElementById("inseminationField");
+      const lastInseminationDate = document.getElementById("lastInseminationDate");
 
-      if (status === "ملقحة" || status === "عشار") {
-        field.style.display = "block";
-        input.required = true;
+      if (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") {
+        inseminationField.style.display = "block";
+        lastInseminationDate.required = true;
       } else {
-        field.style.display = "none";
-        input.required = false;
-        input.value = "";
+        inseminationField.style.display = "none";
+        lastInseminationDate.required = false;
+        lastInseminationDate.value = "";
       }
     }
+
+    // ربط الأحداث
+    document.getElementById("animalType").addEventListener("change", updateBreedOptions);
+    document.getElementById("productionStatus").addEventListener("change", toggleMilkField);
+    document.getElementById("reproductiveStatus").addEventListener("change", toggleInseminationField);
+
+    // لضبط الحالة الأولية عند تحميل الصفحة
+    window.addEventListener("DOMContentLoaded", () => {
+      updateBreedOptions();
+      toggleMilkField();
+      toggleInseminationField();
+    });
 
     const form = document.getElementById("animalForm");
     const msgDiv = document.getElementById("msg");
@@ -203,7 +221,6 @@
       e.preventDefault();
       msgDiv.style.display = "none";
 
-      // قراءة القيم
       const animalNumber = document.getElementById("animalNumber").value.trim();
       const animalType = document.getElementById("animalType").value;
       const breed = document.getElementById("breed").value;
@@ -214,7 +231,6 @@
       const lastCalvingDate = document.getElementById("lastCalvingDate").value;
       const lastInseminationDate = document.getElementById("lastInseminationDate").value;
 
-      // التحقق من وجود userId في localStorage
       const userId = localStorage.getItem("userId");
       if (!userId) {
         msgDiv.textContent = "خطأ: لا يوجد مستخدم مسجل. يرجى تسجيل الدخول.";
@@ -262,7 +278,3 @@
   </script>
 </body>
 </html>
-
-
-
-
