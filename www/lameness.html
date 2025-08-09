@@ -134,31 +134,39 @@
       }
     });
 
-    document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
+   document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
 
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
+  const formData = new FormData(this);
+  const data = Object.fromEntries(formData.entries());
 
-      data.type = "عرج";
-      data.isSmartAlert = true;
-      data.alertRule = "lameness-recheck";
-      data.createdAt = serverTimestamp();
+  // أضف نوع الحدث والتتبع الذكي
+  data.type = "عرج";
+  data.isSmartAlert = true;
+  data.alertRule = "lameness-recheck";
 
-     try {
-  await addDoc(collection(db, "events"), data);
-  
-  if (confirm("✅ تم تسجيل حالة العرج بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-    window.location.href = "add-event.html";
-  } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-    window.location.href = "add-animal.html";
-  } else {
-    window.location.href = "dashboard.html";
+  try {
+    const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      alert("✅ تم تسجيل حالة العرج بنجاح");
+      this.reset();
+      document.getElementById("lamenessDate").valueAsDate = new Date();
+
+      // التوجيه التلقائي لصفحة العلاج والمتابعة بعد التسجيل
+      window.location.href = "treatment-followup.html";
+    } else {
+      alert("❌ فشل في تسجيل الحالة");
+    }
+  } catch (err) {
+    alert("⚠️ فشل الاتصال بالخادم");
+    console.error(err);
   }
-} catch (error) {
-  alert("⚠️ فشل الاتصال بالخادم");
-  console.error(error);
-}
+});
 
     });
   </script>
