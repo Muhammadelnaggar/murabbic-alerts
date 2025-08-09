@@ -170,15 +170,15 @@
       diseaseButtons.forEach(btn => btn.disabled = true);
       msgDiv.style.display = "none";
 
-      const eventData = {
-        animalId,
-        diseaseDate,
-        diseaseName,
-        type: "مرض",
-        isSmartAlert: true,
-        alertRule: "مرض",
-        createdAt: serverTimestamp()
-      };
+     const eventData = {
+  animalId,
+  eventDate: diseaseDate,
+  eventType: diseaseName,
+  type: "مرض",
+  isSmartAlert: true,
+  alertRule: "مرض",
+  createdAt: serverTimestamp()
+};
 
       try {
         await addDoc(collection(db, "events"), eventData);
@@ -207,3 +207,4 @@
 
 </body>
 </html>
+
