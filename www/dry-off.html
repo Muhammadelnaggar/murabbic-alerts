@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -50,60 +50,72 @@
       font-size: 16px;
       width: 100%;
       margin-top: 20px;
+      cursor: pointer;
     }
     .option-group {
-  display: flex;
-  gap: 15px;
-  margin-top: 8px;
-  margin-bottom: 15px;
-}
+      display: flex;
+      gap: 15px;
+      margin-top: 8px;
+      margin-bottom: 15px;
+    }
 
-.option-group label {
-  background-color: #dcedc8;
-  padding: 10px 15px;
-  border-radius: 8px;
-  border: 1px solid #8bc34a;
-  cursor: pointer;
-  font-size: 16px;
-}
-
+    .option-group label {
+      background-color: #dcedc8;
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid #8bc34a;
+      cursor: pointer;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <h1>📄 تسجيل تجفيف الحيوان</h1>
 
-  <form onsubmit="submitDryOff(event)">
+  <form id="dryOffForm">
     <label for="animal-id">رقم الحيوان:</label>
     <input type="text" id="animal-id" required />
 
     <label for="date">تاريخ التجفيف:</label>
     <input type="date" id="date" required />
 
-  <label>سبب التجفيف:</label>
-<div class="option-group">
-  <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
-  <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
-</div>
+    <label>سبب التجفيف:</label>
+    <div class="option-group">
+      <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
+      <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
+    </div>
 
+    <label>تأكيد الحمل:</label>
+    <div class="option-group">
+      <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
+      <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
+    </div>
 
-   <label>تأكيد الحمل:</label>
-<div class="option-group">
-  <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
-  <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
-</div>
-
-
-   <label>تم استخدام محاقن التجفيف؟</label>
-<div class="option-group">
-  <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
-  <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
-</div>
-
+    <label>تم استخدام محاقن التجفيف؟</label>
+    <div class="option-group">
+      <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
+      <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
+    </div>
 
     <button type="submit">💾 تسجيل التجفيف</button>
   </form>
 
-<script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
   window.onload = function () {
     const storedAnimalId = localStorage.getItem("lastAnimalId");
     if (storedAnimalId) {
@@ -115,7 +127,9 @@
     }
   };
 
-  function submitDryOff(event) {
+  const form = document.getElementById("dryOffForm");
+
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const data = {
@@ -126,7 +140,8 @@
       usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
       type: "تجفيف",
       isSmartAlert: true,
-      alertRule: "تجفيف"
+      alertRule: "تجفيف",
+      createdAt: serverTimestamp()
     };
 
     if (!data.animalId || !data.dryOffDate) {
@@ -134,41 +149,29 @@
       return;
     }
 
-    fetch("https://murabbic-alerts.onrender.com/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    })
-      .then(res => {
-        if (res.ok) {
-          const isNewUser = localStorage.getItem("isNewUser") === "true";
-          if (isNewUser) {
-            if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-              window.location.href = "add-event.html";
-            } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-              window.location.href = "add-animal.html";
-            } else {
-              localStorage.removeItem("isNewUser");
-              localStorage.removeItem("lastAnimalId");
-              window.location.href = "dashboard.html";
-            }
-          } else {
-            window.location.href = "dashboard.html";
-          }
-        } else {
-          alert("❌ حدث خطأ أثناء الحفظ.");
-        }
-      })
-      .catch(err => {
-        console.error("❌ خطأ:", err);
-        alert("فشل الاتصال بالخادم.");
-      });
-  }
-</script>
+    try {
+      await addDoc(collection(db, "events"), data);
 
+      const isNewUser = localStorage.getItem("isNewUser") === "true";
+      if (isNewUser) {
+        if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+          window.location.href = "add-event.html";
+        } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+          window.location.href = "add-animal.html";
+        } else {
+          localStorage.removeItem("isNewUser");
+          localStorage.removeItem("lastAnimalId");
+          window.location.href = "dashboard.html";
+        }
+      } else {
+        window.location.href = "dashboard.html";
+      }
+    } catch (error) {
+      console.error("❌ خطأ:", error);
+      alert("فشل الاتصال بالخادم.");
+    }
+  });
+</script>
 
 </body>
 </html>
-
-
-
