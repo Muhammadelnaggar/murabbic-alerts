@@ -95,74 +95,98 @@
 
   <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
 
- <script>
-  const BASE_URL = 'https://murabbic-alerts.onrender.com';
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const params = new URLSearchParams(window.location.search);
-  const number = params.get("number") || localStorage.getItem("lastAnimalId");
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-  if (!number) {
-    alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
-    window.location.href = "animal-list.html";
-  }
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  document.getElementById("animalId").textContent = number;
+    const params = new URLSearchParams(window.location.search);
+    const number = params.get("number") || localStorage.getItem("lastAnimalId");
+    const userId = localStorage.getItem("userId");
 
-  fetch(`${BASE_URL}/api/animals`)
-    .then(res => res.ok ? res.json() : Promise.reject('فشل الاتصال بالسيرفر'))
-    .then(data => {
-      const animal = data.find(a => a.number === number);
-      if (!animal) return alert("❌ لم يتم العثور على الحيوان.");
+    if (!number) {
+      alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+      window.location.href = "animal-list.html";
+    }
 
-      document.getElementById("birthDate").textContent = animal.birthDate || '-';
-      document.getElementById("season").textContent = animal.season || '-';
-      document.getElementById("milkDays").textContent = animal.milkDays || '-';
-      document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
-      document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
-      document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
-      document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
-      document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+    document.getElementById("animalId").textContent = number;
 
-      const chartData = animal.milkCurve?.map((v, i) => ({
-        date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
-        total: v
-      })) || [];
-
-      new Chart(document.getElementById('milkChart'), {
-        type: 'line',
-        data: {
-          labels: chartData.map(e => e.date),
-          datasets: [{
-            label: 'إنتاج اللبن التراكمي (لتر)',
-            data: chartData.map(e => e.total),
-            backgroundColor: 'rgba(76, 175, 80, 0.2)',
-            borderColor: '#4caf50',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              display: true,
-              labels: { font: { size: 14 } }
-            }
-          },
-          scales: {
-            x: { title: { display: true, text: 'الشهر' } },
-            y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
-          }
+    async function loadAnimalData() {
+      try {
+        const animalsRef = collection(db, "animals");
+        const q = query(animalsRef, 
+          where("number", "==", number), 
+          where("userId", "==", userId)
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+          alert("❌ لم يتم العثور على الحيوان الخاص بك.");
+          window.location.href = "animal-list.html";
+          return;
         }
-      });
-    })
-    .catch(err => alert('⚠️ حدث خطأ في تحميل البيانات: ' + err));
-</script>
+        const animal = snapshot.docs[0].data();
+
+        document.getElementById("birthDate").textContent = animal.birthDate || '-';
+        document.getElementById("season").textContent = animal.season || '-';
+        document.getElementById("milkDays").textContent = animal.milkDays || '-';
+        document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
+        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
+        document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
+        document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
+        document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+
+        const chartData = (animal.milkCurve || []).map((v, i) => ({
+          date: new Date().toLocaleDateString('ar-EG', { month: 'short', year: 'numeric' }),
+          total: v
+        }));
+
+        new Chart(document.getElementById('milkChart'), {
+          type: 'line',
+          data: {
+            labels: chartData.map(e => e.date),
+            datasets: [{
+              label: 'إنتاج اللبن التراكمي (لتر)',
+              data: chartData.map(e => e.total),
+              backgroundColor: 'rgba(76, 175, 80, 0.2)',
+              borderColor: '#4caf50',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true,
+                labels: { font: { size: 14 } }
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: 'الشهر' } },
+              y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+            }
+          }
+        });
+      } catch (error) {
+        alert('⚠️ حدث خطأ في تحميل البيانات: ' + error);
+        console.error(error);
+      }
+    }
+
+    loadAnimalData();
+  </script>
 
 </body>
 </html>
-
- 
-
-
