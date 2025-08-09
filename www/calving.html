@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -202,4 +201,57 @@
             number: calfNumber,
             type: "عجل",
             gender: gender,
-            breed: mother?.br
+            breed: mother?.breed || "غير محدد",
+            productionStatus: "عجل",
+            reproductiveStatus: "حديث الولادة",
+            lastCalvingDate: form.calvingDate.value,
+            userId: localStorage.getItem("userId"),
+            motherId: motherId,
+            fatherId: null
+          };
+
+          if ((gender === "ذكر" && !calfNumber.startsWith("1000")) || (gender === "أنثى" && !calfNumber.startsWith("2000"))) {
+            alert("⚠️ يجب أن يبدأ رقم العجل بـ 1000 للذكر أو 2000 للأنثى لتمييزه عن باقي القطيع.");
+            return;
+          }
+
+          await fetch("https://murabbic-alerts.onrender.com/api/animals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(calfAnimal)
+          });
+
+          document.getElementById("cardNumber").textContent = calfNumber;
+          document.getElementById("cardType").textContent = "عجل";
+          document.getElementById("cardGender").textContent = gender;
+          document.getElementById("cardBreed").textContent = calfAnimal.breed;
+          document.getElementById("cardRepro").textContent = calfAnimal.reproductiveStatus;
+          document.getElementById("cardDOB").textContent = form.calvingDate.value;
+          document.getElementById("cardOwner").textContent = calfAnimal.userId;
+          document.getElementById("cardMother").textContent = motherId;
+          document.getElementById("cardFather").textContent = calfAnimal.fatherId || "غير مسجل";
+
+          document.getElementById("calfCardModal").style.display = "flex";
+        } else {
+          alert("✅ تم تسجيل حدث الولادة بنجاح");
+          const anotherEvent = confirm("هل تريد تسجيل حدث آخر؟");
+          if (anotherEvent) {
+            window.location.href = "add-event.html";
+          } else {
+            const anotherAnimal = confirm("هل تريد تسجيل حيوان آخر؟");
+            if (anotherAnimal) {
+              window.location.href = "add-animal.html";
+            } else {
+              window.location.href = "dashboard.html";
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error("⚠️ خطأ:", error);
+        alert("⚠️ حدث خطأ أثناء الاتصال بالخادم");
+      }
+    });
+  </script>
+</body>
+</html>
