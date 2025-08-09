@@ -109,17 +109,16 @@
       event.preventDefault();
 
       const data = {
-  type: "تلقيح", // 🟢 مهم جدًا تحديد نوع الحدث
-  animalId: document.getElementById("animalId").value,
-  date: document.getElementById("inseminationDate").value,  // توحيد اسم الحقل
-  bullName: document.getElementById("bullName").value,
-  heatTime: document.querySelector('input[name="heatTime"]:checked').value,
-  inseminationTime: document.querySelector('input[name="inseminationTime"]:checked').value,
-  technicianName: document.getElementById("technicianName").value,
-  isSmartAlert: true,
-  alertRule: "تلقيح"      
-};
-
+        type: "تلقيح", // 🟢 مهم جدًا تحديد نوع الحدث
+        animalId: document.getElementById("animalId").value.trim(),
+        inseminationDate: document.getElementById("inseminationDate").value,  // توحيد اسم الحقل
+        bullName: document.getElementById("bullName").value.trim(),
+        heatTime: document.querySelector('input[name="heatTime"]:checked').value,
+        inseminationTime: document.querySelector('input[name="inseminationTime"]:checked').value,
+        technicianName: document.getElementById("technicianName").value.trim(),
+        isSmartAlert: true,
+        alertRule: "تلقيح"
+      };
 
       try {
         const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
@@ -143,6 +142,4 @@
   </script>
 </body>
 </html>
-
-
 
