@@ -259,6 +259,7 @@
         await addDoc(collection(db, "animals"), animalData);
 
         alert("✅ تم تسجيل الحيوان بنجاح.");
+        msgDiv.textContent = "✅ تم تسجيل الحيوان بنجاح.";
 
         msgDiv.className = "success";
         msgDiv.style.display = "block";
@@ -283,6 +284,7 @@
   </script>
 </body>
 </html>
+
 
 
 
