@@ -145,15 +145,21 @@
       data.alertRule = "lameness-recheck";
       data.createdAt = serverTimestamp();
 
-      try {
-        await addDoc(collection(db, "events"), data);
-        alert("✅ تم تسجيل حالة العرج بنجاح");
-        this.reset();
-        document.getElementById("lamenessDate").valueAsDate = new Date();
-      } catch (error) {
-        alert("⚠️ فشل الاتصال بالخادم");
-        console.error(error);
-      }
+     try {
+  await addDoc(collection(db, "events"), data);
+  
+  if (confirm("✅ تم تسجيل حالة العرج بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+    window.location.href = "add-event.html";
+  } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+    window.location.href = "add-animal.html";
+  } else {
+    window.location.href = "dashboard.html";
+  }
+} catch (error) {
+  alert("⚠️ فشل الاتصال بالخادم");
+  console.error(error);
+}
+
     });
   </script>
 </body>
