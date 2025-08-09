@@ -29,7 +29,7 @@
     h2 {
       color: #28a745;
       font-size: 28px;
-      margin-bottom: 15px;
+      margin-bottom: 25px;
     }
     input, button {
       width: 100%;
@@ -50,16 +50,6 @@
     button:hover {
       background-color: #218838;
     }
-    #msg {
-      margin-bottom: 15px;
-      padding: 10px;
-      border-radius: 6px;
-      color: #0f5132;
-      background-color: #d1e7dd;
-      font-weight: bold;
-      text-align: center;
-      display: none;
-    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -77,6 +67,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // دالة تشفير كلمة المرور
     async function hashPassword(password) {
       const encoder = new TextEncoder();
       const data = encoder.encode(password);
@@ -87,12 +78,8 @@
 
     window.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("loginForm");
-      const msgDiv = document.getElementById("msg");
-
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-
-        msgDiv.style.display = "none"; // إخفاء الرسالة في بداية المحاولة
 
         const phone = document.getElementById("phone").value.trim();
         const password = document.getElementById("password").value.trim();
@@ -125,9 +112,32 @@
           // تسجيل الدخول ناجح
           localStorage.setItem("userId", userDoc.id);
           localStorage.setItem("userPhone", userData.phone);
+          alert("✅ تم تسجيل الدخول بنجاح");
 
-          // عرض رسالة النجاح داخل النموذج
-          msgDiv.textContent = "✅ تم تسجيل الدخول بنجاح";
-          msgDiv.style.display = "block";
+          const animalsRef = collection(db, "animals");
+          const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
+          const animalSnapshot = await getDocs(animalQuery);
 
-          /
+          if (animalSnapshot.empty) {
+            window.location.href = "add-animal.html";
+          } else {
+            window.location.href = "dashboard.html";
+          }
+
+        } catch (err) {
+          console.error(err);
+          alert("حدث خطأ أثناء تسجيل الدخول.");
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+  <form id="loginForm">
+    <h2>تسجيل الدخول</h2>
+    <input type="text" id="phone" placeholder="رقم الهاتف" required />
+    <input type="password" id="password" placeholder="كلمة المرور" required />
+    <button type="submit">دخول</button>
+  </form>
+</body>
+</html>
