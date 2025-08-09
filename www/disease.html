@@ -12,25 +12,21 @@
       padding: 20px;
       margin: 0;
     }
-
     h2 {
       text-align: center;
       color: #2c3e50;
       font-size: 24px;
       margin-bottom: 20px;
     }
-
     form {
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
-
     label {
       font-weight: bold;
       font-size: 18px;
     }
-
     input, button {
       padding: 14px;
       border-radius: 8px;
@@ -39,13 +35,11 @@
       width: 100%;
       box-sizing: border-box;
     }
-
     .disease-buttons {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 12px;
     }
-
     .disease-buttons button {
       background-color: #8bc34a;
       color: black;
@@ -59,25 +53,11 @@
       gap: 8px;
       transition: background-color 0.3s;
     }
-
     .disease-buttons button.selected {
       border: 2px solid #2c3e50;
       background-color: #558b2f;
       color: white;
     }
-
-    button[type="submit"] {
-      background-color: #dc3545;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 18px;
-    }
-
-    button[type="submit"]:hover {
-      background-color: #c82333;
-    }
-
     #msg {
       margin-top: 20px;
       font-weight: bold;
@@ -87,12 +67,10 @@
       padding: 10px;
       border-radius: 8px;
     }
-
     #msg.success {
       background-color: #d1e7dd;
       color: #0f5132;
     }
-
     #msg.error {
       background-color: #f8d7da;
       color: #842029;
@@ -178,7 +156,17 @@
         return;
       }
 
-      // تعطل الأزرار أثناء الإرسال
+      // تحويل مباشر لصفحات التهاب الضرع أو العرج
+      if (diseaseName === "التهاب ضرع") {
+        window.location.href = `mastitis.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
+        return;
+      }
+      if (diseaseName === "عرج") {
+        window.location.href = `lameness.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
+        return;
+      }
+
+      // تعطيل الأزرار أثناء الإرسال
       diseaseButtons.forEach(btn => btn.disabled = true);
       msgDiv.style.display = "none";
 
