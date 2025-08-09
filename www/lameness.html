@@ -100,75 +100,61 @@
     <button type="submit">تسجيل الحالة</button>
   </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ <script>
+  document.getElementById("lamenessDate").valueAsDate = new Date();
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
 
-    // تعيين التاريخ الحالي افتراضياً
-    document.getElementById("lamenessDate").valueAsDate = new Date();
+    // أضف نوع الحدث والتتبع الذكي
+    data.type = "عرج";
+    data.isSmartAlert = true;
+    data.alertRule = "lameness-recheck";
 
-    // جلب رقم الحيوان والتاريخ من الرابط (تمرير من صفحة الأحداث)
-    window.addEventListener("load", () => {
-      const params = new URLSearchParams(window.location.search);
-      const animalId = params.get("animalId");
-      const date = params.get("date");
+    try {
+      const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
 
-      if (animalId) {
-        document.getElementById("animalId").value = animalId;
+      if (res.ok) {
+        alert("✅ تم تسجيل حالة العرج بنجاح");
+        this.reset();
+        document.getElementById("lamenessDate").valueAsDate = new Date();
+
+        // تمرير animalId و date في الرابط للصفحة التالية
+        const animalId = data.animalId || document.getElementById("animalId").value;
+        const eventDate = data.lamenessDate || document.getElementById("lamenessDate").value;
+        window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
+      } else {
+        alert("❌ فشل في تسجيل الحالة");
       }
-
-      if (date) {
-        document.getElementById("lamenessDate").value = date;
-      }
-    });
-
-   document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
-  e.preventDefault();
-
-  const formData = new FormData(this);
-  const data = Object.fromEntries(formData.entries());
-
-  // أضف نوع الحدث والتتبع الذكي
-  data.type = "عرج";
-  data.isSmartAlert = true;
-  data.alertRule = "lameness-recheck";
-
-  try {
-    const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    });
-
-    if (res.ok) {
-      alert("✅ تم تسجيل حالة العرج بنجاح");
-      this.reset();
-      document.getElementById("lamenessDate").valueAsDate = new Date();
-
-      // التوجيه التلقائي لصفحة العلاج والمتابعة بعد التسجيل
-      window.location.href = "treatment-followup.html";
-    } else {
-      alert("❌ فشل في تسجيل الحالة");
+    } catch (err) {
+      alert("⚠️ فشل الاتصال بالخادم");
+      console.error(err);
     }
-  } catch (err) {
-    alert("⚠️ فشل الاتصال بالخادم");
-    console.error(err);
-  }
-});
+  });
+</script>
 
-    });
-  </script>
+<script>
+  window.addEventListener("load", () => {
+    const params = new URLSearchParams(window.location.search);
+    const animalId = params.get("animalId");
+    const date = params.get("date");
+
+    if (animalId) {
+      document.getElementById("animalId").value = animalId;
+    }
+
+    if (date) {
+      document.getElementById("lamenessDate").value = date;
+    }
+  });
+</script>
+
 </body>
 </html>
