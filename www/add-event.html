@@ -1,6 +1,5 @@
-
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
   <meta charset="UTF-8" />
   <title>تسجيل حدث</title>
@@ -20,22 +19,31 @@
       margin-bottom: 10px;
       color: #2e7d32;
     }
-    .info {
+    .animal-info, .date-info {
       text-align: center;
-      margin-bottom: 15px;
       font-size: 18px;
+      margin-bottom: 10px;
+      color: #2e7d32;
     }
-    label {
-      font-weight: bold;
-    }
-    #eventDate {
-      width: 160px;
-      padding: 6px;
-      border-radius: 6px;
-      border: 1px solid #a5d6a7;
-      font-size: 16px;
-      margin-right: 10px;
+    .warning {
       text-align: center;
+      font-size: 16px;
+      color: #c62828;
+      margin-bottom: 10px;
+    }
+    .form-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 10px 0 20px;
+    }
+    .form-fields input {
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .button-group {
       display: grid;
@@ -53,6 +61,7 @@
       text-align: center;
       transition: background-color 0.3s, color 0.3s;
     }
+    .button-group button.active,
     .button-group button:hover {
       background-color: #2e7d32;
       color: white;
@@ -60,50 +69,97 @@
   </style>
 </head>
 <body>
-
   <h1>تسجيل حدث</h1>
-
-  <div class="info">
-    رقم الحيوان: <span id="animalIdDisplay">---</span> |
-    <label for="eventDate">تاريخ الحدث:</label>
-    <input type="date" id="eventDate" />
+  <div class="animal-info" id="animalInfo"></div>
+  <div class="date-info" id="dateInfo"></div>
+  <div class="warning" id="noAnimalWarning"></div>
+  <div class="form-fields">
+    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
+    <input type="date" id="eventDateInput" required />
   </div>
+  <form id="eventForm">
+    <div class="button-group" id="eventTypeGroup">
+      <button type="button" data-page="calving.html">👶 ولادة</button>
+      <button type="button" data-page="insemination.html">📅 تلقيح</button>
+      <button type="button" data-page="vaccination.html">💉 تحصين</button>
+      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+      <button type="button" data-page="disease.html">🔬 التشخيص</button>
+      <button type="button" data-page="treatment-followup.html">💊 العلاج والمتابعة</button>
+      <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+      <button type="button" data-page="protocols.html">📋 برامج وإجراءات</button>
+      <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    </div>
+  </form>
 
-  <div class="button-group" id="eventTypeGroup">
-    <button type="button" data-page="calving.html">👶 ولادة</button>
-    <button type="button" data-page="insemination.html">📅 تلقيح</button>
-    <button type="button" data-page="vaccination.html">💉 تحصين</button>
-    <button type="button" data-page="disease.html">🧪 أمراض</button>
-    <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-    <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن</button>
-    <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-    <!-- أضف هنا باقي أزرار الأحداث حسب الحاجة -->
-  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  <script>
-    // جلب رقم الحيوان من localStorage
-    const animalId = localStorage.getItem("lastAnimalId") || "";
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-    // عرض رقم الحيوان في الصفحة
-    document.getElementById("animalIdDisplay").textContent = animalId;
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    // تعيين تاريخ الحدث للحقل input
-    const eventDateInput = document.getElementById("eventDate");
-    eventDateInput.valueAsDate = new Date();
+    const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+    const animalInfo = document.getElementById("animalInfo");
+    const dateInfo = document.getElementById("dateInfo");
+    const warning = document.getElementById("noAnimalWarning");
+    const group = document.getElementById("eventTypeGroup");
 
-    // إضافة مستمع للنقر على أزرار الأحداث
-    document.querySelectorAll('#eventTypeGroup button').forEach(button => {
-      button.addEventListener('click', () => {
-        if (!animalId) {
-          alert("⚠️ يرجى تحديد رقم الحيوان أولاً");
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+
+    document.getElementById("animalIdInput").value = storedAnimalId;
+    document.getElementById("eventDateInput").value = formattedDate;
+    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${storedAnimalId || 'غير محدد'}`;
+    dateInfo.textContent = `📅 التاريخ الحالي: ${today.toLocaleDateString('ar-EG')}`;
+
+    const buttons = document.querySelectorAll('#eventTypeGroup button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const animalId = document.getElementById("animalIdInput").value.trim();
+        const eventDate = document.getElementById("eventDateInput").value.trim();
+
+        if (!animalId || !eventDate) {
+          warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
           return;
         }
-        const page = button.getAttribute('data-page');
-        const date = eventDateInput.value;
-        window.location.href = `${page}?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(date)}`;
+        warning.textContent = "";
+
+        try {
+          const eventType = btn.textContent.trim();
+
+          await addDoc(collection(db, "events"), {
+            animalId,
+            eventDate,
+            eventType,
+            createdAt: serverTimestamp()
+          });
+
+          localStorage.setItem("lastAnimalId", animalId);
+
+          const page = btn.getAttribute('data-page');
+          if (page) {
+            window.location.href = `${page}?animalId=${animalId}&date=${eventDate}`;
+          }
+        } catch (error) {
+          console.error("خطأ أثناء تسجيل الحدث:", error);
+          warning.textContent = "حدث خطأ أثناء تسجيل الحدث. حاول مرة أخرى.";
+        }
       });
     });
   </script>
-
 </body>
 </html>
+
