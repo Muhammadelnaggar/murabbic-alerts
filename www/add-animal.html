@@ -258,13 +258,9 @@
 
         await addDoc(collection(db, "animals"), animalData);
 
-        alert("✅ تم تسجيل الحيوان بنجاح.");
         msgDiv.textContent = "✅ تم تسجيل الحيوان بنجاح.";
-
         msgDiv.className = "success";
         msgDiv.style.display = "block";
-        console.log("تم عرض رسالة تأكيد التسجيل"); // 5
-
 
         form.reset();
         document.getElementById("milkField").style.display = "none";
@@ -284,7 +280,3 @@
   </script>
 </body>
 </html>
-
-
-
-
