@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>بطاقة الجاموسة</title>
+  <title>بطاقة الحيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -63,7 +63,7 @@
 </head>
 <body>
 
-  <h1 class="title">بطاقة الجاموسة رقم (<span id="animalId"></span>)</h1>
+  <h1 class="title">بطاقة الحيوان رقم (<span id="animalId"></span>)</h1>
   <button class="photo-button">📷 صورة الحيوان</button>
 
   <div class="section">
@@ -93,7 +93,7 @@
     <span id="reproduction"></span>
   </div>
 
-  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
+  <button onclick="window.location.href='animal-list.html'">🔙 العودة إلى قائمة الحيوانات</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -111,73 +111,81 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // الحصول على المعرف من الرابط
+    // قراءة معرف الوثيقة من رابط الصفحة
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    const docId = params.get("id");
 
-    if (!id) {
+    if (!docId) {
       alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
       window.location.href = "animal-list.html";
     } else {
-      async function loadAnimal() {
-        const docRef = doc(db, "animals", id);
-        const docSnap = await getDoc(docRef);
+      document.getElementById("animalId").textContent = docId;
 
-        if (!docSnap.exists()) {
+      // جلب بيانات الحيوان حسب docId
+      const docRef = doc(db, "animals", docId);
+      getDoc(docRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const animal = docSnap.data();
+
+          document.getElementById("animalId").textContent = animal.animalNumber || docId;
+          document.getElementById("birthDate").textContent = animal.birthDate || '-';
+          document.getElementById("season").textContent = animal.season || '-';
+
+          const milkDays = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : '-';
+          document.getElementById("milkDays").textContent = milkDays;
+          document.getElementById("milkTotal").textContent = animal.dailyMilk || '-';
+
+          document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
+          document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
+          document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
+          document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+
+          // رسم مخطط اللبن إذا متوفر
+          if (animal.milkCurve && animal.milkCurve.length > 0) {
+            const chartData = animal.milkCurve.map((v, i) => ({
+              date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
+              total: v
+            }));
+
+            new Chart(document.getElementById('milkChart'), {
+              type: 'line',
+              data: {
+                labels: chartData.map(e => e.date),
+                datasets: [{
+                  label: 'إنتاج اللبن التراكمي (لتر)',
+                  data: chartData.map(e => e.total),
+                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                  borderColor: '#4caf50',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  fill: true
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: {
+                  legend: {
+                    display: true,
+                    labels: { font: { size: 14 } }
+                  }
+                },
+                scales: {
+                  x: { title: { display: true, text: 'الشهر' } },
+                  y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+                }
+              }
+            });
+          }
+
+        } else {
           alert("❌ لم يتم العثور على بيانات الحيوان.");
           window.location.href = "animal-list.html";
-          return;
         }
-
-        const animal = docSnap.data();
-
-        document.getElementById("animalId").textContent = animal.animalNumber || id;
-        document.getElementById("birthDate").textContent = animal.birthDate || '-';
-        document.getElementById("season").textContent = animal.season || '-';
-        document.getElementById("milkDays").textContent = animal.milkDays || '-';
-        document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
-        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
-        document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
-        document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
-        document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
-
-        // رسم الرسم البياني إن وجد
-        const chartData = animal.milkCurve?.map((v, i) => ({
-          date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
-          total: v
-        })) || [];
-
-        new Chart(document.getElementById('milkChart'), {
-          type: 'line',
-          data: {
-            labels: chartData.map(e => e.date),
-            datasets: [{
-              label: 'إنتاج اللبن التراكمي (لتر)',
-              data: chartData.map(e => e.total),
-              backgroundColor: 'rgba(76, 175, 80, 0.2)',
-              borderColor: '#4caf50',
-              borderWidth: 2,
-              tension: 0.3,
-              fill: true
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: true,
-                labels: { font: { size: 14 } }
-              }
-            },
-            scales: {
-              x: { title: { display: true, text: 'الشهر' } },
-              y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
-            }
-          }
-        });
-      }
-
-      loadAnimal();
+      }).catch(err => {
+        alert("❌ حدث خطأ أثناء تحميل بيانات الحيوان.");
+        console.error(err);
+        window.location.href = "animal-list.html";
+      });
     }
   </script>
 
