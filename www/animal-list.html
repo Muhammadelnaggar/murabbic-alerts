@@ -221,22 +221,23 @@
         const pregnantDays = animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
         const inseminatedDays = animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
 
-        tr.innerHTML = `
-          <td>${animal.number || ''}</td>
-          <td>${animal.type || ''}</td>
-          <td>${animal.breed || ''}</td>
-          <td>${animal.productionStatus || '---'}</td>
-          <td>${daysInMilk}</td>
-          <td>${animal.reproductiveStatus || ''}</td>
-          <td>${inseminatedDays}</td>
-          <td>${animal.dailyMilkProduction || '---'}</td>
-          <td>${pregnantDays}</td>
-          <td>${animal.birthDate || '---'}</td>
-          <td>${animal.lastCalvingDate || '---'}</td>
-          <td><button class="button" onclick="viewCard('${animal.number}')">📄</button></td>
-          <td><button class="button" onclick="goToAddEvent('${animal.number}')">📋</button></td>
-          <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
-        `;
+       tr.innerHTML = `
+  <td>${animal.animalNumber || ''}</td>
+  <td>${animal.animalType || ''}</td>
+  <td>${animal.breed || ''}</td>
+  <td>${animal.productionStatus || '---'}</td>
+  <td>${daysInMilk}</td>
+  <td>${animal.reproductiveStatus || ''}</td>
+  <td>${inseminatedDays}</td>
+  <td>${animal.dailyMilk || '---'}</td>
+  <td>${pregnantDays}</td>
+  <td>${animal.birthDate || '---'}</td>
+  <td>${animal.lastCalvingDate || '---'}</td>
+  <td><button class="button" onclick="viewCard('${animal.id}')">📄</button></td>
+  <td><button class="button" onclick="goToAddEvent('${animal.animalNumber}')">📋</button></td>
+  <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
+`;
+
         tbody.appendChild(tr);
       });
     }
@@ -292,5 +293,6 @@ window.viewCard = function(animalNumber) {
   </script>
 </body>
 </html>
+
 
 
