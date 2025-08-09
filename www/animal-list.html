@@ -241,9 +241,10 @@
       });
     }
 
-    window.viewCard = function(animalNumber) {
-      window.location.href = `cow-card.html?number=${animalNumber}`;
-    }
+   window.viewCard = function(docId) {
+  window.location.href = `cow-card.html?id=${docId}`;
+}
+
 
     window.goToAddEvent = function(animalNumber) {
       localStorage.setItem("lastAnimalId", animalNumber);
@@ -290,3 +291,4 @@
   </script>
 </body>
 </html>
+
