@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>بطاقة الجاموسة</title>
+  <title>بطاقة الحيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -63,7 +63,7 @@
 </head>
 <body>
 
-  <h1 class="title">بطاقة الجاموسة رقم (<span id="animalId"></span>)</h1>
+  <h1 class="title">بطاقة الحيوان رقم (<span id="animalNumber"></span>)</h1>
   <button class="photo-button">📷 صورة الحيوان</button>
 
   <div class="section">
@@ -93,11 +93,11 @@
     <span id="reproduction"></span>
   </div>
 
-  <button onclick="window.location.href='dashboard.html'">🔙 العودة إلى غرفة التحكم</button>
+  <button onclick="window.location.href='animal-list.html'">🔙 العودة إلى قائمة الحيوانات</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
@@ -111,43 +111,42 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // استخراج doc ID من رابط الصفحة
     const params = new URLSearchParams(window.location.search);
-    const number = params.get("number") || localStorage.getItem("lastAnimalId");
-    const userId = localStorage.getItem("userId");
+    const docId = params.get("id");
 
-    if (!number) {
-      alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+    if (!docId) {
+      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
       window.location.href = "animal-list.html";
     }
 
-    document.getElementById("animalId").textContent = number;
-
-    async function loadAnimalData() {
+    async function loadAnimal() {
       try {
-        const animalsRef = collection(db, "animals");
-        const q = query(animalsRef, 
-          where("number", "==", number), 
-          where("userId", "==", userId)
-        );
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-          alert("❌ لم يتم العثور على الحيوان الخاص بك.");
+        const animalRef = doc(db, "animals", docId);
+        const animalSnap = await getDoc(animalRef);
+
+        if (!animalSnap.exists()) {
+          alert("❌ لم يتم العثور على بيانات الحيوان.");
           window.location.href = "animal-list.html";
           return;
         }
-        const animal = snapshot.docs[0].data();
 
-        document.getElementById("birthDate").textContent = animal.birthDate || '-';
-        document.getElementById("season").textContent = animal.season || '-';
-        document.getElementById("milkDays").textContent = animal.milkDays || '-';
-        document.getElementById("milkTotal").textContent = animal.milkTotal || '-';
-        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
-        document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
-        document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
-        document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+        const animal = animalSnap.data();
 
-        const chartData = (animal.milkCurve || []).map((v, i) => ({
-          date: new Date().toLocaleDateString('ar-EG', { month: 'short', year: 'numeric' }),
+        document.getElementById("animalNumber").textContent = animal.number || "غير معروف";
+        document.getElementById("birthDate").textContent = animal.birthDate || "-";
+        document.getElementById("season").textContent = animal.season || "-";
+        document.getElementById("milkDays").textContent = animal.milkDays || "-";
+        document.getElementById("milkTotal").textContent = animal.milkTotal || "-";
+        document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || "-";
+        document.getElementById("expectedDate").textContent = animal.expectedDate || "-";
+        document.getElementById("healthSummary").textContent = animal.healthNotes || "-";
+        document.getElementById("reproduction").textContent = animal.reproductiveStatus || "-";
+
+        // عرض رسم بياني إذا كانت البيانات متوفرة
+        const milkCurve = animal.milkCurve || [];
+        const chartData = milkCurve.map((v, i) => ({
+          date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
           total: v
         }));
 
@@ -168,10 +167,7 @@
           options: {
             responsive: true,
             plugins: {
-              legend: {
-                display: true,
-                labels: { font: { size: 14 } }
-              }
+              legend: { display: true, labels: { font: { size: 14 } } }
             },
             scales: {
               x: { title: { display: true, text: 'الشهر' } },
@@ -180,12 +176,12 @@
           }
         });
       } catch (error) {
-        alert('⚠️ حدث خطأ في تحميل البيانات: ' + error);
+        alert("⚠️ حدث خطأ أثناء تحميل بيانات الحيوان.");
         console.error(error);
       }
     }
 
-    loadAnimalData();
+    loadAnimal();
   </script>
 
 </body>
