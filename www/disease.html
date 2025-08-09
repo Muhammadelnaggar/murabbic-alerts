@@ -57,6 +57,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
+      transition: background-color 0.3s;
     }
 
     .disease-buttons button.selected {
@@ -76,6 +77,26 @@
     button[type="submit"]:hover {
       background-color: #c82333;
     }
+
+    #msg {
+      margin-top: 20px;
+      font-weight: bold;
+      text-align: center;
+      font-size: 18px;
+      display: none;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    #msg.success {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+
+    #msg.error {
+      background-color: #f8d7da;
+      color: #842029;
+    }
   </style>
 </head>
 <body>
@@ -84,10 +105,10 @@
 
   <form id="diseaseForm">
     <label for="animalId">رقم الحيوان</label>
-   <input type="text" id="animalId" name="animalId" readonly>
+    <input type="text" id="animalId" name="animalId" readonly />
 
     <label for="diseaseDate">تاريخ التشخيص</label>
-    <input type="date" id="diseaseDate" name="diseaseDate" required>
+    <input type="date" id="diseaseDate" name="diseaseDate" required />
 
     <label>اختر المرض</label>
     <div class="disease-buttons" id="diseaseButtons">
@@ -112,54 +133,89 @@
     </div>
   </form>
 
-<script>
+  <div id="msg"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const msgDiv = document.getElementById("msg");
+  const diseaseButtons = document.querySelectorAll('#diseaseButtons button');
+  const animalIdInput = document.getElementById("animalId");
+  const diseaseDateInput = document.getElementById("diseaseDate");
+
   const storedAnimalId = localStorage.getItem("lastAnimalId");
-if (storedAnimalId) {
-  document.getElementById("animalId").value = storedAnimalId;
-} else {
-  alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
-  window.location.href = "add-animal.html";
-}
+  if (storedAnimalId) {
+    animalIdInput.value = storedAnimalId;
+  } else {
+    alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+    window.location.href = "add-animal.html";
+  }
 
   // تعيين التاريخ تلقائيًا
-  document.getElementById("diseaseDate").valueAsDate = new Date();
+  diseaseDateInput.valueAsDate = new Date();
 
-  const buttons = document.querySelectorAll('#diseaseButtons button');
+  diseaseButtons.forEach(button => {
+    button.addEventListener('click', async () => {
+      const animalId = animalIdInput.value.trim();
+      const diseaseDate = diseaseDateInput.value;
+      const diseaseName = button.dataset.name;
 
-  buttons.forEach(button => {
-    button.addEventListener('click', () => {
-      const animalId = document.getElementById("animalId").value.trim();
-      const date = document.getElementById("diseaseDate").value;
-      const disease = button.dataset.name;
-
-      if (!animalId || !date) {
+      if (!animalId || !diseaseDate) {
         alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
         return;
       }
 
-      // حفظ البيانات في التخزين المحلي
-      localStorage.setItem("animalId", animalId);
-      localStorage.setItem("diseaseDate", date);
-      localStorage.setItem("lastDiseaseName", disease);
+      // تعطل الأزرار أثناء الإرسال
+      diseaseButtons.forEach(btn => btn.disabled = true);
+      msgDiv.style.display = "none";
 
-      // التوجيه حسب نوع المرض
-      if (disease === "التهاب ضرع") {
-        window.location.href = "mastitis.html";
-      } else if (disease === "عرج") {
-        window.location.href = "lameness.html";
-      } else {
-        alert('✅ تم اختيار المرض: ' + disease);
-        window.location.href = `treatment-followup.html?animalId=${animalId}&date=${date}`;
+      const eventData = {
+        animalId,
+        diseaseDate,
+        diseaseName,
+        type: "مرض",
+        isSmartAlert: true,
+        alertRule: "مرض",
+        createdAt: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, "events"), eventData);
+        msgDiv.textContent = `✅ تم تسجيل مرض "${diseaseName}" بنجاح`;
+        msgDiv.className = "success";
+        msgDiv.style.display = "block";
+
+        // إعادة تمكين الأزرار
+        diseaseButtons.forEach(btn => btn.disabled = false);
+
+        // توجيه بعد 2 ثانية
+        setTimeout(() => {
+          window.location.href = "treatment-followup.html?animalId=" + encodeURIComponent(animalId) + "&date=" + encodeURIComponent(diseaseDate);
+        }, 2000);
+
+      } catch (error) {
+        console.error("خطأ في تسجيل المرض:", error);
+        msgDiv.textContent = "❌ حدث خطأ أثناء التسجيل، حاول مرة أخرى.";
+        msgDiv.className = "error";
+        msgDiv.style.display = "block";
+        diseaseButtons.forEach(btn => btn.disabled = false);
       }
     });
   });
 </script>
 
-
-
 </body>
 </html>
-
-
-
-
