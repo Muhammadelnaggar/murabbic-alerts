@@ -95,99 +95,99 @@
 
   <button onclick="window.location.href='animal-list.html'">🔙 العودة إلى قائمة الحيوانات</button>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    // قراءة معرف الوثيقة من رابط الصفحة
-    const params = new URLSearchParams(window.location.search);
-    const docId = params.get("id");
+  // جلب id من الرابط
+  const params = new URLSearchParams(window.location.search);
+  const docId = params.get("id");
 
-    if (!docId) {
-      alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
-      window.location.href = "animal-list.html";
-    } else {
-      document.getElementById("animalId").textContent = docId;
+  if (!docId) {
+    alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+    window.location.href = "animal-list.html";
+  } else {
+    const docRef = doc(db, "animals", docId);
+    getDoc(docRef).then(docSnap => {
+      if (docSnap.exists()) {
+        const animal = docSnap.data();
 
-      // جلب بيانات الحيوان حسب docId
-      const docRef = doc(db, "animals", docId);
-      getDoc(docRef).then(docSnap => {
-        if (docSnap.exists()) {
-          const animal = docSnap.data();
+        // عرض البيانات
+        document.getElementById("animalId").textContent = animal.animalNumber || "غير معروف";
+        document.getElementById("birthDate").textContent = animal.birthDate || "-";
+        document.getElementById("season").textContent = animal.season || "-";
 
-          document.getElementById("animalId").textContent = animal.animalNumber || docId;
-          document.getElementById("birthDate").textContent = animal.birthDate || '-';
-          document.getElementById("season").textContent = animal.season || '-';
+        const daysInMilk = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : "-";
+        document.getElementById("milkDays").textContent = daysInMilk;
 
-          const milkDays = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : '-';
-          document.getElementById("milkDays").textContent = milkDays;
-          document.getElementById("milkTotal").textContent = animal.dailyMilk || '-';
+        document.getElementById("milkTotal").textContent = animal.dailyMilk || "-";
 
-          document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || '-';
-          document.getElementById("expectedDate").textContent = animal.expectedDate || '-';
-          document.getElementById("healthSummary").textContent = animal.healthNotes || '-';
-          document.getElementById("reproduction").textContent = animal.reproductiveStatus || '-';
+        const pregnantDays = animal.reproductiveStatus === "عشار" && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : "-";
+        document.getElementById("pregnancyAge").textContent = pregnantDays;
 
-          // رسم مخطط اللبن إذا متوفر
-          if (animal.milkCurve && animal.milkCurve.length > 0) {
-            const chartData = animal.milkCurve.map((v, i) => ({
-              date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
-              total: v
-            }));
+        // نترك expectedDate و healthSummary فارغة أو ممكن تحسب حسب بيانات أخرى لو متاحة
+        document.getElementById("expectedDate").textContent = "-";
+        document.getElementById("healthSummary").textContent = animal.healthNotes || "-";
 
-            new Chart(document.getElementById('milkChart'), {
-              type: 'line',
-              data: {
-                labels: chartData.map(e => e.date),
-                datasets: [{
-                  label: 'إنتاج اللبن التراكمي (لتر)',
-                  data: chartData.map(e => e.total),
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                  borderColor: '#4caf50',
-                  borderWidth: 2,
-                  tension: 0.3,
-                  fill: true
-                }]
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: {
-                    display: true,
-                    labels: { font: { size: 14 } }
-                  }
-                },
-                scales: {
-                  x: { title: { display: true, text: 'الشهر' } },
-                  y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
-                }
+        document.getElementById("reproduction").textContent = animal.reproductiveStatus || "-";
+
+        // رسم الرسم البياني لللبن (إن وجد)
+        const chartData = animal.milkCurve?.map((v, i) => ({
+          date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
+          total: v
+        })) || [];
+
+        new Chart(document.getElementById('milkChart'), {
+          type: 'line',
+          data: {
+            labels: chartData.map(e => e.date),
+            datasets: [{
+              label: 'إنتاج اللبن التراكمي (لتر)',
+              data: chartData.map(e => e.total),
+              backgroundColor: 'rgba(76, 175, 80, 0.2)',
+              borderColor: '#4caf50',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true,
+                labels: { font: { size: 14 } }
               }
-            });
+            },
+            scales: {
+              x: { title: { display: true, text: 'الشهر' } },
+              y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+            }
           }
+        });
 
-        } else {
-          alert("❌ لم يتم العثور على بيانات الحيوان.");
-          window.location.href = "animal-list.html";
-        }
-      }).catch(err => {
-        alert("❌ حدث خطأ أثناء تحميل بيانات الحيوان.");
-        console.error(err);
+      } else {
+        alert("❌ لم يتم العثور على بيانات الحيوان.");
         window.location.href = "animal-list.html";
-      });
-    }
-  </script>
+      }
+    }).catch(err => {
+      alert("حدث خطأ في تحميل بيانات الحيوان.");
+      console.error(err);
+    });
+  }
+</script>
 
 </body>
 </html>
