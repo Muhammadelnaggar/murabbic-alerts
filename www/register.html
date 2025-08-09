@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>تسجيل مربي جديد</title>
   <style>
     body {
@@ -13,6 +13,7 @@
       align-items: center;
       min-height: 100vh;
       margin: 0;
+      padding: 20px;
     }
     .container {
       background: white;
@@ -20,13 +21,21 @@
       border-radius: 12px;
       box-shadow: 0 0 15px rgba(0,0,0,0.1);
       max-width: 400px;
-      width: 90%;
+      width: 100%;
+    }
+    h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #2e7d32;
+      text-align: center;
+      font-weight: bold;
     }
     label, input, button {
       display: block;
       width: 100%;
       margin-bottom: 15px;
       font-size: 16px;
+      box-sizing: border-box;
     }
     label {
       font-weight: bold;
@@ -36,7 +45,6 @@
       padding: 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
-      box-sizing: border-box;
     }
     button {
       background-color: #28a745;
@@ -46,33 +54,49 @@
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
+      transition: background-color 0.3s ease;
     }
     button:hover {
       background-color: #218838;
     }
     .message {
-      margin-bottom: 15px;
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
       font-weight: bold;
       text-align: center;
-    }
-    .message.error {
-      background-color: #f8d7da;
-      color: #842029;
+      margin-bottom: 20px;
+      display: none;
+      font-size: 16px;
     }
     .message.success {
       background-color: #d1e7dd;
       color: #0f5132;
+      display: block;
+    }
+    .message.error {
+      background-color: #f8d7da;
+      color: #842029;
+      display: block;
+    }
+    p.login-link {
+      text-align: center;
+      font-size: 14px;
+      margin-top: -10px;
+    }
+    p.login-link a {
+      color: #28a745;
+      text-decoration: none;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>تسجيل مربي جديد</h2>
-    <form id="registerForm" novalidate>
-      <div id="msg" class="message" style="display:none;"></div>
 
+    <div id="msg" class="message"></div>
+
+    <form id="registerForm" novalidate>
       <label for="name">الاسم الكامل *</label>
       <input type="text" id="name" required />
 
@@ -86,127 +110,130 @@
       <input type="password" id="confirmPassword" required minlength="4" />
 
       <button type="submit" id="submitBtn">تسجيل</button>
-      <p style="text-align:center; font-size:14px; margin-top: -10px;">
-  مربي موجود؟ 
-  <a href="login.html" style="color:#28a745; text-decoration:none; font-weight:bold;">ادخل إلى حسابك</a>
-</p>
-
     </form>
+
+    <p class="login-link">
+      مربي موجود؟ 
+      <a href="login.html">ادخل إلى حسابك</a>
+    </p>
   </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-    authDomain: "murabbik.firebaseapp.com",
-    projectId: "murabbik",
-    storageBucket: "murabbik.appspot.com",
-    messagingSenderId: "402719243568",
-    appId: "1:402719243568:web:631114a260d23202dd5cf5"
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  const form = document.getElementById("registerForm");
-  const msgDiv = document.getElementById("msg");
-  const submitBtn = document.getElementById("submitBtn");
+    const form = document.getElementById("registerForm");
+    const msgDiv = document.getElementById("msg");
+    const submitBtn = document.getElementById("submitBtn");
 
-  // دالة لتشفير كلمة المرور باستخدام SHA-256
-  async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  function showMessage(text, type = "error") {
-    msgDiv.textContent = text;
-    msgDiv.className = `message ${type}`;
-    msgDiv.style.display = "block";
-  }
-
-  function clearMessage() {
-    msgDiv.textContent = "";
-    msgDiv.style.display = "none";
-  }
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearMessage();
-    submitBtn.disabled = true;
-
-    const name = document.getElementById("name").value.trim();
-    const phone = document.getElementById("phone").value.trim();
-    const password = document.getElementById("password").value;
-    const confirmPassword = document.getElementById("confirmPassword").value;
-
-    if (!name || !phone || !password || !confirmPassword) {
-      showMessage("جميع الحقول مطلوبة");
-      submitBtn.disabled = false;
-      return;
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    const phonePattern = /^01[0-9]{9}$/;
-    if (!phonePattern.test(phone)) {
-      showMessage("رقم الهاتف غير صحيح. يجب أن يبدأ بـ 01 ويحتوي على 11 رقمًا");
-      submitBtn.disabled = false;
-      return;
+    function showMessage(text, type = "error") {
+      msgDiv.textContent = text;
+      msgDiv.className = `message ${type}`;
+      msgDiv.style.display = "block";
     }
 
-    if (password.length < 4) {
-      showMessage("كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
-      submitBtn.disabled = false;
-      return;
+    function clearMessage() {
+      msgDiv.textContent = "";
+      msgDiv.style.display = "none";
     }
 
-    if (password !== confirmPassword) {
-      showMessage("كلمة المرور وتأكيدها غير متطابقين");
-      submitBtn.disabled = false;
-      return;
-    }
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearMessage();
+      submitBtn.disabled = true;
 
-    try {
-      // تحقق من عدم تكرار رقم الهاتف
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("phone", "==", phone));
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        showMessage("رقم الهاتف مسجل بالفعل");
+      const name = document.getElementById("name").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const password = document.getElementById("password").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
+
+      if (!name || !phone || !password || !confirmPassword) {
+        showMessage("جميع الحقول مطلوبة");
         submitBtn.disabled = false;
         return;
       }
 
-      // تشفير كلمة المرور
-      const hashedPassword = await hashPassword(password);
+      const phonePattern = /^01[0-9]{9}$/;
+      if (!phonePattern.test(phone)) {
+        showMessage("رقم الهاتف غير صحيح. يجب أن يبدأ بـ 01 ويحتوي على 11 رقمًا");
+        submitBtn.disabled = false;
+        return;
+      }
 
-      // إضافة المستخدم
-      await addDoc(usersRef, {
-        fullName: name,
-        phone,
-        password: hashedPassword,
-        createdAt: serverTimestamp()
-      });
+      if (password.length < 4) {
+        showMessage("كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
+        submitBtn.disabled = false;
+        return;
+      }
 
-      showMessage("تم التسجيل بنجاح، سيتم توجيهك إلى صفحة تسجيل الدخول...", "success");
+      if (password !== confirmPassword) {
+        showMessage("كلمة المرور وتأكيدها غير متطابقين");
+        submitBtn.disabled = false;
+        return;
+      }
 
-      setTimeout(() => {
-        window.location.href = "login.html";
-      }, 2000);
+      try {
+        // تحقق من تكرار رقم الهاتف
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("phone", "==", phone));
+        const querySnapshot = await getDocs(q);
 
-    } catch (error) {
-      console.error("خطأ في التسجيل:", error);
-      showMessage("حدث خطأ أثناء التسجيل، حاول مرة أخرى");
-      submitBtn.disabled = false;
-    }
-  });
-</script>
+        if (!querySnapshot.empty) {
+          showMessage("رقم الهاتف مسجل بالفعل");
+          submitBtn.disabled = false;
+          return;
+        }
+
+        // تشفير كلمة المرور
+        const hashedPassword = await hashPassword(password);
+
+        // إضافة المستخدم الجديد
+        await addDoc(usersRef, {
+          fullName: name,
+          phone,
+          password: hashedPassword,
+          createdAt: serverTimestamp()
+        });
+
+        showMessage("✅ تم التسجيل بنجاح، سيتم توجيهك إلى صفحة تسجيل الدخول...", "success");
+
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 2000);
+
+      } catch (error) {
+        console.error("خطأ في التسجيل:", error);
+        showMessage("حدث خطأ أثناء التسجيل، حاول مرة أخرى");
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
 
+ 
+  
+  
 
 
 
