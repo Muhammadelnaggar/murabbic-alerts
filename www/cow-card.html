@@ -1,39 +1,191 @@
-function renderTable(data) {
-  const tbody = document.getElementById('animalBody');
-  const noData = document.getElementById('noData');
-  tbody.innerHTML = '';
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>بطاقة الحيوان</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 10px;
+      color: #1b5e20;
+    }
+    h1 {
+      text-align: center;
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    .section {
+      background-color: #eafbe7;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      line-height: 1.7;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2e7d32;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    canvas {
+      margin-top: 20px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .photo-button {
+      font-size: 14px;
+      padding: 6px 10px;
+      background-color: #aed581;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .title {
+      font-size: 22px;
+      color: #2e7d32;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
 
-  if (!data || data.length === 0) {
-    noData.style.display = 'block';
-    return;
-  } else {
-    noData.style.display = 'none';
+  <h1 class="title">بطاقة الحيوان رقم (<span id="animalNumber"></span>)</h1>
+  <button class="photo-button">📷 صورة الحيوان</button>
+
+  <div class="section">
+    <strong>📅 تاريخ الميلاد:</strong> <span id="birthDate"></span><br>
+    <strong>🧾 موسم الحليب:</strong> <span id="season"></span>
+  </div>
+
+  <div class="section" id="milkSection">
+    <strong>📅 عدد أيام الحليب:</strong> <span id="milkDays"></span> يوم<br>
+    <strong>☑️ إنتاج اللبن:</strong><br>
+    <span id="milkTotal"></span>
+    <canvas id="milkChart"></canvas>
+  </div>
+
+  <div class="section">
+    <strong>👶 عمر العشار:</strong> <span id="pregnancyAge"></span> يوم<br>
+    <strong>📅 تاريخ الولادة المتوقع:</strong> <span id="expectedDate"></span>
+  </div>
+
+  <div class="section">
+    <strong>💊 آخر حالة صحية:</strong><br>
+    <span id="healthSummary"></span>
+  </div>
+
+  <div class="section">
+    <strong>🔍 الحالة التناسلية:</strong><br>
+    <span id="reproduction"></span>
+  </div>
+
+  <button onclick="window.location.href='animal-list.html'">🔙 العودة إلى قائمة الحيوانات</button>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // قراءة id من الرابط
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  if (!id) {
+    alert("❗ لم يتم تحديد رقم الحيوان، سيتم تحويلك إلى قائمة الحيوانات.");
+    window.location.href = "animal-list.html";
   }
 
-  data.forEach(animal => {
-    const tr = document.createElement('tr');
-    tr.style.backgroundColor = animal.animalType === 'بقرة' ? '#fffde7' : '#eeeeee';
+  async function loadAnimal() {
+    try {
+      const docRef = doc(db, "animals", id);
+      const docSnap = await getDoc(docRef);
 
-    const daysInMilk = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : '---';
-    const pregnantDays = animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
-    const inseminatedDays = animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
+      if (!docSnap.exists()) {
+        alert("❌ لم يتم العثور على بيانات الحيوان.");
+        window.location.href = "animal-list.html";
+        return;
+      }
 
-    tr.innerHTML = `
-      <td>${animal.animalNumber || ''}</td>
-      <td>${animal.animalType || ''}</td>
-      <td>${animal.breed || ''}</td>
-      <td>${animal.productionStatus || '---'}</td>
-      <td>${daysInMilk}</td>
-      <td>${animal.reproductiveStatus || ''}</td>
-      <td>${inseminatedDays}</td>
-      <td>${animal.dailyMilk || '---'}</td>
-      <td>${pregnantDays}</td>
-      <td>${animal.birthDate || '---'}</td>
-      <td>${animal.lastCalvingDate || '---'}</td>
-      <td><button class="button" onclick="viewCard('${animal.id}')">📄</button></td>
-      <td><button class="button" onclick="goToAddEvent('${animal.id}')">📋</button></td>
-      <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
+      const animal = docSnap.data();
+
+      document.getElementById("animalId").textContent = animal.animalNumber || "";
+      document.getElementById("birthDate").textContent = animal.birthDate || "-";
+      document.getElementById("season").textContent = animal.season || "-";
+      document.getElementById("milkDays").textContent = animal.milkDays || "-";
+      document.getElementById("milkTotal").textContent = animal.milkTotal || "-";
+      document.getElementById("pregnancyAge").textContent = animal.pregnancyAge || "-";
+      document.getElementById("expectedDate").textContent = animal.expectedDate || "-";
+      document.getElementById("healthSummary").textContent = animal.healthNotes || "-";
+      document.getElementById("reproduction").textContent = animal.reproductiveStatus || "-";
+
+      // رسم البياني (مثل ما هو)
+      const chartData = animal.milkCurve?.map((v, i) => ({
+        date: new Date(2024, i, 1).toLocaleDateString('ar-EG'),
+        total: v
+      })) || [];
+
+      new Chart(document.getElementById('milkChart'), {
+        type: 'line',
+        data: {
+          labels: chartData.map(e => e.date),
+          datasets: [{
+            label: 'إنتاج اللبن التراكمي (لتر)',
+            data: chartData.map(e => e.total),
+            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+            borderColor: '#4caf50',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { font: { size: 14 } }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'الشهر' } },
+            y: { title: { display: true, text: 'لترات اللبن' }, beginAtZero: true }
+          }
+        }
+      });
+
+    } catch (error) {
+      alert("⚠️ حدث خطأ في تحميل بيانات الحيوان.");
+      console.error(error);
+    }
+  }
+
+  loadAnimal();
+</script>
+
+</body>
+</html>
