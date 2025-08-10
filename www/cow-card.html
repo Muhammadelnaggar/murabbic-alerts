@@ -29,11 +29,11 @@
       gap: 12px;
     }
     header .title {
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 26px;
+      font-weight: 800;
       line-height: 1.2;
     }
-    main { padding: 16px; max-width: 900px; margin: 0 auto; }
+    main { padding: 16px; max-width: 1200px; margin: 0 auto; }
     .card {
       background: #fff;
       border: 1px solid var(--border);
@@ -41,11 +41,11 @@
       padding: 16px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.06);
     }
-    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
-    .item { padding: 12px; border-radius: 12px; border: 1px dashed var(--border); background:#fff; }
-    .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    .value { font-size: 16px; font-weight: 700; color: #111; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    
+    .item { padding: 14px; border-radius: 12px; border: 1px dashed var(--border); background:#fff; display:block; }
+    .label { font-size: 16px; font-weight: 800; color: var(--green); margin: 0 0 6px; }
+    .value { font-size: 19px; font-weight: 800; color: #111; }
     .toolbar { display:flex; flex-wrap: wrap; gap:10px; margin: 16px 0 0; }
     .btn {
       appearance: none; border: 0; cursor: pointer;
@@ -64,8 +64,11 @@
     .tabs { display:flex; gap:8px; padding:8px 16px; position: sticky; top: 0; background: var(--yellow); z-index: 5; border-bottom: 1px solid var(--border); }
     .tab { appearance:none; border:1px solid var(--green); background:#fff; color:var(--green); font-weight:700; padding:8px 12px; border-radius:999px; cursor:pointer; }
     .tab.active { background: var(--green); color:#fff; }
-    .tab-section { display:none; }
+    .tab-section { display:block; }
     .tab-section.active { display:block; }
+    .section-title{font-size:22px;font-weight:900;color:var(--green);margin:0 0 10px;}
+      .page-actions{position:fixed; inset-inline:0; bottom:0; background:var(--yellow); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); box-shadow:0 -8px 24px rgba(0,0,0,.08); z-index:1000;}
+    main{padding-bottom:calc(88px + env(safe-area-inset-bottom));}
   </style>
 </head>
 <body>
@@ -74,95 +77,92 @@
   </header>
 
   <main>
-    <nav class="tabs">
-      <button class="tab active" data-tab="tab-overview">البيانات</button>
-      <button class="tab" data-tab="tab-repro">تناسلي</button>
-      <button class="tab" data-tab="tab-prod">إنتاجي</button>
-      <button class="tab" data-tab="tab-health">صحي</button>
-      <button class="tab" data-tab="tab-milk">الألبان</button>
-    </nav>
+    
     <section class="tab-section active" id="tab-overview">
       <div id="info" class="card loading">
-      <div class="row">
-        <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
-        <div class="item"><div class="label">الحالة الإنتاجية</div><div id="v-prod" class="value">—</div></div>
-        <div class="item"><div class="label">الحالة التناسلية</div><div id="v-repro" class="value">—</div></div>
-        <div class="item"><div class="label">إنتاج اللبن اليومي (كجم)</div><div id="v-milk" class="value">—</div></div>
-        <div class="item"><div class="label">تاريخ آخر ولادة</div><div id="v-lastCalving" class="value">—</div></div>
-        <div class="item"><div class="label">تاريخ آخر تلقيح</div><div id="v-lastInsem" class="value">—</div></div>
-        <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
+        <div class="row">
+          <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
+          <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
+          <div class="item"><div class="label">عدد أيام الحليب</div><div id="v-dim" class="value">—</div></div>
+          <div class="item"><div class="label">رقم موسم الحليب</div><div id="v-lact" class="value">—</div></div>
+          <div class="item"><div class="label">الحالة الإنتاجية</div><div id="v-prod" class="value">—</div></div>
+          <div class="item"><div class="label">الحالة التناسلية</div><div id="v-repro" class="value">—</div></div>
+          <div class="item"><div class="label">المجموعة</div><div id="v-group" class="value">—</div></div>
         </div>
-      <div class="toolbar">
-        <a id="btn-add-event" class="btn" href="#">+ تسجيل حدث لهذا الحيوان</a>
-        <a id="btn-dashboard" class="btn secondary" href="dashboard.html">لوحة التحكم</a>
-        <a id="btn-back-list" class="btn secondary" href="animal-list.html">قائمة الحيوانات</a>
+        
+        <div id="status" class="status">جارِ التحميل…</div>
       </div>
-      <div id="status" class="status">جارِ التحميل…</div>
-    </div>
     </section>
 
-    <!-- الذكاء التناسلي -->
-    <section class="tab-section" id="tab-repro">
-      <div id="smartRepro" class="card" style="margin-top:12px;">
-      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء التناسلي</div>
+    <!-- قسم الحالة التناسلية -->
+    <div id="reproCard" class="card" style="margin-top:12px;">
+      <h3 class="section-title">الحالة التناسلية</h3>
       <div class="row">
-        <div class="item"><div class="label">الحالة التناسلية الحالية</div><div id="sm-repro-status" class="value">—</div></div>
-        <div class="item"><div class="label">تاريخ آخر تلقيح</div><div id="sm-last-insem" class="value">—</div></div>
         <div class="item"><div class="label">عدد مرات التلقيح</div><div id="sm-insem-count" class="value">—</div></div>
-        <div class="item"><div class="label">أيام بين آخر تلقيحين</div><div id="sm-insem-last-interval" class="value">—</div></div>
-        <div class="item"><div class="label">متوسط الأيام بين التلقيحات</div><div id="sm-insem-avg-interval" class="value">—</div></div>
-      </div>
-    </div>
-      </div>
-    </section>
-
-    <!-- الذكاء الإنتاجي -->
-    <section class="tab-section" id="tab-prod">
-      <div id="smartProd" class="card" style="margin-top:12px;">
-      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الإنتاجي</div>
-      <div class="row">
-        <div class="item"><div class="label">الحالة الإنتاجية</div><div id="sm-prod-status" class="value">—</div></div>
-        <div class="item"><div class="label">أيام الحليب (DIM)</div><div id="sm-dim" class="value">—</div></div>
-      </div>
-    </div>
-      </div>
-    </section>
-
-    <!-- الذكاء الصحي -->
-    <section class="tab-section" id="tab-health">
-      <div id="smartHealth" class="card" style="margin-top:12px;">
-      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الصحي</div>
-      <div class="row">
-        <div class="item"><div class="label">آخر تشخيص</div><div id="sm-last-diagnosis" class="value">—</div></div>
-        <div class="item"><div class="label">تاريخ التشخيص</div><div id="sm-last-diagnosis-date" class="value">—</div></div>
+        <div class="item"><div class="label">تاريخ آخر تلقيح</div><div id="sm-last-insem" class="value">—</div></div>
+        <div class="item"><div class="label">الأيام منذ آخر تلقيح</div><div id="sm-days-since-insem" class="value">—</div></div>
+        <div class="item"><div class="label">متوسط المدة بين التلقيحات (يوم)</div><div id="sm-insem-avg-interval" class="value">—</div></div>
+        <div class="item"><div class="label">أيام الحمل (لو عشار)</div><div id="sm-gestation-days" class="value">—</div></div>
+        <div class="item"><div class="label">سهولة الولادة الأخيرة</div><div id="sm-calving-ease" class="value">—</div></div>
+        <div class="item"><div class="label">تاريخ الولادة المتوقع</div><div id="sm-expected-calving" class="value">—</div></div>
       </div>
     </div>
 
-          </div>
-    </section>
-
-    <section class="tab-section" id="tab-milk">
+    <!-- قسم الحالة الإنتاجية -->
+    <section id="milk-section">
       <div id="milkCard" class="card" style="margin-top:12px;">
-      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">ذكاء الألبان</div>
-      <div class="row">
-        <div class="item"><div class="label">إنتاج اليوم (كجم)</div><div id="sm-milk-today" class="value">—</div></div>
-        <div class="item"><div class="label">إجمالي هذا الشهر (كجم)</div><div id="sm-milk-month" class="value">—</div></div>
-        <div class="item"><div class="label">التراكمي منذ بداية الموسم (كجم)</div><div id="sm-milk-season" class="value">—</div></div>
+        <h3 class="section-title">الحالة الإنتاجية</h3>
+        <div class="row">
+          <div class="item"><div class="label">إنتاج اليوم (كجم)</div><div id="sm-milk-today" class="value">—</div></div>
+          <div class="item"><div class="label">إنتاج آخر 7 أيام (كجم)</div><div id="sm-milk-week" class="value">—</div></div>
+          <div class="item"><div class="label">إجمالي هذا الشهر (كجم)</div><div id="sm-milk-month" class="value">—</div></div>
+          <div class="item"><div class="label">التراكمي منذ بداية الموسم (كجم)</div><div id="sm-milk-season" class="value">—</div></div>
+        </div>
+        <h3 class="section-title" style="margin:12px 0 8px;">منحنى إنتاج اللبن اليومي</h3>
+        <div id="milkWrap" style="height:260px; position:relative;">
+          <canvas id="milkChart" aria-label="منحنى إنتاج اللبن" role="img"></canvas>
+        </div>
+        <div id="milkStatus" class="status">جارِ تحميل القراءات…</div>
       </div>
-      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin:12px 0 8px;">منحنى إنتاج اللبن اليومي</div>
-      <div id="milkWrap" style="height:260px; position:relative;">
-        <canvas id="milkChart" aria-label="منحنى إنتاج اللبن" role="img"></canvas>
-      </div>
-      <div id="milkStatus" class="status">جارِ تحميل القراءات…</div>
-    </div>
-
-          </div>
     </section>
 
     <div id="errorBox" class="card" style="display:none">
       <div class="error">تعذّر تحميل بيانات الحيوان.</div>
       <div class="status">تأكد من الرابط أو من الصلاحيات. إذا فتحت الصفحة من قائمة الحيوانات فالمفترض أن يعمل الرابط تلقائيًا.</div>
       <div class="toolbar"><a class="btn secondary" href="animal-list.html">الرجوع لقائمة الحيوانات</a></div>
+    </div>
+
+    <!-- قسم الحالة الصحية -->
+    <div id="healthCard" class="card" style="margin-top:12px;">
+      <h3 class="section-title">الحالة الصحية</h3>
+      <div class="row">
+        <div class="item"><div class="label">آخر تشخيص</div><div id="sm-last-diagnosis" class="value">—</div></div>
+        <div class="item"><div class="label">تاريخ التشخيص</div><div id="sm-last-diagnosis-date" class="value">—</div></div>
+      </div>
+      <h3 class="section-title" style="margin:12px 0 8px;">جدول التحصينات</h3>
+      <div style="overflow-x:auto;">
+        <table id="vaccTable" style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">اسم التحصين</th>
+              <th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">تاريخ التحصين</th>
+              <th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">نوع الجرعة</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- قسم التقييم الفني والاقتصادي -->
+    <div id="evalCard" class="card" style="margin-top:12px;">
+      <h3 class="section-title">التقييم الفني والاقتصادي</h3>
+      <ul id="evalList" style="margin:0; padding-inline-start:18px; line-height:1.9;"></ul>
+    </div>
+    <div class="toolbar page-actions">
+      <a id="btn-add-event" class="btn" href="#">+ تسجيل حدث لهذا الحيوان</a>
+      <a id="btn-dashboard" class="btn secondary" href="dashboard.html">لوحة التحكم</a>
+      <a id="btn-back-list" class="btn secondary" href="animal-list.html">قائمة الحيوانات</a>
     </div>
   </main>
 
@@ -176,8 +176,7 @@ import { doc, getDoc, collection, getDocs, query, where } from 'https://www.gsta
 import { auth, db } from './js/firebase-config.js';
 
 // 2) المراجع إلى عناصر الواجهة
-    const tabs    = document.querySelectorAll('.tab');
-    const sections= document.querySelectorAll('.tab-section');
+    // one-page layout: no tabs
     const infoBox = document.getElementById('info');
     const errBox  = document.getElementById('errorBox');
     const status  = document.getElementById('status');
@@ -185,27 +184,16 @@ import { auth, db } from './js/firebase-config.js';
     const vBreed  = document.getElementById('v-breed');
     const vProd   = document.getElementById('v-prod');
     const vRepro  = document.getElementById('v-repro');
-    const vMilk   = document.getElementById('v-milk');
     const vLastC  = document.getElementById('v-lastCalving');
     const vLastI  = document.getElementById('v-lastInsem');
-    const vDob    = document.getElementById('v-dob');const btnAddEvent = document.getElementById('btn-add-event');
+    const vDob    = document.getElementById('v-dob');
+    const vLact   = document.getElementById('v-lact');
+    const vDim    = document.getElementById('v-dim');
+    const vGroup  = document.getElementById('v-group');
+    const btnAddEvent = document.getElementById('btn-add-event');
 
     // 3) أدوات مساعدة
-    function setTab(id) {
-      sections.forEach(s => s.classList.toggle('active', s.id === id));
-      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === id));
-      try { localStorage.setItem('cardTab', id); } catch {}
-    }
-    tabs.forEach(btn => btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const id = btn.dataset.tab;
-      setTab(id);
-      const usp = new URLSearchParams(location.search);
-      usp.set('tab', id);
-      history.replaceState(null, '', location.pathname + '?' + usp.toString());
-    }));
-    const initTab = getQP('tab') || (typeof localStorage !== 'undefined' && localStorage.getItem('cardTab')) || 'tab-overview';
-    setTab(initTab);
+    
 
     // 3) أدوات مساعدة
     const fmt = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' });
@@ -264,8 +252,16 @@ import { auth, db } from './js/firebase-config.js';
       const lastDiagDtEl  = get('sm-last-diagnosis-date');
 
       const milkTodayEl   = get('sm-milk-today');
+      const milkWeekEl    = get('sm-milk-week');
       const milkMonthEl   = get('sm-milk-month');
       const milkSeasonEl  = get('sm-milk-season');
+
+      const daysSinceInsemEl = get('sm-days-since-insem');
+      const gestDaysEl    = get('sm-gestation-days');
+      const expectedCalvingEl = get('sm-expected-calving');
+      const calvingEaseEl = get('sm-calving-ease');
+
+      const vaccTbody = document.querySelector('#vaccTable tbody');
 
       // الحالة التناسلية
       const repro = animalDoc.reproductiveStatus || animalDoc.reproStatus || '—';
@@ -290,10 +286,36 @@ import { auth, db } from './js/firebase-config.js';
         if (insemAvgInt)  insemAvgInt.textContent  = '—';
       }
 
-      // الحالة الإنتاجية + DIM
-      const prod = animalDoc.productionStatus || animalDoc.prodStatus || '—';
-      if (prodStatusEl) prodStatusEl.textContent = prod;
+      // أيام منذ آخر تلقيح + حساب حمل وتاريخ ولادة متوقع
+      const lastInsem = insemEvents.length ? insemEvents[insemEvents.length-1] : null;
+      if (lastInsemEl) lastInsemEl.textContent = lastInsem ? fmt.format(lastInsem) : '—';
+      if (daysSinceInsemEl) daysSinceInsemEl.textContent = lastInsem ? String(daysBetween(lastInsem, new Date())) : '—';
 
+      const aType = animalDoc.type || animalDoc.animalType || '';
+      let gestStd = 280; // أبقار
+      if (/جاموس/i.test(aType) || /buffalo/i.test(aType)) gestStd = 310; // جاموس
+
+      const reproTxt = animalDoc.reproductiveStatus || animalDoc.reproStatus || '';
+      const isPreg = /عشار|preg/i.test(reproTxt);
+      if (isPreg && lastInsem) {
+        const gd = daysBetween(lastInsem, new Date());
+        if (gestDaysEl)    gestDaysEl.textContent = String(gd);
+        const exp = new Date(lastInsem.getTime());
+        exp.setDate(exp.getDate() + gestStd);
+        if (expectedCalvingEl) expectedCalvingEl.textContent = fmt.format(exp);
+      } else {
+        if (gestDaysEl)    gestDaysEl.textContent = '—';
+        if (expectedCalvingEl) expectedCalvingEl.textContent = '—';
+      }
+
+      // سهولة الولادة الأخيرة
+      const lastCalvingEvent = rows.filter(r => {
+        const t = (r.type || r.eventType || '').toString().toLowerCase();
+        return t.includes('ولاد') || t.includes('calv');
+      }).sort((a,b)=> (toJsDate(b.eventDate||b.date||b.createdAt||b.timestamp) - toJsDate(a.eventDate||a.date||a.createdAt||a.timestamp)))[0];
+      if (calvingEaseEl) calvingEaseEl.textContent = lastCalvingEvent ? (lastCalvingEvent.calvingEase || lastCalvingEvent.ease || lastCalvingEvent.dystocia || lastCalvingEvent.score || '—') : '—';
+
+      // الحالة الإنتاجية + DIM (في البيانات الأساسية)
       let lastCalving = animalDoc.lastCalvingDate || animalDoc.lastCalving || null;
       lastCalving = toJsDate(lastCalving);
       if (!lastCalving) {
@@ -303,7 +325,7 @@ import { auth, db } from './js/firebase-config.js';
         }).map(r => toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp)).filter(Boolean).sort((a,b)=>b-a);
         if (calvings.length) lastCalving = calvings[0];
       }
-      if (dimEl) dimEl.textContent = lastCalving ? String(daysBetween(lastCalving, new Date())) : '—';
+      if (vDim) vDim.textContent = lastCalving ? String(daysBetween(lastCalving, new Date())) : '—';
 
       // الذكاء الصحي — آخر تشخيص
       const diagnosisEvents = rows.filter(r => {
@@ -319,6 +341,20 @@ import { auth, db } from './js/firebase-config.js';
       } else {
         if (lastDiagEl)   lastDiagEl.textContent   = '—';
         if (lastDiagDtEl) lastDiagDtEl.textContent = '—';
+      }
+
+      // جدول التحصينات
+      if (vaccTbody) {
+        const vaccs = rows.filter(r => {
+          const t = (r.type || r.eventType || '').toString().toLowerCase();
+          return t.includes('تحص') || t.includes('vacc');
+        }).sort((a,b)=> (toJsDate(b.eventDate||b.date||b.createdAt||b.timestamp) - toJsDate(a.eventDate||a.date||a.createdAt||a.timestamp)));
+        vaccTbody.innerHTML = vaccs.map(v => {
+          const name = v.vaccineName || v.vaccinationName || v.name || v.vaccine || '—';
+          const dt   = fmt.format(toJsDate(v.eventDate||v.date||v.createdAt||v.timestamp));
+          const dose = v.doseType || v.dose || v.booster || '—';
+          return `<tr><td style="padding:8px; border-bottom:1px solid var(--border);">${name}</td><td style="padding:8px; border-bottom:1px solid var(--border);">${dt}</td><td style="padding:8px; border-bottom:1px solid var(--border);">${dose}</td></tr>`;
+        }).join('');
       }
 
       // ذكاء الألبان — اليومي/الشهري/الموسم
@@ -340,6 +376,15 @@ import { auth, db } from './js/firebase-config.js';
       if (milkTodayEl)  milkTodayEl.textContent  = todayMilk ? String(todayMilk) : '—';
       if (milkMonthEl)  milkMonthEl.textContent  = monthMilk ? String(monthMilk) : '—';
       if (milkSeasonEl) milkSeasonEl.textContent = (seasonMilk!=null) ? String(seasonMilk) : '—';
+
+      // حساب الأسبوع (آخر 7 أيام)
+      try {
+        const today2 = new Date();
+        const weekAgo2 = new Date(today2.getFullYear(), today2.getMonth(), today2.getDate()-6);
+        const sum2 = (arr) => arr.reduce((a,b)=> a + Number(b.milk||0), 0);
+        const weekMilk2  = sum2(milkEvents.filter(x => x.dt >= weekAgo2));
+        if (milkWeekEl) milkWeekEl.textContent = weekMilk2 ? String(weekMilk2) : '—';
+      } catch {}
     }
 
     // رسم منحنى إنتاج اللبن اليومي (يعتمد على نفس الأحداث إن توفّرت)
@@ -407,34 +452,69 @@ import { auth, db } from './js/firebase-config.js';
 
         // دعم حقول قديمة وحديثة
         const number = a.number || a.animalId || '—';
-        const type   = a.type || a.animalType || '—';
+        const typeRaw = (a.type || a.animalType || '').toString();
+        const typeNorm = typeRaw.trim().toLowerCase();
         const breed  = a.breed || '—';
         const prod   = a.productionStatus || a.prodStatus || '—';
         const repro  = a.reproductiveStatus || a.reproStatus || '—';
         const milk   = (a.dailyMilkProduction ?? a.milk ?? '—');
+        const lactDoc = (a.lactationNumber ?? a.lactNum ?? a.parity ?? a.seasonNumber ?? a.lactation ?? null);
+        if (vLact) vLact.textContent = (lactDoc != null) ? String(lactDoc) : '—';
         const lastC  = a.lastCalvingDate || a.lastCalving || null;
         const lastI  = a.lastInseminationDate || a.lastInsem || null;
         const dob    = a.birthDate || a.dob || null;
         vBreed.textContent  = breed;
         vProd.textContent   = prod;
         vRepro.textContent  = repro;
-        vMilk.textContent   = (milk === '—') ? '—' : String(milk);
-        vLastC.textContent  = asDate(lastC);
-        vLastI.textContent  = asDate(lastI);
+        if (vGroup) vGroup.textContent = (a.group || a.groupName || a.pen || a.barnGroup || '—');
+        if (vLastC) vLastC.textContent = asDate(lastC);
+        if (vLastI) vLastI.textContent = asDate(lastI);
         vDob.textContent    = asDate(dob);
         // تحديث عنوان الصفحة بالنوع ورقم الحيوان
         if (titleEl) {
-          const t = (type && type !== '—')
-            ? ((type === 'بقرة' || type === 'cow' || type === 'Cow') ? 'البقرة'
-              : (type === 'جاموسة' || type === 'buffalo' || type === 'Buffalo') ? 'الجاموسة' : 'الحيوان')
-            : 'الحيوان';
-          titleEl.textContent = `بطاقة ${t}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
+          let tType = 'الحيوان';
+          if (/بقر/.test(typeNorm) || /cow/.test(typeNorm)) tType = 'البقرة';
+          else if (/جاموس/.test(typeNorm) || /buffalo/.test(typeNorm)) tType = 'الجاموسة';
+          titleEl.textContent = `بطاقة ${tType}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
         }
 
         // تحميل الأجواء الذكية + الرسم البياني
         const events = await loadAllEvents(docId, number);
         await fillSmartSections(events, a);
+        // تحديث رقم موسم الحليب من عدد الولادات إن لم يكن موجودًا في الوثيقة
+        try {
+          const calvCount = events.filter(r => {
+            const t = (r.type || r.eventType || '').toString().toLowerCase();
+            return t.includes('ولاد') || t.includes('calv');
+          }).length;
+          if (vLact && (vLact.textContent === '—' || vLact.textContent === '' )) {
+            vLact.textContent = calvCount ? String(calvCount) : '—';
+          }
+        } catch {}
         await loadMilkSeries(docId, number, events);
+
+        // التقييم الفني والاقتصادي
+        try {
+          const evalUl = document.getElementById('evalList');
+          const items = [];
+          // 49 يوم بعد الولادة بدون تلقيح
+          const dimVal = vDim && vDim.textContent && vDim.textContent !== '—' ? Number(vDim.textContent) : null;
+          const dsEl = document.getElementById('sm-days-since-insem');
+          const daysSinceInsem = dsEl && dsEl.textContent && dsEl.textContent !== '—' ? Number(dsEl.textContent) : null;
+          if (dimVal != null && dimVal >= 49 && (!daysSinceInsem || (lastCalving && daysSinceInsem > dimVal))) {
+            items.push('مرّ 49+ يوم بعد الولادة ولم يُسجل تلقيح حديث — ابدأ برنامج التلقيح والمتابعة.');
+          }
+          const expected = (document.getElementById('sm-expected-calving')||{}).textContent || '';
+          const gestDtxt = (document.getElementById('sm-gestation-days')||{}).textContent || '';
+          if (expected && expected !== '—') {
+            items.push(`موعد الولادة المتوقع: ${expected}`);
+          }
+          const todayMilkTxt = (document.getElementById('sm-milk-today')||{}).textContent || '—';
+          if (todayMilkTxt && todayMilkTxt !== '—') {
+            items.push(`إنتاج اليوم: ${todayMilkTxt} كجم — راجع العليقة مقابل الإنتاج.`);
+          }
+          if (evalUl) evalUl.innerHTML = items.length ? items.map(t=>`<li>${t}</li>`).join('') : '<li>سيتم إكمال التقييم الذكي لاحقًا حسب قواعد Murabbik.</li>';
+        } catch {}
 
         // حفظ آخر حيوان لسهولة الإبحار الذكي
         localStorage.setItem('lastAnimalDocId', docId);
