@@ -142,5 +142,32 @@
       }
     });
   </script>
+  const btnSave = document.querySelector('#btnSaveDiagnosis');
+const form = document.querySelector('#diagnosisForm');
+
+btnSave.addEventListener('click', async ()=>{
+  form.classList.add('is-busy');
+  try {
+    const method = document.querySelector('input[name="method"]:checked')?.value || 'ultrasound'; // 'ultrasound' | 'manual'
+    const result = document.querySelector('input[name="result"]:checked')?.value || 'negative';   // 'positive' | 'negative'
+
+    await Store.saveEvent({
+      animalNumber: document.querySelector('#animalNumber').value.trim(),
+      eventDate: document.querySelector('#eventDate').value || Store.todayYMD(),
+      type: 'pregnancy_diagnosis',
+      notes: document.querySelector('#notes')?.value || null,
+      meta: {
+        method, result,
+        gestationDays: Number(document.querySelector('#gestationDays')?.value || 280)
+      }
+    });
+    showInlineMessage('تم تسجيل تشخيص الحمل ✅');
+  } catch(e){
+    showInlineMessage(e.userFacing? e.message : 'تعذّر الحفظ');
+  } finally {
+    form.classList.remove('is-busy');
+  }
+});
+
 </body>
 </html>
