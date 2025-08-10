@@ -139,5 +139,44 @@
     <input type="password" id="password" placeholder="كلمة المرور" required />
     <button type="submit">دخول</button>
   </form>
+<script type="module">
+  import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
+
+  const form = document.querySelector('#loginForm');
+  const auth = getAuth();
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // حاول نلقط أول حقل نص/تلفون وكلمة السر
+    const userInput = form.querySelector('input[name="email"], input[type="email"], input[type="text"], input[type="tel"]');
+    const passInput = form.querySelector('input[name="password"], input[type="password"]');
+    const u = userInput?.value?.trim() || '';
+    const p = passInput?.value || '';
+
+    // IMPORTANT: لو بتسجّل بـ "إيميل وكلمة سر" لازم u يكون إيميل حقيقي
+    // مؤقتًا لو المستخدم كتب رقم تليفون، هنحوّله لإيميل تجريبي (لازم يكون متسجّل بنفس الإيميل ده في Firebase)
+    const email = u.includes('@') ? u : `${u}@murabbic.local`;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, p);
+      // نجاح
+      location.href = '/dashboard.html';
+    } catch (e) {
+      console.error('Login error:', e.code, e.message);
+      const map = {
+        'auth/invalid-email': 'البريد الإلكتروني غير صالح.',
+        'auth/user-not-found': 'لا يوجد حساب بهذه البيانات.',
+        'auth/wrong-password': 'كلمة المرور غير صحيحة.',
+        'auth/too-many-requests': 'محاولات كثيرة. جرّب لاحقًا.',
+        'auth/network-request-failed': 'مشكلة اتصال بالشبكة.',
+        'auth/unauthorized-domain': 'أضِف الدومين إلى Authorized domains في Firebase.'
+      };
+      alert(map[e.code] || ('خطأ: ' + e.code));
+    }
+  });
+</script>
+
 </body>
 </html>
+
