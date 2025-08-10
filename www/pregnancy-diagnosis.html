@@ -140,22 +140,26 @@
   diagnosisDateInput.valueAsDate = new Date();
 
   // تفعيل الأقسام كما هي
-  function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
-    document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
+function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
+  document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
-    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 30 && lastInseminationDaysAgo < 45) {
-      ultrasound.classList.add("active");
-    }
-    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 45 && lastInseminationDaysAgo < 90) {
-      manual.classList.add("active");
-    }
-    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 90 && lastInseminationDaysAgo < 200) {
-      confirm120.classList.add("active");
-    }
-    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 200) {
-      dryoff.classList.add("active");
-    }
+  // السونار: من 30 يوم وطالع
+  if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 30) {
+    ultrasound.classList.add("active");
   }
+  // التشخيص اليدوي: من 45 يوم وطالع (يضاف فوق السونار)
+  if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 45) {
+    manual.classList.add("active");
+  }
+  // تأكيد 120 يوم للحامل
+  if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 90 && lastInseminationDaysAgo < 200) {
+    confirm120.classList.add("active");
+  }
+  // تأكيد التجفيف 200 يوم
+  if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 200) {
+    dryoff.classList.add("active");
+  }
+}
 
   // أدوات مساعدة متينة
   const getQP = (k) => new URLSearchParams(location.search).get(k);
