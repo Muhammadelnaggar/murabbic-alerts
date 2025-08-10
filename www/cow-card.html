@@ -64,13 +64,12 @@
 </head>
 <body>
   <header>
-    <div class="title">بطاقة الحيوان</div>
+    <div class="title" id="page-title">بطاقة الحيوان<\/div>
   </header>
 
   <main>
     <div id="info" class="card loading">
       <div class="row">
-        <div class="item"><div class="label">رقم الحيوان</div><div id="v-number" class="value">—</div></div>
         <div class="item"><div class="label">نوع الحيوان</div><div id="v-type" class="value">—</div></div>
         <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
         <div class="item"><div class="label">الحالة الإنتاجية</div><div id="v-prod" class="value">—</div></div>
@@ -107,9 +106,7 @@ import { auth, db } from './js/firebase-config.js';
     const infoBox = document.getElementById('info');
     const errBox  = document.getElementById('errorBox');
     const status  = document.getElementById('status');
-
-    const vNumber = document.getElementById('v-number');
-    const vType   = document.getElementById('v-type');
+    const titleEl = document.getElementById('page-title');const vType   = document.getElementById('v-type');
     const vBreed  = document.getElementById('v-breed');
     const vProd   = document.getElementById('v-prod');
     const vRepro  = document.getElementById('v-repro');
@@ -169,8 +166,6 @@ import { auth, db } from './js/firebase-config.js';
         const lastC  = a.lastCalvingDate || a.lastCalving || null;
         const lastI  = a.lastInseminationDate || a.lastInsem || null;
         const dob    = a.birthDate || a.dob || null;
-
-        vNumber.textContent = number;
         vType.textContent   = type;
         vBreed.textContent  = breed;
         vProd.textContent   = prod;
@@ -178,7 +173,12 @@ import { auth, db } from './js/firebase-config.js';
         vMilk.textContent   = (milk === '—') ? '—' : String(milk);
         vLastC.textContent  = asDate(lastC);
         vLastI.textContent  = asDate(lastI);
-        vDob.textContent    = asDate(dob);// حفظ آخر حيوان لسهولة الإبحار الذكي
+        vDob.textContent    = asDate(dob);
+        // تحديث عنوان الصفحة بالنوع ورقم الحيوان
+        if (titleEl) {
+          const t = (type && type !== '—') ? type : 'الحيوان';
+          titleEl.textContent = `بطاقة ${t}${(number && number !== '—') ? ' — رقم ' + number : ''}`;
+        }// حفظ آخر حيوان لسهولة الإبحار الذكي
         localStorage.setItem('lastAnimalDocId', docId);
         if (number && number !== '—') localStorage.setItem('lastAnimalNumber', number);
 
