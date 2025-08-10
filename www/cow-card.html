@@ -86,6 +86,7 @@
     <section class="tab-section active" id="tab-overview">
       <div id="info" class="card loading">
         <div class="row">
+          <div class="item"><div class="label" id="lbl-number">رقم الحيوان</div><div id="v-number" class="value">—</div></div>
           <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
           <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
           <div class="item"><div class="label">عدد أيام الحليب</div><div id="v-dim" class="value">—</div></div>
@@ -161,9 +162,7 @@
     <!-- قسم التقييم الفني والاقتصادي -->
     <div id="evalCard" class="card" style="margin-top:12px;">
       <h3 class="section-title">التقييم الفني والاقتصادي</h3>
-      <div class="cow-value">
-        <div id="ev-cow-badge" class="badge-score">—</div>
-        <div class="hint">قيمة تقديرية مبسّطة موجّهة للمربي (Cow Value)</div>
+      <div class="hint">قيمة تقديرية مبسّطة موجّهة للمربي (Cow Value)</div>
       </div>
       <div class="row">
         <div class="item"><div class="label">التصنيف الإنتاجي الحالي</div><div class="value" id="ev-prod-class">—</div></div>
@@ -210,6 +209,8 @@ import { auth, db } from './js/firebase-config.js';
     const vLact   = document.getElementById('v-lact');
     const vDim    = document.getElementById('v-dim');
     const vGroup  = document.getElementById('v-group');
+    const vNumber = document.getElementById('v-number');
+    const lblNumber = document.getElementById('lbl-number');
     const btnAddEvent = document.getElementById('btn-add-event');
 
     // 3) أدوات مساعدة
@@ -406,27 +407,7 @@ import { auth, db } from './js/firebase-config.js';
         if (milkWeekEl) milkWeekEl.textContent = weekMilk2 ? String(weekMilk2) : '—';
       } catch {}
 
-      // Cow Value مبسّطة للمربي
-      try {
-        const cowBadge = document.getElementById('ev-cow-badge');
-        const prodClassEl = document.getElementById('ev-prod-class');
-        const fertEl = document.getElementById('ev-fertility');
-        const healthEl = document.getElementById('ev-health');
-        const costEl = document.getElementById('ev-cost-milk');
-
-        const todayVal = Number(milkTodayEl?.textContent || 0);
-        if (prodClassEl) prodClassEl.textContent = (todayVal>=20) ? 'عالٍ' : (todayVal>=10 ? 'متوسط' : 'منخفض');
-
-        // صحة: آخر تشخيص خلال 30 يوم
-        let recentDiag = false;
-        try {
-          const lastDiagTxt = lastDiagDtEl?.textContent || '';
-          if (lastDiagTxt && lastDiagTxt !== '—') {
-            const dt = toJsDate(lastDiagTxt);
-            if (dt) recentDiag = daysBetween(dt, new Date()) <= 30;
-          }
-        } catch {}
-        if (healthEl) healthEl.textContent = recentDiag ? 'محتاجة متابعة' : 'جيدة';
+              if (healthEl) healthEl.textContent = recentDiag ? 'محتاجة متابعة' : 'جيدة';
 
         if (fertEl) {
           const reproTxt2 = (animalDoc.reproductiveStatus || animalDoc.reproStatus || '').toString();
@@ -533,6 +514,8 @@ import { auth, db } from './js/firebase-config.js';
           else if (/جاموس/.test(typeNorm) || /buffalo/.test(typeNorm)) tType = 'الجاموسة';
           titleEl.textContent = `بطاقة ${tType}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
         }
+        if (lblNumber) lblNumber.textContent = `رقم ${tType}`;
+        if (vNumber) vNumber.textContent = (number && number !== '—') ? String(number) : '—';
 
         // تحميل الأجواء الذكية + الرسم البياني
         const events = await loadAllEvents(docId, number);
