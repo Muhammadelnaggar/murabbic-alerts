@@ -103,49 +103,38 @@
       border-radius: 8px;
       text-decoration: none;
     }
-    /* ===== أعمدة لاصقة (Sticky) لأول عمودين: رقم الحيوان + النوع ===== */
-:root{
-  /* غيّر الأرقام دي لو حابب توسّع/تضيّق العرض */
-  --sticky-col1: 140px; /* عرض عمود رقم الحيوان */
-  --sticky-col2: 120px; /* عرض عمود النوع */
-}
 
-/* مهم: sticky ما يشتغلش كويس مع collapse */
-#animalTable {
-  border-collapse: separate;   /* ينسخن جدول الـsticky */
-  border-spacing: 0;
-}
+    /* ===== [جديد] دعم الأعمدة اللاصقة “على قدّ النص” ===== */
 
-/* بلاش الخلفية تتهرّب عند اللصق */
-#animalTable th, #animalTable td {
-  background-clip: padding-box;
-}
+    /* لازم sticky يشتغل على جدول منفصل الحدود */
+    #animalTable { border-collapse: separate; border-spacing: 0; }
+    #animalTable th, #animalTable td { background-clip: padding-box; }
 
-/* العمود 1: رقم الحيوان */
-#animalTable th:nth-child(1),
-#animalTable td:nth-child(1) {
-  position: sticky;
-  right: 0;                 /* لأن الصفحة RTL */
-  z-index: 4;               /* فوق باقي الخلايا */
-  min-width: var(--sticky-col1);
-}
-#animalTable th:nth-child(1) { background: #dcedc8; }
-#animalTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+    /* العمود 1: رقم الحيوان (يلتصق يمين في RTL) */
+    #animalTable th:nth-child(1),
+    #animalTable td:nth-child(1) {
+      position: sticky;
+      right: 0;
+      z-index: 4;
+      white-space: nowrap;
+      width: 1px; /* يضغط العرض لأقل حجم يوافق النص */
+      background: #fff; /* علشان ما يشفّش اللي تحته عند اللصق */
+    }
+    #animalTable th:nth-child(1){ background:#dcedc8; }
+    #animalTable td:nth-child(1){ box-shadow: -1px 0 0 #cddc39 inset; }
 
-/* العمود 2: النوع */
-#animalTable th:nth-child(2),
-#animalTable td:nth-child(2) {
-  position: sticky;
-  right: var(--sticky-col1);
-  z-index: 3;
-  min-width: var(--sticky-col2);
-}
-#animalTable th:nth-child(2) { background: #dcedc8; }
-#animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
-
-/* تأكد إن فيه سكرول أفقي لو الجدول عريض */
-.table-wrapper { overflow-x: auto; }
-
+    /* العمود 2: النوع (يزاح بمقدار عرض العمود الأول الحقيقي) */
+    #animalTable th:nth-child(2),
+    #animalTable td:nth-child(2) {
+      position: sticky;
+      right: var(--sticky-col1, 0px); /* تتضبط بالجافاسكربت */
+      z-index: 3;
+      white-space: nowrap;
+      width: 1px;
+      background: #fff;
+    }
+    #animalTable th:nth-child(2){ background:#dcedc8; }
+    #animalTable td:nth-child(2){ box-shadow: -1px 0 0 #cddc39 inset; }
   </style>
 </head>
 <body>
@@ -182,163 +171,4 @@
           <th>عمر الحمل</th>
           <th>تاريخ الميلاد</th>
           <th>تاريخ آخر ولادة</th>
-          <th>البطاقة</th>
-          <th>تسجيل حدث</th>
-          <th>حذف</th>
-        </tr>
-      </thead>
-      <tbody id="animalBody"></tbody>
-    </table>
-  </div>
-
-  <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
-  <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    let animalsData = [];
-    const userId = localStorage.getItem("userId");
-
-    async function loadAnimals() {
-      if (!userId) {
-        alert("❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.");
-        window.location.href = "login.html";
-        return;
-      }
-
-      const animalsRef = collection(db, "animals");
-      const q = query(animalsRef, where("userId", "==", userId));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      animalsData = data;
-
-      updateTypeOptions();
-      renderTable(animalsData);
-    }
-
-    loadAnimals();
-
-    function updateTypeOptions() {
-      const typeSelector = document.getElementById("typeSelector");
-      typeSelector.innerHTML = '<option value="">عرض النوع</option>'; // تنظيف القائمة قبل الإضافة
-      const types = [...new Set(animalsData.map(a => a.type))];
-      types.forEach(type => {
-        const option = document.createElement("option");
-        option.value = type;
-        option.textContent = type === "بقرة" ? "🐄 الأبقار" : "🐃 الجاموس";
-        typeSelector.appendChild(option);
-      });
-    }
-
-    function renderTable(data) {
-      const tbody = document.getElementById('animalBody');
-      const noData = document.getElementById('noData');
-      tbody.innerHTML = '';
-
-      if (!data || data.length === 0) {
-        noData.style.display = 'block';
-        return;
-      } else {
-        noData.style.display = 'none';
-      }
-
-      data.forEach(animal => {
-        const tr = document.createElement('tr');
-        tr.style.backgroundColor = animal.type === 'بقرة' ? '#fffde7' : '#eeeeee';
-
-        const daysInMilk = animal.lastCalvingDate ? Math.floor((Date.now() - new Date(animal.lastCalvingDate)) / (1000 * 60 * 60 * 24)) : '---';
-        const pregnantDays = animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
-        const inseminatedDays = animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate ? Math.floor((Date.now() - new Date(animal.lastInseminationDate)) / (1000 * 60 * 60 * 24)) : '---';
-
-       tr.innerHTML = `
-  <td>${animal.animalNumber || ''}</td>
-  <td>${animal.animalType || ''}</td>
-  <td>${animal.breed || ''}</td>
-  <td>${animal.productionStatus || '---'}</td>
-  <td>${daysInMilk}</td>
-  <td>${animal.reproductiveStatus || ''}</td>
-  <td>${inseminatedDays}</td>
-  <td>${animal.dailyMilk || '---'}</td>
-  <td>${pregnantDays}</td>
-  <td>${animal.birthDate || '---'}</td>
-  <td>${animal.lastCalvingDate || '---'}</td>
-  <td><button class="button" onclick="viewCard('${animal.id}')">📄</button></td>
-  <td><button class="button" onclick="goToAddEvent('${animal.animalNumber}')">📋</button></td>
-  <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
-`;
-
-        tbody.appendChild(tr);
-      });
-    }
-window.viewCard = function(animalNumber) {
-window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-}
-
-
-
-    window.goToAddEvent = function(animalNumber) {
-      localStorage.setItem("lastAnimalId", animalNumber);
-      window.location.href = "add-event.html";
-    }
-
-    window.deleteAnimal = async function(animalDocId) {
-      if (confirm("هل أنت متأكد من حذف الحيوان؟")) {
-        try {
-          await deleteDoc(doc(db, "animals", animalDocId));
-          animalsData = animalsData.filter(a => a.id !== animalDocId);
-          renderTable(animalsData);
-        } catch (err) {
-          alert("فشل في حذف الحيوان.");
-          console.error(err);
-        }
-      }
-    }
-
-   document.getElementById('searchNumber').addEventListener('input', function() {
-  const query = this.value.trim();
-  const filtered = animalsData.filter(a => a.animalNumber?.includes(query));
-  renderTable(filtered);
-});
-
-
-    window.filterType = function(type) {
-      if (!type) return renderTable(animalsData);
-      const filtered = animalsData.filter(a => a.type === type);
-      renderTable(filtered);
-    }
-
-    window.filterReproductiveStatus = function(status) {
-      if (!status) return renderTable(animalsData);
-      const filtered = animalsData.filter(a => a.reproductiveStatus === status);
-      renderTable(filtered);
-    }
-
-    window.resetFilter = function() {
-      renderTable(animalsData);
-      document.getElementById('searchNumber').value = '';
-      document.getElementById('filterReproductive').value = '';
-      document.getElementById('typeSelector').value = '';
-    }
-  </script>
-</body>
-</html>
-
-
-
-
-
-
+          <t
