@@ -228,8 +228,64 @@
     }, { once: true }); // مرّة واحدة تكفي
   }
 </script>
+<!-- 🆘 شريط طوارئ مؤقت لتجاوز الدخول وإظهار التشخيص -->
+<script type="module">
+  import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
+  import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
+
+  // لو مش عايز الشريط يظهر، افتح الصفحة بـ ?norescue=1
+  if (!location.search.includes('norescue=1')) {
+    // تهيئة Firebase من window.firebaseConfig
+    const app = getApps().length ? getApp() : initializeApp(window.firebaseConfig || {});
+    const auth = getAuth(app);
+
+    // UI بسيط تحت اليمين
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:14px/1.4 system-ui;z-index:9999;box-shadow:0 6px 16px rgba(0,0,0,.25)';
+    bar.innerHTML = `
+      <div style="margin-bottom:6px">🆘 وضع الطوارئ</div>
+      <button id="btnAnon" style="margin-inline-end:6px;padding:6px 10px;border:0;border-radius:6px;cursor:pointer">دخول تجريبي</button>
+      <button id="btnDiag" style="padding:6px 10px;border:0;border-radius:6px;cursor:pointer;background:#444;color:#fff">تشخيص</button>
+      <div id="msg" style="margin-top:6px;opacity:.85"></div>
+    `;
+    document.body.appendChild(bar);
+
+    const msg = bar.querySelector('#msg');
+    const say = t => msg.textContent = t;
+
+    // دخول تجريبي (Anonymous) → يحوّل للوحة
+    bar.querySelector('#btnAnon').addEventListener('click', async ()=>{
+      try {
+        say('جارٍ الدخول…');
+        await signInAnonymously(auth);
+        say('تم — جارٍ التحويل…'); 
+        location.href = '/dashboard.html';
+      } catch (e) {
+        console.error(e);
+        say('فشِل الدخول التجريبي: ' + (e.code || e.message));
+        // لو ظهر auth/operation-not-allowed فعّل Anonymous من الكونسول
+      }
+    });
+
+    // تشخيص سريع
+    bar.querySelector('#btnDiag').addEventListener('click', async ()=>{
+      try {
+        const cfgOk = !!(window.firebaseConfig && window.firebaseConfig.apiKey && window.firebaseConfig.projectId);
+        console.log('firebaseConfig:', window.firebaseConfig);
+        say(cfgOk ? '✅ firebaseConfig موجود.' : '⚠️ firebaseConfig مفقود/ناقص.');
+        // محاولة دخول Anonymous كتست
+        await signInAnonymously(auth);
+        say((msg.textContent ? msg.textContent + ' ' : '') + '✅ اختبار Auth نجح. يمكنك استخدام "دخول تجريبي".');
+      } catch(e) {
+        console.error('Diag:', e.code, e.message);
+        say('❌ Auth فشل: ' + e.code + ' — راجع Authorized domains وطرق الدخول.');
+      }
+    });
+  }
+</script>
 
 </body>
 </html>
+
 
 
