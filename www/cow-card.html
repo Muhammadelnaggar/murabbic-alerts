@@ -155,12 +155,21 @@
         </table>
       </div>
     </div>
-
     <!-- قسم التقييم الفني والاقتصادي -->
     <div id="evalCard" class="card" style="margin-top:12px;">
       <h3 class="section-title">التقييم الفني والاقتصادي</h3>
-      <ul id="evalList" style="margin:0; padding-inline-start:18px; line-height:1.9;"></ul>
+      <div class="row">
+        <div class="item"><div class="label">التصنيف الإنتاجي الحالي</div><div class="value" id="ev-prod-class">—</div></div>
+        <div class="item"><div class="label">مؤشر الخصوبة</div><div class="value" id="ev-fertility">—</div></div>
+        <div class="item"><div class="label">مؤشر الصحة</div><div class="value" id="ev-health">—</div></div>
+        <div class="item"><div class="label">تكلفة/كجم لبن (تقديري)</div><div class="value" id="ev-cost-milk">—</div></div>
+      </div>
+      <h3 class="section-title" style="margin:12px 0 8px;">ملاحظات فنية</h3>
+      <ul id="evalList" style="margin:0; padding-inline-start:18px; line-height:1.9;">
+        <li>—</li>
+      </ul>
     </div>
+
     <div class="toolbar page-actions">
       <a id="btn-add-event" class="btn main" href="#">+ تسجيل حدث لهذا الحيوان</a>
       <div class="actions-secondary">
@@ -497,36 +506,15 @@ import { auth, db } from './js/firebase-config.js';
         } catch {}
         await loadMilkSeries(docId, number, events);
 
-        // التقييم الفني والاقتصادي
-        try {
-          const evalUl = document.getElementById('evalList');
-          const items = [];
-          // 49 يوم بعد الولادة بدون تلقيح
-          const dimVal = vDim && vDim.textContent && vDim.textContent !== '—' ? Number(vDim.textContent) : null;
-          const dsEl = document.getElementById('sm-days-since-insem');
-          const daysSinceInsem = dsEl && dsEl.textContent && dsEl.textContent !== '—' ? Number(dsEl.textContent) : null;
-          if (dimVal != null && dimVal >= 49 && (!daysSinceInsem || (lastCalving && daysSinceInsem > dimVal))) {
-            items.push('مرّ 49+ يوم بعد الولادة ولم يُسجل تلقيح حديث — ابدأ برنامج التلقيح والمتابعة.');
-          }
-          const expected = (document.getElementById('sm-expected-calving')||{}).textContent || '';
-          const gestDtxt = (document.getElementById('sm-gestation-days')||{}).textContent || '';
-          if (expected && expected !== '—') {
-            items.push(`موعد الولادة المتوقع: ${expected}`);
-          }
-          const todayMilkTxt = (document.getElementById('sm-milk-today')||{}).textContent || '—';
-          if (todayMilkTxt && todayMilkTxt !== '—') {
-            items.push(`إنتاج اليوم: ${todayMilkTxt} كجم — راجع العليقة مقابل الإنتاج.`);
-          }
-          if (evalUl) evalUl.innerHTML = items.length ? items.map(t=>`<li>${t}</li>`).join('') : '<li>سيتم إكمال التقييم الذكي لاحقًا حسب قواعد Murabbik.</li>';
-        } catch {}
-
         // حفظ آخر حيوان لسهولة الإبحار الذكي
         localStorage.setItem('lastAnimalDocId', docId);
         if (number && number !== '—') localStorage.setItem('lastAnimalNumber', number);
 
         // زر تسجيل حدث: نمرر كل ما يفيد الصفحة التالية
-        const qp = new URLSearchParams({ docId, animalNumber: String(number || '') });
-        btnAddEvent.href = `add-event.html?${qp.toString()}`;
+        const urlNumParam2 = getQP('animalNumber') || getQP('number') || '';
+        const numForLink2 = (number && number !== '—') ? String(number) : String(urlNumParam2 || '');
+        const qp2 = new URLSearchParams({ docId, animalNumber: numForLink2, number: numForLink2 });
+        btnAddEvent.href = `add-event.html?${qp2.toString()}`;
 
         infoBox.classList.remove('loading');
         status.innerHTML = '<span class="ok">✓ تم تحميل بطاقة الحيوان بنجاح.</span>';
