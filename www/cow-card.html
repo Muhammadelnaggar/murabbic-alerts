@@ -79,8 +79,7 @@
         <div class="item"><div class="label">تاريخ آخر ولادة</div><div id="v-lastCalving" class="value">—</div></div>
         <div class="item"><div class="label">تاريخ آخر تلقيح</div><div id="v-lastInsem" class="value">—</div></div>
         <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
-        <div class="item"><div class="label">معرّف المستند (Firestore)</div><div id="v-doc" class="value mono">—</div></div>
-      </div>
+        </div>
       <div class="toolbar">
         <a id="btn-add-event" class="btn" href="#">+ تسجيل حدث لهذا الحيوان</a>
         <a id="btn-dashboard" class="btn secondary" href="dashboard.html">لوحة التحكم</a>
@@ -96,8 +95,8 @@
     </div>
   </main>
 
-  <!-- ملاحظة مهمة: احرص على تضمين ملف الإعدادات قبل هذا السكربت -->
-  <!-- مثال: <script type="module" src="./config.js"></script> الذي يصدّر firebaseConfig -->
+  <!-- يتم تضمين ملف الإعدادات قبل سكربت الصفحة -->
+<script type="module" src="./config.js"></script>
 
   <script type="module">
     // 1) استيراد Firebase v10 (CDN) + التهيئة عبر config.js
@@ -107,14 +106,20 @@
 
     // حاول قراءة التهيئة من نافذة المتصفح أو من وحدة config.js
     let firebaseConfig;
-    try {
-      // إذا كان لديك ملف config.js يصدّر firebaseConfig
-      const mod = await import('./config.js');
-      firebaseConfig = mod.firebaseConfig || window.firebaseConfig;
-    } catch(e) {
-      // للسيرفرات القديمة قد تكون المتغيرات متاحة على window
-      firebaseConfig = window.firebaseConfig;
-    }
+try {
+  // المحاولة الأولى: داخل نفس المجلد
+  const mod = await import('./config.js');
+  firebaseConfig = mod.firebaseConfig || window.firebaseConfig;
+} catch (e1) {
+  try {
+    // المحاولة الثانية: المسار الجذري للموقع
+    const mod2 = await import('/config.js');
+    firebaseConfig = mod2.firebaseConfig || window.firebaseConfig;
+  } catch (e2) {
+    // محاولـة أخيرة: كمتغير عام إن كان قد تم تضمينه كسكربت "غير module"
+    firebaseConfig = window.firebaseConfig;
+  }
+}
 
     if (!firebaseConfig) {
       const status = document.getElementById('status');
@@ -140,10 +145,7 @@
     const vMilk   = document.getElementById('v-milk');
     const vLastC  = document.getElementById('v-lastCalving');
     const vLastI  = document.getElementById('v-lastInsem');
-    const vDob    = document.getElementById('v-dob');
-    const vDoc    = document.getElementById('v-doc');
-
-    const btnAddEvent = document.getElementById('btn-add-event');
+    const vDob    = document.getElementById('v-dob');const btnAddEvent = document.getElementById('btn-add-event');
 
     // 3) أدوات مساعدة
     const fmt = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' });
@@ -161,12 +163,12 @@
     const getQP = (key) => new URLSearchParams(location.search).get(key);
 
     // 4) تحميل الوثيقة حسب docId من الاستعلام ?id=...
-    const docId = getQP('id');
+    let docId = getQP('id') || getQP('docId') || getQP('number');
 
     if (!docId) {
       infoBox.style.display = 'none';
       errBox.style.display = 'block';
-      errBox.querySelector('.status').textContent = 'لا يوجد معرّف مستند في الرابط (?id=DOC_ID).';
+      errBox.querySelector('.status').textContent = 'لا يوجد معرّف للحيوان في الرابط.';
       throw new Error('Missing ?id');
     }
 
@@ -205,10 +207,7 @@
         vMilk.textContent   = (milk === '—') ? '—' : String(milk);
         vLastC.textContent  = asDate(lastC);
         vLastI.textContent  = asDate(lastI);
-        vDob.textContent    = asDate(dob);
-        vDoc.textContent    = docId;
-
-        // حفظ آخر حيوان لسهولة الإبحار الذكي
+        vDob.textContent    = asDate(dob);// حفظ آخر حيوان لسهولة الإبحار الذكي
         localStorage.setItem('lastAnimalDocId', docId);
         if (number && number !== '—') localStorage.setItem('lastAnimalNumber', number);
 
