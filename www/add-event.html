@@ -106,7 +106,7 @@
 
   </form>
 
- <script type="module">
+<script type="module">
   import { db, auth } from "./js/firebase-config.js";
   import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -116,44 +116,84 @@
   const warning    = document.getElementById("noAnimalWarning");
   const idInput    = document.getElementById("animalIdInput");
   const dateInput  = document.getElementById("eventDateInput");
-  const btns       = document.querySelectorAll('#eventTypeGroup button');
-  const trimBtn    = document.querySelector('#eventTypeGroup button[data-page="trimming.html"]');
 
-  // املأ من باراميترات الرابط أو من التخزين المحلي
+  // ✅ نضيف صندوق رسالة داخلي لو مش موجود
+  let msgBox = document.getElementById("inlineMsg");
+  if (!msgBox) {
+    const form = document.getElementById("eventForm") || document.querySelector("form");
+    msgBox = document.createElement("div");
+    msgBox.id = "inlineMsg";
+    msgBox.className = "notice";
+    msgBox.role = "status";
+    msgBox.style.display = "none";
+    msgBox.innerHTML = `
+      <div class="text"></div>
+      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1;padding:12px;border-radius:8px;border:0;background:#2e7d32;color:#fff;font-weight:bold">تسجيل أحداث أخرى</button>
+        <button type="button" class="btn btn-ghost"   id="msgNo"  style="flex:1;padding:12px;border-radius:8px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;font-weight:bold">لوحة التحكم</button>
+      </div>
+    `;
+    form.appendChild(msgBox);
+  }
+  const msgText = msgBox.querySelector(".text");
+  const btnYes  = msgBox.querySelector("#msgYes");
+  const btnNo   = msgBox.querySelector("#msgNo");
+
+  function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
+    msgText.textContent = message;
+    btnYes.textContent = yesText;
+    btnNo.textContent  = noText;
+    msgBox.style.display = "block";
+    return new Promise(resolve=>{
+      const onYes = ()=>{ cleanup(); resolve(true);  };
+      const onNo  = ()=>{ cleanup(); resolve(false); };
+      btnYes.addEventListener('click', onYes, { once:true });
+      btnNo .addEventListener('click', onNo , { once:true });
+      function cleanup(){ msgBox.style.display="none"; }
+    });
+  }
+
+  // تعبئة من الرابط/المحلّي
   const qp = new URLSearchParams(location.search);
   const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
   const presetDate = qp.get("date") || new Date().toISOString().slice(0,10);
-
-  idInput.value   = presetId;
+  idInput.value = presetId;
   dateInput.value = presetDate;
 
   const today = new Date();
   animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
   dateInfo.textContent   = `📅 التاريخ الحالي: ${today.toLocaleDateString('ar-EG')}`;
 
-  onAuthStateChanged(auth, (user)=>{
-    if (!user) { location.href = "login.html"; return; }
-
-    // وظيفه عامه للتحقق من الحقول
-    function getContextOrWarn() {
-      const animalId = idInput.value.trim();
-      const eventDate = dateInput.value.trim();
-      if (!animalId || !eventDate) {
-        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-        return null;
-      }
-      warning.textContent = "";
-      localStorage.setItem("lastAnimalId", animalId);
-      return { animalId, eventDate };
+  function getContextOrWarn(){
+    const animalId = idInput.value.trim();
+    const eventDate= dateInput.value.trim();
+    if (!animalId || !eventDate){
+      warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+      return null;
     }
+    warning.textContent = "";
+    localStorage.setItem("lastAnimalId", animalId);
+    return { animalId, eventDate };
+  }
 
-    // 1) زر تقليم الحوافر: يسجّل فورًا مع سؤال الإبحار
-    if (trimBtn) {
-      trimBtn.addEventListener('click', async () => {
+  onAuthStateChanged(auth, (user)=>{
+    if (!user){ location.href="login.html"; return; }
+
+    // ✅ تخلّص من أي مستمعين قدام بإستبدال مجموعة الأزرار (clone & replace)
+    const group = document.getElementById("eventTypeGroup");
+    const clone = group.cloneNode(true);
+    group.parentNode.replaceChild(clone, group);
+
+    const btns    = clone.querySelectorAll('button');
+    const trimBtn = clone.querySelector('button[data-page="trimming.html"]');
+
+    // زر تقليم الحوافر — تسجيل فوري + رسالة داخلية (بدون alert/confirm)
+    if (trimBtn){
+      trimBtn.addEventListener('click', async ()=>{
         const ctx = getContextOrWarn();
         if (!ctx) return;
 
-        try {
+        try{
           await addDoc(collection(db, "events"), {
             userId: user.uid,
             animalId: ctx.animalId,
@@ -164,32 +204,23 @@
             createdAt: serverTimestamp()
           });
 
-          const again = confirm(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.\n\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟`);
-          if (again) {
-            // نبقى في نفس الصفحة ونسمح بالمتابعة
-            // (اختياري) ثبّت التاريخ على اليوم
-            // dateInput.value = new Date().toISOString().slice(0,10);
-          } else {
-            location.href = "dashboard.html";
-          }
-        } catch (err) {
+          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
+          if (!goAgain) location.href = "dashboard.html";
+          // لو نعم: نبقى في نفس الصفحة بدون Alerts
+        }catch(err){
           console.error(err);
           warning.textContent = "❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.";
         }
       });
     }
 
-    // 2) باقي الأزرار: نفس سلوكك السابق (انتقال للصفحات المتخصصة)
-    btns.forEach(btn => {
-      // لو ده زر التقليم، سيبه للـ handler أعلاه
+    // باقي الأزرار — تسجيل حدث عام ثم الانتقال لصفحتهم (بدون Alerts/Confirms)
+    btns.forEach(btn=>{
       if (btn === trimBtn) return;
-
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async ()=>{
         const ctx = getContextOrWarn();
         if (!ctx) return;
-
-        try {
-          // حفظ حدث عام باسم الزر (كما كان)
+        try{
           await addDoc(collection(db, "events"), {
             userId: user.uid,
             animalId: ctx.animalId,
@@ -198,13 +229,12 @@
             eventType: btn.textContent.trim(),
             createdAt: serverTimestamp()
           });
-
           const page = btn.getAttribute('data-page');
-          if (page) {
+          if (page){
             location.href = `${page}?animalId=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
           }
-        } catch (error) {
-          console.error("خطأ أثناء تسجيل الحدث:", error);
+        }catch(err){
+          console.error(err);
           warning.textContent = "❌ حدث خطأ أثناء تسجيل الحدث. حاول مرة أخرى.";
         }
       });
@@ -212,8 +242,10 @@
   });
 </script>
 
+
 </body>
 </html>
+
 
 
 
