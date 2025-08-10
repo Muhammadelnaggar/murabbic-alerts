@@ -129,17 +129,17 @@
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // عناصر الصفحة كما هي
-  const animalIdInput = document.getElementById("animalId");
+  const animalIdInput   = document.getElementById("animalId");
   const diagnosisDateInput = document.getElementById("diagnosisDate");
   const ultrasound = document.getElementById("ultrasound");
-  const manual = document.getElementById("manual");
+  const manual     = document.getElementById("manual");
   const confirm120 = document.getElementById("confirm120");
-  const dryoff = document.getElementById("dryoff");
+  const dryoff     = document.getElementById("dryoff");
 
   // تاريخ اليوم افتراضيًا
   diagnosisDateInput.valueAsDate = new Date();
 
-  // نفس دالة التفعيل بدون تغيير
+  // تفعيل الأقسام كما هي
   function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
     document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
 
@@ -157,65 +157,117 @@
     }
   }
 
-  // مساعد بسيط لقراءة باراميتر من الرابط
+  // أدوات مساعدة متينة
   const getQP = (k) => new URLSearchParams(location.search).get(k);
 
+  function toJsDate(v) {
+    if (!v) return null;
+    if (v instanceof Date) return v;
+    if (typeof v === 'string') {
+      // دعم YYYY-MM-DD بدون لبس منطقة زمنية
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        const [y,m,d] = v.split('-').map(Number);
+        return new Date(y, m-1, d);
+      }
+      const d = new Date(v);
+      return isNaN(d) ? null : d;
+    }
+    // Firestore Timestamp
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (typeof v === 'object' && typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    return null;
+  }
+
+  function daysBetween(a, b) {
+    if (!a || !b) return null;
+    // تجاهل الوقت – نحسب بالأيام فقط
+    const d1 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+    const d2 = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+    return Math.round((d2 - d1) / 86400000);
+  }
+
+  // تطبيع نص الحالة التناسلية (يتعامل مع تهجئات/إنجليزي)
+  function normalizeReproStatus(s) {
+    const t = (s || '').toString().trim().toLowerCase();
+    // شوية مرادفات
+    if (/(preg|عشار|حامل)/.test(t)) return "عشار";
+    if (/(ملقح|ملقحه|ملقحة|inseminated|bred)/.test(t)) return "ملقحة";
+    if (/(open|مفتوح|مفتوحة|فارغة)/.test(t)) return "مفتوحة";
+    return s || '';
+  }
+
   let currentUser = null;
-  let currentAnimal = null; // هنحتفظ بالوثيقة اللي هنلاقيها
+  let currentAnimal = null;
 
   onAuthStateChanged(auth, (user) => {
     if (!user) { window.location.href = "login.html"; return; }
     currentUser = user;
 
-    // لو فيه رقم في الرابط، نعبّيه ونحاول نقرأ الحيوان
     const id = getQP("animalId") || getQP("number") || getQP("animalNumber");
     if (id) {
       animalIdInput.value = id;
-      fetchAnimalAndActivate(id);
+      fetchAnimalAndMaybeActivate(id);
     }
   });
 
-  // قراءة الحيوان من Firestore (بتصفية على userId ثم مطابقة الرقم محليًا)
-  async function fetchAnimalAndActivate(idValue) {
+  async function fetchAnimalAndMaybeActivate(idValue) {
     try {
       const animalsRef = collection(db, "animals");
       const q = query(animalsRef, where("userId", "==", currentUser.uid));
       const snap = await getDocs(q);
       const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      const key = String(idValue).trim();
+      // نحاول على أكبر عدد من الحقول
       const match = animals.find(a => {
         const candidates = [
-          a.animalId, a.number, a.animalNumber, a.tag, a.earTag, a.code, a.idNumber
-        ].map(v => (v == null ? "" : String(v)));
-        return candidates.includes(String(idValue));
-      }) || animals.find(a => a.id === idValue); // كـ fallback لو حد حط docId
+          a.animalId, a.number, a.animalNumber, a.animal_no,
+          a.tag, a.earTag, a.earNo, a.code, a.idNumber, a.id
+        ].map(v => (v == null ? "" : String(v).trim()));
+        return candidates.includes(key);
+      });
 
-      if (!match) return; // مش لقيناه
+      if (!match) { currentAnimal = null; return; }
       currentAnimal = match;
 
-      const reproductiveStatus = match.reproductiveStatus || match.reproStatus || "";
-      const lastInsemStr =
-        match.lastInseminationDate || match.lastInsem || match.last_breeding_date || "";
+      const reproNorm = normalizeReproStatus(match.reproductiveStatus || match.reproStatus || "");
+      const lastInsemRaw =
+        match.lastInseminationDate || match.lastInsem || match.last_breeding_date ||
+        match.lastBreedingDate || match.lastBreedDate || null;
 
-      if (!reproductiveStatus || !lastInsemStr) return;
+      const lastInsemDt = toJsDate(lastInsemRaw);
+      const refDate = toJsDate(diagnosisDateInput.value) || new Date();
+      const diff = daysBetween(lastInsemDt, refDate);
 
-      const lastDate = new Date(lastInsemStr);
-      const dayRef = new Date(diagnosisDateInput.value || new Date());
-      const lastInseminationDaysAgo = Math.floor((dayRef - lastDate) / (1000 * 60 * 60 * 24));
-
-      activateSection(reproductiveStatus, lastInseminationDaysAgo);
+      if (reproNorm && diff != null) {
+        activateSection(reproNorm, diff);
+      }
     } catch (e) {
       console.error("fetchAnimal error:", e);
     }
   }
 
-  // عند تغيير رقم الحيوان يدويًا
+  // لما المستخدم يغير رقم الحيوان يدويًا
   animalIdInput.addEventListener("change", () => {
     const val = animalIdInput.value.trim();
-    if (val) fetchAnimalAndActivate(val);
+    if (val) fetchAnimalAndMaybeActivate(val);
   });
 
-  // حفظ التشخيص في events + تحديث حالة الحيوان (اختياري)
+  // لو غيّر تاريخ التشخيص، أعد حساب الشرط لنفس الحيوان الحالي
+  diagnosisDateInput.addEventListener("change", () => {
+    if (!currentAnimal) return;
+    const reproNorm = normalizeReproStatus(currentAnimal.reproductiveStatus || currentAnimal.reproStatus || "");
+    const lastInsemRaw =
+      currentAnimal.lastInseminationDate || currentAnimal.lastInsem || currentAnimal.last_breeding_date ||
+      currentAnimal.lastBreedingDate || currentAnimal.lastBreedDate || null;
+
+    const lastInsemDt = toJsDate(lastInsemRaw);
+    const refDate = toJsDate(diagnosisDateInput.value) || new Date();
+    const diff = daysBetween(lastInsemDt, refDate);
+    if (reproNorm && diff != null) activateSection(reproNorm, diff);
+  });
+
+  // حفظ التشخيص في events + تحديث بسيط للحيوان
   document.getElementById("diagnosisForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -224,10 +276,10 @@
 
     const payload = {
       userId: currentUser.uid,
-      animalId: animalIdInput.value.trim(),
+      animalId: (animalIdInput.value || "").trim(),
       animalNumber: currentAnimal?.animalNumber || currentAnimal?.number || null,
       eventDate: diagnosisDateInput.value,
-      type: "pregnancy_diagnosis", // نوع الحدث
+      type: "تشخيص حمل",
       result: selectedResult.value, // عشار / فارغة
       vet: document.getElementById("vet").value || "",
       createdAt: serverTimestamp()
@@ -236,24 +288,18 @@
     try {
       await addDoc(collection(db, "events"), payload);
 
-      // تحديث بسيط لحالة الحيوان (لا يغيّر التصميم)
+      // تحديث حالة الحيوان (اختياري وخفيف)
       if (currentAnimal?.id) {
         const updates = {
           lastDiagnosis: "تشخيص حمل",
           lastDiagnosisDate: payload.eventDate
         };
-        if (selectedResult.value === "عشار") updates.reproductiveStatus = "عشار";
-        if (selectedResult.value === "فارغة") updates.reproductiveStatus = "مفتوحة";
-
-        try {
-          await updateDoc(doc(db, "animals", currentAnimal.id), updates);
-        } catch (e) {
-          console.warn("update animal skipped:", e);
-        }
+        if (payload.result === "عشار")   updates.reproductiveStatus = "عشار";
+        if (payload.result === "فارغة")  updates.reproductiveStatus = "مفتوحة";
+        try { await updateDoc(doc(db, "animals", currentAnimal.id), updates); } catch {}
       }
 
       alert("✅ تم تسجيل التشخيص بنجاح");
-      // رجوع لبطاقة الحيوان
       const num = payload.animalNumber || payload.animalId;
       const usp = new URLSearchParams({ number: num, animalNumber: num });
       window.location.href = `cow-card.html?${usp.toString()}`;
@@ -263,7 +309,7 @@
     }
   });
 
-  // نفس سلوكك القديم عند التحميل (لو فيه animalId في الرابط)
+  // دعم نفس السلوك القديم عند التحميل
   window.addEventListener("load", () => {
     const id = getQP("animalId");
     if (id && !animalIdInput.value) {
@@ -273,6 +319,7 @@
     }
   });
 </script>
+
 
 </body>
 </html>
