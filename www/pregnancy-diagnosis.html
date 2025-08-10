@@ -8,11 +8,11 @@
     body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
     h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
     fieldset { border: 2px solid #2e7d32; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
-    /* كنّا بنستعمل active للتفعيل الشرطي، لكن دلوقتي الاتنين دايمًا مفعّلين */
     legend { font-weight: bold; font-size: 18px; color: #2e7d32; padding: 0 10px; }
     label { display: block; margin-top: 10px; font-weight: bold; }
     input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; }
-    .radio-group { margin: 10px 0; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .radio-group { margin: 6px 0; }
     .radio-group label { display: inline-block; margin-left: 15px; font-weight: normal; }
     button { background-color: #2e7d32; color: white; padding: 14px 20px; font-size: 18px; border: none; border-radius: 8px; width: 100%; cursor: pointer; }
     button:hover { background-color: #27642a; }
@@ -28,25 +28,28 @@
     <label for="diagnosisDate">تاريخ التشخيص</label>
     <input type="date" id="diagnosisDate" name="diagnosisDate" required>
 
-    <!-- السونار: دائمًا ظاهر ومفعّل -->
-    <fieldset id="ultrasound">
-      <legend>تشخيص بالسونار (بعد 30 يوم من آخر تلقيح)</legend>
-      <div class="radio-group">
-        <label><input type="radio" name="result" value="عشار"> عشار</label>
-        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+    <!-- قسم واحد فقط -->
+    <fieldset>
+      <legend>تشخيص الحمل</legend>
+
+      <div class="row">
+        <div>
+          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">طريقة التشخيص</div>
+          <div class="radio-group" id="methodGroup">
+            <label><input type="radio" name="method" value="ultrasound" required> سونار</label>
+            <label><input type="radio" name="method" value="manual"> يدوي</label>
+          </div>
+        </div>
+
+        <div>
+          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">النتيجة</div>
+          <div class="radio-group" id="resultGroup">
+            <label><input type="radio" name="result" value="عشار" required> عشار</label>
+            <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+          </div>
+        </div>
       </div>
     </fieldset>
-
-    <!-- التشخيص اليدوي: دائمًا ظاهر ومفعّل -->
-    <fieldset id="manual">
-      <legend>تشخيص يدوي (بعد 45 يوم من آخر تلقيح)</legend>
-      <div class="radio-group">
-        <label><input type="radio" name="result" value="عشار"> عشار</label>
-        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
-      </div>
-    </fieldset>
-
-    <!-- تم حذف تأكيد 120 يوم وتجفيف 200 يوم بناءً على طلبك -->
 
     <label for="vet">اسم الطبيب البيطري (اختياري)</label>
     <input type="text" id="vet" name="vet">
@@ -62,79 +65,40 @@
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // ملىّ القيم من الرابط لو موجودة
+    // تعبئة من رابط إن وُجد
     const qp = new URLSearchParams(location.search);
     const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
-    const dateFromURL = qp.get("date") || "";
-
-    const animalIdInput = document.getElementById("animalId");
-    const diagnosisDateInput = document.getElementById("diagnosisDate");
-    animalIdInput.value = animalFromURL || "";
-    diagnosisDateInput.value = dateFromURL || new Date().toISOString().slice(0,10);
+    const dateFromURL   = qp.get("date") || "";
+    document.getElementById("animalId").value = animalFromURL;
+    document.getElementById("diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
 
     let currentUser = null;
 
-    onAuthStateChanged(auth, (user) => {
-      if (!user) { window.location.href = "login.html"; return; }
+    onAuthStateChanged(auth, (user)=>{
+      if(!user){ location.href = "login.html"; return; }
       currentUser = user;
     });
 
-    // حفظ التشخيص في events + محاولة تحديث حالة الحيوان (اختياري)
-    document.getElementById("diagnosisForm").addEventListener("submit", async (e) => {
+    document.getElementById("diagnosisForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
 
-      const selected = document.querySelector('input[name="result"]:checked');
-      if (!selected) return alert("يرجى اختيار نتيجة التشخيص");
+      const animalNum = document.getElementById("animalId").value.trim();
+      const eventDate = document.getElementById("diagnosisDate").value;
+      const methodEl  = document.querySelector('input[name="method"]:checked');
+      const resultEl  = document.querySelector('input[name="result"]:checked');
 
-      const animalNum = (animalIdInput.value || "").trim();
       if (!animalNum) return alert("اكتب رقم الحيوان.");
+      if (!methodEl)  return alert("اختر طريقة التشخيص.");
+      if (!resultEl)  return alert("اختر نتيجة التشخيص.");
 
       const payload = {
         userId: currentUser?.uid || null,
-        animalId: animalNum,           // نخزن الرقم كما أدخله المستخدم
-        animalNumber: animalNum,       // نفس الرقم لاستخدامه في البطاقة
-        eventDate: diagnosisDateInput.value,
+        animalId: animalNum,
+        animalNumber: animalNum,
+        eventDate,
         type: "تشخيص حمل",
-        result: selected.value,        // عشار / فارغة
-        vet: document.getElementById("vet").value || "",
-        createdAt: serverTimestamp()
-      };
+        method: methodEl.value,         // ultrasound | manual
+        result: resultEl.value,         // عشار | فارغة
+        vet: document.getElementById("vet").value
 
-      try {
-        await addDoc(collection(db, "events"), payload);
-
-        // (اختياري) نحاول تحديث وثيقة الحيوان إن وجدناها
-        if (currentUser) {
-          try {
-            const animalsRef = collection(db, "animals");
-            const q1 = query(animalsRef, where("userId", "==", currentUser.uid));
-            const snap = await getDocs(q1);
-            const docMatch = snap.docs.find(d => {
-              const a = d.data();
-              const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
-                .map(v => v == null ? "" : String(v));
-              return candidates.includes(animalNum);
-            });
-            if (docMatch) {
-              const updates = {
-                lastDiagnosis: "تشخيص حمل",
-                lastDiagnosisDate: payload.eventDate
-              };
-              if (selected.value === "عشار")   updates.reproductiveStatus = "عشار";
-              if (selected.value === "فارغة")  updates.reproductiveStatus = "مفتوحة";
-              await updateDoc(doc(db, "animals", docMatch.id), updates);
-            }
-          } catch {}
-        }
-
-        alert("✅ تم تسجيل التشخيص بنجاح");
-        const usp = new URLSearchParams({ number: animalNum });
-        window.location.href = `cow-card.html?${usp.toString()}`;
-      } catch (err) {
-        console.error(err);
-        alert("❌ حدث خطأ أثناء التسجيل");
-      }
-    });
-  </script>
-</body>
-</html>
+        
