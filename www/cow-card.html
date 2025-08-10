@@ -67,8 +67,10 @@
     .tab-section { display:block; }
     .tab-section.active { display:block; }
     .section-title{font-size:22px;font-weight:900;color:var(--green);margin:0 0 10px;}
-      .page-actions{position:fixed; inset-inline:0; bottom:0; background:var(--yellow); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); box-shadow:0 -8px 24px rgba(0,0,0,.08); z-index:1000;}
-    main{padding-bottom:calc(88px + env(safe-area-inset-bottom));}
+      .page-actions{position:fixed; inset-inline:0; bottom:0; background:var(--yellow); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); box-shadow:0 -8px 24px rgba(0,0,0,.08); z-index:1000; display:flex; flex-direction:column; gap:10px; align-items:center;}
+    main{padding-bottom:calc(200px + env(safe-area-inset-bottom));}
+      .page-actions .actions-secondary{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+    .page-actions .btn.main{width:100%; max-width:520px; font-size:17px; padding:14px 18px;}
   </style>
 </head>
 <body>
@@ -160,9 +162,11 @@
       <ul id="evalList" style="margin:0; padding-inline-start:18px; line-height:1.9;"></ul>
     </div>
     <div class="toolbar page-actions">
-      <a id="btn-add-event" class="btn" href="#">+ تسجيل حدث لهذا الحيوان</a>
-      <a id="btn-dashboard" class="btn secondary" href="dashboard.html">لوحة التحكم</a>
-      <a id="btn-back-list" class="btn secondary" href="animal-list.html">قائمة الحيوانات</a>
+      <a id="btn-add-event" class="btn main" href="#">+ تسجيل حدث لهذا الحيوان</a>
+      <div class="actions-secondary">
+        <a id="btn-dashboard" class="btn secondary" href="dashboard.html">لوحة التحكم</a>
+        <a id="btn-back-list" class="btn secondary" href="animal-list.html">قائمة الحيوانات</a>
+      </div>
     </div>
   </main>
 
