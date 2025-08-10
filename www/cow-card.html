@@ -64,13 +64,12 @@
 </head>
 <body>
   <header>
-    <div class="title" id="page-title">بطاقة الحيوان<\/div>
+    <div class="title" id="page-title">بطاقة الحيوان</div>
   </header>
 
   <main>
     <div id="info" class="card loading">
       <div class="row">
-        <div class="item"><div class="label">نوع الحيوان</div><div id="v-type" class="value">—</div></div>
         <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
         <div class="item"><div class="label">الحالة الإنتاجية</div><div id="v-prod" class="value">—</div></div>
         <div class="item"><div class="label">الحالة التناسلية</div><div id="v-repro" class="value">—</div></div>
@@ -87,6 +86,50 @@
       <div id="status" class="status">جارِ التحميل…</div>
     </div>
 
+    <!-- الذكاء التناسلي -->
+    <div id="smartRepro" class="card" style="margin-top:12px;">
+      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء التناسلي</div>
+      <div class="row">
+        <div class="item"><div class="label">الحالة التناسلية الحالية</div><div id="sm-repro-status" class="value">—</div></div>
+        <div class="item"><div class="label">تاريخ آخر تلقيح</div><div id="sm-last-insem" class="value">—</div></div>
+        <div class="item"><div class="label">عدد مرات التلقيح</div><div id="sm-insem-count" class="value">—</div></div>
+        <div class="item"><div class="label">أيام بين آخر تلقيحين</div><div id="sm-insem-last-interval" class="value">—</div></div>
+        <div class="item"><div class="label">متوسط الأيام بين التلقيحات</div><div id="sm-insem-avg-interval" class="value">—</div></div>
+      </div>
+    </div>
+
+    <!-- الذكاء الإنتاجي -->
+    <div id="smartProd" class="card" style="margin-top:12px;">
+      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الإنتاجي</div>
+      <div class="row">
+        <div class="item"><div class="label">الحالة الإنتاجية</div><div id="sm-prod-status" class="value">—</div></div>
+        <div class="item"><div class="label">أيام الحليب (DIM)</div><div id="sm-dim" class="value">—</div></div>
+      </div>
+    </div>
+
+    <!-- الذكاء الصحي -->
+    <div id="smartHealth" class="card" style="margin-top:12px;">
+      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الصحي</div>
+      <div class="row">
+        <div class="item"><div class="label">آخر تشخيص</div><div id="sm-last-diagnosis" class="value">—</div></div>
+        <div class="item"><div class="label">تاريخ التشخيص</div><div id="sm-last-diagnosis-date" class="value">—</div></div>
+      </div>
+    </div>
+
+    <div id="milkCard" class="card" style="margin-top:12px;">
+      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">ذكاء الألبان</div>
+      <div class="row">
+        <div class="item"><div class="label">إنتاج اليوم (كجم)</div><div id="sm-milk-today" class="value">—</div></div>
+        <div class="item"><div class="label">إجمالي هذا الشهر (كجم)</div><div id="sm-milk-month" class="value">—</div></div>
+        <div class="item"><div class="label">التراكمي منذ بداية الموسم (كجم)</div><div id="sm-milk-season" class="value">—</div></div>
+      </div>
+      <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin:12px 0 8px;">منحنى إنتاج اللبن اليومي</div>
+      <div id="milkWrap" style="height:260px; position:relative;">
+        <canvas id="milkChart" aria-label="منحنى إنتاج اللبن" role="img"></canvas>
+      </div>
+      <div id="milkStatus" class="status">جارِ تحميل القراءات…</div>
+    </div>
+
     <div id="errorBox" class="card" style="display:none">
       <div class="error">تعذّر تحميل بيانات الحيوان.</div>
       <div class="status">تأكد من الرابط أو من الصلاحيات. إذا فتحت الصفحة من قائمة الحيوانات فالمفترض أن يعمل الرابط تلقائيًا.</div>
@@ -95,18 +138,19 @@
   </main>
 
   <!-- تعتمد الصفحة على ملف firebase-config.js الذي يهيئ Firebase ويصدّر auth و db -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script type="module">
     // 1) استيراد Firebase v10 (مطابقة لنسخة مشروعك) + auth/db من firebase-config.js
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { doc, getDoc, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { auth, db } from './js/firebase-config.js';
 
 // 2) المراجع إلى عناصر الواجهة
     const infoBox = document.getElementById('info');
     const errBox  = document.getElementById('errorBox');
     const status  = document.getElementById('status');
-    const titleEl = document.getElementById('page-title');const vType   = document.getElementById('v-type');
+    const titleEl = document.getElementById('page-title');
     const vBreed  = document.getElementById('v-breed');
     const vProd   = document.getElementById('v-prod');
     const vRepro  = document.getElementById('v-repro');
@@ -129,6 +173,163 @@ import { auth, db } from './js/firebase-config.js';
     };
 
     const getQP = (key) => new URLSearchParams(location.search).get(key);
+
+    // تحميل كل أحداث الحيوان (مرّة واحدة)
+    async function loadAllEvents(docId, number) {
+      const eventsRef = collection(db, 'events');
+      let snap = await getDocs(query(eventsRef, where('animalDocId','==', docId)));
+      let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if ((!rows || rows.length === 0) && number) {
+        snap = await getDocs(query(eventsRef, where('animalNumber','==', String(number))));
+        rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      return rows;
+    }
+
+    // أدوات مساعدة للتواريخ
+    const toJsDate = (x) => {
+      if (!x) return null;
+      try { if (typeof x.toDate === 'function') return x.toDate(); } catch {}
+      const d = (typeof x === 'string') ? new Date(x) : x;
+      return isNaN(d) ? null : d;
+    };
+    const daysBetween = (a,b) => {
+      if (!a || !b) return null;
+      const ms = Math.abs(b - a);
+      return Math.floor(ms / (1000*60*60*24));
+    };
+    const isSameDay = (a,b) => a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+
+    // تعبئة الأجواء الذكية
+    async function fillSmartSections(rows, animalDoc) {
+      const get = (id) => document.getElementById(id);
+      const reproStatusEl = get('sm-repro-status');
+      const lastInsemEl   = get('sm-last-insem');
+      const insemCountEl  = get('sm-insem-count');
+      const insemLastInt  = get('sm-insem-last-interval');
+      const insemAvgInt   = get('sm-insem-avg-interval');
+
+      const prodStatusEl  = get('sm-prod-status');
+      const dimEl         = get('sm-dim');
+
+      const lastDiagEl    = get('sm-last-diagnosis');
+      const lastDiagDtEl  = get('sm-last-diagnosis-date');
+
+      const milkTodayEl   = get('sm-milk-today');
+      const milkMonthEl   = get('sm-milk-month');
+      const milkSeasonEl  = get('sm-milk-season');
+
+      // الحالة التناسلية
+      const repro = animalDoc.reproductiveStatus || animalDoc.reproStatus || '—';
+      if (reproStatusEl) reproStatusEl.textContent = repro;
+
+      const insemEvents = rows.filter(r => {
+        const t = (r.type || r.eventType || '').toString().toLowerCase();
+        return t.includes('تلقي') || t.includes('insemin');
+      }).map(r => toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp)).filter(Boolean).sort((a,b)=>a-b);
+
+      if (insemCountEl) insemCountEl.textContent = insemEvents.length ? String(insemEvents.length) : '—';
+      if (lastInsemEl)  lastInsemEl.textContent  = insemEvents.length ? fmt.format(insemEvents[insemEvents.length-1]) : '—';
+
+      if (insemEvents.length >= 2) {
+        const intervals = insemEvents.slice(1).map((d,i)=> daysBetween(insemEvents[i], d)).filter(v=>v!=null);
+        const lastInt   = intervals[intervals.length-1];
+        const avgInt    = Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length);
+        if (insemLastInt) insemLastInt.textContent = String(lastInt);
+        if (insemAvgInt)  insemAvgInt.textContent  = String(avgInt);
+      } else {
+        if (insemLastInt) insemLastInt.textContent = '—';
+        if (insemAvgInt)  insemAvgInt.textContent  = '—';
+      }
+
+      // الحالة الإنتاجية + DIM
+      const prod = animalDoc.productionStatus || animalDoc.prodStatus || '—';
+      if (prodStatusEl) prodStatusEl.textContent = prod;
+
+      let lastCalving = animalDoc.lastCalvingDate || animalDoc.lastCalving || null;
+      lastCalving = toJsDate(lastCalving);
+      if (!lastCalving) {
+        const calvings = rows.filter(r => {
+          const t = (r.type || r.eventType || '').toString().toLowerCase();
+          return t.includes('ولاد') || t.includes('calv');
+        }).map(r => toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp)).filter(Boolean).sort((a,b)=>b-a);
+        if (calvings.length) lastCalving = calvings[0];
+      }
+      if (dimEl) dimEl.textContent = lastCalving ? String(daysBetween(lastCalving, new Date())) : '—';
+
+      // الذكاء الصحي — آخر تشخيص
+      const diagnosisEvents = rows.filter(r => {
+        const t = (r.type || r.eventType || '').toString().toLowerCase();
+        return t.includes('تشخيص') || t.includes('مرض') || t.includes('diagnos') || t.includes('disease');
+      }).sort((a,b)=> (toJsDate(b.eventDate||b.date||b.createdAt||b.timestamp) - toJsDate(a.eventDate||a.date||a.createdAt||a.timestamp)));
+
+      if (diagnosisEvents.length) {
+        const last = diagnosisEvents[0];
+        const name = last.diseaseName || last.diagnosis || last.diagnosisName || last.disease || '—';
+        if (lastDiagEl)   lastDiagEl.textContent   = name;
+        if (lastDiagDtEl) lastDiagDtEl.textContent = fmt.format(toJsDate(last.eventDate||last.date||last.createdAt||last.timestamp));
+      } else {
+        if (lastDiagEl)   lastDiagEl.textContent   = '—';
+        if (lastDiagDtEl) lastDiagDtEl.textContent = '—';
+      }
+
+      // ذكاء الألبان — اليومي/الشهري/الموسم
+      const milkEvents = rows.map(r => ({
+        dt: toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp),
+        milk: (r.milkKg ?? r.milk ?? r.dailyMilk ?? r.quantity ?? r.amount)
+      })).filter(x => x.dt && (x.milk ?? null) != null);
+
+      const today = new Date();
+      const month = today.getMonth();
+      const year  = today.getFullYear();
+
+      const sum = (arr) => arr.reduce((a,b)=> a + Number(b.milk||0), 0);
+
+      const todayMilk = sum(milkEvents.filter(x => isSameDay(x.dt, today)));
+      const monthMilk = sum(milkEvents.filter(x => x.dt.getMonth()===month && x.dt.getFullYear()===year));
+      const seasonMilk = lastCalving ? sum(milkEvents.filter(x => x.dt >= lastCalving)) : null;
+
+      if (milkTodayEl)  milkTodayEl.textContent  = todayMilk ? String(todayMilk) : '—';
+      if (milkMonthEl)  milkMonthEl.textContent  = monthMilk ? String(monthMilk) : '—';
+      if (milkSeasonEl) milkSeasonEl.textContent = (seasonMilk!=null) ? String(seasonMilk) : '—';
+    }
+
+    // رسم منحنى إنتاج اللبن اليومي (يعتمد على نفس الأحداث إن توفّرت)
+    async function loadMilkSeries(docId, number, preRows) {
+      const card   = document.getElementById('milkCard');
+      const st     = document.getElementById('milkStatus');
+      const canvas = document.getElementById('milkChart');
+      if (!card) return;
+      try {
+        let rows = preRows;
+        if (!rows) rows = await loadAllEvents(docId, number);
+
+        const series = rows.map(r => {
+          const milk = (r.milkKg ?? r.milk ?? r.dailyMilk ?? r.quantity ?? r.amount);
+          const dt = toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp);
+          return { dt, milk };
+        }).filter(r => r.dt && (r.milk ?? null) != null);
+
+        if (series.length === 0) { st.textContent = 'لا توجد قراءات لإنتاج اللبن بعد.'; return; }
+
+        series.sort((a,b) => a.dt - b.dt);
+        const labels = series.map(r => new Intl.DateTimeFormat('ar-EG', { month: 'short', day: 'numeric' }).format(r.dt));
+        const data   = series.map(r => Number(r.milk));
+
+        if (typeof Chart === 'undefined') { st.textContent = 'تعذّر تحميل مكتبة الرسم.'; return; }
+
+        const ctx = canvas.getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: { labels, datasets: [{ label: 'إنتاج اللبن (كجم)', data, tension: 0.3, fill: false, borderWidth: 2, pointRadius: 2 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6 } }, y: { beginAtZero: true } } }
+        });
+        st.textContent = `آخر ${data.length} قراءة.`;
+      } catch (e) {
+        console.error('milk chart error', e);
+        st.textContent = 'حدث خطأ أثناء تحميل القراءات.';
+      }
+    }
 
     // 4) تحميل الوثيقة حسب docId من الاستعلام ?id=...
     let docId = getQP('id') || getQP('docId') || getQP('number');
@@ -166,7 +367,6 @@ import { auth, db } from './js/firebase-config.js';
         const lastC  = a.lastCalvingDate || a.lastCalving || null;
         const lastI  = a.lastInseminationDate || a.lastInsem || null;
         const dob    = a.birthDate || a.dob || null;
-        vType.textContent   = type;
         vBreed.textContent  = breed;
         vProd.textContent   = prod;
         vRepro.textContent  = repro;
@@ -176,9 +376,19 @@ import { auth, db } from './js/firebase-config.js';
         vDob.textContent    = asDate(dob);
         // تحديث عنوان الصفحة بالنوع ورقم الحيوان
         if (titleEl) {
-          const t = (type && type !== '—') ? type : 'الحيوان';
-          titleEl.textContent = `بطاقة ${t}${(number && number !== '—') ? ' — رقم ' + number : ''}`;
-        }// حفظ آخر حيوان لسهولة الإبحار الذكي
+          const t = (type && type !== '—')
+            ? ((type === 'بقرة' || type === 'cow' || type === 'Cow') ? 'البقرة'
+              : (type === 'جاموسة' || type === 'buffalo' || type === 'Buffalo') ? 'الجاموسة' : 'الحيوان')
+            : 'الحيوان';
+          titleEl.textContent = `بطاقة ${t}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
+        }
+
+        // تحميل الأجواء الذكية + الرسم البياني
+        const events = await loadAllEvents(docId, number);
+        await fillSmartSections(events, a);
+        await loadMilkSeries(docId, number, events);
+
+        // حفظ آخر حيوان لسهولة الإبحار الذكي
         localStorage.setItem('lastAnimalDocId', docId);
         if (number && number !== '—') localStorage.setItem('lastAnimalNumber', number);
 
