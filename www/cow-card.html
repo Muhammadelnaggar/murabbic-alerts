@@ -67,6 +67,9 @@
     .tab-section { display:block; }
     .tab-section.active { display:block; }
     .section-title{font-size:22px;font-weight:900;color:var(--green);margin:0 0 10px;}
+    .cow-value{display:flex;align-items:center;gap:12px;margin:6px 0 12px;}
+    .badge-score{font-size:24px;font-weight:900;letter-spacing:2px;background:#e8f5ea;color:#14532d;border:2px solid var(--green);border-radius:12px;padding:6px 10px;min-width:140px;text-align:center;}
+    .cow-value .hint{color:var(--muted);font-size:13px;}
       .page-actions{position:fixed; inset-inline:0; bottom:0; background:var(--yellow); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); box-shadow:0 -8px 24px rgba(0,0,0,.08); z-index:1000; display:flex; flex-direction:column; gap:10px; align-items:center;}
     main{padding-bottom:calc(200px + env(safe-area-inset-bottom));}
       .page-actions .actions-secondary{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
@@ -158,6 +161,10 @@
     <!-- قسم التقييم الفني والاقتصادي -->
     <div id="evalCard" class="card" style="margin-top:12px;">
       <h3 class="section-title">التقييم الفني والاقتصادي</h3>
+      <div class="cow-value">
+        <div id="ev-cow-badge" class="badge-score">—</div>
+        <div class="hint">قيمة تقديرية مبسّطة موجّهة للمربي (Cow Value)</div>
+      </div>
       <div class="row">
         <div class="item"><div class="label">التصنيف الإنتاجي الحالي</div><div class="value" id="ev-prod-class">—</div></div>
         <div class="item"><div class="label">مؤشر الخصوبة</div><div class="value" id="ev-fertility">—</div></div>
@@ -398,23 +405,49 @@ import { auth, db } from './js/firebase-config.js';
         const weekMilk2  = sum2(milkEvents.filter(x => x.dt >= weekAgo2));
         if (milkWeekEl) milkWeekEl.textContent = weekMilk2 ? String(weekMilk2) : '—';
       } catch {}
-    }
 
-    // رسم منحنى إنتاج اللبن اليومي (يعتمد على نفس الأحداث إن توفّرت)
-    async function loadMilkSeries(docId, number, preRows) {
-      const card   = document.getElementById('milkCard');
-      const st     = document.getElementById('milkStatus');
-      const canvas = document.getElementById('milkChart');
-      if (!card) return;
+      // Cow Value مبسّطة للمربي
       try {
-        let rows = preRows;
-        if (!rows) rows = await loadAllEvents(docId, number);
+        const cowBadge = document.getElementById('ev-cow-badge');
+        const prodClassEl = document.getElementById('ev-prod-class');
+        const fertEl = document.getElementById('ev-fertility');
+        const healthEl = document.getElementById('ev-health');
+        const costEl = document.getElementById('ev-cost-milk');
 
-        const series = rows.map(r => {
-          const milk = (r.milkKg ?? r.milk ?? r.dailyMilk ?? r.quantity ?? r.amount);
-          const dt = toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp);
-          return { dt, milk };
-        }).filter(r => r.dt && (r.milk ?? null) != null);
+        const todayVal = Number(milkTodayEl?.textContent || 0);
+        if (prodClassEl) prodClassEl.textContent = (todayVal>=20) ? 'عالٍ' : (todayVal>=10 ? 'متوسط' : 'منخفض');
+
+        // صحة: آخر تشخيص خلال 30 يوم
+        let recentDiag = false;
+        try {
+          const lastDiagTxt = lastDiagDtEl?.textContent || '';
+          if (lastDiagTxt && lastDiagTxt !== '—') {
+            const dt = toJsDate(lastDiagTxt);
+            if (dt) recentDiag = daysBetween(dt, new Date()) <= 30;
+          }
+        } catch {}
+        if (healthEl) healthEl.textContent = recentDiag ? 'محتاجة متابعة' : 'جيدة';
+
+        if (fertEl) {
+          const reproTxt2 = (animalDoc.reproductiveStatus || animalDoc.reproStatus || '').toString();
+          if (/عشار|preg/i.test(reproTxt2)) fertEl.textContent = 'عشار';
+          else if (daysSinceInsemEl && daysSinceInsemEl.textContent && daysSinceInsemEl.textContent !== '—') fertEl.textContent = `مفتوحة (${daysSinceInsemEl.textContent} يوم منذ آخر تلقيح)`;
+          else fertEl.textContent = 'مفتوحة';
+        }
+
+        if (costEl) costEl.textContent = (animalDoc.costPerKg || animalDoc.cowCostPerKg || '—');
+
+        if (cowBadge) {
+          let stars = 3;
+          if (todayVal >= 20) stars += 1; else if (todayVal <= 5) stars -= 1;
+          const reproTxt2 = (animalDoc.reproductiveStatus || animalDoc.reproStatus || '').toString();
+          if (/عشار|preg/i.test(reproTxt2)) stars += 0.5;
+          if (recentDiag) stars -= 1;
+          stars = Math.max(1, Math.min(5, Math.round(stars)));
+          cowBadge.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+        }
+      } catch {}
+      ).filter(r => r.dt && (r.milk ?? null) != null);
 
         if (series.length === 0) { st.textContent = 'لا توجد قراءات لإنتاج اللبن بعد.'; return; }
 
