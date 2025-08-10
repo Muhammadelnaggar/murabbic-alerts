@@ -1,291 +1,35 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>تسجيل الدخول</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Cairo', 'Arial', sans-serif;
-      background: linear-gradient(to bottom right, #ffffcc, #eeffdd);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-    }
-    form {
-      background-color: #ffffff;
-      padding: 30px 25px;
-      border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
-      width: 90%;
-      text-align: center;
-    }
-    h2 {
-      color: #28a745;
-      font-size: 28px;
-      margin-bottom: 25px;
-    }
-    input, button {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 15px;
-      font-size: 1em;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-    }
-    button {
-      background-color: #28a745;
-      color: white;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #218838;
-    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#f7fbe9;margin:0}
+    .card{max-width:420px;margin:48px auto;background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:20px}
+    h2{color:#1e8e3e;text-align:center;margin:0 0 16px}
+    .in{width:100%;padding:12px 14px;margin:10px 0;border-radius:10px;border:1px solid #e4ecf7;background:#eef5ff}
+    .btn{width:100%;padding:12px 14px;margin-top:12px;border:0;border-radius:10px;background:#1e8e3e;color:#fff;font-weight:600;cursor:pointer}
+    .note{font-size:13px;color:#6b7280;text-align:center;margin-top:10px}
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // دالة تشفير كلمة المرور
-    async function hashPassword(password) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      const form = document.getElementById("loginForm");
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        const phone = document.getElementById("phone").value.trim();
-        const password = document.getElementById("password").value.trim();
-
-        if (!phone || !password) {
-          alert("يرجى إدخال رقم الهاتف وكلمة المرور.");
-          return;
-        }
-
-        try {
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("phone", "==", phone));
-          const querySnapshot = await getDocs(q);
-
-          if (querySnapshot.empty) {
-            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
-            return;
-          }
-
-          const userDoc = querySnapshot.docs[0];
-          const userData = userDoc.data();
-
-          const hashedInputPassword = await hashPassword(password);
-
-          if (hashedInputPassword !== userData.password) {
-            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
-            return;
-          }
-
-          // تسجيل الدخول ناجح
-          localStorage.setItem("userId", userDoc.id);
-          localStorage.setItem("userPhone", userData.phone);
-          alert("✅ تم تسجيل الدخول بنجاح");
-
-          const animalsRef = collection(db, "animals");
-          const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
-          const animalSnapshot = await getDocs(animalQuery);
-
-          if (animalSnapshot.empty) {
-            window.location.href = "add-animal.html";
-          } else {
-            window.location.href = "dashboard.html";
-          }
-
-        } catch (err) {
-          console.error(err);
-          alert("حدث خطأ أثناء تسجيل الدخول.");
-        }
-      });
-    });
-  </script>
 </head>
 <body>
-  <form id="loginForm">
+  <div class="card">
     <h2>تسجيل الدخول</h2>
-    <input type="text" id="phone" placeholder="رقم الهاتف" required />
-    <input type="password" id="password" placeholder="كلمة المرور" required />
-    <button type="submit">دخول</button>
-  </form>
-<script type="module">
-  import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
+    <form id="loginForm" action="#" method="post">
+      <input class="in" type="text" placeholder="رقم الموبايل أو البريد" autocomplete="username" required>
+      <input class="in" type="password" placeholder="كلمة المرور" autocomplete="current-password" required>
+      <button class="btn" type="submit">دخول</button>
+      <div class="note">وضع تشغيل مؤقت — سيوجهك مباشرة إلى اللوحة.</div>
+    </form>
+  </div>
 
-  const form = document.querySelector('#loginForm');
-  const auth = getAuth();
-
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // حاول نلقط أول حقل نص/تلفون وكلمة السر
-    const userInput = form.querySelector('input[name="email"], input[type="email"], input[type="text"], input[type="tel"]');
-    const passInput = form.querySelector('input[name="password"], input[type="password"]');
-    const u = userInput?.value?.trim() || '';
-    const p = passInput?.value || '';
-
-    // IMPORTANT: لو بتسجّل بـ "إيميل وكلمة سر" لازم u يكون إيميل حقيقي
-    // مؤقتًا لو المستخدم كتب رقم تليفون، هنحوّله لإيميل تجريبي (لازم يكون متسجّل بنفس الإيميل ده في Firebase)
-    const email = u.includes('@') ? u : `${u}@murabbic.local`;
-
-    try {
-      await signInWithEmailAndPassword(auth, email, p);
-      // نجاح
-      location.href = '/dashboard.html';
-    } catch (e) {
-      console.error('Login error:', e.code, e.message);
-      const map = {
-        'auth/invalid-email': 'البريد الإلكتروني غير صالح.',
-        'auth/user-not-found': 'لا يوجد حساب بهذه البيانات.',
-        'auth/wrong-password': 'كلمة المرور غير صحيحة.',
-        'auth/too-many-requests': 'محاولات كثيرة. جرّب لاحقًا.',
-        'auth/network-request-failed': 'مشكلة اتصال بالشبكة.',
-        'auth/unauthorized-domain': 'أضِف الدومين إلى Authorized domains في Firebase.'
-      };
-      alert(map[e.code] || ('خطأ: ' + e.code));
-    }
-  });
-</script>
-<script type="module">
-  import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
-
-  // استخدم الموجود أو فعّل من window.firebaseConfig
-  const app = getApps().length ? getApp() : initializeApp(window.firebaseConfig);
-  const auth = getAuth(app);
-
-  const form = document.querySelector('#loginForm');
-  if (!form) {
-    console.warn('لم يتم العثور على #loginForm');
-  } else {
-    // مكان نعرض فيه رسالة واضحة بدل alert
-    const msg = document.createElement('div');
-    msg.id = 'loginMsg';
-    msg.style.cssText = 'margin-top:8px;color:#b00020;font-size:14px';
-    form.appendChild(msg);
-
-    form.addEventListener('submit', async (e) => {
+  <!-- توجيه فوري للوحة بدل أي تكامل مع Auth (مؤقتًا) -->
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e){
       e.preventDefault();
-      e.stopImmediatePropagation(); // نمنع أي listeners قديمة كانت بتعمل alert
-      msg.textContent = '';
-
-      // التقط أول حقل لليوزر + الباسورد
-      const userInput = form.querySelector('input[name="email"],input[type="email"],input[type="tel"],input[type="text"]');
-      const passInput = form.querySelector('input[name="password"],input[type="password"]');
-      const u = (userInput?.value || '').trim();
-      const p = passInput?.value || '';
-
-      // لو المستخدم أدخل رقم تليفون، نحوله مؤقتًا لإيميل وهمي (لازم يكون نفس الإيميل مسجّل في Firebase)
-      const email = u.includes('@') ? u : `${u}@murabbic.local`;
-
-      try {
-        await signInWithEmailAndPassword(auth, email, p);
-        location.href = '/dashboard.html';
-      } catch (err) {
-        console.error('Login error:', err.code, err.message);
-        const map = {
-          'auth/invalid-email': 'البريد الإلكتروني غير صالح.',
-          'auth/user-not-found': 'لا يوجد حساب بهذه البيانات.',
-          'auth/wrong-password': 'كلمة المرور غير صحيحة.',
-          'auth/too-many-requests': 'محاولات كثيرة. جرّب لاحقًا.',
-          'auth/network-request-failed': 'مشكلة اتصال بالشبكة.',
-          'auth/unauthorized-domain': 'أضِف الدومين إلى Authorized domains في Firebase.',
-          'auth/configuration-not-found': 'تحقق من window.firebaseConfig في الصفحة.'
-        };
-        msg.textContent = map[err.code] || ('خطأ: ' + err.code);
-        alert(map[err.code] || ('خطأ: ' + err.code)); // مؤقتًا لو محتاج تنبيه
-      }
-    }, { once: true }); // مرّة واحدة تكفي
-  }
-</script>
-<!-- 🆘 شريط طوارئ مؤقت لتجاوز الدخول وإظهار التشخيص -->
-<script type="module">
-  import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
-  import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
-
-  // لو مش عايز الشريط يظهر، افتح الصفحة بـ ?norescue=1
-  if (!location.search.includes('norescue=1')) {
-    // تهيئة Firebase من window.firebaseConfig
-    const app = getApps().length ? getApp() : initializeApp(window.firebaseConfig || {});
-    const auth = getAuth(app);
-
-    // UI بسيط تحت اليمين
-    const bar = document.createElement('div');
-    bar.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;font:14px/1.4 system-ui;z-index:9999;box-shadow:0 6px 16px rgba(0,0,0,.25)';
-    bar.innerHTML = `
-      <div style="margin-bottom:6px">🆘 وضع الطوارئ</div>
-      <button id="btnAnon" style="margin-inline-end:6px;padding:6px 10px;border:0;border-radius:6px;cursor:pointer">دخول تجريبي</button>
-      <button id="btnDiag" style="padding:6px 10px;border:0;border-radius:6px;cursor:pointer;background:#444;color:#fff">تشخيص</button>
-      <div id="msg" style="margin-top:6px;opacity:.85"></div>
-    `;
-    document.body.appendChild(bar);
-
-    const msg = bar.querySelector('#msg');
-    const say = t => msg.textContent = t;
-
-    // دخول تجريبي (Anonymous) → يحوّل للوحة
-    bar.querySelector('#btnAnon').addEventListener('click', async ()=>{
-      try {
-        say('جارٍ الدخول…');
-        await signInAnonymously(auth);
-        say('تم — جارٍ التحويل…'); 
-        location.href = '/dashboard.html';
-      } catch (e) {
-        console.error(e);
-        say('فشِل الدخول التجريبي: ' + (e.code || e.message));
-        // لو ظهر auth/operation-not-allowed فعّل Anonymous من الكونسول
-      }
+      location.href = '/dashboard.html';
     });
-
-    // تشخيص سريع
-    bar.querySelector('#btnDiag').addEventListener('click', async ()=>{
-      try {
-        const cfgOk = !!(window.firebaseConfig && window.firebaseConfig.apiKey && window.firebaseConfig.projectId);
-        console.log('firebaseConfig:', window.firebaseConfig);
-        say(cfgOk ? '✅ firebaseConfig موجود.' : '⚠️ firebaseConfig مفقود/ناقص.');
-        // محاولة دخول Anonymous كتست
-        await signInAnonymously(auth);
-        say((msg.textContent ? msg.textContent + ' ' : '') + '✅ اختبار Auth نجح. يمكنك استخدام "دخول تجريبي".');
-      } catch(e) {
-        console.error('Diag:', e.code, e.message);
-        say('❌ Auth فشل: ' + e.code + ' — راجع Authorized domains وطرق الدخول.');
-      }
-    });
-  }
-</script>
-
+  </script>
 </body>
 </html>
-
-
-
