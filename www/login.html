@@ -176,7 +176,60 @@
     }
   });
 </script>
+<script type="module">
+  import { getApps, getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
+
+  // استخدم الموجود أو فعّل من window.firebaseConfig
+  const app = getApps().length ? getApp() : initializeApp(window.firebaseConfig);
+  const auth = getAuth(app);
+
+  const form = document.querySelector('#loginForm');
+  if (!form) {
+    console.warn('لم يتم العثور على #loginForm');
+  } else {
+    // مكان نعرض فيه رسالة واضحة بدل alert
+    const msg = document.createElement('div');
+    msg.id = 'loginMsg';
+    msg.style.cssText = 'margin-top:8px;color:#b00020;font-size:14px';
+    form.appendChild(msg);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // نمنع أي listeners قديمة كانت بتعمل alert
+      msg.textContent = '';
+
+      // التقط أول حقل لليوزر + الباسورد
+      const userInput = form.querySelector('input[name="email"],input[type="email"],input[type="tel"],input[type="text"]');
+      const passInput = form.querySelector('input[name="password"],input[type="password"]');
+      const u = (userInput?.value || '').trim();
+      const p = passInput?.value || '';
+
+      // لو المستخدم أدخل رقم تليفون، نحوله مؤقتًا لإيميل وهمي (لازم يكون نفس الإيميل مسجّل في Firebase)
+      const email = u.includes('@') ? u : `${u}@murabbic.local`;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, p);
+        location.href = '/dashboard.html';
+      } catch (err) {
+        console.error('Login error:', err.code, err.message);
+        const map = {
+          'auth/invalid-email': 'البريد الإلكتروني غير صالح.',
+          'auth/user-not-found': 'لا يوجد حساب بهذه البيانات.',
+          'auth/wrong-password': 'كلمة المرور غير صحيحة.',
+          'auth/too-many-requests': 'محاولات كثيرة. جرّب لاحقًا.',
+          'auth/network-request-failed': 'مشكلة اتصال بالشبكة.',
+          'auth/unauthorized-domain': 'أضِف الدومين إلى Authorized domains في Firebase.',
+          'auth/configuration-not-found': 'تحقق من window.firebaseConfig في الصفحة.'
+        };
+        msg.textContent = map[err.code] || ('خطأ: ' + err.code);
+        alert(map[err.code] || ('خطأ: ' + err.code)); // مؤقتًا لو محتاج تنبيه
+      }
+    }, { once: true }); // مرّة واحدة تكفي
+  }
+</script>
 
 </body>
 </html>
+
 
