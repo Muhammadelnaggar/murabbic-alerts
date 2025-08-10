@@ -406,29 +406,6 @@ import { auth, db } from './js/firebase-config.js';
         const weekMilk2  = sum2(milkEvents.filter(x => x.dt >= weekAgo2));
         if (milkWeekEl) milkWeekEl.textContent = weekMilk2 ? String(weekMilk2) : '—';
       } catch {}
-
-              if (healthEl) healthEl.textContent = recentDiag ? 'محتاجة متابعة' : 'جيدة';
-
-        if (fertEl) {
-          const reproTxt2 = (animalDoc.reproductiveStatus || animalDoc.reproStatus || '').toString();
-          if (/عشار|preg/i.test(reproTxt2)) fertEl.textContent = 'عشار';
-          else if (daysSinceInsemEl && daysSinceInsemEl.textContent && daysSinceInsemEl.textContent !== '—') fertEl.textContent = `مفتوحة (${daysSinceInsemEl.textContent} يوم منذ آخر تلقيح)`;
-          else fertEl.textContent = 'مفتوحة';
-        }
-
-        if (costEl) costEl.textContent = (animalDoc.costPerKg || animalDoc.cowCostPerKg || '—');
-
-        if (cowBadge) {
-          let stars = 3;
-          if (todayVal >= 20) stars += 1; else if (todayVal <= 5) stars -= 1;
-          const reproTxt2 = (animalDoc.reproductiveStatus || animalDoc.reproStatus || '').toString();
-          if (/عشار|preg/i.test(reproTxt2)) stars += 0.5;
-          if (recentDiag) stars -= 1;
-          stars = Math.max(1, Math.min(5, Math.round(stars)));
-          cowBadge.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
-        }
-      } catch {}
-      
 }
 
     // رسم منحنى إنتاج اللبن اليومي (Chart.js)
@@ -491,6 +468,7 @@ import { auth, db } from './js/firebase-config.js';
         const number = a.number || a.animalId || '—';
         const typeRaw = (a.type || a.animalType || '').toString();
         const typeNorm = typeRaw.trim().toLowerCase();
+        let tType = 'الحيوان';
         const breed  = a.breed || '—';
         const prod   = a.productionStatus || a.prodStatus || '—';
         const repro  = a.reproductiveStatus || a.reproStatus || '—';
@@ -509,7 +487,7 @@ import { auth, db } from './js/firebase-config.js';
         vDob.textContent    = asDate(dob);
         // تحديث عنوان الصفحة بالنوع ورقم الحيوان
         if (titleEl) {
-          let tType = 'الحيوان';
+          tType = 'الحيوان';
           if (/بقر/.test(typeNorm) || /cow/.test(typeNorm)) tType = 'البقرة';
           else if (/جاموس/.test(typeNorm) || /buffalo/.test(typeNorm)) tType = 'الجاموسة';
           titleEl.textContent = `بطاقة ${tType}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
