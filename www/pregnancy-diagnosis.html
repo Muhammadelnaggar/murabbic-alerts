@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+  <!DOCTYPE html>
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
@@ -99,6 +100,47 @@
         type: "تشخيص حمل",
         method: methodEl.value,         // ultrasound | manual
         result: resultEl.value,         // عشار | فارغة
-        vet: document.getElementById("vet").value
+        vet: document.getElementById("vet").value || "",
+        createdAt: serverTimestamp()
+      };
 
-        
+      try {
+        await addDoc(collection(db, "events"), payload);
+
+        // (اختياري) حدّث حالة الحيوان إن لقيّناه
+        if (currentUser) {
+          try {
+            const animalsRef = collection(db, "animals");
+            const q1 = query(animalsRef, where("userId","==", currentUser.uid));
+            const snap = await getDocs(q1);
+            const match = snap.docs.find(d=>{
+              const a=d.data();
+              const cs=[a.animalId,a.number,a.animalNumber,a.tag,a.earTag].map(v=>v==null?"":String(v));
+              return cs.includes(animalNum);
+            });
+            if (match) {
+              const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
+              if (payload.result === "عشار")   updates.reproductiveStatus = "عشار";
+              if (payload.result === "فارغة")  updates.reproductiveStatus = "مفتوحة";
+              await updateDoc(doc(db,"animals",match.id), updates);
+            }
+          } catch {}
+        }
+
+        // سؤال المستخدم — يكمل أحداث ولا يرجع للداشبورد؟
+        const again = confirm("✅ تم تسجيل التشخيص.\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟");
+        if (again) {
+          // افتح صفحة تسجيل حدث للحيوان نفسه
+          location.href = `add-event.html?number=${encodeURIComponent(animalNum)}`;
+        } else {
+          // رجوع للداشبورد
+          location.href = "dashboard.html";
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ حدث خطأ أثناء التسجيل");
+      }
+    });
+  </script>
+</body>
+</html>
