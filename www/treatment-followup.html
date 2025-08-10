@@ -107,68 +107,111 @@
 
   <button onclick="submitTreatment()">تسجيل</button>
 
-<script>
-  // قراءة رقم الحيوان والتاريخ من الرابط
-  const params = new URLSearchParams(window.location.search);
-  const passedAnimalId = params.get("animalId");
-  const passedDate = params.get("date");
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const today = new Date().toISOString().split('T')[0];
+  // Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  // عناصر الصفحة
+  const params           = new URLSearchParams(window.location.search);
+  const inputAnimalId    = document.getElementById('animalId');
+  const inputTreatDate   = document.getElementById('treatmentDate');
+  const radiosFollowup   = document.querySelectorAll('input[name="followup"]');
+
+  // تعبئة رقم الحيوان والتاريخ من صفحة الأحداث
+  const passedAnimalId = params.get("animalId");
+  const passedDate     = params.get("date");
+  const todayStr = new Date().toISOString().split('T')[0];
 
   window.addEventListener('DOMContentLoaded', () => {
-    // تعبئة التاريخ الافتراضي
-    document.getElementById('treatmentDate').value = passedDate || today;
-
-    // تعبئة رقم الحيوان تلقائيًا من الرابط أو من localStorage
-    document.getElementById('animalId').value =
-      passedAnimalId || localStorage.getItem('currentAnimalId') || '';
-
-    // تفعيل خيارات المتابعة بعد 3 أيام من تاريخ التخزين السابق
-    const savedDate = new Date(localStorage.getItem('treatmentStartDate') || today);
-    const now = new Date();
-    const diff = Math.floor((now - savedDate) / (1000 * 60 * 60 * 24));
-    if (diff >= 3) {
-      document.querySelectorAll('input[name="followup"]').forEach(r => r.disabled = false);
-    }
+    inputAnimalId.value  = passedAnimalId || localStorage.getItem('lastAnimalId') || '';
+    inputTreatDate.value = passedDate || todayStr;
+    lockFollowupByDate(); // تفعيل/تعطيل المتابعة حسب الفرق بالأيام
   });
 
- async function submitTreatment() {
-  const data = {
-    animalId: document.getElementById('animalId').value,
-    date: document.getElementById('treatmentDate').value,
-    type: "علاج ومتابعة",
-    treatmentDescription: document.getElementById('treatmentDescription').value,
-    veterinarian: document.getElementById('veterinarian').value,
-    followup: document.querySelector('input[name="followup"]:checked')?.value || "غير مفعلة",
-    isSmartAlert: true,
-    alertRule: "treatment-followup-after-3days"
-  };
+  // أي تغيير في تاريخ العلاج يعيد فحص التفعيل (من غير تغيير في الشكل)
+  inputTreatDate.addEventListener('change', lockFollowupByDate);
 
-  if (data.followup === "ساءت الحالة") {
-    const nextFollowup = new Date();
-    nextFollowup.setDate(nextFollowup.getDate() + 3);
-    localStorage.setItem('treatmentStartDate', nextFollowup.toISOString());
-    alert("❗ حالة الحيوان ساءت. سيتم تحديد متابعة أخرى بعد 3 أيام.");
+  function daysBetween(dateStr) {
+    if (!dateStr) return -1;
+    const d  = new Date(dateStr + 'T00:00:00');
+    const t0 = new Date(); t0.setHours(0,0,0,0);
+    const diffMs = t0 - d;
+    return Math.floor(diffMs / (1000*60*60*24));
   }
 
-  try {
-    const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    });
+  function lockFollowupByDate() {
+    const diff = daysBetween(inputTreatDate.value);
+    const enable = diff >= 3;
+    radiosFollowup.forEach(r => r.disabled = !enable);
+    // مفيش تغيير بصري إضافي؛ نفس التصميم
+  }
 
-    if (res.ok) {
-      alert("✅ تم حفظ العلاج والمتابعة بنجاح");
-      window.location.href = "dashboard.html";
-    } else {
+  // إرسال العلاج/المتابعة إلى فايرستور
+  window.submitTreatment = async function submitTreatment() {
+    const animalId = inputAnimalId.value.trim();
+    const date     = inputTreatDate.value;
+
+    if (!animalId || !date) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ العلاج.");
+      return;
+    }
+
+    // لو المتابعة لسه مقفولة، نخزن “غير مفعلة”
+    const followupEnabled = Array.from(radiosFollowup).every(r => r.disabled === false);
+    const selectedFollow  = document.querySelector('input[name="followup"]:checked');
+    const followupValue   = followupEnabled && selectedFollow ? selectedFollow.value : "غير مفعلة";
+
+    const payload = {
+      type: "علاج",                  // نوع الحدث
+      animalId,
+      date,                          // تاريخ العلاج
+      treatmentDescription: (document.getElementById('treatmentDescription').value || "").trim(),
+      veterinarian: (document.getElementById('veterinarian').value || "").trim(),
+      followup: followupValue,       // حالة المتابعة (أو غير مفعلة)
+      userId: localStorage.getItem("userId") || null,
+      isSmartAlert: true,
+      alertRule: "treatment-followup-after-3days",
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await addDoc(collection(db, "events"), payload);
+
+      // لو الحالة "ساءت الحالة" نذكّر نرجع بعد 3 أيام (اختياري، بدون تغيير الشكل)
+      if (followupValue === "ساءت الحالة") {
+        const next = new Date();
+        next.setDate(next.getDate() + 3);
+        localStorage.setItem('lastTreatmentDate', date);
+        // تنبيه بسيط
+        alert("❗ حالة الحيوان ساءت. سيتم جدولة متابعة بعد 3 أيام.");
+      }
+
+      alert("✅ تم حفظ العلاج/المتابعة بنجاح");
+      // ابحار ذكي بسيط (نفس أسلوب الصفحات الأخرى)
+      if (confirm("هل تريد تسجيل حدث آخر؟")) {
+        window.location.href = "add-event.html";
+      } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+        window.location.href = "add-animal.html";
+      } else {
+        window.location.href = "dashboard.html";
+      }
+    } catch (e) {
+      console.error(e);
       alert("حدث خطأ أثناء الحفظ. حاول مرة أخرى.");
     }
-  } catch (err) {
-    alert("فشل الاتصال بالخادم");
-  }
-}
-
+  };
 </script>
 
 </body>
