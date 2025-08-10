@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -241,34 +242,14 @@
     });
   });
 </script>
-const btnHoof = document.querySelector('#btnHoofTrim');
-btnHoof.addEventListener('click', async ()=>{
-  btnHoof.disabled = true;
-  try {
-    await Store.saveEvent({
-      animalNumber: new URLSearchParams(location.search).get('number') || document.querySelector('#animalNumber').value.trim(),
-      eventDate: Store.todayYMD(),
-      type: 'hoof_trim',
-      notes: 'عملية تقليم حوافر (زر سريع)'
-    });
-    showInlineMessage('تم تسجيل تقليم الحوافر ✅ — تسجّل حاجة تانية؟');
-  } catch(e){
-    showInlineMessage(e.userFacing? e.message : 'تعذّر حفظ الحدث');
-  } finally { btnHoof.disabled = false; }
-});
-
-// تقدر تعمل أزرار سريعة تانية بنفس الأسلوب:
-function quickSave(type, meta={}) {
-  return Store.saveEvent({
-    animalNumber: new URLSearchParams(location.search).get('number') || document.querySelector('#animalNumber').value.trim(),
-    eventDate: Store.todayYMD(),
-    type, meta
-  });
-}
 
 
 </body>
 </html>
+
+
+
+
 
 
 
