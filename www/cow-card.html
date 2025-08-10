@@ -95,44 +95,15 @@
     </div>
   </main>
 
-  <!-- يتم تضمين ملف الإعدادات قبل سكربت الصفحة -->
-<script type="module" src="./config.js"></script>
+  <!-- تعتمد الصفحة على ملف firebase-config.js الذي يهيئ Firebase ويصدّر auth و db -->
 
   <script type="module">
-    // 1) استيراد Firebase v10 (CDN) + التهيئة عبر config.js
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
-    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth.js';
-    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js';
+    // 1) استيراد Firebase v10 (مطابقة لنسخة مشروعك) + auth/db من firebase-config.js
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { auth, db } from './js/firebase-config.js';
 
-    // حاول قراءة التهيئة من نافذة المتصفح أو من وحدة config.js
-    let firebaseConfig;
-try {
-  // المحاولة الأولى: داخل نفس المجلد
-  const mod = await import('./config.js');
-  firebaseConfig = mod.firebaseConfig || window.firebaseConfig;
-} catch (e1) {
-  try {
-    // المحاولة الثانية: المسار الجذري للموقع
-    const mod2 = await import('/config.js');
-    firebaseConfig = mod2.firebaseConfig || window.firebaseConfig;
-  } catch (e2) {
-    // محاولـة أخيرة: كمتغير عام إن كان قد تم تضمينه كسكربت "غير module"
-    firebaseConfig = window.firebaseConfig;
-  }
-}
-
-    if (!firebaseConfig) {
-      const status = document.getElementById('status');
-      status.textContent = '❌ لم يتم إيجاد إعدادات Firebase (config.js).';
-      document.getElementById('info').classList.remove('loading');
-      throw new Error('Firebase config missing');
-    }
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    // 2) المراجع إلى عناصر الواجهة
+// 2) المراجع إلى عناصر الواجهة
     const infoBox = document.getElementById('info');
     const errBox  = document.getElementById('errorBox');
     const status  = document.getElementById('status');
