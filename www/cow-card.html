@@ -462,7 +462,8 @@ import { auth, db } from './js/firebase-config.js';
         const a = snap.data();
 
         // دعم حقول قديمة وحديثة
-        const number = a.number || a.animalId || '—';
+        const numberFromUrl = getQP('animalNumber') || getQP('number') || getQP('cowNumber') || getQP('buffaloNumber') || getQP('animal_no') || '';
+        const number = (a.number || a.animalNumber || a.animal_no || a.tag || a.earTag || a.earNo || a.code || a.idNumber || a.animalId || numberFromUrl || '—');
         const typeRaw = (a.type || a.animalType || '').toString();
         const typeNorm = typeRaw.trim().toLowerCase();
         let tType = 'الحيوان';
