@@ -26,7 +26,7 @@
       padding: 16px 20px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 12px; flex-wrap: wrap;
     }
     header .title {
       font-size: 26px;
@@ -74,11 +74,13 @@
     main{padding-bottom:calc(200px + env(safe-area-inset-bottom));}
       .page-actions .actions-secondary{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
     .page-actions .btn.main{width:100%; max-width:520px; font-size:17px; padding:14px 18px;}
+      .badge-number{display:none;background:#fff;color:var(--green);border:2px solid var(--green);border-radius:999px;padding:4px 12px;font-weight:900;font-size:16px;line-height:1;}
   </style>
 </head>
 <body>
   <header>
     <div class="title" id="page-title">بطاقة الحيوان</div>
+    <span id="badge-number" class="badge-number" title="رقم الحيوان">—</span>
   </header>
 
   <main>
@@ -208,6 +210,7 @@ import { auth, db } from './js/firebase-config.js';
     const vLact   = document.getElementById('v-lact');
     const vDim    = document.getElementById('v-dim');
     const vGroup  = document.getElementById('v-group');
+    const badgeEl = document.getElementById('badge-number');
     const btnAddEvent = document.getElementById('btn-add-event');
 
     // 3) أدوات مساعدة
@@ -489,6 +492,10 @@ import { auth, db } from './js/firebase-config.js';
           if (/بقر/.test(typeNorm) || /cow/.test(typeNorm)) tType = 'البقرة';
           else if (/جاموس/.test(typeNorm) || /buffalo/.test(typeNorm)) tType = 'الجاموسة';
           titleEl.textContent = `بطاقة ${tType}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
+        }
+        if (badgeEl) {
+          if (number && number !== '—') { badgeEl.textContent = String(number); badgeEl.style.display = 'inline-flex'; }
+          else { badgeEl.style.display = 'none'; }
         }
         
 
