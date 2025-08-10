@@ -103,6 +103,49 @@
       border-radius: 8px;
       text-decoration: none;
     }
+    /* ===== أعمدة لاصقة (Sticky) لأول عمودين: رقم الحيوان + النوع ===== */
+:root{
+  /* غيّر الأرقام دي لو حابب توسّع/تضيّق العرض */
+  --sticky-col1: 140px; /* عرض عمود رقم الحيوان */
+  --sticky-col2: 120px; /* عرض عمود النوع */
+}
+
+/* مهم: sticky ما يشتغلش كويس مع collapse */
+#animalTable {
+  border-collapse: separate;   /* ينسخن جدول الـsticky */
+  border-spacing: 0;
+}
+
+/* بلاش الخلفية تتهرّب عند اللصق */
+#animalTable th, #animalTable td {
+  background-clip: padding-box;
+}
+
+/* العمود 1: رقم الحيوان */
+#animalTable th:nth-child(1),
+#animalTable td:nth-child(1) {
+  position: sticky;
+  right: 0;                 /* لأن الصفحة RTL */
+  z-index: 4;               /* فوق باقي الخلايا */
+  min-width: var(--sticky-col1);
+}
+#animalTable th:nth-child(1) { background: #dcedc8; }
+#animalTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+
+/* العمود 2: النوع */
+#animalTable th:nth-child(2),
+#animalTable td:nth-child(2) {
+  position: sticky;
+  right: var(--sticky-col1);
+  z-index: 3;
+  min-width: var(--sticky-col2);
+}
+#animalTable th:nth-child(2) { background: #dcedc8; }
+#animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+
+/* تأكد إن فيه سكرول أفقي لو الجدول عريض */
+.table-wrapper { overflow-x: auto; }
+
   </style>
 </head>
 <body>
@@ -293,6 +336,7 @@ window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}
   </script>
 </body>
 </html>
+
 
 
 
