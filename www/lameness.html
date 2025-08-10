@@ -12,25 +12,21 @@
       padding: 20px;
       margin: 0;
     }
-
     h2 {
       color: #2e7d32;
       text-align: center;
       margin-bottom: 25px;
       font-size: 24px;
     }
-
     form {
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
-
     label {
       font-weight: bold;
       font-size: 18px;
     }
-
     input, select, button {
       padding: 14px;
       font-size: 18px;
@@ -38,13 +34,11 @@
       border: 1px solid #2e7d32;
       box-sizing: border-box;
     }
-
     .radio-group {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
     }
-
     .radio-group label {
       display: flex;
       align-items: center;
@@ -56,25 +50,29 @@
       border: 1px solid #2e7d32;
       cursor: pointer;
     }
-
     button[type="submit"] {
       background-color: #2e7d32;
       color: white;
       font-size: 20px;
       cursor: pointer;
     }
-
-    #confirmationMsg {
+    /* رسالة تأكيد داخل الصفحة بدون تغيير الشكل العام */
+    #msg {
       display: none;
       text-align: center;
-      color: green;
       font-weight: bold;
-      margin-top: 15px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
     }
+    #msg.success { background:#d1e7dd; color:#0f5132; }
+    #msg.error   { background:#f8d7da; color:#842029; }
   </style>
 </head>
 <body>
   <h2>تسجيل حالة العرج</h2>
+
+  <div id="msg"></div>
 
   <form id="lamenessForm">
     <label for="animalId">رقم الحيوان</label>
@@ -105,70 +103,93 @@
     <label for="vet">اسم الطبيب البيطري المعالج</label>
     <input type="text" id="vet" name="vet">
 
-    <button type="submit">تسجيل الحالة</button>
+    <button type="submit" id="saveBtn">تسجيل الحالة</button>
   </form>
 
-  <p id="confirmationMsg">✅ تم تسجيل حالة العرج بنجاح! جاري الانتقال...</p>
+  <!-- ربط Firestore بدون لمس التصميم -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  <script>
-    document.getElementById("lamenessDate").valueAsDate = new Date();
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-    document.getElementById("lamenessForm").addEventListener("submit", async function(e) {
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    // تهيئة الحقول من صفحة الأحداث (أولوية: URL ثم التخزين المحلي)
+    const params = new URLSearchParams(window.location.search);
+    const urlAnimal = params.get("animalId");
+    const urlDate   = params.get("date");
+
+    const animalInput = document.getElementById("animalId");
+    const dateInput   = document.getElementById("lamenessDate");
+
+    animalInput.value = urlAnimal || localStorage.getItem("lastAnimalId") || "";
+    dateInput.value   = urlDate   || new Date().toISOString().split("T")[0];
+
+    const form  = document.getElementById("lamenessForm");
+    const msg   = document.getElementById("msg");
+    const btn   = document.getElementById("saveBtn");
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      msg.style.display = "none";
+      btn.disabled = true;
 
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
+      const data = {
+        animalId: animalInput.value.trim(),
+        lamenessDate: dateInput.value,
+        affectedLeg: form.querySelector('input[name="affectedLeg"]:checked')?.value || "",
+        lamenessType: document.getElementById("lamenessType").value,
+        vet: document.getElementById("vet").value.trim() || null,
+        type: "عرج",
+        isSmartAlert: true,
+        alertRule: "lameness-recheck",
+        userId: localStorage.getItem("userId") || null,
+        createdAt: serverTimestamp()
+      };
 
-      data.type = "عرج";
-      data.isSmartAlert = true;
-      data.alertRule = "lameness-recheck";
+      if (!data.animalId || !data.lamenessDate || !data.affectedLeg || !data.lamenessType) {
+        btn.disabled = false;
+        msg.textContent = "يرجى استكمال البيانات المطلوبة.";
+        msg.className = "error";
+        msg.style.display = "block";
+        return;
+      }
 
       try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
+        await addDoc(collection(db, "events"), data);
 
-        if (res.ok) {
-          // إظهار رسالة التأكيد
-          const msg = document.getElementById("confirmationMsg");
-          msg.style.display = "block";
+        // حفظ آخر رقم وتاريخ للاستخدام التالي
+        localStorage.setItem("lastAnimalId", data.animalId);
+        localStorage.setItem("lastEventDate", data.lamenessDate);
 
-          // تعطيل زر التسجيل مؤقتًا
-          this.querySelector("button[type='submit']").disabled = true;
+        // رسالة نجاح + إبحار ذكي
+        msg.textContent = "✅ تم تسجيل حالة العرج بنجاح! سيتم تحويلك تلقائيًا…";
+        msg.className = "success";
+        msg.style.display = "block";
 
-          // الانتقال بعد 3 ثواني مع تمرير بيانات رقم الحيوان والتاريخ
-          const animalId = data.animalId || document.getElementById("animalId").value;
-          const eventDate = data.lamenessDate || document.getElementById("lamenessDate").value;
+        setTimeout(() => {
+          window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(data.animalId)}&date=${encodeURIComponent(data.lamenessDate)}`;
+        }, 2000);
 
-          setTimeout(() => {
-            window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
-          }, 3000);
-        } else {
-          alert("❌ فشل في تسجيل الحالة");
-        }
       } catch (err) {
-        alert("⚠️ فشل الاتصال بالخادم");
         console.error(err);
-      }
-    });
-
-    // تعيين القيم القادمة من الرابط تلقائيًا للحقلين
-    window.addEventListener("load", () => {
-      const params = new URLSearchParams(window.location.search);
-      const animalId = params.get("animalId");
-      const date = params.get("date");
-
-      if (animalId) {
-        document.getElementById("animalId").value = animalId;
-      }
-
-      if (date) {
-        document.getElementById("lamenessDate").value = date;
+        msg.textContent = "❌ حدث خطأ أثناء الحفظ. حاول مرة أخرى.";
+        msg.className = "error";
+        msg.style.display = "block";
+        btn.disabled = false;
       }
     });
   </script>
-
 </body>
 </html>
+
+ 
