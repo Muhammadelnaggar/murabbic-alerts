@@ -1,10 +1,119 @@
 
-<script type="module">
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل تحصين</title>
+  <style>
+    body {
+      direction: rtl;
+      background-color: #fffde7;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      color: #2e7d32;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    textarea, input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 5px;
+      border: 1px solid #2e7d32;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #2e7d32;
+      color: white;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      margin-top: 25px;
+      width: 100%;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📋 تسجيل تحصين</h1>
+
+  <form id="vaccinationForm">
+    <label for="animalId">رقم الحيوان (للتحصين الفردي):</label>
+    <input type="text" id="animalId" name="animalId" style="font-size: 16px; padding: 10px; height: 45px;">
+
+    <label for="animalIds">أرقام الحيوانات (للتحصين الجماعي - رقم في كل سطر أو مفصول بفاصلة):</label>
+    <textarea id="animalIds" rows="4" style="resize: vertical;"></textarea>
+
+    <label for="date">التاريخ:</label>
+    <input type="date" id="date" required style="font-size: 16px; padding: 10px; height: 45px;">
+
+    <label for="vaccineType">نوع التحصين:</label>
+    <select id="vaccineType" required>
+      <option value="">-- اختر نوع التحصين --</option>
+      <option>الإجهاض المعدي</option>
+      <option>تسمم دموي</option>
+      <option>كلوستريديا (لاهوائيات)</option>
+      <option>التهاب الضرع</option>
+      <option>المجموعة التنفسية (Cattle Master)</option>
+      <option>حُمى الثلاث أيام</option>
+      <option>التهاب الجلد العقدي</option>
+      <option>الحُمى القلاعية</option>
+      <option>الباستريلا (حمى النقل)</option>
+    </select>
+
+    <label>نوع الجرعة:</label>
+    <div class="radio-group">
+      <label><input type="radio" name="doseType" value="مبدئية" required> مبدئية</label>
+      <label><input type="radio" name="doseType" value="منشطة"> منشطة</label>
+    </div>
+
+    <label for="vetName">اسم الطبيب (اختياري):</label>
+    <input type="text" id="vetName" style="font-size: 16px; padding: 10px; height: 45px;">
+
+    <button type="submit">تسجيل التحصين</button>
+  </form>
+
+ <script type="module">
   import { db, auth } from "./js/firebase-config.js";
   import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  const form = document.getElementById("vaccinationForm");
+  // مراجع العناصر
+  const form        = document.getElementById("vaccinationForm");
+  const singleInput = document.getElementById("animalId");
+  const groupInput  = document.getElementById("animalIds");
+  const dateInput   = document.getElementById("date");
+  const typeSelect  = document.getElementById("vaccineType");
+  const vetInput    = document.getElementById("vetName");
+
+  // تعبئة افتراضية من الباراميتر (اختياري)
+  const qp = new URLSearchParams(location.search);
+  const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
+  const dateFromURL   = qp.get("date") || "";
+  if (animalFromURL) singleInput.value = animalFromURL;
+  dateInput.value = dateFromURL || new Date().toISOString().slice(0,10);
 
   onAuthStateChanged(auth, (user) => {
     if (!user) { window.location.href = "login.html"; return; }
@@ -12,19 +121,18 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const singleId = document.getElementById("animalId").value.trim();
-      const groupIdsRaw = document.getElementById("animalIds").value;
-
-      // كوّن قائمة الأرقام
-      let ids = [];
+      const singleId = (singleInput.value || "").trim();
+      const groupRaw = (groupInput.value || "");
       const isSingle = !!singleId;
+
+      // كوّن قائمة الأرقام: فردي أو قائمة (سطر/فاصلة)
+      let ids = [];
       if (isSingle) {
         ids = [singleId];
       } else {
-        ids = groupIdsRaw
-          .split(/[\n,]+/)
-          .map(s => s.trim())
-          .filter(Boolean);
+        ids = groupRaw.split(/[\n,]+/)
+                      .map(s => s.trim())
+                      .filter(Boolean);
       }
 
       if (ids.length === 0) {
@@ -32,19 +140,13 @@
         return;
       }
 
-      // اقرأ الحقول كما هي
-      const date = document.getElementById("date").value;
-      const vaccineType = document.getElementById("vaccineType").value;
       const doseTypeEl = document.querySelector('input[name="doseType"]:checked');
-      const doseType = doseTypeEl ? doseTypeEl.value : "";
-      const veterinarianName = document.getElementById("vetName").value;
-
-      const common = {
+      const payloadCommon = {
         userId: user.uid,
-        date,
-        vaccineType,
-        doseType,
-        veterinarianName,
+        date: dateInput.value,
+        vaccineType: typeSelect.value,
+        doseType: doseTypeEl ? doseTypeEl.value : "",
+        veterinarianName: vetInput.value || "",
         type: "تحصين",
         isSmartAlert: true,
         alertRule: "vaccination-next-dose-reminder",
@@ -52,8 +154,9 @@
       };
 
       let successCount = 0;
+
       for (const id of ids) {
-        const payload = { ...common, animalId: id, animalNumber: id };
+        const payload = { ...payloadCommon, animalId: id, animalNumber: id };
         try {
           await addDoc(collection(db, "events"), payload);
           successCount++;
@@ -62,7 +165,7 @@
         }
       }
 
-      // ابحار بعد الحفظ — حسب فردي/جماعي
+      // الابحار بعد الحفظ:
       if (isSingle) {
         const goEvents = confirm(`✅ تم تسجيل التحصين للحيوان ${singleId}.\n\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟`);
         if (goEvents) {
@@ -74,8 +177,8 @@
         const again = confirm(`✅ تم تسجيل التحصين لـ ${successCount} من ${ids.length} حيوان.\n\nهل تريد تسجيل تحصين آخر؟`);
         if (again) {
           form.reset();
-          // ثبّت التاريخ على اليوم بعد التفريغ (اختياري)
-          document.getElementById("date").value = new Date().toISOString().slice(0,10);
+          // تثبيت التاريخ على اليوم بعد التفريغ (اختياري)
+          dateInput.value = new Date().toISOString().slice(0,10);
         } else {
           window.location.href = "dashboard.html";
         }
@@ -83,3 +186,6 @@
     });
   });
 </script>
+
+</body>
+</html>
