@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -6,75 +5,22 @@
   <title>تشخيص الحمل</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    body {
-      direction: rtl;
-      background-color: #fff9db;
-      font-family: 'Arial', sans-serif;
-      padding: 20px;
-      color: #1b5e20;
-    }
-    h1 {
-      text-align: center;
-      font-size: 28px;
-      margin-bottom: 30px;
-      color: #2e7d32;
-    }
-    fieldset {
-      border: 2px solid #2e7d32;
-      border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 25px;
-      opacity: 0.5;
-      pointer-events: none;
-    }
-    fieldset.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    legend {
-      font-weight: bold;
-      font-size: 18px;
-      color: #2e7d32;
-      padding: 0 10px;
-    }
-    label {
-      display: block;
-      margin-top: 10px;
-      font-weight: bold;
-    }
-    input[type="text"], input[type="date"] {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-    .radio-group {
-      margin: 10px 0;
-    }
-    .radio-group label {
-      display: inline-block;
-      margin-left: 15px;
-      font-weight: normal;
-    }
-    button {
-      background-color: #2e7d32;
-      color: white;
-      padding: 14px 20px;
-      font-size: 18px;
-      border: none;
-      border-radius: 8px;
-      width: 100%;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #27642a;
-    }
+    body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
+    h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
+    fieldset { border: 2px solid #2e7d32; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
+    /* كنّا بنستعمل active للتفعيل الشرطي، لكن دلوقتي الاتنين دايمًا مفعّلين */
+    legend { font-weight: bold; font-size: 18px; color: #2e7d32; padding: 0 10px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; }
+    .radio-group { margin: 10px 0; }
+    .radio-group label { display: inline-block; margin-left: 15px; font-weight: normal; }
+    button { background-color: #2e7d32; color: white; padding: 14px 20px; font-size: 18px; border: none; border-radius: 8px; width: 100%; cursor: pointer; }
+    button:hover { background-color: #27642a; }
   </style>
 </head>
 <body>
   <h1>تشخيص الحمل</h1>
+
   <form id="diagnosisForm">
     <label for="animalId">رقم الحيوان</label>
     <input type="text" id="animalId" name="animalId" required>
@@ -82,6 +28,7 @@
     <label for="diagnosisDate">تاريخ التشخيص</label>
     <input type="date" id="diagnosisDate" name="diagnosisDate" required>
 
+    <!-- السونار: دائمًا ظاهر ومفعّل -->
     <fieldset id="ultrasound">
       <legend>تشخيص بالسونار (بعد 30 يوم من آخر تلقيح)</legend>
       <div class="radio-group">
@@ -90,6 +37,7 @@
       </div>
     </fieldset>
 
+    <!-- التشخيص اليدوي: دائمًا ظاهر ومفعّل -->
     <fieldset id="manual">
       <legend>تشخيص يدوي (بعد 45 يوم من آخر تلقيح)</legend>
       <div class="radio-group">
@@ -98,21 +46,7 @@
       </div>
     </fieldset>
 
-    <fieldset id="confirm120">
-      <legend>تأكيد الحمل عند 120 يوم</legend>
-      <div class="radio-group">
-        <label><input type="radio" name="result" value="عشار"> عشار</label>
-        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
-      </div>
-    </fieldset>
-
-    <fieldset id="dryoff">
-      <legend>تأكيد الحمل للتجفيف عند 200 يوم</legend>
-      <div class="radio-group">
-        <label><input type="radio" name="result" value="عشار"> عشار</label>
-        <label><input type="radio" name="result" value="فارغة"> فارغة</label>
-      </div>
-    </fieldset>
+    <!-- تم حذف تأكيد 120 يوم وتجفيف 200 يوم بناءً على طلبك -->
 
     <label for="vet">اسم الطبيب البيطري (اختياري)</label>
     <input type="text" id="vet" name="vet">
@@ -120,164 +54,87 @@
     <button type="submit">تسجيل التشخيص</button>
   </form>
 
-<script type="module">
-  import { db, auth } from "./js/firebase-config.js";
-  import {
-    collection, query, where, getDocs, orderBy, limit,
-    addDoc, serverTimestamp, doc, updateDoc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  <script type="module">
+    import { db, auth } from "./js/firebase-config.js";
+    import {
+      collection, query, where, getDocs,
+      addDoc, serverTimestamp, doc, updateDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  const animalIdInput = document.getElementById("animalId");
-  const diagnosisDateInput = document.getElementById("diagnosisDate");
-  const ultrasound = document.getElementById("ultrasound");
-  const manual     = document.getElementById("manual");
-  const confirm120 = document.getElementById("confirm120");
-  const dryoff     = document.getElementById("dryoff");
+    // ملىّ القيم من الرابط لو موجودة
+    const qp = new URLSearchParams(location.search);
+    const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
+    const dateFromURL = qp.get("date") || "";
 
-  const qp = new URLSearchParams(location.search);
-  const getQP = (k)=> qp.get(k);
+    const animalIdInput = document.getElementById("animalId");
+    const diagnosisDateInput = document.getElementById("diagnosisDate");
+    animalIdInput.value = animalFromURL || "";
+    diagnosisDateInput.value = dateFromURL || new Date().toISOString().slice(0,10);
 
-  // اضبط التاريخ من الرابط أو اليوم
-  const qDate = getQP("date");
-  diagnosisDateInput.valueAsDate = qDate ? new Date(qDate) : new Date();
+    let currentUser = null;
 
-  function activateSection(repro, days){
-    document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
-    if (repro === "ملقحة" && days >= 30) ultrasound.classList.add("active"); // من 30 وطالع
-    if (repro === "ملقحة" && days >= 45) manual.classList.add("active");     // يضاف فوق السونار
-    if (repro === "عشار"  && days >= 90 && days < 200) confirm120.classList.add("active");
-    if (repro === "عشار"  && days >= 200) dryoff.classList.add("active");
-  }
-
-  function toJsDate(v){
-    if (!v) return null;
-    if (v instanceof Date) return v;
-    if (typeof v === "string"){
-      if (/^\d{4}-\d{2}-\d{2}$/.test(v)){ const [y,m,d]=v.split("-").map(Number); return new Date(y,m-1,d); }
-      const d = new Date(v); return isNaN(d) ? null : d;
-    }
-    if (typeof v.toDate === "function") return v.toDate(); // Firestore Timestamp
-    if (typeof v === "object" && v.seconds) return new Date(v.seconds*1000);
-    return null;
-  }
-  function daysBetween(a,b){
-    if (!a||!b) return null;
-    const d1=new Date(a.getFullYear(),a.getMonth(),a.getDate());
-    const d2=new Date(b.getFullYear(),b.getMonth(),b.getDate());
-    return Math.round((d2-d1)/86400000);
-  }
-  function normRepro(s){
-    const t=(s||"").toString().trim().toLowerCase();
-    if (/(preg|عشار|حامل)/.test(t)) return "عشار";
-    if (/(ملقح|ملقحه|ملقحة|inseminated|bred)/.test(t)) return "ملقحة";
-    if (/(open|مفتوح|مفتوحة|فارغة)/.test(t)) return "مفتوحة";
-    return s||"";
-  }
-  const ar2enDigits = s => (s||"").replace(/[٠-٩]/g, d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d));
-
-  let currentUser=null, currentAnimal=null, lastInsemDate=null;
-
-  onAuthStateChanged(auth, (user)=>{
-    if(!user){ location.href="login.html"; return; }
-    currentUser = user;
-    const id = getQP("animalId") || getQP("number") || getQP("animalNumber");
-    if (id){ animalIdInput.value = id; loadAndActivate(id); }
-  });
-
-  async function loadAndActivate(idValue){
-    // 1) هات الحيوان
-    const key = ar2enDigits(String(idValue).trim());
-    const animalsRef = collection(db,"animals");
-    const qA = query(animalsRef, where("userId","==", currentUser.uid));
-    const sA = await getDocs(qA);
-    const animals = sA.docs.map(d=>({id:d.id, ...d.data()}));
-    const a = animals.find(x=>{
-      const c=[x.animalId,x.number,x.animalNumber,x.animal_no,x.tag,x.earTag,x.earNo,x.code,x.idNumber,x.id]
-        .map(v=>ar2enDigits(v==null?"":String(v).trim()));
-      return c.includes(key);
+    onAuthStateChanged(auth, (user) => {
+      if (!user) { window.location.href = "login.html"; return; }
+      currentUser = user;
     });
-    if (!a){ currentAnimal=null; return; }
-    currentAnimal = a;
 
-    // 2) حدِّد آخر تلقيح: من الوثيقة أو من الأحداث كـ fallback
-    lastInsemDate = toJsDate(
-      a.lastInseminationDate || a.lastInsem || a.last_breeding_date || a.lastBreedingDate || a.lastBreedDate
-    );
+    // حفظ التشخيص في events + محاولة تحديث حالة الحيوان (اختياري)
+    document.getElementById("diagnosisForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    if (!lastInsemDate){
-      const evRef = collection(db,"events");
-      const q1 = query(evRef,
-        where("userId","==", currentUser.uid),
-        where("type","in", ["insemination","تلقيح"]),
-        where("animalNumber","==", a.animalNumber || a.number || key),
-        orderBy("eventDate","desc"), limit(1)
-      );
-      const q2 = query(evRef,
-        where("userId","==", currentUser.uid),
-        where("type","in", ["insemination","تلقيح"]),
-        where("animalId","==", key),
-        orderBy("eventDate","desc"), limit(1)
-      );
-      const [s1,s2] = await Promise.all([getDocs(q1).catch(()=>null), getDocs(q2).catch(()=>null)]);
-      const lastEv = [s1,s2].filter(Boolean).flatMap(s=>s.docs).sort((d1,d2)=>{
-        const a=toJsDate(d1.data().eventDate), b=toJsDate(d2.data().eventDate);
-        return (b?.getTime()||0)-(a?.getTime()||0);
-      })[0];
-      if (lastEv) lastInsemDate = toJsDate(lastEv.data().eventDate);
-    }
+      const selected = document.querySelector('input[name="result"]:checked');
+      if (!selected) return alert("يرجى اختيار نتيجة التشخيص");
 
-    // 3) احسب الأيام وفعّل
-    const refDate = toJsDate(diagnosisDateInput.value) || new Date();
-    const diff = daysBetween(lastInsemDate, refDate);
-    const repro = normRepro(a.reproductiveStatus || a.reproStatus || (diff!=null ? "ملقحة" : ""));
+      const animalNum = (animalIdInput.value || "").trim();
+      if (!animalNum) return alert("اكتب رقم الحيوان.");
 
-    if (repro && diff!=null) activateSection(repro, diff);
-  }
+      const payload = {
+        userId: currentUser?.uid || null,
+        animalId: animalNum,           // نخزن الرقم كما أدخله المستخدم
+        animalNumber: animalNum,       // نفس الرقم لاستخدامه في البطاقة
+        eventDate: diagnosisDateInput.value,
+        type: "تشخيص حمل",
+        result: selected.value,        // عشار / فارغة
+        vet: document.getElementById("vet").value || "",
+        createdAt: serverTimestamp()
+      };
 
-  animalIdInput.addEventListener("change", ()=>{
-    const v = animalIdInput.value.trim(); if (v) loadAndActivate(v);
-  });
-  diagnosisDateInput.addEventListener("change", ()=>{
-    if (!currentAnimal) return;
-    const refDate = toJsDate(diagnosisDateInput.value) || new Date();
-    const diff = daysBetween(lastInsemDate, refDate);
-    const repro = normRepro(currentAnimal.reproductiveStatus || currentAnimal.reproStatus || "ملقحة");
-    if (repro && diff!=null) activateSection(repro, diff);
-  });
+      try {
+        await addDoc(collection(db, "events"), payload);
 
-  // الحفظ كما هو
-  document.getElementById("diagnosisForm").addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const selected = document.querySelector('input[name="result"]:checked');
-    if (!selected) return alert("يرجى اختيار نتيجة التشخيص");
+        // (اختياري) نحاول تحديث وثيقة الحيوان إن وجدناها
+        if (currentUser) {
+          try {
+            const animalsRef = collection(db, "animals");
+            const q1 = query(animalsRef, where("userId", "==", currentUser.uid));
+            const snap = await getDocs(q1);
+            const docMatch = snap.docs.find(d => {
+              const a = d.data();
+              const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
+                .map(v => v == null ? "" : String(v));
+              return candidates.includes(animalNum);
+            });
+            if (docMatch) {
+              const updates = {
+                lastDiagnosis: "تشخيص حمل",
+                lastDiagnosisDate: payload.eventDate
+              };
+              if (selected.value === "عشار")   updates.reproductiveStatus = "عشار";
+              if (selected.value === "فارغة")  updates.reproductiveStatus = "مفتوحة";
+              await updateDoc(doc(db, "animals", docMatch.id), updates);
+            }
+          } catch {}
+        }
 
-    const payload = {
-      userId: currentUser.uid,
-      animalId: animalIdInput.value.trim(),
-      animalNumber: currentAnimal?.animalNumber || currentAnimal?.number || null,
-      eventDate: diagnosisDateInput.value,
-      type: "تشخيص حمل",
-      result: selected.value,
-      vet: document.getElementById("vet").value || "",
-      createdAt: serverTimestamp()
-    };
-
-    await addDoc(collection(db,"events"), payload).catch(()=>alert("❌ تعذر الحفظ"));
-    if (currentAnimal?.id){
-      const updates={ lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: payload.eventDate };
-      if (payload.result==="عشار")  updates.reproductiveStatus="عشار";
-      if (payload.result==="فارغة") updates.reproductiveStatus="مفتوحة";
-      try{ await updateDoc(doc(db,"animals",currentAnimal.id), updates); }catch{}
-    }
-
-    alert("✅ تم تسجيل التشخيص");
-    const num = payload.animalNumber || payload.animalId;
-    location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-  });
-</script>
-
-
-
+        alert("✅ تم تسجيل التشخيص بنجاح");
+        const usp = new URLSearchParams({ number: animalNum });
+        window.location.href = `cow-card.html?${usp.toString()}`;
+      } catch (err) {
+        console.error(err);
+        alert("❌ حدث خطأ أثناء التسجيل");
+      }
+    });
+  </script>
 </body>
 </html>
