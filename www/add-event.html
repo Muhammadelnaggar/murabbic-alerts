@@ -167,5 +167,59 @@
       });
     });
   </script>
+  <script type="module">
+  import { db, auth } from "./js/firebase-config.js";
+  import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  const params = new URLSearchParams(location.search);
+
+  onAuthStateChanged(auth, (user)=>{
+    if (!user) { location.href = "login.html"; return; }
+
+    // هنمسك أول فورم لو مفيش id
+    const form   = document.getElementById('eventForm') || document.querySelector('form');
+    if (!form) { alert('لم يتم العثور على نموذج الحدث'); return; }
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+
+      const number = params.get('animalNumber') || params.get('number') || localStorage.getItem('lastAnimalId') || '';
+
+      // ماسكات الحقول بمرونة حتى لو IDs مختلفة
+      const typeEl  = document.getElementById('eventType') || form.querySelector('[name="eventType"], #type');
+      const qtyEl   = document.getElementById('qty')       || form.querySelector('[name="qty"], [name="quantity"], #quantity');
+      const dateEl  = document.getElementById('eventDate') || form.querySelector('[name="eventDate"], input[type="date"]');
+      const notesEl = document.getElementById('notes')     || form.querySelector('[name="notes"], textarea');
+
+      const payload = {
+        userId: user.uid,
+        animalNumber: number,
+        type: typeEl?.value || '',
+        quantity: qtyEl?.value ? Number(qtyEl.value) : null,
+        eventDate: dateEl?.value || new Date().toISOString().slice(0,10),
+        notes: notesEl?.value || '',
+        createdAt: serverTimestamp()
+      };
+
+      if (!payload.animalNumber) { alert('حدد رقم الحيوان أولًا.'); return; }
+      if (!payload.type)        { alert('اختر نوع الحدث.');      return; }
+
+      await addDoc(collection(db, 'events'), payload);
+
+      const again = confirm('✅ تم تسجيل الحدث.\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟');
+      if (again) {
+        if (qtyEl)   qtyEl.value = '';
+        if (notesEl) notesEl.value = '';
+        if (dateEl)  dateEl.value = new Date().toISOString().slice(0,10);
+        typeEl?.focus();
+      } else {
+        location.href = 'dashboard.html';
+      }
+    });
+  });
+</script>
+
 </body>
 </html>
+
