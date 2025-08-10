@@ -197,7 +197,34 @@
 </script>
 <script type="module" src="/js/store.js"></script>
 <script type="module" src="/js/smart-tracker.js"></script>
+// عناصر
+const btnSave = document.querySelector('#btnSave');
+const form = document.querySelector('#vaccinationForm');
+
+btnSave.addEventListener('click', async ()=>{
+  form.classList.add('is-busy');
+  try {
+    const payload = {
+      animalNumber: document.querySelector('#animalNumber').value.trim(),
+      eventDate: document.querySelector('#eventDate').value || Store.todayYMD(),
+      type: 'vaccination',
+      notes: document.querySelector('#notes')?.value || null,
+      meta: {
+        vaccine: document.querySelector('#vaccine')?.value || '',
+        dose: document.querySelector('#dose')?.value || '',
+        boosterDays: Number(document.querySelector('#boosterDays')?.value || 0)
+      }
+    };
+    await Store.saveEvent(payload);
+    showInlineMessage('تم حفظ التحصين ✅ — تسجّل حدث آخر؟ (نعم: ابقى هنا / لا: للوحة)');
+  } catch(e){
+    showInlineMessage(e.userFacing? e.message : 'تعذّر الحفظ، حاول لاحقًا');
+  } finally {
+    form.classList.remove('is-busy');
+  }
+});
 
 </body>
 </html>
+
 
