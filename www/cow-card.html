@@ -60,6 +60,12 @@
     .ok { color: var(--green); font-weight: 700; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .loading { opacity: .7; }
+      /* تبويب الصفحة الواحدة */
+    .tabs { display:flex; gap:8px; padding:8px 16px; position: sticky; top: 0; background: var(--yellow); z-index: 5; border-bottom: 1px solid var(--border); }
+    .tab { appearance:none; border:1px solid var(--green); background:#fff; color:var(--green); font-weight:700; padding:8px 12px; border-radius:999px; cursor:pointer; }
+    .tab.active { background: var(--green); color:#fff; }
+    .tab-section { display:none; }
+    .tab-section.active { display:block; }
   </style>
 </head>
 <body>
@@ -68,7 +74,15 @@
   </header>
 
   <main>
-    <div id="info" class="card loading">
+    <nav class="tabs">
+      <button class="tab active" data-tab="tab-overview">البيانات</button>
+      <button class="tab" data-tab="tab-repro">تناسلي</button>
+      <button class="tab" data-tab="tab-prod">إنتاجي</button>
+      <button class="tab" data-tab="tab-health">صحي</button>
+      <button class="tab" data-tab="tab-milk">الألبان</button>
+    </nav>
+    <section class="tab-section active" id="tab-overview">
+      <div id="info" class="card loading">
       <div class="row">
         <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
         <div class="item"><div class="label">الحالة الإنتاجية</div><div id="v-prod" class="value">—</div></div>
@@ -85,9 +99,11 @@
       </div>
       <div id="status" class="status">جارِ التحميل…</div>
     </div>
+    </section>
 
     <!-- الذكاء التناسلي -->
-    <div id="smartRepro" class="card" style="margin-top:12px;">
+    <section class="tab-section" id="tab-repro">
+      <div id="smartRepro" class="card" style="margin-top:12px;">
       <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء التناسلي</div>
       <div class="row">
         <div class="item"><div class="label">الحالة التناسلية الحالية</div><div id="sm-repro-status" class="value">—</div></div>
@@ -97,18 +113,24 @@
         <div class="item"><div class="label">متوسط الأيام بين التلقيحات</div><div id="sm-insem-avg-interval" class="value">—</div></div>
       </div>
     </div>
+      </div>
+    </section>
 
     <!-- الذكاء الإنتاجي -->
-    <div id="smartProd" class="card" style="margin-top:12px;">
+    <section class="tab-section" id="tab-prod">
+      <div id="smartProd" class="card" style="margin-top:12px;">
       <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الإنتاجي</div>
       <div class="row">
         <div class="item"><div class="label">الحالة الإنتاجية</div><div id="sm-prod-status" class="value">—</div></div>
         <div class="item"><div class="label">أيام الحليب (DIM)</div><div id="sm-dim" class="value">—</div></div>
       </div>
     </div>
+      </div>
+    </section>
 
     <!-- الذكاء الصحي -->
-    <div id="smartHealth" class="card" style="margin-top:12px;">
+    <section class="tab-section" id="tab-health">
+      <div id="smartHealth" class="card" style="margin-top:12px;">
       <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">الذكاء الصحي</div>
       <div class="row">
         <div class="item"><div class="label">آخر تشخيص</div><div id="sm-last-diagnosis" class="value">—</div></div>
@@ -116,7 +138,11 @@
       </div>
     </div>
 
-    <div id="milkCard" class="card" style="margin-top:12px;">
+          </div>
+    </section>
+
+    <section class="tab-section" id="tab-milk">
+      <div id="milkCard" class="card" style="margin-top:12px;">
       <div class="label" style="font-size:14px;color:#1b8f3a;font-weight:700;margin-bottom:8px;">ذكاء الألبان</div>
       <div class="row">
         <div class="item"><div class="label">إنتاج اليوم (كجم)</div><div id="sm-milk-today" class="value">—</div></div>
@@ -129,6 +155,9 @@
       </div>
       <div id="milkStatus" class="status">جارِ تحميل القراءات…</div>
     </div>
+
+          </div>
+    </section>
 
     <div id="errorBox" class="card" style="display:none">
       <div class="error">تعذّر تحميل بيانات الحيوان.</div>
@@ -147,6 +176,8 @@ import { doc, getDoc, collection, getDocs, query, where } from 'https://www.gsta
 import { auth, db } from './js/firebase-config.js';
 
 // 2) المراجع إلى عناصر الواجهة
+    const tabs    = document.querySelectorAll('.tab');
+    const sections= document.querySelectorAll('.tab-section');
     const infoBox = document.getElementById('info');
     const errBox  = document.getElementById('errorBox');
     const status  = document.getElementById('status');
@@ -158,6 +189,23 @@ import { auth, db } from './js/firebase-config.js';
     const vLastC  = document.getElementById('v-lastCalving');
     const vLastI  = document.getElementById('v-lastInsem');
     const vDob    = document.getElementById('v-dob');const btnAddEvent = document.getElementById('btn-add-event');
+
+    // 3) أدوات مساعدة
+    function setTab(id) {
+      sections.forEach(s => s.classList.toggle('active', s.id === id));
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+      try { localStorage.setItem('cardTab', id); } catch {}
+    }
+    tabs.forEach(btn => btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = btn.dataset.tab;
+      setTab(id);
+      const usp = new URLSearchParams(location.search);
+      usp.set('tab', id);
+      history.replaceState(null, '', location.pathname + '?' + usp.toString());
+    }));
+    const initTab = getQP('tab') || (typeof localStorage !== 'undefined' && localStorage.getItem('cardTab')) || 'tab-overview';
+    setTab(initTab);
 
     // 3) أدوات مساعدة
     const fmt = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' });
