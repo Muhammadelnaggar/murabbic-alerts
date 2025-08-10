@@ -86,7 +86,6 @@
     <section class="tab-section active" id="tab-overview">
       <div id="info" class="card loading">
         <div class="row">
-          <div class="item"><div class="label" id="lbl-number">رقم الحيوان</div><div id="v-number" class="value">—</div></div>
           <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
           <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
           <div class="item"><div class="label">عدد أيام الحليب</div><div id="v-dim" class="value">—</div></div>
@@ -209,8 +208,6 @@ import { auth, db } from './js/firebase-config.js';
     const vLact   = document.getElementById('v-lact');
     const vDim    = document.getElementById('v-dim');
     const vGroup  = document.getElementById('v-group');
-    const vNumber = document.getElementById('v-number');
-    const lblNumber = document.getElementById('lbl-number');
     const btnAddEvent = document.getElementById('btn-add-event');
 
     // 3) أدوات مساعدة
@@ -492,8 +489,7 @@ import { auth, db } from './js/firebase-config.js';
           else if (/جاموس/.test(typeNorm) || /buffalo/.test(typeNorm)) tType = 'الجاموسة';
           titleEl.textContent = `بطاقة ${tType}${(number && number !== '—') ? ` رقم (${number})` : ''}`;
         }
-        if (lblNumber) lblNumber.textContent = `رقم ${tType}`;
-        if (vNumber) vNumber.textContent = (number && number !== '—') ? String(number) : '—';
+        
 
         // تحميل الأجواء الذكية + الرسم البياني
         const events = await loadAllEvents(docId, number);
@@ -515,9 +511,20 @@ import { auth, db } from './js/firebase-config.js';
         if (number && number !== '—') localStorage.setItem('lastAnimalNumber', number);
 
         // زر تسجيل حدث: نمرر كل ما يفيد الصفحة التالية
-        const urlNumParam2 = getQP('animalNumber') || getQP('number') || '';
+        const urlNumParam2 = getQP('animalNumber') || getQP('number') || getQP('cowNumber') || getQP('buffaloNumber') || getQP('animal_no') || '';
         const numForLink2 = (number && number !== '—') ? String(number) : String(urlNumParam2 || '');
-        const qp2 = new URLSearchParams({ docId, animalNumber: numForLink2, number: numForLink2 });
+        const typeForLink = (a.type || a.animalType || '');
+        const qp2 = new URLSearchParams({
+          docId,
+          animalDocId: docId,
+          animalNumber: numForLink2,
+          number: numForLink2,
+          cowNumber: numForLink2,
+          buffaloNumber: numForLink2,
+          animal_no: numForLink2,
+          type: typeForLink,
+          animalType: typeForLink
+        });
         btnAddEvent.href = `add-event.html?${qp2.toString()}`;
 
         infoBox.classList.remove('loading');
