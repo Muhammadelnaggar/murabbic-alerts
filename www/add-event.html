@@ -94,6 +94,16 @@
       <button type="button" data-page="protocols.html">📋 برامج وإجراءات</button>
       <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
     </div>
+      <!-- … داخل <form id="eventForm"> … -->
+  <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none">
+    <div class="text"></div>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" id="msgYes">تسجيل أحداث أخرى</button>
+      <button type="button" class="btn btn-ghost"   id="msgNo">لوحة التحكم</button>
+    </div>
+  </div>
+</form>
+
   </form>
 
  <script type="module">
@@ -204,5 +214,6 @@
 
 </body>
 </html>
+
 
 
