@@ -120,92 +120,159 @@
     <button type="submit">تسجيل التشخيص</button>
   </form>
 
-  <script>
-    const animalIdInput = document.getElementById("animalId");
-    const diagnosisDateInput = document.getElementById("diagnosisDate");
-    const ultrasound = document.getElementById("ultrasound");
-    const manual = document.getElementById("manual");
-    const confirm120 = document.getElementById("confirm120");
-    const dryoff = document.getElementById("dryoff");
+<script type="module">
+  import { db, auth } from "./js/firebase-config.js";
+  import {
+    collection, query, where, getDocs,
+    addDoc, serverTimestamp, doc, updateDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    diagnosisDateInput.valueAsDate = new Date();
+  // عناصر الصفحة كما هي
+  const animalIdInput = document.getElementById("animalId");
+  const diagnosisDateInput = document.getElementById("diagnosisDate");
+  const ultrasound = document.getElementById("ultrasound");
+  const manual = document.getElementById("manual");
+  const confirm120 = document.getElementById("confirm120");
+  const dryoff = document.getElementById("dryoff");
 
-    function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
-      document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
+  // تاريخ اليوم افتراضيًا
+  diagnosisDateInput.valueAsDate = new Date();
 
-      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 30 && lastInseminationDaysAgo < 45) {
-        ultrasound.classList.add("active");
-      }
-      if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 45 && lastInseminationDaysAgo < 90) {
-        manual.classList.add("active");
-      }
-      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 90 && lastInseminationDaysAgo < 200) {
-        confirm120.classList.add("active");
-      }
-      if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 200) {
-        dryoff.classList.add("active");
-      }
+  // نفس دالة التفعيل بدون تغيير
+  function activateSection(reproductiveStatus, lastInseminationDaysAgo) {
+    document.querySelectorAll("fieldset").forEach(fs => fs.classList.remove("active"));
+
+    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 30 && lastInseminationDaysAgo < 45) {
+      ultrasound.classList.add("active");
     }
+    if (reproductiveStatus === "ملقحة" && lastInseminationDaysAgo >= 45 && lastInseminationDaysAgo < 90) {
+      manual.classList.add("active");
+    }
+    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 90 && lastInseminationDaysAgo < 200) {
+      confirm120.classList.add("active");
+    }
+    if (reproductiveStatus === "عشار" && lastInseminationDaysAgo >= 200) {
+      dryoff.classList.add("active");
+    }
+  }
 
-    animalIdInput.addEventListener("change", () => {
-      fetch("https://murabbic-alerts.onrender.com/api/animals")
-        .then(res => res.json())
-        .then(data => {
-          const animal = data.find(a => a.animalId === animalIdInput.value || a.number === animalIdInput.value);
-          if (!animal || !animal.reproductiveStatus || !animal.lastInseminationDate) return;
+  // مساعد بسيط لقراءة باراميتر من الرابط
+  const getQP = (k) => new URLSearchParams(location.search).get(k);
 
-          const reproductiveStatus = animal.reproductiveStatus;
-          const lastDate = new Date(animal.lastInseminationDate);
-          const today = new Date(diagnosisDateInput.value);
-          const diffTime = today - lastDate;
-          const lastInseminationDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  let currentUser = null;
+  let currentAnimal = null; // هنحتفظ بالوثيقة اللي هنلاقيها
 
-          activateSection(reproductiveStatus, lastInseminationDaysAgo);
-        });
-    });
+  onAuthStateChanged(auth, (user) => {
+    if (!user) { window.location.href = "login.html"; return; }
+    currentUser = user;
 
-    document.getElementById("diagnosisForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
+    // لو فيه رقم في الرابط، نعبّيه ونحاول نقرأ الحيوان
+    const id = getQP("animalId") || getQP("number") || getQP("animalNumber");
+    if (id) {
+      animalIdInput.value = id;
+      fetchAnimalAndActivate(id);
+    }
+  });
 
-      const selectedResult = document.querySelector('input[name="result"]:checked');
-      if (!selectedResult) return alert("يرجى اختيار نتيجة التشخيص");
+  // قراءة الحيوان من Firestore (بتصفية على userId ثم مطابقة الرقم محليًا)
+  async function fetchAnimalAndActivate(idValue) {
+    try {
+      const animalsRef = collection(db, "animals");
+      const q = query(animalsRef, where("userId", "==", currentUser.uid));
+      const snap = await getDocs(q);
+      const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const data = {
-        animalId: animalIdInput.value,
-        date: diagnosisDateInput.value,
+      const match = animals.find(a => {
+        const candidates = [
+          a.animalId, a.number, a.animalNumber, a.tag, a.earTag, a.code, a.idNumber
+        ].map(v => (v == null ? "" : String(v)));
+        return candidates.includes(String(idValue));
+      }) || animals.find(a => a.id === idValue); // كـ fallback لو حد حط docId
 
-        result: selectedResult.value,
-        vet: document.getElementById("vet").value,
-        type: "تشخيص حمل"
-      };
+      if (!match) return; // مش لقيناه
+      currentAnimal = match;
 
-      try {
-        const res = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
+      const reproductiveStatus = match.reproductiveStatus || match.reproStatus || "";
+      const lastInsemStr =
+        match.lastInseminationDate || match.lastInsem || match.last_breeding_date || "";
 
-        if (res.ok) {
-          alert("✅ تم تسجيل التشخيص بنجاح");
-          window.location.href = "add-event.html";
-        } else {
-          alert("❌ حدث خطأ أثناء التسجيل");
+      if (!reproductiveStatus || !lastInsemStr) return;
+
+      const lastDate = new Date(lastInsemStr);
+      const dayRef = new Date(diagnosisDateInput.value || new Date());
+      const lastInseminationDaysAgo = Math.floor((dayRef - lastDate) / (1000 * 60 * 60 * 24));
+
+      activateSection(reproductiveStatus, lastInseminationDaysAgo);
+    } catch (e) {
+      console.error("fetchAnimal error:", e);
+    }
+  }
+
+  // عند تغيير رقم الحيوان يدويًا
+  animalIdInput.addEventListener("change", () => {
+    const val = animalIdInput.value.trim();
+    if (val) fetchAnimalAndActivate(val);
+  });
+
+  // حفظ التشخيص في events + تحديث حالة الحيوان (اختياري)
+  document.getElementById("diagnosisForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const selectedResult = document.querySelector('input[name="result"]:checked');
+    if (!selectedResult) return alert("يرجى اختيار نتيجة التشخيص");
+
+    const payload = {
+      userId: currentUser.uid,
+      animalId: animalIdInput.value.trim(),
+      animalNumber: currentAnimal?.animalNumber || currentAnimal?.number || null,
+      eventDate: diagnosisDateInput.value,
+      type: "pregnancy_diagnosis", // نوع الحدث
+      result: selectedResult.value, // عشار / فارغة
+      vet: document.getElementById("vet").value || "",
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await addDoc(collection(db, "events"), payload);
+
+      // تحديث بسيط لحالة الحيوان (لا يغيّر التصميم)
+      if (currentAnimal?.id) {
+        const updates = {
+          lastDiagnosis: "تشخيص حمل",
+          lastDiagnosisDate: payload.eventDate
+        };
+        if (selectedResult.value === "عشار") updates.reproductiveStatus = "عشار";
+        if (selectedResult.value === "فارغة") updates.reproductiveStatus = "مفتوحة";
+
+        try {
+          await updateDoc(doc(db, "animals", currentAnimal.id), updates);
+        } catch (e) {
+          console.warn("update animal skipped:", e);
         }
-      } catch (err) {
-        alert("⚠️ فشل الاتصال بالخادم");
       }
-    });
 
-    window.addEventListener("load", () => {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("animalId");
-      if (id) {
-        animalIdInput.value = id;
-        diagnosisDateInput.valueAsDate = new Date();
-        animalIdInput.dispatchEvent(new Event("change"));
-      }
-    });
-  </script>
+      alert("✅ تم تسجيل التشخيص بنجاح");
+      // رجوع لبطاقة الحيوان
+      const num = payload.animalNumber || payload.animalId;
+      const usp = new URLSearchParams({ number: num, animalNumber: num });
+      window.location.href = `cow-card.html?${usp.toString()}`;
+    } catch (err) {
+      console.error(err);
+      alert("❌ حدث خطأ أثناء التسجيل");
+    }
+  });
+
+  // نفس سلوكك القديم عند التحميل (لو فيه animalId في الرابط)
+  window.addEventListener("load", () => {
+    const id = getQP("animalId");
+    if (id && !animalIdInput.value) {
+      animalIdInput.value = id;
+      diagnosisDateInput.valueAsDate = new Date();
+      animalIdInput.dispatchEvent(new Event("change"));
+    }
+  });
+</script>
+
 </body>
 </html>
