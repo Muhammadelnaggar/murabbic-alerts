@@ -447,26 +447,36 @@ import { auth, db } from './js/firebase-config.js';
           cowBadge.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
         }
       } catch {}
-      ).filter(r => r.dt && (r.milk ?? null) != null);
+      
+}
 
-        if (series.length === 0) { st.textContent = 'لا توجد قراءات لإنتاج اللبن بعد.'; return; }
-
-        series.sort((a,b) => a.dt - b.dt);
+    // رسم منحنى إنتاج اللبن اليومي (Chart.js)
+    async function loadMilkSeries(docId, number, preRows) {
+      const st = document.getElementById('milkStatus');
+      const canvas = document.getElementById('milkChart');
+      try {
+        let rows = preRows;
+        if (!rows) rows = await loadAllEvents(docId, number);
+        const series = rows.map(r => {
+          const milk = (r.milkKg ?? r.milk ?? r.dailyMilk ?? r.quantity ?? r.amount);
+          const dt = toJsDate(r.eventDate || r.date || r.createdAt || r.timestamp);
+          return { dt, milk };
+        }).filter(r => r.dt && (r.milk ?? null) != null);
+        if (series.length === 0) { if (st) st.textContent = 'لا توجد قراءات لإنتاج اللبن بعد.'; return; }
+        series.sort((a,b)=> a.dt - b.dt);
         const labels = series.map(r => new Intl.DateTimeFormat('ar-EG', { month: 'short', day: 'numeric' }).format(r.dt));
         const data   = series.map(r => Number(r.milk));
-
-        if (typeof Chart === 'undefined') { st.textContent = 'تعذّر تحميل مكتبة الرسم.'; return; }
-
+        if (typeof Chart === 'undefined') { if (st) st.textContent = 'تعذّر تحميل مكتبة الرسم.'; return; }
         const ctx = canvas.getContext('2d');
         new Chart(ctx, {
           type: 'line',
           data: { labels, datasets: [{ label: 'إنتاج اللبن (كجم)', data, tension: 0.3, fill: false, borderWidth: 2, pointRadius: 2 }] },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6 } }, y: { beginAtZero: true } } }
         });
-        st.textContent = `آخر ${data.length} قراءة.`;
+        if (st) st.textContent = `آخر ${data.length} قراءة.`;
       } catch (e) {
         console.error('milk chart error', e);
-        st.textContent = 'حدث خطأ أثناء تحميل القراءات.';
+        if (st) st.textContent = 'حدث خطأ أثناء تحميل القراءات.';
       }
     }
 
