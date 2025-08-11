@@ -89,6 +89,13 @@
         <label class="muted">بحث سريع</label>
         <input id="feedSearch" list="feedlist" placeholder="اكتب للبحث عن خامة" style="width:100%">
       </div>
+      <div class="grow">
+        <label class="muted">نموذج تركيبة</label>
+        <select id="tpl" style="width:100%">
+          <option value="">— اختر نموذج —</option>
+        </select>
+      </div>
+      <button id="applyTpl" class="btn">تحميل النموذج</button>
       <button id="addPreset" class="btn">إضافة</button>
       <button id="addBySearch" class="btn">إضافة بالبحث</button>
       <button id="clearAll" class="btn">مسح</button>
@@ -183,6 +190,8 @@
   const clearBtn = document.getElementById('clearAll');
   const feedSearch = document.getElementById('feedSearch');
   const addBySearchBtn = document.getElementById('addBySearch');
+  const tplSel = document.getElementById('tpl');
+  const applyTplBtn = document.getElementById('applyTpl');
   const tbody = document.querySelector('#tbl tbody');
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
@@ -255,10 +264,85 @@
     { name:'مخلوط معادن/فيتامينات', dm:95 },
   ];
 
+  // ==== قوالب علائق جاهزة (Templates) ====
+  const TEMPLATES = [
+    {
+      key: 'tmr_asfed_high_cow',
+      name: 'TMR as-fed — حلابة مرتفعة (بقر)',
+      mode: 'tmr_asfed',
+      items: [
+        { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
+        { name:'دريس برسيم', cat:'rough', dm:90, kg:1.5 },
+        { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:6 },
+        { name:'كسب فول صويا 48%', cat:'conc', dm:89, kg:2.5 },
+        { name:'مولاس', cat:'conc', dm:75, kg:0.5 },
+        { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, kg:0.15 },
+        { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, kg:0.10 },
+        { name:'ملح طعام', cat:'conc', dm:100, kg:0.05 },
+        { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
+        { name:'دهون محمية', cat:'conc', dm:99, kg:0.30 },
+      ]
+    },
+    {
+      key: 'tmr_percent_mid_cow',
+      name: 'TMR نسب as-fed — حلابة متوسطة (بقر)',
+      mode: 'tmr_percent',
+      items: [
+        { name:'سيلاج ذرة', cat:'rough', dm:33, pct:40 },
+        { name:'دريس برسيم', cat:'rough', dm:90, pct:5 },
+        { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:23 },
+        { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:10 },
+        { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:12 },
+        { name:'مولاس', cat:'conc', dm:75, pct:3 },
+        { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
+        { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
+        { name:'ملح طعام', cat:'conc', dm:100, pct:1 },
+        { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:2 },
+      ]
+    },
+    {
+      key: 'split_conc6',
+      name: 'منفصل — مركز 6 كجم + خشن as-fed',
+      mode: 'split', concKg: 6,
+      items: [
+        // خشن بالكجم/رأس
+        { name:'سيلاج ذرة', cat:'rough', dm:33, kg:20 },
+        { name:'دريس برسيم', cat:'rough', dm:90, kg:1 },
+        // مركز بالنسبة as-fed (المجموع ≈ 100%)
+        { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:45 },
+        { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:15 },
+        { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:20 },
+        { name:'جلوتين فيد (CGF)', cat:'conc', dm:90, pct:5 },
+        { name:'مولاس', cat:'conc', dm:75, pct:5 },
+        { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
+        { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
+        { name:'ملح طعام', cat:'conc', dm:100, pct:2 },
+        { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:4 },
+      ]
+    },
+    {
+      key: 'tmr_asfed_closeup',
+      name: 'TMR as-fed — تحضير ولادة (Close-up)',
+      mode: 'tmr_asfed',
+      items: [
+        { name:'سيلاج ذرة', cat:'rough', dm:33, kg:12 },
+        { name:'تبن قمح', cat:'rough', dm:90, kg:2 },
+        { name:'ردة قمح (نخالة)', cat:'conc', dm:89, kg:1.5 },
+        { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:2 },
+        { name:'كسب كانولا', cat:'conc', dm:90, kg:1.2 },
+        { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, kg:0.15 },
+        { name:'ملح طعام', cat:'conc', dm:100, kg:0.05 },
+        { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
+      ]
+    }
+  ];
+
   // تعبئة قائمة الـ preset
   FEEDS.forEach((f,i)=>{
     const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o);
   });
+  // املأ قائمة قوالب العلائق
+  TEMPLATES.forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.name; tplSel.appendChild(o); });
 
   // datalist للاقتراح بالكتابة في عمود الاسم
   const dl = document.createElement('datalist'); dl.id = 'feedlist';
@@ -303,6 +387,39 @@
     }
     kgEl.style.opacity  = kgEl.disabled? .5 : 1;
     pctEl.style.opacity = pctEl.disabled? .5 : 1;
+  }
+  // === مساعدات لضبط السطر الفارغ بحسب وضع الإدخال والتركيز تلقائيًا ===
+  function isRowEmpty(tr){
+    if (!tr) return true;
+    const name = tr.querySelector('.name')?.value?.trim();
+    const kg   = tr.querySelector('.kg')?.value;
+    const pct  = tr.querySelector('.pct')?.value;
+    return (!name && !kg && !pct);
+  }
+  function focusEditable(tr){
+    const mode = modeSel.value;
+    const cat  = (tr.querySelector('.cat')?.value)||'conc';
+    const kgEl = tr.querySelector('.kg');
+    const pctEl= tr.querySelector('.pct');
+    setRowState(tr);
+    setTimeout(()=>{
+      if (mode==='tmr_asfed'){ kgEl?.focus(); kgEl?.select?.(); }
+      else if (mode==='tmr_percent'){ pctEl?.focus(); pctEl?.select?.(); }
+      else { // split
+        if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); }
+        else { pctEl?.focus(); pctEl?.select?.(); }
+      }
+    }, 0);
+  }
+  function ensureEditableForMode(){
+    let tr = tbody.querySelector('tr');
+    if (!tr){ addEmptyRow(); tr = tbody.querySelector('tr'); }
+    if (modeSel.value==='split' && tr){
+      // اجعل أول سطر خشن افتراضيًا لسهولة إدخال الكجم إذا كان السطر فارغًا
+      const catEl = tr.querySelector('.cat');
+      if (catEl && catEl.value!=='rough' && isRowEmpty(tr)) catEl.value='rough';
+    }
+    focusEditable(tr);
   }
 
   function recalc(){
@@ -409,21 +526,51 @@
       const f = FEEDS.find(x=>x.name===nameEl.value.trim());
       if (f && !dmEl.value) dmEl.value = f.dm;
       setRowState(tr); recalc();
-    });
+    ensureEditableForMode();
+  });
     ;[dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setRowState(tr); recalc(); }));
 
     setRowState(tr);
   }
 
-  function addEmptyRow(){ addRow({}); }
+  function addEmptyRow(){
+    const mode = modeSel.value;
+    const cat  = (mode==='split') ? 'rough' : 'conc';
+    addRow({ cat });
+  }
 
   // init rows
   addEmptyRow();
+  ensureEditableForMode();
 
   addPresetBtn.onclick = ()=>{
     const idx = parseInt(presetSel.value); if (isNaN(idx)) return;
     const f = FEEDS[idx]; addRow({ name:f.name, dm:f.dm, price:'', kg:'', pct:'', cat: guessCat(f.name) }); recalc();
   };
+
+  function applyTemplate(key){
+    const tpl = TEMPLATES.find(t=> t.key === key); if(!tpl) return;
+    // اضبط الوضع حسب القالب
+    modeSel.value = tpl.mode; updateModeUI();
+    // اضبط كمية المركز في وضع المنفصل إن وُجدت
+    if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
+    // امسح وأعد التعبئة
+    tbody.innerHTML='';
+    (tpl.items||[]).forEach(it=>{
+      const def = FEEDS.find(x=> x.name === it.name);
+      addRow({
+        name: it.name,
+        dm  : (it.dm ?? def?.dm ?? ''),
+        cat : it.cat || guessCat(it.name),
+        kg  : (typeof it.kg  !== 'undefined')  ? it.kg  : '',
+        pct : (typeof it.pct !== 'undefined')  ? it.pct : '',
+      });
+    });
+    recalc();
+  }
+
+  if (applyTplBtn){ applyTplBtn.addEventListener('click', ()=>{ const k = tplSel?.value || ''; if(k) applyTemplate(k); }); }
+
   if (addBySearchBtn){
     const addByName = ()=>{
       const q = (feedSearch?.value || '').trim();
@@ -436,6 +583,7 @@
     addBySearchBtn.addEventListener('click', addByName);
     feedSearch?.addEventListener('keydown', e=>{ if(e.key==='Enter') addByName(); });
   }
+
   clearBtn.onclick = ()=>{ if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); } };
 
   function updateModeUI(){
@@ -456,6 +604,7 @@
   }
 
   modeSel.addEventListener('change', updateModeUI);
+  modeSel.addEventListener('change', ensureEditableForMode);
   concKgInput.addEventListener('input', recalc);
   updateModeUI();
 
