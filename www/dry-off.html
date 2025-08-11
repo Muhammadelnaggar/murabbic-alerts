@@ -2,289 +2,203 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل حدث</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تجفيف الحيوان</title>
   <style>
     body {
       direction: rtl;
-      background-color: #fff9db;
+      background-color: #fffde7;
       font-family: 'Arial', sans-serif;
-      padding: 10px;
-      margin: 0;
-      color: #1b5e20;
+      padding: 20px;
     }
+
     h1 {
       text-align: center;
-      font-size: 24px;
-      margin-bottom: 10px;
       color: #2e7d32;
+      margin-bottom: 20px;
     }
-    .animal-info, .date-info {
-      text-align: center;
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: #2e7d32;
-    }
-    .warning {
-      text-align: center;
-      font-size: 16px;
-      color: #c62828;
-      margin-bottom: 10px;
-      min-height: 22px;
-    }
-    .form-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin: 10px 0 20px;
-    }
-    .form-fields input {
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .button-group {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 10px;
-    }
-    .button-group button {
-      padding: 15px;
-      background-color: #a5d6a7;
-      border: none;
+
+    form {
+      background-color: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      padding: 20px;
       border-radius: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      text-align: center;
-      transition: background-color 0.3s, color 0.3s;
+      max-width: 500px;
+      margin: auto;
     }
-    .button-group button.active,
-    .button-group button:hover {
-      background-color: #2e7d32;
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #388e3c;
       color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .option-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 8px;
+      margin-bottom: 15px;
+    }
+
+    .option-group label {
+      background-color: #dcedc8;
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid #8bc34a;
+      cursor: pointer;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <h1>تسجيل حدث</h1>
-  <div class="animal-info" id="animalInfo"></div>
-  <div class="date-info" id="dateInfo"></div>
-  <div class="warning" id="noAnimalWarning"></div>
+  <h1>📄 تسجيل تجفيف الحيوان</h1>
 
-  <div class="form-fields">
-    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
-    <input type="date" id="eventDateInput" required />
-  </div>
+  <form id="dryOffForm">
+    <label for="animal-id">رقم الحيوان:</label>
+    <input type="text" id="animal-id" required />
 
-  <form id="eventForm">
-    <div class="button-group" id="eventTypeGroup">
-      <button type="button" data-page="calving.html">👶 ولادة</button>
-      <button type="button" data-page="insemination.html">📅 تلقيح</button>
-      <button type="button" data-page="vaccination.html">💉 تحصين</button>
-      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-      <button type="button" data-page="disease.html">🔬 التشخيص</button>
-      <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
-      <button type="button" data-page="protocols.html">📋 برامج وإجراءات</button>
-      <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    <label for="date">تاريخ التجفيف:</label>
+    <input type="date" id="date" required />
+
+    <label>سبب التجفيف:</label>
+    <div class="option-group">
+      <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
+      <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
     </div>
 
-    <!-- صندوق رسالة داخلي (بدون تنبيه منبثق) -->
-    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none">
-      <div class="text"></div>
-      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1;padding:12px;border-radius:8px;border:0;background:#2e7d32;color:#fff;font-weight:bold">تسجيل أحداث أخرى</button>
-        <button type="button" class="btn btn-ghost"   id="msgNo"  style="flex:1;padding:12px;border-radius:8px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;font-weight:bold">لوحة التحكم</button>
-      </div>
+    <label>تأكيد الحمل:</label>
+    <div class="option-group">
+      <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
+      <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
     </div>
+
+    <label>تم استخدام محاقن التجفيف؟</label>
+    <div class="option-group">
+      <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
+      <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
+    </div>
+
+    <button type="submit">💾 تسجيل التجفيف</button>
   </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // عناصر DOM
-    const animalInfo = document.getElementById("animalInfo");
-    const dateInfo   = document.getElementById("dateInfo");
-    const warning    = document.getElementById("noAnimalWarning");
-    const idInput    = document.getElementById("animalIdInput");
-    const dateInput  = document.getElementById("eventDateInput");
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+    authDomain: "murabbik.firebaseapp.com",
+    projectId: "murabbik",
+    storageBucket: "murabbik.appspot.com",
+    messagingSenderId: "402719243568",
+    appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  };
 
-    const msgBox = document.getElementById("inlineMsg");
-    const msgText = msgBox.querySelector(".text");
-    const btnYes  = msgBox.querySelector("#msgYes");
-    const btnNo   = msgBox.querySelector("#msgNo");
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
-      msgText.textContent = message;
-      btnYes.textContent = yesText;
-      btnNo.textContent  = noText;
-      msgBox.style.display = "block";
-      return new Promise(resolve=>{
-        const onYes = ()=>{ cleanup(); resolve(true);  };
-        const onNo  = ()=>{ cleanup(); resolve(false); };
-        btnYes.addEventListener('click', onYes, { once:true });
-        btnNo .addEventListener('click', onNo , { once:true });
-        function cleanup(){ msgBox.style.display="none"; }
-      });
+  // عناصر DOM
+  const form = document.getElementById("dryOffForm");
+  const idEl = document.getElementById("animal-id");
+  const dateEl = document.getElementById("date");
+
+  function todayYYYYMMDD(){
+    const d = new Date();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  window.onload = function () {
+    const qp = new URLSearchParams(location.search);
+    const qpId = qp.get('animalId') || qp.get('number') || "";
+
+    const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+    const id = storedAnimalId || qpId;
+
+    if (id) {
+      idEl.value = id;
+      idEl.readOnly = true;
+    } else {
+      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+      window.location.href = "add-animal.html";
+      return;
     }
 
-    // تاريخ اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
+    if(!dateEl.value){
+      dateEl.value = todayYYYYMMDD();
+    }
+  };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const data = {
+      animalId: idEl.value.trim(),
+      dryOffDate: dateEl.value,
+      reason: document.querySelector('input[name="reason"]:checked')?.value || null,
+      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
+      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
+      type: "تجفيف",
+      isSmartAlert: true,
+      alertRule: "تجفيف",
+      createdAt: serverTimestamp()
+    };
+
+    if (!data.animalId || !data.dryOffDate) {
+      alert("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولاً");
+      return;
     }
 
-    // تعبئة من الرابط/المحلّي
-    function hydrateContext(){
-      const qp = new URLSearchParams(location.search);
-      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-      const presetDate = qp.get("date") || todayLocal();
-      idInput.value = presetId;
-      dateInput.value = presetDate;
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-      try {
-        // عرض التاريخ بصيغة محلية عربية فقط في العنوان (input يظل YYYY-MM-DD)
-        const parts = presetDate.split('-');
-        const pretty = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10)).toLocaleDateString('ar-EG');
-        dateInfo.textContent   = `📅 التاريخ الحالي: ${pretty}`;
-      } catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`; }
-    }
+    try {
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn) btn.disabled = true;
 
-    // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
-    idInput.addEventListener('input', ()=>{
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
-    });
-    dateInput.addEventListener('input', ()=>{
-      try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
-      catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
-    });
+      await addDoc(collection(db, "events"), data);
 
-    function getContextOrWarn(){
-      const animalId = idInput.value.trim();
-      const eventDate= dateInput.value.trim();
-      if (!animalId || !eventDate){
-        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-        return null;
-      }
-      warning.textContent = "";
-      localStorage.setItem("lastAnimalId", animalId);
-      return { animalId, eventDate };
-    }
-
-    // تهيئة Firebase بمرونة (توافق قبل/بعد التوحيد)
-    async function setupFirebase(){
-      let db, auth;
-      try {
-        const mod = await import('./js/firebase-config.js'); // يتوقّع تصدير db, auth
-        if (mod?.db && mod?.auth){
-          db = mod.db; auth = mod.auth;
-          return { db, auth };
+      const isNewUser = localStorage.getItem("isNewUser") === "true";
+      if (isNewUser) {
+        if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
+          window.location.href = "add-event.html";
+        } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
+          window.location.href = "add-animal.html";
+        } else {
+          localStorage.removeItem("isNewUser");
+          localStorage.removeItem("lastAnimalId");
+          window.location.href = "dashboard.html";
         }
-      } catch(e){ /* نتجاهل ونرجع للخطة ب */ }
-      try {
-        const cfg = await import('./config.js'); // يتوقّع تصدير firebaseConfig
-        const app = initializeApp(cfg.firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        return { db, auth };
-      } catch(e2){
-        console.error('Firebase config not found. Provide js/firebase-config.js or config.js', e2);
-        warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكد من وجود config.js أو js/firebase-config.js";
-        return { db:null, auth:null };
-      }
-    }
-
-    // ربط الأزرار
-    function wireButtons(db, auth){
-      const group = document.getElementById("eventTypeGroup");
-      if(!group) return;
-      // إزالة مستمعين قدام
-      const clone = group.cloneNode(true);
-      group.parentNode.replaceChild(clone, group);
-
-      const btns    = clone.querySelectorAll('button');
-      const trimBtn = clone.querySelector('button[data-page="trimming.html"]');
-
-      // زر تقليم الحوافر — تسجيل فوري + رسالة داخلية
-      if (trimBtn){
-        trimBtn.addEventListener('click', async ()=>{
-          const ctx = getContextOrWarn();
-          if (!ctx) return;
-          try{
-            if (db){
-              await addDoc(collection(db, "events"), {
-                userId: auth?.currentUser?.uid || null,
-                animalId: ctx.animalId,
-                animalNumber: ctx.animalId,
-                eventDate: ctx.eventDate,
-                type: "تقليم الحوافر",
-                eventType: "تقليم الحوافر",
-                createdAt: serverTimestamp()
-              });
-            }
-            const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-            if (!goAgain) location.href = "dashboard.html";
-          }catch(err){
-            console.error(err);
-            warning.textContent = "❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.";
-          }
-        });
-      }
-
-      // باقي الأزرار — تسجيل حدث عام ثم الانتقال
-      btns.forEach(btn=>{
-        if (btn === trimBtn) return;
-        btn.addEventListener('click', async ()=>{
-          const ctx = getContextOrWarn();
-          if (!ctx) return;
-          try{
-            if (db){
-              await addDoc(collection(db, "events"), {
-                userId: auth?.currentUser?.uid || null,
-                animalId: ctx.animalId,
-                animalNumber: ctx.animalId,
-                eventDate: ctx.eventDate,
-                eventType: btn.textContent.trim(),
-                createdAt: serverTimestamp()
-              });
-            }
-          }catch(err){
-            console.error(err);
-            // لو فشل الحفظ نكمل تنقّلًا
-          }finally{
-            const page = btn.getAttribute('data-page');
-            if (page){
-              location.href = `${page}?animalId=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
-            }
-          }
-        });
-      });
-    }
-
-    // بدء التشغيل
-    (async function init(){
-      hydrateContext();
-      const { db, auth } = await setupFirebase();
-      if (auth){
-        onAuthStateChanged(auth, (user)=>{
-          if (!user){ location.href = "login.html"; return; }
-          wireButtons(db, auth);
-        });
       } else {
-        // في حالة عدم توفر auth (وضع تطوير/اختبار)، نسمح بالعمل بدون تسجيل دخول
-        wireButtons(db, null);
+        alert("✅ تم التسجيل بنجاح");
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 300);
       }
-    })();
-  </script>
+    } catch (error) {
+      console.error("❌ خطأ:", error);
+      alert("فشل الاتصال بالخادم.");
+    }
+  });
+</script>
+
 </body>
 </html>
+
