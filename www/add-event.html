@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -261,7 +260,8 @@
           const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
           if (!goAgain) location.href = 'dashboard.html';
         } else if (page){
-          location.href = `${page}?animalId=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
+          const qs = `animalId=${encodeURIComponent(ctx.animalId)}&animalIdd=${encodeURIComponent(ctx.animalId)}&number=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
+          location.href = `${page}?${qs}`;
         }
       });
     }
