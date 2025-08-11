@@ -61,6 +61,8 @@
       <select id="ctxSpecies"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
     </span>
     <span class="pill">🥛 متوسط إنتاج/رأس: <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="width:90px"></span>
+    <span class="pill">🧭 أيام الحمل (DCC): <input id="ctxDCC" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
+    <span class="pill">🍼 متبقي للولادة (يوم): <b id="dtcVal">—</b></span>
     <span class="pill"><label><input id="ctxEarlyDry" type="checkbox"> جاف مبكّر</label></span>
     <span class="pill"><label><input id="ctxCloseUp" type="checkbox"> تحضير ولادة</label></span>
     <span class="pill">🤰 حالة الحمل:
@@ -171,7 +173,7 @@
 
 <script type="module">
   import { db, auth } from './js/firebase-config.js';
-  import { addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { addDoc, collection, serverTimestamp, getDocs, getDoc, doc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
   const warn = document.getElementById('warn');
@@ -181,6 +183,8 @@
   const ctxDIM = document.getElementById('ctxDIM');
   const ctxSpecies = document.getElementById('ctxSpecies');
   const ctxAvgMilk = document.getElementById('ctxAvgMilk');
+  const ctxDCC = document.getElementById('ctxDCC');
+  const dtcVal = document.getElementById('dtcVal');
   const ctxEarlyDry = document.getElementById('ctxEarlyDry');
   const ctxCloseUp = document.getElementById('ctxCloseUp');
   const ctxPreg = document.getElementById('ctxPreg');
@@ -222,6 +226,7 @@
   ctxDIM.value      = qp.get('dim') || '';
   ctxSpecies.value  = qp.get('species') || '';
   ctxAvgMilk.value  = qp.get('avgMilk') || '';
+  ctxDCC.value     = qp.get('dcc') || '';
   ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
@@ -552,6 +557,78 @@
     const tpl = TEMPLATES.find(t=> t.key === key); if(!tpl) return;
     // اضبط الوضع حسب القالب
     modeSel.value = tpl.mode; updateModeUI();
+
+  // === تعبئة تلقائية لسياق الحيوان إذا كان مفردًا ===
+  (async function autoFillContextSingleAnimal(){
+    try{
+      if (!animalId || groupName) return; // مجموعة؟ سيبها يدوي
+
+      // 1) حاول جلب النوع من animals
+      try{
+        const direct = await getDoc(doc(db, 'animals', String(animalId)));
+        if (direct.exists() && !ctxSpecies.value){
+          const a = direct.data();
+          const sp = a?.species || a?.type || a?.kind;
+          if (sp) ctxSpecies.value = (String(sp).includes('جاموس') ? 'جاموس' : 'بقر');
+        }
+      }catch(_){/* تجاهل */}
+      if (!ctxSpecies.value){
+        try{
+          const qs = query(collection(db,'animals'), where('number','==', String(animalId)), limit(1));
+          const snap = await getDocs(qs);
+          snap.forEach(d=>{ const a=d.data(); const sp=a?.species||a?.type; if(sp&&!ctxSpecies.value) ctxSpecies.value=(String(sp).includes('جاموس')?'جاموس':'بقر'); });
+        }catch(_){/* تجاهل */}
+      }
+
+      // 2) اجلب آخر الأحداث لهذا الحيوان لاستنتاج DIM/الحمل/الإنتاج
+      async function getEvents(orderField){
+        const qv = query(collection(db,'events'), where('animalId','==', String(animalId)), orderBy(orderField,'desc'), limit(50));
+        const s = await getDocs(qv); return s.docs.map(x=> x.data());
+      }
+      let events = [];
+      try{ events = await getEvents('createdAt'); }catch(_){ try{ events = await getEvents('eventDate'); }catch(__){} }
+
+      const toDate = (v)=>{
+        if (!v) return null; if (v instanceof Date) return v; if (typeof v==='string') return new Date(v+'T00:00:00');
+        if (v?.toDate) return v.toDate(); return null; };
+      const diffDays = (d1,d2)=>{ if(!d1||!d2) return null; const ms = d1.getTime()-d2.getTime(); return Math.floor(ms/86400000); };
+
+      // آخر ولادة ⇒ DIM
+      const today = toDate(eventDate) || new Date();
+      const calv = events.find(e => (e?.type==='ولادة') || (e?.eventType && String(e.eventType).includes('ولادة')));
+      const calvDate = toDate(calv?.eventDate) || toDate(calv?.createdAt);
+      const DIM = diffDays(today, calvDate);
+      if (!ctxDIM.value && DIM!=null && DIM>=0) ctxDIM.value = DIM;
+
+      // آخر تشخيص حمل ⇒ حالة الحمل
+      const pregEvt = events.find(e => (e?.pregnancyStatus) || (e?.eventType && String(e.eventType).includes('تشخيص')));
+      const preg = pregEvt?.pregnancyStatus || pregEvt?.preg || pregEvt?.result;
+      if (!ctxPreg.value && preg){ ctxPreg.value = (String(preg).includes('عشار') ? 'عشار' : (String(preg).includes('فارغ')?'فارغة':'')); }
+
+      // تقدير DCC من آخر تلقيح إذا كانت عشار
+      if ((ctxPreg.value==='عشار' || !ctxPreg.value)){
+        const aiEvt = events.find(e => (e?.type && String(e.type).includes('تلقيح')) || (e?.eventType && String(e.eventType).includes('تلقيح')));
+        const aiDate = toDate(aiEvt?.eventDate) || toDate(aiEvt?.createdAt);
+        const DCC = diffDays(today, aiDate);
+        if (!ctxDCC.value && DCC!=null && DCC>=0) ctxDCC.value = DCC;
+      }
+
+      // متوسط اللبن من آخر 7 تسجيلات إنتاج اللبن اليومي
+      const milkVals = [];
+      events.forEach(e=>{
+        if (e?.eventType && String(e.eventType).includes('اللبن')){
+          const v = e?.milkKg ?? e?.milk ?? e?.amount ?? null;
+          if (typeof v==='number') milkVals.push(v);
+        }
+      });
+      if (!ctxAvgMilk.value && milkVals.length){
+        const n = Math.min(7, milkVals.length);
+        const avg = milkVals.slice(0,n).reduce((a,b)=>a+b,0)/n;
+        ctxAvgMilk.value = Number(avg.toFixed(1));
+      }
+
+    }catch(err){ console.warn('autoFillContextSingleAnimal:', err); }
+  })();
     // اضبط كمية المركز في وضع المنفصل إن وُجدت
     if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
     // امسح وأعد التعبئة
@@ -657,6 +734,8 @@
           earlyDry: !!(ctxEarlyDry?.checked),
           closeUp: !!(ctxCloseUp?.checked),
           pregnancyStatus: ctxPreg?.value || null,
+          pregnancyDays: ctxDCC?.value ? parseInt(ctxDCC.value) : null,
+          daysToCalving: (ctxDCC?.value ? (getGestLen() - parseInt(ctxDCC.value)) : null)
         },
         createdAt: serverTimestamp()
       });
@@ -669,6 +748,27 @@
   });
 
   onAuthStateChanged(auth, (user)=>{ if(!user){ location.href='login.html'; } });
+
+  // === قواعد الجفاف/التحضير بناءً على DCC ===
+  function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
+  function applyDCCRules(){
+    const dcc = parseInt(ctxDCC?.value);
+    const GL = getGestLen();
+    if (!isNaN(dcc)){
+      const dtc = GL - dcc;
+      if (dtcVal) dtcVal.textContent = isFinite(dtc)? String(dtc) : '—';
+      // جاف قبل 60 يوم من الموعد المتوقع
+      ctxEarlyDry.checked = (dcc >= (GL - 60));
+      // تحضير ولادة آخر 21 يوم
+      ctxCloseUp.checked  = (dcc >= (GL - 21));
+    } else {
+      if (dtcVal) dtcVal.textContent = '—';
+    }
+  }
+  ctxDCC?.addEventListener('input', applyDCCRules);
+  ctxSpecies?.addEventListener('change', applyDCCRules);
+  // شغّل القاعدة عند الفتح وبعد التعبئة التلقائية
+  applyDCCRules();
 </script>
 </body>
 </html>
