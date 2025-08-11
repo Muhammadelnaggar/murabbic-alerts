@@ -548,6 +548,70 @@ import { auth, db } from './js/firebase-config.js';
       }
     });
   </script>
+  <script type="module">
+  // امسك أي زر/لينك للبطاقة
+  const cowCardTargets = document.querySelectorAll(
+    '[data-page="cow-card.html"], a[href$="cow-card.html"], a[href*="cow-card.html"], #btnCowCard'
+  );
+
+  function openCowCardWith(id){
+    if (!id) return;
+    localStorage.setItem('lastAnimalId', id);
+    const qs = `animalId=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}`;
+    location.href = `cow-card.html?${qs}`;
+  }
+
+  function showMiniPrompt(){
+    if (document.getElementById('quickPrompt')) return; // موجود بالفعل
+    const box = document.createElement('div');
+    box.id = 'quickPrompt';
+    box.style.cssText = `
+      position:fixed; inset:auto 12px 12px 12px; z-index:9999;
+      background:#f1f8e9; border:1px solid #c5e1a5; border-radius:12px;
+      padding:12px; display:flex; gap:8px; align-items:center;
+    `;
+    box.innerHTML = `
+      <span style="font-weight:bold;color:#2e7d32;white-space:nowrap">رقم الحيوان:</span>
+      <input id="qpInput" type="text" inputmode="numeric" placeholder="مثال: 105"
+             style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px">
+      <button id="qpGo"
+              style="padding:10px 14px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-weight:bold">
+        فتح البطاقة
+      </button>
+      <button id="qpClose"
+              style="padding:10px 14px;border:1px solid #2e7d32;border-radius:8px;background:#fff;color:#2e7d32;font-weight:bold">
+        إلغاء
+      </button>
+    `;
+    document.body.appendChild(box);
+    const input = box.querySelector('#qpInput');
+    const goBtn = box.querySelector('#qpGo');
+    const clsBtn= box.querySelector('#qpClose');
+
+    function go(){
+      const v = (input.value || '').trim();
+      if (v) { box.remove(); openCowCardWith(v); }
+      else { input.focus(); }
+    }
+    goBtn.addEventListener('click', go);
+    input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') go(); });
+    clsBtn.addEventListener('click', ()=> box.remove());
+    input.focus();
+  }
+
+  function handleCowCardClick(e){
+    e.preventDefault();
+    const qp = new URLSearchParams(location.search);
+    const id = qp.get('animalId') || localStorage.getItem('lastAnimalId') || '';
+    if (id) { openCowCardWith(id); }
+    else { showMiniPrompt(); }
+  }
+
+  cowCardTargets.forEach(el => {
+    el.addEventListener('click', handleCowCardClick);
+  });
+</script>
+
 </body>
 </html>
 
@@ -555,3 +619,4 @@ import { auth, db } from './js/firebase-config.js';
  
 
    
+
