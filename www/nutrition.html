@@ -74,7 +74,12 @@
           <option value="">— اختر —</option>
         </select>
       </div>
+      <div class="grow">
+        <label class="muted">بحث سريع</label>
+        <input id="feedSearch" list="feedlist" placeholder="اكتب للبحث عن خامة" style="width:100%">
+      </div>
       <button id="addPreset" class="btn">إضافة</button>
+      <button id="addBySearch" class="btn">إضافة بالبحث</button>
       <button id="clearAll" class="btn">مسح</button>
     </div>
 
@@ -157,6 +162,8 @@
   const presetSel = document.getElementById('preset');
   const addPresetBtn = document.getElementById('addPreset');
   const clearBtn = document.getElementById('clearAll');
+  const feedSearch = document.getElementById('feedSearch');
+  const addBySearchBtn = document.getElementById('addBySearch');
   const tbody = document.querySelector('#tbl tbody');
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
@@ -189,15 +196,34 @@
   const FEEDS = [
     { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
     { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
+    { name:'ردة أرز', dm:90 }, { name:'ذرة رفيعة (سورجم)', dm:88 },
+    { name:'شوفان', dm:90 }, { name:'فول بلدي (فابا)', dm:88 },
+    { name:'بازلاء علفية', dm:88 },
+
+    { name:'DDGS (ذرة)', dm:90 }, { name:'جلوتين فيد (CGF)', dm:90 },
+    { name:'جلوتين ميل (CGM)', dm:90 }, { name:'قشور فول صويا (Soy Hulls)', dm:90 },
+    { name:'لب بنجر مجفف', dm:90 }, { name:'لب بنجر مبلل', dm:25 },
+    { name:'لب حمضيات مجفف', dm:90 }, { name:'مولاس', dm:75 },
+
     { name:'كسب فول صويا 44%', dm:89 }, { name:'كسب فول صويا 48%', dm:89 },
     { name:'كسب عباد الشمس', dm:89 }, { name:'كسب كانولا', dm:90 },
-    { name:'DDGS (ذرة)', dm:90 }, { name:'جلوتين فيد (CGF)', dm:90 },
-    { name:'جلوتين ميل (CGM)', dm:90 }, { name:'لب بنجر مجفف', dm:90 },
-    { name:'لب بنجر مبلل', dm:25 }, { name:'مولاس', dm:75 },
-    { name:'سيلاج ذرة', dm:33 }, { name:'برسيم أخضر', dm:18 },
-    { name:'دريس برسيم', dm:90 }, { name:'قش/تبن', dm:90 },
-    { name:'بذرة قطن كاملة', dm:92 }, { name:'كسب قطن', dm:92 },
-    { name:'كسب نخيل', dm:90 }, { name:'مخلوط معادن/فيتامينات', dm:95 },
+    { name:'كسب قطن', dm:92 }, { name:'كسب نخيل', dm:90 },
+    { name:'كسب فول سوداني', dm:90 }, { name:'كسب سمسم', dm:90 },
+    { name:'كسب كتان', dm:90 },
+
+    { name:'بذرة قطن كاملة', dm:92 }, { name:'قشور بذرة قطن (Hulls)', dm:90 },
+
+    { name:'سيلاج ذرة', dm:33 }, { name:'سيلاج سورجم', dm:30 },
+    { name:'برسيم أخضر', dm:18 }, { name:'دريس برسيم', dm:90 },
+    { name:'دريس حشيشة/نجيل', dm:90 }, { name:'تبن قمح', dm:90 },
+    { name:'قش أرز', dm:90 },
+
+    { name:'دهون محمية', dm:99 }, { name:'زيت نباتي علفي', dm:99 },
+    { name:'يوريا علفية', dm:100 }, { name:'حجر جيري (كالسيوم)', dm:100 },
+    { name:'فوسفات ثنائي الكالسيوم (DCP)', dm:100 }, { name:'ملح طعام', dm:100 },
+    { name:'بيكربونات صوديوم', dm:100 }, { name:'أكسيد ماغنسيوم', dm:100 },
+    { name:'بنتونيت', dm:100 }, { name:'خميرة حية/مستنبت خمائري', dm:95 },
+    { name:'مخلوط معادن/فيتامينات', dm:95 },
   ];
 
   // تعبئة قائمة الـ preset
@@ -369,6 +395,18 @@
     const idx = parseInt(presetSel.value); if (isNaN(idx)) return;
     const f = FEEDS[idx]; addRow({ name:f.name, dm:f.dm, price:'', kg:'', pct:'', cat: guessCat(f.name) }); recalc();
   };
+  if (addBySearchBtn){
+    const addByName = ()=>{
+      const q = (feedSearch?.value || '').trim();
+      if(!q) return;
+      const f = FEEDS.find(x=> x.name === q)
+            || FEEDS.find(x=> x.name.includes(q))
+            || FEEDS.find(x=> x.name.toLowerCase().includes(q.toLowerCase()));
+      if (f){ addRow({ name:f.name, dm:f.dm, price:'', kg:'', pct:'', cat: guessCat(f.name) }); recalc(); feedSearch.value=''; }
+    };
+    addBySearchBtn.addEventListener('click', addByName);
+    feedSearch?.addEventListener('keydown', e=>{ if(e.key==='Enter') addByName(); });
+  }
   clearBtn.onclick = ()=>{ if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); } };
 
   function updateModeUI(){
@@ -447,9 +485,3 @@
 </script>
 </body>
 </html>
-
-
- 
-
-
-   
