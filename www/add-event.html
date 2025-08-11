@@ -184,83 +184,85 @@
 
     // تهيئة Firebase بمرونة (توافق قبل/بعد التوحيد)
     async function setupFirebase(){
+      // نحاول أولًا استيراد وحدة التهيئة الجاهزة داخل www/js/
       try {
-        const mod = await import('./js/firebase-config.js'); // مسار صحيح داخل www/
+        const mod = await import('./js/firebase-config.js?v=2');
+        // حالة 1: الملف يصدّر db, auth مباشرة
         if (mod?.db && mod?.auth){
+          console.log('[Firebase] using ./js/firebase-config.js (db/auth exports)');
           return { db: mod.db, auth: mod.auth };
         }
+        // حالة 2: الملف يصدّر firebaseConfig فقط
+        if (mod?.firebaseConfig){
+          console.log('[Firebase] using ./js/firebase-config.js (firebaseConfig)');
+          const app  = initializeApp(mod.firebaseConfig);
+          const db   = getFirestore(app);
+          const auth = getAuth(app);
+          return { db, auth };
+        }
       } catch (e) {
-        // نعرض رسالة واضحة ونكمّل بدون تعطيل الصفحة
+        console.warn('[Firebase] import ./js/firebase-config.js failed', e);
       }
-      console.error('Firebase config not found at ./js/firebase-config.js');
-      warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكّد من وجود ./js/firebase-config.js";
+
+      // محاولة ثانية: config.js في الجذر
+      try {
+        const { firebaseConfig } = await import('./config.js?v=2');
+        console.log('[Firebase] using ./config.js');
+        const app  = initializeApp(firebaseConfig);
+        const db   = getFirestore(app);
+        const auth = getAuth(app);
+        return { db, auth };
+      } catch(e2){
+        console.warn('[Firebase] import ./config.js failed', e2);
+      }
+
+      console.error('Firebase config not found at ./js/firebase-config.js nor ./config.js');
+      warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكّد من وجود ./js/firebase-config.js أو ./config.js";
       return { db:null, auth:null };
     }
 
     // ربط الأزرار
     function wireButtons(db, auth){
-      const group = document.getElementById("eventTypeGroup");
-      if(!group) return;
-      // إزالة مستمعين قدام
-      const clone = group.cloneNode(true);
-      group.parentNode.replaceChild(clone, group);
+      const container = document.getElementById("eventTypeGroup");
+      if(!container) return;
 
-      const btns    = clone.querySelectorAll('button');
-      const trimBtn = clone.querySelector('button[data-page="trimming.html"]');
+      // تفويض حدث واحد يغطي كل الأزرار (أضمن من الاستنساخ)
+      container.addEventListener('click', async (ev)=>{
+        const btn = ev.target.closest('button');
+        if (!btn || !container.contains(btn)) return;
 
-      // زر تقليم الحوافر — تسجيل فوري + رسالة داخلية
-      if (trimBtn){
-        trimBtn.addEventListener('click', async ()=>{
-          const ctx = getContextOrWarn();
-          if (!ctx) return;
-          try{
-            if (db){
-              await addDoc(collection(db, "events"), {
-                userId: auth?.currentUser?.uid || null,
-                animalId: ctx.animalId,
-                animalNumber: ctx.animalId,
-                eventDate: ctx.eventDate,
-                type: "تقليم الحوافر",
-                eventType: "تقليم الحوافر",
-                createdAt: serverTimestamp()
-              });
-            }
-            const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-            if (!goAgain) location.href = "dashboard.html";
-          }catch(err){
-            console.error(err);
-            warning.textContent = "❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.";
+        const ctx = getContextOrWarn();
+        if (!ctx) return;
+
+        const page   = btn.getAttribute('data-page');
+        const isTrim = page === 'trimming.html';
+
+        try{
+          if (db){
+            await addDoc(collection(db, 'events'), {
+              userId: auth?.currentUser?.uid || null,
+              animalId: ctx.animalId,
+              animalNumber: ctx.animalId,
+              eventDate: ctx.eventDate,
+              type: isTrim ? 'تقليم الحوافر' : undefined,
+              eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
+              createdAt: serverTimestamp()
+            });
           }
-        });
-      }
-
-      // باقي الأزرار — تسجيل حدث عام ثم الانتقال
-      btns.forEach(btn=>{
-        if (btn === trimBtn) return;
-        btn.addEventListener('click', async ()=>{
-          const ctx = getContextOrWarn();
-          if (!ctx) return;
-          try{
-            if (db){
-              await addDoc(collection(db, "events"), {
-                userId: auth?.currentUser?.uid || null,
-                animalId: ctx.animalId,
-                animalNumber: ctx.animalId,
-                eventDate: ctx.eventDate,
-                eventType: btn.textContent.trim(),
-                createdAt: serverTimestamp()
-              });
-            }
-          }catch(err){
-            console.error(err);
-            // لو فشل الحفظ نكمل تنقّلًا
-          }finally{
-            const page = btn.getAttribute('data-page');
-            if (page){
-              location.href = `${page}?animalId=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
-            }
+        }catch(err){
+          console.error(err);
+          if (isTrim) {
+            warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
           }
-        });
+        }
+
+        // التنقّل/الرسالة الداخلية
+        if (isTrim){
+          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
+          if (!goAgain) location.href = 'dashboard.html';
+        } else if (page){
+          location.href = `${page}?animalId=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
+        }
       });
     }
 
