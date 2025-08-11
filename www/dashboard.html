@@ -7,7 +7,7 @@
   <style>
     body{background:#fff9db;font-family:Arial,sans-serif;padding:20px;color:#1b5e20;margin:0}
     h1{text-align:center;font-size:28px;font-weight:bold;margin:0 0 10px}
-    /* شريط مؤشرات بسيط للقطيع */
+    /* شريط مؤشرات للقطيع كله */
     .smartbar{max-width:980px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #c5e1a5;background:#f1f8e9}
     /* الشبكة الأصلية */
@@ -20,7 +20,7 @@
 <body>
   <h1>📊 لوحة التحكم - مربيك</h1>
 
-  <!-- مؤشرات القطيع كله -->
+  <!-- مؤشرات القطيع -->
   <div class="smartbar">
     <span class="chip" id="chipDay">📅 اليوم: —</span>
     <span class="chip">🥛 لبن اليوم: <b id="chipMilk">—</b> لتر</span>
@@ -29,4 +29,134 @@
     <span class="chip">💰 صافي اليوم: <b id="chipNet">—</b></span>
   </div>
 
-  <!-- شبكة الأزرار كاملة كما ه
+  <!-- شبكة الأزرار كاملة -->
+  <div class="dashboard">
+    <div class="card" onclick="location.href='add-animal.html'">
+      <span class="icon">➕</span>تسجيل حيوان جديد
+    </div>
+    <div class="card" onclick="location.href='animal-list.html'">
+      <span class="icon">📋</span>قائمة الحيوانات
+    </div>
+    <div class="card" onclick="location.href='add-event.html'">
+      <span class="icon">🗓️</span>تسجيل الأحداث
+    </div>
+    <div class="card" onclick="location.href='alerts.html'">
+      <span class="icon">🔔</span>التنبيهات الذكية
+    </div>
+    <div class="card" onclick="return openCowCardSmart(event)">
+      <span class="icon">🆔</span>البطاقة الذكية
+    </div>
+    <div class="card" onclick="location.href='daily-milk.html'">
+      <span class="icon">🥛</span>تسجيل اللبن اليومي
+    </div>
+    <div class="card" onclick="location.href='milk-reports.html'">
+      <span class="icon">📊</span>تقارير اللبن
+    </div>
+    <div class="card" onclick="location.href='farm-economy.html'">
+      <span class="icon">💰</span>اقتصاد المزرعة
+    </div>
+    <div class="card" onclick="location.href='evaluation.html'">
+      <span class="icon">📈</span>تقييم الحيوانات
+    </div>
+    <div class="card" onclick="location.href='smart-feeding.html'">
+      <span class="icon">🍽️</span>التغذية الذكية
+    </div>
+  </div>
+
+<script type="module">
+  // ===== عرض تاريخ اليوم
+  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  try { document.getElementById('chipDay').textContent = '📅 اليوم: ' + new Date(todayLocal()).toLocaleDateString('ar-EG'); }
+  catch { document.getElementById('chipDay').textContent = '📅 اليوم: ' + todayLocal(); }
+  const fmt = n => (n===null||n===undefined||isNaN(n)) ? '—' : new Intl.NumberFormat('ar-EG',{maximumFractionDigits:1}).format(n);
+
+  // ===== زر البطاقة الذكية (يفتح مباشرة أو يظهر Mini-Prompt)
+  window.openCowCardSmart = function(e){
+    e.preventDefault();
+    const qs = new URLSearchParams(location.search);
+    const id = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
+    if (id){
+      localStorage.setItem('lastAnimalId', id);
+      location.href = `cow-card.html?animalId=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}`;
+      return false;
+    }
+    if (document.getElementById('quickPrompt')) return false;
+    const box = document.createElement('div');
+    box.id = 'quickPrompt';
+    box.style.cssText = 'position:fixed;inset:auto 12px 12px 12px;z-index:9999;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center';
+    box.innerHTML = `
+      <span style="font-weight:bold;color:#2e7d32">رقم الحيوان:</span>
+      <input id="qpInput" type="text" inputmode="numeric" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px" placeholder="مثال: 105">
+      <button id="qpGo" style="padding:10px 14px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-weight:bold">فتح</button>
+      <button id="qpClose" style="padding:10px 14px;border:1px solid #2e7d32;border-radius:8px;background:#fff;color:#2e7d32;font-weight:bold">إلغاء</button>
+    `;
+    document.body.appendChild(box);
+    const input = box.querySelector('#qpInput');
+    const go = ()=>{ const v=input.value.trim(); if(v){ box.remove(); localStorage.setItem('lastAnimalId', v); location.href = `cow-card.html?animalId=${encodeURIComponent(v)}&number=${encodeURIComponent(v)}`; } else input.focus(); };
+    box.querySelector('#qpGo').onclick = go;
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+    box.querySelector('#qpClose').onclick = ()=> box.remove();
+    input.focus();
+    return false;
+  };
+
+  // ===== مؤشرات القطيع (Firestore) — خفيفة وبسيطة
+  try {
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, collection, getDocs, query, where, Timestamp } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { getAuth, onAuthStateChanged } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+
+    const mod = await import('./js/firebase-config.js'); // تأكد أن الملف موجود
+    const app = initializeApp(mod.firebaseConfig);
+    const db  = getFirestore(app);
+    const auth= getAuth(app);
+
+    onAuthStateChanged(auth, async (user)=>{
+      if (!user) return;
+
+      const now = new Date();
+      const startToday = new Date(now); startToday.setHours(0,0,0,0);
+      const tsToday = Timestamp.fromDate(startToday);
+      const ts30    = Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()-30));
+
+      // 1) لبن اليوم (dailyMilk ثم events كـ fallback)
+      let milkLiters=0, milkEntries=0;
+      try{
+        const q1 = query(collection(db,'dailyMilk'), where('userId','==',user.uid), where('createdAt','>=', tsToday));
+        (await getDocs(q1)).forEach(doc=>{ const d=doc.data(); const n=parseFloat(d.amount||d.liters||0)||0; milkLiters+=n; milkEntries++; });
+      }catch{}
+      if (milkEntries===0){
+        const q2 = query(collection(db,'events'), where('userId','==',user.uid), where('createdAt','>=', tsToday));
+        (await getDocs(q2)).forEach(doc=>{ const d=doc.data(); const t=(d.type||'')+(d.eventType||''); if(/لبن|milk/i.test(t)){ const n=parseFloat(d.amount||d.liters||0)||0; milkLiters+=n; milkEntries++; }});
+      }
+      document.getElementById('chipMilk').textContent = fmt(milkLiters);
+
+      // 2) تلقيحات + 3) ولادات (30 يوم) — قطيع كله
+      let ins=0, cal=0;
+      const q3 = query(collection(db,'events'), where('userId','==',user.uid), where('createdAt','>=', ts30));
+      (await getDocs(q3)).forEach(doc=>{
+        const t = ((doc.data().type||'') + ' ' + (doc.data().eventType||'')).toLowerCase();
+        if (t.includes('تلقيح') || t.includes('insemin')) ins++;
+        else if (t.includes('ولاد') || t.includes('calv')) cal++;
+      });
+      document.getElementById('chipIns').textContent  = fmt(ins);
+      document.getElementById('chipCalv').textContent = fmt(cal);
+
+      // 4) صافي اليوم = (إيراد اللبن) – (تكلفة علف القطيع)
+      const price = parseFloat(localStorage.getItem('econPrice')||'0')||0; // سعر اللتر
+      const feedC = parseFloat(localStorage.getItem('econFeed') ||'0')||0; // تكلفة/بقرة/يوم
+      const herd  = parseInt  (localStorage.getItem('econHerd') ||'0')||0; // حجم القطيع
+      const revenue = price * milkLiters;
+      const feed    = feedC * herd;
+      const net     = revenue - feed;
+      document.getElementById('chipNet').textContent = (revenue||feed) ? fmt(net) : '—';
+    });
+  } catch(e) {
+    // لو Firebase غير جاهز، نسيب الشرطات — الواجهة لا تتعطل
+    console.warn('Smartbar KPIs disabled:', e);
+  }
+</script>
+</body>
+</html>
