@@ -140,7 +140,51 @@
     el.addEventListener('click', handleCowCardClick);
   });
 </script>
+<script type="module">
+  // امسك أي زر/لينك يفتح بطاقة الحيوان
+  const targets = document.querySelectorAll(
+    '[data-page="cow-card.html"], a[href$="cow-card.html"], a[href*="cow-card.html"], #btnCowCard'
+  );
+
+  function openCard(id){
+    if (!id) return;
+    localStorage.setItem('lastAnimalId', id);
+    // نحط كل الأسماء المحتملة عشان التوافق
+    const qs = `animalId=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}&Pid=${encodeURIComponent(id)}`;
+    location.href = `cow-card.html?${qs}`;
+  }
+
+  function askForId(){
+    if (document.getElementById('quickPrompt')) return;
+    const box = document.createElement('div');
+    box.id = 'quickPrompt';
+    box.style.cssText = 'position:fixed;inset:auto 12px 12px 12px;z-index:9999;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center';
+    box.innerHTML = `
+      <span style="font-weight:bold;color:#2e7d32">رقم الحيوان:</span>
+      <input id="qpInput" type="text" inputmode="numeric" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px" placeholder="مثال: 105">
+      <button id="qpGo" style="padding:10px 14px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-weight:bold">فتح البطاقة</button>
+      <button id="qpClose" style="padding:10px 14px;border:1px solid #2e7d32;border-radius:8px;background:#fff;color:#2e7d32;font-weight:bold">إلغاء</button>
+    `;
+    document.body.appendChild(box);
+    const input = box.querySelector('#qpInput');
+    const go    = () => { const v = input.value.trim(); if (v){ box.remove(); openCard(v); } else input.focus(); };
+    box.querySelector('#qpGo').onclick = go;
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    box.querySelector('#qpClose').onclick = () => box.remove();
+    input.focus();
+  }
+
+  function handle(e){
+    e.preventDefault();
+    const qs  = new URLSearchParams(location.search);
+    const id  = qs.get('animalId') || qs.get('number') || localStorage.getItem('lastAnimalId') || '';
+    id ? openCard(id) : askForId();
+  }
+
+  targets.forEach(el => el.addEventListener('click', handle));
+</script>
 
 </body>
 </html>
+
 
