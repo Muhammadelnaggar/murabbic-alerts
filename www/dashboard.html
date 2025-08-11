@@ -6,40 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     body{background:#fff9db;font-family:Arial,sans-serif;padding:20px;color:#1b5e20;margin:0}
-    h1{margin:0 0 12px;text-align:center;font-size:28px;font-weight:bold}
-    /* ========= مربيّك النابض (Hero) ========= */
-    .pulse-card{
-      max-width:980px;margin:0 auto 16px;position:relative;overflow:hidden;
-      background:linear-gradient(135deg,#eafbe7,#fffde7);
-      border:2px solid #c5e1a5;border-radius:16px;padding:16px;
-      box-shadow:0 6px 18px rgba(46,125,50,.12)
-    }
-    .pulse-wrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-    .pulse{
-      width:68px;height:68px;border-radius:50%;
-      background:#2e7d32;position:relative;box-shadow:0 0 0 rgba(46,125,50,.4);
-      animation:pulse 1.6s infinite
-    }
-    .pulse::after{
-      content:"";position:absolute;inset:18px;background:#fff;border-radius:50%;
-      box-shadow:inset 0 0 0 2px #1b5e20
-    }
-    @keyframes pulse{
-      0%{box-shadow:0 0 0 0 rgba(46,125,50,.4)}
-      70%{box-shadow:0 0 0 18px rgba(46,125,50,0)}
-      100%{box-shadow:0 0 0 0 rgba(46,125,50,0)}
-    }
-    .pulse-title{font-weight:900;color:#2e7d32}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
-      border:1px solid #8bc34a;background:#dcedc8;color:#1b5e20;font-size:14px}
-    .hero-actions{margin-inline-start:auto;display:flex;gap:8px;flex-wrap:wrap}
-    .btn{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
-    .btn-primary{background:#2e7d32;color:#fff}
-    .btn-ghost{background:#fff;color:#2e7d32;border:1px solid #2e7d32}
-    /* ========= الشبكة ========= */
+    h1{text-align:center;font-size:28px;font-weight:bold;margin:0 0 10px}
+    /* شريط ذكي صغير وبسيط */
+    .smartbar{max-width:980px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #c5e1a5;background:#f1f8e9}
+    /* الشبكة القديمة كما هي */
     .dashboard{max-width:980px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:15px}
-    .card{background:#eafbe7;padding:20px;border-radius:12px;text-align:center;font-weight:bold;cursor:pointer;
-      border:2px solid #c5e1a5;box-shadow:2px 2px 5px rgba(0,0,0,.08);font-size:18px}
+    .card{background:#eafbe7;padding:20px;border-radius:12px;text-align:center;font-size:18px;font-weight:bold;cursor:pointer;border:2px solid #c5e1a5;box-shadow:2px 2px 5px rgba(0,0,0,.1)}
     .card:hover{background:#dcedc8}
     .icon{font-size:30px;margin-bottom:10px;display:block}
   </style>
@@ -47,71 +20,33 @@
 <body>
   <h1>📊 لوحة التحكم - مربيك</h1>
 
-  <!-- ========= مُرَبّيك النابض (فايرال) ========= -->
-  <section class="pulse-card" id="murabbikPulse">
-    <div class="pulse-wrap">
-      <div class="pulse" aria-hidden="true"></div>
-      <div>
-        <div class="pulse-title">مُرَبّيك النابض</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-          <span class="badge" id="lastCowBadge">🐄 آخر حيوان: —</span>
-          <span class="badge" id="todayBadge">📅 اليوم: —</span>
-          <span class="badge" id="quickHint">⚡ نصيحة: سجّل حدثًا مهمًا اليوم</span>
-        </div>
-      </div>
-      <div class="hero-actions">
-        <button class="btn btn-primary" id="pulseOpenCard">فتح البطاقة</button>
-        <button class="btn btn-ghost" id="pulseAddEvent">تسجيل حدث اليوم</button>
-        <button class="btn btn-ghost" id="pulseShare">مشاركة 💬</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========= الشبكة كما هي ========= -->
-  <div class="dashboard">
-    <div class="card" onclick="location.href='add-animal.html'"><span class="icon">➕</span>تسجيل حيوان جديد</div>
-    <div class="card" onclick="location.href='animal-list.html'"><span class="icon">📋</span>قائمة الحيوانات</div>
-    <div class="card" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>تسجيل الأحداث</div>
-    <div class="card" onclick="location.href='alerts.html'"><span class="icon">🔔</span>التنبيهات الذكية</div>
-
-    <!-- مهم: عرّف زر البطاقة بمعرّف ليستفيد من Mini-Prompt -->
-    <div class="card" id="btnCowCard"><span class="icon">🆔</span>البطاقة الذكية</div>
-
-    <div class="card" onclick="location.href='daily-milk.html'"><span class="icon">🥛</span>تسجيل اللبن اليومي</div>
-    <div class="card" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-    <div class="card" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعة</div>
-    <div class="card" onclick="location.href='evaluation.html'"><span class="icon">📈</span>تقييم الحيوانات</div>
-    <div class="card" onclick="location.href='smart-feeding.html'"><span class="icon">🍽️</span>التغذية الذكية</div>
+  <!-- الشريط الذكي -->
+  <div class="smartbar" id="smartbar">
+    <span class="chip" id="chipDay">📅 اليوم: —</span>
+    <span class="chip">🥛 لبن اليوم: <b id="chipMilk">—</b> لتر</span>
+    <span class="chip">📅 تلقيحات (30ي): <b id="chipIns">—</b></span>
+    <span class="chip">💰 صافي تقديري: <b id="chipNet">—</b></span>
   </div>
 
-<script type="module">
-  // ===== أدوات صغيرة
-  const todayLocal = () => {
-    const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  };
+  <!-- شبكة الكروت الأصلية (لم أحذف شيئًا) -->
+  <div class="dashboard">
+    <div class="card" onclick="location.href='add-animal.html'">
+      <span class="icon">➕</span>تسجيل حيوان جديد
+    </div>
+    <div class="card" onclick="location.href='animal-list.html'">
+      <span class="icon">📋</span>قائمة الحيوانات
+    </div>
+    <div class="card" onclick="location.href='add-event.html'">
+      <span class="icon">🗓️</span>تسجيل الأحداث
+    </div>
+    <div class="card" onclick="location.href='alerts.html'">
+      <span class="icon">🔔</span>التنبيهات الذكية
+    </div>
 
-  // ===== تهيئة نبض المربيك
-  const lastCowBadge = document.getElementById('lastCowBadge');
-  const todayBadge   = document.getElementById('todayBadge');
-  const openCardBtn  = document.getElementById('pulseOpenCard');
-  const addEventBtn  = document.getElementById('pulseAddEvent');
-  const shareBtn     = document.getElementById('pulseShare');
+    <!-- غيّرت ده فقط: بدل onclick حطّيت id علشان Mini-Prompt لو مفيش رقم -->
+    <div class="card" id="btnCowCard">
+      <span class="icon">🆔</span>البطاقة الذكية
+    </div>
 
-  const lastId = new URLSearchParams(location.search).get('animalId') || localStorage.getItem('lastAnimalId') || '';
-  lastCowBadge.textContent = '🐄 آخر حيوان: ' + (lastId || '—');
-  try { todayBadge.textContent = '📅 اليوم: ' + new Date(todayLocal()).toLocaleDateString('ar-EG'); } catch { todayBadge.textContent = '📅 اليوم: ' + todayLocal(); }
-
-  // ===== Mini-Prompt لفتح البطاقة
-  function openCowCardWith(id){
-    if (!id) return;
-    localStorage.setItem('lastAnimalId', id);
-    const qs = `animalId=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}`;
-    location.href = `cow-card.html?${qs}`;
-  }
-  function showMiniPrompt(){
-    if (document.getElementById('quickPrompt')) return;
-    const box = document.createElement('div');
-    box.id = 'quickPrompt';
-    box.style.cssText = `
-      position:fixed;inset:auto
+    <div class="card" onclick="location.href='daily-milk.html'">
+      <s
