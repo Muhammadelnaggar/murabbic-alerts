@@ -35,7 +35,14 @@
 <body>
 <div class="wrap">
   <h1>🧠 التغذية الذكية — تحليل التركيبة</h1>
-  $1
+  <div class="row" id="hdrInfo">
+    <span class="pill">🐄 الهدف: <b id="who">—</b></span>
+    <span class="pill">📅 تاريخ التركيبة: <b id="date">—</b></span>
+    <span class="pill">⚙️ طريقة الإدخال: <b id="mode">—</b></span>
+    <span class="pill">🐃 النوع: <b id="species">—</b></span>
+    <span class="pill">🕒 DIM: <b id="dim">—</b></span>
+    <span class="pill">🤰 DCC: <b id="dcc">—</b></span>
+  </div>
 
   <!-- مؤشر جودة التغذية -->
   <div class="card" id="qualityCard">
@@ -48,7 +55,7 @@
     </div>
   </div>
 
-  $2
+  <div class="card">
     <div class="grid">
       <div class="kpi"><span class="muted">إجمالي كجم DM/رأس</span><b id="kpiDM">—</b></div>
       <div class="kpi"><span class="muted">تكلفة/رأس/يوم</span><b id="kpiCost">—</b></div>
@@ -284,7 +291,24 @@
       const mixPriceDM = dmFracMix>0 ? (asFedMix/dmFracMix) : 0;
       el('kpiMix').textContent = mixPriceDM? nf(mixPriceDM):'—';
       el('kpiDmpct').textContent = dmFracMix? nf(dmFracMix*100)+'%':'—';
-      if (Math.abs(rows.reduce((a,b)=>a+(b.pct||0),0) - 100) > 0.5) setMsg('أدخل كمية الخلطة as-fed/رأس لحساب DM والتكلفة والقيم الغذائية.');
+      if (Math.abs(rows.reduce((a,b)=>a+(b.pct||0),0) - 100) > 0.5) setMsg('⚠️ مجموع النسب لا يساوي 100%');
+
+      if (totalAf>0){
+        rows.forEach(r=>{
+          const kg = totalAf * (r.pct||0)/100; r.kg = kg;
+          const kgDM = kg * (r.dm||0)/100; r.kgDM = kgDM;
+          const pDM = r.dm>0? (r.price/(r.dm/100)) : 0; r.cost = (kgDM/1000)*pDM;
+          const nut = getNut(r.name, r.cat);
+          cpKg   += kgDM * (nut.cp/100);
+          fatKg  += kgDM * (nut.fat/100);
+          energyMcal += kgDM * (nut.nel);
+          asFedTotal += kg;
+          if ((r.cat||'conc')==='rough') roughDM+=kgDM; else concDM+=kgDM;
+          totDM+=kgDM; totCost+=r.cost; addRow(r);
+        });
+      } else {
+        rows.forEach(r=> addRow(r));
+        setMsg('أدخل كمية الخلطة as-fed/رأس لحساب DM والتكلفة والقيم الغذائية.');
       }
     } else { // split
       // concentrate block from percents + concKgAf
