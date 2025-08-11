@@ -116,28 +116,48 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
+  // عناصر DOM
+  const form = document.getElementById("dryOffForm");
+  const idEl = document.getElementById("animal-id");
+  const dateEl = document.getElementById("date");
+
+  function todayYYYYMMDD(){
+    const d = new Date();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
   window.onload = function () {
-    const storedAnimalId = localStorage.getItem("lastAnimalId");
-    if (storedAnimalId) {
-      document.getElementById("animal-id").value = storedAnimalId;
-      document.getElementById("animal-id").readOnly = true;
+    const qp = new URLSearchParams(location.search);
+    const qpId = qp.get('animalId') || qp.get('number') || "";
+
+    const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+    const id = storedAnimalId || qpId;
+
+    if (id) {
+      idEl.value = id;
+      idEl.readOnly = true;
     } else {
       alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
       window.location.href = "add-animal.html";
+      return;
+    }
+
+    if(!dateEl.value){
+      dateEl.value = todayYYYYMMDD();
     }
   };
-
-  const form = document.getElementById("dryOffForm");
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const data = {
-      animalId: document.getElementById("animal-id").value,
-      dryOffDate: document.getElementById("date").value,
-      reason: document.querySelector('input[name="reason"]:checked')?.value,
-      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value,
-      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value,
+      animalId: idEl.value.trim(),
+      dryOffDate: dateEl.value,
+      reason: document.querySelector('input[name="reason"]:checked')?.value || null,
+      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
+      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
       type: "تجفيف",
       isSmartAlert: true,
       alertRule: "تجفيف",
@@ -150,6 +170,9 @@
     }
 
     try {
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn) btn.disabled = true;
+
       await addDoc(collection(db, "events"), data);
 
       const isNewUser = localStorage.getItem("isNewUser") === "true";
@@ -165,8 +188,9 @@
         }
       } else {
         alert("✅ تم التسجيل بنجاح");
-setTimeout(() => {
-        window.location.href = "dashboard.html";
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 300);
       }
     } catch (error) {
       console.error("❌ خطأ:", error);
@@ -177,4 +201,3 @@ setTimeout(() => {
 
 </body>
 </html>
-
