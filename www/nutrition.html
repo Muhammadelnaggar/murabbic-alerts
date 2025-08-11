@@ -52,9 +52,20 @@
   <h1>📄 تسجيل تركيبة التغذية</h1>
 
   <div class="info">
-    <span class="pill">🐄 الحيوان: <b id="animalInfo">—</b></span>
+    <span class="pill">🐄 الحيوان/المجموعة: <b id="animalInfo">—</b></span>
     <span class="pill">📅 التاريخ: <b id="dateInfo">—</b></span>
-    <span class="pill">🛠️ الوضع: <b id="modeInfo">—</b></span>
+  </div>
+  <div class="info">
+    <span class="pill">🕒 أيام الحليب: <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
+    <span class="pill">🐃 النوع:
+      <select id="ctxSpecies"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
+    </span>
+    <span class="pill">🥛 متوسط إنتاج/رأس: <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="width:90px"></span>
+    <span class="pill"><label><input id="ctxEarlyDry" type="checkbox"> جاف مبكّر</label></span>
+    <span class="pill"><label><input id="ctxCloseUp" type="checkbox"> تحضير ولادة</label></span>
+    <span class="pill">🤰 حالة الحمل:
+      <select id="ctxPreg"><option value="">—</option><option value="عشار">عشار</option><option value="فارغة">فارغة</option></select>
+    </span>
   </div>
   <div class="warning" id="warn"></div>
 
@@ -158,7 +169,15 @@
 
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
-  const modeInfo= document.getElementById('modeInfo');
+  const modeInfo= document.getElementById('modeInfo'); // قد لا يوجد بعد تعديل الواجهة
+  // عناصر سياق القطيع
+  const ctxDIM = document.getElementById('ctxDIM');
+  const ctxSpecies = document.getElementById('ctxSpecies');
+  const ctxAvgMilk = document.getElementById('ctxAvgMilk');
+  const ctxEarlyDry = document.getElementById('ctxEarlyDry');
+  const ctxCloseUp = document.getElementById('ctxCloseUp');
+  const ctxPreg = document.getElementById('ctxPreg');
+
   const presetSel = document.getElementById('preset');
   const addPresetBtn = document.getElementById('addPreset');
   const clearBtn = document.getElementById('clearAll');
@@ -188,8 +207,18 @@
 
   const qp = new URLSearchParams(location.search);
   const animalId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
+  const groupName = qp.get('group') || '';
   const eventDate= qp.get('date') || todayLocal();
-  document.getElementById('animalInfo').textContent = animalId || 'غير محدد';
+  // تعبئة سياق القطيع من الرابط إن وُجد
+  ctxDIM.value      = qp.get('dim') || '';
+  ctxSpecies.value  = qp.get('species') || '';
+  ctxAvgMilk.value  = qp.get('avgMilk') || '';
+  ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
+  if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
+  if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
+
+  document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
+  try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
   // ===== لستة الخامات (عامية مربيك) =====
@@ -410,7 +439,7 @@
   clearBtn.onclick = ()=>{ if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); } };
 
   function updateModeUI(){
-    const mode = modeSel.value; modeInfo.textContent = mode;
+    const mode = modeSel.value; if (modeInfo) modeInfo.textContent = mode;
     splitBox.style.display = (mode==='split')? '' : 'none';
     // Show/hide columns
     const showCols = new Set(
@@ -471,6 +500,15 @@
         eventType: 'تغذية',
         nutrition: { mode, rows, concKgAf: concKgInput.value||null },
         kpis,
+        context: {
+          group: groupName || null,
+          species: ctxSpecies?.value || null,
+          daysInMilk: ctxDIM?.value ? parseInt(ctxDIM.value) : null,
+          avgMilkKg: ctxAvgMilk?.value ? parseFloat(ctxAvgMilk.value) : null,
+          earlyDry: !!(ctxEarlyDry?.checked),
+          closeUp: !!(ctxCloseUp?.checked),
+          pregnancyStatus: ctxPreg?.value || null,
+        },
         createdAt: serverTimestamp()
       });
       const again = await showNotice(`✅ تم حفظ تركيبة التغذية للحيوان ${animalId}`);
