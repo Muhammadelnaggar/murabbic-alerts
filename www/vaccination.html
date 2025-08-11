@@ -11,10 +11,11 @@
     .context{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 12px}
     .card{max-width:520px;margin:0 auto;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:16px}
     label{display:block;margin-top:12px;font-weight:bold;color:#2e7d32}
-    input,select,textarea{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:6px;font-size:16px;box-sizing:border-box}
-    textarea{min-height:90px;resize:vertical}
+    input,select{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:6px;font-size:16px;box-sizing:border-box}
     .row{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:640px){.row-2{grid-template-columns:1fr 1fr}}
+    .radio-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+    .radio-group label{display:flex;align-items:center;gap:8px;background:#dcedc8;border:1px solid #8bc34a;border-radius:8px;padding:8px 12px;cursor:pointer}
     .actions{position:sticky;bottom:0;left:0;right:0;background:rgba(255,255,255,.9);backdrop-filter:saturate(1.1) blur(2px);border-top:1px solid #c5e1a5;padding:10px 0;margin-top:14px}
     .actions .wrap{max-width:520px;margin:0 auto;display:flex;gap:8px}
     button{appearance:none;border:0;border-radius:8px;padding:12px 14px;font-weight:bold;font-size:16px;cursor:pointer}
@@ -34,53 +35,39 @@
 
   <div class="card">
     <form id="vaccinationForm">
-      <div class="row">
+      <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
           <input id="animalId" type="text" placeholder="مثال: 105"/>
         </div>
         <div>
-          <label for="date">تاريخ التحصين</label>
+          <label for="date">التاريخ</label>
           <input id="date" type="date"/>
         </div>
       </div>
 
-      <div class="row row-2">
+      <div class="row">
         <div>
-          <label for="vaccine">نوع اللقاح</label>
-          <input id="vaccine" list="vaccines" placeholder="مثال: الحمى القلاعية"/>
-          <datalist id="vaccines">
-            <option value="الحمى القلاعية (FMD)"></option>
-            <option value="الجلد العقدي (LSD)"></option>
-            <option value="التسمم المعوي (Enterotoxemia)"></option>
-            <option value="البروسيلا (Brucella)"></option>
-          </datalist>
-        </div>
-        <div>
-          <label for="dose">الجرعة</label>
-          <input id="dose" type="text" placeholder="مثال: 2 مل"/>
-        </div>
-      </div>
-
-      <div class="row row-2">
-        <div>
-          <label for="route">طريق الإعطاء</label>
-          <select id="route">
-            <option value="IM">عضلي (IM)</option>
-            <option value="SC">تحت الجلد (SC)</option>
-            <option value="Oral">فموي</option>
-            <option value="Spray">رش</option>
-            <option value="Other">أخرى</option>
+          <label for="vaccine">نوع التحصين</label>
+          <select id="vaccine">
+            <option value="" selected disabled>اختر نوع التحصين</option>
+            <option value="الحمى القلاعية (FMD)">الحمى القلاعية (FMD)</option>
+            <option value="الجلد العقدي (LSD)">الجلد العقدي (LSD)</option>
+            <option value="التسمم المعوي (Clostridial)">التسمم المعوي (Clostridial)</option>
+            <option value="البروسيلا (Brucella)">البروسيلا (Brucella)</option>
+            <option value="IBR">IBR</option>
+            <option value="BVD">BVD</option>
+            <option value="الجمرة الخبيثة (Anthrax)">الجمرة الخبيثة (Anthrax)</option>
+            <option value="الباستريلا/التهاب رئوي (HS/Pasteurella)">الباستريلا/التهاب رئوي (HS/Pasteurella)</option>
           </select>
         </div>
-        <div>
-          <label for="nextDue">موعد الجرعة/التحصين القادم</label>
-          <input id="nextDue" type="date"/>
-        </div>
       </div>
 
-      <label for="notes">ملاحظات</label>
-      <textarea id="notes" placeholder="تفاصيل إضافية إن وجدت..."></textarea>
+      <label>نوع الجرعة</label>
+      <div class="radio-group">
+        <label><input type="radio" name="doseType" value="primary"/> أولية</label>
+        <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
+      </div>
 
       <div id="warn" class="warn"></div>
 
@@ -113,10 +100,6 @@
     const animalIdEl= document.getElementById('animalId');
     const dateEl    = document.getElementById('date');
     const vaccineEl = document.getElementById('vaccine');
-    const doseEl    = document.getElementById('dose');
-    const routeEl   = document.getElementById('route');
-    const nextDueEl = document.getElementById('nextDue');
-    const notesEl   = document.getElementById('notes');
 
     const saveBtn   = document.getElementById('saveBtn');
     const resetBtn  = document.getElementById('resetBtn');
@@ -150,14 +133,27 @@
 
     async function setupFirebase(){
       try{
-        const mod = await import('./js/firebase-config.js?v=3');
+        const mod = await import('./js/firebase-config.js?v=4');
         if(mod?.db && mod?.auth){ return { db:mod.db, auth:mod.auth }; }
         if(mod?.firebaseConfig){ const app=initializeApp(mod.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }
       }catch(e){ console.warn('fb cfg import failed', e); }
-      try{ const cfg = await import('./config.js?v=3'); const app=initializeApp(cfg.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }catch(e2){ showWarn('❌ تعذّر تحميل إعدادات Firebase.'); return { db:null, auth:null }; }
+      try{ const cfg = await import('./config.js?v=4'); const app=initializeApp(cfg.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }catch(e2){ showWarn('❌ تعذّر تحميل إعدادات Firebase.'); return { db:null, auth:null }; }
     }
 
-    function getCtx(){ const animalId=animalIdEl.value.trim(); const dt=dateEl.value.trim(); if(!animalId||!dt){ showWarn('⚠️ أدخل رقم الحيوان وتاريخ التحصين.'); return null;} clearWarn(); localStorage.setItem('lastAnimalId', animalId); return { animalId, dt }; }
+    function getDoseType(){
+      const el = document.querySelector('input[name="doseType"]:checked');
+      return el ? el.value : null;
+    }
+
+    function getCtx(){
+      const animalId=animalIdEl.value.trim();
+      const dt=dateEl.value.trim();
+      const vaccine=vaccineEl.value;
+      const doseType=getDoseType();
+      if(!animalId||!dt||!vaccine||!doseType){ showWarn('⚠️ أدخل رقم الحيوان، التاريخ، نوع التحصين ونوع الجرعة.'); return null;}
+      clearWarn(); localStorage.setItem('lastAnimalId', animalId);
+      return { animalId, dt, vaccine, doseType };
+    }
 
     const { db, auth } = await setupFirebase();
 
@@ -167,11 +163,8 @@
         type:'vaccination', eventType:'تحصين',
         animalId: ctx.animalId, animalNumber: ctx.animalId,
         date: ctx.dt,
-        vaccine: vaccineEl.value.trim() || null,
-        dose: doseEl.value.trim() || null,
-        route: routeEl.value || null,
-        nextDue: nextDueEl.value || null,
-        notes: notesEl.value.trim() || null,
+        vaccine: ctx.vaccine,
+        doseType: ctx.doseType, // primary | booster
         userId: auth?.currentUser?.uid || null,
         createdAt: serverTimestamp()
       };
@@ -179,8 +172,7 @@
       saveBtn.disabled = true; saveBtn.textContent = '... جاري الحفظ';
       try{
         if(db) await addDoc(collection(db,'events'), payload);
-        hideMsg();
-        showMsg('✅ تم تسجيل التحصين بنجاح');
+        hideMsg(); showMsg('✅ تم تسجيل التحصين بنجاح');
       }catch(e){ console.error(e); showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.'); }
       finally{ saveBtn.disabled=false; saveBtn.textContent='💾 تسجيل التحصين'; }
     }
@@ -189,15 +181,15 @@
     form.addEventListener('submit', (e)=>{ e.preventDefault(); saveVaccination(); });
 
     btnYes.addEventListener('click', ()=>{
-      const ctx = getCtx(); if(!ctx) return;
+      const qp = new URLSearchParams(location.search);
+      const id = animalIdEl.value.trim() || qp.get('animalId') || qp.get('animalIdd') || qp.get('number') || '';
+      const dt = dateEl.value.trim() || qp.get('date') || todayLocal();
       hideMsg();
-      location.href = `add-event.html?animalId=${encodeURIComponent(ctx.animalId)}&animalIdd=${encodeURIComponent(ctx.animalId)}&number=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.dt)}`;
+      location.href = `add-event.html?animalId=${encodeURIComponent(id)}&animalIdd=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
     });
     btnNo.addEventListener('click', ()=>{ hideMsg(); location.href = 'dashboard.html'; });
 
-    resetBtn.addEventListener('click', ()=>{
-      form.reset(); hydrate(); hideMsg(); clearWarn();
-    });
+    resetBtn.addEventListener('click', ()=>{ form.reset(); hydrate(); hideMsg(); clearWarn(); });
   </script>
 </body>
 </html>
