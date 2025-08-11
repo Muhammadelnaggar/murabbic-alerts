@@ -57,7 +57,7 @@
   <h1>التغذية الذكية — حساب المادة الجافة</h1>
   <div class="bar">
     <span class="pill">📅 اليوم: <span id="today">—</span></span>
-    <span class="pill">🍼 سعر اللبن:
+    <span class="pill">🍼 سعر كيلو اللبن:
       <input id="milkPriceTop" type="number" inputmode="decimal" step="0.01" placeholder="جنيه/لتر" style="width:110px;border:1px solid #8bc34a;border-radius:8px;padding:6px;background:#fff">
     </span>
     <span class="pill">💰 العملة: <b id="currency">جنيه/طن</b></span>
@@ -68,12 +68,11 @@
     <div class="row stack">
       <div class="grow">
         <label class="muted">طريقة الإدخال</label>
-       <select id="mode" style="width:100%">
-  <option value="tmr_asfed" selected>خلطة كاملة TMR — as-fed/رأس</option>
-  <option value="tmr_percent">خلطة كاملة TMR — نسب as-fed للطن</option>
-  <option value="split">مركزات وخشن — منفصل</option>
-</select>
-
+        <select id="mode" style="width:100%">
+          <option value="asfed" selected>كميات as‑fed/رأس</option>
+          <option value="percent">نِسَب مئوية (as‑fed) لطن الخلطة</option>
+          <option value="split">وضع منفصل: خشن as‑fed يوميًا + مركزات نسب as‑fed للطن</option>
+        </select>
       </div>
       <div class="grow">
         <label class="muted">إضافة خامة جاهزة</label>
@@ -143,15 +142,15 @@
   <div class="card">
     <div class="row stack">
       <div class="grow">
-        <label class="muted">إعدادات الاقتصاد السريعة (للدashboard)</label>
-        <div class="row stack">
-          <label class="muted">سعر اللتر (جنيه): <input id="econPrice" type="number" inputmode="decimal" step="0.01" style="width:140px"></label>
-          <label class="muted">تكلفة علف/بقرة/يوم: <input id="econFeed" type="number" inputmode="decimal" step="0.01" style="width:160px"></label>
-          <label class="muted">حجم القطيع: <input id="econHerd" type="number" inputmode="numeric" step="1" style="width:120px"></label>
-          <button id="saveEcon" class="btn" style="width:160px">حفظ الإعدادات</button>
-        </div>
-      </div>
-    </div>
+        $1
+          <label class=\"muted\">إنتاج اللبن (كجم/بقرة/يوم): <input id=\"econMilkKg\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:140px\"></label>
+          <label class=\"muted\">سعر كيلو اللبن (جنيه): <input id=\"econMilkPrice\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:160px\"></label>
+          <label class=\"muted\">تكلفة التغذية/رأس/يوم: <input id=\"econFeed\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:160px\"></label>
+          <button id=\"fillFromTot\" class=\"btn\" style=\"width:180px\">استخدم التكلفة المحسوبة</button>
+          <label class=\"muted\">تكلفة كيلو اللبن من التغذية: <input id=\"econFeedPerKg\" type=\"number\" inputmode=\"decimal\" step=\"0.001\" style=\"width:160px\" disabled></label>
+          <label class=\"muted\">حجم القطيع: <input id=\"econHerd\" type=\"number\" inputmode=\"numeric\" step=\"1\" style=\"width:120px\"></label>
+          <button id=\"saveEcon\" class=\"btn\" style=\"width:160px\">حفظ الإعدادات</button>
+        $2
   </div>
 </div>
 
@@ -227,33 +226,55 @@
   const concKgInput = document.getElementById('concKgInput');
 
   // Econ quick settings (for dashboard) + مزامنة سعر اللبن أعلى الصفحة
-  const econPrice = document.getElementById('econPrice');
+  const econMilkPrice = document.getElementById('econMilkPrice');
+  const econMilkKg   = document.getElementById('econMilkKg');
+  const econFeedPerKg= document.getElementById('econFeedPerKg');
+  const fillFromTot  = document.getElementById('fillFromTot');
   const econFeed  = document.getElementById('econFeed');
   const econHerd  = document.getElementById('econHerd');
   const milkTop   = document.getElementById('milkPriceTop');
 
   function syncMilkInputs(fromTop){
     if (fromTop){
-      econPrice.value = milkTop.value;
+      econMilkPrice.value = milkTop.value;
     }else{
-      milkTop.value = econPrice.value;
+      milkTop.value = econMilkPrice.value;
     }
-    localStorage.setItem('econPrice', (milkTop.value||econPrice.value||'0'));
+    localStorage.setItem('econMilkPrice', (milkTop.value||econMilkPrice.value||'0'));
   }
 
   document.getElementById('saveEcon').onclick = ()=>{
-    localStorage.setItem('econPrice', econPrice.value||'0');
-    localStorage.setItem('econFeed',  econFeed.value||'0');
-    localStorage.setItem('econHerd',  econHerd.value||'0');
-    milkTop.value = econPrice.value||'';
+    localStorage.setItem('econMilkPrice', econMilkPrice.value||'0');
+    localStorage.setItem('econMilkKg',   econMilkKg.value||'0');
+    localStorage.setItem('econFeed',     econFeed.value||'0');
+    localStorage.setItem('econHerd',     econHerd.value||'0');
+    computeFeedPerKg();
+    milkTop.value = econMilkPrice.value||'';
     alert('✔️ تم حفظ إعدادات الاقتصاد');
   };
-  econPrice.value = localStorage.getItem('econPrice')||'';
-  milkTop.value   = econPrice.value;
+  econMilkPrice.value = localStorage.getItem('econMilkPrice') || localStorage.getItem('econPrice') || '';
+  milkTop.value   = econMilkPrice.value;
+  econMilkKg.value= localStorage.getItem('econMilkKg')||'';
   econFeed.value  = localStorage.getItem('econFeed')||'';
   econHerd.value  = localStorage.getItem('econHerd')||'';
+  econFeedPerKg.value = localStorage.getItem('econFeedPerKg')||'';
   milkTop.addEventListener('input', ()=> syncMilkInputs(true));
-  econPrice.addEventListener('input', ()=> syncMilkInputs(false));
+  econMilkPrice.addEventListener('input', ()=> syncMilkInputs(false));
+  function computeFeedPerKg(){
+    const milkKg = parseFloat(econMilkKg.value)||0;
+    const feedC  = parseFloat(econFeed.value)||0;
+    const val = milkKg>0 ? feedC/milkKg : 0;
+    econFeedPerKg.value = val ? nf(val) : '';
+    localStorage.setItem('econFeedPerKg', val || 0);
+  }
+  ;[econMilkKg, econFeed].forEach(el=> el.addEventListener('input', computeFeedPerKg));
+  computeFeedPerKg();
+  document.getElementById('fillFromTot').addEventListener('click', ()=>{
+    const txt = (totCost.textContent||'').toString();
+    const num = parseFloat(txt.replace(/[^0-9.\-]/g,''))||0;
+    if (num>0){ econFeed.value = num; computeFeedPerKg(); }
+    else { alert('لا توجد قيمة محسوبة حاليًا.'); }
+  });
 
   // اليوم المحلي
   const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
