@@ -184,25 +184,17 @@
 
     // تهيئة Firebase بمرونة (توافق قبل/بعد التوحيد)
     async function setupFirebase(){
-      let db, auth;
       try {
-        const mod = await import('./js/firebase-config.js'); // يتوقّع تصدير db, auth
+        const mod = await import('./js/firebase-config.js'); // مسار صحيح داخل www/
         if (mod?.db && mod?.auth){
-          db = mod.db; auth = mod.auth;
-          return { db, auth };
+          return { db: mod.db, auth: mod.auth };
         }
-      } catch(e){ /* نتجاهل ونرجع للخطة ب */ }
-      try {
-        const cfg = await import('./config.js'); // يتوقّع تصدير firebaseConfig
-        const app = initializeApp(cfg.firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        return { db, auth };
-      } catch(e2){
-        console.error('Firebase config not found. Provide js/firebase-config.js or config.js', e2);
-        warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكد من وجود config.js أو js/firebase-config.js";
-        return { db:null, auth:null };
+      } catch (e) {
+        // نعرض رسالة واضحة ونكمّل بدون تعطيل الصفحة
       }
+      console.error('Firebase config not found at ./js/firebase-config.js');
+      warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكّد من وجود ./js/firebase-config.js";
+      return { db:null, auth:null };
     }
 
     // ربط الأزرار
