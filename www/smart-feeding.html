@@ -3,575 +3,409 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>التغذية الذكية</title>
+  <title>🧠 التغذية الذكية — تحليل التركيبة</title>
   <style>
-    :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32;--muted:#5f6f64}
+    :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32}
     *{box-sizing:border-box}
-    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;color:#1b5e20;padding:12px}
-    h1{margin:0 0 8px;text-align:center;color:var(--green);font-size:22px}
+    body{direction:rtl;background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;color:#1b5e20;padding:12px}
+    h1{margin:0 0 10px;text-align:center;color:var(--green);font-size:22px}
     .wrap{max-width:1080px;margin:0 auto}
-    .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;color:#1b5e20;font-size:13px}
-
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .row>.grow{flex:1}
-    select,input,button{font-size:14px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;font-size:13px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
+    input,select,button{min-height:44px;font-size:14px}
     input,select{padding:10px;border:1px solid #ccc;border-radius:10px}
-    input,select,button{min-height:44px}
     button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
     .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
     .btn-primary{background:var(--green);color:#fff}
-
-    .table-wrap{width:100%;overflow-x:auto}
-    table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1060px}
-    th,td{border:1px solid #e0ebd3;padding:8px;text-align:center}
-    th{background:#eafbe7;color:#1b5e20}
-    tbody tr:nth-child(odd){background:#fcfff5}
-
-    .total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
-    .total .pill{background:#fff}
-
-    .muted{color:var(--muted);font-size:12px}
-
-    /* ===== Mobile-first: بطاقات بدل الجدول على الشاشات الصغيرة ===== */
-    @media (max-width: 640px){
-      .bar{justify-content:stretch}
-      .row.stack > *{flex:1 1 100%}
-      .table-wrap{overflow:visible}
-      table, thead, tbody, th, td, tr{display:block;min-width:unset}
-      thead{display:none}
-      tbody tr{margin:0 0 12px 0;border:1px solid #e0ebd3;border-radius:12px;background:#fff}
-      tbody tr > td{display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid #eef3e4;padding:10px 12px}
-      tbody tr > td:last-child{border-bottom:0}
-      td::before{content:attr(data-label);font-weight:bold;color:#2e7d32;flex:0 0 48%}
-      td > input, td > select{width:48%}
-      .total{justify-content:center}
-      .pill{font-size:12px}
-      h1{font-size:20px}
-    }
+    .muted{opacity:.85}
+    .warn{color:#c62828}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+    .kpi{background:#eafbe7;border:1px solid #e0ebd3;border-radius:10px;padding:10px;text-align:center}
+    .kpi b{display:block;font-size:18px;margin-top:4px;color:#1b5e20}
+    .table-wrap{display:none}
+    @media(max-width:640px){.grid{grid-template-columns:1fr 1fr}}
+    /* جودة التغذية */
+    .quality{display:flex;align-items:center;gap:10px;margin-top:8px}
+    .quality .bar{flex:1;height:14px;border-radius:999px;background:#eceff1;border:1px solid var(--border);overflow:hidden}
+    .quality .bar span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#e53935,#fdd835,#43a047);transition:width .4s ease}
+    .quality .score{min-width:64px;text-align:center;font-weight:bold}
   </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>التغذية الذكية — حساب المادة الجافة</h1>
-  <div class="bar">
-    <span class="pill">📅 اليوم: <span id="today">—</span></span>
-    <span class="pill">🍼 سعر كيلو اللبن:
-      <input id="milkPriceTop" type="number" inputmode="decimal" step="0.01" placeholder="جنيه/لتر" style="width:110px;border:1px solid #8bc34a;border-radius:8px;padding:6px;background:#fff">
-    </span>
-    <span class="pill">💰 العملة: <b id="currency">جنيه/طن</b></span>
-    <span class="pill">🛒 مصدر الأسعار: يدوي / عالمي<span id="srcHint" class="muted"></span></span>
+  <h1>🧠 التغذية الذكية — تحليل التركيبة</h1>
+  $1
+
+  <!-- مؤشر جودة التغذية -->
+  <div class="card" id="qualityCard">
+    <div class="row" style="align-items:center">
+      <span class="pill">🌈 مؤشر جودة التغذية: <b id="qLabel">—</b></span>
+      <div class="quality" style="flex:1">
+        <div class="bar"><span id="qFill"></span></div>
+        <div class="score" id="qScore">—</div>
+      </div>
+    </div>
+  </div>
+
+  $2
+    <div class="grid">
+      <div class="kpi"><span class="muted">إجمالي كجم DM/رأس</span><b id="kpiDM">—</b></div>
+      <div class="kpi"><span class="muted">تكلفة/رأس/يوم</span><b id="kpiCost">—</b></div>
+      <div class="kpi"><span class="muted">سعر طن الخلطة (DM)</span><b id="kpiMix">—</b></div>
+      <div class="kpi"><span class="muted">خشِن : مركز (DM)</span><b id="kpiFC">—</b></div>
+      <div class="kpi"><span class="muted">% DM للخلطة</span><b id="kpiDmpct">—</b></div>
+      <div class="kpi"><span class="muted">سعر كيلو اللبن</span>
+        <div class="row"><input id="milkPrice" type="number" inputmode="decimal" step="0.01" style="width:120px"><button id="saveMilkPrice" class="btn">حفظ</button></div>
+      </div>
+      <div class="kpi"><span class="muted">تكلفة التغذية/كجم لبن</span><b id="kpiFeedPerKg">—</b></div>
+      <div class="kpi"><span class="muted">هامش فوق تكلفة العلف/رأس</span><b id="kpiMargin">—</b></div>
+      <div class="kpi"><span class="muted">إجمالي الخلطة as‑fed/رأس</span><b id="kpiAsFedTotal">—</b></div>
+      <div class="kpi"><span class="muted">% بروتين خام (DM)</span><b id="kpiCPpct">—</b></div>
+      <div class="kpi"><span class="muted">طاقة العليقة (ميجا جول/يوم)</span><b id="kpiEnergy">—</b></div>
+      <div class="kpi"><span class="muted">% دهون (DM)</span><b id="kpiFatPct">—</b></div>
+      <div class="kpi"><span class="muted">كجم DM / كجم لبن</span><b id="kpiDMIperKg">—</b></div>
+      <div class="kpi"><span class="muted">التكلفة الكلية/كجم لبن (+25%)</span><b id="kpiMilkCostTotal">—</b></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="pill">🥛 متوسط إنتاج/رأس: <input id="avgMilk" type="number" inputmode="decimal" step="0.1" style="width:90px"></div>
+      <div class="pill" id="afBox" style="display:none">⚖️ تقدير كمية الخلطة as-fed/رأس: <input id="asFedKg" type="number" inputmode="decimal" step="0.1" style="width:90px"></div>
+      <div class="pill warn" id="msg"></div>
+    </div>
+  </div>
+
+  <div class="card" id="diagnostics" style="display:none">
+    <div class="pill">🩺 ملاحظات ذكية</div>
+    <ul id="notes" style="margin:8px 16px"></ul>
   </div>
 
   <div class="card">
-    <div class="row stack">
-      <div class="grow">
-        <label class="muted">طريقة الإدخال</label>
-        <select id="mode" style="width:100%">
-          <option value="asfed" selected>كميات as‑fed/رأس</option>
-          <option value="percent">نِسَب مئوية (as‑fed) لطن الخلطة</option>
-          <option value="split">وضع منفصل: خشن as‑fed يوميًا + مركزات نسب as‑fed للطن</option>
-        </select>
+    <div class="row" style="justify-content:space-between">
+      <div class="pill">📋 تم التحليل من آخر تركيبة محفوظة — التفاصيل مخفية هنا</div>
+      <div class="row">
+        <button id="gotoEdit" class="btn">تعديل التركيبة</button>
+        <button id="gotoEvents" class="btn">تسجيل حدث جديد</button>
+        <button id="gotoDash" class="btn">لوحة التحكم</button>
       </div>
-      <div class="grow">
-        <label class="muted">إضافة خامة جاهزة</label>
-        <select id="preset" style="width:100%">
-          <option value="">— اختر —</option>
-        </select>
-      </div>
-      <button id="addPreset" class="btn" style="flex:1">إضافة</button>
-      <button id="fetchGlobal" class="btn" style="flex:1">تحديث الأسعار من السوق العالمي</button>
-      <button id="saveLocal" class="btn" style="flex:1">حفظ محليًا</button>
-      <button id="clearAll" class="btn" style="flex:1">مسح</button>
     </div>
+  </div>
 
-    <!-- مدخلات إضافية لوضع الفصل بين الخشن والمركز -->
-    <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
-      <div class="grow">
-        <label class="muted">كمية العلف المركز (as‑fed) كجم/رأس/يوم</label>
-        <input id="concKgInput" type="number" inputmode="decimal" step="0.01" placeholder="مثال: 6.0" style="width:160px">
-      </div>
-      <div class="pill" id="splitHint">في هذا الوضع: كل صف له "فئة" = خشن أو مركز. الخشن يُحسب بالكجم/رأس، والمركز يُبنى منه سعر طن مركز (as‑fed→DM) ثم نُطبّقه على كمية المركز المدخلة.</div>
-    </div>
-
-    <div class="table-wrap">
-      <table id="tbl">
-        <thead>
-          <tr>
-            <th data-col="name">الخامة (عامية مربيك)</th>
-            <th data-col="cat">الفئة</th>
-            <th data-col="dm">% مادة جافة</th>
-            <th data-col="pTon">سعر الطن (كما هو)</th>
-            <th data-col="pTonDM">سعر/طن مادة جافة</th>
-            <th data-col="pct">نسبة as‑fed %</th>
-            <th data-col="kg">كمية as‑fed كجم/رأس/يوم</th>
-            <th data-col="kgDM">كجم مادة جافة/رأس</th>
-            <th data-col="cost">تكلفة/رأس/يوم</th>
-            <th data-col="src">المصدر</th>
-            <th data-col="rm">حذف</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="total" id="totalsBase">
-      <span class="pill" id="pillSumPct" style="display:none">مجموع النِّسب: <b id="sumPct">0%</b></span>
-      <span class="pill">إجمالي كجم مادة جافة/رأس: <b id="totDM">0</b></span>
-      <span class="pill">تكلفة العليقة/رأس/يوم: <b id="totCost">0</b></span>
-      <span class="pill" id="pillMix">سعر طن العلف (مادة جافة): <b id="mixPriceDM">—</b></span>
-    </div>
-
-    <!-- إجماليات إضافية تظهر فقط في وضع الفصل -->
-    <div class="total" id="totalsSplit" style="display:none">
-      <span class="pill">خشن — كجم DM/رأس: <b id="roughDM">—</b></span>
-      <span class="pill">خشن — تكلفة/رأس: <b id="roughCost">—</b></span>
-      <span class="pill">مركز — مجموع النِّسب: <b id="sumPctConc">—%</b></span>
-      <span class="pill">مركز — %DM للخلطة: <b id="concDMpct">—%</b></span>
-      <span class="pill">مركز — سعر طن (DM): <b id="concPriceDM">—</b></span>
-      <span class="pill">مركز — كمية as‑fed/رأس: <b id="concKgShow">—</b></span>
-      <span class="pill">مركز — كجم DM/رأس: <b id="concKgDM">—</b></span>
-      <span class="pill">مركز — تكلفة/رأس: <b id="concCost">—</b></span>
-      <span class="pill">الإجمالي — تكلفة/رأس: <b id="totalCostAll">—</b></span>
-    </div>
-
-    <div class="muted" style="margin-top:6px">* في وضع النِّسب as‑fed، يتم حساب **سعر طن العلف (مادة جافة)** = متوسط سعر الطن كما هو ÷ نسبة الـDM الكلية للخليط.</div>
+  <div class="table-wrap"> <!-- مخفي حسب رغبتك -->
+    <table id="tbl">
+      <thead><tr>
+        <th>الخامة</th><th>الفئة</th><th>% DM</th><th>سعر طن as‑fed</th><th>سعر/طن DM</th>
+        <th>٪ as‑fed</th><th>كجم as‑fed/رأس</th><th>كجم DM/رأس</th><th>تكلفة/رأس</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <div class="card">
-    <div class="row stack">
-      <div class="grow">
-        $1
-          <label class=\"muted\">إنتاج اللبن (كجم/بقرة/يوم): <input id=\"econMilkKg\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:140px\"></label>
-          <label class=\"muted\">سعر كيلو اللبن (جنيه): <input id=\"econMilkPrice\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:160px\"></label>
-          <label class=\"muted\">تكلفة التغذية/رأس/يوم: <input id=\"econFeed\" type=\"number\" inputmode=\"decimal\" step=\"0.01\" style=\"width:160px\"></label>
-          <button id=\"fillFromTot\" class=\"btn\" style=\"width:180px\">استخدم التكلفة المحسوبة</button>
-          <label class=\"muted\">تكلفة كيلو اللبن من التغذية: <input id=\"econFeedPerKg\" type=\"number\" inputmode=\"decimal\" step=\"0.001\" style=\"width:160px\" disabled></label>
-          <label class=\"muted\">حجم القطيع: <input id=\"econHerd\" type=\"number\" inputmode=\"numeric\" step=\"1\" style=\"width:120px\"></label>
-          <button id=\"saveEcon\" class=\"btn\" style=\"width:160px\">حفظ الإعدادات</button>
-        $2
+    <div class="row">
+      <button class="btn-primary" id="refresh">🔄 تحديث التحليل</button>
+    </div>
   </div>
 </div>
 
 <script type="module">
-  // ===== بيانات الخامات (عامية مربيك) + DM% افتراضي + رمز سوقي مستقبلي =====
-  const FEEDS = [
-    { name:'ذرة صفراء مجروشة', dm:88, symbol:'CORN' },
-    { name:'شعير', dm:88, symbol:'BARLEY' },
-    { name:'قمح مطحون', dm:88, symbol:'WHEAT' },
-    { name:'ردة قمح (نخالة)', dm:89, symbol:'WHEAT_BRAN' },
-    { name:'كسب فول صويا 44%', dm:89, symbol:'SOYMEAL_44' },
-    { name:'كسب فول صويا 48%', dm:89, symbol:'SOYMEAL_48' },
-    { name:'كسب عباد الشمس', dm:89, symbol:'SUNFLOWER_MEAL' },
-    { name:'كسب كانولا', dm:90, symbol:'CANOLA_MEAL' },
-    { name:'DDGS (ذرة)', dm:90, symbol:'DDGS' },
-    { name:'جلوتين فيد (CGF)', dm:90, symbol:'CORN_GLUTEN_FEED' },
-    { name:'جلوتين ميل (CGM)', dm:90, symbol:'CORN_GLUTEN_MEAL' },
-    { name:'لب بنجر مجفف', dm:90, symbol:'BEET_PULP_DRY' },
-    { name:'لب بنجر مبلل', dm:25, symbol:'BEET_PULP_WET' },
-    { name:'مولاس', dm:75, symbol:'MOLASSES' },
-    { name:'سيلاج ذرة', dm:33, symbol:'CORN_SILAGE' },
-    { name:'برسيم أخضر', dm:18, symbol:'FRESH_BERSEEM' },
-    { name:'دريس برسيم', dm:90, symbol:'ALFALFA_HAY' },
-    { name:'قش أرز', dm:90, symbol:'RICE_STRAW' },
-    { name:'تبن قمح/شعير', dm:90, symbol:'WHEAT_STRAW' },
-    { name:'بذرة قطن كاملة', dm:92, symbol:'WHOLE_COTTONSEED' },
-    { name:'كسب قطن', dm:92, symbol:'COTTONSEED_MEAL' },
-    { name:'كسب نخيل', dm:90, symbol:'PALM_KERNEL_MEAL' },
-    { name:'ذرة رفيعة (سورجم)', dm:88, symbol:'SORGHUM' },
-    { name:'شوفان', dm:90, symbol:'OATS' },
-    { name:'فول بلدي (فابا)', dm:88, symbol:'FABA_BEANS' },
-    { name:'بازلاء علفية', dm:88, symbol:'FIELD_PEAS' },
-    { name:'دهون محمية', dm:99, symbol:'PROTECTED_FAT' },
-    { name:'يوريا علفية', dm:100, symbol:'UREA' },
-    { name:'بيكربونات صوديوم', dm:100, symbol:'SODIUM_BICARB' },
-    { name:'ملح', dm:100, symbol:'SALT' },
-    { name:'حجر جيري (كالسيوم)', dm:100, symbol:'LIMESTONE' },
-    { name:'مخلوط معادن/فيتامينات', dm:95, symbol:'VIT_MIN_PREMIX' },
-  ];
+  import { db, auth } from './js/firebase-config.js';
+  import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-  // قوائم لتخمين الفئة تلقائيًا
-  const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','benjer','بنجر','pulp','hay','silage','straw','fresh','green'];
+  const qs = new URLSearchParams(location.search);
+  const animalId = qs.get('animalId') || qs.get('number') || localStorage.getItem('lastAnimalId') || '';
+  const group    = qs.get('group') || '';
 
-  // ===== عناصر واجهة
-  const todayEl = document.getElementById('today');
-  const currencyEl = document.getElementById('currency');
-  const presetSel = document.getElementById('preset');
-  const addPresetBtn = document.getElementById('addPreset');
-  const fetchBtn = document.getElementById('fetchGlobal');
-  const saveBtn = document.getElementById('saveLocal');
-  const clearBtn= document.getElementById('clearAll');
-  const tbody = document.querySelector('#tbl tbody');
-  const totDM = document.getElementById('totDM');
-  const totCost = document.getElementById('totCost');
-  const mixPriceDM = document.getElementById('mixPriceDM');
-  const pillSumPct = document.getElementById('pillSumPct');
-  const sumPctEl = document.getElementById('sumPct');
-  const modeSel = document.getElementById('mode');
-  const splitBox = document.getElementById('splitBox');
-
-  // إجماليات وضع الفصل
-  const totalsBase = document.getElementById('totalsBase');
-  const totalsSplit= document.getElementById('totalsSplit');
-  const roughDMEl  = document.getElementById('roughDM');
-  const roughCostEl= document.getElementById('roughCost');
-  const sumPctConcEl = document.getElementById('sumPctConc');
-  const concDMpctEl  = document.getElementById('concDMpct');
-  const concPriceDMEl= document.getElementById('concPriceDM');
-  const concKgShowEl = document.getElementById('concKgShow');
-  const concKgDMEl   = document.getElementById('concKgDM');
-  const concCostEl   = document.getElementById('concCost');
-  const totalCostAllEl = document.getElementById('totalCostAll');
-  const concKgInput = document.getElementById('concKgInput');
-
-  // Econ quick settings (for dashboard) + مزامنة سعر اللبن أعلى الصفحة
-  const econMilkPrice = document.getElementById('econMilkPrice');
-  const econMilkKg   = document.getElementById('econMilkKg');
-  const econFeedPerKg= document.getElementById('econFeedPerKg');
-  const fillFromTot  = document.getElementById('fillFromTot');
-  const econFeed  = document.getElementById('econFeed');
-  const econHerd  = document.getElementById('econHerd');
-  const milkTop   = document.getElementById('milkPriceTop');
-
-  function syncMilkInputs(fromTop){
-    if (fromTop){
-      econMilkPrice.value = milkTop.value;
-    }else{
-      milkTop.value = econMilkPrice.value;
-    }
-    localStorage.setItem('econMilkPrice', (milkTop.value||econMilkPrice.value||'0'));
-  }
-
-  document.getElementById('saveEcon').onclick = ()=>{
-    localStorage.setItem('econMilkPrice', econMilkPrice.value||'0');
-    localStorage.setItem('econMilkKg',   econMilkKg.value||'0');
-    localStorage.setItem('econFeed',     econFeed.value||'0');
-    localStorage.setItem('econHerd',     econHerd.value||'0');
-    computeFeedPerKg();
-    milkTop.value = econMilkPrice.value||'';
-    alert('✔️ تم حفظ إعدادات الاقتصاد');
-  };
-  econMilkPrice.value = localStorage.getItem('econMilkPrice') || localStorage.getItem('econPrice') || '';
-  milkTop.value   = econMilkPrice.value;
-  econMilkKg.value= localStorage.getItem('econMilkKg')||'';
-  econFeed.value  = localStorage.getItem('econFeed')||'';
-  econHerd.value  = localStorage.getItem('econHerd')||'';
-  econFeedPerKg.value = localStorage.getItem('econFeedPerKg')||'';
-  milkTop.addEventListener('input', ()=> syncMilkInputs(true));
-  econMilkPrice.addEventListener('input', ()=> syncMilkInputs(false));
-  function computeFeedPerKg(){
-    const milkKg = parseFloat(econMilkKg.value)||0;
-    const feedC  = parseFloat(econFeed.value)||0;
-    const val = milkKg>0 ? feedC/milkKg : 0;
-    econFeedPerKg.value = val ? nf(val) : '';
-    localStorage.setItem('econFeedPerKg', val || 0);
-  }
-  ;[econMilkKg, econFeed].forEach(el=> el.addEventListener('input', computeFeedPerKg));
-  computeFeedPerKg();
-  document.getElementById('fillFromTot').addEventListener('click', ()=>{
-    const txt = (totCost.textContent||'').toString();
-    const num = parseFloat(txt.replace(/[^0-9.\-]/g,''))||0;
-    if (num>0){ econFeed.value = num; computeFeedPerKg(); }
-    else { alert('لا توجد قيمة محسوبة حاليًا.'); }
-  });
-
-  // اليوم المحلي
-  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-  try{ todayEl.textContent = new Date(todayLocal()).toLocaleDateString('ar-EG'); }catch{ todayEl.textContent = todayLocal(); }
-
-  // تهيئة قائمة الخامات الجاهزة
-  FEEDS.forEach((f,i)=>{
-    const opt = document.createElement('option'); opt.value = String(i); opt.textContent = f.name; presetSel.appendChild(opt);
-  });
-
-  // تحميل من التخزين المحلي
-  let rows = [];
-  try{ rows = JSON.parse(localStorage.getItem('rationRows')||'[]'); }catch{ rows=[]; }
-
-  function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
-
-  function guessCat(name){
-    const s = (name||'').toLowerCase();
-    return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough' : 'conc';
-  }
-
-  function addRow(feed){
-    const tr = document.createElement('tr');
-    const catVal = feed?.cat || guessCat(feed?.name);
-    tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
-    tr.appendChild(td('الفئة', `<select class="cat"><option value="rough" ${catVal==='rough'?'selected':''}>خشن</option><option value="conc" ${catVal==='conc'?'selected':''}>مركز</option></select>`, 'cat'));
-    tr.appendChild(td('% مادة جافة', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="%" style="width:100px">`, 'dm'));
-    tr.appendChild(td('سعر الطن', `<input class="pTon" type="number" inputmode="decimal" step="0.01" value="${feed?.price||''}" placeholder="جنيه/طن" style="width:140px">`, 'pTon'));
-    tr.appendChild(td('سعر/طن مادة جافة', `<span class="pTonDM">—</span>`, 'pTonDM'));
-    tr.appendChild(td('نسبة as‑fed %', `<input class="pct" type="number" inputmode="decimal" step="0.01" value="${feed?.pct||''}" placeholder="%" style="width:100px">`, 'pct'));
-    tr.appendChild(td('كمية as-fed', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
-    tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
-    tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
-    tr.appendChild(td('المصدر', `<span class="src">${feed?.src||'يدوي'}</span>`, 'src'));
-    tr.appendChild(td('حذف', `<button class="rm btn" aria-label="حذف السطر">×</button>`, 'rm'));
-    tbody.appendChild(tr);
-    hookRow(tr, feed);
-  }
-
-  // datalist للاقتراحات
-  const dl = document.createElement('datalist'); dl.id = 'feedlist';
-  FEEDS.forEach(f=>{ const o=document.createElement('option'); o.value=f.name; dl.appendChild(o); });
-  document.body.appendChild(dl);
-
-  function recalc(){
-    const mode = modeSel.value; // 'asfed' | 'percent' | 'split'
-    let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
-    let roughDM=0, roughCost=0; // split
-    let concMixAsFed=0, concDmFrac=0, concSumPct=0; // split
-    const concKg = parseFloat(concKgInput.value)||0; // split
-
-    const items = [];
-
-    tbody.querySelectorAll('tr').forEach(tr=>{
-      const name = tr.querySelector('.name').value.trim();
-      const cat  = (tr.querySelector('.cat')?.value)||'conc';
-      const dm   = parseFloat(tr.querySelector('.dm').value)||0; // %
-      const pTon = parseFloat(tr.querySelector('.pTon').value)||0; // as-fed
-      const kg   = parseFloat(tr.querySelector('.kg').value)||0; // as-fed kg/head/day
-      const pct  = parseFloat(tr.querySelector('.pct').value)||0; // % of as-fed
-      const pTonDM = (dm>0? (pTon / (dm/100)) : 0);
-      tr.querySelector('.pTonDM').textContent = pTonDM? nf(pTonDM):'—';
-
-      if (mode === 'asfed'){
-        const kgDM   = kg * (dm/100);
-        const cost   = (kgDM/1000) * pTonDM; // kgDM -> tonDM
-        tr.querySelector('.kgDM').textContent   = kgDM? nf(kgDM):'—';
-        tr.querySelector('.cost').textContent   = cost? nf(cost):'—';
-        totalDM  += kgDM;
-        totalCost+= cost;
-      } else if (mode === 'percent'){
-        tr.querySelector('.kgDM').textContent = '—';
-        tr.querySelector('.cost').textContent = '—';
-        if (pct>0){
-          mixAsFed += (pct/100) * pTon;      // متوسط سعر الطن كما هو
-          dmFrac  += (pct/100) * (dm/100);   // نسبة DM الكلية في طن as-fed
-          sumPct  += pct;
-        }
-      } else { // split
-        if (cat==='rough'){
-          const kgDM   = kg * (dm/100);
-          const cost   = (kgDM/1000) * pTonDM;
-          tr.querySelector('.kgDM').textContent   = kgDM? nf(kgDM):'—';
-          tr.querySelector('.cost').textContent   = cost? nf(cost):'—';
-          roughDM  += kgDM;
-          roughCost+= cost;
-        } else { // conc
-          tr.querySelector('.kgDM').textContent = '—';
-          tr.querySelector('.cost').textContent = '—';
-          if (pct>0){
-            concMixAsFed += (pct/100) * pTon;
-            concDmFrac   += (pct/100) * (dm/100);
-            concSumPct   += pct;
-          }
-        }
-      }
-
-      items.push({ name, cat, dm, price:pTon, kg, pct, src: tr.querySelector('.src').textContent||'يدوي' });
-    });
-
-    if (mode === 'asfed'){
-      totDM.textContent   = nf(totalDM);
-      totCost.textContent = nf(totalCost);
-      // حساب سعر طن DM للخلطة من مساهمات DM
-      if (totalDM>0){
-        mix = 0;
-        tbody.querySelectorAll('tr').forEach(tr=>{
-          const dm=parseFloat(tr.querySelector('.dm').value)||0;
-          const pTon=parseFloat(tr.querySelector('.pTon').value)||0;
-          const kg=parseFloat(tr.querySelector('.kg').value)||0;
-          const pTonDM = (dm>0? (pTon/(dm/100)) : 0);
-          const share  = (kg*(dm/100)) / totalDM; // DM share
-          mix += share * pTonDM;
-        });
-      }
-      pillSumPct.style.display = 'none';
-      document.getElementById('pillMix').style.display = '';
-      totalsSplit.style.display = 'none';
-    } else if (mode === 'percent'){
-      totDM.textContent   = '—';
-      totCost.textContent = '—';
-      sumPctEl.textContent = nf(sumPct) + '%';
-      pillSumPct.style.display = 'inline-flex';
-      mix = dmFrac>0 ? (mixAsFed / dmFrac) : 0; // تحويل متوسط السعر كما هو إلى سعر/طن DM
-      document.getElementById('pillMix').style.display = '';
-      totalsSplit.style.display = 'none';
-    } else { // split
-      // احسب سعر طن المركز DM
-      const concPriceDM = (concDmFrac>0) ? (concMixAsFed / concDmFrac) : 0;
-      const concKgDM    = concKg * concDmFrac;
-      const concCost    = (concKgDM/1000) * concPriceDM;
-
-      const totalDMAll  = roughDM + concKgDM;
-      const totalCostAll= roughCost + concCost;
-
-      // اعرض القيم
-      roughDMEl.textContent   = nf(roughDM);
-      roughCostEl.textContent = nf(roughCost);
-      sumPctConcEl.textContent= nf(concSumPct) + '%';
-      concDMpctEl.textContent = nf(concDmFrac*100) + '%';
-      concPriceDMEl.textContent = concPriceDM ? nf(concPriceDM) : '—';
-      concKgShowEl.textContent  = concKg ? nf(concKg) : '—';
-      concKgDMEl.textContent    = concKgDM ? nf(concKgDM) : '—';
-      concCostEl.textContent    = concCost ? nf(concCost) : '—';
-      totalCostAllEl.textContent= (totalCostAll || totalCostAll===0) ? nf(totalCostAll) : '—';
-
-      totDM.textContent   = totalDMAll ? nf(totalDMAll) : '—';
-      totCost.textContent = totalCostAll ? nf(totalCostAll) : '—';
-
-      // إظهار/إخفاء عناصر
-      pillSumPct.style.display = 'none';
-      document.getElementById('pillMix').style.display = 'none';
-      totalsSplit.style.display = 'flex';
-    }
-
-    mixPriceDM.textContent = mix? nf(mix):'—';
-    localStorage.setItem('rationRows', JSON.stringify(items));
-  }
-
+  const el = (id)=> document.getElementById(id);
   const nf = (x)=> new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0);
+  const clamp=(v,min,max)=> Math.min(max, Math.max(min, v));
+  function bandScore(v, min, goodMin, goodMax, max){
+    if (v==null || isNaN(v)) return null;
+    if (v<=min || v>=max) return 0;
+    if (v>=goodMin && v<=goodMax) return 100;
+    if (v<goodMin) return 100 * ( (v - min) / (goodMin - min) );
+    return 100 * ( (max - v) / (max - goodMax) );
+  }
+  function gradeLabel(score){
+    if (score==null) return '—';
+    if (score>=85) return 'ممتاز 🟢';
+    if (score>=70) return 'جيد ✅';
+    if (score>=55) return 'مقبول ⚠️';
+    return 'غير متزن 🔴';
+  }
+  const qFill = document.getElementById('qFill');
+  const qScore= document.getElementById('qScore');
+  const qLabel= document.getElementById('qLabel');
+  let lastEv = null;
 
-  function setSplitRowState(tr){
-    const mode = modeSel.value;
-    const cat  = (tr.querySelector('.cat')?.value)||'conc';
-    const kgEl  = tr.querySelector('.kg');
-    const pctEl = tr.querySelector('.pct');
-    if (mode!== 'split'){
-      kgEl.disabled = (mode==='percent');
-      pctEl.disabled= (mode==='asfed');
-      kgEl.style.opacity  = kgEl.disabled? .5 : 1;
-      pctEl.style.opacity = pctEl.disabled? .5 : 1;
-      return;
-    }
-    if (cat==='rough'){
-      kgEl.disabled = false; pctEl.disabled = true;
-    } else {
-      kgEl.disabled = true;  pctEl.disabled = false;
-    }
-    kgEl.style.opacity  = kgEl.disabled? .5 : 1;
-    pctEl.style.opacity = pctEl.disabled? .5 : 1;
+  // قيم غذائية تقريبية لكل خامة على أساس المادة الجافة (DM)
+  // cp: % بروتين خام على DM، fat: % دهون على DM، nel: طاقة لبنية صافية (ميجا جول/كجم DM)
+  const NUT = {
+    'ذرة صفراء مجروشة':        {cp:9,  fat:4,  nel:8.45},
+    'شعير':                     {cp:12, fat:2.1,nel:7.95},
+    'قمح مطحون':               {cp:13, fat:1.9,nel:8.55},
+    'ردة قمح (نخالة)':         {cp:16, fat:4,  nel:6.8},
+    'ردة أرز':                  {cp:14, fat:14, nel:7.6},
+    'ذرة رفيعة (سورجم)':       {cp:10, fat:3.2,nel:7.9},
+    'شوفان':                    {cp:12, fat:5,  nel:7.6},
+    'فول بلدي (فابا)':         {cp:26, fat:1.5,nel:6.8},
+    'بازلاء علفية':            {cp:23, fat:1.5,nel:7.0},
+
+    'DDGS (ذرة)':              {cp:30, fat:10, nel:8.4},
+    'جلوتين فيد (CGF)':        {cp:23, fat:3,  nel:6.9},
+    'جلوتين ميل (CGM)':        {cp:60, fat:2,  nel:7.2},
+    'قشور فول صويا (Soy Hulls)':{cp:10, fat:2, nel:6.3},
+    'لب بنجر مجفف':            {cp:10, fat:0.7,nel:6.4},
+    'لب بنجر مبلل':            {cp:10, fat:0.7,nel:6.4},
+    'لب حمضيات مجفف':          {cp:7,  fat:1.6,nel:6.5},
+    'مولاس':                   {cp:5,  fat:0,  nel:5.4},
+
+    'كسب فول صويا 44%':        {cp:44, fat:1.5,nel:7.0},
+    'كسب فول صويا 48%':        {cp:48, fat:1.5,nel:7.2},
+    'كسب عباد الشمس':          {cp:32, fat:1.5,nel:6.0},
+    'كسب كانولا':              {cp:38, fat:3,  nel:6.6},
+    'كسب قطن':                 {cp:24, fat:2,  nel:6.5},
+    'كسب نخيل':                {cp:17, fat:8,  nel:6.5},
+    'كسب فول سوداني':          {cp:45, fat:1,  nel:7.1},
+    'كسب سمسم':                {cp:38, fat:10, nel:6.8},
+    'كسب كتان':                {cp:33, fat:8,  nel:6.6},
+
+    'بذرة قطن كاملة':         {cp:23, fat:18, nel:7.2},
+    'قشور بذرة قطن (Hulls)':  {cp:4,  fat:2,  nel:4.0},
+
+    'سيلاج ذرة':               {cp:8,  fat:3,  nel:6.7},
+    'سيلاج سورجم':            {cp:7,  fat:2.5,nel:6.0},
+    'برسيم أخضر':              {cp:19, fat:2.5,nel:5.4},
+    'دريس برسيم':              {cp:18, fat:2,  nel:4.9},
+    'دريس حشيشة/نجيل':        {cp:12, fat:2,  nel:4.6},
+    'تبن قمح':                 {cp:4,  fat:1.5,nel:3.3},
+    'قش أرز':                  {cp:4,  fat:1.5,nel:3.0},
+
+    'دهون محمية':              {cp:0,  fat:99, nel:25.0},
+    'زيت نباتي علفي':         {cp:0,  fat:99, nel:25.0},
+    'يوريا علفية':             {cp:281,fat:0,  nel:0},
+    'حجر جيري (كالسيوم)':     {cp:0,  fat:0,  nel:0},
+    'فوسفات ثنائي الكالسيوم (DCP)':{cp:0,fat:0,nel:0},
+    'ملح طعام':                {cp:0,  fat:0,  nel:0},
+    'بيكربونات صوديوم':       {cp:0,  fat:0,  nel:0},
+    'أكسيد ماغنسيوم':         {cp:0,  fat:0,  nel:0},
+    'بنتونيت':                 {cp:0,  fat:0,  nel:0},
+    'خميرة حية/مستنبت خمائري':{cp:40, fat:1,  nel:5.0},
+    'مخلوط معادن/فيتامينات':  {cp:0,  fat:0,  nel:0},
+  };
+  function getNut(name, cat){
+    const n = NUT[name?.trim?.()] || null;
+    if (n) return n;
+    // تقديرات افتراضية لو الخامة مش معرّفة
+    if ((cat||'conc')==='rough') return {cp:12, fat:2, nel:4.8};
+    return {cp:16, fat:3, nel:7.5};
   }
 
-  function hookRow(tr, feed){
-    const nameEl = tr.querySelector('.name');
-    const dmEl   = tr.querySelector('.dm');
-    const pEl    = tr.querySelector('.pTon');
-    const kgEl   = tr.querySelector('.kg');
-    const pctEl  = tr.querySelector('.pct');
-    const catEl  = tr.querySelector('.cat');
-    tr.querySelector('.rm').onclick = ()=>{ tr.remove(); recalc(); };
+  // Header
+  el('who').textContent = group || animalId || 'غير محدد';
+  el('gotoDash').onclick   = ()=> location.href='dashboard.html';
+  el('gotoEvents').onclick = ()=> location.href=`add-event.html?animalId=${encodeURIComponent(animalId||'')}`;
+  el('gotoEdit').onclick   = ()=> location.href=`nutrition.html?animalId=${encodeURIComponent(animalId||'')}&return=smart-feeding.html`;
 
-    // لو كتب اسم خامة موجودة، عبّي DM تلقائيًا وتخمين الفئة
-    nameEl.addEventListener('change', ()=>{
-      const f = FEEDS.find(x=>x.name===nameEl.value.trim());
-      if (f && !dmEl.value){ dmEl.value = f.dm; tr.querySelector('.src').textContent = 'يدوي'; }
-      if (!catEl.value){ catEl.value = guessCat(nameEl.value); }
-      setSplitRowState(tr);
-      recalc();
-    });
-    ;[dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setSplitRowState(tr); recalc(); }));
+  // Milk price local setting
+  const milkPriceInput = el('milkPrice');
+  milkPriceInput.value = localStorage.getItem('milkPrice') || '';
+  el('saveMilkPrice').onclick = ()=> localStorage.setItem('milkPrice', milkPriceInput.value||'');
 
-    setSplitRowState(tr);
+  async function fetchLastNutrition(){
+    let docs = [];
+    async function run(q){ const s=await getDocs(q); s.forEach(d=>docs.push({id:d.id,...d.data()})); }
+    // 1) by animal
+    if (animalId){
+      try{ await run(query(collection(db,'events'), where('animalId','==',String(animalId)), where('eventType','==','تغذية'), orderBy('createdAt','desc'), limit(1))); }catch{}
+      if(!docs.length){ try{ await run(query(collection(db,'events'), where('animalId','==',String(animalId)), where('type','==','تغذية'), orderBy('createdAt','desc'), limit(1))); }catch{} }
+      if(!docs.length){ try{ await run(query(collection(db,'events'), where('animalId','==',String(animalId)), orderBy('createdAt','desc'), limit(10))); }catch{} docs = docs.filter(x=> x.eventType==='تغذية' || x.type==='تغذية'); docs = docs.slice(0,1); }
+    }
+    // 2) by group
+    if (!docs.length && group){
+      try{ await run(query(collection(db,'events'), where('context.group','==',group), where('eventType','==','تغذية'), orderBy('createdAt','desc'), limit(1))); }catch{}
+      if(!docs.length){ try{ await run(query(collection(db,'events'), where('eventType','==','تغذية'), orderBy('createdAt','desc'), limit(30))); }catch{} docs = docs.filter(x=> x.context?.group===group); docs = docs.slice(0,1); }
+    }
+    return docs[0] || null;
   }
 
-  function updateModeUI(){
-    const mode = modeSel.value;
-    const tbl = document.getElementById('tbl');
-    tbl.classList.toggle('mode-percent', mode==='percent');
+  function clearTable(){ el('tbl').querySelector('tbody').innerHTML=''; }
+  function addRow(r){
+    const tr=document.createElement('tr');
+    const pDM = r.dm>0? (r.price/(r.dm/100)) : 0;
+    tr.innerHTML = `<td>${r.name||''}</td><td>${r.cat||''}</td><td>${r.dm||''}</td><td>${r.price||''}</td><td>${pDM?nf(pDM):'—'}</td>`+
+                   `<td>${r.pct||''}</td><td>${r.kg||''}</td><td>${r.kgDM?nf(r.kgDM):'—'}</td><td>${r.cost?nf(r.cost):'—'}</td>`;
+    el('tbl').querySelector('tbody').appendChild(tr);
+  }
 
-    // إظهار/إخفاء عناصر عليا
-    splitBox.style.display  = (mode==='split') ? '' : 'none';
-    totalsSplit.style.display = (mode==='split') ? 'flex' : 'none';
+  function analyze(ev){
+    const mode = ev?.nutrition?.mode || ev?.kpis?.mode || 'tmr_asfed';
+    const rows = (ev?.nutrition?.rows||[]).map(r=>({...r}));
+    el('mode').textContent = mode;
+    el('date').textContent = (ev?.eventDate ? new Date(ev.eventDate).toLocaleDateString('ar-EG') : '—');
+    el('species').textContent = ev?.context?.species || '—';
+    el('dim').textContent = ev?.context?.daysInMilk ?? '—';
+    el('dcc').textContent = ev?.context?.pregnancyDays ?? '—';
+    el('avgMilk').value = ev?.context?.avgMilkKg ?? '';
 
-    // إظهار/إخفاء الأعمدة حسب الوضع
-    let showCols = [];
-    if (mode==='asfed'){
-      showCols = ['name','cat','dm','pTon','pTonDM','kg','kgDM','cost','src','rm'];
-    }else if (mode==='percent'){
-      showCols = ['name','cat','dm','pTon','pTonDM','pct','src','rm'];
-    }else{ // split
-      showCols = ['name','cat','dm','pTon','pTonDM','pct','kg','kgDM','cost','src','rm'];
-    }
-    const shouldShow = new Set(showCols);
+    clearTable();
 
-    // th
-    document.querySelectorAll('th').forEach(th=>{
-      const col = th.dataset.col; if(!col) return;
-      th.style.display = shouldShow.has(col) ? '' : 'none';
-    });
-    // td
-    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-      tr.querySelectorAll('td').forEach(td=>{
-        const col = td.dataset.col; if(!col) return;
-        td.style.display = shouldShow.has(col) ? '' : 'none';
+    // helpers
+    let totDM=0, totCost=0, roughDM=0, concDM=0, dmFracMix=0, asFedMix=0; let msg='';
+    let asFedTotal=0; // إجمالي as-fed/رأس
+    let cpKg=0, fatKg=0, energyMcal=0; // مجاميع مغذيات على أساس DM
+    const setMsg=(t)=>{ el('msg').textContent=t; };
+
+    if (mode==='tmr_asfed'){
+      rows.forEach(r=>{
+        const pDM = r.dm>0? (r.price/(r.dm/100)) : 0;
+        const kgDM = (r.kg||0)*(r.dm||0)/100; r.kgDM=kgDM;
+        const cost = (kgDM/1000)*pDM; r.cost=cost;
+        const nut = getNut(r.name, r.cat);
+        cpKg   += kgDM * (nut.cp/100);
+        fatKg  += kgDM * (nut.fat/100);
+        energyMcal += kgDM * (nut.nel);
+        asFedTotal += (r.kg||0);
+        if ((r.cat||'conc')==='rough') roughDM+=kgDM; else concDM+=kgDM;
+        totDM+=kgDM; totCost+=cost; addRow(r);
       });
-      setSplitRowState(tr);
-    });
+      // mix price DM
+      let mixDM=0; rows.forEach(r=>{ const pDM=r.dm>0? (r.price/(r.dm/100)) : 0; const share = totDM>0? (r.kgDM/totDM):0; mixDM += share*pDM; });
+      el('kpiMix').textContent = mixDM? nf(mixDM):'—';
+      // DM% of mix
+      const dmPct = (asFedTotal>0 && totDM>0)? (totDM/asFedTotal*100) : 0;
+      el('kpiDmpct').textContent = dmPct? nf(dmPct)+'%':'—';
+      el('afBox').style.display='none';
+    } else if (mode==='tmr_percent'){
+      // show percent column; need as-fed total to compute DM/cost
+      el('afBox').style.display='inline-flex';
+      const totalAf = parseFloat(el('asFedKg').value)||0;
+      rows.forEach(r=>{ dmFracMix += (r.pct||0)/100 * (r.dm||0)/100; asFedMix += (r.pct||0)/100 * (r.price||0); });
+      const mixPriceDM = dmFracMix>0 ? (asFedMix/dmFracMix) : 0;
+      el('kpiMix').textContent = mixPriceDM? nf(mixPriceDM):'—';
+      el('kpiDmpct').textContent = dmFracMix? nf(dmFracMix*100)+'%':'—';
+      if (Math.abs(rows.reduce((a,b)=>a+(b.pct||0),0) - 100) > 0.5) setMsg('أدخل كمية الخلطة as-fed/رأس لحساب DM والتكلفة والقيم الغذائية.');
+      }
+    } else { // split
+      // concentrate block from percents + concKgAf
+      const concKgAf = parseFloat(ev?.nutrition?.concKgAf||0) || 0;
+      const concRows = rows.filter(r=> (r.cat||'conc')==='conc');
+      const roughRows= rows.filter(r=> (r.cat||'conc')==='rough');
+      let concDmFrac=0, concAs=0, concCPfrac=0, concFatFrac=0, concNELfrac=0;
+      concRows.forEach(r=>{ 
+        const dmfr = (r.pct||0)/100 * (r.dm||0)/100; 
+        const nut = getNut(r.name, r.cat);
+        concDmFrac += dmfr; concAs += (r.pct||0)/100 * (r.price||0);
+        concCPfrac  += dmfr * (nut.cp/100);
+        concFatFrac += dmfr * (nut.fat/100);
+        concNELfrac += dmfr * (nut.nel);
+      });
+      const concPriceDM = concDmFrac>0? (concAs/concDmFrac) : 0;
+      const concKgDM = concKgAf * concDmFrac; const concCost = (concKgDM/1000) * concPriceDM;
+      const concCPpct = concDmFrac>0? (concCPfrac/concDmFrac*100) : 0;
+      const concFatpct= concDmFrac>0? (concFatFrac/concDmFrac*100) : 0;
+      const concNEL   = concDmFrac>0? (concNELfrac/concDmFrac) : 0; // MJ/kg DM
+      // accumulate concentrate nutrients
+      cpKg   += concKgDM * (concCPpct/100);
+      fatKg  += concKgDM * (concFatpct/100);
+      energyMcal += concKgDM * concNEL;
+      concDM += concKgDM; totCost += concCost; asFedTotal += concKgAf;
 
-    // تحكم في شريط الإجماليات الأساسي
-    document.getElementById('pillMix').style.display = (mode==='split') ? 'none' : '';
-    pillSumPct.style.display = (mode==='percent') ? 'inline-flex' : 'none';
+      roughRows.forEach(r=>{
+        const pDM = r.dm>0? (r.price/(r.dm/100)) : 0;
+        const kgDM = (r.kg||0)*(r.dm||0)/100; r.kgDM=kgDM; r.cost=(kgDM/1000)*pDM; 
+        const nut = getNut(r.name, r.cat);
+        cpKg   += kgDM * (nut.cp/100);
+        fatKg  += kgDM * (nut.fat/100);
+        energyMcal += kgDM * (nut.nel);
+        asFedTotal += (r.kg||0);
+        roughDM+=kgDM; totCost+=r.cost; addRow(r);
+      });
+      // Add a synthetic row for concentrate result
+      addRow({ name:'مركز — نتيجة الخلطة', cat:'conc', dm: nf(concDmFrac*100), price: '', pct: '—', kg: nf(concKgAf), kgDM: concKgDM, cost: concCost });
+      totDM = roughDM + concDM;
+      // mix price DM weighted
+      let mixDM=0; const allRows=[...roughRows,{dm:concDmFrac*100, kgDM:concKgDM, price: (concDmFrac>0? (concAs/concDmFrac*(concDmFrac*100/100)):0)}];
+      allRows.forEach(r=>{ const pDM=r.dm>0? ((r.price && typeof r.price==='number')? r.price/(r.dm/100) : (concPriceDM)) : 0; const share = totDM>0? (r.kgDM/totDM):0; mixDM += share*pDM; });
+      el('kpiMix').textContent = mixDM? nf(mixDM):'—';
+      el('kpiDmpct').textContent = '—';
+    }
 
-    recalc();
+    // === مؤشر جودة التغذية ===
+    const energyPerDM = (totDM>0) ? (energyMcal / totDM) : null; // MJ/kg DM
+    const speciesTxt = (ev?.context?.species||'بقر');
+    const cpBand    = (speciesTxt==='جاموس') ? [11,13,16,18] : [12,14,18,20]; // [min,goodMin,goodMax,max] %
+    const roughBand = [35,40,60,70];
+    const fatBand   = [2,3,6,8];
+    const enBand    = [5.5,6.2,7.2,8.0];
+    const milkKgQ   = parseFloat(el('avgMilk').value)||0;
+    const dmiPerKg  = (milkKgQ>0 && totDM>0) ? (totDM/milkKgQ) : null;
+    const effBand   = [0.7,0.8,1.0,1.3];
+
+    const roughPct = (totDM>0)? (roughDM/totDM*100):null;
+    const cpPctVal = (totDM>0)? (cpKg/totDM*100):null;
+    const fatPctVal= (totDM>0)? (fatKg/totDM*100):null;
+
+    let scores=[]; 
+    const sRough = bandScore(roughPct, ...roughBand); if (sRough!=null) scores.push({w:0.25,s:sRough});
+    const sCP    = bandScore(cpPctVal, ...cpBand);   if (sCP   !=null) scores.push({w:0.25,s:sCP});
+    const sEn    = bandScore(energyPerDM, ...enBand);if (sEn   !=null) scores.push({w:0.25,s:sEn});
+    const sFat   = bandScore(fatPctVal, ...fatBand); if (sFat  !=null) scores.push({w:0.10,s:sFat});
+    const sEff   = bandScore(dmiPerKg, ...effBand);  if (sEff  !=null) scores.push({w:0.15,s:sEff});
+
+    const wsum = scores.reduce((a,b)=>a+b.w,0);
+    let q = (wsum>0)? (scores.reduce((a,b)=> a + b.w*b.s, 0) / wsum) : null;
+    if (q!=null){ q = Math.round(q); qFill.style.width = q+'%'; qScore.textContent = q.toString(); qLabel.textContent = gradeLabel(q); }
+    else { qFill.style.width='0%'; qScore.textContent='—'; qLabel.textContent='—'; }
+
+    // KPIs
+    el('kpiDM').textContent   = totDM? nf(totDM):'—';
+    el('kpiCost').textContent = (totCost||totCost===0)? nf(totCost):'—';
+    const fPct = totDM>0? (roughDM/totDM*100):0, cPct=100-fPct; el('kpiFC').textContent = (totDM>0? `${nf(fPct)}% : ${nf(cPct)}%` : '—');
+
+    el('kpiAsFedTotal').textContent = asFedTotal? nf(asFedTotal):'—';
+    const cpPct = totDM>0? (cpKg/totDM*100) : 0; el('kpiCPpct').textContent = cpPct? nf(cpPct)+'%':'—';
+    const fatPct= totDM>0? (fatKg/totDM*100): 0; el('kpiFatPct').textContent= fatPct? nf(fatPct)+'%':'—';
+    el('kpiEnergy').textContent = energyMcal? nf(energyMcal):'—';
+
+    const milkKg = parseFloat(el('avgMilk').value)||0; const milkPrice = parseFloat(milkPriceInput.value)||0;
+    if (milkKg>0){
+      const feedPerKg = totCost>0? (totCost/milkKg) : 0; el('kpiFeedPerKg').textContent = nf(feedPerKg);
+      const dmiPerKg  = totDM>0? (totDM/milkKg) : 0; el('kpiDMIperKg').textContent = dmiPerKg? nf(dmiPerKg):'—';
+      const milkCostTotal = feedPerKg * 1.25; el('kpiMilkCostTotal').textContent = nf(milkCostTotal);
+      if (milkPrice>0){ const margin = milkKg*milkPrice - totCost; el('kpiMargin').textContent = nf(margin); } else el('kpiMargin').textContent='—';
+    } else {
+      el('kpiFeedPerKg').textContent='—';
+      el('kpiMargin').textContent='—';
+      el('kpiDMIperKg').textContent='—';
+      el('kpiMilkCostTotal').textContent='—';
+    }
+
+    // Diagnostics (بسيطة كبداية)
+    const notes=[]; const species = (ev?.context?.species||'بقر');
+    if (mode!=='tmr_percent' && totDM>0){
+      if (fPct<40) notes.push('نسبة المادة الخشنة منخفضة (<40% DM).');
+      if (species==='بقر' && (milkKg>0 && (totDM/milkKg)<0.8)) notes.push('مدخول DM/إنتاج منخفض — راجع الطاقة/الألياف.');
+    }
+    const box = el('diagnostics'); const ul=el('notes');
+    if (notes.length){ box.style.display='block'; ul.innerHTML=''; notes.forEach(n=>{ const li=document.createElement('li'); li.textContent=n; ul.appendChild(li); }); }
+    else { box.style.display='none'; ul.innerHTML=''; }
   }
 
-  // تحميل الصفوف المخزنة أو سطر فارغ
-  if (rows.length){ rows.forEach(addRow); } else { addRow({}); }
+  async function refresh(){
+    el('msg').textContent=''; clearTable();
+    const ev = await fetchLastNutrition();
+    if (!ev){ el('msg').textContent='لا يوجد حدث تغذية محفوظ بعد لهذا الهدف.'; return; }
+    lastEv = ev;
+    analyze(ev);
+  }
 
-  // إضافة خامة جاهزة
-  addPresetBtn.onclick = ()=>{
-    const idx = parseInt(presetSel.value); if (isNaN(idx)) return;
-    const f = FEEDS[idx]; addRow({ name:f.name, dm:f.dm, price:'', kg:'', pct:'', cat: guessCat(f.name), src:'يدوي' }); recalc();
-  };
+  el('refresh').onclick = refresh;
+  el('avgMilk').addEventListener('input', ()=> lastEv? analyze(lastEv):refresh());
+  el('milkPrice').addEventListener('input', ()=> lastEv? analyze(lastEv):refresh());
+  el('asFedKg').addEventListener('input', ()=> lastEv? analyze(lastEv):refresh());
 
-  saveBtn.onclick = ()=>{ alert('✔️ تم حفظ الخلطة محليًا'); };
-  clearBtn.onclick = ()=>{ if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addRow({}); recalc(); } };
-
-  // زر تحديث الأسعار من السوق العالمي (جاهز للمستقبل) — يحاول القراءة من Firestore feedPrices/{symbol}
-  fetchBtn.onclick = async ()=>{
-    try{
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-      const { getFirestore, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-      const cfgMod = await import('./js/firebase-config.js');
-      const app = initializeApp(cfgMod.firebaseConfig);
-      const db  = getFirestore(app);
-
-      // لكل صف، لو الاسم معروف وله رمز، حاول جيب priceEGP أو (priceUSD×usdToEgp)
-      const trs = Array.from(tbody.querySelectorAll('tr'));
-      for (const tr of trs){
-        const name = tr.querySelector('.name').value.trim();
-        const f = FEEDS.find(x=>x.name===name);
-        if(!f || !f.symbol) continue;
-        const ref = doc(db, 'feedPrices', f.symbol);
-        const snap= await getDoc(ref);
-        if (snap.exists()){
-          const data = snap.data();
-          const price = (data.priceEGP || (data.priceUSD && data.usdToEgp ? data.priceUSD*data.usdToEgp : null));
-          if (price){ tr.querySelector('.pTon').value = price; tr.querySelector('.src').textContent = 'عالمي'; }
-        }
-      }
-      recalc();
-      document.getElementById('srcHint').textContent = ' (تم التحديث إن وُجدت بيانات)';
-    }catch(e){
-      console.warn('Global price fetch not configured', e);
-      alert('ℹ️ لم يتم تفعيل ربط السوق العالمي بعد. استخدم الأسعار اليدوية مؤقتًا.');
-    }
-  };
-
-  modeSel.addEventListener('change', updateModeUI);
-  document.getElementById('concKgInput').addEventListener('input', recalc);
-  updateModeUI();
-
-  // اليوم المحلي
-  const todayLocal2 = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-  try{ document.getElementById('today').textContent = new Date(todayLocal2()).toLocaleDateString('ar-EG'); }catch{ document.getElementById('today').textContent = todayLocal2(); }
-
-  function nf(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
+  onAuthStateChanged(auth, (user)=>{ if(!user){ location.href='login.html'; } else { refresh(); } });
 </script>
 </body>
 </html>
