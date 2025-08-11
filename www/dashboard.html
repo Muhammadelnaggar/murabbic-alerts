@@ -7,10 +7,10 @@
   <style>
     body{background:#fff9db;font-family:Arial,sans-serif;padding:20px;color:#1b5e20;margin:0}
     h1{text-align:center;font-size:28px;font-weight:bold;margin:0 0 10px}
-    /* شريط ذكي صغير وبسيط */
+    /* شريط مؤشرات بسيط للقطيع */
     .smartbar{max-width:980px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #c5e1a5;background:#f1f8e9}
-    /* الشبكة القديمة كما هي */
+    /* الشبكة الأصلية */
     .dashboard{max-width:980px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:15px}
     .card{background:#eafbe7;padding:20px;border-radius:12px;text-align:center;font-size:18px;font-weight:bold;cursor:pointer;border:2px solid #c5e1a5;box-shadow:2px 2px 5px rgba(0,0,0,.1)}
     .card:hover{background:#dcedc8}
@@ -20,33 +20,13 @@
 <body>
   <h1>📊 لوحة التحكم - مربيك</h1>
 
-  <!-- الشريط الذكي -->
-  <div class="smartbar" id="smartbar">
+  <!-- مؤشرات القطيع كله -->
+  <div class="smartbar">
     <span class="chip" id="chipDay">📅 اليوم: —</span>
     <span class="chip">🥛 لبن اليوم: <b id="chipMilk">—</b> لتر</span>
     <span class="chip">📅 تلقيحات (30ي): <b id="chipIns">—</b></span>
-    <span class="chip">💰 صافي تقديري: <b id="chipNet">—</b></span>
+    <span class="chip">👶 ولادات (30ي): <b id="chipCalv">—</b></span>
+    <span class="chip">💰 صافي اليوم: <b id="chipNet">—</b></span>
   </div>
 
-  <!-- شبكة الكروت الأصلية (لم أحذف شيئًا) -->
-  <div class="dashboard">
-    <div class="card" onclick="location.href='add-animal.html'">
-      <span class="icon">➕</span>تسجيل حيوان جديد
-    </div>
-    <div class="card" onclick="location.href='animal-list.html'">
-      <span class="icon">📋</span>قائمة الحيوانات
-    </div>
-    <div class="card" onclick="location.href='add-event.html'">
-      <span class="icon">🗓️</span>تسجيل الأحداث
-    </div>
-    <div class="card" onclick="location.href='alerts.html'">
-      <span class="icon">🔔</span>التنبيهات الذكية
-    </div>
-
-    <!-- غيّرت ده فقط: بدل onclick حطّيت id علشان Mini-Prompt لو مفيش رقم -->
-    <div class="card" id="btnCowCard">
-      <span class="icon">🆔</span>البطاقة الذكية
-    </div>
-
-    <div class="card" onclick="location.href='daily-milk.html'">
-      <s
+  <!-- شبكة الأزرار كاملة كما ه
