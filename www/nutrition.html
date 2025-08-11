@@ -185,34 +185,30 @@
   document.getElementById('animalInfo').textContent = animalId || 'غير محدد';
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
-  // ===== خامات مقترحة
+  // ===== لستة الخامات (عامية مربيك) =====
   const FEEDS = [
-    { name:'ذرة صفراء مجروشة', dm:88 },
-    { name:'شعير', dm:88 },
-    { name:'ردة قمح (نخالة)', dm:89 },
-    { name:'كسب فول صويا 44%', dm:89 },
-    { name:'كسب فول صويا 48%', dm:89 },
-    { name:'كسب عباد الشمس', dm:89 },
-    { name:'كسب كانولا', dm:90 },
-    { name:'DDGS (ذرة)', dm:90 },
-    { name:'جلوتين فيد (CGF)', dm:90 },
-    { name:'جلوتين ميل (CGM)', dm:90 },
-    { name:'لب بنجر مجفف', dm:90 },
-    { name:'لب بنجر مبلل', dm:25 },
-    { name:'مولاس', dm:75 },
-    { name:'سيلاج ذرة', dm:33 },
-    { name:'برسيم أخضر', dm:18 },
-    { name:'دريس برسيم', dm:90 },
-    { name:'قش/تبن', dm:90 },
-    { name:'بذرة قطن كاملة', dm:92 },
-    { name:'كسب قطن', dm:92 },
-    { name:'كسب نخيل', dm:90 },
-    { name:'مخلوط معادن/فيتامينات', dm:95 },
+    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
+    { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
+    { name:'كسب فول صويا 44%', dm:89 }, { name:'كسب فول صويا 48%', dm:89 },
+    { name:'كسب عباد الشمس', dm:89 }, { name:'كسب كانولا', dm:90 },
+    { name:'DDGS (ذرة)', dm:90 }, { name:'جلوتين فيد (CGF)', dm:90 },
+    { name:'جلوتين ميل (CGM)', dm:90 }, { name:'لب بنجر مجفف', dm:90 },
+    { name:'لب بنجر مبلل', dm:25 }, { name:'مولاس', dm:75 },
+    { name:'سيلاج ذرة', dm:33 }, { name:'برسيم أخضر', dm:18 },
+    { name:'دريس برسيم', dm:90 }, { name:'قش/تبن', dm:90 },
+    { name:'بذرة قطن كاملة', dm:92 }, { name:'كسب قطن', dm:92 },
+    { name:'كسب نخيل', dm:90 }, { name:'مخلوط معادن/فيتامينات', dm:95 },
   ];
 
+  // تعبئة قائمة الـ preset
   FEEDS.forEach((f,i)=>{
     const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o);
   });
+
+  // datalist للاقتراح بالكتابة في عمود الاسم
+  const dl = document.createElement('datalist'); dl.id = 'feedlist';
+  FEEDS.forEach(f => { const o = document.createElement('option'); o.value = f.name; dl.appendChild(o); });
+  document.body.appendChild(dl);
 
   const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
@@ -235,11 +231,6 @@
     tbody.appendChild(tr);
     hookRow(tr, feed);
   }
-
-  // datalist
-  const dl = document.createElement('datalist'); dl.id='feedlist';
-  FEEDS.forEach(f=>{ const o=document.createElement('option'); o.value=f.name; dl.appendChild(o); });
-  document.body.appendChild(dl);
 
   function nf(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
 
@@ -336,9 +327,9 @@
       document.getElementById('sumPctConc').textContent = nf(concSumPct)+'%';
       document.getElementById('concDMpct').textContent = nf(concDmFrac*100)+'%';
       document.getElementById('concPriceDM').textContent = concPriceDM? nf(concPriceDM):'—';
-      document.getElementById('concKgShow').textContent = concKg? nf(concKg):'—';
-      document.getElementById('concKgDM').textContent = concKgDM? nf(concKgDM):'—';
-      document.getElementById('concCost').textContent = concCost? nf(concCost):'—';
+      document.getElementById('concKgShow').textContent  = concKg? nf(concKg):'—';
+      document.getElementById('concKgDM').textContent    = concKgDM? nf(concKgDM):'—';
+      document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
       document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
 
       document.getElementById('totDM').textContent = totalDMAll? nf(totalDMAll):'—';
@@ -433,7 +424,7 @@
     };
 
     try{
-      const docRef = await addDoc(collection(db, 'events'), {
+      await addDoc(collection(db, 'events'), {
         userId: auth?.currentUser?.uid || null,
         animalId: animalId,
         animalNumber: animalId,
