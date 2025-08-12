@@ -81,20 +81,29 @@
   </div>
 
   <form id="eventForm">
-    <div class="button-group" id="eventTypeGroup">
-      <button type="button" data-page="calving.html">👶 ولادة</button>
-      <button type="button" data-page="insemination.html">📅 تلقيح</button>
-      <button type="button" data-page="vaccination.html">💉 تحصين</button>
-      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-      <button type="button" data-page="disease.html">🔬 التشخيص</button>
-      <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
-      <button type="button" data-page="protocols.html">📋 برامج وإجراءات</button>
-      <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-    </div>
+   <div class="button-group" id="eventTypeGroup">
+  <button type="button" data-page="calving.html">👶 ولادة</button>
+  <button type="button" data-page="insemination.html">📅 تلقيح</button>
+  <button type="button" data-page="vaccination.html">💉 تحصين</button>
+  <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+  <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+  <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+  <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+  <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+  <button type="button" data-page="disease.html">🔬 التشخيص</button>
+
+  <!-- يبقى زر التقليم كما هو (تسجيل فوري + رسالة داخلية) -->
+  <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+
+  <!-- ⚠️ تم الاستبدال: كان "protocols.html" -->
+  <button type="button" data-page="abortion.html">🩸 إجهاض</button>
+
+  <!-- زر جديد -->
+  <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+
+  <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+</div>
+
 
     <!-- صندوق رسالة داخلي (بدون تنبيه منبثق) -->
     <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none">
@@ -270,4 +279,5 @@
 
 </body>
 </html>
+
 
