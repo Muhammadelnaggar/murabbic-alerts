@@ -1,378 +1,445 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <!-- احفظ الملف بهذا الاسم: www/visual-eval.html -->
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>📷 التقييم البصري — Murabbik</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تقييم الحيوان بالكاميرا — مُرَبِّك</title>
   <style>
-    :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32}
+    :root{
+      --green:#0ea05a; /* الأخضر الأساسي */
+      --green-600:#0b7f47;
+      --bg:#f7faf7;    /* خلفية خفيفة */
+      --text:#0f172a;  /* أسود مائل للأزرق لقراءة جيدة */
+      --muted:#64748b; /* رمادي للنصوص الثانوية */
+      --card:#ffffff;  /* خلفيات البطاقات */
+      --danger:#c2410c; /* تنبيه */
+    }
     *{box-sizing:border-box}
-    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;color:#1b5e20;padding:12px}
-    h1{margin:0 0 10px;text-align:center;color:var(--green);font-size:22px}
-    .wrap{max-width:980px;margin:0 auto}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;font-size:13px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
-    button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
-    .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
-    .btn-primary{background:var(--green);color:#fff}
-    .muted{opacity:.9}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+    body{
+      margin:0; font-family: system-ui, 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
+      background:var(--bg); color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10; background:var(--card);
+      border-bottom:1px solid #e2e8f0; padding:12px 16px;
+      display:flex; align-items:center; gap:12px;
+    }
+    .title{font-weight:800; color:var(--green); margin:0}
+    .badge{background:#e6f8ef; color:var(--green-600); padding:4px 8px; border-radius:999px; font-size:12px}
+    .container{max-width:960px; margin:16px auto; padding:0 16px}
+    .card{background:var(--card); border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    .row{display:grid; grid-template-columns:1fr; gap:12px}
+    @media(min-width:860px){.row{grid-template-columns: 1.2fr .8fr}}
 
-    .stepper{display:flex;gap:8px;flex-wrap:wrap}
-    .step{padding:8px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-weight:bold}
-    .step.active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px}
+    .controls .select, .controls .input{padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; background:#fff}
+    .controls .btn{padding:10px 14px; border:none; border-radius:12px; cursor:pointer; font-weight:700}
+    .btn-primary{background:var(--green); color:#fff}
+    .btn-light{background:#f1f5f9; color:#0f172a}
+    .btn-danger{background:var(--danger); color:#fff}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
 
-    .media{position:relative;background:#000;border-radius:12px;overflow:hidden;min-height:240px}
-    video,canvas{width:100%;height:auto;display:block}
-    .overlay{position:absolute;inset:0;pointer-events:none}
-    .overlay::before{content:"";position:absolute;inset:10% 8%;border:2px dashed rgba(255,255,255,.6);border-radius:12px}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .angles{display:flex; gap:8px; padding:12px; border-bottom:1px solid #e2e8f0}
+    .angle-tab{padding:8px 12px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; color:#0f172a}
+    .angle-tab.active{background:var(--green); color:#fff; border-color:var(--green)}
 
-    .pointsHint{font-size:13px;color:#1b5e20}
-    .pointsBar{display:flex;gap:6px;flex-wrap:wrap}
-    .ptBadge{padding:6px 8px;border-radius:8px;border:1px dashed #8bc34a;background:#f7fff4}
-    .ptBadge.done{background:#dcedc8;border-style:solid}
+    .preview-wrap{position:relative; border-radius:16px; overflow:hidden; background:#000}
+    video#preview{width:100%; height:auto; display:block; background:#000}
+    canvas#overlay{position:absolute; inset:0; pointer-events:none}
 
-    .kpi{background:#eafbe7;border:1px solid #e0ebd3;border-radius:10px;padding:10px;text-align:center}
-    .kpi b{display:block;font-size:18px;margin-top:4px;color:#1b5e20}
+    .capture-bar{display:flex; gap:8px; padding:12px; border-top:1px solid #e2e8f0; justify-content:space-between}
+    .status{display:flex; gap:8px; flex-wrap:wrap}
+    .thumb{width:72px; height:72px; border-radius:12px; overflow:hidden; border:2px solid #e2e8f0; background:#f8fafc; position:relative}
+    .thumb img{width:100%; height:100%; object-fit:cover}
+    .thumb .label{position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.5); color:#fff; font-size:11px; text-align:center}
 
-    .notice{display:none;border:1px solid var(--border);background:#fff;padding:12px;border-radius:10px}
+    .helper{padding:12px; color:var(--muted); line-height:1.8}
+    .helper strong{color:var(--green-600)}
+
+    .checklist{padding:12px; display:grid; gap:8px}
+    .checklist h3{margin:8px 0; color:var(--green-600)}
+    .checklist label{display:flex; align-items:center; gap:8px}
+    .save-bar{display:flex; gap:8px; padding:12px; border-top:1px solid #e2e8f0}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>📷 التقييم البصري — Murabbik</h1>
-  <div class="row" id="hdrInfo">
-    <span class="pill">🐄 الحيوان: <b id="who">—</b></span>
-    <span class="pill">📅 التاريخ: <b id="when">—</b></span>
-    <span class="pill">👁️ اللقطة: <b id="viewLbl">—</b></span>
-  </div>
+  <header>
+    <h1 class="title">تقييم بالكاميرا</h1>
+    <span class="badge">مُرَبِّك</span>
+    <div style="margin-inline-start:auto; color:var(--muted); font-weight:700">رقم الحيوان: <span class="animal-number">—</span></div>
+  </header>
 
-  <div class="card">
-    <div class="stepper" id="stepper"></div>
-    <div class="media" id="mediaBox">
-      <video id="preview" playsinline muted></video>
-      <canvas id="snap" style="display:none"></canvas>
-      <div class="overlay"></div>
-    </div>
-    <div class="controls">
-      <button id="startCam" class="btn">🎥 تشغيل الكاميرا</button>
-      <button id="capture" class="btn-primary">📸 التقط</button>
-      <button id="retake" class="btn">↩️ إعادة</button>
-      <label class="btn" style="position:relative;overflow:hidden">
-        ⬆️ رفع صورة
-        <input id="uploader" type="file" accept="image/*" capture="environment" style="position:absolute;inset:0;opacity:0"/>
-      </label>
-      <button id="next" class="btn">التالي ▶️</button>
-    </div>
-    <div class="notice" id="camMsg"></div>
-  </div>
-
-  <div class="card" id="rearTools" style="display:none">
-    <div class="row" style="justify-content:space-between;align-items:flex-start">
-      <div class="pointsHint">
-        ضع النقاط بالترتيب:
-        <ol style="margin:6px 0 0 18px">
-          <li>حلمة خلفية يسار</li>
-          <li>حلمة خلفية يمين</li>
-          <li>حلمة أمامية يسار</li>
-          <li>حلمة أمامية يمين</li>
-          <li>عرض الضرع — يسار</li>
-          <li>عرض الضرع — يمين</li>
-        </ol>
+  <div class="container row">
+    <!-- عمود الكاميرا -->
+    <section class="card" id="cameraCard">
+      <div class="angles">
+        <button class="angle-tab active" data-angle="side">جانب</button>
+        <button class="angle-tab" data-angle="udder-front">ضرع أمامي</button>
+        <button class="angle-tab" data-angle="udder-rear">ضرع خلفي</button>
+        <button class="angle-tab" data-angle="teat-close">قريب الحلمات</button>
       </div>
-      <div class="pointsBar" id="pointsBar"></div>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button id="undoPoint" class="btn">تراجع عن آخر نقطة</button>
-      <button id="clearPoints" class="btn">مسح النقاط</button>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="grid">
-      <div class="kpi"><span class="muted">تماثل الضرع</span><b id="kSym">—</b></div>
-      <div class="kpi"><span class="muted">اتساع وضع الحلمات</span><b id="kPlace">—</b></div>
-      <div class="kpi"><span class="muted">ملاحظات</span><b id="kNotes">—</b></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <div class="row">
-        <button id="saveEval" class="btn-primary">💾 حفظ التقييم</button>
+      <div class="controls">
+        <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
+        <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
+        <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
+        <div style="margin-inline-start:auto"></div>
+        <button id="captureBtn" class="btn btn-primary">التقاط</button>
+        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
+        <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
       </div>
-      <div class="row">
-        <button id="gotoCard" class="btn">بطاقة الحيوان</button>
-        <button id="gotoDash" class="btn">لوحة التحكم</button>
+
+      <div class="preview-wrap">
+        <video id="preview" playsinline autoplay muted></video>
+        <canvas id="overlay"></canvas>
       </div>
-    </div>
+
+      <div class="capture-bar">
+        <div class="status" id="thumbs"></div>
+        <div class="helper" id="helperText">وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يجب أن يضم من الكتف إلى نهاية الحوض، مع وجود الأرضية في أسفل الإطار.</div>
+      </div>
+    </section>
+
+    <!-- عمود الملاحظات السريعة -->
+    <aside class="card">
+      <form id="metaForm" style="padding:12px">
+        <input type="hidden" id="animalId" name="animalId" />
+        <label style="display:block; margin:6px 0">تاريخ التقييم
+          <input type="date" id="eventDate" name="eventDate" class="input" required />
+        </label>
+      </form>
+
+      <div class="checklist">
+        <h3>ملاحظات سريعة (اختياري)</h3>
+        <label><input type="checkbox" id="isClean"/> الحيوان نظيف وجاف</label>
+        <label><input type="checkbox" id="goodLight"/> الإضاءة كافية (بدون ظلال قوية)</label>
+        <label><input type="checkbox" id="onFlat"/> الأرض مستوية</label>
+        <label><input type="checkbox" id="animalStanding"/> الحيوان واقف بثبات</label>
+        <label><input type="checkbox" id="teatsVisible"/> الحلمات واضحة</label>
+      </div>
+
+      <div class="save-bar">
+        <button id="saveBtn" class="btn btn-primary" style="width:100%">حفظ التقييم والصور</button>
+      </div>
+    </aside>
   </div>
-</div>
 
-<script type="module">
-  // === Firebase setup (مرن) ===
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { getStorage, ref as sRef, uploadString } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+  <script type="module">
+    /*
+      اسم الملف المُعتمد للحفظ: www/visual-eval.html
+      ملاحظة مهمة: هذا الملف يتوقع أن لديك ملف تهيئة Firebase على المسار التالي
+      www/js/firebase-config.js
+      الذي يصدّر (db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL)
+      بنفس أسلوب مشروع مُرَبِّك الحالي.
+      إن اختلفت صادراتك، عدّل أسطر الاستيراد أدناه بما يلائم.
+    */
+    import { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } from './www/js/firebase-config.js';
 
-  let app, db, auth, storage;
-  try{
-    const mod = await import('./js/firebase-config.js');
-    if (mod?.db && mod?.auth){ app = mod.app; db = mod.db; auth = mod.auth; storage = getStorage(app); }
-    else if (mod?.firebaseConfig){ app = initializeApp(mod.firebaseConfig); db = getFirestore(app); auth = getAuth(app); storage = getStorage(app); }
-    else { throw new Error('Bad firebase-config.js'); }
-  }catch(e){
-    console.error('Firebase config load failed', e);
-    const fallback = { apiKey:"AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc", authDomain:"murabbik.firebaseapp.com", projectId:"murabbik", storageBucket:"murabbik.appspot.com", messagingSenderId:"402719243568", appId:"1:402719243568:web:631114a260d23202dd5cf5" };
-    app = initializeApp(fallback); db = getFirestore(app); auth = getAuth(app); storage = getStorage(app);
-  }
+    // ---------- أدوات مساعدة عامة ----------
+    const qs = new URLSearchParams(location.search);
+    const $ = (s, p=document)=> p.querySelector(s);
+    const $$ = (s, p=document)=> [...p.querySelectorAll(s)];
 
-  // === Helpers / State ===
-  const qs = new URLSearchParams(location.search);
-  const animalId = qs.get('animalId') || qs.get('number') || localStorage.getItem('lastAnimalId') || '';
-  const today = new Date();
-  const whenStr = today.toISOString().slice(0,10);
-  const el = (id)=> document.getElementById(id);
-  const nf = (x)=> new Intl.NumberFormat('ar-EG',{maximumFractionDigits:1}).format(x||0);
-
-  el('who').textContent = animalId || 'غير محدد';
-  el('when').textContent = today.toLocaleDateString('ar-EG');
-  el('gotoDash').onclick = ()=> location.href = 'dashboard.html';
-  el('gotoCard').onclick = ()=> { if (animalId){ location.href = `cow-card.html?animalId=${encodeURIComponent(animalId)}&number=${encodeURIComponent(animalId)}` } };
-
-  if (!animalId){
-    const msg = el('camMsg');
-    msg.textContent = '⚠️ لم يتم تحديد رقم الحيوان. سيتم حفظ التقييم بدون ربط ما لم تدخل رقمًا في بطاقة الحيوان لاحقًا.';
-    msg.style.display = 'block';
-  }
-
-  const views = [
-    {key:'left',   label:'جانب يسار'},
-    {key:'right',  label:'جانب يمين'},
-    {key:'rear',   label:'خلف — الضرع'},
-    {key:'rear34', label:'¾ خلفي'}
-  ];
-  let cur = 0; // index of view
-  let mediaStream = null;
-  const images = {}; // key -> dataURL
-  const points = { rear: [] }; // array of points for rear view
-
-  // Build stepper
-  const stepper = el('stepper');
-  function renderStepper(){
-    stepper.innerHTML = '';
-    views.forEach((v,i)=>{
-      const s = document.createElement('div');
-      s.className = 'step'+(i===cur?' active':'');
-      s.textContent = `${i+1}) ${v.label}${images[v.key]? ' ✅':''}`;
-      stepper.appendChild(s);
-    });
-    el('viewLbl').textContent = views[cur].label;
-  }
-  renderStepper();
-
-  // Camera controls
-  const video = el('preview');
-  const canvas = el('snap');
-  const ctx = canvas.getContext('2d');
-  const camMsg = el('camMsg');
-
-  async function startCam(){
-    try{
-      stopCam();
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal:'environment' } }, audio:false });
-      video.srcObject = mediaStream; await video.play();
-      video.style.display='block'; canvas.style.display='none';
-      camMsg.style.display='none';
-    }catch(err){
-      console.error(err);
-      camMsg.textContent = 'لا يمكن تشغيل الكاميرا — يمكنك رفع صورة من جهازك.';
-      camMsg.style.display = 'block';
+    function todayCairo(){
+      const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
+      const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
     }
-  }
-  function stopCam(){
-    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
-  }
 
-  function capture(){
-    const vw = video.videoWidth || video.clientWidth; const vh = video.videoHeight || video.clientHeight;
-    if (!vw || !vh){ camMsg.textContent='الكاميرا غير جاهزة بعد.'; camMsg.style.display='block'; return; }
-    canvas.width = vw; canvas.height = vh;
-    ctx.drawImage(video, 0, 0, vw, vh);
-    video.style.display='none'; canvas.style.display='block';
-    const url = canvas.toDataURL('image/jpeg', 0.9);
-    images[views[cur].key] = url;
-    renderStepper();
-    maybeShowRearTools();
-  }
+    function getAnimalFromContext(){
+      const id = qs.get('animalId') || localStorage.getItem('currentAnimalId') || '';
+      const number = qs.get('number') || localStorage.getItem('currentAnimalNumber') || '';
+      const date = qs.get('date') || sessionStorage.getItem('currentEventDate') || localStorage.getItem('currentEventDate') || todayCairo();
+      if(id) localStorage.setItem('currentAnimalId', id);
+      if(number) localStorage.setItem('currentAnimalNumber', number);
+      if(date){ localStorage.setItem('currentEventDate', date); sessionStorage.setItem('currentEventDate', date); }
+      return {id, number, date};
+    }
 
-  function retake(){
-    // مسح الصورة الحالية لنفس الخطوة وإظهار الفيديو
-    delete images[views[cur].key];
-    renderStepper();
-    video.style.display='block'; canvas.style.display='none';
-    points.rear = [];
-    drawPoints(); updateMetrics();
-    el('rearTools').style.display = 'none';
-  }
-
-  function handleUpload(file){
-    const reader = new FileReader();
-    reader.onload = () =>{
-      const img = new Image();
-      img.onload = ()=>{
-        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img,0,0);
-        video.style.display='none'; canvas.style.display='block';
-        images[views[cur].key] = canvas.toDataURL('image/jpeg',0.9);
-        renderStepper();
-        maybeShowRearTools();
-      };
-      img.src = reader.result;
+    // ---------- حالة الصفحة ----------
+    const anglesOrder = ['side','udder-front','udder-rear','teat-close'];
+    const angleLabels = { 'side':'جانب', 'udder-front':'ضرع أمامي', 'udder-rear':'ضرع خلفي', 'teat-close':'قريب الحلمات' };
+    const helperByAngle = {
+      'side': 'وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يجب أن يضم من الكتف إلى نهاية الحوض، مع وجود الأرضية في أسفل الإطار.',
+      'udder-front': 'صوّر <strong>الضرع من الأمام</strong>؛ احرص أن تكون الأرجل الأمامية خارج الإطار قدر الإمكان والحلمات ظاهرة.',
+      'udder-rear': 'صوّر <strong>الضرع من الخلف</strong>؛ اجعل الذيل خارج الوسط والحلمات الأربع داخل الإطار.',
+      'teat-close': 'التقط <strong>قريب للحلمات</strong>؛ مركز الإطار بين الحلمات الأربع لمسح التموضع والطول.'
     };
-    reader.readAsDataURL(file);
-  }
 
-  function next(){
-    if (cur < views.length-1){ cur++; renderStepper(); points.rear=[]; drawPoints(); updateMetrics(); el('rearTools').style.display='none'; }
-    else { camMsg.textContent = 'انتهت الخطوات. يمكنك حفظ التقييم الآن.'; camMsg.style.display='block'; }
-  }
+    let state = {
+      currentAngle: 'side',
+      stream: null,
+      track: null,
+      capabilities: null,
+      torchOn: false,
+      captures: /** @type {Record<string,string|null>} */ ({
+        'side': null,
+        'udder-front': null,
+        'udder-rear': null,
+        'teat-close': null,
+      }),
+    };
 
-  function maybeShowRearTools(){
-    if (views[cur].key === 'rear' && images['rear']){ el('rearTools').style.display='block'; drawPoints(); updateMetrics(); }
-    else { el('rearTools').style.display='none'; }
-  }
+    // ---------- عناصر ----------
+    const preview = $('#preview');
+    const overlay = $('#overlay');
+    const cameraSelect = $('#cameraSelect');
+    const toggleFlash = $('#toggleFlash');
+    const restartBtn = $('#restartBtn');
+    const captureBtn = $('#captureBtn');
+    const retakeBtn = $('#retakeBtn');
+    const nextAngleBtn = $('#nextAngleBtn');
+    const thumbs = $('#thumbs');
+    const helperText = $('#helperText');
+    const metaForm = $('#metaForm');
+    const animalIdInput = $('#animalId');
+    const eventDateInput = $('#eventDate');
+    const saveBtn = $('#saveBtn');
+    const numberSpan = document.querySelector('.animal-number');
 
-  // === Rear points marking on canvas ===
-  const pointsOrder = [
-    'حلمة خلفية يسار','حلمة خلفية يمين','حلمة أمامية يسار','حلمة أمامية يمين','عرض الضرع — يسار','عرض الضرع — يمين'
-  ];
-  const pointsBar = el('pointsBar');
-  function renderPointsBar(){
-    pointsBar.innerHTML='';
-    pointsOrder.forEach((lbl,i)=>{
-      const div = document.createElement('div');
-      div.className = 'ptBadge'+(points.rear[i]? ' done':'');
-      div.textContent = (i+1)+') '+lbl;
-      pointsBar.appendChild(div);
-    });
-  }
-  function drawPoints(){
-    if (!images['rear']) return;
-    // redraw current image
-    const img = new Image(); img.onload = ()=>{
-      ctx.drawImage(img,0,0,canvas.width,canvas.height);
-      ctx.fillStyle = '#ff5252'; ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 2;
-      points.rear.forEach((p,idx)=>{
-        ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2); ctx.fill();
-        ctx.font = '14px Arial'; ctx.fillStyle = '#2e7d32'; ctx.fillText(String(idx+1), p.x+8, p.y-8);
-        ctx.fillStyle = '#ff5252';
+    // ---------- تهيئة السياق ----------
+    const ctx = getAnimalFromContext();
+    if(animalIdInput) animalIdInput.value = ctx.id || '';
+    if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
+    numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
+
+    // ---------- الكاميرا ----------
+    async function listCameras(){
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const cams = devs.filter(d=> d.kind === 'videoinput');
+      cameraSelect.innerHTML = '';
+      cams.forEach((c,i)=>{
+        const opt = document.createElement('option');
+        opt.value = c.deviceId; opt.textContent = c.label || `كاميرا ${i+1}`;
+        cameraSelect.appendChild(opt);
       });
-    }; img.src = images['rear'];
-    renderPointsBar();
-  }
-  canvas.addEventListener('click', (e)=>{
-    if (views[cur].key !== 'rear' || !images['rear']) return;
-    if (points.rear.length >= pointsOrder.length) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width/rect.width);
-    const y = (e.clientY - rect.top)  * (canvas.height/rect.height);
-    points.rear.push({x,y});
-    drawPoints(); updateMetrics();
-  });
-  el('undoPoint').onclick = ()=>{ points.rear.pop(); drawPoints(); updateMetrics(); };
-  el('clearPoints').onclick= ()=>{ points.rear=[]; drawPoints(); updateMetrics(); };
-
-  function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
-  function updateMetrics(){
-    // Compute simple metrics when we have at least width points
-    const kSym = el('kSym'); const kPlace = el('kPlace'); const kNotes = el('kNotes');
-    if (points.rear.length < 6){ kSym.textContent='—'; kPlace.textContent='—'; kNotes.textContent='—'; return; }
-    const [rrL, rrR, rfL, rfR, uL, uR] = points.rear; // naming: rear-left teat, rear-right teat, fore-left, fore-right
-    const w = Math.max(1, dist(uL,uR));
-
-    // تماثل: فرق تمركز حلمات اليسار/اليمين بالنسبة لحواف العرض
-    const leftAvgX  = (rrL.x + rfL.x)/2; const rightAvgX = (rrR.x + rfR.x)/2;
-    const leftGap   = Math.abs(leftAvgX - uL.x); const rightGap = Math.abs(uR.x - rightAvgX);
-    const asym      = Math.abs(leftGap - rightGap)/w; // 0 أفضل
-    const scoreSym  = Math.max(0, Math.min(100, Math.round(100*(1 - asym*2))));
-
-    // اتساع وضع الحلمات: أصغر مسافة بين أي حمتين نسبةً إلى العرض (كلما زادت كان أفضل حتى حد معين)
-    const teats = [rrL, rrR, rfL, rfR];
-    let minD = Infinity; for(let i=0;i<4;i++){ for(let j=i+1;j<4;j++){ minD = Math.min(minD, dist(teats[i], teats[j])); } }
-    const spread = minD / w; // طبيعي ~0.08–0.18 تقريبًا حسب الصورة — نحول لدرجة
-    let scorePlace = Math.round(Math.max(0, Math.min(100, (spread-0.06)/0.12*100))); // 0.06→0 ، 0.18→100 تقريبًا
-
-    kSym.textContent   = scoreSym+' / 100';
-    kPlace.textContent = scorePlace+' / 100';
-    const notes=[]; if (scoreSym<60) notes.push('تماثل الضرع منخفض — راجع انتظام اليمين/اليسار.'); if (scorePlace<60) notes.push('الحلمات متقاربة — راجع اتساع الوضع.');
-    kNotes.textContent = notes.length? notes.join(' | ') : 'جيد';
-  }
-
-  // === Save ===
-  async function saveEvaluation(){
-    const user = auth.currentUser; if (!user){ location.href='login.html'; return; }
-    const uid = user.uid; const ts = Date.now();
-    // upload available images
-    const imagePaths = {};
-    for (const v of views){
-      const key = v.key; const url = images[key]; if (!url) continue;
-      const path = `evaluations/${uid}/${animalId||'unknown'}/${ts}_${key}.jpg`;
-      const ref = sRef(storage, path);
-      await uploadString(ref, url, 'data_url');
-      imagePaths[key] = path;
+      return cams;
     }
 
-    const docData = {
-      userId: uid,
-      animalId: animalId || null,
-      eventDate: whenStr,
-      views: views.map(v=>v.key),
-      images: imagePaths,
-      points: { rear: points.rear },
-      scores: {
-        udder_symmetry: (el('kSym').textContent==='—'? null : parseInt(el('kSym').textContent)),
-        teat_placement: (el('kPlace').textContent==='—'? null : parseInt(el('kPlace').textContent))
-      },
-      createdAt: serverTimestamp()
-    };
+    async function startCamera(deviceId){
+      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+      const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { ideal: 'environment' } } };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      state.stream = stream;
+      preview.srcObject = stream;
+      const [track] = stream.getVideoTracks();
+      state.track = track;
+      const cap = track.getCapabilities?.() || null;
+      state.capabilities = cap;
+      await preview.play();
+      fitOverlay();
+      drawGuide();
+      await populateTorchSupport();
+    }
 
-    // save evaluation
-    const evalRef = await addDoc(collection(db,'evaluations'), docData);
+    async function populateTorchSupport(){
+      const cap = state.capabilities;
+      const hasTorch = !!(cap && 'torch' in cap);
+      toggleFlash.disabled = !hasTorch;
+    }
 
-    // optional: سجل حدث للمتابعة الذكية
-    await addDoc(collection(db,'events'), {
-      userId: uid,
-      animalId: animalId || null,
-      eventDate: whenStr,
-      type: 'تقييم بصري',
-      eventType: 'تقييم بصري (ضرع)',
-      context: { source: 'visual-eval', evalId: evalRef.id },
-      createdAt: serverTimestamp()
+    function fitOverlay(){
+      const rect = preview.getBoundingClientRect();
+      overlay.width = rect.width * devicePixelRatio; // لضمان دقة جيدة على الموبايل
+      overlay.height = rect.height * devicePixelRatio;
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+    }
+
+    function drawGuide(){
+      const ctx2d = overlay.getContext('2d');
+      if(!ctx2d) return;
+      ctx2d.clearRect(0,0,overlay.width, overlay.height);
+      ctx2d.lineWidth = 4 * devicePixelRatio;
+      ctx2d.strokeStyle = 'rgba(14,160,90,0.9)';
+      ctx2d.fillStyle = 'rgba(14,160,90,0.08)';
+      const w = overlay.width, h = overlay.height;
+      // شبكة خفيفة
+      ctx2d.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx2d.lineWidth = 1 * devicePixelRatio;
+      for(let i=1;i<3;i++){
+        ctx2d.beginPath(); ctx2d.moveTo((w/3)*i,0); ctx2d.lineTo((w/3)*i,h); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(0,(h/3)*i); ctx2d.lineTo(w,(h/3)*i); ctx2d.stroke();
+      }
+
+      // إطار موجه بحسب الزاوية
+      ctx2d.strokeStyle = 'rgba(14,160,90,0.9)';
+      ctx2d.lineWidth = 4 * devicePixelRatio;
+      let rx= w*0.08, ry= h*0.12, rw= w*0.84, rh= h*0.76;
+      const a = state.currentAngle;
+      if(a==='side'){
+        rx = w*0.05; ry=h*0.15; rw=w*0.9; rh=h*0.7;
+      }else if(a==='udder-front'){
+        rx = w*0.18; ry=h*0.12; rw=w*0.64; rh=h*0.76;
+        // دليل مركزي
+        ctx2d.beginPath(); ctx2d.moveTo(w/2, ry); ctx2d.lineTo(w/2, ry+rh); ctx2d.stroke();
+      }else if(a==='udder-rear'){
+        rx = w*0.15; ry=h*0.12; rw=w*0.7; rh=h*0.76;
+        // خطيْن لتوسيط الحلمات
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.4, ry); ctx2d.lineTo(w*0.4, ry+rh); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.6, ry); ctx2d.lineTo(w*0.6, ry+rh); ctx2d.stroke();
+      }else if(a==='teat-close'){
+        rx = w*0.25; ry=h*0.25; rw=w*0.5; rh=h*0.5;
+        // صليب مركزي
+        ctx2d.beginPath(); ctx2d.moveTo(w/2, h*0.2); ctx2d.lineTo(w/2, h*0.8); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.2, h/2); ctx2d.lineTo(w*0.8, h/2); ctx2d.stroke();
+      }
+      // إطار خارجي
+      ctx2d.beginPath(); ctx2d.roundRect(rx, ry, rw, rh, 20 * devicePixelRatio); ctx2d.stroke();
+    }
+
+    async function toggleTorch(){
+      try{
+        if(!state.track) return;
+        state.torchOn = !state.torchOn;
+        await state.track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
+        toggleFlash.setAttribute('aria-pressed', String(state.torchOn));
+        toggleFlash.textContent = state.torchOn ? 'الفلاش: يعمل' : 'الفلاش';
+      }catch(err){
+        console.warn('Torch not supported', err);
+      }
+    }
+
+    function dataURLFromVideo(){
+      const video = preview;
+      const c = document.createElement('canvas');
+      const w = video.videoWidth, h = video.videoHeight;
+      c.width = w; c.height = h;
+      const ctx2d = c.getContext('2d');
+      ctx2d.drawImage(video, 0,0, w,h);
+      return c.toDataURL('image/jpeg', 0.92);
+    }
+
+    function setAngle(angle){
+      state.currentAngle = angle;
+      $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle));
+      helperText.innerHTML = helperByAngle[angle];
+      drawGuide();
+      updateButtons();
+    }
+
+    function updateButtons(){
+      const hasCapture = !!state.captures[state.currentAngle];
+      retakeBtn.disabled = !hasCapture;
+    }
+
+    function renderThumbs(){
+      thumbs.innerHTML = '';
+      for(const a of anglesOrder){
+        const wrap = document.createElement('div'); wrap.className='thumb';
+        const img = document.createElement('img');
+        if(state.captures[a]){ img.src = state.captures[a]; }
+        wrap.appendChild(img);
+        const lb = document.createElement('div'); lb.className='label'; lb.textContent = angleLabels[a];
+        wrap.appendChild(lb);
+        wrap.title = angleLabels[a];
+        wrap.addEventListener('click', ()=> setAngle(a));
+        thumbs.appendChild(wrap);
+      }
+    }
+
+    // ---------- أحداث واجهة ----------
+    window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+
+    $$('.angle-tab').forEach(btn=>{
+      btn.addEventListener('click', ()=> setAngle(btn.dataset.angle));
     });
 
-    const n = el('camMsg');
-    n.textContent = '✅ تم حفظ التقييم بنجاح';
-    n.style.display = 'block';
-  }
+    toggleFlash.addEventListener('click', toggleTorch);
 
-  // === Wire UI ===
-  el('startCam').onclick = startCam;
-  el('capture').onclick  = capture;
-  el('retake').onclick   = retake;
-  el('uploader').addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if (f) handleUpload(f); });
-  el('next').onclick     = next;
-  el('saveEval').onclick = saveEvaluation;
+    restartBtn.addEventListener('click', async ()=>{
+      await startCamera(cameraSelect.value);
+    });
 
-  // start with camera off for privacy; auto-start if permission previously granted
-  if (navigator.permissions && navigator.permissions.query){
-    try{ const st = await navigator.permissions.query({name:'camera'}); if (st.state==='granted') startCam(); }catch{}
-  }
+    cameraSelect.addEventListener('change', async ()=>{
+      await startCamera(cameraSelect.value);
+    });
 
-  onAuthStateChanged(auth, (user)=>{ if (!user) location.href='login.html'; });
-  window.addEventListener('beforeunload', ()=> stopCam());
-</script>
+    captureBtn.addEventListener('click', ()=>{
+      const url = dataURLFromVideo();
+      state.captures[state.currentAngle] = url;
+      renderThumbs();
+      updateButtons();
+    });
+
+    retakeBtn.addEventListener('click', ()=>{
+      state.captures[state.currentAngle] = null;
+      renderThumbs();
+      updateButtons();
+    });
+
+    nextAngleBtn.addEventListener('click', ()=>{
+      const idx = anglesOrder.indexOf(state.currentAngle);
+      const next = anglesOrder[(idx+1)%anglesOrder.length];
+      setAngle(next);
+    });
+
+    saveBtn.addEventListener('click', async ()=>{
+      try{
+        saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…';
+        const animalId = animalIdInput.value.trim();
+        const date = eventDateInput.value || todayCairo();
+        if(!animalId){ alert('رقم/معرّف الحيوان غير موجود'); return; }
+
+        // رفع الصور إلى Firebase Storage
+        const uploaded = {};
+        for(const [angle, dataUrl] of Object.entries(state.captures)){
+          if(!dataUrl) continue;
+          const path = `camera-evaluations/${animalId}/${date}/${angle}.jpg`;
+          const r = ref(storage, path);
+          await uploadString(r, dataUrl, 'data_url');
+          const url = await getDownloadURL(r);
+          uploaded[angle] = url;
+        }
+
+        const doc = {
+          type: 'تقييم بصري بالكاميرا',
+          animalId, date,
+          images: uploaded,
+          notes: {
+            isClean: $('#isClean').checked || false,
+            goodLight: $('#goodLight').checked || false,
+            onFlat: $('#onFlat').checked || false,
+            animalStanding: $('#animalStanding').checked || false,
+            teatsVisible: $('#teatsVisible').checked || false,
+          },
+          createdAt: serverTimestamp()
+        };
+        await addDoc(collection(db,'events'), doc);
+
+        if(Object.keys(uploaded).length === 0){
+          alert('تم حفظ التقييم بدون صور (لم تُلتقط صور).');
+        } else {
+          alert('تم الحفظ ورفع الصور بنجاح.');
+        }
+
+        // العودة لبطاقة الحيوان
+        const go = confirm('هل تريد فتح بطاقة الحيوان الآن؟');
+        if(go){
+          const q = new URLSearchParams({ animalId, date });
+          location.href = `cow-card.html?${q.toString()}`;
+        }
+      }catch(err){
+        console.error(err);
+        alert('حدث خطأ أثناء الحفظ/الرفع. تحقق من الاتصال وإعدادات Firebase.');
+      }finally{
+        saveBtn.disabled = false; saveBtn.textContent = 'حفظ التقييم والصور';
+      }
+    });
+
+    // ---------- تشغيل مبدئي ----------
+    (async function init(){
+      try{
+        await listCameras();
+        await startCamera(cameraSelect.value);
+        renderThumbs();
+        setAngle('side');
+      }catch(err){
+        console.warn(err);
+        alert('تعذّر الوصول للكاميرا. تأكد من السماح بالأذونات واستخدام https.');
+      }
+    })();
+  </script>
 </body>
 </html>
