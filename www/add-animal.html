@@ -204,6 +204,13 @@
       }
     }
 
+    // تاريخ اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
+
     // ربط الأحداث
     document.getElementById("animalType").addEventListener("change", updateBreedOptions);
     document.getElementById("productionStatus").addEventListener("change", toggleMilkField);
@@ -258,17 +265,14 @@
 
         await addDoc(collection(db, "animals"), animalData);
 
-        msgDiv.textContent = "✅ تم تسجيل الحيوان بنجاح.";
+        // ✅ حفظ آخر رقم + رسالة نجاح + تحويل مباشر إلى صفحة الأحداث
+        localStorage.setItem("lastAnimalId", animalNumber);
+        msgDiv.textContent = "✅ تم تسجيل حيوان جديد بنجاح";
         msgDiv.className = "success";
         msgDiv.style.display = "block";
 
-        form.reset();
-        document.getElementById("milkField").style.display = "none";
-        document.getElementById("inseminationField").style.display = "none";
-
-        setTimeout(() => {
-          window.location.href = "add-event.html";
-        }, 2000);
+        const dateStr = todayLocal();
+        location.href = `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
 
       } catch (error) {
         console.error("خطأ في تسجيل الحيوان:", error);
