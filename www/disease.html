@@ -1,28 +1,31 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الأمراض</title>
   <style>
-    body { direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; padding: 20px; margin: 0; }
-    h2 { text-align: center; color: #2c3e50; font-size: 24px; margin-bottom: 20px; }
-    form { display: flex; flex-direction: column; gap: 15px; }
-    label { font-weight: bold; font-size: 18px; }
-    input, button { padding: 14px; border-radius: 8px; border: 1px solid #ccc; font-size: 18px; width: 100%; box-sizing: border-box; }
-    .disease-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-    .disease-buttons button { background-color: #8bc34a; color: black; border: none; cursor: pointer; font-size: 18px; padding: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.3s; }
-    .disease-buttons button.selected { border: 2px solid #2c3e50; background-color: #558b2f; color: white; }
-    #msg { margin-top: 20px; font-weight: bold; text-align: center; font-size: 18px; display: none; padding: 10px; border-radius: 8px; }
-    #msg.success { background-color: #d1e7dd; color: #0f5132; }
-    #msg.error { background-color: #f8d7da; color: #842029; }
+    body{direction:rtl;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f9f9f9;padding:20px;margin:0}
+    h2{text-align:center;color:#2c3e50;font-size:24px;margin-bottom:20px}
+    form{display:flex;flex-direction:column;gap:15px;max-width:720px;margin:auto}
+    label{font-weight:bold;font-size:18px}
+    input,button{padding:14px;border-radius:8px;border:1px solid #ccc;font-size:18px;width:100%;box-sizing:border-box}
+    .disease-buttons{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .disease-buttons button{background:#8bc34a;color:#000;border:none;cursor:pointer;font-size:18px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background-color .3s}
+    .disease-buttons button:hover{background:#7cb342}
+    #msg{margin-top:12px;font-weight:bold;text-align:center;font-size:16px;display:none;padding:10px;border-radius:8px}
+    #msg.success{background:#d1e7dd;color:#0f5132;display:block}
+    #msg.error{background:#f8d7da;color:#842029;display:block}
+    .actions{display:none;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+    .actions .btn{padding:10px 14px;border-radius:8px;border:1px solid #2c3e50;background:#fff;color:#2c3e50;font-weight:bold;cursor:pointer}
+    .actions .btn.primary{background:#2c3e50;color:#fff;border-color:#2c3e50}
   </style>
 </head>
 <body>
 
   <h2>🧪 تسجيل الأمراض</h2>
 
-  <form id="diseaseForm">
+  <form id="diseaseForm" onsubmit="return false">
     <label for="animalId">رقم الحيوان</label>
     <input type="text" id="animalId" name="animalId" readonly />
 
@@ -40,7 +43,7 @@
       <button type="button" data-name="ابتلاع جسم معدني">ابتلاع جسم معدني</button>
       <button type="button" data-name="التهاب جلد عقدي">التهاب جلد عقدي</button>
       <button type="button" data-name="حمي قلاعية">حمي قلاعية</button>
-      <button type="button" data-name="حمل الثلاث ايام">حمل الثلاث ايام</button>
+      <button type="button" data-name="حمي الثلاث ايام">حمي الثلاث ايام</button>
       <button type="button" data-name="تسمم دموي">تسمم دموي</button>
       <button type="button" data-name="لكمة كرش">لكمة كرش</button>
       <button type="button" data-name="اجهاد حراري">اجهاد حراري</button>
@@ -50,9 +53,13 @@
       <button type="button" data-name="نقص ماغنسيوم">نقص ماغنسيوم</button>
       <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
     </div>
-  </form>
 
-  <div id="msg"></div>
+    <div id="msg"></div>
+    <div class="actions" id="afterSave">
+      <button type="button" class="btn" id="btnClear">تسجيل مرض آخر</button>
+      <button type="button" class="btn primary" id="btnDash">لوحة التحكم</button>
+    </div>
+  </form>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -66,86 +73,103 @@
     messagingSenderId: "402719243568",
     appId: "1:402719243568:web:631114a260d23202dd5cf5"
   };
-
   const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const db  = getFirestore(app);
 
   const msgDiv = document.getElementById("msg");
-  const diseaseButtons = document.querySelectorAll('#diseaseButtons button');
-  const animalIdInput = document.getElementById("animalId");
-  const diseaseDateInput = document.getElementById("diseaseDate");
+  const actionsBox = document.getElementById("afterSave");
+  const btnClear   = document.getElementById("btnClear");
+  const btnDash    = document.getElementById("btnDash");
 
-  // جلب الرقم من URL أو آخر رقم محفوظ
-  const qp = new URLSearchParams(location.search);
-  const presetId = qp.get('animalId') || qp.get('number') || localStorage.getItem("lastAnimalId") || '';
-  if (presetId) {
-    animalIdInput.value = presetId;
-    localStorage.setItem('lastAnimalId', presetId);
-  } else {
-    alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
-    window.location.href = "add-animal.html";
+  const animalIdInput    = document.getElementById("animalId");
+  const diseaseDateInput = document.getElementById("diseaseDate");
+  const container        = document.getElementById("diseaseButtons");
+
+  // اليوم المحلي بصيغة YYYY-MM-DD
+  function todayLocal(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
   }
 
-  // تاريخ اليوم تلقائيًا
-  diseaseDateInput.valueAsDate = new Date();
+  // تعبئة من الرابط أو التخزين المحلي
+  (function hydrate(){
+    const qp = new URLSearchParams(location.search);
+    const preId   = qp.get("animalId") || qp.get("number") || localStorage.getItem("lastAnimalId");
+    const preDate = qp.get("date") || todayLocal();
+    if (!preId){
+      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
+      location.href = "add-animal.html";
+      return;
+    }
+    animalIdInput.value    = preId;
+    diseaseDateInput.value = preDate;
+  })();
 
-  diseaseButtons.forEach(button => {
-    button.addEventListener('click', async () => {
-      const animalId = animalIdInput.value.trim();
-      const diseaseDate = diseaseDateInput.value;
-      const diseaseName = button.dataset.name;
+  function showMsg(text, type="success"){
+    msgDiv.textContent = text;
+    msgDiv.className = type === "success" ? "success" : "error";
+    msgDiv.style.display = "block";
+    actionsBox.style.display = type === "success" ? "flex" : "none";
+  }
+  function clearMsg(){
+    msgDiv.textContent = "";
+    msgDiv.style.display = "none";
+    actionsBox.style.display = "none";
+  }
 
-      if (!animalId || !diseaseDate) {
-        alert("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً");
-        return;
-      }
+  btnClear.addEventListener('click', clearMsg);
+  btnDash.addEventListener('click', ()=> location.href='dashboard.html');
 
-      // انتقال مخصص للحالات التي لها صفحة خاصة فقط
-      if (diseaseName === "التهاب ضرع") {
-        window.location.href = `mastitis.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
-        return;
-      }
-      if (diseaseName === "عرج") {
-        window.location.href = `lameness.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
-        return;
-      }
+  // تفويض الحدث لكل الأزرار
+  container.addEventListener('click', async (ev)=>{
+    const btn = ev.target.closest('button[data-name]');
+    if (!btn) return;
 
-      // تسجيل مباشر لباقي الأمراض (بدون أي ارتباط بـ treatment-followup)
-      diseaseButtons.forEach(btn => btn.disabled = true);
-      msgDiv.style.display = "none";
+    const animalId   = (animalIdInput.value || "").trim();
+    const diseaseDate= diseaseDateInput.value;
 
-      const eventData = {
-        animalId,
-        eventDate: diseaseDate,
-        eventType: diseaseName,
-        type: "مرض",
-        isSmartAlert: true,
-        alertRule: "مرض",
-        createdAt: serverTimestamp()
-      };
+    if (!animalId || !diseaseDate){
+      showMsg("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً","error");
+      return;
+    }
 
-      try {
-        await addDoc(collection(db, "events"), eventData);
-        msgDiv.textContent = `✅ تم تسجيل مرض "${diseaseName}" بنجاح`;
-        msgDiv.className = "success";
-        msgDiv.style.display = "block";
+    const name = btn.dataset.name;
 
-        diseaseButtons.forEach(btn => btn.disabled = false);
+    // الحالات الخاصة: فتح صفحات مخصصة وتمرير الرقم والتاريخ
+    if (name === "التهاب ضرع"){
+      location.href = `mastitis.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
+      return;
+    }
+    if (name === "عرج"){
+      location.href = `lameness.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
+      return;
+    }
 
-        // رجوع سلس لصفحة الأحداث وتمرير الرقم والتاريخ
-        setTimeout(() => {
-          const qs = `animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
-          window.location.href = `add-event.html?${qs}`;
-        }, 1500);
+    // تعطيل كل الأزرار أثناء الحفظ
+    const all = container.querySelectorAll('button');
+    all.forEach(b=> b.disabled = true);
 
-      } catch (error) {
-        console.error("خطأ في تسجيل المرض:", error);
-        msgDiv.textContent = "❌ حدث خطأ أثناء التسجيل، حاول مرة أخرى.";
-        msgDiv.className = "error";
-        msgDiv.style.display = "block";
-        diseaseButtons.forEach(btn => btn.disabled = false);
-      }
-    });
+    const eventData = {
+      animalId,
+      animalNumber: animalId,
+      eventDate: diseaseDate,
+      eventType: name,
+      type: "مرض",
+      isSmartAlert: true,
+      alertRule: "مرض",
+      createdAt: serverTimestamp()
+    };
+
+    try{
+      await addDoc(collection(db,"events"), eventData);
+      showMsg(`✅ تم تسجيل مرض "${name}" بنجاح`);
+    }catch(err){
+      console.error("خطأ في تسجيل المرض:", err);
+      showMsg("❌ حدث خطأ أثناء التسجيل، حاول مرة أخرى.","error");
+    }finally{
+      all.forEach(b=> b.disabled = false);
+    }
   });
 </script>
 
