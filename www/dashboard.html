@@ -63,6 +63,7 @@
   import { db } from './js/firebase-config.js';
   import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+  // عناصر الويدجت
   const chip   = document.getElementById('weatherCard');
   const wLoc   = document.getElementById('wLoc');
   const wTemp  = document.getElementById('wTemp');
@@ -71,19 +72,17 @@
   const wState = document.getElementById('wState');
   const wRefresh = document.getElementById('wRefresh');
 
-  function THI(c, rh){ const f=c*9/5+32; return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10; }
-  function thiColor(thi){
-    if (thi < 68) return {bg:'#c8e6c9', txt:'مريح'};
-    if (thi < 72) return {bg:'#fff9c4', txt:'توتر خفيف'};
-    if (thi < 79) return {bg:'#ffe0b2', txt:'توتر متوسط'};
-    if (thi < 84) return {bg:'#ffccbc', txt:'توتر شديد'};
-    return {bg:'#ffcdd2', txt:'توتر شديد جدًا'};
-  }
+  // تأكيد وجود مفتاح المنطقة في localStorage (لا يغيّر التصميم/الابحار)
+  (function ensureRegionKey(){
+    let key = localStorage.getItem('userRegionKey');
+    if (key) return;
+    const c = localStorage.getItem('userCountry');
+    const r = localStorage.getItem('userRegion');
+    if (c && r) key = `${c}:${r}`; else key = 'مصر:القاهرة';
+    localStorage.setItem('userRegionKey', key);
+  })();
 
-  function saveCache(key, data){ localStorage.setItem('weather:'+key, JSON.stringify({...data, ts:Date.now()})); }
-  function loadCache(key){ const s=localStorage.getItem('weather:'+key); if(!s) return null; const o=JSON.parse(s); return (Date.now()-o.ts)<60*60*1000?o:null; }
-
-  // خريطة إحداثيات مبسطة (يمكن نقلها إلى Firestore وثم نوسّعها لاحقًا)
+  // خريطة إحداثيات مبسطة (fallback إذا لم نجدها في Firestore)
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
     'مصر:الجيزة':  {lat:30.0131, lon:31.2089},
@@ -94,70 +93,13 @@
     'قطر:الدوحة': {lat:25.2854, lon:51.5310},
     'الكويت:العاصمة': {lat:29.3759, lon:47.9774},
     'البحرين:العاصمة': {lat:26.2235, lon:50.5876},
-    'عُمان:مسقط': {lat:23.5880, lon:58.3829},
-    // ... أضف حسب حاجتك، أو خزّن جميع المناطق في geoRegions
+    'عُمان:مسقط': {lat:23.5880, lon:58.3829}
   };
 
   async function getCoords(regionKey){
-    try{ const snap = await getDoc(doc(db,'geoRegions', regionKey)); if (snap.exists()) return snap.data(); }catch{}
+    try{ const s = await getDoc(doc(db,'geoRegions', regionKey)); if (s.exists()) return s.data(); }catch{}
     return GEO[regionKey] || null;
   }
-
-  async function fetchWeather(lat, lon){
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=Africa/Cairo`;
-    const r = await fetch(url); const j = await r.json();
-    return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
-  }
-
-  async function renderWeather(force=false){
-    const key = localStorage.getItem('userRegionKey');
-    if(!key){ return; }
-    wLoc.textContent = key;
-
-    let data = !force && loadCache(key);
-    if(!data){
-      const coords = await getCoords(key);
-      if(!coords){ chip.style.display='none'; return; }
-      data = await fetchWeather(coords.lat, coords.lon);
-      saveCache(key, data);
-    }
-
-    const thi = THI(data.t, data.h);
-    const {bg, txt} = thiColor(thi);
-
-    chip.style.display='flex';
-    chip.style.background = bg;
-    wTemp.textContent = `${Math.round(data.t)}°C`;
-    wHum.textContent  = `${Math.round(data.h)}%`;
-    wTHI.textContent  = thi;
-    wState.textContent= txt;
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{ renderWeather(); });
-  wRefresh.addEventListener('click', ()=>{ renderWeather(true); });
-</script>
-  <script type="module">
-  const chip   = document.getElementById('weatherCard');
-  const wLoc   = document.getElementById('wLoc');
-  const wTemp  = document.getElementById('wTemp');
-  const wHum   = document.getElementById('wHum');
-  const wTHI   = document.getElementById('wTHI');
-  const wState = document.getElementById('wState');
-  const wRefresh = document.getElementById('wRefresh');
-
-  // خريطة إحداثيات مبسطة كبداية
-  const GEO = {
-    'مصر:القاهرة': {lat:30.0444, lon:31.2357},
-    'مصر:الجيزة':  {lat:30.0131, lon:31.2089},
-    'مصر:الإسكندرية': {lat:31.2001, lon:29.9187},
-    'السعودية:الرياض': {lat:24.7136, lon:46.6753},
-    'السعودية:mكة المكرمة': {lat:21.3891, lon:39.8579},
-    'الإمارات:دبي': {lat:25.2048, lon:55.2708},
-    'قطر:الدوحة': {lat:25.2854, lon:51.5310},
-    'الكويت:العاصمة': {lat:29.3759, lon:47.9774},
-    'عُمان:مسقط': {lat:23.5880, lon:58.3829},
-    'البحرين:العاصمة': {lat:26.2235, lon:50.5876}
-  };
 
   function THI(c, rh){ const f=c*9/5+32; return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10; }
   function thiColor(thi){
@@ -167,28 +109,24 @@
     if (thi < 84) return {bg:'#ffccbc', txt:'توتر شديد'};
     return {bg:'#ffcdd2', txt:'توتر شديد جدًا'};
   }
+
   function saveCache(key, data){ localStorage.setItem('weather:'+key, JSON.stringify({...data, ts:Date.now()})); }
-  function loadCache(key){
-    const s = localStorage.getItem('weather:'+key);
-    if(!s) return null;
-    const o = JSON.parse(s);
-    return (Date.now()-o.ts) < 60*60*1000 ? o : null; // ساعة
-  }
+  function loadCache(key){ try{ const o=JSON.parse(localStorage.getItem('weather:'+key)||'null'); return o && (Date.now()-o.ts)<3600000 ? o : null; }catch{return null;} }
+
   async function fetchWeather(lat, lon){
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`;
-    const r = await fetch(url);
-    const j = await r.json();
+    const r = await fetch(url); const j = await r.json();
     return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
   }
 
   async function renderWeather(force=false){
-    const key = localStorage.getItem('userRegionKey');  // يتخزن بعد الـ login
+    const key = localStorage.getItem('userRegionKey');
     if(!key){ chip.style.display='none'; return; }
     wLoc.textContent = key;
 
     let data = !force && loadCache(key);
     if(!data){
-      const coords = GEO[key];
+      const coords = await getCoords(key);
       if(!coords){ chip.style.display='none'; return; }
       data = await fetchWeather(coords.lat, coords.lon);
       if (!data || data.t==null || data.h==null){ chip.style.display='none'; return; }
@@ -212,4 +150,3 @@
 
 </body>
 </html>
-
