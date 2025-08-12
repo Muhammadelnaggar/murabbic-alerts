@@ -2,161 +2,139 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>لوحة التحكم - مربيك</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>لوحة التحكم - مربيك</title>
   <style>
-    body{background:#fff9db;font-family:Arial,sans-serif;padding:20px;color:#1b5e20;margin:0}
-    h1{text-align:center;font-size:28px;font-weight:bold;margin:0 0 10px}
-    /* شريط مؤشرات للقطيع كله */
-    .smartbar{max-width:980px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #c5e1a5;background:#f1f8e9}
-    /* الشبكة الأصلية */
-    .dashboard{max-width:980px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:15px}
-    .card{background:#eafbe7;padding:20px;border-radius:12px;text-align:center;font-size:18px;font-weight:bold;cursor:pointer;border:2px solid #c5e1a5;box-shadow:2px 2px 5px rgba(0,0,0,.1)}
-    .card:hover{background:#dcedc8}
-    .icon{font-size:30px;margin-bottom:10px;display:block}
+    :root{--bg:#fff9db;--card:#ffffff;--muted:#dcedc8;--green:#2e7d32;--border:#c5e1a5}
+    *{box-sizing:border-box}
+    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
+    h1{margin:0 0 16px;text-align:center;color:var(--green)}
+    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .tile{background:#eafbe7;border:2px solid #c5e1a5;border-radius:12px;padding:18px;text-align:center;font-weight:bold;cursor:pointer}
+    .tile .icon{display:block;font-size:28px;margin-bottom:8px}
+    .tile:hover{background:#dcedc8}
+
+    /* Weather widget */
+    #weatherCard{display:none;align-items:center;gap:12px}
+    #weatherBadge{display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);padding:8px 12px;background:var(--muted)}
+    #wLoc{font-weight:bold}
+    .wvals{display:flex;gap:10px;flex-wrap:wrap}
+    .wval{background:#f7fff4;border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:90px;text-align:center}
+    .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);border-radius:10px;padding:8px 12px;font-weight:bold;cursor:pointer}
+    .btn:hover{background:#f4fff1}
+    @media(max-width:560px){.wvals{gap:6px}.wval{min-width:78px;padding:6px 8px}}
   </style>
 </head>
 <body>
   <h1>📊 لوحة التحكم - مربيك</h1>
 
-  <!-- مؤشرات القطيع -->
-  <div class="smartbar">
-    <span class="chip" id="chipDay">📅 اليوم: —</span>
-    <span class="chip">🥛 لبن اليوم: <b id="chipMilk">—</b> لتر</span>
-    <span class="chip">📅 تلقيحات (30ي): <b id="chipIns">—</b></span>
-    <span class="chip">👶 ولادات (30ي): <b id="chipCalv">—</b></span>
-    <span class="chip">💰 صافي اليوم: <b id="chipNet">—</b></span>
+  <!-- الطقس و THI -->
+  <div id="weatherCard" class="card">
+    <div id="weatherBadge">
+      <span>🌦️</span>
+      <span id="wLoc">—</span>
+    </div>
+    <div class="wvals" style="flex:1">
+      <div class="wval"><div>الحرارة</div><b id="wTemp">—°C</b></div>
+      <div class="wval"><div>الرطوبة</div><b id="wHum">—%</b></div>
+      <div class="wval"><div>THI</div><b id="wTHI">—</b></div>
+      <div class="wval"><div>الحالة</div><b id="wState">—</b></div>
+    </div>
+    <button id="wRefresh" class="btn">تحديث</button>
   </div>
 
-  <!-- شبكة الأزرار كاملة -->
-  <div class="dashboard">
-    <div class="card" onclick="location.href='add-animal.html'">
-      <span class="icon">➕</span>تسجيل حيوان جديد
-    </div>
-    <div class="card" onclick="location.href='animal-list.html'">
-      <span class="icon">📋</span>قائمة الحيوانات
-    </div>
-    <div class="card" onclick="location.href='add-event.html'">
-      <span class="icon">🗓️</span>تسجيل الأحداث
-    </div>
-    <div class="card" onclick="location.href='alerts.html'">
-      <span class="icon">🔔</span>التنبيهات الذكية
-    </div>
-    <div class="card" onclick="return openCowCardSmart(event)">
-      <span class="icon">🆔</span>البطاقة الذكية
-    </div>
-    <div class="card" onclick="location.href='daily-milk.html'">
-      <span class="icon">🥛</span>تسجيل اللبن اليومي
-    </div>
-    <div class="card" onclick="location.href='milk-reports.html'">
-      <span class="icon">📊</span>تقارير اللبن
-    </div>
-    <div class="card" onclick="location.href='farm-economy.html'">
-      <span class="icon">💰</span>اقتصاد المزرعة
-    </div>
-    <div class="card" onclick="location.href='evaluation.html'">
-      <span class="icon">📈</span>تقييم الحيوانات
-    </div>
-    <div class="card" onclick="location.href='smart-feeding.html'">
-      <span class="icon">🍽️</span>التغذية الذكية
-    </div>
+  <!-- روابط سريعة -->
+  <div class="dashboard" style="margin-top:12px">
+    <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>تسجيل حيوان جديد</div>
+    <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>قائمة الحيوانات</div>
+    <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>تسجيل الأحداث</div>
+    <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>التنبيهات الذكية</div>
+    <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🆔</span>البطاقة الذكية</div>
+    <div class="tile" onclick="location.href='daily-milk.html'"><span class="icon">🥛</span>تسجيل اللبن اليومي</div>
+    <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
+    <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعة</div>
+    <div class="tile" onclick="location.href='evaluation.html'"><span class="icon">📈</span>تقييم الحيوانات</div>
+    <div class="tile" onclick="location.href='nutrition.html'"><span class="icon">🌿</span>تركيبة التغذية</div>
+    <div class="tile" onclick="location.href='smart-feeding.html'"><span class="icon">🧠</span>التغذية الذكية</div>
   </div>
 
 <script type="module">
-  // ===== عرض تاريخ اليوم
-  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-  try { document.getElementById('chipDay').textContent = '📅 اليوم: ' + new Date(todayLocal()).toLocaleDateString('ar-EG'); }
-  catch { document.getElementById('chipDay').textContent = '📅 اليوم: ' + todayLocal(); }
-  const fmt = n => (n===null||n===undefined||isNaN(n)) ? '—' : new Intl.NumberFormat('ar-EG',{maximumFractionDigits:1}).format(n);
+  import { db } from './js/firebase-config.js';
+  import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-  // ===== زر البطاقة الذكية (يفتح مباشرة أو يظهر Mini-Prompt)
-  window.openCowCardSmart = function(e){
-    e.preventDefault();
-    const qs = new URLSearchParams(location.search);
-    const id = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
-    if (id){
-      localStorage.setItem('lastAnimalId', id);
-      location.href = `cow-card.html?animalId=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}`;
-      return false;
-    }
-    if (document.getElementById('quickPrompt')) return false;
-    const box = document.createElement('div');
-    box.id = 'quickPrompt';
-    box.style.cssText = 'position:fixed;inset:auto 12px 12px 12px;z-index:9999;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center';
-    box.innerHTML = `
-      <span style="font-weight:bold;color:#2e7d32">رقم الحيوان:</span>
-      <input id="qpInput" type="text" inputmode="numeric" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px" placeholder="مثال: 105">
-      <button id="qpGo" style="padding:10px 14px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-weight:bold">فتح</button>
-      <button id="qpClose" style="padding:10px 14px;border:1px solid #2e7d32;border-radius:8px;background:#fff;color:#2e7d32;font-weight:bold">إلغاء</button>
-    `;
-    document.body.appendChild(box);
-    const input = box.querySelector('#qpInput');
-    const go = ()=>{ const v=input.value.trim(); if(v){ box.remove(); localStorage.setItem('lastAnimalId', v); location.href = `cow-card.html?animalId=${encodeURIComponent(v)}&number=${encodeURIComponent(v)}`; } else input.focus(); };
-    box.querySelector('#qpGo').onclick = go;
-    input.addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
-    box.querySelector('#qpClose').onclick = ()=> box.remove();
-    input.focus();
-    return false;
+  const chip   = document.getElementById('weatherCard');
+  const wLoc   = document.getElementById('wLoc');
+  const wTemp  = document.getElementById('wTemp');
+  const wHum   = document.getElementById('wHum');
+  const wTHI   = document.getElementById('wTHI');
+  const wState = document.getElementById('wState');
+  const wRefresh = document.getElementById('wRefresh');
+
+  function THI(c, rh){ const f=c*9/5+32; return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10; }
+  function thiColor(thi){
+    if (thi < 68) return {bg:'#c8e6c9', txt:'مريح'};
+    if (thi < 72) return {bg:'#fff9c4', txt:'توتر خفيف'};
+    if (thi < 79) return {bg:'#ffe0b2', txt:'توتر متوسط'};
+    if (thi < 84) return {bg:'#ffccbc', txt:'توتر شديد'};
+    return {bg:'#ffcdd2', txt:'توتر شديد جدًا'};
+  }
+
+  function saveCache(key, data){ localStorage.setItem('weather:'+key, JSON.stringify({...data, ts:Date.now()})); }
+  function loadCache(key){ const s=localStorage.getItem('weather:'+key); if(!s) return null; const o=JSON.parse(s); return (Date.now()-o.ts)<60*60*1000?o:null; }
+
+  // خريطة إحداثيات مبسطة (يمكن نقلها إلى Firestore وثم نوسّعها لاحقًا)
+  const GEO = {
+    'مصر:القاهرة': {lat:30.0444, lon:31.2357},
+    'مصر:الجيزة':  {lat:30.0131, lon:31.2089},
+    'مصر:الإسكندرية': {lat:31.2001, lon:29.9187},
+    'السعودية:الرياض': {lat:24.7136, lon:46.6753},
+    'السعودية:مكة المكرمة': {lat:21.3891, lon:39.8579},
+    'الإمارات:دبي': {lat:25.2048, lon:55.2708},
+    'قطر:الدوحة': {lat:25.2854, lon:51.5310},
+    'الكويت:العاصمة': {lat:29.3759, lon:47.9774},
+    'البحرين:العاصمة': {lat:26.2235, lon:50.5876},
+    'عُمان:مسقط': {lat:23.5880, lon:58.3829},
+    // ... أضف حسب حاجتك، أو خزّن جميع المناطق في geoRegions
   };
 
-  // ===== مؤشرات القطيع (Firestore) — خفيفة وبسيطة
-  try {
-    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-    const { getFirestore, collection, getDocs, query, where, Timestamp } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { getAuth, onAuthStateChanged } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-
-    const mod = await import('./js/firebase-config.js'); // تأكد أن الملف موجود
-    const app = initializeApp(mod.firebaseConfig);
-    const db  = getFirestore(app);
-    const auth= getAuth(app);
-
-    onAuthStateChanged(auth, async (user)=>{
-      if (!user) return;
-
-      const now = new Date();
-      const startToday = new Date(now); startToday.setHours(0,0,0,0);
-      const tsToday = Timestamp.fromDate(startToday);
-      const ts30    = Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()-30));
-
-      // 1) لبن اليوم (dailyMilk ثم events كـ fallback)
-      let milkLiters=0, milkEntries=0;
-      try{
-        const q1 = query(collection(db,'dailyMilk'), where('userId','==',user.uid), where('createdAt','>=', tsToday));
-        (await getDocs(q1)).forEach(doc=>{ const d=doc.data(); const n=parseFloat(d.amount||d.liters||0)||0; milkLiters+=n; milkEntries++; });
-      }catch{}
-      if (milkEntries===0){
-        const q2 = query(collection(db,'events'), where('userId','==',user.uid), where('createdAt','>=', tsToday));
-        (await getDocs(q2)).forEach(doc=>{ const d=doc.data(); const t=(d.type||'')+(d.eventType||''); if(/لبن|milk/i.test(t)){ const n=parseFloat(d.amount||d.liters||0)||0; milkLiters+=n; milkEntries++; }});
-      }
-      document.getElementById('chipMilk').textContent = fmt(milkLiters);
-
-      // 2) تلقيحات + 3) ولادات (30 يوم) — قطيع كله
-      let ins=0, cal=0;
-      const q3 = query(collection(db,'events'), where('userId','==',user.uid), where('createdAt','>=', ts30));
-      (await getDocs(q3)).forEach(doc=>{
-        const t = ((doc.data().type||'') + ' ' + (doc.data().eventType||'')).toLowerCase();
-        if (t.includes('تلقيح') || t.includes('insemin')) ins++;
-        else if (t.includes('ولاد') || t.includes('calv')) cal++;
-      });
-      document.getElementById('chipIns').textContent  = fmt(ins);
-      document.getElementById('chipCalv').textContent = fmt(cal);
-
-      // 4) صافي اليوم = (إيراد اللبن) – (تكلفة علف القطيع)
-      const price = parseFloat(localStorage.getItem('econPrice')||'0')||0; // سعر اللتر
-      const feedC = parseFloat(localStorage.getItem('econFeed') ||'0')||0; // تكلفة/بقرة/يوم
-      const herd  = parseInt  (localStorage.getItem('econHerd') ||'0')||0; // حجم القطيع
-      const revenue = price * milkLiters;
-      const feed    = feedC * herd;
-      const net     = revenue - feed;
-      document.getElementById('chipNet').textContent = (revenue||feed) ? fmt(net) : '—';
-    });
-  } catch(e) {
-    // لو Firebase غير جاهز، نسيب الشرطات — الواجهة لا تتعطل
-    console.warn('Smartbar KPIs disabled:', e);
+  async function getCoords(regionKey){
+    try{ const snap = await getDoc(doc(db,'geoRegions', regionKey)); if (snap.exists()) return snap.data(); }catch{}
+    return GEO[regionKey] || null;
   }
+
+  async function fetchWeather(lat, lon){
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=Africa/Cairo`;
+    const r = await fetch(url); const j = await r.json();
+    return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
+  }
+
+  async function renderWeather(force=false){
+    const key = localStorage.getItem('userRegionKey');
+    if(!key){ return; }
+    wLoc.textContent = key;
+
+    let data = !force && loadCache(key);
+    if(!data){
+      const coords = await getCoords(key);
+      if(!coords){ chip.style.display='none'; return; }
+      data = await fetchWeather(coords.lat, coords.lon);
+      saveCache(key, data);
+    }
+
+    const thi = THI(data.t, data.h);
+    const {bg, txt} = thiColor(thi);
+
+    chip.style.display='flex';
+    chip.style.background = bg;
+    wTemp.textContent = `${Math.round(data.t)}°C`;
+    wHum.textContent  = `${Math.round(data.h)}%`;
+    wTHI.textContent  = thi;
+    wState.textContent= txt;
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{ renderWeather(); });
+  wRefresh.addEventListener('click', ()=>{ renderWeather(true); });
 </script>
 </body>
 </html>
