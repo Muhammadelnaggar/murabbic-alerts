@@ -106,7 +106,7 @@
     </div>
   </form>
 
- <script type="module">
+<script type="module">
   import { db, auth } from "./js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -118,7 +118,7 @@
   const idInput    = document.getElementById("animalIdInput");
   const dateInput  = document.getElementById("eventDateInput");
 
-  const msgBox = document.getElementById("inlineMsg");
+  const msgBox  = document.getElementById("inlineMsg");
   const msgText = msgBox.querySelector(".text");
   const btnYes  = msgBox.querySelector("#msgYes");
   const btnNo   = msgBox.querySelector("#msgNo");
@@ -148,9 +148,11 @@
   function hydrateContext(){
     const qp = new URLSearchParams(location.search);
     const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-    const presetDate = qp.get("date") || todayLocal();
+    const presetDate = qp.get("date") || localStorage.getItem("lastEventDate") || todayLocal();
+
     idInput.value = presetId;
     dateInput.value = presetDate;
+
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
     try {
       const [y,m,d] = presetDate.split('-').map(Number);
@@ -177,8 +179,25 @@
       return null;
     }
     warning.textContent = "";
+
+    // تخزين للسياق (متوافق وقد تُستخدمه الصفحات الأبناء)
     localStorage.setItem("lastAnimalId", animalId);
+    localStorage.setItem("lastEventDate", eventDate);
+    sessionStorage.setItem("ctxAnimalId", animalId);
+    sessionStorage.setItem("ctxEventDate", eventDate);
+
     return { animalId, eventDate };
+  }
+
+  // بناء رابط آمن مع كل المفاتيح المتوافقة
+  function buildTargetUrl(page, ctx){
+    // نستخدم URL API لضمان بناء الاستعلام بشكل صحيح
+    const u = new URL(page, location.href);
+    u.searchParams.set('animalId', ctx.animalId);
+    u.searchParams.set('number',   ctx.animalId);
+    u.searchParams.set('Pid',      ctx.animalId);     // لبعض الصفحات القديمة
+    u.searchParams.set('date',     ctx.eventDate);
+    return u.toString();
   }
 
   // ربط الأزرار (تفويض حدث)
@@ -196,6 +215,7 @@
       const page   = btn.getAttribute('data-page');
       const isTrim = page === 'trimming.html';
 
+      // نحاول نسجل الحدث، ولو فشل لا نمنع التنقل
       try{
         await addDoc(collection(db, 'events'), {
           userId: auth?.currentUser?.uid || null,
@@ -207,17 +227,16 @@
           createdAt: serverTimestamp()
         });
       }catch(err){
-        console.error(err);
+        console.error('addDoc failed:', err);
         if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
       }
 
       // التنقّل/الرسالة الداخلية
       if (isTrim){
-        const goAgain = await showNotice(`✅ تم تسجيل \"تقليم الحوافر\" للحيوان ${ctx.animalId}.`);
+        const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
         if (!goAgain) location.href = 'dashboard.html';
       } else if (page){
-        const qs = `animalId=${encodeURIComponent(ctx.animalId)}&animalIdd=${encodeURIComponent(ctx.animalId)}&number=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
-        location.href = `${page}?${qs}`;
+        location.href = buildTargetUrl(page, ctx);
       }
     });
   }
