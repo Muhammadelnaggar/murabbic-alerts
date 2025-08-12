@@ -88,6 +88,26 @@
     <section class="tab-section active" id="tab-overview">
       <div id="info" class="card loading">
         <div class="row">
+          <div class="card" id="veCard" style="display:none; margin-top:10px; border:1px solid #c5e1a5; border-radius:12px; padding:12px; background:#f1f8e9">
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+    <span style="background:#dcedc8;border:1px solid #c5e1a5;border-radius:999px;padding:6px 10px;display:inline-flex;gap:6px;align-items:center">
+      <b>📷 آخر تقييم بصري</b>
+    </span>
+    <span id="veDate" style="font-weight:bold;color:#2e7d32">—</span>
+    <span id="veGrade" style="margin-inline-start:auto;font-weight:bold;">—</span>
+  </div>
+  <div style="margin-top:8px; display:flex; gap:12px; flex-wrap:wrap">
+    <div style="background:#fff;border:1px solid #e0ebd3;border-radius:10px;padding:8px 10px;min-width:120px;text-align:center">
+      <div class="muted">الدرجة</div>
+      <b id="veScore">—</b>
+    </div>
+    <div style="background:#fff;border:1px solid #e0ebd3;border-radius:10px;padding:8px 10px;min-width:160px;flex:1">
+      <div class="muted">ملاحظات مختصرة</div>
+      <ul id="veFlags" style="margin:6px 16px; padding:0 0 0 14px"></ul>
+    </div>
+  </div>
+</div>
+
           <div class="item"><div class="label">السلالة</div><div id="v-breed" class="value">—</div></div>
           <div class="item"><div class="label">تاريخ الميلاد</div><div id="v-dob" class="value">—</div></div>
           <div class="item"><div class="label">عدد أيام الحليب</div><div id="v-dim" class="value">—</div></div>
@@ -611,6 +631,74 @@ import { auth, db } from './js/firebase-config.js';
     el.addEventListener('click', handleCowCardClick);
   });
 </script>
+<script type="module">
+  import { db } from './js/firebase-config.js';
+  import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+  // اجلب معرف الحيوان من الرابط أو آخر مختار محليًا
+  const qs = new URLSearchParams(location.search);
+  const animalId = qs.get('animalId') || qs.get('number') || localStorage.getItem('lastAnimalId') || '';
+
+  const box     = document.getElementById('veCard');
+  const elDate  = document.getElementById('veDate');
+  const elScore = document.getElementById('veScore');
+  const elGrade = document.getElementById('veGrade');
+  const elFlags = document.getElementById('veFlags');
+
+  // نجرّب أكثر من اسم كولكشن لضمان التوافق (حسب ما حفظته في visual-eval.html)
+  async function fetchLastVisualEval(id){
+    if (!id) return null;
+    const tryCollections = ['visualEvaluations', 'visual-evaluations', 'evaluations'];
+    for (const colName of tryCollections){
+      try{
+        const q = query(
+          collection(db, colName),
+          where('animalId', '==', String(id)),
+          orderBy('createdAt','desc'),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) return { ...snap.docs[0].data(), id: snap.docs[0].id, _col: colName };
+      }catch(e){
+        // تجاهل ونجرّب اللي بعده
+      }
+    }
+    return null;
+  }
+
+  function gradeLabel(score){
+    if (score == null) return '—';
+    const s = Number(score);
+    if (s >= 85) return 'ممتاز 🟢';
+    if (s >= 70) return 'جيد ✅';
+    if (s >= 55) return 'مقبول ⚠️';
+    return 'بحاجة لتحسين 🔴';
+  }
+
+  function renderEval(ev){
+    if (!ev){ box.style.display='none'; return; }
+    const dt = ev.eventDate ? new Date(ev.eventDate) : (ev.createdAt?.toDate ? ev.createdAt.toDate() : null);
+    elDate.textContent  = dt ? dt.toLocaleDateString('ar-EG') : '—';
+    elScore.textContent = ev.score != null ? Math.round(ev.score) : '—';
+    elGrade.textContent = gradeLabel(ev.score);
+
+    elFlags.innerHTML = '';
+    const flags = ev.flags || ev.issues || ev.findings || []; // توافق مع أسماء حقول محتملة
+    if (Array.isArray(flags) && flags.length){
+      flags.slice(0,5).forEach(f=>{
+        const li=document.createElement('li'); li.textContent = f; elFlags.appendChild(li);
+      });
+    } else {
+      const li=document.createElement('li'); li.textContent = 'لا ملاحظات بارزة'; elFlags.appendChild(li);
+    }
+    box.style.display = 'block';
+  }
+
+  (async ()=>{
+    const last = await fetchLastVisualEval(animalId);
+    renderEval(last);
+  })();
+</script>
 
 </body>
 </html>
@@ -619,4 +707,5 @@ import { auth, db } from './js/firebase-config.js';
  
 
    
+
 
