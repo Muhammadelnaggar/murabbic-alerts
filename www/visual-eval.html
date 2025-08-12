@@ -61,6 +61,12 @@
     .checklist h3{margin:8px 0; color:var(--green-600)}
     .checklist label{display:flex; align-items:center; gap:8px}
     .save-bar{display:flex; gap:8px; padding:12px; border-top:1px solid #e2e8f0}
+      .drop-hint{position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-weight:800; color:var(--green-600); background:rgba(255,255,255,.6); text-align:center; padding:16px}
+    .preview-wrap.dragover .drop-hint{display:flex}
+    .metrics{padding:12px; border-top:1px solid #e2e8f0; display:grid; gap:8px}
+    .metrics h3{margin:8px 0; color:var(--green-600)}
+    .metric{display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px 12px; font-weight:700}
+    .metric small{font-weight:400; color:var(--muted)}
   </style>
 </head>
 <body>
@@ -87,13 +93,16 @@
         <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
         <div style="margin-inline-start:auto"></div>
         <button id="captureBtn" class="btn btn-primary">التقاط</button>
-        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
-        <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
+        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط<\/button>
+        <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة<\/button>
+        <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+        <button id="nextAngleBtn" class="btn btn-light">التالي ▸<\/button>
       </div>
 
       <div class="preview-wrap">
         <video id="preview" playsinline autoplay muted></video>
         <canvas id="overlay"></canvas>
+        <div class="drop-hint" id="dropHint">أفلت الصورة هنا لتعيينها لزاوية <span id="dropAngleLabel">—</span></div>
       </div>
 
       <div class="capture-bar">
@@ -118,6 +127,11 @@
         <label><input type="checkbox" id="onFlat"/> الأرض مستوية</label>
         <label><input type="checkbox" id="animalStanding"/> الحيوان واقف بثبات</label>
         <label><input type="checkbox" id="teatsVisible"/> الحلمات واضحة</label>
+      </div>
+
+      <div class="metrics" id="metrics">
+        <h3>مؤشرات تقديرية (Demo)</h3>
+        <div class="helper">التقط/ارفع صورة لعرض المؤشرات.</div>
       </div>
 
       <div class="save-bar">
@@ -345,12 +359,50 @@
       }
     }
 
+    // مؤشرات Demo: دوال مساعدة وحسابات تقديرية
+    function hashString(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h + s.charCodeAt(i); h|=0; } return Math.abs(h); }
+    function seededValue(seed, min, max){ const x = Math.sin(seed)*10000; const frac = x - Math.floor(x); return Math.round(min + frac*(max-min)); }
+    async function computeKPIs(dataUrl, angle){
+      try{
+        const img = new Image(); img.src = dataUrl; await img.decode();
+        const c = document.createElement('canvas'); c.width = 320; c.height = Math.max(1, Math.round(320*(img.height/img.width)));
+        const g = c.getContext('2d'); g.drawImage(img,0,0,c.width,c.height);
+        const id = g.getImageData(0,0,c.width,c.height);
+        let sum=0; for(let i=0;i<id.data.length;i+=4){ sum += 0.2126*id.data[i]+0.7152*id.data[i+1]+0.0722*id.data[i+2]; }
+        const avg = sum/(id.data.length/4);
+        const lighting = Math.max(0, Math.min(100, Math.round((avg/255)*100)));
+        const ratio = img.width/img.height; const framing = Math.max(0, Math.min(100, Math.round(100 - Math.abs(ratio-1.6)*80)));
+        const seed = hashString(angle + dataUrl.slice(0,64));
+        const teatSpacing = seededValue(seed, 6, 10);
+        const udderDepthScore = seededValue(seed+13, 5, 9);
+        const symmetry = seededValue(seed+27, 70, 95);
+        return { lighting, framing, teatSpacing, udderDepthScore, symmetry };
+      }catch(e){
+        return { lighting: 0, framing: 0, teatSpacing: 0, udderDepthScore: 0, symmetry: 0 };
+      }
+    }
+    function metricRow(name, value){ return '<div class="metric"><div>'+name+'</div><div>'+value+'</div></div>'; }
+    async function refreshMetrics(angle){
+      const box = document.getElementById('metrics'); if(!box) return;
+      const dataUrl = state.captures[angle];
+      if(!dataUrl){ box.innerHTML = '<h3>مؤشرات تقديرية (Demo)</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; }
+      const k = await computeKPIs(dataUrl, angle);
+      box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>'
+        + metricRow('جودة الإضاءة', k.lighting+'%')
+        + metricRow('اتساق الإطار', k.framing+'%')
+        + metricRow('تموضع/تباعد الحلمات', k.teatSpacing+' سم')
+        + metricRow('عمق الضرع (1–9)', k.udderDepthScore)
+        + metricRow('تناظر الضروع', k.symmetry+'%');
+    }
+
     function setAngle(angle){
       state.currentAngle = angle;
       $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle));
       helperText.innerHTML = helperByAngle[angle];
       drawGuide();
       updateButtons();
+      refreshMetrics(angle);
+      if(typeof updateDropHint==='function') updateDropHint();
     }
 
     function updateButtons(){
@@ -383,6 +435,36 @@
     const demoBtn = $('#demoBtn');
     if(demoBtn) demoBtn.addEventListener('click', runDemo);
 
+    const uploadBtn = $('#uploadBtn');
+    const uploadInput = $('#uploadInput');
+    if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
+    function onUploadFiles(e){
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{ state.captures[state.currentAngle] = reader.result; renderThumbs(); updateButtons(); refreshMetrics(state.currentAngle); };
+      reader.readAsDataURL(file);
+      if(uploadInput) uploadInput.value = '';
+    }
+    if(uploadInput) uploadInput.addEventListener('change', onUploadFiles);
+
+    const previewWrap = document.querySelector('.preview-wrap');
+    const dropHint = document.getElementById('dropHint');
+    const dropAngleLabel = document.getElementById('dropAngleLabel');
+    function updateDropHint(){ if(dropAngleLabel) dropAngleLabel.textContent = angleLabels[state.currentAngle]; }
+    if(previewWrap){
+      ['dragenter','dragover'].forEach(ev => previewWrap.addEventListener(ev, (e)=>{ e.preventDefault(); previewWrap.classList.add('dragover'); updateDropHint(); }));
+      ['dragleave','dragend'].forEach(ev => previewWrap.addEventListener(ev, ()=> previewWrap.classList.remove('dragover')));
+      previewWrap.addEventListener('drop', (e)=>{
+        e.preventDefault(); previewWrap.classList.remove('dragover');
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ()=>{ state.captures[state.currentAngle] = reader.result; renderThumbs(); updateButtons(); refreshMetrics(state.currentAngle); };
+        reader.readAsDataURL(file);
+      });
+    }
+
     toggleFlash.addEventListener('click', toggleTorch);
 
     restartBtn.addEventListener('click', async ()=>{
@@ -398,12 +480,14 @@
       state.captures[state.currentAngle] = url;
       renderThumbs();
       updateButtons();
+      refreshMetrics(state.currentAngle);
     });
 
     retakeBtn.addEventListener('click', ()=>{
       state.captures[state.currentAngle] = null;
       renderThumbs();
       updateButtons();
+      refreshMetrics(state.currentAngle);
     });
 
     nextAngleBtn.addEventListener('click', ()=>{
@@ -496,6 +580,7 @@
           if(badge) badge.style.display='inline-block';
           renderThumbs();
           setAngle('side');
+        refreshMetrics('side');
           await runDemo();
           return;
         }
