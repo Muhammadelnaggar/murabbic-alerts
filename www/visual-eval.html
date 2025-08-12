@@ -134,7 +134,7 @@
       بنفس أسلوب مشروع مُرَبِّك الحالي.
       إن اختلفت صادراتك، عدّل أسطر الاستيراد أدناه بما يلائم.
     */
-    import { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } from './www/js/firebase-config.js';
+    
 
     // ---------- أدوات مساعدة عامة ----------
     const qs = new URLSearchParams(location.search);
@@ -377,6 +377,8 @@
 
     saveBtn.addEventListener('click', async ()=>{
       try{
+        // تحميل Firebase عند الحاجة فقط (كي لا يمنع خطأ الاستيراد تشغيل الكاميرا)
+        const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } = await import('./js/firebase-config.js');
         saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…';
         const animalId = animalIdInput.value.trim();
         const date = eventDateInput.value || todayCairo();
@@ -431,8 +433,19 @@
     // ---------- تشغيل مبدئي ----------
     (async function init(){
       try{
+        if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+          alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب. جرّب Chrome/Edge أو جهاز موبايل.');
+          return;
+        }
+        if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
+          console.warn('غير آمن: يجب https أو localhost لتشغيل الكاميرا');
+          alert('هذه الصفحة تحتاج https أو localhost لتشغيل الكاميرا.');
+        }
+        // ابدأ بالكاميرا الافتراضية للمطالبة بالإذن أولاً
+        await startCamera();
+        // ثم اعرض قائمة الكاميرات بعد الحصول على الإذن
         await listCameras();
-        await startCamera(cameraSelect.value);
+        if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value = cameraSelect.options[0].value; }
         renderThumbs();
         setAngle('side');
       }catch(err){
