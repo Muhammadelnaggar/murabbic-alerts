@@ -150,9 +150,19 @@
   document.addEventListener('DOMContentLoaded', ()=> renderWeather());
   wRefresh.addEventListener('click', ()=> renderWeather(true));
 </script>
+<script type="module">
+  const veBtn = document.getElementById('btnVisualEval');
+  veBtn?.addEventListener('click', () => {
+    const qs  = new URLSearchParams(location.search);
+    const id  = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
+    const url = id ? `visual-eval.html?animalId=${encodeURIComponent(id)}` : `visual-eval.html`;
+    location.href = url;
+  });
+</script>
 
 </body>
 </html>
+
 
 
 
