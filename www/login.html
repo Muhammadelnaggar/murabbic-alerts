@@ -113,6 +113,17 @@
           localStorage.setItem("userId", userDoc.id);
           localStorage.setItem("userPhone", userData.phone);
           alert("✅ تم تسجيل الدخول بنجاح");
+          // حفظ البلد/المنطقة لاستخدام الطقس و THI
+const country = userData.country || '';
+const region  = userData.region  || '';
+if (country && region) {
+  const regionKey = `${country}:${region}`;
+  localStorage.setItem('userRegionKey', regionKey);
+  localStorage.setItem('userCountry', country);
+  localStorage.setItem('userRegion',  region);
+  // (اختياري) امسح أي كاش طقس قديم
+  localStorage.removeItem('weather:' + regionKey);
+}
 
           const animalsRef = collection(db, "animals");
           const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
@@ -141,3 +152,4 @@
   </form>
 </body>
 </html>
+
