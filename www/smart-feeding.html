@@ -429,7 +429,28 @@
   el('milkPrice').addEventListener('input', ()=> lastEv? analyze(lastEv):refresh());
   el('asFedKg').addEventListener('input', ()=> lastEv? analyze(lastEv):refresh());
 
-  onAuthStateChanged(auth, (user)=>{ if(!user){ location.href='login.html'; } else { refresh(); } });
+ function boot(){
+  const hasLS = !!localStorage.getItem('userId'); // جلسة تسجيل الدخول الخاصة بنا
+
+  if (auth && typeof onAuthStateChanged === 'function') {
+    onAuthStateChanged(auth, (user) => {
+      if (user || hasLS) {
+        refresh();
+      } else {
+        location.href = 'login.html';
+      }
+    });
+  } else {
+    // في حال ما فيش Firebase Auth أصلاً
+    if (hasLS) { 
+      refresh(); 
+    } else { 
+      location.href = 'login.html'; 
+    }
+  }
+}
+boot();
+
 </script>
 </body>
 </html>
