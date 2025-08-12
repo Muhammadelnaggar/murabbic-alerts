@@ -118,7 +118,7 @@
   const idInput    = document.getElementById("animalIdInput");
   const dateInput  = document.getElementById("eventDateInput");
 
-  const msgBox  = document.getElementById("inlineMsg");
+  const msgBox = document.getElementById("inlineMsg");
   const msgText = msgBox.querySelector(".text");
   const btnYes  = msgBox.querySelector("#msgYes");
   const btnNo   = msgBox.querySelector("#msgNo");
@@ -144,25 +144,30 @@
     return d.toISOString().slice(0,10);
   }
 
-  // تعبئة من الرابط/المحلّي
+  // املأ الحقول من الرابط/المخزن
   function hydrateContext(){
     const qp = new URLSearchParams(location.search);
-    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-    const presetDate = qp.get("date") || localStorage.getItem("lastEventDate") || todayLocal();
+    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber")
+                    || sessionStorage.getItem("ctxAnimalId")
+                    || localStorage.getItem("lastAnimalId") || "";
+    const presetDate = qp.get("date")
+                    || sessionStorage.getItem("ctxEventDate")
+                    || localStorage.getItem("lastEventDate")
+                    || todayLocal();
 
-    idInput.value = presetId;
+    idInput.value   = presetId;
     dateInput.value = presetDate;
 
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-    try {
+    try{
       const [y,m,d] = presetDate.split('-').map(Number);
-      dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-    } catch{
+      dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+    }catch{
       dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
     }
   }
 
-  // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
+  // مزامنة الشريط مع إدخال المستخدم
   idInput.addEventListener('input', ()=>{
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
   });
@@ -171,6 +176,7 @@
     catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
   });
 
+  // حفظ السياق والتحقق
   function getContextOrWarn(){
     const animalId = idInput.value.trim();
     const eventDate= dateInput.value.trim();
@@ -179,28 +185,26 @@
       return null;
     }
     warning.textContent = "";
-
-    // تخزين للسياق (متوافق وقد تُستخدمه الصفحات الأبناء)
+    // خزّن للسفحات الأخرى
     localStorage.setItem("lastAnimalId", animalId);
     localStorage.setItem("lastEventDate", eventDate);
     sessionStorage.setItem("ctxAnimalId", animalId);
     sessionStorage.setItem("ctxEventDate", eventDate);
-
     return { animalId, eventDate };
   }
 
-  // بناء رابط آمن مع كل المفاتيح المتوافقة
+  // نبني رابط بالباراميترات المتوافقة
   function buildTargetUrl(page, ctx){
-    // نستخدم URL API لضمان بناء الاستعلام بشكل صحيح
     const u = new URL(page, location.href);
-    u.searchParams.set('animalId', ctx.animalId);
-    u.searchParams.set('number',   ctx.animalId);
-    u.searchParams.set('Pid',      ctx.animalId);     // لبعض الصفحات القديمة
-    u.searchParams.set('date',     ctx.eventDate);
+    u.searchParams.set('animalId',  ctx.animalId);
+    u.searchParams.set('number',    ctx.animalId);
+    u.searchParams.set('Pid',       ctx.animalId);
+    u.searchParams.set('animalIdd', ctx.animalId);
+    u.searchParams.set('date',      ctx.eventDate);
     return u.toString();
   }
 
-  // ربط الأزرار (تفويض حدث)
+  // ربط الأزرار (تفويض حدث واحد يغطي المجموعة كلها)
   function wireButtons(db, auth){
     const container = document.getElementById("eventTypeGroup");
     if(!container) return;
@@ -215,7 +219,7 @@
       const page   = btn.getAttribute('data-page');
       const isTrim = page === 'trimming.html';
 
-      // نحاول نسجل الحدث، ولو فشل لا نمنع التنقل
+      // نسجّل الحدث (لو فشل نحاول نكمل التنقّل)
       try{
         await addDoc(collection(db, 'events'), {
           userId: auth?.currentUser?.uid || null,
@@ -227,7 +231,7 @@
           createdAt: serverTimestamp()
         });
       }catch(err){
-        console.error('addDoc failed:', err);
+        console.warn('save failed:', err);
         if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
       }
 
@@ -248,3 +252,5 @@
     wireButtons(db, auth);
   });
 </script>
+</body>
+</html>
