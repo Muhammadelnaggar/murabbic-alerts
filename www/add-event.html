@@ -144,30 +144,23 @@
     return d.toISOString().slice(0,10);
   }
 
-  // املأ الحقول من الرابط/المخزن
+  // تعبئة من الرابط/المحلّي
   function hydrateContext(){
     const qp = new URLSearchParams(location.search);
-    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber")
-                    || sessionStorage.getItem("ctxAnimalId")
-                    || localStorage.getItem("lastAnimalId") || "";
-    const presetDate = qp.get("date")
-                    || sessionStorage.getItem("ctxEventDate")
-                    || localStorage.getItem("lastEventDate")
-                    || todayLocal();
-
-    idInput.value   = presetId;
+    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
+    const presetDate = qp.get("date") || todayLocal();
+    idInput.value = presetId;
     dateInput.value = presetDate;
-
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-    try{
+    try {
       const [y,m,d] = presetDate.split('-').map(Number);
-      dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-    }catch{
+      dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+    } catch{
       dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
     }
   }
 
-  // مزامنة الشريط مع إدخال المستخدم
+  // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
   idInput.addEventListener('input', ()=>{
     animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
   });
@@ -176,7 +169,6 @@
     catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
   });
 
-  // حفظ السياق والتحقق
   function getContextOrWarn(){
     const animalId = idInput.value.trim();
     const eventDate= dateInput.value.trim();
@@ -185,26 +177,49 @@
       return null;
     }
     warning.textContent = "";
-    // خزّن للسفحات الأخرى
     localStorage.setItem("lastAnimalId", animalId);
-    localStorage.setItem("lastEventDate", eventDate);
-    sessionStorage.setItem("ctxAnimalId", animalId);
-    sessionStorage.setItem("ctxEventDate", eventDate);
     return { animalId, eventDate };
   }
 
-  // نبني رابط بالباراميترات المتوافقة
-  function buildTargetUrl(page, ctx){
-    const u = new URL(page, location.href);
-    u.searchParams.set('animalId',  ctx.animalId);
-    u.searchParams.set('number',    ctx.animalId);
-    u.searchParams.set('Pid',       ctx.animalId);
-    u.searchParams.set('animalIdd', ctx.animalId);
-    u.searchParams.set('date',      ctx.eventDate);
-    return u.toString();
+  /* ⬇️⬇️ ألصق هنا الدوال الجديدة ⬇️⬇️ */
+  function pushContext(ctx){
+    const id = String(ctx.animalId);
+    const dt = String(ctx.eventDate);
+    ['lastAnimalId','ctxAnimalId','currentAnimalId'].forEach(k=> localStorage.setItem(k, id));
+    ['ctxAnimalId','currentAnimalId'].forEach(k=> sessionStorage.setItem(k, id));
+    ['lastEventDate','ctxEventDate','eventDate','Date','dt'].forEach(k=>{
+      localStorage.setItem(k, dt);
+      sessionStorage.setItem(k, dt);
+    });
+    ['calvingDate','calvDate','calving_dt'].forEach(k=>{
+      localStorage.setItem(k, dt);
+      sessionStorage.setItem(k, dt);
+    });
+    ['closeupDate','closeUpDate','close_dt'].forEach(k=>{
+      localStorage.setItem(k, dt);
+      sessionStorage.setItem(k, dt);
+    });
   }
 
-  // ربط الأزرار (تفويض حدث واحد يغطي المجموعة كلها)
+  function buildTargetUrl(page, ctx){
+    const u  = new URL(page, location.href);
+    const id = String(ctx.animalId);
+    const dt = String(ctx.eventDate);
+    ['animalId','number','animalNumber','Pid','animalIdd','cowId','CowID','ID']
+      .forEach(k => u.searchParams.set(k, id));
+    ['date','eventDate','Date','dt']
+      .forEach(k => u.searchParams.set(k, dt));
+    if (page.includes('calving')){
+      ['calvingDate','calvDate','calving_dt'].forEach(k => u.searchParams.set(k, dt));
+    }
+    if (page.includes('close-up')){
+      ['closeupDate','closeUpDate','close_dt'].forEach(k => u.searchParams.set(k, dt));
+    }
+    return u.toString();
+  }
+  /* ⬆️⬆️ نهاية اللصق ⬆️⬆️ */
+
+  // ربط الأزرار (تفويض حدث)
   function wireButtons(db, auth){
     const container = document.getElementById("eventTypeGroup");
     if(!container) return;
@@ -219,7 +234,6 @@
       const page   = btn.getAttribute('data-page');
       const isTrim = page === 'trimming.html';
 
-      // نسجّل الحدث (لو فشل نحاول نكمل التنقّل)
       try{
         await addDoc(collection(db, 'events'), {
           userId: auth?.currentUser?.uid || null,
@@ -231,15 +245,16 @@
           createdAt: serverTimestamp()
         });
       }catch(err){
-        console.warn('save failed:', err);
+        console.error(err);
         if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
       }
 
-      // التنقّل/الرسالة الداخلية
       if (isTrim){
         const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
         if (!goAgain) location.href = 'dashboard.html';
       } else if (page){
+        // ✅ خزّن السياق + ابنِ الرابط المتوافق
+        pushContext(ctx);
         location.href = buildTargetUrl(page, ctx);
       }
     });
@@ -252,5 +267,7 @@
     wireButtons(db, auth);
   });
 </script>
+
 </body>
 </html>
+
