@@ -3,239 +3,270 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>تسجيل مربي جديد</title>
+  <title>مربي جديد؟</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
+    :root{--bg1:#eeffdd;--bg2:#fffedc;--green:#2e7d32;--border:#c5e1a5;--card:#ffffff}
+    *{box-sizing:border-box}
+    body{
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
+      display:flex;align-items:center;justify-content:center;min-height:100vh;
+      margin:0;padding:16px;color:#1b5e20;
     }
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      max-width: 400px;
-      width: 100%;
+    .container{
+      width:100%;max-width:460px;background:var(--card);
+      border:1px solid var(--border);border-radius:14px;padding:24px;
+      box-shadow:0 4px 20px rgba(0,0,0,.08);
     }
-    h2 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: #2e7d32;
-      text-align: center;
-      font-weight: bold;
+    h2{margin:0 0 16px;color:var(--green);text-align:center;font-weight:bold}
+    label{display:block;font-weight:bold;margin:.35rem 0 .35rem}
+    input,select,button{width:100%;font-size:16px;min-height:44px}
+    input,select{border:1px solid #ccc;border-radius:10px;padding:10px}
+    .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .hint{font-size:12px;color:var(--green);margin-top:-4px;margin-bottom:8px}
+    button{
+      background:var(--green);color:#fff;border:0;border-radius:10px;
+      padding:12px;font-weight:bold;cursor:pointer;transition:.2s ease background;
     }
-    label, input, button {
-      display: block;
-      width: 100%;
-      margin-bottom: 15px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-    label {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    input {
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background-color: #28a745;
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
-      background-color: #218838;
-    }
-    .message {
-      padding: 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 20px;
-      display: none;
-      font-size: 16px;
-    }
-    .message.success {
-      background-color: #d1e7dd;
-      color: #0f5132;
-      display: block;
-    }
-    .message.error {
-      background-color: #f8d7da;
-      color: #842029;
-      display: block;
-    }
-    p.login-link {
-      text-align: center;
-      font-size: 14px;
-      margin-top: -10px;
-    }
-    p.login-link a {
-      color: #28a745;
-      text-decoration: none;
-      font-weight: bold;
-    }
+    button:hover{background:#256a28}
+    .message{display:none;padding:12px;border-radius:10px;font-weight:bold;text-align:center;margin-bottom:10px}
+    .message.success{display:block;background:#d1e7dd;color:#0f5132}
+    .message.error{display:block;background:#f8d7da;color:#842029}
+    .muted{font-size:13px;opacity:.85}
+    .link{margin-top:6px;text-align:center}
+    .link a{color:var(--green);text-decoration:none;font-weight:bold}
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>تسجيل مربي جديد</h2>
-
-    <div id="msg" class="message"></div>
+    <h2>تسجيل مستخدم جديد</h2>
+    <div id="msg" class="message" role="status" aria-live="polite"></div>
 
     <form id="registerForm" novalidate>
       <label for="name">الاسم الكامل *</label>
-      <input type="text" id="name" required />
+      <input id="name" type="text" required />
 
       <label for="phone">رقم الهاتف *</label>
-      <input type="tel" id="phone" required pattern="^01[0-9]{9}$" placeholder="مثال: 01012345678" />
+      <input id="phone" type="tel" required placeholder="مثال (مصر): 01012345678" />
+      <div id="phoneHint" class="hint">* سنطبّق نمطًا مناسبًا حسب الدولة المختارة.</div>
+
+      <div class="row-2">
+        <div>
+          <label for="country">الدولة *</label>
+          <select id="country" required>
+            <option value="">— اختر الدولة —</option>
+            <option>مصر</option>
+            <option>السعودية</option>
+            <option>الإمارات</option>
+            <option>الكويت</option>
+            <option>قطر</option>
+            <option>البحرين</option>
+            <option>عُمان</option>
+            <option>الأردن</option>
+            <option>لبنان</option>
+            <option>سوريا</option>
+            <option>فلسطين</option>
+            <option>العراق</option>
+            <option>اليمن</option>
+            <option>ليبيا</option>
+            <option>تونس</option>
+            <option>الجزائر</option>
+            <option>المغرب</option>
+            <option>موريتانيا</option>
+            <option>السودان</option>
+            <option>الصومال</option>
+            <option>جيبوتي</option>
+            <option>جزر القمر</option>
+          </select>
+        </div>
+        <div>
+          <label for="region">المنطقة/المحافظة *</label>
+          <select id="region" required disabled>
+            <option value="">— اختر الدولة أولاً —</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="role">التسجيل كـ *</label>
+      <select id="role" required>
+        <option value="">— اختر الدور —</option>
+        <option>مربي</option>
+        <option>طبيب بيطري</option>
+        <option>مهندس إنتاج</option>
+        <option>صاحب مزرعة</option>
+        <option>مدير مزرعة</option>
+        <option>استشاري</option>
+      </select>
 
       <label for="password">كلمة المرور *</label>
-      <input type="password" id="password" required minlength="4" />
+      <input id="password" type="password" required minlength="4" />
 
       <label for="confirmPassword">تأكيد كلمة المرور *</label>
-      <input type="password" id="confirmPassword" required minlength="4" />
+      <input id="confirmPassword" type="password" required minlength="4" />
 
-      <button type="submit" id="submitBtn">تسجيل</button>
+      <button id="submitBtn" type="submit">تسجيل</button>
     </form>
 
-    <p class="login-link">
-      مربي موجود؟ 
-      <a href="login.html">ادخل إلى حسابك</a>
-    </p>
+    <div class="link muted">لديك حساب؟ <a href="login.html">ادخل إلى حسابك</a></div>
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { db } from './js/firebase-config.js';
+    import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    // عناصر DOM
+    const form = document.getElementById('registerForm');
+    const msg  = document.getElementById('msg');
+    const btn  = document.getElementById('submitBtn');
+    const countrySel = document.getElementById('country');
+    const regionSel  = document.getElementById('region');
+    const phoneInp   = document.getElementById('phone');
+    const phoneHint  = document.getElementById('phoneHint');
+
+    // خريطة المناطق — بدون إدخال يدوي (للاستخدام مع الطقس لاحقًا)
+    const REGIONS = {
+      "مصر": ["القاهرة","الجيزة","القليوبية","الشرقية","الدقهلية","البحيرة","الغربية","المنوفية","كفر الشيخ","دمياط","الإسكندرية","المنيا","أسيوط","سوهاج","قنا","الأقصر","أسوان","بني سويف","الفيوم","البحر الأحمر","الوادي الجديد","مطروح","شمال سيناء","جنوب سيناء"],
+      "السعودية": ["الرياض","مكة المكرمة","المدينة المنورة","القصيم","الشرقية","عسير","تبوك","حائل","الحدود الشمالية","جازان","نجران","الباحة","الجوف"],
+      "الإمارات": ["أبوظبي","دبي","الشارقة","عجمان","أم القيوين","رأس الخيمة","الفجيرة"],
+      "الكويت": ["العاصمة","الأحمدي","حولي","الفروانية","الجهراء","مبارك الكبير"],
+      "قطر": ["الدوحة","الريان","الوكرة","الخور والذخيرة","الشمال","أم صلال","الظعاين","الشحانية"],
+      "البحرين": ["العاصمة","المحرق","الشمالية","الجنوبية"],
+      "عُمان": ["مسقط","ظفار","شمال الباطنة","جنوب الباطنة","الداخلية","شمال الشرقية","جنوب الشرقية","الظاهرة","الوسطى","مسندم"],
+      "الأردن": ["عمّان","الزرقاء","إربد","البلقاء","المفرق","الكرك","معان","الطفيلة","العقبة","مأدبا","جرش","عجلون"],
+      "لبنان": ["بيروت","جبل لبنان","الشمال","البقاع","النبطية","الجنوب","بعلبك-الهرمل","عكار"],
+      "سوريا": ["دمشق","ريف دمشق","حلب","حمص","حماة","اللاذقية","طرطوس","إدلب","دير الزور","الرقة","الحسكة","درعا","السويداء","القنيطرة"],
+      "فلسطين": ["القدس","رام الله والبيرة","الخليل","بيت لحم","نابلس","طولكرم","قلقيلية","جنين","أريحا والأغوار","سلفيت","غزة","خانيونس","رفح","الشمال","الوسطى"],
+      "العراق": ["بغداد","نينوى","البصرة","أربيل","النجف","كربلاء","ذي قار","ديالى","صلاح الدين","كركوك","السليمانية","القادسية","بابل","الأنبار","واسط","المثنى","ميسان","دهوك"],
+      "اليمن": ["صنعاء","عدن","تعز","الحديدة","إب","حضرموت","شبوة","مأرب","صعدة","البيضاء","ذمار","المحويت","ريمة","حجة","لحج","أبين","الضالع","المهرة"],
+      "ليبيا": ["طرابلس","بنغازي","مصراتة","سبها","درنة","البيضاء","الزاوية","غريان","اجدابيا","الكفرة","الجفرة","مرزق","الواحات","طبرق"],
+      "تونس": ["تونس","أريانة","بن عروس","منوبة","نابل","زغوان","بنزرت","باجة","جندوبة","الكاف","سليانة","القيروان","سوسة","المنستير","المهدية","صفاقس","القصرين","قفصة","توزر","قبلي","مدنين","تطاوين"],
+      "الجزائر": ["الجزائر","وهران","قسنطينة","سطيف","البليدة","سيدي بلعباس","باتنة","عنابة","جيجل","بجاية","تلمسان","الأغواط","بسكرة","غرداية","ورقلة","تيزي وزو","تيبازة","البويرة"],
+      "المغرب": ["الرباط-سلا-القنيطرة","الدار البيضاء-سطات","مراكش-آسفي","فاس-مكناس","طنجة-تطوان-الحسيمة","الشرق","بني ملال-خنيفرة","درعة-تافيلالت","سوس-ماسة","العيون-الساقية الحمراء","كلميم-واد نون","الداخلة-وادي الذهب"],
+      "موريتانيا": ["نواكشوط","الحوض الشرقي","الحوض الغربي","لعصابة","كوركول","البراكنة","اترارزة","تكانت","كيدي ماغا","تيرس زمور","داخلت نواذيبو","آدرار"],
+      "السودان": ["الخرطوم","الجزيرة","القضارف","سنار","كسلا","البحر الأحمر","نهر النيل","الشمالية","شمال كردفان","جنوب كردفان","شمال دارفور","جنوب دارفور","غرب دارفور","وسط دارفور","شرق دارفور","النيل الأزرق"],
+      "الصومال": ["بنادر","بونتلاند","جوبالاند","جنوب غرب","هيرشبيلي","غلمدغ","أرض الصومال"],
+      "جيبوتي": ["مدينة جيبوتي","علي صبيح","تاجورة","أوبوك","دهر","أرتا"],
+      "جزر القمر": ["نجازيدجا (القمر الكبرى)","أنجوان","موهيلي"]
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    const form = document.getElementById("registerForm");
-    const msgDiv = document.getElementById("msg");
-    const submitBtn = document.getElementById("submitBtn");
-
-    async function hashPassword(password) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    function fillRegions(country){
+      regionSel.innerHTML = '';
+      regionSel.disabled = true;
+      const list = REGIONS[country];
+      if (!list){
+        const op = document.createElement('option');
+        op.value=''; op.textContent='— غير متاح —';
+        regionSel.appendChild(op);
+        return;
+      }
+      const def = document.createElement('option');
+      def.value=''; def.textContent='— اختر المنطقة/المحافظة —';
+      regionSel.appendChild(def);
+      list.forEach(name=>{
+        const op = document.createElement('option');
+        op.value=name; op.textContent=name; regionSel.appendChild(op);
+      });
+      regionSel.disabled = false;
     }
 
-    function showMessage(text, type = "error") {
-      msgDiv.textContent = text;
-      msgDiv.className = `message ${type}`;
-      msgDiv.style.display = "block";
+    function setPhonePlaceholder(country){
+      const map = {
+        'مصر':'01012345678',
+        'السعودية':'05xxxxxxxx',
+        'الإمارات':'05xxxxxxxx',
+        'الكويت':'5xxxxxxxx',
+        'قطر':'3xxxxxxxx',
+        'البحرين':'3xxxxxxx',
+        'عُمان':'9xxxxxxxx',
+        'الأردن':'07xxxxxxxx',
+        'لبنان':'03xxxxxx',
+        'سوريا':'09xxxxxxxx',
+        'فلسطين':'059xxxxxxx',
+        'العراق':'07xxxxxxxx',
+        'اليمن':'7xxxxxxxx',
+        'ليبيا':'09xxxxxxxx',
+        'تونس':'2xxxxxxxx / 9xxxxxxxx',
+        'الجزائر':'05xxxxxxxx',
+        'المغرب':'06xxxxxxxx',
+        'موريتانيا':'22xxxxxxx',
+        'السودان':'09xxxxxxxx',
+        'الصومال':'+252xxxxxxxx',
+        'جيبوتي':'+253xxxxxxxx',
+        'جزر القمر':'+269xxxxxxx'
+      };
+      phoneInp.placeholder = `مثال (${country||'دولة'}): ${map[country]||'+9715xxxxxxx'}`;
     }
 
-    function clearMessage() {
-      msgDiv.textContent = "";
-      msgDiv.style.display = "none";
+    countrySel.addEventListener('change', ()=>{
+      fillRegions(countrySel.value);
+      setPhonePlaceholder(countrySel.value);
+    });
+
+    function showMessage(text, type='error'){
+      msg.textContent = text; msg.className = `message ${type}`; msg.style.display='block';
+    }
+    function clearMessage(){ msg.textContent=''; msg.style.display='none'; }
+
+    async function hashPassword(password){
+      const enc = new TextEncoder();
+      const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
     }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      clearMessage();
-      submitBtn.disabled = true;
+    function validatePhoneByCountry(phone, country){
+      const p = phone.replace(/\s|-/g,'');
+      if (country==='مصر') return /^01\d{9}$/.test(p);
+      // عام: 7–15 رقم مع اختيار +
+      return /^\+?\d{7,15}$/.test(p);
+    }
 
-      const name = document.getElementById("name").value.trim();
-      const phone = document.getElementById("phone").value.trim();
-      const password = document.getElementById("password").value;
-      const confirmPassword = document.getElementById("confirmPassword").value;
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault(); clearMessage(); btn.disabled=true;
+      const fullName = document.getElementById('name').value.trim();
+      const phone    = phoneInp.value.trim();
+      const country  = countrySel.value.trim();
+      const region   = regionSel.value.trim();
+      const role     = document.getElementById('role').value.trim();
+      const password = document.getElementById('password').value;
+      const confirm  = document.getElementById('confirmPassword').value;
 
-      if (!name || !phone || !password || !confirmPassword) {
-        showMessage("جميع الحقول مطلوبة");
-        submitBtn.disabled = false;
-        return;
+      if (!fullName || !phone || !country || !region || !role || !password || !confirm){
+        showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
       }
-
-      const phonePattern = /^01[0-9]{9}$/;
-      if (!phonePattern.test(phone)) {
-        showMessage("رقم الهاتف غير صحيح. يجب أن يبدأ بـ 01 ويحتوي على 11 رقمًا");
-        submitBtn.disabled = false;
-        return;
+      if (!validatePhoneByCountry(phone, country)){
+        showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
       }
+      if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون 4 أحرف أو أكثر'); btn.disabled=false; return; }
+      if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقين'); btn.disabled=false; return; }
 
-      if (password.length < 4) {
-        showMessage("كلمة المرور يجب أن تكون 4 أحرف أو أكثر");
-        submitBtn.disabled = false;
-        return;
-      }
+      try{
+        // منع تكرار الهاتف
+        const usersRef = collection(db,'users');
+        const q = query(usersRef, where('phone','==', phone));
+        const snap = await getDocs(q);
+        if (!snap.empty){ showMessage('رقم الهاتف مسجل بالفعل'); btn.disabled=false; return; }
 
-      if (password !== confirmPassword) {
-        showMessage("كلمة المرور وتأكيدها غير متطابقين");
-        submitBtn.disabled = false;
-        return;
-      }
-
-      try {
-        // تحقق من تكرار رقم الهاتف
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("phone", "==", phone));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          showMessage("رقم الهاتف مسجل بالفعل");
-          submitBtn.disabled = false;
-          return;
-        }
-
-        // تشفير كلمة المرور
-        const hashedPassword = await hashPassword(password);
-
-        // إضافة المستخدم الجديد
+        const passHash = await hashPassword(password);
         await addDoc(usersRef, {
-          fullName: name,
-          phone,
-          password: hashedPassword,
+          fullName, phone, country, region, role,
+          password: passHash,
           createdAt: serverTimestamp()
         });
-
-        showMessage("✅ تم التسجيل بنجاح، سيتم توجيهك إلى صفحة تسجيل الدخول...", "success");
-
-        setTimeout(() => {
-          window.location.href = "login.html";
-        }, 2000);
-
-      } catch (error) {
-        console.error("خطأ في التسجيل:", error);
-        showMessage("حدث خطأ أثناء التسجيل، حاول مرة أخرى");
-        submitBtn.disabled = false;
+        showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
+        setTimeout(()=> location.href='login.html', 1400);
+      }catch(err){
+        console.error(err);
+        showMessage('حدث خطأ أثناء التسجيل، حاول مرة أخرى');
+        btn.disabled=false;
+        return;
       }
     });
   </script>
 </body>
 </html>
 
- 
   
   
-
-
 
 
 
