@@ -106,180 +106,126 @@
     </div>
   </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+ <script type="module">
+  import { db, auth } from "./js/firebase-config.js";
+  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // عناصر DOM
-    const animalInfo = document.getElementById("animalInfo");
-    const dateInfo   = document.getElementById("dateInfo");
-    const warning    = document.getElementById("noAnimalWarning");
-    const idInput    = document.getElementById("animalIdInput");
-    const dateInput  = document.getElementById("eventDateInput");
+  // عناصر DOM
+  const animalInfo = document.getElementById("animalInfo");
+  const dateInfo   = document.getElementById("dateInfo");
+  const warning    = document.getElementById("noAnimalWarning");
+  const idInput    = document.getElementById("animalIdInput");
+  const dateInput  = document.getElementById("eventDateInput");
 
-    const msgBox = document.getElementById("inlineMsg");
-    const msgText = msgBox.querySelector(".text");
-    const btnYes  = msgBox.querySelector("#msgYes");
-    const btnNo   = msgBox.querySelector("#msgNo");
+  const msgBox = document.getElementById("inlineMsg");
+  const msgText = msgBox.querySelector(".text");
+  const btnYes  = msgBox.querySelector("#msgYes");
+  const btnNo   = msgBox.querySelector("#msgNo");
 
-    function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
-      msgText.textContent = message;
-      btnYes.textContent = yesText;
-      btnNo.textContent  = noText;
-      msgBox.style.display = "block";
-      return new Promise(resolve=>{
-        const onYes = ()=>{ cleanup(); resolve(true);  };
-        const onNo  = ()=>{ cleanup(); resolve(false); };
-        btnYes.addEventListener('click', onYes, { once:true });
-        btnNo .addEventListener('click', onNo , { once:true });
-        function cleanup(){ msgBox.style.display="none"; }
-      });
-    }
-
-    // تاريخ اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-
-    // تعبئة من الرابط/المحلّي
-    function hydrateContext(){
-      const qp = new URLSearchParams(location.search);
-      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-      const presetDate = qp.get("date") || todayLocal();
-      idInput.value = presetId;
-      dateInput.value = presetDate;
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-      try {
-        // عرض التاريخ بصيغة محلية عربية فقط في العنوان (input يظل YYYY-MM-DD)
-        const parts = presetDate.split('-');
-        const pretty = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10)).toLocaleDateString('ar-EG');
-        dateInfo.textContent   = `📅 التاريخ الحالي: ${pretty}`;
-      } catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`; }
-    }
-
-    // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
-    idInput.addEventListener('input', ()=>{
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
+  function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
+    msgText.textContent = message;
+    btnYes.textContent = yesText;
+    btnNo.textContent  = noText;
+    msgBox.style.display = "block";
+    return new Promise(resolve=>{
+      const onYes = ()=>{ cleanup(); resolve(true);  };
+      const onNo  = ()=>{ cleanup(); resolve(false); };
+      btnYes.addEventListener('click', onYes, { once:true });
+      btnNo .addEventListener('click', onNo , { once:true });
+      function cleanup(){ msgBox.style.display="none"; }
     });
-    dateInput.addEventListener('input', ()=>{
-      try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
-      catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
-    });
+  }
 
-    function getContextOrWarn(){
-      const animalId = idInput.value.trim();
-      const eventDate= dateInput.value.trim();
-      if (!animalId || !eventDate){
-        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-        return null;
-      }
-      warning.textContent = "";
-      localStorage.setItem("lastAnimalId", animalId);
-      return { animalId, eventDate };
+  // تاريخ اليوم المحلي YYYY-MM-DD
+  function todayLocal(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+
+  // تعبئة من الرابط/المحلّي
+  function hydrateContext(){
+    const qp = new URLSearchParams(location.search);
+    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
+    const presetDate = qp.get("date") || todayLocal();
+    idInput.value = presetId;
+    dateInput.value = presetDate;
+    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
+    try {
+      const [y,m,d] = presetDate.split('-').map(Number);
+      dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+    } catch{
+      dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
     }
+  }
 
-    // تهيئة Firebase بمرونة (توافق قبل/بعد التوحيد)
-    async function setupFirebase(){
-      // نحاول أولًا استيراد وحدة التهيئة الجاهزة داخل www/js/
-      try {
-        const mod = await import('./js/firebase-config.js?v=2');
-        // حالة 1: الملف يصدّر db, auth مباشرة
-        if (mod?.db && mod?.auth){
-          console.log('[Firebase] using ./js/firebase-config.js (db/auth exports)');
-          return { db: mod.db, auth: mod.auth };
-        }
-        // حالة 2: الملف يصدّر firebaseConfig فقط
-        if (mod?.firebaseConfig){
-          console.log('[Firebase] using ./js/firebase-config.js (firebaseConfig)');
-          const app  = initializeApp(mod.firebaseConfig);
-          const db   = getFirestore(app);
-          const auth = getAuth(app);
-          return { db, auth };
-        }
-      } catch (e) {
-        console.warn('[Firebase] import ./js/firebase-config.js failed', e);
-      }
+  // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
+  idInput.addEventListener('input', ()=>{
+    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
+  });
+  dateInput.addEventListener('input', ()=>{
+    try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
+    catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
+  });
 
-      // محاولة ثانية: config.js في الجذر
-      try {
-        const { firebaseConfig } = await import('./config.js?v=2');
-        console.log('[Firebase] using ./config.js');
-        const app  = initializeApp(firebaseConfig);
-        const db   = getFirestore(app);
-        const auth = getAuth(app);
-        return { db, auth };
-      } catch(e2){
-        console.warn('[Firebase] import ./config.js failed', e2);
-      }
-
-      console.error('Firebase config not found at ./js/firebase-config.js nor ./config.js');
-      warning.textContent = "❌ تعذّر تحميل إعدادات Firebase. تأكّد من وجود ./js/firebase-config.js أو ./config.js";
-      return { db:null, auth:null };
+  function getContextOrWarn(){
+    const animalId = idInput.value.trim();
+    const eventDate= dateInput.value.trim();
+    if (!animalId || !eventDate){
+      warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+      return null;
     }
+    warning.textContent = "";
+    localStorage.setItem("lastAnimalId", animalId);
+    return { animalId, eventDate };
+  }
 
-    // ربط الأزرار
-    function wireButtons(db, auth){
-      const container = document.getElementById("eventTypeGroup");
-      if(!container) return;
+  // ربط الأزرار (تفويض حدث)
+  function wireButtons(db, auth){
+    const container = document.getElementById("eventTypeGroup");
+    if(!container) return;
 
-      // تفويض حدث واحد يغطي كل الأزرار (أضمن من الاستنساخ)
-      container.addEventListener('click', async (ev)=>{
-        const btn = ev.target.closest('button');
-        if (!btn || !container.contains(btn)) return;
+    container.addEventListener('click', async (ev)=>{
+      const btn = ev.target.closest('button');
+      if (!btn || !container.contains(btn)) return;
 
-        const ctx = getContextOrWarn();
-        if (!ctx) return;
+      const ctx = getContextOrWarn();
+      if (!ctx) return;
 
-        const page   = btn.getAttribute('data-page');
-        const isTrim = page === 'trimming.html';
+      const page   = btn.getAttribute('data-page');
+      const isTrim = page === 'trimming.html';
 
-        try{
-          if (db){
-            await addDoc(collection(db, 'events'), {
-              userId: auth?.currentUser?.uid || null,
-              animalId: ctx.animalId,
-              animalNumber: ctx.animalId,
-              eventDate: ctx.eventDate,
-              type: isTrim ? 'تقليم الحوافر' : undefined,
-              eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
-              createdAt: serverTimestamp()
-            });
-          }
-        }catch(err){
-          console.error(err);
-          if (isTrim) {
-            warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
-          }
-        }
-
-        // التنقّل/الرسالة الداخلية
-        if (isTrim){
-          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-          if (!goAgain) location.href = 'dashboard.html';
-        } else if (page){
-          const qs = `animalId=${encodeURIComponent(ctx.animalId)}&animalIdd=${encodeURIComponent(ctx.animalId)}&number=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
-          location.href = `${page}?${qs}`;
-        }
-      });
-    }
-
-    // بدء التشغيل
-    (async function init(){
-      hydrateContext();
-      const { db, auth } = await setupFirebase();
-      if (auth){
-        onAuthStateChanged(auth, (user)=>{
-          if (!user){ location.href = "login.html"; return; }
-          wireButtons(db, auth);
+      try{
+        await addDoc(collection(db, 'events'), {
+          userId: auth?.currentUser?.uid || null,
+          animalId: ctx.animalId,
+          animalNumber: ctx.animalId,
+          eventDate: ctx.eventDate,
+          type: isTrim ? 'تقليم الحوافر' : undefined,
+          eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
+          createdAt: serverTimestamp()
         });
-      } else {
-        // في حالة عدم توفر auth (وضع تطوير/اختبار)، نسمح بالعمل بدون تسجيل دخول
-        wireButtons(db, null);
+      }catch(err){
+        console.error(err);
+        if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
       }
-    })();
-  </script>
-</body>
-</html>
+
+      // التنقّل/الرسالة الداخلية
+      if (isTrim){
+        const goAgain = await showNotice(`✅ تم تسجيل \"تقليم الحوافر\" للحيوان ${ctx.animalId}.`);
+        if (!goAgain) location.href = 'dashboard.html';
+      } else if (page){
+        const qs = `animalId=${encodeURIComponent(ctx.animalId)}&animalIdd=${encodeURIComponent(ctx.animalId)}&number=${encodeURIComponent(ctx.animalId)}&date=${encodeURIComponent(ctx.eventDate)}`;
+        location.href = `${page}?${qs}`;
+      }
+    });
+  }
+
+  // بدء التشغيل
+  hydrateContext();
+  onAuthStateChanged(auth, (user)=>{
+    if (!user){ location.href = "login.html"; return; }
+    wireButtons(db, auth);
+  });
+</script>
