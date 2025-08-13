@@ -233,7 +233,7 @@
         'udder-rear': null,
         'teat-close': null,
         'front-body': null,
-        'head-neck': null,
+        'head-neck': null
       }),
       k: /** @type {Record<string, any>} */ ({})
     };
@@ -257,7 +257,7 @@
 
     // === Camera helpers ===
     async function listCameras(){
-      if(!navigator.mediaDevices?.enumerateDevices) return [];
+      if(!navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) return [];
       const devs = await navigator.mediaDevices.enumerateDevices();
       const cams = devs.filter(d=> d.kind === 'videoinput');
       if(cameraSelect){
@@ -636,7 +636,7 @@
     function collectAnalysisSnapshot(animalId, date){
       const perAngle = state.k || {};
       const all = Object.assign({}, perAngle['side'], perAngle['udder-rear'], perAngle['udder-front'], perAngle['teat-close'], perAngle['front-body'], perAngle['head-neck']);
-      if(!all.rearLegsWidth && (perAngle['udder-rear']?.teatDistribution)) all.rearLegsWidth = perAngle['udder-rear'].teatDistribution;
+      if(!all.rearLegsWidth && ((perAngle['udder-rear'] && perAngle['udder-rear'].teatDistribution))) all.rearLegsWidth = perAngle['udder-rear'].teatDistribution;
       const overall = computeOverallMVS(all||{});
         if(PURCHASE){
           const pb = document.getElementById('purchaseBadge');
@@ -705,7 +705,7 @@
       computeKPIs(dataUrl, angle).then(k=>{
         state.k[angle] = Object.assign({}, state.k[angle]||{}, k);
         const all = Object.assign({}, state.k['side'], state.k['udder-rear'], state.k['udder-front'], state.k['teat-close'], state.k['front-body'], state.k['head-neck']);
-        if(!all.rearLegsWidth && (state.k['udder-rear']?.teatDistribution)) all.rearLegsWidth = state.k['udder-rear'].teatDistribution;
+        if(!all.rearLegsWidth && ((state.k['udder-rear'] && state.k['udder-rear'].teatDistribution))) all.rearLegsWidth = state.k['udder-rear'].teatDistribution;
         const overall = computeOverallMVS(all||{});
         box.innerHTML = '<h3>التقييم</h3>' + renderScoreWidget(overall);
         if(PURCHASE){
