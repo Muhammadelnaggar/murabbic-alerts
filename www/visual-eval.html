@@ -235,27 +235,22 @@ function computeKPIs(dataUrl, angle){ return new Promise(res=>{ const img=new Im
       }
       res(k); }; img.onerror=()=>res({lighting:0,framing:0}); img.src=dataUrl; }); }
 
-function refreshMetricsEx(angle){ const box=$('#metrics'); if(!box) return; const dataUrl=state.captures[angle]; if(!dataUrl){ box.innerHTML='<h3>التقييم</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; } computeKPIs(dataUrl,angle).then(k=>{ state.k[angle]=Object.assign({},state.k[angle]||{},k); const all=Object.assign({}, state.k['udder-rear'], state.k['side'], state.k['teat-close']);  box.innerHTML='<h3>التقييم</h3>'+renderScoreWidget(mvs); }); }
-
-function renderThumbsIf(){ renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle); }
-
-// UI bindings
-window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
-window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ fitOverlay(); drawGuide(); },150); });
-$$('.angle-tab').forEach(b=> b.addEventListener('click', ()=> setAngle(b.dataset.angle)) );
-const demoBtn=$('#demoBtn'); if(demoBtn) demoBtn.addEventListener('click', ()=>{ state.captures={}; anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); });
-const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput'); if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click()); if(uploadInput) uploadInput.addEventListener('change', e=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.captures[state.currentAngle]=r.result; renderThumbsIf(); }; r.readAsDataURL(f); uploadInput.value=''; });
-const previewWrap=$('.preview-wrap'); const dropAngleLabel=$('#dropAngleLabel'); function updDrop(){ if(dropAngleLabel) dropAngleLabel.textContent=angleLabels[state.currentAngle]; } if(previewWrap){ ['dragenter','dragover'].forEach(ev=> previewWrap.addEventListener(ev,e=>{ e.preventDefault(); previewWrap.classList.add('dragover'); updDrop(); })); ['dragleave','dragend'].forEach(ev=> previewWrap.addEventListener(ev,()=> previewWrap.classList.remove('dragover'))); previewWrap.addEventListener('drop',e=>{ e.preventDefault(); previewWrap.classList.remove('dragover'); const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.captures[state.currentAngle]=r.result; renderThumbsIf(); }; r.readAsDataURL(f); }); }
-if(toggleFlash) toggleFlash.addEventListener('click', async ()=>{ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed', String(state.torchOn)); toggleFlash.textContent = state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch{}});
-if(restartBtn) restartBtn.addEventListener('click', ()=> startCamera(cameraSelect && cameraSelect.value));
-if(cameraSelect) cameraSelect.addEventListener('change', ()=> startCamera(cameraSelect.value));
-if(captureBtn) captureBtn.addEventListener('click', ()=>{ const url=dataURLFromVideo(); if(!url){ if(uploadInput) uploadInput.click(); return; } state.captures[state.currentAngle]=url; renderThumbsIf(); });
-if(retakeBtn) retakeBtn.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; renderThumbsIf(); });
-if(nextAngleBtn) nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
-
-function makePlaceholder(label){ const c=document.createElement('canvas'); c.width=1280; c.height=720; const g=c.getContext('2d'); const grd=g.createLinearGradient(0,0,1280,720); grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9'); g.fillStyle=grd; g.fillRect(0,0,1280,720); g.fillStyle='#0ea05a'; g.fillRect(60,60,1160,600); g.fillStyle='#ffffff'; g.font='bold 60px Cairo, Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('عرض توضيحي — '+label,640,360); g.font='26px Cairo, Arial'; g.fillText('Murabbik Visual Evaluation (Prototype)',640,430); return c.toDataURL('image/jpeg',0.9); }
-
-(async function init(){ const ctx=getCtx(); if(animalIdInput) animalIdInput.value=ctx.id; if(eventDateInput) eventDateInput.value=ctx.date; if(numberSpan) numberSpan.textContent=ctx.id||'—'; renderThumbs(); setAngle('udder-rear'); if(DEMO){ anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); return; } if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); return; } await startCamera(); await listCameras(); if(cameraSelect && !cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
+function refreshMetricsEx(angle){
+  const box = $('#metrics');
+  if (!box) return;
+  const dataUrl = state.captures[angle];
+  if (!dataUrl) {
+    box.innerHTML = '<h3>التقييم</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>' + angleLabels[angle] + '</strong> لعرض المؤشرات.</div>';
+    return;
+  }
+  computeKPIs(dataUrl, angle).then(k => {
+    state.k[angle] = Object.assign({}, state.k[angle] || {}, k);
+    const all = Object.assign({}, state.k['udder-rear'], state.k['side'], state.k['teat-close']);
+    const mvs = computeOverallMVS(all || {});
+    box.innerHTML = '<h3>التقييم</h3>' + renderScoreWidget(mvs);
+  }).catch(() => {
+    box.innerHTML = '<h3>التقييم</h3><div class="helper">تعذّر حساب المؤشرات لهذه اللقطة.</div>';
+  });
 })();
 </script>
 </body>
