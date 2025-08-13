@@ -213,6 +213,178 @@
       k: /** @type {Record<string, any>} */ ({})
     };
 
+    // === DOM references ===
+    const preview = document.querySelector('#preview');
+    const overlay = document.querySelector('#overlay');
+    const cameraSelect = document.querySelector('#cameraSelect');
+    const toggleFlash = document.querySelector('#toggleFlash');
+    const restartBtn = document.querySelector('#restartBtn');
+    const captureBtn = document.querySelector('#captureBtn');
+    const retakeBtn = document.querySelector('#retakeBtn');
+    const nextAngleBtn = document.querySelector('#nextAngleBtn');
+    const thumbs = document.querySelector('#thumbs');
+    const helperText = document.querySelector('#helperText');
+    const metaForm = document.querySelector('#metaForm');
+    const animalIdInput = document.querySelector('#animalId');
+    const eventDateInput = document.querySelector('#eventDate');
+    const saveBtn = document.querySelector('#saveBtn');
+    const numberSpan = document.querySelector('.animal-number');
+
+    // === Camera helpers ===
+    async function listCameras(){
+      if(!navigator.mediaDevices?.enumerateDevices) return [];
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const cams = devs.filter(d=> d.kind === 'videoinput');
+      if(cameraSelect){
+        cameraSelect.innerHTML = '';
+        cams.forEach((c,i)=>{
+          const opt = document.createElement('option');
+          opt.value = c.deviceId; opt.textContent = c.label || `كاميرا ${i+1}`;
+          cameraSelect.appendChild(opt);
+        });
+      }
+      return cams;
+    }
+
+    async function startCamera(deviceId){
+      try{
+        if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+        const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { ideal: 'environment' } } };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        state.stream = stream;
+        if(preview) preview.srcObject = stream;
+        const [track] = stream.getVideoTracks();
+        state.track = track;
+        state.capabilities = (track.getCapabilities && track.getCapabilities()) || null;
+        if(preview){ await preview.play(); }
+        fitOverlay();
+        drawGuide();
+        await populateTorchSupport();
+      }catch(err){ console.warn('startCamera error', err); }
+    }
+
+    async function populateTorchSupport(){
+      const cap = state.capabilities;
+      const hasTorch = !!(cap && 'torch' in cap);
+      if(toggleFlash) toggleFlash.disabled = !hasTorch;
+    }
+
+    async function toggleTorch(){
+      try{
+        if(!state.track) return;
+        state.torchOn = !state.torchOn;
+        await state.track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
+        if(toggleFlash){
+          toggleFlash.setAttribute('aria-pressed', String(state.torchOn));
+          toggleFlash.textContent = state.torchOn ? 'الفلاش: يعمل' : 'الفلاش';
+        }
+      }catch(err){ console.warn('Torch not supported', err); }
+    }
+
+    function fitOverlay(){
+      if(!preview || !overlay) return;
+      const rect = preview.getBoundingClientRect();
+      overlay.width = Math.max(1, Math.floor(rect.width * devicePixelRatio));
+      overlay.height = Math.max(1, Math.floor(rect.height * devicePixelRatio));
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+    }
+
+    function drawGuide(){
+      if(!overlay) return;
+      const ctx2d = overlay.getContext('2d'); if(!ctx2d) return;
+      ctx2d.clearRect(0,0,overlay.width, overlay.height);
+      const w = overlay.width, h = overlay.height;
+      // grid
+      ctx2d.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx2d.lineWidth = 1 * devicePixelRatio;
+      for(let i=1;i<3;i++){
+        ctx2d.beginPath(); ctx2d.moveTo((w/3)*i,0); ctx2d.lineTo((w/3)*i,h); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(0,(h/3)*i); ctx2d.lineTo(w,(h/3)*i); ctx2d.stroke();
+      }
+      // frame per angle
+      ctx2d.strokeStyle = 'rgba(14,160,90,0.9)';
+      ctx2d.lineWidth = 4 * devicePixelRatio;
+      let rx= w*0.08, ry= h*0.12, rw= w*0.84, rh= h*0.76;
+      const a = state.currentAngle;
+      if(a==='side'){
+        rx = w*0.05; ry=h*0.15; rw=w*0.9; rh=h*0.7;
+      }else if(a==='udder-front'){
+        rx = w*0.18; ry=h*0.12; rw=w*0.64; rh=h*0.76;
+        ctx2d.beginPath(); ctx2d.moveTo(w/2, ry); ctx2d.lineTo(w/2, ry+rh); ctx2d.stroke();
+      }else if(a==='udder-rear'){
+        rx = w*0.15; ry=h*0.12; rw=w*0.7; rh=h*0.76;
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.4, ry); ctx2d.lineTo(w*0.4, ry+rh); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.6, ry); ctx2d.lineTo(w*0.6, ry+rh); ctx2d.stroke();
+      }else if(a==='teat-close'){
+        rx = w*0.25; ry=h*0.25; rw=w*0.5; rh=h*0.5;
+        ctx2d.beginPath(); ctx2d.moveTo(w/2, h*0.2); ctx2d.lineTo(w/2, h*0.8); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.2, h/2); ctx2d.lineTo(w*0.8, h/2); ctx2d.stroke();
+      }else if(a==='front-body'){
+        rx = w*0.12; ry=h*0.12; rw=w*0.76; rh=h*0.76;
+        ctx2d.beginPath(); ctx2d.moveTo(w/2, ry); ctx2d.lineTo(w/2, ry+rh); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.35, ry); ctx2d.lineTo(w*0.35, ry+rh); ctx2d.stroke();
+        ctx2d.beginPath(); ctx2d.moveTo(w*0.65, ry); ctx2d.lineTo(w*0.65, ry+rh); ctx2d.stroke();
+      }else if(a==='head-neck'){
+        rx = w*0.2; ry=h*0.2; rw=w*0.6; rh=h*0.6;
+        ctx2d.setLineDash([8*devicePixelRatio, 10*devicePixelRatio]);
+        ctx2d.strokeRect(w*0.6, h*0.35, w*0.18, h*0.18);
+        ctx2d.setLineDash([]);
+      }
+      if(ctx2d.roundRect){ ctx2d.beginPath(); ctx2d.roundRect(rx, ry, rw, rh, 20 * devicePixelRatio); ctx2d.stroke(); }
+      else { ctx2d.strokeRect(rx, ry, rw, rh); }
+    }
+
+    function dataURLFromVideo(){
+      if(!preview) return '';
+      const w = preview.videoWidth || preview.clientWidth || 0;
+      const h = preview.videoHeight || preview.clientHeight || 0;
+      if(!w || !h) return '';
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx2d = c.getContext('2d'); ctx2d.drawImage(preview,0,0,w,h);
+      return c.toDataURL('image/jpeg', 0.92);
+    }
+
+    // === KPI helpers ===
+    function hashString(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h + s.charCodeAt(i); h|=0; } return Math.abs(h); }
+    function seededValue(seed, min, max){ const x = Math.sin(seed)*10000; const frac = x - Math.floor(x); return Math.round(min + frac*(max-min)); }
+
+    // Minimal wrappers so earlier calls don't crash
+    function metricRow(name, value){ return '<div class="metric"><div>'+name+'</div><div>'+value+'</div></div>'; }
+    function refreshMetrics(angle){ if(typeof refreshMetricsEx==='function') return refreshMetricsEx(angle); }
+
+    // Demo placeholders + sequence
+    function makePlaceholder(label){
+      const c = document.createElement('canvas');
+      c.width = 1280; c.height = 720;
+      const g = c.getContext('2d');
+      const grd = g.createLinearGradient(0,0,1280,720);
+      grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9');
+      g.fillStyle = grd; g.fillRect(0,0,1280,720);
+      g.fillStyle = '#0ea05a'; g.fillRect(60,60,1160,600);
+      g.fillStyle = '#ffffff'; g.font = 'bold 60px Cairo, Arial';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText('عرض توضيحي — '+label, 640, 360);
+      g.font = '26px Cairo, Arial';
+      g.fillText('Murabbik Visual Evaluation (Prototype)', 640, 430);
+      return c.toDataURL('image/jpeg', 0.9);
+    }
+
+    async function runDemo(){
+      const badge = document.getElementById('demoBadge');
+      if(badge) badge.style.display='inline-block';
+      for(const a of anglesOrder){
+        setAngle(a);
+        await new Promise(r=> setTimeout(r, 250));
+        state.captures[a] = makePlaceholder(angleLabels[a]);
+        renderThumbs();
+        refreshMetrics(a);
+        if(typeof refreshMetricsEx==='function') refreshMetricsEx(a);
+      }
+    }
+
+    function setAngle
+
     function setAngle(angle){
       state.currentAngle = angle;
       $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle));
