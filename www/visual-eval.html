@@ -645,6 +645,17 @@
     }
 
     // ---------- تشغيل مبدئي ----------
+    // تعبئة المعرف/التاريخ من باراميترز الرابط تلقائيًا
+    (function prefillContext(){
+      try{
+        const ctx = getAnimalFromContext();
+        if (animalIdInput && !animalIdInput.value) animalIdInput.value = ctx.id || '';
+        if (eventDateInput && !eventDateInput.value) eventDateInput.value = ctx.date || todayCairo();
+        if (numberSpan) numberSpan.textContent = (ctx.number || ctx.id || '—');
+      }catch(e){ /* ignore */ }
+    })();
+
+    // ---------- تشغيل مبدئي ----------
     (async function init(){
       try{
         if(DEMO){
