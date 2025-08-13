@@ -104,7 +104,7 @@
         <button id="captureBtn" class="btn btn-primary">التقاط</button>
         <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
         <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
-        <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+        <input id="uploadInput" type="file" accept="image/*" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
         <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
       </div>
 
@@ -211,22 +211,7 @@
         'head-neck': null,
       }),
       k: /** @type {Record<string, any>} */ ({})
-    }, state.k_side, state.k_['udder-rear'], state.k_['udder-front'], state.k_['teat-close'], state.k_['front-body'], state.k_['head-neck']);
-      // fallback: لو في rear legs width مش موجود، نستخدم توزيع الحلمات كمؤشر تقريبي
-      if(!all.rearLegsWidth && (state.k_['udder-rear']?.teatDistribution)) all.rearLegsWidth = state.k_['udder-rear'].teatDistribution;
-      const overall = computeOverallMVS(all);
-      box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>' +
-        renderAngleMetrics(angle, k) +
-        '<div class="metric" style="margin-top:6px"><div>النتيجة الإجمالية (MVS)</div><div>'+overall.mvs+' — <small>'+overall.grade+'</small></div></div>';
-    }
-      const k = await computeKPIs(dataUrl, angle);
-      box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>'
-        + metricRow('جودة الإضاءة', k.lighting+'%')
-        + metricRow('اتساق الإطار', k.framing+'%')
-        + metricRow('تموضع/تباعد الحلمات', k.teatSpacing+' سم')
-        + metricRow('عمق الضرع (1–9)', k.udderDepthScore)
-        + metricRow('تناظر الضروع', k.symmetry+'%');
-    }
+    };
 
     function setAngle(angle){
       state.currentAngle = angle;
@@ -278,7 +263,7 @@
       const file = e.target.files && e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = ()=>{ state.captures[state.currentAngle] = reader.result; renderThumbs(); updateButtons(); refreshMetrics(state.currentAngle); };
+      reader.onload = ()=>{ state.captures[state.currentAngle] = reader.result; renderThumbs(); updateButtons(); refreshMetrics(state.currentAngle); if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle); };
       reader.readAsDataURL(file);
       if(uploadInput) uploadInput.value = '';
     }
@@ -312,17 +297,13 @@
     });
 
     captureBtn.addEventListener('click', ()=>{
-      const url = dataURLFromVideo();
+      const url = (typeof dataURLFromVideo==='function') ? dataURLFromVideo() : '';
+      if(!url){ if(uploadInput) uploadInput.click(); return; }
       state.captures[state.currentAngle] = url;
       renderThumbs();
       updateButtons();
       refreshMetrics(state.currentAngle);
       if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
-    });
-      state.captures[state.currentAngle] = url;
-      renderThumbs();
-      updateButtons();
-      refreshMetrics(state.currentAngle);
     });
 
     retakeBtn.addEventListener('click', ()=>{
@@ -331,9 +312,6 @@
       updateButtons();
       refreshMetrics(state.currentAngle);
       if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
-    });
-      updateButtons();
-      refreshMetrics(state.currentAngle);
     });
 
     nextAngleBtn.addEventListener('click', ()=>{
