@@ -383,9 +383,7 @@
       }
     }
 
-    function setAngle
-
-    function setAngle(angle){
+        function setAngle(angle){
       state.currentAngle = angle;
       $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle));
       helperText.innerHTML = helperByAngle[angle];
