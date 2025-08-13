@@ -190,13 +190,39 @@ function drawGuide(){ if(!overlay) return; const ctx=overlay.getContext('2d'); i
 }
 
 async function listCameras(){ if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices) return []; const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect){ cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); } return cams; }
-async function startCamera(deviceId){ try{ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); } const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}}; const stream=await navigator.mediaDevices.getUserMedia(cs); state.stream=stream; if(preview) preview.srcObject=stream; const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=(track.getCapabilities&&track.getCapabilities())||null; if(preview) await preview.play(); fitOverlay(); drawGuide(); }catch(e){ console.warn('startCamera',e); }}
+async function startCamera(deviceId){
+  try{
+    if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+    const cs = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { ideal: 'environment' } } };
+    const stream = await navigator.mediaDevices.getUserMedia(cs);
+    state.stream = stream;
+    if (preview) preview.srcObject = stream;
+    const [track] = stream.getVideoTracks();
+    state.track = track;
+    state.capabilities = (track.getCapabilities && track.getCapabilities()) || null;
+    if (preview) await preview.play();
+    fitOverlay();
+    drawGuide();
+  } catch(e){
+    console.warn('startCamera', e);
+    try{
+      // Fallback آمن للموبايل — اعرض Demo بدل الشاشة البيضاء
+      anglesOrder.forEach(a=> state.captures[a] = makePlaceholder(angleLabels[a]));
+      renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle);
+      const badge = document.getElementById('demoBadge'); if(badge) badge.style.display='inline-block';
+    }catch(_){}
+  }
+}
+
 
 function setAngle(a){ state.currentAngle=a; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===a)); if(helperText) helperText.innerHTML=helperByAngle[a]; drawGuide(); updateButtons(); refreshMetricsEx(a); }
 function updateButtons(){ const has=!!state.captures[state.currentAngle]; if(retakeBtn) retakeBtn.disabled=!has; }
 function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
 
 function dataURLFromVideo(){ if(!preview) return ''; const w=preview.videoWidth||preview.clientWidth||0; const h=preview.videoHeight||preview.clientHeight||0; if(!w||!h) return ''; const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
+
+// Placeholder لتجربة العرض على الموبايل في حال فشل الكاميرا
+function makePlaceholder(label){ const c=document.createElement('canvas'); c.width=1280; c.height=720; const g=c.getContext('2d'); const grd=g.createLinearGradient(0,0,1280,720); grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9'); g.fillStyle=grd; g.fillRect(0,0,1280,720); g.fillStyle='#0ea05a'; g.fillRect(60,60,1160,600); g.fillStyle='#ffffff'; g.font='bold 60px Cairo, Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('عرض توضيحي — '+label,640,360); g.font='26px Cairo, Arial'; g.fillText('Murabbik Visual Evaluation',640,430); return c.toDataURL('image/jpeg',0.9); }
 
 const ANALYTICS={weights:{
   // Udder 40%
