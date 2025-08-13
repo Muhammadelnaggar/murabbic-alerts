@@ -1,283 +1,239 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <!-- احفظ الملف بهذا الاسم: www/visual-eval.html -->
   <meta charset="UTF-8" />
-  <title>تسجيل حدث</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تقييم الحيوان بالكاميرا — مُرَبِّك</title>
   <style>
-    body {
-      direction: rtl;
-      background-color: #fff9db;
-      font-family: 'Arial', sans-serif;
-      padding: 10px;
-      margin: 0;
-      color: #1b5e20;
+    :root{
+      --green:#0ea05a; /* الأخضر الأساسي */
+
+    
+      --green-600:#0b7f47;
+      --bg:#f7faf7;    /* خلفية خفيفة */
+      --text:#0f172a;  /* أسود مائل للأزرق لقراءة جيدة */
+      --muted:#64748b; /* رمادي للنصوص الثانوية */
+      --card:#ffffff;  /* خلفيات البطاقات */
+      --danger:#c2410c; /* تنبيه */
     }
-    h1 {
-      text-align: center;
-      font-size: 24px;
-      margin-bottom: 10px;
-      color: #2e7d32;
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui, 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
+      background:var(--bg); color:var(--text);
     }
-    .animal-info, .date-info {
-      text-align: center;
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: #2e7d32;
+    header{
+      position:sticky; top:0; z-index:10; background:var(--card);
+      border-bottom:1px solid #e2e8f0; padding:12px 16px;
+      display:flex; align-items:center; gap:12px;
     }
-    .warning {
-      text-align: center;
-      font-size: 16px;
-      color: #c62828;
-      margin-bottom: 10px;
-      min-height: 22px;
+    .title{font-weight:800; color:var(--green); margin:0}
+    .badge{background:#e6f8ef; color:var(--green-600); padding:4px 8px; border-radius:999px; font-size:12px}
+    .container{max-width:960px; margin:16px auto; padding:0 16px}
+    .card{background:var(--card); border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    .row{display:grid; grid-template-columns:1fr; gap:12px}
+    @media(min-width:860px){.row{grid-template-columns: 1.2fr .8fr}}
+
+    .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px}
+    .controls .select, .controls .input{padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; font-size:16px}
+    .controls .btn{padding:12px 14px; border:none; border-radius:12px; cursor:pointer; font-weight:700; min-height:44px; box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .btn-primary{background:var(--green); color:#fff}
+    .btn-light{background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1}
+    .btn-danger{background:var(--danger); color:#fff}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+
+    .angles{display:flex; gap:8px; padding:12px; border-bottom:1px solid #e2e8f0}
+    .angle-tab{padding:10px 12px; border-radius:999px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; font-weight:700; color:#0f172a; min-height:44px}
+    .angle-tab.active{background:var(--green); color:#fff; border-color:var(--green)}
+
+    .preview-wrap{position:relative; border-radius:16px; overflow:hidden; background:#000}
+    video#preview{width:100%; height:auto; display:block; background:#000}
+    canvas#overlay{position:absolute; inset:0; pointer-events:none}
+
+    .capture-bar{display:flex; gap:8px; padding:12px; border-top:1px solid #e2e8f0; justify-content:space-between}
+    .status{display:flex; gap:8px; flex-wrap:wrap}
+    .thumb{width:72px; height:72px; border-radius:12px; overflow:hidden; border:2px solid #e2e8f0; background:#f8fafc; position:relative}
+    .thumb img{width:100%; height:100%; object-fit:cover}
+    .thumb .label{position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.5); color:#fff; font-size:11px; text-align:center}
+
+    .helper{padding:12px; color:var(--muted); line-height:1.8}
+    .helper strong{color:var(--green-600)}
+
+    .checklist{padding:12px; display:grid; gap:8px}
+    .checklist h3{margin:8px 0; color:var(--green-600)}
+    .checklist label{display:flex; align-items:center; gap:8px}
+    .save-bar{display:flex; gap:8px; padding:12px; border-top:1px solid #e2e8f0}
+      .drop-hint{position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-weight:800; color:var(--green-600); background:rgba(255,255,255,.6); text-align:center; padding:16px}
+    .preview-wrap.dragover .drop-hint{display:flex}
+    .metrics{padding:12px; border-top:1px solid #e2e8f0; display:grid; gap:8px}
+    .metrics h3{margin:8px 0; color:var(--green-600)}
+    .metric{display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px 12px; font-weight:700}
+    .metric small{font-weight:400; color:var(--muted)}
+    @media(max-width:520px){
+      .controls{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+      .controls .select{grid-column:1 / -1}
+      .controls .btn{width:100%; font-size:16px}
+      .angles{flex-wrap:wrap}
+      .angle-tab{flex:1; text-align:center; font-size:15px}
     }
-    .form-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin: 10px 0 20px;
-    }
-    .form-fields input {
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .button-group {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 10px;
-    }
-    .button-group button {
-      padding: 15px;
-      background-color: #a5d6a7;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      text-align: center;
-      transition: background-color 0.3s, color 0.3s;
-    }
-    .button-group button.active,
-    .button-group button:hover {
-      background-color: #2e7d32;
-      color: white;
-    }
+  /* ---- Score widget (مختصر) ---- */
+    .score{display:grid;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+    .score-badge{display:inline-block;padding:6px 10px;border:1px solid transparent;border-radius:999px;font-weight:800;width:max-content}
+    .score-bar{height:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden}
+    .score-bar .fill{height:100%}
+    .score-note{color:var(--muted);font-weight:700}
   </style>
 </head>
 <body>
-  <h1>تسجيل حدث</h1>
-  <div class="animal-info" id="animalInfo"></div>
-  <div class="date-info" id="dateInfo"></div>
-  <div class="warning" id="noAnimalWarning"></div>
+  <header>
+    <h1 class="title">تقييم بالكاميرا</h1>
+    <span class="badge">مُرَبِّك</span> <span class="badge" id="demoBadge" style="display:none;background:#fff3cd;color:#92400e;border:1px solid #facc15">وضع العرض</span> <span class="badge" id="purchaseBadge" style="display:none;background:#e0f2fe;color:#075985;border:1px solid #7dd3fc">شراء</span>
+    <div style="margin-inline-start:auto; color:var(--muted); font-weight:700">رقم الحيوان: <span class="animal-number">—</span></div>
+  </header>
 
-  <div class="form-fields">
-    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
-    <input type="date" id="eventDateInput" required />
+  <div class="container row">
+    <!-- عمود الكاميرا -->
+    <section class="card" id="cameraCard">
+      <div class="angles">
+        <button class="angle-tab active" data-angle="side">جانب</button>
+        <button class="angle-tab" data-angle="udder-front">ضرع أمامي</button>
+        <button class="angle-tab" data-angle="udder-rear">ضرع خلفي</button>
+        <button class="angle-tab" data-angle="teat-close">قريب الحلمات</button>
+        <button class="angle-tab" data-angle="front-body">أمام الجسم</button>
+        <button class="angle-tab" data-angle="head-neck">الرأس والرقبة</button>
+      </div>
+
+      <div class="controls">
+        <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
+        <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
+        <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
+        <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
+        <div style="margin-inline-start:auto"></div>
+        <button id="captureBtn" class="btn btn-primary">التقاط</button>
+        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
+        <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
+        <input id="uploadInput" type="file" accept="image/*" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
+        <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
+      </div>
+
+      <div class="preview-wrap">
+        <video id="preview" playsinline autoplay muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="drop-hint" id="dropHint">أفلت الصورة هنا لتعيينها لزاوية <span id="dropAngleLabel">—</span></div>
+      </div>
+
+      <div class="capture-bar">
+        <div class="status" id="thumbs"></div>
+        <div class="helper" id="helperText">وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يجب أن يضم من الكتف إلى نهاية الحوض، مع وجود الأرضية في أسفل الإطار.</div>
+      </div>
+    </section>
+
+    <!-- عمود الملاحظات السريعة -->
+    <aside class="card">
+      <form id="metaForm" style="padding:12px">
+        <input type="hidden" id="animalId" name="animalId" />
+        <label style="display:block; margin:6px 0">تاريخ التقييم
+          <input type="date" id="eventDate" name="eventDate" class="input" required />
+        </label>
+      </form>
+
+      <div class="checklist">
+        <h3>ملاحظات سريعة (اختياري)</h3>
+        <label><input type="checkbox" id="isClean"/> الحيوان نظيف وجاف</label>
+        <label><input type="checkbox" id="goodLight"/> الإضاءة كافية (بدون ظلال قوية)</label>
+        <label><input type="checkbox" id="onFlat"/> الأرض مستوية</label>
+        <label><input type="checkbox" id="animalStanding"/> الحيوان واقف بثبات</label>
+        <label><input type="checkbox" id="teatsVisible"/> الحلمات واضحة</label>
+      </div>
+
+      <div class="metrics" id="metrics">
+        <h3>التقييم</h3>
+        <div class="helper">التقط/ارفع صورة لعرض المؤشرات.</div>
+      </div>
+
+      <div class="save-bar">
+        <button id="saveBtn" class="btn btn-primary" style="width:100%">حفظ التقييم والصور</button>
+      </div>
+    </aside>
   </div>
 
-  <form id="eventForm">
-   <div class="button-group" id="eventTypeGroup">
-  <button type="button" data-page="calving.html">👶 ولادة</button>
-  <button type="button" data-page="insemination.html">📅 تلقيح</button>
-  <button type="button" data-page="vaccination.html">💉 تحصين</button>
-  <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-  <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-  <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-  <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-  <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-  <button type="button" data-page="disease.html">🔬 التشخيص</button>
+  <script type="module">
+// ===== Murabbik Visual Eval — stable minimal script (mobile-safe) =====
+const qs = new URLSearchParams(location.search);
+const $ = (s,p=document)=>p.querySelector(s);
+const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 
-  <!-- يبقى زر التقليم كما هو (تسجيل فوري + رسالة داخلية) -->
-  <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+const DEMO = qs.get('demo')==='1' || qs.get('mode')==='demo' || (location.protocol!=='https:' && location.hostname!=='localhost');
+const PURCHASE = qs.get('mode')==='purchase' || qs.get('purchase')==='1';
 
-  <!-- ⚠️ تم الاستبدال: كان "protocols.html" -->
-  <button type="button" data-page="abortion.html">🩸 إجهاض</button>
+function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
+function getCtx(){ const id=qs.get('animalId')||''; const date=qs.get('date')||todayCairo(); return {id,date}; }
 
-  <!-- زر جديد -->
-  <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+const anglesOrder=['side','udder-front','udder-rear','teat-close','front-body','head-neck'];
+const angleLabels={ 'side':'جانب','udder-front':'ضرع أمامي','udder-rear':'ضرع خلفي','teat-close':'قريب الحلمات','front-body':'أمام الجسم','head-neck':'الرأس والرقبة' };
+const helperByAngle={
+  'side':'وجّه الكاميرا من <strong>جانب الحيوان</strong>…',
+  'udder-front':'صوّر <strong>الضرع من الأمام</strong>…',
+  'udder-rear':'صوّر <strong>الضرع من الخلف</strong>…',
+  'teat-close':'التقط <strong>قريب للحلمات</strong>…',
+  'front-body':'التقط <strong>واجهة الحيوان</strong>…',
+  'head-neck':'التقط <strong>الرأس والرقبة</strong>…'
+};
 
-  <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-</div>
+const state={ currentAngle:'side', stream:null, track:null, capabilities:null, torchOn:false, captures:{}, k:{} };
+anglesOrder.forEach(a=> state.captures[a]=null);
 
+const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
+const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
+const captureBtn=$('#captureBtn'), retakeBtn=$('#retakeBtn'), nextAngleBtn=$('#nextAngleBtn');
+const thumbs=$('#thumbs'), helperText=$('#helperText');
+const animalIdInput=$('#animalId'), eventDateInput=$('#eventDate'), numberSpan=$('.animal-number');
+const saveBtn=$('#saveBtn');
 
-    <!-- صندوق رسالة داخلي (بدون تنبيه منبثق) -->
-    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none">
-      <div class="text"></div>
-      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1;padding:12px;border-radius:8px;border:0;background:#2e7d32;color:#fff;font-weight:bold">تسجيل أحداث أخرى</button>
-        <button type="button" class="btn btn-ghost"   id="msgNo"  style="flex:1;padding:12px;border-radius:8px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;font-weight:bold">لوحة التحكم</button>
-      </div>
-    </div>
-  </form>
+function fitOverlay(){ if(!preview||!overlay) return; const r=preview.getBoundingClientRect(); overlay.width=Math.max(1,Math.floor(r.width*devicePixelRatio)); overlay.height=Math.max(1,Math.floor(r.height*devicePixelRatio)); overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
+function drawGuide(){ if(!overlay) return; const ctx=overlay.getContext('2d'); if(!ctx) return; ctx.clearRect(0,0,overlay.width,overlay.height); const w=overlay.width,h=overlay.height; ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1*devicePixelRatio; for(let i=1;i<3;i++){ ctx.beginPath(); ctx.moveTo((w/3)*i,0); ctx.lineTo((w/3)*i,h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,(h/3)*i); ctx.lineTo(w,(h/3)*i); ctx.stroke(); } ctx.strokeStyle='rgba(14,160,90,.9)'; ctx.lineWidth=4*devicePixelRatio; let rx=w*.08,ry=h*.12,rw=w*.84,rh=h*.76; const a=state.currentAngle; if(a==='side'){ rx=w*.05; ry=h*.15; rw=w*.9; rh=h*.7; } else if(a==='udder-front'){ rx=w*.18; ry=h*.12; rw=w*.64; rh=h*.76; ctx.beginPath(); ctx.moveTo(w/2,ry); ctx.lineTo(w/2,ry+rh); ctx.stroke(); } else if(a==='udder-rear'){ rx=w*.15; ry=h*.12; rw=w*.7; rh=h*.76; ctx.beginPath(); ctx.moveTo(w*.4,ry); ctx.lineTo(w*.4,ry+rh); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w*.6,ry); ctx.lineTo(w*.6,ry+rh); ctx.stroke(); } else if(a==='teat-close'){ rx=w*.25; ry=h*.25; rw=w*.5; rh=h*.5; ctx.beginPath(); ctx.moveTo(w/2,h*.2); ctx.lineTo(w/2,h*.8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w*.2,h/2); ctx.lineTo(w*.8,h/2); ctx.stroke(); } else if(a==='front-body'){ rx=w*.12; ry=h*.12; rw=w*.76; rh=h*.76; ctx.beginPath(); ctx.moveTo(w/2,ry); ctx.lineTo(w/2,ry+rh); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w*.35,ry); ctx.lineTo(w*.35,ry+rh); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w*.65,ry); ctx.lineTo(w*.65,ry+rh); ctx.stroke(); } else if(a==='head-neck'){ rx=w*.2; ry=h*.2; rw=w*.6; rh=h*.6; }
+  if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(rx,ry,rw,rh,20*devicePixelRatio); ctx.stroke(); } else { ctx.strokeRect(rx,ry,rw,rh); }
+}
 
-<script type="module">
-  import { db, auth } from "./js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+async function listCameras(){ if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices) return []; const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect){ cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); } return cams; }
+async function startCamera(deviceId){ try{ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); } const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}}; const stream=await navigator.mediaDevices.getUserMedia(cs); state.stream=stream; if(preview) preview.srcObject=stream; const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=(track.getCapabilities&&track.getCapabilities())||null; if(preview) await preview.play(); fitOverlay(); drawGuide(); }catch(e){ console.warn('startCamera',e); }}
 
-  // عناصر DOM
-  const animalInfo = document.getElementById("animalInfo");
-  const dateInfo   = document.getElementById("dateInfo");
-  const warning    = document.getElementById("noAnimalWarning");
-  const idInput    = document.getElementById("animalIdInput");
-  const dateInput  = document.getElementById("eventDateInput");
+function setAngle(a){ state.currentAngle=a; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===a)); if(helperText) helperText.innerHTML=helperByAngle[a]; drawGuide(); updateButtons(); refreshMetricsEx(a); }
+function updateButtons(){ const has=!!state.captures[state.currentAngle]; if(retakeBtn) retakeBtn.disabled=!has; }
+function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
 
-  const msgBox = document.getElementById("inlineMsg");
-  const msgText = msgBox.querySelector(".text");
-  const btnYes  = msgBox.querySelector("#msgYes");
-  const btnNo   = msgBox.querySelector("#msgNo");
+function dataURLFromVideo(){ if(!preview) return ''; const w=preview.videoWidth||preview.clientWidth||0; const h=preview.videoHeight||preview.clientHeight||0; if(!w||!h) return ''; const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
-  function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
-    msgText.textContent = message;
-    btnYes.textContent = yesText;
-    btnNo.textContent  = noText;
-    msgBox.style.display = "block";
-    return new Promise(resolve=>{
-      const onYes = ()=>{ cleanup(); resolve(true);  };
-      const onNo  = ()=>{ cleanup(); resolve(false); };
-      btnYes.addEventListener('click', onYes, { once:true });
-      btnNo .addEventListener('click', onNo , { once:true });
-      function cleanup(){ msgBox.style.display="none"; }
-    });
-  }
+const ANALYTICS={weights:{udderCleft:12, udderHeightHock:8, teatDistribution:10, foreAttachment:6, teatLengthDia:4, rumpAngle:30, rearLegsWidth:10, frontLegsWidth:6, chestWidth:4, femininity:10}};
+function hashString(s){let h=0;for(let i=0;i<s.length;i++){h=(h<<5)-h+s.charCodeAt(i);h|=0;}return Math.abs(h);} function seededValue(seed,min,max){const x=Math.sin(seed)*10000;const frac=x-Math.floor(x);return Math.round(min+frac*(max-min));}
+function gradeInfo(mvs){ if(mvs>=85) return {label:'ممتاز', bg:'#dcfce7', border:'#86efac', fg:'#14532d'}; if(mvs>=75) return {label:'جيد جدًا', bg:'#e0f2fe', border:'#7dd3fc', fg:'#075985'}; if(mvs>=60) return {label:'متوسط', bg:'#fef9c3', border:'#facc15', fg:'#92400e'}; return {label:'ضعيف', bg:'#fee2e2', border:'#fecaca', fg:'#7f1d1d'}; }
+function renderScoreWidget(mvs){ const g=gradeInfo(mvs); return `<div class="score"><div class="score-badge" style="background:${g.bg};color:${g.fg};border-color:${g.border}">${g.label}</div><div class="score-bar"><div class="fill" style="width:${mvs}%;background:${g.border}"></div></div><div class="score-note">MVS: ${mvs} / 100</div></div>`; }
+function computeOverallMVS(all){ const w=ANALYTICS.weights; let score=0,sum=0; for(const k in w){ if(all && all[k]!=null){ score += (w[k]*all[k])/100; sum += w[k]; } } const mvs=sum?Math.round((score/sum)*100):0; return mvs; }
 
-  // تاريخ اليوم المحلي YYYY-MM-DD
-  function todayLocal(){
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  }
+function computeKPIs(dataUrl, angle){ return new Promise(res=>{ const img=new Image(); img.onload=()=>{ const c=document.createElement('canvas'); c.width=320; c.height=Math.max(1,Math.round(320*(img.height/img.width))); const g=c.getContext('2d'); g.drawImage(img,0,0,c.width,c.height); const id=g.getImageData(0,0,c.width,c.height); let sum=0; for(let i=0;i<id.data.length;i+=4){ sum += 0.2126*id.data[i]+0.7152*id.data[i+1]+0.0722*id.data[i+2]; } const avg=sum/(id.data.length/4); const lighting=Math.max(0,Math.min(100,Math.round((avg/255)*100))); const ratio=img.width/img.height; const framing=Math.max(0,Math.min(100,Math.round(100-Math.abs(ratio-1.6)*80))); const seed=hashString(angle+dataUrl.slice(0,64)); const k={lighting,framing}; if(angle==='side'){k.rumpAngle=seededValue(seed+101,60,95);k.backRump=seededValue(seed+102,60,95);} if(angle==='udder-rear'){k.udderCleft=seededValue(seed+103,60,95);k.udderHeightHock=seededValue(seed+104,60,95);k.teatDistribution=seededValue(seed+105,60,95);} if(angle==='udder-front'){k.foreAttachment=seededValue(seed+106,60,95);} if(angle==='teat-close'){k.teatLengthDia=seededValue(seed+107,60,95);} if(angle==='front-body'){k.chestWidth=seededValue(seed+108,60,95);k.frontLegsWidth=seededValue(seed+109,60,95);} if(angle==='head-neck'){k.femininity=seededValue(seed+110,60,95);} res(k); }; img.onerror=()=>res({lighting:0,framing:0}); img.src=dataUrl; }); }
 
-  // تعبئة من الرابط/المحلّي
-  function hydrateContext(){
-    const qp = new URLSearchParams(location.search);
-    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-    const presetDate = qp.get("date") || todayLocal();
-    idInput.value = presetId;
-    dateInput.value = presetDate;
-    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-    try {
-      const [y,m,d] = presetDate.split('-').map(Number);
-      dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-    } catch{
-      dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
-    }
-  }
+function refreshMetricsEx(angle){ const box=$('#metrics'); if(!box) return; const dataUrl=state.captures[angle]; if(!dataUrl){ box.innerHTML='<h3>التقييم</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; } computeKPIs(dataUrl,angle).then(k=>{ state.k[angle]=Object.assign({},state.k[angle]||{},k); const all=Object.assign({}, state.k['side'], state.k['udder-rear'], state.k['udder-front'], state.k['teat-close'], state.k['front-body'], state.k['head-neck']); if(!all.rearLegsWidth && state.k['udder-rear'] && state.k['udder-rear'].teatDistribution) all.rearLegsWidth=state.k['udder-rear'].teatDistribution; const mvs=computeOverallMVS(all||{}); box.innerHTML='<h3>التقييم</h3>'+renderScoreWidget(mvs); }); }
 
-  // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
-  idInput.addEventListener('input', ()=>{
-    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
-  });
-  dateInput.addEventListener('input', ()=>{
-    try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
-    catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
-  });
+function renderThumbsIf(){ renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle); }
 
-  function getContextOrWarn(){
-    const animalId = idInput.value.trim();
-    const eventDate= dateInput.value.trim();
-    if (!animalId || !eventDate){
-      warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-      return null;
-    }
-    warning.textContent = "";
-    localStorage.setItem("lastAnimalId", animalId);
-    return { animalId, eventDate };
-  }
+// UI bindings
+window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ fitOverlay(); drawGuide(); },150); });
+$$('.angle-tab').forEach(b=> b.addEventListener('click', ()=> setAngle(b.dataset.angle)) );
+const demoBtn=$('#demoBtn'); if(demoBtn) demoBtn.addEventListener('click', ()=>{ state.captures={}; anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); });
+const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput'); if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click()); if(uploadInput) uploadInput.addEventListener('change', e=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.captures[state.currentAngle]=r.result; renderThumbsIf(); }; r.readAsDataURL(f); uploadInput.value=''; });
+const previewWrap=$('.preview-wrap'); const dropAngleLabel=$('#dropAngleLabel'); function updDrop(){ if(dropAngleLabel) dropAngleLabel.textContent=angleLabels[state.currentAngle]; } if(previewWrap){ ['dragenter','dragover'].forEach(ev=> previewWrap.addEventListener(ev,e=>{ e.preventDefault(); previewWrap.classList.add('dragover'); updDrop(); })); ['dragleave','dragend'].forEach(ev=> previewWrap.addEventListener(ev,()=> previewWrap.classList.remove('dragover'))); previewWrap.addEventListener('drop',e=>{ e.preventDefault(); previewWrap.classList.remove('dragover'); const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.captures[state.currentAngle]=r.result; renderThumbsIf(); }; r.readAsDataURL(f); }); }
+if(toggleFlash) toggleFlash.addEventListener('click', async ()=>{ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed', String(state.torchOn)); toggleFlash.textContent = state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch{}});
+if(restartBtn) restartBtn.addEventListener('click', ()=> startCamera(cameraSelect && cameraSelect.value));
+if(cameraSelect) cameraSelect.addEventListener('change', ()=> startCamera(cameraSelect.value));
+if(captureBtn) captureBtn.addEventListener('click', ()=>{ const url=dataURLFromVideo(); if(!url){ if(uploadInput) uploadInput.click(); return; } state.captures[state.currentAngle]=url; renderThumbsIf(); });
+if(retakeBtn) retakeBtn.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; renderThumbsIf(); });
+if(nextAngleBtn) nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
 
-  /* ⬇️⬇️ ألصق هنا الدوال الجديدة ⬇️⬇️ */
-  function pushContext(ctx){
-    const id = String(ctx.animalId);
-    const dt = String(ctx.eventDate);
-    ['lastAnimalId','ctxAnimalId','currentAnimalId'].forEach(k=> localStorage.setItem(k, id));
-    ['ctxAnimalId','currentAnimalId'].forEach(k=> sessionStorage.setItem(k, id));
-    ['lastEventDate','ctxEventDate','eventDate','Date','dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-    ['calvingDate','calvDate','calving_dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-    ['closeupDate','closeUpDate','close_dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-  }
+function makePlaceholder(label){ const c=document.createElement('canvas'); c.width=1280; c.height=720; const g=c.getContext('2d'); const grd=g.createLinearGradient(0,0,1280,720); grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9'); g.fillStyle=grd; g.fillRect(0,0,1280,720); g.fillStyle='#0ea05a'; g.fillRect(60,60,1160,600); g.fillStyle='#ffffff'; g.font='bold 60px Cairo, Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('عرض توضيحي — '+label,640,360); g.font='26px Cairo, Arial'; g.fillText('Murabbik Visual Evaluation (Prototype)',640,430); return c.toDataURL('image/jpeg',0.9); }
 
-  function buildTargetUrl(page, ctx){
-    const u  = new URL(page, location.href);
-    const id = String(ctx.animalId);
-    const dt = String(ctx.eventDate);
-    ['animalId','number','animalNumber','Pid','animalIdd','cowId','CowID','ID']
-      .forEach(k => u.searchParams.set(k, id));
-    ['date','eventDate','Date','dt']
-      .forEach(k => u.searchParams.set(k, dt));
-    if (page.includes('calving')){
-      ['calvingDate','calvDate','calving_dt'].forEach(k => u.searchParams.set(k, dt));
-    }
-    if (page.includes('close-up')){
-      ['closeupDate','closeUpDate','close_dt'].forEach(k => u.searchParams.set(k, dt));
-    }
-    return u.toString();
-  }
-  /* ⬆️⬆️ نهاية اللصق ⬆️⬆️ */
-
-  // ربط الأزرار (تفويض حدث)
-  function wireButtons(db, auth){
-    const container = document.getElementById("eventTypeGroup");
-    if(!container) return;
-
-    container.addEventListener('click', async (ev)=>{
-      const btn = ev.target.closest('button');
-      if (!btn || !container.contains(btn)) return;
-
-      const ctx = getContextOrWarn();
-      if (!ctx) return;
-
-      const page   = btn.getAttribute('data-page');
-      const isTrim = page === 'trimming.html';
-
-      try{
-        await addDoc(collection(db, 'events'), {
-          userId: auth?.currentUser?.uid || null,
-          animalId: ctx.animalId,
-          animalNumber: ctx.animalId,
-          eventDate: ctx.eventDate,
-          type: isTrim ? 'تقليم الحوافر' : undefined,
-          eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
-          createdAt: serverTimestamp()
-        });
-      }catch(err){
-        console.error(err);
-        if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
-      }
-
-      if (isTrim){
-        const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-        if (!goAgain) location.href = 'dashboard.html';
-      } else if (page){
-        // ✅ خزّن السياق + ابنِ الرابط المتوافق
-        pushContext(ctx);
-        location.href = buildTargetUrl(page, ctx);
-      }
-    });
-  }
-
-  // بدء التشغيل
-  hydrateContext();
-  onAuthStateChanged(auth, (user)=>{
-    if (!user){ location.href = "login.html"; return; }
-    wireButtons(db, auth);
-  });
+(async function init(){ const ctx=getCtx(); if(animalIdInput) animalIdInput.value=ctx.id; if(eventDateInput) eventDateInput.value=ctx.date; if(numberSpan) numberSpan.textContent=ctx.id||'—'; renderThumbs(); setAngle('side'); if(DEMO){ anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); return; } if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ anglesOrder.forEach(a=> state.captures[a]=makePlaceholder(angleLabels[a])); renderThumbsIf(); return; } await startCamera(); await listCameras(); if(cameraSelect && !cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
+})();
 </script>
-
 </body>
 </html>
-
-
