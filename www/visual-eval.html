@@ -486,17 +486,10 @@
         thumbs.appendChild(wrap);
       }
     }
-        wrap.appendChild(img);
-        const lb = document.createElement('div'); lb.className='label'; lb.textContent = angleLabels[a];
-        wrap.appendChild(lb);
-        wrap.title = angleLabels[a];
-        wrap.addEventListener('click', ()=> setAngle(a));
-        thumbs.appendChild(wrap);
-      }
-    }
 
     // ---------- أحداث واجهة ----------
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+    window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ fitOverlay(); drawGuide(); }, 150); }); drawGuide(); });
 
     $$('.angle-tab').forEach(btn=>{
       btn.addEventListener('click', ()=> setAngle(btn.dataset.angle));
@@ -565,7 +558,7 @@
       setAngle(next);
     });
 
-    saveBtn.addEventListener('click', async ()=>{
+    if (saveBtn) saveBtn.addEventListener('click', async ()=>{
       try{
         saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…';
         const animalId = animalIdInput.value.trim();
