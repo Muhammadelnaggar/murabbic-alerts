@@ -91,6 +91,8 @@
         <button class="angle-tab" data-angle="udder-front">ضرع أمامي</button>
         <button class="angle-tab" data-angle="udder-rear">ضرع خلفي</button>
         <button class="angle-tab" data-angle="teat-close">قريب الحلمات</button>
+        <button class="angle-tab" data-angle="front-body">أمام الجسم</button>
+        <button class="angle-tab" data-angle="head-neck">الرأس والرقبة</button>
       </div>
 
       <div class="controls">
@@ -183,13 +185,15 @@
     }
 
     // ---------- حالة الصفحة ----------
-    const anglesOrder = ['side','udder-front','udder-rear','teat-close'];
-    const angleLabels = { 'side':'جانب', 'udder-front':'ضرع أمامي', 'udder-rear':'ضرع خلفي', 'teat-close':'قريب الحلمات' };
+    const anglesOrder = ['side','udder-front','udder-rear','teat-close','front-body','head-neck'];
+    const angleLabels = { 'side':'جانب', 'udder-front':'ضرع أمامي', 'udder-rear':'ضرع خلفي', 'teat-close':'قريب الحلمات', 'front-body':'أمام الجسم', 'head-neck':'الرأس والرقبة' };
     const helperByAngle = {
       'side': 'وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يجب أن يضم من الكتف إلى نهاية الحوض، مع وجود الأرضية في أسفل الإطار.',
       'udder-front': 'صوّر <strong>الضرع من الأمام</strong>؛ احرص أن تكون الأرجل الأمامية خارج الإطار قدر الإمكان والحلمات ظاهرة.',
       'udder-rear': 'صوّر <strong>الضرع من الخلف</strong>؛ اجعل الذيل خارج الوسط والحلمات الأربع داخل الإطار.',
-      'teat-close': 'التقط <strong>قريب للحلمات</strong>؛ مركز الإطار بين الحلمات الأربع لمسح التموضع والطول.'
+      'teat-close': 'التقط <strong>قريب للحلمات</strong>؛ مركز الإطار بين الحلمات الأربع لمسح التموضع والطول.',
+      'front-body': 'التقط <strong>واجهة الحيوان</strong>؛ الهدف قياس <em>اتساع الصدر</em> و<em>اتساع الأرجل الأمامية</em>. اجعل الكاميرا على ارتفاع الصدر وخط المنتصف في مركز الإطار.',
+      'head-neck': 'التقط <strong>الرأس والرقبة</strong> من الجانب؛ نقيّم علامات الأنوثة (رقبة رفيعة وطويلة، رأس أنعم). اجعل الكادر من مقدمة الكتف حتى فتحتي الأنف.'
     };
 
     let state = {
@@ -203,196 +207,18 @@
         'udder-front': null,
         'udder-rear': null,
         'teat-close': null,
+        'front-body': null,
+        'head-neck': null,
       }),
-    };
-
-    // ---------- عناصر ----------
-    const preview = $('#preview');
-    const overlay = $('#overlay');
-    const cameraSelect = $('#cameraSelect');
-    const toggleFlash = $('#toggleFlash');
-    const restartBtn = $('#restartBtn');
-    const captureBtn = $('#captureBtn');
-    const retakeBtn = $('#retakeBtn');
-    const nextAngleBtn = $('#nextAngleBtn');
-    const thumbs = $('#thumbs');
-    const helperText = $('#helperText');
-    const metaForm = $('#metaForm');
-    const animalIdInput = $('#animalId');
-    const eventDateInput = $('#eventDate');
-    const saveBtn = $('#saveBtn');
-    const numberSpan = document.querySelector('.animal-number');
-
-    // ---------- تهيئة السياق ----------
-    const ctx = getAnimalFromContext();
-    if(animalIdInput) animalIdInput.value = ctx.id || '';
-    if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
-    numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
-
-    // ---------- الكاميرا ----------
-    async function listCameras(){
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      const cams = devs.filter(d=> d.kind === 'videoinput');
-      cameraSelect.innerHTML = '';
-      cams.forEach((c,i)=>{
-        const opt = document.createElement('option');
-        opt.value = c.deviceId; opt.textContent = c.label || `كاميرا ${i+1}`;
-        cameraSelect.appendChild(opt);
-      });
-      return cams;
+      k: /** @type {Record<string, any>} */ ({})
+    }, state.k_side, state.k_['udder-rear'], state.k_['udder-front'], state.k_['teat-close'], state.k_['front-body'], state.k_['head-neck']);
+      // fallback: لو في rear legs width مش موجود، نستخدم توزيع الحلمات كمؤشر تقريبي
+      if(!all.rearLegsWidth && (state.k_['udder-rear']?.teatDistribution)) all.rearLegsWidth = state.k_['udder-rear'].teatDistribution;
+      const overall = computeOverallMVS(all);
+      box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>' +
+        renderAngleMetrics(angle, k) +
+        '<div class="metric" style="margin-top:6px"><div>النتيجة الإجمالية (MVS)</div><div>'+overall.mvs+' — <small>'+overall.grade+'</small></div></div>';
     }
-
-    async function startCamera(deviceId){
-      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
-      const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: { ideal: 'environment' } } };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      state.stream = stream;
-      preview.srcObject = stream;
-      const [track] = stream.getVideoTracks();
-      state.track = track;
-      const cap = track.getCapabilities?.() || null;
-      state.capabilities = cap;
-      await preview.play();
-      fitOverlay();
-      drawGuide();
-      await populateTorchSupport();
-    }
-
-    async function populateTorchSupport(){
-      const cap = state.capabilities;
-      const hasTorch = !!(cap && 'torch' in cap);
-      toggleFlash.disabled = !hasTorch;
-    }
-
-    function fitOverlay(){
-      const rect = preview.getBoundingClientRect();
-      overlay.width = rect.width * devicePixelRatio; // لضمان دقة جيدة على الموبايل
-      overlay.height = rect.height * devicePixelRatio;
-      overlay.style.width = rect.width + 'px';
-      overlay.style.height = rect.height + 'px';
-    }
-
-    function drawGuide(){
-      const ctx2d = overlay.getContext('2d');
-      if(!ctx2d) return;
-      ctx2d.clearRect(0,0,overlay.width, overlay.height);
-      ctx2d.lineWidth = 4 * devicePixelRatio;
-      ctx2d.strokeStyle = 'rgba(14,160,90,0.9)';
-      ctx2d.fillStyle = 'rgba(14,160,90,0.08)';
-      const w = overlay.width, h = overlay.height;
-      // شبكة خفيفة
-      ctx2d.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx2d.lineWidth = 1 * devicePixelRatio;
-      for(let i=1;i<3;i++){
-        ctx2d.beginPath(); ctx2d.moveTo((w/3)*i,0); ctx2d.lineTo((w/3)*i,h); ctx2d.stroke();
-        ctx2d.beginPath(); ctx2d.moveTo(0,(h/3)*i); ctx2d.lineTo(w,(h/3)*i); ctx2d.stroke();
-      }
-
-      // إطار موجه بحسب الزاوية
-      ctx2d.strokeStyle = 'rgba(14,160,90,0.9)';
-      ctx2d.lineWidth = 4 * devicePixelRatio;
-      let rx= w*0.08, ry= h*0.12, rw= w*0.84, rh= h*0.76;
-      const a = state.currentAngle;
-      if(a==='side'){
-        rx = w*0.05; ry=h*0.15; rw=w*0.9; rh=h*0.7;
-      }else if(a==='udder-front'){
-        rx = w*0.18; ry=h*0.12; rw=w*0.64; rh=h*0.76;
-        // دليل مركزي
-        ctx2d.beginPath(); ctx2d.moveTo(w/2, ry); ctx2d.lineTo(w/2, ry+rh); ctx2d.stroke();
-      }else if(a==='udder-rear'){
-        rx = w*0.15; ry=h*0.12; rw=w*0.7; rh=h*0.76;
-        // خطيْن لتوسيط الحلمات
-        ctx2d.beginPath(); ctx2d.moveTo(w*0.4, ry); ctx2d.lineTo(w*0.4, ry+rh); ctx2d.stroke();
-        ctx2d.beginPath(); ctx2d.moveTo(w*0.6, ry); ctx2d.lineTo(w*0.6, ry+rh); ctx2d.stroke();
-      }else if(a==='teat-close'){
-        rx = w*0.25; ry=h*0.25; rw=w*0.5; rh=h*0.5;
-        // صليب مركزي
-        ctx2d.beginPath(); ctx2d.moveTo(w/2, h*0.2); ctx2d.lineTo(w/2, h*0.8); ctx2d.stroke();
-        ctx2d.beginPath(); ctx2d.moveTo(w*0.2, h/2); ctx2d.lineTo(w*0.8, h/2); ctx2d.stroke();
-      }
-      // إطار خارجي
-      ctx2d.beginPath(); ctx2d.roundRect(rx, ry, rw, rh, 20 * devicePixelRatio); ctx2d.stroke();
-    }
-
-    async function toggleTorch(){
-      try{
-        if(!state.track) return;
-        state.torchOn = !state.torchOn;
-        await state.track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
-        toggleFlash.setAttribute('aria-pressed', String(state.torchOn));
-        toggleFlash.textContent = state.torchOn ? 'الفلاش: يعمل' : 'الفلاش';
-      }catch(err){
-        console.warn('Torch not supported', err);
-      }
-    }
-
-    function dataURLFromVideo(){
-      const video = preview;
-      const c = document.createElement('canvas');
-      const w = video.videoWidth, h = video.videoHeight;
-      c.width = w; c.height = h;
-      const ctx2d = c.getContext('2d');
-      ctx2d.drawImage(video, 0,0, w,h);
-      return c.toDataURL('image/jpeg', 0.92);
-    }
-
-    // صور توضيحية مولّدة برمجيًا في وضع العرض
-    function makePlaceholder(label){
-      const c = document.createElement('canvas');
-      c.width = 1280; c.height = 720;
-      const g = c.getContext('2d');
-      const grd = g.createLinearGradient(0,0,1280,720);
-      grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9');
-      g.fillStyle = grd; g.fillRect(0,0,1280,720);
-      g.fillStyle = '#0ea05a'; g.fillRect(60,60,1160,600);
-      g.fillStyle = '#ffffff'; g.font = 'bold 72px Cairo, Arial';
-      g.textAlign='center'; g.textBaseline='middle';
-      g.fillText('عرض توضيحي — '+label, 640, 360);
-      g.font = '28px Cairo, Arial';
-      g.fillText('Murabbik Visual Evaluation (Prototype)', 640, 430);
-      return c.toDataURL('image/jpeg', 0.9);
-    }
-
-    async function runDemo(){
-      const badge = document.getElementById('demoBadge');
-      if(badge) badge.style.display='inline-block';
-      // محاكاة الالتقاط لكل زاوية بالتتابع
-      for(const a of anglesOrder){
-        setAngle(a);
-        await new Promise(r=> setTimeout(r, 600));
-        state.captures[a] = makePlaceholder(angleLabels[a]);
-        renderThumbs();
-        await new Promise(r=> setTimeout(r, 200));
-      }
-    }
-
-    // مؤشرات Demo: دوال مساعدة وحسابات تقديرية
-    function hashString(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h + s.charCodeAt(i); h|=0; } return Math.abs(h); }
-    function seededValue(seed, min, max){ const x = Math.sin(seed)*10000; const frac = x - Math.floor(x); return Math.round(min + frac*(max-min)); }
-    async function computeKPIs(dataUrl, angle){
-      try{
-        const img = new Image(); img.src = dataUrl; await img.decode();
-        const c = document.createElement('canvas'); c.width = 320; c.height = Math.max(1, Math.round(320*(img.height/img.width)));
-        const g = c.getContext('2d'); g.drawImage(img,0,0,c.width,c.height);
-        const id = g.getImageData(0,0,c.width,c.height);
-        let sum=0; for(let i=0;i<id.data.length;i+=4){ sum += 0.2126*id.data[i]+0.7152*id.data[i+1]+0.0722*id.data[i+2]; }
-        const avg = sum/(id.data.length/4);
-        const lighting = Math.max(0, Math.min(100, Math.round((avg/255)*100)));
-        const ratio = img.width/img.height; const framing = Math.max(0, Math.min(100, Math.round(100 - Math.abs(ratio-1.6)*80)));
-        const seed = hashString(angle + dataUrl.slice(0,64));
-        const teatSpacing = seededValue(seed, 6, 10);
-        const udderDepthScore = seededValue(seed+13, 5, 9);
-        const symmetry = seededValue(seed+27, 70, 95);
-        return { lighting, framing, teatSpacing, udderDepthScore, symmetry };
-      }catch(e){
-        return { lighting: 0, framing: 0, teatSpacing: 0, udderDepthScore: 0, symmetry: 0 };
-      }
-    }
-    function metricRow(name, value){ return '<div class="metric"><div>'+name+'</div><div>'+value+'</div></div>'; }
-    async function refreshMetrics(angle){
-      const box = document.getElementById('metrics'); if(!box) return;
-      const dataUrl = state.captures[angle];
-      if(!dataUrl){ box.innerHTML = '<h3>مؤشرات تقديرية (Demo)</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; }
       const k = await computeKPIs(dataUrl, angle);
       box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>'
         + metricRow('جودة الإضاءة', k.lighting+'%')
@@ -408,7 +234,10 @@
       helperText.innerHTML = helperByAngle[angle];
       drawGuide();
       updateButtons();
+      // النسخة الأصلية من المؤشرات
       refreshMetrics(angle);
+      // نسخة موسعة لحساب MVS
+      if(typeof refreshMetricsEx==='function') refreshMetricsEx(angle);
       if(typeof updateDropHint==='function') updateDropHint();
     }
 
@@ -488,11 +317,21 @@
       renderThumbs();
       updateButtons();
       refreshMetrics(state.currentAngle);
+      if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
+    });
+      state.captures[state.currentAngle] = url;
+      renderThumbs();
+      updateButtons();
+      refreshMetrics(state.currentAngle);
     });
 
     retakeBtn.addEventListener('click', ()=>{
       state.captures[state.currentAngle] = null;
       renderThumbs();
+      updateButtons();
+      refreshMetrics(state.currentAngle);
+      if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
+    });
       updateButtons();
       refreshMetrics(state.currentAngle);
     });
@@ -586,8 +425,9 @@
           const badge = document.getElementById('demoBadge');
           if(badge) badge.style.display='inline-block';
           renderThumbs();
-          setAngle('side');
+        setAngle('side');
         refreshMetrics('side');
+        if(typeof refreshMetricsEx==='function') refreshMetricsEx('side');
           await runDemo();
           return;
         }
@@ -611,6 +451,112 @@
         alert('تعذّر الوصول للكاميرا. تأكد من السماح بالأذونات واستخدام https.');
       }
     })();
+  // نسخة موسّعة من لوحة المؤشرات وفق المطلوب
+    function refreshMetricsEx(angle){
+      const box = document.getElementById('metrics'); if(!box) return;
+      const dataUrl = state.captures[angle];
+      if(!dataUrl){ box.innerHTML = '<h3>مؤشرات تقديرية (Demo)</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; }
+      computeKPIs(dataUrl, angle).then(k=>{
+        state.k[angle] = Object.assign({}, state.k[angle]||{}, k);
+        const all = Object.assign({}, state.k['side'], state.k['udder-rear'], state.k['udder-front'], state.k['teat-close'], state.k['front-body'], state.k['head-neck']);
+        if(!all.rearLegsWidth && (state.k['udder-rear']?.teatDistribution)) all.rearLegsWidth = state.k['udder-rear'].teatDistribution;
+        const overall = computeOverallMVS(all||{});
+        box.innerHTML = '<h3>مؤشرات تقديرية (Demo) — '+angleLabels[angle]+'</h3>' +
+          renderAngleMetrics(angle, k) +
+          '<div class="metric" style="margin-top:6px"><div>النتيجة الإجمالية (MVS)</div><div>'+overall.mvs+' — <small>'+overall.grade+'</small></div></div>';
+      });
+    }
+  // === OVERRIDES: اعتماد Rump Angle بدل Body Depth على الصورة الجانبية ===
+    function computeKPIs(dataUrl, angle){
+      try{
+        const img = new Image(); img.src = dataUrl; return img.decode().then(()=>{
+          const c = document.createElement('canvas'); c.width = 320; c.height = Math.max(1, Math.round(320*(img.height/img.width)));
+          const g = c.getContext('2d'); g.drawImage(img,0,0,c.width,c.height);
+          const id = g.getImageData(0,0,c.width,c.height);
+          let sum=0; for(let i=0;i<id.data.length;i+=4){ sum += 0.2126*id.data[i]+0.7152*id.data[i+1]+0.0722*id.data[i+2]; }
+          const avg = sum/(id.data.length/4);
+          const lighting = Math.max(0, Math.min(100, Math.round((avg/255)*100)));
+          const ratio = img.width/img.height; const framing = Math.max(0, Math.min(100, Math.round(100 - Math.abs(ratio-1.6)*80)));
+          const seed = hashString(angle + dataUrl.slice(0,64));
+          const k = { lighting, framing };
+          if(angle==='side'){
+            k.rumpAngle = seededValue(seed+101, 60, 95); // زاوية الحوض/العجز — المؤثر الأساسي على سهولة الولادة والخصوبة
+            k.backRump  = seededValue(seed+102, 60, 95); // سلامة الظهر والحوض
+          }
+          if(angle==='udder-rear'){
+            k.udderCleft       = seededValue(seed+103, 60, 95);
+            k.udderHeightHock  = seededValue(seed+104, 60, 95);
+            k.teatDistribution = seededValue(seed+105, 60, 95);
+          }
+          if(angle==='udder-front'){
+            k.foreAttachment   = seededValue(seed+106, 60, 95);
+          }
+          if(angle==='teat-close'){
+            k.teatLengthDia    = seededValue(seed+107, 60, 95);
+          }
+          if(angle==='front-body'){
+            k.chestWidth       = seededValue(seed+108, 60, 95);
+            k.frontLegsWidth   = seededValue(seed+109, 60, 95);
+          }
+          if(angle==='head-neck'){
+            k.femininity       = seededValue(seed+110, 60, 95);
+          }
+          return k;
+        });
+      }catch(e){
+        return Promise.resolve({ lighting: 0, framing: 0 });
+      }
+    }
+
+    function renderAngleMetrics(angle, k){
+      const rows = [];
+      if(angle==='side'){
+        rows.push(metricRow('زاوية الحوض/العجز (Rump Angle)', (k.rumpAngle||0)+'%'));
+        rows.push(metricRow('الظهر والحوض (Back & Rump)', (k.backRump||0)+'%'));
+      }
+      if(angle==='udder-rear'){
+        rows.push(metricRow('رابطة وسطية/الشق (Udder Cleft)', (k.udderCleft||0)+'%'));
+        rows.push(metricRow('ارتفاع الضرع عن العرقوب', (k.udderHeightHock||0)+'%'));
+        rows.push(metricRow('توزيع الحلمات (Spacing/Balance)', (k.teatDistribution||0)+'%'));
+      }
+      if(angle==='udder-front'){
+        rows.push(metricRow('التحام/اتصال الضرع الأمامي', (k.foreAttachment||0)+'%'));
+      }
+      if(angle==='teat-close'){
+        rows.push(metricRow('طول/قطر الحلمات (نسبي)', (k.teatLengthDia||0)+'%'));
+      }
+      if(angle==='front-body'){
+        rows.push(metricRow('اتساع الصدر (Chest Width)', (k.chestWidth||0)+'%'));
+        rows.push(metricRow('اتساع الأرجل الأمامية', (k.frontLegsWidth||0)+'%'));
+      }
+      if(angle==='head-neck'){
+        rows.push(metricRow('أنوثة الرأس/الرقبة', (k.femininity||0)+'%'));
+      }
+      rows.push(metricRow('جودة الإضاءة', (k.lighting||0)+'%'));
+      rows.push(metricRow('اتساق الإطار', (k.framing||0)+'%'));
+      return rows.join('');
+    }
+
+    function computeOverallMVS(all){
+      const weights = {
+        // 40% Udder (توزّع داخلي)
+        udderCleft:12, udderHeightHock:8, teatDistribution:10, foreAttachment:6, teatLengthDia:4,
+        // 30% Rump Angle
+        rumpAngle:30,
+        // 20% Legs (خلفية/أمامية + اتساع صدر كمؤشّر أمامي)
+        rearLegsWidth:10, frontLegsWidth:6, chestWidth:4,
+        // 10% Femininity
+        femininity:10
+      };
+      let score=0, weightSum=0;
+      for(const [k,v] of Object.entries(weights)){
+        if(all && all[k]!=null){ score += (v * all[k])/100; weightSum += v; }
+      }
+      const mvs = weightSum? Math.round((score/weightSum)*100):0;
+      let grade='';
+      if(mvs>=85) grade='ممتاز'; else if(mvs>=70) grade='جيد'; else if(mvs>=55) grade='يحتاج انتباه'; else grade='تنبيه';
+      return { mvs, grade };
+    }
   </script>
 </body>
 </html>
