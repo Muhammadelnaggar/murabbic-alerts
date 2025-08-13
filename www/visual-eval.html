@@ -147,7 +147,7 @@
       </div>
 
       <div class="metrics" id="metrics">
-        <h3>التقييم<\/h3>
+        <h3>التقييم</h3>
         <div class="helper">التقط/ارفع صورة لعرض المؤشرات.</div>
       </div>
 
@@ -701,13 +701,13 @@
     function refreshMetricsEx(angle){
       const box = document.getElementById('metrics'); if(!box) return;
       const dataUrl = state.captures[angle];
-      if(!dataUrl){ box.innerHTML = '<h3>التقييم<\/h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; }
+      if(!dataUrl){ box.innerHTML = '<h3>التقييم</h3><div class="helper">التقط/ارفع صورة لزاوية <strong>'+angleLabels[angle]+'</strong> لعرض المؤشرات.</div>'; return; }
       computeKPIs(dataUrl, angle).then(k=>{
         state.k[angle] = Object.assign({}, state.k[angle]||{}, k);
         const all = Object.assign({}, state.k['side'], state.k['udder-rear'], state.k['udder-front'], state.k['teat-close'], state.k['front-body'], state.k['head-neck']);
         if(!all.rearLegsWidth && (state.k['udder-rear']?.teatDistribution)) all.rearLegsWidth = state.k['udder-rear'].teatDistribution;
         const overall = computeOverallMVS(all||{});
-        box.innerHTML = '<h3>التقييم<\/h3>' + renderScoreWidget(overall);
+        box.innerHTML = '<h3>التقييم</h3>' + renderScoreWidget(overall);
         if(PURCHASE){
           const pb = document.getElementById('purchaseBadge');
           if(pb){
