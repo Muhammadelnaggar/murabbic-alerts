@@ -182,6 +182,15 @@
     }
 
     // ---------- أدوات مساعدة عامة ----------
+    // التقط أي خطأ غير مُعالج على الموبايل واعرض بانر بدل صفحة بيضاء
+    (function(){
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;inset:auto 8px 8px 8px;z-index:9999;display:none;background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca;border-radius:10px;padding:8px;font-weight:700;font-family:system-ui';
+      document.addEventListener('DOMContentLoaded', ()=> document.body.appendChild(banner));
+      function show(msg){ banner.textContent = 'حدث خطأ: '+msg; banner.style.display='block'; }
+      window.addEventListener('error', e=>{ show(e.message||''); });
+      window.addEventListener('unhandledrejection', e=>{ const m = (e.reason && (e.reason.message||e.reason))||''; show(m); });
+    })();
     const qs = new URLSearchParams(location.search);
     const $ = (s, p=document)=> p.querySelector(s);
     const $$ = (s, p=document)=> [...p.querySelectorAll(s)];
@@ -257,7 +266,7 @@
 
     // === Camera helpers ===
     async function listCameras(){
-      if(!navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) return [];
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
       const devs = await navigator.mediaDevices.enumerateDevices();
       const cams = devs.filter(d=> d.kind === 'videoinput');
       if(cameraSelect){
@@ -447,7 +456,7 @@
         function setAngle(angle){
       state.currentAngle = angle;
       $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle));
-      helperText.innerHTML = helperByAngle[angle];
+      if (helperText) helperText.innerHTML = helperByAngle[angle];
       drawGuide();
       updateButtons();
       // النسخة الأصلية من المؤشرات
@@ -463,11 +472,20 @@
     }
 
     function renderThumbs(){
+      if (!thumbs) return;
       thumbs.innerHTML = '';
       for(const a of anglesOrder){
         const wrap = document.createElement('div'); wrap.className='thumb';
         const img = document.createElement('img');
         if(state.captures[a]){ img.src = state.captures[a]; }
+        wrap.appendChild(img);
+        const lb = document.createElement('div'); lb.className='label'; lb.textContent = angleLabels[a];
+        wrap.appendChild(lb);
+        wrap.title = angleLabels[a];
+        wrap.addEventListener('click', ()=> setAngle(a));
+        thumbs.appendChild(wrap);
+      }
+    }
         wrap.appendChild(img);
         const lb = document.createElement('div'); lb.className='label'; lb.textContent = angleLabels[a];
         wrap.appendChild(lb);
@@ -517,17 +535,13 @@
       });
     }
 
-    toggleFlash.addEventListener('click', toggleTorch);
+    if (toggleFlash) toggleFlash.addEventListener('click', toggleTorch);
 
-    restartBtn.addEventListener('click', async ()=>{
-      await startCamera(cameraSelect.value);
-    });
+    if (restartBtn) restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
 
-    cameraSelect.addEventListener('change', async ()=>{
-      await startCamera(cameraSelect.value);
-    });
+    if (cameraSelect) cameraSelect.addEventListener('change', async ()=>{ await startCamera(cameraSelect.value); });
 
-    captureBtn.addEventListener('click', ()=>{
+    if (captureBtn) captureBtn.addEventListener('click', ()=>{
       const url = (typeof dataURLFromVideo==='function') ? dataURLFromVideo() : '';
       if(!url){ if(uploadInput) uploadInput.click(); return; }
       state.captures[state.currentAngle] = url;
@@ -537,7 +551,7 @@
       if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
     });
 
-    retakeBtn.addEventListener('click', ()=>{
+    if (retakeBtn) retakeBtn.addEventListener('click', ()=>{
       state.captures[state.currentAngle] = null;
       renderThumbs();
       updateButtons();
@@ -545,7 +559,7 @@
       if(typeof refreshMetricsEx==='function') refreshMetricsEx(state.currentAngle);
     });
 
-    nextAngleBtn.addEventListener('click', ()=>{
+    if (nextAngleBtn) nextAngleBtn.addEventListener('click', ()=>{
       const idx = anglesOrder.indexOf(state.currentAngle);
       const next = anglesOrder[(idx+1)%anglesOrder.length];
       setAngle(next);
