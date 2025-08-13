@@ -251,6 +251,50 @@ function refreshMetricsEx(angle){
   }).catch(() => {
     box.innerHTML = '<h3>التقييم</h3><div class="helper">تعذّر حساب المؤشرات لهذه اللقطة.</div>';
   });
+}
+// ---------- Init & bindings (restored) ----------
+(function(){
+  const ctx = getCtx();
+  if (animalIdInput) animalIdInput.value = ctx.id || '';
+  if (eventDateInput) eventDateInput.value = ctx.date || todayCairo();
+  if (numberSpan) numberSpan.textContent = ctx.id || '—';
+
+  renderThumbs();
+  setAngle('udder-rear');
+
+  $$('.angle-tab').forEach(btn => btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
+
+  const uploadBtn = $('#uploadBtn'), uploadInput = $('#uploadInput');
+  if (uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
+  if (uploadInput) uploadInput.addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{ state.captures[state.currentAngle]=r.result; renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle); };
+    r.readAsDataURL(f);
+  });
+
+  if (captureBtn) captureBtn.addEventListener('click', ()=>{
+    const url = dataURLFromVideo();
+    if (!url) return;
+    state.captures[state.currentAngle] = url;
+    renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle);
+  });
+  if (retakeBtn) retakeBtn.addEventListener('click', ()=>{
+    state.captures[state.currentAngle] = null;
+    renderThumbs(); updateButtons(); refreshMetricsEx(state.currentAngle);
+  });
+  if (nextAngleBtn) nextAngleBtn.addEventListener('click', ()=>{
+    const i = anglesOrder.indexOf(state.currentAngle);
+    setAngle(anglesOrder[(i+1)%anglesOrder.length]);
+  });
+
+  window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ fitOverlay(); drawGuide(); }, 150); });
+
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    startCamera().then(()=> listCameras()).catch(e=> console.warn('Camera init', e));
+  }
 })();
 </script>
 </body>
