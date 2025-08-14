@@ -104,40 +104,55 @@
 
   // ====== Hidden reference images (user never sees them) ======
   // ضع الصور داخل www/refs/feces/ بهذه الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-  const REF_BASE = 'images/feaces/'; // انت قلت هتحط الصور هنا
-  const REF_EXTS = ['jpg','jpeg','png','webp'];
+  const REF_BASE = (()=>{ const base = 'images/feaces/'; try{ return new URL(base, location.href).href; }catch{ return base; } })();
+  const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const REF_NAMES = [
-    {score:1,   name:'1'},
-    {score:2,   name:'2'},
-    {score:3,   name:'3'},
-    {score:3.5, name:'3_5'},
-    {score:4,   name:'4'},
-    {score:5,   name:'5'}
+    {score:1,   names:['1']},
+    {score:2,   names:['2']},
+    {score:3,   names:['3']},
+    {score:3.5, names:['3_5','3.5']},
+    {score:4,   names:['4']},
+    {score:5,   names:['5']}
   ];
-  const REF_LIST = REF_NAMES.map(({score,name})=>({
+  const REF_LIST = REF_NAMES.flatMap(({score,names})=> names.map(name=>({
     score,
     urls: REF_EXTS.map(ext=> `${REF_BASE}${name}.${ext}`)
-  }));
+  })));
 
   function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } // normalize
     let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
   function loadRefVector(item){
-    // جرّب الامتدادات بالترتيب لحد ما واحدة تشتغل
     const candidates = item.urls || [];
     let i = 0;
     return new Promise(res=>{
       function tryNext(){
-        if(i >= candidates.length) return res(null);
+        if(i >= candidates.length){ console.warn('Ref not found for', item.score, item.urls); return res(null); }
+        const url = candidates[i];
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        try{
+          const abs = new URL(url, location.href);
+          if(abs.origin !== location.origin) img.crossOrigin = 'anonymous';
+        }catch{}
         img.onload = ()=> res({ score: item.score, vec: imgToVec(img) });
+        img.onerror = ()=> { i++; tryNext(); };
+        img.src = url;
+      }
+      tryNext();
+    });
+  });
         img.onerror = ()=> { i++; tryNext(); };
         img.src = candidates[i];
       }
       tryNext();
     });
   }
-  const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr => arr.filter(Boolean));
+  const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr=>{
+    const refs = arr.filter(Boolean);
+    if(!refs.length && scoreNote){
+      scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/images/feaces/ بالأسماء الصحيحة (خاصة 3_5).';
+    }
+    return refs;
+  });
 
   function cosine(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
   function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToVec(img)); img.src=dataUrl; }); }
