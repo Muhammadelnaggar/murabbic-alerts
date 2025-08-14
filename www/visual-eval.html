@@ -87,11 +87,12 @@
     <!-- عمود الكاميرا -->
     <section class="card" id="cameraCard">
       <div class="angles">
-        <button class="angle-tab active" data-angle="side">جانب</button>
-        <button class="angle-tab" data-angle="udder-front">ضرع أمامي</button>
-        <button class="angle-tab" data-angle="udder-rear">ضرع خلفي</button>
-        <button class="angle-tab" data-angle="teat-close">قريب الحلمات</button>
-      </div>
+  <button class="angle-tab active" data-angle="udder-rear">لقطة خلفية</button>
+  <button class="angle-tab" data-angle="side">لقطة جانبية</button>
+  <button class="angle-tab" data-angle="front-body">لقطة أمامية</button>
+  <button class="angle-tab" data-angle="teat-close">لقطة قريبة للضرع</button>
+</div>
+
 
       <div class="controls">
         <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
@@ -184,12 +185,17 @@
 
     // ---------- حالة الصفحة ----------
     const anglesOrder = ['side','udder-front','udder-rear','teat-close'];
-    const angleLabels = { 'side':'جانب', 'udder-front':'ضرع أمامي', 'udder-rear':'ضرع خلفي', 'teat-close':'قريب الحلمات' };
+    'udder-rear': 'لقطة خلفية',
+  'side': 'لقطة جانبية',
+  'front-body': 'لقطة أمامية',
+  'teat-close': 'لقطة قريبة للضرع'
+};
     const helperByAngle = {
-      'side': 'وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يجب أن يضم من الكتف إلى نهاية الحوض، مع وجود الأرضية في أسفل الإطار.',
-      'udder-front': 'صوّر <strong>الضرع من الأمام</strong>؛ احرص أن تكون الأرجل الأمامية خارج الإطار قدر الإمكان والحلمات ظاهرة.',
-      'udder-rear': 'صوّر <strong>الضرع من الخلف</strong>؛ اجعل الذيل خارج الوسط والحلمات الأربع داخل الإطار.',
-      'teat-close': 'التقط <strong>قريب للحلمات</strong>؛ مركز الإطار بين الحلمات الأربع لمسح التموضع والطول.'
+    'udder-rear': 'التقط <strong>لقطة خلفية</strong>؛ نقيم <em>تماثل أرباع الضرع/الـ udder cleft</em> و<em>توزيع الحلمات</em> + <em>استقامة واتساع الأرجل الخلفية</em>.',
+  'side': 'التقط <strong>لقطة جانبية</strong>؛ نقيم <em>استقامة الظهر</em> (المثالي مستقيم) و<em>زاوية الرامب</em> (ميل خفيف مثالي) + <em>عمق الجسم ومحيط الصدر</em> + <em>علامات الأنوثة</em>.',
+  'front-body': 'التقط <strong>لقطة أمامية</strong>؛ نقيم <em>اتساع الصدر</em> و<em>توازي الأرجل الأمامية</em>.',
+  'teat-close': 'التقط <strong>لقطة قريبة للضرع</strong>؛ نقيم <em>طول/حجم الحلمات</em> و<em>تماثلها</em>.'
+};
     };
 
     let state = {
@@ -612,5 +618,90 @@
       }
     })();
   </script>
+  <!-- === Scoring override: يحسب MVS بالنِّسَب الجديدة بدون لمس بقية الصفحة === -->
+<script>
+(function(){
+  // أوزان الفئات الإجمالية
+  const NEW_WEIGHTS = { UDDER:40, BACK_RUMP:30, BODY_LEGS:20, FEMININITY:10 };
+
+  // توزيع البنود داخل كل فئة (النِّسب داخل الفئة = 100)
+  const SUB = {
+    UDDER: { udderCleft:25, udderBalance:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
+    BACK_RUMP: { backStraight:55, rumpAngle:45 },
+    BODY_LEGS: { chestWidth:25, bodyDepth:25, frontLegsParallel:20, rearLegsStraightness:15, rearLegsWidth:15 },
+    FEMININITY: { femininity:100 }
+  };
+
+  // يحوّل state.k -> درجات الفئات -> MVS
+  function computeScoresFromState(){
+    const k = (window.state && window.state.k) || {};
+    const all = Object.assign({}, k['udder-rear'], k['side'], k['front-body'], k['front'], k['teat-close'], k['udder-close']);
+    if (!Object.keys(all).length) return null;
+
+    const w = (map) => {
+      let s=0, sw=0;
+      for (const key in map){
+        const v = all[key], ww = map[key];
+        if (typeof v === 'number'){ s += v*ww; sw += ww; }
+      }
+      return sw ? Math.round(s/sw) : 0;
+    };
+
+    const UDDER      = w(SUB.UDDER);
+    const BACK_RUMP  = w(SUB.BACK_RUMP);
+    const BODY_LEGS  = w(SUB.BODY_LEGS);
+    const FEMININITY = w(SUB.FEMININITY);
+
+    const total = NEW_WEIGHTS.UDDER + NEW_WEIGHTS.BACK_RUMP + NEW_WEIGHTS.BODY_LEGS + NEW_WEIGHTS.FEMININITY;
+    const MVS = Math.round(
+      (UDDER*NEW_WEIGHTS.UDDER + BACK_RUMP*NEW_WEIGHTS.BACK_RUMP + BODY_LEGS*NEW_WEIGHTS.BODY_LEGS + FEMININITY*NEW_WEIGHTS.FEMININITY) / total
+    );
+    return { UDDER, BACK_RUMP, BODY_LEGS, FEMININITY, MVS };
+  }
+
+  // ❶ لو عندك دالة computeOverallMVS قديمة: نستبدلها بنفس الإسم
+  window.computeOverallMVS = function(all){
+    // لو اتندَهت بالداتا مباشرة، نعيد استخدامها؛ وإلا خدها من state.k
+    if (!all){
+      const s = computeScoresFromState();
+      return s ? s.MVS : 0;
+    }
+    // حساب بنفس المنطق على الكائن الممرَّر
+    const w = (map) => {
+      let s=0, sw=0;
+      for (const key in map){
+        const v = all[key], ww = map[key];
+        if (typeof v === 'number'){ s += v*ww; sw += ww; }
+      }
+      return sw ? Math.round(s/sw) : 0;
+    };
+    const UDDER      = w({ udderCleft:25, udderBalance:20, teatDistribution:20, teatSize:15, teatSymmetry:20 });
+    const BACK_RUMP  = w({ backStraight:55, rumpAngle:45 });
+    const BODY_LEGS  = w({ chestWidth:25, bodyDepth:25, frontLegsParallel:20, rearLegsStraightness:15, rearLegsWidth:15 });
+    const FEMININITY = w({ femininity:100 });
+    const total = 40+30+20+10;
+    return Math.round((UDDER*40 + BACK_RUMP*30 + BODY_LEGS*20 + FEMININITY*10) / total);
+  };
+
+  // ❷ ولو صفحتك ما بتستخدمش computeOverallMVS: نهوّك refreshMetricsEx بعد ما يشتغل
+  document.addEventListener('DOMContentLoaded', function(){
+    if (window.refreshMetricsEx){
+      const orig = window.refreshMetricsEx;
+      window.refreshMetricsEx = function(angle){
+        orig.call(this, angle); // احتفظ بالسلوك الأصلي
+        try{
+          const s = computeScoresFromState();
+          if (s && document.getElementById('metrics')){
+            // لو ويدجِتّك تقبل رقم فقط:
+            document.getElementById('metrics').innerHTML =
+              '<h3>التقييم</h3>' + (window.renderScoreWidget ? window.renderScoreWidget(s.MVS) : ('MVS: '+s.MVS));
+          }
+        }catch(e){}
+      };
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
