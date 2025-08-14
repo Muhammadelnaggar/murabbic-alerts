@@ -11,8 +11,14 @@
     h1{margin:0 0 16px;text-align:center;color:var(--green)}
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-    .tile{background:#eafbe7;border:2px solid #c5e1a5;border-radius:12px;padding:18px;text-align:center;font-weight:bold;cursor:pointer}
-    .tile .icon{display:block;font-size:28px;margin-bottom:8px}
+
+    .tile{
+      background:#eafbe7;border:2px solid #c5e1a5;border-radius:12px;
+      padding:18px;text-align:center;font-weight:bold;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px
+    }
+    .tile .icon{display:block;font-size:28px;margin-bottom:2px}
+    .tile small{font-weight:normal;color:#335c33}
     .tile:hover{background:#dcedc8}
 
     /* Weather widget */
@@ -51,21 +57,24 @@
     <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>تسجيل الأحداث</div>
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>ارشيف التنبيهات الذكية</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🆔</span>البطاقة الذكية</div>
+
     <div class="tile" id="btnVisualEval">
-  <span class="icon">📷</span>التقييم البصري
-</div>
+      <span class="icon">📷</span>
+      التقييم البصري
+    </div>
 
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
     <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعة</div>
     <div class="tile" onclick="location.href='evaluation.html'"><span class="icon">📈</span>تقييم الحيوانات</div>
     <div class="tile" onclick="location.href='nutrition.html'"><span class="icon">🌿</span>تركيبة التغذية</div>
     <div class="tile" onclick="location.href='smart-feeding.html'"><span class="icon">🧠</span>التغذية الذكية</div>
-    <div id="fecesEvalCard" role="button" tabindex="0"
-     style="cursor:pointer; padding:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
-  <div style="font-weight:800; color:#0ea05a; margin-bottom:6px;">التقييم البصري للتغذية</div>
-  <div style="color:#0f172a;">تقييم الروث بالكاميرا</div>
-</div>
 
+    <!-- ✅ نفس ستايل الكروت -->
+    <div class="tile" id="fecesEvalCard" role="button" tabindex="0">
+      <span class="icon">💩</span>
+      التقييم البصري للتغذية
+      <small>تقييم الروث بالكاميرا</small>
+    </div>
   </div>
 
 <script type="module">
@@ -81,7 +90,6 @@
   const wState = document.getElementById('wState');
   const wRefresh = document.getElementById('wRefresh');
 
-  // تأكيد وجود مفتاح المنطقة في localStorage (لا يغيّر التصميم/الابحار)
   (function ensureRegionKey(){
     let key = localStorage.getItem('userRegionKey');
     if (key) return;
@@ -91,7 +99,6 @@
     localStorage.setItem('userRegionKey', key);
   })();
 
-  // خريطة إحداثيات مبسطة (fallback إذا لم نجدها في Firestore)
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
     'مصر:الجيزة':  {lat:30.0131, lon:31.2089},
@@ -156,15 +163,20 @@
   document.addEventListener('DOMContentLoaded', ()=> renderWeather());
   wRefresh.addEventListener('click', ()=> renderWeather(true));
 </script>
+
 <script type="module">
   const veBtn = document.getElementById('btnVisualEval');
   veBtn?.addEventListener('click', () => {
     const qs  = new URLSearchParams(location.search);
-    const id  = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
+    const id  = qs.get('animalId')
+               || localStorage.getItem('currentAnimalId')
+               || localStorage.getItem('lastAnimalId')
+               || '';
     const url = id ? `visual-eval.html?animalId=${encodeURIComponent(id)}` : `visual-eval.html`;
     location.href = url;
   });
 </script>
+
 <script>
 (function(){
   const el = document.getElementById('fecesEvalCard');
@@ -177,7 +189,6 @@
   }
 
   function buildUrl(){
-    // لو حاطط data-* على الـdiv هتاخد الأولوية، وإلا هنقرأ من localStorage
     const id     = el.dataset.animalId || localStorage.getItem('currentAnimalId')     || '';
     const number = el.dataset.number   || localStorage.getItem('currentAnimalNumber') || '';
     const date   = el.dataset.date     || localStorage.getItem('currentEventDate')    || todayCairo();
@@ -187,12 +198,9 @@
     if (number) qs.set('number', number);
     if (date)   qs.set('date', date);
 
-    // أثناء التطوير بدون https خلي الصفحة تشتغل في وضع العرض عشان الكاميرا
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
       qs.set('demo','1');
     }
-
-    // غيّر اسم الملف هنا لو مختلف عندك
     return 'feces-eval.html?' + qs.toString();
   }
 
@@ -204,8 +212,3 @@
 
 </body>
 </html>
-
-
-
-
-
