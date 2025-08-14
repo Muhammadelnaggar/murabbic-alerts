@@ -145,6 +145,30 @@ html, body{ max-width:100vw !important; overflow-x:clip !important; } /* fallbac
   word-break: break-word;   /* اكسر الكلمات الطويلة عند اللزوم */
   min-width: 0;             /* اسمح للزر يصغّر */
 }
+/* === Mobile overflow final fix (drop-in) === */
+html, body { width:100%; max-width:100vw !important; overflow-x:clip !important; }
+@supports not (overflow: clip){ html, body{ overflow-x:hidden !important; } }
+
+header{ display:flex; flex-wrap:wrap; }
+header > *{ min-width:0; }
+header .device-info{
+  margin-inline-start:auto;
+  flex:1 1 180px; min-width:0;
+  text-align:end; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.preview-wrap, .container, .row, .card{ width:100%; max-width:100%; }
+img, video, canvas{ display:block; max-width:100%; height:auto; }
+
+.controls .btn, .controls .select, .controls .input, .angle-tab{
+  min-width:0; max-width:100%; white-space:normal; word-break:break-word;
+}
+.capture-bar{ flex-wrap:wrap; align-items:stretch; }
+.status{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.thumb{ flex:0 0 auto; }
+
+/* لو في عنصر محرّر متحقن من إضافة المتصفح */
+editor-card{ display:none !important; }
 
   </style>
 </head>
