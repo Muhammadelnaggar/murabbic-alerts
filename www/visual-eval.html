@@ -74,6 +74,17 @@
       .angles{flex-wrap:wrap}
       .angle-tab{flex:1; text-align:center; font-size:15px}
     }
+    /* عَطّل أي طبقة editor-card محقونة من المتصفح عشان ما تعيش فوق الصفحة */
+editor-card, .editor-card {
+  pointer-events: none !important;  /* سيّب الكِلكات تعدّي */
+  opacity: 0 !important;
+  visibility: hidden !important;
+  position: static !important;
+  z-index: -1 !important;
+}
+/* ارفع طبقات التطبيق تحسّباً */
+header, .container, #cameraCard { position: relative; z-index: 1; }
+
   </style>
 </head>
 <body>
