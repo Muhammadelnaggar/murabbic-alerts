@@ -713,6 +713,14 @@ header, .container, #cameraCard { position: relative; z-index: 1; }
   });
 })();
 </script>
+<script>
+  // امسح أي editor-card أول ما يظهر (ولو رجع تاني نمسحه)
+  function nukeEditorCard(){
+    document.querySelectorAll('editor-card,.editor-card').forEach(n=>{ try{ n.remove(); }catch{} });
+  }
+  new MutationObserver(nukeEditorCard).observe(document.documentElement, {childList:true, subtree:true});
+  document.addEventListener('DOMContentLoaded', nukeEditorCard);
+</script>
 
 </body>
 </html>
