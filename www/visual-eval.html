@@ -194,19 +194,23 @@ header, .container, #cameraCard { position: relative; z-index: 1; }
       return {id, number, date};
     }
 
-    // ---------- حالة الصفحة ----------
-    const anglesOrder = ['side','udder-front','udder-rear','teat-close'];
-    'udder-rear': 'لقطة خلفية',
+  // ---------- حالة الصفحة ----------
+const anglesOrder = ['udder-rear','side','front-body','teat-close'];
+
+const angleLabels = {
+  'udder-rear': 'لقطة خلفية',
   'side': 'لقطة جانبية',
   'front-body': 'لقطة أمامية',
   'teat-close': 'لقطة قريبة للضرع'
 };
-    const helperByAngle = {
-    'udder-rear': 'التقط <strong>لقطة خلفية</strong>؛ نقيم <em>تماثل أرباع الضرع/الـ udder cleft</em> و<em>توزيع الحلمات</em> + <em>استقامة واتساع الأرجل الخلفية</em>.',
+
+const helperByAngle = {
+  'udder-rear': 'التقط <strong>لقطة خلفية</strong>؛ نقيم <em>تماثل أرباع الضرع/الـ udder cleft</em> و<em>توزيع الحلمات</em> + <em>استقامة واتساع الأرجل الخلفية</em>.',
   'side': 'التقط <strong>لقطة جانبية</strong>؛ نقيم <em>استقامة الظهر</em> (المثالي مستقيم) و<em>زاوية الرامب</em> (ميل خفيف مثالي) + <em>عمق الجسم ومحيط الصدر</em> + <em>علامات الأنوثة</em>.',
   'front-body': 'التقط <strong>لقطة أمامية</strong>؛ نقيم <em>اتساع الصدر</em> و<em>توازي الأرجل الأمامية</em>.',
   'teat-close': 'التقط <strong>لقطة قريبة للضرع</strong>؛ نقيم <em>طول/حجم الحلمات</em> و<em>تماثلها</em>.'
 };
+
     };
 
     let state = {
