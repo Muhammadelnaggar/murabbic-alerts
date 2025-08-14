@@ -60,6 +60,12 @@
     <div class="tile" onclick="location.href='evaluation.html'"><span class="icon">📈</span>تقييم الحيوانات</div>
     <div class="tile" onclick="location.href='nutrition.html'"><span class="icon">🌿</span>تركيبة التغذية</div>
     <div class="tile" onclick="location.href='smart-feeding.html'"><span class="icon">🧠</span>التغذية الذكية</div>
+    <div id="fecesEvalCard" role="button" tabindex="0"
+     style="cursor:pointer; padding:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+  <div style="font-weight:800; color:#0ea05a; margin-bottom:6px;">التقييم البصري للتغذية</div>
+  <div style="color:#0f172a;">تقييم الروث بالكاميرا</div>
+</div>
+
   </div>
 
 <script type="module">
@@ -159,9 +165,46 @@
     location.href = url;
   });
 </script>
+<script>
+(function(){
+  const el = document.getElementById('fecesEvalCard');
+  if(!el) return;
+
+  function todayCairo(){
+    const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
+    const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function buildUrl(){
+    // لو حاطط data-* على الـdiv هتاخد الأولوية، وإلا هنقرأ من localStorage
+    const id     = el.dataset.animalId || localStorage.getItem('currentAnimalId')     || '';
+    const number = el.dataset.number   || localStorage.getItem('currentAnimalNumber') || '';
+    const date   = el.dataset.date     || localStorage.getItem('currentEventDate')    || todayCairo();
+
+    const qs = new URLSearchParams();
+    if (id)     qs.set('animalId', id);
+    if (number) qs.set('number', number);
+    if (date)   qs.set('date', date);
+
+    // أثناء التطوير بدون https خلي الصفحة تشتغل في وضع العرض عشان الكاميرا
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      qs.set('demo','1');
+    }
+
+    // غيّر اسم الملف هنا لو مختلف عندك
+    return 'feces-eval.html?' + qs.toString();
+  }
+
+  function go(){ location.href = buildUrl(); }
+  el.addEventListener('click', go);
+  el.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); }});
+})();
+</script>
 
 </body>
 </html>
+
 
 
 
