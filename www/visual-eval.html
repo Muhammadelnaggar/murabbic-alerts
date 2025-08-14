@@ -169,6 +169,27 @@ img, video, canvas{ display:block; max-width:100%; height:auto; }
 
 /* لو في عنصر محرّر متحقن من إضافة المتصفح */
 editor-card{ display:none !important; }
+/* ===== HARD LOCK: no horizontal scroll anywhere ===== */
+html, body { width:100% !important; max-width:100% !important; overflow-x:clip !important; }
+@supports not (overflow: clip) { html, body { overflow-x:hidden !important; } }
+
+/* أي عنصر داخل الـbody لا يتجاوز العرض */
+:where(body, body *) { max-inline-size:100% !important; }
+
+/* عيال الـgrid/flex لازم تقدر تصغّر */
+:where(.row, .controls, .capture-bar) > * { min-width:0 !important; }
+
+/* الزرار/التابات ما تفردش العرض بسبب نص طويل */
+.angle-tab, .controls .btn, .controls .select, .controls .input {
+  min-width:0 !important; white-space:normal; word-break:break-word;
+}
+
+/* قصّ أي طفح على حواف الحاويات */
+:where(header, .container, .row, .card, .preview-wrap) { overflow-x:clip !important; }
+@supports not (overflow: clip) { :where(header, .container, .row, .card, .preview-wrap){ overflow-x:hidden !important; } }
+
+/* بعض إضافات Edge/المحررات بتحقن عناصر توسّع الصفحة */
+editor-card, .editor-card { display:none !important; }
 
   </style>
 </head>
