@@ -119,8 +119,8 @@
   function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
   // ====== Hidden reference images (user never sees them) ======
-  // ضع الصور داخل www/images/1/ بهذه الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-  const REF_BASE = (()=>{ const base = 'www/images/1/'; try{ return new URL(base, location.href).href; }catch{ return base; } })();
+  // ضع الصور داخل www/www/images/1/ بهذه الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
+  const REF_BASE = (()=>{ const base = 'www/www/images/1/'; try{ return new URL(base, location.href).href; }catch{ return base; } })();
   const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const REF_NAMES = [
     {score:1,   names:['1']},
@@ -160,7 +160,7 @@
   const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr=>{
     const refs = arr.filter(Boolean);
     __REFS_COUNT__ = refs.length; window.__REFS_COUNT__ = __REFS_COUNT__;
-    if(!refs.length && scoreNote){ scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/www/images/1/ بالأسماء الصحيحة (خاصة 3_5).'; }
+    if(!refs.length && scoreNote){ scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/www/www/images/1/ بالأسماء الصحيحة (خاصة 3_5).'; }
     return refs;
   });
 
@@ -173,7 +173,7 @@
       scoreBadge.textContent='غير محسوب — مراجع مفقودة';
       scoreFill.style.width='0%';
       scoreFill.style.background='#facc15';
-      scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/www/images/1/';
+      scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/www/www/images/1/';
       state.lastScore=null;
       return;
     }
@@ -237,7 +237,7 @@
   });
 
   async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block'; // استخدم صورة مرجعية 3_5 لعرض مثالي
-    const demoRef='www/images/1/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
+    const demoRef='www/www/images/1/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
 
   (async function init(){ try{
     const ctx=getAnimalFromContext();
