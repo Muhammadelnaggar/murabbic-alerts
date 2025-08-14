@@ -120,7 +120,7 @@
 
   // ====== Hidden reference images (user never sees them) ======
   // ضع الصور داخل www/www/images/1/ بهذه الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-  const REF_BASE = (()=>{ const base = 'www/www/images/1/'; try{ return new URL(base, location.href).href; }catch{ return base; } })();
+  const REF_BASE = (()=>{ const base = 'www/images/1/'; try{ return new URL(base, location.href).href; }catch{ return base; } })();
   const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const REF_NAMES = [
     {score:1,   names:['1']},
