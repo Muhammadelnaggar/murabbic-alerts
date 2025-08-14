@@ -104,19 +104,40 @@
 
   // ====== Hidden reference images (user never sees them) ======
   // ضع الصور داخل www/refs/feces/ بهذه الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-  const REF_LIST=[
-    {score:1,   url:'refs/feces/1.jpg'},
-    {score:2,   url:'refs/feces/2.jpg'},
-    {score:3,   url:'refs/feces/3.jpg'},
-    {score:3.5, url:'refs/feces/3_5.jpg'},
-    {score:4,   url:'refs/feces/4.jpg'},
-    {score:5,   url:'refs/feces/5.jpg'}
+  const REF_BASE = 'images/feaces/'; // انت قلت هتحط الصور هنا
+  const REF_EXTS = ['jpg','jpeg','png','webp'];
+  const REF_NAMES = [
+    {score:1,   name:'1'},
+    {score:2,   name:'2'},
+    {score:3,   name:'3'},
+    {score:3.5, name:'3_5'},
+    {score:4,   name:'4'},
+    {score:5,   name:'5'}
   ];
+  const REF_LIST = REF_NAMES.map(({score,name})=>({
+    score,
+    urls: REF_EXTS.map(ext=> `${REF_BASE}${name}.${ext}`)
+  }));
 
   function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } // normalize
     let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
-  function loadRefVector(item){ return new Promise(res=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>res({score:item.score, vec:imgToVec(img)}); img.onerror=()=>res(null); img.src=item.url; }); }
-  const refVectorsPromise=Promise.all(REF_LIST.map(loadRefVector)).then(arr=>arr.filter(Boolean));
+  function loadRefVector(item){
+    // جرّب الامتدادات بالترتيب لحد ما واحدة تشتغل
+    const candidates = item.urls || [];
+    let i = 0;
+    return new Promise(res=>{
+      function tryNext(){
+        if(i >= candidates.length) return res(null);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = ()=> res({ score: item.score, vec: imgToVec(img) });
+        img.onerror = ()=> { i++; tryNext(); };
+        img.src = candidates[i];
+      }
+      tryNext();
+    });
+  }
+  const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr => arr.filter(Boolean));
 
   function cosine(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
   function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToVec(img)); img.src=dataUrl; }); }
@@ -136,7 +157,7 @@
   if(uploadInput) uploadInput.addEventListener('change', async (e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const url=r.result; state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; }; r.readAsDataURL(f); uploadInput.value=''; });
 
   async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block'; // استخدم صورة مرجعية 3_5 لعرض مثالي
-    const demoRef='refs/feces/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
+    const demoRef='images/feaces/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
 
   (async function init(){ try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب.'); }
