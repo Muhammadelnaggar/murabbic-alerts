@@ -18,7 +18,7 @@
     .angle-tab{padding:10px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:700;min-height:44px}
     .angle-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
 
-    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px}
     .controls .select,.controls .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
     .controls .btn{padding:12px 14px;border:none;border-radius:12px;cursor:pointer;font-weight:700;min-height:44px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     .btn-primary{background:var(--green);color:#fff}
@@ -26,12 +26,12 @@
     .btn-danger{background:var(--danger);color:#fff}
     .btn:disabled{opacity:.6;cursor:not-allowed}
 
-    .preview-wrap{position:relative;border-radius:16px;overflow:hidden;background:#000}
-    video#preview{width:100%;height:auto;display:block;background:#000}
+    .preview-wrap{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;max-height:56vh}
+    video#preview{width:100%;height:100%;display:block;background:#000;object-fit:cover}
     canvas#overlay{position:absolute;inset:0;pointer-events:none}
 
-    .thumbs{display:flex;gap:8px;padding:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap}
-    .thumb{width:72px;height:72px;border-radius:12px;overflow:hidden;border:2px solid #e2e8f0;background:#f8fafc;position:relative}
+    .thumbs{display:flex;gap:8px;padding:8px;border-top:1px solid #e2e8f0;flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory}
+    .thumb{width:56px;height:56px;border-radius:12px;overflow:hidden;border:2px solid #e2e8f0;background:#f8fafc;position:relative;flex:0 0 auto;scroll-snap-align:start}
     .thumb img{width:100%;height:100%;object-fit:cover}
     .thumb .label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);color:#fff;font-size:11px;text-align:center}
 
@@ -48,7 +48,28 @@
     /* تعطيل أي عنصر محرر يعلّق فوق الصفحة */
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     header,.container,#cameraCard{position:relative;z-index:1}
-  </style>
+    /* Controls layout refinement */
+  .controls.controls-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+  .controls-grid .left{display:flex;gap:8px;align-items:center}
+  .controls-grid .right{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch;justify-items:stretch}
+@media(min-width:860px){.controls-grid .right{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .btn-lg{padding:14px 18px;font-size:18px}
+  @media(max-width:560px){
+    .controls.controls-grid{grid-template-columns:1fr}
+    .controls-grid .right{justify-content:stretch}
+    .controls .btn, .controls .select{width:100%}
+    #captureBtn{order:-1}
+  }
+  /* اجعل شريط التحكم ثابتًا أسفل العنوان لتقليل التمرير */
+  #cameraCard .controls{position:sticky;top:56px;z-index:5;background:var(--card);border-bottom:1px solid #e2e8f0}
+  @media(max-width:560px){
+    .angles{padding:8px}
+    .results,.save-bar{padding:8px}
+  }
+  /* شريط نوع الحيوان + القائمة جنب بعض دائمًا */
+  .kind-grid{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+  @media(max-width:560px){.kind-grid{grid-template-columns:1fr 1fr}}
+</style>
 </head>
 <body>
   <header>
@@ -59,8 +80,7 @@
   </header>
 
   <div class="container">
-    <section class="card" id="kindCard">
-      <div class="controls">
+    $1<div class="controls kind-grid">
         <div role="radiogroup" aria-label="نوع الحيوان" style="display:flex;gap:12px;align-items:center">
           <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindCow" value="cow"> أبقار</label>
           <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindBuffalo" value="buffalo"> جاموس</label>
@@ -75,19 +95,21 @@
         <button class="angle-tab" data-angle="side">لقطة جانبية</button>
       </div>
 
-      <div class="controls">
-        <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
-        <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
-        <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
-        <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
-        <div style="margin-inline-start:auto"></div>
-        <button id="captureBtn" class="btn btn-primary">التقاط</button>
-        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
-        <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
-        <input id="uploadInput" type="file" accept="image/*" style="display:none" />
-        <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
+      <div class="controls controls-grid">
+        <div class="left">
+          <button id="captureBtn" class="btn btn-primary btn-lg">التقاط</button>
+          <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
+        </div>
+        <div class="right">
+          <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
+          <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
+          <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
+          <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
+          <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+          <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
+          <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
+        </div>
       </div>
-
       <div class="preview-wrap">
         <video id="preview" playsinline autoplay muted></video>
         <canvas id="overlay"></canvas>
