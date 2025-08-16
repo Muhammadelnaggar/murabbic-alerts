@@ -33,8 +33,13 @@
     .tile small{font-weight:normal;color:#335c33}
     .tile:hover{background:#dcedc8;transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
 
+    /* أيقونة مركّبة للبطاقة الذكية */
+    .tile .icon.icon-layer{position:relative;display:inline-flex;align-items:center;justify-content:center}
+    .icon-layer .i-main{font-size:24px;line-height:1}
+    .icon-layer .i-badge{position:absolute;bottom:-4px;right:-4px;font-size:14px;background:#fff;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
     /* ويدجت الطقس (نسخة مضغوطة) */
-    #weatherCard{display:none;align-items:center;gap:10px;padding:10px 12px}
+    #weatherCard{display:none;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
     #weatherCard.compact .wvals{display:flex;gap:6px;flex-wrap:wrap}
     #weatherCard.compact #weatherBadge{
       display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);
@@ -49,10 +54,60 @@
       border-radius:10px;padding:6px 10px;font-weight:bold;cursor:pointer;font-size:12px}
     .btn:hover{background:#f4fff1}
 
+    /* محوّل نوع القطيع */
+    .herd-toggle{display:flex;gap:6px;align-items:center}
+    .herd-toggle .seg{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+    .herd-toggle .seg.active{background:var(--green);color:#fff}
+
+    /* مؤشر THI الصغير */
+    .thi-scale{min-width:160px;max-width:260px;display:flex;flex-direction:column;gap:4px}
+    .thi-track{position:relative;height:8px;border-radius:999px;background:#e0e0e0;overflow:hidden}
+    .thi-marker{position:absolute;top:50%;width:10px;height:10px;border:2px solid var(--green);background:#fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+    .thi-labels{display:flex;justify-content:space-between;font-size:11px;color:#335c33;padding:0 2px}
+
+    /* Tooltip THI */
+    .thi-tooltip{position:absolute;top:-30px;transform:translateX(-50%);background:#1b5e20;color:#fff;font-size:11px;padding:4px 6px;border-radius:6px;white-space:nowrap;display:none}
+    .thi-tooltip::after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);border-width:5px;border-style:solid;border-color:#1b5e20 transparent transparent transparent}
+
+    /* مؤشر THI الصغير */
+    .thi-scale{min-width:160px;max-width:260px;display:flex;flex-direction:column;gap:4px}
+    .thi-track{position:relative;height:8px;border-radius:999px;background:#e0e0e0;overflow:hidden}
+    .thi-marker{position:absolute;top:50%;width:10px;height:10px;border:2px solid var(--green);background:#fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+    .thi-labels{display:flex;justify-content:space-between;font-size:11px;color:#335c33;padding:0 2px}
+
+    /* Tooltip THI */
+    .thi-tooltip{position:absolute;top:-30px;transform:translateX(-50%);background:#1b5e20;color:#fff;font-size:11px;padding:4px 6px;border-radius:6px;white-space:nowrap;display:none}
+    .thi-tooltip::after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);border-width:5px;border-style:solid;border-color:#1b5e20 transparent transparent transparent}
+
+    /* بلاطة كبيرة + أزرار فرعية */
+    .tile-lg{min-height:140px}
+    .tile-2x{grid-column:span 2}
+    @media(max-width:560px){.tile-2x{grid-column:span 1}}
+    .subactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:var(--green);border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
+    .subbtn:hover{background:#f4fff1}
+
     @media(max-width:560px){
       .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
       .tile{min-height:110px;padding:14px}
+      .tile-m-full{grid-column:1 / -1}
     }
+  /* عدّاد THI بشكل ساعة */
+    .thi-clock{position:relative;width:clamp(44px,12vw,64px);height:clamp(44px,12vw,64px);margin:4px 6px}
+    .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side, transparent 62%, #000 63%);mask:radial-gradient(farthest-side, transparent 62%, #000 63%)}
+    .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1);will-change:transform}
+    
+    .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
+    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+    .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
+    
+
+    @media(max-width:560px){#weatherCard{justify-content:center;flex-direction:column;align-items:center;gap:8px}.herd-toggle{justify-content:center}}
+  
+  @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
   </style>
 </head>
 <body>
@@ -64,54 +119,61 @@
       <span>🌦️</span>
       <span id="wLoc">—</span>
     </div>
+    <button id="wRefresh" class="btn" style="margin-inline-start:auto">تحديث</button>
     <div class="wvals" style="flex:1">
       <div class="wval"><div>الحرارة</div><b id="wTemp">—°C</b></div>
       <div class="wval"><div>الرطوبة</div><b id="wHum">—%</b></div>
       <div class="wval"><div>THI</div><b id="wTHI">—</b></div>
       <div class="wval"><div>الحالة</div><b id="wState">—</b></div>
     </div>
-    <button id="wRefresh" class="btn">تحديث</button>
+    <div class="herd-toggle" role="group" aria-label="نوع القطيع">
+      <button class="seg" id="herdCow" type="button">أبقار</button>
+      <button class="seg active" id="herdBuffalo" type="button">جاموس</button>
+    </div>
+    <div class="thi-clock" aria-label="مؤشر THI">
+      <div class="dial" id="thiDial"><div class="arc" id="thiArc"></div></div>
+      <div class="needle" id="thiNeedle"></div>
+      <div class="center"></div>
+      <div class="thi-tooltip" id="thiTip" style="display:none"></div>
+    </div>
   </div>
 
   <!-- روابط سريعة -->
   <div class="dashboard" style="margin-top:12px">
-    <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>تسجيل حيوان جديد</div>
-    <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>قائمة الحيوانات</div>
-    <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>تسجيل الأحداث</div>
-    <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>ارشيف التنبيهات الذكية</div>
-    <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🆔</span>البطاقة الذكية</div>
+    <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>حيوان جديد</div>
+    <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>حيواناتي</div>
+    <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
+    <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
+    <div class="tile" onclick="location.href='cow-card.html'"><span class="icon icon-layer"><span class="i-main">🐮</span><span class="i-badge">💳</span></span>البطاقة الذكية</div>
 
     <div class="tile" id="milkTraitsCard" role="button" tabindex="0">
-      <span class="icon">🥛</span>
-      التقييم البصري لصفات إنتاج اللبن
-      <small>بالكاميرا (ضرع/جانبي/خلفي)</small>
+      <span class="icon">🐄</span>
+      سمات حيوان اللبن /كاميرا
     </div>
 
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-    <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعة</div>
+    <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعه</div>
 
     <!-- ⛔ تمت إزالة بلاطة تقييم الحيوانات (evaluation.html) بناءً على طلبك -->
 
-    <div class="tile" onclick="location.href='nutrition.html'"><span class="icon">🌿</span>تركيبة التغذية</div>
-    <div class="tile" onclick="location.href='smart-feeding.html'"><span class="icon">🧠</span>التغذية الذكية</div>
-
     <!-- تقييم التغذية بالحالة الجسميّة (BCS) -->
-    <div class="tile" id="bcsNutritionCard" role="button" tabindex="0">
-      <span class="icon">🧍</span>
-      التقييم الذكي للتغذية (قياس الحالة الجسميّة بالكاميرا)
-      <small>BCS → توصيات تغذية</small>
+    <div class="tile tile-lg tile-2x tile-m-full" id="smartNutritionTile" role="group" tabindex="0">
+      <span class="icon">🧠</span>
+      تقييم التغذية الذكي
+      
+      <div class="subactions" aria-label="اختيارات التقييم">
+        <button class="subbtn" id="goFeces">الروث بالكاميرا</button>
+        <button class="subbtn" id="goBCS">الحالة الجسميّة بالكاميرا</button>
+        <button class="subbtn" id="goRation">تقييم العليقة</button>
+      </div>
     </div>
 
     <!-- تقييم الروث بالكاميرا -->
-    <div class="tile" id="fecesEvalCard" role="button" tabindex="0">
-      <span class="icon">💩</span>
-      التقييم الذكي للتغذية (بتقييم الروث بالكاميرا)
-      <small>Feces score → توصيات</small>
-    </div>
+    
   </div>
 
 <script>
-// ويدجت الطقس — نسخة مستقلة لا تعتمد على Firebase
+// ويدجت الطقس — نسخة مستقلة مع محوّل أبقار/جاموس
 (function(){
   const chip   = document.getElementById('weatherCard');
   const wLoc   = document.getElementById('wLoc');
@@ -120,12 +182,28 @@
   const wTHI   = document.getElementById('wTHI');
   const wState = document.getElementById('wState');
   const wRefresh = document.getElementById('wRefresh');
+  const thiTrack = document.querySelector('.thi-track');
+  const thiMarker = document.getElementById('thiMarker');
+  const thiTip = document.getElementById('thiTip');
+  const thiDial = document.getElementById('thiDial');
+  const thiArc = document.getElementById('thiArc');
+  const thiNeedle = document.getElementById('thiNeedle');
+  const thiCenter = document.querySelector('.thi-clock .center');
+  const thiL1 = document.getElementById('thiL1');
+  const thiL2 = document.getElementById('thiL2');
+  const thiL3 = document.getElementById('thiL3');
+  const thiL4 = document.getElementById('thiL4');
+  const herdCow = document.getElementById('herdCow');
+  const herdBuffalo = document.getElementById('herdBuffalo');
+  let tipTimer = null;
+  function showTip(){ if(!thiTip) return; thiTip.style.display='block'; clearTimeout(tipTimer); tipTimer=setTimeout(()=>{ thiTip.style.display='none'; }, 1800);} 
+  function hideTip(){ if(!thiTip) return; thiTip.style.display='none'; }
 
-  // أظهر الويدجت فورًا بشكل مضغوط
+  // إظهار الويدجت فورًا
   chip.style.display='flex';
   chip.classList.add('compact');
 
-  // إعداد المنطقة الافتراضية
+  // المنطقة الافتراضية
   let key = localStorage.getItem('userRegionKey');
   if(!key){
     const c = localStorage.getItem('userCountry');
@@ -134,6 +212,15 @@
     localStorage.setItem('userRegionKey', key);
   }
   wLoc.textContent = key;
+
+  // محوّل نوع القطيع
+  function getProfile(){ return (localStorage.getItem('herdProfile') === 'cow') ? 'cow' : 'buffalo'; }
+  function setProfile(p){ localStorage.setItem('herdProfile', p); }
+  function syncToggle(){
+    const p = getProfile();
+    herdCow?.classList.toggle('active', p==='cow');
+    herdBuffalo?.classList.toggle('active', p==='buffalo');
+  }
 
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
@@ -148,22 +235,40 @@
     'عُمان:مسقط': {lat:23.5880, lon:58.3829}
   };
 
-  function THI(c, rh){ const f=c*9/5+32; return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10; }
-  function thiColor(thi){
-    if (thi < 68) return {bg:'#c8e6c9', txt:'مريح'};
-    if (thi < 72) return {bg:'#fff9c4', txt:'توتر خفيف'};
-    if (thi < 79) return {bg:'#ffe0b2', txt:'توتر متوسط'};
-    if (thi < 84) return {bg:'#ffccbc', txt:'توتر شديد'};
-    return {bg:'#ffcdd2', txt:'توتر شديد جدًا'};
+  function THI(c, rh){
+    const f = c*9/5 + 32;
+    return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10;
   }
+
+  function bands(){
+    return getProfile()==='cow' ? {t1:68,t2:72,t3:79,t4:84} : {t1:66,t2:70,t3:77,t4:82};
+  }
+  function colorAndText(thi, b){
+    let txt;
+    if (thi < b.t1) txt='مريح';
+    else if (thi < b.t2) txt='اجهاد خفيف';
+    else if (thi < b.t3) txt='اجهاد متوسط';
+    else if (thi < b.t4) txt='اجهاد شديد';
+    else txt='اجهاد شديد جدا';
+
+    let bg;
+    if (thi < b.t1) bg='#c8e6c9';
+    else if (thi < b.t2) bg='#fff9c4';
+    else if (thi < b.t3) bg='#ffe0b2';
+    else if (thi < b.t4) bg='#ffccbc';
+    else bg='#ffcdd2';
+    return {bg, txt};
+  }
+
   function saveCache(key, data){ localStorage.setItem('weather:'+key, JSON.stringify({...data, ts:Date.now()})); }
-  function loadCache(key){ try{ const o=JSON.parse(localStorage.getItem('weather:'+key)||'null'); return o && (Date.now()-o.ts)<3600000 ? o : null; }catch{return null;} }
+  function loadCache(key){ try{ const o=JSON.parse(localStorage.getItem('weather:'+key)||'null'); return o && (Date.now()-o.ts)<3600000 ? o : null;}catch{ return null; } }
+
   async function fetchWeather(lat, lon){
     try{
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=Africa%2FCairo`;
       const r = await fetch(url); const j = await r.json();
       return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
-    }catch(e){ return null; }
+    }catch{ return null; }
   }
 
   async function renderWeather(force=false){
@@ -176,8 +281,40 @@
     }
     if(!data){ return; }
 
+    const b = bands();
+    // حدّث العناوين أسفل الشريط
+    if (thiL1) thiL1.textContent = b.t1;
+    if (thiL2) thiL2.textContent = b.t2;
+    if (thiL3) thiL3.textContent = b.t3;
+    if (thiL4) thiL4.textContent = b.t4;
+
     const thi = THI(data.t, data.h);
-    const {bg, txt} = thiColor(thi);
+    const {bg, txt} = colorAndText(thi, b);
+
+    // تحديث عدّاد الساعة (دائري)
+    const minTHI=50, maxTHI=90;
+    const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
+    if (thiArc){
+      const minTHI=50, maxTHI=90;
+      const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
+      const arcSpanPct = 240/360*100; // ثلثا الساعة العلويان
+      const pArc = v => (pct(v)/100) * arcSpanPct;
+      const p1 = pArc(b.t1), p2 = pArc(b.t2), p3 = pArc(b.t3);
+      thiArc.style.background = `conic-gradient(from -120deg,
+        #90caf9 0% ${p1}%,
+        #fff59d ${p1}% ${p2}%,
+        #ffcc80 ${p2}% ${p3}%,
+        #ef5350 ${p3}% ${arcSpanPct}%,
+        transparent ${arcSpanPct}% 100%)`;
+    }
+    if (thiNeedle){
+      const minTHI=50, maxTHI=90;
+      const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
+      const p = Math.max(0, Math.min(100, pct(thi)));
+      const angle = -120 + (p * 2.4); // 0→100% عبر 240°
+      thiNeedle.style.setProperty('--angle', angle + 'deg');
+    }
+
     chip.style.background = bg;
     wTemp.textContent = `${Math.round(data.t)}°C`;
     wHum.textContent  = `${Math.round(data.h)}%`;
@@ -185,9 +322,13 @@
     wState.textContent= txt;
   }
 
-  window.renderWeather = renderWeather; // إتاحة الوظيفة للزر
-  document.addEventListener('DOMContentLoaded', ()=> renderWeather());
-  wRefresh.addEventListener('click', ()=> renderWeather(true));
+  // أحداث
+  window.renderWeather = renderWeather; // للزر تحديث
+  document.addEventListener('DOMContentLoaded', ()=> { syncToggle(); renderWeather(); });
+  wRefresh.addEventListener('click', ()=> { renderWeather(true); showTip(); });
+  herdCow?.addEventListener('click', ()=>{ setProfile('cow'); syncToggle(); renderWeather(true); });
+  herdBuffalo?.addEventListener('click', ()=>{ setProfile('buffalo'); syncToggle(); renderWeather(true); });
+  if (thiMarker){ thiMarker.addEventListener('mouseenter', showTip); thiMarker.addEventListener('mouseleave', hideTip); thiMarker.addEventListener('touchstart', (e)=>{ e.preventDefault(); showTip(); }, {passive:false}); }
 })();
 </script>
 
@@ -227,20 +368,21 @@
     return base + '?' + qs.toString();
   }
 
-  // feces eval
-  const feces = document.getElementById('fecesEvalCard');
-  if(feces){
+  // اختيارات داخل بلاطة "تقييم التغذية الذكي"
+  const fecesBtn  = document.getElementById('goFeces');
+  if(fecesBtn){
     const go = ()=> location.href = buildQS('feces-eval.html');
-    feces.addEventListener('click', go);
-    feces.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }});
+    fecesBtn.addEventListener('click', go);
   }
-
-  // BCS → Nutrition
-  const bcs = document.getElementById('bcsNutritionCard');
-  if(bcs){
-    const go = ()=> location.href = buildQS('bcs-eval.html'); // يفتح صفحة BCS لديك
-    bcs.addEventListener('click', go);
-    bcs.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }});
+  const bcsBtn    = document.getElementById('goBCS');
+  if(bcsBtn){
+    const go = ()=> location.href = buildQS('bcs-eval.html');
+    bcsBtn.addEventListener('click', go);
+  }
+  const rationBtn = document.getElementById('goRation');
+  if(rationBtn){
+    const go = ()=> location.href = 'smart-feeding.html';
+    rationBtn.addEventListener('click', go);
   }
 })();
 </script>
