@@ -39,8 +39,14 @@
     .icon-layer .i-badge{position:absolute;bottom:-4px;right:-4px;font-size:14px;background:#fff;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
     /* ويدجت الطقس (نسخة مضغوطة) */
-    #weatherCard{display:none;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
+    #weatherCard{display:none;gap:12px;padding:10px 12px;display:grid;grid-template-columns:clamp(90px,26vw,140px) 1fr;align-items:center}
     #weatherCard.compact .wvals{display:flex;gap:6px;flex-wrap:wrap}
+    /* تخطيط الساعة يسار، البيانات يمين متكدسة */
+    #weatherCard .thi-clock{grid-column:1;grid-row:1 / span 3;justify-self:center}
+    #weatherCard #weatherBadge{grid-column:2;grid-row:1}
+    #weatherCard #wRefresh{grid-column:2;grid-row:1;justify-self:end;align-self:start}
+    #weatherCard .wvals{grid-column:2;grid-row:2}
+    #weatherCard .herd-toggle{grid-column:2;grid-row:3;justify-content:flex-start}
     #weatherCard.compact #weatherBadge{
       display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);
       padding:6px 10px;background:var(--muted);font-size:14px
@@ -93,7 +99,7 @@
       .tile-m-full{grid-column:1 / -1}
     }
   /* عدّاد THI بشكل ساعة */
-    .thi-clock{position:relative;width:clamp(44px,12vw,64px);height:clamp(44px,12vw,64px);margin:4px 6px}
+    .thi-clock{position:relative;width:clamp(64px,22vw,120px);height:clamp(64px,22vw,120px);margin:4px 6px}
     .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
     .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side, transparent 62%, #000 63%);mask:radial-gradient(farthest-side, transparent 62%, #000 63%)}
     .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1);will-change:transform}
@@ -105,7 +111,8 @@
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     
 
-    @media(max-width:560px){#weatherCard{justify-content:center;flex-direction:column;align-items:center;gap:8px}.herd-toggle{justify-content:center}}
+    @media(max-width:560px){#weatherCard{grid-template-columns:clamp(84px,32vw,120px) 1fr;align-items:center}.herd-toggle{justify-content:flex-start}}
+  
   
   @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
   </style>
@@ -200,7 +207,7 @@
   function hideTip(){ if(!thiTip) return; thiTip.style.display='none'; }
 
   // إظهار الويدجت فورًا
-  chip.style.display='flex';
+  chip.style.display='grid';
   chip.classList.add('compact');
 
   // المنطقة الافتراضية
