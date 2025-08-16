@@ -45,8 +45,12 @@
     #weatherCard .thi-clock{grid-column:1;grid-row:1 / span 3;justify-self:center}
     #weatherCard #weatherBadge{grid-column:2;grid-row:1}
     #weatherCard #wRefresh{grid-column:2;grid-row:1;justify-self:end;align-self:start}
-    #weatherCard .wvals{grid-column:2;grid-row:2}
-    #weatherCard .herd-toggle{grid-column:2;grid-row:3;justify-content:flex-start}
+    #weatherCard .wvals{grid-column:2;grid-row:3}
+    #weatherCard .herd-toggle{grid-column:2;grid-row:4;justify-content:flex-start}
+    #weatherCard .loc-toggle{grid-column:2;grid-row:2;justify-content:flex-start}
+    .loc-toggle{display:flex;gap:6px;align-items:center}
+    .loc-toggle .seg{appearance:none;border:1px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+    .loc-toggle .seg.active{background:var(--green);color:#fff}
     #weatherCard.compact #weatherBadge{
       display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);
       padding:6px 10px;background:var(--muted);font-size:14px
@@ -123,7 +127,12 @@
       <span>🌦️</span>
       <span id="wLoc">—</span>
     </div>
-    <button id="wRefresh" class="btn" style="margin-inline-start:auto">تحديث</button>
+    $1
+    <div class="loc-toggle" role="group" aria-label="مصدر الموقع">
+      <button class="seg" id="modeFarm" type="button">مزرعتي</button>
+      <button class="seg" id="modeGPS" type="button">موقعي</button>
+      <button class="btn" id="setFarmBtn" type="button" title="تعيين موقع المزرعة">تعيين</button>
+    </div>
     <div class="wvals" style="flex:1">
       <div class="wval"><div>الحرارة</div><b id="wTemp">—°C</b></div>
       <div class="wval"><div>الرطوبة</div><b id="wHum">—%</b></div>
@@ -199,6 +208,10 @@
   const thiL4 = document.getElementById('thiL4');
   const herdCow = document.getElementById('herdCow');
   const herdBuffalo = document.getElementById('herdBuffalo');
+  // عناصر وضع الموقع
+  const modeFarm = document.getElementById('modeFarm');
+  const modeGPS = document.getElementById('modeGPS');
+  const setFarmBtn = document.getElementById('setFarmBtn');
   let tipTimer = null;
   function showTip(){ if(!thiTip) return; thiTip.style.display='block'; clearTimeout(tipTimer); tipTimer=setTimeout(()=>{ thiTip.style.display='none'; }, 1800);} 
   function hideTip(){ if(!thiTip) return; thiTip.style.display='none'; }
@@ -218,6 +231,21 @@
     herdCow?.classList.toggle('active', p==='cow');
     herdBuffalo?.classList.toggle('active', p==='buffalo');
   }
+
+  // وضع الموقع (مزرعتي / موقعي)
+  function getLocMode(){
+    const saved = localStorage.getItem('locMode');
+    if (saved==='gps' || saved==='farm') return saved;
+    return localStorage.getItem('farmCoords') ? 'farm' : 'gps';
+  }
+  function setLocMode(m){ localStorage.setItem('locMode', m); syncLocMode(); }
+  function syncLocMode(){
+    const m = getLocMode();
+    modeFarm?.classList.toggle('active', m==='farm');
+    modeGPS?.classList.toggle('active', m==='gps');
+  }
+  function getFarmCoords(){ try{ const o = JSON.parse(localStorage.getItem('farmCoords')||'null'); return o && o.lat!=null && o.lon!=null ? o : null; }catch{ return null; }}
+  async function setFarm(coords, name){ localStorage.setItem('farmCoords', JSON.stringify({lat:coords.lat, lon:coords.lon, name:name||''})); setLocMode('farm'); }
 
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
@@ -273,7 +301,7 @@
     try{
       const coords = await getCoords(force);
       if(!coords){ chip.style.display='grid'; return; }
-      const cacheKey = `gps:${coords.lat.toFixed(2)},${coords.lon.toFixed(2)}`;
+      const cacheKey = `${getLocMode()==='farm'?'farm':'gps'}:${coords.lat.toFixed(2)},${coords.lon.toFixed(2)}`;
       let data = !force && loadCache(cacheKey);
       if(!data){
         data = await fetchWeather(coords.lat, coords.lon);
@@ -281,8 +309,8 @@
       }
       if(!data){ return; }
 
-      const place = await reverseGeocode(coords.lat, coords.lon);
-      wLoc.textContent = place || 'موقعك الحالي';
+      const place = coords.label || await reverseGeocode(coords.lat, coords.lon);
+      wLoc.textContent = (getLocMode()==='farm') ? (place ? `مزرعتك: ${place}` : 'مزرعتك') : (place || 'موقعك الحالي');
 
       const b = bands();
       const thi = THI(data.t, data.h);
@@ -312,7 +340,7 @@
     }catch(e){}
   }
 
-  async function getCoords(force=false){
+  async function readGPS(force=false){
     try{
       const saved = JSON.parse(localStorage.getItem('lastGPS')||'null');
       if(saved && !force && (Date.now()-saved.ts) < 10*60*1000) return {lat:saved.lat, lon:saved.lon};
@@ -327,7 +355,25 @@
         }
       }catch{}
     }
-    return GEO['مصر:القاهرة'];
+    return null;
+  }
+
+  async function getCoords(force=false){
+    const mode = getLocMode();
+    if(mode==='farm'){
+      const f = getFarmCoords();
+      if (f) return {lat:f.lat, lon:f.lon, label:f.name||''};
+      // لو غير محددة نرجع للـGPS
+      const g = await readGPS(force);
+      if (g) return g;
+      return GEO['مصر:القاهرة'];
+    } else {
+      const g = await readGPS(force);
+      if (g) return g;
+      const f = getFarmCoords();
+      if (f) return {lat:f.lat, lon:f.lon, label:f.name||''};
+      return GEO['مصر:القاهرة'];
+    }
   }
 
   async function reverseGeocode(lat, lon){
@@ -345,8 +391,27 @@
 
   // أحداث
   window.renderWeather = renderWeather; // للزر تحديث
-  document.addEventListener('DOMContentLoaded', ()=> { syncToggle(); renderWeather(); });
+  document.addEventListener('DOMContentLoaded', ()=> { syncToggle(); syncLocMode(); renderWeather(); });
   wRefresh.addEventListener('click', ()=> { renderWeather(true); showTip(); });
+  modeFarm?.addEventListener('click', ()=>{ setLocMode('farm'); renderWeather(true); });
+  modeGPS?.addEventListener('click', ()=>{ setLocMode('gps'); renderWeather(true); });
+  setFarmBtn?.addEventListener('click', async ()=>{
+    let coords = null;
+    const useCurrent = confirm('تعيين موقع المزرعة على موقعي الحالي؟ اضغط إلغاء لتحديد يدويًا (lat,lon).');
+    if (useCurrent){ coords = await readGPS(true); }
+    if (!coords){
+      const text = prompt('أدخل الإحداثيات بصيغة lat,lon (مثال: 30.59,31.50)');
+      if (text){
+        const parts = text.split(',').map(s=>parseFloat(s.trim()));
+        if (parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])) coords = {lat:parts[0], lon:parts[1]};
+      }
+    }
+    if (coords){
+      const name = await reverseGeocode(coords.lat, coords.lon);
+      await setFarm(coords, name);
+      renderWeather(true);
+    }
+  });
   herdCow?.addEventListener('click', ()=>{ setProfile('cow'); syncToggle(); renderWeather(true); });
   herdBuffalo?.addEventListener('click', ()=>{ setProfile('buffalo'); syncToggle(); renderWeather(true); });
   if (thiMarker){ thiMarker.addEventListener('mouseenter', showTip); thiMarker.addEventListener('mouseleave', hideTip); thiMarker.addEventListener('touchstart', (e)=>{ e.preventDefault(); showTip(); }, {passive:false}); }
