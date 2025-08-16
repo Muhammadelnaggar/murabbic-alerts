@@ -45,31 +45,25 @@
     .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0}
     .save-bar .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
 
-    /* تعطيل أي عنصر محرر يعلّق فوق الصفحة */
-    editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
-    header,.container,#cameraCard{position:relative;z-index:1}
-    /* Controls layout refinement */
-  .controls.controls-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
-  .controls-grid .left{display:flex;gap:8px;align-items:center}
-  .controls-grid .right{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch;justify-items:stretch}
-@media(min-width:860px){.controls-grid .right{grid-template-columns:repeat(4,minmax(0,1fr))}}
-  .btn-lg{padding:14px 18px;font-size:18px}
-  @media(max-width:560px){
-    .controls.controls-grid{grid-template-columns:1fr}
-    .controls-grid .right{justify-content:stretch}
-    .controls .btn, .controls .select{width:100%}
-    #captureBtn{order:-1}
-  }
-  /* اجعل شريط التحكم ثابتًا أسفل العنوان لتقليل التمرير */
-  #cameraCard .controls{position:sticky;top:56px;z-index:5;background:var(--card);border-bottom:1px solid #e2e8f0}
-  @media(max-width:560px){
-    .angles{padding:8px}
-    .results,.save-bar{padding:8px}
-  }
-  /* شريط نوع الحيوان + القائمة جنب بعض دائمًا */
-  .kind-grid{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
-  @media(max-width:560px){.kind-grid{grid-template-columns:1fr 1fr}}
-</style>
+    /* شريط نوع الحيوان + القائمة جنب بعض */
+    .kind-card{padding:8px}
+    .kind-grid{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+    @media(max-width:560px){.kind-grid{grid-template-columns:1fr 1fr}}
+
+    /* شبكة تحكم مضغوطة */
+    .controls.controls-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .controls-grid .left{display:flex;gap:8px;align-items:center}
+    .controls-grid .right{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    @media(min-width:860px){.controls-grid .right{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    .btn-lg{padding:14px 18px;font-size:18px}
+    @media(max-width:560px){
+      .controls.controls-grid{grid-template-columns:1fr}
+      .controls-grid .right{justify-content:stretch}
+      .controls .btn, .controls .select{width:100%}
+      #captureBtn{order:-1}
+    }
+    #cameraCard .controls{position:sticky;top:56px;z-index:5;background:var(--card);border-bottom:1px solid #e2e8f0}
+  </style>
 </head>
 <body>
   <header>
@@ -80,7 +74,10 @@
   </header>
 
   <div class="container">
-    $1<div class="controls kind-grid">
+
+    <!-- نوع الحيوان -->
+    <section class="card kind-card">
+      <div class="kind-grid">
         <div role="radiogroup" aria-label="نوع الحيوان" style="display:flex;gap:12px;align-items:center">
           <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindCow" value="cow"> أبقار</label>
           <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindBuffalo" value="buffalo"> جاموس</label>
@@ -110,6 +107,7 @@
           <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
         </div>
       </div>
+
       <div class="preview-wrap">
         <video id="preview" playsinline autoplay muted></video>
         <canvas id="overlay"></canvas>
@@ -122,7 +120,7 @@
         <div id="scoreWidget" class="score">
           <div class="score-badge" id="scoreBadge">—</div>
           <div class="score-bar"><div class="fill" id="scoreFill" style="width:0%"></div></div>
-          <div class="score-note" id="scoreNote">التقط زاويتين (خلفية + جانبية). المدى 2–5؛ المثالي = 3. نعطي وزنًا أكبر للخلفية (Tail fold + Pin bone) بنسبة 60%.</div>
+          <div class="score-note" id="scoreNote">المدى يعتمد على النوع.</div>
         </div>
       </div>
 
@@ -163,7 +161,42 @@
   function populateType(kind, selected){ const opts=TYPE_OPTIONS[kind]||[]; if(!animalTypeSel) return; animalTypeSel.innerHTML=''; opts.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; animalTypeSel.appendChild(o); }); if(selected && opts.includes(selected)) animalTypeSel.value=selected; }
   function saveKindToLS(kind, type){ try{ localStorage.setItem('animalKind', kind); localStorage.setItem('animalType', type);}catch{} }
   function readKind(){ const k=localStorage.getItem('animalKind')||'cow'; const t=localStorage.getItem('animalType')|| (TYPE_OPTIONS[k]?TYPE_OPTIONS[k][0]:''); return {k,t}; }
-  function initKindBar(){ if(!kindCow||!kindBuffalo||!animalTypeSel) return; const {k,t}=readKind(); if(k==='buffalo'){ kindBuffalo.checked=true; } else { kindCow.checked=true; } populateType(k,t); saveKindToLS(k, animalTypeSel.value); [kindCow, kindBuffalo].forEach(r=> r && r.addEventListener('change', ()=>{ const kind = kindBuffalo.checked?'buffalo':'cow'; populateType(kind, null); saveKindToLS(kind, animalTypeSel.value); })); animalTypeSel.addEventListener('change', ()=> saveKindToLS(kindBuffalo.checked?'buffalo':'cow', animalTypeSel.value)); }
+
+  function updateKindUI(){
+    const k = kindBuffalo.checked ? 'buffalo' : 'cow';
+    // اخفِ تبويب الجانبية للجاموس
+    const sideBtn = document.querySelector('[data-angle="side"]');
+    if(sideBtn){
+      sideBtn.style.display = (k==='buffalo') ? 'none' : '';
+      if(k==='buffalo' && state.currentAngle!=='rear') setAngle('rear');
+    }
+    // حدّث الملاحظة
+    scoreNote.textContent = k==='buffalo'
+      ? 'المدى 1–5؛ المثالي = 3. لقطة خلفية واحدة (Tail fold + Pin bone).'
+      : 'المدى 2–5؛ المثالي = 3. زاويتان (خلفية + جانبية). نزن الخلفية 60%.';
+  }
+
+  function initKindBar(){
+    if(!kindCow||!kindBuffalo||!animalTypeSel) return;
+    const {k,t}=readKind();
+    (k==='buffalo'?kindBuffalo:kindCow).checked = true;
+    populateType(k,t);
+    saveKindToLS(k, animalTypeSel.value);
+    updateKindUI();
+    [kindCow, kindBuffalo].forEach(r=> r.addEventListener('change', ()=>{
+      const kind = kindBuffalo.checked?'buffalo':'cow';
+      populateType(kind, null);
+      saveKindToLS(kind, animalTypeSel.value);
+      updateKindUI();
+      renderOverall();
+    }));
+    animalTypeSel.addEventListener('change', ()=>{
+      saveKindToLS(kindBuffalo.checked?'buffalo':'cow', animalTypeSel.value);
+      // إعادة حساب لأن مراجع الجاموس تختلف
+      refsCache.rear=null; refsCache.side=null;
+      renderOverall();
+    });
+  }
 
   const state={ currentAngle:'rear', stream:null, track:null, capabilities:null, torchOn:false, captures:{rear:null, side:null}, scores:{rear:null, side:null} };
   const anglesOrder=['rear','side'];
@@ -173,8 +206,13 @@
   function drawGuide(){ const g=overlay.getContext('2d'); if(!g) return; const w=overlay.width,h=overlay.height; g.clearRect(0,0,w,h);
     // grid
     g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1*devicePixelRatio; for(let i=1;i<3;i++){ g.beginPath(); g.moveTo((w/3)*i,0); g.lineTo((w/3)*i,h); g.stroke(); g.beginPath(); g.moveTo(0,(h/3)*i); g.lineTo(w,(h/3)*i); g.stroke(); }
-    // focus box differs per angle
-    g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*devicePixelRatio; let rx,ry,rw,rh; if(state.currentAngle==='rear'){ rx=w*.2; ry=h*.45; rw=w*.6; rh=h*.35; g.beginPath(); g.moveTo(w/2, ry); g.lineTo(w/2, ry+rh); g.stroke(); } else { rx=w*.15; ry=h*.35; rw=w*.7; rh=h*.4; g.beginPath(); g.moveTo(w*.35, ry); g.lineTo(w*.35, ry+rh); g.stroke(); g.beginPath(); g.moveTo(w*.65, ry); g.lineTo(w*.65, ry+rh); g.stroke(); } if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); } }
+    // focus box
+    g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*devicePixelRatio;
+    let rx,ry,rw,rh;
+    if(state.currentAngle==='rear'){ rx=w*.2; ry=h*.45; rw=w*.6; rh=h*.35; g.beginPath(); g.moveTo(w/2, ry); g.lineTo(w/2, ry+rh); g.stroke(); }
+    else { rx=w*.15; ry=h*.35; rw=w*.7; rh=h*.4; g.beginPath(); g.moveTo(w*.35, ry); g.lineTo(w*.35, ry+rh); g.stroke(); g.beginPath(); g.moveTo(w*.65, ry); g.lineTo(w*.65, ry+rh); g.stroke(); }
+    if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); }
+  }
 
   async function listCameras(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); return cams; }
   async function startCamera(deviceId){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); } const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}}; const stream=await navigator.mediaDevices.getUserMedia(cs); state.stream=stream; preview.srcObject=stream; const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null; await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport(); }
@@ -186,7 +224,9 @@
   // ===== Hidden reference images =====
   const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const BASES = ['images/','www/images/','/images/','/www/images/'];
-  const MAP = {
+
+  // أبقار (2–5) — زاويتان
+  const MAP_COW = {
     side: [
       {score:2,    bases:['bsc2_side']},
       {score:2.75, bases:['bsc2_75_side','bsc2.75_side']},
@@ -204,13 +244,41 @@
       {score:5,    bases:['bsc5_rear']},
     ]
   };
+
+  // جاموس (1–5) — لقطة خلفية فقط
+  const MAP_BUF_EGY = [
+    {score:1, bases:['bcs_egybuf_1']},
+    {score:2, bases:['bcs_egybuf_2']},
+    {score:3, bases:['bcs_egybuf_3']},
+    {score:4, bases:['bcs_egybuf_4']},
+    {score:5, bases:['bcs_egybuf_5']},
+  ];
+  const MAP_BUF_HYP = [
+    {score:1, bases:['bcs_hypbuf_1']},
+    {score:2, bases:['bcs_hypbuf_2']},
+    {score:3, bases:['bcs_hypbuf_3']},
+    {score:4, bases:['bcs_hypbuf_4']},
+    {score:5, bases:['bcs_hypbuf_5']},
+  ];
+
   function buildUrls(baseName){ return BASES.flatMap(root=> REF_EXTS.map(ext=> `${root}${baseName}.${ext}`)); }
-  function buildRefList(angle){ return (MAP[angle]||[]).flatMap(({score,bases})=> bases.map(b=>({ score, urls: buildUrls(b) }))); }
+
+  function buildRefList(angle){
+    const kind = (document.getElementById('kindBuffalo')?.checked) ? 'buffalo' : (localStorage.getItem('animalKind')||'cow');
+    if(kind==='buffalo'){
+      if(angle!=='rear') return []; // الجاموس خلفية فقط
+      const type = (document.getElementById('animalType')?.value)||localStorage.getItem('animalType')||'مصري';
+      const list = (type==='هجين') ? MAP_BUF_HYP : MAP_BUF_EGY;
+      return list.flatMap(({score,bases})=> bases.map(b=>({ score, urls: buildUrls(b) })));
+    }
+    // أبقار
+    const src = MAP_COW[angle]||[];
+    return src.flatMap(({score,bases})=> bases.map(b=>({ score, urls: buildUrls(b) })));
+  }
 
   function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
 
   function loadRefVector(urls, score){ let i=0; return new Promise(res=>{ function next(){ if(i>=urls.length) return res(null); const img=new Image(); try{ const abs=new URL(urls[i], location.href); if(abs.origin!==location.origin) img.crossOrigin='anonymous'; }catch{} img.onload=()=>res({score, vec:imgToVec(img)}); img.onerror=()=>{ i++; next(); }; img.src=urls[i]; } next(); }); }
-
   async function buildRefsFor(angle){ const list=buildRefList(angle); const arr=await Promise.all(list.map(item=>loadRefVector(item.urls,item.score))); return arr.filter(Boolean); }
 
   const refsCache = {rear:null, side:null};
@@ -220,11 +288,40 @@
   function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToVec(img)); img.src=dataUrl; }); }
   async function scoreBCSFor(angle, dataUrl){ const refs=await ensureRefs(angle); if(!refs.length) return null; const vec=await vectorForDataURL(dataUrl); let best=null; for(const r of refs){ const sim=cosine(vec,r.vec); if(!best || sim>best.sim) best={score:r.score, sim}; } return best?best.score:null; }
 
-  function labelForScore(s){ if(s==null) return '—'; if(s<2.3) return 'نحيفة'; if(s<3) return 'تميل للنحافة'; if(s===3) return 'مثالية'; if(s<=3.7) return 'تميل للسمنة'; if(s<=4.5) return 'سمينة'; return 'سمينة جدًا'; }
+  function labelForScore(s){
+    if(s==null) return '—';
+    if(s<1.6) return 'نحيفة جدًا';
+    if(s<2.5) return 'نحيفة';
+    if(Math.abs(s-3)<0.06) return 'مثالية';
+    if(s<3.7) return 'تميل للسمنة';
+    if(s<4.6) return 'سمينة';
+    return 'سمينة جدًا';
+  }
 
   function renderThumbs(){ thumbs.innerHTML=''; for(const a of anglesOrder){ const wrap=document.createElement('div'); wrap.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; wrap.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; wrap.appendChild(lb); wrap.addEventListener('click', ()=> setAngle(a)); thumbs.appendChild(wrap); } }
 
-  function renderOverall(){ const haveRear=typeof state.scores.rear==='number'; const haveSide=typeof state.scores.side==='number'; if(!haveRear && !haveSide){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; } const wRear=0.6, wSide=0.4; const overall = ((haveRear?state.scores.rear:3)*wRear + (haveSide?state.scores.side:3)*wSide) / ((haveRear?wRear:0)+(haveSide?wSide:0)||1); const pct=Math.min(100, Math.max(0,(overall/5)*100)); scoreBadge.textContent=`${labelForScore(overall)} — ${overall.toFixed(2)} / 5`; scoreFill.style.width=pct+'%'; scoreFill.style.background = Math.abs(overall-3)<0.06 ? '#86efac' : '#7dd3fc'; }
+  function renderOverall(){
+    const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
+    if(kind==='buffalo'){
+      const s = (typeof state.scores.rear==='number') ? state.scores.rear : null;
+      if(s==null){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; }
+      const pct=Math.min(100, Math.max(0,(s/5)*100));
+      scoreBadge.textContent=`${labelForScore(s)} — ${s.toFixed(2)} / 5`;
+      scoreFill.style.width=pct+'%';
+      scoreFill.style.background = Math.abs(s-3)<0.06 ? '#86efac' : '#7dd3fc';
+      return;
+    }
+    // أبقار: 60% خلفية + 40% جانبية
+    const haveRear=typeof state.scores.rear==='number';
+    const haveSide=typeof state.scores.side==='number';
+    if(!haveRear && !haveSide){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; }
+    const wRear=0.6, wSide=0.4;
+    const overall = ((haveRear?state.scores.rear:3)*wRear + (haveSide?state.scores.side:3)*wSide) / ((haveRear?wRear:0)+(haveSide?wSide:0)||1);
+    const pct=Math.min(100, Math.max(0,(overall/5)*100));
+    scoreBadge.textContent=`${labelForScore(overall)} — ${overall.toFixed(2)} / 5`;
+    scoreFill.style.width=pct+'%';
+    scoreFill.style.background = Math.abs(overall-3)<0.06 ? '#86efac' : '#7dd3fc';
+  }
 
   function setAngle(angle){ state.currentAngle=angle; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle)); drawGuide(); updateButtons(); }
   function updateButtons(){ const has=!!state.captures[state.currentAngle]; retakeBtn.disabled=!has; }
@@ -252,16 +349,23 @@
       if(eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
       const animalId = (animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
       const date = (eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
-      const haveRear=typeof state.scores.rear==='number';
-      const haveSide=typeof state.scores.side==='number';
-      if(!haveRear && !haveSide){ alert('التقط زاوية واحدة على الأقل.'); return; }
-      const overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) / ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
 
-      const animalKind = localStorage.getItem('animalKind') || 'cow';
-      const animalType = localStorage.getItem('animalType') || (TYPE_OPTIONS[animalKind]?.[0] || '');
+      const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
+      const type = localStorage.getItem('animalType') || (TYPE_OPTIONS[kind]?.[0] || '');
+
+      let overall=null;
+      if(kind==='buffalo'){
+        if(typeof state.scores.rear!=='number'){ alert('التقط لقطة خلفية للجاموس.'); return; }
+        overall = state.scores.rear;
+      }else{
+        const haveRear=typeof state.scores.rear==='number';
+        const haveSide=typeof state.scores.side==='number';
+        if(!haveRear && !haveSide){ alert('التقط زاوية واحدة على الأقل.'); return; }
+        overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) / ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
+      }
 
       if(isDemo){
-        const doc={ type:'BCS بالكاميرا (عرض)', animalId, date, animalKind, animalType, scores:{...state.scores, overall}, captures:{...state.captures}, createdAt: Date.now() };
+        const doc={ type:'BCS بالكاميرا (عرض)', animalId, date, animalKind:kind, animalType:type, scores:{...state.scores, overall}, captures:{...state.captures}, createdAt: Date.now() };
         localStorage.setItem('murabbik_bcs_demo_last', JSON.stringify(doc));
         alert('تم الحفظ محليًا (وضع العرض).');
       }else{
@@ -269,15 +373,45 @@
           const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } = await import('./js/firebase-config.js');
           const uploaded={};
           for(const a of anglesOrder){ if(state.captures[a]){ const path=`bcs-evaluations/${animalId}/${date}/${a}.jpg`; const r=ref(storage, path); await uploadString(r, state.captures[a], 'data_url'); uploaded[a]=await getDownloadURL(r); } }
-          const doc={ type:'BCS بالكاميرا', animalId, date, animalKind, animalType, scores:{...state.scores, overall}, images: uploaded, createdAt: serverTimestamp() };
+          const doc={ type:'BCS بالكاميرا', animalId, date, animalKind:kind, animalType:type, scores:{...state.scores, overall}, images: uploaded, createdAt: serverTimestamp() };
           await addDoc(collection(db,'events'), doc);
           alert('تم الحفظ ورفع الصور.');
-        }catch(err){ console.warn(err); alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.'); localStorage.setItem('murabbik_bcs_last', JSON.stringify({animalId,date,animalKind,animalType,scores:{...state.scores,overall},captures:{...state.captures},at:Date.now()})); }
+        }catch(err){ console.warn(err); alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.'); localStorage.setItem('murabbik_bcs_last', JSON.stringify({animalId,date,animalKind:kind,animalType:type,scores:{...state.scores,overall},captures:{...state.captures},at:Date.now()})); }
       }
     } finally { saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم'; }
   });
 
-  async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block'; const demoBase = {rear:'bsc3_rear', side:'bsc3_side'}; for(const a of anglesOrder){ const urls = buildUrls(demoBase[a]); let chosen=null; for(const u of urls){ try{ await new Promise((ok,fail)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=fail; im.src=u; }).then(im=>{ const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; c.getContext('2d').drawImage(im,0,0); chosen=c.toDataURL('image/jpeg',0.9); }); break; }catch(e){} } if(chosen){ state.captures[a]=chosen; state.scores[a]=await scoreBCSFor(a,chosen); renderThumbs(); renderOverall(); } } }
+  async function runDemo(){
+    const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
+    const kind = kindBuffalo?.checked ? 'buffalo' : 'cow';
+    if(kind==='buffalo'){
+      const base = (animalTypeSel.value==='هجين')?'bcs_hypbuf_3':'bcs_egybuf_3';
+      const urls = BASES.flatMap(root=> REF_EXTS.map(ext=> `${root}${base}.${ext}`));
+      let chosen=null;
+      for(const u of urls){
+        try{
+          await new Promise((ok,fail)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=fail; im.src=u; })
+          .then(im=>{ const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; c.getContext('2d').drawImage(im,0,0); chosen=c.toDataURL('image/jpeg',0.9); });
+          break;
+        }catch(e){}
+      }
+      if(chosen){ state.captures.rear=chosen; state.scores.rear=await scoreBCSFor('rear',chosen); renderThumbs(); renderOverall(); }
+    }else{
+      const demoBase = {rear:'bsc3_rear', side:'bsc3_side'};
+      for(const a of anglesOrder){
+        const urls = BASES.flatMap(root=> REF_EXTS.map(ext=> `${root}${demoBase[a]}.${ext}`));
+        let chosen=null;
+        for(const u of urls){
+          try{
+            await new Promise((ok,fail)=>{ const im=new Image(); im.onload=()=>ok(im); im.onerror=fail; im.src=u; })
+            .then(im=>{ const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; c.getContext('2d').drawImage(im,0,0); chosen=c.toDataURL('image/jpeg',0.9); });
+            break;
+          }catch(e){}
+        }
+        if(chosen){ state.captures[a]=chosen; state.scores[a]=await scoreBCSFor(a,chosen); renderThumbs(); renderOverall(); }
+      }
+    }
+  }
 
   function renderInitial(){ renderThumbs(); setAngle('rear'); renderOverall(); }
 
@@ -295,8 +429,7 @@
 
     renderInitial();
 
-    const demoBtn = document.getElementById('demoBtn');
-    demoBtn?.addEventListener('click', runDemo);
+    document.getElementById('demoBtn')?.addEventListener('click', runDemo);
     if(isDemo) runDemo();
   }catch(e){ console.warn(e); }
   })();
