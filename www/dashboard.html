@@ -9,34 +9,57 @@
     *{box-sizing:border-box}
     body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
     h1{margin:0 0 16px;text-align:center;color:var(--green)}
+
+    /* الشبكة */
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
-    .tile{
-      background:#eafbe7;border:2px solid #c5e1a5;border-radius:12px;
-      padding:18px;text-align:center;font-weight:bold;cursor:pointer;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px
+    /* الكروت */
+    .card{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;
+      padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)
     }
-    .tile .icon{display:block;font-size:28px;margin-bottom:2px}
-    .tile small{font-weight:normal;color:#335c33}
-    .tile:hover{background:#dcedc8}
 
-    /* Weather widget */
-    #weatherCard{display:none;align-items:center;gap:12px}
-    #weatherBadge{display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);padding:8px 12px;background:var(--muted)}
+    /* البلاطات (قلب مربيك) */
+    .tile{
+      background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
+      padding:16px;text-align:center;font-weight:bold;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:118px;
+      transition:transform .12s ease, box-shadow .12s ease, background .12s ease
+    }
+    .tile .icon{
+      display:block;width:44px;height:44px;line-height:44px;border-radius:50%;
+      border:1px solid var(--border);font-size:24px
+    }
+    .tile small{font-weight:normal;color:#335c33}
+    .tile:hover{background:#dcedc8;transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
+
+    /* ويدجت الطقس (نسخة مضغوطة) */
+    #weatherCard{display:none;align-items:center;gap:10px;padding:10px 12px}
+    #weatherCard.compact .wvals{display:flex;gap:6px;flex-wrap:wrap}
+    #weatherCard.compact #weatherBadge{
+      display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);
+      padding:6px 10px;background:var(--muted);font-size:14px
+    }
     #wLoc{font-weight:bold}
-    .wvals{display:flex;gap:10px;flex-wrap:wrap}
-    .wval{background:#f7fff4;border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:90px;text-align:center}
-    .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);border-radius:10px;padding:8px 12px;font-weight:bold;cursor:pointer}
+    #weatherCard.compact .wval{
+      background:#f7fff4;border:1px solid var(--border);border-radius:10px;
+      padding:6px 8px;min-width:72px;text-align:center;font-size:13px
+    }
+    .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);
+      border-radius:10px;padding:6px 10px;font-weight:bold;cursor:pointer;font-size:12px}
     .btn:hover{background:#f4fff1}
-    @media(max-width:560px){.wvals{gap:6px}.wval{min-width:78px;padding:6px 8px}}
+
+    @media(max-width:560px){
+      .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+      .tile{min-height:110px;padding:14px}
+    }
   </style>
 </head>
 <body>
   <h1>📊 لوحة التحكم - مربيك</h1>
-  
-  <!-- الطقس و THI -->
-  <div id="weatherCard" class="card">
+
+  <!-- الطقس و THI (مضغوط) -->
+  <div id="weatherCard" class="card" aria-label="الطقس و مؤشر الحرارة-الرطوبة">
     <div id="weatherBadge">
       <span>🌦️</span>
       <span id="wLoc">—</span>
@@ -58,30 +81,38 @@
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>ارشيف التنبيهات الذكية</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🆔</span>البطاقة الذكية</div>
 
-    <div class="tile" id="btnVisualEval">
-      <span class="icon">📷</span>
-      التقييم البصري
+    <div class="tile" id="milkTraitsCard" role="button" tabindex="0">
+      <span class="icon">🥛</span>
+      التقييم البصري لصفات إنتاج اللبن
+      <small>بالكاميرا (ضرع/جانبي/خلفي)</small>
     </div>
 
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
     <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعة</div>
-    <div class="tile" onclick="location.href='evaluation.html'"><span class="icon">📈</span>تقييم الحيوانات</div>
+
+    <!-- ⛔ تمت إزالة بلاطة تقييم الحيوانات (evaluation.html) بناءً على طلبك -->
+
     <div class="tile" onclick="location.href='nutrition.html'"><span class="icon">🌿</span>تركيبة التغذية</div>
     <div class="tile" onclick="location.href='smart-feeding.html'"><span class="icon">🧠</span>التغذية الذكية</div>
 
-    <!-- ✅ نفس ستايل الكروت -->
+    <!-- تقييم التغذية بالحالة الجسميّة (BCS) -->
+    <div class="tile" id="bcsNutritionCard" role="button" tabindex="0">
+      <span class="icon">🧍</span>
+      التقييم الذكي للتغذية (قياس الحالة الجسميّة بالكاميرا)
+      <small>BCS → توصيات تغذية</small>
+    </div>
+
+    <!-- تقييم الروث بالكاميرا -->
     <div class="tile" id="fecesEvalCard" role="button" tabindex="0">
       <span class="icon">💩</span>
-      التقييم البصري للتغذية
-      <small>تقييم الروث بالكاميرا</small>
+      التقييم الذكي للتغذية (بتقييم الروث بالكاميرا)
+      <small>Feces score → توصيات</small>
     </div>
   </div>
 
-<script type="module">
-  import { db } from './js/firebase-config.js';
-  import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-  // عناصر الويدجت
+<script>
+// ويدجت الطقس — نسخة مستقلة لا تعتمد على Firebase
+(function(){
   const chip   = document.getElementById('weatherCard');
   const wLoc   = document.getElementById('wLoc');
   const wTemp  = document.getElementById('wTemp');
@@ -90,14 +121,19 @@
   const wState = document.getElementById('wState');
   const wRefresh = document.getElementById('wRefresh');
 
-  (function ensureRegionKey(){
-    let key = localStorage.getItem('userRegionKey');
-    if (key) return;
+  // أظهر الويدجت فورًا بشكل مضغوط
+  chip.style.display='flex';
+  chip.classList.add('compact');
+
+  // إعداد المنطقة الافتراضية
+  let key = localStorage.getItem('userRegionKey');
+  if(!key){
     const c = localStorage.getItem('userCountry');
     const r = localStorage.getItem('userRegion');
-    if (c && r) key = `${c}:${r}`; else key = 'مصر:القاهرة';
+    key = (c && r) ? `${c}:${r}` : 'مصر:القاهرة';
     localStorage.setItem('userRegionKey', key);
-  })();
+  }
+  wLoc.textContent = key;
 
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
@@ -112,11 +148,6 @@
     'عُمان:مسقط': {lat:23.5880, lon:58.3829}
   };
 
-  async function getCoords(regionKey){
-    try{ const s = await getDoc(doc(db,'geoRegions', regionKey)); if (s.exists()) return s.data(); }catch{}
-    return GEO[regionKey] || null;
-  }
-
   function THI(c, rh){ const f=c*9/5+32; return Math.round(((f - (0.55 - 0.0055*rh)*(f - 58)))*10)/10; }
   function thiColor(thi){
     if (thi < 68) return {bg:'#c8e6c9', txt:'مريح'};
@@ -125,34 +156,28 @@
     if (thi < 84) return {bg:'#ffccbc', txt:'توتر شديد'};
     return {bg:'#ffcdd2', txt:'توتر شديد جدًا'};
   }
-
   function saveCache(key, data){ localStorage.setItem('weather:'+key, JSON.stringify({...data, ts:Date.now()})); }
   function loadCache(key){ try{ const o=JSON.parse(localStorage.getItem('weather:'+key)||'null'); return o && (Date.now()-o.ts)<3600000 ? o : null; }catch{return null;} }
-
   async function fetchWeather(lat, lon){
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`;
-    const r = await fetch(url); const j = await r.json();
-    return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
+    try{
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=Africa%2FCairo`;
+      const r = await fetch(url); const j = await r.json();
+      return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
+    }catch(e){ return null; }
   }
 
   async function renderWeather(force=false){
-    const key = localStorage.getItem('userRegionKey');
-    if(!key){ chip.style.display='none'; return; }
-    wLoc.textContent = key;
-
     let data = !force && loadCache(key);
     if(!data){
-      const coords = await getCoords(key);
-      if(!coords){ chip.style.display='none'; return; }
+      const coords = GEO[key];
+      if(!coords){ return; }
       data = await fetchWeather(coords.lat, coords.lon);
-      if (!data || data.t==null || data.h==null){ chip.style.display='none'; return; }
-      saveCache(key, data);
+      if(data && data.t!=null && data.h!=null) saveCache(key, data);
     }
+    if(!data){ return; }
 
     const thi = THI(data.t, data.h);
     const {bg, txt} = thiColor(thi);
-
-    chip.style.display='flex';
     chip.style.background = bg;
     wTemp.textContent = `${Math.round(data.t)}°C`;
     wHum.textContent  = `${Math.round(data.h)}%`;
@@ -160,40 +185,38 @@
     wState.textContent= txt;
   }
 
+  window.renderWeather = renderWeather; // إتاحة الوظيفة للزر
   document.addEventListener('DOMContentLoaded', ()=> renderWeather());
   wRefresh.addEventListener('click', ()=> renderWeather(true));
+})();
 </script>
 
 <script type="module">
-  const veBtn = document.getElementById('btnVisualEval');
+  const veBtn = document.getElementById('milkTraitsCard');
   veBtn?.addEventListener('click', () => {
     const qs  = new URLSearchParams(location.search);
     const id  = qs.get('animalId')
                || localStorage.getItem('currentAnimalId')
                || localStorage.getItem('lastAnimalId')
                || '';
-    const url = id ? `visual-eval.html?animalId=${encodeURIComponent(id)}` : `visual-eval.html`;
+    const url = id ? `visual-eval.html?focus=milk&animalId=${encodeURIComponent(id)}` : `visual-eval.html?focus=milk`;
     location.href = url;
   });
 </script>
 
 <script>
 (function(){
-  const el = document.getElementById('fecesEvalCard');
-  if(!el) return;
-
   function todayCairo(){
     const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
     const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
-
-  function buildUrl(){
-    const id     = el.dataset.animalId || localStorage.getItem('currentAnimalId')     || '';
-    const number = el.dataset.number   || localStorage.getItem('currentAnimalNumber') || '';
-    const date   = el.dataset.date     || localStorage.getItem('currentEventDate')    || todayCairo();
-
+  function buildQS(base){
     const qs = new URLSearchParams();
+    const id     = localStorage.getItem('currentAnimalId')     || '';
+    const number = localStorage.getItem('currentAnimalNumber') || '';
+    const date   = localStorage.getItem('currentEventDate')    || todayCairo();
+
     if (id)     qs.set('animalId', id);
     if (number) qs.set('number', number);
     if (date)   qs.set('date', date);
@@ -201,12 +224,24 @@
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
       qs.set('demo','1');
     }
-    return 'feces-eval.html?' + qs.toString();
+    return base + '?' + qs.toString();
   }
 
-  function go(){ location.href = buildUrl(); }
-  el.addEventListener('click', go);
-  el.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); }});
+  // feces eval
+  const feces = document.getElementById('fecesEvalCard');
+  if(feces){
+    const go = ()=> location.href = buildQS('feces-eval.html');
+    feces.addEventListener('click', go);
+    feces.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }});
+  }
+
+  // BCS → Nutrition
+  const bcs = document.getElementById('bcsNutritionCard');
+  if(bcs){
+    const go = ()=> location.href = buildQS('bcs-eval.html'); // يفتح صفحة BCS لديك
+    bcs.addEventListener('click', go);
+    bcs.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }});
+  }
 })();
 </script>
 
