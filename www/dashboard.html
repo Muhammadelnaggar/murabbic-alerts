@@ -4,11 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لوحة التحكم - مربيك</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="img/dashboard-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="img/dashboard-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/dashboard-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root{--bg:#fff9db;--card:#ffffff;--muted:#dcedc8;--green:#2e7d32;--border:#c5e1a5}
     *{box-sizing:border-box}
     body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
-    h1{margin:0 0 16px;text-align:center;color:var(--green)}
+    h1{margin:0 0 16px;text-align:center;color:#1b5e20}
+    /* لوجو العنوان */
+    .brand{display:flex;align-items:center;justify-content:center;gap:10px}
+    .brand-icon{height:28px;width:28px;object-fit:contain}
+    .brand-icon-svg{height:28px;width:28px;display:inline-block;vertical-align:middle}
+    @media(max-width:560px){.brand-icon{height:24px;width:24px}.brand-icon-svg{height:24px;width:24px}}
+    @media(max-width:560px){.brand-icon{height:24px;width:24px}}
+    
 
     /* الشبكة */
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
@@ -119,7 +130,20 @@
   </style>
 </head>
 <body>
-  <h1>📊 لوحة التحكم - مربيك</h1>
+  <h1 class="brand">
+    <img id="brandImg" class="brand-icon" alt="لوحة التحكم" style="display:none"/>
+    <svg id="brandSvg" class="brand-icon-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="أيقونة لوحة التحكم">
+      <!-- سهم/صح باللون الأزرق -->
+      <path d="M6 38 L18 50 L40 18" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- قاعدة الأعمدة -->
+      <rect x="28" y="46" width="30" height="6" rx="3" fill="#1e88e5"/>
+      <!-- الأعمدة -->
+      <rect x="30" y="30" width="6" height="16" rx="3" fill="#ef5350"/>
+      <rect x="40" y="24" width="6" height="22" rx="3" fill="#fdd835"/>
+      <rect x="50" y="16" width="6" height="30" rx="3" fill="#7cb342"/>
+    </svg>
+    لوحة التحكم - مربيك
+  </h1>
 
   <!-- الطقس و THI (مضغوط) -->
   <div id="weatherCard" class="card" aria-label="الطقس و مؤشر الحرارة-الرطوبة">
@@ -127,7 +151,7 @@
       <span>🌦️</span>
       <span id="wLoc">—</span>
     </div>
-    $1
+    <button id="wRefresh" class="btn" style="margin-inline-start:auto" type="button">تحديث</button>
     <div class="loc-toggle" role="group" aria-label="مصدر الموقع">
       <button class="seg" id="modeFarm" type="button">مزرعتي</button>
       <button class="seg" id="modeGPS" type="button">موقعي</button>
@@ -392,7 +416,7 @@
   // أحداث
   window.renderWeather = renderWeather; // للزر تحديث
   document.addEventListener('DOMContentLoaded', ()=> { syncToggle(); syncLocMode(); renderWeather(); });
-  wRefresh.addEventListener('click', ()=> { renderWeather(true); showTip(); });
+  wRefresh?.addEventListener('click', ()=> { renderWeather(true); showTip(); });
   modeFarm?.addEventListener('click', ()=>{ setLocMode('farm'); renderWeather(true); });
   modeGPS?.addEventListener('click', ()=>{ setLocMode('gps'); renderWeather(true); });
   setFarmBtn?.addEventListener('click', async ()=>{
@@ -473,5 +497,42 @@
 })();
 </script>
 
+<script>
+// تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية
+(function(){
+  const img = document.getElementById('brandImg');
+  const svg = document.getElementById('brandSvg');
+  if(!img) return;
+  const candidates = [
+    'www/images/dashboard',
+    'www/images/dashboard.svg',
+    'www/images/dashboard.png',
+    'www/images/dashboard.webp',
+    'www/images/dashboard.jpg',
+    '/www/images/dashboard',
+    '/www/images/dashboard.svg',
+    '/www/images/dashboard.png',
+    '/www/images/dashboard.webp',
+    '/www/images/dashboard.jpg',
+    '/images/dashboard.svg',
+    '/images/dashboard.png',
+    '/images/dashboard.webp',
+    '/images/dashboard.jpg',
+    'images/dashboard.svg',
+    'images/dashboard.png',
+    'images/dashboard.webp',
+    'images/dashboard.jpg'
+  ];
+  function tryLoad(i){
+    if(i>=candidates.length) return; // هيفضل يستخدم الـSVG المضمّن
+    const src = candidates[i];
+    const test = new Image();
+    test.onload = ()=>{ img.src = src; img.style.display='inline-block'; if(svg) svg.remove(); };
+    test.onerror = ()=> tryLoad(i+1);
+    test.src = src + (src.includes('?')?'':'?v=1');
+  }
+  tryLoad(0);
+})();
+</script>
 </body>
 </html>
