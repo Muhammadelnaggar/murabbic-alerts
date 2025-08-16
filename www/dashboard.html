@@ -39,8 +39,8 @@
     .icon-layer .i-badge{position:absolute;bottom:-4px;right:-4px;font-size:14px;background:#fff;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
     /* ويدجت الطقس (نسخة مضغوطة) */
-    #weatherCard{display:none;gap:12px;padding:10px 12px;display:grid;grid-template-columns:clamp(90px,26vw,140px) 1fr;align-items:center}
-    #weatherCard.compact .wvals{display:flex;gap:6px;flex-wrap:wrap}
+    #weatherCard{display:none;gap:12px;padding:10px 12px;display:grid;grid-template-columns:clamp(110px,34vw,160px) 1fr;align-items:center}
+    #weatherCard.compact .wvals{display:grid;grid-template-columns:1fr;gap:8px}
     /* تخطيط الساعة يسار، البيانات يمين متكدسة */
     #weatherCard .thi-clock{grid-column:1;grid-row:1 / span 3;justify-self:center}
     #weatherCard #weatherBadge{grid-column:2;grid-row:1}
@@ -52,10 +52,7 @@
       padding:6px 10px;background:var(--muted);font-size:14px
     }
     #wLoc{font-weight:bold}
-    #weatherCard.compact .wval{
-      background:#f7fff4;border:1px solid var(--border);border-radius:10px;
-      padding:6px 8px;min-width:72px;text-align:center;font-size:13px
-    }
+    #weatherCard.compact .wval{background:#f7fff4;border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:auto;width:100%;text-align:center;font-size:13px}
     .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);
       border-radius:10px;padding:6px 10px;font-weight:bold;cursor:pointer;font-size:12px}
     .btn:hover{background:#f4fff1}
@@ -99,9 +96,9 @@
       .tile-m-full{grid-column:1 / -1}
     }
   /* عدّاد THI بشكل ساعة */
-    .thi-clock{position:relative;width:clamp(64px,22vw,120px);height:clamp(64px,22vw,120px);margin:4px 6px}
+    .thi-clock{position:relative;width:clamp(110px,34vw,160px);height:clamp(110px,34vw,160px);margin:4px 6px}
     .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side, transparent 62%, #000 63%);mask:radial-gradient(farthest-side, transparent 62%, #000 63%)}
+    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side, transparent 55%, #000 56%);mask:radial-gradient(farthest-side, transparent 55%, #000 56%)}
     .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1);will-change:transform}
     
     .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
@@ -111,7 +108,7 @@
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     
 
-    @media(max-width:560px){#weatherCard{grid-template-columns:clamp(84px,32vw,120px) 1fr;align-items:center}.herd-toggle{justify-content:flex-start}}
+    @media(max-width:560px){#weatherCard{grid-template-columns:clamp(110px,40vw,170px) 1fr;align-items:center}.herd-toggle{justify-content:flex-start}}
   
   
   @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
@@ -210,15 +207,8 @@
   chip.style.display='grid';
   chip.classList.add('compact');
 
-  // المنطقة الافتراضية
-  let key = localStorage.getItem('userRegionKey');
-  if(!key){
-    const c = localStorage.getItem('userCountry');
-    const r = localStorage.getItem('userRegion');
-    key = (c && r) ? `${c}:${r}` : 'مصر:القاهرة';
-    localStorage.setItem('userRegionKey', key);
-  }
-  wLoc.textContent = key;
+  // الموقع بالـ GPS تلقائي
+  wLoc.textContent = 'جارِ تحديد الموقع…';
 
   // محوّل نوع القطيع
   function getProfile(){ return (localStorage.getItem('herdProfile') === 'cow') ? 'cow' : 'buffalo'; }
@@ -233,6 +223,7 @@
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
     'مصر:الجيزة':  {lat:30.0131, lon:31.2089},
     'مصر:الإسكندرية': {lat:31.2001, lon:29.9187},
+    'مصر:الشرقية': {lat:30.587, lon:31.502}, // محافظة الشرقية (زقازيق تقريبًا)
     'السعودية:الرياض': {lat:24.7136, lon:46.6753},
     'السعودية:مكة المكرمة': {lat:21.3891, lon:39.8579},
     'الإمارات:دبي': {lat:25.2048, lon:55.2708},
@@ -272,61 +263,84 @@
 
   async function fetchWeather(lat, lon){
     try{
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=Africa%2FCairo`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`;
       const r = await fetch(url); const j = await r.json();
       return { t: j.current?.temperature_2m, h: j.current?.relative_humidity_2m };
     }catch{ return null; }
   }
 
   async function renderWeather(force=false){
-    let data = !force && loadCache(key);
-    if(!data){
-      const coords = GEO[key];
-      if(!coords){ return; }
-      data = await fetchWeather(coords.lat, coords.lon);
-      if(data && data.t!=null && data.h!=null) saveCache(key, data);
+    try{
+      const coords = await getCoords(force);
+      if(!coords){ chip.style.display='grid'; return; }
+      const cacheKey = `gps:${coords.lat.toFixed(2)},${coords.lon.toFixed(2)}`;
+      let data = !force && loadCache(cacheKey);
+      if(!data){
+        data = await fetchWeather(coords.lat, coords.lon);
+        if(data && data.t!=null && data.h!=null) saveCache(cacheKey, data);
+      }
+      if(!data){ return; }
+
+      const place = await reverseGeocode(coords.lat, coords.lon);
+      wLoc.textContent = place || 'موقعك الحالي';
+
+      const b = bands();
+      const thi = THI(data.t, data.h);
+      const {bg, txt} = colorAndText(thi, b);
+
+      if (thiArc){
+        const minTHI=50, maxTHI=90;
+        const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
+        const arcSpanPct = 240/360*100; // ثلثا الساعة العلويان
+        const pArc = v => (pct(v)/100) * arcSpanPct;
+        const p1 = pArc(b.t1), p2 = pArc(b.t2), p3 = pArc(b.t3);
+        thiArc.style.background = `conic-gradient(from -120deg, #90caf9 0% ${p1}%, #fff59d ${p1}% ${p2}%, #ffcc80 ${p2}% ${p3}%, #ef5350 ${p3}% ${arcSpanPct}%, transparent ${arcSpanPct}% 100%)`;
+      }
+      if (thiNeedle){
+        const minTHI=50, maxTHI=90;
+        const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
+        const p = Math.max(0, Math.min(100, pct(thi)));
+        const angle = -120 + (p * 2.4); // 0→100% عبر 240°
+        thiNeedle.style.setProperty('--angle', angle + 'deg');
+      }
+
+      chip.style.background = bg;
+      wTemp.textContent = `${Math.round(data.t)}°C`;
+      wHum.textContent  = `${Math.round(data.h)}%`;
+      wTHI.textContent  = thi;
+      wState.textContent= txt;
+    }catch(e){}
+  }
+
+  async function getCoords(force=false){
+    try{
+      const saved = JSON.parse(localStorage.getItem('lastGPS')||'null');
+      if(saved && !force && (Date.now()-saved.ts) < 10*60*1000) return {lat:saved.lat, lon:saved.lon};
+    }catch{}
+    if (navigator.geolocation){
+      try{
+        const pos = await new Promise(res=>navigator.geolocation.getCurrentPosition(p=>res(p), _=>res(null), {maximumAge:600000, timeout:6000}));
+        if(pos){
+          const c={lat:pos.coords.latitude, lon:pos.coords.longitude};
+          localStorage.setItem('lastGPS', JSON.stringify({...c, ts: Date.now()}));
+          return c;
+        }
+      }catch{}
     }
-    if(!data){ return; }
+    return GEO['مصر:القاهرة'];
+  }
 
-    const b = bands();
-    // حدّث العناوين أسفل الشريط
-    if (thiL1) thiL1.textContent = b.t1;
-    if (thiL2) thiL2.textContent = b.t2;
-    if (thiL3) thiL3.textContent = b.t3;
-    if (thiL4) thiL4.textContent = b.t4;
-
-    const thi = THI(data.t, data.h);
-    const {bg, txt} = colorAndText(thi, b);
-
-    // تحديث عدّاد الساعة (دائري)
-    const minTHI=50, maxTHI=90;
-    const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
-    if (thiArc){
-      const minTHI=50, maxTHI=90;
-      const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
-      const arcSpanPct = 240/360*100; // ثلثا الساعة العلويان
-      const pArc = v => (pct(v)/100) * arcSpanPct;
-      const p1 = pArc(b.t1), p2 = pArc(b.t2), p3 = pArc(b.t3);
-      thiArc.style.background = `conic-gradient(from -120deg,
-        #90caf9 0% ${p1}%,
-        #fff59d ${p1}% ${p2}%,
-        #ffcc80 ${p2}% ${p3}%,
-        #ef5350 ${p3}% ${arcSpanPct}%,
-        transparent ${arcSpanPct}% 100%)`;
-    }
-    if (thiNeedle){
-      const minTHI=50, maxTHI=90;
-      const pct = v => ((v - minTHI) * 100 / (maxTHI - minTHI));
-      const p = Math.max(0, Math.min(100, pct(thi)));
-      const angle = -120 + (p * 2.4); // 0→100% عبر 240°
-      thiNeedle.style.setProperty('--angle', angle + 'deg');
-    }
-
-    chip.style.background = bg;
-    wTemp.textContent = `${Math.round(data.t)}°C`;
-    wHum.textContent  = `${Math.round(data.h)}%`;
-    wTHI.textContent  = thi;
-    wState.textContent= txt;
+  async function reverseGeocode(lat, lon){
+    try{
+      const u = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=ar`;
+      const r = await fetch(u); const j = await r.json();
+      const g = j?.results?.[0];
+      if(g){
+        const parts = [g.country, g.admin1, g.name].filter(Boolean);
+        return parts.join('، ');
+      }
+    }catch{}
+    return 'موقعك الحالي';
   }
 
   // أحداث
