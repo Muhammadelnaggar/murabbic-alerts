@@ -524,21 +524,39 @@
   const tile = document.getElementById('sensorsTile');
   const badge = document.getElementById('sensorsStatus');
   function setBadge(txt, ok){ if(!badge) return; badge.textContent = txt; badge.style.background = ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor = ok?'#c5e1a5':'#ffecb3'; }
+
+  function getApiBase(){
+    const v = (localStorage.getItem('API_BASE')||'').trim();
+    if(!/^https?:\/\//.test(v) || v.includes('localhost')) return '';
+    return v;
+  }
+
   async function ping(){
     try{
-      const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 3000);
-      const API_BASE = (localStorage.getItem('API_BASE')||'').trim();
+      setBadge('جارٍ الاتصال…', false);
+      const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 30000); // 15s بسبب Cold Start
+      const API_BASE = getApiBase();
       const url = API_BASE ? `${API_BASE}/api/sensors/health` : '/api/sensors/health';
       const opts = { signal: ctl.signal };
       if (API_BASE) opts.mode = 'cors';
       const r = await fetch(url, opts); clearTimeout(to);
-      if(!r.ok) throw 0; const j = await r.json();
-      const n = Number(j?.devices||0); setBadge(`متصل • ${n}`, true);
 
-    }catch{ setBadge('غير مفعّل', false); }
+      if (r.status === 503){ setBadge('غير مفعّل', false); return; } // السيرفر بدون Service Account
+      if (!r.ok){ setBadge('غير متصل', false); return; }
+
+      const j = await r.json();
+      const n = Number(j?.devices||0);
+      setBadge(`متصل • ${n}`, true);
+    }catch{ setBadge('غير متصل', false); }
   }
-  tile?.addEventListener('click', ()=>{ location.href='sensors.html'; });
-  document.addEventListener('DOMContentLoaded', ping);
+
+  tile?.addEventListener('click', ()=>{ location.href='sensor-test.html'; });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    ping();
+    setTimeout(ping, 6000);   // محاولة ثانية بعد 6 ثواني
+    setTimeout(ping, 25000);  // محاولة ثالثة تحسبًا لـ Cold Start الطويل
+    setInterval(ping, 60000); // تحديث كل دقيقة
+  });
 })();
 
 // تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية
@@ -579,4 +597,3 @@
 </script>
 </body>
 </html>
-
