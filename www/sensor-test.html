@@ -31,6 +31,10 @@
       .btn{flex:1 1 100%;width:100%;font-size:16px;padding:12px}
       table{font-size:14px}
     }
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+    .chip{border:1px solid var(--green);background:#fff;border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:600}
+    .chip:hover{background:#f4fff1}
+    .input{flex:1 1 180px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff}
   </style>
 </head>
 <body>
@@ -43,6 +47,27 @@
       <a class="btn" href="dashboard.html">↩︎ الرجوع للوحة التحكم</a>
     </div>
     <div class="row muted">المصدر: نفس الدومين الحالي. لا حاجة لإعداد CORS.</div>
+
+    <h3>أنواع الحساسات (نماذج سريعة)</h3>
+    <div class="chips" id="chipBox">
+      $1
+      <button class="chip" data-type="milkcond">🧪 توصيلية اللبن</button>
+      <button class="chip" data-type="milkcolor">🎨 لون اللبن</button>
+      <button class="chip" data-type="mounting">❤️ نشاط التزاوج/الركوب</button>
+      <button class="chip" data-type="activity">🏷️ ياقة/نشاط</button>
+      <button class="chip" data-type="rumination">🐄 اجترار</button>
+      <button class="chip" data-type="weight">⚖️ ميزان ذكي</button>
+      <button class="chip" data-type="bodytemp">🌡️ حرارة جسم</button>
+      <button class="chip" data-type="rumenph">🧪 pH كرش</button>
+      <button class="chip" data-type="water">🚰 عداد مياه</button>
+      <button class="chip" data-type="feeder">🍽️ معلف ذكي</button>
+    </div>
+
+    <div class="row" style="align-items:center">
+      <input id="farm" class="input" placeholder="معرّف المزرعة" value="EG-ALSHARKIA-01"/>
+      <input id="dev" class="input" placeholder="معرّف الجهاز (اختياري)"/>
+    </div>
+
     <h3>النتيجة</h3>
     <pre id="out">—</pre>
     <h3>الأجهزة</h3>
@@ -69,11 +94,11 @@ async function health(){
 async function ingest(){
   const payload = {
     farmId:'EG-ALSHARKIA-01',
-    deviceId:'amb-001',
-    device:{name:'Ambient Box', type:'env'},
+    deviceId:'act-001',
+    device:{name:'Activity Tag', type:'activity'},
     metrics:[
-      {name:'ambient.temp_c', value:31.7, unit:'°C', ts: Date.now()},
-      {name:'ambient.rh_pct', value:64,   unit:'%',  ts: Date.now()}
+      {name:'activity.idx', value:rnd(20,90), unit:'', ts: Date.now()},
+      {name:'activity.steps', value:rnd(1000,6000), unit:'', ts: Date.now()}
     ]
   };
   const r = await fetch('/ingest', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -85,7 +110,7 @@ async function list(){
   const j = await r.json();
   log({status:r.status, ok:r.ok, count:j?.devices?.length||0});
   tbody.innerHTML = '';
-  (j.devices||[]).forEach(d=>{
+  (j.devices||[]).filter(d=>{const t=(d.type||'').toLowerCase(); return t!=='env' && t!=='thi';}).forEach(d=>{
     const tr = document.createElement('tr');
     const last = d.lastSeen ? new Date(d.lastSeen).toLocaleString('ar-EG') : '—';
     const msum = d.metrics ? Object.entries(d.metrics).map(([k,v])=>`${k}: ${v.value}${v.unit||''}`).slice(0,4).join(' • ') : '—';
@@ -100,6 +125,73 @@ document.getElementById('btnIngest').onclick = ingest;
 document.getElementById('btnList').onclick = list;
 
 health();
+
+// ====== نماذج الحساسات ======
+const farmEl = document.getElementById('farm');
+const devEl  = document.getElementById('dev');
+
+function rnd(min,max){ return Math.round((Math.random()*(max-min)+min)*10)/10; }
+
+function buildDemoPayload(type){
+  const farmId = (farmEl?.value||'').trim() || 'EG-ALSHARKIA-01';
+  const deviceId = (devEl?.value||'').trim() || `${type}-demo-001`;
+  const now = Date.now();
+  const base = { farmId, deviceId, device:{ name:type.toUpperCase(), type }, metrics: [] };
+  switch(type){
+    case 'milk':
+      base.metrics = [
+        {name:'milk.yield_l',  value:rnd(8,25),  unit:'L',  ts:now},
+        {name:'milk.fat_pct',  value:rnd(3.2,5), unit:'%',  ts:now},
+        {name:'milk.prot_pct', value:rnd(2.8,4), unit:'%',  ts:now}
+      ]; break;
+    case 'milkcond':
+      base.metrics = [
+        {name:'milk.cond_mScm', value:rnd(3.5,7), unit:'mS/cm', ts:now}
+      ]; break;
+    case 'milkcolor':
+      base.metrics = [
+        {name:'milk.color_score', value:rnd(20,90), unit:'', ts:now}
+      ]; break;
+    case 'mounting':
+      base.metrics = [
+        {name:'repro.mounts_24h', value: Math.round(rnd(0,25)), unit:'', ts:now},
+        {name:'repro.mount_idx', value: rnd(0,100), unit:'', ts:now},
+        {name:'repro.heat_prob_pct', value: rnd(5,95), unit:'%', ts:now}
+      ]; break;
+    case 'activity':
+      base.metrics = [
+        {name:'activity.steps', value:rnd(1000,6000), unit:'', ts:now},
+        {name:'activity.idx',   value:rnd(20,90),     unit:'', ts:now}
+      ]; break;
+    case 'rumination':
+      base.metrics = [ {name:'rumination.min', value:rnd(350,600), unit:'min', ts:now} ]; break;
+    case 'weight':
+      base.metrics = [ {name:'weight.kg', value:rnd(350,700), unit:'kg', ts:now} ]; break;
+    case 'bodytemp':
+      base.metrics = [ {name:'body.temp_c', value:rnd(37.5,40.5), unit:'°C', ts:now} ]; break;
+    case 'rumenph':
+      base.metrics = [ {name:'rumen.ph', value:rnd(5.4,7), unit:'', ts:now} ]; break;
+    case 'water':
+      base.metrics = [ {name:'water.flow_lpm', value:rnd(0,20), unit:'L/min', ts:now} ]; break;
+    case 'feeder':
+      base.metrics = [ {name:'feed.intake_kg', value:rnd(5,25), unit:'kg', ts:now} ]; break;
+  }
+  return base;
+}
+
+async function ingestType(type){
+  const payload = buildDemoPayload(type);
+  const r = await fetch('/ingest', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json().catch(()=>null);
+  log({status:r.status, ok:r.ok, json:j, sent:payload});
+  if(r.ok) list();
+}
+
+document.getElementById('chipBox').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.chip');
+  if(!btn) return;
+  ingestType(btn.dataset.type);
+});
 </script>
 </body>
 </html>
