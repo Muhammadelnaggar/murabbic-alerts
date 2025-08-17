@@ -1,5 +1,5 @@
 // ✅ النسخة النهائية الصحيحة 100% من serve.js
-
+const admin = require('firebase-admin');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -18,6 +18,25 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'www')));
+let db = null;
+try {
+  const sa = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : null;
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: sa
+        ? admin.credential.cert(sa)
+        : admin.credential.applicationDefault()
+    });
+  }
+  db = admin.firestore();
+  console.log('✅ Firebase Admin initialized');
+} catch (e) {
+  console.log('⚠️ Sensors API disabled (no service account).', e.message);
+}
+
 
 // تسجيل مستخدم جديد
 app.post('/api/users', (req, res) => {
@@ -105,6 +124,76 @@ app.post('/api/events', (req, res) => {
   }
 
   res.status(200).json({ message: '✅ تم تسجيل الحدث وتحديث بيانات الحيوان بنجاح', event });
+});
+// ✅ صحة الاتصال للبلاطة (يرد 503 لو السرّ مش موجود)
+app.get('/api/sensors/health', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+    const snap = await db.collection('devices').where('lastSeen', '>=', tenMinAgo).get();
+    res.json({ ok: true, devices: snap.size });
+  } catch (e) {
+    console.error('health', e);
+    res.status(500).json({ ok: false, error: 'health_failed' });
+  }
+});
+
+// ✅ استقبال قراءات من أي حساس/نظام كبير
+// body: { farmId, deviceId, device?:{name,type}, metrics:[{name,value,unit,ts}] }
+app.post('/ingest', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+
+    const { farmId, deviceId, metrics = [], device = {} } = req.body || {};
+    if (!farmId || !deviceId)
+      return res.status(400).json({ ok:false, error:'farmId & deviceId required' });
+
+    const now = Date.now();
+    const ref = db.collection('devices').doc(deviceId);
+
+    // تحويل القياسات إلى Map مُهيّأ للتخزين
+    const metricsMap = {};
+    for (const m of metrics) {
+      if (!m || !m.name) continue;
+      metricsMap[m.name] = {
+        value: m.value ?? null,
+        unit: m.unit || '',
+        ts: m.ts || now
+      };
+    }
+
+    const lastSeen = metrics.reduce((t, m) => Math.max(t, m?.ts || now), now);
+
+    await ref.set({
+      farmId, deviceId,
+      name: device.name || deviceId,
+      type: device.type || 'generic',
+      lastSeen
+    }, { merge: true });
+
+    await ref.set({ metrics: metricsMap }, { merge: true });
+
+    res.json({ ok:true });
+  } catch (e) {
+    console.error('ingest', e);
+    res.status(500).json({ ok:false, error:'ingest_failed' });
+  }
+});
+
+// ✅ (اختياري) قائمة الأجهزة لصفحة sensors.html
+app.get('/api/devices', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+    const { farm } = req.query;
+    let q = db.collection('devices');
+    if (farm) q = q.where('farmId', '==', farm);
+    const snap = await q.limit(200).get();
+    const devices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json({ ok: true, devices });
+  } catch (e) {
+    console.error('devices', e);
+    res.status(500).json({ ok:false, error:'devices_failed' });
+  }
 });
 
 // باقي المسارات كما هي بدون تغيير
