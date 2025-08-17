@@ -527,7 +527,11 @@
   async function ping(){
     try{
       const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 3000);
-      const r = await fetch('/api/sensors/health', {signal: ctl.signal}); clearTimeout(to);
+      const API_BASE = (localStorage.getItem('API_BASE')||'').trim();
+      const url = API_BASE ? `${API_BASE}/api/sensors/health` : '/api/sensors/health';
+      const opts = { signal: ctl.signal };
+      if (API_BASE) opts.mode = 'cors';
+      const r = await fetch(url, opts); clearTimeout(to);
       if(!r.ok) throw 0; const j = await r.json();
       const n = Number(j?.devices||0); setBadge(n>0?`متصل • ${n}`:'متصل', true);
     }catch{ setBadge('غير مفعّل', false); }
