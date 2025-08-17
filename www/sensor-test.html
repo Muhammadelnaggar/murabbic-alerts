@@ -1,101 +1,91 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>اختبار الحساسات - Murabbik</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>اختبار الحساسات</title>
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background-color: #fff9db;
-      padding: 30px;
-      max-width: 600px;
-      margin: auto;
-    }
-    h2 {
-      text-align: center;
-      color: #2e7d32;
-      margin-bottom: 20px;
-    }
-    label {
-      font-weight: bold;
-      display: block;
-      margin-top: 15px;
-    }
-    input, select, button {
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      margin-top: 5px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-    }
-    button {
-      background-color: #2e7d32;
-      color: white;
-      margin-top: 20px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #256b2f;
-    }
+    :root{--bg:#fff9db;--card:#ffffff;--muted:#dcedc8;--green:#2e7d32;--border:#c5e1a5}
+    *{box-sizing:border-box}
+    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
+    h1{margin:0 0 16px;text-align:center;color:#1b5e20}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);max-width:780px;margin:0 auto}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+    .btn{appearance:none;border:2px solid var(--green);background:#fff;color:var(--green);border-radius:999px;padding:10px 14px;font-weight:bold;cursor:pointer}
+    .btn:hover{background:#f4fff1}
+    .muted{font-size:12px;color:#446}
+    pre{background:#f7fff4;border:1px solid var(--border);padding:10px;border-radius:10px;overflow:auto;max-height:320px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid var(--border);padding:8px;text-align:center}
+    th{background:#eafbe7}
+    a{color:#2e7d32}
   </style>
 </head>
 <body>
-  <h2>📡 إرسال قراءة حساس يدويًا</h2>
+  <h1>🛰️ صفحة اختبار الحساسات</h1>
+  <div class="card">
+    <div class="row">
+      <button class="btn" id="btnHealth">فحص /api/sensors/health</button>
+      <button class="btn" id="btnIngest">إرسال قراءة تجريبية</button>
+      <button class="btn" id="btnList">قائمة الأجهزة</button>
+      <a class="btn" href="dashboard.html">↩︎ الرجوع للوحة التحكم</a>
+    </div>
+    <div class="row muted">المصدر: نفس الدومين الحالي. لا حاجة لإعداد CORS.</div>
+    <h3>النتيجة</h3>
+    <pre id="out">—</pre>
+    <h3>الأجهزة</h3>
+    <table id="tbl" style="display:none">
+      <thead><tr><th>الجهاز</th><th>المزرعة</th><th>النوع</th><th>آخر ظهور</th><th>ملخص قياسات</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-  <form id="sensorForm">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+<script>
+const out = document.getElementById('out');
+const tbl = document.getElementById('tbl');
+const tbody = tbl.querySelector('tbody');
 
-    <label for="sensorType">نوع الحساس</label>
-    <select id="sensorType" name="sensorType" required>
-      <option value="">اختر النوع</option>
-      <option value="temperature">درجة الحرارة</option>
-      <option value="milk">إنتاج اللبن</option>
-      <option value="rumination">اجترار</option>
-      <option value="motion">الحركة</option>
-    </select>
+function log(obj){ out.textContent = (typeof obj==='string')?obj:JSON.stringify(obj,null,2); }
 
-    <label for="value">القيمة</label>
-    <input type="number" id="value" name="value" step="any" required>
+async function health(){
+  const r = await fetch('/api/sensors/health');
+  log({status:r.status, ok:r.ok, json: await r.json().catch(()=>null)});
+}
 
-    <label for="unit">الوحدة</label>
-    <input type="text" id="unit" name="unit" placeholder="°C / L / دقيقة ...">
+async function ingest(){
+  const payload = {
+    farmId:'EG-ALSHARKIA-01',
+    deviceId:'amb-001',
+    device:{name:'Ambient Box', type:'env'},
+    metrics:[
+      {name:'ambient.temp_c', value:31.7, unit:'°C', ts: Date.now()},
+      {name:'ambient.rh_pct', value:64,   unit:'%',  ts: Date.now()}
+    ]
+  };
+  const r = await fetch('/ingest', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  log({status:r.status, ok:r.ok, json: await r.json().catch(()=>null)});
+}
 
-    <button type="submit">📤 إرسال القراءة</button>
-  </form>
+async function list(){
+  const r = await fetch('/api/devices');
+  const j = await r.json();
+  log({status:r.status, ok:r.ok, count:j?.devices?.length||0});
+  tbody.innerHTML = '';
+  (j.devices||[]).forEach(d=>{
+    const tr = document.createElement('tr');
+    const last = d.lastSeen ? new Date(d.lastSeen).toLocaleString('ar-EG') : '—';
+    const msum = d.metrics ? Object.entries(d.metrics).map(([k,v])=>`${k}: ${v.value}${v.unit||''}`).slice(0,4).join(' • ') : '—';
+    tr.innerHTML = `<td>${d.id}</td><td>${d.farmId||'—'}</td><td>${d.type||'—'}</td><td>${last}</td><td style="text-align:right">${msum}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbl.style.display = 'table';
+}
 
-  <script>
-    document.getElementById("sensorForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
+document.getElementById('btnHealth').onclick = health;
+document.getElementById('btnIngest').onclick = ingest;
+document.getElementById('btnList').onclick = list;
 
-      const data = {
-        animalId: document.getElementById("animalId").value,
-        sensorType: document.getElementById("sensorType").value,
-        value: parseFloat(document.getElementById("value").value),
-        unit: document.getElementById("unit").value || "",
-        timestamp: new Date().toISOString()
-      };
-
-      const res = await fetch("https://murabbic-alerts.onrender.com/api/sensors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-
-      if (res.ok) {
-        alert("✅ تم إرسال القراءة بنجاح");
-        this.reset();
-      } else {
-        const msg = await res.text();
-        alert("❌ فشل في الإرسال:\n" + msg);
-      }
-    });
-  </script>
-  <!-- ربط جاهز مع مستقبل Bluetooth -->
-  <script src="js/sensor-bluetooth.js"></script>
+health();
+</script>
 </body>
 </html>
