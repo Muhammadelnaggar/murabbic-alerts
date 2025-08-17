@@ -14,7 +14,11 @@
   "dependencies": {
     "@types/node": "^22.13.11",
     "express": "^5.1.0",
-    "cors": "^2.8.5"
-  }
+    "cors": "^2.8.5",
+     "firebase-admin": "^12.5.0"
+  },
+  "engines": { "node": "18.x" }
 }
+  
+
 
