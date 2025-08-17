@@ -126,17 +126,24 @@ app.post('/api/events', (req, res) => {
   res.status(200).json({ message: '✅ تم تسجيل الحدث وتحديث بيانات الحيوان بنجاح', event });
 });
 // ✅ صحة الاتصال للبلاطة (يرد 503 لو السرّ مش موجود)
+// صحة الاتصال للبلاطة
 app.get('/api/sensors/health', async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+    if (!db) {
+      return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+    }
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
-    const snap = await db.collection('devices').where('lastSeen', '>=', tenMinAgo).get();
-    res.json({ ok: true, devices: snap.size });
+    const snap = await db.collection('devices')
+                         .where('lastSeen', '>=', tenMinAgo)
+                         .get();
+
+    return res.json({ ok: true, devices: snap.size });
   } catch (e) {
     console.error('health', e);
-    res.status(500).json({ ok: false, error: 'health_failed' });
+    return res.status(500).json({ ok: false, error: 'health_failed' });
   }
 });
+
 
 // ✅ استقبال قراءات من أي حساس/نظام كبير
 // body: { farmId, deviceId, device?:{name,type}, metrics:[{name,value,unit,ts}] }
