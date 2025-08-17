@@ -1,4 +1,7 @@
 // ✅ النسخة النهائية الصحيحة 100% من serve.js
+const { evaluateSensorAlerts, evaluateAppAlerts, thiBuffalo, thiLevelBuffalo } =
+  require('./server/alerts-engine');
+
 const admin = require('firebase-admin');
 const express = require('express');
 const fs = require('fs');
@@ -149,25 +152,48 @@ app.get('/api/sensors/health', async (req, res) => {
 // body: { farmId, deviceId, device?:{name,type}, metrics:[{name,value,unit,ts}] }
 app.post('/ingest', async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
+    if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
 
-    const { farmId, deviceId, metrics = [], device = {} } = req.body || {};
-    if (!farmId || !deviceId)
-      return res.status(400).json({ ok:false, error:'farmId & deviceId required' });
+    const { farmId, deviceId, metrics = [], device = {}, subject } = req.body || {};
+    if (!farmId || !deviceId) return res.status(400).json({ ok:false, error:'farmId & deviceId required' });
 
     const now = Date.now();
     const ref = db.collection('devices').doc(deviceId);
+    const prevSnap = await ref.get(); 
+    const prevDoc  = prevSnap.exists ? prevSnap.data() : null;
 
-    // تحويل القياسات إلى Map مُهيّأ للتخزين
     const metricsMap = {};
-    for (const m of metrics) {
-      if (!m || !m.name) continue;
-      metricsMap[m.name] = {
-        value: m.value ?? null,
-        unit: m.unit || '',
-        ts: m.ts || now
-      };
-    }
+    for (const m of metrics) if (m?.name)
+      metricsMap[m.name] = { value: m.value ?? null, unit: m.unit || '', ts: m.ts || now };
+
+    const lastSeen = metrics.reduce((t, m) => Math.max(t, m?.ts || now), now);
+
+    await ref.set({
+      farmId, deviceId, name: device.name || deviceId, type: (device.type || 'generic').toLowerCase(),
+      lastSeen, subject: subject || prevDoc?.subject || null
+    }, { merge:true });
+    await ref.set({ metrics: metricsMap }, { merge:true });
+
+    // تخزين زمني (timeline)
+    await ref.collection('telemetry').doc(String(lastSeen)).set({
+      ts: lastSeen, farmId, deviceId, subject: subject || prevDoc?.subject || null, metrics: metricsMap
+    });
+
+    // توليد تنبيهات "بالحساسات"
+    const alerts = evaluateSensorAlerts({
+      now: lastSeen, farmId, deviceId,
+      subject: subject || prevDoc?.subject || null,
+      metricsMap, prevDoc
+    });
+    for (const a of alerts) await db.collection('alerts').add({ ...a, read:false });
+
+    res.json({ ok:true, alerts: alerts.length });
+  } catch (e) {
+    console.error('ingest', e);
+    res.status(500).json({ ok:false, error:'ingest_failed' });
+  }
+});
+
 
     const lastSeen = metrics.reduce((t, m) => Math.max(t, m?.ts || now), now);
 
@@ -188,20 +214,40 @@ app.post('/ingest', async (req, res) => {
 });
 
 // ✅ (اختياري) قائمة الأجهزة لصفحة sensors.html
+// قراءة قائمة الأجهزة (تستخدمها صفحة sensor-test.html)
 app.get('/api/devices', async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
-    const { farm } = req.query;
-    let q = db.collection('devices');
-    if (farm) q = q.where('farmId', '==', farm);
-    const snap = await q.limit(200).get();
-    const devices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    res.json({ ok: true, devices });
+    if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
+
+    // استبعاد افتراضي لأنواع env و thi (تقدر تشيلها)
+    const exclude = String(req.query.exclude || 'env,thi')
+      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+    // إظهار النشطة فقط خلال آخر 10 دقائق لو activeOnly=1
+    const activeOnly = req.query.activeOnly === '1';
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+
+    const snap = await db.collection('devices')
+      .orderBy('lastSeen', 'desc')
+      .limit(200)
+      .get();
+
+    let devices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (exclude.length) {
+      devices = devices.filter(d => !exclude.includes((d.type || '').toLowerCase()));
+    }
+    if (activeOnly) {
+      devices = devices.filter(d => Number(d.lastSeen || 0) >= tenMinAgo);
+    }
+
+    return res.json({ ok:true, devices });
   } catch (e) {
     console.error('devices', e);
-    res.status(500).json({ ok:false, error:'devices_failed' });
+    return res.status(500).json({ ok:false, error:'devices_failed' });
   }
 });
+
 
 // باقي المسارات كما هي بدون تغيير
 app.get('/api/animals', (req, res) => {
