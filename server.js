@@ -415,4 +415,175 @@ app.get('/api/herd-stats', async (req, res) => {
         if (!aId || !peDate) continue;
         const birthsForA = (birthsByAnimal[aId] || [])
           .sort((a,b)=> toDate(b.date||b.createdAt) - toDate(a.date||a.createdAt));
-        const lastBirthBefore = birthsForA.find(b => toDate(b.
+        const lastBirthBefore = birthsForA.find(b => toDate(b.date||b.createdAt) <= peDate);
+        const lacStart = lastBirthBefore ? toDate(lastBirthBefore.date || lastBirthBefore.createdAt) : new Date(peDate.getTime() - 420*dayMs);
+        const services = (insByAnimal[aId] || []).filter(s => {
+          const d = toDate(s.date || s.createdAt);
+          return d && d >= lacStart && d <= peDate;
+        }).length;
+        if (services > 0) { totals += services; cases += 1; }
+      }
+      const avgServicesPerConception = cases ? (totals / cases) : 0;
+
+      const pct = (num) => totalActive > 0 ? +((num / totalActive) * 100).toFixed(1) : 0.0;
+
+      return res.json({
+        ok: true,
+        windows: { analysisDays, pregnantLookbackDays: pregLookbackDays },
+        totals: {
+          totalActive,
+          pregnant:   { count: pregnantSet.size,    pct: pct(pregnantSet.size) },
+          inseminated:{ count: inseminatedSet.size, pct: pct(inseminatedSet.size) },
+          open:       { count: openCount,           pct: pct(openCount) },
+        },
+        fertility: {
+          conceptionRatePct: +conceptionRate.toFixed(1),
+          avgServicesPerConception: +avgServicesPerConception.toFixed(2),
+          denominators: {
+            inseminationsInWindow: insInWindow.length,
+            pregnanciesInWindow: pregPosInAnalysis.length
+          }
+        }
+      });
+    }
+
+    // ===== Fallback: ملفات محلية
+    const animals = readJson(animalsPath, []);
+    const activeAnimals = animals.filter(a => a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
+    const totalActive = activeAnimals.length;
+    const events = readJson(eventsPath, []);
+
+    // نعتبر: type قد يكون بالعربي أو إنجليزي
+    const insAll  = events.filter(e => /insemination|تلقيح/i.test(e.type || ''));
+    const pregAll = events.filter(e => /pregnancy|حمل/i.test(e.type || ''));
+    const births  = events.filter(e => /birth|ولادة/i.test(e.type || ''));
+
+    const insInWindow = insAll.filter(e => (toDate(e.ts || e.date) >= sinceAnalysis));
+    const pregPosAll = pregAll.filter(e => {
+      const ok = /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || e.note || ''));
+      const when = toDate(e.ts || e.date);
+      return ok && when >= sincePreg;
+    });
+
+    const pregnantSet = new Set(pregPosAll.map(e => String(e.animalId)));
+    const inseminatedSet = new Set(insInWindow.map(e => String(e.animalId)));
+    const openCount = Math.max(0, totalActive - pregnantSet.size);
+
+    const pregPosInAnalysis = pregAll.filter(e => {
+      const ok = /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || e.note || ''));
+      const when = toDate(e.ts || e.date);
+      return ok && when >= sinceAnalysis;
+    });
+
+    const conceptionRate = insInWindow.length > 0
+      ? (pregPosInAnalysis.length / insInWindow.length) * 100
+      : 0;
+
+    // متوسط خدمات/حمل (تقريبي محليًا بدون ربط ولادة)
+    const byAnimal = (arr) => arr.reduce((m, e) => ((m[String(e.animalId)] ||= []).push(e), m), {});
+    const birthsByAnimal = byAnimal(births);
+    const insByAnimal = byAnimal(insAll);
+
+    let totals = 0, cases = 0;
+    for (const pe of pregPosInAnalysis) {
+      const aId = String(pe.animalId);
+      const peDate = toDate(pe.ts || pe.date);
+      const birthsForA = (birthsByAnimal[aId] || []).sort((a,b)=> (toDate(b.ts||b.date) - toDate(a.ts||a.date)));
+      const lastBirthBefore = birthsForA.find(b => toDate(b.ts||b.date) <= peDate);
+      const lacStart = lastBirthBefore ? toDate(lastBirthBefore.ts || lastBirthBefore.date) : new Date(peDate.getTime() - 420*dayMs);
+      const services = (insByAnimal[aId] || []).filter(s => {
+        const d = toDate(s.ts || s.date);
+        return d && d >= lacStart && d <= peDate;
+      }).length;
+      if (services > 0) { totals += services; cases += 1; }
+    }
+    const avgServicesPerConception = cases ? (totals / cases) : 0;
+
+    const pct = (num) => totalActive > 0 ? +((num / totalActive) * 100).toFixed(1) : 0.0;
+
+    return res.json({
+      ok: true,
+      windows: { analysisDays, pregnantLookbackDays: pregLookbackDays },
+      totals: {
+        totalActive,
+        pregnant:   { count: pregnantSet.size,    pct: pct(pregnantSet.size) },
+        inseminated:{ count: inseminatedSet.size, pct: pct(inseminatedSet.size) },
+        open:       { count: openCount,           pct: pct(openCount) },
+      },
+      fertility: {
+        conceptionRatePct: +conceptionRate.toFixed(1),
+        avgServicesPerConception: +avgServicesPerConception.toFixed(2),
+        denominators: {
+          inseminationsInWindow: insInWindow.length,
+          pregnanciesInWindow: pregPosInAnalysis.length
+        }
+      }
+    });
+  } catch (e) {
+    console.error('herd-stats error', e);
+    res.status(500).json({ ok:false, error: String(e?.message || e) });
+  }
+});
+
+// ============================================================
+//                   WEB PAGES / ROUTES
+// ============================================================
+
+// (اختياري) بوابة timeline.html للأدمن فقط
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+const ADMIN_DEV_OPEN = process.env.ADMIN_DEV_OPEN === '1';
+
+async function ensureAdmin(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const m = header.match(/^Bearer (.+)$/);
+    const idToken = m ? m[1] : (req.query.token || '');
+    if (idToken && db) {
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      const okClaim = decoded.admin === true;
+      const okEmail = decoded.email && ADMIN_EMAILS.includes(decoded.email.toLowerCase());
+      if (okClaim || okEmail) return next();
+    }
+    if (ADMIN_DEV_OPEN && req.query.dev === '1') return next();
+    return res.status(404).send('Not Found');
+  } catch {
+    return res.status(404).send('Not Found');
+  }
+}
+
+app.get('/timeline.html', ensureAdmin, (req, res) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'www', 'timeline.html'));
+});
+
+app.get('/sensors.html', (req, res) => res.redirect(301, '/sensor-test.html'));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'www', 'index.html'));
+});
+
+// توافق قديم لمسار قديم
+app.get('/alerts/:id', (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  const oldAlerts = readJson(alertsPath, []);
+  const userAlerts = oldAlerts.filter(a => a.user_id === userId);
+  res.json({ alerts: userAlerts });
+});
+
+app.get('/api/animals', (req, res) => {
+  fs.readFile(animalsPath, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'فشل في قراءة البيانات' });
+    try { res.json(JSON.parse(data)); } catch { res.status(500).json({ error: 'خطأ في البيانات' }); }
+  });
+});
+
+// ============================================================
+//                    STATIC & START SERVER
+// ============================================================
+// مهم: static ييجي بعد الراوتات الخاصة (عشان حماية timeline.html)
+app.use(express.static(path.join(__dirname, 'www')));
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
