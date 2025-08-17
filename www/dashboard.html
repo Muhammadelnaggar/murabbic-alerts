@@ -11,7 +11,7 @@
   <style>
     :root{--bg:#fff9db;--card:#ffffff;--muted:#dcedc8;--green:#2e7d32;--border:#c5e1a5}
     *{box-sizing:border-box}
-    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
+    body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20;overflow-x:hidden}
     h1{margin:0 0 16px;text-align:center;color:#1b5e20}
     /* لوجو العنوان */
     .brand{display:flex;align-items:center;justify-content:center;gap:10px}
@@ -31,8 +31,7 @@
     }
 
     /* البلاطات (قلب مربيك) */
-    .tile{
-      background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
+    .tile{position:relative; background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:118px;
       transition:transform .12s ease, box-shadow .12s ease, background .12s ease
@@ -43,6 +42,7 @@
     }
     .tile small{font-weight:normal;color:#335c33}
     .tile:hover{background:#dcedc8;transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
+    .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 
     /* أيقونة مركّبة للبطاقة الذكية */
     .tile .icon.icon-layer{position:relative;display:inline-flex;align-items:center;justify-content:center}
@@ -58,10 +58,15 @@
     #weatherCard #wRefresh{grid-column:2;grid-row:1;justify-self:end;align-self:start}
     #weatherCard .wvals{grid-column:2;grid-row:3}
     #weatherCard .herd-toggle{grid-column:2;grid-row:4;justify-content:flex-start}
+    
     #weatherCard .loc-toggle{grid-column:2;grid-row:2;justify-content:flex-start}
     .loc-toggle{display:flex;gap:6px;align-items:center}
     .loc-toggle .seg{appearance:none;border:1px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
     .loc-toggle .seg.active{background:var(--green);color:#fff}
+    
+    
+    
+    #weatherBadge .src{font-size:12px;color:#335c33;border:1px solid var(--border);border-radius:999px;padding:2px 8px;background:#f7fff4;margin-inline-start:6px}
     #weatherCard.compact #weatherBadge{
       display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);
       padding:6px 10px;background:var(--muted);font-size:14px
@@ -127,6 +132,11 @@
   
   
   @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
+  /* منع أي سكرول أفقي وضمان تناسب العناصر مع الشاشة */
+    html,body{overflow-x:hidden}
+    #weatherCard,.dashboard{max-width:100%}
+    .card,.tile{min-width:0}
+    img,svg{max-width:100%;height:auto}
   </style>
 </head>
 <body>
@@ -150,6 +160,7 @@
     <div id="weatherBadge">
       <span>🌦️</span>
       <span id="wLoc">—</span>
+      <span id="wSrc" class="src">المصدر: طقس</span>
     </div>
     <button id="wRefresh" class="btn" style="margin-inline-start:auto" type="button">تحديث</button>
     <div class="loc-toggle" role="group" aria-label="مصدر الموقع">
@@ -157,6 +168,7 @@
       <button class="seg" id="modeGPS" type="button">موقعي</button>
       <button class="btn" id="setFarmBtn" type="button" title="تعيين موقع المزرعة">تعيين</button>
     </div>
+    
     <div class="wvals" style="flex:1">
       <div class="wval"><div>الحرارة</div><b id="wTemp">—°C</b></div>
       <div class="wval"><div>الرطوبة</div><b id="wHum">—%</b></div>
@@ -189,7 +201,11 @@
     </div>
 
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-    <div class="tile" onclick="location.href='farm-economy.html'"><span class="icon">💰</span>اقتصاد المزرعه</div>
+    <div class="tile" id="sensorsTile" role="button" tabindex="0">
+      <span class="icon">🛰️</span>
+      الأجهزة والحساسات
+      <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
+    </div>
 
     <!-- ⛔ تمت إزالة بلاطة تقييم الحيوانات (evaluation.html) بناءً على طلبك -->
 
@@ -218,6 +234,7 @@
   const wHum   = document.getElementById('wHum');
   const wTHI   = document.getElementById('wTHI');
   const wState = document.getElementById('wState');
+  const wSrc = document.getElementById('wSrc');
   const wRefresh = document.getElementById('wRefresh');
   const thiTrack = document.querySelector('.thi-track');
   const thiMarker = document.getElementById('thiMarker');
@@ -270,6 +287,8 @@
   }
   function getFarmCoords(){ try{ const o = JSON.parse(localStorage.getItem('farmCoords')||'null'); return o && o.lat!=null && o.lon!=null ? o : null; }catch{ return null; }}
   async function setFarm(coords, name){ localStorage.setItem('farmCoords', JSON.stringify({lat:coords.lat, lon:coords.lon, name:name||''})); setLocMode('farm'); }
+
+  // استخدام الحساسات (نعم/لا)
 
   const GEO = {
     'مصر:القاهرة': {lat:30.0444, lon:31.2357},
@@ -333,6 +352,9 @@
       }
       if(!data){ return; }
 
+    // محاولة استخدام الحساسات إذا مفعّلة
+    let usedSrc = 'weather';
+
       const place = coords.label || await reverseGeocode(coords.lat, coords.lon);
       wLoc.textContent = (getLocMode()==='farm') ? (place ? `مزرعتك: ${place}` : 'مزرعتك') : (place || 'موقعك الحالي');
 
@@ -357,6 +379,7 @@
       }
 
       chip.style.background = bg;
+    if (wSrc){ wSrc.textContent = (usedSrc==='sensor') ? 'المصدر: حساس' : 'المصدر: طقس'; }
       wTemp.textContent = `${Math.round(data.t)}°C`;
       wHum.textContent  = `${Math.round(data.h)}%`;
       wTHI.textContent  = thi;
@@ -418,11 +441,9 @@
   document.addEventListener('DOMContentLoaded', ()=> { syncToggle(); syncLocMode(); renderWeather(); });
   wRefresh?.addEventListener('click', ()=> { renderWeather(true); showTip(); });
   modeFarm?.addEventListener('click', ()=>{ setLocMode('farm'); renderWeather(true); });
-  modeGPS?.addEventListener('click', ()=>{ setLocMode('gps'); renderWeather(true); });
+  modeGPS?.addEventListener('click', ()=>{ setLocMode('gps');  renderWeather(true); });
   setFarmBtn?.addEventListener('click', async ()=>{
-    let coords = null;
-    const useCurrent = confirm('تعيين موقع المزرعة على موقعي الحالي؟ اضغط إلغاء لتحديد يدويًا (lat,lon).');
-    if (useCurrent){ coords = await readGPS(true); }
+    let coords = await readGPS(true);
     if (!coords){
       const text = prompt('أدخل الإحداثيات بصيغة lat,lon (مثال: 30.59,31.50)');
       if (text){
@@ -498,6 +519,23 @@
 </script>
 
 <script>
+// بلاطة الأجهزة والحساسات: حالة اتصال سريعة + انتقال للصفحة
+(function(){
+  const tile = document.getElementById('sensorsTile');
+  const badge = document.getElementById('sensorsStatus');
+  function setBadge(txt, ok){ if(!badge) return; badge.textContent = txt; badge.style.background = ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor = ok?'#c5e1a5':'#ffecb3'; }
+  async function ping(){
+    try{
+      const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 3000);
+      const r = await fetch('/api/sensors/health', {signal: ctl.signal}); clearTimeout(to);
+      if(!r.ok) throw 0; const j = await r.json();
+      const n = Number(j?.devices||0); setBadge(n>0?`متصل • ${n}`:'متصل', true);
+    }catch{ setBadge('غير مفعّل', false); }
+  }
+  tile?.addEventListener('click', ()=>{ location.href='sensors.html'; });
+  document.addEventListener('DOMContentLoaded', ping);
+})();
+
 // تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية
 (function(){
   const img = document.getElementById('brandImg');
