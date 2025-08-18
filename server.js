@@ -102,13 +102,16 @@ app.post('/api/users/login', (req, res) => {
 });
 
 // تسجيل حيوان جديد (محلي)
+// تسجيل حيوان جديد (محلي)
 app.post('/api/animals', (req, res) => {
   const animals = readJson(animalsPath, []);
-  const newAnimal = { ...req.body, id: animals.length + 1 };
+  const farmId = req.body.farmId || req.body.farm || 'DEFAULT';
+  const newAnimal = { ...req.body, id: animals.length + 1, farmId };
   animals.push(newAnimal);
   fs.writeFileSync(animalsPath, JSON.stringify(animals, null, 2));
   res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
 });
+
 
 // تسجيل حدث عام + توليد تنبيهات بدون حساسات (محلي + Firestore إن وُجد)
 app.post('/api/events', async (req, res) => {
