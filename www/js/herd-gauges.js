@@ -1,144 +1,102 @@
-// www/js/herd-gauges.js — ربط الداشبورد بـ /api/herd-stats مع تمرير farmId
-(function(){
-  // ===== Helpers =====
-  function getApiBase(){
-    const v = (localStorage.getItem('API_BASE')||'').trim();
-    if(!/^https?:\/\//.test(v) || v.includes('localhost')) return '';
-    return v;
-  }
-  function getSpecies(){
-    // herdProfile: 'cow' أو 'buffalo' (يتحدد من ويدجت الطقس)
-    return (localStorage.getItem('herdProfile') === 'cow') ? 'cow' : 'buffalo';
-  }
-  function getFarmId(){
-    // عيّنها مرّة من الكونسول إن مش موجودة: localStorage.setItem('FARM_ID','DEFAULT')
-    return localStorage.getItem('FARM_ID') || 'DEFAULT';
-  }
+// www/js/herd-gauges.js  (نسخة مستقرة)
+(function () {
+  const root = document.getElementById('herd-analysis');
+  if (!root) return;
 
-  // ===== رسم عدّاد نصف دائري بسيط =====
-  function drawGauge(container, pct){
-    if (!container) return;
-    const p = Math.max(0, Math.min(100, Number(pct)||0));
-    const w = 200, h = 100, r = 90, cx = 100, cy = 100;
-    const toXY = (angleRad) => ({
-      x: cx + r * Math.cos(angleRad),
-      y: cy - r * Math.sin(angleRad)
-    });
-    const start = toXY(Math.PI);                   // يسار
-    const angle = Math.PI - (Math.PI * p / 100);   // من π إلى 0
-    const end   = toXY(angle);
-    const largeArc = p > 50 ? 1 : 0;
+  const els = {
+    gPreg: root.querySelector('.gauge[data-key="pregnant"]'),
+    gIns:  root.querySelector('.gauge[data-key="inseminated"]'),
+    gOpen: root.querySelector('.gauge[data-key="open"]'),
+    gConc: root.querySelector('.gauge[data-key="conception"]'),
+    lPreg: document.getElementById('line-pregnant'),
+    lIns:  document.getElementById('line-inseminated'),
+    lOpen: document.getElementById('line-open'),
+    lConc: document.getElementById('line-conception'),
+    numbers: document.getElementById('herd-numbers')
+  };
 
-    container.innerHTML = `
-      <svg viewBox="0 0 ${w} ${h}" aria-label="Gauge ${p}%">
-        <!-- مسار الخلفية -->
-        <path d="M ${cx-r} ${cy} A ${r} ${r} 0 1 1 ${cx+r} ${cy}"
-              fill="none" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round"/>
-        <!-- المسار الفعّال -->
-        <path d="M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}"
-              fill="none" stroke="#10b981" stroke-width="14" stroke-linecap="round"/>
+  function pctSafe(v){ v = Number(v||0); if (isNaN(v) || v<0) v=0; if (v>100) v=100; return Math.round(v); }
+
+  // رسم نصف عدّاد بسيط بالـSVG
+  function drawGauge(el, pct) {
+    if (!el) return;
+    const p = pctSafe(pct);
+    const angle = (p / 100) * 180;         // 0..180
+    const r = 45, cx = 50, cy = 50;
+    // needle end
+    const nx = cx + r * Math.cos((Math.PI * (180 - angle)) / 180);
+    const ny = cy - r * Math.sin((Math.PI * (180 - angle)) / 180);
+
+    el.innerHTML = `
+      <svg viewBox="0 0 100 60" width="100%" height="100%">
+        <!-- الخلفية -->
+        <path d="M5,50 A45,45 0 0 1 95,50" fill="none" stroke="#eee" stroke-width="12"/>
+        <!-- ألوان القطاعات -->
+        <path d="M5,50 A45,45 0 0 1 35,10" fill="none" stroke="#90caf9" stroke-width="12"/>
+        <path d="M35,10 A45,45 0 0 1 65,10" fill="none" stroke="#fff59d" stroke-width="12"/>
+        <path d="M65,10 A45,45 0 0 1 95,50" fill="none" stroke="#ffcc80" stroke-width="12"/>
+        <!-- المؤشر -->
+        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#000" stroke-width="2"/>
+        <circle cx="${cx}" cy="${cy}" r="3" fill="#000"/>
       </svg>
-      <div class="val">${p.toFixed(1)}%</div>
+      <div class="val">${p}%</div>
     `;
   }
 
-  // ===== تحديث النصوص تحت العدّادات =====
-  function setLine(id, txt){
-    const el = document.getElementById(id);
-    if (el) el.textContent = txt;
-  }
+  // عرض السطور أسفل كل عدّاد
+  function setLine(el, txt){ if (el) el.textContent = txt; }
 
-  // ===== جلب ملخص القطيع =====
-  async function fetchHerdStats(){
-    const API_BASE = getApiBase();
-    const qs = new URLSearchParams({
-      species: getSpecies(),
-      farmId:  getFarmId()
-    });
-    const url = (API_BASE ? `${API_BASE}/api/herd-stats` : `/api/herd-stats`) + `?${qs.toString()}`;
-    const opts = API_BASE ? { mode: 'cors' } : {};
-    const r = await fetch(url, opts);
-    if (!r.ok) throw new Error('herd-stats http error');
-    return await r.json();
-  }
+  function renderGauges(data){
+    try{
+      const t = data?.totals || {};
+      const fert = data?.fertility || {};
+      const total = Number(t.totalActive||0);
 
-  // ===== ربط البيانات بالواجهة =====
-  function renderHerdStats(data){
-    if (!data || !data.ok) return;
+      drawGauge(els.gPreg, t.pregnant?.pct);
+      drawGauge(els.gIns,  t.inseminated?.pct);
+      drawGauge(els.gOpen, t.open?.pct);
+      drawGauge(els.gConc, fert.conceptionRatePct);
 
-    const total = Number(data.totals?.totalActive || 0);
+      setLine(els.lPreg, total ? `${t.pregnant?.count||0} من ${total}` : '—');
+      setLine(els.lIns,  total ? `${t.inseminated?.count||0} من ${total}` : '—');
+      setLine(els.lOpen, total ? `${t.open?.count||0} من ${total}` : '—');
+      setLine(els.lConc, typeof fert.conceptionRatePct==='number' ? `${pctSafe(fert.conceptionRatePct)}%` : '—');
 
-    // القيم الأساسية
-    const pregC = Number(data.totals?.pregnant?.count || 0);
-    const pregP = Number(data.totals?.pregnant?.pct   || 0);
-
-    const insC  = Number(data.totals?.inseminated?.count || 0);
-    const insP  = Number(data.totals?.inseminated?.pct   || 0);
-
-    const openC = Number(data.totals?.open?.count || 0);
-    const openP = Number(data.totals?.open?.pct   || 0);
-
-    const concP = Number(data.fertility?.conceptionRatePct || 0);
-    const avgSPC= Number(data.fertility?.avgServicesPerConception || 0);
-
-    // رسم العدّادات
-    drawGauge(document.querySelector('.gauge[data-key="pregnant"]'),   pregP);
-    drawGauge(document.querySelector('.gauge[data-key="inseminated"]'),insP);
-    drawGauge(document.querySelector('.gauge[data-key="open"]'),       openP);
-    drawGauge(document.querySelector('.gauge[data-key="conception"]'), concP);
-
-    // السطور أسفل كل عدّاد
-    setLine('line-pregnant',   `${pregC} من ${total} (${pregP.toFixed(1)}%)`);
-    setLine('line-inseminated',`${insC} من ${total} (${insP.toFixed(1)}%)`);
-    setLine('line-open',       `${openC} من ${total} (${openP.toFixed(1)}%)`);
-    setLine('line-conception', `${concP.toFixed(1)}% • متوسط خدمات/حمل: ${avgSPC.toFixed(2)}`);
-
-    // ملخص الأرقام (مساعد)
-    const denIns = Number(data.fertility?.denominators?.inseminationsInWindow || 0);
-    const denPreg= Number(data.fertility?.denominators?.pregnanciesInWindow   || 0);
-    const box = document.getElementById('herd-numbers');
-    if (box){
-      box.innerHTML = `
-        إجمالي نشط: <b>${total}</b><br/>
-        تلقيحات في نافذة التحليل: <b>${denIns}</b> — اختبارات حمل موجبة في النافذة: <b>${denPreg}</b><br/>
-        Conception%: <b>${concP.toFixed(1)}%</b> — خدمات/حمل: <b>${avgSPC.toFixed(2)}</b>
-      `;
+      if (els.numbers) {
+        const d = fert?.denominators || {};
+        els.numbers.textContent =
+          `إجمالي نشط: ${total} — تلقيحات نافذة: ${d.inseminationsInWindow||0} — حمول نافذة: ${d.pregnanciesInWindow||0}`;
+      }
+    }catch(e){
+      console.error('renderGauges error:', e);
     }
   }
 
- async function refresh(){
-  try{
-    const API_BASE = (localStorage.getItem('API_BASE')||'').trim();
-    const url = (API_BASE && !API_BASE.includes('localhost'))
-      ? `${API_BASE}/api/herd-stats?species=${getSpecies()}`
-      : `/api/herd-stats?species=${getSpecies()}`;
+  async function refreshGauges(){
+    try{
+      const species = (localStorage.getItem('herdProfile')==='cow') ? 'cow' : 'buffalo';
+      const farmId  = localStorage.getItem('farmId') || localStorage.getItem('FARM_ID') || 'DEFAULT';
 
-    const r = await fetch(url, { mode: API_BASE ? 'cors' : 'same-origin' });
-    if(!r.ok){ throw new Error('herd-stats http error'); }
-
-    const j = await r.json();
-    renderGauges(j); // الدالة اللي ترسم المقاييس
-  }catch(e){
-    console.warn('herd-gauges refresh failed:', e.message);
-    // قيم افتراضية هادئة علشان ما تبانش أخطاء للمستخدم
-    renderGauges({
-      ok:false,
-      totals:{ totalActive:0, pregnant:{count:0,pct:0}, inseminated:{count:0,pct:0}, open:{count:0,pct:0} },
-      fertility:{ conceptionRatePct:0, avgServicesPerConception:0, denominators:{ inseminationsInWindow:0, pregnanciesInWindow:0 } }
-    });
-  }
-}
-
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    // تعديل: لو عندك تعريف قديم لـ const species داخل هذا الملف، احذفه.
-    // إحنا بنقرأها بدالة getSpecies() من localStorage.
-    if (!localStorage.getItem('FARM_ID')) {
-      // افتراضي للتجربة الأولى
-      localStorage.setItem('FARM_ID','DEFAULT');
+      const r = await fetch(`/api/herd-stats?species=${encodeURIComponent(species)}&farmId=${encodeURIComponent(farmId)}`, {
+        headers: { 'x-farm-id': farmId }
+      });
+      if (!r.ok) throw new Error('http '+r.status);
+      const j = await r.json();
+      renderGauges(j);
+    }catch(e){
+      console.error('herd-gauges refresh failed:', e);
+      // فشل: صفّر العدادات بدل ما تفضل "—"
+      renderGauges({
+        totals:{ totalActive:0, pregnant:{count:0,pct:0}, inseminated:{count:0,pct:0}, open:{count:0,pct:0} },
+        fertility:{ conceptionRatePct:0, denominators:{ inseminationsInWindow:0, pregnanciesInWindow:0 } }
+      });
     }
-    refresh();
-    // تحديث كل 5 دقائق
-    setInterval(refresh, 5 * 60 * 1000);
-  });
+  }
+
+  // نعرّفها جلوبال لأن الداشبورد بيناديها
+  window.renderGauges = renderGauges;
+  window.refreshHerdGauges = refreshGauges;
+
+  document.addEventListener('DOMContentLoaded', refreshGauges);
+  window.addEventListener('focus', refreshGauges);
 })();
