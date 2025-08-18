@@ -106,14 +106,29 @@
     }
   }
 
-  async function refresh(){
-    try{
-      const j = await fetchHerdStats();
-      renderHerdStats(j);
-    }catch(e){
-      console.warn('herd-gauges refresh failed:', e.message||e);
-    }
+ async function refresh(){
+  try{
+    const API_BASE = (localStorage.getItem('API_BASE')||'').trim();
+    const url = (API_BASE && !API_BASE.includes('localhost'))
+      ? `${API_BASE}/api/herd-stats?species=${getSpecies()}`
+      : `/api/herd-stats?species=${getSpecies()}`;
+
+    const r = await fetch(url, { mode: API_BASE ? 'cors' : 'same-origin' });
+    if(!r.ok){ throw new Error('herd-stats http error'); }
+
+    const j = await r.json();
+    renderGauges(j); // الدالة اللي ترسم المقاييس
+  }catch(e){
+    console.warn('herd-gauges refresh failed:', e.message);
+    // قيم افتراضية هادئة علشان ما تبانش أخطاء للمستخدم
+    renderGauges({
+      ok:false,
+      totals:{ totalActive:0, pregnant:{count:0,pct:0}, inseminated:{count:0,pct:0}, open:{count:0,pct:0} },
+      fertility:{ conceptionRatePct:0, avgServicesPerConception:0, denominators:{ inseminationsInWindow:0, pregnanciesInWindow:0 } }
+    });
   }
+}
+
 
   document.addEventListener('DOMContentLoaded', ()=>{
     // تعديل: لو عندك تعريف قديم لـ const species داخل هذا الملف، احذفه.
