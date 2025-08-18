@@ -83,6 +83,21 @@
     <span id="badge-number" class="badge-number" title="رقم الحيوان">—</span>
   </header>
   </header>
+<!-- KPIs: بطاقة الحيوان -->
+<section id="animal-kpis" class="card kpis" aria-label="مؤشرات الحيوان">
+  <div class="kpi">
+    <div class="kpi-label">DIM (أيام في اللبن)</div>
+    <div id="kpi-dim" class="kpi-val">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">آخر تلقيح</div>
+    <div id="kpi-last-ins" class="kpi-val">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">الحالة</div>
+    <div id="kpi-status" class="kpi-val">—</div>
+  </div>
+</section>
 
   <!-- [ANIMAL-KPIS] شرائط مؤشرات الحيوان -->
   <div id="kpi-timeline-card" style="margin:8px 12px 0;"></div>
@@ -717,6 +732,7 @@ import { auth, db } from './js/firebase-config.js';
  
 
    
+
 
 
 
