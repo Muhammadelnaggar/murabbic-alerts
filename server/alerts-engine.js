@@ -1,105 +1,203 @@
 // server/alerts-engine.js
-// محرك قواعد التنبيهات الذكية (يُستدعى من server.js)
+// ------------------------------------------------------------
+// توحيد أكواد التنبيهات: pregnancy_positive, heat_window_now,
+// dryoff_due_soon, calving_due_soon
+// يعمل مع حدث التطبيق (evaluateAppAlerts) + قراءات الحساسات (evaluateSensorAlerts)
+// ------------------------------------------------------------
 
-function v(map, name){ return map && map[name] ? Number(map[name].value) : undefined; }
-function pctDrop(newV, oldV){ if(!(newV>0 && oldV>0)) return 0; return (oldV-newV)/oldV; }
+'use strict';
 
-/**
- * تقييم تنبيهات "بالحساسات" انطلاقًا من قراءة /ingest
- * @param {Object} p
- * @param {number} p.now
- * @param {string} p.farmId
- * @param {string} p.deviceId
- * @param {Object|null} p.subject  // { animalId } اختياري
- * @param {Object} p.metricsMap    // { name: {value, unit, ts} }
- * @param {Object|null} p.prevDoc  // وثيقة الجهاز قبل التحديث
- */
-function evaluateSensorAlerts({ now, farmId, deviceId, subject, metricsMap, prevDoc }) {
-  const alerts = [];
-  const prev = (prevDoc && prevDoc.metrics) || {};
+const DAY = 24 * 60 * 60 * 1000;
 
-  // لبن
-  const yieldL   = v(metricsMap,'milk.yield_l');
-  const prevYield= v(prev,'milk.yield_l');
-  const cond     = v(metricsMap,'milk.cond_mScm');
-  const prevCond = v(prev,'milk.cond_mScm');
-  const color    = v(metricsMap,'milk.color_score');
+const WINDOWS = {
+  heatActivityMin: 90,          // عتبة نشاط تقديرية للشياع (بدون حساسات متقدمة)
+  calvingSoonDays: 21,          // قبل الولادة بـ 21 يوم
+  dryoffBeforeCalvingDays: 60,  // التجفيف قبل الولادة بـ 60 يوم
+  dryoffSoonWindowDays: 10      // نافذة تنبيه "قرب التجفيف"
+};
 
-  // نشاط/شبق
-  const heat     = v(metricsMap,'repro.heat_prob_pct');
-  const mounts   = v(metricsMap,'repro.mounts_24h');
-  const actIdx   = v(metricsMap,'activity.idx');
-
-  // صحة/تغذية
-  const bodyT    = v(metricsMap,'body.temp_c');
-  const rum      = v(metricsMap,'rumination.min');
-  const prevRum  = v(prev,'rumination.min');
-  const water    = v(metricsMap,'water.flow_lpm');
-  const feedKg   = v(metricsMap,'feed.intake_kg');
-
-  // ===== قواعد مختصرة قابلة للضبط =====
-  // 1) اشتباه التهاب ضرع: (cond مرتفع أو قفزة) + (لون غير طبيعي أو هبوط إنتاج)
-  const condHigh  = typeof cond==='number' && cond >= 6.0;        // حد أولي
-  const condJump  = (cond!=null && prevCond!=null) && cond >= prevCond * 1.2; // قفزة ≥20%
-  const colorHigh = typeof color==='number' && color >= 70;        // 0..100
-  const yieldDown = (yieldL!=null && prevYield!=null) && pctDrop(yieldL, prevYield) >= 0.2; // ↓20%
-  if ((condHigh || condJump) && (colorHigh || yieldDown)) {
-    alerts.push(msg('MASTITIS_SUSPECT','warn','اشتباه التهاب ضرع — راجع لون اللبن والتوصيلية والإنتاج'));
-  }
-
-  // 2) شبق محتمل
-  if ((typeof heat==='number' && heat >= 70) || ((mounts||0) >= 10 && (actIdx||0) >= 60)) {
-    alerts.push(msg('HEAT_POSSIBLE','info','شبق محتمل اليوم — راجع مجموعة التلقيح'));
-  }
-
-  // 3) حمّى/ارتفاع حرارة جسم
-  if (typeof bodyT==='number' && bodyT >= 39.5) {
-    alerts.push(msg('FEVER','alert','ارتفاع ملحوظ في حرارة الجسم'));
-  }
-
-  // 4) اجترار منخفض
-  if ((typeof rum==='number' && rum < 380) || (rum!=null && prevRum!=null && pctDrop(rum, prevRum) >= 0.2)) {
-    alerts.push(msg('LOW_RUMINATION','warn','انخفاض في دقائق الاجترار — راجع العليقة والصحة'));
-  }
-
-  // 5) تدفق مياه منخفض
-  if (typeof water==='number' && water < 1) {
-    alerts.push(msg('LOW_WATER_FLOW','info','تدفق مياه منخفض في الحظيرة'));
-  }
-
-  // 6) تناول علف منخفض
-  if (typeof feedKg==='number' && feedKg < 8) {
-    alerts.push(msg('LOW_FEED_INTAKE','info','تناول العلف أقل من الطبيعي'));
-  }
-
-  function msg(code, severity, message){
-    return { ts:now, farmId, deviceId, subject, code, severity, message, metrics: metricsMap };
-  }
-  return alerts;
+function gestationDays(species) {
+  return (String(species || '').toLowerCase() === 'cow') ? 280 : 310; // cow=280, buffalo=310
 }
 
-/**
- * تنبيهات "بدون حساسات" انطلاقًا من أحداث التطبيق (ولادة، حليب يومي، ...)
- * @param {import('firebase-admin').firestore.Firestore} db
- * @param {Object} p { now, farmId, event }
- */
-async function evaluateAppAlerts(db, { now, farmId, event }) {
+function toDate(v) {
+  if (!v) return null;
+  if (v._seconds) return new Date(v._seconds * 1000);
+  if (typeof v === 'number') return new Date(v);
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T00:00:00Z');
+  return new Date(s);
+}
+
+function makeAlert({ farmId, subject, code, severity='info', message, ts, source='app', species, meta={} }) {
+  return {
+    farmId: farmId || 'DEFAULT',
+    subject: subject || null,           // مثال: { animalId: '123' }
+    code,                               // pregnancy_positive | heat_window_now | dryoff_due_soon | calving_due_soon
+    severity,                           // info | warning | critical ...
+    message,
+    species: (species || 'buffalo').toLowerCase(),
+    ts: ts || Date.now(),
+    source,                             // 'app' | 'sensor'
+    meta
+  };
+}
+
+// خرائط نصوص رسائل سريعة
+const MSG = {
+  pregnancy_positive: 'تم تأكيد الحمل (+).',
+  heat_window_now: 'نشاط مرتفع يدل على شياع (نافذة الآن).',
+  dryoff_due_soon: 'قرب موعد التجفيف (استعد).',
+  calving_due_soon: 'قرب موعد الولادة (استعد).'
+};
+
+// ===========================================================
+// تنبيهات بالحساسات: نشاط مرتفع => heat_window_now
+// ===========================================================
+function evaluateSensorAlerts(ctx) {
   const out = [];
-  if (event.type === 'ولادة') {
-    out.push({ ts:now, farmId, deviceId:'-', subject:{ animalId:event.animalId }, code:'POSTPARTUM_START', severity:'info', message:'تم تسجيل ولادة — ابدأ متابعة ما بعد الولادة 0–21 يوم', metrics:{} });
-  }
-  if (event.type === 'حليب-يومي') {
-    const y = Number(event.yield_l||0); const f = Number(event.fat_pct||0);
-    if (y <= 8 || f < 3) {
-      out.push({ ts:now, farmId, deviceId:'-', subject:{ animalId:event.animalId }, code:'LOW_MILK_TODAY', severity:'warn', message:'إنتاج اللبن اليوم منخفض — راجع التغذية/الصحة', metrics:{ 'milk.yield_l':{value:y,unit:'L'}, 'milk.fat_pct':{value:f,unit:'%'} } });
+  try {
+    const { now = Date.now(), farmId = 'DEFAULT', subject = {}, metricsMap = {} } = ctx || {};
+    const animalId = subject?.animalId || subject?.id || null;
+    if (!animalId) return out;
+
+    // نشاط (activity/steps/motion) — حد بسيط مبدئي
+    const act =
+      Number(metricsMap.activity?.value ?? metricsMap.steps?.value ?? metricsMap.motion?.value ?? NaN);
+
+    if (!Number.isNaN(act) && act >= WINDOWS.heatActivityMin) {
+      out.push(makeAlert({
+        farmId,
+        subject: { animalId },
+        code: 'heat_window_now',
+        severity: 'warning',
+        message: `${MSG.heat_window_now} (activity=${act})`,
+        ts: now,
+        source: 'sensor'
+      }));
+    }
+  } catch {}
+  return out;
+}
+
+// ===========================================================
+// تنبيهات بتفعيلات التطبيق (أحداث) + استقراء من التاريخ
+// ===========================================================
+async function evaluateAppAlerts(db, ctx) {
+  const out = [];
+  const now = Number(ctx?.now || Date.now());
+  const farmId = ctx?.farmId || 'DEFAULT';
+  const ev = ctx?.event || {};
+  const animalId = String(ev.animalId || ev?.subject?.animalId || '').trim();
+  const species = (ev.species || 'buffalo').toLowerCase();
+
+  if (!animalId) return out;
+
+  // 1) مباشرةً من الحدث الحالي
+  const typeL = String(ev.type || '').toLowerCase();
+
+  // حمل إيجابي
+  if (/(preg|حمل)/.test(typeL)) {
+    const resField = String(ev.result || ev.status || ev.outcome || ev.note || '').toLowerCase();
+    if (/(pos|ايجاب|positive)/.test(resField)) {
+      out.push(makeAlert({
+        farmId,
+        subject: { animalId },
+        code: 'pregnancy_positive',
+        severity: 'info',
+        message: MSG.pregnancy_positive,
+        ts: Number(ev.ts || Date.now()),
+        species,
+        source: 'app',
+        meta: { eventId: ev.id || null }
+      }));
     }
   }
-  for (const a of out) await db.collection('alerts').add({ ...a, read:false });
-  return out.length;
+
+  // رصد شياع (لو جالك حدث "شياع")
+  if (/(heat|شياع)/.test(typeL)) {
+    out.push(makeAlert({
+      farmId,
+      subject: { animalId },
+      code: 'heat_window_now',
+      severity: 'warning',
+      message: MSG.heat_window_now,
+      ts: Number(ev.ts || Date.now()),
+      species,
+      source: 'app',
+      meta: { eventId: ev.id || null }
+    }));
+  }
+
+  // 2) استقراء قرب الولادة/التجفيف بناءً على آخر تلقيح (من Firestore لو متاح)
+  try {
+    if (db) {
+      // آخر تلقيح
+      const insSnap = await db.collection('events')
+        .where('farmId', '==', farmId)
+        .where('animalId', '==', animalId)
+        .where('type', '==', 'insemination')
+        .orderBy('date', 'desc')
+        .limit(1)
+        .get();
+
+      if (!insSnap.empty) {
+        const ins = insSnap.docs[0].data();
+        const insDate = toDate(ins.date || ins.createdAt || ev.ts || Date.now());
+        if (insDate) {
+          const gest = gestationDays(species);
+          const dueDate = new Date(insDate.getTime() + gest * DAY);
+
+          // قرب الولادة
+          const calvingSoonStart = new Date(dueDate.getTime() - WINDOWS.calvingSoonDays * DAY);
+          if (now >= calvingSoonStart.getTime() && now <= dueDate.getTime()) {
+            out.push(makeAlert({
+              farmId,
+              subject: { animalId },
+              code: 'calving_due_soon',
+              severity: 'warning',
+              message: MSG.calving_due_soon,
+              ts: now,
+              species,
+              source: 'app',
+              meta: { inseminationDate: ins.date || null, dueDate: dueDate.toISOString().slice(0,10) }
+            }));
+          }
+
+          // قرب التجفيف (60 يوم قبل الولادة) + نافذة تنبيه 10 أيام
+          const dryoffDate = new Date(dueDate.getTime() - WINDOWS.dryoffBeforeCalvingDays * DAY);
+          const drySoonStart = new Date(dryoffDate.getTime() - WINDOWS.dryoffSoonWindowDays * DAY);
+          const drySoonEnd   = new Date(dryoffDate.getTime() + 1*DAY); // هامش يوم
+          if (now >= drySoonStart.getTime() && now <= drySoonEnd.getTime()) {
+            out.push(makeAlert({
+              farmId,
+              subject: { animalId },
+              code: 'dryoff_due_soon',
+              severity: 'info',
+              message: MSG.dryoff_due_soon,
+              ts: now,
+              species,
+              source: 'app',
+              meta: {
+                inseminationDate: ins.date || null,
+                expectedDryoffDate: dryoffDate.toISOString().slice(0,10),
+                expectedCalvingDate: dueDate.toISOString().slice(0,10)
+              }
+            }));
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // تجاهل أي أخطاء قراءة، ونكمّل باللي قدرنا نطلعه من الحدث الحالي
+  }
+
+  // كتابة التنبيهات (لو مطلوب من هنا) تفضل من الراوتر/ingest
+  // هنا فقط بنُرجع الـ array للخادم عشان يكتبها.
+  return out;
 }
 
-// THI للجاموس (بدون حساس)
-function thiBuffalo(t, rh){ const f=t*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
-function thiLevelBuffalo(thi){ if(thi<68) return ['info','مريح']; if(thi<72) return ['info','اجهاد خفيف']; if(thi<79) return ['warn','اجهاد متوسط']; if(thi<84) return ['alert','اجهاد شديد']; return ['alert','اجهاد شديد جدا']; }
-
-module.exports = { evaluateSensorAlerts, evaluateAppAlerts, thiBuffalo, thiLevelBuffalo };
+module.exports = {
+  evaluateSensorAlerts,
+  evaluateAppAlerts
+};
