@@ -346,6 +346,9 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get('/api/herd-stats', async (req, res) => {
   try {
     const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
+        // NEW: قيّد بالـ farmId (من query أو الهيدر) وافتراضي DEFAULT
+    const farmId = String(req.query.farmId || req.headers['x-farm-id'] || 'DEFAULT');
+
     const analysisDays = parseInt(req.query.analysisDays || '90', 10);
     const gestationDays = species.includes('buffalo') ? 310 : 280;
     const pregLookbackDays = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
@@ -361,7 +364,10 @@ app.get('/api/herd-stats', async (req, res) => {
       const adb = admin.firestore();
 
       // إجمالي القطيع (نشط)
-      const animalsSnap = await adb.collection('animals').get();
+      const animalsSnap = await adb.collection('animals')
+  .where('farmId', '==', farmId)
+  .get();
+
       const animals = animalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const activeAnimals = animals.filter(a => {
         const st = String(a.status || '').toLowerCase();
@@ -373,12 +379,19 @@ app.get('/api/herd-stats', async (req, res) => {
       const totalActive = activeIds.size;
 
       // أحداث رئيسية
-      const eventsCol = adb.collection('events');
-      const [insSnap, pregSnap, calvSnap] = await Promise.all([
-        eventsCol.where('type', '==', 'insemination').where('date', '>=', toYYYYMMDD(sinceEvents)).get(),
-        eventsCol.where('type', '==', 'pregnancy').where('date', '>=', toYYYYMMDD(sinceEvents)).get(),
-        eventsCol.where('type', '==', 'birth').where('date', '>=', toYYYYMMDD(sinceEvents)).get(),
-      ]);
+    const eventsCol = adb.collection('events');
+
+// قاعدة مشتركة بالمزرعة
+const baseQ = eventsCol.where('farmId', '==', farmId);
+
+// تخصيص النوع + التاريخ لكل استعلام
+const sinceStr = toYYYYMMDD(sinceEvents);
+const [insSnap, pregSnap, calvSnap] = await Promise.all([
+  baseQ.where('type', '==', 'insemination').where('date', '>=', sinceStr).get(),
+  baseQ.where('type', '==', 'pregnancy')  .where('date', '>=', sinceStr).get(),
+  baseQ.where('type', '==', 'birth')      .where('date', '>=', sinceStr).get(),
+]);
+
 
       const insAll  = insSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(e.animalId));
       const pregAll = pregSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(e.animalId));
