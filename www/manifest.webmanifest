@@ -1,0 +1,16 @@
+{
+  "name": "مربيك",
+  "short_name": "مربيك",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff9db",
+  "theme_color": "#1b5e20",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "/img/dashboard-16.png",  "sizes": "16x16",  "type": "image/png" },
+    { "src": "/img/dashboard-32.png",  "sizes": "32x32",  "type": "image/png" },
+    { "src": "/img/dashboard-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/images/dashboard.svg",  "sizes": "64x64",  "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
