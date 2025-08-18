@@ -194,6 +194,12 @@
 
   <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
+  <script src="js/mbk-animals.js?v=1"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    MBK.animal.enhanceAnimalList(); // تفعيل “التمرير الذكي”
+  });
+</script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -337,6 +343,7 @@ window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}
   </script>
 </body>
 </html>
+
 
 
 
