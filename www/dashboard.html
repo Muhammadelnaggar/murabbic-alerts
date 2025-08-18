@@ -224,6 +224,36 @@
     <!-- تقييم الروث بالكاميرا -->
     
   </div>
+<!-- [HERD-ANALYSIS] نتائج القطيع -->
+<section id="herd-analysis" style="margin:10px 12px">
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+    <div class="card" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px">
+      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4>
+      <div class="gauge" data-key="pregnant"></div>
+      <div class="line" id="line-pregnant" style="font-size:13px;color:#333;margin-top:6px">—</div>
+    </div>
+    <div class="card" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px">
+      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4>
+      <div class="gauge" data-key="inseminated"></div>
+      <div class="line" id="line-inseminated" style="font-size:13px;color:#333;margin-top:6px">—</div>
+    </div>
+    <div class="card" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px">
+      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4>
+      <div class="gauge" data-key="open"></div>
+      <div class="line" id="line-open" style="font-size:13px;color:#333;margin-top:6px">—</div>
+    </div>
+    <div class="card" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px">
+      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4>
+      <div class="gauge" data-key="conception"></div>
+      <div class="line" id="line-conception" style="font-size:13px;color:#333;margin-top:6px">—</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px">
+    <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4>
+    <div id="herd-numbers" style="font-size:13px;color:#333">—</div>
+  </div>
+</section>
 
 <script>
 // ويدجت الطقس — نسخة مستقلة مع محوّل أبقار/جاموس
@@ -597,3 +627,4 @@
 </script>
 </body>
 </html>
+
