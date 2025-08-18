@@ -157,7 +157,7 @@ app.post('/api/events', async (req, res) => {
 
     // تحديثات خاصة بحدث الولادة في ملف animals.json
     if ((event.type === 'ولادة' || /birth|calv/i.test(event.type)) && fs.existsSync(animalsPath)) {
-      const animals = readJson(animalsPath, []);
+      const animals = readJson(animalsPath, []).filter(a => belongs(a.farmId));
       const idx = animals.findIndex(a => String(a.number ?? a.id) === String(event.animalId));
       if (idx !== -1) {
         animals[idx].lastCalvingDate = event.calvingDate || event.ts;
@@ -389,17 +389,29 @@ const farmId = String(
     const sinceAnalysis = new Date(now.getTime() - analysisDays * dayMs);
     const sincePreg = new Date(now.getTime() - pregLookbackDays * dayMs);
     const sinceEvents = new Date(now.getTime() - eventsLookbackDays * dayMs);
+    // Helper: هل السجل يتبع هذه المزرعة؟
+const belongs = (recFarm) => {
+  // السجلات القديمة بدون farmId نعتبرها DEFAULT
+  if (recFarm == null || recFarm === '' || typeof recFarm === 'undefined') {
+    return String(farmId) === 'DEFAULT';
+  }
+  return String(recFarm) === String(farmId);
+};
 
     // ===== إذا Firestore متاح — نستخدمه
     if (db) {
       const adb = admin.firestore();
 
       // إجمالي القطيع (نشط)
-      const animalsSnap = await adb.collection('animals')
-  .where('farmId', '==', farmId)
-  .get();
+     // Helper: هل السجل يتبع هذه المزرعة؟
+const belongs = (recFarm) => {
+  // السجلات القديمة بدون farmId نعتبرها DEFAULT
+  if (recFarm == null || recFarm === '' || typeof recFarm === 'undefined') {
+    return String(farmId) === 'DEFAULT';
+  }
+  return String(recFarm) === String(farmId);
+};
 
-      const animals = animalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const activeAnimals = animals.filter(a => {
         const st = String(a.status || '').toLowerCase();
         if (a.active === false) return false;
