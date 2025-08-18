@@ -1,0 +1,7 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="لوحة التحكم">
+  <path d="M6 38 L18 50 L40 18" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="28" y="46" width="30" height="6" rx="3" fill="#1e88e5"/>
+  <rect x="30" y="30" width="6" height="16" rx="3" fill="#ef5350"/>
+  <rect x="40" y="24" width="6" height="22" rx="3" fill="#fdd835"/>
+  <rect x="50" y="16" width="6" height="30" rx="3" fill="#7cb342"/>
+</svg>
