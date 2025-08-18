@@ -1,21 +1,14 @@
-// ✅ server.js — نسخة مُنقّحة ومحكومة بالمزرعة (farmId)
+// ✅ server.js — نسخة مُنقّحة ومحكومة بالمستخدم (userId) مع توافق farmId
 // ------------------------------------------------------------
-// - Express + تخزين محلي (users/animals/events)
-// - Firebase Admin (Firestore) للحساسات والتنبيهات
-// - Routes: /ingest /api/devices /api/alerts /api/sensors/health /api/animal-timeline
-// - /api/herd-stats (ملخص القطيع) مع Fallback للملفات + فلترة farmId
-// - بوابة اختيارية /timeline.html للأدمن فقط
-// ------------------------------------------------------------
-
-const path = require('path');
-const fs = require('fs');
-const express = require('express');
-const cors = require('cors');
-const admin = require('firebase-admin');
+const path   = require('path');
+const fs     = require('fs');
+const express= require('express');
+const cors   = require('cors');
+const admin  = require('firebase-admin');
 
 const { evaluateSensorAlerts, evaluateAppAlerts } = require('./server/alerts-engine');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // -------------------------
@@ -71,9 +64,24 @@ const readJson = (p, fallback=[]) => {
   try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
   catch { return fallback; }
 };
-// تطبيع هوية المزرعة + مقارنة آمنة
-const farmKey = (v) => (v == null || v === '' ? 'DEFAULT' : String(v));
-const sameFarm = (recFarm, targetFarm) => farmKey(recFarm) === farmKey(targetFarm);
+
+// هوية المستأجر Tenant (userId أولًا مع توافق farmId)
+const tenantKey = (v) => (v == null || v === '' ? 'DEFAULT' : String(v));
+function resolveTenant(req){
+  return tenantKey(
+    req.headers['x-user-id'] || req.query.userId ||
+    req.headers['x-farm-id'] || req.query.farmId ||
+    process.env.DEFAULT_TENANT_ID || process.env.DEFAULT_FARM_ID || 'DEFAULT'
+  );
+}
+// هل السجل يتبع هذا المستأجر؟ (يدعم userId أو farmId داخل السجل)
+function belongs(rec, tenant){
+  const recTenant =
+    rec?.userId != null && rec.userId !== '' ? rec.userId :
+    rec?.farmId != null && rec.farmId !== '' ? rec.farmId :
+    'DEFAULT';
+  return tenantKey(recTenant) === tenantKey(tenant);
+}
 
 // ============================================================
 //                API ROUTES — بيانات التطبيق
@@ -104,26 +112,29 @@ app.post('/api/users/login', (req, res) => {
   res.json({ message: 'تم تسجيل الدخول', user });
 });
 
-// تسجيل حيوان جديد (محلي)
+// تسجيل حيوان جديد (محلي) — تثبيت tenant
 app.post('/api/animals', (req, res) => {
   const animals = readJson(animalsPath, []);
-  const farmId = req.body.farmId || req.body.farm || 'DEFAULT';
-  const newAnimal = { ...req.body, id: animals.length + 1, farmId };
+  const tenant  = tenantKey(req.body.userId || req.headers['x-user-id'] || req.body.farmId || req.headers['x-farm-id'] || 'DEFAULT');
+
+  const newAnimal = { ...req.body, id: animals.length + 1, userId: tenant, farmId: tenant }; // farmId للتوافق
   animals.push(newAnimal);
   fs.writeFileSync(animalsPath, JSON.stringify(animals, null, 2));
   res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
 });
 
-// تسجيل حدث عام + توليد تنبيهات بدون حساسات (محلي + Firestore إن وُجد)
+// تسجيل حدث (محلي + Firestore) — تثبيت tenant
 app.post('/api/events', async (req, res) => {
   try {
     const event = req.body || {};
-    // تطبيع/تثبيت farmId للحدث
-    event.farmId = event.farmId || event.farm || req.headers['x-farm-id'] || process.env.DEFAULT_FARM_ID || 'DEFAULT';
+    const tenant = tenantKey(event.userId || req.headers['x-user-id'] || event.farmId || req.headers['x-farm-id'] || process.env.DEFAULT_TENANT_ID || 'DEFAULT');
+    event.userId = tenant;
+    event.farmId = event.farmId || tenant; // توافق
 
     if (!event || !event.type || !event.animalId) {
       return res.status(400).json({ error: 'بيانات الحدث ناقصة' });
     }
+
     const events = readJson(eventsPath, []);
     event.id = events.length + 1;
     if (!event.ts) event.ts = Date.now();
@@ -140,11 +151,12 @@ app.post('/api/events', async (req, res) => {
         t.includes('heat')    || t.includes('شياع')   ? 'heat'        :
         'event';
 
-      const whenMs = Number(event.ts || Date.now());
+      const whenMs  = Number(event.ts || Date.now());
       const whenISO = new Date(whenMs).toISOString().slice(0,10);
 
       const doc = {
-        farmId: farmKey(event.farmId),
+        userId: tenant,                 // الأساس
+        farmId: tenant,                 // توافق
         animalId: String(event.animalId || ''),
         type: typeNorm,
         date: whenISO, // YYYY-MM-DD
@@ -156,12 +168,11 @@ app.post('/api/events', async (req, res) => {
       try { await db.collection('events').add(doc); } catch {}
     }
 
-    // تحديثات خاصة بحدث الولادة في ملف animals.json (بدون فقد باقي الحيوانات)
-    if ((event.type === 'ولادة' || /birth|calv/i.test(event.type)) && fs.existsSync(animalsPath)) {
+    // تحديثات خاصة بحدث الولادة في ملف animals.json
+    if ((/birth|calv/i.test(event.type) || event.type === 'ولادة') && fs.existsSync(animalsPath)) {
       const animals = readJson(animalsPath, []);
       const idx = animals.findIndex(a =>
-        sameFarm(a.farmId, event.farmId) &&
-        String(a.number ?? a.id) === String(event.animalId)
+        belongs(a, tenant) && String(a.number ?? a.id) === String(event.animalId)
       );
       if (idx !== -1) {
         animals[idx].lastCalvingDate = event.calvingDate || event.ts;
@@ -172,9 +183,9 @@ app.post('/api/events', async (req, res) => {
       }
     }
 
-    // تنبيهات بدون حساسات — تُكتب في Firestore إن أمكن
+    // تنبيهات بدون حساسات — Firestore
     if (db) {
-      await evaluateAppAlerts(db, { now: Date.now(), farmId: farmKey(event.farmId), event });
+      await evaluateAppAlerts(db, { now: Date.now(), farmId: tenant, event });
     }
 
     res.status(200).json({ message: '✅ تم تسجيل الحدث بنجاح', event });
@@ -189,15 +200,14 @@ app.post('/api/events', async (req, res) => {
 // ============================================================
 
 // صحة اتصال API الحساسات
-app.get('/api/sensors/health', async (req, res) => {
+app.get('/api/sensors/health', async (_req, res) => {
   try {
     if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
     const snap = await db.collection('devices').where('lastSeen', '>=', tenMinAgo).get();
-    // استبعاد أنواع الطقس/THI من العدّ حسب الاتفاق
     const count = snap.docs
       .map(d => (d.data().type || '').toLowerCase())
-      .filter(t => t !== 'env' && t !== 'thi').length;
+      .filter(t => t !== 'env' && t !== 'thi').length; // استبعاد الطقس/THI
     return res.json({ ok: true, devices: count });
   } catch (e) {
     console.error('health', e);
@@ -210,8 +220,9 @@ app.post('/ingest', async (req, res) => {
   try {
     if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
 
-    const { farmId, deviceId, metrics = [], device = {}, subject } = req.body || {};
-    if (!farmId || !deviceId) return res.status(400).json({ ok:false, error:'farmId & deviceId required' });
+    const { farmId, userId, deviceId, metrics = [], device = {}, subject } = req.body || {};
+    const tenant = tenantKey(userId || req.headers['x-user-id'] || farmId || req.headers['x-farm-id']);
+    if (!tenant || !deviceId) return res.status(400).json({ ok:false, error:'tenant & deviceId required' });
 
     const now = Date.now();
     const ref = db.collection('devices').doc(deviceId);
@@ -226,27 +237,26 @@ app.post('/ingest', async (req, res) => {
 
     const lastSeen = metrics.reduce((t, m) => Math.max(t, m?.ts || now), now);
 
-    // Snapshot
     await ref.set({
-      farmId: farmKey(farmId),
+      userId: tenant,
+      farmId: tenant, // توافق
       deviceId,
       name: device.name || deviceId,
       type: (device.type || 'generic').toLowerCase(),
       lastSeen,
       subject: subject || prevDoc?.subject || null
     }, { merge: true });
+
     await ref.set({ metrics: metricsMap }, { merge: true });
 
-    // Timeline (telemetry)
     await ref.collection('telemetry').doc(String(lastSeen)).set({
-      ts: lastSeen, farmId: farmKey(farmId), deviceId,
+      ts: lastSeen, userId: tenant, farmId: tenant, deviceId,
       subject: subject || prevDoc?.subject || null,
       metrics: metricsMap
     });
 
-    // تنبيهات بالحساسات
     const alerts = evaluateSensorAlerts({
-      now: lastSeen, farmId: farmKey(farmId), deviceId,
+      now: lastSeen, farmId: tenant, deviceId,
       subject: subject || prevDoc?.subject || null,
       metricsMap, prevDoc
     });
@@ -286,20 +296,19 @@ app.get('/api/devices', async (req, res) => {
   }
 });
 
-// قراءة التنبيهات للواجهة (بوب-أبس/تحليلات)
+// قراءة التنبيهات
 app.get('/api/alerts', async (req, res) => {
   try {
     if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
 
-    const farm     = req.query.farm || null;
+    const tenant   = resolveTenant(req);
     const animalId = req.query.animalId || null;
     const sinceMs  = Number(req.query.since || 0);
     const days     = Number(req.query.days || 0);
     const limit    = Math.min(Number(req.query.limit || 100), 2000);
 
-    let q = db.collection('alerts');
+    let q = db.collection('alerts').where('farmId','==', tenant); // نخزن farmId=tenant
 
-    if (farm) q = q.where('farmId', '==', farm);
     if (animalId) q = q.where('subject.animalId', '==', animalId);
 
     let since = sinceMs;
@@ -310,7 +319,6 @@ app.get('/api/alerts', async (req, res) => {
 
     const snap = await q.get();
     const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
     return res.json({ ok:true, count: arr.length, alerts: arr, items: arr });
   } catch (e) {
     console.error('alerts', e);
@@ -318,7 +326,7 @@ app.get('/api/alerts', async (req, res) => {
   }
 });
 
-// الخط الزمني لحيوان (محلي + Firestore)
+// الخط الزمني لحيوان
 app.get('/api/animal-timeline', async (req, res) => {
   try {
     const animalId = String(req.query.animalId || '').trim();
@@ -327,7 +335,7 @@ app.get('/api/animal-timeline', async (req, res) => {
 
     const items = [];
 
-    // 1) أحداث التطبيق من الملف المحلي
+    // أحداث التطبيق (محلي)
     const events = readJson(eventsPath, []);
     events.filter(e => String(e.animalId) === animalId)
       .forEach(e => items.push({
@@ -337,7 +345,7 @@ app.get('/api/animal-timeline', async (req, res) => {
         summary: e.note || e.notes || ''
       }));
 
-    // 2) تنبيهات Firestore
+    // Firestore
     if (db) {
       const alSnap = await db.collection('alerts')
         .where('subject.animalId', '==', animalId)
@@ -349,7 +357,6 @@ app.get('/api/animal-timeline', async (req, res) => {
         items.push({ kind:'alert', ts: d.get('ts'), code: d.get('code'), summary: d.get('message') });
       }
 
-      // 3) آخر قراءات من الأجهزة المرتبطة بالحيوان
       const devSnap = await db.collection('devices')
         .where('subject.animalId', '==', animalId)
         .limit(50).get().catch(() => ({ docs: [] }));
@@ -376,64 +383,73 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get('/api/herd-stats', async (req, res) => {
   try {
     const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
-    // قيّد بالـ farmId (Header ثم Query ثم ENV ثم DEFAULT)
-    const farmId = String(
-      req.headers['x-farm-id'] || req.query.farmId || process.env.DEFAULT_FARM_ID || 'DEFAULT'
-    );
-    const inFarm = (recFarm) => sameFarm(recFarm, farmId);
+    const tenant  = resolveTenant(req);
 
-    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
-    const gestationDays = species.includes('buffalo') ? 310 : 280;
+    const analysisDays     = parseInt(req.query.analysisDays || '90', 10);
+    const gestationDays    = species.includes('buffalo') ? 310 : 280;
     const pregLookbackDays = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
     const eventsLookbackDays = Math.max(analysisDays + gestationDays + 60, 420);
 
     const now = new Date();
     const sinceAnalysis = new Date(now.getTime() - analysisDays * dayMs);
-    const sincePreg = new Date(now.getTime() - pregLookbackDays * dayMs);
-    const sinceEvents = new Date(now.getTime() - eventsLookbackDays * dayMs);
+    const sincePreg     = new Date(now.getTime() - pregLookbackDays * dayMs);
+    const sinceEvents   = new Date(now.getTime() - eventsLookbackDays * dayMs);
+    const sinceStr      = toYYYYMMDD(sinceEvents);
 
     // ===== Firestore
     if (db) {
       const adb = admin.firestore();
 
-      // الحيوانات (مفلترة بالمزرعة)
-      const animalsSnap = await adb.collection('animals').get();
-      const animals = animalsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(a => inFarm(a.farmId));
+      // الحيوانات (OR: userId أو farmId)
+      let animalsDocs = [];
+      try {
+        const a1 = await adb.collection('animals').where('userId','==', tenant).get();
+        animalsDocs = a1.docs.slice();
+      } catch {}
+      try {
+        const a2 = await adb.collection('animals').where('farmId','==', tenant).get();
+        const seen = new Set(animalsDocs.map(d=>d.id));
+        for (const d of a2.docs) if (!seen.has(d.id)) animalsDocs.push(d);
+      } catch {}
 
+      const animals = animalsDocs.map(d => ({ id: d.id, ...d.data() }));
       const activeAnimals = animals.filter(a => {
         const st = String(a.status || '').toLowerCase();
         if (a.active === false) return false;
         if (['sold','dead','archived','inactive'].includes(st)) return false;
         return true;
       });
-      const activeIds = new Set(activeAnimals.map(a => String(a.id)));
+      const activeIds   = new Set(activeAnimals.map(a => String(a.id)));
       const totalActive = activeIds.size;
 
-      // الأحداث (مع fallback لو نقص اندكس)
-      const eventsCol = adb.collection('events');
-      const sinceStr = toYYYYMMDD(sinceEvents);
-
+      // الأحداث (OR + fallback للـ index)
       async function fetchType(type) {
-        try {
-          const snap = await eventsCol
-            .where('farmId','==', farmId)
-            .where('type','==', type)
-            .where('date','>=', sinceStr)
-            .get();
-          return snap.docs;
-        } catch (e) {
-          // Fallback: farm+type ثم فلترة التاريخ في الذاكرة
-          const snap = await eventsCol
-            .where('farmId','==', farmId)
-            .where('type','==', type)
-            .orderBy('date','desc')
-            .limit(2000)
-            .get()
-            .catch(() => ({ docs: [] }));
-          return (snap.docs || []).filter(d => (d.get('date') || '') >= sinceStr);
+        const collect = [];
+        async function tryQ(field) {
+          try {
+            const snap = await adb.collection('events')
+              .where(field,'==', tenant)
+              .where('type','==', type)
+              .where('date','>=', sinceStr)
+              .get();
+            collect.push(...snap.docs);
+          } catch {
+            const snap = await adb.collection('events')
+              .where(field,'==', tenant)
+              .where('type','==', type)
+              .orderBy('date','desc')
+              .limit(2000)
+              .get()
+              .catch(() => ({ docs: [] }));
+            (snap.docs || []).forEach(d => { if ((d.get('date') || '') >= sinceStr) collect.push(d); });
+          }
         }
+        await tryQ('userId');
+        await tryQ('farmId');
+        // إزالة المكرر
+        const map = new Map();
+        for (const d of collect) map.set(d.id, d);
+        return Array.from(map.values());
       }
 
       const [insDocs, pregDocs, calvDocs] = await Promise.all([
@@ -448,7 +464,7 @@ app.get('/api/herd-stats', async (req, res) => {
 
       const byAnimal = (arr) => arr.reduce((m, e) => ((m[e.animalId] ||= []).push(e), m), {});
       const birthsByAnimal = byAnimal(births);
-      const insByAnimal = byAnimal(insAll);
+      const insByAnimal    = byAnimal(insAll);
 
       const insInWindow = insAll.filter(e => toDate(e.date || e.createdAt) >= sinceAnalysis);
 
@@ -459,9 +475,9 @@ app.get('/api/herd-stats', async (req, res) => {
         return ok && when >= sincePreg;
       });
 
-      const pregnantSet = new Set(pregPosAll.map(e => String(e.animalId)));
-      const openCount = Math.max(0, totalActive - pregnantSet.size);
-      const inseminatedSet = new Set(insInWindow.map(e => String(e.animalId)));
+      const pregnantSet   = new Set(pregPosAll.map(e => String(e.animalId)));
+      const openCount     = Math.max(0, totalActive - pregnantSet.size);
+      const inseminatedSet= new Set(insInWindow.map(e => String(e.animalId)));
 
       const pregPosInAnalysis = pregAll.filter(e => {
         const resField = String(e.result || e.status || e.outcome || '').toLowerCase();
@@ -470,19 +486,16 @@ app.get('/api/herd-stats', async (req, res) => {
         return ok && when >= sinceAnalysis;
       });
 
-      // Conception%
       const conceptionRate = insInWindow.length > 0
         ? (pregPosInAnalysis.length / insInWindow.length) * 100
         : 0;
 
-      // متوسط خدمات/حمل
       let totals = 0, cases = 0;
       for (const pe of pregPosInAnalysis) {
         const aId = String(pe.animalId);
         const peDate = toDate(pe.date || pe.createdAt);
         if (!aId || !peDate) continue;
-        const birthsForA = (birthsByAnimal[aId] || [])
-          .sort((a,b)=> toDate(b.date||b.createdAt) - toDate(a.date||a.createdAt));
+        const birthsForA = (birthsByAnimal[aId] || []).sort((a,b)=> toDate(b.date||b.createdAt) - toDate(a.date||a.createdAt));
         const lastBirthBefore = birthsForA.find(b => toDate(b.date||b.createdAt) <= peDate);
         const lacStart = lastBirthBefore ? toDate(lastBirthBefore.date || lastBirthBefore.createdAt) : new Date(peDate.getTime() - 420*dayMs);
         const services = (insByAnimal[aId] || []).filter(s => {
@@ -492,7 +505,6 @@ app.get('/api/herd-stats', async (req, res) => {
         if (services > 0) { totals += services; cases += 1; }
       }
       const avgServicesPerConception = cases ? (totals / cases) : 0;
-
       const pct = (num) => totalActive > 0 ? +((num / totalActive) * 100).toFixed(1) : 0.0;
 
       return res.json({
@@ -515,30 +527,32 @@ app.get('/api/herd-stats', async (req, res) => {
       });
     }
 
-    // ===== Fallback: ملفات محلية (مفلترة بالمزرعة)
-    const animals = readJson(animalsPath, []).filter(a => inFarm(a.farmId));
+    // ===== Fallback: ملفات محلية (مفلترة بالـtenant)
+    const animalsAll = readJson(animalsPath, []);
+    const animals    = animalsAll.filter(a => belongs(a, tenant));
     const activeAnimals = animals.filter(a =>
       a.active !== false &&
       !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase())
     );
     const totalActive = activeAnimals.length;
-    const events = readJson(eventsPath, []).filter(e => inFarm(e.farmId));
 
-    // نعتبر: type قد يكون بالعربي أو إنجليزي
+    const eventsAll = readJson(eventsPath, []);
+    const events    = eventsAll.filter(e => belongs(e, tenant));
+
     const insAll  = events.filter(e => /insemination|تلقيح/i.test(e.type || ''));
     const pregAll = events.filter(e => /pregnancy|حمل/i.test(e.type || ''));
     const births  = events.filter(e => /birth|ولادة/i.test(e.type || ''));
 
-    const insInWindow = insAll.filter(e => (toDate(e.ts || e.date) >= sinceAnalysis));
+    const insInWindow = insAll.filter(e => toDate(e.ts || e.date) >= sinceAnalysis);
     const pregPosAll = pregAll.filter(e => {
       const ok = /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || e.note || ''));
       const when = toDate(e.ts || e.date);
       return ok && when >= sincePreg;
     });
 
-    const pregnantSet = new Set(pregPosAll.map(e => String(e.animalId)));
+    const pregnantSet    = new Set(pregPosAll.map(e => String(e.animalId)));
     const inseminatedSet = new Set(insInWindow.map(e => String(e.animalId)));
-    const openCount = Math.max(0, totalActive - pregnantSet.size);
+    const openCount      = Math.max(0, totalActive - pregnantSet.size);
 
     const pregPosInAnalysis = pregAll.filter(e => {
       const ok = /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || e.note || ''));
@@ -550,10 +564,9 @@ app.get('/api/herd-stats', async (req, res) => {
       ? (pregPosInAnalysis.length / insInWindow.length) * 100
       : 0;
 
-    // متوسط خدمات/حمل (تقريبي محليًا)
     const byAnimal = (arr) => arr.reduce((m, e) => ((m[String(e.animalId)] ||= []).push(e), m), {});
     const birthsByAnimal = byAnimal(births);
-    const insByAnimal = byAnimal(insAll);
+    const insByAnimal    = byAnimal(insAll);
 
     let totals = 0, cases = 0;
     for (const pe of pregPosInAnalysis) {
@@ -569,7 +582,6 @@ app.get('/api/herd-stats', async (req, res) => {
       if (services > 0) { totals += services; cases += 1; }
     }
     const avgServicesPerConception = cases ? (totals / cases) : 0;
-
     const pct = (num) => totalActive > 0 ? +((num / totalActive) * 100).toFixed(1) : 0.0;
 
     return res.json({
@@ -599,10 +611,7 @@ app.get('/api/herd-stats', async (req, res) => {
 // ============================================================
 //                   WEB PAGES / ROUTES
 // ============================================================
-
-// (اختياري) بوابة timeline.html للأدمن فقط
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
-  .split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const ADMIN_DEV_OPEN = process.env.ADMIN_DEV_OPEN === '1';
 
 async function ensureAdmin(req, res, next) {
@@ -628,9 +637,9 @@ app.get('/timeline.html', ensureAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'timeline.html'));
 });
 
-app.get('/sensors.html', (req, res) => res.redirect(301, '/sensor-test.html'));
+app.get('/sensors.html', (_req, res) => res.redirect(301, '/sensor-test.html'));
 
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'index.html'));
 });
 
@@ -642,7 +651,7 @@ app.get('/alerts/:id', (req, res) => {
   res.json({ alerts: userAlerts });
 });
 
-app.get('/api/animals', (req, res) => {
+app.get('/api/animals', (_req, res) => {
   fs.readFile(animalsPath, 'utf8', (err, data) => {
     if (err) return res.status(500).json({ error: 'فشل في قراءة البيانات' });
     try { res.json(JSON.parse(data)); } catch { res.status(500).json({ error: 'خطأ في البيانات' }); }
@@ -652,7 +661,6 @@ app.get('/api/animals', (req, res) => {
 // ============================================================
 //                    STATIC & START SERVER
 // ============================================================
-// مهم: static ييجي بعد الراوتات الخاصة (عشان حماية timeline.html)
 app.use(express.static(path.join(__dirname, 'www')));
 
 app.listen(PORT, '0.0.0.0', () => {
