@@ -117,6 +117,9 @@ app.post('/api/animals', (req, res) => {
 app.post('/api/events', async (req, res) => {
   try {
     const event = req.body || {};
+        // [ADD] تطبيع/تثبيت farmId للحدث
+    event.farmId = event.farmId || event.farm || req.headers['x-farm-id'] || 'DEFAULT';
+
     if (!event || !event.type || !event.animalId) {
       return res.status(400).json({ error: 'بيانات الحدث ناقصة' });
     }
