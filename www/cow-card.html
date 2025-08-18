@@ -82,6 +82,12 @@
     <div class="title" id="page-title">بطاقة الحيوان</div>
     <span id="badge-number" class="badge-number" title="رقم الحيوان">—</span>
   </header>
+  </header>
+
+  <!-- [ANIMAL-KPIS] شرائط مؤشرات الحيوان -->
+  <div id="kpi-timeline-card" style="margin:8px 12px 0;"></div>
+
+  <!-- بقية محتوى البطاقة يكمّل هنا... -->
 
   <main>
     
@@ -699,6 +705,10 @@ import { auth, db } from './js/firebase-config.js';
     renderEval(last);
   })();
 </script>
+  <!-- ... بقية سكربتات الصفحة إن وُجدت -->
+  <script src="js/animal-kpis.js"></script>
+</body>
+</html>
 
 </body>
 </html>
@@ -707,5 +717,6 @@ import { auth, db } from './js/firebase-config.js';
  
 
    
+
 
 
