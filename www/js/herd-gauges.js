@@ -1,102 +1,112 @@
-// www/js/herd-gauges.js  (نسخة مستقرة)
+// www/js/herd-gauges.js
 (function () {
-  const root = document.getElementById('herd-analysis');
-  if (!root) return;
+  // ---------- helpers ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-  const els = {
-    gPreg: root.querySelector('.gauge[data-key="pregnant"]'),
-    gIns:  root.querySelector('.gauge[data-key="inseminated"]'),
-    gOpen: root.querySelector('.gauge[data-key="open"]'),
-    gConc: root.querySelector('.gauge[data-key="conception"]'),
-    lPreg: document.getElementById('line-pregnant'),
-    lIns:  document.getElementById('line-inseminated'),
-    lOpen: document.getElementById('line-open'),
-    lConc: document.getElementById('line-conception'),
-    numbers: document.getElementById('herd-numbers')
-  };
+  function getUserId() {
+    return (
+      localStorage.getItem('currentUserId') ||
+      localStorage.getItem('user_id') ||
+      localStorage.getItem('userId') ||
+      'DEFAULT'
+    );
+  }
+  function getSpecies() {
+    return localStorage.getItem('herdProfile') === 'cow' ? 'cow' : 'buffalo';
+  }
 
-  function pctSafe(v){ v = Number(v||0); if (isNaN(v) || v<0) v=0; if (v>100) v=100; return Math.round(v); }
+  async function fetchHerdStats() {
+    const userId = getUserId();
+    const species = getSpecies();
+    const qs = new URLSearchParams({
+      species,
+      analysisDays: '90',
+      userId, // ← نمرّر userId كـ query
+    });
+    const res = await fetch(`/api/herd-stats?${qs}`, {
+      headers: { 'X-User-Id': userId }, // ← ونمرّره أيضاً في الهيدر
+    });
+    if (!res.ok) throw new Error('herd-stats http error');
+    return await res.json();
+  }
 
-  // رسم نصف عدّاد بسيط بالـSVG
   function drawGauge(el, pct) {
-    if (!el) return;
-    const p = pctSafe(pct);
-    const angle = (p / 100) * 180;         // 0..180
-    const r = 45, cx = 50, cy = 50;
-    // needle end
-    const nx = cx + r * Math.cos((Math.PI * (180 - angle)) / 180);
-    const ny = cy - r * Math.sin((Math.PI * (180 - angle)) / 180);
+    pct = Math.max(0, Math.min(100, Number(pct) || 0));
+    el.innerHTML = '';
+    el.classList.add('gauge');
 
-    el.innerHTML = `
-      <svg viewBox="0 0 100 60" width="100%" height="100%">
-        <!-- الخلفية -->
-        <path d="M5,50 A45,45 0 0 1 95,50" fill="none" stroke="#eee" stroke-width="12"/>
-        <!-- ألوان القطاعات -->
-        <path d="M5,50 A45,45 0 0 1 35,10" fill="none" stroke="#90caf9" stroke-width="12"/>
-        <path d="M35,10 A45,45 0 0 1 65,10" fill="none" stroke="#fff59d" stroke-width="12"/>
-        <path d="M65,10 A45,45 0 0 1 95,50" fill="none" stroke="#ffcc80" stroke-width="12"/>
-        <!-- المؤشر -->
-        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#000" stroke-width="2"/>
-        <circle cx="${cx}" cy="${cy}" r="3" fill="#000"/>
-      </svg>
-      <div class="val">${p}%</div>
-    `;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 100');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const track = document.createElementNS(svgNS, 'path');
+    track.setAttribute('d', 'M10,100 A90,90 0 0 1 190,100');
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', '#e5e7eb');
+    track.setAttribute('stroke-width', '14');
+    track.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(track);
+
+    const val = document.createElementNS(svgNS, 'path');
+    val.setAttribute('d', 'M10,100 A90,90 0 0 1 190,100');
+    val.setAttribute('fill', 'none');
+    val.setAttribute('stroke', '#10b981'); // أخضر
+    val.setAttribute('stroke-width', '14');
+    val.setAttribute('stroke-linecap', 'round');
+    val.style.transition = 'stroke-dasharray .6s ease';
+    svg.appendChild(val);
+
+    el.appendChild(svg);
+
+    const L = val.getTotalLength();
+    const on = (pct / 100) * L;
+    val.style.strokeDasharray = `${on} ${L - on}`;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'val';
+    lbl.textContent = `${Math.round(pct)}%`;
+    el.appendChild(lbl);
   }
 
-  // عرض السطور أسفل كل عدّاد
-  function setLine(el, txt){ if (el) el.textContent = txt; }
+  function setLine(id, txt) {
+    const el = document.getElementById(`line-${id}`);
+    if (el) el.textContent = txt;
+  }
 
-  function renderGauges(data){
-    try{
-      const t = data?.totals || {};
-      const fert = data?.fertility || {};
-      const total = Number(t.totalActive||0);
+  async function refresh() {
+    try {
+      const data = await fetchHerdStats();
+      const totals = data.totals || {};
+      const totalActive = Number(totals.totalActive || 0);
 
-      drawGauge(els.gPreg, t.pregnant?.pct);
-      drawGauge(els.gIns,  t.inseminated?.pct);
-      drawGauge(els.gOpen, t.open?.pct);
-      drawGauge(els.gConc, fert.conceptionRatePct);
+      const mapPct = {
+        pregnant: totals.pregnant?.pct || 0,
+        inseminated: totals.inseminated?.pct || 0,
+        open: totals.open?.pct || 0,
+        conception: data.fertility?.conceptionRatePct || 0,
+      };
 
-      setLine(els.lPreg, total ? `${t.pregnant?.count||0} من ${total}` : '—');
-      setLine(els.lIns,  total ? `${t.inseminated?.count||0} من ${total}` : '—');
-      setLine(els.lOpen, total ? `${t.open?.count||0} من ${total}` : '—');
-      setLine(els.lConc, typeof fert.conceptionRatePct==='number' ? `${pctSafe(fert.conceptionRatePct)}%` : '—');
+      $$('.gauge').forEach((g) => {
+        const key = g.dataset.key;
+        drawGauge(g, mapPct[key] || 0);
+      });
 
-      if (els.numbers) {
-        const d = fert?.denominators || {};
-        els.numbers.textContent =
-          `إجمالي نشط: ${total} — تلقيحات نافذة: ${d.inseminationsInWindow||0} — حمول نافذة: ${d.pregnanciesInWindow||0}`;
+      setLine('pregnant', `${totals.pregnant?.count || 0} من ${totalActive}`);
+      setLine('inseminated', `${totals.inseminated?.count || 0} من ${totalActive}`);
+      setLine('open', `${totals.open?.count || 0} من ${totalActive}`);
+
+      const sum = document.getElementById('herd-numbers');
+      if (sum) {
+        const insW = data.fertility?.denominators?.inseminationsInWindow || 0;
+        const pregW = data.fertility?.denominators?.pregnanciesInWindow || 0;
+        sum.textContent = `إجمالي نشِط: ${totalActive} — تلقيحات في النافذة: ${insW} — حمول موجبة: ${pregW}`;
       }
-    }catch(e){
-      console.error('renderGauges error:', e);
+    } catch (e) {
+      console.error('herd-gauges', e);
     }
   }
 
-  async function refreshGauges(){
-    try{
-      const species = (localStorage.getItem('herdProfile')==='cow') ? 'cow' : 'buffalo';
-      const farmId  = localStorage.getItem('farmId') || localStorage.getItem('FARM_ID') || 'DEFAULT';
-
-      const r = await fetch(`/api/herd-stats?species=${encodeURIComponent(species)}&farmId=${encodeURIComponent(farmId)}`, {
-        headers: { 'x-farm-id': farmId }
-      });
-      if (!r.ok) throw new Error('http '+r.status);
-      const j = await r.json();
-      renderGauges(j);
-    }catch(e){
-      console.error('herd-gauges refresh failed:', e);
-      // فشل: صفّر العدادات بدل ما تفضل "—"
-      renderGauges({
-        totals:{ totalActive:0, pregnant:{count:0,pct:0}, inseminated:{count:0,pct:0}, open:{count:0,pct:0} },
-        fertility:{ conceptionRatePct:0, denominators:{ inseminationsInWindow:0, pregnanciesInWindow:0 } }
-      });
-    }
-  }
-
-  // نعرّفها جلوبال لأن الداشبورد بيناديها
-  window.renderGauges = renderGauges;
-  window.refreshHerdGauges = refreshGauges;
-
-  document.addEventListener('DOMContentLoaded', refreshGauges);
-  window.addEventListener('focus', refreshGauges);
+  document.addEventListener('DOMContentLoaded', refresh);
 })();
