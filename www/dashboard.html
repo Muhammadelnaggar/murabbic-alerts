@@ -123,8 +123,7 @@
     
     .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
     .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
-    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
-    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+   
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     
 
@@ -137,12 +136,15 @@
     #weatherCard,.dashboard{max-width:100%}
     .card,.tile{min-width:0}
     img,svg{max-width:100%;height:auto}
-    <style>
+  img,svg{max-width:100%;height:auto}
+
 .gauge { width: 100%; aspect-ratio: 2 / 1; position: relative; }
 .gauge svg { width: 100%; height: 100%; display:block; }
-.gauge .val { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-weight:700; color:#065f46; font-size:22px; }
-</style>
+.gauge .val {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-weight:700; color:#065f46; font-size:22px;
+}
+
 
   </style>
 </head>
@@ -637,5 +639,6 @@
 <script src="js/smart-alerts.js"></script>
 </body>
 </html>
+
 
 
