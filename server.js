@@ -376,6 +376,11 @@ app.get('/api/herd-stats', async (req, res) => {
     const farmId = String(req.query.farmId || req.headers['x-farm-id'] || 'DEFAULT');
 
     const analysisDays = parseInt(req.query.analysisDays || '90', 10);
+    // 👇 ثبت هوية المزرعة القادمة من الهيدر أو الكويري أو ENV
+const farmId = String(
+  req.headers['x-farm-id'] || req.query.farmId || process.env.DEFAULT_FARM_ID || 'DEFAULT'
+);
+
     const gestationDays = species.includes('buffalo') ? 310 : 280;
     const pregLookbackDays = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
     const eventsLookbackDays = Math.max(analysisDays + gestationDays + 60, 420);
