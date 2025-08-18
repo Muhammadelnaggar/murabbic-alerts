@@ -34,4 +34,315 @@
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:6px;min-height:118px;
       transition:transform .12s ease,box-shadow .12s ease,background .12s ease}
-    .tile .icon{display:block;width:44px;heigh
+    .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px}
+    .tile small{font-weight:normal;color:#335c33}
+    .tile:hover{background:#dcedc8;transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
+    .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .tile .icon.icon-layer{position:relative;display:inline-flex;align-items:center;justify-content:center}
+    .icon-layer .i-main{font-size:24px;line-height:1}
+    .icon-layer .i-badge{position:absolute;bottom:-4px;right:-4px;font-size:14px;background:#fff;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+    /* ويدجت الطقس (مضغوط) */
+    #weatherCard{display:grid;gap:12px;padding:10px 12px;grid-template-columns:clamp(110px,34vw,160px) 1fr;align-items:center;max-width:100%}
+    #weatherCard.compact .wvals{display:grid;grid-template-columns:1fr;gap:8px}
+    #weatherCard .thi-clock{grid-column:1;grid-row:1 / span 3;justify-self:center}
+    #weatherCard #weatherBadge{grid-column:2;grid-row:1}
+    #weatherCard #wRefresh{grid-column:2;grid-row:1;justify-self:end;align-self:start}
+    #weatherCard .wvals{grid-column:2;grid-row:3}
+    #weatherCard .herd-toggle{grid-column:2;grid-row:4;justify-content:flex-start}
+    #weatherCard .loc-toggle{grid-column:2;grid-row:2;justify-content:flex-start}
+
+    .loc-toggle,.herd-toggle{display:flex;gap:6px;align-items:center}
+    .loc-toggle .seg,.herd-toggle .seg{appearance:none;border:1px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+    .loc-toggle .seg.active,.herd-toggle .seg.active{background:var(--green);color:#fff}
+
+    #weatherBadge .src{font-size:12px;color:#335c33;border:1px solid var(--border);border-radius:999px;padding:2px 8px;background:#f7fff4;margin-inline-start:6px}
+    #weatherCard.compact #weatherBadge{display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid var(--border);padding:6px 10px;background:var(--muted);font-size:14px}
+    #wLoc{font-weight:bold}
+    #weatherCard.compact .wval{background:#f7fff4;border:1px solid var(--border);border-radius:10px;padding:8px 10px;width:100%;text-align:center;font-size:13px}
+    .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);border-radius:10px;padding:6px 10px;font-weight:bold;cursor:pointer;font-size:12px}
+    .btn:hover{background:#f4fff1}
+
+    /* مؤشر THI كساعة */
+    .thi-clock{position:relative;width:clamp(110px,34vw,160px);height:clamp(110px,34vw,160px);margin:4px 6px}
+    .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side,transparent 55%, #000 56%);mask:radial-gradient(farthest-side,transparent 55%, #000 56%)}
+    .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1)}
+    .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
+    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+    .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
+    @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
+
+    /* المقاييس */
+    .gauge{width:100%;aspect-ratio:2/1;position:relative}
+    .gauge svg{width:100%;height:100%;display:block}
+    .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
+
+    /* بلاطة كبيرة */
+    .tile-lg{min-height:140px}
+    .tile-2x{grid-column:span 2}
+    .subactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:var(--green);border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
+    .subbtn:hover{background:#f4fff1}
+
+    @media(max-width:560px){
+      .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+      .tile{min-height:110px;padding:14px}
+      .tile-m-full{grid-column:1 / -1}
+    }
+
+    img,svg{max-width:100%;height:auto}
+  </style>
+</head>
+<body>
+  <h1 class="brand">
+    <img id="brandImg" class="brand-icon" alt="لوحة التحكم"/>
+    <svg id="brandSvg" class="brand-icon-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="أيقونة لوحة التحكم">
+      <path d="M6 38 L18 50 L40 18" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="28" y="46" width="30" height="6" rx="3" fill="#1e88e5"/>
+      <rect x="30" y="30" width="6" height="16" rx="3" fill="#ef5350"/>
+      <rect x="40" y="24" width="6" height="22" rx="3" fill="#fdd835"/>
+      <rect x="50" y="16" width="6" height="30" rx="3" fill="#7cb342"/>
+    </svg>
+    لوحة التحكم - مربيك
+  </h1>
+
+  <!-- الطقس و THI -->
+  <div id="weatherCard" class="card" aria-label="الطقس و مؤشر الحرارة-الرطوبة">
+    <div id="weatherBadge"><span>🌦️</span><span id="wLoc">—</span><span id="wSrc" class="src">المصدر: طقس</span></div>
+    <button id="wRefresh" class="btn" style="margin-inline-start:auto" type="button">تحديث</button>
+    <div class="loc-toggle" role="group" aria-label="مصدر الموقع">
+      <button class="seg" id="modeFarm" type="button">مزرعتي</button>
+      <button class="seg" id="modeGPS" type="button">موقعي</button>
+      <button class="btn" id="setFarmBtn" type="button" title="تعيين موقع المزرعة">تعيين</button>
+    </div>
+    <div class="wvals" style="flex:1">
+      <div class="wval"><div>الحرارة</div><b id="wTemp">—°C</b></div>
+      <div class="wval"><div>الرطوبة</div><b id="wHum">—%</b></div>
+      <div class="wval"><div>THI</div><b id="wTHI">—</b></div>
+      <div class="wval"><div>الحالة</div><b id="wState">—</b></div>
+    </div>
+    <div class="herd-toggle" role="group" aria-label="نوع القطيع">
+      <button class="seg" id="herdCow" type="button">أبقار</button>
+      <button class="seg active" id="herdBuffalo" type="button">جاموس</button>
+    </div>
+    <div class="thi-clock" aria-label="مؤشر THI">
+      <div class="dial" id="thiDial"><div class="arc" id="thiArc"></div></div>
+      <div class="needle" id="thiNeedle"></div>
+      <div class="center"></div>
+      <div class="thi-tooltip" id="thiTip" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- روابط سريعة -->
+  <div class="dashboard" style="margin-top:12px">
+    <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>حيوان جديد</div>
+    <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>حيواناتي</div>
+    <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
+    <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
+    <div class="tile" onclick="location.href='cow-card.html'"><span class="icon icon-layer"><span class="i-main">🐮</span><span class="i-badge">💳</span></span>البطاقة الذكية</div>
+
+    <div class="tile" id="milkTraitsCard" role="button" tabindex="0">
+      <span class="icon">🐄</span>
+      سمات حيوان اللبن /كاميرا
+    </div>
+
+    <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
+
+    <div class="tile" id="sensorsTile" role="button" tabindex="0">
+      <span class="icon">🛰️</span>
+      الأجهزة والحساسات
+      <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
+    </div>
+
+    <div class="tile tile-lg tile-2x tile-m-full" id="smartNutritionTile" role="group" tabindex="0">
+      <span class="icon">🧠</span>
+      تقييم التغذية الذكي
+      <div class="subactions" aria-label="اختيارات التقييم">
+        <button class="subbtn" id="goFeces">الروث بالكاميرا</button>
+        <button class="subbtn" id="goBCS">الحالة الجسميّة بالكاميرا</button>
+        <button class="subbtn" id="goRation">تقييم العليقة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [HERD-ANALYSIS] نتائج القطيع -->
+  <section id="herd-analysis" style="margin:10px 12px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4><div class="gauge" data-key="pregnant"></div><div class="line" id="line-pregnant" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4><div class="gauge" data-key="inseminated"></div><div class="line" id="line-inseminated" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4><div class="gauge" data-key="open"></div><div class="line" id="line-open" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4><div class="gauge" data-key="conception"></div><div class="line" id="line-conception" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+    </div>
+    <div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4><div id="herd-numbers" style="font-size:13px;color:#333">—</div></div>
+  </section>
+
+  <!-- سكربتات -->
+  <script src="js/mbk-animals.js?v=2"></script>
+
+  <!-- الطقس و THI -->
+  <script>
+  (function(){
+    const chip = document.getElementById('weatherCard');
+    const wLoc = document.getElementById('wLoc'), wTemp = document.getElementById('wTemp'), wHum = document.getElementById('wHum'),
+          wTHI = document.getElementById('wTHI'), wState = document.getElementById('wState'), wSrc = document.getElementById('wSrc'),
+          wRefresh = document.getElementById('wRefresh');
+    const thiArc = document.getElementById('thiArc'), thiNeedle = document.getElementById('thiNeedle');
+    const herdCow = document.getElementById('herdCow'), herdBuffalo = document.getElementById('herdBuffalo');
+    const modeFarm = document.getElementById('modeFarm'), modeGPS = document.getElementById('modeGPS'), setFarmBtn = document.getElementById('setFarmBtn');
+
+    chip.classList.add('compact');
+    wLoc.textContent = 'جارِ تحديد الموقع…';
+
+    function getProfile(){ return (localStorage.getItem('herdProfile') === 'cow') ? 'cow' : 'buffalo'; }
+    function setProfile(p){ localStorage.setItem('herdProfile', p); }
+    function syncToggle(){ const p=getProfile(); herdCow?.classList.toggle('active',p==='cow'); herdBuffalo?.classList.toggle('active',p==='buffalo'); }
+
+    function getLocMode(){ const s=localStorage.getItem('locMode'); if(s==='gps'||s==='farm') return s; return localStorage.getItem('farmCoords')?'farm':'gps'; }
+    function setLocMode(m){ localStorage.setItem('locMode',m); syncLocMode(); }
+    function syncLocMode(){ const m=getLocMode(); modeFarm?.classList.toggle('active',m==='farm'); modeGPS?.classList.toggle('active',m==='gps'); }
+    function getFarmCoords(){ try{ const o=JSON.parse(localStorage.getItem('farmCoords')||'null'); return (o&&o.lat!=null&&o.lon!=null)?o:null; }catch{ return null; } }
+    async function setFarm(c,n){ localStorage.setItem('farmCoords',JSON.stringify({lat:c.lat,lon:c.lon,name:n||''})); setLocMode('farm'); }
+
+    const GEO = {'مصر:القاهرة':{lat:30.0444,lon:31.2357}};
+    function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
+    function bands(){ return getProfile()==='cow'?{t1:68,t2:72,t3:79,t4:84}:{t1:66,t2:70,t3:77,t4:82}; }
+    function colorAndText(thi,b){ let txt,bg; if(thi<b.t1){txt='مريح';bg='#c8e6c9';} else if(thi<b.t2){txt='اجهاد خفيف';bg='#fff9c4';}
+      else if(thi<b.t3){txt='اجهاد متوسط';bg='#ffe0b2';} else if(thi<b.t4){txt='اجهاد شديد';bg='#ffccbc';} else {txt='اجهاد شديد جدا';bg='#ffcdd2';}
+      return {bg,txt}; }
+    function saveCache(k,d){ localStorage.setItem('weather:'+k,JSON.stringify({...d,ts:Date.now()})); }
+    function loadCache(k){ try{ const o=JSON.parse(localStorage.getItem('weather:'+k)||'null'); return o&&(Date.now()-o.ts)<3600000?o:null; }catch{ return null; } }
+
+    async function fetchWeather(lat,lon){
+      try{
+        const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
+        const j=await r.json();
+        return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
+      }catch{ return null; }
+    }
+
+    async function readGPS(force=false){
+      try{ const s=JSON.parse(localStorage.getItem('lastGPS')||'null'); if(s && !force && (Date.now()-s.ts)<600000) return {lat:s.lat,lon:s.lon}; }catch{}
+      if(navigator.geolocation){
+        try{ const pos=await new Promise(res=>navigator.geolocation.getCurrentPosition(p=>res(p),_=>res(null),{maximumAge:600000,timeout:6000}));
+             if(pos){ const c={lat:pos.coords.latitude,lon:pos.coords.longitude}; localStorage.setItem('lastGPS',JSON.stringify({...c,ts:Date.now()})); return c; } }catch{}
+      }
+      return null;
+    }
+
+    async function getCoords(force=false){
+      const mode=getLocMode();
+      if(mode==='farm'){ const f=getFarmCoords(); if(f) return {lat:f.lat,lon:f.lon,label:f.name||''}; const g=await readGPS(force); if(g) return g; return GEO['مصر:القاهرة']; }
+      else{ const g=await readGPS(force); if(g) return g; const f=getFarmCoords(); if(f) return {lat:f.lat,lon:f.lon,label:f.name||''}; return GEO['مصر:القاهرة']; }
+    }
+
+    async function reverseGeocode(lat,lon){
+      try{ const r=await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=ar`);
+           const j=await r.json(); const g=j?.results?.[0]; if(g){ return [g.country,g.admin1,g.name].filter(Boolean).join('، '); } }catch{}
+      return 'موقعك الحالي';
+    }
+
+    async function renderWeather(force=false){
+      try{
+        const coords=await getCoords(force); if(!coords){ return; }
+        const cacheKey=`${getLocMode()==='farm'?'farm':'gps'}:${coords.lat.toFixed(2)},${coords.lon.toFixed(2)}`;
+        let data=!force && loadCache(cacheKey); if(!data){ data=await fetchWeather(coords.lat,coords.lon); if(data&&data.t!=null&&data.h!=null) saveCache(cacheKey,data); }
+        if(!data) return;
+
+        const place = coords.label || await reverseGeocode(coords.lat,coords.lon);
+        wLoc.textContent = (getLocMode()==='farm') ? (place ? `مزرعتك: ${place}` : 'مزرعتك') : (place || 'موقعك الحالي');
+
+        const b=bands(); const thi=THI(data.t,data.h); const {bg,txt}=colorAndText(thi,b);
+        if(thiArc){ const min=50,max=90,p=v=>((v-min)*100/(max-min)), span=240/360*100, pArc=v=>(p(v)/100)*span;
+          const p1=pArc(b.t1),p2=pArc(b.t2),p3=pArc(b.t3);
+          thiArc.style.background = `conic-gradient(from -120deg,#90caf9 0% ${p1}%,#fff59d ${p1}% ${p2}%,#ffcc80 ${p2}% ${p3}%,#ef5350 ${p3}% ${span}%,transparent ${span}% 100%)`; }
+        if(thiNeedle){ const min=50,max=90,p=v=>((v-min)*100/(max-min)), ang=-120+Math.max(0,Math.min(100,p(thi)))*2.4; thiNeedle.style.setProperty('--angle',ang+'deg'); }
+
+        chip.style.background = bg;
+        if(wSrc) wSrc.textContent = 'المصدر: طقس';
+        wTemp.textContent = `${Math.round(data.t)}°C`;
+        wHum.textContent  = `${Math.round(data.h)}%`;
+        wTHI.textContent  = thi;
+        wState.textContent= txt;
+      }catch(e){}
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{ syncToggle(); syncLocMode(); renderWeather(); });
+    wRefresh?.addEventListener('click', ()=> renderWeather(true));
+    modeFarm?.addEventListener('click', ()=>{ setLocMode('farm'); renderWeather(true); });
+    modeGPS?.addEventListener('click', ()=>{ setLocMode('gps');  renderWeather(true); });
+    setFarmBtn?.addEventListener('click', async ()=>{
+      let coords=await readGPS(true);
+      if(!coords){
+        const text=prompt('أدخل الإحداثيات بصيغة lat,lon (مثال: 30.59,31.50)');
+        if(text){ const p=text.split(',').map(s=>parseFloat(s.trim())); if(p.length===2 && !isNaN(p[0]) && !isNaN(p[1])) coords={lat:p[0],lon:p[1]}; }
+      }
+      if(coords){ const name=await reverseGeocode(coords.lat,coords.lon); await setFarm(coords,name); renderWeather(true); }
+    });
+    herdCow?.addEventListener('click', ()=>{ setProfile('cow'); syncToggle(); renderWeather(true); });
+    herdBuffalo?.addEventListener('click', ()=>{ setProfile('buffalo'); syncToggle(); renderWeather(true); });
+  })();
+  </script>
+
+  <!-- الملاحة إلى تقييم السمات -->
+  <script type="module">
+    const veBtn = document.getElementById('milkTraitsCard');
+    veBtn?.addEventListener('click', () => {
+      const qs  = new URLSearchParams(location.search);
+      const id  = qs.get('animalId') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const url = id ? `visual-eval.html?focus=milk&animalId=${encodeURIComponent(id)}` : `visual-eval.html?focus=milk`;
+      location.href = url;
+    });
+  </script>
+
+  <!-- بلاطة الأجهزة والحساسات -->
+  <script>
+  (function(){
+    const tile = document.getElementById('sensorsTile');
+    const badge = document.getElementById('sensorsStatus');
+    function setBadge(txt, ok){ if(!badge) return; badge.textContent = txt; badge.style.background = ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor = ok?'#c5e1a5':'#ffecb3'; }
+    function getApiBase(){ const v=(localStorage.getItem('API_BASE')||'').trim(); if(!/^https?:\/\//.test(v) || v.includes('localhost')) return ''; return v; }
+    async function ping(){
+      try{
+        setBadge('جارٍ الاتصال…', false);
+        const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),30000);
+        const API_BASE=getApiBase(); const url=API_BASE?`${API_BASE}/api/sensors/health`:'/api/sensors/health';
+        const opts={ signal:ctl.signal }; if(API_BASE) opts.mode='cors';
+        const r=await fetch(url,opts); clearTimeout(to);
+        if(r.status===503){ setBadge('غير مفعّل', false); return; }
+        if(!r.ok){ setBadge('غير متصل', false); return; }
+        const j=await r.json(); const n=Number(j?.devices||0); setBadge(`متصل • ${n}`, true);
+      }catch{ setBadge('غير متصل', false); }
+    }
+    tile?.addEventListener('click', ()=>{ location.href='sensor-test.html'; });
+    document.addEventListener('DOMContentLoaded', ()=>{
+      ping(); setTimeout(ping,6000); setTimeout(ping,25000); setInterval(ping,60000);
+    });
+  })();
+  </script>
+
+  <!-- تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية -->
+  <script>
+  (function(){
+    const img=document.getElementById('brandImg'); const svg=document.getElementById('brandSvg'); if(!img) return;
+    const candidates=[
+      '/images/dashboard.svg','/images/dashboard.png','/images/dashboard.webp','/images/dashboard.jpg',
+      'images/dashboard.svg','images/dashboard.png','images/dashboard.webp','images/dashboard.jpg'
+    ];
+    function tryLoad(i){
+      if(i>=candidates.length) return;
+      const src=candidates[i] + (candidates[i].includes('?')?'':'?v=1');
+      const test=new Image();
+      test.onload=()=>{ img.src=src; img.style.display='inline-block'; if(svg) svg.remove(); };
+      test.onerror=()=>tryLoad(i+1);
+      test.src=src;
+    }
+    tryLoad(0);
+  })();
+  </script>
+
+  <!-- في النهاية: رسوم القطيع والتنبيهات -->
+  <script src="js/herd-gauges.js?v=2"></script>
+  <script src="js/smart-alerts.js?v=2"></script>
+</body>
+</html>
