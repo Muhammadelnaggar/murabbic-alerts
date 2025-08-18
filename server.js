@@ -128,6 +128,32 @@ app.post('/api/events', async (req, res) => {
     if (!event.ts) event.ts = Date.now();
     events.push(event);
     fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
+        // ===== Mirror to Firestore (اختياري لكنه مهم لحساب قرب الولادة/التجفيف)
+    if (db) {
+      const t = String(event.type || '').toLowerCase();
+      const typeNorm =
+        t.includes('insemin') || t.includes('تلقيح') ? 'insemination' :
+        t.includes('preg')    || t.includes('حمل')    ? 'pregnancy'   :
+        t.includes('calv')    || t.includes('ولادة')  ? 'birth'       :
+        t.includes('heat')    || t.includes('شياع')   ? 'heat'        :
+        'event';
+
+      const whenMs = Number(event.ts || Date.now());
+      const whenISO = new Date(whenMs).toISOString().slice(0,10);
+
+      const doc = {
+        farmId: event.farmId || 'DEFAULT',
+        animalId: String(event.animalId || ''),
+        type: typeNorm,
+        date: whenISO, // YYYY-MM-DD
+        createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
+        species: (event.species || 'buffalo').toLowerCase(),
+        // حقول إضافية شائعة:
+        result: event.result || event.status || '',
+        note: event.note || ''
+      };
+      try { await db.collection('events').add(doc); } catch {} // لو فشل مش مشكلة حرجة
+    }
 
     // تحديثات خاصة بحدث الولادة في ملف animals.json
     if ((event.type === 'ولادة' || /birth|calv/i.test(event.type)) && fs.existsSync(animalsPath)) {
