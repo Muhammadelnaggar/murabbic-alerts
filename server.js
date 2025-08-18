@@ -1,10 +1,10 @@
-// ✅ server.js — النسخة النهائية (مُنقّحة)
+// ✅ server.js — نسخة مُنقّحة ومحكومة بالمزرعة (farmId)
 // ------------------------------------------------------------
-// - خادم إكسبريس + تخزين محلي (users/animals/events)
+// - Express + تخزين محلي (users/animals/events)
 // - Firebase Admin (Firestore) للحساسات والتنبيهات
-// - راوتات: /ingest /api/devices /api/alerts /api/sensors/health /api/animal-timeline
-// - /api/herd-stats لملخص القطيع (للداشبورد) مع Fallback للملفات
-// - بوابة اختيارية لـ /timeline.html للأدمن فقط
+// - Routes: /ingest /api/devices /api/alerts /api/sensors/health /api/animal-timeline
+// - /api/herd-stats (ملخص القطيع) مع Fallback للملفات + فلترة farmId
+// - بوابة اختيارية /timeline.html للأدمن فقط
 // ------------------------------------------------------------
 
 const path = require('path');
@@ -71,6 +71,9 @@ const readJson = (p, fallback=[]) => {
   try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
   catch { return fallback; }
 };
+// تطبيع هوية المزرعة + مقارنة آمنة
+const farmKey = (v) => (v == null || v === '' ? 'DEFAULT' : String(v));
+const sameFarm = (recFarm, targetFarm) => farmKey(recFarm) === farmKey(targetFarm);
 
 // ============================================================
 //                API ROUTES — بيانات التطبيق
@@ -102,7 +105,6 @@ app.post('/api/users/login', (req, res) => {
 });
 
 // تسجيل حيوان جديد (محلي)
-// تسجيل حيوان جديد (محلي)
 app.post('/api/animals', (req, res) => {
   const animals = readJson(animalsPath, []);
   const farmId = req.body.farmId || req.body.farm || 'DEFAULT';
@@ -112,13 +114,12 @@ app.post('/api/animals', (req, res) => {
   res.status(200).json({ message: 'تم تسجيل الحيوان بنجاح' });
 });
 
-
 // تسجيل حدث عام + توليد تنبيهات بدون حساسات (محلي + Firestore إن وُجد)
 app.post('/api/events', async (req, res) => {
   try {
     const event = req.body || {};
-        // [ADD] تطبيع/تثبيت farmId للحدث
-    event.farmId = event.farmId || event.farm || req.headers['x-farm-id'] || 'DEFAULT';
+    // تطبيع/تثبيت farmId للحدث
+    event.farmId = event.farmId || event.farm || req.headers['x-farm-id'] || process.env.DEFAULT_FARM_ID || 'DEFAULT';
 
     if (!event || !event.type || !event.animalId) {
       return res.status(400).json({ error: 'بيانات الحدث ناقصة' });
@@ -128,7 +129,8 @@ app.post('/api/events', async (req, res) => {
     if (!event.ts) event.ts = Date.now();
     events.push(event);
     fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
-        // ===== Mirror to Firestore (اختياري لكنه مهم لحساب قرب الولادة/التجفيف)
+
+    // Mirror إلى Firestore (غير إلزامي)
     if (db) {
       const t = String(event.type || '').toLowerCase();
       const typeNorm =
@@ -142,23 +144,25 @@ app.post('/api/events', async (req, res) => {
       const whenISO = new Date(whenMs).toISOString().slice(0,10);
 
       const doc = {
-        farmId: event.farmId || 'DEFAULT',
+        farmId: farmKey(event.farmId),
         animalId: String(event.animalId || ''),
         type: typeNorm,
         date: whenISO, // YYYY-MM-DD
         createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
         species: (event.species || 'buffalo').toLowerCase(),
-        // حقول إضافية شائعة:
         result: event.result || event.status || '',
         note: event.note || ''
       };
-      try { await db.collection('events').add(doc); } catch {} // لو فشل مش مشكلة حرجة
+      try { await db.collection('events').add(doc); } catch {}
     }
 
-    // تحديثات خاصة بحدث الولادة في ملف animals.json
+    // تحديثات خاصة بحدث الولادة في ملف animals.json (بدون فقد باقي الحيوانات)
     if ((event.type === 'ولادة' || /birth|calv/i.test(event.type)) && fs.existsSync(animalsPath)) {
-      const animals = readJson(animalsPath, []).filter(a => belongs(a.farmId));
-      const idx = animals.findIndex(a => String(a.number ?? a.id) === String(event.animalId));
+      const animals = readJson(animalsPath, []);
+      const idx = animals.findIndex(a =>
+        sameFarm(a.farmId, event.farmId) &&
+        String(a.number ?? a.id) === String(event.animalId)
+      );
       if (idx !== -1) {
         animals[idx].lastCalvingDate = event.calvingDate || event.ts;
         animals[idx].reproductiveStatus = 'حديث الولادة';
@@ -170,7 +174,7 @@ app.post('/api/events', async (req, res) => {
 
     // تنبيهات بدون حساسات — تُكتب في Firestore إن أمكن
     if (db) {
-      await evaluateAppAlerts(db, { now: Date.now(), farmId: event.farmId || 'DEFAULT', event });
+      await evaluateAppAlerts(db, { now: Date.now(), farmId: farmKey(event.farmId), event });
     }
 
     res.status(200).json({ message: '✅ تم تسجيل الحدث بنجاح', event });
@@ -224,7 +228,8 @@ app.post('/ingest', async (req, res) => {
 
     // Snapshot
     await ref.set({
-      farmId, deviceId,
+      farmId: farmKey(farmId),
+      deviceId,
       name: device.name || deviceId,
       type: (device.type || 'generic').toLowerCase(),
       lastSeen,
@@ -234,14 +239,14 @@ app.post('/ingest', async (req, res) => {
 
     // Timeline (telemetry)
     await ref.collection('telemetry').doc(String(lastSeen)).set({
-      ts: lastSeen, farmId, deviceId,
+      ts: lastSeen, farmId: farmKey(farmId), deviceId,
       subject: subject || prevDoc?.subject || null,
       metrics: metricsMap
     });
 
     // تنبيهات بالحساسات
     const alerts = evaluateSensorAlerts({
-      now: lastSeen, farmId, deviceId,
+      now: lastSeen, farmId: farmKey(farmId), deviceId,
       subject: subject || prevDoc?.subject || null,
       metricsMap, prevDoc
     });
@@ -306,7 +311,6 @@ app.get('/api/alerts', async (req, res) => {
     const snap = await q.get();
     const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // توحيد المخرج: alerts + items (توافق للخلف)
     return res.json({ ok:true, count: arr.length, alerts: arr, items: arr });
   } catch (e) {
     console.error('alerts', e);
@@ -359,7 +363,7 @@ app.get('/api/animal-timeline', async (req, res) => {
 
     items.sort((a, b) => b.ts - a.ts);
     const eventsOut = items.slice(0, limit);
-    return res.json({ ok:true, items: eventsOut, events: eventsOut }); // events للتوافق
+    return res.json({ ok:true, items: eventsOut, events: eventsOut });
   } catch (e) {
     console.error('timeline', e);
     return res.status(500).json({ ok:false, error:'timeline_failed' });
@@ -372,15 +376,13 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get('/api/herd-stats', async (req, res) => {
   try {
     const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
-        // NEW: قيّد بالـ farmId (من query أو الهيدر) وافتراضي DEFAULT
-    const farmId = String(req.query.farmId || req.headers['x-farm-id'] || 'DEFAULT');
+    // قيّد بالـ farmId (Header ثم Query ثم ENV ثم DEFAULT)
+    const farmId = String(
+      req.headers['x-farm-id'] || req.query.farmId || process.env.DEFAULT_FARM_ID || 'DEFAULT'
+    );
+    const inFarm = (recFarm) => sameFarm(recFarm, farmId);
 
     const analysisDays = parseInt(req.query.analysisDays || '90', 10);
-    // 👇 ثبت هوية المزرعة القادمة من الهيدر أو الكويري أو ENV
-const farmId = String(
-  req.headers['x-farm-id'] || req.query.farmId || process.env.DEFAULT_FARM_ID || 'DEFAULT'
-);
-
     const gestationDays = species.includes('buffalo') ? 310 : 280;
     const pregLookbackDays = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
     const eventsLookbackDays = Math.max(analysisDays + gestationDays + 60, 420);
@@ -389,28 +391,16 @@ const farmId = String(
     const sinceAnalysis = new Date(now.getTime() - analysisDays * dayMs);
     const sincePreg = new Date(now.getTime() - pregLookbackDays * dayMs);
     const sinceEvents = new Date(now.getTime() - eventsLookbackDays * dayMs);
-    // Helper: هل السجل يتبع هذه المزرعة؟
-const belongs = (recFarm) => {
-  // السجلات القديمة بدون farmId نعتبرها DEFAULT
-  if (recFarm == null || recFarm === '' || typeof recFarm === 'undefined') {
-    return String(farmId) === 'DEFAULT';
-  }
-  return String(recFarm) === String(farmId);
-};
 
-    // ===== إذا Firestore متاح — نستخدمه
+    // ===== Firestore
     if (db) {
       const adb = admin.firestore();
 
-      // إجمالي القطيع (نشط)
-     // Helper: هل السجل يتبع هذه المزرعة؟
-const belongs = (recFarm) => {
-  // السجلات القديمة بدون farmId نعتبرها DEFAULT
-  if (recFarm == null || recFarm === '' || typeof recFarm === 'undefined') {
-    return String(farmId) === 'DEFAULT';
-  }
-  return String(recFarm) === String(farmId);
-};
+      // الحيوانات (مفلترة بالمزرعة)
+      const animalsSnap = await adb.collection('animals').get();
+      const animals = animalsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(a => inFarm(a.farmId));
 
       const activeAnimals = animals.filter(a => {
         const st = String(a.status || '').toLowerCase();
@@ -418,27 +408,43 @@ const belongs = (recFarm) => {
         if (['sold','dead','archived','inactive'].includes(st)) return false;
         return true;
       });
-      const activeIds = new Set(activeAnimals.map(a => a.id));
+      const activeIds = new Set(activeAnimals.map(a => String(a.id)));
       const totalActive = activeIds.size;
 
-      // أحداث رئيسية
-    const eventsCol = adb.collection('events');
+      // الأحداث (مع fallback لو نقص اندكس)
+      const eventsCol = adb.collection('events');
+      const sinceStr = toYYYYMMDD(sinceEvents);
 
-// قاعدة مشتركة بالمزرعة
-const baseQ = eventsCol.where('farmId', '==', farmId);
+      async function fetchType(type) {
+        try {
+          const snap = await eventsCol
+            .where('farmId','==', farmId)
+            .where('type','==', type)
+            .where('date','>=', sinceStr)
+            .get();
+          return snap.docs;
+        } catch (e) {
+          // Fallback: farm+type ثم فلترة التاريخ في الذاكرة
+          const snap = await eventsCol
+            .where('farmId','==', farmId)
+            .where('type','==', type)
+            .orderBy('date','desc')
+            .limit(2000)
+            .get()
+            .catch(() => ({ docs: [] }));
+          return (snap.docs || []).filter(d => (d.get('date') || '') >= sinceStr);
+        }
+      }
 
-// تخصيص النوع + التاريخ لكل استعلام
-const sinceStr = toYYYYMMDD(sinceEvents);
-const [insSnap, pregSnap, calvSnap] = await Promise.all([
-  baseQ.where('type', '==', 'insemination').where('date', '>=', sinceStr).get(),
-  baseQ.where('type', '==', 'pregnancy')  .where('date', '>=', sinceStr).get(),
-  baseQ.where('type', '==', 'birth')      .where('date', '>=', sinceStr).get(),
-]);
+      const [insDocs, pregDocs, calvDocs] = await Promise.all([
+        fetchType('insemination'),
+        fetchType('pregnancy'),
+        fetchType('birth')
+      ]);
 
-
-      const insAll  = insSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(e.animalId));
-      const pregAll = pregSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(e.animalId));
-      const births  = calvSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(e.animalId));
+      const insAll  = insDocs .map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(String(e.animalId)));
+      const pregAll = pregDocs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(String(e.animalId)));
+      const births  = calvDocs.map(d => ({ id: d.id, ...d.data() })).filter(e => activeIds.has(String(e.animalId)));
 
       const byAnimal = (arr) => arr.reduce((m, e) => ((m[e.animalId] ||= []).push(e), m), {});
       const birthsByAnimal = byAnimal(births);
@@ -453,9 +459,9 @@ const [insSnap, pregSnap, calvSnap] = await Promise.all([
         return ok && when >= sincePreg;
       });
 
-      const pregnantSet = new Set(pregPosAll.map(e => e.animalId));
+      const pregnantSet = new Set(pregPosAll.map(e => String(e.animalId)));
       const openCount = Math.max(0, totalActive - pregnantSet.size);
-      const inseminatedSet = new Set(insInWindow.map(e => e.animalId));
+      const inseminatedSet = new Set(insInWindow.map(e => String(e.animalId)));
 
       const pregPosInAnalysis = pregAll.filter(e => {
         const resField = String(e.result || e.status || e.outcome || '').toLowerCase();
@@ -472,7 +478,7 @@ const [insSnap, pregSnap, calvSnap] = await Promise.all([
       // متوسط خدمات/حمل
       let totals = 0, cases = 0;
       for (const pe of pregPosInAnalysis) {
-        const aId = pe.animalId;
+        const aId = String(pe.animalId);
         const peDate = toDate(pe.date || pe.createdAt);
         if (!aId || !peDate) continue;
         const birthsForA = (birthsByAnimal[aId] || [])
@@ -509,11 +515,14 @@ const [insSnap, pregSnap, calvSnap] = await Promise.all([
       });
     }
 
-    // ===== Fallback: ملفات محلية
-    const animals = readJson(animalsPath, []);
-    const activeAnimals = animals.filter(a => a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
+    // ===== Fallback: ملفات محلية (مفلترة بالمزرعة)
+    const animals = readJson(animalsPath, []).filter(a => inFarm(a.farmId));
+    const activeAnimals = animals.filter(a =>
+      a.active !== false &&
+      !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase())
+    );
     const totalActive = activeAnimals.length;
-    const events = readJson(eventsPath, []);
+    const events = readJson(eventsPath, []).filter(e => inFarm(e.farmId));
 
     // نعتبر: type قد يكون بالعربي أو إنجليزي
     const insAll  = events.filter(e => /insemination|تلقيح/i.test(e.type || ''));
@@ -541,7 +550,7 @@ const [insSnap, pregSnap, calvSnap] = await Promise.all([
       ? (pregPosInAnalysis.length / insInWindow.length) * 100
       : 0;
 
-    // متوسط خدمات/حمل (تقريبي محليًا بدون ربط ولادة)
+    // متوسط خدمات/حمل (تقريبي محليًا)
     const byAnimal = (arr) => arr.reduce((m, e) => ((m[String(e.animalId)] ||= []).push(e), m), {});
     const birthsByAnimal = byAnimal(births);
     const insByAnimal = byAnimal(insAll);
