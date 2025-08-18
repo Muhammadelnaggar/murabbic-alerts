@@ -600,30 +600,36 @@
 })();
 
 // تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية
+<script>
 (function(){
   const img = document.getElementById('brandImg');
   const svg = document.getElementById('brandSvg');
   if(!img) return;
+
+  // جرّب المسارات الصحيحة فقط (بدون /www/)
   const candidates = [
-    'www/images/dashboard',
-    'www/images/dashboard.svg',
-    'www/images/dashboard.png',
-    'www/images/dashboard.webp',
-    'www/images/dashboard.jpg',
-    '/www/images/dashboard',
-    '/www/images/dashboard.svg',
-    '/www/images/dashboard.png',
-    '/www/images/dashboard.webp',
-    '/www/images/dashboard.jpg',
-    '/images/dashboard.svg',
-    '/images/dashboard.png',
-    '/images/dashboard.webp',
-    '/images/dashboard.jpg',
     'images/dashboard.svg',
     'images/dashboard.png',
     'images/dashboard.webp',
     'images/dashboard.jpg'
   ];
+
+  function tryLoad(i){
+    if(i >= candidates.length) return; // يظل يستخدم الـSVG المضمّن
+    const src = candidates[i] + (candidates[i].includes('?') ? '' : '?v=1');
+    const test = new Image();
+    test.onload = ()=>{
+      img.src = src;
+      img.style.display = 'inline-block';
+      svg && svg.remove();
+    };
+    test.onerror = ()=> tryLoad(i+1);
+    test.src = src;
+  }
+  tryLoad(0);
+})();
+</script>
+
   function tryLoad(i){
     if(i>=candidates.length) return; // هيفضل يستخدم الـSVG المضمّن
     const src = candidates[i];
@@ -640,6 +646,7 @@
 <script src="js/smart-alerts.js?v=2"></script>
 </body>
 </html>
+
 
 
 
