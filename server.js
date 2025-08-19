@@ -1,5 +1,5 @@
-// server.js — نسخة نظيفة ومحكمة
-// ----------------------------------------------
+// server.js — نسخة نهائية مُحكَمة وتشتغل تلقائيًا على آلاف المستخدمين
+// -----------------------------------------------------------------
 const path    = require('path');
 const fs      = require('fs');
 const express = require('express');
@@ -9,25 +9,25 @@ const admin   = require('firebase-admin');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ====== بيانات محلية (fallback) ======
+// ===================== ملفات محلية (Fallback) =====================
 const dataDir     = path.join(__dirname, 'data');
 const usersPath   = path.join(dataDir, 'users.json');
 const animalsPath = path.join(dataDir, 'animals.json');
 const eventsPath  = path.join(dataDir, 'events.json');
-const alertsPath  = path.join(dataDir, 'alerts.json'); // توافق قديم
+const alertsPath  = path.join(dataDir, 'alerts.json'); // توافق قديم لمسار /alerts/:id
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-const readJson = (p, fallback=[]) => {
+const readJson = (p, fallback = []) => {
   try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
   catch { return fallback; }
 };
 
-// ====== ميدلوير عام ======
+// ===================== ميدلوير عام =====================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ====== Firebase Admin ======
+// ===================== Firebase Admin =====================
 let db = null;
 try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : null;
@@ -42,9 +42,9 @@ try {
   console.log('⚠️ Firestore disabled:', e.message);
 }
 
-// ====== Helpers ======
+// ===================== Helpers =====================
 const dayMs = 86400000;
-const toYYYYMMDD = (d) => new Date(d).toISOString().slice(0,10);
+const toYYYYMMDD = (d) => new Date(d).toISOString().slice(0, 10);
 const toDate = (v) => {
   if (!v) return null;
   if (v._seconds) return new Date(v._seconds * 1000);
@@ -54,27 +54,27 @@ const toDate = (v) => {
   return new Date(s);
 };
 
-const tenantKey = (v) => (v==null || v==='') ? 'DEFAULT' : String(v);
-function resolveTenant(req){
+const tenantKey = (v) => (v == null || v === '') ? 'DEFAULT' : String(v);
+function resolveTenant(req) {
   return tenantKey(
     req.headers['x-user-id'] || req.query.userId ||
     req.headers['x-farm-id'] || req.query.farmId ||
     process.env.DEFAULT_TENANT_ID || process.env.DEFAULT_FARM_ID || 'DEFAULT'
   );
 }
-function belongs(rec, tenant){
+function belongs(rec, tenant) {
   const t = rec?.userId ?? rec?.farmId ?? 'DEFAULT';
   return tenantKey(t) === tenantKey(tenant);
 }
-function requireUserId(req, res, next){
+function requireUserId(req, res, next) {
   const t = resolveTenant(req);
-  if (!t || t === 'DEFAULT') return res.status(400).json({ ok:false, error:'userId_required' });
+  if (!t || t === 'DEFAULT') return res.status(400).json({ ok: false, error: 'userId_required' });
   req.userId = t;
   next();
 }
 
-// ====== Admin Gate ======
-const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+// ===================== Admin Gate =====================
+const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const ADMIN_DEV_OPEN = process.env.ADMIN_DEV_OPEN === '1';
 
 async function ensureAdmin(req, res, next) {
@@ -95,30 +95,81 @@ async function ensureAdmin(req, res, next) {
   }
 }
 
+// ===================== تجميعة حيوانات + Auto-claim =====================
+const AUTO_CLAIM_MISSING_USERID = process.env.AUTO_CLAIM_MISSING_USERID !== '0'; // افتراضيًا يعمل
+
+/**
+ * يجمع حيوانات المستأجر من:
+ *  - animals (جذر)
+ *  - collectionGroup('animals')
+ *  - users/{uid}/animals (لالتقاط وثائق ناقصة userId)
+ * ويمكنه تثبيت userId تلقائيًا على الوثائق الناقصة (idempotent)
+ */
+async function fetchAnimalsForTenant(tenant, { autoclaim = false } = {}) {
+  if (!db) {
+    const animals = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    return { animals, autoClaimed: 0 };
+  }
+
+  const adb = admin.firestore();
+  const seen = new Map(); // path -> data
+  const push = (d) => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...(d.data() || {}), __path: d.ref.path }); };
+
+  // 1) الجذر
+  for (const fld of ['userId', 'farmId']) {
+    try { (await adb.collection('animals').where(fld, '==', tenant).limit(3000).get()).docs.forEach(push); } catch {}
+  }
+  // 2) collectionGroup
+  for (const fld of ['userId', 'farmId']) {
+    try { (await adb.collectionGroup('animals').where(fld, '==', tenant).limit(3000).get()).docs.forEach(push); } catch {}
+  }
+  // 3) users/{tenant}/animals (لالتقاط الناقص)
+  try { (await adb.collection('users').doc(tenant).collection('animals').limit(3000).get()).docs.forEach(push); } catch {}
+
+  // تثبيت userId تلقائيًا لو ناقص
+  let autoClaimed = 0;
+  if (autoclaim) {
+    let batch = adb.batch(); let ops = 0;
+    for (const a of seen.values()) {
+      if (!a.userId) {
+        batch.set(adb.doc(a.__path), { userId: tenant, farmId: tenant }, { merge: true });
+        autoClaimed++; ops++;
+        if (ops >= 450) { await batch.commit(); batch = adb.batch(); ops = 0; }
+      }
+    }
+    if (ops > 0) { try { await batch.commit(); } catch { autoClaimed = 0; } }
+  }
+
+  const animals = [...seen.values()].map(a => { delete a.__path; return a; })
+    .sort((a, b) => String(a.number || '').localeCompare(String(b.number || ''), 'en', { numeric: true }));
+
+  return { animals, autoClaimed };
+}
+
 // ============================================================
-//                       API: EVENTS
+//                          API: EVENTS
 // ============================================================
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
-    const event = req.body || {};
+    const event  = req.body || {};
     const tenant = req.userId;
     event.userId = tenant;
-    event.farmId = event.farmId || tenant;
+    event.farmId = event.farmId || tenant; // توافق مع القديم
 
     if (!event.type || !event.animalId) {
-      return res.status(400).json({ ok:false, error:'missing_fields' });
+      return res.status(400).json({ ok: false, error: 'missing_fields' });
     }
 
     // محلي
-    const events = readJson(eventsPath, []);
-    event.id = events.length + 1;
+    const ev = readJson(eventsPath, []);
+    event.id = ev.length + 1;
     if (!event.ts) event.ts = Date.now();
-    events.push(event);
-    fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
+    ev.push(event);
+    fs.writeFileSync(eventsPath, JSON.stringify(ev, null, 2));
 
-    // Mirror إلى Firestore
+    // Mirror إلى Firestore (اختياري)
     if (db) {
-      const t = String(event.type||'').toLowerCase();
+      const t = String(event.type || '').toLowerCase();
       const typeNorm =
         t.includes('insemin') || t.includes('تلقيح') ? 'insemination' :
         t.includes('preg')    || t.includes('حمل')    ? 'pregnancy'   :
@@ -127,7 +178,6 @@ app.post('/api/events', requireUserId, async (req, res) => {
 
       const whenMs  = Number(event.ts || Date.now());
       const whenISO = toYYYYMMDD(whenMs);
-
       const doc = {
         userId: tenant,
         farmId: tenant,
@@ -142,26 +192,26 @@ app.post('/api/events', requireUserId, async (req, res) => {
       try { await db.collection('events').add(doc); } catch {}
     }
 
-    return res.json({ ok:true, event });
+    return res.json({ ok: true, event });
   } catch (e) {
     console.error('events', e);
-    res.status(500).json({ ok:false, error:'failed_to_save_event' });
+    res.status(500).json({ ok: false, error: 'failed_to_save_event' });
   }
 });
 
 // ============================================================
-//                       API: ALERTS
+//                          API: ALERTS
 // ============================================================
 app.get('/api/alerts', async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
+    if (!db) return res.status(503).json({ ok: false, error: 'sensors_api_disabled' });
     const tenant   = resolveTenant(req);
     const animalId = req.query.animalId || null;
     const sinceMs  = Number(req.query.since || 0);
     const days     = Number(req.query.days || 0);
     const limit    = Math.min(Number(req.query.limit || 100), 2000);
 
-    let q = db.collection('alerts').where('farmId','==', tenant);
+    let q = db.collection('alerts').where('farmId', '==', tenant);
     if (animalId) q = q.where('subject.animalId', '==', animalId);
 
     let since = sinceMs;
@@ -170,30 +220,30 @@ app.get('/api/alerts', async (req, res) => {
 
     q = q.orderBy('ts', 'desc').limit(limit);
     const snap = await q.get();
-    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    res.json({ ok:true, count: arr.length, alerts: arr });
+    const arr  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json({ ok: true, count: arr.length, alerts: arr });
   } catch (e) {
     console.error('alerts', e);
-    res.status(500).json({ ok:false, error:'alerts_failed' });
+    res.status(500).json({ ok: false, error: 'alerts_failed' });
   }
 });
 
 // ============================================================
-//                       API: ANIMAL TIMELINE
+//                          API: ANIMAL TIMELINE
 // ============================================================
 app.get('/api/animal-timeline', async (req, res) => {
   try {
     const animalId = String(req.query.animalId || '').trim();
-    const limit = Math.min(Number(req.query.limit || 200), 1000);
-    if (!animalId) return res.status(400).json({ ok:false, error:'animalId required' });
+    const limit    = Math.min(Number(req.query.limit || 200), 1000);
+    if (!animalId) return res.status(400).json({ ok: false, error: 'animalId required' });
 
     const items = [];
 
     // محلي
-    const events = readJson(eventsPath, []);
-    events.filter(e => String(e.animalId) === animalId)
+    const ev = readJson(eventsPath, []);
+    ev.filter(e => String(e.animalId) === animalId)
       .forEach(e => items.push({
-        kind:'event',
+        kind: 'event',
         ts: e.ts || toDate(e.date)?.getTime() || Date.now(),
         title: e.type || e.title || 'حدث',
         summary: e.note || e.notes || ''
@@ -203,73 +253,75 @@ app.get('/api/animal-timeline', async (req, res) => {
     if (db) {
       const alSnap = await db.collection('alerts')
         .where('subject.animalId', '==', animalId)
-        .orderBy('ts','desc').limit(limit).get().catch(()=>({docs:[]}));
-      for (const d of (alSnap.docs||[])) {
-        items.push({ kind:'alert', ts: d.get('ts'), code: d.get('code'), summary: d.get('message') });
+        .orderBy('ts', 'desc').limit(limit).get().catch(() => ({ docs: [] }));
+      for (const d of (alSnap.docs || [])) {
+        items.push({ kind: 'alert', ts: d.get('ts'), code: d.get('code'), summary: d.get('message') });
       }
       const devSnap = await db.collection('devices')
-        .where('subject.animalId','==', animalId)
-        .limit(50).get().catch(()=>({docs:[]}));
-      for (const d of (devSnap.docs||[])) {
+        .where('subject.animalId', '==', animalId)
+        .limit(50).get().catch(() => ({ docs: [] }));
+      for (const d of (devSnap.docs || [])) {
         const m = d.get('metrics') || {};
-        const summary = Object.entries(m).slice(0,3).map(([k,v]) => `${k}: ${v.value}${v.unit||''}`).join(' • ');
-        items.push({ kind:'reading', ts: d.get('lastSeen') || 0, name: d.id, summary });
+        const summary = Object.entries(m).slice(0, 3).map(([k, v]) => `${k}: ${v.value}${v.unit || ''}`).join(' • ');
+        items.push({ kind: 'reading', ts: d.get('lastSeen') || 0, name: d.id, summary });
       }
     }
 
-    items.sort((a,b)=>b.ts-a.ts);
-    const out = items.slice(0, limit);
-    res.json({ ok:true, items: out });
+    items.sort((a, b) => b.ts - a.ts);
+    res.json({ ok: true, items: items.slice(0, limit) });
   } catch (e) {
     console.error('timeline', e);
-    res.status(500).json({ ok:false, error:'timeline_failed' });
+    res.status(500).json({ ok: false, error: 'timeline_failed' });
   }
 });
 
 // ============================================================
-//                       API: HERD STATS (مختصرة)
+//                          API: HERD STATS
 // ============================================================
 app.get('/api/herd-stats', async (req, res) => {
   try {
     const tenant  = resolveTenant(req);
     const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
-    const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
+    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
+    const gestationDays = species.includes('buffalo') ? 310 : 280;
 
-    // Firestore أولًا
+    // Firestore أولاً
     if (db) {
       const adb = admin.firestore();
 
-      // الحيوانات
-      let animalsDocs = [];
-      try { animalsDocs = (await adb.collection('animals').where('userId','==',tenant).get()).docs.slice(); } catch {}
-      try {
-        const d2 = await adb.collection('animals').where('farmId','==',tenant).get();
-        const seen = new Set(animalsDocs.map(d=>d.id));
-        for (const d of d2.docs) if (!seen.has(d.id)) animalsDocs.push(d);
-      } catch {}
+      // الحيوانات (باستخدام الدالة المشتركة + autoclaim)
+      const { animals: animalsArr } = await fetchAnimalsForTenant(tenant, { autoclaim: AUTO_CLAIM_MISSING_USERID });
+      const activeAnimals = animalsArr.filter(a => {
+        const st = String(a.status || '').toLowerCase();
+        if (a.active === false) return false;
+        return !['sold', 'dead', 'archived', 'inactive'].includes(st);
+      });
+      const activeIds   = new Set(activeAnimals.map(a => String(a.id)));
+      const totalActive = activeIds.size;
 
-      const animals = animalsDocs.map(d => ({ id:d.id, ...(d.data()||{}) }));
-      const active = animals.filter(a => a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
-      const totalActive = active.length;
-
-      // أحداث حديثة
-      const since = new Date(Date.now() - (analysisDays + 310 + 60) * dayMs);
-      const sinceStr = toYYYYMMDD(since);
+      // نافذة الأحداث
+      const eventsLookbackDays = Math.max(analysisDays + gestationDays + 60, 420);
+      const sinceAnalysis = new Date(Date.now() - analysisDays * dayMs);
+      const sinceEvents   = new Date(Date.now() - eventsLookbackDays * dayMs);
+      const sinceStr      = toYYYYMMDD(sinceEvents);
 
       async function fetchType(type) {
         const out = [];
         async function tryQ(field) {
           try {
-            const s = await adb.collection('events').where(field,'==',tenant).where('type','==',type).where('date','>=',sinceStr).get();
+            const s = await adb.collection('events').where(field, '==', tenant)
+              .where('type', '==', type).where('date', '>=', sinceStr).get();
             out.push(...s.docs);
           } catch {
-            const s = await adb.collection('events').where(field,'==',tenant).where('type','==',type).orderBy('date','desc').limit(2000).get().catch(()=>({docs:[]}));
-            (s.docs||[]).forEach(d=>{ if ((d.get('date')||'') >= sinceStr) out.push(d); });
+            const s = await adb.collection('events').where(field, '==', tenant)
+              .where('type', '==', type).orderBy('date', 'desc')
+              .limit(2000).get().catch(() => ({ docs: [] }));
+            (s.docs || []).forEach(d => { if ((d.get('date') || '') >= sinceStr) out.push(d); });
           }
         }
         await tryQ('userId'); await tryQ('farmId');
-        const map = new Map(); out.forEach(d=>map.set(d.id,d));
-        return [...map.values()].map(d=>({ id:d.id, ...(d.data()||{}) }));
+        const map = new Map(); out.forEach(d => map.set(d.id, d));
+        return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
       }
 
       const [ins, preg, births] = await Promise.all([
@@ -278,225 +330,243 @@ app.get('/api/herd-stats', async (req, res) => {
         fetchType('birth')
       ]);
 
-      const activeIds = new Set(active.map(a=>String(a.id)));
-      const insWin  = ins .filter(e => activeIds.has(String(e.animalId)) && toDate(e.date||e.createdAt) >= new Date(Date.now()-analysisDays*dayMs));
-      const pregPos = preg.filter(e => activeIds.has(String(e.animalId)) && /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
+      const insInWindow = ins.filter(e => activeIds.has(String(e.animalId)) && toDate(e.date || e.createdAt) >= sinceAnalysis);
+      const pregPosAll = preg.filter(e => activeIds.has(String(e.animalId)) && /preg|positive|حمل|ايجاب/i.test(String(e.result || e.status || e.outcome || '')));
+      const pregSet = new Set(pregPosAll.map(e => String(e.animalId)));
 
-      const pregSet = new Set(pregPos.map(e=>String(e.animalId)));
       const openCount = Math.max(0, totalActive - pregSet.size);
-      const conceptionRate = insWin.length ? +( (pregPos.filter(e=>toDate(e.date||e.createdAt) >= new Date(Date.now()-analysisDays*dayMs)).length / insWin.length) * 100 ).toFixed(1) : 0;
+      const pregnanciesInAnalysis = pregPosAll.filter(e => toDate(e.date || e.createdAt) >= sinceAnalysis).length;
+      const conceptionRate = insInWindow.length ? +((pregnanciesInAnalysis / insInWindow.length) * 100).toFixed(1) : 0;
 
-      res.json({
-        ok:true,
-        totals:{
+      return res.json({
+        ok: true,
+        windows: { analysisDays, gestationDays },
+        totals: {
           totalActive,
-          pregnant:   { count: pregSet.size, pct: totalActive? +((pregSet.size/totalActive)*100).toFixed(1):0 },
-          inseminated:{ count: new Set(insWin.map(e=>String(e.animalId))).size, pct: totalActive? +((new Set(insWin.map(e=>String(e.animalId))).size/totalActive)*100).toFixed(1):0 },
-          open:       { count: openCount, pct: totalActive? +((openCount/totalActive)*100).toFixed(1):0 }
+          pregnant:   { count: pregSet.size,    pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0 },
+          inseminated:{ count: new Set(insInWindow.map(e => String(e.animalId))).size,
+                        pct: totalActive ? +((new Set(insInWindow.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0 },
+          open:       { count: openCount,       pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0 },
         },
-        fertility:{
-          conceptionRatePct: conceptionRate
-        }
+        fertility: { conceptionRatePct: conceptionRate }
       });
-      return;
     }
 
     // محلي fallback
-    const animalsAll = readJson(animalsPath, []).filter(a=>belongs(a,tenant));
-    const active = animalsAll.filter(a => a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
+    const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    const active = animalsAll.filter(a => a.active !== false && !['sold', 'dead', 'archived', 'inactive'].includes(String(a.status || '').toLowerCase()));
     const totalActive = active.length;
-    const evAll = readJson(eventsPath, []).filter(e=>belongs(e,tenant));
-    const insWin  = evAll.filter(e => /insemination|تلقيح/i.test(e.type||'') && toDate(e.ts||e.date) >= new Date(Date.now()-analysisDays*dayMs));
-    const pregPos = evAll.filter(e => /pregnancy|حمل/i.test(e.type||'') && /positive|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
+    const evAll = readJson(eventsPath, []).filter(e => belongs(e, tenant));
+    const sinceAnalysis = new Date(Date.now() - analysisDays * dayMs);
+    const insInWindow = evAll.filter(e => /insemination|تلقيح/i.test(e.type || '') && toDate(e.ts || e.date) >= sinceAnalysis);
+    const pregPosAll  = evAll.filter(e => /pregnancy|حمل/i.test(e.type || '') && /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || '')));
+    const pregSet     = new Set(pregPosAll.map(e => String(e.animalId)));
 
-    const pregSet = new Set(pregPos.map(e=>String(e.animalId)));
     const openCount = Math.max(0, totalActive - pregSet.size);
-    const conceptionRate = insWin.length ? +((pregPos.filter(e=>toDate(e.ts||e.date) >= new Date(Date.now()-analysisDays*dayMs)).length / insWin.length) * 100).toFixed(1) : 0;
+    const pregnanciesInAnalysis = pregPosAll.filter(e => toDate(e.ts || e.date) >= sinceAnalysis).length;
+    const conceptionRate = insInWindow.length ? +((pregnanciesInAnalysis / insInWindow.length) * 100).toFixed(1) : 0;
 
     res.json({
-      ok:true,
-      totals:{
+      ok: true,
+      windows: { analysisDays, gestationDays },
+      totals: {
         totalActive,
-        pregnant:   { count: pregSet.size, pct: totalActive? +((pregSet.size/totalActive)*100).toFixed(1):0 },
-        inseminated:{ count: new Set(insWin.map(e=>String(e.animalId))).size, pct: totalActive? +((new Set(insWin.map(e=>String(e.animalId))).size/totalActive)*100).toFixed(1):0 },
-        open:       { count: openCount, pct: totalActive? +((openCount/totalActive)*100).toFixed(1):0 }
+        pregnant:   { count: pregSet.size, pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0 },
+        inseminated:{ count: new Set(insInWindow.map(e => String(e.animalId))).size,
+                      pct: totalActive ? +((new Set(insInWindow.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0 },
+        open:       { count: openCount,       pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0 },
       },
-      fertility:{ conceptionRatePct: conceptionRate }
+      fertility: { conceptionRatePct: conceptionRate }
     });
   } catch (e) {
     console.error('herd-stats', e);
-    res.status(500).json({ ok:false, error:String(e?.message||e) });
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
 // ============================================================
-//                       API: ANIMALS (Robust)
+//                          API: ANIMALS (Robust + Auto-claim)
 // ============================================================
-// 🔄 استبدال كامل لراوت /api/animals
 app.get('/api/animals', async (req, res) => {
   try {
     const tenant = resolveTenant(req);
-
-    if (db) {
-      const adb = admin.firestore();
-      const seen = new Map(); // key = path
-      const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
-
-      for (const fld of ['userId','farmId']) {
-        try { (await adb.collection('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-        try { (await adb.collectionGroup('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-      }
-
-      const arr = [...seen.values()];
-      arr.sort((a,b)=> String(a.number||'').localeCompare(String(b.number||''),'en',{numeric:true}));
-      return res.json(arr);
-    }
-
-    // Fallback للملفات المحلية
-    const animalsAll = readJson(animalsPath, []);
-    const animals    = animalsAll.filter(a => belongs(a, tenant));
+    const { animals, autoClaimed } = await fetchAnimalsForTenant(tenant, { autoclaim: AUTO_CLAIM_MISSING_USERID });
+    res.set('X-Auto-Claimed', String(autoClaimed || 0));
     return res.json(animals);
   } catch (e) {
     console.error('animals list', e);
-    return res.status(500).json({ ok:false, error:'animals_failed' });
+    return res.status(500).json({ ok: false, error: 'animals_failed' });
   }
 });
 
+// (اختياري) استعلام حسب أرقام للمراجعة السريعة
+app.get('/api/animals/by-numbers', async (req, res) => {
+  try {
+    if (!db) return res.json([]);
+    const numsParam = String(req.query.nums || '').trim();
+    if (!numsParam) return res.json([]);
+    const wanted = numsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    const adb = admin.firestore();
+    const out = [];
+    for (const v of wanted) {
+      const set = new Map();
+      const push = d => { if (d && d.exists) set.set(d.ref.path, { id: d.id, ...(d.data() || {}) }); };
+      const cand = [v]; const n = Number(v); if (!Number.isNaN(n)) cand.push(n);
+      for (const x of cand) {
+        try { (await adb.collection('animals').where('number', '==', x).limit(50).get()).docs.forEach(push); } catch {}
+        try { (await adb.collectionGroup('animals').where('number', '==', x).limit(50).get()).docs.forEach(push); } catch {}
+      }
+      try { const d = await adb.collection('animals').doc(String(v)).get(); if (d.exists) push(d); } catch {}
+      out.push({ number: v, matches: [...set.values()] });
+    }
+    res.json({ ok: true, items: out });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'bynumbers_failed' });
+  }
+});
 
 // ============================================================
 //                 ADMIN: نقل ملكية أرقام محددة (آمن)
 // ============================================================
 app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    if (!db) return res.status(503).json({ ok: false, error: 'firestore_disabled' });
     const from = String(req.query.from || '').trim();
     const to   = String(req.query.to   || '').trim();
     const numsParam = String(req.query.nums || '').trim();
     const apply = String(req.query.apply || '') === '1';
     const uidOk = s => /^[A-Za-z0-9_-]{16,64}$/.test(s);
-    if (!from || !to || !numsParam) return res.status(400).json({ ok:false, error:'from,to,nums required' });
-    if (!uidOk(from) || !uidOk(to))  return res.status(400).json({ ok:false, error:'invalid uid' });
-    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
+    if (!from || !to || !numsParam) return res.status(400).json({ ok: false, error: 'from,to,nums required' });
+    if (!uidOk(from) || !uidOk(to))  return res.status(400).json({ ok: false, error: 'invalid uid' });
+    const wanted = numsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
     const adb = admin.firestore();
 
-    function uniqPush(set,d){ if(d&&d.exists) set.set(d.ref.path,d); }
-    async function findByNumber(val){
-      const set=new Map(); const cand=[val]; const n=Number(val); if(!Number.isNaN(n)) cand.push(n);
+    function uniqPush(set, d) { if (d && d.exists) set.set(d.ref.path, d); }
+    async function findByNumber(val) {
+      const set = new Map(); const cand = [val]; const n = Number(val); if (!Number.isNaN(n)) cand.push(n);
       for (const v of cand) {
-        try { (await adb.collection('animals').where('number','==',v).limit(50).get()).docs.forEach(d=>uniqPush(set,d)); } catch {}
-        try { (await adb.collectionGroup('animals').where('number','==',v).limit(50).get()).docs.forEach(d=>uniqPush(set,d)); } catch {}
+        try { (await adb.collection('animals').where('number', '==', v).limit(50).get()).docs.forEach(d => uniqPush(set, d)); } catch {}
+        try { (await adb.collectionGroup('animals').where('number', '==', v).limit(50).get()).docs.forEach(d => uniqPush(set, d)); } catch {}
       }
-      try { const d=await adb.collection('animals').doc(String(val)).get(); uniqPush(set,d); } catch {}
+      try { const d = await adb.collection('animals').doc(String(val)).get(); uniqPush(set, d); } catch {}
       return [...set.values()];
     }
 
-    const plan=[];
+    const plan = [];
     for (const num of wanted) {
       const docs = await findByNumber(num);
       for (const d of docs) {
-        const a=d.data()||{};
-        const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
-        const willUpdate = String(owner||'').trim() === from;
-        plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before: owner??null, willUpdate });
+        const a = d.data() || {};
+        const owner = a.userId || a.farmId || a.createdBy || a.ownerId || a.uid || null;
+        const willUpdate = String(owner || '').trim() === from;
+        plan.push({ path: d.ref.path, id: d.id, number: a.number ?? null, owner_before: owner ?? null, willUpdate });
       }
     }
 
-    let updated=0;
+    let updated = 0;
     if (apply) {
-      let batch = adb.batch(); let ops=0;
+      let batch = adb.batch(); let ops = 0;
       for (const p of plan) {
         if (!p.willUpdate) continue;
         const ref = adb.doc(p.path);
-        batch.set(ref, { userId: to, farmId: to }, { merge:true });
+        batch.set(ref, { userId: to, farmId: to }, { merge: true });
         updated++; ops++;
-        if (ops>=450) { await batch.commit(); batch=adb.batch(); ops=0; }
+        if (ops >= 450) { await batch.commit(); batch = adb.batch(); ops = 0; }
       }
-      if (ops>0) await batch.commit();
+      if (ops > 0) await batch.commit();
     }
 
-    try { await db.collection('admin_audits').add({ kind:'animals.transfer-owner', ts:Date.now(), apply, from, to, nums:wanted, matched: plan.filter(p=>p.willUpdate).length, updated }); } catch {}
+    try { await db.collection('admin_audits').add({ kind: 'animals.transfer-owner', ts: Date.now(), apply, from, to, nums: wanted, matched: plan.filter(p => p.willUpdate).length, updated }); } catch {}
 
-    res.json({ ok:true, dryRun: !apply, from, to, nums:wanted, found: plan.length, matched: plan.filter(p=>p.willUpdate).length, updated, plan });
+    res.json({ ok: true, dryRun: !apply, from, to, nums: wanted, found: plan.length, matched: plan.filter(p => p.willUpdate).length, updated, plan });
   } catch (e) {
     console.error('transfer-owner', e);
-    res.status(500).json({ ok:false, error: e?.message || 'transfer_failed' });
+    res.status(500).json({ ok: false, error: e?.message || 'transfer_failed' });
   }
 });
 
 // ============================================================
-//                 DEBUG (يعمل فقط في DEV)
+//                 إصلاح سريع: Claim أرقام للمستخدم الحالي
+// ============================================================
+// POST /api/fix/animals/claim?nums=1,2&allow=UID_قديم[,UID2][&dry=1]
+app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok: false, error: 'firestore_disabled' });
+    const tenant = req.userId;
+    const numsParam = String(req.query.nums || '').trim();
+    const allow = new Set(String(req.query.allow || '').split(',').map(s => s.trim()).filter(Boolean));
+    const dry = String(req.query.dry || '') === '1';
+    if (!numsParam) return res.status(400).json({ ok: false, error: 'nums required' });
+
+    const adb = admin.firestore();
+    const wanted = numsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    const seen = new Map();
+    const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
+
+    async function findByNumber(v) {
+      const cand = [v]; const n = Number(v); if (!Number.isNaN(n)) cand.push(n);
+      for (const x of cand) {
+        try { (await adb.collection('animals').where('number', '==', x).limit(50).get()).docs.forEach(push); } catch {}
+        try { (await adb.collectionGroup('animals').where('number', '==', x).limit(50).get()).docs.forEach(push); } catch {}
+      }
+      try { const d = await adb.collection('animals').doc(String(v)).get(); push(d); } catch {}
+    }
+
+    for (const num of wanted) await findByNumber(num);
+
+    const plan = [];
+    for (const d of seen.values()) {
+      const a = d.data() || {};
+      const owner = a.userId || a.farmId || a.createdBy || a.ownerId || a.uid || null;
+      const can = !owner || allow.has(String(owner).trim());
+      plan.push({ path: d.ref.path, id: d.id, number: a.number ?? null, owner_before: owner ?? null, willUpdate: !!can });
+      if (can && !dry) await d.ref.set({ userId: tenant, farmId: tenant }, { merge: true });
+    }
+
+    res.json({ ok: true, dryRun: dry, tenant, found: plan.length, updated: dry ? 0 : plan.filter(p => p.willUpdate).length, plan });
+  } catch (e) {
+    console.error('claim error', e);
+    res.status(500).json({ ok: false, error: e?.message || 'claim_failed' });
+  }
+});
+
+// ============================================================
+//                          DEBUG (DEV فقط)
 // ============================================================
 if (ADMIN_DEV_OPEN) {
-  app.get('/api/debug/echo-tenant', (req,res) => {
-    res.json({ header_x_user_id: req.headers['x-user-id']||null, query_userId:req.query.userId||null, resolvedTenant: resolveTenant(req) });
+  app.get('/api/debug/echo-tenant', (req, res) => {
+    res.json({ header_x_user_id: req.headers['x-user-id'] || null, query_userId: req.query.userId || null, resolvedTenant: resolveTenant(req) });
   });
 
   app.get('/api/debug/cloud-animals-sample', async (_req, res) => {
     try {
-      if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+      if (!db) return res.status(503).json({ ok: false, error: 'firestore_disabled' });
       const snap = await admin.firestore().collectionGroup('animals').limit(10).get();
       const items = snap.docs.map(d => {
         const a = d.data() || {};
-        return { path:d.ref.path, id:d.id, userId:a.userId||null, farmId:a.farmId||null, number:a.number||null };
+        return { path: d.ref.path, id: d.id, userId: a.userId || null, farmId: a.farmId || null, number: a.number || null };
       });
-      res.json({ ok:true, items });
+      res.json({ ok: true, items });
     } catch (e) {
-      res.status(500).json({ ok:false, error:e?.message||'cloud_sample_failed' });
+      res.status(500).json({ ok: false, error: e?.message || 'cloud_sample_failed' });
     }
   });
 }
-// ===== Claim animals by numbers for the current user (safe) =====
-// POST /api/fix/animals/claim?nums=1,2&allow=DoWQaqC9kUP1HU2aLSnu[,UID2][&dry=1]
-app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
-  try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
-    const tenant = req.userId;
-    const numsParam = String(req.query.nums || '').trim();
-    const allow = new Set(String(req.query.allow||'').split(',').map(s=>s.trim()).filter(Boolean));
-    const dry = String(req.query.dry||'') === '1';
-    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required' });
-
-    const adb = admin.firestore();
-    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
-    const seen = new Map();
-    const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
-
-    async function findByNumber(v){
-      const cand=[v]; const n=Number(v); if(!Number.isNaN(n)) cand.push(n);
-      for(const x of cand){
-        try{ (await adb.collection('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
-        try{ (await adb.collectionGroup('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
-      }
-      try{ const d=await adb.collection('animals').doc(String(v)).get(); push(d);}catch{}
-    }
-
-    for(const num of wanted) await findByNumber(num);
-
-    const plan=[];
-    for(const d of seen.values()){
-      const a=d.data()||{};
-      const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
-      const can = !owner || allow.has(String(owner).trim());
-      plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before:owner??null, willUpdate:!!can });
-      if (can && !dry) await d.ref.set({ userId: tenant }, { merge:true });
-    }
-
-    res.json({ ok:true, dryRun:dry, tenant, found:plan.length,
-      updated: dry ? 0 : plan.filter(p=>p.willUpdate).length, plan });
-  } catch (e) {
-    console.error('claim error', e);
-    res.status(500).json({ ok:false, error:e?.message||'claim_failed' });
-  }
-});
 
 // ============================================================
-//                 COMPAT + WEB PAGES
+//                        توافق + صفحات الويب
 // ============================================================
+// مسار قديم للتوافق
 app.get('/alerts/:id', (req, res) => {
   const userId = parseInt(req.params.id, 10);
   const oldAlerts = readJson(alertsPath, []);
   const userAlerts = oldAlerts.filter(a => a.user_id === userId);
   res.json({ alerts: userAlerts });
+});
+
+// كتم تحذير الصحة
+app.get('/api/sensors/health', (_req, res) => {
+  const ok = !!db; res.status(ok ? 200 : 503).json({ ok, devices: 0 });
 });
 
 app.get('/timeline.html', ensureAdmin, (_req, res) => {
@@ -508,10 +578,10 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'index.html'));
 });
 
-// ===== Static must be last
+// ===================== Static must be last =====================
 app.use(express.static(path.join(__dirname, 'www')));
 
-// ===== Start
+// ===================== Start =====================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
 });
