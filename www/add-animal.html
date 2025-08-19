@@ -135,12 +135,21 @@
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
   </form>
-<script>window.dataLayer = window.dataLayer || [];</script>
 
-<script src="/js/app-core.js" defer></script>
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
+  <!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || {
+      event: function(name, props){
+        try { window.dataLayer.push({ event: name, ts: Date.now(), ...(props||{}) }); } catch(e){}
+      }
+    };
+  </script>
 
+  <!-- 1) تحليلات خارجية (يرسل page_view تلقائيًا) -->
+  <script src="/js/app-core.js" defer></script>
+
+  <!-- 2) سكربت الصفحة (Firebase + منطق الصفحة) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -335,12 +344,14 @@
       }
     });
   </script>
- 
+
+  <!-- 3) بعد تهيئة Firebase: الخطّ الزمني + القواعد الذكية (لا تغيير بصري) -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+
+  <!-- سكربتاتك الأصلية كما هي -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js" defer></script>
 
 </body>
 </html>
-
-
-
