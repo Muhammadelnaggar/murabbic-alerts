@@ -1,112 +1,96 @@
-// www/js/herd-gauges.js
-(function () {
-  // ---------- helpers ----------
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+// /www/js/herd-gauges.js
+(() => {
+  const qs = (sel, el = document) => el.querySelector(sel);
+  const qsa = (sel, el = document) => [...el.querySelectorAll(sel)];
+  const fmtPct = (x) => Number.isFinite(x) ? Math.round(x) + '%' : '—';
 
-  function getUserId() {
-    return (
-      localStorage.getItem('currentUserId') ||
-      localStorage.getItem('user_id') ||
-      localStorage.getItem('userId') ||
-      'DEFAULT'
-    );
+  function ensureGauge(el) {
+    if (el.__wired) return;
+    el.__wired = true;
+    el.innerHTML = `
+      <svg viewBox="0 0 100 50" aria-hidden="true">
+        <path d="M10,50 A40,40 0 0 1 90,50" fill="none" stroke="#eee" stroke-width="10" />
+        <path class="bar" d="M10,50 A40,40 0 0 1 90,50" fill="none" stroke="#2e7d32" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 250"/>
+      </svg>
+      <div class="val">—</div>
+    `;
   }
-  function getSpecies() {
-    return localStorage.getItem('herdProfile') === 'cow' ? 'cow' : 'buffalo';
-  }
-
-  async function fetchHerdStats() {
-    const userId = getUserId();
-    const species = getSpecies();
-    const qs = new URLSearchParams({
-      species,
-      analysisDays: '90',
-      userId, // ← نمرّر userId كـ query
-    });
-    const res = await fetch(`/api/herd-stats?${qs}`, {
-      headers: { 'X-User-Id': userId }, // ← ونمرّره أيضاً في الهيدر
-    });
-    if (!res.ok) throw new Error('herd-stats http error');
-    return await res.json();
+  function setGauge(el, pct) {
+    ensureGauge(el);
+    const dash = Math.max(0, Math.min(100, +pct || 0)) * 1.57; // قوس نصف دائرة
+    qs('.bar', el).setAttribute('stroke-dasharray', `${dash} 250`);
+    qs('.val', el).textContent = fmtPct(pct);
   }
 
-  function drawGauge(el, pct) {
-    pct = Math.max(0, Math.min(100, Number(pct) || 0));
-    el.innerHTML = '';
-    el.classList.add('gauge');
-
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('viewBox', '0 0 200 100');
-    svg.setAttribute('aria-hidden', 'true');
-
-    const track = document.createElementNS(svgNS, 'path');
-    track.setAttribute('d', 'M10,100 A90,90 0 0 1 190,100');
-    track.setAttribute('fill', 'none');
-    track.setAttribute('stroke', '#e5e7eb');
-    track.setAttribute('stroke-width', '14');
-    track.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(track);
-
-    const val = document.createElementNS(svgNS, 'path');
-    val.setAttribute('d', 'M10,100 A90,90 0 0 1 190,100');
-    val.setAttribute('fill', 'none');
-    val.setAttribute('stroke', '#10b981'); // أخضر
-    val.setAttribute('stroke-width', '14');
-    val.setAttribute('stroke-linecap', 'round');
-    val.style.transition = 'stroke-dasharray .6s ease';
-    svg.appendChild(val);
-
-    el.appendChild(svg);
-
-    const L = val.getTotalLength();
-    const on = (pct / 100) * L;
-    val.style.strokeDasharray = `${on} ${L - on}`;
-
-    const lbl = document.createElement('div');
-    lbl.className = 'val';
-    lbl.textContent = `${Math.round(pct)}%`;
-    el.appendChild(lbl);
+  // كتابة سطر الوصف تحت كل عداد
+  function setLine(id, text) {
+    const el = qs('#' + id);
+    if (el) el.textContent = text;
   }
 
-  function setLine(id, txt) {
-    const el = document.getElementById(`line-${id}`);
-    if (el) el.textContent = txt;
-  }
-
-  async function refresh() {
+  async function getJSON(url) {
     try {
-      const data = await fetchHerdStats();
-      const totals = data.totals || {};
-      const totalActive = Number(totals.totalActive || 0);
-
-      const mapPct = {
-        pregnant: totals.pregnant?.pct || 0,
-        inseminated: totals.inseminated?.pct || 0,
-        open: totals.open?.pct || 0,
-        conception: data.fertility?.conceptionRatePct || 0,
-      };
-
-      $$('.gauge').forEach((g) => {
-        const key = g.dataset.key;
-        drawGauge(g, mapPct[key] || 0);
-      });
-
-      setLine('pregnant', `${totals.pregnant?.count || 0} من ${totalActive}`);
-      setLine('inseminated', `${totals.inseminated?.count || 0} من ${totalActive}`);
-      setLine('open', `${totals.open?.count || 0} من ${totalActive}`);
-
-      const sum = document.getElementById('herd-numbers');
-      if (sum) {
-        const insW = data.fertility?.denominators?.inseminationsInWindow || 0;
-        const pregW = data.fertility?.denominators?.pregnanciesInWindow || 0;
-        sum.textContent = `إجمالي نشِط: ${totalActive} — تلقيحات في النافذة: ${insW} — حمول موجبة: ${pregW}`;
-      }
-    } catch (e) {
-      console.error('herd-gauges', e);
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (_) {
+      return null;
     }
   }
 
-  document.addEventListener('DOMContentLoaded', refresh);
+  async function load() {
+    // النوع المختار (جاموس/أبقار)
+    const species = (localStorage.getItem('herdProfile') || 'buffalo').toLowerCase();
+
+    // 1) اقرأ الحيوانات (للتأكد من ظهورها للمستخدم)
+    const animals = await getJSON(API('/api/animals')) || [];
+    const totalAnimals = Array.isArray(animals) ? animals.length
+                       : Array.isArray(animals.items) ? animals.items.length : 0;
+
+    // 2) إحصاءات القطيع
+    const stats = await getJSON(API(`/api/herd-stats?species=${encodeURIComponent(species)}&analysisDays=90`));
+
+    // إعداد القيم الافتراضية (لو حصل خطأ، ما نرميش 500 للواجهة)
+    const S = {
+      totalActive: 0,
+      pregnantCnt: 0, pregnantPct: 0,
+      inseminatedCnt: 0, inseminatedPct: 0,
+      openCnt: 0, openPct: 0,
+      conceptionPct: 0
+    };
+
+    if (stats && stats.ok && stats.totals) {
+      S.totalActive     = +stats.totals.totalActive || 0;
+      S.pregnantCnt     = +(stats.totals.pregnant?.count || 0);
+      S.pregnantPct     = +(stats.totals.pregnant?.pct || 0);
+      S.inseminatedCnt  = +(stats.totals.inseminated?.count || 0);
+      S.inseminatedPct  = +(stats.totals.inseminated?.pct || 0);
+      S.openCnt         = +(stats.totals.open?.count || 0);
+      S.openPct         = +(stats.totals.open?.pct || 0);
+      S.conceptionPct   = +(stats.fertility?.conceptionRatePct || 0);
+    } else {
+      // fallback: لو السيرفر رجّع خطأ، استخدم عدد الحيوانات على الأقل للعرض
+      S.totalActive = totalAnimals;
+    }
+
+    // رسم العدادات
+    setGauge(qs('.gauge[data-key="pregnant"]'),    S.pregnantPct);
+    setGauge(qs('.gauge[data-key="inseminated"]'), S.inseminatedPct);
+    setGauge(qs('.gauge[data-key="open"]'),        S.openPct);
+    setGauge(qs('.gauge[data-key="conception"]'),  S.conceptionPct);
+
+    // السطور التوضيحية
+    setLine('line-pregnant',    `عِشار: ${S.pregnantCnt} من ${S.totalActive}`);
+    setLine('line-inseminated', `ملقّحات: ${S.inseminatedCnt} من ${S.totalActive}`);
+    setLine('line-open',        `مفتوحة: ${S.openCnt} من ${S.totalActive}`);
+    setLine('line-conception',  `Conception: ${fmtPct(S.conceptionPct)}`);
+
+    const numbersEl = qs('#herd-numbers');
+    if (numbersEl) {
+      numbersEl.textContent =
+        `إجمالي نشِط: ${S.totalActive} • عِشار: ${S.pregnantCnt} • ملقّحات: ${S.inseminatedCnt} • مفتوحة: ${S.openCnt}`;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
 })();
