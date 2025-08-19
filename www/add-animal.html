@@ -133,11 +133,12 @@
     </div>
 
     <button type="submit">📥 تسجيل الحيوان</button>
+    <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
   </form>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
@@ -211,16 +212,63 @@
       return d.toISOString().slice(0,10);
     }
 
+    // ———— الإبحار فقط (بدون أي تغيير بصري) ————
+    const DASHBOARD_URL = 'dashboard.html';
+    let __hasAnimals = null;
+
+    async function userHasAnimals(userId){
+      const q0 = query(collection(db,'animals'), where('userId','==', userId), limit(1));
+      const snap0 = await getDocs(q0);
+      return !snap0.empty;
+    }
+
+    async function getUserIdWithRetry(tries = 20, delay = 150){
+      for (let i=0;i<tries;i++){
+        const uid = localStorage.getItem('userId');
+        if (uid) return uid;
+        await new Promise(r=>setTimeout(r, delay));
+      }
+      return null;
+    }
+
     // ربط الأحداث
     document.getElementById("animalType").addEventListener("change", updateBreedOptions);
     document.getElementById("productionStatus").addEventListener("change", toggleMilkField);
     document.getElementById("reproductiveStatus").addEventListener("change", toggleInseminationField);
 
-    // لضبط الحالة الأولية عند تحميل الصفحة
-    window.addEventListener("DOMContentLoaded", () => {
+    // لضبط الحالة الأولية عند تحميل الصفحة + منطق الرجوع
+    window.addEventListener("DOMContentLoaded", async () => {
       updateBreedOptions();
       toggleMilkField();
       toggleInseminationField();
+
+      // إعداد الرجوع للداشبورد للمستخدم الموجود، والمنع للمستخدم الجديد
+      history.pushState({page:'add-animal'}, '', location.href);
+      const uid = await getUserIdWithRetry();
+      if (uid){
+        try { __hasAnimals = await userHasAnimals(uid); } catch(_){ __hasAnimals = null; }
+      }
+      window.addEventListener('popstate', () => {
+        if (__hasAnimals === false){
+          alert('أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.');
+          history.pushState({page:'add-animal'}, '', location.href);
+        } else {
+          location.href = DASHBOARD_URL;
+        }
+      });
+
+      // زر إلغاء والعودة (إبحار فقط، بدون أي تنسيق بصري إضافي)
+      const cancelLink = document.getElementById('cancelLink');
+      if (cancelLink){
+        cancelLink.addEventListener('click', (e)=>{
+          e.preventDefault();
+          if (__hasAnimals === false){
+            alert('أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.');
+            return;
+          }
+          location.href = DASHBOARD_URL;
+        });
+      }
     });
 
     const form = document.getElementById("animalForm");
@@ -287,5 +335,3 @@
 
 </body>
 </html>
-
-
