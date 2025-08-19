@@ -1,10 +1,10 @@
 // ✅ server.js — نسخة مُنقّحة ومحكومة بالمستخدم (userId) مع توافق farmId
 // ------------------------------------------------------------
-const path   = require('path');
-const fs     = require('fs');
-const express= require('express');
-const cors   = require('cors');
-const admin  = require('firebase-admin');
+const path    = require('path');
+const fs      = require('fs');
+const express = require('express');
+const cors    = require('cors');
+const admin   = require('firebase-admin');
 
 const { evaluateSensorAlerts, evaluateAppAlerts } = require('./server/alerts-engine');
 
@@ -36,6 +36,7 @@ try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : null;
+
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: sa ? admin.credential.cert(sa) : admin.credential.applicationDefault()
@@ -60,14 +61,14 @@ const toDate = (v) => {
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T00:00:00Z');
   return new Date(s);
 };
-const readJson = (p, fallback=[]) => {
+const readJson = (p, fallback = []) => {
   try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
   catch { return fallback; }
 };
 
 // هوية المستأجر Tenant (userId أولًا مع توافق farmId)
 const tenantKey = (v) => (v == null || v === '' ? 'DEFAULT' : String(v));
-function resolveTenant(req){
+function resolveTenant(req) {
   return tenantKey(
     req.headers['x-user-id'] || req.query.userId ||
     req.headers['x-farm-id'] || req.query.farmId ||
@@ -75,12 +76,26 @@ function resolveTenant(req){
   );
 }
 // هل السجل يتبع هذا المستأجر؟ (يدعم userId أو farmId داخل السجل)
-function belongs(rec, tenant){
+function belongs(rec, tenant) {
   const recTenant =
     rec?.userId != null && rec.userId !== '' ? rec.userId :
     rec?.farmId != null && rec.farmId !== '' ? rec.farmId :
     'DEFAULT';
   return tenantKey(recTenant) === tenantKey(tenant);
+}
+
+// ===== ميدلوير صارم لبعض الراوتات (لازم userId/farmId) =====
+function extractTenantFromReq(req) {
+  return (
+    req.headers['x-user-id'] || req.query.userId ||
+    req.headers['x-farm-id'] || req.query.farmId || ''
+  );
+}
+function requireUserId(req, res, next) {
+  const t = extractTenantFromReq(req);
+  if (!t) return res.status(400).json({ error: 'userId مطلوب. مرّره في X-User-Id أو ?userId' });
+  req.userId = t; // نستخدمه كـ tenant
+  next();
 }
 
 // ============================================================
@@ -115,7 +130,10 @@ app.post('/api/users/login', (req, res) => {
 // تسجيل حيوان جديد (محلي) — تثبيت tenant
 app.post('/api/animals', (req, res) => {
   const animals = readJson(animalsPath, []);
-  const tenant  = tenantKey(req.body.userId || req.headers['x-user-id'] || req.body.farmId || req.headers['x-farm-id'] || 'DEFAULT');
+  const tenant  = tenantKey(
+    req.body.userId || req.headers['x-user-id'] ||
+    req.body.farmId || req.headers['x-farm-id'] || 'DEFAULT'
+  );
 
   const newAnimal = { ...req.body, id: animals.length + 1, userId: tenant, farmId: tenant }; // farmId للتوافق
   animals.push(newAnimal);
@@ -127,7 +145,11 @@ app.post('/api/animals', (req, res) => {
 app.post('/api/events', async (req, res) => {
   try {
     const event = req.body || {};
-    const tenant = tenantKey(event.userId || req.headers['x-user-id'] || event.farmId || req.headers['x-farm-id'] || process.env.DEFAULT_TENANT_ID || 'DEFAULT');
+    const tenant = tenantKey(
+      event.userId || req.headers['x-user-id'] ||
+      event.farmId || req.headers['x-farm-id'] ||
+      process.env.DEFAULT_TENANT_ID || 'DEFAULT'
+    );
     event.userId = tenant;
     event.farmId = event.farmId || tenant; // توافق
 
@@ -265,7 +287,7 @@ app.post('/ingest', async (req, res) => {
     return res.json({ ok:true, alerts: alerts.length });
   } catch (e) {
     console.error('ingest', e);
-    return res.status(500).json({ ok:false, error:'ingest_failed' });
+    return res.status(500).json({ ok:false, error:'igest_failed' });
   }
 });
 
@@ -385,9 +407,9 @@ app.get('/api/herd-stats', async (req, res) => {
     const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
     const tenant  = resolveTenant(req);
 
-    const analysisDays     = parseInt(req.query.analysisDays || '90', 10);
-    const gestationDays    = species.includes('buffalo') ? 310 : 280;
-    const pregLookbackDays = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
+    const analysisDays       = parseInt(req.query.analysisDays || '90', 10);
+    const gestationDays      = species.includes('buffalo') ? 310 : 280;
+    const pregLookbackDays   = parseInt(req.query.pregnantLookbackDays || String(gestationDays), 10);
     const eventsLookbackDays = Math.max(analysisDays + gestationDays + 60, 420);
 
     const now = new Date();
@@ -481,7 +503,7 @@ app.get('/api/herd-stats', async (req, res) => {
 
       const pregPosInAnalysis = pregAll.filter(e => {
         const resField = String(e.result || e.status || e.outcome || '').toLowerCase();
-        const ok = /preg|positive|حمل|ايجاب/.test(resField);
+               const ok = /preg|positive|حمل|ايجاب/.test(resField);
         const when = toDate(e.date || e.createdAt);
         return ok && when >= sinceAnalysis;
       });
@@ -609,6 +631,122 @@ app.get('/api/herd-stats', async (req, res) => {
 });
 
 // ============================================================
+//     GET /api/animals و GET /api/events — نسخة مُحصّنة
+// ============================================================
+
+// animals: Firestore + Local, requires tenant
+app.get('/api/animals', requireUserId, async (req, res) => {
+  try {
+    const tenant = tenantKey(req.userId);
+    let cloud = [];
+
+    if (db) {
+      const adb = admin.firestore();
+      const acc = [];
+      try {
+        const s1 = await adb.collection('animals').where('userId','==', tenant).get();
+        acc.push(...s1.docs);
+      } catch {}
+      try {
+        const s2 = await adb.collection('animals').where('farmId','==', tenant).get();
+        const seen = new Set(acc.map(d=>d.id));
+        for (const d of s2.docs) if (!seen.has(d.id)) acc.push(d);
+      } catch {}
+      cloud = acc.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    const local = readJson(animalsPath, [])
+      .filter(a => belongs(a, tenant))
+      .map((a, i) => ({ id: a.id || `local-${i+1}`, ...a }));
+
+    const byKey = new Map();
+    for (const x of [...cloud, ...local]) {
+      const key = x.id ? `id:${x.id}` : `num:${x.number}|sp:${x.species||''}`;
+      if (!byKey.has(key)) byKey.set(key, x);
+    }
+
+    const items = [...byKey.values()].map(a => ({
+      id: a.id || null,
+      number: a.number ?? null,
+      species: a.species ?? null,
+      category: a.category ?? null,
+      status: a.status ?? null,
+      lactationStatus: a.lactationStatus ?? null,
+      lastCalvingDate: a.lastCalvingDate ?? null
+    }));
+
+    return res.json(items);
+  } catch (e) {
+    console.error('GET /api/animals error:', e);
+    return res.status(500).json({ error: 'animals_route_failed', message: e?.message });
+  }
+});
+
+// events: Firestore + Local, requires tenant
+app.get('/api/events', requireUserId, async (req, res) => {
+  try {
+    const tenant   = tenantKey(req.userId);
+    const animalId = req.query.animalId ? String(req.query.animalId) : null;
+    const type     = req.query.type ? String(req.query.type) : null;
+    const dateFrom = req.query.dateFrom || null; // YYYY-MM-DD
+    const dateTo   = req.query.dateTo   || null;
+
+    let cloud = [];
+    if (db) {
+      const adb = admin.firestore();
+      const docs = [];
+      async function pull(field){
+        let q = adb.collection('events').where(field,'==', tenant);
+        if (animalId) q = q.where('animalId','==', animalId);
+        if (type)     q = q.where('type','==', type);
+        try {
+          if (dateFrom) q = q.where('date','>=', dateFrom);
+          if (dateTo)   q = q.where('date','<=', dateTo);
+          const s = await q.orderBy('date','desc').limit(500).get();
+          docs.push(...s.docs);
+        } catch {
+          const s = await q.orderBy('date','desc').limit(2000).get().catch(()=>({docs:[]}));
+          for (const d of s.docs) {
+            const dd = d.get('date') || '';
+            if ((!dateFrom || dd >= dateFrom) && (!dateTo || dd <= dateTo)) docs.push(d);
+          }
+        }
+      }
+      await pull('userId'); await pull('farmId');
+      const map = new Map(); for (const d of docs) map.set(d.id, d);
+      cloud = Array.from(map.values()).map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    const localRaw = readJson(eventsPath, []).filter(e => belongs(e, tenant));
+    const local = localRaw.map((e, i) => {
+      const ts = Number(e.ts || Date.now());
+      const iso = new Date(ts).toISOString().slice(0,10);
+      return {
+        id: e.id || `local-${i+1}`,
+        userId: tenant,
+        animalId: String(e.animalId || ''),
+        type: e.type || 'event',
+        date: e.date || iso,
+        note: e.note || e.notes || ''
+      };
+    });
+
+    let items = [...cloud, ...local];
+
+    if (animalId) items = items.filter(e => String(e.animalId) === animalId);
+    if (type)     items = items.filter(e => String(e.type) === type);
+    if (dateFrom) items = items.filter(e => (e.date || '') >= dateFrom);
+    if (dateTo)   items = items.filter(e => (e.date || '') <= dateTo);
+
+    items.sort((a,b) => (a.date < b.date ? 1 : -1));
+    return res.json(items.slice(0, 500));
+  } catch (e) {
+    console.error('GET /api/events error:', e);
+    return res.status(500).json({ error: 'events_route_failed', message: e?.message });
+  }
+});
+
+// ============================================================
 //                   WEB PAGES / ROUTES
 // ============================================================
 const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -649,13 +787,6 @@ app.get('/alerts/:id', (req, res) => {
   const oldAlerts = readJson(alertsPath, []);
   const userAlerts = oldAlerts.filter(a => a.user_id === userId);
   res.json({ alerts: userAlerts });
-});
-
-app.get('/api/animals', (_req, res) => {
-  fs.readFile(animalsPath, 'utf8', (err, data) => {
-    if (err) return res.status(500).json({ error: 'فشل في قراءة البيانات' });
-    try { res.json(JSON.parse(data)); } catch { res.status(500).json({ error: 'خطأ في البيانات' }); }
-  });
 });
 
 // ============================================================
