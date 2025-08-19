@@ -332,69 +332,36 @@ app.get('/api/herd-stats', async (req, res) => {
 // ============================================================
 //                       API: ANIMALS (Robust)
 // ============================================================
-app.get('/api/animals', requireUserId, async (req, res) => {
+// 🔄 استبدال كامل لراوت /api/animals
+app.get('/api/animals', async (req, res) => {
   try {
-    const tenant = tenantKey(req.userId);
-    const items = new Map();
-    const pushDoc = (d) => { if(!d) return; const a=d.data? (d.data()||{}):d; const key=d.ref? d.ref.path : (a.id||Math.random()); items.set(key, { id:d.id||a.id||null, ...a }); };
+    const tenant = resolveTenant(req);
 
     if (db) {
       const adb = admin.firestore();
-      const ownerFields = ['userId','farmId'];
+      const seen = new Map(); // key = path
+      const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
 
-      // users/{tenant}/animals
-      try { (await adb.collection('users').doc(tenant).collection('animals').limit(500).get()).docs.forEach(pushDoc); } catch {}
-
-      // root (userId/farmId)
-      for (const f of ownerFields) {
-        try { (await adb.collection('animals').where(f,'==',tenant).limit(500).get()).docs.forEach(pushDoc); } catch {}
+      for (const fld of ['userId','farmId']) {
+        try { (await adb.collection('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
+        try { (await adb.collectionGroup('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
       }
 
-      // collectionGroup (userId/farmId)
-      if (items.size === 0) {
-        for (const f of ownerFields) {
-          try { (await adb.collectionGroup('animals').where(f,'==',tenant).limit(500).get()).docs.forEach(pushDoc); } catch {}
-        }
-      }
-
-      // Fallback من الأحداث: animalId → number/docId
-      if (items.size === 0) {
-        const ev = [];
-        async function pull(field){
-          try { ev.push(...(await adb.collection('events').where(field,'==',tenant).orderBy('date','desc').limit(2000).get()).docs); }
-          catch { ev.push(...((await adb.collection('events').where(field,'==',tenant).orderBy('createdAt','desc').limit(2000).get().catch(()=>({docs:[]}))).docs||[])); }
-        }
-        await pull('userId'); await pull('farmId');
-        const keys = new Set(ev.map(d=>String(d.get('animalId')||'').trim()).filter(Boolean));
-        for (const k of keys) {
-          const cand=[k]; const n=Number(k); if(!Number.isNaN(n)) cand.push(n);
-          for (const v of cand) {
-            try { (await adb.collection('animals').where('number','==',v).limit(5).get()).docs.forEach(pushDoc); } catch {}
-            try { (await adb.collectionGroup('animals').where('number','==',v).limit(5).get()).docs.forEach(pushDoc); } catch {}
-          }
-          try { const d = await adb.collection('animals').doc(String(k)).get(); if (d.exists) pushDoc(d); } catch {}
-        }
-      }
-    } else {
-      readJson(animalsPath, []).filter(a=>belongs(a,tenant)).forEach(pushDoc);
+      const arr = [...seen.values()];
+      arr.sort((a,b)=> String(a.number||'').localeCompare(String(b.number||''),'en',{numeric:true}));
+      return res.json(arr);
     }
 
-    const out = [...items.values()].map(a => ({
-      id: a.id || null,
-      number: a.number ?? null,
-      species: a.species ?? null,
-      category: a.category ?? null,
-      status: a.status ?? null,
-      lactationStatus: a.lactationStatus ?? null,
-      lastCalvingDate: a.lastCalvingDate ?? null
-    }));
-
-    res.json(out);
+    // Fallback للملفات المحلية
+    const animalsAll = readJson(animalsPath, []);
+    const animals    = animalsAll.filter(a => belongs(a, tenant));
+    return res.json(animals);
   } catch (e) {
-    console.error('animals', e);
-    res.status(500).json({ ok:false, error:'animals_route_failed', message:e?.message });
+    console.error('animals list', e);
+    return res.status(500).json({ ok:false, error:'animals_failed' });
   }
 });
+
 
 // ============================================================
 //                 ADMIN: نقل ملكية أرقام محددة (آمن)
