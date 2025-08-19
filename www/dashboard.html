@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لوحة التحكم - مربيك</title>
 
-  <!-- أيقونة مؤكدة -->
+  <!-- أيقونة مؤكّدة -->
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#1b5e20"/>
@@ -57,16 +57,30 @@
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:6px;min-height:118px}
     .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px}
+    .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px}
 
-    /* ===== Gauges (نص دائرة) ===== */
+    /* المقاييس (herd-gauges) */
     .gauge{width:100%;aspect-ratio:2/1;position:relative}
     .gauge svg{width:100%;height:100%;display:block}
     .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
-    .line{font-size:13px;color:#333;margin-top:6px}
+
+    /* بلاطة كبيرة */
+    .tile-lg{min-height:140px}
+    .tile-2x{grid-column:span 2}
+    .subactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
+    .subbtn:hover{background:#f4fff1}
+
+    @media(max-width:560px){
+      .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+      .tile{min-height:110px;padding:14px}
+      .tile-m-full{grid-column:1 / -1}
+    }
   </style>
 </head>
 <body>
   <h1 class="brand">
+    <img id="brandImg" class="brand-icon" alt="لوحة التحكم"/>
     <svg class="brand-icon-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="لوحة">
       <path d="M6 38 L18 50 L40 18" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
       <rect x="28" y="46" width="30" height="6" rx="3" fill="#1e88e5"/>
@@ -110,40 +124,43 @@
     <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
+
+    <div class="tile" id="milkTraitsCard" role="button" tabindex="0">
+      <span class="icon">🐄</span>
+      سمات حيوان اللبن /كاميرا
+    </div>
+
+    <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
+
+    <div class="tile" id="sensorsTile" role="button" tabindex="0">
+      <span class="icon">🛰️</span>
+      الأجهزة والحساسات
+      <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
+    </div>
+
+    <div class="tile tile-lg tile-2x tile-m-full" id="smartNutritionTile" role="group" tabindex="0">
+      <span class="icon">🧠</span>
+      تقييم التغذية الذكي
+      <div class="subactions" aria-label="اختيارات التقييم">
+        <button class="subbtn" id="goFeces">الروث بالكاميرا</button>
+        <button class="subbtn" id="goBCS">الحالة الجسميّة بالكاميرا</button>
+        <button class="subbtn" id="goRation">تقييم العليقة</button>
+      </div>
+    </div>
   </div>
 
-  <!-- [HERD GAUGES] -->
+  <!-- [HERD-ANALYSIS] نتائج القطيع -->
   <section id="herd-analysis" style="margin:10px 12px">
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-      <div class="card">
-        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4>
-        <div class="gauge" data-key="pregnant"></div>
-        <div class="line" id="line-pregnant">—</div>
-      </div>
-      <div class="card">
-        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4>
-        <div class="gauge" data-key="inseminated"></div>
-        <div class="line" id="line-inseminated">—</div>
-      </div>
-      <div class="card">
-        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4>
-        <div class="gauge" data-key="open"></div>
-        <div class="line" id="line-open">—</div>
-      </div>
-      <div class="card">
-        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4>
-        <div class="gauge" data-key="conception"></div>
-        <div class="line" id="line-conception">—</div>
-      </div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4><div class="gauge" data-key="pregnant"></div><div class="line" id="line-pregnant" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4><div class="gauge" data-key="inseminated"></div><div class="line" id="line-inseminated" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4><div class="gauge" data-key="open"></div><div class="line" id="line-open" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4><div class="gauge" data-key="conception"></div><div class="line" id="line-conception" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
     </div>
-
-    <div class="card" style="margin-top:10px">
-      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4>
-      <div id="herd-numbers">—</div>
-    </div>
+    <div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4><div id="herd-numbers" style="font-size:13px;color:#333">—</div></div>
   </section>
 
-  <!-- ===== سكربت الطقس (القديم كما هو) ===== -->
+  <!-- ===== ويدجت الطقس (سكربت الويدجت القديم) ===== -->
   <script>
     (function(){
       const segFarm = document.getElementById('segFarm');
@@ -176,10 +193,8 @@
       async function readGPS(force=false){
         try{ const c=JSON.parse(localStorage.getItem('lastGPS')||'null'); if(c && !force && (Date.now()-c.ts)<600000) return {lat:c.lat,lon:c.lon}; }catch{}
         if(navigator.geolocation){
-          try{
-            const pos=await new Promise(res=>navigator.geolocation.getCurrentPosition(p=>res(p),_=>res(null),{maximumAge:600000,timeout:6000}));
-            if(pos){ const out={lat:pos.coords.latitude,lon:pos.coords.longitude}; localStorage.setItem('lastGPS',JSON.stringify({...out,ts:Date.now()})); return out; }
-          }catch{}
+          try{ const pos=await new Promise(res=>navigator.geolocation.getCurrentPosition(p=>res(p),_=>res(null),{maximumAge:600000,timeout:6000}));
+               if(pos){ const out={lat:pos.coords.latitude,lon:pos.coords.longitude}; localStorage.setItem('lastGPS',JSON.stringify({...out,ts:Date.now()})); return out; } }catch{}
         }
         return null;
       }
@@ -241,94 +256,71 @@
       document.addEventListener('DOMContentLoaded', ()=> render());
     })();
   </script>
-  <!-- ===== /سكربت الطقس ===== -->
+  <!-- ===== /ويدجت الطقس ===== -->
 
-  <!-- ⚠️ مهم: حقن X-User-Id قبل أي سكربتات تستدعي /api -->
+  <!-- ⭐ مهم جدًا: حقن الـUID قبل أي سكربت يتواصل مع /api -->
   <script src="/js/tenant-bootstrap.js"></script>
 
-  <!-- سكربتاتك (اختياري تبقي عليها) -->
+  <!-- بلاطة الأجهزة والحساسات (تستخدم /api) -->
+  <script>
+    (function(){
+      const tile = document.getElementById('sensorsTile');
+      const badge = document.getElementById('sensorsStatus');
+      function setBadge(txt, ok){ if(!badge) return; badge.textContent = txt; badge.style.background = ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor = ok?'#c5e1a5':'#ffecb3'; }
+      function getApiBase(){ const v=(localStorage.getItem('API_BASE')||'').trim(); if(!/^https?:\/\//.test(v) || v.includes('localhost')) return ''; return v; }
+      async function ping(){
+        try{
+          setBadge('جارٍ الاتصال…', false);
+          const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),30000);
+          const API_BASE=getApiBase(); const url=API_BASE?`${API_BASE}/api/sensors/health`:'/api/sensors/health';
+          const opts={ signal:ctl.signal }; if(API_BASE) opts.mode='cors';
+          const r=await fetch(url,opts); clearTimeout(to);
+          if(r.status===503){ setBadge('غير مفعّل', false); return; }
+          if(!r.ok){ setBadge('غير متصل', false); return; }
+          const j=await r.json(); const n=Number(j?.devices||0); setBadge(`متصل • ${n}`, true);
+        }catch{ setBadge('غير متصل', false); }
+      }
+      tile?.addEventListener('click', ()=>{ location.href='sensor-test.html'; });
+      document.addEventListener('DOMContentLoaded', ()=>{
+        ping(); setTimeout(ping,6000); setTimeout(ping,25000); setInterval(ping,60000);
+      });
+    })();
+  </script>
+
+  <!-- الملاحة إلى تقييم السمات -->
+  <script type="module">
+    const veBtn = document.getElementById('milkTraitsCard');
+    veBtn?.addEventListener('click', () => {
+      const qs  = new URLSearchParams(location.search);
+      const id  = qs.get('animalId') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const url = id ? `visual-eval.html?focus=milk&animalId=${encodeURIComponent(id)}` : `visual-eval.html?focus=milk`;
+      location.href = url;
+    });
+  </script>
+
+  <!-- تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية -->
+  <script>
+    (function(){
+      const img=document.getElementById('brandImg'); const svg=document.querySelector('.brand-icon-svg'); if(!img) return;
+      const candidates=[
+        '/images/dashboard.svg','/images/dashboard.png','/images/dashboard.webp','/images/dashboard.jpg',
+        'images/dashboard.svg','images/dashboard.png','images/dashboard.webp','images/dashboard.jpg'
+      ];
+      function tryLoad(i){
+        if(i>=candidates.length) return;
+        const src=candidates[i] + (candidates[i].includes('?')?'':'?v=1');
+        const test=new Image();
+        test.onload=()=>{ img.src=src; img.style.display='inline-block'; svg && svg.remove(); };
+        test.onerror=()=>tryLoad(i+1);
+        test.src=src;
+      }
+      tryLoad(0);
+    })();
+  </script>
+
+  <!-- سكربتات الواجهة التي تتعامل مع /api (بعد tenant-bootstrap) -->
   <script src="js/mbk-animals.js?v=2"></script>
   <script src="js/herd-gauges.js?v=2"></script>
   <script src="js/smart-alerts.js?v=2"></script>
-
-  <!-- ===== احتياطي: رسم الجوج + جلب /api/herd-stats (في حالة عدم وجود herd-gauges.js) ===== -->
-  <script>
-    (function(){
-      if (window.__gauges_bootstrapped) return; // امنع التكرار لو ملف خارجي بيعمل نفس الشغل
-      window.__gauges_bootstrapped = true;
-
-      // طلب API مع هيدر التينانت
-      function apiFetch(url, opts={}){
-        const h = Object.assign({'X-User-Id': localStorage.getItem('userId') || ''}, (opts.headers||{}));
-        return fetch(url, Object.assign({}, opts, { headers: h }));
-      }
-
-      // دالة رسم نص دائرة بسيطة
-      function mountGauge(el, pct){
-        pct = Math.max(0, Math.min(100, Number(pct)||0));
-        const r = 40;                       // نصف القطر
-        const circ = Math.PI * r;           // طول القوس (نص دائرة)
-        const fill = (pct/100) * circ;      // طول الجزء الملوَّن
-        el.innerHTML = `
-          <svg viewBox="0 0 100 50" aria-hidden="true">
-            <path d="M10 50 A40 40 0 0 1 90 50" stroke="#e5e7eb" stroke-width="10" fill="none" stroke-linecap="round"/>
-            <path d="M10 50 A40 40 0 0 1 90 50" stroke="#2e7d32" stroke-width="10" fill="none"
-                  stroke-dasharray="${fill} ${circ}" stroke-linecap="round"/>
-          </svg>
-          <div class="val">${pct}%</div>`;
-      }
-
-      function setLine(id, txt){ const el=document.getElementById(id); if(el) el.textContent = txt; }
-
-      async function renderHerd(){
-        try{
-          const r = await apiFetch('/api/herd-stats');
-          if(!r.ok) throw new Error('herd-stats http error');
-          const j = await r.json();
-
-          const totals = j?.totals || {};
-          const fert   = j?.fertility || {};
-
-          const totalActive = Number(totals.totalActive||0);
-          const pregC = Number(totals.pregnant?.count||0);
-          const pregP = Number(totals.pregnant?.pct||0);
-          const insC  = Number(totals.inseminated?.count||0);
-          const insP  = Number(totals.inseminated?.pct||0);
-          const openC = Number(totals.open?.count||0);
-          const openP = Number(totals.open?.pct||0);
-          const concP = Number(fert.conceptionRatePct||0);
-
-          // ارسم الجوج
-          document.querySelectorAll('.gauge').forEach(g=>{
-            const key = g.getAttribute('data-key');
-            if(key==='pregnant')   mountGauge(g, pregP);
-            else if(key==='inseminated') mountGauge(g, insP);
-            else if(key==='open')  mountGauge(g, openP);
-            else if(key==='conception') mountGauge(g, concP);
-          });
-
-          // السطور تحت كل جوج
-          setLine('line-pregnant',    `${pregC} من ${totalActive}`);
-          setLine('line-inseminated', `${insC} من ${totalActive}`);
-          setLine('line-open',        `${openC} من ${totalActive}`);
-          setLine('line-conception',  `Conception: ${concP}%`);
-
-          // ملخص
-          const summary = `إجمالي نشط: ${totalActive} • عِشار: ${pregC} • ملقّحات: ${insC} • مفتوحة: ${openC} • Conception: ${concP}%`;
-          const sEl = document.getElementById('herd-numbers');
-          if(sEl) sEl.textContent = summary;
-
-        } catch(e){
-          // في حالة الفشل: صفر
-          document.querySelectorAll('.gauge').forEach(g=> mountGauge(g, 0));
-          setLine('line-pregnant','—'); setLine('line-inseminated','—'); setLine('line-open','—'); setLine('line-conception','—');
-          const sEl = document.getElementById('herd-numbers'); if(sEl) sEl.textContent='تعذّر جلب بيانات القطيع الآن.';
-          console.warn('herd-gauges error:', e);
-        }
-      }
-
-      document.addEventListener('DOMContentLoaded', renderHerd);
-    })();
-  </script>
 </body>
 </html>
