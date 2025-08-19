@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>لوحة التحكم - مربيك</title>
 
-  <!-- أيقونة واحدة مؤكّدة الوجود -->
+  <!-- أيقونة مؤكّدة -->
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#1b5e20">
+
+  <!-- MUST: حقن هوية المستخدم + عميل API قبل أي سكربت يطلب الداتا -->
+  <script src="/js/tenant-bootstrap.js" defer></script>
+  <script src="/js/api.js" defer></script>
 
   <style>
     :root{--bg:#fff9db;--card:#ffffff;--muted:#dcedc8;--green:#2e7d32;--border:#c5e1a5}
@@ -17,19 +21,14 @@
     body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
     h1{margin:0 0 16px;text-align:center;color:#1b5e20}
 
-    /* لوجو العنوان */
     .brand{display:flex;align-items:center;justify-content:center;gap:10px}
     .brand-icon{height:28px;width:28px;object-fit:contain;display:none}
     .brand-icon-svg{height:28px;width:28px;display:inline-block;vertical-align:middle}
     @media(max-width:560px){.brand-icon,.brand-icon-svg{height:24px;width:24px}}
 
-    /* الشبكة */
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;max-width:100%}
-
-    /* الكروت */
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 
-    /* البلاطات */
     .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:6px;min-height:118px;
@@ -42,7 +41,6 @@
     .icon-layer .i-main{font-size:24px;line-height:1}
     .icon-layer .i-badge{position:absolute;bottom:-4px;right:-4px;font-size:14px;background:#fff;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
-    /* ويدجت الطقس (مضغوط) */
     #weatherCard{display:grid;gap:12px;padding:10px 12px;grid-template-columns:clamp(110px,34vw,160px) 1fr;align-items:center;max-width:100%}
     #weatherCard.compact .wvals{display:grid;grid-template-columns:1fr;gap:8px}
     #weatherCard .thi-clock{grid-column:1;grid-row:1 / span 3;justify-self:center}
@@ -63,7 +61,6 @@
     .btn{appearance:none;border:1px solid var(--green);background:#fff;color:var(--green);border-radius:10px;padding:6px 10px;font-weight:bold;cursor:pointer;font-size:12px}
     .btn:hover{background:#f4fff1}
 
-    /* مؤشر THI كساعة */
     .thi-clock{position:relative;width:clamp(110px,34vw,160px);height:clamp(110px,34vw,160px);margin:4px 6px}
     .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
     .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side,transparent 55%, #000 56%);mask:radial-gradient(farthest-side,transparent 55%, #000 56%)}
@@ -73,16 +70,14 @@
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     @media (prefers-reduced-motion: reduce){ .thi-clock .needle{ transition:none } }
 
-    /* المقاييس */
     .gauge{width:100%;aspect-ratio:2/1;position:relative}
     .gauge svg{width:100%;height:100%;display:block}
     .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
 
-    /* بلاطة كبيرة */
     .tile-lg{min-height:140px}
     .tile-2x{grid-column:span 2}
     .subactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
-    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:var(--green);border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
+    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
     .subbtn:hover{background:#f4fff1}
 
     @media(max-width:560px){
@@ -177,10 +172,7 @@
     <div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4><div id="herd-numbers" style="font-size:13px;color:#333">—</div></div>
   </section>
 
-  <!-- سكربتات -->
-  <script src="js/mbk-animals.js?v=2"></script>
-
-  <!-- الطقس و THI -->
+  <!-- الطقس و THI (كما لديك) -->
   <script>
   (function(){
     const chip = document.getElementById('weatherCard');
@@ -250,7 +242,7 @@
         if(!data) return;
 
         const place = coords.label || await reverseGeocode(coords.lat,coords.lon);
-        wLoc.textContent = (getLocMode()==='farm') ? (place ? `مزرعتك: ${place}` : 'مزرعتك') : (place || 'موقعك الحالي');
+        document.getElementById('wLoc').textContent = (getLocMode()==='farm') ? (place ? `مزرعتك: ${place}` : 'مزرعتك') : (place || 'موقعك الحالي');
 
         const b=bands(); const thi=THI(data.t,data.h); const {bg,txt}=colorAndText(thi,b);
         if(thiArc){ const min=50,max=90,p=v=>((v-min)*100/(max-min)), span=240/360*100, pArc=v=>(p(v)/100)*span;
@@ -267,7 +259,11 @@
       }catch(e){}
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>{ syncToggle(); syncLocMode(); renderWeather(); });
+    document.addEventListener('DOMContentLoaded', ()=>{ 
+      syncToggle(); 
+      syncLocMode(); 
+      renderWeather(); 
+    });
     wRefresh?.addEventListener('click', ()=> renderWeather(true));
     modeFarm?.addEventListener('click', ()=>{ setLocMode('farm'); renderWeather(true); });
     modeGPS?.addEventListener('click', ()=>{ setLocMode('gps');  renderWeather(true); });
@@ -321,7 +317,7 @@
   })();
   </script>
 
-  <!-- تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية -->
+  <!-- تحميل شعار العنوان -->
   <script>
   (function(){
     const img=document.getElementById('brandImg'); const svg=document.getElementById('brandSvg'); if(!img) return;
@@ -341,16 +337,60 @@
   })();
   </script>
 
-  <script src="/js/tenant-bootstrap.js"></script><!-- في النهاية: رسوم القطيع والتنبيهات -->
-  <script src="js/mbk-animals.js?v=2"></script>
-  <script src="js/herd-gauges.js?v=2"></script>
-  <script src="js/smart-alerts.js?v=2"></script>
-  <script src="/js/api.js" defer></script>
- 
+  <!-- [جديد] رسم مقاييس القطيع + ملخص الأرقام (بدون أي كونسول) -->
+  <script>
+  (function(){
+    const DAYS = 90;
+    const species = (localStorage.getItem('herdProfile')==='cow') ? 'cow' : 'buffalo';
 
+    function setLine(id, text){ const el=document.getElementById(id); if(el) el.textContent=text; }
+
+    function mountGauge(el, pct){
+      pct = Math.max(0, Math.min(100, Number(pct)||0));
+      const W=200,H=110,CX=100,CY=100,R=90, C=Math.PI*R, prog=C*(pct/100);
+      el.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" aria-hidden="true">
+          <path d="M ${CX-R} ${CY} A ${R} ${R} 0 0 1 ${CX+R} ${CY}" fill="none" stroke="#e0e0e0" stroke-width="14" stroke-linecap="round"/>
+          <path d="M ${CX-R} ${CY} A ${R} ${R} 0 0 1 ${CX+R} ${CY}" fill="none" stroke="#2e7d32" stroke-width="14" stroke-linecap="round" stroke-dasharray="${prog} ${C}"/>
+        </svg>
+        <div class="val">${pct.toFixed(0)}%</div>`;
+    }
+
+    async function loadHerd(){
+      try{
+        const data = await api.get(`/herd-stats?species=${species}&analysisDays=${DAYS}`);
+        const T = data?.totals || {};
+        const F = data?.fertility || {};
+        const G = {
+          pregnant:     T.pregnant?.pct ?? 0,
+          inseminated:  T.inseminated?.pct ?? 0,
+          open:         T.open?.pct ?? 0,
+          conception:   F.conceptionRatePct ?? 0
+        };
+        document.querySelectorAll('.gauge').forEach(el => {
+          mountGauge(el, G[el.getAttribute('data-key')] ?? 0);
+        });
+
+        setLine('line-pregnant',    `${T.pregnant?.count ?? 0} من ${T.totalActive ?? 0}`);
+        setLine('line-inseminated', `${T.inseminated?.count ?? 0} من ${T.totalActive ?? 0}`);
+        setLine('line-open',        `${T.open?.count ?? 0} من ${T.totalActive ?? 0}`);
+        setLine('line-conception',  `${(F.conceptionRatePct ?? 0).toFixed(1)}% (نافذة ${DAYS} يومًا)`);
+
+        const sum = `إجمالي نشط: ${T.totalActive ?? 0} — عِشار: ${T.pregnant?.count ?? 0} — ملقّحات: ${T.inseminated?.count ?? 0} — مفتوحة: ${T.open?.count ?? 0}`;
+        const wrap = document.getElementById('herd-numbers');
+        if (wrap) wrap.textContent = sum;
+      } catch (e){
+        document.querySelectorAll('.gauge').forEach(el => el.innerHTML = '<div class="val">—</div>');
+        setLine('line-pregnant','—'); setLine('line-inseminated','—'); setLine('line-open','—'); setLine('line-conception','—');
+        const wrap = document.getElementById('herd-numbers');
+        if (wrap) wrap.textContent = 'تعذّر جلب بيانات القطيع الآن.';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadHerd);
+  })();
+  </script>
+
+  <!-- لا نحتاج هنا ملفات قديمة ترسم المقاييس؛ استعضنا عنها بالاسكربت أعلاه -->
 </body>
 </html>
-
-
-
-
