@@ -47,14 +47,15 @@
       border: none;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #218838;
-    }
+    button:hover { background-color: #218838; }
   </style>
+
+  <!-- Firebase v10 (App + Firestore) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+    // ▼ إعداد Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
       authDomain: "murabbik.firebaseapp.com",
@@ -65,9 +66,9 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const db  = getFirestore(app);
 
-    // دالة تشفير كلمة المرور
+    // ▼ دالة تشفير كلمة المرور (SHA-256)
     async function hashPassword(password) {
       const encoder = new TextEncoder();
       const data = encoder.encode(password);
@@ -76,68 +77,79 @@
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // ▼ مُساعِدة: استخراج UID المُعتمد للتينانت
+    function resolveTenantUID(userDoc) {
+      const data = userDoc.data() || {};
+      // لو فيه uid/authUid داخل وثيقة المستخدم استخدمه، وإلا استخدم id بتاع الوثيقة
+      return data.uid || data.authUid || userDoc.id;
+    }
+
+    // ▼ معالجة النموذج
     window.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("loginForm");
+      const phoneInput = document.getElementById("phone");
+      const passInput  = document.getElementById("password");
+
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const phone = document.getElementById("phone").value.trim();
-        const password = document.getElementById("password").value.trim();
-
+        const phone = phoneInput.value.trim();
+        const password = passInput.value.trim();
         if (!phone || !password) {
           alert("يرجى إدخال رقم الهاتف وكلمة المرور.");
           return;
         }
 
         try {
+          // 1) ابحث عن المستخدم برقم الهاتف
           const usersRef = collection(db, "users");
-          const q = query(usersRef, where("phone", "==", phone));
-          const querySnapshot = await getDocs(q);
-
-          if (querySnapshot.empty) {
+          const q = query(usersRef, where("phone", "==", phone), limit(1));
+          const snap = await getDocs(q);
+          if (snap.empty) {
             alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
             return;
           }
 
-          const userDoc = querySnapshot.docs[0];
-          const userData = userDoc.data();
+          const userDoc = snap.docs[0];
+          const userData = userDoc.data() || {};
 
-          const hashedInputPassword = await hashPassword(password);
-
-          if (hashedInputPassword !== userData.password) {
+          // 2) تحقق من كلمة المرور (SHA-256)
+          const hashedInput = await hashPassword(password);
+          if (!userData.password || hashedInput !== userData.password) {
             alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
             return;
           }
 
-          // تسجيل الدخول ناجح
-          localStorage.setItem("userId", userDoc.id);
-          localStorage.setItem("userPhone", userData.phone);
-          alert("✅ تم تسجيل الدخول بنجاح");
-          // حفظ البلد/المنطقة لاستخدام الطقس و THI
-const country = userData.country || '';
-const region  = userData.region  || '';
-if (country && region) {
-  const regionKey = `${country}:${region}`;
-  localStorage.setItem('userRegionKey', regionKey);
-  localStorage.setItem('userCountry', country);
-  localStorage.setItem('userRegion',  region);
-  // (اختياري) امسح أي كاش طقس قديم
-  localStorage.removeItem('weather:' + regionKey);
-}
+          // 3) حدّد الـUID الذي سنستخدمه كتِنانت (يتوافق مع السيرفر وبيانات الحيوانات)
+          const tenantUID = resolveTenantUID(userDoc);
 
+          // 4) خزّن بيانات الجلسة — مهم: userId = tenantUID فقط (بدون تكرار بقيم مختلفة)
+          localStorage.setItem('userId', tenantUID);
+          localStorage.setItem('userPhone', userData.phone || '');
+          localStorage.setItem('profileDocId', userDoc.id);
+
+          // (اختياري) البلد/المنطقة للطقس و THI
+          const country = userData.country || '';
+          const region  = userData.region  || '';
+          if (country && region) {
+            const regionKey = `${country}:${region}`;
+            localStorage.setItem('userRegionKey', regionKey);
+            localStorage.setItem('userCountry', country);
+            localStorage.setItem('userRegion',  region);
+            localStorage.removeItem('weather:' + regionKey); // امسح كاش قديم
+          }
+
+          // 5) قرار التوجيه: لو ما فيش حيوانات لهذا الـUID روح لصفحة الإضافة، غير كده للداشبورد
           const animalsRef = collection(db, "animals");
-          const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
-          const animalSnapshot = await getDocs(animalQuery);
+          const aQ = query(animalsRef, where("userId", "==", tenantUID), limit(1));
+          const aSnap = await getDocs(aQ);
 
-          if (animalSnapshot.empty) {
-            window.location.href = "add-animal.html";
-          } else {
-            window.location.href = "dashboard.html";
-          }
+          alert("✅ تم تسجيل الدخول بنجاح");
+          window.location.href = aSnap.empty ? "add-animal.html" : "dashboard.html";
 
         } catch (err) {
           console.error(err);
-          alert("حدث خطأ أثناء تسجيل الدخول.");
+          alert("حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى.");
         }
       });
     });
@@ -146,10 +158,13 @@ if (country && region) {
 <body>
   <form id="loginForm">
     <h2>تسجيل الدخول</h2>
-    <input type="text" id="phone" placeholder="رقم الهاتف" required />
-    <input type="password" id="password" placeholder="كلمة المرور" required />
+    <input type="text" id="phone" placeholder="رقم الهاتف" autocomplete="username" required />
+    <input type="password" id="password" placeholder="كلمة المرور" autocomplete="current-password" required />
     <button type="submit">دخول</button>
   </form>
+
+  <!-- ملاحظة مهمة: في صفحات الـAPI (مثلاً dashboard.html) ضِف سكربت حقن الهيدر مرة واحدة قبل </body>
+       <script src="/js/tenant-bootstrap.js"></script>
+       هذا يضمن إرسال X-User-Id تلقائيًا في كل طلب fetch إلى /api/... -->
 </body>
 </html>
-
