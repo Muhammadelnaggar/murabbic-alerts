@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>سجل الأحداث</title>
+  <style>
+    :root{--bg:#fff9db;--card:#fff;--muted:#eafbe7;--green:#2e7d32;--border:#c5e1a5;--text:#1b5e20}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+    header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px}
+    header h1{margin:0;font-size:18px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px}
+    select,input[type="date"],input[type="search"]{
+      border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff;min-width:160px
+    }
+    .btn{appearance:none;border:1px solid var(--green);color:var(--green);background:#fff;border-radius:10px;
+      padding:8px 12px;font-weight:700;cursor:pointer
+    }
+    .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+    main{padding:10px 14px;display:grid;gap:12px}
+    .empty{padding:20px;text-align:center;color:#555}
+    .group{display:grid;gap:8px}
+    .group h3{margin:6px 0 2px;font-size:14px;color:#0b6b4b}
+    .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .ev{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;
+      background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px}
+    .ev .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--border);background:#fff}
+    .ev .title{font-weight:700}
+    .ev .meta{font-size:12px;color:#3d5d3d}
+    .chips{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{border:1px solid var(--green);color:var(--green);background:#fff;border-radius:999px;padding:4px 10px;cursor:pointer;font-size:12px}
+    .chip.active{background:var(--green);color:#fff}
+    .footbar{position:sticky;bottom:0;background:linear-gradient(180deg, rgba(255,249,219,0) 0%, var(--bg) 40%);
+      padding:8px 14px;border-top:1px dashed var(--border)}
+    @media (max-width:540px){
+      select,input[type="date"],input[type="search"]{min-width:120px}
+    }
+  </style>
+</head>
+<body>
+  <header class="card">
+    <h1>سجل الأحداث</h1>
+    <div class="toolbar">
+      <select id="animalSelect" title="اختر الحيوان"></select>
+      <input id="fromDate" type="date" />
+      <input id="toDate" type="date" />
+      <input id="q" type="search" placeholder="بحث في العنوان/الوصف" />
+      <button id="resetBtn" class="btn">إعادة الضبط</button>
+      <button id="addBtn" class="btn primary">حدث جديد</button>
+    </div>
+    <div class="chips" id="typeChips" aria-label="نوع الحدث">
+      <button class="chip" data-k="all">الكل</button>
+      <button class="chip" data-k="insemination">تلقيح</button>
+      <button class="chip" data-k="pregnancy">حمل</button>
+      <button class="chip" data-k="birth">ولادة</button>
+      <button class="chip" data-k="heat">شياع</button>
+      <button class="chip" data-k="treat|علاج">علاج</button>
+    </div>
+  </header>
+
+  <main id="list">
+    <div class="card empty">اختر الحيوان لعرض أحداثه…</div>
+  </main>
+
+  <div class="footbar row">
+    <div id="count" class="meta">—</div>
+    <div style="display:flex;gap:6px">
+      <button id="reloadBtn" class="btn">تحديث</button>
+    </div>
+  </div>
+
+  <script>
+  // ===== Helpers =====
+  const $ = s => document.querySelector(s);
+  const list = $('#list');
+  const sel  = $('#animalSelect');
+  const from = $('#fromDate');
+  const to   = $('#toDate');
+  const q    = $('#q');
+  const chips= $('#typeChips');
+  const addBtn = $('#addBtn');
+  const reloadBtn = $('#reloadBtn');
+  const resetBtn  = $('#resetBtn');
+  const countEl   = $('#count');
+
+  const pad = n => String(n).padStart(2,'0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  // افتراضي: آخر 6 شهور
+  const now = new Date();
+  const sixMoAgo = new Date(now); sixMoAgo.setMonth(now.getMonth()-6);
+  from.value = ymd(sixMoAgo);
+  to.value   = ymd(now);
+
+  // حمّل قائمة الحيوانات
+  async function loadAnimals(){
+    try{
+      const r = await fetch('/api/animals');
+      const arr = await r.json();
+      sel.innerHTML = '<option value="">— اختر الحيوان —</option>' +
+        arr.map(a => `<option value="${a.id}" data-number="${a.number||''}">${a.number||a.id} — ${a.breed||a.species||'بدون سلالة'}</option>`).join('');
+      // تفعيل الحيوان الحالي من LocalStorage إن وُجد
+      const currentId = localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      if (currentId) sel.value = currentId;
+      updateAddLink();
+      if (sel.value) fetchEvents();
+    }catch(e){
+      sel.innerHTML = '<option>تعذر تحميل الحيوانات</option>';
+    }
+  }
+
+  function updateAddLink(){
+    const id = sel.value;
+    const num = sel.selectedOptions[0]?.dataset.number || '';
+    const qs  = new URLSearchParams();
+    if (id) qs.set('animalId', id);
+    if (num) qs.set('number', num);
+    addBtn.onclick = () => location.href = 'add-event.html' + (qs.toString() ? ('?'+qs.toString()) : '');
+  }
+
+  // جلب الخط الزمني لهذا الحيوان (ثم فلترة الأحداث فقط)
+  async function fetchEvents(){
+    const animalId = sel.value;
+    if (!animalId){
+      list.innerHTML = '<div class="card empty">اختر الحيوان لعرض أحداثه…</div>';
+      countEl.textContent = '—';
+      return;
+    }
+    list.innerHTML = '<div class="card empty">جارِ التحميل…</div>';
+    try{
+      const url = `/api/animal-timeline?animalId=${encodeURIComponent(animalId)}&limit=1000`;
+      const r = await fetch(url);
+      const j = await r.json();
+      const items = (j.items || j.events || []).filter(x => x.kind === 'event');
+      state.all = normalize(items);
+      applyFilters();
+    }catch(e){
+      list.innerHTML = '<div class="card empty">تعذر تحميل البيانات</div>';
+    }
+  }
+
+  // نحاول استخراج نوع موحّد من العنوان
+  function normalize(items){
+    const mapType = (t) => {
+      const s = String(t || '').toLowerCase();
+      if (/insemin|تلقيح/.test(s)) return 'insemination';
+      if (/preg|حمل/.test(s))     return 'pregnancy';
+      if (/birth|calv|ولاد/.test(s)) return 'birth';
+      if (/heat|شياع/.test(s))    return 'heat';
+      if (/treat|علاج/.test(s))   return 'treat';
+      return 'event';
+    };
+    return items.map(x => ({
+      ts: Number(x.ts || Date.now()),
+      title: x.title || 'حدث',
+      summary: x.summary || '',
+      type: mapType(x.title),
+    })).sort((a,b)=> b.ts - a.ts);
+  }
+
+  const state = { all:[], filtered:[], type:'all', q:'', from:from.value, to:to.value };
+
+  function applyFilters(){
+    state.from = from.value ? new Date(from.value+'T00:00:00Z').getTime() : 0;
+    state.to   = to.value   ? new Date(to.value  +'T23:59:59Z').getTime() : Infinity;
+    state.q    = q.value.trim();
+    const qrx  = state.q ? new RegExp(state.q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i') : null;
+
+    const arr = state.all.filter(ev => {
+      if (ev.ts < state.from || ev.ts > state.to) return false;
+      if (state.type !== 'all' && !new RegExp(state.type,'i').test(ev.type)) return false;
+      if (qrx && !(qrx.test(ev.title) || qrx.test(ev.summary))) return false;
+      return true;
+    });
+
+    state.filtered = arr;
+    render();
+  }
+
+  function iconFor(t){
+    switch(t){
+      case 'insemination': return '💉';
+      case 'pregnancy':    return '🧪';
+      case 'birth':        return '🐮';
+      case 'heat':         return '🔥';
+      case 'treat':        return '🩺';
+      default:             return '🗒️';
+    }
+  }
+
+  function render(){
+    if (!state.filtered.length){
+      list.innerHTML = '<div class="card empty">لا توجد أحداث ضمن الفترة/الفلاتر المحددة.</div>';
+      countEl.textContent = '0';
+      return;
+    }
+    // تجميع حسب اليوم
+    const byDay = {};
+    for (const ev of state.filtered){
+      const d = new Date(ev.ts);
+      const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      (byDay[key] ||= []).push(ev);
+    }
+
+    const parts = [];
+    for (const day of Object.keys(byDay).sort((a,b)=> b.localeCompare(a))){
+      const nice = new Date(day+'T00:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      parts.push(`<section class="group"><h3>${nice}</h3>`);
+      for (const ev of byDay[day]){
+        const t = new Date(ev.ts).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+        parts.push(`
+          <article class="ev">
+            <div class="ic">${iconFor(ev.type)}</div>
+            <div>
+              <div class="title">${ev.title}</div>
+              <div class="meta">${ev.summary ? ev.summary : ''}</div>
+            </div>
+            <div class="meta" style="white-space:nowrap">${t}</div>
+          </article>
+        `);
+      }
+      parts.push(`</section>`);
+    }
+    list.innerHTML = parts.join('');
+    countEl.textContent = String(state.filtered.length);
+  }
+
+  // أحداث الواجهة
+  sel.addEventListener('change', ()=>{ 
+    localStorage.setItem('currentAnimalId', sel.value || '');
+    updateAddLink();
+    fetchEvents(); 
+  });
+  [from,to,q].forEach(el => el.addEventListener('input', applyFilters));
+  reloadBtn.addEventListener('click', fetchEvents);
+  resetBtn.addEventListener('click', ()=>{
+    from.value = ymd(sixMoAgo); to.value = ymd(now); q.value = ''; 
+    chips.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chips.querySelector('[data-k="all"]').classList.add('active'); state.type='all';
+    applyFilters();
+  });
+
+  chips.addEventListener('click', (e)=>{
+    const b = e.target.closest('.chip'); if(!b) return;
+    chips.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    b.classList.add('active');
+    state.type = b.dataset.k || 'all';
+    applyFilters();
+  });
+
+  // تهيئة
+  (function init(){
+    chips.querySelector('[data-k="all"]').classList.add('active');
+    loadAnimals();
+  })();
+  </script>
+</body>
+</html>
