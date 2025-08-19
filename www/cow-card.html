@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>بطاقة البقرة – معاينة</title>
   <style>
-    :root{--bg:#fff9db;--card:#fff;--border:#c5e1a5;--green:#2e7d32;--text:#114;--muted:#f6fff2}
+    :root{--bg:#fff9db;--card:#fff;--border:#c5e1a5;--green:#2e7d32;--text:#143b24;--muted:#f6fff2}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.4;color:#143b24;padding:18px}
     .wrap{max-width:920px;margin:0 auto}
@@ -15,9 +15,10 @@
     .title h1{margin:0;font-size:clamp(18px,4.6vw,28px);color:#14532d}
     .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
-    .chip-repro::before{content:"🍼 ";}
-    .chip-prod::before{content:"📈 ";}
-    .chip-health::before{content:"🩺 ";}
+    .chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
+    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
+    .chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
+    .chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
 
     /* أقسام البطاقة */
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -28,11 +29,12 @@
     @media (max-width:560px){.grid{grid-template-columns:1fr}}
     .fi{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fcfff8}
     .fi span{color:#2b593a;font-size:13px}
-    .fi b{color:#0f5132}
+    .fi b{color:#0f5132; direction:ltr; unicode-bidi:plaintext; font-variant-numeric:tabular-nums}
 
-    /* مؤشر سمات اللبن (SVG نصف دائرة Responsive) */
+    /* مؤشر سمات اللبن */
     .milk-gauge-box{width:min(360px,92vw);aspect-ratio:2/1;position:relative;margin:8px auto;display:grid;place-items:center}
     .milk-gauge-box svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .milk-gauge-box svg *{vector-effect:non-scaling-stroke;shape-rendering:geometricPrecision}
     .milk-gauge-box .val{position:absolute;bottom:8%;inset-inline:0;text-align:center;font-weight:800;color:#065f46;font-size:clamp(14px,4vw,18px)}
     .legend{display:flex;gap:10px;justify-content:center;font-size:12px;color:#355}
     .leg{display:inline-flex;align-items:center;gap:6px}
@@ -45,7 +47,7 @@
     .kpi .lbl{font-size:12px;color:#2b593a}
     .kpi .val{font-weight:800;color:#14532d;font-size:clamp(16px,4.6vw,20px)}
 
-    /* مخطط مع تمرير أفقي لفترة الحليب بالكامل */
+    /* مخطط الإنتاج */
     .chart-scroll{overflow-x:auto;overflow-y:hidden;border:1px dashed #c5e1a5;border-radius:12px;background:#fff}
     .prod-chart{display:block;height:240px}
     @media (max-width:560px){.prod-chart{height:200px}}
@@ -62,17 +64,17 @@
 <body>
   <div class="wrap">
     <!-- عنوان + شرائط -->
-    <div class="title">
+    <div class="title" aria-label="عنوان بطاقة الحيوان">
       <h1 id="cardTitle">بطاقة البقرة رقم —</h1>
-      <div class="chips">
-        <div class="chip chip-repro" id="chipRepro">—</div>
-        <div class="chip chip-prod"  id="chipProd">—</div>
-        <div class="chip chip-health" id="chipHealth">—</div>
+      <div class="chips" role="group" aria-label="حالات الحيوان">
+        <div class="chip chip-repro"  id="chipRepro"  data-variant="ok">—</div>
+        <div class="chip chip-prod"   id="chipProd"   data-variant="ok">—</div>
+        <div class="chip chip-health" id="chipHealth" data-variant="ok">—</div>
       </div>
     </div>
 
     <!-- المعلومات الأساسية -->
-    <section class="card">
+    <section class="card" aria-label="المعلومات الأساسية">
       <h3>المعلومات الأساسية</h3>
       <div class="grid" id="basicInfo">
         <div class="fi"><span>تاريخ الميلاد</span><b id="fiBirth">—</b></div>
@@ -86,23 +88,20 @@
     </section>
 
     <!-- تقييم سمات اللبن -->
-    <section class="card">
+    <section class="card" aria-label="تقييم سمات اللبن">
       <h3>تقييم سمات اللبن</h3>
       <div class="milk-gauge-box">
-        <svg viewBox="0 0 100 50" preserveAspectRatio="none">
-          <!-- الخلفية الرمادية -->
+        <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid meet">
           <path id="gBg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#e5e7eb" stroke-width="12" stroke-linecap="round"/>
-          <!-- سيُحقن الشرائح بالألوان عبر JS -->
           <g id="gSlices"></g>
-          <!-- الإبرة -->
           <g id="needle" transform="rotate(180 50 50)">
-            <line x1="50" y1="50" x2="50" y2="14" stroke="#111" stroke-width="1.6" />
+            <line x1="50" y1="50" x2="50" y2="14" stroke="#111" stroke-width="1.8" />
             <circle cx="50" cy="50" r="2.2" fill="#111" />
           </g>
         </svg>
-        <div class="val" id="milkGaugeVal">—</div>
+        <div class="val" id="milkGaugeVal" aria-live="polite">—</div>
       </div>
-      <div class="legend">
+      <div class="legend" aria-hidden="true">
         <span class="leg"><span class="dot" style="background:#ef5350"></span>ضعيف</span>
         <span class="leg"><span class="dot" style="background:#ffb74d"></span>متوسط</span>
         <span class="leg"><span class="dot" style="background:#fff176"></span>جيد</span>
@@ -110,8 +109,8 @@
       </div>
     </section>
 
-    <!-- إنتاج اللبن: KPIs + مخطط كامل موسم الحليب -->
-    <section class="card">
+    <!-- إنتاج اللبن -->
+    <section class="card" aria-label="إنتاج اللبن">
       <h3>إنتاج اللبن</h3>
       <div class="kpi3">
         <div class="kpi"><div class="lbl">إنتاج اليوم</div><div class="val" id="kpiMilkToday">—</div></div>
@@ -124,8 +123,9 @@
       <div class="hint">يعرض كامل فترة الحليب — اسحب/تمرير أفقيًا لمشاهدة كل الأيام (كجم/يوم)</div>
     </section>
 
-    <!-- الحالة التناسلية (موسعة) -->
-    <section class="card"><h3>الحالة التناسلية</h3>
+    <!-- الحالة التناسلية -->
+    <section class="card" aria-label="الحالة التناسلية">
+      <h3>الحالة التناسلية</h3>
       <div class="grid">
         <div class="fi"><span>تاريخ آخر تلقيح</span><b id="fiLastIns">—</b></div>
         <div class="fi"><span>متوسط خدمات/حمل</span><b id="fiSPC">—</b></div>
@@ -137,7 +137,8 @@
     </section>
 
     <!-- الحالة الصحية -->
-    <section class="card"><h3>الحالة الصحية</h3>
+    <section class="card" aria-label="الحالة الصحية">
+      <h3>الحالة الصحية</h3>
       <div class="grid">
         <div class="fi"><span>الحالة الحالية</span><b id="fiHealth">—</b></div>
         <div class="fi"><span>آخر فحص</span><b id="fiLastCheck">—</b></div>
@@ -150,217 +151,223 @@
       </div>
     </section>
   </div>
-<script src="js/mbk-animals.js?v=2"></script>
 
-<script>
-  // ====== بيانات تجريبية للمعاينة (استبدلها ببياناتك لاحقًا) ======
-  const state = {
-    number: 2,
-    reproductiveStatus: 'مفتوحة',          // شارة تناسلية بجوار العنوان
-    productionStatus: 'حليب مبكر',          // شارة إنتاجية بجوار العنوان
-    healthStatus: 'سليم',                    // شارة صحية بجوار العنوان
+  <script src="js/mbk-animals.js?v=2"></script>
+  <script>
+    // ===== Demo state (يمكن استبداله ببيانات حقيقية) =====
+    const state = {
+      number: 2,
+      reproductiveStatus: 'مفتوحة',
+      productionStatus: 'حليب مبكر',
+      healthStatus: 'سليم',
 
-    birthDate: '2021-03-25',
-    lastCalvingDate: '2025-06-30',
-    lactationNumber: 3,
-    daysInMilk: 147,
-    gestationDays: null,                     // لو null يُحتسب من lastInseminationDate
-    lastInseminationDate: '2025-07-15',
-    breed: 'هولشتاين',
-    group: 'أ-الحلابات',
-    milkTraitsScore: 78,                     // 0..100
+      birthDate: '2021-03-25',
+      lastCalvingDate: '2025-06-30',
+      lactationNumber: 3,
+      daysInMilk: 147,
+      gestationDays: null,
+      lastInseminationDate: '2025-07-15',
+      pregnancyDate: null, // إن كانت موجودة تُستخدم لحساب عمر الحمل أولًا
+      breed: 'هولشتاين',
+      group: 'أ-الحلابات',
+      milkTraitsScore: 78,
 
-    // ——— تناسلي ———
-    servicesCount: 2,
-    pregnancyDate: '2025-09-02',
-    inseminations: ['2025-07-15','2025-08-08'],
-    estrusDates: ['2025-07-01','2025-07-23','2025-08-14','2025-09-05'],
-    ovsynch: { active:true, name:'Ovsynch', started:'2025-07-02' },
+      servicesCount: 2,
+      inseminations: ['2025-07-15','2025-08-08'],
+      estrusDates: ['2025-07-01','2025-07-23','2025-08-14','2025-09-05'],
+      ovsynch: { active:true, name:'Ovsynch', started:'2025-07-02' },
 
-    // ——— الإنتاج ——— (سلسلة كاملة لموسم الحليب)
-    milkTodayKg: 23.4,
-    seasonTotalKg: 3150,
-    m305Kg: 6800,
-    milkSeries: (function(){
-      // توليد 150 يوم كمثال
-      const N = 150; const arr=[]; for(let i=0;i<N;i++){ arr.push({d:i, v: 17 + Math.sin(i/4)*2.5 + (i>40? (i-40)*0.08:0)}); } return arr;
-    })(),
+      milkTodayKg: 23.4,
+      seasonTotalKg: 3150,
+      m305Kg: 6800,
+      milkSeries: (function(){ const N=150, a=[]; for(let i=0;i<N;i++){ a.push({d:i, v: 17 + Math.sin(i/4)*2.5 + (i>40? (i-40)*0.08:0)}); } return a; })(),
 
-    // ——— صحة ———
-    lastCheckDate: '2025-09-10',
-    healthHistory: [
-      {date:'2025-08-10', diagnosis:'حمى اللبن', note:'خفيفة – استجابة سريعة'},
-      {date:'2025-08-28', diagnosis:'التهاب ضرع خفيف', note:'ربع خلفي يمين'},
-      {date:'2025-09-10', diagnosis:'سليم', note:'لا توجد ملاحظات'}
-    ]
-  };
+      lastCheckDate: '2025-09-10',
+      healthHistory: [
+        {date:'2025-08-10', diagnosis:'حمى اللبن', note:'خفيفة – استجابة سريعة'},
+        {date:'2025-08-28', diagnosis:'التهاب ضرع خفيف', note:'ربع خلفي يمين'},
+        {date:'2025-09-10', diagnosis:'سليم', note:'لا توجد ملاحظات'}
+      ]
+    };
 
-  const $ = (id)=>document.getElementById(id);
-  const put=(id,v)=>{const n=$(id); if(n) n.textContent = (v ?? '—');};
-  const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
+    // ===== Helpers
+    const $ = (id)=>document.getElementById(id);
+    const put=(id,v)=>{const n=$(id); if(n) n.textContent = (v ?? '—');};
+    const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
+    const NF = new Intl.NumberFormat('ar-EG');
 
-  // العنوان + الشرائط
-  put('cardTitle', `بطاقة البقرة رقم ${state.number ?? '—'}`);
-  put('chipRepro', state.reproductiveStatus || '—');
-  put('chipProd',  state.productionStatus  || '—');
-  put('chipHealth', state.healthStatus || '—');
-
-  // المعلومات الأساسية
-  put('fiBirth', fmtD(state.birthDate));
-  put('fiLastCalving', fmtD(state.lastCalvingDate));
-  put('fiLactNo', state.lactationNumber);
-  put('fiDIM', state.daysInMilk);
-  put('fiBreed', state.breed);
-  put('fiGroup', state.group);
-
-  // عمر الحمل (يوم)
-  let gestDays = state.gestationDays;
-  if (gestDays == null && state.lastInseminationDate) {
-    const ms = Date.now() - new Date(state.lastInseminationDate).getTime();
-    gestDays = Math.max(0, Math.floor(ms / 86400000));
-  }
-  put('fiGestAge', (gestDays!=null)?gestDays:'—');
-
-  // ====== تقييم سمات اللبن (SVG) ======
-  function polar(cx, cy, r, ang){
-    const a = (ang*Math.PI)/180; return [cx + r*Math.cos(a), cy + r*Math.sin(a)];
-  }
-  function arcPath(cx, cy, r, a0, a1){
-    const [x0,y0] = polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1);
-    return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
-  }
-  (function renderGauge(score){
-    score = Math.max(0, Math.min(100, Number(score)||0));
-    const g = document.getElementById('gSlices');
-    if(!g) return; g.innerHTML = '';
-    const colors = ['#ef5350','#ffb74d','#fff176','#66bb6a']; // ضعيف→ممتاز
-    const steps  = [0,25,50,75,100];
-    for(let i=0;i<4;i++){
-      const s = steps[i], e = steps[i+1];
-      const a0 = 180 - (s/100)*180;
-      const a1 = 180 - (e/100)*180;
-      const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-      p.setAttribute('d', arcPath(50,50,40,a0,a1));
-      p.setAttribute('fill','none');
-      p.setAttribute('stroke', colors[i]);
-      p.setAttribute('stroke-width','12');
-      p.setAttribute('stroke-linecap','round');
-      g.appendChild(p);
+    // تلوين الشرائط حسب الحالة
+    function variantFor(txt){
+      const t = String(txt||'').toLowerCase();
+      if (/سليم|حامل|طبيعي|مريح/.test(t)) return 'ok';
+      if (/مفتوح|خطر منخفض|متوسط/.test(t)) return 'warn';
+      if (/حاد|شديد|مرض|نفاس متعثر/.test(t)) return 'danger';
+      return 'ok';
     }
-    const ang = 180 - (score/100)*180; // 0..100 ↦ 180..0
-    const needle = document.getElementById('needle');
-    if(needle){ needle.setAttribute('transform',`rotate(${ang} 50 50)`); }
-    const valEl = document.getElementById('milkGaugeVal');
-    if(valEl){ valEl.textContent = `${score}%`; }
-  })(state.milkTraitsScore);
-
-  // ====== KPIs إنتاج اللبن ======
-  put('kpiMilkToday', (state.milkTodayKg!=null? state.milkTodayKg.toFixed(1)+' كجم' : '—'));
-  put('kpiSeason', (state.seasonTotalKg!=null? state.seasonTotalKg.toLocaleString('ar-EG')+' كجم' : '—'));
-  put('kpi305', (state.m305Kg!=null? state.m305Kg.toLocaleString('ar-EG')+' كجم' : '—'));
-
-  // ====== رسم مخطط إنتاج اللبن (كامل الموسم + تمرير أفقي) ======
-  (function renderMilkChart(series){
-    const svg = document.getElementById('milkChart');
-    const sc  = document.getElementById('milkScroll');
-    if(!svg || !series || !series.length) return;
-    const data = series.map((p,i)=>({x:i, y:Number(p.v)||0}));
-    const N = data.length;
-    const pad = 10; // هامش داخلي
-    const pxPer = (window.innerWidth<560)? 6 : 7; // عرض يوم واحد بالبكسل
-    const W = pad*2 + (N-1)*pxPer + 20; // عرض الرسم بالبكسل
-    const H = (svg.clientHeight||240);   // ارتفاع فعلي بالبكسل
-
-    // اجعل الSVG أعرض من الحاوية لتمكين التمرير
-    svg.setAttribute('viewBox', `0 0 ${W} 60`);
-    svg.style.width = W + 'px';
-
-    const maxY = Math.max(...data.map(d=>d.y), 1);
-    const minY = Math.min(...data.map(d=>d.y), 0);
-    const yRange = Math.max(1, maxY - minY);
-    const sx = (i)=> pad + (i*pxPer);
-    const sy = (v)=> 60 - 6 - ((v - minY) * (60-12)/yRange);
-
-    // مسار الخط
-    let d = '';
-    data.forEach((p,i)=>{ d += (i? ' L ':'M ') + sx(i).toFixed(2) + ' ' + sy(p.y).toFixed(2); });
-    // منطقة تحت الخط
-    const area = d + ` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-
-    svg.innerHTML = '';
-    // شبكة خفيفة
-    const grid = document.createElementNS('http://www.w3.org/2000/svg','g');
-    for(let i=1;i<=3;i++){
-      const y = 6 + i*(60-12)/3; const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-      line.setAttribute('x1', 6); line.setAttribute('x2', W-6); line.setAttribute('y1', y); line.setAttribute('y2', y);
-      line.setAttribute('stroke', '#e9f5dc'); line.setAttribute('stroke-width', '0.6');
-      grid.appendChild(line);
+    function setChip(el, text){
+      if(!el) return;
+      el.textContent = text || '—';
+      el.setAttribute('data-variant', variantFor(text));
     }
-    svg.appendChild(grid);
 
-    const ap = document.createElementNS('http://www.w3.org/2000/svg','path');
-    ap.setAttribute('d', area); ap.setAttribute('fill', '#cdeccd'); ap.setAttribute('opacity','0.6');
-    svg.appendChild(ap);
+    // ===== العنوان + الشرائط
+    put('cardTitle', `بطاقة البقرة رقم ${state.number ?? '—'}`);
+    setChip($('chipRepro'),  state.reproductiveStatus);
+    setChip($('chipProd'),   state.productionStatus);
+    setChip($('chipHealth'), state.healthStatus);
 
-    const lp = document.createElementNS('http://www.w3.org/2000/svg','path');
-    lp.setAttribute('d', d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
-    svg.appendChild(lp);
+    // ===== المعلومات الأساسية
+    put('fiBirth', fmtD(state.birthDate));
+    put('fiLastCalving', fmtD(state.lastCalvingDate));
+    put('fiLactNo', NF.format(state.lactationNumber ?? '—'));
+    put('fiDIM', NF.format(state.daysInMilk ?? '—'));
+    put('fiBreed', state.breed || '—');
+    put('fiGroup', state.group || '—');
 
-    // نقطة اليوم الحالي
-    const cx = sx(N-1), cy = sy(data[N-1].y);
-    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 2); dot.setAttribute('fill', '#1b5e20');
-    svg.appendChild(dot);
+    // عمر الحمل (يوم) — من pregnancyDate إن وُجد، وإلا من آخر تلقيح
+    let gestDays = state.gestationDays;
+    const refDate = state.pregnancyDate || state.lastInseminationDate;
+    if (gestDays == null && refDate) {
+      const ms = Date.now() - new Date(refDate).getTime();
+      gestDays = Math.max(0, Math.floor(ms / 86400000));
+    }
+    put('fiGestAge', gestDays!=null ? NF.format(gestDays) : '—');
 
-    // تمرير تلقائي لنهاية السلسلة (اليوم الحالي)
-    setTimeout(()=>{ sc.scrollLeft = svg.scrollWidth; }, 0);
-  })(state.milkSeries);
+    // ===== مؤشر سمات اللبن
+    function polar(cx, cy, r, ang){ const a=(ang*Math.PI)/180; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
+    function arcPath(cx, cy, r, a0, a1){ const [x0,y0]=polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1); return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`; }
+    (function renderGauge(score){
+      score = Math.max(0, Math.min(100, Number(score)||0));
+      const g = document.getElementById('gSlices'); if(!g) return; g.innerHTML = '';
+      const colors = ['#ef5350','#ffb74d','#fff176','#66bb6a']; const steps=[0,25,50,75,100];
+      for(let i=0;i<4;i++){
+        const s=steps[i], e=steps[i+1];
+        const a0 = 180 - (s/100)*180, a1 = 180 - (e/100)*180;
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.setAttribute('d', arcPath(50,50,40,a0,a1));
+        p.setAttribute('fill','none'); p.setAttribute('stroke', colors[i]); p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round');
+        g.appendChild(p);
+      }
+      const ang = 180 - (score/100)*180;
+      const needle = document.getElementById('needle'); if(needle){ needle.setAttribute('transform',`rotate(${ang} 50 50)`); }
+      const label = score>=75? 'ممتاز' : score>=50? 'جيد' : score>=25? 'متوسط' : 'ضعيف';
+      put('milkGaugeVal', `${label} — ${score}%`);
+    })(state.milkTraitsScore);
 
-  // ====== تناسلي (حسابات إضافية) ======
-  function avgDaysBetween(dates){
-    if(!dates || dates.length<2) return null;
-    const ms = dates.map(d=> new Date(d).getTime()).sort((a,b)=>a-b);
-    const diffs = []; for(let i=1;i<ms.length;i++){ diffs.push((ms[i]-ms[i-1])/86400000); }
-    const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length; return Math.round(avg);
-  }
+    // ===== KPIs إنتاج اللبن
+    put('kpiMilkToday', state.milkTodayKg!=null? `${state.milkTodayKg.toFixed(1)} كجم` : '—');
+    put('kpiSeason', state.seasonTotalKg!=null? `${NF.format(state.seasonTotalKg)} كجم` : '—');
+    put('kpi305', state.m305Kg!=null? `${NF.format(state.m305Kg)} كجم` : '—');
 
-  put('fiLastIns', fmtD(state.lastInseminationDate));
+    // ===== مخطط الإنتاج (قابل للتمرير طول فترة الحليب)
+    (function renderMilkChart(series){
+      const svg = document.getElementById('milkChart');
+      const sc  = document.getElementById('milkScroll');
+      if(!svg || !sc || !Array.isArray(series) || !series.length) return;
 
-  // SPC: عدد خدمات حتى الحمل في موسم جاري (تقريبي للمعاينة)
-  let spc = state.servicesCount;
-  if(Array.isArray(state.inseminations) && state.pregnancyDate){
-    const pd = new Date(state.pregnancyDate).getTime();
-    spc = state.inseminations.filter(d=> new Date(d).getTime() <= pd).length || spc;
-  }
-  put('fiSPC', (spc!=null)? spc : '—');
+      // استخدم عرض الحاوية لتحديد كثافة الأيام
+      const base = Math.max(sc.clientWidth, 320);
+      const pxPer = Math.max(6, Math.min(11, Math.round(base/28))); // عرض منطقي لليوم
+      const pad = 10;
 
-  const serviceInt = avgDaysBetween(state.inseminations);
-  put('fiServiceInterval', serviceInt!=null? (serviceInt+' يوم') : '—');
+      const data = series.map((p,i)=>({x:i, y:Number(p.v)||0}));
+      const N = data.length;
+      const W = pad*2 + (N-1)*pxPer + 20;
 
-  const lastHeat = (state.estrusDates && state.estrusDates.length) ? state.estrusDates[state.estrusDates.length-1] : null;
-  put('fiLastHeat', fmtD(lastHeat));
-  const heatInt = avgDaysBetween(state.estrusDates);
-  put('fiHeatInterval', heatInt!=null? (heatInt+' يوم') : '—');
+      svg.setAttribute('viewBox', `0 0 ${W} 60`);
+      svg.style.width = W + 'px';
 
-  if(state.ovsynch && state.ovsynch.active){
-    put('fiOvsynch', `${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`);
-  } else { put('fiOvsynch','—'); }
+      const maxY = Math.max(...data.map(d=>d.y), 1);
+      const minY = Math.min(...data.map(d=>d.y), 0);
+      const yRange = Math.max(1, maxY - minY);
+      const sx = (i)=> pad + (i*pxPer);
+      const sy = (v)=> 60 - 6 - ((v - minY) * (60-12)/yRange);
 
-  // ====== صحة ======
-  put('fiHealth', state.healthStatus||'—');
-  put('fiLastCheck', fmtD(state.lastCheckDate));
-  const hl = document.getElementById('healthList');
-  if(Array.isArray(state.healthHistory) && state.healthHistory.length){
-    state.healthHistory.forEach(it=>{
+      // شبكة
+      svg.innerHTML = '';
+      const grid = document.createElementNS('http://www.w3.org/2000/svg','g');
+      for(let i=1;i<=3;i++){
+        const y = 6 + i*(60-12)/3;
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1', 6); line.setAttribute('x2', W-6); line.setAttribute('y1', y); line.setAttribute('y2', y);
+        line.setAttribute('stroke', '#e9f5dc'); line.setAttribute('stroke-width', '0.6');
+        grid.appendChild(line);
+      }
+      svg.appendChild(grid);
+
+      // منطقة
+      let d = ''; data.forEach((p,i)=>{ d += (i? ' L ':'M ') + sx(i).toFixed(2) + ' ' + sy(p.y).toFixed(2); });
+      const area = d + ` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
+      const ap = document.createElementNS('http://www.w3.org/2000/svg','path');
+      ap.setAttribute('d', area); ap.setAttribute('fill', '#cdeccd'); ap.setAttribute('opacity','0.6');
+      svg.appendChild(ap);
+
+      // خط
+      const lp = document.createElementNS('http://www.w3.org/2000/svg','path');
+      lp.setAttribute('d', d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
+      svg.appendChild(lp);
+
+      // نقطة آخر يوم
+      const cx = sx(N-1), cy = sy(data[N-1].y);
+      const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 2); dot.setAttribute('fill', '#1b5e20');
+      svg.appendChild(dot);
+
+      // تمرير تلقائي لنهاية السلسلة
+      setTimeout(()=>{ sc.scrollLeft = svg.scrollWidth; }, 0);
+      // إعادة حساب عند تغيير الحجم
+      addEventListener('resize', ()=> renderMilkChart(series), {once:true});
+    })(state.milkSeries);
+
+    // ===== تناسلي
+    const avgDaysBetween=(dates)=>{
+      if(!dates || dates.length<2) return null;
+      const ms = dates.map(d=> new Date(d).getTime()).sort((a,b)=>a-b);
+      const diffs = []; for(let i=1;i<ms.length;i++) diffs.push((ms[i]-ms[i-1])/86400000);
+      return Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length);
+    };
+    put('fiLastIns', fmtD(state.lastInseminationDate));
+
+    let spc = state.servicesCount;
+    if(Array.isArray(state.inseminations) && state.pregnancyDate){
+      const pd = new Date(state.pregnancyDate).getTime();
+      spc = state.inseminations.filter(d=> new Date(d).getTime() <= pd).length || spc;
+    }
+    put('fiSPC', spc!=null? NF.format(spc) : '—');
+
+    const serviceInt = avgDaysBetween(state.inseminations);
+    put('fiServiceInterval', serviceInt!=null? `${NF.format(serviceInt)} يوم` : '—');
+
+    const lastHeat = (state.estrusDates && state.estrusDates.length) ? state.estrusDates[state.estrusDates.length-1] : null;
+    put('fiLastHeat', fmtD(lastHeat));
+    const heatInt = avgDaysBetween(state.estrusDates);
+    put('fiHeatInterval', heatInt!=null? `${NF.format(heatInt)} يوم` : '—');
+
+    if(state.ovsynch && state.ovsynch.active){
+      put('fiOvsynch', `${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`);
+    } else { put('fiOvsynch','—'); }
+
+    // ===== صحة
+    put('fiHealth', state.healthStatus||'—');
+    put('fiLastCheck', fmtD(state.lastCheckDate));
+    const hl = $('healthList');
+    if(Array.isArray(state.healthHistory) && state.healthHistory.length){
+      state.healthHistory.slice(-6).forEach(it=>{
+        const row = document.createElement('div'); row.className='hl';
+        const d=document.createElement('div'); d.textContent = fmtD(it.date);
+        const dx=document.createElement('div'); dx.textContent = it.diagnosis || '—';
+        const nt=document.createElement('div'); nt.className='note'; nt.textContent = it.note || '';
+        row.appendChild(d); row.appendChild(dx); row.appendChild(nt);
+        hl.appendChild(row);
+      });
+    } else {
       const row = document.createElement('div'); row.className='hl';
-      const d=document.createElement('div'); d.textContent = fmtD(it.date);
-      const dx=document.createElement('div'); dx.textContent = it.diagnosis || '—';
-      const nt=document.createElement('div'); nt.className='note'; nt.textContent = it.note || '';
-      row.appendChild(d); row.appendChild(dx); row.appendChild(nt);
+      const c1=document.createElement('div'); c1.textContent='—';
+      const c2=document.createElement('div'); c2.textContent='لا توجد سجلات';
+      const c3=document.createElement('div'); c3.className='note'; c3.textContent='';
+      row.appendChild(c1); row.appendChild(c2); row.appendChild(c3);
       hl.appendChild(row);
-    });
-  }
-</script>
+    }
+  </script>
 </body>
 </html>
-
