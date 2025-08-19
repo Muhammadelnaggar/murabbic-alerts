@@ -1,343 +1,154 @@
-// server.js — إصدار مستقر Production-Ready
-// ----------------------------------------------
-const path    = require('path');
-const fs      = require('fs');
-const express = require('express');
-const cors    = require('cors');
-const admin   = require('firebase-admin');
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل الدخول</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      direction: rtl;
+      font-family: 'Cairo', 'Arial', sans-serif;
+      background: linear-gradient(to bottom right, #ffffcc, #eeffdd);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    form {
+      background-color: #ffffff;
+      padding: 30px 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+    h2 {
+      color: #28a745;
+      font-size: 28px;
+      margin-bottom: 25px;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 1em;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #28a745;
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+      authDomain: "murabbik.firebaseapp.com",
+      projectId: "murabbik",
+      storageBucket: "murabbik.appspot.com",
+      messagingSenderId: "402719243568",
+      appId: "1:402719243568:web:631114a260d23202dd5cf5"
+    };
 
-// ========== تخزين محلي (Fallback) ==========
-const dataDir     = path.join(__dirname, 'data');
-const usersPath   = path.join(dataDir, 'users.json');
-const animalsPath = path.join(dataDir, 'animals.json');
-const eventsPath  = path.join(dataDir, 'events.json');
-const alertsPath  = path.join(dataDir, 'alerts.json'); // توافق قديم
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-const readJson = (p, fallback=[]) => {
-  try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
-  catch { return fallback; }
-};
+    // دالة تشفير كلمة المرور
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
-// ========== ميدلوير ==========
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+    window.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("loginForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-// ========== Firebase Admin ==========
-let db = null;
-try {
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : null;
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: sa ? admin.credential.cert(sa) : admin.credential.applicationDefault()
-    });
-  }
-  db = admin.firestore();
-  console.log('✅ Firebase Admin ready');
-} catch (e) {
-  console.log('⚠️ Firestore disabled:', e.message);
+        const phone = document.getElementById("phone").value.trim();
+        const password = document.getElementById("password").value.trim();
+
+        if (!phone || !password) {
+          alert("يرجى إدخال رقم الهاتف وكلمة المرور.");
+          return;
+        }
+
+        try {
+          const usersRef = collection(db, "users");
+          const q = query(usersRef, where("phone", "==", phone));
+          const querySnapshot = await getDocs(q);
+
+          if (querySnapshot.empty) {
+            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
+            return;
+          }
+
+          const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data();
+
+          const hashedInputPassword = await hashPassword(password);
+
+          if (hashedInputPassword !== userData.password) {
+            alert("❌ رقم الهاتف أو كلمة المرور غير صحيحة.");
+            return;
+          }
+
+          // تسجيل الدخول ناجح
+          localStorage.setItem("userId", userDoc.id);
+          localStorage.setItem("userPhone", userData.phone);
+          alert("✅ تم تسجيل الدخول بنجاح");
+          // حفظ البلد/المنطقة لاستخدام الطقس و THI
+const country = userData.country || '';
+const region  = userData.region  || '';
+if (country && region) {
+  const regionKey = `${country}:${region}`;
+  localStorage.setItem('userRegionKey', regionKey);
+  localStorage.setItem('userCountry', country);
+  localStorage.setItem('userRegion',  region);
+  // (اختياري) امسح أي كاش طقس قديم
+  localStorage.removeItem('weather:' + regionKey);
 }
 
-// ========== Helpers ==========
-const dayMs = 86400000;
-const tenantKey = (v) => (v==null || v==='') ? 'DEFAULT' : String(v);
-function resolveTenant(req){
-  return tenantKey(
-    req.headers['x-user-id'] || req.query.userId ||
-    process.env.DEFAULT_TENANT_ID || 'DEFAULT'
-  );
-}
-function belongs(rec, tenant){
-  const t = rec?.userId ?? rec?.farmId ?? 'DEFAULT';
-  return tenantKey(t) === tenantKey(tenant);
-}
-const toDate = (v) => {
-  if (!v) return null;
-  if (v._seconds) return new Date(v._seconds * 1000);
-  if (typeof v === 'number') return new Date(v);
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T00:00:00Z');
-  return new Date(s);
-};
-function requireUserId(req, res, next){
-  const t = resolveTenant(req);
-  if (!t || t === 'DEFAULT') return res.status(400).json({ ok:false, error:'userId_required' });
-  req.userId = t;
-  next();
-}
+          const animalsRef = collection(db, "animals");
+          const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
+          const animalSnapshot = await getDocs(animalQuery);
 
-// ========== Debug خفيفة ==========
-const ADMIN_DEV_OPEN = process.env.ADMIN_DEV_OPEN === '1';
-if (ADMIN_DEV_OPEN) {
-  app.get('/api/debug/echo-tenant', (req,res) => {
-    res.json({
-      header_x_user_id: req.headers['x-user-id']||null,
-      query_userId:req.query.userId||null,
-      resolvedTenant: resolveTenant(req)
-    });
-  });
+          if (animalSnapshot.empty) {
+            window.location.href = "add-animal.html";
+          } else {
+            window.location.href = "dashboard.html";
+          }
 
-  app.get('/api/debug/cloud-animals-sample', async (_req, res) => {
-    try {
-      if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
-      const snap = await admin.firestore().collectionGroup('animals').limit(10).get();
-      const items = snap.docs.map(d => {
-        const a = d.data() || {};
-        return { path:d.ref.path, id:d.id, userId:a.userId||null, farmId:a.farmId||null, number:a.number||null };
+        } catch (err) {
+          console.error(err);
+          alert("حدث خطأ أثناء تسجيل الدخول.");
+        }
       });
-      res.json({ ok:true, items });
-    } catch (e) {
-      res.status(500).json({ ok:false, error:e?.message||'cloud_sample_failed' });
-    }
-  });
-}
-
-// ============================================================
-//                       API: ANIMALS
-// ============================================================
-app.get('/api/animals', async (req, res) => {
-  try {
-    const tenant = resolveTenant(req);
-
-    if (db) {
-      const adb = admin.firestore();
-      const seen = new Map();
-      const push = d => { if (d && d.exists) seen.set(d.ref.path, { id:d.id, ...(d.data()||{}) }); };
-
-      for (const fld of ['userId','farmId']) {
-        try { (await adb.collection('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-        try { (await adb.collectionGroup('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-      }
-
-      const arr = [...seen.values()]
-        .sort((a,b)=> String(a.number||'').localeCompare(String(b.number||''),'en',{numeric:true}));
-      return res.json(arr);
-    }
-
-    // Fallback ملفي
-    return res.json(readJson(animalsPath, []).filter(a => belongs(a, tenant)));
-  } catch (e) {
-    console.error('animals list', e);
-    res.status(500).json({ ok:false, error:'animals_failed' });
-  }
-});
-
-// ============================================================
-//                       API: HERD STATS (بدون فهارس مركبة)
-// ============================================================
-app.get('/api/herd-stats', async (req, res) => {
-  try {
-    const tenant  = resolveTenant(req);
-    const species = (req.query.species || '').toLowerCase();
-    const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
-    const gestationDays = species.includes('buffalo') ? 310 : 280;
-
-    const sinceAnalysis = new Date(Date.now() - analysisDays * dayMs);
-    const sinceEvents   = new Date(Date.now() - (analysisDays + gestationDays + 60) * dayMs);
-
-    if (db) {
-      const adb = admin.firestore();
-
-      // الحيوانات (الجذر + collectionGroup)
-      const seen = new Map(); const push = d => { if(d?.exists) seen.set(d.ref.path, d); };
-      for (const fld of ['userId','farmId']) {
-        try { (await adb.collection('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-        try { (await adb.collectionGroup('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-      }
-      const animals = [...seen.values()].map(d => ({ id:d.id, ...(d.data()||{}) }));
-      const active  = animals.filter(a => a?.active !== false &&
-        !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
-      const totalActive = active.length;
-      const activeIds   = new Set(active.map(a => String(a.id)));
-
-      // الأحداث: type + orderBy(date desc) + limit، ثم فلترة tenant + التاريخ في الذاكرة
-      async function fetchType(type, limitN=2000){
-        const snap = await adb.collection('events')
-          .where('type','==', type)
-          .orderBy('date','desc')   // فهرس type+date موجود
-          .limit(limitN)
-          .get()
-          .catch(()=>({docs:[]}));
-        return snap.docs.map(d => ({ id:d.id, ...(d.data()||{}) }))
-          .filter(e => tenantKey(e.userId||e.farmId) === tenantKey(tenant))
-          .filter(e => toDate(e.date || e.createdAt) >= sinceEvents);
-      }
-
-      const [ins, preg] = await Promise.all([ fetchType('insemination'), fetchType('pregnancy') ]);
-
-      const insWin   = ins .filter(e => activeIds.has(String(e.animalId)) && toDate(e.date||e.createdAt) >= sinceAnalysis);
-      const pregPos  = preg.filter(e => activeIds.has(String(e.animalId)) && /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
-      const pregInAn = pregPos.filter(e => toDate(e.date || e.createdAt) >= sinceAnalysis);
-
-      const pregSet    = new Set(pregPos.map(e => String(e.animalId)));
-      const openCount  = Math.max(0, totalActive - pregSet.size);
-      const insIds     = new Set(insWin.map(e => String(e.animalId)));
-      const cr         = insWin.length ? +((pregInAn.length/insWin.length)*100).toFixed(1) : 0;
-      const pct = (n)=> totalActive ? +((n/totalActive)*100).toFixed(1) : 0;
-
-      return res.json({
-        ok:true,
-        totals:{
-          totalActive,
-          pregnant:   { count: pregSet.size, pct: pct(pregSet.size) },
-          inseminated:{ count: insIds.size,  pct: pct(insIds.size) },
-          open:       { count: openCount,    pct: pct(openCount) }
-        },
-        fertility:{ conceptionRatePct: cr }
-      });
-    }
-
-    // Fallback ملفي:
-    const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
-    const active = animalsAll.filter(a => a.active !== false &&
-      !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
-    const totalActive = active.length;
-
-    const evAll = readJson(eventsPath, []).filter(e => belongs(e, tenant));
-    const insWin  = evAll.filter(e => /insemination|تلقيح/i.test(e.type||'') && toDate(e.ts||e.date) >= sinceAnalysis);
-    const pregPos = evAll.filter(e => /pregnancy|حمل/i.test(e.type||'') && /positive|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
-    const pregInAn= pregPos.filter(e => toDate(e.ts||e.date) >= sinceAnalysis);
-
-    const pregSet    = new Set(pregPos.map(e => String(e.animalId)));
-    const openCount  = Math.max(0, totalActive - pregSet.size);
-    const insIds     = new Set(insWin.map(e => String(e.animalId)));
-    const pct = (n)=> totalActive ? +((n/totalActive)*100).toFixed(1) : 0;
-    const cr  = insWin.length ? +((pregInAn.length/insWin.length)*100).toFixed(1) : 0;
-
-    return res.json({
-      ok:true,
-      totals:{
-        totalActive,
-        pregnant:   { count: pregSet.size, pct: pct(pregSet.size) },
-        inseminated:{ count: insIds.size,  pct: pct(insIds.size) },
-        open:       { count: openCount,    pct: pct(openCount) }
-      },
-      fertility:{ conceptionRatePct: cr }
     });
-  } catch (e) {
-    console.error('herd-stats', e);
-    res.status(500).json({ ok:false, error:String(e?.message||e) });
-  }
-});
-
-// ============================================================
-//                       API: EVENTS (محلي + Mirror)
-// ============================================================
-app.post('/api/events', requireUserId, async (req, res) => {
-  try {
-    const event = req.body || {};
-    const tenant = req.userId;
-    event.userId = tenant;
-    event.farmId = tenant;
-
-    if (!event.type || !event.animalId) {
-      return res.status(400).json({ ok:false, error:'missing_fields' });
-    }
-
-    // محلي
-    const events = readJson(eventsPath, []);
-    event.id = events.length + 1;
-    if (!event.ts) event.ts = Date.now();
-    events.push(event);
-    fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
-
-    // Mirror إلى Firestore (مبسطة وآمنة)
-    if (db) {
-      const t = String(event.type||'').toLowerCase();
-      const typeNorm =
-        t.includes('insemin') || t.includes('تلقيح') ? 'insemination' :
-        t.includes('preg')    || t.includes('حمل')    ? 'pregnancy'   :
-        t.includes('calv')    || t.includes('ولادة')  ? 'birth'       :
-        t.includes('heat')    || t.includes('شياع')   ? 'heat'        : 'event';
-      const whenMs  = Number(event.ts || Date.now());
-      const whenISO = new Date(whenMs).toISOString().slice(0,10);
-
-      try {
-        await db.collection('events').add({
-          userId: tenant, farmId: tenant,
-          animalId: String(event.animalId||''),
-          type: typeNorm, date: whenISO,
-          createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
-          species: (event.species || 'buffalo').toLowerCase(),
-          result: event.result || event.status || '',
-          note: event.note || ''
-        });
-      } catch {}
-    }
-
-    return res.json({ ok:true, event });
-  } catch (e) {
-    console.error('events', e);
-    res.status(500).json({ ok:false, error:'failed_to_save_event' });
-  }
-});
-
-// ============================================================
-//                       API: TIMELINE (مختصر)
-// ============================================================
-app.get('/api/animal-timeline', async (req, res) => {
-  try {
-    const animalId = String(req.query.animalId || '').trim();
-    const limit = Math.min(Number(req.query.limit || 200), 1000);
-    if (!animalId) return res.status(400).json({ ok:false, error:'animalId required' });
-
-    const items = [];
-
-    // محلي
-    const evLocal = readJson(eventsPath, []);
-    evLocal.filter(e => String(e.animalId) === animalId)
-      .forEach(e => items.push({
-        kind:'event',
-        ts: e.ts || toDate(e.date)?.getTime() || Date.now(),
-        title: e.type || e.title || 'حدث',
-        summary: e.note || e.notes || ''
-      }));
-
-    // Firestore (تنبيهات + أجهزة)
-    if (db) {
-      const alSnap = await db.collection('alerts')
-        .where('subject.animalId','==', animalId)
-        .orderBy('ts','desc').limit(limit).get().catch(()=>({docs:[]}));
-      for (const d of (alSnap.docs||[])) {
-        items.push({ kind:'alert', ts: d.get('ts'), code: d.get('code'), summary: d.get('message') });
-      }
-      const devSnap = await db.collection('devices')
-        .where('subject.animalId','==', animalId)
-        .limit(50).get().catch(()=>({docs:[]}));
-      for (const d of (devSnap.docs||[])) {
-        const m = d.get('metrics') || {};
-        const summary = Object.entries(m).slice(0,3).map(([k,v]) => `${k}: ${v.value}${v.unit||''}`).join(' • ');
-        items.push({ kind:'reading', ts: d.get('lastSeen') || 0, name: d.id, summary });
-      }
-    }
-
-    items.sort((a,b)=>b.ts-a.ts);
-    res.json({ ok:true, items: items.slice(0, limit) });
-  } catch (e) {
-    console.error('timeline', e);
-    res.status(500).json({ ok:false, error:'timeline_failed' });
-  }
-});
-
-// ============================================================
-//                 توافق قديم + صفحات
-// ============================================================
-app.get('/alerts/:id', (req, res) => {
-  const userId = parseInt(req.params.id, 10);
-  const oldAlerts = readJson(alertsPath, []);
-  const userAlerts = oldAlerts.filter(a => a.user_id === userId);
-  res.json({ alerts: userAlerts });
-});
-
-app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'www', 'index.html')));
-
-// static في النهاية
-app.use(express.static(path.join(__dirname, 'www')));
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
+  </script>
+</head>
+<body>
+  <form id="loginForm">
+    <h2>تسجيل الدخول</h2>
+    <input type="text" id="phone" placeholder="رقم الهاتف" required />
+    <input type="password" id="password" placeholder="كلمة المرور" required />
+    <button type="submit">دخول</button>
+  </form>
+</body>
+</html>
