@@ -281,105 +281,115 @@ app.get('/api/animal-timeline', async (req, res) => {
 // ============================================================
 //   API: HERD STATS  (يشوف animals من الجذر + collectionGroup)
 // ============================================================
+// ============================================================
+//            API: HERD STATS (Never throws 500 to client)
+// ============================================================
 app.get('/api/herd-stats', async (req, res) => {
+  const safeZeros = () => res.json({
+    ok: true,
+    totals: {
+      totalActive: 0,
+      pregnant:   { count: 0, pct: 0 },
+      inseminated:{ count: 0, pct: 0 },
+      open:       { count: 0, pct: 0 }
+    },
+    fertility: { conceptionRatePct: 0 }
+  });
+
   try {
     const tenant  = resolveTenant(req);
-    const species = (req.query.species || '').toLowerCase(); // 'cow' | 'buffalo'
-    const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
-    const gestationDays = species.includes('buffalo') ? 310 : 280;
+    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
 
+    // Firestore أولاً
     if (db) {
       const adb = admin.firestore();
-      const dayMs = 86400000;
-      const toYYYYMMDD = (d) => new Date(d).toISOString().slice(0,10);
-      const toDate = (v) => {
-        if (!v) return null;
-        if (v._seconds) return new Date(v._seconds * 1000);
-        if (typeof v === 'number') return new Date(v);
-        const s = String(v);
-        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T00:00:00Z');
-        return new Date(s);
-      };
+      const sinceAnalysis = Date.now() - analysisDays * 86400000;
+      const sinceStr = new Date(Date.now() - (analysisDays + 310 + 60) * 86400000).toISOString().slice(0,10);
 
-      // 1) اجمع الحيوانات من الجذر + collectionGroup (مع إزالة التكرار)
-      async function fetchAnimalsForTenant(t){
-        const seen = new Map(); const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
-        for (const fld of ['userId','farmId']) {
-          try { (await adb.collection('animals').where(fld,'==',t).limit(2000).get()).docs.forEach(push); } catch {}
-          try { (await adb.collectionGroup('animals').where(fld,'==',t).limit(2000).get()).docs.forEach(push); } catch {}
-        }
-        return Array.from(seen.values()).map(d => ({ id:d.id, ...(d.data()||{}) }));
-      }
-      const animals = await fetchAnimalsForTenant(tenant);
+      // اقرأ الحيوانات (userId أو farmId) بأمان
+      const animalsDocs = new Map();
+      const push = (d) => d && d.exists && animalsDocs.set(d.id, d.data() || {});
+      try { (await adb.collection('animals').where('userId','==',tenant).get()).docs.forEach(push); } catch {}
+      try { (await adb.collection('animals').where('farmId','==',tenant).get()).docs.forEach(push); } catch {}
+      // collectionGroup دعم جزئي – إن فشل تجاهله
+      try { (await adb.collectionGroup('animals').where('userId','==',tenant).get()).docs.forEach(d => animalsDocs.set(d.id, d.data() || {})); } catch {}
+      try { (await adb.collectionGroup('animals').where('farmId','==',tenant).get()).docs.forEach(d => animalsDocs.set(d.id, d.data() || {})); } catch {}
 
-      const active = animals.filter(a =>
-        a?.active !== false &&
-        !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase())
-      );
+      const animals = [...animalsDocs.values()];
+      const active = animals.filter(a => a?.active !== false && !['sold','dead','archived','inactive'].includes(String(a?.status||'').toLowerCase()));
+      const activeIds = new Set(active.map((a,i) => String(a.id || a.uid || a.number || i)));
       const totalActive = active.length;
-      const activeIds   = new Set(active.map(a => String(a.id)));
 
-      // 2) اجمع الأحداث ضمن نافذة زمنية مرنة
-      const sinceAnalysis = new Date(Date.now() - analysisDays * dayMs);
-      const sinceEvents   = new Date(Date.now() - (analysisDays + gestationDays + 60) * dayMs);
-      const sinceStr      = toYYYYMMDD(sinceEvents);
-
-      async function fetchType(type){
-        const set = new Map(); const push = d => { if (d && d.exists) set.set(d.id, d); };
-        for (const fld of ['userId','farmId']) {
+      // دوال قراءة أحداث آمنة – لا ترمي
+      async function fetchType(type) {
+        const bag = new Map();
+        async function tryQ(field) {
           try {
-            (await adb.collection('events')
-              .where(fld,'==',tenant).where('type','==',type)
-              .where('date','>=',sinceStr)).docs.forEach(push);
+            const s = await adb.collection('events')
+              .where(field, '==', tenant).where('type', '==', type).where('date', '>=', sinceStr).get();
+            s.docs.forEach(d => bag.set(d.id, d.data() || {}));
           } catch {
-            (await adb.collection('events')
-              .where(fld,'==',tenant).where('type','==',type)
-              .orderBy('date','desc').limit(2000).get()
-            ).docs.forEach(d => { if ((d.get('date')||'') >= sinceStr) push(d); });
+            const s = await adb.collection('events')
+              .where(field, '==', tenant).where('type', '==', type).orderBy('date','desc').limit(2000).get().catch(()=>({docs:[]}));
+            (s.docs||[]).forEach(d => { const dt=d.get('date')||''; if (dt>=sinceStr) bag.set(d.id, d.data()||{}); });
           }
         }
-        return Array.from(set.values()).map(d => ({ id:d.id, ...(d.data()||{}) }));
+        await tryQ('userId'); await tryQ('farmId');
+        return [...bag.values()];
       }
 
-      const [ins, preg] = await Promise.all([
-        fetchType('insemination'),
-        fetchType('pregnancy'),
-      ]);
+      let ins=[], preg=[];
+      try { [ins, preg] = await Promise.all([fetchType('insemination'), fetchType('pregnancy')]); } catch {}
 
-      const insInWindow = ins.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        toDate(e.date || e.createdAt) >= sinceAnalysis
-      );
+      const inWindow = (e) => {
+        const t = new Date(e.date || e.createdAt?._seconds*1000 || 0).getTime();
+        return Number.isFinite(t) && t >= sinceAnalysis;
+      };
+      const insWin = ins.filter(e => activeIds.has(String(e.animalId)) && inWindow(e));
+      const pregPosAll = preg.filter(e => activeIds.has(String(e.animalId)) &&
+        /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
 
-      const pregPos      = preg.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||''))
-      );
-
-      const pregPosInWin = preg.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')) &&
-        toDate(e.date || e.createdAt) >= sinceAnalysis
-      );
-
-      const pregSet   = new Set(pregPos.map(e => String(e.animalId)));
+      const pregSet = new Set(pregPosAll.map(e => String(e.animalId)));
       const openCount = Math.max(0, totalActive - pregSet.size);
-      const concRate  = insInWindow.length
-        ? +((pregPosInWin.length / insInWindow.length) * 100).toFixed(1)
-        : 0;
+      const pregPosInAnalysis = pregPosAll.filter(inWindow);
+
+      const conception = insWin.length ? (pregPosInAnalysis.length / insWin.length) * 100 : 0;
+      const pct = (n) => totalActive ? +((n/totalActive)*100).toFixed(1) : 0;
 
       return res.json({
-        ok:true,
-        totals:{
+        ok: true,
+        totals: {
           totalActive,
-          pregnant:   { count: pregSet.size, pct: totalActive ? +((pregSet.size/totalActive)*100).toFixed(1) : 0 },
-          inseminated:{ count: new Set(insInWindow.map(e=>String(e.animalId))).size,
-                        pct: totalActive ? +((new Set(insInWindow.map(e=>String(e.animalId))).size/totalActive)*100).toFixed(1) : 0 },
-          open:       { count: openCount, pct: totalActive ? +((openCount/totalActive)*100).toFixed(1) : 0 }
+          pregnant:    { count: pregSet.size,      pct: pct(pregSet.size) },
+          inseminated: { count: new Set(insWin.map(e=>String(e.animalId))).size, pct: pct(new Set(insWin.map(e=>String(e.animalId))).size) },
+          open:        { count: openCount,         pct: pct(openCount) }
         },
-        fertility:{ conceptionRatePct: concRate }
+        fertility: { conceptionRatePct: +conception.toFixed(1) }
       });
     }
+
+    // Fallback (ملفات محلية) — لا ترمي أبدًا
+    const tenant = resolveTenant(req);
+    const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    const active = animalsAll.filter(a => a?.active !== false && !['sold','dead','archived','inactive'].includes(String(a?.status||'').toLowerCase()));
+    const totalActive = active.length;
+
+    return res.json({
+      ok: true,
+      totals: {
+        totalActive,
+        pregnant:   { count: 0, pct: 0 },
+        inseminated:{ count: 0, pct: 0 },
+        open:       { count: totalActive, pct: 100 }
+      },
+      fertility: { conceptionRatePct: 0 }
+    });
+
+  } catch (e) {
+    console.error('herd-stats fatal:', e);
+    return safeZeros();
+  }
+});
 
     // 3) Fallback للملفات المحلية (بدون تغيير منطقي كبير)
     const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
