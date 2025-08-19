@@ -51,12 +51,18 @@
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
 
-    /* شبكة البلاطات (بسيطة؛ بتكمّل تصميمك الحالي) */
+    /* شبكة البلاطات */
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
     .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:6px;min-height:118px}
     .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px}
+
+    /* ===== Gauges (نص دائرة) ===== */
+    .gauge{width:100%;aspect-ratio:2/1;position:relative}
+    .gauge svg{width:100%;height:100%;display:block}
+    .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
+    .line{font-size:13px;color:#333;margin-top:6px}
   </style>
 </head>
 <body>
@@ -97,7 +103,7 @@
   </div>
   <!-- ============================================================= -->
 
-  <!-- شبكة البلاطات / روابط سريعة (اتركها كما تحب) -->
+  <!-- شبكة البلاطات / روابط سريعة -->
   <div class="dashboard" style="margin-top:12px">
     <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>حيوان جديد</div>
     <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>حيواناتي</div>
@@ -106,7 +112,38 @@
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
   </div>
 
-  <!-- ===== ويدجت الطقس (منطقه السكربت الخاص بالقديم) ===== -->
+  <!-- [HERD GAUGES] -->
+  <section id="herd-analysis" style="margin:10px 12px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4>
+        <div class="gauge" data-key="pregnant"></div>
+        <div class="line" id="line-pregnant">—</div>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4>
+        <div class="gauge" data-key="inseminated"></div>
+        <div class="line" id="line-inseminated">—</div>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4>
+        <div class="gauge" data-key="open"></div>
+        <div class="line" id="line-open">—</div>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4>
+        <div class="gauge" data-key="conception"></div>
+        <div class="line" id="line-conception">—</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:10px">
+      <h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4>
+      <div id="herd-numbers">—</div>
+    </div>
+  </section>
+
+  <!-- ===== سكربت الطقس (القديم كما هو) ===== -->
   <script>
     (function(){
       const segFarm = document.getElementById('segFarm');
@@ -120,14 +157,12 @@
       const thiArc = document.getElementById('thiArc');
       const thiNeedle = document.getElementById('thiNeedle');
 
-      // تفضيلات
       function getMode(){ return (localStorage.getItem('locMode')==='farm')?'farm':'gps'; }
       function setMode(m){ localStorage.setItem('locMode',m); syncSeg(); }
       function syncSeg(){ const m=getMode(); segFarm.classList.toggle('active',m==='farm'); segGPS.classList.toggle('active',m==='gps'); }
       function getFarm(){ try{ const x=JSON.parse(localStorage.getItem('farmCoords')||'null'); return (x&&x.lat!=null)?x:null; }catch{return null;} }
       async function setFarm(c){ localStorage.setItem('farmCoords',JSON.stringify(c)); setMode('farm'); }
 
-      // حساب THI + نطاقات الأبقار/الجاموس (كالقديم – نعتمد الجاموس افتراضي)
       function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
       function bands(buffalo=true){ return buffalo?{t1:66,t2:70,t3:77,t4:82}:{t1:68,t2:72,t3:79,t4:84}; }
       function colorAndText(thi,b){
@@ -138,7 +173,6 @@
         return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
       }
 
-      // GPS
       async function readGPS(force=false){
         try{ const c=JSON.parse(localStorage.getItem('lastGPS')||'null'); if(c && !force && (Date.now()-c.ts)<600000) return {lat:c.lat,lon:c.lon}; }catch{}
         if(navigator.geolocation){
@@ -156,7 +190,6 @@
         else { const g=await readGPS(force); if(g) return g; const f=getFarm(); if(f) return f; return {lat:30.0444,lon:31.2357}; }
       }
 
-      // Open-Meteo
       async function fetchWeather(lat,lon){
         try{
           const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
@@ -165,22 +198,18 @@
         }catch{ return null; }
       }
 
-      // رسم القيم
       function drawTHI(thi,isBuffalo=true){
         const b=bands(isBuffalo);
-        // قوس الألوان
         if(thiArc){
           const min=50,max=90,p=v=>((v-min)*100/(max-min)), span=240/360*100, pArc=v=>(p(v)/100)*span;
           const p1=pArc(b.t1),p2=pArc(b.t2),p3=pArc(b.t3);
           thiArc.style.background = `conic-gradient(from -120deg,#90caf9 0% ${p1}%,#fff59d ${p1}% ${p2}%,#ffcc80 ${p2}% ${p3}%,#ef5350 ${p3}% ${span}%,transparent ${span}% 100%)`;
         }
-        // إبرة
         if(thiNeedle){
           const min=50,max=90,p=v=>((v-min)*100/(max-min));
           const ang=-120+Math.max(0,Math.min(100,p(thi)))*2.4;
           thiNeedle.style.setProperty('--angle',ang+'deg');
         }
-        // الحالة
         const {bg,txt}=colorAndText(thi,b);
         document.getElementById('weatherClassic').style.background = bg;
         sEl.textContent = txt;
@@ -200,12 +229,10 @@
         drawTHI(thi,true); // جاموس افتراضيًا
       }
 
-      // أحداث
       segFarm.addEventListener('click', ()=>{ setMode('farm'); render(true); });
       segGPS .addEventListener('click', ()=>{ setMode('gps');  render(true); });
       btnRef .addEventListener('click', ()=> render(true));
       btnPin .addEventListener('click', async ()=>{
-        // تعيين المزرعة حسب GPS الحالي
         const g=await readGPS(true);
         if(g){ await setFarm(g); alert('✅ تم تثبيت موقع المزرعة'); render(true); }
         else { alert('تعذّر تحديد موقعك الآن'); }
@@ -214,14 +241,94 @@
       document.addEventListener('DOMContentLoaded', ()=> render());
     })();
   </script>
-  <!-- ===== /ويدجت الطقس ===== -->
+  <!-- ===== /سكربت الطقس ===== -->
 
   <!-- ⚠️ مهم: حقن X-User-Id قبل أي سكربتات تستدعي /api -->
   <script src="/js/tenant-bootstrap.js"></script>
 
-  <!-- سكربتات الواجهة التي تتعامل مع /api -->
+  <!-- سكربتاتك (اختياري تبقي عليها) -->
   <script src="js/mbk-animals.js?v=2"></script>
   <script src="js/herd-gauges.js?v=2"></script>
   <script src="js/smart-alerts.js?v=2"></script>
+
+  <!-- ===== احتياطي: رسم الجوج + جلب /api/herd-stats (في حالة عدم وجود herd-gauges.js) ===== -->
+  <script>
+    (function(){
+      if (window.__gauges_bootstrapped) return; // امنع التكرار لو ملف خارجي بيعمل نفس الشغل
+      window.__gauges_bootstrapped = true;
+
+      // طلب API مع هيدر التينانت
+      function apiFetch(url, opts={}){
+        const h = Object.assign({'X-User-Id': localStorage.getItem('userId') || ''}, (opts.headers||{}));
+        return fetch(url, Object.assign({}, opts, { headers: h }));
+      }
+
+      // دالة رسم نص دائرة بسيطة
+      function mountGauge(el, pct){
+        pct = Math.max(0, Math.min(100, Number(pct)||0));
+        const r = 40;                       // نصف القطر
+        const circ = Math.PI * r;           // طول القوس (نص دائرة)
+        const fill = (pct/100) * circ;      // طول الجزء الملوَّن
+        el.innerHTML = `
+          <svg viewBox="0 0 100 50" aria-hidden="true">
+            <path d="M10 50 A40 40 0 0 1 90 50" stroke="#e5e7eb" stroke-width="10" fill="none" stroke-linecap="round"/>
+            <path d="M10 50 A40 40 0 0 1 90 50" stroke="#2e7d32" stroke-width="10" fill="none"
+                  stroke-dasharray="${fill} ${circ}" stroke-linecap="round"/>
+          </svg>
+          <div class="val">${pct}%</div>`;
+      }
+
+      function setLine(id, txt){ const el=document.getElementById(id); if(el) el.textContent = txt; }
+
+      async function renderHerd(){
+        try{
+          const r = await apiFetch('/api/herd-stats');
+          if(!r.ok) throw new Error('herd-stats http error');
+          const j = await r.json();
+
+          const totals = j?.totals || {};
+          const fert   = j?.fertility || {};
+
+          const totalActive = Number(totals.totalActive||0);
+          const pregC = Number(totals.pregnant?.count||0);
+          const pregP = Number(totals.pregnant?.pct||0);
+          const insC  = Number(totals.inseminated?.count||0);
+          const insP  = Number(totals.inseminated?.pct||0);
+          const openC = Number(totals.open?.count||0);
+          const openP = Number(totals.open?.pct||0);
+          const concP = Number(fert.conceptionRatePct||0);
+
+          // ارسم الجوج
+          document.querySelectorAll('.gauge').forEach(g=>{
+            const key = g.getAttribute('data-key');
+            if(key==='pregnant')   mountGauge(g, pregP);
+            else if(key==='inseminated') mountGauge(g, insP);
+            else if(key==='open')  mountGauge(g, openP);
+            else if(key==='conception') mountGauge(g, concP);
+          });
+
+          // السطور تحت كل جوج
+          setLine('line-pregnant',    `${pregC} من ${totalActive}`);
+          setLine('line-inseminated', `${insC} من ${totalActive}`);
+          setLine('line-open',        `${openC} من ${totalActive}`);
+          setLine('line-conception',  `Conception: ${concP}%`);
+
+          // ملخص
+          const summary = `إجمالي نشط: ${totalActive} • عِشار: ${pregC} • ملقّحات: ${insC} • مفتوحة: ${openC} • Conception: ${concP}%`;
+          const sEl = document.getElementById('herd-numbers');
+          if(sEl) sEl.textContent = summary;
+
+        } catch(e){
+          // في حالة الفشل: صفر
+          document.querySelectorAll('.gauge').forEach(g=> mountGauge(g, 0));
+          setLine('line-pregnant','—'); setLine('line-inseminated','—'); setLine('line-open','—'); setLine('line-conception','—');
+          const sEl = document.getElementById('herd-numbers'); if(sEl) sEl.textContent='تعذّر جلب بيانات القطيع الآن.';
+          console.warn('herd-gauges error:', e);
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', renderHerd);
+    })();
+  </script>
 </body>
 </html>
