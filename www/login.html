@@ -77,11 +77,31 @@
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    // ▼ مُساعِدة: استخراج UID المُعتمد للتينانت
-    function resolveTenantUID(userDoc) {
+    // ▼ اختَر الـUID الأنسب للتينانت عبر اختبار السيرفر
+    async function pickTenantUID(userDoc) {
       const data = userDoc.data() || {};
-      // لو فيه uid/authUid داخل وثيقة المستخدم استخدمه، وإلا استخدم id بتاع الوثيقة
-      return data.uid || data.authUid || userDoc.id;
+      const raw = [data.uid, data.authUid, userDoc.id].map(v => (v||'').toString().trim()).filter(Boolean);
+      const seen = new Set();
+      const candidates = raw.filter(u => (seen.has(u) ? false : (seen.add(u), true)));
+      if (candidates.length === 0) return userDoc.id; // احتياط
+
+      // جرّب كل مرشّح ضد /api/animals واختر الأكثر بيانات
+      const probes = await Promise.all(candidates.map(async (uid) => {
+        try {
+          const res = await fetch('/api/animals', { headers: { 'X-User-Id': uid } });
+          if (!res.ok) return { uid, count: -1 };
+          const body = await res.json();
+          const count = Array.isArray(body) ? body.length : (Array.isArray(body.items) ? body.items.length : 0);
+          return { uid, count };
+        } catch { return { uid, count: -1 }; }
+      }));
+
+      // أولاً: أي UID أعطى عدد > 0
+      const withData = probes.filter(p => p.count > 0).sort((a,b)=>b.count-a.count);
+      if (withData.length) return withData[0].uid;
+
+      // وإلا خذ أول مرشّح صالح كما هو
+      return candidates[0];
     }
 
     // ▼ معالجة النموذج
@@ -120,10 +140,10 @@
             return;
           }
 
-          // 3) حدّد الـUID الذي سنستخدمه كتِنانت (يتوافق مع السيرفر وبيانات الحيوانات)
-          const tenantUID = resolveTenantUID(userDoc);
+          // 3) حدد الـUID النهائي بالتجربة ضد السيرفر
+          const tenantUID = await pickTenantUID(userDoc);
 
-          // 4) خزّن بيانات الجلسة — مهم: userId = tenantUID فقط (بدون تكرار بقيم مختلفة)
+          // 4) خزّن بيانات الجلسة
           localStorage.setItem('userId', tenantUID);
           localStorage.setItem('userPhone', userData.phone || '');
           localStorage.setItem('profileDocId', userDoc.id);
@@ -136,16 +156,22 @@
             localStorage.setItem('userRegionKey', regionKey);
             localStorage.setItem('userCountry', country);
             localStorage.setItem('userRegion',  region);
-            localStorage.removeItem('weather:' + regionKey); // امسح كاش قديم
+            localStorage.removeItem('weather:' + regionKey);
           }
 
-          // 5) قرار التوجيه: لو ما فيش حيوانات لهذا الـUID روح لصفحة الإضافة، غير كده للداشبورد
-          const animalsRef = collection(db, "animals");
-          const aQ = query(animalsRef, where("userId", "==", tenantUID), limit(1));
-          const aSnap = await getDocs(aQ);
+          // 5) حدِّد التوجيه بناءً على بيانات السيرفر (أوثق من Firestore المباشر)
+          let hasAnimals = false;
+          try {
+            const res = await fetch('/api/animals', { headers: { 'X-User-Id': tenantUID } });
+            if (res.ok) {
+              const body = await res.json();
+              const count = Array.isArray(body) ? body.length : (Array.isArray(body.items) ? body.items.length : 0);
+              hasAnimals = count > 0;
+            }
+          } catch {}
 
           alert("✅ تم تسجيل الدخول بنجاح");
-          window.location.href = aSnap.empty ? "add-animal.html" : "dashboard.html";
+          window.location.href = hasAnimals ? "dashboard.html" : "add-animal.html";
 
         } catch (err) {
           console.error(err);
