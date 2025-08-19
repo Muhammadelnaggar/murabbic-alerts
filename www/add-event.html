@@ -115,7 +115,11 @@
     </div>
   </form>
 <script src="js/mbk-animals.js?v=2"></script>
+<script>window.dataLayer = window.dataLayer || [];</script>
 
+<script src="/js/app-core.js" defer></script>
+<script type="module" src="/js/timeline.js"></script>
+<script type="module" src="/js/smart-checks.js"></script>
 <script type="module">
   import { db, auth } from "./js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -280,5 +284,6 @@
 
 </body>
 </html>
+
 
 
