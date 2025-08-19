@@ -635,37 +635,48 @@ app.get('/api/herd-stats', async (req, res) => {
 // ============================================================
 
 // animals: Firestore + Local, requires tenant
+// ===== GET /api/animals (Robust Firestore + Local, requires tenant) =====
 app.get('/api/animals', requireUserId, async (req, res) => {
   try {
     const tenant = tenantKey(req.userId);
-    let cloud = [];
+    const results = new Map();
 
+    // ---- Firestore (كل المسارات المحتملة) ----
     if (db) {
       const adb = admin.firestore();
-      const acc = [];
-      try {
-        const s1 = await adb.collection('animals').where('userId','==', tenant).get();
-        acc.push(...s1.docs);
-      } catch {}
-      try {
-        const s2 = await adb.collection('animals').where('farmId','==', tenant).get();
-        const seen = new Set(acc.map(d=>d.id));
-        for (const d of s2.docs) if (!seen.has(d.id)) acc.push(d);
-      } catch {}
-      cloud = acc.map(d => ({ id: d.id, ...d.data() }));
+      const addDocs = (snap) => {
+        (snap.docs || []).forEach(d => {
+          const data = d.data() || {};
+          const key  = `fs:${d.ref.path}`;             // مفتاح فريد بالمسار
+          if (!results.has(key)) results.set(key, { id: d.id, _path: d.ref.path, ...data });
+        });
+      };
+
+      // 1) جذر /animals بفلترة userId/farmId
+      try { addDocs(await adb.collection('animals').where('userId','==', tenant).limit(500).get()); } catch {}
+      try { addDocs(await adb.collection('animals').where('farmId','==', tenant).limit(500).get()); } catch {}
+
+      // 2) حقول بديلة شائعة
+      try { addDocs(await adb.collection('animals').where('createdBy','==', tenant).limit(500).get()); } catch {}
+      try { addDocs(await adb.collection('animals').where('ownerId','==', tenant).limit(500).get()); } catch {}
+      try { addDocs(await adb.collection('animals').where('uid','==', tenant).limit(500).get()); } catch {}
+
+      // 3) collectionGroup لو الحيوانات Subcollection اسمها animals
+      try { addDocs(await adb.collectionGroup('animals').where('userId','==', tenant).limit(500).get()); } catch {}
+      try { addDocs(await adb.collectionGroup('animals').where('farmId','==', tenant).limit(500).get()); } catch {}
+
+      // 4) users/{tenant}/animals مباشرة
+      try { addDocs(await adb.collection('users').doc(tenant).collection('animals').limit(500).get()); } catch {}
     }
 
-    const local = readJson(animalsPath, [])
-      .filter(a => belongs(a, tenant))
-      .map((a, i) => ({ id: a.id || `local-${i+1}`, ...a }));
+    // ---- محلي (JSON) كfallback ----
+    const local = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    local.forEach((a,i) => {
+      const key = a.id ? `local:${a.id}` : `local:${i}`;
+      if (!results.has(key)) results.set(key, { id: a.id || `local-${i+1}`, ...a });
+    });
 
-    const byKey = new Map();
-    for (const x of [...cloud, ...local]) {
-      const key = x.id ? `id:${x.id}` : `num:${x.number}|sp:${x.species||''}`;
-      if (!byKey.has(key)) byKey.set(key, x);
-    }
-
-    const items = [...byKey.values()].map(a => ({
+    const items = Array.from(results.values()).map(a => ({
       id: a.id || null,
       number: a.number ?? null,
       species: a.species ?? null,
@@ -675,12 +686,13 @@ app.get('/api/animals', requireUserId, async (req, res) => {
       lastCalvingDate: a.lastCalvingDate ?? null
     }));
 
-    return res.json(items);
+    return res.json(items);    // [] لو مفيش؛ بدون 500
   } catch (e) {
-    console.error('GET /api/animals error:', e);
+    console.error('GET /api/animals robust error:', e);
     return res.status(500).json({ error: 'animals_route_failed', message: e?.message });
   }
 });
+
 
 // events: Firestore + Local, requires tenant
 app.get('/api/events', requireUserId, async (req, res) => {
@@ -743,6 +755,33 @@ app.get('/api/events', requireUserId, async (req, res) => {
   } catch (e) {
     console.error('GET /api/events error:', e);
     return res.status(500).json({ error: 'events_route_failed', message: e?.message });
+  }
+});
+// ===== Debug: عينة من حيوانات Firestore لمعرفة الحقول الفعلية =====
+app.get('/api/debug/cloud-animals-sample', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const limit = Math.min(parseInt(req.query.limit || '10',10), 50);
+    const adb = admin.firestore();
+    // نستخدم collectionGroup لاحتمال أن تكون الحيوانات Subcollection تحت users/{uid}/animals أو غيره
+    const snap = await adb.collectionGroup('animals').limit(limit).get();
+
+    const items = snap.docs.map(d => {
+      const a = d.data() || {};
+      return {
+        path: d.ref.path, id: d.id,
+        // الحقول الشائعة لتحديد التينانت الحقيقي
+        userId: a.userId || null, farmId: a.farmId || null,
+        createdBy: a.createdBy || null, ownerId: a.ownerId || null, uid: a.uid || null,
+        // شوية حقول مفيدة
+        number: a.number || null, species: a.species || null, status: a.status || null
+      };
+    });
+
+    res.json({ ok:true, items });
+  } catch (e) {
+    res.status(500).json({ ok:false, error: e?.message || 'cloud_sample_failed' });
   }
 });
 
