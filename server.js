@@ -478,6 +478,49 @@ if (ADMIN_DEV_OPEN) {
     }
   });
 }
+// ===== Claim animals by numbers for the current user (safe) =====
+// POST /api/fix/animals/claim?nums=1,2&allow=DoWQaqC9kUP1HU2aLSnu[,UID2][&dry=1]
+app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    const tenant = req.userId;
+    const numsParam = String(req.query.nums || '').trim();
+    const allow = new Set(String(req.query.allow||'').split(',').map(s=>s.trim()).filter(Boolean));
+    const dry = String(req.query.dry||'') === '1';
+    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required' });
+
+    const adb = admin.firestore();
+    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
+    const seen = new Map();
+    const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
+
+    async function findByNumber(v){
+      const cand=[v]; const n=Number(v); if(!Number.isNaN(n)) cand.push(n);
+      for(const x of cand){
+        try{ (await adb.collection('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
+        try{ (await adb.collectionGroup('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
+      }
+      try{ const d=await adb.collection('animals').doc(String(v)).get(); push(d);}catch{}
+    }
+
+    for(const num of wanted) await findByNumber(num);
+
+    const plan=[];
+    for(const d of seen.values()){
+      const a=d.data()||{};
+      const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
+      const can = !owner || allow.has(String(owner).trim());
+      plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before:owner??null, willUpdate:!!can });
+      if (can && !dry) await d.ref.set({ userId: tenant }, { merge:true });
+    }
+
+    res.json({ ok:true, dryRun:dry, tenant, found:plan.length,
+      updated: dry ? 0 : plan.filter(p=>p.willUpdate).length, plan });
+  } catch (e) {
+    console.error('claim error', e);
+    res.status(500).json({ ok:false, error:e?.message||'claim_failed' });
+  }
+});
 
 // ============================================================
 //                 COMPAT + WEB PAGES
