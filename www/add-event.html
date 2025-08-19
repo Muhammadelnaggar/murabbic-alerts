@@ -64,7 +64,7 @@
     }
     .button-group button.active,
     .button-group button:hover {
-      background-color: #2e7d32;
+      background-color: #2e7د32;
       color: white;
     }
   </style>
@@ -114,176 +114,198 @@
       </div>
     </div>
   </form>
-<script src="js/mbk-animals.js?v=2"></script>
-<script>window.dataLayer = window.dataLayer || [];</script>
 
-<script src="/js/app-core.js" defer></script>
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
-<script type="module">
-  import { db, auth } from "./js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  <!-- ✅ ثبّت dataLayer + t.event قبل أي سكربت -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+  </script>
 
-  // عناصر DOM
-  const animalInfo = document.getElementById("animalInfo");
-  const dateInfo   = document.getElementById("dateInfo");
-  const warning    = document.getElementById("noAnimalWarning");
-  const idInput    = document.getElementById("animalIdInput");
-  const dateInput  = document.getElementById("eventDateInput");
+  <!-- ✅ تحليلات خارجية (يسجل page_view تلقائيًا) -->
+  <script src="/js/app-core.js" defer></script>
 
-  const msgBox = document.getElementById("inlineMsg");
-  const msgText = msgBox.querySelector(".text");
-  const btnYes  = msgBox.querySelector("#msgYes");
-  const btnNo   = msgBox.querySelector("#msgNo");
+  <!-- ✅ تهيئة Firebase (يضمن جاهزية التطبيق قبل باقي الموديولات) -->
+  <script type="module" src="./js/firebase-config.js"></script>
 
-  function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
-    msgText.textContent = message;
-    btnYes.textContent = yesText;
-    btnNo.textContent  = noText;
-    msgBox.style.display = "block";
-    return new Promise(resolve=>{
-      const onYes = ()=>{ cleanup(); resolve(true);  };
-      const onNo  = ()=>{ cleanup(); resolve(false); };
-      btnYes.addEventListener('click', onYes, { once:true });
-      btnNo .addEventListener('click', onNo , { once:true });
-      function cleanup(){ msgBox.style.display="none"; }
-    });
-  }
+  <!-- ✅ الخط الزمني + القواعد الذكية (لا تغيير بصري) -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
 
-  // تاريخ اليوم المحلي YYYY-MM-DD
-  function todayLocal(){
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  }
+  <!-- ✅ تفعيل المراقبة العامة للتنبيهات (اختياري) -->
+  <script type="module">
+    const tenantId = localStorage.getItem('tenantId') || 'default';
+    const userId   = localStorage.getItem('userId');
+    try{ timeline?.init({ tenantId, userId }); }catch{}
+    try{ smart?.startAlertsWatcher({ tenantId, userId, onAlert: a => alert('🔔 ' + a.message) }); }catch{}
+  </script>
 
-  // تعبئة من الرابط/المحلّي
-  function hydrateContext(){
-    const qp = new URLSearchParams(location.search);
-    const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-    const presetDate = qp.get("date") || todayLocal();
-    idInput.value = presetId;
-    dateInput.value = presetDate;
-    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-    try {
-      const [y,m,d] = presetDate.split('-').map(Number);
-      dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-    } catch{
-      dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
+  <!-- ✅ منطق الصفحة (كما هو، بدون أي تغيير بصري) -->
+  <script type="module">
+    import { db, auth } from "./js/firebase-config.js";
+    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    // عناصر DOM
+    const animalInfo = document.getElementById("animalInfo");
+    const dateInfo   = document.getElementById("dateInfo");
+    const warning    = document.getElementById("noAnimalWarning");
+    const idInput    = document.getElementById("animalIdInput");
+    const dateInput  = document.getElementById("eventDateInput");
+
+    const msgBox = document.getElementById("inlineMsg");
+    const msgText = msgBox.querySelector(".text");
+    const btnYes  = msgBox.querySelector("#msgYes");
+    const btnNo   = msgBox.querySelector("#msgNo");
+
+    function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
+      msgText.textContent = message;
+      btnYes.textContent = yesText;
+      btnNo.textContent  = noText;
+      msgBox.style.display = "block";
+      return new Promise(resolve=>{
+        const onYes = ()=>{ cleanup(); resolve(true);  };
+        const onNo  = ()=>{ cleanup(); resolve(false); };
+        btnYes.addEventListener('click', onYes, { once:true });
+        btnNo .addEventListener('click', onNo , { once:true });
+        function cleanup(){ msgBox.style.display="none"; }
+      });
     }
-  }
 
-  // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
-  idInput.addEventListener('input', ()=>{
-    animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
-  });
-  dateInput.addEventListener('input', ()=>{
-    try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
-    catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
-  });
-
-  function getContextOrWarn(){
-    const animalId = idInput.value.trim();
-    const eventDate= dateInput.value.trim();
-    if (!animalId || !eventDate){
-      warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-      return null;
+    // تاريخ اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
     }
-    warning.textContent = "";
-    localStorage.setItem("lastAnimalId", animalId);
-    return { animalId, eventDate };
-  }
 
-  /* ⬇️⬇️ ألصق هنا الدوال الجديدة ⬇️⬇️ */
-  function pushContext(ctx){
-    const id = String(ctx.animalId);
-    const dt = String(ctx.eventDate);
-    ['lastAnimalId','ctxAnimalId','currentAnimalId'].forEach(k=> localStorage.setItem(k, id));
-    ['ctxAnimalId','currentAnimalId'].forEach(k=> sessionStorage.setItem(k, id));
-    ['lastEventDate','ctxEventDate','eventDate','Date','dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-    ['calvingDate','calvDate','calving_dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-    ['closeupDate','closeUpDate','close_dt'].forEach(k=>{
-      localStorage.setItem(k, dt);
-      sessionStorage.setItem(k, dt);
-    });
-  }
-
-  function buildTargetUrl(page, ctx){
-    const u  = new URL(page, location.href);
-    const id = String(ctx.animalId);
-    const dt = String(ctx.eventDate);
-    ['animalId','number','animalNumber','Pid','animalIdd','cowId','CowID','ID']
-      .forEach(k => u.searchParams.set(k, id));
-    ['date','eventDate','Date','dt']
-      .forEach(k => u.searchParams.set(k, dt));
-    if (page.includes('calving')){
-      ['calvingDate','calvDate','calving_dt'].forEach(k => u.searchParams.set(k, dt));
-    }
-    if (page.includes('close-up')){
-      ['closeupDate','closeUpDate','close_dt'].forEach(k => u.searchParams.set(k, dt));
-    }
-    return u.toString();
-  }
-  /* ⬆️⬆️ نهاية اللصق ⬆️⬆️ */
-
-  // ربط الأزرار (تفويض حدث)
-  function wireButtons(db, auth){
-    const container = document.getElementById("eventTypeGroup");
-    if(!container) return;
-
-    container.addEventListener('click', async (ev)=>{
-      const btn = ev.target.closest('button');
-      if (!btn || !container.contains(btn)) return;
-
-      const ctx = getContextOrWarn();
-      if (!ctx) return;
-
-      const page   = btn.getAttribute('data-page');
-      const isTrim = page === 'trimming.html';
-
-      try{
-        await addDoc(collection(db, 'events'), {
-          userId: auth?.currentUser?.uid || null,
-          animalId: ctx.animalId,
-          animalNumber: ctx.animalId,
-          eventDate: ctx.eventDate,
-          type: isTrim ? 'تقليم الحوافر' : undefined,
-          eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
-          createdAt: serverTimestamp()
-        });
-      }catch(err){
-        console.error(err);
-        if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
+    // تعبئة من الرابط/المحلّي
+    function hydrateContext(){
+      const qp = new URLSearchParams(location.search);
+      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
+      const presetDate = qp.get("date") || todayLocal();
+      idInput.value = presetId;
+      dateInput.value = presetDate;
+      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
+      try {
+        const [y,m,d] = presetDate.split('-').map(Number);
+        dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+      } catch{
+        dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
       }
+    }
 
-      if (isTrim){
-        const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-        if (!goAgain) location.href = 'dashboard.html';
-      } else if (page){
-        // ✅ خزّن السياق + ابنِ الرابط المتوافق
-        pushContext(ctx);
-        location.href = buildTargetUrl(page, ctx);
-      }
+    // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
+    idInput.addEventListener('input', ()=>{
+      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
     });
-  }
+    dateInput.addEventListener('input', ()=>{
+      try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
+      catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
+    });
 
-  // بدء التشغيل
-  hydrateContext();
-  onAuthStateChanged(auth, (user)=>{
-    if (!user){ location.href = "login.html"; return; }
-    wireButtons(db, auth);
-  });
-</script>
+    function getContextOrWarn(){
+      const animalId = idInput.value.trim();
+      const eventDate= dateInput.value.trim();
+      if (!animalId || !eventDate){
+        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+        return null;
+      }
+      warning.textContent = "";
+      localStorage.setItem("lastAnimalId", animalId);
+      return { animalId, eventDate };
+    }
 
+    /* ⬇️⬇️ الدوال الداعمة لسياق الروابط ⬇️⬇️ */
+    function pushContext(ctx){
+      const id = String(ctx.animalId);
+      const dt = String(ctx.eventDate);
+      ['lastAnimalId','ctxAnimalId','currentAnimalId'].forEach(k=> localStorage.setItem(k, id));
+      ['ctxAnimalId','currentAnimalId'].forEach(k=> sessionStorage.setItem(k, id));
+      ['lastEventDate','ctxEventDate','eventDate','Date','dt'].forEach(k=>{
+        localStorage.setItem(k, dt);
+        sessionStorage.setItem(k, dt);
+      });
+      ['calvingDate','calvDate','calving_dt'].forEach(k=>{
+        localStorage.setItem(k, dt);
+        sessionStorage.setItem(k, dt);
+      });
+      ['closeupDate','closeUpDate','close_dt'].forEach(k=>{
+        localStorage.setItem(k, dt);
+        sessionStorage.setItem(k, dt);
+      });
+    }
+
+    function buildTargetUrl(page, ctx){
+      const u  = new URL(page, location.href);
+      const id = String(ctx.animalId);
+      const dt = String(ctx.eventDate);
+      ['animalId','number','animalNumber','Pid','animalIdd','cowId','CowID','ID']
+        .forEach(k => u.searchParams.set(k, id));
+      ['date','eventDate','Date','dt']
+        .forEach(k => u.searchParams.set(k, dt));
+      if (page.includes('calving')){
+        ['calvingDate','calvDate','calving_dt'].forEach(k => u.searchParams.set(k, dt));
+      }
+      if (page.includes('close-up')){
+        ['closeupDate','closeUpDate','close_dt'].forEach(k => u.searchParams.set(k, dt));
+      }
+      return u.toString();
+    }
+    /* ⬆️⬆️ نهاية الدوال ⬆️⬆️ */
+
+    // ربط الأزرار (تفويض حدث)
+    function wireButtons(db, auth){
+      const container = document.getElementById("eventTypeGroup");
+      if(!container) return;
+
+      container.addEventListener('click', async (ev)=>{
+        const btn = ev.target.closest('button');
+        if (!btn || !container.contains(btn)) return;
+
+        const ctx = getContextOrWarn();
+        if (!ctx) return;
+
+        const page   = btn.getAttribute('data-page');
+        const isTrim = page === 'trimming.html';
+
+        try{
+          await addDoc(collection(db, 'events'), {
+            userId: auth?.currentUser?.uid || null,
+            animalId: ctx.animalId,
+            animalNumber: ctx.animalId,
+            eventDate: ctx.eventDate,
+            type: isTrim ? 'تقليم الحوافر' : undefined,
+            eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
+            createdAt: serverTimestamp()
+          });
+        }catch(err){
+          console.error(err);
+          if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
+        }
+
+        if (isTrim){
+          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
+          if (!goAgain) location.href = 'dashboard.html';
+        } else if (page){
+          // ✅ خزّن السياق + ابنِ الرابط المتوافق
+          pushContext(ctx);
+          location.href = buildTargetUrl(page, ctx);
+        }
+      });
+    }
+
+    // بدء التشغيل
+    hydrateContext();
+    onAuthStateChanged(auth, (user)=>{
+      if (!user){ location.href = "login.html"; return; }
+      wireButtons(db, auth);
+    });
+  </script>
+
+  <!-- ⭐ مهم جدًا: حقن الـUID (قبل أي سكربت يتعامل مع /api) -->
+  <script src="/js/tenant-bootstrap.js"></script>
+
+  <!-- سكربتات الواجهة التي قد تستخدم /api -->
+  <script src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
-
-
-
