@@ -784,6 +784,79 @@ app.get('/api/debug/cloud-animals-sample', async (req, res) => {
     res.status(500).json({ ok:false, error: e?.message || 'cloud_sample_failed' });
   }
 });
+// ===== Fix: stamp userId/farmId on animals by numbers =====
+// POST /api/fix/animals/attach-userid?nums=1,2[&dry=1]
+// Header: X-User-Id: <UID>
+app.post('/api/fix/animals/attach-userid', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    const tenant = (req.userId || '').toString().trim();
+    const dryRun = String(req.query.dry || '') === '1';
+    const numsParam = String(req.query.nums || '').trim();
+    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required, e.g. ?nums=1,2' });
+
+    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean);
+    const adb = admin.firestore();
+
+    async function findByNumber(val){
+      const set = new Map(); const push=d=>{ if(d&&d.exists) set.set(d.ref.path,d); };
+      const cand=[val]; const n=Number(val); if(!Number.isNaN(n)) cand.push(n);
+      for(const v of cand){
+        try{ (await adb.collection('animals').where('number','==',v).limit(20).get()).docs.forEach(push);}catch{}
+        try{ (await adb.collectionGroup('animals').where('number','==',v).limit(20).get()).docs.forEach(push);}catch{}
+      }
+      try{ const d=await adb.collection('animals').doc(String(val)).get(); push(d);}catch{}
+      return [...set.values()];
+    }
+
+    const plan=[];
+    for(const num of wanted){
+      const docs=await findByNumber(num);
+      for(const d of docs){
+        const a=d.data()||{};
+        const current=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
+        const ok=!current || String(current).trim()===tenant; // ما نلمسش لو مالك مختلف
+        plan.push({ path:d.ref.path, id:d.id, number:a.number??null,
+                    userId_before:a.userId??null, farmId_before:a.farmId??null,
+                    willUpdate: !!ok });
+        if(ok && !dryRun){ await d.ref.set({ userId:tenant, farmId:tenant }, { merge:true }); }
+      }
+    }
+    res.json({ ok:true, dryRun, tenant, nums:wanted, found:plan.length,
+               updated: dryRun?0:plan.filter(p=>p.willUpdate).length, plan });
+  } catch(e){
+    console.error('fix attach-userid error:', e);
+    res.status(500).json({ ok:false, error:e?.message||'attach_failed' });
+  }
+});
+
+// (اختياري للمراجعة) GET /api/animals/by-numbers?nums=1,2
+app.get('/api/animals/by-numbers', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    const numsParam = String(req.query.nums || '').trim();
+    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required, e.g. ?nums=1,2' });
+
+    const wanted = numsParam.split(',').map(s => s.trim()).filter(Boolean);
+    const adb = admin.firestore();
+    const out = new Map();
+    const push = (d)=>{ if(d && d.exists){ const a=d.data()||{}; out.set(d.ref.path, { id:d.id, ...a }); } };
+
+    for (const value of wanted) {
+      const candidates = [value];
+      const n = Number(value); if (!Number.isNaN(n)) candidates.push(n);
+      for (const v of candidates) {
+        try { (await adb.collection('animals').where('number','==',v).limit(20).get()).docs.forEach(push); } catch {}
+        try { (await adb.collectionGroup('animals').where('number','==',v).limit(20).get()).docs.forEach(push); } catch {}
+      }
+      try { const d = await adb.collection('animals').doc(String(value)).get(); push(d); } catch {}
+    }
+
+    res.json({ ok:true, count: out.size, items: [...out.values()] });
+  } catch (e) {
+    res.status(500).json({ ok:false, error: e?.message || 'by_numbers_failed' });
+  }
+});
 
 // ============================================================
 //                   WEB PAGES / ROUTES
