@@ -31,7 +31,7 @@
       padding: 14px;
       font-size: 18px;
       border-radius: 8px;
-      border: 1px solid #2e7d32;
+      border: 1px solid #2e7د32;
       box-sizing: border-box;
     }
     .radio-group {
@@ -106,90 +106,118 @@
     <button type="submit" id="saveBtn">تسجيل الحالة</button>
   </form>
 
-  <!-- ربط Firestore بدون لمس التصميم -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- ثبّت dataLayer + t.event (لا يغيّر الشكل) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: '/lameness.html' });
+  </script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  <!-- تحليلات خارجية (اختياري) -->
+  <script src="/js/app-core.js" defer></script>
 
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+  <!-- ⭐ مهم جدًا قبل أي نداء إلى /api -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js" defer></script>
 
-    // تهيئة الحقول من صفحة الأحداث (أولوية: URL ثم التخزين المحلي)
-    const params = new URLSearchParams(window.location.search);
-    const urlAnimal = params.get("animalId");
-    const urlDate   = params.get("date");
+  <script>
+    // اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
 
-    const animalInput = document.getElementById("animalId");
-    const dateInput   = document.getElementById("lamenessDate");
+    // تهيئة الحقول من URL أو التخزين المحلي
+    function hydrate(){
+      const qs = new URLSearchParams(location.search);
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
+      document.getElementById('animalId').value = id;
+      document.getElementById('lamenessDate').value = dt;
+      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); localStorage.setItem('lastEventDate', dt); }catch{}
+      try{ history.replaceState(null, '', location.pathname); }catch{}
+    }
 
-    animalInput.value = urlAnimal || localStorage.getItem("lastAnimalId") || "";
-    dateInput.value   = urlDate   || new Date().toISOString().split("T")[0];
+    document.addEventListener('DOMContentLoaded', hydrate);
 
-    const form  = document.getElementById("lamenessForm");
-    const msg   = document.getElementById("msg");
-    const btn   = document.getElementById("saveBtn");
-
-    form.addEventListener("submit", async (e) => {
+    // إرسال إلى /api/events
+    document.getElementById('lamenessForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      msg.style.display = "none";
+      const msg = document.getElementById('msg');
+      const btn = document.getElementById('saveBtn');
+      msg.style.display = 'none';
       btn.disabled = true;
 
-      const data = {
-        animalId: animalInput.value.trim(),
-        lamenessDate: dateInput.value,
-        affectedLeg: form.querySelector('input[name="affectedLeg"]:checked')?.value || "",
-        lamenessType: document.getElementById("lamenessType").value,
-        vet: document.getElementById("vet").value.trim() || null,
-        type: "عرج",
-        isSmartAlert: true,
-        alertRule: "lameness-recheck",
-        userId: localStorage.getItem("userId") || null,
-        createdAt: serverTimestamp()
-      };
-
-      if (!data.animalId || !data.lamenessDate || !data.affectedLeg || !data.lamenessType) {
+      const userId   = localStorage.getItem('userId');
+      const tenantId = localStorage.getItem('tenantId') || 'default';
+      if(!userId){
+        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        location.href = 'login.html';
         btn.disabled = false;
-        msg.textContent = "يرجى استكمال البيانات المطلوبة.";
-        msg.className = "error";
-        msg.style.display = "block";
         return;
       }
 
-      try {
-        await addDoc(collection(db, "events"), data);
+      const animalId     = document.getElementById('animalId').value.trim();
+      const lamenessDate = document.getElementById('lamenessDate').value;
+      const affectedLeg  = (document.querySelector('input[name="affectedLeg"]:checked')||{}).value;
+      const lamenessType = document.getElementById('lamenessType').value;
+      const vet          = document.getElementById('vet').value.trim() || null;
 
-        // حفظ آخر رقم وتاريخ للاستخدام التالي
-        localStorage.setItem("lastAnimalId", data.animalId);
-        localStorage.setItem("lastEventDate", data.lamenessDate);
+      if(!animalId || !lamenessDate || !affectedLeg || !lamenessType){
+        btn.disabled = false;
+        msg.textContent = 'يرجى استكمال البيانات المطلوبة.';
+        msg.className = 'error';
+        msg.style.display = 'block';
+        return;
+      }
 
-        // رسالة نجاح + إبحار ذكي
-        msg.textContent = "✅ تم تسجيل حالة العرج بنجاح! سيتم تحويلك تلقائيًا…";
-        msg.className = "success";
-        msg.style.display = "block";
+      const payload = {
+        type: 'عرج',
+        eventType: 'عرج',
+        userId,
+        tenantId,
+        animalId,
+        animalNumber: animalId,
+        eventDate: lamenessDate,
+        lamenessDate,
+        affectedLeg,
+        lamenessType,
+        vet,
+        isSmartAlert: true,
+        alertRule: 'lameness-recheck',
+        source: 'lameness.html'
+      };
 
-        setTimeout(() => {
-          window.location.href = `treatment-followup.html?animalId=${encodeURIComponent(data.animalId)}&date=${encodeURIComponent(data.lamenessDate)}`;
-        }, 2000);
-
-      } catch (err) {
+      try{
+        const r = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if(r.ok){
+          try{ localStorage.setItem('lastAnimalId', animalId); localStorage.setItem('lastEventDate', lamenessDate); }catch{}
+          msg.textContent = '✅ تم تسجيل حالة العرج بنجاح! سيتم تحويلك تلقائيًا…';
+          msg.className = 'success';
+          msg.style.display = 'block';
+          setTimeout(()=>{
+            location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(lamenessDate)}`;
+          }, 2000);
+        } else {
+          const txt = await r.text();
+          msg.textContent = '❌ حدث فشل في الحفظ: ' + (txt || 'Bad Request');
+          msg.className = 'error';
+          msg.style.display = 'block';
+          btn.disabled = false;
+        }
+      }catch(err){
         console.error(err);
-        msg.textContent = "❌ حدث خطأ أثناء الحفظ. حاول مرة أخرى.";
-        msg.className = "error";
-        msg.style.display = "block";
+        msg.textContent = '❌ حدث خطأ أثناء الاتصال بالخادم';
+        msg.className = 'error';
+        msg.style.display = 'block';
         btn.disabled = false;
       }
     });
   </script>
 </body>
 </html>
-
- 
