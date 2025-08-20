@@ -1,30 +1,137 @@
-// smart-checks.js — نسخة Stub بدون منطق تشغيل
-// الهدف: تعريف واجهة window.smart بدون أي قواعد أو تنبيهات حالياً
-// بحيث لا يحدث أي خطأ لو استدعيت الدوال من صفحات مختلفة.
+// smart-checks.js — Simple • Effective • Very Smart
+// لا تغيّر أي تصميم. يعمل في الخلفية على القواعد الذكية فقط.
+// يعتمد على window.dataLayer / t.event لو متاحة.
 
 (function(){
   'use strict';
   if (!window.smart) window.smart = {};
 
-  // إعدادات افتراضية (غير مُستخدمة حالياً — للاتساق فقط)
-  window.smart.cfg = {
-    vwpDays: 60,
-    placentaCheckHours: 24,
-    heatStartDays: 21,
-    pregCheckDays: 35
+  // إعدادات افتراضية (يمكن تعديلها قبل التحميل التالي)
+  window.smart.cfg = Object.assign({
+    vwpDays: 60,             // نافذة انتظار ما بعد الولادة (يوم)
+    placentaCheckHours: 24,  // متابعة نزول المشيمة (ساعة)
+    heatStartDays: 21,       // بدء متابعة الشبق بعد الولادة (يوم)
+    pregCheckDays: 35,       // تشخيص الحمل بعد التلقيح (يوم)
+    dryOffMaxMilk: 10        // حد الإنتاج اليومي عند طلب التجفيف (لتر)
+  }, window.smart.cfg || {});
+
+  // ======= Helpers =======
+  const dlPush = (name, props) => {
+    try {
+      if (window.t && typeof window.t.event === 'function') {
+        window.t.event(name, props);
+      } else {
+        (window.dataLayer = window.dataLayer || []).push({ event:name, ts:Date.now(), ...(props||{}) });
+      }
+    } catch {}
   };
+  const QS = new URLSearchParams(location.search);
+  const pick = (k, fb=null)=> QS.get(k) || localStorage.getItem(k) || sessionStorage.getItem(k) || fb;
+  const isValidDate = (d)=> d instanceof Date && !isNaN(d);
+  const parse = (s)=> { if(!s) return null; try{ const d=new Date(s); return isValidDate(d)?d:null; }catch{ return null; } };
+  const daysBetween  = (a,b)=> { if(!a||!b) return NaN; const ms=+parse(b)-(+parse(a)); return Math.floor(ms/86400000); };
+  const hoursBetween = (a,b)=> { if(!a||!b) return NaN; const ms=+parse(b)-(+parse(a)); return Math.floor(ms/3600000); };
+  const todayISO = ()=> { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 
-  // ضابط فوري قبل التلقيح — يسمح دائماً حالياً
-  window.smart.beforeInsemination = async function(/* { lastCalvingDate } */){
-    return true; // لا منع ولا تنبيه في وضع الـ Stub
-  };
+  function fire(onAlert, payload){
+    dlPush('smart_alert_triggered', payload);
+    try { if (typeof onAlert==='function') onAlert(payload); else alert('🔔 ' + payload.message); } catch {}
+  }
 
-  // أحداث بعد التسجيل — لا تفعل شيئاً حالياً
-  window.smart.onCalvingRecorded = async function(/* { tenantId, userId, animalId, calvingDate } */){};
-  window.smart.onInseminationRecorded = async function(/* { tenantId, userId, animalId, inseminationDate } */){};
+  // ======= Stubs يمكن للتطبيق استدعاؤها لاحقًا =======
+  window.smart.beforeInsemination      = window.smart.beforeInsemination      || (async ()=> true);
+  window.smart.onCalvingRecorded       = window.smart.onCalvingRecorded       || (async ()=>{});
+  window.smart.onInseminationRecorded  = window.smart.onInseminationRecorded  || (async ()=>{});
 
-  // مراقب التنبيهات — لا يراقب شيئاً حالياً، ويُعيد دالة لإيقافه (لا تفعل شيئاً)
-  window.smart.startAlertsWatcher = function(/* { tenantId, userId, onAlert } */){
-    return function stop(){ /* no-op */ };
+  // ======= المراقب العام للقواعد =======
+  window.smart.startAlertsWatcher = function ({ tenantId, userId, onAlert } = {}){
+    // مفتاح تشغيل يدوي: لا يعمل إلا إذا فعّلته صراحةً
+    if (localStorage.getItem('SMART_ON') !== '1') return function stop(){};
+
+    function checkAll(){
+      const cfg = window.smart.cfg || {};
+      const page = (location.pathname.split('/').pop() || '').toLowerCase();
+
+      // سياق موحّد
+      const animalId  = pick('animalId') || pick('number') || pick('animalNumber') || pick('currentAnimalId') || pick('lastAnimalId') || '';
+      const eventDate = pick('date') || pick('eventDate') || todayISO();
+      const calv      = pick('calvingDate') || pick('calvDate') || pick('calving_dt');
+      const lastInsem = pick('lastInseminationDate') || pick('inseminationDate') || pick('insemination_dt');
+
+      // --- Rule 1: انتظار 60 يوم قبل التلقيح ---
+      if (page.includes('insemination')){
+        const d = daysBetween(calv, eventDate);
+        if (Number.isFinite(d) && d < Number(cfg.vwpDays)){
+          fire(onAlert, {
+            ruleId:  'wait_60_post_calving',
+            severity:'warn',
+            animalId, days:d, vwp:Number(cfg.vwpDays),
+            message: `الحيوان ${animalId}: مر ${d} يوم فقط من الولادة — نافذة انتظار التلقيح ${cfg.vwpDays} يوم.`
+          });
+        }
+      }
+
+      // --- Rule 2: بعد 24h من الولادة اسأل عن المشيمة ---
+      if (page.includes('calving') || page.includes('dashboard') || page.includes('add-event')){
+        const h = hoursBetween(calv, eventDate);
+        const key = calv ? `seen_placenta_${calv}` : '';
+        if (Number.isFinite(h) && h >= Number(cfg.placentaCheckHours) && key && !localStorage.getItem(key)){
+          localStorage.setItem(key,'1'); // منع التكرار لكل ولادة
+          fire(onAlert, {
+            ruleId:'placenta_check_24h', severity:'info', animalId, hours:h,
+            message:`مر ${h} ساعة منذ الولادة للحيوان ${animalId}. هل نزلت المشيمة؟`
+          });
+        }
+      }
+
+      // --- Rule 3: ابدأ متابعة الشبق بعد 21 يوم من الولادة ---
+      if (page.includes('dashboard') || page.includes('add-event')){
+        const d = daysBetween(calv, eventDate);
+        const key = calv ? `seen_heatstart_${calv}` : '';
+        if (Number.isFinite(d) && d >= Number(cfg.heatStartDays) && key && !localStorage.getItem(key)){
+          localStorage.setItem(key,'1');
+          fire(onAlert, {
+            ruleId:'start_heat_monitoring', severity:'tip', animalId, days:d,
+            message:`${d} يوم منذ الولادة — ابدأ متابعة الشبق.`
+          });
+        }
+      }
+
+      // --- Rule 4: تشخيص الحمل بعد 35 يوم من آخر تلقيح ---
+      if (page.includes('pregnancy') || page.includes('dashboard') || page.includes('add-event')){
+        const d = daysBetween(lastInsem, eventDate);
+        if (Number.isFinite(d)){
+          if (d >= Number(cfg.pregCheckDays)){
+            fire(onAlert, {
+              ruleId:'preg_diagnosis_due', severity:'info', animalId, days:d,
+              message:`${d} يوم منذ آخر تلقيح — وقت مناسب لتشخيص الحمل.`
+            });
+          } else if (page.includes('pregnancy')){
+            fire(onAlert, {
+              ruleId:'preg_diagnosis_too_early', severity:'warn', animalId, days:d,
+              message:`${d} يوم فقط منذ التلقيح — التشخيص مبكر. الموصى ${cfg.pregCheckDays} يوم.`
+            });
+          }
+        }
+      }
+
+      // --- Rule 5: فحص طلب التجفيف مقابل إنتاج اللبن ---
+      if (page.includes('dry-off')){
+        const milk = Number(pick('dailyMilk') || pick('milk') || '');
+        if (!Number.isNaN(milk) && milk > Number(cfg.dryOffMaxMilk)){
+          fire(onAlert, {
+            ruleId:'dryoff_high_milk', severity:'warn', animalId, milk, max:Number(cfg.dryOffMaxMilk),
+            message:`إنتاج ${milk} لتر/يوم — أعلى من حد التجفيف المقترح (${cfg.dryOffMaxMilk} لتر).`
+          });
+        }
+      }
+    }
+
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', checkAll, { once:true });
+    else
+      setTimeout(checkAll, 0);
+
+    return function stop(){ /* لا شيء حاليًا */ };
   };
 })();
