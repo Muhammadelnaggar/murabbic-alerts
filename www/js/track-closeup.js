@@ -1,6 +1,5 @@
-export function onCloseupSave(meta = {}) {
-try { t.event('closeup_save', meta); } catch (e) {}
-}
-export function onCloseupPrefill(meta = {}) {
-try { t.event('closeup_prefill', meta); } catch (e) {}
-}
+// /js/track-closeup.js
+import { track } from '/js/track-core.js';
+
+export const onCloseupPrefill = (m = {}) => track('closeup_prefill', m);
+export const onCloseupSave    = (m = {}) => track('closeup_save', m);
