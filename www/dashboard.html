@@ -364,7 +364,29 @@
   <script src="js/mbk-animals.js?v=2"></script>
   <script src="js/herd-gauges.js?v=2"></script>
   <script src="js/smart-alerts.js?v=2"></script>
+  <!-- (1) تتبّع أساسي -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.t = window.t || { event: (name, props) => {
+    try { dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
+  }};
+  t.event('page_view', { page: location.pathname });
+</script>
+<script src="/js/app-core.js" defer></script>
+<script type="module" src="/js/timeline.js"></script>
+<script type="module" src="/js/smart-checks.js"></script>
+
+<!-- (2) الهوية + واجهة النداءات -->
+<script src="/js/tenant-bootstrap.js"></script>
+<script src="/js/api.js" defer></script>
+
+<!-- (3) فحص الصحة/التليمترى — آخر سكربت قبل الإغلاق -->
+<script type="module" src="/js/health-check.js"></script>
 </body>
 </html>
+
+</body>
+</html>
+
 
 
