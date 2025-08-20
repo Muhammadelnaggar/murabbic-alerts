@@ -159,6 +159,8 @@
     </div>
     <div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4><div id="herd-numbers" style="font-size:13px;color:#333">—</div></div>
   </section>
+  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
+<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
 
   <!-- ثبّت dataLayer + t.event (قبل أي سكربت) -->
   <script>
@@ -364,4 +366,5 @@
   <script src="js/smart-alerts.js?v=2"></script>
 </body>
 </html>
+
 
