@@ -165,6 +165,9 @@
     window.dataLayer = window.dataLayer || [];
     window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
   </script>
+  <script>
+  if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
+</script>
 
   <!-- تحليلات خارجية: يسجل page_view تلقائيًا -->
   <script src="/js/app-core.js" defer></script>
@@ -361,3 +364,4 @@
   <script src="js/smart-alerts.js?v=2"></script>
 </body>
 </html>
+
