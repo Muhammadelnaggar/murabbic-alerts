@@ -4,69 +4,16 @@
   <meta charset="UTF-8" />
   <title>تحضير للولادة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { firebaseConfig } from './config.js';
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const form = document.getElementById("closeup-form");
-
-      form.addEventListener("submit", async function (e) {
-        e.preventDefault();
-
-        const userId = localStorage.getItem("userId");
-        const animalId = document.getElementById("animal-id").value.trim();
-        const closeUpDate = document.getElementById("date").value;
-        const ration = document.querySelector('input[name="ration"]:checked')?.value;
-        const anionicSalts = document.querySelector('input[name="anionicSalts"]:checked')?.value;
-
-        if (!userId || !animalId || !closeUpDate || !ration || !anionicSalts) {
-          alert("يرجى ملء جميع الحقول المطلوبة.");
-          return;
-        }
-
-        const eventData = {
-          userId,
-          animalId,
-          date: closeUpDate,
-          ration,
-          anionicSalts,
-          type: "تحضير للولادة",
-          isSmartAlert: true,
-          alertRule: "close-up-preparation",
-          timestamp: serverTimestamp()
-        };
-
-        try {
-          await addDoc(collection(db, "events"), eventData);
-
-          const isNewUser = localStorage.getItem("isNewUser") === "true";
-
-          if (isNewUser) {
-            if (confirm("✅ تم حفظ التحضير بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-              window.location.href = "add-event.html";
-            } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-              window.location.href = "add-animal.html";
-            } else {
-              localStorage.removeItem("isNewUser");
-              localStorage.removeItem("lastAnimalId");
-              window.location.href = "dashboard.html";
-            }
-          } else {
-            alert("✅ تم حفظ الحدث بنجاح.");
-            window.location.href = "dashboard.html";
-          }
-        } catch (error) {
-          console.error("خطأ في حفظ الحدث:", error);
-          alert("❌ فشل في حفظ البيانات.");
-        }
-      });
-    });
+  <!-- ✅ لا تغيير بصري: التتبّع فقط -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: '/close-up.html' });
   </script>
+
+  <!-- ✅ تحليلات خارجية (اختياري) -->
+  <script src="/js/app-core.js" defer></script>
 
   <style>
     body {
@@ -137,6 +84,95 @@
 
     <button type="submit" class="submit-button">تسجيل التحضير</button>
   </form>
+
+  <!-- ⭐ مهم جدًا: حقن الـUID/tenant قبل أي سكربت يكلّم /api -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <!-- غلاف النداءات يضيف userId/tenantId تلقائيًا إذا لزم -->
+  <script src="/js/api.js" defer></script>
+
+  <!-- ✅ منطق الصفحة: بدون أي تغيير في الشكل -->
+  <script>
+    // اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
+
+    // ملء الحقول من الرابط/المحلّي
+    function hydrate(){
+      const qp = new URLSearchParams(location.search);
+      const id = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qp.get('closeupDate') || qp.get('date') || qp.get('eventDate') || todayLocal();
+      const idEl = document.getElementById('animal-id');
+      const dtEl = document.getElementById('date');
+      idEl.value = id;
+      dtEl.value = dt;
+      // تنظيف الرابط بعد الالتقاط
+      if (id || qp.get('date') || qp.get('eventDate') || qp.get('closeupDate')){
+        try{ history.replaceState(null, '', location.pathname); }catch{}
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', hydrate);
+
+    document.getElementById('closeup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const userId   = localStorage.getItem('userId');
+      const tenantId = localStorage.getItem('tenantId') || 'default';
+      if (!userId){
+        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        location.href = 'login.html';
+        return;
+      }
+
+      const animalId      = document.getElementById('animal-id').value.trim();
+      const closeUpDate   = document.getElementById('date').value;
+      const ration        = (document.querySelector('input[name="ration"]:checked')||{}).value;
+      const anionicSalts  = (document.querySelector('input[name="anionicSalts"]:checked')||{}).value;
+
+      if (!animalId || !closeUpDate || !ration || !anionicSalts){
+        alert('يرجى ملء جميع الحقول المطلوبة.');
+        return;
+      }
+
+      const payload = {
+        type: 'تحضير للولادة',
+        eventType: 'تحضير للولادة',
+        userId,
+        tenantId,
+        animalId,
+        animalNumber: animalId,
+        eventDate: closeUpDate,
+        ration,
+        anionicSalts,
+        isSmartAlert: true,
+        alertRule: 'close-up-preparation',
+        source: 'close-up.html'
+      };
+
+      try{
+        const r = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (r.ok){
+          try{ localStorage.setItem('closeupDate', closeUpDate); }catch{}
+          alert('✅ تم حفظ التحضير بنجاح');
+          location.href = 'dashboard.html';
+        } else {
+          const msg = await r.text();
+          alert('❌ فشل في حفظ البيانات\n' + (msg || 'Bad Request'));
+        }
+      }catch(err){
+        console.error('خطأ في حفظ الحدث:', err);
+        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
+      }
+    });
+  </script>
 
 </body>
 </html>
