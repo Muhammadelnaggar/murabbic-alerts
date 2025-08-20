@@ -48,6 +48,9 @@
   </style>
 </head>
 <body>
+<!-- تتبع مبكر وفق “التتبع الذكي” -->
+<script>window.dataLayer=window.dataLayer||[];window.dataLayer.push({event:'page_view',page:'nutrition'});window.t=window.t||{event:(p)=>window.dataLayer.push(p)};</script>
+
 <div class="wrap">
   <h1>📄 تسجيل تركيبة التغذية</h1>
 
@@ -172,13 +175,20 @@
 </div>
 
 <script type="module">
-  import { db, auth } from './js/firebase-config.js';
-  import { addDoc, collection, serverTimestamp, getDocs, getDoc, doc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  // تحميل ديناميكي يضمن عمل الصفحة حتى لو فشل استيراد Firebase (لا يغيّر التصميم)
+  let db=null, auth=null,
+      addDoc, collection, serverTimestamp, getDocs, getDoc, doc, query, where, orderBy, limit,
+      onAuthStateChanged;
+  try{
+    ({ db, auth } = await import('./js/firebase-config.js'));
+    ({ addDoc, collection, serverTimestamp, getDocs, getDoc, doc, query, where, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'));
+    ({ onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'));
+  }catch(e){ console.warn('Firebase modules not loaded; running offline mode', e); }
+
 
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
-  const modeInfo= document.getElementById('modeInfo'); // قد لا يوجد بعد تعديل الواجهة
+  const modeInfo= document.getElementById('modeInfo'); // قد لا يوجد
   // عناصر سياق القطيع
   const ctxDIM = document.getElementById('ctxDIM');
   const ctxSpecies = document.getElementById('ctxSpecies');
@@ -226,13 +236,12 @@
   ctxDIM.value      = qp.get('dim') || '';
   ctxSpecies.value  = qp.get('species') || '';
   ctxAvgMilk.value  = qp.get('avgMilk') || '';
-  ctxDCC.value     = qp.get('dcc') || '';
+  ctxDCC.value      = qp.get('dcc') || '';
   ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
 
   document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
-  try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
   // ===== لستة الخامات (عامية مربيك) =====
@@ -472,7 +481,6 @@
     const pillSumPct = document.getElementById('pillSumPct');
 
     if (mode==='tmr_asfed'){
-      // وزنًا على مساهمة DM
       if (totalDM>0){
         let mixDM=0; document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
           const dm=parseFloat(tr.querySelector('.dm').value)||0;
@@ -516,6 +524,19 @@
     }
 
     document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
+
+    // تحذيرات ذكية بدون تغيير الواجهة
+    let w = '';
+    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as‑fed = ${nf(sumPct)}% (المثالي 100%)`;
+    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+    // تنبيه على DM مفقود مع وجود أرقام
+    const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
+      const dm = parseFloat(tr.querySelector('.dm').value);
+      const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
+      return !dm && hasVal;
+    });
+    if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+    warn.textContent = w;
   }
 
   function hookRow(tr){
@@ -531,9 +552,9 @@
       const f = FEEDS.find(x=>x.name===nameEl.value.trim());
       if (f && !dmEl.value) dmEl.value = f.dm;
       setRowState(tr); recalc();
-    ensureEditableForMode();
-  });
-    ;[dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setRowState(tr); recalc(); }));
+      ensureEditableForMode();
+    });
+    [dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setRowState(tr); recalc(); }));
 
     setRowState(tr);
   }
@@ -558,77 +579,78 @@
     // اضبط الوضع حسب القالب
     modeSel.value = tpl.mode; updateModeUI();
 
-  // === تعبئة تلقائية لسياق الحيوان إذا كان مفردًا ===
-  (async function autoFillContextSingleAnimal(){
-    try{
-      if (!animalId || groupName) return; // مجموعة؟ سيبها يدوي
-
-      // 1) حاول جلب النوع من animals
+    // === تعبئة تلقائية لسياق الحيوان إذا كان مفردًا ===
+    (async function autoFillContextSingleAnimal(){
       try{
-        const direct = await getDoc(doc(db, 'animals', String(animalId)));
-        if (direct.exists() && !ctxSpecies.value){
-          const a = direct.data();
-          const sp = a?.species || a?.type || a?.kind;
-          if (sp) ctxSpecies.value = (String(sp).includes('جاموس') ? 'جاموس' : 'بقر');
-        }
-      }catch(_){/* تجاهل */}
-      if (!ctxSpecies.value){
+        if (!animalId || groupName) return; // مجموعة؟ سيبها يدوي
+
+        // 1) حاول جلب النوع من animals
         try{
-          const qs = query(collection(db,'animals'), where('number','==', String(animalId)), limit(1));
-          const snap = await getDocs(qs);
-          snap.forEach(d=>{ const a=d.data(); const sp=a?.species||a?.type; if(sp&&!ctxSpecies.value) ctxSpecies.value=(String(sp).includes('جاموس')?'جاموس':'بقر'); });
+          const direct = await getDoc(doc(db, 'animals', String(animalId)));
+          if (direct.exists() && !ctxSpecies.value){
+            const a = direct.data();
+            const sp = a?.species || a?.type || a?.kind;
+            if (sp) ctxSpecies.value = (String(sp).includes('جاموس') ? 'جاموس' : 'بقر');
+          }
         }catch(_){/* تجاهل */}
-      }
-
-      // 2) اجلب آخر الأحداث لهذا الحيوان لاستنتاج DIM/الحمل/الإنتاج
-      async function getEvents(orderField){
-        const qv = query(collection(db,'events'), where('animalId','==', String(animalId)), orderBy(orderField,'desc'), limit(50));
-        const s = await getDocs(qv); return s.docs.map(x=> x.data());
-      }
-      let events = [];
-      try{ events = await getEvents('createdAt'); }catch(_){ try{ events = await getEvents('eventDate'); }catch(__){} }
-
-      const toDate = (v)=>{
-        if (!v) return null; if (v instanceof Date) return v; if (typeof v==='string') return new Date(v+'T00:00:00');
-        if (v?.toDate) return v.toDate(); return null; };
-      const diffDays = (d1,d2)=>{ if(!d1||!d2) return null; const ms = d1.getTime()-d2.getTime(); return Math.floor(ms/86400000); };
-
-      // آخر ولادة ⇒ DIM
-      const today = toDate(eventDate) || new Date();
-      const calv = events.find(e => (e?.type==='ولادة') || (e?.eventType && String(e.eventType).includes('ولادة')));
-      const calvDate = toDate(calv?.eventDate) || toDate(calv?.createdAt);
-      const DIM = diffDays(today, calvDate);
-      if (!ctxDIM.value && DIM!=null && DIM>=0) ctxDIM.value = DIM;
-
-      // آخر تشخيص حمل ⇒ حالة الحمل
-      const pregEvt = events.find(e => (e?.pregnancyStatus) || (e?.eventType && String(e.eventType).includes('تشخيص')));
-      const preg = pregEvt?.pregnancyStatus || pregEvt?.preg || pregEvt?.result;
-      if (!ctxPreg.value && preg){ ctxPreg.value = (String(preg).includes('عشار') ? 'عشار' : (String(preg).includes('فارغ')?'فارغة':'')); }
-
-      // تقدير DCC من آخر تلقيح إذا كانت عشار
-      if ((ctxPreg.value==='عشار' || !ctxPreg.value)){
-        const aiEvt = events.find(e => (e?.type && String(e.type).includes('تلقيح')) || (e?.eventType && String(e.eventType).includes('تلقيح')));
-        const aiDate = toDate(aiEvt?.eventDate) || toDate(aiEvt?.createdAt);
-        const DCC = diffDays(today, aiDate);
-        if (!ctxDCC.value && DCC!=null && DCC>=0) ctxDCC.value = DCC;
-      }
-
-      // متوسط اللبن من آخر 7 تسجيلات إنتاج اللبن اليومي
-      const milkVals = [];
-      events.forEach(e=>{
-        if (e?.eventType && String(e.eventType).includes('اللبن')){
-          const v = e?.milkKg ?? e?.milk ?? e?.amount ?? null;
-          if (typeof v==='number') milkVals.push(v);
+        if (!ctxSpecies.value){
+          try{
+            const qs = query(collection(db,'animals'), where('number','==', String(animalId)), limit(1));
+            const snap = await getDocs(qs);
+            snap.forEach(d=>{ const a=d.data(); const sp=a?.species||a?.type; if(sp&&!ctxSpecies.value) ctxSpecies.value=(String(sp).includes('جاموس')?'جاموس':'بقر'); });
+          }catch(_){/* تجاهل */}
         }
-      });
-      if (!ctxAvgMilk.value && milkVals.length){
-        const n = Math.min(7, milkVals.length);
-        const avg = milkVals.slice(0,n).reduce((a,b)=>a+b,0)/n;
-        ctxAvgMilk.value = Number(avg.toFixed(1));
-      }
 
-    }catch(err){ console.warn('autoFillContextSingleAnimal:', err); }
-  })();
+        // 2) اجلب آخر الأحداث لهذا الحيوان لاستنتاج DIM/الحمل/الإنتاج
+        async function getEvents(orderField){
+          const qv = query(collection(db,'events'), where('animalId','==', String(animalId)), orderBy(orderField,'desc'), limit(50));
+          const s = await getDocs(qv); return s.docs.map(x=> x.data());
+        }
+        let events = [];
+        try{ events = await getEvents('createdAt'); }catch(_){ try{ events = await getEvents('eventDate'); }catch(__){} }
+
+        const toDate = (v)=>{
+          if (!v) return null; if (v instanceof Date) return v; if (typeof v==='string') return new Date(v+'T00:00:00');
+          if (v?.toDate) return v.toDate(); return null; };
+        const diffDays = (d1,d2)=>{ if(!d1||!d2) return null; const ms = d1.getTime()-d2.getTime(); return Math.floor(ms/86400000); };
+
+        // آخر ولادة ⇒ DIM
+        const today = toDate(eventDate) || new Date();
+        const calv = events.find(e => (e?.type==='ولادة') || (e?.eventType && String(e.eventType).includes('ولادة')));
+        const calvDate = toDate(calv?.eventDate) || toDate(calv?.createdAt);
+        const DIM = diffDays(today, calvDate);
+        if (!ctxDIM.value && DIM!=null && DIM>=0) ctxDIM.value = DIM;
+
+        // آخر تشخيص حمل ⇒ حالة الحمل
+        const pregEvt = events.find(e => (e?.pregnancyStatus) || (e?.eventType && String(e.eventType).includes('تشخيص')));
+        const preg = pregEvt?.pregnancyStatus || pregEvt?.preg || pregEvt?.result;
+        if (!ctxPreg.value && preg){ ctxPreg.value = (String(preg).includes('عشار') ? 'عشار' : (String(preg).includes('فارغ')?'فارغة':'')); }
+
+        // تقدير DCC من آخر تلقيح إذا كانت عشار
+        if ((ctxPreg.value==='عشار' || !ctxPreg.value)){
+          const aiEvt = events.find(e => (e?.type && String(e.type).includes('تلقيح')) || (e?.eventType && String(e.eventType).includes('تلقيح')));
+          const aiDate = toDate(aiEvt?.eventDate) || toDate(aiEvt?.createdAt);
+          const DCC = diffDays(today, aiDate);
+          if (!ctxDCC.value && DCC!=null && DCC>=0) ctxDCC.value = DCC;
+        }
+
+        // متوسط اللبن من آخر 7 تسجيلات إنتاج اللبن اليومي
+        const milkVals = [];
+        events.forEach(e=>{
+          if (e?.eventType && String(e.eventType).includes('اللبن')){
+            const v = e?.milkKg ?? e?.milk ?? e?.amount ?? null;
+            if (typeof v==='number') milkVals.push(v);
+          }
+        });
+        if (!ctxAvgMilk.value && milkVals.length){
+          const n = Math.min(7, milkVals.length);
+          const avg = milkVals.slice(0,n).reduce((a,b)=>a+b,0)/n;
+          ctxAvgMilk.value = Number(avg.toFixed(1));
+        }
+
+      }catch(err){ console.warn('autoFillContextSingleAnimal:', err); }
+    })();
+
     // اضبط كمية المركز في وضع المنفصل إن وُجدت
     if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
     // امسح وأعد التعبئة
@@ -717,8 +739,9 @@
     };
 
     try{
+      const uid = localStorage.getItem('userId') || (auth?.currentUser?.uid || null);
       await addDoc(collection(db, 'events'), {
-        userId: auth?.currentUser?.uid || null,
+        userId: uid,
         animalId: animalId,
         animalNumber: animalId,
         eventDate: eventDate,
@@ -739,6 +762,7 @@
         },
         createdAt: serverTimestamp()
       });
+      window.t.event({event:'nutrition_save', page:'nutrition', mode, rows:rows.length});
       const again = await showNotice(`✅ تم حفظ تركيبة التغذية للحيوان ${animalId}`);
       if (!again) location.href = 'dashboard.html';
     }catch(e){
@@ -747,28 +771,19 @@
     }
   });
 
- function boot(){
-  const hasLS = !!localStorage.getItem('userId'); // جلسة تسجيل الدخول الخاصة بنا
-
-  if (auth && typeof onAuthStateChanged === 'function') {
-    onAuthStateChanged(auth, (user) => {
-      if (user || hasLS) {
-        refresh();
-      } else {
-        location.href = 'login.html';
-      }
-    });
-  } else {
-    // في حال ما فيش Firebase Auth أصلاً
-    if (hasLS) { 
-      refresh(); 
-    } else { 
-      location.href = 'login.html'; 
+  function boot(){
+    const hasLS = !!localStorage.getItem('userId');
+    if (auth && typeof onAuthStateChanged === 'function') {
+      onAuthStateChanged(auth, (user) => {
+        if (user || hasLS) { refresh(); }
+        else { location.href = 'login.html'; }
+      });
+    } else {
+      if (hasLS) { refresh(); } else { location.href = 'login.html'; }
     }
   }
-}
-boot();
-
+  function refresh(){ recalc(); }
+  boot();
 
   // === قواعد الجفاف/التحضير بناءً على DCC ===
   function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
@@ -778,9 +793,7 @@ boot();
     if (!isNaN(dcc)){
       const dtc = GL - dcc;
       if (dtcVal) dtcVal.textContent = isFinite(dtc)? String(dtc) : '—';
-      // جاف قبل 60 يوم من الموعد المتوقع
       ctxEarlyDry.checked = (dcc >= (GL - 60));
-      // تحضير ولادة آخر 21 يوم
       ctxCloseUp.checked  = (dcc >= (GL - 21));
     } else {
       if (dtcVal) dtcVal.textContent = '—';
@@ -788,8 +801,16 @@ boot();
   }
   ctxDCC?.addEventListener('input', applyDCCRules);
   ctxSpecies?.addEventListener('change', applyDCCRules);
-  // شغّل القاعدة عند الفتح وبعد التعبئة التلقائية
   applyDCCRules();
+
+  // تحميل قالب عبر ?tpl=...
+  const tplKey = qp.get('tpl'); if (tplKey) { tplSel.value = tplKey; applyTemplate(tplKey); }
 </script>
+
+<!-- ترتيب السكربتات العام (لا يغيّر التصميم) وفق مبادئ “مربيك” -->
+<script src="/js/app-core.js"></script>
+<script type="module" src="/js/smart-checks.js"></script>
+<script src="/js/tenant-bootstrap.js"></script>
+<script src="/js/api.js"></script>
 </body>
 </html>
