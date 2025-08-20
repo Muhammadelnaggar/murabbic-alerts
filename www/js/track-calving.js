@@ -1,7 +1,5 @@
-// تتبّع ذكي منفصل — بلا أي تأثير بصري
-export function onCalvingSave(meta = {}) {
-try { t.event('calving_save', meta); } catch (e) {}
-}
-export function onCalvingPrefill(meta = {}) {
-try { t.event('calving_prefill', meta); } catch (e) {}
-}
+// /js/track-calving.js
+import { track } from '/js/track-core.js';
+
+export const onCalvingPrefill = (m = {}) => track('calving_prefill', m);
+export const onCalvingSave    = (m = {}) => track('calving_save', m);
