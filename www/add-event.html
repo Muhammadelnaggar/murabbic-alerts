@@ -111,6 +111,8 @@
       </div>
     </div>
   </form>
+  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
+<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
 
   <!-- ✅ ثبّت dataLayer + t.event قبل أي سكربت -->
   <script>
@@ -318,6 +320,7 @@
  <script type="module" src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
+
 
 
 
