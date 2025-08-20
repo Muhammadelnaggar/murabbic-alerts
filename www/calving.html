@@ -1,3 +1,4 @@
+<!-- calving.html (نسخة مُراجَعة — بدون أي تغيير بصري) -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -88,7 +89,8 @@
 
   <div id="msg"></div>
 
-  <form id="calvingForm">
+  <!-- ملاحظة: أضفنا data-event و data-redirect فقط (لا تغيّر الشكل) -->
+  <form id="calvingForm" data-event="calving" data-redirect="/add-event.html">
     <label for="animalId">رقم الحيوان</label>
     <input type="text" id="animalId" name="animalId" required>
 
@@ -119,117 +121,28 @@
     <button type="submit">💾 تسجيل</button>
   </form>
 
-  <!-- ثبّت dataLayer + t.event (لا يؤثر على التصميم) -->
+  <!-- 1) dataLayer + t.event (ثابت على كل الصفحات) -->
   <script>
     window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
-    t.event('page_view', { page: '/calving.html' });
+    window.t = window.t || { event: (name, props) => {
+      try { window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
+    }};
+    t.event('page_view', { page: location.pathname });
   </script>
 
-  <!-- تحليلات خارجية (اختياري) -->
+  <!-- 2) الأساس التحليلي -->
   <script src="/js/app-core.js" defer></script>
-  <script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
-<script type="module">
-  import * as T from '/js/timeline.js';
-  import * as S from '/js/smart-checks.js';
-  // عرّف أسماء عالمية للتشييك اليدوي وباقي السكربتات التي تتوقع وجودها
-  window.timeline ??= T;
-  window.smart ??= S;
-</script>
 
-  <!-- ⭐ مهم جدًا: حقن هوية المستخدم/المستأجر قبل أي نداء إلى /api -->
+  <!-- 3) الموديولات (دون أي جسور أو “لَزق”) -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+
+  <!-- 4) الهوية وواجهة الـAPI (لازم tenant-bootstrap قبل api.js) -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js" defer></script>
 
-  <script>
-    // تاريخ اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-
-    // التمهيد من الرابط + المحلي
-    window.addEventListener('DOMContentLoaded', () => {
-      const qs = new URLSearchParams(location.search);
-      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
-      const dt = qs.get('calvingDate') || qs.get('calvDate') || qs.get('calving_dt') || qs.get('date') || qs.get('eventDate') || todayLocal();
-
-      document.getElementById('animalId').value   = id;
-      document.getElementById('calvingDate').value = dt;
-
-      if (!id){
-        alert('❗ لم يتم العثور على رقم الحيوان، يرجى العودة لتحديد الحيوان.');
-        location.href = 'add-event.html';
-        return;
-      }
-
-      try{
-        localStorage.setItem('currentAnimalId', id);
-        localStorage.setItem('lastAnimalId', id);
-      }catch{}
-    });
-
-    // إرسال الحدث إلى /api/events (مع userId/tenantId)
-    document.getElementById('calvingForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const userId   = localStorage.getItem('userId');
-      const tenantId = localStorage.getItem('tenantId') || 'default';
-      if (!userId){
-        alert('⚠️ يجب تسجيل الدخول أولًا.');
-        location.href = 'login.html';
-        return;
-      }
-
-      const form = e.currentTarget;
-      const payload = {
-        type: 'ولادة',
-        eventType: 'ولادة',
-        userId,
-        tenantId,
-        animalId: form.animalId.value.trim(),
-        animalNumber: form.animalId.value.trim(),
-        eventDate: form.calvingDate.value,
-        calvingDate: form.calvingDate.value,
-        birthEase: (form.querySelector('input[name="birthEase"]:checked')||{}).value,
-        calfGender: (form.querySelector('input[name="calfGender"]:checked')||{}).value,
-        calfId: form.calfId.value.trim(),
-        calfFate: (form.querySelector('input[name="calfFate"]:checked')||{}).value,
-        source: 'calving.html'
-      };
-
-      try{
-        const r = await fetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const msgDiv = document.getElementById('msg');
-        if (r.ok){
-          try{ localStorage.setItem('lastCalvingDate', payload.calvingDate); }catch{}
-          msgDiv.textContent = '✅ تم تسجيل حدث الولادة بنجاح';
-          msgDiv.style.display = 'block';
-          setTimeout(()=>{ msgDiv.style.display='none'; location.href = 'add-event.html'; }, 2000);
-        } else {
-          const txt = await r.text();
-          msgDiv.textContent = '❌ فشل التسجيل: ' + (txt||'');
-          msgDiv.style.display = 'block';
-        }
-      }catch(err){
-        console.error(err);
-        const msgDiv = document.getElementById('msg');
-        msgDiv.textContent = '❌ حدث خطأ أثناء الاتصال بالخادم';
-        msgDiv.style.display = 'block';
-      }
-    });
-  </script>
-<script type="module" src="/js/track-calving.js"></script>
-<script type="module" src="/js/calving.js"></script>
+  <!-- 5) سكربتات الحدث (تتبُّع + منطق الإرسال إلى /api/events مع fallback) -->
+  <script type="module" src="/js/track-calving.js"></script>
+  <script type="module" src="/js/calving.js"></script>
 </body>
 </html>
-
-
-
