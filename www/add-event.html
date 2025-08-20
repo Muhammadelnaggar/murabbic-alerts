@@ -298,6 +298,11 @@
           const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
           if (!goAgain) location.href = 'dashboard.html';
         } else if (page){
+          // حفظ آخر تلقيح لتشغيل ذكاء تشخيص الحمل لاحقًا
+if (page === 'insemination.html') {
+  localStorage.setItem('lastInseminationDate', ctx.eventDate);
+}
+
           // ✅ خزّن السياق + ابنِ الرابط المتوافق
           pushContext(ctx);
           location.href = buildTargetUrl(page, ctx);
@@ -320,6 +325,7 @@
  <script type="module" src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
+
 
 
 
