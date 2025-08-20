@@ -386,6 +386,15 @@
         };
 
         await addDoc(collection(db, "animals"), animalData);
+       try {
+  t.event('animal_created', {
+    userId,
+    animalNumber,
+    animalType,
+    breed,
+    productionStatus
+  });
+} catch {}
 
         // ✅ حفظ آخر رقم + رسالة نجاح + تحويل مباشر إلى صفحة الأحداث
         localStorage.setItem("lastAnimalId", animalNumber);
@@ -415,5 +424,6 @@
 
 </body>
 </html>
+
 
 
