@@ -147,11 +147,4 @@ export function initEventPage({
 }
 
 
-// =========================
-// File: /js/track-core.js
-// تتبُّع عام بسيط
-// =========================
 
-export function track(name, meta = {}) {
-  try { t.event(name, meta); } catch (e) {}
-}
