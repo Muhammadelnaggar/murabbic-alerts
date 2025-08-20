@@ -278,6 +278,15 @@
             eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
             createdAt: serverTimestamp()
           });
+          try {
+  t.event('event_recorded', {
+    userId: auth?.currentUser?.uid || null,
+    animalId: ctx.animalId,
+    eventDate: ctx.eventDate,
+    eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim()
+  });
+} catch {}
+
         }catch(err){
           console.error(err);
           if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
@@ -309,6 +318,7 @@
  <script type="module" src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
+
 
 
 
