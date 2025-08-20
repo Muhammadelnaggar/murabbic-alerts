@@ -64,7 +64,7 @@
     }
     .button-group button.active,
     .button-group button:hover {
-      background-color: #2e7د32;
+      background-color: #2e7d32;
       color: white;
     }
   </style>
@@ -192,6 +192,17 @@
       } catch{
         dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
       }
+      // تنظيف الرابط من الباراميترات بعد الالتقاط حتى لا تعيد الملء عند الرجوع
+      if (presetId || qp.get('date')){
+        try{ history.replaceState(null,'',location.pathname); }catch{}
+      }
+    }`;
+      try {
+        const [y,m,d] = presetDate.split('-').map(Number);
+        dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+      } catch{
+        dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
+      }
     }
 
     // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
@@ -259,6 +270,7 @@
       if(!container) return;
 
       container.addEventListener('click', async (ev)=>{
+        ev.preventDefault(); ev.stopPropagation();
         const btn = ev.target.closest('button');
         if (!btn || !container.contains(btn)) return;
 
@@ -268,8 +280,17 @@
         const page   = btn.getAttribute('data-page');
         const isTrim = page === 'trimming.html';
 
+        // ✅ خزّن السياق مبكرًا لضمان توافره في الصفحات الأبناء حتى لو تعطل التسجيل
+        pushContext(ctx);
+        if (page === 'insemination.html') {
+          // حفظ آخر تلقيح لذكاء تشخيص الحمل
+          try{ localStorage.setItem('lastInseminationDate', ctx.eventDate); }catch{}
+        }
+        const targetUrl = page ? buildTargetUrl(page, ctx) : null;
+
+        // سجّل الحدث في الخلفية بدون تعطيل الملاحة
         try{
-          await addDoc(collection(db, 'events'), {
+          void addDoc(collection(db, 'events'), {
             userId: auth?.currentUser?.uid || null,
             animalId: ctx.animalId,
             animalNumber: ctx.animalId,
@@ -277,7 +298,26 @@
             type: isTrim ? 'تقليم الحوافر' : undefined,
             eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
             createdAt: serverTimestamp()
-          });
+          }).catch(err=>console.error('events.add failed', err));
+        }catch(err){ console.error('events.add error', err); }
+
+        if (isTrim){
+          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
+          if (goAgain){
+            // تفريغ النموذج للجولة التالية
+            idInput.value='';
+            dateInput.value=todayLocal();
+            animalInfo.textContent = `🐄 رقم الحيوان الحالي: غير محدد`;
+            try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }catch{}
+            try{ history.replaceState(null,'',location.pathname); }catch{}
+          } else {
+            location.href = 'dashboard.html';
+          }
+        } else if (targetUrl){
+          // الانتقال فورًا مع تمرير الرقم والتاريخ في الرابط
+          location.href = targetUrl;
+        }
+      });
         }catch(err){
           console.error(err);
           if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
