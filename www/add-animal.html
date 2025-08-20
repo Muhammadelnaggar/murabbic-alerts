@@ -202,6 +202,9 @@
       }
     };
   </script>
+<script>
+  if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
+</script>
 
   <!-- 1) تحليلات خارجية (يرسل page_view تلقائيًا) -->
   <script src="/js/app-core.js" defer></script>
@@ -412,4 +415,5 @@
 
 </body>
 </html>
+
 
