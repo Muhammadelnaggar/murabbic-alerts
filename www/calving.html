@@ -130,6 +130,13 @@
   <script src="/js/app-core.js" defer></script>
   <script type="module" src="/js/timeline.js"></script>
 <script type="module" src="/js/smart-checks.js"></script>
+<script type="module">
+  import * as T from '/js/timeline.js';
+  import * as S from '/js/smart-checks.js';
+  // عرّف أسماء عالمية للتشييك اليدوي وباقي السكربتات التي تتوقع وجودها
+  window.timeline ??= T;
+  window.smart ??= S;
+</script>
 
   <!-- ⭐ مهم جدًا: حقن هوية المستخدم/المستأجر قبل أي نداء إلى /api -->
   <script src="/js/tenant-bootstrap.js"></script>
@@ -223,5 +230,6 @@
 <script type="module" src="/js/calving.js"></script>
 </body>
 </html>
+
 
 
