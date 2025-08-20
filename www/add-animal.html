@@ -193,7 +193,9 @@
   })();
 </script>
 
-  <!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
+  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
+<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
+<!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
   <script>
     window.dataLayer = window.dataLayer || [];
     window.t = window.t || {
@@ -424,6 +426,7 @@
 
 </body>
 </html>
+
 
 
 
