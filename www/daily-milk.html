@@ -91,94 +91,116 @@
     <button type="submit">تسجيل الإنتاج</button>
   </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- ثبّت dataLayer + t.event (لا يؤثر بصريًا) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: '/daily-milk.html' });
+  </script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  <!-- تحليلات خارجية (اختياري) -->
+  <script src="/js/app-core.js" defer></script>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  <!-- ⭐ ضروري قبل أي نداء إلى /api -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js" defer></script>
 
-    const lastAnimalId = localStorage.getItem("lastAnimalId");
-    if (lastAnimalId) {
-      document.getElementById("animalId").value = lastAnimalId;
-      document.getElementById("date").value = new Date().toISOString().split("T")[0];
+  <script>
+    // تاريخ اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
     }
 
-    // تحديث إجمالي اللبن تلقائيًا
-    const milking1Input = document.getElementById("milking1");
-    const milking2Input = document.getElementById("milking2");
-    const milking3Input = document.getElementById("milking3");
-    const totalMilkInput = document.getElementById("totalMilk");
-
-    function updateTotalMilk() {
-      const val1 = parseFloat(milking1Input.value) || 0;
-      const val2 = parseFloat(milking2Input.value) || 0;
-      const val3 = parseFloat(milking3Input.value) || 0;
-      totalMilkInput.value = (val1 + val2 + val3).toFixed(2);
+    // اجمع المجموع بدقة رقمية بسيطة
+    function sumMilk(){
+      const n = v => Math.max(0, Number.parseFloat(v || '0')) || 0;
+      const v1 = n(document.getElementById('milking1').value);
+      const v2 = n(document.getElementById('milking2').value);
+      const v3 = n(document.getElementById('milking3').value);
+      document.getElementById('totalMilk').value = (v1+v2+v3).toFixed(2);
     }
 
-    milking1Input.addEventListener("input", updateTotalMilk);
-    milking2Input.addEventListener("input", updateTotalMilk);
-    milking3Input.addEventListener("input", updateTotalMilk);
+    // تعبئة من الرابط + المحلّي
+    function hydrate(){
+      const qs = new URLSearchParams(location.search);
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
+      document.getElementById('animalId').value = id;
+      document.getElementById('date').value = dt;
+      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); }catch{}
+    }
 
-    document.getElementById("milk-form").addEventListener("submit", async function(event) {
-      event.preventDefault();
+    // اربطي الأحداث
+    ['milking1','milking2','milking3'].forEach(id=>{
+      document.addEventListener('input', (e)=>{ if(e.target && e.target.id===id) sumMilk(); });
+    });
+    document.addEventListener('DOMContentLoaded', ()=>{ hydrate(); sumMilk(); });
 
-      const animalId = document.getElementById("animalId").value;
-      if (!animalId) {
-        alert("لم يتم العثور على رقم الحيوان. الرجاء تسجيل حيوان جديد أولاً.");
+    // إرسال البيانات إلى /api/events
+    document.getElementById('milk-form').addEventListener('submit', async (ev)=>{
+      ev.preventDefault();
+      const animalId = document.getElementById('animalId').value.trim();
+      const date      = document.getElementById('date').value;
+      if(!animalId){
+        alert('لم يتم العثور على رقم الحيوان. الرجاء العودة وتحديد الحيوان.');
+        location.href = 'add-event.html';
         return;
       }
 
-      const date = document.getElementById("date").value;
-      const milking1 = parseFloat(document.getElementById("milking1").value) || 0;
-      const milking2 = parseFloat(document.getElementById("milking2").value) || 0;
-      const milking3 = parseFloat(document.getElementById("milking3").value) || 0;
-      const totalMilk = parseFloat(document.getElementById("totalMilk").value) || 0;
+      const n = v => Math.max(0, Number.parseFloat(v || '0')) || 0;
+      const milking1  = n(document.getElementById('milking1').value);
+      const milking2  = n(document.getElementById('milking2').value);
+      const milking3  = n(document.getElementById('milking3').value);
+      const totalMilk = n(document.getElementById('totalMilk').value || (milking1+milking2+milking3));
 
-      const milkData = {
+      const userId   = localStorage.getItem('userId');
+      const tenantId = localStorage.getItem('tenantId') || 'default';
+      if(!userId){
+        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        location.href = 'login.html';
+        return;
+      }
+
+      const payload = {
+        type: 'إنتاج اللبن اليومي',
+        eventType: 'إنتاج اللبن اليومي',
+        userId,
+        tenantId,
         animalId,
-        date,
-        milking1,
-        milking2,
-        milking3,
+        animalNumber: animalId,
+        eventDate: date,
+        milking1, milking2, milking3,
         totalMilk,
-        type: "إنتاج اللبن اليومي",
-        isSmartAlert: true,
-        alertRule: "إنتاج اللبن اليومي",
-        createdAt: serverTimestamp()
+        source: 'daily-milk.html'
       };
 
-      try {
-        const docRef = await addDoc(collection(db, "events"), milkData);
-        alert("✅ تم تسجيل إنتاج اللبن بنجاح");
-
-        if (confirm("هل تريد تسجيل حدث آخر؟")) {
-          window.location.href = "add-event.html";
-        } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-          window.location.href = "add-animal.html";
+      try{
+        const r = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if(r.ok){
+          t.event('milk_saved', { animalId, totalMilk });
+          alert('✅ تم تسجيل إنتاج اللبن بنجاح');
+          if (confirm('هل تريد تسجيل حدث آخر؟')) {
+            location.href = 'add-event.html';
+          } else if (confirm('هل تريد تسجيل حيوان آخر؟')) {
+            location.href = 'add-animal.html';
+          } else {
+            location.href = 'dashboard.html';
+          }
         } else {
-          window.location.href = "dashboard.html";
+          const msg = await r.text();
+          alert('❌ فشل في التسجيل:\n' + (msg || 'Bad Request'));
         }
-      } catch (error) {
-        console.error("❌ حدث خطأ أثناء الاتصال بالخادم:", error);
-        alert("❌ حدث خطأ أثناء الاتصال بالخادم");
+      }catch(err){
+        console.error(err);
+        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
       }
     });
   </script>
 </body>
 </html>
-
-
-
-
-
