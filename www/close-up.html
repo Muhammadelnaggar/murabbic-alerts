@@ -1,74 +1,29 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تحضير للولادة</title>
+  <title>تحضير للولادة — إنتاجي (Smart Tracking)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <!-- ✅ لا تغيير بصري: التتبّع فقط -->
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
-    t.event('page_view', { page: '/close-up.html' });
-  </script>
-
-  <!-- ✅ تحليلات خارجية (اختياري) -->
-  <script src="/js/app-core.js" defer></script>
-
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Arial', sans-serif;
-      background-color: #fff9db;
-      padding: 20px;
-    }
-
-    h1 {
-      color: #2e7d32;
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    label {
-      display: block;
-      margin-top: 15px;
-      font-weight: bold;
-    }
-
-    input[type="text"], input[type="date"] {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 20px;
-      margin-top: 10px;
-    }
-
-    .submit-button {
-      background-color: #2e7d32;
-      color: white;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      margin-top: 30px;
-      width: 100%;
-      font-size: 18px;
-    }
+    body { direction: rtl; font-family: Arial, sans-serif; background-color: #fff9db; padding: 20px; margin: 0; }
+    h1 { color: #2e7d32; text-align: center; margin-bottom: 30px; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; }
+    .radio-group { display: flex; gap: 20px; margin-top: 10px; }
+    .submit-button { background-color: #2e7d32; color: white; padding: 12px; border: none; border-radius: 8px; margin-top: 30px; width: 100%; font-size: 18px; cursor: pointer; }
+    .submit-button:hover { background-color: #1a6324; }
   </style>
 </head>
 <body>
-
   <h1>📦 تحضير للولادة</h1>
 
-  <form id="closeup-form">
-    <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" required />
+  <!-- سلوك فقط: أضفنا data-event و data-redirect (لا تغيّر الشكل) -->
+  <form id="closeupForm" data-event="closeup" data-redirect="/dashboard.html">
+    <label for="animalId">رقم الحيوان:</label>
+    <input type="text" id="animalId" name="animalId" required />
 
-    <label for="date">تاريخ التحضير:</label>
-    <input type="date" id="date" required />
+    <label for="closeupDate">تاريخ التحضير:</label>
+    <input type="date" id="closeupDate" name="closeupDate" required />
 
     <label>عليقة التحضير:</label>
     <div class="radio-group">
@@ -85,96 +40,26 @@
     <button type="submit" class="submit-button">تسجيل التحضير</button>
   </form>
 
-  <!-- ⭐ مهم جدًا: حقن الـUID/tenant قبل أي سكربت يكلّم /api -->
+  <!-- تتبّع ثابت -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: location.pathname });
+  </script>
+
+  <!-- الأساس التحليلي -->
+  <script src="/js/app-core.js" defer></script>
+
+  <!-- الموديولات (لا جسور ولا globals) -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+
+  <!-- الهوية وواجهة الـAPI (tenant قبل api) -->
   <script src="/js/tenant-bootstrap.js"></script>
-  <!-- غلاف النداءات يضيف userId/tenantId تلقائيًا إذا لزم -->
   <script src="/js/api.js" defer></script>
 
-  <!-- ✅ منطق الصفحة: بدون أي تغيير في الشكل -->
-  <script>
-    // اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-
-    // ملء الحقول من الرابط/المحلّي
-    function hydrate(){
-      const qp = new URLSearchParams(location.search);
-      const id = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
-      const dt = qp.get('closeupDate') || qp.get('date') || qp.get('eventDate') || todayLocal();
-      const idEl = document.getElementById('animal-id');
-      const dtEl = document.getElementById('date');
-      idEl.value = id;
-      dtEl.value = dt;
-      // تنظيف الرابط بعد الالتقاط
-      if (id || qp.get('date') || qp.get('eventDate') || qp.get('closeupDate')){
-        try{ history.replaceState(null, '', location.pathname); }catch{}
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', hydrate);
-
-    document.getElementById('closeup-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const userId   = localStorage.getItem('userId');
-      const tenantId = localStorage.getItem('tenantId') || 'default';
-      if (!userId){
-        alert('⚠️ يجب تسجيل الدخول أولًا.');
-        location.href = 'login.html';
-        return;
-      }
-
-      const animalId      = document.getElementById('animal-id').value.trim();
-      const closeUpDate   = document.getElementById('date').value;
-      const ration        = (document.querySelector('input[name="ration"]:checked')||{}).value;
-      const anionicSalts  = (document.querySelector('input[name="anionicSalts"]:checked')||{}).value;
-
-      if (!animalId || !closeUpDate || !ration || !anionicSalts){
-        alert('يرجى ملء جميع الحقول المطلوبة.');
-        return;
-      }
-
-      const payload = {
-        type: 'تحضير للولادة',
-        eventType: 'تحضير للولادة',
-        userId,
-        tenantId,
-        animalId,
-        animalNumber: animalId,
-        eventDate: closeUpDate,
-        ration,
-        anionicSalts,
-        isSmartAlert: true,
-        alertRule: 'close-up-preparation',
-        source: 'close-up.html'
-      };
-
-      try{
-        const r = await fetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (r.ok){
-          try{ localStorage.setItem('closeupDate', closeUpDate); }catch{}
-          alert('✅ تم حفظ التحضير بنجاح');
-          location.href = 'dashboard.html';
-        } else {
-          const msg = await r.text();
-          alert('❌ فشل في حفظ البيانات\n' + (msg || 'Bad Request'));
-        }
-      }catch(err){
-        console.error('خطأ في حفظ الحدث:', err);
-        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
-      }
-    });
-  </script>
-<script type="module" src="/js/track-closeup.js"></script>
-<script type="module" src="/js/closeup.js"></script>
+  <!-- سكربتات الحدث (Smart Tracking عبر track-closeup.js/closeup.js) -->
+  <script type="module" src="/js/track-closeup.js"></script>
+  <script type="module" src="/js/closeup.js"></script>
 </body>
 </html>
-
