@@ -135,6 +135,63 @@
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
   </form>
+<!-- ✅ ربط واجهة السلالات/اللبن كـ Fallback (بدون أي تغييرات بصرية) -->
+<script>
+  (function(){
+    const animalTypeEl = document.getElementById('animalType');
+    const breedEl = document.getElementById('breed');
+    const productionEl = document.getElementById('productionStatus');
+    const milkField = document.getElementById('milkField');
+    const dailyMilk = document.getElementById('dailyMilk');
+    const reproductiveEl = document.getElementById('reproductiveStatus');
+    const inseminationField = document.getElementById('inseminationField');
+    const lastInseminationDate = document.getElementById('lastInseminationDate');
+
+    const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
+    const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
+
+    function updateBreedOptionsLocal(){
+      if(!animalTypeEl || !breedEl) return;
+      const type = animalTypeEl.value;
+      const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
+      breedEl.innerHTML = '<option value="">اختر السلالة</option>' +
+        breeds.map(b => `<option value="${b}">${b}</option>`).join('');
+    }
+    function toggleMilkFieldLocal(){
+      if(!productionEl || !milkField || !dailyMilk) return;
+      const show = (productionEl.value === "حلاب");
+      milkField.style.display = show ? "block" : "none";
+      dailyMilk.required = show;
+      if(!show){ dailyMilk.value = ""; }
+    }
+    function toggleInseminationFieldLocal(){
+      if(!reproductiveEl || !inseminationField || !lastInseminationDate) return;
+      const show = (reproductiveEl.value === "ملقحة" || reproductiveEl.value === "عشار");
+      inseminationField.style.display = show ? "block" : "none";
+      lastInseminationDate.required = show;
+      if(!show){ lastInseminationDate.value = ""; }
+    }
+
+    // ربط الأحداث (يدعم change + input للاطمئنان)
+    if (animalTypeEl) ['change','input'].forEach(e => animalTypeEl.addEventListener(e, updateBreedOptionsLocal));
+    if (productionEl) ['change','input'].forEach(e => productionEl.addEventListener(e, toggleMilkFieldLocal));
+    if (reproductiveEl) ['change','input'].forEach(e => reproductiveEl.addEventListener(e, toggleInseminationFieldLocal));
+
+    // حالة أولية عند التحميل
+    document.addEventListener('DOMContentLoaded', ()=>{
+      updateBreedOptionsLocal();
+      toggleMilkFieldLocal();
+      toggleInseminationFieldLocal();
+    });
+
+    // تعرّف بسيط لسهولة التحقق من الـConsole (اختياري)
+    window.__mbkUI = {
+      updateBreedOptions: updateBreedOptionsLocal,
+      toggleMilkField: toggleMilkFieldLocal,
+      toggleInseminationField: toggleInseminationFieldLocal
+    };
+  })();
+</script>
 
   <!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
   <script>
@@ -355,3 +412,4 @@
 
 </body>
 </html>
+
