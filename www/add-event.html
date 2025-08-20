@@ -63,7 +63,10 @@
       transition: background-color 0.3s, color 0.3s;
     }
     .button-group button.active,
-   .button-group button:hover { background-color: #2e7d32; }
+    .button-group button:hover {
+      background-color: #2e7د32;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -111,17 +114,12 @@
       </div>
     </div>
   </form>
-  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
-<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
 
   <!-- ✅ ثبّت dataLayer + t.event قبل أي سكربت -->
   <script>
     window.dataLayer = window.dataLayer || [];
     window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
   </script>
-<script>
-  if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
-</script>
 
   <!-- ✅ تحليلات خارجية (يسجل page_view تلقائيًا) -->
   <script src="/js/app-core.js" defer></script>
@@ -183,7 +181,7 @@
     // تعبئة من الرابط/المحلّي
     function hydrateContext(){
       const qp = new URLSearchParams(location.search);
-      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
+      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
       const presetDate = qp.get("date") || todayLocal();
       idInput.value = presetId;
       dateInput.value = presetDate;
@@ -280,15 +278,6 @@
             eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
             createdAt: serverTimestamp()
           });
-          try {
-  t.event('event_recorded', {
-    userId: auth?.currentUser?.uid || null,
-    animalId: ctx.animalId,
-    eventDate: ctx.eventDate,
-    eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim()
-  });
-} catch {}
-
         }catch(err){
           console.error(err);
           if (isTrim) warning.textContent = '❌ حدث خطأ أثناء تسجيل تقليم الحوافر. حاول مرة أخرى.';
@@ -298,11 +287,6 @@
           const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
           if (!goAgain) location.href = 'dashboard.html';
         } else if (page){
-          // حفظ آخر تلقيح لتشغيل ذكاء تشخيص الحمل لاحقًا
-if (page === 'insemination.html') {
-  localStorage.setItem('lastInseminationDate', ctx.eventDate);
-}
-
           // ✅ خزّن السياق + ابنِ الرابط المتوافق
           pushContext(ctx);
           location.href = buildTargetUrl(page, ctx);
@@ -322,12 +306,6 @@ if (page === 'insemination.html') {
   <script src="/js/tenant-bootstrap.js"></script>
 
   <!-- سكربتات الواجهة التي قد تستخدم /api -->
- <script type="module" src="js/mbk-animals.js?v=2"></script>
+  <script src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
-
-
-
-
-
-
