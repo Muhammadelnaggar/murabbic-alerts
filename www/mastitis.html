@@ -108,71 +108,98 @@
     <button type="submit">تسجيل الحالة</button>
   </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- ثبّت dataLayer + t.event (لا يغيّر الشكل) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: '/mastitis.html' });
+  </script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  <!-- تحليلات خارجية (اختياري) -->
+  <script src="/js/app-core.js" defer></script>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  <!-- ⭐ لازم قبل أي نداء إلى /api -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js" defer></script>
 
-    // ملء الحقول برقم الحيوان والتاريخ القادم من رابط صفحة الأحداث
-    window.addEventListener("load", () => {
-      const params = new URLSearchParams(window.location.search);
-      const animalId = params.get("animalId");
-      const date = params.get("date");
+  <script>
+    // اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
 
-      if (animalId) {
-        document.getElementById("animal-id").value = animalId;
-      }
-      if (date) {
-        document.getElementById("date").value = date;
-      }
-    });
+    // تعبئة من الرابط أو التخزين المحلي
+    function hydrate(){
+      const qs = new URLSearchParams(location.search);
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
+      document.getElementById('animal-id').value = id;
+      document.getElementById('date').value = dt;
+      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); localStorage.setItem('lastEventDate', dt); }catch{}
+      try{ history.replaceState(null, '', location.pathname); }catch{}
+    }
 
-    document.getElementById("mastitis-form").addEventListener("submit", async (event) => {
+    document.addEventListener('DOMContentLoaded', hydrate);
+
+    // إرسال إلى /api/events
+    document.getElementById('mastitis-form').addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const animalId = document.getElementById("animal-id").value.trim();
-      const date = document.getElementById("date").value;
-      const mastitisType = document.getElementById("mastitis-type").value;
-      const quarters = Array.from(document.querySelectorAll("input[name='quarters']:checked")).map(cb => cb.value);
-
-      if (!animalId || !date || !mastitisType || quarters.length === 0) {
-        alert("يرجى ملء جميع الحقول المطلوبة.");
+      const userId   = localStorage.getItem('userId');
+      const tenantId = localStorage.getItem('tenantId') || 'default';
+      if(!userId){
+        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        location.href = 'login.html';
         return;
       }
 
-      const data = {
+      const animalId    = document.getElementById('animal-id').value.trim();
+      const date        = document.getElementById('date').value;
+      const mastitisType= document.getElementById('mastitis-type').value;
+      const quarters    = Array.from(document.querySelectorAll("input[name='quarters']:checked")).map(cb => cb.value);
+
+      if(!animalId || !date || !mastitisType || quarters.length === 0){
+        alert('يرجى ملء جميع الحقول المطلوبة.');
+        return;
+      }
+
+      const payload = {
+        type: 'التهاب الضرع',
+        eventType: 'التهاب الضرع',
+        userId,
+        tenantId,
         animalId,
-        diseaseDate: date,
-        diseaseName: "التهاب الضرع",
+        animalNumber: animalId,
+        eventDate: date,
+        diseaseName: 'التهاب الضرع',
         mastitisType,
         quarters,
-        type: "مرض",
         isSmartAlert: true,
-        alertRule: "مرض",
-        createdAt: serverTimestamp()
+        alertRule: 'mastitis',
+        source: 'mastitis.html'
       };
 
-      try {
-        await addDoc(collection(db, "events"), data);
-        alert("✅ تم تسجيل الحالة بنجاح");
-        window.location.href = "treatment-followup.html";
-      } catch (err) {
-        alert("فشل الاتصال بالخادم");
+      try{
+        const r = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if(r.ok){
+          try{ localStorage.setItem('lastAnimalId', animalId); localStorage.setItem('lastEventDate', date); }catch{}
+          alert('✅ تم تسجيل الحالة بنجاح');
+          location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(date)}`;
+        } else {
+          const msg = await r.text();
+          alert('❌ فشل في التسجيل:\n' + (msg || 'Bad Request'));
+        }
+      }catch(err){
         console.error(err);
+        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
       }
     });
   </script>
-
 </body>
 </html>
