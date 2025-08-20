@@ -95,53 +95,97 @@
     <button type="submit">تسجيل الحدث</button>
   </form>
 
+  <!-- ثبّت dataLayer + t.event قبل أي سكربت (لا يؤثر بصريًا) -->
   <script>
-    window.addEventListener("DOMContentLoaded", () => {
-      const params = new URLSearchParams(window.location.search);
-      let animalId = params.get("animalId");
-      if (!animalId) {
-        animalId = localStorage.getItem("lastAnimalId");
+    window.dataLayer = window.dataLayer || [];
+    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
+    t.event('page_view', { page: '/insemination.html' });
+  </script>
+
+  <!-- تحليلات خارجية (اختياري) -->
+  <script src="/js/app-core.js" defer></script>
+
+  <!-- ⚠️ مهم: حقن هوية المستخدم/المستأجر قبل أي نداء إلى /api -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js" defer></script>
+
+  <script>
+    // تاريخ اليوم المحلي YYYY-MM-DD
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
+
+    // التهيئة من الرابط + المحلّي
+    window.addEventListener('DOMContentLoaded', () => {
+      const qs = new URLSearchParams(location.search);
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
+
+      const idEl  = document.getElementById('animalId');
+      const dtEl  = document.getElementById('inseminationDate');
+
+      idEl.value = id;
+      dtEl.value = dt;
+
+      // لو مافيش رقم — رجوع لصفحة اختيار الحدث
+      if (!id){
+        alert('❗ لم يتم العثور على رقم الحيوان، يرجى العودة لتحديد الحيوان.');
+        location.href = 'add-event.html';
+        return;
       }
-      if (animalId) {
-        document.getElementById("animalId").value = animalId;
-      } else {
-        alert("❗ لم يتم العثور على رقم الحيوان، يرجى العودة لتحديد الحيوان.");
-        window.location.href = "add-event.html";
-      }
+
+      // خزِّن للسPages الأخرى
+      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); }catch{}
     });
 
-    document.getElementById("inseminationForm").addEventListener("submit", async function(event) {
-      event.preventDefault();
+    // إرسال النموذج إلى /api/events (مع userId/tenantId)
+    document.getElementById('inseminationForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
 
-      const data = {
-        type: "تلقيح",
-        animalId: document.getElementById("animalId").value,
-        date: document.getElementById("inseminationDate").value,
-        bullName: document.getElementById("bullName").value,
-        heatTime: document.querySelector('input[name="heatTime"]:checked').value,
-        inseminationTime: document.querySelector('input[name="inseminationTime"]:checked').value,
-        technicianName: document.getElementById("technicianName").value,
-        isSmartAlert: true,
-        alertRule: "تلقيح"
+      const userId   = localStorage.getItem('userId');
+      const tenantId = localStorage.getItem('tenantId') || 'default';
+      if (!userId){
+        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        location.href = 'login.html';
+        return;
+      }
+
+      const payload = {
+        type: 'تلقيح',
+        eventType: 'تلقيح',
+        userId,
+        tenantId,
+        animalId: document.getElementById('animalId').value.trim(),
+        animalNumber: document.getElementById('animalId').value.trim(),
+        eventDate: document.getElementById('inseminationDate').value,
+        bullName: document.getElementById('bullName').value.trim() || null,
+        heatTime: (document.querySelector('input[name="heatTime"]:checked')||{}).value,
+        inseminationTime: (document.querySelector('input[name="inseminationTime"]:checked')||{}).value,
+        technicianName: document.getElementById('technicianName').value.trim() || null,
+        source: 'insemination.html'
       };
 
       try {
-        const response = await fetch("https://murabbic-alerts.onrender.com/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
+        // استخدم مسارًا نسبيًا للاستفادة من API_BASE إن وُجد
+        const r = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
 
-        if (response.ok) {
-          alert("✅ تم تسجيل حدث التلقيح بنجاح");
-          window.location.href = "dashboard.html";
+        if (r.ok){
+          try{ localStorage.setItem('lastInseminationDate', payload.eventDate); }catch{}
+          alert('✅ تم تسجيل حدث التلقيح بنجاح');
+          location.href = 'dashboard.html';
         } else {
-          const message = await response.text();
-          alert("❌ فشل في التسجيل:\n" + message);
+          const msg = await r.text();
+          alert('❌ فشل في التسجيل:\n' + (msg || 'Bad Request'));
         }
-      } catch (error) {
-        alert("❌ حدث خطأ أثناء الاتصال بالخادم");
-        console.error(error);
+      } catch(err){
+        console.error(err);
+        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
       }
     });
   </script>
