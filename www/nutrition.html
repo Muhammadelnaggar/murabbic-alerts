@@ -1,3 +1,4 @@
+<!-- nutrition.html (نسخة ثابتة: تصميم + حسابات كما هي، وتتبع منضبط، وحفظ خارجي) -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -5,25 +6,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل تركيبة التغذية</title>
 
-  <!-- تتبّع مُوحَّد وآمن (page_view مرّة واحدة فقط) -->
+  <!-- تتبّع واحد آمن في <head> (يمنع تكرار page_view) -->
   <script>
-  (function(){
-    window.dataLayer = window.dataLayer || [];
-    const fired = new Set();
-    function push(name, props){
-      props = props || {};
-      if (name === 'page_view'){
-        const key = (props.page || location.pathname);
-        if (fired.has(key)) return;
-        fired.add(key);
-        setTimeout(()=>fired.delete(key), 3000);
-      }
-      try { window.dataLayer.push({ event:name, ts:Date.now(), ...props }); } catch(e){}
-    }
-    window.t = window.t || {};
-    window.t.event = function(name, props){ push(name, props); };
-    push('page_view', { page: location.pathname });
-  })();
+    (function(){
+      window.dataLayer = window.dataLayer || [];
+      const fired = new Set();
+      function push(name, props){ try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} }
+      window.t = window.t || {};
+      window.t.event = function(name, props){
+        if(name==='page_view'){
+          const key = (props && props.page) || location.pathname;
+          if(fired.has(key)) return;
+          fired.add(key);
+          setTimeout(()=>fired.delete(key), 2000);
+        }
+        push(name, props);
+      };
+      t.event('page_view', { page: location.pathname });
+    })();
   </script>
 
   <style>
@@ -34,7 +34,6 @@
     .wrap{max-width:1080px;margin:0 auto}
     .info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
     .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;color:#1b5e20;font-size:13px}
-
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .row>.grow{flex:1}
@@ -44,18 +43,14 @@
     button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
     .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
     .btn-primary{background:var(--green);color:#fff}
-
     .warning{color:#c62828;text-align:center;min-height:22px;margin-top:6px}
-
     .table-wrap{width:100%;overflow-x:auto}
     table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1020px}
     th,td{border:1px solid #e0ebd3;padding:8px;text-align:center}
     th{background:#eafbe7;color:#1b5e20}
     tbody tr:nth-child(odd){background:#fcfff5}
-
     .total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
     .total .pill{background:#fff}
-
     @media (max-width: 640px){
       .row.stack > *{flex:1 1 100%}
       table, thead, tbody, th, td, tr{display:block;min-width:unset}
@@ -177,15 +172,21 @@
 
   <div class="card">
     <div class="row stack">
-      <!-- فورم خفيفة للحفظ (لا تغيّر الشكل) -->
       <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
         <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
       </form>
     </div>
+    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
+      <div class="text" style="font-weight:bold"></div>
+      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1">تسجيل أحداث أخرى</button>
+        <button type="button" class="btn" id="msgNo" style="flex:1">لوحة التحكم</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ===== منطق الحسابات والـUI فقط (بدون حفظ/نداءات API) ===== -->
+<!-- ===== منطق الحسابات والـUI فقط (لا حفظ ولا تتبّع هنا) ===== -->
 <script type="module">
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
@@ -215,11 +216,10 @@
   const groupName = qp.get('group') || '';
   const eventDate= qp.get('date') || todayLocal();
 
-  // إظهار هوية الحيوان/التاريخ أعلى الصفحة
   document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
-  // تعبئة سياق القطيع من الرابط إن وُجد
+  // تعبئة سياق من الرابط
   ctxDIM.value      = qp.get('dim') || '';
   ctxSpecies.value  = qp.get('species') || '';
   ctxAvgMilk.value  = qp.get('avgMilk') || '';
@@ -228,19 +228,36 @@
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
 
-  // لستة الخامات (مختصرة – زوّدها كما تحب)
+  // قائمة الخامات (كاملة)
   const FEEDS = [
-    { name:'سيلاج ذرة', dm:33 }, { name:'تبن قمح', dm:90 }, { name:'دريس برسيم', dm:90 },
-    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
-    { name:'كسب فول صويا 48%', dm:89 }, { name:'مولاس', dm:75 },
-    { name:'حجر جيري (كالسيوم)', dm:100 }, { name:'ملح طعام', dm:100 },
-    { name:'بيكربونات صوديوم', dm:100 }, { name:'دهون محمية', dm:99 },
+    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
+    { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
+    { name:'ردة أرز', dm:90 }, { name:'ذرة رفيعة (سورجم)', dm:88 },
+    { name:'شوفان', dm:90 }, { name:'فول بلدي (فابا)', dm:88 },
+    { name:'بازلاء علفية', dm:88 }, { name:'DDGS (ذرة)', dm:90 },
+    { name:'جلوتين فيد (CGF)', dm:90 }, { name:'جلوتين ميل (CGM)', dm:90 },
+    { name:'قشور فول صويا (Soy Hulls)', dm:90 }, { name:'لب بنجر مجفف', dm:90 },
+    { name:'لب بنجر مبلل', dm:25 }, { name:'لب حمضيات مجفف', dm:90 },
+    { name:'مولاس', dm:75 }, { name:'كسب فول صويا 44%', dm:89 },
+    { name:'كسب فول صويا 48%', dm:89 }, { name:'كسب عباد الشمس', dm:89 },
+    { name:'كسب كانولا', dm:90 }, { name:'كسب قطن', dm:92 },
+    { name:'كسب نخيل', dm:90 }, { name:'كسب فول سوداني', dm:90 },
+    { name:'كسب سمسم', dm:90 }, { name:'كسب كتان', dm:90 },
+    { name:'بذرة قطن كاملة', dm:92 }, { name:'قشور بذرة قطن (Hulls)', dm:90 },
+    { name:'سيلاج ذرة', dm:33 }, { name:'سيلاج سورجم', dm:30 },
+    { name:'برسيم أخضر', dm:18 }, { name:'دريس برسيم', dm:90 },
+    { name:'دريس حشيشة/نجيل', dm:90 }, { name:'تبن قمح', dm:90 },
+    { name:'قش أرز', dm:90 }, { name:'دهون محمية', dm:99 },
+    { name:'زيت نباتي علفي', dm:99 }, { name:'يوريا علفية', dm:100 },
+    { name:'حجر جيري (كالسيوم)', dm:100 }, { name:'فوسفات ثنائي الكالسيوم (DCP)', dm:100 },
+    { name:'ملح طعام', dm:100 }, { name:'بيكربونات صوديوم', dm:100 },
+    { name:'أكسيد ماغنسيوم', dm:100 }, { name:'بنتونيت', dm:100 },
+    { name:'خميرة حية/مستنبت خمائري', dm:95 }, { name:'مخلوط معادن/فيتامينات', dm:95 },
   ];
-
   FEEDS.forEach((f,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o); });
 
   const TEMPLATES = [
-    { key:'tmr_asfed_high_cow', name:'TMR as-fed — حلابة مرتفعة (بقر)', mode:'tmr_asfed', items:[
+    { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
       { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
       { name:'دريس برسيم', cat:'rough', dm:90, kg:1.5 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:6 },
@@ -252,7 +269,7 @@
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
       { name:'دهون محمية', cat:'conc', dm:99, kg:0.30 },
     ]},
-    { key:'tmr_percent_mid_cow', name:'TMR نسب as-fed — حلابة متوسطة (بقر)', mode:'tmr_percent', items:[
+    { key: 'tmr_percent_mid_cow', name: 'TMR نسب as-fed — حلابة متوسطة (بقر)', mode: 'tmr_percent', items: [
       { name:'سيلاج ذرة', cat:'rough', dm:33, pct:40 },
       { name:'دريس برسيم', cat:'rough', dm:90, pct:5 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:23 },
@@ -264,7 +281,7 @@
       { name:'ملح طعام', cat:'conc', dm:100, pct:1 },
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:2 },
     ]},
-    { key:'split_conc6', name:'منفصل — مركز 6 كجم + خشن as-fed', mode:'split', concKg:6, items:[
+    { key: 'split_conc6', name: 'منفصل — مركز 6 كجم + خشن as-fed', mode: 'split', concKg: 6, items: [
       { name:'سيلاج ذرة', cat:'rough', dm:33, kg:20 },
       { name:'دريس برسيم', cat:'rough', dm:90, kg:1 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:45 },
@@ -489,7 +506,11 @@
     modeSel.value = tpl.mode;
     if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
     document.querySelector('#tbl tbody').innerHTML='';
-    (tpl.items||[]).forEach(it=> addRow({ name:it.name, dm:(it.dm ?? FEEDS.find(x=>x.name===it.name)?.dm ?? ''), cat:it.cat, kg:it.kg, pct:it.pct }));
+    (tpl.items||[]).forEach(it=>{
+      const def = FEEDS.find(x=> x.name === it.name);
+      const dm  = (it.dm ?? def?.dm ?? '');
+      addRow({ name:it.name, dm, cat:it.cat || (def?guessCat(def.name):'conc'), kg:it.kg, pct:it.pct });
+    });
     updateModeUI(); recalc();
   });
 
@@ -531,7 +552,6 @@
   modeSel.addEventListener('change', ensureEditableForMode);
   concKgInput.addEventListener('input', recalc);
 
-  // قواعد DCC
   function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
   function applyDCCRules(){
     const dcc = parseInt(ctxDCC?.value);
@@ -549,11 +569,10 @@
   ctxSpecies?.addEventListener('change', applyDCCRules);
   applyDCCRules();
 
-  // ابدأ بوضع مناسب
   updateModeUI();
 </script>
 
-<!-- الأساس التحليلي + الذكاء -->
+<!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
 <script src="/js/app-core.js" defer></script>
 <script type="module" src="/js/timeline.js"></script>
 <script type="module" src="/js/smart-checks.js"></script>
@@ -561,7 +580,9 @@
 <script src="/js/tenant-bootstrap.js"></script>
 <script src="/js/api.js" defer></script>
 
-<!-- تتبّع + منطق الحفظ (ملفات منفصلة، لا تغيّر الواجهة) -->
+<!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
+<script type="module" src="/js/events-core.js"></script>
+<script type="module" src="/js/track-core.js"></script>
 <script type="module" src="/js/track-nutrition.js"></script>
 <script type="module" src="/js/nutrition.js"></script>
 </body>
