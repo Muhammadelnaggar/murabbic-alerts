@@ -1,3 +1,4 @@
+import { initEventPage } from '/js/events-core.js';
 import { onNutritionSave, onNutritionPrefill } from '/js/track-nutrition.js';
 const Q = (s)=>document.querySelector(s);
 const val = (ids=[])=>{ for(const id of ids){ const el=document.getElementById(id)||document.querySelector(`[name="${id}"]`); if(el&&el.value) return el.value.trim(); } return ''; };
