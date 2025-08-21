@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>تسجيل حدث التلقيح</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
   <style>
     body {
       direction: rtl;
@@ -63,6 +64,20 @@
       background-color: #1b5e20;
     }
   </style>
+
+  <!-- تتبع موحّد -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="js/app-core.js"></script>
+  <script type="module" src="js/timeline.js"></script>
+  <script type="module" src="js/smart-checks.js"></script>
+  <script src="js/tenant-bootstrap.js"></script>
+  <script src="js/api.js"></script>
+
+  <!-- فايربيز -->
+  <script type="module" src="js/firebase-config.js"></script>
+
+  <!-- التنبيهات الذكية -->
+  <script src="js/smart-alerts.js"></script>
 </head>
 <body>
 
@@ -92,90 +107,54 @@
     <label>اسم الملقح:</label>
     <input type="text" id="technicianName" />
 
-    <button type="submit">تسجيل الحدث</button>
+    <button type="submit">💾 تسجيل الحدث</button>
   </form>
 
-  <!-- ثبّت dataLayer + t.event قبل أي سكربت (لا يؤثر بصريًا) -->
- <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
->
-
-  <!-- تحليلات خارجية (اختياري) -->
-  <script src="/js/app-core.js" defer></script>
-
-  <!-- ⚠️ مهم: حقن هوية المستخدم/المستأجر قبل أي نداء إلى /api -->
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
-
   <script>
-    // تاريخ اليوم المحلي YYYY-MM-DD
+    // Page View مرة واحدة
+    t.event('page_view', { page: "insemination.html" });
+
     function todayLocal(){
       const d = new Date();
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       return d.toISOString().slice(0,10);
     }
 
-    // التهيئة من الرابط + المحلّي
     window.addEventListener('DOMContentLoaded', () => {
       const qs = new URLSearchParams(location.search);
-      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || 
+                 qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
       const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
 
-      const idEl  = document.getElementById('animalId');
-      const dtEl  = document.getElementById('inseminationDate');
+      document.getElementById('animalId').value = id;
+      document.getElementById('inseminationDate').value = dt;
 
-      idEl.value = id;
-      dtEl.value = dt;
-
-      // لو مافيش رقم — رجوع لصفحة اختيار الحدث
       if (!id){
-        alert('❗ لم يتم العثور على رقم الحيوان، يرجى العودة لتحديد الحيوان.');
+        smartAlerts.show('❗ لم يتم العثور على رقم الحيوان، يرجى العودة لتحديد الحيوان.', { type:"error", block:true });
         location.href = 'add-event.html';
         return;
       }
 
-      // خزِّن للسPages الأخرى
-      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); }catch{}
+      try { 
+        localStorage.setItem('currentAnimalId', id); 
+        localStorage.setItem('lastAnimalId', id); 
+      } catch {}
     });
 
-    // إرسال النموذج إلى /api/events (مع userId/tenantId)
     document.getElementById('inseminationForm').addEventListener('submit', async (ev) => {
       ev.preventDefault();
 
       const userId   = localStorage.getItem('userId');
       const tenantId = localStorage.getItem('tenantId') || 'default';
       if (!userId){
-        alert('⚠️ يجب تسجيل الدخول أولًا.');
+        smartAlerts.show('⚠️ يجب تسجيل الدخول أولًا.', { type:"error", block:true });
         location.href = 'login.html';
         return;
       }
 
       const payload = {
         type: 'تلقيح',
-        eventType: 'تلقيح',
+        eventType: 'insemination',
         userId,
         tenantId,
         animalId: document.getElementById('animalId').value.trim(),
@@ -188,8 +167,14 @@
         source: 'insemination.html'
       };
 
+      // تحقق ذكي (قاعدة 60 يوم بعد الولادة)
+      const check = smart?.validate(payload);
+      if (check?.severity === "critical") {
+        smartAlerts.show(check.message, { type:"error", block:true });
+        return;
+      }
+
       try {
-        // استخدم مسارًا نسبيًا للاستفادة من API_BASE إن وُجد
         const r = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -198,19 +183,19 @@
 
         if (r.ok){
           try{ localStorage.setItem('lastInseminationDate', payload.eventDate); }catch{}
-          alert('✅ تم تسجيل حدث التلقيح بنجاح');
+          t.event("insemination_save", { animalId: payload.animalId, eventDate: payload.eventDate });
+          smartAlerts.show("✅ تم تسجيل حدث التلقيح بنجاح", { type:"success" });
           location.href = 'dashboard.html';
         } else {
           const msg = await r.text();
-          alert('❌ فشل في التسجيل:\n' + (msg || 'Bad Request'));
+          smartAlerts.show("❌ فشل في التسجيل:\n" + (msg || 'Bad Request'), { type:"error" });
         }
       } catch(err){
         console.error(err);
-        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
+        smartAlerts.show("❌ حدث خطأ أثناء الاتصال بالخادم", { type:"error" });
       }
     });
   </script>
 
 </body>
 </html>
-
