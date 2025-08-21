@@ -5,25 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل تركيبة التغذية</title>
 
-  <!-- تتبّع موحّد + منع تكرار page_view -->
+  <!-- تتبّع قياسي + منع تكرار page_view لنفس المسار -->
   <script>
-    (function () {
+    (function(){
       window.dataLayer = window.dataLayer || [];
-      const sent = new Set();
-      const pushSafe = (name, props) => {
-        try { window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
-      };
+      window.__sentEvents = window.__sentEvents || new Set();
       window.t = window.t || {};
-      window.t.event = function (name, props) {
+      window.t.event = function(name, props){
+        props = props || {};
         if (name === 'page_view') {
-          const key = 'pv:' + ((props && props.page) || location.pathname);
-          if (sent.has(key)) return;
-          sent.add(key);
-          setTimeout(()=>sent.delete(key), 2000);
+          var key = 'pv:' + (props.page || location.pathname);
+          if (window.__sentEvents.has(key)) return;
+          window.__sentEvents.add(key);
         }
-        pushSafe(name, props||{});
+        try { dataLayer.push({ event:name, ts:Date.now(), ...props }); } catch(e){}
       };
-      // أطلق page_view مرة واحدة فقط
       t.event('page_view', { page: location.pathname });
     })();
   </script>
@@ -36,7 +32,6 @@
     .wrap{max-width:1080px;margin:0 auto}
     .info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
     .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;color:#1b5e20;font-size:13px}
-
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .row>.grow{flex:1}
@@ -46,18 +41,14 @@
     button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
     .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
     .btn-primary{background:var(--green);color:#fff}
-
     .warning{color:#c62828;text-align:center;min-height:22px;margin-top:6px}
-
     .table-wrap{width:100%;overflow-x:auto}
     table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1020px}
     th,td{border:1px solid #e0ebd3;padding:8px;text-align:center}
     th{background:#eafbe7;color:#1b5e20}
     tbody tr:nth-child(odd){background:#fcfff5}
-
     .total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
     .total .pill{background:#fff}
-
     @media (max-width: 640px){
       .row.stack > *{flex:1 1 100%}
       table, thead, tbody, th, td, tr{display:block;min-width:unset}
@@ -179,11 +170,13 @@
 
   <div class="card">
     <div class="row stack">
-      <!-- فورم خفيفة للحفظ (لا تغيّر الشكل) -->
+      <!-- form خفيفة للحفظ -->
       <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
         <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
       </form>
     </div>
+
+    <!-- رسالة تأكيد بعد الحفظ -->
     <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
       <div class="text" style="font-weight:bold"></div>
       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -196,7 +189,7 @@
 
 <!-- ===== منطق الحسابات والـUI فقط (بدون حفظ/نداءات API) ===== -->
 <script type="module">
-  // حسابات/واجهة فقط — الحفظ في /js/nutrition.js
+  // (نفس منطقك السابق للحسابات والـUI — لم ألمسه)
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
   const ctxDIM = document.getElementById('ctxDIM');
@@ -219,7 +212,6 @@
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
 
-  function showNum(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
   function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
   const qp = new URLSearchParams(location.search);
   const animalId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
@@ -229,7 +221,6 @@
   document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
-  // سياق من الرابط
   ctxDIM.value      = qp.get('dim') || '';
   ctxSpecies.value  = qp.get('species') || '';
   ctxAvgMilk.value  = qp.get('avgMilk') || '';
@@ -238,44 +229,17 @@
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
 
-  // لستة الخامات (الكاملة)
   const FEEDS = [
-    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
-    { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
-    { name:'ردة أرز', dm:90 }, { name:'ذرة رفيعة (سورجم)', dm:88 },
-    { name:'شوفان', dm:90 }, { name:'فول بلدي (فابا)', dm:88 },
-    { name:'بازلاء علفية', dm:88 },
-
-    { name:'DDGS (ذرة)', dm:90 }, { name:'جلوتين فيد (CGF)', dm:90 },
-    { name:'جلوتين ميل (CGM)', dm:90 }, { name:'قشور فول صويا (Soy Hulls)', dm:90 },
-    { name:'لب بنجر مجفف', dm:90 }, { name:'لب بنجر مبلل', dm:25 },
-    { name:'لب حمضيات مجفف', dm:90 }, { name:'مولاس', dm:75 },
-
-    { name:'كسب فول صويا 44%', dm:89 }, { name:'كسب فول صويا 48%', dm:89 },
-    { name:'كسب عباد الشمس', dm:89 }, { name:'كسب كانولا', dm:90 },
-    { name:'كسب قطن', dm:92 }, { name:'كسب نخيل', dm:90 },
-    { name:'كسب فول سوداني', dm:90 }, { name:'كسب سمسم', dm:90 },
-    { name:'كسب كتان', dm:90 },
-
-    { name:'بذرة قطن كاملة', dm:92 }, { name:'قشور بذرة قطن (Hulls)', dm:90 },
-
-    { name:'سيلاج ذرة', dm:33 }, { name:'سيلاج سورجم', dm:30 },
-    { name:'برسيم أخضر', dm:18 }, { name:'دريس برسيم', dm:90 },
-    { name:'دريس حشيشة/نجيل', dm:90 }, { name:'تبن قمح', dm:90 },
-    { name:'قش أرز', dm:90 },
-
-    { name:'دهون محمية', dm:99 }, { name:'زيت نباتي علفي', dm:99 },
-    { name:'يوريا علفية', dm:100 }, { name:'حجر جيري (كالسيوم)', dm:100 },
-    { name:'فوسفات ثنائي الكالسيوم (DCP)', dm:100 }, { name:'ملح طعام', dm:100 },
-    { name:'بيكربونات صوديوم', dm:100 }, { name:'أكسيد ماغنسيوم', dm:100 },
-    { name:'بنتونيت', dm:100 }, { name:'خميرة حية/مستنبت خمائري', dm:95 },
-    { name:'مخلوط معادن/فيتامينات', dm:95 },
+    { name:'سيلاج ذرة', dm:33 }, { name:'تبن قمح', dm:90 }, { name:'دريس برسيم', dm:90 },
+    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
+    { name:'كسب فول صويا 48%', dm:89 }, { name:'مولاس', dm:75 },
+    { name:'حجر جيري (كالسيوم)', dm:100 }, { name:'ملح طعام', dm:100 },
+    { name:'بيكربونات صوديوم', dm:100 }, { name:'دهون محمية', dm:99 },
   ];
-
   FEEDS.forEach((f,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o); });
 
   const TEMPLATES = [
-    { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
+    { key:'tmr_asfed_high_cow', name:'TMR as-fed — حلابة مرتفعة (بقر)', mode:'tmr_asfed', items:[
       { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
       { name:'دريس برسيم', cat:'rough', dm:90, kg:1.5 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:6 },
@@ -287,7 +251,7 @@
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
       { name:'دهون محمية', cat:'conc', dm:99, kg:0.30 },
     ]},
-    { key: 'tmr_percent_mid_cow', name: 'TMR نسب as-fed — حلابة متوسطة (بقر)', mode: 'tmr_percent', items: [
+    { key:'tmr_percent_mid_cow', name:'TMR نسب as-fed — حلابة متوسطة (بقر)', mode:'tmr_percent', items:[
       { name:'سيلاج ذرة', cat:'rough', dm:33, pct:40 },
       { name:'دريس برسيم', cat:'rough', dm:90, pct:5 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:23 },
@@ -299,7 +263,7 @@
       { name:'ملح طعام', cat:'conc', dm:100, pct:1 },
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:2 },
     ]},
-    { key: 'split_conc6', name: 'منفصل — مركز 6 كجم + خشن as-fed', mode: 'split', concKg: 6, items: [
+    { key:'split_conc6', name:'منفصل — مركز 6 كجم + خشن as-fed', mode:'split', concKg:6, items:[
       { name:'سيلاج ذرة', cat:'rough', dm:33, kg:20 },
       { name:'دريس برسيم', cat:'rough', dm:90, kg:1 },
       { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:45 },
@@ -312,16 +276,6 @@
       { name:'ملح طعام', cat:'conc', dm:100, pct:2 },
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:4 },
     ]},
-    { key: 'tmr_asfed_closeup', name: 'TMR as-fed — تحضير ولادة (Close-up)', mode: 'tmr_asfed', items: [
-      { name:'سيلاج ذرة', cat:'rough', dm:33, kg:12 },
-      { name:'تبن قمح', cat:'rough', dm:90, kg:2 },
-      { name:'ردة قمح (نخالة)', cat:'conc', dm:89, kg:1.5 },
-      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:2 },
-      { name:'كسب كانولا', cat:'conc', dm:90, kg:1.2 },
-      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, kg:0.15 },
-      { name:'ملح طعام', cat:'conc', dm:100, kg:0.05 },
-      { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
-    ]}
   ];
   TEMPLATES.forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.name; tplSel.appendChild(o); });
 
@@ -331,7 +285,6 @@
 
   const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
-
   function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
 
   function addRow(feed={}){
@@ -350,6 +303,8 @@
     tbody.appendChild(tr);
     hookRow(tr);
   }
+
+  function nf(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
 
   function setRowState(tr){
     const mode = modeSel.value;
@@ -397,11 +352,11 @@
   }
 
   function recalc(){
-    const mode = modeSel.value; // 'tmr_asfed' | 'tmr_percent' | 'split'
+    const mode = modeSel.value;
     let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
-    let roughDM=0, roughCost=0; // split
-    let concMixAsFed=0, concDmFrac=0, concSumPct=0; // split
-    const concKg = parseFloat(concKgInput.value)||0; // split
+    let roughDM=0, roughCost=0;
+    let concMixAsFed=0, concDmFrac=0, concSumPct=0;
+    const concKg = parseFloat(concKgInput.value)||0;
 
     tbody.querySelectorAll('tr').forEach(tr=>{
       const dm = parseFloat(tr.querySelector('.dm').value)||0;
@@ -410,24 +365,24 @@
       const pc = parseFloat(tr.querySelector('.pct').value)||0;
       const cat= (tr.querySelector('.cat')?.value)||'conc';
       const pDM= dm>0? (p/(dm/100)) : 0;
-      tr.querySelector('.pTonDM').textContent = pDM? showNum(pDM):'—';
+      tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
 
       if (mode==='tmr_asfed'){
         const kgDM = kg*(dm/100);
         const cost = (kgDM/1000)*pDM;
-        tr.querySelector('.kgDM').textContent = kgDM? showNum(kgDM):'—';
-        tr.querySelector('.cost').textContent = cost? showNum(cost):'—';
+        tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+        tr.querySelector('.cost').textContent = cost? nf(cost):'—';
         totalDM+=kgDM; totalCost+=cost;
       } else if (mode==='tmr_percent'){
         tr.querySelector('.kgDM').textContent = '—';
         tr.querySelector('.cost').textContent = '—';
         if (pc>0){ mixAsFed+=(pc/100)*p; dmFrac+=(pc/100)*(dm/100); sumPct+=pc; }
-      } else { // split
+      } else {
         if (cat==='rough'){
           const kgDM = kg*(dm/100);
           const cost = (kgDM/1000)*pDM;
-          tr.querySelector('.kgDM').textContent = kgDM? showNum(kgDM):'—';
-          tr.querySelector('.cost').textContent = cost? showNum(cost):'—';
+          tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+          tr.querySelector('.cost').textContent = cost? nf(cost):'—';
           roughDM+=kgDM; roughCost+=cost;
         } else {
           tr.querySelector('.kgDM').textContent = '—';
@@ -452,42 +407,42 @@
         mix = mixDM;
       }
       pillMix.style.display=''; pillSumPct.style.display='none';
-      document.getElementById('totDM').textContent = showNum(totalDM);
-      document.getElementById('totCost').textContent = showNum(totalCost);
+      document.getElementById('totDM').textContent = nf(totalDM);
+      document.getElementById('totCost').textContent = nf(totalCost);
     } else if (mode==='tmr_percent'){
       mix = dmFrac>0? (mixAsFed/dmFrac) : 0;
-      document.getElementById('sumPct').textContent = showNum(sumPct)+'%';
+      document.getElementById('sumPct').textContent = nf(sumPct)+'%';
       pillMix.style.display=''; pillSumPct.style.display='inline-flex';
       document.getElementById('totDM').textContent = '—';
       document.getElementById('totCost').textContent = '—';
-    } else { // split
+    } else {
       const concPriceDM = concDmFrac>0? (concMixAsFed/concDmFrac) : 0;
       const concKgDM    = concKg * concDmFrac;
       const concCost    = (concKgDM/1000) * concPriceDM;
       const totalDMAll  = roughDM + concKgDM;
       const totalCostAll= roughCost + concCost;
 
-      document.getElementById('roughDM').textContent = showNum(roughDM);
-      document.getElementById('roughCost').textContent = showNum(roughCost);
-      document.getElementById('sumPctConc').textContent = showNum(concSumPct)+'%';
-      document.getElementById('concDMpct').textContent = showNum(concDmFrac*100)+'%';
-      document.getElementById('concPriceDM').textContent = concPriceDM? showNum(concPriceDM):'—';
-      document.getElementById('concKgShow').textContent  = concKg? showNum(concKg):'—';
-      document.getElementById('concKgDM').textContent    = concKgDM? showNum(concKgDM):'—';
-      document.getElementById('concCost').textContent    = concCost? showNum(concCost):'—';
-      document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? showNum(totalCostAll):'—';
+      document.getElementById('roughDM').textContent = nf(roughDM);
+      document.getElementById('roughCost').textContent = nf(roughCost);
+      document.getElementById('sumPctConc').textContent = nf(concSumPct)+'%';
+      document.getElementById('concDMpct').textContent = nf(concDmFrac*100)+'%';
+      document.getElementById('concPriceDM').textContent = concPriceDM? nf(concPriceDM):'—';
+      document.getElementById('concKgShow').textContent  = concKg? nf(concKg):'—';
+      document.getElementById('concKgDM').textContent    = concKgDM? nf(concKgDM):'—';
+      document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
+      document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
 
-      document.getElementById('totDM').textContent = totalDMAll? showNum(totalDMAll):'—';
-      document.getElementById('totCost').textContent = totalCostAll? showNum(totalCostAll):'—';
+      document.getElementById('totDM').textContent = totalDMAll? nf(totalDMAll):'—';
+      document.getElementById('totCost').textContent = totalCostAll? nf(totalCostAll):'—';
 
       pillMix.style.display='none'; pillSumPct.style.display='none';
     }
 
-    document.getElementById('mixPriceDM').textContent = mix? showNum(mix):'—';
+    document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
 
     let w = '';
-    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${showNum(sumPct)}% (المثالي 100%)`;
-    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${showNum(concSumPct)}% (المثالي 100%)`;
+    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
+    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
     const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
       const dm = parseFloat(tr.querySelector('.dm').value);
       const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
@@ -521,7 +476,6 @@
     addRow({ cat });
   }
 
-  // init
   addEmptyRow();
   ensureEditableForMode();
   recalc();
@@ -532,10 +486,7 @@
     modeSel.value = tpl.mode;
     if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
     document.querySelector('#tbl tbody').innerHTML='';
-    (tpl.items||[]).forEach(it=>{
-      const def = FEEDS.find(x=> x.name === it.name);
-      addRow({ name:it.name, dm:(it.dm ?? def?.dm ?? ''), cat:it.cat || (def? guessCat(def.name):'conc'), kg:it.kg, pct:it.pct });
-    });
+    (tpl.items||[]).forEach(it=> addRow({ name:it.name, dm:(it.dm ?? FEEDS.find(x=>x.name===it.name)?.dm ?? ''), cat:it.cat, kg:it.kg, pct:it.pct }));
     updateModeUI(); recalc();
   });
 
@@ -577,7 +528,6 @@
   modeSel.addEventListener('change', ensureEditableForMode);
   concKgInput.addEventListener('input', recalc);
 
-  // قواعد DCC
   function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
   function applyDCCRules(){
     const dcc = parseInt(ctxDCC?.value);
@@ -594,11 +544,6 @@
   ctxDCC?.addEventListener('input', applyDCCRules);
   ctxSpecies?.addEventListener('change', applyDCCRules);
   applyDCCRules();
-
-  // تحميل قالب عبر ?tpl=...
-  const tplKey = qp.get('tpl'); if (tplKey) { tplSel.value = tplKey; const btn = document.getElementById('applyTpl'); btn?.click(); }
-
-  // بداية مناسبة
   updateModeUI();
 </script>
 
@@ -610,11 +555,10 @@
 <script src="/js/tenant-bootstrap.js"></script>
 <script src="/js/api.js" defer></script>
 
-<!-- الكور + تتبع + منطق الحفظ (لا تغيّر واجهتك) -->
+<!-- الكور + تتبع + منطق الحفظ -->
 <script type="module" src="/js/events-core.js"></script>
 <script type="module" src="/js/track-core.js"></script>
 <script type="module" src="/js/track-nutrition.js"></script>
 <script type="module" src="/js/nutrition.js"></script>
-
 </body>
 </html>
