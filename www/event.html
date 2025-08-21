@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>قالب الأحداث – مربيك</title>
+
+  <!-- تتبع موحّد -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="js/app-core.js"></script>
+  <script type="module" src="js/timeline.js"></script>
+  <script type="module" src="js/smart-checks.js"></script>
+  <script src="js/tenant-bootstrap.js"></script>
+  <script src="js/api.js"></script>
+
+  <!-- فايربيز -->
+  <script type="module" src="js/firebase-config.js"></script>
+
+  <!-- التنبيهات الذكية -->
+  <script src="js/smart-alerts.js"></script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; background:#f9f9f9; margin:0; }
+    .hidden-template { display:none; }
+  </style>
+</head>
+<body>
+  <div class="hidden-template">
+    <!-- هذه الصفحة Template فقط – لا تُعرَض للمربي -->
+    <h3>قالب الأحداث الذكي – مربيك</h3>
+  </div>
+
+  <script>
+    // تسجيل Page View (مرة واحدة فقط)
+    t.event('page_view', { page: location.pathname });
+
+    // تمرير السياق (animalId, date) لأي صفحة ابن
+    function buildTargetUrl(base) {
+      const params = new URLSearchParams();
+      const animalId = localStorage.getItem("lastAnimalId") || "";
+      const date = localStorage.getItem("lastEventDate") || "";
+      if (animalId) params.set("animalId", animalId);
+      if (date) params.set("date", date);
+      return base + "?" + params.toString();
+    }
+
+    // مثال استخدام: redirect لصفحة تلقيح
+    // location.href = buildTargetUrl("insemination.html");
+
+    // مثال على تشغيل smart-checks + تنبيه
+    function saveEvent(eventData) {
+      const check = smart?.validate(eventData);
+      if (check?.severity === "critical") {
+        smartAlerts.show(check.message, { type:"error", block:true });
+        return;
+      }
+      api.post("/api/events", eventData).then(res => {
+        if(res.ok) {
+          t.event("event_save", {eventType: eventData.eventType});
+          smartAlerts.show("✅ تم الحفظ بنجاح", { type:"success" });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
