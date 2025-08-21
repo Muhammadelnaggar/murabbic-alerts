@@ -366,12 +366,31 @@
   <script src="js/smart-alerts.js?v=2"></script>
   <!-- (1) تتبّع أساسي -->
 <script>
-  window.dataLayer = window.dataLayer || [];
-  window.t = window.t || { event: (name, props) => {
-    try { dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
-  }};
-  t.event('page_view', { page: location.pathname });
+  (function () {
+    window.dataLayer = window.dataLayer || [];
+    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
+    window.__sentEvents = window.__sentEvents || new Set();
+
+    window.t = window.t || {
+      event: function (name, props) {
+        try {
+          props = props || {};
+          // منع تكرار page_view لنفس المسار
+          if (name === 'page_view') {
+            var key = 'pv:' + (props.page || location.pathname);
+            if (window.__sentEvents.has(key)) return;
+            window.__sentEvents.add(key);
+          }
+          dataLayer.push({ event: name, ts: Date.now(), ...props });
+        } catch (e) {}
+      }
+    };
+
+    // أطلق page_view مرة واحدة فقط
+    t.event('page_view', { page: location.pathname });
+  })();
 </script>
+
 <script src="/js/app-core.js" defer></script>
 <script type="module" src="/js/timeline.js"></script>
 <script type="module" src="/js/smart-checks.js"></script>
@@ -387,6 +406,7 @@
 
 </body>
 </html>
+
 
 
 
