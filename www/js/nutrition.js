@@ -1,61 +1,132 @@
-// /js/nutrition.js
-import { initEventPage, Q } from '/js/events-core.js';
-import { track } from '/js/track-core.js';
+// حفظ حدث التغذية إلى /api/events + Fallback Firestore — بدون أي تغيير بصري
+import { onNutritionSave } from '/js/track-nutrition.js';
 
-// رسالة مدمجة داخل الصفحة (تستخدم #inlineMsg الموجود في HTML)
-function showInlineNotice(message){
-  const box = document.getElementById('inlineMsg');
-  const text = box?.querySelector('.text');
-  const yes  = box?.querySelector('#msgYes');
-  const no   = box?.querySelector('#msgNo');
-  if (!box || !text || !yes || !no) return Promise.resolve(false);
+function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function qp(){ return new URLSearchParams(location.search); }
 
-  text.textContent = message;
-  box.style.display = 'block';
-
-  return new Promise(resolve=>{
-    const onYes = ()=>{ cleanup(); resolve(true); };
-    const onNo  = ()=>{ cleanup(); resolve(false); };
-    yes.addEventListener('click', onYes, { once:true });
-    no .addEventListener('click', onNo , { once:true });
-    function cleanup(){ box.style.display='none'; }
-  });
+function deriveCtx(){
+  const p = qp();
+  const animalId = p.get('animalId') || p.get('number') || p.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
+  let eventDate  = p.get('eventDate') || p.get('date') || p.get('dt') || p.get('Date') || localStorage.getItem('eventDate') || localStorage.getItem('lastEventDate') || todayLocal();
+  try{
+    if(animalId){ localStorage.setItem('currentAnimalId', animalId); localStorage.setItem('lastAnimalId', animalId); }
+    if(eventDate){ localStorage.setItem('eventDate', eventDate); localStorage.setItem('lastEventDate', eventDate); }
+  }catch{}
+  return { animalId, eventDate };
 }
 
-initEventPage({
-  eventType: 'تغذية',
-  formSelector: 'form[data-event="nutrition"], #nutritionForm, form',
-  dateSel: ['#eventDate','[name="eventDate"]'],
-  onPrefill: (ctx) => track('nutrition_prefill', { animalId: ctx.animalId, date: ctx.eventDate, source: location.pathname.slice(1) }),
+function collectRows(){
+  const rows = [];
+  document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
+    const get = sel => (tr.querySelector(sel)?.value ?? '').toString().trim();
+    const name = get('.name'); if (!name) return;
+    rows.push({
+      name,
+      cat : (tr.querySelector('.cat')?.value)||'conc',
+      dm  : parseFloat(get('.dm'))||0,
+      price: parseFloat(get('.pTon'))||0,
+      kg  : parseFloat(get('.kg'))||0,
+      pct : parseFloat(get('.pct'))||0,
+    });
+  });
+  return rows;
+}
 
-  buildDetails: () => ({
-    mode: (document.getElementById('mode')?.value || 'TMR').toUpperCase(),
-    rationName: document.getElementById('rationName')?.value?.trim()
-                || document.querySelector('[name="dietName"]')?.value?.trim()
-                || undefined,
-    dmiKg: parseFloat(document.getElementById('dmi')?.value
-           || document.getElementById('dmiKg')?.value || '') || undefined,
-    milkKgPerDay: parseFloat(document.getElementById('milkKg')?.value
-                 || document.getElementById('milkKgPerDay')?.value || '') || undefined,
-    milkPricePerKg: parseFloat(document.getElementById('milkPrice')?.value
-                  || document.getElementById('milkPricePerKg')?.value || '') || undefined,
-    feedCostPerHeadPerDay: parseFloat(document.getElementById('feedCost')?.value
-                           || document.getElementById('feedCostPerHead')?.value || '') || undefined,
-    costPerKgMilk: parseFloat(document.getElementById('costPerKgMilk')?.value || '') || undefined,
-    asFedPct: document.getElementById('asFedPct')?.value || undefined,
-    foragePct: document.getElementById('foragePct')?.value || undefined,
-    concentratePct: document.getElementById('concentratePct')?.value || undefined,
-    notes: document.getElementById('notes')?.value?.trim()
-           || document.querySelector('[name="notes"]')?.value?.trim() || undefined,
-  }),
+function readKPIs(){
+  const txt = id => (document.getElementById(id)?.textContent||'').trim();
+  return {
+    mode: document.getElementById('mode')?.value || 'tmr_asfed',
+    mixPriceDM: txt('mixPriceDM'),
+    totDM: txt('totDM'),
+    totCost: txt('totCost'),
+    split: {
+      roughDM : txt('roughDM'),
+      roughCost: txt('roughCost'),
+      concDMpct: txt('concDMpct'),
+      concPriceDM: txt('concPriceDM'),
+      concKgAf: document.getElementById('concKgInput')?.value || '',
+      concKgDM: txt('concKgDM'),
+      concCost: txt('concCost'),
+      totalCostAll: txt('totalCostAll'),
+    }
+  };
+}
 
-  // لا تحويل تلقائي — هنقرر حسب اختيارك
-  redirectTo: false,
+function readContext(){
+  const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
+  const getSel = id => document.getElementById(id)?.value || null;
+  const species = getSel('ctxSpecies');
+  const dcc = getNum('ctxDCC');
+  const gest = (species==='جاموس') ? 310 : 280;
+  const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
 
-  onSaved: async ({ payload, mode }) => {
-    try { track('nutrition_save', { animalId: payload.animalId, date: payload.eventDate, mode, source: payload.source, modeName: payload?.details?.mode }); } catch(e){}
-    const again = await showInlineNotice(`✅ تم حفظ تركيبة التغذية للحيوان ${payload.animalId}`);
-    if (!again) location.href = 'dashboard.html';
-    else window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-});
+  return {
+    group: qp().get('group') || null,
+    species,
+    daysInMilk: getNum('ctxDIM'),
+    avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
+    earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
+    closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
+    pregnancyStatus: getSel('ctxPreg'),
+    pregnancyDays: dcc,
+    daysToCalving
+  };
+}
+
+async function postAPI(payload){
+  const API_BASE = (localStorage.getItem('API_BASE') || '').replace(/\/$/, '');
+  const url = (API_BASE ? API_BASE : '') + '/api/events';
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if (!r.ok) throw new Error('API failed: '+r.status);
+  return r.json().catch(()=>({}));
+}
+
+async function saveFirestore(payload){
+  const cfgMod = await import('/js/firebase-config.js');
+  const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig || cfgMod.config;
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
+  const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
+}
+
+function redirectSmart(){
+  const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
+  setTimeout(()=>{ location.href = to; }, 250);
+}
+
+async function saveEvent(e){
+  e?.preventDefault?.();
+  const { animalId, eventDate } = deriveCtx();
+  if (!animalId || !eventDate){ alert('⚠️ يرجى التأكد من رقم الحيوان والتاريخ.'); return; }
+
+  const rows = collectRows();
+  const payload = {
+    type: 'تغذية',
+    eventType: 'تغذية',
+    userId: localStorage.getItem('userId'),
+    tenantId: localStorage.getItem('tenantId') || 'default',
+    animalId, animalNumber: animalId,
+    eventDate,
+    nutritionMode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+    nutritionRows: rows,
+    nutritionKPIs: readKPIs(),
+    nutritionContext: readContext(),
+    source: 'nutrition.html'
+  };
+
+  let modeSaved = 'api';
+  try{ await postAPI(payload); }
+  catch(err){ console.warn('API error; fallback to Firestore', err); await saveFirestore(payload); modeSaved = 'firestore'; }
+
+  try{ onNutritionSave({ animalId, date: eventDate, rows: rows.length, mode: modeSaved, source: 'nutrition.html' }); }catch(e){}
+  redirectSmart();
+}
+
+(function bind(){
+  const form = document.getElementById('nutritionForm') || document.querySelector('form[data-event="nutrition"]');
+  if (form) form.addEventListener('submit', saveEvent);
+  const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
+  if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
+})();
