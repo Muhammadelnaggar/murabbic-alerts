@@ -1,132 +1,589 @@
-// حفظ حدث التغذية إلى /api/events + Fallback Firestore — بدون أي تغيير بصري
-import { onNutritionSave } from '/js/track-nutrition.js';
+<!-- nutrition.html (نسخة ثابتة: تصميم + حسابات كما هي، وتتبع منضبط، وحفظ خارجي) -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل تركيبة التغذية</title>
 
-function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-function qp(){ return new URLSearchParams(location.search); }
+  <!-- تتبّع واحد آمن في <head> (يمنع تكرار page_view) -->
+  <script>
+    (function(){
+      window.dataLayer = window.dataLayer || [];
+      const fired = new Set();
+      function push(name, props){ try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} }
+      window.t = window.t || {};
+      window.t.event = function(name, props){
+        if(name==='page_view'){
+          const key = (props && props.page) || location.pathname;
+          if(fired.has(key)) return;
+          fired.add(key);
+          setTimeout(()=>fired.delete(key), 2000);
+        }
+        push(name, props);
+      };
+      t.event('page_view', { page: location.pathname });
+    })();
+  </script>
 
-function deriveCtx(){
-  const p = qp();
-  const animalId = p.get('animalId') || p.get('number') || p.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
-  let eventDate  = p.get('eventDate') || p.get('date') || p.get('dt') || p.get('Date') || localStorage.getItem('eventDate') || localStorage.getItem('lastEventDate') || todayLocal();
-  try{
-    if(animalId){ localStorage.setItem('currentAnimalId', animalId); localStorage.setItem('lastAnimalId', animalId); }
-    if(eventDate){ localStorage.setItem('eventDate', eventDate); localStorage.setItem('lastEventDate', eventDate); }
-  }catch{}
-  return { animalId, eventDate };
-}
-
-function collectRows(){
-  const rows = [];
-  document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-    const get = sel => (tr.querySelector(sel)?.value ?? '').toString().trim();
-    const name = get('.name'); if (!name) return;
-    rows.push({
-      name,
-      cat : (tr.querySelector('.cat')?.value)||'conc',
-      dm  : parseFloat(get('.dm'))||0,
-      price: parseFloat(get('.pTon'))||0,
-      kg  : parseFloat(get('.kg'))||0,
-      pct : parseFloat(get('.pct'))||0,
-    });
-  });
-  return rows;
-}
-
-function readKPIs(){
-  const txt = id => (document.getElementById(id)?.textContent||'').trim();
-  return {
-    mode: document.getElementById('mode')?.value || 'tmr_asfed',
-    mixPriceDM: txt('mixPriceDM'),
-    totDM: txt('totDM'),
-    totCost: txt('totCost'),
-    split: {
-      roughDM : txt('roughDM'),
-      roughCost: txt('roughCost'),
-      concDMpct: txt('concDMpct'),
-      concPriceDM: txt('concPriceDM'),
-      concKgAf: document.getElementById('concKgInput')?.value || '',
-      concKgDM: txt('concKgDM'),
-      concCost: txt('concCost'),
-      totalCostAll: txt('totalCostAll'),
+  <style>
+    :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32;--muted:#5f6f64}
+    *{box-sizing:border-box}
+    body{direction:rtl;background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;color:#1b5e20;padding:12px}
+    h1{margin:0 0 8px;text-align:center;color:var(--green);font-size:22px}
+    .wrap{max-width:1080px;margin:0 auto}
+    .info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;color:#1b5e20;font-size:13px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .row>.grow{flex:1}
+    select,input,button{font-size:14px}
+    input,select{padding:10px;border:1px solid #ccc;border-radius:10px}
+    input,select,button{min-height:44px}
+    button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
+    .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
+    .btn-primary{background:var(--green);color:#fff}
+    .warning{color:#c62828;text-align:center;min-height:22px;margin-top:6px}
+    .table-wrap{width:100%;overflow-x:auto}
+    table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1020px}
+    th,td{border:1px solid #e0ebd3;padding:8px;text-align:center}
+    th{background:#eafbe7;color:#1b5e20}
+    tbody tr:nth-child(odd){background:#fcfff5}
+    .total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
+    .total .pill{background:#fff}
+    @media (max-width: 640px){
+      .row.stack > *{flex:1 1 100%}
+      table, thead, tbody, th, td, tr{display:block;min-width:unset}
+      thead{display:none}
+      tbody tr{margin:0 0 12px 0;border:1px solid #e0ebd3;border-radius:12px;background:#fff}
+      tbody tr > td{display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid #eef3e4;padding:10px 12px}
+      tbody tr > td:last-child{border-bottom:0}
+      td::before{content:attr(data-label);font-weight:bold;color:#2e7d32;flex:0 0 48%}
+      td > input, td > select{width:48%}
     }
-  };
-}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📄 تسجيل تركيبة التغذية</h1>
 
-function readContext(){
-  const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
-  const getSel = id => document.getElementById(id)?.value || null;
-  const species = getSel('ctxSpecies');
-  const dcc = getNum('ctxDCC');
-  const gest = (species==='جاموس') ? 310 : 280;
-  const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
+  <div class="info">
+    <span class="pill">🐄 الحيوان/المجموعة: <b id="animalInfo">—</b></span>
+    <span class="pill">📅 التاريخ: <b id="dateInfo">—</b></span>
+  </div>
+  <div class="info">
+    <span class="pill">🕒 أيام الحليب: <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
+    <span class="pill">🐃 النوع:
+      <select id="ctxSpecies"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
+    </span>
+    <span class="pill">🥛 متوسط إنتاج/رأس: <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="width:90px"></span>
+    <span class="pill">🧭 أيام الحمل (DCC): <input id="ctxDCC" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
+    <span class="pill">🍼 متبقي للولادة (يوم): <b id="dtcVal">—</b></span>
+    <span class="pill"><label><input id="ctxEarlyDry" type="checkbox"> جاف مبكّر</label></span>
+    <span class="pill"><label><input id="ctxCloseUp" type="checkbox"> تحضير ولادة</label></span>
+    <span class="pill">🤰 حالة الحمل:
+      <select id="ctxPreg"><option value="">—</option><option value="عشار">عشار</option><option value="فارغة">فارغة</option></select>
+    </span>
+  </div>
+  <div class="warning" id="warn"></div>
 
-  return {
-    group: qp().get('group') || null,
-    species,
-    daysInMilk: getNum('ctxDIM'),
-    avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
-    earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
-    closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
-    pregnancyStatus: getSel('ctxPreg'),
-    pregnancyDays: dcc,
-    daysToCalving
-  };
-}
+  <div class="card">
+    <div class="row stack">
+      <div class="grow">
+        <label class="muted">طريقة الإدخال</label>
+        <select id="mode" style="width:100%">
+          <option value="tmr_asfed" selected>خلطة كاملة TMR — as-fed/رأس</option>
+          <option value="tmr_percent">خلطة كاملة TMR — نسب as-fed للطن</option>
+          <option value="split">مركزات وخشن — منفصل</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label class="muted">إضافة خامة جاهزة</label>
+        <select id="preset" style="width:100%">
+          <option value="">— اختر —</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label class="muted">بحث سريع</label>
+        <input id="feedSearch" list="feedlist" placeholder="اكتب للبحث عن خامة" style="width:100%">
+      </div>
+      <div class="grow">
+        <label class="muted">نموذج تركيبة</label>
+        <select id="tpl" style="width:100%">
+          <option value="">— اختر نموذج —</option>
+        </select>
+      </div>
+      <button id="applyTpl" class="btn">تحميل النموذج</button>
+      <button id="addPreset" class="btn">إضافة</button>
+      <button id="addBySearch" class="btn">إضافة بالبحث</button>
+      <button id="clearAll" class="btn">مسح</button>
+    </div>
 
-async function postAPI(payload){
-  const API_BASE = (localStorage.getItem('API_BASE') || '').replace(/\/$/, '');
-  const url = (API_BASE ? API_BASE : '') + '/api/events';
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  if (!r.ok) throw new Error('API failed: '+r.status);
-  return r.json().catch(()=>({}));
-}
+    <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
+      <div class="grow">
+        <label class="muted">كمية المركز as-fed كجم/رأس/يوم</label>
+        <input id="concKgInput" type="number" inputmode="decimal" step="0.01" placeholder="مثال: 6.0" style="width:160px">
+      </div>
+      <div class="grow">
+        <label class="muted">ملاحظة</label>
+        <div class="pill">صفوف الفئة = خشن تُكتب بالكجم/رأس. صفوف الفئة = مركز تُكتب نسب as-fed للطن.</div>
+      </div>
+    </div>
 
-async function saveFirestore(payload){
-  const cfgMod = await import('/js/firebase-config.js');
-  const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig || cfgMod.config;
-  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
-  const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
-}
+    <div class="table-wrap">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th data-col="name">الخامة</th>
+            <th data-col="cat">الفئة</th>
+            <th data-col="dm">% DM</th>
+            <th data-col="pTon">سعر الطن (as-fed)</th>
+            <th data-col="pTonDM">سعر/طن DM</th>
+            <th data-col="pct">نسبة as-fed %</th>
+            <th data-col="kg">كجم as-fed/رأس</th>
+            <th data-col="kgDM">كجم DM/رأس</th>
+            <th data-col="cost">تكلفة/رأس/يوم</th>
+            <th data-col="rm">حذف</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-function redirectSmart(){
-  const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
-  setTimeout(()=>{ location.href = to; }, 250);
-}
+    <div class="total" id="totalsBase">
+      <span class="pill" id="pillSumPct" style="display:none">مجموع النِّسب: <b id="sumPct">0%</b></span>
+      <span class="pill">إجمالي كجم DM/رأس: <b id="totDM">0</b></span>
+      <span class="pill">تكلفة/رأس/يوم: <b id="totCost">0</b></span>
+      <span class="pill" id="pillMix">سعر طن TMR (DM): <b id="mixPriceDM">—</b></span>
+    </div>
 
-async function saveEvent(e){
-  e?.preventDefault?.();
-  const { animalId, eventDate } = deriveCtx();
-  if (!animalId || !eventDate){ alert('⚠️ يرجى التأكد من رقم الحيوان والتاريخ.'); return; }
+    <div class="total" id="totalsSplit" style="display:none">
+      <span class="pill">خشن — كجم DM/رأس: <b id="roughDM">—</b></span>
+      <span class="pill">خشن — تكلفة/رأس: <b id="roughCost">—</b></span>
+      <span class="pill">مركز — مجموع النِّسب: <b id="sumPctConc">—%</b></span>
+      <span class="pill">مركز — %DM للخلطة: <b id="concDMpct">—%</b></span>
+      <span class="pill">مركز — سعر طن (DM): <b id="concPriceDM">—</b></span>
+      <span class="pill">مركز — as-fed/رأس: <b id="concKgShow">—</b></span>
+      <span class="pill">مركز — كجم DM/رأس: <b id="concKgDM">—</b></span>
+      <span class="pill">مركز — تكلفة/رأس: <b id="concCost">—</b></span>
+      <span class="pill">الإجمالي — تكلفة/رأس: <b id="totalCostAll">—</b></span>
+    </div>
+  </div>
 
-  const rows = collectRows();
-  const payload = {
-    type: 'تغذية',
-    eventType: 'تغذية',
-    userId: localStorage.getItem('userId'),
-    tenantId: localStorage.getItem('tenantId') || 'default',
-    animalId, animalNumber: animalId,
-    eventDate,
-    nutritionMode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-    nutritionRows: rows,
-    nutritionKPIs: readKPIs(),
-    nutritionContext: readContext(),
-    source: 'nutrition.html'
-  };
+  <div class="card">
+    <div class="row stack">
+      <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
+        <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
+      </form>
+    </div>
+    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
+      <div class="text" style="font-weight:bold"></div>
+      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1">تسجيل أحداث أخرى</button>
+        <button type="button" class="btn" id="msgNo" style="flex:1">لوحة التحكم</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-  let modeSaved = 'api';
-  try{ await postAPI(payload); }
-  catch(err){ console.warn('API error; fallback to Firestore', err); await saveFirestore(payload); modeSaved = 'firestore'; }
+<!-- ===== منطق الحسابات والـUI فقط (لا حفظ ولا تتبّع هنا) ===== -->
+<script type="module">
+  const warn = document.getElementById('warn');
+  const modeSel = document.getElementById('mode');
+  const ctxDIM = document.getElementById('ctxDIM');
+  const ctxSpecies = document.getElementById('ctxSpecies');
+  const ctxAvgMilk = document.getElementById('ctxAvgMilk');
+  const ctxDCC = document.getElementById('ctxDCC');
+  const dtcVal = document.getElementById('dtcVal');
+  const ctxEarlyDry = document.getElementById('ctxEarlyDry');
+  const ctxCloseUp = document.getElementById('ctxCloseUp');
+  const ctxPreg = document.getElementById('ctxPreg');
 
-  try{ onNutritionSave({ animalId, date: eventDate, rows: rows.length, mode: modeSaved, source: 'nutrition.html' }); }catch(e){}
-  redirectSmart();
-}
+  const presetSel = document.getElementById('preset');
+  const addPresetBtn = document.getElementById('addPreset');
+  const clearBtn = document.getElementById('clearAll');
+  const feedSearch = document.getElementById('feedSearch');
+  const addBySearchBtn = document.getElementById('addBySearch');
+  const tplSel = document.getElementById('tpl');
+  const applyTplBtn = document.getElementById('applyTpl');
+  const tbody = document.querySelector('#tbl tbody');
+  const splitBox = document.getElementById('splitBox');
+  const concKgInput = document.getElementById('concKgInput');
 
-(function bind(){
-  const form = document.getElementById('nutritionForm') || document.querySelector('form[data-event="nutrition"]');
-  if (form) form.addEventListener('submit', saveEvent);
-  const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
-  if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
-})();
+  function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+  const qp = new URLSearchParams(location.search);
+  const animalId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
+  const groupName = qp.get('group') || '';
+  const eventDate= qp.get('date') || todayLocal();
+
+  document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
+  try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
+
+  // تعبئة سياق من الرابط
+  ctxDIM.value      = qp.get('dim') || '';
+  ctxSpecies.value  = qp.get('species') || '';
+  ctxAvgMilk.value  = qp.get('avgMilk') || '';
+  ctxDCC.value      = qp.get('dcc') || '';
+  ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
+  if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
+  if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
+
+  // قائمة الخامات (كاملة)
+  const FEEDS = [
+    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
+    { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
+    { name:'ردة أرز', dm:90 }, { name:'ذرة رفيعة (سورجم)', dm:88 },
+    { name:'شوفان', dm:90 }, { name:'فول بلدي (فابا)', dm:88 },
+    { name:'بازلاء علفية', dm:88 }, { name:'DDGS (ذرة)', dm:90 },
+    { name:'جلوتين فيد (CGF)', dm:90 }, { name:'جلوتين ميل (CGM)', dm:90 },
+    { name:'قشور فول صويا (Soy Hulls)', dm:90 }, { name:'لب بنجر مجفف', dm:90 },
+    { name:'لب بنجر مبلل', dm:25 }, { name:'لب حمضيات مجفف', dm:90 },
+    { name:'مولاس', dm:75 }, { name:'كسب فول صويا 44%', dm:89 },
+    { name:'كسب فول صويا 48%', dm:89 }, { name:'كسب عباد الشمس', dm:89 },
+    { name:'كسب كانولا', dm:90 }, { name:'كسب قطن', dm:92 },
+    { name:'كسب نخيل', dm:90 }, { name:'كسب فول سوداني', dm:90 },
+    { name:'كسب سمسم', dm:90 }, { name:'كسب كتان', dm:90 },
+    { name:'بذرة قطن كاملة', dm:92 }, { name:'قشور بذرة قطن (Hulls)', dm:90 },
+    { name:'سيلاج ذرة', dm:33 }, { name:'سيلاج سورجم', dm:30 },
+    { name:'برسيم أخضر', dm:18 }, { name:'دريس برسيم', dm:90 },
+    { name:'دريس حشيشة/نجيل', dm:90 }, { name:'تبن قمح', dm:90 },
+    { name:'قش أرز', dm:90 }, { name:'دهون محمية', dm:99 },
+    { name:'زيت نباتي علفي', dm:99 }, { name:'يوريا علفية', dm:100 },
+    { name:'حجر جيري (كالسيوم)', dm:100 }, { name:'فوسفات ثنائي الكالسيوم (DCP)', dm:100 },
+    { name:'ملح طعام', dm:100 }, { name:'بيكربونات صوديوم', dm:100 },
+    { name:'أكسيد ماغنسيوم', dm:100 }, { name:'بنتونيت', dm:100 },
+    { name:'خميرة حية/مستنبت خمائري', dm:95 }, { name:'مخلوط معادن/فيتامينات', dm:95 },
+  ];
+  FEEDS.forEach((f,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o); });
+
+  const TEMPLATES = [
+    { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
+      { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
+      { name:'دريس برسيم', cat:'rough', dm:90, kg:1.5 },
+      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:6 },
+      { name:'كسب فول صويا 48%', cat:'conc', dm:89, kg:2.5 },
+      { name:'مولاس', cat:'conc', dm:75, kg:0.5 },
+      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, kg:0.15 },
+      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, kg:0.10 },
+      { name:'ملح طعام', cat:'conc', dm:100, kg:0.05 },
+      { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
+      { name:'دهون محمية', cat:'conc', dm:99, kg:0.30 },
+    ]},
+    { key: 'tmr_percent_mid_cow', name: 'TMR نسب as-fed — حلابة متوسطة (بقر)', mode: 'tmr_percent', items: [
+      { name:'سيلاج ذرة', cat:'rough', dm:33, pct:40 },
+      { name:'دريس برسيم', cat:'rough', dm:90, pct:5 },
+      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:23 },
+      { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:10 },
+      { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:12 },
+      { name:'مولاس', cat:'conc', dm:75, pct:3 },
+      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
+      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
+      { name:'ملح طعام', cat:'conc', dm:100, pct:1 },
+      { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:2 },
+    ]},
+    { key: 'split_conc6', name: 'منفصل — مركز 6 كجم + خشن as-fed', mode: 'split', concKg: 6, items: [
+      { name:'سيلاج ذرة', cat:'rough', dm:33, kg:20 },
+      { name:'دريس برسيم', cat:'rough', dm:90, kg:1 },
+      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:45 },
+      { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:15 },
+      { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:20 },
+      { name:'جلوتين فيد (CGF)', cat:'conc', dm:90, pct:5 },
+      { name:'مولاس', cat:'conc', dm:75, pct:5 },
+      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
+      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
+      { name:'ملح طعام', cat:'conc', dm:100, pct:2 },
+      { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:4 },
+    ]},
+  ];
+  TEMPLATES.forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.name; tplSel.appendChild(o); });
+
+  const dl = document.createElement('datalist'); dl.id = 'feedlist';
+  FEEDS.forEach(f => { const o = document.createElement('option'); o.value = f.name; dl.appendChild(o); });
+  document.body.appendChild(dl);
+
+  const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
+  function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
+
+  function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
+
+  function addRow(feed={}){
+    const tr = document.createElement('tr');
+    const catVal = feed?.cat || guessCat(feed?.name);
+    tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
+    tr.appendChild(td('الفئة', `<select class="cat"><option value="rough" ${catVal==='rough'?'selected':''}>خشن</option><option value="conc" ${catVal==='conc'?'selected':''}>مركز</option></select>`, 'cat'));
+    tr.appendChild(td('% DM', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="%" style="width:100px">`, 'dm'));
+    tr.appendChild(td('سعر الطن (as-fed)', `<input class="pTon" type="number" inputmode="decimal" step="0.01" value="${feed?.price||''}" placeholder="جنيه/طن" style="width:140px">`, 'pTon'));
+    tr.appendChild(td('سعر/طن DM', `<span class="pTonDM">—</span>`, 'pTonDM'));
+    tr.appendChild(td('نسبة as-fed %', `<input class="pct" type="number" inputmode="decimal" step="0.01" value="${feed?.pct||''}" placeholder="%" style="width:100px">`, 'pct'));
+    tr.appendChild(td('كجم as-fed/رأس', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
+    tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
+    tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
+    tr.appendChild(td('حذف', `<button class="rm btn" aria-label="حذف السطر">×</button>`, 'rm'));
+    tbody.appendChild(tr);
+    hookRow(tr);
+  }
+
+  function nf(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
+
+  function setRowState(tr){
+    const mode = modeSel.value;
+    const cat  = (tr.querySelector('.cat')?.value)||'conc';
+    const kgEl  = tr.querySelector('.kg');
+    const pctEl = tr.querySelector('.pct');
+    if (mode!== 'split'){
+      kgEl.disabled = (mode==='tmr_percent');
+      pctEl.disabled= (mode==='tmr_asfed');
+    } else {
+      if (cat==='rough'){ kgEl.disabled=false; pctEl.disabled=true; }
+      else { kgEl.disabled=true; pctEl.disabled=false; }
+    }
+    kgEl.style.opacity  = kgEl.disabled? .5 : 1;
+    pctEl.style.opacity = pctEl.disabled? .5 : 1;
+  }
+
+  function isRowEmpty(tr){
+    if (!tr) return true;
+    const name = tr.querySelector('.name')?.value?.trim();
+    const kg   = tr.querySelector('.kg')?.value;
+    const pct  = tr.querySelector('.pct')?.value;
+    return (!name && !kg && !pct);
+  }
+  function focusEditable(tr){
+    const mode = modeSel.value;
+    const cat  = (tr.querySelector('.cat')?.value)||'conc';
+    const kgEl = tr.querySelector('.kg');
+    const pctEl= tr.querySelector('.pct');
+    setRowState(tr);
+    setTimeout(()=>{
+      if (mode==='tmr_asfed'){ kgEl?.focus(); kgEl?.select?.(); }
+      else if (mode==='tmr_percent'){ pctEl?.focus(); pctEl?.select?.(); }
+      else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
+    }, 0);
+  }
+  function ensureEditableForMode(){
+    let tr = tbody.querySelector('tr');
+    if (!tr){ addEmptyRow(); tr = tbody.querySelector('tr'); }
+    if (modeSel.value==='split' && tr){
+      const catEl = tr.querySelector('.cat');
+      if (catEl && catEl.value!=='rough' && isRowEmpty(tr)) catEl.value='rough';
+    }
+    focusEditable(tr);
+  }
+
+  function recalc(){
+    const mode = modeSel.value;
+    let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
+    let roughDM=0, roughCost=0;
+    let concMixAsFed=0, concDmFrac=0, concSumPct=0;
+    const concKg = parseFloat(concKgInput.value)||0;
+
+    tbody.querySelectorAll('tr').forEach(tr=>{
+      const dm = parseFloat(tr.querySelector('.dm').value)||0;
+      const p  = parseFloat(tr.querySelector('.pTon').value)||0;
+      const kg = parseFloat(tr.querySelector('.kg').value)||0;
+      const pc = parseFloat(tr.querySelector('.pct').value)||0;
+      const cat= (tr.querySelector('.cat')?.value)||'conc';
+      const pDM= dm>0? (p/(dm/100)) : 0;
+      tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
+
+      if (mode==='tmr_asfed'){
+        const kgDM = kg*(dm/100);
+        const cost = (kgDM/1000)*pDM;
+        tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+        tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+        totalDM+=kgDM; totalCost+=cost;
+      } else if (mode==='tmr_percent'){
+        tr.querySelector('.kgDM').textContent = '—';
+        tr.querySelector('.cost').textContent = '—';
+        if (pc>0){ mixAsFed+=(pc/100)*p; dmFrac+=(pc/100)*(dm/100); sumPct+=pc; }
+      } else {
+        if (cat==='rough'){
+          const kgDM = kg*(dm/100);
+          const cost = (kgDM/1000)*pDM;
+          tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+          tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+          roughDM+=kgDM; roughCost+=cost;
+        } else {
+          tr.querySelector('.kgDM').textContent = '—';
+          tr.querySelector('.cost').textContent = '—';
+          if (pc>0){ concMixAsFed+=(pc/100)*p; concDmFrac+=(pc/100)*(dm/100); concSumPct+=pc; }
+        }
+      }
+    });
+
+    const pillMix = document.getElementById('pillMix');
+    const pillSumPct = document.getElementById('pillSumPct');
+
+    if (mode==='tmr_asfed'){
+      if (totalDM>0){
+        let mixDM=0; document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
+          const dm=parseFloat(tr.querySelector('.dm').value)||0;
+          const p=parseFloat(tr.querySelector('.pTon').value)||0;
+          const kg=parseFloat(tr.querySelector('.kg').value)||0;
+          const pDM= dm>0? (p/(dm/100)) : 0;
+          const share=(kg*(dm/100))/totalDM; mixDM += share*pDM;
+        });
+        mix = mixDM;
+      }
+      pillMix.style.display=''; pillSumPct.style.display='none';
+      document.getElementById('totDM').textContent = nf(totalDM);
+      document.getElementById('totCost').textContent = nf(totalCost);
+    } else if (mode==='tmr_percent'){
+      mix = dmFrac>0? (mixAsFed/dmFrac) : 0;
+      document.getElementById('sumPct').textContent = nf(sumPct)+'%';
+      pillMix.style.display=''; pillSumPct.style.display='inline-flex';
+      document.getElementById('totDM').textContent = '—';
+      document.getElementById('totCost').textContent = '—';
+    } else {
+      const concPriceDM = concDmFrac>0? (concMixAsFed/concDmFrac) : 0;
+      const concKgDM    = concKg * concDmFrac;
+      const concCost    = (concKgDM/1000) * concPriceDM;
+      const totalDMAll  = roughDM + concKgDM;
+      const totalCostAll= roughCost + concCost;
+
+      document.getElementById('roughDM').textContent = nf(roughDM);
+      document.getElementById('roughCost').textContent = nf(roughCost);
+      document.getElementById('sumPctConc').textContent = nf(concSumPct)+'%';
+      document.getElementById('concDMpct').textContent = nf(concDmFrac*100)+'%';
+      document.getElementById('concPriceDM').textContent = concPriceDM? nf(concPriceDM):'—';
+      document.getElementById('concKgShow').textContent  = concKg? nf(concKg):'—';
+      document.getElementById('concKgDM').textContent    = concKgDM? nf(concKgDM):'—';
+      document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
+      document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
+
+      document.getElementById('totDM').textContent = totalDMAll? nf(totalDMAll):'—';
+      document.getElementById('totCost').textContent = totalCostAll? nf(totalCostAll):'—';
+
+      pillMix.style.display='none'; pillSumPct.style.display='none';
+    }
+
+    document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
+
+    let w = '';
+    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
+    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+    const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
+      const dm = parseFloat(tr.querySelector('.dm').value);
+      const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
+      return !dm && hasVal;
+    });
+    if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+    warn.textContent = w;
+  }
+
+  function hookRow(tr){
+    const nameEl = tr.querySelector('.name');
+    const dmEl   = tr.querySelector('.dm');
+    const pEl    = tr.querySelector('.pTon');
+    const kgEl   = tr.querySelector('.kg');
+    const pctEl  = tr.querySelector('.pct');
+    const catEl  = tr.querySelector('.cat');
+    tr.querySelector('.rm').onclick = ()=>{ tr.remove(); recalc(); };
+
+    nameEl.addEventListener('change', ()=>{
+      const f = FEEDS.find(x=>x.name===nameEl.value.trim());
+      if (f && !dmEl.value) dmEl.value = f.dm;
+      setRowState(tr); recalc(); ensureEditableForMode();
+    });
+    [dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setRowState(tr); recalc(); }));
+    setRowState(tr);
+  }
+
+  function addEmptyRow(){
+    const mode = modeSel.value;
+    const cat  = (mode==='split') ? 'rough' : 'conc';
+    addRow({ cat });
+  }
+
+  // init
+  addEmptyRow();
+  ensureEditableForMode();
+  recalc();
+
+  document.getElementById('applyTpl')?.addEventListener('click', ()=>{
+    const key = document.getElementById('tpl')?.value || '';
+    const tpl = TEMPLATES.find(t=> t.key===key); if(!tpl) return;
+    modeSel.value = tpl.mode;
+    if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
+    document.querySelector('#tbl tbody').innerHTML='';
+    (tpl.items||[]).forEach(it=>{
+      const def = FEEDS.find(x=> x.name === it.name);
+      const dm  = (it.dm ?? def?.dm ?? '');
+      addRow({ name:it.name, dm, cat:it.cat || (def?guessCat(def.name):'conc'), kg:it.kg, pct:it.pct });
+    });
+    updateModeUI(); recalc();
+  });
+
+  document.getElementById('addPreset')?.addEventListener('click', ()=>{
+    const idx = parseInt(presetSel.value); if (isNaN(idx)) return;
+    const f = FEEDS[idx]; addRow({ name:f.name, dm:f.dm, cat: guessCat(f.name) }); recalc();
+  });
+
+  document.getElementById('addBySearch')?.addEventListener('click', ()=>{
+    const q = (feedSearch?.value || '').trim(); if(!q) return;
+    const f = FEEDS.find(x=> x.name === q) || FEEDS.find(x=> x.name.includes(q)) || FEEDS.find(x=> x.name.toLowerCase().includes(q.toLowerCase()));
+    if (f){ addRow({ name:f.name, dm:f.dm, cat: guessCat(f.name) }); recalc(); feedSearch.value=''; }
+  });
+  feedSearch?.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); const btn=document.getElementById('addBySearch'); btn?.click(); } });
+
+  document.getElementById('clearAll')?.addEventListener('click', ()=>{
+    if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); }
+  });
+
+  function updateModeUI(){
+    const mode = modeSel.value;
+    splitBox.style.display = (mode==='split')? '' : 'none';
+    const showCols = new Set(
+      mode==='tmr_asfed'  ? ['name','cat','dm','pTon','pTonDM','kg','kgDM','cost','rm'] :
+      mode==='tmr_percent'? ['name','cat','dm','pTon','pTonDM','pct','rm'] :
+                            ['name','cat','dm','pTon','pTonDM','pct','kg','kgDM','cost','rm']
+    );
+    document.querySelectorAll('th').forEach(th=>{ const c=th.dataset.col; if(!c)return; th.style.display = showCols.has(c)? '':'none'; });
+    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
+      tr.querySelectorAll('td').forEach(td=>{ const c=td.dataset.col; if(!c)return; td.style.display = showCols.has(c)? '':'none'; });
+      setRowState(tr);
+    });
+    document.getElementById('totalsBase').style.display  = (mode!=='split')? '' : 'none';
+    document.getElementById('totalsSplit').style.display = (mode==='split')? '' : 'none';
+    recalc();
+  }
+
+  modeSel.addEventListener('change', updateModeUI);
+  modeSel.addEventListener('change', ensureEditableForMode);
+  concKgInput.addEventListener('input', recalc);
+
+  function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
+  function applyDCCRules(){
+    const dcc = parseInt(ctxDCC?.value);
+    const GL = getGestLen();
+    if (!isNaN(dcc)){
+      const dtc = GL - dcc;
+      if (dtcVal) dtcVal.textContent = isFinite(dtc)? String(dtc) : '—';
+      ctxEarlyDry.checked = (dcc >= (GL - 60));
+      ctxCloseUp.checked  = (dcc >= (GL - 21));
+    } else {
+      if (dtcVal) dtcVal.textContent = '—';
+    }
+  }
+  ctxDCC?.addEventListener('input', applyDCCRules);
+  ctxSpecies?.addEventListener('change', applyDCCRules);
+  applyDCCRules();
+
+  updateModeUI();
+</script>
+
+<!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
+<script src="/js/app-core.js" defer></script>
+<script type="module" src="/js/timeline.js"></script>
+<script type="module" src="/js/smart-checks.js"></script>
+<!-- الهوية قبل أي نداءات /api -->
+<script src="/js/tenant-bootstrap.js"></script>
+<script src="/js/api.js" defer></script>
+
+<!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
+<script type="module" src="/js/events-core.js"></script>
+<script type="module" src="/js/track-core.js"></script>
+<script type="module" src="/js/track-nutrition.js"></script>
+<script type="module" src="/js/nutrition.js"></script>
+</body>
+</html>
