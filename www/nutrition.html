@@ -4,6 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل تركيبة التغذية</title>
+  <script>
+/* Page tracker (de-duped) — ضع هذا أول سكربت داخل <head> */
+(function(){
+  const PATH = location.pathname;
+  window.dataLayer = window.dataLayer || [];
+  const sent = window.__sentEvents || (window.__sentEvents = new Set());
+
+  function push(name, props){ try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} }
+
+  // واجهة موحّدة + منع تكرار page_view لنفس الصفحة
+  window.t = window.t || {};
+  window.t.event = function(name, props){
+    if (name === 'page_view'){
+      const key = 'pv:' + (props && props.page ? props.page : PATH);
+      if (sent.has(key)) return;         // تجاهل المكرر
+      sent.add(key);
+      setTimeout(()=>sent.delete(key), 2000);  // نافذة قصيرة لمنع الدوبلكيت
+    }
+    push(name, props);
+  };
+
+  // أطلق page_view مرة واحدة فقط
+  t.event('page_view', { page: PATH });
+})();
+</script>
 
   <!-- تتبّع قياسي + منع تكرار page_view لنفس المسار -->
   <script>
