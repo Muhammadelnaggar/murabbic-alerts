@@ -29,15 +29,31 @@
 
   <!-- تتبع قياسي (لا يغيّر التصميم) -->
 <script>
-  window.dataLayer = window.dataLayer || [];
-  window.t = window.t || { event: (name, props) => {
-    try { dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
-  }};
-  if (!window.__pvDone) {
+  (function () {
+    window.dataLayer = window.dataLayer || [];
+    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
+    window.__sentEvents = window.__sentEvents || new Set();
+
+    window.t = window.t || {
+      event: function (name, props) {
+        try {
+          props = props || {};
+          // منع تكرار page_view لنفس المسار
+          if (name === 'page_view') {
+            var key = 'pv:' + (props.page || location.pathname);
+            if (window.__sentEvents.has(key)) return;
+            window.__sentEvents.add(key);
+          }
+          dataLayer.push({ event: name, ts: Date.now(), ...props });
+        } catch (e) {}
+      }
+    };
+
+    // أطلق page_view مرة واحدة فقط
     t.event('page_view', { page: location.pathname });
-    window.__pvDone = true;
-  }
+  })();
 </script>
+
 
 
   <style>
