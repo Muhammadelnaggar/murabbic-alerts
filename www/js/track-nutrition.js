@@ -1,4 +1,9 @@
 // /js/track-nutrition.js
 import { track } from '/js/track-core.js';
-export const onNutritionPrefill = (m = {}) => track('nutrition_prefill', m);
-export const onNutritionSave    = (m = {}) => track('nutrition_save', m);
+
+export function onNutritionPrefill(meta = {}) {
+  track('nutrition_prefill', meta);
+}
+export function onNutritionSave(meta = {}) {
+  track('nutrition_save', meta);
+}
