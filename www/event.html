@@ -62,5 +62,36 @@
       });
     }
   </script>
+  <script>
+  window.saveEvent = async function(eventData) {
+    // تحقق ذكي بالقواعد
+    const check = window.smart?.validate ? smart.validate(eventData) : null;
+    if (check?.severity === "critical") {
+      window.smartAlerts?.show(check.message, { type:"error", block:true });
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(eventData)
+      });
+      if (res.ok) {
+        window.t?.event("event_save", { eventType: eventData.eventType });
+        window.smartAlerts?.show("✅ تم الحفظ بنجاح", { type:"success" });
+        // بعد النجاح → رجوع للداشبورد
+        location.href = "dashboard.html";
+      } else {
+        const msg = await res.text();
+        window.smartAlerts?.show("❌ فشل في التسجيل: " + msg, { type:"error" });
+      }
+    } catch (err) {
+      console.error(err);
+      window.smartAlerts?.show("⚠️ خطأ في الاتصال بالخادم", { type:"error" });
+    }
+  };
+</script>
+
 </body>
 </html>
