@@ -107,11 +107,32 @@
   </form>
 
   <!-- ثبّت dataLayer + t.event (لا يغيّر الشكل) -->
-  <script>
+ <script>
+  (function () {
     window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => { try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
-    t.event('page_view', { page: '/lameness.html' });
-  </script>
+    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
+    window.__sentEvents = window.__sentEvents || new Set();
+
+    window.t = window.t || {
+      event: function (name, props) {
+        try {
+          props = props || {};
+          // منع تكرار page_view لنفس المسار
+          if (name === 'page_view') {
+            var key = 'pv:' + (props.page || location.pathname);
+            if (window.__sentEvents.has(key)) return;
+            window.__sentEvents.add(key);
+          }
+          dataLayer.push({ event: name, ts: Date.now(), ...props });
+        } catch (e) {}
+      }
+    };
+
+    // أطلق page_view مرة واحدة فقط
+    t.event('page_view', { page: location.pathname });
+  })();
+</script>
+
 
   <!-- تحليلات خارجية (اختياري) -->
   <script src="/js/app-core.js" defer></script>
