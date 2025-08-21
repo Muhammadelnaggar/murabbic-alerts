@@ -1,8 +1,5 @@
-// =========================
-// File: /js/events-core.js
+// /js/events-core.js
 // Simple – Effective – Very Smart (no visual changes)
-// أدوات مشتركة لكل صفحات الأحداث
-// =========================
 
 export const Q = (s) => document.querySelector(s);
 
@@ -19,10 +16,8 @@ export function pickVal(ids = []) {
 export function readCtxFromURL() {
   const p = new URLSearchParams(location.search);
   const pick = (...keys) => { for (const k of keys) { const v = p.get(k); if (v) return v; } return ''; };
-  return {
-    animalId: pick('animalId','number','animalNumber','id'),
-    eventDate: pick('eventDate','date','dt','Date'),
-  };
+  return { animalId: pick('animalId','number','animalNumber','id'),
+           eventDate: pick('eventDate','date','dt','Date') };
 }
 
 export function persistCtx({ animalId, eventDate }) {
@@ -54,7 +49,7 @@ export function buildBase(eventType, ctx, { dateSel = ['#eventDate','[name="even
   const dateKeys = Array.from(new Set(['eventDate', ...toKeysFromSelectors(dateSel), 'date', 'dt', 'Date']));
   const eventDate = pickVal(dateKeys) || ctx.eventDate;
   const details = extra.details || {};
-  const payload = {
+  return {
     type: eventType,
     eventType,
     userId: localStorage.getItem('userId'),
@@ -64,9 +59,8 @@ export function buildBase(eventType, ctx, { dateSel = ['#eventDate','[name="even
     eventDate,
     source: location.pathname.slice(1),
     details,
-    ...details // flatten لملاءمة مسارات قديمة تتوقع الحقول أعلى المستوى
+    ...details // compatibility للواجهات القديمة
   };
-  return payload;
 }
 
 export async function postToAPI(payload) {
@@ -93,10 +87,17 @@ export async function saveToFirestoreFallback(payload) {
 }
 
 export function dispatchSaved(detail) { document.dispatchEvent(new CustomEvent('event:saved', { detail })); }
-export function smartRedirect(to = (Q('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html') { setTimeout(()=>{ location.href = to; }, 1200); }
+
+// الجديد: إمكانية تعطيل التحويل أو التحكم في التأخير
+export function smartRedirect(to) {
+  if (to === false || window.NO_AUTO_REDIRECT === true) return;
+  const target = to ?? (Q('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
+  const delay = Number(window.__redirectDelayMs || 1600);
+  setTimeout(()=>{ location.href = target; }, delay);
+}
 
 export function bindStandardForm({ formSelector = 'form', saveBtnSelector = '#saveEvent' }, onSubmit) {
-  const form = Q(formSelector) || Q('form');
+  const form = Q(formSelector) || Q('#nutritionForm') || Q('form');
   if (form) form.addEventListener('submit', onSubmit);
   const btn = Q(saveBtnSelector) || Q('[data-action="save-event"]');
   if (btn && form) btn.addEventListener('click', (e)=>{ e.preventDefault(); form.requestSubmit(); });
@@ -140,11 +141,10 @@ export function initEventPage({
 
     try { onSaved({ payload, mode }); } catch(e){}
     dispatchSaved({ ok:true, mode, payload });
-    smartRedirect(redirectTo);
+
+    // إذا redirectTo === false لن نُحوّل تلقائيًا
+    smartRedirect(typeof redirectTo === 'undefined' ? undefined : redirectTo);
   }
 
   bindStandardForm({ formSelector }, handle);
 }
-
-
-
