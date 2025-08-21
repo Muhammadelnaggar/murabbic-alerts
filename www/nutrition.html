@@ -7,13 +7,17 @@
   <title>تسجيل تركيبة التغذية</title>
 
   <!-- تتبع قياسي (لا يغيّر التصميم) -->
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => {
-      try { dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
-    }};
+<script>
+  window.dataLayer = window.dataLayer || [];
+  window.t = window.t || { event: (name, props) => {
+    try { dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
+  }};
+  if (!window.__pvDone) {
     t.event('page_view', { page: location.pathname });
-  </script>
+    window.__pvDone = true;
+  }
+</script>
+
 
   <style>
     :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32;--muted:#5f6f64}
@@ -567,5 +571,7 @@
 <script type="module" src="/js/track-core.js"></script>
 <script type="module" src="/js/track-nutrition.js"></script>
 <script type="module" src="/js/nutrition.js"></script>
+
+
 </body>
 </html>
