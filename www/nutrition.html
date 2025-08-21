@@ -5,6 +5,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>تسجيل تركيبة التغذية</title>
+<script>
+/* De-dupe page_view safely */
+(function(){
+  window.dataLayer = window.dataLayer || [];
+  const fired = new Set();
+  const rawPush = (name, props) => {
+    try { window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); } catch(e){}
+  };
+  // وحّد t.event بحيث يمنع تكرار page_view لنفس الصفحة
+  window.t = window.t || {};
+  window.t.event = function(name, props){
+    if (name === 'page_view'){
+      const key = (props && props.page) || location.pathname;
+      if (fired.has(key)) return;          // تجاهل المكرر
+      fired.add(key);
+      setTimeout(()=>fired.delete(key), 2000);
+    }
+    rawPush(name, props);
+  };
+})();
+</script>
 
   <!-- تتبع قياسي (لا يغيّر التصميم) -->
 <script>
