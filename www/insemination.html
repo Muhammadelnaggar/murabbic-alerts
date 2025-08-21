@@ -1,43 +1,12 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>تسجيل تلقيح</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8" />
+  <title>تسجيل حدث التلقيح</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- تتبع أساسي -->
+  <!-- تتبع + السكربتات الموحدة من event.html -->
   <script>window.dataLayer = window.dataLayer || [];</script>
-</head>
-<body>
-  <header>
-    <h1>📌 تسجيل حدث: تلقيح</h1>
-  </header>
-
-  <main>
-    <form id="inseminationForm">
-      <label for="animalId">رقم الحيوان:</label>
-      <input type="text" id="animalId" name="animalId" required />
-
-      <label for="eventDate">تاريخ التلقيح:</label>
-      <input type="date" id="eventDate" name="eventDate" required />
-
-      <label for="bullName">اسم/كود الطلوقة:</label>
-      <input type="text" id="bullName" name="bullName" />
-
-      <label for="heatTime">توقيت الشبق:</label>
-      <select id="heatTime" name="heatTime">
-        <option value="am">صباح</option>
-        <option value="pm">مساء</option>
-      </select>
-
-      <button type="submit">💾 حفظ التلقيح</button>
-    </form>
-
-    <div id="msg" style="margin-top:1rem; color:green;"></div>
-  </main>
-
-  <!-- ===== سكربتات مربيك حسب الـ Check-List ===== -->
   <script src="js/app-core.js"></script>
   <script type="module" src="js/timeline.js"></script>
   <script type="module" src="js/smart-checks.js"></script>
@@ -45,56 +14,93 @@
   <script src="js/api.js"></script>
   <script type="module" src="js/firebase-config.js"></script>
   <script src="js/smart-alerts.js"></script>
-  <script src="js/event-core.js"></script>
+
+  <style>
+    body { direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+           background:#fff9db; margin:0; padding:20px; }
+    h2 { text-align:center; color:#2e7d32; margin-bottom:20px; }
+    form { background:#fff; border:2px solid #8bc34a; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:15px; }
+    label { font-weight:bold; }
+    input,button { font-size:16px; }
+    input[type="text"], input[type="date"] {
+      width:100%; padding:12px; border:1px solid #ccc; border-radius:8px; background:#f1f8e9;
+    }
+    .radio-group { display:flex; gap:20px; }
+    .radio-group label { display:flex; align-items:center; gap:5px; }
+    button { background:#2e7d32; color:#fff; padding:14px; border:none; border-radius:8px; cursor:pointer; }
+    button:hover { background:#1b5e20; }
+  </style>
+</head>
+<body>
+
+  <h2>تسجيل حدث التلقيح</h2>
+
+  <form id="inseminationForm">
+    <label>رقم الحيوان:</label>
+    <input type="text" id="animalId" required readonly />
+
+    <label>تاريخ التلقيح:</label>
+    <input type="date" id="inseminationDate" required />
+
+    <label>اسم الطلوقة (اختياري):</label>
+    <input type="text" id="bullName" />
+
+    <label>وقت الشياع:</label>
+    <div class="radio-group">
+      <label><input type="radio" name="heatTime" value="صباحاً" required /> صباحاً</label>
+      <label><input type="radio" name="heatTime" value="مساءً" /> مساءً</label>
+    </div>
+
+    <label>وقت التلقيح:</label>
+    <div class="radio-group">
+      <label><input type="radio" name="inseminationTime" value="صباحاً" required /> صباحاً</label>
+      <label><input type="radio" name="inseminationTime" value="مساءً" /> مساءً</label>
+    </div>
+
+    <label>اسم الملقح:</label>
+    <input type="text" id="technicianName" />
+
+    <button type="submit">💾 تسجيل الحدث</button>
+  </form>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // تعبئة الحقول من السياق (animalId, date)
-      const QS = new URLSearchParams(location.search);
-      const animalId = QS.get("animalId") || localStorage.getItem("lastAnimalId") || "";
-      const dt = QS.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
-      document.getElementById("animalId").value = animalId;
-      document.getElementById("eventDate").value = dt;
+    // سجل زيارة الصفحة
+    t.event('page_view', { page: "insemination.html" });
 
-      // تسجيل Page View
-      if (window.t?.event) t.event("page_view", {page:"insemination"});
-      
-      // معالجة الفورم
-      document.getElementById("inseminationForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
+    // تجهيز القيم الأولية من السياق
+    window.addEventListener('DOMContentLoaded', () => {
+      const qs = new URLSearchParams(location.search);
+      const id = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
+      const dt = qs.get('date') || new Date().toISOString().slice(0,10);
 
-        const data = {
-          type: "تلقيح",
-          animalId: document.getElementById("animalId").value,
-          eventDate: document.getElementById("eventDate").value,
-          bullName: document.getElementById("bullName").value,
-          heatTime: document.getElementById("heatTime").value,
-          source: "insemination.html"
-        };
+      document.getElementById('animalId').value = id;
+      document.getElementById('inseminationDate').value = dt;
+    });
 
-        try {
-          await saveEvent(data);  // من event-core.js
-          document.getElementById("msg").textContent = "✅ تم حفظ التلقيح بنجاح";
+    // عند حفظ النموذج
+    document.getElementById("inseminationForm").addEventListener("submit", (e) => {
+      e.preventDefault();
 
-          // تتبع
-          if (window.t?.event) t.event("insemination_save", data);
+      const payload = {
+        eventType: "insemination",
+        eventDate: document.getElementById("inseminationDate").value,
+        animalId: document.getElementById("animalId").value,
+        bullName: document.getElementById("bullName").value,
+        heatTime: (document.querySelector("input[name=heatTime]:checked")||{}).value,
+        inseminationTime: (document.querySelector("input[name=inseminationTime]:checked")||{}).value,
+        technicianName: document.getElementById("technicianName").value,
+        source: "insemination.html"
+      };
 
-          // تشغيل القواعد الذكية
-          smart.startAlertsWatcher({
-            userId: localStorage.getItem("userId"),
-            onAlert: (a) => smartAlerts.show(a.message, a.severity || "info")
-          });
+      // تحقق ذكي (مثلاً 60 يوم بعد الولادة)
+      const check = smart?.validate ? smart.validate(payload) : null;
+      if (check?.severity === "critical") {
+        smartAlerts.show(check.message, { type:"error", block:true });
+        return;
+      }
 
-          // حفظ السياق
-          localStorage.setItem("lastAnimalId", data.animalId);
-          localStorage.setItem("lastEventDate", data.eventDate);
-
-        } catch (err) {
-          console.error("فشل حفظ التلقيح:", err);
-          document.getElementById("msg").textContent = "❌ حدث خطأ أثناء الحفظ";
-          document.getElementById("msg").style.color = "red";
-        }
-      });
+      // استعمل الدالة الموحدة من event.html
+      saveEvent(payload);
     });
   </script>
 </body>
