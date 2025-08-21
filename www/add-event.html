@@ -116,10 +116,32 @@
   </form>
 
   <!-- ✅ ثبّت dataLayer + t.event قبل أي سكربت -->
-  <script>
+ <script>
+  (function () {
     window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
-  </script>
+    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
+    window.__sentEvents = window.__sentEvents || new Set();
+
+    window.t = window.t || {
+      event: function (name, props) {
+        try {
+          props = props || {};
+          // منع تكرار page_view لنفس المسار
+          if (name === 'page_view') {
+            var key = 'pv:' + (props.page || location.pathname);
+            if (window.__sentEvents.has(key)) return;
+            window.__sentEvents.add(key);
+          }
+          dataLayer.push({ event: name, ts: Date.now(), ...props });
+        } catch (e) {}
+      }
+    };
+
+    // أطلق page_view مرة واحدة فقط
+    t.event('page_view', { page: location.pathname });
+  })();
+</script>
+
 
   <!-- ✅ تحليلات خارجية (يسجل page_view تلقائيًا) -->
   <script src="/js/app-core.js" defer></script>
@@ -327,3 +349,4 @@
   <script src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
+
