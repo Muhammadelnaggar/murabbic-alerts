@@ -197,13 +197,31 @@
 <script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
 <!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
   <script>
+  (function () {
     window.dataLayer = window.dataLayer || [];
+    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
+    window.__sentEvents = window.__sentEvents || new Set();
+
     window.t = window.t || {
-      event: function(name, props){
-        try { window.dataLayer.push({ event: name, ts: Date.now(), ...(props||{}) }); } catch(e){}
+      event: function (name, props) {
+        try {
+          props = props || {};
+          // منع تكرار page_view لنفس المسار
+          if (name === 'page_view') {
+            var key = 'pv:' + (props.page || location.pathname);
+            if (window.__sentEvents.has(key)) return;
+            window.__sentEvents.add(key);
+          }
+          dataLayer.push({ event: name, ts: Date.now(), ...props });
+        } catch (e) {}
       }
     };
-  </script>
+
+    // أطلق page_view مرة واحدة فقط
+    t.event('page_view', { page: location.pathname });
+  })();
+</script>
+
 <script>
   if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
 </script>
@@ -426,6 +444,7 @@
 
 </body>
 </html>
+
 
 
 
