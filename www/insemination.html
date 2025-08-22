@@ -5,23 +5,57 @@
   <title>تسجيل حدث التلقيح</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- يرث كل السكربتات الأساسية من event.html -->
+  <!-- سكربت مشترك للأحداث (يرث من event.html الأساسيات) -->
   <script src="js/event-core.js"></script>
 
   <style>
-    body { direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-           background:#fff9db; margin:0; padding:20px; }
+    body {
+      direction: rtl;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background:#fff9db;
+      margin:0;
+      padding:20px;
+    }
     h2 { text-align:center; color:#2e7d32; margin-bottom:20px; }
-    form { background:#fff; border:2px solid #8bc34a; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:15px; }
+    form {
+      background:#fff;
+      border:2px solid #8bc34a;
+      border-radius:12px;
+      padding:20px;
+      display:flex;
+      flex-direction:column;
+      gap:15px;
+    }
     label { font-weight:bold; }
     input,button { font-size:16px; }
     input[type="text"], input[type="date"] {
-      width:100%; padding:12px; border:1px solid #ccc; border-radius:8px; background:#f1f8e9;
+      width:100%;
+      padding:12px;
+      border:1px solid #ccc;
+      border-radius:8px;
+      background:#f1f8e9;
     }
     .radio-group { display:flex; gap:20px; }
     .radio-group label { display:flex; align-items:center; gap:5px; }
-    button { background:#2e7d32; color:#fff; padding:14px; border:none; border-radius:8px; cursor:pointer; }
+    button {
+      background:#2e7d32;
+      color:#fff;
+      padding:14px;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+    }
     button:hover { background:#1b5e20; }
+    .success-msg {
+      margin-top:15px;
+      padding:12px;
+      border-radius:8px;
+      background:#e8f5e9;
+      color:#1b5e20;
+      text-align:center;
+      font-weight:bold;
+      display:none;
+    }
   </style>
 </head>
 <body>
@@ -56,18 +90,22 @@
     <button type="submit">💾 تسجيل الحدث</button>
   </form>
 
+  <div id="successMsg" class="success-msg">✅ تم تسجيل حدث التلقيح بنجاح</div>
+
   <script>
     // تجهيز القيم الأولية من السياق (animalId + date)
     window.addEventListener('DOMContentLoaded', () => {
       const ctx = getContext();
       document.getElementById('animalId').value = ctx.animalId || '';
-      document.getElementById('inseminationDate').value = ctx.date || new Date().toISOString().slice(0,10);
+      document.getElementById('inseminationDate').value =
+        ctx.date || new Date().toISOString().slice(0,10);
 
+      // تتبع عرض الصفحة
       t.event('page_view', { page: "insemination.html" });
     });
 
     // عند حفظ النموذج
-    document.getElementById("inseminationForm").addEventListener("submit", (e) => {
+    document.getElementById("inseminationForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const payload = {
@@ -81,7 +119,13 @@
         source: "insemination.html"
       };
 
-      saveEvent(payload); // تستخدم الدالة الموحدة من event-core.js
+      try {
+        await saveEvent(payload); // تستخدم الدالة الموحدة من event-core.js
+        document.getElementById("successMsg").style.display = "block";
+      } catch (err) {
+        alert("❌ حدث خطأ أثناء الحفظ، حاول مرة أخرى.");
+        console.error(err);
+      }
     });
   </script>
 </body>
