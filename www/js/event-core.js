@@ -1,99 +1,77 @@
-// js/event-core.js
+// www/js/event-core.js
+// ملف موحّد لحفظ جميع أحداث مربيك
+// يعتمد على tenant-bootstrap.js + api.js
 
-// --- تتبع موحد ---
-window.dataLayer = window.dataLayer || [];
-window.t = window.t || {
-  event: function (name, params) {
-    window.dataLayer.push({ event: name, ...params });
-    console.log("Tracked:", name, params);
-  }
-};
+import { getContext } from "./tenant-bootstrap.js";
 
-// --- استخراج السياق (animalId, date, وغيرها) ---
-function getContext() {
-  const qs = new URLSearchParams(location.search);
+window.eventCore = {
+  /**
+   * حفظ حدث موحّد
+   * @param {string} eventType - نوع الحدث (بالعربي: "تلقيح" / "لبن يومي" / "عرج" ...)
+   * @param {object} extra - بيانات إضافية خاصة بالحدث
+   */
+  async save(eventType, extra = {}) {
+    const ctx = getContext();
 
-  const ctx = {
-    animalId:
-      qs.get("animalId") ||
-      qs.get("number") ||
-      qs.get("animalNumber") ||
-      localStorage.getItem("lastAnimalId") ||
-      localStorage.getItem("currentAnimalId") ||
-      sessionStorage.getItem("ctxAnimalId") ||
-      "",
-    date:
-      qs.get("date") ||
-      qs.get("eventDate") ||
-      localStorage.getItem("lastEventDate") ||
-      localStorage.getItem("eventDate") ||
-      sessionStorage.getItem("ctxDate") ||
-      new Date().toISOString().slice(0, 10)
-  };
-
-  if (ctx.animalId) {
-    localStorage.setItem("lastAnimalId", ctx.animalId);
-    localStorage.setItem("currentAnimalId", ctx.animalId);
-    sessionStorage.setItem("ctxAnimalId", ctx.animalId);
-  }
-  if (ctx.date) {
-    localStorage.setItem("lastEventDate", ctx.date);
-    localStorage.setItem("eventDate", ctx.date);
-    sessionStorage.setItem("ctxDate", ctx.date);
-  }
-
-  return ctx;
-}
-
-// --- حفظ حدث موحد ---
-async function saveEvent(payload) {
-  try {
-    const userId = localStorage.getItem("userId");
-    const tenantId = localStorage.getItem("tenantId");
-
-    // تأكيد الحقول الأساسية
-    if (!payload.animalId) payload.animalId = localStorage.getItem("lastAnimalId") || "";
-    if (!payload.eventDate) payload.eventDate = new Date().toISOString().slice(0, 10);
-
-    const enriched = {
-      ...payload,
-      userId,
-      tenantId,
-      createdAt: new Date().toISOString()
+    // بناء الـpayload
+    const payload = {
+      userId: ctx.userId,
+      tenantId: ctx.tenantId || ctx.userId,
+      animalId: ctx.animalId || null,
+      animalNumber: ctx.animalNumber || null,
+      eventType: eventType,      // لازم بالعربي
+      eventDate: ctx.eventDate,
+      ...extra
     };
 
-    // تتبع
-    t.event("event_save", enriched);
-
-    // إرسال للسيرفر
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(enriched)
+    // 🔹 تتبع قبل الحفظ
+    window.dataLayer = window.dataLayer || [];
+    t?.event("event_save", {
+      page: location.pathname,
+      eventType: payload.eventType,
+      animalId: payload.animalId,
+      eventDate: payload.eventDate
     });
 
-    if (!res.ok) throw new Error("خطأ في الحفظ");
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": ctx.userId
+        },
+        body: JSON.stringify(payload)
+      });
 
-    // تنبيه نجاح (مع fallback)
-    if (typeof smartAlerts !== "undefined") {
-      smartAlerts.show("✅ تم تسجيل الحدث بنجاح", { type: "success" });
-    } else {
-      alert("✅ تم تسجيل الحدث بنجاح");
+      if (!res.ok) {
+        throw new Error(`فشل حفظ الحدث (${eventType})`);
+      }
+
+      const data = await res.json();
+      console.log(`✅ تم حفظ حدث (${eventType}):`, data);
+
+      // 🔹 تتبع نجاح الحفظ
+      t?.event("event_saved_success", {
+        page: location.pathname,
+        eventType: payload.eventType,
+        animalId: payload.animalId,
+        eventDate: payload.eventDate
+      });
+
+      return data;
+
+    } catch (err) {
+      console.error("❌ خطأ أثناء الحفظ:", err);
+
+      // 🔹 تتبع فشل الحفظ
+      t?.event("event_saved_error", {
+        page: location.pathname,
+        eventType: eventType,
+        error: err.message
+      });
+
+      alert("حدث خطأ أثناء الحفظ");
+      throw err;
     }
-
-    if (enriched.animalId) localStorage.setItem("lastAnimalId", enriched.animalId);
-    if (enriched.eventDate) localStorage.setItem("lastEventDate", enriched.eventDate);
-
-    return true;
-  } catch (err) {
-    console.error("فشل حفظ الحدث:", err);
-
-    if (typeof smartAlerts !== "undefined") {
-      smartAlerts.show("❌ حدث خطأ أثناء الحفظ", { type: "error" });
-    } else {
-      alert("❌ حدث خطأ أثناء الحفظ");
-    }
-
-    return false;
   }
-}
+};
