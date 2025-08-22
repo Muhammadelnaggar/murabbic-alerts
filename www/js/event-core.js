@@ -13,7 +13,6 @@ window.t = window.t || {
 function getContext() {
   const qs = new URLSearchParams(location.search);
 
-  // ترتيب الأولوية: URL → localStorage → sessionStorage
   const ctx = {
     animalId:
       qs.get("animalId") ||
@@ -32,7 +31,6 @@ function getContext() {
       new Date().toISOString().slice(0, 10)
   };
 
-  // خزن آخر سياق لاستعماله لاحقًا
   if (ctx.animalId) {
     localStorage.setItem("lastAnimalId", ctx.animalId);
     localStorage.setItem("currentAnimalId", ctx.animalId);
@@ -50,9 +48,13 @@ function getContext() {
 // --- حفظ حدث موحد ---
 async function saveEvent(payload) {
   try {
-    // ضمّ الهوية + المصدر
     const userId = localStorage.getItem("userId");
     const tenantId = localStorage.getItem("tenantId");
+
+    // تأكيد الحقول الأساسية
+    if (!payload.animalId) payload.animalId = localStorage.getItem("lastAnimalId") || "";
+    if (!payload.eventDate) payload.eventDate = new Date().toISOString().slice(0, 10);
+
     const enriched = {
       ...payload,
       userId,
@@ -72,18 +74,26 @@ async function saveEvent(payload) {
 
     if (!res.ok) throw new Error("خطأ في الحفظ");
 
-    smartAlerts.show("✅ تم تسجيل الحدث بنجاح", { type: "success" });
+    // تنبيه نجاح (مع fallback)
+    if (typeof smartAlerts !== "undefined") {
+      smartAlerts.show("✅ تم تسجيل الحدث بنجاح", { type: "success" });
+    } else {
+      alert("✅ تم تسجيل الحدث بنجاح");
+    }
 
-    // بعد النجاح خزّن آخر معرف وتاريخ
-    if (enriched.animalId)
-      localStorage.setItem("lastAnimalId", enriched.animalId);
-    if (enriched.eventDate)
-      localStorage.setItem("lastEventDate", enriched.eventDate);
+    if (enriched.animalId) localStorage.setItem("lastAnimalId", enriched.animalId);
+    if (enriched.eventDate) localStorage.setItem("lastEventDate", enriched.eventDate);
 
     return true;
   } catch (err) {
     console.error("فشل حفظ الحدث:", err);
-    smartAlerts.show("❌ حدث خطأ أثناء الحفظ", { type: "error" });
+
+    if (typeof smartAlerts !== "undefined") {
+      smartAlerts.show("❌ حدث خطأ أثناء الحفظ", { type: "error" });
+    } else {
+      alert("❌ حدث خطأ أثناء الحفظ");
+    }
+
     return false;
   }
 }
