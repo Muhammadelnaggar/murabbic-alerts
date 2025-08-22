@@ -44,54 +44,35 @@
       return base + "?" + params.toString();
     }
 
-    // مثال استخدام: redirect لصفحة تلقيح
-    // location.href = buildTargetUrl("insemination.html");
-
-    // مثال على تشغيل smart-checks + تنبيه
-    function saveEvent(eventData) {
-      const check = smart?.validate(eventData);
+    // الحفظ الذكي الموحد لكل الأحداث
+    window.saveEvent = async function(eventData) {
+      // تحقق من القواعد (smart-checks)
+      const check = window.smart?.validate ? smart.validate(eventData) : null;
       if (check?.severity === "critical") {
-        smartAlerts.show(check.message, { type:"error", block:true });
+        window.smartAlerts?.show(check.message, { type:"error", block:true });
         return;
       }
-      api.post("/api/events", eventData).then(res => {
-        if(res.ok) {
-          t.event("event_save", {eventType: eventData.eventType});
-          smartAlerts.show("✅ تم الحفظ بنجاح", { type:"success" });
+
+      try {
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(eventData)
+        });
+        if (res.ok) {
+          window.t?.event("event_save", { eventType: eventData.eventType });
+          window.smartAlerts?.show("✅ تم الحفظ بنجاح", { type:"success" });
+          // بعد النجاح → رجوع للداشبورد
+          location.href = "dashboard.html";
+        } else {
+          const msg = await res.text();
+          window.smartAlerts?.show("❌ فشل في التسجيل: " + msg, { type:"error" });
         }
-      });
-    }
-  </script>
-  <script>
-  window.saveEvent = async function(eventData) {
-    // تحقق ذكي بالقواعد
-    const check = window.smart?.validate ? smart.validate(eventData) : null;
-    if (check?.severity === "critical") {
-      window.smartAlerts?.show(check.message, { type:"error", block:true });
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(eventData)
-      });
-      if (res.ok) {
-        window.t?.event("event_save", { eventType: eventData.eventType });
-        window.smartAlerts?.show("✅ تم الحفظ بنجاح", { type:"success" });
-        // بعد النجاح → رجوع للداشبورد
-        location.href = "dashboard.html";
-      } else {
-        const msg = await res.text();
-        window.smartAlerts?.show("❌ فشل في التسجيل: " + msg, { type:"error" });
+      } catch (err) {
+        console.error(err);
+        window.smartAlerts?.show("⚠️ خطأ في الاتصال بالخادم", { type:"error" });
       }
-    } catch (err) {
-      console.error(err);
-      window.smartAlerts?.show("⚠️ خطأ في الاتصال بالخادم", { type:"error" });
-    }
-  };
-</script>
-
+    };
+  </script>
 </body>
 </html>
