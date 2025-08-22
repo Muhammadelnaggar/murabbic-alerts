@@ -96,17 +96,13 @@
     window.addEventListener('DOMContentLoaded', () => {
       const ctx = getContext(); // من event-core.js
 
-      // تمرير الرقم من add-event أو التخزين أو تركه فارغ للإدخال اليدوي
       const animalIdInput = document.getElementById('animalId');
       if (ctx.animalId) {
         animalIdInput.value = ctx.animalId;
       } else if (localStorage.getItem('lastAnimalId')) {
         animalIdInput.value = localStorage.getItem('lastAnimalId');
-      } else {
-        animalIdInput.value = '';
       }
 
-      // تمرير التاريخ أو تعيين اليوم افتراضياً
       const dateInput = document.getElementById('inseminationDate');
       if (ctx.date) {
         dateInput.value = ctx.date;
@@ -116,8 +112,9 @@
         dateInput.value = new Date().toISOString().slice(0,10);
       }
 
-      // تتبع عرض الصفحة
-      t.event('page_view', { page: "insemination.html" });
+      if (typeof t !== 'undefined' && t.event) {
+        t.event('page_view', { page: "insemination.html" });
+      }
     });
 
     document.getElementById("inseminationForm").addEventListener("submit", async (e) => {
