@@ -297,10 +297,18 @@ window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}
 
 
 
-    window.goToAddEvent = function(animalNumber) {
-      localStorage.setItem("lastAnimalId", animalNumber);
-      window.location.href = "add-event.html";
-    }
+   window.goToAddEvent = function(animalNumber) {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  // حفظ آخر رقم وتاريخ في localStorage
+  localStorage.setItem("lastAnimalId", animalNumber);
+  localStorage.setItem("lastEventDate", today);
+
+  // تمرير عبر الرابط أيضًا بكل المفاتيح اللي الصفحات الأبناء ممكن تحتاجها
+  window.location.href =
+    `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
+}
+
 
     window.deleteAnimal = async function(animalDocId) {
       if (confirm("هل أنت متأكد من حذف الحيوان؟")) {
@@ -343,6 +351,7 @@ window.location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}
   </script>
 </body>
 </html>
+
 
 
 
