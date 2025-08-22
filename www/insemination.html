@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <!-- سكربت مشترك للأحداث -->
-  <script src="js/event-core.js"></script>
+  <script src="./js/event-core.js"></script>
 
   <style>
     body {
@@ -94,7 +94,10 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      const ctx = getContext(); // من event-core.js
+      let ctx = {};
+      if (typeof getContext === 'function') {
+        ctx = getContext();
+      }
 
       const animalIdInput = document.getElementById('animalId');
       if (ctx.animalId) {
@@ -134,7 +137,9 @@
       };
 
       try {
-        await saveEvent(payload);
+        if (typeof saveEvent === 'function') {
+          await saveEvent(payload);
+        }
         localStorage.setItem('lastAnimalId', payload.animalId);
         localStorage.setItem('lastEventDate', payload.eventDate);
         document.getElementById("successMsg").style.display = "block";
