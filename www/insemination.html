@@ -116,42 +116,32 @@
         dateInput.value = new Date().toISOString().slice(0,10);
       }
 
-      if (typeof t !== 'undefined' && t.event) {
-        t.event('page_view', { page: "insemination.html" });
-      }
     });
 
-    document.getElementById("inseminationForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const payload = {
-        eventType: "insemination",
-        eventDate: document.getElementById("inseminationDate").value,
-        animalId: document.getElementById("animalId").value,
-        bullName: document.getElementById("bullName").value,
-        heatTime: (document.querySelector("input[name=heatTime]:checked")||{}).value,
-        inseminationTime: (document.querySelector("input[name=inseminationTime]:checked")||{}).value,
-        technicianName: document.getElementById("technicianName").value,
-        source: "insemination.html"
-      };
-
-      try {
-        if (typeof saveEvent === 'function') {
-          await saveEvent(payload);
-        }
-        localStorage.setItem('lastAnimalId', payload.animalId);
-        localStorage.setItem('lastEventDate', payload.eventDate);
-        document.getElementById("successMsg").style.display = "block";
-      } catch (err) {
-        alert("❌ حدث خطأ أثناء الحفظ، حاول مرة أخرى.");
-        console.error(err);
-      }
-    });
   </script>
-  <script>
-  // تهيئة الصفحة علشان يتسجل التتبع page_view
+
+<script>
   const ctx = eventCore.init("تلقيح");
+
+  document.getElementById("saveBtn").addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      await eventCore.save("تلقيح", {
+        animalId: document.getElementById("animalId")?.value,
+        eventDate: document.getElementById("inseminationDate")?.value,
+        bullName: document.getElementById("bullName")?.value,
+        heatTime: document.querySelector("input[name=heatTime]:checked")?.value,
+        inseminationTime: document.querySelector("input[name=inseminationTime]:checked")?.value,
+        technicianName: document.getElementById("technicianName")?.value
+      });
+      document.getElementById("successMsg").style.display = "block";
+    } catch (err) {
+      console.error(err);
+      alert("❌ حدث خطأ أثناء الحفظ");
+    }
+  });
 </script>
+
 </body>
 </html>
 
