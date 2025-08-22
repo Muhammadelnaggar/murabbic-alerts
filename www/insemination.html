@@ -5,7 +5,7 @@
   <title>تسجيل حدث التلقيح</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- سكربت مشترك للأحداث (يرث من event.html الأساسيات) -->
+  <!-- سكربت مشترك للأحداث -->
   <script src="js/event-core.js"></script>
 
   <style>
@@ -64,7 +64,7 @@
 
   <form id="inseminationForm">
     <label>رقم الحيوان:</label>
-    <input type="text" id="animalId" required readonly />
+    <input type="text" id="animalId" placeholder="أدخل رقم الحيوان" />
 
     <label>تاريخ التلقيح:</label>
     <input type="date" id="inseminationDate" required />
@@ -93,18 +93,33 @@
   <div id="successMsg" class="success-msg">✅ تم تسجيل حدث التلقيح بنجاح</div>
 
   <script>
-    // تجهيز القيم الأولية من السياق (animalId + date)
     window.addEventListener('DOMContentLoaded', () => {
-      const ctx = getContext();
-      document.getElementById('animalId').value = ctx.animalId || '';
-      document.getElementById('inseminationDate').value =
-        ctx.date || new Date().toISOString().slice(0,10);
+      const ctx = getContext(); // من event-core.js
+
+      // تمرير الرقم من add-event أو التخزين أو تركه فارغ للإدخال اليدوي
+      const animalIdInput = document.getElementById('animalId');
+      if (ctx.animalId) {
+        animalIdInput.value = ctx.animalId;
+      } else if (localStorage.getItem('lastAnimalId')) {
+        animalIdInput.value = localStorage.getItem('lastAnimalId');
+      } else {
+        animalIdInput.value = '';
+      }
+
+      // تمرير التاريخ أو تعيين اليوم افتراضياً
+      const dateInput = document.getElementById('inseminationDate');
+      if (ctx.date) {
+        dateInput.value = ctx.date;
+      } else if (localStorage.getItem('lastEventDate')) {
+        dateInput.value = localStorage.getItem('lastEventDate');
+      } else {
+        dateInput.value = new Date().toISOString().slice(0,10);
+      }
 
       // تتبع عرض الصفحة
       t.event('page_view', { page: "insemination.html" });
     });
 
-    // عند حفظ النموذج
     document.getElementById("inseminationForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -120,7 +135,9 @@
       };
 
       try {
-        await saveEvent(payload); // تستخدم الدالة الموحدة من event-core.js
+        await saveEvent(payload);
+        localStorage.setItem('lastAnimalId', payload.animalId);
+        localStorage.setItem('lastEventDate', payload.eventDate);
         document.getElementById("successMsg").style.display = "block";
       } catch (err) {
         alert("❌ حدث خطأ أثناء الحفظ، حاول مرة أخرى.");
