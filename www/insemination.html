@@ -99,13 +99,15 @@
       const animalIdInput = document.getElementById('animalId');
       if (ctx.animalId) {
         animalIdInput.value = ctx.animalId;
+      } else if (ctx.number || ctx.animalNumber) {
+        animalIdInput.value = ctx.number || ctx.animalNumber;
       } else if (localStorage.getItem('lastAnimalId')) {
         animalIdInput.value = localStorage.getItem('lastAnimalId');
       }
 
       const dateInput = document.getElementById('inseminationDate');
-      if (ctx.date) {
-        dateInput.value = ctx.date;
+      if (ctx.date || ctx.eventDate) {
+        dateInput.value = ctx.date || ctx.eventDate;
       } else if (localStorage.getItem('lastEventDate')) {
         dateInput.value = localStorage.getItem('lastEventDate');
       } else {
