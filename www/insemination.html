@@ -88,17 +88,15 @@
     <input type="text" id="technicianName" />
 
    <button type="submit" id="saveBtn">💾 تسجيل الحدث</button>
-
   </form>
 
   <div id="successMsg" class="success-msg">✅ تم تسجيل حدث التلقيح بنجاح</div>
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
+      // تعبئة الحقول من الرابط أو التخزين
       const params = new URLSearchParams(window.location.search);
       const animalIdInput = document.getElementById('animalId');
-
-      // محاولة الحصول على رقم الحيوان من معطيات الرابط أو التخزين
       if (params.get('animalId')) {
         animalIdInput.value = params.get('animalId');
       } else if (params.get('number')) {
@@ -116,32 +114,29 @@
         dateInput.value = new Date().toISOString().slice(0,10);
       }
 
-    });
+      // تهيئة التتبع
+      const ctx = eventCore.init("تلقيح");
 
-  </script>
-
-<script>
-  const ctx = eventCore.init("تلقيح");
-
-  document.getElementById("saveBtn").addEventListener("click", async (e) => {
-    e.preventDefault();
-    try {
-      await eventCore.save("تلقيح", {
-        animalId: document.getElementById("animalId")?.value,
-        eventDate: document.getElementById("inseminationDate")?.value,
-        bullName: document.getElementById("bullName")?.value,
-        heatTime: document.querySelector("input[name=heatTime]:checked")?.value,
-        inseminationTime: document.querySelector("input[name=inseminationTime]:checked")?.value,
-        technicianName: document.getElementById("technicianName")?.value
+      // زر الحفظ
+      document.getElementById("saveBtn").addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await eventCore.save("تلقيح", {
+            animalId: document.getElementById("animalId")?.value,
+            eventDate: document.getElementById("inseminationDate")?.value,
+            bullName: document.getElementById("bullName")?.value,
+            heatTime: document.querySelector("input[name=heatTime]:checked")?.value,
+            inseminationTime: document.querySelector("input[name=inseminationTime]:checked")?.value,
+            technicianName: document.getElementById("technicianName")?.value
+          });
+          document.getElementById("successMsg").style.display = "block";
+        } catch (err) {
+          console.error(err);
+          alert("❌ حدث خطأ أثناء الحفظ");
+        }
       });
-      document.getElementById("successMsg").style.display = "block";
-    } catch (err) {
-      console.error(err);
-      alert("❌ حدث خطأ أثناء الحفظ");
-    }
-  });
-</script>
+    });
+  </script>
 
 </body>
 </html>
-
