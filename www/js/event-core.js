@@ -2,7 +2,8 @@
 // ملف موحّد لحفظ جميع أحداث مربيك
 // يعتمد على tenant-bootstrap.js + api.js
 
-import { getContext } from "./tenant-bootstrap.js";
+const getContext = window.getContext;
+
 
 window.eventCore = {
   /**
