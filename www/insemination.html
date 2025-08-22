@@ -64,7 +64,7 @@
 
   <form id="inseminationForm">
     <label>رقم الحيوان:</label>
-    <input type="text" id="animalId" placeholder="أدخل رقم الحيوان" />
+    <input type="text" id="animalId" placeholder="رقم الحيوان" readonly />
 
     <label>تاريخ التلقيح:</label>
     <input type="date" id="inseminationDate" required />
@@ -94,23 +94,21 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      let ctx = {};
-      if (typeof getContext === 'function') {
-        ctx = getContext();
-      }
-
+      const params = new URLSearchParams(window.location.search);
       const animalIdInput = document.getElementById('animalId');
-      if (ctx.animalId) {
-        animalIdInput.value = ctx.animalId;
-      } else if (ctx.number || ctx.animalNumber) {
-        animalIdInput.value = ctx.number || ctx.animalNumber;
+
+      // محاولة الحصول على رقم الحيوان من معطيات الرابط أو التخزين
+      if (params.get('animalId')) {
+        animalIdInput.value = params.get('animalId');
+      } else if (params.get('number')) {
+        animalIdInput.value = params.get('number');
       } else if (localStorage.getItem('lastAnimalId')) {
         animalIdInput.value = localStorage.getItem('lastAnimalId');
       }
 
       const dateInput = document.getElementById('inseminationDate');
-      if (ctx.date || ctx.eventDate) {
-        dateInput.value = ctx.date || ctx.eventDate;
+      if (params.get('date')) {
+        dateInput.value = params.get('date');
       } else if (localStorage.getItem('lastEventDate')) {
         dateInput.value = localStorage.getItem('lastEventDate');
       } else {
