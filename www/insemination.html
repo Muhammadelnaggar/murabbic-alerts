@@ -5,7 +5,9 @@
   <title>تسجيل حدث التلقيح</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- استايل خاص بالصفحة فقط -->
+  <!-- يرث كل السكربتات الأساسية من event.html -->
+  <script src="js/event-core.js"></script>
+
   <style>
     body { direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
            background:#fff9db; margin:0; padding:20px; }
@@ -54,20 +56,14 @@
     <button type="submit">💾 تسجيل الحدث</button>
   </form>
 
-  <!-- سكربت خاص بالصفحة -->
-  <script src="js/event-core.js"></script>
   <script>
-    // سجل زيارة الصفحة
-    t.event('page_view', { page: "insemination.html" });
-
-    // تجهيز القيم الأولية من السياق
+    // تجهيز القيم الأولية من السياق (animalId + date)
     window.addEventListener('DOMContentLoaded', () => {
-      const qs = new URLSearchParams(location.search);
-      const id = qs.get('animalId') || localStorage.getItem('lastAnimalId') || '';
-      const dt = qs.get('date') || new Date().toISOString().slice(0,10);
+      const ctx = getContext();
+      document.getElementById('animalId').value = ctx.animalId || '';
+      document.getElementById('inseminationDate').value = ctx.date || new Date().toISOString().slice(0,10);
 
-      document.getElementById('animalId').value = id;
-      document.getElementById('inseminationDate').value = dt;
+      t.event('page_view', { page: "insemination.html" });
     });
 
     // عند حفظ النموذج
@@ -85,8 +81,7 @@
         source: "insemination.html"
       };
 
-      // استعمل الدالة الموحدة من event-core.js
-      saveEvent(payload);
+      saveEvent(payload); // تستخدم الدالة الموحدة من event-core.js
     });
   </script>
 </body>
