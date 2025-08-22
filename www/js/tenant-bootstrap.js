@@ -32,3 +32,23 @@
   // تشخيص خفيف
   console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
 })();
+  // مِساعدة خفيفة لتوحيد بناء روابط الـAPI إن احتجتها
+  window.API = (path) => path.startsWith('/') ? path : ('/' + path);
+
+  // تشخيص خفيف
+  console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
+})();
+
+// إضافة دالة getContext لإرجاع سياق موحّد
+window.getContext = function () {
+  return {
+    userId: localStorage.getItem("userId") || null,
+    tenantId: localStorage.getItem("tenantId") || null,
+    animalId: localStorage.getItem("currentAnimalId") 
+              || localStorage.getItem("lastAnimalId") 
+              || null,
+    animalNumber: localStorage.getItem("currentAnimalNumber") || null,
+    eventDate: localStorage.getItem("lastEventDate") 
+              || new Date().toISOString().slice(0,10)
+  };
+};
