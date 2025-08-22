@@ -1,150 +1,89 @@
-// /js/events-core.js
-// Simple – Effective – Very Smart (no visual changes)
+// js/event-core.js
 
-export const Q = (s) => document.querySelector(s);
-
-export function pickVal(ids = []) {
-  for (const id of ids) {
-    const byId = document.getElementById(id);
-    if (byId && byId.value?.toString().trim() !== '') return byId.value.trim();
-    const byName = document.querySelector(`[name="${id}"]`);
-    if (byName && byName.value?.toString().trim() !== '') return byName.value.trim();
+// --- تتبع موحد ---
+window.dataLayer = window.dataLayer || [];
+window.t = window.t || {
+  event: function (name, params) {
+    window.dataLayer.push({ event: name, ...params });
+    console.log("Tracked:", name, params);
   }
-  return '';
-}
+};
 
-export function readCtxFromURL() {
-  const p = new URLSearchParams(location.search);
-  const pick = (...keys) => { for (const k of keys) { const v = p.get(k); if (v) return v; } return ''; };
-  return { animalId: pick('animalId','number','animalNumber','id'),
-           eventDate: pick('eventDate','date','dt','Date') };
-}
+// --- استخراج السياق (animalId, date, وغيرها) ---
+function getContext() {
+  const qs = new URLSearchParams(location.search);
 
-export function persistCtx({ animalId, eventDate }) {
-  try {
-    if (animalId) ['lastAnimalId','currentAnimalId','ctxAnimalId'].forEach(k=>localStorage.setItem(k, animalId));
-    if (eventDate) ['lastEventDate','eventDate','Date','dt'].forEach(k=>localStorage.setItem(k, eventDate));
-  } catch {}
-}
-
-export function deriveCtx() {
-  const u = readCtxFromURL();
-  const animalId = u.animalId || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
-  let eventDate = u.eventDate || localStorage.getItem('eventDate') || localStorage.getItem('lastEventDate') || '';
-  if (!eventDate) eventDate = new Date().toISOString().slice(0,10);
-  persistCtx({ animalId, eventDate });
-  return { animalId, eventDate };
-}
-
-export function prefillStandard(ctx, { animalSel = ['#animalId','[name="animalId"]'], dateSel = ['#eventDate','[name="eventDate"]'] } = {}) {
-  const a = animalSel.map(s=>Q(s)).find(Boolean); if (a && !a.value) a.value = ctx.animalId || '';
-  const d = dateSel.map(s=>Q(s)).find(Boolean); if (d && !d.value) d.value = ctx.eventDate || '';
-}
-
-function toKeysFromSelectors(selectors = []) {
-  return selectors.map(s => s.replace(/^#/, '').replace(/^\[name=\"/, '').replace(/\"\]$/, ''));
-}
-
-export function buildBase(eventType, ctx, { dateSel = ['#eventDate','[name="eventDate"]'], extra = {} } = {}) {
-  const dateKeys = Array.from(new Set(['eventDate', ...toKeysFromSelectors(dateSel), 'date', 'dt', 'Date']));
-  const eventDate = pickVal(dateKeys) || ctx.eventDate;
-  const details = extra.details || {};
-  return {
-    type: eventType,
-    eventType,
-    userId: localStorage.getItem('userId'),
-    tenantId: localStorage.getItem('tenantId') || 'default',
-    animalId: pickVal(['animalId']) || ctx.animalId,
-    animalNumber: pickVal(['animalNumber','number']) || ctx.animalId,
-    eventDate,
-    source: location.pathname.slice(1),
-    details,
-    ...details // compatibility للواجهات القديمة
+  // ترتيب الأولوية: URL → localStorage → sessionStorage
+  const ctx = {
+    animalId:
+      qs.get("animalId") ||
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      localStorage.getItem("lastAnimalId") ||
+      localStorage.getItem("currentAnimalId") ||
+      sessionStorage.getItem("ctxAnimalId") ||
+      "",
+    date:
+      qs.get("date") ||
+      qs.get("eventDate") ||
+      localStorage.getItem("lastEventDate") ||
+      localStorage.getItem("eventDate") ||
+      sessionStorage.getItem("ctxDate") ||
+      new Date().toISOString().slice(0, 10)
   };
-}
 
-export async function postToAPI(payload) {
-  const API_BASE = (localStorage.getItem('API_BASE') || '').replace(/\/$/, '');
-  const url = (API_BASE ? API_BASE : '') + '/api/events';
-  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  if (!res.ok) throw new Error('API failed: ' + res.status);
-  return res.json().catch(()=>({}));
-}
-
-export async function saveToFirestoreFallback(payload) {
-  try {
-    const cfgMod = await import('/js/firebase-config.js');
-    const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig || cfgMod.config;
-    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
-    const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
-  } catch (e) {
-    console.error('Firestore fallback failed', e);
-    throw e;
+  // خزن آخر سياق لاستعماله لاحقًا
+  if (ctx.animalId) {
+    localStorage.setItem("lastAnimalId", ctx.animalId);
+    localStorage.setItem("currentAnimalId", ctx.animalId);
+    sessionStorage.setItem("ctxAnimalId", ctx.animalId);
   }
+  if (ctx.date) {
+    localStorage.setItem("lastEventDate", ctx.date);
+    localStorage.setItem("eventDate", ctx.date);
+    sessionStorage.setItem("ctxDate", ctx.date);
+  }
+
+  return ctx;
 }
 
-export function dispatchSaved(detail) { document.dispatchEvent(new CustomEvent('event:saved', { detail })); }
+// --- حفظ حدث موحد ---
+async function saveEvent(payload) {
+  try {
+    // ضمّ الهوية + المصدر
+    const userId = localStorage.getItem("userId");
+    const tenantId = localStorage.getItem("tenantId");
+    const enriched = {
+      ...payload,
+      userId,
+      tenantId,
+      createdAt: new Date().toISOString()
+    };
 
-// الجديد: إمكانية تعطيل التحويل أو التحكم في التأخير
-export function smartRedirect(to) {
-  if (to === false || window.NO_AUTO_REDIRECT === true) return;
-  const target = to ?? (Q('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
-  const delay = Number(window.__redirectDelayMs || 1600);
-  setTimeout(()=>{ location.href = target; }, delay);
-}
+    // تتبع
+    t.event("event_save", enriched);
 
-export function bindStandardForm({ formSelector = 'form', saveBtnSelector = '#saveEvent' }, onSubmit) {
-  const form = Q(formSelector) || Q('#nutritionForm') || Q('form');
-  if (form) form.addEventListener('submit', onSubmit);
-  const btn = Q(saveBtnSelector) || Q('[data-action="save-event"]');
-  if (btn && form) btn.addEventListener('click', (e)=>{ e.preventDefault(); form.requestSubmit(); });
-}
+    // إرسال للسيرفر
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(enriched)
+    });
 
-export function guardLoggedIn() {
-  const userId = localStorage.getItem('userId');
-  if (!userId) {
-    alert('⚠️ يجب تسجيل الدخول أولًا.');
-    location.href = 'login.html';
+    if (!res.ok) throw new Error("خطأ في الحفظ");
+
+    smartAlerts.show("✅ تم تسجيل الحدث بنجاح", { type: "success" });
+
+    // بعد النجاح خزّن آخر معرف وتاريخ
+    if (enriched.animalId)
+      localStorage.setItem("lastAnimalId", enriched.animalId);
+    if (enriched.eventDate)
+      localStorage.setItem("lastEventDate", enriched.eventDate);
+
+    return true;
+  } catch (err) {
+    console.error("فشل حفظ الحدث:", err);
+    smartAlerts.show("❌ حدث خطأ أثناء الحفظ", { type: "error" });
     return false;
   }
-  return true;
-}
-
-export function initEventPage({
-  eventType,
-  formSelector = 'form',
-  animalSel = ['#animalId','[name="animalId"]'],
-  dateSel = ['#eventDate','[name="eventDate"]'],
-  onPrefill = ()=>{},
-  buildDetails = ()=>({}),
-  onSaved = ()=>{},
-  redirectTo,
-}) {
-  const ctx = deriveCtx();
-  prefillStandard(ctx, { animalSel, dateSel });
-
-  try { onPrefill(ctx); } catch(e){}
-
-  async function handle(e){
-    e?.preventDefault?.();
-    if (!guardLoggedIn()) return;
-
-    const details = buildDetails(ctx) || {};
-    const payload = buildBase(eventType, ctx, { dateSel, extra: { details } });
-
-    let mode = 'api';
-    try { await postToAPI(payload); }
-    catch(err){ console.warn('API error; fallback to Firestore', err); await saveToFirestoreFallback(payload); mode = 'firestore'; }
-
-    try { onSaved({ payload, mode }); } catch(e){}
-    dispatchSaved({ ok:true, mode, payload });
-
-    // إذا redirectTo === false لن نُحوّل تلقائيًا
-    smartRedirect(typeof redirectTo === 'undefined' ? undefined : redirectTo);
-  }
-
-  bindStandardForm({ formSelector }, handle);
 }
