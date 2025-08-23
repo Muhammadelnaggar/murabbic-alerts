@@ -1,6 +1,11 @@
 // www/js/event-core.js
 // ملف موحّد لحفظ جميع أحداث مربيك
 // يعتمد على tenant-bootstrap.js + api.js
+// تأكد إن getContext متوفرة
+if (typeof window.getContext !== "function") {
+  console.error("⚠️ getContext غير متعرفة – لازم تفتح الصفحة من event.html أو من add-event.html");
+  alert("❌ افتح التقييم من لوحة الأحداث أو من إضافة حدث، مش مباشرة من الرابط");
+}
 
 const getContext = window.getContext;
 
