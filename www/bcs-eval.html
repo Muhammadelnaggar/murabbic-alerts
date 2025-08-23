@@ -436,46 +436,49 @@ function loadRefVector(urls, score) {
 <script src="/js/event-core.js"></script>
   
 <script>
-  document.getElementById("saveBtn").addEventListener("click", async (e) => {
-    e.preventDefault();
+ document.getElementById("saveBtn").addEventListener("click", async (e) => {
+  e.preventDefault();
 
-    // 1. نجيب نوع الحيوان من الاختيار/التخزين
-    const kind = localStorage.getItem('animalKind') || 
-                 (document.getElementById('kindBuffalo')?.checked ? 'buffalo' : 'cow');
-    const type = localStorage.getItem('animalType') || '';
+  const ctx = getAnimalFromContext(); // بيرجع {id, number, date}
+  const kind = localStorage.getItem('animalKind') || 
+               (document.getElementById('kindBuffalo')?.checked ? 'buffalo' : 'cow');
+  const type = localStorage.getItem('animalType') || '';
 
-    // 2. نحسب الدرجة النهائية overall زي ما كان عندك
-    let overall = null;
-    if(kind === 'buffalo'){
-      if(typeof state.scores.rear !== 'number'){ 
-        alert('التقط لقطة خلفية للجاموس.'); 
-        return; 
-      }
-      overall = state.scores.rear;
-    } else {
-      const haveRear = typeof state.scores.rear === 'number';
-      const haveSide = typeof state.scores.side === 'number';
-      if(!haveRear && !haveSide){ 
-        alert('التقط زاوية واحدة على الأقل.'); 
-        return; 
-      }
-      overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) /
-                ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
+  let overall = null;
+  if (kind === 'buffalo') {
+    if (typeof state.scores.rear !== 'number') { 
+      alert('التقط لقطة خلفية للجاموس.'); 
+      return; 
     }
-
-    try {
-      // 3. نسجل عبر event-core
-      await eventCore.save("تقييم حالة جسمية", {
-        animalKind: kind,
-        animalType: type,
-        scores: { ...state.scores, overall }
-      });
-      alert("✅ تم حفظ التقييم بنجاح");
-    } catch(err) {
-      console.error(err);
-      alert("❌ حدث خطأ أثناء الحفظ");
+    overall = state.scores.rear;
+  } else {
+    const haveRear = typeof state.scores.rear === 'number';
+    const haveSide = typeof state.scores.side === 'number';
+    if (!haveRear && !haveSide) { 
+      alert('التقط زاوية واحدة على الأقل.'); 
+      return; 
     }
-  });
+    overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) /
+              ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
+  }
+
+  try {
+    const result = await eventCore.save("تقييم حالة جسمية", {
+      animalId: ctx.id || null,
+      animalNumber: ctx.number || null,
+      eventDate: ctx.date || new Date().toISOString().slice(0,10),
+      animalKind: kind,
+      animalType: type,
+      scores: { ...state.scores, overall }
+    });
+    console.log("✅ API result:", result);
+    alert("✅ تم حفظ التقييم بنجاح");
+  } catch(err) {
+    console.error("❌ API error:", err);
+    alert("❌ حدث خطأ أثناء الحفظ");
+  }
+});
+
 </script>
 
 </body>
