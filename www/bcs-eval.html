@@ -225,7 +225,7 @@
   function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth||preview.clientWidth, h=preview.videoHeight||preview.clientHeight; if(!w||!h) return null; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
   // ===== Hidden reference images =====
-  const REF_EXTS = ['jpg', 'png', 'webp', 'JPG', 'PNG', 'WEBP'];
+  const REF_EXTS = ['jpg','png','webp'];
 const BASES = ['images/'];  
 
 
@@ -406,11 +406,10 @@ function loadRefVector(urls, score) {
   function renderInitial(){ renderThumbs(); setAngle('rear'); renderOverall(); }
 
   (async function init(){ try{
-   const ctx = getContext();
-if (animalIdInput) animalIdInput.value = ctx.animalId || '';
-if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
-
-   
+    const ctx=getAnimalFromContext();
+    if(animalIdInput) animalIdInput.value = ctx.id || '';
+    if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
+    if(numberSpan) numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
 
     initKindBar();
 
@@ -474,18 +473,6 @@ if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
       console.error(err);
       alert("❌ حدث خطأ أثناء الحفظ");
     }
-  });
-</script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const ctx = window.getContext?.();
-    if (!ctx || !ctx.animalId) {
-      alert("⚠️ افتح التقييم من لوحة الأحداث أو من إضافة حدث (مش مباشرة من الرابط).");
-      return;
-    }
-
-    console.log("📌 Context loaded:", ctx);
-    // هنا تكمّل باقي الكود (التقاط الصور – الحفظ – إلخ)
   });
 </script>
 
