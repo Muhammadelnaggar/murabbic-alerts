@@ -225,7 +225,7 @@
   function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth||preview.clientWidth, h=preview.videoHeight||preview.clientHeight; if(!w||!h) return null; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
   // ===== Hidden reference images =====
-  const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
+  const REF_EXTS = ['jpg','png','webp'];
 const BASES = ['images/'];  
 
 
