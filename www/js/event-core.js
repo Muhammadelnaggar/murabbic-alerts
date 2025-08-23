@@ -1,10 +1,4 @@
-// www/js/event-core.js
-// ملف موحّد لحفظ جميع أحداث مربيك
-// يعتمد على tenant-bootstrap.js + api.js
-// تأكد إن getContext متوفرة
-
 const getContext = window.getContext;
-
 
 window.eventCore = {
   /**
@@ -23,7 +17,8 @@ window.eventCore = {
       animalNumber: ctx.animalNumber || null,
       eventType: eventType,      // لازم بالعربي
       eventDate: ctx.eventDate,
-      ...extra
+      ...extra,
+      createdAt: new Date().toISOString()
     };
 
     // 🔹 تتبع قبل الحفظ
@@ -34,6 +29,10 @@ window.eventCore = {
       animalId: payload.animalId,
       eventDate: payload.eventDate
     });
+
+    // 🟢 لوجات ديباج
+    console.log("🚀 getContext() = ", ctx);
+    console.log("🚀 Payload to save:", payload);
 
     try {
       const res = await fetch("/api/events", {
