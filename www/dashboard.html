@@ -403,9 +403,15 @@
 <script type="module" src="/js/health-check.js"></script>
 </body>
 </html>
+<script>
+  document.getElementById("goBCS").onclick   = () => location.href = buildTargetUrl("bcs-eval.html");
+  document.getElementById("goFeces").onclick = () => location.href = buildTargetUrl("feces-eval.html");
+  document.getElementById("goRation").onclick= () => location.href = buildTargetUrl("nutrition.html");
+</script>
 
 </body>
 </html>
+
 
 
 
