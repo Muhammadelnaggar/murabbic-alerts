@@ -31,7 +31,7 @@
 
   // تشخيص خفيف
   console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
-})();   // ← قفل الـ IIFE هنا
+  // ← قفل الـ IIFE هنا
 
 // --- تعريف getContext بعد الـ IIFE ---
 window.getContext = function () {
@@ -46,3 +46,5 @@ window.getContext = function () {
            || new Date().toISOString().slice(0,10)
   };
 };
+  
+})(); 
