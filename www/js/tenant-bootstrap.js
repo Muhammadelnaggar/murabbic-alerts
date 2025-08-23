@@ -30,19 +30,19 @@
 
   // تشخيص خفيف
   console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
-
   // --- تعريف getContext جوا نفس IIFE ---
-  window.getContext = function () {
-    return {
-      userId: localStorage.getItem("userId") || null,
-      tenantId: localStorage.getItem("tenantId") || null,
-      animalId: localStorage.getItem("currentAnimalId") 
-             || localStorage.getItem("lastAnimalId") 
-             || null,
-      animalNumber: localStorage.getItem("currentAnimalNumber") || null,
-      eventDate: localStorage.getItem("lastEventDate") 
-             || new Date().toISOString().slice(0,10)
-    };
-  };
 
 })();  // ← قفلة واحدة بس هنا
+window.getContext = function () {
+  return {
+    userId: localStorage.getItem("userId") || null,
+    tenantId: localStorage.getItem("tenantId") || null,
+    animalId: localStorage.getItem("currentAnimalId") 
+           || localStorage.getItem("lastAnimalId") 
+           || null,
+    animalNumber: localStorage.getItem("currentAnimalNumber") || null,
+    eventDate: localStorage.getItem("lastEventDate") 
+           || new Date().toISOString().slice(0,10)
+  };
+};
+
