@@ -19,32 +19,30 @@
     const req = (input instanceof Request) ? input : new Request(input, init || {});
     const headers = new Headers(req.headers || {});
     if (uid && shouldAttachHeader(req.url)) {
-      // لا تكتب فوق الهيدر إن كان مُرسل يدويًا
       if (!headers.has('X-User-Id')) headers.set('X-User-Id', uid);
     }
     const nextReq = new Request(req, { headers });
     return _fetch(nextReq);
   };
 
-  // مِساعدة خفيفة لتوحيد بناء روابط الـAPI إن احتجتها
+  // مِساعدة خفيفة لتوحيد بناء روابط الـAPI
   window.API = (path) => path.startsWith('/') ? path : ('/' + path);
 
   // تشخيص خفيف
   console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
-  // ← قفل الـ IIFE هنا
 
-// --- تعريف getContext بعد الـ IIFE ---
-window.getContext = function () {
-  return {
-    userId: localStorage.getItem("userId") || null,
-    tenantId: localStorage.getItem("tenantId") || null,
-    animalId: localStorage.getItem("currentAnimalId") 
-           || localStorage.getItem("lastAnimalId") 
-           || null,
-    animalNumber: localStorage.getItem("currentAnimalNumber") || null,
-    eventDate: localStorage.getItem("lastEventDate") 
-           || new Date().toISOString().slice(0,10)
+  // --- تعريف getContext جوا نفس IIFE ---
+  window.getContext = function () {
+    return {
+      userId: localStorage.getItem("userId") || null,
+      tenantId: localStorage.getItem("tenantId") || null,
+      animalId: localStorage.getItem("currentAnimalId") 
+             || localStorage.getItem("lastAnimalId") 
+             || null,
+      animalNumber: localStorage.getItem("currentAnimalNumber") || null,
+      eventDate: localStorage.getItem("lastEventDate") 
+             || new Date().toISOString().slice(0,10)
+    };
   };
-};
-  
-})(); 
+
+})();  // ← قفلة واحدة بس هنا
