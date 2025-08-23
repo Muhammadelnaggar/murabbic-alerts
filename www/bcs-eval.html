@@ -281,8 +281,32 @@ const BASES = ['images/'];
   }
 
   function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
+function loadRefVector(urls, score) {
+  let i = 0;
+  return new Promise(res => {
+    function tryNext() {
+      if (i >= urls.length) return res(null);
 
-  function loadRefVector(urls, score){ let i=0; return new Promise(res=>{ function next(){ if(i>=urls.length) return res(null); const img=new Image(); try{ const abs=new URL(urls[i], location.href); if(abs.origin!==location.origin) img.crossOrigin='anonymous'; }catch{} img.onload=()=>res({score, vec:imgToVec(img)}); img.onerror=()=>{ i++; next(); }; img.src=urls[i]; } next(); }); }
+      const url = urls[i];
+      // جرب الأول هل الملف موجود
+      fetch(url, { method: "HEAD" })
+        .then(r => {
+          if (!r.ok) {
+            i++;
+            tryNext();
+            return;
+          }
+          const img = new Image();
+          img.onload = () => res({ score, vec: imgToVec(img) });
+          img.onerror = () => { i++; tryNext(); };
+          img.src = url;
+        })
+        .catch(() => { i++; tryNext(); });
+    }
+    tryNext();
+  });
+}
+
   async function buildRefsFor(angle){ const list=buildRefList(angle); const arr=await Promise.all(list.map(item=>loadRefVector(item.urls,item.score))); return arr.filter(Boolean); }
 
   const refsCache = {rear:null, side:null};
