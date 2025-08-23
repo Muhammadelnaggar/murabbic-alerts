@@ -406,10 +406,11 @@ function loadRefVector(urls, score) {
   function renderInitial(){ renderThumbs(); setAngle('rear'); renderOverall(); }
 
   (async function init(){ try{
-    const ctx=getAnimalFromContext();
-    if(animalIdInput) animalIdInput.value = ctx.id || '';
-    if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
-    if(numberSpan) numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
+   const ctx = getContext();
+if (animalIdInput) animalIdInput.value = ctx.animalId || '';
+if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
+
+   
 
     initKindBar();
 
