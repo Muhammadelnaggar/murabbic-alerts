@@ -342,45 +342,7 @@
   nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
 
   // حفظ التقييم
-  if(saveBtn) saveBtn.addEventListener('click', async ()=>{
-    try{
-      saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…';
-      const ctx=getAnimalFromContext();
-      if(animalIdInput) animalIdInput.value = animalIdInput.value || ctx.id || '';
-      if(eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
-      const animalId = (animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
-      const date = (eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
-
-      const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
-      const type = localStorage.getItem('animalType') || (TYPE_OPTIONS[kind]?.[0] || '');
-
-      let overall=null;
-      if(kind==='buffalo'){
-        if(typeof state.scores.rear!=='number'){ alert('التقط لقطة خلفية للجاموس.'); return; }
-        overall = state.scores.rear;
-      }else{
-        const haveRear=typeof state.scores.rear==='number';
-        const haveSide=typeof state.scores.side==='number';
-        if(!haveRear && !haveSide){ alert('التقط زاوية واحدة على الأقل.'); return; }
-        overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) / ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
-      }
-
-      if(isDemo){
-        const doc={ type:'BCS بالكاميرا (عرض)', animalId, date, animalKind:kind, animalType:type, scores:{...state.scores, overall}, captures:{...state.captures}, createdAt: Date.now() };
-        localStorage.setItem('murabbik_bcs_demo_last', JSON.stringify(doc));
-        alert('تم الحفظ محليًا (وضع العرض).');
-      }else{
-        try{
-          const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } = await import('./js/firebase-config.js');
-          const uploaded={};
-          for(const a of anglesOrder){ if(state.captures[a]){ const path=`bcs-evaluations/${animalId}/${date}/${a}.jpg`; const r=ref(storage, path); await uploadString(r, state.captures[a], 'data_url'); uploaded[a]=await getDownloadURL(r); } }
-          const doc={ type:'BCS بالكاميرا', animalId, date, animalKind:kind, animalType:type, scores:{...state.scores, overall}, images: uploaded, createdAt: serverTimestamp() };
-          await addDoc(collection(db,'events'), doc);
-          alert('تم الحفظ ورفع الصور.');
-        }catch(err){ console.warn(err); alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.'); localStorage.setItem('murabbik_bcs_last', JSON.stringify({animalId,date,animalKind:kind,animalType:type,scores:{...state.scores,overall},captures:{...state.captures},at:Date.now()})); }
-      }
-    } finally { saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم'; }
-  });
+  
 
   async function runDemo(){
     const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
@@ -442,5 +404,50 @@
   new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded', nukeEditorCard);
 </script>
+<!-- سكربت مشترك للأحداث -->
+<script src="js/event-core.js"></script>
+<script>
+  document.getElementById("saveBtn").addEventListener("click", async (e) => {
+    e.preventDefault();
+
+    // 1. نجيب نوع الحيوان من الاختيار/التخزين
+    const kind = localStorage.getItem('animalKind') || 
+                 (document.getElementById('kindBuffalo')?.checked ? 'buffalo' : 'cow');
+    const type = localStorage.getItem('animalType') || '';
+
+    // 2. نحسب الدرجة النهائية overall زي ما كان عندك
+    let overall = null;
+    if(kind === 'buffalo'){
+      if(typeof state.scores.rear !== 'number'){ 
+        alert('التقط لقطة خلفية للجاموس.'); 
+        return; 
+      }
+      overall = state.scores.rear;
+    } else {
+      const haveRear = typeof state.scores.rear === 'number';
+      const haveSide = typeof state.scores.side === 'number';
+      if(!haveRear && !haveSide){ 
+        alert('التقط زاوية واحدة على الأقل.'); 
+        return; 
+      }
+      overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) /
+                ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
+    }
+
+    try {
+      // 3. نسجل عبر event-core
+      await eventCore.save("تقييم حالة جسمية", {
+        animalKind: kind,
+        animalType: type,
+        scores: { ...state.scores, overall }
+      });
+      alert("✅ تم حفظ التقييم بنجاح");
+    } catch(err) {
+      console.error(err);
+      alert("❌ حدث خطأ أثناء الحفظ");
+    }
+  });
+</script>
+
 </body>
 </html>
