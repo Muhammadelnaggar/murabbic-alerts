@@ -31,22 +31,9 @@
 
   // تشخيص خفيف
   console.debug('[tenant-bootstrap] X-User-Id =', uid || '(مفقود)');
-})();   // ← بيقفّل الـ IIFE هنا بس
+})();   // ← قفل الـ IIFE هنا
 
-// إضافة دالة getContext لإرجاع سياق موحّد
-window.getContext = function () {
-  return {
-    userId: localStorage.getItem("userId") || null,
-    tenantId: localStorage.getItem("tenantId") || null,
-    animalId: localStorage.getItem("currentAnimalId") 
-           || localStorage.getItem("lastAnimalId") 
-           || null,
-    animalNumber: localStorage.getItem("currentAnimalNumber") || null,
-    eventDate: localStorage.getItem("lastEventDate") 
-           || new Date().toISOString().slice(0,10)
-  };
-};
-// إضافة دالة getContext لإرجاع سياق موحّد
+// --- تعريف getContext بعد الـ IIFE ---
 window.getContext = function () {
   return {
     userId: localStorage.getItem("userId") || null,
