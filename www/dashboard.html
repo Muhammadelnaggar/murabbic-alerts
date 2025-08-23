@@ -408,9 +408,41 @@
   document.getElementById("goFeces").onclick = () => location.href = buildTargetUrl("feces-eval.html");
   document.getElementById("goRation").onclick= () => location.href = buildTargetUrl("nutrition.html");
 </script>
+<script>
+  // دالة لبناء الرابط مع تمرير animalId و date لو موجودين
+  function buildTargetUrl(base) {
+    const params = new URLSearchParams();
+    const animalId = localStorage.getItem("lastAnimalId") || "";
+    const date = localStorage.getItem("lastEventDate") || "";
+    if (animalId) params.set("animalId", animalId);
+    if (date) params.set("date", date);
+    return base + "?" + params.toString();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // زر الروث
+    const fecesBtn = document.getElementById("goFeces");
+    if (fecesBtn) fecesBtn.addEventListener("click", () => {
+      location.href = buildTargetUrl("feces-eval.html");
+    });
+
+    // زر BCS
+    const bcsBtn = document.getElementById("goBCS");
+    if (bcsBtn) bcsBtn.addEventListener("click", () => {
+      location.href = buildTargetUrl("bcs-eval.html");
+    });
+
+    // زر العليقة
+    const rationBtn = document.getElementById("goRation");
+    if (rationBtn) rationBtn.addEventListener("click", () => {
+      location.href = buildTargetUrl("nutrition.html");
+    });
+  });
+</script>
 
 </body>
 </html>
+
 
 
 
