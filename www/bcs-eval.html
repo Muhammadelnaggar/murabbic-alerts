@@ -143,7 +143,21 @@
   const isDemo = qs.get('demo')==='1' || qs.get('mode')==='demo';
 
   function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
-  function getAnimalFromContext(){ const id=qs.get('animalId')||localStorage.getItem('currentAnimalId')||''; const number=qs.get('number')||localStorage.getItem('currentAnimalNumber')||''; const date=qs.get('date')||sessionStorage.getItem('currentEventDate')||localStorage.getItem('currentEventDate')||todayCairo(); if(id) localStorage.setItem('currentAnimalId',id); if(number) localStorage.setItem('currentAnimalNumber',number); if(date){ localStorage.setItem('currentEventDate',date); sessionStorage.setItem('currentEventDate',date);} return {id,number,date}; }
+window.getAnimalFromContext = function(){
+  const qs = new URLSearchParams(location.search);
+  const id = qs.get('animalId') || localStorage.getItem('currentAnimalId') || '';
+  const number = qs.get('number') || localStorage.getItem('currentAnimalNumber') || '';
+  const date = qs.get('date') || sessionStorage.getItem('currentEventDate') || localStorage.getItem('currentEventDate') || todayCairo();
+
+  if (id) localStorage.setItem('currentAnimalId', id);
+  if (number) localStorage.setItem('currentAnimalNumber', number);
+  if (date) { 
+    localStorage.setItem('currentEventDate', date);
+    sessionStorage.setItem('currentEventDate', date);
+  }
+
+  return { id, number, date };
+};
 
   const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
   const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
