@@ -1,78 +1,40 @@
-const getContext = window.getContext;
+export async function save(eventType, payload) {
+  try {
+    const ctx = window.getAnimalFromContext ? window.getAnimalFromContext() : {};
+    console.log("🚀 getContext() =", ctx);
 
-window.eventCore = {
-  /**
-   * حفظ حدث موحّد
-   * @param {string} eventType - نوع الحدث (بالعربي: "تلقيح" / "لبن يومي" / "عرج" ...)
-   * @param {object} extra - بيانات إضافية خاصة بالحدث
-   */
-  async save(eventType, extra = {}) {
-    const ctx = getContext();
-
-    // بناء الـpayload
-    const payload = {
-      userId: ctx.userId,
-      tenantId: ctx.tenantId || ctx.userId,
-      animalId: ctx.animalId || null,
-      animalNumber: ctx.animalNumber || null,
-      eventType: eventType,      // لازم بالعربي
-      eventDate: ctx.eventDate,
-      ...extra,
-      createdAt: new Date().toISOString()
+    const body = {
+      type: eventType,
+      ...payload,
+      userId: ctx.userId || localStorage.getItem("userId") || null,
     };
 
-    // 🔹 تتبع قبل الحفظ
-    window.dataLayer = window.dataLayer || [];
-    t?.event("event_save", {
-      page: location.pathname,
-      eventType: payload.eventType,
-      animalId: payload.animalId,
-      eventDate: payload.eventDate
+    console.log("📦 Payload to save:", body);
+
+    const headers = {
+      "Content-Type": "application/json",
+      "X-User-Id": body.userId || "",
+    };
+
+    console.log("📡 Sending fetch to /api/events with headers:", headers);
+
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
     });
 
-    // 🟢 لوجات ديباج
-    console.log("🚀 getContext() = ", ctx);
-    console.log("🚀 Payload to save:", payload);
+    console.log("🌐 Response status:", res.status);
 
-    try {
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": ctx.userId
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        throw new Error(`فشل حفظ الحدث (${eventType})`);
-      }
-
-      const data = await res.json();
-      console.log(`✅ تم حفظ حدث (${eventType}):`, data);
-
-      // 🔹 تتبع نجاح الحفظ
-      t?.event("event_saved_success", {
-        page: location.pathname,
-        eventType: payload.eventType,
-        animalId: payload.animalId,
-        eventDate: payload.eventDate
-      });
-
-      return data;
-
-    } catch (err) {
-      console.error("❌ خطأ أثناء الحفظ:", err);
-
-      // 🔹 تتبع فشل الحفظ
-      t?.event("event_saved_error", {
-        page: location.pathname,
-        eventType: eventType,
-        error: err.message
-      });
-
-      alert("حدث خطأ أثناء الحفظ");
-      throw err;
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("❌ Server responded with:", text);
+      throw new Error("Server error: " + text);
     }
+
+    return await res.json();
+  } catch (err) {
+    console.error("🔥 save() failed:", err);
+    throw err;
   }
-};
+}
