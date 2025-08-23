@@ -475,6 +475,18 @@ function loadRefVector(urls, score) {
     }
   });
 </script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const ctx = window.getContext?.();
+    if (!ctx || !ctx.animalId) {
+      alert("⚠️ افتح التقييم من لوحة الأحداث أو من إضافة حدث (مش مباشرة من الرابط).");
+      return;
+    }
+
+    console.log("📌 Context loaded:", ctx);
+    // هنا تكمّل باقي الكود (التقاط الصور – الحفظ – إلخ)
+  });
+</script>
 
 </body>
 </html>
