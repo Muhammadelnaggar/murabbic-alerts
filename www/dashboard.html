@@ -439,9 +439,32 @@
     });
   });
 </script>
+<script>
+  (function(){
+    const qs  = new URLSearchParams(location.search);
+    const id  = qs.get('animalId') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+    const dt  = qs.get('date') || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10);
+
+    document.getElementById('goFeces')?.addEventListener('click', ()=>{
+      const url = id ? `feces-eval.html?animalId=${encodeURIComponent(id)}&date=${dt}` : `feces-eval.html`;
+      location.href = url;
+    });
+
+    document.getElementById('goBCS')?.addEventListener('click', ()=>{
+      const url = id ? `bcs-eval.html?animalId=${encodeURIComponent(id)}&date=${dt}` : `bcs-eval.html`;
+      location.href = url;
+    });
+
+    document.getElementById('goRation')?.addEventListener('click', ()=>{
+      const url = id ? `nutrition.html?animalId=${encodeURIComponent(id)}&date=${dt}` : `nutrition.html`;
+      location.href = url;
+    });
+  })();
+</script>
 
 </body>
 </html>
+
 
 
 
