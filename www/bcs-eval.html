@@ -452,6 +452,7 @@ function loadRefVector(urls, score) {
 <script>
  document.getElementById("saveBtn").addEventListener("click", async (e) => {
   e.preventDefault();
+ console.log("🔔 saveBtn clicked");
 
   const ctx = getAnimalFromContext(); // بيرجع {id, number, date}
   const kind = localStorage.getItem('animalKind') || 
@@ -475,6 +476,14 @@ function loadRefVector(urls, score) {
     overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) /
               ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
   }
+      console.log("📦 payload before save:", {
+    animalId: ctx.id,
+    animalNumber: ctx.number,
+    eventDate: ctx.date,
+    kind,
+    type,
+    scores: { ...state.scores, overall }
+  });
 
   try {
     const result = await eventCore.save("تقييم حالة جسمية", {
