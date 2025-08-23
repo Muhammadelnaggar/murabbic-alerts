@@ -200,7 +200,9 @@
   }
 
   const state={ currentAngle:'rear', stream:null, track:null, capabilities:null, torchOn:false, captures:{rear:null, side:null}, scores:{rear:null, side:null} };
-  const anglesOrder=['rear','side'];
+  window.state = state;
+
+  const anglesOrder=['rear','side'];// هنا؟
   const angleLabels={ rear:'خلفية', side:'جانبية' };
 
   function fitOverlay(){ const r=preview.getBoundingClientRect(); overlay.width=Math.max(1,Math.floor(r.width*devicePixelRatio)); overlay.height=Math.max(1,Math.floor(r.height*devicePixelRatio)); overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
@@ -231,17 +233,17 @@ const BASES = ['images/'];
   const MAP_COW = {
     side: [
       {score:2,    bases:['bsc2_side']},
-      {score:2.75, bases:['bsc2_75_side','bsc2.75_side']},
+      {score:2.75, bases:['bsc2_75_side']},
       {score:3,    bases:['bsc3_side']},
-      {score:3.25, bases:['bsc3_25_side','bsc3.25_side']},
+      {score:3.25, bases:['bsc3_25_side']},
       {score:4,    bases:['bsc4_side']},
       {score:5,    bases:['bsc5_side']},
     ],
     rear: [
       {score:2,    bases:['bsc2_rear']},
-      {score:2.75, bases:['bsc2_75_rear','bsc2.75_rear']},
+      {score:2.75, bases:['bsc2_75_rear']},
       {score:3,    bases:['bsc3_rear']},
-      {score:3.25, bases:['bsc3_25_rear','bsc3.25_rear']},
+      {score:3.25, bases:['bsc3_25_rear']},
       {score:4,    bases:['bsc4_rear']},
       {score:5,    bases:['bsc5_rear']},
     ]
