@@ -450,40 +450,43 @@ function loadRefVector(urls, score) {
 <script src="/js/event-core.js"></script>
   
 <script>
- document.getElementById("saveBtn").addEventListener("click", async (e) => {
-  e.preventDefault();
- const payload = {
-    animalId: localStorage.getItem("currentAnimalId") || "",
-    animalNumber: localStorage.getItem("currentAnimalId") || "",
-    eventDate: localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10),
-    eventType: "تقييم حالة الجسم (BCS)",
-    score: window.bcsScore ?? 0
+document.addEventListener("DOMContentLoaded", () => {
+  const saveBtn = document.getElementById("saveBtn");
+  if (!saveBtn) return;   // لو الزر مش موجود ما يعملش حاجة
 
-    source: "bcs-eval.html"
-  };
+  saveBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
 
+    const payload = {
+      animalId: localStorage.getItem("currentAnimalId") || "",
+      animalNumber: localStorage.getItem("currentAnimalId") || "",
+      eventDate: localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10),
+      eventType: "تقييم حالة الجسم (BCS)",
+      score: Number(window.bcsScore) || 0,
+      value: Number(window.bcsScore) || 0,
+      source: "bcs-eval.html"
+    };
 
-  try {
-    console.log("📦 payload to send:", payload);
+    try {
+      console.log("📦 payload to send:", payload);
 
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": localStorage.getItem("userId") || "",
-      },
-      body: JSON.stringify(payload),
-    });
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": localStorage.getItem("userId") || "",
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (!res.ok) throw new Error("API error");
-    alert("✅ تم حفظ التقييم بنجاح");
-  } catch (err) {
-    console.error("API error:", err);
-    alert("❌ حدث خطأ أثناء الحفظ");
-  }
-
+      if (!res.ok) throw new Error("API error");
+      alert("✅ تم حفظ التقييم بنجاح");
+    } catch (err) {
+      console.error("API error:", err);
+      alert("❌ حدث خطأ أثناء الحفظ");
+    }
+  });
 });
-
 </script>
 
 </body>
