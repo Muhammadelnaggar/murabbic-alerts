@@ -460,9 +460,11 @@ function loadRefVector(urls, score) {
     score: window.bcsScore || null,
     source: "bcs-eval.html"
   };
-console.log("📦 payload to send:", payload);
+
 
   try {
+    console.log("📦 payload to send:", payload);
+
     const res = await fetch("/api/events", {
       method: "POST",
       headers: {
