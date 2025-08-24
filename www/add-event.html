@@ -322,9 +322,72 @@ document.addEventListener("DOMContentLoaded", () => {
 <!-- لازم يكون موجود -->
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/app-core.js"></script>
+<!-- 1) تهيئة الهوية -->
+<script>
+window.authReady = (async () => {
+  // 1) حمِّل البوتستراب لو مش موجود أصلاً
+  if (!window.tenantBootstrapLoaded) {
+    await new Promise((ok, err) => {
+      const s = document.createElement('script');
+      s.src = '/js/tenant-bootstrap.js';
+      s.onload = () => { window.tenantBootstrapLoaded = true; ok(); };
+      s.onerror = () => err(new Error('tenant-bootstrap missing'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // 2) انتظر init لو موجودة
+  if (window.tenantBootstrap?.init) {
+    try { await window.tenantBootstrap.init(); } catch(e) {}
+  }
+
+  // 3) لو مفيش userId في الذاكرة، جرّب استعادته من LocalStorage
+  if (!window.currentUserId) {
+    const uid = localStorage.getItem('userId');
+    if (uid) window.currentUserId = uid;
+  }
+
+  // 4) اختبر الجلسة من السيرفر (غير إجباري لكنه مفيد للموبايل)
+  try {
+    const API_BASE = window.API_BASE || '';
+    const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+    if (r.ok) {
+      const me = await r.json().catch(()=>({}));
+      if (me?.userId) window.currentUserId = me.userId;
+    }
+  } catch(e){}
+
+  return Boolean(window.currentUserId);
+})();
+</script>
+
+<!-- 2) بوابة الدخول (حارس واحد موحد) -->
+<script>
+(async () => {
+  // امنع السباق: استنى authReady لحد 5 ثواني بحد أقصى
+  const ok = await Promise.race([
+    window.authReady,
+    new Promise(res => setTimeout(() => res(false), 5000))
+  ]);
+
+  if (!ok) {
+    // لو لسه مش متأكدين من الهوية، ما نعملش Loop لا نهائي — سجّل سبب واضح وارجع للّوجين مرة واحدة
+    console.warn('Auth not ready; redirecting to login once.');
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace(`/login.html?next=${next}`);
+    return;
+  }
+
+  console.log('✅ Auth OK as', window.currentUserId);
+})();
+</script>
+
+<!-- 3) بقية سكربتات الصفحة (بعد التأكد من الهوية) -->
+<script type="module" src="/js/app-core.js"></script>
 
 </body>
 </html>
+
 
 
 
