@@ -89,7 +89,7 @@
     <div class="bar">
       <button class="btn" id="wxRefresh" type="button">تحديث</button>
       <button class="btn" id="wxPin" type="button">ثبّت</button>
-      <span style="margin-inline-start:auto;font-weight:bold;">موضع الحالي</span>
+      <span style="margin-inline-start:auto;font-weight:bold;">الموضع</span>
       <button class="seg" id="segFarm" type="button">مزرعتي</button>
       <button class="seg" id="segGPS" type="button">موقعي</button>
     </div>
@@ -118,14 +118,68 @@
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-    <div class="tile" id="sensorsTile" role="button" tabindex="0">
+    <div class="tile" id="sensorsTile" role="button" tabindex="0" onclick="location.href='sensor-test.html'">
       <span class="icon">🛰️</span>
       الأجهزة والحساسات
       <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
     </div>
-    <div class="tile" id="rationTile" role="button" tabindex="0" onclick="location.href='nutrition.html'">
-      تقييم العليقة
+    <div class="tile" id="nutritionEvalTile" role="button" tabindex="0" onclick="location.href='nutrition-eval.html'">
+      تقييم التغذية
     </div>
   </div>
+
+  <!-- سكربت الويدجت -->
+  <script>
+    (function(){
+      const tEl=document.getElementById('wxTemp');
+      const hEl=document.getElementById('wxHum');
+      const thiEl=document.getElementById('wxTHI');
+      const sEl=document.getElementById('wxState');
+      const thiArc=document.getElementById('thiArc');
+      const thiNeedle=document.getElementById('thiNeedle');
+
+      function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
+      function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
+      function colorAndText(thi,b){
+        if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
+        if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
+        if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
+        if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
+        return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
+      }
+      async function fetchWeather(){
+        try{
+          const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&current=temperature_2m,relative_humidity_2m&timezone=auto`);
+          const j=await r.json();
+          return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
+        }catch{return null;}
+      }
+      function drawTHI(thi){
+        const b=bands();
+        if(thiArc){
+          thiArc.style.background = `conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)`;
+        }
+        if(thiNeedle){
+          const ang=-120+((thi-50)/40)*240;
+          thiNeedle.style.setProperty('--angle',ang+'deg');
+        }
+        const {bg,txt}=colorAndText(thi,b);
+        document.getElementById('weatherClassic').style.background = bg;
+        sEl.textContent = txt;
+      }
+      async function render(){
+        const data=await fetchWeather();
+        if(!data) return;
+        const t=Math.round(data.t), h=Math.round(data.h);
+        const thi=THI(t,h);
+        tEl.textContent=`${t}°C`;
+        hEl.textContent=`${h}%`;
+        thiEl.textContent=thi;
+        drawTHI(thi);
+      }
+      document.getElementById('wxRefresh').addEventListener('click',()=>render());
+      document.addEventListener('DOMContentLoaded',()=>render());
+    })();
+  </script>
 </body>
 </html>
