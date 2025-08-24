@@ -1,29 +1,54 @@
 // /js/calving.js
-import { initEventPage, Q } from '/js/events-core.js';
-import { onCalvingPrefill, onCalvingSave } from '/js/track-calving.js';
+import { getContext } from "./event-core.js";
 
-function ensureAnimalOrRedirect(ctx){
-  const a = Q('#animalId')?.value?.trim() || ctx.animalId;
-  if (!a){ alert('❗ رقم الحيوان مفقود'); location.href = 'add-event.html'; return false; }
-  return true;
-}
+document.addEventListener("DOMContentLoaded", () => {
+  // 1) قراءة السياق (animalId + date)
+  const ctx = getContext();
+  console.log("📌 Calving context:", ctx);
 
-initEventPage({
-  eventType: 'ولادة',
-  formSelector: '#calvingForm, form[data-event="calving"], form',
-  animalSel: ['#animalId','[name="animalId"]'],
-  dateSel: ['#calvingDate','[name="calvingDate"]','#eventDate','[name="eventDate"]'],
-  onPrefill: (ctx) => {
-    if (!ensureAnimalOrRedirect(ctx)) return;
-    onCalvingPrefill({ animalId: ctx.animalId, date: ctx.eventDate, source: location.pathname.slice(1) });
-  },
-  buildDetails: () => ({
-    calvingDate: (Q('#calvingDate')?.value || Q('[name="calvingDate"]')?.value || Q('#eventDate')?.value || '').trim(),
-    birthEase: (document.querySelector('input[name="birthEase"]:checked')||{}).value,
-    calfGender: (document.querySelector('input[name="calfGender"]:checked')||{}).value,
-    calfId: (Q('#calfId')?.value || Q('[name="calfId"]')?.value || '').trim(),
-    calfFate: (document.querySelector('input[name="calfFate"]:checked')||{}).value,
-  }),
-  onSaved: ({ payload, mode }) =>
-    onCalvingSave({ animalId: payload.animalId, date: payload.eventDate, mode, source: payload.source })
+  // 2) تخزين آخر قيم (fallback لو الصفحة تفتحت مباشرة)
+  if (ctx.animalId) localStorage.setItem("lastAnimalId", ctx.animalId);
+  if (ctx.eventDate) localStorage.setItem("lastEventDate", ctx.eventDate);
+
+  // 3) ملء الحقول في النموذج (لو عندك input#animalId و input#eventDate)
+  document.querySelector("#animalId")?.setAttribute("value", ctx.animalId);
+  document.querySelector("#eventDate")?.setAttribute("value", ctx.eventDate);
+
+  // 4) حفظ النموذج عند الضغط على زر الحفظ
+  const form = document.querySelector("#calvingForm");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      // بناء الحمولة (payload)
+      const payload = {
+        eventType: "ولادة",
+        animalId: ctx.animalId,
+        eventDate: ctx.eventDate || new Date().toISOString().slice(0, 10),
+        notes: form.querySelector("#notes")?.value || "",
+        createdAt: new Date().toISOString(),
+        source: "calving.html"
+      };
+
+      console.log("📦 Calving payload:", payload);
+
+      try {
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          alert("✅ تم حفظ حدث الولادة بنجاح");
+          window.location.href = "cow-card.html?animalId=" + ctx.animalId;
+        } else {
+          alert("⚠️ حدث خطأ أثناء الحفظ");
+        }
+      } catch (err) {
+        console.error("❌ Calving save error:", err);
+        alert("❌ تعذر الاتصال بالسيرفر");
+      }
+    });
+  }
 });
