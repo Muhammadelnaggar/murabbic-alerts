@@ -1,164 +1,230 @@
-<!-- calving.html (نسخة مُراجَعة — بدون أي تغيير بصري) -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل حدث ولادة</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل حدث الولادة — مُرَبِّك</title>
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
-      padding: 20px;
-      margin: 0;
-    }
+    :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0}
+    .bar{max-width:920px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .title{font-weight:700;color:var(--green-600)}
 
-    h2 {
-      text-align: center;
-      color: #2e7d32;
-      margin-bottom: 30px;
-      font-size: 26px;
-    }
+    main{max-width:920px;margin:16px auto;padding:16px}
+    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    label{font-weight:600;font-size:14px;color:#0f172a}
+    input,select,textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
+    textarea{min-height:80px;resize:vertical}
+    .row{display:grid;gap:12px}
+    @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
+    .actions{display:flex;gap:10px;justify-content:stretch;margin-top:12px}
+    button{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:700;cursor:pointer}
+    .save{background:var(--green);color:#fff}
+    .ghost{background:#eef2f7;color:#0f172a}
 
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      max-width: 500px;
-      margin: auto;
-      background: #ffffff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
-    label {
-      font-weight: bold;
-      color: #1b5e20;
-    }
-
-    input, select, button {
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    .radio-group {
-      display: flex;
-      justify-content: space-between;
-      padding: 0 10px;
-    }
-
-    .radio-group label {
-      margin-left: 10px;
-      font-weight: normal;
-    }
-
-    button {
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    button:hover {
-      background-color: #1a6324;
-    }
-
-    #msg {
-      display: none;
-      background-color: #d1e7dd;
-      color: #0f5132;
-      padding: 10px;
-      margin-bottom: 15px;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: bold;
-      max-width: 500px;
-      margin: 10px auto;
-    }
+    .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
+    .infobar.show{display:block}
+    .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
   </style>
 </head>
 <body>
-
-  <h2>🍼 تسجيل حدث ولادة</h2>
-
-  <div id="msg"></div>
-
-  <!-- ملاحظة: أضفنا data-event و data-redirect فقط (لا تغيّر الشكل) -->
-  <form id="calvingForm" data-event="calving" data-redirect="/add-event.html">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
-
-    <label for="calvingDate">تاريخ الولادة</label>
-    <input type="date" id="calvingDate" name="calvingDate" required>
-
-    <label>سهولة الولادة</label>
-    <div class="radio-group">
-      <label><input type="radio" name="birthEase" value="سهلة" checked> سهلة</label>
-      <label><input type="radio" name="birthEase" value="عسرة"> عسرة</label>
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <header>
+    <div class="bar">
+      <div class="title">تسجيل حدث الولادة</div>
+      <a class="ghost" href="add-event.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
+  </header>
 
-    <label>جنس العجل</label>
-    <div class="radio-group">
-      <label><input type="radio" name="calfGender" value="ذكر" checked> ذكر</label>
-      <label><input type="radio" name="calfGender" value="أنثى"> أنثى</label>
+  <main>
+    <div class="card grid" id="formCard">
+      <div class="row">
+        <div>
+          <label>رقم الحيوان</label>
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" />
+        </div>
+        <div>
+          <label>المعرّف (إن وجد)</label>
+          <input id="animalId" placeholder="animalId" />
+        </div>
+        <div>
+          <label>تاريخ الولادة</label>
+          <input id="eventDate" type="date" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>نوع الولادة</label>
+          <select id="calvingKind">
+            <option value="طبيعية">طبيعية</option>
+            <option value="متعسرة">متعسرة</option>
+            <option value="قيصرية">قيصرية</option>
+          </select>
+        </div>
+        <div>
+          <label>عدد المواليد</label>
+          <select id="calfCount">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div>
+          <label>المشيمة المحتبسة</label>
+          <select id="retainedPlacenta">
+            <option value="لا">لا</option>
+            <option value="نعم">نعم</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>جنس المولود (1)</label>
+          <select id="calf1Sex">
+            <option value="غير محدد">غير محدد</option>
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+            <option value="ميت">ميت</option>
+          </select>
+        </div>
+        <div>
+          <label>جنس المولود (2)</label>
+          <select id="calf2Sex">
+            <option value="غير محدد">غير محدد</option>
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+            <option value="ميت">ميت</option>
+          </select>
+        </div>
+        <div>
+          <label>ملاحظات</label>
+          <input id="notes" placeholder="اختياري" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="save" id="saveBtn">حفظ الولادة ✅</button>
+        <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
+      </div>
+
+      <div id="info" class="infobar"></div>
     </div>
+  </main>
 
-    <label for="calfId">رقم العجل</label>
-    <input type="text" id="calfId" name="calfId" required>
-
-    <label>مصير العجل</label>
-    <div class="radio-group">
-      <label><input type="radio" name="calfFate" value="تربية" checked> تربية</label>
-      <label><input type="radio" name="calfFate" value="بيع"> بيع</label>
-    </div>
-
-    <button type="submit">💾 تسجيل</button>
-  </form>
-
-  <!-- 1) dataLayer + t.event (ثابت على كل الصفحات) -->
- <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
-
-
- 
-  <script src="/js/app-core.js" defer></script>
+  <!-- ترتيب السكربتات حسب معايير مربيك -->
+  <script src="/js/app-core.js"></script>
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
-  <script type="module" src="/js/event-core.js"></script>!-- 2) الأساس التحليلي -->
-  <!-- 5) سكربتات الحدث (تتبُّع + منطق الإرسال إلى /api/events مع fallback) -->
-  <script type="module" src="/js/track-calving.js"></script>
-  <script type="module" src="/js/calving.js"></script>
+  <script src="/js/api.js"></script>
+  <script type="module">
+    // calving.js (مضمّن كـ module لتسهيل النسخ)
+    const $ = (id)=>document.getElementById(id);
+
+    // 1) جلب سياق URL + التخزين
+    function getQuery(){
+      const p = new URLSearchParams(location.search);
+      const obj = Object.fromEntries(p.entries());
+      return obj;
+    }
+    function getCtx(){
+      const q = getQuery();
+      const ctx = {
+        animalId: q.animalId || q.id || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '',
+        animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
+        eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
+      };
+      return ctx;
+    }
+
+    // 2) تهيئة الحقول
+    const ctx = getCtx();
+    $('animalId').value = ctx.animalId;
+    $('animalNumber').value = ctx.animalNumber;
+    $('eventDate').value = ctx.eventDate;
+    $('calf2Sex').disabled = true; // يُفعل تلقائيًا عند اختيار توأم
+
+    $('calfCount').addEventListener('change', ()=>{
+      const two = $('calfCount').value === '2';
+      $('calf2Sex').disabled = !two;
+      if(!two){ $('calf2Sex').value = 'غير محدد'; }
+    });
+
+    // 3) فتح بطاقة الحيوان
+    $('toCardBtn').addEventListener('click', ()=>{
+      const number = $('animalNumber').value || ctx.animalNumber || '';
+      if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
+      const url = `cow-card.html?number=${encodeURIComponent(number)}`;
+      location.href = url;
+    });
+
+    // 4) حفظ الحدث
+    $('saveBtn').addEventListener('click', onSave);
+
+    async function onSave(){
+      try{
+        const animalId = $('animalId').value.trim();
+        const animalNumber = $('animalNumber').value.trim();
+        const eventDate = $('eventDate').value;
+        if(!animalId && !animalNumber){
+          return showMsg('أدخل رقم الحيوان أو المعرّف قبل الحفظ', true);
+        }
+        if(!eventDate){
+          return showMsg('من فضلك اختر تاريخ الولادة', true);
+        }
+        // فحص تاريخ مستقبلي
+        const today = new Date().toISOString().slice(0,10);
+        if(eventDate > today){
+          return showMsg('تاريخ الولادة لا يمكن أن يكون في المستقبل', true);
+        }
+
+        const payload = {
+          type: 'ولادة',            // نوع الحدث عربيًا
+          eventType: 'calving',     // تسمية تقنية اختيارية
+          eventDate,
+          animalId: animalId || undefined,
+          animalNumber: animalNumber || undefined,
+          calvingKind: $('calvingKind').value,
+          calfCount: Number($('calfCount').value),
+          calf1Sex: $('calf1Sex').value,
+          calf2Sex: $('calf2Sex').value,
+          retainedPlacenta: $('retainedPlacenta').value === 'نعم',
+          notes: $('notes').value.trim() || undefined,
+          source: location.pathname
+        };
+
+        // تتبّع
+        try{ window.t?.event && t.event('calving_save_attempt', payload); }catch(_){ }
+
+        // إرسال إلى API (الغلاف متاح في /js/api.js)
+        const res = await window.api?.post('/api/events', payload);
+        if(!res || (res && res.error)){
+          console.warn('API response', res);
+          return showMsg('تعذّر الحفظ عبر الخادم — سيتم الحفظ لاحقًا أو جرّب مجددًا', true);
+        }
+
+        // تحديث آخر سياق
+        localStorage.setItem('lastAnimalId', animalId || ctx.animalId || '');
+        localStorage.setItem('lastEventDate', eventDate);
+
+        try{ t.event('calving_save_success', {eventDate, calfCount: payload.calfCount}); }catch(_){ }
+        showMsg('✅ تم حفظ حدث الولادة بنجاح. يمكنك المتابعة أو فتح البطاقة.', false);
+
+      }catch(err){
+        console.error(err);
+        showMsg('حدث خطأ غير متوقع أثناء الحفظ', true);
+      }
+    }
+
+    function showMsg(text, isError){
+      const el = $('info');
+      el.className = 'infobar ' + (isError ? 'show error' : 'show');
+      el.textContent = text;
+    }
+  </script>
 </body>
 </html>
-
-
-
