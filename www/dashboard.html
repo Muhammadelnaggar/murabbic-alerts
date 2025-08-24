@@ -118,7 +118,7 @@
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-    <div class="tile" id="sensorsTile" role="button" tabindex="0" onclick="location.href='sensor-test.html'">
+    <div class="tile" id="sensorsTile" role="button" tabindex="0">
       <span class="icon">🛰️</span>
       الأجهزة والحساسات
       <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
@@ -179,6 +179,27 @@
       }
       document.getElementById('wxRefresh').addEventListener('click',()=>render());
       document.addEventListener('DOMContentLoaded',()=>render());
+    })();
+  </script>
+
+  <!-- فحص حالة الحساسات -->
+  <script>
+    (function(){
+      const tile=document.getElementById('sensorsTile');
+      const badge=document.getElementById('sensorsStatus');
+      function setBadge(txt,ok){ if(!badge) return; badge.textContent=txt; badge.style.background=ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor=ok?'#c5e1a5':'#ffecb3'; }
+      async function ping(){
+        try{
+          setBadge('جارٍ الاتصال…',false);
+          const r=await fetch('/api/sensors/health');
+          if(!r.ok){ setBadge('غير متصل',false); return; }
+          const j=await r.json();
+          const n=Number(j?.devices||0);
+          setBadge(`متصل • ${n}`,true);
+        }catch{ setBadge('غير متصل',false); }
+      }
+      tile?.addEventListener('click',()=>{ location.href='sensor-test.html'; });
+      document.addEventListener('DOMContentLoaded',()=>{ ping(); setInterval(ping,60000); });
     })();
   </script>
 </body>
