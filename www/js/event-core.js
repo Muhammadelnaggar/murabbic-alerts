@@ -1,5 +1,22 @@
 // www/js/event-core.js
 
+// ✅ دالة قراءة السياق (animalId + date فقط)
+window.getAnimalFromContext = function () {
+  const url = new URLSearchParams(window.location.search);
+
+  const ctx = {
+    animalId: url.get("animalId") || localStorage.getItem("lastAnimalId") || "",
+    eventDate: url.get("date") || localStorage.getItem("lastEventDate") || ""
+  };
+
+  // تحديث التخزين المحلي للفallback
+  if (ctx.animalId) localStorage.setItem("lastAnimalId", ctx.animalId);
+  if (ctx.eventDate) localStorage.setItem("lastEventDate", ctx.eventDate);
+
+  return ctx;
+};
+
+// ✅ جزء الحفظ
 export const eventCore = {
   async save(eventType, payload) {
     try {
