@@ -115,38 +115,81 @@
     </div>
   </main>
 
-  <!-- ترتيب السكربتات حسب معايير مربيك -->
+  <!-- ترتيب السكربتات حسب معايير مربيك (مُحدَّث لتفادي أخطاء 404 و Firebase) -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <!-- تأكد من تهيئة Firebase قبل أي سكربت قد يستدعي getApp() -->
+  <script type="module" src="/js/firebase-config.js"></script>
   <script src="/js/app-core.js"></script>
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js"></script>
+  <!-- فallback خفيف في حال /js/api.js غير موجود أو لم يعرِّف window.api -->
+  <script>
+    (function(){
+      if(!window.api){
+        console.warn('[calving] /js/api.js غير متاح — تفعيل فالباك fetch');
+        window.api = {
+          async post(url, body){
+            const base = window.API_BASE || '';
+            const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
+            const res = await fetch(base + url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-User-Id': uid },
+              body: JSON.stringify(body)
+            });
+            let json = null; try{ json = await res.clone().json(); }catch(_){ }
+            return res.ok ? (json || { ok:true }) : { error:true, status: res.status, body: (json||await res.text()) };
+          }
+        };
+      }
+    })();
+  </script>
+  <!-- ضع السكربتات التي قد تستخدم Firebase بعد firebase-config -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
   <script type="module">
-    // calving.js (مضمّن كـ module لتسهيل النسخ)
+    // ✅ بدلًا من تحميل api.js كملف منفصل (سبب الخطأ 404/MIME)
+    // نضمّن غلاف API بسيط هنا متوافق مع /api/*
+
+    const API_BASE = window.API_BASE || '';
+    window.api = {
+      async post(path, data){
+        try{
+          const res = await fetch(API_BASE + path, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Id': localStorage.getItem('userId') || ''
+            },
+            body: JSON.stringify(data)
+          });
+          return await res.json();
+        }catch(err){
+          console.error('API error', err);
+          return {error: true, message: err.message};
+        }
+      }
+    };
+
     const $ = (id)=>document.getElementById(id);
 
-    // 1) جلب سياق URL + التخزين
     function getQuery(){
       const p = new URLSearchParams(location.search);
-      const obj = Object.fromEntries(p.entries());
-      return obj;
+      return Object.fromEntries(p.entries());
     }
     function getCtx(){
       const q = getQuery();
-      const ctx = {
+      return {
         animalId: q.animalId || q.id || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '',
         animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
         eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
       };
-      return ctx;
     }
 
-    // 2) تهيئة الحقول
     const ctx = getCtx();
     $('animalId').value = ctx.animalId;
     $('animalNumber').value = ctx.animalNumber;
     $('eventDate').value = ctx.eventDate;
-    $('calf2Sex').disabled = true; // يُفعل تلقائيًا عند اختيار توأم
+    $('calf2Sex').disabled = true;
 
     $('calfCount').addEventListener('change', ()=>{
       const two = $('calfCount').value === '2';
@@ -154,15 +197,12 @@
       if(!two){ $('calf2Sex').value = 'غير محدد'; }
     });
 
-    // 3) فتح بطاقة الحيوان
     $('toCardBtn').addEventListener('click', ()=>{
       const number = $('animalNumber').value || ctx.animalNumber || '';
       if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
-      const url = `cow-card.html?number=${encodeURIComponent(number)}`;
-      location.href = url;
+      location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
     });
 
-    // 4) حفظ الحدث
     $('saveBtn').addEventListener('click', onSave);
 
     async function onSave(){
@@ -176,15 +216,14 @@
         if(!eventDate){
           return showMsg('من فضلك اختر تاريخ الولادة', true);
         }
-        // فحص تاريخ مستقبلي
         const today = new Date().toISOString().slice(0,10);
         if(eventDate > today){
           return showMsg('تاريخ الولادة لا يمكن أن يكون في المستقبل', true);
         }
 
         const payload = {
-          type: 'ولادة',            // نوع الحدث عربيًا
-          eventType: 'calving',     // تسمية تقنية اختيارية
+          type: 'ولادة',
+          eventType: 'calving',
           eventDate,
           animalId: animalId || undefined,
           animalNumber: animalNumber || undefined,
@@ -197,17 +236,14 @@
           source: location.pathname
         };
 
-        // تتبّع
         try{ window.t?.event && t.event('calving_save_attempt', payload); }catch(_){ }
 
-        // إرسال إلى API (الغلاف متاح في /js/api.js)
-        const res = await window.api?.post('/api/events', payload);
-        if(!res || (res && res.error)){
+        const res = await window.api.post('/api/events', payload);
+        if(!res || res.error){
           console.warn('API response', res);
           return showMsg('تعذّر الحفظ عبر الخادم — سيتم الحفظ لاحقًا أو جرّب مجددًا', true);
         }
 
-        // تحديث آخر سياق
         localStorage.setItem('lastAnimalId', animalId || ctx.animalId || '');
         localStorage.setItem('lastEventDate', eventDate);
 
