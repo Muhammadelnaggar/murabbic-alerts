@@ -292,7 +292,36 @@ pushContext(ctx);
       wireButtons();
     });
   </script>
+  <script>
+function goToPage(page) {
+  // اقرأ السياق من URL أو LocalStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const animalId = urlParams.get("animalId") || localStorage.getItem("lastAnimalId") || "";
+  const eventDate = urlParams.get("date") || localStorage.getItem("lastEventDate") || "";
+
+  // جهّز الرابط
+  let url = page;
+  const params = [];
+  if (animalId) params.push(`animalId=${animalId}`);
+  if (eventDate) params.push(`date=${eventDate}`);
+  if (params.length) url += "?" + params.join("&");
+
+  // اذهب للصفحة
+  window.location.href = url;
+}
+
+// اربط كل الأزرار اللي فيها data-page
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("button[data-page]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      goToPage(btn.getAttribute("data-page"));
+    });
+  });
+});
+</script>
+
 </body>
 </html>
+
 
 
