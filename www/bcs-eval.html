@@ -457,7 +457,8 @@ function loadRefVector(urls, score) {
     animalNumber: localStorage.getItem("currentAnimalId") || "",
     eventDate: localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10),
     eventType: "تقييم حالة الجسم (BCS)",
-    score: window.bcsScore || null,
+    score: window.bcsScore ?? 0
+
     source: "bcs-eval.html"
   };
 
