@@ -149,20 +149,17 @@
 </script>
 
 
-  <!-- 2) الأساس التحليلي -->
+ 
   <script src="/js/app-core.js" defer></script>
-
-  <!-- 3) الموديولات (دون أي جسور أو “لَزق”) -->
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
 
   <!-- 4) الهوية وواجهة الـAPI (لازم tenant-bootstrap قبل api.js) -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js" defer></script>
-
+  <script type="module" src="/js/event-core.js"></script>!-- 2) الأساس التحليلي -->
   <!-- 5) سكربتات الحدث (تتبُّع + منطق الإرسال إلى /api/events مع fallback) -->
   <script type="module" src="/js/track-calving.js"></script>
   <script type="module" src="/js/calving.js"></script>
 </body>
 </html>
+
 
