@@ -381,12 +381,31 @@ window.authReady = (async () => {
   console.log('✅ Auth OK as', window.currentUserId);
 })();
 </script>
+<script>
+(async () => {
+  // امنع السباق: استنى authReady لحد 5 ثواني بحد أقصى
+  const ok = await Promise.race([
+    window.authReady,
+    new Promise(res => setTimeout(() => res(false), 5000))
+  ]);
 
+  if (!ok) {
+    // لو لسه مش متأكدين من الهوية، ما نعملش Loop لا نهائي — سجّل سبب واضح وارجع للّوجين مرة واحدة
+    console.warn('Auth not ready; redirecting to login once.');
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace(`/login.html?next=${next}`);
+    return;
+  }
+
+  console.log('✅ Auth OK as', window.currentUserId);
+})();
+</script>
 <!-- 3) بقية سكربتات الصفحة (بعد التأكد من الهوية) -->
 <script type="module" src="/js/app-core.js"></script>
 
 </body>
 </html>
+
 
 
 
