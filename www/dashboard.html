@@ -36,7 +36,7 @@
     #weatherClassic .pill b{display:block;margin-top:4px}
     #weatherClassic .right{grid-row:1 / span 3;grid-column:2;display:flex;align-items:center;justify-content:center}
 
-    /* ساعة THI (كما بالصورة القديمة) */
+    /* ساعة THI */
     .thi-clock{position:relative;width:160px;height:160px}
     .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
     .thi-clock .arc{position:absolute;inset:0;border-radius:50%;
@@ -56,20 +56,13 @@
     .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
       padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:6px;min-height:118px}
-    .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px}
+    .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px;margin-bottom:6px}
     .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px}
 
     /* المقاييس (herd-gauges) */
     .gauge{width:100%;aspect-ratio:2/1;position:relative}
     .gauge svg{width:100%;height:100%;display:block}
     .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
-
-    /* بلاطة كبيرة */
-    .tile-lg{min-height:140px}
-    .tile-2x{grid-column:span 2}
-    .subactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
-    .subbtn{appearance:none;border:2px solid var(--green);background:#fff;color:#2e7d32;border-radius:999px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;min-width:160px}
-    .subbtn:hover{background:#f4fff1}
 
     @media(max-width:560px){
       .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
@@ -124,335 +117,15 @@
     <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
-
-    <div class="tile" id="milkTraitsCard" role="button" tabindex="0">
-      <span class="icon">🐄</span>
-      سمات حيوان اللبن /كاميرا
-    </div>
-
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
-
     <div class="tile" id="sensorsTile" role="button" tabindex="0">
       <span class="icon">🛰️</span>
       الأجهزة والحساسات
       <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
     </div>
-
-    <div class="tile tile-lg tile-2x tile-m-full" id="smartNutritionTile" role="group" tabindex="0">
-      <span class="icon">🧠</span>
-      تقييم التغذية الذكي
-      <div class="subactions" aria-label="اختيارات التقييم">
-        <button class="subbtn" id="goFeces">الروث بالكاميرا</button>
-        <button class="subbtn" id="goBCS">الحالة الجسميّة بالكاميرا</button>
-        <button class="subbtn" id="goRation">تقييم العليقة</button>
-      </div>
+    <div class="tile" id="rationTile" role="button" tabindex="0" onclick="location.href='nutrition.html'">
+      تقييم العليقة
     </div>
   </div>
-<script>
-  document.getElementById('goBCS')?.addEventListener('click', ()=>{
-    location.href = 'bcs-eval.html';
-  });
-</script>
-
-  <!-- [HERD-ANALYSIS] نتائج القطيع -->
-  <section id="herd-analysis" style="margin:10px 12px">
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">عِشار القطيع</h4><div class="gauge" data-key="pregnant"></div><div class="line" id="line-pregnant" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
-      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملقّحات (نافذة التحليل)</h4><div class="gauge" data-key="inseminated"></div><div class="line" id="line-inseminated" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
-      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">مفتوحة</h4><div class="gauge" data-key="open"></div><div class="line" id="line-open" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
-      <div class="card"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">Conception%</h4><div class="gauge" data-key="conception"></div><div class="line" id="line-conception" style="font-size:13px;color:#333;margin-top:6px">—</div></div>
-    </div>
-    <div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px;color:#11825d;font-size:14px">ملخص أرقام</h4><div id="herd-numbers" style="font-size:13px;color:#333">—</div></div>
-  </section>
-  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
-<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
-
-  <!-- ثبّت dataLayer + t.event (قبل أي سكربت) -->
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    window.t = window.t || { event: (name, props) => { try{ window.dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} } };
-  </script>
-  <script>
-  if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
-</script>
-
-  <!-- تحليلات خارجية: يسجل page_view تلقائيًا -->
-  <script src="/js/app-core.js" defer></script>
-
-  <!-- Firebase (للـ timeline/alerts) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
-    const app = initializeApp(firebaseConfig);
-    getFirestore(app);
-  </script>
-
-  <!-- الخط الزمني + القواعد الذكية -->
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-
-  <!-- تفعيل مراقب التنبيهات (بدون أي تغيير بصري) -->
-  <script type="module">
-    const tenantId = localStorage.getItem('tenantId') || 'default';
-    const userId   = localStorage.getItem('userId');
-    timeline?.init({ tenantId, userId });
-    smart?.startAlertsWatcher({ tenantId, userId, onAlert: a => alert('🔔 ' + a.message) });
-  </script>
-
-  <!-- ===== ويدجت الطقس (سكربت الويدجت القديم) ===== -->
-  <script>
-    (function(){
-      const segFarm = document.getElementById('segFarm');
-      const segGPS  = document.getElementById('segGPS');
-      const btnRef  = document.getElementById('wxRefresh');
-      const btnPin  = document.getElementById('wxPin');
-      const tEl = document.getElementById('wxTemp');
-      const hEl = document.getElementById('wxHum');
-      const thiEl = document.getElementById('wxTHI');
-      const sEl = document.getElementById('wxState');
-      const thiArc = document.getElementById('thiArc');
-      const thiNeedle = document.getElementById('thiNeedle');
-
-      function getMode(){ return (localStorage.getItem('locMode')==='farm')?'farm':'gps'; }
-      function setMode(m){ localStorage.setItem('locMode',m); syncSeg(); }
-      function syncSeg(){ const m=getMode(); segFarm.classList.toggle('active',m==='farm'); segGPS.classList.toggle('active',m==='gps'); }
-      function getFarm(){ try{ const x=JSON.parse(localStorage.getItem('farmCoords')||'null'); return (x&&x.lat!=null)?x:null; }catch{return null;} }
-      async function setFarm(c){ localStorage.setItem('farmCoords',JSON.stringify(c)); setMode('farm'); }
-
-      function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
-      function bands(buffalo=true){ return buffalo?{t1:66,t2:70,t3:77,t4:82}:{t1:68,t2:72,t3:79,t4:84}; }
-      function colorAndText(thi,b){
-        if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
-        if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
-        if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
-        if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
-        return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
-      }
-
-      async function readGPS(force=false){
-        try{ const c=JSON.parse(localStorage.getItem('lastGPS')||'null'); if(c && !force && (Date.now()-c.ts)<600000) return {lat:c.lat,lon:c.lon}; }catch{}
-        if(navigator.geolocation){
-          try{ const pos=await new Promise(res=>navigator.geolocation.getCurrentPosition(p=>res(p),_=>res(null),{maximumAge:600000,timeout:6000}));
-               if(pos){ const out={lat:pos.coords.latitude,lon:pos.coords.longitude}; localStorage.setItem('lastGPS',JSON.stringify({...out,ts:Date.now()})); return out; } }catch{}
-        }
-        return null;
-      }
-
-      async function getCoords(force=false){
-        const m=getMode();
-        if(m==='farm'){ const f=getFarm(); if(f) return f; const g=await readGPS(force); if(g) return g; return {lat:30.0444,lon:31.2357}; }
-        else { const g=await readGPS(force); if(g) return g; const f=getFarm(); if(f) return f; return {lat:30.0444,lon:31.2357}; }
-      }
-
-      async function fetchWeather(lat,lon){
-        try{
-          const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`);
-          const j=await r.json();
-          return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
-        }catch{ return null; }
-      }
-
-      function drawTHI(thi,isBuffalo=true){
-        const b=bands(isBuffalo);
-        if(thiArc){
-          const min=50,max=90,p=v=>((v-min)*100/(max-min)), span=240/360*100, pArc=v=>(p(v)/100)*span;
-          const p1=pArc(b.t1),p2=pArc(b.t2),p3=pArc(b.t3);
-          thiArc.style.background = `conic-gradient(from -120deg,#90caf9 0% ${p1}%,#fff59d ${p1}% ${p2}%,#ffcc80 ${p2}% ${p3}%,#ef5350 ${p3}% ${span}%,transparent ${span}% 100%)`;
-        }
-        if(thiNeedle){
-          const min=50,max=90,p=v=>((v-min)*100/(max-min));
-          const ang=-120+Math.max(0,Math.min(100,p(thi)))*2.4;
-          thiNeedle.style.setProperty('--angle',ang+'deg');
-        }
-        const {bg,txt}=colorAndText(thi,b);
-        document.getElementById('weatherClassic').style.background = bg;
-        sEl.textContent = txt;
-      }
-
-      async function render(force=false){
-        syncSeg();
-        const c = await getCoords(force);
-        if(!c) return;
-        const data = await fetchWeather(c.lat,c.lon);
-        if(!data) return;
-        const t = Math.round(data.t), h = Math.round(data.h);
-        const thi = THI(t, h);
-        tEl.textContent = `${t}°C`;
-        hEl.textContent = `${h}%`;
-        thiEl.textContent = thi;
-        drawTHI(thi,true); // جاموس افتراضيًا
-      }
-
-      segFarm.addEventListener('click', ()=>{ setMode('farm'); render(true); });
-      segGPS .addEventListener('click', ()=>{ setMode('gps');  render(true); });
-      btnRef .addEventListener('click', ()=> render(true));
-      btnPin .addEventListener('click', async ()=>{
-        const g=await readGPS(true);
-        if(g){ await setFarm(g); alert('✅ تم تثبيت موقع المزرعة'); render(true); }
-        else { alert('تعذّر تحديد موقعك الآن'); }
-      });
-
-      document.addEventListener('DOMContentLoaded', ()=> render());
-    })();
-  </script>
-  <!-- ===== /ويدجت الطقس ===== -->
-
-  <!-- ⭐ مهم جدًا: حقن الـUID قبل أي سكربت يتواصل مع /api -->
-  <script src="/js/tenant-bootstrap.js"></script>
-
-  <!-- بلاطة الأجهزة والحساسات (تستخدم /api) -->
-  <script>
-    (function(){
-      const tile = document.getElementById('sensorsTile');
-      const badge = document.getElementById('sensorsStatus');
-      function setBadge(txt, ok){ if(!badge) return; badge.textContent = txt; badge.style.background = ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor = ok?'#c5e1a5':'#ffecb3'; }
-      function getApiBase(){ const v=(localStorage.getItem('API_BASE')||'').trim(); if(!/^https?:\/\//.test(v) || v.includes('localhost')) return ''; return v; }
-      async function ping(){
-        try{
-          setBadge('جارٍ الاتصال…', false);
-          const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),30000);
-          const API_BASE=getApiBase(); const url=API_BASE?`${API_BASE}/api/sensors/health`:'/api/sensors/health';
-          const opts={ signal:ctl.signal }; if(API_BASE) opts.mode='cors';
-          const r=await fetch(url,opts); clearTimeout(to);
-          if(r.status===503){ setBadge('غير مفعّل', false); return; }
-          if(!r.ok){ setBadge('غير متصل', false); return; }
-          const j=await r.json(); const n=Number(j?.devices||0); setBadge(`متصل • ${n}`, true);
-        }catch{ setBadge('غير متصل', false); }
-      }
-      tile?.addEventListener('click', ()=>{ location.href='sensor-test.html'; });
-      document.addEventListener('DOMContentLoaded', ()=>{
-        ping(); setTimeout(ping,6000); setTimeout(ping,25000); setInterval(ping,60000);
-      });
-    })();
-  </script>
-
-  <!-- الملاحة إلى تقييم السمات -->
-  <script type="module">
-    const veBtn = document.getElementById('milkTraitsCard');
-    veBtn?.addEventListener('click', () => {
-      const qs  = new URLSearchParams(location.search);
-      const id  = qs.get('animalId') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
-      const url = id ? `visual-eval.html?focus=milk&animalId=${encodeURIComponent(id)}` : `visual-eval.html?focus=milk`;
-      location.href = url;
-    });
-  </script>
-
-  <!-- تحميل أيقونة العنوان من السيرفر مع بدائل تلقائية -->
-  <script>
-    (function(){
-      const img=document.getElementById('brandImg'); const svg=document.querySelector('.brand-icon-svg'); if(!img) return;
-      const candidates=[
-        '/images/dashboard.svg','/images/dashboard.png','/images/dashboard.webp','/images/dashboard.jpg',
-        'images/dashboard.svg','images/dashboard.png','images/dashboard.webp','images/dashboard.jpg'
-      ];
-      function tryLoad(i){
-        if(i>=candidates.length) return;
-        const src=candidates[i] + (candidates[i].includes('?')?'':'?v=1');
-        const test=new Image();
-        test.onload=()=>{ img.src=src; img.style.display='inline-block'; svg && svg.remove(); };
-        test.onerror=()=>tryLoad(i+1);
-        test.src=src;
-      }
-      tryLoad(0);
-    })();
-  </script>
-
-  <!-- سكربتات الواجهة التي تتعامل مع /api (بعد tenant-bootstrap) -->
-  <script src="js/mbk-animals.js?v=2"></script>
-  <script src="js/herd-gauges.js?v=2"></script>
-  <script src="js/smart-alerts.js?v=2"></script>
-  <!-- (1) تتبّع أساسي -->
-<script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
-
-<script src="/js/app-core.js" defer></script>
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
-
-<!-- (2) الهوية + واجهة النداءات -->
-<script src="/js/tenant-bootstrap.js"></script>
-<script src="/js/api.js" defer></script>
-
-<!-- (3) فحص الصحة/التليمترى — آخر سكربت قبل الإغلاق -->
-<script type="module" src="/js/health-check.js"></script>
 </body>
 </html>
-<script>
-  document.getElementById("goBCS").onclick   = () => location.href = buildTargetUrl("bcs-eval.html");
-  document.getElementById("goFeces").onclick = () => location.href = buildTargetUrl("feces-eval.html");
-  document.getElementById("goRation").onclick= () => location.href = buildTargetUrl("nutrition.html");
-</script>
-<script>
-  // دالة لبناء الرابط مع تمرير animalId و date لو موجودين
-  function buildTargetUrl(base) {
-    const params = new URLSearchParams();
-    const animalId = localStorage.getItem("lastAnimalId") || "";
-    const date = localStorage.getItem("lastEventDate") || "";
-    if (animalId) params.set("animalId", animalId);
-    if (date) params.set("date", date);
-    return base + "?" + params.toString();
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    // زر الروث
-    const fecesBtn = document.getElementById("goFeces");
-    if (fecesBtn) fecesBtn.addEventListener("click", () => {
-      location.href = buildTargetUrl("feces-eval.html");
-    });
-
-    // زر BCS
-    const bcsBtn = document.getElementById("goBCS");
-    if (bcsBtn) bcsBtn.addEventListener("click", () => {
-      location.href = buildTargetUrl("bcs-eval.html");
-    });
-
-    // زر العليقة
-    const rationBtn = document.getElementById("goRation");
-    if (rationBtn) rationBtn.addEventListener("click", () => {
-      location.href = buildTargetUrl("nutrition.html");
-    });
-  });
-</script>
-
-
-</body>
-</html>
-
-
-
-
-
-
-
-
