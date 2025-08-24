@@ -7,22 +7,26 @@
   <style>
     body {
       direction: rtl;
-      background-color: #fff9db;
-      font-family: 'Arial', sans-serif;
-      padding: 10px;
+      background: linear-gradient(to bottom, #fdfdf6, #fff9db);
+      font-family: 'Cairo', 'Arial', sans-serif;
       margin: 0;
       color: #1b5e20;
     }
     h1 {
       text-align: center;
-      font-size: 24px;
-      margin-bottom: 10px;
-      color: #2e7d32;
+      font-size: 26px;
+      margin: 0;
+      padding: 20px 10px;
+      background: #2e7d32;
+      color: #fff;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
     }
     .animal-info, .date-info {
       text-align: center;
       font-size: 18px;
-      margin-bottom: 10px;
+      margin: 8px 0;
       color: #2e7d32;
     }
     .warning {
@@ -35,8 +39,12 @@
     .form-fields {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin: 10px 0 20px;
+      gap: 12px;
+      margin: 15px;
+      padding: 15px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .form-fields input {
       padding: 12px;
@@ -48,24 +56,85 @@
     }
     .button-group {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 10px;
+      margin: 15px;
     }
     .button-group button {
-      padding: 15px;
-      background-color: #a5d6a7;
-      border: none;
+      padding: 12px;
+      background: #ffffff;
+      border: 2px solid #a5d6a7;
       border-radius: 10px;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
       text-align: center;
-      transition: background-color 0.3s, color 0.3s;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
     }
-    .button-group button.active,
     .button-group button:hover {
       background-color: #2e7d32;
-      color: white;
+      border-color: #2e7d32;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .nutrition-eval-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #e8f5e9;
+      border-radius: 12px;
+      border: 1px solid #a5d6a7;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    .nutrition-eval-container h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: bold;
+      color: #1b5e20;
+      text-align: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #a5d6a7;
+    }
+    .nutrition-eval-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .nutrition-eval-buttons button {
+      flex: 1 1 40%;
+      min-width: 100px;
+      background: #ffffff;
+      border: 2px solid #81c784;
+      border-radius: 8px;
+      font-size: 13px;
+      padding: 10px;
+      transition: all 0.3s ease;
+    }
+    .nutrition-eval-buttons button:hover {
+      background: #2e7d32;
+      border-color: #2e7d32;
+      color: #fff;
+      transform: translateY(-2px);
+    }
+    #inlineMsg {
+      margin: 15px;
+      padding: 12px;
+      background: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    #inlineMsg .text {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2e7d32;
+      margin-bottom: 8px;
+      text-align: center;
     }
   </style>
 </head>
@@ -82,125 +151,47 @@
 
   <form id="eventForm">
    <div class="button-group" id="eventTypeGroup">
-  <button type="button" data-page="calving.html">👶 ولادة</button>
-  <button type="button" data-page="insemination.html">📅 تلقيح</button>
-  <button type="button" data-page="vaccination.html">💉 تحصين</button>
-  <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-  <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-  <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-  <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-  <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-  <button type="button" data-page="disease.html">🔬 التشخيص</button>
-
-  <!-- يبقى زر التقليم كما هو (تسجيل فوري + رسالة داخلية) -->
-  <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
-
-  <!-- ⚠️ تم الاستبدال: كان "protocols.html" -->
-  <button type="button" data-page="abortion.html">🩸 إجهاض</button>
-
-  <!-- زر جديد -->
-  <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
-
-  <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-</div>
-
-
-    <!-- صندوق رسالة داخلي (بدون تنبيه منبثق) -->
-    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none">
-      <div class="text"></div>
-      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1;padding:12px;border-radius:8px;border:0;background:#2e7d32;color:#fff;font-weight:bold">تسجيل أحداث أخرى</button>
-        <button type="button" class="btn btn-ghost"   id="msgNo"  style="flex:1;padding:12px;border-radius:8px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;font-weight:bold">لوحة التحكم</button>
+    <button type="button" data-page="calving.html">👶 ولادة</button>
+    <button type="button" data-page="insemination.html">📅 تلقيح</button>
+    <button type="button" data-page="vaccination.html">💉 تحصين</button>
+    <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+    <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+    <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+    <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+    <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+    <button type="button" data-page="disease.html">🔬 التشخيص</button>
+    <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+    <button type="button" data-page="abortion.html">🩸 إجهاض</button>
+    <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+    <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    <div class="nutrition-eval-container">
+      <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
+      <div class="nutrition-eval-buttons">
+        <button type="button" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
+        <button type="button" data-page="feces-eval.html">💩 تقييم الروث</button>
       </div>
     </div>
+    <button type="button" data-page="milk-traits.html">🥛 صفات اللبن</button>
+   </div>
   </form>
 
-  <!-- ✅ ثبّت dataLayer + t.event قبل أي سكربت -->
- <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
-
-
-  <!-- ✅ تحليلات خارجية (يسجل page_view تلقائيًا) -->
-  <script src="/js/app-core.js" defer></script>
-
-  <!-- ✅ تهيئة Firebase (يضمن جاهزية التطبيق قبل باقي الموديولات) -->
-  <script type="module" src="./js/firebase-config.js"></script>
-
-  <!-- ✅ الخط الزمني + القواعد الذكية (لا تغيير بصري) -->
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-
-  <!-- ✅ تفعيل المراقبة العامة للتنبيهات (اختياري) -->
-  <script type="module">
-    const tenantId = localStorage.getItem('tenantId') || 'default';
-    const userId   = localStorage.getItem('userId');
-    try{ timeline?.init({ tenantId, userId }); }catch{}
-    try{ smart?.startAlertsWatcher({ tenantId, userId, onAlert: a => alert('🔔 ' + a.message) }); }catch{}
-  </script>
-
-  <!-- ✅ منطق الصفحة (كما هو، بدون أي تغيير بصري) -->
   <script type="module">
     import { db, auth } from "./js/firebase-config.js";
     import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // عناصر DOM
     const animalInfo = document.getElementById("animalInfo");
     const dateInfo   = document.getElementById("dateInfo");
     const warning    = document.getElementById("noAnimalWarning");
     const idInput    = document.getElementById("animalIdInput");
     const dateInput  = document.getElementById("eventDateInput");
 
-    const msgBox = document.getElementById("inlineMsg");
-    const msgText = msgBox.querySelector(".text");
-    const btnYes  = msgBox.querySelector("#msgYes");
-    const btnNo   = msgBox.querySelector("#msgNo");
-
-    function showNotice(message, yesText="تسجيل أحداث أخرى", noText="لوحة التحكم"){
-      msgText.textContent = message;
-      btnYes.textContent = yesText;
-      btnNo.textContent  = noText;
-      msgBox.style.display = "block";
-      return new Promise(resolve=>{
-        const onYes = ()=>{ cleanup(); resolve(true);  };
-        const onNo  = ()=>{ cleanup(); resolve(false); };
-        btnYes.addEventListener('click', onYes, { once:true });
-        btnNo .addEventListener('click', onNo , { once:true });
-        function cleanup(){ msgBox.style.display="none"; }
-      });
-    }
-
-    // تاريخ اليوم المحلي YYYY-MM-DD
     function todayLocal(){
       const d = new Date();
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       return d.toISOString().slice(0,10);
     }
 
-    // تعبئة من الرابط
     function hydrateContext(){
       const qp = new URLSearchParams(location.search);
       const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
@@ -214,20 +205,9 @@
       } catch{
         dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
       }
-      // تنظيف الرابط من الباراميترات بعد الالتقاط حتى لا تعيد الملء عند الرجوع
-      if (presetId || qp.get('date')){
-        try{ history.replaceState(null,'',location.pathname); }catch{}
-      }
     }
 
-    // مزامنة الشريط العلوي عند تعديل الحقول يدويًا
-    idInput.addEventListener('input', ()=>{
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${idInput.value.trim() || 'غير محدد'}`;
-    });
-    dateInput.addEventListener('input', ()=>{
-      try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }
-      catch{ dateInfo.textContent = `📅 التاريخ الحالي: ${dateInput.value}`; }
-    });
+    hydrateContext();
 
     function getContextOrWarn(){
       const animalId = idInput.value.trim();
@@ -241,111 +221,50 @@
       return { animalId, eventDate };
     }
 
-    /* ⬇️⬇️ الدوال الداعمة لسياق الروابط ⬇️⬇️ */
     function pushContext(ctx){
       const id = String(ctx.animalId);
       const dt = String(ctx.eventDate);
-      ['lastAnimalId','ctxAnimalId','currentAnimalId'].forEach(k=> localStorage.setItem(k, id));
-      ['ctxAnimalId','currentAnimalId'].forEach(k=> sessionStorage.setItem(k, id));
-      ['lastEventDate','ctxEventDate','eventDate','Date','dt'].forEach(k=>{
-        localStorage.setItem(k, dt);
-        sessionStorage.setItem(k, dt);
-      });
-      ['calvingDate','calvDate','calving_dt'].forEach(k=>{
-        localStorage.setItem(k, dt);
-        sessionStorage.setItem(k, dt);
-      });
-      ['closeupDate','closeUpDate','close_dt'].forEach(k=>{
-        localStorage.setItem(k, dt);
-        sessionStorage.setItem(k, dt);
-      });
+      localStorage.setItem('ctxAnimalId', id);
+      localStorage.setItem('ctxEventDate', dt);
     }
 
     function buildTargetUrl(page, ctx){
       const u  = new URL(page, location.href);
-      const id = String(ctx.animalId);
-      const dt = String(ctx.eventDate);
-      ['animalId','number','animalNumber','Pid','animalIdd','cowId','CowID','ID']
-        .forEach(k => u.searchParams.set(k, id));
-      ['date','eventDate','Date','dt']
-        .forEach(k => u.searchParams.set(k, dt));
-      if (page.includes('calving')){
-        ['calvingDate','calvDate','calving_dt'].forEach(k => u.searchParams.set(k, dt));
-      }
-      if (page.includes('close-up')){
-        ['closeupDate','closeUpDate','close_dt'].forEach(k => u.searchParams.set(k, dt));
-      }
+      u.searchParams.set('animalId', ctx.animalId);
+      u.searchParams.set('date', ctx.eventDate);
       return u.toString();
     }
-    /* ⬆️⬆️ نهاية الدوال ⬆️⬆️ */
 
-    // ربط الأزرار (تفويض حدث)
-    function wireButtons(db, auth){
+    function wireButtons(){
       const container = document.getElementById("eventTypeGroup");
       if(!container) return;
-
-      container.addEventListener('click', async (ev)=>{
-        const btn = ev.target.closest('button');
-        if (!btn || !container.contains(btn)) return;
-
-        const ctx = getContextOrWarn();
-        if (!ctx) return;
-
-        const page   = btn.getAttribute('data-page');
-        const isTrim = page === 'trimming.html';
-
-        // خزّن السياق مبكرًا
-        pushContext(ctx);
-        if (page === 'insemination.html'){
-          try{ localStorage.setItem('lastInseminationDate', ctx.eventDate); }catch{}
-        }
-        const targetUrl = page ? buildTargetUrl(page, ctx) : null;
-
-        // سجلّ الحدث في الخلفية (لا تعطل الملاحة)
-        try{
-          void addDoc(collection(db, 'events'), {
-            userId: auth?.currentUser?.uid || null,
-            animalId: ctx.animalId,
-            animalNumber: ctx.animalId,
-            eventDate: ctx.eventDate,
-            type: isTrim ? 'تقليم الحوافر' : undefined,
-            eventType: isTrim ? 'تقليم الحوافر' : btn.textContent.trim(),
-            createdAt: serverTimestamp()
-          }).catch(err=>console.error('events.add failed', err));
-        }catch(err){ console.error('events.add error', err); }
-
-        if (isTrim){
-          const goAgain = await showNotice(`✅ تم تسجيل "تقليم الحوافر" للحيوان ${ctx.animalId}.`);
-          if (goAgain){
-            idInput.value = '';
-            dateInput.value = todayLocal();
-            animalInfo.textContent = `🐄 رقم الحيوان الحالي: غير محدد`;
-            try{ dateInfo.textContent = `📅 التاريخ الحالي: ${new Date(dateInput.value).toLocaleDateString('ar-EG')}`; }catch{}
-            try{ history.replaceState(null,'',location.pathname); }catch{}
+      container.querySelectorAll('button[data-page]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const ctx = getContextOrWarn();
+          if(!ctx) return;
+          pushContext(ctx);
+          const page = btn.getAttribute('data-page');
+          const targetUrl = buildTargetUrl(page, ctx);
+          if(page === 'trimming.html'){
+            await addDoc(collection(db, 'events'), {
+              userId: auth?.currentUser?.uid || null,
+              animalId: ctx.animalId,
+              eventDate: ctx.eventDate,
+              eventType: 'تقليم الحوافر',
+              createdAt: serverTimestamp()
+            });
+            alert(`✅ تم تسجيل تقليم الحوافر للحيوان ${ctx.animalId}`);
           } else {
-            location.href = 'dashboard.html';
+            location.href = targetUrl;
           }
-          return;
-        }
-
-        if (targetUrl){
-          location.href = targetUrl;
-        }
+        });
       });
     }
 
-    // بدء التشغيل
-    hydrateContext();
-    onAuthStateChanged(auth, (user)=>{
-      if (!user){ location.href = "login.html"; return; }
-      wireButtons(db, auth);
+    onAuthStateChanged(auth, user=>{
+      if(!user){ location.href = "login.html"; return; }
+      wireButtons();
     });
   </script>
-
-  <!-- ⭐ مهم جدًا: حقن الـUID (قبل أي سكربت يتعامل مع /api) -->
-  <script src="/js/tenant-bootstrap.js"></script>
-
-  <!-- سكربتات الواجهة التي قد تستخدم /api -->
-  <script src="js/mbk-animals.js?v=2"></script>
 </body>
 </html>
