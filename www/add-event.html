@@ -228,12 +228,19 @@
       localStorage.setItem('ctxEventDate', dt);
     }
 
-    function buildTargetUrl(page, ctx){
-      const u  = new URL(page, location.href);
-      u.searchParams.set('animalId', ctx.animalId);
-      u.searchParams.set('date', ctx.eventDate);
-      return u.toString();
-    }
+  function buildTargetUrl(page, ctx){
+  const u  = new URL(page, location.href);
+  const uid = String(ctx.animalId);        // UID من Firestore
+  const num = String(ctx.animalNumber);    // الرقم للمربي
+  const dt  = String(ctx.eventDate);
+
+  u.searchParams.set("animalId", uid);   // UID
+  u.searchParams.set("number", num);     // الرقم
+  u.searchParams.set("date", dt);        // التاريخ
+
+  return u.toString();
+}
+
 
     function wireButtons(){
       const container = document.getElementById("eventTypeGroup");
@@ -268,3 +275,4 @@
   </script>
 </body>
 </html>
+
