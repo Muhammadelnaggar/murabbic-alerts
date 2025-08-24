@@ -1,59 +1,34 @@
-// /js/calving.js
+import { eventCore } from "./event-core.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 1) قراءة السياق من event-core.js
   const ctx = window.getAnimalFromContext?.() || {};
   console.log("📌 Calving context:", ctx);
 
-  // 2) تخزين آخر قيم (fallback لو الصفحة تفتحت مباشرة)
-  if (ctx.animalId) localStorage.setItem("lastAnimalId", ctx.animalId);
-  if (ctx.eventDate) localStorage.setItem("lastEventDate", ctx.eventDate);
-
-  // 3) ملء الحقول في النموذج
-  const animalIdInput = document.querySelector("#animalId");
-  if (animalIdInput && ctx.animalId) {
-    animalIdInput.value = ctx.animalId;
-  }
-
+  const animalIdInput  = document.querySelector("#animalId");
   const eventDateInput = document.querySelector("#eventDate");
-  if (eventDateInput && ctx.eventDate) {
-    eventDateInput.value = ctx.eventDate;  // 👈 هنا هيتملأ التاريخ جوه input
-  }
+  if (animalIdInput && ctx.animalId)  animalIdInput.value  = ctx.animalId;
+  if (eventDateInput && ctx.eventDate) eventDateInput.value = ctx.eventDate;
 
-  // 4) حفظ النموذج عند الضغط على زر الحفظ
   const form = document.querySelector("#calvingForm");
-  if (form) {
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  if (!form) return;
 
-      const payload = {
-        eventType: "ولادة",
-        animalId: ctx.animalId,
-        eventDate: ctx.eventDate,   // دايمًا التاريخ اللي جاي من add-event
-        notes: form.querySelector("#notes")?.value || "",
-        createdAt: new Date().toISOString(),
-        source: "calving.html"
-      };
+  // 🟢 الهاندلر
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      console.log("📦 Calving payload:", payload);
+    const payload = {
+      animalId: animalIdInput?.value || ctx.animalId || "",
+      eventDate: eventDateInput?.value || ctx.eventDate || "",
+      notes: form.querySelector("#notes")?.value || ""
+    };
 
-      try {
-        const res = await fetch("/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          alert("✅ تم حفظ حدث الولادة بنجاح");
-          window.location.href = "cow-card.html?animalId=" + ctx.animalId;
-        } else {
-          alert("⚠️ حدث خطأ أثناء الحفظ");
-        }
-      } catch (err) {
-        console.error("❌ Calving save error:", err);
-        alert("❌ تعذر الاتصال بالسيرفر");
-      }
-    });
-  }
+    try {
+      await eventCore.save("calving", payload);
+      alert("✅ تم حفظ حدث الولادة بنجاح");
+      window.location.href = "cow-card.html?animalId=" + payload.animalId;
+    } catch (err) {
+      console.error("❌ خطأ أثناء الحفظ:", err);
+      alert("⚠️ حدث خطأ أثناء الحفظ");
+    }
+  });
 });
