@@ -1,16 +1,15 @@
 // /js/calving.js
-import { getContext } from "./event-core.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 1) قراءة السياق (animalId + date)
-  const ctx = getContext();
+  // 1) قراءة السياق (animalId + date) من event-core.js
+  const ctx = window.getAnimalFromContext?.() || {};
   console.log("📌 Calving context:", ctx);
 
   // 2) تخزين آخر قيم (fallback لو الصفحة تفتحت مباشرة)
   if (ctx.animalId) localStorage.setItem("lastAnimalId", ctx.animalId);
   if (ctx.eventDate) localStorage.setItem("lastEventDate", ctx.eventDate);
 
-  // 3) ملء الحقول في النموذج (لو عندك input#animalId و input#eventDate)
+  // 3) ملء الحقول في النموذج
   document.querySelector("#animalId")?.setAttribute("value", ctx.animalId);
   document.querySelector("#eventDate")?.setAttribute("value", ctx.eventDate);
 
@@ -20,7 +19,6 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      // بناء الحمولة (payload)
       const payload = {
         eventType: "ولادة",
         animalId: ctx.animalId,
