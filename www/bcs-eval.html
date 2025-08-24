@@ -452,54 +452,32 @@ function loadRefVector(urls, score) {
 <script>
  document.getElementById("saveBtn").addEventListener("click", async (e) => {
   e.preventDefault();
- console.log("🔔 saveBtn clicked");
-
-  const ctx = getAnimalFromContext(); // بيرجع {id, number, date}
-  const kind = localStorage.getItem('animalKind') || 
-               (document.getElementById('kindBuffalo')?.checked ? 'buffalo' : 'cow');
-  const type = localStorage.getItem('animalType') || '';
-
-  let overall = null;
-  if (kind === 'buffalo') {
-    if (typeof state.scores.rear !== 'number') { 
-      alert('التقط لقطة خلفية للجاموس.'); 
-      return; 
-    }
-    overall = state.scores.rear;
-  } else {
-    const haveRear = typeof state.scores.rear === 'number';
-    const haveSide = typeof state.scores.side === 'number';
-    if (!haveRear && !haveSide) { 
-      alert('التقط زاوية واحدة على الأقل.'); 
-      return; 
-    }
-    overall = ((haveRear?state.scores.rear:3)*0.6 + (haveSide?state.scores.side:3)*0.4) /
-              ((haveRear?0.6:0)+(haveSide?0.4:0)||1);
-  }
-      console.log("📦 payload before save:", {
-    animalId: ctx.id,
-    animalNumber: ctx.number,
-    eventDate: ctx.date,
-    kind,
-    type,
-    scores: { ...state.scores, overall }
-  });
+ const payload = {
+    animalId: localStorage.getItem("currentAnimalId") || "",
+    animalNumber: localStorage.getItem("currentAnimalId") || "",
+    eventDate: localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10),
+    eventType: "تقييم حالة الجسم (BCS)",
+    score: window.bcsScore || null,
+    source: "bcs-eval.html"
+  };
 
   try {
-    const result = await eventCore.save("تقييم حالة جسمية", {
-      animalId: ctx.id || null,
-      animalNumber: ctx.number || null,
-      eventDate: ctx.date || new Date().toISOString().slice(0,10),
-      animalKind: kind,
-      animalType: type,
-      scores: { ...state.scores, overall }
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": localStorage.getItem("userId") || "",
+      },
+      body: JSON.stringify(payload),
     });
-    console.log("✅ API result:", result);
+
+    if (!res.ok) throw new Error("API error");
     alert("✅ تم حفظ التقييم بنجاح");
-  } catch(err) {
-    console.error("❌ API error:", err);
+  } catch (err) {
+    console.error("API error:", err);
     alert("❌ حدث خطأ أثناء الحفظ");
   }
+
 });
 
 </script>
