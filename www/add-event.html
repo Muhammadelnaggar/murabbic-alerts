@@ -192,22 +192,41 @@
       return d.toISOString().slice(0,10);
     }
 
-    function hydrateContext(){
-      const qp = new URLSearchParams(location.search);
-      const presetId   = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || "";
-      const presetDate = qp.get("date") || todayLocal();
-      idInput.value = presetId;
-      dateInput.value = presetDate;
-      animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetId || 'غير محدد'}`;
-      try {
-        const [y,m,d] = presetDate.split('-').map(Number);
-        dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-      } catch{
-        dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
-      }
-    }
+  function hydrateContext(){
+  const qp = new URLSearchParams(location.search);
 
-    hydrateContext();
+  // UID من Firestore (وثيقة الحيوانات)
+  const presetId   = qp.get("animalId") || "";     
+
+  // رقم الحيوان اللي المربي مدخله
+  const presetNum  = qp.get("number") || qp.get("animalNumber") || "";  
+
+  const presetDate = qp.get("date") || todayLocal();
+
+  // املى الحقول
+  idInput.value = presetId;
+  dateInput.value = presetDate;
+
+  // عرض الرقم للمربي لو موجود
+  animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
+
+  try {
+    const [y,m,d] = presetDate.split('-').map(Number);
+    dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+  } catch {
+    dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
+  }
+
+  // ✅ رجّع الاتنين بشكل منفصل
+  return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
+}
+
+ // ✅ استدعاء الدالة وتخزين النتيجة في ctx
+const ctx = hydrateContext();
+
+// تقدر تبعته بعدين لأي دالة تحتاجه
+pushContext(ctx);
+
 
     function getContextOrWarn(){
       const animalId = idInput.value.trim();
@@ -275,4 +294,5 @@
   </script>
 </body>
 </html>
+
 
