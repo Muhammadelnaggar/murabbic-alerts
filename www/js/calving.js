@@ -65,8 +65,18 @@ document.addEventListener("DOMContentLoaded", () => {
   if (ctx.eventDate) localStorage.setItem("lastEventDate", ctx.eventDate);
 
   // 3) ملء الحقول في النموذج
-  document.querySelector("#animalId")?.setAttribute("value", ctx.animalId);
-  document.querySelector("#eventDate")?.setAttribute("value", ctx.eventDate);
+ // ✅ ملء رقم الحيوان
+const animalIdInput = document.querySelector("#animalId");
+if (animalIdInput && ctx.animalId) {
+  animalIdInput.value = ctx.animalId;
+}
+
+// ✅ ملء تاريخ الولادة
+const eventDateInput = document.querySelector("#eventDate");
+if (eventDateInput && ctx.eventDate) {
+  eventDateInput.value = ctx.eventDate;  // 👈 دي اللي هتظهر التاريخ جوه input
+}
+
 
   // 4) حفظ النموذج عند الضغط على زر الحفظ
   const form = document.querySelector("#calvingForm");
