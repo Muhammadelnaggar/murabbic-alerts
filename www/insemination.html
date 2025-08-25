@@ -247,5 +247,48 @@
       el.textContent = text;
     }
   </script>
+  <!-- طبقة توافق: تلتقط number/date من URL أو التخزين وتعبّي الحقول تلقائيًا -->
+<script type="module">
+  const $ = id => document.getElementById(id);
+  const norm = v => (v==null || v==='undefined' || v==='null' || v==='NaN') ? '' : String(v).trim();
+  const qs = new URLSearchParams(location.search);
+
+  let number = norm(
+    qs.get('number') ||
+    qs.get('animalNumber') ||
+    localStorage.getItem('currentAnimalNumber') ||
+    localStorage.getItem('lastAnimalNumber')
+  );
+
+  let eventDate = norm(
+    qs.get('date') ||
+    qs.get('eventDate') ||
+    localStorage.getItem('lastEventDate') ||
+    new Date().toISOString().slice(0,10)
+  );
+
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    eventDate = new Date().toISOString().slice(0,10);
+  }
+
+  // عبّي الحقول لو كانت فاضية
+  if ($('animalNumber') && !norm($('animalNumber').value)) {
+    $('animalNumber').value = number || '';
+  }
+  if ($('eventDate') && !norm($('eventDate').value)) {
+    $('eventDate').value = eventDate || new Date().toISOString().slice(0,10);
+  }
+
+  // لوج رقابي (بدون تغيير السلوك)
+  if (!qs.get('number') || !qs.get('date')) {
+    console.warn('[insemination] opened without full params', location.pathname, [...qs.entries()]);
+  }
+
+  // توحيد التخزين ليستفيد باقي الأبناء
+  if (number)   { localStorage.setItem('currentAnimalNumber', number); localStorage.setItem('lastAnimalNumber', number); }
+  if (eventDate){ localStorage.setItem('lastEventDate', eventDate); }
+</script>
+
 </body>
 </html>
+
