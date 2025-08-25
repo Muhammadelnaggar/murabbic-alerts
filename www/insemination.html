@@ -2,142 +2,250 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل حدث التلقيح</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <!-- سكربت مشترك للأحداث -->
-<script type="module" src="/js/event-core.js"></script>
-
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل حدث التلقيح — مُرَبِّك</title>
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background:#fff9db;
-      margin:0;
-      padding:20px;
-    }
-    h2 { text-align:center; color:#2e7d32; margin-bottom:20px; }
-    form {
-      background:#fff;
-      border:2px solid #8bc34a;
-      border-radius:12px;
-      padding:20px;
-      display:flex;
-      flex-direction:column;
-      gap:15px;
-    }
-    label { font-weight:bold; }
-    input,button { font-size:16px; }
-    input[type="text"], input[type="date"] {
-      width:100%;
-      padding:12px;
-      border:1px solid #ccc;
-      border-radius:8px;
-      background:#f1f8e9;
-    }
-    .radio-group { display:flex; gap:20px; }
-    .radio-group label { display:flex; align-items:center; gap:5px; }
-    button {
-      background:#2e7d32;
-      color:#fff;
-      padding:14px;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-    }
-    button:hover { background:#1b5e20; }
-    .success-msg {
-      margin-top:15px;
-      padding:12px;
-      border-radius:8px;
-      background:#e8f5e9;
-      color:#1b5e20;
-      text-align:center;
-      font-weight:bold;
-      display:none;
-    }
+    :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0}
+    .bar{max-width:920px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .title{font-weight:700;color:var(--green-600)}
+
+    main{max-width:920px;margin:16px auto;padding:16px}
+    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    label{font-weight:600;font-size:14px;color:#0f172a}
+    input,select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
+    .row{display:grid;gap:12px}
+    @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
+    .radio-group{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px}
+    .actions{display:flex;gap:10px;justify-content:stretch;margin-top:12px}
+    button{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:700;cursor:pointer}
+    .save{background:var(--green);color:#fff}
+    .ghost{background:#eef2f7;color:#0f172a}
+
+    .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
+    .infobar.show{display:block}
+    .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
   </style>
 </head>
 <body>
-
-  <h2>تسجيل حدث التلقيح</h2>
-
-  <form id="inseminationForm">
-    <label>رقم الحيوان:</label>
-    <input type="text" id="animalId" placeholder="رقم الحيوان" readonly />
-
-    <label>تاريخ التلقيح:</label>
-    <input type="date" id="inseminationDate" required />
-
-    <label>اسم الطلوقة (اختياري):</label>
-    <input type="text" id="bullName" />
-
-    <label>وقت الشياع:</label>
-    <div class="radio-group">
-      <label><input type="radio" name="heatTime" value="صباحاً" required /> صباحاً</label>
-      <label><input type="radio" name="heatTime" value="مساءً" /> مساءً</label>
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <header>
+    <div class="bar">
+      <div class="title">تسجيل حدث التلقيح</div>
+      <a class="ghost" href="add-event.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
+  </header>
 
-    <label>وقت التلقيح:</label>
-    <div class="radio-group">
-      <label><input type="radio" name="inseminationTime" value="صباحاً" required /> صباحاً</label>
-      <label><input type="radio" name="inseminationTime" value="مساءً" /> مساءً</label>
+  <main>
+    <div class="card grid" id="formCard">
+      <div class="row">
+        <div>
+          <label>رقم الحيوان <span style="color:red">*</span></label>
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+        </div>
+        <div>
+          <label>تاريخ التلقيح <span style="color:red">*</span></label>
+          <input id="eventDate" type="date" required />
+        </div>
+        <div>
+          <label>طريقة التلقيح <span style="color:red">*</span></label>
+          <select id="inseminationMethod" required>
+            <option value="">اختر...</option>
+            <option value="طبيعي">طبيعي</option>
+            <option value="اصطناعي">اصطناعي</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>كود السائل المنوي <span style="color:red">*</span></label>
+          <input id="semenCode" placeholder="مثال: BULL123" required />
+        </div>
+        <div>
+          <label>اسم الملقّح <span style="color:red">*</span></label>
+          <input id="inseminator" placeholder="اسم الملقّح" required list="inseminatorsList" />
+          <datalist id="inseminatorsList"></datalist>
+        </div>
+        <div>
+          <label>وقت التلقيح <span style="color:red">*</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="inseminationTime" value="صباحا" required /> صباحا</label>
+            <label><input type="radio" name="inseminationTime" value="مساءا" /> مساءا</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>حالة الشياع <span style="color:red">*</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="heatStatus" value="صباحا" required /> صباحا</label>
+            <label><input type="radio" name="heatStatus" value="مساءا" /> مساءا</label>
+          </div>
+        </div>
+        <div>
+          <label>ملاحظات</label>
+          <input id="notes" placeholder="اختياري" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="save" id="saveBtn">حفظ التلقيح ✅</button>
+        <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
+      </div>
+
+      <div id="info" class="infobar"></div>
     </div>
+  </main>
 
-    <label>اسم الملقح:</label>
-    <input type="text" id="technicianName" />
-
-   <button type="submit" id="saveBtn">💾 تسجيل الحدث</button>
-  </form>
-
-  <div id="successMsg" class="success-msg">✅ تم تسجيل حدث التلقيح بنجاح</div>
-
+  <!-- ✅ سكربتات بالترتيب الصحيح مع إصلاح الفالباك -->
+  <script type="module" src="/js/firebase-config.js"></script>
+  <script src="/js/app-core.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+  
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      // تعبئة الحقول من الرابط أو التخزين
-      const params = new URLSearchParams(window.location.search);
-      const animalIdInput = document.getElementById('animalId');
-      if (params.get('animalId')) {
-        animalIdInput.value = params.get('animalId');
-      } else if (params.get('number')) {
-        animalIdInput.value = params.get('number');
-      } else if (localStorage.getItem('lastAnimalId')) {
-        animalIdInput.value = localStorage.getItem('lastAnimalId');
-      }
-
-      const dateInput = document.getElementById('inseminationDate');
-      if (params.get('date')) {
-        dateInput.value = params.get('date');
-      } else if (localStorage.getItem('lastEventDate')) {
-        dateInput.value = localStorage.getItem('lastEventDate');
-      } else {
-        dateInput.value = new Date().toISOString().slice(0,10);
-      }
-
-      // تهيئة التتبع
-      const ctx = eventCore.init("تلقيح");
-
-      // زر الحفظ
-      document.getElementById("saveBtn").addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await eventCore.save("تلقيح", {
-            animalId: document.getElementById("animalId")?.value,
-            eventDate: document.getElementById("inseminationDate")?.value,
-            bullName: document.getElementById("bullName")?.value,
-            heatTime: document.querySelector("input[name=heatTime]:checked")?.value,
-            inseminationTime: document.querySelector("input[name=inseminationTime]:checked")?.value,
-            technicianName: document.getElementById("technicianName")?.value
-          });
-          document.getElementById("successMsg").style.display = "block";
-        } catch (err) {
-          console.error(err);
-          alert("❌ حدث خطأ أثناء الحفظ");
+    if(!window.api){
+      window.api = {
+        async post(url, body){
+          const base = window.API_BASE || '';
+          const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
+          try{
+            const res = await fetch(base + url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-User-Id': uid },
+              body: JSON.stringify(body)
+            });
+            return await res.json();
+          }catch(err){
+            console.error('API error', err);
+            return {error:true,message:err.message};
+          }
         }
-      });
-    });
+      }
+    }
   </script>
 
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+  <script type="module">
+    const $ = (id)=>document.getElementById(id);
+
+    function getQuery(){
+      const p = new URLSearchParams(location.search);
+      return Object.fromEntries(p.entries());
+    }
+    function getCtx(){
+      const q = getQuery();
+      return {
+        animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
+        eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
+      };
+    }
+
+    const ctx = getCtx();
+    $('animalNumber').value = ctx.animalNumber;
+    $('eventDate').value = ctx.eventDate;
+
+    // تحميل أسماء الملقّحين (اقتراحات) من فايرستور
+    (async function loadInseminators(){
+      try{
+        const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
+        if(!uid) return;
+        const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const db = getFirestore();
+        const q = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
+        const snap = await getDocs(q);
+        const set = new Set();
+        const list = document.getElementById('inseminatorsList');
+        list.innerHTML = '';
+        snap.forEach(doc=>{ const n = doc.data()?.name; if(n && !set.has(n)){ set.add(n); const opt = document.createElement('option'); opt.value = n; list.appendChild(opt);} });
+      }catch(e){ console.warn('loadInseminators skipped', e); }
+    })();
+
+    $('toCardBtn').addEventListener('click', ()=>{
+      const number = $('animalNumber').value || ctx.animalNumber || '';
+      if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
+      location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
+    });
+
+    $('saveBtn').addEventListener('click', onSave);
+
+    async function onSave(){
+      try{
+        const animalNumber = $('animalNumber').value.trim();
+        const eventDate = $('eventDate').value;
+        const inseminator = $('inseminator').value.trim();
+        const semenCode = $('semenCode').value.trim();
+        const inseminationMethod = $('inseminationMethod').value;
+        const inseminationTime = document.querySelector('input[name="inseminationTime"]:checked')?.value;
+        const heatStatus = document.querySelector('input[name="heatStatus"]:checked')?.value;
+
+        if(!animalNumber || !eventDate || !inseminator || !semenCode || !inseminationMethod || !inseminationTime || !heatStatus){
+          return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
+        }
+
+        const today = new Date().toISOString().slice(0,10);
+        if(eventDate > today){
+          return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true);
+        }
+
+        const payload = {
+          type: 'تلقيح',
+          eventType: 'insemination',
+          eventDate,
+          animalNumber,
+          inseminationMethod,
+          semenCode,
+          inseminator,
+          inseminationTime,
+          heatStatus,
+          notes: $('notes').value.trim() || undefined,
+          source: location.pathname
+        };
+
+        let res = await window.api.post('/api/events', payload);
+        if(!res || res.error){
+          console.warn('API response', res);
+        }
+
+        try{
+          const { getFirestore, collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+          const db = getFirestore();
+          await addDoc(collection(db, 'events'), {
+            ...payload,
+            createdAt: serverTimestamp()
+          });
+          try{
+            const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
+            if(uid && inseminator){
+              await addDoc(collection(db, 'inseminators'), {
+                name: inseminator,
+                userId: uid,
+                lastUsedAt: serverTimestamp()
+              });
+            }
+          }catch(e){ console.warn('inseminators add skipped', e); }
+        }catch(e){ console.warn('Firestore save skipped', e); }
+
+        localStorage.setItem('lastEventDate', eventDate);
+
+        showMsg('✅ تم حفظ حدث التلقيح بنجاح. يمكنك المتابعة أو فتح البطاقة.', false);
+
+      }catch(err){
+        console.error(err);
+        showMsg('حدث خطأ غير متوقع أثناء الحفظ', true);
+      }
+    }
+
+    function showMsg(text, isError){
+      const el = $('info');
+      el.className = 'infobar ' + (isError ? 'show error' : 'show');
+      el.textContent = text;
+    }
+  </script>
 </body>
 </html>
