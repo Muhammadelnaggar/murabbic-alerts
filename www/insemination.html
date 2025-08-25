@@ -141,13 +141,13 @@
     function getCtx(){
       const q = getQuery();
       return {
-        animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
+        number: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
         eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
       };
     }
 
     const ctx = getCtx();
-    $('animalNumber').value = ctx.animalNumber;
+    $('animalNumber').value = ctx.number;
     $('eventDate').value = ctx.eventDate;
 
     // تحميل أسماء الملقّحين (اقتراحات) من فايرستور
@@ -167,7 +167,7 @@
     })();
 
     $('toCardBtn').addEventListener('click', ()=>{
-      const number = $('animalNumber').value || ctx.animalNumber || '';
+      const number = $('animalNumber').value || ctx.number || '';
       if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
       location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
     });
@@ -198,6 +198,7 @@
           eventType: 'insemination',
           eventDate,
           animalNumber,
+          number: animalNumber,
           inseminationMethod,
           semenCode,
           inseminator,
