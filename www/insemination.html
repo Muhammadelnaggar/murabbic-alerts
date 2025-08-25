@@ -44,7 +44,7 @@
       <div class="row">
         <div>
           <label>رقم الحيوان <span style="color:red">*</span></label>
-         <input id="animalId" placeholder="animalId" />
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
         </div>
         <div>
           <label>تاريخ التلقيح <span style="color:red">*</span></label>
@@ -106,7 +106,7 @@
   <script type="module" src="/js/firebase-config.js"></script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
-  
+
   <script>
     if(!window.api){
       window.api = {
@@ -140,9 +140,11 @@
     }
     function getCtx(){
       const q = getQuery();
+      const n = (v)=> (v===undefined || v===null || v==='undefined' || v==='null') ? '' : v;
       return {
-        number: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
-        eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
+        animalId: n(q.animalId || q.id || q.animalID),
+        number:   n(q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber')),
+        eventDate: n(q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10))
       };
     }
 
@@ -150,20 +152,27 @@
     $('animalNumber').value = ctx.number;
     $('eventDate').value = ctx.eventDate;
 
-    // تحميل أسماء الملقّحين (اقتراحات) من فايرستور
-    (async function loadInseminators(){
+    // لو الرقم فاضي لكن فيه animalId، نحاول جلبه تلقائيًا
+    (async function resolveNumberIfNeeded(){
       try{
-        const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
-        if(!uid) return;
-        const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-        const db = getFirestore();
-        const q = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
-        const snap = await getDocs(q);
-        const set = new Set();
-        const list = document.getElementById('inseminatorsList');
-        list.innerHTML = '';
-        snap.forEach(doc=>{ const n = doc.data()?.name; if(n && !set.has(n)){ set.add(n); const opt = document.createElement('option'); opt.value = n; list.appendChild(opt);} });
-      }catch(e){ console.warn('loadInseminators skipped', e); }
+        const numEl = $('animalNumber');
+        if(numEl.value) return;
+        if(!ctx.animalId) return;
+        const base = window.API_BASE || '';
+        const headers = { 'X-User-Id': localStorage.getItem('userId') || localStorage.getItem('tenantId') || '' };
+        const candidates = [
+          `/api/animals/${encodeURIComponent(ctx.animalId)}`,
+          `/api/animals?id=${encodeURIComponent(ctx.animalId)}`,
+          `/api/animals?animalId=${encodeURIComponent(ctx.animalId)}`
+        ];
+        for(const path of candidates){
+          const res = await fetch(base + path, { headers });
+          if(!res.ok) continue;
+          let data=null; try{ data = await res.json(); }catch(_){ }
+          const number = data?.number || data?.animalNumber || data?.animal?.number || data?.animal?.animalNumber;
+          if(number){ numEl.value = number; localStorage.setItem('currentAnimalNumber', number); break; }
+        }
+      }catch(e){ console.warn('resolveNumberIfNeeded failed', e); }
     })();
 
     $('toCardBtn').addEventListener('click', ()=>{
@@ -197,6 +206,7 @@
           type: 'تلقيح',
           eventType: 'insemination',
           eventDate,
+          animalId: ctx.animalId || undefined,
           animalNumber,
           number: animalNumber,
           inseminationMethod,
@@ -250,4 +260,3 @@
   </script>
 </body>
 </html>
-
