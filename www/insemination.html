@@ -207,6 +207,10 @@ const addDaysISO=(iso,n)=>{const d=new Date(iso);d.setDate(d.getDate()+n);return
         if(eventDate > today){
           return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true);
         }
+        // احذف أي مفاتيح قيمتها undefined/null (خصوصًا notes)
+const cleanPayload = Object.fromEntries(
+  Object.entries(payload).filter(([,v]) => v !== undefined && v !== null)
+);
 
         const payload = {
           type: 'تلقيح',
@@ -223,7 +227,7 @@ const addDaysISO=(iso,n)=>{const d=new Date(iso);d.setDate(d.getDate()+n);return
           source: location.pathname
         };
 
-        let res = await window.api.post('/api/events', payload);
+       let res = await window.api.post('/api/events', cleanPayload);
         if(!res || res.error){
           console.warn('API response', res);
         }
@@ -231,9 +235,7 @@ const addDaysISO=(iso,n)=>{const d=new Date(iso);d.setDate(d.getDate()+n);return
         try{
           const { getFirestore, collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
           const db = getFirestore();
-          await addDoc(collection(db, 'events'), {
-            ...payload,
-            createdAt: serverTimestamp()
+         await addDoc(collection(db, 'events'), { ...cleanPayload, createdAt: serverTimestamp() });
           });
           try{
             const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
@@ -319,6 +321,7 @@ if ($('eventDate')) {
 
 </body>
 </html>
+
 
 
 
