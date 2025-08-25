@@ -133,6 +133,9 @@
   <script type="module" src="/js/smart-checks.js"></script>
   <script type="module">
     const $ = (id)=>document.getElementById(id);
+    function track(e,p={}){try{window.t?.event&&t.event(e,p)}catch{} try{(window.dataLayer=window.dataLayer||[]).push({event:e,...p})}catch{}}
+const addDaysISO=(iso,n)=>{const d=new Date(iso);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+
 
     function getQuery(){
       const p = new URLSearchParams(location.search);
@@ -156,6 +159,8 @@
     const ctx = getCtx();
     $('animalNumber').value = ctx.animalNumber;
     $('eventDate').value = ctx.eventDate;
+    track('insemination_page_open',{number:$('animalNumber').value||undefined,date:$('eventDate').value,path:location.pathname});
+
 
     // تحميل أسماء الملقّحين (اقتراحات) من فايرستور
     (async function loadInseminators(){
@@ -191,6 +196,8 @@
         const inseminationMethod = $('inseminationMethod').value;
         const inseminationTime = document.querySelector('input[name="inseminationTime"]:checked')?.value;
         const heatStatus = document.querySelector('input[name="heatStatus"]:checked')?.value;
+        track('insemination_save_attempt',{number:animalNumber,date:eventDate,method:inseminationMethod});
+
 
         if(!animalNumber || !eventDate || !inseminator || !semenCode || !inseminationMethod || !inseminationTime || !heatStatus){
           return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
@@ -243,11 +250,14 @@
        localStorage.setItem('lastEventDate', eventDate);
 localStorage.setItem('currentAnimalNumber', animalNumber);
 localStorage.setItem('lastAnimalNumber', animalNumber);
+track('insemination_save_success',{number:animalNumber,date:eventDate});
 
         showMsg('✅ تم حفظ حدث التلقيح بنجاح. يمكنك المتابعة أو فتح البطاقة.', false);
 
       }catch(err){
         console.error(err);
+        track('insemination_save_fail',{error:String(err)});
+
         showMsg('حدث خطأ غير متوقع أثناء الحفظ', true);
       }
     }
@@ -309,6 +319,7 @@ if ($('eventDate')) {
 
 </body>
 </html>
+
 
 
 
