@@ -165,7 +165,7 @@
         const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
         const db = getFirestore();
         const qry = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
-        const snap = await getDocs(q);
+        const snap = await getDocs(qry);
         const set = new Set();
         const list = document.getElementById('inseminatorsList');
         list.innerHTML = '';
@@ -309,5 +309,6 @@ if ($('eventDate')) {
 
 </body>
 </html>
+
 
 
