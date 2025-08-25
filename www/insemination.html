@@ -94,7 +94,11 @@
       </div>
 
       <div class="actions">
-        <button class="save" id="saveBtn">حفظ التلقيح ✅</button>
+        <button type="button" class="save" id="saveBtn"
+        onclick="window.__onSave && window.__onSave()">
+  حفظ التلقيح ✅
+</button>
+
         <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
       </div>
 
@@ -321,6 +325,7 @@ if ($('eventDate')) {
 
 </body>
 </html>
+
 
 
 
