@@ -1,43 +1,316 @@
-<script>
-function goToPage(page) {
-  const urlParams = new URLSearchParams(window.location.search);
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل حدث</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      direction: rtl;
+      background: linear-gradient(to bottom, #fdfdf6, #fff9db);
+      font-family: 'Cairo', 'Arial', sans-serif;
+      margin: 0;
+      color: #1b5e20;
+    }
+    h1 {
+      text-align: center;
+      font-size: 26px;
+      margin: 0;
+      padding: 20px 10px;
+      background: #2e7d32;
+      color: #fff;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    }
+    .animal-info, .date-info {
+      text-align: center;
+      font-size: 18px;
+      margin: 8px 0;
+      color: #2e7d32;
+    }
+    .warning {
+      text-align: center;
+      font-size: 16px;
+      color: #c62828;
+      margin-bottom: 10px;
+      min-height: 22px;
+    }
+    .form-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 15px;
+      padding: 15px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .form-fields input {
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 15px;
+    }
+    .button-group button {
+      padding: 12px;
+      background: #ffffff;
+      border: 2px solid #a5d6a7;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    }
+    .button-group button:hover {
+      background-color: #2e7d32;
+      border-color: #2e7d32;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .nutrition-eval-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #e8f5e9;
+      border-radius: 12px;
+      border: 1px solid #a5d6a7;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    .nutrition-eval-container h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: bold;
+      color: #1b5e20;
+      text-align: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #a5d6a7;
+    }
+    .nutrition-eval-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .nutrition-eval-buttons button {
+      flex: 1 1 40%;
+      min-width: 100px;
+      background: #ffffff;
+      border: 2px solid #81c784;
+      border-radius: 8px;
+      font-size: 13px;
+      padding: 10px;
+      transition: all 0.3s ease;
+    }
+    .nutrition-eval-buttons button:hover {
+      background: #2e7d32;
+      border-color: #2e7d32;
+      color: #fff;
+      transform: translateY(-2px);
+    }
+    #inlineMsg {
+      margin: 15px;
+      padding: 12px;
+      background: #f1f8e9;
+      border: 1px solid #c5e1a5;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    #inlineMsg .text {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2e7d32;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>تسجيل حدث</h1>
+  <div class="animal-info" id="animalInfo"></div>
+  <div class="date-info" id="dateInfo"></div>
+  <div class="warning" id="noAnimalWarning"></div>
 
-  // دالة لتطبيع القيم (منع undefined/null)
-  const norm = v => (v === undefined || v === null || v === 'undefined' || v === 'null' || v === 'NaN')
-    ? '' : String(v).trim();
+  <div class="form-fields">
+    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
+    <input type="date" id="eventDateInput" required />
+  </div>
 
-  // الرقم: ناخده من الرابط أو التخزين
-  const number = norm(
-    urlParams.get('number') ||
-    urlParams.get('animalNumber') ||
-    localStorage.getItem('currentAnimalNumber') ||
-    localStorage.getItem('lastAnimalNumber') ||
-    ''
-  );
+  <form id="eventForm">
+   <div class="button-group" id="eventTypeGroup">
+    <button type="button" data-page="calving.html">👶 ولادة</button>
+    <button type="button" data-page="insemination.html">📅 تلقيح</button>
+    <button type="button" data-page="vaccination.html">💉 تحصين</button>
+    <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+    <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+    <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+    <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+    <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+    <button type="button" data-page="disease.html">🔬 التشخيص</button>
+    <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+    <button type="button" data-page="abortion.html">🩸 إجهاض</button>
+    <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+    <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    <div class="nutrition-eval-container">
+      <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
+      <div class="nutrition-eval-buttons">
+        <button type="button" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
+        <button type="button" data-page="feces-eval.html">💩 تقييم الروث</button>
+      </div>
+    </div>
+    <button type="button" data-page="milk-traits.html">🥛 صفات اللبن</button>
+   </div>
+  </form>
 
-  // التاريخ: ناخده من الرابط أو التخزين، لو مش موجود نحط تاريخ اليوم
-  const dateRaw = norm(
-    urlParams.get('date') ||
-    urlParams.get('eventDate') ||
-    localStorage.getItem('lastEventDate') ||
-    ''
-  );
-  const todayISO = new Date().toISOString().slice(0,10);
-  const date = dateRaw || todayISO;
+  <script type="module">
+    import { db, auth } from "./js/firebase-config.js";
+    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // لو الرقم فاضي، نمنع التنقل
-  if (!number) {
-    alert('اختَر/أدخل رقم الحيوان أولًا');
-    return;
+    const animalInfo = document.getElementById("animalInfo");
+    const dateInfo   = document.getElementById("dateInfo");
+    const warning    = document.getElementById("noAnimalWarning");
+    const idInput    = document.getElementById("animalIdInput");
+    const dateInput  = document.getElementById("eventDateInput");
+
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
+
+  function hydrateContext(){
+  const qp = new URLSearchParams(location.search);
+
+  // UID من Firestore (وثيقة الحيوانات)
+  const presetId   = qp.get("animalId") || "";     
+
+  // رقم الحيوان اللي المربي مدخله
+  const presetNum  = qp.get("number") || qp.get("animalNumber") || "";  
+
+  const presetDate = qp.get("date") || todayLocal();
+
+  // املى الحقول
+  idInput.value = presetId;
+  dateInput.value = presetDate;
+
+  // عرض الرقم للمربي لو موجود
+  animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
+
+  try {
+    const [y,m,d] = presetDate.split('-').map(Number);
+    dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
+  } catch {
+    dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
   }
 
-  // جهز الرابط
-  const qs = new URLSearchParams({ number, date }).toString();
-  const url = `${page}?${qs}`;
+  // ✅ رجّع الاتنين بشكل منفصل
+  return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
+}
+
+ // ✅ استدعاء الدالة وتخزين النتيجة في ctx
+const ctx = hydrateContext();
+
+// تقدر تبعته بعدين لأي دالة تحتاجه
+pushContext(ctx);
+
+
+    function getContextOrWarn(){
+      const animalId = idInput.value.trim();
+      const eventDate= dateInput.value.trim();
+      if (!animalId || !eventDate){
+        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+        return null;
+      }
+      warning.textContent = "";
+      localStorage.setItem("lastAnimalId", animalId);
+      return { animalId, eventDate };
+    }
+
+    function pushContext(ctx){
+      const id = String(ctx.animalId);
+      const dt = String(ctx.eventDate);
+      localStorage.setItem('ctxAnimalId', id);
+      localStorage.setItem('ctxEventDate', dt);
+    }
+
+  function buildTargetUrl(page, ctx){
+  const u  = new URL(page, location.href);
+  const uid = String(ctx.animalId);        // UID من Firestore
+  const num = String(ctx.animalNumber);    // الرقم للمربي
+  const dt  = String(ctx.eventDate);
+
+  u.searchParams.set("animalId", uid);   // UID
+  u.searchParams.set("number", num);     // الرقم
+  u.searchParams.set("date", dt);        // التاريخ
+
+  return u.toString();
+}
+
+
+    function wireButtons(){
+      const container = document.getElementById("eventTypeGroup");
+      if(!container) return;
+      container.querySelectorAll('button[data-page]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const ctx = getContextOrWarn();
+          if(!ctx) return;
+          pushContext(ctx);
+          const page = btn.getAttribute('data-page');
+          const targetUrl = buildTargetUrl(page, ctx);
+          if(page === 'trimming.html'){
+            await addDoc(collection(db, 'events'), {
+              userId: auth?.currentUser?.uid || null,
+              animalId: ctx.animalId,
+              eventDate: ctx.eventDate,
+              eventType: 'تقليم الحوافر',
+              createdAt: serverTimestamp()
+            });
+            alert(`✅ تم تسجيل تقليم الحوافر للحيوان ${ctx.animalId}`);
+          } else {
+            location.href = targetUrl;
+          }
+        });
+      });
+    }
+
+    onAuthStateChanged(auth, user=>{
+      if(!user){ location.href = "login.html"; return; }
+      wireButtons();
+    });
+  </script>
+  <script>
+function goToPage(page) {
+  // اقرأ السياق من URL أو LocalStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const animalId = urlParams.get("animalId") || localStorage.getItem("lastAnimalId") || "";
+  const eventDate = urlParams.get("date") || localStorage.getItem("lastEventDate") || "";
+
+  // جهّز الرابط
+  let url = page;
+  const params = [];
+  if (animalId) params.push(`animalId=${animalId}`);
+  if (eventDate) params.push(`date=${eventDate}`);
+  if (params.length) url += "?" + params.join("&");
+
+  // اذهب للصفحة
   window.location.href = url;
 }
 
-// اربط الأزرار
+// اربط كل الأزرار اللي فيها data-page
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("button[data-page]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -46,3 +319,155 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
+<!-- لازم يكون موجود -->
+<script src="/js/tenant-bootstrap.js"></script>
+<script type="module" src="/js/app-core.js"></script>
+<!-- 1) تهيئة الهوية -->
+<script>
+window.authReady = (async () => {
+  // 1) حمِّل البوتستراب لو مش موجود أصلاً
+  if (!window.tenantBootstrapLoaded) {
+    await new Promise((ok, err) => {
+      const s = document.createElement('script');
+      s.src = '/js/tenant-bootstrap.js';
+      s.onload = () => { window.tenantBootstrapLoaded = true; ok(); };
+      s.onerror = () => err(new Error('tenant-bootstrap missing'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // 2) انتظر init لو موجودة
+  if (window.tenantBootstrap?.init) {
+    try { await window.tenantBootstrap.init(); } catch(e) {}
+  }
+
+  // 3) لو مفيش userId في الذاكرة، جرّب استعادته من LocalStorage
+  if (!window.currentUserId) {
+    const uid = localStorage.getItem('userId');
+    if (uid) window.currentUserId = uid;
+  }
+
+  // 4) اختبر الجلسة من السيرفر (غير إجباري لكنه مفيد للموبايل)
+  try {
+    const API_BASE = window.API_BASE || '';
+    const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+    if (r.ok) {
+      const me = await r.json().catch(()=>({}));
+      if (me?.userId) window.currentUserId = me.userId;
+    }
+  } catch(e){}
+
+  return Boolean(window.currentUserId);
+})();
+</script>
+
+<!-- 2) بوابة الدخول (حارس واحد موحد) -->
+<script>
+(async () => {
+  // امنع السباق: استنى authReady لحد 5 ثواني بحد أقصى
+  const ok = await Promise.race([
+    window.authReady,
+    new Promise(res => setTimeout(() => res(false), 5000))
+  ]);
+
+  if (!ok) {
+    // لو لسه مش متأكدين من الهوية، ما نعملش Loop لا نهائي — سجّل سبب واضح وارجع للّوجين مرة واحدة
+    console.warn('Auth not ready; redirecting to login once.');
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace(`/login.html?next=${next}`);
+    return;
+  }
+
+  console.log('✅ Auth OK as', window.currentUserId);
+})();
+</script>
+<script>
+(() => {
+  // تطبيع قيم النص (منع "undefined"/"null"/NaN)
+  const norm = v => (v === undefined || v === null || v === 'undefined' || v === 'null' || v === 'NaN')
+    ? '' : String(v).trim();
+
+  // التقط الرقم من عدة مصادر: URL -> حقول -> عناصر data-attr -> LocalStorage
+  function getAnimalNumber() {
+    const url = new URLSearchParams(location.search);
+    // 1) من الـURL إن وُجد
+    let num = norm(url.get('number') || url.get('animalNumber'));
+    if (num) return num;
+
+    // 2) من الحقول (جرّب أشهر المعرفات/الأسماء)
+    const idCandidates = ['animalNumber','cowNumber','number','earTag','tag'];
+    for (const id of idCandidates) {
+      const el = document.getElementById(id);
+      if (el && norm(el.value)) return norm(el.value);
+    }
+    const nameCandidates = ['animalNumber','cowNumber','number','earTag','tag'];
+    for (const name of nameCandidates) {
+      const el = document.querySelector(`[name="${name}"]`);
+      if (el && norm(el.value)) return norm(el.value);
+    }
+
+    // 3) من عنصر به data-current-animal-number
+    const dataHost = document.querySelector('[data-current-animal-number]');
+    if (dataHost && norm(dataHost.getAttribute('data-current-animal-number'))) {
+      return norm(dataHost.getAttribute('data-current-animal-number'));
+    }
+
+    // 4) من LocalStorage
+    return norm(localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
+  }
+
+  // التقط التاريخ من: URL -> حقل -> LocalStorage -> تاريخ اليوم
+  function getEventDate() {
+    const url = new URLSearchParams(location.search);
+    let d = norm(url.get('date') || url.get('eventDate'));
+    if (!d) {
+      const el = document.getElementById('eventDate') || document.querySelector('[name="eventDate"]');
+      if (el && norm(el.value)) d = norm(el.value);
+    }
+    if (!d) d = norm(localStorage.getItem('lastEventDate'));
+    if (!d) d = new Date().toISOString().slice(0,10); // اليوم بصيغة ISO
+    // تأكيد الصيغة ISO yyyy-mm-dd
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const parsed = new Date(d);
+      d = isNaN(parsed) ? new Date().toISOString().slice(0,10) : parsed.toISOString().slice(0,10);
+    }
+    return d;
+  }
+
+  function goToPage(page) {
+    const number = getAnimalNumber();
+    const date   = getEventDate();
+
+    // حماية: لازم رقم الحيوان
+    if (!number) {
+      alert('اختَر/أدخل رقم الحيوان أولًا');
+      console.warn('[add-event] animal number missing — prevented navigation');
+      return;
+    }
+
+    // مرّر دائمًا number + date (نفس ما تعمل الولادة)
+    const qs = new URLSearchParams({ number, date }).toString();
+    const url = `${page}?${qs}`;
+
+    console.debug('[add-event] navigating ->', url);
+    location.href = url;
+  }
+
+  // اربط جميع الأزرار التي تحتوي data-page
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('button[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => goToPage(btn.getAttribute('data-page')));
+    });
+  });
+})();
+</script>
+
+<!-- 3) بقية سكربتات الصفحة (بعد التأكد من الهوية) -->
+<script type="module" src="/js/app-core.js"></script>
+
+</body>
+</html>
+
+
+
+
