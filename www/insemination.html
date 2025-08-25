@@ -138,13 +138,20 @@
       const p = new URLSearchParams(location.search);
       return Object.fromEntries(p.entries());
     }
-    function getCtx(){
-      const q = getQuery();
-      return {
-        animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
-        eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
-      };
-    }
+ function getCtx(){
+  const q = getQuery();
+  const norm = v => (v == null || v === 'undefined' || v === 'null' || v === 'NaN') ? '' : String(v).trim();
+  // تاريخ اليوم بصيغة ISO
+  const today = new Date().toISOString().slice(0,10);
+  let date = norm(q.date || q.eventDate || localStorage.getItem('lastEventDate') || today);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = today;
+
+  return {
+    animalNumber: norm(q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || ''),
+    eventDate: date
+  };
+}
+
 
     const ctx = getCtx();
     $('animalNumber').value = ctx.animalNumber;
@@ -157,7 +164,7 @@
         if(!uid) return;
         const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
         const db = getFirestore();
-        const q = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
+        const qry = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
         const snap = await getDocs(q);
         const set = new Set();
         const list = document.getElementById('inseminatorsList');
@@ -166,11 +173,12 @@
       }catch(e){ console.warn('loadInseminators skipped', e); }
     })();
 
-    $('toCardBtn').addEventListener('click', ()=>{
-      const number = $('animalNumber').value || ctx.animalNumber || '';
-      if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
-      location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
-    });
+   $('toCardBtn').addEventListener('click', ()=>{
+  const norm = v => (v == null || v === 'undefined' || v === 'null') ? '' : String(v).trim();
+  const number = norm($('animalNumber').value) || norm(ctx.animalNumber) || '';
+  if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
+  location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
+});
 
     $('saveBtn').addEventListener('click', onSave);
 
@@ -198,6 +206,7 @@
           eventType: 'insemination',
           eventDate,
           animalNumber,
+           number: animalNumber,
           inseminationMethod,
           semenCode,
           inseminator,
@@ -231,7 +240,9 @@
           }catch(e){ console.warn('inseminators add skipped', e); }
         }catch(e){ console.warn('Firestore save skipped', e); }
 
-        localStorage.setItem('lastEventDate', eventDate);
+       localStorage.setItem('lastEventDate', eventDate);
+localStorage.setItem('currentAnimalNumber', animalNumber);
+localStorage.setItem('lastAnimalNumber', animalNumber);
 
         showMsg('✅ تم حفظ حدث التلقيح بنجاح. يمكنك المتابعة أو فتح البطاقة.', false);
 
@@ -272,12 +283,19 @@
   }
 
   // عبّي الحقول لو كانت فاضية
-  if ($('animalNumber') && !norm($('animalNumber').value)) {
+ if ($('animalNumber')) {
+  const cur = ($('animalNumber').value || '').trim();
+  if (cur === '' || cur === 'undefined' || cur === 'null') {
     $('animalNumber').value = number || '';
   }
-  if ($('eventDate') && !norm($('eventDate').value)) {
+}
+if ($('eventDate')) {
+  const curD = ($('eventDate').value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(curD)) {
     $('eventDate').value = eventDate || new Date().toISOString().slice(0,10);
   }
+}
+
 
   // لوج رقابي (بدون تغيير السلوك)
   if (!qs.get('number') || !qs.get('date')) {
@@ -291,4 +309,5 @@
 
 </body>
 </html>
+
 
