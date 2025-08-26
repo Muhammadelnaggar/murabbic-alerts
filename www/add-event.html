@@ -144,36 +144,35 @@
   <div class="animal-info" id="animalInfo"></div>
   <div class="date-info" id="dateInfo"></div>
   <div class="warning" id="noAnimalWarning"></div>
-
   <div class="form-fields">
     <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
     <input type="date" id="eventDateInput" required />
   </div>
 
   <form id="eventForm">
-   <div class="button-group" id="eventTypeGroup">
-    <button type="button" data-page="calving.html">👶 ولادة</button>
-    <button type="button" data-page="insemination.html">📅 تلقيح</button>
-    <button type="button" data-page="vaccination.html">💉 تحصين</button>
-    <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-    <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-    <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-    <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-    <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-    <button type="button" data-page="disease.html">🔬 التشخيص</button>
-    <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
-    <button type="button" data-page="abortion.html">🩸 إجهاض</button>
-    <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
-    <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-    <div class="nutrition-eval-container">
-      <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
-      <div class="nutrition-eval-buttons">
-        <button type="button" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
-        <button type="button" data-page="feces-eval.html">💩 تقييم الروث</button>
+    <div class="button-group" id="eventTypeGroup">
+      <button type="button" data-page="calving.html">👶 ولادة</button>
+      <button type="button" data-page="insemination.html">📅 تلقيح</button>
+      <button type="button" data-page="vaccination.html">💉 تحصين</button>
+      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
+      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
+      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
+      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+      <button type="button" data-page="disease.html">🔬 التشخيص</button>
+      <button type="button" data-page="trimming.html">🦶 تقليم الحوافر</button>
+      <button type="button" data-page="abortion.html">🩸 إجهاض</button>
+      <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+      <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+      <div class="nutrition-eval-container">
+        <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
+        <div class="nutrition-eval-buttons">
+          <button type="button" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
+          <button type="button" data-page="feces-eval.html">💩 تقييم الروث</button>
+        </div>
       </div>
+      <button type="button" data-page="milk-traits.html">🥛 صفات اللبن</button>
     </div>
-    <button type="button" data-page="milk-traits.html">🥛 صفات اللبن</button>
-   </div>
   </form>
 
  <script type="module">
@@ -192,24 +191,24 @@
     const presetDate = norm(qp.get("date")) || todayISO();
 
     // املأ الواجهة (اختياري)
-    if ($("animalInfo")) $("animalInfo").textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
-    if ($("dateInfo"))   $("dateInfo").textContent   = `📅 التاريخ الحالي: ${presetDate}`;
-    if ($("animalIdInput") && !norm($("animalIdInput").value)) $("animalIdInput").value = presetId;
-    if ($("eventDateInput") && !norm($("eventDateInput").value)) $("eventDateInput").value = presetDate;
+    if ($("#animalInfo")) $("#animalInfo").textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
+    if ($("#dateInfo"))   $("#dateInfo").textContent   = `📅 التاريخ الحالي: ${presetDate}`;
+    if ($("#animalIdInput") && !norm($("#animalIdInput").value)) $("#animalIdInput").value = presetId;
+    if ($("#eventDateInput") && !norm($("#eventDateInput").value)) $("#eventDateInput").value = presetDate;
 
     return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
   }
 
   function getContextOrWarn(){
-    const animalId  = norm($("animalIdInput")?.value);
-    let   eventDate = norm($("eventDateInput")?.value) || todayISO();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) eventDate = todayISO();
+    const animalId  = norm($("#animalIdInput")?.value);
+    let   eventDate = norm($("#eventDateInput")?.value) || todayISO();
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)) eventDate = todayISO();
 
     if (!animalId || !eventDate){
-      if ($("noAnimalWarning")) $("noAnimalWarning").textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+      if ($("#noAnimalWarning")) $("#noAnimalWarning").textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
       return null;
     }
-    if ($("noAnimalWarning")) $("noAnimalWarning").textContent = "";
+    if ($("#noAnimalWarning")) $("#noAnimalWarning").textContent = "";
     localStorage.setItem("lastEventDate", eventDate);
     return { animalId, eventDate };
   }
@@ -261,32 +260,71 @@
     wireButtonsOnce();
   });
 </script>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN') ? '' : String(v).trim();
+  const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
 
+  function hydrate(){
+    const qs = new URLSearchParams(location.search);
+    const number = norm(qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '');
+    let date = norm(qs.get('date') || localStorage.getItem('lastEventDate') || todayISO());
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
- 
-<!-- لازم يكون موجود -->
+    $('animalInfo') && ($('animalInfo').textContent = `🐄 رقم الحيوان الحالي: ${number || 'غير محدد'}`);
+    $('dateInfo')   && ($('dateInfo').textContent   = `📅 التاريخ الحالي: ${date}`);
+    $('animalIdInput') && !norm($('animalIdInput').value) && ($('animalIdInput').value = number);
+    $('eventDateInput') && !norm($('eventDateInput').value) && ($('eventDateInput').value = date);
 
+    return { number, date };
+  }
 
-  
+  function getCtxOrWarn(){
+    const number = norm($('animalIdInput')?.value);
+    let date = norm($('eventDateInput')?.value) || todayISO();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
+    if(!number){
+      $('noAnimalWarning') && ($('noAnimalWarning').textContent = '⚠️ أدخل رقم الحيوان أولًا.');
+      return null;
+    }
+    $('noAnimalWarning') && ($('noAnimalWarning').textContent = '');
+    localStorage.setItem('currentAnimalNumber', number);
+    localStorage.setItem('lastAnimalNumber', number);
+    localStorage.setItem('lastEventDate', date);
+    return { number, date };
+  }
 
+  function buildUrl(page, ctx){
+    const u = new URL(page, location.href);
+    u.searchParams.set('number', ctx.number);
+    u.searchParams.set('date', ctx.date);
+    return u.toString();
+  }
 
-<!-- 2) بوابة الدخول (حارس واحد موحد) -->
+  function wire(){
+    const base = hydrate();
+    document.querySelectorAll('button[data-page]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const form = getCtxOrWarn(); if(!form) return;
+        const ctx = {...base, ...form};
+        location.href = buildUrl(btn.getAttribute('data-page'), ctx);
+      }, {passive:true});
+    });
+  }
 
+  // لو فيه خطأ جافاسكربت يبان لك شريط أحمر تحت
+  window.addEventListener('error', e=>{
+    const box = document.createElement('div');
+    box.style.cssText='position:fixed;bottom:10px;left:10px;right:10px;background:#ffebee;color:#b71c1c;padding:10px;border:1px solid #ef9a9a;border-radius:8px;z-index:9999;font:14px sans-serif';
+    box.textContent = 'خطأ بالصفحة: ' + (e.error?.message || e.message);
+    document.body.appendChild(box);
+  });
 
-
-<script type="module" src="/js/app-core.js"></script>
-<script src="/js/tenant-bootstrap.js" defer></script>
-
+  document.addEventListener('DOMContentLoaded', wire);
+})();
+</script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
