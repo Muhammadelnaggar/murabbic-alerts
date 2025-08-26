@@ -279,76 +279,65 @@ pushContext(ctx);
 
   function buildTargetUrl(page, ctx){
   const u  = new URL(page, location.href);
-  const uid = String(ctx.animalId);        // UID من Firestore
-  const num = String(ctx.animalNumber);    // الرقم للمربي
-  const dt  = String(ctx.eventDate);
+  const uid = String(ctx.animalId || '');
+  // fallback ذكي: لو مفيش animalNumber خد الـ UID أو آخر رقم محفوظ
+  const num = String(ctx.animalNumber || ctx.animalId || localStorage.getItem('currentAnimalNumber') || '');
+  const dt  = String(ctx.eventDate || '');
 
-  u.searchParams.set("animalId", uid);   // UID
-  u.searchParams.set("number", num);     // الرقم
-  u.searchParams.set("date", dt);        // التاريخ
+  if (uid) u.searchParams.set("animalId", uid);
+  if (num) u.searchParams.set("number",   num);
+  if (dt)  u.searchParams.set("date",     dt);
 
   return u.toString();
 }
 
+function wireButtons(){
+  const container = document.getElementById("eventTypeGroup");
+  if(!container) return;
 
-    function wireButtons(){
-      const container = document.getElementById("eventTypeGroup");
-      if(!container) return;
-      container.querySelectorAll('button[data-page]').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          const ctx = getContextOrWarn();
-          if(!ctx) return;
-          pushContext(ctx);
-          const page = btn.getAttribute('data-page');
-          const targetUrl = buildTargetUrl(page, ctx);
-          if(page === 'trimming.html'){
-            await addDoc(collection(db, 'events'), {
-              userId: auth?.currentUser?.uid || null,
-              animalId: ctx.animalId,
-              eventDate: ctx.eventDate,
-              eventType: 'تقليم الحوافر',
-              createdAt: serverTimestamp()
-            });
-            alert(`✅ تم تسجيل تقليم الحوافر للحيوان ${ctx.animalId}`);
-          } else {
-            location.href = targetUrl;
-          }
+  // فلّاج بسيط لمنع الربط المزدوج لو حصل استدعاء متكرر
+  if (window.__AE_BOUND) return;
+
+  container.querySelectorAll('button[data-page]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const formCtx = getContextOrWarn();   // { animalId, eventDate } من الحقول
+      if(!formCtx) return;
+
+      const urlCtx  = hydrateContext();     // { animalId, animalNumber, eventDate } من URL
+      const ctx     = { ...urlCtx, ...formCtx }; // يضمن animalNumber لو جاي من الـURL
+
+      pushContext(ctx);
+      const page = btn.getAttribute('data-page');
+      const targetUrl = buildTargetUrl(page, ctx);
+
+      if(page === 'trimming.html'){
+        await addDoc(collection(db, 'events'), {
+          userId: auth?.currentUser?.uid || null,
+          animalId: ctx.animalId,
+          eventDate: ctx.eventDate,
+          eventType: 'تقليم الحوافر',
+          createdAt: serverTimestamp()
         });
-      });
-    }
-
-    onAuthStateChanged(auth, user=>{
-      if(!user){ location.href = "login.html"; return; }
-      wireButtons();
-    });
-  </script>
-  <script>
-function goToPage(page) {
-  // اقرأ السياق من URL أو LocalStorage
-  const urlParams = new URLSearchParams(window.location.search);
-  const animalId = urlParams.get("animalId") || localStorage.getItem("lastAnimalId") || "";
-  const eventDate = urlParams.get("date") || localStorage.getItem("lastEventDate") || "";
-
-  // جهّز الرابط
-  let url = page;
-  const params = [];
-  if (animalId) params.push(`animalId=${animalId}`);
-  if (eventDate) params.push(`date=${eventDate}`);
-  if (params.length) url += "?" + params.join("&");
-
-  // اذهب للصفحة
-  window.location.href = url;
-}
-
-// اربط كل الأزرار اللي فيها data-page
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("button[data-page]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      goToPage(btn.getAttribute("data-page"));
+        alert(`✅ تم تسجيل تقليم الحوافر للحيوان ${ctx.animalId}`);
+      } else {
+        location.href = targetUrl;
+      }
     });
   });
+
+  window.__AE_BOUND = true;
+ }
+
+    onAuthStateChanged(auth, user=>{
+      if (!user) {
++    const next = encodeURIComponent(location.pathname + location.search);
++    location.replace(`/login.html?next=${next}`);
++    return;
++  }
+  wireButtons();
 });
-</script>
+  </script>
+ 
 <!-- لازم يكون موجود -->
 
 
@@ -499,6 +488,7 @@ window.authReady = (async () => {
 
 </body>
 </html>
+
 
 
 
