@@ -139,35 +139,6 @@
   </style>
 </head>
 <body>
-  <!-- 🔒 وضع الضيف + منع التحويل للّوجِن + منع تكرار app-core -->
-<script>
-  (function () {
-    // 1) وضع الضيف للبروتوتايب (يوفر userId/tenantId للي بيعتمدوا عليهم)
-    if (!localStorage.getItem('userId'))   localStorage.setItem('userId', 'guest');
-    if (!localStorage.getItem('tenantId')) localStorage.setItem('tenantId', 'guest');
-    window.MBK_ALLOW_GUEST = true;
-
-    // 2) منع أي تحويل تلقائي لصفحة اللوجِن في هذه الصفحة فقط
-    const assign = location.assign.bind(location);
-    const replace = location.replace.bind(location);
-    const isLogin = (u) => /login/i.test(String(u||''));
-    location.assign  = (u) => (window.MBK_ALLOW_GUEST && isLogin(u)) ? console.warn('[add-event] blocked redirect:', u) : assign(u);
-    location.replace = (u) => (window.MBK_ALLOW_GUEST && isLogin(u)) ? console.warn('[add-event] blocked redirect:', u) : replace(u);
-
-    // 3) منع تكرار تحميل app-core.js
-    if (window.__APP_CORE_LOADED) {
-      document.querySelectorAll('script[src$="/js/app-core.js"]').forEach((el, i) => { if (i > 0) el.remove(); });
-      console.warn('[add-event] duplicate app-core removed');
-    } else {
-      window.__APP_CORE_LOADED = true;
-    }
-
-    // 4) فالباك آمن للـ API عشان مايكسرش الصفحة لو app-core اتأخر
-    if (!window.api || typeof window.api.post !== 'function') {
-      window.api = { async post(){ return { ok:true }; } };
-    }
-  })();
-</script>
 
   <h1>تسجيل حدث</h1>
   <div class="animal-info" id="animalInfo"></div>
@@ -330,10 +301,10 @@ function wireButtons(){
 
     onAuthStateChanged(auth, user=>{
       if (!user) {
-+    const next = encodeURIComponent(location.pathname + location.search);
-+    location.replace(`/login.html?next=${next}`);
-+    return;
-+  }
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace(`/login.html?next=${next}`);
+    return;
+  }
   wireButtons();
 });
   </script>
@@ -342,145 +313,11 @@ function wireButtons(){
 
 
   
-<!-- 1) تهيئة الهوية -->
-<script>
-window.authReady = (async () => {
-  // 1) حمِّل البوتستراب لو مش موجود أصلاً
-  if (!window.tenantBootstrapLoaded) {
-    await new Promise((ok, err) => {
-      const s = document.createElement('script');
-      s.src = '/js/tenant-bootstrap.js';
-      s.onload = () => { window.tenantBootstrapLoaded = true; ok(); };
-      s.onerror = () => err(new Error('tenant-bootstrap missing'));
-      document.head.appendChild(s);
-    });
-  }
 
-  // 2) انتظر init لو موجودة
-  if (window.tenantBootstrap?.init) {
-    try { await window.tenantBootstrap.init(); } catch(e) {}
-  }
 
-  // 3) لو مفيش userId في الذاكرة، جرّب استعادته من LocalStorage
-  if (!window.currentUserId) {
-    const uid = localStorage.getItem('userId');
-    if (uid) window.currentUserId = uid;
-  }
-
-  // 4) اختبر الجلسة من السيرفر (غير إجباري لكنه مفيد للموبايل)
-  try {
-    const API_BASE = window.API_BASE || '';
-    const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
-    if (r.ok) {
-      const me = await r.json().catch(()=>({}));
-      if (me?.userId) window.currentUserId = me.userId;
-    }
-  } catch(e){}
-
-  return Boolean(window.currentUserId);
-})();
-</script>
 
 <!-- 2) بوابة الدخول (حارس واحد موحد) -->
-<script>
-(async () => {
-  // امنع السباق: استنى authReady لحد 5 ثواني بحد أقصى
-  const ok = await Promise.race([
-    window.authReady,
-    new Promise(res => setTimeout(() => res(false), 5000))
-  ]);
 
-  if (!ok) {
-    // لو لسه مش متأكدين من الهوية، ما نعملش Loop لا نهائي — سجّل سبب واضح وارجع للّوجين مرة واحدة
-    console.warn('Auth not ready; redirecting to login once.');
-    const next = encodeURIComponent(location.pathname + location.search);
-    location.replace(`/login.html?next=${next}`);
-    return;
-  }
-
-  console.log('✅ Auth OK as', window.currentUserId);
-})();
-</script>
-<script>
-(() => {
-  // تطبيع قيم النص (منع "undefined"/"null"/NaN)
-  const norm = v => (v === undefined || v === null || v === 'undefined' || v === 'null' || v === 'NaN')
-    ? '' : String(v).trim();
-
-  // التقط الرقم من عدة مصادر: URL -> حقول -> عناصر data-attr -> LocalStorage
-  function getAnimalNumber() {
-    const url = new URLSearchParams(location.search);
-    // 1) من الـURL إن وُجد
-    let num = norm(url.get('number') || url.get('animalNumber'));
-    if (num) return num;
-
-    // 2) من الحقول (جرّب أشهر المعرفات/الأسماء)
-    const idCandidates = ['animalNumber','cowNumber','number','earTag','tag'];
-    for (const id of idCandidates) {
-      const el = document.getElementById(id);
-      if (el && norm(el.value)) return norm(el.value);
-    }
-    const nameCandidates = ['animalNumber','cowNumber','number','earTag','tag'];
-    for (const name of nameCandidates) {
-      const el = document.querySelector(`[name="${name}"]`);
-      if (el && norm(el.value)) return norm(el.value);
-    }
-
-    // 3) من عنصر به data-current-animal-number
-    const dataHost = document.querySelector('[data-current-animal-number]');
-    if (dataHost && norm(dataHost.getAttribute('data-current-animal-number'))) {
-      return norm(dataHost.getAttribute('data-current-animal-number'));
-    }
-
-    // 4) من LocalStorage
-    return norm(localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
-  }
-
-  // التقط التاريخ من: URL -> حقل -> LocalStorage -> تاريخ اليوم
-  function getEventDate() {
-    const url = new URLSearchParams(location.search);
-    let d = norm(url.get('date') || url.get('eventDate'));
-    if (!d) {
-      const el = document.getElementById('eventDate') || document.querySelector('[name="eventDate"]');
-      if (el && norm(el.value)) d = norm(el.value);
-    }
-    if (!d) d = norm(localStorage.getItem('lastEventDate'));
-    if (!d) d = new Date().toISOString().slice(0,10); // اليوم بصيغة ISO
-    // تأكيد الصيغة ISO yyyy-mm-dd
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-      const parsed = new Date(d);
-      d = isNaN(parsed) ? new Date().toISOString().slice(0,10) : parsed.toISOString().slice(0,10);
-    }
-    return d;
-  }
-
-  function goToPage(page) {
-    const number = getAnimalNumber();
-    const date   = getEventDate();
-
-    // حماية: لازم رقم الحيوان
-    if (!number) {
-      alert('اختَر/أدخل رقم الحيوان أولًا');
-      console.warn('[add-event] animal number missing — prevented navigation');
-      return;
-    }
-
-    // مرّر دائمًا number + date (نفس ما تعمل الولادة)
-    const qs = new URLSearchParams({ number, date }).toString();
-    const url = `${page}?${qs}`;
-
-    console.debug('[add-event] navigating ->', url);
-    location.href = url;
-  }
-
-  // اربط جميع الأزرار التي تحتوي data-page
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('button[data-page]').forEach(btn => {
-      btn.addEventListener('click', () => goToPage(btn.getAttribute('data-page')));
-    });
-  });
-})();
-</script>
 
 <!-- 3) بقية سكربتات الصفحة (بعد التأكد من الهوية) -->
 <script type="module" src="/js/app-core.js"></script>
@@ -488,7 +325,6 @@ window.authReady = (async () => {
 
 </body>
 </html>
-
 
 
 
