@@ -218,12 +218,15 @@ if (!window.api || typeof window.api.post !== 'function') {
         const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined && v !== null));
 
         // API (اختياري)
-        try{
-         await window.api.post('/api/events', cleanPayload);
+      // API (اختياري)
+try {
+  if (window.api?.post) {
+    await window.api.post('/api/events', cleanPayload);
   }
 } catch (e) {
   console.warn('API error', e);
 }
+
 
         // Firestore
         try{
@@ -307,4 +310,5 @@ if (!window.api || typeof window.api.post !== 'function') {
   </script>
 </body>
 </html>
+
 
