@@ -176,138 +176,51 @@
    </div>
   </form>
 
-  <script type="module">
-    import { db, auth } from "./js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+ <script type="module">
+  import { auth } from "./js/firebase-config.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const animalInfo = document.getElementById("animalInfo");
-    const dateInfo   = document.getElementById("dateInfo");
-    const warning    = document.getElementById("noAnimalWarning");
-    const idInput    = document.getElementById("animalIdInput");
-    const dateInput  = document.getElementById("eventDateInput");
+  // ⚠️ تأكد إن الدوال دي موجودة فوق: hydrateContext / getContextOrWarn / buildTargetUrl
+  let currentUser = null;
 
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
+  function wireButtonsOnce(){
+    if (window.__AE_BOUND) return;
+    const container = document.getElementById("eventTypeGroup");
+    if (!container) return;
 
-  function hydrateContext(){
-  const qp = new URLSearchParams(location.search);
+    const { animalId, animalNumber, eventDate } = hydrateContext();
 
-  // UID من Firestore (وثيقة الحيوانات)
-  const presetId   = qp.get("animalId") || "";     
+    container.querySelectorAll('button[data-page]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const formCtx = getContextOrWarn();            // { animalId, eventDate } من الحقول
+        if (!formCtx) return;
+        const ctx = { animalId, animalNumber, ...formCtx };
+        const targetUrl = buildTargetUrl(btn.dataset.page, ctx);
 
-  // رقم الحيوان اللي المربي مدخله
-  const presetNum  = qp.get("number") || qp.get("animalNumber") || "";  
+        // ⛔️ لو مش لوج إن: ودّيه للّوجين مع next = الصفحة الهدف
+        if (!currentUser) {
+          const next = encodeURIComponent(targetUrl);
+          location.href = `/login.html?next=${next}`;
+          return;
+        }
 
-  const presetDate = qp.get("date") || todayLocal();
-
-  // املى الحقول
-  idInput.value = presetId;
-  dateInput.value = presetDate;
-
-  // عرض الرقم للمربي لو موجود
-  animalInfo.textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
-
-  try {
-    const [y,m,d] = presetDate.split('-').map(Number);
-    dateInfo.textContent   = `📅 التاريخ الحالي: ${new Date(y, m-1, d).toLocaleDateString('ar-EG')}`;
-  } catch {
-    dateInfo.textContent = `📅 التاريخ الحالي: ${presetDate}`;
-  }
-
-  // ✅ رجّع الاتنين بشكل منفصل
-  return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
-}
-
- // ✅ استدعاء الدالة وتخزين النتيجة في ctx
-const ctx = hydrateContext();
-
-// تقدر تبعته بعدين لأي دالة تحتاجه
-pushContext(ctx);
-
-
-    function getContextOrWarn(){
-      const animalId = idInput.value.trim();
-      const eventDate= dateInput.value.trim();
-      if (!animalId || !eventDate){
-        warning.textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-        return null;
-      }
-      warning.textContent = "";
-      localStorage.setItem("lastAnimalId", animalId);
-      return { animalId, eventDate };
-    }
-
-    function pushContext(ctx){
-      const id = String(ctx.animalId);
-      const dt = String(ctx.eventDate);
-      localStorage.setItem('ctxAnimalId', id);
-      localStorage.setItem('ctxEventDate', dt);
-    }
-
-  function buildTargetUrl(page, ctx){
-  const u  = new URL(page, location.href);
-  const uid = String(ctx.animalId || '');
-  // fallback ذكي: لو مفيش animalNumber خد الـ UID أو آخر رقم محفوظ
-  const num = String(ctx.animalNumber || ctx.animalId || localStorage.getItem('currentAnimalNumber') || '');
-  const dt  = String(ctx.eventDate || '');
-
-  if (uid) u.searchParams.set("animalId", uid);
-  if (num) u.searchParams.set("number",   num);
-  if (dt)  u.searchParams.set("date",     dt);
-
-  return u.toString();
-}
-
-function wireButtons(){
-  const container = document.getElementById("eventTypeGroup");
-  if(!container) return;
-
-  // فلّاج بسيط لمنع الربط المزدوج لو حصل استدعاء متكرر
-  if (window.__AE_BOUND) return;
-
-  container.querySelectorAll('button[data-page]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const formCtx = getContextOrWarn();   // { animalId, eventDate } من الحقول
-      if(!formCtx) return;
-
-      const urlCtx  = hydrateContext();     // { animalId, animalNumber, eventDate } من URL
-      const ctx     = { ...urlCtx, ...formCtx }; // يضمن animalNumber لو جاي من الـURL
-
-      pushContext(ctx);
-      const page = btn.getAttribute('data-page');
-      const targetUrl = buildTargetUrl(page, ctx);
-
-      if(page === 'trimming.html'){
-        await addDoc(collection(db, 'events'), {
-          userId: auth?.currentUser?.uid || null,
-          animalId: ctx.animalId,
-          eventDate: ctx.eventDate,
-          eventType: 'تقليم الحوافر',
-          createdAt: serverTimestamp()
-        });
-        alert(`✅ تم تسجيل تقليم الحوافر للحيوان ${ctx.animalId}`);
-      } else {
+        // ✅ لوج إن: روح مباشرة
         location.href = targetUrl;
-      }
+      });
     });
-  });
 
-  window.__AE_BOUND = true;
- }
-
-    onAuthStateChanged(auth, user=>{
-      if (!user) {
-    const next = encodeURIComponent(location.pathname + location.search);
-    
-    return;
+    window.__AE_BOUND = true;
+    console.debug('[add-event] bound buttons');
   }
-  wireButtons();
-});
-  </script>
+
+  // ما نعملش redirect هنا إطلاقًا
+  onAuthStateChanged(auth, (u)=>{
+    currentUser = u || null;
+    document.body.dataset.auth = currentUser ? 'ok' : 'anon';
+    wireButtonsOnce();
+  });
+</script>
+
  
 <!-- لازم يكون موجود -->
 
@@ -326,6 +239,7 @@ function wireButtons(){
 
 </body>
 </html>
+
 
 
 
