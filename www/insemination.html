@@ -110,7 +110,12 @@
     const $ = (id)=>document.getElementById(id);
 
     // تتبع + أدوات مساعدة
-    function track(e,p={}){ try{ window.t?.event?.(e,p) }catch{} try{ (window.dataLayer=window.dataLayer||[]).push({event:e,...p}) }catch{} }
+   function track(e,p={}) {
+  try { window.t?.event?.(e,p); } catch(_) {}
+  try { (window.dataLayer = window.dataLayer || []).push({ event:e, ...p }); } catch(_) {}
+  try { console.debug('[track]', e, p); } catch(_) {}
+}
+
     const addDaysISO=(iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
     // سياق
@@ -167,6 +172,13 @@
     });
 
     // حفظ
+    // ضمان وجود API محلي حتى لو app-core.js ما حمّلش
+if (!window.api || typeof window.api.post !== 'function') {
+  window.api = {
+    async post(){ return { ok:true }; } // فالباك لا يمنع الحفظ في فايرستور
+  };
+}
+
     async function onSave(){
       try{
         const animalNumber = $('animalNumber').value.trim();
@@ -206,7 +218,12 @@
         const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined && v !== null));
 
         // API (اختياري)
-        try{ await window.api.post('/api/events', cleanPayload); }catch(e){ console.warn('API error', e); }
+        try{
+         await window.api.post('/api/events', cleanPayload);
+  }
+} catch (e) {
+  console.warn('API error', e);
+}
 
         // Firestore
         try{
@@ -290,3 +307,4 @@
   </script>
 </body>
 </html>
+
