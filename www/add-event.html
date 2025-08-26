@@ -180,7 +180,50 @@
   import { auth } from "./js/firebase-config.js";
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // ⚠️ تأكد إن الدوال دي موجودة فوق: hydrateContext / getContextOrWarn / buildTargetUrl
+  // ====== Helpers ======
+  const $ = (id)=>document.getElementById(id);
+  const norm = v => (v==null || v==='undefined' || v==='null' || v==='NaN') ? '' : String(v).trim();
+  const todayISO = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+
+  function hydrateContext(){
+    const qp = new URLSearchParams(location.search);
+    const presetId   = norm(qp.get("animalId"));
+    const presetNum  = norm(qp.get("number") || qp.get("animalNumber"));
+    const presetDate = norm(qp.get("date")) || todayISO();
+
+    // املأ الواجهة (اختياري)
+    if ($("animalInfo")) $("animalInfo").textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
+    if ($("dateInfo"))   $("dateInfo").textContent   = `📅 التاريخ الحالي: ${presetDate}`;
+    if ($("animalIdInput") && !norm($("animalIdInput").value)) $("animalIdInput").value = presetId;
+    if ($("eventDateInput") && !norm($("eventDateInput").value)) $("eventDateInput").value = presetDate;
+
+    return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
+  }
+
+  function getContextOrWarn(){
+    const animalId  = norm($("animalIdInput")?.value);
+    let   eventDate = norm($("eventDateInput")?.value) || todayISO();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) eventDate = todayISO();
+
+    if (!animalId || !eventDate){
+      if ($("noAnimalWarning")) $("noAnimalWarning").textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
+      return null;
+    }
+    if ($("noAnimalWarning")) $("noAnimalWarning").textContent = "";
+    localStorage.setItem("lastEventDate", eventDate);
+    return { animalId, eventDate };
+  }
+
+  function buildTargetUrl(page, ctx){
+    const u = new URL(page, location.href);
+    if (ctx.animalId)    u.searchParams.set("animalId", ctx.animalId);
+    const num = ctx.animalNumber || ctx.animalId;
+    if (num)              u.searchParams.set("number", num);
+    if (ctx.eventDate)    u.searchParams.set("date", ctx.eventDate);
+    return u.toString();
+  }
+
+  // ====== Wire buttons ======
   let currentUser = null;
 
   function wireButtonsOnce(){
@@ -188,23 +231,21 @@
     const container = document.getElementById("eventTypeGroup");
     if (!container) return;
 
-    const { animalId, animalNumber, eventDate } = hydrateContext();
+    const baseCtx = hydrateContext();
 
     container.querySelectorAll('button[data-page]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const formCtx = getContextOrWarn();            // { animalId, eventDate } من الحقول
+        const formCtx = getContextOrWarn();       // من الحقول
         if (!formCtx) return;
-        const ctx = { animalId, animalNumber, ...formCtx };
+        const ctx = { ...baseCtx, ...formCtx };   // دمج مع بارامز الـURL لو موجودة
         const targetUrl = buildTargetUrl(btn.dataset.page, ctx);
 
-        // ⛔️ لو مش لوج إن: ودّيه للّوجين مع next = الصفحة الهدف
+        // غير مسجّل؟ ودّيه للّوجين مع next=الهدف
         if (!currentUser) {
-          const next = encodeURIComponent(targetUrl);
-          location.href = `/login.html?next=${next}`;
+          location.href = `/login.html?next=${encodeURIComponent(targetUrl)}`;
           return;
         }
-
-        // ✅ لوج إن: روح مباشرة
+        // مسجّل؟ انطلق
         location.href = targetUrl;
       });
     });
@@ -213,13 +254,14 @@
     console.debug('[add-event] bound buttons');
   }
 
-  // ما نعملش redirect هنا إطلاقًا
+  // لا تعمل أي Redirect هنا عند التحميل
   onAuthStateChanged(auth, (u)=>{
     currentUser = u || null;
     document.body.dataset.auth = currentUser ? 'ok' : 'anon';
     wireButtonsOnce();
   });
 </script>
+
 
  
 <!-- لازم يكون موجود -->
@@ -239,6 +281,7 @@
 
 </body>
 </html>
+
 
 
 
