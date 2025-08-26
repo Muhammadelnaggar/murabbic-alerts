@@ -139,6 +139,36 @@
   </style>
 </head>
 <body>
+  <!-- 🔒 وضع الضيف + منع التحويل للّوجِن + منع تكرار app-core -->
+<script>
+  (function () {
+    // 1) وضع الضيف للبروتوتايب (يوفر userId/tenantId للي بيعتمدوا عليهم)
+    if (!localStorage.getItem('userId'))   localStorage.setItem('userId', 'guest');
+    if (!localStorage.getItem('tenantId')) localStorage.setItem('tenantId', 'guest');
+    window.MBK_ALLOW_GUEST = true;
+
+    // 2) منع أي تحويل تلقائي لصفحة اللوجِن في هذه الصفحة فقط
+    const assign = location.assign.bind(location);
+    const replace = location.replace.bind(location);
+    const isLogin = (u) => /login/i.test(String(u||''));
+    location.assign  = (u) => (window.MBK_ALLOW_GUEST && isLogin(u)) ? console.warn('[add-event] blocked redirect:', u) : assign(u);
+    location.replace = (u) => (window.MBK_ALLOW_GUEST && isLogin(u)) ? console.warn('[add-event] blocked redirect:', u) : replace(u);
+
+    // 3) منع تكرار تحميل app-core.js
+    if (window.__APP_CORE_LOADED) {
+      document.querySelectorAll('script[src$="/js/app-core.js"]').forEach((el, i) => { if (i > 0) el.remove(); });
+      console.warn('[add-event] duplicate app-core removed');
+    } else {
+      window.__APP_CORE_LOADED = true;
+    }
+
+    // 4) فالباك آمن للـ API عشان مايكسرش الصفحة لو app-core اتأخر
+    if (!window.api || typeof window.api.post !== 'function') {
+      window.api = { async post(){ return { ok:true }; } };
+    }
+  })();
+</script>
+
   <h1>تسجيل حدث</h1>
   <div class="animal-info" id="animalInfo"></div>
   <div class="date-info" id="dateInfo"></div>
@@ -320,8 +350,9 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 <!-- لازم يكون موجود -->
-<script src="/js/tenant-bootstrap.js"></script>
-<script type="module" src="/js/app-core.js"></script>
+
+
+  
 <!-- 1) تهيئة الهوية -->
 <script>
 window.authReady = (async () => {
@@ -464,9 +495,11 @@ window.authReady = (async () => {
 
 <!-- 3) بقية سكربتات الصفحة (بعد التأكد من الهوية) -->
 <script type="module" src="/js/app-core.js"></script>
+<script src="/js/tenant-bootstrap.js" defer></script>
 
 </body>
 </html>
+
 
 
 
