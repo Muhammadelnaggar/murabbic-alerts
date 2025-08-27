@@ -193,6 +193,22 @@
     const auth = getAuth();
 
     // Buttons
+    // Buttons — إعادة تشغيل وربط مباشر
+(function wireButtons(){
+  const toCardBtn = $('toCardBtn');
+  if (toCardBtn) {
+    toCardBtn.onclick = ()=>{
+      const num = ($('animalNumber')?.value || '').trim();
+      if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
+      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+    };
+  }
+  const saveBtn = $('saveBtn');
+  if (saveBtn) {
+    saveBtn.onclick = onSave;
+  }
+})();
+
     $('toCardBtn').addEventListener('click', ()=>{ const num = ($('animalNumber')?.value || '').trim(); if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; } location.href = `cow-card.html?number=${encodeURIComponent(num)}`; });
 
     $('saveBtn').addEventListener('click', onSave);
