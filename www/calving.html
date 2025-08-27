@@ -5,29 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل حدث الولادة — مُرَبِّك</title>
   <style>
-    :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0}
-    .bar{max-width:920px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .title{font-weight:700;color:var(--green-600)}
+    :root {
+      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
+      --muted:#64748b; --card:#ffffff; --danger:#c2410c;
+    }
+    * { box-sizing:border-box; }
+    html, body { max-width:100%; overflow-x:hidden; }
+    body { margin:0; font-family:'Cairo', Tahoma, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e2e8f0; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+    .bar { max-width:920px; margin:0 auto; padding:14px 18px; display:flex; gap:8px; align-items:center; justify-content:space-between; }
+    .title { font-weight:700; color:var(--green-600); font-size:18px; }
 
-    main{max-width:920px;margin:16px auto;padding:16px}
-    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px}
-    label{font-weight:600;font-size:14px;color:#0f172a}
-    input,select,textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
-    textarea{min-height:80px;resize:vertical}
-    .row{display:grid;gap:12px}
-    @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
-    .actions{display:flex;gap:10px;justify-content:stretch;margin-top:12px}
-    button{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:700;cursor:pointer}
-    .save{background:var(--green);color:#fff}
-    .ghost{background:#eef2f7;color:#0f172a}
+    main { max-width:920px; margin:20px auto; padding:16px; padding-bottom:110px; }
+    .card { background:var(--card); border:1px solid #e2e8f0; border-radius:16px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    .row { display:grid; gap:14px; min-width:0; }
+    @media(min-width:720px) { .row { grid-template-columns:repeat(2,1fr); } }
 
-    .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .infobar.show{display:block}
-    .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+    label { font-weight:600; font-size:15px; color:#0f172a; display:block; margin-bottom:6px; }
+    input, select, textarea { width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; font-size:16px; }
+    textarea { min-height:80px; resize:vertical; }
+
+    .radio-group { display:flex; flex-wrap:wrap; gap:10px; padding:6px 0; }
+    .radio-group label { font-weight:500; font-size:14px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:6px 10px; cursor:pointer; transition:all .2s; white-space:normal; }
+    .radio-group input { margin-inline-start:6px; }
+    .radio-group label:hover { background:#e2e8f0; }
+
+    .actions-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e2e8f0; box-shadow:0 -2px 6px rgba(0,0,0,0.08); display:flex; gap:10px; padding:12px; z-index:20; }
+    .actions-bar button { flex:1; padding:14px; font-size:16px; font-weight:700; border-radius:12px; cursor:pointer; border:0; }
+    .actions-bar .save { background:var(--green); color:#fff; }
+    .actions-bar .ghost { background:#eef2f7; color:#0f172a; }
+
+    .infobar { display:none; margin-top:14px; padding:12px; border-radius:10px; font-size:14px; font-weight:600; }
+    .infobar.show { display:block; }
+    .infobar.error { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
+    .infobar:not(.error) { background:#ecfdf5; border:1px solid #bbf7d0; color:#065f46; }
   </style>
 </head>
 <body>
@@ -43,225 +55,181 @@
     <div class="card grid" id="formCard">
       <div class="row">
         <div>
-          <label>المعرف</label>
-          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" />
-        </div>
-        <div>
           <label>رقم الحيوان</label>
-          <input id="animalId" placeholder="animalId" />
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
         </div>
         <div>
           <label>تاريخ الولادة</label>
-          <input id="eventDate" type="date" />
+          <input id="eventDate" type="date" required />
         </div>
       </div>
 
       <div class="row">
         <div>
           <label>نوع الولادة</label>
-          <select id="calvingKind">
+          <select id="calvingKind" required>
+            <option value="">اختر</option>
             <option value="طبيعية">طبيعية</option>
             <option value="متعسرة">متعسرة</option>
             <option value="قيصرية">قيصرية</option>
+            <option value="نافقة">نافقة</option>
           </select>
         </div>
-        <div>
+        <div class="live-only">
           <label>عدد المواليد</label>
-          <select id="calfCount">
-            <option value="1">1</option>
-            <option value="2">2</option>
-          </select>
+          <div class="radio-group">
+            <label><input type="radio" name="calfCount" value="1" required> 1</label>
+            <label><input type="radio" name="calfCount" value="2"> 2</label>
+            <label><input type="radio" name="calfCount" value="3"> 3</label>
+          </div>
         </div>
+      </div>
+
+      <div class="offspring-group live-only" id="offspring1">
+        <label>المولود (1)</label>
+        <div class="row">
+          <div>
+            <label>جنس المولود</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf1Sex" value="ذكر" required> ذكر</label>
+              <label><input type="radio" name="calf1Sex" value="أنثى"> أنثى</label>
+            </div>
+          </div>
+          <div>
+            <label>رقم العجل</label>
+            <input id="calfId" placeholder="رقم تعريف العجل" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="offspring-group live-only" id="offspring2" style="display:none">
+        <label>المولود (2)</label>
+        <div class="row">
+          <div>
+            <label>جنس المولود</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf2Sex" value="ذكر"> ذكر</label>
+              <label><input type="radio" name="calf2Sex" value="أنثى"> أنثى</label>
+            </div>
+          </div>
+          <div>
+            <label>رقم العجل</label>
+            <input id="calf2Id" placeholder="رقم تعريف العجل الثاني" />
+          </div>
+        </div>
+      </div>
+
+      <div class="offspring-group live-only" id="offspring3" style="display:none">
+        <label>المولود (3)</label>
+        <div class="row">
+          <div>
+            <label>جنس المولود</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf3Sex" value="ذكر"> ذكر</label>
+              <label><input type="radio" name="calf3Sex" value="أنثى"> أنثى</label>
+            </div>
+          </div>
+          <div>
+            <label>رقم العجل</label>
+            <input id="calf3Id" placeholder="رقم تعريف العجل الثالث" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row live-only">
         <div>
-          <label>المشيمة المحتبسة</label>
-          <select id="retainedPlacenta">
-            <option value="لا">لا</option>
-            <option value="نعم">نعم</option>
-          </select>
+          <label>مصير العجل</label>
+          <div class="radio-group">
+            <label><input type="radio" name="calfFate" value="تربية" required> تربية</label>
+            <label><input type="radio" name="calfFate" value="بيع"> بيع</label>
+          </div>
         </div>
       </div>
 
       <div class="row">
-        <div>
-          <label>جنس المولود (1)</label>
-          <select id="calf1Sex">
-            <option value="غير محدد">غير محدد</option>
-            <option value="ذكر">ذكر</option>
-            <option value="أنثى">أنثى</option>
-            <option value="ميت">ميت</option>
-          </select>
-        </div>
-        <div>
-          <label>جنس المولود (2)</label>
-          <select id="calf2Sex">
-            <option value="غير محدد">غير محدد</option>
-            <option value="ذكر">ذكر</option>
-            <option value="أنثى">أنثى</option>
-            <option value="ميت">ميت</option>
-          </select>
-        </div>
         <div>
           <label>ملاحظات</label>
           <input id="notes" placeholder="اختياري" />
         </div>
       </div>
 
-      <div class="actions">
-        <button class="save" id="saveBtn">حفظ الولادة ✅</button>
-        <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
-      </div>
-
       <div id="info" class="infobar"></div>
     </div>
   </main>
 
-  <!-- ترتيب السكربتات حسب معايير مربيك (مُحدَّث لتفادي أخطاء 404 و Firebase) -->
-  <script>window.dataLayer = window.dataLayer || [];</script>
-  <!-- تأكد من تهيئة Firebase قبل أي سكربت قد يستدعي getApp() -->
-  <script type="module" src="/js/firebase-config.js"></script>
-  <script src="/js/app-core.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js"></script>
-  <!-- فallback خفيف في حال /js/api.js غير موجود أو لم يعرِّف window.api -->
-  <script>
-    (function(){
-      if(!window.api){
-        console.warn('[calving] /js/api.js غير متاح — تفعيل فالباك fetch');
-        window.api = {
-          async post(url, body){
-            const base = window.API_BASE || '';
-            const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
-            const res = await fetch(base + url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-User-Id': uid },
-              body: JSON.stringify(body)
-            });
-            let json = null; try{ json = await res.clone().json(); }catch(_){ }
-            return res.ok ? (json || { ok:true }) : { error:true, status: res.status, body: (json||await res.text()) };
-          }
-        };
-      }
-    })();
-  </script>
-  <!-- ضع السكربتات التي قد تستخدم Firebase بعد firebase-config -->
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-  <script type="module">
-    // ✅ بدلًا من تحميل api.js كملف منفصل (سبب الخطأ 404/MIME)
-    // نضمّن غلاف API بسيط هنا متوافق مع /api/*
+  <div class="actions-bar">
+    <button class="save" id="saveBtn">حفظ الولادة ✅</button>
+    <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
+  </div>
 
-    const API_BASE = window.API_BASE || '';
-    window.api = {
-      async post(path, data){
-        try{
-          const res = await fetch(API_BASE + path, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-User-Id': localStorage.getItem('userId') || ''
-            },
-            body: JSON.stringify(data)
-          });
-          return await res.json();
-        }catch(err){
-          console.error('API error', err);
-          return {error: true, message: err.message};
-        }
-      }
-    };
+  <!-- Firebase config must set window.FIREBASE_CONFIG -->
+  <script type="module" src="/js/firebase-config.js"></script>
+  <script type="module">
+    import { getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const $ = (id)=>document.getElementById(id);
+    const qs = (sel)=>document.querySelector(sel);
+    const qsa = (sel)=>Array.from(document.querySelectorAll(sel));
+    function val(name){ const el = qs(`[name="${name}"]:checked`); return el ? el.value : ''; }
+    function showMsg(text, isError){ const el = $('info'); if(!el) { alert(text); return; } el.className = 'infobar ' + (isError ? 'show error' : 'show'); el.textContent = text; }
 
-    function getQuery(){
-      const p = new URLSearchParams(location.search);
-      return Object.fromEntries(p.entries());
-    }
-    function getCtx(){
-      const q = getQuery();
-      return {
-        animalId: q.animalId || q.id || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '',
-        animalNumber: q.number || q.animalNumber || localStorage.getItem('currentAnimalNumber') || '',
-        eventDate: q.date || q.eventDate || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10)
-      };
-    }
+    // UI logic
+    function updateOffspringUI(){ const count = val('calfCount'); $('offspring2').style.display = (count === '2' || count === '3') ? '' : 'none'; $('offspring3').style.display = (count === '3') ? '' : 'none'; }
+    function disableGroupByName(name, disabled){ qsa(`[name="${name}"]`).forEach(r=>{ r.disabled = disabled; if(disabled) r.checked = false; }); }
+    function disableInputs(selector, disabled){ qsa(selector).forEach(el=>{ el.disabled = disabled; if(disabled && 'value' in el) el.value=''; }); }
+    function updateModeUI(){ const kind = $('calvingKind').value; const isDead = (kind === 'نافقة'); qsa('.live-only').forEach(el=>{ el.style.display = isDead ? 'none' : ''; }); disableGroupByName('calfCount', isDead); disableGroupByName('calf1Sex', isDead); disableGroupByName('calf2Sex', isDead); disableGroupByName('calf3Sex', isDead); disableGroupByName('calfFate', isDead); disableInputs('#calfId, #calf2Id, #calf3Id', isDead); if(isDead){ qsa('[name="calfCount"]').forEach(r=> r.checked = false); } updateOffspringUI(); }
+    qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
+    $('calvingKind').addEventListener('change', updateModeUI);
+    updateModeUI();
 
-    const ctx = getCtx();
-    $('animalId').value = ctx.animalId;
-    $('animalNumber').value = ctx.animalNumber;
-    $('eventDate').value = ctx.eventDate;
-    $('calf2Sex').disabled = true;
+    // Hydrate from query if provided
+    (function hydrate(){ const p = new URLSearchParams(location.search); const num = p.get('number') || p.get('animalNumber') || ''; const date = p.get('date') || ''; if(num) $('animalNumber').value = num; if(date) $('eventDate').value = date; })();
 
-    $('calfCount').addEventListener('change', ()=>{
-      const two = $('calfCount').value === '2';
-      $('calf2Sex').disabled = !two;
-      if(!two){ $('calf2Sex').value = 'غير محدد'; }
-    });
+    // Firebase init
+    let app; try { app = getApp(); } catch { if(window.FIREBASE_CONFIG) app = initializeApp(window.FIREBASE_CONFIG); }
+    const db = getFirestore();
+    const auth = getAuth();
 
-    $('toCardBtn').addEventListener('click', ()=>{
-      const number = $('animalNumber').value || ctx.animalNumber || '';
-      if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
-      location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
-    });
+    // Buttons
+    $('toCardBtn').addEventListener('click', ()=>{ const num = ($('animalNumber')?.value || '').trim(); if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; } location.href = `cow-card.html?number=${encodeURIComponent(num)}`; });
 
     $('saveBtn').addEventListener('click', onSave);
-
     async function onSave(){
       try{
-        const animalId = $('animalId').value.trim();
+        const btn = $('saveBtn'); btn.disabled = true;
         const animalNumber = $('animalNumber').value.trim();
-        const eventDate = $('eventDate').value;
-        if(!animalId && !animalNumber){
-          return showMsg('أدخل رقم الحيوان أو المعرّف قبل الحفظ', true);
-        }
-        if(!eventDate){
-          return showMsg('من فضلك اختر تاريخ الولادة', true);
-        }
-        const today = new Date().toISOString().slice(0,10);
-        if(eventDate > today){
-          return showMsg('تاريخ الولادة لا يمكن أن يكون في المستقبل', true);
-        }
+        const eventDate    = $('eventDate').value;
+        const calvingKind  = $('calvingKind').value;
+        if(!animalNumber){ showMsg('أدخل رقم الحيوان', true); return; }
+        if(!eventDate){ showMsg('اختر تاريخ الولادة', true); return; }
+        if(!calvingKind){ showMsg('اختر نوع الولادة', true); return; }
 
-        const payload = {
-          type: 'ولادة',
-          eventType: 'calving',
-          eventDate,
-          animalId: animalId || undefined,
-          animalNumber: animalNumber || undefined,
-          calvingKind: $('calvingKind').value,
-          calfCount: Number($('calfCount').value),
-          calf1Sex: $('calf1Sex').value,
-          calf2Sex: $('calf2Sex').value,
-          retainedPlacenta: $('retainedPlacenta').value === 'نعم',
-          notes: $('notes').value.trim() || undefined,
-          source: location.pathname
-        };
+        const isDead = (calvingKind === 'نافقة');
+        const count  = isDead ? 0 : Number(val('calfCount'));
+        if(!isDead && !count){ showMsg('اختر عدد المواليد', true); return; }
 
-        try{ window.t?.event && t.event('calving_save_attempt', payload); }catch(_){ }
-
-        const res = await window.api.post('/api/events', payload);
-        if(!res || res.error){
-          console.warn('API response', res);
-          return showMsg('تعذّر الحفظ عبر الخادم — سيتم الحفظ لاحقًا أو جرّب مجددًا', true);
+        const calves = [];
+        if(!isDead){
+          const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل', true); return; }
+          const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim(); if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)', true); return; }
+          calves.push({ number:id1, sex:sex1, fate });
+          if(count >= 2){ const sex2 = val('calf2Sex'); const id2 = $('calf2Id').value.trim(); if(!sex2 || !id2){ showMsg('أكمل بيانات المولود (2)', true); return; } calves.push({ number:id2, sex:sex2, fate }); }
+          if(count >= 3){ const sex3 = val('calf3Sex'); const id3 = $('calf3Id').value.trim(); if(!sex3 || !id3){ showMsg('أكمل بيانات المولود (3)', true); return; } calves.push({ number:id3, sex:sex3, fate }); }
         }
 
-        localStorage.setItem('lastAnimalId', animalId || ctx.animalId || '');
-        localStorage.setItem('lastEventDate', eventDate);
+        const uid = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('tenantId') || null;
 
-        try{ t.event('calving_save_success', {eventDate, calfCount: payload.calfCount}); }catch(_){ }
-        showMsg('✅ تم حفظ حدث الولادة بنجاح. يمكنك المتابعة أو فتح البطاقة.', false);
+        const eventPayload = { type:'ولادة', eventType:'calving', eventDate, animalNumber, calvingKind, calfCount:count, notes:($('notes').value.trim() || null), uid, createdAt:serverTimestamp(), source:location.pathname };
+        const evRef = await addDoc(collection(db,'events'), eventPayload);
 
-      }catch(err){
-        console.error(err);
-        showMsg('حدث خطأ غير متوقع أثناء الحفظ', true);
-      }
-    }
+        for(const c of calves){ await addDoc(collection(db,'calves'), { number:c.number, fate:c.fate, birthDate:eventDate, damNumber:animalNumber, sex:c.sex, uid, eventId:evRef.id, createdAt:serverTimestamp(), source:location.pathname }); }
 
-    function showMsg(text, isError){
-      const el = $('info');
-      el.className = 'infobar ' + (isError ? 'show error' : 'show');
-      el.textContent = text;
+        showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
+      }catch(err){ console.error(err); showMsg('تعذّر الحفظ في فايربيز', true); }
+      finally{ $('saveBtn').disabled = false; }
     }
   </script>
 </body>
 </html>
-
