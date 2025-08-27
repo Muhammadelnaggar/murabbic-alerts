@@ -168,9 +168,8 @@
   <!-- Firebase config must set window.FIREBASE_CONFIG -->
   <script type="module" src="/js/firebase-config.js"></script>
   <script type="module">
-    import { getApp, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { db, auth } from '/js/firebase-config.js';
+  import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const $=(id)=>document.getElementById(id);
     const qs=(s)=>document.querySelector(s);
@@ -280,3 +279,4 @@
   </script>
 </body>
 </html>
+
