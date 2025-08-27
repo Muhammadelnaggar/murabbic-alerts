@@ -2,339 +2,232 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل حدث</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل حدث — مُرَبِّك</title>
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <meta name="theme-color" content="#2e7d32" />
   <style>
-    body {
-      direction: rtl;
-      background: linear-gradient(to bottom, #fdfdf6, #fff9db);
-      font-family: 'Cairo', 'Arial', sans-serif;
-      margin: 0;
-      color: #1b5e20;
-    }
-    h1 {
-      text-align: center;
-      font-size: 26px;
-      margin: 0;
-      padding: 20px 10px;
-      background: #2e7d32;
-      color: #fff;
-      border-bottom-left-radius: 20px;
-      border-bottom-right-radius: 20px;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
-    }
-    .animal-info, .date-info {
-      text-align: center;
-      font-size: 18px;
-      margin: 8px 0;
-      color: #2e7d32;
-    }
-    .warning {
-      text-align: center;
-      font-size: 16px;
-      color: #c62828;
-      margin-bottom: 10px;
-      min-height: 22px;
-    }
-    .form-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin: 15px;
-      padding: 15px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .form-fields input {
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .button-group {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 10px;
-      margin: 15px;
-    }
-    .button-group button {
-      padding: 12px;
-      background: #ffffff;
-      border: 2px solid #a5d6a7;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-    }
-    .button-group button:hover {
-      background-color: #2e7d32;
-      border-color: #2e7d32;
-      color: #fff;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-    .nutrition-eval-container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 12px;
-      margin-top: 10px;
-      background: #e8f5e9;
-      border-radius: 12px;
-      border: 1px solid #a5d6a7;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-    }
-    .nutrition-eval-container h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: bold;
-      color: #1b5e20;
-      text-align: center;
-      padding-bottom: 5px;
-      border-bottom: 1px solid #a5d6a7;
-    }
-    .nutrition-eval-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-    }
-    .nutrition-eval-buttons button {
-      flex: 1 1 40%;
-      min-width: 100px;
-      background: #ffffff;
-      border: 2px solid #81c784;
-      border-radius: 8px;
-      font-size: 13px;
-      padding: 10px;
-      transition: all 0.3s ease;
-    }
-    .nutrition-eval-buttons button:hover {
-      background: #2e7d32;
-      border-color: #2e7d32;
-      color: #fff;
-      transform: translateY(-2px);
-    }
-    #inlineMsg {
-      margin: 15px;
-      padding: 12px;
-      background: #f1f8e9;
-      border: 1px solid #c5e1a5;
-      border-radius: 10px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    #inlineMsg .text {
-      font-size: 14px;
-      font-weight: bold;
-      color: #2e7d32;
-      margin-bottom: 8px;
-      text-align: center;
-    }
+    :root{ --green:#2e7d32; --green-200:#a5d6a7; --green-600:#1b5e20; --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --danger:#c62828; }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(to bottom,var(--bg1),var(--bg2));font-family:'Cairo','Arial',sans-serif;color:var(--green-600)}
+    h1{margin:0;padding:18px;text-align:center;background:var(--green);color:#fff;border-bottom-left-radius:20px;border-bottom-right-radius:20px;box-shadow:0 3px 6px rgba(0,0,0,.2);font-size:24px}
+    .meta{padding:8px 10px;text-align:center;font-size:16px}
+    .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
+    .form{margin:12px;padding:14px;background:var(--card);border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.08);display:grid;gap:12px}
+    .form input{width:100%;padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:12px}
+    @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);}}
+    .btn{padding:14px;background:#fff;border:2px solid var(--green-200);border-radius:12px;font-weight:700;cursor:pointer;text-align:center;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.06);font-size:16px}
+    .btn:hover{background:var(--green);border-color:var(--green);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
+    .section{margin:12px;padding:12px;background:#e8f5e9;border:1px solid var(--green-200);border-radius:12px}
+    .section h3{margin:0 0 8px;text-align:center;color:var(--green-600);font-size:16px}
+    #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
+    #inlineMsg .text{font-size:14px;font-weight:700;color:var(--green-600);text-align:center}
+  .badge{display:inline-block;margin-inline-start:8px;padding:.2em .6em;border-radius:999px;font-size:12px;font-weight:700;vertical-align:baseline}
+.badge.ok{background:#c8e6c9;color:#1b5e20;border:1px solid #81c784}
+.badge.err{background:#ffebee;color:#b71c1c;border:1px solid #ef9a9a}
   </style>
 </head>
 <body>
-
   <h1>تسجيل حدث</h1>
-  <div class="animal-info" id="animalInfo"></div>
-  <div class="date-info" id="dateInfo"></div>
-  <div class="warning" id="noAnimalWarning"></div>
-  <div class="form-fields">
-    <input type="text" id="animalIdInput" placeholder="رقم الحيوان" required />
-    <input type="date" id="eventDateInput" required />
+  <div class="meta" id="animalInfo"></div>
+  <div class="meta" id="dateInfo"></div>
+  <div class="warning" id="warn"></div>
+
+  <div class="form">
+    <input id="animalNumber" type="text" placeholder="رقم الحيوان" inputmode="numeric" />
+    <input id="eventDate" type="date" />
   </div>
 
-  <form id="eventForm">
-    <div class="button-group" id="eventTypeGroup">
-      <button type="button" data-page="calving.html">👶 ولادة</button>
-      <button type="button" data-page="insemination.html">📅 تلقيح</button>
-      <button type="button" data-page="vaccination.html">💉 تحصين</button>
-      <button type="button" data-page="dry-off.html">🚫 تجفيف</button>
-      <button type="button" data-page="close-up.html">🍼 تحضير للولادة</button>
-      <button type="button" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-      <button type="button" data-page="nutrition.html">🌿 تغذية</button>
-      <button type="button" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-      <button type="button" data-page="disease.html">🔬 التشخيص</button>
-      <button type="button" data-action="trimming.html">🦶 تقليم الحوافر</button>
-      <button type="button" data-page="abortion.html">🩸 إجهاض</button>
-      <button type="button" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
-      <button type="button" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-      <div class="nutrition-eval-container">
-        <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
-        <div class="nutrition-eval-buttons">
-          <button type="button" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
-          <button type="button" data-page="feces-eval.html">💩 تقييم الروث</button>
-        </div>
-      </div>
-      <button type="button" data-page="milk-traits.html">🥛 صفات اللبن</button>
+  <div id="inlineMsg"><div class="text"></div></div>
+
+  <div class="grid" id="eventButtons">
+    <button class="btn" data-page="calving.html">👶 ولادة</button>
+    <button class="btn" data-page="insemination.html">📅 تلقيح</button>
+    <button class="btn" data-page="vaccination.html">💉 تحصين</button>
+    <button class="btn" data-page="dry-off.html">🚫 تجفيف</button>
+    <button class="btn" data-page="close-up.html">🍼 تحضير للولادة</button>
+    <button class="btn" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+    <button class="btn" data-page="nutrition.html">🌿 تغذية</button>
+    <button class="btn" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
+    <button class="btn" data-page="disease.html">🔬 التشخيص</button>
+    <button class="btn" id="btnTrimming" data-action="trimming">🦶 تقليم الحوافر</button>
+    <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
+    <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+    <button class="btn" data-page="ovsynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    <button class="btn" data-page="milk-traits.html">🥛 صفات اللبن</button>
+  </div>
+
+  <div class="section">
+    <h3>🌿⚖️ التقييم الذكي للتغذية</h3>
+    <div class="grid">
+      <button class="btn" data-page="bcs-eval.html">⚖️ تقييم حالة الجسم (BCS)</button>
+      <button class="btn" data-page="feces-eval.html">💩 تقييم الروث</button>
     </div>
-  </form>
+  </div>
 
- <script type="module">
-  import { auth } from "./js/firebase-config.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="/js/app-core.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js"></script>
 
-  // ====== Helpers ======
-  const $ = (id)=>document.getElementById(id);
-  const norm = v => (v==null || v==='undefined' || v==='null' || v==='NaN') ? '' : String(v).trim();
-  const todayISO = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  <script>
+  (function(){
+    const $ = s=>document.querySelector(s);
+    const $$ = s=>document.querySelectorAll(s);
+    const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
+    const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
 
-  function hydrateContext(){
-    const qp = new URLSearchParams(location.search);
-    const presetId   = norm(qp.get("animalId"));
-    const presetNum  = norm(qp.get("number") || qp.get("animalNumber"));
-    const presetDate = norm(qp.get("date")) || todayISO();
-
-    // املأ الواجهة (اختياري)
-    if ($("#animalInfo")) $("#animalInfo").textContent = `🐄 رقم الحيوان الحالي: ${presetNum || presetId || 'غير محدد'}`;
-    if ($("#dateInfo"))   $("#dateInfo").textContent   = `📅 التاريخ الحالي: ${presetDate}`;
-    if ($("#animalIdInput") && !norm($("#animalIdInput").value)) $("#animalIdInput").value = presetId;
-    if ($("#eventDateInput") && !norm($("#eventDateInput").value)) $("#eventDateInput").value = presetDate;
-
-    return { animalId: presetId, animalNumber: presetNum, eventDate: presetDate };
-  }
-
-  function getContextOrWarn(){
-    const animalId  = norm($("#animalIdInput")?.value);
-    let   eventDate = norm($("#eventDateInput")?.value) || todayISO();
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate)) eventDate = todayISO();
-
-    if (!animalId || !eventDate){
-      if ($("#noAnimalWarning")) $("#noAnimalWarning").textContent = "⚠️ يرجى إدخال رقم الحيوان وتاريخ الحدث قبل المتابعة.";
-      return null;
-    }
-    if ($("#noAnimalWarning")) $("#noAnimalWarning").textContent = "";
-    localStorage.setItem("lastEventDate", eventDate);
-    return { animalId, eventDate };
-  }
-
-  function buildTargetUrl(page, ctx){
-    const u = new URL(page, location.href);
-    if (ctx.animalId)    u.searchParams.set("animalId", ctx.animalId);
-    const num = ctx.animalNumber || ctx.animalId;
-    if (num)              u.searchParams.set("number", num);
-    if (ctx.eventDate)    u.searchParams.set("date", ctx.eventDate);
-    return u.toString();
-  }
-
-  // ====== Wire buttons ======
-  let currentUser = null;
-
-  function wireButtonsOnce(){
-    if (window.__AE_BOUND) return;
-    const container = document.getElementById("eventTypeGroup");
-    if (!container) return;
-
-    const baseCtx = hydrateContext();
-
-    container.querySelectorAll('button[data-page]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const formCtx = getContextOrWarn();       // من الحقول
-        if (!formCtx) return;
-        const ctx = { ...baseCtx, ...formCtx };   // دمج مع بارامز الـURL لو موجودة
-        const targetUrl = buildTargetUrl(btn.dataset.page, ctx);
-
-        // غير مسجّل؟ ودّيه للّوجين مع next=الهدف
-        if (!currentUser) {
-          location.href = `/login.html?next=${encodeURIComponent(targetUrl)}`;
-          return;
+    async function verifyAnimal(number){
+      try{
+        if(!number) return false;
+        if(typeof window.api?.get === 'function'){
+          const res = await window.api.get('/api/animals?number='+encodeURIComponent(number));
+          if(res && res.exists){
+            $('#warn').textContent = `✅ الحيوان رقم ${number} موجود في قائمتك.`;
+            return true;
+          } else {
+            $('#warn').textContent = `❌ الحيوان رقم ${number} غير موجود في قائمتك.`;
+            return false;
+          }
         }
-        // مسجّل؟ انطلق
-        location.href = targetUrl;
-      });
-    });
-
-    window.__AE_BOUND = true;
-    console.debug('[add-event] bound buttons');
-  }
-
-  // لا تعمل أي Redirect هنا عند التحميل
-  onAuthStateChanged(auth, (u)=>{
-    currentUser = u || null;
-    document.body.dataset.auth = currentUser ? 'ok' : 'anon';
-    wireButtonsOnce();
-  });
-</script>
-<script>
-(function(){
-  const $ = id => document.getElementById(id);
-  const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN') ? '' : String(v).trim();
-  const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
-
-  function hydrate(){
-    const qs = new URLSearchParams(location.search);
-    const number = norm(qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '');
-    let date = norm(qs.get('date') || localStorage.getItem('lastEventDate') || todayISO());
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-
-    $('animalInfo') && ($('animalInfo').textContent = `🐄 رقم الحيوان الحالي: ${number || 'غير محدد'}`);
-    $('dateInfo')   && ($('dateInfo').textContent   = `📅 التاريخ الحالي: ${date}`);
-    $('animalIdInput') && !norm($('animalIdInput').value) && ($('animalIdInput').value = number);
-    $('eventDateInput') && !norm($('eventDateInput').value) && ($('eventDateInput').value = date);
-
-    return { number, date };
-  }
-
-  function getCtxOrWarn(){
-    const number = norm($('animalIdInput')?.value);
-    let date = norm($('eventDateInput')?.value) || todayISO();
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-
-    if(!number){
-      $('noAnimalWarning') && ($('noAnimalWarning').textContent = '⚠️ أدخل رقم الحيوان أولًا.');
-      return null;
+      }catch(err){
+        console.error('verifyAnimal error', err);
+        $('#warn').textContent = '⚠️ تعذر التحقق الآن.';
+        return false;
+      }
     }
-    $('noAnimalWarning') && ($('noAnimalWarning').textContent = '');
-    localStorage.setItem('currentAnimalNumber', number);
-    localStorage.setItem('lastAnimalNumber', number);
-    localStorage.setItem('lastEventDate', date);
-    return { number, date };
+
+    function hydrate(){
+      const qs = new URLSearchParams(location.search);
+      const fromUrlNumber = norm(qs.get('number') || qs.get('animalNumber') || '');
+      const fromUrlDate = norm(qs.get('date') || '');
+      const number = fromUrlNumber || norm(localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber')) || '';
+      let date = fromUrlDate || norm(localStorage.getItem('lastEventDate')) || todayISO();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+      $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${ number || 'غير محدد' }`;
+      $('#dateInfo').textContent   = `📅 التاريخ الحالي: ${ date }`;
+      if(!norm($('#eventDate').value)) $('#eventDate').value = date;
+      if(number) verifyAnimal(number);
+    }
+
+    function ctxOrWarn(){
+      const number = norm($('#animalNumber').value || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
+      let date = norm($('#eventDate').value) || todayISO();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+      if(!number){ $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.'; return null; }
+      localStorage.setItem('currentAnimalNumber', number);
+      localStorage.setItem('lastAnimalNumber', number);
+      localStorage.setItem('lastEventDate', date);
+      return { number, date };
+    }
+
+    function buildUrl(page, ctx){
+      const u = new URL(page, location.href);
+      u.searchParams.set('number', ctx.number);
+      u.searchParams.set('date', ctx.date);
+      return u.toString();
+    }
+
+    function navToChild(page){
+      const ctx = ctxOrWarn(); if(!ctx) return;
+      verifyAnimal(ctx.number).then(ok=>{ if(ok) location.href = buildUrl(page, ctx); });
+    }
+
+    function wireButtons(){
+      $$('#eventButtons .btn[data-page]').forEach(btn=>{
+        btn.addEventListener('click', ()=> navToChild(btn.getAttribute('data-page')), {passive:true});
+      });
+    }
+
+    async function saveTrimmingInline(){
+      const ctx = ctxOrWarn(); if(!ctx) return;
+      const ok = await verifyAnimal(ctx.number); if(!ok) return;
+      try{
+        const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
+        if(typeof window.api?.post === 'function'){
+          await window.api.post('/api/events', payload);
+        }
+        const box = document.getElementById('inlineMsg');
+        box.querySelector('.text').textContent = `✅ تم تسجيل تقليم الحوافر للحيوان رقم ${ctx.number} بتاريخ ${ctx.date}.`;
+        box.style.display = 'block';
+        window.dataLayer.push({event:'event_saved', eventType:'trimming', number:ctx.number, date:ctx.date});
+      }catch(err){
+        const box = document.getElementById('inlineMsg');
+        box.querySelector('.text').textContent = `❌ تعذر التسجيل الآن. جرّب لاحقًا.`;
+        box.style.display = 'block';
+        console.error('Trimming save failed', err);
+      }
+    }
+
+    function wireTrimming(){
+      $('#btnTrimming')?.addEventListener('click', saveTrimmingInline, {passive:true});
+    }
+
+    hydrate();
+    wireButtons();
+    wireTrimming();
+  })();
+  </script>
+<script>
+// ===== التحقق الذكي من رقم الحيوان (بدون تغيير التصميم) =====
+(function(){
+  function setBadge(state){
+    const host = document.getElementById('animalInfo');
+    if(!host) return;
+    const old = host.querySelector('.badge');
+    if(old) old.remove();
+    window.__animal_ok = state;
+    if(state === true){
+      const b = document.createElement('span'); b.className='badge ok'; b.textContent='مؤكد'; host.appendChild(b);
+    }else if(state === false){
+      const b = document.createElement('span'); b.className='badge err'; b.textContent='غير موجود'; host.appendChild(b);
+    }
   }
 
-  function buildUrl(page, ctx){
-    const u = new URL(page, location.href);
-    u.searchParams.set('number', ctx.number);
-    u.searchParams.set('date', ctx.date);
-    return u.toString();
+  async function verifyAnimalNumber(number){
+    try{
+      let res = null;
+      if(typeof window.api?.get === 'function'){
+        try{ res = await window.api.get(`/api/animals?number=${encodeURIComponent(number)}`); }
+        catch(_){ res = await window.api.get('/api/animals'); }
+      }
+      let ok = false;
+      if(Array.isArray(res) && res.length){
+        ok = res.some(a => String(a.number||a.animalNumber||'').trim() === String(number).trim());
+      }else if(res && typeof res === 'object'){
+        const n = String(res.number||res.animalNumber||'').trim();
+        ok = !!n && n === String(number).trim();
+      }
+      setBadge(ok);
+    }catch(err){
+      console.error('verifyAnimalNumber failed', err);
+      setBadge(null);
+    }
   }
 
-  function wire(){
-    const base = hydrate();
-    document.querySelectorAll('button[data-page]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const form = getCtxOrWarn(); if(!form) return;
-        const ctx = {...base, ...form};
-        location.href = buildUrl(btn.getAttribute('data-page'), ctx);
-      }, {passive:true});
-    });
+  // امنع الدخول لصفحات الأحداث إن كان الرقم غير مؤكد
+  const grid = document.getElementById('eventButtons');
+  if(grid){
+    grid.addEventListener('click', function(e){
+      const btn = e.target.closest('[data-page]');
+      if(!btn) return;
+      if(window.__animal_ok === false){
+        e.stopPropagation(); e.preventDefault();
+        const w = document.getElementById('warn');
+        if(w) w.textContent = '❌ رقم الحيوان غير موجود ضمن قطيعك.';
+      }else{
+        const w = document.getElementById('warn');
+        if(w) w.textContent = '';
+      }
+    }, true);
   }
 
-  // لو فيه خطأ جافاسكربت يبان لك شريط أحمر تحت
-  window.addEventListener('error', e=>{
-    const box = document.createElement('div');
-    box.style.cssText='position:fixed;bottom:10px;left:10px;right:10px;background:#ffebee;color:#b71c1c;padding:10px;border:1px solid #ef9a9a;border-radius:8px;z-index:9999;font:14px sans-serif';
-    box.textContent = 'خطأ بالصفحة: ' + (e.error?.message || e.message);
-    document.body.appendChild(box);
-  });
-
-  document.addEventListener('DOMContentLoaded', wire);
+  // تحقّق فوري عند فتح الصفحة من الرقم المخزن للمستخدم
+  const number = (localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '').trim();
+  if(number){ verifyAnimalNumber(number); } else { setBadge(null); }
 })();
+// ===== نهاية التحقق =====
 </script>
-<script>window.dataLayer = window.dataLayer || [];</script>
-<script src="/js/app-core.js"></script>
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
-<script src="/js/tenant-bootstrap.js"></script>
-<script src="/js/api.js"></script>
-
-<!-- سكربت الصفحة الجديد -->
-<script src="/js/add-event.js"></script>
-
 </body>
 </html>
-
