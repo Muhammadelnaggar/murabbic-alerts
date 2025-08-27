@@ -454,8 +454,9 @@ function loadRefVector(urls, score) {
   document.addEventListener('DOMContentLoaded', nukeEditorCard);
 </script>
 <!-- سكربت مشترك للأحداث -->
-<script src="/js/tenant-bootstrap.js"></script>
-<script src="/js/event-core.js"></script>
+<script type="module" src="/js/tenant-bootstrap.js"></script>
+<script type="module" src="/js/event-core.js"></script>
+
   
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -501,30 +502,64 @@ document.addEventListener("DOMContentLoaded", () => {
   import { db, auth } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
- document.addEventListener("DOMContentLoaded", () => {
--  const saveBtn = document.getElementById("saveBtn");
-+  const oldBtn = document.getElementById("saveBtn");
-+  if (!oldBtn) return;
-+  const saveBtn = oldBtn.cloneNode(true);
-+  oldBtn.parentNode.replaceChild(saveBtn, oldBtn);
+  function todayCairo(){
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
 
-   const eventDateInput = document.getElementById("eventDate");
-   // ...
-   saveBtn.addEventListener("click", async (e) => {
-     e.preventDefault();
-     if (saveBtn.disabled) return;
-     saveBtn.disabled = true;
-     // بقية كودك كما هو (payload -> addDoc -> alerts)
+  document.addEventListener("DOMContentLoaded", () => {
+    const oldBtn = document.getElementById("saveBtn");
+    if (!oldBtn) return;
 
-        await addDoc(collection(db, "events"), payload);
+    // نفصل أي listeners قديمة بدون ما نغيّر الشكل
+    const saveBtn = oldBtn.cloneNode(true);
+    oldBtn.parentNode.replaceChild(saveBtn, oldBtn);
+
+    const eventDateInput = document.getElementById("eventDate");
+    if (eventDateInput && !eventDateInput.value) {
+      eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+    }
+
+    saveBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();              // يمنع أي handler قديم (مثلاً /api/events)
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+
+      const animalId     = localStorage.getItem("currentAnimalId")     || "";
+      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+      const eventDate    = (eventDateInput && eventDateInput.value)
+                           ? eventDateInput.value
+                           : (localStorage.getItem("currentEventDate") || todayCairo());
+      const score        = (typeof window.bcsScore === "number") ? window.bcsScore : 0;
+
+      const uid = (auth && auth.currentUser && auth.currentUser.uid)
+                  || localStorage.getItem("userId")
+                  || localStorage.getItem("tenantId")
+                  || null;
+
+      try {
+        await addDoc(collection(db, "events"), {
+          type: "تقييم حالة الجسم",
+          eventType: "bcs_eval",
+          eventDate,
+          animalId,
+          animalNumber,
+          score: Number(score),
+          value: Number(score),
+          uid,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        });
         alert("✅ تم حفظ التقييم بنجاح");
       } catch (err) {
-        console.error("Firestore error:", err);
+        console.error("Firestore save error:", err);
         alert("❌ حدث خطأ أثناء الحفظ");
       } finally {
         saveBtn.disabled = false;
       }
-    });
+    }, { capture: true }); // أولوية عالية لمنع أي كود قديم
   });
 </script>
 
