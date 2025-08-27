@@ -21,6 +21,7 @@
 
     label{font-weight:600;font-size:15px;color:#0f172a;display:block;margin-bottom:6px}
     input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:16px}
+    input[type="text"][inputmode="numeric"]{letter-spacing:.5px}
     textarea{min-height:80px;resize:vertical}
 
     .radio-group{display:flex;flex-wrap:wrap;gap:10px;padding:6px 0}
@@ -188,10 +189,17 @@
     // تهيئة الحقول من URL (إن وُجدت)
     (function hydrate(){const p=new URLSearchParams(location.search);const num=p.get('number')||p.get('animalNumber')||'';const date=p.get('date')||new Date().toISOString().slice(0,10);if(num) $('animalNumber').value=num; $('eventDate').value=date;})();
 
-    // Firebase
-    let app;try{app=getApp()}catch{if(window.FIREBASE_CONFIG)app=initializeApp(window.FIREBASE_CONFIG)}
-    const db=getFirestore();
-    const auth=getAuth();
+    // تهيئة Firebase
+    let app, db, auth;
+    try {
+      try { app = getApp(); } catch { if (window.FIREBASE_CONFIG) app = initializeApp(window.FIREBASE_CONFIG); }
+      if (!app) { showMsg('إعداد Firebase غير موجود. تأكد من تحميل /js/firebase-config.js', true); throw new Error('No Firebase app'); }
+      db = getFirestore();
+      auth = getAuth();
+    } catch (e) {
+      console.error('Firebase init error:', e);
+      showMsg('تعذّر تهيئة Firebase — يرجى ضبط المفاتيح', true);
+    }
 
     // تتبّع بسيط
     try{window.t&&t.event&&t.event('calving_form_open',{path:location.pathname})}catch(_){}
@@ -210,31 +218,64 @@
         const animalNumber=$('animalNumber').value.trim();
         const eventDate=$('eventDate').value;
         const calvingKind=$('calvingKind').value;
-        if(!animalNumber){showMsg('أدخل رقم الحيوان',true);return}
-        if(!eventDate){showMsg('اختر تاريخ الولادة',true);return}
-        if(!calvingKind){showMsg('اختر نوع الولادة',true);return}
+        if(!animalNumber){showMsg('أدخل رقم الحيوان',true);sv.disabled=false;return}
+        if(!eventDate){showMsg('اختر تاريخ الولادة',true);sv.disabled=false;return}
+        if(!calvingKind){showMsg('اختر نوع الولادة',true);sv.disabled=false;return}
+
         const dead=(calvingKind==='نافقة');
         const count=dead?0:Number(val('calfCount'));
-        if(!dead&&!count){showMsg('اختر عدد المواليد',true);return}
+        if(!dead&&!count){showMsg('اختر عدد المواليد',true);sv.disabled=false;return}
 
         const calves=[];
         if(!dead){
-          const fate=val('calfFate'); if(!fate){showMsg('اختر مصير العجل',true);return}
-          const sex1=val('calf1Sex'); const id1=$('calfId').value.trim(); if(!sex1||!id1){showMsg('أكمل بيانات المولود (1)',true);return}
+          const fate=val('calfFate'); if(!fate){showMsg('اختر مصير العجل',true);sv.disabled=false;return}
+          const sex1=val('calf1Sex'); const id1=$('calfId').value.trim(); if(!sex1||!id1){showMsg('أكمل بيانات المولود (1)',true);sv.disabled=false;return}
           calves.push({number:id1,sex:sex1,fate});
-          if(count>=2){const sex2=val('calf2Sex'); const id2=$('calf2Id').value.trim(); if(!sex2||!id2){showMsg('أكمل بيانات المولود (2)',true);return} calves.push({number:id2,sex:sex2,fate})}
-          if(count>=3){const sex3=val('calf3Sex'); const id3=$('calf3Id').value.trim(); if(!sex3||!id3){showMsg('أكمل بيانات المولود (3)',true);return} calves.push({number:id3,sex:sex3,fate})}
+          if(count>=2){const sex2=val('calf2Sex'); const id2=$('calf2Id').value.trim(); if(!sex2||!id2){showMsg('أكمل بيانات المولود (2)',true);sv.disabled=false;return} calves.push({number:id2,sex:sex2,fate})}
+          if(count>=3){const sex3=val('calf3Sex'); const id3=$('calf3Id').value.trim(); if(!sex3||!id3){showMsg('أكمل بيانات المولود (3)',true);sv.disabled=false;return} calves.push({number:id3,sex:sex3,fate})}
         }
 
+        if(!db){showMsg('قاعدة البيانات غير مهيأة',true);sv.disabled=false;return}
+
         const uid=auth?.currentUser?.uid||localStorage.getItem('userId')||localStorage.getItem('tenantId')||null;
-        const payload={type:'ولادة',eventType:'calving',eventDate,animalNumber,calvingKind,calfCount:count,notes:($('notes').value.trim()||null),uid,createdAt:serverTimestamp(),source:location.pathname};
-        const ev=await addDoc(collection(db,'events'),payload);
-        for(const c of calves){await addDoc(collection(db,'calves'),{number:c.number,fate:c.fate,birthDate:eventDate,damNumber:animalNumber,sex:c.sex,uid,eventId:ev.id,createdAt:serverTimestamp(),source:location.pathname})}
+        const payload={
+          type:'ولادة',
+          eventType:'calving',
+          eventDate,
+          animalNumber,
+          calvingKind,
+          calfCount:count,
+          notes:($('notes').value.trim()||null),
+          uid,
+          createdAt:serverTimestamp(),
+          source:location.pathname
+        };
+
+        const evRef = await addDoc(collection(db,'events'), payload);
+
+        for(const c of calves){
+          await addDoc(collection(db,'calves'),{
+            number:c.number,
+            fate:c.fate,
+            birthDate:eventDate,
+            damNumber:animalNumber,
+            sex:c.sex,
+            uid,
+            eventId:evRef.id,
+            createdAt:serverTimestamp(),
+            source:location.pathname
+          });
+        }
 
         showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح',false);
-        try{t?.event&&t.event('calving_save_success',{animalNumber,eventDate,calfCount:count,calvingKind})}catch(_){}}
-      catch(err){console.error(err);showMsg('تعذّر الحفظ في فايربيز',true);try{t?.event&&t.event('calving_save_error',{message:String(err?.message||err),path:location.pathname})}catch(_){}}
-      finally{$('saveBtn').disabled=false}
+        try{t?.event&&t.event('calving_save_success',{animalNumber,eventDate,calfCount:count,calvingKind})}catch(_){}
+      }catch(err){
+        console.error(err);
+        showMsg('تعذّر الحفظ في فايربيز',true);
+        try{t?.event&&t.event('calving_save_error',{message:String(err?.message||err),path:location.pathname})}catch(_){}
+      }finally{
+        $('saveBtn').disabled=false;
+      }
     }
   </script>
 </body>
