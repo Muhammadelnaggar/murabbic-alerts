@@ -5,12 +5,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebas
 
 // ✳️ ضع القيم الحقيقية من Firebase Console هنا
 const firebaseConfig = {
-  apiKey: "AIza...YOUR_KEY",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",                // مهم جدًا
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
+  authDomain: "murabbik.firebaseapp.com",
+  projectId: "murabbik",
+  storageBucket: "murabbik.firebasestorage.app",
+  messagingSenderId: "402719243568",
+  appId: "1:402719243568:web:631114a260d23202dd5cf5"
 };
 
 // تهيئة واحدة فقط
