@@ -23,9 +23,6 @@
     .section h3{margin:0 0 8px;text-align:center;color:var(--green-600);font-size:16px}
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--green-600);text-align:center}
-    .badge{display:inline-block;margin-inline-start:8px;padding:.2em .6em;border-radius:999px;font-size:12px;font-weight:700;vertical-align:baseline}
-    .badge.ok{background:#c8e6c9;color:#1b5e20;border:1px solid #81c784}
-    .badge.err{background:#ffebee;color:#b71c1c;border:1px solid #ef9a9a}
   </style>
 </head>
 <body>
@@ -105,18 +102,19 @@
       return u.toString();
     }
 
-    function navToChild(page){
-      const ctx = ctxOrWarn(); if(!ctx) return;
-      location.href = buildUrl(page, ctx);
-    }
-
     function wireButtons(){
-      $$('#eventButtons .btn[data-page]').forEach(btn=>{
-        btn.addEventListener('click', ()=> navToChild(btn.getAttribute('data-page')), {passive:true});
+      $$('#eventButtons .btn[data-page], .section .btn[data-page]').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          e.preventDefault();
+          const ctx = ctxOrWarn(); if(!ctx) return;
+          const target = btn.getAttribute('data-page');
+          if(target){ location.href = buildUrl(target, ctx); }
+        }, {passive:true});
       });
     }
 
-    async function saveTrimmingInline(){
+    async function saveTrimmingInline(e){
+      e.preventDefault();
       const ctx = ctxOrWarn(); if(!ctx) return;
       try{
         const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
@@ -136,7 +134,7 @@
     }
 
     function wireTrimming(){
-      $('#btnTrimming')?.addEventListener('click', saveTrimmingInline, {passive:true});
+      $('#btnTrimming')?.addEventListener('click', saveTrimmingInline, {passive:false});
     }
 
     hydrate();
