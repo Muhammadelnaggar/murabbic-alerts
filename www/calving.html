@@ -5,41 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل حدث الولادة — مُرَبِّك</title>
   <style>
-    :root {
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
-      --muted:#64748b; --card:#ffffff; --danger:#c2410c;
-    }
-    * { box-sizing:border-box; }
-    html, body { max-width:100%; overflow-x:hidden; }
-    body { margin:0; font-family:'Cairo', Tahoma, Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e2e8f0; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
-    .bar { max-width:920px; margin:0 auto; padding:14px 18px; display:flex; gap:8px; align-items:center; justify-content:space-between; }
-    .title { font-weight:700; color:var(--green-600); font-size:18px; }
+    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
+    *{box-sizing:border-box}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0;box-shadow:0 2px 4px rgba(0,0,0,.05)}
+    .bar{max-width:920px;margin:0 auto;padding:14px 18px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .title{font-weight:700;color:var(--green-600);font-size:18px}
 
-    main { max-width:920px; margin:20px auto; padding:16px; padding-bottom:110px; }
-    .card { background:var(--card); border:1px solid #e2e8f0; border-radius:16px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); }
-    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
-    .row { display:grid; gap:14px; min-width:0; }
-    @media(min-width:720px) { .row { grid-template-columns:repeat(2,1fr); } }
+    main{max-width:920px;margin:20px auto;padding:16px;padding-bottom:110px}
+    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    .row{display:grid;gap:14px;min-width:0}
+    @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
 
-    label { font-weight:600; font-size:15px; color:#0f172a; display:block; margin-bottom:6px; }
-    input, select, textarea { width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; font-size:16px; }
-    textarea { min-height:80px; resize:vertical; }
+    label{font-weight:600;font-size:15px;color:#0f172a;display:block;margin-bottom:6px}
+    input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:16px}
+    textarea{min-height:80px;resize:vertical}
 
-    .radio-group { display:flex; flex-wrap:wrap; gap:10px; padding:6px 0; }
-    .radio-group label { font-weight:500; font-size:14px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:6px 10px; cursor:pointer; transition:all .2s; white-space:normal; }
-    .radio-group input { margin-inline-start:6px; }
-    .radio-group label:hover { background:#e2e8f0; }
+    .radio-group{display:flex;flex-wrap:wrap;gap:10px;padding:6px 0}
+    .radio-group label{font-weight:500;font-size:14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;cursor:pointer;transition:all .2s;white-space:normal}
+    .radio-group input{margin-inline-start:6px}
+    .radio-group label:hover{background:#e2e8f0}
 
-    .actions-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e2e8f0; box-shadow:0 -2px 6px rgba(0,0,0,0.08); display:flex; gap:10px; padding:12px; z-index:20; }
-    .actions-bar button { flex:1; padding:14px; font-size:16px; font-weight:700; border-radius:12px; cursor:pointer; border:0; }
-    .actions-bar .save { background:var(--green); color:#fff; }
-    .actions-bar .ghost { background:#eef2f7; color:#0f172a; }
+    .actions-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -2px 6px rgba(0,0,0,.08);display:flex;gap:10px;padding:12px;z-index:20}
+    .actions-bar button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:12px;cursor:pointer;border:0}
+    .actions-bar .save{background:var(--green);color:#fff}
+    .actions-bar .ghost{background:#eef2f7;color:#0f172a}
 
-    .infobar { display:none; margin-top:14px; padding:12px; border-radius:10px; font-size:14px; font-weight:600; }
-    .infobar.show { display:block; }
-    .infobar.error { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
-    .infobar:not(.error) { background:#ecfdf5; border:1px solid #bbf7d0; color:#065f46; }
+    .infobar{display:none;margin-top:14px;padding:12px;border-radius:10px;font-size:14px;font-weight:600}
+    .infobar.show{display:block}
+    .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+    .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
   </style>
 </head>
 <body>
@@ -162,6 +159,11 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
+  <!-- تتبع وذكاء مُرَبِّك -->
+  <script src="/js/app-core.js"></script>
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+
   <!-- Firebase config must set window.FIREBASE_CONFIG -->
   <script type="module" src="/js/firebase-config.js"></script>
   <script type="module">
@@ -169,80 +171,70 @@
     import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    const $ = (id)=>document.getElementById(id);
-    const qs = (sel)=>document.querySelector(sel);
-    const qsa = (sel)=>Array.from(document.querySelectorAll(sel));
-    function val(name){ const el = qs(`[name="${name}"]:checked`); return el ? el.value : ''; }
-    function showMsg(text, isError){ const el = $('info'); if(!el) { alert(text); return; } el.className = 'infobar ' + (isError ? 'show error' : 'show'); el.textContent = text; }
+    const $=(id)=>document.getElementById(id);
+    const qs=(s)=>document.querySelector(s);
+    const qsa=(s)=>Array.from(document.querySelectorAll(s));
+    function val(name){const el=qs(`[name="${name}"]:checked`);return el?el.value:''}
+    function showMsg(text,isError){const el=$('info');if(!el){alert(text);return}el.className='infobar '+(isError?'show error':'show');el.textContent=text}
 
-    // UI logic
-    function updateOffspringUI(){ const count = val('calfCount'); $('offspring2').style.display = (count === '2' || count === '3') ? '' : 'none'; $('offspring3').style.display = (count === '3') ? '' : 'none'; }
-    function disableGroupByName(name, disabled){ qsa(`[name="${name}"]`).forEach(r=>{ r.disabled = disabled; if(disabled) r.checked = false; }); }
-    function disableInputs(selector, disabled){ qsa(selector).forEach(el=>{ el.disabled = disabled; if(disabled && 'value' in el) el.value=''; }); }
-    function updateModeUI(){ const kind = $('calvingKind').value; const isDead = (kind === 'نافقة'); qsa('.live-only').forEach(el=>{ el.style.display = isDead ? 'none' : ''; }); disableGroupByName('calfCount', isDead); disableGroupByName('calf1Sex', isDead); disableGroupByName('calf2Sex', isDead); disableGroupByName('calf3Sex', isDead); disableGroupByName('calfFate', isDead); disableInputs('#calfId, #calf2Id, #calf3Id', isDead); if(isDead){ qsa('[name="calfCount"]').forEach(r=> r.checked = false); } updateOffspringUI(); }
-    qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
-    $('calvingKind').addEventListener('change', updateModeUI);
-    updateModeUI();
+    // إظهار/إخفاء مجموعات المواليد بحسب النوع/العدد
+    function updateOffspringUI(){const c=val('calfCount');$('offspring2').style.display=(c==='2'||c==='3')?'':'none';$('offspring3').style.display=(c==='3')?'':'none'}
+    function disableGroup(name,disabled){qsa(`[name="${name}"]`).forEach(r=>{r.disabled=disabled;if(disabled)r.checked=false})}
+    function disableInputs(selector,disabled){qsa(selector).forEach(el=>{el.disabled=disabled;if(disabled&&'value'in el)el.value=''})}
+    function updateModeUI(){const k=$('calvingKind').value;const dead=(k==='نافقة');qsa('.live-only').forEach(el=>el.style.display=dead?'none':'');disableGroup('calfCount',dead);disableGroup('calf1Sex',dead);disableGroup('calf2Sex',dead);disableGroup('calf3Sex',dead);disableGroup('calfFate',dead);disableInputs('#calfId,#calf2Id,#calf3Id',dead);if(dead){qsa('[name="calfCount"]').forEach(r=>r.checked=false)}updateOffspringUI()}
+    qsa('[name="calfCount"]').forEach(r=>r.addEventListener('change',updateOffspringUI));
+    $('calvingKind').addEventListener('change',updateModeUI);
 
-    // Hydrate from query if provided
-    (function hydrate(){ const p = new URLSearchParams(location.search); const num = p.get('number') || p.get('animalNumber') || ''; const date = p.get('date') || ''; if(num) $('animalNumber').value = num; if(date) $('eventDate').value = date; })();
+    // تهيئة الحقول من URL (إن وُجدت)
+    (function hydrate(){const p=new URLSearchParams(location.search);const num=p.get('number')||p.get('animalNumber')||'';const date=p.get('date')||new Date().toISOString().slice(0,10);if(num) $('animalNumber').value=num; $('eventDate').value=date;})();
 
-    // Firebase init
-    let app; try { app = getApp(); } catch { if(window.FIREBASE_CONFIG) app = initializeApp(window.FIREBASE_CONFIG); }
-    const db = getFirestore();
-    const auth = getAuth();
+    // Firebase
+    let app;try{app=getApp()}catch{if(window.FIREBASE_CONFIG)app=initializeApp(window.FIREBASE_CONFIG)}
+    const db=getFirestore();
+    const auth=getAuth();
 
-    // Buttons — ربط مُحكَم وإعادة التشغيل فورًا
+    // تتبّع بسيط
+    try{window.t&&t.event&&t.event('calving_form_open',{path:location.pathname})}catch(_){}
+
+    // الأزرار — ربط مُحكَم
     (function wireButtons(){
-      const toCardBtn = $('toCardBtn');
-      if (toCardBtn && !toCardBtn.__bound){
-        toCardBtn.__bound = true;
-        toCardBtn.addEventListener('click', ()=>{
-          const num = ($('animalNumber')?.value || '').trim();
-          if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
-          location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-        });
-      }
-      const saveBtn = $('saveBtn');
-      if (saveBtn && !saveBtn.__bound){
-        saveBtn.__bound = true;
-        saveBtn.addEventListener('click', onSave);
-      }
+      const to=$('toCardBtn'); if(to&&!to.__b){to.__b=true;to.addEventListener('click',()=>{const n=($('animalNumber')?.value||'').trim();if(!n){showMsg('أدخل رقم الحيوان أولًا',true);return}location.href=`cow-card.html?number=${encodeURIComponent(n)}`})}
+      const sv=$('saveBtn'); if(sv&&!sv.__b){sv.__b=true;sv.addEventListener('click',onSave)}
     })();
+
+    updateModeUI();
 
     async function onSave(){
       try{
-        const btn = $('saveBtn'); btn.disabled = true;
-        const animalNumber = $('animalNumber').value.trim();
-        const eventDate    = $('eventDate').value;
-        const calvingKind  = $('calvingKind').value;
-        if(!animalNumber){ showMsg('أدخل رقم الحيوان', true); return; }
-        if(!eventDate){ showMsg('اختر تاريخ الولادة', true); return; }
-        if(!calvingKind){ showMsg('اختر نوع الولادة', true); return; }
+        const sv=$('saveBtn'); sv.disabled=true;
+        const animalNumber=$('animalNumber').value.trim();
+        const eventDate=$('eventDate').value;
+        const calvingKind=$('calvingKind').value;
+        if(!animalNumber){showMsg('أدخل رقم الحيوان',true);return}
+        if(!eventDate){showMsg('اختر تاريخ الولادة',true);return}
+        if(!calvingKind){showMsg('اختر نوع الولادة',true);return}
+        const dead=(calvingKind==='نافقة');
+        const count=dead?0:Number(val('calfCount'));
+        if(!dead&&!count){showMsg('اختر عدد المواليد',true);return}
 
-        const isDead = (calvingKind === 'نافقة');
-        const count  = isDead ? 0 : Number(val('calfCount'));
-        if(!isDead && !count){ showMsg('اختر عدد المواليد', true); return; }
-
-        const calves = [];
-        if(!isDead){
-          const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل', true); return; }
-          const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim(); if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)', true); return; }
-          calves.push({ number:id1, sex:sex1, fate });
-          if(count >= 2){ const sex2 = val('calf2Sex'); const id2 = $('calf2Id').value.trim(); if(!sex2 || !id2){ showMsg('أكمل بيانات المولود (2)', true); return; } calves.push({ number:id2, sex:sex2, fate }); }
-          if(count >= 3){ const sex3 = val('calf3Sex'); const id3 = $('calf3Id').value.trim(); if(!sex3 || !id3){ showMsg('أكمل بيانات المولود (3)', true); return; } calves.push({ number:id3, sex:sex3, fate }); }
+        const calves=[];
+        if(!dead){
+          const fate=val('calfFate'); if(!fate){showMsg('اختر مصير العجل',true);return}
+          const sex1=val('calf1Sex'); const id1=$('calfId').value.trim(); if(!sex1||!id1){showMsg('أكمل بيانات المولود (1)',true);return}
+          calves.push({number:id1,sex:sex1,fate});
+          if(count>=2){const sex2=val('calf2Sex'); const id2=$('calf2Id').value.trim(); if(!sex2||!id2){showMsg('أكمل بيانات المولود (2)',true);return} calves.push({number:id2,sex:sex2,fate})}
+          if(count>=3){const sex3=val('calf3Sex'); const id3=$('calf3Id').value.trim(); if(!sex3||!id3){showMsg('أكمل بيانات المولود (3)',true);return} calves.push({number:id3,sex:sex3,fate})}
         }
 
-        const uid = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('tenantId') || null;
+        const uid=auth?.currentUser?.uid||localStorage.getItem('userId')||localStorage.getItem('tenantId')||null;
+        const payload={type:'ولادة',eventType:'calving',eventDate,animalNumber,calvingKind,calfCount:count,notes:($('notes').value.trim()||null),uid,createdAt:serverTimestamp(),source:location.pathname};
+        const ev=await addDoc(collection(db,'events'),payload);
+        for(const c of calves){await addDoc(collection(db,'calves'),{number:c.number,fate:c.fate,birthDate:eventDate,damNumber:animalNumber,sex:c.sex,uid,eventId:ev.id,createdAt:serverTimestamp(),source:location.pathname})}
 
-        const eventPayload = { type:'ولادة', eventType:'calving', eventDate, animalNumber, calvingKind, calfCount:count, notes:($('notes').value.trim() || null), uid, createdAt:serverTimestamp(), source:location.pathname };
-        const evRef = await addDoc(collection(db,'events'), eventPayload);
-
-        for(const c of calves){ await addDoc(collection(db,'calves'), { number:c.number, fate:c.fate, birthDate:eventDate, damNumber:animalNumber, sex:c.sex, uid, eventId:evRef.id, createdAt:serverTimestamp(), source:location.pathname }); }
-
-        showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
-      }catch(err){ console.error(err); showMsg('تعذّر الحفظ في فايربيز', true); }
-      finally{ $('saveBtn').disabled = false; }
+        showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح',false);
+        try{t?.event&&t.event('calving_save_success',{animalNumber,eventDate,calfCount:count,calvingKind})}catch(_){}}
+      catch(err){console.error(err);showMsg('تعذّر الحفظ في فايربيز',true);try{t?.event&&t.event('calving_save_error',{message:String(err?.message||err),path:location.pathname})}catch(_){}}
+      finally{$('saveBtn').disabled=false}
     }
   </script>
 </body>
