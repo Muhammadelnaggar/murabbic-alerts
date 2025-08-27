@@ -192,26 +192,24 @@
     const db = getFirestore();
     const auth = getAuth();
 
-    // Buttons
-    // Buttons — إعادة تشغيل وربط مباشر
-(function wireButtons(){
-  const toCardBtn = $('toCardBtn');
-  if (toCardBtn) {
-    toCardBtn.onclick = ()=>{
-      const num = ($('animalNumber')?.value || '').trim();
-      if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
-      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-    };
-  }
-  const saveBtn = $('saveBtn');
-  if (saveBtn) {
-    saveBtn.onclick = onSave;
-  }
-})();
+    // Buttons — ربط مُحكَم وإعادة التشغيل فورًا
+    (function wireButtons(){
+      const toCardBtn = $('toCardBtn');
+      if (toCardBtn && !toCardBtn.__bound){
+        toCardBtn.__bound = true;
+        toCardBtn.addEventListener('click', ()=>{
+          const num = ($('animalNumber')?.value || '').trim();
+          if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
+          location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+        });
+      }
+      const saveBtn = $('saveBtn');
+      if (saveBtn && !saveBtn.__bound){
+        saveBtn.__bound = true;
+        saveBtn.addEventListener('click', onSave);
+      }
+    })();
 
-    $('toCardBtn').addEventListener('click', ()=>{ const num = ($('animalNumber')?.value || '').trim(); if(!num){ showMsg('أدخل رقم الحيوان أولًا', true); return; } location.href = `cow-card.html?number=${encodeURIComponent(num)}`; });
-
-    $('saveBtn').addEventListener('click', onSave);
     async function onSave(){
       try{
         const btn = $('saveBtn'); btn.disabled = true;
