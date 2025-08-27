@@ -238,6 +238,119 @@
     });
   });
 </script>
+<!-- تشغيل الأزرار + الحفظ في فايرستور + زر الرجوع بعد الحفظ (بدون أي تغيير في التصميم) -->
+<script type="module">
+  // استيراد فايربيز (يعتمد على ملف الإعداد لديك)
+  import { db, auth } from '/js/firebase-config.js';
+  import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+  const $ = (s,p=document)=>p.querySelector(s);
+  const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
+
+  // ========== تشغيل الكاميرا ==========
+  async function startCamera(deviceId){
+    const preview = $('#preview');
+    const overlay = $('#overlay');
+    const toggleFlash = $('#toggleFlash');
+    const st = window.__camState ||= { stream:null, track:null, caps:null, torchOn:false };
+    try{
+      if(st.stream){ try{ st.stream.getTracks().forEach(t=>t.stop()); }catch{} }
+      const constraints = deviceId ? { video:{ deviceId:{ exact: deviceId } } }
+                                   : { video:{ facingMode:{ ideal:'environment' } } };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      st.stream = stream; const [track] = stream.getVideoTracks(); st.track = track;
+      st.caps = (track.getCapabilities && track.getCapabilities()) || null;
+      preview.srcObject = stream; await (preview.play?.());
+      if(toggleFlash) toggleFlash.disabled = !(st.caps && 'torch' in st.caps);
+      fitOverlay(); drawGuide();
+    }catch(err){ console.error('Camera init error:',err); alert('تعذّر فتح الكاميرا. تأكد من الإذن وHTTPS.'); }
+  }
+  async function listCameras(){
+    try{
+      const cameraSelect = $('#cameraSelect');
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const cams = devs.filter(d=>d.kind==='videoinput');
+      if(cameraSelect){
+        cameraSelect.innerHTML='';
+        cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); });
+      }
+      return cams;
+    }catch(e){ console.warn('enumerateDevices failed', e); return []; }
+  }
+  function fitOverlay(){ const preview=$('#preview'), overlay=$('#overlay'); if(!preview||!overlay) return; const r=preview.getBoundingClientRect(); const dpr=window.devicePixelRatio||1; overlay.width=Math.max(1,Math.floor(r.width*dpr)); overlay.height=Math.max(1,Math.floor(r.height*dpr)); overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
+  function drawGuide(){ const overlay=$('#overlay'); const g=overlay.getContext('2d'); if(!g) return; const w=overlay.width,h=overlay.height,dpr=window.devicePixelRatio||1; g.clearRect(0,0,w,h); g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1*dpr; for(let i=1;i<3;i++){ g.beginPath(); g.moveTo((w/3)*i,0); g.lineTo((w/3)*i,h); g.stroke(); g.beginPath(); g.moveTo(0,(h/3)*i); g.lineTo(w,(h/3)*i); g.stroke(); } g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*dpr; const rx=w*.2, ry=h*.45, rw=w*.6, rh=h*.35; if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*dpr); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); } }
+  function dataURLFromVideo(){ const preview=$('#preview'); const c=document.createElement('canvas'); const w=preview.videoWidth||preview.clientWidth, h=preview.videoHeight||preview.clientHeight; if(!w||!h) return null; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
+
+  // ========== ثَمبنايلز وزوايا بسيطة ==========
+  const state = { currentAngle:'rear', captures:{rear:null, side:null} };
+  const anglesOrder=['rear','side'];
+  const angleLabels={ rear:'خلفية', side:'جانبية' };
+  function setAngle(a){ state.currentAngle=a; $$('.angle-tab').forEach(b=> b.classList.toggle('active', b.dataset.angle===a)); drawGuide(); updateButtons(); }
+  function renderThumbs(){ const thumbs=$('#thumbs'); thumbs.innerHTML=''; for(const a of anglesOrder){ const wrap=document.createElement('div'); wrap.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; wrap.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; wrap.appendChild(lb); wrap.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(wrap); } }
+  function updateButtons(){ const has=!!state.captures[state.currentAngle]; const retakeBtn=$('#retakeBtn'); if(retakeBtn) retakeBtn.disabled=!has; }
+
+  // ========== حفظ في فايرستور وزر الرجوع ==========
+  function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+  async function saveToFirestore(){
+    const saveBtn=$('#saveBtn'); if(!saveBtn) return;
+    const eventDateInput=$('#eventDate');
+    const animalId = localStorage.getItem('currentAnimalId') || '';
+    const animalNumber = localStorage.getItem('currentAnimalNumber') || '';
+    const eventDate = (eventDateInput && eventDateInput.value) ? eventDateInput.value : (localStorage.getItem('currentEventDate')||todayCairo());
+    const score = (typeof window.bcsScore==='number') ? window.bcsScore : 0;
+    const uid = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('tenantId') || null;
+
+    const payload = { type:'تقييم حالة الجسم', eventType:'bcs_eval', eventDate, animalId, animalNumber, score:Number(score), value:Number(score), uid, source:'bcs-eval.html', createdAt:serverTimestamp() };
+
+    try{
+      saveBtn.disabled=true;
+      await addDoc(collection(db,'events'), payload);
+      alert('✅ تم حفظ التقييم بنجاح');
+      // زر رجوع يظهر بعد الحفظ
+      const bar = saveBtn.parentElement; let backBtn = $('#backToEvents');
+      if(!backBtn && bar){ backBtn=document.createElement('a'); backBtn.id='backToEvents'; backBtn.className='btn btn-light'; backBtn.href='add-event.html'; backBtn.textContent='العودة للأحداث'; bar.appendChild(backBtn); }
+    }catch(err){ console.error('Firestore error:',err); alert('❌ حدث خطأ أثناء الحفظ'); }
+    finally{ saveBtn.disabled=false; }
+  }
+
+  // ========== ربط الأزرار ==========
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    // تهيئة التاريخ الافتراضي
+    const eventDateInput=$('#eventDate'); if(eventDateInput && !eventDateInput.value){ eventDateInput.value = localStorage.getItem('currentEventDate')||todayCairo(); }
+
+    // تشغيل الكاميرا
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ console.warn('Camera API not supported'); }
+    else { await startCamera(); await listCameras(); }
+
+    // زوايا
+    $$('.angle-tab').forEach(b=> b.addEventListener('click', ()=> setAngle(b.dataset.angle)));
+    setAngle('rear'); renderThumbs(); updateButtons();
+
+    // التقاط
+    $('#captureBtn')?.addEventListener('click', ()=>{ const url=dataURLFromVideo(); if(!url) return; state.captures[state.currentAngle]=url; renderThumbs(); updateButtons(); });
+    $('#retakeBtn')?.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; renderThumbs(); updateButtons(); });
+
+    // اختيار كاميرا
+    $('#cameraSelect')?.addEventListener('change', (e)=> startCamera(e.target.value));
+    $('#restartBtn')?.addEventListener('click', ()=> startCamera($('#cameraSelect')?.value));
+
+    // فلاش
+    $('#toggleFlash')?.addEventListener('click', async ()=>{ try{ const st=window.__camState; if(!st?.track) return; st.torchOn=!st.torchOn; await st.track.applyConstraints({ advanced:[{ torch: st.torchOn }] }); $('#toggleFlash').setAttribute('aria-pressed', String(st.torchOn)); }catch(e){ console.warn('Torch not supported', e); } });
+
+    // رفع صورة بديلة
+    $('#uploadBtn')?.addEventListener('click', ()=> $('#uploadInput')?.click());
+    $('#uploadInput')?.addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ state.captures[state.currentAngle]=r.result; renderThumbs(); updateButtons(); }; r.readAsDataURL(f); e.target.value=''; });
+
+    // التالي
+    $('#nextAngleBtn')?.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
+
+    // حفظ
+    $('#saveBtn')?.addEventListener('click', (e)=>{ e.preventDefault(); saveToFirestore(); });
+
+    // تكييف الإطار مع تغيير المقاس
+    window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+  });
+</script>
 
 </body>
 </html>
