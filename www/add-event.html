@@ -30,7 +30,7 @@
 </head>
 <body>
   <h1>تسجيل حدث</h1>
-  <div class="meta" id="animalInfo"></div>
+  <div class="meta" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
   <div class="meta" id="dateInfo"></div>
   <div class="warning" id="warn"></div>
 
@@ -100,15 +100,11 @@
 
     function hydrate(){
       const qs = new URLSearchParams(location.search);
-      const fromUrlNumber = norm(qs.get('number') || qs.get('animalNumber') || '');
       const fromUrlDate = norm(qs.get('date') || '');
-      const number = fromUrlNumber || norm(localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber')) || '';
       let date = fromUrlDate || norm(localStorage.getItem('lastEventDate')) || todayISO();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-      $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${ number || 'غير محدد' }`;
       $('#dateInfo').textContent   = `📅 التاريخ الحالي: ${ date }`;
       if(!norm($('#eventDate').value)) $('#eventDate').value = date;
-      if(number) verifyAnimal(number);
     }
 
     function ctxOrWarn(){
@@ -223,9 +219,8 @@
     }, true);
   }
 
-  // تحقّق فوري عند فتح الصفحة من الرقم المخزن للمستخدم
-  const number = (localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '').trim();
-  if(number){ verifyAnimalNumber(number); } else { setBadge(null); }
+  // لا نملأ الحيوان من العنوان، ننتظر إدخال المستخدم
+  setBadge(null);
 })();
 // ===== نهاية التحقق =====
 </script>
