@@ -211,6 +211,7 @@
 
     const state={ currentAngle:'rear', stream:null, track:null, capabilities:null, torchOn:false, captures:{rear:null, side:null}, scores:{rear:null, side:null} };
     window.state = state;
+   window.bcsScore = null;
 
     const anglesOrder=['rear','side'];
     const angleLabels={ rear:'خلفية', side:'جانبية' };
@@ -329,17 +330,50 @@
 
     function renderThumbs(){ thumbs.innerHTML=''; for(const a of anglesOrder){ const wrap=document.createElement('div'); wrap.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; wrap.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; wrap.appendChild(lb); wrap.addEventListener('click', ()=> setAngle(a)); thumbs.appendChild(wrap); } }
 
-    function renderOverall(){
-      const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
-      if(kind==='buffalo'){
-        const s = (typeof state.scores.rear==='number') ? state.scores.rear : null;
-        if(s==null){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; }
-        const pct=Math.min(100, Math.max(0,(s/5)*100));
-        scoreBadge.textContent=`${labelForScore(s)} — ${s.toFixed(2)} / 5`;
-        scoreFill.style.width=pct+'%';
-        scoreFill.style.background = Math.abs(s-3)<0.06 ? '#86efac' : '#7dd3fc';
-        return;
-      }
+   function renderOverall(){
+  const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
+
+  if(kind==='buffalo'){
+    const s = (typeof state.scores.rear==='number') ? state.scores.rear : null;
+
+    if(s==null){
+      window.bcsScore = null;                      // << مهم
+      scoreBadge.textContent='—';
+      scoreFill.style.width='0%';
+      return;
+    }
+
+    window.bcsScore = Number(s);                   // << مهم
+    const pct=Math.min(100, Math.max(0,(s/5)*100));
+    scoreBadge.textContent=`${labelForScore(s)} — ${s.toFixed(2)} / 5`;
+    scoreFill.style.width=pct+'%';
+    scoreFill.style.background = Math.abs(s-3)<0.06 ? '#86efac' : '#7dd3fc';
+    return;
+  }
+
+  // أبقار: 60% خلفية + 40% جانبية
+  const haveRear=typeof state.scores.rear==='number';
+  const haveSide=typeof state.scores.side==='number';
+
+  if(!haveRear && !haveSide){
+    window.bcsScore = null;                        // << مهم
+    scoreBadge.textContent='—';
+    scoreFill.style.width='0%';
+    return;
+  }
+
+  const wRear=0.6, wSide=0.4;
+  const overall = ((haveRear?state.scores.rear:3)*wRear + (haveSide?state.scores.side:3)*wSide) /
+                  ((haveRear?wRear:0)+(haveSide?wSide:0)||1);
+
+  window.bcsScore = Number(overall.toFixed(2));    // << مهم
+
+  const pct=Math.min(100, Math.max(0,(overall/5)*100));
+  scoreBadge.textContent=`${labelForScore(overall)} — ${overall.toFixed(2)} / 5`;
+  scoreFill.style.width=pct+'%';
+  scoreFill.style.background = Math.abs(overall-3)<0.06 ? '#86efac' : '#7dd3fc';
+}
+
       const haveRear=typeof state.scores.rear==='number';
       const haveSide=typeof state.scores.side==='number';
       if(!haveRear && !haveSide){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; }
