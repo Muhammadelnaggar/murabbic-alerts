@@ -51,8 +51,8 @@
     <button class="btn" id="btnTrimming" data-action="trimming">🦶 تقليم الحوافر</button>
     <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
     <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
-    <button class="btn" data-page="ovsynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-    <button class="btn" data-page="milk-traits.html">🥛 صفات اللبن</button>
+    <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+    <button class="btn" data-page="visual-eval.html">🥛 صفات اللبن</button>
   </div>
 
   <div class="section">
@@ -113,8 +113,7 @@
       });
     }
 
-    async function saveTrimmingInline(e){
-      e.preventDefault();
+    async function saveTrimmingInline(){
       const ctx = ctxOrWarn(); if(!ctx) return;
       try{
         const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
@@ -134,7 +133,10 @@
     }
 
     function wireTrimming(){
-      $('#btnTrimming')?.addEventListener('click', saveTrimmingInline, {passive:false});
+      $('#btnTrimming')?.addEventListener('click', e=>{
+        e.preventDefault();
+        saveTrimmingInline();
+      }, {passive:false});
     }
 
     hydrate();
