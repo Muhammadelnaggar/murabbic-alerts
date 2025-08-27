@@ -23,9 +23,9 @@
     .section h3{margin:0 0 8px;text-align:center;color:var(--green-600);font-size:16px}
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--green-600);text-align:center}
-  .badge{display:inline-block;margin-inline-start:8px;padding:.2em .6em;border-radius:999px;font-size:12px;font-weight:700;vertical-align:baseline}
-.badge.ok{background:#c8e6c9;color:#1b5e20;border:1px solid #81c784}
-.badge.err{background:#ffebee;color:#b71c1c;border:1px solid #ef9a9a}
+    .badge{display:inline-block;margin-inline-start:8px;padding:.2em .6em;border-radius:999px;font-size:12px;font-weight:700;vertical-align:baseline}
+    .badge.ok{background:#c8e6c9;color:#1b5e20;border:1px solid #81c784}
+    .badge.err{background:#ffebee;color:#b71c1c;border:1px solid #ef9a9a}
   </style>
 </head>
 <body>
@@ -78,26 +78,6 @@
     const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
     const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
 
-    async function verifyAnimal(number){
-      try{
-        if(!number) return false;
-        if(typeof window.api?.get === 'function'){
-          const res = await window.api.get('/api/animals?number='+encodeURIComponent(number));
-          if(res && res.exists){
-            $('#warn').textContent = `✅ الحيوان رقم ${number} موجود في قائمتك.`;
-            return true;
-          } else {
-            $('#warn').textContent = `❌ الحيوان رقم ${number} غير موجود في قائمتك.`;
-            return false;
-          }
-        }
-      }catch(err){
-        console.error('verifyAnimal error', err);
-        $('#warn').textContent = '⚠️ تعذر التحقق الآن.';
-        return false;
-      }
-    }
-
     function hydrate(){
       const qs = new URLSearchParams(location.search);
       const fromUrlDate = norm(qs.get('date') || '');
@@ -108,7 +88,7 @@
     }
 
     function ctxOrWarn(){
-      const number = norm($('#animalNumber').value || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
+      const number = norm($('#animalNumber').value);
       let date = norm($('#eventDate').value) || todayISO();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
       if(!number){ $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.'; return null; }
@@ -127,7 +107,7 @@
 
     function navToChild(page){
       const ctx = ctxOrWarn(); if(!ctx) return;
-      verifyAnimal(ctx.number).then(ok=>{ if(ok) location.href = buildUrl(page, ctx); });
+      location.href = buildUrl(page, ctx);
     }
 
     function wireButtons(){
@@ -138,7 +118,6 @@
 
     async function saveTrimmingInline(){
       const ctx = ctxOrWarn(); if(!ctx) return;
-      const ok = await verifyAnimal(ctx.number); if(!ok) return;
       try{
         const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
         if(typeof window.api?.post === 'function'){
@@ -165,64 +144,5 @@
     wireTrimming();
   })();
   </script>
-<script>
-// ===== التحقق الذكي من رقم الحيوان (بدون تغيير التصميم) =====
-(function(){
-  function setBadge(state){
-    const host = document.getElementById('animalInfo');
-    if(!host) return;
-    const old = host.querySelector('.badge');
-    if(old) old.remove();
-    window.__animal_ok = state;
-    if(state === true){
-      const b = document.createElement('span'); b.className='badge ok'; b.textContent='مؤكد'; host.appendChild(b);
-    }else if(state === false){
-      const b = document.createElement('span'); b.className='badge err'; b.textContent='غير موجود'; host.appendChild(b);
-    }
-  }
-
-  async function verifyAnimalNumber(number){
-    try{
-      let res = null;
-      if(typeof window.api?.get === 'function'){
-        try{ res = await window.api.get(`/api/animals?number=${encodeURIComponent(number)}`); }
-        catch(_){ res = await window.api.get('/api/animals'); }
-      }
-      let ok = false;
-      if(Array.isArray(res) && res.length){
-        ok = res.some(a => String(a.number||a.animalNumber||'').trim() === String(number).trim());
-      }else if(res && typeof res === 'object'){
-        const n = String(res.number||res.animalNumber||'').trim();
-        ok = !!n && n === String(number).trim();
-      }
-      setBadge(ok);
-    }catch(err){
-      console.error('verifyAnimalNumber failed', err);
-      setBadge(null);
-    }
-  }
-
-  // امنع الدخول لصفحات الأحداث إن كان الرقم غير مؤكد
-  const grid = document.getElementById('eventButtons');
-  if(grid){
-    grid.addEventListener('click', function(e){
-      const btn = e.target.closest('[data-page]');
-      if(!btn) return;
-      if(window.__animal_ok === false){
-        e.stopPropagation(); e.preventDefault();
-        const w = document.getElementById('warn');
-        if(w) w.textContent = '❌ رقم الحيوان غير موجود ضمن قطيعك.';
-      }else{
-        const w = document.getElementById('warn');
-        if(w) w.textContent = '';
-      }
-    }, true);
-  }
-
-  // لا نملأ الحيوان من العنوان، ننتظر إدخال المستخدم
-  setBadge(null);
-})();
-// ===== نهاية التحقق =====
-</script>
 </body>
 </html>
