@@ -454,68 +454,91 @@ function renderOverall(){
   <script type="module" src="/js/event-core.js"></script>
 
   <!-- حفظ التقييم في فايرستور فقط -->
-  <script type="module">
-    import { db, auth } from "/js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ <!-- حفظ التقييم في فايرستور (نهائي) -->
+<script type="module">
+  // تحميل فايرستور
+  import { collection, addDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    function todayCairo(){
-      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
-      const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
-      return `${y}-${m}-${d}`;
-    }
+  // جلب db, auth من إعداداتك
+  let db = null, auth = null;
+  try {
+    const cfg = await import("/js/firebase-config.js"); // لازم يصدّر db (ونختياري auth)
+    db = cfg.db || null;
+    auth = cfg.auth || null;
+  } catch (e) {
+    console.error("Firebase config load error:", e);
+  }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const oldBtn = document.getElementById("saveBtn");
-      if (!oldBtn) return;
+  // لو مفيش db يبقى مفيش حفظ
+  if (!db) {
+    console.error("Firestore DB غير متاح. تأكّد أن /js/firebase-config.js بيصدّر db.");
+  }
 
-      const saveBtn = oldBtn.cloneNode(true);
-      oldBtn.parentNode.replaceChild(saveBtn, oldBtn);
+  // عناصر الواجهة
+  const saveBtn = document.getElementById("saveBtn");
+  const eventDateInput = document.getElementById("eventDate");
 
-      const eventDateInput = document.getElementById("eventDate");
-      if (eventDateInput && !eventDateInput.value) {
-        eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+  // تاريخ القاهرة الافتراضي
+  function todayCairo(){
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+  if (eventDateInput && !eventDateInput.value) {
+    eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+  }
+
+  // ربط زر الحفظ
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!db) { alert("❌ لا يمكن الحفظ: إعداد فايرستور غير متاح."); return; }
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+
+      // لازم يكون فيه سكور محسوب
+      const bcs = (typeof window.bcsScore === "number") ? Number(window.bcsScore) : NaN;
+      if (!Number.isFinite(bcs)) {
+        saveBtn.disabled = false;
+        alert("⚠️ احسب التقييم أولاً قبل الحفظ (التقط الصورة وسيظهر السكور).");
+        return;
       }
 
-      saveBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        if (saveBtn.disabled) return;
-        saveBtn.disabled = true;
+      // بيانات الحدث
+      const animalId     = localStorage.getItem("currentAnimalId")     || "";
+      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+      const eventDate    = (eventDateInput && eventDateInput.value)
+                           ? eventDateInput.value
+                           : (localStorage.getItem("currentEventDate") || todayCairo());
+      const uid          = (auth && auth.currentUser && auth.currentUser.uid)
+                           || localStorage.getItem("userId")
+                           || localStorage.getItem("tenantId")
+                           || null;
 
-        const animalId     = localStorage.getItem("currentAnimalId")     || "";
-        const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-        const eventDate    = (eventDateInput && eventDateInput.value)
-                             ? eventDateInput.value
-                             : (localStorage.getItem("currentEventDate") || todayCairo());
-        const score        = (typeof window.bcsScore === "number") ? window.bcsScore : 0;
+      try {
+        await addDoc(collection(db, "events"), {
+          type: "تقييم حالة الجسم",
+          eventType: "bcs_eval",
+          eventDate,
+          animalId,
+          animalNumber,
+          score: bcs,
+          value: bcs,
+          uid,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        });
+        alert("✅ تم حفظ التقييم بنجاح");
+      } catch (err) {
+        console.error("Firestore save error:", err);
+        alert("❌ حدث خطأ أثناء الحفظ");
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }, { capture: true });
+  }
+</script>
 
-        const uid = (auth && auth.currentUser && auth.currentUser.uid)
-                    || localStorage.getItem("userId")
-                    || localStorage.getItem("tenantId")
-                    || null;
-
-        try {
-          await addDoc(collection(db, "events"), {
-            type: "تقييم حالة الجسم",
-            eventType: "bcs_eval",
-            eventDate,
-            animalId,
-            animalNumber,
-            score: Number(score),
-            value: Number(score),
-            uid,
-            source: location.pathname,
-            createdAt: serverTimestamp()
-          });
-          alert("✅ تم حفظ التقييم بنجاح");
-        } catch (err) {
-          console.error("Firestore save error:", err);
-          alert("❌ حدث خطأ أثناء الحفظ");
-        } finally {
-          saveBtn.disabled = false;
-        }
-      }, { capture: true });
-    });
-  </script>
 </body>
 </html>
