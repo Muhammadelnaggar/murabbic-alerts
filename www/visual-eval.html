@@ -318,23 +318,22 @@ window.state = state; // ← خارج الكائن وبعده مباشرة
       }
       return k;
     }
-    function computeOverallFromState(){
-      const NEW_WEIGHTS={ UDDER:40, BACK_RUMP:30, BODY_LEGS:20, FEMININITY:10 };
-      const SUB={
-        UDDER:{ udderCleft:25, udderBalance:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
-        BACK_RUMP:{ backStraight:55, rumpAngle:45 },
-        BODY_LEGS:{ chestWidth:25, bodyDepth:25, frontLegsParallel:20, rearLegsStraightness:15, rearLegsWidth:15 },
-        FEMININITY:{ femininity:100 }
-      };
-      const all=Object.assign({},state.k['udder-rear'],state.k['side'],state.k['front-body'],state.k['teat-close']);
-      if(!Object.keys(all).length) return 0;
-      const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
-      const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), BL=w(SUB.BODY_LEGS), F=w(SUB.FEMININITY);
-      const total=NEW_WEIGHTS.UDDER+NEW_WEIGHTS.BACK_RUMP+NEW_WEIGHTS.BODY_LEGS+NEW_WEIGHTS.FEMININITY;
-      return Math.round((U*NEW_WEIGHTS.UDDER + B*NEW_WEIGHTS.BACK_RUMP + BL*NEW_WEIGHTS.BODY_LEGS + F*NEW_WEIGHTS.FEMININITY)/total);
-      }
-    window.computeOverallFromState = computeOverallFromState;
-
+   function computeOverallFromState(){
+  const NEW_WEIGHTS={ UDDER:40, BACK_RUMP:30, BODY_LEGS:20, FEMININITY:10 };
+  const SUB={
+    UDDER:{ udderCleft:25, udderBalance:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
+    BACK_RUMP:{ backStraight:55, rumpAngle:45 },
+    BODY_LEGS:{ chestWidth:25, bodyDepth:25, frontLegsParallel:20, rearLegsStraightness:15, rearLegsWidth:15 },
+    FEMININITY:{ femininity:100 }
+  };
+  const all=Object.assign({},state.k['udder-rear'],state.k['side'],state.k['front-body'],state.k['teat-close']);
+  if(!Object.keys(all).length) return 0;
+  const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
+  const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), BL=w(SUB.BODY_LEGS), F=w(SUB.FEMININITY);
+  const total=NEW_WEIGHTS.UDDER+NEW_WEIGHTS.BACK_RUMP+NEW_WEIGHTS.BODY_LEGS+NEW_WEIGHTS.FEMININITY;
+  return Math.round((U*NEW_WEIGHTS.UDDER + B*NEW_WEIGHTS.BACK_RUMP + BL*NEW_WEIGHTS.BODY_LEGS + F*NEW_WEIGHTS.FEMININITY)/total);
+}
+window.computeOverallFromState = computeOverallFromState;
     function gradeInfo(mvs){ if(mvs>=85) return {label:'ممتاز', bg:'#dcfce7', border:'#86efac', fg:'#14532d'}; if(mvs>=75) return {label:'جيد جدًا', bg:'#e0f2fe', border:'#7dd3fc', fg:'#075985'}; if(mvs>=60) return {label:'متوسط', bg:'#fef9c3', border:'#facc15', fg:'#92400e'}; return {label:'ضعيف', bg:'#fee2e2', border:'#fecaca', fg:'#7f1d1d'}; }
     function renderScoreWidget(mvs){ const g=gradeInfo(mvs); return `<div class="score"><div class="score-badge" style="background:${g.bg};color:${g.fg};border-color:${g.border}">${g.label}</div><div class="score-bar"><div class="fill" style="width:${mvs}%;background:${g.border}"></div></div><div class="score-note">MVS: ${mvs} / 100</div></div>`; }
     function updateOverallUI(){ const box=$('#metrics'); if(!box) return; const mvs=computeOverallFromState(); box.innerHTML = '<h3>التقييم الإجمالي</h3>'+ renderScoreWidget(mvs); }
