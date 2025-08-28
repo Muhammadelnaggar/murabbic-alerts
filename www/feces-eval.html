@@ -128,6 +128,17 @@ html, body { overflow-x: hidden; }
   const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
   const scoreBadge=$('#scoreBadge'), scoreFill=$('#scoreFill'), scoreNote=$('#scoreNote');
   const saveBtn=$('#saveBtn'), animalIdInput=$('#animalId'), eventDateInput=$('#eventDate');
+  // زر الرجوع
+const backBtn = document.getElementById('backBtn');
+backBtn?.addEventListener('click', () => {
+  const ctx = getAnimalFromContext();                 // يأخذ التاريخ الحالي/المختار
+  const u = new URL('/events.html', location.origin); // صفحة الأحداث
+  if (ctx.date) u.searchParams.set('date', ctx.date);
+  const id = localStorage.getItem('currentAnimalId') || animalIdInput?.value || '';
+  if (id) u.searchParams.set('animalId', id);
+  location.href = u.toString();
+});
+
   const numberSpan=document.querySelector('.animal-number');
 
   const state={ stream:null, track:null, capabilities:null, torchOn:false, lastCapture:null, lastScore:null };
@@ -144,9 +155,7 @@ html, body { overflow-x: hidden; }
 
   // ====== Hidden reference images (user never sees them) ======  // المراجع: داخل www/images/ — الأسماء المتوقعة: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
   // استخدم مطلق في الويب، ونِسبي في التشغيل من ملف
-const REF_BASES = (location.protocol === 'file:')
-  ? ['./images/','./www/images/']       // تشغيل محلي
-  : ['/images/','/www/images/'];         // على السيرفر
+const REF_BASES = ['www/images/'];     // على السيرفر
 
 function buildUrls(baseName){
   return REF_BASES.flatMap(root =>
@@ -241,37 +250,79 @@ function buildUrls(baseName){
   if(uploadInput) uploadInput.addEventListener('change', async (e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const url=r.result; state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; }; r.readAsDataURL(f); uploadInput.value=''; });
 
   // حفظ التقييم
-  if(saveBtn) saveBtn.addEventListener('click', async ()=>{
-    try{
-      if(state.lastScore==null){ alert('التقط أو ارفع صورة أولاً لاحتساب الدرجة.'); return; }
-      saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…';
-      const ctx=getAnimalFromContext();
-      if(animalIdInput) animalIdInput.value = animalIdInput.value || ctx.id || '';
-      if(eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
-      const animalId = (animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
-      const date = (eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
+ if (saveBtn) saveBtn.addEventListener('click', async ()=>{
+  try{
+    if (state.lastScore == null) { alert('التقط أو ارفع صورة أولاً لاحتساب الدرجة.'); return; }
 
-      if(isDemo){
-        const doc={ type:'تقييم الروث بالكاميرا (عرض)', animalId, date, fecesScore: state.lastScore, captured: state.lastCapture, createdAt: Date.now() };
-        localStorage.setItem('murabbik_feces_demo_last', JSON.stringify(doc));
-        alert('تم الحفظ محليًا (وضع العرض).');
-      }else{
-        try{
-          const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } = await import('./js/firebase-config.js');
-          const uploaded={};
-          if(state.lastCapture){
-            const path=`feces-evaluations/${animalId}/${date}/feces.jpg`;
-            const r=ref(storage, path);
-            await uploadString(r, state.lastCapture, 'data_url');
-            uploaded.image=await getDownloadURL(r);
-          }
-          const doc={ type:'تقييم الروث بالكاميرا', animalId, date, fecesScore: state.lastScore, image: uploaded.image||null, createdAt: serverTimestamp() };
-          await addDoc(collection(db,'events'), doc);
-          alert('تم الحفظ ورفع الصورة.');
-        }catch(err){ console.warn(err); alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.'); localStorage.setItem('murabbik_feces_last', JSON.stringify({animalId,date,score:state.lastScore,captured:state.lastCapture,at:Date.now()})); }
+    saveBtn.disabled = true; const txt = saveBtn.textContent;
+    saveBtn.textContent = 'جارٍ الحفظ…';
+
+    const ctx = getAnimalFromContext();
+    if (animalIdInput) animalIdInput.value = animalIdInput.value || ctx.id || '';
+    if (eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
+
+    const animalId = (animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
+    const date = (eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
+
+    if (isDemo) {
+      localStorage.setItem('murabbik_feces_demo_last', JSON.stringify({
+        type:'تقييم الروث بالكاميرا (عرض)',
+        animalId, date,
+        fecesScore: state.lastScore,
+        captured: state.lastCapture,
+        createdAt: Date.now()
+      }));
+      alert('تم الحفظ محليًا (وضع العرض).');
+      return;
+    }
+
+    const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } =
+      await import('/js/firebase-config.js'); // مسار مطلق
+
+    // حاول رفع الصورة، ولو فشل كمّل من غيرها
+    let imageUrl = null;
+    if (state.lastCapture) {
+      try {
+        const path = `feces-evaluations/${animalId}/${date}/feces.jpg`;
+        const r = ref(storage, path);
+        await uploadString(r, state.lastCapture, 'data_url');
+        imageUrl = await getDownloadURL(r);
+      } catch (e) {
+        console.warn('Storage upload failed, will save without image', e);
       }
-    }finally{ saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم'; }
-  });
+    }
+
+    await addDoc(collection(db, 'events'), {
+      type: 'تقييم الروث بالكاميرا',
+      eventType: 'feces_eval',
+      eventDate: date,
+      animalId,
+      fecesScore: Number(state.lastScore),
+      image: imageUrl || null,
+      source: location.pathname,
+      createdAt: serverTimestamp()
+    });
+
+    alert(imageUrl ? 'تم الحفظ ورفع الصورة.' : 'تم الحفظ (بدون صورة).');
+  } catch (err) {
+    console.error('Firestore save error:', err);
+    alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.');
+    try {
+      const ctx = getAnimalFromContext();
+      localStorage.setItem('murabbik_feces_last', JSON.stringify({
+        animalId: ctx.id || 'unknown',
+        date: ctx.date || todayCairo(),
+        score: state.lastScore,
+        captured: state.lastCapture,
+        at: Date.now()
+      }));
+    } catch {}
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'حفظ التقييم';
+  }
+});
+
 
   async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block'; // استخدم صورة مرجعية 3_5 لعرض مثالي
     const demoRef='www/images/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
