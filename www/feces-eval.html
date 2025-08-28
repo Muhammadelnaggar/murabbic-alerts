@@ -35,33 +35,18 @@
     .score-bar .fill{height:100%}
     .score-note{color:var(--muted);font-weight:700}
 
-    /* تعطيل أي عنصر محرر يعلّق فوق الصفحة */
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     header,.container,#cameraCard{position:relative;z-index:1}
-  .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0}
+
+    .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0}
     .save-bar .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
-    /* شريط الحفظ موبايل-فرست */
-.save-bar{
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  align-items: stretch;
-}
-.save-bar .btn{
-  width: 100%;
-}
 
-/* شاشات أوسع: التاريخ على اليسار والأزرار تحت بعض برضه */
-@media (min-width: 640px){
-  .save-bar{
-    grid-template-columns: 1fr;
-  }
-}
+    .save-bar{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
+    .save-bar .btn{width:100%}
+    @media (min-width: 640px){ .save-bar{grid-template-columns:1fr} }
 
-/* امنع أي سكروول عرضي */
-html, body { overflow-x: hidden; }
-.container { max-width: 880px; margin: 16px auto; padding: 0 16px; }
-
+    html, body { overflow-x: hidden; }
+    .container { max-width: 880px; margin: 16px auto; padding: 0 16px; }
   </style>
 </head>
 <body>
@@ -111,336 +96,233 @@ html, body { overflow-x: hidden; }
       </div>
     </section>
   </div>
-<script src="js/mbk-animals.js?v=2"></script>
 
-<script type="module">
-  const qs = new URLSearchParams(location.search);
-  const $ = (s,p=document)=>p.querySelector(s);
-  const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
-  const isDemo = qs.get('demo')==='1' || qs.get('mode')==='demo';
+  <script src="js/mbk-animals.js?v=2"></script>
 
-  function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
-  function getAnimalFromContext(){ const id=qs.get('animalId')||localStorage.getItem('currentAnimalId')||''; const number=qs.get('number')||localStorage.getItem('currentAnimalNumber')||''; const date=qs.get('date')||sessionStorage.getItem('currentEventDate')||localStorage.getItem('currentEventDate')||todayCairo(); if(id) localStorage.setItem('currentAnimalId',id); if(number) localStorage.setItem('currentAnimalNumber',number); if(date){ localStorage.setItem('currentEventDate',date); sessionStorage.setItem('currentEventDate',date);} return {id,number,date}; }
+  <script type="module">
+    const qs = new URLSearchParams(location.search);
+    const $  = (s,p=document)=>p.querySelector(s);
+    const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
+    const isDemo = qs.get('demo')==='1' || qs.get('mode')==='demo';
 
-  const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
-  const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
-  const captureBtn=$('#captureBtn'), retakeBtn=$('#retakeBtn');
-  const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
-  // تفعيل زر "رفع صورة بديلة"
-if (uploadBtn && uploadInput) {
-  uploadBtn.addEventListener('click', () => uploadInput.click());
-
-  uploadInput.addEventListener('change', async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-
-    const r = new FileReader();
-    r.onload = async () => {
-      const url = r.result;              // Data URL للصورة
-      state.lastCapture = url;
-      const s = await scoreFeces(url);   // احسب الدرجة
-      renderFecesScore(s);               // اعرض النتيجة
-      if (retakeBtn) retakeBtn.disabled = false;
-    };
-    r.readAsDataURL(f);
-    e.target.value = ''; // تفريغ المدخل
-  });
-}
-
-  const scoreBadge=$('#scoreBadge'), scoreFill=$('#scoreFill'), scoreNote=$('#scoreNote');
-  const saveBtn=$('#saveBtn'), animalIdInput=$('#animalId'), eventDateInput=$('#eventDate');
-  // زر الرجوع
-const backBtn = document.getElementById('backBtn');
-backBtn?.addEventListener('click', () => {
-  const ctx = getAnimalFromContext();                 // يأخذ التاريخ الحالي/المختار
-  const u = new URL('/events.html', location.origin); // صفحة الأحداث
-  if (ctx.date) u.searchParams.set('date', ctx.date);
-  const id = localStorage.getItem('currentAnimalId') || animalIdInput?.value || '';
-  if (id) u.searchParams.set('animalId', id);
-  location.href = u.toString();
-});
-
-  const numberSpan=document.querySelector('.animal-number');
-
-  const state={ stream:null, track:null, capabilities:null, torchOn:false, lastCapture:null, lastScore:null };
-
-  function fitOverlay(){ const r=preview.getBoundingClientRect(); overlay.width=r.width*devicePixelRatio; overlay.height=r.height*devicePixelRatio; overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
-  function drawGuide(){ const g=overlay.getContext('2d'); if(!g) return; const w=overlay.width,h=overlay.height; g.clearRect(0,0,w,h); g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1*devicePixelRatio; for(let i=1;i<3;i++){ g.beginPath(); g.moveTo((w/3)*i,0); g.lineTo((w/3)*i,h); g.stroke(); g.beginPath(); g.moveTo(0,(h/3)*i); g.lineTo(w,(h/3)*i); g.stroke(); } g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*devicePixelRatio; const rx=w*.18, ry=h*.18, rw=w*.64, rh=h*.64; if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); } }
-
-  async function listCameras(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); return cams; }
-  async function startCamera(deviceId){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); } const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}}; const stream=await navigator.mediaDevices.getUserMedia(cs); state.stream=stream; preview.srcObject=stream; const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null; await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport(); }
-  function populateTorchSupport(){ const cap=state.capabilities; toggleFlash.disabled=!(cap&&'torch' in cap); }
-  async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); } }
-
-  function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
-
-  
-function buildUrls(baseName){
-  return REF_BASES.flatMap(root =>
-    REF_EXTS.map(ext => `${root}${baseName}.${ext}`)
-  );
-}
-  const REF_BASES = ['www/images/']; // بدون شرطة مائلة في البداية – زي ما طلبت
-  const REF_EXTS  = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
-  const REF_NAMES = [
-    {score:1,   names:['1']},
-    {score:2,   names:['2']},
-    {score:3,   names:['3']},
-    {score:3.5, names:['3_5','3.5']},
-    {score:4,   names:['4']},
-    {score:5,   names:['5']}
-  ];
- const REF_LIST = REF_NAMES.flatMap(({score,names}) =>
-  names.map(name => ({
-    score,
-    urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`))
-  }))
-);
-
-
-  function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } // normalize
-    let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
-  function loadRefVector(item){
-    const candidates = item.urls || [];
-    let i = 0;
-    return new Promise(res=>{
-      function tryNext(){
-        if(i >= candidates.length){ console.warn('Ref not found for', item.score, item.urls); return res(null); }
-        const url = candidates[i];
-        const img = new Image();
-        try{
-          const abs = new URL(url, location.href);
-          if(abs.origin !== location.origin) img.crossOrigin = 'anonymous';
-        }catch{}
-        img.onload = ()=> res({ score: item.score, vec: imgToVec(img) });
-        img.onerror = ()=> { i++; tryNext(); };
-        img.src = url;
-      }
-      tryNext();
-    });
-  }
-  let __REFS_COUNT__=0; window.__REFS_COUNT__=0;
-  const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr=>{
-    const refs = arr.filter(Boolean);
-    __REFS_COUNT__ = refs.length; window.__REFS_COUNT__ = __REFS_COUNT__;
-    if(!refs.length && scoreNote){ scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/images/ بالأسماء الصحيحة (خاصة 3_5).'; }
-    return refs;
-  });
-
-  function cosine(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
-  function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToVec(img)); img.src=dataUrl; }); }
-  async function scoreFeces(dataUrl){ const refs=await refVectorsPromise; if(!refs.length) return 3.5; const vec=await vectorForDataURL(dataUrl); let best=null; for(const r of refs){ const sim=cosine(vec,r.vec); if(!best || sim>best.sim) best={score:r.score, sim}; } return best?best.score:3.5; }
-
-  function renderFecesScore(s){
-    if(window.__REFS_COUNT__===0){
-      scoreBadge.textContent='غير محسوب — مراجع مفقودة';
-      scoreFill.style.width='0%';
-      scoreFill.style.background='#facc15';
-      scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/';
-      state.lastScore=null;
-      return;
+    function todayCairo(){
+      const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
+      const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
     }
-    let label='';
-    if(s<=1.5) label='إسهال';
-    else if(s<=2.5) label='لين';
-    else if(s<3.5) label='قريب للمثالي';
-    else if(s===3.5) label='مثالي';
-    else if(s<=4.5) label='صلب';
-    else label='إمساك';
-    scoreBadge.textContent=`${label} — ${s} / 5`;
-    const pct=Math.min(100, Math.max(0, (s/5)*100));
-    scoreFill.style.width=pct+'%';
-    scoreFill.style.background = s===3.5 ? '#86efac' : '#7dd3fc';
-    scoreNote.textContent='';
-    state.lastScore = s;
-  }
-
-  // ====== UI bindings ====== ======
-  window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
-  toggleFlash.addEventListener('click', toggleTorch);
-  restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-  cameraSelect.addEventListener('change', async ()=>{ await startCamera(cameraSelect.value); });
-
-  captureBtn.addEventListener('click', async ()=>{ const url=dataURLFromVideo(); state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; });
-  retakeBtn.addEventListener('click', ()=>{ state.lastCapture=null; renderFecesScore(3.5); retakeBtn.disabled=true; });
-  if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
-  if(uploadInput) uploadInput.addEventListener('change', async (e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const url=r.result; state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; }; r.readAsDataURL(f); uploadInput.value=''; });
-
-  // حفظ التقييم
- if (saveBtn) saveBtn.addEventListener('click', async ()=>{
-  try{
-    if (state.lastScore == null) { alert('التقط أو ارفع صورة أولاً لاحتساب الدرجة.'); return; }
-
-    saveBtn.disabled = true; const txt = saveBtn.textContent;
-    saveBtn.textContent = 'جارٍ الحفظ…';
-
-    const ctx = getAnimalFromContext();
-    if (animalIdInput) animalIdInput.value = animalIdInput.value || ctx.id || '';
-    if (eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
-
-    const animalId = (animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
-    const date = (eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
-
-    if (isDemo) {
-      localStorage.setItem('murabbik_feces_demo_last', JSON.stringify({
-        type:'تقييم الروث بالكاميرا (عرض)',
-        animalId, date,
-        fecesScore: state.lastScore,
-        captured: state.lastCapture,
-        createdAt: Date.now()
-      }));
-      alert('تم الحفظ محليًا (وضع العرض).');
-      return;
+    function getAnimalFromContext(){
+      const id=qs.get('animalId')||localStorage.getItem('currentAnimalId')||'';
+      const number=qs.get('number')||localStorage.getItem('currentAnimalNumber')||'';
+      const date=qs.get('date')||sessionStorage.getItem('currentEventDate')||localStorage.getItem('currentEventDate')||todayCairo();
+      if(id) localStorage.setItem('currentAnimalId',id);
+      if(number) localStorage.setItem('currentAnimalNumber',number);
+      if(date){ localStorage.setItem('currentEventDate',date); sessionStorage.setItem('currentEventDate',date); }
+      return {id,number,date};
     }
 
-    const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } =
-      await import('/js/firebase-config.js'); // مسار مطلق
+    const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
+    const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
+    const captureBtn=$('#captureBtn'), retakeBtn=$('#retakeBtn');
+    const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
+    const scoreBadge=$('#scoreBadge'), scoreFill=$('#scoreFill'), scoreNote=$('#scoreNote');
+    const saveBtn=$('#saveBtn'), animalIdInput=$('#animalId'), eventDateInput=$('#eventDate');
+    const backBtn=$('#backBtn');
+    const numberSpan=$('.animal-number');
 
-    // حاول رفع الصورة، ولو فشل كمّل من غيرها
-    let imageUrl = null;
-    if (state.lastCapture) {
-      try {
-        const path = `feces-evaluations/${animalId}/${date}/feces.jpg`;
-        const r = ref(storage, path);
-        await uploadString(r, state.lastCapture, 'data_url');
-        imageUrl = await getDownloadURL(r);
-      } catch (e) {
-        console.warn('Storage upload failed, will save without image', e);
-      }
+    const state={ stream:null, track:null, capabilities:null, torchOn:false, lastCapture:null, lastScore:null };
+    window.state = state; // في حال احتجته سكربت آخر
+
+    function fitOverlay(){ const r=preview.getBoundingClientRect(); overlay.width=r.width*devicePixelRatio; overlay.height=r.height*devicePixelRatio; overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
+    function drawGuide(){ const g=overlay.getContext('2d'); if(!g) return; const w=overlay.width,h=overlay.height; g.clearRect(0,0,w,h);
+      g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1*devicePixelRatio;
+      for(let i=1;i<3;i++){ g.beginPath(); g.moveTo((w/3)*i,0); g.lineTo((w/3)*i,h); g.stroke(); g.beginPath(); g.moveTo(0,(h/3)*i); g.lineTo(w,(h/3)*i); g.stroke(); }
+      g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*devicePixelRatio; const rx=w*.18, ry=h*.18, rw=w*.64, rh=h*.64;
+      if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); }
     }
 
-    await addDoc(collection(db, 'events'), {
-      type: 'تقييم الروث بالكاميرا',
-      eventType: 'feces_eval',
-      eventDate: date,
-      animalId,
-      fecesScore: Number(state.lastScore),
-      image: imageUrl || null,
-      source: location.pathname,
-      createdAt: serverTimestamp()
+    async function listCameras(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); return cams; }
+    async function startCamera(deviceId){
+      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+      const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}};
+      const stream=await navigator.mediaDevices.getUserMedia(cs);
+      state.stream=stream; preview.srcObject=stream;
+      const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null;
+      await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport();
+    }
+    function populateTorchSupport(){ const cap=state.capabilities; toggleFlash.disabled=!(cap&&'torch' in cap); }
+    async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); } }
+
+    function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
+
+    /* ==== مراجع الصور: داخل www/images/ ==== */
+    const REF_BASES = ['www/images/']; // كما طلبت بالضبط
+    const REF_EXTS  = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
+    const REF_NAMES = [
+      {score:1,   names:['1']},
+      {score:2,   names:['2']},
+      {score:3,   names:['3']},
+      {score:3.5, names:['3_5','3.5']},
+      {score:4,   names:['4']},
+      {score:5,   names:['5']}
+    ];
+    const REF_LIST = REF_NAMES.flatMap(({score,names}) =>
+      names.map(name => ({ score, urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`)) }))
+    );
+
+    function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
+    function loadRefVector(item){
+      const candidates=item.urls||[]; let i=0;
+      return new Promise(res=>{
+        function next(){ if(i>=candidates.length){ console.warn('Ref not found for', item.score, item.urls); return res(null); }
+          const url=candidates[i]; const img=new Image();
+          try{ const abs=new URL(url, location.href); if(abs.origin!==location.origin) img.crossOrigin='anonymous'; }catch{}
+          img.onload=()=>res({score:item.score, vec:imgToVec(img)}); img.onerror=()=>{ i++; next(); }; img.src=url;
+        } next();
+      });
+    }
+    let __REFS_COUNT__=0; window.__REFS_COUNT__=0;
+    const refVectorsPromise = Promise.all(REF_LIST.map(loadRefVector)).then(arr=>{
+      const refs=arr.filter(Boolean); __REFS_COUNT__=refs.length; window.__REFS_COUNT__=__REFS_COUNT__;
+      if(!refs.length && scoreNote){ scoreNote.textContent='تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/images/ (خصوصًا 3_5).'; }
+      return refs;
     });
 
-    alert(imageUrl ? 'تم الحفظ ورفع الصورة.' : 'تم الحفظ (بدون صورة).');
-  } catch (err) {
-    console.error('Firestore save error:', err);
-    alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.');
-    try {
-      const ctx = getAnimalFromContext();
-      localStorage.setItem('murabbik_feces_last', JSON.stringify({
-        animalId: ctx.id || 'unknown',
-        date: ctx.date || todayCairo(),
-        score: state.lastScore,
-        captured: state.lastCapture,
-        at: Date.now()
-      }));
-    } catch {}
-  } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'حفظ التقييم';
-  }
-});
+    function cosine(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+    function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToVec(img)); img.src=dataUrl; }); }
+    async function scoreFeces(dataUrl){ const refs=await refVectorsPromise; if(!refs.length) return 3.5; const vec=await vectorForDataURL(dataUrl); let best=null; for(const r of refs){ const sim=cosine(vec,r.vec); if(!best||sim>best.sim) best={score:r.score,sim}; } return best?best.score:3.5; }
 
-
-  async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block'; // استخدم صورة مرجعية 3_5 لعرض مثالي
-    const demoRef='www/images/3_5.jpg'; try{ const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef; }catch{ renderFecesScore(3.5); } }
-
-  (async function init(){ try{
-    const ctx=getAnimalFromContext();
-    if(animalIdInput) animalIdInput.value = ctx.id || '';
-    if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
-    if(numberSpan) numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
-    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب.'); }
-    if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
-    await startCamera(); await listCameras(); if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
-    if(isDemo) runDemo();
-  }catch(e){ console.warn(e); }
-  })();
-</script>
-
-<script>
-  // إزالة أي عنصر محرّر لو ظهر فجأة
-  function nukeEditorCard(){ document.querySelectorAll('editor-card,.editor-card').forEach(n=>{ try{ n.remove(); }catch{} }); }
-  new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
-  document.addEventListener('DOMContentLoaded', nukeEditorCard);
-</script>
-  <!-- حفظ التقييم في فايرستور فقط -->
-<!-- حفظ تقييم الروث في فايرستور فقط -->
-<script type="module">
-  import { db, auth } from "/js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  function todayCairo(){
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
-    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
-    return `${y}-${m}-${d}`;
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const oldBtn = document.getElementById("saveBtn");
-    if (!oldBtn) return;
-
-    // نبدّل الزر بنسخة جديدة لمنع أي ليسنر قديم
-    const saveBtn = oldBtn.cloneNode(true);
-    oldBtn.parentNode.replaceChild(saveBtn, oldBtn);
-
-    const eventDateInput = document.getElementById("eventDate");
-    if (eventDateInput && !eventDateInput.value) {
-      eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+    function renderFecesScore(s){
+      if(window.__REFS_COUNT__===0){
+        scoreBadge.textContent='غير محسوب — مراجع مفقودة';
+        scoreFill.style.width='0%'; scoreFill.style.background='#facc15';
+        scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/';
+        state.lastScore=null; return;
+      }
+      let label=''; if(s<=1.5) label='إسهال'; else if(s<=2.5) label='لين'; else if(s<3.5) label='قريب للمثالي'; else if(s===3.5) label='مثالي'; else if(s<=4.5) label='صلب'; else label='إمساك';
+      scoreBadge.textContent=`${label} — ${s} / 5`;
+      const pct=Math.min(100, Math.max(0,(s/5)*100)); scoreFill.style.width=pct+'%';
+      scoreFill.style.background = s===3.5 ? '#86efac' : '#7dd3fc'; scoreNote.textContent='';
+      state.lastScore=s;
     }
 
-    saveBtn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (saveBtn.disabled) return;
+    /* ربط الواجهات */
+    window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+    toggleFlash.addEventListener('click', toggleTorch);
+    restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
+    cameraSelect.addEventListener('change', async ()=>{ await startCamera(cameraSelect.value); });
 
-      // لازم يكون في نتيجة محسوبة
-      const fecesScore = (typeof window.state?.lastScore === "number") ? Number(window.state.lastScore) : null;
-      if (fecesScore == null) {
-        alert("التقط/ارفع صورة أولاً لاحتساب درجة الروث.");
-        return;
-      }
+    captureBtn.addEventListener('click', async ()=>{ const url=dataURLFromVideo(); state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; });
+    retakeBtn.addEventListener('click', ()=>{ state.lastCapture=null; renderFecesScore(3.5); retakeBtn.disabled=true; });
 
-      saveBtn.disabled = true;
-      const orig = saveBtn.textContent;
-      saveBtn.textContent = "جارٍ الحفظ…";
+    /* تفعيل زر "رفع صورة بديلة" */
+    if(uploadBtn && uploadInput){
+      uploadBtn.addEventListener('click', ()=> uploadInput.click());
+      uploadInput.addEventListener('change', async (e)=>{
+        const f=e.target.files && e.target.files[0]; if(!f) return;
+        const r=new FileReader();
+        r.onload=async ()=>{ const url=r.result; state.lastCapture=url; const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; };
+        r.readAsDataURL(f); e.target.value='';
+      });
+    }
 
-      try {
-        const animalId     = localStorage.getItem("currentAnimalId")     || "";
-        const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-        const eventDate    = (eventDateInput && eventDateInput.value)
-                             ? eventDateInput.value
-                             : (localStorage.getItem("currentEventDate") || todayCairo());
+    /* زر الرجوع إلى add-event.html */
+    backBtn?.addEventListener('click', ()=>{
+      const ctx=getAnimalFromContext();
+      const u=new URL('add-event.html', location.origin);
+      if(ctx.date) u.searchParams.set('date', ctx.date);
+      const id=localStorage.getItem('currentAnimalId') || animalIdInput?.value || '';
+      if(id) u.searchParams.set('animalId', id);
+      location.href=u.toString();
+    });
 
-        const uid = (auth && auth.currentUser && auth.currentUser.uid)
-                    || localStorage.getItem("userId")
-                    || localStorage.getItem("tenantId")
-                    || null;
+    /* حفظ على فايرستور */
+    if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+      try{
+        if(state.lastScore==null){ alert('التقط أو ارفع صورة أولاً لاحتساب الدرجة.'); return; }
+        saveBtn.disabled=true; const txt=saveBtn.textContent; saveBtn.textContent='جارٍ الحفظ…';
 
-        await addDoc(collection(db, "events"), {
-          type: "تقييم الروث بالكاميرا",
-          eventType: "feces_eval",
-          eventDate,
+        const ctx=getAnimalFromContext();
+        if(animalIdInput) animalIdInput.value = animalIdInput.value || ctx.id || '';
+        if(eventDateInput) eventDateInput.value = eventDateInput.value || ctx.date || todayCairo();
+
+        const animalId=(animalIdInput && animalIdInput.value.trim()) || ctx.id || 'unknown';
+        const date=(eventDateInput && eventDateInput.value) || ctx.date || todayCairo();
+
+        if(isDemo){
+          localStorage.setItem('murabbik_feces_demo_last', JSON.stringify({
+            type:'تقييم الروث بالكاميرا (عرض)', animalId, date,
+            fecesScore: state.lastScore, captured: state.lastCapture, createdAt: Date.now()
+          }));
+          alert('تم الحفظ محليًا (وضع العرض).');
+          return;
+        }
+
+        const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } =
+          await import('/js/firebase-config.js');
+
+        let imageUrl=null;
+        if(state.lastCapture){
+          try{
+            const path=`feces-evaluations/${animalId}/${date}/feces.jpg`;
+            const r=ref(storage, path);
+            await uploadString(r, state.lastCapture, 'data_url');
+            imageUrl=await getDownloadURL(r);
+          }catch(e){ console.warn('Upload failed, saving without image', e); }
+        }
+
+        await addDoc(collection(db,'events'), {
+          type:'تقييم الروث بالكاميرا',
+          eventType:'feces_eval',
+          eventDate:date,
           animalId,
-          animalNumber,
-          fecesScore,
-          value: fecesScore,
-          uid,
+          fecesScore:Number(state.lastScore),
+          image: imageUrl || null,
           source: location.pathname,
           createdAt: serverTimestamp()
         });
 
-        alert("✅ تم حفظ تقييم الروث بنجاح");
-      } catch (err) {
-        console.error("Firestore save error:", err);
-        alert("❌ حدث خطأ أثناء الحفظ");
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = orig;
+        alert(imageUrl ? 'تم الحفظ ورفع الصورة.' : 'تم الحفظ (بدون صورة).');
+      }catch(err){
+        console.error('Firestore save error:', err);
+        alert('تعذّر الحفظ السحابي؛ تم الحفظ محليًا.');
+        try{
+          const ctx=getAnimalFromContext();
+          localStorage.setItem('murabbik_feces_last', JSON.stringify({
+            animalId: ctx.id || 'unknown',
+            date: ctx.date || todayCairo(),
+            score: state.lastScore,
+            captured: state.lastCapture,
+            at: Date.now()
+          }));
+        }catch{}
+      }finally{
+        saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم';
       }
-    }, { capture: true });
-  });
-</script>
+    });
 
+    /* init */
+    (async function init(){
+      try{
+        const ctx=getAnimalFromContext();
+        if(animalIdInput) animalIdInput.value = ctx.id || '';
+        if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
+        if(numberSpan) numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
 
+        if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب.'); return; }
+        if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
+        await startCamera(); await listCameras(); if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
+        if(isDemo){
+          const demoRef='www/images/3_5.jpg';
+          const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); }; img.src=demoRef;
+        }
+      }catch(e){ console.warn(e); }
+    })();
+  </script>
+
+  <script>
+    function nukeEditorCard(){ document.querySelectorAll('editor-card,.editor-card').forEach(n=>{ try{ n.remove(); }catch{} }); }
+    new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
+    document.addEventListener('DOMContentLoaded', nukeEditorCard);
+  </script>
 </body>
 </html>
