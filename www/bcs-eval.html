@@ -609,6 +609,44 @@ function renderOverall(){
   });
 })();
 </script>
+<script>
+  // تفعيل زر "رفع صورة بديلة" + معالجة الصورة واحتساب الدرجة
+  document.addEventListener('DOMContentLoaded', () => {
+    const uploadBtn   = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+
+    if (!uploadBtn || !uploadInput) return;
+
+    uploadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadInput.click();
+    });
+
+    uploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const rd = new FileReader();
+      rd.onload = async () => {
+        const dataUrl = rd.result;
+
+        // هذه المتغيرات/الدوال موجودة في صفحة BCS لديك
+        if (window.state && window.state.currentAngle) {
+          state.captures[state.currentAngle] = dataUrl;
+          state.scores[state.currentAngle]   = await scoreBCSFor(state.currentAngle, dataUrl);
+          renderThumbs();
+          renderOverall();
+          updateButtons && updateButtons();
+        }
+      };
+      rd.readAsDataURL(file);
+
+      // للسماح برفع نفس الملف مرة ثانية
+      e.target.value = '';
+    });
+  });
+</script>
 
 </body>
 </html>
