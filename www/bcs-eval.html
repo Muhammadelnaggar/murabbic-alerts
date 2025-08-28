@@ -135,6 +135,9 @@
           <input type="date" id="eventDate" class="input" />
         </label>
         <div style="margin-inline-start:auto"></div>
+        <button id="backEventsBtn" class="btn" style="padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#f1f5f9;color:#0f172a">
+  رجوع للأحداث
+</button>
         <button id="saveBtn" class="btn btn-primary">حفظ التقييم</button>
       </div>
     </section>
@@ -538,6 +541,40 @@ function renderOverall(){
       }
     }, { capture: true });
   }
+</script>
+<script>
+(function(){
+  function todayCairo(){
+    var now = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
+    var y = now.getFullYear();
+    var m = String(now.getMonth()+1).padStart(2,'0');
+    var d = String(now.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    // يملأ التاريخ بتاريخ اليوم لو فاضي
+    var dateInput = document.getElementById('eventDate');
+    if(dateInput && !dateInput.value){
+      dateInput.value = (localStorage.getItem('currentEventDate') || todayCairo());
+    }
+
+    // زر الرجوع لصفحة الأحداث مع تمرير التاريخ
+    var backBtn = document.getElementById('backEventsBtn');
+    if(backBtn){
+      backBtn.addEventListener('click', function(){
+        var date = (dateInput && dateInput.value) ? dateInput.value : todayCairo();
+        try{ localStorage.setItem('currentEventDate', date); }catch(e){}
+
+        // مسار صفحة الأحداث (عدله لو مختلف عندك)
+        var qs = new URLSearchParams(location.search);
+        var returnUrl = qs.get('return') || '/add-event.html'; // بدّله لمسارك الحقيقي لو مش /events.html
+        var sep = returnUrl.indexOf('?')>=0 ? '&' : '?';
+        location.href = returnUrl + sep + 'date=' + encodeURIComponent(date);
+      });
+    }
+  });
+})();
 </script>
 
 </body>
