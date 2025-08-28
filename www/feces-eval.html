@@ -143,7 +143,17 @@ html, body { overflow-x: hidden; }
   function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
   // ====== Hidden reference images (user never sees them) ======  // المراجع: داخل www/images/ — الأسماء المتوقعة: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-  const REF_BASES = (location.protocol === 'file:') ? ['images/','www/images/'] : ['/images/','/www/images/'];
+  // استخدم مطلق في الويب، ونِسبي في التشغيل من ملف
+const REF_BASES = (location.protocol === 'file:')
+  ? ['./images/','./www/images/']       // تشغيل محلي
+  : ['/images/','/www/images/'];         // على السيرفر
+
+function buildUrls(baseName){
+  return REF_BASES.flatMap(root =>
+    REF_EXTS.map(ext => `${root}${baseName}.${ext}`)
+  );
+}
+
 
   const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const REF_NAMES = [
