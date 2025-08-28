@@ -100,6 +100,7 @@
         </label>
 
         <div style="margin-inline-start:auto;display:flex;gap:8px">
+           <div id="saveMsg" style="display:none;width:100%;padding:10px;border-radius:12px;font-weight:700;text-align:center"></div>
           <!-- زر الرجوع إلى add-event (المطلوب 5) -->
           <button id="backBtn" class="btn btn-light" type="button">رجوع لصفحة الحدث</button>
           <button id="saveBtn" class="btn btn-primary" type="button">حفظ التقييم</button>
@@ -499,6 +500,56 @@
       if (eventDateInput && !eventDateInput.value) {
         eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
       }
+      const msgBox = document.getElementById("saveMsg");
+
+function showMsg(text, success=true) {
+  if(!msgBox) return;
+  msgBox.textContent = text;
+  msgBox.style.display = "block";
+  msgBox.style.background = success ? "#dcfce7" : "#fee2e2";   // أخضر أو أحمر
+  msgBox.style.color = success ? "#166534" : "#991b1b";       // خط غامق
+  msgBox.style.border = success ? "1px solid #86efac" : "1px solid #fca5a5";
+  setTimeout(()=>{ msgBox.style.display="none"; }, 4000);     // اختفاء بعد 4 ثوانٍ
+}
+
+btn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (btn.disabled) return;
+  const score = Number(window.fecesScore ?? 0);
+  if (!score) { showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false); return; }
+
+  btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
+
+  const animalId     = (animalIdHidden?.value?.trim()) || localStorage.getItem("currentAnimalId") || "";
+  const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+  const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
+
+  const uid = (auth && auth.currentUser && auth.currentUser.uid)
+              || localStorage.getItem("userId")
+              || localStorage.getItem("tenantId")
+              || null;
+
+  try {
+    await addDoc(collection(db, "events"), {
+      type: "تقييم الروث بالكاميرا",
+      eventType: "feces_eval",
+      eventDate,
+      animalId,
+      animalNumber,
+      fecesScore: score,
+      value: score,
+      uid,
+      source: location.pathname,
+      createdAt: serverTimestamp()
+    });
+    showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+  } catch (err) {
+    console.error("Firestore save error:", err);
+    showMsg("❌ حدث خطأ أثناء الحفظ", false);
+  } finally {
+    btn.disabled = false; btn.textContent = "حفظ التقييم";
+  }
+}, { capture: true });
 
       btn?.addEventListener("click", async (e) => {
         e.preventDefault();
