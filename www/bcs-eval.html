@@ -42,7 +42,8 @@
     .score-bar .fill{height:100%}
     .score-note{color:var(--muted);font-weight:700}
 
-    .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8ف0}
+    .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0
+}
     .save-bar .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
 
     #saveBtn{
@@ -287,20 +288,21 @@
     function imgToVec(img){ const w=64,h=64; const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); g.drawImage(img,0,0,w,h); const d=g.getImageData(0,0,w,h).data; const v=new Float32Array(w*h); let k=0; for(let i=0;i<d.length;i+=4){ v[k++]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } let mean=0; for(let i=0;i<v.length;i++) mean+=v[i]; mean/=v.length; let norm=0; for(let i=0;i<v.length;i++){ v[i]-=mean; norm+=v[i]*v[i]; } norm=Math.sqrt(norm)||1; for(let i=0;i<v.length;i++) v[i]/=norm; return v; }
 
     /* التصحيح: بدون HEAD */
-    function loadRefVector(urls, score) {
-      let i = 0;
-      return new Promise(res => {
-        function tryNext() {
-          if (i >= urls.length) return res(null);
-          const url = urls[i++];
-          const img = new Image();
-          img.onload = () => res({ score, vec: imgToVec(img) });
-          img.onerror = tryNext;
-          img.src = url;
-        }
-        tryNext();
-      });
+  function loadRefVector(urls, score) {
+  let i = 0;
+  return new Promise(res => {
+    function tryNext() {
+      if (i >= urls.length) return res(null);
+      const url = urls[i++];
+      const img = new Image();
+      img.onload = () => res({ score, vec: imgToVec(img) });
+      img.onerror = () => tryNext();
+      img.src = url;
     }
+    tryNext();
+  });
+}
+
 
     async function buildRefsFor(angle){ const list=buildRefList(angle); const arr=await Promise.all(list.map(item=>loadRefVector(item.urls,item.score))); return arr.filter(Boolean); }
 
@@ -329,61 +331,50 @@
     }
 
     function renderThumbs(){ thumbs.innerHTML=''; for(const a of anglesOrder){ const wrap=document.createElement('div'); wrap.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; wrap.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; wrap.appendChild(lb); wrap.addEventListener('click', ()=> setAngle(a)); thumbs.appendChild(wrap); } }
+function renderOverall(){
+  const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked ? 'buffalo' : 'cow');
 
-   function renderOverall(){
-  const kind = localStorage.getItem('animalKind') || (kindBuffalo?.checked?'buffalo':'cow');
-
-  if(kind==='buffalo'){
-    const s = (typeof state.scores.rear==='number') ? state.scores.rear : null;
-
-    if(s==null){
-      window.bcsScore = null;                      // << مهم
-      scoreBadge.textContent='—';
-      scoreFill.style.width='0%';
+  // —— الجاموس: لقطة خلفية واحدة 1–5 ——
+  if (kind === 'buffalo') {
+    const s = (typeof state.scores.rear === 'number') ? state.scores.rear : null;
+    if (s == null) {
+      window.bcsScore = null;
+      scoreBadge.textContent = '—';
+      scoreFill.style.width = '0%';
       return;
     }
-
-    window.bcsScore = Number(s);                   // << مهم
-    const pct=Math.min(100, Math.max(0,(s/5)*100));
-    scoreBadge.textContent=`${labelForScore(s)} — ${s.toFixed(2)} / 5`;
-    scoreFill.style.width=pct+'%';
-    scoreFill.style.background = Math.abs(s-3)<0.06 ? '#86efac' : '#7dd3fc';
+    const pct = Math.min(100, Math.max(0, (s / 5) * 100));
+    scoreBadge.textContent = `${labelForScore(s)} — ${s.toFixed(2)} / 5`;
+    scoreFill.style.width = pct + '%';
+    scoreFill.style.background = Math.abs(s - 3) < 0.06 ? '#86efac' : '#7dd3fc';
+    window.bcsScore = Number(s.toFixed(2));
     return;
   }
 
-  // أبقار: 60% خلفية + 40% جانبية
-  const haveRear=typeof state.scores.rear==='number';
-  const haveSide=typeof state.scores.side==='number';
+  // —— الأبقار: وزن الخلفية 60% والجانبية 40% (المدى 2–5) ——
+  const haveRear = typeof state.scores.rear === 'number';
+  const haveSide = typeof state.scores.side === 'number';
 
-  if(!haveRear && !haveSide){
-    window.bcsScore = null;                        // << مهم
-    scoreBadge.textContent='—';
-    scoreFill.style.width='0%';
+  if (!haveRear && !haveSide) {
+    window.bcsScore = null;
+    scoreBadge.textContent = '—';
+    scoreFill.style.width = '0%';
     return;
   }
 
-  const wRear=0.6, wSide=0.4;
-  const overall = ((haveRear?state.scores.rear:3)*wRear + (haveSide?state.scores.side:3)*wSide) /
-                  ((haveRear?wRear:0)+(haveSide?wSide:0)||1);
+  const wRear = 0.6, wSide = 0.4;
+  const overall = (
+    (haveRear ? state.scores.rear : 3) * wRear +
+    (haveSide ? state.scores.side : 3) * wSide
+  ) / ((haveRear ? wRear : 0) + (haveSide ? wSide : 0) || 1);
 
-  window.bcsScore = Number(overall.toFixed(2));    // << مهم
-
-  const pct=Math.min(100, Math.max(0,(overall/5)*100));
-  scoreBadge.textContent=`${labelForScore(overall)} — ${overall.toFixed(2)} / 5`;
-  scoreFill.style.width=pct+'%';
-  scoreFill.style.background = Math.abs(overall-3)<0.06 ? '#86efac' : '#7dd3fc';
+  const pct = Math.min(100, Math.max(0, (overall / 5) * 100));
+  scoreBadge.textContent = `${labelForScore(overall)} — ${overall.toFixed(2)} / 5`;
+  scoreFill.style.width = pct + '%';
+  scoreFill.style.background = Math.abs(overall - 3) < 0.06 ? '#86efac' : '#7dd3fc';
+  window.bcsScore = Number(overall.toFixed(2));
 }
 
-      const haveRear=typeof state.scores.rear==='number';
-      const haveSide=typeof state.scores.side==='number';
-      if(!haveRear && !haveSide){ scoreBadge.textContent='—'; scoreFill.style.width='0%'; return; }
-      const wRear=0.6, wSide=0.4;
-      const overall = ((haveRear?state.scores.rear:3)*wRear + (haveSide?state.scores.side:3)*wSide) / ((haveRear?wRear:0)+(haveSide?wSide:0)||1);
-      const pct=Math.min(100, Math.max(0,(overall/5)*100));
-      scoreBadge.textContent=`${labelForScore(overall)} — ${overall.toFixed(2)} / 5`;
-      scoreFill.style.width=pct+'%';
-      scoreFill.style.background = Math.abs(overall-3)<0.06 ? '#86efac' : '#7dd3fc';
-    }
 
     function setAngle(angle){ state.currentAngle=angle; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle)); drawGuide(); updateButtons(); }
     function updateButtons(){ const has=!!state.captures[state.currentAngle]; retakeBtn.disabled=!has; }
