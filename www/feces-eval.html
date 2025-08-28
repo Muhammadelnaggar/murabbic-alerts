@@ -126,6 +126,27 @@ html, body { overflow-x: hidden; }
   const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
   const captureBtn=$('#captureBtn'), retakeBtn=$('#retakeBtn');
   const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
+  // تفعيل زر "رفع صورة بديلة"
+if (uploadBtn && uploadInput) {
+  uploadBtn.addEventListener('click', () => uploadInput.click());
+
+  uploadInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+
+    const r = new FileReader();
+    r.onload = async () => {
+      const url = r.result;              // Data URL للصورة
+      state.lastCapture = url;
+      const s = await scoreFeces(url);   // احسب الدرجة
+      renderFecesScore(s);               // اعرض النتيجة
+      if (retakeBtn) retakeBtn.disabled = false;
+    };
+    r.readAsDataURL(f);
+    e.target.value = ''; // تفريغ المدخل
+  });
+}
+
   const scoreBadge=$('#scoreBadge'), scoreFill=$('#scoreFill'), scoreNote=$('#scoreNote');
   const saveBtn=$('#saveBtn'), animalIdInput=$('#animalId'), eventDateInput=$('#eventDate');
   // زر الرجوع
@@ -159,9 +180,8 @@ function buildUrls(baseName){
     REF_EXTS.map(ext => `${root}${baseName}.${ext}`)
   );
 }
- const REF_EXTS = ['jpg','png','webp'];
-    const BASES = ['images/'];
-
+  const REF_BASES = ['www/images/']; // بدون شرطة مائلة في البداية – زي ما طلبت
+  const REF_EXTS  = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
   const REF_NAMES = [
     {score:1,   names:['1']},
     {score:2,   names:['2']},
