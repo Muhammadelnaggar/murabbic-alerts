@@ -70,6 +70,39 @@
       #captureBtn{order:-1}
     }
     #cameraCard .controls{position:sticky;top:56px;z-index:5;background:var(--card);border-bottom:1px solid #e2e8f0}
+    /* الموبايل: الأزرار فوق بعض وبعرض الكارت كله */
+.save-bar{
+  display:flex;
+  flex-direction: column;   /* نخلي العناصر تحت بعض */
+  align-items: stretch;
+  gap: 8px;
+}
+.save-bar button{
+  width: 100% !important;   /* كل زر ياخد عرض الكارت */
+  max-width: 100%;
+}
+
+/* لو عندك زر رجوع */
+#backBtn{ width:100% !important; }
+
+/* الحقل (التاريخ) ياخد سطر لوحده من غير ما يسبب سكروول */
+.save-bar label{
+  width: 100%;
+  min-width: 0;
+}
+
+/* الشاشات الأوسع: نرجّع الصف أفقي لو حابب (اختياري) */
+@media (min-width: 640px){
+  .save-bar{
+    flex-direction: row;
+    align-items: center;
+  }
+  .save-bar label{ flex: 1 1 260px; }
+  .save-bar button, #backBtn{
+    width: auto !important; /* الأزرار ترجع بحجمها الطبيعي */
+  }
+}
+
   </style>
 </head>
 <body>
