@@ -67,6 +67,39 @@
     /* تعطيل أي عنصر محرر */
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     header,.container,#cameraCard{position:relative;z-index:1}
+    /* — تحسين أزرار الحفظ والرجوع للموبايل — */
+.save-bar{
+  display:flex;
+  gap:12px;
+  padding:12px;
+  border-top:1px solid #e2e8f0;
+  flex-wrap:wrap;
+  align-items:stretch;            /* يخلي الأزرار تاخد ارتفاع كامل */
+}
+
+.save-bar .btn{
+  flex:1 1 48%;                   /* زرين جنب بعض على الشاشات الأوسع */
+  min-height:56px;                /* ارتفاع لمسي مريح */
+  font-size:16px;                 /* حجم خط مناسب للموبايل */
+  padding:14px 16px;              /* مساحة لمس أوسع */
+  border-radius:14px;             /* زوايا أنعم */
+  touch-action:manipulation;      /* استجابة لمس أسرع */
+}
+
+/* رسالة التأكيد تاخد مساحة ولا تزاحم الأزرار */
+.save-bar .msg{ margin-bottom:6px; }
+
+/* شاشات الموبايل الصغيرة: نخلي الزرين تحت بعض بعرض كامل */
+@media (max-width: 540px){
+  .save-bar{ flex-direction:column; }
+  .save-bar .btn{
+    flex:1 1 auto;
+    width:100%;
+    min-height:60px;
+    font-size:17px;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -192,11 +225,17 @@
       'teat-close':'التقط <strong>لقطة قريبة للضرع</strong>؛ طول/حجم/تماثل الحلمات.'
     };
 
-    const state={
-      currentAngle:'side',stream:null,track:null,capabilities:null,torchOn:false,
-      captures:{'udder-rear':null,'side':null,'front-body':null,'teat-close':null},
-      k:{} // مؤشرات لكل زاوية
-    };
+   const state = {
+  currentAngle: 'side',
+  stream: null,
+  track: null,
+  capabilities: null,
+  torchOn: false,
+  captures: { 'udder-rear': null, 'side': null, 'front-body': null, 'teat-close': null },
+  k: {} // مؤشرات لكل زاوية
+};
+window.state = state; // ← خارج الكائن وبعده مباشرة
+
 
     const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
     const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
@@ -293,7 +332,9 @@
       const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), BL=w(SUB.BODY_LEGS), F=w(SUB.FEMININITY);
       const total=NEW_WEIGHTS.UDDER+NEW_WEIGHTS.BACK_RUMP+NEW_WEIGHTS.BODY_LEGS+NEW_WEIGHTS.FEMININITY;
       return Math.round((U*NEW_WEIGHTS.UDDER + B*NEW_WEIGHTS.BACK_RUMP + BL*NEW_WEIGHTS.BODY_LEGS + F*NEW_WEIGHTS.FEMININITY)/total);
-    }
+      }
+    window.computeOverallFromState = computeOverallFromState;
+
     function gradeInfo(mvs){ if(mvs>=85) return {label:'ممتاز', bg:'#dcfce7', border:'#86efac', fg:'#14532d'}; if(mvs>=75) return {label:'جيد جدًا', bg:'#e0f2fe', border:'#7dd3fc', fg:'#075985'}; if(mvs>=60) return {label:'متوسط', bg:'#fef9c3', border:'#facc15', fg:'#92400e'}; return {label:'ضعيف', bg:'#fee2e2', border:'#fecaca', fg:'#7f1d1d'}; }
     function renderScoreWidget(mvs){ const g=gradeInfo(mvs); return `<div class="score"><div class="score-badge" style="background:${g.bg};color:${g.fg};border-color:${g.border}">${g.label}</div><div class="score-bar"><div class="fill" style="width:${mvs}%;background:${g.border}"></div></div><div class="score-note">MVS: ${mvs} / 100</div></div>`; }
     function updateOverallUI(){ const box=$('#metrics'); if(!box) return; const mvs=computeOverallFromState(); box.innerHTML = '<h3>التقييم الإجمالي</h3>'+ renderScoreWidget(mvs); }
@@ -345,69 +386,6 @@
     });
 
     // حفظ في فايربيز + رسالة تأكيد داخل الفورم
-    saveBtn.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      const animalId=animalIdInput.value.trim(); const date=eventDateInput.value||todayCairo();
-      if(!animalId){ showMsg('⚠️ رقم/معرّف الحيوان غير موجود', false); return; }
-
-      // جمع الصور الملتقطة
-      const uploaded={}; for(const [angle,dataUrl] of Object.entries(state.captures)){ if(dataUrl) uploaded[angle]=dataUrl; }
-      if(Object.keys(uploaded).length===0){ showMsg('⚠️ التقط على الأقل صورة واحدة', false); return; }
-
-      const overall = computeOverallFromState();
-
-      saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…';
-      t.event('visual_save_click',{animalId, date, overall});
-
-      if(isDemo){
-        localStorage.setItem('murabbik_demo_visual', JSON.stringify({type:'تقييم بصري بالكاميرا (عرض)',animalId,date,images:uploaded,overall,createdAt:Date.now()}));
-        showMsg('✅ تم الحفظ محليًا (عرض)', true);
-        saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم والصور';
-        t.event('visual_save_done',{mode:'demo'});
-        return;
-      }
-
-      let ok=false;
-      try{
-        const { db, storage, serverTimestamp, addDoc, collection, ref, uploadString, getDownloadURL } = await import('./js/firebase-config.js');
-
-        // رفع الصور إلى التخزين والاحتفاظ بالروابط
-        const urls={};
-        for(const [angle,dataUrl] of Object.entries(uploaded)){
-          const path=`camera-evaluations/${animalId}/${date}/${angle}.jpg`;
-          const r=ref(storage,path); await uploadString(r,dataUrl,'data_url'); urls[angle]=await getDownloadURL(r);
-        }
-
-        // مستند الحدث في Firestore (مثل باقي مسار مربيك)
-        await addDoc(collection(db,'events'), {
-          type:'تقييم بصري بالكاميرا',
-          eventType:'visual_eval',
-          eventDate: date,
-          animalId,
-          animalNumber: (localStorage.getItem('currentAnimalNumber')||''),
-          overallScore: overall,
-          kpi: state.k,
-          images: urls,
-          uid: (localStorage.getItem('userId')||localStorage.getItem('tenantId')||null),
-          source: location.pathname,
-          createdAt: serverTimestamp()
-        });
-
-        ok=true;
-        showMsg('✅ تم حفظ التقييم والصور بنجاح', true);
-        t.event('visual_save_done',{mode:'firebase', overall});
-      }catch(err){
-        console.error(err);
-        showMsg('❌ تعذّر الحفظ السحابي — سيتم الحفظ محليًا', false);
-        // حفظ محلي كاحتياطي
-        try{
-          localStorage.setItem('murabbik_visual_fallback', JSON.stringify({animalId,date,images:uploaded,overall,createdAt:Date.now()}));
-        }catch{}
-        t.event('visual_save_error',{message:String(err&&err.message||err)});
-      }finally{
-        saveBtn.disabled=false; saveBtn.textContent='حفظ التقييم والصور';
-      }
-    });
 
     async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
       for(const a of anglesOrder){ setAngle(a); await new Promise(r=>setTimeout(r,200));
@@ -433,5 +411,80 @@
     new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
     document.addEventListener('DOMContentLoaded', nukeEditorCard);
   </script>
+  <script type="module">
+  import {
+    ensureAuth, db, serverTimestamp, addDoc, collection
+  } from "./js/firebase-config.js";
+
+  // عناصر الواجهة
+  const saveBtn       = document.getElementById("saveBtn");
+  const animalIdInput = document.getElementById("animalId");
+  const eventDateInput= document.getElementById("eventDate");
+
+  // رسالة تأكيد داخل الفورم (لو موجودة)، وإلا نستخدم alert
+  function showMsg(text, ok=true){
+    const box = document.getElementById("saveMsg");
+    if (!box) { alert(text); return; }
+    box.textContent = text;
+    box.className = "msg " + (ok ? "ok" : "err");
+    setTimeout(()=>{ box.className = "msg"; }, 4000);
+  }
+
+  function todayCairo(){
+    const now = new Date(new Date().toLocaleString("en-US",{ timeZone:"Africa/Cairo" }));
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  }
+
+  // زر الحفظ: يحفظ النتيجة فقط (بدون صور)
+  saveBtn?.addEventListener("click", async (e)=>{
+    e.preventDefault();
+
+    const animalId  = (animalIdInput?.value || "").trim();
+    const eventDate = eventDateInput?.value || todayCairo();
+    if (!animalId){ showMsg("⚠️ رقم الحيوان غير موجود", false); return; }
+
+    // لازم يكون فيه لقطة واحدة على الأقل عشان نحسب إجمالي
+    const hasAnyCapture = Object.values((window.state?.captures)||{}).some(Boolean);
+    if (!hasAnyCapture){ showMsg("⚠️ التقط صورة واحدة على الأقل لحساب النتيجة", false); return; }
+
+    // الإجمالي من دالتك الحالية في الصفحة
+    const overall = (typeof window.computeOverallFromState === "function")
+      ? window.computeOverallFromState()
+      : 0;
+
+    // تعطيل الزر أثناء الحفظ
+    const btnPrev = saveBtn.textContent;
+    saveBtn.disabled = true; saveBtn.textContent = "جارٍ الحفظ…";
+
+    try{
+      await ensureAuth();
+
+      await addDoc(collection(db,"events"), {
+        type: "تقييم بصري بالكاميرا",
+        eventType: "visual_eval",
+        eventDate,
+        animalId,
+        animalNumber: localStorage.getItem("currentAnimalNumber") || "",
+        overallScore: overall,
+        kpi: window.state?.k || {},               // مؤشرات الزوايا فقط
+        uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
+        source: location.pathname,
+        createdAt: serverTimestamp()
+      });
+
+      showMsg("✅ تم حفظ نتيجة التقييم بنجاح (بدون صور)", true);
+    }catch(err){
+      showMsg("❌ تعذّر الحفظ السحابي — تم حفظ النتيجة محليًا", false);
+      try{
+        localStorage.setItem("murabbik_visual_result_fallback", JSON.stringify({
+          animalId, eventDate, overall, kpi: (window.state?.k||{}), createdAt: Date.now()
+        }));
+      }catch{}
+    }finally{
+      saveBtn.disabled = false; saveBtn.textContent = btnPrev;
+    }
+  });
+</script>
+
 </body>
 </html>
