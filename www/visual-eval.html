@@ -131,7 +131,7 @@
 
       <div class="save-bar">
         <div id="saveMsg" class="msg" style="width:100%"></div>
-        <button id="saveBtn" type="button" class="btn btn-primary">حفظ نتيجة التقييم</button>
+        <button id="saveBtn" type="button" class="btn btn-primary" onclick="window.__handleSave && window.__handleSave(event)">حفظ نتيجة التقييم</button>
         <button id="backBtn" type="button" class="btn btn-light">رجوع لصفحة الأحداث</button>
       </div>
     </aside>
@@ -311,8 +311,8 @@
   </script>
 
   <!-- حفظ النتيجة فقط (بدون صور) إلى فايربيز -->
-  <script type="module">
-    import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
+<script>
+  (function(){
     const saveBtn=document.getElementById('saveBtn');
     const animalIdInput=document.getElementById('animalId');
     const eventDateInput=document.getElementById('eventDate');
@@ -321,12 +321,23 @@
     function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
     function setMsg(t,ok=true){ if(!saveMsg){ alert(t); return; } saveMsg.textContent=t; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>saveMsg.className='msg',4000); }
 
-    async function handleSave(e){
-      e?.preventDefault?.();
-      const btnPrev=saveBtn.textContent; saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…';
+    async function __handleSave(e){
+      try{ e && e.preventDefault && e.preventDefault(); }catch{}
+      if(!window.computeOverallFromState){ setMsg('⚠️ لا يمكن حساب التقييم الآن', false); return; }
+      const btnPrev=saveBtn && saveBtn.textContent; if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…'; }
       try{
-        const {overall,U,B,F,FE}=window.computeOverallFromState();
+        const res = window.computeOverallFromState();
+        const overall = res && res.overall || 0;
+        const U = res && res.U || 0, B = res && res.B || 0, F = res && res.F || 0, FE = res && res.FE || 0;
         if(!overall){ setMsg('⚠️ التقط صورة واحدة على الأقل لحساب النتيجة', false); return; }
+
+        // استدعاء ديناميكي حتى لو ملف firebase-config.js غير موجود أثناء التحميل
+        let mod = null;
+        try{ mod = await import('./js/firebase-config.js'); }
+        catch(err){ console.error('firebase-config import failed', err); }
+        if(!mod){ setMsg('❌ لم يتم العثور على إعداد فايربيز (firebase-config.js)', false); return; }
+        const { ensureAuth, db, serverTimestamp, addDoc, collection } = mod;
+
         const payload={
           type:'تقييم Milking Traits', eventType:'milking_traits_eval',
           animalId:(animalIdInput?.value||'')||null,
@@ -334,7 +345,6 @@
           eventDate: eventDateInput?.value || todayCairo(),
           overallScore: overall,
           groups:{ udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
-          // KPIs مفصلة (بدون صور)
           kpi: window.state?.k || {},
           uid:  localStorage.getItem('userId') || localStorage.getItem('tenantId') || null,
           source: location.pathname,
@@ -345,10 +355,13 @@
         setMsg('✅ تم حفظ نتيجة التقييم (بدون صور)', true);
         try{ window.dataLayer && window.dataLayer.push({event:'milking_traits_save', overall:overall}); }catch{}
       }catch(err){ console.error(err); setMsg('❌ تعذّر الحفظ في فايربيز', false); }
-      finally{ saveBtn.disabled=false; saveBtn.textContent=btnPrev; }
+      finally{ if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=btnPrev; } }
     }
 
-    saveBtn?.addEventListener('click', handleSave);
-  </script>
+    // توفّر الدالة عموميًا + ربط آمن للزر
+    window.__handleSave = __handleSave;
+    saveBtn && saveBtn.addEventListener('click', __handleSave);
+  })();
+</script>
 </body>
 </html>
