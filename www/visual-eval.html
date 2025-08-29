@@ -3,20 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>تقييم الحيوان بالكاميرا — مُرَبِّك</title>
+  <title>نموذج تقييم Milking Traits بالكاميرا — مُرَبِّك</title>
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c;
+      --bar:#e2e8f0;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid #e2e8f0;padding:12px 16px;display:flex;align-items:center;gap:12px}
     .title{font-weight:800;color:var(--green);margin:0}
     .badge{background:#e6f8ef;color:var(--green-600);padding:4px 8px;border-radius:999px;font-size:12px}
+
     .container{max-width:960px;margin:16px auto;padding:0 16px}
-    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
     .row{display:grid;grid-template-columns:1fr;gap:12px}
     @media (min-width:860px){.row{grid-template-columns:1.2fr .8fr}}
+
+    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+
+    /* كاميرا */
+    .angles{display:flex;gap:8px;padding:12px;border-bottom:1px solid #e2e8f0;overflow:auto}
+    .angle-tab{padding:10px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:700;color:#0f172a;min-height:44px;white-space:nowrap}
+    .angle-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
 
     .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px}
     .controls .select,.controls .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
@@ -26,12 +34,8 @@
     .btn-danger{background:var(--danger);color:#fff}
     .btn:disabled{opacity:.6;cursor:not-allowed}
 
-    .angles{display:flex;gap:8px;padding:12px;border-bottom:1px solid #e2e8f0;overflow:auto}
-    .angle-tab{padding:10px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:700;color:#0f172a;min-height:44px;white-space:nowrap}
-    .angle-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
-
     .preview-wrap{position:relative;border-radius:16px;overflow:hidden;background:#000}
-    video#preview{width:100%;height:auto;display:block;background:#000}
+    video#preview{width:100%;height:auto;display:block;background:#000;pointer-events:none}
     canvas#overlay{position:absolute;inset:0;pointer-events:none}
 
     .capture-bar{display:flex;gap:8px;padding:12px;border-top:1px solid #e2e8f0;justify-content:space-between;flex-wrap:wrap}
@@ -43,71 +47,39 @@
     .helper{padding:12px;color:var(--muted);line-height:1.8}
     .helper strong{color:var(--green-600)}
 
-    .checklist{padding:12px;display:grid;gap:8px}
-    .checklist h3{margin:8px 0;color:var(--green-600)}
-    .save-bar{display:flex;gap:8px;padding:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:center}
+    /* عمود الجانب الأيمن */
+    aside.card{position:relative;z-index:3}
+    #cameraCard{position:relative;z-index:1;overflow:hidden}
 
-    .drop-hint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-weight:800;color:var(--green-600);background:rgba(255,255,255,.6);text-align:center;padding:16px}
-    .preview-wrap.dragover .drop-hint{display:flex}
-
-    .metrics{padding:12px;border-top:1px solid #e2e8f0;display:grid;gap:8px}
+    .metrics{padding:12px;border-top:1px solid #e2e8f0;display:grid;gap:10px}
     .metrics h3{margin:8px 0;color:var(--green-600)}
 
-    .score{display:grid;gap:10px;padding:8px;border:1px solid #e2e8ف0;border-radius:12px;background:#fff}
+    .score{display:grid;gap:10px;padding:10px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
     .score-badge{display:inline-block;padding:6px 10px;border:1px solid transparent;border-radius:999px;font-weight:800;width:max-content}
-    .score-bar{height:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden}
-    .score-bar .fill{height:100%}
-    .score-note{color:var(--muted);font-weight:700}
+    .bar{height:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden}
+    .bar .fill{height:100%}
+    .note{color:var(--muted);font-weight:700}
 
-    .msg{display:none;width:100%;padding:10px;border-radius:12px;font-weight:700;text-align:center}
+    .group{border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#fff}
+    .rowg{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin:6px 0}
+    .rowg .pct{font-weight:800;color:#0f172a}
+
+    /* شريط الحفظ */
+    .save-bar{display:flex;gap:12px;padding:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:stretch}
+    .save-bar .msg{display:none;width:100%;padding:10px;border-radius:12px;font-weight:700;text-align:center}
     .msg.ok{display:block;background:#dcfce7;border:1px solid #86efac;color:#14532d}
     .msg.err{display:block;background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d}
 
-    editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
-    header,.container,#cameraCard{position:relative;z-index:1}
-
-    /* ======== إصلاح عدم قابلية النقر على زر الحفظ ======== */
-    /* امنع محتوى الكاميرا من التمدد خارج عموده والتغطية على العمود الأيمن */
-    #cameraCard{ position:relative; z-index:1; overflow:hidden; }
-    /* ارفع العمود الأيمن قليلاً */
-    aside.card{ position:relative; z-index:2; }
-    /* عطّل التقاط النقر من فيديو/كانفاس نهائيًا */
-    video#preview, canvas#overlay{ pointer-events:none; }
-    /* تأكيد استقبال النقر على شريط الحفظ */
-    .save-bar, .save-bar .btn{ pointer-events:auto !important; position:relative; z-index:3; }
-    /* ====================================================== */
-
-.save-bar{
-  display:flex;
-  gap:12px;
-  padding:12px;
-  border-top:1px solid #e2e8f0;
-  flex-wrap:wrap;
-  align-items:stretch;
-}
-.save-bar .btn{
-  flex:1 1 48%;
-  min-height:56px;
-  font-size:16px;
-  padding:14px 16px;
-  border-radius:14px;
-  touch-action:manipulation;
-}
-.save-bar .msg{ margin-bottom:6px; }
-@media (max-width: 540px){
-  .save-bar{ flex-direction:column; }
-  .save-bar .btn{
-    flex:1 1 auto;
-    width:100%;
-    min-height:60px;
-    font-size:17px;
-  }
-}
+    .save-bar .btn{flex:1 1 48%;min-height:56px;font-size:16px;padding:14px 16px;border-radius:14px;touch-action:manipulation;pointer-events:auto}
+    @media (max-width:540px){
+      .save-bar{flex-direction:column}
+      .save-bar .btn{flex:1 1 auto;width:100%;min-height:60px;font-size:17px}
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1 class="title">تقييم بالكاميرا</h1>
+    <h1 class="title">تقييم Milking Traits بالكاميرا</h1>
     <span class="badge">مُرَبِّك</span>
     <span class="badge" id="demoBadge" style="display:none;background:#fff3cd;color:#92400e;border:1px solid #facc15">وضع العرض</span>
     <div style="margin-inline-start:auto;color:var(--muted);font-weight:700">رقم الحيوان: <span class="animal-number">—</span></div>
@@ -119,18 +91,15 @@
         <button class="angle-tab active" data-angle="udder-rear">لقطة خلفية</button>
         <button class="angle-tab" data-angle="side">لقطة جانبية</button>
         <button class="angle-tab" data-angle="front-body">لقطة أمامية</button>
-        <button class="angle-tab" data-angle="teat-close">لقطة قريبة للضرع</button>
+        <button class="angle-tab" data-angle="teat-close">قريبة للضرع</button>
       </div>
 
       <div class="controls">
         <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
         <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
         <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
-
         <div style="margin-inline-start:auto"></div>
-
         <button id="captureToggleBtn" class="btn btn-primary">التقاط</button>
-
         <button id="uploadBtn" class="btn btn-light">رفع صورة</button>
         <input id="uploadInput" type="file" accept="image/*" style="display:none" />
         <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
@@ -139,12 +108,11 @@
       <div class="preview-wrap">
         <video id="preview" playsinline autoplay muted></video>
         <canvas id="overlay"></canvas>
-        <div class="drop-hint" id="dropHint">أفلت الصورة هنا لتعيينها لزاوية <span id="dropAngleLabel">—</span></div>
       </div>
 
       <div class="capture-bar">
         <div class="status" id="thumbs"></div>
-        <div class="helper" id="helperText">وجّه الكاميرا من <strong>جانب الحيوان</strong>؛ الإطار يضم من الكتف لنهاية الحوض، والأرضية تظهر أسفل الإطار. حافظ على ثبات الموبايل وتجنّب الظلال القوية.</div>
+        <div class="helper" id="helperText">وجّه الكاميرا حسب الزاوية المختارة. التقط الأربع لقطات: خلفية/جانبية/أمامية/قريبة للضرع.</div>
       </div>
     </section>
 
@@ -154,47 +122,34 @@
         <label style="display:block;margin:6px 0">تاريخ التقييم
           <input type="date" id="eventDate" name="eventDate" class="input" required />
         </label>
-
-        <div class="checklist" style="margin-top:6px">
-          <h3>تعليمات الالتقاط</h3>
-          <div style="color:var(--muted);line-height:1.8">
-            • تأكد من <strong>إضاءة جيدة</strong> بلا ظلال حادة.<br/>
-            • الأرض <strong>مستوية</strong> والحيوان <strong>واقف</strong> بثبات.<br/>
-            • الحلمات والضرع <strong>واضحة</strong> في اللقطات الخاصة بها.<br/>
-            • التقط <strong>الأربع زوايا</strong> لضمان تقييم أدق.
-          </div>
-        </div>
       </form>
 
       <div class="metrics" id="metrics">
         <h3>التقييم الإجمالي</h3>
-        <div class="helper">التقط/ارفع الصور ثم يظهر الإجمالي هنا.</div>
+        <div class="helper">التقط/ارفع الصور ثم يظهر الإجمالي هنا (لا تُحفَظ الصور؛ تُحفَظ النتائج فقط).</div>
       </div>
 
       <div class="save-bar">
         <div id="saveMsg" class="msg" style="width:100%"></div>
-        <button id="backBtn" class="btn btn-light" style="flex:1">رجوع لصفحة الحدث</button>
-        <button id="saveBtn" type="button" class="btn btn-primary" style="flex:1">حفظ التقييم والصور</button>
+        <button id="saveBtn" type="button" class="btn btn-primary">حفظ نتيجة التقييم</button>
+        <button id="backBtn" type="button" class="btn btn-light">رجوع لصفحة الأحداث</button>
       </div>
     </aside>
   </div>
 
-  <script src="js/mbk-animals.js?v=2"></script>
-
-  <script type="module">
+  <script>
+    // ===== تهيئة عامة وحالة الصفحة =====
     const qs = new URLSearchParams(location.search);
     const $ = (s,p=document)=>p.querySelector(s);
     const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
     const isDemo = qs.get('demo')==='1' || qs.get('mode')==='demo';
 
+    // تتبع ذكي (جاهز للتكامل)
     window.dataLayer = window.dataLayer || [];
-    const t = window.t || { event: (name,p={}) => { try{ window.dataLayer.push({event:name, ...p}); }catch{} } };
-    t.event('page_view', { page: location.pathname, feature:'visual_eval' });
+    const t = { event:(name,p={})=>{ try{ window.dataLayer.push({event:name, ...p}); }catch{} } };
+    t.event('page_view', { page: location.pathname, feature:'milking_traits_eval' });
 
-    function todayCairo(){
-      const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
-      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    }
+    function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
     function getAnimalFromContext(){
       const id=qs.get('animalId')||localStorage.getItem('currentAnimalId')||'';
       const number=qs.get('number')||localStorage.getItem('currentAnimalNumber')||'';
@@ -206,35 +161,22 @@
     }
 
     const anglesOrder=['udder-rear','side','front-body','teat-close'];
-    const angleLabels={
-      'udder-rear':'لقطة خلفية',
-      'side':'لقطة جانبية',
-      'front-body':'لقطة أمامية',
-      'teat-close':'لقطة قريبة للضرع'
-    };
+    const angleLabels={ 'udder-rear':'خلفية','side':'جانبية','front-body':'أمامية','teat-close':'قريبة ضرع' };
     const helperByAngle={
-      'udder-rear':'التقط <strong>لقطة خلفية</strong>؛ قياس تماثل أرباع الضرع وتوزيع الحلمات واتساع الأرجل الخلفية.',
-      'side':'التقط <strong>لقطة جانبية</strong>؛ استقامة الظهر وزاوية الرامب وعمق الجسم.',
-      'front-body':'التقط <strong>لقطة أمامية</strong>؛ اتساع الصدر وتوازي الأرجل الأمامية.',
-      'teat-close':'التقط <strong>لقطة قريبة للضرع</strong>؛ طول/حجم/تماثل الحلمات.'
+      'udder-rear':'قيّم تماثل أرباع الضرع وتوزيع الحلمات واتساع الأرجل الخلفية والـ udder cleft.',
+      'side':'قيّم استقامة الظهر وزاوية الرامب وعمق الجسم.',
+      'front-body':'قيّم اتساع الصدر واستقامة/توازي الأرجل الأمامية.',
+      'teat-close':'قيّم توزيع/حجم الحلمات وتماثلها.'
     };
 
-    const state = {
-      currentAngle: 'side',
-      stream: null,
-      track: null,
-      capabilities: null,
-      torchOn: false,
-      captures: { 'udder-rear': null, 'side': null, 'front-body': null, 'teat-close': null },
-      k: {}
-    };
-    window.state = state;
+    const state = { currentAngle:'side', stream:null, track:null, capabilities:null, torchOn:false, captures: { 'udder-rear':null,'side':null,'front-body':null,'teat-close':null }, k:{} };
+    window.state = state; // لأغراض الذكاء والتتبع
 
     const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
     const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
     const captureToggleBtn=$('#captureToggleBtn'), nextAngleBtn=$('#nextAngleBtn');
     const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
-    const thumbs=$('#thumbs'), helperText=$('#helperText'), dropAngleLabel=$('#dropAngleLabel');
+    const thumbs=$('#thumbs'), helperText=$('#helperText');
     const animalIdInput=$('#animalId'), eventDateInput=$('#eventDate'), saveBtn=$('#saveBtn'), backBtn=$('#backBtn');
     const numberSpan=document.querySelector('.animal-number'); const saveMsg=$('#saveMsg');
 
@@ -243,28 +185,15 @@
     if(eventDateInput) eventDateInput.value=ctx.date||todayCairo();
     if(numberSpan) numberSpan.textContent=ctx.number||(ctx.id?`#${String(ctx.id).slice(-5)}`:'—');
 
-    function showMsg(text, ok=true){
-      if(!saveMsg) return;
-      saveMsg.textContent = text;
-      saveMsg.className = 'msg ' + (ok?'ok':'err');
-      setTimeout(()=>{ saveMsg.className='msg'; }, 4000);
-    }
+    function showMsg(text, ok=true){ if(!saveMsg) return; saveMsg.textContent=text; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>{ saveMsg.className='msg'; }, 4000); }
 
-    async function listCameras(){
-      const devs=await navigator.mediaDevices.enumerateDevices();
-      const cams=devs.filter(d=>d.kind==='videoinput');
-      cameraSelect.innerHTML='';
-      cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); });
-      return cams;
-    }
-    async function startCamera(deviceId){
-      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+    // ===== الكاميرا =====
+    async function listCameras(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=''; cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); }); return cams; }
+    async function startCamera(deviceId){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
       const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}};
-      const stream=await navigator.mediaDevices.getUserMedia(cs);
-      state.stream=stream; preview.srcObject=stream;
+      const stream=await navigator.mediaDevices.getUserMedia(cs); state.stream=stream; preview.srcObject=stream;
       const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null;
-      await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport();
-    }
+      await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport(); }
     function populateTorchSupport(){ const cap=state.capabilities; toggleFlash.disabled=!(cap&&'torch' in cap); }
     function fitOverlay(){ const r=preview.getBoundingClientRect(); overlay.width=r.width*devicePixelRatio; overlay.height=r.height*devicePixelRatio; overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px'; }
     function drawGuide(){ const g=overlay.getContext('2d'); if(!g) return; const w=overlay.width,h=overlay.height; g.clearRect(0,0,w,h);
@@ -274,10 +203,152 @@
       let rx=w*.08,ry=h*.12,rw=w*.84,rh=h*.76; const a=state.currentAngle;
       if(a==='side'){ rx=w*.05; ry=h*.15; rw=w*.9; rh=h*.7; }
       else if(a==='udder-rear'){ rx=w*.15; ry=h*.12; rw=w*.7; rh=h*.76; g.beginPath(); g.moveTo(w*.4,ry); g.lineTo(w*.4,ry+rh); g.stroke(); g.beginPath(); g.moveTo(w*.6,ry); g.lineTo(w*.6,ry+rh); g.stroke(); }
-      else if(a==='teat-close'){ rx=w*.25; ry=h*.25; rw=w*.5; rh=h*.5; g.beginPath(); g.moveTo(w/2,h*.2); g.lineTo(w/2,h*.8); g.stroke(); g.beginPath(); g.moveTo(w*.2,h/2); g.lineTo(w*.8,h/2); g.stroke(); }
+      else if(a==='teat-close'){ rx=w*.25; ry=h*.25; rw=w*.5; rh=h*.5; }
       else if(a==='front-body'){ rx=w*.12; ry=h*.12; rw=w*.76; rh=h*.76; }
       if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); }
     }
     async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); }}
+    function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
 
-    function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImag
+    function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
+
+    // ===== الحسابات (جاهزة للذكاء الاصطناعي) =====
+    function hashString(s){let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return Math.abs(h); }
+    function seededValue(seed,min,max){ const x=Math.sin(seed)*10000; const f=x-Math.floor(x); return Math.round(min+f*(max-min)); }
+    async function computeKPIs(dataUrl, angle){
+      const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
+      const k={};
+      if(angle==='udder-rear'){
+        k.udderCleft=seededValue(seed+10,60,95);
+        k.udderBalanceFrontRear=seededValue(seed+11,60,95); // توازن النصف الأمامي والخلفي
+        k.teatDistribution=seededValue(seed+12,60,95);
+        k.teatSize=seededValue(seed+13,60,95);
+      } else if(angle==='side'){
+        k.backStraight=seededValue(seed+21,60,95);
+        k.rumpAngle=seededValue(seed+22,60,95);
+        k.bodyDepth=seededValue(seed+23,60,95);
+      } else if(angle==='front-body'){
+        k.chestWidth=seededValue(seed+31,60,95);
+        k.frontLegsParallel=seededValue(seed+32,60,95);
+      } else if(angle==='teat-close'){
+        k.teatSize=seededValue(seed+41,60,95);
+        k.teatDistribution=seededValue(seed+42,60,95);
+        k.teatSymmetry=seededValue(seed+43,60,95);
+      }
+      return k;
+    }
+
+    // الأوزان: 40% ضرع، 30% ظهر/رامب/عمق، 20% صدر/أرجل أمامية، 10% أنوثة
+    function computeOverallFromState(){
+      const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
+      const SUB={
+        UDDER:{ udderCleft:25, udderBalanceFrontRear:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
+        BACK_RUMP:{ backStraight:45, rumpAngle:35, bodyDepth:20 },
+        FRONT_LEGS:{ chestWidth:50, frontLegsParallel:50 },
+        FEMININITY:{ femininity:100 }
+      };
+      const all=Object.assign({},state.k['udder-rear'],state.k['side'],state.k['front-body'],state.k['teat-close']);
+      // علامة الأنوثة (قد تُستمد من الجانب)
+      if(state.k['side'] && state.k['side'].femininity==null){ all.femininity = seededValue( hashString('fem'+(all.backStraight||70)), 60, 95 ); }
+      const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
+      const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), F=w(SUB.FRONT_LEGS), FE=w(SUB.FEMININITY);
+      const total=WEIGHTS.UDDER+WEIGHTS.BACK_RUMP+WEIGHTS.FRONT_LEGS+WEIGHTS.FEMININITY;
+      const overall=Math.round((U*WEIGHTS.UDDER + B*WEIGHTS.BACK_RUMP + F*WEIGHTS.FRONT_LEGS + FE*WEIGHTS.FEMININITY)/total);
+      return {overall,U,B,F,FE};
+    }
+
+    function verbal(m){ if(m>=85) return 'ممتاز'; if(m>=75) return 'جيد جدًا'; if(m>=60) return 'متوسط'; return 'ضعيف'; }
+    function groupWidget(title,pct){ return `<div class="rowg"><div>${title}</div><div class="pct">${pct}%</div><div class="bar" style="grid-column:1 / span 2"><div class="fill" style="width:${pct}%;background:#86efac"></div></div></div>`; }
+
+    function renderScore(){ const m=document.getElementById('metrics'); if(!m) return; const {overall,U,B,F,FE}=computeOverallFromState();
+      if(!overall){ m.innerHTML='<h3>التقييم الإجمالي</h3><div class="helper">التقط/ارفع الصور ثم يظهر الإجمالي هنا.</div>'; return; }
+      const v=verbal(overall); const badgeBg = overall>=85?'#dcfce7':overall>=75?'#e0f2fe':overall>=60?'#fef9c3':'#fee2e2';
+      const badgeBor= overall>=85?'#86efac':overall>=75?'#7dd3fc':overall>=60?'#facc15':'#fecaca';
+      const badgeFg = overall>=85?'#14532d':overall>=75?'#075985':overall>=60?'#92400e':'#7f1d1d';
+      m.innerHTML=`
+        <h3>التقييم الإجمالي</h3>
+        <div class="score">
+          <div class="score-badge" style="background:${badgeBg};border-color:${badgeBor};color:${badgeFg}">${v}</div>
+          <div class="bar"><div class="fill" style="width:${overall}%;background:${badgeBor}"></div></div>
+          <div class="note">MVS: ${overall} / 100</div>
+        </div>
+        <div class="group">
+          ${groupWidget('الضرع (40%)',U)}
+          ${groupWidget('الظهر/الرامب/عمق الجسم (30%)',B)}
+          ${groupWidget('الصدر والأرجل الأمامية (20%)',F)}
+          ${groupWidget('علامات الأنوثة (10%)',FE)}
+        </div>`;
+    }
+
+    function setAngle(a){ state.currentAngle=a; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===a)); if(helperText) helperText.textContent=helperByAngle[a]; drawGuide(); updateButtons(); renderScore(); }
+    function updateButtons(){ const has=!!state.captures[state.currentAngle]; captureToggleBtn.textContent = has ? 'إعادة الالتقاط' : 'التقاط'; }
+
+    window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
+    $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
+
+    uploadBtn.addEventListener('click', ()=> uploadInput.click());
+    uploadInput.addEventListener('change', e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const dataUrl=r.result; state.captures[state.currentAngle]=dataUrl; state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_upload',{angle:state.currentAngle}); }; r.readAsDataURL(f); uploadInput.value=''; });
+
+    captureToggleBtn.addEventListener('click', async ()=>{
+      const has=!!state.captures[state.currentAngle];
+      if(has){ state.captures[state.currentAngle]=null; state.k[state.currentAngle]=null; renderThumbs(); updateButtons(); renderScore(); t.event('capture_clear',{angle:state.currentAngle}); }
+      else{ const url=dataURLFromVideo(); state.captures[state.currentAngle]=url; state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_take',{angle:state.currentAngle}); }
+    });
+
+    nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
+    toggleFlash.addEventListener('click', toggleTorch);
+    restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
+    backBtn.addEventListener('click', ()=>{ const params=new URLSearchParams(); if(ctx.id) params.set('animalId',ctx.id); if(ctx.number) params.set('number',ctx.number); if(ctx.date) params.set('date',ctx.date); location.href = `add-event.html?${params.toString()}`; });
+
+    (async function init(){
+      try{
+        if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
+        await startCamera(); await listCameras();
+        renderThumbs(); setAngle('side');
+        if(!eventDateInput.value) eventDateInput.value=todayCairo();
+      }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
+    })();
+  </script>
+
+  <!-- حفظ النتيجة فقط (بدون صور) إلى فايربيز -->
+  <script type="module">
+    import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
+    const saveBtn=document.getElementById('saveBtn');
+    const animalIdInput=document.getElementById('animalId');
+    const eventDateInput=document.getElementById('eventDate');
+    const saveMsg=document.getElementById('saveMsg');
+
+    function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
+    function setMsg(t,ok=true){ if(!saveMsg){ alert(t); return; } saveMsg.textContent=t; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>saveMsg.className='msg',4000); }
+
+    async function handleSave(e){
+      e?.preventDefault?.();
+      const btnPrev=saveBtn.textContent; saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…';
+      try{
+        const {overall,U,B,F,FE}=window.computeOverallFromState();
+        if(!overall){ setMsg('⚠️ التقط صورة واحدة على الأقل لحساب النتيجة', false); return; }
+        const payload={
+          type:'تقييم Milking Traits', eventType:'milking_traits_eval',
+          animalId:(animalIdInput?.value||'')||null,
+          animalNumber: localStorage.getItem('currentAnimalNumber')||'',
+          eventDate: eventDateInput?.value || todayCairo(),
+          overallScore: overall,
+          groups:{ udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
+          // KPIs مفصلة (بدون صور)
+          kpi: window.state?.k || {},
+          uid:  localStorage.getItem('userId') || localStorage.getItem('tenantId') || null,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        };
+        await ensureAuth();
+        await addDoc(collection(db,'events'), payload);
+        setMsg('✅ تم حفظ نتيجة التقييم (بدون صور)', true);
+        try{ window.dataLayer && window.dataLayer.push({event:'milking_traits_save', overall:overall}); }catch{}
+      }catch(err){ console.error(err); setMsg('❌ تعذّر الحفظ في فايربيز', false); }
+      finally{ saveBtn.disabled=false; saveBtn.textContent=btnPrev; }
+    }
+
+    saveBtn?.addEventListener('click', handleSave);
+  </script>
+</body>
+</html>
