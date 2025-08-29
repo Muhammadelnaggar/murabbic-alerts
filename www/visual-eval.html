@@ -65,6 +65,13 @@
 
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     header,.container,#cameraCard{position:relative;z-index:1}
+
+    /* --- إصلاح قابلية النقر على زر الحفظ --- */
+    aside.card{position:relative; z-index:5;}       /* رفع العمود الأيمن فوق أي طبقة */
+    #cameraCard{position:relative; z-index:1; overflow:hidden;} /* منع امتداد محتوى الكاميرا */
+    .save-bar, .save-bar .btn{pointer-events:auto !important;}
+    /* ---------------------------------------- */
+
 .save-bar{
   display:flex;
   gap:12px;
@@ -162,7 +169,8 @@
       <div class="save-bar">
         <div id="saveMsg" class="msg" style="width:100%"></div>
         <button id="backBtn" class="btn btn-light" style="flex:1">رجوع لصفحة الحدث</button>
-        <button id="saveBtn" type="button" class="btn btn-primary" style="flex:1">حفظ التقييم والصور</button>
+        <!-- أضفنا onclick لضمان الاستجابة حتى لو كان هناك طبقة حابسة -->
+        <button id="saveBtn" type="button" class="btn btn-primary" style="flex:1" onclick="window.__mbkSaveClick && __mbkSaveClick(event)">حفظ التقييم والصور</button>
       </div>
     </aside>
   </div>
@@ -382,70 +390,80 @@
     document.addEventListener('DOMContentLoaded', nukeEditorCard);
   </script>
 
- <script type="module">
-  import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
+  <!-- حفظ فايربيز (لم يتغير المنطق، فقط أعيد تنظيمه لربطين: click و mbk:save) -->
+  <script type="module">
+    import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
 
-  const saveBtn        = document.getElementById("saveBtn");
-  const animalIdInput  = document.getElementById("animalId");
-  const eventDateInput = document.getElementById("eventDate");
+    const saveBtn        = document.getElementById("saveBtn");
+    const animalIdInput  = document.getElementById("animalId");
+    const eventDateInput = document.getElementById("eventDate");
 
-  function showMsg(text, ok=true){
-    const box = document.getElementById("saveMsg");
-    if(!box){ alert(text); return; }
-    box.textContent = text;
-    box.className   = "msg " + (ok ? "ok" : "err");
-    setTimeout(()=>{ box.className = "msg"; }, 4000);
-  }
-
-  function todayCairo(){
-    const now = new Date(new Date().toLocaleString("en-US",{ timeZone:"Africa/Cairo" }));
-    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  }
-
-  function getOverall(){
-    try{
-      return (typeof window.computeOverallFromState === "function")
-        ? (window.computeOverallFromState() || 0)
-        : 0;
-    }catch{ return 0; }
-  }
-
-  saveBtn?.addEventListener("click", async (e)=>{
-    e.preventDefault();
-
-    const btnPrev = saveBtn.textContent;
-    saveBtn.disabled = true;
-    saveBtn.textContent = "جارٍ الحفظ…";
-
-    try{
-      const animalId     = (animalIdInput?.value || "").trim() || null;
-      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-      const eventDate    = eventDateInput?.value || todayCairo();
-
-      await ensureAuth();
-
-      await addDoc(collection(db,"events"), {
-        type: "تقييم بصري بالكاميرا",
-        eventType: "visual_eval",
-        eventDate,
-        animalId,
-        animalNumber,
-        overallScore: getOverall(),
-        kpi: (window.state && window.state.k) ? window.state.k : {},
-        uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
-        source: location.pathname,
-        createdAt: serverTimestamp()
-      });
-
-      showMsg("✅ تم الحفظ في فايربيز بنجاح", true);
-    }catch(err){
-      showMsg("❌ تعذّر الحفظ في فايربيز", false);
-    }finally{
-      saveBtn.disabled = false;
-      saveBtn.textContent = btnPrev;
+    function showMsg(text, ok=true){
+      const box = document.getElementById("saveMsg");
+      if(!box){ alert(text); return; }
+      box.textContent = text;
+      box.className   = "msg " + (ok ? "ok" : "err");
+      setTimeout(()=>{ box.className = "msg"; }, 4000);
     }
-  });
-</script>
+    function todayCairo(){
+      const now = new Date(new Date().toLocaleString("en-US",{ timeZone:"Africa/Cairo" }));
+      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
+    function getOverall(){
+      try{
+        return (typeof window.computeOverallFromState === "function")
+          ? (window.computeOverallFromState() || 0)
+          : 0;
+      }catch{ return 0; }
+    }
+
+    async function handleSave(e){
+      if(e) { try{ e.preventDefault(); }catch{} }
+      const btnPrev = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "جارٍ الحفظ…";
+      try{
+        const animalId     = (animalIdInput?.value || "").trim() || null;
+        const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+        const eventDate    = eventDateInput?.value || todayCairo();
+        await ensureAuth();
+        await addDoc(collection(db,"events"), {
+          type: "تقييم بصري بالكاميرا",
+          eventType: "visual_eval",
+          eventDate,
+          animalId,
+          animalNumber,
+          overallScore: getOverall(),
+          kpi: (window.state && window.state.k) ? window.state.k : {},
+          uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        });
+        showMsg("✅ تم الحفظ في فايربيز بنجاح", true);
+      }catch(err){
+        showMsg("❌ تعذّر الحفظ في فايربيز", false);
+      }finally{
+        saveBtn.disabled = false;
+        saveBtn.textContent = btnPrev;
+      }
+    }
+
+    // ربط مزدوج: نقرة عادية + حدث مخصص لضمان التشغيل حتى مع أي طبقة فوقية
+    saveBtn?.addEventListener("click", handleSave);
+    saveBtn?.addEventListener("mbk:save", handleSave);
+  </script>
+
+  <!-- مُشغِّل بسيط للنقر يرسل حدثًا مخصصًا يتخطى أي طبقة حابسة -->
+  <script>
+    window.__mbkSaveClick = function(ev){
+      try{ ev && ev.preventDefault && ev.preventDefault(); }catch{}
+      const btn = document.getElementById('saveBtn');
+      if(btn){
+        const evt = new CustomEvent('mbk:save', {bubbles:true, cancelable:true});
+        btn.dispatchEvent(evt);
+      }
+    };
+  </script>
 
 </body>
 </html>
