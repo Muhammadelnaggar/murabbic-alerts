@@ -382,20 +382,18 @@
     document.addEventListener('DOMContentLoaded', nukeEditorCard);
   </script>
 
-  <script type="module">
-  import {
-    ensureAuth, db, serverTimestamp, addDoc, collection
-  } from "./js/firebase-config.js";
+ <script type="module">
+  import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
 
-  const saveBtn       = document.getElementById("saveBtn");
-  const animalIdInput = document.getElementById("animalId");
-  const eventDateInput= document.getElementById("eventDate");
+  const saveBtn        = document.getElementById("saveBtn");
+  const animalIdInput  = document.getElementById("animalId");
+  const eventDateInput = document.getElementById("eventDate");
 
   function showMsg(text, ok=true){
     const box = document.getElementById("saveMsg");
-    if (!box) { alert(text); return; }
+    if(!box){ alert(text); return; }
     box.textContent = text;
-    box.className = "msg " + (ok ? "ok" : "err");
+    box.className   = "msg " + (ok ? "ok" : "err");
     setTimeout(()=>{ box.className = "msg"; }, 4000);
   }
 
@@ -404,48 +402,47 @@
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   }
 
-  // ✅ تشغيل زر الحفظ والتأكد من العمل حتى لو animalId غير متوفر لكن رقم الحيوان موجود
+  function getOverall(){
+    try{
+      return (typeof window.computeOverallFromState === "function")
+        ? (window.computeOverallFromState() || 0)
+        : 0;
+    }catch{ return 0; }
+  }
+
   saveBtn?.addEventListener("click", async (e)=>{
     e.preventDefault();
 
-    const animalId   = (animalIdInput?.value || "").trim();
-    const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-    const eventDate  = eventDateInput?.value || todayCairo();
-
-    if (!animalId && !animalNumber){
-      showMsg("⚠️ لا يوجد رقم/معرّف للحيوان. افتح الصفحة من add-event أو اختر الحيوان أولاً.", false);
-      return;
-    }
-
-    const hasAnyCapture = Object.values((window.state?.captures)||{}).some(Boolean);
-    if (!hasAnyCapture){ showMsg("⚠️ التقط صورة واحدة على الأقل لحساب النتيجة", false); return; }
-
-    const overall = (typeof window.computeOverallFromState === "function")
-      ? window.computeOverallFromState()
-      : 0;
-
     const btnPrev = saveBtn.textContent;
-    saveBtn.disabled = true; saveBtn.textContent = "جارٍ الحفظ…";
+    saveBtn.disabled = true;
+    saveBtn.textContent = "جارٍ الحفظ…";
 
     try{
+      const animalId     = (animalIdInput?.value || "").trim() || null;
+      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+      const eventDate    = eventDateInput?.value || todayCairo();
+
       await ensureAuth();
+
       await addDoc(collection(db,"events"), {
         type: "تقييم بصري بالكاميرا",
         eventType: "visual_eval",
         eventDate,
-        animalId: animalId || null,
-        animalNumber: animalNumber || "",
-        overallScore: overall,
-        kpi: window.state?.k || {},
+        animalId,
+        animalNumber,
+        overallScore: getOverall(),
+        kpi: (window.state && window.state.k) ? window.state.k : {},
         uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
         source: location.pathname,
         createdAt: serverTimestamp()
       });
-      showMsg("✅ تم حفظ نتيجة التقييم في فايربيز", true);
+
+      showMsg("✅ تم الحفظ في فايربيز بنجاح", true);
     }catch(err){
       showMsg("❌ تعذّر الحفظ في فايربيز", false);
     }finally{
-      saveBtn.disabled = false; saveBtn.textContent = btnPrev;
+      saveBtn.disabled = false;
+      saveBtn.textContent = btnPrev;
     }
   });
 </script>
