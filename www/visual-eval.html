@@ -404,12 +404,18 @@
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   }
 
+  // ✅ تشغيل زر الحفظ والتأكد من العمل حتى لو animalId غير متوفر لكن رقم الحيوان موجود
   saveBtn?.addEventListener("click", async (e)=>{
     e.preventDefault();
 
-    const animalId  = (animalIdInput?.value || "").trim();
-    const eventDate = eventDateInput?.value || todayCairo();
-    if (!animalId){ showMsg("⚠️ رقم الحيوان غير موجود", false); return; }
+    const animalId   = (animalIdInput?.value || "").trim();
+    const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+    const eventDate  = eventDateInput?.value || todayCairo();
+
+    if (!animalId && !animalNumber){
+      showMsg("⚠️ لا يوجد رقم/معرّف للحيوان. افتح الصفحة من add-event أو اختر الحيوان أولاً.", false);
+      return;
+    }
 
     const hasAnyCapture = Object.values((window.state?.captures)||{}).some(Boolean);
     if (!hasAnyCapture){ showMsg("⚠️ التقط صورة واحدة على الأقل لحساب النتيجة", false); return; }
@@ -427,8 +433,8 @@
         type: "تقييم بصري بالكاميرا",
         eventType: "visual_eval",
         eventDate,
-        animalId,
-        animalNumber: localStorage.getItem("currentAnimalNumber") || "",
+        animalId: animalId || null,
+        animalNumber: animalNumber || "",
         overallScore: overall,
         kpi: window.state?.k || {},
         uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
