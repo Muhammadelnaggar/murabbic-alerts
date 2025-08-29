@@ -38,123 +38,89 @@
     button:disabled { opacity:.7; cursor:not-allowed; }
   </style>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ <script type="module">
+  import { db, ensureAuth } from "./js/firebase-config.js";
+  import { doc, getDoc, collection, query, where, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // TODO: حدّثي القيم لو انتقلتِ لمشروع آخر
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  const form = document.getElementById("loginForm");
+  const btn  = document.getElementById("submitBtn");
+  const msg  = document.getElementById("formMsg");
 
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+  function setMsg(t, ok=false){
+    msg.textContent = t;
+    msg.className   = "msg " + (ok ? "ok" : "err");
+    msg.style.display = "block";
+  }
 
-    // دالة تشفير كلمة المرور
-    async function hashPassword(password) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // توحيد رقم الهاتف: إزالة مسافات/شرطات + تحويل الأرقام العربية إلى لاتينية
+  function normalizePhone(raw){
+    const arab = "٠١٢٣٤٥٦٧٨٩";
+    let s = (raw||"").trim().replace(/[\s-]/g,"");
+    s = s.replace(/[٠-٩]/g, d => String(arab.indexOf(d)));
+    return s;
+  }
+
+  // SHA-256
+  async function hashPassword(password){
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // جلب المستخدم: DocID=phone -> fallback where
+  async function fetchUserByPhone(phone){
+    const idSnap = await getDoc(doc(db,"users", phone));
+    if (idSnap.exists()) return { id: idSnap.id, data: idSnap.data() };
+    const qs = await getDocs(query(collection(db,"users"), where("phone","==", phone)));
+    if (!qs.empty){ const d=qs.docs[0]; return { id:d.id, data:d.data() }; }
+    return null;
+  }
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault(); msg.style.display="none";
+    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+    try{
+      await ensureAuth(); // لازم قبل القراءة حسب الـ Rules
+
+      const phoneIn = document.getElementById("phone").value;
+      const passIn  = document.getElementById("password").value;
+      const phone   = normalizePhone(phoneIn);
+
+      if (!phone || !passIn){ setMsg("يرجى إدخال رقم الهاتف وكلمة المرور.", false); return; }
+
+      const user = await fetchUserByPhone(phone);
+      if (!user){ setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.", false); return; }
+
+      const hashed = await hashPassword(passIn);
+      if (hashed !== (user.data.password||"")){ setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.", false); return; }
+
+      // ✅ نجاح
+      localStorage.setItem("userId",    user.id);
+      localStorage.setItem("userPhone", user.data.phone || phone);
+      if (user.data.country && user.data.region){
+        const key = `${user.data.country}:${user.data.region}`;
+        localStorage.setItem("userCountry",  user.data.country);
+        localStorage.setItem("userRegion",   user.data.region);
+        localStorage.setItem("userRegionKey", key);
+        localStorage.removeItem("weather:"+key); // اختياري
+      }
+
+      setMsg("✅ تم تسجيل الدخول بنجاح — سيتم تحويلك الآن…", true);
+      setTimeout(()=> location.href="dashboard.html", 600);
+
+    }catch(err){
+      console.error(err);
+      setMsg("حدث خطأ أثناء تسجيل الدخول. تحقّق من الاتصال والصلاحيات.", false);
+    }finally{
+      btn.disabled=false; btn.textContent=prev;
     }
+  });
 
-    // أداة رسائل داخل النموذج
-    function setMsg(text, ok = true) {
-      const box = document.getElementById("formMsg");
-      if (!box) return;
-      box.textContent = text;
-      box.className = "msg " + (ok ? "ok" : "err");
-    }
+  // فحص سريع من الكونسول (اختياري):
+  // import("./js/firebase-config.js").then(m=>console.log(m.db._databaseId));
+  // لازم يطبع { projectId:"murabbik-470511", database:"murabbikdata" }
+</script>
 
-    window.addEventListener("DOMContentLoaded", () => {
-      const form = document.getElementById("loginForm");
-      const btn  = document.getElementById("submitBtn");
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        setMsg(""); // مسح الرسالة
-
-        const phone = document.getElementById("phone").value.trim();
-        const password = document.getElementById("password").value.trim();
-
-        if (!phone || !password) {
-          setMsg("يرجى إدخال رقم الهاتف وكلمة المرور.", false);
-          return;
-        }
-
-        const prevText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = "جارٍ التحقق…";
-
-        try {
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("phone", "==", phone));
-          const querySnapshot = await getDocs(q);
-
-          if (querySnapshot.empty) {
-            setMsg("❌ رقم الهاتف أو كلمة المرور غير صحيحة.", false);
-            return;
-          }
-
-          const userDoc = querySnapshot.docs[0];
-          const userData = userDoc.data();
-
-          const hashedInputPassword = await hashPassword(password);
-          if (hashedInputPassword !== userData.password) {
-            setMsg("❌ رقم الهاتف أو كلمة المرور غير صحيحة.", false);
-            return;
-          }
-
-          // ✅ تسجيل الدخول ناجح
-          localStorage.setItem("userId", userDoc.id);
-          localStorage.setItem("userPhone", userData.phone);
-
-          // حفظ البلد/المنطقة لاستخدام الطقس و THI
-          const country = userData.country || '';
-          const region  = userData.region  || '';
-          if (country && region) {
-            const regionKey = `${country}:${region}`;
-            localStorage.setItem('userRegionKey', regionKey);
-            localStorage.setItem('userCountry', country);
-            localStorage.setItem('userRegion',  region);
-            localStorage.removeItem('weather:' + regionKey); // اختياري
-          }
-
-          setMsg("✅ تم تسجيل الدخول بنجاح — سيتم تحويلك الآن…", true);
-
-          // تحويل لطيف بعد نصف ثانية
-          setTimeout(async () => {
-            // التحقق إن كان لديه حيوانات
-            try {
-              const animalsRef = collection(db, "animals");
-              const animalQuery = query(animalsRef, where("userId", "==", userDoc.id));
-              const animalSnapshot = await getDocs(animalQuery);
-              if (animalSnapshot.empty) {
-                window.location.href = "add-animal.html";
-              } else {
-                window.location.href = "dashboard.html";
-              }
-            } catch {
-              window.location.href = "dashboard.html";
-            }
-          }, 600);
-
-        } catch (err) {
-          console.error(err);
-          setMsg("حدث خطأ أثناء تسجيل الدخول. حاول مرة أخرى.", false);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = prevText;
-        }
-      });
-    });
-  </script>
 </head>
 <body>
   <form id="loginForm" novalidate>
@@ -166,3 +132,4 @@
   </form>
 </body>
 </html>
+
