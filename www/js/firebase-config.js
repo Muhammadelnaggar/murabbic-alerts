@@ -10,7 +10,7 @@ import { getFirestore, addDoc, collection, serverTimestamp }
 // ⚙️ ضعي هنا القيم التي تظهر لك في صفحة Web App في Firebase (apiKey, authDomain, ...)
 // تلاقيها في Project settings → Your apps → murabbik (Web App) → Config
 const firebaseConfig = {
-  apiKey: "انسخي من صفحة Firebase",
+  apiKey: "AIzaSyCnkVBmRIyDZDpUX4yMH3SeR0hbnBqrh-4",
   authDomain: "murabbik-470511.firebaseapp.com",
   projectId: "murabbik-470511",
   storageBucket: "murabbik-470511.appspot.com",
