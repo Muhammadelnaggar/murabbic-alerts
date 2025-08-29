@@ -53,7 +53,7 @@
     .metrics{padding:12px;border-top:1px solid #e2e8f0;display:grid;gap:8px}
     .metrics h3{margin:8px 0;color:var(--green-600)}
 
-    .score{display:grid;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+    .score{display:grid;gap:10px;padding:8px;border:1px solid #e2e8ف0;border-radius:12px;background:#fff}
     .score-badge{display:inline-block;padding:6px 10px;border:1px solid transparent;border-radius:999px;font-weight:800;width:max-content}
     .score-bar{height:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden}
     .score-bar .fill{height:100%}
@@ -66,11 +66,16 @@
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     header,.container,#cameraCard{position:relative;z-index:1}
 
-    /* --- إصلاح قابلية النقر على زر الحفظ --- */
-    aside.card{position:relative; z-index:5;}       /* رفع العمود الأيمن فوق أي طبقة */
-    #cameraCard{position:relative; z-index:1; overflow:hidden;} /* منع امتداد محتوى الكاميرا */
-    .save-bar, .save-bar .btn{pointer-events:auto !important;}
-    /* ---------------------------------------- */
+    /* ======== إصلاح عدم قابلية النقر على زر الحفظ ======== */
+    /* امنع محتوى الكاميرا من التمدد خارج عموده والتغطية على العمود الأيمن */
+    #cameraCard{ position:relative; z-index:1; overflow:hidden; }
+    /* ارفع العمود الأيمن قليلاً */
+    aside.card{ position:relative; z-index:2; }
+    /* عطّل التقاط النقر من فيديو/كانفاس نهائيًا */
+    video#preview, canvas#overlay{ pointer-events:none; }
+    /* تأكيد استقبال النقر على شريط الحفظ */
+    .save-bar, .save-bar .btn{ pointer-events:auto !important; position:relative; z-index:3; }
+    /* ====================================================== */
 
 .save-bar{
   display:flex;
@@ -169,8 +174,7 @@
       <div class="save-bar">
         <div id="saveMsg" class="msg" style="width:100%"></div>
         <button id="backBtn" class="btn btn-light" style="flex:1">رجوع لصفحة الحدث</button>
-        <!-- أضفنا onclick لضمان الاستجابة حتى لو كان هناك طبقة حابسة -->
-        <button id="saveBtn" type="button" class="btn btn-primary" style="flex:1" onclick="window.__mbkSaveClick && __mbkSaveClick(event)">حفظ التقييم والصور</button>
+        <button id="saveBtn" type="button" class="btn btn-primary" style="flex:1">حفظ التقييم والصور</button>
       </div>
     </aside>
   </div>
@@ -276,194 +280,4 @@
     }
     async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); }}
 
-    function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
-
-    function hashString(s){let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return Math.abs(h); }
-    function seededValue(seed,min,max){ const x=Math.sin(seed)*10000; const f=x-Math.floor(x); return Math.round(min+f*(max-min)); }
-    async function computeKPIs(dataUrl, angle){
-      const seed=hashString(angle+dataUrl.slice(0,64));
-      const k={};
-      if(angle==='udder-rear'){
-        k.udderCleft=seededValue(seed+10,60,95);
-        k.udderBalance=seededValue(seed+11,60,95);
-        k.teatDistribution=seededValue(seed+12,60,95);
-        k.rearLegsWidth=seededValue(seed+13,60,95);
-        k.rearLegsStraightness=seededValue(seed+14,60,95);
-      } else if(angle==='side'){
-        k.backStraight=seededValue(seed+21,60,95);
-        k.rumpAngle=seededValue(seed+22,60,95);
-        k.chestWidth=seededValue(seed+23,60,95);
-        k.bodyDepth=seededValue(seed+24,60,95);
-        k.femininity=seededValue(seed+25,60,95);
-      } else if(angle==='front-body'){
-        k.chestWidth=seededValue(seed+31,60,95);
-        k.frontLegsParallel=seededValue(seed+32,60,95);
-      } else if(angle==='teat-close'){
-        k.teatSize=seededValue(seed+41,60,95);
-        k.teatSymmetry=seededValue(seed+42,60,95);
-        k.teatDistribution=seededValue(seed+43,60,95);
-      }
-      return k;
-    }
-    function computeOverallFromState(){
-      const NEW_WEIGHTS={ UDDER:40, BACK_RUMP:30, BODY_LEGS:20, FEMININITY:10 };
-      const SUB={
-        UDDER:{ udderCleft:25, udderBalance:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
-        BACK_RUMP:{ backStraight:55, rumpAngle:45 },
-        BODY_LEGS:{ chestWidth:25, bodyDepth:25, frontLegsParallel:20, rearLegsStraightness:15, rearLegsWidth:15 },
-        FEMININITY:{ femininity:100 }
-      };
-      const all=Object.assign({},state.k['udder-rear'],state.k['side'],state.k['front-body'],state.k['teat-close']);
-      if(!Object.keys(all).length) return 0;
-      const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
-      const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), BL=w(SUB.BODY_LEGS), F=w(SUB.FEMININITY);
-      const total=NEW_WEIGHTS.UDDER+NEW_WEIGHTS.BACK_RUMP+NEW_WEIGHTS.BODY_LEGS+NEW_WEIGHTS.FEMININITY;
-      return Math.round((U*NEW_WEIGHTS.UDDER + B*NEW_WEIGHTS.BACK_RUMP + BL*NEW_WEIGHTS.BODY_LEGS + F*NEW_WEIGHTS.FEMININITY)/total);
-    }
-    window.computeOverallFromState = computeOverallFromState;
-
-    function gradeInfo(mvs){ if(mvs>=85) return {label:'ممتاز', bg:'#dcfce7', border:'#86efac', fg:'#14532d'}; if(mvs>=75) return {label:'جيد جدًا', bg:'#e0f2fe', border:'#7dd3fc', fg:'#075985'}; if(mvs>=60) return {label:'متوسط', bg:'#fef9c3', border:'#facc15', fg:'#92400e'}; return {label:'ضعيف', bg:'#fee2e2', border:'#fecaca', fg:'#7f1d1d'}; }
-    function renderScoreWidget(mvs){ const g=gradeInfo(mvs); return `<div class="score"><div class="score-badge" style="background:${g.bg};color:${g.fg};border-color:${g.border}">${g.label}</div><div class="score-bar"><div class="fill" style="width:${mvs}%;background:${g.border}"></div></div><div class="score-note">MVS: ${mvs} / 100</div></div>`; }
-    function updateOverallUI(){ const box=$('#metrics'); if(!box) return; const mvs=computeOverallFromState(); box.innerHTML = '<h3>التقييم الإجمالي</h3>'+ renderScoreWidget(mvs); }
-
-    function setAngle(a){ state.currentAngle=a; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===a)); if(helperText) helperText.innerHTML=helperByAngle[a]; drawGuide(); updateButtons(); updateDropHint(); updateOverallUI(); }
-    function updateButtons(){ const has=!!state.captures[state.currentAngle]; captureToggleBtn.textContent = has ? 'إعادة الالتقاط' : 'التقاط'; }
-    function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
-
-    window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
-    $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
-
-    if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
-    if(uploadInput) uploadInput.addEventListener('change', onUploadFiles);
-    function onUploadFiles(e){ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const dataUrl=r.result; state.captures[state.currentAngle]=dataUrl; state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle); renderThumbs(); updateButtons(); updateOverallUI(); t.event('visual_capture_upload',{angle:state.currentAngle}); }; r.readAsDataURL(f); uploadInput.value=''; }
-
-    const previewWrap=document.querySelector('.preview-wrap');
-    function updateDropHint(){ const d=$('#dropAngleLabel'); if(d) d.textContent=angleLabels[state.currentAngle]; }
-    if(previewWrap){ ['dragenter','dragover'].forEach(ev=> previewWrap.addEventListener(ev,(e)=>{ e.preventDefault(); previewWrap.classList.add('dragover'); updateDropHint(); }));
-      ['dragleave','dragend'].forEach(ev=> previewWrap.addEventListener(ev,()=> previewWrap.classList.remove('dragover')));
-      previewWrap.addEventListener('drop',(e)=>{ e.preventDefault(); previewWrap.classList.remove('dragover'); const file=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=async ()=>{ const dataUrl=rd.result; state.captures[state.currentAngle]=dataUrl; state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle); renderThumbs(); updateButtons(); updateOverallUI(); t.event('visual_capture_drop',{angle:state.currentAngle}); }; rd.readAsDataURL(file); });
-    }
-
-    captureToggleBtn.addEventListener('click', async ()=>{
-      const has=!!state.captures[state.currentAngle];
-      if(has){
-        state.captures[state.currentAngle]=null; state.k[state.currentAngle]=null; renderThumbs(); updateButtons(); updateOverallUI();
-        t.event('visual_capture_clear',{angle:state.currentAngle});
-      }else{
-        const url=dataURLFromVideo(); state.captures[state.currentAngle]=url; state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle);
-        renderThumbs(); updateButtons(); updateOverallUI();
-        t.event('visual_capture_take',{angle:state.currentAngle});
-      }
-    });
-
-    nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('visual_angle_next',{angle:state.currentAngle}); });
-
-    toggleFlash.addEventListener('click', toggleTorch);
-    restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-
-    backBtn.addEventListener('click', ()=>{
-      const params=new URLSearchParams(); if(ctx.id) params.set('animalId',ctx.id); if(ctx.number) params.set('number',ctx.number); if(ctx.date) params.set('date',ctx.date);
-      location.href = `add-event.html?${params.toString()}`;
-    });
-
-    async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
-      for(const a of anglesOrder){ setAngle(a); await new Promise(r=>setTimeout(r,200));
-        const ph=makePlaceholder(angleLabels[a]); state.captures[a]=ph; state.k[a]=await computeKPIs(ph,a); renderThumbs(); await new Promise(r=>setTimeout(r,80)); }
-      updateOverallUI();
-    }
-    function makePlaceholder(label){ const c=document.createElement('canvas'); c.width=1280; c.height=720; const g=c.getContext('2d'); const grd=g.createLinearGradient(0,0,1280,720); grd.addColorStop(0,'#e6f8ef'); grd.addColorStop(1,'#c7f9e9'); g.fillStyle=grd; g.fillRect(0,0,1280,720); g.fillStyle='#0ea05a'; g.fillRect(60,60,1160,600); g.fillStyle='#ffffff'; g.font='bold 60px Cairo, Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('عرض — '+label,640,360); g.font='26px Cairo, Arial'; g.fillText('Murabbik Visual Evaluation',640,430); return c.toDataURL('image/jpeg',0.9); }
-
-    (async function init(){
-      try{
-        if(isDemo){ renderThumbs(); setAngle('side'); updateOverallUI(); await runDemo(); return; }
-        if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
-        if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
-        await startCamera(); await listCameras(); if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
-        renderThumbs(); setAngle('side');
-      }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
-    })();
-  </script>
-
-  <script>
-    function nukeEditorCard(){ document.querySelectorAll('editor-card,.editor-card').forEach(n=>{ try{ n.remove(); }catch{} }); }
-    new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
-    document.addEventListener('DOMContentLoaded', nukeEditorCard);
-  </script>
-
-  <!-- حفظ فايربيز (لم يتغير المنطق، فقط أعيد تنظيمه لربطين: click و mbk:save) -->
-  <script type="module">
-    import { ensureAuth, db, serverTimestamp, addDoc, collection } from "./js/firebase-config.js";
-
-    const saveBtn        = document.getElementById("saveBtn");
-    const animalIdInput  = document.getElementById("animalId");
-    const eventDateInput = document.getElementById("eventDate");
-
-    function showMsg(text, ok=true){
-      const box = document.getElementById("saveMsg");
-      if(!box){ alert(text); return; }
-      box.textContent = text;
-      box.className   = "msg " + (ok ? "ok" : "err");
-      setTimeout(()=>{ box.className = "msg"; }, 4000);
-    }
-    function todayCairo(){
-      const now = new Date(new Date().toLocaleString("en-US",{ timeZone:"Africa/Cairo" }));
-      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    }
-    function getOverall(){
-      try{
-        return (typeof window.computeOverallFromState === "function")
-          ? (window.computeOverallFromState() || 0)
-          : 0;
-      }catch{ return 0; }
-    }
-
-    async function handleSave(e){
-      if(e) { try{ e.preventDefault(); }catch{} }
-      const btnPrev = saveBtn.textContent;
-      saveBtn.disabled = true;
-      saveBtn.textContent = "جارٍ الحفظ…";
-      try{
-        const animalId     = (animalIdInput?.value || "").trim() || null;
-        const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-        const eventDate    = eventDateInput?.value || todayCairo();
-        await ensureAuth();
-        await addDoc(collection(db,"events"), {
-          type: "تقييم بصري بالكاميرا",
-          eventType: "visual_eval",
-          eventDate,
-          animalId,
-          animalNumber,
-          overallScore: getOverall(),
-          kpi: (window.state && window.state.k) ? window.state.k : {},
-          uid:  localStorage.getItem("userId") || localStorage.getItem("tenantId") || null,
-          source: location.pathname,
-          createdAt: serverTimestamp()
-        });
-        showMsg("✅ تم الحفظ في فايربيز بنجاح", true);
-      }catch(err){
-        showMsg("❌ تعذّر الحفظ في فايربيز", false);
-      }finally{
-        saveBtn.disabled = false;
-        saveBtn.textContent = btnPrev;
-      }
-    }
-
-    // ربط مزدوج: نقرة عادية + حدث مخصص لضمان التشغيل حتى مع أي طبقة فوقية
-    saveBtn?.addEventListener("click", handleSave);
-    saveBtn?.addEventListener("mbk:save", handleSave);
-  </script>
-
-  <!-- مُشغِّل بسيط للنقر يرسل حدثًا مخصصًا يتخطى أي طبقة حابسة -->
-  <script>
-    window.__mbkSaveClick = function(ev){
-      try{ ev && ev.preventDefault && ev.preventDefault(); }catch{}
-      const btn = document.getElementById('saveBtn');
-      if(btn){
-        const evt = new CustomEvent('mbk:save', {bubbles:true, cancelable:true});
-        btn.dispatchEvent(evt);
-      }
-    };
-  </script>
-
-</body>
-</html>
+    function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImag
