@@ -75,6 +75,10 @@
       .save-bar{flex-direction:column}
       .save-bar .btn{flex:1 1 auto;width:100%;min-height:60px;font-size:17px}
     }
+      /* منع أي طبقة تحرير من حجب الأزرار */
+    editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
+    /* تأكيد أولوية شريط الحفظ */
+    .save-bar,#saveBtn{position:relative;z-index:2147483647 !important;pointer-events:auto !important}
   </style>
 </head>
 <body>
@@ -361,6 +365,17 @@
     // توفّر الدالة عموميًا + ربط آمن للزر
     window.__handleSave = __handleSave;
     saveBtn && saveBtn.addEventListener('click', __handleSave);
+  })();
+</script>
+<script>
+  // إزالة أي طبقة "editor-card" قد تغطي الأزرار
+  (function(){
+    function nuke(){
+      document.querySelectorAll('editor-card,.editor-card').forEach(n=>{ try{ n.remove(); }catch{} });
+    }
+    new MutationObserver(nuke).observe(document.documentElement,{childList:true,subtree:true});
+    document.addEventListener('DOMContentLoaded', nuke);
+    nuke();
   })();
 </script>
 </body>
