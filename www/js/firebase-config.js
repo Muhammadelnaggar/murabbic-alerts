@@ -9,16 +9,18 @@ import {
 
 // ✳️ إعدادات مشروعك
 const firebaseConfig = {
-  apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-  authDomain: "murabbik.firebaseapp.com",
-  projectId: "murabbik",
-  storageBucket: "murabbik.firebasestorage.app", // (اختياري: غالبًا .appspot.com)
-  messagingSenderId: "402719243568",
-  appId: "1:402719243568:web:631114a260d23202dd5cf5"
+  apiKey: "AIzaSyCnkVBmRIyDZDpUX4yMH3SeR0hbnBqrh-4",
+  authDomain: "murabbik-470511.firebaseapp.com",
+  projectId: "murabbik-470511",
+  storageBucket: "murabbik-470511.firebasestorage.app",
+  messagingSenderId: "118468123456",
+  appId: "1:118468123456:web:f26a0d1bad72b3792cf8a5",
+  measurementId: "G-RQLB522T8B"
 };
 
-// تهيئة واحدة
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
 // نصدر الكائنات المطلوبة
 export const auth = getAuth(app);
