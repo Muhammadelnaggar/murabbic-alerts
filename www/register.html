@@ -111,8 +111,8 @@
   </div>
 
   <script type="module">
-    import { db } from './js/firebase-config.js';
-    import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { db, ensureAuth } from './js/firebase-config.js';
+ import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // عناصر DOM
     const form = document.getElementById('registerForm');
@@ -241,17 +241,18 @@
 
       try{
         // منع تكرار الهاتف
-        const usersRef = collection(db,'users');
-        const q = query(usersRef, where('phone','==', phone));
-        const snap = await getDocs(q);
-        if (!snap.empty){ showMessage('رقم الهاتف مسجل بالفعل'); btn.disabled=false; return; }
-
-        const passHash = await hashPassword(password);
-        await addDoc(usersRef, {
-          fullName, phone, country, region, role,
-          password: passHash,
-          createdAt: serverTimestamp()
-        });
+      // لازم توقيع (حتى لو Anonymous) علشان القواعد تسمح
+ await ensureAuth();
+ // استخدم ID = رقم الهاتف لمنع التكرار وقراءة أسرع
+ const userRef = doc(db, 'users', phone);
+ if ((await getDoc(userRef)).exists()) {
+   showMessage('رقم الهاتف مسجّل بالفعل'); btn.disabled=false; return;
+ }
+ await setDoc(userRef, {
+   fullName, phone, country, region, role,
+   password: await hashPassword(password),
+   createdAt: serverTimestamp()
+   });
         showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
         setTimeout(()=> location.href='login.html', 1400);
       }catch(err){
@@ -267,6 +268,7 @@
 
   
   
+
 
 
 
