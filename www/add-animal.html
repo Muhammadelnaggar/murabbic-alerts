@@ -76,6 +76,41 @@
       color: #842029;
       display: block;
     }
+    /* Toast أنيق داخل النموذج */
+.toast {
+  display: none;
+  position: relative;
+  padding: 12px 14px 12px 48px;          /* مساحة للأيقونة */
+  border-radius: 14px;
+  background: #ecfdf5;                   /* أخضر باهت */
+  border: 1px solid #10b98133;
+  color: #065f46;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(16,185,129,.15);
+  margin-bottom: 10px;
+}
+.toast.show { display:block; animation: toast-pop .25s ease-out; }
+.toast .icon {
+  position: absolute;
+  inset-inline-start: 12px;              /* يحترم RTL */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 22px;
+}
+.toast .bar {
+  position: absolute;
+  left: 8px; right: 8px; bottom: 6px;
+  height: 3px; background: #d1fae5;
+  border-radius: 999px; overflow: hidden;
+}
+.toast .bar span {
+  display: block; height: 100%; width: 100%;
+  background: #10b981; animation: toast-shrink 1.6s linear forwards;
+}
+
+@keyframes toast-pop { from {opacity:0; transform: translateY(-6px);} to {opacity:1; transform:none;} }
+@keyframes toast-shrink { from {width:100%} to {width:0%} }
+
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
 </head>
@@ -230,6 +265,22 @@
   <script src="/js/app-core.js" defer></script>
 
   <!-- 2) سكربت الصفحة (Firebase + منطق الصفحة) -->
+  function flashOK(text, ms = 1600) {
+  const box = document.getElementById('msg');
+  if (!box) return;
+  box.className = 'toast show';
+  box.innerHTML = `
+    <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
+      <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+    <div>${text}</div>
+    <div class="bar"><span></span></div>
+  `;
+  // إخفاء تلقائي بعد ms
+  setTimeout(() => { box.className = 'toast'; }, ms + 50);
+}
+
 <script type="module">
   // استخدمي إعدادات مشروع murabbik-470511 من ملفك الموحّد
   import { db, ensureAuth } from "./js/firebase-config.js";
@@ -326,11 +377,11 @@
       localStorage.setItem("currentAnimalId", ref.id);
       localStorage.setItem("currentAnimalNumber", animalNumber);
 
-      setMsg("✅ تم تسجيل حيوان جديد بنجاح", true);
-
-      // التوجيه باستخدام الـID الحقيقي
-      const dateStr = todayLocal();
-      location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+   flashOK("تم تسجيل الحيوان بنجاح ✅");
+setTimeout(() => {
+  const dateStr = todayLocal();
+  location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+}, 1200);
     }catch(err){
       console.error("خطأ في تسجيل الحيوان:", err);
       setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الاتصال والصلاحيات.", false);
@@ -349,6 +400,7 @@
 
 </body>
 </html>
+
 
 
 
