@@ -177,78 +177,77 @@
     import { db, auth, ensureAuth } from "./js/firebase-config.js";
     import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const COL = localStorage.getItem('events_collection') || 'events';
+    const COL = 'events';
+try { localStorage.removeItem('events_collection'); } catch {}
 
     async function onSave(){
-      try{
-        const animalNumber = $('animalNumber').value.trim();
-        const eventDate    = $('eventDate').value;
-        const inseminator  = $('inseminator').value.trim();
-        const semenCode    = $('semenCode').value.trim();
-        const method       = $('inseminationMethod').value;
-        const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value;
-        const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value;
-        const notes        = $('notes').value.trim();
+  try{
+    const animalNumber = document.getElementById('animalNumber').value.trim();
+    const eventDate    = document.getElementById('eventDate').value;
+    const method       = document.getElementById('inseminationMethod').value;
+    const semenCode    = document.getElementById('semenCode').value.trim();
+    const inseminator  = document.getElementById('inseminator').value.trim();
+    const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value || '';
+    const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value || '';
+    const notes        = document.getElementById('notes').value.trim();
 
-        track('insemination_save_attempt',{number:animalNumber,date:eventDate,method});
-
-        if(!animalNumber || !eventDate || !inseminator || !semenCode || !method || !timeOfDay || !heatState){
-          return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
-        }
-        const today = new Date().toISOString().slice(0,10);
-        if(eventDate > today){ return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); }
-
-        // تأكيد التوقيع (حسب القواعد)
-        await ensureAuth();
-
-        const userId = localStorage.getItem('userId') || (auth?.currentUser?.uid ?? null);
-
-        const payload = {
-          type: 'insemination',
-          eventType: 'insemination',
-          eventDate,
-          animalNumber,
-          number: animalNumber,
-          inseminationMethod: method,
-          semenCode,
-          inseminator,
-          inseminationTime: timeOfDay,
-          heatStatus: heatState,
-          notes: notes || null,
-          userId,
-          source: location.pathname,
-          createdAt: serverTimestamp()
-        };
-
-        const ref = await addDoc(collection(db, COL), payload);
-
-        // تذكيرات ذكية
-        const suggestions = [
-          `موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`,
-          `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`
-        ];
-        track('insemination_save_success',{number:animalNumber,date:eventDate,suggestions});
-
-        // رسالة تأكيد داخل النموذج
-        showMsg(`✅ تم حفظ حدث التلقيح بنجاح. ${suggestions.join(' — ')}`, false);
-
-        // تخزين محلي
-        localStorage.setItem('lastEventDate', eventDate);
-        localStorage.setItem('currentAnimalNumber', animalNumber);
-        localStorage.setItem('lastAnimalNumber', animalNumber);
-
-        // إعادة التوجيه اللطيف
-        setTimeout(()=> {
-          location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}`;
-        }, 900);
-
-        console.log("saved to", COL, "id=", ref.id);
-      }catch(err){
-        console.error("[insemination save] FAILED", err);
-        track('insemination_save_fail',{error:String(err)});
-        showMsg('تعذّر الحفظ في فايرستور — تحقّق من الاتصال/الصلاحيات.', true);
-      }
+    // تحققات
+    if(!animalNumber || !eventDate || !method || !semenCode || !inseminator || !timeOfDay || !heatState){
+      return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
     }
+    const todayISO = new Date().toISOString().slice(0,10);
+    if (eventDate > todayISO){
+      return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true);
+    }
+
+    // لازم توقيع حسب الـ Rules
+    await ensureAuth();
+    const userId = localStorage.getItem('userId') || (auth?.currentUser?.uid ?? null);
+
+    const payload = {
+      type: 'insemination',
+      eventType: 'insemination',
+      eventDate,
+      animalNumber,
+      number: animalNumber,
+      inseminationMethod: method,
+      semenCode,
+      inseminator,
+      inseminationTime: timeOfDay,
+      heatStatus: heatState,
+      notes: notes || null,
+      userId,
+      source: location.pathname,
+      createdAt: serverTimestamp()
+    };
+
+    // الحفظ داخل events فقط
+    const ref = await addDoc(collection(db, COL), payload);
+    if (!ref?.id) throw new Error('no document id from Firestore');
+
+    // تذكيرات ذكية (الدالة addDaysISO موجودة عندك فوق)
+    const tips = [
+      `موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`,
+      `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`
+    ];
+
+    // تحديث محلي + رسالة نجاح داخل النموذج
+    localStorage.setItem('lastEventDate', eventDate);
+    localStorage.setItem('currentAnimalNumber', animalNumber);
+    localStorage.setItem('lastAnimalNumber', animalNumber);
+    showMsg(`✅ تم الحفظ بنجاح داخل مجموعة events. ${tips.join(' — ')}`, false);
+
+    // تحويل لطيف
+    setTimeout(()=> {
+      location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}`;
+    }, 900);
+
+    console.log('saved to', COL, 'id=', ref.id);
+  }catch(err){
+    console.error('[insemination save] FAILED', err);
+    showMsg('❌ تعذّر الحفظ في فايربيز. لن تظهر رسالة نجاح قبل التأكد من الكتابة.', true);
+  }
+}
 
     // ربط الزر
     document.getElementById('saveBtn')?.addEventListener('click', onSave);
@@ -266,3 +265,4 @@
   </script>
 </body>
 </html>
+
