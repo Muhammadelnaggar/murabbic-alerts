@@ -2,227 +2,239 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تسجيل اللبن اليومي</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تسجيل إنتاج اللبن اليومي — مُرَبِّك</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <style>
-    body {
-      background-color: #fff9db;
-      font-family: 'Arial', sans-serif;
-      padding: 20px;
-      color: #2e7d32;
+    :root{
+      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
+      --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --danger:#c2410c;
     }
-    h1 {
-      text-align: center;
-      font-size: 26px;
-      margin-bottom: 20px;
-      color: #1e4620;
+    *{box-sizing:border-box}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px}
+    h1{margin:0;color:var(--green-600);font-size:20px;font-weight:800}
+    .wrap{max-width:720px;margin:16px auto;padding:0 12px}
+    form{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    label{display:block;margin-top:12px;font-weight:700}
+    input[type="text"],input[type="date"],input[type="number"],select{
+      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none
     }
-    form {
-      background-color: #e8f5e9;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.1);
-      max-width: 500px;
-      margin: auto;
+    input:focus, select:focus{border-color:var(--green-600)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .col{flex:1 1 180px;min-width:180px}
+    .radio-group{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+    .radio-group label{font-weight:600}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      appearance:none;border:none;border-radius:12px;padding:12px 14px;cursor:pointer;font-weight:800;font-size:16px
     }
-    label {
-      display: block;
-      margin: 12px 0 6px;
-      font-weight: bold;
-      font-size: 16px;
+    .btn-primary{background:var(--green);color:#fff}
+    .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
+    .submit{width:100%;margin-top:18px}
+    .confirm{display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px}
+    .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:6px}
+    .muted{color:var(--muted);font-size:14px}
+    .err{display:none;margin:12px 0;padding:10px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;border-radius:10px;font-weight:700}
+    /* تكبير خانة رقم الحيوان لتماشي مع باقي الصفحات */
+    #animalId{
+      font-size:20px; padding:14px 16px; border-radius:12px; letter-spacing:.3px; height:56px;
     }
-    input[type="text"],
-    input[type="date"],
-    input[type="number"] {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #a5d6a7;
-      border-radius: 8px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-    .milking-box {
-      background-color: #f1f8e9;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 15px;
-    }
-    button {
-      width: 100%;
-      padding: 14px;
-      background-color: #43a047;
-      color: white;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
-      background-color: #388e3c;
-    }
+    .hide{display:none !important}
   </style>
 </head>
 <body>
-  <h1>🥛 تسجيل اللبن اليومي</h1>
+  <header><h1>🥛 تسجيل إنتاج اللبن اليومي</h1></header>
 
-  <form id="milk-form">
-    <label for="animalId">رقم الحيوان:</label>
-    <input type="text" id="animalId" name="animalId" readonly />
+  <div class="wrap">
+    <div id="err" class="err"></div>
 
-    <label for="date">التاريخ:</label>
-    <input type="date" id="date" name="date" required />
+    <form id="milkForm">
+      <div class="row">
+        <div class="col">
+          <label for="animalId">رقم الحيوان</label>
+          <input id="animalId" name="animalId" inputmode="numeric" autocomplete="off" required />
+        </div>
+        <div class="col">
+          <label for="eventDate">تاريخ اليوم</label>
+          <input id="eventDate" name="eventDate" type="date" required />
+        </div>
+      </div>
 
-    <div class="milking-box">
-      <label for="milking1">الحلبة الأولى (لتر)</label>
-      <input type="number" id="milking1" name="milking1" min="0" step="0.1" />
+      <label>نوع الحيوان</label>
+      <div class="radio-group" id="kindGroup">
+        <label><input type="radio" name="kind" value="cow"> بقرة</label>
+        <label><input type="radio" name="kind" value="buffalo"> جاموسة</label>
+      </div>
 
-      <label for="milking2">الحلبة الثانية (لتر)</label>
-      <input type="number" id="milking2" name="milking2" min="0" step="0.1" />
+      <div id="sessions">
+        <!-- حقول الحلبات تتغير حسب النوع -->
+        <div class="row">
+          <div class="col">
+            <label id="s1label" for="s1">حلبة 1 (كجم)</label>
+            <input id="s1" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+          </div>
+          <div class="col">
+            <label id="s2label" for="s2">حلبة 2 (كجم)</label>
+            <input id="s2" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+          </div>
+          <div class="col" id="col-s3">
+            <label id="s3label" for="s3">حلبة 3 (كجم)</label>
+            <input id="s3" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+          </div>
+        </div>
+      </div>
 
-      <label for="milking3">الحلبة الثالثة (لتر)</label>
-      <input type="number" id="milking3" name="milking3" min="0" step="0.1" />
-    </div>
+      <button class="btn btn-primary submit" type="submit">تسجيل اللبن اليومي</button>
 
-    <label for="totalMilk">إجمالي إنتاج اللبن اليومي (لتر)</label>
-    <input type="number" id="totalMilk" name="totalMilk" readonly />
+      <!-- ✅ تأكيد داخل النموذج -->
+      <div id="confirmBox" class="confirm" aria-live="polite">
+        <div class="title">✅ تم تسجيل اللبن اليومي بنجاح</div>
+        <div class="muted" id="totalLine"></div>
+        <div class="row" style="margin-top:8px">
+          <button type="button" id="goAddEvent" class="btn btn-primary">تسجيل حدث آخر</button>
+          <button type="button" id="backDash" class="btn btn-ghost">العودة للوحة التحكم</button>
+        </div>
+      </div>
+    </form>
+  </div>
 
-    <button type="submit">تسجيل الإنتاج</button>
-  </form>
+  <script type="module">
+    // ===== أدوات عامة =====
+    const $ = (id)=> document.getElementById(id);
+    const errBox = $('err');
+    function showErr(msg){ errBox.textContent = '⚠️ ' + msg; errBox.style.display = 'block'; }
+    function hideErr(){ errBox.style.display = 'none'; errBox.textContent=''; }
+    function getQS(k){ return new URL(location.href).searchParams.get(k) || ''; }
+    function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
+    function buildUrl(path, params){
+      const u = new URL(path, location.origin);
+      Object.entries(params||{}).forEach(([k,v])=>{
+        if ((v ?? '').toString().trim() !== '') u.searchParams.set(k, v);
+      });
+      return u.toString();
+    }
+    function toNum(v){ const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; }
 
-  <!-- ثبّت dataLayer + t.event (لا يؤثر بصريًا) -->
-<script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
+    // ===== تفعيل/إخفاء حلبة ثالثة حسب النوع =====
+    const colS3 = $('col-s3'), s1label = $('s1label'), s2label = $('s2label'), s3label = $('s3label');
+    function applyKindUI(kind){
+      if (kind === 'buffalo'){
+        // جاموسة = حلبتان
+        colS3.classList.add('hide');
+        s1label.textContent = 'حلبة صباح (كجم)';
+        s2label.textContent = 'حلبة مساء (كجم)';
+      } else {
+        // بقرة = 3 حلبات
+        colS3.classList.remove('hide');
+        s1label.textContent = 'حلبة 1 (كجم)';
+        s2label.textContent = 'حلبة 2 (كجم)';
+        s3label.textContent = 'حلبة 3 (كجم)';
       }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
-
-
-  <!-- تحليلات خارجية (اختياري) -->
-  <script src="/js/app-core.js" defer></script>
-
-  <!-- ⭐ ضروري قبل أي نداء إلى /api -->
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
-
-  <script>
-    // تاريخ اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
     }
 
-    // اجمع المجموع بدقة رقمية بسيطة
-    function sumMilk(){
-      const n = v => Math.max(0, Number.parseFloat(v || '0')) || 0;
-      const v1 = n(document.getElementById('milking1').value);
-      const v2 = n(document.getElementById('milking2').value);
-      const v3 = n(document.getElementById('milking3').value);
-      document.getElementById('totalMilk').value = (v1+v2+v3).toFixed(2);
-    }
+    // ===== تهيئة القيم من السياق =====
+    const inputAnimal = $('animalId');
+    const inputDate   = $('eventDate');
+    const kindRadios  = Array.from(document.querySelectorAll('input[name="kind"]'));
+    const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
+                                   localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
+    const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
+                                   localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
+    const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
 
-    // تعبئة من الرابط + المحلّي
-    function hydrate(){
-      const qs = new URLSearchParams(location.search);
-      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || qs.get('Pid') || qs.get('cowId') || localStorage.getItem('lastAnimalId') || '';
-      const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
-      document.getElementById('animalId').value = id;
-      document.getElementById('date').value = dt;
-      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); }catch{}
-    }
+    if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
+    if (!inputDate.value   && qsDate)   inputDate.value   = qsDate;
 
-    // اربطي الأحداث
-    ['milking1','milking2','milking3'].forEach(id=>{
-      document.addEventListener('input', (e)=>{ if(e.target && e.target.id===id) sumMilk(); });
-    });
-    document.addEventListener('DOMContentLoaded', ()=>{ hydrate(); sumMilk(); });
+    let currentKind = (qsKind === 'buffalo' || qsKind === 'cow') ? qsKind : 'buffalo';
+    kindRadios.forEach(r => { r.checked = (r.value === currentKind); r.addEventListener('change', ()=> {
+      if (r.checked){ currentKind = r.value; localStorage.setItem('lastKind', currentKind); applyKindUI(currentKind); }
+    })});
+    applyKindUI(currentKind);
 
-    // إرسال البيانات إلى /api/events
-    document.getElementById('milk-form').addEventListener('submit', async (ev)=>{
-      ev.preventDefault();
-      const animalId = document.getElementById('animalId').value.trim();
-      const date      = document.getElementById('date').value;
-      if(!animalId){
-        alert('لم يتم العثور على رقم الحيوان. الرجاء العودة وتحديد الحيوان.');
-        location.href = 'add-event.html';
-        return;
+    // ===== ربط فايرستور عبر /js/firebase-config.js =====
+    let db, addDoc, collection, serverTimestamp;
+    async function ensureDb(){
+      try{
+        const appMod = await import('/js/firebase-config.js');
+        const app = appMod.app || appMod.default || appMod; // يدعم أشكال التصدير
+        const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        db = appMod.db || mod.getFirestore(app.app || app);
+        addDoc = mod.addDoc; collection = mod.collection; serverTimestamp = mod.serverTimestamp;
+      } catch (e){
+        showErr('تعذّر تحميل إعدادات Firebase. تأكّد من وجود /js/firebase-config.js');
+        throw e;
       }
+    }
+    await ensureDb();
 
-      const n = v => Math.max(0, Number.parseFloat(v || '0')) || 0;
-      const milking1  = n(document.getElementById('milking1').value);
-      const milking2  = n(document.getElementById('milking2').value);
-      const milking3  = n(document.getElementById('milking3').value);
-      const totalMilk = n(document.getElementById('totalMilk').value || (milking1+milking2+milking3));
+    // ===== منطق الإرسال =====
+    const form = $('milkForm');
+    const confirmBox = $('confirmBox');
+    const totalLine = $('totalLine');
+    const goAddEventBtn = $('goAddEvent');
+    const backDashBtn = $('backDash');
 
-      const userId   = localStorage.getItem('userId');
-      const tenantId = localStorage.getItem('tenantId') || 'default';
-      if(!userId){
-        alert('⚠️ يجب تسجيل الدخول أولًا.');
-        location.href = 'login.html';
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault(); hideErr();
+
+      const animalId = inputAnimal.value.trim();
+      const eventDate = inputDate.value.trim();
+      const kind = currentKind; // 'cow' | 'buffalo'
+      const s1 = toNum($('s1').value), s2 = toNum($('s2').value), s3 = toNum($('s3').value);
+      const total = kind === 'buffalo' ? (s1 + s2) : (s1 + s2 + s3);
+
+      if (!animalId || !eventDate){
+        showErr('من فضلك أدخل رقم الحيوان وتاريخ اليوم.');
         return;
       }
 
       const payload = {
-        type: 'إنتاج اللبن اليومي',
-        eventType: 'إنتاج اللبن اليومي',
-        userId,
-        tenantId,
+        userId: (window.__tenant?.userId || localStorage.getItem('userId') || '').trim(),
         animalId,
         animalNumber: animalId,
-        eventDate: date,
-        milking1, milking2, milking3,
-        totalMilk,
-        source: 'daily-milk.html'
+        eventType: 'لبن يومي',
+        type: 'daily_milk',
+        eventDate,
+        kind,
+        milkSessions: kind === 'buffalo'
+          ? [{n:1, kg:s1},{n:2, kg:s2}]
+          : [{n:1, kg:s1},{n:2, kg:s2},{n:3, kg:s3}],
+        milkKg: total,
+        source: location.pathname,
+        createdAt: serverTimestamp()
       };
 
       try{
-        const r = await fetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if(r.ok){
-          t.event('milk_saved', { animalId, totalMilk });
-          alert('✅ تم تسجيل إنتاج اللبن بنجاح');
-          if (confirm('هل تريد تسجيل حدث آخر؟')) {
-            location.href = 'add-event.html';
-          } else if (confirm('هل تريد تسجيل حيوان آخر؟')) {
-            location.href = 'add-animal.html';
-          } else {
-            location.href = 'dashboard.html';
-          }
-        } else {
-          const msg = await r.text();
-          alert('❌ فشل في التسجيل:\n' + (msg || 'Bad Request'));
-        }
-      }catch(err){
-        console.error(err);
-        alert('❌ حدث خطأ أثناء الاتصال بالخادم');
+        await addDoc(collection(db, 'events'), payload);
+
+        // تحديث سياق للصفحات الأخرى
+        localStorage.setItem('lastAnimalId', animalId);
+        localStorage.setItem('currentAnimalId', animalId);
+        localStorage.setItem('eventDate', eventDate);
+        localStorage.setItem('lastEventDate', eventDate);
+        localStorage.setItem('lastKind', kind);
+
+        // إظهار التأكيد داخل النموذج + الإجمالي
+        totalLine.textContent = 'الإجمالي: ' + total.toFixed(1) + ' كجم';
+        confirmBox.style.display = 'block';
+      } catch(err){
+        console.error('Firestore save error:', err);
+        showErr('تعذّر حفظ اللبن اليومي. تأكّد من الاتصال والصلاحيات ثم أعد المحاولة.');
       }
+    });
+
+    // ===== أزرار ما بعد النجاح =====
+    goAddEventBtn.addEventListener('click', ()=>{
+      const url = buildUrl('/add-event.html', {
+        animalId: inputAnimal.value.trim(),
+        date: inputDate.value.trim()
+      });
+      location.href = url;
+    });
+    backDashBtn.addEventListener('click', ()=>{
+      location.href = '/dashboard.html';
     });
   </script>
 </body>
 </html>
-
