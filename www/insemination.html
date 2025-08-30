@@ -166,12 +166,16 @@
       location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
     });
 
-    // رسائل داخل النموذج
-    function showMsg(text, isError){
-      const el = $('info');
-      el.className = 'infobar ' + (isError ? 'show error' : 'show');
-      el.textContent = text;
-    }
+   function showMsg(text, isError){
+  const el = document.getElementById('info');
+  el.className = 'infobar ' + (isError ? 'show error' : 'show');
+  el.setAttribute('role','status');
+  el.setAttribute('aria-live','polite');
+  el.innerHTML = (isError ? '❌ ' : '✅ ') + text;
+
+  // خليها في النص وتبقى باينة للمستخدم
+  try { el.scrollIntoView({behavior:'smooth', block:'center'}); } catch {}
+}
 
     // حفظ على فايرستور
     import { db, auth, ensureAuth } from "./js/firebase-config.js";
@@ -239,8 +243,8 @@ try { localStorage.removeItem('events_collection'); } catch {}
 
     // تحويل لطيف
     setTimeout(()=> {
-      location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}`;
-    }, 900);
+     location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}`;
+}, 3000);
 
     console.log('saved to', COL, 'id=', ref.id);
   }catch(err){
@@ -265,4 +269,5 @@ try { localStorage.removeItem('events_collection'); } catch {}
   </script>
 </body>
 </html>
+
 
