@@ -5,82 +5,142 @@
   <title>تحضير للولادة — إنتاجي (Smart Tracking)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    body { direction: rtl; font-family: Arial, sans-serif; background-color: #fff9db; padding: 20px; margin: 0; }
-    h1 { color: #2e7d32; text-align: center; margin-bottom: 30px; }
-    label { display: block; margin-top: 15px; font-weight: bold; }
-    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; }
-    .radio-group { display: flex; gap: 20px; margin-top: 10px; }
-    .submit-button { background-color: #2e7d32; color: white; padding: 12px; border: none; border-radius: 8px; margin-top: 30px; width: 100%; font-size: 18px; cursor: pointer; }
-    .submit-button:hover { background-color: #1a6324; }
+    :root{
+      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
+      --muted:#64748b; --card:#ffffff; --danger:#c2410c; --accent:#fff9db;
+      --border:#e2e8f0;
+    }
+    *{box-sizing:border-box}
+    html, body { max-width:100%; overflow-x:hidden; }
+    body { margin:0; font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif; background:var(--bg); color:var(--text); padding:16px; }
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--green)}
+    h1{margin:0;font-size:20px;color:var(--green-600);font-weight:800}
+    .wrap{max-width:720px;margin:16px auto}
+    form{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    label{display:block;margin-top:12px;font-weight:700;color:var(--text)}
+    input[type="text"], input[type="date"]{
+      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;
+      font-size:16px;outline:none;
+    }
+    input:focus{border-color:var(--green-600)}
+    .radio-group{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+    .radio-group label{font-weight:600}
+    .submit-button{
+      background:var(--green);color:#fff;padding:12px;border:none;border-radius:12px;
+      margin-top:18px;width:100%;font-size:17px;cursor:pointer;font-weight:800
+    }
+    .submit-button:hover{background:var(--green-600)}
+    /* صندوق التأكيد داخل النموذج */
+    .confirm{
+      display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px
+    }
+    .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:8px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{
+      appearance:none;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700
+    }
+    .btn-primary{background:var(--green);color:#fff}
+    .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
+    /* حوار صغير */
+    .dialog{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);
+      align-items:center;justify-content:center;padding:16px;z-index:50
+    }
+    .dialog .card{
+      background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)
+    }
+    .dialog h3{margin:0 0 8px 0;color:var(--green-600)}
+    .muted{color:var(--muted);font-size:14px}
   </style>
 </head>
 <body>
-  <h1>📦 تحضير للولادة</h1>
+  <header>
+    <div class="dot"></div>
+    <h1>📦 تحضير للولادة</h1>
+  </header>
 
-  <!-- سلوك فقط: أضفنا data-event و data-redirect (لا تغيّر الشكل) -->
-  <form id="closeupForm" data-event="closeup" data-redirect="/dashboard.html">
-    <label for="animalId">رقم الحيوان:</label>
-    <input type="text" id="animalId" name="animalId" required />
+  <div class="wrap">
+    <!-- لا تغيير بصري جذري: نفس الروح والألوان -->
+    <form id="closeupForm" data-event="closeup" data-redirect="/dashboard.html">
+      <label for="animalId">رقم الحيوان:</label>
+      <input type="text" id="animalId" name="animalId" required />
 
-    <label for="closeupDate">تاريخ التحضير:</label>
-    <input type="date" id="closeupDate" name="closeupDate" required />
+      <label for="closeupDate">تاريخ التحضير:</label>
+      <input type="date" id="closeupDate" name="closeupDate" required />
 
-    <label>عليقة التحضير:</label>
-    <div class="radio-group">
-      <label><input type="radio" name="ration" value="نعم" required /> نعم</label>
-      <label><input type="radio" name="ration" value="لا" /> لا</label>
+      <label>عليقة التحضير:</label>
+      <div class="radio-group">
+        <label><input type="radio" name="ration" value="نعم" required /> نعم</label>
+        <label><input type="radio" name="ration" value="لا" /> لا</label>
+      </div>
+
+      <label>الأملاح الأنيونية:</label>
+      <div class="radio-group">
+        <label><input type="radio" name="anionicSalts" value="نعم" required /> نعم</label>
+        <label><input type="radio" name="anionicSalts" value="لا" /> لا</label>
+      </div>
+
+      <button type="submit" class="submit-button">تسجيل التحضير</button>
+
+      <!-- ✅ رسالة تأكيد داخل النموذج بعد الحفظ -->
+      <div id="confirmBox" class="confirm">
+        <div class="title">✅ تم تسجيل تحضير الولادة بنجاح</div>
+        <div class="row">
+          <button type="button" id="goNutrition" class="btn btn-primary">إدخال العليقة الآن</button>
+          <button type="button" id="backDash" class="btn btn-ghost">العودة للوحة التحكم</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- حوار سؤال إدخال العليقة (يظهر بعد الحفظ لو الإجابة "نعم") -->
+  <div id="nutritionDialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="nd_t">
+    <div class="card">
+      <h3 id="nd_t">إدخال عليقة التحضير؟</h3>
+      <p class="muted">يمكنك الانتقال فورًا لصفحة التغذية لإدخال مكونات العليقة لهذا الحيوان.</p>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="nd_yes" class="btn btn-primary">نعم، انتقل الآن</button>
+        <button type="button" id="nd_no" class="btn btn-ghost">لاحقًا</button>
+      </div>
     </div>
+  </div>
 
-    <label>الأملاح الأنيونية:</label>
-    <div class="radio-group">
-      <label><input type="radio" name="anionicSalts" value="نعم" required /> نعم</label>
-      <label><input type="radio" name="anionicSalts" value="لا" /> لا</label>
-    </div>
-
-    <button type="submit" class="submit-button">تسجيل التحضير</button>
-  </form>
-
-  <!-- تتبّع ثابت -->
- <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
-
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
+  <!-- تتبّع ثابت (منع تكرار page_view) -->
+  <script>
+    (function () {
+      window.dataLayer = window.dataLayer || [];
+      window.__sentEvents = window.__sentEvents || new Set();
+      window.t = window.t || {
+        event: function (name, props) {
+          try {
+            props = props || {};
+            if (name === 'page_view') {
+              const key = 'pv:' + (props.page || location.pathname);
+              if (window.__sentEvents.has(key)) return;
+              window.__sentEvents.add(key);
+            }
+            dataLayer.push({ event: name, ts: Date.now(), ...props });
+          } catch (e) {}
+        }
+      };
+      t.event('page_view', { page: location.pathname });
+    })();
+  </script>
 
   <!-- الأساس التحليلي -->
   <script src="/js/app-core.js" defer></script>
 
-  <!-- الموديولات (لا جسور ولا globals) -->
+  <!-- الموديولات -->
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
 
-  <!-- الهوية وواجهة الـAPI (tenant قبل api) -->
+  <!-- الهوية وواجهة الـAPI -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js" defer></script>
 
-  <!-- سكربتات الحدث (Smart Tracking عبر track-closeup.js/closeup.js) -->
+  <!-- تتبّع الحدث + منطق الصفحة -->
   <script type="module" src="/js/track-closeup.js"></script>
   <script type="module" src="/js/closeup.js"></script>
 </body>
 </html>
-
