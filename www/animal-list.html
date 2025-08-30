@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -6,147 +5,34 @@
   <title>قائمة الحيوانات</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body {
-      font-family: 'Arial', sans-serif;
-      background-color: #fffde9;
-      direction: rtl;
-      padding: 10px;
-      margin: 0;
-    }
-    h1 {
-      color: #2e7d32;
-      text-align: center;
-      font-size: 22px;
-      margin-bottom: 15px;
-    }
-    .controls {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .controls input, .controls select {
-      padding: 8px;
-      font-size: 14px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      min-width: 150px;
-    }
-    .controls button {
-      padding: 8px 12px;
-      background-color: #4caf50;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .controls button:hover {
-      background-color: #388e3c;
-    }
-    .table-wrapper {
-      overflow-x: auto;
-      background: #fefefc;
-      border-radius: 10px;
-      box-shadow: 0 0 5px #ccc;
-      margin-bottom: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 950px;
-    }
-    th, td {
-      padding: 10px;
-      text-align: center;
-      border: 1px solid #cddc39;
-      font-size: 15px;
-    }
-    th {
-      background-color: #dcedc8;
-      color: #33691e;
-    }
-    tr:nth-child(even) {
-      background-color: #f9fbe7;
-    }
-    .button {
-      padding: 5px 10px;
-      background-color: #43a047;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .button:hover {
-      background-color: #388e3c;
-    }
-    .delete-button {
-      background-color: #c62828;
-    }
-    .delete-button:hover {
-      background-color: #b71c1c;
-    }
-    .no-data {
-      text-align: center;
-      color: #c62828;
-      margin-top: 30px;
-      font-size: 18px;
-    }
-    .back-button {
-      display: block;
-      text-align: center;
-      background-color: #4caf50;
-      color: white;
-      font-size: 16px;
-      padding: 10px;
-      border-radius: 8px;
-      text-decoration: none;
-    }
-    /* ===== أعمدة لاصقة (Sticky) لأول عمودين: رقم الحيوان + النوع ===== */
-:root{
-  /* غيّر الأرقام دي لو حابب توسّع/تضيّق العرض */
-  --sticky-col1: 140px; /* عرض عمود رقم الحيوان */
-  --sticky-col2: 120px; /* عرض عمود النوع */
-}
+    body { font-family: 'Arial', sans-serif; background-color: #fffde9; direction: rtl; padding: 10px; margin: 0; }
+    h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
+    .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .controls input, .controls select { padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px; }
+    .controls button { padding: 8px 12px; background-color: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .controls button:hover { background-color: #388e3c; }
+    .table-wrapper { overflow-x: auto; background: #fefefc; border-radius: 10px; box-shadow: 0 0 5px #ccc; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; min-width: 950px; }
+    th, td { padding: 10px; text-align: center; border: 1px solid #cddc39; font-size: 15px; }
+    th { background-color: #dcedc8; color: #33691e; }
+    tr:nth-child(even) { background-color: #f9fbe7; }
+    .button { padding: 5px 10px; background-color: #43a047; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .button:hover { background-color: #388e3c; }
+    .delete-button { background-color: #c62828; }
+    .delete-button:hover { background-color: #b71c1c; }
+    .no-data { text-align: center; color: #c62828; margin-top: 30px; font-size: 18px; }
+    .back-button { display: block; text-align: center; background-color: #4caf50; color: white; font-size: 16px; padding: 10px; border-radius: 8px; text-decoration: none; }
 
-/* مهم: sticky ما يشتغلش كويس مع collapse */
-#animalTable {
-  border-collapse: separate;   /* ينسخن جدول الـsticky */
-  border-spacing: 0;
-}
-
-/* بلاش الخلفية تتهرّب عند اللصق */
-#animalTable th, #animalTable td {
-  background-clip: padding-box;
-}
-
-/* العمود 1: رقم الحيوان */
-#animalTable th:nth-child(1),
-#animalTable td:nth-child(1) {
-  position: sticky;
-  right: 0;                 /* لأن الصفحة RTL */
-  z-index: 4;               /* فوق باقي الخلايا */
-  min-width: var(--sticky-col1);
-}
-#animalTable th:nth-child(1) { background: #dcedc8; }
-#animalTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
-
-/* العمود 2: النوع */
-#animalTable th:nth-child(2),
-#animalTable td:nth-child(2) {
-  position: sticky;
-  right: var(--sticky-col1);
-  z-index: 3;
-  min-width: var(--sticky-col2);
-}
-#animalTable th:nth-child(2) { background: #dcedc8; }
-#animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
-
-/* تأكد إن فيه سكرول أفقي لو الجدول عريض */
-.table-wrapper { overflow-x: auto; }
-
+    :root{ --sticky-col1: 140px; --sticky-col2: 120px; }
+    #animalTable { border-collapse: separate; border-spacing: 0; }
+    #animalTable th, #animalTable td { background-clip: padding-box; }
+    #animalTable th:nth-child(1), #animalTable td:nth-child(1) { position: sticky; right: 0; z-index: 4; min-width: var(--sticky-col1); }
+    #animalTable th:nth-child(1) { background: #dcedc8; }
+    #animalTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+    #animalTable th:nth-child(2), #animalTable td:nth-child(2) { position: sticky; right: var(--sticky-col1); z-index: 3; min-width: var(--sticky-col2); }
+    #animalTable th:nth-child(2) { background: #dcedc8; }
+    #animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+    .table-wrapper { overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -194,145 +80,144 @@
 
   <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
+
+  <!-- سكربت تحسين التمرير (لو الملف موجود) -->
   <script src="js/mbk-animals.js?v=1"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function(){
-    MBK.animal.enhanceAnimalList(); // تفعيل “التمرير الذكي”
-  });
-<script type="module">
-  import { db, ensureAuth, auth } from "/js/firebase-config.js";
-  import { collection, query, where, getDocs, deleteDoc, doc } 
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      if (window.MBK?.animal?.enhanceAnimalList) {
+        MBK.animal.enhanceAnimalList();
+      }
+    });
+  </script>
 
-  const $  = id => document.getElementById(id);
-  let animalsData = [];
+  <!-- سكربت فايرستور (يعتمد على firebase-config.js) -->
+  <script type="module">
+    import { db, ensureAuth, auth } from "/js/firebase-config.js";
+    import { collection, query, where, getDocs, deleteDoc, doc } 
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  async function loadAnimals() {
-    await ensureAuth();
-    const uid = localStorage.getItem("userId") || auth?.currentUser?.uid || "";
-    if (!uid) {
-      alert("❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.");
-      location.href = "login.html";
-      return;
+    const $  = id => document.getElementById(id);
+    let animalsData = [];
+
+    async function loadAnimals() {
+      try{
+        await ensureAuth();
+      }catch(_){} // في حال ensureAuth غير مطلوب لك
+
+      const uid = localStorage.getItem("userId") || auth?.currentUser?.uid || "";
+      if (!uid) {
+        alert("❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.");
+        location.href = "login.html";
+        return;
+      }
+
+      const snap = await getDocs(query(collection(db, "animals"), where("userId", "==", uid)));
+      animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      updateTypeOptions();
+      renderTable(animalsData);
     }
-    const snap = await getDocs(query(collection(db, "animals"), where("userId", "==", uid)));
-    animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    updateTypeOptions();
-    renderTable(animalsData);
-  }
 
-  function updateTypeOptions() {
-    const typeSelector = $("typeSelector");
-    typeSelector.innerHTML = '<option value="">عرض النوع</option>';
-    const types = [...new Set(animalsData.map(a => a.animalType).filter(Boolean))];
-    types.forEach(type => {
-      const opt = document.createElement("option");
-      opt.value = type;
-      opt.textContent = (type === "بقرة") ? "🐄 الأبقار" : "🐃 الجاموس";
-      typeSelector.appendChild(opt);
+    function updateTypeOptions() {
+      const typeSelector = $("typeSelector");
+      typeSelector.innerHTML = '<option value="">عرض النوع</option>';
+      const types = [...new Set(animalsData.map(a => a.animalType).filter(Boolean))];
+      types.forEach(type => {
+        const opt = document.createElement("option");
+        opt.value = type;
+        opt.textContent = (type === "بقرة") ? "🐄 الأبقار" : "🐃 الجاموس";
+        typeSelector.appendChild(opt);
+      });
+    }
+
+    function renderTable(data) {
+      const tbody  = $("animalBody");
+      const noData = $("noData");
+      tbody.innerHTML = "";
+
+      if (!data || data.length === 0) { noData.style.display = "block"; return; }
+      noData.style.display = "none";
+
+      data.forEach(animal => {
+        const days = ms => Math.floor(ms / 86400000);
+        const daysInMilk = animal.lastCalvingDate
+          ? days(Date.now() - new Date(animal.lastCalvingDate))
+          : '---';
+        const pregnantDays = (animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate)
+          ? days(Date.now() - new Date(animal.lastInseminationDate))
+          : '---';
+        const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate)
+          ? days(Date.now() - new Date(animal.lastInseminationDate))
+          : '---';
+
+        const tr = document.createElement("tr");
+        tr.style.backgroundColor = (animal.animalType === "بقرة") ? "#fffde7" : "#eeeeee";
+        tr.innerHTML = `
+          <td>${animal.animalNumber || ""}</td>
+          <td>${animal.animalType || ""}</td>
+          <td>${animal.breed || ""}</td>
+          <td>${animal.productionStatus || "---"}</td>
+          <td>${daysInMilk}</td>
+          <td>${animal.reproductiveStatus || ""}</td>
+          <td>${inseminatedDays}</td>
+          <td>${animal.dailyMilk ?? "---"}</td>
+          <td>${pregnantDays}</td>
+          <td>${animal.birthDate || "---"}</td>
+          <td>${animal.lastCalvingDate || "---"}</td>
+          <td><button class="button" onclick="viewCard('${animal.animalNumber || ""}')">📄</button></td>
+          <td><button class="button" onclick="goToAddEvent('${animal.animalNumber || ""}')">📋</button></td>
+          <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // أزرار الجدول (global)
+    window.viewCard = function(animalNumber){
+      if(!animalNumber) return;
+      location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
+    };
+
+    window.goToAddEvent = function(animalNumber){
+      if(!animalNumber) return;
+      const today = new Date().toISOString().slice(0,10);
+      localStorage.setItem("lastAnimalId", animalNumber);
+      localStorage.setItem("lastEventDate", today);
+      location.href =
+        `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
+    };
+
+    window.deleteAnimal = async function(animalDocId){
+      if(!confirm("هل أنت متأكد من حذف الحيوان؟")) return;
+      await deleteDoc(doc(db, "animals", animalDocId));
+      animalsData = animalsData.filter(a => a.id !== animalDocId);
+      renderTable(animalsData);
+    };
+
+    // فلاتر أعلى الجدول
+    $("searchNumber").addEventListener("input", function(){
+      const q = this.value.trim();
+      renderTable(animalsData.filter(a => (a.animalNumber || "").includes(q)));
     });
-  }
 
-  function renderTable(data) {
-    const tbody  = $("animalBody");
-    const noData = $("noData");
-    tbody.innerHTML = "";
+    window.filterType = function(type){
+      if(!type) return renderTable(animalsData);
+      renderTable(animalsData.filter(a => a.animalType === type));
+    };
 
-    if (!data || data.length === 0) { noData.style.display = "block"; return; }
-    noData.style.display = "none";
+    window.filterReproductiveStatus = function(status){
+      if(!status) return renderTable(animalsData);
+      renderTable(animalsData.filter(a => a.reproductiveStatus === status));
+    };
 
-    data.forEach(animal => {
-      const days = ms => Math.floor(ms / 86400000);
-      const daysInMilk = animal.lastCalvingDate
-        ? days(Date.now() - new Date(animal.lastCalvingDate))
-        : '---';
-      const pregnantDays = (animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate)
-        ? days(Date.now() - new Date(animal.lastInseminationDate))
-        : '---';
-      const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate)
-        ? days(Date.now() - new Date(animal.lastInseminationDate))
-        : '---';
+    window.resetFilter = function(){
+      $("searchNumber").value = "";
+      $("filterReproductive").value = "";
+      $("typeSelector").value = "";
+      renderTable(animalsData);
+    };
 
-      const tr = document.createElement("tr");
-      tr.style.backgroundColor = (animal.animalType === "بقرة") ? "#fffde7" : "#eeeeee";
-      tr.innerHTML = `
-        <td>${animal.animalNumber || ""}</td>
-        <td>${animal.animalType || ""}</td>
-        <td>${animal.breed || ""}</td>
-        <td>${animal.productionStatus || "---"}</td>
-        <td>${daysInMilk}</td>
-        <td>${animal.reproductiveStatus || ""}</td>
-        <td>${inseminatedDays}</td>
-        <td>${animal.dailyMilk ?? "---"}</td>
-        <td>${pregnantDays}</td>
-        <td>${animal.birthDate || "---"}</td>
-        <td>${animal.lastCalvingDate || "---"}</td>
-        <td><button class="button" onclick="viewCard('${animal.animalNumber || ""}')">📄</button></td>
-        <td><button class="button" onclick="goToAddEvent('${animal.animalNumber || ""}')">📋</button></td>
-        <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // أزرار الجدول (global)
-  window.viewCard = function(animalNumber){
-    if(!animalNumber) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-  };
-
-  window.goToAddEvent = function(animalNumber){
-    if(!animalNumber) return;
-    const today = new Date().toISOString().slice(0,10);
-    localStorage.setItem("lastAnimalId", animalNumber);
-    localStorage.setItem("lastEventDate", today);
-    location.href =
-      `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
-  };
-
-  window.deleteAnimal = async function(animalDocId){
-    if(!confirm("هل أنت متأكد من حذف الحيوان؟")) return;
-    await deleteDoc(doc(db, "animals", animalDocId));
-    animalsData = animalsData.filter(a => a.id !== animalDocId);
-    renderTable(animalsData);
-  };
-
-  // فلاتر أعلى الجدول (بدون تغيير على الـHTML)
-  $("searchNumber").addEventListener("input", function(){
-    const q = this.value.trim();
-    renderTable(animalsData.filter(a => (a.animalNumber || "").includes(q)));
-  });
-
-  window.filterType = function(type){
-    if(!type) return renderTable(animalsData);
-    renderTable(animalsData.filter(a => a.animalType === type));
-  };
-
-  window.filterReproductiveStatus = function(status){
-    if(!status) return renderTable(animalsData);
-    renderTable(animalsData.filter(a => a.reproductiveStatus === status));
-  };
-
-  window.resetFilter = function(){
-    $("searchNumber").value = "";
-    $("filterReproductive").value = "";
-    $("typeSelector").value = "";
-    renderTable(animalsData);
-  };
-
-  loadAnimals();
-</script>
-
-
+    loadAnimals();
+  </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
