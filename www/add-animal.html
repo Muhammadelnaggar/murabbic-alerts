@@ -230,209 +230,123 @@
   <script src="/js/app-core.js" defer></script>
 
   <!-- 2) سكربت الصفحة (Firebase + منطق الصفحة) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ <script type="module">
+  // ✅ استخدمي إعدادات مشروعك الجديد من ملف config الموحد
+  import { db, ensureAuth } from "./js/firebase-config.js";
+  import {
+    collection, addDoc, serverTimestamp, query, where, limit, getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-      authDomain: "murabbik.firebaseapp.com",
-      projectId: "murabbik",
-      storageBucket: "murabbik.appspot.com",
-      messagingSenderId: "402719243568",
-      appId: "1:402719243568:web:631114a260d23202dd5cf5"
-    };
+  // أدوات صغيرة
+  const form   = document.getElementById("animalForm");
+  const msgDiv = document.getElementById("msg");
+  const DASHBOARD_URL = "dashboard.html";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  function setMsg(text, ok=false){
+    msgDiv.textContent = text;
+    msgDiv.className   = ok ? "success" : "error";
+    msgDiv.style.display = "block";
+  }
+  function todayLocal(){
+    const d = new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
 
-    const cowBreeds = ["خليط", "هولشتاين", "جيرسي", "مونبليار", "سيمينتال", "أخرى"];
-    const buffaloBreeds = ["مصري", "هجين إيطالي", "هجين هندي"];
+  // هل للمستخدم حيوانات؟ (لاستخدامه مع زر الرجوع)
+  async function userHasAnimals(userId){
+    const q0 = query(collection(db,"animals"), where("userId","==",userId), limit(1));
+    const s0 = await getDocs(q0);
+    return !s0.empty;
+  }
 
-    function updateBreedOptions() {
-      const animalType = document.getElementById("animalType").value;
-      const breedSelect = document.getElementById("breed");
-      breedSelect.innerHTML = '<option value="">اختر السلالة</option>';
-
-      let breeds = [];
-      if (animalType === "بقرة") {
-        breeds = cowBreeds;
-      } else if (animalType === "جاموسة") {
-        breeds = buffaloBreeds;
-      }
-
-      breeds.forEach(b => {
-        const option = document.createElement("option");
-        option.value = b;
-        option.textContent = b;
-        breedSelect.appendChild(option);
-      });
+  // منطق الرجوع/الإبحار
+  let __hasAnimals = null;
+  window.addEventListener("DOMContentLoaded", async () => {
+    // حملي الحالة الأولية لزر الرجوع
+    history.pushState({page:"add-animal"}, "", location.href);
+    const uid = localStorage.getItem("userId");
+    if (uid){
+      try { __hasAnimals = await userHasAnimals(uid); } catch {}
     }
-
-    function toggleMilkField() {
-      const productionStatus = document.getElementById("productionStatus").value;
-      const milkField = document.getElementById("milkField");
-      const dailyMilkInput = document.getElementById("dailyMilk");
-
-      if (productionStatus === "حلاب") {
-        milkField.style.display = "block";
-        dailyMilkInput.required = true;
+    window.addEventListener("popstate", () => {
+      if (__hasAnimals === false){
+        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+        history.pushState({page:"add-animal"}, "", location.href);
       } else {
-        milkField.style.display = "none";
-        dailyMilkInput.required = false;
-        dailyMilkInput.value = "";
+        location.href = DASHBOARD_URL;
       }
-    }
+    });
 
-    function toggleInseminationField() {
-      const reproductiveStatus = document.getElementById("reproductiveStatus").value;
-      const inseminationField = document.getElementById("inseminationField");
-      const lastInseminationDate = document.getElementById("lastInseminationDate");
-
-      if (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") {
-        inseminationField.style.display = "block";
-        lastInseminationDate.required = true;
-      } else {
-        inseminationField.style.display = "none";
-        lastInseminationDate.required = false;
-        lastInseminationDate.value = "";
-      }
-    }
-
-    // تاريخ اليوم المحلي YYYY-MM-DD
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-
-    // ———— الإبحار فقط (بدون أي تغيير بصري) ————
-    const DASHBOARD_URL = 'dashboard.html';
-    let __hasAnimals = null;
-
-    async function userHasAnimals(userId){
-      const q0 = query(collection(db,'animals'), where('userId','==', userId), limit(1));
-      const snap0 = await getDocs(q0);
-      return !snap0.empty;
-    }
-
-    async function getUserIdWithRetry(tries = 20, delay = 150){
-      for (let i=0;i<tries;i++){
-        const uid = localStorage.getItem('userId');
-        if (uid) return uid;
-        await new Promise(r=>setTimeout(r, delay));
-      }
-      return null;
-    }
-
-    // ربط الأحداث
-    document.getElementById("animalType").addEventListener("change", updateBreedOptions);
-    document.getElementById("productionStatus").addEventListener("change", toggleMilkField);
-    document.getElementById("reproductiveStatus").addEventListener("change", toggleInseminationField);
-
-    // لضبط الحالة الأولية عند تحميل الصفحة + منطق الرجوع
-    window.addEventListener("DOMContentLoaded", async () => {
-      updateBreedOptions();
-      toggleMilkField();
-      toggleInseminationField();
-
-      // إعداد الرجوع للداشبورد للمستخدم الموجود، والمنع للمستخدم الجديد
-      history.pushState({page:'add-animal'}, '', location.href);
-      const uid = await getUserIdWithRetry();
-      if (uid){
-        try { __hasAnimals = await userHasAnimals(uid); } catch(_){ __hasAnimals = null; }
-      }
-      window.addEventListener('popstate', () => {
+    const cancelLink = document.getElementById("cancelLink");
+    if (cancelLink){
+      cancelLink.addEventListener("click", (e)=>{
+        e.preventDefault();
         if (__hasAnimals === false){
-          alert('أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.');
-          history.pushState({page:'add-animal'}, '', location.href);
-        } else {
-          location.href = DASHBOARD_URL;
+          alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+          return;
         }
+        location.href = DASHBOARD_URL;
       });
-
-      // زر إلغاء والعودة (إبحار فقط، بدون أي تنسيق بصري إضافي)
-      const cancelLink = document.getElementById('cancelLink');
-      if (cancelLink){
-        cancelLink.addEventListener('click', (e)=>{
-          e.preventDefault();
-          if (__hasAnimals === false){
-            alert('أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.');
-            return;
-          }
-          location.href = DASHBOARD_URL;
-        });
-      }
-    });
-
-    const form = document.getElementById("animalForm");
-    const msgDiv = document.getElementById("msg");
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      msgDiv.style.display = "none";
-
-      const animalNumber = document.getElementById("animalNumber").value.trim();
-      const animalType = document.getElementById("animalType").value;
-      const breed = document.getElementById("breed").value;
-      const productionStatus = document.getElementById("productionStatus").value;
-      const dailyMilk = document.getElementById("dailyMilk").value.trim();
-      const reproductiveStatus = document.getElementById("reproductiveStatus").value;
-      const birthDate = document.getElementById("birthDate").value;
-      const lastCalvingDate = document.getElementById("lastCalvingDate").value;
-      const lastInseminationDate = document.getElementById("lastInseminationDate").value;
-
-      const userId = localStorage.getItem("userId");
-      if (!userId) {
-        msgDiv.textContent = "خطأ: لا يوجد مستخدم مسجل. يرجى تسجيل الدخول.";
-        msgDiv.className = "error";
-        msgDiv.style.display = "block";
-        return;
-      }
-
-      try {
-        const animalData = {
-          animalNumber,
-          animalType,
-          breed,
-          productionStatus,
-          dailyMilk: productionStatus === "حلاب" ? Number(dailyMilk) : null,
-          reproductiveStatus,
-          birthDate: birthDate || null,
-          lastCalvingDate,
-          lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationDate : null,
-          userId,
-          createdAt: serverTimestamp()
-        };
-
-        await addDoc(collection(db, "animals"), animalData);
-       try {
-  t.event('animal_created', {
-    userId,
-    animalNumber,
-    animalType,
-    breed,
-    productionStatus
+    }
   });
-} catch {}
 
-        // ✅ حفظ آخر رقم + رسالة نجاح + تحويل مباشر إلى صفحة الأحداث
-        localStorage.setItem("lastAnimalId", animalNumber);
-        msgDiv.textContent = "✅ تم تسجيل حيوان جديد بنجاح";
-        msgDiv.className = "success";
-        msgDiv.style.display = "block";
+  // حفظ الحيوان
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    msgDiv.style.display="none";
 
-        const dateStr = todayLocal();
-        location.href = `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+    const animalNumber        = document.getElementById("animalNumber").value.trim();
+    const animalType          = document.getElementById("animalType").value;
+    const breed               = document.getElementById("breed").value;
+    const productionStatus    = document.getElementById("productionStatus").value;
+    const dailyMilkVal        = document.getElementById("dailyMilk").value.trim();
+    const reproductiveStatus  = document.getElementById("reproductiveStatus").value;
+    const birthDate           = document.getElementById("birthDate").value || null;
+    const lastCalvingDate     = document.getElementById("lastCalvingDate").value;
+    const lastInseminationInp = document.getElementById("lastInseminationDate").value;
 
-      } catch (error) {
-        console.error("خطأ في تسجيل الحيوان:", error);
-        msgDiv.textContent = "حدث خطأ أثناء تسجيل الحيوان. حاول مرة أخرى.";
-        msgDiv.className = "error";
-        msgDiv.style.display = "block";
-      }
-    });
-  </script>
+    const userId = localStorage.getItem("userId");
+    if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. يرجى تسجيل الدخول.", false); return; }
+
+    try{
+      // لازم توقيع (Anonymous) قبل الكتابة حسب الـ Rules
+      await ensureAuth();
+
+      const animalData = {
+        animalNumber,
+        animalType,
+        breed,
+        productionStatus,
+        dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal) : null,
+        reproductiveStatus,
+        birthDate,
+        lastCalvingDate,
+        lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationInp : null,
+        userId,
+        createdAt: serverTimestamp()
+      };
+
+      const ref = await addDoc(collection(db, "animals"), animalData);
+
+      // تتبُّع (اختياري)
+      try{ window.t && t.event && t.event("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
+
+      // خزّني الـID والرقم للسياق التالي
+      localStorage.setItem("currentAnimalId",    ref.id);
+      localStorage.setItem("currentAnimalNumber", animalNumber);
+
+      setMsg("✅ تم تسجيل حيوان جديد بنجاح", true);
+
+      // استخدمي معرّف المستند في التوجيه — مش رقم الحيوان
+      const dateStr = todayLocal();
+      location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+
+    }catch(err){
+      console.error("خطأ في تسجيل الحيوان:", err);
+      setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الاتصال والصلاحيات.", false);
+    }
+  });
+</script>
 
   <!-- 3) بعد تهيئة Firebase: الخطّ الزمني + القواعد الذكية (لا تغيير بصري) -->
   <script type="module" src="/js/timeline.js"></script>
@@ -444,6 +358,7 @@
 
 </body>
 </html>
+
 
 
 
