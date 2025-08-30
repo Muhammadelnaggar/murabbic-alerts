@@ -26,6 +26,9 @@
     .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
     .infobar.show{display:block}
     .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+
+    /* Toast داخل النموذج (تستخدم نفس صندوق الرسائل) */
+    .toast{display:block}
   </style>
 </head>
 <body>
@@ -93,7 +96,7 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="save" id="saveBtn" onclick="window.__onSave && window.__onSave()">حفظ التلقيح ✅</button>
+        <button type="button" class="save" id="saveBtn">حفظ التلقيح ✅</button>
         <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
       </div>
 
@@ -106,19 +109,18 @@
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
 
+  <!-- منطق الصفحة -->
   <script type="module">
     const $ = (id)=>document.getElementById(id);
 
-    // تتبع + أدوات مساعدة
-   function track(e,p={}) {
-  try { window.t?.event?.(e,p); } catch(_) {}
-  try { (window.dataLayer = window.dataLayer || []).push({ event:e, ...p }); } catch(_) {}
-  try { console.debug('[track]', e, p); } catch(_) {}
-}
+    function track(e,p={}) {
+      try { window.t?.event?.(e,p); } catch(_) {}
+      try { (window.dataLayer = window.dataLayer || []).push({ event:e, ...p }); } catch(_) {}
+    }
 
     const addDaysISO=(iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
-    // سياق
+    // سياق رقم الحيوان/التاريخ
     function getQuery(){ const p=new URLSearchParams(location.search); return Object.fromEntries(p.entries()); }
     function getCtx(){
       const q = getQuery();
@@ -131,258 +133,136 @@
         eventDate: date
       };
     }
-
     const ctx = getCtx();
     $('animalNumber').value = ctx.animalNumber;
     $('eventDate').value = ctx.eventDate;
 
     track('insemination_page_open',{number:$('animalNumber').value||undefined,date:$('eventDate').value,path:location.pathname});
 
-    // اقتراح/تتبّع تغييرات مهمة
-    $('inseminationMethod')?.addEventListener('change', e=>track('insemination_method_change',{method:e.target.value}));
-    document.querySelectorAll('input[name="inseminationTime"]').forEach(r=>r.addEventListener('change',()=>{
-      const v=document.querySelector('input[name="inseminationTime"]:checked')?.value; track('insemination_time_change',{time:v});
-    }));
-    document.querySelectorAll('input[name="heatStatus"]').forEach(r=>r.addEventListener('change',()=>{
-      const v=document.querySelector('input[name="heatStatus"]:checked')?.value; track('insemination_heat_change',{heat:v});
-    }));
-
     // تحميل مقترحات أسماء الملقّحين
     (async function loadInseminators(){
       try{
         const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
         if(!uid) return;
-        const { getFirestore, collection, query, where, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const { getFirestore, collection, query, where, orderBy, limit, getDocs } =
+          await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
         const db = getFirestore();
         const qry = query(collection(db, 'inseminators'), where('userId','==', uid), orderBy('lastUsedAt','desc'), limit(25));
         const snap = await getDocs(qry);
         const set = new Set();
         const list = document.getElementById('inseminatorsList');
         list.innerHTML = '';
-        snap.forEach(doc=>{ const n = doc.data()?.name; if(n && !set.has(n)){ set.add(n); const opt=document.createElement('option'); opt.value=n; list.appendChild(opt);} });
+        snap.forEach(doc=>{
+          const n = doc.data()?.name;
+          if(n && !set.has(n)){ set.add(n); const opt=document.createElement('option'); opt.value=n; list.appendChild(opt); }
+        });
       }catch(e){ console.warn('loadInseminators skipped', e); }
     })();
 
-    // فتح البطاقة
+    // فتح بطاقة الحيوان
     $('toCardBtn').addEventListener('click', ()=>{
-      const norm = v => (v==null || v==='undefined' || v==='null') ? '' : String(v).trim();
-      const number = norm($('animalNumber').value) || norm(ctx.animalNumber) || '';
+      const number = ($('animalNumber').value || '').trim() || (ctx.animalNumber || '');
       if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
       location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
     });
 
-    // حفظ
-    // ضمان وجود API محلي حتى لو app-core.js ما حمّلش
-if (!window.api || typeof window.api.post !== 'function') {
-  window.api = {
-    async post(){ return { ok:true }; } // فالباك لا يمنع الحفظ في فايرستور
-  };
-}
-
-    async function onSave(){
-      try{
-        const animalNumber = $('animalNumber').value.trim();
-        const eventDate = $('eventDate').value;
-        const inseminator = $('inseminator').value.trim();
-        const semenCode = $('semenCode').value.trim();
-        const inseminationMethod = $('inseminationMethod').value;
-        const inseminationTime = document.querySelector('input[name="inseminationTime"]:checked')?.value;
-        const heatStatus = document.querySelector('input[name="heatStatus"]:checked')?.value;
-
-        track('insemination_save_attempt',{number:animalNumber,date:eventDate,method:inseminationMethod});
-
-        if(!animalNumber || !eventDate || !inseminator || !semenCode || !inseminationMethod || !inseminationTime || !heatStatus){
-          return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
-        }
-        const today = new Date().toISOString().slice(0,10);
-        if(eventDate > today){ return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); }
-
-        // بناء الحمولة
-        const payload = {
-          type: 'تلقيح',
-          eventType: 'insemination',
-          eventDate,
-          animalNumber,
-          number: animalNumber,
-          inseminationMethod,
-          semenCode,
-          inseminator,
-          inseminationTime,
-          heatStatus,
-          source: location.pathname
-        };
-        const notesVal = $('notes').value.trim();
-        if (notesVal) payload.notes = notesVal;
-
-        // تنظيف من أي undefined/null
-        const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([,v]) => v !== undefined && v !== null));
-
-        // API (اختياري)
-      // API (اختياري)
-try {
-  if (window.api?.post) {
-    await window.api.post('/api/events', cleanPayload);
-  }
-} catch (e) {
-  console.warn('API error', e);
-}
-
-
-        // Firestore
-        try{
-          const { getFirestore, collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-          const db = getFirestore();
-          await addDoc(collection(db, 'events'), { ...cleanPayload, createdAt: serverTimestamp() });
-
-          // حفظ اسم الملقّح للاقتراحات لاحقًا
-          const uid = localStorage.getItem('userId') || localStorage.getItem('tenantId') || '';
-          if(uid && inseminator){
-            await addDoc(collection(db, 'inseminators'), {
-              name: inseminator,
-              userId: uid,
-              lastUsedAt: serverTimestamp()
-            });
-          }
-        }catch(e){
-          console.warn('Firestore save failed', e);
-          track('insemination_save_fail',{error:String(e)});
-          return showMsg('تعذّر الحفظ في فايرستور — جرّب لاحقًا', true);
-        }
-
-        // تحديث محلي + اقتراحات ذكية
-        localStorage.setItem('lastEventDate', eventDate);
-        localStorage.setItem('currentAnimalNumber', animalNumber);
-        localStorage.setItem('lastAnimalNumber', animalNumber);
-
-        const suggestions = [
-          `موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`,
-          `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`
-        ];
-        track('insemination_save_success',{number:animalNumber,date:eventDate,suggestions});
-        showMsg(`✅ تم حفظ حدث التلقيح بنجاح. يمكنك المتابعة أو فتح البطاقة.\nاقتراحات: ${suggestions.join('، ')}`, false);
-
-      }catch(err){
-        console.error(err);
-        track('insemination_save_fail',{error:String(err)});
-        showMsg('حدث خطأ غير متوقع أثناء الحفظ', true);
-      }
-    }
-
-    // ربط الزر + Fallback للـ onclick
-    window.__onSave = onSave;
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('saveBtn')?.addEventListener('click', onSave);
-    });
-
-    // رسائل
+    // رسائل داخل النموذج
     function showMsg(text, isError){
       const el = $('info');
       el.className = 'infobar ' + (isError ? 'show error' : 'show');
       el.textContent = text;
     }
-  </script>
 
-  <!-- طبقة توافق: التقاط number/date من URL أو التخزين -->
-  <script type="module">
-    const $ = id => document.getElementById(id);
-    const norm = v => (v==null || v==='undefined' || v==='null' || v==='NaN') ? '' : String(v).trim();
-    const qs = new URLSearchParams(location.search);
+    // حفظ على فايرستور
+    import { db, auth, ensureAuth } from "./js/firebase-config.js";
+    import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    let number = norm(qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
-    let eventDate = norm(qs.get('date') || qs.get('eventDate') || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10));
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) eventDate = new Date().toISOString().slice(0,10);
+    const COL = localStorage.getItem('events_collection') || 'events';
 
-    if ($('animalNumber')) {
-      const cur = ($('animalNumber').value || '').trim();
-      if (cur === '' || cur === 'undefined' || cur === 'null') $('animalNumber').value = number || '';
-    }
-    if ($('eventDate')) {
-      const curD = ($('eventDate').value || '').trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(curD)) $('eventDate').value = eventDate || new Date().toISOString().slice(0,10);
-    }
+    async function onSave(){
+      try{
+        const animalNumber = $('animalNumber').value.trim();
+        const eventDate    = $('eventDate').value;
+        const inseminator  = $('inseminator').value.trim();
+        const semenCode    = $('semenCode').value.trim();
+        const method       = $('inseminationMethod').value;
+        const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value;
+        const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value;
+        const notes        = $('notes').value.trim();
 
-    if (!qs.get('number') || !qs.get('date')) {
-      console.warn('[insemination] opened without full params', location.pathname, [...qs.entries()]);
-    }
+        track('insemination_save_attempt',{number:animalNumber,date:eventDate,method});
 
-    if (number)   { localStorage.setItem('currentAnimalNumber', number); localStorage.setItem('lastAnimalNumber', number); }
-    if (eventDate){ localStorage.setItem('lastEventDate', eventDate); }
-  </script>
-  <!-- سكربت حفظ حدث التلقيح: ضعيه بعد سكربت التهيئة مباشرة، وقبل </body> -->
-<script type="module">
-  import { db, ensureAuth } from "./js/firebase-config.js";
-  import { addDoc, collection, serverTimestamp }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        if(!animalNumber || !eventDate || !inseminator || !semenCode || !method || !timeOfDay || !heatState){
+          return showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
+        }
+        const today = new Date().toISOString().slice(0,10);
+        if(eventDate > today){ return showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); }
 
-  // اسم مجموعة الأحداث (من localStorage لو موجود)
-  const COL = localStorage.getItem("events_collection") || "events";
+        // تأكيد التوقيع (حسب القواعد)
+        await ensureAuth();
 
-  // جلب الفورم (عدّلي الـid لو اسمك مختلف)
-  const form =
-    document.getElementById("inseminationForm") ||
-    document.getElementById("eventForm");
+        const userId = localStorage.getItem('userId') || (auth?.currentUser?.uid ?? null);
 
-  // أدوات صغيرة للقراءة
-  const v  = sel => (document.querySelector(sel)?.value || "").trim();
-  const dv = sel =>  document.querySelector(sel)?.value || "";
-  const ch = name => (document.querySelector(`input[name="${name}"]:checked`)?.value || "");
-  const todayLocal = () => {
-    const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  };
+        const payload = {
+          type: 'insemination',
+          eventType: 'insemination',
+          eventDate,
+          animalNumber,
+          number: animalNumber,
+          inseminationMethod: method,
+          semenCode,
+          inseminator,
+          inseminationTime: timeOfDay,
+          heatStatus: heatState,
+          notes: notes || null,
+          userId,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        };
 
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
+        const ref = await addDoc(collection(db, COL), payload);
 
-    const animalNumber = v("#animalNumber");
-    // يدعم أي id: eventDate أو inseminationDate
-    const date         = dv("#eventDate") || dv("#inseminationDate") || todayLocal();
-    const method       = v("#method");
-    const semenCode    = v("#semenCode");
-    const inseminator  = v("#inseminator");
-    const timeOfDay    = ch("time");
-    const heatState    = ch("heat");
-    const notes        = v("#notes");
-    const userId       = localStorage.getItem("userId") || null;
+        // تذكيرات ذكية
+        const suggestions = [
+          `موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`,
+          `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`
+        ];
+        track('insemination_save_success',{number:animalNumber,date:eventDate,suggestions});
 
-    if (!animalNumber || !date || !method || !semenCode || !inseminator) {
-      alert("أكملي الحقول المطلوبة (*)"); return;
-    }
+        // رسالة تأكيد داخل النموذج
+        showMsg(`✅ تم حفظ حدث التلقيح بنجاح. ${suggestions.join(' — ')}`, false);
 
-    try {
-      await ensureAuth();
+        // تخزين محلي
+        localStorage.setItem('lastEventDate', eventDate);
+        localStorage.setItem('currentAnimalNumber', animalNumber);
+        localStorage.setItem('lastAnimalNumber', animalNumber);
 
-      const payload = {
-        type: "insemination",
-        animalNumber, date, method,
-        semenCode, inseminator, timeOfDay, heatState,
-        notes: notes || null,
-        userId,
-        createdAt: serverTimestamp()
-      };
+        // إعادة التوجيه اللطيف
+        setTimeout(()=> {
+          location.href = `events.html?number=${encodeURIComponent(animalNumber)}`;
+        }, 900);
 
-      const ref = await addDoc(collection(db, COL), payload);
-
-      // رسالة تأكيد أنيقة داخل النموذج (لو flashOK موجود)
-      if (window.flashOK) {
-        window.flashOK("تم تسجيل حدث التلقيح بنجاح ✅");
+        console.log("saved to", COL, "id=", ref.id);
+      }catch(err){
+        console.error("[insemination save] FAILED", err);
+        track('insemination_save_fail',{error:String(err)});
+        showMsg('تعذّر الحفظ في فايرستور — تحقّق من الاتصال/الصلاحيات.', true);
       }
-
-      // توجيه لطيف بعد التأكيد
-      setTimeout(() => {
-        location.href = `events.html?number=${encodeURIComponent(animalNumber)}`;
-      }, 900);
-
-      console.log("saved to", COL, "id=", ref.id);
-    } catch (err) {
-      console.error("[insemination save]", err);
-      alert("تعذر الحفظ في فايربيز. تحققي من الاتصال والصلاحيات.");
     }
-  });
-</script>
 
+    // ربط الزر
+    document.getElementById('saveBtn')?.addEventListener('click', onSave);
+
+    // طبقة توافق: لو الصفحة فُتحت بدون بارامترات املأ الحقول من التخزين
+    (function compatFill(){
+      const qs = new URLSearchParams(location.search);
+      const norm = v => (v==null || v==='undefined' || v==='null' || v==='NaN') ? '' : String(v).trim();
+      let number   = norm(qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
+      let evDate   = norm(qs.get('date') || qs.get('eventDate') || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10));
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(evDate)) evDate = new Date().toISOString().slice(0,10);
+      if ($('animalNumber') && !($('animalNumber').value||'').trim()) $('animalNumber').value = number || '';
+      if ($('eventDate')    && !($('eventDate').value||'').trim())     $('eventDate').value    = evDate || new Date().toISOString().slice(0,10);
+    })();
+  </script>
 </body>
 </html>
-
-
-
