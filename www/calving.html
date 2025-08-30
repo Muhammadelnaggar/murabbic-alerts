@@ -28,22 +28,14 @@
     .actions-bar button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:12px;cursor:pointer;border:0}
     .actions-bar .save{background:var(--green);color:#fff}
     .actions-bar .ghost{background:#eef2f7;color:#0f172a}
-    .infobar{
-      display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:16px;
-      font-weight:700;text-align:center
-    }
+    .infobar{display:none;margin-top:14px;padding:12px;border-radius:10px;font-size:14px;font-weight:600}
     .infobar.show{display:block}
     .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
     .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .confirm-btn{
-      margin-top:10px;padding:10px 14px;border:0;border-radius:10px;font-weight:800;cursor:pointer;
-      background:#065f46;color:#fff
-    }
   </style>
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
-
   <header>
     <div class="bar">
       <div class="title">تسجيل حدث الولادة</div>
@@ -156,7 +148,7 @@
         </div>
       </div>
 
-      <div id="info" class="infobar" role="status" aria-live="polite"></div>
+      <div id="info" class="infobar"></div>
     </div>
   </main>
 
@@ -165,159 +157,131 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
-  <!-- تتبع بسيط (اختياري) -->
-  <script>window.t = window.t || { event(){ try{ (window.dataLayer=window.dataLayer||[]).push(arguments);}catch{}} };</script>
+  <!-- سكربتات التتبع -->
+  <script src="/js/app-core.js"></script>
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
 
-  <!-- Firebase + منطق الصفحة -->
-  <script type="module">
-    import { db, auth, ensureAuth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  <!-- Firebase config (مهم) -->
+<script type="module">
+  import { db, auth, ensureAuth } from '/js/firebase-config.js';
+  import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    const $  = id => document.getElementById(id);
-    const qs = s  => document.querySelector(s);
-    const qsa= s  => Array.from(document.querySelectorAll(s));
-    const EVENTS = localStorage.getItem('events_collection') || 'events';   // 👈 اسم مجموعة الأحداث
+  const $=(id)=>document.getElementById(id);
+  const qs=(s)=>document.querySelector(s);
+  const qsa=(s)=>Array.from(document.querySelectorAll(s));
+  function val(name){const el=qs(`[name="${name}"]:checked`);return el?el.value:''}
 
-    // أدوات
-    const val = name => (document.querySelector(`[name="${name}"]:checked`)?.value || '');
-    function showMsg(text, isError=false){
-      const el = $('info');
-      el.className = 'infobar ' + (isError ? 'show error' : 'show');
-      el.innerHTML = (isError ? '❌ ' : '✅ ') + text +
-        (isError ? '' : '<div><button id="okMsg" class="confirm-btn" type="button">تمّ الفهم ✅</button></div>');
-      try { el.scrollIntoView({behavior:'smooth', block:'center'}); } catch {}
-      // زر تأكيد بصري داخل النموذج
-      const ok = document.getElementById('okMsg');
-      ok?.addEventListener('click', ()=>{ el.className='infobar'; el.innerHTML=''; });
-    }
+  // نفس صندوق الرسائل، مع تمريرها لمنتصف الكارت بصريًا بدون تغيير النص
+  function showMsg(text,isError){
+    const el=$('info');
+    el.className='infobar '+(isError?'show error':'show');
+    el.textContent=text;
+    try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
+  }
 
-    // واجهة العرض/الإخفاء حسب الحالة
-    function updateOffspringUI(){
-      const c = val('calfCount');
-      $('offspring2').style.display = (c==='2'||c==='3') ? '' : 'none';
-      $('offspring3').style.display = (c==='3') ? '' : 'none';
-    }
-    function disableGroup(name,disabled){
-      qsa(`[name="${name}"]`).forEach(r=>{ r.disabled=disabled; if(disabled) r.checked=false; });
-    }
-    function disableInputs(selector,disabled){
-      qsa(selector).forEach(el=>{ el.disabled=disabled; if(disabled && 'value' in el) el.value=''; });
-    }
-    function updateModeUI(){
-      const k = $('calvingKind').value;
-      const dead = (k==='نافقة');
-      qsa('.live-only').forEach(el => el.style.display = dead ? 'none' : '');
-      disableGroup('calfCount', dead);
-      disableGroup('calf1Sex', dead);
-      disableGroup('calf2Sex', dead);
-      disableGroup('calf3Sex', dead);
-      disableGroup('calfFate', dead);
-      disableInputs('#calfId,#calf2Id,#calf3Id', dead);
-      if(dead){ qsa('[name="calfCount"]').forEach(r=>r.checked=false); }
-      updateOffspringUI();
-    }
-    qsa('[name="calfCount"]').forEach(r=>r.addEventListener('change', updateOffspringUI));
-    $('calvingKind').addEventListener('change', updateModeUI);
+  function updateOffspringUI(){
+    const c=val('calfCount');
+    $('offspring2').style.display=(c==='2'||c==='3')?'':'none';
+    $('offspring3').style.display=(c==='3')?'':'none';
+  }
+  function disableGroup(name,disabled){qsa(`[name="${name}"]`).forEach(r=>{r.disabled=disabled;if(disabled)r.checked=false})}
+  function disableInputs(selector,disabled){qsa(selector).forEach(el=>{el.disabled=disabled;if(disabled&&'value'in el)el.value=''})}
+  function updateModeUI(){
+    const k=$('calvingKind').value;const dead=(k==='نافقة');
+    qsa('.live-only').forEach(el=>el.style.display=dead?'none':'');
+    disableGroup('calfCount',dead);disableGroup('calf1Sex',dead);
+    disableGroup('calf2Sex',dead);disableGroup('calf3Sex',dead);
+    disableGroup('calfFate',dead);disableInputs('#calfId,#calf2Id,#calf3Id',dead);
+    if(dead){qsa('[name="calfCount"]').forEach(r=>r.checked=false)}
+    updateOffspringUI();
+  }
+  qsa('[name="calfCount"]').forEach(r=>r.addEventListener('change',updateOffspringUI));
+  $('calvingKind').addEventListener('change',updateModeUI);
 
-    // ملء من URL
-    (function hydrate(){
-      const p=new URLSearchParams(location.search);
-      const num=p.get('number')||p.get('animalNumber')||'';
-      const date=p.get('date')||new Date().toISOString().slice(0,10);
-      if(num) $('animalNumber').value=num;
-      $('eventDate').value=date;
-    })();
+  // ملء الحقول من URL
+  (function hydrate(){
+    const p=new URLSearchParams(location.search);
+    const num=p.get('number')||p.get('animalNumber')||'';
+    const date=p.get('date')||new Date().toISOString().slice(0,10);
+    if(num) $('animalNumber').value=num; $('eventDate').value=date;
+  })();
 
-    // فتح بطاقة الحيوان
-    $('toCardBtn').addEventListener('click', ()=>{
-      const n = ($('animalNumber').value||'').trim();
-      if(!n){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    });
+  // زر البطاقة
+  $('toCardBtn').addEventListener('click',()=>{
+    const n=($('animalNumber').value||'').trim();
+    if(!n){showMsg('أدخل رقم الحيوان أولًا',true);return}
+    location.href=`cow-card.html?number=${encodeURIComponent(n)}`;
+  });
 
-    updateModeUI();
+  updateModeUI();
 
-    // حفظ
-    $('saveBtn').addEventListener('click', onSave);
+  // 👈 اسم مجموعة الأحداث من localStorage أو 'events'
+  const EVENTS = localStorage.getItem('events_collection') || 'events';
 
-    async function onSave(){
-      const btn = $('saveBtn');
-      try{
-        btn.disabled = true;
-        const prevTxt = btn.textContent;
-        btn.textContent = 'جارٍ الحفظ…';
+  // زر الحفظ
+  $('saveBtn').addEventListener('click',onSave);
 
-        const animalNumber = $('animalNumber').value.trim();
-        const eventDate    = $('eventDate').value;
-        const calvingKind  = $('calvingKind').value;
+  async function onSave(){
+    const sv=$('saveBtn');
+    try{
+      sv.disabled=true; const prev=sv.textContent; sv.textContent='جارٍ الحفظ…';
 
-        if(!animalNumber){ showMsg('أدخل رقم الحيوان', true); return; }
-        if(!eventDate){    showMsg('اختر تاريخ الولادة', true); return; }
-        if(!calvingKind){  showMsg('اختر نوع الولادة', true); return; }
+      const animalNumber=$('animalNumber').value.trim();
+      const eventDate=$('eventDate').value;
+      const calvingKind=$('calvingKind').value;
 
-        const dead  = (calvingKind==='نافقة');
-        const count = dead ? 0 : Number(val('calfCount'));
-        if(!dead && !count){ showMsg('اختر عدد المواليد', true); return; }
+      if(!animalNumber){showMsg('أدخل رقم الحيوان',true);sv.disabled=false;sv.textContent=prev;return}
+      if(!eventDate){showMsg('اختر تاريخ الولادة',true);sv.disabled=false;sv.textContent=prev;return}
+      if(!calvingKind){showMsg('اختر نوع الولادة',true);sv.disabled=false;sv.textContent=prev;return}
 
-        const calves=[];
-        if(!dead){
-          const fate = val('calfFate');
-          if(!fate){ showMsg('اختر مصير العجل', true); return; }
-          const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim();
-          if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)', true); return; }
-          calves.push({number:id1,sex:sex1,fate});
+      const dead=(calvingKind==='نافقة');
+      const count=dead?0:Number(val('calfCount'));
+      if(!dead&&!count){showMsg('اختر عدد المواليد',true);sv.disabled=false;sv.textContent=prev;return}
 
-          if(count>=2){
-            const sex2 = val('calf2Sex'); const id2 = $('calf2Id').value.trim();
-            if(!sex2 || !id2){ showMsg('أكمل بيانات المولود (2)', true); return; }
-            calves.push({number:id2,sex:sex2,fate});
-          }
-          if(count>=3){
-            const sex3 = val('calf3Sex'); const id3 = $('calf3Id').value.trim();
-            if(!sex3 || !id3){ showMsg('أكمل بيانات المولود (3)', true); return; }
-            calves.push({number:id3,sex:sex3,fate});
-          }
-        }
-
-        // ✅ تأكيد التوقيع (Project الجديد عبر firebase-config.js)
-        await ensureAuth();
-
-        const uid = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('tenantId') || null;
-
-        // احفظ الحدث في المجموعة المحددة (events / أو الاسم الذي في localStorage)
-        const payload = {
-          type:'ولادة',
-          eventType:'calving',
-          eventDate,
-          animalNumber,
-          calvingKind,
-          calfCount: count,
-          notes: ($('notes').value.trim() || null),
-          uid,
-          createdAt: serverTimestamp(),
-          source: location.pathname
-        };
-        const evRef = await addDoc(collection(db, EVENTS), payload);
-
-        // احفظ بيانات العجول (إن وجدت)
-        for(const c of calves){
-          await addDoc(collection(db,'calves'),{
-            number:c.number, fate:c.fate, birthDate:eventDate,
-            damNumber:animalNumber, sex:c.sex, uid, eventId:evRef.id,
-            createdAt:serverTimestamp(), source:location.pathname
-          });
-        }
-
-        showMsg('تم حفظ حدث الولادة والعجول بنجاح داخل قاعدة البيانات ✅', false);
-        btn.textContent = 'تم الحفظ ✓';
-      }catch(err){
-        console.error(err);
-        showMsg('تعذّر الحفظ في فايربيز. تأكدي من الاتصال والصلاحيات.', true);
-      }finally{
-        // أرجعي الزر بعد ثانيتين (لو فشل)، لو نجح بيفضل "تم الحفظ ✓"
-        setTimeout(()=>{ $('saveBtn').disabled=false; }, 2000);
+      const calves=[];
+      if(!dead){
+        const fate=val('calfFate'); if(!fate){showMsg('اختر مصير العجل',true);sv.disabled=false;sv.textContent=prev;return}
+        const sex1=val('calf1Sex'); const id1=$('calfId').value.trim(); if(!sex1||!id1){showMsg('أكمل بيانات المولود (1)',true);sv.disabled=false;sv.textContent=prev;return}
+        calves.push({number:id1,sex:sex1,fate});
+        if(count>=2){const sex2=val('calf2Sex'); const id2=$('calf2Id').value.trim(); if(!sex2||!id2){showMsg('أكمل بيانات المولود (2)',true);sv.disabled=false;sv.textContent=prev;return} calves.push({number:id2,sex:sex2,fate})}
+        if(count>=3){const sex3=val('calf3Sex'); const id3=$('calf3Id').value.trim(); if(!sex3||!id3){showMsg('أكمل بيانات المولود (3)',true);sv.disabled=false;sv.textContent=prev;return} calves.push({number:id3,sex:sex3,fate})}
       }
+
+      // ✅ تأكيد التوقيع لمشروعك الحالي
+      await ensureAuth();
+
+      const uid=auth?.currentUser?.uid||localStorage.getItem('userId')||localStorage.getItem('tenantId')||null;
+
+      // حفظ الحدث في المجموعة المطلوبة (EVENTS)
+      const payload={
+        type:'ولادة',eventType:'calving',eventDate,animalNumber,
+        calvingKind,calfCount:count,notes:($('notes').value.trim()||null),
+        uid,createdAt:serverTimestamp(),source:location.pathname
+      };
+      const evRef = await addDoc(collection(db, EVENTS), payload);
+
+      // حفظ العجول (إن وجدت)
+      for(const c of calves){
+        await addDoc(collection(db,'calves'),{
+          number:c.number,fate:c.fate,birthDate:eventDate,damNumber:animalNumber,
+          sex:c.sex,uid,eventId:evRef.id,createdAt:serverTimestamp(),source:location.pathname
+        });
+      }
+
+      // 👈 نفس الرسالة المطلوبة، وبالمنتصف، ثم تحويل تلقائي للداشبورد
+      showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
+      setTimeout(()=>{ location.href='dashboard.html'; }, 1200);
+
+      sv.textContent='تم الحفظ ✓';
+    }catch(err){
+      console.error(err);
+      showMsg('تعذّر الحفظ في فايربيز',true);
+    }finally{
+      setTimeout(()=>{ $('saveBtn').disabled=false; }, 1500);
     }
-  </script>
+  }
+</script>
+
 </body>
 </html>
