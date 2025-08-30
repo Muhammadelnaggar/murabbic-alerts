@@ -7,61 +7,38 @@
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
-      --muted:#64748b; --card:#ffffff; --danger:#c2410c; --accent:#fff9db;
-      --border:#e2e8f0;
+      --muted:#64748b; --card:#ffffff; --danger:#c2410c; --border:#e2e8f0;
     }
     *{box-sizing:border-box}
     html, body { max-width:100%; overflow-x:hidden; }
     body { margin:0; font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif; background:var(--bg); color:var(--text); padding:16px; }
     header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px}
-    .dot{width:10px;height:10px;border-radius:50%;background:var(--green)}
     h1{margin:0;font-size:20px;color:var(--green-600);font-weight:800}
     .wrap{max-width:720px;margin:16px auto}
     form{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    label{display:block;margin-top:12px;font-weight:700;color:var(--text)}
-    input[type="text"], input[type="date"]{
-      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;
-      font-size:16px;outline:none;
-    }
+    label{display:block;margin-top:12px;font-weight:700}
+    input[type="text"], input[type="date"]{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none}
     input:focus{border-color:var(--green-600)}
     .radio-group{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
     .radio-group label{font-weight:600}
-    .submit-button{
-      background:var(--green);color:#fff;padding:12px;border:none;border-radius:12px;
-      margin-top:18px;width:100%;font-size:17px;cursor:pointer;font-weight:800
-    }
+    .submit-button{background:var(--green);color:#fff;padding:12px;border:none;border-radius:12px;margin-top:18px;width:100%;font-size:17px;cursor:pointer;font-weight:800}
     .submit-button:hover{background:var(--green-600)}
-    /* صندوق التأكيد داخل النموذج */
-    .confirm{
-      display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px
-    }
+    .confirm{display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px}
     .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:8px}
     .row{display:flex;gap:8px;flex-wrap:wrap}
-    .btn{
-      appearance:none;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700
-    }
+    .btn{appearance:none;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
     .btn-primary{background:var(--green);color:#fff}
-    .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
-    /* حوار صغير */
-    .dialog{
-      display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);
-      align-items:center;justify-content:center;padding:16px;z-index:50
-    }
-    .dialog .card{
-      background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)
-    }
+    .btn-ghost{background:#fff;border:1px solid var(--border)}
+    .dialog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;padding:16px;z-index:50}
+    .dialog .card{background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)}
     .dialog h3{margin:0 0 8px 0;color:var(--green-600)}
     .muted{color:var(--muted);font-size:14px}
   </style>
 </head>
 <body>
-  <header>
-    <div class="dot"></div>
-    <h1>📦 تحضير للولادة</h1>
-  </header>
+  <header><h1>📦 تحضير للولادة</h1></header>
 
   <div class="wrap">
-    <!-- لا تغيير بصري جذري: نفس الروح والألوان -->
     <form id="closeupForm" data-event="closeup" data-redirect="/dashboard.html">
       <label for="animalId">رقم الحيوان:</label>
       <input type="text" id="animalId" name="animalId" required />
@@ -83,7 +60,6 @@
 
       <button type="submit" class="submit-button">تسجيل التحضير</button>
 
-      <!-- ✅ رسالة تأكيد داخل النموذج بعد الحفظ -->
       <div id="confirmBox" class="confirm">
         <div class="title">✅ تم تسجيل تحضير الولادة بنجاح</div>
         <div class="row">
@@ -94,7 +70,6 @@
     </form>
   </div>
 
-  <!-- حوار سؤال إدخال العليقة (يظهر بعد الحفظ لو الإجابة "نعم") -->
   <div id="nutritionDialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="nd_t">
     <div class="card">
       <h3 id="nd_t">إدخال عليقة التحضير؟</h3>
@@ -106,7 +81,7 @@
     </div>
   </div>
 
-  <!-- تتبّع ثابت (منع تكرار page_view) -->
+  <!-- تتبّع خفيف ومنع تكرار page_view -->
   <script>
     (function () {
       window.dataLayer = window.dataLayer || [];
@@ -128,18 +103,14 @@
     })();
   </script>
 
-  <!-- الأساس التحليلي -->
+  <!-- أساسيات مشروع مربيك (بدون تغيير بصري) -->
   <script src="/js/app-core.js" defer></script>
-
-  <!-- الموديولات -->
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
-
-  <!-- الهوية وواجهة الـAPI -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/api.js" defer></script>
 
-  <!-- تتبّع الحدث + منطق الصفحة -->
+  <!-- تتبّع + منطق الصفحة -->
   <script type="module" src="/js/track-closeup.js"></script>
   <script type="module" src="/js/closeup.js"></script>
 </body>
