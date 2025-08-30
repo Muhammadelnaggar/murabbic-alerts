@@ -25,6 +25,7 @@
     .toast .bar span{display:block;height:100%;width:100%;background:#10b981;animation:toast-shrink 1.6s linear forwards}
     @keyframes toast-pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
     @keyframes toast-shrink{from{width:100%}to{width:0%}}
+    #msg.toast.show { display: block; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
 </head>
@@ -151,22 +152,27 @@
   <script src="/js/app-core.js" defer></script>
 
   <!-- ✅ تعريف toast داخل سكربت عادي وتصديره على window -->
-  <script>
-    window.flashOK = function(text, ms = 1600){
-      const box = document.getElementById('msg');
-      if (!box) return;
-      box.className = 'toast show';
-      box.innerHTML = `
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
-          <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-        </svg>
-        <div>${text}</div>
-        <div class="bar"><span></span></div>
-      `;
-      setTimeout(()=>{ box.className='toast'; box.innerHTML=''; }, ms+80);
-    };
-  </script>
+ <script>
+  window.flashOK = function(text, ms = 1600){
+    const box = document.getElementById('msg');
+    if (!box) return;
+    box.className = 'toast show';
+    box.style.display = 'block';  // ✅ إظهار صريحًا ليتجاوز أي ستايل سابق
+    box.innerHTML = `
+      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
+        <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <div>${text}</div>
+      <div class="bar"><span></span></div>
+    `;
+    setTimeout(()=>{
+      box.className = 'toast';
+      box.style.display = 'none'; // ✅ أخفِه بعد الانتهاء
+      box.innerHTML = '';
+    }, ms + 80);
+  };
+</script>
 
   <!-- سكربت الصفحة (Firebase + منطق الصفحة) -->
   <script type="module">
@@ -285,3 +291,4 @@
 
 </body>
 </html>
+
