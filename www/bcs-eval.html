@@ -167,6 +167,7 @@
         <label style="display:flex;gap:8px;align-items:center">تاريخ التقييم
           <input type="date" id="eventDate" class="input" />
         </label>
+          <input id="commentInput" class="input" placeholder="تعليق (اختياري)" />
         <div style="margin-inline-start:auto"></div>
         <button id="backEventsBtn" class="btn" style="padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#f1f5f9;color:#0f172a">
   رجوع للأحداث
@@ -491,31 +492,26 @@ function renderOverall(){
 
   <!-- حفظ التقييم في فايرستور فقط -->
  <!-- حفظ التقييم في فايرستور (نهائي) -->
+<!-- حفظ التقييم في فايرستور (سكور + تعليق) -->
 <script type="module">
-  // تحميل فايرستور
   import { collection, addDoc, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // جلب db, auth من إعداداتك
+  // جلب db, auth من firebase-config.js
   let db = null, auth = null;
   try {
-    const cfg = await import("/js/firebase-config.js"); // لازم يصدّر db (ونختياري auth)
+    const cfg = await import("/js/firebase-config.js");
     db = cfg.db || null;
     auth = cfg.auth || null;
   } catch (e) {
     console.error("Firebase config load error:", e);
   }
 
-  // لو مفيش db يبقى مفيش حفظ
-  if (!db) {
-    console.error("Firestore DB غير متاح. تأكّد أن /js/firebase-config.js بيصدّر db.");
-  }
+  const $ = s => document.querySelector(s);
+  const saveBtn        = $("#saveBtn");
+  const eventDateInput = $("#eventDate");
+  const commentInput   = $("#commentInput");
 
-  // عناصر الواجهة
-  const saveBtn = document.getElementById("saveBtn");
-  const eventDateInput = document.getElementById("eventDate");
-
-  // تاريخ القاهرة الافتراضي
   function todayCairo(){
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
     const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
@@ -525,7 +521,6 @@ function renderOverall(){
     eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
   }
 
-  // ربط زر الحفظ
   if (saveBtn) {
     saveBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -533,7 +528,7 @@ function renderOverall(){
       if (saveBtn.disabled) return;
       saveBtn.disabled = true;
 
-      // لازم يكون فيه سكور محسوب
+      // لازم يكون السكور محسوب
       const bcs = (typeof window.bcsScore === "number") ? Number(window.bcsScore) : NaN;
       if (!Number.isFinite(bcs)) {
         saveBtn.disabled = false;
@@ -541,16 +536,15 @@ function renderOverall(){
         return;
       }
 
-      // بيانات الحدث
+      // تكوين البيانات
       const animalId     = localStorage.getItem("currentAnimalId")     || "";
       const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-      const eventDate    = (eventDateInput && eventDateInput.value)
-                           ? eventDateInput.value
-                           : (localStorage.getItem("currentEventDate") || todayCairo());
-      const uid          = (auth && auth.currentUser && auth.currentUser.uid)
+      const eventDate    = (eventDateInput?.value) || (localStorage.getItem("currentEventDate") || todayCairo());
+      const uid          = (auth?.currentUser?.uid)
                            || localStorage.getItem("userId")
                            || localStorage.getItem("tenantId")
                            || null;
+      const comment      = (commentInput?.value || "").trim();
 
       try {
         await addDoc(collection(db, "events"), {
@@ -559,13 +553,17 @@ function renderOverall(){
           eventDate,
           animalId,
           animalNumber,
-          score: bcs,
-          value: bcs,
+          score: bcs,          // ✅ رقم السكور
+          value: bcs,          // (احتفاظ بالتسمية السابقة لو بتستخدم في أماكن أخرى)
+          comment: comment || null,  // ✅ التعليق
           uid,
           source: location.pathname,
           createdAt: serverTimestamp()
         });
+
         alert("✅ تم حفظ التقييم بنجاح");
+        // (اختياري) لو عايز ترجّع المستخدم لصفحة الأحداث:
+        // location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
       } catch (err) {
         console.error("Firestore save error:", err);
         alert("❌ حدث خطأ أثناء الحفظ");
@@ -575,40 +573,7 @@ function renderOverall(){
     }, { capture: true });
   }
 </script>
-<script>
-(function(){
-  function todayCairo(){
-    var now = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
-    var y = now.getFullYear();
-    var m = String(now.getMonth()+1).padStart(2,'0');
-    var d = String(now.getDate()).padStart(2,'0');
-    return y+'-'+m+'-'+d;
-  }
 
-  document.addEventListener('DOMContentLoaded', function(){
-    // يملأ التاريخ بتاريخ اليوم لو فاضي
-    var dateInput = document.getElementById('eventDate');
-    if(dateInput && !dateInput.value){
-      dateInput.value = (localStorage.getItem('currentEventDate') || todayCairo());
-    }
-
-    // زر الرجوع لصفحة الأحداث مع تمرير التاريخ
-    var backBtn = document.getElementById('backEventsBtn');
-    if(backBtn){
-      backBtn.addEventListener('click', function(){
-        var date = (dateInput && dateInput.value) ? dateInput.value : todayCairo();
-        try{ localStorage.setItem('currentEventDate', date); }catch(e){}
-
-        // مسار صفحة الأحداث (عدله لو مختلف عندك)
-        var qs = new URLSearchParams(location.search);
-        var returnUrl = qs.get('return') || '/add-event.html'; // بدّله لمسارك الحقيقي لو مش /events.html
-        var sep = returnUrl.indexOf('?')>=0 ? '&' : '?';
-        location.href = returnUrl + sep + 'date=' + encodeURIComponent(date);
-      });
-    }
-  });
-})();
-</script>
 <script>
   // تفعيل زر "رفع صورة بديلة" + معالجة الصورة واحتساب الدرجة
   document.addEventListener('DOMContentLoaded', () => {
