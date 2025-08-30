@@ -308,7 +308,81 @@ try {
     if (number)   { localStorage.setItem('currentAnimalNumber', number); localStorage.setItem('lastAnimalNumber', number); }
     if (eventDate){ localStorage.setItem('lastEventDate', eventDate); }
   </script>
+  <!-- سكربت حفظ حدث التلقيح: ضعيه بعد سكربت التهيئة مباشرة، وقبل </body> -->
+<script type="module">
+  import { db, ensureAuth } from "./js/firebase-config.js";
+  import { addDoc, collection, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // اسم مجموعة الأحداث (من localStorage لو موجود)
+  const COL = localStorage.getItem("events_collection") || "events";
+
+  // جلب الفورم (عدّلي الـid لو اسمك مختلف)
+  const form =
+    document.getElementById("inseminationForm") ||
+    document.getElementById("eventForm");
+
+  // أدوات صغيرة للقراءة
+  const v  = sel => (document.querySelector(sel)?.value || "").trim();
+  const dv = sel =>  document.querySelector(sel)?.value || "";
+  const ch = name => (document.querySelector(`input[name="${name}"]:checked`)?.value || "");
+  const todayLocal = () => {
+    const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  };
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const animalNumber = v("#animalNumber");
+    // يدعم أي id: eventDate أو inseminationDate
+    const date         = dv("#eventDate") || dv("#inseminationDate") || todayLocal();
+    const method       = v("#method");
+    const semenCode    = v("#semenCode");
+    const inseminator  = v("#inseminator");
+    const timeOfDay    = ch("time");
+    const heatState    = ch("heat");
+    const notes        = v("#notes");
+    const userId       = localStorage.getItem("userId") || null;
+
+    if (!animalNumber || !date || !method || !semenCode || !inseminator) {
+      alert("أكملي الحقول المطلوبة (*)"); return;
+    }
+
+    try {
+      await ensureAuth();
+
+      const payload = {
+        type: "insemination",
+        animalNumber, date, method,
+        semenCode, inseminator, timeOfDay, heatState,
+        notes: notes || null,
+        userId,
+        createdAt: serverTimestamp()
+      };
+
+      const ref = await addDoc(collection(db, COL), payload);
+
+      // رسالة تأكيد أنيقة داخل النموذج (لو flashOK موجود)
+      if (window.flashOK) {
+        window.flashOK("تم تسجيل حدث التلقيح بنجاح ✅");
+      }
+
+      // توجيه لطيف بعد التأكيد
+      setTimeout(() => {
+        location.href = `events.html?number=${encodeURIComponent(animalNumber)}`;
+      }, 900);
+
+      console.log("saved to", COL, "id=", ref.id);
+    } catch (err) {
+      console.error("[insemination save]", err);
+      alert("تعذر الحفظ في فايربيز. تحققي من الاتصال والصلاحيات.");
+    }
+  });
+</script>
+
 </body>
 </html>
+
 
 
