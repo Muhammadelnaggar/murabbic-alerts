@@ -230,14 +230,13 @@
   <script src="/js/app-core.js" defer></script>
 
   <!-- 2) سكربت الصفحة (Firebase + منطق الصفحة) -->
- <script type="module">
-  // ✅ استخدمي إعدادات مشروعك الجديد من ملف config الموحد
+<script type="module">
+  // استخدمي إعدادات مشروع murabbik-470511 من ملفك الموحّد
   import { db, ensureAuth } from "./js/firebase-config.js";
   import {
     collection, addDoc, serverTimestamp, query, where, limit, getDocs
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // أدوات صغيرة
   const form   = document.getElementById("animalForm");
   const msgDiv = document.getElementById("msg");
   const DASHBOARD_URL = "dashboard.html";
@@ -252,21 +251,16 @@
     return d.toISOString().slice(0,10);
   }
 
-  // هل للمستخدم حيوانات؟ (لاستخدامه مع زر الرجوع)
-  async function userHasAnimals(userId){
-    const q0 = query(collection(db,"animals"), where("userId","==",userId), limit(1));
-    const s0 = await getDocs(q0);
-    return !s0.empty;
-  }
-
-  // منطق الرجوع/الإبحار
+  // رجوع ذكي
   let __hasAnimals = null;
   window.addEventListener("DOMContentLoaded", async () => {
-    // حملي الحالة الأولية لزر الرجوع
     history.pushState({page:"add-animal"}, "", location.href);
     const uid = localStorage.getItem("userId");
     if (uid){
-      try { __hasAnimals = await userHasAnimals(uid); } catch {}
+      try {
+        const s0 = await getDocs(query(collection(db,"animals"), where("userId","==",uid), limit(1)));
+        __hasAnimals = !s0.empty;
+      } catch {}
     }
     window.addEventListener("popstate", () => {
       if (__hasAnimals === false){
@@ -276,18 +270,15 @@
         location.href = DASHBOARD_URL;
       }
     });
-
-    const cancelLink = document.getElementById("cancelLink");
-    if (cancelLink){
-      cancelLink.addEventListener("click", (e)=>{
-        e.preventDefault();
-        if (__hasAnimals === false){
-          alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-          return;
-        }
-        location.href = DASHBOARD_URL;
-      });
-    }
+    const cancel = document.getElementById("cancelLink");
+    cancel?.addEventListener("click",(e)=>{
+      e.preventDefault();
+      if (__hasAnimals === false){
+        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+        return;
+      }
+      location.href = DASHBOARD_URL;
+    });
   });
 
   // حفظ الحيوان
@@ -306,10 +297,10 @@
     const lastInseminationInp = document.getElementById("lastInseminationDate").value;
 
     const userId = localStorage.getItem("userId");
-    if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. يرجى تسجيل الدخول.", false); return; }
+    if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. ادخل أولاً.", false); return; }
 
     try{
-      // لازم توقيع (Anonymous) قبل الكتابة حسب الـ Rules
+      // لازم توقيع (Anonymous) قبل الكتابة
       await ensureAuth();
 
       const animalData = {
@@ -317,36 +308,36 @@
         animalType,
         breed,
         productionStatus,
-        dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal) : null,
+        dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
         reproductiveStatus,
         birthDate,
         lastCalvingDate,
-        lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationInp : null,
+        lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationInp || null : null,
         userId,
         createdAt: serverTimestamp()
       };
 
       const ref = await addDoc(collection(db, "animals"), animalData);
 
-      // تتبُّع (اختياري)
-      try{ window.t && t.event && t.event("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
+      // تتبُّع اختياري
+      try{ window.t?.event?.("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
 
-      // خزّني الـID والرقم للسياق التالي
-      localStorage.setItem("currentAnimalId",    ref.id);
+      // خزّني الـID والرقم للسياق القادم
+      localStorage.setItem("currentAnimalId", ref.id);
       localStorage.setItem("currentAnimalNumber", animalNumber);
 
       setMsg("✅ تم تسجيل حيوان جديد بنجاح", true);
 
-      // استخدمي معرّف المستند في التوجيه — مش رقم الحيوان
+      // التوجيه باستخدام الـID الحقيقي
       const dateStr = todayLocal();
       location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
-
     }catch(err){
       console.error("خطأ في تسجيل الحيوان:", err);
       setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الاتصال والصلاحيات.", false);
     }
   });
 </script>
+
 
   <!-- 3) بعد تهيئة Firebase: الخطّ الزمني + القواعد الذكية (لا تغيير بصري) -->
   <script type="module" src="/js/timeline.js"></script>
@@ -358,6 +349,7 @@
 
 </body>
 </html>
+
 
 
 
