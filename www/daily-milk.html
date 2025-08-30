@@ -7,7 +7,7 @@
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
-      --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --danger:#c2410c;
+      --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
     }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
@@ -35,19 +35,22 @@
     .confirm{display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px}
     .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:6px}
     .muted{color:var(--muted);font-size:14px}
-    .err{display:none;margin:12px 0;padding:10px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;border-radius:10px;font-weight:700}
-    /* تكبير خانة رقم الحيوان لتماشي مع باقي الصفحات */
-    #animalId{
-      font-size:20px; padding:14px 16px; border-radius:12px; letter-spacing:.3px; height:56px;
-    }
+    /* رسالة مستخدم عامة (من غير تفاصيل تقنية) */
+    .msg{display:none;margin:12px 0;padding:10px;border:1px solid #fde68a;background:#fffbeb;color:#7c2d12;border-radius:10px;font-weight:700}
+    /* تكبير خانة رقم الحيوان */
+    #animalId{font-size:20px;padding:14px 16px;border-radius:12px;letter-spacing:.3px;height:56px}
     .hide{display:none !important}
+    /* شريط ديباچ اختياري للمطور (يظهر مع ?debug=1) */
+    #devbar{display:none;position:fixed;top:0;left:0;right:0;z-index:99;background:#111;color:#0f0;font:12px/1.4 monospace;padding:6px}
   </style>
 </head>
 <body>
+  <div id="devbar"></div>
   <header><h1>🥛 تسجيل إنتاج اللبن اليومي</h1></header>
 
   <div class="wrap">
-    <div id="err" class="err"></div>
+    <!-- رسالة عامة للمستخدم عند الحاجة فقط -->
+    <div id="msg" class="msg" aria-live="polite"></div>
 
     <form id="milkForm">
       <div class="row">
@@ -68,7 +71,6 @@
       </div>
 
       <div id="sessions">
-        <!-- حقول الحلبات تتغير حسب النوع -->
         <div class="row">
           <div class="col">
             <label id="s1label" for="s1">حلبة 1 (كجم)</label>
@@ -100,11 +102,16 @@
   </div>
 
   <script type="module">
+    // ===== إعداد وضع التطوير الاختياري =====
+    const DEV = new URL(location.href).searchParams.get('debug') === '1' || localStorage.getItem('debug') === '1';
+    const devbar = document.getElementById('devbar');
+    function dev(msg){ if(DEV){ devbar.style.display='block'; devbar.textContent = String(msg); } console.error(msg); }
+
     // ===== أدوات عامة =====
     const $ = (id)=> document.getElementById(id);
-    const errBox = $('err');
-    function showErr(msg){ errBox.textContent = '⚠️ ' + msg; errBox.style.display = 'block'; }
-    function hideErr(){ errBox.style.display = 'none'; errBox.textContent=''; }
+    const msgBox = $('msg');
+    function showMsg(text){ msgBox.textContent = text; msgBox.style.display = 'block'; }
+    function hideMsg(){ msgBox.textContent=''; msgBox.style.display = 'none'; }
     function getQS(k){ return new URL(location.href).searchParams.get(k) || ''; }
     function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
     function buildUrl(path, params){
@@ -116,24 +123,17 @@
     }
     function toNum(v){ const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; }
 
-    // ===== تفعيل/إخفاء حلبة ثالثة حسب النوع =====
+    // ===== تفعيل/إخفاء الحلبة الثالثة حسب النوع =====
     const colS3 = $('col-s3'), s1label = $('s1label'), s2label = $('s2label'), s3label = $('s3label');
     function applyKindUI(kind){
       if (kind === 'buffalo'){
-        // جاموسة = حلبتان
-        colS3.classList.add('hide');
-        s1label.textContent = 'حلبة صباح (كجم)';
-        s2label.textContent = 'حلبة مساء (كجم)';
+        colS3.classList.add('hide'); s1label.textContent='حلبة صباح (كجم)'; s2label.textContent='حلبة مساء (كجم)';
       } else {
-        // بقرة = 3 حلبات
-        colS3.classList.remove('hide');
-        s1label.textContent = 'حلبة 1 (كجم)';
-        s2label.textContent = 'حلبة 2 (كجم)';
-        s3label.textContent = 'حلبة 3 (كجم)';
+        colS3.classList.remove('hide'); s1label.textContent='حلبة 1 (كجم)'; s2label.textContent='حلبة 2 (كجم)'; s3label.textContent='حلبة 3 (كجم)';
       }
     }
 
-    // ===== تهيئة القيم من السياق =====
+    // ===== تهيئة السياق =====
     const inputAnimal = $('animalId');
     const inputDate   = $('eventDate');
     const kindRadios  = Array.from(document.querySelectorAll('input[name="kind"]'));
@@ -142,28 +142,26 @@
     const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
                                    localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
     const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
-
     if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
     if (!inputDate.value   && qsDate)   inputDate.value   = qsDate;
-
     let currentKind = (qsKind === 'buffalo' || qsKind === 'cow') ? qsKind : 'buffalo';
     kindRadios.forEach(r => { r.checked = (r.value === currentKind); r.addEventListener('change', ()=> {
       if (r.checked){ currentKind = r.value; localStorage.setItem('lastKind', currentKind); applyKindUI(currentKind); }
     })});
     applyKindUI(currentKind);
 
-    // ===== ربط فايرستور عبر /js/firebase-config.js =====
+    // ===== ربط فايرستور (من غير أي رسائل تقنية للمستخدم) =====
     let db, addDoc, collection, serverTimestamp;
     async function ensureDb(){
       try{
         const appMod = await import('/js/firebase-config.js');
-        const app = appMod.app || appMod.default || appMod; // يدعم أشكال التصدير
+        const app = appMod.app || appMod.default || appMod;
         const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
         db = appMod.db || mod.getFirestore(app.app || app);
         addDoc = mod.addDoc; collection = mod.collection; serverTimestamp = mod.serverTimestamp;
       } catch (e){
-        showErr('تعذّر تحميل إعدادات Firebase. تأكّد من وجود /js/firebase-config.js');
-        throw e;
+        // لا نعرض أي تحذير للمستخدم — فقط سجل للمطور
+        dev('Firebase init failed: ' + (e?.message || e));
       }
     }
     await ensureDb();
@@ -176,16 +174,22 @@
     const backDashBtn = $('backDash');
 
     form.addEventListener('submit', async (e)=>{
-      e.preventDefault(); hideErr();
+      e.preventDefault(); hideMsg();
 
       const animalId = inputAnimal.value.trim();
       const eventDate = inputDate.value.trim();
-      const kind = currentKind; // 'cow' | 'buffalo'
+      const kind = currentKind;
       const s1 = toNum($('s1').value), s2 = toNum($('s2').value), s3 = toNum($('s3').value);
       const total = kind === 'buffalo' ? (s1 + s2) : (s1 + s2 + s3);
 
       if (!animalId || !eventDate){
-        showErr('من فضلك أدخل رقم الحيوان وتاريخ اليوم.');
+        showMsg('من فضلك أدخل رقم الحيوان وتاريخ اليوم.');
+        return;
+      }
+      if (!db){
+        // رسالة مستخدم عامة فقط
+        showMsg('تعذّر الحفظ الآن. أعد المحاولة لاحقًا.');
+        dev('Save blocked — Firestore not ready');
         return;
       }
 
@@ -208,23 +212,21 @@
       try{
         await addDoc(collection(db, 'events'), payload);
 
-        // تحديث سياق للصفحات الأخرى
         localStorage.setItem('lastAnimalId', animalId);
         localStorage.setItem('currentAnimalId', animalId);
         localStorage.setItem('eventDate', eventDate);
         localStorage.setItem('lastEventDate', eventDate);
         localStorage.setItem('lastKind', kind);
 
-        // إظهار التأكيد داخل النموذج + الإجمالي
         totalLine.textContent = 'الإجمالي: ' + total.toFixed(1) + ' كجم';
         confirmBox.style.display = 'block';
       } catch(err){
-        console.error('Firestore save error:', err);
-        showErr('تعذّر حفظ اللبن اليومي. تأكّد من الاتصال والصلاحيات ثم أعد المحاولة.');
+        dev('Firestore save error: ' + (err?.message || err));
+        showMsg('تعذّر حفظ اللبن اليومي. أعد المحاولة لاحقًا.');
       }
     });
 
-    // ===== أزرار ما بعد النجاح =====
+    // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
       const url = buildUrl('/add-event.html', {
         animalId: inputAnimal.value.trim(),
@@ -232,9 +234,7 @@
       });
       location.href = url;
     });
-    backDashBtn.addEventListener('click', ()=>{
-      location.href = '/dashboard.html';
-    });
+    backDashBtn.addEventListener('click', ()=>{ location.href = '/dashboard.html'; });
   </script>
 </body>
 </html>
