@@ -493,32 +493,55 @@ function renderOverall(){
   <!-- حفظ التقييم في فايرستور فقط -->
  <!-- حفظ التقييم في فايرستور (نهائي) -->
 <!-- حفظ التقييم في فايرستور (سكور + تعليق) -->
+<!-- حفظ التقييم في فايرستور (score + وصف برمجي) -->
 <script type="module">
   import { collection, addDoc, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // جلب db, auth من firebase-config.js
-  let db = null, auth = null;
+  // نحاول جلب db, auth, ensureAuth من إعداداتك الموحدة
+  let db = null, auth = null, ensureAuth = null;
   try {
     const cfg = await import("/js/firebase-config.js");
     db = cfg.db || null;
     auth = cfg.auth || null;
+    ensureAuth = cfg.ensureAuth || (async ()=>{});
   } catch (e) {
     console.error("Firebase config load error:", e);
   }
 
-  const $ = s => document.querySelector(s);
+  const $ = (s)=>document.querySelector(s);
   const saveBtn        = $("#saveBtn");
   const eventDateInput = $("#eventDate");
-  const commentInput   = $("#commentInput");
 
   function todayCairo(){
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const now = new Date(new Date().toLocaleString("en-US",{timeZone:"Africa/Cairo"}));
     const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
     return `${y}-${m}-${d}`;
   }
   if (eventDateInput && !eventDateInput.value) {
     eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+  }
+
+  // مولّد وصف برمجي اعتمادًا على السكور والنوع
+  function labelForScore(s){
+    if(s == null) return "—";
+    if(s < 1.6) return "نحيفة جدًا";
+    if(s < 2.5) return "نحيفة";
+    if(Math.abs(s - 3) < 0.06) return "مثالية";
+    if(s < 3.7) return "تميل للسمنة";
+    if(s < 4.6) return "سمينة";
+    return "سمينة جدًا";
+  }
+  function buildBCSNote(bcs){
+    const kindLS = localStorage.getItem("animalKind");               // 'cow' | 'buffalo'
+    const kind = (document.getElementById("kindBuffalo")?.checked) ? 'buffalo' : (kindLS || 'cow');
+    const type = document.getElementById("animalType")?.value || localStorage.getItem("animalType") || "";
+    const label = labelForScore(bcs);
+    const range = (kind === 'buffalo') ? "1–5" : "2–5";
+    const ideal = "3";
+    const kindTxt = (kind === 'buffalo') ? "جاموس" : "أبقار";
+    const typePart = type ? `، التصنيف: ${type}` : "";
+    return `BCS ${bcs.toFixed(2)} (${label}) — النوع: ${kindTxt}${typePart} — النطاق ${range}؛ المثالي ≈ ${ideal}.`;
   }
 
   if (saveBtn) {
@@ -528,23 +551,23 @@ function renderOverall(){
       if (saveBtn.disabled) return;
       saveBtn.disabled = true;
 
-      // لازم يكون السكور محسوب
+      // لازم يكون السكور متحسب
       const bcs = (typeof window.bcsScore === "number") ? Number(window.bcsScore) : NaN;
       if (!Number.isFinite(bcs)) {
         saveBtn.disabled = false;
-        alert("⚠️ احسب التقييم أولاً قبل الحفظ (التقط الصورة وسيظهر السكور).");
+        alert("⚠️ احسب التقييم أولًا (التقط صورة ليظهر السكور).");
         return;
       }
 
-      // تكوين البيانات
+      try { await ensureAuth?.(); } catch {}
+
       const animalId     = localStorage.getItem("currentAnimalId")     || "";
       const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-      const eventDate    = (eventDateInput?.value) || (localStorage.getItem("currentEventDate") || todayCairo());
-      const uid          = (auth?.currentUser?.uid)
-                           || localStorage.getItem("userId")
-                           || localStorage.getItem("tenantId")
-                           || null;
-      const comment      = (commentInput?.value || "").trim();
+      const eventDate    = eventDateInput?.value || localStorage.getItem("currentEventDate") || todayCairo();
+      const uid          = (auth?.currentUser?.uid) || localStorage.getItem("userId") || localStorage.getItem("tenantId") || null;
+
+      // الوصف البرمجي المطلوب
+      const progDesc = buildBCSNote(bcs);
 
       try {
         await addDoc(collection(db, "events"), {
@@ -553,16 +576,17 @@ function renderOverall(){
           eventDate,
           animalId,
           animalNumber,
-          score: bcs,          // ✅ رقم السكور
-          value: bcs,          // (احتفاظ بالتسمية السابقة لو بتستخدم في أماكن أخرى)
-          comment: comment || null,  // ✅ التعليق
+          score: bcs,            // رقم السكور
+          value: bcs,            // للتوافق إن احتجته بمكان آخر
+          notes: progDesc,       // <-- الوصف البرمجي
+          comment: progDesc,     // <-- نفس الوصف (اختياري) تحت comment
           uid,
           source: location.pathname,
           createdAt: serverTimestamp()
         });
 
         alert("✅ تم حفظ التقييم بنجاح");
-        // (اختياري) لو عايز ترجّع المستخدم لصفحة الأحداث:
+        // (اختياري) تحويل تلقائي لصفحة الأحداث:
         // location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
       } catch (err) {
         console.error("Firestore save error:", err);
