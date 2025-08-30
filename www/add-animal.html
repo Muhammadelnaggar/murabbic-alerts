@@ -183,6 +183,105 @@
       msgDiv.className   = ok ? "success" : "error";
       msgDiv.style.display = "block";
     }
-    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+    function todayLocal(){
+      const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
 
-    // رجو
+    // رجوع ذكي
+    let __hasAnimals = null;
+    window.addEventListener("DOMContentLoaded", async () => {
+      history.pushState({page:"add-animal"}, "", location.href);
+      const uid = localStorage.getItem("userId");
+      if (uid){
+        try {
+          const s0 = await getDocs(query(collection(db,"animals"), where("userId","==",uid), limit(1)));
+          __hasAnimals = !s0.empty;
+        } catch {}
+      }
+      window.addEventListener("popstate", () => {
+        if (__hasAnimals === false){
+          alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+          history.pushState({page:"add-animal"}, "", location.href);
+        } else {
+          location.href = DASHBOARD_URL;
+        }
+      });
+      const cancel = document.getElementById("cancelLink");
+      cancel?.addEventListener("click",(e)=>{
+        e.preventDefault();
+        if (__hasAnimals === false){
+          alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+          return;
+        }
+        location.href = DASHBOARD_URL;
+      });
+    });
+
+    // حفظ الحيوان
+    form.addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      msgDiv.style.display="none";
+
+      const animalNumber        = document.getElementById("animalNumber").value.trim();
+      const animalType          = document.getElementById("animalType").value;
+      const breed               = document.getElementById("breed").value;
+      const productionStatus    = document.getElementById("productionStatus").value;
+      const dailyMilkVal        = document.getElementById("dailyMilk").value.trim();
+      const reproductiveStatus  = document.getElementById("reproductiveStatus").value;
+      const birthDate           = document.getElementById("birthDate").value || null;
+      const lastCalvingDate     = document.getElementById("lastCalvingDate").value;
+      const lastInseminationInp = document.getElementById("lastInseminationDate").value;
+
+      const userId = localStorage.getItem("userId");
+      if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. ادخل أولاً.", false); return; }
+
+      try{
+        // لازم توقيع (Anonymous) قبل الكتابة
+        await ensureAuth();
+
+        const animalData = {
+          animalNumber,
+          animalType,
+          breed,
+          productionStatus,
+          dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
+          reproductiveStatus,
+          birthDate,
+          lastCalvingDate,
+          lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? (lastInseminationInp || null) : null,
+          userId,
+          createdAt: serverTimestamp()
+        };
+
+        const ref = await addDoc(collection(db, "animals"), animalData);
+
+        try{ window.t?.event?.("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
+
+        localStorage.setItem("currentAnimalId", ref.id);
+        localStorage.setItem("currentAnimalNumber", animalNumber);
+
+        // ✅ Toast تأكيد أنيق داخل النموذج
+        window.flashOK("تم تسجيل الحيوان بنجاح ✅");
+
+        // تحويل بعد 1.2 ثانية
+        setTimeout(() => {
+          const dateStr = todayLocal();
+          location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+        }, 1200);
+
+      }catch(err){
+        console.error("خطأ في تسجيل الحيوان:", err);
+        setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الاتصال والصلاحيات.", false);
+      }
+    });
+  </script>
+
+  <!-- سكربتاتك الأصلية كما هي -->
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js" defer></script>
+
+</body>
+</html>
