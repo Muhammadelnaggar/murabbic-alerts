@@ -200,8 +200,11 @@
     MBK.animal.enhanceAnimalList(); // تفعيل “التمرير الذكي”
   });
 <script type="module">
-  import { db, ensureAuth } from '/js/firebase-config.js';
-  import { collection, query, where, getDocs, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  // ✅ استخدمي ملف التهيئة الموحد لمشروعك
+  import { db, ensureAuth } from './js/firebase-config.js';
+  import {
+    collection, query, where, getDocs, deleteDoc, doc
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
   let animalsData = [];
   const userId = localStorage.getItem('userId');
@@ -213,10 +216,10 @@
       return;
     }
 
-    // توقيع سريع حسب القواعد
+    // توقيع سريع لو القواعد بتطلبه
     try { await ensureAuth(); } catch {}
 
-    // حمّل حيوانات المستخدم الحالي
+    // حمّل حيوانات المستخدم الحالي من مجموعة animals
     const q = query(collection(db, 'animals'), where('userId', '==', userId));
     const snap = await getDocs(q);
     animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -224,22 +227,20 @@
     updateTypeOptions();
     renderTable(animalsData);
   }
-  loadAnimals();
 
-  // شغّل قائمة "النوع" أعلى النموذج (أبقار/جاموس)
+  // قائمة النوع أعلى الجدول (أبقار/جاموس)
   function updateTypeOptions() {
-    const typeSelector = document.getElementById('typeSelector');
-    typeSelector.innerHTML = '<option value=\"\">عرض النوع</option>';
+    const sel = document.getElementById('typeSelector');
+    sel.innerHTML = '<option value="">عرض النوع</option>';
     const types = [...new Set(animalsData.map(a => a.animalType).filter(Boolean))];
     for (const t of types) {
-      const opt = document.createElement('option');
-      opt.value = t;
-      opt.textContent = (t === 'بقرة') ? '🐄 الأبقار' : (t === 'جاموسة' ? '🐃 الجاموس' : t);
-      typeSelector.appendChild(opt);
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = (t === 'بقرة') ? '🐄 الأبقار' : (t === 'جاموسة' ? '🐃 الجاموس' : t);
+      sel.appendChild(o);
     }
   }
 
-  // اعرض الجدول (بدون أي تغيير في الأعمدة)
   function renderTable(data) {
     const tbody  = document.getElementById('animalBody');
     const noData = document.getElementById('noData');
@@ -248,14 +249,15 @@
     if (!data || data.length === 0) { noData.style.display = 'block'; return; }
     noData.style.display = 'none';
 
-    data.forEach(animal => {
+    const days = d => Math.floor((Date.now() - new Date(d)) / 86400000);
+
+    for (const animal of data) {
       const tr = document.createElement('tr');
       tr.style.backgroundColor = (animal.animalType === 'بقرة') ? '#fffde7' : '#eeeeee';
 
-      const days = d => Math.floor((Date.now() - new Date(d)) / 86400000);
-      const daysInMilk     = animal.lastCalvingDate ? days(animal.lastCalvingDate) : '---';
-      const pregnantDays   = (animal.reproductiveStatus === 'عشار'   && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
-      const inseminatedDays= (animal.reproductiveStatus === 'ملقحة'  && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
+      const daysInMilk      = animal.lastCalvingDate ? days(animal.lastCalvingDate) : '---';
+      const pregnantDays    = (animal.reproductiveStatus === 'عشار'  && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
+      const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
 
       tr.innerHTML = `
         <td>${animal.animalNumber || ''}</td>
@@ -273,25 +275,26 @@
         <td><button class="button" onclick="goToAddEvent('${animal.animalNumber || ''}')">📋</button></td>
         <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
       `;
-      document.getElementById('animalBody').appendChild(tr);
-    });
+      tbody.appendChild(tr);
+    }
   }
 
-  // الأزرار (بدون تغيير في الشكل/النص)
-  window.viewCard = function(animalNumber) {
+  // ✅ لازم تكون على window عشان onclick يلاقيها
+  window.viewCard = function (animalNumber) {
     if (!animalNumber) return;
     location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
   };
 
-  window.goToAddEvent = function(animalNumber) {
+  window.goToAddEvent = function (animalNumber) {
     const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     const today = d.toISOString().slice(0,10);
-    localStorage.setItem('lastAnimalId', animalNumber);
+    localStorage.setItem('lastAnimalId',  animalNumber);
     localStorage.setItem('lastEventDate', today);
-    location.href = `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
+    location.href =
+      `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
   };
 
-  window.deleteAnimal = async function(animalDocId) {
+  window.deleteAnimal = async function (animalDocId) {
     if (!confirm('هل أنت متأكد من حذف الحيوان؟')) return;
     try {
       await deleteDoc(doc(db, 'animals', animalDocId));
@@ -303,32 +306,36 @@
     }
   };
 
-  // البحث والفلاتر — نفس السلوك لكن على animal.animalType
-  document.getElementById('searchNumber').addEventListener('input', function() {
+  // البحث والفلاتر — نفس الواجهة، لكن على animal.animalType
+  document.getElementById('searchNumber').addEventListener('input', function () {
     const q = this.value.trim();
     renderTable(animalsData.filter(a => (a.animalNumber || '').includes(q)));
   });
 
-  window.filterType = function(type) {
+  window.filterType = function (type) {
     if (!type) return renderTable(animalsData);
     renderTable(animalsData.filter(a => a.animalType === type));
   };
 
-  window.filterReproductiveStatus = function(status) {
+  window.filterReproductiveStatus = function (status) {
     if (!status) return renderTable(animalsData);
     renderTable(animalsData.filter(a => a.reproductiveStatus === status));
   };
 
-  window.resetFilter = function() {
+  window.resetFilter = function () {
     renderTable(animalsData);
     document.getElementById('searchNumber').value = '';
     document.getElementById('filterReproductive').value = '';
     document.getElementById('typeSelector').value = '';
   };
+
+  // ابدأ التحميل
+  loadAnimals();
 </script>
 
 </body>
 </html>
+
 
 
 
