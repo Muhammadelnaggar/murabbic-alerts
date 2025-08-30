@@ -200,35 +200,39 @@
     MBK.animal.enhanceAnimalList(); // تفعيل “التمرير الذكي”
   });
 <script type="module">
-  // ✅ استخدمي ملف التهيئة الموحد لمشروعك
-  import { db, ensureAuth } from './js/firebase-config.js';
+  // نحاول نستورد إعدادات Firebase من المسار النسبي، ولو فشل نجرب الجذر
+  let cfg;
+  try { cfg = await import('./js/firebase-config.js'); }
+  catch { cfg = await import('/js/firebase-config.js'); }
+
+  const { db, ensureAuth } = cfg;
   import {
     collection, query, where, getDocs, deleteDoc, doc
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+  // ===== بيانات وحالة الصفحة =====
   let animalsData = [];
   const userId = localStorage.getItem('userId');
 
+  // تحميل الحيوانات للمستخدم الحالي
   async function loadAnimals() {
     if (!userId) {
       alert('❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.');
       location.href = 'login.html';
       return;
     }
+    try { await (ensureAuth?.()); } catch {}
 
-    // توقيع سريع لو القواعد بتطلبه
-    try { await ensureAuth(); } catch {}
-
-    // حمّل حيوانات المستخدم الحالي من مجموعة animals
-    const q = query(collection(db, 'animals'), where('userId', '==', userId));
-    const snap = await getDocs(q);
+    const snap = await getDocs(
+      query(collection(db, 'animals'), where('userId', '==', userId))
+    );
     animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     updateTypeOptions();
     renderTable(animalsData);
   }
 
-  // قائمة النوع أعلى الجدول (أبقار/جاموس)
+  // قائمة النوع أعلى النموذج (أبقار/جاموس)
   function updateTypeOptions() {
     const sel = document.getElementById('typeSelector');
     sel.innerHTML = '<option value="">عرض النوع</option>';
@@ -241,6 +245,7 @@
     }
   }
 
+  // رسم الجدول
   function renderTable(data) {
     const tbody  = document.getElementById('animalBody');
     const noData = document.getElementById('noData');
@@ -279,7 +284,7 @@
     }
   }
 
-  // ✅ لازم تكون على window عشان onclick يلاقيها
+  // ===== دوال الأزرار (لازم على window) =====
   window.viewCard = function (animalNumber) {
     if (!animalNumber) return;
     location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
@@ -306,7 +311,7 @@
     }
   };
 
-  // البحث والفلاتر — نفس الواجهة، لكن على animal.animalType
+  // ===== البحث والفلاتر بنفس واجهتك =====
   document.getElementById('searchNumber').addEventListener('input', function () {
     const q = this.value.trim();
     renderTable(animalsData.filter(a => (a.animalNumber || '').includes(q)));
@@ -329,12 +334,13 @@
     document.getElementById('typeSelector').value = '';
   };
 
-  // ابدأ التحميل
+  // بدء التحميل
   loadAnimals();
 </script>
 
 </body>
 </html>
+
 
 
 
