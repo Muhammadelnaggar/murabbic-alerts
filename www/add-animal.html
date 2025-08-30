@@ -5,112 +5,26 @@
   <title>إضافة حيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body {
-      font-family: 'Cairo', sans-serif;
-      background: linear-gradient(to bottom right, #eeffdd, #fffedc);
-      padding: 20px;
-      margin: 0;
-    }
-    h1 {
-      text-align: center;
-      color: #2e7d32;
-      font-size: 26px;
-      margin-bottom: 15px;
-      font-weight: bold;
-    }
-    form {
-      max-width: 550px;
-      margin: auto;
-      background-color: #ffffff;
-      padding: 25px;
-      border-radius: 15px;
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
-    }
-    label {
-      display: block;
-      margin-top: 15px;
-      font-weight: bold;
-      color: #2e7d32;
-    }
-    input, select, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 6px;
-      font-size: 16px;
-      border: 1px solid #cddc39;
-      border-radius: 8px;
-      box-sizing: border-box;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #8bc34a;
-      box-shadow: 0 0 5px #cddc39;
-    }
-    button {
-      background-color: #43a047;
-      color: white;
-      margin-top: 25px;
-      font-weight: bold;
-      border: none;
-      transition: background-color 0.3s ease;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #2e7d32;
-    }
-    #msg {
-      margin-bottom: 15px;
-      padding: 10px;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
-      display: none;
-    }
-    #msg.success {
-      background-color: #d1e7dd;
-      color: #0f5132;
-      display: block;
-    }
-    #msg.error {
-      background-color: #f8d7da;
-      color: #842029;
-      display: block;
-    }
+    body{font-family:'Cairo',sans-serif;background:linear-gradient(to bottom right,#eeffdd,#fffedc);padding:20px;margin:0}
+    h1{txt-align:center;text-align:center;color:#2e7d32;font-size:26px;margin-bottom:15px;font-weight:bold}
+    form{max-width:550px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 0 12px rgba(0,0,0,.1)}
+    label{display:block;margin-top:15px;font-weight:bold;color:#2e7d32}
+    input,select,button{width:100%;padding:12px;margin-top:6px;font-size:16px;border:1px solid #cddc39;border-radius:8px;box-sizing:border-box}
+    input:focus,select:focus{outline:none;border-color:#8bc34a;box-shadow:0 0 5px #cddc39}
+    button{background:#43a047;color:#fff;margin-top:25px;font-weight:bold;border:none;transition:background-color .3s ease;cursor:pointer}
+    button:hover{background:#2e7d32}
+    #msg{margin-bottom:15px;padding:10px;border-radius:6px;font-weight:bold;text-align:center;display:none}
+    #msg.success{background:#d1e7dd;color:#0f5132;display:block}
+    #msg.error{background:#f8d7da;color:#842029;display:block}
+
     /* Toast أنيق داخل النموذج */
-.toast {
-  display: none;
-  position: relative;
-  padding: 12px 14px 12px 48px;          /* مساحة للأيقونة */
-  border-radius: 14px;
-  background: #ecfdf5;                   /* أخضر باهت */
-  border: 1px solid #10b98133;
-  color: #065f46;
-  font-weight: 700;
-  box-shadow: 0 8px 24px rgba(16,185,129,.15);
-  margin-bottom: 10px;
-}
-.toast.show { display:block; animation: toast-pop .25s ease-out; }
-.toast .icon {
-  position: absolute;
-  inset-inline-start: 12px;              /* يحترم RTL */
-  top: 50%;
-  transform: translateY(-50%);
-  width: 22px; height: 22px;
-}
-.toast .bar {
-  position: absolute;
-  left: 8px; right: 8px; bottom: 6px;
-  height: 3px; background: #d1fae5;
-  border-radius: 999px; overflow: hidden;
-}
-.toast .bar span {
-  display: block; height: 100%; width: 100%;
-  background: #10b981; animation: toast-shrink 1.6s linear forwards;
-}
-
-@keyframes toast-pop { from {opacity:0; transform: translateY(-6px);} to {opacity:1; transform:none;} }
-@keyframes toast-shrink { from {width:100%} to {width:0%} }
-
+    .toast{display:none;position:relative;padding:12px 14px 12px 48px;border-radius:14px;background:#ecfdf5;border:1px solid #10b98133;color:#065f46;font-weight:700;box-shadow:0 8px 24px rgba(16,185,129,.15);margin-bottom:10px}
+    .toast.show{display:block;animation:toast-pop .25s ease-out}
+    .toast .icon{position:absolute;inset-inline-start:12px;top:50%;transform:translateY(-50%);width:22px;height:22px}
+    .toast .bar{position:absolute;left:8px;right:8px;bottom:6px;height:3px;background:#d1fae5;border-radius:999px;overflow:hidden}
+    .toast .bar span{display:block;height:100%;width:100%;background:#10b981;animation:toast-shrink 1.6s linear forwards}
+    @keyframes toast-pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+    @keyframes toast-shrink{from{width:100%}to{width:0%}}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
 </head>
@@ -170,241 +84,105 @@
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
   </form>
-<!-- ✅ ربط واجهة السلالات/اللبن كـ Fallback (بدون أي تغييرات بصرية) -->
-<script>
-  (function(){
-    const animalTypeEl = document.getElementById('animalType');
-    const breedEl = document.getElementById('breed');
-    const productionEl = document.getElementById('productionStatus');
-    const milkField = document.getElementById('milkField');
-    const dailyMilk = document.getElementById('dailyMilk');
-    const reproductiveEl = document.getElementById('reproductiveStatus');
-    const inseminationField = document.getElementById('inseminationField');
-    const lastInseminationDate = document.getElementById('lastInseminationDate');
 
-    const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
-    const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
-
-    function updateBreedOptionsLocal(){
-      if(!animalTypeEl || !breedEl) return;
-      const type = animalTypeEl.value;
-      const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
-      breedEl.innerHTML = '<option value="">اختر السلالة</option>' +
-        breeds.map(b => `<option value="${b}">${b}</option>`).join('');
-    }
-    function toggleMilkFieldLocal(){
-      if(!productionEl || !milkField || !dailyMilk) return;
-      const show = (productionEl.value === "حلاب");
-      milkField.style.display = show ? "block" : "none";
-      dailyMilk.required = show;
-      if(!show){ dailyMilk.value = ""; }
-    }
-    function toggleInseminationFieldLocal(){
-      if(!reproductiveEl || !inseminationField || !lastInseminationDate) return;
-      const show = (reproductiveEl.value === "ملقحة" || reproductiveEl.value === "عشار");
-      inseminationField.style.display = show ? "block" : "none";
-      lastInseminationDate.required = show;
-      if(!show){ lastInseminationDate.value = ""; }
-    }
-
-    // ربط الأحداث (يدعم change + input للاطمئنان)
-    if (animalTypeEl) ['change','input'].forEach(e => animalTypeEl.addEventListener(e, updateBreedOptionsLocal));
-    if (productionEl) ['change','input'].forEach(e => productionEl.addEventListener(e, toggleMilkFieldLocal));
-    if (reproductiveEl) ['change','input'].forEach(e => reproductiveEl.addEventListener(e, toggleInseminationFieldLocal));
-
-    // حالة أولية عند التحميل
-    document.addEventListener('DOMContentLoaded', ()=>{
-      updateBreedOptionsLocal();
-      toggleMilkFieldLocal();
-      toggleInseminationFieldLocal();
-    });
-
-    // تعرّف بسيط لسهولة التحقق من الـConsole (اختياري)
-    window.__mbkUI = {
-      updateBreedOptions: updateBreedOptionsLocal,
-      toggleMilkField: toggleMilkFieldLocal,
-      toggleInseminationField: toggleInseminationFieldLocal
-    };
-  })();
-</script>
-
-  <!-- تفعيل الذكاء تلقائيًا مرة واحدة إذا غير مفعّل -->
-<script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
-<!-- ثبّت dataLayer + t.event (بدون أي تغيير بصري) -->
+  <!-- واجهة fallback للسلالات/الحليب -->
   <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
+    (function(){
+      const animalTypeEl = document.getElementById('animalType');
+      const breedEl = document.getElementById('breed');
+      const productionEl = document.getElementById('productionStatus');
+      const milkField = document.getElementById('milkField');
+      const dailyMilk = document.getElementById('dailyMilk');
+      const reproductiveEl = document.getElementById('reproductiveStatus');
+      const inseminationField = document.getElementById('inseminationField');
+      const lastInseminationDate = document.getElementById('lastInseminationDate');
 
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
+      const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
+      const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
+
+      function updateBreedOptionsLocal(){
+        if(!animalTypeEl || !breedEl) return;
+        const type = animalTypeEl.value;
+        const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
+        breedEl.innerHTML = '<option value="">اختر السلالة</option>' + breeds.map(b=>`<option value="${b}">${b}</option>`).join('');
       }
-    };
+      function toggleMilkFieldLocal(){
+        if(!productionEl || !milkField || !dailyMilk) return;
+        const show = (productionEl.value === "حلاب");
+        milkField.style.display = show ? "block" : "none";
+        dailyMilk.required = show; if(!show) dailyMilk.value = "";
+      }
+      function toggleInseminationFieldLocal(){
+        if(!reproductiveEl || !inseminationField || !lastInseminationDate) return;
+        const show = (reproductiveEl.value === "ملقحة" || reproductiveEl.value === "عشار");
+        inseminationField.style.display = show ? "block" : "none";
+        lastInseminationDate.required = show; if(!show) lastInseminationDate.value = "";
+      }
+      if (animalTypeEl) ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
+      if (productionEl) ['change','input'].forEach(e=>productionEl.addEventListener(e,toggleMilkFieldLocal));
+      if (reproductiveEl) ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
+      document.addEventListener('DOMContentLoaded', ()=>{ updateBreedOptionsLocal(); toggleMilkFieldLocal(); toggleInseminationFieldLocal(); });
+      window.__mbkUI = { updateBreedOptions: updateBreedOptionsLocal, toggleMilkField: toggleMilkFieldLocal, toggleInseminationField: toggleInseminationFieldLocal };
+    })();
+  </script>
 
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
+  <!-- تفعيل الذكاء مرة واحدة -->
+  <script> if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1'); </script>
 
-<script>
-  if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
-</script>
+  <!-- dataLayer + page_view مرة واحدة -->
+  <script>
+    (function () {
+      window.dataLayer = window.dataLayer || [];
+      window.__sentEvents = window.__sentEvents || new Set();
+      window.t = window.t || { event: function (name, props){ try{
+        props = props || {};
+        if (name === 'page_view'){
+          var key = 'pv:' + (props.page || location.pathname);
+          if (window.__sentEvents.has(key)) return;
+          window.__sentEvents.add(key);
+        }
+        dataLayer.push({event:name, ts:Date.now(), ...props});
+      }catch{}}};
+      t.event('page_view', { page: location.pathname });
+    })();
+  </script>
 
-  <!-- 1) تحليلات خارجية (يرسل page_view تلقائيًا) -->
+  <!-- تحليلات خارجية -->
   <script src="/js/app-core.js" defer></script>
 
-  <!-- 2) سكربت الصفحة (Firebase + منطق الصفحة) -->
-  function flashOK(text, ms = 1600) {
-  const box = document.getElementById('msg');
-  if (!box) return;
-  box.className = 'toast show';
-  box.innerHTML = `
-    <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
-      <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-    </svg>
-    <div>${text}</div>
-    <div class="bar"><span></span></div>
-  `;
-  // إخفاء تلقائي بعد ms
-  setTimeout(() => { box.className = 'toast'; }, ms + 50);
-}
+  <!-- ✅ تعريف toast داخل سكربت عادي وتصديره على window -->
+  <script>
+    window.flashOK = function(text, ms = 1600){
+      const box = document.getElementById('msg');
+      if (!box) return;
+      box.className = 'toast show';
+      box.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
+          <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div>${text}</div>
+        <div class="bar"><span></span></div>
+      `;
+      setTimeout(()=>{ box.className='toast'; box.innerHTML=''; }, ms+80);
+    };
+  </script>
 
-<script type="module">
-  // استخدمي إعدادات مشروع murabbik-470511 من ملفك الموحّد
-  import { db, ensureAuth } from "./js/firebase-config.js";
-  import {
-    collection, addDoc, serverTimestamp, query, where, limit, getDocs
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- سكربت الصفحة (Firebase + منطق الصفحة) -->
+  <script type="module">
+    import { db, ensureAuth } from "./js/firebase-config.js";
+    import { collection, addDoc, serverTimestamp, query, where, limit, getDocs }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const form   = document.getElementById("animalForm");
-  const msgDiv = document.getElementById("msg");
-  const DASHBOARD_URL = "dashboard.html";
+    const form   = document.getElementById("animalForm");
+    const msgDiv = document.getElementById("msg");
+    const DASHBOARD_URL = "dashboard.html";
 
-  function setMsg(text, ok=false){
-    msgDiv.textContent = text;
-    msgDiv.className   = ok ? "success" : "error";
-    msgDiv.style.display = "block";
-  }
-  function todayLocal(){
-    const d = new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  }
-
-  // رجوع ذكي
-  let __hasAnimals = null;
-  window.addEventListener("DOMContentLoaded", async () => {
-    history.pushState({page:"add-animal"}, "", location.href);
-    const uid = localStorage.getItem("userId");
-    if (uid){
-      try {
-        const s0 = await getDocs(query(collection(db,"animals"), where("userId","==",uid), limit(1)));
-        __hasAnimals = !s0.empty;
-      } catch {}
+    function setMsg(text, ok=false){
+      msgDiv.textContent = text;
+      msgDiv.className   = ok ? "success" : "error";
+      msgDiv.style.display = "block";
     }
-    window.addEventListener("popstate", () => {
-      if (__hasAnimals === false){
-        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-        history.pushState({page:"add-animal"}, "", location.href);
-      } else {
-        location.href = DASHBOARD_URL;
-      }
-    });
-    const cancel = document.getElementById("cancelLink");
-    cancel?.addEventListener("click",(e)=>{
-      e.preventDefault();
-      if (__hasAnimals === false){
-        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-        return;
-      }
-      location.href = DASHBOARD_URL;
-    });
-  });
+    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 
-  // حفظ الحيوان
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    msgDiv.style.display="none";
-
-    const animalNumber        = document.getElementById("animalNumber").value.trim();
-    const animalType          = document.getElementById("animalType").value;
-    const breed               = document.getElementById("breed").value;
-    const productionStatus    = document.getElementById("productionStatus").value;
-    const dailyMilkVal        = document.getElementById("dailyMilk").value.trim();
-    const reproductiveStatus  = document.getElementById("reproductiveStatus").value;
-    const birthDate           = document.getElementById("birthDate").value || null;
-    const lastCalvingDate     = document.getElementById("lastCalvingDate").value;
-    const lastInseminationInp = document.getElementById("lastInseminationDate").value;
-
-    const userId = localStorage.getItem("userId");
-    if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. ادخل أولاً.", false); return; }
-
-    try{
-      // لازم توقيع (Anonymous) قبل الكتابة
-      await ensureAuth();
-
-      const animalData = {
-        animalNumber,
-        animalType,
-        breed,
-        productionStatus,
-        dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
-        reproductiveStatus,
-        birthDate,
-        lastCalvingDate,
-        lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? lastInseminationInp || null : null,
-        userId,
-        createdAt: serverTimestamp()
-      };
-
-      const ref = await addDoc(collection(db, "animals"), animalData);
-
-      // تتبُّع اختياري
-      try{ window.t?.event?.("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
-
-      // خزّني الـID والرقم للسياق القادم
-      localStorage.setItem("currentAnimalId", ref.id);
-      localStorage.setItem("currentAnimalNumber", animalNumber);
-
-   flashOK("تم تسجيل الحيوان بنجاح ✅");
-setTimeout(() => {
-  const dateStr = todayLocal();
-  location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
-}, 1200);
-    }catch(err){
-      console.error("خطأ في تسجيل الحيوان:", err);
-      setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الاتصال والصلاحيات.", false);
-    }
-  });
-</script>
-
-
-  <!-- 3) بعد تهيئة Firebase: الخطّ الزمني + القواعد الذكية (لا تغيير بصري) -->
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-
-  <!-- سكربتاتك الأصلية كما هي -->
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
-
-</body>
-</html>
-
-
-
-
-
-
-
-
+    // رجو
