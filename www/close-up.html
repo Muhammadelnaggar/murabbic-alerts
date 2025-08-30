@@ -2,33 +2,38 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تحضير للولادة — إنتاجي (Smart Tracking)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تحضير للولادة — مُرَبِّك</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <style>
     :root{
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
-      --muted:#64748b; --card:#ffffff; --danger:#c2410c; --border:#e2e8f0;
+      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
+      --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --danger:#c2410c;
     }
     *{box-sizing:border-box}
-    html, body { max-width:100%; overflow-x:hidden; }
-    body { margin:0; font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif; background:var(--bg); color:var(--text); padding:16px; }
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px}
-    h1{margin:0;font-size:20px;color:var(--green-600);font-weight:800}
-    .wrap{max-width:720px;margin:16px auto}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px}
+    h1{margin:0;color:var(--green-600);font-size:20px;font-weight:800}
+    .wrap{max-width:720px;margin:16px auto;padding:0 12px}
     form{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     label{display:block;margin-top:12px;font-weight:700}
-    input[type="text"], input[type="date"]{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none}
+    input[type="text"],input[type="date"]{
+      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none
+    }
     input:focus{border-color:var(--green-600)}
     .radio-group{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
     .radio-group label{font-weight:600}
-    .submit-button{background:var(--green);color:#fff;padding:12px;border:none;border-radius:12px;margin-top:18px;width:100%;font-size:17px;cursor:pointer;font-weight:800}
-    .submit-button:hover{background:var(--green-600)}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      appearance:none;border:none;border-radius:12px;padding:12px 14px;cursor:pointer;font-weight:800;font-size:16px
+    }
+    .btn-primary{background:var(--green);color:#fff}
+    .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
+    .submit{width:100%;margin-top:18px}
     .confirm{display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px}
     .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:8px}
     .row{display:flex;gap:8px;flex-wrap:wrap}
-    .btn{appearance:none;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
-    .btn-primary{background:var(--green);color:#fff}
-    .btn-ghost{background:#fff;border:1px solid var(--border)}
+    .err{display:none;margin:12px 0;padding:10px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;border-radius:10px;font-weight:700}
     .dialog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;padding:16px;z-index:50}
     .dialog .card{background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)}
     .dialog h3{margin:0 0 8px 0;color:var(--green-600)}
@@ -39,28 +44,31 @@
   <header><h1>📦 تحضير للولادة</h1></header>
 
   <div class="wrap">
-    <form id="closeupForm" data-event="closeup" data-redirect="/dashboard.html">
-      <label for="animalId">رقم الحيوان:</label>
-      <input type="text" id="animalId" name="animalId" required />
+    <div id="err" class="err"></div>
 
-      <label for="closeupDate">تاريخ التحضير:</label>
-      <input type="date" id="closeupDate" name="closeupDate" required />
+    <form id="closeupForm">
+      <label for="animalId">رقم الحيوان</label>
+      <input id="animalId" name="animalId" inputmode="numeric" autocomplete="off" required />
 
-      <label>عليقة التحضير:</label>
+      <label for="eventDate">تاريخ التحضير</label>
+      <input id="eventDate" name="eventDate" type="date" required />
+
+      <label>عليقة التحضير</label>
       <div class="radio-group">
-        <label><input type="radio" name="ration" value="نعم" required /> نعم</label>
-        <label><input type="radio" name="ration" value="لا" /> لا</label>
+        <label><input type="radio" name="ration" value="نعم" required> نعم</label>
+        <label><input type="radio" name="ration" value="لا"> لا</label>
       </div>
 
-      <label>الأملاح الأنيونية:</label>
+      <label>الأملاح الأنيونية</label>
       <div class="radio-group">
-        <label><input type="radio" name="anionicSalts" value="نعم" required /> نعم</label>
-        <label><input type="radio" name="anionicSalts" value="لا" /> لا</label>
+        <label><input type="radio" name="anionicSalts" value="نعم" required> نعم</label>
+        <label><input type="radio" name="anionicSalts" value="لا"> لا</label>
       </div>
 
-      <button type="submit" class="submit-button">تسجيل التحضير</button>
+      <button class="btn btn-primary submit" type="submit">تسجيل التحضير</button>
 
-      <div id="confirmBox" class="confirm">
+      <!-- ✅ تأكيد داخلي -->
+      <div id="confirmBox" class="confirm" aria-live="polite">
         <div class="title">✅ تم تسجيل تحضير الولادة بنجاح</div>
         <div class="row">
           <button type="button" id="goNutrition" class="btn btn-primary">إدخال العليقة الآن</button>
@@ -70,10 +78,11 @@
     </form>
   </div>
 
+  <!-- مربع حوار “إدخال العليقة؟” -->
   <div id="nutritionDialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="nd_t">
     <div class="card">
       <h3 id="nd_t">إدخال عليقة التحضير؟</h3>
-      <p class="muted">يمكنك الانتقال فورًا لصفحة التغذية لإدخال مكونات العليقة لهذا الحيوان.</p>
+      <p class="muted">يمكنك الانتقال الآن لصفحة التغذية لإدخال مكونات العليقة لهذا الحيوان.</p>
       <div class="row" style="margin-top:10px">
         <button type="button" id="nd_yes" class="btn btn-primary">نعم، انتقل الآن</button>
         <button type="button" id="nd_no" class="btn btn-ghost">لاحقًا</button>
@@ -81,37 +90,123 @@
     </div>
   </div>
 
-  <!-- تتبّع خفيف ومنع تكرار page_view -->
-  <script>
-    (function () {
-      window.dataLayer = window.dataLayer || [];
-      window.__sentEvents = window.__sentEvents || new Set();
-      window.t = window.t || {
-        event: function (name, props) {
-          try {
-            props = props || {};
-            if (name === 'page_view') {
-              const key = 'pv:' + (props.page || location.pathname);
-              if (window.__sentEvents.has(key)) return;
-              window.__sentEvents.add(key);
-            }
-            dataLayer.push({ event: name, ts: Date.now(), ...props });
-          } catch (e) {}
-        }
-      };
-      t.event('page_view', { page: location.pathname });
+  <!-- منطق الصفحة + ربط فايرستور (كلّه في سكربت واحد) -->
+  <script type="module">
+    // 1) تحميل Firebase app (من مشروعك) + Firestore SDK
+    async function getDb(){
+      let appOrDb;
+      try {
+        // تفضيل firestore-config.js إن كان عندك
+        appOrDb = await import('/js/firestore-config.js');
+      } catch(e1){
+        try { appOrDb = await import('/js/firebase-config.js'); }
+        catch(e2){ showErr('لم أجد /js/firestore-config.js ولا /js/firebase-config.js'); throw e2; }
+      }
+      const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+      const app = appOrDb.app || appOrDb.default || appOrDb; // يدعم أشكال التصدير الشائعة
+      const db  = appOrDb.db || mod.getFirestore(app.app || app);
+      return { db, ...mod };
+    }
+
+    // 2) أدوات صغيرة
+    const $ = (id)=> document.getElementById(id);
+    const errBox = $('err');
+    function showErr(msg){ errBox.textContent = '⚠️ ' + msg; errBox.style.display = 'block'; }
+    function hideErr(){ errBox.style.display = 'none'; errBox.textContent=''; }
+    function getQS(name){ return new URL(location.href).searchParams.get(name) || ''; }
+    function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
+    function buildUrl(path, params){
+      const u = new URL(path, location.origin);
+      Object.entries(params||{}).forEach(([k,v])=>{
+        if ((v ?? '').toString().trim() !== '') u.searchParams.set(k, v);
+      });
+      return u.toString();
+    }
+
+    // 3) تهيئة الحقول من السياق (addevent → animalId/date)
+    const inputAnimal = $('animalId');
+    const inputDate = $('eventDate');
+    const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'), localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
+    const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'), localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
+    if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
+    if (!inputDate.value && qsDate)     inputDate.value   = qsDate;
+
+    // 4) الحفظ في Firestore
+    const form = $('closeupForm');
+    const confirmBox = $('confirmBox');
+    const dialog = $('nutritionDialog');
+    const goNutritionBtn = $('goNutrition');
+    const backDashBtn = $('backDash');
+    const ndYes = $('nd_yes');
+    const ndNo  = $('nd_no');
+
+    let db, addDoc, collection, serverTimestamp;
+    (async () => {
+      try {
+        const mod = await getDb();
+        db = mod.db; addDoc = mod.addDoc; collection = mod.collection; serverTimestamp = mod.serverTimestamp;
+      } catch (e) {
+        showErr('تعذّر تهيئة الاتصال بفايرستور.');
+        console.error(e);
+      }
     })();
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault(); hideErr();
+
+      const animalId = inputAnimal.value.trim();
+      const eventDate = inputDate.value.trim();
+      const ration = (form.querySelector('input[name="ration"]:checked')?.value || '').trim();
+      const anionicSalts = (form.querySelector('input[name="anionicSalts"]:checked')?.value || '').trim();
+
+      if (!animalId || !eventDate){
+        showErr('من فضلك أدخل رقم الحيوان وتاريخ التحضير.');
+        return;
+      }
+      if (!db){ showErr('قاعدة البيانات غير جاهزة بعد. حدّث الصفحة أو راجع ملف Firebase config.'); return; }
+
+      const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
+      const payload = {
+        userId, animalId, animalNumber: animalId,
+        eventType: 'تحضير للولادة', type: 'closeup',
+        eventDate, ration, anionicSalts,
+        source: location.pathname, createdAt: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, 'events'), payload);
+
+        // حفظ سياق سهل للصفحات التالية
+        localStorage.setItem('lastAnimalId', animalId);
+        localStorage.setItem('currentAnimalId', animalId);
+        localStorage.setItem('eventDate', eventDate);
+        localStorage.setItem('lastEventDate', eventDate);
+
+        // تأكيد داخل النموذج
+        confirmBox.style.display = 'block';
+
+        // لو المختار "نعم" لعليقة التحضير → اسأل الانتقال
+        if (ration === 'نعم') dialog.style.display = 'flex';
+      } catch (err) {
+        console.error('Firestore save error:', err);
+        showErr('تعذّر حفظ التحضير. تأكّد من الصلاحيات/الاتصال وأعد المحاولة.');
+      }
+    });
+
+    backDashBtn?.addEventListener('click', ()=>{
+      location.href = '/dashboard.html';
+    });
+
+    function goNutrition(){
+      const url = buildUrl('/nutrition.html', {
+        animalId: inputAnimal.value.trim(),
+        date: inputDate.value.trim()
+      });
+      location.href = url;
+    }
+    goNutritionBtn?.addEventListener('click', goNutrition);
+    ndYes?.addEventListener('click', goNutrition);
+    ndNo?.addEventListener('click', ()=>{ dialog.style.display = 'none'; });
   </script>
-
-  <!-- أساسيات مشروع مربيك (بدون تغيير بصري) -->
-  <script src="/js/app-core.js" defer></script>
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
-
-  <!-- تتبّع + منطق الصفحة -->
-  <script type="module" src="/js/track-closeup.js"></script>
-  <script type="module" src="/js/closeup.js"></script>
 </body>
 </html>
