@@ -482,114 +482,86 @@
   </script>
 
   <!-- (المطلوب 4) ربط فايربيز: حفظ التقييم (الدرجة فقط) في Firestore — بدون حفظ الصور -->
-  <script type="module">
-    import { db, auth } from "/js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script type="module">
+  import { db, auth } from "/js/firebase-config.js";
+  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    function todayCairo(){
-      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
-      const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
-      return `${y}-${m}-${d}`;
+  function todayCairo(){
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+    const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // وصف برمجي ثابت للسكور
+  function fecesDesc(score){
+    if (score <= 1.5) return "إسهال";
+    if (score <= 2.5) return "لين";
+    if (score <  3.5) return "قريب للمثالي";
+    if (score === 3.5) return "مثالي";
+    if (score <= 4.5) return "صلب";
+    return "إمساك";
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("saveBtn");
+    const eventDateInput = document.getElementById("eventDate");
+    const animalIdHidden = document.getElementById("animalId");
+    const msgBox = document.getElementById("saveMsg");
+
+    if (eventDateInput && !eventDateInput.value) {
+      eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const btn = document.getElementById("saveBtn");
-      const eventDateInput = document.getElementById("eventDate");
-      const animalIdHidden = document.getElementById("animalId");
+    function showMsg(text, success=true) {
+      if(!msgBox) return;
+      msgBox.textContent = text;
+      msgBox.style.display = "block";
+      msgBox.style.background = success ? "#dcfce7" : "#fee2e2";
+      msgBox.style.color = success ? "#166534" : "#991b1b";
+      msgBox.style.border = success ? "1px solid #86efac" : "1px solid #fca5a5";
+      setTimeout(()=>{ msgBox.style.display="none"; }, 4000);
+    }
 
-      if (eventDateInput && !eventDateInput.value) {
-        eventDateInput.value = localStorage.getItem("currentEventDate") || todayCairo();
+    btn?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (btn.disabled) return;
+
+      const score = Number(window.fecesScore ?? 0);
+      if (!score) { showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false); return; }
+
+      const oldText = btn.textContent;
+      btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
+
+      const animalId     = (animalIdHidden?.value?.trim()) || localStorage.getItem("currentAnimalId") || "";
+      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+      const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
+
+      const uid = (auth?.currentUser?.uid)
+                  || localStorage.getItem("userId")
+                  || localStorage.getItem("tenantId")
+                  || null;
+
+      try {
+        await addDoc(collection(db, "events"), {
+          type: "تقييم الروث بالكاميرا",
+          eventType: "feces_eval",
+          eventDate,
+          animalId,
+          animalNumber,
+          fecesScore: score,            // الرقم
+          description: fecesDesc(score),// الوصف البرمجي
+          value: score,                 // نفس الرقم لتوحيد التقارير
+          uid,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        });
+        showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+      } catch (err) {
+        console.error("Firestore save error:", err);
+        showMsg("❌ حدث خطأ أثناء الحفظ", false);
+      } finally {
+        btn.disabled = false; btn.textContent = oldText;
       }
-      const msgBox = document.getElementById("saveMsg");
-
-function showMsg(text, success=true) {
-  if(!msgBox) return;
-  msgBox.textContent = text;
-  msgBox.style.display = "block";
-  msgBox.style.background = success ? "#dcfce7" : "#fee2e2";   // أخضر أو أحمر
-  msgBox.style.color = success ? "#166534" : "#991b1b";       // خط غامق
-  msgBox.style.border = success ? "1px solid #86efac" : "1px solid #fca5a5";
-  setTimeout(()=>{ msgBox.style.display="none"; }, 4000);     // اختفاء بعد 4 ثوانٍ
-}
-
-btn?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  if (btn.disabled) return;
-  const score = Number(window.fecesScore ?? 0);
-  if (!score) { showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false); return; }
-
-  btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
-
-  const animalId     = (animalIdHidden?.value?.trim()) || localStorage.getItem("currentAnimalId") || "";
-  const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-  const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
-
-  const uid = (auth && auth.currentUser && auth.currentUser.uid)
-              || localStorage.getItem("userId")
-              || localStorage.getItem("tenantId")
-              || null;
-
-  try {
-    await addDoc(collection(db, "events"), {
-      type: "تقييم الروث بالكاميرا",
-      eventType: "feces_eval",
-      eventDate,
-      animalId,
-      animalNumber,
-      fecesScore: score,
-      value: score,
-      uid,
-      source: location.pathname,
-      createdAt: serverTimestamp()
     });
-    showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
-  } catch (err) {
-    console.error("Firestore save error:", err);
-    showMsg("❌ حدث خطأ أثناء الحفظ", false);
-  } finally {
-    btn.disabled = false; btn.textContent = "حفظ التقييم";
-  }
-}, { capture: true });
-
-      btn?.addEventListener("click", async (e) => {
-        e.preventDefault();
-        if (btn.disabled) return;
-        const score = Number(window.fecesScore ?? 0);
-        if (!score) { alert("التقط/ارفع صورة أولًا لاحتساب الدرجة."); return; }
-
-        btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
-
-        const animalId     = (animalIdHidden?.value?.trim()) || localStorage.getItem("currentAnimalId") || "";
-        const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-        const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
-
-        const uid = (auth && auth.currentUser && auth.currentUser.uid)
-                    || localStorage.getItem("userId")
-                    || localStorage.getItem("tenantId")
-                    || null;
-
-        try {
-          await addDoc(collection(db, "events"), {
-            type: "تقييم الروث بالكاميرا",
-            eventType: "feces_eval",
-            eventDate,
-            animalId,
-            animalNumber,
-            fecesScore: score,
-            value: score,
-            uid,
-            source: location.pathname,
-            createdAt: serverTimestamp()
-          });
-          alert("✅ تم حفظ تقييم الروث في فايرستور (بدون صور).");
-        } catch (err) {
-          console.error("Firestore save error:", err);
-          alert("❌ حدث خطأ أثناء الحفظ");
-        } finally {
-          btn.disabled = false; btn.textContent = "حفظ التقييم";
-        }
-      }, { capture: true });
-    });
-  </script>
-</body>
-</html>
+  });
+</script>
