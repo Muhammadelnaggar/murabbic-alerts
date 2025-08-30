@@ -1,5 +1,10 @@
 // /js/track-closeup.js
-import { track } from '/js/track-core.js';
-
-export const onCloseupPrefill = (m = {}) => track('closeup_prefill', m);
-export const onCloseupSave    = (m = {}) => track('closeup_save', m);
+(function(){
+  const f = document.getElementById('closeupForm');
+  if (!f) return;
+  f.addEventListener('change', (e)=>{
+    const n = e.target?.name;
+    if (!n) return;
+    window.t?.event('closeup_change', { field: n, page: location.pathname });
+  }, {passive:true});
+})();
