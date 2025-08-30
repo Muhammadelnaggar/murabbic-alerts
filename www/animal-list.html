@@ -200,146 +200,133 @@
     MBK.animal.enhanceAnimalList(); // تفعيل “التمرير الذكي”
   });
 <script type="module">
-  // نحاول نستورد إعدادات Firebase من المسار النسبي، ولو فشل نجرب الجذر
-  let cfg;
-  try { cfg = await import('./js/firebase-config.js'); }
-  catch { cfg = await import('/js/firebase-config.js'); }
+  import { db, ensureAuth, auth } from "/js/firebase-config.js";
+  import { collection, query, where, getDocs, deleteDoc, doc } 
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const { db, ensureAuth } = cfg;
-  import {
-    collection, query, where, getDocs, deleteDoc, doc
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-  // ===== بيانات وحالة الصفحة =====
+  const $  = id => document.getElementById(id);
   let animalsData = [];
-  const userId = localStorage.getItem('userId');
 
-  // تحميل الحيوانات للمستخدم الحالي
   async function loadAnimals() {
-    if (!userId) {
-      alert('❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.');
-      location.href = 'login.html';
+    await ensureAuth();
+    const uid = localStorage.getItem("userId") || auth?.currentUser?.uid || "";
+    if (!uid) {
+      alert("❗ لا يوجد مستخدم مسجل، يرجى تسجيل الدخول.");
+      location.href = "login.html";
       return;
     }
-    try { await (ensureAuth?.()); } catch {}
-
-    const snap = await getDocs(
-      query(collection(db, 'animals'), where('userId', '==', userId))
-    );
+    const snap = await getDocs(query(collection(db, "animals"), where("userId", "==", uid)));
     animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
     updateTypeOptions();
     renderTable(animalsData);
   }
 
-  // قائمة النوع أعلى النموذج (أبقار/جاموس)
   function updateTypeOptions() {
-    const sel = document.getElementById('typeSelector');
-    sel.innerHTML = '<option value="">عرض النوع</option>';
+    const typeSelector = $("typeSelector");
+    typeSelector.innerHTML = '<option value="">عرض النوع</option>';
     const types = [...new Set(animalsData.map(a => a.animalType).filter(Boolean))];
-    for (const t of types) {
-      const o = document.createElement('option');
-      o.value = t;
-      o.textContent = (t === 'بقرة') ? '🐄 الأبقار' : (t === 'جاموسة' ? '🐃 الجاموس' : t);
-      sel.appendChild(o);
-    }
+    types.forEach(type => {
+      const opt = document.createElement("option");
+      opt.value = type;
+      opt.textContent = (type === "بقرة") ? "🐄 الأبقار" : "🐃 الجاموس";
+      typeSelector.appendChild(opt);
+    });
   }
 
-  // رسم الجدول
   function renderTable(data) {
-    const tbody  = document.getElementById('animalBody');
-    const noData = document.getElementById('noData');
-    tbody.innerHTML = '';
+    const tbody  = $("animalBody");
+    const noData = $("noData");
+    tbody.innerHTML = "";
 
-    if (!data || data.length === 0) { noData.style.display = 'block'; return; }
-    noData.style.display = 'none';
+    if (!data || data.length === 0) { noData.style.display = "block"; return; }
+    noData.style.display = "none";
 
-    const days = d => Math.floor((Date.now() - new Date(d)) / 86400000);
+    data.forEach(animal => {
+      const days = ms => Math.floor(ms / 86400000);
+      const daysInMilk = animal.lastCalvingDate
+        ? days(Date.now() - new Date(animal.lastCalvingDate))
+        : '---';
+      const pregnantDays = (animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate)
+        ? days(Date.now() - new Date(animal.lastInseminationDate))
+        : '---';
+      const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate)
+        ? days(Date.now() - new Date(animal.lastInseminationDate))
+        : '---';
 
-    for (const animal of data) {
-      const tr = document.createElement('tr');
-      tr.style.backgroundColor = (animal.animalType === 'بقرة') ? '#fffde7' : '#eeeeee';
-
-      const daysInMilk      = animal.lastCalvingDate ? days(animal.lastCalvingDate) : '---';
-      const pregnantDays    = (animal.reproductiveStatus === 'عشار'  && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
-      const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate) ? days(animal.lastInseminationDate) : '---';
-
+      const tr = document.createElement("tr");
+      tr.style.backgroundColor = (animal.animalType === "بقرة") ? "#fffde7" : "#eeeeee";
       tr.innerHTML = `
-        <td>${animal.animalNumber || ''}</td>
-        <td>${animal.animalType || ''}</td>
-        <td>${animal.breed || ''}</td>
-        <td>${animal.productionStatus || '---'}</td>
+        <td>${animal.animalNumber || ""}</td>
+        <td>${animal.animalType || ""}</td>
+        <td>${animal.breed || ""}</td>
+        <td>${animal.productionStatus || "---"}</td>
         <td>${daysInMilk}</td>
-        <td>${animal.reproductiveStatus || ''}</td>
+        <td>${animal.reproductiveStatus || ""}</td>
         <td>${inseminatedDays}</td>
-        <td>${animal.dailyMilk ?? '---'}</td>
+        <td>${animal.dailyMilk ?? "---"}</td>
         <td>${pregnantDays}</td>
-        <td>${animal.birthDate || '---'}</td>
-        <td>${animal.lastCalvingDate || '---'}</td>
-        <td><button class="button" onclick="viewCard('${animal.animalNumber || ''}')">📄</button></td>
-        <td><button class="button" onclick="goToAddEvent('${animal.animalNumber || ''}')">📋</button></td>
+        <td>${animal.birthDate || "---"}</td>
+        <td>${animal.lastCalvingDate || "---"}</td>
+        <td><button class="button" onclick="viewCard('${animal.animalNumber || ""}')">📄</button></td>
+        <td><button class="button" onclick="goToAddEvent('${animal.animalNumber || ""}')">📋</button></td>
         <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
       `;
       tbody.appendChild(tr);
-    }
+    });
   }
 
-  // ===== دوال الأزرار (لازم على window) =====
-  window.viewCard = function (animalNumber) {
-    if (!animalNumber) return;
+  // أزرار الجدول (global)
+  window.viewCard = function(animalNumber){
+    if(!animalNumber) return;
     location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
   };
 
-  window.goToAddEvent = function (animalNumber) {
-    const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    const today = d.toISOString().slice(0,10);
-    localStorage.setItem('lastAnimalId',  animalNumber);
-    localStorage.setItem('lastEventDate', today);
+  window.goToAddEvent = function(animalNumber){
+    if(!animalNumber) return;
+    const today = new Date().toISOString().slice(0,10);
+    localStorage.setItem("lastAnimalId", animalNumber);
+    localStorage.setItem("lastEventDate", today);
     location.href =
       `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
   };
 
-  window.deleteAnimal = async function (animalDocId) {
-    if (!confirm('هل أنت متأكد من حذف الحيوان؟')) return;
-    try {
-      await deleteDoc(doc(db, 'animals', animalDocId));
-      animalsData = animalsData.filter(a => a.id !== animalDocId);
-      renderTable(animalsData);
-    } catch (err) {
-      alert('فشل في حذف الحيوان.');
-      console.error(err);
-    }
+  window.deleteAnimal = async function(animalDocId){
+    if(!confirm("هل أنت متأكد من حذف الحيوان؟")) return;
+    await deleteDoc(doc(db, "animals", animalDocId));
+    animalsData = animalsData.filter(a => a.id !== animalDocId);
+    renderTable(animalsData);
   };
 
-  // ===== البحث والفلاتر بنفس واجهتك =====
-  document.getElementById('searchNumber').addEventListener('input', function () {
+  // فلاتر أعلى الجدول (بدون تغيير على الـHTML)
+  $("searchNumber").addEventListener("input", function(){
     const q = this.value.trim();
-    renderTable(animalsData.filter(a => (a.animalNumber || '').includes(q)));
+    renderTable(animalsData.filter(a => (a.animalNumber || "").includes(q)));
   });
 
-  window.filterType = function (type) {
-    if (!type) return renderTable(animalsData);
+  window.filterType = function(type){
+    if(!type) return renderTable(animalsData);
     renderTable(animalsData.filter(a => a.animalType === type));
   };
 
-  window.filterReproductiveStatus = function (status) {
-    if (!status) return renderTable(animalsData);
+  window.filterReproductiveStatus = function(status){
+    if(!status) return renderTable(animalsData);
     renderTable(animalsData.filter(a => a.reproductiveStatus === status));
   };
 
-  window.resetFilter = function () {
+  window.resetFilter = function(){
+    $("searchNumber").value = "";
+    $("filterReproductive").value = "";
+    $("typeSelector").value = "";
     renderTable(animalsData);
-    document.getElementById('searchNumber').value = '';
-    document.getElementById('filterReproductive').value = '';
-    document.getElementById('typeSelector').value = '';
   };
 
-  // بدء التحميل
   loadAnimals();
 </script>
 
+
 </body>
 </html>
+
 
 
 
