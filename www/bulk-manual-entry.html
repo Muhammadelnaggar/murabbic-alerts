@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>إدخال يدوي جماعي — مربيك (اختبار)</title>
+  <style>
+    :root{--bg:#fff9db;--card:#fff;--border:#c5e1a5;--green:#2e7d32;--text:#143b24;--muted:#f6fff2}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--text);padding:18px}
+    .wrap{max-width:1100px;margin:0 auto}
+    h1{margin:0 0 12px;color:#14532d;text-align:center}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .card h2{margin:0 0 10px;font-size:18px;color:#17623b}
+    textarea{width:100%;min-height:140px;background:#fcfff8;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:ui-monospace,Consolas,monospace}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{background:#2e7d32;color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
+    .btn.out{background:#e8f5e9;color:#1b5e20;border:1px solid var(--border)}
+    .help{font-size:13px;color:#315b3f;background:#f6fff2;border:1px solid var(--border);border-radius:10px;padding:8px;margin:8px 0}
+    .ok{color:#1b5e20;font-weight:700}
+    .err{color:#7f1d1d;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    @media (max-width:800px){.grid{grid-template-columns:1fr}}
+    .small{font-size:12px;color:#3a5}
+    .mono{font-family:ui-monospace,Consolas,monospace}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🧪 إدخال يدوي جماعي لاختبار التتبع الذكي</h1>
+
+    <!-- مستخدمون -->
+    <section class="card">
+      <h2>١) المستخدمون (Users)</h2>
+      <div class="help">
+        كل سطر = <span class="mono">userId, name, email</span> — مثال: <span class="mono">demo_u1, Demo User 1, demo1@example.com</span>
+      </div>
+      <div class="row">
+        <button id="tplUsers" class="btn out">توليد 3 مستخدمين افتراضيين</button>
+        <button id="saveUsers" class="btn">حفظ المستخدمين</button>
+        <span id="usersMsg"></span>
+      </div>
+      <textarea id="usersBox" placeholder="demo_u1, Demo User 1, demo1@example.com
+demo_u2, Demo User 2, demo2@example.com"></textarea>
+    </section>
+
+    <!-- الحيوانات -->
+    <section class="card">
+      <h2>٢) الحيوانات (Animals)</h2>
+      <div class="help">
+        كل سطر = <span class="mono">userId, number, animaltype, breed, group, birthDate, lastCalvingDate, lactationNumber</span><br>
+        ـ <b>animaltype</b>: <span class="mono">cow</span> أو <span class="mono">buffalo</span> (تقبل "بقرة/جاموسة" أيضًا).<br>
+        ـ التواريخ بصيغة <span class="mono">YYYY-MM-DD</span>. أي عمود تتركه فاضي يتم تعويضه بقيم معقولة.
+      </div>
+      <div class="row">
+        <button id="tplAnimals" class="btn out">توليد 30 بقرة + 20 جاموسة موزعة على المستخدمين</button>
+        <button id="saveAnimals" class="btn">حفظ الحيوانات</button>
+        <span id="animalsMsg"></span>
+      </div>
+      <textarea id="animalsBox" placeholder="demo_u1, 101, cow, هولشتاين, أ-الحلابات, 2021-05-20, 2025-04-01, 3
+demo_u1, 102, buffalo, بلدي, ب-العشار, 2020-11-10, 2025-03-15, 2"></textarea>
+    </section>
+
+    <!-- الأحداث -->
+    <section class="card">
+      <h2>٣) الأحداث (Events)</h2>
+      <div class="help">
+        كل سطر = <span class="mono">userId, animalNumber, type, eventDate, [extra...]</span><br>
+        النوع (<b>type</b>) واحد من: <span class="mono">milk | calving | insemination | heat | pregnancy | disease</span><br>
+        أمثلة:<br>
+        • لبن يومي (إجمالي): <span class="mono">demo_u1, 101, milk, 2025-08-30, milkKg=18.5</span><br>
+        • لبن يومي (ص/م): <span class="mono">demo_u1, 101, milk, 2025-08-30, am=8.3, pm=10.2</span> (سيُحسب الإجمالي تلقائيًا)<br>
+        • تلقيح: <span class="mono">demo_u1, 101, insemination, 2025-06-10, semen=Bull-X</span><br>
+        • شياع: <span class="mono">demo_u1, 101, heat, 2025-05-20</span><br>
+        • حمل: <span class="mono">demo_u1, 101, pregnancy, 2025-07-20, result=positive</span><br>
+        • ولادة: <span class="mono">demo_u1, 101, calving, 2025-04-01, note=ولادة طبيعية</span><br>
+        • مرض: <span class="mono">demo_u1, 101, disease, 2025-08-05, diagnosis=التهاب ضرع خفيف, note=ربع خلفي يمين</span>
+      </div>
+      <div class="row">
+        <button id="tplEvents" class="btn out">توليد أحداث نموذجية (لبن/تلقيح/شياع/ولادة)</button>
+        <button id="saveEvents" class="btn">حفظ الأحداث</button>
+        <span id="eventsMsg"></span>
+      </div>
+      <textarea id="eventsBox" placeholder="demo_u1, 101, milk, 2025-08-30, milkKg=18.5
+demo_u1, 101, insemination, 2025-06-10, semen=Bull-X"></textarea>
+    </section>
+
+    <section class="card">
+      <h2>Check-list سريعة</h2>
+      <div class="grid">
+        <div class="help">
+          1) احفظ المستخدمين → 2) احفظ الحيوانات → 3) احفظ الأحداث.<br>
+          ثم افتح البطاقة: <span class="mono">/cow-card.html?number=101</span> أو من خانة الرقم داخل البطاقة.
+        </div>
+        <div class="help">
+          لو عايز تمسح كل داتا الديمو: افتح الـ Console ونفّذ <span class="mono">window.cleanupDemo()</span> (موجودة تحت).
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    // ===== Firebase =====
+    const appMod = await import('/js/firebase-config.js');
+    const {
+      getFirestore, collection, doc, setDoc, addDoc, getDocs, getDoc, writeBatch,
+      query, where, limit, serverTimestamp
+    } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const app = appMod.app || appMod.default || appMod;
+    const db  = appMod.db  || getFirestore(app.app || app);
+
+    // ===== Helpers =====
+    const $ = (id)=>document.getElementById(id);
+    const today = new Date();
+    const ymd = (d)=> d ? new Date(d).toISOString().slice(0,10) : '';
+    const toDate = (s)=> {
+      if(!s) return null;
+      // يقبل YYYY-MM-DD فقط لضمان التوافق
+      return new Date(s);
+    };
+    const normKind = (k)=>{const s=String(k??'').trim().toLowerCase();
+      if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
+      if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
+      return 'cow';
+    };
+
+    // Parse line "key=value" extras to object
+    function parseExtras(tokens){
+      const extra = {};
+      tokens.forEach(t=>{
+        const [k,...rest] = t.split('=');
+        if(!k || !rest.length) return;
+        const val = rest.join('=').trim();
+        extra[k.trim()] = (/^-?\d+(\.\d+)?$/.test(val) ? Number(val) : val);
+      });
+      return extra;
+    }
+
+    // ===== UI Elements =====
+    const usersBox   = $('usersBox');
+    const animalsBox = $('animalsBox');
+    const eventsBox  = $('eventsBox');
+    const usersMsg   = $('usersMsg');
+    const animalsMsg = $('animalsMsg');
+    const eventsMsg  = $('eventsMsg');
+
+    // ===== Templates (prefill) =====
+    $('tplUsers').onclick = ()=>{
+      usersBox.value = [
+        'demo_u1, Demo User 1, demo1@mbk.local',
+        'demo_u2, Demo User 2, demo2@mbk.local',
+        'demo_u3, Demo User 3, demo3@mbk.local'
+      ].join('\\n');
+    };
+
+    $('tplAnimals').onclick = ()=>{
+      // 30 بقرة + 20 جاموسة موزعة على 3 مستخدمين
+      const lines = [];
+      let num = 101;
+      const users = ['demo_u1','demo_u2','demo_u3'];
+      const breedsCow = ['هولشتاين','فريزيان'];
+      const breedsBuf = ['بلدي','مُحسّن'];
+      const groups = ['أ-الحلابات','ب-العشار','ج-قريبة الولادة'];
+
+      // 30 بقرة
+      for (let i=0;i<30;i++){
+        const u = users[i%users.length];
+        const b = breedsCow[i%breedsCow.length];
+        const g = groups[i%groups.length];
+        const birth = '2021-01-15';
+        const calv  = '2025-04-01';
+        lines.push(`${u}, ${num}, cow, ${b}, ${g}, ${birth}, ${calv}, ${2 + (i%3)}`);
+        num++;
+      }
+      // 20 جاموسة
+      for (let i=0;i<20;i++){
+        const u = users[i%users.length];
+        const b = breedsBuf[i%breedsBuf.length];
+        const g = groups[i%groups.length];
+        const birth = '2020-10-10';
+        const calv  = '2025-03-15';
+        lines.push(`${u}, ${num}, buffalo, ${b}, ${g}, ${birth}, ${calv}, ${1 + (i%3)}`);
+        num++;
+      }
+      animalsBox.value = lines.join('\\n');
+    };
+
+    $('tplEvents').onclick = ()=>{
+      // نموذج: لبن لأسبوعين + تلقيح + شياع + احتمال حمل
+      const lines = [];
+      // خذ أول 10 أرقام من animalsBox إن وُجدت، وإلا افتراضي 101..110
+      const nums = [];
+      const hasAnimals = animalsBox.value.trim().length>0;
+      if (hasAnimals){
+        for (const line of animalsBox.value.split(/\\n+/)){
+          const parts = line.split(',').map(s=>s.trim());
+          if (parts.length>=2 && parts[1]) nums.push({u:parts[0], n:parts[1]});
+          if (nums.length>=10) break;
+        }
+      } else {
+        const users = ['demo_u1','demo_u2','demo_u3'];
+        for (let n=101;n<=110;n++) nums.push({u:users[n%3], n:String(n)});
+      }
+
+      // أسبوعان لبن يومي (am/pm)
+      const start = new Date('2025-08-15');
+      for (const {u,n} of nums){
+        for (let d=0; d<14; d++){
+          const dd = new Date(start); dd.setDate(dd.getDate()+d);
+          const iso = dd.toISOString().slice(0,10);
+          const am = (8 + Math.random()*4).toFixed(1);
+          const pm = (9 + Math.random()*4).toFixed(1);
+          lines.push(`${u}, ${n}, milk, ${iso}, am=${am}, pm=${pm}`);
+        }
+        // تلقيح + شياع سابق
+        lines.push(`${u}, ${n}, heat, 2025-06-20`);
+        lines.push(`${u}, ${n}, insemination, 2025-06-25, semen=Bull-X`);
+        // احتمال حمل
+        if (Math.random()<0.6) lines.push(`${u}, ${n}, pregnancy, 2025-08-05, result=positive`);
+        // حدث صحي محتمل
+        if (Math.random()<0.25) lines.push(`${u}, ${n}, disease, 2025-08-22, diagnosis=التهاب ضرع خفيف, note=ربع خلفي يمين`);
+      }
+      eventsBox.value = lines.join('\\n');
+    };
+
+    // ===== Save USERS =====
+    $('saveUsers').onclick = async ()=>{
+      usersMsg.textContent='';
+      const lines = usersBox.value.split(/\\n+/).map(s=>s.trim()).filter(Boolean);
+      if (!lines.length){ usersMsg.innerHTML = '<span class="err">لا توجد أسطر.</span>'; return; }
+      const batch = writeBatch(db);
+      const col = collection(db,'users');
+      let ok=0;
+      for (const ln of lines){
+        const [userId,name,email] = ln.split(',').map(s=>s.trim());
+        if (!userId){ continue; }
+        batch.set(doc(col, userId), {
+          name: name || userId, email: email || `${userId}@mbk.local`,
+          demo: true, createdAt: serverTimestamp()
+        }, {merge:true});
+        ok++;
+      }
+      await batch.commit();
+      usersMsg.innerHTML = `<span class="ok">تم حفظ ${ok} مستخدم(ين).</span>`;
+    };
+
+    // ===== Save ANIMALS =====
+    $('saveAnimals').onclick = async ()=>{
+      animalsMsg.textContent='';
+      const lines = animalsBox.value.split(/\\n+/).map(s=>s.trim()).filter(Boolean);
+      if (!lines.length){ animalsMsg.innerHTML = '<span class="err">لا توجد أسطر.</span>'; return; }
+      const col = collection(db,'animals');
+      let ok=0;
+      const batchSize = 400; // نكتب فردي لتفادي تجاوز حجم الدوكيومنت
+      for (const ln of lines){
+        const [userId, number, kind, breed, group, birthDate, lastCalvingDate, lactNo] =
+          ln.split(',').map(s=>s.trim());
+        if(!userId || !number) continue;
+        const animaltype = normKind(kind||'cow');
+        const ref = doc(col); // id تلقائي
+        const docData = {
+          userId,
+          number: String(number),
+          animalNumber: Number(number),
+          userId_number: `${userId}#${String(number)}`,
+          animaltype,
+          breed: breed || 'هولشتاين',
+          group: group || 'أ-الحلابات',
+          birthDate: birthDate || '2021-01-01',
+          lastCalvingDate: lastCalvingDate || '2025-04-01',
+          lactationNumber: Number(lactNo||2),
+          milkTraitsScore: 60,
+          reproductiveStatus: 'مفتوحة',
+          healthStatus: 'سليم',
+          demo: true, createdAt: serverTimestamp()
+        };
+        await setDoc(ref, docData);
+        ok++;
+      }
+      animalsMsg.innerHTML = `<span class="ok">تم حفظ ${ok} حيوان.</span>`;
+    };
+
+    // ابحث animalId لكل رقم + مستخدم
+    async function resolveAnimalId(userId, number){
+      const A = collection(db,'animals');
+      const qs = [
+        query(A, where('userId','==', userId), where('number','==', String(number)), limit(1)),
+        query(A, where('userId','==', userId), where('animalNumber','==', Number(number)), limit(1))
+      ];
+      for (const qy of qs){
+        const snap = await getDocs(qy);
+        if(!snap.empty) return snap.docs[0].id;
+      }
+      // آخر محاولة بدون userId
+      const snap2 = await getDocs(query(A, where('number','==', String(number)), limit(1)));
+      if(!snap2.empty) return snap2.docs[0].id;
+      return null;
+    }
+
+    // ===== Save EVENTS =====
+    $('saveEvents').onclick = async ()=>{
+      eventsMsg.textContent='';
+      const lines = eventsBox.value.split(/\\n+/).map(s=>s.trim()).filter(Boolean);
+      if (!lines.length){ eventsMsg.innerHTML = '<span class="err">لا توجد أسطر.</span>'; return; }
+
+      const E = collection(db,'events');
+      let ok=0, fail=0;
+
+      // نكتب على دفعات لتقليل عدد الرحلات
+      for (const ln of lines){
+        const parts = ln.split(',').map(s=>s.trim());
+        if (parts.length < 4){ fail++; continue; }
+        const [userId, animalNumber, type, date, ...rest] = parts;
+        const eventDate = (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) ? date : ymd(new Date(date));
+        const kind = String(type||'').toLowerCase();
+        const extra = parseExtras(rest);
+
+        try{
+          const animalId = await resolveAnimalId(userId, animalNumber);
+          const base = {
+            userId: userId || null,
+            animalId: animalId || null,
+            animalNumber: String(animalNumber),
+            animalNumberNum: Number(animalNumber),
+            type: kind,                         // قيم قياسية تشتغل مع البطاقة
+            eventDate,
+            demo: true,
+            createdAt: serverTimestamp()
+          };
+
+          // لبن: milkKg من extra أو am+pm
+          if (kind==='milk'){
+            const milkKg = (extra.milkKg!=null) ? Number(extra.milkKg)
+                          : ((Number(extra.am||0)+Number(extra.pm||0))||null);
+            await addDoc(E, { ...base, milkKg, ...extra });
+          } else {
+            await addDoc(E, { ...base, ...extra });
+          }
+          ok++;
+        } catch(e){
+          console.error(e); fail++;
+        }
+      }
+
+      const msg = `<span class="ok">تم حفظ ${ok} حدث.</span>` + (fail? ` <span class="err">(${fail} فشل)</span>`:'');
+      eventsMsg.innerHTML = msg;
+    };
+
+    // ===== Cleanup demo data (اختياري) =====
+    async function cleanupDemo(){
+      const { getDocs, query, where, collection, writeBatch, doc } =
+        await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+      // احذف events حيث demo==true
+      const eventsQ = query(collection(db,'events'), where('demo','==', true));
+      const eventsSnap = await getDocs(eventsQ);
+      const batch1 = writeBatch(db);
+      eventsSnap.forEach(d=> batch1.delete(doc(db,'events',d.id)));
+      await batch1.commit();
+
+      // احذف animals حيث demo==true
+      const animalsQ = query(collection(db,'animals'), where('demo','==', true));
+      const animalsSnap = await getDocs(animalsQ);
+      const batch2 = writeBatch(db);
+      animalsSnap.forEach(d=> batch2.delete(doc(db,'animals',d.id)));
+      await batch2.commit();
+
+      // احذف users حيث demo==true
+      const usersQ = query(collection(db,'users'), where('demo','==', true));
+      const usersSnap = await getDocs(usersQ);
+      const batch3 = writeBatch(db);
+      usersSnap.forEach(d=> batch3.delete(doc(db,'users',d.id)));
+      await batch3.commit();
+
+      alert('🧹 تم تنظيف بيانات الديمو');
+    }
+    window.cleanupDemo = cleanupDemo;
+  </script>
+</body>
+</html>
