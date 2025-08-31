@@ -152,51 +152,22 @@
     </section>
   </div>
 
-  <script src="js/mbk-animals.js?v=2"></script>
-  <script>
-    // ===== Demo state (يمكن استبداله ببيانات حقيقية) =====
-    const state = {
-      number: 2,
-      reproductiveStatus: 'مفتوحة',
-      productionStatus: 'حليب مبكر',
-      healthStatus: 'سليم',
+  <!-- Firestore + ربط البيانات (بدون أي عناصر تقارير للمستخدم) -->
+  <script type="module">
+    // Firebase / Firestore
+    const appMod = await import('/js/firebase-config.js');
+    const { getFirestore, collection, doc, getDoc, getDocs, query, where, orderBy, limit } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const app = appMod.app || appMod.default || appMod;
+    const db  = appMod.db  || getFirestore(app.app || app);
 
-      birthDate: '2021-03-25',
-      lastCalvingDate: '2025-06-30',
-      lactationNumber: 3,
-      daysInMilk: 147,
-      gestationDays: null,
-      lastInseminationDate: '2025-07-15',
-      pregnancyDate: null, // إن كانت موجودة تُستخدم لحساب عمر الحمل أولًا
-      breed: 'هولشتاين',
-      group: 'أ-الحلابات',
-      milkTraitsScore: 78,
-
-      servicesCount: 2,
-      inseminations: ['2025-07-15','2025-08-08'],
-      estrusDates: ['2025-07-01','2025-07-23','2025-08-14','2025-09-05'],
-      ovsynch: { active:true, name:'Ovsynch', started:'2025-07-02' },
-
-      milkTodayKg: 23.4,
-      seasonTotalKg: 3150,
-      m305Kg: 6800,
-      milkSeries: (function(){ const N=150, a=[]; for(let i=0;i<N;i++){ a.push({d:i, v: 17 + Math.sin(i/4)*2.5 + (i>40? (i-40)*0.08:0)}); } return a; })(),
-
-      lastCheckDate: '2025-09-10',
-      healthHistory: [
-        {date:'2025-08-10', diagnosis:'حمى اللبن', note:'خفيفة – استجابة سريعة'},
-        {date:'2025-08-28', diagnosis:'التهاب ضرع خفيف', note:'ربع خلفي يمين'},
-        {date:'2025-09-10', diagnosis:'سليم', note:'لا توجد ملاحظات'}
-      ]
-    };
-
-    // ===== Helpers
+    // Helpers
     const $ = (id)=>document.getElementById(id);
     const put=(id,v)=>{const n=$(id); if(n) n.textContent = (v ?? '—');};
     const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
     const NF = new Intl.NumberFormat('ar-EG');
+    const todayStr = new Date().toISOString().slice(0,10);
 
-    // تلوين الشرائط حسب الحالة
     function variantFor(txt){
       const t = String(txt||'').toLowerCase();
       if (/سليم|حامل|طبيعي|مريح/.test(t)) return 'ok';
@@ -204,170 +175,138 @@
       if (/حاد|شديد|مرض|نفاس متعثر/.test(t)) return 'danger';
       return 'ok';
     }
-    function setChip(el, text){
-      if(!el) return;
-      el.textContent = text || '—';
-      el.setAttribute('data-variant', variantFor(text));
-    }
-
-    // ===== العنوان + الشرائط
-    put('cardTitle', `بطاقة البقرة رقم ${state.number ?? '—'}`);
-    setChip($('chipRepro'),  state.reproductiveStatus);
-    setChip($('chipProd'),   state.productionStatus);
-    setChip($('chipHealth'), state.healthStatus);
-
-    // ===== المعلومات الأساسية
-    put('fiBirth', fmtD(state.birthDate));
-    put('fiLastCalving', fmtD(state.lastCalvingDate));
-    put('fiLactNo', NF.format(state.lactationNumber ?? '—'));
-    put('fiDIM', NF.format(state.daysInMilk ?? '—'));
-    put('fiBreed', state.breed || '—');
-    put('fiGroup', state.group || '—');
-
-    // عمر الحمل (يوم) — من pregnancyDate إن وُجد، وإلا من آخر تلقيح
-    let gestDays = state.gestationDays;
-    const refDate = state.pregnancyDate || state.lastInseminationDate;
-    if (gestDays == null && refDate) {
-      const ms = Date.now() - new Date(refDate).getTime();
-      gestDays = Math.max(0, Math.floor(ms / 86400000));
-    }
-    put('fiGestAge', gestDays!=null ? NF.format(gestDays) : '—');
-
-    // ===== مؤشر سمات اللبن
+    function setChip(el, text){ if(!el) return; el.textContent = text || '—'; el.setAttribute('data-variant', variantFor(text)); }
     function polar(cx, cy, r, ang){ const a=(ang*Math.PI)/180; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
     function arcPath(cx, cy, r, a0, a1){ const [x0,y0]=polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1); return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`; }
-    (function renderGauge(score){
-      score = Math.max(0, Math.min(100, Number(score)||0));
-      const g = document.getElementById('gSlices'); if(!g) return; g.innerHTML = '';
-      const colors = ['#ef5350','#ffb74d','#fff176','#66bb6a']; const steps=[0,25,50,75,100];
-      for(let i=0;i<4;i++){
-        const s=steps[i], e=steps[i+1];
-        const a0 = 180 - (s/100)*180, a1 = 180 - (e/100)*180;
-        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        p.setAttribute('d', arcPath(50,50,40,a0,a1));
-        p.setAttribute('fill','none'); p.setAttribute('stroke', colors[i]); p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round');
-        g.appendChild(p);
+
+    // مفاتيح الدخول
+    const url = new URL(location.href);
+    const numberParam  = url.searchParams.get('number') || url.searchParams.get('animalNumber') || url.searchParams.get('num') || '';
+    const animalIdParam= url.searchParams.get('animalId') || '';
+    const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
+
+    // جلب الحيوان
+    async function loadAnimal(){
+      if (!userId) throw new Error('userId غير متاح');
+      if (animalIdParam){
+        const d = await getDoc(doc(db, 'animals', animalIdParam));
+        if (d.exists() && d.data().userId === userId) return { id:d.id, ...d.data() };
       }
-      const ang = 180 - (score/100)*180;
-      const needle = document.getElementById('needle'); if(needle){ needle.setAttribute('transform',`rotate(${ang} 50 50)`); }
-      const label = score>=75? 'ممتاز' : score>=50? 'جيد' : score>=25? 'متوسط' : 'ضعيف';
-      put('milkGaugeVal', `${label} — ${score}%`);
-    })(state.milkTraitsScore);
-
-    // ===== KPIs إنتاج اللبن
-    put('kpiMilkToday', state.milkTodayKg!=null? `${state.milkTodayKg.toFixed(1)} كجم` : '—');
-    put('kpiSeason', state.seasonTotalKg!=null? `${NF.format(state.seasonTotalKg)} كجم` : '—');
-    put('kpi305', state.m305Kg!=null? `${NF.format(state.m305Kg)} كجم` : '—');
-
-    // ===== مخطط الإنتاج (قابل للتمرير طول فترة الحليب)
-    (function renderMilkChart(series){
-      const svg = document.getElementById('milkChart');
-      const sc  = document.getElementById('milkScroll');
-      if(!svg || !sc || !Array.isArray(series) || !series.length) return;
-
-      // استخدم عرض الحاوية لتحديد كثافة الأيام
-      const base = Math.max(sc.clientWidth, 320);
-      const pxPer = Math.max(6, Math.min(11, Math.round(base/28))); // عرض منطقي لليوم
-      const pad = 10;
-
-      const data = series.map((p,i)=>({x:i, y:Number(p.v)||0}));
-      const N = data.length;
-      const W = pad*2 + (N-1)*pxPer + 20;
-
-      svg.setAttribute('viewBox', `0 0 ${W} 60`);
-      svg.style.width = W + 'px';
-
-      const maxY = Math.max(...data.map(d=>d.y), 1);
-      const minY = Math.min(...data.map(d=>d.y), 0);
-      const yRange = Math.max(1, maxY - minY);
-      const sx = (i)=> pad + (i*pxPer);
-      const sy = (v)=> 60 - 6 - ((v - minY) * (60-12)/yRange);
-
-      // شبكة
-      svg.innerHTML = '';
-      const grid = document.createElementNS('http://www.w3.org/2000/svg','g');
-      for(let i=1;i<=3;i++){
-        const y = 6 + i*(60-12)/3;
-        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-        line.setAttribute('x1', 6); line.setAttribute('x2', W-6); line.setAttribute('y1', y); line.setAttribute('y2', y);
-        line.setAttribute('stroke', '#e9f5dc'); line.setAttribute('stroke-width', '0.6');
-        grid.appendChild(line);
+      if (numberParam){
+        const key = `${userId}#${numberParam}`;
+        let snap = await getDocs(query(collection(db,'animals'), where('userId_number','==', key), limit(1)));
+        if (snap.empty){
+          snap = await getDocs(query(collection(db,'animals'),
+                   where('userId','==', userId), where('number','==', numberParam), limit(1)));
+        }
+        const docu = snap.docs[0];
+        if (docu) return { id: docu.id, ...docu.data() };
       }
-      svg.appendChild(grid);
-
-      // منطقة
-      let d = ''; data.forEach((p,i)=>{ d += (i? ' L ':'M ') + sx(i).toFixed(2) + ' ' + sy(p.y).toFixed(2); });
-      const area = d + ` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-      const ap = document.createElementNS('http://www.w3.org/2000/svg','path');
-      ap.setAttribute('d', area); ap.setAttribute('fill', '#cdeccd'); ap.setAttribute('opacity','0.6');
-      svg.appendChild(ap);
-
-      // خط
-      const lp = document.createElementNS('http://www.w3.org/2000/svg','path');
-      lp.setAttribute('d', d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
-      svg.appendChild(lp);
-
-      // نقطة آخر يوم
-      const cx = sx(N-1), cy = sy(data[N-1].y);
-      const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 2); dot.setAttribute('fill', '#1b5e20');
-      svg.appendChild(dot);
-
-      // تمرير تلقائي لنهاية السلسلة
-      setTimeout(()=>{ sc.scrollLeft = svg.scrollWidth; }, 0);
-      // إعادة حساب عند تغيير الحجم
-      addEventListener('resize', ()=> renderMilkChart(series), {once:true});
-    })(state.milkSeries);
-
-    // ===== تناسلي
-    const avgDaysBetween=(dates)=>{
-      if(!dates || dates.length<2) return null;
-      const ms = dates.map(d=> new Date(d).getTime()).sort((a,b)=>a-b);
-      const diffs = []; for(let i=1;i<ms.length;i++) diffs.push((ms[i]-ms[i-1])/86400000);
-      return Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length);
-    };
-    put('fiLastIns', fmtD(state.lastInseminationDate));
-
-    let spc = state.servicesCount;
-    if(Array.isArray(state.inseminations) && state.pregnancyDate){
-      const pd = new Date(state.pregnancyDate).getTime();
-      spc = state.inseminations.filter(d=> new Date(d).getTime() <= pd).length || spc;
+      throw new Error('لم يتم العثور على الحيوان');
     }
-    put('fiSPC', spc!=null? NF.format(spc) : '—');
 
-    const serviceInt = avgDaysBetween(state.inseminations);
-    put('fiServiceInterval', serviceInt!=null? `${NF.format(serviceInt)} يوم` : '—');
-
-    const lastHeat = (state.estrusDates && state.estrusDates.length) ? state.estrusDates[state.estrusDates.length-1] : null;
-    put('fiLastHeat', fmtD(lastHeat));
-    const heatInt = avgDaysBetween(state.estrusDates);
-    put('fiHeatInterval', heatInt!=null? `${NF.format(heatInt)} يوم` : '—');
-
-    if(state.ovsynch && state.ovsynch.active){
-      put('fiOvsynch', `${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`);
-    } else { put('fiOvsynch','—'); }
-
-    // ===== صحة
-    put('fiHealth', state.healthStatus||'—');
-    put('fiLastCheck', fmtD(state.lastCheckDate));
-    const hl = $('healthList');
-    if(Array.isArray(state.healthHistory) && state.healthHistory.length){
-      state.healthHistory.slice(-6).forEach(it=>{
-        const row = document.createElement('div'); row.className='hl';
-        const d=document.createElement('div'); d.textContent = fmtD(it.date);
-        const dx=document.createElement('div'); dx.textContent = it.diagnosis || '—';
-        const nt=document.createElement('div'); nt.className='note'; nt.textContent = it.note || '';
-        row.appendChild(d); row.appendChild(dx); row.appendChild(nt);
-        hl.appendChild(row);
-      });
-    } else {
-      const row = document.createElement('div'); row.className='hl';
-      const c1=document.createElement('div'); c1.textContent='—';
-      const c2=document.createElement('div'); c2.textContent='لا توجد سجلات';
-      const c3=document.createElement('div'); c3.className='note'; c3.textContent='';
-      row.appendChild(c1); row.appendChild(c2); row.appendChild(c3);
-      hl.appendChild(row);
+    // جلب الأحداث
+    async function loadEvents(animal){
+      let evSnap = await getDocs(query(
+        collection(db,'events'),
+        where('userId','==', userId),
+        where('animalId','==', animal.id)
+      ));
+      if (evSnap.empty && (animal.number || numberParam)){
+        evSnap = await getDocs(query(
+          collection(db,'events'),
+          where('userId','==', userId),
+          where('animalNumber','==', String(animal.number || numberParam))
+        ));
+      }
+      return evSnap.docs.map(d=>({ id:d.id, ...d.data() }))
+                        .sort((a,b)=> String(a.eventDate).localeCompare(String(b.eventDate)));
     }
-  </script>
-</body>
-</html>
+
+    // حساب المقاييس
+    function computeState(animal, events){
+      const state = {
+        number: animal.number ?? animal.id?.slice(-6),
+        reproductiveStatus: '—',
+        productionStatus: '—',
+        healthStatus: 'سليم',
+
+        birthDate: animal.birthDate || null,
+        lastCalvingDate: null,
+        lactationNumber: animal.lactationNumber ?? null,
+        daysInMilk: null,
+        gestationDays: null,
+        lastInseminationDate: null,
+        pregnancyDate: animal.pregnancyDate || null,
+        breed: animal.breed || '—',
+        group: animal.group || '—',
+        milkTraitsScore: animal.milkTraitsScore ?? 0,
+
+        servicesCount: 0,
+        inseminations: [],
+        estrusDates: [],
+        ovsynch: animal.ovsynch || null,
+
+        milkTodayKg: null,
+        seasonTotalKg: null,
+        m305Kg: null,
+        milkSeries: [],
+
+        lastCheckDate: animal.lastCheckDate || null,
+        healthHistory: []
+      };
+
+      const byType = (t)=> events.filter(e => (e.type===t || e.eventType===t));
+      const milkEv = byType('daily_milk').concat(byType('لبن يومي'));
+      const calvEv = byType('calving').concat(byType('ولادة'));
+      const insEv  = byType('insemination').concat(byType('تلقيح'));
+      const heatEv = byType('heat').concat(byType('شياع'));
+      const diseaseEv = events.filter(e => /مرض|mastitis|lameness|التهاب|عرج/i.test(String(e.type)+' '+String(e.eventType)));
+
+      const lastCalving = calvEv.slice(-1)[0];
+      state.lastCalvingDate = lastCalving?.eventDate || animal.lastCalvingDate || null;
+
+      if (state.lastCalvingDate){
+        const ms = Date.now() - new Date(state.lastCalvingDate).getTime();
+        state.daysInMilk = Math.max(0, Math.floor(ms/86400000));
+      }
+
+      state.inseminations = insEv.map(e=> e.eventDate).filter(Boolean);
+      state.servicesCount = state.inseminations.length;
+      state.lastInseminationDate = state.inseminations.slice(-1)[0] || null;
+
+      state.estrusDates = heatEv.map(e=> e.eventDate).filter(Boolean);
+
+      if (milkEv.length){
+        const series = [];
+        let seasonSum = 0;
+        const calvDay = state.lastCalvingDate ? new Date(state.lastCalvingDate).getTime() : null;
+
+        for (const e of milkEv){
+          const kg = Number(e.milkKg ?? 0);
+          seasonSum += kg;
+          if (e.eventDate){
+            if (calvDay){
+              const di = Math.floor((new Date(e.eventDate).getTime() - calvDay)/86400000);
+              series.push({ d: Math.max(0, di), v: kg });
+            } else {
+              series.push({ d: series.length, v: kg });
+            }
+          }
+          if (e.eventDate === todayStr) state.milkTodayKg = kg;
+        }
+        state.seasonTotalKg = seasonSum || null;
+        if (state.daysInMilk && state.daysInMilk>0 && state.seasonTotalKg!=null){
+          const avg = state.seasonTotalKg / state.daysInMilk;
+          state.m305Kg = Math.round(avg * 305);
+        }
+        state.milkSeries = series.sort((a,b)=>a.d-b.d);
+      }
+
+      state.healthHistory = diseaseEv.map(d => ({
+        date: d.eventDate || '',
+        diagnosis: d.diagnosis || d.eventType || d.type || '—',
+        note: d.note || ''
+      }));
+
+      state.reproductiveStatus = state.pregnancyDate ? 'حامل'
