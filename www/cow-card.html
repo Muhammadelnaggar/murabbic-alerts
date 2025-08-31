@@ -175,6 +175,29 @@
   } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   const app = appMod.app || appMod.default || appMod;
   const db  = appMod.db  || getFirestore(app.app || app);
+ // ⬅️ ضعها بعد import مباشرة
+const normKind = (k)=>{
+  const s = String(k ?? '').trim().toLowerCase();
+  if (/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
+  if (/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
+  return '';
+};
+const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
+const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
+
+const extractKind = (obj = {})=>{
+  const candidates = [
+    obj.animaltype,          // 👈 الحقل الفعلي عندك
+    obj.kind, obj.type, obj.category, obj.species,
+    obj.animalType, obj.animal_kind, obj.animalClass,
+    obj['نوع'], obj['النوع'], obj['الفصيلة']
+  ];
+  for (const v of candidates){
+    const k = normKind(v);
+    if (k) return k;
+  }
+  return '';
+};
 
   // ===== Helpers =====
   const $ = (id)=>document.getElementById(id);
@@ -431,7 +454,13 @@
   // ===== تشغيل =====
   const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
   const idParam     = url.searchParams.get('animalId') || '';
-  const typeParam   = (url.searchParams.get('type') || url.searchParams.get('kind') || '').toLowerCase();
+ const typeParam = (
+  url.searchParams.get('type') ||
+  url.searchParams.get('kind') ||
+  url.searchParams.get('animaltype')   // 👈 دعم animaltype في الرابط
+  || ''
+).toLowerCase();
+
 
   if (numberParam || idParam){
     if (openbar) openbar.style.display='none';
@@ -452,4 +481,5 @@
 
 </body>
 </html>
+
 
