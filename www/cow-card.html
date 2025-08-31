@@ -167,336 +167,289 @@
   </div>
 
   <!-- Firestore + منطق الفتح/المعاينة -->
-  <script type="module">
-    // Firebase / Firestore
-    const appMod = await import('/js/firebase-config.js');
-    const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const app = appMod.app || appMod.default || appMod;
-    const db  = appMod.db  || getFirestore(app.app || app);
+ <script type="module">
+  // Firebase / Firestore
+  const appMod = await import('/js/firebase-config.js');
+  const {
+    getFirestore, collection, doc, getDoc, getDocs, query, where, limit
+  } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const app = appMod.app || appMod.default || appMod;
+  const db  = appMod.db  || getFirestore(app.app || app);
 
-    // Helpers
-    const $ = (id)=>document.getElementById(id);
-    const put=(id,v)=>{const n=$(id); if(n) n.textContent = (v ?? '—');};
-    const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
-    const NF = new Intl.NumberFormat('ar-EG');
-    const todayStr = new Date().toISOString().slice(0,10);
-    const url = new URL(location.href);
-    const userId = (window.__tenant?.userId || localStorage.getItem('userId') || url.searchParams.get('userId') || '').trim();
+  // ===== Helpers =====
+  const $ = (id)=>document.getElementById(id);
+  const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
+  const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
+  const NF = new Intl.NumberFormat('ar-EG');
+  const todayStr = new Date().toISOString().slice(0,10);
+  const url = new URL(location.href);
+  const userId = (window.__tenant?.userId || localStorage.getItem('userId') || url.searchParams.get('userId') || '').trim();
 
-    const openbar   = $('openbar');
-    const openInput = $('openNumber');
-    const openBtn   = $('openBtn');
-    const kindValEl = $('kindVal');
+  const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
+  const arKind = (k)=> k==='cow' ? 'بقرة' : (k==='buffalo' ? 'جاموسة' : '—');
 
-    const arKind = (k)=> k==='cow' ? 'بقرة' : (k==='buffalo' ? 'جاموسة' : '—');
+  // ===== استعلامات ذكية للعثور على الحيوان =====
+  async function firstDoc(qs){
+    for (const q of qs){
+      const snap = await getDocs(q);
+      if (!snap.empty) return snap.docs[0];
+    }
+    return null;
+  }
 
-    // --- جلب الحيوان ---
-    async function fetchAnimal({number, animalId}){
-      if (animalId){
-        const d = await getDoc(doc(db, 'animals', animalId));
-        if (d.exists() && (!userId || d.data().userId === userId)) return { id:d.id, ...d.data() };
-      }
-      if (number){
-        if (userId){
-          const key = `${userId}#${number}`;
-          let snap = await getDocs(query(collection(db,'animals'), where('userId_number','==', key), limit(1)));
-          if (snap.empty){
-            snap = await getDocs(query(collection(db,'animals'), where('userId','==', userId), where('number','==', number), limit(1)));
-          }
-          const docu = snap.docs[0]; if (docu) return { id: docu.id, ...docu.data() };
-        } else {
-          const snap = await getDocs(query(collection(db,'animals'), where('number','==', number), limit(1)));
-          const docu = snap.docs[0]; if (docu) return { id: docu.id, ...docu.data() };
+  async function fetchAnimalByNumber(n){
+    if(!n) return null;
+    const nStr = String(n).trim();
+    const nNum = Number(nStr);
+    const A = collection(db,'animals');
+    const qs = [];
+
+    // 1) مفتاح مركب userId#number
+    if (userId) qs.push(query(A, where('userId_number','==', `${userId}#${nStr}`), limit(1)));
+
+    // 2) userId + (number | animalNumber) كـ نص/رقم
+    if (userId){
+      qs.push(query(A, where('userId','==', userId), where('number','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) qs.push(query(A, where('userId','==', userId), where('number','==', nNum), limit(1)));
+      qs.push(query(A, where('userId','==', userId), where('animalNumber','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) qs.push(query(A, where('userId','==', userId), where('animalNumber','==', nNum), limit(1)));
+    }
+
+    // 3) بدون userId (بيئات تجريبية)
+    qs.push(query(A, where('number','==', nStr), limit(1)));
+    if (Number.isFinite(nNum)) qs.push(query(A, where('number','==', nNum), limit(1)));
+    qs.push(query(A, where('animalNumber','==', nStr), limit(1)));
+    if (Number.isFinite(nNum)) qs.push(query(A, where('animalNumber','==', nNum), limit(1)));
+
+    const docu = await firstDoc(qs);
+    return docu ? { id: docu.id, ...docu.data() } : null;
+  }
+
+  async function fetchAnimal({number, animalId}){
+    if (animalId){
+      const d = await getDoc(doc(db,'animals', animalId));
+      if (d.exists() && (!userId || d.data().userId===userId)) return { id:d.id, ...d.data() };
+    }
+    const a = await fetchAnimalByNumber(number);
+    if (a) return a;
+    throw new Error('لا يوجد حيوان مطابق');
+  }
+
+  // ===== جلب الأحداث =====
+  async function fetchEvents(animal){
+    const E = collection(db,'events');
+    // لا نقيّد بـ userId حتى لا نفرّغ النتائج لو الحقول ناقصة
+    let snap = await getDocs(query(E, where('animalId','==', animal.id)));
+    if (snap.empty && animal.number){
+      const nStr=String(animal.number), nNum=Number(nStr);
+      const qs=[];
+      qs.push(query(E, where('animalNumber','==', nStr)));
+      if (Number.isFinite(nNum)) qs.push(query(E, where('animalNumber','==', nNum)));
+      const docu = await firstDoc(qs);
+      snap = docu ? {docs:[docu]} : snap; // بسيط: خذ أول واحد لو لقيته
+    }
+    return snap.docs.map(d=>({ id:d.id, ...d.data() }))
+                    .sort((a,b)=> String(a.eventDate).localeCompare(String(b.eventDate)));
+  }
+
+  // ===== بناء الحالة من الأحداث/الوثيقة =====
+  function buildState(animal, events){
+    const state = {
+      number: animal.number ?? animal.animalNumber ?? animal.id?.slice(-6),
+      reproductiveStatus: animal.reproductiveStatus || '—',
+      productionStatus:   animal.productionStatus || '—',
+      healthStatus:       animal.healthStatus || 'سليم',
+      birthDate: animal.birthDate || null,
+      lastCalvingDate: animal.lastCalvingDate || null,
+      lactationNumber: animal.lactationNumber ?? null,
+      daysInMilk: null,
+      gestationDays: null,
+      lastInseminationDate: null,
+      pregnancyDate: animal.pregnancyDate || null,
+      breed: animal.breed || '—',
+      group: animal.group || '—',
+      milkTraitsScore: animal.milkTraitsScore ?? 0,
+      servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
+      milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
+      lastCheckDate: animal.lastCheckDate || null, healthHistory: []
+    };
+
+    const byType=(t)=> events.filter(e=>(e.type===t||e.eventType===t));
+    const milkEv=byType('daily_milk').concat(byType('لبن يومي'));
+    const calvEv=byType('calving').concat(byType('ولادة'));
+    const insEv =byType('insemination').concat(byType('تلقيح'));
+    const heatEv=byType('heat').concat(byType('شياع'));
+    const diseaseEv = events.filter(e=>/مرض|mastitis|lameness|التهاب|عرج/i.test(`${e.type} ${e.eventType}`));
+
+    if(!state.lastCalvingDate) state.lastCalvingDate = calvEv.slice(-1)[0]?.eventDate || null;
+    if(state.lastCalvingDate){
+      const ms = Date.now() - new Date(state.lastCalvingDate).getTime();
+      state.daysInMilk = Math.max(0, Math.floor(ms/86400000));
+    }
+
+    state.inseminations = insEv.map(e=>e.eventDate).filter(Boolean);
+    state.servicesCount = state.inseminations.length;
+    state.lastInseminationDate = state.inseminations.slice(-1)[0] || null;
+    state.estrusDates = heatEv.map(e=>e.eventDate).filter(Boolean);
+
+    if (milkEv.length){
+      let sum=0; const series=[];
+      const calvMs = state.lastCalvingDate ? new Date(state.lastCalvingDate).getTime() : null;
+      for (const e of milkEv){
+        const kg = Number(e.milkKg ?? 0); sum += kg;
+        if (e.eventDate){
+          if (calvMs){ const di = Math.floor((new Date(e.eventDate).getTime()-calvMs)/86400000); series.push({d:Math.max(0,di), v:kg}); }
+          else { series.push({d:series.length, v:kg}); }
+          if (e.eventDate===todayStr) state.milkTodayKg = kg;
         }
       }
-      throw new Error('لا يوجد حيوان مطابق');
-    }
-
-    // --- معاينة النوع فور كتابة الرقم (بدون فتح البطاقة) ---
-    let debounceT=null;
-    async function previewKindByNumber(n){
-      if(!n) { kindValEl.textContent='—'; return; }
-      try{
-        const a = await fetchAnimal({number:n});
-        const k = a.kind || a.type || a.category;
-        kindValEl.textContent = arKind(String(k).toLowerCase());
-        // خزّنه ليستفيد منه بقية الصفحات
-        localStorage.setItem('lastKind', String(k).toLowerCase());
-      }catch{
-        kindValEl.textContent = 'غير موجود';
+      state.seasonTotalKg = sum || null;
+      if (state.daysInMilk>0 && state.seasonTotalKg!=null){
+        const avg = state.seasonTotalKg / state.daysInMilk; state.m305Kg = Math.round(avg*305);
       }
-    }
-    openInput.addEventListener('input', ()=>{
-      const v = (openInput.value||'').trim();
-      clearTimeout(debounceT);
-      debounceT = setTimeout(()=> previewKindByNumber(v), 350);
-    });
-    openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
-
-    // --- جلب الأحداث وبناء الحالة ---
-    async function fetchEvents(animal){
-      let snap = await getDocs(query(collection(db,'events'), where('animalId','==', animal.id)));
-      if (snap.empty && animal.number){
-        snap = await getDocs(query(collection(db,'events'), where('animalNumber','==', String(animal.number))));
-      }
-      return snap.docs.map(d=>({ id:d.id, ...d.data() }))
-                      .sort((a,b)=> String(a.eventDate).localeCompare(String(b.eventDate)));
+      state.milkSeries = series.sort((a,b)=>a.d-b.d);
     }
 
-    function buildState(animal, events){
-      const state = {
-        number: animal.number ?? animal.id?.slice(-6),
-        reproductiveStatus: animal.reproductiveStatus || '—',
-        productionStatus: animal.productionStatus || '—',
-        healthStatus: animal.healthStatus || 'سليم',
-        birthDate: animal.birthDate || null,
-        lastCalvingDate: animal.lastCalvingDate || null,
-        lactationNumber: animal.lactationNumber ?? null,
-        daysInMilk: null,
-        gestationDays: null,
-        lastInseminationDate: null,
-        pregnancyDate: animal.pregnancyDate || null,
-        breed: animal.breed || '—',
-        group: animal.group || '—',
-        milkTraitsScore: animal.milkTraitsScore ?? 0,
-        servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
-        milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
-        lastCheckDate: animal.lastCheckDate || null, healthHistory: []
-      };
+    state.healthHistory = diseaseEv.map(d=>({date:d.eventDate||'', diagnosis:d.diagnosis||d.eventType||d.type||'—', note:d.note||''}));
+    state.reproductiveStatus = state.pregnancyDate ? 'حامل' : (state.servicesCount ? 'مفتوحة' : (state.reproductiveStatus||'—'));
+    state.productionStatus   = state.daysInMilk!=null ? (state.daysInMilk<60?'حليب مبكر': state.daysInMilk<200?'حليب متوسط':'حليب متأخر') : (state.productionStatus||'—');
+    if (diseaseEv.length) state.healthStatus = 'حالات صحية مسجلة';
+    return state;
+  }
 
-      const byType = (t)=> events.filter(e => (e.type===t || e.eventType===t));
-      const milkEv = byType('daily_milk').concat(byType('لبن يومي'));
-      const calvEv = byType('calving').concat(byType('ولادة'));
-      const insEv  = byType('insemination').concat(byType('تلقيح'));
-      const heatEv = byType('heat').concat(byType('شياع'));
-      const diseaseEv = events.filter(e => /مرض|mastitis|lameness|التهاب|عرج/i.test(String(e.type)+' '+String(e.eventType)));
+  // ===== رسم العدّاد والمخطط (نفس الواجهة) =====
+  function polar(cx,cy,r,ang){const a=(ang*Math.PI)/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
+  function arcPath(cx,cy,r,a0,a1){const[x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
+  function renderGauge(score){
+    score=Math.max(0,Math.min(100,Number(score)||0));
+    const g=document.getElementById('gSlices'); if(!g) return; g.innerHTML='';
+    const colors=['#ef5350','#ffb74d','#fff176','#66bb6a'], steps=[0,25,50,75,100];
+    for(let i=0;i<4;i++){const s=steps[i],e=steps[i+1],a0=180-(s/100)*180,a1=180-(e/100)*180;
+      const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+      p.setAttribute('d',arcPath(50,50,40,a0,a1)); p.setAttribute('fill','none'); p.setAttribute('stroke',colors[i]);
+      p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round'); g.appendChild(p);}
+    const ang=180-(score/100)*180, needle=document.getElementById('needle'); if(needle){needle.setAttribute('transform',`rotate(${ang} 50 50)`);}
+    const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف'; put('milkGaugeVal',`${label} — ${score}%`);
+  }
+  function renderMilkChart(series){
+    const svg=$('milkChart'), sc=$('milkScroll'); if(!svg||!sc||!Array.isArray(series)||!series.length){svg.innerHTML='';return;}
+    const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
+    const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
+    svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
+    const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
+    const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+    svg.innerHTML=''; const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+    for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
+    let d=''; data.forEach((p,i)=>{d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2);});
+    const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
+    const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
+    const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
+    const cx=pad+(N-1)*pxPer, cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
+    setTimeout(()=>{sc.scrollLeft=svg.scrollWidth;},0); addEventListener('resize',()=>renderMilkChart(series),{once:true});
+  }
 
-      if (!state.lastCalvingDate) state.lastCalvingDate = calvEv.slice(-1)[0]?.eventDate || null;
-      if (state.lastCalvingDate){
-        const ms = Date.now() - new Date(state.lastCalvingDate).getTime();
-        state.daysInMilk = Math.max(0, Math.floor(ms/86400000));
-      }
+  function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
+    const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b);
+    const dif=[]; for(let i=1;i<ms.length;i++) dif.push((ms[i]-ms[i-1])/86400000);
+    return Math.round(dif.reduce((a,b)=>a+b,0)/dif.length);
+  }
 
-      state.inseminations = insEv.map(e=> e.eventDate).filter(Boolean);
-      state.servicesCount = state.inseminations.length;
-      state.lastInseminationDate = state.inseminations.slice(-1)[0] || null;
-      state.estrusDates = heatEv.map(e=> e.eventDate).filter(Boolean);
+  function setChip(el,text){ if(!el) return; const t=String(text||'').toLowerCase(); let v='ok';
+    if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger';
+    el.textContent=text||'—'; el.setAttribute('data-variant',v);
+  }
 
-      if (milkEv.length){
-        let sum = 0; const series=[];
-        const calvMs = state.lastCalvingDate ? new Date(state.lastCalvingDate).getTime() : null;
-        for (const e of milkEv){
-          const kg = Number(e.milkKg ?? 0); sum += kg;
-          if (e.eventDate){
-            if (calvMs){ const di = Math.floor((new Date(e.eventDate).getTime() - calvMs)/86400000); series.push({d:Math.max(0,di), v:kg}); }
-            else { series.push({d:series.length, v:kg}); }
-            if (e.eventDate === todayStr) state.milkTodayKg = kg;
-          }
-        }
-        state.seasonTotalKg = sum || null;
-        if (state.daysInMilk && state.daysInMilk>0 && state.seasonTotalKg!=null){
-          const avg = state.seasonTotalKg / state.daysInMilk; state.m305Kg = Math.round(avg*305);
-        }
-        state.milkSeries = series.sort((a,b)=>a.d-b.d);
-      }
-
-      state.healthHistory = diseaseEv.map(d=>({date:d.eventDate||'', diagnosis:d.diagnosis||d.eventType||d.type||'—', note:d.note||''}));
-      state.reproductiveStatus = state.pregnancyDate ? 'حامل' : (state.servicesCount ? 'مفتوحة' : (state.reproductiveStatus||'—'));
-      state.productionStatus   = state.daysInMilk!=null ? (state.daysInMilk<60?'حليب مبكر': state.daysInMilk<200?'حليب متوسط':'حليب متأخر') : (state.productionStatus||'—');
-      if (diseaseEv.length) state.healthStatus = 'حالات صحية مسجلة';
-
-      return state;
-    }
-
-    // رسم المؤشر + المخطط (بدون تغيير شكلي)
-    function polar(cx, cy, r, ang){ const a=(ang*Math.PI)/180; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
-    function arcPath(cx, cy, r, a0, a1){ const [x0,y0]=polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1); return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`; }
-    function renderGauge(score){
-      score = Math.max(0, Math.min(100, Number(score)||0));
-      const g = document.getElementById('gSlices'); if(!g) return; g.innerHTML = '';
-      const colors = ['#ef5350','#ffb74d','#fff176','#66bb6a']; const steps=[0,25,50,75,100];
-      for(let i=0;i<4;i++){
-        const s=steps[i], e=steps[i+1];
-        const a0 = 180 - (s/100)*180, a1 = 180 - (e/100)*180;
-        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        p.setAttribute('d', arcPath(50,50,40,a0,a1));
-        p.setAttribute('fill','none'); p.setAttribute('stroke', colors[i]); p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round');
-        g.appendChild(p);
-      }
-      const ang = 180 - (score/100)*180;
-      const needle = document.getElementById('needle'); if(needle){ needle.setAttribute('transform',`rotate(${ang} 50 50)`); }
-      const label = score>=75? 'ممتاز' : score>=50? 'جيد' : score>=25? 'متوسط' : 'ضعيف';
-      put('milkGaugeVal', `${label} — ${score}%`);
-    }
-
-    function renderMilkChart(series){
-      const svg = document.getElementById('milkChart');
-      const sc  = document.getElementById('milkScroll');
-      if(!svg || !sc || !Array.isArray(series) || !series.length){ svg.innerHTML=''; return; }
-
-      const base = Math.max(sc.clientWidth, 320);
-      const pxPer = Math.max(6, Math.min(11, Math.round(base/28)));
-      const pad = 10;
-
-      const data = series.map((p,i)=>({x:i, y:Number(p.v)||0}));
-      const N = data.length;
-      const W = pad*2 + (N-1)*pxPer + 20;
-
-      svg.setAttribute('viewBox', `0 0 ${W} 60`);
-      svg.style.width = W + 'px';
-
-      const maxY = Math.max(...data.map(d=>d.y), 1);
-      const minY = Math.min(...data.map(d=>d.y), 0);
-      const yRange = Math.max(1, maxY - minY);
-      const sx = (i)=> pad + (i*pxPer);
-      const sy = (v)=> 60 - 6 - ((v - minY) * (60-12)/yRange);
-
-      svg.innerHTML = '';
-      const grid = document.createElementNS('http://www.w3.org/2000/svg','g');
-      for(let i=1;i<=3;i++){
-        const y = 6 + i*(60-12)/3;
-        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-        line.setAttribute('x1', 6); line.setAttribute('x2', W-6); line.setAttribute('y1', y); line.setAttribute('y2', y);
-        line.setAttribute('stroke', '#e9f5dc'); line.setAttribute('stroke-width', '0.6');
-        grid.appendChild(line);
-      }
-      svg.appendChild(grid);
-
-      let d = ''; data.forEach((p,i)=>{ d += (i? ' L ':'M ') + sx(i).toFixed(2) + ' ' + sy(p.y).toFixed(2); });
-      const area = d + ` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-      const ap = document.createElementNS('http://www.w3.org/2000/svg','path');
-      ap.setAttribute('d', area); ap.setAttribute('fill', '#cdeccd'); ap.setAttribute('opacity','0.6');
-      svg.appendChild(ap);
-
-      const lp = document.createElementNS('http://www.w3.org/2000/svg','path');
-      lp.setAttribute('d', d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
-      svg.appendChild(lp);
-
-      const cx = pad + (N-1)*pxPer, cy = sy(data[N-1].y);
-      const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 2); dot.setAttribute('fill', '#1b5e20');
-      svg.appendChild(dot);
-
-      setTimeout(()=>{ sc.scrollLeft = svg.scrollWidth; }, 0);
-      addEventListener('resize', ()=> renderMilkChart(series), {once:true});
-    }
-
-    function avgDaysBetween(dates){
-      if(!dates || dates.length<2) return null;
-      const ms = dates.map(d=> new Date(d).getTime()).sort((a,b)=>a-b);
-      const diffs = []; for(let i=1;i<ms.length;i++) diffs.push((ms[i]-ms[i-1])/86400000);
-      return Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length);
-    }
-
-    function setChip(el, text){
-      if(!el) return;
-      const t = String(text||'').toLowerCase();
-      let variant='ok';
-      if (/مفتوح|خطر منخفض|متوسط/.test(t)) variant='warn';
-      if (/حاد|شديد|مرض|نفاس متعثر/.test(t)) variant='danger';
-      el.textContent = text || '—';
-      el.setAttribute('data-variant', variant);
-    }
-
-    function renderCard(state){
-      $('cardTitle').textContent = `بطاقة البقرة رقم ${state.number ?? '—'}`;
-      setChip($('chipRepro'),  state.reproductiveStatus);
-      setChip($('chipProd'),   state.productionStatus);
-      setChip($('chipHealth'), state.healthStatus);
-
-      put('fiBirth', fmtD(state.birthDate));
-      put('fiLastCalving', fmtD(state.lastCalvingDate));
-      put('fiLactNo', state.lactationNumber!=null? NF.format(state.lactationNumber):'—');
-      put('fiDIM', state.daysInMilk!=null? NF.format(state.daysInMilk):'—');
-      let gestDays = state.gestationDays;
-      const refDate = state.pregnancyDate || state.lastInseminationDate;
-      if (gestDays == null && refDate) {
-        const ms = Date.now() - new Date(refDate).getTime();
-        gestDays = Math.max(0, Math.floor(ms / 86400000));
-      }
-      put('fiGestAge', gestDays!=null ? NF.format(gestDays) : '—');
-      put('fiBreed', state.breed || '—');
-      put('fiGroup', state.group || '—');
-
-      renderGauge(state.milkTraitsScore);
-      put('kpiMilkToday', state.milkTodayKg!=null? `${Number(state.milkTodayKg).toFixed(1)} كجم` : '—');
-      put('kpiSeason', state.seasonTotalKg!=null? `${NF.format(Math.round(state.seasonTotalKg))} كجم` : '—');
-      put('kpi305', state.m305Kg!=null? `${NF.format(Math.round(state.m305Kg))} كجم` : '—');
-      renderMilkChart(state.milkSeries);
-
-      put('fiLastIns', fmtD(state.lastInseminationDate));
-      const spc = state.servicesCount;
-      put('fiSPC', spc!=null? NF.format(spc) : '—');
-      const serviceInt = avgDaysBetween(state.inseminations);
-      put('fiServiceInterval', serviceInt!=null? `${NF.format(serviceInt)} يوم` : '—');
-      const lastHeat = (state.estrusDates && state.estrusDates.length) ? state.estrusDates[state.estrusDates.length-1] : null;
-      put('fiLastHeat', fmtD(lastHeat));
-      const heatInt = avgDaysBetween(state.estrusDates);
-      put('fiHeatInterval', heatInt!=null? `${NF.format(heatInt)} يوم` : '—');
-
-      if(state.ovsynch && state.ovsynch.active){
-        put('fiOvsynch', `${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`);
-      } else { put('fiOvsynch','—'); }
-
-      put('fiHealth', state.healthStatus||'—');
-      put('fiLastCheck', fmtD(state.lastCheckDate));
-      const hl = $('healthList'); hl.innerHTML='';
-      if(Array.isArray(state.healthHistory) && state.healthHistory.length){
-        state.healthHistory.slice(-6).forEach(it=>{
-          const row = document.createElement('div'); row.className='hl';
-          const d=document.createElement('div'); d.textContent = fmtD(it.date);
-          const dx=document.createElement('div'); dx.textContent = it.diagnosis || '—';
-          const nt=document.createElement('div'); nt.className='note'; nt.textContent = it.note || '';
-          row.appendChild(d); row.appendChild(dx); row.appendChild(nt);
-          hl.appendChild(row);
-        });
-      } else {
-        const row = document.createElement('div'); row.className='hl';
-        const c1=document.createElement('div'); c1.textContent='—';
-        const c2=document.createElement('div'); c2.textContent='لا توجد سجلات';
-        const c3=document.createElement('div'); c3.className='note'; c3.textContent='';
-        row.appendChild(c1); row.appendChild(c2); row.appendChild(c3);
-        hl.appendChild(row);
-      }
-    }
-
-    async function loadAndRender({number, animalId, type}){
-      // حفظ النوع القادم من قائمة حيواناتي (اختياري لكنه مطلوب حسب طلبك)
-      if(type){ localStorage.setItem('lastKind', String(type).toLowerCase()); kindValEl.textContent = arKind(String(type).toLowerCase()); }
-      const animal = await fetchAnimal({number, animalId});
-      // لو لم يُمرر نوع من الرابط، استخرجه من الوثيقة
-      if(!type){ const k = (animal.kind || animal.type || animal.category || '').toLowerCase(); if(k) kindValEl.textContent = arKind(k); }
-      localStorage.setItem('lastAnimalId', animal.number || number || '');
-      const events = await fetchEvents(animal);
-      const state  = buildState(animal, events);
-      renderCard(state);
-    }
-
-    // تشغيل تلقائي عند وجود باراميترات من "قائمة حيواناتي"
-    const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
-    const idParam     = url.searchParams.get('animalId') || '';
-    const typeParam   = (url.searchParams.get('type') || url.searchParams.get('kind') || '').toLowerCase();
-
-    if (numberParam || idParam){
-      openbar.style.display = 'none';
-      if(typeParam) kindValEl.textContent = arKind(typeParam);
-      loadAndRender({number:numberParam, animalId:idParam, type:typeParam}).catch(err=>{
-        console.error(err); $('cardTitle').textContent = 'تعذّر تحميل بطاقة الحيوان';
+  function renderCard(state){
+    $('cardTitle').textContent = `بطاقة البقرة رقم ${state.number ?? '—'}`;
+    setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
+    put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
+    put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
+    put('fiDIM',state.daysInMilk!=null?NF.format(state.daysInMilk):'—');
+    let g=state.gestationDays, ref=state.pregnancyDate||state.lastInseminationDate;
+    if(g==null&&ref){const ms=Date.now()-new Date(ref).getTime(); g=Math.max(0,Math.floor(ms/86400000));}
+    put('fiGestAge',g!=null?NF.format(g):'—'); put('fiBreed',state.breed||'—'); put('fiGroup',state.group||'—');
+    renderGauge(state.milkTraitsScore);
+    put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
+    put('kpiSeason',state.seasonTotalKg!=null?`${NF.format(Math.round(state.seasonTotalKg))} كجم`:'—');
+    put('kpi305',state.m305Kg!=null?`${NF.format(Math.round(state.m305Kg))} كجم`:'—');
+    renderMilkChart(state.milkSeries);
+    put('fiLastIns',fmtD(state.lastInseminationDate));
+    const spc=state.servicesCount; put('fiSPC',spc!=null?NF.format(spc):'—');
+    const svcI=avgDaysBetween(state.inseminations); put('fiServiceInterval',svcI!=null?`${NF.format(svcI)} يوم`:'—');
+    const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
+    const hI=avgDaysBetween(state.estrusDates); put('fiHeatInterval',hI!=null?`${NF.format(hI)} يوم`:'—');
+    if(state.ovsynch&&state.ovsynch.active){ put('fiOvsynch',`${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`); } else put('fiOvsynch','—');
+    put('fiHealth',state.healthStatus||'—'); put('fiLastCheck',fmtD(state.lastCheckDate));
+    const hl=$('healthList'); hl.innerHTML='';
+    if(Array.isArray(state.healthHistory)&&state.healthHistory.length){
+      state.healthHistory.slice(-6).forEach(it=>{
+        const row=document.createElement('div'); row.className='hl';
+        const d=document.createElement('div'); d.textContent=fmtD(it.date);
+        const dx=document.createElement('div'); dx.textContent=it.diagnosis||'—';
+        const nt=document.createElement('div'); nt.className='note'; nt.textContent=it.note||'';
+        row.appendChild(d); row.appendChild(dx); row.appendChild(nt); hl.appendChild(row);
       });
     } else {
-      // لا توجد باراميترات → المستخدم يكتب الرقم يدويًا
-      // لو فيه رقم محفوظ سابقًا أعرض نوعه مباشرةً
-      const lastNum = localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
-      if(lastNum){ openInput.value = lastNum; previewKindByNumber(lastNum); }
+      const row=document.createElement('div'); row.className='hl';
+      ['—','لا توجد سجلات',''].forEach((t,i)=>{const c=document.createElement('div'); if(i===2)c.className='note'; c.textContent=t; row.appendChild(c);});
+      hl.appendChild(row);
+    }
+  }
+
+  // ===== معاينة النوع فور كتابة الرقم =====
+  let debounceT=null;
+  async function previewKind(n){
+    kindValEl && (kindValEl.textContent='—');
+    if(!n) return;
+    try{
+      const a=await fetchAnimalByNumber(n);
+      const k=(a?.kind||a?.type||a?.category||'').toLowerCase();
+      if(kindValEl) kindValEl.textContent = arKind(k);
+      if(k) localStorage.setItem('lastKind',k);
+    }catch{ if(kindValEl) kindValEl.textContent='غير موجود'; }
+  }
+  if (openInput){
+    openInput.addEventListener('input', ()=>{
+      clearTimeout(debounceT);
+      debounceT = setTimeout(()=> previewKind((openInput.value||'').trim()), 300);
+    });
+    openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
+  }
+
+  async function loadAndRender({number, animalId, type}){
+    if(type){ localStorage.setItem('lastKind', String(type).toLowerCase()); if(kindValEl) kindValEl.textContent=arKind(String(type).toLowerCase()); }
+    const animal = await fetchAnimal({number, animalId});
+    if(!type){ const k=(animal.kind||animal.type||animal.category||'').toLowerCase(); if(k && kindValEl) kindValEl.textContent=arKind(k); }
+    localStorage.setItem('currentAnimalId', String(animal.number || number || ''));
+    const events = await fetchEvents(animal);
+    const state  = buildState(animal, events);
+    renderCard(state);
+  }
+
+  // ===== تشغيل =====
+  const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
+  const idParam     = url.searchParams.get('animalId') || '';
+  const typeParam   = (url.searchParams.get('type') || url.searchParams.get('kind') || '').toLowerCase();
+
+  if (numberParam || idParam){
+    if (openbar) openbar.style.display='none';
+    if (typeParam && kindValEl) kindValEl.textContent = arKind(typeParam);
+    loadAndRender({number:numberParam, animalId:idParam, type:typeParam})
+      .catch(()=>{ $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان'; });
+  } else {
+    const lastNum = localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+    if(lastNum && openInput){ openInput.value=lastNum; previewKind(lastNum); }
+    if(openBtn){
       openBtn.addEventListener('click', ()=>{
-        const n = (openInput.value || '').trim();
-        if (!n) return;
-        loadAndRender({number:n}).catch(err=>{
-          console.error(err); $('cardTitle').textContent = 'لا يوجد حيوان بهذا الرقم';
-        });
+        const n=(openInput.value||'').trim(); if(!n) return;
+        loadAndRender({number:n}).catch(()=>{ $('cardTitle').textContent='لا يوجد حيوان بهذا الرقم'; });
       });
     }
-  </script>
+  }
+</script>
+
 </body>
 </html>
+
