@@ -113,6 +113,8 @@
 <script type="module">
   import { db, ensureAuth } from './js/firebase-config.js';
   import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { getAuth, createUserWithEmailAndPassword }
+    from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
   // عناصر DOM
   const form = document.getElementById('registerForm');
@@ -197,41 +199,44 @@ form.addEventListener('submit', async (e)=>{
   if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون ٤ أحرف أو أكثر'); btn.disabled=false; return; }
   if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقة'); btn.disabled=false; return; }
 
-  // نزّل الهاتف لصيغة موحّدة: أرقام فقط (Key للفهرس)
-  const normalizePhone = s => (s||'').replace(/[^\d]/g,'');
-  const phone = normalizePhone(phoneRaw);
+  // تحويل الأرقام العربية وإبقاء الأرقام فقط لبناء بريد داخلي
+  const phoneKey = (phoneRaw||'')
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/\D/g,'');
+  if (!phoneKey){ showMessage('رقم هاتف غير صالح'); btn.disabled=false; return; }
 
-  // لازم uid (Anonymous)
-  const authUser = await ensureAuth();
-  const uid = authUser?.uid;
-  if (!uid){ showMessage('تعذّر إنشاء جلسة. أعد المحاولة.'); btn.disabled=false; return; }
-
-  // 1) أنشئ فهرس الهاتف أولاً (لو موجود هيرفض تلقائيًا بالرولز)
-  try{
-    await setDoc(doc(db,'users_phone', phone), { uid, createdAt: serverTimestamp() });
-  }catch(err){
-    // لو كان موجود بالفعل → رقم مكرر
-    showMessage('رقم الهاتف مسجّل بالفعل'); btn.disabled=false; return;
-  }
-
-  // 2) احفظ ملف المستخدم users/{uid}
-  const payload = {
-    fullName, phone: phoneRaw, country, region, role,
-    passwordHash: await hashPassword(password),
-    createdAt: serverTimestamp()
-  };
+  const auth = getAuth();
+  const pseudoEmail = `${phoneKey}@murabbik.local`; // بريد داخلي مشتق من الهاتف
 
   try{
-    await setDoc(doc(db,'users', uid), payload, { merge: true });
-  }catch(err){
-    // تراجع آمن: امسح الفهرس لو كتابة المستخدم فشلت (اختياري)
-    // await deleteDoc(doc(db,'users_phone', phone));
-    showMessage('حدث خطأ أثناء التسجيل، حاول مرة أخرى'); btn.disabled=false; return;
-  }
+    // إنشاء الحساب وتوليد uid آمن
+    const cred = await createUserWithEmailAndPassword(auth, pseudoEmail, password);
+    const uid  = cred.user.uid;
 
-  localStorage.setItem('userId', uid);
-  showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
-  setTimeout(()=> location.href='login.html', 1200);
+    // حجز المستند users/{uid}
+    const userRef = doc(db,'users', uid);
+    if ((await getDoc(userRef)).exists()){
+      showMessage('حدث تعارض في التسجيل، حاول برقم مختلف'); btn.disabled=false; return;
+    }
+
+    await setDoc(userRef, {
+      fullName, phone: phoneRaw, country, region, role,
+      createdAt: serverTimestamp()
+    });
+
+    localStorage.setItem('userId', uid);
+    localStorage.setItem('phone', phoneRaw);
+    localStorage.setItem('country', country);
+    localStorage.setItem('region', region);
+
+    showMessage('✅ تم التسجيل بنجاح، سيتم تحويلك لصفحة الدخول...', 'success');
+    setTimeout(()=> location.href='login.html', 900);
+
+  }catch(err){
+    showMessage('تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى');
+  }finally{
+    btn.disabled=false;
+  }
 });
 
 </script>
@@ -242,6 +247,7 @@ form.addEventListener('submit', async (e)=>{
 
   
   
+
 
 
 
