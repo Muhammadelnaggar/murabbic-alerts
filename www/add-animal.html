@@ -7,7 +7,7 @@
   <style>
     body{font-family:'Cairo',sans-serif;background:linear-gradient(to bottom right,#eeffdd,#fffedc);padding:20px;margin:0}
     h1{txt-align:center;text-align:center;color:#2e7d32;font-size:26px;margin-bottom:15px;font-weight:bold}
-    form{max-width:550px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 0 12px rgba(0,0,0,.1)}
+    form{max-width:600px;margin:auto;background:#fff;padding:25px;border-radius:15px;box-shadow:0 0 12px rgba(0,0,0,.1)}
     label{display:block;margin-top:15px;font-weight:bold;color:#2e7d32}
     input,select,button{width:100%;padding:12px;margin-top:6px;font-size:16px;border:1px solid #cddc39;border-radius:8px;box-sizing:border-box}
     input:focus,select:focus{outline:none;border-color:#8bc34a;box-shadow:0 0 5px #cddc39}
@@ -17,7 +17,7 @@
     #msg.success{background:#d1e7dd;color:#0f5132;display:block}
     #msg.error{background:#f8d7da;color:#842029;display:block}
 
-    /* Toast أنيق داخل النموذج */
+    /* Toast */
     .toast{display:none;position:relative;padding:12px 14px 12px 48px;border-radius:14px;background:#ecfdf5;border:1px solid #10b98133;color:#065f46;font-weight:700;box-shadow:0 8px 24px rgba(16,185,129,.15);margin-bottom:10px}
     .toast.show{display:block;animation:toast-pop .25s ease-out}
     .toast .icon{position:absolute;inset-inline-start:12px;top:50%;transform:translateY(-50%);width:22px;height:22px}
@@ -71,11 +71,23 @@
       <option value="إجهاض">إجهاض</option>
     </select>
 
+    <!-- 🔸 جديد: عدد مرات التلقيح بالموسم الحالي -->
+    <label for="servicesCount">عدد مرات التلقيح (الموسم الحالي):</label>
+    <input type="number" id="servicesCount" min="0" placeholder="0" />
+
+    <!-- 🔸 جديد: رقم موسم الحليب الحالي -->
+    <label for="lactationNumber">رقم موسم الحليب الحالي:</label>
+    <input type="number" id="lactationNumber" min="0" placeholder="مثال: 3" />
+
     <label for="birthDate">تاريخ الميلاد (اختياري):</label>
     <input type="date" id="birthDate" />
 
     <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
     <input type="date" id="lastCalvingDate" required />
+
+    <!-- 🔸 جديد: DIM محسوبة تلقائياً من تاريخ آخر ولادة -->
+    <label for="daysInMilk">عدد أيام الحليب (DIM):</label>
+    <input type="number" id="daysInMilk" readonly disabled placeholder="يُحسب تلقائيًا" />
 
     <div id="inseminationField" style="display:none;">
       <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
@@ -97,33 +109,62 @@
       const reproductiveEl = document.getElementById('reproductiveStatus');
       const inseminationField = document.getElementById('inseminationField');
       const lastInseminationDate = document.getElementById('lastInseminationDate');
+      const lastCalvingDate = document.getElementById('lastCalvingDate');
+      const daysInMilk = document.getElementById('daysInMilk');
 
       const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
       const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
 
       function updateBreedOptionsLocal(){
-        if(!animalTypeEl || !breedEl) return;
         const type = animalTypeEl.value;
         const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
         breedEl.innerHTML = '<option value="">اختر السلالة</option>' + breeds.map(b=>`<option value="${b}">${b}</option>`).join('');
       }
       function toggleMilkFieldLocal(){
-        if(!productionEl || !milkField || !dailyMilk) return;
         const show = (productionEl.value === "حلاب");
         milkField.style.display = show ? "block" : "none";
         dailyMilk.required = show; if(!show) dailyMilk.value = "";
+        computeDIM(); // تحديث DIM عند تغيير حالة الإنتاج
       }
+      // 🔸 إظهار تاريخ آخر تلقيح لــ ملقحة + عشار + مفتوحة
       function toggleInseminationFieldLocal(){
-        if(!reproductiveEl || !inseminationField || !lastInseminationDate) return;
-        const show = (reproductiveEl.value === "ملقحة" || reproductiveEl.value === "عشار");
+        const val = reproductiveEl.value;
+        const show = (val === "ملقحة" || val === "عشار" || val === "مفتوحة");
         inseminationField.style.display = show ? "block" : "none";
-        lastInseminationDate.required = show; if(!show) lastInseminationDate.value = "";
+        lastInseminationDate.required = (val === "ملقحة" || val === "عشار");
+        if(!show){ lastInseminationDate.value = ""; }
       }
-      if (animalTypeEl) ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
-      if (productionEl) ['change','input'].forEach(e=>productionEl.addEventListener(e,toggleMilkFieldLocal));
-      if (reproductiveEl) ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
-      document.addEventListener('DOMContentLoaded', ()=>{ updateBreedOptionsLocal(); toggleMilkFieldLocal(); toggleInseminationFieldLocal(); });
-      window.__mbkUI = { updateBreedOptions: updateBreedOptionsLocal, toggleMilkField: toggleMilkFieldLocal, toggleInseminationField: toggleInseminationFieldLocal };
+
+      // 🔸 حساب DIM = الأيام منذ آخر ولادة (عند وجود تاريخ وآخر حالة إنتاج "حلاب" أو دائمًا)
+      function computeDIM(){
+        const calv = lastCalvingDate.value;
+        if (!calv){ daysInMilk.value = ""; return; }
+        const d0 = new Date(calv);
+        const d1 = new Date();
+        // تصحيح لمنطقة التوقيت
+        d0.setHours(0,0,0,0); d1.setHours(0,0,0,0);
+        const diff = Math.max(0, Math.round((d1-d0)/86400000));
+        daysInMilk.value = String(diff);
+      }
+
+      ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
+      ['change','input'].forEach(e=>productionEl.addEventListener(e,toggleMilkFieldLocal));
+      ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
+      ['change','input'].forEach(e=>lastCalvingDate.addEventListener(e,computeDIM));
+
+      document.addEventListener('DOMContentLoaded', ()=>{
+        updateBreedOptionsLocal();
+        toggleMilkFieldLocal();
+        toggleInseminationFieldLocal();
+        computeDIM();
+      });
+
+      window.__mbkUI = {
+        updateBreedOptions: updateBreedOptionsLocal,
+        toggleMilkField: toggleMilkFieldLocal,
+        toggleInseminationField: toggleInseminationFieldLocal,
+        computeDIM
+      };
     })();
   </script>
 
@@ -151,28 +192,24 @@
   <!-- تحليلات خارجية -->
   <script src="/js/app-core.js" defer></script>
 
-  <!-- ✅ تعريف toast داخل سكربت عادي وتصديره على window -->
- <script>
-  window.flashOK = function(text, ms = 1600){
-    const box = document.getElementById('msg');
-    if (!box) return;
-    box.className = 'toast show';
-    box.style.display = 'block';  // ✅ إظهار صريحًا ليتجاوز أي ستايل سابق
-    box.innerHTML = `
-      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
-        <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-      </svg>
-      <div>${text}</div>
-      <div class="bar"><span></span></div>
-    `;
-    setTimeout(()=>{
-      box.className = 'toast';
-      box.style.display = 'none'; // ✅ أخفِه بعد الانتهاء
-      box.innerHTML = '';
-    }, ms + 80);
-  };
-</script>
+  <!-- ✅ Toast -->
+  <script>
+    window.flashOK = function(text, ms = 1600){
+      const box = document.getElementById('msg');
+      if (!box) return;
+      box.className = 'toast show';
+      box.style.display = 'block';
+      box.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
+          <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div>${text}</div>
+        <div class="bar"><span></span></div>
+      `;
+      setTimeout(()=>{ box.className = 'toast'; box.style.display = 'none'; box.innerHTML = ''; }, ms + 80);
+    };
+  </script>
 
   <!-- سكربت الصفحة (Firebase + منطق الصفحة) -->
   <script type="module">
@@ -184,17 +221,16 @@
     const msgDiv = document.getElementById("msg");
     const DASHBOARD_URL = "dashboard.html";
 
+    const $ = (id)=>document.getElementById(id);
+    const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+
     function setMsg(text, ok=false){
       msgDiv.textContent = text;
       msgDiv.className   = ok ? "success" : "error";
       msgDiv.style.display = "block";
     }
-    function todayLocal(){
-      const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
 
-    // رجوع ذكي
+    // رجوع ذكي (بدون تغيير)
     let __hasAnimals = null;
     window.addEventListener("DOMContentLoaded", async () => {
       history.pushState({page:"add-animal"}, "", location.href);
@@ -224,56 +260,79 @@
       });
     });
 
+    // 🔹 تحويل النوع العربي لقيمة معيارية
+    function normAnimaltype(ar){
+      const s = String(ar||'').trim();
+      if (s === 'بقرة' || s.toLowerCase() === 'cow') return 'cow';
+      if (s === 'جاموسة' || s.toLowerCase() === 'buffalo') return 'buffalo';
+      return 'cow';
+    }
+
     // حفظ الحيوان
     form.addEventListener("submit", async (e)=>{
       e.preventDefault();
       msgDiv.style.display="none";
 
-      const animalNumber        = document.getElementById("animalNumber").value.trim();
-      const animalType          = document.getElementById("animalType").value;
-      const breed               = document.getElementById("breed").value;
-      const productionStatus    = document.getElementById("productionStatus").value;
-      const dailyMilkVal        = document.getElementById("dailyMilk").value.trim();
-      const reproductiveStatus  = document.getElementById("reproductiveStatus").value;
-      const birthDate           = document.getElementById("birthDate").value || null;
-      const lastCalvingDate     = document.getElementById("lastCalvingDate").value;
-      const lastInseminationInp = document.getElementById("lastInseminationDate").value;
+      const numberStr            = $("animalNumber").value.trim();
+      const numberNum            = Number(numberStr);
+      const animalTypeAr         = $("animalType").value;
+      const animaltype           = normAnimaltype(animalTypeAr);
+      const breed                = $("breed").value;
+      const productionStatus     = $("productionStatus").value;
+      const dailyMilkVal         = $("dailyMilk").value.trim();
+      const reproductiveStatus   = $("reproductiveStatus").value;
+      const servicesCount        = Number($("servicesCount").value || 0);              // جديد
+      const lactationNumber      = Number($("lactationNumber").value || 0);            // جديد
+      const birthDate            = $("birthDate").value || null;
+      const lastCalvingDate      = $("lastCalvingDate").value;
+      const lastInseminationInp  = $("lastInseminationDate").value || null;
+      const daysInMilkVal        = Number($("daysInMilk").value || 0);                 // جديد (محسوب)
 
       const userId = localStorage.getItem("userId");
       if (!userId){ setMsg("خطأ: لا يوجد مستخدم مسجَّل. ادخل أولاً.", false); return; }
+      if (!numberStr || !animalTypeAr || !lastCalvingDate){ setMsg("أكمل الحقول المطلوبة.", false); return; }
 
       try{
-        // لازم توقيع (Anonymous) قبل الكتابة
         await ensureAuth();
 
-        const animalData = {
-          animalNumber,
-          animalType,
+        // نبني الدوكيومنت بصيغة متوافقة مع بطاقة الحيوان
+        const docData = {
+          userId,
+          number: numberStr,
+          animalNumber: numberNum,
+          userId_number: `${userId}#${numberStr}`,
+          animaltype,            // معياري: cow/buffalo
+          animalTypeAr,          // اختياري: للنص العربي
           breed,
           productionStatus,
           dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
           reproductiveStatus,
+          servicesCount,         // ✅ جديد
+          lactationNumber,       // ✅ جديد
           birthDate,
           lastCalvingDate,
-          lastInseminationDate: (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? (lastInseminationInp || null) : null,
-          userId,
-          createdAt: serverTimestamp()
+          lastInseminationDate:
+            (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار") ? (lastInseminationInp || null)
+            : (reproductiveStatus === "مفتوحة" ? (lastInseminationInp || null) : null), // ✅ مفتوحة (اختياري)
+          daysInMilk: daysInMilkVal || null, // ✅ جديد (DIM المحسوبة)
+          createdAt: serverTimestamp(),
+          demo: true
         };
 
-        const ref = await addDoc(collection(db, "animals"), animalData);
+        const ref = await addDoc(collection(db, "animals"), docData);
 
-        try{ window.t?.event?.("animal_created", { userId, animalNumber, animalType, breed, productionStatus }); }catch{}
+        try{ window.t?.event?.("animal_created", {
+          userId, number:numberStr, animaltype, breed, productionStatus, lactationNumber, servicesCount
+        }); }catch{}
 
         localStorage.setItem("currentAnimalId", ref.id);
-        localStorage.setItem("currentAnimalNumber", animalNumber);
+        localStorage.setItem("currentAnimalNumber", numberStr);
 
-        // ✅ Toast تأكيد أنيق داخل النموذج
         window.flashOK("تم تسجيل الحيوان بنجاح ✅");
 
-        // تحويل بعد 1.2 ثانية
         setTimeout(() => {
           const dateStr = todayLocal();
-          location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(dateStr)}`;
+          location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(dateStr)}`;
         }, 1200);
 
       }catch(err){
@@ -291,4 +350,3 @@
 
 </body>
 </html>
-
