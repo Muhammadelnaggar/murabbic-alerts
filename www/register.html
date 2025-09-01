@@ -177,62 +177,63 @@
   }
 
   // الحفظ (محاولة مباشرة، ولو فشلت بالصلاحيات نجرب ensureAuth ثم نعيد)
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault(); clearMessage(); btn.disabled = true;
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault(); clearMessage(); btn.disabled = true;
 
-    const fullName = document.getElementById('name').value.trim();
-    const phone    = phoneInp.value.trim();
-    const country  = countrySel.value.trim();
-    const region   = regionSel.value.trim();
-    const role     = document.getElementById('role').value.trim();
-    const password = document.getElementById('password').value;
-    const confirm  = document.getElementById('confirmPassword').value;
+  const fullName = document.getElementById('name').value.trim();
+  const phoneRaw = phoneInp.value.trim();
+  const country  = countrySel.value.trim();
+  const region   = regionSel.value.trim();
+  const role     = document.getElementById('role').value.trim();
+  const password = document.getElementById('password').value;
+  const confirm  = document.getElementById('confirmPassword').value;
 
-    if (!fullName || !phone || !country || !region || !role || !password || !confirm){
-      showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
-    }
-    if (!validatePhoneByCountry(phone, country)){
-      showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
-    }
-    if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون ٤ أحرف أو أكثر'); btn.disabled=false; return; }
-    if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقة'); btn.disabled=false; return; }
+  if (!fullName || !phoneRaw || !country || !region || !role || !password || !confirm){
+    showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
+  }
+  if (!validatePhoneByCountry(phoneRaw, country)){
+    showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
+  }
+  if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون ٤ أحرف أو أكثر'); btn.disabled=false; return; }
+  if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقة'); btn.disabled=false; return; }
 
-    const phoneIdxRef = doc(db, 'users_phone', phone);
-    const userRef     = doc(db, 'users', phone);            // المعرف = رقم الهاتف (كما كان يعمل قبلًا)
-    const payload = {
-      fullName, phone, country, region, role,
-      passwordHash: await hashPassword(password),
-      createdAt: serverTimestamp()
-    };
+  // نزّل الهاتف لصيغة موحّدة: أرقام فقط (Key للفهرس)
+  const normalizePhone = s => (s||'').replace(/[^\d]/g,'');
+  const phone = normalizePhone(phoneRaw);
 
-    async function writeOnce(){
-      if ((await getDoc(phoneIdxRef)).exists()){
-        throw new Error('PHONE_EXISTS');
-      }
-      await setDoc(userRef, payload, { merge:true });
-      await setDoc(phoneIdxRef, { uid: phone, createdAt: serverTimestamp() }, { merge:true });
-    }
+  // لازم uid (Anonymous)
+  const authUser = await ensureAuth();
+  const uid = authUser?.uid;
+  if (!uid){ showMessage('تعذّر إنشاء جلسة. أعد المحاولة.'); btn.disabled=false; return; }
 
-    try{
-      // محاولة كتابة مباشرة
-      await writeOnce();
-    }catch(e){
-      // إعادة المحاولة بعد توقيع Anonymous إن لزم
-      try{
-        await ensureAuth();
-        await writeOnce();
-      }catch(e2){
-        showMessage(e2.message==='PHONE_EXISTS' ? 'رقم الهاتف مسجّل بالفعل' : 'حدث خطأ أثناء التسجيل، حاول مرة أخرى');
-        btn.disabled=false;
-        return;
-      }
-    }
+  // 1) أنشئ فهرس الهاتف أولاً (لو موجود هيرفض تلقائيًا بالرولز)
+  try{
+    await setDoc(doc(db,'users_phone', phone), { uid, createdAt: serverTimestamp() });
+  }catch(err){
+    // لو كان موجود بالفعل → رقم مكرر
+    showMessage('رقم الهاتف مسجّل بالفعل'); btn.disabled=false; return;
+  }
 
-    // نجاح
-    localStorage.setItem('userId', phone);
-    showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
-    setTimeout(()=> location.href='login.html', 1200);
-  });
+  // 2) احفظ ملف المستخدم users/{uid}
+  const payload = {
+    fullName, phone: phoneRaw, country, region, role,
+    passwordHash: await hashPassword(password),
+    createdAt: serverTimestamp()
+  };
+
+  try{
+    await setDoc(doc(db,'users', uid), payload, { merge: true });
+  }catch(err){
+    // تراجع آمن: امسح الفهرس لو كتابة المستخدم فشلت (اختياري)
+    // await deleteDoc(doc(db,'users_phone', phone));
+    showMessage('حدث خطأ أثناء التسجيل، حاول مرة أخرى'); btn.disabled=false; return;
+  }
+
+  localStorage.setItem('userId', uid);
+  showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
+  setTimeout(()=> location.href='login.html', 1200);
+});
+
 </script>
 
 
@@ -241,6 +242,7 @@
 
   
   
+
 
 
 
