@@ -38,88 +38,75 @@
     button:disabled { opacity:.7; cursor:not-allowed; }
   </style>
 
- <script type="module">
+<script type="module">
   import { db, ensureAuth } from "./js/firebase-config.js";
-  import { doc, getDoc, collection, query, where, getDocs }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const form = document.getElementById("loginForm");
   const btn  = document.getElementById("submitBtn");
   const msg  = document.getElementById("formMsg");
 
-  function setMsg(t, ok=false){
-    msg.textContent = t;
-    msg.className   = "msg " + (ok ? "ok" : "err");
-    msg.style.display = "block";
-  }
+  const show = (t, ok=false)=>{
+    msg.textContent = t || '';
+    msg.className = "msg " + (ok ? "ok" : "err");
+    msg.style.display = t ? "block" : "none";
+  };
 
-  // توحيد رقم الهاتف: إزالة مسافات/شرطات + تحويل الأرقام العربية إلى لاتينية
+  // تطبيع رقم الهاتف: تحويل أرقام عربية → لاتينية ثم إبقاء الأرقام فقط
   function normalizePhone(raw){
-    const arab = "٠١٢٣٤٥٦٧٨٩";
-    let s = (raw||"").trim().replace(/[\s-]/g,"");
-    s = s.replace(/[٠-٩]/g, d => String(arab.indexOf(d)));
-    return s;
+    const map = "٠١٢٣٤٥٦٧٨٩";
+    let s = (raw||"").trim().replace(/[٠-٩]/g, d => String(map.indexOf(d)));
+    return s.replace(/\D/g,''); // أرقام فقط
   }
 
-  // SHA-256
   async function hashPassword(password){
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
   }
 
-  // جلب المستخدم: DocID=phone -> fallback where
-  async function fetchUserByPhone(phone){
-    const idSnap = await getDoc(doc(db,"users", phone));
-    if (idSnap.exists()) return { id: idSnap.id, data: idSnap.data() };
-    const qs = await getDocs(query(collection(db,"users"), where("phone","==", phone)));
-    if (!qs.empty){ const d=qs.docs[0]; return { id:d.id, data:d.data() }; }
-    return null;
-  }
-
   form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); msg.style.display="none";
-    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+    e.preventDefault(); show(""); const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+
     try{
-      await ensureAuth(); // لازم قبل القراءة حسب الـ Rules
+      await ensureAuth(); // مطلوبة للقراءة حسب الرولز
 
       const phoneIn = document.getElementById("phone").value;
       const passIn  = document.getElementById("password").value;
-      const phone   = normalizePhone(phoneIn);
+      const phoneKey = normalizePhone(phoneIn);
 
-      if (!phone || !passIn){ setMsg("يرجى إدخال رقم الهاتف وكلمة المرور.", false); return; }
+      if (!phoneKey || !passIn){ show("يرجى إدخال رقم الهاتف وكلمة المرور."); return; }
 
-      const user = await fetchUserByPhone(phone);
-      if (!user){ setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.", false); return; }
+      // 1) احصل على uid من فهرس الهاتف
+      const idx = await getDoc(doc(db,"users_phone", phoneKey));
+      if (!idx.exists()){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
+      const uid = idx.data().uid;
 
-      const hashed = await hashPassword(passIn);
-      if (hashed !== (user.data.password||"")){ setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.", false); return; }
+      // 2) اقرأ ملف المستخدم users/{uid}
+      const udoc = await getDoc(doc(db,"users", uid));
+      if (!udoc.exists()){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
+      const user = udoc.data();
 
-      // ✅ نجاح
-      localStorage.setItem("userId",    user.id);
-      localStorage.setItem("userPhone", user.data.phone || phone);
-      if (user.data.country && user.data.region){
-        const key = `${user.data.country}:${user.data.region}`;
-        localStorage.setItem("userCountry",  user.data.country);
-        localStorage.setItem("userRegion",   user.data.region);
-        localStorage.setItem("userRegionKey", key);
-        localStorage.removeItem("weather:"+key); // اختياري
-      }
+      // 3) تحقق كلمة المرور مقابل passwordHash
+      const ok = (user.passwordHash === await hashPassword(passIn));
+      if (!ok){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
 
-      setMsg("✅ تم تسجيل الدخول بنجاح — سيتم تحويلك الآن…", true);
-      setTimeout(()=> location.href="dashboard.html", 600);
+      // 4) نجاح: خزّن ثم انتقل للوحة التحكم
+      localStorage.setItem("userId", uid);
+      localStorage.setItem("phone", user.phone || phoneIn);
+      if (user.country) localStorage.setItem("country", user.country);
+      if (user.region)  localStorage.setItem("region",  user.region);
 
+      show("✅ تم تسجيل الدخول بنجاح — سيتم تحويلك الآن…", true);
+      location.href = "dashboard.html";
     }catch(err){
       console.error(err);
-      setMsg("حدث خطأ أثناء تسجيل الدخول. تحقّق من الاتصال والصلاحيات.", false);
+      show("حدث خطأ أثناء تسجيل الدخول. تحقّق من الاتصال والصلاحيات.");
     }finally{
       btn.disabled=false; btn.textContent=prev;
     }
   });
-
-  // فحص سريع من الكونسول (اختياري):
-  // import("./js/firebase-config.js").then(m=>console.log(m.db._databaseId));
-  // لازم يطبع { projectId:"murabbik-470511", database:"murabbikdata" }
 </script>
+
 
 </head>
 <body>
@@ -132,4 +119,5 @@
   </form>
 </body>
 </html>
+
 
