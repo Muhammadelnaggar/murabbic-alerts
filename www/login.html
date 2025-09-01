@@ -39,8 +39,10 @@
   </style>
 
 <script type="module">
-  import { db, ensureAuth } from "./js/firebase-config.js";
+  import { db } from "./js/firebase-config.js";
   import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const form = document.getElementById("loginForm");
   const btn  = document.getElementById("submitBtn");
@@ -52,60 +54,48 @@
     msg.style.display = t ? "block" : "none";
   };
 
-  // تطبيع رقم الهاتف: تحويل أرقام عربية → لاتينية ثم إبقاء الأرقام فقط
-  function normalizePhone(raw){
-    const map = "٠١٢٣٤٥٦٧٨٩";
-    let s = (raw||"").trim().replace(/[٠-٩]/g, d => String(map.indexOf(d)));
-    return s.replace(/\D/g,''); // أرقام فقط
-  }
-
-  async function hashPassword(password){
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  function toPhoneKey(raw){
+    return (raw||'')
+      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+      .replace(/\D/g,'');
   }
 
   form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); show(""); const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+    e.preventDefault(); show("");
+    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
 
     try{
-      await ensureAuth(); // مطلوبة للقراءة حسب الرولز
+      const phoneKey = toPhoneKey(document.getElementById("phone").value);
+      const password = document.getElementById("password").value;
+      if (!phoneKey || !password){ show("أدخل الهاتف وكلمة المرور."); return; }
 
-      const phoneIn = document.getElementById("phone").value;
-      const passIn  = document.getElementById("password").value;
-      const phoneKey = normalizePhone(phoneIn);
+      const auth = getAuth();
+      const email = `${phoneKey}@murabbik.local`;
 
-      if (!phoneKey || !passIn){ show("يرجى إدخال رقم الهاتف وكلمة المرور."); return; }
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const uid  = cred.user.uid;
 
-      // 1) احصل على uid من فهرس الهاتف
-      const idx = await getDoc(doc(db,"users_phone", phoneKey));
-      if (!idx.exists()){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
-      const uid = idx.data().uid;
+      // حمّل بيانات المستخدم من users/{uid}
+      const snap = await getDoc(doc(db,"users", uid));
+      if (!snap.exists()){ show("تعذر تحميل ملف المستخدم."); return; }
+      const user = snap.data();
 
-      // 2) اقرأ ملف المستخدم users/{uid}
-      const udoc = await getDoc(doc(db,"users", uid));
-      if (!udoc.exists()){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
-      const user = udoc.data();
-
-      // 3) تحقق كلمة المرور مقابل passwordHash
-      const ok = (user.passwordHash === await hashPassword(passIn));
-      if (!ok){ show("رقم الهاتف أو كلمة المرور غير صحيحة."); return; }
-
-      // 4) نجاح: خزّن ثم انتقل للوحة التحكم
       localStorage.setItem("userId", uid);
-      localStorage.setItem("phone", user.phone || phoneIn);
+      localStorage.setItem("phone", user.phone || phoneKey);
       if (user.country) localStorage.setItem("country", user.country);
       if (user.region)  localStorage.setItem("region",  user.region);
 
-      show("✅ تم تسجيل الدخول بنجاح — سيتم تحويلك الآن…", true);
+      show("✅ تم تسجيل الدخول — سيتم تحويلك الآن…", true);
       location.href = "dashboard.html";
+
     }catch(err){
-      console.error(err);
-      show("حدث خطأ أثناء تسجيل الدخول. تحقّق من الاتصال والصلاحيات.");
+      show("الهاتف أو كلمة المرور غير صحيحة.");
     }finally{
       btn.disabled=false; btn.textContent=prev;
     }
   });
 </script>
+
 
 
 </head>
@@ -119,5 +109,6 @@
   </form>
 </body>
 </html>
+
 
 
