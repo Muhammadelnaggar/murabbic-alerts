@@ -110,164 +110,134 @@
     <div class="link muted">لديك حساب؟ <a href="login.html">ادخل إلى حسابك</a></div>
   </div>
 
-  <script type="module">
+<script type="module">
   import { db, ensureAuth } from './js/firebase-config.js';
- import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    // عناصر DOM
-    const form = document.getElementById('registerForm');
-    const msg  = document.getElementById('msg');
-    const btn  = document.getElementById('submitBtn');
-    const countrySel = document.getElementById('country');
-    const regionSel  = document.getElementById('region');
-    const phoneInp   = document.getElementById('phone');
-    const phoneHint  = document.getElementById('phoneHint');
+  // عناصر DOM
+  const form = document.getElementById('registerForm');
+  const msg  = document.getElementById('msg');
+  const btn  = document.getElementById('submitBtn');
+  const countrySel = document.getElementById('country');
+  const regionSel  = document.getElementById('region');
+  const phoneInp   = document.getElementById('phone');
+  const phoneHint  = document.getElementById('phoneHint');
 
-    // خريطة المناطق — بدون إدخال يدوي (للاستخدام مع الطقس لاحقًا)
-    const REGIONS = {
-      "مصر": ["القاهرة","الجيزة","القليوبية","الشرقية","الدقهلية","البحيرة","الغربية","المنوفية","كفر الشيخ","دمياط","الإسكندرية","المنيا","أسيوط","سوهاج","قنا","الأقصر","أسوان","بني سويف","الفيوم","البحر الأحمر","الوادي الجديد","مطروح","شمال سيناء","جنوب سيناء"],
-      "السعودية": ["الرياض","مكة المكرمة","المدينة المنورة","القصيم","الشرقية","عسير","تبوك","حائل","الحدود الشمالية","جازان","نجران","الباحة","الجوف"],
-      "الإمارات": ["أبوظبي","دبي","الشارقة","عجمان","أم القيوين","رأس الخيمة","الفجيرة"],
-      "الكويت": ["العاصمة","الأحمدي","حولي","الفروانية","الجهراء","مبارك الكبير"],
-      "قطر": ["الدوحة","الريان","الوكرة","الخور والذخيرة","الشمال","أم صلال","الظعاين","الشحانية"],
-      "البحرين": ["العاصمة","المحرق","الشمالية","الجنوبية"],
-      "عُمان": ["مسقط","ظفار","شمال الباطنة","جنوب الباطنة","الداخلية","شمال الشرقية","جنوب الشرقية","الظاهرة","الوسطى","مسندم"],
-      "الأردن": ["عمّان","الزرقاء","إربد","البلقاء","المفرق","الكرك","معان","الطفيلة","العقبة","مأدبا","جرش","عجلون"],
-      "لبنان": ["بيروت","جبل لبنان","الشمال","البقاع","النبطية","الجنوب","بعلبك-الهرمل","عكار"],
-      "سوريا": ["دمشق","ريف دمشق","حلب","حمص","حماة","اللاذقية","طرطوس","إدلب","دير الزور","الرقة","الحسكة","درعا","السويداء","القنيطرة"],
-      "فلسطين": ["القدس","رام الله والبيرة","الخليل","بيت لحم","نابلس","طولكرم","قلقيلية","جنين","أريحا والأغوار","سلفيت","غزة","خانيونس","رفح","الشمال","الوسطى"],
-      "العراق": ["بغداد","نينوى","البصرة","أربيل","النجف","كربلاء","ذي قار","ديالى","صلاح الدين","كركوك","السليمانية","القادسية","بابل","الأنبار","واسط","المثنى","ميسان","دهوك"],
-      "اليمن": ["صنعاء","عدن","تعز","الحديدة","إب","حضرموت","شبوة","مأرب","صعدة","البيضاء","ذمار","المحويت","ريمة","حجة","لحج","أبين","الضالع","المهرة"],
-      "ليبيا": ["طرابلس","بنغازي","مصراتة","سبها","درنة","البيضاء","الزاوية","غريان","اجدابيا","الكفرة","الجفرة","مرزق","الواحات","طبرق"],
-      "تونس": ["تونس","أريانة","بن عروس","منوبة","نابل","زغوان","بنزرت","باجة","جندوبة","الكاف","سليانة","القيروان","سوسة","المنستير","المهدية","صفاقس","القصرين","قفصة","توزر","قبلي","مدنين","تطاوين"],
-      "الجزائر": ["الجزائر","وهران","قسنطينة","سطيف","البليدة","سيدي بلعباس","باتنة","عنابة","جيجل","بجاية","تلمسان","الأغواط","بسكرة","غرداية","ورقلة","تيزي وزو","تيبازة","البويرة"],
-      "المغرب": ["الرباط-سلا-القنيطرة","الدار البيضاء-سطات","مراكش-آسفي","فاس-مكناس","طنجة-تطوان-الحسيمة","الشرق","بني ملال-خنيفرة","درعة-تافيلالت","سوس-ماسة","العيون-الساقية الحمراء","كلميم-واد نون","الداخلة-وادي الذهب"],
-      "موريتانيا": ["نواكشوط","الحوض الشرقي","الحوض الغربي","لعصابة","كوركول","البراكنة","اترارزة","تكانت","كيدي ماغا","تيرس زمور","داخلت نواذيبو","آدرار"],
-      "السودان": ["الخرطوم","الجزيرة","القضارف","سنار","كسلا","البحر الأحمر","نهر النيل","الشمالية","شمال كردفان","جنوب كردفان","شمال دارفور","جنوب دارفور","غرب دارفور","وسط دارفور","شرق دارفور","النيل الأزرق"],
-      "الصومال": ["بنادر","بونتلاند","جوبالاند","جنوب غرب","هيرشبيلي","غلمدغ","أرض الصومال"],
-      "جيبوتي": ["مدينة جيبوتي","علي صبيح","تاجورة","أوبوك","دهر","أرتا"],
-      "جزر القمر": ["نجازيدجا (القمر الكبرى)","أنجوان","موهيلي"]
+  // خريطة المناطق
+  const REGIONS = {
+    "مصر": ["القاهرة","الجيزة","القليوبية","الشرقية","الدقهلية","البحيرة","الغربية","المنوفية","كفر الشيخ","دمياط","الإسكندرية","المنيا","أسيوط","سوهاج","قنا","الأقصر","أسوان","بني سويف","الفيوم","البحر الأحمر","الوادي الجديد","مطروح","شمال سيناء","جنوب سيناء"],
+    "السعودية": ["الرياض","مكة المكرمة","المدينة المنورة","القصيم","الشرقية","عسير","تبوك","حائل","الحدود الشمالية","جازان","نجران","الباحة","الجوف"],
+    "الإمارات": ["أبوظبي","دبي","الشارقة","عجمان","أم القيوين","رأس الخيمة","الفجيرة"],
+    "الكويت": ["العاصمة","الأحمدي","حولي","الفروانية","الجهراء","مبارك الكبير"],
+    "قطر": ["الدوحة","الريان","الوكرة","الخور والذخيرة","الشمال","أم صلال","الظعاين","الشحانية"],
+    "البحرين": ["العاصمة","المحرق","الشمالية","الجنوبية"],
+    "عُمان": ["مسقط","ظفار","شمال الباطنة","جنوب الباطنة","الداخلية","شمال الشرقية","جنوب الشرقية","الظاهرة","الوسطى","مسندم"],
+    "الأردن": ["عمّان","الزرقاء","إربد","البلقاء","المفرق","الكرك","معان","الطفيلة","العقبة","مأدبا","جرش","عجلون"],
+    "لبنان": ["بيروت","جبل لبنان","الشمال","البقاع","النبطية","الجنوب","بعلبك-الهرمل","عكار"],
+    "سوريا": ["دمشق","ريف دمشق","حلب","حمص","حماة","اللاذقية","طرطوس","إدلب","دير الزور","الرقة","الحسكة","درعا","السويداء","القنيطرة"],
+    "فلسطين": ["القدس","رام الله والبيرة","الخليل","بيت لحم","نابلس","طولكرم","قلقيلية","جنين","أريحا والأغوار","سلفيت","غزة","خانيونس","رفح","الشمال","الوسطى"],
+    "العراق": ["بغداد","نينوى","البصرة","أربيل","النجف","كربلاء","ذي قار","ديالى","صلاح الدين","كركوك","السليمانية","القادسية","بابل","الأنبار","واسط","المثنى","ميسان","دهوك"],
+    "اليمن": ["صنعاء","عدن","تعز","الحديدة","إب","حضرموت","شبوة","مأرب","صعدة","البيضاء","ذمار","المحويت","ريمة","حجة","لحج","أبين","الضالع","المهرة"],
+    "ليبيا": ["طرابلس","بنغازي","مصراتة","سبها","درنة","البيضاء","الزاوية","غريان","اجدابيا","الكفرة","الجفرة","مرزق","الواحات","طبرق"],
+    "تونس": ["تونس","أريانة","بن عروس","منوبة","نابل","زغوان","بنزرت","باجة","جندوبة","الكاف","سليانة","القيروان","سوسة","المنستير","المهدية","صفاقس","القصرين","قفصة","توزر","قبلي","مدنين","تطاوين"],
+    "الجزائر": ["الجزائر","وهران","قسنطينة","سطيف","البليدة","سيدي بلعباس","باتنة","عنابة","جيجل","بجاية","تلمسان","الأغواط","بسكرة","غرداية","ورقلة","تيزي وزو","تيبازة","البويرة"],
+    "المغرب": ["الرباط-سلا-القنيطرة","الدار البيضاء-سطات","مراكش-آسفي","فاس-مكناس","طنجة-تطوان-الحسيمة","الشرق","بني ملال-خنيفرة","درعة-تافيلالت","سوس-ماسة","العيون-الساقية الحمراء","كلميم-واد نون","الداخلة-وادي الذهب"],
+    "موريتانيا": ["نواكشوط","الحوض الشرقي","الحوض الغربي","لعصابة","كوركول","البراكنة","اترارزة","تكانت","كيدي ماغا","تيرس زمور","داخلت نواذيبو","آدرار"],
+    "السودان": ["الخرطوم","الجزيرة","القضارف","سنار","كسلا","البحر الأحمر","نهر النيل","الشمالية","شمال كردفان","جنوب كردفان","شمال دارفور","جنوب دارفور","غرب دارفور","وسط دارفور","شرق دارفور","النيل الأزرق"],
+    "الصومال": ["بنادر","بونتلاند","جوبالاند","جنوب غرب","هيرشبيلي","غلمدغ","أرض الصومال"],
+    "جيبوتي": ["مدينة جيبوتي","علي صبيح","تاجورة","أوبوك","دهر","أرتا"],
+    "جزر القمر": ["نجازيدجا (القمر الكبرى)","أنجوان","موهيلي"]
+  };
+
+  function fillRegions(country){
+    regionSel.innerHTML=''; regionSel.disabled=true;
+    const list = REGIONS[country];
+    const def = document.createElement('option');
+    def.value=''; def.textContent = list ? '— اختر المنطقة/المحافظة —' : '— غير متاح —';
+    regionSel.appendChild(def);
+    if (list){ list.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; regionSel.appendChild(o); }); regionSel.disabled=false; }
+  }
+  function setPhonePlaceholder(country){
+    const map = {
+      'مصر':'01012345678','السعودية':'05xxxxxxxx','الإمارات':'05xxxxxxxx','الكويت':'5xxxxxxxx','قطر':'3xxxxxxxx','البحرين':'3xxxxxxx','عُمان':'9xxxxxxxx','الأردن':'07xxxxxxxx','لبنان':'03xxxxxx','سوريا':'09xxxxxxxx','فلسطين':'059xxxxxxx','العراق':'07xxxxxxxx','اليمن':'7xxxxxxxx','ليبيا':'09xxxxxxxx','تونس':'2xxxxxxxx / 9xxxxxxxx','الجزائر':'05xxxxxxxx','المغرب':'06xxxxxxxx','موريتانيا':'22xxxxxxx','السودان':'09xxxxxxxx','الصومال':'+252xxxxxxxx','جيبوتي':'+253xxxxxxxx','جزر القمر':'+269xxxxxxx'
     };
+    phoneInp.placeholder = `مثال (${country||'دولة'}): ${map[country]||'+9715xxxxxxx'}`;
+  }
+  countrySel.addEventListener('change', ()=>{ fillRegions(countrySel.value); setPhonePlaceholder(countrySel.value); });
 
-    function fillRegions(country){
-      regionSel.innerHTML = '';
-      regionSel.disabled = true;
-      const list = REGIONS[country];
-      if (!list){
-        const op = document.createElement('option');
-        op.value=''; op.textContent='— غير متاح —';
-        regionSel.appendChild(op);
-        return;
+  function showMessage(text,type='error'){ msg.textContent=text; msg.className=`message ${type}`; msg.style.display='block'; }
+  function clearMessage(){ msg.textContent=''; msg.style.display='none'; }
+
+  async function hashPassword(password){
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  function validatePhoneByCountry(phone,country){
+    const p = phone.replace(/\s|-/g,'');
+    if (country==='مصر') return /^01\d{9}$/.test(p);
+    return /^\+?\d{7,15}$/.test(p);
+  }
+
+  // حفظ
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault(); clearMessage(); btn.disabled = true;
+
+    const fullName = document.getElementById('name').value.trim();
+    const phone    = phoneInp.value.trim();
+    const country  = countrySel.value.trim();
+    const region   = regionSel.value.trim();
+    const role     = document.getElementById('role').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm  = document.getElementById('confirmPassword').value;
+
+    if (!fullName || !phone || !country || !region || !role || !password || !confirm){
+      showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
+    }
+    if (!validatePhoneByCountry(phone, country)){
+      showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
+    }
+    if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون 4 أحرف أو أكثر'); btn.disabled=false; return; }
+    if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقين'); btn.disabled=false; return; }
+
+    try{
+      // توقيع (Anonymous) + uid
+      const user = await ensureAuth();
+      const uid  = user?.uid || (localStorage.getItem('userId') || '');
+      if (!uid){ showMessage('تعذر إنشاء جلسة. أعد المحاولة.'); btn.disabled=false; return; }
+      localStorage.setItem('userId', uid);
+
+      // منع تكرار الهاتف عبر اندكس بسيط
+      const phoneIdxRef = doc(db, 'users_phone', phone);
+      if ((await getDoc(phoneIdxRef)).exists()){
+        showMessage('رقم الهاتف مسجّل بالفعل'); btn.disabled=false; return;
       }
-      const def = document.createElement('option');
-      def.value=''; def.textContent='— اختر المنطقة/المحافظة —';
-      regionSel.appendChild(def);
-      list.forEach(name=>{
-        const op = document.createElement('option');
-        op.value=name; op.textContent=name; regionSel.appendChild(op);
-      });
-      regionSel.disabled = false;
+
+      // users/{uid}
+      await setDoc(doc(db, 'users', uid), {
+        fullName, phone, country, region, role,
+        passwordHash: await hashPassword(password),
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      // users_phone/{phone} → {uid}
+      await setDoc(phoneIdxRef, { uid, createdAt: serverTimestamp() });
+
+      showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
+      setTimeout(()=> location.href='login.html', 1400);
+    }catch(err){
+      showMessage('حدث خطأ أثناء التسجيل، حاول مرة أخرى');
+      btn.disabled=false;
     }
+  });
+</script>
 
-    function setPhonePlaceholder(country){
-      const map = {
-        'مصر':'01012345678',
-        'السعودية':'05xxxxxxxx',
-        'الإمارات':'05xxxxxxxx',
-        'الكويت':'5xxxxxxxx',
-        'قطر':'3xxxxxxxx',
-        'البحرين':'3xxxxxxx',
-        'عُمان':'9xxxxxxxx',
-        'الأردن':'07xxxxxxxx',
-        'لبنان':'03xxxxxx',
-        'سوريا':'09xxxxxxxx',
-        'فلسطين':'059xxxxxxx',
-        'العراق':'07xxxxxxxx',
-        'اليمن':'7xxxxxxxx',
-        'ليبيا':'09xxxxxxxx',
-        'تونس':'2xxxxxxxx / 9xxxxxxxx',
-        'الجزائر':'05xxxxxxxx',
-        'المغرب':'06xxxxxxxx',
-        'موريتانيا':'22xxxxxxx',
-        'السودان':'09xxxxxxxx',
-        'الصومال':'+252xxxxxxxx',
-        'جيبوتي':'+253xxxxxxxx',
-        'جزر القمر':'+269xxxxxxx'
-      };
-      phoneInp.placeholder = `مثال (${country||'دولة'}): ${map[country]||'+9715xxxxxxx'}`;
-    }
-
-    countrySel.addEventListener('change', ()=>{
-      fillRegions(countrySel.value);
-      setPhonePlaceholder(countrySel.value);
-    });
-
-    function showMessage(text, type='error'){
-      msg.textContent = text; msg.className = `message ${type}`; msg.style.display='block';
-    }
-    function clearMessage(){ msg.textContent=''; msg.style.display='none'; }
-
-    async function hashPassword(password){
-      const enc = new TextEncoder();
-      const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
-      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-    }
-
-    function validatePhoneByCountry(phone, country){
-      const p = phone.replace(/\s|-/g,'');
-      if (country==='مصر') return /^01\d{9}$/.test(p);
-      // عام: 7–15 رقم مع اختيار +
-      return /^\+?\d{7,15}$/.test(p);
-    }
-
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault(); clearMessage(); btn.disabled=true;
-      const fullName = document.getElementById('name').value.trim();
-      const phone    = phoneInp.value.trim();
-      const country  = countrySel.value.trim();
-      const region   = regionSel.value.trim();
-      const role     = document.getElementById('role').value.trim();
-      const password = document.getElementById('password').value;
-      const confirm  = document.getElementById('confirmPassword').value;
-
-      if (!fullName || !phone || !country || !region || !role || !password || !confirm){
-        showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
-      }
-      if (!validatePhoneByCountry(phone, country)){
-        showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
-      }
-      if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون 4 أحرف أو أكثر'); btn.disabled=false; return; }
-      if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقين'); btn.disabled=false; return; }
-
-      try{
-        // منع تكرار الهاتف
-      // لازم توقيع (حتى لو Anonymous) علشان القواعد تسمح
- await ensureAuth();
- // استخدم ID = رقم الهاتف لمنع التكرار وقراءة أسرع
- const userRef = doc(db, 'users', phone);
- if ((await getDoc(userRef)).exists()) {
-   showMessage('رقم الهاتف مسجّل بالفعل'); btn.disabled=false; return;
- }
- await setDoc(userRef, {
-   fullName, phone, country, region, role,
-   password: await hashPassword(password),
-   createdAt: serverTimestamp()
-   });
-        showMessage('✅ تم التسجيل بنجاح، سيتم توجيهك لصفحة الدخول...', 'success');
-        setTimeout(()=> location.href='login.html', 1400);
-      }catch(err){
-        console.error(err);
-        showMessage('حدث خطأ أثناء التسجيل، حاول مرة أخرى');
-        btn.disabled=false;
-        return;
-      }
-    });
-  </script>
 </body>
 </html>
 
   
   
+
 
 
 
