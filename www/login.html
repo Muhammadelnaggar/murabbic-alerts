@@ -1,114 +1,54 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل الدخول</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      direction: rtl;
-      font-family: 'Cairo', 'Arial', sans-serif;
-      background: linear-gradient(to bottom right, #ffffcc, #eeffdd);
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; margin: 0; padding: 20px;
-    }
-    form {
-      background-color: #ffffff;
-      padding: 30px 25px;
-      border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-      max-width: 400px; width: 90%; text-align: center;
-    }
-    h2 { color: #28a745; font-size: 28px; margin-bottom: 16px; }
-    .msg {
-      display: none; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-weight: 700;
-      text-align: center; font-size: 14px;
-    }
-    .msg.ok  { display:block; background:#dcfce7; border:1px solid #86efac; color:#14532d; }
-    .msg.err { display:block; background:#fee2e2; border:1px solid #fca5a5; color:#7f1d1d; }
-    input, button {
-      width: 100%; padding: 12px; margin-bottom: 12px; font-size: 1em;
-      border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box;
-    }
-    button {
-      background-color: #28a745; color: white; font-weight: bold; border: none; cursor: pointer;
-    }
-    button:hover { background-color: #218838; }
-    button:disabled { opacity:.7; cursor:not-allowed; }
-  </style>
-
 <script type="module">
   import { db } from "./js/firebase-config.js";
   import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const form = document.getElementById("loginForm");
   const btn  = document.getElementById("submitBtn");
   const msg  = document.getElementById("formMsg");
 
-  const show = (t, ok=false)=>{
-    msg.textContent = t || '';
-    msg.className = "msg " + (ok ? "ok" : "err");
-    msg.style.display = t ? "block" : "none";
-  };
+  function setMsg(t, ok=false){ msg.textContent=t; msg.className="msg "+(ok?"ok":"err"); msg.style.display="block"; }
+  function clearMsg(){ msg.style.display="none"; }
 
-  function toPhoneKey(raw){
-    return (raw||'')
-      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-      .replace(/\D/g,'');
+  // أرقام عربية → لاتينية + إزالة كل ما ليس رقم
+  function phoneKey(raw){
+    const ar="٠١٢٣٤٥٦٧٨٩";
+    return (raw||"").trim()
+      .replace(/[٠-٩]/g, d => String(ar.indexOf(d)))
+      .replace(/\D/g,"");
   }
 
   form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); show("");
-    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+    e.preventDefault(); clearMsg(); btn.disabled=true;
+
+    const pk   = phoneKey(document.getElementById("phone").value);
+    const pass = document.getElementById("password").value;
+    if(!pk || !pass){ setMsg("أدخل رقم الهاتف وكلمة المرور."); btn.disabled=false; return; }
 
     try{
-      const phoneKey = toPhoneKey(document.getElementById("phone").value);
-      const password = document.getElementById("password").value;
-      if (!phoneKey || !password){ show("أدخل الهاتف وكلمة المرور."); return; }
-
       const auth = getAuth();
-      const email = `${phoneKey}@murabbik.local`;
+      // بريد داخلي مشتق من الرقم (لا يطلب من المستخدم)
+      const pseudoEmail = `${pk}@murabbik.local`;
 
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, pseudoEmail, pass);
       const uid  = cred.user.uid;
 
       // حمّل بيانات المستخدم من users/{uid}
       const snap = await getDoc(doc(db,"users", uid));
-      if (!snap.exists()){ show("تعذر تحميل ملف المستخدم."); return; }
-      const user = snap.data();
+      const u = snap.exists() ? snap.data() : {};
 
       localStorage.setItem("userId", uid);
-      localStorage.setItem("phone", user.phone || phoneKey);
-      if (user.country) localStorage.setItem("country", user.country);
-      if (user.region)  localStorage.setItem("region",  user.region);
+      localStorage.setItem("userPhone", u.phone || pk);
+      if(u.country) localStorage.setItem("country", u.country);
+      if(u.region)  localStorage.setItem("region",  u.region);
 
-      show("✅ تم تسجيل الدخول — سيتم تحويلك الآن…", true);
-      location.href = "dashboard.html";
+      setMsg("✅ تم تسجيل الدخول — يتم التحويل…", true);
+      setTimeout(()=> location.href="dashboard.html", 600);
 
     }catch(err){
-      show("الهاتف أو كلمة المرور غير صحيحة.");
+      setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.");
     }finally{
-      btn.disabled=false; btn.textContent=prev;
+      btn.disabled=false;
     }
   });
 </script>
-
-
-
-</head>
-<body>
-  <form id="loginForm" novalidate>
-    <h2>تسجيل الدخول</h2>
-    <div id="formMsg" class="msg" role="status" aria-live="polite"></div>
-    <input type="text" id="phone" placeholder="رقم الهاتف" autocomplete="username" required />
-    <input type="password" id="password" placeholder="كلمة المرور" autocomplete="current-password" required />
-    <button id="submitBtn" type="submit">دخول</button>
-  </form>
-</body>
-</html>
-
-
-
