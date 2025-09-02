@@ -41,54 +41,59 @@
 <script type="module">
   import { db } from "./js/firebase-config.js";
   import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const form = document.getElementById("loginForm");
   const btn  = document.getElementById("submitBtn");
   const msg  = document.getElementById("formMsg");
 
-  function setMsg(t, ok=false){ msg.textContent=t; msg.className="msg "+(ok?"ok":"err"); msg.style.display="block"; }
-  function clearMsg(){ msg.style.display="none"; }
-
-  // أرقام عربية → لاتينية + إزالة كل ما ليس رقم
-  function phoneKey(raw){
-    const ar="٠١٢٣٤٥٦٧٨٩";
-    return (raw||"").trim()
-      .replace(/[٠-٩]/g, d => String(ar.indexOf(d)))
-      .replace(/\D/g,"");
+  function setMsg(t, ok=false){
+    msg.textContent = t;
+    msg.className   = "msg " + (ok ? "ok" : "err");
+    msg.style.display = "block";
+  }
+  // توحيد الأرقام العربية وترك أرقام فقط
+  function phoneKeyOf(raw){
+    const s = (raw||"").trim()
+      .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+      .replace(/\D/g,'');
+    return s;
   }
 
   form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); clearMsg(); btn.disabled=true;
-
-    const pk   = phoneKey(document.getElementById("phone").value);
-    const pass = document.getElementById("password").value;
-    if(!pk || !pass){ setMsg("أدخل رقم الهاتف وكلمة المرور."); btn.disabled=false; return; }
-
+    e.preventDefault(); msg.style.display="none";
+    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
     try{
-      const auth = getAuth();
-      // بريد داخلي مشتق من الرقم (لا يطلب من المستخدم)
-      const pseudoEmail = `${pk}@murabbik.local`;
+      const phoneIn = document.getElementById("phone").value;
+      const passIn  = document.getElementById("password").value;
+      const phoneKey = phoneKeyOf(phoneIn);
+      if (!phoneKey || !passIn){ setMsg("أدخل رقم الهاتف وكلمة المرور."); return; }
 
-      const cred = await signInWithEmailAndPassword(auth, pseudoEmail, pass);
+      const auth = getAuth();
+      const pseudoEmail = `${phoneKey}@murabbik.local`;
+
+      // ✅ تسجيل دخول فعلي على Firebase Auth
+      const cred = await signInWithEmailAndPassword(auth, pseudoEmail, passIn);
       const uid  = cred.user.uid;
 
-      // حمّل بيانات المستخدم من users/{uid}
+      // حمّل بروفايل المستخدم من users/{uid}
       const snap = await getDoc(doc(db,"users", uid));
       const u = snap.exists() ? snap.data() : {};
 
+      // خزّن الـ UID لاستخدامه في صفحات الإضافة/الداشبورد
       localStorage.setItem("userId", uid);
-      localStorage.setItem("userPhone", u.phone || pk);
-      if(u.country) localStorage.setItem("country", u.country);
-      if(u.region)  localStorage.setItem("region",  u.region);
+      if (u.phone)   localStorage.setItem("userPhone", u.phone);
+      if (u.country) localStorage.setItem("userCountry", u.country);
+      if (u.region)  localStorage.setItem("userRegion",  u.region);
 
-      setMsg("✅ تم تسجيل الدخول — يتم التحويل…", true);
+      setMsg("✅ تم تسجيل الدخول — تحويل…", true);
       setTimeout(()=> location.href="dashboard.html", 600);
 
     }catch(err){
       setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.");
     }finally{
-      btn.disabled=false;
+      btn.disabled=false; btn.textContent=prev;
     }
   });
 </script>
@@ -107,5 +112,6 @@
   </form>
 </body>
 </html>
+
 
 
