@@ -163,7 +163,12 @@
   const preApp = cfgMod.app || cfgMod.default?.app || null;
   const app = preApp || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
   const preDb  = cfgMod.db  || cfgMod.default?.db  || null;
-  const DB = preDb || getFirestore(app);
+// ✅ أربط على قاعدة Firestore المسماة murabbikdata (أو الاسم القادم من الكونفيج)
+const DB_NAME =
+  (cfg.DB_ID || cfg.databaseId || cfg.default?.DB_ID || cfg.default?.databaseId || 'murabbikdata');
+
+const DB = db ?? getFirestore(app, DB_NAME);
+
 
   /* ===== 2) UID للمستأجر الحالي ===== */
   const UID =
@@ -519,4 +524,5 @@
 
 </body>
 </html>
+
 
