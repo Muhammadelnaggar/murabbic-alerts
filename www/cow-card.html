@@ -19,7 +19,7 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
     .chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
-    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
+    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0ب2;color:#7a4f00}
     .chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
     .chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -145,26 +145,24 @@
   </div>
 
 <script type="module">
-  // ===== firebase-config.js (app/db) =====
-const cfg = await import('/js/firebase-config.js');
-const app = (cfg.app || cfg.default?.app) || null;
-const db  = (cfg.db  || cfg.default?.db)  || null;
+  /* ========= firebase-config ========= */
+  const cfg = await import('/js/firebase-config.js');
+  const app = (cfg.app || cfg.default?.app) || null;
+  const db  = (cfg.db  || cfg.default?.db)  || null;
 
-
-  // ===== Firestore utils =====
+  /* ========= Firestore ========= */
   const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
     await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
- const DB = db || (app ? getFirestore(app) : getFirestore());
+  const DB = db || (app ? getFirestore(app) : getFirestore());
 
-
-  // ===== Current user (tenant) =====
+  /* ========= Current user ========= */
   const UID =
     localStorage.getItem('userId') ||
     localStorage.getItem('tenantId') ||
     (window.tenant && (window.tenant.userId || window.tenant.uid)) ||
     window.TENANT_USER_ID || '';
 
-  // ===== Kind =====
+  /* ========= Kind utils ========= */
   const normKind = (k)=>{ const s=String(k??'').trim().toLowerCase();
     if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
     if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
@@ -177,7 +175,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     for(const v of c){ const k=normKind(v); if(k) return k; } return '';
   };
 
-  // ===== DOM/helpers =====
+  /* ========= DOM/helpers ========= */
   const $=(id)=>document.getElementById(id);
   const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
   const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
@@ -186,7 +184,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
   const url = new URL(location.href);
   const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
 
-  // ===== Normalize animal =====
+  /* ========= Normalize animal ========= */
   function normalizeAnimalDoc(d={}){
     return {
       id: d.id,
@@ -207,7 +205,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     };
   }
 
-  // ===== Event helpers =====
+  /* ========= Event helpers ========= */
   const TYPE_RULES = [
     ['milk',        /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
     ['calving',     /(calving|ولاد|نفاس)/i],
@@ -230,35 +228,52 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     return sum;
   }
 
-  // ===== Queries (SCOPED BY USER) =====
-  async function firstDoc(qs){ for(const q of qs){ const s=await getDocs(q); if(!s.empty) return s.docs[0]; } return null; }
-
-  function userScopedAnimalQueries(A, nStr, nNum){
-    const scopes = [];
-    if (UID) {
-      scopes.push(query(A, where('userId','==', UID), where('number','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('userId','==', UID), where('number','==', nNum), limit(1)));
-      scopes.push(query(A, where('userId','==', UID), where('animalNumber','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('userId','==', UID), where('animalNumber','==', nNum), limit(1)));
-
-      scopes.push(query(A, where('ownerUid','==', UID), where('number','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('ownerUid','==', UID), where('number','==', nNum), limit(1)));
-      scopes.push(query(A, where('ownerUid','==', UID), where('animalNumber','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('ownerUid','==', UID), where('animalNumber','==', nNum), limit(1)));
-    } else {
-      scopes.push(query(A, where('number','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('number','==', nNum), limit(1)));
-      scopes.push(query(A, where('animalNumber','==', nStr), limit(1)));
-      if (Number.isFinite(nNum)) scopes.push(query(A, where('animalNumber','==', nNum), limit(1)));
-    }
-    return scopes;
-  }
-
+  /* ========= Queries (User-first، بلا مؤشرات مركّبة) ========= */
   async function fetchAnimalByNumber(n){
-    if(!n) return null; const A=collection(DB,'animals');
+    if(!n) return null;
+    const A=collection(DB,'animals');
     const nStr=String(n).trim(); const nNum=Number(nStr);
-    const d=await firstDoc(userScopedAnimalQueries(A, nStr, nNum));
-    return d? normalizeAnimalDoc({id:d.id, ...d.data()}): null;
+
+    // (1) حيوانات المستخدم أولاً (index منفرد على userId)
+    if (UID){
+      const snap = await getDocs(query(A, where('userId','==', UID), limit(200)));
+      let hit = null;
+      snap.forEach(d=>{
+        const v = {id:d.id, ...d.data()};
+        if (
+          String(v.number)===nStr ||
+          String(v.animalNumber)===nStr ||
+          Number(v.number)===nNum  ||
+          Number(v.animalNumber)===nNum
+        ){ hit = v; }
+      });
+      if (hit) return normalizeAnimalDoc(hit);
+    }
+
+    // (2) احتياطي: استعلامات بسيطة بلا userId + فلترة UID بعد الجلب
+    const qs = [
+      query(A, where('number','==', nStr), limit(5)),
+      Number.isFinite(nNum)? query(A, where('number','==', nNum), limit(5)) : null,
+      query(A, where('animalNumber','==', nStr), limit(5)),
+      Number.isFinite(nNum)? query(A, where('animalNumber','==', nNum), limit(5)) : null,
+    ].filter(Boolean);
+    for (const qy of qs){
+      const s = await getDocs(qy);
+      if (!s.empty){
+        // اختر وثيقة تخص نفس UID لو موجود
+        let chosen = s.docs[0];
+        if (UID){
+          s.forEach(d=>{
+            const v=d.data();
+            if (v.userId===UID || v.ownerUid===UID) chosen=d;
+          });
+        }
+        const data = chosen.data();
+        if (UID && data && (data.userId!==UID) && (data.ownerUid!==UID)) continue;
+        return normalizeAnimalDoc({id:chosen.id, ...data});
+      }
+    }
+    return null;
   }
 
   async function fetchAnimal({number, animalId}){
@@ -277,27 +292,34 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
 
   async function fetchEvents(animal){
     const E=collection(DB,'events'); const rows=[];
-    const baseFilters = (q0)=> UID ? query(q0, where('userId','==', UID)) : q0;
 
+    // الأفضل: بالـ id (index فردي تلقائي)
     if (animal.id){
-      const qy = baseFilters(query(E, where('animalId','==', animal.id)));
-      (await getDocs(qy)).forEach(d=>rows.push({id:d.id, ...d.data()}));
+      const s = await getDocs(query(E, where('animalId','==', animal.id)));
+      s.forEach(d=>rows.push({id:d.id, ...d.data()}));
     }
+
+    // احتياطي بالرقم، ثم فلترة UID بعد الجلب
     if (animal.number!=null){
       const nStr=String(animal.number), nNum=Number(nStr);
-      const qs=[
-        baseFilters(query(E, where('animalNumber','==', nStr))),
-        Number.isFinite(nNum)? baseFilters(query(E, where('animalNumber','==', nNum))) : null,
-        baseFilters(query(E, where('number','==', nStr))),
-        Number.isFinite(nNum)? baseFilters(query(E, where('number','==', nNum))) : null,
+      const ql=[
+        query(E, where('animalNumber','==', nStr)),
+        Number.isFinite(nNum)? query(E, where('animalNumber','==', nNum)) : null,
+        query(E, where('number','==', nStr)),
+        Number.isFinite(nNum)? query(E, where('number','==', nNum)) : null,
       ].filter(Boolean);
-      for(const qy of qs){ const s=await getDocs(qy); s.forEach(d=>rows.push({id:d.id, ...d.data()})); }
+      for(const qy of ql){
+        const s=await getDocs(qy);
+        s.forEach(d=>rows.push({id:d.id, ...d.data()}));
+      }
     }
-    const uniq=new Map(rows.map(r=>[r.id,r]));
+
+    const filtered = UID ? rows.filter(r => !r.userId || r.userId===UID || r.ownerUid===UID) : rows;
+    const uniq=new Map(filtered.map(r=>[r.id,r]));
     return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
   }
 
-  // ===== State build =====
+  /* ========= Build state ========= */
   function buildState(animal, events){
     const st={
       number: animal.number ?? animal.id?.slice(-6),
@@ -361,7 +383,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     return st;
   }
 
-  // ===== UI (gauge + chart + chips) =====
+  /* ========= UI ========= */
   function polar(cx,cy,r,ang){const a=(ang*Math.PI)/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
   function arcPath(cx,cy,r,a0,a1){const[x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
   function renderGauge(score){
@@ -407,7 +429,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     el.textContent=text||'—'; el.setAttribute('data-variant',v);
   }
 
-  // ===== Render =====
+  /* ========= Render ========= */
   function renderCard(state, kind){
     $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
     setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
@@ -445,7 +467,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     }
   }
 
-  // ===== Preview kind =====
+  /* ========= Preview kind ========= */
   let debounceT=null;
   async function previewKind(n){
     if(kindValEl) kindValEl.textContent='—';
@@ -462,7 +484,7 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
     openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
   }
 
-  // ===== Load & run =====
+  /* ========= Load & run ========= */
   async function loadAndRender({number, animalId, type}){
     let kind = normKind(type);
     const animal = await fetchAnimal({number, animalId});
@@ -503,4 +525,3 @@ const db  = (cfg.db  || cfg.default?.db)  || null;
 
 </body>
 </html>
-
