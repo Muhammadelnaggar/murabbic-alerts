@@ -19,7 +19,7 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
     .chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
-    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0ب2;color:#7a4f00}
+    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
     .chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
     .chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
@@ -145,24 +145,48 @@
   </div>
 
 <script type="module">
-  /* ========= firebase-config ========= */
-  const cfg = await import('/js/firebase-config.js');
-  const app = (cfg.app || cfg.default?.app) || null;
-  const db  = (cfg.db  || cfg.default?.db)  || null;
+  /* ===== 1) Firebase init آمن من firebase-config.js ===== */
+  const cfgMod = await import('/js/firebase-config.js');
 
-  /* ========= Firestore ========= */
-  const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
-    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const DB = db || (app ? getFirestore(app) : getFirestore());
+  // نحاول كل الأشكال الممكنة للكونفيج
+  const firebaseConfig =
+    cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
 
-  /* ========= Current user ========= */
+  const [{ initializeApp, getApps }, {
+    getFirestore, collection, doc, getDoc, getDocs, query, where, limit
+  }] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+  ]);
+
+  // لو الملف مديّنا app/db جاهزين استخدمهم، وإلا فعّل app من config
+  const preApp = cfgMod.app || cfgMod.default?.app || null;
+  const app = preApp || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
+  const preDb  = cfgMod.db  || cfgMod.default?.db  || null;
+  const DB = preDb || getFirestore(app);
+
+  /* ===== 2) UID للمستأجر الحالي ===== */
   const UID =
     localStorage.getItem('userId') ||
     localStorage.getItem('tenantId') ||
     (window.tenant && (window.tenant.userId || window.tenant.uid)) ||
     window.TENANT_USER_ID || '';
 
-  /* ========= Kind utils ========= */
+  /* ===== 3) يساعدنا نبلغ الخطأ على الصفحة بدل ما ندوّخ ===== */
+  const errBox = document.createElement('div');
+  errBox.style.cssText = 'position:fixed;inset-inline:12px;bottom:12px;background:#ffebee;color:#7f1d1d;border:1px solid #ffcdd2;border-radius:10px;padding:10px;font:12px system-ui;display:none;z-index:9999';
+  document.body.appendChild(errBox);
+  const showErr = (msg)=>{ errBox.textContent = msg; errBox.style.display='block'; };
+
+  /* ===== 4) أدوات واجهة وتهيئة بسيطة ===== */
+  const $=id=>document.getElementById(id);
+  const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
+  const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
+  const NF = new Intl.NumberFormat('ar-EG');
+  const todayStr = new Date().toISOString().slice(0,10);
+  const url = new URL(location.href);
+  const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
+
   const normKind = (k)=>{ const s=String(k??'').trim().toLowerCase();
     if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
     if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
@@ -175,17 +199,8 @@
     for(const v of c){ const k=normKind(v); if(k) return k; } return '';
   };
 
-  /* ========= DOM/helpers ========= */
-  const $=(id)=>document.getElementById(id);
-  const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
-  const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
-  const NF = new Intl.NumberFormat('ar-EG');
-  const todayStr = new Date().toISOString().slice(0,10);
-  const url = new URL(location.href);
-  const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
-
-  /* ========= Normalize animal ========= */
-  function normalizeAnimalDoc(d={}){
+  /* ===== 5) تطبيع بيانات الحيوان + الأحداث ===== */
+  function normalizeAnimalDoc(d={}) {
     return {
       id: d.id,
       number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
@@ -205,7 +220,6 @@
     };
   }
 
-  /* ========= Event helpers ========= */
   const TYPE_RULES = [
     ['milk',        /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
     ['calving',     /(calving|ولاد|نفاس)/i],
@@ -228,29 +242,27 @@
     return sum;
   }
 
-  /* ========= Queries (User-first، بلا مؤشرات مركّبة) ========= */
+  /* ===== 6) جلب الحيوانات لمستخدم UID أولاً (بدون مؤشرات مركّبة) ===== */
   async function fetchAnimalByNumber(n){
     if(!n) return null;
     const A=collection(DB,'animals');
     const nStr=String(n).trim(); const nNum=Number(nStr);
 
-    // (1) حيوانات المستخدم أولاً (index منفرد على userId)
+    // (أ) اجلب حيوانات المستخدم (index بسيط على userId)، ثم طابق محليًا
     if (UID){
-      const snap = await getDocs(query(A, where('userId','==', UID), limit(200)));
-      let hit = null;
-      snap.forEach(d=>{
-        const v = {id:d.id, ...d.data()};
+      const s = await getDocs(query(A, where('userId','==', UID), limit(200)));
+      let hit=null;
+      s.forEach(d=>{
+        const v={id:d.id, ...d.data()};
         if (
-          String(v.number)===nStr ||
-          String(v.animalNumber)===nStr ||
-          Number(v.number)===nNum  ||
-          Number(v.animalNumber)===nNum
-        ){ hit = v; }
+          String(v.number)===nStr || String(v.animalNumber)===nStr ||
+          Number(v.number)===nNum  || Number(v.animalNumber)===nNum
+        ) hit=v;
       });
       if (hit) return normalizeAnimalDoc(hit);
     }
 
-    // (2) احتياطي: استعلامات بسيطة بلا userId + فلترة UID بعد الجلب
+    // (ب) احتياطي: استعلامات بسيطة بالرقم فقط ثم فلترة UID إن وُجد
     const qs = [
       query(A, where('number','==', nStr), limit(5)),
       Number.isFinite(nNum)? query(A, where('number','==', nNum), limit(5)) : null,
@@ -260,7 +272,6 @@
     for (const qy of qs){
       const s = await getDocs(qy);
       if (!s.empty){
-        // اختر وثيقة تخص نفس UID لو موجود
         let chosen = s.docs[0];
         if (UID){
           s.forEach(d=>{
@@ -277,6 +288,7 @@
   }
 
   async function fetchAnimal({number, animalId}){
+    const { idParam } = {};
     if (animalId){
       const dd=await getDoc(doc(DB,'animals', animalId));
       if (dd.exists()){
@@ -292,14 +304,10 @@
 
   async function fetchEvents(animal){
     const E=collection(DB,'events'); const rows=[];
-
-    // الأفضل: بالـ id (index فردي تلقائي)
     if (animal.id){
       const s = await getDocs(query(E, where('animalId','==', animal.id)));
       s.forEach(d=>rows.push({id:d.id, ...d.data()}));
     }
-
-    // احتياطي بالرقم، ثم فلترة UID بعد الجلب
     if (animal.number!=null){
       const nStr=String(animal.number), nNum=Number(nStr);
       const ql=[
@@ -313,13 +321,12 @@
         s.forEach(d=>rows.push({id:d.id, ...d.data()}));
       }
     }
-
     const filtered = UID ? rows.filter(r => !r.userId || r.userId===UID || r.ownerUid===UID) : rows;
     const uniq=new Map(filtered.map(r=>[r.id,r]));
     return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
   }
 
-  /* ========= Build state ========= */
+  /* ===== 7) بناء الحالة + الرسم ===== */
   function buildState(animal, events){
     const st={
       number: animal.number ?? animal.id?.slice(-6),
@@ -383,20 +390,20 @@
     return st;
   }
 
-  /* ========= UI ========= */
-  function polar(cx,cy,r,ang){const a=(ang*Math.PI)/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
-  function arcPath(cx,cy,r,a0,a1){const[x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
   function renderGauge(score){
     score=Math.max(0,Math.min(100,Number(score)||0));
-    const g=$('gSlices'); if(!g) return; g.innerHTML='';
+    const g=document.getElementById('gSlices'); if(!g) return; g.innerHTML='';
     const colors=['#ef5350','#ffb74d','#fff176','#66bb6a'], steps=[0,25,50,75,100];
+    const arc=(cx,cy,r,a0,a1)=>{const A=(x)=>x*Math.PI/180, p=(ang)=>[cx+r*Math.cos(A(ang)), cy+r*Math.sin(A(ang))];
+      const [x0,y0]=p(a0),[x1,y1]=p(a1); return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;};
     for(let i=0;i<4;i++){const s=steps[i],e=steps[i+1],a0=180-(s/100)*180,a1=180-(e/100)*180;
       const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-      p.setAttribute('d',arcPath(50,50,40,a0,a1)); p.setAttribute('fill','none');
+      p.setAttribute('d',arc(50,50,40,a0,a1)); p.setAttribute('fill','none');
       p.setAttribute('stroke',colors[i]); p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round'); g.appendChild(p);
     }
-    const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
-    const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف'; put('milkGaugeVal',`${label} — ${score}%`);
+    const ang=180-(score/100)*180; const needle=document.getElementById('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
+    const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف';
+    put('milkGaugeVal',`${label} — ${score}%`);
   }
 
   function renderMilkChart(series){
@@ -406,15 +413,17 @@
     svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
     const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
     const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
-    svg.innerHTML=''; const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+    svg.innerHTML='';
+    const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
     for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
       ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y);
-      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
+      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);}
+    svg.appendChild(grid);
     let d=''; data.forEach((p,i)=>{d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2);});
     const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
     const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
     const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
-    const cx=pad+(N-1)*pxPer, cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const cx=sx(N-1), cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
     dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
     setTimeout(()=>{sc.scrollLeft=svg.scrollWidth;},0); addEventListener('resize',()=>renderMilkChart(series),{once:true});
   }
@@ -428,8 +437,6 @@
     if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger';
     el.textContent=text||'—'; el.setAttribute('data-variant',v);
   }
-
-  /* ========= Render ========= */
   function renderCard(state, kind){
     $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
     setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
@@ -467,39 +474,27 @@
     }
   }
 
-  /* ========= Preview kind ========= */
-  let debounceT=null;
-  async function previewKind(n){
-    if(kindValEl) kindValEl.textContent='—';
-    if(!n) return;
-    try{
-      const a=await fetchAnimalByNumber(n);
-      const k=a? a.kind : '';
-      if(kindValEl) kindValEl.textContent = kindNameAr(k);
-      if(k) localStorage.setItem('lastKind',k);
-    }catch{ if(kindValEl) kindValEl.textContent='غير موجود'; }
-  }
-  if (openInput){
-    openInput.addEventListener('input', ()=>{ clearTimeout(debounceT); debounceT=setTimeout(()=>previewKind((openInput.value||'').trim()),300); });
-    openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
-  }
-
-  /* ========= Load & run ========= */
+  /* ===== 8) تحميل وتشغيل ===== */
   async function loadAndRender({number, animalId, type}){
-    let kind = normKind(type);
-    const animal = await fetchAnimal({number, animalId});
-    if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
-    if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
+    try{
+      let kind = normKind(type);
+      const animal = await fetchAnimal({number, animalId});
+      if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
+      if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
 
-    localStorage.setItem('currentAnimalId', String(animal.id || ''));
-    if (animal.number!=null){
-      localStorage.setItem('currentAnimalNumber', String(animal.number));
-      localStorage.setItem('lastAnimalNumber', String(animal.number));
+      localStorage.setItem('currentAnimalId', String(animal.id || ''));
+      if (animal.number!=null){
+        localStorage.setItem('currentAnimalNumber', String(animal.number));
+        localStorage.setItem('lastAnimalNumber', String(animal.number));
+      }
+
+      const events = await fetchEvents(animal);
+      const state  = buildState(animal, events);
+      renderCard(state, kind);
+    }catch(e){
+      showErr(e?.message || String(e));
+      $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان';
     }
-
-    const events = await fetchEvents(animal);
-    const state  = buildState(animal, events);
-    renderCard(state, kind);
   }
 
   const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
@@ -509,11 +504,10 @@
   if (numberParam || idParam){
     if (openbar) openbar.style.display='none';
     if (typeParam && kindValEl) kindValEl.textContent = kindNameAr(normKind(typeParam));
-    loadAndRender({number:numberParam, animalId:idParam, type:typeParam})
-      .catch(()=>{ $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان'; });
+    loadAndRender({number:numberParam, animalId:idParam, type:typeParam});
   } else {
     const lastNum = localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
-    if(lastNum && openInput){ openInput.value=lastNum; previewKind(lastNum); }
+    if(lastNum && openInput){ openInput.value=lastNum; (async()=>{ try{const a=await fetchAnimalByNumber(lastNum); if(kindValEl) kindValEl.textContent=kindNameAr(a? a.kind : '');}catch{}})(); }
     if(openBtn){
       openBtn.addEventListener('click', ()=>{
         const n=(openInput.value||'').trim(); if(!n) return;
@@ -525,3 +519,4 @@
 
 </body>
 </html>
+
