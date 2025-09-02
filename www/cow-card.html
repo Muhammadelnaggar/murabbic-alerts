@@ -146,6 +146,8 @@
 
 <script type="module">
   /* ========= Firebase init (مرن وآمن) ========= */
+ <script type="module">
+  /* ========= Firebase init (يدعم databaseId مسمى) ========= */
   const [{ initializeApp, getApps }, { getFirestore, collection, doc, getDoc, getDocs, query, where, limit }] =
     await Promise.all([
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
@@ -153,13 +155,16 @@
     ]);
 
   const cfgMod = await import('/js/firebase-config.js');
-  // يدعم أي من: export default {..config..} أو export default {config:{..}} أو export const app/db
-  const exportedApp = cfgMod.app || cfgMod.default?.app;
-  const exportedDb  = cfgMod.db  || cfgMod.default?.db;
-  const configObj   = cfgMod.config || cfgMod.default?.config || (cfgMod.default && !cfgMod.default.app ? cfgMod.default : null);
+  // نقبل أي شكل من الكونفيج
+  const configObj = cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
 
-  const app = exportedApp || (getApps().length ? getApps()[0] : initializeApp(configObj));
-  const db  = exportedDb  || getFirestore(app);
+  // ✅ Database ID حسب لقطة الشاشة: murabbikdata
+  const DB_ID = 'murabbikdata';
+
+  const app = (getApps().length ? getApps()[0] : initializeApp(configObj));
+  // <-- أهم سطرين
+  // استخدم الداتابيز المسمّاة بدلاً من الافتراضية
+  const db  = getFirestore(app, DB_ID);
 
   /* ========= Helpers ========= */
   const $=(id)=>document.getElementById(id);
@@ -502,3 +507,4 @@
 </script>
 </body>
 </html>
+
