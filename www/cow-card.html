@@ -39,7 +39,7 @@
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 10px}
     @media (max-width:560px){.kpi3{grid-template-columns:1fr}}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center}
-    .kpi .lbl{font-size:12px;color:#2b593ا}
+    .kpi .lbl{font-size:12px;color:#2b593a}
     .kpi .val{font-weight:800;color:#14532d;font-size:clamp(16px,4.6vw,20px)}
     .chart-scroll{overflow-x:auto;overflow-y:hidden;border:1px dashed #c5e1a5;border-radius:12px;background:#fff}
     .prod-chart{display:block;height:240px}
@@ -145,14 +145,23 @@
   </div>
 
 <script type="module">
-  // ===== Imports =====
-  const appMod = await import('/js/firebase-config.js');
-  const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
-    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const app = appMod.app || appMod.default || appMod;
-  const db  = appMod.db  || getFirestore(app.app || app);
+  /* ========= Firebase init (مرن وآمن) ========= */
+  const [{ initializeApp, getApps }, { getFirestore, collection, doc, getDoc, getDocs, query, where, limit }] =
+    await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+    ]);
 
-  // ===== Helpers =====
+  const cfgMod = await import('/js/firebase-config.js');
+  // يدعم أي من: export default {..config..} أو export default {config:{..}} أو export const app/db
+  const exportedApp = cfgMod.app || cfgMod.default?.app;
+  const exportedDb  = cfgMod.db  || cfgMod.default?.db;
+  const configObj   = cfgMod.config || cfgMod.default?.config || (cfgMod.default && !cfgMod.default.app ? cfgMod.default : null);
+
+  const app = exportedApp || (getApps().length ? getApps()[0] : initializeApp(configObj));
+  const db  = exportedDb  || getFirestore(app);
+
+  /* ========= Helpers ========= */
   const $=(id)=>document.getElementById(id);
   const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
   const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
@@ -161,10 +170,8 @@
   const url = new URL(location.href);
   const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
 
-  // ===== pick + kind helpers =====
-  const pick = (obj, keys) => { for (const k of keys) if (obj[k] !== undefined) return obj[k]; return null; };
-  const normKind = (v)=>{
-    const s=String(v ?? '').trim().toLowerCase();
+  const pick = (obj, keys) => { for (const k of keys) if (obj && obj[k] !== undefined) return obj[k]; return null; };
+  const normKind = (v)=>{ const s=String(v ?? '').trim().toLowerCase();
     if (['cow','بقر','بقرة'].includes(s)) return 'cow';
     if (['buffalo','جاموس','جاموسة','جاموسه'].includes(s)) return 'buffalo';
     return '';
@@ -172,14 +179,9 @@
   const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
   const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
 
-  // ===== Animal doc normalization (عربي + إنجليزي) =====
   function normalizeAnimalDoc(d = {}) {
     const number = pick(d, ['number','animalNumber','no','رقم','رقم الحيوان']);
-    const kindRaw = pick(d, [
-      'animaltype','animalType','animalTypeAr','kind','type',
-      'الفصيلة','النوع','نوع الحيوان'
-    ]);
-
+    const kindRaw = pick(d, ['animaltype','animalType','animalTypeAr','kind','type','الفصيلة','النوع','نوع الحيوان']);
     return {
       id: d.id,
       number,
@@ -200,7 +202,6 @@
     };
   }
 
-  // ===== Event helpers =====
   const TYPE_RULES = [
     ['milk',        /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
     ['calving',     /(calving|ولاد|نفاس)/i],
@@ -217,13 +218,11 @@
   function evMilkKg(e){
     const direct = toNum(e.milkKg ?? e.total ?? e.kg ?? e.milk ?? e.amount);
     if (direct>0) return direct;
-    let sum=0;
-    const partKey = /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
+    let sum=0; const partKey = /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
     for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum += toNum(v);
     return sum;
   }
 
-  // ===== Queries =====
   async function firstDoc(qs){ for(const q of qs){ const s=await getDocs(q); if(!s.empty) return s.docs[0]; } return null; }
 
   async function fetchAnimalByNumber(n){
@@ -268,7 +267,6 @@
     return [...uniq.values()].sort((a,b)=> evDate(a).localeCompare(evDate(b)));
   }
 
-  // ===== Build state =====
   function buildState(animal, events){
     const st={
       number: animal.number ?? animal.id?.slice(-6),
@@ -291,7 +289,6 @@
     };
 
     const milkTmp=[]; let season=0;
-
     for(const e of events){
       const t=evType(e), d=evDate(e);
       if(t==='calving' && d) st.lastCalvingDate = d;
@@ -333,7 +330,6 @@
     return st;
   }
 
-  // ===== UI helpers (gauge/chart/chips) =====
   function polar(cx,cy,r,ang){const a=(ang*Math.PI)/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
   function arcPath(cx,cy,r,a0,a1){const[x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
   function renderGauge(score){
@@ -348,58 +344,58 @@
     const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
     const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف'; put('milkGaugeVal',`${label} — ${score}%`);
   }
- function renderMilkChart(series){
-  const svg=$('milkChart'), sc=$('milkScroll');
-  if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
 
-  const base=Math.max(sc.clientWidth,320);
-  const pxPer=Math.max(6,Math.min(11,Math.round(base/28)));
-  const pad=10;
+  function renderMilkChart(series){
+    const svg=$('milkChart'), sc=$('milkScroll');
+    if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
 
-  const data = series.map((p,i)=>({ x:i, y: Number(p.v) || 0 }));
-  const N=data.length, W=pad*2+(N-1)*pxPer+20;
+    const base=Math.max(sc.clientWidth,320);
+    const pxPer=Math.max(6,Math.min(11,Math.round(base/28)));
+    const pad=10;
 
-  svg.setAttribute('viewBox',`0 0 ${W} 60`);
-  svg.style.width=W+'px';
+    const data = series.map((p,i)=>({ x:i, y: Number(p.v) || 0 }));
+    const N=data.length, W=pad*2+(N-1)*pxPer+20;
 
-  const maxY=Math.max(...data.map(d=>d.y),1);
-  const minY=Math.min(...data.map(d=>d.y),0);
-  const yR=Math.max(1,maxY-minY);
-  const sx=(i)=>pad+(i*pxPer);
-  const sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+    svg.setAttribute('viewBox',`0 0 ${W} 60`);
+    svg.style.width=W+'px';
 
-  svg.innerHTML='';
-  const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
-  for(let i=1;i<=3;i++){
-    const y=6+i*(60-12)/3;
-    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ln.setAttribute('x1',6); ln.setAttribute('x2',W-6);
-    ln.setAttribute('y1',y); ln.setAttribute('y2',y);
-    ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6');
-    grid.appendChild(ln);
+    const maxY=Math.max(...data.map(d=>d.y),1);
+    const minY=Math.min(...data.map(d=>d.y),0);
+    const yR=Math.max(1,maxY-minY);
+    const sx=(i)=>pad+(i*pxPer);
+    const sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+
+    svg.innerHTML='';
+    const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+    for(let i=1;i<=3;i++){
+      const y=6+i*(60-12)/3;
+      const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1',6); ln.setAttribute('x2',W-6);
+      ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6');
+      grid.appendChild(ln);
+    }
+    svg.appendChild(grid);
+
+    let d=''; data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
+
+    const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
+    const ap=document.createElementNS('http://www.w3.org/2000/svg','path');
+    ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6');
+    svg.appendChild(ap);
+
+    const lp=document.createElementNS('http://www.w3.org/2000/svg','path');
+    lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
+    svg.appendChild(lp);
+
+    const cx=sx(N-1), cy=sy(data[N-1].y);
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20');
+    svg.appendChild(dot);
+
+    setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
+    addEventListener('resize',()=>renderMilkChart(series),{once:true});
   }
-  svg.appendChild(grid);
-
-  let d='';
-  data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
-
-  const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-  const ap=document.createElementNS('http://www.w3.org/2000/svg','path');
-  ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6');
-  svg.appendChild(ap);
-
-  const lp=document.createElementNS('http://www.w3.org/2000/svg','path');
-  lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
-  svg.appendChild(lp);
-
-  const cx=sx(N-1), cy=sy(data[N-1].y);
-  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
-  dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20');
-  svg.appendChild(dot);
-
-  setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
-  addEventListener('resize',()=>renderMilkChart(series),{once:true});
-}
 
   function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
     const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b);
@@ -411,7 +407,6 @@
     el.textContent=text||'—'; el.setAttribute('data-variant',v);
   }
 
-  // ===== Render card =====
   function renderCard(state, kind){
     $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
     setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
@@ -449,7 +444,7 @@
     }
   }
 
-  // ===== Preview kind while typing number =====
+  /* ========= Preview kind ========= */
   let debounceT=null;
   async function previewKind(n){
     if(kindValEl) kindValEl.textContent='—';
@@ -466,13 +461,20 @@
     openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
   }
 
-  // ===== Load & run =====
+  /* ========= Load & render ========= */
   async function loadAndRender({number, animalId, type}){
     let kind = normKind(type);
     const animal = await fetchAnimal({number, animalId});
     if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
     if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
-    localStorage.setItem('currentAnimalId', String(animal.number || number || ''));
+
+    // ✅ حفظ صحيح للسياق
+    if (animal.id) localStorage.setItem('currentAnimalId', String(animal.id));
+    if (animal.number!=null) {
+      localStorage.setItem('currentAnimalNumber', String(animal.number));
+      localStorage.setItem('lastAnimalNumber', String(animal.number));
+    }
+
     const events = await fetchEvents(animal);
     const state  = buildState(animal, events);
     renderCard(state, kind);
@@ -488,7 +490,7 @@
     loadAndRender({number:numberParam, animalId:idParam, type:typeParam})
       .catch(()=>{ $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان'; });
   } else {
-    const lastNum = localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+    const lastNum = localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
     if(lastNum && openInput){ openInput.value=lastNum; previewKind(lastNum); }
     if(openBtn){
       openBtn.addEventListener('click', ()=>{
@@ -498,10 +500,5 @@
     }
   }
 </script>
-
-
 </body>
 </html>
-
-
-
