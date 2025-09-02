@@ -146,14 +146,16 @@
 
 <script type="module">
   // ===== firebase-config.js (app/db) =====
-  const cfg = await import('/js/firebase-config.js');
-  const app = cfg.app || cfg.default?.app || cfg.default || cfg;
-  const db  = cfg.db  || cfg.default?.db  || null;
+const cfg = await import('/js/firebase-config.js');
+const app = (cfg.app || cfg.default?.app) || null;
+const db  = (cfg.db  || cfg.default?.db)  || null;
+
 
   // ===== Firestore utils =====
   const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
     await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const DB = db || getFirestore(app);
+ const DB = db || (app ? getFirestore(app) : getFirestore());
+
 
   // ===== Current user (tenant) =====
   const UID =
@@ -501,3 +503,4 @@
 
 </body>
 </html>
+
