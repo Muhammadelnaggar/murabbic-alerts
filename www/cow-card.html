@@ -145,8 +145,6 @@
   </div>
 
 <script type="module">
-  /* ========= Firebase init (مرن وآمن) ========= */
- <script type="module">
   /* ========= Firebase init (يدعم databaseId مسمى) ========= */
   const [{ initializeApp, getApps }, { getFirestore, collection, doc, getDoc, getDocs, query, where, limit }] =
     await Promise.all([
@@ -155,15 +153,12 @@
     ]);
 
   const cfgMod = await import('/js/firebase-config.js');
-  // نقبل أي شكل من الكونفيج
   const configObj = cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
 
-  // ✅ Database ID حسب لقطة الشاشة: murabbikdata
+  // ✅ Database ID حسب المشروع
   const DB_ID = 'murabbikdata';
 
   const app = (getApps().length ? getApps()[0] : initializeApp(configObj));
-  // <-- أهم سطرين
-  // استخدم الداتابيز المسمّاة بدلاً من الافتراضية
   const db  = getFirestore(app, DB_ID);
 
   /* ========= Helpers ========= */
@@ -473,7 +468,7 @@
     if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
     if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
 
-    // ✅ حفظ صحيح للسياق
+    // ✅ حفظ السياق
     if (animal.id) localStorage.setItem('currentAnimalId', String(animal.id));
     if (animal.number!=null) {
       localStorage.setItem('currentAnimalNumber', String(animal.number));
@@ -507,4 +502,3 @@
 </script>
 </body>
 </html>
-
