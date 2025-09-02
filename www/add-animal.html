@@ -256,126 +256,130 @@
   </script>
 
   <!-- حفظ في فايرستور تحت حساب المستخدم الحالي فقط -->
-  <script type="module">
-    import { db } from "./js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp, query, where, limit, getDocs }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+<script type="module">
+  import { db } from "./js/firebase-config.js";
+  import { collection, addDoc, serverTimestamp, query, where, limit, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const form   = document.getElementById("animalForm");
-    const msgDiv = document.getElementById("msg");
-    const DASHBOARD_URL = "dashboard.html";
-    const $ = (id)=>document.getElementById(id);
-    const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-    const setMsg=(t,ok=false)=>{ msgDiv.textContent=t; msgDiv.className=ok?"success":"error"; msgDiv.style.display="block"; };
+  const auth = getAuth();
+  let CURRENT_UID = null;
 
-    // المستخدم الحالي
-    const auth = getAuth();
-    let CURRENT_UID = null;
+  onAuthStateChanged(auth, (u) => {
+    if (!u) {
+      location.href = "login.html?next=add-animal.html";
+    } else {
+      CURRENT_UID = u.uid;
+      localStorage.setItem("userId", CURRENT_UID);
+    }
+  });
 
-    onAuthStateChanged(auth, (u)=>{
-      if (!u){
-        location.href = "login.html?next=add-animal.html";
+  const form   = document.getElementById("animalForm");
+  const msgDiv = document.getElementById("msg");
+  const $ = (id)=>document.getElementById(id);
+  const DASHBOARD_URL = "dashboard.html";
+  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  const setMsg=(t,ok=false)=>{ msgDiv.textContent=t; msgDiv.className=ok?"success":"error"; msgDiv.style.display="block"; };
+
+  // رجوع ذكي
+  let __hasAnimals = null;
+  window.addEventListener("DOMContentLoaded", async () => {
+    history.pushState({page:"add-animal"}, "", location.href);
+    if (CURRENT_UID){
+      try {
+        const s0 = await getDocs(query(collection(db,"animals"), where("ownerUid","==",CURRENT_UID), limit(1)));
+        __hasAnimals = !s0.empty;
+      } catch {}
+    }
+    window.addEventListener("popstate", () => {
+      if (__hasAnimals === false){
+        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
+        history.pushState({page:"add-animal"}, "", location.href);
       } else {
-        CURRENT_UID = u.uid;
-        localStorage.setItem("userId", CURRENT_UID);
-      }
-    });
-
-    // رجوع ذكي
-    let __hasAnimals = null;
-    window.addEventListener("DOMContentLoaded", async () => {
-      history.pushState({page:"add-animal"}, "", location.href);
-      if (CURRENT_UID){
-        try {
-          const s0 = await getDocs(query(collection(db,"animals"), where("userId","==",CURRENT_UID), limit(1)));
-          __hasAnimals = !s0.empty;
-        } catch {}
-      }
-      document.getElementById("cancelLink")?.addEventListener("click",(e)=>{
-        e.preventDefault();
-        if (__hasAnimals === false){ alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع."); return; }
         location.href = DASHBOARD_URL;
-      });
-      window.addEventListener("popstate", () => {
-        if (__hasAnimals === false){
-          alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-          history.pushState({page:"add-animal"}, "", location.href);
-        } else {
-          location.href = DASHBOARD_URL;
-        }
-      });
-    });
-
-    // توحيد النوع
-    const normAnimaltype = (ar)=>{
-      const s=String(ar||"").trim().toLowerCase();
-      if (s==="cow" || ar==="بقرة") return "cow";
-      if (s==="buffalo" || ar==="جاموسة") return "buffalo";
-      return "cow";
-    };
-
-    // حفظ
-    form.addEventListener("submit", async (e)=>{
-      e.preventDefault(); msgDiv.style.display="none";
-      if (!CURRENT_UID){ setMsg("فضلاً سجّل الدخول أولاً.", false); return; }
-
-      const numberStr            = $("animalNumber").value.trim();
-      const animalTypeAr         = $("animalType").value;
-      const breed                = $("breed").value;
-      const productionStatus     = $("productionStatus").value;
-      const dailyMilkVal         = $("dailyMilk").value.trim();
-      const reproductiveStatus   = $("reproductiveStatus").value;
-      const servicesCount        = Number($("servicesCount").value || 0);
-      const lactationNumber      = Number($("lactationNumber").value || 0);
-      const birthDate            = $("birthDate").value || null;
-      const lastCalvingDate      = $("lastCalvingDate").value;
-      const lastInseminationInp  = $("lastInseminationDate").value || null;
-      const daysInMilkVal        = Number($("daysInMilk").value || 0);
-
-      if (!numberStr || !animalTypeAr){ setMsg("أكمل الحقول المطلوبة.", false); return; }
-      if (lactationNumber > 0 && !lastCalvingDate){ setMsg("أدخل تاريخ آخر ولادة.", false); return; }
-      if (productionStatus === "جاف" && !lastInseminationInp){ setMsg("أدخل تاريخ آخر تلقيح.", false); return; }
-
-      try{
-        const ref = await addDoc(collection(db,"animals"), {
-          userId: CURRENT_UID,
-          number: numberStr,
-          animalNumber: Number(numberStr),
-          userId_number: `${CURRENT_UID}#${numberStr}`,
-          animaltype: normAnimaltype(animalTypeAr),
-          animalTypeAr,
-          breed,
-          productionStatus,
-          dailyMilk: productionStatus==="حلاب" ? Number(dailyMilkVal||0) : null,
-          reproductiveStatus,
-          servicesCount,
-          lactationNumber,
-          birthDate,
-          lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
-          lastInseminationDate:
-            (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
-              ? (lastInseminationInp || null) : null,
-          daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
-          createdAt: serverTimestamp(),
-          demo: true
-        });
-
-        window.flashOK?.("تم تسجيل الحيوان بنجاح ✅");
-        localStorage.setItem("currentAnimalId", ref.id);
-        localStorage.setItem("currentAnimalNumber", numberStr);
-        setTimeout(()=>{ const d=todayLocal(); location.href=`add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`; }, 1200);
-
-      }catch(err){
-        console.error(err);
-        setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
       }
     });
-  </script>
+    document.getElementById("cancelLink")?.addEventListener("click",(e)=>{
+      e.preventDefault();
+      if (__hasAnimals === false){ alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع."); return; }
+      location.href = DASHBOARD_URL;
+    });
+  });
+
+  const normAnimaltype = (ar)=>{
+    const s=String(ar||"").trim().toLowerCase();
+    if (s==="cow" || ar==="بقرة") return "cow";
+    if (s==="buffalo" || ar==="جاموسة") return "buffalo";
+    return "cow";
+  };
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault(); msgDiv.style.display="none";
+    if (!CURRENT_UID){ setMsg("فضلاً سجّل الدخول أولاً.", false); return; }
+
+    const numberStr            = $("animalNumber").value.trim();
+    const animalTypeAr         = $("animalType").value;
+    const breed                = $("breed").value;
+    const productionStatus     = $("productionStatus").value;
+    const dailyMilkVal         = $("dailyMilk").value.trim();
+    const reproductiveStatus   = $("reproductiveStatus").value;
+    const servicesCount        = Number($("servicesCount").value || 0);
+    const lactationNumber      = Number($("lactationNumber").value || 0);
+    const birthDate            = $("birthDate").value || null;
+    const lastCalvingDate      = $("lastCalvingDate").value;
+    const lastInseminationInp  = $("lastInseminationDate").value || null;
+    const daysInMilkVal        = Number($("daysInMilk").value || 0);
+
+    if (!numberStr || !animalTypeAr){ setMsg("أكمل الحقول المطلوبة.", false); return; }
+    if (lactationNumber > 0 && !lastCalvingDate){ setMsg("أدخل تاريخ آخر ولادة.", false); return; }
+    if (productionStatus === "جاف" && !lastInseminationInp){ setMsg("أدخل تاريخ آخر تلقيح.", false); return; }
+
+    try{
+      const ref = await addDoc(collection(db,"animals"), {
+        // مطلوب حسب الرولز
+        ownerUid: CURRENT_UID,
+
+        // للربط الداخلي
+        userId: CURRENT_UID,
+        userId_number: `${CURRENT_UID}#${numberStr}`,
+
+        number: numberStr,
+        animalNumber: Number(numberStr),
+        animaltype: normAnimaltype(animalTypeAr),
+        animalTypeAr,
+        breed,
+        productionStatus,
+        dailyMilk: productionStatus==="حلاب" ? Number(dailyMilkVal||0) : null,
+        reproductiveStatus,
+        servicesCount,
+        lactationNumber,
+        birthDate,
+        lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
+        lastInseminationDate:
+          (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
+            ? (lastInseminationInp || null) : null,
+        daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
+        createdAt: serverTimestamp(),
+        demo: true
+      });
+
+      window.flashOK?.("تم تسجيل الحيوان بنجاح ✅");
+      localStorage.setItem("currentAnimalId", ref.id);
+      localStorage.setItem("currentAnimalNumber", numberStr);
+      const d=todayLocal();
+      setTimeout(()=>{ location.href=`add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`; }, 1200);
+
+    }catch(err){
+      console.error(err);
+      setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
+    }
+  });
+</script>
 
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
 </body>
 </html>
+
