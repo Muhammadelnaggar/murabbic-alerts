@@ -145,23 +145,37 @@
   </div>
 
 <script type="module">
-  /* ========= Firebase init (يدعم databaseId مسمى) ========= */
-  const [{ initializeApp, getApps }, { getFirestore, collection, doc, getDoc, getDocs, query, where, limit }] =
-    await Promise.all([
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
-    ]);
+  // ===== firebase-config.js (app/db) =====
+  const cfg = await import('/js/firebase-config.js');
+  const app = cfg.app || cfg.default?.app || cfg.default || cfg;
+  const db  = cfg.db  || cfg.default?.db  || null;
 
-  const cfgMod = await import('/js/firebase-config.js');
-  const configObj = cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
+  // ===== Firestore utils =====
+  const { getFirestore, collection, doc, getDoc, getDocs, query, where, limit } =
+    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const DB = db || getFirestore(app);
 
-  // ✅ Database ID حسب المشروع
-  const DB_ID = 'murabbikdata';
+  // ===== Current user (tenant) =====
+  const UID =
+    localStorage.getItem('userId') ||
+    localStorage.getItem('tenantId') ||
+    (window.tenant && (window.tenant.userId || window.tenant.uid)) ||
+    window.TENANT_USER_ID || '';
 
-  const app = (getApps().length ? getApps()[0] : initializeApp(configObj));
-  const db  = getFirestore(app, DB_ID);
+  // ===== Kind =====
+  const normKind = (k)=>{ const s=String(k??'').trim().toLowerCase();
+    if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
+    if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
+    return '';
+  };
+  const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
+  const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
+  const extractKind = (o={})=>{
+    const c=[o.animaltype,o.kind,o.type,o.category,o.species,o.animalType,o.animal_kind,o.animalClass,o['نوع'],o['النوع'],o['الفصيلة']];
+    for(const v of c){ const k=normKind(v); if(k) return k; } return '';
+  };
 
-  /* ========= Helpers ========= */
+  // ===== DOM/helpers =====
   const $=(id)=>document.getElementById(id);
   const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
   const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
@@ -170,38 +184,28 @@
   const url = new URL(location.href);
   const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
 
-  const pick = (obj, keys) => { for (const k of keys) if (obj && obj[k] !== undefined) return obj[k]; return null; };
-  const normKind = (v)=>{ const s=String(v ?? '').trim().toLowerCase();
-    if (['cow','بقر','بقرة'].includes(s)) return 'cow';
-    if (['buffalo','جاموس','جاموسة','جاموسه'].includes(s)) return 'buffalo';
-    return '';
-  };
-  const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
-  const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
-
-  function normalizeAnimalDoc(d = {}) {
-    const number = pick(d, ['number','animalNumber','no','رقم','رقم الحيوان']);
-    const kindRaw = pick(d, ['animaltype','animalType','animalTypeAr','kind','type','الفصيلة','النوع','نوع الحيوان']);
+  // ===== Normalize animal =====
+  function normalizeAnimalDoc(d={}){
     return {
       id: d.id,
-      number,
-      kind: normKind(kindRaw),
-      birthDate:        pick(d, ['birthDate','birth_date','dob','تاريخ الميلاد']),
-      lastCalvingDate:  pick(d, ['lastCalvingDate','lastCalving','calvingDate','تاريخ آخر ولادة','اخر ولادة']),
-      lactationNumber:  pick(d, ['lactationNumber','lactNo','رقم موسم الحليب','موسم الحليب','موسم_الحليب']),
-      breed:            pick(d, ['breed','breedName','السلالة']),
-      group:            pick(d, ['group','المجموعة']),
-      pregnancyDate:    pick(d, ['pregnancyDate','pregnantFrom','تاريخ الحمل']),
-      reproductiveStatus: pick(d, ['reproductiveStatus','الحالة التناسلية']),
-      productionStatus:   pick(d, ['productionStatus','حالة الإنتاج','الحالة الإنتاجية']),
-      healthStatus:       pick(d, ['healthStatus','الحالة الصحية']) ?? 'سليم',
-      lastCheckDate:      pick(d, ['lastCheckDate','healthCheckDate','آخر فحص']),
-      milkTraitsScore:    Number(pick(d, ['milkTraitsScore','milk_score','تقييم الحليب','درجة اللبن'])) || 0,
-      ovsynch:            pick(d, ['ovsynch','بروتوكول','بروتوكول Ovsynch']),
-      ownerUid:           pick(d, ['ownerUid','userId','صاحب'])
+      number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
+      kind: extractKind(d),
+      birthDate: d.birthDate ?? d.birth_date ?? d.dob ?? d['تاريخ الميلاد'] ?? null,
+      lastCalvingDate: d.lastCalvingDate ?? d.lastCalving ?? d.calvingDate ?? d['تاريخ آخر ولادة'] ?? null,
+      lactationNumber: d.lactationNumber ?? d.lactNo ?? d['رقم موسم الحليب'] ?? null,
+      breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
+      group: d.group ?? d['المجموعة'] ?? null,
+      pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
+      reproductiveStatus: d.reproductiveStatus ?? d['الحالة التناسلية'] ?? null,
+      productionStatus:   d.productionStatus   ?? d['حالة الإنتاج'] ?? null,
+      healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
+      lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
+      milkTraitsScore: Number(d.milkTraitsScore ?? d.milk_score ?? 0) || 0,
+      ovsynch: d.ovsynch ?? null
     };
   }
 
+  // ===== Event helpers =====
   const TYPE_RULES = [
     ['milk',        /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
     ['calving',     /(calving|ولاد|نفاس)/i],
@@ -218,30 +222,51 @@
   function evMilkKg(e){
     const direct = toNum(e.milkKg ?? e.total ?? e.kg ?? e.milk ?? e.amount);
     if (direct>0) return direct;
-    let sum=0; const partKey = /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
+    let sum=0;
+    const partKey = /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
     for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum += toNum(v);
     return sum;
   }
 
+  // ===== Queries (SCOPED BY USER) =====
   async function firstDoc(qs){ for(const q of qs){ const s=await getDocs(q); if(!s.empty) return s.docs[0]; } return null; }
 
+  function userScopedAnimalQueries(A, nStr, nNum){
+    const scopes = [];
+    if (UID) {
+      scopes.push(query(A, where('userId','==', UID), where('number','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('userId','==', UID), where('number','==', nNum), limit(1)));
+      scopes.push(query(A, where('userId','==', UID), where('animalNumber','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('userId','==', UID), where('animalNumber','==', nNum), limit(1)));
+
+      scopes.push(query(A, where('ownerUid','==', UID), where('number','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('ownerUid','==', UID), where('number','==', nNum), limit(1)));
+      scopes.push(query(A, where('ownerUid','==', UID), where('animalNumber','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('ownerUid','==', UID), where('animalNumber','==', nNum), limit(1)));
+    } else {
+      scopes.push(query(A, where('number','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('number','==', nNum), limit(1)));
+      scopes.push(query(A, where('animalNumber','==', nStr), limit(1)));
+      if (Number.isFinite(nNum)) scopes.push(query(A, where('animalNumber','==', nNum), limit(1)));
+    }
+    return scopes;
+  }
+
   async function fetchAnimalByNumber(n){
-    if(!n) return null; const A=collection(db,'animals');
+    if(!n) return null; const A=collection(DB,'animals');
     const nStr=String(n).trim(); const nNum=Number(nStr);
-    const qs=[
-      query(A, where('number','==', nStr), limit(1)),
-      Number.isFinite(nNum)? query(A, where('number','==', nNum), limit(1)): null,
-      query(A, where('animalNumber','==', nStr), limit(1)),
-      Number.isFinite(nNum)? query(A, where('animalNumber','==', nNum), limit(1)): null
-    ].filter(Boolean);
-    const d=await firstDoc(qs);
+    const d=await firstDoc(userScopedAnimalQueries(A, nStr, nNum));
     return d? normalizeAnimalDoc({id:d.id, ...d.data()}): null;
   }
 
   async function fetchAnimal({number, animalId}){
     if (animalId){
-      const dd=await getDoc(doc(db,'animals', animalId));
-      if (dd.exists()) return normalizeAnimalDoc({id:dd.id, ...dd.data()});
+      const dd=await getDoc(doc(DB,'animals', animalId));
+      if (dd.exists()){
+        const ad = {id:dd.id, ...dd.data()};
+        if (!UID || ad.userId===UID || ad.ownerUid===UID) return normalizeAnimalDoc(ad);
+        throw new Error('غير مسموح');
+      }
     }
     const a=await fetchAnimalByNumber(number);
     if (a) return a;
@@ -249,24 +274,28 @@
   }
 
   async function fetchEvents(animal){
-    const E=collection(db,'events'); const rows=[];
+    const E=collection(DB,'events'); const rows=[];
+    const baseFilters = (q0)=> UID ? query(q0, where('userId','==', UID)) : q0;
+
     if (animal.id){
-      (await getDocs(query(E, where('animalId','==', animal.id)))).forEach(d=>rows.push({id:d.id, ...d.data()}));
+      const qy = baseFilters(query(E, where('animalId','==', animal.id)));
+      (await getDocs(qy)).forEach(d=>rows.push({id:d.id, ...d.data()}));
     }
     if (animal.number!=null){
       const nStr=String(animal.number), nNum=Number(nStr);
       const qs=[
-        query(E, where('animalNumber','==', nStr)),
-        Number.isFinite(nNum)? query(E, where('animalNumber','==', nNum)) : null,
-        query(E, where('number','==', nStr)),
-        Number.isFinite(nNum)? query(E, where('number','==', nNum)) : null,
+        baseFilters(query(E, where('animalNumber','==', nStr))),
+        Number.isFinite(nNum)? baseFilters(query(E, where('animalNumber','==', nNum))) : null,
+        baseFilters(query(E, where('number','==', nStr))),
+        Number.isFinite(nNum)? baseFilters(query(E, where('number','==', nNum))) : null,
       ].filter(Boolean);
       for(const qy of qs){ const s=await getDocs(qy); s.forEach(d=>rows.push({id:d.id, ...d.data()})); }
     }
     const uniq=new Map(rows.map(r=>[r.id,r]));
-    return [...uniq.values()].sort((a,b)=> evDate(a).localeCompare(evDate(b)));
+    return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
   }
 
+  // ===== State build =====
   function buildState(animal, events){
     const st={
       number: animal.number ?? animal.id?.slice(-6),
@@ -330,6 +359,7 @@
     return st;
   }
 
+  // ===== UI (gauge + chart + chips) =====
   function polar(cx,cy,r,ang){const a=(ang*Math.PI)/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
   function arcPath(cx,cy,r,a0,a1){const[x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1);return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
   function renderGauge(score){
@@ -346,55 +376,23 @@
   }
 
   function renderMilkChart(series){
-    const svg=$('milkChart'), sc=$('milkScroll');
-    if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
-
-    const base=Math.max(sc.clientWidth,320);
-    const pxPer=Math.max(6,Math.min(11,Math.round(base/28)));
-    const pad=10;
-
-    const data = series.map((p,i)=>({ x:i, y: Number(p.v) || 0 }));
-    const N=data.length, W=pad*2+(N-1)*pxPer+20;
-
-    svg.setAttribute('viewBox',`0 0 ${W} 60`);
-    svg.style.width=W+'px';
-
-    const maxY=Math.max(...data.map(d=>d.y),1);
-    const minY=Math.min(...data.map(d=>d.y),0);
-    const yR=Math.max(1,maxY-minY);
-    const sx=(i)=>pad+(i*pxPer);
-    const sy=(v)=>60-6-((v-minY)*(60-12)/yR);
-
-    svg.innerHTML='';
-    const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
-    for(let i=1;i<=3;i++){
-      const y=6+i*(60-12)/3;
-      const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-      ln.setAttribute('x1',6); ln.setAttribute('x2',W-6);
-      ln.setAttribute('y1',y); ln.setAttribute('y2',y);
-      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6');
-      grid.appendChild(ln);
-    }
-    svg.appendChild(grid);
-
-    let d=''; data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
-
+    const svg=$('milkChart'), sc=$('milkScroll'); if(!svg||!sc||!Array.isArray(series)||!series.length){svg.innerHTML='';return;}
+    const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
+    const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
+    svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
+    const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
+    const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+    svg.innerHTML=''; const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+    for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
+    let d=''; data.forEach((p,i)=>{d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2);});
     const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-    const ap=document.createElementNS('http://www.w3.org/2000/svg','path');
-    ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6');
-    svg.appendChild(ap);
-
-    const lp=document.createElementNS('http://www.w3.org/2000/svg','path');
-    lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
-    svg.appendChild(lp);
-
-    const cx=sx(N-1), cy=sy(data[N-1].y);
-    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20');
-    svg.appendChild(dot);
-
-    setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
-    addEventListener('resize',()=>renderMilkChart(series),{once:true});
+    const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
+    const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
+    const cx=pad+(N-1)*pxPer, cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
+    setTimeout(()=>{sc.scrollLeft=svg.scrollWidth;},0); addEventListener('resize',()=>renderMilkChart(series),{once:true});
   }
 
   function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
@@ -407,6 +405,7 @@
     el.textContent=text||'—'; el.setAttribute('data-variant',v);
   }
 
+  // ===== Render =====
   function renderCard(state, kind){
     $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
     setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
@@ -444,7 +443,7 @@
     }
   }
 
-  /* ========= Preview kind ========= */
+  // ===== Preview kind =====
   let debounceT=null;
   async function previewKind(n){
     if(kindValEl) kindValEl.textContent='—';
@@ -461,16 +460,15 @@
     openInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); openBtn.click(); } });
   }
 
-  /* ========= Load & render ========= */
+  // ===== Load & run =====
   async function loadAndRender({number, animalId, type}){
     let kind = normKind(type);
     const animal = await fetchAnimal({number, animalId});
     if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
     if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
 
-    // ✅ حفظ السياق
-    if (animal.id) localStorage.setItem('currentAnimalId', String(animal.id));
-    if (animal.number!=null) {
+    localStorage.setItem('currentAnimalId', String(animal.id || ''));
+    if (animal.number!=null){
       localStorage.setItem('currentAnimalNumber', String(animal.number));
       localStorage.setItem('lastAnimalNumber', String(animal.number));
     }
@@ -500,5 +498,6 @@
     }
   }
 </script>
+
 </body>
 </html>
