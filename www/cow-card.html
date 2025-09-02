@@ -160,14 +160,15 @@
   ]);
 
   // لو الملف مديّنا app/db جاهزين استخدمهم، وإلا فعّل app من config
-  const preApp = cfgMod.app || cfgMod.default?.app || null;
-  const app = preApp || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
-  const preDb  = cfgMod.db  || cfgMod.default?.db  || null;
-// ✅ أربط على قاعدة Firestore المسماة murabbikdata (أو الاسم القادم من الكونفيج)
-const DB_NAME =
-  (cfg.DB_ID || cfg.databaseId || cfg.default?.DB_ID || cfg.default?.databaseId || 'murabbikdata');
+ const PRE_APP = cfgMod.app || cfgMod.default?.app || null;
+const APP = PRE_APP || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
 
-const DB = db ?? getFirestore(app, DB_NAME);
+const PRE_DB  = cfgMod.db  || cfgMod.default?.db  || null;
+// اسم قاعدة Firestore (لو مش محدد في الملف، هنستخدم 'murabbikdata')
+const DB_NAME =
+  (cfgMod.DB_ID || cfgMod.databaseId || cfgMod.default?.DB_ID || cfgMod.default?.databaseId || 'murabbikdata');
+
+const DB = PRE_DB || getFirestore(APP, DB_NAME);
 
 
   /* ===== 2) UID للمستأجر الحالي ===== */
@@ -307,30 +308,7 @@ const DB = db ?? getFirestore(app, DB_NAME);
     throw new Error('لا يوجد حيوان مطابق');
   }
 
-  async function fetchEvents(animal){
-    const E=collection(DB,'events'); const rows=[];
-    if (animal.id){
-      const s = await getDocs(query(E, where('animalId','==', animal.id)));
-      s.forEach(d=>rows.push({id:d.id, ...d.data()}));
-    }
-    if (animal.number!=null){
-      const nStr=String(animal.number), nNum=Number(nStr);
-      const ql=[
-        query(E, where('animalNumber','==', nStr)),
-        Number.isFinite(nNum)? query(E, where('animalNumber','==', nNum)) : null,
-        query(E, where('number','==', nStr)),
-        Number.isFinite(nNum)? query(E, where('number','==', nNum)) : null,
-      ].filter(Boolean);
-      for(const qy of ql){
-        const s=await getDocs(qy);
-        s.forEach(d=>rows.push({id:d.id, ...d.data()}));
-      }
-    }
-    const filtered = UID ? rows.filter(r => !r.userId || r.userId===UID || r.ownerUid===UID) : rows;
-    const uniq=new Map(filtered.map(r=>[r.id,r]));
-    return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
-  }
-
+ async function fetchEvents(animal){
   /* ===== 7) بناء الحالة + الرسم ===== */
   function buildState(animal, events){
     const st={
@@ -524,5 +502,6 @@ const DB = db ?? getFirestore(app, DB_NAME);
 
 </body>
 </html>
+
 
 
