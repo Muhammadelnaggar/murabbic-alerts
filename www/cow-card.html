@@ -152,19 +152,6 @@
   const app = appMod.app || appMod.default || appMod;
   const db  = appMod.db  || getFirestore(app.app || app);
 
-  // ===== Kind normalizer (cow/buffalo) =====
-  const normKind = (k)=>{ const s=String(k??'').trim().toLowerCase();
-    if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
-    if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
-    return '';
-  };
-  const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
-  const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
-  const extractKind = (o={})=>{
-    const c=[o.animaltype,o.kind,o.type,o.category,o.species,o.animalType,o.animal_kind,o.animalClass,o['نوع'],o['النوع'],o['الفصيلة']];
-    for(const v of c){ const k=normKind(v); if(k) return k; } return '';
-  };
-
   // ===== Helpers =====
   const $=(id)=>document.getElementById(id);
   const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
@@ -174,28 +161,46 @@
   const url = new URL(location.href);
   const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
 
-  // ===== Animal doc normalization =====
-  function normalizeAnimalDoc(d={}){
+  // ===== pick + kind helpers =====
+  const pick = (obj, keys) => { for (const k of keys) if (obj[k] !== undefined) return obj[k]; return null; };
+  const normKind = (v)=>{
+    const s=String(v ?? '').trim().toLowerCase();
+    if (['cow','بقر','بقرة'].includes(s)) return 'cow';
+    if (['buffalo','جاموس','جاموسة','جاموسه'].includes(s)) return 'buffalo';
+    return '';
+  };
+  const kindNameAr  = (k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
+  const kindTitleAr = (k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
+
+  // ===== Animal doc normalization (عربي + إنجليزي) =====
+  function normalizeAnimalDoc(d = {}) {
+    const number = pick(d, ['number','animalNumber','no','رقم','رقم الحيوان']);
+    const kindRaw = pick(d, [
+      'animaltype','animalType','animalTypeAr','kind','type',
+      'الفصيلة','النوع','نوع الحيوان'
+    ]);
+
     return {
       id: d.id,
-      number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
-      kind: extractKind(d),
-      birthDate: d.birthDate ?? d.birth_date ?? d.dob ?? d['تاريخ الميلاد'] ?? null,
-      lastCalvingDate: d.lastCalvingDate ?? d.lastCalving ?? d.calvingDate ?? d['تاريخ آخر ولادة'] ?? null,
-      lactationNumber: d.lactationNumber ?? d.lactNo ?? d['رقم موسم الحليب'] ?? null,
-      breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
-      group: d.group ?? d['المجموعة'] ?? null,
-      pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
-      reproductiveStatus: d.reproductiveStatus ?? d['الحالة التناسلية'] ?? null,
-      productionStatus:   d.productionStatus   ?? d['حالة الإنتاج'] ?? null,
-      healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
-      lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
-      milkTraitsScore: d.milkTraitsScore ?? d.milk_score ?? 0,
-      ovsynch: d.ovsynch ?? null
+      number,
+      kind: normKind(kindRaw),
+      birthDate:        pick(d, ['birthDate','birth_date','dob','تاريخ الميلاد']),
+      lastCalvingDate:  pick(d, ['lastCalvingDate','lastCalving','calvingDate','تاريخ آخر ولادة','اخر ولادة']),
+      lactationNumber:  pick(d, ['lactationNumber','lactNo','رقم موسم الحليب','موسم الحليب','موسم_الحليب']),
+      breed:            pick(d, ['breed','breedName','السلالة']),
+      group:            pick(d, ['group','المجموعة']),
+      pregnancyDate:    pick(d, ['pregnancyDate','pregnantFrom','تاريخ الحمل']),
+      reproductiveStatus: pick(d, ['reproductiveStatus','الحالة التناسلية']),
+      productionStatus:   pick(d, ['productionStatus','حالة الإنتاج','الحالة الإنتاجية']),
+      healthStatus:       pick(d, ['healthStatus','الحالة الصحية']) ?? 'سليم',
+      lastCheckDate:      pick(d, ['lastCheckDate','healthCheckDate','آخر فحص']),
+      milkTraitsScore:    Number(pick(d, ['milkTraitsScore','milk_score','تقييم الحليب','درجة اللبن'])) || 0,
+      ovsynch:            pick(d, ['ovsynch','بروتوكول','بروتوكول Ovsynch']),
+      ownerUid:           pick(d, ['ownerUid','userId','صاحب'])
     };
   }
 
-  // ===== Events normalization (generic) =====
+  // ===== Event helpers =====
   const TYPE_RULES = [
     ['milk',        /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
     ['calving',     /(calving|ولاد|نفاس)/i],
@@ -263,7 +268,7 @@
     return [...uniq.values()].sort((a,b)=> evDate(a).localeCompare(evDate(b)));
   }
 
-  // ===== Build state (milk + reproduction + health) =====
+  // ===== Build state =====
   function buildState(animal, events){
     const st={
       number: animal.number ?? animal.id?.slice(-6),
@@ -346,7 +351,7 @@
   function renderMilkChart(series){
     const svg=$('milkChart'), sc=$('milkScroll'); if(!svg||!sc||!Array.isArray(series)||!series.length){svg.innerHTML='';return;}
     const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
-    const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
+    const data=series.map((p,i)=>({x:i,y(Number(p.v)||0)})), N=data.length, W=pad*2+(N-1)*pxPer+20;
     svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
     const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
     const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
@@ -354,11 +359,11 @@
     for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
       ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y);
       ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
-    let d=''; data.forEach((p,i)=>{d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2);});
+    let d=''; series.forEach((p,i)=>{const y=Number(p.v)||0; d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(y).toFixed(2);});
     const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
     const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
     const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
-    const cx=pad+(N-1)*pxPer, cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const cx=pad+(N-1)*pxPer, cy=sy(Number(series[N-1].v)||0); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
     dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
     setTimeout(()=>{sc.scrollLeft=svg.scrollWidth;},0); addEventListener('resize',()=>renderMilkChart(series),{once:true});
   }
@@ -372,7 +377,7 @@
     el.textContent=text||'—'; el.setAttribute('data-variant',v);
   }
 
-  // ===== Render card (uses kind) =====
+  // ===== Render card =====
   function renderCard(state, kind){
     $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
     setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
@@ -460,6 +465,8 @@
   }
 </script>
 
+
 </body>
 </html>
+
 
