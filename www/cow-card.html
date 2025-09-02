@@ -348,25 +348,59 @@
     const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
     const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف'; put('milkGaugeVal',`${label} — ${score}%`);
   }
-  function renderMilkChart(series){
-    const svg=$('milkChart'), sc=$('milkScroll'); if(!svg||!sc||!Array.isArray(series)||!series.length){svg.innerHTML='';return;}
-    const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
-    const data=series.map((p,i)=>({x:i,y(Number(p.v)||0)})), N=data.length, W=pad*2+(N-1)*pxPer+20;
-    svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
-    const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
-    const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
-    svg.innerHTML=''; const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
-    for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-      ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y);
-      ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
-    let d=''; series.forEach((p,i)=>{const y=Number(p.v)||0; d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(y).toFixed(2);});
-    const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-    const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
-    const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
-    const cx=pad+(N-1)*pxPer, cy=sy(Number(series[N-1].v)||0); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
-    setTimeout(()=>{sc.scrollLeft=svg.scrollWidth;},0); addEventListener('resize',()=>renderMilkChart(series),{once:true});
+ function renderMilkChart(series){
+  const svg=$('milkChart'), sc=$('milkScroll');
+  if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
+
+  const base=Math.max(sc.clientWidth,320);
+  const pxPer=Math.max(6,Math.min(11,Math.round(base/28)));
+  const pad=10;
+
+  const data = series.map((p,i)=>({ x:i, y: Number(p.v) || 0 }));
+  const N=data.length, W=pad*2+(N-1)*pxPer+20;
+
+  svg.setAttribute('viewBox',`0 0 ${W} 60`);
+  svg.style.width=W+'px';
+
+  const maxY=Math.max(...data.map(d=>d.y),1);
+  const minY=Math.min(...data.map(d=>d.y),0);
+  const yR=Math.max(1,maxY-minY);
+  const sx=(i)=>pad+(i*pxPer);
+  const sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+
+  svg.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+  for(let i=1;i<=3;i++){
+    const y=6+i*(60-12)/3;
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',6); ln.setAttribute('x2',W-6);
+    ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+    ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6');
+    grid.appendChild(ln);
   }
+  svg.appendChild(grid);
+
+  let d='';
+  data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
+
+  const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
+  const ap=document.createElementNS('http://www.w3.org/2000/svg','path');
+  ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6');
+  svg.appendChild(ap);
+
+  const lp=document.createElementNS('http://www.w3.org/2000/svg','path');
+  lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2');
+  svg.appendChild(lp);
+
+  const cx=sx(N-1), cy=sy(data[N-1].y);
+  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20');
+  svg.appendChild(dot);
+
+  setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
+  addEventListener('resize',()=>renderMilkChart(series),{once:true});
+}
+
   function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
     const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b);
     const dif=[]; for(let i=1;i<ms.length;i++) dif.push((ms[i]-ms[i-1])/86400000);
@@ -468,5 +502,6 @@
 
 </body>
 </html>
+
 
 
