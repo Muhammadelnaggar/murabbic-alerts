@@ -145,28 +145,22 @@
   </div>
 <script type="module">
   /* ===== 1) Firebase boot من firebase-config.js (مضمون) ===== */
-  const cfgMod = await import('/js/firebase-config.js');
+/* ===== INIT: Firebase + Firestore على قاعدة murabbikdata ===== */
+import cfg from '/js/firebase-config.js';   // يجب أن يصدّر config كـ export default
 
-  // كل الأشكال المحتملة للكونفيج
-  const firebaseConfig =
-    cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
+const [{ initializeApp, getApps }, fs] = await Promise.all([
+  import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+  import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+]);
 
-  const [{ initializeApp, getApps }, {
-    getFirestore, collection, doc, getDoc, getDocs, query, where, limit
-  }] = await Promise.all([
-    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
-    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
-  ]);
+// أنشئ/أعد استخدام تطبيق Firebase
+const app = getApps().length ? getApps()[0] : initializeApp(cfg.config ?? cfg);
 
-  // استخدم app/db الجاهزين لو موجودين، وإلا أنشئ من config
-  const PRE_APP = cfgMod.app || cfgMod.default?.app || null;
-  const APP = PRE_APP || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
+// ✅ أهم سطر: نختار قاعدة Firestore المسمّاة من صورك
+export const DB = fs.getFirestore(app, 'murabbikdata');
 
-  const PRE_DB  = cfgMod.db  || cfgMod.default?.db  || null;
-  const DB_NAME =
-    (cfgMod.DB_ID || cfgMod.databaseId || cfgMod.default?.DB_ID || cfgMod.default?.databaseId || 'murabbikdata');
-
-  const DB = PRE_DB || getFirestore(APP, DB_NAME);
+// (اختياري للراحة لاحقًا)
+export const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
 
   /* ===== 2) UID للمستأجر الحالي ===== */
   const UID =
@@ -553,6 +547,7 @@
 
 </body>
 </html>
+
 
 
 
