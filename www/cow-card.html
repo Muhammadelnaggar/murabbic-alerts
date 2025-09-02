@@ -143,12 +143,11 @@
       </div>
     </section>
   </div>
-
 <script type="module">
-  /* ===== 1) Firebase init آمن من firebase-config.js ===== */
+  /* ===== 1) Firebase boot من firebase-config.js (مضمون) ===== */
   const cfgMod = await import('/js/firebase-config.js');
 
-  // نحاول كل الأشكال الممكنة للكونفيج
+  // كل الأشكال المحتملة للكونفيج
   const firebaseConfig =
     cfgMod.config || cfgMod.default?.config || cfgMod.default || cfgMod;
 
@@ -159,17 +158,15 @@
     import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
   ]);
 
-  // لو الملف مديّنا app/db جاهزين استخدمهم، وإلا فعّل app من config
- const PRE_APP = cfgMod.app || cfgMod.default?.app || null;
-const APP = PRE_APP || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
+  // استخدم app/db الجاهزين لو موجودين، وإلا أنشئ من config
+  const PRE_APP = cfgMod.app || cfgMod.default?.app || null;
+  const APP = PRE_APP || (getApps().length ? getApps()[0] : initializeApp(firebaseConfig));
 
-const PRE_DB  = cfgMod.db  || cfgMod.default?.db  || null;
-// اسم قاعدة Firestore (لو مش محدد في الملف، هنستخدم 'murabbikdata')
-const DB_NAME =
-  (cfgMod.DB_ID || cfgMod.databaseId || cfgMod.default?.DB_ID || cfgMod.default?.databaseId || 'murabbikdata');
+  const PRE_DB  = cfgMod.db  || cfgMod.default?.db  || null;
+  const DB_NAME =
+    (cfgMod.DB_ID || cfgMod.databaseId || cfgMod.default?.DB_ID || cfgMod.default?.databaseId || 'murabbikdata');
 
-const DB = PRE_DB || getFirestore(APP, DB_NAME);
-
+  const DB = PRE_DB || getFirestore(APP, DB_NAME);
 
   /* ===== 2) UID للمستأجر الحالي ===== */
   const UID =
@@ -178,13 +175,13 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
     (window.tenant && (window.tenant.userId || window.tenant.uid)) ||
     window.TENANT_USER_ID || '';
 
-  /* ===== 3) يساعدنا نبلغ الخطأ على الصفحة بدل ما ندوّخ ===== */
+  /* ===== 3) صندوق رسالة خطأ واضح ===== */
   const errBox = document.createElement('div');
   errBox.style.cssText = 'position:fixed;inset-inline:12px;bottom:12px;background:#ffebee;color:#7f1d1d;border:1px solid #ffcdd2;border-radius:10px;padding:10px;font:12px system-ui;display:none;z-index:9999';
   document.body.appendChild(errBox);
   const showErr = (msg)=>{ errBox.textContent = msg; errBox.style.display='block'; };
 
-  /* ===== 4) أدوات واجهة وتهيئة بسيطة ===== */
+  /* ===== 4) أدوات واجهة ===== */
   const $=id=>document.getElementById(id);
   const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
   const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
@@ -206,7 +203,7 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
   };
 
   /* ===== 5) تطبيع بيانات الحيوان + الأحداث ===== */
-  function normalizeAnimalDoc(d={}) {
+  function normalizeAnimalDoc(d={}){
     return {
       id: d.id,
       number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
@@ -248,13 +245,12 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
     return sum;
   }
 
-  /* ===== 6) جلب الحيوانات لمستخدم UID أولاً (بدون مؤشرات مركّبة) ===== */
+  /* ===== 6) جلب الحيوان بالرقم (وداخل نطاق المستخدم أولًا) ===== */
   async function fetchAnimalByNumber(n){
     if(!n) return null;
     const A=collection(DB,'animals');
     const nStr=String(n).trim(); const nNum=Number(nStr);
 
-    // (أ) اجلب حيوانات المستخدم (index بسيط على userId)، ثم طابق محليًا
     if (UID){
       const s = await getDocs(query(A, where('userId','==', UID), limit(200)));
       let hit=null;
@@ -268,7 +264,6 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
       if (hit) return normalizeAnimalDoc(hit);
     }
 
-    // (ب) احتياطي: استعلامات بسيطة بالرقم فقط ثم فلترة UID إن وُجد
     const qs = [
       query(A, where('number','==', nStr), limit(5)),
       Number.isFinite(nNum)? query(A, where('number','==', nNum), limit(5)) : null,
@@ -294,7 +289,6 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
   }
 
   async function fetchAnimal({number, animalId}){
-    const { idParam } = {};
     if (animalId){
       const dd=await getDoc(doc(DB,'animals', animalId));
       if (dd.exists()){
@@ -308,7 +302,58 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
     throw new Error('لا يوجد حيوان مطابق');
   }
 
- async function fetchEvents(animal){
+  /* ===== 6.أ) جلب الأحداث بنطاق userId ثم فلترة محليًا ===== */
+  async function fetchEvents(animal){
+    const E = collection(DB, 'events');
+    const rows = [];
+
+    if (UID) {
+      try {
+        const s = await getDocs(query(E, where('userId','==', UID), limit(1000)));
+        s.forEach(d => rows.push({ id: d.id, ...d.data() }));
+
+        const nStr = animal.number != null ? String(animal.number) : null;
+        const nNum = animal.number != null ? Number(nStr) : NaN;
+
+        const filtered = rows.filter(r =>
+          (animal.id && r.animalId === animal.id) ||
+          (nStr && (String(r.animalNumber) === nStr || String(r.number) === nStr)) ||
+          (Number.isFinite(nNum) && (Number(r.animalNumber) === nNum || Number(r.number) === nNum))
+        );
+
+        const uniq = new Map(filtered.map(r => [r.id, r]));
+        return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
+      } catch (e) {
+        console.warn('events user-scope failed, fallback...', e);
+      }
+    }
+
+    try {
+      if (animal.id){
+        const s = await getDocs(query(E, where('animalId','==', animal.id)));
+        s.forEach(d => rows.push({ id:d.id, ...d.data() }));
+      }
+      if (animal.number != null){
+        const nStr = String(animal.number), nNum = Number(nStr);
+        const qs = [
+          query(E, where('animalNumber','==', nStr)),
+          Number.isFinite(nNum) ? query(E, where('animalNumber','==', nNum)) : null,
+          query(E, where('number','==', nStr)),
+          Number.isFinite(nNum) ? query(E, where('number','==', nNum)) : null,
+        ].filter(Boolean);
+        for (const qy of qs){
+          const s = await getDocs(qy);
+          s.forEach(d => rows.push({ id:d.id, ...d.data() }));
+        }
+      }
+    } catch(e){
+      console.warn('events fallback failed', e);
+    }
+
+    const uniq = new Map(rows.map(r => [r.id, r]));
+    return [...uniq.values()].sort((a,b)=> (evDate(a)).localeCompare(evDate(b)));
+  }
+
   /* ===== 7) بناء الحالة + الرسم ===== */
   function buildState(animal, events){
     const st={
@@ -490,7 +535,13 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
     loadAndRender({number:numberParam, animalId:idParam, type:typeParam});
   } else {
     const lastNum = localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
-    if(lastNum && openInput){ openInput.value=lastNum; (async()=>{ try{const a=await fetchAnimalByNumber(lastNum); if(kindValEl) kindValEl.textContent=kindNameAr(a? a.kind : '');}catch{}})(); }
+    if(lastNum && openInput){
+      openInput.value=lastNum;
+      (async()=>{ try{
+        const a=await fetchAnimalByNumber(lastNum);
+        if(kindValEl) kindValEl.textContent=kindNameAr(a? a.kind : '');
+      }catch{} })();
+    }
     if(openBtn){
       openBtn.addEventListener('click', ()=>{
         const n=(openInput.value||'').trim(); if(!n) return;
@@ -502,6 +553,7 @@ const DB = PRE_DB || getFirestore(APP, DB_NAME);
 
 </body>
 </html>
+
 
 
 
