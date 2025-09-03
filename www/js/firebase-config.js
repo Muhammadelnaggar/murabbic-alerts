@@ -1,11 +1,13 @@
-// /js/firebase-config.js  — يعمل مباشرة في المتصفح (ESM عبر CDN)
+// /js/firebase-config.js — يعمل في المتصفح (ESM عبر CDN)
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, setPersistence, browserLocalPersistence, signInAnonymously }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, addDoc, collection, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, setPersistence, browserLocalPersistence, signInAnonymously
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, addDoc, collection, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ⚙️ انسخي القيم من Project settings → Your apps → Web App → Config
+// ⚙️ انسخ القيم من Project settings → Web App → Config
 const firebaseConfig = {
   apiKey: "AIzaSyCnkVBmRIyDZDpUX4yMH3SeR0hbnBqrh-4",
   authDomain: "murabbik-470511.firebaseapp.com",
@@ -17,14 +19,31 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// 👈 مهم: قاعدة Firestore المسماة
-export const db = getFirestore(app, "murabbikdata");
+// ✅ لو عندك قاعدة بيانات مسماة اسمها murabbikdata فعلاً، اترك السطر التالي كما هو.
+// ⚠️ لو لا، استخدم getFirestore(app) بدون اسم.
+export const db = getFirestore(app /*, "murabbikdata"*/);
 
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
-export async function requireAuth(){
-  if (auth.currentUser) return auth.currentUser;
-  throw new Error('LOGIN_REQUIRED');
+// دالة مطابقة لما تستدعيه صفحتك:
+export async function ensureAuth() {
+  if (auth.currentUser) return auth.currentUser;      // جلسة محفوظة
+  try {
+    // تسجيل دخول مجهول تلقائيًا — غرضه تمكين UID للفلاتر والقواعد
+    await signInAnonymously(auth);
+    return auth.currentUser;
+  } catch (e) {
+    console.error("ensureAuth/signInAnonymously failed", e);
+    throw e;
+  }
 }
+
+// (اختياري) احتفظ بـ requireAuth إن كنت تحتاجها في صفحات أخرى
+export async function requireAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  throw new Error("LOGIN_REQUIRED");
+}
+
+// إعادة تصدير أدوات Firestore التي قد تحتاجها صفحات أخرى
 export { addDoc, collection, serverTimestamp };
