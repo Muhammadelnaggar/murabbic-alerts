@@ -165,20 +165,14 @@
   </div>
 
   <script type="module">
-    /* ======================= Firebase INIT =======================
-       ضَعْ مفاتيح مشروعك في ملف: /js/firebase-config.js كالتالي:
-       export default { apiKey:'…', authDomain:'…', projectId:'murabbik', appId:'…' };
-       ثم نستخدم قاعدة البيانات المسماة: murabbikdata حسب إعداداتك. */
-    const cfg = (await import('/js/firebase-config.js')).default;
-    const [{ initializeApp, getApps }, fs] = await Promise.all([
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
-    ]);
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
-    const DB  = fs.getFirestore(app, 'murabbikdata');
-    const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
-
-    /* ======================= Helpers ======================= */
+    /* ======================= Firebase INIT ======================= */
+// نستخدم نفس ملفك كما هو: يفعّل app ويصدر db على قاعدة "murabbikdata"
+const fb = await import('/js/firebase-config.js');
+// نحتاج دوال Firestore فقط (الـ db جاهز من ملفك)
+const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+const DB = fb.db || fs.getFirestore(); // الافتراضي: استخدم المصدّر من ملفك
+const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
+/* ======================= Helpers */ ======================= */
     const $=(id)=>document.getElementById(id);
     const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
     const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
