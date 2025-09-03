@@ -23,10 +23,8 @@ export const db = getFirestore(app, "murabbikdata");
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
-export async function ensureAuth(){
+export async function requireAuth(){
   if (auth.currentUser) return auth.currentUser;
-  const { user } = await signInAnonymously(auth);
-  return user;
+  throw new Error('LOGIN_REQUIRED');
 }
-
 export { addDoc, collection, serverTimestamp };
