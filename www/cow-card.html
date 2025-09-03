@@ -122,11 +122,12 @@
       <h3>الحالة التناسلية</h3>
       <div class="grid">
         <div class="fi"><span>تاريخ آخر تلقيح</span><b id="fiLastIns">—</b></div>
-        <div class="fi"><span>متوسط خدمات/حمل</span><b id="fiSPC">—</b></div>
         <div class="fi"><span>معدل الأيام بين التلقيح</span><b id="fiServiceInterval">—</b></div>
         <div class="fi"><span>تاريخ آخر شياع</span><b id="fiLastHeat">—</b></div>
         <div class="fi"><span>الأيام بين الشياع</span><b id="fiHeatInterval">—</b></div>
         <div class="fi"><span>بروتوكول Ovsynch</span><b id="fiOvsynch">—</b></div>
+        <div class="fi"><span>عدد مرات التلقيح</span><b id="fiServicesCount">—</b></div>
+
       </div>
     </section>
 
@@ -171,6 +172,24 @@ const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
 };
 const kindNameAr=(k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
 const kindTitleAr=(k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
+// === Normalizers ===
+function isDryKeyword(s=''){
+  s = String(s).toLowerCase().trim();
+  return /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i.test(s);
+}
+function normProdStatus(v){
+  if (v == null) return null;
+  return isDryKeyword(v) ? 'جاف' : String(v).trim();
+}
+
+function isPregKeyword(s=''){
+  s = String(s).toLowerCase().trim();
+  return /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i.test(s);
+}
+function normReproStatus(v){
+  if (v == null) return null;
+  return isPregKeyword(v) ? 'عِشار' : String(v).trim();
+}
 
 function normalizeAnimalDoc(d={}){
   return {
@@ -183,8 +202,13 @@ function normalizeAnimalDoc(d={}){
     breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
     group: d.group ?? d['المجموعة'] ?? null,
     pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
-    reproductiveStatus: d.reproductiveStatus ?? d['الحالة التناسلية'] ?? null,
-    productionStatus:   d.productionStatus   ?? d['حالة الإنتاج'] ?? null,
+   reproductiveStatus: normReproStatus(
+  d.reproductiveStatus ?? d['الحالة التناسلية'] ?? d.reproStatus ?? d.statusRepro
+) ?? null,
+productionStatus: normProdStatus(
+  d.productionStatus ?? d['حالة الإنتاج'] ?? d.prodStatus ?? d.status
+) ?? null,
+
     healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
     lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
     milkTraitsScore: Number(d.milkTraitsScore ?? d.milk_score ?? 0) || 0,
@@ -193,13 +217,15 @@ function normalizeAnimalDoc(d={}){
 }
 
 const TYPE_RULES=[
-  ['milk',/(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
-  ['calving',/(calving|ولاد|نفاس)/i],
-  ['insemination',/(insemin|تلقيح|خدم)/i],
-  ['heat',/(heat|estrus|شياع)/i],
-  ['pregnancy',/(pregnan|حمل|ايجابي|موجب)/i],
-  ['disease',/(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
+  ['milk', /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
+  ['calving', /(calving|ولاد|نفاس)/i],
+  ['insemination', /(insemin|ai\b|a\.i\.|تلقيح|خدم|خدمة)/i],
+  ['pregnancy', /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i],
+  ['heat', /(heat|estrus|شياع|شبق)/i],
+  ['dry', /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i],
+  ['disease', /(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
 ];
+
 const evType=(e)=>{const s=String(e.type??e.eventType??e.event??e.name??e.kind??e.category??'').toLowerCase(); for(const [T,rx] of TYPE_RULES) if(rx.test(s)) return T; return 'other';};
 const evDate = (e)=>{
   let d = e?.eventDate ?? e?.date ?? e?.day ?? e?.createdAt ?? e?.ts ?? '';
@@ -347,26 +373,42 @@ function buildState(animal, events){
     milkTraitsScore: animal.milkTraitsScore ?? 0,
     servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
     milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
-    lastCheckDate: animal.lastCheckDate || null, healthHistory: []
+    lastCheckDate: animal.lastCheckDate || null, healthHistory: [],
+    isDry: false, // ← أضفنا فلَاج الجفاف
   };
 
   const milkTmp=[]; let season=0;
-  for(const e of events){
-    const t=evType(e), d=evDate(e);
-    if(t==='calving' && d) st.lastCalvingDate = d;
-    if(t==='insemination' && d){ st.inseminations.push(d); }
-    if(t==='heat' && d){ st.estrusDates.push(d); }
-    if(t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='حامل'; }
-    if(t==='disease'){
+
+  for (const e of events) {
+    const t = evType(e), d = evDate(e);
+
+    // === مكان السطرين اللي سالت عنهم (جوه اللوب) ===
+    if (t === 'dry') { st.isDry = true; st.productionStatus = 'جاف'; }        // ← لو في حدث تجفيف
+    if (t === 'pregnancy') { st.reproductiveStatus = 'عِشار'; }              // ← لو في حدث حمل
+
+    if (t === 'calving' && d) st.lastCalvingDate = d;
+    if (t === 'insemination' && d) { st.inseminations.push(d); }
+    if (t === 'heat' && d) { st.estrusDates.push(d); }
+    if (t === 'pregnancy') {
+      st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null;
+      st.reproductiveStatus = 'عِشار'; // تأكيد
+    }
+    if (t === 'disease') {
       st.healthHistory.push({date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||''});
       st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate = st.lastCheckDate || d || null;
     }
-    if(t==='milk'){
-      const kg=evMilkKg(e); if(kg>0){ season+=kg; milkTmp.push({d,kg}); if(d===todayStr) st.milkTodayKg=kg; }
+    if (t === 'milk') {
+      const kg = evMilkKg(e);
+      if (kg > 0) {
+        season += kg;
+        milkTmp.push({ d, kg });
+        if (d === todayStr) st.milkTodayKg = kg;
+      }
     }
   }
+  // === نهاية اللوب ===
 
-  if(st.lastCalvingDate){
+  if (st.lastCalvingDate){
     const ms=Date.now()-new Date(st.lastCalvingDate).getTime();
     st.daysInMilk=Math.max(0,Math.floor(ms/86400000));
   }
@@ -375,9 +417,9 @@ function buildState(animal, events){
   st.estrusDates.sort();
 
   st.seasonTotalKg = season || null;
-  if(st.daysInMilk>0 && season>0){ st.m305Kg = Math.round((season/st.daysInMilk)*305); }
+  if (st.daysInMilk>0 && season>0){ st.m305Kg = Math.round((season/st.daysInMilk)*305); }
 
-  if(milkTmp.length){
+  if (milkTmp.length){
     const base = st.lastCalvingDate ? new Date(st.lastCalvingDate).getTime() : null;
     st.milkSeries = milkTmp.filter(p=>p.d).map(p=>{
       const di = base ? Math.max(0,Math.floor((new Date(p.d).getTime()-base)/86400000)) : 0;
@@ -385,11 +427,19 @@ function buildState(animal, events){
     }).sort((a,b)=>a.d-b.d);
   }
 
-  if(st.daysInMilk!=null){
-    st.productionStatus = st.daysInMilk<60 ? 'حليب مبكر' : st.daysInMilk<200 ? 'حليب متوسط' : 'حليب متأخر';
+  // أولوية نهائية لحالة الإنتاج: "جاف" فوق أي حساب DIM
+  if (st.isDry) {
+    st.productionStatus = 'جاف';
+  } else if (!animal.productionStatus && st.daysInMilk != null) {
+    st.productionStatus =
+      st.daysInMilk < 60  ? 'حليب مبكر' :
+      st.daysInMilk < 200 ? 'حليب متوسط' :
+                            'حليب متأخر';
   }
+
   return st;
 }
+
 
 /* ======================= UI ======================= */
 function arcPath(cx,cy,r,a0,a1){
@@ -455,7 +505,8 @@ function renderCard(state, kind){
   setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
   put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
   put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
-  put('fiDIM',state.daysInMilk!=null?NF.format(state.daysInMilk):'—');
+  const hideDIM = state.isDry || state.productionStatus === 'جاف';
+  put('fiDIM', (!hideDIM && state.daysInMilk!=null) ? NF.format(state.daysInMilk) : '—');
   let g=state.gestationDays, ref=state.pregnancyDate||state.lastInseminationDate;
   if(g==null&&ref){const ms=Date.now()-new Date(ref).getTime(); g=Math.max(0,Math.floor(ms/86400000));}
   put('fiGestAge',g!=null?NF.format(g):'—'); put('fiBreed',state.breed||'—'); put('fiGroup',state.group||'—');
@@ -465,7 +516,8 @@ function renderCard(state, kind){
   put('kpi305',state.m305Kg!=null?`${NF.format(Math.round(state.m305Kg))} كجم`:'—');
   renderMilkChart(state.milkSeries);
   put('fiLastIns',fmtD(state.lastInseminationDate));
-  const spc=state.servicesCount; put('fiSPC',spc!=null?NF.format(spc):'—');
+  const spc = state.servicesCount;
+  put('fiServicesCount', spc != null ? NF.format(spc) : '—');
   const svcI=avgDaysBetween(state.inseminations); put('fiServiceInterval',svcI!=null?`${NF.format(svcI)} يوم`:'—');
   const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
   const hI=avgDaysBetween(state.estrusDates); put('fiHeatInterval',hI!=null?`${NF.format(hI)} يوم`:'—');
