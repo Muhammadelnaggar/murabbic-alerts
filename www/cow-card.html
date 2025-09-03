@@ -168,6 +168,7 @@
     /* ======================= Firebase INIT ======================= */
 // نستخدم نفس ملفك كما هو: يفعّل app ويصدر db على قاعدة "murabbikdata"
 const fb = await import('/js/firebase-config.js');
+ if (fb.requireAuth) await fb.requireAuth();
 // نحتاج دوال Firestore فقط (الـ db جاهز من ملفك)
 const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 const DB = fb.db || fs.getFirestore(); // الافتراضي: استخدم المصدّر من ملفك
@@ -433,3 +434,4 @@ const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
   </script>
 </body>
 </html>
+
