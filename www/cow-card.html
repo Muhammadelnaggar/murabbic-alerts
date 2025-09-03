@@ -173,7 +173,7 @@ const fb = await import('/js/firebase-config.js');
 const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 const DB = fb.db || fs.getFirestore(); // الافتراضي: استخدم المصدّر من ملفك
 const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
-/* ======================= Helpers */ ======================= */
+/* ======================= Helpers */
     const $=(id)=>document.getElementById(id);
     const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
     const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
@@ -434,4 +434,5 @@ const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
   </script>
 </body>
 </html>
+
 
