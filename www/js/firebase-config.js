@@ -1,13 +1,11 @@
-// /js/firebase-config.js — يعمل في المتصفح (ESM عبر CDN)
+// /js/firebase-config.js  (ESM عبر CDN)
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, setPersistence, browserLocalPersistence, signInAnonymously
+  getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, addDoc, collection, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ⚙️ انسخ القيم من Project settings → Web App → Config
+// ⚙️ إعدادات مشروعك (زي ما عندك)
 const firebaseConfig = {
   apiKey: "AIzaSyCnkVBmRIyDZDpUX4yMH3SeR0hbnBqrh-4",
   authDomain: "murabbik-470511.firebaseapp.com",
@@ -19,31 +17,31 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// ✅ لو عندك قاعدة بيانات مسماة اسمها murabbikdata فعلاً، اترك السطر التالي كما هو.
-// ⚠️ لو لا، استخدم getFirestore(app) بدون اسم.
-export const db = getFirestore(app /*, "murabbikdata"*/);
+// 👈 قاعدة Firestore المسماة
+export const db = getFirestore(app, "murabbikdata");
 
+// Auth + تخزين الجلسة في المتصفح
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
-// دالة مطابقة لما تستدعيه صفحتك:
-export async function ensureAuth() {
-  if (auth.currentUser) return auth.currentUser;      // جلسة محفوظة
-  try {
-    // تسجيل دخول مجهول تلقائيًا — غرضه تمكين UID للفلاتر والقواعد
-    await signInAnonymously(auth);
-    return auth.currentUser;
-  } catch (e) {
-    console.error("ensureAuth/signInAnonymously failed", e);
-    throw e;
-  }
-}
-
-// (اختياري) احتفظ بـ requireAuth إن كنت تحتاجها في صفحات أخرى
-export async function requireAuth() {
+// للصفحات اللي عايزة تحقّق بدون تحويل (هترمي LOGIN_REQUIRED لو مش داخل)
+export async function requireAuth(){
   if (auth.currentUser) return auth.currentUser;
-  throw new Error("LOGIN_REQUIRED");
+  throw new Error('LOGIN_REQUIRED');
 }
 
-// إعادة تصدير أدوات Firestore التي قد تحتاجها صفحات أخرى
-export { addDoc, collection, serverTimestamp };
+// ✅ الواجهة المتوافقة مع كودك الحالي
+// لو مش داخل → نحفظ الصفحة الحالية في sessionStorage ونحوّل لـ login.html
+export async function ensureAuth(loginUrl = '/login.html'){
+  if (auth.currentUser) return auth.currentUser;
+
+  // فرصة قصيرة لو المتصفح يرجّع جلسة محفوظة بسرعة
+  const user = await new Promise((resolve) => {
+    const off = onAuthStateChanged(auth, (u) => { off(); resolve(u || null); });
+  });
+  if (user) return user;
+
+  try { sessionStorage.setItem('postLogin', location.href); } catch {}
+  location.href = loginUrl;
+  throw new Error('LOGIN_REQUIRED_REDIRECT'); // يوقف تنفيذ الصفحة الحالية
+}
