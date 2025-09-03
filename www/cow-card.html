@@ -5,21 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Murabbik – بطاقة الحيوان</title>
   <style>
-    :root{
-      --bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32;--warn:#946200;--danger:#7f1d1d
-    }
+    :root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--ink);padding:18px}
     .wrap{max-width:980px;margin:0 auto}
-
-    /* Top bar */
     .openbar{display:flex;gap:8px;align-items:center;justify-content:center;margin:0 0 12px;flex-wrap:wrap}
     .openbar small{opacity:.8}
     .openbar input{width:160px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
     .openbar button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#e8f5e9;color:#1b5e20;font-weight:700;cursor:pointer}
     .kind-badge{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fcfff8;font-weight:700}
-
-    /* Title */
     .title{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
     .title h1{margin:0;font-size:clamp(18px,4.6vw,28px);color:#14532d}
     .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -28,28 +22,20 @@
     .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
     .chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
     .chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
-
-    /* Card */
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
     .card h3{margin:0 0 10px;color:#17623b;font-size:18px}
-
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media (max-width:560px){.grid{grid-template-columns:1fr}}
     .fi{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
     .fi span{color:#2b593a;font-size:13px}
     .fi b{color:#0f5132;direction:ltr;unicode-bidi:plaintext;font-variant-numeric:tabular-nums}
-
-    /* Gauge */
     .milk-gauge-box{width:min(360px,92vw);aspect-ratio:2/1;position:relative;margin:8px auto;display:grid;place-items:center}
     .milk-gauge-box svg{position:absolute;inset:0;width:100%;height:100%;display:block}
     .milk-gauge-box svg *{vector-effect:non-scaling-stroke;shape-rendering:geometricPrecision}
     .milk-gauge-box .val{position:absolute;bottom:8%;inset-inline:0;text-align:center;font-weight:800;color:#065f46;font-size:clamp(14px,4vw,18px)}
-
     .legend{display:flex;gap:10px;justify-content:center;font-size:12px;color:#355}
     .leg{display:inline-flex;align-items:center;gap:6px}
     .dot{width:10px;height:10px;border-radius:50%}
-
-    /* KPIs + Chart */
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 10px}
     @media (max-width:560px){.kpi3{grid-template-columns:1fr}}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center}
@@ -59,21 +45,16 @@
     .prod-chart{display:block;height:240px}
     @media (max-width:560px){.prod-chart{height:200px}}
     .hint{font-size:12px;color:#456;margin-top:6px;text-align:center}
-
-    /* Health list */
     .hl{display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center}
     .hl.head{font-weight:700;color:#0f5132}
     .hl>div{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:8px}
     @media (max-width:560px){.hl{grid-template-columns:100px 1fr}}
     @media (max-width:560px){.hl .note{grid-column:1 / -1}}
-
-    /* Inline notice */
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Open bar -->
     <div class="openbar" id="openbar">
       <small>افتح بالرقم:</small>
       <input id="openNumber" inputmode="numeric" placeholder="مثال: 108" />
@@ -165,274 +146,389 @@
   </div>
 
   <script type="module">
-    /* ======================= Firebase INIT ======================= */
-// نستخدم نفس ملفك كما هو: يفعّل app ويصدر db على قاعدة "murabbikdata"
+/* ======================= Firebase ======================= */
 const fb = await import('/js/firebase-config.js');
- if (fb.requireAuth) await fb.requireAuth();
-// نحتاج دوال Firestore فقط (الـ db جاهز من ملفك)
+if (fb.ensureAuth) await fb.ensureAuth();
 const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-const DB = fb.db || fs.getFirestore(); // الافتراضي: استخدم المصدّر من ملفك
+const DB = fb.db || fs.getFirestore();
 const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
-/* ======================= Helpers */
-    const $=(id)=>document.getElementById(id);
-    const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
-    const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
-    const NF = new Intl.NumberFormat('ar-EG');
-    const todayStr = new Date().toISOString().slice(0,10);
-    const url = new URL(location.href);
-    const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
+const userNow = fb?.auth?.currentUser || null;   // ensureAuth سبق واتنادى فوق
+const UID = userNow?.uid ?? null;                // معرّف المستخدم الحالي
+const OWN = 'ownerUid';                          // اسم الحقل في المستندات
+/* ======================= Helpers ======================= */
+const $=(id)=>document.getElementById(id);
+const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
+const fmtD=(s)=> s? new Date(s).toLocaleDateString('ar-EG') : '—';
+const NF = new Intl.NumberFormat('ar-EG');
+const todayStr = new Date().toISOString().slice(0,10);
+const url = new URL(location.href);
+const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
 
-    const normKind=(k)=>{const s=String(k??'').trim().toLowerCase(); if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow'; if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo'; return ''; };
-    const kindNameAr=(k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
-    const kindTitleAr=(k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
+const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
+  if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
+  if(/^(buffalo|جاموس|جاموسه|جاموسة)$/.test(s)) return 'buffalo';
+  return '';
+};
+const kindNameAr=(k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
+const kindTitleAr=(k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
 
-    function normalizeAnimalDoc(d={}){
-      return {
-        id: d.id,
-        number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
-        kind: normKind(d.animalType ?? d.kind ?? d.type ?? d['النوع'] ?? d['الفصيلة']),
-        birthDate: d.birthDate ?? d.birth_date ?? d.dob ?? d['تاريخ الميلاد'] ?? null,
-        lastCalvingDate: d.lastCalvingDate ?? d.lastCalving ?? d.calvingDate ?? d['تاريخ آخر ولادة'] ?? null,
-        lactationNumber: d.lactationNumber ?? d.lactNo ?? d['رقم موسم الحليب'] ?? null,
-        breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
-        group: d.group ?? d['المجموعة'] ?? null,
-        pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
-        reproductiveStatus: d.reproductiveStatus ?? d['الحالة التناسلية'] ?? null,
-        productionStatus:   d.productionStatus   ?? d['حالة الإنتاج'] ?? null,
-        healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
-        lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
-        milkTraitsScore: Number(d.milkTraitsScore ?? d.milk_score ?? 0) || 0,
-        ovsynch: d.ovsynch ?? null
-      };
+function normalizeAnimalDoc(d={}){
+  return {
+    id: d.id,
+    number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
+    kind: normKind(d.animalType ?? d.kind ?? d.type ?? d['النوع'] ?? d['الفصيلة'] ?? d.animalTypeAr),
+    birthDate: d.birthDate ?? d.birth_date ?? d.dob ?? d['تاريخ الميلاد'] ?? null,
+    lastCalvingDate: d.lastCalvingDate ?? d.lastCalving ?? d.calvingDate ?? d['تاريخ آخر ولادة'] ?? null,
+    lactationNumber: d.lactationNumber ?? d.lactNo ?? d['رقم موسم الحليب'] ?? null,
+    breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
+    group: d.group ?? d['المجموعة'] ?? null,
+    pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
+    reproductiveStatus: d.reproductiveStatus ?? d['الحالة التناسلية'] ?? null,
+    productionStatus:   d.productionStatus   ?? d['حالة الإنتاج'] ?? null,
+    healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
+    lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
+    milkTraitsScore: Number(d.milkTraitsScore ?? d.milk_score ?? 0) || 0,
+    ovsynch: d.ovsynch ?? null
+  };
+}
+
+const TYPE_RULES=[
+  ['milk',/(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
+  ['calving',/(calving|ولاد|نفاس)/i],
+  ['insemination',/(insemin|تلقيح|خدم)/i],
+  ['heat',/(heat|estrus|شياع)/i],
+  ['pregnancy',/(pregnan|حمل|ايجابي|موجب)/i],
+  ['disease',/(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
+];
+const evType=(e)=>{const s=String(e.type??e.eventType??e.event??e.name??e.kind??e.category??'').toLowerCase(); for(const [T,rx] of TYPE_RULES) if(rx.test(s)) return T; return 'other';};
+const evDate = (e)=>{
+  let d = e?.eventDate ?? e?.date ?? e?.day ?? e?.createdAt ?? e?.ts ?? '';
+  if (d && typeof d.toDate === 'function') d = d.toDate(); // دعم Firestore Timestamp
+  const t = d ? new Date(d) : null;
+  return t && !isNaN(t) ? t.toISOString().slice(0,10) : '';
+};
+const toNum=(v)=>{const n=Number(v); return Number.isFinite(n)?n:0;};
+function evMilkKg(e){
+  const direct=toNum(e.milkKg??e.total??e.kg??e.milk??e.amount); if(direct>0) return direct;
+  let sum=0; const partKey=/(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
+  for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum+=toNum(v); return sum;
+}
+
+/* ======================= Firestore ======================= */
+async function fetchAnimalByNumber(n){
+  if (n == null || String(n).trim() === '') return null;
+
+  const nStr = String(n).trim();
+  const nNum = Number(nStr);
+  const A = collection(DB, 'animals');
+
+  // (1) جرّب doc id = الرقم
+  try {
+    const d = await getDoc(doc(DB, 'animals', nStr));
+    if (d.exists()) {
+      const data = d.data();
+      if (!UID || data?.[OWN] === UID) {
+        return normalizeAnimalDoc({ id: d.id, ...data });
+      }
+    }
+  } catch {}
+
+  // (2) animalNumber كـ Number — نفّذها فقط لو nNum رقم صالح
+  if (Number.isFinite(nNum)) {
+    try {
+      const q1 = UID
+        ? query(A, where(OWN,'==',UID), where('animalNumber','==', nNum), limit(1))
+        : query(A, where('animalNumber','==', nNum), limit(1));
+      const s1 = await getDocs(q1);
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        return normalizeAnimalDoc({ id: d.id, ...d.data() });
+      }
+    } catch {}
+  }
+
+  // (3) animalNumber كـ String — اشطبها لو الحقل دايمًا Number
+  try {
+    const q2 = UID
+      ? query(A, where(OWN,'==',UID), where('animalNumber','==', nStr), limit(1))
+      : query(A, where('animalNumber','==', nStr), limit(1));
+    const s2 = await getDocs(q2);
+    if (!s2.empty) {
+      const d = s2.docs[0];
+      return normalizeAnimalDoc({ id: d.id, ...d.data() });
+    }
+  } catch {}
+
+  return null;
+}
+
+
+
+async function fetchAnimal({number, animalId} = {}) {
+  if (animalId) {
+    const d = await getDoc(doc(DB,'animals', String(animalId)));
+    if (d.exists()) {
+      const data = d.data();
+      if (!UID || data?.[OWN] === UID) {
+        return normalizeAnimalDoc({ id: d.id, ...data });
+      }
+    }
+  }
+
+  const a = await fetchAnimalByNumber(number);
+  if (a) return a;
+
+  throw new Error('لا يوجد حيوان مطابق');
+}
+
+
+async function fetchEvents(animal){
+  const E = collection(DB,'events');
+  const rows = [];
+
+  try{
+    // حسب الـ id
+    if (animal.id) {
+      const qById = UID
+        ? query(E, where('animalId','==', animal.id), where(OWN,'==', UID))
+        : query(E, where('animalId','==', animal.id));
+      const sById = await getDocs(qById);
+      sById.forEach(d => {
+        const r = { id: d.id, ...d.data() };
+        if (!UID || r[OWN] === UID) rows.push(r);
+      });
     }
 
-    const TYPE_RULES=[
-      ['milk',/(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
-      ['calving',/(calving|ولاد|نفاس)/i],
-      ['insemination',/(insemin|تلقيح|خدم)/i],
-      ['heat',/(heat|estrus|شياع)/i],
-      ['pregnancy',/(pregnan|حمل|ايجابي|موجب)/i],
-      ['disease',/(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
-    ];
-    const evType=(e)=>{const s=String(e.type??e.eventType??e.event??e.name??e.kind??e.category??'').toLowerCase(); for(const [T,rx] of TYPE_RULES) if(rx.test(s)) return T; return 'other';};
-    const evDate=(e)=>{const d=e.eventDate??e.date??e.day??e.createdAt??e.ts??''; return d? new Date(d).toISOString().slice(0,10):'';};
-    const toNum=(v)=>{const n=Number(v); return Number.isFinite(n)?n:0;};
-    function evMilkKg(e){
-      const direct=toNum(e.milkKg??e.total??e.kg??e.milk??e.amount); if(direct>0) return direct;
-      let sum=0; const partKey=/(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
-      for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum+=toNum(v); return sum;
-    }
+    // حسب الرقم (String و Number) وفي مفاتيح بديلة
+    if (animal.number != null) {
+      const nStr = String(animal.number), nNum = Number(nStr);
 
-    /* ======================= Firestore Queries ======================= */
-    async function fetchAnimalByNumber(n){
-      if(n==null||n==='') return null;
-      const nStr=String(n).trim(); const nNum=Number(nStr);
-      const A=collection(DB,'animals');
-
-      // Doc ID = الرقم (fallback سريع)
-      try{ const d=await getDoc(doc(DB,'animals',nStr)); if(d.exists()) return normalizeAnimalDoc({id:d.id,...d.data()}); }catch{}
-
-      // الحقل الأساسي animalNumber (Number)
-      try{ const s1=await getDocs(query(A, where('animalNumber','==', nNum), limit(1))); if(!s1.empty){const d=s1.docs[0];return normalizeAnimalDoc({id:d.id,...d.data()});} }catch{}
-
-      // احتياط: لو محفوظ كنص
-      try{ const s2=await getDocs(query(A, where('animalNumber','==', nStr), limit(1))); if(!s2.empty){const d=s2.docs[0];return normalizeAnimalDoc({id:d.id,...d.data()});} }catch{}
-      return null;
-    }
-
-    async function fetchAnimal({number, animalId}={}){
-      if(animalId){ const d=await getDoc(doc(DB,'animals', String(animalId))); if(d.exists()) return normalizeAnimalDoc({id:d.id,...d.data()}); }
-      const a=await fetchAnimalByNumber(number); if(a) return a; throw new Error('لا يوجد حيوان مطابق');
-    }
-
-    async function fetchEvents(animal){
-      const E=collection(DB,'events'); const rows=[];
-      if(animal.id){ const s=await getDocs(query(E, where('animalId','==', animal.id))); s.forEach(d=>rows.push({id:d.id,...d.data()})); }
-      if(animal.number!=null){ const nStr=String(animal.number), nNum=Number(nStr);
-        const qs=[
+      const baseQs = [
+        ...(Number.isFinite(nNum) ? [
           query(E, where('animalNumber','==', nNum)),
-          query(E, where('animalNumber','==', nStr)),
           query(E, where('number','==', nNum)),
-          query(E, where('number','==', nStr)),
-        ];
-        for(const qy of qs){ try{ const s=await getDocs(qy); s.forEach(d=>rows.push({id:d.id,...d.data()})); }catch{} }
-      }
-      const uniq=new Map(rows.map(r=>[r.id,r]));
-      return [...uniq.values()].sort((a,b)=>(evDate(a)||'').localeCompare(evDate(b)||''));
-    }
+        ] : []),
+        query(E, where('animalNumber','==', nStr)),
+        query(E, where('number','==', nStr)),
+      ];
 
-    /* ======================= Build state ======================= */
-    function buildState(animal, events){
-      const st={
-        number: animal.number ?? animal.id?.slice(-6),
-        reproductiveStatus: animal.reproductiveStatus || '—',
-        productionStatus:   animal.productionStatus || '—',
-        healthStatus:       animal.healthStatus || 'سليم',
-        birthDate: animal.birthDate || null,
-        lastCalvingDate: animal.lastCalvingDate || null,
-        lactationNumber: animal.lactationNumber ?? null,
-        daysInMilk: null,
-        gestationDays: null,
-        lastInseminationDate: null,
-        pregnancyDate: animal.pregnancyDate || null,
-        breed: animal.breed || '—',
-        group: animal.group || '—',
-        milkTraitsScore: animal.milkTraitsScore ?? 0,
-        servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
-        milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
-        lastCheckDate: animal.lastCheckDate || null, healthHistory: []
-      };
-
-      const milkTmp=[]; let season=0; const today = todayStr;
-      for(const e of events){
-        const t=evType(e), d=evDate(e);
-        if(t==='calving' && d) st.lastCalvingDate = d;
-        if(t==='insemination' && d){ st.inseminations.push(d); }
-        if(t==='heat' && d){ st.estrusDates.push(d); }
-        if(t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='حامل'; }
-        if(t==='disease'){
-          st.healthHistory.push({date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||''});
-          st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate = st.lastCheckDate || d || null;
-        }
-        if(t==='milk'){
-          const kg=evMilkKg(e); if(kg>0){ season+=kg; milkTmp.push({d,kg}); if(d===today) st.milkTodayKg=kg; }
-        }
-      }
-
-      if(st.lastCalvingDate){ const ms=Date.now()-new Date(st.lastCalvingDate).getTime(); st.daysInMilk=Math.max(0,Math.floor(ms/86400000)); }
-      st.inseminations.sort(); st.servicesCount=st.inseminations.length;
-      st.lastInseminationDate = st.inseminations.at(-1) || null;
-      st.estrusDates.sort();
-
-      st.seasonTotalKg = season || null;
-      if(st.daysInMilk>0 && season>0){ st.m305Kg = Math.round((season/st.daysInMilk)*305); }
-
-      if(milkTmp.length){
-        const base = st.lastCalvingDate ? new Date(st.lastCalvingDate).getTime() : null;
-        st.milkSeries = milkTmp.filter(p=>p.d).map(p=>{
-          const di = base ? Math.max(0,Math.floor((new Date(p.d).getTime()-base)/86400000)) : 0;
-          return {d:di, v:p.kg};
-        }).sort((a,b)=>a.d-b.d);
-      }
-
-      if(st.daysInMilk!=null){ st.productionStatus = st.daysInMilk<60 ? 'حليب مبكر' : st.daysInMilk<200 ? 'حليب متوسط' : 'حليب متأخر'; }
-      return st;
-    }
-
-    /* ======================= UI: Gauge + Chart ======================= */
-    function arcPath(cx,cy,r,a0,a1){const A=(x)=>x*Math.PI/180, P=(ang)=>[cx+r*Math.cos(A(ang)), cy+r*Math.sin(A(ang))]; const [x0,y0]=P(a0),[x1,y1]=P(a1); return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;}
-    function renderGauge(score){
-      score=Math.max(0,Math.min(100,Number(score)||0));
-      const g=$('gSlices'); if(!g) return; g.innerHTML='';
-      const colors=['#ef5350','#ffb74d','#fff176','#66bb6a'], steps=[0,25,50,75,100];
-      for(let i=0;i<4;i++){const s=steps[i],e=steps[i+1],a0=180-(s/100)*180,a1=180-(e/100)*180; const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d',arcPath(50,50,40,a0,a1)); p.setAttribute('fill','none'); p.setAttribute('stroke',colors[i]); p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round'); g.appendChild(p);}
-      const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
-      const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف'; put('milkGaugeVal',`${label} — ${score}%`);
-    }
-
-    function renderMilkChart(series){
-      const svg=$('milkChart'), sc=$('milkScroll'); if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
-      const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
-      const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
-      svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
-      const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
-      const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
-      svg.innerHTML='';
-      const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
-      for(let i=1;i<=3;i++){const y=6+i*(60-12)/3; const ln=document.createElementNS('http://www.w3.org/2000/svg','line'); ln.setAttribute('x1',6); ln.setAttribute('x2',W-6); ln.setAttribute('y1',y); ln.setAttribute('y2',y); ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6'); grid.appendChild(ln);} svg.appendChild(grid);
-      let d=''; data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
-      const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
-      const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
-      const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
-      const cx=sx(N-1), cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
-      setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
-      addEventListener('resize',()=>renderMilkChart(series),{once:true});
-    }
-
-    function avgDaysBetween(dts){ if(!dts||dts.length<2) return null; const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b); const dif=[]; for(let i=1;i<ms.length;i++) dif.push((ms[i]-ms[i-1])/86400000); return Math.round(dif.reduce((a,b)=>a+b,0)/dif.length); }
-    function setChip(el,text){ if(!el) return; const t=String(text||'').toLowerCase(); let v='ok'; if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger'; el.textContent=text||'—'; el.setAttribute('data-variant',v); }
-
-    function renderCard(state, kind){
-      $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
-      setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
-      put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
-      put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
-      put('fiDIM',state.daysInMilk!=null?NF.format(state.daysInMilk):'—');
-      let g=state.gestationDays, ref=state.pregnancyDate||state.lastInseminationDate; if(g==null&&ref){const ms=Date.now()-new Date(ref).getTime(); g=Math.max(0,Math.floor(ms/86400000));}
-      put('fiGestAge',g!=null?NF.format(g):'—'); put('fiBreed',state.breed||'—'); put('fiGroup',state.group||'—');
-      renderGauge(state.milkTraitsScore);
-      put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
-      put('kpiSeason',state.seasonTotalKg!=null?`${NF.format(Math.round(state.seasonTotalKg))} كجم`:'—');
-      put('kpi305',state.m305Kg!=null?`${NF.format(Math.round(state.m305Kg))} كجم`:'—');
-      renderMilkChart(state.milkSeries);
-      put('fiLastIns',fmtD(state.lastInseminationDate));
-      const spc=state.servicesCount; put('fiSPC',spc!=null?NF.format(spc):'—');
-      const svcI=avgDaysBetween(state.inseminations); put('fiServiceInterval',svcI!=null?`${NF.format(svcI)} يوم`:'—');
-      const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
-      const hI=avgDaysBetween(state.estrusDates); put('fiHeatInterval',hI!=null?`${NF.format(hI)} يوم`:'—');
-      if(state.ovsynch&&state.ovsynch.active){ put('fiOvsynch',`${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`); } else put('fiOvsynch','—');
-      put('fiHealth',state.healthStatus||'—'); put('fiLastCheck',fmtD(state.lastCheckDate));
-      const hl=$('healthList'); hl.innerHTML='';
-      if(Array.isArray(state.healthHistory)&&state.healthHistory.length){
-        state.healthHistory.slice(-6).forEach(it=>{
-          const row=document.createElement('div'); row.className='hl';
-          const d=document.createElement('div'); d.textContent=fmtD(it.date);
-          const dx=document.createElement('div'); dx.textContent=it.diagnosis||'—';
-          const nt=document.createElement('div'); nt.className='note'; nt.textContent=it.note||'';
-          row.appendChild(d); row.appendChild(dx); row.appendChild(nt); hl.appendChild(row);
+      for (const qy of baseQs) {
+        const qf = UID ? query(qy, where(OWN,'==', UID)) : qy;
+        const s = await getDocs(qf);
+        s.forEach(d => {
+          const r = { id: d.id, ...d.data() };
+          if (!UID || r[OWN] === UID) rows.push(r);
         });
-      } else {
-        const row=document.createElement('div'); row.className='hl';
-        ['—','لا توجد سجلات',''].forEach((t,i)=>{const c=document.createElement('div'); if(i===2)c.className='note'; c.textContent=t; row.appendChild(c);});
-        hl.appendChild(row);
       }
     }
+  }catch{}
 
-    /* ======================= Load & Run ======================= */
-    async function loadAndRender({number, animalId, type}){
-      try{
-        let kind = normKind(type);
-        const animal = await fetchAnimal({number, animalId});
-        if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
-        if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
+  const uniq = new Map(rows.map(r => [r.id, r]));
+  return [...uniq.values()].sort((a,b)=>(evDate(a)||'').localeCompare(evDate(b)||''));
+}
 
-        // حفظ السياق
-        if (animal.id) localStorage.setItem('currentAnimalId', String(animal.id));
-        if (animal.number!=null) {
-          localStorage.setItem('currentAnimalNumber', String(animal.number));
-          localStorage.setItem('lastAnimalNumber', String(animal.number));
-        }
 
-        const events = await fetchEvents(animal);
-        const state  = buildState(animal, events);
+/* ======================= Build state ======================= */
+function buildState(animal, events){
+  const st={
+    number: animal.number ?? animal.id?.slice(-6),
+    reproductiveStatus: animal.reproductiveStatus || '—',
+    productionStatus:   animal.productionStatus || '—',
+    healthStatus:       animal.healthStatus || 'سليم',
+    birthDate: animal.birthDate || null,
+    lastCalvingDate: animal.lastCalvingDate || null,
+    lactationNumber: animal.lactationNumber ?? null,
+    daysInMilk: null,
+    gestationDays: null,
+    lastInseminationDate: null,
+    pregnancyDate: animal.pregnancyDate || null,
+    breed: animal.breed || '—',
+    group: animal.group || '—',
+    milkTraitsScore: animal.milkTraitsScore ?? 0,
+    servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
+    milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
+    lastCheckDate: animal.lastCheckDate || null, healthHistory: []
+  };
 
-        // لو لا توجد أحداث، نعرض البطاقة + ملاحظة خفيفة
-        if(!events.length){
-          const tip=document.createElement('div'); tip.className='notice';
-          tip.innerHTML=`لا توجد أحداث مسجلة بعد. <a href="/add-event.html?number=${encodeURIComponent(state.number||'')}" style="font-weight:700;color:#1b5e20">أضف أول حدث الآن</a>.`;
-          document.querySelector('.wrap')?.prepend(tip);
-        }
-        renderCard(state, kind);
-      }catch(e){
-        console.error(e); $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان';
-      }
+  const milkTmp=[]; let season=0;
+  for(const e of events){
+    const t=evType(e), d=evDate(e);
+    if(t==='calving' && d) st.lastCalvingDate = d;
+    if(t==='insemination' && d){ st.inseminations.push(d); }
+    if(t==='heat' && d){ st.estrusDates.push(d); }
+    if(t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='حامل'; }
+    if(t==='disease'){
+      st.healthHistory.push({date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||''});
+      st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate = st.lastCheckDate || d || null;
+    }
+    if(t==='milk'){
+      const kg=evMilkKg(e); if(kg>0){ season+=kg; milkTmp.push({d,kg}); if(d===todayStr) st.milkTodayKg=kg; }
+    }
+  }
+
+  if(st.lastCalvingDate){
+    const ms=Date.now()-new Date(st.lastCalvingDate).getTime();
+    st.daysInMilk=Math.max(0,Math.floor(ms/86400000));
+  }
+  st.inseminations.sort(); st.servicesCount=st.inseminations.length;
+  st.lastInseminationDate = st.inseminations.at(-1) || null;
+  st.estrusDates.sort();
+
+  st.seasonTotalKg = season || null;
+  if(st.daysInMilk>0 && season>0){ st.m305Kg = Math.round((season/st.daysInMilk)*305); }
+
+  if(milkTmp.length){
+    const base = st.lastCalvingDate ? new Date(st.lastCalvingDate).getTime() : null;
+    st.milkSeries = milkTmp.filter(p=>p.d).map(p=>{
+      const di = base ? Math.max(0,Math.floor((new Date(p.d).getTime()-base)/86400000)) : 0;
+      return {d:di, v:p.kg};
+    }).sort((a,b)=>a.d-b.d);
+  }
+
+  if(st.daysInMilk!=null){
+    st.productionStatus = st.daysInMilk<60 ? 'حليب مبكر' : st.daysInMilk<200 ? 'حليب متوسط' : 'حليب متأخر';
+  }
+  return st;
+}
+
+/* ======================= UI ======================= */
+function arcPath(cx,cy,r,a0,a1){
+  const A=(x)=>x*Math.PI/180, P=(ang)=>[cx+r*Math.cos(A(ang)), cy+r*Math.sin(A(ang))];
+  const [x0,y0]=P(a0),[x1,y1]=P(a1);
+  return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
+}
+function renderGauge(score){
+  score=Math.max(0,Math.min(100,Number(score)||0));
+  const g=$('gSlices'); if(!g) return; g.innerHTML='';
+  const colors=['#ef5350','#ffb74d','#fff176','#66bb6a'], steps=[0,25,50,75,100];
+  for(let i=0;i<4;i++){
+    const s=steps[i],e=steps[i+1],a0=180-(s/100)*180,a1=180-(e/100)*180;
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',arcPath(50,50,40,a0,a1));
+    p.setAttribute('fill','none'); p.setAttribute('stroke',colors[i]);
+    p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round');
+    g.appendChild(p);
+  }
+  const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
+  const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف';
+  put('milkGaugeVal',`${label} — ${score}%`);
+}
+function renderMilkChart(series){
+  const svg=$('milkChart'), sc=$('milkScroll');
+  if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
+  const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
+  const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
+  svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
+  const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
+  const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
+  svg.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g');
+  for(let i=1;i<=3;i++){
+    const y=6+i*(60-12)/3;
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',6); ln.setAttribute('x2',W-6);
+    ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+    ln.setAttribute('stroke','#e9f5dc'); ln.setAttribute('stroke-width','0.6');
+    grid.appendChild(ln);
+  }
+  svg.appendChild(grid);
+  let d=''; data.forEach((p,i)=>{ d+=(i?' L ':'M ')+sx(i).toFixed(2)+' '+sy(p.y).toFixed(2); });
+  const area=d+` L ${sx(N-1).toFixed(2)} ${60-6} L ${sx(0).toFixed(2)} ${60-6} Z`;
+  const ap=document.createElementNS('http://www.w3.org/2000/svg','path'); ap.setAttribute('d',area); ap.setAttribute('fill','#cdeccd'); ap.setAttribute('opacity','0.6'); svg.appendChild(ap);
+  const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
+  const cx=sx(N-1), cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
+  setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
+  addEventListener('resize',()=>renderMilkChart(series),{once:true});
+}
+function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
+  const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b);
+  const dif=[]; for(let i=1;i<ms.length;i++) dif.push((ms[i]-ms[i-1])/86400000);
+  return Math.round(dif.reduce((a,b)=>a+b,0)/dif.length);
+}
+function setChip(el,text){ if(!el) return; const t=String(text||'').toLowerCase(); let v='ok';
+  if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger';
+  el.textContent=text||'—'; el.setAttribute('data-variant',v);
+}
+function renderCard(state, kind){
+  $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
+  setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
+  put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
+  put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
+  put('fiDIM',state.daysInMilk!=null?NF.format(state.daysInMilk):'—');
+  let g=state.gestationDays, ref=state.pregnancyDate||state.lastInseminationDate;
+  if(g==null&&ref){const ms=Date.now()-new Date(ref).getTime(); g=Math.max(0,Math.floor(ms/86400000));}
+  put('fiGestAge',g!=null?NF.format(g):'—'); put('fiBreed',state.breed||'—'); put('fiGroup',state.group||'—');
+  renderGauge(state.milkTraitsScore);
+  put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
+  put('kpiSeason',state.seasonTotalKg!=null?`${NF.format(Math.round(state.seasonTotalKg))} كجم`:'—');
+  put('kpi305',state.m305Kg!=null?`${NF.format(Math.round(state.m305Kg))} كجم`:'—');
+  renderMilkChart(state.milkSeries);
+  put('fiLastIns',fmtD(state.lastInseminationDate));
+  const spc=state.servicesCount; put('fiSPC',spc!=null?NF.format(spc):'—');
+  const svcI=avgDaysBetween(state.inseminations); put('fiServiceInterval',svcI!=null?`${NF.format(svcI)} يوم`:'—');
+  const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
+  const hI=avgDaysBetween(state.estrusDates); put('fiHeatInterval',hI!=null?`${NF.format(hI)} يوم`:'—');
+  if(state.ovsynch&&state.ovsynch.active){ put('fiOvsynch',`${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`); } else put('fiOvsynch','—');
+  put('fiHealth',state.healthStatus||'—'); put('fiLastCheck',fmtD(state.lastCheckDate));
+  const hl=$('healthList'); hl.innerHTML='';
+  if(Array.isArray(state.healthHistory)&&state.healthHistory.length){
+    state.healthHistory.slice(-6).forEach(it=>{
+      const row=document.createElement('div'); row.className='hl';
+      const d=document.createElement('div'); d.textContent=fmtD(it.date);
+      const dx=document.createElement('div'); dx.textContent=it.diagnosis||'—';
+      const nt=document.createElement('div'); nt.className='note'; nt.textContent=it.note||'';
+      row.appendChild(d); row.appendChild(dx); row.appendChild(nt); hl.appendChild(row);
+    });
+  } else {
+    const row=document.createElement('div'); row.className='hl';
+    ['—','لا توجد سجلات',''].forEach((t,i)=>{const c=document.createElement('div'); if(i===2)c.className='note'; c.textContent=t; row.appendChild(c);});
+    hl.appendChild(row);
+  }
+}
+
+/* ======================= Load & Run ======================= */
+async function loadAndRender({number, animalId, type}){
+  try{
+    let kind = normKind(type);
+    const animal = await fetchAnimal({number, animalId});
+    if(!kind) kind = animal.kind || normKind(localStorage.getItem('lastKind'));
+    if(kind){ localStorage.setItem('lastKind',kind); if(kindValEl) kindValEl.textContent = kindNameAr(kind); }
+
+    if (animal.id) localStorage.setItem('currentAnimalId', String(animal.id));
+    if (animal.number!=null) {
+      localStorage.setItem('currentAnimalNumber', String(animal.number));
+      localStorage.setItem('lastAnimalNumber', String(animal.number));
     }
 
-    const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
-    const idParam     = url.searchParams.get('animalId') || '';
-    const typeParam   = (url.searchParams.get('type') || url.searchParams.get('kind') || url.searchParams.get('animaltype') || '').toLowerCase();
+    const events = await fetchEvents(animal);
+    const state  = buildState(animal, events);
 
-    if (numberParam || idParam){
-      if (openbar) openbar.style.display='none';
-      if (typeParam && kindValEl) kindValEl.textContent = kindNameAr(normKind(typeParam));
-      loadAndRender({number:numberParam, animalId:idParam, type:typeParam});
-    } else {
-      const lastNum = localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
-      if(lastNum && openInput){ openInput.value=lastNum; }
-      if(openBtn){ openBtn.addEventListener('click', ()=>{ const n=(openInput.value||'').trim(); if(!n) return; loadAndRender({number:n}); }); }
+    if(!events.length){
+      const tip=document.createElement('div'); tip.className='notice';
+      tip.innerHTML=`لا توجد أحداث مسجلة بعد. <a href="/add-event.html?number=${encodeURIComponent(state.number||'')}" style="font-weight:700;color:#1b5e20">أضف أول حدث الآن</a>.`;
+      document.querySelector('.wrap')?.prepend(tip);
     }
+    renderCard(state, kind);
+  }catch(e){
+    console.error(e);
+    $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان';
+  }
+}
+
+const numberParam = url.searchParams.get('number') || url.searchParams.get('animalNumber') || '';
+const idParam     = url.searchParams.get('animalId') || '';
+const typeParam   = (url.searchParams.get('type') || url.searchParams.get('kind') || url.searchParams.get('animaltype') || '').toLowerCase();
+
+if (numberParam || idParam){
+  if (openbar) openbar.style.display='none';
+  if (typeParam && kindValEl) kindValEl.textContent = kindNameAr(normKind(typeParam));
+  loadAndRender({number:numberParam, animalId:idParam, type:typeParam});
+} else {
+  const lastNum = localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
+  if(lastNum && openInput){ openInput.value=lastNum; }
+  if(openBtn){ openBtn.addEventListener('click', ()=>{ const n=(openInput.value||'').trim(); if(!n) return; loadAndRender({number:n}); }); }
+}
   </script>
 </body>
 </html>
-
-
