@@ -53,9 +53,8 @@
     <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
     <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
     <button class="btn" data-page="visual-eval.html">🥛 صفات اللبن</button>
-    <button type="button" id="openWeightEvalBtn" style="padding:8px 12px;border:1px solid #cdeccd;border-radius:10px;background:#e8f5e9;color:#14532d;font-weight:700;cursor:pointer">
-  تقدير الوزن
-</button>
+    <button class="btn" id="openWeightEvalBtn" data-page="weight-eval.html">⚖️ تقدير الوزن</button>
+
 
   </div>
 
@@ -148,56 +147,9 @@
     wireTrimming();
   })();
   </script>
-  <script type="module">
-  // 1) امسك الزر
-  const btn = document.getElementById('openWeightEvalBtn');
-
-  // 2) دوال تجيب القيم (مع شوية بدائل مفيدة)
-  function getQSNumber() {
-    const u = new URL(location.href);
-    return u.searchParams.get('number') || u.searchParams.get('animalNumber') || '';
-  }
-  function getNumber() {
-    // غيّر IDs لو مختلفة عندك
-    return (document.getElementById('animalNumber')?.value
-         || getQSNumber()
-         || localStorage.getItem('currentAnimalNumber')
-         || '').trim();
-  }
-  function getDate() {
-    // غيّر ID لو مختلف عندك
-    const fromInput = document.getElementById('eventDate')?.value;
-    if (fromInput && fromInput.length) return fromInput;
-
-    // لو الصفحة مفتوحة ومعاها date في الـURL
-    const qsDate = new URL(location.href).searchParams.get('date');
-    if (qsDate) return qsDate;
-
-    // افتراضي: تاريخ اليوم
-    return new Date().toISOString().slice(0,10);
-  }
-
-  // 3) وظيفة الفتح
-  function openWeightEval() {
-    const number = getNumber();
-    const date   = getDate();
-
-    if (!number) {
-      alert('من فضلك أدخل رقم الحيوان أولاً');
-      return;
-    }
-
-    const qs = new URLSearchParams({ number, date }).toString();
-
-    // افتح في تبويب جديد (غيرها إلى '_self' لو عايز نفس الصفحة)
-    window.open('/weight-eval.html?' + qs, '_blank');
-  }
-
-  // 4) ربط الحدث بالزر
-  if (btn) btn.addEventListener('click', openWeightEval);
-</script>
-
+ 
 </body>
 </html>
+
 
 
