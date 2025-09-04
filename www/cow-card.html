@@ -232,7 +232,7 @@ function normalizeAnimalDoc(d = {}){
 
     // إنتاج
     productionStatus: normProdStatus(x.productionStatus ?? x['حالة الإنتاج'] ?? x.prodStatus ?? x.status) ?? null,
-    milkTodayKg:   x.milkTodayKg   ?? x.todayMilk      ?? x['إنتاج اليوم']   ?? null,
+    milkTodayKg:   x.milkTodayKg   ?? x.todayMilk   ?? x.dailyMilk   ?? x.daily_milk   ?? x['إنتاج اليوم']   ?? null,
     seasonTotalKg: x.seasonTotalKg ?? x.milkSeason     ?? x['إنتاج الموسم']  ?? null,
     m305Kg:        x.m305Kg        ?? x.milk305        ?? x['إنتاج 305 يوم'] ?? null,
 
@@ -773,3 +773,4 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
