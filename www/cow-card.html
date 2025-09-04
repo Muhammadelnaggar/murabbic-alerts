@@ -60,7 +60,6 @@
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
 
     /* شارة صغيرة للمفتاح داخل كل-الحقول */
-    .keytag{opacity:.85;font-size:12px;margin-inline-end:8px;color:#2b593a}
   </style>
 </head>
 <body>
@@ -81,18 +80,19 @@
       </div>
     </div>
 
-    <section class="card" aria-label="المعلومات الأساسية">
-      <h3>المعلومات الأساسية</h3>
-      <div class="grid" id="basicInfo">
-        <div class="fi"><span>تاريخ الميلاد</span><b id="fiBirth">—</b></div>
-        <div class="fi"><span>تاريخ آخر ولادة</span><b id="fiLastCalving">—</b></div>
-        <div class="fi"><span>رقم موسم الحليب</span><b id="fiLactNo">—</b></div>
-        <div class="fi"><span>عدد أيام الحليب DIM</span><b id="fiDIM">—</b></div>
-        <div class="fi"><span>عمر الحمل (يوم)</span><b id="fiGestAge">—</b></div>
-        <div class="fi"><span>السلالة</span><b id="fiBreed">—</b></div>
-        <div class="fi"><span>المجموعة</span><b id="fiGroup">—</b></div>
-      </div>
-    </section>
+   <section class="card" aria-label="المعلومات الأساسية">
+  <h3>المعلومات الأساسية</h3>
+  <div class="grid" id="basicInfo">
+    <div class="fi"><span>تاريخ الميلاد</span><b id="fiBirth">—</b></div>
+    <div class="fi"><span>تاريخ آخر ولادة</span><b id="fiLastCalving">—</b></div>
+    <div class="fi"><span>رقم موسم الحليب</span><b id="fiLactNo">—</b></div>
+    <div class="fi"><span>عدد أيام الحليب DIM</span><b id="fiDIM">—</b></div>
+    <div class="fi"><span>عمر الحمل (يوم)</span><b id="fiGestAge">—</b></div>
+    <div class="fi"><span>السلالة</span><b id="fiBreed">—</b></div>
+    <div class="fi"><span>المجموعة</span><b id="fiGroup">—</b></div>
+  </div>
+</section>
+
 
     <section class="card" aria-label="تقييم سمات اللبن">
       <h3>تقييم سمات اللبن</h3>
@@ -154,12 +154,7 @@
       </div>
     </section>
 
-    <!-- جديد: كل البيانات المسجّلة من وثيقة الحيوان -->
-    <section class="card" aria-label="كل بيانات الحيوان">
-      <h3>كل البيانات المُسجَّلة</h3>
-      <div class="grid" id="allFields"></div>
-    </section>
-
+    
     <!-- جديد: جميع الأحداث المسجّلة -->
     <section class="card" aria-label="الأحداث المسجّلة">
       <h3>الأحداث المسجّلة</h3>
@@ -466,98 +461,176 @@ function setChip(el,text){ if(!el) return; const t=String(text||'').toLowerCase(
   if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger';
   el.textContent=text||'—'; el.setAttribute('data-variant',v);
 }
-
-/* ======================= UI (عَرض كل البيانات + الأحداث) ======================= */
-const SHOWN_KEYS=new Set([
-  'id','number','animalNumber','kind','birthDate','lastCalvingDate','lactationNumber',
-  'reproductiveStatus','productionStatus','healthStatus','pregnancyDate','lastInseminationDate',
-  'servicesCount','estrusDates','serviceIntervalDays','heatIntervalDays',
-  'milkTodayKg','seasonTotalKg','m305Kg','milkTraitsScore','breed','group','lastCheckDate','ovsynch'
-]);
-const SKIP_KEYS=new Set([
-  'ownerUid','createdAt','updatedAt','__name__','__path__','__animalRaw'
-]);
-const LABELS={
-  number:'رقم الحيوان', animalNumber:'رقم الحيوان', kind:'النوع', birthDate:'تاريخ الميلاد',
-  lastCalvingDate:'تاريخ آخر ولادة', lactationNumber:'رقم موسم الحليب', breed:'السلالة', group:'المجموعة',
-  pregnancyDate:'تاريخ الحمل', reproductiveStatus:'الحالة التناسلية', lastInseminationDate:'تاريخ آخر تلقيح',
-  servicesCount:'عدد مرات التلقيح', estrusDates:'تواريخ الشياع', serviceIntervalDays:'معدل الأيام بين التلقيح',
-  heatIntervalDays:'الأيام بين الشياع', productionStatus:'حالة الإنتاج',
-  milkTodayKg:'إنتاج اليوم', seasonTotalKg:'إنتاج الموسم', m305Kg:'إنتاج 305 يوم',
-  healthStatus:'الحالة الصحية', lastCheckDate:'آخر فحص', milkTraitsScore:'سكور سمات اللبن',
-  ovsynch:'بروتوكول Ovsynch'
-};
-const DATE_RX=/^\d{4}-\d{2}-\d{2}/;
-
-function prettifyVal(v){
-  if (v==null || v==='') return '—';
-  if (Array.isArray(v)) return v.length ? v.map(x=>DATE_RX.test(x)?fmtD(x):String(x)).join('، ') : '—';
-  if (typeof v==='object') {
-    // جرّب العثور على قيمة مفيدة
-    const keys=['value','name','label','text']; for(const k of keys){ if (v[k]!=null) return String(v[k]); }
-    try { return JSON.stringify(v); } catch { return String(v); }
-  }
-  if (typeof v==='string' && DATE_RX.test(v)) return fmtD(v);
-  if (typeof v==='number') return NF.format(v);
-  return String(v);
+/* ======================= وضع كل بيان في مكانه ======================= */
+/** أداة صغيرة: تضيف صف .fi إلى Grid معيّن لو فيه قيمة فعلاً */
+function addFi(containerId, label, value) {
+  if (value == null || value === '' || (Array.isArray(value) && !value.length)) return;
+  const box = document.getElementById(containerId);
+  if (!box) return;
+  const fi = document.createElement('div');
+  fi.className = 'fi';
+  const sp = document.createElement('span'); sp.textContent = label;
+  const b  = document.createElement('b');   b.textContent = Array.isArray(value) ? value.join('، ') : String(value);
+  fi.appendChild(sp); fi.appendChild(b); box.appendChild(fi);
 }
 
-function labelForKey(k){ return LABELS[k] || k; }
+/** Aliases -> label + target grid لكل حقل إضافي شائع */
+const EXTRA_FIELD_MAP = [
+  // === أساسي (basicInfo) ===
+  { keys: ['earTag','ear_tag','tag','رقم_الترقيم'],           label: 'رقم الترقيم',         target: 'basicInfo' },
+  { keys: ['rfid','RFID'],                                    label: 'RFID',                target: 'basicInfo' },
+  { keys: ['color','لون'],                                    label: 'اللون',               target: 'basicInfo' },
+  { keys: ['originFarm','origin','المزرعة_المنشأ'],           label: 'مزرعة المنشأ',        target: 'basicInfo' },
+  { keys: ['pen','housing','الحظيرة','المجموعة_السكنية'],     label: 'الحظيرة/المكان',      target: 'basicInfo' },
+  { keys: ['bodyWeight','weight','الوزن'],                    label: 'الوزن (كجم)',         target: 'basicInfo' },
+  { keys: ['birthWeight','weightAtBirth','وزن_الولادة'],      label: 'وزن الولادة (كجم)',   target: 'basicInfo' },
 
-function renderAllFields(animal){
-  const box=$('allFields'); if(!box) return; box.innerHTML='';
-  const raw = {...animal}; // يحتوي الموحّد + الأصل
-  // أعرض كل الحقول بما فيها التي ليست ضمن الأقسام، مع استثناء المفاتيح الداخلية
-  for (const [k,v] of Object.entries(raw)){
-    if (SKIP_KEYS.has(k)) continue;
-    // لا تكرّر المفاتيح التي تم عرضها بالفعل في الأقسام الأساسية + الكيانات المساعدة
-    if (SHOWN_KEYS.has(k)) continue;
+  // === إنتاج اللبن (نضيف سطور داخل نفس القسم) ===
+  { keys: ['milkFat','fat%','fat','دهن'],                     label: 'دهن %',               target: 'milkScroll' },   // هنضيفها قبل المخطط
+  { keys: ['milkProtein','protein%','protein','بروتين'],      label: 'بروتين %',            target: 'milkScroll' },
+  { keys: ['milkLactose','lactose%','لاكتوز'],               label: 'لاكتوز %',            target: 'milkScroll' },
+  { keys: ['milkSNF','snf','مواد_صلبة_لادهنية'],             label: 'SNF %',               target: 'milkScroll' },
 
-    const fi=document.createElement('div'); fi.className='fi';
-    const sp=document.createElement('span'); sp.innerHTML=`<span class="keytag">${labelForKey(k)}</span>`;
-    const b=document.createElement('b'); b.textContent=prettifyVal(v);
-    fi.appendChild(sp); fi.appendChild(b); box.appendChild(fi);
+  // === تناسلي (grid داخل قسم الحالة التناسلية) ===
+  { keys: ['expectedCalvingDate','dueDate','موعد_الولادة'],   label: 'موعد الولادة المتوقع', target: 'fiServiceInterval' /* anchor only */ },
+  { keys: ['pregnancyResult','pregStatus','نتيجة_الحمل'],     label: 'نتيجة الحمل',         target: 'fiServiceInterval' },
+  { keys: ['bull','sire','الأب','الثور'],                     label: 'الثور/الأب',          target: 'fiServiceInterval' },
+
+  // === صحي (grid داخل قسم الحالة الصحية) ===
+  { keys: ['vaccinations','vaccinationProgram','التحصينات'],  label: 'التحصينات',           target: 'healthList' /* anchor only */ },
+  { keys: ['lastMastitisDate','mastitisDate','التهاب_الضرع_آخر'], label: 'آخر التهاب ضرع', target: 'healthList' },
+  { keys: ['lamenessScore','LS','عرج'],                        label: 'درجة العرج',         target: 'healthList' },
+
+  // === سكور/تقييمات بالكاميرا ===
+  { keys: ['bcs','bodyScore','BCS','حالة_الجسم'],             label: 'حالة الجسم (BCS)',    target: 'basicInfo' },
+  { keys: ['fecesScore','manureScore','درجة_الروث'],          label: 'درجة الروث',          target: 'basicInfo' },
+];
+
+/** استخراج أول قيمة موجودة من قائمة aliases */
+function firstDefined(obj, keys) {
+  for (const k of keys) if (obj[k] != null && obj[k] !== '') return obj[k];
+  return null;
+}
+
+/** إدراج الحقول الإضافية داخل الأقسام الموجودة فقط، بدون إطالة أو تغيير بصري */
+function renderExtrasIntoSections(animal) {
+  // نمنع أي تسريب لحقول حساسة/داخلية
+  const BLOCK = new Set(['ownerUid','owner','uid','user','userId','__name__','__path__','id','createdAt','updatedAt']);
+  const safeAnimal = {};
+  for (const [k,v] of Object.entries(animal)) if (!BLOCK.has(k)) safeAnimal[k] = v;
+
+  // حقول الإنتاج: قبل المخطط، نحط Grid صغير مؤقتًا إن لزم
+  const milkScroll = document.getElementById('milkScroll');
+  let prodGrid;
+  if (milkScroll) {
+    prodGrid = document.createElement('div');
+    prodGrid.className = 'grid';
+    prodGrid.style.margin = '8px 0';
+    milkScroll.parentElement.insertBefore(prodGrid, milkScroll); // يظهر فوق المخطط
   }
-  // لضمان ظهور المهم حتى لو كان ضمن SHOWN_KEYS ولم يمتَلئ في الأقسام (قيمته موجودة بالوثيقة)
-  for (const want of ['milkTraitsScore','ovsynch']){
-    if (animal[want]!=null){
-      const fi=document.createElement('div'); fi.className='fi';
-      const sp=document.createElement('span'); sp.innerHTML=`<span class="keytag">${labelForKey(want)}</span>`;
-      const b=document.createElement('b'); b.textContent=prettifyVal(animal[want]);
-      box.appendChild(fi); fi.appendChild(sp); fi.appendChild(b);
+
+  for (const def of EXTRA_FIELD_MAP) {
+    const val = firstDefined(safeAnimal, def.keys);
+    if (val == null) continue;
+
+    // تحديد الـcontainer حسب الهدف
+    let containerId = def.target;
+    let containerEl = null;
+
+    if (def.target === 'milkScroll' && prodGrid) {
+      // الإنتاج: نضيف في الـgrid المؤقت فوق المخطط
+      containerEl = prodGrid;
+    } else if (def.target === 'fiServiceInterval') {
+      // التناسلي: نضيف في Grid القسم التناسلي (أقرب .grid بعد عنوان القسم)
+      const sec = Array.from(document.querySelectorAll('section.card h3'))
+        .find(h => h.textContent.trim().includes('الحالة التناسلية'));
+      if (sec) {
+        const grid = sec.parentElement.querySelector('.grid');
+        containerEl = grid;
+      }
+    } else if (def.target === 'healthList') {
+      // الصحي: نضيف داخل Grid القسم الصحي
+      const sec = Array.from(document.querySelectorAll('section.card h3'))
+        .find(h => h.textContent.trim().includes('الحالة الصحية'));
+      if (sec) {
+        const grid = sec.parentElement.querySelector('.grid');
+        containerEl = grid;
+      }
+    } else {
+      containerEl = document.getElementById(containerId);
     }
+
+    if (!containerEl) continue;
+
+    // إنشاء صف .fi
+    const fi = document.createElement('div'); fi.className = 'fi';
+    const sp = document.createElement('span'); sp.textContent = def.label;
+    const b  = document.createElement('b');
+    b.textContent = Array.isArray(val) ? val.join('، ') : String(val);
+    fi.appendChild(sp); fi.appendChild(b);
+
+    containerEl.appendChild(fi);
   }
 }
 
+// لغاية هنا؟؟
 function compactEventDetails(e){
-  const t=evType(e);
-  if (t==='milk'){
-    const kg=evMilkKg(e); if (kg>0) return `لبن: ${kg} كجم`;
+  const t = evType(e);
+
+  if (t === 'milk'){
+    const kg = evMilkKg(e);
+    if (kg > 0) return `لبن: ${kg} كجم`;
   }
-  if (t==='disease'){
-    const dx=e.diagnosis||e.disease||e.condition||'—';
-    const nt=e.note?` — ${e.note}`:'';
+
+  if (t === 'disease'){
+    const dx = e.diagnosis || e.disease || e.condition || '—';
+    const nt = e.note ? ` — ${e.note}` : '';
     return `تشخيص: ${dx}${nt}`;
   }
-  if (t==='insemination'){
-    const bull=e.bull||e.semen||e.sire||e.straw||'—';
+
+  if (t === 'insemination'){
+    const bull = e.bull || e.semen || e.sire || e.straw || '—';
     return `تلقيح (ثور/سائل): ${bull}`;
   }
-  if (t==='pregnancy'){
-    const res=e.result||e.status||'موجب';
+
+  if (t === 'pregnancy'){
+    const res = e.result || e.status || 'موجب';
     return `تشخيص حمل: ${res}`;
   }
-  if (t==='dry'){ return 'تجفيف الحليب'; }
-  if (t==='calving'){
-    const sex=e.calfSex||e.sex||'—';
-    const diff=e.difficulty||e.assist||'طبيعي';
+
+  if (t === 'dry'){ 
+    return 'تجفيف الحليب'; 
+  }
+
+  if (t === 'calving'){
+    const sex  = e.calfSex || e.sex || '—';
+    const diff = e.difficulty || e.assist || 'طبيعي';
     return `ولادة — جنس العجل: ${sex} — ${diff}`;
   }
-  // fallback مختصر
-  const keys=['value','amount','kg','note','details','desc','comment'];
-  for (const k of keys){ if (e[k]!=null) return `${k}: ${prettifyVal(e[k])}`; }
-  try { return JSON.stringify({type:e.type||e.eventType||'—', ...(['eventDate','date','day'].reduce((a,k)=>{if(e[k])a[k]=e[k];return a;},{}))}); }
-  catch { return '—'; }
+
+  // fallback مختصر — بدون prettifyVal
+  const keys = ['value','amount','kg','note','details','desc','comment'];
+  for (const k of keys){
+    if (e[k] != null){
+      const v = e[k];
+      const txt = Array.isArray(v) ? v.join('، ')
+               : (typeof v === 'number' ? NF.format(v)
+               : String(v));
+      return `${k}: ${txt}`;
+    }
+  }
+
+  try {
+    return JSON.stringify({
+      type: e.type || e.eventType || '—',
+      ...(['eventDate','date','day'].reduce((a,kk)=>{
+        if (e[kk]) a[kk] = e[kk];
+        return a;
+      }, {}))
+    });
+  } catch {
+    return '—';
+  }
 }
 
 function renderEventsList(events){
@@ -607,7 +680,7 @@ function renderCard(state, kind){
   const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
   const hI = state.heatIntervalDays ?? avgDaysBetween(state.estrusDates);
   put('fiHeatInterval', hI != null ? `${NF.format(hI)} يوم` : '—');
-
+  put('fiOvsynch', state.ovsynch ?? '—');
   put('fiHealth',state.healthStatus||'—'); put('fiLastCheck',fmtD(state.lastCheckDate));
   const hl=$('healthList'); hl.innerHTML='';
   if(Array.isArray(state.healthHistory)&&state.healthHistory.length){
@@ -625,7 +698,7 @@ function renderCard(state, kind){
   }
 
   // جديد: اعرض كل الحقول الأخرى من وثيقة الحيوان
-  renderAllFields(state.__animalRaw||{});
+renderExtrasIntoSections(state.__animalRaw || {});
 }
 
 /* ======================= Load & Run ======================= */
