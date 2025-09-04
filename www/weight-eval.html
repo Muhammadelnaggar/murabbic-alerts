@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>تقدير الوزن بالكاميرا — مُرَبِّك</title>
+  <style>
+    :root{ --green:#0ea05a; --border:#c5e1a5; --card:#ffffff; --bg:#f7faf7; --text:#0f172a; }
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:'Cairo','Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--text);}
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);
+      padding:12px 16px;display:flex;align-items:center;gap:12px;}
+    h1{margin:0;font-size:18px;color:var(--green);font-weight:800;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px;}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
+    .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e8f5e9;
+      font-weight:700;font-size:14px;color:#064e3b;cursor:pointer;}
+    video{width:100%;border:1px solid var(--border);border-radius:12px;}
+    canvas{display:none;}
+    .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+    .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
+    .kpi .lbl{font-size:12px;color:#2b593a;}
+    .kpi .val{font-weight:800;color:#14532d;font-size:16px;}
+    .hint{font-size:12px;color:#555;margin-top:10px;}
+  </style>
+</head>
+<body>
+  <header><h1>📏 تقدير الوزن بالكاميرا</h1></header>
+
+  <section class="card">
+    <video id="awCam" playsinline autoplay muted></video>
+    <canvas id="awCan"></canvas>
+
+    <div class="chips">
+      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
+      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
+    </div>
+
+    <div class="kpi3">
+      <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
+      <div class="kpi"><div class="lbl">عرض الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+      <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
+    </div>
+
+    <div class="hint">
+      ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا.  
+      الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
+    </div>
+  </section>
+
+  <!-- مكتبة OpenCV.js -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <script type="module">
+  const $=id=>document.getElementById(id);
+  const v=$('awCam'), can=$('awCan'), ctx=can.getContext('2d');
+  const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
+  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
+
+  const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
+  let stream=null, cvReady=false, pxPerCm=null, lastShot=null;
+
+  btnStart.onclick=async()=>{
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+      v.srcObject=stream;
+    }catch(e){alert('تعذّر فتح الكاميرا');}
+  };
+
+  btnShot.onclick=()=>{
+    if(!cvReady){alert('انتظر تحميل OpenCV.js');return;}
+    if(!v.videoWidth){alert('الكاميرا غير جاهزة');return;}
+    can.width=v.videoWidth; can.height=v.videoHeight;
+    ctx.drawImage(v,0,0,can.width,can.height);
+    lastShot=ctx.getImageData(0,0,can.width,can.height);
+
+    const scale=detectArucoPxPerCm(lastShot);
+    if(!scale){outScale.textContent='—';alert('لم تُكتشف علامة ArUco');return;}
+    pxPerCm=scale; outScale.textContent=pxPerCm.toFixed(2)+' px/cm';
+
+    const mask=animalMask(lastShot);
+    if(!mask){alert('تعذّر تحديد الحيوان');return;}
+    const chestPx=measureWidthAtSlice(mask,0.45);
+    if(!chestPx){alert('فشل قياس العرض');return;}
+    const chestCm=chestPx/pxPerCm;
+    outChestW.textContent=chestCm.toFixed(1);
+    const HG=chestCm*GIRTH_FACTOR;
+    const W=Math.round((HG*HG*HG)/10880);
+    outWeight.textContent=W+' كجم';
+  };
+
+  btnSave.onclick=()=>{
+    const est=parseInt((outWeight.textContent||'').replace(/\D/g,''))||null;
+    const payload={
+      type:'weight',method:'auto(aruco+mask)',marker_cm:ARUCO_MARKER_CM,
+      px_per_cm:pxPerCm,chest_cm:Number(outChestW.textContent)||null,
+      estimatedWeightKg:est,eventDate:new Date().toISOString().slice(0,10)
+    };
+    console.log('SAVE',payload);
+    alert('تم تجهيز حدث الوزن — اربطه بدالتك لحفظه في Firestore.');
+  };
+
+  function detectArucoPxPerCm(imgData){
+    const src=cv.matFromImageData(imgData);
+    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
+    const dict=new cv.aruco_Dictionary(cv.DICT_4X4_50);
+    const params=new cv.aruco_DetectorParameters();
+    const corners=new cv.MatVector(); const ids=new cv.Mat();
+    cv.aruco.detectMarkers(gray,dict,corners,ids,params);
+    let scale=null;
+    if(!ids.empty()){
+      const c=corners.get(0).data32F;
+      const d01=Math.hypot(c[0]-c[2],c[1]-c[3]);
+      const d12=Math.hypot(c[2]-c[4],c[3]-c[5]);
+      const sidePx=(d01+d12)/2; scale=sidePx/ARUCO_MARKER_CM;
+    }
+    src.delete();gray.delete();corners.delete();ids.delete();
+    return scale;
+  }
+
+  function animalMask(imgData){
+    const src=cv.matFromImageData(imgData);
+    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
+    cv.medianBlur(gray,gray,3);
+    const bin=new cv.Mat(); cv.threshold(gray,bin,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
+    const kernel=cv.Mat.ones(5,5,cv.CV_8U); cv.morphologyEx(bin,bin,cv.MORPH_OPEN,kernel);
+    const contours=new cv.MatVector(), hierarchy=new cv.Mat();
+    cv.findContours(bin,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+    let maxA=0,best=-1;
+    for(let i=0;i<contours.size();i++){const a=cv.contourArea(contours.get(i)); if(a>maxA){maxA=a;best=i;}}
+    if(best<0){return null;}
+    const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
+    cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
+    src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();
+    return mask;
+  }
+
+  function measureWidthAtSlice(mask,fracY){
+    const y=Math.round(mask.rows*fracY);
+    let x0=-1,x1=-1;
+    for(let x=0;x<mask.cols;x++){if(mask.ucharPtr(y,x)[0]>0){x0=x;break;}}
+    for(let x=mask.cols-1;x>=0;x--){if(mask.ucharPtr(y,x)[0]>0){x1=x;break;}}
+    return (x0>=0&&x1>x0)?(x1-x0):null;
+  }
+
+  cv['onRuntimeInitialized']=()=>{cvReady=true;};
+  </script>
+</body>
+</html>
