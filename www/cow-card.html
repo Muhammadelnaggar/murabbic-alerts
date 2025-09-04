@@ -191,30 +191,53 @@ function normReproStatus(v){
   return isPregKeyword(v) ? 'عِشار' : String(v).trim();
 }
 
-function normalizeAnimalDoc(d={}){
-  return {
-    id: d.id,
-    number: d.number ?? d.animalNumber ?? d.no ?? d['رقم'] ?? null,
-    kind: normKind(d.animalType ?? d.kind ?? d.type ?? d['النوع'] ?? d['الفصيلة'] ?? d.animalTypeAr),
-    birthDate: d.birthDate ?? d.birth_date ?? d.dob ?? d['تاريخ الميلاد'] ?? null,
-    lastCalvingDate: d.lastCalvingDate ?? d.lastCalving ?? d.calvingDate ?? d['تاريخ آخر ولادة'] ?? null,
-    lactationNumber: d.lactationNumber ?? d.lactNo ?? d['رقم موسم الحليب'] ?? null,
-    breed: d.breed ?? d.breedName ?? d['السلالة'] ?? null,
-    group: d.group ?? d['المجموعة'] ?? null,
-    pregnancyDate: d.pregnancyDate ?? d.pregnantFrom ?? d['تاريخ الحمل'] ?? null,
-   reproductiveStatus: normReproStatus(
-  d.reproductiveStatus ?? d['الحالة التناسلية'] ?? d.reproStatus ?? d.statusRepro
-) ?? null,
-productionStatus: normProdStatus(
-  d.productionStatus ?? d['حالة الإنتاج'] ?? d.prodStatus ?? d.status
-) ?? null,
+function normalizeAnimalDoc(d = {}){
+  const x = plainify(d); // نفك أي Timestamp/Maps داخل الوثيقة
 
-    healthStatus:       d.healthStatus       ?? d['الحالة الصحية'] ?? 'سليم',
-    lastCheckDate: d.lastCheckDate ?? d.healthCheckDate ?? d['آخر فحص'] ?? null,
-    milkTraitsScore: Number(d.milkTraitsScore ?? d.milk_score ?? 0) || 0,
-    ovsynch: d.ovsynch ?? null
+  const normalized = {
+    id: x.id,
+
+    // أساسي
+    number: x.number ?? x.animalNumber ?? x.no ?? x['رقم'] ?? null,
+    kind: normKind(x.animalType ?? x.kind ?? x.type ?? x['النوع'] ?? x['الفصيلة'] ?? x.animalTypeAr),
+    birthDate: x.birthDate ?? x.birth_date ?? x.dob ?? x['تاريخ الميلاد'] ?? null,
+    lastCalvingDate: x.lastCalvingDate ?? x.lastCalving ?? x.calvingDate ?? x['تاريخ آخر ولادة'] ?? null,
+    lactationNumber: x.lactationNumber ?? x.lactNo ?? x['رقم موسم الحليب'] ?? null,
+    breed: x.breed ?? x.breedName ?? x['السلالة'] ?? null,
+    group: x.group ?? x['المجموعة'] ?? null,
+
+    // تناسلي
+    pregnancyDate: x.pregnancyDate ?? x.pregnantFrom ?? x['تاريخ الحمل'] ?? null,
+    reproductiveStatus: normReproStatus(
+      x.reproductiveStatus ?? x['الحالة التناسلية'] ?? x.reproStatus ?? x.statusRepro
+    ) ?? null,
+    lastInseminationDate: x.lastInseminationDate ?? x.lastServiceDate ?? x['تاريخ آخر تلقيح'] ?? null,
+    servicesCount: x.servicesCount ?? x.inseminationsCount ?? x.SPC ?? x['عدد مرات التلقيح'] ?? null,
+    estrusDates: x.estrusDates ?? x.heatDates ?? x['تواريخ الشياع'] ?? [],
+    serviceIntervalDays: x.serviceIntervalDays ?? x.serviceInterval ?? x['معدل الأيام بين التلقيح'] ?? null,
+    heatIntervalDays: x.heatIntervalDays ?? x.heatInterval ?? x['الأيام بين الشياع'] ?? null,
+
+    // إنتاج
+    productionStatus: normProdStatus(
+      x.productionStatus ?? x['حالة الإنتاج'] ?? x.prodStatus ?? x.status
+    ) ?? null,
+    milkTodayKg:   x.milkTodayKg   ?? x.todayMilk      ?? x['إنتاج اليوم']   ?? null,
+    seasonTotalKg: x.seasonTotalKg ?? x.milkSeason     ?? x['إنتاج الموسم']  ?? null,
+    m305Kg:        x.m305Kg        ?? x.milk305        ?? x['إنتاج 305 يوم'] ?? null,
+
+    // صحة
+    healthStatus:  x.healthStatus  ?? x['الحالة الصحية'] ?? 'سليم',
+    lastCheckDate: x.lastCheckDate ?? x.healthCheckDate  ?? x['آخر فحص'] ?? null,
+
+    // أخرى
+    milkTraitsScore: Number(x.milkTraitsScore ?? x.milk_score ?? 0) || 0,
+    ovsynch: x.ovsynch ?? null,
   };
-}
+
+  // نُعيد كل الحقول الأصلية + القيَم الموحَّدة (علشان ما نضيّعش أي بيانات إضافية)
+  return { ...x, ...normalized };
+} // ← هنا نهاية الدالة
+
 
 const TYPE_RULES=[
   ['milk', /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
@@ -238,6 +261,19 @@ function evMilkKg(e){
   const direct=toNum(e.milkKg??e.total??e.kg??e.milk??e.amount); if(direct>0) return direct;
   let sum=0; const partKey=/(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
   for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum+=toNum(v); return sum;
+}
+// يحوّل أي قيمة (بما فيها Firestore Timestamp) لصيغة JSON عادية
+// ========= Helpers (نهاية القسم) =========
+function plainify(obj){
+  if (!obj || typeof obj !== 'object') return obj;
+  // Firestore Timestamp → ISO string
+  if (typeof obj.toDate === 'function') {
+    try { return obj.toDate().toISOString(); } catch { return obj.toString?.() ?? obj; }
+  }
+  if (Array.isArray(obj)) return obj.map(plainify);
+  const out = {};
+  for (const [k,v] of Object.entries(obj)) out[k] = plainify(v);
+  return out;
 }
 
 /* ======================= Firestore ======================= */
@@ -356,47 +392,83 @@ async function fetchEvents(animal){
 
 /* ======================= Build state ======================= */
 function buildState(animal, events){
-  const st={
+  const st = {
     number: animal.number ?? animal.id?.slice(-6),
+
+    // الحالة العامة
     reproductiveStatus: animal.reproductiveStatus || '—',
-    productionStatus:   animal.productionStatus || '—',
-    healthStatus:       animal.healthStatus || 'سليم',
-    birthDate: animal.birthDate || null,
+    productionStatus:   animal.productionStatus   || '—',
+    healthStatus:       animal.healthStatus       || 'سليم',
+
+    // أساسي
+    birthDate:       animal.birthDate       || null,
     lastCalvingDate: animal.lastCalvingDate || null,
     lactationNumber: animal.lactationNumber ?? null,
+
+    // DIM & حمل
     daysInMilk: null,
     gestationDays: null,
-    lastInseminationDate: null,
     pregnancyDate: animal.pregnancyDate || null,
+
+    // تصنيفات
     breed: animal.breed || '—',
     group: animal.group || '—',
+
+    // سكور اللبن
     milkTraitsScore: animal.milkTraitsScore ?? 0,
-    servicesCount: 0, inseminations: [], estrusDates: [], ovsynch: animal.ovsynch || null,
-    milkTodayKg: null, seasonTotalKg: null, m305Kg: null, milkSeries: [],
-    lastCheckDate: animal.lastCheckDate || null, healthHistory: [],
-    isDry: false, // ← أضفنا فلَاج الجفاف
+
+    // تناسلي (نبدأ بما في الوثيقة)
+    inseminations: [],
+    estrusDates: Array.isArray(animal.estrusDates) ? [...animal.estrusDates] : [],
+    lastInseminationDate: animal.lastInseminationDate ?? null,
+    servicesCount: animal.servicesCount ?? null,
+    serviceIntervalDays: animal.serviceIntervalDays ?? null,
+    heatIntervalDays: animal.heatIntervalDays ?? null,
+
+    // إنتاج اللبن (نبدأ بما في الوثيقة)
+    milkTodayKg:   animal.milkTodayKg   ?? null,
+    seasonTotalKg: animal.seasonTotalKg ?? null,
+    m305Kg:        animal.m305Kg        ?? null,
+    milkSeries: [],
+
+    // صحة
+    lastCheckDate: animal.lastCheckDate || null,
+    healthHistory: [],
+
+    ovsynch: animal.ovsynch || null,
+    isDry: false,
   };
 
-  const milkTmp=[]; let season=0;
+  // نجمع الأحداث
+  const milkTmp = [];
+  let season = 0;
 
   for (const e of events) {
     const t = evType(e), d = evDate(e);
 
-    // === مكان السطرين اللي سالت عنهم (جوه اللوب) ===
-    if (t === 'dry') { st.isDry = true; st.productionStatus = 'جاف'; }        // ← لو في حدث تجفيف
-    if (t === 'pregnancy') { st.reproductiveStatus = 'عِشار'; }              // ← لو في حدث حمل
+    if (t === 'dry')       { st.isDry = true; st.productionStatus = 'جاف'; }
+    if (t === 'pregnancy') { st.reproductiveStatus = 'عِشار'; }
 
     if (t === 'calving' && d) st.lastCalvingDate = d;
-    if (t === 'insemination' && d) { st.inseminations.push(d); }
-    if (t === 'heat' && d) { st.estrusDates.push(d); }
+
+    if (t === 'insemination' && d) st.inseminations.push(d);
+    if (t === 'heat' && d)         st.estrusDates.push(d);
+
     if (t === 'pregnancy') {
       st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null;
-      st.reproductiveStatus = 'عِشار'; // تأكيد
+      st.reproductiveStatus = 'عِشار';
     }
+
     if (t === 'disease') {
-      st.healthHistory.push({date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||''});
-      st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate = st.lastCheckDate || d || null;
+      st.healthHistory.push({
+        date: d || '',
+        diagnosis: e.diagnosis || e.note || e.eventType || '—',
+        note: e.note || ''
+      });
+      st.healthStatus = 'حالات صحية مسجلة';
+      st.lastCheckDate = st.lastCheckDate || d || null;
     }
+
     if (t === 'milk') {
       const kg = evMilkKg(e);
       if (kg > 0) {
@@ -406,28 +478,36 @@ function buildState(animal, events){
       }
     }
   }
-  // === نهاية اللوب ===
 
+  // بعد ما عرفنا آخر ولادة، نحسب DIM
   if (st.lastCalvingDate){
-    const ms=Date.now()-new Date(st.lastCalvingDate).getTime();
-    st.daysInMilk=Math.max(0,Math.floor(ms/86400000));
+    const ms = Date.now() - new Date(st.lastCalvingDate).getTime();
+    st.daysInMilk = Math.max(0, Math.floor(ms / 86400000));
   }
-  st.inseminations.sort(); st.servicesCount=st.inseminations.length;
-  st.lastInseminationDate = st.inseminations.at(-1) || null;
+
+  // تناسلي: ترتيب وقيم مشتقة
+  st.inseminations.sort();
+  if (!st.lastInseminationDate) st.lastInseminationDate = st.inseminations.at(-1) || null;
+  if (st.servicesCount == null) st.servicesCount = st.inseminations.length || null;
   st.estrusDates.sort();
 
-  st.seasonTotalKg = season || null;
-  if (st.daysInMilk>0 && season>0){ st.m305Kg = Math.round((season/st.daysInMilk)*305); }
+  // إنتاج اللبن: لو الوثيقة ما وفّرتش قيم، كمّلها من الأحداث
+  if (st.seasonTotalKg == null) st.seasonTotalKg = season || null;
 
   if (milkTmp.length){
     const base = st.lastCalvingDate ? new Date(st.lastCalvingDate).getTime() : null;
     st.milkSeries = milkTmp.filter(p=>p.d).map(p=>{
-      const di = base ? Math.max(0,Math.floor((new Date(p.d).getTime()-base)/86400000)) : 0;
-      return {d:di, v:p.kg};
+      const di = base ? Math.max(0, Math.floor((new Date(p.d).getTime()-base)/86400000)) : 0;
+      return { d: di, v: p.kg };
     }).sort((a,b)=>a.d-b.d);
   }
 
-  // أولوية نهائية لحالة الإنتاج: "جاف" فوق أي حساب DIM
+  // m305 يعتمد على DIM → احسبه هنا
+  if (st.m305Kg == null && st.daysInMilk > 0 && (st.seasonTotalKg || 0) > 0){
+    st.m305Kg = Math.round((st.seasonTotalKg / st.daysInMilk) * 305);
+  }
+
+  // أولوية نهائية لحالة الإنتاج
   if (st.isDry) {
     st.productionStatus = 'جاف';
   } else if (!animal.productionStatus && st.daysInMilk != null) {
@@ -518,10 +598,11 @@ function renderCard(state, kind){
   put('fiLastIns',fmtD(state.lastInseminationDate));
   const spc = state.servicesCount;
   put('fiServicesCount', spc != null ? NF.format(spc) : '—');
-  const svcI=avgDaysBetween(state.inseminations); put('fiServiceInterval',svcI!=null?`${NF.format(svcI)} يوم`:'—');
+  const svcI = state.serviceIntervalDays ?? avgDaysBetween(state.inseminations);
+  put('fiServiceInterval', svcI != null ? `${NF.format(svcI)} يوم` : '—');
   const lastHeat=(state.estrusDates&&state.estrusDates.length)?state.estrusDates.at(-1):null; put('fiLastHeat',fmtD(lastHeat));
-  const hI=avgDaysBetween(state.estrusDates); put('fiHeatInterval',hI!=null?`${NF.format(hI)} يوم`:'—');
-  if(state.ovsynch&&state.ovsynch.active){ put('fiOvsynch',`${state.ovsynch.name||'Ovsynch'} — بدأ ${fmtD(state.ovsynch.started)}`); } else put('fiOvsynch','—');
+  const hI = state.heatIntervalDays ?? avgDaysBetween(state.estrusDates);
+  put('fiHeatInterval', hI != null ? `${NF.format(hI)} يوم` : '—');
   put('fiHealth',state.healthStatus||'—'); put('fiLastCheck',fmtD(state.lastCheckDate));
   const hl=$('healthList'); hl.innerHTML='';
   if(Array.isArray(state.healthHistory)&&state.healthHistory.length){
