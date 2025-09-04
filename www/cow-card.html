@@ -247,7 +247,7 @@ function normalizeAnimalDoc(d = {}){
   return { ...x, ...normalized };
 }
 
-const TYPE_RULES=[
+const TYPE_RULES = [
   ['milk', /(daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج)/i],
   ['calving', /(calving|ولاد|نفاس)/i],
   ['insemination', /(insemin|ai\b|a\.i\.|تلقيح|خدم|خدمة)/i],
@@ -256,14 +256,39 @@ const TYPE_RULES=[
   ['dry', /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i],
   ['disease', /(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
 ];
-const evType=(e)=>{const s=String(e.type??e.eventType??e.event??e.name??e.kind??e.category??'').toLowerCase(); for(const [T,rx] of TYPE_RULES) if(rx.test(s)) return T; return 'other';};
-const evDate=(e)=>{let d=e?.eventDate ?? e?.date ?? e?.day ?? e?.createdAt ?? e?.ts ?? ''; if (d && typeof d.toDate==='function') d=d.toDate(); const t=d?new Date(d):null; return t&&!isNaN(t)?t.toISOString().slice(0,10):'';};
-const toNum=(v)=>{const n=Number(v); return Number.isFinite(n)?n:0;};
-function evMilkKg(e){
-  const direct=toNum(e.milkKg??e.total??e.kg??e.milk??e.amount); if(direct>0) return direct;
-  let sum=0; const partKey=/(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
-  for(const [k,v] of Object.entries(e)) if(partKey.test(k)) sum+=toNum(v); return sum;
+
+// مفاتيح أجزاء الحلب (AM/PM... إلخ)
+const MILK_PART_KEY =
+  /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
+
+// مفاتيح القيم المباشرة لإنتاج اللبن (تشمل dailyMilk)
+const MILK_DIRECT_KEYS = ['dailyMilk','daily_milk','milkKg','total','kg','milk','amount'];
+
+const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+
+const evType = (e = {}) => {
+  const s = String(e.type ?? e.eventType ?? e.event ?? e.name ?? e.kind ?? e.category ?? '').toLowerCase();
+  for (const [T, rx] of TYPE_RULES) if (rx.test(s)) return T;
+
+  // Fallback: لو فيه أي قيمة لبن مباشرة أو أجزاء لبن، اعتبره milk
+  if (MILK_DIRECT_KEYS.some(k => toNum(e[k]) > 0)) return 'milk';
+  for (const [k, v] of Object.entries(e)) if (MILK_PART_KEY.test(k) && toNum(v) > 0) return 'milk';
+
+  return 'other';
+};
+
+function evMilkKg(e = {}) {
+  // أولاً: أي قيمة مباشرة (تشمل dailyMilk)
+  for (const k of MILK_DIRECT_KEYS) {
+    const n = toNum(e[k]);
+    if (n > 0) return n;
+  }
+  // ثانياً: نجمع أجزاء AM/PM/… إن وُجدت
+  let sum = 0;
+  for (const [k, v] of Object.entries(e)) if (MILK_PART_KEY.test(k)) sum += toNum(v);
+  return sum;
 }
+
 
 /* ======================= Firestore ======================= */
 async function fetchAnimalByNumber(n){
