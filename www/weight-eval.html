@@ -12,6 +12,9 @@
       padding:12px 16px;display:flex;align-items:center;gap:12px;}
     h1{margin:0;font-size:18px;color:var(--green);font-weight:800;}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px;}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;}
+    label{font-weight:700;color:#14532d;font-size:13px;margin-bottom:4px;display:block}
+    input[type="text"],input[type="date"]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:#fcfff8}
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
     .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e8f5e9;
       font-weight:700;font-size:14px;color:#064e3b;cursor:pointer;}
@@ -22,12 +25,35 @@
     .kpi .lbl{font-size:12px;color:#2b593a;}
     .kpi .val{font-weight:800;color:#14532d;font-size:16px;}
     .hint{font-size:12px;color:#555;margin-top:10px;}
+    .toast{position:fixed;bottom:12px;left:12px;right:12px;margin:auto;max-width:520px;background:#e8f5e9;
+      color:#064e3b;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-weight:700;display:none}
+    .err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
   </style>
 </head>
 <body>
+  <!-- تتبّع ذكي -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="/js/app-core.js"></script>
+  <script type="module" src="/js/timeline.js"></script>
+  <script type="module" src="/js/smart-checks.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/api.js"></script>
+
   <header><h1>📏 تقدير الوزن بالكاميرا</h1></header>
 
   <section class="card">
+    <!-- ✅ حقولا رقم الحيوان + تاريخ الحدث -->
+    <div class="row">
+      <div>
+        <label for="animalNumber">رقم الحيوان</label>
+        <input id="animalNumber" type="text" inputmode="numeric" placeholder="مثال: 245" />
+      </div>
+      <div>
+        <label for="eventDate">تاريخ الحدث</label>
+        <input id="eventDate" type="date" />
+      </div>
+    </div>
+
     <video id="awCam" playsinline autoplay muted></video>
     <canvas id="awCan"></canvas>
 
@@ -49,59 +75,157 @@
     </div>
   </section>
 
-  <!-- مكتبة OpenCV.js -->
+  <div id="toast" class="toast"></div>
+
+  <!-- OpenCV.js -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <script type="module">
+  // ========= اختصارات DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), can=$('awCan'), ctx=can.getContext('2d');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
+  const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
 
+  // ========= ثوابت وخيارات =========
   const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null;
 
+  // ========= تتبّع ذكي (page_view) =========
+  try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
+
+  // ========= تهيئة الحقول من URL/localStorage =========
+  initContextFields();
+  function initContextFields(){
+    const q=new URLSearchParams(location.search);
+    const num = q.get('number') || q.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
+    const dt  = q.get('date') || q.get('eventDate') || localStorage.getItem('lastEventDate') || new Date().toISOString().slice(0,10);
+    if(num) inpNum.value = num;
+    if(dt)  inpDate.value = dt;
+  }
+  function pushContext(){
+    // نحفظ آخر قيمة لاستخدام الصفحات الأبناء
+    if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
+    if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
+  }
+
+  // ========= الكاميرا =========
   btnStart.onclick=async()=>{
     try{
       stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
       v.srcObject=stream;
-    }catch(e){alert('تعذّر فتح الكاميرا');}
+      fireTrack('camera_start');
+    }catch(e){ return showToast('تعذّر فتح الكاميرا', true); }
   };
 
+  // ========= الالتقاط والتقدير =========
   btnShot.onclick=()=>{
-    if(!cvReady){alert('انتظر تحميل OpenCV.js');return;}
-    if(!v.videoWidth){alert('الكاميرا غير جاهزة');return;}
+    if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
+    if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+
     can.width=v.videoWidth; can.height=v.videoHeight;
     ctx.drawImage(v,0,0,can.width,can.height);
     lastShot=ctx.getImageData(0,0,can.width,can.height);
 
     const scale=detectArucoPxPerCm(lastShot);
-    if(!scale){outScale.textContent='—';alert('لم تُكتشف علامة ArUco');return;}
+    if(!scale){ outScale.textContent='—'; return showToast('لم تُكتشف علامة ArUco', true); }
     pxPerCm=scale; outScale.textContent=pxPerCm.toFixed(2)+' px/cm';
 
     const mask=animalMask(lastShot);
-    if(!mask){alert('تعذّر تحديد الحيوان');return;}
+    if(!mask) return showToast('تعذّر تحديد الحيوان', true);
+
     const chestPx=measureWidthAtSlice(mask,0.45);
-    if(!chestPx){alert('فشل قياس العرض');return;}
+    if(!chestPx) return showToast('فشل قياس العرض', true);
+
     const chestCm=chestPx/pxPerCm;
     outChestW.textContent=chestCm.toFixed(1);
-    const HG=chestCm*GIRTH_FACTOR;
+    const HG=chestCm*GIRTH_FACTOR; // محيط الصدر التقريبي
     const W=Math.round((HG*HG*HG)/10880);
     outWeight.textContent=W+' كجم';
+
+    fireTrack('weight_estimated', {px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
   };
 
-  btnSave.onclick=()=>{
-    const est=parseInt((outWeight.textContent||'').replace(/\D/g,''))||null;
+  // ========= الحفظ كحدث (API أولًا ثم Firestore Fallback) =========
+  btnSave.onclick=async()=>{
+    const animalNumber = (inpNum.value||'').trim();
+    const eventDate    = inpDate.value || new Date().toISOString().slice(0,10);
+    const weightKg     = parseInt((outWeight.textContent||'').replace(/\D/g,'')) || null;
+
+    if(!animalNumber) return showToast('أدخل رقم الحيوان أولًا', true);
+    if(!weightKg)     return showToast('نفّذ التقدير قبل الحفظ', true);
+
     const payload={
-      type:'weight',method:'auto(aruco+mask)',marker_cm:ARUCO_MARKER_CM,
-      px_per_cm:pxPerCm,chest_cm:Number(outChestW.textContent)||null,
-      estimatedWeightKg:est,eventDate:new Date().toISOString().slice(0,10)
+      eventType:'تقدير وزن',
+      feature:'weight_estimation',
+      method:'auto(aruco+mask)',
+      marker_cm: ARUCO_MARKER_CM,
+      px_per_cm: pxPerCm || null,
+      chest_cm: Number(outChestW.textContent)||null,
+      estimatedWeightKg: weightKg,
+      animalNumber, eventDate,
+      source: location.pathname
     };
-    console.log('SAVE',payload);
-    alert('تم تجهيز حدث الوزن — اربطه بدالتك لحفظه في Firestore.');
+
+    pushContext(); // سياق للأبناء
+    fireTrack('weight_save_click', {animalNumber, eventDate, weightKg});
+
+    try {
+      // ✅ الحفظ عبر REST API
+      const res = await window.api?.post?.('/api/events', payload);
+      if(!res || res?.ok===false) throw new Error('API failed');
+      showToast('✅ تم حفظ حدث الوزن عبر API');
+      fireTrack('weight_saved_api', {ok:true});
+    } catch (e) {
+      // 🔁 Fallback إلى Firestore (databaseId = murabbikdata)
+      try{
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js');
+        const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js');
+        const cfg = (await import('/js/firebase-config.js')).default;
+        const app = initializeApp(cfg);
+        const db  = getFirestore(app, 'murabbikdata');
+        await addDoc(collection(db,'events'), {
+          type: 'weight',
+          eventType: 'تقدير وزن',
+          method: payload.method,
+          marker_cm: payload.marker_cm,
+          px_per_cm: payload.px_per_cm,
+          chest_cm: payload.chest_cm,
+          estimatedWeightKg: payload.estimatedWeightKg,
+          animalNumber: payload.animalNumber,
+          eventDate: payload.eventDate,
+          source: payload.source,
+          createdAt: serverTimestamp()
+        });
+        showToast('✅ تم حفظ حدث الوزن في Firestore (بديل)');
+        fireTrack('weight_saved_firestore', {ok:true});
+      }catch(err){
+        console.error(err);
+        showToast('تعذّر الحفظ عبر API وFirestore', true);
+        fireTrack('weight_saved_failed', {ok:false, reason:'api+firestore'});
+      }
+    }
   };
 
+  // ========= أدوات تتبّع + توست =========
+  function fireTrack(event, meta={}){
+    try {
+      window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
+      window.t?.event && window.t.event(event, meta);
+    } catch(e){}
+  }
+  function showToast(msg, isErr=false){
+    toast.textContent = msg; toast.classList.toggle('err', !!isErr);
+    toast.style.display='block'; clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
+  }
+
+  // ========= CV Helpers =========
   function detectArucoPxPerCm(imgData){
+    // @ts-ignore
+    if(!window.cv) return null;
+    const cv = window.cv;
     const src=cv.matFromImageData(imgData);
     const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
     const dict=new cv.aruco_Dictionary(cv.DICT_4X4_50);
@@ -120,6 +244,7 @@
   }
 
   function animalMask(imgData){
+    const cv = window.cv; if(!cv) return null;
     const src=cv.matFromImageData(imgData);
     const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
     cv.medianBlur(gray,gray,3);
@@ -129,7 +254,7 @@
     cv.findContours(bin,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
     let maxA=0,best=-1;
     for(let i=0;i<contours.size();i++){const a=cv.contourArea(contours.get(i)); if(a>maxA){maxA=a;best=i;}}
-    if(best<0){return null;}
+    if(best<0){src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();return null;}
     const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
     cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
     src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();
@@ -139,12 +264,14 @@
   function measureWidthAtSlice(mask,fracY){
     const y=Math.round(mask.rows*fracY);
     let x0=-1,x1=-1;
-    for(let x=0;x<mask.cols;x++){if(mask.ucharPtr(y,x)[0]>0){x0=x;break;}}
-    for(let x=mask.cols-1;x>=0;x--){if(mask.ucharPtr(y,x)[0]>0){x1=x;break;}}
+    for(let x=0;x<mask.cols;x++){ if(mask.ucharPtr(y,x)[0]>0){x0=x;break;} }
+    for(let x=mask.cols-1;x>=0;x--){ if(mask.ucharPtr(y,x)[0]>0){x1=x;break;} }
     return (x0>=0&&x1>x0)?(x1-x0):null;
   }
 
-  cv['onRuntimeInitialized']=()=>{cvReady=true;};
+  // ========= إشارة جاهزية OpenCV =========
+  window.cv = window.cv || {};
+  window.cv.onRuntimeInitialized = ()=>{ cvReady=true; fireTrack('cv_ready'); };
   </script>
 </body>
 </html>
