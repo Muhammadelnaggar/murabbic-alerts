@@ -57,18 +57,42 @@
   </form>
 
 <script type="module">
-  // ✅ استخدم نفس الإصدار 10.12.2 وبلا إعادة تهيئة
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
     collection, query, where, getDocs,
     addDoc, serverTimestamp, doc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // تتبّع خفيف (اختياري)
+  // تتبّع خفيف
   try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
   try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
 
   const $ = (s)=>document.querySelector(s);
+  const form = $("#diagnosisForm");
+  const saveBtn = $("#saveBtn");
+
+  // حاوية رسالة واحدة يعاد استخدامها
+  const msgBox = document.createElement("div");
+  msgBox.style.marginTop = "12px";
+  msgBox.style.borderRadius = "6px";
+  msgBox.style.padding = "12px";
+  msgBox.style.textAlign = "center";
+  msgBox.style.fontWeight = "bold";
+  msgBox.style.display = "none";
+  form.appendChild(msgBox);
+
+  function showMsg(kind, text){
+    msgBox.style.display = "block";
+    if (kind === "ok"){
+      msgBox.style.background = "#c8e6c9"; // أخضر فاتح
+      msgBox.style.color = "#1b5e20";
+    } else {
+      msgBox.style.background = "#ffcdd2"; // أحمر فاتح
+      msgBox.style.color = "#b71c1c";
+    }
+    msgBox.textContent = text;
+    msgBox.scrollIntoView({behavior:"smooth", block:"center"});
+  }
 
   // تهيئة الحقول من URL/localStorage
   const qp = new URLSearchParams(location.search);
@@ -77,32 +101,28 @@
   $("#animalId").value = (animalFromURL||"").toString().trim();
   $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
 
-  // ✅ تأكيد الدخول قبل السماح بأي تفاعل حفظ
-  let currentUser = null;
-  try {
-    currentUser = await ensureAuth("/login.html"); // سيحوّل لو مش داخل
-  } catch (e) {
-    // LOGIN_REQUIRED_REDIRECT يوقف التنفيذ بعد التحويل
-    console.warn(e);
-    throw e;
-  }
+  // تأكيد الدخول (بدون أي alerts)
+  try { await ensureAuth("/login.html"); } catch(e){ throw e; }
 
-  // حفظ الحدث
-  $("#diagnosisForm").addEventListener("submit", async (e)=>{
+  form.addEventListener("submit", async (e)=>{
     e.preventDefault();
+
+    // إلغاء أي رسالة قديمة
+    msgBox.style.display = "none";
 
     const animalNum = $("#animalId").value.trim();
     const eventDate = $("#diagnosisDate").value;
     const methodEl  = document.querySelector('input[name="method"]:checked');
     const resultEl  = document.querySelector('input[name="result"]:checked');
 
-    if (!animalNum) return alert("اكتب رقم الحيوان.");
-    if (!eventDate) return alert("اختر تاريخ التشخيص.");
-    if (!methodEl)  return alert("اختر طريقة التشخيص.");
-    if (!resultEl)  return alert("اختر نتيجة التشخيص.");
+    // تحقق داخلي بدل alerts
+    if (!animalNum){ showMsg("err","اكتب رقم الحيوان."); $("#animalId").focus(); return; }
+    if (!eventDate){ showMsg("err","اختر تاريخ التشخيص."); $("#diagnosisDate").focus(); return; }
+    if (!methodEl){ showMsg("err","اختر طريقة التشخيص."); return; }
+    if (!resultEl){ showMsg("err","اختر نتيجة التشخيص."); return; }
 
     const payload = {
-      userId: currentUser.uid,
+      userId: auth.currentUser.uid,
       animalId: animalNum,
       animalNumber: animalNum,
       eventDate,
@@ -116,6 +136,9 @@
 
     try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: animalNum}); } catch {}
 
+    // تعطيل الزر أثناء الحفظ
+    saveBtn.disabled = true;
+
     try {
       await addDoc(collection(db, "events"), payload);
 
@@ -126,7 +149,7 @@
       // (اختياري) تحديث وثيقة الحيوان لنفس المستخدم
       try {
         const animalsRef = collection(db, "animals");
-        const q1 = query(animalsRef, where("userId","==", currentUser.uid));
+        const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
         const snap = await getDocs(q1);
         const match = snap.docs.find(d=>{
           const a = d.data() || {};
@@ -142,49 +165,23 @@
         }
       } catch {}
 
-     try {
-  await addDoc(collection(db, "events"), payload);
+      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
 
-  // آخر سياق محلي
-  localStorage.setItem("lastAnimalId", animalNum);
-  localStorage.setItem("lastEventDate", eventDate);
+      // ✅ رسالة تأكيد داخلية + إعادة توجيه تلقائي
+      showMsg("ok","✅ تم تشخيص الحمل بنجاح");
+      setTimeout(()=>{
+        location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
+      }, 2000);
 
-  // تحديث حالة الحيوان (اختياري) ... كما في الكود السابق
-
-  // ✅ رسالة تأكيد داخل النموذج
-  const form = document.getElementById("diagnosisForm");
-  const msg = document.createElement("div");
-  msg.textContent = "✅ تم تشخيص الحمل بنجاح";
-  Object.assign(msg.style, {
-    background: "#c8e6c9", color: "#1b5e20",
-    padding: "12px", marginTop: "15px",
-    borderRadius: "6px", textAlign: "center",
-    fontWeight: "bold"
-  });
-  form.appendChild(msg);
-
-  // بعد ثانيتين → رجوع لصفحة الأحداث
-  setTimeout(()=>{
-    location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
-  }, 2000);
-
-} catch (err) {
-  console.error("Firestore save error:", err);
-  // عرض خطأ داخل النموذج بدل alert
-  const form = document.getElementById("diagnosisForm");
-  const errMsg = document.createElement("div");
-  errMsg.textContent = "❌ حدث خطأ أثناء التسجيل. تحقق من الاتصال والصلاحيات.";
-  Object.assign(errMsg.style, {
-    background: "#ffcdd2", color: "#b71c1c",
-    padding: "12px", marginTop: "15px",
-    borderRadius: "6px", textAlign: "center",
-    fontWeight: "bold"
-  });
-  form.appendChild(errMsg);
-}
-
+    } catch (err) {
+      console.error("Firestore save error:", err);
+      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
+      showMsg("err","❌ حدث خطأ أثناء التسجيل. تحقق من الاتصال والصلاحيات.");
+      saveBtn.disabled = false;
+    }
   });
 </script>
+
 
 </body>
 </html>
