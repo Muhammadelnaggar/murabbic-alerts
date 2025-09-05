@@ -31,6 +31,10 @@
     .sep{display:flex;align-items:center;gap:8px;margin:10px 0;color:#2b593a;font-weight:700}
     .sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--border)}
     .hidden{display:none !important;}
+    /* ✅ بادج وضع المصدر */
+    .badge{display:inline-block;padding:4px 8px;border:1px solid var(--border);
+      border-radius:999px;background:#fff;font-size:12px;color:#14532d;margin:6px 0}
+    .badge.err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
   </style>
 </head>
 <body>
@@ -56,6 +60,9 @@
         <input id="eventDate" type="date" />
       </div>
     </div>
+
+    <!-- ✅ بادج وضع المصدر -->
+    <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
     <!-- مصدر 1: كاميرا -->
     <video id="awCam" class="source" playsinline autoplay muted></video>
@@ -92,20 +99,59 @@
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <script type="module">
+  // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
   const can=$('awCan'), ctx=can.getContext('2d');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
+  const modeBadge = $('modeBadge');
 
+  // ========= ثوابت/حالة =========
   const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
+  const isDemo = new URLSearchParams(location.search).get('demo') === '1';
 
-  // تتبّع
+  // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
 
-  // تهيئة الحقول
+  // ========= مساعدات =========
+  function setSaveEnabled(yes){
+    btnSave.disabled = !yes;
+    btnSave.style.opacity = yes ? '1' : '0.5';
+    btnSave.style.pointerEvents = yes ? 'auto' : 'none';
+  }
+  function setSource(s){
+    currentSource = s;
+    if(s === 'camera'){
+      v.classList.remove('hidden');
+      imgPrev.classList.add('hidden');
+      modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
+      modeBadge.classList.remove('err');
+      setSaveEnabled(true);
+    } else {
+      imgPrev.classList.remove('hidden');
+      v.classList.add('hidden');
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      modeBadge.textContent = isDemo ? 'الوضع: صورة (عرض Demo — الحفظ مسموح)' : 'الوضع: صورة (عرض فقط — الحفظ غير مسموح)';
+      modeBadge.classList.toggle('err', !isDemo);
+      setSaveEnabled(isDemo);
+    }
+  }
+  function fireTrack(event, meta={}){
+    try {
+      window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
+      window.t?.event && window.t.event(event, meta);
+    } catch(e){}
+  }
+  function showToast(msg, isErr=false){
+    toast.textContent = msg; toast.classList.toggle('err', !!isErr);
+    toast.style.display='block'; clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
+  }
+
+  // ========= تهيئة الحقول =========
   initContextFields();
   function initContextFields(){
     const q=new URLSearchParams(location.search);
@@ -119,7 +165,7 @@
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
 
-  // الكاميرا
+  // ========= الكاميرا =========
   btnStart.onclick=async()=>{
     try{
       stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
@@ -128,15 +174,16 @@
     }catch(e){ showToast('تعذّر فتح الكاميرا', true); }
   };
 
-  // اختيار صورة بديلة
+  // ========= اختيار صورة =========
   file.onchange = ()=>{
     const f=file.files?.[0]; if(!f) return;
     const url=URL.createObjectURL(f);
-    imgPrev.src=url; imgPrev.onload=()=>URL.revokeObjectURL(url);
+    imgPrev.onload=()=>URL.revokeObjectURL(url);
+    imgPrev.src=url;
     setSource('image'); fireTrack('image_selected', {size:f.size, type:f.type});
   };
 
-  // التقاط/تقدير
+  // ========= التقاط/تقدير =========
   btnShot.onclick=()=>{
     if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
 
@@ -146,7 +193,6 @@
       ctx.drawImage(v,0,0,can.width,can.height);
     } else {
       if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
-      // ملاءمة الصورة للكانفس بالحجم الأصلي
       can.width = imgPrev.naturalWidth; can.height = imgPrev.naturalHeight;
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
     }
@@ -172,7 +218,7 @@
     fireTrack('weight_estimated', {source: currentSource, px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
   };
 
-  // حفظ كحدث
+  // ========= الحفظ =========
   btnSave.onclick=async()=>{
     const animalNumber = (inpNum.value||'').trim();
     const eventDate    = inpDate.value || new Date().toISOString().slice(0,10);
@@ -233,32 +279,7 @@
     }
   };
 
-  // أدوات
-  function setSource(s){
-    currentSource = s;
-    if(s==='camera'){
-      v.classList.remove('hidden');
-      imgPrev.classList.add('hidden');
-    }else{
-      imgPrev.classList.remove('hidden');
-      v.classList.add('hidden');
-      // إيقاف الكاميرا لو كانت تعمل
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-    }
-  }
-  function fireTrack(event, meta={}){
-    try {
-      window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
-      window.t?.event && window.t.event(event, meta);
-    } catch(e){}
-  }
-  function showToast(msg, isErr=false){
-    toast.textContent = msg; toast.classList.toggle('err', !!isErr);
-    toast.style.display='block'; clearTimeout(showToast._t);
-    showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
-  }
-
-  // CV Helpers
+  // ========= CV Helpers =========
   function detectArucoPxPerCm(imgData){
     if(!window.cv) return null; const cv = window.cv;
     const src=cv.matFromImageData(imgData);
@@ -302,7 +323,7 @@
     return (x0>=0&&x1>x0)?(x1-x0):null;
   }
 
-  // جاهزية OpenCV
+  // ========= جاهزية OpenCV =========
   window.cv = window.cv || {};
   window.cv.onRuntimeInitialized = ()=>{ cvReady=true; fireTrack('cv_ready'); };
   </script>
