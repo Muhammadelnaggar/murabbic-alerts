@@ -38,12 +38,15 @@
       font-weight:700;
       text-align:center;
       max-width:560px;
-      margin:16px auto 0;
+      margin:16px auto 0;   /* ← يوسّط الرسالة أفقياً */
     }
     .infobar.show{display:block}
     .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
     .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
   </style>
+
+  <!-- 👇 حمّل Firebase أولاً قبل أي سكربت آخر يستخدمه -->
+  <script type="module" src="/js/firebase-config.js"></script>
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
@@ -176,12 +179,12 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
-  <!-- سكربتات (ذكاء/تتبع) -->
+  <!-- سكربتات (ذكاء/تتبع) — بعد تهيئة فايربيز -->
   <script src="/js/app-core.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
 
-  <!-- Firebase + منطق الصفحة -->
+  <!-- منطق الصفحة + كتابة فايرستور -->
   <script type="module">
     import { db, auth, ensureAuth } from '/js/firebase-config.js';
     import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -190,14 +193,11 @@
     const qs=(s)=>document.querySelector(s);
     const qsa=(s)=>Array.from(document.querySelectorAll(s));
 
-    // مجموعات فايرستور (قابلة للتعديل من LS)
     const EVENTS = localStorage.getItem('events_collection') || 'events';
     const CALVES = localStorage.getItem('calves_collection') || 'calves';
 
-    // تتبع فتح الصفحة
     try{ window.dataLayer.push({event:'calving_form_view'}); }catch{}
 
-    // أدوات مساعدة
     function val(name){ const el = qs(`[name="${name}"]:checked`); return el ? el.value : ''; }
     function showMsg(text,isError){
       const el = $('info');
@@ -206,7 +206,6 @@
       try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
     }
 
-    // المنطقة الزمنية المختارة (من URL ?tz= أو من المتصفح)
     function getPreferredTZ(){
       const p = new URLSearchParams(location.search);
       return p.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -218,14 +217,10 @@
         year:'numeric', month:'2-digit', day:'2-digit',
         hour:'2-digit', minute:'2-digit'
       }).formatToParts(d).reduce((acc, p)=> (acc[p.type]=p.value, acc), {});
-      return {
-        y: parts.year, m: parts.month, d: parts.day,
-        hh: parts.hour, mm: parts.minute
-      };
+      return { y:parts.year, m:parts.month, d:parts.day, hh:parts.hour, mm:parts.minute };
     }
     function pad(n){ return String(n).padStart(2,'0'); }
 
-    // عبّي الحقول الافتراضية حسب الدولة/المنطقة الزمنية
     (function hydrate(){
       const tz = getPreferredTZ();
       $('tzView').value = tz;
@@ -242,7 +237,6 @@
       $('eventTime').value = p.get('time') || defTime;
     })();
 
-    // ذكاء تتبعي بسيط على تغييرات الحقول
     ['animalNumber','eventDate','eventTime','calvingKind','notes'].forEach(id=>{
       const el = $(id);
       el?.addEventListener('change', ()=>{
@@ -255,7 +249,6 @@
       });
     });
 
-    // UI — وضع النافقة يخفي حقول الأحياء
     function updateOffspringUI(){
       const c = val('calfCount');
       $('offspring2').style.display = (c==='2'||c==='3') ? '' : 'none';
@@ -275,14 +268,12 @@
     $('calvingKind').addEventListener('change', updateModeUI);
     updateModeUI();
 
-    // فتح بطاقة الحيوان
     $('toCardBtn').addEventListener('click', ()=>{
       const n = ($('animalNumber').value || '').trim();
       if(!n){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
       location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
     });
 
-    // حفظ
     $('saveBtn').addEventListener('click', onSave);
 
     async function onSave(){
@@ -295,8 +286,8 @@
         btn.disabled=true; btn.textContent='جارٍ الحفظ…';
 
         const animalNumber = $('animalNumber').value.trim();
-        const eventDate    = $('eventDate').value;   // YYYY-MM-DD بحسب الدولة (IANA TZ)
-        const eventTime    = $('eventTime').value;   // HH:mm بحسب الدولة
+        const eventDate    = $('eventDate').value;
+        const eventTime    = $('eventTime').value;
         const calvingKind  = $('calvingKind').value;
 
         if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return restore(); }
@@ -326,20 +317,18 @@
           }
         }
 
-        // المنطقة الزمنية الفعلية المستخدمة
         const tz = getPreferredTZ();
 
-        // حفظ — يلزم توقيع
-        await ensureAuth();
+        // تأكيد الدخول قبل الكتابة (مع تحويل لصفحة الدخول لو مش موقّع)
+        await ensureAuth('/login.html');
         const uid = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('tenantId') || null;
 
-        // حدث الولادة
         const evRef = await addDoc(collection(db, EVENTS), {
           type:'ولادة',
           eventType:'calving',
-          eventDate,                // تاريخ محلي (حسب الدولة)
-          eventTime,                // وقت محلي (حسب الدولة)
-          eventTZ: tz,              // IANA time zone
+          eventDate,
+          eventTime,
+          eventTZ: tz,
           animalNumber,
           calvingKind,
           calfCount: count,
@@ -349,14 +338,13 @@
           createdAt: serverTimestamp()
         });
 
-        // تسجيل العجول
         for(const c of calves){
           await addDoc(collection(db, CALVES), {
             number: c.number,
             sex: c.sex,
             fate: c.fate,
-            birthDate: eventDate,      // تاريخ الميلاد محلي
-            birthTime: eventTime,      // وقت الميلاد محلي
+            birthDate: eventDate,
+            birthTime: eventTime,
             birthTZ: tz,
             damNumber: animalNumber,
             eventId: evRef.id,
@@ -366,12 +354,7 @@
           });
         }
 
-        try {
-          window.dataLayer.push({
-            event:'calving_save_success',
-            animalNumber, calvingKind, calfCount:count, dead, tz
-          });
-        } catch {}
+        try { window.dataLayer.push({event:'calving_save_success', animalNumber, calvingKind, calfCount:count, dead, tz}); } catch {}
 
         showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
         btn.textContent='تم الحفظ ✓';
@@ -380,9 +363,7 @@
       }catch(err){
         console.error(err);
         showMsg('تعذّر الحفظ في فايربيز', true);
-        try {
-          window.dataLayer.push({ event:'calving_save_error', error: String(err && err.message || err) });
-        } catch {}
+        try { window.dataLayer.push({ event:'calving_save_error', error:String(err && err.message || err) }); } catch {}
         restore();
       }
     }
