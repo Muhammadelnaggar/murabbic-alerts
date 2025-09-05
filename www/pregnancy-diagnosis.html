@@ -142,19 +142,47 @@
         }
       } catch {}
 
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
+     try {
+  await addDoc(collection(db, "events"), payload);
 
-      const again = confirm("✅ تم تسجيل التشخيص.\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟");
-      if (again) {
-        location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
-      } else {
-        location.href = "dashboard.html";
-      }
-    } catch (err) {
-      console.error("Firestore save error:", err);
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
-      alert("❌ حدث خطأ أثناء التسجيل. تحقق من اتصال الإنترنت وصلاحيات الحساب.");
-    }
+  // آخر سياق محلي
+  localStorage.setItem("lastAnimalId", animalNum);
+  localStorage.setItem("lastEventDate", eventDate);
+
+  // تحديث حالة الحيوان (اختياري) ... كما في الكود السابق
+
+  // ✅ رسالة تأكيد داخل النموذج
+  const form = document.getElementById("diagnosisForm");
+  const msg = document.createElement("div");
+  msg.textContent = "✅ تم تشخيص الحمل بنجاح";
+  Object.assign(msg.style, {
+    background: "#c8e6c9", color: "#1b5e20",
+    padding: "12px", marginTop: "15px",
+    borderRadius: "6px", textAlign: "center",
+    fontWeight: "bold"
+  });
+  form.appendChild(msg);
+
+  // بعد ثانيتين → رجوع لصفحة الأحداث
+  setTimeout(()=>{
+    location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
+  }, 2000);
+
+} catch (err) {
+  console.error("Firestore save error:", err);
+  // عرض خطأ داخل النموذج بدل alert
+  const form = document.getElementById("diagnosisForm");
+  const errMsg = document.createElement("div");
+  errMsg.textContent = "❌ حدث خطأ أثناء التسجيل. تحقق من الاتصال والصلاحيات.";
+  Object.assign(errMsg.style, {
+    background: "#ffcdd2", color: "#b71c1c",
+    padding: "12px", marginTop: "15px",
+    borderRadius: "6px", textAlign: "center",
+    fontWeight: "bold"
+  });
+  form.appendChild(errMsg);
+}
+
   });
 </script>
 
