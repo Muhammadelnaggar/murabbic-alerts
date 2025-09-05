@@ -41,10 +41,11 @@
   <!-- تتبّع ذكي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js"></script>
+  
+  
 
   <header><h1>📏 تقدير الوزن بالكاميرا</h1></header>
 
@@ -218,6 +219,16 @@
     fireTrack('weight_estimated', {source: currentSource, px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
   };
 
+  async function postJSON(url, body){
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    let data = null; try { data = await res.json(); } catch(e){}
+    return { ok: res.ok, status: res.status, data };
+  }
+ 
   // ========= الحفظ =========
   btnSave.onclick=async()=>{
     const animalNumber = (inpNum.value||'').trim();
@@ -226,6 +237,13 @@
 
     if(!animalNumber) return showToast('أدخل رقم الحيوان أولًا', true);
     if(!weightKg)     return showToast('نفّذ التقدير قبل الحفظ', true);
+    // اشتراطات التشغيل المتفق عليها:
+if (currentSource === 'image' && !isDemo) {
+  return showToast('الحفظ للصورة غير مسموح — استخدم الكاميرا أو فعّل وضع Demo.', true);
+}
+if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0)) {
+  return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
+}
 
     const payload={
       eventType:'تقدير وزن',
@@ -244,7 +262,7 @@
     fireTrack('weight_save_click', {animalNumber, eventDate, weightKg, source: currentSource});
 
     try {
-      const res = await window.api?.post?.('/api/events', payload);
+    const res = await postJSON('/api/events', payload);
       if(!res || res?.ok===false) throw new Error('API failed');
       showToast('✅ تم حفظ حدث الوزن عبر API');
       fireTrack('weight_saved_api', {ok:true});
