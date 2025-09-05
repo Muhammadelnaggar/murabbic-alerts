@@ -60,12 +60,19 @@
   </form>
 
   <script type="module">
-    import { db, auth } from "./js/firebase-config.js";
-    import {
-      collection, query, where, getDocs,
-      addDoc, serverTimestamp, doc, updateDoc
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+   import cfg from "/js/firebase-config.js";
+import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+import {
+  getFirestore, collection, query, where, getDocs,
+  addDoc, serverTimestamp, doc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+// استخدم تطبيق Firebase المُهيأ (لو tenant-bootstrap جهّزه) وإلا حيتهيّأ هنا
+const app  = getApps().length ? getApp() : initializeApp(cfg);
+const db   = getFirestore(app, "murabbikdata"); // لو اسم الـ DB مختلف عندك، عدّله هنا أو احذف الاسم
+const auth = getAuth(app);
+
 
     // تعبئة من رابط إن وُجد
     const qp = new URLSearchParams(location.search);
