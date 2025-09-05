@@ -18,7 +18,7 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
     .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e8f5e9;
       font-weight:700;font-size:14px;color:#064e3b;cursor:pointer;}
-    video{width:100%;border:1px solid var(--border);border-radius:12px;}
+    video,img.preview{width:100%;border:1px solid var(--border);border-radius:12px;background:#fff}
     canvas{display:none;}
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
@@ -28,6 +28,9 @@
     .toast{position:fixed;bottom:12px;left:12px;right:12px;margin:auto;max-width:520px;background:#e8f5e9;
       color:#064e3b;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-weight:700;display:none}
     .err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
+    .sep{display:flex;align-items:center;gap:8px;margin:10px 0;color:#2b593a;font-weight:700}
+    .sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--border)}
+    .hidden{display:none !important;}
   </style>
 </head>
 <body>
@@ -42,7 +45,7 @@
   <header><h1>📏 تقدير الوزن بالكاميرا</h1></header>
 
   <section class="card">
-    <!-- ✅ حقولا رقم الحيوان + تاريخ الحدث -->
+    <!-- رقم الحيوان + التاريخ -->
     <div class="row">
       <div>
         <label for="animalNumber">رقم الحيوان</label>
@@ -54,14 +57,22 @@
       </div>
     </div>
 
-    <video id="awCam" playsinline autoplay muted></video>
-    <canvas id="awCan"></canvas>
+    <!-- مصدر 1: كاميرا -->
+    <video id="awCam" class="source" playsinline autoplay muted></video>
+    <!-- مصدر 2: صورة بديلة -->
+    <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
 
+    <!-- اختيار صورة -->
+    <div class="sep">أو اختر صورة</div>
     <div class="chips">
+      <input id="awFile" type="file" accept="image/*" capture="environment" class="hidden">
+      <label for="awFile" class="chip">📸 اختيار صورة</label>
       <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
       <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
       <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
     </div>
+
+    <canvas id="awCan"></canvas>
 
     <div class="kpi3">
       <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
@@ -70,7 +81,7 @@
     </div>
 
     <div class="hint">
-      ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا.  
+      ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
     </div>
   </section>
@@ -81,21 +92,20 @@
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <script type="module">
-  // ========= اختصارات DOM =========
   const $=id=>document.getElementById(id);
-  const v=$('awCam'), can=$('awCan'), ctx=can.getContext('2d');
+  const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
+  const can=$('awCan'), ctx=can.getContext('2d');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
 
-  // ========= ثوابت وخيارات =========
   const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
-  let stream=null, cvReady=false, pxPerCm=null, lastShot=null;
+  let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
 
-  // ========= تتبّع ذكي (page_view) =========
+  // تتبّع
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
 
-  // ========= تهيئة الحقول من URL/localStorage =========
+  // تهيئة الحقول
   initContextFields();
   function initContextFields(){
     const q=new URLSearchParams(location.search);
@@ -105,27 +115,42 @@
     if(dt)  inpDate.value = dt;
   }
   function pushContext(){
-    // نحفظ آخر قيمة لاستخدام الصفحات الأبناء
     if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
 
-  // ========= الكاميرا =========
+  // الكاميرا
   btnStart.onclick=async()=>{
     try{
       stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
       v.srcObject=stream;
-      fireTrack('camera_start');
-    }catch(e){ return showToast('تعذّر فتح الكاميرا', true); }
+      setSource('camera'); fireTrack('camera_start');
+    }catch(e){ showToast('تعذّر فتح الكاميرا', true); }
   };
 
-  // ========= الالتقاط والتقدير =========
+  // اختيار صورة بديلة
+  file.onchange = ()=>{
+    const f=file.files?.[0]; if(!f) return;
+    const url=URL.createObjectURL(f);
+    imgPrev.src=url; imgPrev.onload=()=>URL.revokeObjectURL(url);
+    setSource('image'); fireTrack('image_selected', {size:f.size, type:f.type});
+  };
+
+  // التقاط/تقدير
   btnShot.onclick=()=>{
     if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
-    if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
 
-    can.width=v.videoWidth; can.height=v.videoHeight;
-    ctx.drawImage(v,0,0,can.width,can.height);
+    if(currentSource==='camera'){
+      if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+      can.width=v.videoWidth; can.height=v.videoHeight;
+      ctx.drawImage(v,0,0,can.width,can.height);
+    } else {
+      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
+      // ملاءمة الصورة للكانفس بالحجم الأصلي
+      can.width = imgPrev.naturalWidth; can.height = imgPrev.naturalHeight;
+      ctx.drawImage(imgPrev,0,0,can.width,can.height);
+    }
+
     lastShot=ctx.getImageData(0,0,can.width,can.height);
 
     const scale=detectArucoPxPerCm(lastShot);
@@ -140,14 +165,14 @@
 
     const chestCm=chestPx/pxPerCm;
     outChestW.textContent=chestCm.toFixed(1);
-    const HG=chestCm*GIRTH_FACTOR; // محيط الصدر التقريبي
+    const HG=chestCm*GIRTH_FACTOR;
     const W=Math.round((HG*HG*HG)/10880);
     outWeight.textContent=W+' كجم';
 
-    fireTrack('weight_estimated', {px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
+    fireTrack('weight_estimated', {source: currentSource, px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
   };
 
-  // ========= الحفظ كحدث (API أولًا ثم Firestore Fallback) =========
+  // حفظ كحدث
   btnSave.onclick=async()=>{
     const animalNumber = (inpNum.value||'').trim();
     const eventDate    = inpDate.value || new Date().toISOString().slice(0,10);
@@ -159,7 +184,8 @@
     const payload={
       eventType:'تقدير وزن',
       feature:'weight_estimation',
-      method:'auto(aruco+mask)',
+      sourceMode: currentSource,
+      method: 'auto(aruco+mask)',
       marker_cm: ARUCO_MARKER_CM,
       px_per_cm: pxPerCm || null,
       chest_cm: Number(outChestW.textContent)||null,
@@ -168,17 +194,15 @@
       source: location.pathname
     };
 
-    pushContext(); // سياق للأبناء
-    fireTrack('weight_save_click', {animalNumber, eventDate, weightKg});
+    pushContext();
+    fireTrack('weight_save_click', {animalNumber, eventDate, weightKg, source: currentSource});
 
     try {
-      // ✅ الحفظ عبر REST API
       const res = await window.api?.post?.('/api/events', payload);
       if(!res || res?.ok===false) throw new Error('API failed');
       showToast('✅ تم حفظ حدث الوزن عبر API');
       fireTrack('weight_saved_api', {ok:true});
     } catch (e) {
-      // 🔁 Fallback إلى Firestore (databaseId = murabbikdata)
       try{
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js');
         const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js');
@@ -196,6 +220,7 @@
           animalNumber: payload.animalNumber,
           eventDate: payload.eventDate,
           source: payload.source,
+          sourceMode: payload.sourceMode,
           createdAt: serverTimestamp()
         });
         showToast('✅ تم حفظ حدث الوزن في Firestore (بديل)');
@@ -208,7 +233,19 @@
     }
   };
 
-  // ========= أدوات تتبّع + توست =========
+  // أدوات
+  function setSource(s){
+    currentSource = s;
+    if(s==='camera'){
+      v.classList.remove('hidden');
+      imgPrev.classList.add('hidden');
+    }else{
+      imgPrev.classList.remove('hidden');
+      v.classList.add('hidden');
+      // إيقاف الكاميرا لو كانت تعمل
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    }
+  }
   function fireTrack(event, meta={}){
     try {
       window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
@@ -221,11 +258,9 @@
     showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
   }
 
-  // ========= CV Helpers =========
+  // CV Helpers
   function detectArucoPxPerCm(imgData){
-    // @ts-ignore
-    if(!window.cv) return null;
-    const cv = window.cv;
+    if(!window.cv) return null; const cv = window.cv;
     const src=cv.matFromImageData(imgData);
     const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
     const dict=new cv.aruco_Dictionary(cv.DICT_4X4_50);
@@ -242,7 +277,6 @@
     src.delete();gray.delete();corners.delete();ids.delete();
     return scale;
   }
-
   function animalMask(imgData){
     const cv = window.cv; if(!cv) return null;
     const src=cv.matFromImageData(imgData);
@@ -257,10 +291,9 @@
     if(best<0){src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();return null;}
     const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
     cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
-    src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();
+    src.delete();gray.delete();bin.delete();contours.delete();hierarchy.delete();
     return mask;
   }
-
   function measureWidthAtSlice(mask,fracY){
     const y=Math.round(mask.rows*fracY);
     let x0=-1,x1=-1;
@@ -269,7 +302,7 @@
     return (x0>=0&&x1>x0)?(x1-x0):null;
   }
 
-  // ========= إشارة جاهزية OpenCV =========
+  // جاهزية OpenCV
   window.cv = window.cv || {};
   window.cv.onRuntimeInitialized = ()=>{ cvReady=true; fireTrack('cv_ready'); };
   </script>
