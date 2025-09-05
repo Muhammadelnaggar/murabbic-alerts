@@ -139,8 +139,11 @@
           <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
           <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
           <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
-          <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
-          <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+         <!-- الزر -->
+          <button id="uploadBtn" type="button" class="btn btn-light">رفع صورة بديلة</button>
+
+          <input id="uploadInput" type="file" accept="image/*" capture="environment" style="display:none" />
+
           <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
           <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
         </div>
@@ -415,7 +418,12 @@ function renderOverall(){
 
     function setAngle(angle){ state.currentAngle=angle; $$('.angle-tab').forEach(el=> el.classList.toggle('active', el.dataset.angle===angle)); drawGuide(); updateButtons(); }
     function updateButtons(){ const has=!!state.captures[state.currentAngle]; retakeBtn.disabled=!has; }
-
+    Object.assign(window, {
+  scoreBCSFor,
+  renderThumbs,
+  renderOverall,
+  updateButtons
+});
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
     $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
     toggleFlash.addEventListener('click', toggleTorch);
