@@ -424,8 +424,7 @@ function renderOverall(){
 
     captureBtn.addEventListener('click', async ()=>{ const url=dataURLFromVideo(); if(!url) return; state.captures[state.currentAngle]=url; state.scores[state.currentAngle]=await scoreBCSFor(state.currentAngle,url); renderThumbs(); renderOverall(); updateButtons(); });
     retakeBtn.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; state.scores[state.currentAngle]=null; renderThumbs(); renderOverall(); updateButtons(); });
-    if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
-    if(uploadInput) uploadInput.addEventListener('change', async (e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const url=r.result; state.captures[state.currentAngle]=url; state.scores[state.currentAngle]=await scoreBCSFor(state.currentAngle,url); renderThumbs(); renderOverall(); updateButtons(); }; r.readAsDataURL(f); uploadInput.value=''; });
+   
     const nextAngleBtn = document.getElementById('nextAngleBtn');
     nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
 
@@ -439,7 +438,16 @@ function renderOverall(){
 
       initKindBar();
 
-      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب.'); }
+     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  const warn = document.createElement('div');
+  Object.assign(warn.style, {
+    background:'#fff3cd', color:'#92400e', border:'1px solid #facc15',
+    padding:'12px', borderRadius:'8px', margin:'8px 12px', fontWeight:'bold', textAlign:'center'
+  });
+  warn.textContent = '⚠️ متصفحك لا يدعم تشغيل الكاميرا عبر الويب. يمكنك رفع صورة بديلة.';
+  document.querySelector('#cameraCard')?.prepend(warn);
+}
+
       if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
       await startCamera(); await listCameras(); if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
 
