@@ -56,121 +56,107 @@
     <button type="submit" id="saveBtn">تسجيل التشخيص</button>
   </form>
 
-  <script type="module">
-    // 1) Firebase
-    import cfg from "/js/firebase-config.js"; // default export { apiKey, projectId, ... }
-    import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-    import {
-      getFirestore, collection, query, where, getDocs,
-      addDoc, serverTimestamp, doc, updateDoc
-    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+<script type="module">
+  // ✅ استخدم نفس الإصدار 10.12.2 وبلا إعادة تهيئة
+  import { db, auth, ensureAuth } from "/js/firebase-config.js";
+  import {
+    collection, query, where, getDocs,
+    addDoc, serverTimestamp, doc, updateDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // استخدم تطبيق Firebase المُهيأ (لو tenant-bootstrap جهّزه) وإلا حيتهيّأ هنا
-    const app  = getApps().length ? getApp() : initializeApp(cfg);
-    // ⚠️ اسم قاعدة البيانات الصحيحة في مربيك
-    const db   = getFirestore(app, "murabbikdata");
-    const auth = getAuth(app);
+  // تتبّع خفيف (اختياري)
+  try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
+  try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
 
-    // 2) تتبّع خفيف (اختياري)
-    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
-    try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
+  const $ = (s)=>document.querySelector(s);
 
-    // 3) تهيئة الحقول من URL أو التخزين
-    const $ = (s)=>document.querySelector(s);
-    const qp = new URLSearchParams(location.search);
-    const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-    const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
-    $("#animalId").value = (animalFromURL||"").toString().trim();
-    $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
+  // تهيئة الحقول من URL/localStorage
+  const qp = new URLSearchParams(location.search);
+  const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
+  const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
+  $("#animalId").value = (animalFromURL||"").toString().trim();
+  $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
 
-    // 4) انتظر الـ Auth قبل السماح بالحفظ
-    let currentUser = null;
-    const authReady = new Promise((resolve)=>{
-      onAuthStateChanged(auth, (user)=>{
-        if (!user) { location.href = "login.html"; return; }
-        currentUser = user;
-        resolve(user);
-      });
-    });
+  // ✅ تأكيد الدخول قبل السماح بأي تفاعل حفظ
+  let currentUser = null;
+  try {
+    currentUser = await ensureAuth("/login.html"); // سيحوّل لو مش داخل
+  } catch (e) {
+    // LOGIN_REQUIRED_REDIRECT يوقف التنفيذ بعد التحويل
+    console.warn(e);
+    throw e;
+  }
 
-    // 5) الحفظ
-    $("#diagnosisForm").addEventListener("submit", async (e)=>{
-      e.preventDefault();
+  // حفظ الحدث
+  $("#diagnosisForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
 
-      // تأكد من اكتمال الـ Auth
-      await authReady;
-      if (!currentUser) { location.href = "login.html"; return; }
+    const animalNum = $("#animalId").value.trim();
+    const eventDate = $("#diagnosisDate").value;
+    const methodEl  = document.querySelector('input[name="method"]:checked');
+    const resultEl  = document.querySelector('input[name="result"]:checked');
 
-      const animalNum = $("#animalId").value.trim();
-      const eventDate = $("#diagnosisDate").value;
-      const methodEl  = document.querySelector('input[name="method"]:checked');
-      const resultEl  = document.querySelector('input[name="result"]:checked');
+    if (!animalNum) return alert("اكتب رقم الحيوان.");
+    if (!eventDate) return alert("اختر تاريخ التشخيص.");
+    if (!methodEl)  return alert("اختر طريقة التشخيص.");
+    if (!resultEl)  return alert("اختر نتيجة التشخيص.");
 
-      if (!animalNum) { alert("اكتب رقم الحيوان."); return; }
-      if (!eventDate) { alert("اختر تاريخ التشخيص."); return; }
-      if (!methodEl)  { alert("اختر طريقة التشخيص."); return; }
-      if (!resultEl)  { alert("اختر نتيجة التشخيص."); return; }
+    const payload = {
+      userId: currentUser.uid,
+      animalId: animalNum,
+      animalNumber: animalNum,
+      eventDate,
+      type: "تشخيص حمل",
+      method: methodEl.value,      // ultrasound | manual
+      result: resultEl.value,      // عشار | فارغة
+      vet: $("#vet").value || "",
+      source: location.pathname,
+      createdAt: serverTimestamp()
+    };
 
-      const payload = {
-        userId: currentUser.uid,
-        animalId: animalNum,
-        animalNumber: animalNum,
-        eventDate,
-        type: "تشخيص حمل",
-        method: methodEl.value,          // ultrasound | manual
-        result: resultEl.value,          // عشار | فارغة
-        vet: $("#vet").value || "",
-        source: location.pathname,
-        createdAt: serverTimestamp()
-      };
+    try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: animalNum}); } catch {}
 
-      // تتبّع محاولة الحفظ
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: animalNum}); } catch {}
+    try {
+      await addDoc(collection(db, "events"), payload);
 
+      // آخر سياق محلي
+      localStorage.setItem("lastAnimalId", animalNum);
+      localStorage.setItem("lastEventDate", eventDate);
+
+      // (اختياري) تحديث وثيقة الحيوان لنفس المستخدم
       try {
-        await addDoc(collection(db, "events"), payload);
-
-        // خزّن آخر سياق محليًا
-        localStorage.setItem("lastAnimalId", animalNum);
-        localStorage.setItem("lastEventDate", eventDate);
-
-        // (اختياري) حدّث حالة الحيوان إن وُجدت وثيقته لنفس المستخدم
-        try {
-          const animalsRef = collection(db, "animals");
-          const q1 = query(animalsRef, where("userId","==", currentUser.uid));
-          const snap = await getDocs(q1);
-
-          const match = snap.docs.find(d=>{
-            const a = d.data() || {};
-            const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
-              .filter(v=>v!=null)
-              .map(v=>String(v).trim());
-            return candidates.includes(String(animalNum));
-          });
-
-          if (match) {
-            const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
-            if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
-            if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
-            await updateDoc(doc(db,"animals",match.id), updates);
-          }
-        } catch {}
-
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
-
-        const again = confirm("✅ تم تسجيل التشخيص.\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟");
-        if (again) {
-          location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
-        } else {
-          location.href = "dashboard.html";
+        const animalsRef = collection(db, "animals");
+        const q1 = query(animalsRef, where("userId","==", currentUser.uid));
+        const snap = await getDocs(q1);
+        const match = snap.docs.find(d=>{
+          const a = d.data() || {};
+          const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
+            .filter(v=>v!=null).map(v=>String(v).trim());
+          return candidates.includes(String(animalNum));
+        });
+        if (match) {
+          const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
+          if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
+          if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
+          await updateDoc(doc(db,"animals",match.id), updates);
         }
-      } catch (err) {
-        console.error("Firestore save error:", err);
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
-        alert("❌ حدث خطأ أثناء التسجيل. تحقق من اتصال الإنترنت وصلاحيات الحساب.");
+      } catch {}
+
+      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
+
+      const again = confirm("✅ تم تسجيل التشخيص.\nهل تريد تسجيل أحداث أخرى لهذا الحيوان؟");
+      if (again) {
+        location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
+      } else {
+        location.href = "dashboard.html";
       }
-    });
-  </script>
+    } catch (err) {
+      console.error("Firestore save error:", err);
+      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
+      alert("❌ حدث خطأ أثناء التسجيل. تحقق من اتصال الإنترنت وصلاحيات الحساب.");
+    }
+  });
+</script>
+
 </body>
 </html>
