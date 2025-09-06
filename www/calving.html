@@ -158,7 +158,7 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
-  <!-- سكربتات التتبع -->
+  <!-- تتبع اختياري -->
   <script src="/js/app-core.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
@@ -176,7 +176,24 @@
     const EVENTS = localStorage.getItem('events_collection') || 'events';
     const CALVES = localStorage.getItem('calves_collection') || 'calves';
 
-    function val(name){ const el = qs(\`[name="\${name}"]:checked\`); return el ? el.value : ''; }
+    // ——— حفظ/استرجاع قبل/بعد التحويل ———
+    const SKEY_NUM  = 'calving:number';
+    const SKEY_DATE = 'calving:date';
+    function persistForm(){
+      try{
+        sessionStorage.setItem(SKEY_NUM,  $('animalNumber').value.trim());
+        sessionStorage.setItem(SKEY_DATE, $('eventDate').value);
+      }catch{}
+    }
+    function restoreForm(){
+      try{
+        if(!$('animalNumber').value) $('animalNumber').value = sessionStorage.getItem(SKEY_NUM)  || '';
+        if(!$('eventDate').value)    $('eventDate').value    = sessionStorage.getItem(SKEY_DATE) || '';
+      }catch{}
+    }
+    function clearPersist(){ try{ sessionStorage.removeItem(SKEY_NUM); sessionStorage.removeItem(SKEY_DATE);}catch{} }
+
+    function val(name){ const el = qs(`[name="${name}"]:checked`); return el ? el.value : ''; }
     function showMsg(text,isError){
       const el = $('info');
       el.className = 'infobar ' + (isError ? 'show error' : 'show');
@@ -189,7 +206,7 @@
       $('offspring2').style.display = (c==='2'||c==='3') ? '' : 'none';
       $('offspring3').style.display = (c==='3') ? '' : 'none';
     }
-    function disableGroup(name,disabled){ qsa(\`[name="\${name}"]\`).forEach(r=>{ r.disabled=disabled; if(disabled) r.checked=false; }); }
+    function disableGroup(name,disabled){ qsa(`[name="${name}"]`).forEach(r=>{ r.disabled=disabled; if(disabled) r.checked=false; }); }
     function disableInputs(selector,disabled){ qsa(selector).forEach(el=>{ el.disabled=disabled; if(disabled&&'value' in el) el.value=''; }); }
     function updateModeUI(){
       const k=$('calvingKind').value, dead=(k==='نافقة');
@@ -202,20 +219,21 @@
     qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
     $('calvingKind').addEventListener('change', updateModeUI);
 
-    // تعبئة من URL
+    // تعبئة من URL أولًا ثم استرجاع لو ناقص
     (function hydrate(){
       const p = new URLSearchParams(location.search);
       const num  = p.get('number') || p.get('animalNumber') || '';
       const date = p.get('date')   || new Date().toISOString().slice(0,10);
       if(num) $('animalNumber').value = num;
-      $('eventDate').value = date;
+      if(date) $('eventDate').value = date;
+      restoreForm();
     })();
 
     // فتح البطاقة
     $('toCardBtn').addEventListener('click', ()=>{
       const n = ($('animalNumber').value || '').trim();
       if(!n){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
-      location.href = \`cow-card.html?number=\${encodeURIComponent(n)}\`;
+      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
     });
 
     updateModeUI();
@@ -230,12 +248,13 @@
       try{
         btn.disabled=true; btn.textContent='جارٍ الحفظ…';
 
-        // فرض تسجيل الدخول
+        // لو مش داخل: خزّن القيم وحوّل لصفحة الدخول ثم ارجع
         try{
           await requireAuth();
-        } catch {
-          try { sessionStorage.setItem('postLogin', location.href); } catch {}
-          location.href = '/login.html?next=' + encodeURIComponent(location.href);
+        }catch{
+          persistForm();
+          const next = encodeURIComponent(location.href);
+          location.href = `/login.html?next=${next}`;
           return;
         }
 
@@ -253,7 +272,7 @@
 
         const calves = [];
         if(!dead){
-          const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل',true); window.dataLayer.push({event:'calving_validate_error', reason:'calfFate'}); return restore(); }
+          const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل',true); return restore(); }
           const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim();
           if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)',true); return restore(); }
           calves.push({number:id1, sex:sex1, fate});
@@ -269,12 +288,9 @@
           }
         }
 
-        // ذكاء اختياري (لو smart-checks موجود)
+        // ذكاء اختياري لو المكتبة متاحة
         let aiHints = null;
-        try{
-          const out = await (window.smartChecks?.calving?.run?.({animalNumber, eventDate, calvingKind, calves}) ?? null);
-          aiHints = out?.hints || null;
-        }catch{}
+        try{ aiHints = (await window.smartChecks?.calving?.run?.({animalNumber, eventDate, calvingKind, calves}))?.hints || null; }catch{}
 
         // 1) حدث الولادة
         const evRef = await addDoc(collection(db, EVENTS), {
@@ -290,11 +306,8 @@
         // 2) العجول
         for(const c of calves){
           await addDoc(collection(db, CALVES), {
-            number: c.number,
-            sex: c.sex,
-            fate: c.fate,
-            birthDate: eventDate,
-            damNumber: animalNumber,
+            number: c.number, sex: c.sex, fate: c.fate,
+            birthDate: eventDate, damNumber: animalNumber,
             eventId: evRef.id,
             uid: auth?.currentUser?.uid || null,
             createdAt: serverTimestamp(),
@@ -302,8 +315,8 @@
           });
         }
 
+        clearPersist();
         window.dataLayer.push({event:'calving_saved', animalNumber, calfCount:count, calvingKind});
-
         showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
         btn.textContent='تم الحفظ ✓';
         setTimeout(()=>{ location.href='dashboard.html'; }, 1200);
