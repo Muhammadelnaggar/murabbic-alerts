@@ -175,180 +175,165 @@
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
 
-  <!-- المنطق الموحد + فايربيز -->
-  <script type="module">
-    import { db, auth, requireAuth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+<script type="module">
+  import { db, auth, requireAuth } from '/js/firebase-config.js';
+  import { collection, addDoc, serverTimestamp }
+    from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    const $ = id => document.getElementById(id);
-    const qs = s => document.querySelector(s);
-    const qsa = s => Array.from(document.querySelectorAll(s));
+  const $  =(id)=>document.getElementById(id);
+  const qs =(s)=>document.querySelector(s);
+  const qsa=(s)=>Array.from(document.querySelectorAll(s));
 
-    const EVENTS = localStorage.getItem('events_collection') || 'events';
-    const CALVES = localStorage.getItem('calves_collection') || 'calves';
+  const EVENTS = localStorage.getItem('events_collection') || 'events';
+  const CALVES = localStorage.getItem('calves_collection') || 'calves';
 
-    const pad = n => String(n).padStart(2,'0');
-    const val = name => (qs(`[name="${name}"]:checked`)?.value || '');
+  // رسالة داخلية مُعاد استخدامها (متمركزة داخل الكارت)
+  function showMsg(text,isError){
+    const el = $('info');
+    el.className = 'infobar ' + (isError ? 'show error' : 'show');
+    el.textContent = text;
+    try{ el.scrollIntoView({behavior:'smooth', block:'center'});}catch{}
+  }
 
-    function showMsg(text,isError){
-      const el = $('info');
-      el.className = 'infobar ' + (isError ? 'show error' : 'show');
-      el.textContent = text;
-      try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
-    }
+  // ✅ ألزِم تسجيل الدخول قبل أي تفاعل
+  try {
+    await requireAuth('/login.html');
+  } catch (e) {
+    showMsg('فشل التحقق من الهوية — برجاء تسجيل الدخول.', true);
+    throw e;
+  }
 
-    function getPreferredTZ(){
-      const p = new URLSearchParams(location.search);
-      return p.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    }
-    function partsNow(tz){
-      const d = new Date();
-      const parts = new Intl.DateTimeFormat('en-GB',{
-        timeZone: tz, hour12:false,
-        year:'numeric', month:'2-digit', day:'2-digit',
-        hour:'2-digit', minute:'2-digit'
-      }).formatToParts(d).reduce((a,p)=> (a[p.type]=p.value, a), {});
-      return { y:parts.year, m:parts.month, d:parts.day, hh:parts.hour, mm:parts.minute };
-    }
+  // أدوات بسيطة للقراءة من النموذج
+  function val(name){ const el = qs(`[name="${name}"]:checked`); return el ? el.value : ''; }
+  function updateOffspringUI(){
+    const c = val('calfCount');
+    $('offspring2').style.display = (c==='2'||c==='3') ? '' : 'none';
+    $('offspring3').style.display = (c==='3') ? '' : 'none';
+  }
+  function disableGroup(name,disabled){ qsa(`[name="${name}"]`).forEach(r=>{ r.disabled=disabled; if(disabled) r.checked=false; }); }
+  function disableInputs(selector,disabled){ qsa(selector).forEach(el=>{ el.disabled=disabled; if(disabled&&'value' in el) el.value=''; }); }
+  function updateModeUI(){
+    const k=$('calvingKind').value, dead=(k==='نافقة');
+    qsa('.live-only').forEach(el=> el.style.display = dead ? 'none' : '');
+    ['calfCount','calf1Sex','calf2Sex','calf3Sex','calfFate'].forEach(n=>disableGroup(n,dead));
+    disableInputs('#calfId,#calf2Id,#calf3Id',dead);
+    if(dead){ qsa('[name="calfCount"]').forEach(r=> r.checked=false); }
+    updateOffspringUI();
+  }
+  qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
+  $('calvingKind').addEventListener('change', updateModeUI);
 
-    // 1) تأكد من التوقيع أولاً
-    try { await requireAuth('/login.html'); }
-    catch (e){ console.error(e); showMsg('فشل التحقق من الهوية — برجاء تسجيل الدخول.', true); throw e; }
+  // تعبئة أولية من URL + المنطقة الزمنية المعروضة
+  (function hydrate(){
+    const p = new URLSearchParams(location.search);
+    const num  = p.get('number') || p.get('animalNumber') || '';
+    const date = p.get('date')   || new Date().toISOString().slice(0,10);
+    if(num) $('animalNumber').value = num;
+    $('eventDate').value = date;
+    const tzInput = document.getElementById('tz');
+    if (tzInput) tzInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  })();
 
-    // تتبع فتح الصفحة
-    try { window.dataLayer.push({event:'calving_form_view'}); } catch {}
+  // زر فتح البطاقة
+  $('toCardBtn').addEventListener('click', ()=>{
+    const n = ($('animalNumber').value || '').trim();
+    if(!n){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
+    location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+  });
 
-    // 2) تهيئة الحقول حسب الدولة/المنطقة الزمنية
-    (function hydrate(){
-      const tz = getPreferredTZ();
-      $('tzView').value = tz;
+  updateModeUI();
 
-      const p = new URLSearchParams(location.search);
-      const num = p.get('number') || p.get('animalNumber') || '';
-      if(num) $('animalNumber').value = num;
+  // حفظ
+  $('saveBtn').addEventListener('click', onSave);
 
-      const r = partsNow(tz);
-      $('eventDate').value = p.get('date') || `${r.y}-${r.m}-${r.d}`;
-      $('eventTime').value = p.get('time') || `${pad(r.hh)}:${pad(r.mm)}`;
-    })();
+  async function onSave(){
+    const btn=$('saveBtn');
+    const restore=()=>{ btn.disabled=false; btn.textContent='حفظ الولادة ✅'; };
+    try{
+      btn.disabled=true; btn.textContent='جارٍ الحفظ…';
 
-    // 3) UI: إظهار/إخفاء مجموعات المواليد
-    function updateOffspringUI(){
-      const c = val('calfCount');
-      $('offspring2').style.display = (c==='2'||c==='3') ? '' : 'none';
-      $('offspring3').style.display = (c==='3') ? '' : 'none';
-    }
-    function disableGroup(name,disabled){ qsa(`[name="${name}"]`).forEach(r=>{ r.disabled=disabled; if(disabled) r.checked=false; }); }
-    function disableInputs(selector,disabled){ qsa(selector).forEach(el=>{ el.disabled=disabled; if(disabled&&'value' in el) el.value=''; }); }
-    function updateModeUI(){
-      const k=$('calvingKind').value, dead=(k==='نافقة');
-      qsa('.live-only').forEach(el=> el.style.display = dead ? 'none' : '');
-      ['calfCount','calf1Sex','calf2Sex','calf3Sex','calfFate'].forEach(n=>disableGroup(n,dead));
-      disableInputs('#calfId,#calf2Id,#calf3Id',dead);
-      if(dead){ qsa('[name="calfCount"]').forEach(r=> r.checked=false); }
-      updateOffspringUI();
-    }
-    qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
-    $('calvingKind').addEventListener('change', updateModeUI);
-    updateModeUI();
+      // تأكيد أن المستخدم مازال داخل
+      await requireAuth('/login.html');
+      const uid = auth.currentUser?.uid || null;
 
-    // فتح بطاقة الحيوان
-    $('toCardBtn').addEventListener('click', ()=>{
-      const n = ($('animalNumber').value || '').trim();
-      if(!n){ showMsg('أدخل رقم الحيوان أولًا', true); return; }
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    });
+      const animalNumber = $('animalNumber').value.trim();
+      const eventDate    = $('eventDate').value;
+      const calvingKind  = $('calvingKind').value;
+      const tzName       = (document.getElementById('tz')?.value || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
 
-    // تتبع تغييرات سريعة
-    ['animalNumber','eventDate','eventTime','calvingKind','notes'].forEach(id=>{
-      const el=$(id);
-      el?.addEventListener('change', ()=>{ try{ window.dataLayer.push({event:'calving_field_change',field:id,value:el.value}); }catch{} });
-    });
-    qsa('[name="calfCount"]').forEach(r=>{
-      r.addEventListener('change', ()=>{ try{ window.dataLayer.push({event:'calf_count_change',value:r.value}); }catch{} });
-    });
+      if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return restore(); }
+      if(!eventDate)   { showMsg('اختر تاريخ الولادة',true); return restore(); }
+      if(!calvingKind) { showMsg('اختر نوع الولادة',true); return restore(); }
 
-    // 4) الحفظ
-    $('saveBtn').addEventListener('click', onSave);
+      const dead  = (calvingKind === 'نافقة');
+      const count = dead ? 0 : Number(val('calfCount'));
+      if(!dead && !count){ showMsg('اختر عدد المواليد',true); return restore(); }
 
-    async function onSave(){
-      const btn=$('saveBtn');
-      const restore=()=>{ btn.disabled=false; btn.textContent='حفظ الولادة ✅'; };
-      try { window.dataLayer.push({event:'calving_save_attempt'}); } catch {}
-
-      try{
-        btn.disabled=true; btn.textContent='جارٍ الحفظ…';
-
-        const animalNumber = $('animalNumber').value.trim();
-        const eventDate    = $('eventDate').value;
-        const eventTime    = $('eventTime').value;
-        const calvingKind  = $('calvingKind').value;
-
-        if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return restore(); }
-        if(!eventDate)   { showMsg('اختر تاريخ الولادة',true); return restore(); }
-        if(!eventTime)   { showMsg('أدخل وقت الولادة',true); return restore(); }
-        if(!calvingKind) { showMsg('اختر نوع الولادة',true); return restore(); }
-
-        const dead  = (calvingKind === 'نافقة');
-        const count = dead ? 0 : Number(val('calfCount'));
-        if(!dead && !count){ showMsg('اختر عدد المواليد',true); return restore(); }
-
-        const calves=[];
-        if(!dead){
-          const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل',true); return restore(); }
-          const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim();
-          if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)',true); return restore(); }
-          calves.push({number:id1, sex:sex1, fate});
-          if(count>=2){
-            const sex2 = val('calf2Sex'); const id2 = $('calf2Id').value.trim();
-            if(!sex2 || !id2){ showMsg('أكمل بيانات المولود (2)',true); return restore(); }
-            calves.push({number:id2, sex:sex2, fate});
-          }
-          if(count>=3){
-            const sex3 = val('calf3Sex'); const id3 = $('calf3Id').value.trim();
-            if(!sex3 || !id3){ showMsg('أكمل بيانات المولود (3)',true); return restore(); }
-            calves.push({number:id3, sex:sex3, fate});
-          }
+      const calves = [];
+      if(!dead){
+        const fate = val('calfFate'); if(!fate){ showMsg('اختر مصير العجل',true); return restore(); }
+        const sex1 = val('calf1Sex'); const id1 = $('calfId').value.trim();
+        if(!sex1 || !id1){ showMsg('أكمل بيانات المولود (1)',true); return restore(); }
+        calves.push({number:id1, sex:sex1, fate});
+        if(count>=2){
+          const sex2 = val('calf2Sex'); const id2 = $('calf2Id').value.trim();
+          if(!sex2 || !id2){ showMsg('أكمل بيانات المولود (2)',true); return restore(); }
+          calves.push({number:id2, sex:sex2, fate});
         }
+        if(count>=3){
+          const sex3 = val('calf3Sex'); const id3 = $('calf3Id').value.trim();
+          if(!sex3 || !id3){ showMsg('أكمل بيانات المولود (3)',true); return restore(); }
+          calves.push({number:id3, sex:sex3, fate});
+        }
+      }
 
-        const tz = getPreferredTZ();
+      // سجل حدث الولادة
+      const evRef = await addDoc(collection(db, EVENTS), {
+        type:'ولادة',
+        eventType:'calving',
+        eventDate,                 // تاريخ محلي (YYYY-MM-DD)
+        eventDateUtc: new Date(eventDate+'T00:00:00Z').toISOString(), // مرجعي UTC
+        tz: tzName,                // المنطقة الزمنية الظاهرة للمستخدم
+        animalNumber,
+        calvingKind,
+        calfCount: count,
+        notes: ($('notes')?.value.trim() || null),
+        uid,                       // حقول الهوية
+        userId: uid,               // لبعض القواعد التي تتوقع userId
+        createdAt: serverTimestamp(),
+        source: location.pathname
+      });
 
-        // تأكيد الجلسة قبل الكتابة
-        await requireAuth('/login.html');
-        if(!auth.currentUser){ showMsg('انتهت جلسة الدخول. ادخل مجددًا.', true); return restore(); }
-        const uid = auth.currentUser.uid;
-
-        // 1) حدث الولادة
-        const evRef = await addDoc(collection(db, EVENTS), {
-          type:'ولادة', eventType:'calving',
-          eventDate, eventTime, eventTZ: tz,
-          animalNumber, calvingKind, calfCount: count,
-          notes: ($('notes').value.trim() || null),
-          uid, source: location.pathname, createdAt: serverTimestamp()
+      // سجّل العجول
+      for(const c of calves){
+        await addDoc(collection(db, CALVES), {
+          number: c.number,
+          sex: c.sex,
+          fate: c.fate,
+          birthDate: eventDate,
+          birthDateUtc: new Date(eventDate+'T00:00:00Z').toISOString(),
+          tz: tzName,
+          damNumber: animalNumber,
+          eventId: evRef.id,
+          uid,
+          userId: uid,
+          createdAt: serverTimestamp(),
+          source: location.pathname
         });
+      }
 
-        // 2) العجول
-        for(const c of calves){
-          await addDoc(collection(db, CALVES), {
-            number:c.number, sex:c.sex, fate:c.fate,
-            birthDate:eventDate, birthTime:eventTime, birthTZ: tz,
-            damNumber:animalNumber, eventId: evRef.id,
-            uid, source: location.pathname, createdAt: serverTimestamp()
-          });
-        }
+      showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
+      btn.textContent='تم الحفظ ✓';
+      setTimeout(()=>{ location.href='dashboard.html'; }, 1200);
 
-        try { window.dataLayer.push({event:'calving_save_success', animalNumber, calvingKind, calfCount:count, dead, tz}); } catch {}
-        showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
-        btn.textContent='تم الحفظ ✓';
-        setTimeout(()=>{ location.href='dashboard.html'; }, 1200);
-
-      }catch(err){
-        console.error(err);
-        const details=(err?.code? `${err.code}: `:'')+(err?.message||String(err));
-        showMsg(`تعذّر الحفظ — ${details}`, true);
-        try { window.dataLayer.push({event:'calving_save_error', error: details}); } catch {}
-      }finally{ restore(); }
+    }catch(err){
+      console.error(err);
+      showMsg('تعذّر الحفظ في فايربيز (تحقق من الصلاحيات).', true);
+      restore();
     }
-  </script>
+  }
+</script>
+
 </body>
 </html>
+
