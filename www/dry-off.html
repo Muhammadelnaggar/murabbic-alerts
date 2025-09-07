@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -73,6 +74,8 @@
   <h1>📄 تسجيل تجفيف الحيوان</h1>
 
   <form id="dryOffForm">
+    
+
     <label for="animal-id">رقم الحيوان:</label>
     <input type="text" id="animal-id" required />
 
@@ -99,27 +102,27 @@
 
     <button type="submit">💾 تسجيل التجفيف</button>
   </form>
-
+<div id="info" class="infobar" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-weight:700;text-align:center"></div>
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-    authDomain: "murabbik.firebaseapp.com",
-    projectId: "murabbik",
-    storageBucket: "murabbik.appspot.com",
-    messagingSenderId: "402719243568",
-    appId: "1:402719243568:web:631114a260d23202dd5cf5"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+ import { db, auth, requireAuth } from "/js/firebase-config.js";
+ import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // عناصر DOM
   const form = document.getElementById("dryOffForm");
   const idEl = document.getElementById("animal-id");
   const dateEl = document.getElementById("date");
+  // شريط الرسائل داخل النموذج
+const info = document.getElementById("info");
+function showMsg(txt, isErr=false){
+  if(!info) return;
+  info.textContent = txt;
+  info.style.display   = "block";
+  info.style.background= isErr ? "#fff7ed" : "#ecfdf5";
+  info.style.border    = "1px solid " + (isErr ? "#fed7aa" : "#bbf7d0");
+  info.style.color     = isErr ? "#9a3412" : "#065f46";
+  try{ info.scrollIntoView({behavior:"smooth", block:"center"}); }catch{}
+}
+
 
   function todayYYYYMMDD(){
     const d = new Date();
@@ -128,77 +131,74 @@
     return `${d.getFullYear()}-${m}-${day}`;
   }
 
-  window.onload = function () {
-    const qp = new URLSearchParams(location.search);
-    const qpId = qp.get('animalId') || qp.get('number') || "";
+ window.onload = function () {
+  const qp = new URLSearchParams(location.search);
+  const qpId = qp.get('animalId') || qp.get('number') || "";
 
-    const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
-    const id = storedAnimalId || qpId;
+  const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+  const id = storedAnimalId || qpId;
 
-    if (id) {
-      idEl.value = id;
-      idEl.readOnly = true;
-    } else {
-      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
-      window.location.href = "add-animal.html";
-      return;
-    }
+  if (id) {
+    idEl.value = id;
+    idEl.readOnly = true;
+  } else {
+    showMsg("❗ لم يتم تحديد الحيوان — سيتم تحويلك لتسجيل حيوان جديد", true);
+    setTimeout(()=>{ window.location.href = "add-animal.html"; }, 900);
+    return;
+  }
 
-    if(!dateEl.value){
-      dateEl.value = todayYYYYMMDD();
-    }
-  };
+  if (!dateEl.value) {
+    dateEl.value = todayYYYYMMDD();
+  }
+};
+
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-
+   // لازم نكون داخلين عشان نضيف userId متوافق مع الرولز
+ try { await requireAuth(); }
+ catch {
+   window.location.href = "/login.html?next=" + encodeURIComponent(location.href);
+   return;
+ }
     const data = {
       animalId: idEl.value.trim(),
       dryOffDate: dateEl.value,
+       eventDate: dateEl.value,
       reason: document.querySelector('input[name="reason"]:checked')?.value || null,
       pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
       usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
       type: "تجفيف",
+      eventType: "dry_off",
+      userId: auth.currentUser?.uid || null, // مهم للرولز
       isSmartAlert: true,
       alertRule: "تجفيف",
       createdAt: serverTimestamp()
     };
 
-    if (!data.animalId || !data.dryOffDate) {
-      alert("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولاً");
+  if (!data.animalId || !data.dryOffDate) {
+      showMsg("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولًا", true);
       return;
     }
+try {
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
 
-    try {
-      const btn = form.querySelector('button[type="submit"]');
-      if(btn) btn.disabled = true;
+  await addDoc(collection(db, "events"), data);
 
-      await addDoc(collection(db, "events"), data);
+  showMsg("✅ تم تسجيل التجفيف بنجاح");
+  setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
+} catch (error) {
+  console.error("❌ خطأ:", error);
+  showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = false;
+}
 
-      const isNewUser = localStorage.getItem("isNewUser") === "true";
-      if (isNewUser) {
-        if (confirm("✅ تم تسجيل التجفيف بنجاح\nهل تريد تسجيل حدث آخر؟")) {
-          window.location.href = "add-event.html";
-        } else if (confirm("هل تريد تسجيل حيوان آخر؟")) {
-          window.location.href = "add-animal.html";
-        } else {
-          localStorage.removeItem("isNewUser");
-          localStorage.removeItem("lastAnimalId");
-          window.location.href = "dashboard.html";
-        }
-      } else {
-        alert("✅ تم التسجيل بنجاح");
-        setTimeout(() => {
-          window.location.href = "dashboard.html";
-        }, 300);
-      }
-    } catch (error) {
-      console.error("❌ خطأ:", error);
-      alert("فشل الاتصال بالخادم.");
-    }
   });
 </script>
 
 </body>
 </html>
+
 
