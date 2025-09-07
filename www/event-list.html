@@ -82,6 +82,16 @@
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
+    // نطاق المستخدم/المستأجر + فلترة عامة للاستعلامات
+    let UID = null, TID = null;
+    function scopeWheres(field, num){
+      const wh = [];
+      if (TID)      wh.push(where('tenantId','==', TID));
+      else if (UID) wh.push(where('userId','==',   UID));
+      wh.push(where(field,'==', num));
+      return wh;
+    }
+
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
 
@@ -154,8 +164,20 @@
     async function getCalvings(num, dir='desc', lim=6){
       const evs = collection(db, 'events');
       // مسارين للتوافق: animalNumber و animalId
-      const q1 = query(evs, where('animalNumber','==',num), where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
-      const q2 = query(evs, where('animalId','==',num),    where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
+      const q1 = query(
+        evs,
+        ...scopeWheres('animalNumber', num),
+        where('eventType','==','calving'),
+        orderBy('eventDate', dir),
+        limit(lim)
+      );
+      const q2 = query(
+        evs,
+        ...scopeWheres('animalId', num),
+        where('eventType','==','calving'),
+        orderBy('eventDate', dir),
+        limit(lim)
+      );
       const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
       const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
       const seen = new Set(); return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
@@ -179,9 +201,9 @@
       try{
         const animals = collection(db, 'animals');
         const qs = [
-          query(animals, where('number','==',num), limit(1)),
-          query(animals, where('animalNumber','==',num), limit(1)),
-          query(animals, where('animalId','==',num), limit(1)),
+          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('number','==',num),       limit(1)),
+          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('animalNumber','==',num), limit(1)),
+          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('animalId','==',num),     limit(1)),
         ];
         const res = await Promise.all(qs.map(getDocs));
         const hit = res.find(s=>!s.empty);
@@ -205,18 +227,28 @@
     async function getEventsForRange(num, startISO, endISO){
       const evs = collection(db, 'events');
       const build = (field)=>{
+        const base = [...scopeWheres(field, num)];
         if (startISO && endISO){
           return query(
             evs,
-            where(field,'==',num),
-            where('eventDate','>=',startISO),
-            where('eventDate','<',endISO),
+            ...base,
+            where('eventDate','>=', startISO),
+            where('eventDate','<',  endISO),
             orderBy('eventDate','desc')
           );
         } else if (startISO){
-          return query(evs, where(field,'==',num), where('eventDate','>=',startISO), orderBy('eventDate','desc'));
+          return query(
+            evs,
+            ...base,
+            where('eventDate','>=', startISO),
+            orderBy('eventDate','desc')
+          );
         } else {
-          return query(evs, where(field,'==',num), orderBy('eventDate','desc'));
+          return query(
+            evs,
+            ...base,
+            orderBy('eventDate','desc')
+          );
         }
       };
       const [s1,s2] = await Promise.all([getDocs(build('animalNumber')), getDocs(build('animalId'))]);
@@ -264,6 +296,10 @@
     // ——— main ———
     (async function run(){
       const user = await requireViewAuth(); if(!user){ return; }
+
+      // إعداد هوية المجال للاستعلامات
+      UID = user.uid;
+      TID = localStorage.getItem('tenantId') || null;
 
       const animalField = document.getElementById('animalNumField');
 
