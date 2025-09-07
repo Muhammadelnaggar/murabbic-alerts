@@ -27,6 +27,8 @@
 .filters{display:flex;gap:8px;align-items:center;margin:8px 0}
 .filters label{font-size:12px;color:var(--muted)}
 .filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
+.filters .num{display:flex;align-items:center;gap:6px}
+.filters input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit;width:140px}
 </style>
 </head>
 <body>
@@ -41,6 +43,10 @@
       </div>
     </div>
     <div class="filters">
+      <div class="num">
+        <label for="animalNumField">رقم الحيوان:</label>
+        <input id="animalNumField" inputmode="numeric" placeholder="—" />
+      </div>
       <label for="catFilter">فلترة:</label>
       <select id="catFilter">
         <option value="">الكل</option>
@@ -259,7 +265,10 @@
     (async function run(){
       const user = await requireViewAuth(); if(!user){ return; }
 
+      const animalField = document.getElementById('animalNumField');
+
       const num = qpNum();
+      if (animalField) { animalField.value = num || ''; animalField.readOnly = true; }
       if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
 
       if (num) {
