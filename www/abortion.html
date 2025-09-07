@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل إجهاض — مُرَبِّك</title>
+  <style>
+    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff;--danger:#c2410c}
+    *{box-sizing:border-box}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid #e2e8f0;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    .bar{max-width:920px;margin:0 auto;padding:14px 18px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .title{font-weight:800;color:var(--green-600);font-size:18px}
+    main{max-width:920px;margin:18px auto;padding:14px}
+    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    .row{display:grid;gap:14px}
+    @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
+    label{font-weight:700;font-size:15px;color:#0f172a;display:block;margin-bottom:6px}
+    input,select{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
+    .muted{color:var(--muted);font-size:13px}
+    .badge{display:inline-block;background:#e6f8ef;color:var(--green-600);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800}
+    .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;font-size:14px;font-weight:700;text-align:center}
+    .infobar.show{display:block}
+    .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+    .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
+
+    .actions{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -2px 6px rgba(0,0,0,.08);display:flex;gap:10px;padding:12px}
+    .btn{flex:1;padding:16px 18px;border-radius:14px;border:0;cursor:pointer;font-weight:800;font-size:17px}
+    .btn.primary{background:var(--green);color:#fff}
+    .btn.ghost{background:#eef2f7;color:#0f172a}
+  .upload-preview{display:flex;gap:12px;align-items:center;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-top:8px}
+    .upload-preview img{width:min(75vw,320px);aspect-ratio:1/1;height:auto;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="title">تسجيل إجهاض <span class="badge">مُرَبِّك</span></div>
+      <a class="ghost" href="dashboard.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">رجوع للوحة التحكم</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="card grid" id="formCard">
+      <div class="row">
+        <div>
+          <label>رقم الحيوان</label>
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required /></div>
+        <div>
+          <label>تاريخ الإجهاض</label>
+          <input id="eventDate" type="date" required />
+        </div>
+      <div class="row">
+        <div>
+          <label>عمر الإجهاض (شهور)</label>
+          <input id="abortionAge" type="text" disabled />
+        </div>
+      </div>
+
+      
+      </div>
+
+      <div class="row">
+        <div>
+          <label>سبب مُقترح</label>
+          <input id="probableCause" type="text" disabled /></div>
+        <div>
+          <label>ملاحظات</label>
+          <input id="notes" placeholder="اختياري" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>صورة المشيمة (اختياري)</label>
+          <div>
+            <button type="button" id="placentaUploadBtn" class="btn ghost" style="width:100%;max-width:260px">رفع صورة</button>
+            <input id="placentaInput" type="file" accept="image/*" capture="environment" style="display:none" />
+            <div id="placentaPreview" class="upload-preview" style="display:none">
+              <img id="placentaImg" alt="معاينة" />
+              <div>
+                <div id="placentaName" style="font-weight:700"></div>
+                <div id="placentaSize" class="muted"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="info" class="infobar"></div>
+    </div>
+  </main>
+
+  <div class="actions">
+    <button class="btn primary" id="saveBtn">حفظ الإجهاض ✅</button>
+    <button class="btn ghost" id="backBtn">رجوع للوحة التحكم</button>
+  </div>
+
+  <script type="module">
+    import { db, auth, requireAuth } from '/js/firebase-config.js';
+    import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const $ =(id)=>document.getElementById(id);
+    const qs=(s)=>document.querySelector(s);
+
+    // حالة داخلية للذكاء بدون عرض خانات للمستخدم
+    let _lastFertilizedDate = null; // YYYY-MM-DD أو null
+    let _isPregnant = false;
+
+    // تمرير السياق من صفحة الأحداث
+    (function hydrate(){
+      const p=new URLSearchParams(location.search);
+      const num=p.get('number')||localStorage.getItem('currentAnimalNumber')||localStorage.getItem('lastAnimalNumber')||'';
+      const date=p.get('date')||localStorage.getItem('currentEventDate')||new Date().toISOString().slice(0,10);
+      if(num){ $('animalNumber').value=num; try{ localStorage.setItem('currentAnimalNumber',num);}catch{} }
+      if(date){ $('eventDate').value=date; try{ localStorage.setItem('currentEventDate',date);}catch{} }
+    })();
+
+    function showMsg(t,err){ const el=$('info'); el.className='infobar '+(err?'show error':'show'); el.textContent=t; try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch{} }
+
+    function monthsBetween(d1,d2){
+      const a=new Date(d1+'T00:00:00'); const b=new Date(d2+'T00:00:00');
+      let months=(b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+      months += (b.getDate()-a.getDate())/30; // تقريب الأيام
+      return Math.max(0, Math.round(months*10)/10);
+    }
+
+    function suggestCause(months){
+      if(!months && months!==0) return '';
+      return months>=6 ? 'بروسيلا (مرجّح ≥6 شهور)' : 'الإسهال الفيروسي المعدي (BVD) — مرجّح < 6 شهور';
+    }
+
+    async function fetchLastFertilizedInsemination(num){
+      // require auth للقراءة وفق الرولز
+      try{ await requireAuth(); }catch{ return null; }
+      const tenantId=localStorage.getItem('tenantId');
+      const evs=collection(db,'events');
+      // آخر تلقيح (نأخذ آخر 5 ونفلتر مخصّب إن وُجد)
+      const wh = [];
+      if(tenantId) wh.push(where('tenantId','==',tenantId)); else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
+      wh.push(where('animalNumber','==',num));
+      wh.push(where('eventType','==','insemination'));
+      const qy=query(evs, ...wh, orderBy('eventDate','desc'), limit(5));
+      const snap=await getDocs(qy);
+      if(snap.empty) return null;
+      let best=null; let fallback=null;
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(!fallback) fallback=d;
+        const ok = d.fertilized===true || d.isFertilized===true || d.result==='مخصب' || d.result==='خصب' || d.pregnancy==='مخصب';
+        if(ok && !best) best=d;
+      });
+      // الإجهاض يستلزم وجود تلقيح مُخصّب سابق
+      return best; // لا نسمح بالفallback هنا
+    }
+
+    // جلب الحالة التناسلية من بطاقة الحيوان
+    async function fetchReproStatus(num){
+      try{ await requireAuth(); }catch{ return {status:null, pregnant:false}; }
+      const tenantId = localStorage.getItem('tenantId');
+      const col = collection(db,'animals');
+      const wh=[];
+      if(tenantId) wh.push(where('tenantId','==',tenantId)); else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
+      // الرقم في بعض المشاريع مخزن كـ number أو animalNumber
+      wh.push(where('animalNumber','==',num));
+      const qy = query(col, ...wh, limit(1));
+      const snap = await getDocs(qy);
+      if(snap.empty) return {status:null, pregnant:false};
+      const a = snap.docs[0].data();
+      const raw = a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
+      let txt = typeof raw==='string' ? raw : (raw===true?'عشار': raw===false?'فارغة': '');
+      const pregnant = (String(txt).includes('عشار')) || raw===true || (String(raw).toLowerCase()==='pregnant');
+      if(!txt && pregnant) txt='عشار';
+      return {status: txt || null, pregnant};
+    }
+
+    async function recalc(){
+      const num = ($('animalNumber').value||'').trim();
+      const date = $('eventDate').value;
+      const save = $('saveBtn');
+      // تهيئة
+      let allow = true; let msg = '';
+      if(!num || !date){
+        $('abortionAge').value = '';
+        $('probableCause').value = '';
+        _lastFertilizedDate = null; _isPregnant = false; allow = false; msg = '';
+      } else {
+        // 1) جلب آخر تلقيح مُخصّب
+        const last = await fetchLastFertilizedInsemination(num);
+        _lastFertilizedDate = last?.eventDate || null;
+        if(!_lastFertilizedDate){ allow = false; msg = 'لا يوجد تلقيح مُخصّب سابق لهذا الحيوان — لا يمكن تسجيل الإجهاض.'; }
+        // 2) الحالة التناسلية (عشار)
+        const rs = await fetchReproStatus(num);
+        _isPregnant = !!rs?.pregnant;
+        if(!_isPregnant){ allow = false; msg = 'الحالة التناسلية ليست عشار — لا يمكن تسجيل الإجهاض.'; }
+        // 3) الحسابات المشتقة عند توافر البيانات
+        if(allow && _lastFertilizedDate){
+          const m = monthsBetween(_lastFertilizedDate, date);
+          $('abortionAge').value = String(m);
+          $('probableCause').value = suggestCause(m);
+        } else {
+          $('abortionAge').value = '';
+          $('probableCause').value = '';
+        }
+      }
+      // التحكم في زر الحفظ والرسالة
+      if(save) save.disabled = !allow;
+      if(msg) showMsg(msg, true); else showMsg('', false);
+    }
+// تحسّن الاستجابة: نحسب تلقائيًا أثناء الكتابة + عند التغيير
+function debounce(fn, ms=300){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+const recalcDebounced = debounce(recalc, 250);
+$('eventDate').addEventListener('change', recalc);
+$('animalNumber').addEventListener('change', recalc);
+$('eventDate').addEventListener('input', recalcDebounced);
+$('animalNumber').addEventListener('input', recalcDebounced);
+recalc();
+
+    // رفع صورة المشيمة (اختياري)
+    let _placentaSelected = false;
+    const placentaBtn = $('placentaUploadBtn');
+    const placentaInput = $('placentaInput');
+    const placentaPreview = $('placentaPreview');
+    const placentaImg = $('placentaImg');
+    const placentaName = $('placentaName');
+    const placentaSize = $('placentaSize');
+    placentaBtn?.addEventListener('click', ()=> placentaInput?.click());
+    placentaInput?.addEventListener('change', (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f){ _placentaSelected=false; if(placentaPreview) placentaPreview.style.display='none'; return; }
+      const r=new FileReader();
+      r.onload=()=>{ if(placentaImg) placentaImg.src=r.result; if(placentaPreview) placentaPreview.style.display='flex'; _placentaSelected=true; if(placentaName) placentaName.textContent=f.name; if(placentaSize) placentaSize.textContent = Math.round(f.size/1024)+' ك.ب'; };
+      r.readAsDataURL(f);
+    });
+
+    $('backBtn')?.addEventListener('click', ()=>{ location.href='dashboard.html'; });
+
+    $('saveBtn').addEventListener('click', onSave);
+
+    async function onSave(){
+      const btn=$('saveBtn'); const reset=()=>{ btn.disabled=false; btn.textContent='حفظ الإجهاض ✅'; };
+      try{
+        btn.disabled=true; btn.textContent='جارٍ الحفظ…';
+        try{ await requireAuth(); }catch{ showMsg('يجب تسجيل الدخول.',true); reset(); return; }
+
+        const animalNumber=($('animalNumber').value||'').trim();
+        const eventDate=$('eventDate').value;
+        if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return reset(); }
+        if(!eventDate){ showMsg('اختر تاريخ الإجهاض',true); return reset(); }
+
+        // يجب وجود تلقيح مخصّب سابق
+        if(!_lastFertilizedDate){ showMsg('لا يوجد تلقيح مُخصّب سابق لهذا الحيوان — لا يمكن تسجيل الإجهاض.', true); return reset(); }
+        // ويجب أن تكون الحالة التناسلية عشار
+        if(!_isPregnant){ showMsg('الحالة التناسلية ليست عشار — لا يمكن تسجيل الإجهاض.', true); return reset(); }
+
+        const ageMonths=Number(($('abortionAge').value||'').replace(',','.'))||null;
+        const probable= $('probableCause').value || null;
+        const tenantId=localStorage.getItem('tenantId')||null;
+        const tz=Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+        await addDoc(collection(db,'events'),{
+          type:'إجهاض', eventType:'abortion',
+          eventDate, eventDateUtc:new Date(eventDate+'T00:00:00Z').toISOString(),
+          animalNumber,
+          abortionAgeMonths: ageMonths,
+          probableCause: probable,
+          hasPlacentaPhoto: _placentaSelected ? true : false,
+          tz, tenantId,
+          source: location.href,
+          userId: auth.currentUser?.uid || null,
+          uid: auth.currentUser?.uid || null,
+          createdAt: serverTimestamp()
+        });
+
+        showMsg('✅ تم حفظ الإجهاض بنجاح', false);
+        btn.textContent='تم الحفظ ✓';
+        setTimeout(()=>{ location.href='add-event.html?number='+encodeURIComponent(animalNumber)+'&date='+encodeURIComponent(eventDate); }, 900);
+      }catch(err){
+        console.error(err);
+        showMsg('تعذّر الحفظ في فايربيز (تحقّق من الصلاحيات/الإندكسات).', true);
+        reset();
+      }
+    }
+  </script>
+</body>
+</html>
