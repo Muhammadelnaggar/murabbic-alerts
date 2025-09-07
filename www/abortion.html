@@ -101,7 +101,7 @@
   <script type="module">
     import { db, auth, requireAuth } from '/js/firebase-config.js';
     import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
+    //import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';  <!-- جديد -->
     const $ =(id)=>document.getElementById(id);
     const qs=(s)=>document.querySelector(s);
 
@@ -118,7 +118,14 @@
       if(date){ $('eventDate').value=date; try{ localStorage.setItem('currentEventDate',date);}catch{} }
     })();
 
-    function showMsg(t,err){ const el=$('info'); el.className='infobar '+(err?'show error':'show'); el.textContent=t; try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch{} }
+  function showMsg(t, err){
+  const el = $('info');
+  if(!t){ el.className = 'infobar'; el.textContent=''; return; } // إخفاء عند فراغ
+  el.className = 'infobar ' + (err ? 'show error' : 'show');
+  el.textContent = t;
+  try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
+}
+
 
     function monthsBetween(d1,d2){
       const a=new Date(d1+'T00:00:00'); const b=new Date(d2+'T00:00:00');
@@ -216,7 +223,8 @@ $('eventDate').addEventListener('change', recalc);
 $('animalNumber').addEventListener('change', recalc);
 $('eventDate').addEventListener('input', recalcDebounced);
 $('animalNumber').addEventListener('input', recalcDebounced);
-recalc();
+requireAuth().catch(()=>{}).finally(()=> recalc());
+
 
     // رفع صورة المشيمة (اختياري)
     let _placentaSelected = false;
