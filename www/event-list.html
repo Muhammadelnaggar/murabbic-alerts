@@ -24,10 +24,9 @@
   .head{gap:8px}
 .btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
 .btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
-.tabs{display:flex;gap:8px;overflow:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:8px 2px;margin-bottom:8px}
-.tabs::-webkit-scrollbar{display:none}
-.tabs a{white-space:nowrap;padding:8px 12px;border:1px solid var(--border);border-radius:999px;text-decoration:none;color:var(--text);background:var(--card)}
-.tabs a.active{background:var(--pill-bg);border-color:var(--pill-border);color:var(--pill-text);font-weight:700}
+.filters{display:flex;gap:8px;align-items:center;margin:8px 0}
+.filters label{font-size:12px;color:var(--muted)}
+.filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
 </style>
 </head>
 <body>
@@ -36,12 +35,21 @@
     <div class="head">
       <div class="title">أحداث هذا الموسم</div>
       <div class="meta" id="meta">—</div>
-      <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
+      <div style="display:flex; gap:8px; align-items:center">
+        <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
+        <a id="toDash" class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
+      </div>
     </div>
-    <div class="tabs" id="tabs">
-      <a id="tab-card" href="#">بطاقة الحيوان</a>
-      <a id="tab-events" href="#" class="active">الأحداث</a>
-      <a id="tab-all" href="#">كل الأحداث</a>
+    <div class="filters">
+      <label for="catFilter">فلترة:</label>
+      <select id="catFilter">
+        <option value="">الكل</option>
+        <option value="انتاج">انتاج</option>
+        <option value="تناسليات">تناسليات</option>
+        <option value="صحة">صحة</option>
+        <option value="تقييم بالكاميرا">تقييم بالكاميرا</option>
+        <option value="تغذية">تغذية</option>
+      </select>
     </div>
     <div class="table-wrap">
       <div class="scroll">
@@ -62,10 +70,11 @@
   </div>
 
   <script type="module">
-    import { db, requireAuth } from '/js/firebase-config.js';
+    import { db, auth } from '/js/firebase-config.js';
     import {
       collection, getDocs, query, where, orderBy, limit
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
@@ -82,6 +91,32 @@
       };
       return m[ev.eventType] || 'حدث';
     };
+
+    // ——— التصنيف حسب الكاتيجوري ———
+    const CATEGORY_MAP = {
+      'انتاج': ['daily_milk','dry_off'],
+      'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
+      'صحة': ['mastitis','lameness','vaccination','treatment','health'],
+      'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment'],
+      'تغذية': ['nutrition','feeding']
+    };
+    function categoryOf(ev){
+      const explicit = ev.category || ev.eventCategory || ev.cat;
+      if (explicit) return explicit;
+      const t = (ev.eventType||'').toString();
+      for (const [cat, types] of Object.entries(CATEGORY_MAP)){
+        if (types.includes(t)) return cat;
+      }
+      return 'أخرى';
+    }
+    function qpCat(){
+      const p = new URLSearchParams(location.search);
+      return p.get('cat') || '';
+    }
+    function filterByCat(events, cat){
+      if (!cat) return events;
+      return events.filter(e => categoryOf(e) === cat);
+    }
     function showErr(t){ errbox.textContent=t; errbox.className='err show'; }
     function qpNum(){
       const p = new URLSearchParams(location.search);
@@ -89,6 +124,24 @@
     }
     function isAllView(){
       return new URLSearchParams(location.search).get('view') === 'all';
+    }
+
+    // انتظار حالة تسجيل الدخول مرة واحدة
+    async function waitAuthOnce(){
+      return await new Promise((resolve)=>{
+        const off = onAuthStateChanged(auth, (u)=>{ off(); resolve(u || null); });
+      });
+    }
+    // تحقق ناعم للعرض داخل الإطارات
+    async function requireViewAuth(){
+      const u = auth.currentUser || await waitAuthOnce();
+      if (!u){
+        const next = '/login.html?next=' + encodeURIComponent(location.href);
+        rows.innerHTML = '<tr><td colspan="3" class="empty">يلزم تسجيل الدخول لعرض الأحداث. <a href="'+next+'">تسجيل الدخول</a></td></tr>';
+        meta.textContent = '—';
+        return null;
+      }
+      return u;
     }
 
     // جلب ولادات الحيوان
@@ -204,7 +257,7 @@
 
     // ——— main ———
     (async function run(){
-      try{ await requireAuth(); }catch{ location.href = '/login.html?next=' + encodeURIComponent(location.href); return; }
+      const user = await requireViewAuth(); if(!user){ return; }
 
       const num = qpNum();
       if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
@@ -212,18 +265,7 @@
       if (num) {
         const q = `number=${encodeURIComponent(num)}`;
         const cardUrl = `cow-card.html?${q}`;
-        const eventsUrl = `event-list.html?${q}`;
-        const allUrl = `${eventsUrl}&view=all`;
         const openCard = $('openCard'); if (openCard) openCard.href = cardUrl;
-        const tabCard = $('tab-card'); if (tabCard) tabCard.href = cardUrl;
-        const tabEvents = $('tab-events'); if (tabEvents) tabEvents.href = eventsUrl;
-        const tabAll = $('tab-all'); if (tabAll) tabAll.href = allUrl;
-        // تفعيل التبويب النشط
-        const view = new URLSearchParams(location.search).get('view') || '';
-        if (view === 'all') {
-          if (tabEvents) tabEvents.classList.remove('active');
-          if (tabAll) tabAll.classList.add('active');
-        }
       }
 
       const today = new Date().toISOString().slice(0,10);
@@ -241,8 +283,22 @@
         bounds.start = getBirthDate(profile);
       }
 
-      const events = await getEventsForRange(num, bounds.start || null, bounds.end || null);
-      render(events, bounds);
+      window.__BOUNDS = bounds;
+      const all = await getEventsForRange(num, bounds.start || null, bounds.end || null);
+      window.__ALL_EVENTS = all;
+      const sel = document.getElementById('catFilter');
+      if (sel) { sel.value = qpCat() || ''; }
+      const currentCat = sel ? sel.value : '';
+      render(filterByCat(all, currentCat), bounds);
+      if (sel){
+        sel.addEventListener('change', ()=>{
+          const cat = sel.value || '';
+          const url = new URL(location.href);
+          if (cat) url.searchParams.set('cat', cat); else url.searchParams.delete('cat');
+          history.replaceState({}, '', url.toString());
+          render(filterByCat(window.__ALL_EVENTS || [], cat), window.__BOUNDS || {start:null,end:null});
+        });
+      }
     })().catch(e=>{ console.error(e); showErr('تعذّر تحميل الأحداث. تأكد من الصلاحيات وقواعد Firestore.'); });
   </script>
 </body>
