@@ -45,6 +45,19 @@
     header,.container,#cameraCard{position:relative;z-index:1}
     .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap}
     .save-bar .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
+    /* تكبير أزرار شريط الحفظ ليتناسق مع باقي الصفحات */
+.save-bar .btn{
+  padding:16px 18px;
+  min-height:54px;
+  font-size:17px;
+  border-radius:14px;
+}
+/* على الموبايل نخليهم صف فوق بعض وبعرض كامل */
+@media (max-width:520px){
+  .save-bar{ flex-direction:column; align-items:stretch }
+  .save-bar .btn{ width:100% }
+}
+
   </style>
 </head>
 <body>
@@ -483,7 +496,7 @@
 
   <!-- (المطلوب 4) ربط فايربيز: حفظ التقييم (الدرجة فقط) في Firestore — بدون حفظ الصور -->
 <script type="module">
-  import { db, auth } from "/js/firebase-config.js";
+  import { db, auth, requireAuth } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   function todayCairo(){
@@ -536,26 +549,48 @@
       const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
       const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
 
-      const uid = (auth?.currentUser?.uid)
-                  || localStorage.getItem("userId")
-                  || localStorage.getItem("tenantId")
-                  || null;
+     const userId  = auth.currentUser?.uid || null;
+ const tenantId = localStorage.getItem("tenantId") || null;
+      // لازم دخول عشان نمر الرولز ونكتب userId
+try { 
+  await requireAuth(); 
+} catch {
+  // نمرر السياق لصفحة الدخول ونرجع تلقائيًا
+  const params = new URLSearchParams();
+  const num = localStorage.getItem("currentAnimalNumber") || "";
+  const dt  = eventDateInput?.value || localStorage.getItem("currentEventDate") || todayCairo();
+  if (num) params.set("number", num);
+  if (dt)  params.set("date", dt);
+  location.href = "/login.html?next=" + encodeURIComponent(location.pathname + "?" + params.toString());
+  return;
+}
 
       try {
         await addDoc(collection(db, "events"), {
           type: "تقييم الروث بالكاميرا",
           eventType: "feces_eval",
           eventDate,
+          eventDateUtc: new Date(eventDate + "T00:00:00Z").toISOString(),
           animalId,
           animalNumber,
           fecesScore: score,            // الرقم
           description: fecesDesc(score),// الوصف البرمجي
           value: score,                 // نفس الرقم لتوحيد التقارير
-          uid,
-          source: location.pathname,
+          userId,                       // مهم لتمرير الرولز
+          uid: userId,                  // (اختياري) للتوافق مع أي كود قديم
+          tenantId,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          source: location.href,
           createdAt: serverTimestamp()
         });
-        showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+       showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+       setTimeout(()=>{
+       const params = new URLSearchParams();
+       if (animalId)     params.set("animalId", animalId);
+       if (animalNumber) params.set("number",   animalNumber);
+       if (eventDate)    params.set("date",     eventDate);
+       location.href = "add-event.html?" + params.toString();
+       }, 900);
       } catch (err) {
         console.error("Firestore save error:", err);
         showMsg("❌ حدث خطأ أثناء الحفظ", false);
