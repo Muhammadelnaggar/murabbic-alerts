@@ -34,8 +34,6 @@
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
-  <!-- تأكد من تحميل firebase-config مبكرًا -->
-  <script type="module">import '/js/firebase-config.js';</script>
 
   <header>
     <div class="bar">
@@ -206,7 +204,7 @@
 
     // هيدريت من URL ثم استرجاع لو ناقص
     (()=>{ const p=new URLSearchParams(location.search);
-      const num=p.get('number')||p.get('animalNumber')||'';
+     const num=p.get('number')||p.get('animalNumber')||p.get('animalId')||'';
       const date=p.get('date')||new Date().toISOString().slice(0,10);
       if(num) $('animalNumber').value=num;
       if(date) $('eventDate').value=date;
@@ -306,3 +304,4 @@
   </script>
 </body>
 </html>
+
