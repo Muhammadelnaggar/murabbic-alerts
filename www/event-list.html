@@ -21,7 +21,14 @@
     .empty{padding:14px;text-align:center;color:var(--muted)}
     .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
     .err.show{display:block}
-  </style>
+  .head{gap:8px}
+.btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
+.btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
+.tabs{display:flex;gap:8px;overflow:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:8px 2px;margin-bottom:8px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs a{white-space:nowrap;padding:8px 12px;border:1px solid var(--border);border-radius:999px;text-decoration:none;color:var(--text);background:var(--card)}
+.tabs a.active{background:var(--pill-bg);border-color:var(--pill-border);color:var(--pill-text);font-weight:700}
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -29,6 +36,12 @@
     <div class="head">
       <div class="title">أحداث هذا الموسم</div>
       <div class="meta" id="meta">—</div>
+      <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
+    </div>
+    <div class="tabs" id="tabs">
+      <a id="tab-card" href="#">بطاقة الحيوان</a>
+      <a id="tab-events" href="#" class="active">الأحداث</a>
+      <a id="tab-all" href="#">كل الأحداث</a>
     </div>
     <div class="table-wrap">
       <div class="scroll">
@@ -73,6 +86,9 @@
     function qpNum(){
       const p = new URLSearchParams(location.search);
       return p.get('number') || p.get('animalId') || p.get('animalNumber') || '';
+    }
+    function isAllView(){
+      return new URLSearchParams(location.search).get('view') === 'all';
     }
 
     // جلب ولادات الحيوان
@@ -155,11 +171,13 @@
       rows.innerHTML = '';
       if (!events.length){
         rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
-        meta.textContent = !bounds.start
-          ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
-          : (bounds.end
-              ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
-              : `من الميلاد ${bounds.start} حتى اليوم`);
+        meta.textContent = isAllView()
+        ? 'كل الأحداث'
+        : (!bounds.start
+            ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
+            : (bounds.end
+                ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
+                : `من الميلاد ${bounds.start} حتى اليوم`));
         return;
       }
       const frag = document.createDocumentFragment();
@@ -175,11 +193,13 @@
         frag.appendChild(tr);
       }
       rows.appendChild(frag);
-      meta.textContent = !bounds.start
-        ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
-        : (bounds.end
-            ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
-            : `من الميلاد ${bounds.start} حتى اليوم`);
+      meta.textContent = isAllView()
+        ? 'كل الأحداث'
+        : (!bounds.start
+            ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
+            : (bounds.end
+                ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
+                : `من الميلاد ${bounds.start} حتى اليوم`));
     }
 
     // ——— main ———
@@ -189,17 +209,36 @@
       const num = qpNum();
       if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
 
+      if (num) {
+        const q = `number=${encodeURIComponent(num)}`;
+        const cardUrl = `cow-card.html?${q}`;
+        const eventsUrl = `event-list.html?${q}`;
+        const allUrl = `${eventsUrl}&view=all`;
+        const openCard = $('openCard'); if (openCard) openCard.href = cardUrl;
+        const tabCard = $('tab-card'); if (tabCard) tabCard.href = cardUrl;
+        const tabEvents = $('tab-events'); if (tabEvents) tabEvents.href = eventsUrl;
+        const tabAll = $('tab-all'); if (tabAll) tabAll.href = allUrl;
+        // تفعيل التبويب النشط
+        const view = new URLSearchParams(location.search).get('view') || '';
+        if (view === 'all') {
+          if (tabEvents) tabEvents.classList.remove('active');
+          if (tabAll) tabAll.classList.add('active');
+        }
+      }
+
       const today = new Date().toISOString().slice(0,10);
       const profile = await getAnimalProfile(num);
       const mode = decideSeasonMode(profile);
+      const view = new URLSearchParams(location.search).get('view') || '';
 
       let bounds = { start:null, end:null };
-      if (mode === 'bounded'){
+      if (view === 'all') {
+        // كل الأحداث بدون حدود موسم
+      } else if (mode === 'bounded'){
         bounds = await getSeasonBounds(num, today);
         if (!bounds.start){ render([], {start:null, end:null}); return; }
       } else {
         bounds.start = getBirthDate(profile);
-        // لو لم نجد تاريخ الميلاد، سنعرض كل الأحداث
       }
 
       const events = await getEventsForRange(num, bounds.start || null, bounds.end || null);
