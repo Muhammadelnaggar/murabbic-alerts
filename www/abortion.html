@@ -162,23 +162,44 @@
       return best || fallback || null; // حساب فقط — لا شرط للحفظ
     }
 
-    async function fetchReproStatus(num){
-      try{ await requireAuth(); }catch{ return {pregnant:false}; }
-      const tenantId = localStorage.getItem('tenantId');
-      const col = collection(db,'animals');
-      const wh=[];
-      if(tenantId) wh.push(where('tenantId','==',tenantId));
-      else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
-      wh.push(where('animalNumber','==',num));
-      const qy=query(col, ...wh, limit(1));
-      const snap=await getDocs(qy);
-      if(snap.empty) return {pregnant:false};
+   async function fetchReproStatus(num){
+  try{ await requireAuth(); }catch{ return {pregnant:false}; }
 
-      const a=snap.docs[0].data();
-      const raw=a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
-      const pregnant=(String(raw).includes('عشار')) || raw===true || (String(raw).toLowerCase()==='pregnant');
-      return {pregnant};
-    }
+  const tenantId = localStorage.getItem('tenantId');
+  const col = collection(db,'animals');
+
+  // عامل تصفية المالك
+  const base = [];
+  if(tenantId) base.push(where('tenantId','==',tenantId));
+  else if(auth.currentUser?.uid) base.push(where('userId','==',auth.currentUser.uid));
+
+  // جرّب أولاً animalNumber، ولو فاضي جرّب number
+  async function qBy(field){
+    const qy = query(col, ...base, where(field,'==',num), limit(1));
+    const snap = await getDocs(qy);
+    return snap.empty ? null : snap.docs[0].data();
+  }
+
+  let a = await qBy('animalNumber');
+  if(!a) a = await qBy('number');            // ← وثيقتك تستخدم هذا
+
+  if(!a) return {pregnant:false};
+
+  // توحيد النص العربي (إزالة التشكيل، توحيد الألف، …) ثم فحص عدة صيغ
+  const raw = a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
+  const norm = (s)=> String(s)
+    .replace(/[\u064B-\u0652]/g,'')         // إزالة التشكيل
+    .replace(/[إأآا]/g,'ا')                  // توحيد الألف
+    .replace(/ة/g,'ه')                       // تقريب التاء المربوطة
+    .toLowerCase();
+
+  const txt = norm(raw);
+  const pregnant = raw===true ||
+                   /عشار|عشر|حامل|pregnant/.test(txt);
+
+  return {pregnant};
+}
+
 
     async function recalc(){
       const num=($('animalNumber').value||'').trim();
