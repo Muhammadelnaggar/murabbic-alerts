@@ -25,12 +25,11 @@
     .infobar.show{display:block}
     .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
     .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-
     .actions{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -2px 6px rgba(0,0,0,.08);display:flex;gap:10px;padding:12px}
     .btn{flex:1;padding:16px 18px;border-radius:14px;border:0;cursor:pointer;font-weight:800;font-size:17px}
     .btn.primary{background:var(--green);color:#fff}
     .btn.ghost{background:#eef2f7;color:#0f172a}
-  .upload-preview{display:flex;gap:12px;align-items:center;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-top:8px}
+    .upload-preview{display:flex;gap:12px;align-items:center;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-top:8px}
     .upload-preview img{width:min(75vw,320px);aspect-ratio:1/1;height:auto;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb}
   </style>
 </head>
@@ -47,32 +46,30 @@
       <div class="row">
         <div>
           <label>رقم الحيوان</label>
-          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required /></div>
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+        </div>
         <div>
           <label>تاريخ الإجهاض</label>
           <input id="eventDate" type="date" required />
         </div>
+      </div>
+
       <div class="row">
         <div>
           <label>عمر الإجهاض (شهور)</label>
           <input id="abortionAge" type="text" disabled />
         </div>
-      </div>
-
-      
-      </div>
-
-      <div class="row">
         <div>
           <label>سبب مُقترح</label>
-          <input id="probableCause" type="text" disabled /></div>
-        <div>
-          <label>ملاحظات</label>
-          <input id="notes" placeholder="اختياري" />
+          <input id="probableCause" type="text" disabled />
         </div>
       </div>
 
       <div class="row">
+        <div>
+          <label>ملاحظات</label>
+          <input id="notes" placeholder="اختياري" />
+        </div>
         <div>
           <label>صورة المشيمة (اختياري)</label>
           <div>
@@ -100,16 +97,17 @@
 
   <script type="module">
     import { db, auth, requireAuth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    //import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';  <!-- جديد -->
-    const $ =(id)=>document.getElementById(id);
-    const qs=(s)=>document.querySelector(s);
+    import {
+      collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    // حالة داخلية للذكاء بدون عرض خانات للمستخدم
-    let _lastFertilizedDate = null; // YYYY-MM-DD أو null
-    let _isPregnant = false;
+    const $ = (id)=>document.getElementById(id);
 
-    // تمرير السياق من صفحة الأحداث
+    // حالة داخلية
+    let _lastInsemDate = null;   // آخر تلقيح (مُخصّب إن وُجد، وإلا آخر تلقيح عادي)
+    let _isPregnant   = false;   // الحالة التناسلية عِشار؟
+
+    // تمرير السياق
     (function hydrate(){
       const p=new URLSearchParams(location.search);
       const num=p.get('number')||localStorage.getItem('currentAnimalNumber')||localStorage.getItem('lastAnimalNumber')||'';
@@ -118,153 +116,162 @@
       if(date){ $('eventDate').value=date; try{ localStorage.setItem('currentEventDate',date);}catch{} }
     })();
 
-  function showMsg(t, err){
-  const el = $('info');
-  if(!t){ el.className = 'infobar'; el.textContent=''; return; } // إخفاء عند فراغ
-  el.className = 'infobar ' + (err ? 'show error' : 'show');
-  el.textContent = t;
-  try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
-}
-
+    function showMsg(t,err){
+      const el=$('info'); if(!el) return;
+      if(!t){ el.className='infobar'; el.textContent=''; return; }
+      el.className='infobar show'+(err?' error':'');
+      el.textContent=t;
+      try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch{}
+    }
 
     function monthsBetween(d1,d2){
+      if(!d1||!d2) return null;
       const a=new Date(d1+'T00:00:00'); const b=new Date(d2+'T00:00:00');
-      let months=(b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
-      months += (b.getDate()-a.getDate())/30; // تقريب الأيام
-      return Math.max(0, Math.round(months*10)/10);
+      let m=(b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth());
+      m += (b.getDate()-a.getDate())/30;
+      return Math.max(0, Math.round(m*10)/10);
     }
 
     function suggestCause(months){
-      if(!months && months!==0) return '';
-      return months>=6 ? 'بروسيلا (مرجّح ≥6 شهور)' : 'الإسهال الفيروسي المعدي (BVD) — مرجّح < 6 شهور';
+      if(months==null) return '';
+      return months>=6 ? 'بروسيلا (≥ 6 شهور)' : 'BVD محتمل (< 6 شهور)';
     }
 
-    async function fetchLastFertilizedInsemination(num){
-      // require auth للقراءة وفق الرولز
+    // نُفضِّل التلقيح المُخصّب، وإن لم يوجد نأخذ آخر تلقيح عادي
+    async function fetchLastInsemination(num){
       try{ await requireAuth(); }catch{ return null; }
       const tenantId=localStorage.getItem('tenantId');
       const evs=collection(db,'events');
-      // آخر تلقيح (نأخذ آخر 5 ونفلتر مخصّب إن وُجد)
-      const wh = [];
-      if(tenantId) wh.push(where('tenantId','==',tenantId)); else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
+      const wh=[];
+      if(tenantId) wh.push(where('tenantId','==',tenantId));
+      else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
       wh.push(where('animalNumber','==',num));
       wh.push(where('eventType','==','insemination'));
-      const qy=query(evs, ...wh, orderBy('eventDate','desc'), limit(5));
+      const qy=query(evs, ...wh, orderBy('eventDate','desc'), limit(10));
       const snap=await getDocs(qy);
       if(snap.empty) return null;
-      let best=null; let fallback=null;
-      snap.forEach(doc=>{
-        const d=doc.data();
-        if(!fallback) fallback=d;
-        const ok = d.fertilized===true || d.isFertilized===true || d.result==='مخصب' || d.result==='خصب' || d.pregnancy==='مخصب';
-        if(ok && !best) best=d;
+
+      let best=null, fallback=null;
+      snap.forEach(d=>{
+        const x=d.data();
+        if(!fallback) fallback=x;
+        const ok = x.fertilized===true || x.isFertilized===true ||
+                   x.result==='مخصب' || x.result==='خصب' || x.pregnancy==='مخصب';
+        if(ok && !best) best=x;
       });
-      // الإجهاض يستلزم وجود تلقيح مُخصّب سابق
-      return best; // لا نسمح بالفallback هنا
+      return best || fallback || null; // حساب فقط — لا شرط للحفظ
     }
 
-    // جلب الحالة التناسلية من بطاقة الحيوان
     async function fetchReproStatus(num){
-      try{ await requireAuth(); }catch{ return {status:null, pregnant:false}; }
+      try{ await requireAuth(); }catch{ return {pregnant:false}; }
       const tenantId = localStorage.getItem('tenantId');
       const col = collection(db,'animals');
       const wh=[];
-      if(tenantId) wh.push(where('tenantId','==',tenantId)); else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
-      // الرقم في بعض المشاريع مخزن كـ number أو animalNumber
+      if(tenantId) wh.push(where('tenantId','==',tenantId));
+      else if(auth.currentUser?.uid) wh.push(where('userId','==',auth.currentUser.uid));
       wh.push(where('animalNumber','==',num));
-      const qy = query(col, ...wh, limit(1));
-      const snap = await getDocs(qy);
-      if(snap.empty) return {status:null, pregnant:false};
-      const a = snap.docs[0].data();
-      const raw = a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
-      let txt = typeof raw==='string' ? raw : (raw===true?'عشار': raw===false?'فارغة': '');
-      const pregnant = (String(txt).includes('عشار')) || raw===true || (String(raw).toLowerCase()==='pregnant');
-      if(!txt && pregnant) txt='عشار';
-      return {status: txt || null, pregnant};
+      const qy=query(col, ...wh, limit(1));
+      const snap=await getDocs(qy);
+      if(snap.empty) return {pregnant:false};
+
+      const a=snap.docs[0].data();
+      const raw=a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
+      const pregnant=(String(raw).includes('عشار')) || raw===true || (String(raw).toLowerCase()==='pregnant');
+      return {pregnant};
     }
 
     async function recalc(){
-      const num = ($('animalNumber').value||'').trim();
-      const date = $('eventDate').value;
-      const save = $('saveBtn');
-      // تهيئة
-      let allow = true; let msg = '';
-      if(!num || !date){
-        $('abortionAge').value = '';
-        $('probableCause').value = '';
-        _lastFertilizedDate = null; _isPregnant = false; allow = false; msg = '';
-      } else {
-        // 1) جلب آخر تلقيح مُخصّب
-        const last = await fetchLastFertilizedInsemination(num);
-        _lastFertilizedDate = last?.eventDate || null;
-        if(!_lastFertilizedDate){ allow = false; msg = 'لا يوجد تلقيح مُخصّب سابق لهذا الحيوان — لا يمكن تسجيل الإجهاض.'; }
-        // 2) الحالة التناسلية (عشار)
-        const rs = await fetchReproStatus(num);
-        _isPregnant = !!rs?.pregnant;
-        if(!_isPregnant){ allow = false; msg = 'الحالة التناسلية ليست عشار — لا يمكن تسجيل الإجهاض.'; }
-        // 3) الحسابات المشتقة عند توافر البيانات
-        if(allow && _lastFertilizedDate){
-          const m = monthsBetween(_lastFertilizedDate, date);
-          $('abortionAge').value = String(m);
-          $('probableCause').value = suggestCause(m);
-        } else {
-          $('abortionAge').value = '';
-          $('probableCause').value = '';
-        }
-      }
-      // التحكم في زر الحفظ والرسالة
-      if(save) save.disabled = !allow;
-      if(msg) showMsg(msg, true); else showMsg('', false);
-    }
-// تحسّن الاستجابة: نحسب تلقائيًا أثناء الكتابة + عند التغيير
-function debounce(fn, ms=300){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-const recalcDebounced = debounce(recalc, 250);
-$('eventDate').addEventListener('change', recalc);
-$('animalNumber').addEventListener('change', recalc);
-$('eventDate').addEventListener('input', recalcDebounced);
-$('animalNumber').addEventListener('input', recalcDebounced);
-requireAuth().catch(()=>{}).finally(()=> recalc());
+      const num=($('animalNumber').value||'').trim();
+      const date=$('eventDate').value;
+      const save=$('saveBtn');
 
+      if(!num || !date){
+        $('abortionAge').value='';
+        $('probableCause').value='';
+        _isPregnant=false; _lastInsemDate=null;
+        if(save) save.disabled=true;
+        showMsg('',false);
+        return;
+      }
+
+      // الحالة التناسلية: الشرط الوحيد
+      const rs=await fetchReproStatus(num);
+      _isPregnant=!!rs?.pregnant;
+
+      // آخر تلقيح (مخصّب أو آخر عادي) لحساب العمر فقط
+      const lastInsem=await fetchLastInsemination(num);
+      _lastInsemDate = lastInsem?.eventDate || null;
+
+      // حساب العمر والسبب المقترح (إن وُجد تاريخ تلقيح)
+      const m=monthsBetween(_lastInsemDate, date);
+      $('abortionAge').value = (m==null? '' : String(m));
+      $('probableCause').value = (m==null? '' : suggestCause(m));
+
+      // تفعيل/تعطيل زر الحفظ: عِشار فقط + مدخلات أساسية
+      if(save) save.disabled = !(_isPregnant && num && date);
+
+      // رسالة توضيح فقط إن لم تكن عِشار
+      if(!_isPregnant) showMsg('الحالة التناسلية ليست عِشار — لا يمكن تسجيل الإجهاض.', true);
+      else showMsg('', false);
+    }
+
+    // تفاعل مباشر
+    function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+    const recalcDebounced = debounce(recalc, 250);
+    $('animalNumber').addEventListener('input', recalcDebounced);
+    $('eventDate').addEventListener('input', recalcDebounced);
+    $('animalNumber').addEventListener('change', recalc);
+    $('eventDate').addEventListener('change', recalc);
+    recalc();
 
     // رفع صورة المشيمة (اختياري)
-    let _placentaSelected = false;
-    const placentaBtn = $('placentaUploadBtn');
-    const placentaInput = $('placentaInput');
-    const placentaPreview = $('placentaPreview');
-    const placentaImg = $('placentaImg');
-    const placentaName = $('placentaName');
-    const placentaSize = $('placentaSize');
+    let _placentaSelected=false;
+    const placentaBtn=$('placentaUploadBtn');
+    const placentaInput=$('placentaInput');
+    const placentaPreview=$('placentaPreview');
+    const placentaImg=$('placentaImg');
+    const placentaName=$('placentaName');
+    const placentaSize=$('placentaSize');
+
     placentaBtn?.addEventListener('click', ()=> placentaInput?.click());
     placentaInput?.addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0];
+      const f=e.target.files && e.target.files[0];
       if(!f){ _placentaSelected=false; if(placentaPreview) placentaPreview.style.display='none'; return; }
       const r=new FileReader();
-      r.onload=()=>{ if(placentaImg) placentaImg.src=r.result; if(placentaPreview) placentaPreview.style.display='flex'; _placentaSelected=true; if(placentaName) placentaName.textContent=f.name; if(placentaSize) placentaSize.textContent = Math.round(f.size/1024)+' ك.ب'; };
+      r.onload=()=>{
+        if(placentaImg) placentaImg.src=r.result;
+        if(placentaPreview) placentaPreview.style.display='flex';
+        _placentaSelected=true;
+        if(placentaName) placentaName.textContent=f.name;
+        if(placentaSize) placentaSize.textContent = Math.round(f.size/1024)+' ك.ب';
+      };
       r.readAsDataURL(f);
     });
 
+    // أزرار أسفل الصفحة
     $('backBtn')?.addEventListener('click', ()=>{ location.href='dashboard.html'; });
-
     $('saveBtn').addEventListener('click', onSave);
 
     async function onSave(){
-      const btn=$('saveBtn'); const reset=()=>{ btn.disabled=false; btn.textContent='حفظ الإجهاض ✅'; };
+      const btn=$('saveBtn');
+      const reset=()=>{ btn.disabled=false; btn.textContent='حفظ الإجهاض ✅'; };
+
       try{
         btn.disabled=true; btn.textContent='جارٍ الحفظ…';
-        try{ await requireAuth(); }catch{ showMsg('يجب تسجيل الدخول.',true); reset(); return; }
+        try{ await requireAuth(); }catch{ showMsg('يجب تسجيل الدخول.',true); return reset(); }
 
         const animalNumber=($('animalNumber').value||'').trim();
         const eventDate=$('eventDate').value;
+
         if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return reset(); }
         if(!eventDate){ showMsg('اختر تاريخ الإجهاض',true); return reset(); }
 
-        // يجب وجود تلقيح مخصّب سابق
-        if(!_lastFertilizedDate){ showMsg('لا يوجد تلقيح مُخصّب سابق لهذا الحيوان — لا يمكن تسجيل الإجهاض.', true); return reset(); }
-        // ويجب أن تكون الحالة التناسلية عشار
-        if(!_isPregnant){ showMsg('الحالة التناسلية ليست عشار — لا يمكن تسجيل الإجهاض.', true); return reset(); }
+        // الشرط الوحيد: عِشار
+        if(!_isPregnant){ showMsg('الحالة التناسلية ليست عِشار — لا يمكن تسجيل الإجهاض.', true); return reset(); }
 
-        const ageMonths=Number(($('abortionAge').value||'').replace(',','.'))||null;
-        const probable= $('probableCause').value || null;
+        // إعادة حساب العمر لحظة الحفظ (اعتمادًا على آخر تلقيح إن وُجد)
+        const m = monthsBetween(_lastInsemDate, eventDate);
+        const probable = (m==null? null : suggestCause(m));
         const tenantId=localStorage.getItem('tenantId')||null;
         const tz=Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -272,8 +279,10 @@ requireAuth().catch(()=>{}).finally(()=> recalc());
           type:'إجهاض', eventType:'abortion',
           eventDate, eventDateUtc:new Date(eventDate+'T00:00:00Z').toISOString(),
           animalNumber,
-          abortionAgeMonths: ageMonths,
+          abortionAgeMonths: (m==null? null : m),
+          lastInseminationDate: _lastInsemDate || null,
           probableCause: probable,
+          notes: ($('notes').value||'') || null,
           hasPlacentaPhoto: _placentaSelected ? true : false,
           tz, tenantId,
           source: location.href,
@@ -287,7 +296,7 @@ requireAuth().catch(()=>{}).finally(()=> recalc());
         setTimeout(()=>{ location.href='add-event.html?number='+encodeURIComponent(animalNumber)+'&date='+encodeURIComponent(eventDate); }, 900);
       }catch(err){
         console.error(err);
-        showMsg('تعذّر الحفظ في فايربيز (تحقّق من الصلاحيات/الإندكسات).', true);
+        showMsg('تعذّر الحفظ في فايربيز (تحقّق من الصلاحيات/الفهارس).', true);
         reset();
       }
     }
