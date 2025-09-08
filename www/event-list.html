@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -22,15 +21,15 @@
     .empty{padding:14px;text-align:center;color:var(--muted)}
     .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
     .err.show{display:block}
-  .head{gap:8px}
-.btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
-.btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
-.filters{display:flex;gap:8px;align-items:center;margin:8px 0}
-.filters label{font-size:12px;color:var(--muted)}
-.filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
-.filters .num{display:flex;align-items:center;gap:6px}
-.filters input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit;width:140px}
-</style>
+    .head{gap:8px}
+    .btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
+    .btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
+    .filters{display:flex;gap:8px;align-items:center;margin:8px 0}
+    .filters label{font-size:12px;color:var(--muted)}
+    .filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
+    .filters .num{display:flex;align-items:center;gap:6px}
+    .filters input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit;width:140px}
+  </style>
 </head>
 <body>
   <div class="wrap">
@@ -85,14 +84,13 @@
 
     // نطاق المستخدم/المستأجر + فلترة عامة للاستعلامات
     let UID = null, TID = null;
-   function scopeWheres(field, num){
-  const wh = [];
-  if (TID) wh.push(where('tenantId','==', TID)); // اختياري
-  if (UID) wh.push(where('userId','==',   UID)); // ضروري مع القواعد
-  wh.push(where(field,'==', num));
-  return wh;
-}
-
+    function scopeWheres(field, num){
+      const wh = [];
+      if (TID) wh.push(where('tenantId','==', TID)); // اختياري
+      if (UID) wh.push(where('userId','==',   UID)); // موافق للقواعد
+      wh.push(where(field,'==', num));
+      return wh;
+    }
 
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
@@ -100,25 +98,25 @@
     // ——— helpers ———
     const fmt = (d)=> d; // eventDate بالفعل YYYY-MM-DD
     const arabicType = (ev) => {
-      if (ev.type) return ev.type; // لو محفوظ بالعربي
+      if (ev.type) return ev.type;
       const m = {
         calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
         pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
         mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
-        close_up:'كلوز أب', nutrition:'تغذية'
+        close_up:'كلوز أب', nutrition:'تغذية',
+        milking_traits_eval:'تقييم بالكاميرا'
       };
       return m[ev.eventType] || 'حدث';
     };
 
     // ——— التصنيف حسب الكاتيجوري ———
-  const CATEGORY_MAP = {
-  'انتاج': ['daily_milk','dry_off'],
-  'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
-  'صحة': ['mastitis','lameness','vaccination','treatment','health'],
-  'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment', 'milking_traits_eval'],
-  'تغذية': ['nutrition','feeding']
-};
-
+    const CATEGORY_MAP = {
+      'انتاج': ['daily_milk','dry_off'],
+      'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
+      'صحة': ['mastitis','lameness','vaccination','treatment','health'],
+      'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment','milking_traits_eval'],
+      'تغذية': ['nutrition','feeding']
+    };
     function categoryOf(ev){
       const explicit = ev.category || ev.eventCategory || ev.cat;
       if (explicit) return explicit;
@@ -151,7 +149,7 @@
         const off = onAuthStateChanged(auth, (u)=>{ off(); resolve(u || null); });
       });
     }
-    // تحقق ناعم للعرض داخل الإطارات
+    // تحقق ناعم للعرض
     async function requireViewAuth(){
       const u = auth.currentUser || await waitAuthOnce();
       if (!u){
@@ -163,88 +161,42 @@
       return u;
     }
 
-    // جلب ولادات الحيوان
-    async function getCalvings(num, dir='desc', lim=6){
-      const evs = collection(db, 'events');
-      // مسارين للتوافق: animalNumber و animalId
-      const q1 = query(
-        evs,
-        ...scopeWheres('animalNumber', num),
-        where('eventType','==','calving'),
-        orderBy('eventDate', dir),
-        limit(lim)
-      );
-      const q2 = query(
-        evs,
-        ...scopeWheres('animalId', num),
-        where('eventType','==','calving'),
-        orderBy('eventDate', dir),
-        limit(lim)
-      );
-      const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-      const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
-      const seen = new Set(); return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
-    }
-
-    // حدود الموسم: من ولادة إلى الولادة التالية
-    async function getSeasonBounds(num, todayISO){
-      const calvDesc = await getCalvings(num, 'desc', 6);
-      const lastCalving = calvDesc.find(c => c.eventDate && c.eventDate <= todayISO) || null;
-      let start = lastCalving?.eventDate || null;
-      let end = null;
-      if (start){
-        const calvAsc = await getCalvings(num, 'asc', 6);
-        end = calvAsc.find(c => c.eventDate && c.eventDate > start)?.eventDate || null;
-      }
-      return { start, end };
-    }
-
-    // بروفايل الحيوان لتحديد النوع (حلاب أم عجل/عجلة)
+    // بروفايل الحيوان + بداية الموسم من الوثيقة
     async function getAnimalProfile(num){
       try{
         const animals = collection(db, 'animals');
         const owner = [
-  ...(UID ? [where('userId','==', UID)] : []),
-  ...(TID ? [where('tenantId','==', TID)] : [])
-];
-const qs = [
-  query(animals, ...owner, where('number','==',num),       limit(1)),
-  query(animals, ...owner, where('animalNumber','==',num), limit(1)),
-  query(animals, ...owner, where('animalId','==',num),     limit(1)),
-];
-
+          ...(UID ? [where('userId','==', UID)] : []),
+          ...(TID ? [where('tenantId','==', TID)] : [])
+        ];
+        const qs = [
+          query(animals, ...owner, where('number','==',num),       limit(1)),
+          query(animals, ...owner, where('animalNumber','==',num), limit(1)),
+          query(animals, ...owner, where('animalId','==',num),     limit(1)),
+        ];
         const res = await Promise.all(qs.map(getDocs));
         const hit = res.find(s=>!s.empty);
         return hit ? hit.docs[0].data() : null;
       }catch{ return null; }
     }
-    function decideSeasonMode(profile){
-      if(!profile) return 'bounded'; // الافتراضي للحلاب
-      const cat  = (profile.category||profile.stage||'').toString().toLowerCase();
-      const type = (profile.type||profile.kind||'').toString().toLowerCase();
-      const isHeiferOrCalf =
-        /heifer|calf|عجل|عجلة|عجلات|عجول/.test(cat) || /heifer|calf|عجل|عجلة/.test(type);
-      return isHeiferOrCalf ? 'open' : 'bounded';
-    }
-    function getBirthDate(profile){
+    function getSeasonStartFromAnimal(profile){
       if(!profile) return null;
-      return profile.birthDate || profile.dob || profile.birthISO || null;
+      // دعم أكثر من اسم للحقل + Timestamp
+      const raw = profile.lastCalvingDate ?? profile.lastCalving ?? profile.lastCalvingISO ?? profile.lastCalvedAt ?? profile.lastCalvingAt ?? null;
+      if(!raw) return null;
+      if (raw && typeof raw?.toDate === 'function'){
+        return raw.toDate().toISOString().slice(0,10);
+      }
+      const s = String(raw).trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
     }
 
-    // جلب الأحداث ضمن النطاق: بداية شاملة، نهاية مستبعدة
-    async function getEventsForRange(num, startISO, endISO){
+    // جلب الأحداث ضمن النطاق: بداية شاملة، نهاية مستبعدة (لا نحدد نهاية)
+    async function getEventsForRange(num, startISO){
       const evs = collection(db, 'events');
       const build = (field)=>{
         const base = [...scopeWheres(field, num)];
-        if (startISO && endISO){
-          return query(
-            evs,
-            ...base,
-            where('eventDate','>=', startISO),
-            where('eventDate','<',  endISO),
-            orderBy('eventDate','desc')
-          );
-        } else if (startISO){
+        if (startISO){
           return query(
             evs,
             ...base,
@@ -270,13 +222,7 @@ const qs = [
       rows.innerHTML = '';
       if (!events.length){
         rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
-        meta.textContent = isAllView()
-        ? 'كل الأحداث'
-        : (!bounds.start
-            ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
-            : (bounds.end
-                ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
-                : `من الولادة ${bounds.start} حتى اليوم`));
+        meta.textContent = bounds.start ? (`من الولادة ${bounds.start} حتى اليوم`) : 'كل الأحداث';
         return;
       }
       const frag = document.createDocumentFragment();
@@ -292,64 +238,48 @@ const qs = [
         frag.appendChild(tr);
       }
       rows.appendChild(frag);
-      meta.textContent = isAllView()
-        ? 'كل الأحداث'
-        : (!bounds.start
-            ? 'لا يوجد موسم (لم تُسجَّل ولادة بداية أو ميلاد)'
-            : (bounds.end
-                ? `من ولادة ${bounds.start} حتى قبل ولادة ${bounds.end}`
-                : `من الميلاد ${bounds.start} حتى اليوم`));
+      meta.textContent = bounds.start ? (`من الولادة ${bounds.start} حتى اليوم`) : 'كل الأحداث';
     }
 
     // ——— main ———
     (async function run(){
       const user = await requireViewAuth(); if(!user){ return; }
 
-      // إعداد هوية المجال للاستعلامات
       UID = user.uid;
       TID = localStorage.getItem('tenantId') || null;
 
-      const animalField = document.getElementById('animalNumField');
-
       const num = qpNum();
+      const animalField = document.getElementById('animalNumField');
       if (animalField) { animalField.value = num || ''; animalField.readOnly = true; }
       if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
 
-      if (num) {
-        const q = `number=${encodeURIComponent(num)}`;
-        const cardUrl = `cow-card.html?${q}`;
-        const openCard = $('openCard'); if (openCard) openCard.href = cardUrl;
-      }
+      // رابط البطاقة
+      const openCard = document.getElementById('openCard');
+      if (openCard) openCard.href = `cow-card.html?number=${encodeURIComponent(num)}`;
 
-      const today = new Date().toISOString().slice(0,10);
       const profile = await getAnimalProfile(num);
-      const mode = decideSeasonMode(profile);
+      const seasonStart = getSeasonStartFromAnimal(profile);
+
+      // لو view=all نعرض الكل، غير كده نستخدم بداية الموسم من وثيقة الحيوان، ولو مش موجودة نعرض الكل
       const view = new URLSearchParams(location.search).get('view') || '';
+      const bounds = (view === 'all') ? {start:null} : {start: seasonStart || null};
 
-      let bounds = { start:null, end:null };
-      if (view === 'all') {
-        // كل الأحداث بدون حدود موسم
-      } else if (mode === 'bounded'){
-        bounds = await getSeasonBounds(num, today);
-        if (!bounds.start){ render([], {start:null, end:null}); return; }
-      } else {
-        bounds.start = getBirthDate(profile);
-      }
+      const all = await getEventsForRange(num, bounds.start || null);
+      window.__ALL_EVENTS = all; window.__BOUNDS = bounds;
 
-      window.__BOUNDS = bounds;
-      const all = await getEventsForRange(num, bounds.start || null, bounds.end || null);
-      window.__ALL_EVENTS = all;
+      // فلترة حسب التصنيف
       const sel = document.getElementById('catFilter');
-      if (sel) { sel.value = qpCat() || ''; }
+      if (sel) sel.value = qpCat() || '';
       const currentCat = sel ? sel.value : '';
       render(filterByCat(all, currentCat), bounds);
+
       if (sel){
         sel.addEventListener('change', ()=>{
           const cat = sel.value || '';
           const url = new URL(location.href);
           if (cat) url.searchParams.set('cat', cat); else url.searchParams.delete('cat');
           history.replaceState({}, '', url.toString());
-          render(filterByCat(window.__ALL_EVENTS || [], cat), window.__BOUNDS || {start:null,end:null});
+          render(filterByCat(window.__ALL_EVENTS || [], cat), window.__BOUNDS || {start:null});
         });
       }
     })().catch(e=>{ console.error(e); showErr('تعذّر تحميل الأحداث. تأكد من الصلاحيات وقواعد Firestore.'); });
