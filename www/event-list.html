@@ -92,7 +92,6 @@
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
 
-    // تطبيع نوع الحدث + التاريخ
     const arabicType = (ev) => {
       if (ev.type) return ev.type;
       const m = {
@@ -104,7 +103,6 @@
       return m[ev.eventType] || 'حدث';
     };
 
-    // آخذ أول تاريخ متاح (سلسلة ISO أو Timestamp)
     function iso(d){
       if (!d) return null;
       if (typeof d?.toDate === 'function') return d.toDate().toISOString().slice(0,10);
@@ -139,6 +137,7 @@
       for (const [cat, types] of Object.entries(CATEGORY_MAP)){ if (types.includes(t)) return cat; }
       return 'أخرى';
     }
+
     const qp = new URLSearchParams(location.search);
     const qpCat = ()=> qp.get('cat') || '';
     const qpNum = ()=> qp.get('number') || qp.get('animalId') || qp.get('animalNumber') || '';
@@ -159,7 +158,6 @@
       return u;
     }
 
-    // جلب بروفايل الحيوان ثم بداية الموسم من الحقل داخل الوثيقة
     async function getAnimalProfile(num){
       try{
         const animals = collection(db, 'animals');
@@ -182,18 +180,35 @@
       return iso(raw);
     }
 
-    // جلب كل أحداث الحيوان ثم فلترة/ترتيب محليًا (بدون orderBy على eventDate)
+    // ⬅️ أهم تعديل: نجلب على الحقول الثلاثة: animalNumber و animalId و number
+    async function getCalvings(num, dir='desc', lim=6){
+      const evs = collection(db, 'events');
+      const qs = [
+        query(evs, ...scopeWheres('animalNumber', num), where('eventType','==','calving'), limit(500)),
+        query(evs, ...scopeWheres('animalId',     num), where('eventType','==','calving'), limit(500)),
+        query(evs, ...scopeWheres('number',       num), where('eventType','==','calving'), limit(500)),
+      ];
+      const snaps = await Promise.all(qs.map(getDocs));
+      const arr = snaps.flatMap(s => s.docs.map(d=>({id:d.id, ...d.data()})));
+      const seen = new Set(), merged = arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
+      // نستخدم normalizedDate ثم نرتب حسب الاتجاه المطلوب
+      const withDate = merged.map(e=> ({...e, _iso: normalizedDate(e)})).filter(e=> e._iso);
+      withDate.sort((a,b)=> dir==='asc' ? a._iso.localeCompare(b._iso) : b._iso.localeCompare(a._iso));
+      return withDate;
+    }
+
     async function getEventsForRange(num, startISO){
       const evs = collection(db, 'events');
-      const q1 = query(evs, ...scopeWheres('animalNumber', num), limit(500));
-      const q2 = query(evs, ...scopeWheres('animalId',     num), limit(500));
-      const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-      const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
-      const seen = new Set(); // إزالة المكرر
+      const qs = [
+        query(evs, ...scopeWheres('animalNumber', num), limit(500)),
+        query(evs, ...scopeWheres('animalId',     num), limit(500)),
+        query(evs, ...scopeWheres('number',       num), limit(500)),
+      ];
+      const snaps = await Promise.all(qs.map(getDocs));
+      const arr = snaps.flatMap(s => s.docs.map(d=>({id:d.id, ...d.data()})));
+      const seen = new Set();
       const merged = arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
-      // تطبيع التاريخ + فلترة الموسم + ترتيب تنازلي
-      const withDate = merged.map(e=> ({...e, _iso: normalizedDate(e)}))
-                             .filter(e=> e._iso); // تجاهل اللي مافيهوش أي تاريخ
+      const withDate = merged.map(e=> ({...e, _iso: normalizedDate(e)})).filter(e=> e._iso);
       const ranged  = startISO ? withDate.filter(e=> e._iso >= startISO) : withDate;
       ranged.sort((a,b)=> b._iso.localeCompare(a._iso));
       return ranged;
@@ -222,10 +237,8 @@
       meta.textContent = bounds.start ? (`من الولادة ${bounds.start} حتى اليوم`) : 'كل الأحداث';
     }
 
-    // ——— main ———
     (async function run(){
       const user = await requireViewAuth(); if(!user) return;
-
       UID = user.uid;
       TID = localStorage.getItem('tenantId') || null;
 
@@ -246,8 +259,8 @@
 
       const sel = document.getElementById('catFilter');
       if (sel) sel.value = qpCat() || '';
-      const cat = sel ? sel.value : '';
       const apply = () => {
+        const cat = sel ? sel.value : '';
         const filtered = cat ? all.filter(e => categoryOf(e) === cat) : all;
         render(filtered, bounds);
       };
