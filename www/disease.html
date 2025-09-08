@@ -2,176 +2,223 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>الأمراض</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>تسجيل أمراض — مُرَبِّك</title>
   <style>
-    body{direction:rtl;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f9f9f9;padding:20px;margin:0}
-    h2{text-align:center;color:#2c3e50;font-size:24px;margin-bottom:20px}
-    form{display:flex;flex-direction:column;gap:15px;max-width:720px;margin:auto}
-    label{font-weight:bold;font-size:18px}
-    input,button{padding:14px;border-radius:8px;border:1px solid #ccc;font-size:18px;width:100%;box-sizing:border-box}
-    .disease-buttons{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-    .disease-buttons button{background:#8bc34a;color:#000;border:none;cursor:pointer;font-size:18px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background-color .3s}
-    .disease-buttons button:hover{background:#7cb342}
-    #msg{margin-top:12px;font-weight:bold;text-align:center;font-size:16px;display:none;padding:10px;border-radius:8px}
-    #msg.success{background:#d1e7dd;color:#0f5132;display:block}
-    #msg.error{background:#f8d7da;color:#842029;display:block}
-    .actions{display:none;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
-    .actions .btn{padding:10px 14px;border-radius:8px;border:1px solid #2c3e50;background:#fff;color:#2c3e50;font-weight:bold;cursor:pointer}
-    .actions .btn.primary{background:#2c3e50;color:#fff;border-color:#2c3e50}
+    :root{
+      --brand:#0ea05a; --brand-600:#0b7f47;
+      --bg:#f7faf7; --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+      --ok-bg:#ecfdf5; --ok-br:#bbf7d0; --ok-fg:#065f46;
+      --err-bg:#fff1f2; --err-br:#fecdd3; --err-fg:#9f1239;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border)}
+    .bar{max-width:920px;margin:0 auto;padding:14px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .title{font-weight:800;color:var(--brand-600)}
+    .link{display:inline-block;padding:10px 12px;border-radius:10px;text-decoration:none;border:1px solid var(--border);background:#fff;color:var(--brand-600);font-weight:800}
+
+    main{max-width:920px;margin:16px auto;padding:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px;padding:14px}
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
+    label{font-weight:800;font-size:14px}
+    input,select{
+      width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:15px;outline:none;transition:.15s border-color ease;
+    }
+    input:focus,select:focus{border-color:var(--brand)}
+
+    .diseases{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(min-width:720px){.diseases{grid-template-columns:1fr 1fr}}
+    .dis-btn{
+      padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:#d9f4e6;cursor:pointer;
+      font-weight:800;text-align:center;transition:transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .dis-btn:hover{border-color:#d1fae5;box-shadow:0 4px 14px rgba(14,160,90,.12)}
+    .dis-btn:active{transform:translateY(1px)}
+    .dis-btn[disabled]{opacity:.55;cursor:not-allowed}
+
+    .infobar{display:none;margin-top:10px;padding:12px;border-radius:12px;font-weight:800;text-align:center}
+    .infobar.show{display:block}
+    .infobar.ok{background:var(--ok-bg);border:1px solid var(--ok-br);color:var(--ok-fg)}
+    .infobar.err{background:var(--err-bg);border:1px solid var(--err-br);color:var(--err-fg)}
+
+    .nav-links{display:none;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+    .nav-links a{padding:10px 12px;border-radius:10px;text-decoration:none;border:1px solid var(--border);background:#fff;color:var(--brand-600);font-weight:800}
   </style>
 </head>
 <body>
+  <header>
+    <div class="bar">
+      <div class="title">تسجيل أمراض</div>
+      <a class="link" href="dashboard.html">لوحة التحكم</a>
+    </div>
+  </header>
 
-  <h2>🧪 تسجيل الأمراض</h2>
-
-  <form id="diseaseForm" onsubmit="return false">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" readonly />
-
-    <label for="diseaseDate">تاريخ التشخيص</label>
-    <input type="date" id="diseaseDate" name="diseaseDate" required />
-
-    <label>اختر المرض</label>
-    <div class="disease-buttons" id="diseaseButtons">
-      <button type="button" data-name="التهاب ضرع">التهاب ضرع</button>
-      <button type="button" data-name="التهاب رئوي">التهاب رئوي</button>
-      <button type="button" data-name="عرج">عرج</button>
-      <button type="button" data-name="اسهال">اسهال</button>
-      <button type="button" data-name="التهاب سرة">التهاب سرة</button>
-      <button type="button" data-name="انقلاب منفحة">انقلاب منفحة</button>
-      <button type="button" data-name="ابتلاع جسم معدني">ابتلاع جسم معدني</button>
-      <button type="button" data-name="التهاب جلد عقدي">التهاب جلد عقدي</button>
-      <button type="button" data-name="حمي قلاعية">حمي قلاعية</button>
-      <button type="button" data-name="حمي الثلاث ايام">حمي الثلاث ايام</button>
-      <button type="button" data-name="تسمم دموي">تسمم دموي</button>
-      <button type="button" data-name="لكمة كرش">لكمة كرش</button>
-      <button type="button" data-name="اجهاد حراري">اجهاد حراري</button>
-      <button type="button" data-name="التهاب العين">التهاب العين</button>
-      <button type="button" data-name="طفيليات دم">طفيليات دم</button>
-      <button type="button" data-name="حمي اللبن">حمي اللبن</button>
-      <button type="button" data-name="نقص ماغنسيوم">نقص ماغنسيوم</button>
-      <button type="button" data-name="نقص فوسفور">نقص فوسفور</button>
+  <main>
+    <div class="card grid">
+      <div class="row">
+        <div>
+          <label>رقم الحيوان</label>
+          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+        </div>
+        <div>
+          <label>تاريخ التشخيص</label>
+          <input id="eventDate" type="date" required />
+        </div>
+        <div>
+          <label>ملاحظات</label>
+          <input id="notes" placeholder="اختياري" />
+        </div>
+      </div>
     </div>
 
-    <div id="msg"></div>
-    <div class="actions" id="afterSave">
-      <button type="button" class="btn" id="btnClear">تسجيل مرض آخر</button>
-      <button type="button" class="btn primary" id="btnDash">لوحة التحكم</button>
+    <div class="card grid">
+      <div class="diseases" id="dz">
+        <!-- 18 زر بالاسم والترتيب كما هو -->
+        <button class="dis-btn" data-code="pneumonia">التهاب رئوي</button>
+        <button class="dis-btn" data-open="mastitis.html">التهاب ضرع</button>
+
+        <button class="dis-btn" data-code="diarrhea">اسهال</button>
+        <button class="dis-btn" data-open="lameness.html">عرج</button>
+
+        <button class="dis-btn" data-code="displaced_abomasum">انقلاب منفحة</button>
+        <button class="dis-btn" data-code="navel_infection">التهاب سرة</button>
+
+        <button class="dis-btn" data-code="lumpy_skin">التهاب جلد عقدي</button>
+        <button class="dis-btn" data-code="hardware_disease">ابتلاع جسم معدني</button>
+
+        <button class="dis-btn" data-code="three_day_sickness">حمى الثلاث ايام</button>
+        <button class="dis-btn" data-code="fmd">حمى قلاعية</button>
+
+        <button class="dis-btn" data-code="rumen_acidosis">لكمة كرش</button>
+        <button class="dis-btn" data-code="septicemia">تسمم دموي</button>
+
+        <button class="dis-btn" data-code="pinkeye">التهاب العين</button>
+        <button class="dis-btn" data-code="heat_stress">اجهاد حراري</button>
+
+        <button class="dis-btn" data-code="milk_fever">حمى اللبن</button>
+        <button class="dis-btn" data-code="blood_parasites">طفيليات دم</button>
+
+        <button class="dis-btn" data-code="phosphorus_def">نقص فوسفور</button>
+        <button class="dis-btn" data-code="magnesium_def">نقص ماغنيسيوم</button>
+      </div>
+
+      <div id="info" class="infobar"></div>
+      <div class="nav-links" id="afterLinks">
+        <a id="openEvents" href="#">فتح صفحة الأحداث</a>
+        <a href="dashboard.html">لوحة التحكم</a>
+      </div>
     </div>
-  </form>
+  </main>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script>
+    (function(){
+      window.dataLayer = window.dataLayer || [];
+      window.t = window.t || { event:(n,p={})=>{ try{ dataLayer.push({event:n, ts:Date.now(), ...p}); }catch{} } };
+      t.event('page_view', { page: location.pathname, feature:'diseases' });
+    })();
+  </script>
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyB0dtFS3R-MQ-LJfd_dB1YOTxiwDVshIYc",
-    authDomain: "murabbik.firebaseapp.com",
-    projectId: "murabbik",
-    storageBucket: "murabbik.appspot.com",
-    messagingSenderId: "402719243568",
-    appId: "1:402719243568:web:631114a260d23202dd5cf5"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+  <script type="module">
+    import { db, auth, ensureAuth } from '/js/firebase-config.js';
+    import { addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-  const msgDiv = document.getElementById("msg");
-  const actionsBox = document.getElementById("afterSave");
-  const btnClear   = document.getElementById("btnClear");
-  const btnDash    = document.getElementById("btnDash");
+    const $ = (id)=>document.getElementById(id);
+    const info = $('info');
+    const afterLinks = $('afterLinks');
+    const openEvents = $('openEvents');
+    const REDIRECT_DELAY = 2600;
 
-  const animalIdInput    = document.getElementById("animalId");
-  const diseaseDateInput = document.getElementById("diseaseDate");
-  const container        = document.getElementById("diseaseButtons");
+    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+    (function hydrate(){
+      const p = new URLSearchParams(location.search);
+      const num  = p.get('number')||p.get('animalNumber')||p.get('animalId')||localStorage.getItem('currentAnimalNumber')||localStorage.getItem('currentAnimalId')||'';
+      const date = p.get('date')||p.get('eventDate')||localStorage.getItem('currentEventDate')||todayLocal();
+      $('animalNumber').value = num;
+      $('eventDate').value    = /^\d{4}-\d{2}-\d{2}$/.test(date)? date : todayLocal();
+      try{
+        localStorage.setItem('currentAnimalNumber', num);
+        localStorage.setItem('currentEventDate', $('eventDate').value);
+      }catch{}
+    })();
 
-  // اليوم المحلي بصيغة YYYY-MM-DD
-  function todayLocal(){
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
-  }
-
-  // تعبئة من الرابط أو التخزين المحلي
-  (function hydrate(){
-    const qp = new URLSearchParams(location.search);
-    const preId   = qp.get("animalId") || qp.get("number") || localStorage.getItem("lastAnimalId");
-    const preDate = qp.get("date") || todayLocal();
-    if (!preId){
-      alert("❗ لم يتم تحديد الحيوان، سيتم تحويلك لتسجيل حيوان جديد");
-      location.href = "add-animal.html";
-      return;
+    function showMsg(text, ok){
+      info.textContent = text;
+      info.className = 'infobar show ' + (ok?'ok':'err');
+      try{ info.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
     }
-    animalIdInput.value    = preId;
-    diseaseDateInput.value = preDate;
-  })();
+    function isFuture(iso){ return iso > todayLocal(); }
 
-  function showMsg(text, type="success"){
-    msgDiv.textContent = text;
-    msgDiv.className = type === "success" ? "success" : "error";
-    msgDiv.style.display = "block";
-    actionsBox.style.display = type === "success" ? "flex" : "none";
-  }
-  function clearMsg(){
-    msgDiv.textContent = "";
-    msgDiv.style.display = "none";
-    actionsBox.style.display = "none";
-  }
+    async function saveDisease(diseaseCode, arabicType){
+      const number = ($('animalNumber').value||'').trim();
+      const date   = $('eventDate').value;
+      const notes  = ($('notes').value||'').trim() || null;
 
-  btnClear.addEventListener('click', clearMsg);
-  btnDash.addEventListener('click', ()=> location.href='dashboard.html');
+      if(!number || !date){ showMsg('أدخل رقم الحيوان وتاريخ التشخيص.', false); return; }
+      if(isFuture(date)){ showMsg('تاريخ التشخيص لا يمكن أن يكون في المستقبل.', false); return; }
 
-  // تفويض الحدث لكل الأزرار
-  container.addEventListener('click', async (ev)=>{
-    const btn = ev.target.closest('button[data-name]');
-    if (!btn) return;
+      try{
+        await ensureAuth();
+        const uid = auth.currentUser?.uid || null;
+        if(!uid){ showMsg('يجب تسجيل الدخول.', false); return; }
 
-    const animalId   = (animalIdInput.value || "").trim();
-    const diseaseDate= diseaseDateInput.value;
+        const tenantId = localStorage.getItem('tenantId') || null;
 
-    if (!animalId || !diseaseDate){
-      showMsg("يرجى إدخال رقم الحيوان وتاريخ التشخيص أولاً","error");
-      return;
+        const payload = {
+          type: arabicType,
+          eventType: 'health',
+          diseaseCode: diseaseCode,
+          diseaseName: arabicType,
+          eventDate: date,
+          animalNumber: number,
+          animalId: number,
+          notes,
+          userId: uid,
+          tenantId,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        };
+
+        const ref = await addDoc(collection(db,'events'), payload);
+        if(!ref?.id) throw new Error('NO_ID');
+
+        try{ window.t && window.t.event('disease_save',{ code:diseaseCode, animal:number, date }); }catch{}
+
+        const evUrl = `add-event.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(date)}`;
+        if(openEvents) openEvents.href = evUrl;
+        afterLinks.style.display = 'flex';
+
+        showMsg('تم حفظ الحالة بنجاح… سيتم فتح صفحة الأحداث.', true);
+        setTimeout(()=>{ location.href = evUrl; }, REDIRECT_DELAY);
+      }catch(err){
+        console.error('[disease save] FAILED', err);
+        showMsg('تعذّر الحفظ في فايرستور. تأكّد من تسجيل الدخول والصلاحيات.', false);
+      }
     }
 
-    const name = btn.dataset.name;
+    // ربط الأزرار الـ 18 كما هي
+    document.querySelectorAll('#dz > .dis-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const open = btn.getAttribute('data-open');
+        if(open){
+          const number = ($('animalNumber').value||'').trim();
+          const date   = $('eventDate').value || todayLocal();
+          const url = new URL(open, location.origin);
+          if(number) url.searchParams.set('number', number);
+          if(date)   url.searchParams.set('date', date);
+          location.href = url.toString();
+          return;
+        }
+        const code = btn.getAttribute('data-code');
+        const name = btn.textContent.trim();
+        saveDisease(code, name);
+      });
+    });
 
-    // الحالات الخاصة: فتح صفحات مخصصة وتمرير الرقم والتاريخ
-    if (name === "التهاب ضرع"){
-      location.href = `mastitis.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
-      return;
-    }
-    if (name === "عرج"){
-      location.href = `lameness.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(diseaseDate)}`;
-      return;
-    }
-
-    // تعطيل كل الأزرار أثناء الحفظ
-    const all = container.querySelectorAll('button');
-    all.forEach(b=> b.disabled = true);
-
-    const eventData = {
-      animalId,
-      animalNumber: animalId,
-      eventDate: diseaseDate,
-      eventType: name,
-      type: "مرض",
-      isSmartAlert: true,
-      alertRule: "مرض",
-      createdAt: serverTimestamp()
-    };
-
-    try{
-      await addDoc(collection(db,"events"), eventData);
-      showMsg(`✅ تم تسجيل مرض "${name}" بنجاح`);
-    }catch(err){
-      console.error("خطأ في تسجيل المرض:", err);
-      showMsg("❌ حدث خطأ أثناء التسجيل، حاول مرة أخرى.","error");
-    }finally{
-      all.forEach(b=> b.disabled = false);
-    }
-  });
-</script>
-
+    $('eventDate')?.addEventListener('change', ()=>{ try{ localStorage.setItem('currentEventDate', $('eventDate').value||todayLocal()); }catch{} });
+    $('animalNumber')?.addEventListener('change', ()=>{ try{ localStorage.setItem('currentAnimalNumber', ($('animalNumber').value||'').trim()); }catch{} });
+  </script>
 </body>
 </html>
