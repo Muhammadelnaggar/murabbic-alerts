@@ -315,6 +315,7 @@
   </script>
 
   <!-- حفظ النتيجة فقط (بدون صور) إلى فايربيز -->
+// حفظ النتيجة فقط (بدون صور) إلى فايربيز
 <script>
   (function(){
     const saveBtn=document.getElementById('saveBtn');
@@ -322,51 +323,87 @@
     const eventDateInput=document.getElementById('eventDate');
     const saveMsg=document.getElementById('saveMsg');
 
-    function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
+    function todayCairo(){
+      const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
+      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
     function setMsg(t,ok=true){ if(!saveMsg){ alert(t); return; } saveMsg.textContent=t; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>saveMsg.className='msg',4000); }
 
     async function __handleSave(e){
       try{ e && e.preventDefault && e.preventDefault(); }catch{}
-      if(!window.computeOverallFromState){ setMsg('⚠️ لا يمكن حساب التقييم الآن', false); return; }
-      const btnPrev=saveBtn && saveBtn.textContent; if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…'; }
+
+      if(!window.computeOverallFromState){
+        setMsg('⚠️ لا يمكن حساب التقييم الآن', false);
+        return;
+      }
+
+      const prevTxt = saveBtn && saveBtn.textContent;
+      if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…'; }
+
       try{
         const res = window.computeOverallFromState();
-        const overall = res && res.overall || 0;
-        const U = res && res.U || 0, B = res && res.B || 0, F = res && res.F || 0, FE = res && res.FE || 0;
-        if(!overall){ setMsg('⚠️ التقط صورة واحدة على الأقل لحساب النتيجة', false); return; }
+        const overall = res?.overall || 0;
+        const U = res?.U || 0, B = res?.B || 0, F = res?.F || 0, FE = res?.FE || 0;
+        if(!overall){
+          setMsg('⚠️ التقط صورة واحدة على الأقل لحساب النتيجة', false);
+          return;
+        }
 
-        // استدعاء ديناميكي حتى لو ملف firebase-config.js غير موجود أثناء التحميل
-        let mod = null;
-        try{ mod = await import('./js/firebase-config.js'); }
-        catch(err){ console.error('firebase-config import failed', err); }
-        if(!mod){ setMsg('❌ لم يتم العثور على إعداد فايربيز (firebase-config.js)', false); return; }
-        const { ensureAuth, db, serverTimestamp, addDoc, collection } = mod;
+        // 1) إعداد فايربيز: نأخذ db و auth من firebase-config.js
+        const mod = await import('./js/firebase-config.js');          // يوفّر db, auth, ensureAuth
+        const { db, auth, ensureAuth } = mod;
 
-        const payload={
-          type:'تقييم Milking Traits', eventType:'milking_traits_eval',
-          animalId:(animalIdInput?.value||'')||null,
-          animalNumber: localStorage.getItem('currentAnimalNumber')||'',
+        // 2) دوال Firestore من الـ CDN (firebase-config لا يصدّرها)
+        const { addDoc, collection, serverTimestamp } =
+          await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+        // 3) تأكيد الدخول وفق القواعد
+        await ensureAuth();
+        const userId = auth?.currentUser?.uid;
+        if(!userId){
+          setMsg('❌ يجب تسجيل الدخول قبل الحفظ', false);
+          return;
+        }
+
+        // 4) تجهيز الحمولة طبقًا لقواعدك (وجود userId إجباري)
+        const payload = {
+          type: 'تقييم Milking Traits',
+          eventType: 'milking_traits_eval',
+          animalId: (animalIdInput?.value||'') || null,
+          animalNumber: localStorage.getItem('currentAnimalNumber') || '',
           eventDate: eventDateInput?.value || todayCairo(),
           overallScore: overall,
-          groups:{ udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
+          groups: { udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
           kpi: window.state?.k || {},
-          uid:  localStorage.getItem('userId') || localStorage.getItem('tenantId') || null,
+
+          // حقول الملكية/التتبّع
+          userId,                          // لازم يساوي auth.uid حسب القواعد
+          uid: userId,                     // (اختياري) للتوافق مع شاشات تانية
+          tenantId: localStorage.getItem('tenantId') || null,
+
           source: location.pathname,
           createdAt: serverTimestamp()
         };
-        await ensureAuth();
+
+        // 5) الحفظ
         await addDoc(collection(db,'events'), payload);
+
         setMsg('✅ تم حفظ نتيجة التقييم (بدون صور)', true);
-        try{ window.dataLayer && window.dataLayer.push({event:'milking_traits_save', overall:overall}); }catch{}
-      }catch(err){ console.error(err); setMsg('❌ تعذّر الحفظ في فايربيز', false); }
-      finally{ if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=btnPrev; } }
+        try{ (window.dataLayer = window.dataLayer || []).push({event:'milking_traits_save', overall}); }catch{}
+      }catch(err){
+        console.error(err);
+        setMsg('❌ تعذّر الحفظ في فايربيز', false);
+      }finally{
+        if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=prevTxt; }
+      }
     }
 
-    // توفّر الدالة عموميًا + ربط آمن للزر
+    // توفّر الدالة عموميًا + ربط الزر
     window.__handleSave = __handleSave;
     saveBtn && saveBtn.addEventListener('click', __handleSave);
   })();
 </script>
+
 <script>
   // إزالة أي طبقة "editor-card" قد تغطي الأزرار
   (function(){
