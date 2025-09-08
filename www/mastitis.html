@@ -175,7 +175,7 @@
 
         try{ localStorage.setItem('lastAnimalId', animalId); localStorage.setItem('lastEventDate', eventDate); }catch{}
         setMsg(`✅ تم حفظ الحالة بنجاح. ${tips.join(' — ')}`, true);
-        setTimeout(()=>{ location.href='dashboard.html'; }, 1600);
+        setTimeout(()=>{ location.href='dashboard.html'; }, 9000);
       }catch(e){
         console.error(e);
         setMsg('❌ فشل الحفظ في فايربيز. حاول مجددًا.', false);
