@@ -22,6 +22,12 @@
       display: flex;
       flex-direction: column;
       gap: 15px;
+      max-width: 560px;
+      margin: 0 auto;
+      background: #fffef4;
+      padding: 16px;
+      border: 1px solid #ffe08a;
+      border-radius: 10px;
     }
     label {
       font-weight: bold;
@@ -31,8 +37,9 @@
       padding: 14px;
       font-size: 18px;
       border-radius: 8px;
-      border: 1px solid #2e7د32;
+      border: 1px solid #2e7d32; /* ✅ تصحيح كود اللون */
       box-sizing: border-box;
+      background: #fff;
     }
     .radio-group {
       display: flex;
@@ -56,17 +63,18 @@
       font-size: 20px;
       cursor: pointer;
     }
-    /* رسالة تأكيد داخل الصفحة بدون تغيير الشكل العام */
+    /* رسالة داخلية */
     #msg {
       display: none;
       text-align: center;
       font-weight: bold;
-      margin-top: 10px;
+      margin: 10px auto 0;
       padding: 10px;
       border-radius: 8px;
+      max-width: 560px;
     }
-    #msg.success { background:#d1e7dd; color:#0f5132; }
-    #msg.error   { background:#f8d7da; color:#842029; }
+    #msg.success { background:#d1e7dd; color:#0f5132; border:1px solid #a3cfbb; }
+    #msg.error   { background:#f8d7da; color:#842029; border:1px solid #f1aeb5; }
   </style>
 </head>
 <body>
@@ -101,47 +109,50 @@
     </select>
 
     <label for="vet">اسم الطبيب البيطري المعالج</label>
-    <input type="text" id="vet" name="vet">
+    <input type="text" id="vet" name="vet" placeholder="اختياري">
 
     <button type="submit" id="saveBtn">تسجيل الحالة</button>
   </form>
 
-  <!-- ثبّت dataLayer + t.event (لا يغيّر الشكل) -->
- <script>
-  (function () {
-    window.dataLayer = window.dataLayer || [];
-    // مخزن بسيط لمنع التكرار داخل نفس الصفحة
-    window.__sentEvents = window.__sentEvents || new Set();
+  <!-- تتبّع بسيط -->
+  <script>
+    (function () {
+      window.dataLayer = window.dataLayer || [];
+      window.__sentEvents = window.__sentEvents || new Set();
+      window.t = window.t || {
+        event: function (name, props) {
+          try {
+            props = props || {};
+            if (name === 'page_view') {
+              var key = 'pv:' + (props.page || location.pathname);
+              if (window.__sentEvents.has(key)) return;
+              window.__sentEvents.add(key);
+            }
+            dataLayer.push({ event: name, ts: Date.now(), ...props });
+          } catch (e) {}
+        }
+      };
+      t.event('page_view', { page: location.pathname, feature: 'lameness' });
+    })();
+  </script>
 
-    window.t = window.t || {
-      event: function (name, props) {
-        try {
-          props = props || {};
-          // منع تكرار page_view لنفس المسار
-          if (name === 'page_view') {
-            var key = 'pv:' + (props.page || location.pathname);
-            if (window.__sentEvents.has(key)) return;
-            window.__sentEvents.add(key);
-          }
-          dataLayer.push({ event: name, ts: Date.now(), ...props });
-        } catch (e) {}
-      }
-    };
-
-    // أطلق page_view مرة واحدة فقط
-    t.event('page_view', { page: location.pathname });
-  })();
-</script>
-
-
-  <!-- تحليلات خارجية (اختياري) -->
+  <!-- اختياري -->
   <script src="/js/app-core.js" defer></script>
 
-  <!-- ⭐ مهم جدًا قبل أي نداء إلى /api -->
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js" defer></script>
+  <!-- Firebase config (murabbikdata) -->
+  <script type="module">
+    import { db, auth, ensureAuth } from '/js/firebase-config.js';
+    import {
+      addDoc, collection, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-  <script>
+    // إعدادات رسائل وتوجيه
+    const REDIRECT_DELAY_MS = 3200; // مدة انتظار قبل التحويل بعد النجاح
+
+    const form = document.getElementById('lamenessForm');
+    const msg  = document.getElementById('msg');
+    const btn  = document.getElementById('saveBtn');
+
     // اليوم المحلي YYYY-MM-DD
     function todayLocal(){
       const d = new Date();
@@ -149,94 +160,99 @@
       return d.toISOString().slice(0,10);
     }
 
-    // تهيئة الحقول من URL أو التخزين المحلي
+    // تهيئة الحقول من URL أو التخزين
     function hydrate(){
       const qs = new URLSearchParams(location.search);
-      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber') || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
+      const id = qs.get('animalId') || qs.get('number') || qs.get('animalNumber')
+               || localStorage.getItem('currentAnimalId') || localStorage.getItem('lastAnimalId') || '';
       const dt = qs.get('date') || qs.get('eventDate') || todayLocal();
-      document.getElementById('animalId').value = id;
+      document.getElementById('animalId').value     = id;
       document.getElementById('lamenessDate').value = dt;
-      try{ localStorage.setItem('currentAnimalId', id); localStorage.setItem('lastAnimalId', id); localStorage.setItem('lastEventDate', dt); }catch{}
-      try{ history.replaceState(null, '', location.pathname); }catch{}
+      try {
+        localStorage.setItem('currentAnimalId', id);
+        localStorage.setItem('lastAnimalId', id);
+        localStorage.setItem('lastEventDate', dt);
+      } catch {}
+      try { history.replaceState(null, '', location.pathname); } catch {}
+    }
+    hydrate();
+
+    function showMsg(text, ok){
+      msg.textContent = text;
+      msg.className = ok ? 'success' : 'error';
+      msg.style.display = 'block';
+      try { msg.scrollIntoView({ behavior:'smooth', block:'center' }); } catch {}
     }
 
-    document.addEventListener('DOMContentLoaded', hydrate);
-
-    // إرسال إلى /api/events
-    document.getElementById('lamenessForm').addEventListener('submit', async (e) => {
+    form.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const msg = document.getElementById('msg');
-      const btn = document.getElementById('saveBtn');
       msg.style.display = 'none';
       btn.disabled = true;
 
-      const userId   = localStorage.getItem('userId');
-      const tenantId = localStorage.getItem('tenantId') || 'default';
-      if(!userId){
-        alert('⚠️ يجب تسجيل الدخول أولًا.');
-        location.href = 'login.html';
-        btn.disabled = false;
-        return;
-      }
-
-      const animalId     = document.getElementById('animalId').value.trim();
-      const lamenessDate = document.getElementById('lamenessDate').value;
-      const affectedLeg  = (document.querySelector('input[name="affectedLeg"]:checked')||{}).value;
-      const lamenessType = document.getElementById('lamenessType').value;
-      const vet          = document.getElementById('vet').value.trim() || null;
-
-      if(!animalId || !lamenessDate || !affectedLeg || !lamenessType){
-        btn.disabled = false;
-        msg.textContent = 'يرجى استكمال البيانات المطلوبة.';
-        msg.className = 'error';
-        msg.style.display = 'block';
-        return;
-      }
-
-      const payload = {
-        type: 'عرج',
-        eventType: 'عرج',
-        userId,
-        tenantId,
-        animalId,
-        animalNumber: animalId,
-        eventDate: lamenessDate,
-        lamenessDate,
-        affectedLeg,
-        lamenessType,
-        vet,
-        isSmartAlert: true,
-        alertRule: 'lameness-recheck',
-        source: 'lameness.html'
-      };
-
-      try{
-        const r = await fetch('/api/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if(r.ok){
-          try{ localStorage.setItem('lastAnimalId', animalId); localStorage.setItem('lastEventDate', lamenessDate); }catch{}
-          msg.textContent = '✅ تم تسجيل حالة العرج بنجاح! سيتم تحويلك تلقائيًا…';
-          msg.className = 'success';
-          msg.style.display = 'block';
-          setTimeout(()=>{
-            location.href = `treatment-followup.html?animalId=${encodeURIComponent(animalId)}&date=${encodeURIComponent(lamenessDate)}`;
-          }, 2000);
-        } else {
-          const txt = await r.text();
-          msg.textContent = '❌ حدث فشل في الحفظ: ' + (txt || 'Bad Request');
-          msg.className = 'error';
-          msg.style.display = 'block';
+      try {
+        // التحقق من تسجيل الدخول (متوافق مع قواعد Firestore)
+        await ensureAuth();
+        const uid = auth.currentUser?.uid || null;
+        if(!uid){
+          showMsg('⚠️ يجب تسجيل الدخول أولًا.', false);
           btn.disabled = false;
+          return;
         }
-      }catch(err){
-        console.error(err);
-        msg.textContent = '❌ حدث خطأ أثناء الاتصال بالخادم';
-        msg.className = 'error';
-        msg.style.display = 'block';
+
+        // جمع المدخلات
+        const animalId     = document.getElementById('animalId').value.trim();
+        const lamenessDate = document.getElementById('lamenessDate').value;
+        const affectedLegEl= document.querySelector('input[name="affectedLeg"]:checked');
+        const affectedLeg  = affectedLegEl ? affectedLegEl.value : '';
+        const lamenessType = document.getElementById('lamenessType').value;
+        const vet          = (document.getElementById('vet').value || '').trim() || null;
+
+        if(!animalId || !lamenessDate || !affectedLeg || !lamenessType){
+          showMsg('يرجى استكمال البيانات المطلوبة.', false);
+          btn.disabled = false;
+          return;
+        }
+
+        // تجهيز الحمولة بما يراعي القواعد: userId يجب يساوي uid
+        const tenantId = localStorage.getItem('tenantId') || null;
+
+        const payload = {
+          type: 'عرج',                 // للعرض بالعربي
+          eventType: 'lameness',       // للتصنيف في القوائم
+          eventDate: lamenessDate,
+          animalId,
+          animalNumber: animalId,      // توافق مع صفحات أخرى
+          affectedLeg,
+          lamenessType,
+          vet,
+          userId: uid,                 // ✅ حسب قواعد Firestore
+          tenantId,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        };
+
+        // الحفظ في مجموعة events
+        const ref = await addDoc(collection(db, 'events'), payload);
+        if(!ref?.id) throw new Error('NO_ID');
+
+        // تتبّع نجاح
+        try { window.t && window.t.event('lameness_save', { animalId, date: lamenessDate }); } catch {}
+
+        // رسالة نجاح + تحويل للوحة التحكم
+        try {
+          localStorage.setItem('lastAnimalId', animalId);
+          localStorage.setItem('lastEventDate', lamenessDate);
+        } catch {}
+
+        showMsg('✅ تم تسجيل حالة العرج بنجاح! سيتم تحويلك تلقائيًا…', true);
+        setTimeout(()=>{ location.href = 'dashboard.html'; }, REDIRECT_DELAY_MS);
+      } catch (err) {
+        console.error('[lameness save] FAILED', err);
+        showMsg('❌ تعذّر الحفظ في فايرستور. تأكّد من تسجيل الدخول والصلاحيات.', false);
         btn.disabled = false;
+      } finally {
+        // إعادة تفعيل الزر لو فشل فقط (لو نجح هنحوّل بعد ثواني)
+        setTimeout(()=>{ btn.disabled = false; }, 800);
       }
     });
   </script>
