@@ -8,20 +8,9 @@
     :root{--brand:#0ea05a;--brand-600:#0b7f47;--head:var(--brand-600);--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--card:#ffffff;--pill-bg:#ecfdf5;--pill-border:#bbf7d0;--pill-text:#065f46;--thead-bg:#f8fafc;--warning-bg:#fff7ed;--warning-border:#fed7aa;--warning-text:#7c2d12}
     body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:#0f172a}
     .wrap{padding:10px}
-    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
     .title{font-weight:800;color:var(--head);font-size:16px}
     .meta{font-size:12px;color:var(--muted)}
-    .table-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    thead th{position:sticky;top:0;background:var(--thead-bg);border-bottom:1px solid var(--border);padding:10px;text-align:right}
-    tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:top}
-    tbody tr:hover{background:#f9fff8}
-    .scroll{max-height:360px;overflow:auto}
-    .pill{display:inline-block;background:var(--pill-bg);border:1px solid var(--pill-border);color:var(--pill-text);border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700}
-    .empty{padding:14px;text-align:center;color:var(--muted)}
-    .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
-    .err.show{display:block}
-    .head{gap:8px}
     .btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
     .btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
     .filters{display:flex;gap:8px;align-items:center;margin:8px 0}
@@ -29,19 +18,32 @@
     .filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
     .filters .num{display:flex;align-items:center;gap:6px}
     .filters input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit;width:140px}
+
+    .table-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    .scroll{max-height:360px;overflow:auto}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead th{position:sticky;top:0;background:var(--thead-bg);border-bottom:1px solid var(--border);padding:10px;text-align:right}
+    tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:top}
+    tbody tr:hover{background:#f9fff8}
+    .pill{display:inline-block;background:var(--pill-bg);border:1px solid var(--pill-border);color:var(--pill-text);border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700}
+    .empty{padding:14px;text-align:center;color:var(--muted)}
+    .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
+    .err.show{display:block}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div id="err" class="err"></div>
+
     <div class="head">
       <div class="title">أحداث هذا الموسم</div>
       <div class="meta" id="meta">—</div>
-      <div style="display:flex; gap:8px; align-items:center">
+      <div style="margin-inline-start:auto;display:flex;gap:8px">
         <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
         <a id="toDash" class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
       </div>
     </div>
+
     <div class="filters">
       <div class="num">
         <label for="animalNumField">رقم الحيوان:</label>
@@ -57,6 +59,7 @@
         <option value="تغذية">تغذية</option>
       </select>
     </div>
+
     <div class="table-wrap">
       <div class="scroll">
         <table dir="rtl">
@@ -77,10 +80,17 @@
 
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
-    import { collection, getDocs, query, where, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+      collection, getDocs, query, where, orderBy, limit
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    let UID = null, TID = null;
+    // ——— ثوابت/حالة ———
+    let UID = null, TID = null;  // مستخدم/مستأجر
+    const $ = (id)=>document.getElementById(id);
+    const rows = $('rows'), errbox = $('err'), meta = $('meta');
+
+    // نطاق الملكية: لازم userId حسب القواعد + tenantId لو موجود
     function scopeWheres(field, num){
       const wh = [];
       if (TID) wh.push(where('tenantId','==', TID));
@@ -89,40 +99,17 @@
       return wh;
     }
 
-    const $ = (id)=>document.getElementById(id);
-    const rows = $('rows'), errbox = $('err'), meta = $('meta');
-
+    // خرائط بسيطة للأسماء العربية
     const arabicType = (ev) => {
       if (ev.type) return ev.type;
       const m = {
         calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
         pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
         mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
-        close_up:'كلوز أب', nutrition:'تغذية', milking_traits_eval:'تقييم بالكاميرا'
+        close_up:'كلوز أب', nutrition:'تغذية', milking_traits_eval:'تقييم Milking Traits'
       };
       return m[ev.eventType] || 'حدث';
     };
-
-    function iso(d){
-      if (!d) return null;
-      if (typeof d?.toDate === 'function') return d.toDate().toISOString().slice(0,10);
-      const s = String(d).slice(0,10);
-      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
-    }
-    function normalizedDate(ev){
-      return (
-        iso(ev.eventDate) ||
-        iso(ev.date) ||
-        iso(ev.dueDate) ||
-        iso(ev.calvingDate) ||
-        iso(ev.dryOffDate) ||
-        iso(ev.pdDate) ||
-        iso(ev.diagDate) ||
-        iso(ev.recordedAt) ||
-        iso(ev.createdAt)
-      );
-    }
-
     const CATEGORY_MAP = {
       'انتاج': ['daily_milk','dry_off'],
       'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
@@ -130,22 +117,31 @@
       'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment','milking_traits_eval'],
       'تغذية': ['nutrition','feeding']
     };
+    const fmt = (d)=> d; // eventDate جاهز YYYY-MM-DD
+    const qp = new URLSearchParams(location.search);
+    const qpNum = ()=> qp.get('number') || qp.get('animalId') || qp.get('animalNumber') || '';
+    const qpCat = ()=> qp.get('cat') || '';
+
     function categoryOf(ev){
       const explicit = ev.category || ev.eventCategory || ev.cat;
       if (explicit) return explicit;
       const t = (ev.eventType||'').toString();
-      for (const [cat, types] of Object.entries(CATEGORY_MAP)){ if (types.includes(t)) return cat; }
+      for (const [cat, types] of Object.entries(CATEGORY_MAP)){
+        if (types.includes(t)) return cat;
+      }
       return 'أخرى';
     }
-
-    const qp = new URLSearchParams(location.search);
-    const qpCat = ()=> qp.get('cat') || '';
-    const qpNum = ()=> qp.get('number') || qp.get('animalId') || qp.get('animalNumber') || '';
-    const isAllView = ()=> qp.get('view') === 'all';
+    function filterByCat(events, cat){
+      if (!cat) return events;
+      return events.filter(e => categoryOf(e) === cat);
+    }
     function showErr(t){ errbox.textContent=t; errbox.className='err show'; }
 
+    // تسجيل الدخول (عرض فقط)
     async function waitAuthOnce(){
-      return await new Promise((resolve)=>{ const off=onAuthStateChanged(auth,(u)=>{ off(); resolve(u||null); }); });
+      return await new Promise((resolve)=>{
+        const off = onAuthStateChanged(auth, (u)=>{ off(); resolve(u || null); });
+      });
     }
     async function requireViewAuth(){
       const u = auth.currentUser || await waitAuthOnce();
@@ -158,6 +154,18 @@
       return u;
     }
 
+    // يجلب بعض ولادات الحيوان (من الأحداث)
+    async function getCalvings(num, dir='desc', lim=8){
+      const evs = collection(db, 'events');
+      const q1 = query(evs, ...scopeWheres('animalNumber', num), where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
+      const q2 = query(evs, ...scopeWheres('animalId',     num), where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
+      const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+      const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
+      const seen = new Set();
+      return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
+    }
+
+    // بروفايل الحيوان (لاستخراج lastCalvingDate إن وُجدت)
     async function getAnimalProfile(num){
       try{
         const animals = collection(db, 'animals');
@@ -175,105 +183,120 @@
         return hit ? hit.docs[0].data() : null;
       }catch{ return null; }
     }
-    function seasonStartFromAnimal(p){
-      const raw = p?.lastCalvingDate ?? p?.lastCalving ?? p?.lastCalvingISO ?? p?.lastCalvedAt ?? p?.lastCalvingAt ?? null;
-      return iso(raw);
+
+    // حدود الموسم = آخر ولادة (من البروفايل أولًا) وحتى الولادة التالية
+    async function getSeasonBounds(num, todayISO, profile){
+      let start = null, end = null;
+
+      // 1) من وثيقة الحيوان أولاً
+      const profileStart =
+        profile?.lastCalvingDate || profile?.lastCalving || profile?.lastCalvingISO || null;
+      if (profileStart) start = profileStart;
+
+      // 2) لو مش موجودة في الوثيقة، هات آخر ولادة من الأحداث (<= اليوم)
+      if (!start){
+        const calvDesc = await getCalvings(num, 'desc', 8);
+        const lastCalving = calvDesc.find(c => c.eventDate && c.eventDate <= todayISO) || null;
+        start = lastCalving?.eventDate || null;
+      }
+
+      // 3) الولادة التالية كحد نهاية
+      if (start){
+        const calvAsc = await getCalvings(num, 'asc', 8);
+        end = calvAsc.find(c => c.eventDate && c.eventDate > start)?.eventDate || null;
+      }
+
+      return { start, end };
     }
 
-    // ⬅️ أهم تعديل: نجلب على الحقول الثلاثة: animalNumber و animalId و number
-    async function getCalvings(num, dir='desc', lim=6){
+    // جلب الأحداث داخل [start, end)
+    async function getEventsForRange(num, startISO, endISO){
       const evs = collection(db, 'events');
-      const qs = [
-        query(evs, ...scopeWheres('animalNumber', num), where('eventType','==','calving'), limit(500)),
-        query(evs, ...scopeWheres('animalId',     num), where('eventType','==','calving'), limit(500)),
-        query(evs, ...scopeWheres('number',       num), where('eventType','==','calving'), limit(500)),
-      ];
-      const snaps = await Promise.all(qs.map(getDocs));
-      const arr = snaps.flatMap(s => s.docs.map(d=>({id:d.id, ...d.data()})));
-      const seen = new Set(), merged = arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
-      // نستخدم normalizedDate ثم نرتب حسب الاتجاه المطلوب
-      const withDate = merged.map(e=> ({...e, _iso: normalizedDate(e)})).filter(e=> e._iso);
-      withDate.sort((a,b)=> dir==='asc' ? a._iso.localeCompare(b._iso) : b._iso.localeCompare(a._iso));
-      return withDate;
-    }
-
-    async function getEventsForRange(num, startISO){
-      const evs = collection(db, 'events');
-      const qs = [
-        query(evs, ...scopeWheres('animalNumber', num), limit(500)),
-        query(evs, ...scopeWheres('animalId',     num), limit(500)),
-        query(evs, ...scopeWheres('number',       num), limit(500)),
-      ];
-      const snaps = await Promise.all(qs.map(getDocs));
-      const arr = snaps.flatMap(s => s.docs.map(d=>({id:d.id, ...d.data()})));
+      const build = (field)=>{
+        const base = [...scopeWheres(field, num)];
+        if (startISO && endISO){
+          return query(evs, ...base,
+            where('eventDate','>=', startISO),
+            where('eventDate','<',  endISO),
+            orderBy('eventDate','desc'));
+        } else if (startISO){
+          return query(evs, ...base,
+            where('eventDate','>=', startISO),
+            orderBy('eventDate','desc'));
+        } else {
+          return query(evs, ...base, orderBy('eventDate','desc'));
+        }
+      };
+      const [s1,s2] = await Promise.all([getDocs(build('animalNumber')), getDocs(build('animalId'))]);
+      const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
       const seen = new Set();
       const merged = arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
-      const withDate = merged.map(e=> ({...e, _iso: normalizedDate(e)})).filter(e=> e._iso);
-      const ranged  = startISO ? withDate.filter(e=> e._iso >= startISO) : withDate;
-      ranged.sort((a,b)=> b._iso.localeCompare(a._iso));
-      return ranged;
+      merged.sort((a,b)=> (b.eventDate||'').localeCompare(a.eventDate||''));
+      return merged;
     }
 
+    // رسم الجدول
     function render(events, bounds){
       rows.innerHTML = '';
       if (!events.length){
         rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
-        meta.textContent = bounds.start ? (`من الولادة ${bounds.start} حتى اليوم`) : 'كل الأحداث';
-        return;
+      } else {
+        const frag = document.createDocumentFragment();
+        for(const ev of events){
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td');
+          const td2 = document.createElement('td');
+          const td3 = document.createElement('td');
+          td1.textContent = fmt(ev.eventDate || ev.dueDate || ev.createdAt?.toDate?.()?.toISOString()?.slice(0,10) || '');
+          td2.innerHTML = `<span class="pill">${arabicType(ev)}</span>`;
+          td3.textContent = ev.notes || ev.aiHints || '' ;
+          tr.append(td1,td2,td3);
+          frag.appendChild(tr);
+        }
+        rows.appendChild(frag);
       }
-      const frag = document.createDocumentFragment();
-      for(const ev of events){
-        const tr  = document.createElement('tr');
-        const td1 = document.createElement('td');
-        const td2 = document.createElement('td');
-        const td3 = document.createElement('td');
-        td1.textContent = ev._iso || '';
-        td2.innerHTML   = `<span class="pill">${arabicType(ev)}</span>`;
-        td3.textContent = ev.notes || ev.aiHints || '';
-        tr.append(td1,td2,td3);
-        frag.appendChild(tr);
+
+      if (!bounds.start){
+        meta.textContent = 'كل الأحداث (لا توجد ولادة مسجّلة لبداية موسم)';
+      } else if (bounds.end){
+        meta.textContent = `من الولادة ${bounds.start} حتى قبل الولادة ${bounds.end}`;
+      } else {
+        meta.textContent = `من الولادة ${bounds.start} حتى اليوم`;
       }
-      rows.appendChild(frag);
-      meta.textContent = bounds.start ? (`من الولادة ${bounds.start} حتى اليوم`) : 'كل الأحداث';
     }
 
+    // ——— main ———
     (async function run(){
-      const user = await requireViewAuth(); if(!user) return;
+      const user = await requireViewAuth(); if(!user){ return; }
       UID = user.uid;
       TID = localStorage.getItem('tenantId') || null;
 
       const num = qpNum();
-      const numField = document.getElementById('animalNumField');
-      if (numField){ numField.value = num || ''; numField.readOnly = true; }
+      const fld = $('animalNumField');
+      if (fld){ fld.value = num || ''; fld.readOnly = true; }
       if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
 
-      const card = document.getElementById('openCard');
-      if (card) card.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+      const openCard = $('openCard');
+      if (openCard) openCard.href = `cow-card.html?number=${encodeURIComponent(num)}`;
 
+      const today = new Date().toISOString().slice(0,10);
       const profile = await getAnimalProfile(num);
-      const start   = (!isAllView()) ? seasonStartFromAnimal(profile) : null;
-      const bounds  = { start: start || null };
+      const bounds  = await getSeasonBounds(num, today, profile);
 
-      const all = await getEventsForRange(num, bounds.start);
-      window.__ALL_EVENTS = all; window.__BOUNDS = bounds;
-
-      const sel = document.getElementById('catFilter');
+      // لو ما فيش ولادة مُسجّلة: اعرض كل الأحداث (علشان ما نخفيش حاجة)
+      const all = await getEventsForRange(num, bounds.start || null, bounds.end || null);
+      const sel = $('catFilter');
       if (sel) sel.value = qpCat() || '';
-      const apply = () => {
-        const cat = sel ? sel.value : '';
-        const filtered = cat ? all.filter(e => categoryOf(e) === cat) : all;
-        render(filtered, bounds);
-      };
-      apply();
+      const currentCat = sel ? sel.value : '';
+      render(filterByCat(all, currentCat), bounds);
 
       if (sel){
         sel.addEventListener('change', ()=>{
-          const c = sel.value || '';
+          const cat = sel.value || '';
           const url = new URL(location.href);
-          if (c) url.searchParams.set('cat', c); else url.searchParams.delete('cat');
+          if (cat) url.searchParams.set('cat', cat); else url.searchParams.delete('cat');
           history.replaceState({}, '', url.toString());
-          const filtered = c ? (window.__ALL_EVENTS||[]).filter(e=> categoryOf(e)===c) : (window.__ALL_EVENTS||[]);
-          render(filtered, window.__BOUNDS||{start:null});
+          render(filterByCat(all, cat), bounds);
         });
       }
     })().catch(e=>{ console.error(e); showErr('تعذّر تحميل الأحداث. تأكد من الصلاحيات وقواعد Firestore.'); });
