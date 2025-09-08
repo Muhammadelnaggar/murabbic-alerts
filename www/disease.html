@@ -6,49 +6,62 @@
   <title>تسجيل أمراض — مُرَبِّك</title>
   <style>
     :root{
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a;
-      --muted:#64748b; --card:#ffffff; --border:#e2e8f0; --warn:#c2410c
+      --brand:#0ea05a;           /* الأساسي */
+      --brand-600:#0b7f47;       /* أغمق */
+      --bg:#f7faf7;              /* خلفية ناعمة */
+      --card:#ffffff;            /* بطاقات */
+      --text:#0f172a;            /* نص */
+      --muted:#64748b;           /* نص ثانوي */
+      --border:#e2e8f0;          /* حدود */
+      --ok-bg:#ecfdf5; --ok-br:#bbf7d0; --ok-fg:#065f46;
+      --err-bg:#fff1f2; --err-br:#fecdd3; --err-fg:#9f1239;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border)}
-    .bar{max-width:920px;margin:0 auto;padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600)}
-    main{max-width:920px;margin:16px auto;padding:16px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+    .bar{max-width:920px;margin:0 auto;padding:14px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .title{font-weight:800;color:var(--brand-600);letter-spacing:.2px}
+    .link{display:inline-block;padding:10px 12px;border-radius:10px;text-decoration:none;border:1px solid var(--border);background:#fff;color:var(--brand-600);font-weight:800}
+
+    main{max-width:920px;margin:16px auto;padding:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
     .grid{display:grid;grid-template-columns:1fr;gap:14px;padding:14px}
     .row{display:grid;grid-template-columns:1fr;gap:12px}
     @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
-    label{font-weight:700;font-size:14px;color:#0f172a}
-    input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:15px}
+    label{font-weight:800;font-size:14px;color:#0f172a}
+    input,select{
+      width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:15px;
+      outline:none;transition:.15s border-color ease;
+    }
+    input:focus,select:focus{border-color:var(--brand)}
     .actions{display:flex;gap:10px;flex-wrap:wrap}
-    .btn{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer}
-    .btn.primary{background:var(--green);color:#fff}
-    .btn.ghost{background:#eef2f7;color:#0f172a}
-    .pill{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800}
 
-    /* لوحة الأمراض كأزرار تحفظ مباشرة */
+    /* أزرار الأمراض (بدون تغيير في الترتيب، فقط ستايل) */
     .diseases{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:720px){.diseases{grid-template-columns:repeat(3,1fr)}}
-    .dis-btn{padding:14px;border:1px solid var(--border);background:#fff;border-radius:14px;cursor:pointer;text-align:center;font-weight:800}
-    .dis-btn:hover{background:#f8fffb}
-    .dis-btn[disabled]{opacity:.5;cursor:not-allowed}
+    .dis-btn{
+      padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:#fff;cursor:pointer;
+      font-weight:800;text-align:center;transition:transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .dis-btn:hover{border-color:#d1fae5;box-shadow:0 4px 14px rgba(14,160,90,.12)}
+    .dis-btn:active{transform:translateY(1px)}
+    .dis-btn[disabled]{opacity:.55;cursor:not-allowed}
 
-    /* شريط الرسالة */
+    /* رسالة داخلية شيك */
     .infobar{display:none;margin-top:10px;padding:12px;border-radius:12px;font-weight:800;text-align:center}
     .infobar.show{display:block}
-    .infobar.ok{background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .infobar.err{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+    .infobar.ok{background:var(--ok-bg);border:1px solid:var(--ok-br);color:var(--ok-fg)}
+    .infobar.err{background:var(--err-bg);border:1px solid var(--err-br);color:var(--err-fg)}
 
     .nav-links{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
-    .nav-links a{padding:10px 12px;border-radius:10px;text-decoration:none;border:1px solid var(--border);background:#fff}
+    .nav-links a{padding:10px 12px;border-radius:10px;text-decoration:none;border:1px solid var(--border);background:#fff;color:var(--brand-600);font-weight:800}
   </style>
 </head>
 <body>
   <header>
     <div class="bar">
-      <div class="title">تسجيل أمراض <span class="pill">مُرَبِّك</span></div>
-      <a class="ghost" href="dashboard.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">لوحة التحكم</a>
+      <div class="title">تسجيل أمراض</div>
+      <a class="link" href="dashboard.html">لوحة التحكم</a>
     </div>
   </header>
 
@@ -56,24 +69,23 @@
     <div class="card grid">
       <div class="row">
         <div>
-          <label>رقم الحيوان <span style="color:#dc2626">*</span></label>
+          <label>رقم الحيوان</label>
           <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
         </div>
         <div>
-          <label>تاريخ التشخيص <span style="color:#dc2626">*</span></label>
+          <label>تاريخ التشخيص</label>
           <input id="eventDate" type="date" required />
         </div>
         <div>
-          <label>ملاحظات (اختياري)</label>
+          <label>ملاحظات</label>
           <input id="notes" placeholder="اختياري" />
         </div>
       </div>
     </div>
 
     <div class="card grid">
-      <div style="font-weight:800;color:#0b7f47">اختر المرض (يتم الحفظ فورًا ما عدا الضرع/العرج):</div>
       <div class="diseases">
-        <!-- أمراض تُحفظ مباشرة -->
+        <!-- تُحفظ مباشرة -->
         <button class="dis-btn" data-code="metritis" data-type="التهاب رحم">التهاب رحم</button>
         <button class="dis-btn" data-code="retained_placenta" data-type="احتباس مشيمة">احتباس مشيمة</button>
         <button class="dis-btn" data-code="ketosis" data-type="كيتوزيس">كيتوزيس</button>
@@ -84,7 +96,7 @@
         <button class="dis-btn" data-code="parasitic" data-type="طفيليات">طفيليات</button>
         <button class="dis-btn" data-code="injury" data-type="إصابة/جرح">إصابة / جرح</button>
 
-        <!-- يستثنى: يفتح صفحاتهم -->
+        <!-- صفحات خاصة -->
         <button class="dis-btn" data-open="mastitis.html">التهاب الضرع (صفحة خاصة)</button>
         <button class="dis-btn" data-open="lameness.html">العرج (صفحة خاصة)</button>
       </div>
@@ -92,21 +104,19 @@
       <div id="info" class="infobar"></div>
       <div class="nav-links" id="afterLinks" style="display:none">
         <a id="openEvents" href="#">فتح صفحة الأحداث</a>
-        <a href="dashboard.html">الانتقال للوحة التحكم</a>
+        <a href="dashboard.html">لوحة التحكم</a>
       </div>
     </div>
   </main>
 
-  <!-- تتبع بسيط -->
   <script>
     (function(){
       window.dataLayer = window.dataLayer || [];
-      window.t = window.t || { event:(name,p={})=>{ try{ dataLayer.push({event:name, ts:Date.now(), ...p}); }catch{} } };
+      window.t = window.t || { event:(n,p={})=>{ try{ dataLayer.push({event:n, ts:Date.now(), ...p}); }catch{} } };
       t.event('page_view', { page: location.pathname, feature:'diseases' });
     })();
   </script>
 
-  <!-- Firebase + Firestore -->
   <script type="module">
     import { db, auth, ensureAuth } from '/js/firebase-config.js';
     import { addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -115,14 +125,9 @@
     const info = $('info');
     const afterLinks = $('afterLinks');
     const openEvents = $('openEvents');
+    const REDIRECT_DELAY = 2600;
 
-    const REDIRECT_DELAY = 2600; // مهلـة قبل التحويل بعد النجاح
-
-    function todayLocal(){
-      const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-    // ملء الحقول من URL/localStorage
+    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
     (function hydrate(){
       const p = new URLSearchParams(location.search);
       const num  = p.get('number')||p.get('animalNumber')||p.get('animalId')||localStorage.getItem('currentAnimalNumber')||localStorage.getItem('currentAnimalId')||'';
@@ -136,28 +141,19 @@
     })();
 
     function showMsg(text, ok){
-      if(!info) return;
       info.textContent = text;
       info.className = 'infobar show ' + (ok?'ok':'err');
       try{ info.scrollIntoView({behavior:'smooth', block:'center'}); }catch{}
     }
-
     function isFuture(iso){ return iso > todayLocal(); }
 
     async function saveDisease(diseaseCode, arabicType){
-      // تحقق مدخلات أساسية
       const number = ($('animalNumber').value||'').trim();
       const date   = $('eventDate').value;
       const notes  = ($('notes').value||'').trim() || null;
 
-      if(!number || !date){
-        showMsg('أدخل رقم الحيوان وتاريخ التشخيص أولًا.', false);
-        return;
-      }
-      if(isFuture(date)){
-        showMsg('تاريخ التشخيص لا يمكن أن يكون في المستقبل.', false);
-        return;
-      }
+      if(!number || !date){ showMsg('أدخل رقم الحيوان وتاريخ التشخيص.', false); return; }
+      if(isFuture(date)){ showMsg('تاريخ التشخيص لا يمكن أن يكون في المستقبل.', false); return; }
 
       try{
         await ensureAuth();
@@ -166,15 +162,14 @@
 
         const tenantId = localStorage.getItem('tenantId') || null;
 
-        // وفق القواعد: userId = uid
         const payload = {
-          type: arabicType,           // يظهر بالعربي في الجداول
-          eventType: 'health',        // يصنّف ضمن "صحة"
-          diseaseCode: diseaseCode,   // كود المرض
-          diseaseName: arabicType,    // اسم المرض (عربي)
+          type: arabicType,
+          eventType: 'health',
+          diseaseCode: diseaseCode,
+          diseaseName: arabicType,
           eventDate: date,
           animalNumber: number,
-          animalId: number,           // توافق
+          animalId: number,
           notes,
           userId: uid,
           tenantId,
@@ -185,50 +180,40 @@
         const ref = await addDoc(collection(db,'events'), payload);
         if(!ref?.id) throw new Error('NO_ID');
 
-        // تتبع
         try{ window.t && window.t.event('disease_save',{ code:diseaseCode, animal:number, date }); }catch{}
 
-        // إعداد روابط بعد الحفظ + تحويل تلقائي للأحداث
         const evUrl = `add-event.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(date)}`;
         if(openEvents) openEvents.href = evUrl;
         if(afterLinks) afterLinks.style.display = 'flex';
 
-        showMsg('✅ تم حفظ الحالة بنجاح. سيتم فتح صفحة الأحداث…', true);
+        showMsg('تم حفظ الحالة بنجاح… سيتم فتح صفحة الأحداث.', true);
         setTimeout(()=>{ location.href = evUrl; }, REDIRECT_DELAY);
       }catch(err){
         console.error('[disease save] FAILED', err);
-        showMsg('❌ تعذّر الحفظ في فايرستور. تأكّد من تسجيل الدخول والصلاحيات.', false);
+        showMsg('تعذّر الحفظ في فايرستور. تأكّد من تسجيل الدخول والصلاحيات.', false);
       }
     }
 
-    // ربط أزرار الأمراض
     document.querySelectorAll('.dis-btn').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
+      btn.addEventListener('click', ()=>{
         const open = btn.getAttribute('data-open');
         if(open){
-          // صفحات خاصة: لا حفظ هنا
           const number = ($('animalNumber').value||'').trim();
           const date   = $('eventDate').value || todayLocal();
           const url = new URL(open, location.origin);
-          url.searchParams.set('number', number);
-          url.searchParams.set('date', date);
+          if(number) url.searchParams.set('number', number);
+          if(date)   url.searchParams.set('date', date);
           location.href = url.toString();
           return;
         }
         const code = btn.getAttribute('data-code');
         const name = btn.getAttribute('data-type');
-        // حفظ فوري
         saveDisease(code, name);
       });
     });
 
-    // تحديث التاريخ المحفوظ محليًا عند تغييره
-    $('eventDate')?.addEventListener('change', ()=>{
-      try{ localStorage.setItem('currentEventDate', $('eventDate').value||todayLocal()); }catch{}
-    });
-    $('animalNumber')?.addEventListener('change', ()=>{
-      try{ localStorage.setItem('currentAnimalNumber', ($('animalNumber').value||'').trim()); }catch{}
-    });
+    $('eventDate')?.addEventListener('change', ()=>{ try{ localStorage.setItem('currentEventDate', $('eventDate').value||todayLocal()); }catch{} });
+    $('animalNumber')?.addEventListener('change', ()=>{ try{ localStorage.setItem('currentAnimalNumber', ($('animalNumber').value||'').trim()); }catch{} });
   </script>
 </body>
 </html>
