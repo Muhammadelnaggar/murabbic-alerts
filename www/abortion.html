@@ -136,42 +136,93 @@
     }
 
     // آخر تلقيح بالتاريخ فقط (بغض النظر عن أي وسوم)
-    async function fetchLastInsemination(num){
-      try{ await requireAuth(); }catch{ return null; }
-      const tenantId=localStorage.getItem('tenantId');
-      const evs=collection(db,'events');
+  // آخر تلقيح بالتاريخ فقط (من events إن وُجد، وإلا من animals.lastInseminationDate)
+async function fetchLastInsemination(num){
+  // نحاول قراءة events لو متاحة
+  let latest = null;
+  try{
+    try{ await requireAuth(); }catch{}
+    const tenantId = localStorage.getItem('tenantId');
+    const uid = auth.currentUser?.uid || null;
+    const evs = collection(db,'events');
 
-      const owners = [
-        tenantId ? where('tenantId','==',tenantId) : null,
-        auth.currentUser?.uid ? where('userId','==',auth.currentUser.uid) : null,
-        null
-      ].filter(Boolean);
+    const owners = [
+      tenantId ? where('tenantId','==',tenantId) : null,
+      uid ? where('userId','==',uid) : null,
+      null
+    ].filter(Boolean);
+    const fields = ['animalNumber','number'];
 
-      const fields = ['animalNumber','number']; // دعم بديل إن وُجد
-      async function tryOne(field, ownerFilter){
-        const clauses = [ where(field,'==', String(num)), where('eventType','==','insemination') ];
-        if(ownerFilter) clauses.unshift(ownerFilter);
-        const qy=query(evs, ...clauses, orderBy('eventDate','desc'), limit(1));
-        const snap=await getDocs(qy);
-        return snap.empty ? null : snap.docs[0].data();
-      }
-
-      let e=null;
-      for(const f of fields){
-        for(const o of owners){
-          e = await tryOne(f,o);
-          if(e) break;
-        }
-        if(e) break;
-      }
-      if(!e){
-        for(const f of fields){
-          e = await tryOne(f,null);
-          if(e) break;
-        }
-      }
-      return e || null;
+    async function tryOne(field, ownerFilter){
+      const clauses = [ where(field,'==', String(num)), where('eventType','==','insemination') ];
+      if(ownerFilter) clauses.unshift(ownerFilter);
+      const qy = query(evs, ...clauses, orderBy('eventDate','desc'), limit(1));
+      const snap = await getDocs(qy);
+      return snap.empty ? null : snap.docs[0].data();
     }
+
+    for(const f of fields){
+      for(const o of owners){
+        latest = await tryOne(f,o);
+        if(latest) break;
+      }
+      if(latest) break;
+    }
+  }catch(e){
+    console.warn('events read failed:', e);
+    latest = null;
+  }
+
+  // لو لقينا حدث في events نرجّعه
+  const pickDate = (obj)=>{
+    const raw = obj?.eventDate ?? obj?.date ?? obj?.serviceDate ?? obj?.inseminationDate;
+    if(!raw) return null;
+    if (typeof raw === 'string') return raw.slice(0,10);
+    if (raw?.toDate) return raw.toDate().toISOString().slice(0,10);
+    return null;
+  };
+  const dFromEvent = pickDate(latest);
+  if(dFromEvent) return { eventDate: dFromEvent };
+
+  // ⬅️ Fallback: خُد التاريخ من animals (زي اللي ظاهر عندك في السكرين شوت)
+  try{
+    const col = collection(db,'animals');
+    const tenantId = localStorage.getItem('tenantId');
+    const uid = auth.currentUser?.uid || null;
+    const owners = [
+      tenantId ? where('tenantId','==',tenantId) : null,
+      uid ? where('userId','==',uid) : null,
+      null
+    ].filter(Boolean);
+    const fields = ['animalNumber','number'];
+
+    async function animalDoc(field, ownerFilter){
+      const clauses = [ where(field,'==', String(num)) ];
+      if(ownerFilter) clauses.unshift(ownerFilter);
+      const qy = query(col, ...clauses, limit(1));
+      const snap = await getDocs(qy);
+      return snap.empty ? null : snap.docs[0].data();
+    }
+
+    let a=null;
+    for(const f of fields){
+      for(const o of owners){ a = await animalDoc(f,o); if(a) break; }
+      if(a) break;
+    }
+    if(!a) for(const f of fields){ a = await animalDoc(f,null); if(a) break; }
+
+    const raw = a?.lastInseminationDate ?? a?.lastInsemDate ?? a?.lastServiceDate ?? a?.inseminationDate;
+    if(raw){
+      const d = typeof raw==='string' ? raw.slice(0,10) : (raw?.toDate ? raw.toDate().toISOString().slice(0,10) : null);
+      if(d) return { eventDate: d };
+    }
+  }catch(e){
+    console.warn('animals fallback failed:', e);
+  }
+
+  return null;
+}
+
 
     // إيجاد الحيوان (animalNumber/number) ومع/بدون فلتر مالك وتوحيد صيغ "عِشار"
     async function fetchReproStatus(num){
