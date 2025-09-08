@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -84,13 +85,14 @@
 
     // نطاق المستخدم/المستأجر + فلترة عامة للاستعلامات
     let UID = null, TID = null;
-    function scopeWheres(field, num){
-      const wh = [];
-      if (TID)      wh.push(where('tenantId','==', TID));
-      else if (UID) wh.push(where('userId','==',   UID));
-      wh.push(where(field,'==', num));
-      return wh;
-    }
+   function scopeWheres(field, num){
+  const wh = [];
+  if (TID) wh.push(where('tenantId','==', TID)); // اختياري
+  if (UID) wh.push(where('userId','==',   UID)); // ضروري مع القواعد
+  wh.push(where(field,'==', num));
+  return wh;
+}
+
 
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
@@ -109,13 +111,14 @@
     };
 
     // ——— التصنيف حسب الكاتيجوري ———
-    const CATEGORY_MAP = {
-      'انتاج': ['daily_milk','dry_off'],
-      'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
-      'صحة': ['mastitis','lameness','vaccination','treatment','health'],
-      'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment'],
-      'تغذية': ['nutrition','feeding']
-    };
+  const CATEGORY_MAP = {
+  'انتاج': ['daily_milk','dry_off'],
+  'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
+  'صحة': ['mastitis','lameness','vaccination','treatment','health'],
+  'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment', 'milking_traits_eval'],
+  'تغذية': ['nutrition','feeding']
+};
+
     function categoryOf(ev){
       const explicit = ev.category || ev.eventCategory || ev.cat;
       if (explicit) return explicit;
@@ -200,11 +203,16 @@
     async function getAnimalProfile(num){
       try{
         const animals = collection(db, 'animals');
-        const qs = [
-          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('number','==',num),       limit(1)),
-          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('animalNumber','==',num), limit(1)),
-          query(animals, ...(TID ? [where('tenantId','==',TID)] : (UID ? [where('userId','==',UID)] : [])), where('animalId','==',num),     limit(1)),
-        ];
+        const owner = [
+  ...(UID ? [where('userId','==', UID)] : []),
+  ...(TID ? [where('tenantId','==', TID)] : [])
+];
+const qs = [
+  query(animals, ...owner, where('number','==',num),       limit(1)),
+  query(animals, ...owner, where('animalNumber','==',num), limit(1)),
+  query(animals, ...owner, where('animalId','==',num),     limit(1)),
+];
+
         const res = await Promise.all(qs.map(getDocs));
         const hit = res.find(s=>!s.empty);
         return hit ? hit.docs[0].data() : null;
