@@ -63,6 +63,7 @@
     .gauge{width:100%;aspect-ratio:2/1;position:relative}
     .gauge svg{width:100%;height:100%;display:block}
     .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
+    
 
     @media(max-width:560px){
       .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
@@ -133,6 +134,69 @@
       تقييم التغذية
     </div>
   </div>
+<!-- مقاييس القطيع (إنتاجي + تناسلي) -->
+<div class="card" id="herdGauges" aria-label="مقاييس القطيع" style="margin-top:12px">
+  <div style="font-weight:800;color:#1b5e20;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+    📊 مؤشرات القطيع (إنتاجي + تناسلي)
+    <span id="g-date" style="margin-inline-start:auto;font-size:12px;border:1px solid #c5e1a5;border-radius:999px;padding:2px 8px;background:#fff">—</span>
+  </div>
+
+  <div class="gauge-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+    <!-- في الحلاب % -->
+    <div class="gauge" data-key="inMilkPct">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-inmilk" d="" stroke="#2e7d32" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>في الحلاب<br><b id="v-inmilk">—%</b></div></div>
+    </div>
+
+    <!-- نسبة العشار % -->
+    <div class="gauge" data-key="pregRate">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-preg" d="" stroke="#1e88e5" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>نسبة العشار<br><b id="v-preg">—%</b></div></div>
+    </div>
+
+    <!-- حديث الولادة كنسبة من الحلاب -->
+    <div class="gauge" data-key="freshShare">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-fresh" d="" stroke="#8e24aa" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>حديث الولادة<br><b id="v-fresh">—%</b></div></div>
+    </div>
+
+    <!-- جاف % من إجمالي القطيع -->
+    <div class="gauge" data-key="dryShare">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-dry" d="" stroke="#ef6c00" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>جاف<br><b id="v-dry">—%</b></div></div>
+    </div>
+
+    <!-- معدل التلقيح 21ي (تقديري) -->
+    <div class="gauge" data-key="serviceRate">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-service" d="" stroke="#3949ab" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>معدل التلقيح 21ي<br><b id="v-service">—%</b></div></div>
+    </div>
+
+    <!-- معدل الإخصاب -->
+    <div class="gauge" data-key="conceptionRate">
+      <svg viewBox="0 0 100 50">
+        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
+        <path id="fg-conception" d="" stroke="#c2185b" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="val"><div>معدل الإخصاب<br><b id="v-conception">—%</b></div></div>
+    </div>
+  </div>
+</div>
 
   <!-- سكربت الويدجت -->
   <script>
@@ -223,8 +287,138 @@
     });
   })();
 </script>
+<script>
+(function(){
+  const $ = s=>document.querySelector(s);
+  const toDate = s=> s? new Date(s): null;
+  const daysBetween = (a,b)=> Math.floor((a-b)/(24*3600*1000));
+  const getDIM = an => { const calv=toDate(an?.calvingDate); if(!calv) return 0; return Math.max(0, daysBetween(new Date(), calv)); };
+  const isDry = an => an?.lactationStatus==='جاف' || an?.dry===true || an?.inMilk===false;
+  const isPreg = an => an?.reproductiveStatus==='عشار' || an?.pregnant===true;
+  const getMilk = an => Number(an?.lastMilkKg ?? an?.production?.milkKg ?? an?.avgMilkKg ?? 0) || 0;
+  const FRESH_FROM=1, FRESH_TO=45;
+  const isFresh = an => { const d=getDIM(an); return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0); };
+
+  // يرسم قوس نصف دائري حسب النسبة
+  function arcPath(percent){
+    const p = Math.max(0, Math.min(100, percent));
+    const theta = Math.PI * (1 - p/100); // من π إلى 0
+    const R=40, cx=50, cy=50;
+    const x = cx + R * Math.cos(theta);
+    const y = cy + R * Math.sin(theta);
+    const laf = p>50 ? 1 : 0;
+    return `M10,50 A40,40 0 ${laf} 1 ${x.toFixed(2)},${y.toFixed(2)}`;
+  }
+
+ <script>
+async function loadAnimals(){
+  try{
+    const r = await fetch('/api/animals');
+    if(r.ok){
+      const raw = await r.json();
+      // يقبل مصفوفة مباشرة أو كائن فيه data
+      const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
+      if(arr.length){ localStorage.setItem('animals_cache', JSON.stringify(arr)); return arr; }
+    }
+  }catch{}
+  try{ return JSON.parse(localStorage.getItem('animals_cache')||'[]'); }catch{ return []; }
+}
+</script>
+
+
+  async function loadExtraRates(){
+    // معدلات إضافية لو متاحة نهايات الأحداث
+    try{
+      const since = new Date(Date.now()-21*24*3600*1000).toISOString().slice(0,10);
+      const [srvRes, pregRes] = await Promise.allSettled([
+        fetch(`/api/events?type=service&from=${since}`),
+        fetch(`/api/events?type=preg_check&from=${since}`)
+      ]);
+      let service21=null, conception=null;
+      if(srvRes.status==='fulfilled' && srvRes.value.ok){
+        const S = await srvRes.value.json(); service21 = Array.isArray(S)? S.length : 0; // هنحوّله % لاحقاً
+      }
+      if(pregRes.status==='fulfilled' && pregRes.value.ok){
+        const P = await pregRes.value.json();
+        const done = Array.isArray(P)? P.length : 0;
+        const pos = (Array.isArray(P)? P : []).filter(e=> String(e?.result||'').includes('حامل') || e?.pregnant===true).length;
+        conception = done? Math.round((pos/done)*100) : null;
+      }
+      return { serviceCount: service21, conceptionRate: conception };
+    }catch{ return { serviceCount:null, conceptionRate:null }; }
+  }
+
+  function calc(animals){
+    const total = animals.length;
+    let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
+
+    for(const an of animals){
+      const dryFlag = isDry(an);
+      if(!dryFlag){ inMilk++; if(isFresh(an)) fresh++; } else { dry++; }
+      if(isPreg(an)) preg++; else if(!dryFlag){ open++; sumDimOpen += getDIM(an); }
+    }
+
+    const inMilkPct = total? Math.round(inMilk/total*100) : 0;
+    const pregRate  = total? Math.round(preg/total*100)    : 0;
+    const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
+    const dryShare  = total? Math.round(dry/total*100)     : 0;
+    const openDim   = open? Math.round(sumDimOpen/open)    : 0;
+
+    return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
+  }
+
+  function renderGauges(k, extra){
+    $('#g-date').textContent = new Date().toISOString().slice(0,10);
+
+    // في الحلاب
+    $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct));
+    $('#v-inmilk').textContent = k.inMilkPct + '%';
+
+    // العشار
+    $('#fg-preg').setAttribute('d', arcPath(k.pregRate));
+    $('#v-preg').textContent = k.pregRate + '%';
+
+    // حديث الولادة من الحلاب
+    $('#fg-fresh').setAttribute('d', arcPath(k.freshShare));
+    $('#v-fresh').textContent = k.freshShare + '%';
+
+    // الجاف من الإجمالي
+    $('#fg-dry').setAttribute('d', arcPath(k.dryShare));
+    $('#v-dry').textContent = k.dryShare + '%';
+
+    // التلقيح 21ي (تقديري: عدد الخدمات/عدد Open)
+    if(extra.serviceCount!=null && k.open>0){
+      const sr = Math.max(0, Math.min(100, Math.round((extra.serviceCount/k.open)*100)));
+      $('#fg-service').setAttribute('d', arcPath(sr));
+      $('#v-service').textContent = sr + '%';
+    }else{
+      $('#fg-service').setAttribute('d', arcPath(0));
+      $('#v-service').textContent = '—%';
+    }
+
+    // الإخصاب
+    if(typeof extra.conceptionRate==='number'){
+      $('#fg-conception').setAttribute('d', arcPath(extra.conceptionRate));
+      $('#v-conception').textContent = extra.conceptionRate + '%';
+    }else{
+      $('#fg-conception').setAttribute('d', arcPath(0));
+      $('#v-conception').textContent = '—%';
+    }
+  }
+
+  async function boot(){
+    const animals = await loadAnimals();
+    const k = calc(animals);
+    const extra = await loadExtraRates(); // غير إجباري
+    renderGauges(k, extra);
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+})();
+</script>
 
 </body>
 </html>
+
 
 
