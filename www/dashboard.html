@@ -521,9 +521,123 @@ async function loadAnimals(){
   document.addEventListener('DOMContentLoaded', boot);
 })();
 </script>
+<script type="module">
+/* ==== Herd Gauges from Firebase Firestore (LIVE) ==== */
+import app from '/js/firebase-config.js';
+import {
+  getFirestore, collection, query, where, onSnapshot
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const $ = s => document.querySelector(s);
+
+// ---------- Helpers (English fields) ----------
+const toDate = s => s ? new Date(s) : null;
+const daysBetween = (a,b)=> Math.floor((a-b)/(24*3600*1000));
+const getDIM = an => {
+  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt);
+  if(!calv) return 0;
+  return Math.max(0, daysBetween(new Date(), calv));
+};
+const isDry = an => {
+  const st = String(an.lactationStatus || an.status || '').toLowerCase();
+  return an.inMilk === false || st.includes('dry');
+};
+const isPreg = an => {
+  const rs = String(an.reproductiveStatus || an.pregStatus || '').toLowerCase();
+  return an.pregnant === true || rs.includes('preg');
+};
+const isFresh = an => {
+  const d = getDIM(an);
+  const lactNo = Number(an.lactationNumber ?? an.lactNo ?? an.lactNum ?? 0);
+  return d>=1 && d<=45 && !isDry(an) && lactNo>0;
+};
+
+// رسم قوس نصف دائرة
+function arcPath(percent){
+  const p = Math.max(0, Math.min(100, Number(percent)||0));
+  const theta = Math.PI * (1 - p/100);
+  const R=40, cx=50, cy=50;
+  const x = cx + R * Math.cos(theta);
+  const y = cy + R * Math.sin(theta);
+  const laf = p>50 ? 1 : 0;
+  return `M10,50 A40,40 0 ${laf} 1 ${x.toFixed(2)},${y.toFixed(2)}`;
+}
+
+// حساب المؤشرات
+function calc(animals){
+  const total = animals.length;
+  let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
+  for(const an of animals){
+    const dryF = isDry(an);
+    if(!dryF){ inMilk++; if(isFresh(an)) fresh++; } else { dry++; }
+    if(isPreg(an)) preg++; else if(!dryF){ open++; sumDimOpen += getDIM(an); }
+  }
+  const inMilkPct = total? Math.round(inMilk/total*100) : 0;
+  const pregRate  = total? Math.round(preg/total*100)  : 0;
+  const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
+  const dryShare  = total? Math.round(dry/total*100)   : 0;
+  const openDim   = open? Math.round(sumDimOpen/open)  : 0;
+  return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
+}
+
+// تعبئة الجوجز
+function renderGauges(k){
+  $('#g-date').textContent = new Date().toISOString().slice(0,10);
+  $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct)); $('#v-inmilk').textContent = k.inMilkPct + '%';
+  $('#fg-preg').setAttribute('d', arcPath(k.pregRate));    $('#v-preg').textContent  = k.pregRate + '%';
+  $('#fg-fresh').setAttribute('d', arcPath(k.freshShare)); $('#v-fresh').textContent = k.freshShare + '%';
+  $('#fg-dry').setAttribute('d', arcPath(k.dryShare));     $('#v-dry').textContent   = k.dryShare + '%';
+  // نسيب service/conception معطّلين لحد ما نربط أحداث
+  $('#fg-service').setAttribute('d', arcPath(0));          $('#v-service').textContent = '—%';
+  $('#fg-conception').setAttribute('d', arcPath(0));       $('#v-conception').textContent = '—%';
+}
+
+// دمج نتائج مصدرين بدون تكرار
+function dedupe(list){
+  const map = new Map();
+  for(const an of list){
+    const key = an.animalNumber ?? an.number ?? an.id ?? an.uid;
+    if(!map.has(key)) map.set(key, an);
+  }
+  return [...map.values()];
+}
+
+// اشتراك مباشر من Firestore
+(function startLive(){
+  const db = getFirestore(app);
+  const userId = (window.__TENANT__ && window.__TENANT__.userId) || localStorage.getItem('userId');
+  if(!userId){ console.warn('MBK KPIs: لا يوجد userId، احفظه في localStorage.userId أو وفّره من __TENANT__.'); return; }
+
+  let aSub=[], bSub=[]; // a: users/{uid}/animals , b: animals where userId==uid
+  const recompute = ()=> {
+    const animals = dedupe([...aSub, ...bSub]);
+    const k = calc(animals);
+    renderGauges(k);
+  };
+
+  // مسار 1: users/{uid}/animals
+  try{
+    const col = collection(db, 'users', userId, 'animals');
+    onSnapshot(col, snap=>{
+      aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+      recompute();
+    }, err=> console.warn('users/{uid}/animals snapshot error', err));
+  }catch(e){ console.warn('users/{uid}/animals not available', e); }
+
+  // مسار 2: animals (top-level) مع userId
+  try{
+    const q = query(collection(db, 'animals'), where('userId','==', userId));
+    onSnapshot(q, snap=>{
+      bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+      recompute();
+    }, err=> console.warn('animals where userId==uid snapshot error', err));
+  }catch(e){ console.warn('animals top-level query not available', e); }
+})();
+</script>
 
 </body>
 </html>
+
 
 
 
