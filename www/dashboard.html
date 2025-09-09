@@ -426,6 +426,11 @@ import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/fi
 const $ = s => document.querySelector(s);
 
 // ---------- Helpers ----------
+  const norm = s => String(s||'')
+  .toLowerCase()
+  .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
+  .trim();
+
 const toDate = v => {
   if(!v) return null;
   if(typeof v==='string') return new Date(v);
@@ -433,34 +438,37 @@ const toDate = v => {
   if(typeof v==='object' && typeof v.seconds==='number') return new Date(v.seconds*1000);
   return null;
 };
+  const isInMilk = an => {
+  if (isDry(an)) return false;                    // الجاف ليس في الحلاب
+  if (an.inMilk === true) return true;            // علم صريح
+  const st = norm(
+    an.productionStatus ||
+    an.lactationStatus ||
+    an.status ||
+    an['الحالة_اللبنية'] || ''
+  );
+  // كلمات مفتاحية للحلاب
+  return /(حلاب|في الحلاب|محلب|منتج|حليب|milk|milking|lact)/.test(st);
+};
+
 const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
 const getDIM = an => {
   const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt || an['تاريخ_الولادة']);
   return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
 };
 const isDry = an => {
-  // نجمع الحالة من عدة حقول وصيغ
-  const st = String(
+  const st = norm(
+    an.productionStatus ||      // ← مهم: "جاف" عندك هنا
     an.lactationStatus ||
     an.status ||
     an['الحالة_اللبنية'] ||
+    an['حالة_الإنتاج'] ||
     ''
-  ).trim().toLowerCase();
-
-  // أعلام بوليانية شائعة للدُّرُوّ
-  const dryBool =
-    an.dry === true ||
-    an.isDry === true ||
-    an.dryCow === true ||
-    an['جاف'] === true;
-
-  // أي واحدة من دول تعتبره "جاف"
-  return (
-    dryBool ||
-    an.inMilk === false ||
-    /dry|dry-off|dryoff|جاف|جافة|جافه/.test(st)
   );
+  const dryBool = an.dry === true || an.isDry === true || an.dryCow === true || an['جاف'] === true;
+  return dryBool || an.inMilk === false || /(dry|dryoff|dry-off|جاف|جافه|جافة)/.test(st);
 };
+
 
 const isPreg = an => {
   const rs = String(an.reproductiveStatus || an.pregStatus || an['الحالة_التناسلية'] || '').toLowerCase();
@@ -485,11 +493,18 @@ function arcPath(percent){
 function calc(animals){
   const total = animals.length;
   let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
+
   for(const an of animals){
-    const dryF = isDry(an);
-    if(!dryF){ inMilk++; if(isFresh(an)) fresh++; } else { dry++; }
-    if(isPreg(an)) preg++; else if(!dryF){ open++; sumDimOpen += getDIM(an); }
+    const dryF  = isDry(an);
+    const milkF = isInMilk(an);
+
+    if (milkF){ inMilk++; if(isFresh(an)) fresh++; }
+    if (dryF){ dry++; }
+
+    if (isPreg(an)) preg++;
+    else if (milkF){ open++; sumDimOpen += getDIM(an); }
   }
+
   const inMilkPct = total? Math.round(inMilk/total*100) : 0;
   const pregRate  = total? Math.round(preg/total*100)  : 0;
   const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
@@ -497,6 +512,7 @@ function calc(animals){
   const openDim   = open? Math.round(sumDimOpen/open)  : 0;
   return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
 }
+
 
 function renderGauges(k){
   $('#g-date').textContent = new Date().toISOString().slice(0,10);
@@ -547,6 +563,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
