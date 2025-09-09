@@ -117,6 +117,12 @@
     <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
+    <div class="tile" id="groupsTile" role="button" tabindex="0"
+     onclick="(window.dataLayer=window.dataLayer||[]).push({event:'tile_click',tile:'groups',page:'dashboard'}); location.href='groups.html'">
+  <span class="icon">👥</span>
+  مجموعات مربيك
+</div>
+
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
     <div class="tile" id="sensorsTile" role="button" tabindex="0">
       <span class="icon">🛰️</span>
@@ -205,7 +211,20 @@
   <!-- لازم يكون موجود -->
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/app-core.js"></script>
+<script>
+  (function(){
+    const t = document.getElementById('groupsTile');
+    if(!t) return;
+    t.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        t.click();
+      }
+    });
+  })();
+</script>
 
 </body>
 </html>
+
 
