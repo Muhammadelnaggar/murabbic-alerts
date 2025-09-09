@@ -199,113 +199,189 @@
 </div>
 
   <!-- سكربت الويدجت -->
-<script type="module" id="wx-fs">
-import app, { db } from '/js/firebase-config.js';
-import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+<!-- طقس بالمواقع فقط (لا قواعد بيانات) -->
+<!-- طقس حسب بيانات التسجيل (بلد/منطقة/مدينة) + خيار GPS + تثبيت محلي -->
+<script id="wx-reg">
+(function(){
+  // عناصر الواجهة
+  const box = document.getElementById('weatherClassic');
+  const tEl = document.getElementById('wxTemp');
+  const hEl = document.getElementById('wxHum');
+  const thiEl = document.getElementById('wxTHI');
+  const sEl = document.getElementById('wxState');
+  const thiArc = document.getElementById('thiArc');
+  const thiNeedle = document.getElementById('thiNeedle');
+  const btnRefresh = document.getElementById('wxRefresh');
+  const btnPin = document.getElementById('wxPin');
+  const segFarm = document.getElementById('segFarm'); // هنستخدمها كـ "المسجّل"
+  const segGPS  = document.getElementById('segGPS');
 
-const USER_ID = window.__TENANT__?.userId || localStorage.getItem('userId');
+  if(!box||!tEl||!hEl||!thiEl||!sEl||!thiArc||!thiNeedle||!btnRefresh||!btnPin||!segFarm||!segGPS) return;
 
-const box       = document.getElementById('weatherClassic');
-const tEl       = document.getElementById('wxTemp');
-const hEl       = document.getElementById('wxHum');
-const thiEl     = document.getElementById('wxTHI');
-const sEl       = document.getElementById('wxState');
-const thiArc    = document.getElementById('thiArc');
-const thiNeedle = document.getElementById('thiNeedle');
-const btnRefresh= document.getElementById('wxRefresh');
-const btnPin    = document.getElementById('wxPin');
-const segFarm   = document.getElementById('segFarm');
-const segGPS    = document.getElementById('segGPS');
+  const DEF = { lat:30.0444, lon:31.2357, place:'القاهرة' };               // افتراضي
+  const LS_PIN   = 'mbk_farm';                                              // تثبيت يدوي (GPS)
+  const LS_WX    = 'mbk_wx_cache';                                          // كاش طقس
+  const LS_REG   = 'mbk_reg_geo';                                           // كاش جيوكود لبيانات التسجيل
 
-const DEF = { lat:30.0444, lon:31.2357, place:'القاهرة' };
-let mode = 'farm';     // farm | gps
-let farm = null;       // {lat, lon, place}
+  let mode = 'reg';   // reg(المسجّل) | gps(موقعي)
+  let pinned = null;  // {lat,lon,place} لو المستخدم عمل "ثبّت"
 
-function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10); }
-function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
-function colorAndText(thi,b){
-  if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
-  if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
-  if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
-  if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
-  return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
-}
-function drawTHI(thi){
-  thiArc.style.background =
-    `conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)`;
-  const ang=-120+((thi-50)/40)*240;
-  thiNeedle.style.setProperty('--angle',ang+'deg');
-  const {bg,txt}=colorAndText(thi,bands());
-  box.style.background = bg; sEl.textContent = txt;
-}
-async function getFarmFromFS(){
-  if(!USER_ID) return null;
-  try{
-    const pRef = doc(db, 'users', USER_ID, 'profile', 'general');
-    const snap = await getDoc(pRef);
-    if(snap.exists()){
-      const d = snap.data();
-      if(typeof d.farmLat==='number' && typeof d.farmLon==='number'){
-        return { lat:d.farmLat, lon:d.farmLon, place:d.farmPlace||'مزرعتي' };
+  // ===== THI و الألوان =====
+  function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
+  function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
+  function colorAndText(thi,b){
+    if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
+    if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
+    if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
+    if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
+    return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
+  }
+  function drawTHI(thi){
+    thiArc.style.background =
+      'conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)';
+    const ang=-120+((thi-50)/40)*240;
+    thiNeedle.style.setProperty('--angle',ang+'deg');
+    const {bg,txt}=colorAndText(thi,bands());
+    box.style.background = bg; sEl.textContent = txt;
+  }
+
+  // ===== Helpers التخزين المحلي =====
+  const readJSON=(k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch{ return null; } };
+  const writeJSON=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+
+  // ===== مصدر "المسجّل": من window.__TENANT__ =====
+  function readTenantAddress(){
+    const T = window.__TENANT__ || {};
+    const country = T.country || T.countryCode || T.address?.country || T.profile?.country;
+    const region  = T.region  || T.state  || T.governorate || T.address?.region || T.profile?.region;
+    const city    = T.city    || T.town   || T.address?.city || T.profile?.city;
+    return { country, region, city };
+  }
+  function regKey(addr){
+    const parts = [addr.city, addr.region, addr.country].filter(Boolean).join('|').toLowerCase();
+    return parts || 'default';
+  }
+  async function geocodeFromRegistration(){
+    const addr = readTenantAddress();
+    if(!addr.country && !addr.region && !addr.city) return null;
+
+    const key = regKey(addr);
+    const cached = readJSON(LS_REG);
+    if(cached && cached.key===key && cached.lat && cached.lon) return cached;
+
+    // نبني نص بحث معقول
+    const q = encodeURIComponent([addr.city, addr.region, addr.country].filter(Boolean).join(', '));
+    try{
+      // Geocoding من Open-Meteo (بدون مفاتيح)
+      const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=ar`, ctl);
+      const j = await r.json();
+      const item = j?.results?.[0];
+      if(item){
+        const place = [item.name, item.admin1, item.country].filter(Boolean).join('، ');
+        const res = { lat:item.latitude, lon:item.longitude, place, key };
+        writeJSON(LS_REG, res);
+        return res;
       }
-    }
-  }catch(e){ console.warn('getFarmFromFS', e); }
-  return null;
-}
-async function saveFarmToFS(lat, lon, place){
-  if(!USER_ID) return;
-  try{
-    const pRef = doc(db, 'users', USER_ID, 'profile', 'general');
-    await setDoc(pRef, { farmLat:lat, farmLon:lon, farmPlace:place||'مزرعتي' }, { merge:true });
-    localStorage.setItem('mbk_farm', JSON.stringify({lat,lon,place}));
-  }catch(e){ console.warn('saveFarmToFS', e); }
-}
-function getFarmFromLocal(){ try{ return JSON.parse(localStorage.getItem('mbk_farm')||'null'); }catch{ return null; } }
-function getCoords(){
-  if(mode==='gps' && navigator.geolocation){
-    return new Promise((resolve)=> {
+    }catch(e){}
+    return null;
+  }
+
+  // ===== اختيار الإحداثيات =====
+  function getPinned(){ return readJSON(LS_PIN); }
+  function savePinned(lat,lon,place){ writeJSON(LS_PIN, {lat,lon,place:place||'مزرعتي'}); }
+
+  function getGPS(){
+    return new Promise((resolve)=>{
+      if(!navigator.geolocation) return resolve(null);
       navigator.geolocation.getCurrentPosition(
         p => resolve({ lat:p.coords.latitude, lon:p.coords.longitude, place:'موقعي' }),
-        _ => resolve(farm || DEF),
+        _ => resolve(null),
         { enableHighAccuracy:true, timeout:5000 }
       );
     });
   }
-  return Promise.resolve(farm || DEF);
-}
-async function fetchWeather(lat, lon){
-  try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`, {cache:'no-store'});
-    const j=await r.json(); return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
-  }catch{ return null; }
-}
-async function render(){
-  const c = await getCoords(); const data = await fetchWeather(c.lat, c.lon);
-  if(!data) return;
-  const t=Math.round(data.t), h=Math.round(data.h), thi=THI(t,h);
-  tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
-}
-function activate(who){ segFarm.classList.toggle('active', who==='farm'); segGPS.classList.toggle('active', who==='gps'); }
-async function boot(){
-  farm = await getFarmFromFS() || getFarmFromLocal() || null;
-  activate('farm');
 
-  segFarm.addEventListener('click', ()=>{ mode='farm'; activate('farm'); render(); });
-  segGPS.addEventListener('click', ()=>{ mode='gps';  activate('gps');  render(); });
-  btnRefresh.addEventListener('click', render);
+  async function pickCoords(){
+    // أولوية: لو المستخدم عامل تثبيت يدوي
+    if(pinned) return pinned;
 
-  btnPin.addEventListener('click', async ()=>{
-    mode='gps'; const c = await getCoords();
-    await saveFarmToFS(c.lat, c.lon, c.place);
-    farm = { lat:c.lat, lon:c.lon, place:c.place };
-    mode='farm'; activate('farm'); render();
-    (window.dataLayer=window.dataLayer||[]).push({event:'farm_pin', lat:c.lat, lon:c.lon});
-  });
+    if(mode==='gps'){
+      const g = await getGPS();
+      if(g) return g;
+    }
 
-  render();
-}
-document.addEventListener('DOMContentLoaded', boot);
+    // موقع التسجيل
+    const reg = await geocodeFromRegistration();
+    if(reg) return reg;
+
+    // افتراضي
+    return DEF;
+  }
+
+  // ===== جلب الطقس + كاش دقيقة =====
+  function wxGetCached(){
+    const x = readJSON(LS_WX);
+    if(x && Date.now()-x.ts < 60_000) return x.data;
+    return null;
+  }
+  function wxSetCached(data){ writeJSON(LS_WX, {ts:Date.now(), data}); }
+
+  async function fetchWeather(lat, lon){
+    const cached = wxGetCached();
+    if(cached && typeof cached.t==='number' && typeof cached.h==='number') return cached;
+    try{
+      const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
+      const r = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
+        { cache:'no-store', ...ctl }
+      );
+      const j=await r.json();
+      const data = { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
+      if(typeof data.t==='number' && typeof data.h==='number') wxSetCached(data);
+      return data;
+    }catch{ return null; }
+  }
+
+  function activate(which){
+    segFarm.classList.toggle('active', which==='reg');
+    segGPS .classList.toggle('active', which==='gps');
+  }
+
+  async function render(){
+    const c = await pickCoords();
+    const data = await fetchWeather(c.lat, c.lon);
+    if(!data || typeof data.t!=='number' || typeof data.h!=='number'){
+      tEl.textContent='—°C'; hEl.textContent='—%'; thiEl.textContent='—'; sEl.textContent='—'; return;
+    }
+    const t=Math.round(data.t), h=Math.round(data.h), thi=THI(t,h);
+    tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
+  }
+
+  async function boot(){
+    pinned = getPinned() || null;       // لو كان فيه تثبيت قديم
+    mode = 'reg';                       // الوضع الافتراضي: بيانات التسجيل
+    activate('reg');
+
+    segFarm.addEventListener('click', ()=>{ mode='reg'; activate('reg'); render(); });
+    segGPS .addEventListener('click', ()=>{ mode='gps'; activate('gps'); render(); });
+    btnRefresh.addEventListener('click', render);
+
+    btnPin.addEventListener('click', async ()=>{
+      mode='gps';
+      const g = await getGPS();
+      if(g){ savePinned(g.lat, g.lon, g.place); pinned = g; }
+      mode='reg'; activate('reg'); render();
+      (window.dataLayer=window.dataLayer||[]).push({event:'farm_pin_local', source:'gps'});
+    });
+
+    render();
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+})();
 </script>
+
 
   <!-- فحص حالة الحساسات -->
   <script>
@@ -344,7 +420,7 @@ document.addEventListener('DOMContentLoaded', boot);
 </script>
 
 <script type="module" id="herd-gauges-fs">
-import app, { db } from '/js/firebase-config.js';
+import { db } from '/js/firebase-config.js';
 import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = s => document.querySelector(s);
@@ -451,6 +527,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
