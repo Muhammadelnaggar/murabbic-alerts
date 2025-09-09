@@ -549,17 +549,30 @@ if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.is
     return Math.max(0, Math.min(100, Math.round(n)));
   };
 
-  const CAND_KEYS = ['milkTraitsScore','traitsScore','milk_score','score','milkTraits','traits','quality'];
+ // مفاتيح محتملة للسكور النهائي (تشمل overallScore)
+const CAND_KEYS = [
+  'overallScore','overall_score','overall',          // الجديد
+  'milkTraitsScore','traitsScore','milk_score',
+  'score','milkTraits','traits','quality'
+];
 
-  const pullScore = (e)=>{
-    // مفاتيح مباشرة
-    for (const k of CAND_KEYS) if (e[k] != null) return e[k];
-    // داخل كائن فرعي milk إن وُجد
-    if (e.milk && typeof e.milk === 'object') {
-      for (const k of CAND_KEYS) if (e.milk[k] != null) return e.milk[k];
+// البحث العميق داخل الحدث وأي كائنات فرعية
+const pullScore = (root)=>{
+  const stack = [root];
+  while (stack.length){
+    const obj = stack.pop();
+    if (!obj || typeof obj !== 'object') continue;
+
+    for (const [k,v] of Object.entries(obj)){
+      if (CAND_KEYS.includes(String(k))) {
+        if (v != null && (typeof v === 'number' || typeof v === 'string')) return v;
+      }
+      if (v && typeof v === 'object') stack.push(v);
     }
-    return null;
-  };
+  }
+  return null;
+};
+
 
   // خُد آخر قيمة متاحة (من الأحدث للأقدم)
   for (let i = events.length - 1; i >= 0; i--) {
@@ -971,6 +984,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
