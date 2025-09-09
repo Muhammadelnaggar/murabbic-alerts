@@ -199,58 +199,113 @@
 </div>
 
   <!-- سكربت الويدجت -->
-  <script>
-    (function(){
-      const tEl=document.getElementById('wxTemp');
-      const hEl=document.getElementById('wxHum');
-      const thiEl=document.getElementById('wxTHI');
-      const sEl=document.getElementById('wxState');
-      const thiArc=document.getElementById('thiArc');
-      const thiNeedle=document.getElementById('thiNeedle');
+<script type="module" id="wx-fs">
+import app, { db } from '/js/firebase-config.js';
+import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-      function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
-      function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
-      function colorAndText(thi,b){
-        if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
-        if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
-        if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
-        if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
-        return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
+const USER_ID = window.__TENANT__?.userId || localStorage.getItem('userId');
+
+const box       = document.getElementById('weatherClassic');
+const tEl       = document.getElementById('wxTemp');
+const hEl       = document.getElementById('wxHum');
+const thiEl     = document.getElementById('wxTHI');
+const sEl       = document.getElementById('wxState');
+const thiArc    = document.getElementById('thiArc');
+const thiNeedle = document.getElementById('thiNeedle');
+const btnRefresh= document.getElementById('wxRefresh');
+const btnPin    = document.getElementById('wxPin');
+const segFarm   = document.getElementById('segFarm');
+const segGPS    = document.getElementById('segGPS');
+
+const DEF = { lat:30.0444, lon:31.2357, place:'القاهرة' };
+let mode = 'farm';     // farm | gps
+let farm = null;       // {lat, lon, place}
+
+function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10); }
+function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
+function colorAndText(thi,b){
+  if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
+  if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
+  if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
+  if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
+  return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
+}
+function drawTHI(thi){
+  thiArc.style.background =
+    `conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)`;
+  const ang=-120+((thi-50)/40)*240;
+  thiNeedle.style.setProperty('--angle',ang+'deg');
+  const {bg,txt}=colorAndText(thi,bands());
+  box.style.background = bg; sEl.textContent = txt;
+}
+async function getFarmFromFS(){
+  if(!USER_ID) return null;
+  try{
+    const pRef = doc(db, 'users', USER_ID, 'profile', 'general');
+    const snap = await getDoc(pRef);
+    if(snap.exists()){
+      const d = snap.data();
+      if(typeof d.farmLat==='number' && typeof d.farmLon==='number'){
+        return { lat:d.farmLat, lon:d.farmLon, place:d.farmPlace||'مزرعتي' };
       }
-      async function fetchWeather(){
-        try{
-          const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&current=temperature_2m,relative_humidity_2m&timezone=auto`);
-          const j=await r.json();
-          return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
-        }catch{return null;}
-      }
-      function drawTHI(thi){
-        const b=bands();
-        if(thiArc){
-          thiArc.style.background = `conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)`;
-        }
-        if(thiNeedle){
-          const ang=-120+((thi-50)/40)*240;
-          thiNeedle.style.setProperty('--angle',ang+'deg');
-        }
-        const {bg,txt}=colorAndText(thi,b);
-        document.getElementById('weatherClassic').style.background = bg;
-        sEl.textContent = txt;
-      }
-      async function render(){
-        const data=await fetchWeather();
-        if(!data) return;
-        const t=Math.round(data.t), h=Math.round(data.h);
-        const thi=THI(t,h);
-        tEl.textContent=`${t}°C`;
-        hEl.textContent=`${h}%`;
-        thiEl.textContent=thi;
-        drawTHI(thi);
-      }
-      document.getElementById('wxRefresh').addEventListener('click',()=>render());
-      document.addEventListener('DOMContentLoaded',()=>render());
-    })();
-  </script>
+    }
+  }catch(e){ console.warn('getFarmFromFS', e); }
+  return null;
+}
+async function saveFarmToFS(lat, lon, place){
+  if(!USER_ID) return;
+  try{
+    const pRef = doc(db, 'users', USER_ID, 'profile', 'general');
+    await setDoc(pRef, { farmLat:lat, farmLon:lon, farmPlace:place||'مزرعتي' }, { merge:true });
+    localStorage.setItem('mbk_farm', JSON.stringify({lat,lon,place}));
+  }catch(e){ console.warn('saveFarmToFS', e); }
+}
+function getFarmFromLocal(){ try{ return JSON.parse(localStorage.getItem('mbk_farm')||'null'); }catch{ return null; } }
+function getCoords(){
+  if(mode==='gps' && navigator.geolocation){
+    return new Promise((resolve)=> {
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat:p.coords.latitude, lon:p.coords.longitude, place:'موقعي' }),
+        _ => resolve(farm || DEF),
+        { enableHighAccuracy:true, timeout:5000 }
+      );
+    });
+  }
+  return Promise.resolve(farm || DEF);
+}
+async function fetchWeather(lat, lon){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`, {cache:'no-store'});
+    const j=await r.json(); return { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
+  }catch{ return null; }
+}
+async function render(){
+  const c = await getCoords(); const data = await fetchWeather(c.lat, c.lon);
+  if(!data) return;
+  const t=Math.round(data.t), h=Math.round(data.h), thi=THI(t,h);
+  tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
+}
+function activate(who){ segFarm.classList.toggle('active', who==='farm'); segGPS.classList.toggle('active', who==='gps'); }
+async function boot(){
+  farm = await getFarmFromFS() || getFarmFromLocal() || null;
+  activate('farm');
+
+  segFarm.addEventListener('click', ()=>{ mode='farm'; activate('farm'); render(); });
+  segGPS.addEventListener('click', ()=>{ mode='gps';  activate('gps');  render(); });
+  btnRefresh.addEventListener('click', render);
+
+  btnPin.addEventListener('click', async ()=>{
+    mode='gps'; const c = await getCoords();
+    await saveFarmToFS(c.lat, c.lon, c.place);
+    farm = { lat:c.lat, lon:c.lon, place:c.place };
+    mode='farm'; activate('farm'); render();
+    (window.dataLayer=window.dataLayer||[]).push({event:'farm_pin', lat:c.lat, lon:c.lon});
+  });
+
+  render();
+}
+document.addEventListener('DOMContentLoaded', boot);
+</script>
 
   <!-- فحص حالة الحساسات -->
   <script>
@@ -287,272 +342,40 @@
     });
   })();
 </script>
-<script>
-;(()=>{ // ; لحماية من التحام مع سكربت قبله بلا فاصلة منقوطة
-  const $ = s=>document.querySelector(s);
 
-  // Helpers
-  const toDate = s=> s? new Date(s): null;
-  const daysBetween = (a,b)=> Math.floor((a-b)/(24*3600*1000));
-  const getDIM = an => { const calv=toDate(an?.calvingDate); if(!calv) return 0; return Math.max(0, daysBetween(new Date(), calv)); };
-  const isDry = an => an?.lactationStatus==='جاف' || an?.dry===true || an?.inMilk===false;
-  const isPreg = an => an?.reproductiveStatus==='عشار' || an?.pregnant===true;
-  const FRESH_FROM=1, FRESH_TO=45;
-  const isFresh = an => { const d=getDIM(an); return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0); };
-
-  // رسم قوس نصف دائرة
-  function arcPath(percent){
-    const p = Math.max(0, Math.min(100, Number(percent)||0));
-    const theta = Math.PI * (1 - p/100);
-    const R=40, cx=50, cy=50;
-    const x = cx + R * Math.cos(theta);
-    const y = cy + R * Math.sin(theta);
-    const laf = p>50 ? 1 : 0;
-    return `M10,50 A40,40 0 ${laf} 1 ${x.toFixed(2)},${y.toFixed(2)}`;
-  }
-
-  // تحميل القطيع (يتحمل شكلين: [] أو {data:[]})
-  async function loadAnimals(){
-    try{
-      const r = await fetch('/api/animals',{cache:'no-store'});
-      if(r.ok){
-        const raw = await r.json();
-        const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
-        if(arr.length){ localStorage.setItem('animals_cache', JSON.stringify(arr)); return arr; }
-      }
-    }catch(e){}
-    try{ return JSON.parse(localStorage.getItem('animals_cache')||'[]'); }catch{ return []; }
-  }
-
-  // معدلات إضافية (اختياري)
-  async function loadExtraRates(){
-    try{
-      const since = new Date(Date.now()-21*24*3600*1000).toISOString().slice(0,10);
-      const [srvRes, pregRes] = await Promise.allSettled([
-        fetch(`/api/events?type=service&from=${since}`),
-        fetch(`/api/events?type=preg_check&from=${since}`)
-      ]);
-      let serviceCount=null, conceptionRate=null;
-      if(srvRes.status==='fulfilled' && srvRes.value.ok){
-        const S = await srvRes.value.json(); serviceCount = Array.isArray(S)? S.length : 0;
-      }
-      if(pregRes.status==='fulfilled' && pregRes.value.ok){
-        const P = await pregRes.value.json();
-        const done = Array.isArray(P)? P.length : 0;
-        const pos = (Array.isArray(P)? P : []).filter(e=> String(e?.result||'').includes('حامل') || e?.pregnant===true).length;
-        conceptionRate = done? Math.round((pos/done)*100) : null;
-      }
-      return { serviceCount, conceptionRate };
-    }catch{ return { serviceCount:null, conceptionRate:null }; }
-  }
-
-  // حساب المؤشرات
-  function calc(animals){
-    const total = animals.length;
-    let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
-    for(const an of animals){
-      const dryFlag = isDry(an);
-      if(!dryFlag){ inMilk++; if(isFresh(an)) fresh++; } else { dry++; }
-      if(isPreg(an)) preg++; else if(!dryFlag){ open++; sumDimOpen += getDIM(an); }
-    }
-    const inMilkPct = total? Math.round(inMilk/total*100) : 0;
-    const pregRate  = total? Math.round(preg/total*100)  : 0;
-    const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
-    const dryShare  = total? Math.round(dry/total*100)   : 0;
-    const openDim   = open? Math.round(sumDimOpen/open)  : 0;
-    return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
-  }
-
-  // تعبئة الواجهه
-  function renderGauges(k, extra){
-    $('#g-date').textContent = new Date().toISOString().slice(0,10);
-
-    $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct));
-    $('#v-inmilk').textContent = k.inMilkPct + '%';
-
-    $('#fg-preg').setAttribute('d', arcPath(k.pregRate));
-    $('#v-preg').textContent = k.pregRate + '%';
-
-    $('#fg-fresh').setAttribute('d', arcPath(k.freshShare));
-    $('#v-fresh').textContent = k.freshShare + '%';
-
-    $('#fg-dry').setAttribute('d', arcPath(k.dryShare));
-    $('#v-dry').textContent = k.dryShare + '%';
-
-    if(extra.serviceCount!=null && k.open>0){
-      const sr = Math.max(0, Math.min(100, Math.round((extra.serviceCount/k.open)*100)));
-      $('#fg-service').setAttribute('d', arcPath(sr));
-      $('#v-service').textContent = sr + '%';
-    }else{
-      $('#fg-service').setAttribute('d', arcPath(0));
-      $('#v-service').textContent = '—%';
-    }
-
-    if(typeof extra.conceptionRate==='number'){
-      $('#fg-conception').setAttribute('d', arcPath(extra.conceptionRate));
-      $('#v-conception').textContent = extra.conceptionRate + '%';
-    }else{
-      $('#fg-conception').setAttribute('d', arcPath(0));
-      $('#v-conception').textContent = '—%';
-    }
-  }
-
-  async function boot(){
-    try{
-      const animals = await loadAnimals();
-      const k = calc(animals);
-      const extra = await loadExtraRates();
-      renderGauges(k, extra);
-      (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render', inMilkPct:k.inMilkPct, pregRate:k.pregRate});
-    }catch(err){
-      console.error('Herd gauges error:', err);
-    }
-  }
-
-  // شغّل بعد تحميل الـ DOM
-  document.addEventListener('DOMContentLoaded', boot);
-})();
-</script>
-
-
- <script>
-async function loadAnimals(){
-  try{
-    const r = await fetch('/api/animals');
-    if(r.ok){
-      const raw = await r.json();
-      // يقبل مصفوفة مباشرة أو كائن فيه data
-      const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
-      if(arr.length){ localStorage.setItem('animals_cache', JSON.stringify(arr)); return arr; }
-    }
-  }catch{}
-  try{ return JSON.parse(localStorage.getItem('animals_cache')||'[]'); }catch{ return []; }
-}
-</script>
-
-<script>
-  async function loadExtraRates(){
-    // معدلات إضافية لو متاحة نهايات الأحداث
-    try{
-      const since = new Date(Date.now()-21*24*3600*1000).toISOString().slice(0,10);
-      const [srvRes, pregRes] = await Promise.allSettled([
-        fetch(`/api/events?type=service&from=${since}`),
-        fetch(`/api/events?type=preg_check&from=${since}`)
-      ]);
-      let service21=null, conception=null;
-      if(srvRes.status==='fulfilled' && srvRes.value.ok){
-        const S = await srvRes.value.json(); service21 = Array.isArray(S)? S.length : 0; // هنحوّله % لاحقاً
-      }
-      if(pregRes.status==='fulfilled' && pregRes.value.ok){
-        const P = await pregRes.value.json();
-        const done = Array.isArray(P)? P.length : 0;
-        const pos = (Array.isArray(P)? P : []).filter(e=> String(e?.result||'').includes('حامل') || e?.pregnant===true).length;
-        conception = done? Math.round((pos/done)*100) : null;
-      }
-      return { serviceCount: service21, conceptionRate: conception };
-    }catch{ return { serviceCount:null, conceptionRate:null }; }
-  }
-
-  function calc(animals){
-    const total = animals.length;
-    let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
-
-    for(const an of animals){
-      const dryFlag = isDry(an);
-      if(!dryFlag){ inMilk++; if(isFresh(an)) fresh++; } else { dry++; }
-      if(isPreg(an)) preg++; else if(!dryFlag){ open++; sumDimOpen += getDIM(an); }
-    }
-
-    const inMilkPct = total? Math.round(inMilk/total*100) : 0;
-    const pregRate  = total? Math.round(preg/total*100)    : 0;
-    const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
-    const dryShare  = total? Math.round(dry/total*100)     : 0;
-    const openDim   = open? Math.round(sumDimOpen/open)    : 0;
-
-    return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
-  }
-
-  function renderGauges(k, extra){
-    $('#g-date').textContent = new Date().toISOString().slice(0,10);
-
-    // في الحلاب
-    $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct));
-    $('#v-inmilk').textContent = k.inMilkPct + '%';
-
-    // العشار
-    $('#fg-preg').setAttribute('d', arcPath(k.pregRate));
-    $('#v-preg').textContent = k.pregRate + '%';
-
-    // حديث الولادة من الحلاب
-    $('#fg-fresh').setAttribute('d', arcPath(k.freshShare));
-    $('#v-fresh').textContent = k.freshShare + '%';
-
-    // الجاف من الإجمالي
-    $('#fg-dry').setAttribute('d', arcPath(k.dryShare));
-    $('#v-dry').textContent = k.dryShare + '%';
-
-    // التلقيح 21ي (تقديري: عدد الخدمات/عدد Open)
-    if(extra.serviceCount!=null && k.open>0){
-      const sr = Math.max(0, Math.min(100, Math.round((extra.serviceCount/k.open)*100)));
-      $('#fg-service').setAttribute('d', arcPath(sr));
-      $('#v-service').textContent = sr + '%';
-    }else{
-      $('#fg-service').setAttribute('d', arcPath(0));
-      $('#v-service').textContent = '—%';
-    }
-
-    // الإخصاب
-    if(typeof extra.conceptionRate==='number'){
-      $('#fg-conception').setAttribute('d', arcPath(extra.conceptionRate));
-      $('#v-conception').textContent = extra.conceptionRate + '%';
-    }else{
-      $('#fg-conception').setAttribute('d', arcPath(0));
-      $('#v-conception').textContent = '—%';
-    }
-  }
-
-  async function boot(){
-    const animals = await loadAnimals();
-    const k = calc(animals);
-    const extra = await loadExtraRates(); // غير إجباري
-    renderGauges(k, extra);
-  }
-
-  document.addEventListener('DOMContentLoaded', boot);
-})();
-</script>
-<script type="module">
-/* ==== Herd Gauges from Firebase Firestore (LIVE) ==== */
-import app from '/js/firebase-config.js';
-import {
-  getFirestore, collection, query, where, onSnapshot
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+<script type="module" id="herd-gauges-fs">
+import app, { db } from '/js/firebase-config.js';
+import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = s => document.querySelector(s);
 
-// ---------- Helpers (English fields) ----------
-const toDate = s => s ? new Date(s) : null;
-const daysBetween = (a,b)=> Math.floor((a-b)/(24*3600*1000));
+// ---------- Helpers ----------
+const toDate = v => {
+  if(!v) return null;
+  if(typeof v==='string') return new Date(v);
+  if(v instanceof Date) return v;
+  if(typeof v==='object' && typeof v.seconds==='number') return new Date(v.seconds*1000);
+  return null;
+};
+const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
 const getDIM = an => {
-  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt);
-  if(!calv) return 0;
-  return Math.max(0, daysBetween(new Date(), calv));
+  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt || an['تاريخ_الولادة']);
+  return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
 };
 const isDry = an => {
-  const st = String(an.lactationStatus || an.status || '').toLowerCase();
-  return an.inMilk === false || st.includes('dry');
+  const st = String(an.lactationStatus || an.status || an['الحالة_اللبنية'] || '').toLowerCase();
+  return an.inMilk===false || st.includes('dry') || st.includes('جاف');
 };
 const isPreg = an => {
-  const rs = String(an.reproductiveStatus || an.pregStatus || '').toLowerCase();
-  return an.pregnant === true || rs.includes('preg');
+  const rs = String(an.reproductiveStatus || an.pregStatus || an['الحالة_التناسلية'] || '').toLowerCase();
+  return an.pregnant===true || rs.includes('preg') || rs.includes('عشار');
 };
 const isFresh = an => {
   const d = getDIM(an);
-  const lactNo = Number(an.lactationNumber ?? an.lactNo ?? an.lactNum ?? 0);
+  const lactNo = Number(an.lactationNumber ?? an.lactNo ?? an.lactNum ?? an['رقم_الحلاب'] ?? 0);
   return d>=1 && d<=45 && !isDry(an) && lactNo>0;
 };
 
-// رسم قوس نصف دائرة
 function arcPath(percent){
   const p = Math.max(0, Math.min(100, Number(percent)||0));
   const theta = Math.PI * (1 - p/100);
@@ -563,7 +386,6 @@ function arcPath(percent){
   return `M10,50 A40,40 0 ${laf} 1 ${x.toFixed(2)},${y.toFixed(2)}`;
 }
 
-// حساب المؤشرات
 function calc(animals){
   const total = animals.length;
   let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
@@ -580,63 +402,56 @@ function calc(animals){
   return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
 }
 
-// تعبئة الجوجز
 function renderGauges(k){
   $('#g-date').textContent = new Date().toISOString().slice(0,10);
   $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct)); $('#v-inmilk').textContent = k.inMilkPct + '%';
   $('#fg-preg').setAttribute('d', arcPath(k.pregRate));    $('#v-preg').textContent  = k.pregRate + '%';
   $('#fg-fresh').setAttribute('d', arcPath(k.freshShare)); $('#v-fresh').textContent = k.freshShare + '%';
   $('#fg-dry').setAttribute('d', arcPath(k.dryShare));     $('#v-dry').textContent   = k.dryShare + '%';
-  // نسيب service/conception معطّلين لحد ما نربط أحداث
   $('#fg-service').setAttribute('d', arcPath(0));          $('#v-service').textContent = '—%';
   $('#fg-conception').setAttribute('d', arcPath(0));       $('#v-conception').textContent = '—%';
 }
 
-// دمج نتائج مصدرين بدون تكرار
 function dedupe(list){
   const map = new Map();
   for(const an of list){
-    const key = an.animalNumber ?? an.number ?? an.id ?? an.uid;
+    const key = an.animalNumber ?? an.number ?? an.id ?? an.uid ?? an.tag;
     if(!map.has(key)) map.set(key, an);
   }
   return [...map.values()];
 }
 
-// اشتراك مباشر من Firestore
 (function startLive(){
-  const db = getFirestore(app);
-  const userId = (window.__TENANT__ && window.__TENANT__.userId) || localStorage.getItem('userId');
-  if(!userId){ console.warn('MBK KPIs: لا يوجد userId، احفظه في localStorage.userId أو وفّره من __TENANT__.'); return; }
+  const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
+  if(!userId){ console.warn('MBK KPIs: لا يوجد userId'); return; }
 
-  let aSub=[], bSub=[]; // a: users/{uid}/animals , b: animals where userId==uid
-  const recompute = ()=> {
+  let aSub=[], bSub=[];
+  const recompute = ()=>{
     const animals = dedupe([...aSub, ...bSub]);
     const k = calc(animals);
     renderGauges(k);
+    (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render', inMilkPct:k.inMilkPct, pregRate:k.pregRate});
+    try{ localStorage.setItem('animals_cache', JSON.stringify(animals)); }catch{}
   };
 
-  // مسار 1: users/{uid}/animals
   try{
     const col = collection(db, 'users', userId, 'animals');
-    onSnapshot(col, snap=>{
-      aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
-      recompute();
-    }, err=> console.warn('users/{uid}/animals snapshot error', err));
+    onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+      err=> console.warn('users/{uid}/animals snapshot error', err));
   }catch(e){ console.warn('users/{uid}/animals not available', e); }
 
-  // مسار 2: animals (top-level) مع userId
   try{
     const q = query(collection(db, 'animals'), where('userId','==', userId));
-    onSnapshot(q, snap=>{
-      bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
-      recompute();
-    }, err=> console.warn('animals where userId==uid snapshot error', err));
+    onSnapshot(q, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+      err=> console.warn('animals where userId==uid snapshot error', err));
   }catch(e){ console.warn('animals top-level query not available', e); }
 })();
 </script>
 
+
 </body>
 </html>
+
 
 
 
