@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Murabbik – بطاقة الحيوان</title>
   <style>
+    /* ألوان نقاط الليجند للجوج */
+.legend .leg:nth-child(1) .dot{background:#ef5350}
+.legend .leg:nth-child(2) .dot{background:#ffb74d}
+.legend .leg:nth-child(3) .dot{background:#fff176}
+.legend .leg:nth-child(4) .dot{background:#66bb6a}
+
+/* جدول الأحداث القابل للتمرير */
+.ev-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+.ev-table{width:100%;border-collapse:separate;border-spacing:0}
+.ev-table th,.ev-table td{padding:10px;border-bottom:1px solid var(--border);font:13px system-ui;vertical-align:top}
+.ev-table thead th{position:sticky;top:0;background:#f8fff5;z-index:1;text-align:right}
+.ev-table tr:hover td{background:#f7fff2}
+.ev-date{white-space:nowrap;color:#0f5132;font-weight:700}
+.ev-type{color:#14532d;font-weight:800}
+.ev-note{color:#355}
+
     :root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--ink);padding:18px}
@@ -58,6 +74,25 @@
     @media (max-width:560px){.hl .note{grid-column:1 / -1}}
 
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
+    /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
+@media (max-width:560px){
+  .ev-scroll{ overflow:auto; }               /* التمرير داخل الصندوق */
+  .ev-table{ table-layout: fixed; }          /* ثبات أعمدة وellipsis */
+  .ev-table thead th{ position: sticky; top: 0; z-index:1; }
+
+  /* صفوف خفيفة */
+  .ev-table th, .ev-table td{ padding:6px 8px; font-size:12px; line-height:1.2; }
+
+  /* قصّ النص لسطـر واحد عشان ما يطوّلش ارتفاع الصف */
+  .ev-type, .ev-note, .ev-date{
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ev-note{
+    display: -webkit-box;
+    -webkit-line-clamp: 1;      /* سطر واحد فقط */
+    -webkit-box-orient: vertical;
+  }
+}
 
     /* شارة صغيرة للمفتاح داخل كل-الحقول */
   </style>
@@ -147,9 +182,7 @@
         <div class="fi"><span>آخر فحص</span><b id="fiLastCheck">—</b></div>
       </div>
       <div style="margin-top:10px">
-        <div class="hl head">
-          <div>التاريخ</div><div>التشخيص</div><div class="note">ملاحظة</div>
-        </div>
+      
         <div id="healthList"></div>
       </div>
     </section>
@@ -471,6 +504,16 @@ function buildState(animal, events){
   else if (!animal.productionStatus && st.daysInMilk!=null){
     st.productionStatus = st.daysInMilk<60?'حليب مبكر' : st.daysInMilk<200?'حليب متوسط' : 'حليب متأخر';
   }
+  // لو مفيش milkTraitsScore في وثيقة الحيوان، خد آخر قيمة من الأحداث
+if ((!st.milkTraitsScore || Number(st.milkTraitsScore) === 0) && Array.isArray(events)) {
+  const lastTrait = [...events].reverse().find(e =>
+    e.milkTraitsScore != null || e.traitsScore != null || e.milk_score != null
+  );
+  if (lastTrait) {
+    st.milkTraitsScore = Number(lastTrait.milkTraitsScore ?? lastTrait.traitsScore ?? lastTrait.milk_score) || 0;
+  }
+}
+
   return st;
 }
 
@@ -706,22 +749,100 @@ function compactEventDetails(e){
 }
 
 function renderEventsList(events){
-  const box=$('evList'); if (!box) return; box.innerHTML='';
+  const box = document.getElementById('evList');
+  if (!box) return;
+  box.innerHTML = '';
+
+  // غلاف التمرير + الجدول
+  const wrap = document.createElement('div');
+  wrap.className = 'ev-scroll';
+  const table = document.createElement('table');
+  table.className = 'ev-table';
+
+  // الرأس
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th style="width:120px">التاريخ</th>
+        <th style="width:220px">النوع (مجمّع)</th>
+        <th>تفاصيل مختصرة</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector('tbody');
+
+  // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
-    const row=document.createElement('div'); row.className='hl';
-    ['—','لا توجد أحداث مسجلة',''].forEach((t,i)=>{const c=document.createElement('div'); if(i===2)c.className='note'; c.textContent=t; row.appendChild(c);});
-    box.appendChild(row); return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="ev-date">—</td>
+      <td class="ev-type">لا توجد أحداث</td>
+      <td class="ev-note"></td>
+    `;
+    tbody.appendChild(tr);
+    wrap.appendChild(table);
+    box.appendChild(wrap);
+    requestAnimationFrame(scheduleFit);
+    return;
   }
-  // آخر 30 حدث (مرتّبة تصاعديًّا بالفعل)
-  const slice = events.slice(-30);
-  for (const e of slice){
-    const row=document.createElement('div'); row.className='hl';
-    const d=document.createElement('div'); d.textContent=fmtD(evDate(e));
-    const tp=document.createElement('div'); tp.textContent=({milk:'إنتاج لبن',calving:'ولادة',insemination:'تلقيح',pregnancy:'تشخيص حمل',heat:'شياع',dry:'تجفيف',disease:'حالة صحية',other:'حدث'}[evType(e)]||'حدث');
-    const nt=document.createElement('div'); nt.className='note'; nt.textContent=compactEventDetails(plainify(e));
-    row.appendChild(d); row.appendChild(tp); row.appendChild(nt); box.appendChild(row);
+
+  // تجميع الأحداث حسب اليوم
+  const map = new Map(); // dateISO -> [{event}, ...]
+  for (const e of events){
+    const d = evDate(e) || '';
+    const key = d || '—';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(e);
   }
+
+  // الأحدث أولًا
+  const days = [...map.keys()].sort().reverse();
+
+  // أسماء الأنواع عربي
+  const TNAME = {
+    milk:'إنتاج لبن', calving:'ولادة', insemination:'تلقيح',
+    pregnancy:'تشخيص حمل', heat:'شياع', dry:'تجفيف',
+    disease:'حالة صحية', other:'حدث'
+  };
+
+  // بناء الصفوف
+  for (const day of days){
+    const arr = map.get(day);
+    const counts = {};
+    const notes  = [];
+
+    for (const e of arr){
+      const t  = evType(e);
+      const tn = TNAME[t] || 'حدث';
+      counts[tn] = (counts[tn] || 0) + 1;
+
+      const c = compactEventDetails(plainify(e));
+      if (c) notes.push(c);
+    }
+
+    const typesSummary = Object.entries(counts)
+      .map(([k,v]) => v>1 ? `${k} ×${v}` : k)
+      .join(' | ');
+
+    const detailsShort = notes.slice(0,6).join(' • ');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="ev-date">${ day && day !== '—' ? new Date(day).toLocaleDateString('ar-EG') : '—' }</td>
+      <td class="ev-type">${ typesSummary || '—' }</td>
+      <td class="ev-note">${ detailsShort || '' }</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+
+  // اضبط الارتفاع لصف واحد على الشاشات الصغيرة
+  requestAnimationFrame(scheduleFit);
 }
+
 
 /* ======================= ربط الأقسام ======================= */
 function renderCard(state, kind){
@@ -772,6 +893,29 @@ function renderCard(state, kind){
   // جديد: اعرض كل الحقول الأخرى من وثيقة الحيوان
 renderExtrasIntoSections(state.__animalRaw || {});
 }
+function fitEventsTableToOneRow(){
+  const wrap = document.querySelector('.ev-scroll');
+  if (!wrap) return;
+  const thead = wrap.querySelector('thead');
+  const first = wrap.querySelector('tbody tr');
+  if (!thead || !first) return;
+
+  // اجمع ارتفاع الرأس + أول صف فقط
+  const headH = Math.ceil(thead.getBoundingClientRect().height);
+  const rowH  = Math.ceil(first.getBoundingClientRect().height);
+  const total = headH + rowH + 2; // هامش بسيط
+
+  if (window.matchMedia('(max-width:560px)').matches){
+    wrap.style.maxHeight = total + 'px';
+  } else {
+    wrap.style.maxHeight = '';    // على الشاشات الكبيرة: ارجع للوضع العادي
+  }
+}
+
+// أعِد الحساب بعد ما الجدول يتبني + عند تغيير المقاس
+let _fitTO;
+function scheduleFit(){ clearTimeout(_fitTO); _fitTO = setTimeout(fitEventsTableToOneRow, 60); }
+window.addEventListener('resize', scheduleFit);
 
 /* ======================= Load & Run ======================= */
 async function loadAndRender({number, animalId, type}){
@@ -820,5 +964,6 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
