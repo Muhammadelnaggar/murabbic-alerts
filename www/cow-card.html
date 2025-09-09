@@ -189,14 +189,11 @@
 
     
     <!-- جديد: جميع الأحداث المسجّلة -->
-    <section class="card" aria-label="الأحداث المسجّلة">
-      <h3>الأحداث المسجّلة</h3>
-      <div class="hl head">
-        <div>التاريخ</div><div>النوع</div><div class="note">تفاصيل</div>
-      </div>
-      <div id="evList"></div>
-    </section>
-  </div>
+ <section class="card" aria-label="الأحداث المسجّلة">
+  <h3>الأحداث المسجّلة</h3>
+  <div id="evList"></div>
+</section>
+</div> 
 
   <script type="module">
 /* ======================= Firebase ======================= */
@@ -228,6 +225,37 @@ const NF = new Intl.NumberFormat('ar-EG');
 const todayStr = new Date().toISOString().slice(0,10);
 const url = new URL(location.href);
 const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
+// يقرأ أي قيمة نسبة مئوية (80 أو "80%") ويقفلها بين 0..100
+// يقرأ أي قيمة نسبة مئوية (80 أو "80%" أو 0.78) ويقفلها 0..100
+const toPercent = (v)=>{
+  if (v == null) return 0;
+  let n = (typeof v === 'string')
+    ? parseFloat(v.replace(/[^\d.-]+/g,''))   // يشيل أي رموز غير أرقام/علامة عشرية
+    : Number(v);
+
+  if (!Number.isFinite(n)) return 0;
+
+  // لو مكتوبة كسلسلة وفيها % نسيبها كما هي، غير كده لو الرقم بين 0 و1 نعتبره كسري ونحوّله لمية
+  if (typeof v === 'string' && v.includes('%')) {
+    // n كما هو
+  } else if (n >= 0 && n <= 1) {
+    n = n * 100;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(n)));
+};
+
+
+// يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
+function eventNameRaw(e = {}){
+  const CANDS = ['name','title','eventName','type','eventType','kind','category','diagnosis'];
+  for (const k of CANDS){
+    const v = e[k];
+    if (v != null && String(v).trim() !== '') return String(v);
+  }
+  return '—';
+}
+
 
 const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
   if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
@@ -285,7 +313,7 @@ function normalizeAnimalDoc(d = {}){
     lastCheckDate: x.lastCheckDate ?? x.healthCheckDate  ?? x['آخر فحص'] ?? null,
 
     // أخرى
-    milkTraitsScore: Number(x.milkTraitsScore ?? x.milk_score ?? 0) || 0,
+   milkTraitsScore: toPercent(x.milkTraitsScore ?? x.milk_score ?? 0),
     ovsynch: x.ovsynch ?? null,
   };
   return { ...x, ...normalized };
@@ -505,16 +533,44 @@ function buildState(animal, events){
     st.productionStatus = st.daysInMilk<60?'حليب مبكر' : st.daysInMilk<200?'حليب متوسط' : 'حليب متأخر';
   }
   // لو مفيش milkTraitsScore في وثيقة الحيوان، خد آخر قيمة من الأحداث
-if ((!st.milkTraitsScore || Number(st.milkTraitsScore) === 0) && Array.isArray(events)) {
-  const lastTrait = [...events].reverse().find(e =>
-    e.milkTraitsScore != null || e.traitsScore != null || e.milk_score != null
-  );
-  if (lastTrait) {
-    st.milkTraitsScore = Number(lastTrait.milkTraitsScore ?? lastTrait.traitsScore ?? lastTrait.milk_score) || 0;
+// تحديث سكور "سمات اللبن" من الأحداث لو مش موجود في وثيقة الحيوان
+if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.isArray(events) && events.length) {
+  // محول محلي آمن للنسبة المئوية (يتعامل مع "78" أو "78%" أو 0.78)
+  const _toPercent = (v)=>{
+    if (v == null) return 0;
+    let n = (typeof v === 'string') ? parseFloat(v.replace(/[^\d.-]+/g,'')) : Number(v);
+    if (!Number.isFinite(n)) return 0;
+    // لو السلسلة فيها % اعتبرها جاهزة، ولو رقم بين 0 و 1 اعتبره كسري وحوّله لم %
+    if (typeof v === 'string' && v.includes('%')) {
+      // n كما هو
+    } else if (n >= 0 && n <= 1) {
+      n = n * 100;
+    }
+    return Math.max(0, Math.min(100, Math.round(n)));
+  };
+
+  const CAND_KEYS = ['milkTraitsScore','traitsScore','milk_score','score','milkTraits','traits','quality'];
+
+  const pullScore = (e)=>{
+    // مفاتيح مباشرة
+    for (const k of CAND_KEYS) if (e[k] != null) return e[k];
+    // داخل كائن فرعي milk إن وُجد
+    if (e.milk && typeof e.milk === 'object') {
+      for (const k of CAND_KEYS) if (e.milk[k] != null) return e.milk[k];
+    }
+    return null;
+  };
+
+  // خُد آخر قيمة متاحة (من الأحدث للأقدم)
+  for (let i = events.length - 1; i >= 0; i--) {
+    const raw = pullScore(events[i]);
+    if (raw != null) {
+      st.milkTraitsScore = _toPercent(raw);
+      break;
+    }
   }
 }
-
-  return st;
+return st;
 }
 
 /* ======================= UI (قياس/رسم) ======================= */
@@ -753,19 +809,13 @@ function renderEventsList(events){
   if (!box) return;
   box.innerHTML = '';
 
-  // غلاف التمرير + الجدول
-  const wrap = document.createElement('div');
-  wrap.className = 'ev-scroll';
-  const table = document.createElement('table');
-  table.className = 'ev-table';
-
-  // الرأس
+  const wrap  = document.createElement('div'); wrap.className = 'ev-scroll';
+  const table = document.createElement('table'); table.className = 'ev-table';
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:120px">التاريخ</th>
-        <th style="width:220px">النوع (مجمّع)</th>
-        <th>تفاصيل مختصرة</th>
+        <th style="width:160px">التاريخ</th>
+        <th>اسم الحدث</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -775,71 +825,28 @@ function renderEventsList(events){
   // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="ev-date">—</td>
-      <td class="ev-type">لا توجد أحداث</td>
-      <td class="ev-note"></td>
-    `;
+    tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td>`;
     tbody.appendChild(tr);
-    wrap.appendChild(table);
-    box.appendChild(wrap);
+    wrap.appendChild(table); box.appendChild(wrap);
     requestAnimationFrame(scheduleFit);
     return;
   }
 
-  // تجميع الأحداث حسب اليوم
-  const map = new Map(); // dateISO -> [{event}, ...]
-  for (const e of events){
-    const d = evDate(e) || '';
-    const key = d || '—';
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(e);
-  }
+  // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ نسيبه في الآخر
+  const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
+    .sort((a,b) => (b.d||'').localeCompare(a.d||''));
 
-  // الأحدث أولًا
-  const days = [...map.keys()].sort().reverse();
-
-  // أسماء الأنواع عربي
-  const TNAME = {
-    milk:'إنتاج لبن', calving:'ولادة', insemination:'تلقيح',
-    pregnancy:'تشخيص حمل', heat:'شياع', dry:'تجفيف',
-    disease:'حالة صحية', other:'حدث'
-  };
-
-  // بناء الصفوف
-  for (const day of days){
-    const arr = map.get(day);
-    const counts = {};
-    const notes  = [];
-
-    for (const e of arr){
-      const t  = evType(e);
-      const tn = TNAME[t] || 'حدث';
-      counts[tn] = (counts[tn] || 0) + 1;
-
-      const c = compactEventDetails(plainify(e));
-      if (c) notes.push(c);
-    }
-
-    const typesSummary = Object.entries(counts)
-      .map(([k,v]) => v>1 ? `${k} ×${v}` : k)
-      .join(' | ');
-
-    const detailsShort = notes.slice(0,6).join(' • ');
-
+  for (const {e, d} of rows){
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="ev-date">${ day && day !== '—' ? new Date(day).toLocaleDateString('ar-EG') : '—' }</td>
-      <td class="ev-type">${ typesSummary || '—' }</td>
-      <td class="ev-note">${ detailsShort || '' }</td>
+      <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
+      <td class="ev-type">${ eventNameRaw(e) }</td>
     `;
     tbody.appendChild(tr);
   }
 
   wrap.appendChild(table);
   box.appendChild(wrap);
-
-  // اضبط الارتفاع لصف واحد على الشاشات الصغيرة
   requestAnimationFrame(scheduleFit);
 }
 
@@ -964,6 +971,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
