@@ -439,9 +439,29 @@ const getDIM = an => {
   return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
 };
 const isDry = an => {
-  const st = String(an.lactationStatus || an.status || an['الحالة_اللبنية'] || '').toLowerCase();
-  return an.inMilk===false || st.includes('dry') || st.includes('جاف');
+  // نجمع الحالة من عدة حقول وصيغ
+  const st = String(
+    an.lactationStatus ||
+    an.status ||
+    an['الحالة_اللبنية'] ||
+    ''
+  ).trim().toLowerCase();
+
+  // أعلام بوليانية شائعة للدُّرُوّ
+  const dryBool =
+    an.dry === true ||
+    an.isDry === true ||
+    an.dryCow === true ||
+    an['جاف'] === true;
+
+  // أي واحدة من دول تعتبره "جاف"
+  return (
+    dryBool ||
+    an.inMilk === false ||
+    /dry|dry-off|dryoff|جاف|جافة|جافه/.test(st)
+  );
 };
+
 const isPreg = an => {
   const rs = String(an.reproductiveStatus || an.pregStatus || an['الحالة_التناسلية'] || '').toLowerCase();
   return an.pregnant===true || rs.includes('preg') || rs.includes('عشار');
@@ -527,6 +547,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
