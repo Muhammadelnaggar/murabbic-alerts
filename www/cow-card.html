@@ -174,8 +174,19 @@ const DB = fb.db || fs.getFirestore(); // يفترض أن fb.db = getFirestore(a
 const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
 const userNow = fb?.auth?.currentUser || null;
 const UID = userNow?.uid ?? null;
-const OWN = 'ownerUid';
+// ثوابت أسماء الحقول
+const ANIM_OWNER_FIELD = 'ownerUid'; // في animals
+const EVENT_USER_FIELD = 'userId';   // في events
 
+// مساعد لاستخراج تاريخ الحدث
+const evDate = (e={}) =>
+  e.eventDate ||
+  e.date ||
+  e.day ||
+  (e.createdAt?.toDate?.()?.toISOString?.().slice(0,10)) ||
+  (e.createdAt instanceof Date ? e.createdAt.toISOString().slice(0,10) : null);
+
+// هنا؟
 /* ======================= Helpers ======================= */
 const $=(id)=>document.getElementById(id);
 const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
@@ -293,65 +304,100 @@ function evMilkKg(e = {}) {
 /* ======================= Firestore ======================= */
 async function fetchAnimalByNumber(n){
   if (n == null || String(n).trim() === '') return null;
-  const nStr=String(n).trim(); const nNum=Number(nStr); const A=collection(DB,'animals');
+  const nStr = String(n).trim();
+  const nNum = Number(nStr);
+  const A = collection(DB, 'animals');
 
-  // doc(id=number)
-  try{ const d=await getDoc(doc(DB,'animals',nStr)); if(d.exists()){ const data=d.data(); if(!UID||data?.[OWN]===UID){ return normalizeAnimalDoc({id:d.id,...data}); } } }catch{}
+  // doc(id = الرقم كنص)
+  try {
+    const d = await getDoc(doc(DB, 'animals', nStr));
+    if (d.exists()) {
+      const data = d.data();
+      if (!UID || data?.[ANIM_OWNER_FIELD] === UID) {
+        return normalizeAnimalDoc({ id: d.id, ...data });
+      }
+    }
+  } catch {}
 
   // animalNumber = Number
-  if (Number.isFinite(nNum)){
-    try{
-      const q1=UID?query(A,where(OWN,'==',UID),where('animalNumber','==',nNum),limit(1))
-                  :query(A,where('animalNumber','==',nNum),limit(1));
-      const s1=await getDocs(q1); if(!s1.empty){ const d=s1.docs[0]; return normalizeAnimalDoc({id:d.id,...d.data()}); }
-    }catch{}
+  if (Number.isFinite(nNum)) {
+    try {
+      const q1 = UID
+        ? query(A, where(ANIM_OWNER_FIELD,'==',UID), where('animalNumber','==',nNum), limit(1))
+        : query(A, where('animalNumber','==',nNum), limit(1));
+      const s1 = await getDocs(q1);
+      if (!s1.empty) { const d = s1.docs[0]; return normalizeAnimalDoc({ id:d.id, ...d.data() }); }
+    } catch {}
   }
 
   // animalNumber = String
-  try{
-    const q2=UID?query(A,where(OWN,'==',UID),where('animalNumber','==',nStr),limit(1))
-                :query(A,where('animalNumber','==',nStr),limit(1));
-    const s2=await getDocs(q2); if(!s2.empty){ const d=s2.docs[0]; return normalizeAnimalDoc({id:d.id,...d.data()}); }
-  }catch{}
+  try {
+    const q2 = UID
+      ? query(A, where(ANIM_OWNER_FIELD,'==',UID), where('animalNumber','==',nStr), limit(1))
+      : query(A, where('animalNumber','==',nStr), limit(1));
+    const s2 = await getDocs(q2);
+    if (!s2.empty) { const d = s2.docs[0]; return normalizeAnimalDoc({ id:d.id, ...d.data() }); }
+  } catch {}
 
   return null;
 }
 
-async function fetchAnimal({number, animalId}={}){
-  if (animalId){
-    const d=await getDoc(doc(DB,'animals',String(animalId)));
-    if (d.exists()){ const data=d.data(); if(!UID||data?.[OWN]===UID){ return normalizeAnimalDoc({id:d.id,...data}); } }
+
+async function fetchAnimal({ number, animalId } = {}) {
+  if (animalId) {
+    const d = await getDoc(doc(DB,'animals', String(animalId)));
+    if (d.exists()) {
+      const data = d.data();
+      if (!UID || data?.[ANIM_OWNER_FIELD] === UID) {
+        return normalizeAnimalDoc({ id:d.id, ...data });
+      }
+    }
   }
-  const a=await fetchAnimalByNumber(number);
+  const a = await fetchAnimalByNumber(number);
   if (a) return a;
   throw new Error('لا يوجد حيوان مطابق');
 }
-
 async function fetchEvents(animal){
-  const E=collection(DB,'events'); const rows=[];
-  try{
-    if (animal.id){
-      const qById=UID?query(E,where('animalId','==',animal.id),where(OWN,'==',UID))
-                     :query(E,where('animalId','==',animal.id));
-      const sById=await getDocs(qById);
-      sById.forEach(d=>{ const r={id:d.id,...d.data()}; if(!UID||r[OWN]===UID) rows.push(r); });
+  const E = collection(DB, 'events');
+  const rows = [];
+
+  try {
+    // حسب معرف وثيقة الحيوان
+    if (animal.id) {
+      const qById = UID
+        ? query(E, where('animalId','==', String(animal.id)), where(EVENT_USER_FIELD,'==',UID))
+        : query(E, where('animalId','==', String(animal.id)));
+      const sById = await getDocs(qById);
+      sById.forEach(d => rows.push({ id:d.id, ...d.data() }));
     }
-    if (animal.number!=null){
-      const nStr=String(animal.number), nNum=Number(nStr);
-      const baseQs=[
-        ...(Number.isFinite(nNum)?[ query(E,where('animalNumber','==',nNum)), query(E,where('number','==',nNum)) ]:[]),
-        query(E,where('animalNumber','==',nStr)),
-        query(E,where('number','==',nStr)),
+
+    // حسب رقم الحيوان (سلسلة ورقم)
+    if (animal.number != null) {
+      const nStr = String(animal.number);
+      const nNum = Number(nStr);
+
+      const baseQs = [
+        query(E, where('animalNumber','==', nStr)),
+        query(E, where('number','==', nStr)),
+        ...(Number.isFinite(nNum) ? [
+          query(E, where('animalNumber','==', nNum)),
+          query(E, where('number','==', nNum)),
+        ] : []),
       ];
-      for (const qy of baseQs){
-        const qf=UID?query(qy,where(OWN,'==',UID)):qy;
-        const s=await getDocs(qf);
-        s.forEach(d=>{ const r={id:d.id,...d.data()}; if(!UID||r[OWN]===UID) rows.push(r); });
+
+      for (const q0 of baseQs) {
+        const qf = UID ? query(q0, where(EVENT_USER_FIELD,'==',UID)) : q0;
+        const s  = await getDocs(qf);
+        s.forEach(d => rows.push({ id:d.id, ...d.data() }));
       }
     }
-  }catch{}
-  const uniq=new Map(rows.map(r=>[r.id,r]));
-  return [...uniq.values()].sort((a,b)=>(evDate(a)||'').localeCompare(evDate(b)||''));
+  } catch (e) {
+    console.error('[fetchEvents] error:', e);
+  }
+
+  // إزالة التكرار ثم الترتيب حسب التاريخ تصاعديًا
+  const uniq = new Map(rows.map(r => [r.id, r]));
+  return [...uniq.values()].sort((a,b) => (evDate(a)||'').localeCompare(evDate(b)||''));
 }
 
 /* ======================= Build state ======================= */
@@ -364,7 +410,8 @@ function buildState(animal, events){
     birthDate:       animal.birthDate       || null,
     lastCalvingDate: animal.lastCalvingDate || null,
     lactationNumber: animal.lactationNumber ?? null,
-    daysInMilk: null, gestationDays: null, pregnancyDate: animal.pregnancyDate || null,
+    daysInMilk: null, gestationDays: 
+      null, pregnancyDate: animal.pregnancyDate || null,
     breed: animal.breed || '—', group: animal.group || '—',
     milkTraitsScore: animal.milkTraitsScore ?? 0,
     inseminations: [], estrusDates: Array.isArray(animal.estrusDates)?[...animal.estrusDates]:[],
@@ -773,4 +820,5 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
