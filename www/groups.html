@@ -77,6 +77,14 @@
   </header>
 
   <main class="wrap">
+    <section class="group-sec" id="sec-all">
+  <div class="group-head" data-id="all">
+    <span class="name">كل الحيوانات</span>
+    <span class="count" id="c-all">0</span>
+  </div>
+  <div class="list" id="list-all"></div>
+</section>
+
     <section class="toolbar">
       <div class="search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
       <button class="btn" id="refreshBtn">تحديث</button>
@@ -343,12 +351,18 @@ const isFresh = an => {
         if(lactNo===0){ if(isPregnant(an)) pregHeifers.push(an); else if(m>=12) breeding.push(an); }
         if(hasDisease(an)) hospital.push(an);
       }
-      return {fresh,high,med,low,dry,suckling,weaned,growing,breeding,pregHeifers,hospital};
-    }
+     return {
+  all: A,
+  fresh, high, med, low, dry,
+  suckling, weaned, growing, breeding, pregHeifers, hospital
+};
+
 
     function updateCounters(){
       const g = splitGroups();
       $('#c-fresh').textContent=g.fresh.length; $('#c-high').textContent=g.high.length; $('#c-med').textContent=g.med.length; $('#c-low').textContent=g.low.length; $('#c-dry').textContent=g.dry.length; $('#c-suckling').textContent=g.suckling.length; $('#c-weaned').textContent=g.weaned.length; $('#c-growing').textContent=g.growing.length; $('#c-breeding').textContent=g.breeding.length; $('#c-pregHeifers').textContent=g.pregHeifers.length; $('#c-hospital').textContent=g.hospital.length;
+      $('#c-all').textContent = g.all.length;
+
     }
 
     function renderSelected(id){
@@ -364,9 +378,14 @@ const isFresh = an => {
     }
 
     function buildChips(){
-      const defs=[
-        ['fresh','حديث الولادة'], ['high','عالي الإدرار'], ['med','متوسط'], ['low','منخفض'], ['dry','جاف'], ['suckling','رضيع'], ['weaned','فطام'], ['growing','نامي'], ['breeding','تحت التلقيح'], ['pregHeifers','عجلات عشار'], ['hospital','مستشفى']
-      ];
+   const defs = [
+  ['all','الكل'],
+  ['fresh','حديث الولادة'], ['high','عالي الإدرار'], ['med','متوسط'],
+  ['low','منخفض'], ['dry','جاف'], ['suckling','رضيع'], ['weaned','فطام'],
+  ['growing','نامي'], ['breeding','تحت التلقيح'], ['pregHeifers','عجلات عشار'],
+  ['hospital','مستشفى']
+];
+
       const host=$('#quickChips'); host.innerHTML='';
       defs.forEach(([id,label])=>{
         const b=document.createElement('button');
