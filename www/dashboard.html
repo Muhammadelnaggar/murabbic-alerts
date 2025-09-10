@@ -63,7 +63,33 @@
     .gauge{width:100%;aspect-ratio:2/1;position:relative}
     .gauge svg{width:100%;height:100%;display:block}
     .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
-    
+    /* ===== KPIs الحلقية الجديدة ===== */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:10px;
+}
+.kpi{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid var(--border);border-radius:12px;background:#fff;
+  padding:10px;min-height:72px
+}
+.kpi-ring{flex:0 0 auto}
+.kpi-ring svg{width:60px;height:60px;display:block}
+.kpi-ring circle.bg{fill:none;stroke:#e0e0e0;stroke-width:6}
+.kpi-ring circle.fg{
+  fill:none;stroke:#2e7d32;stroke-width:6;stroke-linecap:round;
+  stroke-dasharray:113.097;stroke-dashoffset:113.097;
+  transform:rotate(-90deg);transform-origin:22px 22px;
+  transition:stroke-dashoffset .7s ease, stroke .3s ease
+}
+.kpi-body{display:flex;flex-direction:column;gap:2px}
+.kpi-title{font-weight:800;color:#1b5e20;font-size:13px}
+.kpi-value{font-weight:900;font-size:20px;color:#065f46;line-height:1}
+.kpi-sub{font-size:11px;color:#4f5b62}
+.kpi{ transition: transform .12s ease, box-shadow .12s ease }
+.kpi:hover{ transform: translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,.06) }
+
 
     @media(max-width:560px){
       .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
@@ -141,59 +167,101 @@
     <span id="g-date" style="margin-inline-start:auto;font-size:12px;border:1px solid #c5e1a5;border-radius:999px;padding:2px 8px;background:#fff">—</span>
   </div>
 
-  <div class="gauge-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+  <div class="kpi-grid">
     <!-- في الحلاب % -->
-    <div class="gauge" data-key="inMilkPct">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-inmilk" d="" stroke="#2e7d32" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>في الحلاب<br><b id="v-inmilk">—%</b></div></div>
+    <div class="kpi" data-key="inMilkPct" data-hint="من إجمالي القطيع">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-inmilk" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">في الحلاب</div>
+        <div class="kpi-value" id="v-inmilk">—%</div>
+        <div class="kpi-sub">نسبة القطيع المنتج الآن</div>
+      </div>
     </div>
 
     <!-- نسبة العشار % -->
-    <div class="gauge" data-key="pregRate">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-preg" d="" stroke="#1e88e5" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>نسبة العشار<br><b id="v-preg">—%</b></div></div>
+    <div class="kpi" data-key="pregRate" data-hint="نسبة العشار من القطيع">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-preg" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">نسبة العشار</div>
+        <div class="kpi-value" id="v-preg">—%</div>
+        <div class="kpi-sub">من إجمالي القطيع</div>
+      </div>
     </div>
 
     <!-- حديث الولادة كنسبة من الحلاب -->
-    <div class="gauge" data-key="freshShare">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-fresh" d="" stroke="#8e24aa" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>حديث الولادة<br><b id="v-fresh">—%</b></div></div>
+    <div class="kpi" data-key="freshShare" data-hint="حديث الولادة ضمن الحلاب">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-fresh" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">حديث الولادة</div>
+        <div class="kpi-value" id="v-fresh">—%</div>
+        <div class="kpi-sub">من القطيع في الحلاب</div>
+      </div>
     </div>
 
-    <!-- جاف % من إجمالي القطيع -->
-    <div class="gauge" data-key="dryShare">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-dry" d="" stroke="#ef6c00" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>جاف<br><b id="v-dry">—%</b></div></div>
+    <!-- جاف % -->
+    <div class="kpi" data-key="dryShare" data-hint="نسبة الجاف من القطيع">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-dry" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">جاف</div>
+        <div class="kpi-value" id="v-dry">—%</div>
+        <div class="kpi-sub">من إجمالي القطيع</div>
+      </div>
     </div>
 
     <!-- معدل التلقيح 21ي (تقديري) -->
-    <div class="gauge" data-key="serviceRate">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-service" d="" stroke="#3949ab" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>معدل التلقيح 21ي<br><b id="v-service">—%</b></div></div>
+    <div class="kpi" data-key="serviceRate" data-hint="تقديري/قريبًا">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-service" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">معدل التلقيح 21ي</div>
+        <div class="kpi-value" id="v-service">—%</div>
+        <div class="kpi-sub">يُستكمل لاحقًا</div>
+      </div>
     </div>
 
     <!-- معدل الإخصاب -->
-    <div class="gauge" data-key="conceptionRate">
-      <svg viewBox="0 0 100 50">
-        <path d="M10,50 A40,40 0 0 1 90,50" stroke="#e0e0e0" stroke-width="10" fill="none"/>
-        <path id="fg-conception" d="" stroke="#c2185b" stroke-width="10" stroke-linecap="round" fill="none"/>
-      </svg>
-      <div class="val"><div>معدل الإخصاب<br><b id="v-conception">—%</b></div></div>
+    <div class="kpi" data-key="conceptionRate" data-hint="قريبًا">
+      <div class="kpi-ring" aria-hidden="true">
+        <svg viewBox="0 0 44 44">
+          <circle class="bg" cx="22" cy="22" r="18"></circle>
+          <circle id="r-conception" class="fg" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
+        </svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-title">معدل الإخصاب</div>
+        <div class="kpi-value" id="v-conception">—%</div>
+        <div class="kpi-sub">يُستكمل لاحقًا</div>
+      </div>
     </div>
   </div>
 </div>
@@ -480,15 +548,7 @@ const isFresh = an => {
   return d>=1 && d<=45 && !isDry(an) && lactNo>0;
 };
 
-function arcPath(percent){
-  const p = Math.max(0, Math.min(100, Number(percent)||0));
-  const theta = Math.PI * (1 - p/100);
-  const R=40, cx=50, cy=50;
-  const x = cx + R * Math.cos(theta);
-  const y = cy + R * Math.sin(theta);
-  const laf = p>50 ? 1 : 0;
-  return `M10,50 A40,40 0 ${laf} 1 ${x.toFixed(2)},${y.toFixed(2)}`;
-}
+
 
 function calc(animals){
   const total = animals.length;
@@ -514,15 +574,71 @@ function calc(animals){
 }
 
 
-function renderGauges(k){
-  $('#g-date').textContent = new Date().toISOString().slice(0,10);
-  $('#fg-inmilk').setAttribute('d', arcPath(k.inMilkPct)); $('#v-inmilk').textContent = k.inMilkPct + '%';
-  $('#fg-preg').setAttribute('d', arcPath(k.pregRate));    $('#v-preg').textContent  = k.pregRate + '%';
-  $('#fg-fresh').setAttribute('d', arcPath(k.freshShare)); $('#v-fresh').textContent = k.freshShare + '%';
-  $('#fg-dry').setAttribute('d', arcPath(k.dryShare));     $('#v-dry').textContent   = k.dryShare + '%';
-  $('#fg-service').setAttribute('d', arcPath(0));          $('#v-service').textContent = '—%';
-  $('#fg-conception').setAttribute('d', arcPath(0));       $('#v-conception').textContent = '—%';
+// احذف arcPath(...) القديمة
+
+// محيط الحلقة لِـ r=18 => 2πr ≈ 113.097
+const RING_LEN = 113.097;
+
+// لون دلالي بسيط (تقديري) حسب النسبة
+function colorFor(key, pct){
+  // حدود إرشادية عامة
+  if(key==='dryShare'){ // الأقل أفضل عادة
+    if(pct <= 18) return '#2e7d32';
+    if(pct <= 25) return '#fdd835';
+    return '#ef6c00';
+  }
+  // الافتراضي: الأعلى أفضل
+  if(pct >= 80) return '#2e7d32';
+  if(pct >= 60) return '#7cb342';
+  if(pct >= 40) return '#fdd835';
+  if(pct >= 20) return '#ef6c00';
+  return '#c2185b';
 }
+
+function setRing(idSuffix, pct, key){
+  const el = document.getElementById('r-'+idSuffix);
+  if(!el) return;
+  const p = Math.max(0, Math.min(100, Number(pct)||0));
+  const off = RING_LEN * (1 - p/100); // أصغر offset = تعبئة أكبر
+  el.setAttribute('stroke-dashoffset', off.toFixed(2));
+  el.style.stroke = colorFor(key || idSuffix, p);
+}
+
+function renderGauges(k){
+  // التاريخ
+  const d = document.getElementById('g-date');
+  if(d) d.textContent = new Date().toISOString().slice(0,10);
+
+  // في الحلاب
+  setRing('inmilk', k.inMilkPct, 'inMilkPct');
+  const vIn = document.getElementById('v-inmilk');
+  if(vIn) vIn.textContent = k.inMilkPct + '%';
+
+  // نسبة العشار
+  setRing('preg', k.pregRate, 'pregRate');
+  const vPr = document.getElementById('v-preg');
+  if(vPr) vPr.textContent = k.pregRate + '%';
+
+  // حديث الولادة (من الحلاب)
+  setRing('fresh', k.freshShare, 'freshShare');
+  const vFr = document.getElementById('v-fresh');
+  if(vFr) vFr.textContent = k.freshShare + '%';
+
+  // جاف %
+  setRing('dry', k.dryShare, 'dryShare');
+  const vDr = document.getElementById('v-dry');
+  if(vDr) vDr.textContent = k.dryShare + '%';
+
+  // مستقبلًا (صفر الآن)
+  setRing('service', 0, 'serviceRate');
+  const vSr = document.getElementById('v-service');
+  if(vSr) vSr.textContent = '—%';
+
+  setRing('conception', 0, 'conceptionRate');
+  const vCo = document.getElementById('v-conception');
+  if(vCo) vCo.textContent = '—%';
+}
+
 
 function dedupe(list){
   const map = new Map();
@@ -560,9 +676,18 @@ function dedupe(list){
 })();
 </script>
 
+<script>
+  // يضيف Hint على شكل tooltip لكل KPI
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.kpi').forEach(el => {
+      el.title = el.dataset.hint || '';
+    });
+  });
+</script>
 
 </body>
 </html>
+
 
 
 
