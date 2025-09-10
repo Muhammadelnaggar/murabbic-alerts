@@ -178,24 +178,37 @@
  
 
   <!-- منطق الصفحة -->
- <script type="module">
-/* ===================== Firestore (صريح) ===================== */
-import cfg from "/js/firebase-config.js"; // default = { apiKey, projectId, ... }
+<script type="module">
+/* ============= Firebase SDK ============= */
 import { getApps, initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ===================== تهيئة Firebase ===================== */
-const app = getApps().length ? getApp() : initializeApp(cfg);
-const db  = getFirestore(app, "murabbikdata");
+/* ============= firebase-config (ديناميكي مع fallback) ============= */
+let cfg = null;
+try {
+  const m = await import("/js/firebase-config.js");
+  // نقبل أي شكل شائع من التصدير
+  cfg = m?.default ?? m?.firebaseConfig ?? m?.config ?? null;
+} catch (e) {
+  console.warn("firebase-config import failed; continuing with REST only.", e);
+}
 
-/* ===================== أدوات سريعة ===================== */
+const app = getApps().length ? getApp() : (cfg ? initializeApp(cfg) : null);
+let db = null;
+try {
+  if (app) db = getFirestore(app, "murabbikdata");
+} catch (e) {
+  console.warn("getFirestore failed; REST will be used as fallback.", e);
+}
+
+/* ============= أدوات سريعة ============= */
 const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
 
-/* ===================== حالة الصفحة ===================== */
+/* ============= حالة الصفحة ============= */
 const state = {
   animals: [],
   userId: null,
@@ -203,7 +216,7 @@ const state = {
   currentGroup: null
 };
 
-/* ===================== انتظار userId ===================== */
+/* ============= انتظار userId ============= */
 async function waitForUserId(timeoutMs=6000){
   const t0 = Date.now();
   while(Date.now()-t0 < timeoutMs){
@@ -211,10 +224,10 @@ async function waitForUserId(timeoutMs=6000){
     if(uid){ state.userId = uid; return uid; }
     await new Promise(r=>setTimeout(r,100));
   }
-  return null;
+  return null; // نكمل، والـREST/الكاش يشيلوا الموقف
 }
 
-/* ===================== العتبات (محلي + سحابي) ===================== */
+/* ============= العتبات (محلي + سحابي) ============= */
 function loadThresholds(){
   const d = { cowHigh:30, cowMed:15, cowLow:0, bufHigh:12, bufMed:7, bufLow:0, species:'cow' };
   try{ return Object.assign(d, JSON.parse(localStorage.getItem('mbk_group_thresholds')||'{}')); }catch{ return d; }
@@ -222,24 +235,27 @@ function loadThresholds(){
 function saveThresholdsLocal(){
   localStorage.setItem('mbk_group_thresholds', JSON.stringify(state.thresholds));
 }
-
 async function loadThresholdsFromFirestore(){
-  if(!state.userId) return;
-  const ref = doc(db, 'users', state.userId, 'settings', 'groups');
-  const ds  = await getDoc(ref);
-  if(ds.exists()){
-    const cloud = ds.data()?.thresholds || ds.data();
-    state.thresholds = { ...state.thresholds, ...cloud };
-    saveThresholdsLocal();
-  }
+  try{
+    if(!state.userId || !db) return;
+    const ref = doc(db, 'users', state.userId, 'settings', 'groups');
+    const ds  = await getDoc(ref);
+    if(ds.exists()){
+      const cloud = ds.data()?.thresholds || ds.data();
+      state.thresholds = { ...state.thresholds, ...cloud };
+      saveThresholdsLocal();
+    }
+  }catch(e){ console.warn('thresh get err', e); }
 }
 async function saveThresholdsToFirestore(){
-  if(!state.userId) return;
-  const ref = doc(db, 'users', state.userId, 'settings', 'groups');
-  await setDoc(ref, { thresholds: state.thresholds, updatedAt: new Date().toISOString() }, { merge:true });
+  try{
+    if(!state.userId || !db) return;
+    const ref = doc(db, 'users', state.userId, 'settings', 'groups');
+    await setDoc(ref, { thresholds: state.thresholds, updatedAt: new Date().toISOString() }, { merge:true });
+  }catch(e){ console.warn('thresh save err', e); }
 }
 
-/* ===================== تواريخ/مقاييس ===================== */
+/* ============= تواريخ/مقاييس ============= */
 const toDate = v => {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -251,7 +267,6 @@ const toDate = v => {
   return null;
 };
 const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
-
 function getDIM(an){
   const calv =
     toDate(an?.lastCalvingDate) ||
@@ -267,12 +282,7 @@ function getAgeMonths(an){
 }
 function getMilkKg(an){
   return Number(
-    an?.lastMilkKg ??
-    an?.production?.milkKg ??
-    an?.avgMilkKg ??
-    an?.milk_today ??
-    an?.milkToday ??
-    0
+    an?.lastMilkKg ?? an?.production?.milkKg ?? an?.avgMilkKg ?? an?.milk_today ?? an?.milkToday ?? 0
   ) || 0;
 }
 const isBuffalo = an =>
@@ -295,7 +305,6 @@ const isFresh = an => {
   const d = getDIM(an);
   return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0);
 };
-
 function milkBand(an, milk){
   const t = state.thresholds;
   if(isBuffalo(an)){
@@ -305,7 +314,7 @@ function milkBand(an, milk){
   }
 }
 
-/* ===================== تنسيق بيانات الحيوان ===================== */
+/* ============= تنسيق بيانات الحيوان ============= */
 function normalize(an){
   const n={...an};
   if(!n.number && n.animalNumber) n.number=n.animalNumber;
@@ -318,7 +327,7 @@ function normalize(an){
   return n;
 }
 
-/* ===================== بطاقات ===================== */
+/* ============= بطاقات ============= */
 function card(an){
   const milk=getMilkKg(an), dim=getDIM(an), ageM=getAgeMonths(an), band=milkBand(an, milk);
   const tags=[]; tags.push(isBuffalo(an)?'جاموس':'أبقار'); if(isPregnant(an)) tags.push('عشار'); if(isDry(an)) tags.push('جاف'); if(an?.bcs) tags.push('BCS '+an.bcs); if(an?.type) tags.push(an.type);
@@ -338,7 +347,7 @@ function card(an){
   return el;
 }
 
-/* ===================== تقسيم المجموعات ===================== */
+/* ============= تقسيم المجموعات ============= */
 function filterByQuery(list){
   const q=$('#q').value.trim().toLowerCase();
   if(!q) return list;
@@ -363,7 +372,7 @@ function splitGroups(){
   return { all:A, fresh, high, med, low, dry, suckling, weaned, growing, breeding, pregHeifers, hospital };
 }
 
-/* ===================== عدادات + عرض ===================== */
+/* ============= عدادات + عرض ============= */
 function updateCounters(){
   const g = splitGroups();
   $('#c-all').textContent = g.all.length;
@@ -392,10 +401,13 @@ function buildChips(){
   const host=$('#quickChips'); host.innerHTML='';
   defs.forEach(([id,label])=>{
     const b=document.createElement('button');
-    b.className='chip'; b.textContent=label; b.dataset.id=id;
+    b.type='button';
+    b.className='chip';
+    b.textContent=label;
+    b.dataset.id=id;
     b.onclick=()=>{
       state.currentGroup=id;
-      $$('.chip',host).forEach(x=>x.classList.remove('active')); b.classList.add('active');
+      $$('#quickChips .chip').forEach(x=>x.classList.toggle('active', x===b));
       renderSelected(id);
       const counts = splitGroups();
       window.dataLayer.push({event:'group_select', group:id, count:(counts[id]||[]).length});
@@ -407,6 +419,7 @@ function bindGroupHeaders(){
   $$('.group-head').forEach(h=>{
     h.addEventListener('click', ()=>{
       const id=h.getAttribute('data-id');
+      if(!id) return;
       state.currentGroup=id;
       renderSelected(id);
       const counts = splitGroups();
@@ -415,17 +428,21 @@ function bindGroupHeaders(){
   });
 }
 
-/* ===================== تحميل الحيوانات ===================== */
+/* ============= تحميل الحيوانات ============= */
 async function loadAnimalsFromFirestore(){
-  if(!state.userId) return [];
-  const qy = query(collection(db,'animals'), where('userId','==', state.userId));
-  const snap = await getDocs(qy);
-  return snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+  try{
+    if(!state.userId || !db) return [];
+    const qy = query(collection(db,'animals'), where('userId','==', state.userId));
+    const snap = await getDocs(qy);
+    return snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+  }catch(e){
+    console.warn('fb animals err', e);
+    return [];
+  }
 }
 async function loadAnimals(){
   try{
     let arr = [];
-    // REST أولاً لو api.js موجود
     if (typeof api?.get === 'function') {
       const res = await api.get('/api/animals');
       arr = Array.isArray(res?.data)? res.data : (Array.isArray(res)?res:[]);
@@ -443,7 +460,7 @@ async function loadAnimals(){
   updateCounters();
 }
 
-/* ===================== ربط الواجهة ===================== */
+/* ============= ربط الواجهة ============= */
 $$('input[name="species"]').forEach(r=> r.addEventListener('change', ()=>{
   state.thresholds.species = r.value;
   $('#cowThresholds').style.display = r.value==='cow'? 'flex':'none';
@@ -467,25 +484,28 @@ $('#saveSettings').addEventListener('click', async ()=>{
 $('#q').addEventListener('input', updateCounters);
 $('#refreshBtn').addEventListener('click', loadAnimals);
 
-/* ===================== تشغيل ===================== */
-function syncThresholdsUI(){
+/* ============= تشخيص للأخطاء العامة ============= */
+window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
+window.addEventListener('unhandledrejection', e => console.error('Promise Rejection:', e.reason));
+
+/* ============= تشغيل ============= */
+window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({event:'page_view', page:'/groups.html'});
+
+(async function start(){
+  await waitForUserId();            // انتظر الهوية
+  try{ await loadThresholdsFromFirestore(); }catch{}
+  // مزامنة UI
   const sp = state.thresholds.species==='buffalo' ? 'buffalo' : 'cow';
   $$('input[name="species"]').forEach(r=> r.checked = (r.value===sp));
   $('#cowThresholds').style.display = sp==='cow'? 'flex':'none';
   $('#buffThresholds').style.display = sp==='buffalo'? 'flex':'none';
   $('#cowHigh').value=state.thresholds.cowHigh; $('#cowMed').value=state.thresholds.cowMed; $('#cowLow').value=state.thresholds.cowLow;
   $('#bufHigh').value=state.thresholds.bufHigh; $('#bufMed').value=state.thresholds.bufMed; $('#bufLow').value=state.thresholds.bufLow;
-}
 
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({event:'page_view', page:'/groups.html'});
-
-(async function start(){
-  await waitForUserId();
-  try{ await loadThresholdsFromFirestore(); }catch{}
-  syncThresholdsUI();
-  buildChips(); bindGroupHeaders();
+  buildChips(); bindGroupHeaders(); // اربط الأزرار دايمًا حتى لو Firestore وقع
   await loadAnimals();
+
   // افتح "الكل" تلقائيًا
   state.currentGroup = 'all';
   renderSelected('all');
