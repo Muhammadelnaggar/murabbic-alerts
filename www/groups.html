@@ -355,7 +355,12 @@ async function enrichMilkFromEvents(list){
         }
         if (isTypeOneOf(e, calvingEventNames)) bestCalv = d;
       });
-      if(bestMilk!=null){ an.dailyMilk = bestMilk; an.lastMilkKg = bestMilk; }
+    if (bestMilk != null) {
+  an.dailyMilk = bestMilk;
+  an.lastMilkKg = bestMilk;
+  if (bestDate) an._latestMilkDate = bestDate.toISOString();
+}
+
       if(bestCalv) an.lastCalvingDate = bestCalv.toISOString();
     }catch(_) { /* تجاهل لو لا صلاحيات/لا يوجد subcollection */ }
   }
@@ -382,27 +387,50 @@ async function enrichMilkFromEvents(list){
       const prev = bestPerAnimal.get(key);
       if(!prev || d > prev.date) bestPerAnimal.set(key, { date:d, milk:getMilkFromEvent(e) });
     });
+for (const an of stillZero) {
+  const key = String(an.id ?? an.animalId ?? an.animalID ?? an.number ?? an.animalNumber ?? '');
+  const rec = bestPerAnimal.get(key);
+  if (rec && rec.milk > 0) {
+    an.dailyMilk = rec.milk;
+    an.lastMilkKg = rec.milk;
+    if (rec.date) an._latestMilkDate = rec.date.toISOString();
+  }
+}
 
-    for(const an of stillZero){
-      const key = String(an.id ?? an.animalId ?? an.animalID ?? an.number ?? an.animalNumber ?? '');
-      const rec = bestPerAnimal.get(key);
-      if(rec && rec.milk>0){ an.dailyMilk = rec.milk; an.lastMilkKg = rec.milk; }
-    }
   }catch(e){ console.warn('events top-level read err', e); }
 }
 
 const isBuffalo = an =>
   ((an?.kind||'').toLowerCase().includes('buff') || (an?.kind||'').includes('جاموس'));
+
 const isPregnant = an => {
   const joined = [an?.reproductiveStatus, an?.pregStatus, an?.['الحالة_التناسلية']]
     .map(normTxt).join(' ');
   return an?.pregnant === true || joined.includes('عشار') || joined.includes('preg');
 };
-const isDry = an => {
-  const joined = [an?.lactationStatus, an?.productionStatus, an?.status, an?.['الحالة_اللبنية']]
-    .map(normTxt).join(' ');
-  return (an?.inMilk === false || an?.dry === true || joined.includes('جاف') || joined.includes('dry'));
-};
+
+function isDry(an){
+  const joined = [
+    an?.lactationStatus,
+    an?.productionStatus,
+    an?.status,
+    an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
+  ].map(normTxt).join(' ');
+
+  // لو في لبن مُسجّل مؤخرًا (آخر 3 أيام) ⇒ مش جاف
+  const milkToday = getMilkKg(an);
+  const latest = an._latestMilkDate ? new Date(an._latestMilkDate) : null;
+  const recentMilk = milkToday > 0 && (!latest || (Date.now() - +latest) < 3*86400000);
+  if (recentMilk) return false;
+
+  return (
+    an?.inMilk === false ||
+    an?.dry === true ||
+    joined.includes('جاف') ||
+    joined.includes('dry')
+  );
+}
+
 const hasDisease = an =>
   an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
 
@@ -623,6 +651,7 @@ window.dataLayer.push({event:'page_view', page:'/groups.html'});
   state.currentGroup = 'all';
   renderSelected('all');
   const firstChip = $('#quickChips .chip');
+  
   if(firstChip) firstChip.classList.add('active');
 })();
 </script>
