@@ -182,7 +182,8 @@
 /* ============= Firebase SDK ============= */
 import { getApps, initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc
+  getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc,
+   orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ============= firebase-config (ديناميكي مع fallback) ============= */
@@ -207,6 +208,12 @@ try {
 const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
+function num(v){
+  if (v == null) return 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const n = parseFloat(String(v).replace(/[^\d.,-]/g,'').replace(',','.'));
+  return Number.isFinite(n) ? n : 0;
+}
 
 /* ============= حالة الصفحة ============= */
 const state = {
@@ -281,10 +288,109 @@ function getAgeMonths(an){
   return Math.max(0, Math.floor((new Date()-birth)/(30.4375*24*3600*1000)));
 }
 function getMilkKg(an){
-  return Number(
-    an?.lastMilkKg ?? an?.production?.milkKg ?? an?.avgMilkKg ?? an?.milk_today ?? an?.milkToday ?? 0
-  ) || 0;
+  return num(
+    an?.dailyMilk ??          // الحقل الأساسي
+    an?.daily_milk ??
+    an?.milkDaily ??
+    an?.milk_per_day ??
+    an?.milkPerDay ??
+    an?.lastMilkKg ??         // هنملأه من الأحداث لو موجود
+    an?.production?.milkKg ??
+    an?.avgMilkKg ??
+    an?.milk_today ??
+    an?.milkToday ??
+    an?.milk ??
+    an?.milkKg ??
+    an?.milk_kg ??
+    an?.yield ??
+    an?.yieldToday ??
+    0
+  );
 }
+
+// ——— أدوات قراءة الأحداث ———
+const milkEventNames    = ['dailyMilk','daily_milk','milkDaily','milk_per_day','milkPerDay','daily-milk','dailymilk','milk','milkday','لبن يومي','حليب يومي'];
+const calvingEventNames = ['calving','ولادة','calved','parturition'];
+
+function isTypeOneOf(e, names){
+  const t = (String(e?.type || e?.eventType || e?.name || '')).trim().toLowerCase();
+  return names.some(n => t.includes(String(n).toLowerCase()));
+}
+function getEventDate(e){
+  const v = e?.eventDate ?? e?.date ?? e?.createdAt ?? e?.timestamp;
+  if(!v) return null;
+  if (typeof v === 'string') return new Date(v);
+  if (typeof v === 'object') {
+    if (typeof v.seconds === 'number')   return new Date(v.seconds * 1000);
+    if (typeof v._seconds === 'number')  return new Date(v._seconds * 1000);
+  }
+  return null;
+}
+function getMilkFromEvent(e){
+  return num(
+    e?.dailyMilk ?? e?.daily_milk ?? e?.milkDaily ??
+    e?.milk_per_day ?? e?.milkPerDay ??
+    e?.milk ?? e?.milkKg ?? e?.milk_kg ??
+    e?.yield ?? e?.quantity ?? e?.amount ?? 0
+  );
+}
+
+// ——— إثراء الحيوانات من أحدث أحداث اللبن ———
+async function enrichMilkFromEvents(list){
+  if(!db || !state.userId || !Array.isArray(list) || !list.length) return;
+
+  // 1) subcollection: animals/{id}/events
+  for (const an of list){
+    const aid = an.id || an.animalId || null;
+    if (!aid) continue;
+    try{
+      const evCol = collection(db, 'animals', aid, 'events');
+      const snap = await getDocs(query(evCol, orderBy('eventDate','desc'), limit(5)));
+      let bestMilk=null, bestDate=null, bestCalv=null;
+      snap.forEach(docu=>{
+        const e = docu.data(); const d = getEventDate(e); if(!d) return;
+        if (isTypeOneOf(e, milkEventNames)) {
+          const m = getMilkFromEvent(e);
+          if(m>0 && (!bestDate || d>bestDate)){ bestDate=d; bestMilk=m; }
+        }
+        if (isTypeOneOf(e, calvingEventNames)) bestCalv = d;
+      });
+      if(bestMilk!=null){ an.dailyMilk = bestMilk; an.lastMilkKg = bestMilk; }
+      if(bestCalv) an.lastCalvingDate = bestCalv.toISOString();
+    }catch(_) { /* تجاهل لو لا صلاحيات/لا يوجد subcollection */ }
+  }
+
+  // 2) top-level: events (للي لسه 0)
+  const stillZero = list.filter(an => getMilkKg(an) === 0);
+  if(!stillZero.length) return;
+
+  try{
+    let evQuery;
+    try{
+      evQuery = query(collection(db,'events'), where('userId','==', state.userId), orderBy('eventDate','desc'), limit(300));
+    }catch(_){
+      evQuery = query(collection(db,'events'), where('userId','==', state.userId), limit(300));
+    }
+    const evSnap = await getDocs(evQuery);
+
+    const bestPerAnimal = new Map();
+    evSnap.forEach(docu=>{
+      const e = docu.data(); if(!isTypeOneOf(e, milkEventNames)) return;
+      const d = getEventDate(e); if(!d) return;
+      const key = String(e?.animalId ?? e?.animalID ?? e?.animalNumber ?? e?.number ?? '');
+      if(!key) return;
+      const prev = bestPerAnimal.get(key);
+      if(!prev || d > prev.date) bestPerAnimal.set(key, { date:d, milk:getMilkFromEvent(e) });
+    });
+
+    for(const an of stillZero){
+      const key = String(an.id ?? an.animalId ?? an.animalID ?? an.number ?? an.animalNumber ?? '');
+      const rec = bestPerAnimal.get(key);
+      if(rec && rec.milk>0){ an.dailyMilk = rec.milk; an.lastMilkKg = rec.milk; }
+    }
+  }catch(e){ console.warn('events top-level read err', e); }
+}
+
 const isBuffalo = an =>
   ((an?.kind||'').toLowerCase().includes('buff') || (an?.kind||'').includes('جاموس'));
 const isPregnant = an => {
@@ -454,10 +560,17 @@ async function loadAnimals(){
     state.animals = (arr||[]).map(normalize);
   }catch(e){
     try{ state.animals = (await loadAnimalsFromFirestore()).map(normalize); }
-    catch{ try{ state.animals = JSON.parse(localStorage.getItem('animals_cache')||'[]').map(normalize);}catch{} }
+    catch{
+      try{ state.animals = JSON.parse(localStorage.getItem('animals_cache')||'[]').map(normalize);}catch{}
+    }
   }
+
+  // ← مهم: نثري من الأحداث دائمًا (subcollection ثم top-level)
+  try{ await enrichMilkFromEvents(state.animals); }catch(_){}
+
   localStorage.setItem('animals_cache', JSON.stringify(state.animals));
   updateCounters();
+  if (state.currentGroup) renderSelected(state.currentGroup); // إعادة رسم المجموعة المفتوحة إن وُجدت
 }
 
 /* ============= ربط الواجهة ============= */
