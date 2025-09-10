@@ -197,17 +197,88 @@
       saveThresholdsToFirestore().catch(()=>{});
     }
 
-    // أدوات وقت/قيم
-    const toDate = s=> s? new Date(s): null;
-    const daysBetween = (a,b)=> Math.floor((a-b)/(24*3600*1000));
-    function getDIM(an){ const calv=toDate(an?.calvingDate); if(!calv) return 0; return Math.max(0, daysBetween(new Date(), calv)); }
-    function getAgeMonths(an){ const birth=toDate(an?.birthDate); if(!birth) return 0; return Math.max(0, Math.floor((new Date()-birth)/(30.4375*24*3600*1000))); }
-    function getMilkKg(an){ return Number(an?.lastMilkKg ?? an?.production?.milkKg ?? an?.avgMilkKg ?? 0) || 0; }
-    const isBuffalo = an => ((an?.kind||'').toLowerCase().includes('buff') || (an?.kind||'').includes('جاموس'));
-    const isPregnant = an => an?.reproductiveStatus==='عشار' || an?.pregnant===true;
-    const isDry = an => an?.lactationStatus==='جاف' || an?.dry===true || an?.inMilk===false;
-    const hasDisease = an => an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
-    const isFresh = an => { const d=getDIM(an); return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0); };
+ // أدوات وقت/قيم (مُحدَّثة)
+const normTxt = v => String(v ?? '').trim().toLowerCase();
+
+// يقبل Date | ISO string | Firestore Timestamp
+const toDate = v => {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'string') return new Date(v);
+  if (typeof v === 'object') {
+    if (typeof v.seconds === 'number')   return new Date(v.seconds * 1000);
+    if (typeof v._seconds === 'number')  return new Date(v._seconds * 1000);
+  }
+  return null;
+};
+
+const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
+
+// DIM من حقول متعددة + fallback لـ daysInMilk
+function getDIM(an){
+  const calv =
+    toDate(an?.lastCalvingDate) ||
+    toDate(an?.calvingDate)     ||
+    toDate(an?.calvedAt);
+  if (!calv) return Number(an?.daysInMilk) || 0;
+  return Math.max(0, daysBetween(new Date(), calv));
+}
+
+function getAgeMonths(an){
+  const birth = toDate(an?.birthDate);
+  if(!birth) return 0;
+  return Math.max(0, Math.floor((new Date()-birth)/(30.4375*24*3600*1000)));
+}
+
+// قراءة اللبن مع حقول إضافية محتملة
+function getMilkKg(an){
+  return Number(
+    an?.lastMilkKg ??
+    an?.production?.milkKg ??
+    an?.avgMilkKg ??
+    an?.milk_today ??     // لو استخدمت هذا الحقل
+    an?.milkToday ??      // أو هذا
+    0
+  ) || 0;
+}
+
+const isBuffalo = an =>
+  ((an?.kind||'').toLowerCase().includes('buff') || (an?.kind||'').includes('جاموس'));
+
+// عشار من عدة حقول + فلاغ
+const isPregnant = an => {
+  const joined = [
+    an?.reproductiveStatus,
+    an?.pregStatus,
+    an?.['الحالة_التناسلية']
+  ].map(normTxt).join(' ');
+  return an?.pregnant === true || joined.includes('عشار') || joined.includes('preg');
+};
+
+// جاف من عدة حقول + inMilk=false + فلاغ
+const isDry = an => {
+  const joined = [
+    an?.lactationStatus,
+    an?.productionStatus,
+    an?.status,
+    an?.['الحالة_اللبنية']
+  ].map(normTxt).join(' ');
+  return (
+    an?.inMilk === false ||
+    an?.dry === true     ||
+    joined.includes('جاف') ||
+    joined.includes('dry')
+  );
+};
+
+const hasDisease = an =>
+  an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
+
+const isFresh = an => {
+  const d = getDIM(an);
+  return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0);
+};
+
 
     function milkBand(an, milk){
       const t = state.thresholds;
