@@ -600,8 +600,11 @@ function setRing(idSuffix, pct, key){
   const el = document.getElementById('r-'+idSuffix);
   if(!el) return;
   const p = Math.max(0, Math.min(100, Number(pct)||0));
-  const off = RING_LEN * (1 - p/100); // أصغر offset = تعبئة أكبر
-  el.setAttribute('stroke-dashoffset', off.toFixed(2));
+ const off = RING_LEN * (1 - p/100);
+
+
+  // الأفضل والأوضح عبر CSSOM + متوافق مع سفاري/فايرفوكس
+  el.style.setProperty('stroke-dashoffset', off.toFixed(2));
   el.style.stroke = colorFor(key || idSuffix, p);
 }
 
@@ -708,6 +711,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
