@@ -495,6 +495,7 @@ const $ = s => document.querySelector(s);
 
 // ---------- Helpers ----------
   const norm = s => String(s||'')
+    
   .toLowerCase()
   .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
   .trim();
@@ -653,31 +654,51 @@ function dedupe(list){
   const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
   if(!userId){ console.warn('MBK KPIs: لا يوجد userId'); return; }
 
-  let aSub=[], bSub=[];
+  // ✅ تعريف المصفوفتين قبل الاستخدام
+  let aSub = [], bSub = [];
+
+  // ✅ دالة القيم التجريبية (fallback) متاحة قبل استخدامها
+  const paintDemoOnError = ()=> renderGauges({ inMilkPct:70, pregRate:70, freshShare:14, dryShare:30 });
+
+  // عدّاد وصول بيانات فعلي
+  let updates = 0;
+
   const recompute = ()=>{
     const animals = dedupe([...aSub, ...bSub]);
     const k = calc(animals);
+    updates++;
     renderGauges(k);
     (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render', inMilkPct:k.inMilkPct, pregRate:k.pregRate});
     try{ localStorage.setItem('animals_cache', JSON.stringify(animals)); }catch{}
   };
 
+
   try{
     const col = collection(db, 'users', userId, 'animals');
-    onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-      err=> console.warn('users/{uid}/animals snapshot error', err));
+  onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+  err=> { console.warn('users/{uid}/animals snapshot error', err); paintDemoOnError(); });
   }catch(e){ console.warn('users/{uid}/animals not available', e); }
 
   try{
     const q = query(collection(db, 'animals'), where('userId','==', userId));
-    onSnapshot(q, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-      err=> console.warn('animals where userId==uid snapshot error', err));
+  onSnapshot(q, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+  err=> { console.warn('animals where userId==uid snapshot error', err); paintDemoOnError(); });
   }catch(e){ console.warn('animals top-level query not available', e); }
+    // ✅ لو مفيش داتا خلال 1200ms: استخدم الكاش أو قيم توضيحية
+  setTimeout(()=>{
+    if (updates === 0) {
+      try{
+        const cached = JSON.parse(localStorage.getItem('animals_cache') || '[]');
+        if (cached.length){ renderGauges(calc(cached)); return; }
+      }catch{}
+      paintDemoOnError();
+    }
+  }, 1200);
+
 })();
 </script>
 
 <script>
-  // يضيف Hint على شكل tooltip لكل KPI
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.kpi').forEach(el => {
       el.title = el.dataset.hint || '';
@@ -687,6 +708,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
