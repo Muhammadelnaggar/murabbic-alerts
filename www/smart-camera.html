@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>الكاميرا الذكية - مربيك</title>
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <meta name="theme-color" content="#2e7d32" />
+  <style>
+    :root{
+      --green:#2e7d32; --green-50:#f1f8e9; --green-100:#e8f5e9; --green-200:#c5e1a5; --green-600:#1b5e20;
+      --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --ink:#224e24; --muted:#6b8c6b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(to bottom,var(--bg1),var(--bg2));font-family:'Cairo','Arial',sans-serif;color:var(--green-600)}
+
+    /* Header */
+    .topbar{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;justify-content:space-between;
+      background:var(--green);color:#fff;padding:14px 12px;border-bottom-left-radius:20px;border-bottom-right-radius:20px;
+      box-shadow:0 3px 8px rgba(0,0,0,.22)}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:900}
+    .brand svg{width:26px;height:26px}
+    .back{appearance:none;border:0;background:#fff;color:var(--green);border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,.12)}
+    .back:hover{transform:translateY(-1px)}
+
+    /* Meta chips */
+    .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin:10px 12px}
+    .chip{background:#fff;border:1px solid var(--green-200);border-radius:999px;padding:6px 12px;font-weight:800;color:var(--ink)}
+
+    /* Sections */
+    .section{margin:12px;padding:12px;background:var(--card);border:1px solid var(--green-200);border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+    .section .head{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:900;color:var(--ink);margin-bottom:6px}
+    .section .sub{font-size:13px;text-align:center;color:var(--muted);margin:0 0 8px}
+
+    /* Grid of tools */
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:10px}
+    @media(min-width:920px){.grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:560px){.grid{grid-template-columns:1fr}}
+
+    /* Tool cards */
+    .tool{position:relative;padding:16px;border:1.5px solid var(--green-200);border-radius:14px;background:linear-gradient(180deg,#ffffff, var(--green-50));
+      text-align:center;cursor:pointer;font-weight:900;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .12s ease, box-shadow .12s ease}
+    .tool:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.12)}
+    .tool .ico{display:inline-grid;place-items:center;width:58px;height:58px;margin:0 auto 8px;border-radius:50%;
+      border:1px solid var(--green-200);box-shadow:inset 0 0 0 6px #ffffff}
+    .tool .title{font-size:16px}
+    .tool .hint{font-size:12px;color:var(--muted);font-weight:700;margin-top:4px}
+
+    /* Group wrappers */
+    .smart{background:linear-gradient(180deg,var(--green-100),#f7fbef);border:2px dashed var(--green-200)}
+    .smart .head{font-size:18px}
+
+    /* Footer tips */
+    .tips{margin:10px 12px;color:var(--muted);text-align:center;font-size:12px}
+
+    /* Utility hidden warning area (not shown unless we need it) */
+    #warn{display:none;color:#b71c1c;text-align:center;font-weight:800}
+  </style>
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand" aria-label="الرجوع">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M6 38 L18 50 L40 18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="28" y="46" width="30" height="6" rx="3" fill="#fff" opacity=".9"/>
+      </svg>
+      <div>الكاميرا الذكية - مربيك</div>
+    </div>
+    <button id="backBtn" class="back">↩︎ رجوع للأحداث</button>
+  </header>
+
+  <!-- context chips -->
+  <div class="meta">
+    <div class="chip" id="chipAnimal">🐄 الحيوان: —</div>
+    <div class="chip" id="chipDate">📅 التاريخ: —</div>
+  </div>
+  <div id="warn"></div>
+
+  <!-- مجموعة 1: أدوات الكاميرا السريعة -->
+  <section class="section smart" aria-label="أدوات الكاميرا السريعة">
+    <div class="head">🤖 أدوات الكاميرا السريعة</div>
+    <p class="sub">تصوير سريع وتحليل مباشر</p>
+    <div class="grid">
+      <button class="tool" data-page="visual-eval.html" aria-label="سمات اللبن للحيوان (Milk production traits)">
+        <div class="ico">🥛</div>
+        <div class="title">سمات اللبن للحيوان</div>
+        <div class="hint">Milk production traits</div>
+      </button>
+      <button class="tool" data-page="weight-eval.html" aria-label="تقدير الوزن بالكاميرا">
+        <div class="ico">⚖️</div>
+        <div class="title">تقدير الوزن بالكاميرا</div>
+        <div class="hint">تقدير تقريبي من اللقطة</div>
+      </button>
+    </div>
+  </section>
+
+  <!-- مجموعة 2: التقييم الذكي للتغذية -->
+  <section class="section smart" aria-label="التقييم الذكي للتغذية بالكاميرا">
+    <div class="head">🌿 التقييم الذكي للتغذية بالكاميرا</div>
+    <p class="sub">تحليل الحالة الغذائية بصريًا</p>
+    <div class="grid">
+      <button class="tool" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم BCS">
+        <div class="ico">📏</div>
+        <div class="title">تقييم حالة الجسم (BCS)</div>
+        <div class="hint">تحديد الدرجة من الصورة</div>
+      </button>
+      <button class="tool" data-page="feces-eval.html" aria-label="تقييم الروث">
+        <div class="ico">💩</div>
+        <div class="title">تقييم الروث</div>
+        <div class="hint">ملمس/شكل للدلالة على العليقة</div>
+      </button>
+    </div>
+  </section>
+
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="/js/app-core.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+
+  <script>
+  (function(){
+    const $ = s=>document.querySelector(s);
+    const $$ = s=>document.querySelectorAll(s);
+    const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
+    const todayISO = ()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+
+    // Hydrate context from query or storage
+    const qs = new URLSearchParams(location.search);
+    const qNum = norm(qs.get('number'));
+    const qDate = norm(qs.get('date'));
+    const number = qNum || norm(localStorage.getItem('currentAnimalNumber')) || norm(localStorage.getItem('lastAnimalNumber')) || '';
+    let date = qDate || norm(localStorage.getItem('lastEventDate')) || todayISO();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+
+    $('#chipAnimal').textContent = `🐄 الحيوان: ${ number || 'غير محدد' }`;
+    $('#chipDate').textContent   = `📅 التاريخ: ${ date }`;
+
+    // Back to events page carrying context
+    const backUrl = new URL('add-event.html', location.href);
+    if(number) backUrl.searchParams.set('number', number);
+    if(date)   backUrl.searchParams.set('date', date);
+    $('#backBtn').addEventListener('click', ()=>{ location.href = backUrl.toString(); });
+
+    function buildUrl(page){
+      const u = new URL(page, location.href);
+      if(number) u.searchParams.set('number', number);
+      if(date)   u.searchParams.set('date', date);
+      return u.toString();
+    }
+
+    // Wire tools
+    $$('.tool[data-page]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.preventDefault();
+        if(!number){
+          // لا نعرض تعليقات داخل النماذج؛ مجرد تحليلات صامتة
+          window.dataLayer.push({event:'smartcam_click_without_number', page:location.pathname});
+        }
+        const target = btn.getAttribute('data-page');
+        if(target){ location.href = buildUrl(target); }
+      }, {passive:true});
+    });
+
+    // Analytics
+    window.dataLayer.push({event:'smartcam_loaded', number: number || null, date});
+  })();
+  </script>
+</body>
+</html>
