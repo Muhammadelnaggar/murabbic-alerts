@@ -459,7 +459,7 @@ function renderOverall(){
 }
 
       if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
-      await startCamera(); await listCameras(); if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
+   await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
 
       renderInitial();
 
