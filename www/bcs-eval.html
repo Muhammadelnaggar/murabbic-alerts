@@ -429,10 +429,12 @@ function renderOverall(){
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
     $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
     toggleFlash.addEventListener('click', toggleTorch);
-    restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-    cameraSelect.addEventListener('change', async ()=>{ await startCamera(cameraSelect.value); });
+    restartBtn.addEventListener('click', async ()=>{ await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
+    cameraSelect.addEventListener('change', async ()=>{await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
 
-    captureBtn.addEventListener('click', async ()=>{ const url=dataURLFromVideo(); if(!url) return; state.captures[state.currentAngle]=url; state.scores[state.currentAngle]=await scoreBCSFor(state.currentAngle,url); renderThumbs(); renderOverall(); updateButtons(); });
+   captureBtn.addEventListener('click', async () => {
+  const url = await vision.captureHD({ state, preview }); // << ده بدل dataURLFromVideo()
+  if (!url) return;
     retakeBtn.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; state.scores[state.currentAngle]=null; renderThumbs(); renderOverall(); updateButtons(); });
    
     const nextAngleBtn = document.getElementById('nextAngleBtn');
@@ -459,7 +461,7 @@ function renderOverall(){
 }
 
       if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
-   await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
+      await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport });
 
       renderInitial();
 
@@ -505,9 +507,6 @@ function renderOverall(){
     new MutationObserver(nukeEditorCard).observe(document.documentElement,{childList:true,subtree:true});
     document.addEventListener('DOMContentLoaded', nukeEditorCard);
   </script>
-  <script type="module" src="/js/tenant-bootstrap.js"></script>
-  <script type="module" src="/js/event-core.js"></script>
-  <script type="module" src="/js/vision-core.js"></script>
 
   <!-- حفظ التقييم في فايرستور فقط -->
  <!-- حفظ التقييم في فايرستور (نهائي) -->
