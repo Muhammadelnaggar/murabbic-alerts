@@ -181,6 +181,8 @@
   </div>
   <script>window.dataLayer = window.dataLayer || [];</script>
 <script src="/js/app-core.js"></script>
+<!-- ضيف ده قبل سكربت الـ module الرئيسي -->
+<script type="module" src="/js/vision-core.js"></script>
 
   <script src="js/mbk-animals.js?v=2"></script>
 
@@ -429,41 +431,54 @@ function renderOverall(){
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
     $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
     toggleFlash.addEventListener('click', toggleTorch);
-    restartBtn.addEventListener('click', async ()=>{ await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
-    cameraSelect.addEventListener('change', async ()=>{await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport, deviceId: cameraSelect.value });
-
-   captureBtn.addEventListener('click', async () => {
-  const url = await vision.captureHD({ state, preview }); // << ده بدل dataURLFromVideo()
-  if (!url) return;
-    retakeBtn.addEventListener('click', ()=>{ state.captures[state.currentAngle]=null; state.scores[state.currentAngle]=null; renderThumbs(); renderOverall(); updateButtons(); });
-   
-    const nextAngleBtn = document.getElementById('nextAngleBtn');
-    nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); });
-
-    function renderInitial(){ renderThumbs(); setAngle('rear'); renderOverall(); }
-
-    (async function init(){ try{
-      const ctx=getAnimalFromContext();
-      if(animalIdInput) animalIdInput.value = ctx.id || '';
-      if(eventDateInput) eventDateInput.value = ctx.date || todayCairo();
-      if(numberSpan) numberSpan.textContent = ctx.number || (ctx.id ? `#${ctx.id.slice(-5)}` : '—');
-
-      initKindBar();
-
-     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-  const warn = document.createElement('div');
-  Object.assign(warn.style, {
-    background:'#fff3cd', color:'#92400e', border:'1px solid #facc15',
-    padding:'12px', borderRadius:'8px', margin:'8px 12px', fontWeight:'bold', textAlign:'center'
+  // إعادة تشغيل الكاميرا على نفس الجهاز المختار
+// إعادة تشغيل الكاميرا على نفس الجهاز المختار
+restartBtn.addEventListener('click', async () => {
+  await vision.startCameraHD({
+    state, preview, overlay, drawGuide, populateTorchSupport,
+    deviceId: cameraSelect.value
   });
-  warn.textContent = '⚠️ متصفحك لا يدعم تشغيل الكاميرا عبر الويب. يمكنك رفع صورة بديلة.';
-  document.querySelector('#cameraCard')?.prepend(warn);
-}
+});
 
-      if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
-      await vision.startCameraHD({ state, preview, overlay, drawGuide, populateTorchSupport });
+// تغيير الكاميرا من القايمة
+cameraSelect.addEventListener('change', async () => {
+  await vision.startCameraHD({
+    state, preview, overlay, drawGuide, populateTorchSupport,
+    deviceId: cameraSelect.value
+  });
+});
 
-      renderInitial();
+// زر “التالي” بين الزوايا (مرّة واحدة فقط)
+document.getElementById('nextAngleBtn')?.addEventListener('click', () => {
+  const i = anglesOrder.indexOf(state.currentAngle);
+  setAngle(anglesOrder[(i + 1) % anglesOrder.length]);
+});
+
+// التقاط لقطة (مع fallback لو captureHD مش متاح)
+captureBtn.addEventListener('click', async () => {
+  const url = (window.vision?.captureHD)
+    ? await window.vision.captureHD({ state, preview })
+    : dataURLFromVideo();
+
+  if (!url) return;
+
+  // خزّن الصورة والنتيجة
+  state.captures[state.currentAngle] = url;
+  state.scores[state.currentAngle]   = await scoreBCSFor(state.currentAngle, url);
+
+  renderThumbs();
+  renderOverall();
+  updateButtons();
+});
+
+// إعادة الالتقاط
+retakeBtn.addEventListener('click', () => {
+  state.captures[state.currentAngle] = null;
+  state.scores[state.currentAngle]   = null;
+  renderThumbs();
+  renderOverall();
+  updateButtons();
+});
 
       document.getElementById('demoBtn')?.addEventListener('click', async ()=>{
         const kind = kindBuffalo?.checked ? 'buffalo' : 'cow';
