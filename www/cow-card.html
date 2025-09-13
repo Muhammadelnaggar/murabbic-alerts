@@ -758,15 +758,7 @@ function renderTimeline(events, state){
     line.setAttribute('stroke','#e9f5dc'); line.setAttribute('stroke-width','0.8');
     svg.appendChild(line);
 
-    const lbl = document.createElementNS(svgNS,'text');
-    lbl.setAttribute('x',x); lbl.setAttribute('y',H-padB+26);
-    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('font-size','10');
-    lbl.setAttribute('fill','#355'); lbl.textContent = new Date(t).toLocaleDateString('ar-EG');
-    svg.appendChild(lbl);
-  }
-
-  // Tooltip
-// Tooltip
+  
 // Tooltip (جديد) — تموضع دقيق + إخفاء أثناء السحب وخارج التايملاين
 const tip = document.getElementById('tlTip');
 function showTipAt(svg, x, y, title, details, dateStr){
@@ -1252,6 +1244,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
