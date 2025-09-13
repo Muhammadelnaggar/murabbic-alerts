@@ -93,8 +93,29 @@
     -webkit-box-orient: vertical;
   }
 }
+/* === Timeline (أحداث الحيوان) === */
+.timeline-card{position:relative}
+.tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
+.tl-svg{display:block; height:120px; /* يتكيّف أفقيًا */ }
+.tl-legend{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font:12px system-ui; color:#355}
+.tl-legend .leg{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#fcfff8}
+.tl-dot{cursor:pointer}
+.tl-tooltip{
+  position:absolute; /* لا تستخدم inset هنا */
+  transform:translate(-50%,-8px);
+  background:#0b3d2a; color:#fff; border-radius:8px; padding:8px 10px; font:12px/1.4 system-ui;
+  box-shadow:0 6px 18px rgba(0,0,0,.18); pointer-events:none; z-index:50; display:none; max-width:min(80vw,320px)
+}
 
-    /* شارة صغيرة للمفتاح داخل كل-الحقول */
+.tl-tooltip b{display:block; font-weight:800; margin-bottom:4px}
+.tl-date{opacity:.9; font-variant-numeric:tabular-nums}
+
+/* ألوان النقاط حسب نوع الحدث */
+:root{
+  --tl-milk:#2e7d32; --tl-calving:#1b5e20; --tl-insem:#0d9488; --tl-preg:#a16207;
+  --tl-heat:#ef6c00; --tl-dry:#6b7280; --tl-disease:#c62828; --tl-other:#4b5563;
+}
+
   </style>
 </head>
 <body>
@@ -128,6 +149,23 @@
   </div>
 </section>
 
+<section class="card timeline-card" aria-label="الخط الزمني للأحداث">
+  <h3>الخط الزمني</h3>
+  <div class="tl-wrap" id="timelineBox">
+    <!-- يُرسم SVG هنا -->
+  </div>
+  <div class="tl-legend" aria-hidden="true">
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-calving)"></span>ولادة</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-insem)"></span>تلقيح</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-preg)"></span>تشخيص حمل</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-heat)"></span>شياع</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-dry)"></span>تجفيف</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-disease)"></span>حالة صحية</span>
+    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-milk)"></span>لبن</span>
+  </div>
+  <div class="tl-tooltip" id="tlTip" role="status" aria-live="polite"></div>
+  <div class="hint">اسحب أفقياً للتنقل — اضغط/المس النقاط لعرض تفاصيل الحدث.</div>
+</section>
 
     <section class="card" aria-label="تقييم سمات اللبن">
       <h3>تقييم سمات اللبن</h3>
@@ -636,6 +674,173 @@ function renderMilkChart(series){
   setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
   addEventListener('resize',()=>renderMilkChart(series),{once:true});
 }
+    /* === Timeline Helpers === */
+function _colorForType(t){
+  switch(t){
+    case 'calving': return getComputedStyle(document.documentElement).getPropertyValue('--tl-calving') || '#1b5e20';
+    case 'insemination': return getComputedStyle(document.documentElement).getPropertyValue('--tl-insem') || '#0d9488';
+    case 'pregnancy': return getComputedStyle(document.documentElement).getPropertyValue('--tl-preg') || '#a16207';
+    case 'heat': return getComputedStyle(document.documentElement).getPropertyValue('--tl-heat') || '#ef6c00';
+    case 'dry': return getComputedStyle(document.documentElement).getPropertyValue('--tl-dry') || '#6b7280';
+    case 'disease': return getComputedStyle(document.documentElement).getPropertyValue('--tl-disease') || '#c62828';
+    case 'milk': return getComputedStyle(document.documentElement).getPropertyValue('--tl-milk') || '#2e7d32';
+    default: return getComputedStyle(document.documentElement).getPropertyValue('--tl-other') || '#4b5563';
+  }
+}
+function _fmtDate(d){ try{ return new Date(d).toLocaleDateString('ar-EG'); }catch{ return d||'—'; } }
+
+/* === Render Timeline === */
+function renderTimeline(events, state){
+  const box = document.getElementById('timelineBox');
+  if (!box) return;
+  box.innerHTML = '';
+
+  // التواريخ
+  const rows = (Array.isArray(events)?events:[])
+    .map(e => ({ e, d: evDate(e) }))
+    .filter(x => x.d);
+
+  if (!rows.length){
+    const empty = document.createElement('div');
+    empty.style.cssText='padding:10px;color:#456;font:13px system-ui';
+    empty.textContent = 'لا توجد أحداث بعد.';
+    box.appendChild(empty);
+    return;
+  }
+
+  // نطاق التواريخ
+  let minT = Infinity, maxT = -Infinity;
+  for (const r of rows){
+    const t = +new Date(r.d);
+    if (t < minT) minT = t;
+    if (t > maxT) maxT = t;
+  }
+  if (!Number.isFinite(minT) || !Number.isFinite(maxT)) return;
+
+  // في حالة كلّها يوم واحد، وسّع ±3 أيام لتفادي القسمة على صفر
+  if (maxT - minT < 86400000){
+    minT -= 3*86400000; maxT += 3*86400000;
+  }
+
+  // لوحة الرسم: عرض افتراضي ديناميكي حسب عدد الأحداث (40px لكل نقطة + هوامش)
+  const padL = 40, padR = 40, padT = 28, padB = 38;
+  const dotsW = Math.max(600, rows.length * 40);
+  const W = padL + dotsW + padR, H = 120;
+  const Y = Math.round(H/2) + 6; // خط المحور
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class','tl-svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.width = W+'px';
+
+  // محور أفقي + خطوط خفيفة
+  const axis = document.createElementNS(svgNS, 'line');
+  axis.setAttribute('x1', padL); axis.setAttribute('x2', W-padR);
+  axis.setAttribute('y1', Y); axis.setAttribute('y2', Y);
+  axis.setAttribute('stroke', '#cfe9c8'); axis.setAttribute('stroke-width','2');
+  svg.appendChild(axis);
+
+  // تقسيمات زمنية (6 فواصل)
+  const ticks = 6;
+  for (let i=0;i<=ticks;i++){
+    const t = minT + (i*(maxT-minT)/ticks);
+    const x = padL + ((t-minT)/(maxT-minT))*(W-padL-padR);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('x1',x); line.setAttribute('x2',x);
+    line.setAttribute('y1',Y-16); line.setAttribute('y2',Y+16);
+    line.setAttribute('stroke','#e9f5dc'); line.setAttribute('stroke-width','0.8');
+    svg.appendChild(line);
+
+    const lbl = document.createElementNS(svgNS,'text');
+    lbl.setAttribute('x',x); lbl.setAttribute('y',H-padB+26);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('font-size','10');
+    lbl.setAttribute('fill','#355'); lbl.textContent = new Date(t).toLocaleDateString('ar-EG');
+    svg.appendChild(lbl);
+  }
+
+  // Tooltip
+  const tip = document.getElementById('tlTip');
+  function showTip(x, y, title, details, dateStr){
+    if (!tip) return;
+    tip.style.display='block';
+    // تموضع داخل البطاقة
+    const host = box.closest('.timeline-card');
+    const hostRect = host.getBoundingClientRect();
+    tip.style.left = (x - hostRect.left) + 'px';
+    tip.style.top  = (y - hostRect.top - 14) + 'px';
+    tip.innerHTML = `<b>${title||'—'}</b><div>${details||''}</div><div class="tl-date">${dateStr||''}</div>`;
+  }
+  function hideTip(){ if(tip) tip.style.display='none'; }
+
+  // نقاط الأحداث
+  rows.forEach(({e,d})=>{
+    const t = +new Date(d);
+    const x = padL + ((t-minT)/(maxT-minT))*(W-padL-padR);
+    const y = Y;
+
+    const tpe = evType(e);
+    const color = _colorForType(tpe);
+
+    // ساق صغيرة
+    const stem = document.createElementNS(svgNS,'line');
+    stem.setAttribute('x1',x); stem.setAttribute('x2',x);
+    stem.setAttribute('y1',y-14); stem.setAttribute('y2',y+14);
+    stem.setAttribute('stroke', color); stem.setAttribute('stroke-width','1');
+    stem.setAttribute('opacity','0.5');
+    svg.appendChild(stem);
+
+    // نقطة
+    const dot = document.createElementNS(svgNS,'circle');
+    dot.setAttribute('cx',x); dot.setAttribute('cy',y);
+    dot.setAttribute('r',5); dot.setAttribute('fill',color);
+    dot.setAttribute('class','tl-dot');
+    dot.setAttribute('tabindex','0');
+    dot.setAttribute('role','button');
+    dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
+
+    const title = eventNameRaw(e);
+    const details = compactEventDetails(e);
+    const dateStr = _fmtDate(d);
+
+    const show = (evt)=>{
+      // إحداثي النسبي داخل البطاقة لتموضع الـtooltip
+      const rect = svg.getBoundingClientRect();
+      const sx = rect.left + (x/W)*rect.width;
+      const sy = rect.top + (y/H)*rect.height;
+      showTip(sx, sy, title, details, dateStr);
+      // على الموبايل: اخفاء بعد 2.5 ثانية
+      if (matchMedia('(pointer:coarse)').matches){
+        clearTimeout(dot._to); dot._to = setTimeout(hideTip, 2500);
+      }
+    };
+
+    dot.addEventListener('mouseenter', show);
+    dot.addEventListener('focus', show);
+    dot.addEventListener('click', show);
+    dot.addEventListener('mouseleave', hideTip);
+    dot.addEventListener('blur', hideTip);
+
+    svg.appendChild(dot);
+
+    // لِيبِل صغير فوق أو تحت
+    const lbl = document.createElementNS(svgNS,'text');
+    lbl.setAttribute('x',x); lbl.setAttribute('y',y-18);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('font-size','10');
+    lbl.setAttribute('fill','#134e35');
+    lbl.textContent = title;
+    svg.appendChild(lbl);
+  });
+
+  const scroller = document.createElement('div');
+  scroller.style.width = W+'px';
+  scroller.appendChild(svg);
+  box.appendChild(scroller);
+
+  // مرّر تلقائيًا لآخر نقطة
+  setTimeout(()=>{ box.scrollLeft = box.scrollWidth; }, 0);
+}
+
 function avgDaysBetween(dts){ if(!dts||dts.length<2) return null;
   const ms=dts.map(d=>new Date(d).getTime()).sort((a,b)=>a-b);
   const dif=[]; for(let i=1;i<ms.length;i++) dif.push((ms[i]-ms[i-1])/86400000);
@@ -959,9 +1164,10 @@ async function loadAndRender({number, animalId, type}){
       tip.innerHTML=`لا توجد أحداث مسجلة بعد. <a href="/add-event.html?number=${encodeURIComponent(state.number||'')}" style="font-weight:700;color:#1b5e20">أضف أول حدث الآن</a>.`;
       document.querySelector('.wrap')?.prepend(tip);
     }
+renderCard(state, kind);
+renderTimeline(events, state);   // 👈 الجديد
+renderEventsList(events);
 
-    renderCard(state, kind);
-    renderEventsList(events);
   }catch(e){
     console.error(e);
     $('cardTitle').textContent='تعذّر تحميل بطاقة الحيوان';
@@ -984,6 +1190,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
