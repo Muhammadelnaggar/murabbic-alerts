@@ -97,7 +97,9 @@
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
 .tl-svg{display:block; height:120px; /* يتكيّف أفقيًا */ }
-.tl-legend{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font:12px system-ui; color:#355}
+/* اخفاء الليجند تمامًا */
+.tl-legend{display:none}
+
 .tl-legend .leg{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#fcfff8}
 .tl-dot{cursor:pointer}
 .tl-tooltip{
@@ -158,17 +160,8 @@
 <section class="card timeline-card" aria-label="الخط الزمني للأحداث">
   <h3>الخط الزمني</h3>
   <div class="tl-wrap" id="timelineBox">
-    <!-- يُرسم SVG هنا -->
-  </div>
-  <div class="tl-legend" aria-hidden="true">
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-calving)"></span>ولادة</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-insem)"></span>تلقيح</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-preg)"></span>تشخيص حمل</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-heat)"></span>شياع</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-dry)"></span>تجفيف</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-disease)"></span>حالة صحية</span>
-    <span class="leg"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:var(--tl-milk)"></span>لبن</span>
-  </div>
+    </div> <!-- يُرسم SVG هنا -->
+ 
   <div class="tl-tooltip" id="tlTip" role="status" aria-live="polite"></div>
   <div class="hint">اسحب أفقياً للتنقل — اضغط/المس النقاط لعرض تفاصيل الحدث.</div>
 </section>
@@ -1222,6 +1215,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
