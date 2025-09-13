@@ -701,7 +701,7 @@ function renderTimeline(events, state){
   if (!box) return;
   box.innerHTML = '';
 
-  // التواريخ
+  // جهّز صفوف (بتاريخ صالح فقط)
   const rows = (Array.isArray(events)?events:[])
     .map(e => ({ e, d: evDate(e) }))
     .filter(x => x.d);
@@ -714,7 +714,7 @@ function renderTimeline(events, state){
     return;
   }
 
-  // نطاق التواريخ
+  // نطاق الزمن
   let minT = Infinity, maxT = -Infinity;
   for (const r of rows){
     const t = +new Date(r.d);
@@ -722,17 +722,13 @@ function renderTimeline(events, state){
     if (t > maxT) maxT = t;
   }
   if (!Number.isFinite(minT) || !Number.isFinite(maxT)) return;
+  if (maxT - minT < 86400000){ minT -= 3*86400000; maxT += 3*86400000; } // كلّها نفس اليوم
 
-  // في حالة كلّها يوم واحد، وسّع ±3 أيام لتفادي القسمة على صفر
-  if (maxT - minT < 86400000){
-    minT -= 3*86400000; maxT += 3*86400000;
-  }
-
-  // لوحة الرسم: عرض افتراضي ديناميكي حسب عدد الأحداث (40px لكل نقطة + هوامش)
+  // لوحة
   const padL = 40, padR = 40, padT = 28, padB = 38;
   const dotsW = Math.max(600, rows.length * 40);
   const W = padL + dotsW + padR, H = 120;
-  const Y = Math.round(H/2) + 6; // خط المحور
+  const Y = Math.round(H/2) + 6;
 
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
@@ -740,47 +736,52 @@ function renderTimeline(events, state){
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.style.width = W+'px';
 
-  // محور أفقي + خطوط خفيفة
+  // المحور
   const axis = document.createElementNS(svgNS, 'line');
   axis.setAttribute('x1', padL); axis.setAttribute('x2', W-padR);
-  axis.setAttribute('y1', Y); axis.setAttribute('y2', Y);
+  axis.setAttribute('y1', Y);    axis.setAttribute('y2', Y);
   axis.setAttribute('stroke', '#cfe9c8'); axis.setAttribute('stroke-width','2');
   svg.appendChild(axis);
 
-  // تقسيمات زمنية (6 فواصل)
+  // تقسيمات زمنية + عناوينها (تظل موجودة أسفل، مش فوق النقاط)
   const ticks = 6;
   for (let i=0;i<=ticks;i++){
     const t = minT + (i*(maxT-minT)/ticks);
     const x = padL + ((t-minT)/(maxT-minT))*(W-padL-padR);
+
     const line = document.createElementNS(svgNS,'line');
     line.setAttribute('x1',x); line.setAttribute('x2',x);
     line.setAttribute('y1',Y-16); line.setAttribute('y2',Y+16);
     line.setAttribute('stroke','#e9f5dc'); line.setAttribute('stroke-width','0.8');
     svg.appendChild(line);
-}
-  
-// Tooltip (جديد) — تموضع دقيق + إخفاء أثناء السحب وخارج التايملاين
-const tip = document.getElementById('tlTip');
-function showTipAt(svg, x, y, title, details, dateStr){
-  if (!tip) return;
-  tip.style.display='block';
-  const svgRect  = svg.getBoundingClientRect();
-  const hostRect = box.closest('.timeline-card').getBoundingClientRect();
-  const sx = svgRect.left + (x / W) * svgRect.width;
-  const sy = svgRect.top  + (y / H) * svgRect.height;
-  tip.style.left = (sx - hostRect.left) + 'px';
-  tip.style.top  = (sy - hostRect.top  - 14) + 'px';
-  tip.innerHTML = `<b>${title||'—'}</b><div>${details||''}</div><div class="tl-date">${dateStr||''}</div>`;
-}
-function hideTip(){ if (tip) tip.style.display='none'; }
 
-// إخفاء أثناء التمرير أو الضغط خارج الخط الزمني
-box.addEventListener('scroll', hideTip, { passive:true });
-document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hideTip(); }, { passive:true });
+    const lbl = document.createElementNS(svgNS,'text');
+    lbl.setAttribute('x',x); lbl.setAttribute('y',H-padB+26);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('font-size','10');
+    lbl.setAttribute('fill','#355');
+    lbl.textContent = new Date(t).toLocaleDateString('ar-EG');
+    svg.appendChild(lbl);
+   
+  } // 👈 مهم: قفل الحلقة هنا
 
+  // Tooltip — خارج أي حلقات
+  const tip = document.getElementById('tlTip');
+  function showTipAt(svgEl, x, y, title, details, dateStr){
+    if (!tip) return;
+    tip.style.display='block';
+    const svgRect  = svgEl.getBoundingClientRect();
+    const hostRect = box.closest('.timeline-card').getBoundingClientRect();
+    const sx = svgRect.left + (x / W) * svgRect.width;
+    const sy = svgRect.top  + (y / H) * svgRect.height;
+    tip.style.left = (sx - hostRect.left) + 'px';
+    tip.style.top  = (sy - hostRect.top  - 14) + 'px';
+    tip.innerHTML = `<b>${title||'—'}</b><div>${details||''}</div><div class="tl-date">${_fmtDate(dateStr)||''}</div>`;
+  }
+  function hideTip(){ if (tip) tip.style.display='none'; }
+  box.addEventListener('scroll', hideTip, { passive:true });
+  document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hideTip(); }, { passive:true });
 
-
-  // نقاط الأحداث
+  // النقاط فقط (لا نص فوقها)
   rows.forEach(({e,d})=>{
     const t = +new Date(d);
     const x = padL + ((t-minT)/(maxT-minT))*(W-padL-padR);
@@ -789,7 +790,7 @@ document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hi
     const tpe = evType(e);
     const color = _colorForType(tpe);
 
-    // ساق صغيرة
+    // ساق
     const stem = document.createElementNS(svgNS,'line');
     stem.setAttribute('x1',x); stem.setAttribute('x2',x);
     stem.setAttribute('y1',y-14); stem.setAttribute('y2',y+14);
@@ -797,68 +798,45 @@ document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hi
     stem.setAttribute('opacity','0.5');
     svg.appendChild(stem);
 
-    // نقطة
-// نقطة مرئية
-const dot = document.createElementNS(svgNS,'circle');
-dot.setAttribute('cx', x); dot.setAttribute('cy', y);
-dot.setAttribute('r', 6);                  // أكبر قليلًا لظهور أوضح
-dot.setAttribute('fill', color);
-dot.setAttribute('class', 'tl-dot');
-dot.setAttribute('tabindex','0');          // وصول بلوحة المفاتيح
-dot.setAttribute('role','button');
-dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
-svg.appendChild(dot);
+    // نقطة مرئية
+    const dot = document.createElementNS(svgNS,'circle');
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+    dot.setAttribute('r', 6);
+    dot.setAttribute('fill', color);
+    dot.setAttribute('class', 'tl-dot');
+    dot.setAttribute('tabindex','0');
+    dot.setAttribute('role','button');
+    dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
+    svg.appendChild(dot);
 
-// منطقة لمس غير مرئية (لتحسين النقر/اللمس على الموبايل)
-const hit = document.createElementNS(svgNS,'circle');
-hit.setAttribute('cx', x); hit.setAttribute('cy', y);
-hit.setAttribute('r', 16);                 // هدف لمس واسع
-hit.setAttribute('fill', 'transparent');
-hit.style.cursor = 'pointer';
-svg.appendChild(hit);
+    // منطقة لمس واسعة
+    const hit = document.createElementNS(svgNS,'circle');
+    hit.setAttribute('cx', x); hit.setAttribute('cy', y);
+    hit.setAttribute('r', 16);
+    hit.setAttribute('fill', 'transparent');
+    hit.style.cursor = 'pointer';
+    svg.appendChild(hit);
 
-const title   = eventNameRaw(e);
-const details = compactEventDetails(e);
-const dateStr = _fmtDate(d);
+    const title   = eventNameRaw(e);
+    const details = compactEventDetails(e);
+    const dateStr = d;
 
-const openTip  = ()=> showTipAt(svg, x, y, title, details, dateStr);
-const closeTip = hideTip;
+    const openTip  = ()=> showTipAt(svg, x, y, title, details, dateStr);
+    const closeTip = hideTip;
 
-// ماوس
-hit.addEventListener('mouseenter', openTip);
-hit.addEventListener('mouseleave', closeTip);
-
-// كليك
-hit.addEventListener('click', (ev)=>{ 
-  ev.stopPropagation(); 
-  openTip(); 
-  if (e.id) focusEventRow(e.id);               // 👈 قفز للصف
-});
-
-
-// لمس (إظهار سريع + إخفاء تلقائي)
-hit.addEventListener('touchstart', (ev)=>{ 
-  openTip(); 
-  if (e.id) focusEventRow(e.id);               // 👈 قفز للصف
-  clearTimeout(hit._to); 
-  hit._to = setTimeout(closeTip, 2200); 
-}, {passive:true});
-
-hit.addEventListener('touchend', closeTip,   { passive:true });
-hit.addEventListener('touchcancel', closeTip,{ passive:true });
-
-// لوحة المفاتيح
-dot.addEventListener('focus', openTip);
-dot.addEventListener('blur',  closeTip);
-dot.addEventListener('keydown', (ev)=>{ if (ev.key === 'Enter' || ev.key === ' ') openTip(); });
-
-    // لِيبِل صغير فوق أو تحت
-    const lbl = document.createElementNS(svgNS,'text');
-    lbl.setAttribute('x',x); lbl.setAttribute('y',y-18);
-    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('font-size','10');
-    lbl.setAttribute('fill','#134e35');
-    lbl.textContent = title;
-    svg.appendChild(lbl);
+    // ماوس
+    hit.addEventListener('mouseenter', openTip);
+    hit.addEventListener('mouseleave', closeTip);
+    // كليك
+    hit.addEventListener('click', (ev)=>{ ev.stopPropagation(); openTip(); if (e.id) focusEventRow(e.id); });
+    // لمس
+    hit.addEventListener('touchstart', ()=>{ openTip(); if (e.id) focusEventRow(e.id); clearTimeout(hit._to); hit._to=setTimeout(closeTip,2200); }, {passive:true});
+    hit.addEventListener('touchend', closeTip,   {passive:true});
+    hit.addEventListener('touchcancel', closeTip,{passive:true});
+    // لوحة مفاتيح
+    dot.addEventListener('focus', openTip);
+    dot.addEventListener('blur',  closeTip);
+    dot.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter' || ev.key===' ') openTip(); });
   });
 
   const scroller = document.createElement('div');
@@ -1244,6 +1222,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
