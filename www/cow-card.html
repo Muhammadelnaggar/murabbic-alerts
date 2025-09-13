@@ -115,6 +115,12 @@
   --tl-milk:#2e7d32; --tl-calving:#1b5e20; --tl-insem:#0d9488; --tl-preg:#a16207;
   --tl-heat:#ef6c00; --tl-dry:#6b7280; --tl-disease:#c62828; --tl-other:#4b5563;
 }
+/* إبراز صف الحدث عند القفز من التايم لاين */
+.ev-row--focus{
+  outline:2px solid #2e7d32;
+  background:#f1faee !important;
+  transition: background .4s ease;
+}
 
   </style>
 </head>
@@ -760,18 +766,27 @@ function renderTimeline(events, state){
   }
 
   // Tooltip
-  const tip = document.getElementById('tlTip');
-  function showTip(x, y, title, details, dateStr){
-    if (!tip) return;
-    tip.style.display='block';
-    // تموضع داخل البطاقة
-    const host = box.closest('.timeline-card');
-    const hostRect = host.getBoundingClientRect();
-    tip.style.left = (x - hostRect.left) + 'px';
-    tip.style.top  = (y - hostRect.top - 14) + 'px';
-    tip.innerHTML = `<b>${title||'—'}</b><div>${details||''}</div><div class="tl-date">${dateStr||''}</div>`;
-  }
-  function hideTip(){ if(tip) tip.style.display='none'; }
+// Tooltip
+// Tooltip (جديد) — تموضع دقيق + إخفاء أثناء السحب وخارج التايملاين
+const tip = document.getElementById('tlTip');
+function showTipAt(svg, x, y, title, details, dateStr){
+  if (!tip) return;
+  tip.style.display='block';
+  const svgRect  = svg.getBoundingClientRect();
+  const hostRect = box.closest('.timeline-card').getBoundingClientRect();
+  const sx = svgRect.left + (x / W) * svgRect.width;
+  const sy = svgRect.top  + (y / H) * svgRect.height;
+  tip.style.left = (sx - hostRect.left) + 'px';
+  tip.style.top  = (sy - hostRect.top  - 14) + 'px';
+  tip.innerHTML = `<b>${title||'—'}</b><div>${details||''}</div><div class="tl-date">${dateStr||''}</div>`;
+}
+function hideTip(){ if (tip) tip.style.display='none'; }
+
+// إخفاء أثناء التمرير أو الضغط خارج الخط الزمني
+box.addEventListener('scroll', hideTip, { passive:true });
+document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hideTip(); }, { passive:true });
+
+
 
   // نقاط الأحداث
   rows.forEach(({e,d})=>{
@@ -791,37 +806,59 @@ function renderTimeline(events, state){
     svg.appendChild(stem);
 
     // نقطة
-    const dot = document.createElementNS(svgNS,'circle');
-    dot.setAttribute('cx',x); dot.setAttribute('cy',y);
-    dot.setAttribute('r',5); dot.setAttribute('fill',color);
-    dot.setAttribute('class','tl-dot');
-    dot.setAttribute('tabindex','0');
-    dot.setAttribute('role','button');
-    dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
+// نقطة مرئية
+const dot = document.createElementNS(svgNS,'circle');
+dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+dot.setAttribute('r', 6);                  // أكبر قليلًا لظهور أوضح
+dot.setAttribute('fill', color);
+dot.setAttribute('class', 'tl-dot');
+dot.setAttribute('tabindex','0');          // وصول بلوحة المفاتيح
+dot.setAttribute('role','button');
+dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
+svg.appendChild(dot);
 
-    const title = eventNameRaw(e);
-    const details = compactEventDetails(e);
-    const dateStr = _fmtDate(d);
+// منطقة لمس غير مرئية (لتحسين النقر/اللمس على الموبايل)
+const hit = document.createElementNS(svgNS,'circle');
+hit.setAttribute('cx', x); hit.setAttribute('cy', y);
+hit.setAttribute('r', 16);                 // هدف لمس واسع
+hit.setAttribute('fill', 'transparent');
+hit.style.cursor = 'pointer';
+svg.appendChild(hit);
 
-    const show = (evt)=>{
-      // إحداثي النسبي داخل البطاقة لتموضع الـtooltip
-      const rect = svg.getBoundingClientRect();
-      const sx = rect.left + (x/W)*rect.width;
-      const sy = rect.top + (y/H)*rect.height;
-      showTip(sx, sy, title, details, dateStr);
-      // على الموبايل: اخفاء بعد 2.5 ثانية
-      if (matchMedia('(pointer:coarse)').matches){
-        clearTimeout(dot._to); dot._to = setTimeout(hideTip, 2500);
-      }
-    };
+const title   = eventNameRaw(e);
+const details = compactEventDetails(e);
+const dateStr = _fmtDate(d);
 
-    dot.addEventListener('mouseenter', show);
-    dot.addEventListener('focus', show);
-    dot.addEventListener('click', show);
-    dot.addEventListener('mouseleave', hideTip);
-    dot.addEventListener('blur', hideTip);
+const openTip  = ()=> showTipAt(svg, x, y, title, details, dateStr);
+const closeTip = hideTip;
 
-    svg.appendChild(dot);
+// ماوس
+hit.addEventListener('mouseenter', openTip);
+hit.addEventListener('mouseleave', closeTip);
+
+// كليك
+hit.addEventListener('click', (ev)=>{ 
+  ev.stopPropagation(); 
+  openTip(); 
+  if (e.id) focusEventRow(e.id);               // 👈 قفز للصف
+});
+
+
+// لمس (إظهار سريع + إخفاء تلقائي)
+hit.addEventListener('touchstart', (ev)=>{ 
+  openTip(); 
+  if (e.id) focusEventRow(e.id);               // 👈 قفز للصف
+  clearTimeout(hit._to); 
+  hit._to = setTimeout(closeTip, 2200); 
+}, {passive:true});
+
+hit.addEventListener('touchend', closeTip,   { passive:true });
+hit.addEventListener('touchcancel', closeTip,{ passive:true });
+
+// لوحة المفاتيح
+dot.addEventListener('focus', openTip);
+dot.addEventListener('blur',  closeTip);
+dot.addEventListener('keydown', (ev)=>{ if (ev.key === 'Enter' || ev.key === ' ') openTip(); });
 
     // لِيبِل صغير فوق أو تحت
     const lbl = document.createElementNS(svgNS,'text');
@@ -1055,17 +1092,42 @@ function renderEventsList(events){
     .sort((a,b) => (b.d||'').localeCompare(a.d||''));
 
   for (const {e, d} of rows){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
-      <td class="ev-type">${ eventNameRaw(e) }</td>
-    `;
-    tbody.appendChild(tr);
-  }
+  const tr = document.createElement('tr');
+  tr.id = e.id ? `evrow-${e.id}` : '';       // 👈 معرّف الصف
+  tr.setAttribute('aria-selected','false');   // وصولية
+
+  tr.innerHTML = `
+    <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
+    <td class="ev-type">${ eventNameRaw(e) }</td>
+  `;
+  tbody.appendChild(tr);
+}
+
 
   wrap.appendChild(table);
   box.appendChild(wrap);
   requestAnimationFrame(scheduleFit);
+}
+function focusEventRow(evId){
+  if (!evId) return;
+  const row = document.getElementById(`evrow-${evId}`);
+  if (!row) return;
+
+  // حدّد الوعاء القابل للتمرير
+  const scroller = document.querySelector('#evList .ev-scroll') || row.closest('.ev-scroll') || document;
+  // شيل الهايلايت القديم
+  const old = scroller.querySelector('.ev-row--focus');
+  if (old) old.classList.remove('ev-row--focus');
+
+  // هايلايت + تمرير ناعم
+  row.classList.add('ev-row--focus');
+  row.setAttribute('aria-selected','true');
+  const top = row.offsetTop - (scroller.clientHeight/2 - row.clientHeight/2);
+  scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+
+  // إزالة الهايلايت بعد شوية (اختياري)
+  clearTimeout(row._hlTO);
+  row._hlTO = setTimeout(()=>{ row.classList.remove('ev-row--focus'); }, 2500);
 }
 
 
@@ -1190,6 +1252,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
