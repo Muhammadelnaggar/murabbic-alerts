@@ -5,136 +5,110 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Murabbik – بطاقة الحيوان</title>
   <style>
-/* ألوان نقاط الليجند للجوج */
+    /* ألوان نقاط الليجند للجوج */
 .legend .leg:nth-child(1) .dot{background:#ef5350}
 .legend .leg:nth-child(2) .dot{background:#ffb74d}
 .legend .leg:nth-child(3) .dot{background:#fff176}
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
-/* === جدول الأحداث: صفّ واحد ظاهر + تمرير للباقي === */
-.ev-scroll{ height:auto !important; max-height:none !important; }     /* لا نخنق التمرير هنا */
-.ev-scroll.single-row{
-  overflow:auto !important;                      /* تمرير واضح */
-  -webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain;
-}
-/* أول صف مفتوح بالكامل حتى على الموبايل */
-.ev-scroll.single-row .ev-row--open .ev-note{
-  -webkit-line-clamp:unset !important;
-  white-space:normal !important;
-}
-.ev-scroll.single-row .ev-more{ display:none !important; }
+/* جدول الأحداث القابل للتمرير */
+.ev-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+.ev-table{width:100%;border-collapse:separate;border-spacing:0}
+.ev-table th,.ev-table td{padding:10px;border-bottom:1px solid var(--border);font:13px system-ui;vertical-align:top}
+.ev-table thead th{position:sticky;top:0;background:#f8fff5;z-index:1;text-align:right}
+.ev-table tr:hover td{background:#f7fff2}
+.ev-date{white-space:nowrap;color:#0f5132;font-weight:700}
+.ev-type{color:#14532d;font-weight:800}
+.ev-note{color:#355}
 
-/* جدول الأحداث */
-.ev-table{ width:100%; border-collapse:separate; border-spacing:0; }
-.ev-table thead th{
-  position:sticky; top:0; z-index:1;
-  background:#f8fff5; text-align:right;
-  border-bottom:1px solid var(--border);
-}
-.ev-table th,.ev-table td{
-  padding:10px; border-bottom:1px solid var(--border);
-  font:13px/1.5 system-ui; vertical-align:top;
-}
-.ev-table tr:hover td{ background:#f7fff2; }
-.ev-date{ white-space:nowrap; color:#0f5132; font-weight:800; }
-.ev-type{ color:#14532d; font-weight:800; }
-.ev-note{ color:#355; }
-.ev-more{ display:none; }  /* ديسكتوب */
+    :root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--ink);padding:18px}
+    .wrap{max-width:980px;margin:0 auto}
+    .openbar{display:flex;gap:8px;align-items:center;justify-content:center;margin:0 0 12px;flex-wrap:wrap}
+    .openbar small{opacity:.8}
+    .openbar input{width:160px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
+    .openbar button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#e8f5e9;color:#1b5e20;font-weight:700;cursor:pointer}
+    .kind-badge{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fcfff8;font-weight:700}
+    .title{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+    .title h1{margin:0;font-size:clamp(18px,4.6vw,28px);color:#14532d}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
+    .chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
+    .chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
+    .chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
+    .chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
 
-/* موبايل */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .card h3{margin:0 0 10px;color:#17623b;font-size:18px}
+
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    @media (max-width:560px){.grid{grid-template-columns:1fr}}
+    .fi{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
+    .fi span{color:#2b593a;font-size:13px}
+    .fi b{color:#0f5132;direction:ltr;unicode-bidi:plaintext;font-variant-numeric:tabular-nums;word-break:break-word}
+
+    .milk-gauge-box{width:min(360px,92vw);aspect-ratio:2/1;position:relative;margin:8px auto;display:grid;place-items:center}
+    .milk-gauge-box svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .milk-gauge-box svg *{vector-effect:non-scaling-stroke;shape-rendering:geometricPrecision}
+    .milk-gauge-box .val{position:absolute;bottom:8%;inset-inline:0;text-align:center;font-weight:800;color:#065f46;font-size:clamp(14px,4vw,18px)}
+    .legend{display:flex;gap:10px;justify-content:center;font-size:12px;color:#355}
+    .leg{display:inline-flex;align-items:center;gap:6px}
+    .dot{width:10px;height:10px;border-radius:50%}
+
+    .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 10px}
+    @media (max-width:560px){.kpi3{grid-template-columns:1fr}}
+    .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center}
+    .kpi .lbl{font-size:12px;color:#2b593a}
+    .kpi .val{font-weight:800;color:#14532d;font-size:clamp(16px,4.6vw,20px)}
+
+    .chart-scroll{overflow-x:auto;overflow-y:hidden;border:1px dashed #c5e1a5;border-radius:12px;background:#fff}
+    .prod-chart{display:block;height:240px}
+    @media (max-width:560px){.prod-chart{height:200px}}
+    .hint{font-size:12px;color:#456;margin-top:6px;text-align:center}
+
+    .hl{display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center}
+    .hl.head{font-weight:700;color:#0f5132}
+    .hl>div{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:8px}
+    @media (max-width:560px){.hl{grid-template-columns:100px 1fr}}
+    @media (max-width:560px){.hl .note{grid-column:1 / -1}}
+
+    .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
+    /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
 @media (max-width:560px){
-  .ev-scroll.single-row{ max-height:none !important; }
-  .ev-table{ table-layout: fixed; }
-  .ev-table th,.ev-table td{ padding:8px; font-size:12px; line-height:1.35; }
-  .ev-date,.ev-type{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ev-scroll{ overflow:auto; }               /* التمرير داخل الصندوق */
+  .ev-table{ table-layout: fixed; }          /* ثبات أعمدة وellipsis */
+  .ev-table thead th{ position: sticky; top: 0; z-index:1; }
+
+  /* صفوف خفيفة */
+  .ev-table th, .ev-table td{ padding:6px 8px; font-size:12px; line-height:1.2; }
+
+  /* قصّ النص لسطـر واحد عشان ما يطوّلش ارتفاع الصف */
+  .ev-type, .ev-note, .ev-date{
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .ev-note{
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;      /* سطر واحد فقط */
+    -webkit-box-orient: vertical;
   }
-  tr.ev-row--open .ev-note{
-    -webkit-line-clamp:unset;
-    white-space:normal;
-  }
-  .ev-more{
-    display:inline-block;
-    margin-top:6px;
-    font:12px/1 system-ui;
-    color:#1b5e20;
-    border:0; background:transparent; padding:0; cursor:pointer;
-  }
-  tr.ev-row--open .ev-more{ display:none; }
 }
-
-:root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--ink);padding:18px}
-.wrap{max-width:980px;margin:0 auto}
-.openbar{display:flex;gap:8px;align-items:center;justify-content:center;margin:0 0 12px;flex-wrap:wrap}
-.openbar small{opacity:.8}
-.openbar input{width:160px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
-.openbar button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#e8f5e9;color:#1b5e20;font-weight:700;cursor:pointer}
-.kind-badge{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fcfff8;font-weight:700}
-.title{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
-.title h1{margin:0;font-size:clamp(18px,4.6vw,28px);color:#14532d}
-.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
-.chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
-.chip[data-variant="warn"]{background:#fff8e1;border-color:#ffe0b2;color:#7a4f00}
-.chip[data-variant="danger"]{background:#ffebee;border-color:#ffcdd2;color:#7f1d1d}
-.chip-repro::before{content:"🍼 ";} .chip-prod::before{content:"📈 ";} .chip-health::before{content:"🩺 ";}
-
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.card h3{margin:0 0 10px;color:#17623b;font-size:18px}
-
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-@media (max-width:560px){.grid{grid-template-columns:1fr}}
-.fi{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
-.fi span{color:#2b593a;font-size:13px}
-.fi b{color:#0f5132;direction:ltr;unicode-bidi:plaintext;font-variant-numeric:tabular-nums;word-break:break-word}
-
-.milk-gauge-box{width:min(360px,92vw);aspect-ratio:2/1;position:relative;margin:8px auto;display:grid;place-items:center}
-.milk-gauge-box svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.milk-gauge-box svg *{vector-effect:non-scaling-stroke;shape-rendering:geometricPrecision}
-.milk-gauge-box .val{position:absolute;bottom:8%;inset-inline:0;text-align:center;font-weight:800;color:#065f46;font-size:clamp(14px,4vw,18px)}
-.legend{display:flex;gap:10px;justify-content:center;font-size:12px;color:#355}
-.leg{display:inline-flex;align-items:center;gap:6px}
-.dot{width:10px;height:10px;border-radius:50%}
-
-.kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 10px}
-@media (max-width:560px){.kpi3{grid-template-columns:1fr}}
-.kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center}
-.kpi .lbl{font-size:12px;color:#2b593a}
-.kpi .val{font-weight:800;color:#14532d;font-size:clamp(16px,4.6vw,20px)}
-
-.chart-scroll{overflow-x:auto;overflow-y:hidden;border:1px dashed #c5e1a5;border-radius:12px;background:#fff}
-.prod-chart{display:block;height:240px}
-@media (max-width:560px){.prod-chart{height:200px}}
-.hint{font-size:12px;color:#456;margin-top:6px;text-align:center}
-
-.hl{display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center}
-.hl.head{font-weight:700;color:#0f5132}
-.hl>div{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:8px}
-@media (max-width:560px){.hl{grid-template-columns:100px 1fr}}
-@media (max-width:560px){.hl .note{grid-column:1 / -1}}
-
-.notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
-
 /* === Timeline (أحداث الحيوان) === */
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
-.tl-svg{display:block; height:120px;}
+.tl-svg{display:block; height:120px; /* يتكيّف أفقيًا */ }
+/* اخفاء الليجند تمامًا */
 .tl-legend{display:none}
+
 .tl-legend .leg{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#fcfff8}
 .tl-dot{cursor:pointer}
 .tl-tooltip{
-  position:absolute;
+  position:absolute; /* لا تستخدم inset هنا */
   transform:translate(-50%,-8px);
   background:#0b3d2a; color:#fff; border-radius:8px; padding:8px 10px; font:12px/1.4 system-ui;
   box-shadow:0 6px 18px rgba(0,0,0,.18); pointer-events:none; z-index:50; display:none; max-width:min(80vw,320px)
 }
+
 .tl-tooltip b{display:block; font-weight:800; margin-bottom:4px}
 .tl-date{opacity:.9; font-variant-numeric:tabular-nums}
 
@@ -143,24 +117,11 @@ body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,
   --tl-milk:#2e7d32; --tl-calving:#1b5e20; --tl-insem:#0d9488; --tl-preg:#a16207;
   --tl-heat:#ef6c00; --tl-dry:#6b7280; --tl-disease:#c62828; --tl-other:#4b5563;
 }
-/* إبراز صف الحدث عند القفز من التايملاين (لن نستخدم القفز الآن) */
+/* إبراز صف الحدث عند القفز من التايم لاين */
 .ev-row--focus{
   outline:2px solid #2e7d32;
   background:#f1faee !important;
   transition: background .4s ease;
-}
-    /* يمنع قصّ الحروف العربية داخل خلايا الجدول */
-.ev-table th, .ev-table td{
-  padding:12px 10px;
-  border-bottom:1px solid var(--border);
-  font:14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-  vertical-align:top;
-  overflow:visible;           /* مهم لمنع القصّ */
-}
-
-/* على الموبايل كمان نزود الارتفاع شوية */
-@media (max-width:560px){
-  .ev-table th, .ev-table td{ padding:10px 8px; font-size:13px; line-height:1.55; }
 }
 
   </style>
@@ -183,25 +144,27 @@ body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,
       </div>
     </div>
 
-    <section class="card" aria-label="المعلومات الأساسية">
-      <h3>المعلومات الأساسية</h3>
-      <div class="grid" id="basicInfo">
-        <div class="fi"><span>تاريخ الميلاد</span><b id="fiBirth">—</b></div>
-        <div class="fi"><span>تاريخ آخر ولادة</span><b id="fiLastCalving">—</b></div>
-        <div class="fi"><span>رقم موسم الحليب</span><b id="fiLactNo">—</b></div>
-        <div class="fi"><span>عدد أيام الحليب DIM</span><b id="fiDIM">—</b></div>
-        <div class="fi"><span>عمر الحمل (يوم)</span><b id="fiGestAge">—</b></div>
-        <div class="fi"><span>السلالة</span><b id="fiBreed">—</b></div>
-        <div class="fi"><span>المجموعة</span><b id="fiGroup">—</b></div>
-      </div>
-    </section>
+   <section class="card" aria-label="المعلومات الأساسية">
+  <h3>المعلومات الأساسية</h3>
+  <div class="grid" id="basicInfo">
+    <div class="fi"><span>تاريخ الميلاد</span><b id="fiBirth">—</b></div>
+    <div class="fi"><span>تاريخ آخر ولادة</span><b id="fiLastCalving">—</b></div>
+    <div class="fi"><span>رقم موسم الحليب</span><b id="fiLactNo">—</b></div>
+    <div class="fi"><span>عدد أيام الحليب DIM</span><b id="fiDIM">—</b></div>
+    <div class="fi"><span>عمر الحمل (يوم)</span><b id="fiGestAge">—</b></div>
+    <div class="fi"><span>السلالة</span><b id="fiBreed">—</b></div>
+    <div class="fi"><span>المجموعة</span><b id="fiGroup">—</b></div>
+  </div>
+</section>
 
-    <section class="card timeline-card" aria-label="الخط الزمني للأحداث">
-      <h3>الخط الزمني</h3>
-      <div class="tl-wrap" id="timelineBox"></div>
-      <div class="tl-tooltip" id="tlTip" role="status" aria-live="polite"></div>
-      <div class="hint">اسحب أفقياً للتنقل — اضغط/المس النقاط لعرض تفاصيل الحدث.</div>
-    </section>
+<section class="card timeline-card" aria-label="الخط الزمني للأحداث">
+  <h3>الخط الزمني</h3>
+  <div class="tl-wrap" id="timelineBox">
+    </div> <!-- يُرسم SVG هنا -->
+ 
+  <div class="tl-tooltip" id="tlTip" role="status" aria-live="polite"></div>
+  <div class="hint">اسحب أفقياً للتنقل — اضغط/المس النقاط لعرض تفاصيل الحدث.</div>
+</section>
 
     <section class="card" aria-label="تقييم سمات اللبن">
       <h3>تقييم سمات اللبن</h3>
@@ -256,27 +219,28 @@ body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,
         <div class="fi"><span>آخر فحص</span><b id="fiLastCheck">—</b></div>
       </div>
       <div style="margin-top:10px">
+      
         <div id="healthList"></div>
       </div>
     </section>
 
-    <!-- جميع الأحداث المسجّلة -->
-    <section class="card" aria-label="الأحداث المسجّلة">
-      <h3>الأحداث المسجّلة</h3>
-      <div id="evList"></div>
-    </section>
-  </div>
+    
+    <!-- جديد: جميع الأحداث المسجّلة -->
+ <section class="card" aria-label="الأحداث المسجّلة">
+  <h3>الأحداث المسجّلة</h3>
+  <div id="evList"></div>
+</section>
+</div> 
 
   <script type="module">
 /* ======================= Firebase ======================= */
 const fb = await import('/js/firebase-config.js');
 if (fb.ensureAuth) await fb.ensureAuth();
 const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-const DB = fb.db || fs.getFirestore();
+const DB = fb.db || fs.getFirestore(); // يفترض أن fb.db = getFirestore(app,'murabbikdata')
 const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
 const userNow = fb?.auth?.currentUser || null;
 const UID = userNow?.uid ?? null;
-
 // ثوابت أسماء الحقول
 const ANIM_OWNER_FIELD = 'ownerUid'; // في animals
 const EVENT_USER_FIELD = 'userId';   // في events
@@ -289,6 +253,7 @@ const evDate = (e={}) =>
   (e.createdAt?.toDate?.()?.toISOString?.().slice(0,10)) ||
   (e.createdAt instanceof Date ? e.createdAt.toISOString().slice(0,10) : null);
 
+// هنا؟
 /* ======================= Helpers ======================= */
 const $=(id)=>document.getElementById(id);
 const put=(id,v)=>{const n=$(id); if(n) n.textContent=(v ?? '—');};
@@ -297,57 +262,37 @@ const NF = new Intl.NumberFormat('ar-EG');
 const todayStr = new Date().toISOString().slice(0,10);
 const url = new URL(location.href);
 const openbar=$('openbar'), openInput=$('openNumber'), openBtn=$('openBtn'), kindValEl=$('kindVal');
-
+// يقرأ أي قيمة نسبة مئوية (80 أو "80%") ويقفلها بين 0..100
+// يقرأ أي قيمة نسبة مئوية (80 أو "80%" أو 0.78) ويقفلها 0..100
 const toPercent = (v)=>{
   if (v == null) return 0;
   let n = (typeof v === 'string')
-    ? parseFloat(v.replace(/[^\d.-]+/g,''))
+    ? parseFloat(v.replace(/[^\d.-]+/g,''))   // يشيل أي رموز غير أرقام/علامة عشرية
     : Number(v);
+
   if (!Number.isFinite(n)) return 0;
-  if (typeof v === 'string' && v.includes('%')) {/* as-is */}
-  else if (n >= 0 && n <= 1) n *= 100;
+
+  // لو مكتوبة كسلسلة وفيها % نسيبها كما هي، غير كده لو الرقم بين 0 و1 نعتبره كسري ونحوّله لمية
+  if (typeof v === 'string' && v.includes('%')) {
+    // n كما هو
+  } else if (n >= 0 && n <= 1) {
+    n = n * 100;
+  }
+
   return Math.max(0, Math.min(100, Math.round(n)));
 };
 
-/* ======================= أسماء الأحداث = أسماء الصفحات بالعربي ======================= */
-function _pick(e, keys){
-  for (const k of keys){
-    const v = e?.[k];
-    if (v != null && String(v).trim() !== '') return String(v).trim();
+
+// يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
+function eventNameRaw(e = {}){
+  const CANDS = ['name','title','eventName','type','eventType','kind','category','diagnosis'];
+  for (const k of CANDS){
+    const v = e[k];
+    if (v != null && String(v).trim() !== '') return String(v);
   }
-  return null;
-}function eventLabel(e = {}) {
-  const pick = (obj, keys)=>{ for(const k of keys){ const v=obj?.[k]; if(v!=null && String(v).trim()!=='') return String(v).trim(); } return null; };
-
-  // مفاتيح عربية شائعة
-  const ar = pick(e, [
-    'اسم_الحدث','اسم','عنوان','العنوان','عنوان_الصفحة',
-    'pageTitleAr','page_name_ar','page_ar','eventNameAr',
-    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص'
-  ]);
-  if (ar) return ar;
-
-  // لو في اسم عام بأي لغة نعرضه كما هو (بس منغيروش لـ "حدث")
-  const nameAny = pick(e, ['name','title','eventName','label']);
-  if (nameAny) return nameAny;
-
-  // ترجمة للأنواع المعروفة فقط
-  const page = (pick(e,['page','pageName','page_title','screen'])||'').toLowerCase();
-  const type = (pick(e,['type','eventType'])||'').toLowerCase();
-  const MAP = {
-    'milking_traits':'تقييم سمات اللبن','insemination':'تلقيح','pregnancy':'تشخيص حمل',
-    'pregnancy_diagnosis':'تشخيص حمل','calving':'ولادة','dry_off':'تجفيف',
-    'heat':'شياع','lameness':'عرج','mastitis':'التهاب الضرع','closeup':'قرب الولادة'
-  };
-  const key = (page || type).replace(/\s+/g,'_');
-  if (MAP[key]) return MAP[key];
-
-  // لو مش عارفين نص عربي واضح، ما نحطّش "حدث" — نخليها شرطة
   return '—';
 }
 
-  // 4) ترجمة نوع الحدث fallback
- 
 
 const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
   if(/^(cow|بقر|بقرة)$/.test(s)) return 'cow';
@@ -357,10 +302,10 @@ const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
 const kindNameAr=(k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
 const kindTitleAr=(k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
 
-function isDryKeyword(s=''){s=String(s).toLowerCase().trim();return /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i.test(s);} 
+function isDryKeyword(s=''){s=String(s).toLowerCase().trim();return /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i.test(s);}
 function normProdStatus(v){if(v==null) return null; return isDryKeyword(v)?'جاف':String(v).trim();}
 
-function isPregKeyword(s=''){s=String(s).toLowerCase().trim();return /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i.test(s);} 
+function isPregKeyword(s=''){s=String(s).toLowerCase().trim();return /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i.test(s);}
 function normReproStatus(v){if(v==null) return null; return isPregKeyword(v)?'عِشار':String(v).trim();}
 
 // يحوّل أي Timestamp/Maps إلى JSON بسيط
@@ -375,6 +320,8 @@ function normalizeAnimalDoc(d = {}){
   const x = plainify(d);
   const normalized = {
     id: x.id,
+
+    // أساسي
     number: x.number ?? x.animalNumber ?? x.no ?? x['رقم'] ?? null,
     kind: normKind(x.animalType ?? x.kind ?? x.type ?? x['النوع'] ?? x['الفصيلة'] ?? x.animalTypeAr),
     birthDate: x.birthDate ?? x.birth_date ?? x.dob ?? x['تاريخ الميلاد'] ?? null,
@@ -383,6 +330,7 @@ function normalizeAnimalDoc(d = {}){
     breed: x.breed ?? x.breedName ?? x['السلالة'] ?? null,
     group: x.group ?? x['المجموعة'] ?? null,
 
+    // تناسلي
     pregnancyDate: x.pregnancyDate ?? x.pregnantFrom ?? x['تاريخ الحمل'] ?? null,
     reproductiveStatus: normReproStatus(x.reproductiveStatus ?? x['الحالة التناسلية'] ?? x.reproStatus ?? x.statusRepro) ?? null,
     lastInseminationDate: x.lastInseminationDate ?? x.lastServiceDate ?? x['تاريخ آخر تلقيح'] ?? null,
@@ -391,15 +339,18 @@ function normalizeAnimalDoc(d = {}){
     serviceIntervalDays: x.serviceIntervalDays ?? x.serviceInterval ?? x['معدل الأيام بين التلقيح'] ?? null,
     heatIntervalDays: x.heatIntervalDays ?? x.heatInterval ?? x['الأيام بين الشياع'] ?? null,
 
+    // إنتاج
     productionStatus: normProdStatus(x.productionStatus ?? x['حالة الإنتاج'] ?? x.prodStatus ?? x.status) ?? null,
     milkTodayKg:   x.milkTodayKg   ?? x.todayMilk   ?? x.dailyMilk   ?? x.daily_milk   ?? x['إنتاج اليوم']   ?? null,
-    seasonTotalKg: x.seasonTotalKg ?? x.milkSeason  ?? x['إنتاج الموسم']  ?? null,
-    m305Kg:        x.m305Kg        ?? x.milk305     ?? x['إنتاج 305 يوم'] ?? null,
+    seasonTotalKg: x.seasonTotalKg ?? x.milkSeason     ?? x['إنتاج الموسم']  ?? null,
+    m305Kg:        x.m305Kg        ?? x.milk305        ?? x['إنتاج 305 يوم'] ?? null,
 
+    // صحة
     healthStatus:  x.healthStatus  ?? x['الحالة الصحية'] ?? 'سليم',
     lastCheckDate: x.lastCheckDate ?? x.healthCheckDate  ?? x['آخر فحص'] ?? null,
 
-    milkTraitsScore: toPercent(x.milkTraitsScore ?? x.milk_score ?? 0),
+    // أخرى
+   milkTraitsScore: toPercent(x.milkTraitsScore ?? x.milk_score ?? 0),
     ovsynch: x.ovsynch ?? null,
   };
   return { ...x, ...normalized };
@@ -415,9 +366,11 @@ const TYPE_RULES = [
   ['disease', /(mastitis|lameness|disease|ill|مرض|التهاب|عرج)/i],
 ];
 
+// مفاتيح أجزاء الحلب (AM/PM... إلخ)
 const MILK_PART_KEY =
   /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
 
+// مفاتيح القيم المباشرة لإنتاج اللبن (تشمل dailyMilk)
 const MILK_DIRECT_KEYS = ['dailyMilk','daily_milk','milkKg','total','kg','milk','amount'];
 
 const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -425,94 +378,26 @@ const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 const evType = (e = {}) => {
   const s = String(e.type ?? e.eventType ?? e.event ?? e.name ?? e.kind ?? e.category ?? '').toLowerCase();
   for (const [T, rx] of TYPE_RULES) if (rx.test(s)) return T;
+
+  // Fallback: لو فيه أي قيمة لبن مباشرة أو أجزاء لبن، اعتبره milk
   if (MILK_DIRECT_KEYS.some(k => toNum(e[k]) > 0)) return 'milk';
   for (const [k, v] of Object.entries(e)) if (MILK_PART_KEY.test(k) && toNum(v) > 0) return 'milk';
+
   return 'other';
 };
 
 function evMilkKg(e = {}) {
+  // أولاً: أي قيمة مباشرة (تشمل dailyMilk)
   for (const k of MILK_DIRECT_KEYS) {
     const n = toNum(e[k]);
     if (n > 0) return n;
   }
+  // ثانياً: نجمع أجزاء AM/PM/… إن وُجدت
   let sum = 0;
   for (const [k, v] of Object.entries(e)) if (MILK_PART_KEY.test(k)) sum += toNum(v);
   return sum;
 }
 
-/* صف واحد للأحداث: قياس ذكي + مراقبة تغيّر المقاس */
-function activateSingleRowScroll(){
-  const wrap  = document.querySelector('#evList .ev-scroll');
-  const table = wrap?.querySelector('table');
-  const head  = table?.tHead || null;
-  const body  = table?.tBodies?.[0] || null;
-  const first = body?.rows?.[0] || null;
-  if(!wrap || !table || !first) return;
-
-  wrap.classList.add('single-row');
-  first.classList.add('ev-row--open');
-
-  const measure = ()=>{
-    const hHead = Math.ceil(head?.getBoundingClientRect().height || 0);
-    const hRow  = Math.ceil(first.getBoundingClientRect().height || 0);
-    if (hRow < 8) { setTimeout(measure, 40); return; }   // انتظر حتى يرسم الصف
-    wrap.style.maxHeight = (hHead + hRow + 2) + 'px';    // +2 للحدود
-  };
-
-  const ro = new ResizeObserver(measure);
-  ro.observe(first);
-  if (head) ro.observe(head);
-  ro.observe(wrap);
-
-  const mo = new MutationObserver(measure);
-  mo.observe(body, {childList:true, subtree:true, characterData:true});
-
-  measure();
-  window.addEventListener('resize', measure);
-  window.addEventListener('orientationchange', measure);
-
-
-}
-    
-function enableRowByRowScroll(){
-  const wrap  = document.querySelector('#evList .ev-scroll');
-  const table = wrap?.querySelector('table');
-  const body  = table?.tBodies?.[0];
-  const first = body?.rows?.[0];
-  if(!wrap || !body || !first) return;
-   wrap.setAttribute('tabindex','0');               // يخلي العنصر قابل للتركيز
-  wrap.setAttribute('aria-label','قائمة الأحداث'); // (اختياري) لتحسين الإتاحة
-
-
-  let rowH = ()=> Math.ceil(first.getBoundingClientRect().height || 0) || 44;
-
-  // عجلة الماوس = صف واحد لكل حركة
-  wrap.addEventListener('wheel', (ev)=>{
-    if (!wrap.classList.contains('single-row')) return;
-    ev.preventDefault();
-    const step = rowH();
-    wrap.scrollTop += (ev.deltaY > 0 ? +step : -step);
-  }, {passive:false});
-
-  // أسهم لوحة المفاتيح
-  wrap.addEventListener('keydown', (ev)=>{
-    if (ev.key==='ArrowDown' || ev.key==='PageDown'){ ev.preventDefault(); wrap.scrollTop += rowH(); }
-    if (ev.key==='ArrowUp'   || ev.key==='PageUp'  ){ ev.preventDefault(); wrap.scrollTop -= rowH(); }
-  });
-
-  // لمسة واحدة = سوايب صف واحد (تقريبياً)
-  let startY=null;
-  wrap.addEventListener('touchstart', e=>{ startY = e.touches?.[0]?.clientY ?? null; }, {passive:true});
-  wrap.addEventListener('touchend',   e=>{
-    if(startY==null) return;
-    const endY = e.changedTouches?.[0]?.clientY ?? startY;
-    const dy = startY - endY;
-    if (Math.abs(dy) > 20){
-      wrap.scrollTop += (dy>0 ? +rowH() : -rowH());
-    }
-    startY = null;
-  }, {passive:true});
-}
 
 /* ======================= Firestore ======================= */
 async function fetchAnimalByNumber(n){
@@ -521,6 +406,7 @@ async function fetchAnimalByNumber(n){
   const nNum = Number(nStr);
   const A = collection(DB, 'animals');
 
+  // doc(id = الرقم كنص)
   try {
     const d = await getDoc(doc(DB, 'animals', nStr));
     if (d.exists()) {
@@ -531,6 +417,7 @@ async function fetchAnimalByNumber(n){
     }
   } catch {}
 
+  // animalNumber = Number
   if (Number.isFinite(nNum)) {
     try {
       const q1 = UID
@@ -541,6 +428,7 @@ async function fetchAnimalByNumber(n){
     } catch {}
   }
 
+  // animalNumber = String
   try {
     const q2 = UID
       ? query(A, where(ANIM_OWNER_FIELD,'==',UID), where('animalNumber','==',nStr), limit(1))
@@ -551,6 +439,7 @@ async function fetchAnimalByNumber(n){
 
   return null;
 }
+
 
 async function fetchAnimal({ number, animalId } = {}) {
   if (animalId) {
@@ -566,12 +455,12 @@ async function fetchAnimal({ number, animalId } = {}) {
   if (a) return a;
   throw new Error('لا يوجد حيوان مطابق');
 }
-
 async function fetchEvents(animal){
   const E = collection(DB, 'events');
   const rows = [];
 
   try {
+    // حسب معرف وثيقة الحيوان
     if (animal.id) {
       const qById = UID
         ? query(E, where('animalId','==', String(animal.id)), where(EVENT_USER_FIELD,'==',UID))
@@ -580,6 +469,7 @@ async function fetchEvents(animal){
       sById.forEach(d => rows.push({ id:d.id, ...d.data() }));
     }
 
+    // حسب رقم الحيوان (سلسلة ورقم)
     if (animal.number != null) {
       const nStr = String(animal.number);
       const nNum = Number(nStr);
@@ -603,6 +493,7 @@ async function fetchEvents(animal){
     console.error('[fetchEvents] error:', e);
   }
 
+  // إزالة التكرار ثم الترتيب حسب التاريخ تصاعديًا
   const uniq = new Map(rows.map(r => [r.id, r]));
   return [...uniq.values()].sort((a,b) => (evDate(a)||'').localeCompare(evDate(b)||''));
 }
@@ -617,8 +508,8 @@ function buildState(animal, events){
     birthDate:       animal.birthDate       || null,
     lastCalvingDate: animal.lastCalvingDate || null,
     lactationNumber: animal.lactationNumber ?? null,
-    daysInMilk: null, gestationDays: null,
-    pregnancyDate: animal.pregnancyDate || null,
+    daysInMilk: null, gestationDays: 
+      null, pregnancyDate: animal.pregnancyDate || null,
     breed: animal.breed || '—', group: animal.group || '—',
     milkTraitsScore: animal.milkTraitsScore ?? 0,
     inseminations: [], estrusDates: Array.isArray(animal.estrusDates)?[...animal.estrusDates]:[],
@@ -628,7 +519,7 @@ function buildState(animal, events){
     milkSeries: [],
     lastCheckDate: animal.lastCheckDate || null, healthHistory: [],
     ovsynch: animal.ovsynch || null, isDry: false,
-    __animalRaw: animal,
+    __animalRaw: animal, // للاستخدام في “كل البيانات”
   };
 
   const milkTmp=[]; let season=0;
@@ -641,7 +532,7 @@ function buildState(animal, events){
     if (t==='heat' && d) st.estrusDates.push(d);
     if (t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='عِشار'; }
     if (t==='disease'){
-      st.healthHistory.push({ date:d||'', diagnosis:eventLabel(e), note:e.note||'' });
+      st.healthHistory.push({ date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||'' });
       st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate=st.lastCheckDate || d || null;
     }
     if (t==='milk'){
@@ -678,30 +569,58 @@ function buildState(animal, events){
   else if (!animal.productionStatus && st.daysInMilk!=null){
     st.productionStatus = st.daysInMilk<60?'حليب مبكر' : st.daysInMilk<200?'حليب متوسط' : 'حليب متأخر';
   }
+  // لو مفيش milkTraitsScore في وثيقة الحيوان، خد آخر قيمة من الأحداث
+// تحديث سكور "سمات اللبن" من الأحداث لو مش موجود في وثيقة الحيوان
+if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.isArray(events) && events.length) {
+  // محول محلي آمن للنسبة المئوية (يتعامل مع "78" أو "78%" أو 0.78)
+  const _toPercent = (v)=>{
+    if (v == null) return 0;
+    let n = (typeof v === 'string') ? parseFloat(v.replace(/[^\d.-]+/g,'')) : Number(v);
+    if (!Number.isFinite(n)) return 0;
+    // لو السلسلة فيها % اعتبرها جاهزة، ولو رقم بين 0 و 1 اعتبره كسري وحوّله لم %
+    if (typeof v === 'string' && v.includes('%')) {
+      // n كما هو
+    } else if (n >= 0 && n <= 1) {
+      n = n * 100;
+    }
+    return Math.max(0, Math.min(100, Math.round(n)));
+  };
 
-  // سكور سمات اللبن من الأحداث لو مش موجود
-  if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.isArray(events) && events.length) {
-    const CAND_KEYS = ['overallScore','overall_score','overall','milkTraitsScore','traitsScore','milk_score','score','milkTraits','traits','quality'];
-    const pullScore = (root)=>{
-      const stack = [root];
-      while (stack.length){
-        const obj = stack.pop();
-        if (!obj || typeof obj !== 'object') continue;
-        for (const [k,v] of Object.entries(obj)){
-          if (CAND_KEYS.includes(String(k))) {
-            if (v != null && (typeof v === 'number' || typeof v === 'string')) return v;
-          }
-          if (v && typeof v === 'object') stack.push(v);
-        }
+ // مفاتيح محتملة للسكور النهائي (تشمل overallScore)
+const CAND_KEYS = [
+  'overallScore','overall_score','overall',          // الجديد
+  'milkTraitsScore','traitsScore','milk_score',
+  'score','milkTraits','traits','quality'
+];
+
+// البحث العميق داخل الحدث وأي كائنات فرعية
+const pullScore = (root)=>{
+  const stack = [root];
+  while (stack.length){
+    const obj = stack.pop();
+    if (!obj || typeof obj !== 'object') continue;
+
+    for (const [k,v] of Object.entries(obj)){
+      if (CAND_KEYS.includes(String(k))) {
+        if (v != null && (typeof v === 'number' || typeof v === 'string')) return v;
       }
-      return null;
-    };
-    for (let i = events.length - 1; i >= 0; i--) {
-      const raw = pullScore(events[i]);
-      if (raw != null) { st.milkTraitsScore = toPercent(raw); break; }
+      if (v && typeof v === 'object') stack.push(v);
     }
   }
-  return st;
+  return null;
+};
+
+
+  // خُد آخر قيمة متاحة (من الأحدث للأقدم)
+  for (let i = events.length - 1; i >= 0; i--) {
+    const raw = pullScore(events[i]);
+    if (raw != null) {
+      st.milkTraitsScore = _toPercent(raw);
+      break;
+    }
+  }
+}
+return st;
 }
 
 /* ======================= UI (قياس/رسم) ======================= */
@@ -751,12 +670,10 @@ function renderMilkChart(series){
   const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
   const cx=sx(N-1), cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
   dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
-  setTimeout(()=>{ sc.scrollLeft = sc.scrollWidth; }, 0);
-
+  setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
   addEventListener('resize',()=>renderMilkChart(series),{once:true});
 }
-
-/* === Timeline === */
+    /* === Timeline Helpers === */
 function _colorForType(t){
   switch(t){
     case 'calving': return getComputedStyle(document.documentElement).getPropertyValue('--tl-calving') || '#1b5e20';
@@ -771,11 +688,13 @@ function _colorForType(t){
 }
 function _fmtDate(d){ try{ return new Date(d).toLocaleDateString('ar-EG'); }catch{ return d||'—'; } }
 
+/* === Render Timeline === */
 function renderTimeline(events, state){
   const box = document.getElementById('timelineBox');
   if (!box) return;
   box.innerHTML = '';
 
+  // جهّز صفوف (بتاريخ صالح فقط)
   const rows = (Array.isArray(events)?events:[])
     .map(e => ({ e, d: evDate(e) }))
     .filter(x => x.d);
@@ -788,6 +707,7 @@ function renderTimeline(events, state){
     return;
   }
 
+  // نطاق الزمن
   let minT = Infinity, maxT = -Infinity;
   for (const r of rows){
     const t = +new Date(r.d);
@@ -795,8 +715,9 @@ function renderTimeline(events, state){
     if (t > maxT) maxT = t;
   }
   if (!Number.isFinite(minT) || !Number.isFinite(maxT)) return;
-  if (maxT - minT < 86400000){ minT -= 3*86400000; maxT += 3*86400000; }
+  if (maxT - minT < 86400000){ minT -= 3*86400000; maxT += 3*86400000; } // كلّها نفس اليوم
 
+  // لوحة
   const padL = 40, padR = 40, padT = 28, padB = 38;
   const dotsW = Math.max(600, rows.length * 40);
   const W = padL + dotsW + padR, H = 120;
@@ -808,12 +729,14 @@ function renderTimeline(events, state){
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.style.width = W+'px';
 
+  // المحور
   const axis = document.createElementNS(svgNS, 'line');
   axis.setAttribute('x1', padL); axis.setAttribute('x2', W-padR);
   axis.setAttribute('y1', Y);    axis.setAttribute('y2', Y);
   axis.setAttribute('stroke', '#cfe9c8'); axis.setAttribute('stroke-width','2');
   svg.appendChild(axis);
 
+  // تقسيمات زمنية + عناوينها (تظل موجودة أسفل، مش فوق النقاط)
   const ticks = 6;
   for (let i=0;i<=ticks;i++){
     const t = minT + (i*(maxT-minT)/ticks);
@@ -831,8 +754,10 @@ function renderTimeline(events, state){
     lbl.setAttribute('fill','#355');
     lbl.textContent = new Date(t).toLocaleDateString('ar-EG');
     svg.appendChild(lbl);
-  }
+   
+  } // 👈 مهم: قفل الحلقة هنا
 
+  // Tooltip — خارج أي حلقات
   const tip = document.getElementById('tlTip');
   function showTipAt(svgEl, x, y, title, details, dateStr){
     if (!tip) return;
@@ -849,6 +774,7 @@ function renderTimeline(events, state){
   box.addEventListener('scroll', hideTip, { passive:true });
   document.addEventListener('pointerdown', (ev)=>{ if(!box.contains(ev.target)) hideTip(); }, { passive:true });
 
+  // النقاط فقط (لا نص فوقها)
   rows.forEach(({e,d})=>{
     const t = +new Date(d);
     const x = padL + ((t-minT)/(maxT-minT))*(W-padL-padR);
@@ -857,6 +783,7 @@ function renderTimeline(events, state){
     const tpe = evType(e);
     const color = _colorForType(tpe);
 
+    // ساق
     const stem = document.createElementNS(svgNS,'line');
     stem.setAttribute('x1',x); stem.setAttribute('x2',x);
     stem.setAttribute('y1',y-14); stem.setAttribute('y2',y+14);
@@ -864,6 +791,7 @@ function renderTimeline(events, state){
     stem.setAttribute('opacity','0.5');
     svg.appendChild(stem);
 
+    // نقطة مرئية
     const dot = document.createElementNS(svgNS,'circle');
     dot.setAttribute('cx', x); dot.setAttribute('cy', y);
     dot.setAttribute('r', 6);
@@ -871,9 +799,10 @@ function renderTimeline(events, state){
     dot.setAttribute('class', 'tl-dot');
     dot.setAttribute('tabindex','0');
     dot.setAttribute('role','button');
-    dot.setAttribute('aria-label', `${eventLabel(e)} — ${_fmtDate(d)}`);
+    dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
     svg.appendChild(dot);
 
+    // منطقة لمس واسعة
     const hit = document.createElementNS(svgNS,'circle');
     hit.setAttribute('cx', x); hit.setAttribute('cy', y);
     hit.setAttribute('r', 16);
@@ -881,20 +810,23 @@ function renderTimeline(events, state){
     hit.style.cursor = 'pointer';
     svg.appendChild(hit);
 
-    const title   = eventLabel(e);
+    const title   = eventNameRaw(e);
     const details = compactEventDetails(e);
     const dateStr = d;
 
     const openTip  = ()=> showTipAt(svg, x, y, title, details, dateStr);
     const closeTip = hideTip;
 
-    // Hint فقط – بدون قفز للجدول
+    // ماوس
     hit.addEventListener('mouseenter', openTip);
     hit.addEventListener('mouseleave', closeTip);
-    hit.addEventListener('click', (ev)=>{ ev.stopPropagation(); openTip(); });
-    hit.addEventListener('touchstart', ()=>{ openTip(); clearTimeout(hit._to); hit._to=setTimeout(closeTip,2200); }, {passive:true});
+    // كليك
+    hit.addEventListener('click', (ev)=>{ ev.stopPropagation(); openTip(); if (e.id) focusEventRow(e.id); });
+    // لمس
+    hit.addEventListener('touchstart', ()=>{ openTip(); if (e.id) focusEventRow(e.id); clearTimeout(hit._to); hit._to=setTimeout(closeTip,2200); }, {passive:true});
     hit.addEventListener('touchend', closeTip,   {passive:true});
     hit.addEventListener('touchcancel', closeTip,{passive:true});
+    // لوحة مفاتيح
     dot.addEventListener('focus', openTip);
     dot.addEventListener('blur',  closeTip);
     dot.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter' || ev.key===' ') openTip(); });
@@ -905,6 +837,7 @@ function renderTimeline(events, state){
   scroller.appendChild(svg);
   box.appendChild(scroller);
 
+  // مرّر تلقائيًا لآخر نقطة
   setTimeout(()=>{ box.scrollLeft = box.scrollWidth; }, 0);
 }
 
@@ -917,8 +850,8 @@ function setChip(el,text){ if(!el) return; const t=String(text||'').toLowerCase(
   if(/مفتوح|خطر منخفض|متوسط/.test(t)) v='warn'; if(/حاد|شديد|مرض|نفاس متعثر/.test(t)) v='danger';
   el.textContent=text||'—'; el.setAttribute('data-variant',v);
 }
-
-/* ======================= حقول إضافية ======================= */
+/* ======================= وضع كل بيان في مكانه ======================= */
+/** أداة صغيرة: تضيف صف .fi إلى Grid معيّن لو فيه قيمة فعلاً */
 function addFi(containerId, label, value) {
   if (value == null || value === '' || (Array.isArray(value) && !value.length)) return;
   const box = document.getElementById(containerId);
@@ -930,7 +863,9 @@ function addFi(containerId, label, value) {
   fi.appendChild(sp); fi.appendChild(b); box.appendChild(fi);
 }
 
+/** Aliases -> label + target grid لكل حقل إضافي شائع */
 const EXTRA_FIELD_MAP = [
+  // === أساسي (basicInfo) ===
   { keys: ['earTag','ear_tag','tag','رقم_الترقيم'],           label: 'رقم الترقيم',         target: 'basicInfo' },
   { keys: ['rfid','RFID'],                                    label: 'RFID',                target: 'basicInfo' },
   { keys: ['color','لون'],                                    label: 'اللون',               target: 'basicInfo' },
@@ -939,98 +874,131 @@ const EXTRA_FIELD_MAP = [
   { keys: ['bodyWeight','weight','الوزن'],                    label: 'الوزن (كجم)',         target: 'basicInfo' },
   { keys: ['birthWeight','weightAtBirth','وزن_الولادة'],      label: 'وزن الولادة (كجم)',   target: 'basicInfo' },
 
-  { keys: ['milkFat','fat%','fat','دهن'],                     label: 'دهن %',               target: 'milkScroll' },
+  // === إنتاج اللبن (نضيف سطور داخل نفس القسم) ===
+  { keys: ['milkFat','fat%','fat','دهن'],                     label: 'دهن %',               target: 'milkScroll' },   // هنضيفها قبل المخطط
   { keys: ['milkProtein','protein%','protein','بروتين'],      label: 'بروتين %',            target: 'milkScroll' },
   { keys: ['milkLactose','lactose%','لاكتوز'],               label: 'لاكتوز %',            target: 'milkScroll' },
   { keys: ['milkSNF','snf','مواد_صلبة_لادهنية'],             label: 'SNF %',               target: 'milkScroll' },
 
-  { keys: ['expectedCalvingDate','dueDate','موعد_الولادة'],   label: 'موعد الولادة المتوقع', target: 'fiServiceInterval' },
+  // === تناسلي (grid داخل قسم الحالة التناسلية) ===
+  { keys: ['expectedCalvingDate','dueDate','موعد_الولادة'],   label: 'موعد الولادة المتوقع', target: 'fiServiceInterval' /* anchor only */ },
   { keys: ['pregnancyResult','pregStatus','نتيجة_الحمل'],     label: 'نتيجة الحمل',         target: 'fiServiceInterval' },
   { keys: ['bull','sire','الأب','الثور'],                     label: 'الثور/الأب',          target: 'fiServiceInterval' },
 
-  { keys: ['vaccinations','vaccinationProgram','التحصينات'],  label: 'التحصينات',           target: 'healthList' },
+  // === صحي (grid داخل قسم الحالة الصحية) ===
+  { keys: ['vaccinations','vaccinationProgram','التحصينات'],  label: 'التحصينات',           target: 'healthList' /* anchor only */ },
   { keys: ['lastMastitisDate','mastitisDate','التهاب_الضرع_آخر'], label: 'آخر التهاب ضرع', target: 'healthList' },
   { keys: ['lamenessScore','LS','عرج'],                        label: 'درجة العرج',         target: 'healthList' },
 
+  // === سكور/تقييمات بالكاميرا ===
   { keys: ['bcs','bodyScore','BCS','حالة_الجسم'],             label: 'حالة الجسم (BCS)',    target: 'basicInfo' },
   { keys: ['fecesScore','manureScore','درجة_الروث'],          label: 'درجة الروث',          target: 'basicInfo' },
 ];
 
+/** استخراج أول قيمة موجودة من قائمة aliases */
 function firstDefined(obj, keys) {
   for (const k of keys) if (obj[k] != null && obj[k] !== '') return obj[k];
   return null;
 }
 
+/** إدراج الحقول الإضافية داخل الأقسام الموجودة فقط، بدون إطالة أو تغيير بصري */
 function renderExtrasIntoSections(animal) {
+  // نمنع أي تسريب لحقول حساسة/داخلية
   const BLOCK = new Set(['ownerUid','owner','uid','user','userId','__name__','__path__','id','createdAt','updatedAt']);
   const safeAnimal = {};
   for (const [k,v] of Object.entries(animal)) if (!BLOCK.has(k)) safeAnimal[k] = v;
 
+  // حقول الإنتاج: قبل المخطط، نحط Grid صغير مؤقتًا إن لزم
   const milkScroll = document.getElementById('milkScroll');
   let prodGrid;
   if (milkScroll) {
     prodGrid = document.createElement('div');
     prodGrid.className = 'grid';
     prodGrid.style.margin = '8px 0';
-    milkScroll.parentElement.insertBefore(prodGrid, milkScroll);
+    milkScroll.parentElement.insertBefore(prodGrid, milkScroll); // يظهر فوق المخطط
   }
 
   for (const def of EXTRA_FIELD_MAP) {
     const val = firstDefined(safeAnimal, def.keys);
     if (val == null) continue;
 
+    // تحديد الـcontainer حسب الهدف
+    let containerId = def.target;
     let containerEl = null;
+
     if (def.target === 'milkScroll' && prodGrid) {
+      // الإنتاج: نضيف في الـgrid المؤقت فوق المخطط
       containerEl = prodGrid;
     } else if (def.target === 'fiServiceInterval') {
+      // التناسلي: نضيف في Grid القسم التناسلي (أقرب .grid بعد عنوان القسم)
       const sec = Array.from(document.querySelectorAll('section.card h3'))
         .find(h => h.textContent.trim().includes('الحالة التناسلية'));
-      if (sec) containerEl = sec.parentElement.querySelector('.grid');
+      if (sec) {
+        const grid = sec.parentElement.querySelector('.grid');
+        containerEl = grid;
+      }
     } else if (def.target === 'healthList') {
+      // الصحي: نضيف داخل Grid القسم الصحي
       const sec = Array.from(document.querySelectorAll('section.card h3'))
         .find(h => h.textContent.trim().includes('الحالة الصحية'));
-      if (sec) containerEl = sec.parentElement.querySelector('.grid');
+      if (sec) {
+        const grid = sec.parentElement.querySelector('.grid');
+        containerEl = grid;
+      }
     } else {
-      containerEl = document.getElementById(def.target);
+      containerEl = document.getElementById(containerId);
     }
+
     if (!containerEl) continue;
 
+    // إنشاء صف .fi
     const fi = document.createElement('div'); fi.className = 'fi';
     const sp = document.createElement('span'); sp.textContent = def.label;
-    const b  = document.createElement('b');   b.textContent = Array.isArray(val) ? val.join('، ') : String(val);
+    const b  = document.createElement('b');
+    b.textContent = Array.isArray(val) ? val.join('، ') : String(val);
     fi.appendChild(sp); fi.appendChild(b);
+
     containerEl.appendChild(fi);
   }
 }
 
-/* === تفاصيل الحدث المختصرة === */
+// لغاية هنا؟؟
 function compactEventDetails(e){
   const t = evType(e);
+
   if (t === 'milk'){
     const kg = evMilkKg(e);
     if (kg > 0) return `لبن: ${kg} كجم`;
   }
+
   if (t === 'disease'){
-    const dx = eventLabel(e);
+    const dx = e.diagnosis || e.disease || e.condition || '—';
     const nt = e.note ? ` — ${e.note}` : '';
     return `تشخيص: ${dx}${nt}`;
   }
+
   if (t === 'insemination'){
     const bull = e.bull || e.semen || e.sire || e.straw || '—';
     return `تلقيح (ثور/سائل): ${bull}`;
   }
+
   if (t === 'pregnancy'){
     const res = e.result || e.status || 'موجب';
     return `تشخيص حمل: ${res}`;
   }
-  if (t === 'dry'){ return 'تجفيف الحليب'; }
+
+  if (t === 'dry'){ 
+    return 'تجفيف الحليب'; 
+  }
+
   if (t === 'calving'){
     const sex  = e.calfSex || e.sex || '—';
     const diff = e.difficulty || e.assist || 'طبيعي';
     return `ولادة — جنس العجل: ${sex} — ${diff}`;
   }
- const keys = ['value','amount','kg','note','details','desc','comment','ملاحظة','تفاصيل','وصف','تعليق','قيمة'];
 
+  // fallback مختصر — بدون prettifyVal
+  const keys = ['value','amount','kg','note','details','desc','comment'];
   for (const k of keys){
     if (e[k] != null){
       const v = e[k];
@@ -1040,6 +1008,7 @@ function compactEventDetails(e){
       return `${k}: ${txt}`;
     }
   }
+
   try {
     return JSON.stringify({
       type: e.type || e.eventType || '—',
@@ -1053,7 +1022,6 @@ function compactEventDetails(e){
   }
 }
 
-/* === جدول الأحداث === */
 function renderEventsList(events){
   const box = document.getElementById('evList');
   if (!box) return;
@@ -1064,88 +1032,67 @@ function renderEventsList(events){
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:140px">التاريخ</th>
-        <th style="width:160px">اسم الحدث</th>
-        <th>التفاصيل</th>
+        <th style="width:160px">التاريخ</th>
+        <th>اسم الحدث</th>
       </tr>
     </thead>
     <tbody></tbody>
   `;
   const tbody = table.querySelector('tbody');
 
+  // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="ev-date">—</td>
-      <td class="ev-type">لا توجد أحداث</td>
-      <td class="ev-note">—</td>
-    `;
+    tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td>`;
     tbody.appendChild(tr);
-    wrap.appendChild(table);
-    box.appendChild(wrap);
-  } else {
-    const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
-      .sort((a,b) => (b.d||'').localeCompare(a.d||''));
-
-    for (const {e, d} of rows){
-      const tr = document.createElement('tr');
-      tr.id = e.id ? `evrow-${e.id}` : '';
-      tr.setAttribute('aria-selected','false');
-
-      const dateTd = document.createElement('td');
-      dateTd.className = 'ev-date';
-      dateTd.textContent = d ? new Date(d).toLocaleDateString('ar-EG') : '—';
-
-      const nameTd = document.createElement('td');
-      nameTd.className = 'ev-type';
-      nameTd.textContent = eventLabel(e);  /* الاسم بالعربي */
-
-      const detTd = document.createElement('td');
-      detTd.className = 'ev-note';
-      detTd.textContent = compactEventDetails(e) || '—';
-
-      const moreBtn = document.createElement('button');
-      moreBtn.type = 'button';
-      moreBtn.className = 'ev-more';
-      moreBtn.setAttribute('aria-expanded','false');
-      moreBtn.textContent = 'عرض الكل';
-      moreBtn.addEventListener('click', (ev)=>{
-        ev.stopPropagation();
-        const open = tr.classList.toggle('ev-row--open');
-        moreBtn.setAttribute('aria-expanded', String(open));
-      });
-      detTd.appendChild(moreBtn);
-
-      tr.appendChild(dateTd);
-      tr.appendChild(nameTd);
-      tr.appendChild(detTd);
-      tbody.appendChild(tr);
-    }
-
-    wrap.appendChild(table);
-    box.appendChild(wrap);
+    wrap.appendChild(table); box.appendChild(wrap);
+    requestAnimationFrame(scheduleFit);
+    return;
   }
 
-  // فتح/قفل الصف بالسطر كله (مفيد للموبايل)
-  tbody.addEventListener('click', (e)=>{
-    const tr = e.target.closest('tr');
-    if (!tr) return;
-    tr.classList.toggle('ev-row--open');
-  });
+  // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ نسيبه في الآخر
+  const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
+    .sort((a,b) => (b.d||'').localeCompare(a.d||''));
 
-  // قفل العلبة على ارتفاع صف واحد بعد بناء الجدول
-  activateSingleRowScroll();
-  enableRowByRowScroll(); 
+  for (const {e, d} of rows){
+  const tr = document.createElement('tr');
+  tr.id = e.id ? `evrow-${e.id}` : '';       // 👈 معرّف الصف
+  tr.setAttribute('aria-selected','false');   // وصولية
+
+  tr.innerHTML = `
+    <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
+    <td class="ev-type">${ eventNameRaw(e) }</td>
+  `;
+  tbody.appendChild(tr);
 }
 
-// (موجودة لكن لن تُستعمل الآن لأننا منعنا القفز من التايملاين)
-function focusEventRow(eid){
-  const tr = document.getElementById(`evrow-${eid}`);
-  if (!tr) return;
-  tr.classList.add('ev-row--focus');
-  tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  setTimeout(()=> tr.classList.remove('ev-row--focus'), 1600);
+
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+  requestAnimationFrame(scheduleFit);
 }
+function focusEventRow(evId){
+  if (!evId) return;
+  const row = document.getElementById(`evrow-${evId}`);
+  if (!row) return;
+
+  // حدّد الوعاء القابل للتمرير
+  const scroller = document.querySelector('#evList .ev-scroll') || row.closest('.ev-scroll') || document;
+  // شيل الهايلايت القديم
+  const old = scroller.querySelector('.ev-row--focus');
+  if (old) old.classList.remove('ev-row--focus');
+
+  // هايلايت + تمرير ناعم
+  row.classList.add('ev-row--focus');
+  row.setAttribute('aria-selected','true');
+  const top = row.offsetTop - (scroller.clientHeight/2 - row.clientHeight/2);
+  scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+
+  // إزالة الهايلايت بعد شوية (اختياري)
+  clearTimeout(row._hlTO);
+  row._hlTO = setTimeout(()=>{ row.classList.remove('ev-row--focus'); }, 2500);
+}
+
 
 /* ======================= ربط الأقسام ======================= */
 function renderCard(state, kind){
@@ -1193,8 +1140,32 @@ function renderCard(state, kind){
     hl.appendChild(row);
   }
 
-  renderExtrasIntoSections(state.__animalRaw || {});
+  // جديد: اعرض كل الحقول الأخرى من وثيقة الحيوان
+renderExtrasIntoSections(state.__animalRaw || {});
 }
+function fitEventsTableToOneRow(){
+  const wrap = document.querySelector('.ev-scroll');
+  if (!wrap) return;
+  const thead = wrap.querySelector('thead');
+  const first = wrap.querySelector('tbody tr');
+  if (!thead || !first) return;
+
+  // اجمع ارتفاع الرأس + أول صف فقط
+  const headH = Math.ceil(thead.getBoundingClientRect().height);
+  const rowH  = Math.ceil(first.getBoundingClientRect().height);
+  const total = headH + rowH + 2; // هامش بسيط
+
+  if (window.matchMedia('(max-width:560px)').matches){
+    wrap.style.maxHeight = total + 'px';
+  } else {
+    wrap.style.maxHeight = '';    // على الشاشات الكبيرة: ارجع للوضع العادي
+  }
+}
+
+// أعِد الحساب بعد ما الجدول يتبني + عند تغيير المقاس
+let _fitTO;
+function scheduleFit(){ clearTimeout(_fitTO); _fitTO = setTimeout(fitEventsTableToOneRow, 60); }
+window.addEventListener('resize', scheduleFit);
 
 /* ======================= Load & Run ======================= */
 async function loadAndRender({number, animalId, type}){
@@ -1218,10 +1189,9 @@ async function loadAndRender({number, animalId, type}){
       tip.innerHTML=`لا توجد أحداث مسجلة بعد. <a href="/add-event.html?number=${encodeURIComponent(state.number||'')}" style="font-weight:700;color:#1b5e20">أضف أول حدث الآن</a>.`;
       document.querySelector('.wrap')?.prepend(tip);
     }
-
-    renderCard(state, kind);
-    renderTimeline(events, state);
-    renderEventsList(events);
+renderCard(state, kind);
+renderTimeline(events, state);   // 👈 الجديد
+renderEventsList(events);
 
   }catch(e){
     console.error(e);
@@ -1242,16 +1212,16 @@ if (numberParam || idParam){
   if(lastNum && openInput){ openInput.value=lastNum; }
   if(openBtn){ openBtn.addEventListener('click', ()=>{ const n=(openInput.value||'').trim(); if(!n) return; loadAndRender({number:n}); }); }
 }
-
-/* تأكيد إعادة القياس بعد التحميل والخطوط */
-window.addEventListener('load', ()=> {
-  requestAnimationFrame(()=>requestAnimationFrame(activateSingleRowScroll));
-});
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(()=> setTimeout(activateSingleRowScroll, 0));
-}
-
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
 
