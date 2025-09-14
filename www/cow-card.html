@@ -291,31 +291,99 @@ const toPercent = (v)=>{
 };
 
 
-// يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
-// اسم الحدث كما هو من صفحة الحدث بالعربي إن وُجد، ثم أي اسم متاح بدون أي ترجمة
-function eventNameRaw(e = {}) {
-  const hasArabic = (v)=> typeof v === 'string' && /[\u0600-\u06FF]/.test(v);
+// هل النص عربي؟
+const hasArabic = (v)=> typeof v === 'string' && /[\u0600-\u06FF]/.test(v);
 
-  // 1) مفاتيح عربية/محلية واضحة
+// حوّل "close-up" -> "closeup" / "bcs_eval" -> "bcs eval"
+const toKey = (s='') => String(s).trim().toLowerCase().replace(/[-_]+/g,' ').replace(/\s+/g,' ');
+
+// قاموس تعريب للأسماء/الأنواع الشائعة
+const NAME_AR_MAP = new Map([
+  // أنواع عامة
+  ['milk', 'إنتاج اللبن'],
+  ['daily milk', 'إنتاج اللبن'],
+  ['calving', 'ولادة'],
+  ['dry', 'تجفيف الحليب'],
+  ['heat', 'شياع'],
+  ['pregnancy', 'نتيجة حمل'],
+  ['insemination', 'تلقيح'],
+
+  // نماذج/صفحات
+  ['closeup', 'تحضير للولادة'],
+  ['close up', 'تحضير للولادة'],
+  ['feces eval', 'تقييم الروث'],
+  ['bcs eval', 'تقييم حالة الجسم'],
+  ['ovsynchronization', 'بروتوكول Ovsynch'],
+  ['ovsynch', 'بروتوكول Ovsynch'],
+
+  // أمراض شائعة
+  ['mastitis', 'التهاب الضرع'],
+  ['lameness', 'عرج'],
+
+  // أخرى مفيدة
+  ['vaccination', 'تحصين'],
+  ['disease', 'حالة صحية'],
+  ['check', 'فحص صحي'],
+]);
+
+// جرّب ترجمة قيمة مفردة (ترجع عربي إن وُجد، وإلا null)
+function translateToken(v){
+  if (!v) return null;
+  if (hasArabic(v)) return String(v).trim();
+  const k = toKey(v);
+  if (NAME_AR_MAP.has(k)) return NAME_AR_MAP.get(k);
+  return null;
+}
+
+// استنتاج اسم من مسار الصفحة/المصدر
+function nameFromSource(src=''){
+  if (!src) return null;
+  try{
+    const u = new URL(src, location.origin);
+    const base = u.pathname.split('/').pop() || '';
+    const noExt = base.replace(/\.(html|htm)$/i,'');
+    return translateToken(noExt) || null;
+  }catch{
+    // src ممكن يكون '/close-up.html' (نسبي)، نعالجه بدائيًا
+    const base = String(src).split('?')[0].split('#')[0].split('/').pop() || '';
+    const noExt = base.replace(/\.(html|htm)$/i,'');
+    return translateToken(noExt) || null;
+  }
+}
+
+
+function eventNameRaw(e = {}) {
+  // 1) مفاتيح عربية/محلية أولاً
   const arFirstKeys = [
     'اسم_الحدث','اسم','عنوان','العنوان','عنوان_الصفحة',
     'pageTitleAr','page_name_ar','page_ar','eventNameAr',
-    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص',
-    'diseaseName','diagnosis','pregnancyResult','heatStatus' // جديد
+    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص','diseaseName','pregnancyResult','heatStatus'
   ];
   for (const k of arFirstKeys) {
     const v = e?.[k];
     if (v != null && String(v).trim() !== '') return String(v).trim();
   }
 
-  // 2) أي مفتاح عام لكن قيمته بالعربي
-  const genericKeys = ['name','title','label','eventName','type','kind','category'];
+  // 2) مفاتيح عامة لكن قيمتها عربي
+  const genericKeys = ['name','title','label','eventName','type','kind','category','eventType'];
   for (const k of genericKeys) {
     const v = e?.[k];
     if (hasArabic(v)) return String(v).trim();
   }
 
-  // 3) fallback المعتاد
+  // 3) جرّب ترجمة أي قيمة إنجليزية معروفة
+  for (const k of [...genericKeys, 'diagnosis']) {
+    const v = e?.[k];
+    const ar = translateToken(v);
+    if (ar) return ar;
+  }
+
+  // 4) لو فيه مصدر صفحة، خُد منه اسم عربي (close-up.html -> تحضير للولادة)
+  const srcCand = e.source || e.page || e.form || e.url;
+  const fromSrc = nameFromSource(srcCand);
+  if (fromSrc) return fromSrc;
+
+  // 5) آخر حل: أي نص موجود غير فاضي
   for (const k of [...genericKeys, 'eventType']) {
     const v = e?.[k];
     if (v != null && String(v).trim() !== '') return String(v).trim();
@@ -1023,12 +1091,14 @@ function compactEventDetails(e){
     return 'النتيجة: تجفيف الحليب';
   }
 
-  if (t === 'disease'){
-    const dx = e.diagnosis || e.disease || e.condition || e['التشخيص'] || '—';
-    const res = e.result || e.status || e['النتيجة'];
-    const nt = e.note ? ` — ملاحظة: ${e.note}` : '';
-    return `التشخيص: ${dx}${res?` — النتيجة: ${res}`:''}${nt}`;
-  }
+ if (t === 'disease'){
+  const rawDx = e.diseaseName || e.diagnosis || e.disease || e.condition || e['التشخيص'] || '—';
+  const dx = translateToken(rawDx) || rawDx;           // 👈 تعريب
+  const res = e.result || e.status || e['النتيجة'];
+  const nt  = e.note ? ` — ملاحظة: ${e.note}` : '';
+  return `التشخيص: ${dx}${res?` — النتيجة: ${res}`:''}${nt}`;
+}
+
 
   // عام: التقط «نتيجة» لو موجودة
   const res = e.result || e.status || e['النتيجة'];
@@ -1256,6 +1326,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
