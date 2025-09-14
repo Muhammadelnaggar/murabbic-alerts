@@ -11,11 +11,10 @@
 .legend .leg:nth-child(3) .dot{background:#fff176}
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
-/* === جدول الأحداث: صف واحد ظاهر فقط + تمرير للباقي === */
-/* جدول الأحداث: صفّ واحد ظاهر + سكرول للباقي */
-.ev-scroll{ height:auto !important; max-height:none !important; overflow:hidden; }
+/* === جدول الأحداث: صفّ واحد ظاهر + تمرير للباقي === */
+.ev-scroll{ height:auto !important; max-height:none !important; }     /* لا نخنق التمرير هنا */
 .ev-scroll.single-row{
-  overflow-y:auto;
+  overflow:auto !important;                      /* تمرير واضح */
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
 }
@@ -43,7 +42,7 @@
 .ev-note{ color:#355; }
 .ev-more{ display:none; }  /* ديسكتوب */
 
-/* موبايل: بدون ضبط ارتفاع — نخليه يتقاس برمجياً */
+/* موبايل */
 @media (max-width:560px){
   .ev-scroll.single-row{ max-height:none !important; }
   .ev-table{ table-layout: fixed; }
@@ -144,7 +143,7 @@ body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,
   --tl-milk:#2e7d32; --tl-calving:#1b5e20; --tl-insem:#0d9488; --tl-preg:#a16207;
   --tl-heat:#ef6c00; --tl-dry:#6b7280; --tl-disease:#c62828; --tl-other:#4b5563;
 }
-/* إبراز صف الحدث عند القفز من التايملاين */
+/* إبراز صف الحدث عند القفز من التايملاين (لن نستخدم القفز الآن) */
 .ev-row--focus{
   outline:2px solid #2e7d32;
   background:#f1faee !important;
@@ -296,23 +295,56 @@ const toPercent = (v)=>{
   return Math.max(0, Math.min(100, Math.round(n)));
 };
 
-// اسم الحدث كما هو من الداتا — يفضّل التشخيص أولاً
-function eventNameRaw(e = {}) {
-  const pick = (k) => {
-    const v = e && e[k];
-    return v != null && String(v).trim() !== '' ? String(v).trim() : null;
-  };
-  const CANDS = [
-    'diagnosis','diagnose','dx','label','تشخيص',
-    'name','title','eventName','اسم_الحدث',
-    'kind','category',
-    'type','eventType'
-  ];
-  for (const k of CANDS) {
-    const v = pick(k);
-    if (v) return v;
+/* ======================= أسماء الأحداث = أسماء الصفحات بالعربي ======================= */
+function _pick(e, keys){
+  for (const k of keys){
+    const v = e?.[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
   }
-  return '—';
+  return null;
+}
+function eventLabel(e = {}) {
+  // 1) حقول عربية صريحة / عنوان صفحة بالعربي
+  const ar = _pick(e, [
+    'اسم_الحدث','العنوان','عنوان_الصفحة','pageTitleAr','page_name_ar','page_ar',
+    'eventNameAr','nameAr','titleAr','labelAr','تشخيص'
+  ]);
+  if (ar) return ar;
+
+  // 2) أسماء صفحات إنجليزية نعرّبها (أسماء صفحات فقط)
+  const page = (_pick(e, ['page','pageName','page_title','screen']) || '').toLowerCase();
+  const type = (_pick(e, ['type','eventType']) || '').toLowerCase();
+  const MAP = {
+    'milking_traits':'تقييم سمات اللبن',
+    'insemination':'تلقيح',
+    'pregnancy':'تشخيص حمل',
+    'pregnancy_diagnosis':'تشخيص حمل',
+    'calving':'ولادة',
+    'dry_off':'تجفيف',
+    'heat':'شياع',
+    'lameness':'عرج',
+    'mastitis':'التهاب الضرع',
+    'closeup':'قرب الولادة'
+  };
+  const key = (page || type).replace(/\s+/g,'_');
+  if (MAP[key]) return MAP[key];
+
+  // 3) لو الاسم موجود عامًّا
+  const name = _pick(e, ['name','title','eventName','label']);
+  if (name){
+    const s = name.trim().toLowerCase();
+    if (s === 'cow' || s === 'buffalo') return 'حدث';
+    if (MAP[s]) return MAP[s];
+    return name; // إن كان عربي نتركه
+  }
+
+  // 4) ترجمة نوع الحدث fallback
+  const TYPE_AR = {
+    milk:'إنتاج اللبن', calving:'ولادة', insemination:'تلقيح',
+    pregnancy:'تشخيص حمل', heat:'شياع', dry:'تجفيف',
+    disease:'حالة صحية', other:'حدث'
+  };
+  return TYPE_AR[evType(e)] || 'حدث';
 }
 
 const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
@@ -421,7 +453,7 @@ function activateSingleRowScroll(){
   const measure = ()=>{
     const hHead = Math.ceil(head?.getBoundingClientRect().height || 0);
     const hRow  = Math.ceil(first.getBoundingClientRect().height || 0);
-    if (hRow < 8) { setTimeout(measure, 40); return; }   // استنى لحد ما الصف يرسم
+    if (hRow < 8) { setTimeout(measure, 40); return; }   // انتظر حتى يرسم الصف
     wrap.style.maxHeight = (hHead + hRow + 2) + 'px';    // +2 للحدود
   };
 
@@ -565,7 +597,7 @@ function buildState(animal, events){
     if (t==='heat' && d) st.estrusDates.push(d);
     if (t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='عِشار'; }
     if (t==='disease'){
-      st.healthHistory.push({ date:d||'', diagnosis:eventNameRaw(e), note:e.note||'' });
+      st.healthHistory.push({ date:d||'', diagnosis:eventLabel(e), note:e.note||'' });
       st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate=st.lastCheckDate || d || null;
     }
     if (t==='milk'){
@@ -603,7 +635,7 @@ function buildState(animal, events){
     st.productionStatus = st.daysInMilk<60?'حليب مبكر' : st.daysInMilk<200?'حليب متوسط' : 'حليب متأخر';
   }
 
-  // حدّث سكور سمات اللبن من الأحداث لو مش موجود
+  // سكور سمات اللبن من الأحداث لو مش موجود
   if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.isArray(events) && events.length) {
     const CAND_KEYS = ['overallScore','overall_score','overall','milkTraitsScore','traitsScore','milk_score','score','milkTraits','traits','quality'];
     const pullScore = (root)=>{
@@ -795,7 +827,7 @@ function renderTimeline(events, state){
     dot.setAttribute('class', 'tl-dot');
     dot.setAttribute('tabindex','0');
     dot.setAttribute('role','button');
-    dot.setAttribute('aria-label', `${eventNameRaw(e)} — ${_fmtDate(d)}`);
+    dot.setAttribute('aria-label', `${eventLabel(e)} — ${_fmtDate(d)}`);
     svg.appendChild(dot);
 
     const hit = document.createElementNS(svgNS,'circle');
@@ -805,17 +837,18 @@ function renderTimeline(events, state){
     hit.style.cursor = 'pointer';
     svg.appendChild(hit);
 
-    const title   = eventNameRaw(e);
+    const title   = eventLabel(e);
     const details = compactEventDetails(e);
     const dateStr = d;
 
     const openTip  = ()=> showTipAt(svg, x, y, title, details, dateStr);
     const closeTip = hideTip;
 
+    // Hint فقط – بدون قفز للجدول
     hit.addEventListener('mouseenter', openTip);
     hit.addEventListener('mouseleave', closeTip);
-    hit.addEventListener('click', (ev)=>{ ev.stopPropagation(); openTip(); if (e.id) focusEventRow(e.id); });
-    hit.addEventListener('touchstart', ()=>{ openTip(); if (e.id) focusEventRow(e.id); clearTimeout(hit._to); hit._to=setTimeout(closeTip,2200); }, {passive:true});
+    hit.addEventListener('click', (ev)=>{ ev.stopPropagation(); openTip(); });
+    hit.addEventListener('touchstart', ()=>{ openTip(); clearTimeout(hit._to); hit._to=setTimeout(closeTip,2200); }, {passive:true});
     hit.addEventListener('touchend', closeTip,   {passive:true});
     hit.addEventListener('touchcancel', closeTip,{passive:true});
     dot.addEventListener('focus', openTip);
@@ -934,7 +967,7 @@ function compactEventDetails(e){
     if (kg > 0) return `لبن: ${kg} كجم`;
   }
   if (t === 'disease'){
-    const dx = eventNameRaw(e);
+    const dx = eventLabel(e);
     const nt = e.note ? ` — ${e.note}` : '';
     return `تشخيص: ${dx}${nt}`;
   }
@@ -1020,7 +1053,7 @@ function renderEventsList(events){
 
       const nameTd = document.createElement('td');
       nameTd.className = 'ev-type';
-      nameTd.textContent = eventNameRaw(e);
+      nameTd.textContent = eventLabel(e);  /* الاسم بالعربي */
 
       const detTd = document.createElement('td');
       detTd.className = 'ev-note';
@@ -1056,9 +1089,10 @@ function renderEventsList(events){
   });
 
   // قفل العلبة على ارتفاع صف واحد بعد بناء الجدول
-activateSingleRowScroll();
+  activateSingleRowScroll();
 }
 
+// (موجودة لكن لن تُستعمل الآن لأننا منعنا القفز من التايملاين)
 function focusEventRow(eid){
   const tr = document.getElementById(`evrow-${eid}`);
   if (!tr) return;
@@ -1174,4 +1208,3 @@ if (document.fonts && document.fonts.ready) {
   </script>
 </body>
 </html>
-
