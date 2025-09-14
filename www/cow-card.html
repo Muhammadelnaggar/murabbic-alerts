@@ -76,23 +76,31 @@
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
     /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
 @media (max-width:560px){
-  .ev-scroll{ overflow:auto; }               /* التمرير داخل الصندوق */
-  .ev-table{ table-layout: fixed; }          /* ثبات أعمدة وellipsis */
+  .ev-scroll{ overflow:auto; }
+  .ev-table{ table-layout: fixed; }
   .ev-table thead th{ position: sticky; top: 0; z-index:1; }
 
-  /* صفوف خفيفة */
-  .ev-table th, .ev-table td{ padding:6px 8px; font-size:12px; line-height:1.2; }
-
-  /* قصّ النص لسطـر واحد عشان ما يطوّلش ارتفاع الصف */
-  .ev-type, .ev-note, .ev-date{
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .ev-table th, .ev-table td{
+    padding:10px 8px;       /* أكبر */
+    font-size:13px;         /* أوضح */
+    line-height:1.45;
   }
+
+  /* التاريخ والاسم: سطر واحد مع ellipsis */
+  .ev-date, .ev-type{
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  /* التفاصيل/النتيجة: سطرين لقراءة مريحة */
   .ev-note{
-    display: -webkit-box;
-    -webkit-line-clamp: 1;      /* سطر واحد فقط */
-    -webkit-box-orient: vertical;
+    white-space:normal;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
   }
 }
+
 /* === Timeline (أحداث الحيوان) === */
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
@@ -284,13 +292,26 @@ const toPercent = (v)=>{
 
 
 // يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
-function eventNameRaw(e = {}){
-  const CANDS = ['name','title','eventName','type','eventType','kind','category','diagnosis'];
-  for (const k of CANDS){
-    const v = e[k];
-    if (v != null && String(v).trim() !== '') return String(v);
-  }
-  return '—';
+// اسم الحدث كما هو من صفحة الحدث بالعربي إن وُجد، ثم أي اسم متاح بدون أي ترجمة
+function eventNameRaw(e = {}) {
+  const pick = (obj, keys)=>{
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (v != null && String(v).trim() !== '') return String(v).trim();
+    }
+    return null;
+  };
+
+  // أفضلية لعناوين الصفحات/الأحداث العربية
+  const ar = pick(e, [
+    'اسم_الحدث','اسم','عنوان','العنوان','عنوان_الصفحة',
+    'pageTitleAr','page_name_ar','page_ar','eventNameAr',
+    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص'
+  ]);
+  if (ar) return ar;
+
+  // وإلا نعرض أي اسم موجود كما هو
+  return pick(e, ['name','title','eventName','label','type','eventType','kind','category']) ?? '—';
 }
 
 
@@ -968,37 +989,42 @@ function compactEventDetails(e){
 
   if (t === 'milk'){
     const kg = evMilkKg(e);
-    if (kg > 0) return `لبن: ${kg} كجم`;
-  }
-
-  if (t === 'disease'){
-    const dx = e.diagnosis || e.disease || e.condition || '—';
-    const nt = e.note ? ` — ${e.note}` : '';
-    return `تشخيص: ${dx}${nt}`;
+    if (kg > 0) return `النتيجة: ${kg} كجم`;
   }
 
   if (t === 'insemination'){
-    const bull = e.bull || e.semen || e.sire || e.straw || '—';
-    return `تلقيح (ثور/سائل): ${bull}`;
+    const bull = e.bull || e.semen || e.sire || e.straw || e['الثور'] || '—';
+    return `التفاصيل: تلقيح — الثور/السائل: ${bull}`;
   }
 
   if (t === 'pregnancy'){
-    const res = e.result || e.status || 'موجب';
-    return `تشخيص حمل: ${res}`;
-  }
-
-  if (t === 'dry'){ 
-    return 'تجفيف الحليب'; 
+    const res = e.pregnancyResult || e.result || e.status || e['نتيجة_الحمل'] || e['النتيجة'] || 'موجب';
+    return `النتيجة: ${res}`;
   }
 
   if (t === 'calving'){
-    const sex  = e.calfSex || e.sex || '—';
-    const diff = e.difficulty || e.assist || 'طبيعي';
-    return `ولادة — جنس العجل: ${sex} — ${diff}`;
+    const sex  = e.calfSex || e.sex || e['جنس_العجل'] || '—';
+    const diff = e.difficulty || e.assist || e['مساعدة'] || 'طبيعي';
+    return `التفاصيل: ولادة — جنس العجل: ${sex} — ${diff}`;
   }
 
-  // fallback مختصر — بدون prettifyVal
-  const keys = ['value','amount','kg','note','details','desc','comment'];
+  if (t === 'dry'){
+    return 'النتيجة: تجفيف الحليب';
+  }
+
+  if (t === 'disease'){
+    const dx = e.diagnosis || e.disease || e.condition || e['التشخيص'] || '—';
+    const res = e.result || e.status || e['النتيجة'];
+    const nt = e.note ? ` — ملاحظة: ${e.note}` : '';
+    return `التشخيص: ${dx}${res?` — النتيجة: ${res}`:''}${nt}`;
+  }
+
+  // عام: التقط «نتيجة» لو موجودة
+  const res = e.result || e.status || e['النتيجة'];
+  if (res) return `النتيجة: ${res}`;
+
+  // fallback مختصر
+  const keys = ['value','amount','kg','note','details','desc','comment','تفاصيل','ملاحظة'];
   for (const k of keys){
     if (e[k] != null){
       const v = e[k];
@@ -1008,20 +1034,9 @@ function compactEventDetails(e){
       return `${k}: ${txt}`;
     }
   }
-
-  try {
-    return JSON.stringify({
-      type: e.type || e.eventType || '—',
-      ...(['eventDate','date','day'].reduce((a,kk)=>{
-        if (e[kk]) a[kk] = e[kk];
-        return a;
-      }, {}))
-    });
-  } catch {
-    return '—';
-  }
+  return '—';
 }
-
+    
 function renderEventsList(events){
   const box = document.getElementById('evList');
   if (!box) return;
@@ -1029,21 +1044,24 @@ function renderEventsList(events){
 
   const wrap  = document.createElement('div'); wrap.className = 'ev-scroll';
   const table = document.createElement('table'); table.className = 'ev-table';
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th style="width:160px">التاريخ</th>
-        <th>اسم الحدث</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  `;
+ table.innerHTML = `
+  <thead>
+    <tr>
+      <th style="width:160px">التاريخ</th>
+      <th style="width:200px">اسم الحدث</th>
+      <th>التفاصيل / النتيجة</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+`;
+
   const tbody = table.querySelector('tbody');
 
   // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td>`;
+   const tr = document.createElement('tr');
+tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td><td class="ev-note">—</td>`;
+
     tbody.appendChild(tr);
     wrap.appendChild(table); box.appendChild(wrap);
     requestAnimationFrame(scheduleFit);
@@ -1054,17 +1072,29 @@ function renderEventsList(events){
   const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
     .sort((a,b) => (b.d||'').localeCompare(a.d||''));
 
-  for (const {e, d} of rows){
+ for (const {e, d} of rows){
   const tr = document.createElement('tr');
-  tr.id = e.id ? `evrow-${e.id}` : '';       // 👈 معرّف الصف
-  tr.setAttribute('aria-selected','false');   // وصولية
+  tr.id = e.id ? `evrow-${e.id}` : '';
+  tr.setAttribute('aria-selected','false');
 
-  tr.innerHTML = `
-    <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
-    <td class="ev-type">${ eventNameRaw(e) }</td>
-  `;
+  const dateTd = document.createElement('td');
+  dateTd.className = 'ev-date';
+  dateTd.textContent = d ? new Date(d).toLocaleDateString('ar-EG') : '—';
+
+  const nameTd = document.createElement('td');
+  nameTd.className = 'ev-type';
+  nameTd.textContent = eventNameRaw(e);   // 👈 الآن يرجّع العربي أولاً
+
+  const detTd = document.createElement('td');
+  detTd.className = 'ev-note';
+  detTd.textContent = compactEventDetails(e);
+
+  tr.appendChild(dateTd);
+  tr.appendChild(nameTd);
+  tr.appendChild(detTd);
   tbody.appendChild(tr);
 }
+
 
 
   wrap.appendChild(table);
@@ -1215,6 +1245,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
