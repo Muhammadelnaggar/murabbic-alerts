@@ -13,16 +13,17 @@
 
 /* === جدول الأحداث: صندوق تمرير + رأس ثابت + تفاصيل مقروءة === */
 /* === جدول الأحداث: صندوق تمرير + رأس ثابت === */
-.ev-scroll{
-  height: 320px;                /* كان max-height:300px */
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;   /* سلاسة على الموبايل */
-  overscroll-behavior: contain;        /* يمنع سحب الصفحة بدل الصندوق */
-  border:1px solid var(--border);
-  border-radius:12px;
-  background:#fff;
+/* === صفّ واحد فقط ظاهر من جدول الأحداث (والباقي Scroll) === */
+/* === صفّ واحد فقط ظاهر من جدول الأحداث (والباقي Scroll) === */
+.ev-scroll{ height:auto !important; max-height:none !important; }  /* نلغي أي ارتفاعات سابقة */
+.ev-scroll.single-row{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+
+.ev-scroll.single-row .ev-note{
+  -webkit-line-clamp:unset !important;
+  white-space:normal !important;                /* إظهار كل التفاصيل */
 }
+.ev-scroll.single-row .ev-more{ display:none !important; }  /* إلغاء زر "عرض الكل" دائمًا */
+
 
 /* موبايل */
 @media (max-width:560px){
@@ -449,6 +450,29 @@ function evMilkKg(e = {}) {
   for (const [k, v] of Object.entries(e)) if (MILK_PART_KEY.test(k)) sum += toNum(v);
   return sum;
 }
+/* === صف واحد للأحداث: قفل ارتفاع الصندوق على أول صف === */
+function fitEventsBoxToOneRow(){
+  const wrap = document.querySelector('#evList .ev-scroll');
+  if(!wrap) return;
+  const table = wrap.querySelector('table');
+  const head  = table?.tHead || null;
+  const body  = table?.tBodies?.[0] || null;
+  const first = body?.rows?.[0] || null;
+  if(!first) return;
+
+  wrap.classList.add('single-row');       // نمط الصف الواحد
+  first.classList.add('ev-row--open');    // افتح أول صف بالكامل
+
+  wrap.style.height = 'auto';
+  requestAnimationFrame(()=>{
+    const hHead = head ? head.getBoundingClientRect().height : 0;
+    const hRow  = first.getBoundingClientRect().height;
+    wrap.style.height = Math.ceil(hHead + hRow + 2) + 'px'; // +2 للحدود
+  });
+}
+
+// إعادة القياس عند تغيير العرض
+window.addEventListener('resize', fitEventsBoxToOneRow);
 
 
 /* ======================= Firestore ======================= */
@@ -1155,7 +1179,11 @@ function renderEventsList(events){
     if (!tr) return;
     tr.classList.toggle('ev-row--open');
   });
+    // قفل العلبة على ارتفاع صف واحد بعد ما نخلص بناء الجدول
+  fitEventsBoxToOneRow();
 }
+
+
 
   // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ يروح آخر القائمة
 
@@ -1267,6 +1295,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
