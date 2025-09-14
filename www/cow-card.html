@@ -294,25 +294,36 @@ const toPercent = (v)=>{
 // يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
 // اسم الحدث كما هو من صفحة الحدث بالعربي إن وُجد، ثم أي اسم متاح بدون أي ترجمة
 function eventNameRaw(e = {}) {
-  const pick = (obj, keys)=>{
-    for (const k of keys) {
-      const v = obj?.[k];
-      if (v != null && String(v).trim() !== '') return String(v).trim();
-    }
-    return null;
-  };
+  const hasArabic = (v)=> typeof v === 'string' && /[\u0600-\u06FF]/.test(v);
 
-  // أفضلية لعناوين الصفحات/الأحداث العربية
-  const ar = pick(e, [
+  // 1) مفاتيح عربية/محلية واضحة
+  const arFirstKeys = [
     'اسم_الحدث','اسم','عنوان','العنوان','عنوان_الصفحة',
     'pageTitleAr','page_name_ar','page_ar','eventNameAr',
-    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص'
-  ]);
-  if (ar) return ar;
+    'nameAr','titleAr','labelAr','نوع_الحدث','التشخيص',
+    'diseaseName','diagnosis','pregnancyResult','heatStatus' // جديد
+  ];
+  for (const k of arFirstKeys) {
+    const v = e?.[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
 
-  // وإلا نعرض أي اسم موجود كما هو
-  return pick(e, ['name','title','eventName','label','type','eventType','kind','category']) ?? '—';
+  // 2) أي مفتاح عام لكن قيمته بالعربي
+  const genericKeys = ['name','title','label','eventName','type','kind','category'];
+  for (const k of genericKeys) {
+    const v = e?.[k];
+    if (hasArabic(v)) return String(v).trim();
+  }
+
+  // 3) fallback المعتاد
+  for (const k of [...genericKeys, 'eventType']) {
+    const v = e?.[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+
+  return '—';
 }
+
 
 
 const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
@@ -1245,6 +1256,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
