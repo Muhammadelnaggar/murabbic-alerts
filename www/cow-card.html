@@ -355,10 +355,10 @@ const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
 const kindNameAr=(k)=> k==='buffalo' ? 'جاموسة' : k==='cow' ? 'بقرة' : 'حيوان';
 const kindTitleAr=(k)=> k==='buffalo' ? 'بطاقة الجاموسة' : k==='cow' ? 'بطاقة البقرة' : 'بطاقة الحيوان';
 
-function isDryKeyword(s=''){s=String(s).toLowerCase().trim();return /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i.test(s);}
+function isDryKeyword(s=''){s=String(s).toLowerCase().trim();return /(dry\s*-?\s*off|^dry$|جاف(ة)?|تجفيف)/i.test(s);} 
 function normProdStatus(v){if(v==null) return null; return isDryKeyword(v)?'جاف':String(v).trim();}
 
-function isPregKeyword(s=''){s=String(s).toLowerCase().trim();return /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i.test(s);}
+function isPregKeyword(s=''){s=String(s).toLowerCase().trim();return /(pregnan|حامل|عِ?شار|عشار|ايجابي|موجب)/i.test(s);} 
 function normReproStatus(v){if(v==null) return null; return isPregKeyword(v)?'عِشار':String(v).trim();}
 
 // يحوّل أي Timestamp/Maps إلى JSON بسيط
