@@ -11,15 +11,63 @@
 .legend .leg:nth-child(3) .dot{background:#fff176}
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
-/* جدول الأحداث القابل للتمرير */
-.ev-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-.ev-table{width:100%;border-collapse:separate;border-spacing:0}
-.ev-table th,.ev-table td{padding:10px;border-bottom:1px solid var(--border);font:13px system-ui;vertical-align:top}
-.ev-table thead th{position:sticky;top:0;background:#f8fff5;z-index:1;text-align:right}
-.ev-table tr:hover td{background:#f7fff2}
-.ev-date{white-space:nowrap;color:#0f5132;font-weight:700}
-.ev-type{color:#14532d;font-weight:800}
-.ev-note{color:#355}
+/* === جدول الأحداث: صندوق تمرير + رأس ثابت + تفاصيل مقروءة === */
+.ev-scroll{
+  max-height: 300px;          /* على الديسكتوب: صندوق متوسط */
+  overflow:auto;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+}
+.ev-table{ width:100%; border-collapse:separate; border-spacing:0; }
+.ev-table thead th{
+  position:sticky; top:0; z-index:1;
+  background:#f8fff5; text-align:right;
+  border-bottom:1px solid var(--border);
+}
+.ev-table th,.ev-table td{
+  padding:10px; border-bottom:1px solid var(--border);
+  font:13px/1.5 system-ui; vertical-align:top;
+}
+.ev-table tr:hover td{ background:#f7fff2; }
+.ev-date{ white-space:nowrap; color:#0f5132; font-weight:800; }
+.ev-type{ color:#14532d; font-weight:800; }
+.ev-note{ color:#355; }
+    /* اخفاء زر "عرض الكل" افتراضيًا (شاشات كبيرة/ديسكتوب) */
+.ev-more{ display:none; }
+
+
+/* إبراز صف الحدث عند القفز من التايملاين */
+
+
+/* موبايل: ارتفاع مناسب + قصّ التفاصيل لسطرين مع زر "عرض الكل" */
+@media (max-width:560px){
+  .ev-scroll{ max-height: 42vh; }  /* صندوق أصغر قابل للتمرير */
+  .ev-table{ table-layout: fixed; } /* أعمدة ثابتة */
+  .ev-table th,.ev-table td{ padding:8px; font-size:12px; line-height:1.35; }
+
+  .ev-date,.ev-type{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .ev-note{
+    display:-webkit-box;
+    -webkit-line-clamp:2;              /* افتراضيًا سطرين */
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  tr.ev-row--open .ev-note{
+    -webkit-line-clamp:unset;
+    white-space:normal;
+  }
+
+  .ev-more{
+    display:inline-block;
+    margin-top:6px;
+    font:12px/1 system-ui;
+    color:#1b5e20;
+    border:0; background:transparent; padding:0; cursor:pointer;
+  }
+  tr.ev-row--open .ev-more{ display:none; } /* نخفيه بعد الفتح */
+}
 
     :root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
     *{box-sizing:border-box}
@@ -74,25 +122,7 @@
     @media (max-width:560px){.hl .note{grid-column:1 / -1}}
 
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
-    /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
-@media (max-width:560px){
-  .ev-scroll{ overflow:auto; }               /* التمرير داخل الصندوق */
-  .ev-table{ table-layout: fixed; }          /* ثبات أعمدة وellipsis */
-  .ev-table thead th{ position: sticky; top: 0; z-index:1; }
-
-  /* صفوف خفيفة */
-  .ev-table th, .ev-table td{ padding:6px 8px; font-size:12px; line-height:1.2; }
-
-  /* قصّ النص لسطـر واحد عشان ما يطوّلش ارتفاع الصف */
-  .ev-type, .ev-note, .ev-date{
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .ev-note{
-    display: -webkit-box;
-    -webkit-line-clamp: 1;      /* سطر واحد فقط */
-    -webkit-box-orient: vertical;
-  }
-}
+ 
 /* === Timeline (أحداث الحيوان) === */
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
@@ -670,7 +700,8 @@ function renderMilkChart(series){
   const lp=document.createElementNS('http://www.w3.org/2000/svg','path'); lp.setAttribute('d',d); lp.setAttribute('fill','none'); lp.setAttribute('stroke','#2e7d32'); lp.setAttribute('stroke-width','1.2'); svg.appendChild(lp);
   const cx=sx(N-1), cy=sy(data[N-1].y); const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
   dot.setAttribute('cx',cx); dot.setAttribute('cy',cy); dot.setAttribute('r',2); dot.setAttribute('fill','#1b5e20'); svg.appendChild(dot);
-  setTimeout(()=>{ sc.scrollLeft=svg.scrollWidth; },0);
+ setTimeout(()=>{ sc.scrollLeft = sc.scrollWidth; }, 0);
+
   addEventListener('resize',()=>renderMilkChart(series),{once:true});
 }
     /* === Timeline Helpers === */
@@ -1032,65 +1063,84 @@ function renderEventsList(events){
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:160px">التاريخ</th>
-        <th>اسم الحدث</th>
+        <th style="width:140px">التاريخ</th>
+        <th style="width:160px">اسم الحدث</th>
+        <th>التفاصيل</th>
       </tr>
     </thead>
     <tbody></tbody>
   `;
   const tbody = table.querySelector('tbody');
 
-  // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td>`;
+    tr.innerHTML = `
+      <td class="ev-date">—</td>
+      <td class="ev-type">لا توجد أحداث</td>
+      <td class="ev-note">—</td>
+    `;
     tbody.appendChild(tr);
-    wrap.appendChild(table); box.appendChild(wrap);
-    requestAnimationFrame(scheduleFit);
-    return;
+    wrap.appendChild(table);
+    box.appendChild(wrap);
+  } else {
+    const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
+      .sort((a,b) => (b.d||'').localeCompare(a.d||''));
+
+    for (const {e, d} of rows){
+      const tr = document.createElement('tr');
+      tr.id = e.id ? `evrow-${e.id}` : '';
+      tr.setAttribute('aria-selected','false');
+
+      const dateTd = document.createElement('td');
+      dateTd.className = 'ev-date';
+      dateTd.textContent = d ? new Date(d).toLocaleDateString('ar-EG') : '—';
+
+      const nameTd = document.createElement('td');
+      nameTd.className = 'ev-type';
+      nameTd.textContent = eventNameRaw(e);
+
+      const detTd = document.createElement('td');
+      detTd.className = 'ev-note';
+      detTd.textContent = compactEventDetails(e) || '—';
+
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'ev-more';
+      moreBtn.setAttribute('aria-expanded','false');
+      moreBtn.textContent = 'عرض الكل';
+      moreBtn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const open = tr.classList.toggle('ev-row--open');
+        moreBtn.setAttribute('aria-expanded', String(open));
+      });
+      detTd.appendChild(moreBtn);
+
+      tr.appendChild(dateTd);
+      tr.appendChild(nameTd);
+      tr.appendChild(detTd);
+      tbody.appendChild(tr);
+    }
+
+    wrap.appendChild(table);
+    box.appendChild(wrap);
   }
 
-  // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ نسيبه في الآخر
-  const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
-    .sort((a,b) => (b.d||'').localeCompare(a.d||''));
-
-  for (const {e, d} of rows){
-  const tr = document.createElement('tr');
-  tr.id = e.id ? `evrow-${e.id}` : '';       // 👈 معرّف الصف
-  tr.setAttribute('aria-selected','false');   // وصولية
-
-  tr.innerHTML = `
-    <td class="ev-date">${ d ? new Date(d).toLocaleDateString('ar-EG') : '—' }</td>
-    <td class="ev-type">${ eventNameRaw(e) }</td>
-  `;
-  tbody.appendChild(tr);
+  // فتح/قفل الصف بالسطر كله (مفيد للموبايل)
+  tbody.addEventListener('click', (e)=>{
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    tr.classList.toggle('ev-row--open');
+  });
 }
 
+  // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ يروح آخر القائمة
 
-  wrap.appendChild(table);
-  box.appendChild(wrap);
-  requestAnimationFrame(scheduleFit);
-}
-function focusEventRow(evId){
-  if (!evId) return;
-  const row = document.getElementById(`evrow-${evId}`);
-  if (!row) return;
-
-  // حدّد الوعاء القابل للتمرير
-  const scroller = document.querySelector('#evList .ev-scroll') || row.closest('.ev-scroll') || document;
-  // شيل الهايلايت القديم
-  const old = scroller.querySelector('.ev-row--focus');
-  if (old) old.classList.remove('ev-row--focus');
-
-  // هايلايت + تمرير ناعم
-  row.classList.add('ev-row--focus');
-  row.setAttribute('aria-selected','true');
-  const top = row.offsetTop - (scroller.clientHeight/2 - row.clientHeight/2);
-  scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-
-  // إزالة الهايلايت بعد شوية (اختياري)
-  clearTimeout(row._hlTO);
-  row._hlTO = setTimeout(()=>{ row.classList.remove('ev-row--focus'); }, 2500);
+function focusEventRow(eid){
+  const tr = document.getElementById(`evrow-${eid}`);
+  if (!tr) return;
+  tr.classList.add('ev-row--focus');
+  tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  setTimeout(()=> tr.classList.remove('ev-row--focus'), 1600);
 }
 
 
@@ -1143,29 +1193,7 @@ function renderCard(state, kind){
   // جديد: اعرض كل الحقول الأخرى من وثيقة الحيوان
 renderExtrasIntoSections(state.__animalRaw || {});
 }
-function fitEventsTableToOneRow(){
-  const wrap = document.querySelector('.ev-scroll');
-  if (!wrap) return;
-  const thead = wrap.querySelector('thead');
-  const first = wrap.querySelector('tbody tr');
-  if (!thead || !first) return;
 
-  // اجمع ارتفاع الرأس + أول صف فقط
-  const headH = Math.ceil(thead.getBoundingClientRect().height);
-  const rowH  = Math.ceil(first.getBoundingClientRect().height);
-  const total = headH + rowH + 2; // هامش بسيط
-
-  if (window.matchMedia('(max-width:560px)').matches){
-    wrap.style.maxHeight = total + 'px';
-  } else {
-    wrap.style.maxHeight = '';    // على الشاشات الكبيرة: ارجع للوضع العادي
-  }
-}
-
-// أعِد الحساب بعد ما الجدول يتبني + عند تغيير المقاس
-let _fitTO;
-function scheduleFit(){ clearTimeout(_fitTO); _fitTO = setTimeout(fitEventsTableToOneRow, 60); }
-window.addEventListener('resize', scheduleFit);
 
 /* ======================= Load & Run ======================= */
 async function loadAndRender({number, animalId, type}){
@@ -1215,6 +1243,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
