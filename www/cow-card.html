@@ -12,17 +12,19 @@
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
 /* === جدول الأحداث: صف واحد ظاهر فقط + تمرير للباقي === */
-.ev-scroll{ height:auto !important; max-height:none !important; }
+/* جدول الأحداث: صفّ واحد ظاهر + سكرول للباقي */
+.ev-scroll{ height:auto !important; max-height:none !important; overflow:hidden; }
 .ev-scroll.single-row{
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
 }
-.ev-scroll.single-row .ev-note{
+/* أول صف مفتوح بالكامل حتى على الموبايل */
+.ev-scroll.single-row .ev-row--open .ev-note{
   -webkit-line-clamp:unset !important;
   white-space:normal !important;
 }
-.ev-scroll.single-row .ev-more{ display:none !important; }  /* إلغاء زر "عرض الكل" دائمًا */
+.ev-scroll.single-row .ev-more{ display:none !important; }
 
 /* جدول الأحداث */
 .ev-table{ width:100%; border-collapse:separate; border-spacing:0; }
@@ -404,8 +406,8 @@ function evMilkKg(e = {}) {
   return sum;
 }
 
-/* === صف واحد للأحداث: قفل ارتفاع الصندوق على أول صف === */
-function fitEventsBoxToOneRow(){
+/* صف واحد للأحداث: قياس ذكي + مراقبة تغيّر المقاس */
+function activateSingleRowScroll(){
   const wrap  = document.querySelector('#evList .ev-scroll');
   const table = wrap?.querySelector('table');
   const head  = table?.tHead || null;
@@ -413,21 +415,28 @@ function fitEventsBoxToOneRow(){
   const first = body?.rows?.[0] || null;
   if(!wrap || !table || !first) return;
 
-  wrap.classList.add('single-row');      // نمط الصف الواحد
-  first.classList.add('ev-row--open');   // افتح أول صف بالكامل
+  wrap.classList.add('single-row');
+  first.classList.add('ev-row--open');
 
-  // امسح أي ارتفاع سابق ثم قِس بعد اكتمال الـ layout
-  wrap.style.height = 'auto';
-  requestAnimationFrame(()=>{
+  const measure = ()=>{
     const hHead = Math.ceil(head?.getBoundingClientRect().height || 0);
     const hRow  = Math.ceil(first.getBoundingClientRect().height || 0);
-    if (hRow < 10) { setTimeout(fitEventsBoxToOneRow, 50); return; } // لو لسه ما اتقاسش
-    wrap.style.height = (hHead + hRow + 2) + 'px'; // +2 للحدود
-  });
-}
+    if (hRow < 8) { setTimeout(measure, 40); return; }   // استنى لحد ما الصف يرسم
+    wrap.style.maxHeight = (hHead + hRow + 2) + 'px';    // +2 للحدود
+  };
 
-// إعادة القياس عند تغيير العرض
-window.addEventListener('resize', fitEventsBoxToOneRow);
+  const ro = new ResizeObserver(measure);
+  ro.observe(first);
+  if (head) ro.observe(head);
+  ro.observe(wrap);
+
+  const mo = new MutationObserver(measure);
+  mo.observe(body, {childList:true, subtree:true, characterData:true});
+
+  measure();
+  window.addEventListener('resize', measure);
+  window.addEventListener('orientationchange', measure);
+}
 
 /* ======================= Firestore ======================= */
 async function fetchAnimalByNumber(n){
@@ -1047,7 +1056,7 @@ function renderEventsList(events){
   });
 
   // قفل العلبة على ارتفاع صف واحد بعد بناء الجدول
-  fitEventsBoxToOneRow();
+activateSingleRowScroll();
 }
 
 function focusEventRow(eid){
@@ -1155,12 +1164,14 @@ if (numberParam || idParam){
 }
 
 /* تأكيد إعادة القياس بعد التحميل والخطوط */
-window.addEventListener('load', ()=>{
-  requestAnimationFrame(()=>requestAnimationFrame(fitEventsBoxToOneRow));
+window.addEventListener('load', ()=> {
+  requestAnimationFrame(()=>requestAnimationFrame(activateSingleRowScroll));
 });
 if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(()=> setTimeout(fitEventsBoxToOneRow, 0));
+  document.fonts.ready.then(()=> setTimeout(activateSingleRowScroll, 0));
 }
+
   </script>
 </body>
 </html>
+
