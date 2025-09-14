@@ -632,8 +632,14 @@ function buildState(animal, events){
     if (t==='heat' && d) st.estrusDates.push(d);
     if (t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='عِشار'; }
     if (t==='disease'){
-      st.healthHistory.push({ date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||'' });
-      st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate=st.lastCheckDate || d || null;
+     const rawDx = e.diseaseName || e.diagnosis || e.disease || e.condition || e.eventType || e.type || e.name || '';
+const dx    = translateToken(rawDx) || (hasArabic(rawDx) ? String(rawDx).trim() : String(rawDx||'—'));
+st.healthHistory.push({ date: d||'', diagnosis: dx, note: e.note||'' });
+if (st.healthHistory.length && st.healthStatus === 'حالات صحية مسجلة') {
+  const lastDx = st.healthHistory.at(-1)?.diagnosis;
+  if (lastDx) st.healthStatus = lastDx;    // يعرض آخر تشخيص كحالة حالية
+}
+
     }
     if (t==='milk'){
       const kg=evMilkKg(e);
@@ -1326,6 +1332,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
