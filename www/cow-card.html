@@ -12,13 +12,23 @@
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
 /* === جدول الأحداث: صندوق تمرير + رأس ثابت + تفاصيل مقروءة === */
+/* === جدول الأحداث: صندوق تمرير + رأس ثابت === */
 .ev-scroll{
-  max-height: 300px;          /* على الديسكتوب: صندوق متوسط */
-  overflow:auto;
+  height: 320px;                /* كان max-height:300px */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;   /* سلاسة على الموبايل */
+  overscroll-behavior: contain;        /* يمنع سحب الصفحة بدل الصندوق */
   border:1px solid var(--border);
   border-radius:12px;
   background:#fff;
 }
+
+/* موبايل */
+@media (max-width:560px){
+  .ev-scroll{ height: 42vh; }   /* كان max-height:42vh */
+}
+
 .ev-table{ width:100%; border-collapse:separate; border-spacing:0; }
 .ev-table thead th{
   position:sticky; top:0; z-index:1;
@@ -314,14 +324,26 @@ const toPercent = (v)=>{
 
 
 // يجيب اسم الحدث زي ما هو من البيانات، بدون اختراعات
-function eventNameRaw(e = {}){
-  const CANDS = ['name','title','eventName','type','eventType','kind','category','diagnosis'];
-  for (const k of CANDS){
-    const v = e[k];
-    if (v != null && String(v).trim() !== '') return String(v);
+// يجيب اسم الحدث "كما هو" من الداتا، مع تفضيل التشخيص على النوع العام
+// اسم الحدث كما هو من الداتا — يفضّل التشخيص أولاً (يدعم مفاتيح عربية)
+function eventNameRaw(e = {}) {
+  const pick = (k) => {
+    const v = e && e[k];
+    return v != null && String(v).trim() !== '' ? String(v).trim() : null;
+  };
+  const CANDS = [
+    'diagnosis','diagnose','dx','label','تشخيص',          // تشخيص أولاً
+    'name','title','eventName','اسم_الحدث',               // أسماء صريحة
+    'kind','category',                                     // فئات
+    'type','eventType'                                     // النوع العام آخر حاجة
+  ];
+  for (const k of CANDS) {
+    const v = pick(k);
+    if (v) return v;
   }
   return '—';
 }
+
 
 
 const normKind=(k)=>{const s=String(k??'').trim().toLowerCase();
@@ -562,7 +584,8 @@ function buildState(animal, events){
     if (t==='heat' && d) st.estrusDates.push(d);
     if (t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='عِشار'; }
     if (t==='disease'){
-      st.healthHistory.push({ date:d||'', diagnosis:e.diagnosis||e.note||e.eventType||'—', note:e.note||'' });
+   st.healthHistory.push({ date:d||'', diagnosis:eventNameRaw(e), note:e.note||'' });
+
       st.healthStatus='حالات صحية مسجلة'; st.lastCheckDate=st.lastCheckDate || d || null;
     }
     if (t==='milk'){
@@ -1002,11 +1025,12 @@ function compactEventDetails(e){
     if (kg > 0) return `لبن: ${kg} كجم`;
   }
 
-  if (t === 'disease'){
-    const dx = e.diagnosis || e.disease || e.condition || '—';
-    const nt = e.note ? ` — ${e.note}` : '';
-    return `تشخيص: ${dx}${nt}`;
-  }
+ if (t === 'disease'){
+  const dx = eventNameRaw(e);                 // 👈 التشخيص كما هو
+  const nt = e.note ? ` — ${e.note}` : '';
+  return `تشخيص: ${dx}${nt}`;
+}
+
 
   if (t === 'insemination'){
     const bull = e.bull || e.semen || e.sire || e.straw || '—';
@@ -1243,6 +1267,7 @@ if (numberParam || idParam){
   </script>
 </body>
 </html>
+
 
 
 
