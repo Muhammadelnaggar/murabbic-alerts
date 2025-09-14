@@ -29,6 +29,18 @@
     .empty{padding:14px;text-align:center;color:var(--muted)}
     .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
     .err.show{display:block}
+    /* جدول عريض: أول عمودين ثابتين، والباقي سكرول أفقي */
+.table-hscroll{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+.table-wide{border-collapse:separate;border-spacing:0;min-width:900px;width:100%}
+.table-wide thead th{position:sticky;top:0;background:#f8fafc;border-bottom:1px solid var(--border);z-index:3}
+.table-wide th,.table-wide td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+.table-wide tbody tr:hover{background:#f9fff8}
+
+.table-wide .col-date{position:sticky; inset-inline-start:0; background:#fff; z-index:4; min-width:140px; width:140px}
+.table-wide .col-name{position:sticky; inset-inline-start:140px; background:#fff; z-index:4; min-width:200px; width:200px}
+
+.table-wide .pill{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700}
+
   </style>
 </head>
 <body>
@@ -59,10 +71,10 @@
         <option value="تغذية">تغذية</option>
       </select>
     </div>
+<div class="table-wrap table-hscroll">
+  <div class="scroll">
+    <table dir="rtl" class="table-wide">
 
-    <div class="table-wrap">
-      <div class="scroll">
-        <table dir="rtl">
           <thead>
             <tr>
               <th>التاريخ</th>
@@ -89,6 +101,49 @@
     let UID = null, TID = null;  // مستخدم/مستأجر
     const $ = (id)=>document.getElementById(id);
     const rows = $('rows'), errbox = $('err'), meta = $('meta');
+    // مفاتيح لا نعرضها
+const EXCLUDE = new Set([
+  'userId','ownerUid','tenantId','uid',
+  'createdAt','updatedAt','_created','_updated',
+  '__name__','__path__','id','animalRef'
+]);
+
+// مرشّحات اسم الحدث كما هو (بدون تعريب أو ذكاء)
+const NAME_CANDIDATES = [
+  'اسم_الحدث','اسم','عنوان','العنوان','pageTitleAr','page_name_ar','page_ar',
+  'eventNameAr','nameAr','titleAr','labelAr','نوع_الحدث',
+  'name','title','label','eventName','eventType','type','kind','category'
+];
+
+const DATE_CANDIDATES = [
+  'eventDate','date','day','dueDate'
+];
+
+function getEventNameRaw(e={}){
+  for (const k of NAME_CANDIDATES){
+    if (e[k]!=null && String(e[k]).trim()!=='') return String(e[k]).trim();
+  }
+  return '—';
+}
+
+function getEventDateISO(e={}){
+  for (const k of DATE_CANDIDATES){
+    if (e[k]) return String(e[k]);
+  }
+  if (typeof e?.createdAt?.toDate === 'function'){
+    try{ return e.createdAt.toDate().toISOString().slice(0,10); }catch{}
+  }
+  return '';
+}
+
+function cellVal(v){
+  if (v==null) return '—';
+  if (typeof v==='string' || typeof v==='number' || typeof v==='boolean') return String(v);
+  if (typeof v?.toDate==='function'){ try{ return v.toDate().toISOString(); }catch{} }
+  if (Array.isArray(v)) return v.map(x=>cellVal(x)).join('، ');
+  try{ return JSON.stringify(v); }catch{ return String(v); }
+}
+
 
     // نطاق الملكية: لازم userId حسب القواعد + tenantId لو موجود
     function scopeWheres(field, num){
@@ -236,34 +291,88 @@
     }
 
     // رسم الجدول
-    function render(events, bounds){
-      rows.innerHTML = '';
-      if (!events.length){
-        rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
-      } else {
-        const frag = document.createDocumentFragment();
-        for(const ev of events){
-          const tr = document.createElement('tr');
-          const td1 = document.createElement('td');
-          const td2 = document.createElement('td');
-          const td3 = document.createElement('td');
-          td1.textContent = fmt(ev.eventDate || ev.dueDate || ev.createdAt?.toDate?.()?.toISOString()?.slice(0,10) || '');
-          td2.innerHTML = `<span class="pill">${arabicType(ev)}</span>`;
-          td3.textContent = ev.notes || ev.aiHints || '' ;
-          tr.append(td1,td2,td3);
-          frag.appendChild(tr);
-        }
-        rows.appendChild(frag);
-      }
+   // يعرض كل الحقول كما هي من فايربيز: التاريخ + الاسم ثابتين، والباقي أعمدة أفقية
+function renderFlatAll(events){
+  // لا أحداث
+  if (!Array.isArray(events) || !events.length){
+    rows.innerHTML = '<tr><td colspan="999" class="empty">لا توجد أحداث.</td></tr>';
+    return;
+  }
 
-      if (!bounds.start){
-        meta.textContent = 'كل الأحداث (لا توجد ولادة مسجّلة لبداية موسم)';
-      } else if (bounds.end){
-        meta.textContent = `من الولادة ${bounds.start} حتى قبل الولادة ${bounds.end}`;
-      } else {
-        meta.textContent = `من الولادة ${bounds.start} حتى اليوم`;
-      }
+  // اجمع كل المفاتيح الموجودة في كل حدث (عدا المستبعَد + التاريخ + الاسم)
+  const allKeys = new Set();
+  for (const ev of events){
+    for (const k of Object.keys(ev||{})){
+      if (EXCLUDE.has(k)) continue;
+      if (DATE_CANDIDATES.includes(k)) continue;
+      if (NAME_CANDIDATES.includes(k)) continue;
+      allKeys.add(k);
     }
+  }
+  const keys = Array.from(allKeys);
+
+  // ابنِ رأس الجدول: تاريخ + اسم + باقي المفاتيح
+  const thead = rows.closest('table').querySelector('thead');
+  if (thead){
+    thead.innerHTML = '';
+    const trh = document.createElement('tr');
+
+    const thDate = document.createElement('th');
+    thDate.className = 'col-date';
+    thDate.textContent = 'التاريخ';
+    trh.appendChild(thDate);
+
+    const thName = document.createElement('th');
+    thName.className = 'col-name';
+    thName.textContent = 'الحدث';
+    trh.appendChild(thName);
+
+    for (const k of keys){
+      const th = document.createElement('th');
+      th.textContent = k; // كما هو من فايربيز
+      trh.appendChild(th);
+    }
+    thead.appendChild(trh);
+  }
+
+  // صفوف
+  rows.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const ev of events){
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.className = 'col-date';
+    tdDate.textContent = getEventDateISO(ev) || '—';
+    tr.appendChild(tdDate);
+
+    const tdName = document.createElement('td');
+    tdName.className = 'col-name';
+    tdName.innerHTML = `<span class="pill">${getEventNameRaw(ev)}</span>`;
+    tr.appendChild(tdName);
+
+    for (const k of keys){
+      const td = document.createElement('td');
+      td.textContent = cellVal(ev[k]);
+      tr.appendChild(td);
+    }
+
+    frag.appendChild(tr);
+  }
+  rows.appendChild(frag);
+
+
+    
+ }
+function setMeta(bounds){
+  if (!bounds?.start){
+    meta.textContent = 'كل الأحداث (لا توجد ولادة مسجّلة لبداية موسم)';
+  } else if (bounds.end){
+    meta.textContent = `من الولادة ${bounds.start} حتى قبل الولادة ${bounds.end}`;
+  } else {
+    meta.textContent = `من الولادة ${bounds.start} حتى اليوم`;
+  }
+}
 
     // ——— main ———
     (async function run(){
@@ -282,13 +391,16 @@
       const today = new Date().toISOString().slice(0,10);
       const profile = await getAnimalProfile(num);
       const bounds  = await getSeasonBounds(num, today, profile);
+      setMeta(bounds);
+
 
       // لو ما فيش ولادة مُسجّلة: اعرض كل الأحداث (علشان ما نخفيش حاجة)
       const all = await getEventsForRange(num, bounds.start || null, bounds.end || null);
       const sel = $('catFilter');
       if (sel) sel.value = qpCat() || '';
       const currentCat = sel ? sel.value : '';
-      render(filterByCat(all, currentCat), bounds);
+     renderFlatAll(filterByCat(all, currentCat));
+
 
       if (sel){
         sel.addEventListener('change', ()=>{
@@ -296,7 +408,8 @@
           const url = new URL(location.href);
           if (cat) url.searchParams.set('cat', cat); else url.searchParams.delete('cat');
           history.replaceState({}, '', url.toString());
-          render(filterByCat(all, cat), bounds);
+          renderFlatAll(filterByCat(all, cat));
+
         });
       }
     })().catch(e=>{ console.error(e); showErr('تعذّر تحميل الأحداث. تأكد من الصلاحيات وقواعد Firestore.'); });
