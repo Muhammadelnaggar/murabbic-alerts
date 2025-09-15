@@ -11,8 +11,7 @@
       --bg:#f7faf7;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--border:#e2e8f0;--thead:#f8fafc;
       --pill-bg:#ecfdf5;--pill-br:#bbf7d0;--pill-ink:#065f46;
       --warn-bg:#fff7ed;--warn-br:#fed7aa;--warn-ink:#7c2d12;
-      --w1:120px; /* التاريخ — يُضبط آليًا */
-      --w2:160px; /* الحدث — يُضبط آليًا */
+      --w1:120px; --w2:160px; /* يُعاد ضبطهما تلقائياً */
     }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
@@ -66,6 +65,14 @@
     /* هيكل تحميل بسيط */
     .skeleton td{background:linear-gradient(100deg,#f2f6f4 40%,#eaf3ee 50%,#f2f6f4 60%);background-size:200% 100%;animation:s 1.2s infinite linear}
     @keyframes s{to{background-position:-200% 0}}
+
+    /* تفاصيل قابلة للطيّ */
+    details.ev-more{margin-top:6px}
+    details.ev-more summary{cursor:pointer;font-weight:700;color:var(--brand-600)}
+    .kv{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+    .kv .item{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px}
+    .kv .k{color:#475569;margin-inline-end:4px}
+    .kv .v{color:#0f172a;font-weight:700}
   </style>
 </head>
 <body>
@@ -116,10 +123,10 @@
   </div>
 
   <script type="module">
+    /* يجب أن يصدّر /js/firebase-config.js: db, auth
+       مع getFirestore(app, 'murabbikdata') كما هو متفق عليه. */
     import { db, auth } from '/js/firebase-config.js';
-    import {
-      collection, getDocs, query, where, orderBy, limit
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { collection, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     // ---------- DOM ----------
@@ -142,7 +149,7 @@
     const showErr = (msg) => { errBox.textContent = msg; errBox.classList.add('show'); };
     const hideErr = () => { errBox.classList.remove('show'); errBox.textContent=''; };
 
-    // Arabic event label
+    // أسماء عربية للأحداث (لو eventType إنجليزي)
     const arabicType = (ev) => {
       if (ev.type) return ev.type;
       const map = {
@@ -155,7 +162,7 @@
       return map[ev.eventType] || 'حدث';
     };
 
-    // Category mapping (للترشيح الاختياري)
+    // ترشيح بالقسم
     const CATEGORY_MAP = {
       'انتاج' : ['daily_milk','dry_off'],
       'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
@@ -180,17 +187,17 @@
       return ts ? ts.toISOString().slice(0,10) : '';
     };
 
-    // مُساعد لالتقاط قيمة أول مفتاح موجود من بدائل متعددة
+    // مُساعد: التقط أول مفتاح موجود من بدائل متعددة
     const pick = (obj, keys, suffix='')=>{
       for (const k of keys){ if (obj?.[k] !== undefined && obj?.[k] !== '') return `${obj[k]}${suffix}`; }
       return null;
     };
     const joinParts = (arr)=> arr.filter(Boolean).join(' • ');
 
-    // === تفاصيل الحدث بحسب النوع (بدلاً من notes) ===
+    // === تفاصيل الحدث “الملخّص الذكي” حسب النوع (بدلاً من notes) ===
     function detailsFor(ev){
       const t = ev.eventType || '';
-      // —— تلقيح
+
       if (t === 'insemination'){
         const time = pick(ev, ['timeOfDay','aiTime','shift','period']); // صباح/مساء
         const bull = pick(ev, ['bullName','semenBull','stallion','semenCode']);
@@ -200,37 +207,37 @@
         const dim  = pick(ev, ['dim','daysInMilk'],' DIM');
         return joinParts([time && `وقت: ${time}`, bull && `الطلوقة: ${bull}`, dose, tech, heat, dim]);
       }
-      // —— تشخيص حمل
+
       if (t === 'pregnancy_diagnosis'){
-        const method = pick(ev, ['method','pdMethod']); // سونار/يدوي
-        const res = pick(ev, ['result','pregResult']);  // حامل/غير حامل
+        const method = pick(ev, ['method','pdMethod']);
+        const res = pick(ev, ['result','pregResult']);
         const age = pick(ev, ['fetusAgeDays','fetusAge','gestationAgeDays'],' يوم');
         const twin = ev.twin ? 'توائم' : null;
         return joinParts([method && `طريقة: ${method}`, res && `النتيجة: ${res}`, age && `عمر الجنين: ${age}`, twin]);
       }
-      // —— ولادة
+
       if (t === 'calving'){
-        const sex = pick(ev, ['calfSex','sex']); // ذكر/أنثى
-        const type = pick(ev, ['birthType','calvingType']); // مفرد/توائم
+        const sex = pick(ev, ['calfSex','sex']);
+        const type = pick(ev, ['birthType','calvingType']);
         const diff = pick(ev, ['dystocia','difficulty']);
         const rp = ev.retainedPlacenta ? 'احتباس مشيمة' : null;
         const calfId = pick(ev, ['calfNumber','calfId']);
         return joinParts([type && `الولادة: ${type}`, sex && `الجنس: ${sex}`, calfId && `رقم العجل: ${calfId}`, diff && `عسرة: ${diff}`, rp]);
       }
-      // —— لبن يومي
+
       if (t === 'daily_milk'){
         const kg   = pick(ev, ['milkKg','milk','yield'],' كجم');
-        const shift= pick(ev, ['shift','timeOfDay']); // صباح/مساء
+        const shift= pick(ev, ['shift','timeOfDay']);
         const fat  = pick(ev, ['fat','fatPct','fatPercent'],'% دهن');
         const pr   = pick(ev, ['protein','proteinPct','proteinPercent'],'% بروتين');
         const lac  = pick(ev, ['lactose','lactosePct'],'% لاكتوز');
         const snf  = pick(ev, ['snf','snfPct'],'% SNF');
-        const scc  = pick(ev, ['scc','somaticCellCount']); // خلية/مل
+        const scc  = pick(ev, ['scc','somaticCellCount']);
         const ec   = pick(ev, ['ec','conductivity'],' mS/cm');
         const temp = pick(ev, ['milkTemp'],'°C');
         return joinParts([kg && `لبن: ${kg}`, shift && `وردية: ${shift}`, fat, pr, lac, snf, scc && `SCC: ${scc}`, ec && `EC: ${ec}`, temp && `حرارة: ${temp}`]);
       }
-      // —— سمات اللبن بالكاميرا
+
       if (t === 'milking_traits_eval'){
         const speed = pick(ev, ['milkingSpeed','speed'],' كجم/دقيقة');
         const letdown = pick(ev, ['letdownTime'],' ثانية');
@@ -247,7 +254,7 @@
           mast && `مخاطر الضرع: ${mast}`
         ]);
       }
-      // —— تقييم حالة الجسم
+
       if (t === 'bcs_eval'){
         const score = pick(ev, ['score','bcs']);
         const rump  = pick(ev, ['rumpAngle']);
@@ -255,35 +262,37 @@
         const spine = pick(ev, ['backbones']);
         return joinParts([score && `BCS: ${score}`, rump && `زاوية العجز: ${rump}`, ribs && `الأضلاع القصيرة: ${ribs}`, spine && `الفقرات: ${spine}`]);
       }
-      // —— تقييم الروث
+
       if (t === 'feces_eval' || t === 'feces' || t === 'feaces'){
         const score = pick(ev, ['score','fecesScore']);
         const cons  = pick(ev, ['consistency']);
         const fiber = pick(ev, ['longFibers']);
         return joinParts([score && `درجة الروث: ${score}`, cons && `القوام: ${cons}`, fiber && `ألياف طويلة: ${fiber}`]);
       }
-      // —— ضرع/عرج/تطعيم/علاج
+
       if (t === 'mastitis'){
-        const q = pick(ev, ['quarter','teatQuarter']); // RF/RH/LF/LH
+        const q = pick(ev, ['quarter','teatQuarter']);
         const cmt = pick(ev, ['cmt','cmtScore']);
         const sev = pick(ev, ['severity']);
         return joinParts([q && `ربع: ${q}`, cmt && `CMT: ${cmt}`, sev && `شدة: ${sev}`]);
       }
+
       if (t === 'lameness'){
         const sc = pick(ev, ['score','lamenessScore']);
         const leg= pick(ev, ['leg','affectedLeg']);
         const cause = pick(ev, ['cause']);
         return joinParts([sc && `درجة العرج: ${sc}`, leg && `الرجل: ${leg}`, cause && `سبب: ${cause}`]);
       }
+
       if (t === 'vaccination'){
         const v = pick(ev, ['vaccine','vaccineName']);
         const dose = pick(ev, ['dose'],' جرعة');
         const route= pick(ev, ['route']);
         return joinParts([v && `لقاح: ${v}`, dose, route && `مسار: ${route}`]);
       }
-      // —— تغذية
+
       if (t === 'nutrition' || t === 'feeding'){
-        const mode  = pick(ev, ['mode','rationType']); // TMR/Split…
+        const mode  = pick(ev, ['mode','rationType']);
         const dm    = pick(ev, ['dm','dmPct'],'% DM');
         const cp    = pick(ev, ['cp','cpPct'],'% بروتين');
         const ndf   = pick(ev, ['ndf','ndfPct'],'% NDF');
@@ -293,12 +302,42 @@
         return joinParts([mode && `نمط: ${mode}`, dm, cp, ndf, st, cost && `تكلفة: ${cost}`, fcr && `F:C: ${fcr}`]);
       }
 
-      // افتراضي: استعرض أشهر الحقول لو وُجدت
+      // افتراضي عند غياب خرائط خاصة
       const dim = pick(ev, ['dim'],' DIM');
       const kg  = pick(ev, ['milkKg'],' كجم');
       const temp= pick(ev, ['temp'],'°C');
       const generic = joinParts([kg && `لبن: ${kg}`, dim && `DIM: ${dim}`, temp && `حرارة: ${temp}`]);
       return generic || (ev.notes || ev.aiHints || '');
+    }
+
+    // مفاتيح نخفيها من "تفاصيل أكثر"
+    const HIDE_KEYS = new Set([
+      'id','userId','uid','tenantId','createdAt','updatedAt',
+      'animalId','animalNumber','number','source','eventId','docId','_path'
+    ]);
+    function fmtVal(v){
+      if (v == null) return '';
+      if (typeof v === 'boolean') return v ? 'نعم' : 'لا';
+      if (v?.toDate?.) { try{ return v.toDate().toISOString().slice(0,19).replace('T',' ');}catch{} }
+      if (Array.isArray(v)) return v.join(', ');
+      if (typeof v === 'object') return JSON.stringify(v);
+      return String(v);
+    }
+    function buildKV(ev){
+      const frag = document.createDocumentFragment();
+      const wrap = document.createElement('div'); wrap.className='kv';
+      const entries = Object.entries(ev)
+        .filter(([k,v])=> !HIDE_KEYS.has(k) && v!=='' && v!==null && v!==undefined)
+        .sort(([a],[b]) => a.localeCompare(b,'ar'));
+      for (const [k,v] of entries){
+        const div = document.createElement('div'); div.className='item';
+        const kEl = document.createElement('span'); kEl.className='k'; kEl.textContent = k+':';
+        const vEl = document.createElement('span'); vEl.className='v'; vEl.textContent = ' '+fmtVal(v);
+        div.append(kEl, vEl);
+        wrap.appendChild(div);
+      }
+      frag.appendChild(wrap);
+      return frag;
     }
 
     // شروط المالك + حقل الحيوان
@@ -310,7 +349,6 @@
       return wh;
     }
 
-    // انتظار حالة الدخول
     function waitAuth(){ return new Promise(res=>{ const off = onAuthStateChanged(auth,(u)=>{ off(); res(u||null); }); }); }
 
     // ولادات لتحديد حدود الموسم
@@ -393,7 +431,7 @@
       table.style.setProperty('--w2', w2 + 'px');
     }
 
-    // رسم الصفوف
+    // رسم الصفوف (مع "تفاصيل أكثر")
     function renderRows(events, bounds){
       rows.classList.remove('skeleton');
       rows.innerHTML = '';
@@ -415,7 +453,20 @@
 
           const td3 = document.createElement('td');
           td3.className = 'flex-col';
-          td3.textContent = detailsFor(ev);   // ← التفاصيل من الحقول نفسها
+
+          // ملخّص ذكي حسب النوع (تلقيح/سمات اللبن/…)
+          const summary = document.createElement('div');
+          summary.textContent = detailsFor(ev);
+          td3.appendChild(summary);
+
+          // تفاصيل كاملة قابلة للطيّ
+          const det = document.createElement('details');
+          det.className = 'ev-more';
+          const sum = document.createElement('summary');
+          sum.textContent = 'تفاصيل أكثر';
+          det.appendChild(sum);
+          det.appendChild(buildKV(ev));
+          td3.appendChild(det);
 
           tr.append(td1, td2, td3);
           frag.appendChild(tr);
@@ -464,7 +515,8 @@
       const bounds  = await getSeasonBounds(num, today, profile);
 
       const allEvents = await getEventsForRange(num, bounds.start || null, bounds.end || null);
-      renderRows(filterByCat(allEvents, selCat.value || ''), bounds);
+      const initial  = filterByCat(allEvents, selCat.value || '');
+      renderRows(initial, bounds);
 
       selCat.addEventListener('change', ()=>{
         const cat = selCat.value || '';
