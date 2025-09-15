@@ -1,0 +1,70 @@
+/* ========= Murabbik Form Styles ========= */
+
+/* ألوان افتراضية لو متغيّرات :root مش موجودة */
+:root{
+  --brand: #0ea05a;
+  --brand-600: #0b7f47;
+  --border: #e2e8f0;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --error: #b91c1c;
+  --error-bg: #fff1f2;
+  --error-br: #fecaca;
+}
+
+/* حاوية الحقل (اختياري لترك مسافات ثابتة) */
+.field{ margin-bottom: 12px; }
+
+/* الحقول الأساسية */
+input, select, textarea{
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+
+/* تلميح تحت الحقل */
+.field-msg{
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+  display: block;
+}
+
+/* تمييز الحقل غير الصحيح */
+.invalid{
+  border-color: var(--error-br) !important;
+  background: var(--error-bg);
+}
+
+/* تركيز الحقل غير الصحيح */
+.invalid:focus{
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+/* لاصقة “مطلوب” (اختياري) */
+label .req::after{
+  content: " *";
+  color: var(--error);
+  font-weight: 700;
+}
+
+/* Placeholder أفتح شوية */
+::placeholder{ color: #94a3b8; }
+
+/* دعم RTL/LTR بدون كسر */
+html[dir="rtl"] .field { text-align: right; }
+html[dir="ltr"] .field { text-align: left; }
+
+/* داكن (اختياري لو عندك dark class على body) */
+.dark input,.dark select,.dark textarea{
+  background:#0b0f14;color:#e5eef5;border-color:#22303c;
+}
+.dark .field-msg{ color:#ffb4b4; }
+.dark .invalid{ background:#381a1f;border-color:#ff8b8b; }
+.dark .invalid:focus{ outline-color:#ff8b8b; }
