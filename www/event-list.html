@@ -11,8 +11,8 @@
       --bg:#f7faf7;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--border:#e2e8f0;--thead:#f8fafc;
       --pill-bg:#ecfdf5;--pill-br:#bbf7d0;--pill-ink:#065f46;
       --warn-bg:#fff7ed;--warn-br:#fed7aa;--warn-ink:#7c2d12;
-      --w1:120px; /* التاريخ — يُضبط برمجياً على حسب المحتوى */
-      --w2:160px; /* اسم الحدث — يُضبط برمجياً على حسب المحتوى */
+      --w1:120px; /* التاريخ — يُضبط آليًا */
+      --w2:160px; /* الحدث — يُضبط آليًا */
     }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
@@ -29,9 +29,7 @@
 
     .filters{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
     .filters label{font-size:12px;color:var(--muted)}
-    .filters input,.filters select{
-      padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-family:inherit
-    }
+    .filters input,.filters select{padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-family:inherit}
     .filters .num{display:flex;align-items:center;gap:6px}
     .filters input[readonly]{background:#f9fafb;color:#475569}
 
@@ -49,7 +47,7 @@
     .sticky-2{inset-inline-end:var(--w1);min-width:var(--w2);max-width:calc(var(--w2) + 2px);white-space:nowrap}
     thead .sticky-1, thead .sticky-2{background:var(--thead);z-index:7}
 
-    /* باقي الأعمدة تمرير أفقي مريح على الموبايل */
+    /* تفاصيل تمرير أفقي مريح على الموبايل */
     .flex-col{min-width:520px}
     @media (max-width:480px){
       .title{font-size:15px}
@@ -106,7 +104,7 @@
             <tr>
               <th class="sticky-1">التاريخ</th>
               <th class="sticky-2">الحدث</th>
-              <th class="flex-col">تفاصيل / ملاحظات</th>
+              <th class="flex-col">تفاصيل / قيَم الحدث</th>
             </tr>
           </thead>
           <tbody id="rows" class="skeleton">
@@ -118,17 +116,13 @@
   </div>
 
   <script type="module">
-    /* ===== الاعتماد على إعدادات المشروع الحالية =====
-       يجب أن يصدّر /js/firebase-config.js الكائنين db, auth
-       مع getFirestore(app, 'murabbikdata') كما هو متفق عليه.
-    */
     import { db, auth } from '/js/firebase-config.js';
     import {
       collection, getDocs, query, where, orderBy, limit
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    // ---------- عناصر ----------
+    // ---------- DOM ----------
     const $ = (sel,root=document)=>root.querySelector(sel);
     const rows   = $('#rows');
     const metaEl = $('#meta');
@@ -138,19 +132,19 @@
     const errBox = $('#err');
     const openCard = $('#openCard');
 
-    // ---------- هوية المستأجر/المستخدم ----------
+    // ---------- Identity ----------
     let UID = null, TID = null;
     const qp = new URLSearchParams(location.search);
     const getQNum = () => qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
     const getQCat = () => qp.get('cat') || '';
 
-    // ---------- مساعدات ----------
+    // ---------- Helpers ----------
     const showErr = (msg) => { errBox.textContent = msg; errBox.classList.add('show'); };
     const hideErr = () => { errBox.classList.remove('show'); errBox.textContent=''; };
 
-    // أسماء عربية للأحداث (لو eventType إنجليزي)
+    // Arabic event label
     const arabicType = (ev) => {
-      if (ev.type) return ev.type; // الاسم محفوظ بالعربية من صفحات الحدث
+      if (ev.type) return ev.type;
       const map = {
         calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
         pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
@@ -161,7 +155,7 @@
       return map[ev.eventType] || 'حدث';
     };
 
-    // تصنيف
+    // Category mapping (للترشيح الاختياري)
     const CATEGORY_MAP = {
       'انتاج' : ['daily_milk','dry_off'],
       'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
@@ -186,6 +180,127 @@
       return ts ? ts.toISOString().slice(0,10) : '';
     };
 
+    // مُساعد لالتقاط قيمة أول مفتاح موجود من بدائل متعددة
+    const pick = (obj, keys, suffix='')=>{
+      for (const k of keys){ if (obj?.[k] !== undefined && obj?.[k] !== '') return `${obj[k]}${suffix}`; }
+      return null;
+    };
+    const joinParts = (arr)=> arr.filter(Boolean).join(' • ');
+
+    // === تفاصيل الحدث بحسب النوع (بدلاً من notes) ===
+    function detailsFor(ev){
+      const t = ev.eventType || '';
+      // —— تلقيح
+      if (t === 'insemination'){
+        const time = pick(ev, ['timeOfDay','aiTime','shift','period']); // صباح/مساء
+        const bull = pick(ev, ['bullName','semenBull','stallion','semenCode']);
+        const dose = pick(ev, ['doseNo','strawNo'],' قشّة');
+        const tech = pick(ev, ['technician','aiTech','operator'],' (فني)');
+        const heat = pick(ev, ['heatScore','heat'],' حرارة');
+        const dim  = pick(ev, ['dim','daysInMilk'],' DIM');
+        return joinParts([time && `وقت: ${time}`, bull && `الطلوقة: ${bull}`, dose, tech, heat, dim]);
+      }
+      // —— تشخيص حمل
+      if (t === 'pregnancy_diagnosis'){
+        const method = pick(ev, ['method','pdMethod']); // سونار/يدوي
+        const res = pick(ev, ['result','pregResult']);  // حامل/غير حامل
+        const age = pick(ev, ['fetusAgeDays','fetusAge','gestationAgeDays'],' يوم');
+        const twin = ev.twin ? 'توائم' : null;
+        return joinParts([method && `طريقة: ${method}`, res && `النتيجة: ${res}`, age && `عمر الجنين: ${age}`, twin]);
+      }
+      // —— ولادة
+      if (t === 'calving'){
+        const sex = pick(ev, ['calfSex','sex']); // ذكر/أنثى
+        const type = pick(ev, ['birthType','calvingType']); // مفرد/توائم
+        const diff = pick(ev, ['dystocia','difficulty']);
+        const rp = ev.retainedPlacenta ? 'احتباس مشيمة' : null;
+        const calfId = pick(ev, ['calfNumber','calfId']);
+        return joinParts([type && `الولادة: ${type}`, sex && `الجنس: ${sex}`, calfId && `رقم العجل: ${calfId}`, diff && `عسرة: ${diff}`, rp]);
+      }
+      // —— لبن يومي
+      if (t === 'daily_milk'){
+        const kg   = pick(ev, ['milkKg','milk','yield'],' كجم');
+        const shift= pick(ev, ['shift','timeOfDay']); // صباح/مساء
+        const fat  = pick(ev, ['fat','fatPct','fatPercent'],'% دهن');
+        const pr   = pick(ev, ['protein','proteinPct','proteinPercent'],'% بروتين');
+        const lac  = pick(ev, ['lactose','lactosePct'],'% لاكتوز');
+        const snf  = pick(ev, ['snf','snfPct'],'% SNF');
+        const scc  = pick(ev, ['scc','somaticCellCount']); // خلية/مل
+        const ec   = pick(ev, ['ec','conductivity'],' mS/cm');
+        const temp = pick(ev, ['milkTemp'],'°C');
+        return joinParts([kg && `لبن: ${kg}`, shift && `وردية: ${shift}`, fat, pr, lac, snf, scc && `SCC: ${scc}`, ec && `EC: ${ec}`, temp && `حرارة: ${temp}`]);
+      }
+      // —— سمات اللبن بالكاميرا
+      if (t === 'milking_traits_eval'){
+        const speed = pick(ev, ['milkingSpeed','speed'],' كجم/دقيقة');
+        const letdown = pick(ev, ['letdownTime'],' ثانية');
+        const udderD  = pick(ev, ['udderDepth']);
+        const attach  = pick(ev, ['udderAttachment','foreUdderAttachment']);
+        const teatL   = pick(ev, ['teatLength'],' مم');
+        const teatD   = pick(ev, ['teatDiameter'],' مم');
+        const teatP   = pick(ev, ['teatPlacement']);
+        const mast    = pick(ev, ['mastitisRisk','mastitisScore']);
+        return joinParts([
+          speed && `سرعة الحلب: ${speed}`, letdown && `نزول اللبن: ${letdown}`,
+          udderD && `عمق الضرع: ${udderD}`, attach && `اتصال: ${attach}`,
+          teatL && `طول الحلمة: ${teatL}`, teatD && `قطر: ${teatD}`, teatP && `تموضع: ${teatP}`,
+          mast && `مخاطر الضرع: ${mast}`
+        ]);
+      }
+      // —— تقييم حالة الجسم
+      if (t === 'bcs_eval'){
+        const score = pick(ev, ['score','bcs']);
+        const rump  = pick(ev, ['rumpAngle']);
+        const ribs  = pick(ev, ['shortRibs']);
+        const spine = pick(ev, ['backbones']);
+        return joinParts([score && `BCS: ${score}`, rump && `زاوية العجز: ${rump}`, ribs && `الأضلاع القصيرة: ${ribs}`, spine && `الفقرات: ${spine}`]);
+      }
+      // —— تقييم الروث
+      if (t === 'feces_eval' || t === 'feces' || t === 'feaces'){
+        const score = pick(ev, ['score','fecesScore']);
+        const cons  = pick(ev, ['consistency']);
+        const fiber = pick(ev, ['longFibers']);
+        return joinParts([score && `درجة الروث: ${score}`, cons && `القوام: ${cons}`, fiber && `ألياف طويلة: ${fiber}`]);
+      }
+      // —— ضرع/عرج/تطعيم/علاج
+      if (t === 'mastitis'){
+        const q = pick(ev, ['quarter','teatQuarter']); // RF/RH/LF/LH
+        const cmt = pick(ev, ['cmt','cmtScore']);
+        const sev = pick(ev, ['severity']);
+        return joinParts([q && `ربع: ${q}`, cmt && `CMT: ${cmt}`, sev && `شدة: ${sev}`]);
+      }
+      if (t === 'lameness'){
+        const sc = pick(ev, ['score','lamenessScore']);
+        const leg= pick(ev, ['leg','affectedLeg']);
+        const cause = pick(ev, ['cause']);
+        return joinParts([sc && `درجة العرج: ${sc}`, leg && `الرجل: ${leg}`, cause && `سبب: ${cause}`]);
+      }
+      if (t === 'vaccination'){
+        const v = pick(ev, ['vaccine','vaccineName']);
+        const dose = pick(ev, ['dose'],' جرعة');
+        const route= pick(ev, ['route']);
+        return joinParts([v && `لقاح: ${v}`, dose, route && `مسار: ${route}`]);
+      }
+      // —— تغذية
+      if (t === 'nutrition' || t === 'feeding'){
+        const mode  = pick(ev, ['mode','rationType']); // TMR/Split…
+        const dm    = pick(ev, ['dm','dmPct'],'% DM');
+        const cp    = pick(ev, ['cp','cpPct'],'% بروتين');
+        const ndf   = pick(ev, ['ndf','ndfPct'],'% NDF');
+        const st    = pick(ev, ['starch','starchPct'],'% نشا');
+        const cost  = pick(ev, ['feedCost','costPerHead'],' ج/رأس/يوم');
+        const fcr   = pick(ev, ['fc','fcr','feedToMilk']);
+        return joinParts([mode && `نمط: ${mode}`, dm, cp, ndf, st, cost && `تكلفة: ${cost}`, fcr && `F:C: ${fcr}`]);
+      }
+
+      // افتراضي: استعرض أشهر الحقول لو وُجدت
+      const dim = pick(ev, ['dim'],' DIM');
+      const kg  = pick(ev, ['milkKg'],' كجم');
+      const temp= pick(ev, ['temp'],'°C');
+      const generic = joinParts([kg && `لبن: ${kg}`, dim && `DIM: ${dim}`, temp && `حرارة: ${temp}`]);
+      return generic || (ev.notes || ev.aiHints || '');
+    }
+
     // شروط المالك + حقل الحيوان
     function scopeWheres(animalField, num){
       const wh = [];
@@ -195,25 +310,20 @@
       return wh;
     }
 
-    // انتظار حالة الدخول (عرض فقط)
-    function waitAuth(){
-      return new Promise(res=>{
-        const off = onAuthStateChanged(auth,(u)=>{ off(); res(u||null); });
-      });
-    }
+    // انتظار حالة الدخول
+    function waitAuth(){ return new Promise(res=>{ const off = onAuthStateChanged(auth,(u)=>{ off(); res(u||null); }); }); }
 
-    // ولادات الحيوان (لاستخراج حدود الموسم)
+    // ولادات لتحديد حدود الموسم
     async function getCalvings(num, dir='desc', lim=8){
       const evs = collection(db,'events');
       const q1 = query(evs, ...scopeWheres('animalNumber',num), where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
       const q2 = query(evs, ...scopeWheres('animalId',num),     where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
       const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
       const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
-      const seen = new Set(); // إزالة التكرار
-      return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
+      const seen = new Set(); return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
     }
 
-    // بروفايل الحيوان (قد يحتوي lastCalvingDate)
+    // بروفايل الحيوان
     async function getAnimalProfile(num){
       try{
         const animals = collection(db,'animals');
@@ -232,7 +342,7 @@
       }catch{ return null; }
     }
 
-    // حدود الموسم (من آخر ولادة وحتى التالية)
+    // حدود الموسم
     async function getSeasonBounds(num, todayISO, profile){
       let start = profile?.lastCalvingDate || profile?.lastCalving || profile?.lastCalvingISO || null;
       if (!start){
@@ -248,7 +358,7 @@
       return {start, end};
     }
 
-    // جلب أحداث المدى
+    // جلب الأحداث
     async function getEventsForRange(num, startISO, endISO){
       const evs = collection(db,'events');
       const mk = (animalField)=>{
@@ -274,14 +384,11 @@
       const th1 = $('thead th.sticky-1', table);
       const th2 = $('thead th.sticky-2', table);
       if (!th1 || !th2) return;
-
       const col1 = table.querySelectorAll('tbody td.col-1, thead th.sticky-1');
       const col2 = table.querySelectorAll('tbody td.col-2, thead th.sticky-2');
-
-      const pad = 16; // هامش أمان
+      const pad = 16;
       const w1 = Math.ceil([...col1].reduce((mx,c)=>Math.max(mx, c.scrollWidth), th1.scrollWidth)) + pad;
       const w2 = Math.ceil([...col2].reduce((mx,c)=>Math.max(mx, c.scrollWidth), th2.scrollWidth)) + pad;
-
       table.style.setProperty('--w1', w1 + 'px');
       table.style.setProperty('--w2', w2 + 'px');
     }
@@ -308,19 +415,7 @@
 
           const td3 = document.createElement('td');
           td3.className = 'flex-col';
-          const parts = [];
-          if (ev.notes) parts.push(ev.notes);
-          if (ev.aiHints) parts.push(ev.aiHints);
-
-          // قيم مفيدة شائعة للعرض المختصر
-          const kv = [];
-          if (ev.milkKg != null) kv.push(`لبن: ${ev.milkKg} كجم`);
-          if (ev.dim    != null) kv.push(`DIM: ${ev.dim}`);
-          if (ev.temp   != null) kv.push(`حرارة: ${ev.temp}°`);
-          if (ev.score  != null) kv.push(`درجة: ${ev.score}`);
-          if (kv.length) parts.push('— ' + kv.join(' • '));
-
-          td3.textContent = parts.join('  ');
+          td3.textContent = detailsFor(ev);   // ← التفاصيل من الحقول نفسها
 
           tr.append(td1, td2, td3);
           frag.appendChild(tr);
@@ -379,7 +474,6 @@
         renderRows(filterByCat(allEvents, cat), bounds);
       });
 
-      // ثبات العرض على الموبايل
       addEventListener('resize', ()=> requestAnimationFrame(sizeStickyColumns), {passive:true});
       addEventListener('orientationchange', ()=> setTimeout(sizeStickyColumns, 200), {passive:true});
     })().catch(err=>{
