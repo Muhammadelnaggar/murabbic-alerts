@@ -3,75 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>قائمة أحداث الحيوان</title>
+  <title>قائمة أحداث الحيوان — مُرَبِّك</title>
+
   <style>
-    :root{--brand:#0ea05a;--brand-600:#0b7f47;--head:var(--brand-600);--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--card:#ffffff;--pill-bg:#ecfdf5;--pill-border:#bbf7d0;--pill-text:#065f46;--thead-bg:#f8fafc;--warning-bg:#fff7ed;--warning-border:#fed7aa;--warning-text:#7c2d12}
-    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:#0f172a}
-    .wrap{padding:10px}
-    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
-    .title{font-weight:800;color:var(--head);font-size:16px}
+    :root{
+      --brand:#0ea05a;--brand-600:#0b7f47;
+      --bg:#f7faf7;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--border:#e2e8f0;--thead:#f8fafc;
+      --pill-bg:#ecfdf5;--pill-br:#bbf7d0;--pill-ink:#065f46;
+      --warn-bg:#fff7ed;--warn-br:#fed7aa;--warn-ink:#7c2d12;
+      --w1:120px; /* التاريخ — يُضبط برمجياً على حسب المحتوى */
+      --w2:160px; /* اسم الحدث — يُضبط برمجياً على حسب المحتوى */
+    }
+    *{box-sizing:border-box}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Roboto,Tahoma,Arial;background:var(--bg);color:var(--ink)}
+    a{color:inherit}
+
+    .wrap{padding:12px}
+    .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .title{font-weight:900;color:var(--brand-600);font-size:16px}
     .meta{font-size:12px;color:var(--muted)}
-    .btn{display:inline-block;background:var(--brand);color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-weight:800;border:1px solid transparent}
-    .btn.ghost{background:var(--card);color:var(--head);border-color:var(--border)}
-    .filters{display:flex;gap:8px;align-items:center;margin:8px 0}
+    .actions{margin-inline-start:auto;display:flex;gap:8px}
+    .btn{display:inline-block;background:var(--brand);color:#fff;padding:10px 12px;border-radius:12px;font-weight:800;text-decoration:none;border:1px solid transparent}
+    .btn.ghost{background:var(--card);color:var(--brand-600);border-color:var(--border)}
+
+    .filters{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
     .filters label{font-size:12px;color:var(--muted)}
-    .filters select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit}
+    .filters input,.filters select{
+      padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-family:inherit
+    }
     .filters .num{display:flex;align-items:center;gap:6px}
-    .filters input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-family:inherit;width:140px}
+    .filters input[readonly]{background:#f9fafb;color:#475569}
 
-    .table-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .scroll{max-height:360px;overflow:auto}
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    thead th{position:sticky;top:0;background:var(--thead-bg);border-bottom:1px solid var(--border);padding:10px;text-align:right}
-    tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:top}
-    tbody tr:hover{background:#f9fff8}
-    .pill{display:inline-block;background:var(--pill-bg);border:1px solid var(--pill-border);color:var(--pill-text);border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700}
+    .table-wrap{border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden}
+    .scroll{max-height:72vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;table-layout:auto}
+    thead th{position:sticky;top:0;background:var(--thead);border-bottom:1px solid var(--border);padding:10px;text-align:right;z-index:5;white-space:nowrap}
+    tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:top;background:#fff}
+    tbody tr:hover td{background:#f9fff8}
+
+    /* عمودان ثابتان (يمين لكون RTL) */
+    .sticky-1,.sticky-2{position:sticky;z-index:6;background:#fff}
+    .sticky-1{inset-inline-end:0;min-width:var(--w1);max-width:calc(var(--w1) + 2px);white-space:nowrap}
+    .sticky-2{inset-inline-end:var(--w1);min-width:var(--w2);max-width:calc(var(--w2) + 2px);white-space:nowrap}
+    thead .sticky-1, thead .sticky-2{background:var(--thead);z-index:7}
+
+    /* باقي الأعمدة تمرير أفقي مريح على الموبايل */
+    .flex-col{min-width:520px}
+    @media (max-width:480px){
+      .title{font-size:15px}
+      table{font-size:13px}
+      .flex-col{min-width:360px}
+      .btn{padding:9px 12px}
+      .filters input,.filters select{padding:8px}
+    }
+
+    .pill{display:inline-block;background:var(--pill-bg);border:1px solid var(--pill-br);color:var(--pill-ink);
+      border-radius:999px;padding:2px 8px;font-size:12px;font-weight:800;white-space:nowrap}
     .empty{padding:14px;text-align:center;color:var(--muted)}
-    .err{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning-text);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
+    .err{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-ink);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
     .err.show{display:block}
-    /* جدول عريض: أول عمودين ثابتين، والباقي سكرول أفقي */
-.table-hscroll{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-.table-wide{border-collapse:separate;border-spacing:0;min-width:760px;width:100%; table-layout:auto}
-.table-wide th,.table-wide td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;word-break:break-word;white-space:normal}
 
-.table-wide .col-date{
-  position:sticky; inset-inline-start:0; background:#fff; z-index:4;
-  width:92px; min-width:92px; max-width:110px;
-  font-variant-numeric:tabular-nums;
-}
-.table-wide .col-name{
-  position:sticky; inset-inline-start:92px; background:#fff; z-index:4;
-  width:140px; min-width:140px; max-width:180px;
-}
-
-.table-wide .pill{padding:2px 6px; font-size:12px; line-height:1.2}
-
-@media (max-width:560px){
-  .table-wide th,.table-wide td{padding:8px}
-  .table-wide .col-date{width:84px; min-width:84px; max-width:100px}
-  .table-wide .col-name{width:120px; min-width:120px; max-width:150px}
-  .table-wide .pill{font-size:11px; padding:2px 6px}
-}
-
+    /* هيكل تحميل بسيط */
+    .skeleton td{background:linear-gradient(100deg,#f2f6f4 40%,#eaf3ee 50%,#f2f6f4 60%);background-size:200% 100%;animation:s 1.2s infinite linear}
+    @keyframes s{to{background-position:-200% 0}}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div id="err" class="err"></div>
 
-    <div class="head">
+    <header class="head" aria-label="رأس الصفحة">
       <div class="title">أحداث هذا الموسم</div>
-      <div class="meta" id="meta">—</div>
-      <div style="margin-inline-start:auto;display:flex;gap:8px">
+      <div id="meta" class="meta">—</div>
+      <nav class="actions" aria-label="تنقّل">
         <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
-        <a id="toDash" class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
-      </div>
-    </div>
+        <a class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
+      </nav>
+    </header>
 
-    <div class="filters">
+    <section class="filters" aria-label="مرشّحات">
       <div class="num">
         <label for="animalNumField">رقم الحيوان:</label>
-        <input id="animalNumField" inputmode="numeric" placeholder="—" />
+        <input id="animalNumField" inputmode="numeric" placeholder="—" readonly />
       </div>
       <label for="catFilter">فلترة:</label>
       <select id="catFilter">
@@ -82,120 +97,79 @@
         <option value="تقييم بالكاميرا">تقييم بالكاميرا</option>
         <option value="تغذية">تغذية</option>
       </select>
-    </div>
-<div class="table-wrap table-hscroll">
-  <div class="scroll">
-    <table dir="rtl" class="table-wide">
+    </section>
 
+    <section class="table-wrap" aria-label="جدول الأحداث">
+      <div class="scroll">
+        <table dir="rtl" id="eventsTable">
           <thead>
             <tr>
-              <th>التاريخ</th>
-              <th>الحدث</th>
-              <th>ملاحظات</th>
+              <th class="sticky-1">التاريخ</th>
+              <th class="sticky-2">الحدث</th>
+              <th class="flex-col">تفاصيل / ملاحظات</th>
             </tr>
           </thead>
-          <tbody id="rows">
+          <tbody id="rows" class="skeleton">
             <tr><td colspan="3" class="empty">جارٍ التحميل…</td></tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   </div>
 
   <script type="module">
+    /* ===== الاعتماد على إعدادات المشروع الحالية =====
+       يجب أن يصدّر /js/firebase-config.js الكائنين db, auth
+       مع getFirestore(app, 'murabbikdata') كما هو متفق عليه.
+    */
     import { db, auth } from '/js/firebase-config.js';
     import {
       collection, getDocs, query, where, orderBy, limit
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    // ——— ثوابت/حالة ———
-    let UID = null, TID = null;  // مستخدم/مستأجر
-    const $ = (id)=>document.getElementById(id);
-    const rows = $('rows'), errbox = $('err'), meta = $('meta');
-    // مفاتيح لا نعرضها
-const EXCLUDE = new Set([
-  'userId','ownerUid','tenantId','uid',
-  'createdAt','updatedAt','_created','_updated',
-  '__name__','__path__','id','animalRef'
-]);
+    // ---------- عناصر ----------
+    const $ = (sel,root=document)=>root.querySelector(sel);
+    const rows   = $('#rows');
+    const metaEl = $('#meta');
+    const table  = $('#eventsTable');
+    const fldNum = $('#animalNumField');
+    const selCat = $('#catFilter');
+    const errBox = $('#err');
+    const openCard = $('#openCard');
 
-// مرشّحات اسم الحدث كما هو (بدون تعريب أو ذكاء)
-const NAME_CANDIDATES = [
-  'اسم_الحدث','اسم','عنوان','العنوان','pageTitleAr','page_name_ar','page_ar',
-  'eventNameAr','nameAr','titleAr','labelAr','نوع_الحدث',
-  'name','title','label','eventName','eventType','type','kind','category'
-];
+    // ---------- هوية المستأجر/المستخدم ----------
+    let UID = null, TID = null;
+    const qp = new URLSearchParams(location.search);
+    const getQNum = () => qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
+    const getQCat = () => qp.get('cat') || '';
 
-const DATE_CANDIDATES = [
-  'eventDate','date','day','dueDate'
-];
+    // ---------- مساعدات ----------
+    const showErr = (msg) => { errBox.textContent = msg; errBox.classList.add('show'); };
+    const hideErr = () => { errBox.classList.remove('show'); errBox.textContent=''; };
 
-const AR_NAME_KEYS = [
-  'اسم_الحدث','اسم','عنوان','العنوان','نوع_الحدث',
-  'pageTitleAr','page_name_ar','page_ar','eventNameAr','nameAr','titleAr','labelAr'
-];
-const EN_NAME_KEYS = ['name','title','label','eventName','eventType','type','kind','category'];
-
-function getEventNameRaw(e = {}) {
-  for (const k of AR_NAME_KEYS)   if (e[k]!=null && String(e[k]).trim()!=='') return String(e[k]).trim();
-  for (const k of EN_NAME_KEYS)   if (e[k]!=null && String(e[k]).trim()!=='') return String(e[k]).trim(); // fallback مؤقت
-  return '—';
-}
-
-
-function getEventDateISO(e={}){
-  for (const k of DATE_CANDIDATES){
-    if (e[k]) return String(e[k]);
-  }
-  if (typeof e?.createdAt?.toDate === 'function'){
-    try{ return e.createdAt.toDate().toISOString().slice(0,10); }catch{}
-  }
-  return '';
-}
-
-function cellVal(v){
-  if (v==null) return '—';
-  if (typeof v==='string' || typeof v==='number' || typeof v==='boolean') return String(v);
-  if (typeof v?.toDate==='function'){ try{ return v.toDate().toISOString(); }catch{} }
-  if (Array.isArray(v)) return v.map(x=>cellVal(x)).join('، ');
-  try{ return JSON.stringify(v); }catch{ return String(v); }
-}
-
-
-    // نطاق الملكية: لازم userId حسب القواعد + tenantId لو موجود
-    function scopeWheres(field, num){
-      const wh = [];
-      if (TID) wh.push(where('tenantId','==', TID));
-      if (UID) wh.push(where('userId','==',   UID));
-      wh.push(where(field,'==', num));
-      return wh;
-    }
-
-    // خرائط بسيطة للأسماء العربية
+    // أسماء عربية للأحداث (لو eventType إنجليزي)
     const arabicType = (ev) => {
-      if (ev.type) return ev.type;
-      const m = {
+      if (ev.type) return ev.type; // الاسم محفوظ بالعربية من صفحات الحدث
+      const map = {
         calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
         pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
         mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
-        close_up:'كلوز أب', nutrition:'تغذية', milking_traits_eval:'تقييم Milking Traits'
+        close_up:'كلوز أب', nutrition:'تغذية',
+        milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث'
       };
-      return m[ev.eventType] || 'حدث';
+      return map[ev.eventType] || 'حدث';
     };
-    const CATEGORY_MAP = {
-      'انتاج': ['daily_milk','dry_off'],
-      'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
-      'صحة': ['mastitis','lameness','vaccination','treatment','health'],
-      'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment','milking_traits_eval'],
-      'تغذية': ['nutrition','feeding']
-    };
-    const fmt = (d)=> d; // eventDate جاهز YYYY-MM-DD
-    const qp = new URLSearchParams(location.search);
-    const qpNum = ()=> qp.get('number') || qp.get('animalId') || qp.get('animalNumber') || '';
-    const qpCat = ()=> qp.get('cat') || '';
 
-    function categoryOf(ev){
+    // تصنيف
+    const CATEGORY_MAP = {
+      'انتاج' : ['daily_milk','dry_off'],
+      'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
+      'صحة'  : ['mastitis','lameness','vaccination','treatment','health'],
+      'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment','milking_traits_eval','bcs_eval','feces_eval'],
+      'تغذية' : ['nutrition','feeding']
+    };
+    const categoryOf = (ev)=>{
       const explicit = ev.category || ev.eventCategory || ev.cat;
       if (explicit) return explicit;
       const t = (ev.eventType||'').toString();
@@ -203,53 +177,54 @@ function cellVal(v){
         if (types.includes(t)) return cat;
       }
       return 'أخرى';
-    }
-    function filterByCat(events, cat){
-      if (!cat) return events;
-      return events.filter(e => categoryOf(e) === cat);
-    }
-    function showErr(t){ errbox.textContent=t; errbox.className='err show'; }
+    };
+    const filterByCat = (arr, cat)=> !cat ? arr : arr.filter(e=>categoryOf(e)===cat);
 
-    // تسجيل الدخول (عرض فقط)
-    async function waitAuthOnce(){
-      return await new Promise((resolve)=>{
-        const off = onAuthStateChanged(auth, (u)=>{ off(); resolve(u || null); });
+    const fmtDate = (ev) => {
+      if (ev.eventDate) return ev.eventDate; // YYYY-MM-DD
+      const ts = ev.createdAt?.toDate?.();
+      return ts ? ts.toISOString().slice(0,10) : '';
+    };
+
+    // شروط المالك + حقل الحيوان
+    function scopeWheres(animalField, num){
+      const wh = [];
+      if (TID) wh.push(where('tenantId','==', TID));
+      if (UID) wh.push(where('userId','==',   UID));
+      wh.push(where(animalField,'==', num));
+      return wh;
+    }
+
+    // انتظار حالة الدخول (عرض فقط)
+    function waitAuth(){
+      return new Promise(res=>{
+        const off = onAuthStateChanged(auth,(u)=>{ off(); res(u||null); });
       });
     }
-    async function requireViewAuth(){
-      const u = auth.currentUser || await waitAuthOnce();
-      if (!u){
-        const next = '/login.html?next=' + encodeURIComponent(location.href);
-        rows.innerHTML = '<tr><td colspan="3" class="empty">يلزم تسجيل الدخول لعرض الأحداث. <a href="'+next+'">تسجيل الدخول</a></td></tr>';
-        meta.textContent = '—';
-        return null;
-      }
-      return u;
-    }
 
-    // يجلب بعض ولادات الحيوان (من الأحداث)
+    // ولادات الحيوان (لاستخراج حدود الموسم)
     async function getCalvings(num, dir='desc', lim=8){
-      const evs = collection(db, 'events');
-      const q1 = query(evs, ...scopeWheres('animalNumber', num), where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
-      const q2 = query(evs, ...scopeWheres('animalId',     num), where('eventType','==','calving'), orderBy('eventDate', dir), limit(lim));
+      const evs = collection(db,'events');
+      const q1 = query(evs, ...scopeWheres('animalNumber',num), where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
+      const q2 = query(evs, ...scopeWheres('animalId',num),     where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
       const [s1,s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
       const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
-      const seen = new Set();
+      const seen = new Set(); // إزالة التكرار
       return arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
     }
 
-    // بروفايل الحيوان (لاستخراج lastCalvingDate إن وُجدت)
+    // بروفايل الحيوان (قد يحتوي lastCalvingDate)
     async function getAnimalProfile(num){
       try{
-        const animals = collection(db, 'animals');
+        const animals = collection(db,'animals');
         const owner = [
-          ...(UID ? [where('userId','==', UID)] : []),
-          ...(TID ? [where('tenantId','==', TID)] : [])
+          ...(UID ? [where('userId','==',UID)] : []),
+          ...(TID ? [where('tenantId','==',TID)] : [])
         ];
         const qs = [
-          query(animals, ...owner, where('number','==',num),       limit(1)),
+          query(animals, ...owner, where('number','==',num), limit(1)),
           query(animals, ...owner, where('animalNumber','==',num), limit(1)),
-          query(animals, ...owner, where('animalId','==',num),     limit(1)),
+          query(animals, ...owner, where('animalId','==',num), limit(1)),
         ];
         const res = await Promise.all(qs.map(getDocs));
         const hit = res.find(s=>!s.empty);
@@ -257,180 +232,161 @@ function cellVal(v){
       }catch{ return null; }
     }
 
-    // حدود الموسم = آخر ولادة (من البروفايل أولًا) وحتى الولادة التالية
+    // حدود الموسم (من آخر ولادة وحتى التالية)
     async function getSeasonBounds(num, todayISO, profile){
-      let start = null, end = null;
-
-      // 1) من وثيقة الحيوان أولاً
-      const profileStart =
-        profile?.lastCalvingDate || profile?.lastCalving || profile?.lastCalvingISO || null;
-      if (profileStart) start = profileStart;
-
-      // 2) لو مش موجودة في الوثيقة، هات آخر ولادة من الأحداث (<= اليوم)
+      let start = profile?.lastCalvingDate || profile?.lastCalving || profile?.lastCalvingISO || null;
       if (!start){
-        const calvDesc = await getCalvings(num, 'desc', 8);
-        const lastCalving = calvDesc.find(c => c.eventDate && c.eventDate <= todayISO) || null;
-        start = lastCalving?.eventDate || null;
+        const calvDesc = await getCalvings(num,'desc',8);
+        const last = calvDesc.find(c=>c.eventDate && c.eventDate<=todayISO);
+        start = last?.eventDate || null;
       }
-
-      // 3) الولادة التالية كحد نهاية
+      let end = null;
       if (start){
-        const calvAsc = await getCalvings(num, 'asc', 8);
-        end = calvAsc.find(c => c.eventDate && c.eventDate > start)?.eventDate || null;
+        const calvAsc = await getCalvings(num,'asc',8);
+        end = calvAsc.find(c=>c.eventDate && c.eventDate>start)?.eventDate || null;
       }
-
-      return { start, end };
+      return {start, end};
     }
 
-    // جلب الأحداث داخل [start, end)
+    // جلب أحداث المدى
     async function getEventsForRange(num, startISO, endISO){
-      const evs = collection(db, 'events');
-      const build = (field)=>{
-        const base = [...scopeWheres(field, num)];
+      const evs = collection(db,'events');
+      const mk = (animalField)=>{
+        const base = scopeWheres(animalField,num);
         if (startISO && endISO){
-          return query(evs, ...base,
-            where('eventDate','>=', startISO),
-            where('eventDate','<',  endISO),
-            orderBy('eventDate','desc'));
-        } else if (startISO){
-          return query(evs, ...base,
-            where('eventDate','>=', startISO),
-            orderBy('eventDate','desc'));
-        } else {
+          return query(evs, ...base, where('eventDate','>=',startISO), where('eventDate','<',endISO), orderBy('eventDate','desc'));
+        }else if (startISO){
+          return query(evs, ...base, where('eventDate','>=',startISO), orderBy('eventDate','desc'));
+        }else{
           return query(evs, ...base, orderBy('eventDate','desc'));
         }
       };
-      const [s1,s2] = await Promise.all([getDocs(build('animalNumber')), getDocs(build('animalId'))]);
-      const arr = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
+      const [s1,s2] = await Promise.all([getDocs(mk('animalNumber')), getDocs(mk('animalId'))]);
+      const all = [...s1.docs, ...s2.docs].map(d=>({id:d.id, ...d.data()}));
       const seen = new Set();
-      const merged = arr.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
+      const merged = all.filter(e=> (seen.has(e.id)?false:(seen.add(e.id),true)));
       merged.sort((a,b)=> (b.eventDate||'').localeCompare(a.eventDate||''));
       return merged;
     }
 
-    // رسم الجدول
-   // يعرض كل الحقول كما هي من فايربيز: التاريخ + الاسم ثابتين، والباقي أعمدة أفقية
-function renderFlatAll(events){
-  // لا أحداث
-  if (!Array.isArray(events) || !events.length){
-    rows.innerHTML = '<tr><td colspan="999" class="empty">لا توجد أحداث.</td></tr>';
-    return;
-  }
+    // قياس عرض أول عمودين وفق المحتوى
+    function sizeStickyColumns(){
+      const th1 = $('thead th.sticky-1', table);
+      const th2 = $('thead th.sticky-2', table);
+      if (!th1 || !th2) return;
 
-  // اجمع كل المفاتيح الموجودة في كل حدث (عدا المستبعَد + التاريخ + الاسم)
-  const allKeys = new Set();
-  for (const ev of events){
-    for (const k of Object.keys(ev||{})){
-      if (EXCLUDE.has(k)) continue;
-      if (DATE_CANDIDATES.includes(k)) continue;
-      if (NAME_CANDIDATES.includes(k)) continue;
-      allKeys.add(k);
-    }
-  }
-  const keys = Array.from(allKeys);
+      const col1 = table.querySelectorAll('tbody td.col-1, thead th.sticky-1');
+      const col2 = table.querySelectorAll('tbody td.col-2, thead th.sticky-2');
 
-  // ابنِ رأس الجدول: تاريخ + اسم + باقي المفاتيح
-  const thead = rows.closest('table').querySelector('thead');
-  if (thead){
-    thead.innerHTML = '';
-    const trh = document.createElement('tr');
+      const pad = 16; // هامش أمان
+      const w1 = Math.ceil([...col1].reduce((mx,c)=>Math.max(mx, c.scrollWidth), th1.scrollWidth)) + pad;
+      const w2 = Math.ceil([...col2].reduce((mx,c)=>Math.max(mx, c.scrollWidth), th2.scrollWidth)) + pad;
 
-    const thDate = document.createElement('th');
-    thDate.className = 'col-date';
-    thDate.textContent = 'التاريخ';
-    trh.appendChild(thDate);
-
-    const thName = document.createElement('th');
-    thName.className = 'col-name';
-    thName.textContent = 'الحدث';
-    trh.appendChild(thName);
-
-    for (const k of keys){
-      const th = document.createElement('th');
-      th.textContent = k; // كما هو من فايربيز
-      trh.appendChild(th);
-    }
-    thead.appendChild(trh);
-  }
-
-  // صفوف
-  rows.innerHTML = '';
-  const frag = document.createDocumentFragment();
-  for (const ev of events){
-    const tr = document.createElement('tr');
-
-    const tdDate = document.createElement('td');
-    tdDate.className = 'col-date';
-    tdDate.textContent = getEventDateISO(ev) || '—';
-    tr.appendChild(tdDate);
-
-    const tdName = document.createElement('td');
-    tdName.className = 'col-name';
-    tdName.innerHTML = `<span class="pill">${getEventNameRaw(ev)}</span>`;
-    tr.appendChild(tdName);
-
-    for (const k of keys){
-      const td = document.createElement('td');
-      td.textContent = cellVal(ev[k]);
-      tr.appendChild(td);
+      table.style.setProperty('--w1', w1 + 'px');
+      table.style.setProperty('--w2', w2 + 'px');
     }
 
-    frag.appendChild(tr);
-  }
-  rows.appendChild(frag);
+    // رسم الصفوف
+    function renderRows(events, bounds){
+      rows.classList.remove('skeleton');
+      rows.innerHTML = '';
 
+      if (!events.length){
+        rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
+      }else{
+        const frag = document.createDocumentFragment();
+        for(const ev of events){
+          const tr  = document.createElement('tr');
 
-    
- }
-function setMeta(bounds){
-  if (!bounds?.start){
-    meta.textContent = 'كل الأحداث (لا توجد ولادة مسجّلة لبداية موسم)';
-  } else if (bounds.end){
-    meta.textContent = `من الولادة ${bounds.start} حتى قبل الولادة ${bounds.end}`;
-  } else {
-    meta.textContent = `من الولادة ${bounds.start} حتى اليوم`;
-  }
-}
+          const td1 = document.createElement('td');
+          td1.className = 'sticky-1 col-1';
+          td1.textContent = fmtDate(ev);
 
-    // ——— main ———
-    (async function run(){
-      const user = await requireViewAuth(); if(!user){ return; }
+          const td2 = document.createElement('td');
+          td2.className = 'sticky-2 col-2';
+          td2.innerHTML = `<span class="pill" title="${ev.eventType||''}">${arabicType(ev)}</span>`;
+
+          const td3 = document.createElement('td');
+          td3.className = 'flex-col';
+          const parts = [];
+          if (ev.notes) parts.push(ev.notes);
+          if (ev.aiHints) parts.push(ev.aiHints);
+
+          // قيم مفيدة شائعة للعرض المختصر
+          const kv = [];
+          if (ev.milkKg != null) kv.push(`لبن: ${ev.milkKg} كجم`);
+          if (ev.dim    != null) kv.push(`DIM: ${ev.dim}`);
+          if (ev.temp   != null) kv.push(`حرارة: ${ev.temp}°`);
+          if (ev.score  != null) kv.push(`درجة: ${ev.score}`);
+          if (kv.length) parts.push('— ' + kv.join(' • '));
+
+          td3.textContent = parts.join('  ');
+
+          tr.append(td1, td2, td3);
+          frag.appendChild(tr);
+        }
+        rows.appendChild(frag);
+      }
+
+      if (!bounds.start){
+        metaEl.textContent = 'كل الأحداث (لا توجد ولادة مسجَّلة كبداية موسم)';
+      }else if (bounds.end){
+        metaEl.textContent = `من الولادة ${bounds.start} حتى قبل الولادة ${bounds.end}`;
+      }else{
+        metaEl.textContent = `من الولادة ${bounds.start} حتى اليوم`;
+      }
+
+      requestAnimationFrame(sizeStickyColumns);
+    }
+
+    // تدفق التشغيل
+    (async function main(){
+      hideErr();
+
+      const user = auth.currentUser || await waitAuth();
+      if (!user){
+        rows.classList.remove('skeleton');
+        rows.innerHTML = '<tr><td colspan="3" class="empty">يلزم تسجيل الدخول لعرض الأحداث.</td></tr>';
+        metaEl.textContent = '—';
+        return;
+      }
       UID = user.uid;
       TID = localStorage.getItem('tenantId') || null;
 
-      const num = qpNum();
-      const fld = $('animalNumField');
-      if (fld){ fld.value = num || ''; fld.readOnly = true; }
-      if (!num){ rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>'; return; }
+      const num = getQNum();
+      fldNum.value = num || '';
+      if (!num){
+        rows.classList.remove('skeleton');
+        rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>';
+        return;
+      }
 
-      const openCard = $('openCard');
       if (openCard) openCard.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+      selCat.value = getQCat();
 
       const today = new Date().toISOString().slice(0,10);
       const profile = await getAnimalProfile(num);
       const bounds  = await getSeasonBounds(num, today, profile);
-      setMeta(bounds);
 
+      const allEvents = await getEventsForRange(num, bounds.start || null, bounds.end || null);
+      renderRows(filterByCat(allEvents, selCat.value || ''), bounds);
 
-      // لو ما فيش ولادة مُسجّلة: اعرض كل الأحداث (علشان ما نخفيش حاجة)
-      const all = await getEventsForRange(num, bounds.start || null, bounds.end || null);
-      const sel = $('catFilter');
-      if (sel) sel.value = qpCat() || '';
-      const currentCat = sel ? sel.value : '';
-     renderFlatAll(filterByCat(all, currentCat));
+      selCat.addEventListener('change', ()=>{
+        const cat = selCat.value || '';
+        const url = new URL(location.href);
+        if (cat) url.searchParams.set('cat',cat); else url.searchParams.delete('cat');
+        history.replaceState({},'',url.toString());
+        renderRows(filterByCat(allEvents, cat), bounds);
+      });
 
-
-      if (sel){
-        sel.addEventListener('change', ()=>{
-          const cat = sel.value || '';
-          const url = new URL(location.href);
-          if (cat) url.searchParams.set('cat', cat); else url.searchParams.delete('cat');
-          history.replaceState({}, '', url.toString());
-          renderFlatAll(filterByCat(all, cat));
-
-        });
-      }
-    })().catch(e=>{ console.error(e); showErr('تعذّر تحميل الأحداث. تأكد من الصلاحيات وقواعد Firestore.'); });
+      // ثبات العرض على الموبايل
+      addEventListener('resize', ()=> requestAnimationFrame(sizeStickyColumns), {passive:true});
+      addEventListener('orientationchange', ()=> setTimeout(sizeStickyColumns, 200), {passive:true});
+    })().catch(err=>{
+      console.error(err);
+      showErr('تعذّر تحميل الأحداث. تأكّد من الصلاحيات وقواعد Firestore (murabbikdata).');
+      rows.classList.remove('skeleton');
+    });
   </script>
 </body>
 </html>
