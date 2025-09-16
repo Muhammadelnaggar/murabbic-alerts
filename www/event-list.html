@@ -96,29 +96,34 @@
     }
 
     function detailsFor(ev){
-      const t = pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '').trim();
-      if(t === 'تلقيح'){
-        const at  = pick(ev, ['time','eventTime','وقت','ساعة','at'], '').toString();
-        const bull= pick(ev, ['bull','bullName','طلوقة','اسم الطلوقة'], '');
-        const straw=pick(ev, ['straw','strawCode','القشة','كود القشة'], '');
-        const timePart = at ? `الوقت: ${at}` : '';
-        const bullPart = bull? `الطلوقة: ${bull}`: '';
-        const stPart   = straw?`القشة: ${straw}`: '';
-        return [timePart,bullPart,stPart].filter(Boolean).join(' — ');
+      var raw = (pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '')||'').toString().trim().toLowerCase();
+      // تلقيح: الوقت + الطلوقة + القشّة
+      if(raw === 'insemination' || raw === 'تلقيح'){
+        var at    = pick(ev, ['time','eventTime','at','وقت','ساعة'], '');
+        var bull  = pick(ev, ['bull','bullName','sire','sireName','طلوقة','اسم الطلوقة'], '');
+        var straw = pick(ev, ['straw','strawCode','semen','semenCode','dose','doseCode','القشة','كود القشة'], '');
+        var p = [];
+        if(at)    p.push('الوقت: '+at);
+        if(bull)  p.push('الطلوقة: '+bull);
+        if(straw) p.push('القشة: '+straw);
+        return p.join(' — ');
       }
-      if(t === 'لبن يومي'){
-        const kg   = pick(ev, ['milkKg','kg','milk','لبن_كجم','كمية اللبن كجم'], '');
-        const shift= pick(ev, ['shift','milkingShift','الوردية','وردية'], '');
-        const p1 = kg!=='' ? `كجم: ${kg}` : '';
-        const p2 = shift? `الوردية: ${shift}`: '';
-        return [p1,p2].filter(Boolean).join(' — ');
+      // لبن يومي: كجم + الوردية
+      if(raw === 'daily_milk' || raw === 'milk' || raw === 'لبن يومي'){
+        var kg = pick(ev, ['milkKg','milk_kg','milkkg','kg','amount','quantity','milk'], '');
+        var shift = pick(ev, ['shift','milkingShift','session','الوردية','وردية'], '');
+        var p2 = [];
+        if(kg!=='' && kg!=null) p2.push('كجم: '+kg);
+        if(shift) p2.push('الوردية: '+shift);
+        return p2.join(' — ');
       }
-      const note = pick(ev, ['note','ملاحظة'], '');
-      const result = pick(ev, ['result','النتيجة'], '');
+      // افتراضي
+      var note = pick(ev, ['note','ملاحظة'], '');
+      var result = pick(ev, ['result','النتيجة'], '');
       return [note, result].filter(Boolean).join(' — ');
     }
 
-    function renderRows(events){
+    function renderRows(events)(events){
       evBody.innerHTML = '';
       if(!events.length){
         evBody.innerHTML = '<tr><td colspan="4" class="empty">لا توجد نتائج مطابقة…</td></tr>';
@@ -129,7 +134,29 @@
         const tr = document.createElement('tr');
         const cDate  = document.createElement('td'); cDate.textContent  = pick(ev, ['eventDate','date','dt'], '');
         const cNum   = document.createElement('td'); cNum.textContent   = pick(ev, ['animalNumber','number','animalId','id'], '');
-        const cType  = document.createElement('td'); cType.innerHTML    = `<span class="pill">${pick(ev, ['type','eventType','event_name','name'], '')}</span>`;
+        const cType  = document.createElement('td');
+        const tval  = String(pick(ev, ['type','eventType','event_name','name','نوع الحدث'],'')).trim();
+        const slug  = tval.toLowerCase();
+        const mapAr = {
+          'insemination':'تلقيح',
+          'daily_milk':'لبن يومي',
+          'milk':'لبن يومي',
+          'mastitis':'التهاب الضرع',
+          'lameness':'عرج',
+          'calving':'ولادة',
+          'abortion':'إجهاض',
+          'closeup':'تحضير للولادة',
+          'dryoff':'تجفيف',
+          'vaccination':'تحصين',
+          'pregnancy_diagnosis':'تشخيص حمل',
+          'hoof_trimming':'تقليم الحوافر',
+          'milk_traits':'سمات اللبن',
+          'milking traits':'سمات اللبن',
+          'feces_eval':'تقييم الروث',
+          'bcs_eval':'تقييم حالة الجسم'
+        };
+        const label = mapAr[slug] || tval.replaceAll('_',' ').replaceAll('-',' ');
+        cType.innerHTML = '<span class="pill">'+label+'</span>';
         const cDet   = document.createElement('td'); cDet.textContent   = detailsFor(ev);
         tr.append(cDate,cNum,cType,cDet);
         frag.appendChild(tr);
