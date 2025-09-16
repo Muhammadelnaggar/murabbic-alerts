@@ -239,24 +239,27 @@
   }
 
   // 4) سياق الحيوان + آخر تلقيح (يتطلب الإندكسات اللي عندك)
-  async function fetchCtx(){
-    const uid = await getUid();
-    const num = (numEl?.value || '').trim();
-    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
+async function fetchCtx(){
+  const uid = await getUid();
+  const num = (numEl?.value || '').trim();
+  if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
 
-    // النوع + الحالة التناسلية
-    const aSnap = await getDocs(query(
-      collection(db,'animals'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      limit(1)
-    ));
-    const animal = aSnap.empty ? {} : aSnap.docs[0].data();
-    const species     = animal.type || animal.species || animal['النوع'] || '';
-    const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
+  // النوع + الحالة التناسلية من animals
+  const aSnap = await getDocs(query(
+    collection(db,'animals'),
+    where('userId','==',uid),
+    where('animalNumber','==',num),
+    limit(1)
+  ));
+  const animal = aSnap.empty ? {} : aSnap.docs[0].data();
+  const species     = animal.type || animal.species || animal['النوع'] || '';
+  const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
 
-    // آخر تلقيح
-    const eSnap = await getDocs(query(
+  let lastInseminationISO = '';
+
+  // المحاولة 1: الحقل type
+  try {
+    const s1 = await getDocs(query(
       collection(db,'events'),
       where('userId','==',uid),
       where('animalNumber','==',num),
@@ -264,10 +267,47 @@
       orderBy('eventDate','desc'),
       limit(1)
     ));
-    const lastInseminationISO = eSnap.empty ? '' : (eSnap.docs[0].data().eventDate || '');
+    if (!s1.empty) lastInseminationISO = s1.docs[0].data().eventDate || '';
+  } catch (_) { /* لو احتاج إندكس */ }
 
-    return { species, reproStatus, lastInseminationISO };
+  // المحاولة 2: الحقل eventType
+  if (!lastInseminationISO) {
+    try {
+      const s2 = await getDocs(query(
+        collection(db,'events'),
+        where('userId','==',uid),
+        where('animalNumber','==',num),
+        where('eventType','in',['تلقيح','insemination']),
+        orderBy('eventDate','desc'),
+        limit(1)
+      ));
+      if (!s2.empty) lastInseminationISO = s2.docs[0].data().eventDate || '';
+    } catch (_) {}
   }
+
+  // المحاولة 3: fallback — اسحب آخر 50 حدث ورتّب محليًا
+  if (!lastInseminationISO) {
+    const s3 = await getDocs(query(
+      collection(db,'events'),
+      where('userId','==',uid),
+      where('animalNumber','==',num),
+      orderBy('eventDate','desc'),
+      limit(50)
+    ));
+    let latest = '';
+    s3.forEach(d=>{
+      const ev = d.data();
+      const t  = (ev.type || ev.eventType || ev['نوع الحدث'] || '').toString().trim().toLowerCase();
+      if (t==='تلقيح' || t==='insemination') {
+        const dt = ev.eventDate || '';
+        if (dt && (!latest || dt > latest)) latest = dt;
+      }
+    });
+    lastInseminationISO = latest || '';
+  }
+
+  return { species, reproStatus, lastInseminationISO };
+}
 
   // 5) حفظ الحدث بعد نجاح قرار الولادة/الإجهاض
   form.addEventListener('submit', async (e)=>{
@@ -312,6 +352,7 @@
 
 </body>
 </html>
+
 
 
 
