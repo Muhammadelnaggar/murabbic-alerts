@@ -78,17 +78,15 @@
     import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // 🔧 حمِّل إعدادات فايربيز مهما كان أسلوب التصدير (default أو firebaseConfig)
-    // 🔧 جلب إعدادات فايربيز بطريقة متسامحة (ESM أو نافذة)
-    let firebaseConfig = null;
-    try {
-      const mod = await import('/js/firebase-config.js');
-      // ادعم: default أو firebaseConfig أو config أو FIREBASE_CONFIG
-      firebaseConfig = mod?.default || mod?.firebaseConfig || mod?.config || mod?.FIREBASE_CONFIG || null;
-    } catch(_e) {
-      // تجاهل — قد لا يكون الملف ESM أو غير متاح
+    // 🔧 التحميل الرسمي لإعدادات فايربيز عبر ملف /js/firebase-config.js (ESM فقط)
+    import * as cfgMod from '/js/firebase-config.js';
+    const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig;
+    if (!firebaseConfig) {
+      console.error('firebase-config.js must export default (recommended) or named firebaseConfig');
+      const evBody = document.getElementById('evBody');
+      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — الملف /js/firebase-config.js يجب أن يصدّر <b>default</b> أو باسم <b>firebaseConfig</b>.</td></tr>';
+      throw new Error('Missing export from firebase-config.js');
     }
-    // كمل بمحاولة القراءة من window لو الملف غير-ESM
-    if (!firebaseConfig) firebaseConfig = window.firebaseConfig || window.FIREBASE_CONFIG || null;
 
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
