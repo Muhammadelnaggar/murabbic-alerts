@@ -36,7 +36,7 @@
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
-  <script type="module" src="/js/firebase-config.js"></script>
+ 
 
   <header>
     <div class="bar">
@@ -46,15 +46,15 @@
   </header>
 
   <main>
-    <div class="card grid" id="formCard">
+   <form id="calving-form" class="card grid" autocomplete="off" novalidate>
       <div class="row">
         <div>
           <label>رقم الحيوان</label>
-          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+         <input id="animalNumber" data-field="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
         </div>
         <div>
           <label>تاريخ الولادة</label>
-          <input id="eventDate" type="date" required />
+        <input id="eventDate" data-field="eventDate" type="date" required />
         </div>
       </div>
 
@@ -147,12 +147,12 @@
         </div>
       </div>
 
-      <div id="info" class="infobar"></div>
-    </div>
+     <div id="info" class="infobar"></div>
+    </form>
   </main>
 
   <div class="actions-bar">
-    <button class="save" id="saveBtn">حفظ الولادة ✅</button>
+    <button class="save" id="saveBtn" type="submit" form="calving-form">حفظ الولادة ✅</button>
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
@@ -161,152 +161,69 @@
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
 
-  <script type="module">
-    import { db, auth, requireAuth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp }
-      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+ <script type="module">
+  import { db } from '/js/firebase-config.js';
+  import { attachFormValidation, calvingDecision } from '/js/form-rules.js';
+  import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    const $ =(id)=>document.getElementById(id);
-    const qs=(s)=>document.querySelector(s);
-    const qsa=(s)=>Array.from(document.querySelectorAll(s));
+  const form   = document.querySelector('#calving-form');      // تأكد من id الفورم
+  const uid    = localStorage.getItem('userId') || localStorage.getItem('uid') || '';
+  const numEl  = form.querySelector('[data-field="animalNumber"]');
+  const dateEl = form.querySelector('[data-field="eventDate"]');
 
-    const EVENTS = localStorage.getItem('events_collection') || 'events';
-    const CALVES = localStorage.getItem('calves_collection') || 'calves';
+  // فعّل الفالديشن العام الموجود في SCHEMAS للنوع calving
+  attachFormValidation(form, 'calving', { todayISO: new Date().toISOString().slice(0,10) });
 
-    const SNUM='calving:number', SDATE='calving:date';
-    function persist(){ try{
-      sessionStorage.setItem(SNUM,  $('animalNumber').value.trim());
-      sessionStorage.setItem(SDATE, $('eventDate').value);
-    }catch{} }
-    function restore(){ try{
-      if(!$('animalNumber').value) $('animalNumber').value = sessionStorage.getItem(SNUM)||'';
-      if(!$('eventDate').value)    $('eventDate').value    = sessionStorage.getItem(SDATE)||'';
-    }catch{} }
-    function clearPersist(){ try{ sessionStorage.removeItem(SNUM); sessionStorage.removeItem(SDATE);}catch{} }
+  // تحميل النوع + الحالة التناسلية + آخر تلقيح (للحساب)
+  async function fetchCtx(){
+    const num = (numEl?.value || '').trim();
+    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
 
-    function val(name){ const el=qs(`[name="${name}"]:checked`); return el?el.value:''; }
-    function showMsg(t,err){ const el=$('info'); el.className='infobar '+(err?'show error':'show'); el.textContent=t; try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch{} }
+    // الحيوان: النوع + الحالة التناسلية
+    const aQ = query(
+      collection(db,'animals'),
+      where('userId','==',uid),
+      where('animalNumber','==',num),
+      limit(1)
+    );
+    const aSnap = await getDocs(aQ);
+    const animal = aSnap.empty ? {} : aSnap.docs[0].data();
+    const species     = animal.type || animal.species || animal['النوع'] || '';
+    const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
 
-    function updateOffspringUI(){
-      const c=val('calfCount');
-      $('offspring2').style.display=(c==='2'||c==='3')?'':'none';
-      $('offspring3').style.display=(c==='3')?'':'none';
-    }
-    function disableGroup(n,dis){ qsa(`[name="${n}"]`).forEach(r=>{ r.disabled=dis; if(dis) r.checked=false; }); }
-    function disableInputs(sel,dis){ qsa(sel).forEach(e=>{ e.disabled=dis; if(dis&&'value'in e) e.value=''; }); }
-    function updateModeUI(){
-      const k=$('calvingKind').value, dead=(k==='نافقة');
-      qsa('.live-only').forEach(e=> e.style.display=dead?'none':'');
-      ['calfCount','calf1Sex','calf2Sex','calf3Sex','calfFate'].forEach(n=>disableGroup(n,dead));
-      disableInputs('#calfId,#calf2Id,#calf3Id',dead);
-      if(dead) qsa('[name="calfCount"]').forEach(r=> r.checked=false);
-      updateOffspringUI();
-    }
-    qsa('[name="calfCount"]').forEach(r=> r.addEventListener('change', updateOffspringUI));
-    $('calvingKind').addEventListener('change', updateModeUI);
+    // آخر تلقيح
+    const eQ = query(
+      collection(db,'events'),
+      where('userId','==',uid),
+      where('animalNumber','==',num),
+      where('type','in',['تلقيح','insemination']),
+      orderBy('eventDate','desc'),
+      limit(1)
+    );
+    const eSnap = await getDocs(eQ);
+    const lastInseminationISO = eSnap.empty ? '' : (eSnap.docs[0].data().eventDate || '');
 
-    // هيدريت من URL ثم استرجاع لو ناقص
-    (()=>{ const p=new URLSearchParams(location.search);
-     const num=p.get('number')||p.get('animalNumber')||p.get('animalId')||'';
-      const date=p.get('date')||new Date().toISOString().slice(0,10);
-      if(num) $('animalNumber').value=num;
-      if(date) $('eventDate').value=date;
-      restore();
-    })();
+    return { species, reproStatus, lastInseminationISO };
+  }
 
-    $('toCardBtn').addEventListener('click', ()=>{
-      const n=($('animalNumber').value||'').trim();
-      if(!n){ showMsg('أدخل رقم الحيوان أولًا',true); return; }
-      location.href=`cow-card.html?number=${encodeURIComponent(n)}`;
+  // قرار قبل الحفظ: عشار + حد أدنى لأيام الحمل (255 أبقار / 285 جاموس) + تاريخ منطقي
+  form.addEventListener('submit', async (e)=>{
+    const { species, reproStatus, lastInseminationISO } = await fetchCtx();
+    const ok = calvingDecision({
+      species,
+      reproStatus,
+      lastInseminationISO,
+      eventDateISO: (dateEl?.value || '').trim(),
+      animalNumber: (numEl?.value || '').trim(),
+      abortionUrl: '/abortion.html'
     });
+    if (!ok) { e.preventDefault(); e.stopPropagation(); }
+  });
+</script>
 
-    updateModeUI();
-
-    $('saveBtn').addEventListener('click', onSave);
-
-    async function onSave(){
-      const btn=$('saveBtn');
-      const reset=()=>{ btn.disabled=false; btn.textContent='حفظ الولادة ✅'; };
-      try{
-        btn.disabled=true; btn.textContent='جارٍ الحفظ…';
-
-        // تأكيد الدخول — لو مش داخل نحفظ المدخلات ونحوّل
-        try{ await requireAuth(); }
-        catch{ persist(); location.href='/login.html?next='+encodeURIComponent(location.href); return; }
-
-        const animalNumber=$('animalNumber').value.trim();
-        const eventDate=$('eventDate').value;
-        const calvingKind=$('calvingKind').value;
-        if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return reset(); }
-        if(!eventDate){ showMsg('اختر تاريخ الولادة',true); return reset(); }
-        if(!calvingKind){ showMsg('اختر نوع الولادة',true); return reset(); }
-
-        const dead=(calvingKind==='نافقة');
-        const count=dead?0:Number(val('calfCount'));
-        if(!dead && !count){ showMsg('اختر عدد المواليد',true); return reset(); }
-
-        const calves=[];
-        if(!dead){
-          const fate=val('calfFate'); if(!fate){ showMsg('اختر مصير العجل',true); return reset(); }
-          const sex1=val('calf1Sex'); const id1=$('calfId').value.trim();
-          if(!sex1||!id1){ showMsg('أكمل بيانات المولود (1)',true); return reset(); }
-          calves.push({number:id1, sex:sex1, fate});
-          if(count>=2){ const sex2=val('calf2Sex'); const id2=$('calf2Id').value.trim();
-            if(!sex2||!id2){ showMsg('أكمل بيانات المولود (2)',true); return reset(); }
-            calves.push({number:id2, sex:sex2, fate});
-          }
-          if(count>=3){ const sex3=val('calf3Sex'); const id3=$('calf3Id').value.trim();
-            if(!sex3||!id3){ showMsg('أكمل بيانات المولود (3)',true); return reset(); }
-            calves.push({number:id3, sex:sex3, fate});
-          }
-        }
-
-        const tz=Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-        const uid=auth.currentUser?.uid || null;
-        const tenantId=localStorage.getItem('tenantId') || null;
-        const sourceFull=location.href;
-
-        // (اختياري) ذكاء
-        let aiHints=null; try{ aiHints=(await window.smartChecks?.calving?.run?.({animalNumber,eventDate,calvingKind,calves}))?.hints||null; }catch{}
-
-        // 1) حدث الولادة
-        const evRef=await addDoc(collection(db, EVENTS), {
-          type:'ولادة', eventType:'calving',
-          eventDate, eventDateUtc:new Date(eventDate+'T00:00:00Z').toISOString(),
-          animalNumber, calvingKind, calfCount:count,
-          notes: ($('notes').value.trim()||null),
-          aiHints: aiHints || null,
-          tz, source: sourceFull, uid, userId: uid, tenantId,
-          createdAt: serverTimestamp()
-        });
-
-        // 2) العجول
-        for(const c of calves){
-          await addDoc(collection(db, CALVES), {
-            number:c.number, sex:c.sex, fate:c.fate,
-            birthDate:eventDate, birthDateUtc:new Date(eventDate+'T00:00:00Z').toISOString(),
-            damNumber:animalNumber, eventId:evRef.id,
-            tz, source: sourceFull, uid, userId: uid, tenantId,
-            createdAt: serverTimestamp()
-          });
-        }
-
-        clearPersist();
-        window.dataLayer.push({event:'calving_saved', animalNumber, calfCount:count, calvingKind});
-        showMsg('✅ تم حفظ حدث الولادة والعجول بنجاح', false);
-        btn.textContent='تم الحفظ ✓';
-        setTimeout(()=>{ location.href='dashboard.html'; }, 1200);
-
-      }catch(err){
-        console.error(err);
-        window.dataLayer.push({event:'calving_error', message:String(err?.message||err)});
-        showMsg('تعذّر الحفظ في فايربيز (تحقّق من الصلاحيات).', true);
-        reset();
-      }
-    }
-  </script>
 </body>
 </html>
+
 
 
 
