@@ -2,625 +2,148 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>قائمة أحداث الحيوان — مُرَبِّك</title>
+  <title>قائمة الأحداث</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ستايل النماذج/الأخطاء العام -->
+  <link rel="stylesheet" href="css/forms.css">
 
   <style>
-    :root{
-      --brand:#0ea05a;--brand-600:#0b7f47;
-      --bg:#f7faf7;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--border:#e2e8f0;--thead:#f8fafc;
-      --pill-bg:#ecfdf5;--pill-br:#bbf7d0;--pill-ink:#065f46;
-      --warn-bg:#fff7ed;--warn-br:#fed7aa;--warn-ink:#7c2d12;
-      --w1:120px; --w2:160px; /* يُعاد ضبطهما تلقائياً */
+    body { font-family: 'Arial', sans-serif; background-color: #fffde9; direction: rtl; padding: 10px; margin: 0; }
+    h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
+
+    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .controls input, .controls select, .controls button {
+      padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px;
     }
-    *{box-sizing:border-box}
-    html,body{max-width:100%;overflow-x:hidden}
-    body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Roboto,Tahoma,Arial;background:var(--bg);color:var(--ink)}
-    a{color:inherit}
+    .controls button { background-color: #4caf50; color: white; border: none; cursor: pointer; }
+    .controls button:hover { background-color: #388e3c; }
 
-    .wrap{padding:12px}
-    .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .title{font-weight:900;color:var(--brand-600);font-size:16px}
-    .meta{font-size:12px;color:var(--muted)}
-    .actions{margin-inline-start:auto;display:flex;gap:8px}
-    .btn{display:inline-block;background:var(--brand);color:#fff;padding:10px 12px;border-radius:12px;font-weight:800;text-decoration:none;border:1px solid transparent}
-    .btn.ghost{background:var(--card);color:var(--brand-600);border-color:var(--border)}
+    .table-wrapper { overflow-x: auto; background: #fefefc; border-radius: 10px; box-shadow: 0 0 5px #ccc; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1100px; }
+    th, td { padding: 10px; text-align: center; border: 1px solid #cddc39; font-size: 15px; }
+    th { background-color: #dcedc8; color: #33691e; position: sticky; top: 0; z-index: 5; }
+    tr:nth-child(even) { background-color: #f9fbe7; }
+    .button { padding: 5px 10px; background-color: #43a047; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .button:hover { background-color: #388e3c; }
+    .delete-button { background-color: #c62828; }
+    .delete-button:hover { background-color: #b71c1c; }
+    .no-data { text-align: center; color: #c62828; margin-top: 20px; font-size: 16px; }
 
-    .filters{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
-    .filters label{font-size:12px;color:var(--muted)}
-    .filters input,.filters select{padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-family:inherit}
-    .filters .num{display:flex;align-items:center;gap:6px}
-    .filters input[readonly]{background:#f9fafb;color:#475569}
-
-    .table-wrap{border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden}
-    .scroll{max-height:72vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-
-    table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;table-layout:auto}
-    thead th{position:sticky;top:0;background:var(--thead);border-bottom:1px solid var(--border);padding:10px;text-align:right;z-index:5;white-space:nowrap}
-    tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:top;background:#fff}
-    tbody tr:hover td{background:#f9fff8}
-
-    /* عمودان ثابتان (يمين لكون RTL) */
-    .sticky-1,.sticky-2{position:sticky;z-index:6;background:#fff}
-    .sticky-1{inset-inline-end:0;min-width:var(--w1);max-width:calc(var(--w1) + 2px);white-space:nowrap}
-    .sticky-2{inset-inline-end:var(--w1);min-width:var(--w2);max-width:calc(var(--w2) + 2px);white-space:nowrap}
-    thead .sticky-1, thead .sticky-2{background:var(--thead);z-index:7}
-
-    /* تفاصيل تمرير أفقي مريح على الموبايل */
-    .flex-col{min-width:520px}
-    @media (max-width:480px){
-      .title{font-size:15px}
-      table{font-size:13px}
-      .flex-col{min-width:360px}
-      .btn{padding:9px 12px}
-      .filters input,.filters select{padding:8px}
+    /* أعمدة لاصقة (يمين لأن RTL) */
+    :root{ --sticky-col1: 120px; --sticky-col2: 140px; }
+    #eventsTable th, #eventsTable td { background-clip: padding-box; }
+    /* 1) التاريخ */
+    #eventsTable th:nth-child(1), #eventsTable td:nth-child(1) {
+      position: sticky; right: 0; z-index: 4; min-width: var(--sticky-col1);
     }
+    #eventsTable th:nth-child(1) { background: #dcedc8; }
+    #eventsTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; white-space: nowrap; }
+    /* 2) رقم الحيوان */
+    #eventsTable th:nth-child(2), #eventsTable td:nth-child(2) {
+      position: sticky; right: var(--sticky-col1); z-index: 3; min-width: var(--sticky-col2);
+    }
+    #eventsTable th:nth-child(2) { background: #dcedc8; }
+    #eventsTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; white-space: nowrap; }
 
-    .pill{display:inline-block;background:var(--pill-bg);border:1px solid var(--pill-br);color:var(--pill-ink);
-      border-radius:999px;padding:2px 8px;font-size:12px;font-weight:800;white-space:nowrap}
-    .empty{padding:14px;text-align:center;color:var(--muted)}
-    .err{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-ink);padding:10px;border-radius:10px;margin-bottom:8px;font-weight:700;display:none}
-    .err.show{display:block}
+    /* بادج نوع الحدث */
+    .pill{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:800;white-space:nowrap}
 
-    /* هيكل تحميل بسيط */
+    /* شريط لود بسيط */
     .skeleton td{background:linear-gradient(100deg,#f2f6f4 40%,#eaf3ee 50%,#f2f6f4 60%);background-size:200% 100%;animation:s 1.2s infinite linear}
     @keyframes s{to{background-position:-200% 0}}
 
-    /* تفاصيل قابلة للطيّ */
-    details.ev-more{margin-top:6px}
-    details.ev-more summary{cursor:pointer;font-weight:700;color:var(--brand-600)}
-    .kv{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-    .kv .item{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px}
-    .kv .k{color:#475569;margin-inline-end:4px}
-    .kv .v{color:#0f172a;font-weight:700}
+    .actions-row{ display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div id="err" class="err"></div>
+  <h1>🗓️ قائمة الأحداث</h1>
 
-    <header class="head" aria-label="رأس الصفحة">
-      <div class="title">أحداث هذا الموسم</div>
-      <div id="meta" class="meta">—</div>
-      <nav class="actions" aria-label="تنقّل">
-        <a id="openCard" class="btn" href="#">بطاقة الحيوان</a>
-        <a class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
-      </nav>
-    </header>
-
-    <section class="filters" aria-label="مرشّحات">
-      <div class="num">
-        <label for="animalNumField">رقم الحيوان:</label>
-        <input id="animalNumField" inputmode="numeric" placeholder="—" readonly />
-      </div>
-      <label for="catFilter">فلترة:</label>
-      <select id="catFilter">
-        <option value="">الكل</option>
-        <option value="انتاج">انتاج</option>
-        <option value="تناسليات">تناسليات</option>
-        <option value="صحة">صحة</option>
-        <option value="تقييم بالكاميرا">تقييم بالكاميرا</option>
-        <option value="تغذية">تغذية</option>
-      </select>
-    </section>
-
-    <section class="table-wrap" aria-label="جدول الأحداث">
-      <div class="scroll">
-        <table dir="rtl" id="eventsTable">
-          <thead>
-            <tr>
-              <th class="sticky-1">التاريخ</th>
-              <th class="sticky-2">الحدث</th>
-              <th class="flex-col">تفاصيل / قيَم الحدث</th>
-            </tr>
-          </thead>
-          <tbody id="rows" class="skeleton">
-            <tr><td colspan="3" class="empty">جارٍ التحميل…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+  <!-- فلاتر -->
+  <div class="controls">
+    <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
+    <select id="typeSelector">
+      <option value="">كل الأنواع</option>
+    </select>
+    <input type="date" id="fromDate" placeholder="من تاريخ">
+    <input type="date" id="toDate" placeholder="إلى تاريخ">
+    <button id="applyFilters">تطبيق الفلاتر</button>
+    <button id="resetFilter">عرض الكل</button>
   </div>
 
-<script type="module">
-  import { db, auth } from '/js/firebase-config.js';
-  import { collection, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  <!-- الجدول -->
+  <div class="table-wrapper">
+    <table id="eventsTable">
+      <thead>
+        <tr>
+          <th>التاريخ</th>
+          <th>رقم الحيوان</th>
+          <th>نوع الحدث</th>
+          <th>تفاصيل</th>
+          <th>ملاحظات</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="eventsBody" class="skeleton">
+        <tr><td colspan="6">جارٍ التحميل…</td></tr>
+      </tbody>
+    </table>
+  </div>
 
-  // -------- DOM --------
-  const $ = (sel,root=document)=>root.querySelector(sel);
-  const rows   = $('#rows');
-  const metaEl = $('#meta');
-  const table  = $('#eventsTable');
-  const fldNum = $('#animalNumField');
-  const selCat = $('#catFilter');
-  const errBox = $('#err');
-  const openCard = $('#openCard');
+  <!-- أزرار تحكم أسفل الجدول -->
+  <div style="display:flex; gap:10px; justify-content:center; margin-bottom:16px;">
+    <button id="loadMore" style="display:none;">تحميل المزيد</button>
+  </div>
 
-  // -------- Identity --------
-  let UID = null, TID = null;
-  const qp = new URLSearchParams(location.search);
-  const getQNum = () => qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
-  const getQCat = () => qp.get('cat') || '';
+  <div id="noData" class="no-data" style="display:none;">لا توجد أحداث مُسجلة.</div>
+  <a href="dashboard.html" class="button" style="display:block; text-align:center;">🔙 عودة إلى غرفة التحكم</a>
 
-  // -------- Helpers --------
-  function showErr(msg){ errBox.textContent = msg; errBox.classList.add('show'); }
-  function hideErr(){ errBox.classList.remove('show'); errBox.textContent=''; }
+  <!-- سكربت فايربيز -->
+  <script type="module">
+    import { db, auth } from "/js/firebase-config.js";
+    import {
+      collection, query, where, getDocs, orderBy, limit, startAfter, deleteDoc, doc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  function arabicType(ev){
-    if (ev.type) return ev.type;
-    const map = {
+    // DOM helpers
+    const $ = id => document.getElementById(id);
+    const eventsBody = $("eventsBody");
+    const noData = $("noData");
+    const typeSelector = $("typeSelector");
+    const searchNumber = $("searchNumber");
+    const fromDate = $("fromDate");
+    const toDate = $("toDate");
+    const btnApply = $("applyFilters");
+    const btnReset = $("resetFilter");
+    const btnMore = $("loadMore");
+
+    // حالة التحميل/الترقيم
+    let OWNER = null;
+    const PAGE_SIZE = 100;
+    let _lastDoc = null;
+    let _currentFilters = { number:"", type:"", from:null, to:null };
+    let _buffer = []; // نجمع النتائج الحالية في الذاكرة للفلترة السريعة/إعادة الرسم
+
+    // خريطة أسماء عربية للأنواع
+    const TYPE_AR = {
       calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
       pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
       mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
       close_up:'كلوز أب', nutrition:'تغذية',
-      milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث'
+      milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث',
+      abortion:'إجهاض', disease:'حالة صحية'
     };
-    return map[ev.eventType] || 'حدث';
-  }
 
-  const CATEGORY_MAP = {
-    'انتاج' : ['daily_milk','dry_off'],
-    'تناسليات': ['insemination','calving','pregnancy_diagnosis','close_up'],
-    'صحة'  : ['mastitis','lameness','vaccination','treatment','health'],
-    'تقييم بالكاميرا': ['camera_eval','vision_eval','camera_assessment','milking_traits_eval','bcs_eval','feces_eval'],
-    'تغذية' : ['nutrition','feeding']
-  };
+    function arabicType(t){ return TYPE_AR[t] || t || 'حدث'; }
 
-  function categoryOf(ev){
-    const explicit = ev.category || ev.eventCategory || ev.cat;
-    if (explicit) return explicit;
-    const t = (ev.eventType||'').toString();
-    for (const cat in CATEGORY_MAP){
-      if (CATEGORY_MAP[cat].indexOf(t) > -1) return cat;
-    }
-    return 'أخرى';
-  }
-  function filterByCat(arr, cat){ return !cat ? arr : arr.filter(e=>categoryOf(e)===cat); }
+    // تفاصيل مختصرة حسب النوع (من حقول الحدث)
+    function detailsFor(ev){
+      const pick = (keys, suffix='')=>{
+        for(const k of keys){ if(ev[k]!==undefined && ev[k]!=='' && ev[k]!==null) return String(ev[k])+suffix; }
+        return null;
+      };
+      const join = (arr)=> arr.filter(Boolean).join(' • ');
+      const t = ev.eventType || '';
 
-  function fmtDate(ev){
-    if (ev.eventDate) return ev.eventDate;
-    const tsObj = ev.createdAt;
-    if (tsObj && typeof tsObj === 'object' && typeof tsObj.toDate === 'function'){
-      try { return tsObj.toDate().toISOString().slice(0,10); } catch(e){}
-    }
-    return '';
-  }
-
-  // التقط أول قيمة موجودة
-  function pick(obj, keys, suffix){
-    for (let i=0;i<keys.length;i++){
-      const k = keys[i];
-      if (obj && obj[k] !== undefined && obj[k] !== '') return String(obj[k]) + (suffix || '');
-    }
-    return null;
-  }
-  function joinParts(arr){
-    const out = [];
-    for (let i=0;i<arr.length;i++){ if (arr[i]) out.push(arr[i]); }
-    return out.join(' • ');
-  }
-
-  // ——— ملخص تفصيلي حسب نوع الحدث ———
-  function detailsFor(ev){
-    const t = ev.eventType || '';
-
-    if (t === 'insemination'){
-      const time = pick(ev, ['timeOfDay','aiTime','shift','period']);
-      const bull = pick(ev, ['bullName','semenBull','stallion','semenCode']);
-      const dose = pick(ev, ['doseNo','strawNo'],' قشّة');
-      const tech = pick(ev, ['technician','aiTech','operator'],' (فني)');
-      const heat = pick(ev, ['heatScore','heat'],' حرارة');
-      const dim  = pick(ev, ['dim','daysInMilk'],' DIM');
-      return joinParts([
-        time ? ('وقت: ' + time) : null,
-        bull ? ('الطلوقة: ' + bull) : null,
-        dose, tech, heat, dim
-      ]);
-    }
-
-    if (t === 'pregnancy_diagnosis'){
-      const method = pick(ev, ['method','pdMethod']);
-      const res = pick(ev, ['result','pregResult']);
-      const age = pick(ev, ['fetusAgeDays','fetusAge','gestationAgeDays'],' يوم');
-      const twin = ev && ev.twin ? 'توائم' : null;
-      return joinParts([
-        method ? ('طريقة: ' + method) : null,
-        res ? ('النتيجة: ' + res) : null,
-        age ? ('عمر الجنين: ' + age) : null,
-        twin
-      ]);
-    }
-
-    if (t === 'calving'){
-      const sex = pick(ev, ['calfSex','sex']);
-      const type = pick(ev, ['birthType','calvingType']);
-      const diff = pick(ev, ['dystocia','difficulty']);
-      const rp = (ev && ev.retainedPlacenta) ? 'احتباس مشيمة' : null;
-      const calfId = pick(ev, ['calfNumber','calfId']);
-      return joinParts([
-        type ? ('الولادة: ' + type) : null,
-        sex ? ('الجنس: ' + sex) : null,
-        calfId ? ('رقم العجل: ' + calfId) : null,
-        diff ? ('عسرة: ' + diff) : null,
-        rp
-      ]);
-    }
-
-    if (t === 'daily_milk'){
-      const kg   = pick(ev, ['milkKg','milk','yield'],' كجم');
-      const shift= pick(ev, ['shift','timeOfDay']);
-      const fat  = pick(ev, ['fat','fatPct','fatPercent'],'% دهن');
-      const pr   = pick(ev, ['protein','proteinPct','proteinPercent'],'% بروتين');
-      const lac  = pick(ev, ['lactose','lactosePct'],'% لاكتوز');
-      const snf  = pick(ev, ['snf','snfPct'],'% SNF');
-      const scc  = pick(ev, ['scc','somaticCellCount']);
-      const ec   = pick(ev, ['ec','conductivity'],' mS/cm');
-      const temp = pick(ev, ['milkTemp'],'°C');
-      return joinParts([
-        kg ? ('لبن: ' + kg) : null,
-        shift ? ('وردية: ' + shift) : null,
-        fat, pr, lac, snf,
-        scc ? ('SCC: ' + scc) : null,
-        ec ? ('EC: ' + ec) : null,
-        temp ? ('حرارة: ' + temp) : null
-      ]);
-    }
-
-    if (t === 'milking_traits_eval'){
-      const speed = pick(ev, ['milkingSpeed','speed'],' كجم/دقيقة');
-      const letdown = pick(ev, ['letdownTime'],' ثانية');
-      const udderD  = pick(ev, ['udderDepth']);
-      const attach  = pick(ev, ['udderAttachment','foreUdderAttachment']);
-      const teatL   = pick(ev, ['teatLength'],' مم');
-      const teatD   = pick(ev, ['teatDiameter'],' مم');
-      const teatP   = pick(ev, ['teatPlacement']);
-      const mast    = pick(ev, ['mastitisRisk','mastitisScore']);
-      return joinParts([
-        speed ? ('سرعة الحلب: ' + speed) : null,
-        letdown ? ('نزول اللبن: ' + letdown) : null,
-        udderD ? ('عمق الضرع: ' + udderD) : null,
-        attach ? ('اتصال: ' + attach) : null,
-        teatL ? ('طول الحلمة: ' + teatL) : null,
-        teatD ? ('قطر: ' + teatD) : null,
-        teatP ? ('تموضع: ' + teatP) : null,
-        mast ? ('مخاطر الضرع: ' + mast) : null
-      ]);
-    }
-
-    if (t === 'bcs_eval'){
-      const score = pick(ev, ['score','bcs']);
-      const rump  = pick(ev, ['rumpAngle']);
-      const ribs  = pick(ev, ['shortRibs']);
-      const spine = pick(ev, ['backbones']);
-      return joinParts([
-        score ? ('BCS: ' + score) : null,
-        rump ? ('زاوية العجز: ' + rump) : null,
-        ribs ? ('الأضلاع القصيرة: ' + ribs) : null,
-        spine ? ('الفقرات: ' + spine) : null
-      ]);
-    }
-
-    if (t === 'feces_eval' || t === 'feces' || t === 'feaces'){
-      const score = pick(ev, ['score','fecesScore']);
-      const cons  = pick(ev, ['consistency']);
-      const fiber = pick(ev, ['longFibers']);
-      return joinParts([
-        score ? ('درجة الروث: ' + score) : null,
-        cons ? ('القوام: ' + cons) : null,
-        fiber ? ('ألياف طويلة: ' + fiber) : null
-      ]);
-    }
-
-    if (t === 'mastitis'){
-      const q = pick(ev, ['quarter','teatQuarter']);
-      const cmt = pick(ev, ['cmt','cmtScore']);
-      const sev = pick(ev, ['severity']);
-      return joinParts([
-        q ? ('ربع: ' + q) : null,
-        cmt ? ('CMT: ' + cmt) : null,
-        sev ? ('شدة: ' + sev) : null
-      ]);
-    }
-
-    if (t === 'lameness'){
-      const sc = pick(ev, ['score','lamenessScore']);
-      const leg= pick(ev, ['leg','affectedLeg']);
-      const cause = pick(ev, ['cause']);
-      return joinParts([
-        sc ? ('درجة العرج: ' + sc) : null,
-        leg ? ('الرجل: ' + leg) : null,
-        cause ? ('سبب: ' + cause) : null
-      ]);
-    }
-
-    if (t === 'vaccination'){
-      const v = pick(ev, ['vaccine','vaccineName']);
-      const dose = pick(ev, ['dose'],' جرعة');
-      const route= pick(ev, ['route']);
-      return joinParts([
-        v ? ('لقاح: ' + v) : null,
-        dose,
-        route ? ('مسار: ' + route) : null
-      ]);
-    }
-
-    if (t === 'nutrition' || t === 'feeding'){
-      const mode  = pick(ev, ['mode','rationType']);
-      const dm    = pick(ev, ['dm','dmPct'],'% DM');
-      const cp    = pick(ev, ['cp','cpPct'],'% بروتين');
-      const ndf   = pick(ev, ['ndf','ndfPct'],'% NDF');
-      const st    = pick(ev, ['starch','starchPct'],'% نشا');
-      const cost  = pick(ev, ['feedCost','costPerHead'],' ج/رأس/يوم');
-      const fcr   = pick(ev, ['fc','fcr','feedToMilk']);
-      return joinParts([
-        mode ? ('نمط: ' + mode) : null, dm, cp, ndf, st,
-        cost ? ('تكلفة: ' + cost) : null,
-        fcr ? ('F:C: ' + fcr) : null
-      ]);
-    }
-
-    const dim = pick(ev, ['dim'],' DIM');
-    const kg  = pick(ev, ['milkKg'],' كجم');
-    const temp= pick(ev, ['temp'],'°C');
-    const generic = joinParts([
-      kg ? ('لبن: ' + kg) : null,
-      dim ? ('DIM: ' + dim) : null,
-      temp ? ('حرارة: ' + temp) : null
-    ]);
-    return generic || ev.notes || ev.aiHints || '';
-  }
-
-  // مفاتيح نخفيها من تفاصيل أكثر
-  const HIDE_KEYS = {
-    id:1,userId:1,uid:1,tenantId:1,createdAt:1,updatedAt:1,
-    animalId:1,animalNumber:1,number:1,source:1,eventId:1,docId:1,_path:1
-  };
-  function fmtVal(v){
-    if (v === null || v === undefined) return '';
-    if (typeof v === 'boolean') return v ? 'نعم' : 'لا';
-    if (typeof v === 'object' && typeof v.toDate === 'function'){
-      try { return v.toDate().toISOString().slice(0,19).replace('T',' '); } catch(e){}
-    }
-    if (Array.isArray(v)) return v.join(', ');
-    if (typeof v === 'object') return JSON.stringify(v);
-    return String(v);
-  }
-  function buildKV(ev){
-    const wrap = document.createElement('div'); wrap.className='kv';
-    const entries = [];
-    for (const k in ev){
-      if (!HIDE_KEYS[k] && ev[k] !== '' && ev[k] !== null && ev[k] !== undefined){
-        entries.push([k, ev[k]]);
-      }
-    }
-    entries.sort(function(a,b){ return String(a[0]).localeCompare(String(b[0]), 'ar'); });
-    for (let i=0;i<entries.length;i++){
-      const k = entries[i][0], v = entries[i][1];
-      const div = document.createElement('div'); div.className='item';
-      const kEl = document.createElement('span'); kEl.className='k'; kEl.textContent = k+':';
-      const vEl = document.createElement('span'); vEl.className='v'; vEl.textContent = ' '+fmtVal(v);
-      div.appendChild(kEl); div.appendChild(vEl);
-      wrap.appendChild(div);
-    }
-    const frag = document.createDocumentFragment();
-    frag.appendChild(wrap);
-    return frag;
-  }
-
-  // ——— Queries ———
-  function scopeWheres(animalField, num){
-    const wh = [];
-    if (TID) wh.push(where('tenantId','==', TID));
-    if (UID) wh.push(where('userId','==',   UID));
-    wh.push(where(animalField,'==', num));
-    return wh;
-  }
-
-  function waitAuth(){
-    return new Promise(function(res){
-      const off = onAuthStateChanged(auth, function(u){
-        off(); res(u || null);
-      });
-    });
-  }
-
-  async function getCalvings(num, dir, lim){
-    dir = dir || 'desc'; lim = lim || 8;
-    const evs = collection(db,'events');
-    const q1 = query(evs, ...scopeWheres('animalNumber',num), where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
-    const q2 = query(evs, ...scopeWheres('animalId',num),     where('eventType','==','calving'), orderBy('eventDate',dir), limit(lim));
-    const s1 = await getDocs(q1);
-    const s2 = await getDocs(q2);
-    const arr = s1.docs.concat(s2.docs).map(d=>({id:d.id, ...d.data()}));
-    const seen = {};
-    const out = [];
-    for (let i=0;i<arr.length;i++){
-      const id = arr[i].id;
-      if (!seen[id]){ seen[id]=1; out.push(arr[i]); }
-    }
-    return out;
-  }
-
-  async function getAnimalProfile(num){
-    try{
-      const animals = collection(db,'animals');
-      const owner = [];
-      if (UID) owner.push(where('userId','==',UID));
-      if (TID) owner.push(where('tenantId','==',TID));
-      const qs = [
-        query(animals, ...owner, where('number','==',num), limit(1)),
-        query(animals, ...owner, where('animalNumber','==',num), limit(1)),
-        query(animals, ...owner, where('animalId','==',num), limit(1))
-      ];
-      const res = await Promise.all(qs.map(getDocs));
-      for (let i=0;i<res.length;i++){
-        if (!res[i].empty) return res[i].docs[0].data();
-      }
-      return null;
-    }catch(e){ return null; }
-  }
-
-  async function getSeasonBounds(num, todayISO, profile){
-    let start = (profile && (profile.lastCalvingDate || profile.lastCalving || profile.lastCalvingISO)) || null;
-    if (!start){
-      const calvDesc = await getCalvings(num,'desc',8);
-      for (let i=0;i<calvDesc.length;i++){
-        const c = calvDesc[i];
-        if (c.eventDate && c.eventDate <= todayISO){ start = c.eventDate; break; }
-      }
-    }
-    let end = null;
-    if (start){
-      const calvAsc = await getCalvings(num,'asc',8);
-      for (let i=0;i<calvAsc.length;i++){
-        const c = calvAsc[i];
-        if (c.eventDate && c.eventDate > start){ end = c.eventDate; break; }
-      }
-    }
-    return {start:start, end:end};
-  }
-
-  async function getEventsForRange(num, startISO, endISO){
-    const evs = collection(db,'events');
-    function mk(animalField){
-      const base = scopeWheres(animalField,num);
-      if (startISO && endISO){
-        return query(evs, ...base, where('eventDate','>=',startISO), where('eventDate','<',endISO), orderBy('eventDate','desc'));
-      }else if (startISO){
-        return query(evs, ...base, where('eventDate','>=',startISO), orderBy('eventDate','desc'));
-      }else{
-        return query(evs, ...base, orderBy('eventDate','desc'));
-      }
-    }
-    const s1 = await getDocs(mk('animalNumber'));
-    const s2 = await getDocs(mk('animalId'));
-    const all = s1.docs.concat(s2.docs).map(d=>({id:d.id, ...d.data()}));
-    const seen = {};
-    const merged = [];
-    for (let i=0;i<all.length;i++){
-      const id = all[i].id;
-      if (!seen[id]){ seen[id]=1; merged.push(all[i]); }
-    }
-    merged.sort(function(a,b){
-      const da = a.eventDate || '';
-      const db = b.eventDate || '';
-      return db.localeCompare(da);
-    });
-    return merged;
-  }
-
-  // قياس عرض أول عمودين
-  function sizeStickyColumns(){
-    const th1 = $('thead th.sticky-1', table);
-    const th2 = $('thead th.sticky-2', table);
-    if (!th1 || !th2) return;
-    const col1 = table.querySelectorAll('tbody td.col-1, thead th.sticky-1');
-    const col2 = table.querySelectorAll('tbody td.col-2, thead th.sticky-2');
-    let w1 = th1.scrollWidth, w2 = th2.scrollWidth;
-    for (let i=0;i<col1.length;i++){ w1 = Math.max(w1, col1[i].scrollWidth); }
-    for (let j=0;j<col2.length;j++){ w2 = Math.max(w2, col2[j].scrollWidth); }
-    table.style.setProperty('--w1', (Math.ceil(w1)+16) + 'px');
-    table.style.setProperty('--w2', (Math.ceil(w2)+16) + 'px');
-  }
-
-  function renderRows(events, bounds){
-    rows.classList.remove('skeleton');
-    rows.innerHTML = '';
-    if (!events.length){
-      rows.innerHTML = '<tr><td colspan="3" class="empty">لا توجد أحداث ضمن هذا الموسم.</td></tr>';
-    }else{
-      const frag = document.createDocumentFragment();
-      for (let i=0;i<events.length;i++){
-        const ev = events[i];
-        const tr  = document.createElement('tr');
-
-        const td1 = document.createElement('td');
-        td1.className = 'sticky-1 col-1';
-        td1.textContent = fmtDate(ev);
-
-        const td2 = document.createElement('td');
-        td2.className = 'sticky-2 col-2';
-        td2.innerHTML = '<span class="pill" title="'+(ev.eventType||'')+'">'+ arabicType(ev) +'</span>';
-
-        const td3 = document.createElement('td');
-        td3.className = 'flex-col';
-
-        const summary = document.createElement('div');
-        summary.textContent = detailsFor(ev);
-        td3.appendChild(summary);
-
-        const det = document.createElement('details');
-        det.className = 'ev-more';
-        const sum = document.createElement('summary');
-        sum.textContent = 'تفاصيل أكثر';
-        det.appendChild(sum);
-        det.appendChild(buildKV(ev));
-        td3.appendChild(det);
-
-        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-        frag.appendChild(tr);
-      }
-      rows.appendChild(frag);
-    }
-
-    if (!bounds.start){
-      metaEl.textContent = 'كل الأحداث (لا توجد ولادة مسجَّلة كبداية موسم)';
-    }else if (bounds.end){
-      metaEl.textContent = 'من الولادة '+bounds.start+' حتى قبل الولادة '+bounds.end;
-    }else{
-      metaEl.textContent = 'من الولادة '+bounds.start+' حتى اليوم';
-    }
-    requestAnimationFrame(sizeStickyColumns);
-  }
-
-  (async function main(){
-    hideErr();
-
-    const user = auth.currentUser || await waitAuth();
-    if (!user){
-      rows.classList.remove('skeleton');
-      rows.innerHTML = '<tr><td colspan="3" class="empty">يلزم تسجيل الدخول لعرض الأحداث.</td></tr>';
-      metaEl.textContent = '—';
-      return;
-    }
-    UID = user.uid;
-    TID = localStorage.getItem('tenantId') || null;
-
-    const num = getQNum();
-    fldNum.value = num || '';
-    if (!num){
-      rows.classList.remove('skeleton');
-      rows.innerHTML = '<tr><td colspan="3" class="empty">لم يتم تمرير رقم الحيوان.</td></tr>';
-      return;
-    }
-
-    if (openCard) openCard.href = 'cow-card.html?number='+encodeURIComponent(num);
-    selCat.value = getQCat();
-
-    const today = new Date().toISOString().slice(0,10);
-    const profile = await getAnimalProfile(num);
-    const bounds  = await getSeasonBounds(num, today, profile);
-
-    const allEvents = await getEventsForRange(num, bounds.start || null, bounds.end || null);
-    renderRows(filterByCat(allEvents, selCat.value || ''), bounds);
-
-    selCat.addEventListener('change', function(){
-      const cat = selCat.value || '';
-      const url = new URL(location.href);
-      if (cat) url.searchParams.set('cat',cat); else url.searchParams.delete('cat');
-      history.replaceState({},'',url.toString());
-      renderRows(filterByCat(allEvents, cat), bounds);
-    });
-
-    window.addEventListener('resize', function(){ requestAnimationFrame(sizeStickyColumns); }, {passive:true});
-    window.addEventListener('orientationchange', function(){ setTimeout(sizeStickyColumns, 200); }, {passive:true});
-  })().catch(function(err){
-    console.error(err);
-    showErr('تعذّر تحميل الأحداث. تأكّد من الصلاحيات وقواعد Firestore (murabbikdata).');
-    rows.classList.remove('skeleton');
-  });
-</script>
-
-</body>
-</html>
+      if (t==='insemination'){
