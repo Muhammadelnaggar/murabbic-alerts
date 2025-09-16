@@ -266,3 +266,64 @@ export function attachFormValidation(formEl, eventType, ctx={}){
     }
   });
 }
+// ======== حسابات بسيطة مساعدة للولادة ========
+
+// فرق الأيام بين تاريخين ISO (YYYY-MM-DD)
+// فرق الأيام (UTC) من دون تأثير المنطقة الزمنية
+export function daysBetween(aISO, bISO){
+  const [ay, am, ad] = aISO.split('-').map(Number);
+  const [by, bm, bd] = bISO.split('-').map(Number);
+  const a = Date.UTC(ay, am-1, ad);
+  const b = Date.UTC(by, bm-1, bd);
+  return Math.floor((b - a) / 86400000);
+}
+
+
+// حدّ أدنى للحمل حسب النوع: أبقار 255 / جاموس 285
+export function speciesMinDays(speciesStr){
+  const s = (speciesStr||'').toString().toLowerCase();
+  const isBuffalo = /buff|جاموس/.test(s);
+  return { min: isBuffalo ? 285 : 255, kind: isBuffalo ? 'الجاموسة' : 'البقرة' };
+}
+
+/**
+ * قرار حفظ الولادة:
+ * - يشترط الحالة التناسلية "عشار" إن كانت معروفة.
+ * - يمنع الحفظ لو عمر الحمل أقل من الحد الأدنى (255 أبقار / 285 جاموس).
+ * - يعطي خيار "تسجيل إجهاض" أو "استمرار".
+ */
+export function calvingDecision({
+  species,
+  reproStatus,
+  lastInseminationISO,
+  eventDateISO,
+  animalNumber,
+  abortionUrl = '/abortion.html'
+}){
+  // شرط "عشار" لو معروفة
+  if (reproStatus && reproStatus !== 'عشار') {
+    alert('لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عشار».');
+    return false;
+  }
+
+  // لو مافيش تلقيح/تواريخ غير صالحة → اسمح بالمتابعة
+  if (!isISODate(lastInseminationISO) || !isISODate(eventDateISO)) return true;
+
+  const { min, kind } = speciesMinDays(species);
+  const ga = daysBetween(lastInseminationISO, eventDateISO);
+  if (ga < 0) {
+    alert('تاريخ الولادة أقدم من تاريخ آخر تلقيح — راجع التواريخ.');
+    return false;
+  if (ga < min) {
+    const goAbort = window.confirm(
+      `${kind} لم تُكمل الحد الأدنى للحمل (${min} يوم).\n` +
+      `هل تريد تسجيل «إجهاض»؟ (موافق)\nأم «استمرار»؟ (إلغاء)`
+    );
+    if (goAbort) {
+      const qs = new URLSearchParams({ number:String(animalNumber||''), date:eventDateISO });
+      location.href = `${abortionUrl}?${qs.toString()}`;
+    }
+    return false; // أوقف الإرسال الحالي
+  }
+  return true;
+}
