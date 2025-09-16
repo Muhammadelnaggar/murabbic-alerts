@@ -75,7 +75,18 @@
     import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    import firebaseConfig from '/js/firebase-config.js'; // default export
+
+    // 🔧 حمِّل إعدادات فايربيز مهما كان أسلوب التصدير (default أو firebaseConfig)
+    let firebaseConfig;
+    try {
+      const mod = await import('/js/firebase-config.js');
+      firebaseConfig = mod.default || mod.firebaseConfig || mod.config || mod.FIREBASE_CONFIG;
+      if (!firebaseConfig) throw new Error('Missing export');
+    } catch (e) {
+      console.error('Firebase config import failed', e);
+      alert('تعذّر تحميل إعدادات Firebase — تأكد أن /js/firebase-config.js يصدّر default أو firebaseConfig');
+      throw e;
+    }
 
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
@@ -89,20 +100,17 @@
     const auth = getAuth(app);
     const db   = getFirestore(app, 'murabbikdata');
 
-    // قراءة userId (أولوية لما يخزّنه tenant-bootstrap، ثم Auth)
+    // أدوات مساعدة
+    const pick = (obj, keys, def='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return def; };
+    const getParam = (...keys) => { const u=new URL(location.href); for (const k of keys){ const v=u.searchParams.get(k); if(v!=null && v!=='') return v; } return ''; };
+
     function currentUserId(){
-      const ls = localStorage.getItem('userId') || localStorage.getItem('uid') || '';
+      const viaUrl = getParam('userId','uid');
+      const ls = viaUrl || localStorage.getItem('userId') || localStorage.getItem('uid') || '';
       if(ls) return ls;
       const u = auth.currentUser; return u?.uid || '';
     }
 
-    // استخراج قيمة آمنة من حدث
-    const pick = (obj, keys, def='') => {
-      for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; }
-      return def;
-    };
-
-    // تنسيق عمود التفاصيل حسب نوع الحدث
     function detailsFor(ev){
       const t = pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '').trim();
       if(t === 'تلقيح'){
@@ -121,15 +129,9 @@
         const p2 = shift? `الوردية: ${shift}`: '';
         return [p1,p2].filter(Boolean).join(' — ');
       }
-      // افتراضي: أعرض أهم الحقول إن وجدت
       const note = pick(ev, ['note','ملاحظة'], '');
       const result = pick(ev, ['result','النتيجة'], '');
       return [note, result].filter(Boolean).join(' — ');
-    }
-
-    function fmtDate(s){
-      const d = pick(s, ['eventDate','date','dt','تاريخ الحدث'], '');
-      return typeof s === 'object' ? (d||'') : s; // لو أرسلت كقيمة فقط
     }
 
     function renderRows(events){
@@ -151,20 +153,23 @@
       evBody.appendChild(frag);
     }
 
-    // تحميل أولي + فلترة بسيطة على العميل لتفادي فهارس مركّبة
     async function loadAndFilter(){
       const uid = currentUserId();
       if(!uid){ renderRows([]); return; }
 
-      // اجلب أحدث 200 حدث للمستخدم
-      const q = query(collection(db,'events'), where('userId','==',uid), orderBy('eventDate','desc'), limit(200));
+      // اجلب أحدث 200 حدث للمستخدم (userId)
+      const q = query(
+        collection(db,'events'),
+        where('userId','==',uid),
+        orderBy('eventDate','desc'),
+        limit(200)
+      );
       const snap = await getDocs(q);
       const rows = [];
       snap.forEach(doc => rows.push({ id:doc.id, ...doc.data() }));
 
-      // فلاتر
-      const num  = (fNum.value || '').trim();
-      const type = (fType.value || '').trim();
+      const num  = (document.getElementById('f-num').value || '').trim();
+      const type = (document.getElementById('f-type').value || '').trim();
 
       const filtered = rows.filter(r => {
         const okNum  = !num  || (String(pick(r,['animalNumber','number','animalId'],'')).trim() === num);
@@ -176,18 +181,20 @@
       renderRows(filtered);
     }
 
-    // ربط الازرار
+    // ربط الأزرار
     btnApply.addEventListener('click', loadAndFilter);
     btnClear.addEventListener('click', () => { fNum.value=''; fType.value=''; loadAndFilter(); });
 
-    // تعبئة مثال 108 عند الفتح (إن وُجد)
+    // إقلاع الصفحة: وراثة رقم الحيوان + انتظار الـAuth عند الحاجة
     window.addEventListener('DOMContentLoaded', () => {
-      // محاولة وراثة رقم الحيوان من عنوان الصفحة أو التخزين
-      const u = new URL(location.href);
-      const n = u.searchParams.get('number') || u.searchParams.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
-      if(n){ fNum.value = n; }
-      else { fNum.placeholder = 'رقم الحيوان (مثال 108)'; }
-      loadAndFilter();
+      const n = getParam('number','animalNumber','num','n') || localStorage.getItem('currentAnimalNumber') || '';
+      if(n){ fNum.value = n; } else { fNum.placeholder = 'رقم الحيوان (مثال 108)'; }
+
+      if (auth.currentUser || localStorage.getItem('userId') || getParam('userId','uid')) {
+        loadAndFilter();
+      } else {
+        onAuthStateChanged(auth, () => loadAndFilter());
+      }
     });
   </script>
 </body>
