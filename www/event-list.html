@@ -32,8 +32,7 @@
     .empty{padding:18px;text-align:center;color:#6b7280}
   </style>
   <!-- حمِّل إعدادات Firebase كملف عادي (غير ESM) ليضع firebaseConfig على window -->
-  <script src="/js/firebase-config.js"></script>
-</head>
+  </head>
 <body>
   <div class="wrap">
     <h1>قائمة أحداث الحيوان</h1>
@@ -79,14 +78,17 @@
     import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // 🔧 حمِّل إعدادات فايربيز مهما كان أسلوب التصدير (default أو firebaseConfig)
-    // 🔧 تحميل إعدادات فايربيز من المتغيرات العامة (تجنّب مشاكل ESM/default)
-    const firebaseConfig = window.firebaseConfig || window.FIREBASE_CONFIG;
-    if(!firebaseConfig){
-      console.error('firebase-config.js لا يعرّف window.firebaseConfig');
-      const evBody = document.getElementById('evBody');
-      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — تأكد من أن /js/firebase-config.js يُسند الكائن إلى <code>window.firebaseConfig</code></td></tr>';
-      throw new Error('Missing firebaseConfig on window');
+    // 🔧 جلب إعدادات فايربيز بطريقة متسامحة (ESM أو نافذة)
+    let firebaseConfig = null;
+    try {
+      const mod = await import('/js/firebase-config.js');
+      // ادعم: default أو firebaseConfig أو config أو FIREBASE_CONFIG
+      firebaseConfig = mod?.default || mod?.firebaseConfig || mod?.config || mod?.FIREBASE_CONFIG || null;
+    } catch(_e) {
+      // تجاهل — قد لا يكون الملف ESM أو غير متاح
     }
+    // كمل بمحاولة القراءة من window لو الملف غير-ESM
+    if (!firebaseConfig) firebaseConfig = window.firebaseConfig || window.FIREBASE_CONFIG || null;
 
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
@@ -96,7 +98,17 @@
     const evBody = document.getElementById('evBody');
 
     // تهيئة فيربيز + Firestore باسم قاعدة البيانات الصحيحة
-    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    let app;
+    if (getApps().length) {
+      app = getApps()[0];
+    } else if (firebaseConfig) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      console.error('تعذّر العثور على تكوين Firebase');
+      const evBody = document.getElementById('evBody');
+      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — تأكد من أن /js/firebase-config.js يصدّر default أو يعرّف window.firebaseConfig</td></tr>';
+      throw new Error('Missing Firebase configuration');
+    }
     const auth = getAuth(app);
     const db   = getFirestore(app, 'murabbikdata');
 
