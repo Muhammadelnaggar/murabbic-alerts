@@ -161,6 +161,26 @@
    <script type="module" src="/js/firebase-config.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
+<script>
+(function(){
+  const qs = new URLSearchParams(location.search);
+  const $  = (id)=> document.getElementById(id);
+
+  function toISO(s){
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s); if (isNaN(d)) return '';
+    // ISO محلي بدون انزياح المنطقة الزمنية
+    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const num  = qs.get('number') || qs.get('animalNumber') || '';
+    const date = qs.get('date')   || qs.get('dt') || '';
+    if (num  && $('animalNumber')) $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
+    if (date && $('eventDate'))    $('eventDate').value    = toISO(date);
+  });
+})();
+</script>
 
  <script type="module">
   import { db } from '/js/firebase-config.js';
@@ -176,36 +196,34 @@
   attachFormValidation(form, 'calving', { todayISO: new Date().toISOString().slice(0,10) });
 
   // تحميل النوع + الحالة التناسلية + آخر تلقيح (للحساب)
-  async function fetchCtx(){
-    const num = (numEl?.value || '').trim();
-    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
+async function fetchCtx(){
+  const num = (numEl?.value || '').trim();
+  if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
 
-    // الحيوان: النوع + الحالة التناسلية
-    const aQ = query(
-      collection(db,'animals'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      limit(1)
-    );
-    const aSnap = await getDocs(aQ);
-    const animal = aSnap.empty ? {} : aSnap.docs[0].data();
-    const species     = animal.type || animal.species || animal['النوع'] || '';
-    const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
+  // الحيوان: النوع + الحالة التناسلية
+  const aSnap = await getDocs(query(
+    collection(db,'animals'),
+    where('userId','==',uid),
+    where('animalNumber','==',num),
+    limit(1)
+  ));
+  const animal = aSnap.empty ? {} : aSnap.docs[0].data();
+  const species     = animal.type || animal.species || animal['النوع'] || '';
+  const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
 
-    // آخر تلقيح
-    const eQ = query(
-      collection(db,'events'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      where('type','in',['تلقيح','insemination']),
-      orderBy('eventDate','desc'),
-      limit(1)
-    );
-    const eSnap = await getDocs(eQ);
-    const lastInseminationISO = eSnap.empty ? '' : (eSnap.docs[0].data().eventDate || '');
+  // آخر تلقيح (يتطلب إندكس مركّب)
+  const eSnap = await getDocs(query(
+    collection(db,'events'),
+    where('userId','==',uid),
+    where('animalNumber','==',num),
+    where('type','in',['تلقيح','insemination']),
+    orderBy('eventDate','desc'),
+    limit(1)
+  ));
+  const lastInseminationISO = eSnap.empty ? '' : (eSnap.docs[0].data().eventDate || '');
 
-    return { species, reproStatus, lastInseminationISO };
-  }
+  return { species, reproStatus, lastInseminationISO };
+}
 
   // قرار قبل الحفظ: عشار + حد أدنى لأيام الحمل (255 أبقار / 285 جاموس) + تاريخ منطقي
   form.addEventListener('submit', async (e)=>{
@@ -224,6 +242,7 @@
 
 </body>
 </html>
+
 
 
 
