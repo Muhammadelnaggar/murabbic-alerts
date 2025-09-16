@@ -5,49 +5,50 @@
   <title>قائمة الأحداث</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
+  <script type="module" src="js/forms-init.js"></script>
   <style>
     body { font-family: 'Arial', sans-serif; background-color: #fffde9; direction: rtl; padding: 10px; margin: 0; }
     h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
-
-    .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
     .controls input, .controls select { padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px; }
     .controls button { padding: 8px 12px; background-color: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .controls button:hover { background-color: #388e3c; }
-
     .table-wrapper { overflow-x: auto; background: #fefefc; border-radius: 10px; box-shadow: 0 0 5px #ccc; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; min-width: 950px; }
     th, td { padding: 10px; text-align: center; border: 1px solid #cddc39; font-size: 15px; }
-    th { background-color: #dcedc8; color: #33691e; position: sticky; top: 0; z-index: 5; }
+    th { background-color: #dcedc8; color: #33691e; }
     tr:nth-child(even) { background-color: #f9fbe7; }
     .button { padding: 5px 10px; background-color: #43a047; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .button:hover { background-color: #388e3c; }
     .delete-button { background-color: #c62828; }
     .delete-button:hover { background-color: #b71c1c; }
-    .no-data { text-align: center; color: #c62828; margin-top: 20px; font-size: 16px; }
+    .no-data { text-align: center; color: #c62828; margin-top: 30px; font-size: 18px; }
+    .back-button { display: block; text-align: center; background-color: #4caf50; color: white; font-size: 16px; padding: 10px; border-radius: 8px; text-decoration: none; }
 
-    /* أعمدة لاصقة: التاريخ + رقم الحيوان (يمين لأن RTL) */
     :root{ --sticky-col1: 140px; --sticky-col2: 120px; }
     #eventsTable { border-collapse: separate; border-spacing: 0; }
     #eventsTable th, #eventsTable td { background-clip: padding-box; }
+    /* ثبّت التاريخ ثم رقم الحيوان (يمين لأن RTL) */
     #eventsTable th:nth-child(1), #eventsTable td:nth-child(1) { position: sticky; right: 0; z-index: 4; min-width: var(--sticky-col1); }
     #eventsTable th:nth-child(1) { background: #dcedc8; }
     #eventsTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; white-space:nowrap; }
     #eventsTable th:nth-child(2), #eventsTable td:nth-child(2) { position: sticky; right: var(--sticky-col1); z-index: 3; min-width: var(--sticky-col2); }
     #eventsTable th:nth-child(2) { background: #dcedc8; }
     #eventsTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; white-space:nowrap; }
+    .table-wrapper { overflow-x: auto; }
 
     .pill{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:800}
   </style>
 </head>
 <body>
-  <h1>📅 قائمة الأحداث</h1>
+  <h1>📅 قائمة الأحداث المسجلة</h1>
 
   <div class="controls">
     <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
-    <select id="typeSelector">
-      <option value="">كل الأنواع</option>
+    <select id="typeSelector" onchange="filterType(this.value)">
+      <option value="">عرض نوع الحدث</option>
     </select>
-    <button id="resetFilter">عرض الكل</button>
+    <button onclick="resetFilter()">عرض الكل</button>
   </div>
 
   <div class="table-wrapper">
@@ -59,7 +60,7 @@
           <th>نوع الحدث</th>
           <th>تفاصيل</th>
           <th>ملاحظات</th>
-          <th>بطاقة</th>
+          <th>البطاقة</th>
           <th>حذف</th>
         </tr>
       </thead>
@@ -68,189 +69,192 @@
   </div>
 
   <div id="noData" class="no-data" style="display:none;">لا توجد أحداث مُسجلة.</div>
-  <a href="dashboard.html" class="button" style="display:block; text-align:center;">🔙 عودة إلى غرفة التحكم</a>
+  <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
-  <!-- سكربت فايرستور -->
-<script type="module">
-  import { db, auth } from "/js/firebase-config.js";
-  import {
-    collection, query, where, getDocs, deleteDoc, doc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  <!-- سكربت فايرستور (نفس بساطة صفحة الحيوانات) -->
+  <script type="module">
+    import { db, auth } from "/js/firebase-config.js";
+    import { collection, query, where, getDocs, deleteDoc, doc }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // عناصر الواجهة
-  const $ = (id) => document.getElementById(id);
-  const eventsBody = $("eventsBody");
-  const noData     = $("noData");
-  const selType    = $("typeSelector");
-  const inpNum     = $("searchNumber");
+    const $  = id => document.getElementById(id);
+    let eventsData = [];
 
-  // ترجمة الأنواع
-  const TYPE_AR = {
-    calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
-    pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
-    mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
-    close_up:'كلوز أب', nutrition:'تغذية',
-    milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث',
-    abortion:'إجهاض', disease:'حالة صحية'
-  };
-
-  // رقم الحيوان من الرابط (اختياري)
-  const qp = new URLSearchParams(location.search);
-  const initialNumber = qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
-
-  let eventsData = [];
-
-  // ====== دوال مساعدة بسيطة ======
-  function eventDateOf(ev){
-    if (ev.eventDate) return ev.eventDate;             // نص YYYY-MM-DD
-    const ts = ev.createdAt;
-    if (ts && typeof ts === 'object' && typeof ts.toDate === 'function'){
-      try { return ts.toDate().toISOString().slice(0,10); } catch {}
-    }
-    return '';
-  }
-
-  function detailsFor(ev){
-    const t = ev.eventType || '';
-    const pick = (keys, suf='')=>{
-      for(const k of keys){ if(ev[k]!=null && ev[k]!=='') return String(ev[k])+suf; }
-      return null;
+    // ترجمة عربية مباشرة (تقبل عربي/إنجليزي كِلاهما)
+    const TYPE_AR = {
+      calving:'ولادة','ولادة':'ولادة',
+      dry_off:'تجفيف','تجفيف':'تجفيف',
+      insemination:'تلقيح','تلقيح':'تلقيح',
+      pregnancy_diagnosis:'تشخيص حمل','تشخيص حمل':'تشخيص حمل',
+      daily_milk:'لبن يومي','لبن يومي':'لبن يومي',
+      mastitis:'التهاب ضرع','التهاب ضرع':'التهاب ضرع',
+      lameness:'عرج','عرج':'عرج',
+      vaccination:'تطعيم','تطعيم':'تطعيم',
+      close_up:'كلوز أب','كلوز أب':'كلوز أب',
+      nutrition:'تغذية','تغذية':'تغذية',
+      milking_traits_eval:'سمات اللبن (كاميرا)','سمات اللبن (كاميرا)':'سمات اللبن (كاميرا)',
+      bcs_eval:'تقييم حالة الجسم','تقييم حالة الجسم':'تقييم حالة الجسم',
+      feces_eval:'تقييم الروث','تقييم الروث':'تقييم الروث',
+      abortion:'إجهاض','إجهاض':'إجهاض',
+      disease:'حالة صحية','حالة صحية':'حالة صحية'
     };
-    const join = (a)=> a.filter(Boolean).join(' • ');
+    const labelAr = t => TYPE_AR[t] || t || '';
 
-    if (t==='insemination'){
-      return join([
-        pick(['timeOfDay','aiTime','shift']) && ('وقت: '+pick(['timeOfDay','aiTime','shift'])),
-        pick(['bullName','semenBull','stallion','semenCode']) && ('الطلوقة: '+pick(['bullName','semenBull','stallion','semenCode'])),
-        pick(['strawNo','doseNo']) && ('قشّة: '+pick(['strawNo','doseNo']))
-      ]);
-    }
-    if (t==='daily_milk'){
-      return join([
-        pick(['milkKg','milk','yield'],' كجم') && ('لبن: '+pick(['milkKg','milk','yield'],' كجم')),
-        pick(['shift','timeOfDay']) && ('وردية: '+pick(['shift','timeOfDay']))
-      ]);
-    }
-    // باقي الأنواع بشكل مختصر
-    return ev.notes || ev.aiHints || '';
-  }
-
-  function updateTypeOptions(){
-    selType.innerHTML = '<option value="">كل الأنواع</option>';
-    const types = [...new Set(eventsData.map(e => e.eventType).filter(Boolean))];
-    types.forEach(t=>{
-      const opt = document.createElement('option');
-      opt.value = t; opt.textContent = TYPE_AR[t] || t;
-      selType.appendChild(opt);
-    });
-  }
-
-  function renderTable(data){
-    eventsBody.innerHTML = '';
-    if (!data || !data.length){
-      noData.style.display = 'block';
-      return;
-    }
-    noData.style.display = 'none';
-
-    // ترتيب محلي بالتاريخ تنازليًا
-    data = [...data].sort((a,b)=> (eventDateOf(b)||'').localeCompare(eventDateOf(a)||''));
-
-    data.forEach(ev=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${eventDateOf(ev) || ''}</td>
-        <td>${ev.animalNumber ?? ev.animalId ?? ''}</td>
-        <td><span class="pill" title="${ev.eventType||''}">${TYPE_AR[ev.eventType] || ev.eventType || ''}</span></td>
-        <td>${detailsFor(ev) || ''}</td>
-        <td>${ev.notes || ''}</td>
-        <td><button class="button" onclick="viewCard('${ev.animalNumber ?? ev.animalId ?? ""}')">📄</button></td>
-        <td><button class="button delete-button" onclick="deleteEvent('${ev.id}')">🗑️</button></td>
-      `;
-      eventsBody.appendChild(tr);
-    });
-  }
-
-  function filterNow(){
-    const qNum  = inpNum.value.trim();
-    const qType = selType.value || '';
-    return eventsData.filter(ev=>{
-      const numVal = String(ev.animalNumber ?? ev.animalId ?? '');
-      const okNum  = !qNum  || numVal.includes(qNum);
-      const okType = !qType || ev.eventType === qType;
-      return okNum && okType;
-    });
-  }
-
-  // ====== تحميل البيانات ببساطة (زي صفحة الحيوانات) ======
-  async function loadEvents(uid){
-    // بنجرب الحقلين: ownerUid و userId (وندمج)
-    const tries = [
-      getDocs(query(collection(db,'events'), where('ownerUid','==', uid))),
-      getDocs(query(collection(db,'events'), where('userId',  '==', uid)))
-    ];
-    const res = await Promise.allSettled(tries);
-    const map = new Map();
-    for (const r of res){
-      if (r.status !== 'fulfilled') continue;
-      r.value.docs.forEach(d => map.set(d.id, { id:d.id, ...d.data() }));
-    }
-
-    // لو جت فاضية جدًا، نجرّب رقم الحيوان من الرابط (بعض الداتا القديمة قد لا تحمل مالك)
-    if (map.size===0 && initialNumber){
-      const asNum = Number(initialNumber);
-      const variants = Number.isNaN(asNum) ? [initialNumber] : [initialNumber, asNum];
-      const more = [];
-      for (const v of variants){
-        more.push(getDocs(query(collection(db,'events'), where('animalNumber','==', v))));
-        more.push(getDocs(query(collection(db,'events'), where('animalId',    '==', v))));
+    // تاريخ الحدث (يدعم eventDate أو createdAt)
+    function eventDateOf(ev){
+      if (ev.eventDate) return ev.eventDate; // YYYY-MM-DD
+      const ts = ev.createdAt;
+      if (ts && typeof ts === 'object' && typeof ts.toDate === 'function'){
+        try { return ts.toDate().toISOString().slice(0,10); } catch(e){}
       }
-      const moreRes = await Promise.allSettled(more);
-      for (const r of moreRes){
-        if (r.status!=='fulfilled') continue;
-        r.value.docs.forEach(d => map.set(d.id, { id:d.id, ...d.data() }));
+      return '';
+    }
+
+    // تفاصيل مختصرة وواضحة (بدون تعقيد)
+    function detailsOf(ev){
+      const t = ev.eventType;
+      const first = (...keys)=> {
+        for (const k of keys){ if (ev[k]!=null && ev[k]!=='') return String(ev[k]); }
+        return '';
+      };
+      const join = arr => arr.filter(Boolean).join(' • ');
+
+      if (t==='تلقيح' || t==='insemination'){
+        return join([
+          first('timeOfDay','aiTime','shift') && 'وقت: ' + first('timeOfDay','aiTime','shift'),
+          first('bullName','semenBull','stallion','semenCode') && 'الطلوقة: ' + first('bullName','semenBull','stallion','semenCode'),
+          first('strawNo','doseNo') && 'قشّة: ' + first('strawNo','doseNo')
+        ]);
       }
+      if (t==='لبن يومي' || t==='daily_milk'){
+        return join([
+          first('milkKg','milk','yield') && 'لبن: ' + first('milkKg','milk','yield') + ' كجم',
+          first('shift','timeOfDay') && 'وردية: ' + first('shift','timeOfDay')
+        ]);
+      }
+      if (t==='سمات اللبن (كاميرا)' || t==='milking_traits_eval'){
+        return join([
+          first('milkingSpeed','speed') && 'سرعة: ' + first('milkingSpeed','speed'),
+          first('letdownTime') && 'نزول: ' + first('letdownTime') + ' ث'
+        ]);
+      }
+      if (t==='ولادة' || t==='calving'){
+        return join([
+          first('calvingType','birthType') && 'الولادة: ' + first('calvingType','birthType'),
+          first('calfSex','sex') && 'الجنس: ' + first('calfSex','sex')
+        ]);
+      }
+      if (t==='التهاب ضرع' || t==='mastitis'){
+        return join([
+          first('quarter','teatQuarter') && 'ربع: ' + first('quarter','teatQuarter'),
+          first('cmt','cmtScore') && 'CMT: ' + first('cmt','cmtScore')
+        ]);
+      }
+      if (t==='عرج' || t==='lameness'){
+        return join([
+          first('lamenessScore','score') && 'درجة: ' + first('lamenessScore','score'),
+          first('affectedLeg','leg') && 'الرجل: ' + first('affectedLeg','leg')
+        ]);
+      }
+      if (t==='تطعيم' || t==='vaccination'){
+        return join([
+          first('vaccineName','vaccine') && 'لقاح: ' + first('vaccineName','vaccine'),
+        ]);
+      }
+      if (t==='تجفيف' || t==='dry_off'){ return '—'; }
+      if (t==='تغذية' || t==='nutrition'){ return first('rationType','mode') ? 'نمط: ' + first('rationType','mode') : ''; }
+      return ev.notes || ev.aiHints || '';
     }
 
-    eventsData = Array.from(map.values());
-    updateTypeOptions();
-    renderTable(eventsData);
-  }
+    // تحميل (استعلام واحد بسيط زي الحيوانات)
+    onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        location.href = "login.html?next=event-list.html";
+        return;
+      }
+      // لو عندك الحقل اسمه userId بدّل السطر التالي فقط إلى where("userId","==",u.uid)
+      const snap = await getDocs(query(collection(db, "events"), where("ownerUid", "==", u.uid)));
+      eventsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      updateTypeOptions();
+      renderTable(eventsData);
 
-  // ====== أحداث الواجهة ======
-  inpNum.addEventListener('input',  ()=> renderTable(filterNow()));
-  selType.addEventListener('change',()=> renderTable(filterNow()));
-  $("resetFilter").addEventListener('click', ()=>{
-    inpNum.value = ''; selType.value = '';
-    renderTable(eventsData);
-  });
+      // لو في رقم في الرابط نطبّق فلتر مبدئي
+      const qp = new URLSearchParams(location.search);
+      const initialNumber = qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
+      if (initialNumber){
+        $("searchNumber").value = initialNumber;
+        renderTable(filterNow());
+      }
+    });
 
-  // أزرار عامة
-  window.viewCard = function(animalNumber){
-    if(!animalNumber) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-  };
-  window.deleteEvent = async function(eventId){
-    if(!confirm('هل تريد حذف الحدث؟')) return;
-    await deleteDoc(doc(db,'events',eventId));
-    eventsData = eventsData.filter(e=> e.id !== eventId);
-    renderTable(eventsData);
-    if (!eventsData.length){ noData.style.display='block'; }
-  };
-
-  // ====== تشغيل مثل صفحة الحيوانات ======
-  onAuthStateChanged(auth, async (u)=>{
-    if (!u){ location.href = "login.html?next=event-list.html"; return; }
-    await loadEvents(u.uid);
-
-    // فلتر تلقائي لو فيه رقم في الرابط
-    if (initialNumber){
-      inpNum.value = initialNumber;
-      renderTable(filterNow());
+    function updateTypeOptions() {
+      const sel = $("typeSelector");
+      sel.innerHTML = '<option value="">عرض نوع الحدث</option>';
+      const types = [...new Set(eventsData.map(e => e.eventType).filter(Boolean))];
+      types.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = labelAr(t);
+        sel.appendChild(opt);
+      });
     }
-  });
-</script>
 
+    function renderTable(data) {
+      const tbody  = $("eventsBody");
+      const noData = $("noData");
+      tbody.innerHTML = "";
+      if (!data || data.length === 0) { noData.style.display = "block"; return; }
+      noData.style.display = "none";
+
+      // رتب بالتاريخ تنازليًا (محلي)
+      data = [...data].sort((a,b)=> (eventDateOf(b)||'').localeCompare(eventDateOf(a)||''));
+
+      data.forEach(ev => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${eventDateOf(ev) || ""}</td>
+          <td>${ev.animalNumber ?? ev.animalId ?? ""}</td>
+          <td><span class="pill" title="${ev.eventType||''}">${labelAr(ev.eventType)}</span></td>
+          <td>${detailsOf(ev) || ""}</td>
+          <td>${ev.notes || ev.aiHints || ""}</td>
+          <td><button class="button" onclick="viewCard('${ev.animalNumber ?? ev.animalId ?? ""}')">📄</button></td>
+          <td><button class="button delete-button" onclick="deleteEvent('${ev.id}')">🗑️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // فلاتر أعلى الجدول (زي الحيوانات)
+    $("searchNumber").addEventListener("input", function(){
+      const q = this.value.trim();
+      renderTable(eventsData.filter(e => String(e.animalNumber ?? e.animalId ?? "").includes(q)));
+    });
+
+    window.filterType = function(type){
+      if(!type) return renderTable(eventsData);
+      renderTable(eventsData.filter(e => (e.eventType || "") === type || labelAr(e.eventType) === labelAr(type)));
+    };
+
+    window.resetFilter = function(){
+      $("searchNumber").value = "";
+      $("typeSelector").value = "";
+      renderTable(eventsData);
+    };
+
+    // أزرار الجدول (global)
+    window.viewCard = function(animalNumber){
+      if(!animalNumber) return;
+      location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
+    };
+
+    window.deleteEvent = async function(eventId){
+      if(!confirm("هل تريد حذف الحدث؟")) return;
+      await deleteDoc(doc(db, "events", eventId));
+      eventsData = eventsData.filter(e => e.id !== eventId);
+      renderTable(eventsData);
+      if (!eventsData.length){ $("noData").style.display='block'; }
+    };
+  </script>
 </body>
 </html>
