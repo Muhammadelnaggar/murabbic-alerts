@@ -71,174 +71,183 @@
   <a href="dashboard.html" class="button" style="display:block; text-align:center;">🔙 عودة إلى غرفة التحكم</a>
 
   <!-- سكربت فايرستور -->
-  <script type="module">
-    import { db, auth } from "/js/firebase-config.js";
-    import { collection, query, where, getDocs, deleteDoc, doc }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+<script type="module">
+  import { db, auth } from "/js/firebase-config.js";
+  import {
+    collection, query, where, getDocs, deleteDoc, doc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const $  = id => document.getElementById(id);
-    const TYPE_AR = {
-      calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
-      pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
-      mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
-      close_up:'كلوز أب', nutrition:'تغذية',
-      milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث',
-      abortion:'إجهاض', disease:'حالة صحية'
+  // عناصر الواجهة
+  const $ = (id) => document.getElementById(id);
+  const eventsBody = $("eventsBody");
+  const noData     = $("noData");
+  const selType    = $("typeSelector");
+  const inpNum     = $("searchNumber");
+
+  // ترجمة الأنواع
+  const TYPE_AR = {
+    calving:'ولادة', dry_off:'تجفيف', insemination:'تلقيح',
+    pregnancy_diagnosis:'تشخيص حمل', daily_milk:'لبن يومي',
+    mastitis:'التهاب ضرع', lameness:'عرج', vaccination:'تطعيم',
+    close_up:'كلوز أب', nutrition:'تغذية',
+    milking_traits_eval:'سمات اللبن (كاميرا)', bcs_eval:'تقييم حالة الجسم', feces_eval:'تقييم الروث',
+    abortion:'إجهاض', disease:'حالة صحية'
+  };
+
+  // رقم الحيوان من الرابط (اختياري)
+  const qp = new URLSearchParams(location.search);
+  const initialNumber = qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
+
+  let eventsData = [];
+
+  // ====== دوال مساعدة بسيطة ======
+  function eventDateOf(ev){
+    if (ev.eventDate) return ev.eventDate;             // نص YYYY-MM-DD
+    const ts = ev.createdAt;
+    if (ts && typeof ts === 'object' && typeof ts.toDate === 'function'){
+      try { return ts.toDate().toISOString().slice(0,10); } catch {}
+    }
+    return '';
+  }
+
+  function detailsFor(ev){
+    const t = ev.eventType || '';
+    const pick = (keys, suf='')=>{
+      for(const k of keys){ if(ev[k]!=null && ev[k]!=='') return String(ev[k])+suf; }
+      return null;
     };
-    const eventsBody = $("eventsBody");
-    const noData = $("noData");
-    let eventsData = [];
+    const join = (a)=> a.filter(Boolean).join(' • ');
 
-    // لو فيه رقم في الرابط، نفلتر به افتراضيًا (زي animal-list).
-    const qp = new URLSearchParams(location.search);
-    const initialNumber = qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || '';
+    if (t==='insemination'){
+      return join([
+        pick(['timeOfDay','aiTime','shift']) && ('وقت: '+pick(['timeOfDay','aiTime','shift'])),
+        pick(['bullName','semenBull','stallion','semenCode']) && ('الطلوقة: '+pick(['bullName','semenBull','stallion','semenCode'])),
+        pick(['strawNo','doseNo']) && ('قشّة: '+pick(['strawNo','doseNo']))
+      ]);
+    }
+    if (t==='daily_milk'){
+      return join([
+        pick(['milkKg','milk','yield'],' كجم') && ('لبن: '+pick(['milkKg','milk','yield'],' كجم')),
+        pick(['shift','timeOfDay']) && ('وردية: '+pick(['shift','timeOfDay']))
+      ]);
+    }
+    // باقي الأنواع بشكل مختصر
+    return ev.notes || ev.aiHints || '';
+  }
 
-    onAuthStateChanged(auth, async (u) => {
-      if (!u) { location.href = "login.html?next=event-list.html"; return; }
-      await loadEvents(u.uid);
-      // تطبيق فلتر مبدئي من الرابط
-      if (initialNumber) {
-        $("searchNumber").value = initialNumber;
-        renderTable(filterNow());
-      }
+  function updateTypeOptions(){
+    selType.innerHTML = '<option value="">كل الأنواع</option>';
+    const types = [...new Set(eventsData.map(e => e.eventType).filter(Boolean))];
+    types.forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = TYPE_AR[t] || t;
+      selType.appendChild(opt);
     });
+  }
 
-    async function loadEvents(uid) {
-      // ▼ بدّل ownerUid إلى userId إن كان حقل المالك عندك اسمه كده
-      const snap = await getDocs(
-        query(collection(db, "events"), where("ownerUid", "==", uid))
-      );
-      eventsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      updateTypeOptions();
-      renderTable(eventsData);
+  function renderTable(data){
+    eventsBody.innerHTML = '';
+    if (!data || !data.length){
+      noData.style.display = 'block';
+      return;
     }
+    noData.style.display = 'none';
 
-    function updateTypeOptions() {
-      const sel = $("typeSelector");
-      sel.innerHTML = '<option value="">كل الأنواع</option>';
-      const types = [...new Set(eventsData.map(e => e.eventType).filter(Boolean))];
-      types.forEach(t => {
-        const opt = document.createElement("option");
-        opt.value = t;
-        opt.textContent = TYPE_AR[t] || t;
-        sel.appendChild(opt);
-      });
-    }
+    // ترتيب محلي بالتاريخ تنازليًا
+    data = [...data].sort((a,b)=> (eventDateOf(b)||'').localeCompare(eventDateOf(a)||''));
 
-    function eventDateOf(ev){
-      if (ev.eventDate) return ev.eventDate;
-      const ts = ev.createdAt;
-      if (ts && typeof ts === 'object' && typeof ts.toDate === 'function'){
-        try { return ts.toDate().toISOString().slice(0,10); } catch(e){}
-      }
-      return '';
-    }
-
-    function detailsFor(ev){
-      const pick = (keys, suf='')=>{
-        for(const k of keys){ if(ev[k]!==undefined && ev[k]!=='' && ev[k]!==null) return String(ev[k])+suf; }
-        return null;
-      };
-      const join = (arr)=> arr.filter(Boolean).join(' • ');
-      const t = ev.eventType || '';
-      if (t==='insemination'){
-        return join([
-          pick(['timeOfDay','aiTime','shift']) && ('وقت: '+pick(['timeOfDay','aiTime','shift'])),
-          pick(['bullName','semenBull','stallion','semenCode']) && ('الطلوقة: '+pick(['bullName','semenBull','stallion','semenCode'])),
-          pick(['strawNo','doseNo']) && ('قشّة: '+pick(['strawNo','doseNo']))
-        ]);
-      }
-      if (t==='pregnancy_diagnosis'){
-        return join([
-          pick(['result','pregResult']) && ('النتيجة: '+pick(['result','pregResult'])),
-          pick(['method','pdMethod']) && ('طريقة: '+pick(['method','pdMethod'])),
-          pick(['fetusAgeDays','fetusAge'],' يوم') && ('عمر الجنين: '+pick(['fetusAgeDays','fetusAge'],' يوم'))
-        ]);
-      }
-      if (t==='daily_milk'){
-        return join([
-          pick(['milkKg','milk','yield'],' كجم') && ('لبن: '+pick(['milkKg','milk','yield'],' كجم')),
-          pick(['shift','timeOfDay']) && ('وردية: '+pick(['shift','timeOfDay']))
-        ]);
-      }
-      if (t==='milking_traits_eval'){
-        return join([
-          pick(['milkingSpeed','speed'],' كجم/د') && ('سرعة: '+pick(['milkingSpeed','speed'],' كجم/د')),
-          pick(['letdownTime'],' ث') && ('نزول: '+pick(['letdownTime'],' ث')),
-          pick(['mastitisRisk']) && ('مخاطر: '+pick(['mastitisRisk']))
-        ]);
-      }
-      if (t==='calving'){
-        return join([
-          pick(['calvingType','birthType']) && ('الولادة: '+pick(['calvingType','birthType'])),
-          pick(['calfSex','sex']) && ('الجنس: '+pick(['calfSex','sex'])),
-          pick(['calfNumber','calfId']) && ('رقم العجل: '+pick(['calfNumber','calfId']))
-        ]);
-      }
-      if (t==='mastitis'){ return join([ pick(['quarter','teatQuarter']) && ('ربع: '+pick(['quarter','teatQuarter'])), pick(['cmt','cmtScore']) && ('CMT: '+pick(['cmt','cmtScore'])) ]); }
-      if (t==='lameness'){ return join([ pick(['lamenessScore','score']) && ('درجة: '+pick(['lamenessScore','score'])), pick(['affectedLeg','leg']) && ('الرجل: '+pick(['affectedLeg','leg'])) ]); }
-      if (t==='vaccination'){ return join([ pick(['vaccineName','vaccine']) && ('لقاح: '+pick(['vaccineName','vaccine'])), pick(['dose']) && ('جرعة: '+pick(['dose'])), pick(['route']) && ('مسار: '+pick(['route'])) ]); }
-      if (t==='nutrition'){ return join([ pick(['rationType','mode']) && ('نمط: '+pick(['rationType','mode'])), pick(['dmPct','dm'],' %DM') && ('DM: '+pick(['dmPct','dm'],' %DM')) ]); }
-      return ev.notes || ev.aiHints || '';
-    }
-
-    function renderTable(data) {
-      const tbody  = $("eventsBody");
-      const noData = $("noData");
-      tbody.innerHTML = "";
-      if (!data || data.length === 0) { noData.style.display = "block"; return; }
-      noData.style.display = "none";
-
-      // رصّهم تنازليًا بالتاريخ (محليًا)
-      data = [...data].sort((a,b)=> (eventDateOf(b)||'').localeCompare(eventDateOf(a)||''));
-
-      data.forEach(ev => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${eventDateOf(ev) || ""}</td>
-          <td>${ev.animalNumber ?? ev.animalId ?? ""}</td>
-          <td><span class="pill" title="${ev.eventType||''}">${TYPE_AR[ev.eventType] || ev.eventType || ''}</span></td>
-          <td>${detailsFor(ev) || ""}</td>
-          <td>${ev.notes || ""}</td>
-          <td><button class="button" onclick="viewCard('${ev.animalNumber ?? ev.animalId ?? ""}')">📄</button></td>
-          <td><button class="button delete-button" onclick="deleteEvent('${ev.id}')">🗑️</button></td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // أزرار الجدول (global)
-    window.viewCard = function(animalNumber){
-      if(!animalNumber) return;
-      location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-    };
-    window.deleteEvent = async function(eventId){
-      if(!confirm("هل تريد حذف الحدث؟")) return;
-      await deleteDoc(doc(db, "events", eventId));
-      eventsData = eventsData.filter(e => e.id !== eventId);
-      renderTable(eventsData);
-      if (!eventsData.length){ noData.style.display='block'; }
-    };
-
-    // فلاتر أعلى الجدول (نفس أسلوب animal-list)
-    function filterNow(){
-      const qNum  = $("searchNumber").value.trim();
-      const qType = $("typeSelector").value || '';
-      return eventsData.filter(ev => {
-        const okNum  = !qNum  || String(ev.animalNumber ?? ev.animalId ?? '').includes(qNum);
-        const okType = !qType || ev.eventType === qType;
-        return okNum && okType;
-      });
-    }
-
-    $("searchNumber").addEventListener("input", ()=> renderTable(filterNow()));
-    $("typeSelector").addEventListener("change", ()=> renderTable(filterNow()));
-    $("resetFilter").addEventListener("click", ()=>{
-      $("searchNumber").value = "";
-      $("typeSelector").value = "";
-      renderTable(eventsData);
+    data.forEach(ev=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${eventDateOf(ev) || ''}</td>
+        <td>${ev.animalNumber ?? ev.animalId ?? ''}</td>
+        <td><span class="pill" title="${ev.eventType||''}">${TYPE_AR[ev.eventType] || ev.eventType || ''}</span></td>
+        <td>${detailsFor(ev) || ''}</td>
+        <td>${ev.notes || ''}</td>
+        <td><button class="button" onclick="viewCard('${ev.animalNumber ?? ev.animalId ?? ""}')">📄</button></td>
+        <td><button class="button delete-button" onclick="deleteEvent('${ev.id}')">🗑️</button></td>
+      `;
+      eventsBody.appendChild(tr);
     });
-  </script>
-</body>
-</html>
+  }
+
+  function filterNow(){
+    const qNum  = inpNum.value.trim();
+    const qType = selType.value || '';
+    return eventsData.filter(ev=>{
+      const numVal = String(ev.animalNumber ?? ev.animalId ?? '');
+      const okNum  = !qNum  || numVal.includes(qNum);
+      const okType = !qType || ev.eventType === qType;
+      return okNum && okType;
+    });
+  }
+
+  // ====== تحميل البيانات ببساطة (زي صفحة الحيوانات) ======
+  async function loadEvents(uid){
+    // بنجرب الحقلين: ownerUid و userId (وندمج)
+    const tries = [
+      getDocs(query(collection(db,'events'), where('ownerUid','==', uid))),
+      getDocs(query(collection(db,'events'), where('userId',  '==', uid)))
+    ];
+    const res = await Promise.allSettled(tries);
+    const map = new Map();
+    for (const r of res){
+      if (r.status !== 'fulfilled') continue;
+      r.value.docs.forEach(d => map.set(d.id, { id:d.id, ...d.data() }));
+    }
+
+    // لو جت فاضية جدًا، نجرّب رقم الحيوان من الرابط (بعض الداتا القديمة قد لا تحمل مالك)
+    if (map.size===0 && initialNumber){
+      const asNum = Number(initialNumber);
+      const variants = Number.isNaN(asNum) ? [initialNumber] : [initialNumber, asNum];
+      const more = [];
+      for (const v of variants){
+        more.push(getDocs(query(collection(db,'events'), where('animalNumber','==', v))));
+        more.push(getDocs(query(collection(db,'events'), where('animalId',    '==', v))));
+      }
+      const moreRes = await Promise.allSettled(more);
+      for (const r of moreRes){
+        if (r.status!=='fulfilled') continue;
+        r.value.docs.forEach(d => map.set(d.id, { id:d.id, ...d.data() }));
+      }
+    }
+
+    eventsData = Array.from(map.values());
+    updateTypeOptions();
+    renderTable(eventsData);
+  }
+
+  // ====== أحداث الواجهة ======
+  inpNum.addEventListener('input',  ()=> renderTable(filterNow()));
+  selType.addEventListener('change',()=> renderTable(filterNow()));
+  $("resetFilter").addEventListener('click', ()=>{
+    inpNum.value = ''; selType.value = '';
+    renderTable(eventsData);
+  });
+
+  // أزرار عامة
+  window.viewCard = function(animalNumber){
+    if(!animalNumber) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
+  };
+  window.deleteEvent = async function(eventId){
+    if(!confirm('هل تريد حذف الحدث؟')) return;
+    await deleteDoc(doc(db,'events',eventId));
+    eventsData = eventsData.filter(e=> e.id !== eventId);
+    renderTable(eventsData);
+    if (!eventsData.length){ noData.style.display='block'; }
+  };
+
+  // ====== تشغيل مثل صفحة الحيوانات ======
+  onAuthStateChanged(auth, async (u)=>{
+    if (!u){ location.href = "login.html?next=event-list.html"; return; }
+    await loadEvents(u.uid);
+
+    // فلتر تلقائي لو فيه رقم في الرابط
+    if (initialNumber){
+      inpNum.value = initialNumber;
+      renderTable(filterNow());
+    }
+  });
+</script>
