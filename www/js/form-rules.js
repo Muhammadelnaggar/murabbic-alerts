@@ -300,21 +300,26 @@ export function calvingDecision({
   animalNumber,
   abortionUrl = '/abortion.html'
 }){
-  // شرط "عشار" لو معروفة
-  if (reproStatus && reproStatus !== 'عشار') {
+  // 👈 اعتبر أي نص يحتوي كلمة "عشار" صحيحًا، وغير ذلك يمنع
+  const rs = (reproStatus || '').toString().trim();
+  if (rs && !/عشار/.test(rs)) {
     alert('لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عشار».');
     return false;
   }
 
-  // لو مافيش تلقيح/تواريخ غير صالحة → اسمح بالمتابعة
+  // لو التواريخ غير صالحة → اسمح بالمتابعة (ما عندناش أساس نحسب به)
   if (!isISODate(lastInseminationISO) || !isISODate(eventDateISO)) return true;
 
   const { min, kind } = speciesMinDays(species);
   const ga = daysBetween(lastInseminationISO, eventDateISO);
+
+  // فحص تاريخ ولادة أقدم من آخر تلقيح
   if (ga < 0) {
     alert('تاريخ الولادة أقدم من تاريخ آخر تلقيح — راجع التواريخ.');
     return false;
-     }
+  }
+
+  // الحد الأدنى لأيام الحمل (255 أبقار / 285 جاموس)
   if (ga < min) {
     const goAbort = window.confirm(
       `${kind} لم تُكمل الحد الأدنى للحمل (${min} يوم).\n` +
@@ -324,7 +329,8 @@ export function calvingDecision({
       const qs = new URLSearchParams({ number:String(animalNumber||''), date:eventDateISO });
       location.href = `${abortionUrl}?${qs.toString()}`;
     }
-    return false; // أوقف الإرسال الحالي
+    return false;
   }
   return true;
 }
+
