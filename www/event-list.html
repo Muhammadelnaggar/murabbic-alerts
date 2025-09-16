@@ -168,6 +168,16 @@
     }
 
     // تحميل (استعلام واحد بسيط زي الحيوانات)
+   function filterNow(){
+  const q = document.getElementById('searchNumber').value.trim();
+  const t = document.getElementById('typeSelector').value || '';
+  return eventsData.filter(e=>{
+    const numOk  = !q || String(e.animalNumber ?? e.animalId ?? '').includes(q);
+    const typeOk = !t || (e.eventType === t) || ( (TYPE_AR[e.eventType]||e.eventType) === (TYPE_AR[t]||t) );
+    return numOk && typeOk;
+  });
+}
+
     onAuthStateChanged(auth, async (u) => {
       if (!u) {
         location.href = "login.html?next=event-list.html";
