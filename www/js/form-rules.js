@@ -314,6 +314,7 @@ export function calvingDecision({
   if (ga < 0) {
     alert('تاريخ الولادة أقدم من تاريخ آخر تلقيح — راجع التواريخ.');
     return false;
+     }
   if (ga < min) {
     const goAbort = window.confirm(
       `${kind} لم تُكمل الحد الأدنى للحمل (${min} يوم).\n` +
