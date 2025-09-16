@@ -73,20 +73,9 @@
 
   <!-- Firebase (ESM) -->
   <script type="module">
-    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-    // 🔧 حمِّل إعدادات فايربيز مهما كان أسلوب التصدير (default أو firebaseConfig)
-    // 🔧 التحميل الرسمي لإعدادات فايربيز عبر ملف /js/firebase-config.js (ESM فقط)
-    import * as cfgMod from '/js/firebase-config.js';
-    const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig;
-    if (!firebaseConfig) {
-      console.error('firebase-config.js must export default (recommended) or named firebaseConfig');
-      const evBody = document.getElementById('evBody');
-      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — الملف /js/firebase-config.js يجب أن يصدّر <b>default</b> أو باسم <b>firebaseConfig</b>.</td></tr>';
-      throw new Error('Missing export from firebase-config.js');
-    }
+    // ✅ استخدم ملفك الرسمي مباشرة: /js/firebase-config.js يهيّئ التطبيق ويصدر db, auth
+    import { db, auth } from '/js/firebase-config.js';
+    import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
@@ -94,21 +83,6 @@
     const btnApply = document.getElementById('btn-apply');
     const btnClear = document.getElementById('btn-clear');
     const evBody = document.getElementById('evBody');
-
-    // تهيئة فيربيز + Firestore باسم قاعدة البيانات الصحيحة
-    let app;
-    if (getApps().length) {
-      app = getApps()[0];
-    } else if (firebaseConfig) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      console.error('تعذّر العثور على تكوين Firebase');
-      const evBody = document.getElementById('evBody');
-      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — تأكد من أن /js/firebase-config.js يصدّر default أو يعرّف window.firebaseConfig</td></tr>';
-      throw new Error('Missing Firebase configuration');
-    }
-    const auth = getAuth(app);
-    const db   = getFirestore(app, 'murabbikdata');
 
     // أدوات مساعدة
     const pick = (obj, keys, def='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return def; };
@@ -166,8 +140,6 @@
     async function loadAndFilter(){
       const uid = currentUserId();
       if(!uid){ renderRows([]); return; }
-
-      // اجلب أحدث 200 حدث للمستخدم (userId)
       const q = query(
         collection(db,'events'),
         where('userId','==',uid),
@@ -178,8 +150,8 @@
       const rows = [];
       snap.forEach(doc => rows.push({ id:doc.id, ...doc.data() }));
 
-      const num  = (document.getElementById('f-num').value || '').trim();
-      const type = (document.getElementById('f-type').value || '').trim();
+      const num  = (fNum.value || '').trim();
+      const type = (fType.value || '').trim();
 
       const filtered = rows.filter(r => {
         const okNum  = !num  || (String(pick(r,['animalNumber','number','animalId'],'')).trim() === num);
@@ -195,7 +167,7 @@
     btnApply.addEventListener('click', loadAndFilter);
     btnClear.addEventListener('click', () => { fNum.value=''; fType.value=''; loadAndFilter(); });
 
-    // إقلاع الصفحة: وراثة رقم الحيوان + انتظار الـAuth عند الحاجة
+    // إقلاع الصفحة
     window.addEventListener('DOMContentLoaded', () => {
       const n = getParam('number','animalNumber','num','n') || localStorage.getItem('currentAnimalNumber') || '';
       if(n){ fNum.value = n; } else { fNum.placeholder = 'رقم الحيوان (مثال 108)'; }
@@ -203,7 +175,10 @@
       if (auth.currentUser || localStorage.getItem('userId') || getParam('userId','uid')) {
         loadAndFilter();
       } else {
-        onAuthStateChanged(auth, () => loadAndFilter());
+        // انتظر استعادة الجلسة بهدوء
+        const off = auth.onAuthStateChanged ? auth.onAuthStateChanged(() => { off(); loadAndFilter(); }) : null;
+        // fallback بسيط بعد ثانيتين
+        setTimeout(loadAndFilter, 2000);
       }
     });
   </script>
