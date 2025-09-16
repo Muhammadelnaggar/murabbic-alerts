@@ -31,6 +31,8 @@
     .center{display:flex;align-items:center;gap:8px;justify-content:center}
     .empty{padding:18px;text-align:center;color:#6b7280}
   </style>
+  <!-- حمِّل إعدادات Firebase كملف عادي (غير ESM) ليضع firebaseConfig على window -->
+  <script src="/js/firebase-config.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -77,15 +79,13 @@
     import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // 🔧 حمِّل إعدادات فايربيز مهما كان أسلوب التصدير (default أو firebaseConfig)
-    let firebaseConfig;
-    try {
-      const mod = await import('/js/firebase-config.js');
-      firebaseConfig = mod.default || mod.firebaseConfig || mod.config || mod.FIREBASE_CONFIG;
-      if (!firebaseConfig) throw new Error('Missing export');
-    } catch (e) {
-      console.error('Firebase config import failed', e);
-      alert('تعذّر تحميل إعدادات Firebase — تأكد أن /js/firebase-config.js يصدّر default أو firebaseConfig');
-      throw e;
+    // 🔧 تحميل إعدادات فايربيز من المتغيرات العامة (تجنّب مشاكل ESM/default)
+    const firebaseConfig = window.firebaseConfig || window.FIREBASE_CONFIG;
+    if(!firebaseConfig){
+      console.error('firebase-config.js لا يعرّف window.firebaseConfig');
+      const evBody = document.getElementById('evBody');
+      if (evBody) evBody.innerHTML = '<tr><td colspan="4" class="empty">تعذّر تحميل إعدادات Firebase — تأكد من أن /js/firebase-config.js يُسند الكائن إلى <code>window.firebaseConfig</code></td></tr>';
+      throw new Error('Missing firebaseConfig on window');
     }
 
     // ثوابت DOM
