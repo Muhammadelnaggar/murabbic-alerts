@@ -36,7 +36,6 @@
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
- 
 
   <header>
     <div class="bar">
@@ -46,22 +45,27 @@
   </header>
 
   <main>
-   <form id="calving-form" class="card grid" autocomplete="off" novalidate>
+    <form id="calving-form" class="card grid" autocomplete="off" novalidate
+          data-validate="true" data-event="ولادة">
+      <input type="hidden" data-field="animalId" id="animalId">
+      <input type="hidden" data-field="species" id="species">
+      <input type="hidden" data-field="reproStatus" value="عشار">
+
       <div class="row">
         <div>
           <label>رقم الحيوان</label>
-         <input id="animalNumber" data-field="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+          <input id="animalNumber" data-field="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
         </div>
         <div>
           <label>تاريخ الولادة</label>
-        <input id="eventDate" data-field="eventDate" type="date" required />
+          <input id="eventDate" data-field="eventDate" type="date" required />
         </div>
       </div>
 
       <div class="row">
         <div>
           <label>نوع الولادة</label>
-          <select id="calvingKind" required>
+          <select id="calvingKind" data-field="calvingKind" required>
             <option value="">اختر</option>
             <option value="طبيعية">طبيعية</option>
             <option value="متعسرة">متعسرة</option>
@@ -72,9 +76,9 @@
         <div class="live-only">
           <label>عدد المواليد</label>
           <div class="radio-group">
-            <label><input type="radio" name="calfCount" value="1" required> 1</label>
-            <label><input type="radio" name="calfCount" value="2"> 2</label>
-            <label><input type="radio" name="calfCount" value="3"> 3</label>
+            <label><input type="radio" name="calfCount" data-field="calfCount" value="1" required> 1</label>
+            <label><input type="radio" name="calfCount" data-field="calfCount" value="2"> 2</label>
+            <label><input type="radio" name="calfCount" data-field="calfCount" value="3"> 3</label>
           </div>
         </div>
       </div>
@@ -85,13 +89,13 @@
           <div>
             <label>جنس المولود</label>
             <div class="radio-group">
-              <label><input type="radio" name="calf1Sex" value="ذكر" required> ذكر</label>
-              <label><input type="radio" name="calf1Sex" value="أنثى"> أنثى</label>
+              <label><input type="radio" name="calf1Sex" data-field="calf1Sex" value="ذكر" required> ذكر</label>
+              <label><input type="radio" name="calf1Sex" data-field="calf1Sex" value="أنثى"> أنثى</label>
             </div>
           </div>
           <div>
             <label>رقم العجل</label>
-            <input id="calfId" placeholder="رقم تعريف العجل" required />
+            <input id="calfId" data-field="calfId" placeholder="رقم تعريف العجل" required />
           </div>
         </div>
       </div>
@@ -102,13 +106,13 @@
           <div>
             <label>جنس المولود</label>
             <div class="radio-group">
-              <label><input type="radio" name="calf2Sex" value="ذكر"> ذكر</label>
-              <label><input type="radio" name="calf2Sex" value="أنثى"> أنثى</label>
+              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="ذكر"> ذكر</label>
+              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="أنثى"> أنثى</label>
             </div>
           </div>
           <div>
             <label>رقم العجل</label>
-            <input id="calf2Id" placeholder="رقم تعريف العجل الثاني" />
+            <input id="calf2Id" data-field="calf2Id" placeholder="رقم تعريف العجل الثاني" />
           </div>
         </div>
       </div>
@@ -119,13 +123,13 @@
           <div>
             <label>جنس المولود</label>
             <div class="radio-group">
-              <label><input type="radio" name="calf3Sex" value="ذكر"> ذكر</label>
-              <label><input type="radio" name="calf3Sex" value="أنثى"> أنثى</label>
+              <label><input type="radio" name="calf3Sex" data-field="calf3Sex" value="ذكر"> ذكر</label>
+              <label><input type="radio" name="calf3Sex" data-field="calf3Sex" value="أنثى"> أنثى</label>
             </div>
           </div>
           <div>
             <label>رقم العجل</label>
-            <input id="calf3Id" placeholder="رقم تعريف العجل الثالث" />
+            <input id="calf3Id" data-field="calf3Id" placeholder="رقم تعريف العجل الثالث" />
           </div>
         </div>
       </div>
@@ -134,20 +138,24 @@
         <div>
           <label>مصير العجل</label>
           <div class="radio-group">
-            <label><input type="radio" name="calfFate" value="تربية" required> تربية</label>
-            <label><input type="radio" name="calfFate" value="بيع"> بيع</label>
+            <label><input type="radio" name="calfFate" data-field="calfFate" value="تربية" required> تربية</label>
+            <label><input type="radio" name="calfFate" data-field="calfFate" value="بيع"> بيع</label>
           </div>
         </div>
       </div>
 
       <div class="row">
         <div>
+          <label>آخر تلقيح مُخصِّب</label>
+          <input id="lastFertile" type="date" data-field="lastFertileInseminationDate" required />
+        </div>
+        <div>
           <label>ملاحظات</label>
-          <input id="notes" placeholder="اختياري" />
+          <input id="notes" data-field="notes" placeholder="اختياري" />
         </div>
       </div>
 
-     <div id="info" class="infobar"></div>
+      <div id="info" class="infobar"></div>
     </form>
   </main>
 
@@ -156,167 +164,169 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
-  <!-- لازم يكون عندك فورم له id="evForm" وكل حقل عليه data-field -->
-
-<!-- اختياري: سكربتاتك للذكاء/التتبع لو متاحة -->
   <script src="/js/app-core.js"></script>
-   <script type="module" src="/js/firebase-config.js"></script>
+  <script type="module" src="/js/firebase-config.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
-<script>
-(function(){
-  const qs = new URLSearchParams(location.search);
-  const $  = (id)=> document.getElementById(id);
 
-  function toISO(s){
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const d = new Date(s); if (isNaN(d)) return '';
-    // ISO محلي بدون انزياح المنطقة الزمنية
-    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const num  = qs.get('number') || qs.get('animalNumber') || '';
-    const date = qs.get('date')   || qs.get('dt') || '';
-    if (num  && $('animalNumber')) $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
-    if (date && $('eventDate'))    $('eventDate').value    = toISO(date);
-  });
-})();
-</script>
-
-<script type="module">
-  import { db, auth } from '/js/firebase-config.js';
-  import {
-    collection, addDoc, serverTimestamp
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-
-  // عناصر
-  const form   = document.querySelector('#calving-form');
-  const info   = document.getElementById('info');
-  const numEl  = document.getElementById('animalNumber');
-  const dateEl = document.getElementById('eventDate');
-  const kindEl = document.getElementById('calvingKind');
-
-  // عرض رسالة
-  function show(msg, isErr=false){
-    info.textContent = msg;
-    info.className = 'infobar show' + (isErr ? ' error' : '');
-  }
-
-  // تعبئة من URL + إشعال التحقق المبكر (يستفيد من forms-init المركزي)
-  (function prefillAndNotify(){
+  <script>
+  (function(){
     const qs = new URLSearchParams(location.search);
-    const n  = qs.get('number') || qs.get('animalNumber') || '';
-    const d  = qs.get('date')   || qs.get('dt') || '';
-    function setAndPing(el, val){
-      if (!el || !val) return;
-      el.value = val;
-      el.dispatchEvent(new Event('input',  {bubbles:true}));
-      el.dispatchEvent(new Event('change', {bubbles:true}));
+    const $  = (id)=> document.getElementById(id);
+    function toISO(s){
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const d = new Date(s); if (isNaN(d)) return '';
+      return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
     }
-    if (n) setAndPing(numEl, String(n).replace(/[^\d٠-٩۰-۹]/g,''));
-    if (d) {
-      const toISO = (s)=>{
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        const dt = new Date(s); if (isNaN(dt)) return '';
-        return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,10);
-      };
-      const iso = toISO(d);
-      if (iso) setAndPing(dateEl, iso);
-    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const num  = qs.get('number') || qs.get('animalNumber') || '';
+      const date = qs.get('date')   || qs.get('dt') || '';
+      if (num  && $('animalNumber')) $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
+      if (date && $('eventDate'))    $('eventDate').value    = toISO(date);
+    });
   })();
- // --- اجعل شريط الرسائل يمكن قراءته ويظل للنجاح ---
-function hideInfo(){ info.className = 'infobar'; info.textContent = ''; }
-info.setAttribute('role','status');
-info.setAttribute('aria-live','polite');
+  </script>
 
-// زر الحفظ: أعرض "جارِ التحقق..." قبل ما يبدأ submit
-const saveBtn = document.getElementById('saveBtn');
-if (saveBtn){
-  saveBtn.addEventListener('click', (e)=>{
-    // هنعتمد على forms-init.js للفاليديشن والحارس
-    show('جارِ التحقق...', false);
-  });
-}
+  <script type="module">
+    import { db, auth } from '/js/firebase-config.js';
+    import {
+      collection, addDoc, serverTimestamp, query, where, limit, getDocs
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-// راقب ظهور/اختفاء أخطاء الفاليديشن (من attachFormValidation)
-const observer = new MutationObserver(() => {
-  const firstInvalid = form.querySelector('.invalid');
-  if (firstInvalid){
-    // لو فيه أخطاء: أظهر رسالة خطأ وركّز على أول حقل
-    show('راجع الحقول المظللة باللون الأحمر.', true);
-    firstInvalid.focus({ preventScroll: true });
-    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  } else {
-    // لا تُخفِ الرسالة إن كانت "نجاح"
-    // أخفِ فقط لو كانت رسالة خطأ سابقة
-    if (info.classList.contains('error')) hideInfo();
-  }
-});
-observer.observe(form, { subtree:true, attributes:true, attributeFilter:['class'] });
+    const form   = document.querySelector('#calving-form');
+    const info   = document.getElementById('info');
+    const numEl  = document.getElementById('animalNumber');
+    const dateEl = document.getElementById('eventDate');
+    const kindEl = document.getElementById('calvingKind');
+    const saveBtn= document.getElementById('saveBtn');
 
-  // uid أكيد
-  async function getUid(){
-    const ls = localStorage.getItem('userId') || localStorage.getItem('uid');
-    if (ls) return ls;
-    if (auth.currentUser) return auth.currentUser.uid;
-    const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
-    return u?.uid || '';
-  }
+    const animalIdEl = document.getElementById('animalId');
+    const speciesEl  = document.getElementById('species');
+    const lastFertileEl = document.getElementById('lastFertile');
 
-  // ✅ الحفظ فقط — الفاليديشن والحارس مركزيًا عبر forms-init.js
-  let submitting = false;
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault(); e.stopPropagation();
-    if (submitting) return;
-    submitting = true;
-
-    const uid = await getUid();
-    if (!uid){ submitting=false; show('من فضلك سجّل الدخول أولاً.', true); return; }
-
-    // لو وصلنا هنا، يبقى forms-init.js سمح بالتمرير (ok=true)
-    const payload = {
-      userId: uid,
-      type: 'ولادة',
-      eventType: 'ولادة',
-      eventDate: (dateEl?.value || '').trim(),          // ISO YYYY-MM-DD
-      animalNumber: (numEl?.value || '').trim(),
-      calvingKind: (kindEl?.value || '').trim(),
-      calfCount: document.querySelector('input[name="calfCount"]:checked')?.value || '',
-      calf1Sex:  document.querySelector('input[name="calf1Sex"]:checked')?.value || '',
-      calfId:    document.getElementById('calfId')?.value?.trim() || '',
-      notes:     document.getElementById('notes')?.value?.trim() || '',
-      idempotencyKey: `${(numEl?.value||'').trim()}-ولادة-${(dateEl?.value||'').trim()}`,
-      createdAt: serverTimestamp()
-    };
-
-    try{
-      await addDoc(collection(db, 'events'), payload);
-      show('تم حفظ الولادة ✅');
-      setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
-    }catch(err){
-      console.error(err);
-      show('تعذّر حفظ الحدث. حاول مرة أخرى.', true);
-    }finally{
-      submitting = false;
+    function show(msg, isErr=false){
+      info.textContent = msg;
+      info.className = 'infobar show' + (isErr ? ' error' : '');
     }
-  });
-</script>
+    function disableForm(disabled=true){
+      form.querySelectorAll('input, select, button').forEach(el=>{
+        if (el.id === 'toCardBtn') return;
+        el.disabled = disabled;
+      });
+    }
+    function todayISO(){
+      const d=new Date(); d.setHours(0,0,0,0);
+      return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    }
+    async function getUid(){
+      const ls = localStorage.getItem('userId') || localStorage.getItem('uid');
+      if (ls) return ls;
+      if (auth.currentUser) return auth.currentUser.uid;
+      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
+      return u?.uid || '';
+    }
 
+    async function fetchAnimalDocByNumber(number){
+      const num = String(number||'').trim();
+      const q1 = query(collection(db,'animals'), where('animalNumber','==',num), limit(1));
+      const snap = await getDocs(q1);
+      if (snap.empty) return null;
+      const doc = snap.docs[0];
+      return { id: doc.id, data: doc.data() || {} };
+    }
+
+    async function precheck(number){
+      disableForm(true);
+      show('جارِ التحقق المبدئي من بيانات الحيوان…');
+
+      const a = await fetchAnimalDocByNumber(number);
+      if (!a){ show('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
+
+      const sp  = a.data.species;
+      const rs  = a.data.reproStatus;
+      const lf  = a.data.lastFertileInseminationDate;
+
+      if (!sp){ show('نوع القطيع غير مُسجَّل لهذا الحيوان.', true); return; }
+      if (rs !== 'عشار'){ show('لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عِشار".', true); return; }
+      if (!lf){ show('لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".', true); return; }
+
+      if (speciesEl)  speciesEl.value  = sp;
+      if (animalIdEl) animalIdEl.value = a.id;
+      if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
+      if (dateEl && !dateEl.value) dateEl.value = todayISO();
+
+      show('جاهز للتسجيل ✅');
+      disableForm(false);
+    }
+
+    function kickPrecheck(){
+      const n = (numEl?.value||'').trim();
+      if (!n){
+        show('أدخل رقم الحيوان أولًا.', true);
+        disableForm(true);
+        return;
+      }
+      precheck(n);
+    }
+
+    info.setAttribute('role','status');
+    info.setAttribute('aria-live','polite');
+
+    saveBtn?.addEventListener('click', ()=> show('جارِ التحقق...', false));
+
+    document.addEventListener('DOMContentLoaded', kickPrecheck);
+    numEl?.addEventListener('change', kickPrecheck);
+    numEl?.addEventListener('blur', kickPrecheck);
+
+    form.addEventListener('submit', (e)=> e.preventDefault()); // منع أي حفظ قبل نجاح الفاليديشن المركزي
+
+    form.addEventListener('mbk:valid', async (e)=>{
+      const { formData } = e.detail;
+
+      const uid = await getUid();
+      if (!uid){ show('سجّل الدخول أولًا.', true); return; }
+
+      const payload = {
+        userId: uid,
+        type: 'ولادة',
+        eventType: 'ولادة',
+        eventDate: (formData.eventDate || '').trim(),
+        animalNumber: (formData.animalNumber || '').trim(),
+        animalId: (formData.animalId || '').trim(),
+        species: formData.species || '',
+        reproStatus: formData.reproStatus || 'عشار',
+        lastFertileInseminationDate: formData.lastFertileInseminationDate || '',
+        calvingKind: formData.calvingKind || '',
+        calfCount: formData.calfCount || '',
+        calf1Sex:  formData.calf1Sex || '',
+        calfId:    formData.calfId || '',
+        calf2Sex:  formData.calf2Sex || '',
+        calf2Id:   formData.calf2Id || '',
+        calf3Sex:  formData.calf3Sex || '',
+        calf3Id:   formData.calf3Id || '',
+        calfFate:  formData.calfFate || '',
+        notes:     formData.notes || '',
+        idempotencyKey: `${(formData.animalNumber||'').trim()}-ولادة-${(formData.eventDate||'').trim()}`,
+        createdAt: serverTimestamp()
+      };
+
+      try{
+        await addDoc(collection(db, 'events'), payload);
+        show('تم حفظ الولادة ✅');
+        setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
+      }catch(err){
+        console.error(err);
+        show('تعذّر حفظ الحدث.', true);
+      }
+    });
+
+    document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
+      const num = (numEl?.value || '').trim();
+      if (!num){ show('أدخل رقم الحيوان أولًا.', true); return; }
+      location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
+    });
+  </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
