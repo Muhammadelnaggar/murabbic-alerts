@@ -186,10 +186,8 @@
 
 <script type="module">
   import { db, auth } from '/js/firebase-config.js';
-  import { attachFormValidation, calvingDecision } from '/js/form-rules.js';
   import {
-    collection, query, where, orderBy, limit, getDocs,
-    addDoc, serverTimestamp
+    collection, addDoc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
@@ -206,7 +204,7 @@
     info.className = 'infobar show' + (isErr ? ' error' : '');
   }
 
-  // 1) املأ من URL + فعّل الفالديشن فورًا (نطلق input/change)
+  // تعبئة من URL + إشعال التحقق المبكر (يستفيد من forms-init المركزي)
   (function prefillAndNotify(){
     const qs = new URLSearchParams(location.search);
     const n  = qs.get('number') || qs.get('animalNumber') || '';
@@ -217,21 +215,48 @@
       el.dispatchEvent(new Event('input',  {bubbles:true}));
       el.dispatchEvent(new Event('change', {bubbles:true}));
     }
-    // رقم
     if (n) setAndPing(numEl, String(n).replace(/[^\d٠-٩۰-۹]/g,''));
-    // تاريخ (حوّل لأي ISO لو مش YYYY-MM-DD)
     if (d) {
-      const iso = /^\d{4}-\d{2}-\d{2}$/.test(d)
-        ? d
-        : (isNaN(new Date(d)) ? '' : new Date(new Date(d).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10));
+      const toISO = (s)=>{
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const dt = new Date(s); if (isNaN(dt)) return '';
+        return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      };
+      const iso = toISO(d);
       if (iso) setAndPing(dateEl, iso);
     }
   })();
+ // --- اجعل شريط الرسائل يمكن قراءته ويظل للنجاح ---
+function hideInfo(){ info.className = 'infobar'; info.textContent = ''; }
+info.setAttribute('role','status');
+info.setAttribute('aria-live','polite');
 
-  // 2) فعّل قواعد الإدخال
- 
+// زر الحفظ: أعرض "جارِ التحقق..." قبل ما يبدأ submit
+const saveBtn = document.getElementById('saveBtn');
+if (saveBtn){
+  saveBtn.addEventListener('click', (e)=>{
+    // هنعتمد على forms-init.js للفاليديشن والحارس
+    show('جارِ التحقق...', false);
+  });
+}
 
-  // 3) احصل على uid بشكل أكيد (لو مش محفوظ في localStorage انتظر onAuthStateChanged)
+// راقب ظهور/اختفاء أخطاء الفاليديشن (من attachFormValidation)
+const observer = new MutationObserver(() => {
+  const firstInvalid = form.querySelector('.invalid');
+  if (firstInvalid){
+    // لو فيه أخطاء: أظهر رسالة خطأ وركّز على أول حقل
+    show('راجع الحقول المظللة باللون الأحمر.', true);
+    firstInvalid.focus({ preventScroll: true });
+    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // لا تُخفِ الرسالة إن كانت "نجاح"
+    // أخفِ فقط لو كانت رسالة خطأ سابقة
+    if (info.classList.contains('error')) hideInfo();
+  }
+});
+observer.observe(form, { subtree:true, attributes:true, attributeFilter:['class'] });
+
+  // uid أكيد
   async function getUid(){
     const ls = localStorage.getItem('userId') || localStorage.getItem('uid');
     if (ls) return ls;
@@ -240,100 +265,21 @@
     return u?.uid || '';
   }
 
-  // 4) سياق الحيوان + آخر تلقيح (يتطلب الإندكسات اللي عندك)
-async function fetchCtx(){
-  const uid = await getUid();
-  const num = (numEl?.value || '').trim();
-  if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
-
-  // النوع + الحالة التناسلية من animals
-  const aSnap = await getDocs(query(
-    collection(db,'animals'),
-    where('userId','==',uid),
-    where('animalNumber','==',num),
-    limit(1)
-  ));
-  const animal = aSnap.empty ? {} : aSnap.docs[0].data();
-  const species     = animal.type || animal.species || animal['النوع'] || '';
-  const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
-
-  let lastInseminationISO = '';
-
-  // المحاولة 1: الحقل type
-  try {
-    const s1 = await getDocs(query(
-      collection(db,'events'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      where('type','in',['تلقيح','insemination']),
-      orderBy('eventDate','desc'),
-      limit(1)
-    ));
-    if (!s1.empty) lastInseminationISO = s1.docs[0].data().eventDate || '';
-  } catch (_) { /* لو احتاج إندكس */ }
-
-  // المحاولة 2: الحقل eventType
-  if (!lastInseminationISO) {
-    try {
-      const s2 = await getDocs(query(
-        collection(db,'events'),
-        where('userId','==',uid),
-        where('animalNumber','==',num),
-        where('eventType','in',['تلقيح','insemination']),
-        orderBy('eventDate','desc'),
-        limit(1)
-      ));
-      if (!s2.empty) lastInseminationISO = s2.docs[0].data().eventDate || '';
-    } catch (_) {}
-  }
-
-  // المحاولة 3: fallback — اسحب آخر 50 حدث ورتّب محليًا
-  if (!lastInseminationISO) {
-    const s3 = await getDocs(query(
-      collection(db,'events'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      orderBy('eventDate','desc'),
-      limit(50)
-    ));
-    let latest = '';
-    s3.forEach(d=>{
-      const ev = d.data();
-      const t  = (ev.type || ev.eventType || ev['نوع الحدث'] || '').toString().trim().toLowerCase();
-      if (t==='تلقيح' || t==='insemination') {
-        const dt = ev.eventDate || '';
-        if (dt && (!latest || dt > latest)) latest = dt;
-      }
-    });
-    lastInseminationISO = latest || '';
-  }
-
-  return { species, reproStatus, lastInseminationISO };
-}
-
-  // 5) حفظ الحدث بعد نجاح قرار الولادة/الإجهاض
+  // ✅ الحفظ فقط — الفاليديشن والحارس مركزيًا عبر forms-init.js
+  let submitting = false;
   form.addEventListener('submit', async (e)=>{
     e.preventDefault(); e.stopPropagation();
+    if (submitting) return;
+    submitting = true;
 
     const uid = await getUid();
-    if (!uid) { show('من فضلك سجّل الدخول أولاً.', true); return; }
+    if (!uid){ submitting=false; show('من فضلك سجّل الدخول أولاً.', true); return; }
 
-    // **هنا هيظهر إنذار "لم يكتمل الحد الأدنى" لو عمر الحمل < 255/285**
-    const { species, reproStatus, lastInseminationISO } = await fetchCtx();
-    const ok = calvingDecision({
-      species,
-      reproStatus,
-      lastInseminationISO,
-      eventDateISO: (dateEl?.value || '').trim(),
-      animalNumber: (numEl?.value || '').trim(),
-      abortionUrl: '/abortion.html'
-    });
-    if (!ok) return; // calvingDecision إمّا نبّه أو حوّل لصفحة الإجهاض
-
-    // لو كملنا: خزّن الولادة
+    // لو وصلنا هنا، يبقى forms-init.js سمح بالتمرير (ok=true)
     const payload = {
       userId: uid,
       type: 'ولادة',
+      eventType: 'ولادة',
       eventDate: (dateEl?.value || '').trim(),          // ISO YYYY-MM-DD
       animalNumber: (numEl?.value || '').trim(),
       calvingKind: (kindEl?.value || '').trim(),
@@ -341,57 +287,27 @@ async function fetchCtx(){
       calf1Sex:  document.querySelector('input[name="calf1Sex"]:checked')?.value || '',
       calfId:    document.getElementById('calfId')?.value?.trim() || '',
       notes:     document.getElementById('notes')?.value?.trim() || '',
+      idempotencyKey: `${(numEl?.value||'').trim()}-ولادة-${(dateEl?.value||'').trim()}`,
       createdAt: serverTimestamp()
     };
 
-    await addDoc(collection(db, 'events'), payload);
-    show('تم حفظ الولادة ✅');
-
-    // رجّع المستخدم لقائمة الأحداث الخاصة بالحيوان
-    setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
+    try{
+      await addDoc(collection(db, 'events'), payload);
+      show('تم حفظ الولادة ✅');
+      setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
+    }catch(err){
+      console.error(err);
+      show('تعذّر حفظ الحدث. حاول مرة أخرى.', true);
+    }finally{
+      submitting = false;
+    }
   });
 </script>
-<script type="module">
-// ===== إظهار التحقق فور الضغط على زر الولادة =====
-const form    = document.querySelector('#calving-form');
-const saveBtn = document.getElementById('saveBtn');
-const info    = document.getElementById('info');
 
-// بانر حالة بسيط
-function show(msg, isErr=false){
-  info.textContent = msg;
-  info.className = 'infobar show' + (isErr ? ' error' : '');
-}
-function hideInfo(){ info.className = 'infobar'; info.textContent=''; }
-
-// راقب ظهور الأخطاء من attachFormValidation (تضيف .invalid و .field-msg)
-const observer = new MutationObserver(() => {
-  const firstInvalid = form.querySelector('.invalid');
-  if (firstInvalid){
-    // أوقف مؤشر “جار التحقق…”
-    show('راجع الحقول المظللة باللون الأحمر.', true);
-    // مرّكِز على أول حقل خطأ + Scroll لطيف
-    firstInvalid.focus({ preventScroll: true });
-    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  } else {
-    // لا توجد أخطاء ظاهرة حاليًا
-    hideInfo();
-  }
-});
-observer.observe(form, { subtree:true, attributes:true, attributeFilter:['class'] });
-
-// عند الضغط على زر الحفظ: شغّل التحقق/الحارس الآن
-saveBtn.addEventListener('click', (e)=>{
-  // لا تترك الزر يرسل مباشرة — الطلب يمر عبر requestSubmit
-  e.preventDefault();
-  show('جارِ التحقق...', false);
-  // ده بيشغّل listeners داخل attachFormValidation (الفاليديشن + الحارس)
-  form.requestSubmit();
-});
-</script>
 
 </body>
 </html>
+
 
 
 
