@@ -156,7 +156,25 @@
     <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
-  <!-- اختياري: سكربتاتك للذكاء/التتبع لو متاحة -->
+  <!-- لازم يكون عندك فورم له id="evForm" وكل حقل عليه data-field -->
+<script type="module">
+  import { attachFormValidation, calvingDecision } from '/js/form-rules.js';
+
+  const form = document.getElementById('evForm');
+  const todayISO = new Date().toISOString().slice(0,10);
+
+  attachFormValidation(form, 'calving', {
+    todayISO,
+    guard: (clean) => calvingDecision({
+      species:               clean.species,                    // النوع (أبقار/جاموس)
+      reproStatus:           clean.reproStatus,                // الحالة التناسلية
+      lastInseminationISO:   clean.lastPregnantInseminationDate, // آخر تلقيح مُخصِّب
+      eventDateISO:          clean.eventDate,                  // تاريخ الولادة
+      animalNumber:          clean.animalNumber
+    })
+  });
+</script>
+<!-- اختياري: سكربتاتك للذكاء/التتبع لو متاحة -->
   <script src="/js/app-core.js"></script>
    <script type="module" src="/js/firebase-config.js"></script>
   <script type="module" src="/js/timeline.js"></script>
@@ -352,6 +370,7 @@ async function fetchCtx(){
 
 </body>
 </html>
+
 
 
 
