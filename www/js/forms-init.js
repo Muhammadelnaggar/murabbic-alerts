@@ -1,149 +1,93 @@
-// www/js/forms-init.js
-import { attachFormValidation, calvingDecision } from './form-rules.js';
-import { db, auth } from './firebase-config.js';
-import {
-  collection, query, where, orderBy, limit, getDocs
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+// /js/forms-init.js — ESM
+// يركّب تلقائيًا على أي <form data-validate="true" data-event="اسم الحدث">
+// يجمع كل [data-field] ويُظهر رسائل في infobar أعلى النموذج.
+// لا يُغيّر أي تصميم؛ لو مفيش infobar يصنع شريطًا صغيرًا فقط للرسالة.
+// عند النجاح: يطلق حدثًا "mbk:valid" ويحمل البيانات في detail.formData.
 
-(function startWhenReady(){
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap, { once:true });
-  } else {
-    bootstrap();
+import { validateEvent } from './form-rules.js';
+
+function ensureInfoBar(form) {
+  let bar = form.querySelector('.infobar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'infobar';
+    // ستايل خفيف غير مخرّب للتصميم القائم
+    bar.style.cssText = `
+      margin:8px 0; padding:10px 12px; border-radius:10px;
+      font: 14px/1.4 system-ui, 'Cairo', Arial;
+      display:none; background:#fff; border:1px solid #e2e8f0; color:#0f172a;
+    `;
+    form.prepend(bar);
   }
+  return bar;
+}
 
-  async function getUid(){
-    const ls = localStorage.getItem('userId') || localStorage.getItem('uid');
-    if (ls) return ls;
-    if (auth?.currentUser) return auth.currentUser.uid;
-    const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
-    return u?.uid || '';
+function showMsg(bar, msgs, type="error") {
+  if (!bar) return;
+  bar.style.display = 'block';
+  bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
+  bar.style.background   = type === "error" ? "#ffebee" : "#ecfdf5";
+  bar.style.color        = type === "error" ? "#b71c1c" : "#065f46";
+  bar.innerHTML = Array.isArray(msgs) ? `<ul style="margin:0;padding-left:18px">${msgs.map(m=>`<li>${m}</li>`).join("")}</ul>` : msgs;
+}
+
+function collectFormData(form) {
+  const data = {};
+  form.querySelectorAll('[data-field]').forEach(el => {
+    const k = el.getAttribute('data-field');
+    let v = (el.type === 'checkbox') ? (el.checked ? (el.value || true) : "") :
+            (el.type === 'radio') ? (el.checked ? el.value : data[k] || "") :
+            el.value;
+    data[k] = v;
+  });
+  // تطبيع شائع: لو فيه species فارغ حاول قراءته من localStorage
+  if (!data.species && localStorage.getItem('herdSpecies')) {
+    data.species = localStorage.getItem('herdSpecies'); // "أبقار"|"جاموس"
   }
+  return data;
+}
 
-  async function fetchCalvingCtx(form, clean){
-    const num = (clean?.animalNumber || form.querySelector('[data-field="animalNumber"],#animalNumber')?.value || '').trim();
-    const evDate = (clean?.eventDate || form.querySelector('[data-field="eventDate"],#eventDate')?.value || '').trim();
-    const uid = await getUid();
-    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'', dup:false };
+function attachOne(form) {
+  const bar = ensureInfoBar(form);
+  const eventName = form.getAttribute('data-event');
+  if (!eventName) return;
 
-    const aSnap = await getDocs(query(
-      collection(db,'animals'),
-      where('userId','==',uid),
-      where('animalNumber','==',num),
-      limit(1)
-    ));
-    const animal = aSnap.empty ? {} : aSnap.docs[0].data();
-    const species     = animal.type || animal.species || animal['النوع'] || '';
-    const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
 
-    let lastInseminationISO = '';
-    try {
-      const s1 = await getDocs(query(
-        collection(db,'events'),
-        where('userId','==',uid),
-        where('animalNumber','==',num),
-        where('type','in',['تلقيح','insemination']),
-        orderBy('eventDate','desc'), limit(1)
-      ));
-      if (!s1.empty) lastInseminationISO = s1.docs[0].data().eventDate || '';
-    } catch {}
-    if (!lastInseminationISO){
-      try {
-        const s2 = await getDocs(query(
-          collection(db,'events'),
-          where('userId','==',uid),
-          where('animalNumber','==',num),
-          where('eventType','in',['تلقيح','insemination']),
-          orderBy('eventDate','desc'), limit(1)
-        ));
-        if (!s2.empty) lastInseminationISO = s2.docs[0].data().eventDate || '';
-      } catch {}
-    }
+    const formData = collectFormData(form);
+    const { ok, errors } = validateEvent(eventName, formData);
 
-    // منع تكرار نفس تاريخ الولادة
-    let dup = false;
-    if (evDate){
-      const s3 = await getDocs(query(
-        collection(db,'events'),
-        where('userId','==',uid),
-        where('animalNumber','==',num),
-        where('eventDate','==',evDate),
-        limit(5)
-      ));
-      s3.forEach(d=>{
-        const ev = d.data();
-        const t = (ev.type || ev.eventType || ev['نوع الحدث'] || '').toString().toLowerCase();
-        if (t === 'ولادة' || t === 'calving') dup = true;
-      });
-    }
-
-    return { species, reproStatus, lastInseminationISO, dup };
-  }
-
-  function bootstrap(){
-    // اختر الفورم مرة واحدة
-    const form = document.querySelector('#calving-form') || document.querySelector('form');
-    if (!form) return;
-
-    // امنع أي ربط سابق
-    if (form.dataset.validationAttached === '1') return;
-    form.dataset.validationAttached = '1';
-
-    const ctxBase = { todayISO: new Date().toISOString().slice(0,10) };
-    const file = (location.pathname.split('/').pop() || '').toLowerCase();
-    const selType = form.querySelector('[data-field="eventType"]');
-    const pageToType = {
-      'insemination.html'        : 'insemination',
-      'pregnancy-diagnosis.html' : 'pregnancy_diagnosis',
-      'calving.html'             : 'calving',
-      'daily-milk.html'          : 'daily_milk',
-      'dry-off.html'             : 'dry_off',
-      'close-up.html'            : 'close_up',
-      'visual-eval.html'         : 'milking_traits_eval',
-      'bcs-eval.html'            : 'bcs_eval',
-      'feces-eval.html'          : 'feces_eval',
-      'mastitis.html'            : 'mastitis',
-      'lameness.html'            : 'lameness',
-      'vaccination.html'         : 'vaccination',
-      'nutrition.html'           : 'nutrition'
-    };
-    const resolveType = () => (selType?.value) || pageToType[file] || '';
-
-    function attachForType(){
-      const t = resolveType();
-      if (!t) return;
-
-      // فك أي ربط قديم لمنع التسريب/التكرار
-      form.querySelectorAll('.field-msg').forEach(n=>n.remove());
-      form.querySelectorAll('.invalid').forEach(el=> el.classList.remove('invalid'));
-
-      if (t === 'calving'){
-        attachFormValidation(form, 'calving', {
-          ...ctxBase,
-          guard: async (clean) => {
-            const { species, reproStatus, lastInseminationISO, dup } = await fetchCalvingCtx(form, clean);
-            if (dup) return { ok:false, errors:{ eventDate:'هناك ولادة مسجلة لنفس اليوم لهذا الحيوان.' } };
-
-            const dec = calvingDecision({
-              species, reproStatus,
-              lastInseminationISO,
-              eventDateISO: clean.eventDate,
-              animalNumber: clean.animalNumber
-            });
-            return (dec && typeof dec === 'object')
-              ? dec
-              : (dec === true ? {ok:true} : {ok:false, errors:{ _form:'لا يمكن حفظ الولادة حسب القواعد.' }});
-          }
-        });
-      } else {
-        attachFormValidation(form, t, { ...ctxBase });
+    if (!ok) {
+      showMsg(bar, errors, "error");
+      form.dataset.valid = "0";
+      // تركيز أول خطأ إن أمكن
+      const firstFieldName = (errors[0] || "").match(/«(.+?)»/)?.[1];
+      if (firstFieldName) {
+        const el = form.querySelector(`[data-field="${firstFieldName}"]`);
+        if (el?.focus) el.focus();
       }
+      return;
     }
 
-    attachForType();
-    if (selType){
-      selType.addEventListener('change', attachForType, { passive:true });
-    }
-  }
-})();
+    // نجاح ✅
+    form.dataset.valid = "1";
+    showMsg(bar, "✅ البيانات سليمة — جاري الحفظ...", "ok");
+
+    // أطلِق حدث نجاح شامل؛ صفحة الحدث تتولّى onSave
+    const ev = new CustomEvent('mbk:valid', { detail: { formData, eventName, form } });
+    form.dispatchEvent(ev);
+  });
+}
+
+function autoAttach() {
+  document.querySelectorAll('form[data-validate="true"][data-event]').forEach(attachOne);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', autoAttach);
+} else {
+  autoAttach();
+}
+
+export { autoAttach };
