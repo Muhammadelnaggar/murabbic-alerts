@@ -1,17 +1,15 @@
-// www/js/forms-init.js — تفعيل مركزي لكل الصفحات (بدون أي export)
+// www/js/forms-init.js — تفعيل مركزي لكل الصفحات
 import { attachFormValidation, calvingDecision } from './form-rules.js';
-
-// مطلوب للولادة فقط (لجلب الحالة وآخر تلقيح)
 import { db, auth } from './firebase-config.js';
 import {
   collection, query, where, orderBy, limit, getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-const ctxBase = { todayISO: new Date().toISOString().slice(0,10) };
-const form = document.querySelector('#calving-form') || document.querySelector('form');
-if (!form) { /* صفحة عرض فقط */ } else {
-  // امنع الربط المزدوج
+(function () {
+  const ctxBase = { todayISO: new Date().toISOString().slice(0,10) };
+  const form = document.querySelector('#calving-form') || document.querySelector('form');
+  if (!form) return; // صفحة عرض فقط
   if (form.dataset.validationAttached === '1') return;
 
   const file = (location.pathname.split('/').pop() || '').toLowerCase();
@@ -41,12 +39,12 @@ if (!form) { /* صفحة عرض فقط */ } else {
     return u?.uid || '';
   }
 
-  // جلب سياق الولادة
-  async function fetchCalvingCtx(){
-    const numEl = form.querySelector('[data-field="animalNumber"], #animalNumber');
-    const num = (numEl?.value || '').trim();
+  // جلب سياق الولادة + فحص تكرار نفس التاريخ
+  async function fetchCalvingCtx(clean){
+    const num = (clean?.animalNumber || form.querySelector('[data-field="animalNumber"],#animalNumber')?.value || '').trim();
+    const evDate = (clean?.eventDate || form.querySelector('[data-field="eventDate"],#eventDate')?.value || '').trim();
     const uid = await getUid();
-    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'' };
+    if (!uid || !num) return { species:'', reproStatus:'', lastInseminationISO:'', dup:false };
 
     // النوع + الحالة
     const aSnap = await getDocs(query(
@@ -59,8 +57,8 @@ if (!form) { /* صفحة عرض فقط */ } else {
     const species     = animal.type || animal.species || animal['النوع'] || '';
     const reproStatus = animal.reproStatus || animal['الحالة التناسلية'] || '';
 
+    // آخر تلقيح
     let lastInseminationISO = '';
-
     try {
       const s1 = await getDocs(query(
         collection(db,'events'),
@@ -72,7 +70,6 @@ if (!form) { /* صفحة عرض فقط */ } else {
       ));
       if (!s1.empty) lastInseminationISO = s1.docs[0].data().eventDate || '';
     } catch {}
-
     if (!lastInseminationISO){
       try {
         const s2 = await getDocs(query(
@@ -87,55 +84,64 @@ if (!form) { /* صفحة عرض فقط */ } else {
       } catch {}
     }
 
-    if (!lastInseminationISO){
+    // تكرار نفس تاريخ الولادة
+    let dup = false;
+    if (evDate){
       const s3 = await getDocs(query(
         collection(db,'events'),
         where('userId','==',uid),
         where('animalNumber','==',num),
-        orderBy('eventDate','desc'),
-        limit(50)
+        where('type','in',['ولادة','calving']),
+        where('eventDate','==',evDate),
+        limit(1)
       ));
-      let latest = '';
-      s3.forEach(d=>{
-        const ev = d.data();
-        const t  = (ev.type || ev.eventType || ev['نوع الحدث'] || '').toString().trim().toLowerCase();
-        if (t==='تلقيح' || t==='insemination'){
-          const dt = ev.eventDate || '';
-          if (dt && (!latest || dt > latest)) latest = dt;
-        }
-      });
-      lastInseminationISO = latest || '';
+      dup = !s3.empty;
     }
-    return { species, reproStatus, lastInseminationISO };
+
+    return { species, reproStatus, lastInseminationISO, dup };
   }
 
   async function attachCentral(){
     const t = resolveType();
     if (!t) return;
+
     if (t === 'calving'){
       attachFormValidation(form, 'calving', {
         ...ctxBase,
-        // الحارس يمنع الولادة وهي "فارغة" أو "قبل 255/285 يوم"
         guard: async (clean) => {
-          const { species, reproStatus, lastInseminationISO } = await fetchCalvingCtx();
-          return calvingDecision({
+          const { species, reproStatus, lastInseminationISO, dup } = await fetchCalvingCtx(clean);
+
+          // 1) منع تكرار الولادة لنفس التاريخ
+          if (dup) {
+            return { ok:false, errors:{ eventDate:'هناك ولادة مسجلة لنفس اليوم لهذا الحيوان.' } };
+          }
+
+          // 2) الحد الأدنى للحمل/الحالة — باستخدام دالتك كما هي
+          const allowed = calvingDecision({
             species,
             reproStatus,
             lastInseminationISO,
             eventDateISO: clean.eventDate,
             animalNumber: clean.animalNumber
           });
+          // calvingDecision عندك ترجع Boolean → حوّلها لصيغة {ok}
+          return allowed === true ? {ok:true} : {ok:false, errors:{ _form:'لا يمكن حفظ الولادة حسب القواعد.' }};
         }
       });
     } else {
       attachFormValidation(form, t, { ...ctxBase });
     }
+
     form.dataset.validationAttached = '1';
   }
 
-  await attachCentral();
-  if (selType) selType.addEventListener('change', ()=>{
-    form.dataset.validationAttached = '';
-    attachCentral();
-  });
-}
+  // أول ربط
+  attachCentral();
+  // لو عندك select يغيّر نوع الحدث داخل نفس الفورم
+  if (selType){
+    selType.addEventListener('change', ()=>{
+      form.dataset.validationAttached = '';
+      attachCentral();
+    });
+  }
+})();
