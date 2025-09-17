@@ -157,23 +157,7 @@
   </div>
 
   <!-- لازم يكون عندك فورم له id="evForm" وكل حقل عليه data-field -->
-<script type="module">
-  import { attachFormValidation, calvingDecision } from '/js/form-rules.js';
 
-  const form = document.getElementById('evForm');
-  const todayISO = new Date().toISOString().slice(0,10);
-
-  attachFormValidation(form, 'calving', {
-    todayISO,
-    guard: (clean) => calvingDecision({
-      species:               clean.species,                    // النوع (أبقار/جاموس)
-      reproStatus:           clean.reproStatus,                // الحالة التناسلية
-      lastInseminationISO:   clean.lastPregnantInseminationDate, // آخر تلقيح مُخصِّب
-      eventDateISO:          clean.eventDate,                  // تاريخ الولادة
-      animalNumber:          clean.animalNumber
-    })
-  });
-</script>
 <!-- اختياري: سكربتاتك للذكاء/التتبع لو متاحة -->
   <script src="/js/app-core.js"></script>
    <script type="module" src="/js/firebase-config.js"></script>
@@ -367,9 +351,48 @@ async function fetchCtx(){
     setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
   });
 </script>
+<script type="module">
+// ===== إظهار التحقق فور الضغط على زر الولادة =====
+const form    = document.querySelector('#calving-form');
+const saveBtn = document.getElementById('saveBtn');
+const info    = document.getElementById('info');
+
+// بانر حالة بسيط
+function show(msg, isErr=false){
+  info.textContent = msg;
+  info.className = 'infobar show' + (isErr ? ' error' : '');
+}
+function hideInfo(){ info.className = 'infobar'; info.textContent=''; }
+
+// راقب ظهور الأخطاء من attachFormValidation (تضيف .invalid و .field-msg)
+const observer = new MutationObserver(() => {
+  const firstInvalid = form.querySelector('.invalid');
+  if (firstInvalid){
+    // أوقف مؤشر “جار التحقق…”
+    show('راجع الحقول المظللة باللون الأحمر.', true);
+    // مرّكِز على أول حقل خطأ + Scroll لطيف
+    firstInvalid.focus({ preventScroll: true });
+    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // لا توجد أخطاء ظاهرة حاليًا
+    hideInfo();
+  }
+});
+observer.observe(form, { subtree:true, attributes:true, attributeFilter:['class'] });
+
+// عند الضغط على زر الحفظ: شغّل التحقق/الحارس الآن
+saveBtn.addEventListener('click', (e)=>{
+  // لا تترك الزر يرسل مباشرة — الطلب يمر عبر requestSubmit
+  e.preventDefault();
+  show('جارِ التحقق...', false);
+  // ده بيشغّل listeners داخل attachFormValidation (الفاليديشن + الحارس)
+  form.requestSubmit();
+});
+</script>
 
 </body>
 </html>
+
 
 
 
