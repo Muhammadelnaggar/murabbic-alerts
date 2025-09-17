@@ -23,7 +23,7 @@ if (!form) {
       'insemination.html':        'insemination',
       'pregnancy-diagnosis.html': 'pregnancy_diagnosis',
       'calving.html':             'calving',
-      'daily-milk.html':          'daily_milk',
+      //'daily-milk.html':          'daily_milk',
       'dry-off.html':             'dry_off',
       'close-up.html':            'close_up',
       'visual-eval.html':         'milking_traits_eval', // سمات اللبن (كاميرا)
