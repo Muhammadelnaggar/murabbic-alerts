@@ -217,6 +217,22 @@ export function attachFormValidation(formEl, eventType, ctx={}){
     return msg;
   }
 
+  // رسالة عامة أسفل/يمين النموذج (بدون بوب-أب)
+  function ensureFormMsg(formEl){
+    let box = formEl.querySelector('.form-msg');
+    if(!box){
+      box = document.createElement('div');
+      box.className = 'form-msg';
+      box.style.cssText = 'margin-top:10px;color:#c62828;text-align:right;direction:rtl;font:12px system-ui';
+      formEl.appendChild(box);
+    }
+    return box;
+  }
+  function clearFormMsg(formEl){
+    const box = formEl.querySelector('.form-msg');
+    if (box) box.textContent = '';
+  }
+
   function readForm(){
     const out = {};
     formEl.querySelectorAll('[data-field]').forEach(el=>{
@@ -231,13 +247,22 @@ export function attachFormValidation(formEl, eventType, ctx={}){
     // امسح
     formEl.querySelectorAll('.invalid').forEach(el=> el.classList.remove('invalid'));
     formEl.querySelectorAll('.field-msg').forEach(el=> el.textContent='');
+    clearFormMsg(formEl);
+
+    if (!errors) return;
 
     for (const k in errors){
+      if (k === '_form') continue;
       const el = formEl.querySelector(`[data-field="${k}"]`);
       if (!el) continue;
       el.classList.add('invalid');
       const m = ensureErrorEl(el);
       m.textContent = errors[k];
+    }
+
+    if (errors._form){
+      const fm = ensureFormMsg(formEl);
+      fm.textContent = errors._form;
     }
   }
 
@@ -254,10 +279,35 @@ export function attachFormValidation(formEl, eventType, ctx={}){
   formEl.addEventListener('input', validateAndShow);
   formEl.addEventListener('change', validateAndShow);
 
-  // عند الإرسال
-  formEl.addEventListener('submit', (e)=>{
+  // عند الإرسال (مع حارس اختياري بلا أي نوافذ)
+  formEl.addEventListener('submit', async (e)=>{
     const {ok, clean} = validateAndShow();
     if (!ok){ e.preventDefault(); e.stopPropagation(); return; }
+
+    // تشغيل الحارس المركّب إن وُجد، ويجب أن يُرجع {ok, errors?} أو true/false
+    let guardOk = true, guardErrors = null;
+    try{
+      if (typeof ctx?.guard === 'function'){
+        const res = await ctx.guard(clean, eventType);
+        if (typeof res === 'object' && res !== null){
+          guardOk = !!res.ok;
+          guardErrors = res.errors || null;
+        }else{
+          guardOk = res !== false;
+        }
+      }
+    }catch(err){
+      guardOk = false;
+      guardErrors = { _form:'تعذّر التحقق المركّب. برجاء مراجعة القيم والمحاولة مرة أخرى.' };
+      console.error('guard error:', err);
+    }
+
+    if (!guardOk){
+      e.preventDefault(); e.stopPropagation();
+      renderErrors(guardErrors || {_form:'القيم المُدخلة تمنع الحفظ حسب القواعد.'});
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
 
     // استبدل القيم المنظّفة (أرقام مُحوّلة…)
     for (const k in clean){
@@ -266,6 +316,7 @@ export function attachFormValidation(formEl, eventType, ctx={}){
     }
   });
 }
+
 // ======== حسابات بسيطة مساعدة للولادة ========
 
 // فرق الأيام بين تاريخين ISO (YYYY-MM-DD)
@@ -287,57 +338,60 @@ export function speciesMinDays(speciesStr){
 }
 
 /**
- * قرار حفظ الولادة:
+ * قرار حفظ الولادة (نسخة صامتة بلا أي نوافذ):
  * - يشترط الحالة التناسلية "عشار" إن كانت معروفة.
  * - يمنع الحفظ لو عمر الحمل أقل من الحد الأدنى (255 أبقار / 285 جاموس).
- * - يعطي خيار "تسجيل إجهاض" أو "استمرار".
+ * - يُرجِع { ok:false, errors:{ ... , _form } } لعرضها داخليًا.
  */
 export function calvingDecision({
   species,
   reproStatus,
   lastInseminationISO,
   eventDateISO,
-  animalNumber,
-  abortionUrl = '/abortion.html'
+  animalNumber
 }){
+  const errors = {};
+
   // اعتبر أي نص يحتوي "عشار" = حامل
   const rs = (reproStatus || '').toString().trim();
   const isPreg = /عشار/.test(rs);
 
   // لو الحالة مذكورة وليست "عشار" → امنع
   if (rs && !isPreg) {
-    alert('لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عشار».');
-    return false;
+    errors.reproStatus = 'لا يمكن تسجيل ولادة لحيوان غير «عشار».';
+    errors._form = 'الحالة التناسلية تمنع الحفظ.';
+    return { ok:false, errors };
   }
 
-  // ⛔ حامل لكن ماعندناش آخر تلقيح/تاريخ ولادة غير صالح → امنع
-  if (isPreg && (!isISODate(lastInseminationISO) || !isISODate(eventDateISO))) {
-    alert('لا يمكن التحقق من عمر الحمل — رجاءً سجّل آخر «تلقيح» أولًا ثم أعد المحاولة.');
-    return false;
-  }
-
-  // لو مش حامل أو ماعندناش بيانات حالة: اسمح (لا يمكن التحقق)
-  if (!isPreg) return true;
-
-  // حساب عمر الحمل
-  const { min, kind } = speciesMinDays(species); // 255 بقر / 285 جاموس
-  const ga = daysBetween(lastInseminationISO, eventDateISO);
-
-  if (ga < 0) { // تاريخ ولادة أقدم من آخر تلقيح
-    alert('تاريخ الولادة أقدم من تاريخ آخر تلقيح — راجع التواريخ.');
-    return false;
-  }
-
-  if (ga < min) {
-    const goAbort = window.confirm(
-      `${kind} لم تُكمل الحد الأدنى للحمل (${min} يوم).\n` +
-      `هل تريد تسجيل «إجهاض»؟ (موافق)\nأم «استمرار»؟ (إلغاء)`
-    );
-    if (goAbort) {
-      const qs = new URLSearchParams({ number:String(animalNumber||''), date:eventDateISO });
-      location.href = `${abortionUrl}?${qs.toString()}`;
+  // إن كانت عشار فلابد من تواريخ صحيحة لحساب عمر الحمل
+  if (isPreg){
+    if (!isISODate(lastInseminationISO)){
+      errors.lastPregnantInseminationDate = 'سجّل تاريخ آخر تلقيح مُخصِّب أولًا.';
     }
-    return false;
+    if (!isISODate(eventDateISO)){
+      errors.eventDate = 'التاريخ بصيغة YYYY-MM-DD.';
+    }
+    if (Object.keys(errors).length){
+      errors._form = 'لا يمكن التحقق من عمر الحمل بدون تواريخ صحيحة.';
+      return { ok:false, errors };
+    }
+
+    // حساب عمر الحمل والحد الأدنى حسب النوع
+    const { min, kind } = speciesMinDays(species); // 255 بقر / 285 جاموس
+    const ga = daysBetween(lastInseminationISO, eventDateISO);
+
+    if (ga < 0) { // تاريخ ولادة أقدم من آخر تلقيح
+      errors.eventDate = 'تاريخ الولادة أقدم من تاريخ آخر تلقيح.';
+      errors._form = 'راجع التواريخ.';
+      return { ok:false, errors };
+    }
+
+    if (ga < min) {
+      errors.eventDate = `عمر الحمل أقل من الحد الأدنى (${min} يوم) لـ${kind}.`;
+      errors._form = 'هذه ولادة قبل الميعاد المنطقي. استخدم «إجهاض» بدلًا من الولادة.';
+      return { ok:false, errors };
+    }
   }
-  return true;
+
+  return { ok:true };
 }
