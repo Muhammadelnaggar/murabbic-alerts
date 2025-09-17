@@ -280,41 +280,29 @@ export function attachFormValidation(formEl, eventType, ctx={}){
   formEl.addEventListener('change', validateAndShow);
 
   // عند الإرسال (مع حارس اختياري بلا أي نوافذ)
-  formEl.addEventListener('submit', async (e)=>{
-    const {ok, clean} = validateAndShow();
-    if (!ok){ e.preventDefault(); e.stopPropagation(); return; }
+ formEl.addEventListener('submit', async (e)=>{
+  const {ok, clean, errors} = validateAndShow();
+  if (!ok){ e.preventDefault(); e.stopPropagation(); return; }
 
-    // تشغيل الحارس المركّب إن وُجد، ويجب أن يُرجع {ok, errors?} أو true/false
-    let guardOk = true, guardErrors = null;
-    try{
-      if (typeof ctx?.guard === 'function'){
-        const res = await ctx.guard(clean, eventType);
-        if (typeof res === 'object' && res !== null){
-          guardOk = !!res.ok;
-          guardErrors = res.errors || null;
-        }else{
-          guardOk = res !== false;
-        }
-      }
-    }catch(err){
-      guardOk = false;
-      guardErrors = { _form:'تعذّر التحقق المركّب. برجاء مراجعة القيم والمحاولة مرة أخرى.' };
-      console.error('guard error:', err);
-    }
-
-    if (!guardOk){
+  // 🔒 حارس اختياري (مثلاً للولادة)
+  if (typeof ctx.guard === 'function') {
+    const g = await Promise.resolve(ctx.guard(clean));
+    const allow = (g === true) || (g && g.ok === true);
+    if (!allow) {
       e.preventDefault(); e.stopPropagation();
-      renderErrors(guardErrors || {_form:'القيم المُدخلة تمنع الحفظ حسب القواعد.'});
-      if (submitBtn) submitBtn.disabled = true;
+      const gErrors = (g && g.errors) ? g.errors : {_form:'غير مسموح بالحفظ حسب القواعد.'};
+      renderErrors(gErrors);
       return;
     }
+  }
 
-    // استبدل القيم المنظّفة (أرقام مُحوّلة…)
-    for (const k in clean){
-      const el = formEl.querySelector(`[data-field="${k}"]`);
-      if (el && el.type!=='checkbox') el.value = clean[k] ?? '';
-    }
-  });
+  // استبدال القيم المنظّفة…
+  for (const k in clean){
+    const el = formEl.querySelector(`[data-field="${k}"]`);
+    if (el && el.type!=='checkbox') el.value = clean[k] ?? '';
+  }
+});
+
 }
 
 // ======== حسابات بسيطة مساعدة للولادة ========
