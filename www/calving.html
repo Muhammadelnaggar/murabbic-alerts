@@ -256,41 +256,60 @@ async function fetchAnimalDocByNumber(number){
   }
   return null;
 }
+// أقل عمر حمل بالأيام
+const MIN_GD = { 'أبقار': 255, 'جاموس': 285 };
+
+// توحيد النوع إلى "أبقار"/"جاموس"
+function normSpecies(data){
+  const s = String(data.animalTypeAr || data.animalType || data.species || '').trim();
+  if (s === 'cow' || /بقر/i.test(s))       return 'أبقار';
+  if (s === 'buffalo' || /جاموس/i.test(s)) return 'جاموس';
+  return s; // لو مخزّن أصلًا "أبقار/جاموس"
+}
+
+// فرق الأيام بين تاريخين بصيغة YYYY-MM-DD
+function daysBetweenISO(a,b){
+  const A = new Date(a), B = new Date(b);
+  if (isNaN(A) || isNaN(B)) return NaN;
+  A.setHours(0,0,0,0); B.setHours(0,0,0,0);
+  return Math.round((B - A)/86400000);
+}
 
 
-    async function precheck(number){
-      disableForm(true);
-      show('جارِ التحقق المبدئي من بيانات الحيوان…');
+  async function precheck(number){
+  disableForm(true);
+  show('جارِ التحقق المبدئي من بيانات الحيوان…');
 
-      const a = await fetchAnimalDocByNumber(number);
-      if (!a){ show('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
+  const a = await fetchAnimalDocByNumber(number);
+  if (!a){ show('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
 
-   // species: من animalTypeAr أو animalType أو species لو موجودة
-const sp =
-  a.data.animalTypeAr ||
-  (a.data.animalType === 'cow' ? 'أبقار' :
-   a.data.animalType === 'buffalo' ? 'جاموس' :
-   a.data.species || '');
+  // توحيد القيم من وثيقة الحيوان
+  const sp = normSpecies(a.data); // "أبقار" أو "جاموس"
+  const rs = a.data.reproductiveStatus || a.data.reproStatus || '';
+  const lf = a.data.lastInseminationDate || a.data.lastFertileInseminationDate || '';
 
-// الحالة التناسلية: من reproductiveStatus أو reproStatus
-const rs = a.data.reproductiveStatus || a.data.reproStatus || '';
+  // شروط صارمة قبل فتح النموذج
+  if (!sp || !MIN_GD[sp]) { show('نوع القطيع غير معروف/غير مدعوم لهذا الحيوان.', true); return; }
+  if (rs !== 'عشار'){      show('لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عِشار".', true); return; }
+  if (!lf){                show('لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".', true); return; }
 
-// آخر تلقيح مُخصِّب: من lastInseminationDate أو lastFertileInseminationDate
-const lf = a.data.lastInseminationDate || a.data.lastFertileInseminationDate || '';
+  // حساب عمر الحمل (من آخر تلقيح مُخصِّب حتى تاريخ الحدث أو تاريخ اليوم)
+  const evISO = (dateEl?.value && dateEl.value.trim()) || todayISO();
+  const g = daysBetweenISO(lf, evISO);
+  if (!(g >= MIN_GD[sp])){
+    show(`لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).`, true);
+    return;
+  }
 
+  // تمرير القيم للنموذج بعد نجاح الشروط فقط
+  if (speciesEl)  speciesEl.value  = sp;
+  if (animalIdEl) animalIdEl.value = a.id;
+  if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
+  if (dateEl && !dateEl.value) dateEl.value = evISO;
 
-      if (!sp){ show('نوع القطيع غير مُسجَّل لهذا الحيوان.', true); return; }
-      if (rs !== 'عشار'){ show('لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عِشار".', true); return; }
-      if (!lf){ show('لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".', true); return; }
-
-      if (speciesEl)  speciesEl.value  = sp;
-      if (animalIdEl) animalIdEl.value = a.id;
-      if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
-      if (dateEl && !dateEl.value) dateEl.value = todayISO();
-
-      show('جاهز للتسجيل ✅');
-      disableForm(false);
-    }
+  show('جاهز للتسجيل ✅');
+  disableForm(false);
+}
 
     function kickPrecheck(){
       const n = (numEl?.value||'').trim();
@@ -362,4 +381,5 @@ const lf = a.data.lastInseminationDate || a.data.lastFertileInseminationDate || 
 
 </body>
 </html>
+
 
