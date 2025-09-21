@@ -70,36 +70,48 @@
     const $$ = s=>document.querySelectorAll(s);
     const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
     const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
+     const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  const toLatinDigits = s => String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d]).replace(/[^\d]/g,'');
+   function hydrate(){
+  const qs = new URLSearchParams(location.search);
+  const rawDate = norm(qs.get('eventDate') || qs.get('date') || '');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
 
-    function hydrate(){
-      const qs = new URLSearchParams(location.search);
-      const fromUrlDate = norm(qs.get('date') || '');
-      let date = fromUrlDate || norm(localStorage.getItem('lastEventDate')) || todayISO();
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-      $('#dateInfo').textContent   = `📅 التاريخ الحالي: ${ date }`;
-      if(!norm($('#eventDate').value)) $('#eventDate').value = date;
+  const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
+  const number = toLatinDigits(rawNum);
 
-      const number = norm(qs.get('number') || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber'));
-      if(number){ $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${number}`; }
-    }
+  $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
+  if (!norm($('#eventDate').value)) $('#eventDate').value = date;
 
-    function ctxOrWarn(){
-      const number = norm($('#animalNumber').value) || norm(localStorage.getItem('currentAnimalNumber')) || '';
-      let date = norm($('#eventDate').value) || todayISO();
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-      if(!number){ $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.'; return null; }
-      localStorage.setItem('currentAnimalNumber', number);
-      localStorage.setItem('lastAnimalNumber', number);
-      localStorage.setItem('lastEventDate', date);
-      return { number, date };
-    }
+  if (number){
+    $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${number}`;
+    if ($('#animalNumber')) $('#animalNumber').value = number;
+  }
 
-    function buildUrl(page, ctx){
-      const u = new URL(page, location.href);
-      u.searchParams.set('number', ctx.number);
-      u.searchParams.set('date', ctx.date);
-      return u.toString();
-    }
+}
+
+  function ctxOrWarn(){
+  const number = toLatinDigits(norm($('#animalNumber').value));
+  let date = norm($('#eventDate').value) || todayISO();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+
+  if (!number){
+    $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
+    return null;
+  }
+  $('#warn').textContent = '';
+  return { number, date };
+}
+
+
+  function buildUrl(page, ctx){
+  const u = new URL(page, location.href);
+  u.searchParams.set('number', ctx.number);
+  // دعم الصفحتين: الولادة كانت تقرأ "date"، والتلقيح تقرأ "eventDate"
+  u.searchParams.set('date', ctx.date);
+  u.searchParams.set('eventDate', ctx.date);
+  return u.toString();
+}
 
     function wireButtons(){
       $$('#eventButtons .btn[data-page]').forEach(btn=>{
@@ -146,5 +158,6 @@
  
 </body>
 </html>
+
 
 
