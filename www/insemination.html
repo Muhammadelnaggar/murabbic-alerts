@@ -110,6 +110,27 @@
   <script type="module" src="/js/firebase-config.js"></script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
+ <script>
+(function () {
+  // تطبيع الأرقام + تحويل التاريخ إلى ISO محلي
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+  function normISO(s){ if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const d=new Date(s); return isNaN(d)? todayISO() : new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const p   = new URLSearchParams(location.search);
+    const num = (p.get('number') || p.get('animalNumber') || '').trim()
+                  .replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g, d=>map[d]);
+    const dt  = normISO(p.get('eventDate') || p.get('date') || '');
+
+    const numEl  = document.getElementById('animalNumber');
+    const dateEl = document.getElementById('eventDate');
+
+    if (numEl && num)         numEl.value  = num;
+    if (dateEl && !dateEl.value) dateEl.value = dt || todayISO();
+  });
+})();
+</script>
 
   <!-- منطق الصفحة -->
 <script type="module">
@@ -347,6 +368,7 @@
 
 </body>
 </html>
+
 
 
 
