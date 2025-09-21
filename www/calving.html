@@ -204,6 +204,60 @@
     const animalIdEl = document.getElementById('animalId');
     const speciesEl  = document.getElementById('species');
     const lastFertileEl = document.getElementById('lastFertile');
+    function syncCalfGroups(){
+  const isDead = (kindEl.value === 'نافقة');
+  const count = parseInt(form.querySelector('input[name="calfCount"]:checked')?.value || '1', 10);
+
+  // إظهار/إخفاء مجموعات live-only
+  document.querySelectorAll('.live-only').forEach(el=>{
+    el.style.display = isDead ? 'none' : '';
+  });
+
+  // مطلوب/غير مطلوب لحقول المولود (1)
+  const calfId1 = document.getElementById('calfId');
+  const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
+  const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
+
+  const enableLive = !isDead;
+  if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
+  calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+  calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+
+  // (2) و (3) حسب العدد
+  [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
+    const group = document.getElementById(id);
+    const vis = enableLive && count >= idx;
+    if (group) group.style.display = vis ? '' : 'none';
+
+    const idEl   = document.getElementById(`calf${idx}Id`);
+    const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
+    if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
+    sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
+  });
+}
+
+// أربِط المزامنة على تغيّر النوع والعدد + شغّلها أول ما الصفحة تجهز
+kindEl?.addEventListener('change', syncCalfGroups);
+form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
+document.addEventListener('DOMContentLoaded', syncCalfGroups);
+
+    
+    async function existsCalvingSameDay(uid, number, dateISO){
+  const num = String(number || '').trim();
+
+  const q1 = query(
+    collection(db, 'events'),
+    where('userId', '==', uid),          // عزل المستأجر (ضروري)
+    where('animalNumber', '==', num),
+    // لو بتسجّل eventType بالعربي:
+    where('eventType', '==', 'ولادة'),
+    where('eventDate', '==', dateISO),
+    limit(1)
+  );
+
+  const snap = await getDocs(q1);
+  return !snap.empty;
+}
 
     function show(msg, isErr=false){
       info.textContent = msg;
@@ -219,13 +273,11 @@
       const d=new Date(); d.setHours(0,0,0,0);
       return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
     }
-    async function getUid(){
-      const ls = localStorage.getItem('userId') || localStorage.getItem('uid');
-      if (ls) return ls;
-      if (auth.currentUser) return auth.currentUser.uid;
-      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
-      return u?.uid || '';
-    }
+   async function getUid(){
+  if (auth.currentUser) return auth.currentUser.uid;
+  const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
+  return u?.uid || ''; // فشل التوثيق = سلسلة فاضية → يتعامل معها الكود كخطأ
+}
 
   // ⬇️ بدّل الدالة القديمة بهذه
 async function fetchAnimalDocByNumber(number){
@@ -310,17 +362,21 @@ function cmpISO(a, b){ return new Date(a) - new Date(b); }
 
 // إشارات الحمل من الأحداث الأحدث فالأقدم
 async function fetchSignalsFromEvents(number){
+  const uid = await getUid();
   const num = String(number||'').trim();
+
   const qEv = query(
     collection(db,'events'),
+    where('userId','==', uid),          // ✅ عزل المستأجر
     where('animalNumber','==', num),
     orderBy('eventDate','desc'),
     limit(50)
   );
+
   const snap = await getDocs(qEv);
-  let pregnant = null;               // true/false
-  let lastFertileDate = null;        // YYYY-MM-DD
-  let lastBoundary = null;           // آخر "ولادة" أو "إجهاض"
+  let pregnant = null;        // true/false (أحدث تشخيص)
+  let lastFertileDate = null; // YYYY-MM-DD
+  let lastBoundary = null;    // آخر "ولادة" أو "إجهاض"
 
   for (const d of snap.docs){
     const ev = d.data() || {};
@@ -328,30 +384,23 @@ async function fetchSignalsFromEvents(number){
     const res  = ev.result || ev.status || '';
     const dt   = ev.eventDate;
 
-    // أحداث فاصلة تُنهي الحمل
     if (type === 'ولادة' || type === 'إجهاض'){
       if (!lastBoundary) lastBoundary = dt;
       if (pregnant === null) pregnant = false;
       continue;
     }
-
-    // تشخيص حمل
     if (type === 'تشخيص حمل'){
       if (res === 'حامل' && pregnant === null) pregnant = true;
       if (res === 'غير حامل' && pregnant === null) pregnant = false;
     }
-
-    // تلقيح مُخصِّب
     if (!lastFertileDate && (type === 'تلقيح مخصب' || ev.fertile === true || res === 'مخصب')){
       lastFertileDate = dt;
     }
-
     if (pregnant !== null && lastFertileDate) break;
   }
 
   return { pregnant, lastFertileDate, lastBoundary };
 }
-
   async function precheck(number){
  disableForm(true);
 show('جارِ التحقق المبدئي من بيانات الحيوان…');
@@ -422,9 +471,52 @@ if (!(g >= MIN_GD[sp])){
     numEl?.addEventListener('change', kickPrecheck);
     numEl?.addEventListener('blur', kickPrecheck);
 
-    form.addEventListener('submit', (e)=> e.preventDefault()); // منع أي حفظ قبل نجاح الفاليديشن المركزي
+   form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
 
-    form.addEventListener('mbk:valid', async (e)=>{
+  // (1) uid + حقول أساسية
+  const uid    = await getUid();
+  if (!uid){ show('سجّل الدخول أولًا.', true); return; }
+
+  const number = (numEl?.value || '').trim();
+  const evISO  = (dateEl?.value || '').trim();
+  if (!number || !evISO){ show('رقم الحيوان وتاريخ الولادة مطلوبان.', true); return; }
+
+  // (2) منع تاريخ في المستقبل
+  if (evISO > todayISO()){ show('تاريخ الولادة لا يمكن أن يكون في المستقبل.', true); return; }
+
+  // (3) فحصك المبدئي الحالي (pregnant/gestation…) — بيستخدم precheck الموجودة
+  await precheck(number);
+  if (info.classList.contains('error')) return; // لو precheck طلع Error، نوقف
+     if (!form.reportValidity()) { show('أكمل الحقول المطلوبة.', true); return; }
+
+
+  // (4) ⛔️ منع تكرار الولادة لنفس اليوم (هنا بنادي الدالة اللي سألت عنها)
+  if (await existsCalvingSameDay(uid, number, evISO)){
+    show('منع: هناك ولادة مسجّلة لهذا الحيوان في نفس التاريخ.', true);
+    return;
+  }
+
+  // (5) جهّز بيانات الفورم واطلق حدث mbk:valid (مستمعك الحالي بيحفظ في Firestore)
+  const formData = {};
+  form.querySelectorAll('[data-field]').forEach(el=>{
+    const key = el.getAttribute('data-field');
+    let val = '';
+    if (el.type === 'radio') {
+      const chosen = form.querySelector(`input[name="${el.name}"]:checked`);
+      val = chosen ? chosen.value : '';
+    } else {
+      val = (el.value||'').trim();
+    }
+    formData[key] = val;
+  });
+
+  document.dispatchEvent(new CustomEvent('mbk:valid', { detail:{ formData } }));
+});
+
+
+ document.addEventListener('mbk:valid', async (e)=>{
+
       const { formData } = e.detail;
 
       const uid = await getUid();
@@ -473,6 +565,7 @@ if (!(g >= MIN_GD[sp])){
 
 </body>
 </html>
+
 
 
 
