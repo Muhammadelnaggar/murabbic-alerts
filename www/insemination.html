@@ -7,6 +7,24 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل حدث التلقيح — مُرَبِّك</title>
   <style>
+    /* شريط تنبيه أعلى الصفحة (داخل الهيدر) */
+.alertbar{
+  display:none;
+  padding:12px 16px;
+  font-weight:700;
+  text-align:center;
+  border-top:1px solid #fed7aa;
+  border-bottom:1px solid #fed7aa;
+  background:#fff7ed; /* افتراضي: خطأ */
+  color:#9a3412;
+}
+.alertbar.ok{
+  background:#ecfdf5;
+  border-color:#bbf7d0;
+  color:#065f46;
+}
+.alertbar.show{ display:block }
+
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -41,6 +59,7 @@
       <div class="title">تسجيل حدث التلقيح</div>
       <a class="ghost" href="add-event.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
+      <div id="alertBar" class="alertbar" role="alert" aria-live="assertive"></div>
   </header>
 
   <main>
@@ -148,13 +167,36 @@
   const saveBtn  = document.getElementById('saveBtn');
 
   // رسائل
-  function showMsg(text, isErr=false){
+ function showMsg(text, isErr=false){
+  const info = document.getElementById('info');     // الرسالة داخل الكارت (تبقى موجودة)
+  const bar  = document.getElementById('alertBar'); // الشريط العلوي
+
+  const msg = (isErr ? '❌ ' : '✅ ') + text;
+
+  // صندوق الرسالة داخل الكارت (للي يحب يرجعله)
+  if (info){
     info.className = 'infobar ' + (isErr ? 'show error' : 'show');
     info.setAttribute('role','status');
     info.setAttribute('aria-live','polite');
-    info.innerHTML = (isErr ? '❌ ' : '✅ ') + text;
-    try { info.scrollIntoView({behavior:'smooth', block:'center'}); } catch {}
+    info.innerHTML = msg;
   }
+
+  // الشريط العلوي الظاهر فورًا
+  if (bar){
+    bar.className = 'alertbar show' + (isErr ? '' : ' ok');
+    bar.innerHTML = msg;
+
+    // نجاح = أخفي الشريط تلقائيًا بعد ثواني
+    if (!isErr){
+      clearTimeout(window.__alertHide);
+      window.__alertHide = setTimeout(()=>{
+        bar.className = 'alertbar';
+        bar.innerHTML = '';
+      }, 3500);
+    }
+  }
+}
+
   function showToast(text){ showMsg(text,false); info.classList.add('toast'); }
 
   // أدوات مساعدة
@@ -235,6 +277,42 @@
 
   // القواعد
   const FIRST_INSEM_MIN = { 'أبقار': 60, 'جاموس': 45 };
+ // تحميل مقترحات أسماء الملقّحين من Firestore (حسب المستخدم الحالي)
+async function loadInseminators() {
+  try {
+    await ensureAuth();
+    const uid = await getUid();
+    if (!uid) return;
+
+    const list = document.getElementById('inseminatorsList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const qy = query(
+      collection(db, 'inseminators'),
+      where('userId', '==', uid),
+      orderBy('lastUsedAt', 'desc'),
+      limit(50)
+    );
+    const snap = await getDocs(qy);
+
+    const seen = new Set();
+    snap.forEach(doc => {
+      const name = (doc.data()?.name || '').trim();
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        const opt = document.createElement('option');
+        opt.value = name;
+        list.appendChild(opt);
+      }
+    });
+  } catch (e) {
+    console.warn('loadInseminators failed', e);
+  }
+}
+
+// شغّلها عند فتح الصفحة
+document.addEventListener('DOMContentLoaded', loadInseminators);
 
   async function precheckGate(){
     lockForm(true);
@@ -378,6 +456,7 @@
 
 </body>
 </html>
+
 
 
 
