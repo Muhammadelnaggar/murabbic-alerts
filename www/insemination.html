@@ -8,22 +8,22 @@
   <title>تسجيل حدث التلقيح — مُرَبِّك</title>
   <style>
     /* شريط تنبيه أعلى الصفحة (داخل الهيدر) */
-.alertbar{
-  display:none;
-  padding:12px 16px;
-  font-weight:700;
-  text-align:center;
-  border-top:1px solid #fed7aa;
-  border-bottom:1px solid #fed7aa;
-  background:#fff7ed; /* افتراضي: خطأ */
-  color:#9a3412;
-}
-.alertbar.ok{
-  background:#ecfdf5;
-  border-color:#bbf7d0;
-  color:#065f46;
-}
-.alertbar.show{ display:block }
+    .alertbar{
+      display:none;
+      padding:12px 16px;
+      font-weight:700;
+      text-align:center;
+      border-top:1px solid #fed7aa;
+      border-bottom:1px solid #fed7aa;
+      background:#fff7ed; /* افتراضي: خطأ */
+      color:#9a3412;
+    }
+    .alertbar.ok{
+      background:#ecfdf5;
+      border-color:#bbf7d0;
+      color:#065f46;
+    }
+    .alertbar.show{ display:block }
 
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
     *{box-sizing:border-box}
@@ -59,7 +59,7 @@
       <div class="title">تسجيل حدث التلقيح</div>
       <a class="ghost" href="add-event.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
-      <div id="alertBar" class="alertbar" role="alert" aria-live="assertive"></div>
+    <div id="alertBar" class="alertbar" role="alert" aria-live="assertive"></div>
   </header>
 
   <main>
@@ -129,338 +129,320 @@
   <script type="module" src="/js/firebase-config.js"></script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
- <script>
-(function () {
-  // تطبيع الأرقام + تحويل التاريخ إلى ISO محلي
-  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-  function normISO(s){ if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const d=new Date(s); return isNaN(d)? todayISO() : new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const p   = new URLSearchParams(location.search);
-    const num = (p.get('number') || p.get('animalNumber') || '').trim()
-                  .replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g, d=>map[d]);
-    const dt  = normISO(p.get('eventDate') || p.get('date') || '');
+  <!-- تعبئة الرقم/التاريخ من بارامز -->
+  <script>
+    (function () {
+      const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+      function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+      function normISO(s){ if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const d=new Date(s); return isNaN(d)? todayISO() : new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 
-    const numEl  = document.getElementById('animalNumber');
-    const dateEl = document.getElementById('eventDate');
+      document.addEventListener('DOMContentLoaded', () => {
+        const p   = new URLSearchParams(location.search);
+        const num = (p.get('number') || p.get('animalNumber') || '').trim()
+                      .replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g, d=>map[d]);
+        const dt  = normISO(p.get('eventDate') || p.get('date') || '');
 
-    if (numEl && num)         numEl.value  = num;
-    if (dateEl && !dateEl.value) dateEl.value = dt || todayISO();
-  });
-})();
-</script>
+        const numEl  = document.getElementById('animalNumber');
+        const dateEl = document.getElementById('eventDate');
+
+        if (numEl && num)           numEl.value  = num;
+        if (dateEl && !dateEl.value) dateEl.value = dt || todayISO();
+      });
+    })();
+  </script>
 
   <!-- منطق الصفحة -->
-<script type="module">
-  import { db, auth, ensureAuth } from '/js/firebase-config.js';
-  import {
-    collection, addDoc, serverTimestamp,
-    query, where, limit, getDocs, orderBy
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  <script type="module">
+    import { db, auth, ensureAuth } from '/js/firebase-config.js';
+    import {
+      collection, addDoc, serverTimestamp,
+      query, where, limit, getDocs, orderBy
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-  // عناصر الصفحة
-  const info     = document.getElementById('info');
-  const numEl    = document.getElementById('animalNumber');
-  const dateEl   = document.getElementById('eventDate');
-  const saveBtn  = document.getElementById('saveBtn');
+    // عناصر الصفحة
+    const info     = document.getElementById('info');
+    const numEl    = document.getElementById('animalNumber');
+    const dateEl   = document.getElementById('eventDate');
+    const saveBtn  = document.getElementById('saveBtn');
 
-  // رسائل
- function showMsg(text, isErr=false){
-  const info = document.getElementById('info');     // الرسالة داخل الكارت (تبقى موجودة)
-  const bar  = document.getElementById('alertBar'); // الشريط العلوي
+    // رسائل
+    function showMsg(text, isErr=false){
+      const info = document.getElementById('info');     // الرسالة داخل الكارت
+      const bar  = document.getElementById('alertBar'); // الشريط العلوي
 
-  const msg = (isErr ? '❌ ' : '✅ ') + text;
+      const msg = (isErr ? '❌ ' : '✅ ') + text;
 
-  // صندوق الرسالة داخل الكارت (للي يحب يرجعله)
-  if (info){
-    info.className = 'infobar ' + (isErr ? 'show error' : 'show');
-    info.setAttribute('role','status');
-    info.setAttribute('aria-live','polite');
-    info.innerHTML = msg;
-  }
-
-  // الشريط العلوي الظاهر فورًا
-  if (bar){
-    bar.className = 'alertbar show' + (isErr ? '' : ' ok');
-    bar.innerHTML = msg;
-
-    // نجاح = أخفي الشريط تلقائيًا بعد ثواني
-    if (!isErr){
-      clearTimeout(window.__alertHide);
-      window.__alertHide = setTimeout(()=>{
-        bar.className = 'alertbar';
-        bar.innerHTML = '';
-      }, 3500);
-    }
-  }
-}
-
-  function showToast(text){ showMsg(text,false); info.classList.add('toast'); }
-
-  // أدوات مساعدة
-  function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-  async function getUid(){
-    if (auth.currentUser) return auth.currentUser.uid;
-    const u = await new Promise(res => onAuthStateChanged(auth, x => res(x)));
-    return u?.uid || '';
-  }
-  function daysBetweenISO(a,b){ const A=new Date(a), B=new Date(b); if (isNaN(A)||isNaN(B)) return NaN; A.setHours(0,0,0,0); B.setHours(0,0,0,0); return Math.round((B-A)/86400000); }
-  const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const toLatin = s => String(s||'').replace(/[٠-٩۰-۹]/g, d=>DIGITS[d]).replace(/[^\d]/g,'');
-
-  async function fetchAnimalDocByNumber(number){
-    const raw = toLatin(number);
-    const asStr = raw, asNum = raw ? Number(raw) : NaN;
-    const tries = [
-      ['animalNumber','==',asStr], ['animalNumber','==',asNum],
-      ['number','==',asStr],       ['number','==',asNum],
-      ['animalNo','==',asStr],     ['animalNo','==',asNum],
-    ].filter(t => !(typeof t[2]==='number' && Number.isNaN(t[2])));
-    for (const [field,op,val] of tries){
-      const s = await getDocs(query(collection(db,'animals'), where(field,op,val), limit(1)));
-      if (!s.empty){ const d=s.docs[0]; return { id:d.id, data:d.data()||{} }; }
-    }
-    return null;
-  }
-  function normSpecies(data){
-    const s = String(data.animalTypeAr || data.animalType || data.species || '').trim();
-    if (s === 'cow' || /بقر/i.test(s))       return 'أبقار';
-    if (s === 'buffalo' || /جاموس/i.test(s)) return 'جاموس';
-    return s || 'أبقار';
-  }
-
-  // آخر ولادة/إجهاض/تلقيح + إشارة الحمل من الأحداث
-  async function fetchFacts(number){
-    const uid = await getUid();
-    const num = String(number||'').trim();
-    const s = await getDocs(query(
-      collection(db,'events'),
-      where('userId','==', uid),
-      where('animalNumber','==', num),
-      orderBy('eventDate','desc'),
-      limit(80)
-    ));
-    let lastCalving=null, lastAbort=null, lastInsem=null, pregnant=null;
-    for (const d of s.docs){
-      const ev = d.data()||{};
-      const type = (ev.eventType || ev.type || '').trim();
-      const res  = (ev.result || ev.status || '').trim();
-      const dt   = ev.eventDate;
-
-      if (!lastCalving && (type==='ولادة' || type==='calving')) lastCalving = dt;
-      if (!lastAbort   && (type==='إجهاض' || type==='abortion')) lastAbort   = dt;
-      if (!lastInsem   && (type==='insemination' || type==='تلقيح' || type==='تلقيح مخصب' || ev.fertile===true)) lastInsem = dt;
-
-      if (type==='pregnancy_check' || type==='تشخيص حمل'){
-        if (pregnant===null){
-          if (/حامل|موجب/i.test(res)) pregnant = true;
-          if (/غير حامل|سالب/i.test(res)) pregnant = false;
-        }
+      if (info){
+        info.className = 'infobar ' + (isErr ? 'show error' : 'show');
+        info.setAttribute('role','status');
+        info.setAttribute('aria-live','polite');
+        info.innerHTML = msg;
       }
-      if ((type==='ولادة'||type==='calving'||type==='إجهاض'||type==='abortion') && pregnant===null) pregnant = false;
-      if (lastCalving && lastInsem && pregnant!==null) break;
-    }
-    return { lastCalving, lastAbort, lastInsem, pregnant };
-  }
-
-  // قفل/فتح الحقول (نفس سلوك الولادة)
-  function lockForm(disabled=true){
-    document.querySelectorAll('input,select,button').forEach(el=>{
-      const id = el.id || '';
-      if (id==='animalNumber' || id==='eventDate' || id==='toCardBtn') return; // سيب الأساسيات
-      el.disabled = disabled;
-    });
-    if (saveBtn) saveBtn.disabled = disabled;
-  }
-
-  // القواعد
-  const FIRST_INSEM_MIN = { 'أبقار': 60, 'جاموس': 45 };
- // تحميل مقترحات أسماء الملقّحين من Firestore (حسب المستخدم الحالي)
-async function loadInseminators() {
-  try {
-    await ensureAuth();
-    const uid = await getUid();
-    if (!uid) return;
-
-    const list = document.getElementById('inseminatorsList');
-    if (!list) return;
-    list.innerHTML = '';
-
-    const qy = query(
-      collection(db, 'inseminators'),
-      where('userId', '==', uid),
-      orderBy('lastUsedAt', 'desc'),
-      limit(50)
-    );
-    const snap = await getDocs(qy);
-
-    const seen = new Set();
-    snap.forEach(doc => {
-      const name = (doc.data()?.name || '').trim();
-      if (name && !seen.has(name)) {
-        seen.add(name);
-        const opt = document.createElement('option');
-        opt.value = name;
-        list.appendChild(opt);
-      }
-    });
-  } catch (e) {
-    console.warn('loadInseminators failed', e);
-  }
-}
-
-// شغّلها عند فتح الصفحة
-document.addEventListener('DOMContentLoaded', loadInseminators);
-
-  async function precheckGate(){
-    lockForm(true);
-    showMsg('جارِ التحقق المبدئي من الرقم والتاريخ…');
-
-    const number = (numEl?.value||'').trim();
-    const evISO  = (dateEl?.value||'').trim() || todayISO();
-    if (!number){ showMsg('أدخل رقم الحيوان أولًا.', true); return; }
-
-    if (evISO > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل.', true); return; }
-
-    await ensureAuth();
-    const uid = await getUid();
-    if (!uid){ showMsg('سجّل الدخول أولًا.', true); return; }
-
-    const a = await fetchAnimalDocByNumber(number);
-    if (!a){ showMsg('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
-
-    const species = normSpecies(a.data);
-    const facts   = await fetchFacts(number);
-
-    // قاعدة 3: عِشار → منع + توجيه
-    const reproFromDoc = (a.data.reproductiveStatus || a.data.reproStatus || '').trim();
-    const isPreg = (facts.pregnant !== null) ? facts.pregnant : (reproFromDoc === 'عشار');
-    if (isPreg){
-      showMsg('الحيوان مُسجَّل "عِشار". يجب التأكد من الحمل وتسجيل "تشخيص حمل" أولًا قبل التلقيح.', true);
-      // زر سريع لفتح تشخيص الحمل
-      info.insertAdjacentHTML('beforeend',
-        `<div style="margin-top:10px">
-           <a href="pregnancy-diagnosis.html?number=${encodeURIComponent(number)}&eventDate=${encodeURIComponent(evISO)}"
-              style="display:inline-block;padding:10px 14px;border-radius:10px;background:#0ea05a;color:#fff;font-weight:700;text-decoration:none">
-              تسجيل تشخيص حمل الآن
-           </a>
-         </div>`);
-      return;
-    }
-
-    // قاعدة 1: التلقيح الأول بعد الولادة
-    if (facts.lastCalving){
-      const isFirstAfterCalving = !(facts.lastInsem && facts.lastInsem >= facts.lastCalving);
-      if (isFirstAfterCalving){
-        const minDays = FIRST_INSEM_MIN[species] ?? 60;
-        const gap     = daysBetweenISO(facts.lastCalving, evISO);
-        if (gap < (minDays - 5)){
-          showMsg(`منع: التلقيح الأول بعد الولادة يجب أن يكون بعد ${minDays} يوم (${species}). الحالي ${gap} يوم فقط.`, true);
-          return;
-        }
-        if (gap < minDays){
-          showToast(`تنبيه: التلقيح الأول مبكّر بـ ${minDays - gap} يوم — مسموح ضمن سماح 5 أيام.`);
+      if (bar){
+        bar.className = 'alertbar show' + (isErr ? '' : ' ok');
+        bar.innerHTML = msg;
+        if (!isErr){
+          clearTimeout(window.__alertHide);
+          window.__alertHide = setTimeout(()=>{
+            bar.className = 'alertbar';
+            bar.innerHTML = '';
+          }, 3500);
         }
       }
     }
+    function showToast(text){ showMsg(text,false); info.classList.add('toast'); }
 
-    // قاعدة 2: آخر تلقيح بين 15–25 يوم → تنبيه
-    if (facts.lastInsem){
-      const d = daysBetweenISO(facts.lastInsem, evISO);
-      if (d >= 15 && d <= 25){
-        showToast('تنبيه: الحيوان غير منتظم الشياع / استمرار — خروج (آخر تلقيح بين 15–25 يوم).');
+    // أدوات مساعدة
+    function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+    async function getUid(){
+      if (auth.currentUser) return auth.currentUser.uid;
+      const u = await new Promise(res => onAuthStateChanged(auth, x => res(x)));
+      return u?.uid || '';
+    }
+    function daysBetweenISO(a,b){ const A=new Date(a), B=new Date(b); if (isNaN(A)||isNaN(B)) return NaN; A.setHours(0,0,0,0); B.setHours(0,0,0,0); return Math.round((B-A)/86400000); }
+    const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+    const toLatin = s => String(s||'').replace(/[٠-٩۰-۹]/g, d=>DIGITS[d]).replace(/[^\d]/g,'');
+
+    async function fetchAnimalDocByNumber(number){
+      const raw = toLatin(number);
+      const asStr = raw, asNum = raw ? Number(raw) : NaN;
+      const tries = [
+        ['animalNumber','==',asStr], ['animalNumber','==',asNum],
+        ['number','==',asStr],       ['number','==',asNum],
+        ['animalNo','==',asStr],     ['animalNo','==',asNum],
+      ].filter(t => !(typeof t[2]==='number' && Number.isNaN(t[2])));
+      for (const [field,op,val] of tries){
+        const s = await getDocs(query(collection(db,'animals'), where(field,op,val), limit(1)));
+        if (!s.empty){ const d=s.docs[0]; return { id:d.id, data:d.data()||{} }; }
+      }
+      return null;
+    }
+    function normSpecies(data){
+      const s = String(data.animalTypeAr || data.animalType || data.species || '').trim();
+      if (s === 'cow' || /بقر/i.test(s))       return 'أبقار';
+      if (s === 'buffalo' || /جاموس/i.test(s)) return 'جاموس';
+      return s || 'أبقار';
+    }
+
+    // آخر ولادة/إجهاض/تلقيح + إشارة الحمل من الأحداث
+    async function fetchFacts(number){
+      const uid = await getUid();
+      const num = String(number||'').trim();
+      const s = await getDocs(query(
+        collection(db,'events'),
+        where('userId','==', uid),
+        where('animalNumber','==', num),
+        orderBy('eventDate','desc'),
+        limit(80)
+      ));
+      let lastCalving=null, lastAbort=null, lastInsem=null, pregnant=null;
+      for (const d of s.docs){
+        const ev = d.data()||{};
+        const type = (ev.eventType || ev.type || '').trim();
+        const res  = (ev.result || ev.status || '').trim();
+        const dt   = ev.eventDate;
+
+        if (!lastCalving && (type==='ولادة' || type==='calving')) lastCalving = dt;
+        if (!lastAbort   && (type==='إجهاض' || type==='abortion')) lastAbort   = dt;
+        if (!lastInsem   && (type==='insemination' || type==='تلقيح' || type==='تلقيح مخصب' || ev.fertile===true)) lastInsem = dt;
+
+        if (type==='pregnancy_check' || type==='تشخيص حمل'){
+          if (pregnant===null){
+            if (/حامل|موجب/i.test(res)) pregnant = true;
+            if (/غير حامل|سالب/i.test(res)) pregnant = false;
+          }
+        }
+        if ((type==='ولادة'||type==='calving'||type==='إجهاض'||type==='abortion') && pregnant===null) pregnant = false;
+        if (lastCalving && lastInsem && pregnant!==null) break;
+      }
+      return { lastCalving, lastAbort, lastInsem, pregnant };
+    }
+
+    // قفل/فتح الحقول (نفس سلوك الولادة)
+    function lockForm(disabled=true){
+      document.querySelectorAll('input,select,button').forEach(el=>{
+        const id = el.id || '';
+        if (id==='animalNumber' || id==='eventDate' || id==='toCardBtn') return; // سيب الأساسيات
+        el.disabled = disabled;
+      });
+      if (saveBtn) saveBtn.disabled = disabled;
+    }
+
+    // القواعد
+    const FIRST_INSEM_MIN = { 'أبقار': 60, 'جاموس': 45 };
+
+    // تحميل مقترحات أسماء الملقّحين
+    async function loadInseminators() {
+      try {
+        await ensureAuth();
+        const uid = await getUid();
+        if (!uid) return;
+
+        const list = document.getElementById('inseminatorsList');
+        if (!list) return;
+        list.innerHTML = '';
+
+        const qy = query(
+          collection(db, 'inseminators'),
+          where('userId', '==', uid),
+          orderBy('lastUsedAt', 'desc'),
+          limit(50)
+        );
+        const snap = await getDocs(qy);
+
+        const seen = new Set();
+        snap.forEach(doc => {
+          const name = (doc.data()?.name || '').trim();
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            const opt = document.createElement('option');
+            opt.value = name;
+            list.appendChild(opt);
+          }
+        });
+      } catch (e) {
+        console.warn('loadInseminators failed', e);
       }
     }
+    document.addEventListener('DOMContentLoaded', loadInseminators);
 
-    showMsg('جاهز للتسجيل ✅');
-    lockForm(false);
-  }
+    // التحقق المبدئي قبل الحفظ
+    async function precheckGate(){
+      lockForm(true);
+      showMsg('جارِ التحقق المبدئي من الرقم والتاريخ…');
 
-  // تشغيل التحقق المبكر
-  document.addEventListener('DOMContentLoaded', precheckGate);
-  numEl?.addEventListener('change', precheckGate);
-  numEl?.addEventListener('blur',   precheckGate);
-  dateEl?.addEventListener('change', precheckGate);
-  dateEl?.addEventListener('blur',   precheckGate);
+      const number = (numEl?.value||'').trim();
+      const evISO  = (dateEl?.value||'').trim() || todayISO();
+      if (!number){ showMsg('أدخل رقم الحيوان أولًا.', true); return; }
 
-  // onSave — يكرر التحقق بسرعة لحماية السيرفر ثم يحفظ
-  async function onSave(){
-    // اقفل لحين الانتهاء
-    lockForm(true);
+      if (evISO > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل.', true); return; }
 
-    // تحقق سريع من المستقبل
-    const eventDate  = (dateEl?.value||'').trim(); 
-    if (eventDate > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); lockForm(false); return; }
+      await ensureAuth();
+      const uid = await getUid();
+      if (!uid){ showMsg('سجّل الدخول أولًا.', true); return; }
 
-    // لو آخر رسالة كانت خطأ من precheckGate هنوقف
-    if (info.classList.contains('error')) { lockForm(true); return; }
+      const a = await fetchAnimalDocByNumber(number);
+      if (!a){ showMsg('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
 
-    const animalNumber = (numEl?.value||'').trim();
-    const method       = (document.getElementById('inseminationMethod')?.value||'').trim();
-    const semenCode    = (document.getElementById('semenCode')?.value||'').trim();
-    const inseminator  = (document.getElementById('inseminator')?.value||'').trim();
-    const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value || '';
-    const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value || '';
-    if(!animalNumber || !eventDate || !method || !semenCode || !inseminator || !timeOfDay || !heatState){
-      showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
-      lockForm(false);
-      return;
-    }
+      const species = normSpecies(a.data);
+      const facts   = await fetchFacts(number);
 
-    await ensureAuth();
-    const userId = await getUid();
-    if (!userId){ showMsg('سجّل الدخول أولًا.', true); return; }
+      // قاعدة 3: عِشار → منع + توجيه
+      const reproFromDoc = (a.data.reproductiveStatus || a.data.reproStatus || '').trim();
+      const isPreg = (facts.pregnant !== null) ? facts.pregnant : (reproFromDoc === 'عشار');
+      if (isPreg){
+        showMsg('الحيوان مُسجَّل "عِشار". يجب التأكد من الحمل وتسجيل "تشخيص حمل" أولًا قبل التلقيح.', true);
+        info.insertAdjacentHTML('beforeend',
+          `<div style="margin-top:10px">
+             <a href="pregnancy-diagnosis.html?number=${encodeURIComponent(number)}&eventDate=${encodeURIComponent(evISO)}"
+                style="display:inline-block;padding:10px 14px;border-radius:10px;background:#0ea05a;color:#fff;font-weight:700;text-decoration:none">
+                تسجيل تشخيص حمل الآن
+             </a>
+           </div>`);
+        return;
+      }
 
-    const notes = (document.getElementById('notes')?.value || '').trim();
-    const payload = {
-      userId,
-      type: 'insemination',
-      eventType: 'insemination',
-      eventDate,
-      animalNumber,
-      number: animalNumber,
-      inseminationMethod: method,
-      semenCode,
-      inseminator,
-      inseminationTime: timeOfDay,
-      heatStatus: heatState,
-      notes: notes || null,
-      source: location.pathname,
-      createdAt: serverTimestamp()
-    };
+      // قاعدة 1: التلقيح الأول بعد الولادة (مع سماح 5 أيام)
+      if (facts.lastCalving){
+        const isFirstAfterCalving = !(facts.lastInsem && facts.lastInsem >= facts.lastCalving);
+        if (isFirstAfterCalving){
+          const minDays = FIRST_INSEM_MIN[species] ?? 60;
+          const gap     = daysBetweenISO(facts.lastCalving, evISO);
+          if (gap < (minDays - 5)){
+            showMsg(`منع: التلقيح الأول بعد الولادة يجب أن يكون بعد ${minDays} يوم (${species}). الحالي ${gap} يوم فقط.`, true);
+            return;
+          }
+          if (gap < minDays){
+            showToast(`تنبيه: التلقيح الأول مبكّر بـ ${minDays - gap} يوم — مسموح ضمن سماح 5 أيام.`);
+          }
+        }
+      }
 
-    try{
-      const ref = await addDoc(collection(db, 'events'), payload);
-      if (!ref?.id) throw new Error('no id');
-      const addDaysISO = (iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
-      const tips = [`موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`, `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`];
-      showMsg(`تم الحفظ ✅ — ${tips.join(' — ')}`, false);
-      setTimeout(()=> location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(eventDate)}`, 1200);
-    }catch(err){
-      console.error(err);
-      showMsg('تعذّر الحفظ في فايربيز.', true);
+      // قاعدة 2 (معدّلة): آخر تلقيح أقل من 11 يوم → تحذير
+      const REPEAT_WARN_LT = 11;
+      if (facts.lastInsem){
+        const d = daysBetweenISO(facts.lastInsem, evISO);
+        if (d < REPEAT_WARN_LT){
+          showToast('تنبيه: الحيوان غير منتظم الشياع / استمرار — خروج (آخر تلقيح أقل من 11 يوم).');
+        }
+      }
+
+      showMsg('جاهز للتسجيل ✅');
       lockForm(false);
     }
-  }
 
-  document.getElementById('saveBtn')?.addEventListener('click', onSave);
-  document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
-    const number = (numEl?.value||'').trim();
-    if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
-    location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
-  });
-</script>
+    // تشغيل التحقق المبكر
+    document.addEventListener('DOMContentLoaded', precheckGate);
+    numEl?.addEventListener('change', precheckGate);
+    numEl?.addEventListener('blur',   precheckGate);
+    dateEl?.addEventListener('change', precheckGate);
+    dateEl?.addEventListener('blur',   precheckGate);
 
+    // onSave — يكرر التحقق السريع ثم يحفظ
+    async function onSave(){
+      lockForm(true);
 
+      const eventDate  = (dateEl?.value||'').trim();
+      if (eventDate > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); lockForm(false); return; }
+
+      if (info.classList.contains('error')) { lockForm(true); return; }
+
+      const animalNumber = (numEl?.value||'').trim();
+      const method       = (document.getElementById('inseminationMethod')?.value||'').trim();
+      const semenCode    = (document.getElementById('semenCode')?.value||'').trim();
+      const inseminator  = (document.getElementById('inseminator')?.value||'').trim();
+      const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value || '';
+      const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value || '';
+      if(!animalNumber || !eventDate || !method || !semenCode || !inseminator || !timeOfDay || !heatState){
+        showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
+        lockForm(false);
+        return;
+      }
+
+      await ensureAuth();
+      const userId = await getUid();
+      if (!userId){ showMsg('سجّل الدخول أولًا.', true); return; }
+
+      const notes = (document.getElementById('notes')?.value || '').trim();
+      const payload = {
+        userId,
+        type: 'insemination',
+        eventType: 'insemination',
+        eventDate,
+        animalNumber,
+        number: animalNumber,
+        inseminationMethod: method,
+        semenCode,
+        inseminator,
+        inseminationTime: timeOfDay,
+        heatStatus: heatState,
+        notes: notes || null,
+        source: location.pathname,
+        createdAt: serverTimestamp()
+      };
+
+      try{
+        const ref = await addDoc(collection(db, 'events'), payload);
+        if (!ref?.id) throw new Error('no id');
+        const addDaysISO = (iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+        const tips = [`موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`, `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`];
+        showMsg(`تم الحفظ ✅ — ${tips.join(' — ')}`, false);
+        setTimeout(()=> location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(eventDate)}`, 1200);
+      }catch(err){
+        console.error(err);
+        showMsg('تعذّر الحفظ في فايربيز.', true);
+        lockForm(false);
+      }
+    }
+
+    document.getElementById('saveBtn')?.addEventListener('click', onSave);
+    document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
+      const number = (numEl?.value||'').trim();
+      if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
+      location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
+    });
+  </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
