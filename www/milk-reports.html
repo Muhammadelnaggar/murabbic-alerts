@@ -6,7 +6,6 @@
   <title>تقرير اللبن — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
-  <!-- Chart.js للرسم -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff }
@@ -14,35 +13,38 @@
     body{margin:0;font-family:system-ui,'Cairo','Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0}
     .bar{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600)}
+    .title{font-weight:800;color:var(--green-600);font-size:clamp(16px,2.5vw,22px)}
     main{max-width:1100px;margin:16px auto;padding:16px;display:grid;gap:16px}
     .card{background:var(--card);border:1px solid #e2e8f0;border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .grid{display:grid;gap:12px}
     .row{display:grid;gap:12px}
-    @media(min-width:900px){ .row{grid-template-columns:repeat(4,1fr)} }
+    .row.cols-5{grid-template-columns:repeat(5,1fr)}
+    @media(max-width:900px){ .row.cols-5{grid-template-columns:1fr 1fr} }
+    @media(max-width:520px){ .row.cols-5{grid-template-columns:1fr} }
     label{font-weight:700;font-size:14px}
-    input,select{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
+    input,select,button{font-size:16px}
+    input,select{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}
     .metric{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
-    .metric .k{font-size:26px;font-weight:900}
+    .metric .k{font-size:clamp(18px,4.6vw,26px);font-weight:900}
     .muted{color:#64748b}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f7;color:#0f172a;font-weight:700}
+    .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef2f7;color:#0f172a;font-weight:700;border:1px solid #cbd5e1}
     .infobar{display:none;margin-top:8px;padding:10px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
     .infobar.show{display:block}
     .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
-    canvas{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:6px}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right}
+    .chart-wrap{height:360px}
+    @media(max-width:600px){ .chart-wrap{height:260px} }
+    canvas{background:#fff;border:1px solid #e2e8f0;border-radius:12px}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;min-width:720px}
+    th,td{padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap}
   </style>
 </head>
 <body>
   <script>window.dataLayer = window.dataLayer || [];</script>
-
   <header>
     <div class="bar">
       <div class="title">📊 تقرير اللبن</div>
       <div class="actions">
-        <a class="badge" href="dashboard.html">لوحة التحكم</a>
         <a class="badge" href="daily-milk.html">إدخال لبن يومي</a>
         <a class="badge" href="add-event.html">الأحداث</a>
       </div>
@@ -52,9 +54,9 @@
   <main>
     <!-- فلاتر -->
     <div class="card">
-      <div class="row" style="grid-template-columns:repeat(5,1fr)">
+      <div class="row cols-5">
         <div>
-          <label>تاريخ الأساس</label>
+          <label>تاريخ العرض</label>
           <input id="refDate" type="date" />
         </div>
         <div>
@@ -73,7 +75,7 @@
           </select>
         </div>
         <div style="align-self:end">
-          <button id="refreshBtn" class="badge" style="border:1px solid #cbd5e1">تحديث 🔄</button>
+          <button id="refreshBtn" class="badge">تحديث 🔄</button>
         </div>
         <div style="align-self:end">
           <span id="status" class="muted"></span>
@@ -86,7 +88,7 @@
     <div class="card">
       <div class="row">
         <div class="metric">
-          <div class="muted">إجمالي اليوم (حسب النوع)</div>
+          <div class="muted">إجمالي اليوم</div>
           <div class="k" id="kDaily">—</div>
           <div class="muted" id="kDailyBreak"></div>
         </div>
@@ -109,40 +111,38 @@
     </div>
 
     <!-- الرسم -->
-    <div class="card grid">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><b>Scatter</b> — الأفراد: (X) أيام الحليب — (Y) الإنتاج اليومي</div>
-        <div class="muted">الضغط على النقطة يفتح بطاقة الحيوان</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><b>Scatter</b> — (X) أيام الحليب — (Y) الإنتاج اليومي</div>
+        <div class="muted">اضغط على النقطة لفتح بطاقة الحيوان</div>
       </div>
-      <canvas id="scatterChart" height="330"></canvas>
+      <div class="chart-wrap"><canvas id="scatterChart"></canvas></div>
     </div>
 
     <!-- تكلفة كجم اللبن من المادة الجافة -->
-    <div class="card grid">
-      <div class="row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card">
+      <div class="row">
         <div class="metric">
-          <div class="muted">متوسط تكلفة كجم اللبن (شهر الأساس)</div>
+          <div class="muted">متوسط تكلفة كجم اللبن (شهر التقرير)</div>
           <div class="k" id="kCostPerKg">—</div>
-          <div class="muted" id="kCostNote">تحسب من أحداث التغذية (dmIntakeKg × dmCostPerKg) ÷ إجمالي اللبن.</div>
+          <div class="muted" id="kCostNote">تحسب من (dmIntakeKg × dmCostPerKg) ÷ إجمالي اللبن.</div>
         </div>
         <div class="metric">
-          <div class="muted">بيانات التغذية المستخدمة</div>
-          <div id="kCostDbg" class="muted">—</div>
-        </div>
-        <div class="metric">
-          <div class="muted">ملاحظات</div>
-          <div class="muted">في حال نقص الحقول في التغذية أو اللبن لن تُحتسب تلك السجلات.</div>
+          <div class="muted">ملخص التغذية</div>
+          <div class="muted" id="kCostDbg">—</div>
         </div>
       </div>
     </div>
 
-    <!-- لائحة مختصرة (اختياري) -->
+    <!-- أعلى 10 -->
     <div class="card">
       <div style="font-weight:800;margin-bottom:8px">أعلى 10 أفراد حسب الإنتاج اليومي</div>
-      <table class="table" id="topTable">
-        <thead><tr><th>رقم</th><th>النوع</th><th>DIM</th><th>إنتاج اليوم</th><th>حالة تناسلية</th><th>موسم</th><th>مجموعة</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>رقم</th><th>النوع</th><th>DIM</th><th>إنتاج اليوم</th><th>حالة تناسلية</th><th>موسم</th><th>مجموعة</th></tr></thead>
+          <tbody id="topBody"></tbody>
+        </table>
+      </div>
     </div>
   </main>
 
@@ -155,9 +155,7 @@
   <script type="module">
     import { db, auth, ensureAuth } from '/js/firebase-config.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import {
-      collection, query, where, orderBy, limit, getDocs
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // عناصر
     const refDateEl = document.getElementById('refDate');
@@ -166,18 +164,15 @@
     const refreshBtn = document.getElementById('refreshBtn');
     const msg = document.getElementById('msg');
     const statusEl = document.getElementById('status');
+    const topBody = document.getElementById('topBody');
 
-    const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-    const toLatin = s => String(s||'').replace(/[٠-٩۰-۹]/g, d=>DIGITS[d]).replace(/[^\d]/g,'');
-
-    // أدوات وقت
+    // أدوات
     function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
     function startOfMonthISO(d){ const x=new Date(d); x.setDate(1); return x.toISOString().slice(0,10) }
     function endOfMonthISO(d){ const x=new Date(d); x.setMonth(x.getMonth()+1); x.setDate(0); return x.toISOString().slice(0,10) }
     function startOfYearISO(d){ const x=new Date(d); x.setMonth(0,1); return x.toISOString().slice(0,10) }
     function endOfYearISO(d){ const x=new Date(d); x.setMonth(12,0); return x.toISOString().slice(0,10) }
     function daysBetweenISO(a,b){ const A=new Date(a), B=new Date(b); A.setHours(0,0,0,0); B.setHours(0,0,0,0); return Math.round((B-A)/86400000); }
-
     function fmt(n,dec=1){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString('ar-EG',{maximumFractionDigits:dec,minimumFractionDigits:dec}); }
     function showMsg(t,isErr=false){ msg.className='infobar '+(isErr?'show error':'show'); msg.innerHTML=(isErr?'❌ ':'✅ ')+t; }
 
@@ -190,13 +185,31 @@
       return s || 'أبقار';
     }
 
-    // جلب وثيقة الحيوان من animals
+    // آخر يوم لبن متاح (بصرف النظر عن refDate)
+    async function findLatestMilkDate(u){
+      const evQ = query(collection(db,'events'), where('userId','==',u), orderBy('eventDate','desc'), limit(400));
+      const snap = await getDocs(evQ);
+      for (const d of snap.docs){
+        const ev = d.data()||{};
+        const type = (ev.eventType || ev.type || '').trim();
+        if (/daily[_\s-]?milk|إنتاج اللبن اليومي|milk/i.test(type)) return ev.eventDate;
+      }
+      return null;
+    }
+
+    async function hasMilkForDate(u, dateISO){
+      const q1 = query(collection(db,'events'), where('userId','==',u), where('eventDate','==',dateISO), limit(200));
+      const s = await getDocs(q1);
+      for (const d of s.docs){
+        const ev = d.data()||{}; const type = (ev.eventType||ev.type||'').trim();
+        if (/daily[_\s-]?milk|إنتاج اللبن اليومي|milk/i.test(type)) return true;
+      }
+      return false;
+    }
+
+    // جلب وثيقة الحيوان (للتفاصيل)
     async function fetchAnimalDocByNumber(number){
-      const n = toLatin(number);
-      const { getDocs, query, where, limit, collection } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-      const tries = [
-        ['animalNumber','==',n], ['number','==',n], ['animalNo','==',n]
-      ];
+      const tries = [['animalNumber','==',number],['number','==',number],['animalNo','==',number]];
       for (const [f,op,val] of tries){
         const s = await getDocs(query(collection(db,'animals'), where(f,op,val), limit(1)));
         if (!s.empty){ const d=s.docs[0]; return { id:d.id, data:d.data()||{} }; }
@@ -204,319 +217,214 @@
       return null;
     }
 
-    // آخر ولادة لحساب DIM + آخر تشخيص للحالة التناسلية
-    async function fetchFacts(number, refDate){
-      const u = await uid();
-      const qEv = query(
-        collection(db,'events'),
-        where('userId','==', u),
-        where('animalNumber','==', String(number)),
-        orderBy('eventDate','desc'),
-        limit(80)
-      );
-      const s = await getDocs(qEv);
-      let lastCalving=null, repro='غير محدد';
-      for (const d of s.docs){
-        const ev = d.data()||{};
-        const type = (ev.eventType || ev.type || '').trim();
-        const res  = (ev.result || ev.status || '').trim();
-        if (!lastCalving && (type==='calving' || type==='ولادة')) lastCalving = ev.eventDate;
-        if (type==='pregnancy_check' || type==='تشخيص حمل'){ repro = res || repro; break; }
-      }
-      const dim = lastCalving ? Math.max(0, daysBetweenISO(lastCalving, refDate)) : null;
-      return { dim, lastCalving, repro };
-    }
-
-    // استخراج قيمة اللبن من حدث
+    // حقول اللبن
     function readMilk(ev){
       const v = ev.milkKg ?? ev.milk ?? ev.yieldKg ?? ev.yield ?? ev.liters;
       const n = Number(v);
       return isFinite(n) ? n : 0;
     }
 
-    // تصفية النوع
-    function speciesOK(spWanted, sp){
-      if (spWanted==='all') return true;
-      return sp===spWanted;
-    }
+    function speciesOK(filter, sp){ if (filter==='all') return true; return sp===filter; }
 
-    // الرسم
+    // Scatter
     let scatter;
     function drawScatter(datasets){
       const ctx = document.getElementById('scatterChart').getContext('2d');
-      if (scatter){ scatter.destroy(); }
+      if (scatter) scatter.destroy();
       scatter = new Chart(ctx,{
         type:'scatter',
         data:{ datasets },
         options:{
-          responsive:true,
+          responsive:true, maintainAspectRatio:false,
           plugins:{
             legend:{ display:true, labels:{ usePointStyle:true } },
-            tooltip:{
-              callbacks:{
-                label: (ctx)=>{
-                  const p = ctx.raw;
-                  /* p.meta: { number, milk, dim, repro, season, group } */
-                  const lines = [
-                    `رقم: ${p.meta.number}`,
-                    `DIM: ${p.meta.dim ?? '—'}`,
-                    `إنتاج: ${fmt(p.meta.milk,1)}`,
-                    `حالة تناسلية: ${p.meta.repro || '—'}`,
-                    `موسم: ${p.meta.season || '—'}`,
-                    `مجموعة: ${p.meta.group || '—'}`
-                  ];
-                  return lines;
-                }
-              }
-            }
+            tooltip:{ callbacks:{ label:(ctx)=> {
+              const p=ctx.raw.meta;
+              return [`رقم: ${p.number}`, `DIM: ${p.dim ?? '—'}`, `إنتاج: ${fmt(p.milk,1)}`, `حالة: ${p.repro||'—'}`, `موسم: ${p.season||'—'}`, `مجموعة: ${p.group||'—'}`];
+            }}}
           },
-          scales:{
-            x:{ title:{ display:true, text:'أيام الحليب (DIM)' } },
-            y:{ title:{ display:true, text:'الإنتاج اليومي' } }
-          },
-          onClick:(_, elems)=>{
-            if(!elems?.length) return;
-            const d = elems[0];
-            const meta = scatter.data.datasets[d.datasetIndex].data[d.index].meta;
-            if(meta?.number){
-              location.href = `cow-card.html?number=${encodeURIComponent(meta.number)}`;
-            }
-          }
+          scales:{ x:{ title:{display:true,text:'أيام الحليب (DIM)'}}, y:{ title:{display:true,text:'الإنتاج اليومي'} } },
+          onClick:(_,els)=>{ if(!els?.length) return; const m=scatter.data.datasets[els[0].datasetIndex].data[els[0].index].meta; if(m?.number){ location.href=`cow-card.html?number=${encodeURIComponent(m.number)}`; } }
         }
       });
     }
 
-    // تحميل بيانات التقرير
+    // تقدير عدد الحلّاب من animals
+    async function countLactating(u, filterSp){
+      const s = await getDocs(query(collection(db,'animals'), where('userId','==',u), limit(1000)));
+      let n=0, total=0;
+      s.forEach(doc=>{
+        const a=doc.data()||{}; total++;
+        const sp = normSpecies(a);
+        if (!speciesOK(filterSp, sp)) return;
+        const rs = String(a.reproductiveStatus||a.reproStatus||a.milkStatus||a.status||'').trim();
+        if (/حلاب|حليب|lact|milk/i.test(rs)) n++;
+      });
+      return { lactating:n, herd: total };
+    }
+
     async function loadReport(){
       try{
-        statusEl.textContent = 'جاري التحميل…';
+        msg.className='infobar'; msg.innerHTML=''; topBody.innerHTML='';
+        statusEl.textContent='جاري التحميل…';
         await ensureAuth();
         const u = await uid(); if(!u){ showMsg('سجّل الدخول أولًا.', true); return; }
 
-        const refDate = refDateEl.value || todayISO();
+        // اختر تاريخ التقرير: المستخدَم أو آخر متاح
+        let refDate = refDateEl.value || todayISO();
+        if (!(await hasMilkForDate(u, refDate))){
+          const last = await findLatestMilkDate(u);
+          if (last){ refDate = last; refDateEl.value = last; }
+        }
+
         const monthFrom = startOfMonthISO(refDate);
         const monthTo   = endOfMonthISO(refDate);
         const yearFrom  = startOfYearISO(refDate);
         const yearTo    = endOfYearISO(refDate);
         const filterSp  = speciesSel.value;
 
-        // ===== إنتاج اليوم/الشهر/السنة =====
-        const evQ = query(
-          collection(db,'events'),
-          where('userId','==', u),
-          where('eventDate','>=', yearFrom),
-          where('eventDate','<=', yearTo),
-          orderBy('eventDate','desc')
-        );
+        // اجلب كل أحداث السنة ثم فلتر محليًا (بسيط وسريع للحيازات الصغيرة)
+        const evQ = query(collection(db,'events'), where('userId','==',u), orderBy('eventDate','desc'), limit(2000));
         const snap = await getDocs(evQ);
 
         const daySum = { 'أبقار':0, 'جاموس':0, total:0, count:0 };
         const monthSum = { 'أبقار':0, 'جاموس':0, total:0 };
         const yearSum = { 'أبقار':0, 'جاموس':0, total:0 };
-
-        // سنحتاج هذه للسكاتر وللتوب 10
-        const dayAnimals = new Map(); // number -> {milk, event}
-        const seenNumbers = new Set();
+        const dayAnimals = new Map();
 
         for (const d of snap.docs){
-          const ev = d.data()||{};
-          const type = (ev.eventType || ev.type || '').trim();
-          const isMilkEv = /daily[_\s-]?milk|إنتاج اللبن اليومي|milk/i.test(type);
-          if (!isMilkEv) continue;
+          const ev=d.data()||{};
+          const type = (ev.eventType||ev.type||'').trim();
+          if (!/daily[_\s-]?milk|إنتاج اللبن اليومي|milk/i.test(type)) continue;
 
           const evDate = ev.eventDate;
           const milk = readMilk(ev);
           const number = String(ev.animalNumber || ev.number || ev.animalNo || '');
           if (!milk || !number) continue;
 
-          // النوع (إن لم يوجد بالحدث هنجيب لاحقًا من animals عند الحاجة)
           let sp = String(ev.species || ev.animalTypeAr || ev.animalType || '').trim();
           if (sp==='cow' || /بقر/i.test(sp)) sp='أبقار';
           else if (sp==='buffalo' || /جاموس/i.test(sp)) sp='جاموس';
 
-          // يومي
+          // يوم التقرير
           if (evDate===refDate){
-            if(!sp){ // مجهول، سنكمله لاحقًا عند بناء السكاتر
-              dayAnimals.set(number,{ milk, event:ev, species:null });
-            }else if (speciesOK(filterSp, sp)){
-              daySum[sp] = (daySum[sp]||0) + milk;
-              daySum.total += milk;
-              daySum.count += 1;
-              dayAnimals.set(number,{ milk, event:ev, species:sp });
-            }else{
-              // لو النوع لا يطابق الفلتر تجاهله من اليومي
-              dayAnimals.set(number,{ milk, event:ev, species:sp }); // يبقى للسكاتر لو أردنا
-            }
+            dayAnimals.set(number,{ milk, species:sp });
+            if (!sp) continue;
+            if (speciesOK(filterSp, sp)){ daySum[sp]=(daySum[sp]||0)+milk; daySum.total+=milk; daySum.count++; }
           }
 
-          // شهري
-          if (evDate>=monthFrom && evDate<=monthTo){
-            if (!sp){ /* سنُكمل لاحقًا */ }
-            else if (speciesOK(filterSp, sp)){
-              monthSum[sp] = (monthSum[sp]||0) + milk;
-              monthSum.total += milk;
-            }
-          }
-
-          // سنوي
+          // شهري/سنوي
           if (speciesOK(filterSp, sp)){
-            yearSum[sp] = (yearSum[sp]||0) + milk;
-            yearSum.total += milk;
+            if (evDate>=monthFrom && evDate<=monthTo){ monthSum[sp]=(monthSum[sp]||0)+milk; monthSum.total+=milk; }
+            if (evDate>=yearFrom  && evDate<=yearTo ){ yearSum[sp]=(yearSum[sp]||0)+milk; yearSum.total+=milk; }
           }
-
-          seenNumbers.add(number);
         }
 
-        // جلب أنواع/تفاصيل الحيوانات المطلوبة (لمن لا نعرف نوعه أو للـ tooltip)
+        // لو مفيش أي بيانات لهذا اليوم — أعرض تنبيه وعدّاد الحلّاب
+        if (dayAnimals.size===0){
+          const { lactating, herd } = await countLactating(u, filterSp);
+          showMsg(`لا توجد سجلات لبن لليوم ${refDate}. آخر متاح تم اختياره تلقائيًا. عدد الحلّاب التقريبي: ${lactating} من إجمالي القطيع ${herd}.`, true);
+        } else {
+          showMsg(`تم التحميل ليوم ${refDate} ✅`);
+        }
+
+        // استكمال بيانات الحيوانات للرسم
         const animalsMeta = new Map();
-        for (const number of dayAnimals.keys()){
-          try{
-            const ad = await fetchAnimalDocByNumber(number);
-            if (ad){
-              const a = ad.data;
-              animalsMeta.set(number, {
-                species: normSpecies(a),
-                group: a.group || a.groupName || a.pen || '',
-                season: a.season || a.seasonName || '',
-                repro: a.reproductiveStatus || a.reproStatus || ''
-              });
-            }else{
-              animalsMeta.set(number, { species:'أبقار', group:'', season:'', repro:'' });
-            }
-          }catch{ animalsMeta.set(number, { species:'أبقار' }); }
+        for (const num of dayAnimals.keys()){
+          const ad = await fetchAnimalDocByNumber(num);
+          animalsMeta.set(num, ad ? {
+            species: normSpecies(ad.data),
+            group: ad.data.group || ad.data.groupName || ad.data.pen || '',
+            season: ad.data.season || ad.data.seasonName || '',
+            repro: ad.data.reproductiveStatus || ad.data.reproStatus || ''
+          } : { species:'أبقار', group:'', season:'', repro:'' });
         }
 
-        // أكمل النوع المجهول وأعد الحساب اليومي حسب الفلتر
-        if (filterSp!=='all'){
-          // إعادة تصفير اليومي وإعادة الجمع بعد استكمال الأنواع
-          daySum['أبقار']=0; daySum['جاموس']=0; daySum.total=0; daySum.count=0;
-          for (const [num, v] of dayAnimals.entries()){
-            const sp = v.species || animalsMeta.get(num)?.species || 'أبقار';
-            if (speciesOK(filterSp, sp) && v.event?.eventDate===refDate){
-              daySum[sp] += v.milk; daySum.total += v.milk; daySum.count += 1;
-            }
-          }
-        }
-
-        // عرض المؤشرات
+        // تحديث المؤشرات
         document.getElementById('kDaily').textContent   = fmt(daySum.total,1);
         document.getElementById('kDailyBreak').textContent = `أبقار: ${fmt(daySum['أبقار'],1)} — جاموس: ${fmt(daySum['جاموس'],1)}`;
-
         document.getElementById('kMonthly').textContent = fmt(monthSum.total,1);
         document.getElementById('kMonthlyBreak').textContent = `أبقار: ${fmt(monthSum['أبقار'],1)} — جاموس: ${fmt(monthSum['جاموس'],1)}`;
-
         document.getElementById('kYearly').textContent  = fmt(yearSum.total,1);
         document.getElementById('kYearlyBreak').textContent = `أبقار: ${fmt(yearSum['أبقار'],1)} — جاموس: ${fmt(yearSum['جاموس'],1)}`;
 
-        const avg = daySum.count ? (daySum.total / daySum.count) : 0;
+        const avg = daySum.count ? (daySum.total/daySum.count) : 0;
         document.getElementById('kAvg').textContent = fmt(avg,1);
-        document.getElementById('kAvgNote').textContent = `مبني على ${daySum.count} حيوان لديه إدخال لبن اليوم.`;
+        document.getElementById('kAvgNote').textContent = `على ${daySum.count} سجل لبن يومي.`;
 
-        // ===== Scatter =====
-        const dsCows = { label:'أبقار', data:[], pointRadius:5, showLine:false };
-        const dsBuff = { label:'جاموس', data:[], pointRadius:5, showLine:false };
+        // Scatter + Top10
+        const dsCows={label:'أبقار',data:[],pointRadius:5,showLine:false};
+        const dsBuff={label:'جاموس',data:[],pointRadius:5,showLine:false};
+        const rows=[];
 
-        const rowsForTop = [];
-
-        for (const [number, rec] of dayAnimals.entries()){
-          const meta = animalsMeta.get(number) || {};
+        for (const [number, v] of dayAnimals.entries()){
+          const meta = animalsMeta.get(number)||{};
           const sp = meta.species || 'أبقار';
+          if (!speciesOK(speciesSel.value, sp)) continue;
 
-          if (!speciesOK(filterSp, sp)) continue;
+          // حساب DIM من آخر ولادة (سريع عبر events المرتبة)
+          let dim=null, repro=meta.repro||'';
+          const evQ2 = query(collection(db,'events'), where('userId','==',u), where('animalNumber','==',number), orderBy('eventDate','desc'), limit(40));
+          const s2 = await getDocs(evQ2);
+          for (const d of s2.docs){
+            const ev=d.data()||{}; const t=(ev.eventType||ev.type||'').trim();
+            if (!dim && (t==='ولادة'||t==='calving')) dim = Math.max(0, daysBetweenISO(ev.eventDate, refDate));
+            if ((t==='pregnancy_check'||t==='تشخيص حمل') && !repro) repro = ev.result || ev.status || '';
+            if (dim!=null && repro) break;
+          }
 
-          // DIM + حالة تناسلية
-          const facts = await fetchFacts(number, refDate);
-          const dim = facts.dim ?? null;
-          const season = meta.season || inferSeason(refDate);
-          const point = {
-            x: dim ?? 0,
-            y: rec.milk,
-            meta: {
-              number, milk: rec.milk, dim,
-              repro: facts.repro || meta.repro || '',
-              season, group: meta.group || ''
-            }
-          };
-          (sp==='جاموس' ? dsBuff : dsCows).data.push(point);
-
-          rowsForTop.push({
-            number, species: sp, dim: dim ?? '—',
-            milk: rec.milk,
-            repro: point.meta.repro || '—',
-            season, group: point.meta.group || '—'
-          });
+          const point={ x: dim??0, y: v.milk, meta:{ number, milk:v.milk, dim, repro, season:meta.season||inferSeason(refDate), group:meta.group||'' } };
+          (sp==='جاموس'?dsBuff:dsCows).data.push(point);
+          rows.push({ number, species:sp, dim:dim??'—', milk:v.milk, repro:point.meta.repro||'—', season:point.meta.season, group:point.meta.group||'—' });
         }
 
         drawScatter([dsCows, dsBuff]);
-
-        // Top 10
-        rowsForTop.sort((a,b)=>b.milk-a.milk);
-        const tb = document.querySelector('#topTable tbody');
-        tb.innerHTML = rowsForTop.slice(0,10).map(r=>`<tr>
+        rows.sort((a,b)=>b.milk-a.milk);
+        topBody.innerHTML = rows.slice(0,10).map(r=>`<tr>
           <td><a href="cow-card.html?number=${encodeURIComponent(r.number)}">${r.number}</a></td>
           <td>${r.species}</td><td>${r.dim}</td><td>${fmt(r.milk,1)}</td>
           <td>${r.repro}</td><td>${r.season}</td><td>${r.group}</td>
         </tr>`).join('');
 
-        // ===== تكلفة كجم اللبن من المادة الجافة (شهري) =====
-        const nutritQ = query(
-          collection(db,'events'),
-          where('userId','==', u),
-          where('eventDate','>=', monthFrom),
-          where('eventDate','<=', monthTo),
-          orderBy('eventDate','desc')
-        );
+        // تغذية (شهريًا)
+        const nutritQ = query(collection(db,'events'), where('userId','==',u), where('eventDate','>=',startOfMonthISO(refDate)), where('eventDate','<=',endOfMonthISO(refDate)), orderBy('eventDate','desc'));
         const nutritSnap = await getDocs(nutritQ);
-
-        let dmCostTotal = 0, milkMonthTotal = monthSum.total;
-        let mealsCount=0;
-
+        let dmCostTotal=0, mealsCount=0;
         for (const d of nutritSnap.docs){
-          const ev = d.data()||{};
-          const type = (ev.eventType || ev.type || '').trim();
-          const isNut = /nutrition|تغذية/i.test(type);
-          if (!isNut) continue;
-
-          const intake = Number(ev.dmIntakeKg ?? ev.dmKg ?? ev.dm_intake);
-          const costKg = Number(ev.dmCostPerKg ?? ev.rationCostPerKgDM ?? ev.dm_cost);
-
-          if (isFinite(intake) && isFinite(costKg) && intake>0 && costKg>=0){
-            dmCostTotal += (intake * costKg);
-            mealsCount++;
-          }
+          const ev=d.data()||{}; const t=(ev.eventType||ev.type||'').trim();
+          if (!/nutrition|تغذية/i.test(t)) continue;
+          const intake=Number(ev.dmIntakeKg ?? ev.dmKg ?? ev.dm_intake);
+          const costKg=Number(ev.dmCostPerKg ?? ev.rationCostPerKgDM ?? ev.dm_cost);
+          if (isFinite(intake)&&isFinite(costKg)&&intake>0&&costKg>=0){ dmCostTotal+=intake*costKg; mealsCount++; }
         }
-        const costPerKg = (milkMonthTotal>0 && dmCostTotal>0) ? (dmCostTotal / milkMonthTotal) : 0;
-        document.getElementById('kCostPerKg').textContent = costPerKg ? `${fmt(costPerKg,2)} / كجم` : '—';
-        document.getElementById('kCostDbg').textContent = `سجلات تغذية محسوبة: ${mealsCount} — إجمالي لبن الشهر: ${fmt(milkMonthTotal,0)} كجم`;
+        const costPerKg=(monthSum.total>0 && dmCostTotal>0)? (dmCostTotal/monthSum.total) : 0;
+        document.getElementById('kCostPerKg').textContent = costPerKg? `${fmt(costPerKg,2)} / كجم` : '—';
+        document.getElementById('kCostDbg').textContent = `سجلات تغذية محسوبة: ${mealsCount} — إجمالي لبن الشهر: ${fmt(monthSum.total,0)} كجم`;
 
         statusEl.textContent = `آخر تحديث: ${new Date().toLocaleTimeString('ar-EG')}`;
-        showMsg('تم تحديث التقرير ✅');
       }catch(e){
         console.error(e);
         showMsg('تعذّر تحميل التقرير.', true);
-        statusEl.textContent = 'خطأ في التحميل';
+        statusEl.textContent='خطأ في التحميل';
       }
     }
 
     function inferSeason(dateISO){
       const m = new Date(dateISO).getMonth()+1;
-      // تقسيم مبسّط
       if ([12,1,2].includes(m)) return 'شتاء';
       if ([3,4,5].includes(m))  return 'ربيع';
       if ([6,7,8].includes(m))  return 'صيف';
       return 'خريف';
     }
 
-    // إقلاع
+    // إقلاع وتحديث
     document.addEventListener('DOMContentLoaded', ()=>{
-      const today = todayISO();
-      refDateEl.value = today;
+      refDateEl.value = todayISO();
       loadReport();
     });
     refreshBtn.addEventListener('click', loadReport);
     refDateEl.addEventListener('change', loadReport);
     speciesSel.addEventListener('change', loadReport);
-    unitSel.addEventListener('change', loadReport);
   </script>
 </body>
 </html>
