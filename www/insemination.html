@@ -9,20 +9,10 @@
   <style>
     /* شريط تنبيه أعلى الصفحة (داخل الهيدر) */
     .alertbar{
-      display:none;
-      padding:12px 16px;
-      font-weight:700;
-      text-align:center;
-      border-top:1px solid #fed7aa;
-      border-bottom:1px solid #fed7aa;
-      background:#fff7ed; /* افتراضي: خطأ */
-      color:#9a3412;
+      display:none;padding:12px 16px;font-weight:700;text-align:center;
+      border-top:1px solid #fed7aa;border-bottom:1px solid #fed7aa;background:#fff7ed;color:#9a3412
     }
-    .alertbar.ok{
-      background:#ecfdf5;
-      border-color:#bbf7d0;
-      color:#065f46;
-    }
+    .alertbar.ok{ background:#ecfdf5;border-color:#bbf7d0;color:#065f46 }
     .alertbar.show{ display:block }
 
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c }
@@ -35,7 +25,8 @@
     .card{background:var(--card);border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     .grid{display:grid;grid-template-columns:1fr;gap:12px}
     label{font-weight:600;font-size:14px;color:#0f172a}
-    input,select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
+    input,select,textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px}
+    textarea{min-height:96px;resize:vertical}
     .row{display:grid;gap:12px}
     @media(min-width:720px){.row{grid-template-columns:repeat(3,1fr)}}
     .radio-group{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px}
@@ -46,9 +37,21 @@
     .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
     .infobar.show{display:block}
     .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
-
-    /* Toast داخل النموذج (تستخدم نفس صندوق الرسائل) */
     .toast{display:block}
+
+    /* تبويب وضع الإدخال */
+    .modes{display:flex;gap:8px;margin:0 auto 12px;max-width:920px}
+    .seg{flex:1;background:#eef2f7;border:1px solid #e2e8f0;color:#0f172a;padding:10px;border-radius:10px;font-weight:800;cursor:pointer}
+    .seg.active{background:#0ea05a;color:#fff;border-color:#0ea05a}
+
+    /* جدول نتائج الإدخال الجماعي */
+    .bulk-table{width:100%;border-collapse:separate;border-spacing:0 8px;margin-top:10px}
+    .bulk-table th{font-size:13px;color:#475569;text-align:right;padding:6px 8px}
+    .bulk-table td{background:#fff;border:1px solid #e2e8f0;padding:10px 12px;border-radius:10px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px}
+    .ok .badge{background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0}
+    .warn .badge{background:#fffbeb;color:#78350f;border:1px solid #fde68a}
+    .err .badge{background:#fff1f2;color:#9f1239;border:1px solid #fecdd3}
   </style>
 </head>
 <body>
@@ -62,8 +65,15 @@
     <div id="alertBar" class="alertbar" role="alert" aria-live="assertive"></div>
   </header>
 
+  <!-- تبويب الوضع -->
+  <div class="modes">
+    <button id="modeSingle" class="seg active">إدخال فردي</button>
+    <button id="modeBulk" class="seg">إدخال جماعي</button>
+  </div>
+
   <main>
-    <div class="card grid" id="formCard">
+    <!-- === فردي === -->
+    <div class="card grid" id="singleCard">
       <div class="row">
         <div>
           <label>رقم الحيوان <span style="color:red">*</span></label>
@@ -123,6 +133,71 @@
 
       <div id="info" class="infobar"></div>
     </div>
+
+    <!-- === جماعي === -->
+    <div class="card grid" id="bulkCard" style="display:none">
+      <div class="row">
+        <div>
+          <label>تاريخ التلقيح (مشترك) <span style="color:red">*</span></label>
+          <input id="bulkDate" type="date" required />
+        </div>
+        <div>
+          <label>طريقة التلقيح <span style="color:red">*</span></label>
+          <select id="bulkMethod" required>
+            <option value="">اختر...</option>
+            <option value="طبيعي">طبيعي</option>
+            <option value="اصطناعي">اصطناعي</option>
+          </select>
+        </div>
+        <div>
+          <label>نمط الإدخال <span style="color:red">*</span></label>
+          <select id="bulkMode" required>
+            <option value="heat">عن طريق الشياع</option>
+            <option value="program">إجباري / برنامج تزامن</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>كود السائل المنوي <span style="color:red">*</span></label>
+          <input id="bulkSemen" placeholder="مثال: BULL123" required />
+        </div>
+        <div>
+          <label>اسم الملقّح <span style="color:red">*</span></label>
+          <input id="bulkInseminator" placeholder="اسم الملقّح" required list="inseminatorsList" />
+        </div>
+        <div>
+          <label>وقت التلقيح <span style="color:red">*</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="bulkTime" value="صباحا" required /> صباحا</label>
+            <label><input type="radio" name="bulkTime" value="مساءا" /> مساءا</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div id="bulkHeatWrap">
+          <label>حالة الشياع <span style="color:red">*</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="bulkHeat" value="صباحا" required /> صباحا</label>
+            <label><input type="radio" name="bulkHeat" value="مساءا" /> مساءا</label>
+          </div>
+        </div>
+        <div style="grid-column: span 2">
+          <label>أرقام الحيوانات (سطر لكل رقم أو مفصول بفواصل) <span style="color:red">*</span></label>
+          <textarea id="bulkNumbers" placeholder="مثال: 1023, 1040, 2215&#10;أو: 1023&#10;1040&#10;2215"></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="ghost" id="bulkCheckBtn">تحقق من الجميع</button>
+        <button type="button" class="save" id="bulkSaveBtn" disabled>حفظ المحدد ✅</button>
+      </div>
+
+      <div id="bulkInfo" class="infobar"></div>
+      <div id="bulkTableWrap"></div>
+    </div>
   </main>
 
   <!-- ترتيب التحميل -->
@@ -145,9 +220,11 @@
 
         const numEl  = document.getElementById('animalNumber');
         const dateEl = document.getElementById('eventDate');
+        const bulkDate = document.getElementById('bulkDate');
 
         if (numEl && num)           numEl.value  = num;
         if (dateEl && !dateEl.value) dateEl.value = dt || todayISO();
+        if (bulkDate && !bulkDate.value) bulkDate.value = dt || todayISO();
       });
     })();
   </script>
@@ -161,38 +238,40 @@
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    // عناصر الصفحة
+    // عناصر أساسية
     const info     = document.getElementById('info');
     const numEl    = document.getElementById('animalNumber');
     const dateEl   = document.getElementById('eventDate');
     const saveBtn  = document.getElementById('saveBtn');
+    const alertBar = document.getElementById('alertBar');
+
+    // وضع الإدخال
+    const singleCard = document.getElementById('singleCard');
+    const bulkCard   = document.getElementById('bulkCard');
+    const modeSingle = document.getElementById('modeSingle');
+    const modeBulk   = document.getElementById('modeBulk');
+
+    modeSingle.addEventListener('click', ()=>{ modeSingle.classList.add('active'); modeBulk.classList.remove('active'); singleCard.style.display='grid'; bulkCard.style.display='none'; });
+    modeBulk  .addEventListener('click', ()=>{ modeBulk.classList.add('active'); modeSingle.classList.remove('active'); bulkCard.style.display='grid'; singleCard.style.display='none'; });
 
     // رسائل
     function showMsg(text, isErr=false){
-      const info = document.getElementById('info');     // الرسالة داخل الكارت
-      const bar  = document.getElementById('alertBar'); // الشريط العلوي
-
       const msg = (isErr ? '❌ ' : '✅ ') + text;
-
       if (info){
         info.className = 'infobar ' + (isErr ? 'show error' : 'show');
-        info.setAttribute('role','status');
-        info.setAttribute('aria-live','polite');
+        info.setAttribute('role','status'); info.setAttribute('aria-live','polite');
         info.innerHTML = msg;
       }
-      if (bar){
-        bar.className = 'alertbar show' + (isErr ? '' : ' ok');
-        bar.innerHTML = msg;
+      if (alertBar){
+        alertBar.className = 'alertbar show' + (isErr ? '' : ' ok');
+        alertBar.innerHTML = msg;
         if (!isErr){
           clearTimeout(window.__alertHide);
-          window.__alertHide = setTimeout(()=>{
-            bar.className = 'alertbar';
-            bar.innerHTML = '';
-          }, 3500);
+          window.__alertHide = setTimeout(()=>{ alertBar.className='alertbar'; alertBar.innerHTML=''; }, 3500);
         }
       }
     }
-    function showToast(text){ showMsg(text,false); info.classList.add('toast'); }
+    function showToast(text){ showMsg(text,false); info?.classList.add('toast'); }
 
     // أدوات مساعدة
     function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
@@ -260,11 +339,11 @@
       return { lastCalving, lastAbort, lastInsem, pregnant };
     }
 
-    // قفل/فتح الحقول (نفس سلوك الولادة)
+    // قفل/فتح (فردي)
     function lockForm(disabled=true){
-      document.querySelectorAll('input,select,button').forEach(el=>{
+      document.querySelectorAll('#singleCard input,#singleCard select,#singleCard button').forEach(el=>{
         const id = el.id || '';
-        if (id==='animalNumber' || id==='eventDate' || id==='toCardBtn') return; // سيب الأساسيات
+        if (id==='animalNumber' || id==='eventDate' || id==='toCardBtn') return;
         el.disabled = disabled;
       });
       if (saveBtn) saveBtn.disabled = disabled;
@@ -308,7 +387,9 @@
     }
     document.addEventListener('DOMContentLoaded', loadInseminators);
 
-    // التحقق المبدئي قبل الحفظ
+    /* =========================
+       التحقق المبدئي — فردي
+       ========================= */
     async function precheckGate(){
       lockForm(true);
       showMsg('جارِ التحقق المبدئي من الرقم والتاريخ…');
@@ -316,7 +397,6 @@
       const number = (numEl?.value||'').trim();
       const evISO  = (dateEl?.value||'').trim() || todayISO();
       if (!number){ showMsg('أدخل رقم الحيوان أولًا.', true); return; }
-
       if (evISO > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل.', true); return; }
 
       await ensureAuth();
@@ -361,10 +441,9 @@
       }
 
       // قاعدة 2 (معدّلة): آخر تلقيح أقل من 11 يوم → تحذير
-      const REPEAT_WARN_LT = 11;
       if (facts.lastInsem){
         const d = daysBetweenISO(facts.lastInsem, evISO);
-        if (d < REPEAT_WARN_LT){
+        if (d < 11){
           showToast('تنبيه: الحيوان غير منتظم الشياع / استمرار — خروج (آخر تلقيح أقل من 11 يوم).');
         }
       }
@@ -373,20 +452,20 @@
       lockForm(false);
     }
 
-    // تشغيل التحقق المبكر
     document.addEventListener('DOMContentLoaded', precheckGate);
     numEl?.addEventListener('change', precheckGate);
     numEl?.addEventListener('blur',   precheckGate);
     dateEl?.addEventListener('change', precheckGate);
     dateEl?.addEventListener('blur',   precheckGate);
 
-    // onSave — يكرر التحقق السريع ثم يحفظ
+    /* ================
+       حفظ — فردي
+       ================ */
     async function onSave(){
       lockForm(true);
 
       const eventDate  = (dateEl?.value||'').trim();
       if (eventDate > todayISO()){ showMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل', true); lockForm(false); return; }
-
       if (info.classList.contains('error')) { lockForm(true); return; }
 
       const animalNumber = (numEl?.value||'').trim();
@@ -396,9 +475,7 @@
       const timeOfDay    = document.querySelector('input[name="inseminationTime"]:checked')?.value || '';
       const heatState    = document.querySelector('input[name="heatStatus"]:checked')?.value || '';
       if(!animalNumber || !eventDate || !method || !semenCode || !inseminator || !timeOfDay || !heatState){
-        showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true);
-        lockForm(false);
-        return;
+        showMsg('جميع الحقول مطلوبة ماعدا الملاحظات', true); lockForm(false); return;
       }
 
       await ensureAuth();
@@ -407,20 +484,11 @@
 
       const notes = (document.getElementById('notes')?.value || '').trim();
       const payload = {
-        userId,
-        type: 'insemination',
-        eventType: 'insemination',
-        eventDate,
-        animalNumber,
-        number: animalNumber,
-        inseminationMethod: method,
-        semenCode,
-        inseminator,
-        inseminationTime: timeOfDay,
-        heatStatus: heatState,
-        notes: notes || null,
-        source: location.pathname,
-        createdAt: serverTimestamp()
+        userId, type:'insemination', eventType:'insemination',
+        eventDate, animalNumber, number: animalNumber,
+        inseminationMethod: method, semenCode, inseminator,
+        inseminationTime: timeOfDay, heatStatus: heatState,
+        notes: notes || null, source: location.pathname, createdAt: serverTimestamp()
       };
 
       try{
@@ -431,18 +499,204 @@
         showMsg(`تم الحفظ ✅ — ${tips.join(' — ')}`, false);
         setTimeout(()=> location.href = `add-event.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(eventDate)}`, 1200);
       }catch(err){
-        console.error(err);
-        showMsg('تعذّر الحفظ في فايربيز.', true);
-        lockForm(false);
+        console.error(err); showMsg('تعذّر الحفظ في فايربيز.', true); lockForm(false);
       }
     }
-
     document.getElementById('saveBtn')?.addEventListener('click', onSave);
     document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
       const number = (numEl?.value||'').trim();
       if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
       location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
     });
+
+    /* =========================
+       إدخال جماعي — helpers
+       ========================= */
+    function getBulkInputs(){
+      const date = (document.getElementById('bulkDate')?.value || '').trim();
+      const method = (document.getElementById('bulkMethod')?.value || '').trim();
+      const mode   = (document.getElementById('bulkMode')?.value || 'heat').trim();
+      const semen  = (document.getElementById('bulkSemen')?.value || '').trim();
+      const tech   = (document.getElementById('bulkInseminator')?.value || '').trim();
+      const time   = document.querySelector('input[name="bulkTime"]:checked')?.value || '';
+      const heatEl = document.querySelector('input[name="bulkHeat"]:checked');
+      const heat   = (mode==='heat') ? (heatEl?.value || '') : 'برنامج';
+      const rawNums= (document.getElementById('bulkNumbers')?.value || '').trim();
+
+      // قائمة أرقام: سطر/فواصل/مسافات
+      const numbers = rawNums
+        .split(/[\s,;]+/).map(toLatin).filter(Boolean);
+
+      return { date, method, mode, semen, tech, time, heat, numbers };
+    }
+    function setBulkHeatRequired(){
+      const mode = (document.getElementById('bulkMode')?.value || 'heat');
+      const wrap = document.getElementById('bulkHeatWrap');
+      wrap.style.opacity = (mode==='heat') ? '1' : '0.5';
+      wrap.querySelectorAll('input[name="bulkHeat"]').forEach(r=>{
+        r.required = (mode==='heat');
+        r.disabled = (mode!=='heat');
+      });
+    }
+    document.getElementById('bulkMode')?.addEventListener('change', setBulkHeatRequired);
+    document.addEventListener('DOMContentLoaded', setBulkHeatRequired);
+
+    const bulkInfo = document.getElementById('bulkInfo');
+    function bulkMsg(text,isErr=false){
+      bulkInfo.className = 'infobar ' + (isErr ? 'show error' : 'show');
+      bulkInfo.innerHTML = (isErr?'❌ ':'✅ ')+text;
+      alertBar.className = 'alertbar show' + (isErr ? '' : ' ok');
+      alertBar.innerHTML = (isErr?'❌ ':'✅ ')+text;
+    }
+
+    // نفس قواعد الفردي ولكن تُرجِع حالة لكل حيوان
+    async function validateOne(number, eventDate){
+      const result = { number, status:'OK', messages:[], species:'أبقار', facts:{} };
+
+      const a = await fetchAnimalDocByNumber(number);
+      if (!a){ result.status='ERROR'; result.messages.push('رقم غير موجود'); return result; }
+
+      result.species = normSpecies(a.data);
+      const facts = await fetchFacts(number);
+      result.facts = facts;
+
+      const reproFromDoc = (a.data.reproductiveStatus || a.data.reproStatus || '').trim();
+      const isPreg = (facts.pregnant !== null) ? facts.pregnant : (reproFromDoc === 'عشار');
+      if (isPreg){ result.status='ERROR'; result.messages.push('الحيوان مُسجّل عِشار — يلزم تشخيص حمل قبل التلقيح'); return result; }
+
+      if (facts.lastCalving){
+        const isFirstAfterCalving = !(facts.lastInsem && facts.lastInsem >= facts.lastCalving);
+        if (isFirstAfterCalving){
+          const minDays = FIRST_INSEM_MIN[result.species] ?? 60;
+          const gap     = daysBetweenISO(facts.lastCalving, eventDate);
+          if (gap < (minDays - 5)){ result.status='ERROR'; result.messages.push(`مبكر جدًا: التلقيح الأول بعد الولادة ≥ ${minDays} يوم (${result.species})`); }
+          else if (gap < minDays){ result.status = (result.status==='OK'?'WARN':result.status); result.messages.push(`مبكر بـ ${minDays-gap} يوم (مسموح سماح 5 أيام)`); }
+        }
+      }
+
+      if (facts.lastInsem){
+        const d = daysBetweenISO(facts.lastInsem, eventDate);
+        if (d < 11){ result.status = (result.status==='OK'?'WARN':result.status); result.messages.push('آخر تلقيح أقل من 11 يوم'); }
+      }
+      if (result.messages.length===0) result.messages.push('جاهز للتسجيل');
+      return result;
+    }
+
+    function renderBulkTable(rows){
+      const wrap = document.getElementById('bulkTableWrap');
+      if (!rows.length){ wrap.innerHTML=''; document.getElementById('bulkSaveBtn').disabled = true; return; }
+      const okToSave = rows.filter(r=>r.status!=='ERROR').length;
+
+      const html = `
+        <table class="bulk-table">
+          <thead>
+            <tr>
+              <th>رقم الحيوان</th>
+              <th>الحالة</th>
+              <th>تفاصيل</th>
+              <th>حفظ؟</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r=>`
+              <tr class="${r.status==='OK'?'ok':r.status==='WARN'?'warn':'err'}">
+                <td>${r.number}</td>
+                <td><span class="badge">${r.status==='OK'?'سليم':r.status==='WARN'?'تحذير':'خطأ'}</span></td>
+                <td>${r.messages.join(' — ')}</td>
+                <td style="text-align:center">
+                  ${r.status==='ERROR'
+                    ? '<input type="checkbox" disabled />'
+                    : `<input type="checkbox" class="bulk-ck" data-num="${r.number}" checked />`}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+      wrap.innerHTML = html;
+      document.getElementById('bulkSaveBtn').disabled = (okToSave===0);
+    }
+
+    // تحقق جماعي
+    document.getElementById('bulkCheckBtn')?.addEventListener('click', async ()=>{
+      try{
+        await ensureAuth();
+        const uid = await getUid(); if(!uid){ bulkMsg('سجّل الدخول أولًا.', true); return; }
+
+        const { date, method, mode, semen, tech, time, heat, numbers } = getBulkInputs();
+        if (!date || !method || !semen || !tech || !time){ bulkMsg('أكمل الحقول المشتركة أولًا.', true); return; }
+        if (mode==='heat' && !heat){ bulkMsg('اختر حالة الشياع (للشياع فقط).', true); return; }
+        if (!numbers.length){ bulkMsg('أدخل أرقام الحيوانات.', true); return; }
+        if (date > todayISO()){ bulkMsg('تاريخ التلقيح لا يمكن أن يكون في المستقبل.', true); return; }
+
+        bulkMsg(`جارِ التحقق لـ ${numbers.length} حيوان…`);
+        const results = [];
+        for (const n of numbers){
+          // تحقق لكل رقم
+          try{
+            const r = await validateOne(n, date);
+            results.push(r);
+          }catch(e){
+            results.push({ number:n, status:'ERROR', messages:['تعذّر التحقق'] });
+          }
+        }
+        const ok  = results.filter(r=>r.status==='OK').length;
+        const wan = results.filter(r=>r.status==='WARN').length;
+        const err = results.filter(r=>r.status==='ERROR').length;
+
+        bulkMsg(`تم التحقق: سليم ${ok} — تحذير ${wan} — خطأ ${err}.${wan? ' يمكنك الحفظ مع التحذير.':''}`);
+        renderBulkTable(results);
+        // خزّن مؤقتًا للاستخدام عند الحفظ
+        window.__bulkResults = results;
+      }catch(e){
+        console.error(e); bulkMsg('تعذّر تنفيذ التحقق الجماعي.', true);
+      }
+    });
+
+    // حفظ جماعي
+    document.getElementById('bulkSaveBtn')?.addEventListener('click', async ()=>{
+      try{
+        await ensureAuth();
+        const uid = await getUid(); if(!uid){ bulkMsg('سجّل الدخول أولًا.', true); return; }
+
+        const { date, method, mode, semen, tech, time, heat } = getBulkInputs();
+        const checked = Array.from(document.querySelectorAll('.bulk-ck:checked')).map(x=>x.getAttribute('data-num'));
+        if (!checked.length){ bulkMsg('لم يتم اختيار أي حيوان للحفظ.', true); return; }
+
+        bulkMsg(`جارِ الحفظ لـ ${checked.length} حيوان…`);
+
+        let ok=0, fail=0;
+        for (const number of checked){
+          const payload = {
+            userId: uid,
+            type:'insemination', eventType:'insemination',
+            eventDate: date, animalNumber:number, number,
+            inseminationMethod: method, semenCode: semen, inseminator: tech,
+            inseminationTime: time,
+            heatStatus: (mode==='heat'? heat : 'برنامج'),
+            notes: null, source: location.pathname, createdAt: serverTimestamp()
+          };
+          try{
+            const ref = await addDoc(collection(db,'events'), payload);
+            if (ref?.id) ok++; else fail++;
+          }catch(e){
+            console.warn('bulk save failed for', number, e);
+            fail++;
+          }
+        }
+
+        bulkMsg(`تم الحفظ: ناجح ${ok} / فشل ${fail}. ${ok? '✅':''} ${fail? '❌':''}`, fail>0);
+        if (ok>0){
+          // إعادة تمكين/تحديث الجدول: ألغِ اختيار العناصر التي حُفظت
+          document.querySelectorAll('.bulk-ck:checked').forEach(ck=>{ ck.checked=false; ck.disabled=true; });
+          document.getElementById('bulkSaveBtn').disabled = true;
+        }
+      }catch(e){
+        console.error(e); bulkMsg('تعذّر الحفظ الجماعي.', true);
+      }
+    });
+
+    // فتح بطاقة الحيوان من وضع فردي
+    // (موجود بالفعل فوق)
   </script>
 </body>
 </html>
