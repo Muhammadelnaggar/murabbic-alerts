@@ -7,10 +7,7 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a;
-      --muted:#64748b; --card:#fff; --border:#e2e8f0;
-    }
+    :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a; --muted:#64748b; --card:#fff; --border:#e2e8f0; }
     *{box-sizing:border-box}
     body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border)}
@@ -36,8 +33,7 @@
 
     /* الهنت الخارجي للنقاط */
     .hint{
-      position:absolute; inset:auto auto 0 0; /* سنتبدّلها برمجياً */
-      z-index:20; min-width:220px; max-width:90vw;
+      position:absolute; z-index:20; min-width:220px; max-width:90vw;
       padding:10px 12px; border:1px solid var(--border); border-radius:12px;
       background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
       font-size:14px; line-height:1.5; color:var(--text);
@@ -131,7 +127,8 @@
 <script type="module">
   import { db, auth } from '/js/firebase-config.js';
   import {
-    collection, query, where, orderBy, limit, getDocs, startAt, endBefore
+    collection, query, where, orderBy, limit, getDocs,
+    startAt, endBefore
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
@@ -140,6 +137,8 @@
   const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
   const TYPES = ['لبن يومي','milk','daily_milk'];
   const CALVING_TYPES = ['ولادة','calving','Calving','birth','Birth','ولاده','ولادة طبيعية'];
+
+  const chunk = (arr, n=10)=>{ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; };
 
   function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
   const ymd = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO();
@@ -156,7 +155,7 @@
     return u?.uid || '';
   }
 
-  // ---------- Flexible queries ----------
+  // ---------- Milk queries ----------
   async function qLatestDate(uid){
     for (const withUser of [true,false]){
       for (const t of TYPES){
@@ -200,21 +199,7 @@
     return [];
   }
 
-  // --- fetch animal doc by number (fallback DIM) ---
-  async function fetchAnimalDocByNumber(number){
-    const raw = String(number||'').trim().replace(/[٠-٩۰-۹]/g,d=>DIGITS[d]).replace(/[^\d]/g,'');
-    const asStr = raw, asNum = raw ? Number(raw) : NaN;
-    const tries = [
-      ['animalNumber','==',asStr], ['animalNumber','==',asNum],
-      ['number','==',asStr],       ['number','==',asNum],
-      ['animalNo','==',asStr],     ['animalNo','==',asNum],
-    ].filter(t => !(typeof t[2]==='number' && Number.isNaN(t[2])));
-    for (const [f,op,val] of tries){
-      const s = await getDocs(query(collection(db,'animals'), where(f,op,val), limit(1)));
-      if (!s.empty){ const d=s.docs[0]; return { id:d.id, data:d.data()||{} }; }
-    }
-    return null;
-  }
+  // ---------- Fast DIM map (bulk) ----------
   function toISOAny(v){
     if (!v) return null;
     if (typeof v==='string'){
@@ -226,23 +211,183 @@
     if (v?.seconds){ const d=new Date(v.seconds*1000); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
     return null;
   }
-  async function qLastCalving(uid, animalNumber){
-    const num = String(animalNumber||'').trim();
-    for (const withUser of [true,false]){
-      for (const t of CALVING_TYPES){
-        const q1 = withUser && uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('animalNumber','==',num), where('eventType','==',t), orderBy('eventDate','desc'), limit(1))
-          : query(collection(db,'events'), where('animalNumber','==',num), where('eventType','==',t), orderBy('eventDate','desc'), limit(1));
+
+  async function bulkAnimalsCalving(numbers){
+    const out = new Map(); // number -> lastCalvingISO
+    const fields = ['animalNumber','number','animalNo'];
+    for (const f of fields){
+      for (const grp of chunk(numbers,10)){
+        const q1 = query(collection(db,'animals'), where(f,'in', grp));
         const s = await getDocs(q1);
-        if (!s.empty) return s.docs[0].data().eventDate;
+        s.forEach(doc=>{
+          const data = doc.data()||{};
+          const candidates = [
+            data.lastCalving, data.lastCalvingDate, data.calvingDate, data.lastBirthDate,
+            data.calvingAt, data.lastCalvingAt, data.calvingISO, data.lastCalvingISO
+          ];
+          for (const c of candidates){
+            const iso = toISOAny(c);
+            if (iso){
+              const num = String(data.animalNumber || data.number || data.animalNo || '').trim();
+              if (num) {
+                const prev = out.get(num);
+                if (!prev || prev < iso) out.set(num, iso);
+              }
+              break;
+            }
+          }
+        });
       }
     }
-    const adoc = await fetchAnimalDocByNumber(num);
-    const a = adoc?.data || {};
-    const candidates = [a.lastCalving, a.lastCalvingDate, a.calvingDate, a.lastBirthDate, a.calvingAt, a.lastCalvingAt, a.calvingISO, a.lastCalvingISO];
-    for (const c of candidates){ const iso = toISOAny(c); if (iso) return iso; }
-    return null;
+    return out;
   }
+
+  async function bulkEventsCalving(uid, numbers){
+    const out = new Map();
+    for (const grp of chunk(numbers,10)){
+      for (const t of CALVING_TYPES){
+        const q1 = uid
+          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), where('animalNumber','in', grp))
+          : query(collection(db,'events'), where('eventType','==',t), where('animalNumber','in', grp));
+        const s = await getDocs(q1);
+        s.forEach(d=>{
+          const ev = d.data()||{};
+          const num = String(ev.animalNumber || ev.number || '').trim();
+          const iso = ev.eventDate;
+          if (num && iso){
+            const prev = out.get(num);
+            if (!prev || prev < iso) out.set(num, iso); // خُد الأحدث
+          }
+        });
+      }
+    }
+    return out;
+  }
+
+  async function buildDIMMap(uid, numbers){
+    const nums = Array.from(new Set(numbers.filter(Boolean)));
+    if (!nums.length) return new Map();
+    // 1) من animals
+    const m1 = await bulkAnimalsCalving(nums);
+    // 2) الأرقام اللي لسه ناقصة من events (بالجملة)
+    const missing = nums.filter(n => !m1.has(n));
+    if (!missing.length) return m1;
+    const m2 = await bulkEventsCalving(uid, missing);
+    // دمج
+    m2.forEach((v,k)=> m1.set(k,v));
+    return m1;
+  }
+
+  // ---------- Scatter ----------
+  let chart=null, lastMeta=null;
+  const hintEl = $('pointHint');
+  const scatterWrap = $('scatterWrap');
+
+  function placeHint(x, y){
+    const rect = scatterWrap.getBoundingClientRect();
+    const left = rect.left + window.scrollX + x + 10;
+    const top  = rect.top  + window.scrollY + y + 10;
+    hintEl.style.left = left + 'px';
+    hintEl.style.top  = top  + 'px';
+  }
+  function fillHint(meta){
+    $('hNo').textContent    = meta.number ?? '—';
+    $('hKg').textContent    = (meta.kg ?? '—') + ' كجم';
+    $('hDim').textContent   = meta.dim ?? '—';
+    $('hRepro').textContent = meta.repro ?? '—';
+    $('hSeason').textContent= meta.season ?? '—';
+    $('hGroup').textContent = meta.group ?? '—';
+  }
+  function externalTooltipHandler(ctx){
+    const {tooltip} = ctx;
+    if (!tooltip || tooltip.opacity === 0){ hintEl.hidden = true; return; }
+    const dp = tooltip.dataPoints?.[0]; if (!dp){ hintEl.hidden = true; return; }
+    const meta = dp.raw._meta; lastMeta = meta;
+    fillHint(meta); placeHint(tooltip.caretX, tooltip.caretY); hintEl.hidden = false;
+  }
+
+// مرجع الرسم (لو فيه رسم قديم ندمّره قبل نرسم من جديد)
+let scatterChart;
+
+function drawScatter(points){
+  const canvas = document.getElementById('scatter');
+  if (!canvas) return;
+
+  // امسح رسم قديم
+  if (scatterChart){ scatterChart.destroy(); scatterChart = null; }
+
+  // احسب سقف محور اللبن لأقرب مضاعف 5 (حد أدنى 10)
+  const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
+  const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
+
+  scatterChart = new Chart(canvas, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'أفراد القطيع',
+        // نخزن البيانات الأصلية في _meta للتولتيب والضغط
+        data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false, // عشان نقدر نستخدم raw + _meta
+
+      plugins: {
+        legend: { display: false },
+        // ✅ استخدم التولتيب الافتراضي (احذف أي external tooltip قديم عندك)
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: (ctx) => {
+              const m = ctx.raw?._meta || {};
+              const num    = m.number ?? '—';
+              const dim    = m.dim ?? ctx.raw?.x ?? '—';
+              const kg     = m.kg  ?? ctx.raw?.y ?? '—';
+              const repro  = m.repro   ?? '—';
+              const season = m.season  ?? '—';
+              const group  = m.group   ?? '—';
+              return `رقم ${num} • ${kg} كجم • ${dim} يوم • ${repro} • ${season} • ${group}`;
+            }
+          }
+        }
+      },
+
+      scales: {
+        x: {
+          title: { display: true, text: 'أيام الحليب (من آخر ولادة)' }
+        },
+        y: {
+          beginAtZero: true,
+          min: 0,
+          suggestedMax: yMax,   // لو عايز تجبره استخدم: max: yMax
+          ticks: {
+            stepSize: 5,
+            precision: 0,
+            callback: v => `${v} كجم`
+          }
+        }
+      },
+
+      // مؤشر الفأرة: يدُّل إن العنصر قابل للنقر
+      onHover: (evt, elements) => {
+        const el = evt?.native?.target;
+        if (el) el.style.cursor = elements?.length ? 'pointer' : 'default';
+      },
+
+      // الضغط على نقطة = فتح بطاقة الحيوان
+      onClick: (evt, elements, chartInstance) => {
+        if (!elements?.length) return;
+        const { datasetIndex, index } = elements[0];
+        const raw = chartInstance.data.datasets[datasetIndex].data[index];
+        const num = raw?._meta?.number;
+        if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+      }
+    }
+  });
+}
 
   // ---------- KPIs ----------
   function splitByKind(rows){
@@ -254,111 +399,8 @@
     }
     return o;
   }
-
-  async function qFeedForDay(uid, dateISO){
-    for (const withUser of [true,false]){
-      const q1 = withUser && uid
-        ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50))
-        : query(collection(db,'events'), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50));
-      const s = await getDocs(q1);
-      const rows=[]; s.forEach(d=>rows.push(d.data()));
-      if (rows.length) return rows;
-    }
-    return [];
-  }
-
-  // ---------- Scatter ----------
-  let chart=null;
-  let lastMeta=null; // لتخزين بيانات آخر نقطة للهنت
-  const hintEl = $('pointHint');
-  const scatterWrap = $('scatterWrap');
-
-  function placeHint(x, y){
-    // ضعه بالقرب من موقع المؤشر داخل الحاوية
-    const rect = scatterWrap.getBoundingClientRect();
-    const left = rect.left + window.scrollX + x + 10;
-    const top  = rect.top  + window.scrollY + y + 10;
-    hintEl.style.left = left + 'px';
-    hintEl.style.top  = top  + 'px';
-  }
-
-  function fillHint(meta){
-    $('hNo').textContent    = meta.number ?? '—';
-    $('hKg').textContent    = (meta.kg ?? '—') + ' كجم';
-    $('hDim').textContent   = meta.dim ?? '—';
-    $('hRepro').textContent = meta.repro ?? '—';
-    $('hSeason').textContent= meta.season ?? '—';
-    $('hGroup').textContent = meta.group ?? '—';
-  }
-
-  // Tooltip خارجي مخصص
-  function externalTooltipHandler(ctx){
-    const {chart, tooltip} = ctx;
-    if (!tooltip || tooltip.opacity === 0){
-      hintEl.hidden = true;
-      return;
-    }
-    const dp = tooltip.dataPoints?.[0];
-    if (!dp){ hintEl.hidden = true; return; }
-    const meta = dp.raw._meta;
-    lastMeta = meta;
-    fillHint(meta);
-    // موضع داخل الكانفاس → حوّله لموضع داخل الحاوية
-    placeHint(tooltip.caretX, tooltip.caretY);
-    hintEl.hidden = false;
-  }
-
-  function drawScatter(points){
-    const ctx = $('scatter').getContext('2d');
-    if (chart){ chart.destroy(); chart=null; }
-
-    const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
-    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
-
-    chart = new Chart(ctx, {
-      type:'scatter',
-      data:{
-        datasets:[{
-          label:'أفراد القطيع',
-          data: points.map(p=>({x:p.dim, y:p.kg, _meta:p})),
-          pointRadius:5
-        }]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        scales:{
-          x:{ title:{ display:true, text:'أيام الحليب (من آخر ولادة)' } },
-          y:{
-            beginAtZero:true, min:0, suggestedMax:yMax,
-            ticks:{ stepSize:5, precision:0, callback:v=>`${v} كجم` }
-          }
-        },
-        plugins:{
-          tooltip:{
-            enabled:false,             // عطل الافتراضي
-            external: externalTooltipHandler
-          }
-        },
-        // إخفاء الهنت عند النقر خارج النقاط
-        onClick(evt, elements){
-          if (!elements?.length){ hintEl.hidden = true; }
-        }
-      }
-    });
-  }
-
-  $('btnCloseHint').addEventListener('click', ()=>{ hintEl.hidden = true; });
-  $('btnOpenCard').addEventListener('click', ()=>{
-    if (lastMeta?.number){
-      location.href = `cow-card.html?number=${encodeURIComponent(lastMeta.number)}`;
-    }
-  });
-
-  // ---------- Build & KPIs ----------
   function putKpis(dayRows, monthRows, yearRows, totalAnimals){
-    const d = splitByKind(dayRows);
-    const m = splitByKind(monthRows);
-    const y = splitByKind(yearRows);
+    const d = splitByKind(dayRows), m = splitByKind(monthRows), y = splitByKind(yearRows);
     $('sumDay').textContent   = `${(d.all||0).toLocaleString()} كجم`;
     $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
     $('sumMonth').textContent = `${(m.all||0).toLocaleString()} كجم`;
@@ -371,12 +413,14 @@
   }
 
   async function buildScatter(uid, dateISO, rows){
-    let skipped = 0;
-    const pts=[];
+    const numbers = rows.map(r => String(r.animalNumber || r.number || '').trim()).filter(Boolean);
+    const dimMap  = await buildDIMMap(uid, numbers);
+
+    let skipped = 0; const pts=[];
     for (const r of rows){
       const number = String(r.animalNumber || r.number || '').trim();
       const kg = Number(r.milkKg || r.milk || 0) || 0;
-      const dimISO = await qLastCalving(uid, number);
+      const dimISO = dimMap.get(number);
       if (!dimISO){ skipped++; continue; }
       const dim = daysBetweenISO(dimISO, dateISO);
       const repro = (r.reproStatus || r.reproductiveStatus || r.repro || '—');
@@ -389,29 +433,29 @@
     drawScatter(pts);
   }
 
+  async function qFeedForDay(uid, dateISO){
+    for (const withUser of [true,false]){
+      const q1 = withUser && uid
+        ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50))
+        : query(collection(db,'events'), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50));
+      const s = await getDocs(q1); const rows=[]; s.forEach(d=>rows.push(d.data()));
+      if (rows.length) return rows;
+    }
+    return [];
+  }
   async function calcFeedCost(uid, dateISO, dayRows){
     const milkTotal = dayRows.reduce((s,r)=>s + (Number(r.milkKg||r.milk||0)||0), 0);
     const feeds = await qFeedForDay(uid, dateISO);
-    if (!milkTotal || !feeds.length){
-      $('feedCostPerKg').textContent = '— ج.م/كجم';
-      $('feedNote').textContent = 'لا توجد تغذية لهذا اليوم';
-      return;
-    }
-    let totalCost = 0;
-    feeds.forEach(f=>{ totalCost += Number(f.totalCost || f.cost || f.feedCost || 0) || 0; });
-    if (!totalCost){
-      $('feedCostPerKg').textContent = '— ج.م/كجم';
-      $('feedNote').textContent = 'يُلزم توفر تكلفة التغذية (totalCost)';
-      return;
-    }
-    const perKg = totalCost / milkTotal;
-    $('feedCostPerKg').textContent = `${perKg.toFixed(2)} ج.م/كجم`;
+    if (!milkTotal || !feeds.length){ $('feedCostPerKg').textContent='— ج.م/كجم'; $('feedNote').textContent='لا توجد تغذية لهذا اليوم'; return; }
+    let totalCost = 0; feeds.forEach(f=> totalCost += Number(f.totalCost || f.cost || f.feedCost || 0) || 0);
+    if (!totalCost){ $('feedCostPerKg').textContent='— ج.م/كجم'; $('feedNote').textContent='يُلزم توفر تكلفة التغذية (totalCost)'; return; }
+    $('feedCostPerKg').textContent = `${(totalCost/milkTotal).toFixed(2)} ج.م/كجم`;
     $('feedNote').textContent = `إجمالي تكلفة تغذية اليوم: ${totalCost.toFixed(0)} ج.م`;
   }
 
   // ---------- Load ----------
   async function loadAll(){
-    hideMsg(); hintEl.hidden = true;
+    hintEl.hidden = true; hideMsg();
     const uid = await getUid();
     const requested = ymd($('reportDate').value || todayISO());
     let dayRows = await qByDate(uid, requested);
@@ -444,7 +488,7 @@
     const qs = new URLSearchParams(location.search);
     const dt = qs.get('date') || qs.get('eventDate') || todayISO();
     $('reportDate').value = ymd(dt);
-    $('reportDate').addEventListener('change', ()=>{ loadAll(); }, {passive:true});
+    $('reportDate').addEventListener('change', loadAll, {passive:true});
     $('btnRefresh').addEventListener('click', loadAll, {passive:true});
     loadAll();
   })();
