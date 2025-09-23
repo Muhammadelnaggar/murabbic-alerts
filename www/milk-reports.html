@@ -33,6 +33,21 @@
     .notice{margin:10px 0;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;display:none}
     .ok{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
     canvas{width:100%;height:320px;max-height:50vh}
+
+    /* الهنت الخارجي للنقاط */
+    .hint{
+      position:absolute; inset:auto auto 0 0; /* سنتبدّلها برمجياً */
+      z-index:20; min-width:220px; max-width:90vw;
+      padding:10px 12px; border:1px solid var(--border); border-radius:12px;
+      background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
+      font-size:14px; line-height:1.5; color:var(--text);
+    }
+    .hint .row{display:flex;gap:6px}
+    .hint .k{color:#64748b;min-width:96px}
+    .hint .actions{margin-top:8px;display:flex;gap:6px}
+    .btn{appearance:none;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#f8fafc;font-weight:700;cursor:pointer}
+    .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+    .btn.icon{padding:6px 8px}
   </style>
 </head>
 <body>
@@ -86,10 +101,27 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="scatterWrap" style="position:relative">
     <h3 style="margin:0 0 8px 0">خريطة الأفراد (Scatter): <span>أيام الحليب (من آخر ولادة)</span> × <span>كجم/اليوم</span></h3>
     <canvas id="scatter"></canvas>
     <small id="skipNote" style="color:#64748b"></small>
+
+    <!-- الهنت الخارجي -->
+    <div id="pointHint" class="hint" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong>بيانات الحيوان</strong>
+        <button class="btn icon" id="btnCloseHint" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="row"><div class="k">رقم:</div><div class="v" id="hNo">—</div></div>
+      <div class="row"><div class="k">كجم اليوم:</div><div class="v" id="hKg">—</div></div>
+      <div class="row"><div class="k">أيام الحليب:</div><div class="v" id="hDim">—</div></div>
+      <div class="row"><div class="k">حالة تناسلية:</div><div class="v" id="hRepro">—</div></div>
+      <div class="row"><div class="k">الموسم:</div><div class="v" id="hSeason">—</div></div>
+      <div class="row"><div class="k">المجموعة:</div><div class="v" id="hGroup">—</div></div>
+      <div class="actions">
+        <button class="btn primary" id="btnOpenCard">فتح البطاقة</button>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -124,7 +156,7 @@
     return u?.uid || '';
   }
 
-  // ---------- Flexible queries (with/without userId) ----------
+  // ---------- Flexible queries ----------
   async function qLatestDate(uid){
     for (const withUser of [true,false]){
       for (const t of TYPES){
@@ -168,7 +200,7 @@
     return [];
   }
 
-  // --- fetch animal doc by number (for fallback DIM) ---
+  // --- fetch animal doc by number (fallback DIM) ---
   async function fetchAnimalDocByNumber(number){
     const raw = String(number||'').trim().replace(/[٠-٩۰-۹]/g,d=>DIGITS[d]).replace(/[^\d]/g,'');
     const asStr = raw, asNum = raw ? Number(raw) : NaN;
@@ -186,8 +218,7 @@
   function toISOAny(v){
     if (!v) return null;
     if (typeof v==='string'){
-      const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
-      if (m) return m[1];
+      const m = v.match(/^(\d{4}-\d{2}-\d{2})/); if (m) return m[1];
       const d = new Date(v); if (!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
       return null;
     }
@@ -195,10 +226,8 @@
     if (v?.seconds){ const d=new Date(v.seconds*1000); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
     return null;
   }
-
   async function qLastCalving(uid, animalNumber){
     const num = String(animalNumber||'').trim();
-    // 1) من الأحداث
     for (const withUser of [true,false]){
       for (const t of CALVING_TYPES){
         const q1 = withUser && uid
@@ -208,17 +237,10 @@
         if (!s.empty) return s.docs[0].data().eventDate;
       }
     }
-    // 2) من بطاقة الحيوان
     const adoc = await fetchAnimalDocByNumber(num);
     const a = adoc?.data || {};
-    const candidates = [
-      a.lastCalving, a.lastCalvingDate, a.calvingDate, a.lastBirthDate,
-      a.calvingAt, a.lastCalvingAt, a.calvingISO, a.lastCalvingISO
-    ];
-    for (const c of candidates){
-      const iso = toISOAny(c);
-      if (iso) return iso;
-    }
+    const candidates = [a.lastCalving, a.lastCalvingDate, a.calvingDate, a.lastBirthDate, a.calvingAt, a.lastCalvingAt, a.calvingISO, a.lastCalvingISO];
+    for (const c of candidates){ const iso = toISOAny(c); if (iso) return iso; }
     return null;
   }
 
@@ -245,14 +267,53 @@
     return [];
   }
 
+  // ---------- Scatter ----------
   let chart=null;
+  let lastMeta=null; // لتخزين بيانات آخر نقطة للهنت
+  const hintEl = $('pointHint');
+  const scatterWrap = $('scatterWrap');
+
+  function placeHint(x, y){
+    // ضعه بالقرب من موقع المؤشر داخل الحاوية
+    const rect = scatterWrap.getBoundingClientRect();
+    const left = rect.left + window.scrollX + x + 10;
+    const top  = rect.top  + window.scrollY + y + 10;
+    hintEl.style.left = left + 'px';
+    hintEl.style.top  = top  + 'px';
+  }
+
+  function fillHint(meta){
+    $('hNo').textContent    = meta.number ?? '—';
+    $('hKg').textContent    = (meta.kg ?? '—') + ' كجم';
+    $('hDim').textContent   = meta.dim ?? '—';
+    $('hRepro').textContent = meta.repro ?? '—';
+    $('hSeason').textContent= meta.season ?? '—';
+    $('hGroup').textContent = meta.group ?? '—';
+  }
+
+  // Tooltip خارجي مخصص
+  function externalTooltipHandler(ctx){
+    const {chart, tooltip} = ctx;
+    if (!tooltip || tooltip.opacity === 0){
+      hintEl.hidden = true;
+      return;
+    }
+    const dp = tooltip.dataPoints?.[0];
+    if (!dp){ hintEl.hidden = true; return; }
+    const meta = dp.raw._meta;
+    lastMeta = meta;
+    fillHint(meta);
+    // موضع داخل الكانفاس → حوّله لموضع داخل الحاوية
+    placeHint(tooltip.caretX, tooltip.caretY);
+    hintEl.hidden = false;
+  }
+
   function drawScatter(points){
     const ctx = $('scatter').getContext('2d');
     if (chart){ chart.destroy(); chart=null; }
 
-    // احسب سقف محور اللبن من kg (مش y)
     const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
-    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5); // لأقرب مضاعف 5 (حد أدنى 10)
+    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
 
     chart = new Chart(ctx, {
       type:'scatter',
@@ -264,27 +325,36 @@
         }]
       },
       options:{
-        responsive:true,
-        maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false,
         scales:{
           x:{ title:{ display:true, text:'أيام الحليب (من آخر ولادة)' } },
           y:{
-            beginAtZero:true,
-            min:0,
-            suggestedMax:yMax,
+            beginAtZero:true, min:0, suggestedMax:yMax,
             ticks:{ stepSize:5, precision:0, callback:v=>`${v} كجم` }
           }
         },
-        onClick(evt, elements, chartRef){
-          if (!elements?.length) return;
-          const {datasetIndex, index} = elements[0];
-          const raw = chartRef.data.datasets[datasetIndex].data[index]._meta;
-          if (raw?.number) location.href = `cow-card.html?number=${encodeURIComponent(raw.number)}`;
+        plugins:{
+          tooltip:{
+            enabled:false,             // عطل الافتراضي
+            external: externalTooltipHandler
+          }
+        },
+        // إخفاء الهنت عند النقر خارج النقاط
+        onClick(evt, elements){
+          if (!elements?.length){ hintEl.hidden = true; }
         }
       }
     });
   }
 
+  $('btnCloseHint').addEventListener('click', ()=>{ hintEl.hidden = true; });
+  $('btnOpenCard').addEventListener('click', ()=>{
+    if (lastMeta?.number){
+      location.href = `cow-card.html?number=${encodeURIComponent(lastMeta.number)}`;
+    }
+  });
+
+  // ---------- Build & KPIs ----------
   function putKpis(dayRows, monthRows, yearRows, totalAnimals){
     const d = splitByKind(dayRows);
     const m = splitByKind(monthRows);
@@ -306,10 +376,8 @@
     for (const r of rows){
       const number = String(r.animalNumber || r.number || '').trim();
       const kg = Number(r.milkKg || r.milk || 0) || 0;
-
-      let dimISO = await qLastCalving(uid, number);
-      if (!dimISO){ skipped++; continue; } // لا نعرض بدون مرجع ولادة
-
+      const dimISO = await qLastCalving(uid, number);
+      if (!dimISO){ skipped++; continue; }
       const dim = daysBetweenISO(dimISO, dateISO);
       const repro = (r.reproStatus || r.reproductiveStatus || r.repro || '—');
       const group = (r.group || r.groupName || '—');
@@ -343,7 +411,7 @@
 
   // ---------- Load ----------
   async function loadAll(){
-    hideMsg();
+    hideMsg(); hintEl.hidden = true;
     const uid = await getUid();
     const requested = ymd($('reportDate').value || todayISO());
     let dayRows = await qByDate(uid, requested);
@@ -376,7 +444,7 @@
     const qs = new URLSearchParams(location.search);
     const dt = qs.get('date') || qs.get('eventDate') || todayISO();
     $('reportDate').value = ymd(dt);
-    $('reportDate').addEventListener('change', loadAll);
+    $('reportDate').addEventListener('change', ()=>{ loadAll(); }, {passive:true});
     $('btnRefresh').addEventListener('click', loadAll, {passive:true});
     loadAll();
   })();
