@@ -316,15 +316,7 @@ function placeHintNear(chart, caretX, caretY){
   hintEl.style.top  = (rect.top  + window.scrollY + caretY + 10) + 'px';
 }
 
-function externalTooltipHandler(ctx){
-  const { chart, tooltip } = ctx;
-  if (!tooltip || tooltip.opacity === 0){ hideHintSoon(); return; }
-  const dp = tooltip.dataPoints?.[0]; if (!dp){ hideHintSoon(); return; }
-  const meta = dp.raw._meta; lastMeta = meta;
-  fillHint(meta);                    // ← عندك بالفعل
-  placeHintNear(chart, tooltip.caretX, tooltip.caretY);
-  hintEl.hidden = false;
-}
+
 
 
 
@@ -344,67 +336,110 @@ function externalTooltipHandler(ctx){
     $('hDelta').textContent = formatDelta(meta.deltaPct);
   }
 
- 
+ function externalTooltipHandler(ctx){
+  const { chart, tooltip } = ctx;
+  const hintEl = document.getElementById('pointHint');
+  if (!hintEl) return;
 
-  function drawScatter(points){
-    const canvas = document.getElementById('scatter');
-    if (!canvas) return;
-
-    if (scatterChart){ scatterChart.destroy(); scatterChart = null; }
-
-    const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
-    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
-
-    const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
-    const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
-
-    scatterChart = new Chart(canvas, {
-      type: 'scatter',
-      data: {
-        datasets: [{
-          label: 'أفراد القطيع',
-          data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
-          pointRadius: 5
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        parsing: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false, external: externalTooltipHandler }
-        },
-        scales: {
-          x: {
-            title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
-            beginAtZero: true, min: 0, suggestedMax: xMax,
-            ticks: { stepSize: 30, precision: 0 }
-          },
-          y: {
-            beginAtZero: true, min: 0, suggestedMax: yMax,
-            ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` }
-          }
-        },
-        onHover: (evt, elements) => {
-          const el = evt?.native?.target;
-          if (el) el.style.cursor = elements?.length ? 'pointer' : 'default';
-        },
-        onClick: (evt, elements, chartInstance) => {
-          if (!elements?.length) return;
-          const { datasetIndex, index } = elements[0];
-          const raw = chartInstance.data.datasets[datasetIndex].data[index];
-          const num = raw?._meta?.number;
-          if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-        },
-        events: ['mousemove','mouseout','click','touchstart','touchmove','touchend']
-      }
-    });
-
-    // إخفاء الهِنت عند مغادرة اللوحة أو نهاية اللمس
-    canvas.addEventListener('mouseleave', () => { hintEl.hidden = true; }, {passive:true});
-    canvas.addEventListener('touchend',   () => { hintEl.hidden = true; }, {passive:true});
+  // اخفِ الهِنت لو مفيش نقطة تحت المؤشر
+  if (!tooltip || tooltip.opacity === 0){
+    hintEl.hidden = true;
+    return;
   }
+
+  // أقرب نقطة
+  const dp = tooltip.dataPoints?.[0];
+  if (!dp){
+    hintEl.hidden = true;
+    return;
+  }
+
+  // بياناتنا المخبأة في _meta
+  const meta = dp.raw?._meta || {};
+  window.lastMeta = meta;         // لو عندك lastMeta معرف فوق، ده بس تأكيد
+
+  // عبّي محتوى الهِنت
+  if (typeof fillHint === 'function') fillHint(meta);
+
+  // حط الهِنت جنب المؤشر/النقطة
+  const rect = chart.canvas.getBoundingClientRect();
+  hintEl.style.left = (rect.left + window.scrollX + tooltip.caretX + 10) + 'px';
+  hintEl.style.top  = (rect.top  + window.scrollY + tooltip.caretY + 10) + 'px';
+  hintEl.hidden = false;
+}
+
+
+ // ضعها مكان الدالة القديمة بالكامل
+function drawScatter(points){
+  const canvas = document.getElementById('scatter');
+  if (!canvas) return;
+
+  if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
+
+  // حساب حدود المحاور
+  const maxY = Math.max(0, ...points.map(p => Number(p.kg)  || 0));
+  const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
+  const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
+  const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
+
+  scatterChart = new Chart(canvas, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'أفراد القطيع',
+        data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
+        pointRadius: 5,
+        pointHoverRadius: 8,
+        pointHitRadius: 18   // ← تكبير منطقة الالتقاط (يسهّل الهوفر/اللمس)
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false,
+
+      // ← خلي التفاعل يلقط "أقرب نقطة"
+      interaction: { mode: 'nearest', intersect: true, axis: 'xy' },
+
+      plugins: {
+        legend: { display: false },
+        // ← هنستخدم الهِنت العائم الخارجي
+        tooltip: { enabled: false, external: externalTooltipHandler }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
+          beginAtZero: true, min: 0, suggestedMax: xMax,
+          ticks: { stepSize: 30, precision: 0 }
+        },
+        y: {
+          beginAtZero: true, min: 0, suggestedMax: yMax,
+          ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` }
+        }
+      },
+
+      onHover: (evt, els) => {
+        const el = evt?.native?.target;
+        if (el) el.style.cursor = els?.length ? 'pointer' : 'default';
+      },
+      onClick: (evt, els, chartInstance) => {
+        if (!els?.length) return;
+        const { datasetIndex, index } = els[0];
+        const raw = chartInstance.data.datasets[datasetIndex].data[index];
+        const num = raw?._meta?.number;
+        if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+      },
+
+      // ← دعم اللمس على الموبايل
+      events: ['mousemove','mouseout','click','touchstart','touchmove','touchend']
+    }
+  });
+
+  // إخفاء الهِنت عند مغادرة اللوحة/نهاية اللمس
+  canvas.addEventListener('mouseleave', () => { document.getElementById('pointHint').hidden = true; }, {passive:true});
+  canvas.addEventListener('touchend',   () => { document.getElementById('pointHint').hidden = true; }, {passive:true});
+}
+
 
   // ---------- KPIs ----------
   function splitByKind(rows){
