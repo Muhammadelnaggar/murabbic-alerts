@@ -99,7 +99,7 @@
 <script type="module">
   import { db, auth } from '/js/firebase-config.js';
   import {
-    collection, query, where, orderBy, limit, getDocs, startAt, endAt
+    collection, query, where, orderBy, limit, getDocs, startAt, endBefore
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
@@ -158,8 +158,8 @@
       let bag=[];
       for (const t of TYPES){
         const q1 = withUser && uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endAt(endISO))
-          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endAt(endISO));
+          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endBefore(endISO))
+          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endBefore(endISO));
         const s = await getDocs(q1);
         s.forEach(d=>bag.push(d.data()));
       }
@@ -194,7 +194,7 @@
     if (typeof v==='number'){ const d=new Date(v); if(!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
     if (v?.seconds){ const d=new Date(v.seconds*1000); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
     return null;
-    }
+  }
 
   async function qLastCalving(uid, animalNumber){
     const num = String(animalNumber||'').trim();
@@ -208,7 +208,7 @@
         if (!s.empty) return s.docs[0].data().eventDate;
       }
     }
-    // 2) من بطاقة الحيوان (حقول شائعة)
+    // 2) من بطاقة الحيوان
     const adoc = await fetchAnimalDocByNumber(num);
     const a = adoc?.data || {};
     const candidates = [
@@ -247,11 +247,12 @@
 
   let chart=null;
   function drawScatter(points){
-    const ctx = $('scatter');
+    const ctx = $('scatter').getContext('2d');
     if (chart){ chart.destroy(); chart=null; }
 
-    const maxDim = Math.max(0, ...points.map(p=>p.dim).filter(Number.isFinite));
-    const suggestedMax = Math.max(60, Math.ceil((maxDim+10)/10)*10);
+    // احسب سقف محور اللبن من kg (مش y)
+    const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
+    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5); // لأقرب مضاعف 5 (حد أدنى 10)
 
     chart = new Chart(ctx, {
       type:'scatter',
@@ -263,33 +264,22 @@
         }]
       },
       options:{
-        responsive:true, maintainAspectRatio:false,
+        responsive:true,
+        maintainAspectRatio:false,
         scales:{
-          x:{
-            title:{display:true,text:'أيام الحليب (من آخر ولادة)'},
-            ticks:{
-              stepSize:20,
-              callback:(v)=> Math.round(v)
-            },
-            suggestedMin:0,
-            suggestedMax
-          },
-          y:{ title:{display:true,text:'كجم/اليوم'} }
-        },
-        plugins:{
-          tooltip:{
-            callbacks:{
-              label(ctx){
-                const m = ctx.raw._meta;
-                return `${m.number} — ${ctx.parsed.y} كجم • ${Math.round(ctx.parsed.x)} يوم\nحالة: ${m.repro||'—'} • موسم: ${m.season||'—'} • مجموعة: ${m.group||'—'}`;
-              }
-            }
+          x:{ title:{ display:true, text:'أيام الحليب (من آخر ولادة)' } },
+          y:{
+            beginAtZero:true,
+            min:0,
+            suggestedMax:yMax,
+            ticks:{ stepSize:5, precision:0, callback:v=>`${v} كجم` }
           }
         },
-        onClick(evt, els){
-          if (!els?.length) return;
-          const m = els[0].element.$context.raw._meta;
-          if (m?.number) location.href = `cow-card.html?number=${encodeURIComponent(m.number)}`;
+        onClick(evt, elements, chartRef){
+          if (!elements?.length) return;
+          const {datasetIndex, index} = elements[0];
+          const raw = chartRef.data.datasets[datasetIndex].data[index]._meta;
+          if (raw?.number) location.href = `cow-card.html?number=${encodeURIComponent(raw.number)}`;
         }
       }
     });
