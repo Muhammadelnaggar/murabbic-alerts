@@ -307,6 +307,7 @@
   }
 
 // مرجع الرسم (لو فيه رسم قديم ندمّره قبل نرسم من جديد)
+// مرجع الرسم (لو فيه رسم قديم ندمّره قبل نرسم من جديد)
 let scatterChart;
 
 function drawScatter(points){
@@ -319,6 +320,10 @@ function drawScatter(points){
   // احسب سقف محور اللبن لأقرب مضاعف 5 (حد أدنى 10)
   const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
   const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
+
+  // ✅ احسب سقف محور DIM لأقرب مضاعف 30 (حد أدنى 30) وخليه يبدأ من 0
+  const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
+  const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
 
   scatterChart = new Chart(canvas, {
     type: 'scatter',
@@ -333,38 +338,34 @@ function drawScatter(points){
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      parsing: false, // عشان نقدر نستخدم raw + _meta
+      parsing: false,
 
       plugins: {
         legend: { display: false },
-        // ✅ استخدم التولتيب الافتراضي (احذف أي external tooltip قديم عندك)
+        // لو بتستخدم الهنت العائم (externalTooltipHandler) خليه هنا
         tooltip: {
-          enabled: true,
-          callbacks: {
-            label: (ctx) => {
-              const m = ctx.raw?._meta || {};
-              const num    = m.number ?? '—';
-              const dim    = m.dim ?? ctx.raw?.x ?? '—';
-              const kg     = m.kg  ?? ctx.raw?.y ?? '—';
-              const repro  = m.repro   ?? '—';
-              const season = m.season  ?? '—';
-              const group  = m.group   ?? '—';
-              return `رقم ${num} • ${kg} كجم • ${dim} يوم • ${repro} • ${season} • ${group}`;
-            }
-          }
+          enabled: false,
+          external: externalTooltipHandler
         }
       },
 
       scales: {
         x: {
-          title: { display: true, text: 'أيام الحليب (من آخر ولادة)' }
+          title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
+          beginAtZero: true,
+          min: 0,
+          suggestedMax: xMax,
+          ticks: {
+            stepSize: 30,     // غيّرها لـ 15 أو 10 لو حابب
+            precision: 0
+          }
         },
         y: {
           beginAtZero: true,
           min: 0,
           suggestedMax: yMax,   // لو عايز تجبره استخدم: max: yMax
           ticks: {
-            stepSize: 5,
+            stepSize: 5,        // تدريج 5 كجم زي ما طلبت
             precision: 0,
             callback: v => `${v} كجم`
           }
