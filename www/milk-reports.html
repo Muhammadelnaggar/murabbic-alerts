@@ -344,13 +344,7 @@ function externalTooltipHandler(ctx){
     $('hDelta').textContent = formatDelta(meta.deltaPct);
   }
 
-  function externalTooltipHandler(ctx){
-    const {tooltip} = ctx;
-    if (!tooltip || tooltip.opacity === 0){ hintEl.hidden = true; return; }
-    const dp = tooltip.dataPoints?.[0]; if (!dp){ hintEl.hidden = true; return; }
-    const meta = dp.raw._meta; lastMeta = meta;
-    fillHint(meta); placeHint(tooltip.caretX, tooltip.caretY); hintEl.hidden = false;
-  }
+ 
 
   function drawScatter(points){
     const canvas = document.getElementById('scatter');
