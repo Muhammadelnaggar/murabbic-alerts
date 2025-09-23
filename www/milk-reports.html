@@ -32,16 +32,18 @@
     canvas{width:100%;height:320px;max-height:50vh}
 
     /* الهِنت الخارجي للنقاط */
-    .hint{
-      position:absolute; z-index:20; min-width:220px; max-width:90vw;
-      padding:10px 12px; border:1px solid var(--border); border-radius:12px;
-      background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
-      font-size:14px; line-height:1.5; color:var(--text);
-      pointer-events:auto; /* علشان أزرار الهنت تشتغل */
-    }
-    .hint .row{display:flex;gap:6px}
-    .hint .k{color:#64748b;min-width:130px}
-    .hint .actions{margin-top:8px;display:flex;gap:6px}
+   /* الهِنت الخارجي للنقاط */
+.hint{
+  position:absolute; z-index:20; min-width:220px; max-width:90vw;
+  padding:10px 12px; border:1px solid var(--border); border-radius:12px;
+  background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
+  font-size:14px; line-height:1.5; color:var(--text);
+  pointer-events:auto; /* علشان تقدر تضغط الأزرار */
+}
+.hint .row{display:flex;gap:6px}
+.hint .k{color:#64748b;min-width:130px}
+.hint .actions{margin-top:8px;display:flex;gap:6px}
+
     .btn{appearance:none;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#f8fafc;font-weight:700;cursor:pointer}
     .btn.primary{background:var(--green);border-color:#0ea05a;color:#fff}
     .btn.icon{padding:6px 8px}
@@ -295,18 +297,36 @@
   }
 
   // ---------- Scatter + هِنت عائم ----------
-  let scatterChart;
-  const hintEl = $('pointHint');
-  const scatterWrap = $('scatterWrap');
-  let lastMeta = null;
+ let scatterChart;
+const hintEl = document.getElementById('pointHint');
+const scatterWrap = document.getElementById('scatterWrap');
+let lastMeta = null;
 
-  function placeHint(x, y){
-    const rect = scatterWrap.getBoundingClientRect();
-    const left = rect.left + window.scrollX + x + 10;
-    const top  = rect.top  + window.scrollY + y + 10;
-    hintEl.style.left = left + 'px';
-    hintEl.style.top  = top  + 'px';
-  }
+let hintPinned = false;
+function hideHintSoon(){
+  clearTimeout(window.__hideHintT);
+  window.__hideHintT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 250);
+}
+hintEl.addEventListener('mouseenter', ()=>{ hintPinned = true; });
+hintEl.addEventListener('mouseleave', ()=>{ hintPinned = false; hideHintSoon(); });
+
+function placeHintNear(chart, caretX, caretY){
+  const rect = chart.canvas.getBoundingClientRect();
+  hintEl.style.left = (rect.left + window.scrollX + caretX + 10) + 'px';
+  hintEl.style.top  = (rect.top  + window.scrollY + caretY + 10) + 'px';
+}
+
+function externalTooltipHandler(ctx){
+  const { chart, tooltip } = ctx;
+  if (!tooltip || tooltip.opacity === 0){ hideHintSoon(); return; }
+  const dp = tooltip.dataPoints?.[0]; if (!dp){ hideHintSoon(); return; }
+  const meta = dp.raw._meta; lastMeta = meta;
+  fillHint(meta);                    // ← عندك بالفعل
+  placeHintNear(chart, tooltip.caretX, tooltip.caretY);
+  hintEl.hidden = false;
+}
+
+
 
   function formatDelta(pct){
     if (pct == null || Number.isNaN(pct)) return '—';
