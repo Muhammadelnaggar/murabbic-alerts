@@ -9,13 +9,13 @@
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a;
-      --muted:#64748b; --card:#fff; --border:#e2e8f0; --warn:#f59e0b; --danger:#dc2626
+      --muted:#64748b; --card:#fff; --border:#e2e8f0;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border)}
     .bar{max-width:960px;margin:0 auto;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600);display:flex;gap:8px;align-items:center}
+    .title{font-weight:800;color:var(--green-600)}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
     .chip{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-weight:700;cursor:pointer}
     .chip.primary{background:var(--green);color:#fff;border-color:var(--green)}
@@ -23,26 +23,16 @@
     .row{display:grid;grid-template-columns:1fr;gap:12px}
     @media(min-width:640px){ .row{grid-template-columns:repeat(2,1fr)} }
     @media(min-width:920px){ .row{grid-template-columns:repeat(3,1fr)} }
-
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     .kpi{display:flex;flex-direction:column;gap:6px}
-    .kpi h3{margin:0;font-size:14px;color:#0f172a}
+    .kpi h3{margin:0;font-size:14px}
     .kpi .num{font-weight:900;font-size:22px}
     .kpi small{color:var(--muted)}
-
     .inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     input[type="date"]{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px}
-
-    .notice{margin:10px 0;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700}
+    .notice{margin:10px 0;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;display:none}
     .ok{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
-
     canvas{width:100%;height:320px;max-height:50vh}
-
-    /* موبايل: بطاقات بفل سكرين تقريبا */
-    @media(max-width:420px){
-      .kpi .num{font-size:20px}
-      .bar .actions{width:100%;justify-content:flex-end}
-    }
   </style>
 </head>
 <body>
@@ -66,7 +56,7 @@
     <div id="lastUpdate" class="inline" style="color:var(--muted);font-size:13px"></div>
   </div>
 
-  <div id="msg" class="notice" style="display:none"></div>
+  <div id="msg" class="notice"></div>
 
   <div class="row" id="kpis">
     <div class="card kpi">
@@ -97,13 +87,12 @@
   </div>
 
   <div class="card">
-    <h3 style="margin:0 0 8px 0">خريطة الأفراد (Scatter): أيام الحليب × كجم/اليوم</h3>
+    <h3 style="margin:0 0 8px 0">خريطة الأفراد (Scatter): <span>أيام الحليب (من آخر ولادة)</span> × <span>كجم/اليوم</span></h3>
     <canvas id="scatter"></canvas>
-    <small style="color:var(--muted)">انقر على النقطة لفتح بطاقة الحيوان</small>
+    <small id="skipNote" style="color:#64748b"></small>
   </div>
 </main>
 
-<!-- Firebase + Chart.js -->
 <script type="module" src="/js/firebase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -114,43 +103,19 @@
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-  // ==== أدوات مساعدة ====
+  // ---------- Helpers ----------
   const $ = id => document.getElementById(id);
   const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const toLatin = s => String(s||'').replace(/[٠-٩۰-۹]/g,d=>DIGITS[d]).replace(/[^\d]/g,'');
   const TYPES = ['لبن يومي','milk','daily_milk'];
+  const CALVING_TYPES = ['ولادة','calving','Calving','birth','Birth','ولاده','ولادة طبيعية'];
 
-  function todayISO(){
-    const d=new Date(); d.setHours(0,0,0,0);
-    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  }
-  function ymd(date){ return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayISO(); }
-  function daysBetweenISO(a,b){
-    const A=new Date(a), B=new Date(b);
-    A.setHours(0,0,0,0); B.setHours(0,0,0,0);
-    return Math.round((B-A)/86400000);
-  }
-  function monthBounds(dISO){
-    const d=new Date(dISO); d.setDate(1);
-    const start = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    const next = new Date(d); next.setMonth(next.getMonth()+1); next.setDate(1);
-    const end = new Date(next.getTime()-next.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    return {start,end}; // [start, end)
-  }
-  function yearBounds(dISO){
-    const y = dISO.slice(0,4);
-    return {start: `${y}-01-01`, end: `${(+y+1)}-01-01`};
-  }
-  function normKind(v){
-    if (/buffalo|جاموس/i.test(v)) return 'جاموس';
-    return 'أبقار';
-  }
-  function show(msg, ok=false){
-    const el = $('msg');
-    el.style.display='block';
-    el.className = 'notice ' + (ok ? 'ok' : '');
-    el.textContent = msg;
-  }
+  function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+  const ymd = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO();
+  function daysBetweenISO(a,b){ const A=new Date(a), B=new Date(b); A.setHours(0,0,0,0); B.setHours(0,0,0,0); return Math.round((B-A)/86400000); }
+  function monthBounds(dISO){ const d=new Date(dISO); d.setDate(1); const start = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); const n=new Date(d); n.setMonth(n.getMonth()+1); n.setDate(1); const end=new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10); return {start,end}; }
+  function yearBounds(dISO){ const y=dISO.slice(0,4); return {start:`${y}-01-01`, end:`${+y+1}-01-01`}; }
+  const normKind = v => /buffalo|جاموس/i.test(v)? 'جاموس':'أبقار';
+  function show(msg, ok=false){ const el=$('msg'); el.style.display='block'; el.className='notice ' + (ok?'ok':''); el.textContent=msg; }
   function hideMsg(){ $('msg').style.display='none'; }
 
   async function getUid(){
@@ -159,9 +124,8 @@
     return u?.uid || '';
   }
 
-  // ==== استعلامات مرنة (تحترم/تتجاهل userId) ====
+  // ---------- Flexible queries (with/without userId) ----------
   async function qLatestDate(uid){
-    // جرّب كل التسميات وبـ userId، ثم بدون userId
     for (const withUser of [true,false]){
       for (const t of TYPES){
         const q1 = withUser && uid
@@ -176,7 +140,7 @@
 
   async function qByDate(uid, dateISO){
     for (const withUser of [true,false]){
-      let bag = [];
+      let bag=[];
       for (const t of TYPES){
         const q1 = withUser && uid
           ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), where('eventDate','==',dateISO), limit(500))
@@ -190,9 +154,8 @@
   }
 
   async function qByRange(uid, startISO, endISO){
-    // [start, end) على نفس الحقل eventDate
     for (const withUser of [true,false]){
-      let bag = [];
+      let bag=[];
       for (const t of TYPES){
         const q1 = withUser && uid
           ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endAt(endISO))
@@ -205,33 +168,71 @@
     return [];
   }
 
+  // --- fetch animal doc by number (for fallback DIM) ---
+  async function fetchAnimalDocByNumber(number){
+    const raw = String(number||'').trim().replace(/[٠-٩۰-۹]/g,d=>DIGITS[d]).replace(/[^\d]/g,'');
+    const asStr = raw, asNum = raw ? Number(raw) : NaN;
+    const tries = [
+      ['animalNumber','==',asStr], ['animalNumber','==',asNum],
+      ['number','==',asStr],       ['number','==',asNum],
+      ['animalNo','==',asStr],     ['animalNo','==',asNum],
+    ].filter(t => !(typeof t[2]==='number' && Number.isNaN(t[2])));
+    for (const [f,op,val] of tries){
+      const s = await getDocs(query(collection(db,'animals'), where(f,op,val), limit(1)));
+      if (!s.empty){ const d=s.docs[0]; return { id:d.id, data:d.data()||{} }; }
+    }
+    return null;
+  }
+  function toISOAny(v){
+    if (!v) return null;
+    if (typeof v==='string'){
+      const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) return m[1];
+      const d = new Date(v); if (!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      return null;
+    }
+    if (typeof v==='number'){ const d=new Date(v); if(!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+    if (v?.seconds){ const d=new Date(v.seconds*1000); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+    return null;
+    }
+
   async function qLastCalving(uid, animalNumber){
-    // آخر ولادة لهذا الحيوان
     const num = String(animalNumber||'').trim();
-    // لو فيه userId كويس، وإلا هات أي
+    // 1) من الأحداث
     for (const withUser of [true,false]){
-      const q1 = withUser && uid
-        ? query(collection(db,'events'), where('userId','==',uid), where('animalNumber','==',num), where('eventType','==','ولادة'), orderBy('eventDate','desc'), limit(1))
-        : query(collection(db,'events'), where('animalNumber','==',num), where('eventType','==','ولادة'), orderBy('eventDate','desc'), limit(1));
-      const s = await getDocs(q1);
-      if (!s.empty) return s.docs[0].data().eventDate;
+      for (const t of CALVING_TYPES){
+        const q1 = withUser && uid
+          ? query(collection(db,'events'), where('userId','==',uid), where('animalNumber','==',num), where('eventType','==',t), orderBy('eventDate','desc'), limit(1))
+          : query(collection(db,'events'), where('animalNumber','==',num), where('eventType','==',t), orderBy('eventDate','desc'), limit(1));
+        const s = await getDocs(q1);
+        if (!s.empty) return s.docs[0].data().eventDate;
+      }
+    }
+    // 2) من بطاقة الحيوان (حقول شائعة)
+    const adoc = await fetchAnimalDocByNumber(num);
+    const a = adoc?.data || {};
+    const candidates = [
+      a.lastCalving, a.lastCalvingDate, a.calvingDate, a.lastBirthDate,
+      a.calvingAt, a.lastCalvingAt, a.calvingISO, a.lastCalvingISO
+    ];
+    for (const c of candidates){
+      const iso = toISOAny(c);
+      if (iso) return iso;
     }
     return null;
   }
 
-  // ==== حسابات ====
+  // ---------- KPIs ----------
   function splitByKind(rows){
     const o={all:0,cow:0,buff:0};
     for (const r of rows){
       const kg = Number(r.milkKg || r.milk || 0) || 0;
       const k  = normKind(r.kind || r.species || r.animalType || r.animalTypeAr || '');
-      o.all += kg;
-      if (k==='جاموس') o.buff += kg; else o.cow += kg;
+      o.all += kg; if (k==='جاموس') o.buff += kg; else o.cow += kg;
     }
     return o;
   }
 
-  // تغذية: نحاول إيجاد cost/DM لليوم — (اختياري)
   async function qFeedForDay(uid, dateISO){
     for (const withUser of [true,false]){
       const q1 = withUser && uid
@@ -244,25 +245,35 @@
     return [];
   }
 
-  // ==== واجهة ====
   let chart=null;
   function drawScatter(points){
     const ctx = $('scatter');
     if (chart){ chart.destroy(); chart=null; }
+
+    const maxDim = Math.max(0, ...points.map(p=>p.dim).filter(Number.isFinite));
+    const suggestedMax = Math.max(60, Math.ceil((maxDim+10)/10)*10);
+
     chart = new Chart(ctx, {
       type:'scatter',
       data:{
         datasets:[{
           label:'أفراد القطيع',
           data: points.map(p=>({x:p.dim, y:p.kg, _meta:p})),
-          pointRadius:5,
+          pointRadius:5
         }]
       },
       options:{
-        responsive:true,
-        maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false,
         scales:{
-          x:{ title:{display:true,text:'أيام الحليب'} },
+          x:{
+            title:{display:true,text:'أيام الحليب (من آخر ولادة)'},
+            ticks:{
+              stepSize:20,
+              callback:(v)=> Math.round(v)
+            },
+            suggestedMin:0,
+            suggestedMax
+          },
           y:{ title:{display:true,text:'كجم/اليوم'} }
         },
         plugins:{
@@ -270,7 +281,7 @@
             callbacks:{
               label(ctx){
                 const m = ctx.raw._meta;
-                return `${m.number} — ${ctx.parsed.y} كجم • ${ctx.parsed.x} يوم\nحالة: ${m.repro||'—'} • موسم: ${m.season||'—'} • مجموعة: ${m.group||'—'}`;
+                return `${m.number} — ${ctx.parsed.y} كجم • ${Math.round(ctx.parsed.x)} يوم\nحالة: ${m.repro||'—'} • موسم: ${m.season||'—'} • مجموعة: ${m.group||'—'}`;
               }
             }
           }
@@ -278,9 +289,7 @@
         onClick(evt, els){
           if (!els?.length) return;
           const m = els[0].element.$context.raw._meta;
-          if (m?.number){
-            location.href = `cow-card.html?number=${encodeURIComponent(m.number)}`;
-          }
+          if (m?.number) location.href = `cow-card.html?number=${encodeURIComponent(m.number)}`;
         }
       }
     });
@@ -290,38 +299,35 @@
     const d = splitByKind(dayRows);
     const m = splitByKind(monthRows);
     const y = splitByKind(yearRows);
-
     $('sumDay').textContent   = `${(d.all||0).toLocaleString()} كجم`;
     $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
-
     $('sumMonth').textContent = `${(m.all||0).toLocaleString()} كجم`;
     $('sumMonthBreak').textContent = `أبقار: ${m.cow||0} • جاموس: ${m.buff||0}`;
-
     $('sumYear').textContent  = `${(y.all||0).toLocaleString()} كجم`;
     $('sumYearBreak').textContent = `أبقار: ${y.cow||0} • جاموس: ${y.buff||0}`;
-
-    const milkers = dayRows.length; // عدد الحلّاب = عدد السجلات اليومية
+    const milkers = dayRows.length;
     $('avgHerd').textContent = milkers ? `${(d.all/milkers).toFixed(1)} كجم/رأس` : '— كجم/رأس';
     $('milkersCount').textContent = `عدد الحلّاب: ${milkers} / إجمالي: ${totalAnimals ?? '—'}`;
   }
 
   async function buildScatter(uid, dateISO, rows){
-    // لكل حيوان: kg اليوم + DIM من آخر ولادة + بعض البيانات الاختيارية
+    let skipped = 0;
     const pts=[];
     for (const r of rows){
       const number = String(r.animalNumber || r.number || '').trim();
       const kg = Number(r.milkKg || r.milk || 0) || 0;
-      let dim = 0;
-      try{
-        const lastCalv = await qLastCalving(uid, number);
-        if (lastCalv) dim = daysBetweenISO(lastCalv, dateISO);
-      }catch(_){}
+
+      let dimISO = await qLastCalving(uid, number);
+      if (!dimISO){ skipped++; continue; } // لا نعرض بدون مرجع ولادة
+
+      const dim = daysBetweenISO(dimISO, dateISO);
       const repro = (r.reproStatus || r.reproductiveStatus || r.repro || '—');
       const group = (r.group || r.groupName || '—');
       const m = dateISO.slice(5,7);
       const season = (['12','01','02'].includes(m))? 'شتاء' : (['03','04','05'].includes(m)?'ربيع': (['06','07','08'].includes(m)?'صيف':'خريف'));
       pts.push({number, kg, dim, repro, season, group});
     }
+    $('skipNote').textContent = skipped ? `تم إخفاء ${skipped} حيوان/حيوانات لعدم توفر تاريخ ولادة لديهم.` : '';
     drawScatter(pts);
   }
 
@@ -333,12 +339,8 @@
       $('feedNote').textContent = 'لا توجد تغذية لهذا اليوم';
       return;
     }
-    // نحاول إيجاد totalDmKg/totalCost أو ما شابه
     let totalCost = 0;
-    feeds.forEach(f=>{
-      const c = Number(f.totalCost || f.cost || f.feedCost || 0) || 0;
-      totalCost += c;
-    });
+    feeds.forEach(f=>{ totalCost += Number(f.totalCost || f.cost || f.feedCost || 0) || 0; });
     if (!totalCost){
       $('feedCostPerKg').textContent = '— ج.م/كجم';
       $('feedNote').textContent = 'يُلزم توفر تكلفة التغذية (totalCost)';
@@ -346,19 +348,16 @@
     }
     const perKg = totalCost / milkTotal;
     $('feedCostPerKg').textContent = `${perKg.toFixed(2)} ج.م/كجم`;
-    $('feedNote').textContent = `إجمالي تكلفة التغذية/اليوم: ${totalCost.toFixed(0)} ج.م`;
+    $('feedNote').textContent = `إجمالي تكلفة تغذية اليوم: ${totalCost.toFixed(0)} ج.م`;
   }
 
-  // ==== التحميل الرئيسي ====
+  // ---------- Load ----------
   async function loadAll(){
     hideMsg();
-    const uid = await getUid(); // قد يكون فاضي
+    const uid = await getUid();
     const requested = ymd($('reportDate').value || todayISO());
-
-    // هات بيانات اليوم المطلوب
     let dayRows = await qByDate(uid, requested);
 
-    // لو مفيش، حمّل آخر يوم متاح ثم اعرض ملاحظة
     if (!dayRows.length){
       const last = await qLatestDate(uid);
       if (last){
@@ -371,27 +370,18 @@
     }
 
     const dateISO = $('reportDate').value || requested;
-
-    // الشهر والسنة
     const {start:ms, end:me} = monthBounds(dateISO);
     const {start:ys, end:ye} = yearBounds(dateISO);
     const monthRows = await qByRange(uid, ms, me);
     const yearRows  = await qByRange(uid, ys, ye);
 
-    // إجمالي الحيوانات (اختياري) — نستخدم عدد السجلات اليومية كعدد حلاب
-    // لو محتاج إجمالي القطيع فعلي، ممكن تجيبه من animals لاحقًا.
     putKpis(dayRows, monthRows, yearRows, undefined);
-
-    // Scatter
     await buildScatter(uid, dateISO, dayRows);
-
-    // التغذية
     await calcFeedCost(uid, dateISO, dayRows);
 
     $('lastUpdate').textContent = `آخر تحديث: ${new Date().toLocaleTimeString()}`;
   }
 
-  // تهيئة التاريخ + ربط الأزرار
   (function init(){
     const qs = new URLSearchParams(location.search);
     const dt = qs.get('date') || qs.get('eventDate') || todayISO();
