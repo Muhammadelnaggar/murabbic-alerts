@@ -4,418 +4,402 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تقرير اللبن — مُرَبِّك</title>
-  <link rel="stylesheet" href="css/forms.css" />
-  <!-- Chart.js للرسم -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/forms.css">
+  <script type="module" src="js/forms-init.js"></script>
   <style>
     :root{
-      --green:#0ea05a; --green-600:#0b7f47; --muted:#64748b; --card:#fff;
-      --border:#e2e8f0; --bg:#f7faf7; --danger:#b91c1c; --amber:#b45309;
+      --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a;
+      --muted:#64748b; --card:#fff; --border:#e2e8f0; --warn:#f59e0b; --danger:#dc2626
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);font-family:'Cairo',system-ui,Arial}
-    header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--border)}
-    .bar{max-width:980px;margin:0 auto;padding:10px 12px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600)}
+    body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border)}
+    .bar{max-width:960px;margin:0 auto;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .title{font-weight:800;color:var(--green-600);display:flex;gap:8px;align-items:center}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .btn{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 12px;font-weight:700;cursor:pointer}
-    .btn.brand{background:var(--green);border-color:var(--green);color:#fff}
-    main{max-width:980px;margin:10px auto;padding:12px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px}
-    @media(min-width:720px){ .grid{grid-template-columns:1.1fr .9fr} }
-    .kpis{display:grid;grid-template-columns:1fr;gap:10px}
-    @media(min-width:560px){ .kpis{grid-template-columns:repeat(2,1fr)} }
-    .kpi{border:1px solid var(--border);border-radius:12px;padding:12px}
-    .kpi h4{margin:0 0 6px 0;font-size:14px;color:#0f172a}
-    .kpi .v{font-size:18px;font-weight:800}
-    .muted{color:var(--muted);font-size:13px}
-    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-    .alert{margin:8px 0;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700}
+    .chip{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-weight:700;cursor:pointer}
+    .chip.primary{background:var(--green);color:#fff;border-color:var(--green)}
+    main{max-width:960px;margin:14px auto;padding:10px}
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:640px){ .row{grid-template-columns:repeat(2,1fr)} }
+    @media(min-width:920px){ .row{grid-template-columns:repeat(3,1fr)} }
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .kpi{display:flex;flex-direction:column;gap:6px}
+    .kpi h3{margin:0;font-size:14px;color:#0f172a}
+    .kpi .num{font-weight:900;font-size:22px}
+    .kpi small{color:var(--muted)}
+
+    .inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    input[type="date"]{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px}
+
+    .notice{margin:10px 0;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700}
     .ok{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
-    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type="date"], select{padding:8px 10px;border:1px solid var(--border);border-radius:10px}
-    .legend{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
-    .dot{display:inline-block;width:10px;height:10px;border-radius:50%}
-    canvas{max-width:100%}
-    .footer-note{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+
+    canvas{width:100%;height:320px;max-height:50vh}
+
+    /* موبايل: بطاقات بفل سكرين تقريبا */
+    @media(max-width:420px){
+      .kpi .num{font-size:20px}
+      .bar .actions{width:100%;justify-content:flex-end}
+    }
   </style>
 </head>
 <body>
 <header>
   <div class="bar">
-    <div class="title">تقرير اللبن</div>
+    <div class="title">📊 تقرير اللبن</div>
     <div class="actions">
-      <a class="btn" href="add-daily-milk.html">إدخالٍ يومي</a>
-      <a class="btn" href="add-event.html">الأحداث</a>
-      <button id="refreshBtn" class="btn brand">تحديث</button>
+      <a class="chip" href="daily-milk.html">إدخال يومي</a>
+      <a class="chip" href="add-event.html">الأحداث</a>
+      <button id="btnRefresh" class="chip primary">تحديث</button>
     </div>
   </div>
 </header>
 
 <main>
+  <div class="card inline" style="justify-content:space-between">
+    <div class="inline">
+      <label for="reportDate" style="font-weight:700">تاريخ العرض:</label>
+      <input id="reportDate" type="date">
+    </div>
+    <div id="lastUpdate" class="inline" style="color:var(--muted);font-size:13px"></div>
+  </div>
+
+  <div id="msg" class="notice" style="display:none"></div>
+
+  <div class="row" id="kpis">
+    <div class="card kpi">
+      <h3>إجمالي اليوم</h3>
+      <div class="num" id="sumDay">— كجم</div>
+      <small id="sumDayBreak">أبقار: — • جاموس: —</small>
+    </div>
+    <div class="card kpi">
+      <h3>إجمالي الشهر</h3>
+      <div class="num" id="sumMonth">— كجم</div>
+      <small id="sumMonthBreak">أبقار: — • جاموس: —</small>
+    </div>
+    <div class="card kpi">
+      <h3>إجمالي السنة</h3>
+      <div class="num" id="sumYear">— كجم</div>
+      <small id="sumYearBreak">أبقار: — • جاموس: —</small>
+    </div>
+    <div class="card kpi">
+      <h3>متوسط القطيع اليومي</h3>
+      <div class="num" id="avgHerd">— كجم/رأس</div>
+      <small id="milkersCount">عدد الحلّاب: — / إجمالي: —</small>
+    </div>
+    <div class="card kpi">
+      <h3>متوسط تكلفة كجم اللبن (تغذية)</h3>
+      <div class="num" id="feedCostPerKg">— ج.م/كجم</div>
+      <small id="feedNote">يتطلب حدث تغذية لليوم</small>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="toolbar">
-      <label class="muted">تاريخ العرض:</label>
-      <input type="date" id="viewDate" />
-      <span id="usedDateText" class="muted"></span>
-    </div>
-    <div id="topMsg" class="alert" style="display:none"></div>
-
-    <div class="grid" style="margin-top:8px">
-      <!-- يسار: المؤشرات -->
-      <section class="kpis">
-        <div class="kpi">
-          <h4>إجمالي اليوم</h4>
-          <div class="v"><span id="totDay">—</span> كجم</div>
-          <div class="muted">أبقار: <span id="totDayC">—</span> — جاموس: <span id="totDayB">—</span></div>
-        </div>
-        <div class="kpi">
-          <h4>إجمالي الشهر</h4>
-          <div class="v"><span id="totMonth">—</span> كجم</div>
-          <div class="muted">أبقار: <span id="totMonthC">—</span> — جاموس: <span id="totMonthB">—</span></div>
-        </div>
-        <div class="kpi">
-          <h4>إجمالي السنة</h4>
-          <div class="v"><span id="totYear">—</span> كجم</div>
-          <div class="muted">أبقار: <span id="totYearC">—</span> — جاموس: <span id="totYearB">—</span></div>
-        </div>
-        <div class="kpi">
-          <h4>متوسط القطيع اليومي</h4>
-          <div class="v"><span id="avgHerd">—</span> كجم/رأس</div>
-          <div class="muted">عدد الحلّاب: <span id="milkingCount">—</span></div>
-        </div>
-        <div class="kpi">
-          <h4>متوسط تكلفة كجم اللبن (تغذية)</h4>
-          <div class="v"><span id="costKg">—</span> ج.م/كجم</div>
-          <div class="muted">يُحسب من آخر خلطة مادة جافة</div>
-        </div>
-      </section>
-
-      <!-- يمين: الرسم -->
-      <section class="card" style="padding:10px">
-        <div class="legend">
-          <span><span class="dot" style="background:#2563eb"></span> أبقار</span>
-          <span><span class="dot" style="background:#16a34a"></span> جاموس</span>
-        </div>
-        <canvas id="scatter" height="260"></canvas>
-        <div class="footer-note">الرسم: (أيام الحليب ←) مقابل (الإنتاج اليومي ↑)</div>
-      </section>
-    </div>
+    <h3 style="margin:0 0 8px 0">خريطة الأفراد (Scatter): أيام الحليب × كجم/اليوم</h3>
+    <canvas id="scatter"></canvas>
+    <small style="color:var(--muted)">انقر على النقطة لفتح بطاقة الحيوان</small>
   </div>
 </main>
 
-<!-- Firebase -->
+<!-- Firebase + Chart.js -->
 <script type="module" src="/js/firebase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<!-- منطق الصفحة -->
 <script type="module">
-import { db, auth } from '/js/firebase-config.js';
-import {
-  collection, query, where, orderBy, limit, getDocs
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  import { db, auth } from '/js/firebase-config.js';
+  import {
+    collection, query, where, orderBy, limit, getDocs, startAt, endAt
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-const $ = id => document.getElementById(id);
-const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-const toISO = s => {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return s;
-  const d = new Date(s||''); if (isNaN(d)) return '';
-  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-};
-const todayISO = ()=>{ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+  // ==== أدوات مساعدة ====
+  const $ = id => document.getElementById(id);
+  const DIGITS={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  const toLatin = s => String(s||'').replace(/[٠-٩۰-۹]/g,d=>DIGITS[d]).replace(/[^\d]/g,'');
+  const TYPES = ['لبن يومي','milk','daily_milk'];
 
-async function getUid(){
-  if (auth.currentUser) return auth.currentUser.uid;
-  const u = await new Promise(res=>onAuthStateChanged(auth, x=>res(x)));
-  return u?.uid || '';
-}
-
-/* ------------- جلب آخر تاريخ متاح لحدث "إنتاج اللبن اليومي" ------------- */
-async function getLatestMilkDate(uid, upToISO=''){
-  const types = ['إنتاج اللبن اليومي','daily_milk','milk'];
-  const q1 = query(
-    collection(db,'events'),
-    where('userId','==', uid),
-    where('eventType','in', types),
-    orderBy('eventDate','desc'),
-    limit(500)
-  );
-  const snap = await getDocs(q1);
-  let firstDate = '';
-  for (const d of snap.docs){
-    const ev = d.data()||{};
-    const dt = ev.eventDate;
-    if (!firstDate) firstDate = dt;
-    if (!upToISO || dt <= upToISO) return dt;
+  function todayISO(){
+    const d=new Date(); d.setHours(0,0,0,0);
+    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
   }
-  return firstDate; // قد يكون فاضي لو مفيش بيانات
-}
-
-/* --------- جلب سجلات اليوم المختار (أفراد) + ملخصات وتوزيع النوع --------- */
-async function getMilkForDate(uid, dateISO){
-  const types = ['إنتاج اللبن اليومي','daily_milk','milk'];
-  const q1 = query(
-    collection(db,'events'),
-    where('userId','==', uid),
-    where('eventType','in', types),
-    where('eventDate','==', dateISO),
-    orderBy('animalNumber','asc')
-  );
-  const snap = await getDocs(q1);
-  const rows = [];
-  for (const d of snap.docs){
-    const x = d.data() || {};
-    const milk = Number(x.milk || x.milkKg || x.yield || x.amount || 0);
-    const sp   = (x.species || x.animalTypeAr || '').trim() || 'أبقار';
-    const num  = (x.animalNumber || x.number || '').toString().replace(/[٠-٩۰-۹]/g, c=>DIGITS[c]);
-    rows.push({
-      animalNumber:num, milk, species: (/جاموس|buffalo/i.test(sp)? 'جاموس':'أبقار'),
-      group: (x.group || x.groupName || '') || '—',
-      season: (x.season || '') || '—',
-      repro: (x.reproStatus || x.reproductiveStatus || x.status || '') || '—'
-    });
+  function ymd(date){ return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayISO(); }
+  function daysBetweenISO(a,b){
+    const A=new Date(a), B=new Date(b);
+    A.setHours(0,0,0,0); B.setHours(0,0,0,0);
+    return Math.round((B-A)/86400000);
   }
-  return rows;
-}
-
-/* --------- آخر ولادة للحيوان لحساب Days in Milk --------- */
-async function getLastCalvingDate(uid, animalNumber, upToISO){
-  const q1 = query(
-    collection(db,'events'),
-    where('userId','==', uid),
-    where('animalNumber','==', animalNumber),
-    where('eventType','in', ['ولادة','calving']),
-    orderBy('eventDate','desc'),
-    limit(1)
-  );
-  const s = await getDocs(q1);
-  if (s.empty) return '';
-  const d = s.docs[0].data()||{};
-  const dt = d.eventDate || '';
-  return (upToISO && dt>upToISO) ? '' : dt;
-}
-
-/* --------- عدد الحلّاب من "animals" (إن وُجد) كدعم --------- */
-async function getMilkingCount(uid){
-  // نحاول أكثر من أسلوب للملفّات المختلفة
-  const q1 = query(collection(db,'animals'), where('userId','==', uid), limit(400));
-  const s = await getDocs(q1);
-  let milking=0;
-  s.forEach(doc=>{
-    const a = doc.data()||{};
-    const st = (a.productionStatus || a.statusAr || a.status || '').toString();
-    if (/حلاب|حلّاب|lactating|milking/i.test(st)) milking++;
-  });
-  return milking || null; // لو 0 نرجّع null علشان ما يضللش
-}
-
-/* --------- آخر خلطة مادة جافة لحساب تكلفة كجم اللبن --------- */
-async function getLastRation(uid, upToISO){
-  // نتوقع وثائق rations: { userId, date, dmPricePerKg, dmiKgPerHead, milkPerHead }
-  const q1 = query(
-    collection(db,'rations'),
-    where('userId','==', uid),
-    orderBy('date','desc'),
-    limit(50)
-  );
-  const s = await getDocs(q1);
-  for (const d of s.docs){
-    const r = d.data()||{};
-    const dt = r.date; if (!dt) continue;
-    if (!upToISO || dt <= upToISO){
-      return {
-        dmPrice: Number(r.dmPricePerKg || r.dm_cost_kg || 0),
-        dmi:     Number(r.dmiKgPerHead || r.dmi || 0),
-        milk:    Number(r.milkPerHead || 0)
-      };
-    }
+  function monthBounds(dISO){
+    const d=new Date(dISO); d.setDate(1);
+    const start = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    const next = new Date(d); next.setMonth(next.getMonth()+1); next.setDate(1);
+    const end = new Date(next.getTime()-next.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    return {start,end}; // [start, end)
   }
-  return null;
-}
+  function yearBounds(dISO){
+    const y = dISO.slice(0,4);
+    return {start: `${y}-01-01`, end: `${(+y+1)}-01-01`};
+  }
+  function normKind(v){
+    if (/buffalo|جاموس/i.test(v)) return 'جاموس';
+    return 'أبقار';
+  }
+  function show(msg, ok=false){
+    const el = $('msg');
+    el.style.display='block';
+    el.className = 'notice ' + (ok ? 'ok' : '');
+    el.textContent = msg;
+  }
+  function hideMsg(){ $('msg').style.display='none'; }
 
-/* --------------------------- UI / حسابات --------------------------- */
-let chart;
-function setMsg(text, ok=false){
-  const el = $('topMsg');
-  if (!text){ el.style.display='none'; el.textContent=''; return; }
-  el.className = ok ? 'alert ok' : 'alert';
-  el.textContent = text;
-  el.style.display = 'block';
-}
+  async function getUid(){
+    if (auth.currentUser) return auth.currentUser.uid;
+    const u = await new Promise(res=>onAuthStateChanged(auth, x=>res(x)));
+    return u?.uid || '';
+  }
 
-function daysBetween(a,b){
-  const A=new Date(a), B=new Date(b); A.setHours(0,0,0,0); B.setHours(0,0,0,0);
-  return Math.round((B-A)/86400000);
-}
-
-function fmt(n){ return (isNaN(n)||n==null)? '—' : Number(n).toLocaleString('ar-EG', {maximumFractionDigits:1}); }
-
-async function refresh(){
-  try{
-    setMsg('…جارِ تحميل آخر بيانات متاحة');
-    const uid = await getUid();
-    if (!uid) { setMsg('سجّل الدخول أولًا'); return; }
-
-    const asked = toISO($('viewDate').value) || todayISO();
-    let used = await getLatestMilkDate(uid, asked);
-    if (!used){
-      // لا توجد سجلات إطلاقًا
-      $('usedDateText').textContent = '';
-      setMsg('لا توجد سجلات لبن محفوظة حتى الآن', false);
-      // صفّر المؤشرات
-      ['totDay','totMonth','totYear','avgHerd','totDayC','totDayB','totMonthC','totMonthB','totYearC','totYearB','milkingCount','costKg']
-        .forEach(id=>$(id).textContent='—');
-      if (chart){ chart.destroy(); chart=null; }
-      return;
+  // ==== استعلامات مرنة (تحترم/تتجاهل userId) ====
+  async function qLatestDate(uid){
+    // جرّب كل التسميات وبـ userId، ثم بدون userId
+    for (const withUser of [true,false]){
+      for (const t of TYPES){
+        const q1 = withUser && uid
+          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate','desc'), limit(1))
+          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate','desc'), limit(1));
+        const s = await getDocs(q1);
+        if (!s.empty) return s.docs[0].data().eventDate;
+      }
     }
+    return null;
+  }
 
-    $('usedDateText').textContent = `(آخر متاح: ${used})`;
-
-    // بيانات اليوم المختار (المتاح)
-    const rows = await getMilkForDate(uid, used);
-    if (!rows.length){
-      setMsg(`لا توجد سجلات لليوم ${asked}. تم عرض آخر تاريخ متاح: ${used}.`, false);
-    }else{
-      setMsg(`تم عرض بيانات يوم ${used}`, true);
+  async function qByDate(uid, dateISO){
+    for (const withUser of [true,false]){
+      let bag = [];
+      for (const t of TYPES){
+        const q1 = withUser && uid
+          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), where('eventDate','==',dateISO), limit(500))
+          : query(collection(db,'events'), where('eventType','==',t), where('eventDate','==',dateISO), limit(500));
+        const s = await getDocs(q1);
+        s.forEach(d=>bag.push(d.data()));
+      }
+      if (bag.length) return bag;
     }
+    return [];
+  }
 
-    // إجمالي اليوم + حسب النوع
-    const sumBy = (arr, pred)=>arr.reduce((a,x)=>a+(pred?pred(x):x),0);
-    const dayC = sumBy(rows, r=> r.species==='أبقار' ? (r.milk||0) : 0);
-    const dayB = sumBy(rows, r=> r.species==='جاموس' ? (r.milk||0) : 0);
-    $('totDay').textContent   = fmt(dayC + dayB);
-    $('totDayC').textContent  = fmt(dayC);
-    $('totDayB').textContent  = fmt(dayB);
-
-    // عدد الحلّاب = عدد الحيوانات التي لديها سجل في هذا اليوم (أقرب تعريف) أو من animals
-    const uniq = new Set(rows.map(r=>r.animalNumber).filter(Boolean));
-    let milkingCount = uniq.size;
-    if (!milkingCount){
-      const fromAnimals = await getMilkingCount(uid);
-      if (fromAnimals) milkingCount = fromAnimals;
+  async function qByRange(uid, startISO, endISO){
+    // [start, end) على نفس الحقل eventDate
+    for (const withUser of [true,false]){
+      let bag = [];
+      for (const t of TYPES){
+        const q1 = withUser && uid
+          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endAt(endISO))
+          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endAt(endISO));
+        const s = await getDocs(q1);
+        s.forEach(d=>bag.push(d.data()));
+      }
+      if (bag.length) return bag;
     }
-    $('milkingCount').textContent = milkingCount || '—';
-    $('avgHerd').textContent = (milkingCount && (dayC+dayB)) ? fmt((dayC+dayB)/milkingCount) : '—';
+    return [];
+  }
 
-    // إجمالي الشهر/السنة: نجيب آخر 500 حدث ونجمّع
-    const qAgg = query(
-      collection(db,'events'),
-      where('userId','==', uid),
-      where('eventType','in',['إنتاج اللبن اليومي','daily_milk','milk']),
-      orderBy('eventDate','desc'),
-      limit(500)
-    );
-    const sAgg = await getDocs(qAgg);
-    const ym = used.slice(0,7), yy = used.slice(0,4);
-    let mC=0,mB=0,yC=0,yB=0;
-    sAgg.forEach(d=>{
-      const x=d.data()||{}; const dt=x.eventDate||''; if (!dt) return;
-      const sp=(x.species||x.animalTypeAr||'').match(/جاموس|buffalo/i)?'B':'C';
-      const milk=Number(x.milk||x.milkKg||x.yield||x.amount||0);
-      if (dt.startsWith(ym)){ if (sp==='C') mC+=milk; else mB+=milk; }
-      if (dt.startsWith(yy)){ if (sp==='C') yC+=milk; else yB+=milk; }
-    });
-    $('totMonth').textContent = fmt(mC+mB);
-    $('totMonthC').textContent= fmt(mC);
-    $('totMonthB').textContent= fmt(mB);
-    $('totYear').textContent  = fmt(yC+yB);
-    $('totYearC').textContent = fmt(yC);
-    $('totYearB').textContent = fmt(yB);
-
-    // تكلفة كجم اللبن (لو فيه rations)
-    const ration = await getLastRation(uid, used);
-    if (ration && ration.dmPrice>0 && ration.dmi>0 && ration.milk>0){
-      const cost = (ration.dmPrice * ration.dmi) / ration.milk;
-      $('costKg').textContent = fmt(cost);
-    }else{
-      $('costKg').textContent = '—';
+  async function qLastCalving(uid, animalNumber){
+    // آخر ولادة لهذا الحيوان
+    const num = String(animalNumber||'').trim();
+    // لو فيه userId كويس، وإلا هات أي
+    for (const withUser of [true,false]){
+      const q1 = withUser && uid
+        ? query(collection(db,'events'), where('userId','==',uid), where('animalNumber','==',num), where('eventType','==','ولادة'), orderBy('eventDate','desc'), limit(1))
+        : query(collection(db,'events'), where('animalNumber','==',num), where('eventType','==','ولادة'), orderBy('eventDate','desc'), limit(1));
+      const s = await getDocs(q1);
+      if (!s.empty) return s.docs[0].data().eventDate;
     }
+    return null;
+  }
 
-    // رسم مبعثر: لازم نضيف Days in Milk أولًا
-    const points = [];
+  // ==== حسابات ====
+  function splitByKind(rows){
+    const o={all:0,cow:0,buff:0};
     for (const r of rows){
-      if (!r.animalNumber) continue;
-      const lastCalv = await getLastCalvingDate(uid, r.animalNumber, used);
-      const dim = lastCalv ? daysBetween(lastCalv, used) : null;
-      points.push({
-        x: dim ?? 0,
-        y: Number(r.milk||0),
-        species: r.species,
-        label: r.animalNumber,
-        meta: {
-          dim: dim ?? '—',
-          repro: r.repro || '—',
-          season: r.season || '—',
-          group: r.group || '—'
-        }
-      });
+      const kg = Number(r.milkKg || r.milk || 0) || 0;
+      const k  = normKind(r.kind || r.species || r.animalType || r.animalTypeAr || '');
+      o.all += kg;
+      if (k==='جاموس') o.buff += kg; else o.cow += kg;
     }
+    return o;
+  }
 
-    // ارسم
-    const ctx = $('scatter').getContext('2d');
-    if (chart) chart.destroy();
+  // تغذية: نحاول إيجاد cost/DM لليوم — (اختياري)
+  async function qFeedForDay(uid, dateISO){
+    for (const withUser of [true,false]){
+      const q1 = withUser && uid
+        ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50))
+        : query(collection(db,'events'), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50));
+      const s = await getDocs(q1);
+      const rows=[]; s.forEach(d=>rows.push(d.data()));
+      if (rows.length) return rows;
+    }
+    return [];
+  }
+
+  // ==== واجهة ====
+  let chart=null;
+  function drawScatter(points){
+    const ctx = $('scatter');
+    if (chart){ chart.destroy(); chart=null; }
     chart = new Chart(ctx, {
-      type: 'scatter',
-      data: {
-        datasets: [
-          {
-            label: 'أبقار',
-            data: points.filter(p=>p.species==='أبقار').map(p=>({x:p.x,y:p.y, _meta:p})),
-            backgroundColor: '#2563eb88',
-            borderColor: '#2563eb',
-            pointRadius: 4
-          },
-          {
-            label: 'جاموس',
-            data: points.filter(p=>p.species==='جاموس').map(p=>({x:p.x,y:p.y, _meta:p})),
-            backgroundColor: '#16a34a88',
-            borderColor: '#16a34a',
-            pointRadius: 4
-          }
-        ]
+      type:'scatter',
+      data:{
+        datasets:[{
+          label:'أفراد القطيع',
+          data: points.map(p=>({x:p.dim, y:p.kg, _meta:p})),
+          pointRadius:5,
+        }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: { title: { display:true, text:'أيام الحليب (DIM)' } },
-          y: { title: { display:true, text:'إنتاج يومي (كجم)' } }
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        scales:{
+          x:{ title:{display:true,text:'أيام الحليب'} },
+          y:{ title:{display:true,text:'كجم/اليوم'} }
         },
-        plugins: {
-          tooltip: {
+        plugins:{
+          tooltip:{
             callbacks:{
               label(ctx){
                 const m = ctx.raw._meta;
-                return [
-                  `حيوان: ${m.label||ctx.raw._meta.label}`,
-                  `DIM: ${m.dim}`,
-                  `إنتاج: ${ctx.parsed.y} كجم`,
-                  `حالة تناسلية: ${m.repro}`,
-                  `الموسم: ${m.season}`,
-                  `المجموعة: ${m.group}`
-                ];
+                return `${m.number} — ${ctx.parsed.y} كجم • ${ctx.parsed.x} يوم\nحالة: ${m.repro||'—'} • موسم: ${m.season||'—'} • مجموعة: ${m.group||'—'}`;
               }
             }
-          },
-          legend: { position:'top' }
+          }
+        },
+        onClick(evt, els){
+          if (!els?.length) return;
+          const m = els[0].element.$context.raw._meta;
+          if (m?.number){
+            location.href = `cow-card.html?number=${encodeURIComponent(m.number)}`;
+          }
         }
       }
     });
-
-  }catch(err){
-    console.error(err);
-    setMsg('تعذّر تحميل التقرير الآن', false);
   }
-}
 
-/* ------------- تهيئة واجهة الموبايل + الأحداث ------------- */
-document.addEventListener('DOMContentLoaded', ()=>{
-  $('viewDate').value = todayISO();
-  $('refreshBtn').addEventListener('click', refresh);
-  $('viewDate').addEventListener('change', refresh);
-  refresh(); // تحميل أولي
-});
+  function putKpis(dayRows, monthRows, yearRows, totalAnimals){
+    const d = splitByKind(dayRows);
+    const m = splitByKind(monthRows);
+    const y = splitByKind(yearRows);
+
+    $('sumDay').textContent   = `${(d.all||0).toLocaleString()} كجم`;
+    $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
+
+    $('sumMonth').textContent = `${(m.all||0).toLocaleString()} كجم`;
+    $('sumMonthBreak').textContent = `أبقار: ${m.cow||0} • جاموس: ${m.buff||0}`;
+
+    $('sumYear').textContent  = `${(y.all||0).toLocaleString()} كجم`;
+    $('sumYearBreak').textContent = `أبقار: ${y.cow||0} • جاموس: ${y.buff||0}`;
+
+    const milkers = dayRows.length; // عدد الحلّاب = عدد السجلات اليومية
+    $('avgHerd').textContent = milkers ? `${(d.all/milkers).toFixed(1)} كجم/رأس` : '— كجم/رأس';
+    $('milkersCount').textContent = `عدد الحلّاب: ${milkers} / إجمالي: ${totalAnimals ?? '—'}`;
+  }
+
+  async function buildScatter(uid, dateISO, rows){
+    // لكل حيوان: kg اليوم + DIM من آخر ولادة + بعض البيانات الاختيارية
+    const pts=[];
+    for (const r of rows){
+      const number = String(r.animalNumber || r.number || '').trim();
+      const kg = Number(r.milkKg || r.milk || 0) || 0;
+      let dim = 0;
+      try{
+        const lastCalv = await qLastCalving(uid, number);
+        if (lastCalv) dim = daysBetweenISO(lastCalv, dateISO);
+      }catch(_){}
+      const repro = (r.reproStatus || r.reproductiveStatus || r.repro || '—');
+      const group = (r.group || r.groupName || '—');
+      const m = dateISO.slice(5,7);
+      const season = (['12','01','02'].includes(m))? 'شتاء' : (['03','04','05'].includes(m)?'ربيع': (['06','07','08'].includes(m)?'صيف':'خريف'));
+      pts.push({number, kg, dim, repro, season, group});
+    }
+    drawScatter(pts);
+  }
+
+  async function calcFeedCost(uid, dateISO, dayRows){
+    const milkTotal = dayRows.reduce((s,r)=>s + (Number(r.milkKg||r.milk||0)||0), 0);
+    const feeds = await qFeedForDay(uid, dateISO);
+    if (!milkTotal || !feeds.length){
+      $('feedCostPerKg').textContent = '— ج.م/كجم';
+      $('feedNote').textContent = 'لا توجد تغذية لهذا اليوم';
+      return;
+    }
+    // نحاول إيجاد totalDmKg/totalCost أو ما شابه
+    let totalCost = 0;
+    feeds.forEach(f=>{
+      const c = Number(f.totalCost || f.cost || f.feedCost || 0) || 0;
+      totalCost += c;
+    });
+    if (!totalCost){
+      $('feedCostPerKg').textContent = '— ج.م/كجم';
+      $('feedNote').textContent = 'يُلزم توفر تكلفة التغذية (totalCost)';
+      return;
+    }
+    const perKg = totalCost / milkTotal;
+    $('feedCostPerKg').textContent = `${perKg.toFixed(2)} ج.م/كجم`;
+    $('feedNote').textContent = `إجمالي تكلفة التغذية/اليوم: ${totalCost.toFixed(0)} ج.م`;
+  }
+
+  // ==== التحميل الرئيسي ====
+  async function loadAll(){
+    hideMsg();
+    const uid = await getUid(); // قد يكون فاضي
+    const requested = ymd($('reportDate').value || todayISO());
+
+    // هات بيانات اليوم المطلوب
+    let dayRows = await qByDate(uid, requested);
+
+    // لو مفيش، حمّل آخر يوم متاح ثم اعرض ملاحظة
+    if (!dayRows.length){
+      const last = await qLatestDate(uid);
+      if (last){
+        $('reportDate').value = last;
+        dayRows = await qByDate(uid, last);
+        show(`لا توجد سجلات لبن لليوم ${requested}. تم عرض آخر يوم متاح: ${last}.`);
+      }else{
+        show('لا توجد سجلات لبن محفوظة حتى الآن.');
+      }
+    }
+
+    const dateISO = $('reportDate').value || requested;
+
+    // الشهر والسنة
+    const {start:ms, end:me} = monthBounds(dateISO);
+    const {start:ys, end:ye} = yearBounds(dateISO);
+    const monthRows = await qByRange(uid, ms, me);
+    const yearRows  = await qByRange(uid, ys, ye);
+
+    // إجمالي الحيوانات (اختياري) — نستخدم عدد السجلات اليومية كعدد حلاب
+    // لو محتاج إجمالي القطيع فعلي، ممكن تجيبه من animals لاحقًا.
+    putKpis(dayRows, monthRows, yearRows, undefined);
+
+    // Scatter
+    await buildScatter(uid, dateISO, dayRows);
+
+    // التغذية
+    await calcFeedCost(uid, dateISO, dayRows);
+
+    $('lastUpdate').textContent = `آخر تحديث: ${new Date().toLocaleTimeString()}`;
+  }
+
+  // تهيئة التاريخ + ربط الأزرار
+  (function init(){
+    const qs = new URLSearchParams(location.search);
+    const dt = qs.get('date') || qs.get('eventDate') || todayISO();
+    $('reportDate').value = ymd(dt);
+    $('reportDate').addEventListener('change', loadAll);
+    $('btnRefresh').addEventListener('click', loadAll, {passive:true});
+    loadAll();
+  })();
 </script>
 </body>
 </html>
