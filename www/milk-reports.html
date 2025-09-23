@@ -37,6 +37,7 @@
       padding:10px 12px; border:1px solid var(--border); border-radius:12px;
       background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
       font-size:14px; line-height:1.5; color:var(--text);
+      pointer-events:auto; /* علشان أزرار الهنت تشتغل */
     }
     .hint .row{display:flex;gap:6px}
     .hint .k{color:#64748b;min-width:130px}
@@ -278,9 +279,8 @@
 
   // ---------- خريطة “القيمة السابقة” لقياس التغيير ----------
   async function buildPrevMap(uid, dateISO, numbers){
-    // هنجيب آخر 7 أيام قبل تاريخ العرض مرة واحدة ونستخرج أقرب تسجيل سابق لكل رقم
     const start = addDaysISO(dateISO, -7);
-    const rows = await qByRange(uid, start, dateISO); // endBefore(dateISO) ⇒ أقل من اليوم
+    const rows = await qByRange(uid, start, dateISO); // أقل من اليوم
     const map = new Map(); // number -> {kg, date}
     for (const r of rows){
       const num = String(r.animalNumber || r.number || '').trim();
@@ -290,7 +290,6 @@
       const cur = map.get(num);
       if (!cur || cur.date < dt) map.set(num, { kg, date: dt });
     }
-    // لو محتاج نضمن وجود مفاتيح لكل أرقام اليوم:
     numbers.forEach(n => { if (!map.has(n)) map.set(n, null); });
     return map;
   }
@@ -322,8 +321,7 @@
     $('hRepro').textContent = meta.repro ?? '—';
     $('hSeason').textContent= meta.season ?? '—';
     $('hGroup').textContent = meta.group ?? '—';
-    const deltaTxt = formatDelta(meta.deltaPct);
-    $('hDelta').textContent = deltaTxt;
+    $('hDelta').textContent = formatDelta(meta.deltaPct);
   }
 
   function externalTooltipHandler(ctx){
@@ -340,11 +338,9 @@
 
     if (scatterChart){ scatterChart.destroy(); scatterChart = null; }
 
-    // yMax لأقرب مضاعف 5 (حد أدنى 10)
     const maxY = Math.max(0, ...points.map(p => Number(p.kg) || 0));
     const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
 
-    // xMax لأقرب مضاعف 30 (حد أدنى 30) — مع بداية من 0
     const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
     const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
 
@@ -363,7 +359,6 @@
         parsing: false,
         plugins: {
           legend: { display: false },
-          // ✅ الهِنت العائم
           tooltip: { enabled: false, external: externalTooltipHandler }
         },
         scales: {
@@ -387,9 +382,14 @@
           const raw = chartInstance.data.datasets[datasetIndex].data[index];
           const num = raw?._meta?.number;
           if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-        }
+        },
+        events: ['mousemove','mouseout','click','touchstart','touchmove','touchend']
       }
     });
+
+    // إخفاء الهِنت عند مغادرة اللوحة أو نهاية اللمس
+    canvas.addEventListener('mouseleave', () => { hintEl.hidden = true; }, {passive:true});
+    canvas.addEventListener('touchend',   () => { hintEl.hidden = true; }, {passive:true});
   }
 
   // ---------- KPIs ----------
@@ -415,7 +415,7 @@
 
   function putKpis(dayRows, monthRows, yearRows, totalAnimals, prevTotal, prevDate){
     const d = splitByKind(dayRows), m = splitByKind(monthRows), y = splitByKind(yearRows);
-    $('sumDay').firstChild.nodeValue = `${(d.all||0).toLocaleString()} كجم`; // حافظ على الشارة المجاورة
+    $('sumDay').firstChild.nodeValue = `${(d.all||0).toLocaleString()} كجم`; // حافظ على الشارة
     setDayDeltaBadge(d.all||0, prevTotal||0, prevDate||'—');
 
     $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
@@ -497,7 +497,7 @@
 
     const dateISO = $('reportDate').value || requested;
 
-    // إجمالي اليوم السابق (أقرب يوم متاح قبل التاريخ حتى 7 أيام)
+    // إجمالي اليوم السابق (حتى 7 أيام للخلف)
     let prevDate = addDaysISO(dateISO, -1);
     let prevRows = await qByDate(uid, prevDate);
     for (let i=2; i<=7 && !prevRows.length; i++){
@@ -512,7 +512,7 @@
     const monthRows = await qByRange(uid, ms, me);
     const yearRows  = await qByRange(uid, ys, ye);
 
-    // خرائط DIM والقيَم السابقة بالكتلة لأداء أفضل
+    // خرائط DIM والقيَم السابقة
     const numbers = dayRows.map(r => String(r.animalNumber || r.number || '').trim()).filter(Boolean);
     const [dimMap, prevMap] = await Promise.all([
       buildDIMMap(uid, numbers),
@@ -533,7 +533,7 @@
     $('reportDate').addEventListener('change', loadAll, {passive:true});
     $('btnRefresh').addEventListener('click', loadAll, {passive:true});
 
-    // زر إغلاق الهنت وفتح البطاقة
+    // زر إغلاق الهِنت وفتح البطاقة
     $('btnCloseHint')?.addEventListener('click', ()=> hintEl.hidden = true);
     $('btnOpenCard')?.addEventListener('click', ()=> {
       if (lastMeta?.number) location.href = `cow-card.html?number=${encodeURIComponent(lastMeta.number)}`;
