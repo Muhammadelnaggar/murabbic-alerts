@@ -32,17 +32,16 @@
     canvas{width:100%;height:320px;max-height:50vh}
 
     /* الهِنت الخارجي للنقاط */
-   /* الهِنت الخارجي للنقاط */
-.hint{
-  position:absolute; z-index:20; min-width:220px; max-width:90vw;
-  padding:10px 12px; border:1px solid var(--border); border-radius:12px;
-  background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
-  font-size:14px; line-height:1.5; color:var(--text);
-  pointer-events:auto; /* علشان تقدر تضغط الأزرار */
-}
-.hint .row{display:flex;gap:6px}
-.hint .k{color:#64748b;min-width:130px}
-.hint .actions{margin-top:8px;display:flex;gap:6px}
+    .hint{
+      position:absolute; z-index:20; min-width:220px; max-width:90vw;
+      padding:10px 12px; border:1px solid var(--border); border-radius:12px;
+      background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
+      font-size:14px; line-height:1.5; color:var(--text);
+      pointer-events:auto; /* علشان تقدر تضغط الأزرار */
+    }
+    .hint .row{display:flex;gap:6px}
+    .hint .k{color:#64748b;min-width:130px}
+    .hint .actions{margin-top:8px;display:flex;gap:6px}
 
     .btn{appearance:none;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#f8fafc;font-weight:700;cursor:pointer}
     .btn.primary{background:var(--green);border-color:#0ea05a;color:#fff}
@@ -297,149 +296,108 @@
   }
 
   // ---------- Scatter + هِنت عائم ----------
- let scatterChart;
-const hintEl = document.getElementById('pointHint');
-const scatterWrap = document.getElementById('scatterWrap');
-let lastMeta = null;
+  let scatterChart;
 
-let hintPinned = false;
-function hideHintSoon(){
-  clearTimeout(window.__hideHintT);
-  window.__hideHintT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 250);
-}
-hintEl.addEventListener('mouseenter', ()=>{ hintPinned = true; });
-hintEl.addEventListener('mouseleave', ()=>{ hintPinned = false; hideHintSoon(); });
-
-function placeHintNear(chart, caretX, caretY){
-  const rect = chart.canvas.getBoundingClientRect();
-  hintEl.style.left = (rect.left + window.scrollX + caretX + 10) + 'px';
-  hintEl.style.top  = (rect.top  + window.scrollY + caretY + 10) + 'px';
-}
-
-
-
-
-
-  function formatDelta(pct){
-    if (pct == null || Number.isNaN(pct)) return '—';
-    const s = pct > 0 ? '+' : '';
-    return `${s}${pct.toFixed(1)}%`;
-  }
-
-  function fillHint(meta){
-    $('hNo').textContent    = meta.number ?? '—';
-    $('hKg').textContent    = (meta.kg ?? '—') + ' كجم';
-    $('hDim').textContent   = meta.dim ?? '—';
-    $('hRepro').textContent = meta.repro ?? '—';
-    $('hSeason').textContent= meta.season ?? '—';
-    $('hGroup').textContent = meta.group ?? '—';
-    $('hDelta').textContent = formatDelta(meta.deltaPct);
-  }
-
- function externalTooltipHandler(ctx){
-  const { chart, tooltip } = ctx;
   const hintEl = document.getElementById('pointHint');
-  if (!hintEl) return;
+  let lastMeta = null;
+  let hintPinned = false;
+  let hideT;
 
-  // اخفِ الهِنت لو مفيش نقطة تحت المؤشر
-  if (!tooltip || tooltip.opacity === 0){
-    hintEl.hidden = true;
-    return;
-  }
-
-  // أقرب نقطة
-  const dp = tooltip.dataPoints?.[0];
-  if (!dp){
-    hintEl.hidden = true;
-    return;
-  }
-
-  // بياناتنا المخبأة في _meta
-  const meta = dp.raw?._meta || {};
-  window.lastMeta = meta;         // لو عندك lastMeta معرف فوق، ده بس تأكيد
-
-  // عبّي محتوى الهِنت
-  if (typeof fillHint === 'function') fillHint(meta);
-
-  // حط الهِنت جنب المؤشر/النقطة
-  const rect = chart.canvas.getBoundingClientRect();
-  hintEl.style.left = (rect.left + window.scrollX + tooltip.caretX + 10) + 'px';
-  hintEl.style.top  = (rect.top  + window.scrollY + tooltip.caretY + 10) + 'px';
-  hintEl.hidden = false;
-}
-
-
- // ضعها مكان الدالة القديمة بالكامل
-function drawScatter(points){
-  const canvas = document.getElementById('scatter');
-  if (!canvas) return;
-
-  if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
-
-  // حساب حدود المحاور
-  const maxY = Math.max(0, ...points.map(p => Number(p.kg)  || 0));
-  const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
-  const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
-  const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
-
-  scatterChart = new Chart(canvas, {
-    type: 'scatter',
-    data: {
-      datasets: [{
-        label: 'أفراد القطيع',
-        data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
-        pointRadius: 5,
-        pointHoverRadius: 8,
-        pointHitRadius: 18   // ← تكبير منطقة الالتقاط (يسهّل الهوفر/اللمس)
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      parsing: false,
-
-      // ← خلي التفاعل يلقط "أقرب نقطة"
-      interaction: { mode: 'nearest', intersect: true, axis: 'xy' },
-
-      plugins: {
-        legend: { display: false },
-        // ← هنستخدم الهِنت العائم الخارجي
-        tooltip: { enabled: false, external: externalTooltipHandler }
-      },
-      scales: {
-        x: {
-          title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
-          beginAtZero: true, min: 0, suggestedMax: xMax,
-          ticks: { stepSize: 30, precision: 0 }
-        },
-        y: {
-          beginAtZero: true, min: 0, suggestedMax: yMax,
-          ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` }
-        }
-      },
-
-      onHover: (evt, els) => {
-        const el = evt?.native?.target;
-        if (el) el.style.cursor = els?.length ? 'pointer' : 'default';
-      },
-      onClick: (evt, els, chartInstance) => {
-        if (!els?.length) return;
-        const { datasetIndex, index } = els[0];
-        const raw = chartInstance.data.datasets[datasetIndex].data[index];
-        const num = raw?._meta?.number;
-        if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-      },
-
-      // ← دعم اللمس على الموبايل
-      events: ['mousemove','mouseout','click','touchstart','touchmove','touchend']
-    }
+  hintEl.addEventListener('mouseenter', ()=>{ hintPinned = true; clearTimeout(hideT); });
+  hintEl.addEventListener('mouseleave', ()=> {
+    hintPinned = false;
+    clearTimeout(hideT);
+    hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
   });
 
-  // إخفاء الهِنت عند مغادرة اللوحة/نهاية اللمس
-  canvas.addEventListener('mouseleave', () => { document.getElementById('pointHint').hidden = true; }, {passive:true});
-  canvas.addEventListener('touchend',   () => { document.getElementById('pointHint').hidden = true; }, {passive:true});
-}
+  function externalTooltipHandler(ctx){
+    const { chart, tooltip } = ctx;
+    if (!tooltip || tooltip.opacity === 0){
+      clearTimeout(hideT);
+      hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
+      return;
+    }
+    const dp = tooltip.dataPoints?.[0];
+    if (!dp) return;
 
+    const meta = dp.raw?._meta || {};
+    lastMeta = meta;
+
+    document.getElementById('hNo').textContent     = meta.number ?? '—';
+    document.getElementById('hKg').textContent     = (meta.kg ?? '—') + ' كجم';
+    document.getElementById('hDim').textContent    = meta.dim ?? '—';
+    document.getElementById('hRepro').textContent  = meta.repro ?? '—';
+    document.getElementById('hSeason').textContent = meta.season ?? '—';
+    document.getElementById('hGroup').textContent  = meta.group ?? '—';
+    const d = meta.deltaPct;
+    document.getElementById('hDelta').textContent  = (d==null || Number.isNaN(d)) ? '—' : `${d>0?'+':''}${d.toFixed(1)}%`;
+
+    const rect = chart.canvas.getBoundingClientRect();
+    hintEl.style.left = (rect.left + window.scrollX + tooltip.caretX + 10) + 'px';
+    hintEl.style.top  = (rect.top  + window.scrollY + tooltip.caretY + 10) + 'px';
+    hintEl.hidden = false;
+  }
+
+  function drawScatter(points){
+    const canvas = document.getElementById('scatter');
+    if (!canvas) return;
+
+    if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
+
+    const maxY = Math.max(0, ...points.map(p => Number(p.kg)  || 0));
+    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
+    const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
+    const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
+
+    scatterChart = new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: 'أفراد القطيع',
+          data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
+          pointRadius: 5,
+          pointHoverRadius: 10,
+          pointHitRadius: 28
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false, external: externalTooltipHandler }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
+            beginAtZero: true, min: 0, suggestedMax: xMax,
+            ticks: { stepSize: 30, precision: 0 }
+          },
+          y: {
+            beginAtZero: true, min: 0, suggestedMax: yMax,
+            ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` }
+          }
+        },
+        onHover: (evt, els) => {
+          const el = evt?.native?.target;
+          if (el) el.style.cursor = els?.length ? 'pointer' : 'default';
+        },
+        onClick: (evt, els, chartInstance) => {
+          if (!els?.length) return;
+          const { datasetIndex, index } = els[0];
+          const raw = chartInstance.data.datasets[datasetIndex].data[index];
+          const num = raw?._meta?.number;
+          if (num) location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+        },
+        events: ['mousemove','pointermove','mouseout','mouseleave','click','touchstart','touchmove','touchend']
+      }
+    });
+
+    canvas.addEventListener('mouseleave', () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
+    canvas.addEventListener('touchend',   () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
+  }
 
   // ---------- KPIs ----------
   function splitByKind(rows){
@@ -583,7 +541,11 @@ function drawScatter(points){
     $('btnRefresh').addEventListener('click', loadAll, {passive:true});
 
     // زر إغلاق الهِنت وفتح البطاقة
-    $('btnCloseHint')?.addEventListener('click', ()=> hintEl.hidden = true);
+    $('btnCloseHint')?.addEventListener('click', ()=>{
+      hintPinned = false;
+      hintEl.hidden = true;
+    });
+
     $('btnOpenCard')?.addEventListener('click', ()=> {
       if (lastMeta?.number) location.href = `cow-card.html?number=${encodeURIComponent(lastMeta.number)}`;
     });
