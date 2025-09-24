@@ -31,35 +31,24 @@
     .ok{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
     canvas{width:100%;height:320px;max-height:50vh}
 
-    /* الهِنت الخارجي للنقاط */
-    .hint{
-      position:absolute; z-index:20; min-width:220px; max-width:90vw;
-      padding:10px 12px; border:1px solid var(--border); border-radius:12px;
-      background:#ffffff; box-shadow:0 8px 24px rgba(2,6,23,.15);
-      font-size:14px; line-height:1.5; color:var(--text);
-      pointer-events:auto; /* علشان تقدر تضغط الأزرار */
+    /* هِنت مختصر مستقل */
+    .milk-hint{
+      position:absolute; z-index:20; max-width:90vw;
+      padding:8px 10px; border:1px solid var(--border); border-radius:12px;
+      background:#fff; box-shadow:0 8px 24px rgba(2,6,23,.15);
+      font-size:14px; line-height:1.45; color:var(--text); pointer-events:auto
     }
-    .hint .row{display:flex;gap:6px}
-    .hint .k{color:#64748b;min-width:130px}
-    .hint .actions{margin-top:8px;display:flex;gap:6px}
-.hint .hint-line1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:800}
-.hint .hint-line2{color:#64748b;margin-top:4px}
-
+    .milk-hint .line1{display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-weight:800}
+    .milk-hint .line2{color:#64748b; margin-top:2px}
+    .milk-hint .close{position:absolute; top:6px; inset-inline-end:6px}
     .btn{appearance:none;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#f8fafc;font-weight:700;cursor:pointer}
-    .btn.primary{background:var(--green);border-color:#0ea05a;color:#fff}
     .btn.icon{padding:6px 8px}
-
-    /* شارة نسبة التغيير */
+    .btn.primary{background:var(--green);border-color:#0ea05a;color:#fff}
     .delta{display:inline-block;margin-inline-start:8px;padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-size:12px;font-weight:800}
     .delta.up{color:#065f46;background:#ecfdf5;border-color:#bbf7d0}
     .delta.down{color:#991b1b;background:#fef2f2;border-color:#fecaca}
     .delta.neutral{color:#64748b;background:#f1f5f9;border-color:#e2e8f0}
-    /* هِنت مستقل لا يتأثر بتنسيقات الصفحة */
-  .milk-hint{position:absolute;z-index:20;max-width:90vw;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(2,6,23,.15);font-size:14px;line-height:1.45;color:var(--text);pointer-events:auto}
-  .milk-hint .line1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:800}
-  .milk-hint .line2{color:#64748b;margin-top:2px}
-  .milk-hint .actions{display:flex;gap:6px;margin-top:6px;justify-content:flex-end}
-</style>
+  </style>
 </head>
 <body>
 <header>
@@ -119,33 +108,18 @@
     <canvas id="scatter"></canvas>
     <small id="skipNote" style="color:#64748b"></small>
 
-    <!-- الهِنت الخارجي (نسخة مختصرة فوق النقطة) -->
-<div id="pointHint" class="milk-hint" hidden>
-  <div class="line1">
-    <strong id="hNo">#—</strong>
-    <span>•</span>
-    <span id="hKg">— كجم/يوم</span>
-    <span>•</span>
-    <span id="hDim">— يوم</span>
-    <span id="hDelta" class="delta neutral" title="التغير">—</span>
-  </div>
-  <div class="line2" id="hLine2"></div>
-  <div class="actions">
-    <button class="btn icon" id="btnCloseHint" aria-label="إغلاق">✕</button>
-    <button class="btn primary" id="btnOpenCard">فتح البطاقة</button>
-  </div>
-</div>
-</div>
-      <div class="row"><div class="k">رقم:</div><div class="v" id="hNo">—</div></div>
-      <div class="row"><div class="k">كجم اليوم:</div><div class="v" id="hKg">—</div></div>
-      <div class="row"><div class="k">التغيّر عن آخر تسجيل:</div><div class="v" id="hDelta">—</div></div>
-      <div class="row"><div class="k">أيام الحليب:</div><div class="v" id="hDim">—</div></div>
-      <div class="row"><div class="k">حالة تناسلية:</div><div class="v" id="hRepro">—</div></div>
-      <div class="row"><div class="k">الموسم:</div><div class="v" id="hSeason">—</div></div>
-      <div class="row"><div class="k">المجموعة:</div><div class="v" id="hGroup">—</div></div>
-      <div class="actions">
-        <button class="btn primary" id="btnOpenCard">فتح البطاقة</button>
+    <!-- هِنت مختصر فوق/بجوار النقطة -->
+    <div id="pointHint" class="milk-hint" hidden>
+      <button class="btn icon close" id="btnCloseHint" aria-label="إغلاق">✕</button>
+      <div class="line1">
+        <strong id="hNo">#—</strong>
+        <span>•</span>
+        <span id="hKg">— كجم/اليوم</span>
+        <span>•</span>
+        <span id="hDim">— يوم</span>
+        <span id="hDelta" class="delta neutral">—</span>
       </div>
+      <div class="line2" id="hLine2"></div>
     </div>
   </div>
 </main>
@@ -313,77 +287,154 @@
     return map;
   }
 
-  // ---------- Scatter + هِنت عائم (ملخص فوق النقطة) ----------
-let scatterChart;
+  // ---------- Scatter + هِنت (مختصر فوق/بجوار النقطة) ----------
+  let scatterChart;
+  const hintEl = document.getElementById('pointHint');
+  let lastMeta = null;
+  let hintPinned = false;
+  let hideT;
 
-const hintEl = document.getElementById('pointHint');
-let lastMeta = null;
-let hintPinned = false;
-let hideT;
+  function fillHint(meta){
+    const num = meta.number ?? '—';
+    const kg  = meta.kg != null ? `${meta.kg} كجم/اليوم` : '— كجم/اليوم';
+    const dim = meta.dim != null ? `${meta.dim} يوم` : '— يوم';
+    document.getElementById('hNo').textContent  = `#${num}`;
+    document.getElementById('hKg').textContent  = kg;
+    document.getElementById('hDim').textContent = dim;
 
-function fillHint(meta){
-  const num = meta.number ?? '—';
-  const kg  = meta.kg != null ? `${meta.kg} كجم/يوم` : '— كجم/يوم';
-  const dim = meta.dim != null ? `${meta.dim} يوم` : '— يوم';
-  document.getElementById('hNo').textContent  = `#${num}`;
-  document.getElementById('hKg').textContent  = kg;
-  document.getElementById('hDim').textContent = dim;
-  const d = meta.deltaPct; const deltaEl = document.getElementById('hDelta');
-  if (d==null || Number.isNaN(d)) { deltaEl.textContent='—'; deltaEl.className='delta neutral'; }
-  else { const trend=d>0?'up':(d<0?'down':'neutral'); deltaEl.textContent=`${d>0?'+':''}${d.toFixed(1)}%`; deltaEl.className=`delta ${trend}`; }
-  const parts=[]; if(meta.group&&meta.group!=='—')parts.push(meta.group); if(meta.repro&&meta.repro!=='—')parts.push(meta.repro); if(meta.season&&meta.season!=='—')parts.push(meta.season);
-  const l2=document.getElementById('hLine2'); if(parts.length){ l2.textContent=parts.join(' • '); l2.style.display='block'; } else { l2.textContent=''; l2.style.display='none'; }
-}
-
-function placeHintAtPoint(chart, x, y){
-  const prevVis = hintEl.style.visibility; hintEl.style.visibility='hidden'; hintEl.hidden=false;
-  const rect = chart.canvas.getBoundingClientRect();
-  const W = hintEl.offsetWidth; const H = hintEl.offsetHeight;
-  let left = rect.left + window.scrollX + x - W/2;
-  let top  = rect.top  + window.scrollY + y - H - 12;
-  const minLeft = rect.left + window.scrollX + 4; const maxLeft = rect.right + window.scrollX - W - 4; left = Math.min(Math.max(left,minLeft),maxLeft);
-  const minTop  = rect.top  + window.scrollY + 4; if(top < minTop){ top = rect.top + window.scrollY + y + 12; }
-  hintEl.style.left = left + 'px'; hintEl.style.top  = top + 'px'; hintEl.style.visibility=prevVis;
-}
-
-hintEl.addEventListener('mouseenter', ()=>{ hintPinned=true; clearTimeout(hideT); });
-hintEl.addEventListener('mouseleave', ()=>{ hintPinned=false; clearTimeout(hideT); hideT=setTimeout(()=>{ if(!hintPinned) hintEl.hidden=true; }, 200); });
-
-function externalTooltipHandler(ctx){
-  const { chart, tooltip } = ctx;
-  if (!tooltip || tooltip.opacity === 0){ clearTimeout(hideT); hideT=setTimeout(()=>{ if(!hintPinned) hintEl.hidden=true; }, 200); return; }
-  const dp = tooltip.dataPoints?.[0]; if (!dp) return;
-  const meta = dp.raw?._meta || {}; lastMeta = meta; fillHint(meta);
-  const { x, y } = dp.element; placeHintAtPoint(chart, x, y); hintEl.hidden=false;
-}
-
-function drawScatter(points){
-  const canvas = document.getElementById('scatter'); if (!canvas) return;
-  if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
-  const maxY = Math.max(0, ...points.map(p=>Number(p.kg)||0)); const yMax = Math.max(10, Math.ceil((maxY+1)/5)*5);
-  const maxX = Math.max(0, ...points.map(p=>Number(p.dim)||0)); const xMax = Math.max(30, Math.ceil((maxX+1)/30)*30);
-
-  scatterChart = new Chart(canvas, { type:'scatter', data:{ datasets:[{ label:'أفراد القطيع', data: points.map(p=>({x:p.dim,y:p.kg,_meta:p})), pointRadius:5, pointHoverRadius:10, pointHitRadius:28 }] },
-    options:{ responsive:true, maintainAspectRatio:false, parsing:false,
-      interaction:{ mode:'nearest', intersect:false, axis:'xy' },
-      plugins:{ legend:{display:false}, tooltip:{ enabled:false, external: externalTooltipHandler, position:'nearest' } },
-      scales:{ x:{ title:{display:true,text:'أيام الحليب (من آخر ولادة)'}, beginAtZero:true, min:0, suggestedMax:xMax, ticks:{ stepSize:30, precision:0 } },
-              y:{ beginAtZero:true, min:0, suggestedMax:yMax, ticks:{ stepSize:5, precision:0, callback:v=>`${v} كجم` } } },
-      onHover:(evt,els)=>{ const el=evt?.native?.target; if(el) el.style.cursor = els?.length ? 'pointer' : 'default'; },
-      onClick:(evt, els, chartInstance)=>{ const pts=chartInstance.getElementsAtEventForMode(evt,'nearest',{intersect:false},true); if(!pts?.length) return; const p=pts[0]; const raw=chartInstance.data.datasets[p.datasetIndex].data[p.index]; const meta=raw?._meta||{}; lastMeta=meta; fillHint(meta); placeHintAtPoint(chartInstance,p.element.x,p.element.y); hintEl.hidden=false; hintPinned=true; },
-      events:['mousemove','pointermove','mouseout','mouseleave','click','touchstart','touchmove','touchend']
+    const d = meta.deltaPct;
+    const deltaEl = document.getElementById('hDelta');
+    if (d==null || Number.isNaN(d)) { deltaEl.textContent='—'; deltaEl.className='delta neutral'; }
+    else {
+      const trend = d>0?'up':(d<0?'down':'neutral');
+      deltaEl.textContent = `${d>0?'+':''}${d.toFixed(1)}%`;
+      deltaEl.className   = `delta ${trend}`;
     }
+
+    const parts = [];
+    if (meta.group)  parts.push(meta.group);
+    if (meta.repro)  parts.push(meta.repro);
+    if (meta.season) parts.push(meta.season);
+    const l2 = document.getElementById('hLine2');
+    if (parts.length){ l2.textContent = parts.join(' • '); l2.style.display='block'; }
+    else { l2.textContent = ''; l2.style.display='none'; }
+  }
+
+  function placeHintAtPoint(chart, x, y){
+    const prevVis = hintEl.style.visibility;
+    hintEl.style.visibility = 'hidden';
+    hintEl.hidden = false;
+
+    const rect = chart.canvas.getBoundingClientRect();
+    const W = hintEl.offsetWidth, H = hintEl.offsetHeight;
+
+    let left = rect.left + window.scrollX + x - W/2;
+    let top  = rect.top  + window.scrollY + y - H - 12;
+
+    const minLeft = rect.left + window.scrollX + 4;
+    const maxLeft = rect.right + window.scrollX - W - 4;
+    left = Math.min(Math.max(left, minLeft), maxLeft);
+
+    const minTop = rect.top + window.scrollY + 4;
+    if (top < minTop) { top = rect.top + window.scrollY + y + 12; }
+
+    hintEl.style.left = left + 'px';
+    hintEl.style.top  = top  + 'px';
+    hintEl.style.visibility = prevVis;
+  }
+
+  hintEl.addEventListener('mouseenter', ()=>{ hintPinned = true; clearTimeout(hideT); });
+  hintEl.addEventListener('mouseleave', ()=>{ hintPinned = false; clearTimeout(hideT);
+    hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
   });
+  document.getElementById('btnCloseHint')?.addEventListener('click', ()=>{ hintPinned = false; hintEl.hidden = true; });
 
-  const handlePointer=(evt,pin=false)=>{ const pts=scatterChart.getElementsAtEventForMode(evt,'nearest',{intersect:false},true); if(!pts?.length){ if(!hintPinned) hintEl.hidden=true; return;} const p=pts[0]; const raw=scatterChart.data.datasets[p.datasetIndex].data[p.index]; const meta=raw?._meta||{}; lastMeta=meta; fillHint(meta); placeHintAtPoint(scatterChart,p.element.x,p.element.y); hintEl.hidden=false; if(pin) hintPinned=true; };
-  canvas.addEventListener('touchstart', e=>handlePointer(e,false), {passive:true});
-  canvas.addEventListener('touchmove',  e=>handlePointer(e,false), {passive:true});
-  canvas.addEventListener('click',      e=>handlePointer(e,true));
-  canvas.addEventListener('mouseleave', ()=>{ if(!hintPinned) hintEl.hidden=true; }, {passive:true});
-  canvas.addEventListener('touchend',   ()=>{ if(!hintPinned) hintEl.hidden=true; }, {passive:true});
-}
+  function externalTooltipHandler(ctx){
+    const { chart, tooltip } = ctx;
+    if (!tooltip || tooltip.opacity === 0){
+      clearTimeout(hideT);
+      hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
+      return;
+    }
+    const dp = tooltip.dataPoints?.[0];
+    if (!dp) return;
 
-// ---------- KPIs ----------
+    const meta = dp.raw?._meta || {};
+    lastMeta = meta;
+    fillHint(meta);
+
+    const { x, y } = dp.element;
+    placeHintAtPoint(chart, x, y);
+    hintEl.hidden = false;
+  }
+
+  function drawScatter(points){
+    const canvas = document.getElementById('scatter');
+    if (!canvas) return;
+
+    if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
+
+    const maxY = Math.max(0, ...points.map(p => Number(p.kg)  || 0));
+    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
+    const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
+    const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
+
+    scatterChart = new Chart(canvas, {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: 'أفراد القطيع',
+          data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
+          pointRadius: 5,
+          pointHoverRadius: 10,
+          pointHitRadius: 28
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false, external: externalTooltipHandler }
+        },
+        scales: {
+          x: { title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
+               beginAtZero: true, min: 0, suggestedMax: xMax,
+               ticks: { stepSize: 30, precision: 0 } },
+          y: { beginAtZero: true, min: 0, suggestedMax: yMax,
+               ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` } }
+        },
+        onHover: (evt, els) => {
+          const el = evt?.native?.target;
+          if (el) el.style.cursor = els?.length ? 'pointer' : 'default';
+        }
+      }
+    });
+
+    // دعم اللمس + الضغط للتثبيت
+    const handlePointer = (e, pin=false) => {
+      if (e.cancelable) e.preventDefault();
+      const pts = scatterChart.getElementsAtEventForMode(e, 'nearest', {intersect:false}, true);
+      if (!pts?.length){ if(!hintPinned) hintEl.hidden = true; return; }
+
+      const p = pts[0];
+      const raw  = scatterChart.data.datasets[p.datasetIndex].data[p.index];
+      const meta = raw?._meta || {};
+      lastMeta = meta; fillHint(meta);
+      placeHintAtPoint(scatterChart, p.element.x, p.element.y);
+      hintEl.hidden = false; if (pin) hintPinned = true;
+    };
+
+    canvas.addEventListener('touchstart', e => handlePointer(e, false), {passive:false});
+    canvas.addEventListener('touchmove',  e => handlePointer(e, false), {passive:false});
+    canvas.addEventListener('click',      e => handlePointer(e, true));
+    canvas.addEventListener('mouseleave', () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
+    canvas.addEventListener('touchend',   () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
+  }
+
+  // ---------- KPIs ----------
   function splitByKind(rows){
     const o={all:0,cow:0,buff:0};
     for (const r of rows){
@@ -406,7 +457,7 @@ function drawScatter(points){
 
   function putKpis(dayRows, monthRows, yearRows, totalAnimals, prevTotal, prevDate){
     const d = splitByKind(dayRows), m = splitByKind(monthRows), y = splitByKind(yearRows);
-    $('sumDay').firstChild.nodeValue = `${(d.all||0).toLocaleString()} كجم`; // حافظ على الشارة
+    $('sumDay').firstChild.nodeValue = `${(d.all||0).toLocaleString()} كجم`;
     setDayDeltaBadge(d.all||0, prevTotal||0, prevDate||'—');
 
     $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
@@ -524,14 +575,10 @@ function drawScatter(points){
     $('reportDate').addEventListener('change', loadAll, {passive:true});
     $('btnRefresh').addEventListener('click', loadAll, {passive:true});
 
-    // زر إغلاق الهِنت وفتح البطاقة
+    // إغلاق الهِنت
     $('btnCloseHint')?.addEventListener('click', ()=>{
       hintPinned = false;
       hintEl.hidden = true;
-    });
-
-    $('btnOpenCard')?.addEventListener('click', ()=> {
-      if (lastMeta?.number) location.href = `cow-card.html?number=${encodeURIComponent(lastMeta.number)}`;
     });
 
     loadAll();
