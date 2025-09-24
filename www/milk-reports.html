@@ -42,6 +42,8 @@
     .hint .row{display:flex;gap:6px}
     .hint .k{color:#64748b;min-width:130px}
     .hint .actions{margin-top:8px;display:flex;gap:6px}
+.hint .hint-line1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:800}
+.hint .hint-line2{color:#64748b;margin-top:4px}
 
     .btn{appearance:none;border:1px solid var(--border);padding:8px 10px;border-radius:10px;background:#f8fafc;font-weight:700;cursor:pointer}
     .btn.primary{background:var(--green);border-color:#0ea05a;color:#fff}
@@ -113,11 +115,23 @@
     <small id="skipNote" style="color:#64748b"></small>
 
     <!-- الهِنت الخارجي -->
-    <div id="pointHint" class="hint" hidden>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <strong>بيانات الحيوان</strong>
-        <button class="btn icon" id="btnCloseHint" aria-label="إغلاق">✕</button>
-      </div>
+<div id="pointHint" class="hint" hidden>
+  <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:6px">
+    <button class="btn icon" id="btnCloseHint" aria-label="إغلاق">✕</button>
+  </div>
+  <div class="hint-line1">
+    <strong id="hNo">—</strong>
+    <span>•</span>
+    <span id="hKg">— كجم/يوم</span>
+    <span>•</span>
+    <span id="hDim">— يوم</span>
+    <span id="hDelta" class="delta neutral" title="التغيّر">—</span>
+  </div>
+  <div class="hint-line2" id="hLine2"></div>
+  <div class="actions" style="margin-top:8px">
+    <button class="btn primary" id="btnOpenCard">فتح البطاقة</button>
+  </div>
+</div>
       <div class="row"><div class="k">رقم:</div><div class="v" id="hNo">—</div></div>
       <div class="row"><div class="k">كجم اليوم:</div><div class="v" id="hKg">—</div></div>
       <div class="row"><div class="k">التغيّر عن آخر تسجيل:</div><div class="v" id="hDelta">—</div></div>
@@ -313,14 +327,33 @@ hintEl.addEventListener('mouseleave', ()=>{
 
 // تعبئة محتوى الهِنت
 function fillHint(meta){
-  document.getElementById('hNo').textContent     = meta.number ?? '—';
-  document.getElementById('hKg').textContent     = (meta.kg ?? '—') + ' كجم';
-  document.getElementById('hDim').textContent    = meta.dim ?? '—';
-  document.getElementById('hRepro').textContent  = meta.repro ?? '—';
-  document.getElementById('hSeason').textContent = meta.season ?? '—';
-  document.getElementById('hGroup').textContent  = meta.group ?? '—';
+  const num = meta.number ?? '—';
+  const kg  = meta.kg != null ? `${meta.kg} كجم/يوم` : '— كجم/يوم';
+  const dim = meta.dim != null ? `${meta.dim} يوم` : '— يوم';
+
+  document.getElementById('hNo').textContent  = `#${num}`;
+  document.getElementById('hKg').textContent  = kg;
+  document.getElementById('hDim').textContent = dim;
+
   const d = meta.deltaPct;
-  document.getElementById('hDelta').textContent  = (d==null || Number.isNaN(d)) ? '—' : `${d>0?'+':''}${d.toFixed(1)}%`;
+  const deltaEl = document.getElementById('hDelta');
+  if (d==null || Number.isNaN(d)){
+    deltaEl.textContent='—';
+    deltaEl.className='delta neutral';
+  }else{
+    const trend = d>0? 'up' : (d<0? 'down' : 'neutral');
+    deltaEl.textContent = `${d>0?'+':''}${d.toFixed(1)}%`;
+    deltaEl.className = `delta ${trend}`;
+  }
+
+  const parts = [];
+  if (meta.group && meta.group !== '—') parts.push(meta.group);
+  if (meta.repro && meta.repro !== '—') parts.push(meta.repro);
+  if (meta.season && meta.season !== '—') parts.push(meta.season);
+  const l2 = document.getElementById('hLine2');
+  if (parts.length){ l2.textContent = parts.join(' • '); l2.style.display='block'; }
+  else { l2.textContent=''; l2.style.display='none'; }
+}${d.toFixed(1)}%`;
 }
 
 // ضع الهِنت فوق نقطة الرسم (مع حواف آمنة)
