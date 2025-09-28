@@ -2,153 +2,161 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>تشخيص الحمل</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تشخيص الحمل — مُرَبِّك</title>
+
+  <!-- ستايل مُرَبِّك القياسي -->
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+
   <style>
-    body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
-    h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
-    fieldset { border: 2px solid #2e7d32; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
-    legend { font-weight: bold; font-size: 18px; color: #2e7d32; padding: 0 10px; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .radio-group { margin: 6px 0; }
-    .radio-group label { display: inline-block; margin-left: 15px; font-weight: normal; }
-    button { background-color: #2e7d32; color: white; padding: 14px 20px; font-size: 18px; border: none; border-radius: 8px; width: 100%; cursor: pointer; }
-    button:hover { background-color: #27642a; }
+    :root{
+      --green:#2e7d32; --green-600:#1b5e20;
+      --bg:#fff9db; --card:#ffffff; --ink:#143b24;
+      --border:#c5e1a5; --muted:#f6fff2; --danger:#c62828;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Cairo','Segoe UI',Tahoma,Arial}
+    header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px}
+    header .t{font-weight:800;color:var(--green-600)}
+    .wrap{max-width:720px;margin:12px auto;padding:0 12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .label{font-weight:700;margin:8px 0 6px}
+    input[type="text"],input[type="date"]{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--ink)
+    }
+    fieldset{border:2px solid var(--green-600);border-radius:12px;padding:12px;margin:14px 0}
+    legend{font-weight:800;color:var(--green-600);padding:0 8px}
+    .row{display:flex;gap:18px;flex-wrap:wrap}
+    .col{flex:1 1 240px;min-width:240px}
+    .radios label{display:inline-flex;align-items:center;gap:6px;margin-inline-end:16px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;
+      background:var(--green);color:#fff;border:none;border-radius:12px;
+      padding:12px 16px;font-weight:800;cursor:pointer;width:100%}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .infobar{margin-top:12px;padding:10px;border-radius:10px;font-weight:800;display:none}
+    .infobar.ok{display:block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
+    .infobar.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+    .hint{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 10px;font-size:12px;margin-inline-start:6px}
   </style>
 </head>
 <body>
-  <h1>تشخيص الحمل</h1>
 
-  <form id="diagnosisForm" autocomplete="off">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
+<header><span class="t">تشخيص الحمل — مُرَبِّك</span></header>
 
-    <label for="diagnosisDate">تاريخ التشخيص</label>
-    <input type="date" id="diagnosisDate" name="diagnosisDate" required>
+<div class="wrap">
+  <form class="card" id="diagnosisForm" data-form="تشخيص حمل" autocomplete="off">
+    <div class="label">رقم الحيوان <span class="hint">مطلوب</span></div>
+    <input type="text" name="animalId" data-field="animalId" inputmode="numeric" placeholder="اكتب رقم الحيوان">
+
+    <div class="label">تاريخ التشخيص <span class="hint">مطلوب</span></div>
+    <input type="date" name="eventDate" data-field="eventDate">
 
     <fieldset>
       <legend>تشخيص الحمل</legend>
 
       <div class="row">
-        <div>
-          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">طريقة التشخيص</div>
-          <div class="radio-group" id="methodGroup">
-            <label><input type="radio" name="method" value="ultrasound" required> سونار</label>
-            <label><input type="radio" name="method" value="manual"> يدوي</label>
+        <div class="col">
+          <div class="label">طريقة التشخيص <span class="hint">سونار ≥ 26 • جس يدوي ≥ 40</span></div>
+          <div class="radios">
+            <label><input type="radio" name="method" data-field="method" value="سونار"> سونار</label>
+            <label><input type="radio" name="method" data-field="method" value="جس يدوي"> جس يدوي</label>
           </div>
         </div>
 
-        <div>
-          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">النتيجة</div>
-          <div class="radio-group" id="resultGroup">
-            <label><input type="radio" name="result" value="عشار" required> عشار</label>
-            <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+        <div class="col">
+          <div class="label">النتيجة</div>
+          <div class="radios">
+            <label><input type="radio" name="result" data-field="result" value="عشار"> عشار</label>
+            <label><input type="radio" name="result" data-field="result" value="فارغة"> فارغة</label>
           </div>
         </div>
       </div>
     </fieldset>
 
-    <label for="vet">اسم الطبيب البيطري (اختياري)</label>
-    <input type="text" id="vet" name="vet">
+    <div class="label">اسم الطبيب البيطري (اختياري)</div>
+    <input type="text" name="vet">
 
-    <button type="submit" id="saveBtn">تسجيل التشخيص</button>
+    <button type="submit" id="saveBtn" class="btn">تسجيل التشخيص</button>
+    <div id="infobar" class="infobar" role="status" aria-live="polite"></div>
   </form>
+</div>
+
+<!-- ترتيب السكربتات حسب مُرَبِّك -->
+<script>window.dataLayer = window.dataLayer || [];</script>
+<script src="js/app-core.js"></script>
+<script type="module" src="js/timeline.js"></script>
+<script type="module" src="js/smart-checks.js"></script>
+<script src="js/tenant-bootstrap.js"></script>
+<script src="js/api.js"></script>
 
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-    collection, query, where, getDocs,
-    addDoc, serverTimestamp, doc, updateDoc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { addDoc, collection, serverTimestamp, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // تتبّع خفيف
-  try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
-  try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
+  // تتبّع
+  try { window.dataLayer.push({event:"page_view", page: location.pathname}); } catch {}
+  try { if (window.t?.event) t.event("page_view", {page: location.pathname}); } catch {}
 
   const $ = (s)=>document.querySelector(s);
-  const form = $("#diagnosisForm");
-  const saveBtn = $("#saveBtn");
+  const form   = $("#diagnosisForm");
+  const bar    = $("#infobar");
+  const saveBtn= $("#saveBtn");
 
-  // حاوية رسالة واحدة يعاد استخدامها
-  const msgBox = document.createElement("div");
-  msgBox.style.marginTop = "12px";
-  msgBox.style.borderRadius = "6px";
-  msgBox.style.padding = "12px";
-  msgBox.style.textAlign = "center";
-  msgBox.style.fontWeight = "bold";
-  msgBox.style.display = "none";
-  form.appendChild(msgBox);
-
-  function showMsg(kind, text){
-    msgBox.style.display = "block";
-    if (kind === "ok"){
-      msgBox.style.background = "#c8e6c9"; // أخضر فاتح
-      msgBox.style.color = "#1b5e20";
-    } else {
-      msgBox.style.background = "#ffcdd2"; // أحمر فاتح
-      msgBox.style.color = "#b71c1c";
-    }
-    msgBox.textContent = text;
-    msgBox.scrollIntoView({behavior:"smooth", block:"center"});
+  function showBar(kind, txt){
+    bar.className = "infobar " + (kind === "ok" ? "ok" : "err");
+    bar.textContent = txt;
+    bar.style.display = "block";
+    bar.scrollIntoView({behavior:"smooth", block:"center"});
   }
 
-  // تهيئة الحقول من URL/localStorage
+  // Prefill من URL/LocalStorage
   const qp = new URLSearchParams(location.search);
   const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-  const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
-  $("#animalId").value = (animalFromURL||"").toString().trim();
-  $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
+  const dateFromURL   = qp.get("eventDate") || qp.get("date") || localStorage.getItem("lastEventDate") || "";
+  form.elements.animalId.value = (animalFromURL||"").toString().trim();
+  form.elements.eventDate.value = dateFromURL || new Date().toISOString().slice(0,10);
 
-  // تأكيد الدخول (بدون أي alerts)
+  // تأكيد الدخول
   try { await ensureAuth("/login.html"); } catch(e){ throw e; }
 
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
+    bar.style.display = "none";
 
-    // إلغاء أي رسالة قديمة
-    msgBox.style.display = "none";
+    const animalId = form.elements.animalId.value.trim();
+    const eventDate= form.elements.eventDate.value;
+    const methodEl = form.querySelector('input[name="method"]:checked');
+    const resultEl = form.querySelector('input[name="result"]:checked');
 
-    const animalNum = $("#animalId").value.trim();
-    const eventDate = $("#diagnosisDate").value;
-    const methodEl  = document.querySelector('input[name="method"]:checked');
-    const resultEl  = document.querySelector('input[name="result"]:checked');
-
-    // تحقق داخلي بدل alerts
-    if (!animalNum){ showMsg("err","اكتب رقم الحيوان."); $("#animalId").focus(); return; }
-    if (!eventDate){ showMsg("err","اختر تاريخ التشخيص."); $("#diagnosisDate").focus(); return; }
-    if (!methodEl){ showMsg("err","اختر طريقة التشخيص."); return; }
-    if (!resultEl){ showMsg("err","اختر نتيجة التشخيص."); return; }
+    if(!animalId){ showBar("err","اكتب رقم الحيوان."); form.elements.animalId.focus(); return; }
+    if(!eventDate){ showBar("err","اختر تاريخ التشخيص."); form.elements.eventDate.focus(); return; }
+    if(!methodEl){ showBar("err","اختر طريقة التشخيص (سونار/جس يدوي)."); return; }
+    if(!resultEl){ showBar("err","اختر نتيجة التشخيص."); return; }
 
     const payload = {
       userId: auth.currentUser.uid,
-      animalId: animalNum,
-      animalNumber: animalNum,
+      animalId, animalNumber: animalId,
       eventDate,
       type: "تشخيص حمل",
-      method: methodEl.value,      // ultrasound | manual
-      result: resultEl.value,      // عشار | فارغة
-      vet: $("#vet").value || "",
+      method: methodEl.value,         // "سونار" | "جس يدوي" — متوافق مع الفاليديشن المركزي
+      result: resultEl.value,         // "عشار" | "فارغة"
+      vet: form.elements.vet.value || "",
       source: location.pathname,
       createdAt: serverTimestamp()
     };
 
-    try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: animalNum}); } catch {}
+    try { if (window.t?.event) t.event("pregnancy_diagnosis_save_click", {animal: animalId}); } catch {}
 
-    // تعطيل الزر أثناء الحفظ
     saveBtn.disabled = true;
 
     try {
       await addDoc(collection(db, "events"), payload);
 
-      // آخر سياق محلي
-      localStorage.setItem("lastAnimalId", animalNum);
+      // حفظ سياق محلي
+      localStorage.setItem("lastAnimalId", animalId);
       localStorage.setItem("lastEventDate", eventDate);
 
-      // (اختياري) تحديث وثيقة الحيوان لنفس المستخدم
+      // تحديث وثيقة الحيوان (اختياري، إن وُجدت)
       try {
         const animalsRef = collection(db, "animals");
         const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
@@ -157,7 +165,7 @@
           const a = d.data() || {};
           const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
             .filter(v=>v!=null).map(v=>String(v).trim());
-          return candidates.includes(String(animalNum));
+          return candidates.includes(String(animalId));
         });
         if (match) {
           const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
@@ -167,23 +175,22 @@
         }
       } catch {}
 
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
+      try { if (window.t?.event) t.event("pregnancy_diagnosis_save_done", {animal: animalId}); } catch {}
 
-      // ✅ رسالة تأكيد داخلية + إعادة توجيه تلقائي
-      showMsg("ok","✅ تم تشخيص الحمل بنجاح");
-      setTimeout(()=>{
-        location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
-      }, 2000);
+      // ✅ رسالة تأكيد داخل النموذج + إعادة توجيه خفيفة
+      showBar("ok","✅ تم تسجيل تشخيص الحمل بنجاح");
+      setTimeout(()=> {
+        location.href = `add-event.html?number=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
+      }, 1500);
 
-    } catch (err) {
+    } catch(err){
       console.error("Firestore save error:", err);
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
-      showMsg("err","❌ حدث خطأ أثناء التسجيل. تحقق من الاتصال والصلاحيات.");
+      try { if (window.t?.event) t.event("pregnancy_diagnosis_save_error", {message:String(err?.message||err)}); } catch {}
+      showBar("err","❌ حدث خطأ أثناء التسجيل. تأكد من الاتصال والصلاحيات.");
       saveBtn.disabled = false;
     }
   });
 </script>
-
 
 </body>
 </html>
