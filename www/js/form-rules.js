@@ -7,6 +7,9 @@ export const thresholds = {
   جاموس: { minGestationDays: 285 },
 };
 
+// حدّ أدنى لتشخيص الحمل حسب الطريقة
+const MIN_PD_BY_METHOD = { "سونار": 26, "جس يدوي": 40 };
+
 const toDate = (v) => (v instanceof Date ? v : (v ? new Date(v) : null));
 const daysBetween = (d1, d2) => {
   const a = toDate(d1), b = toDate(d2);
@@ -15,14 +18,14 @@ const daysBetween = (d1, d2) => {
   return Math.round(ms / 86400000);
 };
 
-const req = (val) => !(val === undefined || val === null || String(val).trim() === "");
-const isDate = (val) => !Number.isNaN(toDate(val)?.getTime());
-const isNum  = (val) => val === "" ? true : !Number.isNaN(Number(val));
+const req   = (val) => !(val === undefined || val === null || String(val).trim() === "");
+const isDate= (val) => !Number.isNaN(toDate(val)?.getTime());
+const isNum = (val) => val === "" ? true : !Number.isNaN(Number(val));
 
-/** تعريف الحقول المشتركة */
+/** الحقول المشتركة */
 const commonFields = {
-  animalId:   { required: true, msg: "رقم/معرّف الحيوان مفقود." },
-  eventDate:  { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
+  animalId:  { required: true, msg: "رقم/معرّف الحيوان مفقود." },
+  eventDate: { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
 };
 
 /** تعريف قواعد كل حدث */
@@ -31,27 +34,32 @@ export const eventSchemas = {
     fields: {
       ...commonFields,
       species: { required: true, enum: ["أبقار", "جاموس"], msg: "نوع القطيع (أبقار/جاموس) مطلوب." },
-      reproStatus: { required: true, enum: ["عشار"], msg: "الولادة لا تُسجَّل إلا إذا كانت الحالة التناسلية عشار." },
+      reproStatus: { required: true, enum: ["عشار"], msg: "الولادة لا تُسجَّل إلا إذا كانت الحالة التناسلية عِشار." },
       lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
-      // اختياري: إدخال يدوي لعمر الحمل لو حبيت تستخدمه (يتجاوز الحساب الآلي)
+      // اختياري: إدخال يدوي لعمر الحمل (يتجاوز الحساب الآلي)
       gestationOverrideDays: { type: "number" },
     },
     guards: ["calvingDecision"],
   },
 
+  // ✅ مضافة: سكيمة تشخيص الحمل حسب شروطك
   "تشخيص حمل": {
     fields: {
       ...commonFields,
-      method: { required: true, enum: ["سونار", "جس", "اختبار معملي", "أخرى"], msg: "اختَر وسيلة التشخيص." },
-      result: { required: true, enum: ["حامل", "غير حامل", "مُلتبس"], msg: "نتيجة التشخيص مطلوبة." },
+      reproStatus: { required: true, enum: ["ملقح"], msg: "تشخيص الحمل مسموح فقط عندما تكون الحالة «ملقح»." },
+      method: { required: true, enum: ["سونار", "جس يدوي"], msg: "اختَر وسيلة التشخيص (سونار/جس يدوي)." },
+      // نعتمد على "آخر تلقيح" أيًّا كان (غير مشروط بكونه مُخصّب)
+      lastInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مطلوب." },
+      // النتيجة اختيارية هنا التزامًا بـ «فقط لا غير». يمكن جعلها مطلوبة عند الحاجة.
+      result: { required: false, enum: ["حامل", "غير حامل", "مُلتبس"] },
     },
-    guards: [],
+    guards: ["pregnancyDiagnosisDecision"],
   },
 
   "إجهاض": {
     fields: {
       ...commonFields,
-      reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض لا يُسجَّل إلا إذا كانت الحالة عشار." },
+      reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض لا يُسجَّل إلا إذا كانت الحالة عِشار." },
       lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
     },
     guards: ["abortionDecision"],
@@ -93,64 +101,7 @@ function validateField(key, rule, value) {
 /** الحُرّاس (Guards) الخاصة بقرارات الحدث */
 const guards = {
   calvingDecision(formData) {
-    // شرط مركزي: الحالة "عشار" + عمر حمل ≥ العتبة حسب النوع
+    // شرط مركزي: الحالة "عِشار" + عمر حمل ≥ العتبة حسب النوع
     const species = formData.species;
     const th = thresholds[species]?.minGestationDays;
-    if (!th) return `نوع القطيع غير معروف: «${species}».`;
-
-    const eventDate = formData.eventDate;
-    const lastFertile = formData.lastFertileInseminationDate;
-
-    let g = formData.gestationOverrideDays;
-    if (!g || Number.isNaN(Number(g))) {
-      g = daysBetween(lastFertile, eventDate);
-    } else {
-      g = Number(g);
-    }
-
-    if (Number.isNaN(g) || g <= 0) {
-      return "تعذّر حساب عمر الحمل. راجع تاريخ آخر تلقيح مُخصِّب وتاريخ الحدث.";
-    }
-    if (g < th) {
-      return `لا يسمح بتسجيل الولادة قبل تمام الحمل (${th} يوم للـ${species}). العمر المحسوب = ${g} يوم.`;
-    }
-    return null;
-  },
-
-  abortionDecision(formData) {
-    // شرط المستخدم: الإجهاض لا يحدث إلا من عِشار، ويُحسب عمر الحمل من آخر تلقيح مُخصِّب
-    const eventDate = formData.eventDate;
-    const lastFertile = formData.lastFertileInseminationDate;
-    const g = daysBetween(lastFertile, eventDate);
-
-    if (Number.isNaN(g) || g <= 0) {
-      return "عمر الحمل للإجهاض غير منطقي. تحقّق من تاريخ آخر تلقيح مُخصِّب وتاريخ الحدث.";
-    }
-    // لا نضع حدًا أدنى هنا؛ يكفي منطقية التاريخين وأن الحالة عِشار (تم فحصها في الحقول)
-    return null;
-  },
-};
-
-/** التحقق الكامل حسب نوع الحدث */
-export function validateEvent(eventName, formData) {
-  const schema = eventSchemas[eventName];
-  if (!schema) return { ok: false, errors: [`نوع حدث غير معرّف: «${eventName}».`] };
-
-  const errors = [];
-  // حقول
-  for (const [key, rule] of Object.entries(schema.fields)) {
-    const v = formData[key];
-    const err = validateField(key, rule, v);
-    if (err) errors.push(err);
-  }
-
-  // حُرّاس
-  if (errors.length === 0 && schema.guards?.length) {
-    for (const g of schema.guards) {
-      const msg = guards[g]?.(formData);
-      if (msg) errors.push(msg);
-    }
-  }
-
-  return { ok: errors.length === 0, errors };
-}
+    if (!th) return `نوع القطي
