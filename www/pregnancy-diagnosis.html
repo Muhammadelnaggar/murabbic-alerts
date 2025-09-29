@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تشخيص الحمل — مُرَبِّك</title>
-  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/forms.css" />
   <style>
     :root{
       --green:#2e7d32; --green-600:#1b5e20;
       --bg:#fff9db; --card:#ffffff; --ink:#143b24;
-      --border:#c5e1a5; --muted:#f6fff2;
+      --border:#c5e1a5;
     }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Cairo','Segoe UI',Tahoma,Arial}
@@ -41,10 +41,10 @@
 <div class="wrap">
   <form class="card" id="diagnosisForm" autocomplete="off">
     <div class="label">رقم الحيوان <span class="hint">مطلوب</span></div>
-    <input type="text" name="animalId" inputmode="numeric" placeholder="اكتب رقم الحيوان">
+    <input type="text" name="animalId" inputmode="numeric" placeholder="اكتب رقم الحيوان" />
 
     <div class="label">تاريخ التشخيص <span class="hint">مطلوب</span></div>
-    <input type="date" name="eventDate">
+    <input type="date" name="eventDate" />
 
     <fieldset>
       <legend>تشخيص الحمل</legend>
@@ -52,23 +52,23 @@
         <div class="col">
           <div class="label">طريقة التشخيص <span class="hint">سونار ≥ 26 • جس يدوي ≥ 40</span></div>
           <div class="radios">
-            <label><input type="radio" name="method" value="سونار"> سونار</label>
-            <label><input type="radio" name="method" value="جس يدوي"> جس يدوي</label>
+            <label><input type="radio" name="method" value="سونار" /> سونار</label>
+            <label><input type="radio" name="method" value="جس يدوي" /> جس يدوي</label>
           </div>
         </div>
 
         <div class="col">
           <div class="label">النتيجة</div>
           <div class="radios">
-            <label><input type="radio" name="result" value="عشار"> عشار</label>
-            <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+            <label><input type="radio" name="result" value="عشار" /> عشار</label>
+            <label><input type="radio" name="result" value="فارغة" /> فارغة</label>
           </div>
         </div>
       </div>
     </fieldset>
 
     <div class="label">اسم الطبيب البيطري (اختياري)</div>
-    <input type="text" name="vet">
+    <input type="text" name="vet" />
 
     <button type="submit" id="saveBtn" class="btn">تسجيل التشخيص</button>
     <div id="infobar" class="infobar" role="status" aria-live="polite"></div>
@@ -76,26 +76,45 @@
 </div>
 
 <script>window.dataLayer = window.dataLayer || [];</script>
-<script src="js/app-core.js"></script>
 
-<!-- نتجاوز timeline/smart-checks مؤقتًا إن كان فيهما خطأ -->
+<!-- سكربت الصفحة -->
 <script type="module">
-  Promise.allSettled([
-    import('/js/timeline.js'),
-    import('/js/smart-checks.js')
-  ]);
-</script>
+  // 1) التقاط number/date من add-event (مع Fallback محلي)
+  (function prefillFromAddEvent(){
+    const qs = new URLSearchParams(location.search);
+    const animal =
+      (qs.get("number") ?? qs.get("animalId") ?? qs.get("animalNumber") ??
+       localStorage.getItem("currentAnimalId") ?? localStorage.getItem("lastAnimalId") ?? "").toString().trim();
 
-<!-- لا تحمل api.js الآن لأنه راجع 404/MIME HTML -->
-<!-- <script src="/js/api.js"></script> -->
+    const date =
+      (qs.get("date") ?? qs.get("eventDate") ?? localStorage.getItem("currentEventDate") ??
+       localStorage.getItem("lastEventDate") ?? new Date().toISOString().slice(0,10));
+
+    const form = document.getElementById("diagnosisForm");
+    const animalEl = form.querySelector('[name="animalId"],[name="animalNumber"],[name="number"]');
+    const dateEl   = form.querySelector('[name="eventDate"],[name="diagnosisDate"],[name="date"]');
+    if (animal && animalEl) animalEl.value = animal;
+    if (date && dateEl)     dateEl.value   = date;
+
+    if (animal) {
+      localStorage.setItem("currentAnimalId", animal);
+      localStorage.setItem("lastAnimalId", animal);
+    }
+    if (date) {
+      localStorage.setItem("currentEventDate", date);
+      localStorage.setItem("lastEventDate", date);
+    }
+  })();
+</script>
 
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import { addDoc, collection, serverTimestamp, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    addDoc, collection, serverTimestamp, query, where, getDocs, doc, updateDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { validateEvent } from "/js/form-rules.js";   // ✅ الفاليديشن المركزي
 
   try { window.dataLayer.push({event:"page_view", page: location.pathname}); } catch {}
-  try { if (window.t?.event) t.event("page_view", {page: location.pathname}); } catch {}
 
   const $ = (s)=>document.querySelector(s);
   const form    = $("#diagnosisForm");
@@ -109,23 +128,15 @@
     bar.scrollIntoView({behavior:"smooth", block:"center"});
   }
 
-  // Prefill من URL/LocalStorage
-  const qp = new URLSearchParams(location.search);
-  const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-  const dateFromURL   = qp.get("eventDate") || qp.get("date") || localStorage.getItem("lastEventDate") || "";
-  form.elements.animalId.value  = (animalFromURL||"").toString().trim();
-  form.elements.eventDate.value = dateFromURL || new Date().toISOString().slice(0,10);
-
-  // تأكيد الدخول
   await ensureAuth("/login.html");
 
-  // === سياق الفاليديشن: آخر تلقيح + الحالة الحالية ===
+  // === جلب سياق الفاليديشن: الحالة الحالية + آخر تلقيح حتى تاريخ التشخيص ===
   async function getCtx(animalId, untilDate){
     const userId = auth.currentUser.uid;
-
-    // 1) جلب الحالة من animals
     let reproStatus = null, animalDocId = null;
-    {
+
+    // من animals
+    try {
       const animalsRef = collection(db, "animals");
       const q1 = query(animalsRef, where("userId","==", userId));
       const snap = await getDocs(q1);
@@ -139,18 +150,18 @@
         const a = match.data() || {};
         reproStatus = a.reproductiveStatus || a.reproStatus || null;
       }
-    }
+    } catch {}
 
-    // 2) جلب آخر تلقيح من events لنفس الحيوان حتى تاريخ التشخيص
+    // من events (آخر تلقيح ≤ تاريخ التشخيص)
     let lastInseminationDate = null;
-    {
+    try {
       const evRef = collection(db, "events");
       const q2 = query(evRef, where("userId","==", userId), where("animalNumber","==", String(animalId)));
-      const snap = await getDocs(q2);
+      const snap2 = await getDocs(q2);
       const INSEM_TYPES = new Set(["تلقيح","تلقيح مخصب","تلقيح مُخصِّب","Insemination","AI","خدمة"]);
       const ed = new Date(untilDate).setHours(0,0,0,0);
       const candidates = [];
-      snap.forEach(docu=>{
+      snap2.forEach(docu=>{
         const e = docu.data() || {};
         if (!e?.eventDate || !e?.type) return;
         if (!INSEM_TYPES.has(String(e.type).trim())) return;
@@ -161,7 +172,7 @@
         candidates.sort((a,b)=>b-a);
         lastInseminationDate = new Date(candidates[0]).toISOString().slice(0,10);
       }
-    }
+    } catch {}
 
     return { reproStatus, lastInseminationDate, animalDocId };
   }
@@ -176,22 +187,21 @@
     const methodEl  = form.querySelector('input[name="method"]:checked');
     const resultEl  = form.querySelector('input[name="result"]:checked');
 
-    // تحقق أساسي سريع
     if(!animalId){ showBar("err","اكتب رقم الحيوان."); saveBtn.disabled=false; return; }
     if(!eventDate){ showBar("err","اختر تاريخ التشخيص."); saveBtn.disabled=false; return; }
     if(!methodEl){ showBar("err","اختر طريقة التشخيص (سونار/جس يدوي)."); saveBtn.disabled=false; return; }
     if(!resultEl){ showBar("err","اختر نتيجة التشخيص."); saveBtn.disabled=false; return; }
 
-    // جلب السياق للفاليديشن المركزي
+    // سياق الفاليديشن
     const ctx = await getCtx(animalId, eventDate);
 
-    // الفاليديشن المركزي (كما في /js/form-rules.js)
+    // ✅ الفاليديشن المركزي
     const v = validateEvent("تشخيص حمل", {
       animalId,
       eventDate,
-      method: methodEl.value,              // "سونار" | "جس يدوي"
-      result: resultEl.value,              // "عشار" | "فارغة"
-      reproStatus: ctx.reproStatus,        // لازم تطلع "ملقح" ليعدّي
+      method: methodEl.value,            // "سونار" | "جس يدوي"
+      result: resultEl.value,            // "عشار" | "فارغة"
+      reproStatus: ctx.reproStatus,      // يجب أن تكون "ملقح"
       lastInseminationDate: ctx.lastInseminationDate
     });
 
@@ -201,34 +211,40 @@
       return;
     }
 
-    // حفظ الحدث بعد النجاح
+    // الحفظ
     const payload = {
       userId: auth.currentUser.uid,
       animalId, animalNumber: animalId,
       eventDate, type: "تشخيص حمل",
       method: methodEl.value, result: resultEl.value,
       vet: form.elements.vet.value || "",
-      source: location.pathname, createdAt: serverTimestamp()
+      source: location.pathname,
+      createdAt: serverTimestamp()
     };
 
     try {
       await addDoc(collection(db,"events"), payload);
 
+      localStorage.setItem("currentAnimalId", animalId);
       localStorage.setItem("lastAnimalId", animalId);
+      localStorage.setItem("currentEventDate", eventDate);
       localStorage.setItem("lastEventDate", eventDate);
 
       // تحديث بطاقة الحيوان (اختياري)
       try{
-        if (ctx.animalDocId){
+        const { animalDocId } = await getCtx(animalId, eventDate);
+        if (animalDocId){
           const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate:eventDate };
           if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
           if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
-          await updateDoc(doc(db,"animals",ctx.animalDocId), updates);
+          await updateDoc(doc(db,"animals",animalDocId), updates);
         }
       }catch{}
 
       showBar("ok","✅ تم تسجيل تشخيص الحمل بنجاح");
-      setTimeout(()=>{ location.href = `add-event.html?number=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`; }, 1500);
+      setTimeout(()=> {
+        location.href = `add-event.html?number=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
+      }, 1500);
 
     } catch (err){
       console.error(err);
