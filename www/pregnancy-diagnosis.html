@@ -2,108 +2,61 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>تشخيص الحمل — مُرَبِّك</title>
-  <link rel="stylesheet" href="css/forms.css" />
+  <title>تشخيص الحمل</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="css/forms.css">
+  <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{
-      --green:#2e7d32; --green-600:#1b5e20;
-      --bg:#fff9db; --card:#ffffff; --ink:#143b24;
-      --border:#c5e1a5;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,'Cairo','Segoe UI',Tahoma,Arial}
-    header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px}
-    header .t{font-weight:800;color:var(--green-600)}
-    .wrap{max-width:720px;margin:12px auto;padding:0 12px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
-    .label{font-weight:700;margin:8px 0 6px}
-    input[type="text"],input[type="date"]{
-      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--ink)
-    }
-    fieldset{border:2px solid var(--green-600);border-radius:12px;padding:12px;margin:14px 0}
-    legend{font-weight:800;color:var(--green-600);padding:0 8px}
-    .row{display:flex;gap:18px;flex-wrap:wrap}
-    .col{flex:1 1 240px;min-width:240px}
-    .radios label{display:inline-flex;align-items:center;gap:6px;margin-inline-end:16px}
-    .btn{display:inline-flex;align-items:center;justify-content:center;background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer;width:100%}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    .infobar{margin-top:12px;padding:10px;border-radius:10px;font-weight:800;display:none}
-    .infobar.ok{display:block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .hint{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 10px;font-size:12px;margin-inline-start:6px}
+    body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
+    h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
+    fieldset { border: 2px solid #2e7d32; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
+    legend { font-weight: bold; font-size: 18px; color: #2e7d32; padding: 0 10px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .radio-group { margin: 6px 0; }
+    .radio-group label { display: inline-block; margin-left: 15px; font-weight: normal; }
+    button { background-color: #2e7d32; color: white; padding: 14px 20px; font-size: 18px; border: none; border-radius: 8px; width: 100%; cursor: pointer; }
+    button:hover { background-color: #27642a; }
   </style>
 </head>
 <body>
+  <h1>تشخيص الحمل</h1>
 
-<header><span class="t">تشخيص الحمل — مُرَبِّك</span></header>
+  <form id="diagnosisForm" autocomplete="off">
+    <label for="animalId">رقم الحيوان</label>
+    <input type="text" id="animalId" name="animalId" required>
 
-<div class="wrap">
-  <form class="card" id="diagnosisForm" autocomplete="off">
-    <div class="label">رقم الحيوان <span class="hint">مطلوب</span></div>
-    <input type="text" name="animalId" inputmode="numeric" placeholder="اكتب رقم الحيوان" />
-
-    <div class="label">تاريخ التشخيص <span class="hint">مطلوب</span></div>
-    <input type="date" name="eventDate" />
+    <label for="diagnosisDate">تاريخ التشخيص</label>
+    <input type="date" id="diagnosisDate" name="diagnosisDate" required>
 
     <fieldset>
       <legend>تشخيص الحمل</legend>
+
       <div class="row">
-        <div class="col">
-          <div class="label">طريقة التشخيص <span class="hint">سونار ≥ 26 • جس يدوي ≥ 40</span></div>
-          <div class="radios">
-            <label><input type="radio" name="method" value="سونار" /> سونار</label>
-            <label><input type="radio" name="method" value="جس يدوي" /> جس يدوي</label>
+        <div>
+          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">طريقة التشخيص</div>
+          <div class="radio-group" id="methodGroup">
+            <label><input type="radio" name="method" value="ultrasound" required> سونار</label>
+            <label><input type="radio" name="method" value="manual"> يدوي</label>
           </div>
         </div>
 
-        <div class="col">
-          <div class="label">النتيجة</div>
-          <div class="radios">
-            <label><input type="radio" name="result" value="عشار" /> عشار</label>
-            <label><input type="radio" name="result" value="فارغة" /> فارغة</label>
+        <div>
+          <div style="margin-bottom:6px;font-weight:bold;color:#2e7d32;">النتيجة</div>
+          <div class="radio-group" id="resultGroup">
+            <label><input type="radio" name="result" value="عشار" required> عشار</label>
+            <label><input type="radio" name="result" value="فارغة"> فارغة</label>
           </div>
         </div>
       </div>
     </fieldset>
 
-    <div class="label">اسم الطبيب البيطري (اختياري)</div>
-    <input type="text" name="vet" />
+    <label for="vet">اسم الطبيب البيطري (اختياري)</label>
+    <input type="text" id="vet" name="vet">
 
-    <button type="submit" id="saveBtn" class="btn" disabled>تسجيل التشخيص</button>
-    <div id="okbar" class="infobar ok" role="status" aria-live="polite" style="display:none"></div>
+    <button type="submit" id="saveBtn">تسجيل التشخيص</button>
   </form>
-</div>
-
-<script>window.dataLayer = window.dataLayer || [];</script>
-
-<!-- Prefill من add-event/localStorage (بدون أي تغيير بصري) -->
-<script type="module">
-  (function prefill(){
-    const qs = new URLSearchParams(location.search);
-    const animal =
-      (qs.get("number") ?? qs.get("animalId") ?? qs.get("animalNumber") ??
-       localStorage.getItem("currentAnimalId") ?? localStorage.getItem("lastAnimalId") ?? "").toString().trim();
-
-    const date =
-      (qs.get("date") ?? qs.get("eventDate") ?? localStorage.getItem("currentEventDate") ??
-       localStorage.getItem("lastEventDate") ?? new Date().toISOString().slice(0,10));
-
-    const form = document.getElementById("diagnosisForm");
-    if (animal) form.elements.animalId.value = animal;
-    if (date)   form.elements.eventDate.value = date;
-
-    if (animal) {
-      localStorage.setItem("currentAnimalId", animal);
-      localStorage.setItem("lastAnimalId", animal);
-    }
-    if (date) {
-      localStorage.setItem("currentEventDate", date);
-      localStorage.setItem("lastEventDate", date);
-    }
-  })();
-</script>
-
-<!-- منطق الصفحة: فاليديشن مركزي من DB فقط + حفظ -->
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
