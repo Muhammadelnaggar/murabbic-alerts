@@ -138,96 +138,94 @@
       return months>=6 ? 'بروسيلا (≥ 6 شهور)' : 'BVD محتمل (< 6 شهور)';
     }
 
-    // آخر تلقيح بالتاريخ فقط (بغض النظر عن أي وسوم)
-  // آخر تلقيح بالتاريخ فقط (من events إن وُجد، وإلا من animals.lastInseminationDate)
-async function fetchLastInsemination(num){
-  // نحاول قراءة events لو متاحة
-  let latest = null;
-  try{
-    try{ await requireAuth(); }catch{}
-    const tenantId = localStorage.getItem('tenantId');
-    const uid = auth.currentUser?.uid || null;
-    const evs = collection(db,'events');
+    // آخر تلقيح بالتاريخ فقط (من events إن وُجد، وإلا من animals.lastInseminationDate)
+    async function fetchLastInsemination(num){
+      // نحاول قراءة events لو متاحة
+      let latest = null;
+      try{
+        try{ await requireAuth(); }catch{}
+        const tenantId = localStorage.getItem('tenantId');
+        const uid = auth.currentUser?.uid || null;
+        const evs = collection(db,'events');
 
-    const owners = [
-      tenantId ? where('tenantId','==',tenantId) : null,
-      uid ? where('userId','==',uid) : null,
-      null
-    ].filter(Boolean);
-    const fields = ['animalNumber','number'];
+        const owners = [
+          tenantId ? where('tenantId','==',tenantId) : null,
+          uid ? where('userId','==',uid) : null,
+          null
+        ].filter(Boolean);
+        const fields = ['animalNumber','number'];
 
-    async function tryOne(field, ownerFilter){
-      const clauses = [ where(field,'==', String(num)), where('eventType','==','insemination') ];
-      if(ownerFilter) clauses.unshift(ownerFilter);
-      const qy = query(evs, ...clauses, orderBy('eventDate','desc'), limit(1));
-      const snap = await getDocs(qy);
-      return snap.empty ? null : snap.docs[0].data();
-    }
+        async function tryOne(field, ownerFilter){
+          const clauses = [ where(field,'==', String(num)), where('eventType','==','insemination') ];
+          if(ownerFilter) clauses.unshift(ownerFilter);
+          const qy = query(evs, ...clauses, orderBy('eventDate','desc'), limit(1));
+          const snap = await getDocs(qy);
+          return snap.empty ? null : snap.docs[0].data();
+        }
 
-    for(const f of fields){
-      for(const o of owners){
-        latest = await tryOne(f,o);
-        if(latest) break;
+        for(const f of fields){
+          for(const o of owners){
+            latest = await tryOne(f,o);
+            if(latest) break;
+          }
+          if(latest) break;
+        }
+      }catch(e){
+        console.warn('events read failed:', e);
+        latest = null;
       }
-      if(latest) break;
+
+      // لو لقينا حدث في events نرجّعه
+      const pickDate = (obj)=>{
+        const raw = obj?.eventDate ?? obj?.date ?? obj?.serviceDate ?? obj?.inseminationDate;
+        if(!raw) return null;
+        if (typeof raw === 'string') return raw.slice(0,10);
+        if (raw?.toDate) return raw.toDate().toISOString().slice(0,10);
+        return null;
+      };
+      const dFromEvent = pickDate(latest);
+      if(dFromEvent) return { eventDate: dFromEvent };
+
+      // ⬅️ Fallback: من animals
+      try{
+        const col = collection(db,'animals');
+        const tenantId = localStorage.getItem('tenantId');
+        const uid = auth.currentUser?.uid || null;
+        const owners = [
+          tenantId ? where('tenantId','==',tenantId) : null,
+          uid ? where('userId','==',uid) : null,
+          null
+        ].filter(Boolean);
+        const fields = ['animalNumber','number'];
+
+        async function animalDoc(field, ownerFilter){
+          const clauses = [ where(field,'==', String(num)) ];
+          if(ownerFilter) clauses.unshift(ownerFilter);
+          const qy = query(col, ...clauses, limit(1));
+          const snap = await getDocs(qy);
+          return snap.empty ? null : snap.docs[0].data();
+        }
+
+        let a=null;
+        for(const f of fields){
+          for(const o of owners){ a = await animalDoc(f,o); if(a) break; }
+          if(a) break;
+        }
+        if(!a) for(const f of fields){ a = await animalDoc(f,null); if(a) break; }
+
+        const raw = a?.lastInseminationDate ?? a?.lastInsemDate ?? a?.lastServiceDate ?? a?.inseminationDate;
+        if(raw){
+          const d = typeof raw==='string' ? raw.slice(0,10) : (raw?.toDate ? raw.toDate().toISOString().slice(0,10) : null);
+          if(d) return { eventDate: d };
+        }
+      }catch(e){
+        console.warn('animals fallback failed:', e);
+      }
+
+      return null;
     }
-  }catch(e){
-    console.warn('events read failed:', e);
-    latest = null;
-  }
 
-  // لو لقينا حدث في events نرجّعه
-  const pickDate = (obj)=>{
-    const raw = obj?.eventDate ?? obj?.date ?? obj?.serviceDate ?? obj?.inseminationDate;
-    if(!raw) return null;
-    if (typeof raw === 'string') return raw.slice(0,10);
-    if (raw?.toDate) return raw.toDate().toISOString().slice(0,10);
-    return null;
-  };
-  const dFromEvent = pickDate(latest);
-  if(dFromEvent) return { eventDate: dFromEvent };
-
-  // ⬅️ Fallback: خُد التاريخ من animals (زي اللي ظاهر عندك في السكرين شوت)
-  try{
-    const col = collection(db,'animals');
-    const tenantId = localStorage.getItem('tenantId');
-    const uid = auth.currentUser?.uid || null;
-    const owners = [
-      tenantId ? where('tenantId','==',tenantId) : null,
-      uid ? where('userId','==',uid) : null,
-      null
-    ].filter(Boolean);
-    const fields = ['animalNumber','number'];
-
-    async function animalDoc(field, ownerFilter){
-      const clauses = [ where(field,'==', String(num)) ];
-      if(ownerFilter) clauses.unshift(ownerFilter);
-      const qy = query(col, ...clauses, limit(1));
-      const snap = await getDocs(qy);
-      return snap.empty ? null : snap.docs[0].data();
-    }
-
-    let a=null;
-    for(const f of fields){
-      for(const o of owners){ a = await animalDoc(f,o); if(a) break; }
-      if(a) break;
-    }
-    if(!a) for(const f of fields){ a = await animalDoc(f,null); if(a) break; }
-
-    const raw = a?.lastInseminationDate ?? a?.lastInsemDate ?? a?.lastServiceDate ?? a?.inseminationDate;
-    if(raw){
-      const d = typeof raw==='string' ? raw.slice(0,10) : (raw?.toDate ? raw.toDate().toISOString().slice(0,10) : null);
-      if(d) return { eventDate: d };
-    }
-  }catch(e){
-    console.warn('animals fallback failed:', e);
-  }
-
-  return null;
-}
-
-
-    // إيجاد الحيوان (animalNumber/number) ومع/بدون فلتر مالك وتوحيد صيغ "عِشار"
+    // إيجاد الحيوان ومع/بدون فلتر مالك وتوحيد صيغ "عِشار"
     async function fetchReproStatus(num){
       const col = collection(db,'animals');
       const tenantId = localStorage.getItem('tenantId');
@@ -244,153 +242,3 @@ async function fetchLastInsemination(num){
         const clauses = [ where(field,'==', String(num)) ];
         if(ownerFilter) clauses.unshift(ownerFilter);
         const qy = query(col, ...clauses, limit(1));
-        const snap = await getDocs(qy);
-        return snap.empty ? null : snap.docs[0].data();
-      }
-
-      let a=null;
-      try{
-        for (const f of fields){
-          for (const o of owners){
-            a = await tryOne(f, o);
-            if(a) break;
-          }
-          if(a) break;
-        }
-        if(!a){
-          for (const f of fields){
-            a = await tryOne(f, null);
-            if(a) break;
-          }
-        }
-      }catch(e){
-        console.warn('read animals failed:', e);
-        return {pregnant:false};
-      }
-      if(!a) return {pregnant:false};
-
-      const raw = a.reproductiveStatus ?? a.reproStatus ?? a.status ?? a.pregnancyStatus ?? a.pregnancy ?? '';
-      const norm = (s)=> String(s)
-        .replace(/[\u064B-\u0652]/g,'')
-        .replace(/[إأآا]/g,'ا')
-        .replace(/ة/g,'ه')
-        .toLowerCase().trim();
-
-      const txt = norm(raw);
-      const pregnant = (raw === true) || /عشار|عشر|حامل|pregnant|preg/.test(txt);
-      return {pregnant};
-    }
-
-    // حسابات وتفعيل الزر
-    async function recalc(){
-      const num = ($('animalNumber').value||'').trim();
-      const date = $('eventDate').value;
-      const save = $('saveBtn');
-
-      $('abortionAge').value = '';
-      $('probableCause').value = '';
-      if(save) save.disabled = true;
-      showMsg('', false);
-
-      if(!num || !date) return;
-
-      const rs = await fetchReproStatus(num);
-      _isPregnant = !!rs?.pregnant;
-
-      const lastInsem = await fetchLastInsemination(num);
-      _lastInsemDate = lastInsem?.eventDate || null;
-
-      const m = monthsBetween(_lastInsemDate, date);
-      $('abortionAge').value = (m==null? '' : String(m));
-      $('probableCause').value = (m==null? '' : suggestCause(m));
-
-      if(!_isPregnant){
-        if(save) save.disabled = true;
-        showMsg('الحالة التناسلية ليست عِشار — لا يمكن تسجيل الإجهاض.', true);
-      }else{
-        if(save) save.disabled = false;
-        showMsg('', false);
-      }
-    }
-
-    function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-    $('animalNumber').addEventListener('input', debounce(recalc,250));
-    $('eventDate').addEventListener('input', debounce(recalc,250));
-    $('animalNumber').addEventListener('change', recalc);
-    $('eventDate').addEventListener('change', recalc);
-    recalc();
-
-    // رفع صورة المشيمة (اختياري)
-    let _placentaSelected=false;
-    const placentaBtn=$('placentaUploadBtn');
-    const placentaInput=$('placentaInput');
-    const placentaPreview=$('placentaPreview');
-    const placentaImg=$('placentaImg');
-    const placentaName=$('placentaName');
-    const placentaSize=$('placentaSize');
-    placentaBtn?.addEventListener('click', ()=> placentaInput?.click());
-    placentaInput?.addEventListener('change', (e)=>{
-      const f=e.target.files && e.target.files[0];
-      if(!f){ _placentaSelected=false; if(placentaPreview) placentaPreview.style.display='none'; return; }
-      const r=new FileReader();
-      r.onload=()=>{
-        if(placentaImg) placentaImg.src=r.result;
-        if(placentaPreview) placentaPreview.style.display='flex';
-        _placentaSelected=true;
-        if(placentaName) placentaName.textContent=f.name;
-        if(placentaSize) placentaSize.textContent = Math.round(f.size/1024)+' ك.ب';
-      };
-      r.readAsDataURL(f);
-    });
-
-    // أزرار أسفل الصفحة
-    $('backBtn')?.addEventListener('click', ()=>{ location.href='dashboard.html'; });
-    $('saveBtn').addEventListener('click', onSave);
-
-    async function onSave(){
-      const btn=$('saveBtn');
-      const reset=()=>{ btn.disabled=false; btn.textContent='حفظ الإجهاض ✅'; };
-      try{
-        btn.disabled=true; btn.textContent='جارٍ الحفظ…';
-        try{ await requireAuth(); }catch{ showMsg('يجب تسجيل الدخول.',true); return reset(); }
-
-        const animalNumber=($('animalNumber').value||'').trim();
-        const eventDate=$('eventDate').value;
-        if(!animalNumber){ showMsg('أدخل رقم الحيوان',true); return reset(); }
-        if(!eventDate){ showMsg('اختر تاريخ الإجهاض',true); return reset(); }
-
-        if(!_isPregnant){ showMsg('الحالة التناسلية ليست عِشار — لا يمكن تسجيل الإجهاض.', true); return reset(); }
-
-        const m = monthsBetween(_lastInsemDate, eventDate);
-        const probable = (m==null? null : suggestCause(m));
-        const tenantId=localStorage.getItem('tenantId')||null;
-        const tz=Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-        await addDoc(collection(db,'events'),{
-          type:'إجهاض', eventType:'abortion',
-          eventDate, eventDateUtc:new Date(eventDate+'T00:00:00Z').toISOString(),
-          animalNumber,
-          abortionAgeMonths: (m==null? null : m),
-          lastInseminationDate: _lastInsemDate || null,
-          probableCause: probable,
-          notes: ($('notes').value||'') || null,
-          hasPlacentaPhoto: _placentaSelected ? true : false,
-          tz, tenantId,
-          source: location.href,
-          userId: auth.currentUser?.uid || null,
-          uid: auth.currentUser?.uid || null,
-          createdAt: serverTimestamp()
-        });
-
-        showMsg('✅ تم حفظ الإجهاض بنجاح', false);
-        btn.textContent='تم الحفظ ✓';
-        setTimeout(()=>{ location.href='add-event.html?number='+encodeURIComponent(animalNumber)+'&date='+encodeURIComponent(eventDate); }, 900);
-      }catch(err){
-        console.error(err);
-        showMsg('تعذّر الحفظ في فايربيز (تحقّق من الصلاحيات/الفهارس).', true);
-        reset();
-      }
-    }
-  </script>
-</body>
-</html>
