@@ -30,7 +30,6 @@
     .btn:disabled{opacity:.6;cursor:not-allowed}
     .infobar{margin-top:12px;padding:10px;border-radius:10px;font-weight:800;display:none}
     .infobar.ok{display:block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .infobar.err{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
     .hint{display:inline-block;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;border-radius:999px;padding:2px 10px;font-size:12px;margin-inline-start:6px}
   </style>
 </head>
@@ -70,16 +69,16 @@
     <div class="label">اسم الطبيب البيطري (اختياري)</div>
     <input type="text" name="vet" />
 
-    <button type="submit" id="saveBtn" class="btn">تسجيل التشخيص</button>
-    <div id="infobar" class="infobar" role="status" aria-live="polite"></div>
+    <button type="submit" id="saveBtn" class="btn" disabled>تسجيل التشخيص</button>
+    <div id="okbar" class="infobar ok" role="status" aria-live="polite" style="display:none"></div>
   </form>
 </div>
 
 <script>window.dataLayer = window.dataLayer || [];</script>
 
-<!-- تهيئة الحقول من add-event والـlocalStorage -->
+<!-- Prefill من add-event/localStorage (بدون أي تغيير بصري) -->
 <script type="module">
-  (function prefillFromAddEvent(){
+  (function prefill(){
     const qs = new URLSearchParams(location.search);
     const animal =
       (qs.get("number") ?? qs.get("animalId") ?? qs.get("animalNumber") ??
@@ -90,11 +89,8 @@
        localStorage.getItem("lastEventDate") ?? new Date().toISOString().slice(0,10));
 
     const form = document.getElementById("diagnosisForm");
-    const animalEl = form.elements.animalId;
-    const dateEl   = form.elements.eventDate;
-
-    if (animal) animalEl.value = animal;
-    if (date)   dateEl.value   = date;
+    if (animal) form.elements.animalId.value = animal;
+    if (date)   form.elements.eventDate.value = date;
 
     if (animal) {
       localStorage.setItem("currentAnimalId", animal);
@@ -107,117 +103,119 @@
   })();
 </script>
 
-<!-- منطق الصفحة + الفاليديشن المركزي + الحفظ -->
+<!-- منطق الصفحة: فاليديشن مركزي من DB فقط + حفظ -->
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
     addDoc, collection, serverTimestamp, query, where, getDocs, doc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { validateEvent } from "/js/form-rules.js";
+  import { validateEvent } from "/js/form-rules.js";   // ✅ مصدر وحيد للفاليديشن
 
   try { window.dataLayer.push({event:"page_view", page: location.pathname}); } catch {}
 
-  const $ = (s)=>document.querySelector(s);
-  const form    = $("#diagnosisForm");
-  const bar     = $("#infobar");
-  const saveBtn = $("#saveBtn");
+  const $      = (s)=>document.querySelector(s);
+  const form   = $("#diagnosisForm");
+  const okbar  = $("#okbar");
+  const saveBtn= $("#saveBtn");
 
-  function showBar(kind, txt){
-    bar.className = "infobar " + (kind === "ok" ? "ok" : "err");
-    bar.textContent = txt;
-    bar.style.display = "block";
-    bar.scrollIntoView({behavior:"smooth", block:"center"});
-  }
-
-  // تأكيد تسجيل الدخول
   await ensureAuth("/login.html");
 
-  // جلب الحالة التناسلية + آخر تلقيح حتى تاريخ التشخيص
+  // ————— جلب سياق الفاليديشن من قاعدة البيانات —————
   async function getCtx(animalId, untilDate){
     const userId = auth.currentUser?.uid;
     let reproStatus = null, animalDocId = null, lastInseminationDate = null;
 
-    // من animals
-    try {
-      const animalsRef = collection(db, "animals");
-      const q1 = query(animalsRef, where("userId","==", userId));
-      const snap = await getDocs(q1);
-      const match = snap.docs.find(d=>{
-        const a = d.data() || {};
-        const ids = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
-          .filter(Boolean).map(v=>String(v).trim());
-        return ids.includes(String(animalId));
-      });
-      if (match){
-        animalDocId = match.id;
-        const a = match.data() || {};
-        reproStatus = a.reproductiveStatus || a.reproStatus || null;
-      }
-    } catch {}
+    // من animals (بالـ userId)
+    const animalsRef = collection(db, "animals");
+    const q1 = query(animalsRef, where("userId","==", userId));
+    const snap = await getDocs(q1);
+    const match = snap.docs.find(d=>{
+      const a = d.data() || {};
+      const ids = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
+        .filter(Boolean).map(v=>String(v).trim());
+      return ids.includes(String(animalId));
+    });
+    if (match){
+      animalDocId = match.id;
+      const a = match.data() || {};
+      reproStatus = a.reproductiveStatus || a.reproStatus || null;
+    }
 
     // من events (آخر تلقيح ≤ تاريخ التشخيص)
-    try {
-      const evRef = collection(db, "events");
-      // نفلتر بالـ animalNumber لأننا بنحفظه بنفس رقم الحيوان
-      const q2 = query(evRef, where("userId","==", userId), where("animalNumber","==", String(animalId)));
-      const snap2 = await getDocs(q2);
-      const INSEM_TYPES = new Set(["تلقيح","تلقيح مخصب","تلقيح مُخصِّب","Insemination","AI","خدمة"]);
-      const ed = new Date(untilDate).setHours(0,0,0,0);
-      let latest = null;
-      snap2.forEach(docu=>{
-        const e = docu.data() || {};
-        if (!e?.eventDate || !e?.type) return;
-        if (!INSEM_TYPES.has(String(e.type).trim())) return;
-        const t = new Date(e.eventDate).setHours(0,0,0,0);
-        if (t <= ed && (!latest || t > latest)) latest = t;
-      });
-      if (latest) lastInseminationDate = new Date(latest).toISOString().slice(0,10);
-    } catch {}
+    const evRef = collection(db, "events");
+    const q2 = query(evRef, where("userId","==", userId), where("animalNumber","==", String(animalId)));
+    const snap2 = await getDocs(q2);
+    const INSEM_TYPES = new Set(["تلقيح","تلقيح مخصب","تلقيح مُخصِّب","Insemination","AI","خدمة"]);
+    const ed = new Date(untilDate).setHours(0,0,0,0);
+    let latest = null;
+    snap2.forEach(docu=>{
+      const e = docu.data() || {};
+      if (!e?.eventDate || !e?.type) return;
+      if (!INSEM_TYPES.has(String(e.type).trim())) return;
+      const t = new Date(e.eventDate).setHours(0,0,0,0);
+      if (t <= ed && (!latest || t > latest)) latest = t;
+    });
+    if (latest) lastInseminationDate = new Date(latest).toISOString().slice(0,10);
 
     return { reproStatus, lastInseminationDate, animalDocId };
   }
 
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    bar.style.display = "none";
-    saveBtn.disabled = true;
+  // ————— تشغيل فاليديشن صامت لتمكين/تعطيل زر الحفظ فقط —————
+  let lastCheckSig = 0;
+  async function silentValidateAndToggle(){
+    const sig = ++lastCheckSig;
 
     const animalId  = form.elements.animalId.value.trim();
     const eventDate = form.elements.eventDate.value;
     const methodEl  = form.querySelector('input[name="method"]:checked');
     const resultEl  = form.querySelector('input[name="result"]:checked');
 
-    if(!animalId){ showBar("err","اكتب رقم الحيوان."); saveBtn.disabled=false; return; }
-    if(!eventDate){ showBar("err","اختر تاريخ التشخيص."); saveBtn.disabled=false; return; }
-    if(!methodEl){ showBar("err","اختر طريقة التشخيص (سونار/جس يدوي)."); saveBtn.disabled=false; return; }
-    if(!resultEl){ showBar("err","اختر نتيجة التشخيص."); saveBtn.disabled=false; return; }
+    // مدخلات أساسية
+    if(!animalId || !eventDate || !methodEl || !resultEl){
+      saveBtn.disabled = true; return;
+    }
 
-    // سياق الفاليديشن
     const ctx = await getCtx(animalId, eventDate);
+    if (sig !== lastCheckSig) return; // تجاهل نتائج قديمة
 
-    // ✅ الفاليديشن المركزي (اسم الحدث بالعربي حسب الاتفاق)
     const v = validateEvent("تشخيص حمل", {
       animalId,
       eventDate,
-      method: methodEl.value,            // "سونار" | "جس يدوي"
-      result: resultEl.value,            // "عشار" | "فارغة"
-      reproStatus: ctx.reproStatus,      // يجب أن تكون "ملقح"
+      method: methodEl.value,      // "سونار" | "جس يدوي"
+      result: resultEl.value,      // "عشار" | "فارغة"
+      reproStatus: ctx.reproStatus,
       lastInseminationDate: ctx.lastInseminationDate
     });
 
-    if (!v?.ok){
-      const msg = Array.isArray(v?.errors) && v.errors.length ? v.errors.join(" — ") : "مدخلات غير مكتملة أو غير صحيحة.";
-      showBar("err", msg);
-      saveBtn.disabled = false;
-      return;
-    }
+    saveBtn.disabled = !v?.ok;     // لا نعرض أخطاء؛ مجرد تعطيل/تمكين
+  }
 
-    // الحفظ في Firestore (events)
+  // نراقب كل المدخلات لإعادة الفحص الصامت
+  ["input","change"].forEach(evt=>{
+    form.addEventListener(evt, (e)=>{
+      if (e.target && (e.target.name==="animalId" || e.target.name==="eventDate" || e.target.name==="method" || e.target.name==="result")){
+        silentValidateAndToggle();
+      }
+    });
+  });
+  // فحص أولي بعد التحميل/التهيئة
+  window.addEventListener("load", silentValidateAndToggle);
+
+  // ————— الحفظ —————
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+
+    // لو الزر مفعّل فالفاليديشن مركزي مرّ بالفعل
+    const animalId  = form.elements.animalId.value.trim();
+    const eventDate = form.elements.eventDate.value;
+    const method    = form.querySelector('input[name="method"]:checked')?.value;
+    const result    = form.querySelector('input[name="result"]:checked')?.value;
+
     const payload = {
       userId: auth.currentUser.uid,
       animalId, animalNumber: String(animalId),
       eventDate, type: "تشخيص حمل",
-      method: methodEl.value, result: resultEl.value,
+      method, result,
       vet: form.elements.vet.value?.trim() || "",
       source: location.pathname,
       createdAt: serverTimestamp()
@@ -226,7 +224,7 @@
     try {
       await addDoc(collection(db,"events"), payload);
 
-      // تحديث الكاش المحلي
+      // كاش محلي
       localStorage.setItem("currentAnimalId", animalId);
       localStorage.setItem("lastAnimalId", animalId);
       localStorage.setItem("currentEventDate", eventDate);
@@ -237,21 +235,27 @@
         const { animalDocId } = await getCtx(animalId, eventDate);
         if (animalDocId){
           const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate:eventDate };
-          if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
-          if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
+          if (result === "عشار")  updates.reproductiveStatus = "عشار";
+          if (result === "فارغة") updates.reproductiveStatus = "مفتوحة";
           await updateDoc(doc(db,"animals",animalDocId), updates);
         }
       }catch{}
 
-      showBar("ok","✅ تم تسجيل تشخيص الحمل بنجاح");
-      setTimeout(()=> {
+      // تأكيد أخضر فقط
+      okbar.textContent = "✅ تم تسجيل تشخيص الحمل بنجاح";
+      okbar.style.display = "block";
+
+      setTimeout(()=>{
         location.href = `add-event.html?number=${encodeURIComponent(animalId)}&date=${encodeURIComponent(eventDate)}`;
       }, 1200);
 
     } catch (err){
-      console.error(err);
-      showBar("err","❌ تعذّر الحفظ: تأكد من الاتصال والصلاحيات.");
-      saveBtn.disabled = false;
+      // لا نعرض أخطاء في الواجهة حسب طلبك
+      console.error("Firestore save failed", err);
+      // إعادة التعطيل لتفادي تكرار الضغط
+      saveBtn.disabled = true;
+      // إعادة فحص صامت (في حال تحسّنت الظروف/المدخلات)
+      silentValidateAndToggle();
     }
   });
 </script>
