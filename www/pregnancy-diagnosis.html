@@ -121,11 +121,13 @@
   await ensureAuth("/login.html");
 
   // ————— جلب سياق الفاليديشن من قاعدة البيانات —————
-  async function getCtx(animalId, untilDate){
-    const userId = auth.currentUser?.uid;
-    let reproStatus = null, animalDocId = null, lastInseminationDate = null;
+// ————— جلب سياق الفاليديشن من قاعدة البيانات —————
+async function getCtx(animalId, untilDate){
+  const userId = auth.currentUser?.uid;
+  let reproStatus = null, animalDocId = null, lastInseminationDate = null;
 
-    // من animals (بالـ userId)
+  // 1) animals: نلتقط الحالة التناسلية بأي معرّف محفوظ
+  try {
     const animalsRef = collection(db, "animals");
     const q1 = query(animalsRef, where("userId","==", userId));
     const snap = await getDocs(q1);
@@ -140,26 +142,42 @@
       const a = match.data() || {};
       reproStatus = a.reproductiveStatus || a.reproStatus || null;
     }
+  } catch {}
 
-    // من events (آخر تلقيح ≤ تاريخ التشخيص)
+  // 2) events: نبحث بسجلات محفوظة بـ animalNumber أو animalId
+  try {
     const evRef = collection(db, "events");
-    const q2 = query(evRef, where("userId","==", userId), where("animalNumber","==", String(animalId)));
-    const snap2 = await getDocs(q2);
-    const INSEM_TYPES = new Set(["تلقيح","تلقيح مخصب","تلقيح مُخصِّب","Insemination","AI","خدمة"]);
+    const qNum = query(evRef, where("userId","==", userId), where("animalNumber","==", String(animalId)));
+    const qId  = query(evRef, where("userId","==", userId), where("animalId","==", String(animalId)));
+    const [snapNum, snapId] = await Promise.all([getDocs(qNum).catch(()=>null), getDocs(qId).catch(()=>null)]);
+
+    // نغطي كل المسميات المحتملة لنوع حدث التلقيح
+    const INSEM_TYPES = new Set([
+      "تلقيح","تلقيح مخصب","تلقيح مُخصِّب","خدمة",
+      "AI","Insemination","insemination","Service","service"
+    ]);
+
     const ed = new Date(untilDate).setHours(0,0,0,0);
     let latest = null;
-    snap2.forEach(docu=>{
+
+    const consider = (s)=> s && s.forEach(docu=>{
       const e = docu.data() || {};
-      if (!e?.eventDate || !e?.type) return;
-      if (!INSEM_TYPES.has(String(e.type).trim())) return;
+      const evType = String(e.eventType ?? e.type ?? "").trim();   // ← دعم eventType أو type
+      if (!e?.eventDate || !evType) return;
+      if (!INSEM_TYPES.has(evType)) return;
       const t = new Date(e.eventDate).setHours(0,0,0,0);
       if (t <= ed && (!latest || t > latest)) latest = t;
     });
+
+    consider(snapNum);
+    consider(snapId);
+
     if (latest) lastInseminationDate = new Date(latest).toISOString().slice(0,10);
+  } catch {}
 
-    return { reproStatus, lastInseminationDate, animalDocId };
-  }
-
+  return { reproStatus, lastInseminationDate, animalDocId };
+}
+  
   // ————— تشغيل فاليديشن صامت لتمكين/تعطيل زر الحفظ فقط —————
   let lastCheckSig = 0;
   async function silentValidateAndToggle(){
