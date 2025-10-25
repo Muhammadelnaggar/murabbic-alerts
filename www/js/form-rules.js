@@ -73,17 +73,16 @@ export const eventSchemas = {
   },
 
   // ——— الإجهاض ———
- guards.abortionDecision = async (ctx) => {
-  const { animalNumber, eventDate, db } = ctx;
-  if (!animalNumber || !db) return { ok: false, msg: "البيانات غير مكتملة." };
+// ——— الإجهاض ———
+"إجهاض": {
+  fields: {
+    ...commonFields,
+    reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض يتطلّب أن تكون الحالة «عِشار»." },
+    lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب لتحديد عمر الإجهاض." },
+  },
+  guards: ["abortionDecision"],
+},
 
-  const { collection, query, where, orderBy, limit, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-  const q = query(
-    collection(db, "events"),
-    where("animalNumber", "==", animalNumber),
-    orderBy("eventDate", "desc"),
-    limit(10)
-  );
   const snap = await getDocs(q);
 
   let reproStatus = null;
