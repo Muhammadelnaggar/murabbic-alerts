@@ -74,40 +74,15 @@ export const eventSchemas = {
 
   // ——— الإجهاض ———
 // ——— الإجهاض ———
-"إجهاض": {
-  fields: {
-    ...commonFields,
-    reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض يتطلّب أن تكون الحالة «عِشار»." },
-    lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب لتحديد عمر الإجهاض." },
+
+   "إجهاض": {
+    fields: {
+      ...commonFields,
+      reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض يتطلّب أن تكون الحالة «عِشار»." },
+      lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب لتحديد عمر الإجهاض." },
+    },
+    guards: ["abortionDecision"],
   },
-  guards: ["abortionDecision"],
-},
-
-  const snap = await getDocs(q);
-
-  let reproStatus = null;
-  let lastInsemination = null;
-
-  snap.forEach(doc => {
-    const d = doc.data();
-    if (!reproStatus && d.reproductiveStatus) reproStatus = d.reproductiveStatus;
-    if (!lastInsemination && d.eventType?.includes("تلقيح")) lastInsemination = d.eventDate;
-  });
-
-  if (reproStatus !== "عشار") {
-    return { ok: false, msg: "❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض." };
-  }
-
-  if (!lastInsemination) {
-    return { ok: false, msg: "⚠️ لا يوجد تلقيح سابق، لا يمكن تحديد عمر الإجهاض." };
-  }
-
-  // حساب عمر الإجهاض
-  const diffDays = (new Date(eventDate) - new Date(lastInsemination)) / (1000 * 60 * 60 * 24);
-  const months = (diffDays / 30).toFixed(1);
-  return { ok: true, msg: `✅ عمر الإجهاض التقريبي ${months} شهر`, abortionAge: months };
-};
-
   // ——— التجفيف ———
   "تجفيف": {
     fields: {
