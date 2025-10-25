@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل إجهاض — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
-  <!-- ✅ تحميل الفاليديشن المركزي -->
   <script type="module" src="js/forms-init.js"></script>
   <style>
     :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
@@ -46,49 +45,67 @@
     const $ = id => document.getElementById(id);
     const info = $("info");
 
-    // 🟢 تمرير الرقم والتاريخ من صفحة الأحداث أو التخزين المحلي
+    // تمرير الرقم والتاريخ من صفحة الأحداث أو التخزين المحلي
     const p = new URLSearchParams(location.search);
     const num = p.get("number") || localStorage.getItem("lastAnimalNumber");
-    const dt  = p.get("date")   || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+    const dt  = p.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
     $("animalNumber").value = num || "";
     $("eventDate").value = dt || "";
 
     function msg(t, ok){
-      info.className = "infobar " + (ok ? "ok":"err");
+      info.className = "infobar " + (ok ? "ok" : "err");
       info.textContent = t;
     }
 
-    // ✅ التحقق الفوري — التلقيح + الحالة التناسلية
+    // ✅ التحقق الفوري — الحالة من animals أولاً + تاريخ التلقيح من events أو Fallback من animals
     async function checkAnimal(){
       if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); $("saveBtn").disabled=true; return; }
 
       try{
-        // آخر تلقيح
-        const qInsem = query(collection(db,"events"),
-          where("animalNumber","==",num),
-          where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
-          orderBy("eventDate","desc"), limit(1));
-        const insemSnap = await getDocs(qInsem);
-      if(insemSnap.empty){ msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false); $("saveBtn").disabled=true; return; }
+        // 1) جلب الحيوان (animalNumber أو number)
+        let animal = null;
+        let aSnap = await getDocs(query(collection(db,"animals"), where("animalNumber","==",num), limit(1)));
+        if (aSnap.empty) aSnap = await getDocs(query(collection(db,"animals"), where("number","==",num), limit(1)));
+        if (!aSnap.empty) animal = aSnap.docs[0].data();
 
-        const last = insemSnap.docs[0].data();
+        const status = (animal?.reproductiveStatus || animal?.reproStatus || "").trim();
 
-        // الحالة التناسلية
-        const qAnimal = query(collection(db,"animals"), where("animalNumber","==",num), limit(1));
-        const aSnap = await getDocs(qAnimal);
-        if(!aSnap.empty){
-          const animal = aSnap.docs[0].data();
-          const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
-          if(status && !status.includes("عشار")){
-            msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false);
-            $("saveBtn").disabled=true;
-            return;
-          }
+        // 2) الشرط الرئيسي
+        if (!status || !status.includes("عشار")) {
+          msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false);
+          $("saveBtn").disabled = true;
+          return;
         }
 
-        // حساب العمر والسبب المحتمل
-        const d1 = new Date(last.eventDate);
+        // 3) نحاول آخر تلقيح من events
+        const qInsem = query(
+          collection(db,"events"),
+          where("animalNumber","==",num),
+          where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
+          orderBy("eventDate","desc"),
+          limit(1)
+        );
+        const insemSnap = await getDocs(qInsem);
+
+        // 4) تحديد تاريخ التلقيح
+        let lastInsem =
+          (!insemSnap.empty ? insemSnap.docs[0].data()?.eventDate : null) ||
+          animal?.lastInseminationDate || animal?.lastInsemDate || animal?.lastServiceDate;
+
+        if (typeof lastInsem === "object" && lastInsem?.toDate) lastInsem = lastInsem.toDate().toISOString().slice(0,10);
+        if (typeof lastInsem === "string") lastInsem = lastInsem.slice(0,10);
+
+        // 5) حساب عمر الإجهاض
+        const d1 = lastInsem ? new Date(lastInsem) : null;
         const d2 = new Date(dt);
+        if (!d1 || Number.isNaN(d1.getTime())) {
+          msg("✅ الحالة عِشار، تم التحقق. (تعذّر تحديد تاريخ التلقيح بدقة)", true);
+          $("abortionAge").value = "";
+          $("probableCause").value = "";
+          $("saveBtn").disabled = false;
+          return;
+        }
+
         const months = ((d2 - d1) / (1000*60*60*24*30.44)).toFixed(1);
         $("abortionAge").value = months;
         $("probableCause").value = months >= 6 ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
