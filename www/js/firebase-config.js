@@ -1,102 +1,47 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>تسجيل إجهاض — مُرَبِّك</title>
-  <link rel="stylesheet" href="css/forms.css" />
-  <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px;text-align:center;font-weight:800;color:var(--green-600)}
-    main{padding:16px;max-width:600px;margin:auto}
-    label{display:block;margin-top:12px;font-weight:700}
-    input,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
-    button{width:100%;margin-top:20px;padding:14px;background:var(--green);color:#fff;border:0;border-radius:10px;font-weight:800;font-size:16px;cursor:pointer}
-    .infobar{margin-top:10px;padding:10px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
-    .ok{background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0}
-    .err{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
-  </style>
-</head>
-<body>
-  <header>تسجيل إجهاض</header>
-  <main>
-    <div id="info" class="infobar"></div>
-    <label>رقم الحيوان</label>
-    <input id="animalNumber" readonly />
-    <label>تاريخ الإجهاض</label>
-    <input id="eventDate" type="date" readonly />
-    <label>عمر الإجهاض (بالشهور)</label>
-    <input id="abortionAge" readonly />
-    <label>السبب المحتمل</label>
-    <input id="probableCause" readonly />
-    <label>ملاحظات</label>
-    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
-    <button id="saveBtn">حفظ الإجهاض ✅</button>
-  </main>
+// /js/firebase-config.js  (ESM عبر CDN)
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  <script>
-  (async () => {
-    // تحميل Firebase الموحد من مربيك
-    const { db, auth } = await import('/js/firebase-config.js');
-    const { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+// ⚙️ إعدادات مشروعك (زي ما عندك)
+const firebaseConfig = {
+  apiKey: "AIzaSyCnkVBmRIyDZDpUX4yMH3SeR0hbnBqrh-4",
+  authDomain: "murabbik-470511.firebaseapp.com",
+  projectId: "murabbik-470511",
+  storageBucket: "murabbik-470511.appspot.com",
+  messagingSenderId: "118468123456",
+  appId: "1:118468123456:web:f26a0d1bad72b3792cf8a5"
+};
 
-    const $ = id => document.getElementById(id);
-    const info = $("info");
-    const num = new URLSearchParams(location.search).get("number") || localStorage.getItem("lastAnimalNumber");
-    const dt = new URLSearchParams(location.search).get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-    $("animalNumber").value = num || "";
-    $("eventDate").value = dt || "";
+// 👈 قاعدة Firestore المسماة
+export const db = getFirestore(app, "murabbikdata");
 
-    function msg(t, ok){
-      info.className = "infobar " + (ok ? "ok":"err");
-      info.textContent = t;
-    }
+// Auth + تخزين الجلسة في المتصفح
+export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
-    // ✅ التحقق الفوري فور تحميل الصفحة
-    async function checkInsem(){
-      if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); $("saveBtn").disabled=true; return; }
-      try{
-        const qy = query(collection(db,"events"),
-          where("animalNumber","==",num),
-          where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
-          orderBy("eventDate","desc"), limit(1));
-        const snap = await getDocs(qy);
-        if(snap.empty){ msg("⚠️ لا يوجد تلقيح سابق.", false); $("saveBtn").disabled=true; return; }
-        const last = snap.docs[0].data();
-        const d1=new Date(last.eventDate); const d2=new Date(dt);
-        const months=((d2-d1)/(1000*60*60*24*30.44)).toFixed(1);
-        $("abortionAge").value=months;
-        $("probableCause").value=months>=6?"احتمال بروسيلا (≥6 شهور)":"احتمال BVD (<6 شهور)";
-        msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
-        $("saveBtn").disabled=false;
-      }catch(e){ console.error(e); msg("⚠️ خطأ أثناء التحقق.", false); $("saveBtn").disabled=true; }
-    }
+// للصفحات اللي عايزة تحقّق بدون تحويل (هترمي LOGIN_REQUIRED لو مش داخل)
+export async function requireAuth(){
+  if (auth.currentUser) return auth.currentUser;
+  throw new Error('LOGIN_REQUIRED');
+}
 
-    await checkInsem();
+// ✅ الواجهة المتوافقة مع كودك الحالي
+// لو مش داخل → نحفظ الصفحة الحالية في sessionStorage ونحوّل لـ login.html
+export async function ensureAuth(loginUrl = '/login.html'){
+  if (auth.currentUser) return auth.currentUser;
 
-    // ✅ الحفظ في Firestore murabbikdata
-    $("saveBtn").onclick = async ()=>{
-      try{
-        await addDoc(collection(db,"events"),{
-          animalNumber:num,
-          eventType:"إجهاض",
-          eventDate:dt,
-          abortionAgeMonths:parseFloat($("abortionAge").value)||null,
-          probableCause:$("probableCause").value||"",
-          notes:$("notes").value||"",
-          userId:auth.currentUser?.uid||null,
-          createdAt:serverTimestamp()
-        });
-        msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
-        localStorage.setItem("lastAnimalNumber",num);
-        localStorage.setItem("lastEventDate",dt);
-      }catch(e){ console.error(e); msg("❌ فشل في الحفظ.", false); }
-    };
-  })();
-  </script>
-</body>
-</html>
+  // فرصة قصيرة لو المتصفح يرجّع جلسة محفوظة بسرعة
+  const user = await new Promise((resolve) => {
+    const off = onAuthStateChanged(auth, (u) => { off(); resolve(u || null); });
+  });
+  if (user) return user;
+
+  try { sessionStorage.setItem('postLogin', location.href); } catch {}
+  location.href = loginUrl;
+  throw new Error('LOGIN_REQUIRED_REDIRECT'); // يوقف تنفيذ الصفحة الحالية
+}
