@@ -3,193 +3,100 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
-
   <title>تسجيل إجهاض — مُرَبِّك</title>
+  <link rel="stylesheet" href="css/forms.css" />
   <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff;--danger:#c2410c}
+    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
     *{box-sizing:border-box}
-    html,body{max-width:100%;overflow-x:hidden}
-    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid #e2e8f0;box-shadow:0 2px 6px rgba(0,0,0,.05)}
-    .bar{max-width:920px;margin:0 auto;padding:14px 18px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600);font-size:18px}
-    main{max-width:920px;margin:18px auto;padding:14px}
-    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
-    .row{display:grid;gap:14px}
-    @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
-    label{font-weight:700;font-size:15px;color:#0f172a;display:block;margin-bottom:6px}
-    input,select{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
-    .muted{color:var(--muted);font-size:13px}
-    .badge{display:inline-block;background:#e6f8ef;color:var(--green-600);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800}
-    .infobar{display:none;margin-top:12px;padding:12px;border-radius:10px;font-size:14px;font-weight:700;text-align:center}
-    .infobar.show{display:block}
-    .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
-    .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
-    .actions{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -2px 6px rgba(0,0,0,.08);display:flex;gap:10px;padding:12px}
-    .btn{flex:1;padding:16px 18px;border-radius:14px;border:0;cursor:pointer;font-weight:800;font-size:17px}
-    .btn.primary{background:var(--green);color:#fff}
-    .btn.ghost{background:#eef2f7;color:#0f172a}
+    body{margin:0;font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px;text-align:center;font-weight:800;color:var(--green-600)}
+    main{padding:16px;max-width:600px;margin:auto}
+    label{display:block;margin-top:12px;font-weight:700}
+    input,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+    button{width:100%;margin-top:20px;padding:14px;background:var(--green);color:#fff;border:0;border-radius:10px;font-weight:800;font-size:16px;cursor:pointer}
+    .infobar{margin-top:10px;padding:10px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
+    .ok{background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0}
+    .err{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
   </style>
 </head>
 <body>
-  <header>
-    <div class="bar">
-      <div class="title">تسجيل إجهاض <span class="badge">مُرَبِّك</span></div>
-      <a class="ghost" href="dashboard.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">رجوع للوحة التحكم</a>
-    </div>
-  </header>
-
+  <header>تسجيل إجهاض</header>
   <main>
-    <div class="card grid" id="formCard">
-      <div class="row">
-        <div>
-          <label>رقم الحيوان</label>
-          <input id="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
-        </div>
-        <div>
-          <label>تاريخ الإجهاض</label>
-          <input id="eventDate" type="date" required />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>عمر الإجهاض (شهور)</label>
-          <input id="abortionAge" type="text" disabled />
-        </div>
-        <div>
-          <label>سبب مُقترح</label>
-          <input id="probableCause" type="text" disabled />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>ملاحظات</label>
-          <input id="notes" placeholder="اختياري" />
-        </div>
-      </div>
-
-      <div id="info" class="infobar"></div>
-    </div>
+    <div id="info" class="infobar"></div>
+    <label>رقم الحيوان</label>
+    <input id="animalNumber" readonly />
+    <label>تاريخ الإجهاض</label>
+    <input id="eventDate" type="date" readonly />
+    <label>عمر الإجهاض (بالشهور)</label>
+    <input id="abortionAge" readonly />
+    <label>السبب المحتمل</label>
+    <input id="probableCause" readonly />
+    <label>ملاحظات</label>
+    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+    <button id="saveBtn">حفظ الإجهاض ✅</button>
   </main>
 
-  <div class="actions">
-    <button class="btn primary" id="saveBtn">حفظ الإجهاض ✅</button>
-    <button class="btn ghost" id="backBtn">رجوع للوحة التحكم</button>
-  </div>
+  <script>
+  (async () => {
+    // تحميل Firebase الموحد من مربيك
+    const { db, auth } = await import('/js/firebase-config.js');
+    const { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  <script type="module">
-    import { app, db, auth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs, updateDoc } 
-      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    const $ = id => document.getElementById(id);
+    const info = $("info");
+    const num = new URLSearchParams(location.search).get("number") || localStorage.getItem("lastAnimalNumber");
+    const dt = new URLSearchParams(location.search).get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
-    const $ = (id)=>document.getElementById(id);
-    const info = $('info');
+    $("animalNumber").value = num || "";
+    $("eventDate").value = dt || "";
 
-    function showMsg(t,err=false){
-      info.textContent=t;
-      info.className='infobar show'+(err?' error':'');
+    function msg(t, ok){
+      info.className = "infobar " + (ok ? "ok":"err");
+      info.textContent = t;
     }
 
-    const monthsBetween=(d1,d2)=>{
-      if(!d1||!d2) return 0;
-      const a=new Date(d1), b=new Date(d2);
-      return Math.max(0,Math.round(((b-a)/30/24/3600/1000)*10)/10);
-    };
-    const suggestCause=(m)=>!m?'':(m>=6?'بروسيلا (≥6 شهور)':'BVD محتمل (<6 شهور)');
-
-    async function fetchRepro(num){
-      const q=query(collection(db,'animals'),where('animalNumber','==',String(num)),limit(1));
-      const s=await getDocs(q);
-      if(s.empty) return '';
-      return (s.docs[0].data().reproductiveStatus||'').trim();
-    }
-
-    async function lastInsemination(num){
-      const qy=query(collection(db,'events'),
-        where('animalNumber','==',String(num)),
-        orderBy('eventDate','desc'),limit(20));
-      const s=await getDocs(qy);
-      if(s.empty) return null;
-      const labels=['تلقيح','تلقيح مُخصِّب','insemination'];
-      for(const d of s.docs){
-        const ev=(d.data().eventType||'').trim();
-        if(labels.includes(ev)){
-          const ed=d.data().eventDate;
-          return typeof ed==='string'?ed:ed.toDate().toISOString().slice(0,10);
-        }
-      }
-      return null;
-    }
-
-    async function autoCheck(){
-      const num=$('animalNumber').value.trim();
-      const date=$('eventDate').value;
-      if(!num||!date) return;
-
-      showMsg('⏳ جاري الفحص...');
-      const st=await fetchRepro(num);
-      if(!['عشار','pregnant','Pregnant'].includes(st)){
-        showMsg('⚠️ الحيوان غير عِشار – لا يمكن تسجيل إجهاض',true);
-        $('saveBtn').disabled=true;
-        return;
-      }
-
-      const li=await lastInsemination(num);
-      if(!li){
-        showMsg('⚠️ لا يوجد تلقيح سابق',true);
-        $('saveBtn').disabled=true;
-        return;
-      }
-
-      const g=monthsBetween(li,date);
-      $('abortionAge').value=g;
-      $('probableCause').value=suggestCause(g);
-      showMsg(`✅ عِشار — عمر الحمل ${g} شهر / ${suggestCause(g)}`);
-      $('saveBtn').disabled=false;
-    }
-
-    // تمرير الرقم والتاريخ ثم الفحص فورًا
-    (()=>{
-      const p=new URLSearchParams(location.search);
-      const num=p.get('number')||localStorage.getItem('currentAnimalNumber')||'';
-      const date=p.get('date')||new Date().toISOString().slice(0,10);
-      $('animalNumber').value=num;
-      $('eventDate').value=date;
-      localStorage.setItem('currentAnimalNumber',num);
-      localStorage.setItem('currentEventDate',date);
-      autoCheck(); // ✅ تشغيل الفحص الذكي مباشرة
-    })();
-
-    $('saveBtn').addEventListener('click', async ()=>{
-      const num=$('animalNumber').value.trim();
-      const date=$('eventDate').value;
-      const g=$('abortionAge').value||0;
+    // ✅ التحقق الفوري فور تحميل الصفحة
+    async function checkInsem(){
+      if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); $("saveBtn").disabled=true; return; }
       try{
-        await addDoc(collection(db,'events'),{
-          animalNumber:num,
-          eventType:'إجهاض',
-          eventDate:date,
-          abortionAgeMonths:g,
-          probableCause:$('probableCause').value||'',
-          notes:$('notes').value||'',
-          createdAt:serverTimestamp(),
-          userId:auth.currentUser?.uid||null
-        });
-        showMsg('✅ تم الحفظ وتحديث الحالة');
-        const q=query(collection(db,'animals'),where('animalNumber','==',String(num)),limit(1));
-        const s=await getDocs(q);
-        if(!s.empty) await updateDoc(s.docs[0].ref,{reproductiveStatus:'فاضية'});
-      }catch(e){
-        console.error(e);showMsg('خطأ أثناء الحفظ',true);
-      }
-    });
+        const qy = query(collection(db,"events"),
+          where("animalNumber","==",num),
+          where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
+          orderBy("eventDate","desc"), limit(1));
+        const snap = await getDocs(qy);
+        if(snap.empty){ msg("⚠️ لا يوجد تلقيح سابق.", false); $("saveBtn").disabled=true; return; }
+        const last = snap.docs[0].data();
+        const d1=new Date(last.eventDate); const d2=new Date(dt);
+        const months=((d2-d1)/(1000*60*60*24*30.44)).toFixed(1);
+        $("abortionAge").value=months;
+        $("probableCause").value=months>=6?"احتمال بروسيلا (≥6 شهور)":"احتمال BVD (<6 شهور)";
+        msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
+        $("saveBtn").disabled=false;
+      }catch(e){ console.error(e); msg("⚠️ خطأ أثناء التحقق.", false); $("saveBtn").disabled=true; }
+    }
 
-    $('backBtn').addEventListener('click',()=>location.href='dashboard.html');
+    await checkInsem();
+
+    // ✅ الحفظ في Firestore murabbikdata
+    $("saveBtn").onclick = async ()=>{
+      try{
+        await addDoc(collection(db,"events"),{
+          animalNumber:num,
+          eventType:"إجهاض",
+          eventDate:dt,
+          abortionAgeMonths:parseFloat($("abortionAge").value)||null,
+          probableCause:$("probableCause").value||"",
+          notes:$("notes").value||"",
+          userId:auth.currentUser?.uid||null,
+          createdAt:serverTimestamp()
+        });
+        msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
+        localStorage.setItem("lastAnimalNumber",num);
+        localStorage.setItem("lastEventDate",dt);
+      }catch(e){ console.error(e); msg("❌ فشل في الحفظ.", false); }
+    };
+  })();
   </script>
 </body>
 </html>
