@@ -75,14 +75,22 @@ export const eventSchemas = {
   // ——— الإجهاض ———
 // ——— الإجهاض ———
 
-   "إجهاض": {
-    fields: {
-      ...commonFields,
-      reproStatus: { required: true, enum: ["عشار"], msg: "الإجهاض يتطلّب أن تكون الحالة «عِشار»." },
-      lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب لتحديد عمر الإجهاض." },
-    },
-    guards: ["abortionDecision"],
-  },
+ // — الإجهاض —
+abortionDecision(fd) {
+  const { reproStatus, lastFertileInseminationDate, eventDate } = fd;
+
+  // الشرط الوحيد المطلوب
+  if (reproStatus !== "عشار") {
+    return "❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.";
+  }
+
+  // باقي الفحص الحسابي فقط بدون رسائل أخرى
+  const d = daysBetween(lastFertileInseminationDate, eventDate);
+  if (Number.isNaN(d)) return "تعذّر حساب عمر الحمل عند الإجهاض.";
+  const months = (d / 30).toFixed(1);
+  return `✅ عمر الإجهاض التقريبي ${months} شهر.`;
+},
+
   // ——— التجفيف ———
   "تجفيف": {
     fields: {
