@@ -69,7 +69,8 @@
           where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
           orderBy("eventDate","desc"), limit(1));
         const insemSnap = await getDocs(qInsem);
-        if(insemSnap.empty){ msg("⚠️ لا يوجد تلقيح سابق.", false); $("saveBtn").disabled=true; return; }
+      if(insemSnap.empty){ msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false); $("saveBtn").disabled=true; return; }
+
         const last = insemSnap.docs[0].data();
 
         // الحالة التناسلية
