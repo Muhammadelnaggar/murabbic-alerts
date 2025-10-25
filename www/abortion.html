@@ -68,14 +68,15 @@
         if (aSnap.empty) aSnap = await getDocs(query(collection(db,"animals"), where("number","==",num), limit(1)));
         if (!aSnap.empty) animal = aSnap.docs[0].data();
 
-        const status = (animal?.reproductiveStatus || animal?.reproStatus || "").trim();
+      const status = (animal?.reproductiveStatus || animal?.reproStatus || "").trim();
 
-        // 2) الشرط الرئيسي
-        if (!status || !status.includes("عشار")) {
-          msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false);
-          $("saveBtn").disabled = true;
-          return;
-        }
+// ✅ الشرط الوحيد: يجب أن تكون الحالة "عِشار" فقط
+if (status !== "عِشار") {
+  msg(`❌ الحالة التناسلية الحالية هي «${status || "غير معروفة"}»، ولا يمكن تسجيل الإجهاض إلا للحيوانات العِشار فقط.`, false);
+  $("saveBtn").disabled = true;
+  return;
+}
+
 
         // 3) نحاول آخر تلقيح من events
         const qInsem = query(
