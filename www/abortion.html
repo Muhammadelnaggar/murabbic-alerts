@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-page="abortion">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل إجهاض — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
+  <!-- ✅ تحميل الفاليديشن المركزي -->
+  <script type="module" src="js/forms-init.js"></script>
   <style>
     :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
     *{box-sizing:border-box}
@@ -19,7 +21,7 @@
     .err{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
   </style>
 </head>
-<body>
+<body data-page="abortion">
   <header>تسجيل إجهاض</header>
   <main>
     <div id="info" class="infobar"></div>
@@ -33,21 +35,21 @@
     <input id="probableCause" readonly />
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
-    <button id="saveBtn">حفظ الإجهاض ✅</button>
+    <button id="saveBtn" data-validate="true">حفظ الإجهاض ✅</button>
   </main>
 
-  <script>
-  (async () => {
-    // تحميل Firebase الموحد من مربيك
-    const { db, auth } = await import('/js/firebase-config.js');
-    const { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  <script type="module">
+    import { db, auth } from '/js/firebase-config.js';
+    import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } 
+      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const $ = id => document.getElementById(id);
     const info = $("info");
-    const num = new URLSearchParams(location.search).get("number") || localStorage.getItem("lastAnimalNumber");
-    const dt = new URLSearchParams(location.search).get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
+    // 🟢 تمرير الرقم والتاريخ من صفحة الأحداث أو التخزين المحلي
+    const p = new URLSearchParams(location.search);
+    const num = p.get("number") || localStorage.getItem("lastAnimalNumber");
+    const dt  = p.get("date")   || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
     $("animalNumber").value = num || "";
     $("eventDate").value = dt || "";
 
@@ -56,29 +58,52 @@
       info.textContent = t;
     }
 
-    // ✅ التحقق الفوري فور تحميل الصفحة
-    async function checkInsem(){
+    // ✅ التحقق الفوري — التلقيح + الحالة التناسلية
+    async function checkAnimal(){
       if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); $("saveBtn").disabled=true; return; }
+
       try{
-        const qy = query(collection(db,"events"),
+        // آخر تلقيح
+        const qInsem = query(collection(db,"events"),
           where("animalNumber","==",num),
           where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
           orderBy("eventDate","desc"), limit(1));
-        const snap = await getDocs(qy);
-        if(snap.empty){ msg("⚠️ لا يوجد تلقيح سابق.", false); $("saveBtn").disabled=true; return; }
-        const last = snap.docs[0].data();
-        const d1=new Date(last.eventDate); const d2=new Date(dt);
-        const months=((d2-d1)/(1000*60*60*24*30.44)).toFixed(1);
-        $("abortionAge").value=months;
-        $("probableCause").value=months>=6?"احتمال بروسيلا (≥6 شهور)":"احتمال BVD (<6 شهور)";
+        const insemSnap = await getDocs(qInsem);
+        if(insemSnap.empty){ msg("⚠️ لا يوجد تلقيح سابق.", false); $("saveBtn").disabled=true; return; }
+        const last = insemSnap.docs[0].data();
+
+        // الحالة التناسلية
+        const qAnimal = query(collection(db,"animals"), where("animalNumber","==",num), limit(1));
+        const aSnap = await getDocs(qAnimal);
+        if(!aSnap.empty){
+          const animal = aSnap.docs[0].data();
+          const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
+          if(status && !status.includes("عشار")){
+            msg("❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.", false);
+            $("saveBtn").disabled=true;
+            return;
+          }
+        }
+
+        // حساب العمر والسبب المحتمل
+        const d1 = new Date(last.eventDate);
+        const d2 = new Date(dt);
+        const months = ((d2 - d1) / (1000*60*60*24*30.44)).toFixed(1);
+        $("abortionAge").value = months;
+        $("probableCause").value = months >= 6 ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
         msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
         $("saveBtn").disabled=false;
-      }catch(e){ console.error(e); msg("⚠️ خطأ أثناء التحقق.", false); $("saveBtn").disabled=true; }
+
+      }catch(e){
+        console.error(e);
+        msg("⚠️ خطأ أثناء التحقق.", false);
+        $("saveBtn").disabled=true;
+      }
     }
 
-    await checkInsem();
+    await checkAnimal();
 
-    // ✅ الحفظ في Firestore murabbikdata
+    // ✅ الحفظ في Firestore murabbikdata.events
     $("saveBtn").onclick = async ()=>{
       try{
         await addDoc(collection(db,"events"),{
@@ -94,9 +119,11 @@
         msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
         localStorage.setItem("lastAnimalNumber",num);
         localStorage.setItem("lastEventDate",dt);
-      }catch(e){ console.error(e); msg("❌ فشل في الحفظ.", false); }
+      }catch(e){
+        console.error(e);
+        msg("❌ فشل في الحفظ.", false);
+      }
     };
-  })();
   </script>
 </body>
 </html>
