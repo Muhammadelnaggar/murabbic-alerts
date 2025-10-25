@@ -122,26 +122,33 @@
     await checkAnimal();
 
     // ✅ الحفظ في Firestore murabbikdata.events
-    $("saveBtn").onclick = async ()=>{
-      try{
-        await addDoc(collection(db,"events"),{
-          animalNumber:num,
-          eventType:"إجهاض",
-          eventDate:dt,
-          abortionAgeMonths:parseFloat($("abortionAge").value)||null,
-          probableCause:$("probableCause").value||"",
-          notes:$("notes").value||"",
-          userId:auth.currentUser?.uid||null,
-          createdAt:serverTimestamp()
-        });
-        msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
-        localStorage.setItem("lastAnimalNumber",num);
-        localStorage.setItem("lastEventDate",dt);
-      }catch(e){
-        console.error(e);
-        msg("❌ فشل في الحفظ.", false);
-      }
-    };
+ $("saveBtn").onclick = async ()=>{
+  try{
+    await addDoc(collection(db,"events"),{
+      animalNumber:num,
+      eventType:"إجهاض",
+      eventDate:dt,
+      abortionAgeMonths:parseFloat($("abortionAge").value)||null,
+      probableCause:$("probableCause").value||"",
+      notes:$("notes").value||"",
+      userId:auth.currentUser?.uid||null,
+      createdAt:serverTimestamp()
+    });
+    msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
+    localStorage.setItem("lastAnimalNumber",num);
+    localStorage.setItem("lastEventDate",dt);
+
+    // 🔹 إبحار ذكي بعد النجاح
+    setTimeout(()=>{
+      window.location.href = `cow-card.html?number=${num}`;
+    }, 1500); // بعد ثانية ونصف لظهور الرسالة
+
+  }catch(e){
+    console.error(e);
+    msg("❌ فشل في الحفظ.", false);
+  }
+};
+
   </script>
 </body>
 </html>
