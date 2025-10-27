@@ -7,78 +7,99 @@
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
+    :root{
+      --green:#0ea05a;--green-600:#0b7f47;
+      --bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff;
+      --err-bg:#fff7ed;--err-text:#9a3412;--ok-bg:#ecfdf5;--ok-text:#065f46;
+    }
     *{box-sizing:border-box}
     body{margin:0;font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text)}
     header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px;text-align:center;font-weight:800;color:var(--green-600)}
     main{padding:16px;max-width:600px;margin:auto}
     label{display:block;margin-top:12px;font-weight:700}
-    input,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+    input,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:'Cairo',sans-serif}
     button{width:100%;margin-top:20px;padding:14px;background:var(--green);color:#fff;border:0;border-radius:10px;font-weight:800;font-size:16px;cursor:pointer}
-    .infobar{margin-top:10px;padding:10px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
-    .ok{background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0}
-    .err{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+    .infobar{margin-top:10px;padding:10px;border-radius:8px;font-size:14px;font-weight:700;text-align:center;transition:all .3s}
+    .ok{background:var(--ok-bg);color:var(--ok-text);border:1px solid #bbf7d0}
+    .err{background:var(--err-bg);color:var(--err-text);border:1px solid #fed7aa}
   </style>
 </head>
 <body data-page="abortion">
   <header>تسجيل إجهاض</header>
   <main>
     <div id="info" class="infobar"></div>
+
     <label>رقم الحيوان</label>
     <input id="animalNumber" readonly />
+
     <label>تاريخ الإجهاض</label>
     <input id="eventDate" type="date" readonly />
+
     <label>عمر الإجهاض (بالشهور)</label>
     <input id="abortionAge" readonly />
+
     <label>السبب المحتمل</label>
     <input id="probableCause" readonly />
+
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+
     <button id="saveBtn" data-validate="true">حفظ الإجهاض ✅</button>
   </main>
 
   <script type="module">
-    import { db, auth } from '/js/firebase-config.js';
-    import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } 
-      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import appConfig from '/js/firebase-config.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } 
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const app = initializeApp(appConfig);
+    const db = getFirestore(app, "murabbikdata");
+    const auth = getAuth(app);
 
     const $ = id => document.getElementById(id);
     const info = $("info");
+    const btn = $("saveBtn");
 
-    // تمرير الرقم والتاريخ من صفحة الأحداث أو التخزين المحلي
     const p = new URLSearchParams(location.search);
-    const num = p.get("number") || localStorage.getItem("lastAnimalNumber");
-    const dt  = p.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
-    $("animalNumber").value = num || "";
-    $("eventDate").value = dt || "";
+    const num = p.get("number") || localStorage.getItem("lastAnimalNumber") || "";
+    const dt = p.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
-    function msg(t, ok){
+    $("animalNumber").value = num;
+    $("eventDate").value = dt;
+
+    function msg(t, ok=false){
       info.className = "infobar " + (ok ? "ok" : "err");
       info.textContent = t;
     }
 
-    // ✅ التحقق الفوري — الحالة من animals أولاً + تاريخ التلقيح من events أو Fallback من animals
     async function checkAnimal(){
-      if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); $("saveBtn").disabled=true; return; }
+      if(!num){
+        msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
+        btn.disabled = true;
+        return;
+      }
 
       try{
-        // 1) جلب الحيوان (animalNumber أو number)
-        let animal = null;
         let aSnap = await getDocs(query(collection(db,"animals"), where("animalNumber","==",num), limit(1)));
-        if (aSnap.empty) aSnap = await getDocs(query(collection(db,"animals"), where("number","==",num), limit(1)));
-        if (!aSnap.empty) animal = aSnap.docs[0].data();
+        if(aSnap.empty) aSnap = await getDocs(query(collection(db,"animals"), where("number","==",num), limit(1)));
 
-      const status = (animal?.reproductiveStatus || animal?.reproStatus || "").trim();
+        if(aSnap.empty){
+          msg("⚠️ الحيوان غير موجود في السجلات.", false);
+          btn.disabled = true;
+          return;
+        }
 
-// ✅ الشرط الوحيد: يجب أن تكون الحالة "عِشار" فقط
-if (status !== "عِشار") {
-  msg(`❌ الحالة التناسلية الحالية هي «${status || "غير معروفة"}»، ولا يمكن تسجيل الإجهاض إلا للحيوانات العِشار فقط.`, false);
-  $("saveBtn").disabled = true;
-  return;
-}
+        const animal = aSnap.docs[0].data();
+        const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
 
+        if(status !== "عِشار"){
+          msg(`❌ الحالة التناسلية الحالية هي «${status || "غير معروفة"}». لا يمكن تسجيل الإجهاض إلا للحيوانات العِشار فقط.`, false);
+          btn.disabled = true;
+          return;
+        }
 
-        // 3) نحاول آخر تلقيح من events
         const qInsem = query(
           collection(db,"events"),
           where("animalNumber","==",num),
@@ -88,22 +109,21 @@ if (status !== "عِشار") {
         );
         const insemSnap = await getDocs(qInsem);
 
-        // 4) تحديد تاريخ التلقيح
         let lastInsem =
           (!insemSnap.empty ? insemSnap.docs[0].data()?.eventDate : null) ||
-          animal?.lastInseminationDate || animal?.lastInsemDate || animal?.lastServiceDate;
+          animal.lastInseminationDate || animal.lastInsemDate || animal.lastServiceDate;
 
-        if (typeof lastInsem === "object" && lastInsem?.toDate) lastInsem = lastInsem.toDate().toISOString().slice(0,10);
-        if (typeof lastInsem === "string") lastInsem = lastInsem.slice(0,10);
+        if(lastInsem?.toDate) lastInsem = lastInsem.toDate().toISOString().slice(0,10);
+        if(typeof lastInsem === "string") lastInsem = lastInsem.slice(0,10);
 
-        // 5) حساب عمر الإجهاض
         const d1 = lastInsem ? new Date(lastInsem) : null;
         const d2 = new Date(dt);
-        if (!d1 || Number.isNaN(d1.getTime())) {
-          msg("✅ الحالة عِشار، تم التحقق. (تعذّر تحديد تاريخ التلقيح بدقة)", true);
+
+        if(!d1 || isNaN(d1.getTime())){
+          msg("✅ الحالة عِشار، تم التحقق. (لم يُحدد تاريخ التلقيح)", true);
           $("abortionAge").value = "";
           $("probableCause").value = "";
-          $("saveBtn").disabled = false;
+          btn.disabled = false;
           return;
         }
 
@@ -111,45 +131,45 @@ if (status !== "عِشار") {
         $("abortionAge").value = months;
         $("probableCause").value = months >= 6 ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
         msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
-        $("saveBtn").disabled=false;
+        btn.disabled = false;
 
       }catch(e){
         console.error(e);
-        msg("⚠️ خطأ أثناء التحقق.", false);
-        $("saveBtn").disabled=true;
+        msg("⚠️ حدث خطأ أثناء التحقق.", false);
+        btn.disabled = true;
       }
     }
 
     await checkAnimal();
 
-    // ✅ الحفظ في Firestore murabbikdata.events
- $("saveBtn").onclick = async ()=>{
-  try{
-    await addDoc(collection(db,"events"),{
-      animalNumber:num,
-      eventType:"إجهاض",
-      eventDate:dt,
-      abortionAgeMonths:parseFloat($("abortionAge").value)||null,
-      probableCause:$("probableCause").value||"",
-      notes:$("notes").value||"",
-      userId:auth.currentUser?.uid||null,
-      createdAt:serverTimestamp()
-    });
-    msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
-    localStorage.setItem("lastAnimalNumber",num);
-    localStorage.setItem("lastEventDate",dt);
+    btn.onclick = async () => {
+      try{
+        await addDoc(collection(db,"events"), {
+          animalNumber:num,
+          eventType:"إجهاض",
+          eventDate:dt,
+          abortionAgeMonths:parseFloat($("abortionAge").value) || null,
+          probableCause:$("probableCause").value || "",
+          notes:$("notes").value || "",
+          userId:auth.currentUser?.uid || null,
+          createdAt:serverTimestamp()
+        });
 
-    // 🔹 إبحار ذكي بعد النجاح
-    setTimeout(()=>{
-      window.location.href = `cow-card.html?number=${num}`;
-    }, 1500); // بعد ثانية ونصف لظهور الرسالة
+        msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
+        localStorage.setItem("lastAnimalNumber", num);
+        localStorage.setItem("lastEventDate", dt);
 
-  }catch(e){
-    console.error(e);
-    msg("❌ فشل في الحفظ.", false);
-  }
-};
+        setTimeout(()=>location.href=`cow-card.html?number=${num}`, 1500);
+      }catch(e){
+        console.error(e);
+        msg("❌ فشل في الحفظ، حاول مرة أخرى.", false);
+      }
+    };
 
+    // ✅ تتبّع ذكي موحد لكل الصفحات
+    window.dataLayer = window.dataLayer || [];
+    const t = window.t || { event:(n,d)=>window.dataLayer.push({event:n,...d}) };
+    t.event('page_view', {page:'abortion', title:'تسجيل إجهاض'});
   </script>
 </body>
 </html>
