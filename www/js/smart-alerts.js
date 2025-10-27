@@ -1,124 +1,83 @@
-// www/js/smart-alerts.js
-// تنبيهات الواجهة (خفيف للداشبورد) — يسحب /api/alerts ويعرض Toasts بسيطة.
-// يعمل بأمان حتى لو Firestore غير مفعّل (بيسكت بدون أخطاء).
+// /js/smart-alerts.js
+// ======================
+// مُرَبِّك – نظام تنبيهات فوري بصوت Popup
+// يعتمد على buildTimelineAlertsFor() من alerts-engine.js
 
-(function () {
-  // ==== إعدادات صغيرة ====
-  const POLL_MS = 60 * 1000; // كل دقيقة
-  const MAX_TOASTS = 4;
+import { buildTimelineAlertsFor } from '/js/alerts-engine.js';
+import { getAnimalEvents } from '/js/api.js';
 
-  // عناوين/أيقونات للتنبيهات الموحدة
-  const TITLES = {
-    pregnancy_positive: 'حمل مؤكد',
-    heat_window_now: 'شبق محتمل الآن',
-    dryoff_due_soon: 'قرب الجفاف',
-    calving_due_soon: 'قرب الولادة'
-  };
-  const ICONS = {
-    pregnancy_positive: '🤰',
-    heat_window_now: '🔥',
-    dryoff_due_soon: '🥛',
-    calving_due_soon: '🐄'
-  };
+const audio = new Audio('/sounds/alert.mp3'); // ضع صوتك هنا (ملف قصير mp3 في www/sounds)
 
-  // API base (يسمح بوضع نطاق مختلف في localStorage.API_BASE)
-  function getApiBase() {
-    const v = (localStorage.getItem('API_BASE') || '').trim();
-    if (!/^https?:\/\//.test(v) || v.includes('localhost')) return '';
-    return v.replace(/\/+$/, '');
+export async function showSmartAlerts(animal){
+  try {
+    const events = await getAnimalEvents(animal.id || animal.animalNumber);
+    const alerts = buildTimelineAlertsFor(animal, events, new Date());
+    if (!alerts.length) return;
+
+    alerts.forEach(a => renderPopup(a));
+    playSound();
+  } catch(err){
+    console.error('⚠️ smart-alerts error:', err);
   }
+}
 
-  // حالة آخر تنبيه
-  let lastTs = Number(localStorage.getItem('alerts:lastTs') || 0);
-  const seen = new Set();
-
-  // ==== CSS للتوست ====
-  const css = `
-  #alertsToasts{position:fixed;left:12px;bottom:12px;display:flex;flex-direction:column;gap:8px;z-index:9999;direction:rtl}
-  .toast{position:relative;background:#fff;border:1px solid #c5e1a5;border-radius:12px;padding:10px 14px;min-width:220px;max-width:84vw;
-         box-shadow:0 6px 14px rgba(0,0,0,.10);color:#1b5e20}
-  .toast .h{font-weight:700;margin-bottom:4px}
-  .toast .m{font-size:12px;color:#2e7d32}
-  .toast .x{position:absolute;inset-inline-start:8px;top:6px;cursor:pointer;color:#2e7d32}
-  .toast.pregnancy_positive{border-color:#66bb6a}
-  .toast.heat_window_now{border-color:#ef6c00}
-  .toast.dryoff_due_soon{border-color:#1565c0}
-  .toast.calving_due_soon{border-color:#8e24aa}
+function renderPopup(alert){
+  const popup = document.createElement('div');
+  popup.className = `murabbik-popup ${alert.level}`;
+  popup.innerHTML = `
+    <div class="head">${alert.name}</div>
+    <div class="msg">${alert.message}</div>
+    ${alert.link ? `<a href="${alert.link}" class="link">فتح الصفحة</a>` : ''}
   `;
-  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  document.body.appendChild(popup);
+  setTimeout(()=> popup.classList.add('show'), 50);
+  setTimeout(()=> closePopup(popup), 15000);
+  popup.addEventListener('click', ()=> closePopup(popup));
+}
 
-  // حاوية التوست
-  let holder = document.getElementById('alertsToasts');
-  if (!holder) { holder = document.createElement('div'); holder.id = 'alertsToasts'; document.body.appendChild(holder); }
+function closePopup(el){
+  el.classList.remove('show');
+  setTimeout(()=> el.remove(), 300);
+}
 
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function playSound(){
+  try { audio.currentTime = 0; audio.play().catch(()=>{}); } catch(e){}
+}
 
-  function toast(a) {
-    if (!a) return;
-    if (a.id && seen.has(a.id)) return;
-    if (a.id) seen.add(a.id);
-
-    // تقليم القديم
-    while (holder.children.length >= MAX_TOASTS) holder.removeChild(holder.firstChild);
-
-    const code = String(a.code || '').trim();
-    const el = document.createElement('div');
-    el.className = `toast ${code}`;
-    const title = TITLES[code] || (a.title || 'تنبيه');
-    const icon  = ICONS[code] || '🔔';
-    const msg   = a.message || a.summary || '';
-    el.innerHTML = `
-      <div class="x" title="إغلاق">✕</div>
-      <div class="h">${icon} ${esc(title)}</div>
-      <div class="m">${esc(msg)}</div>
-    `;
-    el.querySelector('.x').onclick = () => el.remove();
-    holder.appendChild(el);
-    setTimeout(() => el.remove(), 8000);
-  }
-
-  async function fetchAlerts() {
-    try {
-      const base = getApiBase() || '';
-      let url = (base ? `${base}/api/alerts` : '/api/alerts');
-      const qs = new URLSearchParams();
-      const farm = (localStorage.getItem('farmId') || '').trim();
-      if (farm) qs.set('farm', farm);
-      if (lastTs > 0) qs.set('since', String(lastTs)); else qs.set('days', '1');
-      qs.set('limit', '100');
-      url += `?${qs.toString()}`;
-
-      const opts = base ? { mode: 'cors' } : {};
-      const r = await fetch(url, opts).catch(() => null);
-      if (!r) return;
-      if (r.status === 503) { // Firestore غير مفعّل
-        console.debug('[smart-alerts] alerts API disabled.');
-        return;
-      }
-      if (!r.ok) return;
-
-      const j = await r.json();
-      const arr = (j.items || j.alerts || []).slice().sort((a, b) => (a.ts||0) - (b.ts||0));
-      for (const it of arr) {
-        if (it.ts && it.ts > lastTs) lastTs = it.ts;
-        toast(it);
-      }
-      localStorage.setItem('alerts:lastTs', String(lastTs));
-    } catch (e) {
-      // صمت — لا نكسر الصفحة
-    }
-  }
-
-  function tick() {
-    fetchAlerts();
-  }
-
-  window.addEventListener('DOMContentLoaded', () => {
-    tick();
-    setInterval(tick, POLL_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-  });
-
-  // API بسيط لو احتجته لاحقًا
-  window.smartAlerts = { fetchNow: tick, get lastTs(){ return lastTs; } };
-})();
+// ====== تنسيقات CSS داخلية ======
+const style = document.createElement('style');
+style.textContent = `
+.murabbik-popup{
+  position:fixed;
+  top:20px;
+  right:-400px;
+  width:280px;
+  padding:12px 14px;
+  border-radius:14px;
+  color:#fff;
+  font:15px 'Cairo',sans-serif;
+  box-shadow:0 4px 12px rgba(0,0,0,.15);
+  transition:all .4s ease;
+  z-index:999999;
+  cursor:pointer;
+  backdrop-filter: blur(8px);
+}
+.murabbik-popup.show{ right:20px; opacity:1; }
+.murabbik-popup .head{font-weight:900;margin-bottom:4px;}
+.murabbik-popup .msg{font-size:14px;line-height:1.4;}
+.murabbik-popup .link{
+  display:inline-block;
+  margin-top:6px;
+  background:rgba(255,255,255,.2);
+  color:#fff;
+  padding:4px 8px;
+  border-radius:8px;
+  font-weight:700;
+  text-decoration:none;
+}
+.murabbik-popup.info{background:#0ea05a;}
+.murabbik-popup.notice{background:#facc15;color:#222;}
+.murabbik-popup.warning{background:#fb923c;}
+.murabbik-popup.alert{background:#dc2626;}
+`;
+document.head.appendChild(style);
