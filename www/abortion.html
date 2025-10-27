@@ -64,23 +64,82 @@
     function msg(t, ok=false){ info.className = "infobar " + (ok ? "ok" : "err"); info.textContent = t; }
 
     // ✅ بوابة التحقق: شرط "عِشار" فقط قبل الإدخال
-    async function checkAnimal(){
-      if(!num){ msg("⚠️ لم يتم تمرير رقم الحيوان.", false); btn.disabled = true; return; }
-      try{
-        // جلب الحيوان
-        let aSnap = await getDocs(query(collection(db,"animals"), where("animalNumber","==",num), limit(1)));
-        if(aSnap.empty) aSnap = await getDocs(query(collection(db,"animals"), where("number","==",num), limit(1)));
-        if(aSnap.empty){ msg("⚠️ الحيوان غير موجود.", false); btn.disabled = true; return; }
+   async function checkAnimal() {
+  if (!num) {
+    msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
+    btn.disabled = true;
+    return false;
+  }
 
-        const animal = aSnap.docs[0].data();
-      const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
+  try {
+    // جلب الحيوان من قاعدة البيانات
+    let aSnap = await getDocs(query(collection(db, "animals"), where("animalNumber", "==", num), limit(1)));
+    if (aSnap.empty)
+      aSnap = await getDocs(query(collection(db, "animals"), where("number", "==",num), limit(1)));
 
-if (status === "عِشار") {
-  msg(`✅ الحالة الحالية «${status}». تم السماح بتسجيل الإجهاض.`, true);
-} else {
-  msg(`❌ الحالة الحالية «${status || "غير معروفة"}». لا يمكن تسجيل الإجهاض إلا للحيوانات العِشار فقط.`, false);
-  btn.disabled = true;
-  return;
+    if (aSnap.empty) {
+      msg("⚠️ الحيوان غير موجود.", false);
+      btn.disabled = true;
+      return false;
+    }
+
+    const animal = aSnap.docs[0].data();
+    const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
+    const isPregnant = status === "عِشار";
+
+    // ✅ الشرط الوحيد — لازم يكون عِشار
+    if (!isPregnant) {
+      msg("❌ لا يمكن تسجيل إجهاض لحيوان غير عِشار.", false);
+      btn.disabled = true;
+      return false;
+    }
+
+    // ✅ الحالة صحيحة، استمر بالحساب والحفظ
+    msg("✅ تم التحقق: الحيوان عِشار، يمكن تسجيل الإجهاض.", true);
+    btn.disabled = false;
+
+    // حساب عمر الحمل (اختياري)
+    const qInsem = query(
+      collection(db, "events"),
+      where("animalNumber", "==", num),
+      where("eventType", "in", ["تلقيح", "تلقيح مُخصِّب", "insemination"]),
+      orderBy("eventDate", "desc"),
+      limit(1)
+    );
+    const insemSnap = await getDocs(qInsem);
+
+    let lastInsem =
+      (!insemSnap.empty ? insemSnap.docs[0].data()?.eventDate : null) ||
+      animal.lastInseminationDate || animal.lastInsemDate || animal.lastServiceDate;
+
+    if (lastInsem?.toDate)
+      lastInsem = lastInsem.toDate().toISOString().slice(0, 10);
+    if (typeof lastInsem === "string")
+      lastInsem = lastInsem.slice(0, 10);
+
+    const d1 = lastInsem ? new Date(lastInsem) : null;
+    const d2 = new Date(dt);
+
+    if (!d1 || isNaN(d1.getTime())) {
+      $("abortionAge").value = "";
+      $("probableCause").value = "";
+      return true;
+    }
+
+    const months = ((d2 - d1) / (1000 * 60 * 60 * 24 * 30.44)).toFixed(1);
+    $("abortionAge").value = months;
+    $("probableCause").value = months >= 6
+      ? "احتمال بروسيلا (≥6 شهور)"
+      : "احتمال BVD (<6 شهور)";
+    msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
+    return true;
+
+  } catch (err) {
+    console.error(err);
+    msg("⚠️ خطأ أثناء التحقق.", false);
+    btn.disabled = true;
+    return false;
+  }
 }
 
         // آخر تلقيح (اختياري لحساب العمر)
