@@ -73,11 +73,15 @@
         if(aSnap.empty){ msg("⚠️ الحيوان غير موجود.", false); btn.disabled = true; return; }
 
         const animal = aSnap.docs[0].data();
-        const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
-        if(status !== "عِشار"){
-          msg(`❌ الحالة الحالية «${status || "غير معروفة"}». الإجهاض للحيوانات العِشار فقط.`, false);
-          btn.disabled = true; return;
-        }
+      const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
+
+if (status === "عِشار") {
+  msg(`✅ الحالة الحالية «${status}». تم السماح بتسجيل الإجهاض.`, true);
+} else {
+  msg(`❌ الحالة الحالية «${status || "غير معروفة"}». لا يمكن تسجيل الإجهاض إلا للحيوانات العِشار فقط.`, false);
+  btn.disabled = true;
+  return;
+}
 
         // آخر تلقيح (اختياري لحساب العمر)
         const qInsem = query(
