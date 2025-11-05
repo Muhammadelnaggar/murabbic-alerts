@@ -1,14 +1,33 @@
-// api.js — Murabbik Alerts API Base
+// ===============================
+// js/api.js  (Murabbik Web Client)
+// ===============================
 console.log("✅ api.js loaded");
 
+// 🔗 اضبط عنوان الـ API الأساسي
 window.API_BASE = "https://murabbic-alerts.onrender.com";
 
-export async function apiGet(path){
-  const uid = window.userId || localStorage.getItem("userId");
-  const r = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "X-User-Id": uid || ""
-    }
-  });
-  return r.json();
+// 🧩 دالة GET جاهزة للاستخدام عبر كل الصفحات
+export async function apiGet(path) {
+  const uid =
+    window.userId ||
+    localStorage.getItem("userId") ||
+    sessionStorage.getItem("userId");
+
+  if (!uid) {
+    console.warn("⚠️ لا يوجد userId ! لن يتم جلب البيانات.");
+    return {};
+  }
+
+  try {
+    const r = await fetch(`${API_BASE}${path}`, {
+      headers: { "X-User-Id": uid }
+    });
+    if (!r.ok) throw new Error(`API Error: ${r.status}`);
+    return r.json();
+  } catch (err) {
+    console.error("❌ خطأ في الاتصال بالـ API:", err);
+    return {};
+  }
 }
+
+// ✅ جاهز
