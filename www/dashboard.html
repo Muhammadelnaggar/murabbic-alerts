@@ -513,6 +513,56 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     })();
   </script>
 
+  <!-- عدادات الإبرة: دوال عامة (بدون اعتماد على /api/herd-stats) -->
+  <script>
+    (function(){
+      function gaugeDesc(v){ if(v<40) return 'ضعيف'; if(v<70) return 'متوسط'; return 'ممتاز'; }
+      function buildGauge(canvasId, value){
+        return new RadialGauge({
+          renderTo: canvasId,
+          width: 140, height: 140,
+          minValue: 0, maxValue: 100, units: "%",
+          majorTicks: ["0","20","40","60","80","100"], minorTicks: 2,
+          strokeTicks: true,
+          highlights:[
+            { from:0,  to:40, color:"#d32f2f" },
+            { from:40,to:70, color:"#fbc02d" },
+            { from:70,to:100,color:"#388e3c" }
+          ],
+          needleType:"arrow", needleWidth:2,
+          animationDuration:900, animationRule:"linear",
+          value: value
+        }).draw();
+      }
+      // نجعلها متاحة للـ module
+      window.mbkGauges = {
+        gaugeDesc,
+        buildGauge,
+        updateNeedles(base, reproRates, prod){
+          const fert   = Number(reproRates?.cr||0);           // خصوبة = CR%
+          const health = Number(base?.inMilkPct||0);           // صحة (مؤقتًا: نسبة في الحلاب)
+          const milk   = prod?.avgMilk ? Math.min(100, Math.round(prod.avgMilk)) : 0; // تقريبي
+          const feed   = 70; // Placeholder لحين توصيل Smart Feeding
+
+          buildGauge('gFert',   fert);
+          buildGauge('gHealth', health);
+          buildGauge('gMilk',   milk);
+          buildGauge('gFeed',   feed);
+
+          document.getElementById('vFert').textContent   = fert + '%';
+          document.getElementById('vHealth').textContent = health + '%';
+          document.getElementById('vMilk').textContent   = milk + '%';
+          document.getElementById('vFeed').textContent   = feed + '%';
+
+          document.getElementById('dFert').textContent   = gaugeDesc(fert);
+          document.getElementById('dHealth').textContent = gaugeDesc(health);
+          document.getElementById('dMilk').textContent   = gaugeDesc(milk);
+          document.getElementById('dFeed').textContent   = gaugeDesc(feed);
+        }
+      };
+    })();
+  </script>
+
   <!-- مؤشرات القطيع + التبويبات (Firestore) -->
   <script type="module" id="herd-gauges-fs">
   import { db } from '/js/firebase-config.js';
@@ -639,7 +689,7 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
 
   function calcHerdFromAnimals(animals){
     const total = animals.length;
-    let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
+    let inMilk=0, fresh=0, dry=0, preg=0;
 
     for(const an of animals){
       const dryF  = isDry(an);
@@ -648,7 +698,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       if (milkF){ inMilk++; const d = getDIM(an); if(d>=1 && d<=45) fresh++; }
       if (dryF){ dry++; }
       if (isPreg(an)) preg++;
-      else if (milkF){ open++; sumDimOpen += getDIM(an); }
     }
 
     const inMilkPct = total? Math.round(inMilk/total*100) : 0;
@@ -828,6 +877,9 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     renderGauges(base, reproRates, currentSpec);
     renderTabs(prod, reproRates, extras, nut);
     colorizeTab(currentSpec, base, reproRates, extras);
+
+    // ✅ تشغيل عدادات الإبرة من نفس النتائج (بدون /api/herd-stats)
+    window.mbkGauges?.updateNeedles(base, reproRates, prod);
   }
 
   const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
@@ -856,59 +908,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
   });
   </script>
 
-  <!-- عدادات الإبرة: قراءة من /api/herd-stats وعرض الوصف الذكي -->
-  <script>
-    function gaugeDesc(v){ if(v<40) return 'ضعيف'; if(v<70) return 'متوسط'; return 'ممتاز'; }
-    function buildGauge(canvasId, value){
-      return new RadialGauge({
-        renderTo: canvasId,
-        width: 140, height: 140,
-        minValue: 0, maxValue: 100, units: "%",
-        majorTicks: ["0","20","40","60","80","100"], minorTicks: 2,
-        strokeTicks: true,
-        highlights:[
-          { from:0,  to:40, color:"#d32f2f" },
-          { from:40,to:70, color:"#fbc02d" },
-          { from:70,to:100,color:"#388e3c" }
-        ],
-        needleType:"arrow", needleWidth:2,
-        animationDuration:900, animationRule:"linear",
-        value: value
-      }).draw();
-    }
-    async function loadHerdStats(){
-      try{
-        const r=await fetch('/api/herd-stats',{cache:'no-store'});
-        if(!r.ok) throw new Error('API error');
-        const j=await r.json();
-        const data={
-          fert:+j.fertility||0,
-          health:+j.health||0,
-          milk:+j.milk||0,
-          feed:+j.feeding||0
-        };
-        buildGauge('gFert', data.fert);
-        buildGauge('gHealth', data.health);
-        buildGauge('gMilk', data.milk);
-        buildGauge('gFeed', data.feed);
-
-        document.getElementById('vFert').textContent = data.fert + '%';
-        document.getElementById('vHealth').textContent = data.health + '%';
-        document.getElementById('vMilk').textContent = data.milk + '%';
-        document.getElementById('vFeed').textContent = data.feed + '%';
-
-        document.getElementById('dFert').textContent = gaugeDesc(data.fert);
-        document.getElementById('dHealth').textContent = gaugeDesc(data.health);
-        document.getElementById('dMilk').textContent = gaugeDesc(data.milk);
-        document.getElementById('dFeed').textContent = gaugeDesc(data.feed);
-      }catch(e){
-        // فشل الاتصال: نتركها شرطة — أو نقدر نحط قيم صفرية
-      }
-    }
-    document.addEventListener('DOMContentLoaded', loadHerdStats);
-  </script>
-
   <script type="module" src="/js/smart-alerts.js"></script>
 </body>
 </html>
-
