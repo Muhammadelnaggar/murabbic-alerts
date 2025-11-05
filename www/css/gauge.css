@@ -1,0 +1,10 @@
+.gauge{position:relative;width:180px;aspect-ratio:1/0.62}
+.gauge svg{width:100%;height:auto;display:block}
+.gauge .label{position:absolute;inset-inline:0;bottom:0.2rem;text-align:center;font-weight:700;color:#1b5e20}
+.gauge .value{display:block;font-size:1.1rem}
+.gauge .unit{opacity:.7;font-size:.85rem}
+
+/* ألوان ثابتة لمراتب الأداء */
+:root{
+  --green:#2e7d32; --yellow:#f9a825; --red:#c62828; --track:#e8f5e9; --needle:#0d3b1f;
+}
