@@ -496,8 +496,7 @@ import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/fi
 const $ = s => document.querySelector(s);
 
 // ---------- Helpers ----------
-  const norm = s => String(s||'')
-    
+const norm = s => String(s||'')
   .toLowerCase()
   .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
   .trim();
@@ -509,27 +508,12 @@ const toDate = v => {
   if(typeof v==='object' && typeof v.seconds==='number') return new Date(v.seconds*1000);
   return null;
 };
-  const isInMilk = an => {
-  if (isDry(an)) return false;                    // الجاف ليس في الحلاب
-  if (an.inMilk === true) return true;            // علم صريح
-  const st = norm(
-    an.productionStatus ||
-    an.lactationStatus ||
-    an.status ||
-    an['الحالة_اللبنية'] || ''
-  );
-  // كلمات مفتاحية للحلاب
-  return /(حلاب|في الحلاب|محلب|منتج|حليب|milk|milking|lact)/.test(st);
-};
 
 const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
-const getDIM = an => {
-  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt || an['تاريخ_الولادة']);
-  return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
-};
+
 const isDry = an => {
   const st = norm(
-    an.productionStatus ||      // ← مهم: "جاف" عندك هنا
+    an.productionStatus ||
     an.lactationStatus ||
     an.status ||
     an['الحالة_اللبنية'] ||
@@ -540,20 +524,31 @@ const isDry = an => {
   return dryBool || an.inMilk === false || /(dry|dryoff|dry-off|جاف|جافه|جافة)/.test(st);
 };
 
+const isInMilk = an => {
+  if (isDry(an)) return false;
+  if (an.inMilk === true) return true;
+  const st = norm(an.productionStatus || an.lactationStatus || an.status || an['الحالة_اللبنية'] || '');
+  return /(حلاب|في الحلاب|محلب|منتج|حليب|milk|milking|lact)/.test(st);
+};
+
+const getDIM = an => {
+  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt || an['تاريخ_الولادة']);
+  return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
+};
 
 const isPreg = an => {
   const rs = String(an.reproductiveStatus || an.pregStatus || an['الحالة_التناسلية'] || '').toLowerCase();
   return an.pregnant===true || rs.includes('preg') || rs.includes('عشار');
 };
+
 const isFresh = an => {
   const d = getDIM(an);
   const lactNo = Number(an.lactationNumber ?? an.lactNo ?? an.lactNum ?? an['رقم_الحلاب'] ?? 0);
   return d>=1 && d<=45 && !isDry(an) && lactNo>0;
 };
 
-
-
-function calc(animals){
+// ---------- حسابات القطيع (من animals فقط) ----------
+function calcHerdFromAnimals(animals){
   const total = animals.length;
   let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
 
@@ -573,19 +568,59 @@ function calc(animals){
   const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
   const dryShare  = total? Math.round(dry/total*100)   : 0;
   const openDim   = open? Math.round(sumDimOpen/open)  : 0;
+
   return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
 }
 
+// ---------- استخراج مؤشرات التناسل من events ----------
+const isType = (t, patterns) => patterns.some(p => new RegExp(p,'i').test(String(t||'')));
 
-// احذف arcPath(...) القديمة
+// مرونة في التسميات (عربي/إنجليزي)
+const INSEM_PATTERNS = ['تلقيح','تلقيح\\s*مخص', 'insemination'];
+const PD_PATTERNS    = ['تشخيص\\s*حمل','pregnancy\\s*diagnosis'];
+const CALV_PATTERNS  = ['ولاده','ولادة','calving'];
 
-// محيط الحلقة لِـ r=18 => 2πr ≈ 113.097
+function calcReproFromEvents(animals, events){
+  const now = new Date();
+  const d21 = new Date(now.getTime() - 21*86400000);
+  const d60 = new Date(now.getTime() - 60*86400000);
+  const d90 = new Date(now.getTime() - 90*86400000);
+
+  // الحيوانات المؤهلة للتلقيح (تقريبًا)
+  const eligible = animals.filter(a => isInMilk(a) && !isPreg(a) && getDIM(a) >= 60);
+
+  // خدمات آخر 21 يوم
+  const servicesLast21 = events.filter(e =>
+    isType(e.type, INSEM_PATTERNS) && toDate(e.eventDate) && toDate(e.eventDate) >= d21
+  ).length;
+
+  const serviceRate = eligible.length ? Math.round( (servicesLast21 / eligible.length) * 100 ) : 0;
+
+  // تشخيصات إيجابية (حامل) آخر 90 يوم
+  const pregPosLast90 = events.filter(e => {
+    const d = toDate(e.eventDate);
+    const res = String(e.result || e.outcome || e['النتيجة'] || '').toLowerCase();
+    const isPregnant = /(عشار|preg|positive|حامل)/.test(res);
+    return isType(e.type, PD_PATTERNS) && d && d >= d90 && isPregnant;
+  }).length;
+
+  const insemsLast90 = events.filter(e =>
+    isType(e.type, INSEM_PATTERNS) && toDate(e.eventDate) && toDate(e.eventDate) >= d90
+  ).length;
+
+  const conceptionRate = insemsLast90 ? Math.round( (pregPosLast90 / insemsLast90) * 100 ) : 0;
+
+  // متوسط الأيام المفتوحة موجود من animals (openDim)
+  const { openDim } = calcHerdFromAnimals(animals);
+
+  return { serviceRate, conceptionRate, openDim };
+}
+
+// ---------- رسم الحلقات ----------
 const RING_LEN = 113.097;
 
-// لون دلالي بسيط (تقديري) حسب النسبة
 function colorFor(key, pct){
-  // حدود إرشادية عامة
-  if(key==='dryShare'){ // الأقل أفضل عادة
+  if(key==='dryShare'){ // الأقل أفضل
     if(pct <= 18) return '#2e7d32';
     if(pct <= 25) return '#fdd835';
     return '#ef6c00';
@@ -602,50 +637,43 @@ function setRing(idSuffix, pct, key){
   const el = document.getElementById('r-'+idSuffix);
   if(!el) return;
   const p = Math.max(0, Math.min(100, Number(pct)||0));
- const off = RING_LEN * (1 - p/100);
-
-
-  // الأفضل والأوضح عبر CSSOM + متوافق مع سفاري/فايرفوكس
+  const off = RING_LEN * (1 - p/100);
   el.style.setProperty('stroke-dashoffset', off.toFixed(2));
   el.style.stroke = colorFor(key || idSuffix, p);
 }
 
-function renderGauges(k){
-  // التاريخ
+function renderGauges(base, repro){
   const d = document.getElementById('g-date');
   if(d) d.textContent = new Date().toISOString().slice(0,10);
 
-  // في الحلاب
-  setRing('inmilk', k.inMilkPct, 'inMilkPct');
-  const vIn = document.getElementById('v-inmilk');
-  if(vIn) vIn.textContent = k.inMilkPct + '%';
+  // الأساسية
+  setRing('inmilk', base.inMilkPct, 'inMilkPct');  $('#v-inmilk')?.textContent = base.inMilkPct + '%';
+  setRing('preg',   base.pregRate,  'pregRate');   $('#v-preg')?.textContent   = base.pregRate  + '%';
+  setRing('fresh',  base.freshShare,'freshShare'); $('#v-fresh')?.textContent  = base.freshShare+ '%';
+  setRing('dry',    base.dryShare,  'dryShare');   $('#v-dry')?.textContent    = base.dryShare  + '%';
 
-  // نسبة العشار
-  setRing('preg', k.pregRate, 'pregRate');
-  const vPr = document.getElementById('v-preg');
-  if(vPr) vPr.textContent = k.pregRate + '%';
+  // الجديدة
+  setRing('service', repro.serviceRate, 'serviceRate');
+  const vSr = $('#v-service'); if(vSr) vSr.textContent = repro.serviceRate + '%';
 
-  // حديث الولادة (من الحلاب)
-  setRing('fresh', k.freshShare, 'freshShare');
-  const vFr = document.getElementById('v-fresh');
-  if(vFr) vFr.textContent = k.freshShare + '%';
+  setRing('conception', repro.conceptionRate, 'conceptionRate');
+  const vCr = $('#v-conception'); if(vCr) vCr.textContent = repro.conceptionRate + '%';
 
-  // جاف %
-  setRing('dry', k.dryShare, 'dryShare');
-  const vDr = document.getElementById('v-dry');
-  if(vDr) vDr.textContent = k.dryShare + '%';
-
-  // مستقبلًا (صفر الآن)
-  setRing('service', 0, 'serviceRate');
-  const vSr = document.getElementById('v-service');
-  if(vSr) vSr.textContent = '—%';
-
-  setRing('conception', 0, 'conceptionRate');
-  const vCo = document.getElementById('v-conception');
-  if(vCo) vCo.textContent = '—%';
+  // عناوين عربي + إنجليزي (بدون تغيير بصري كبير)
+  const title = (rootSel, ar, en) => {
+    const el = document.querySelector(rootSel+' .kpi-title');
+    const sub = document.querySelector(rootSel+' .kpi-sub');
+    if(el) el.innerHTML = `${ar}<br><span style="font-weight:600;font-size:11px;opacity:.85">${en}</span>`;
+    if(sub && rootSel.includes('[data-key="serviceRate"]')) sub.textContent = 'نسبة التلقيحات على المؤهلات (آخر 21 يوم)';
+    if(sub && rootSel.includes('[data-key="conceptionRate"]')) sub.textContent = 'نسبة التشخيص الإيجابي إلى التلقيحات (آخر 90 يوم)';
+    if(sub && rootSel.includes('[data-key="openDim"]')) sub.textContent = 'متوسط الأيام المفتوحة للأبقار المفتوحة (Open)';
+  };
+  title('.kpi[data-key="serviceRate"]', 'معدل التلقيح', 'Service Rate (21d)');
+  title('.kpi[data-key="conceptionRate"]', 'معدل الإخصاب', 'Conception Rate');
+  // الأيام المفتوحة معروضة داخل KPI اللبن المفتوحة (نحدّثها في شارة صغيرة لو حابب لاحقًا)
 }
 
-
+// ---------- دمج التدفقات ----------
 function dedupe(list){
   const map = new Map();
   for(const an of list){
@@ -659,49 +687,74 @@ function dedupe(list){
   const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
   if(!userId){ console.warn('MBK KPIs: لا يوجد userId'); return; }
 
-  // ✅ تعريف المصفوفتين قبل الاستخدام
-  let aSub = [], bSub = [];
-
-  // ✅ دالة القيم التجريبية (fallback) متاحة قبل استخدامها
-  const paintDemoOnError = ()=> renderGauges({ inMilkPct:70, pregRate:70, freshShare:14, dryShare:30 });
-
-  // عدّاد وصول بيانات فعلي
+  let aSub = [], bSub = [], eSub = [];   // animals (users/*), animals (top), events
   let updates = 0;
+
+  const paintDemoOnError = ()=>{
+    const base = { inMilkPct:70, pregRate:70, freshShare:14, dryShare:30, openDim:120 };
+    const repro = { serviceRate:25, conceptionRate:30, openDim: base.openDim };
+    renderGauges(base, repro);
+  };
 
   const recompute = ()=>{
     const animals = dedupe([...aSub, ...bSub]);
-    const k = calc(animals);
+    const base = calcHerdFromAnimals(animals);
+    const repro = calcReproFromEvents(animals, eSub);
+    renderGauges(base, repro);
     updates++;
-    renderGauges(k);
-    (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render', inMilkPct:k.inMilkPct, pregRate:k.pregRate});
+    (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render',
+      inMilkPct:base.inMilkPct, pregRate:base.pregRate,
+      serviceRate:repro.serviceRate, conceptionRate:repro.conceptionRate
+    });
     try{ localStorage.setItem('animals_cache', JSON.stringify(animals)); }catch{}
   };
 
-
+  // animals: users/{uid}/animals
   try{
     const col = collection(db, 'users', userId, 'animals');
-  onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-  err=> { console.warn('users/{uid}/animals snapshot error', err); paintDemoOnError(); });
+    onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+      err=> { console.warn('users/{uid}/animals snapshot error', err); paintDemoOnError(); });
   }catch(e){ console.warn('users/{uid}/animals not available', e); }
 
+  // animals: top-level
   try{
-    const q = query(collection(db, 'animals'), where('userId','==', userId));
-  onSnapshot(q, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-  err=> { console.warn('animals where userId==uid snapshot error', err); paintDemoOnError(); });
+    const q1 = query(collection(db, 'animals'), where('userId','==', userId));
+    onSnapshot(q1, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
+      err=> { console.warn('animals where userId==uid snapshot error', err); paintDemoOnError(); });
   }catch(e){ console.warn('animals top-level query not available', e); }
-    // ✅ لو مفيش داتا خلال 1200ms: استخدم الكاش أو قيم توضيحية
+
+  // events: نقرأ آخر 420 يوم (بالتقريب) — فلترة هنا من الجانب البرمجي
+  try{
+    const q2 = query(collection(db, 'events'), where('userId','==', userId));
+    onSnapshot(q2, snap=>{
+      eSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .filter(e => {
+          const d = toDate(e.eventDate);
+          // نحتفظ بسنة وربع تقريبًا فقط
+          return d ? (Date.now() - d.getTime() <= 420*86400000) : true;
+        });
+      recompute();
+    }, err=> { console.warn('events where userId==uid snapshot error', err); paintDemoOnError(); });
+  }catch(e){ console.warn('events query not available', e); }
+
+  // fallback لو مفيش تدفق
   setTimeout(()=>{
     if (updates === 0) {
       try{
         const cached = JSON.parse(localStorage.getItem('animals_cache') || '[]');
-        if (cached.length){ renderGauges(calc(cached)); return; }
+        if (cached.length){
+          const base = calcHerdFromAnimals(cached);
+          const repro = { serviceRate:0, conceptionRate:0, openDim: base.openDim };
+          renderGauges(base, repro);
+          return;
+        }
       }catch{}
       paintDemoOnError();
     }
   }, 1200);
-
 })();
 </script>
+
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -714,6 +767,7 @@ function dedupe(list){
 
 </body>
 </html>
+
 
 
 
