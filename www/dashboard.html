@@ -82,6 +82,7 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
   .tile-m-full{grid-column:1 / -1}
 }
 </style>
+<link rel="stylesheet" href="css/gauge.css">
 </head>
 <body>
   <h1>لوحة التحكم - مربيك</h1>
@@ -110,7 +111,13 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       <div class="pill" style="grid-column:1 / span 2"><div>الحالة</div><b id="wxState">—</b></div>
     </div>
   </div>
-  <!-- ============================================================= -->
+
+  <div id="kpi-gauges" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:12px 0">
+    <div id="g-thi"></div>
+    <div id="g-prod"></div>
+    <div id="g-repro"></div>
+    <div id="g-health"></div>
+  </div>
 
   <!-- شبكة البلاطات / روابط سريعة -->
   <div class="dashboard card" style="margin-top:12px">
@@ -141,7 +148,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     </div>
 
     <div class="kpi-grid">
-      <!-- في الحلاب % -->
       <div class="kpi" data-key="inMilkPct" data-hint="من إجمالي القطيع">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -156,7 +162,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
         </div>
       </div>
 
-      <!-- نسبة العشار % -->
       <div class="kpi" data-key="pregRate" data-hint="نسبة العشار من القطيع">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -171,7 +176,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
         </div>
       </div>
 
-      <!-- حديث الولادة كنسبة من الحلاب -->
       <div class="kpi" data-key="freshShare" data-hint="حديث الولادة ضمن الحلاب">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -186,7 +190,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
         </div>
       </div>
 
-      <!-- جاف % -->
       <div class="kpi" data-key="dryShare" data-hint="نسبة الجاف من القطيع">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -201,7 +204,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
         </div>
       </div>
 
-      <!-- معدل التلقيح 21ي -->
       <div class="kpi" data-key="serviceRate" data-hint="عدد التلقيحات على المؤهلات خلال 21 يوم">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -216,7 +218,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
         </div>
       </div>
 
-      <!-- معدل الإخصاب -->
       <div class="kpi" data-key="conceptionRate" data-hint="التلقيحات التي انتهت بحمل / إجمالي التلقيحات">
         <div class="kpi-ring" aria-hidden="true">
           <svg viewBox="0 0 44 44">
@@ -252,7 +253,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       <button class="tab-btn" data-tab="nut">تغذية</button>
     </div>
 
-    <!-- إنتاج -->
     <div class="tab-content active" id="tab-prod">
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-title">متوسط الإنتاج اليومي</div><div id="k-avgMilk" class="kpi-value">—</div></div>
@@ -262,7 +262,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       </div>
     </div>
 
-    <!-- تناسل -->
     <div class="tab-content" id="tab-repro">
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-title">متوسط الأيام المفتوحة</div><div id="k-openDays" class="kpi-value">—</div></div>
@@ -276,7 +275,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       </div>
     </div>
 
-    <!-- استبعاد -->
     <div class="tab-content" id="tab-cull">
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-title">استبعاد إنتاجي</div><div id="k-culProd" class="kpi-value">—%</div></div>
@@ -285,7 +283,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       </div>
     </div>
 
-    <!-- تغذية -->
     <div class="tab-content" id="tab-nut">
       <div class="kpi-grid">
         <div class="kpi"><div class="kpi-title">Feed Efficiency</div><div id="k-fe" class="kpi-value">—</div></div>
@@ -332,7 +329,7 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     }
     function drawTHI(thi){
       thiArc.style.background =
-        'conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)';
+        'conic-gradient(from -120deg,#90caf9 0% 25%,#fff59د 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)'.replace('د','9');
       const ang=-120+((thi-50)/40)*240;
       thiNeedle.style.setProperty('--angle',ang+'deg');
       const {bg,txt}=colorAndText(thi,bands());
@@ -530,7 +527,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
   optBuff.addEventListener('click', ()=> setStoredSpec('buffalo'));
 
   function autoDetectSpec(animals){
-    // إن كانت معظم الحيوانات جاموس → جاموس، غير ذلك أبقار
     let buff=0, cow=0;
     for(const a of animals){
       const sp = norm(a.species||a.type||a['النوع']||'');
@@ -540,25 +536,12 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return buff>cow ? 'buffalo' : 'cow';
   }
 
-  // Benchmarks حسب النوع
+  // Benchmarks
   function getBench(spec){
     if(spec==='buffalo'){
-      return {
-        CR:{good:48, warn:38},    // %
-        PR:{good:20, warn:15},    // %
-        OPEN:{good:130, warn:155, lowerBetter:true},
-        CI:{good:410, warn:450, lowerBetter:true},
-        SC:{good:2.2, warn:2.6, lowerBetter:true}
-      };
+      return { CR:{good:48, warn:38}, PR:{good:20, warn:15}, OPEN:{good:130, warn:155, lowerBetter:true}, CI:{good:410, warn:450, lowerBetter:true}, SC:{good:2.2, warn:2.6, lowerBetter:true} };
     }
-    // cow default
-    return {
-      CR:{good:55, warn:45},      // %
-      PR:{good:25, warn:18},      // %
-      OPEN:{good:110, warn:130, lowerBetter:true},
-      CI:{good:380, warn:410, lowerBetter:true},
-      SC:{good:2.0, warn:2.4, lowerBetter:true}
-    };
+    return { CR:{good:55, warn:45}, PR:{good:25, warn:18}, OPEN:{good:110, warn:130, lowerBetter:true}, CI:{good:380, warn:410, lowerBetter:true}, SC:{good:2.0, warn:2.4, lowerBetter:true} };
   }
 
   function kpiColor(value, rule){
@@ -575,7 +558,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     }
   }
 
-  // حلقات
   function setRing(idSuffix, pct, stroke){
     const el = document.getElementById('r-'+idSuffix);
     if(!el) return;
@@ -585,7 +567,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     el.style.stroke = stroke || '#2e7d32';
   }
 
-  // حسابات أساسية من animals
   function calcHerdFromAnimals(animals){
     const total = animals.length;
     let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
@@ -609,23 +590,19 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
   }
 
-  // ربط PD+ بالتلقيح الأقرب السابق (CR صحيح)
-  function calcReproFromEvents(animals, events, spec){
+  function calcReproFromEvents(animals, events){
     const now = new Date();
     const d21 = new Date(now.getTime() - 21*86400000);
     const d90 = new Date(now.getTime() - 90*86400000);
     const d180 = new Date(now.getTime() - 180*86400000);
 
-    // مؤهلات التلقيح
     const eligible = animals.filter(a => isInMilk(a) && !isPreg(a) && getDIM(a) >= 60).length;
 
-    // Service Rate (21d) = عدد التلقيحات / المؤهلات
     const servicesLast21 = events.filter(e =>
       isType(e.type, INSEM) && toDate(e.eventDate) && toDate(e.eventDate) >= d21
     ).length;
     const serviceRate = eligible ? Math.round( (servicesLast21 / eligible) * 100 ) : 0;
 
-    // CR صحيح (ربط PD+ بتلقيح سابق)
     const insems90 = events.filter(e=> isType(e.type,INSEM) && toDate(e.eventDate) && toDate(e.eventDate)>=d90);
     const pdPos90  = events.filter(e=>{
       const d = toDate(e.eventDate);
@@ -633,7 +610,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       return isType(e.type, PD) && d && d>=d90 && /(عشار|preg|positive|حامل)/.test(res);
     });
 
-    // بناء index للتلقيحات لكل حيوان بتاريخها
     const insByAnimal = new Map();
     insems90.forEach(e=>{
       const key = e.animalId || e.animalNumber || e.number || e.tag;
@@ -650,7 +626,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       const dPD = toDate(pd.eventDate);
       const list = (insByAnimal.get(key)||[]).filter(x=> toDate(x.eventDate) && toDate(x.eventDate) <= dPD);
       if(!list.length) return;
-      // أقرب تلقيح سابق خلال 300 يوم
       list.sort((a,b)=> toDate(b.eventDate)-toDate(a.eventDate));
       const lastIns = list[0];
       if(dPD - toDate(lastIns.eventDate) <= 300*86400000) linkedPreg++;
@@ -658,12 +633,10 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
 
     const cr = insems90.length ? Math.min(100, Math.round((linkedPreg/insems90.length)*100)) : 0;
 
-    // PR21 = الحوامل الجديدة خلال 21 يوم / المؤهلات
     const newPreg21 = events.filter(e=> isType(e.type,PD)
       && /(عشار|preg|positive|حامل)/i.test(String(e.result||e.outcome||e['النتيجة']||'')) && toDate(e.eventDate)>=d21).length;
     const pr = eligible? Math.round((newPreg21/eligible)*100) : 0;
 
-    // S/C (180 يوم)
     const insems180 = events.filter(e=> isType(e.type,INSEM) && toDate(e.eventDate)>=d180).length;
     const preg180   = events.filter(e=> isType(e.type,PD) && /(عشار|preg|positive|حامل)/i.test(String(e.result||e.outcome||e['النتيجة']||'')) && toDate(e.eventDate)>=d180).length;
     const sc = preg180? (Math.round((insems180/preg180)*10)/10) : (insems180? (insems180).toFixed(1): 0);
@@ -671,7 +644,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return { serviceRate, cr, pr, sc };
   }
 
-  // إنتاج
   function calcProduction(animals, events){
     const milking = animals.filter(isInMilk);
     const inMilk = milking.length;
@@ -685,15 +657,13 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return { sumMilk, avgMilk, inMilk, avgDIM };
   }
 
-  // تناسل إضافي (Open/CI/Abortion/Dead/AFC)
   function calcReproExtras(animals, events){
     const now = new Date();
     const d365 = new Date(now.getTime()-365*86400000);
 
     const open = animals.filter(a=> isInMilk(a) && !isPreg(a) );
-    const openDays = open.length? Math.round(open.reduce((s,a)=> s+getDIM(a),0)/open.length) : 0;
+    const openDays = open.length? Math.round(open.reduce((س,a)=> س+getDIM(a),0)/open.length) : 0; // س=س
 
-    // CI: متوسط الفرق بين آخر ولادتين لكل أنثى
     let ciVals=[];
     const calvByAnimal = new Map();
     events.filter(e=> isType(e.type,CALV) && toDate(e.eventDate)).forEach(e=>{
@@ -716,7 +686,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     const calvs  = events.filter(e=> isType(e.type,CALV)  && toDate(e.eventDate)>=d365 ).length;
     const deadCalv = events.filter(e=> isType(e.type,CALV) && (/(ميت|نافق|dead|still)/i.test(String(e.outcome||e.calfStatus||e['حالة_العجل']||''))) && toDate(e.eventDate)>=d365).length;
 
-    // AFC
     const afcVals=[];
     animals.forEach(a=>{
       const bd = toDate(a.birthDate || a.dob || a['تاريخ_الميلاد']);
@@ -730,16 +699,9 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     });
     const afc = afcVals.length? Math.round(afcVals.reduce((s,x)=>s+x,0)/afcVals.length):0;
 
-    return {
-      openDays,
-      ci,
-      ar: calvs? Math.round((aborts/Math.max(calvs,1))*100):0,
-      dcr: calvs? Math.round((deadCalv/calvs)*100):0,
-      afc
-    };
+    return { openDays, ci, ar: calvs? Math.round((aborts/Math.max(calvs,1))*100):0, dcr: calvs? Math.round((deadCalv/calvs)*100):0, afc };
   }
 
-  // تغذية
   function calcNutrition(animals, prod){
     const priceMilk = Number(localStorage.getItem('mbk.pricePerKgMilk')||localStorage.getItem('nutrition.pricePerKgMilk')||0) || 0;
     const feedCostHead = Number(localStorage.getItem('mbk.feedCostPerHead')||localStorage.getItem('nutrition.feedCostPerHead')||0) || 0;
@@ -761,24 +723,19 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return { avgDMI, fe, iofc };
   }
 
-  // رسم الحلقات المختصرة
   function renderGauges(base, reproRates, spec){
     const d = $('g-date'); if(d) d.textContent = new Date().toISOString().slice(0,10);
-    // Benchmarks لتلوين الحلقات (منطقي عام)
-    const B = getBench(spec);
 
     setRing('inmilk', base.inMilkPct, '#2e7d32');  $('v-inmilk').textContent = base.inMilkPct + '%';
     setRing('preg',   base.pregRate,  kpiColor(base.pregRate, {good: (spec==='buffalo'?48:55), warn:(spec==='buffalo'?38:45)})); $('v-preg').textContent   = base.pregRate  + '%';
     setRing('fresh',  base.freshShare,'#2e7d32');  $('v-fresh').textContent  = base.freshShare+ '%';
-    // الجاف: الأقل أفضل
     const dryClr = (base.dryShare<=18)?'#2e7d32':(base.dryShare<=25?'#fdd835':'#ef6c00');
     setRing('dry', base.dryShare, dryClr); $('v-dry').textContent = base.dryShare + '%';
 
-    setRing('service', reproRates.serviceRate, kpiColor(reproRates.serviceRate, B.PR)); $('v-service').textContent = reproRates.serviceRate + '%';
-    setRing('conception', reproRates.cr, kpiColor(reproRates.cr, B.CR)); $('v-conception').textContent = reproRates.cr + '%';
+    setRing('service', reproRates.serviceRate, kpiColor(reproRates.serviceRate, getBench(spec).PR)); $('v-service').textContent = reproRates.serviceRate + '%';
+    setRing('conception', reproRates.cr, kpiColor(reproRates.cr, getBench(spec).CR)); $('v-conception').textContent = reproRates.cr + '%';
   }
 
-  // تبويبات: تلوين القيم حسب Benchmarks
   function colorizeTab(spec, base, reproRates, extras){
     const B = getBench(spec);
     $('k-openDays').style.color = kpiColor(extras.openDays, B.OPEN);
@@ -788,7 +745,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     $('k-sc').style.color       = kpiColor(reproRates.sc, B.SC);
   }
 
-  // عرض تبويبات
   function renderTabs(prod, reproRates, extras, nut){
     $('k-sumMilk').textContent = String(prod.sumMilk.toFixed ? prod.sumMilk.toFixed(1) : Math.round(prod.sumMilk*10)/10);
     $('k-avgMilk').textContent = prod.avgMilk ? (prod.avgMilk+' كجم') : '—';
@@ -807,17 +763,12 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     $('k-dmi').textContent = nut.avgDMI ? (nut.avgDMI+' كجم') : '—';
     $('k-fe').textContent  = nut.fe ? nut.fe.toFixed(2) : '—';
     $('k-iofc').textContent= (nut.iofc || nut.iofc===0) ? (nut.iofc+' جنيه') : '—';
-
-    // متوسطات حالة الجسم/الروث إن توفرت
-    // (يمكن حسابها من الأحداث لو متاحة—ملف سابق)
   }
 
-  // تدفقات
   let aSub=[], eSub=[];
   let currentSpec = getStoredSpec() || 'cow';
 
   function recompute(){
-    // إن لم يختر المستخدم يدويًا، اكتشف من القطيع
     if(!getStoredSpec() && aSub.length){
       currentSpec = autoDetectSpec(aSub);
       setSpecUI(currentSpec);
@@ -835,7 +786,6 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     colorizeTab(currentSpec, base, reproRates, extras);
   }
 
-  // اشتراكات Firestore
   const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
   if(userId){
     try{
@@ -856,12 +806,18 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     }catch(e){ console.warn('events query error', e); }
   }
 
-  // مفاتيح مساعدة/وصول
   document.addEventListener('DOMContentLoaded', ()=>{
     document.querySelectorAll('.kpi').forEach(el => { el.title = el.dataset.hint || ''; });
   });
   </script>
 
   <script type="module" src="/js/smart-alerts.js"></script>
+  <script type="module">
+  import { renderGauge, MBK_BANDS } from '/js/gauge.js';
+  renderGauge(document.getElementById('g-thi'),   { value: 74, label: 'THI', unit: '', bands: MBK_BANDS.thi });
+  renderGauge(document.getElementById('g-prod'),  { value: 82, label: 'إنتاج', unit: '%', bands: MBK_BANDS.production });
+  renderGauge(document.getElementById('g-repro'), { value: 58, label: 'تناسل', unit: '%', bands: MBK_BANDS.reproduction });
+  renderGauge(document.getElementById('g-health'),{ value: 91, label: 'صحة (صفات/روث)', unit: '%', bands: MBK_BANDS.health });
+  </script>
 </body>
 </html>
