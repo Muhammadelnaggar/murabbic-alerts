@@ -1,3 +1,8 @@
+// KPI Engine v1.0 — Species Filter Enabled (Cow/Buffalo/All)
+// DIM>=3 filter applied for production KPIs
+// Dynamic thresholds using last 14-21 days rolling window
+// Based on Firestore events: daily_milk, insemination, calving, pregnancy-diagnosis, abortion
+
 // /www/js/herd-gauges.js
 (() => {
   const qs = (sel, el = document) => el.querySelector(sel);
