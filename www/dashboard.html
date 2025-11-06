@@ -16,12 +16,18 @@
     html,body{overflow-x:hidden}
     body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
     h1{margin:0 0 16px;text-align:center;color:#1b5e20}
+
     .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+
     .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
     .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:118px}
     .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px;margin-bottom:6px}
     .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px}
-    @media(max-width:560px){.dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.tile{min-height:110px;padding:14px}}
+
+    @media(max-width:560px){
+      .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+      .tile{min-height:110px;padding:14px}
+    }
 
     /* ويدجت الطقس (كما هو) */
     #weatherClassic{background:#ffe3e8;border:1.5px solid #ffccd5;border-radius:16px;padding:12px;margin-bottom:8px}
@@ -41,7 +47,7 @@
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
 
-    /* فلاتر النوع (الخيار A) */
+    /* فلاتر النوع */
     #speciesFilter{text-align:center;margin:10px 0}
     #speciesFilter .filter-btn{background:#fff;border:2px solid var(--green);color:var(--green);padding:6px 14px;border-radius:12px;cursor:pointer;font-weight:bold;margin:0 4px;font-size:15px}
     #speciesFilter .filter-btn.active{background:var(--green);color:#fff}
@@ -86,14 +92,14 @@
     </div>
   </div>
 
-  <!-- فلاتر النوع (الخيار A: أسفل الويدجت مباشرة) -->
+  <!-- فلاتر النوع -->
   <div id="speciesFilter">
     <button class="filter-btn active" data-species="all">🐄🐃 الكل</button>
     <button class="filter-btn" data-species="cow">🐄 أبقار</button>
     <button class="filter-btn" data-species="buffalo">🐃 جاموس</button>
   </div>
 
-  <!-- شبكة البلاطات القديمة كما هي -->
+  <!-- شبكة البلاطات كما هي -->
   <div class="dashboard">
     <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>حيوان جديد</div>
     <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>حيواناتي</div>
@@ -107,6 +113,18 @@
       <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
     </div>
     <div class="tile" role="button" tabindex="0" onclick="location.href='nutrition-eval.html'">تقييم التغذية</div>
+  </div>
+
+  <!-- تحتاج تدخل -->
+  <div class="card" id="attentionSection" style="margin-top:12px">
+    <h3 style="color:#2e7d32;margin:0 0 8px;">⚠️ تحتاج تدخل</h3>
+    <div id="attentionList" style="display:flex;flex-direction:column;gap:6px;font-size:14px;color:#2e7d32"></div>
+  </div>
+
+  <!-- أحدث الأحداث (7 أيام) -->
+  <div class="card section" id="recentEvents">
+    <div style="font-weight:900;color:#1b5e20;margin-bottom:6px">🕘 أحدث الأحداث (7 أيام)</div>
+    <div id="recentList" style="display:flex;flex-direction:column;gap:6px;font-size:14px;color:#2e7d32"></div>
   </div>
 
   <!-- مؤشرات القطيع: تناسلي -->
@@ -128,8 +146,8 @@
   <div class="card section" id="sec-prod">
     <div class="title">🍼 مؤشرات إنتاجية</div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkAvg" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">متوسط إنتاج اليوم</div><div class="kpi-value" id="v-milkAvg">— كجم</div><div class="kpi-sub">لكل رأس في الحلاب</div></div></div>
-      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkTotal" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">إجمالي إنتاج اليوم</div><div class="kpi-value" id="v-milkTotal">— كجم</div><div class="kpi-sub" id="v-milkTrend">— مقارنة بأمس</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkAvg" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">متوسط إنتاج اليوم</div><div class="kpi-value" id="v-milkAvg">— لتر</div><div class="kpi-sub">لكل رأس في الحلاب</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkTotal" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">إجمالي إنتاج اليوم</div><div class="kpi-value" id="v-milkTotal">— لتر</div><div class="kpi-sub" id="v-milkTrend">— مقارنة بأمس</div></div></div>
       <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-inMilkPct" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">في الحلاب</div><div class="kpi-value" id="v-inMilkPct">—%</div><div class="kpi-sub" id="v-inMilkCount">— رأس</div></div></div>
       <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-dim" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">متوسط DIM</div><div class="kpi-value" id="v-dim">—</div><div class="kpi-sub">أيام الحليب</div></div></div>
     </div>
@@ -157,22 +175,37 @@
     </div>
   </div>
 
-  <!-- الطقس (كما هو) -->
+  <!-- الطقس -->
   <script>
     (function(){
       const box=document.getElementById('weatherClassic');
-      const tEl=wxTemp, hEl=wxHum, thiEl=wxTHI, sEl=wxState, thiArc=document.getElementById('thiArc'), thiNeedle=document.getElementById('thiNeedle');
-      const btnRefresh=wxRefresh, btnPin=wxPin, segFarm=segFarm, segGPS=segGPS;
+      const tEl = document.getElementById('wxTemp');
+      const hEl = document.getElementById('wxHum');
+      const thiEl = document.getElementById('wxTHI');
+      const sEl = document.getElementById('wxState');
+      const thiArc = document.getElementById('thiArc');
+      const thiNeedle = document.getElementById('thiNeedle');
+      const btnRefresh = document.getElementById('wxRefresh');
+      const btnPin = document.getElementById('wxPin');
+      const segFarm = document.getElementById('segFarm');
+      const segGPS = document.getElementById('segGPS');
       if(!box) return;
+
       const DEF={lat:30.0444,lon:31.2357,place:'القاهرة'};
       const LS_PIN='mbk_farm', LS_WX='mbk_wx_cache', LS_REG='mbk_reg_geo';
       let mode='reg', pinned=null;
 
       function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
-      // حساسية أبسط للجاموس: نحرك حدود الإنذار درجتين لأسفل
       function bandsFor(species){ const base={t1:66,t2:70,t3:77,t4:82}; if(species==='buffalo') return {t1:64,t2:68,t3:75,t4:80}; return base; }
-      // species الحالي من الفلتر
       function currentSpecies(){ const a=document.querySelector('#speciesFilter .filter-btn.active'); return a?.dataset?.species||'all'; }
+      function colorAndText(thi,s){
+        const b=bandsFor(s);
+        if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
+        if(thi<b.t2) return {bg:'#fff9c4',txt:'إجهاد خفيف'};
+        if(thi<b:t3) return {bg:'#ffe0b2',txt:'إجهاد متوسط'};
+        if(thi<b.t4) return {bg:'#ffccbc',txt:'إجهاد شديد'};
+        return {bg:'#ffcdd2',txt:'إجهاد شديد جدًا'};
+      }
       function colorAndText(thi,s){
         const b=bandsFor(s);
         if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
@@ -186,48 +219,86 @@
         const ang=-120+((thi-50)/40)*240; thiNeedle.style.setProperty('--angle',ang+'deg');
         const {bg,txt}=colorAndText(thi,currentSpecies()); box.style.background=bg; sEl.textContent=txt;
       }
+
       const readJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}};
       const writeJSON=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+
       function readTenantAddress(){const T=window.__TENANT__||{};return{country:T.country||T.address?.country,region:T.region||T.address?.region,city:T.city||T.address?.city}}
       function regKey(a){return [a.city,a.region,a.country].filter(Boolean).join('|').toLowerCase()||'default'}
-      async function geocodeFromRegistration(){const addr=readTenantAddress();if(!addr.country&&!addr.region&&!addr.city) return null; const key=regKey(addr); const c=readJSON(LS_REG); if(c&&c.key===key&&c.lat&&c.lon) return c; try{const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent([addr.city,addr.region,addr.country].filter(Boolean).join(', '))}&count=1&language=ar`); const j=await r.json(); const it=j?.results?.[0]; if(it){const res={lat:it.latitude,lon:it.longitude,place:[it.name,it.admin1,it.country].filter(Boolean).join('، '),key}; writeJSON(LS_REG,res); return res}}catch{} return null}
+      async function geocodeFromRegistration(){
+        const addr=readTenantAddress(); if(!addr.country&&!addr.region&&!addr.city) return null;
+        const key=regKey(addr); const c=readJSON(LS_REG); if(c&&c.key===key&&c.lat&&c.lon) return c;
+        try{
+          const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent([addr.city,addr.region,addr.country].filter(Boolean).join(', '))}&count=1&language=ar`);
+          const j=await r.json(); const it=j?.results?.[0];
+          if(it){const res={lat:it.latitude,lon:it.longitude,place:[it.name,it.admin1,it.country].filter(Boolean).join('، '),key}; writeJSON(LS_REG,res); return res}
+        }catch{}
+        return null;
+      }
+
       function getPinned(){return readJSON(LS_PIN)}
       function savePinned(lat,lon,place){writeJSON(LS_PIN,{lat,lon,place:place||'مزرعتي'})}
       function getGPS(){return new Promise(res=>{if(!navigator.geolocation) return res(null); navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude,place:'موقعي'}),_=>res(null),{enableHighAccuracy:true,timeout:5000})})}
+
       async function pickCoords(){ if(pinned) return pinned; if(mode==='gps'){const g=await getGPS(); if(g) return g} const reg=await geocodeFromRegistration(); if(reg) return reg; return DEF }
       function wxGetCached(){const x=readJSON(LS_WX); if(x&&Date.now()-x.ts<60000) return x.data; return null}
       function wxSetCached(d){writeJSON(LS_WX,{ts:Date.now(),data:d})}
-      async function fetchWeather(lat,lon){const cached=wxGetCached(); if(cached&&typeof cached.t==='number'&&typeof cached.h==='number') return cached; try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,{cache:'no-store'}); const j=await r.json(); const d={t:j.current?.temperature_2m,h:j.current?.relative_humidity_2m}; if(typeof d.t==='number'&&typeof d.h==='number') wxSetCached(d); return d}catch{return null}}
+      async function fetchWeather(lat,lon){
+        const cached=wxGetCached(); if(cached&&typeof cached.t==='number'&&typeof cached.h==='number') return cached;
+        try{
+          const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,{cache:'no-store'});
+          const j=await r.json(); const d={t:j.current?.temperature_2m,h:j.current?.relative_humidity_2m};
+          if(typeof d.t==='number'&&typeof d.h==='number') wxSetCached(d); return d
+        }catch{ return null }
+      }
+
       function activate(w){segFarm.classList.toggle('active',w==='reg'); segGPS.classList.toggle('active',w==='gps')}
-      async function render(){const c=await pickCoords(); const d=await fetchWeather(c.lat,c.lon); if(!d){wxTemp.textContent='—°C'; wxHum.textContent='—%'; wxTHI.textContent='—'; wxState.textContent='—'; return} const t=Math.round(d.t), h=Math.round(d.h), thi=THI(t,h); wxTemp.textContent=`${t}°C`; wxHum.textContent=`${h}%`; wxTHI.textContent=thi; drawTHI(thi)}
-      async function boot(){pinned=getPinned()||null; mode='reg'; activate('reg'); segFarm.addEventListener('click',()=>{mode='reg';activate('reg');render()}); segGPS.addEventListener('click',()=>{mode='gps';activate('gps');render()}); wxRefresh.addEventListener('click',render); wxPin.addEventListener('click',async()=>{mode='gps';const g=await getGPS(); if(g){savePinned(g.lat,g.lon,g.place); pinned=g} mode='reg';activate('reg');render()}); render()}
+      async function render(){
+        const c=await pickCoords(); const d=await fetchWeather(c.lat,c.lon);
+        if(!d){tEl.textContent='—°C'; hEl.textContent='—%'; thiEl.textContent='—'; sEl.textContent='—'; return}
+        const t=Math.round(d.t), h=Math.round(d.h), thi=THI(t,h);
+        tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
+      }
+      async function boot(){
+        pinned=getPinned()||null; mode='reg'; activate('reg');
+        segFarm.addEventListener('click',()=>{mode='reg';activate('reg');render()});
+        segGPS.addEventListener('click',()=>{mode='gps';activate('gps');render()});
+        btnRefresh.addEventListener('click',render);
+        btnPin.addEventListener('click',async()=>{mode='gps';const g=await getGPS(); if(g){savePinned(g.lat,g.lon,g.place); pinned=g} mode='reg';activate('reg');render()});
+        render();
+      }
       document.addEventListener('DOMContentLoaded', boot);
-      // تحديث حالة النص عند تغيير النوع
-      document.getElementById('speciesFilter').addEventListener('click', (e)=>{ if(e.target.classList.contains('filter-btn')) render(); });
+      document.getElementById('speciesFilter').addEventListener('click',(e)=>{ if(e.target.classList.contains('filter-btn')) render(); });
     })();
   </script>
 
-  <!-- نواة المؤشرات عبر /api/herd-stats -->
+  <!-- مؤشرات عبر /api/herd-stats + أقسام المساعدة -->
   <script>
-    // ============= إعدادات عامة =============
     const ringLen = 113.097;
     const $ = (s)=>document.querySelector(s);
     const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+
     function setRing(id, pct, palette='up'){
       const el = document.getElementById(id); if(!el) return;
       const p = isFinite(pct)? clamp(pct,0,100) : 0;
       el.style.strokeDashoffset = (ringLen*(1-p/100)).toFixed(2);
       let c = '#2e7d32';
-      if(palette==='down'){ // الأقل أفضل
-        if(p<=80) c='#2e7d32'; else if(p<=120) c='#fdd835'; else if(p<=150) c='#ef6c00'; else c='#c62828';
-      }else{ // الأعلى أفضل
-        if(p>=80) c='#2e7d32'; else if(p>=60) c='#7cb342'; else if(p>=40) c='#fdd835'; else if(p>=20) c='#ef6c00'; else c='#c62828';
+      if(palette==='down'){
+        if(p<=80) c='#2e7d32';
+        else if(p<=120) c='#fdd835';
+        else if(p<=150) c='#ef6c00';
+        else c='#c62828';
+      }else{
+        if(p>=80) c='#2e7d32';
+        else if(p>=60) c='#7cb342';
+        else if(p>=40) c='#fdd835';
+        else if(p>=20) c='#ef6c00';
+        else c='#c62828';
       }
       el.style.stroke = c;
     }
     function setText(sel,val,suffix=''){const el=$(sel); if(!el) return; el.textContent=(val==null||val==='')?'—':(val+suffix)}
 
-    // ============= فلتر النوع =============
     let species='all';
     document.querySelectorAll('#speciesFilter .filter-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -238,57 +309,116 @@
       });
     });
 
-    // ============= سحب المؤشرات =============
     let timer=null;
-    async function pullAndRender(){
-      try{
-        // يُفترض أن tenant-bootstrap يحقن الهوية تلقائيًا (الهيدر X-User-Id)
-        const r = await fetch(`/api/herd-stats?species=${species}`, {cache:'no-store'});
-        const j = await r.json();
+    async function fetchJSON(u){
+      try{ const r=await fetch(u,{cache:'no-store'}); return await r.json(); }catch{ return {}; }
+    }
 
-        // تناسلي
-        const R = j.repro || {};
-        setText('#v-pregRate21', R.pregnancyRate21, '%');   setRing('r-pregRate21', R.pregnancyRate21);
-        setText('#v-conception', R.conceptionRate, '%');     setRing('r-conception', R.conceptionRate);
-        setText('#v-spc', R.servicesPerConception);          setRing('r-spc', R.servicesPerConception? clamp(100 - (Math.max(1,Math.min(5,Number(R.servicesPerConception)))-1)*20,0,100):0, 'down');
-        setText('#v-openDays', R.avgOpenDays);               setRing('r-openDays', R.avgOpenDays? clamp(150 - Math.min(150,R.avgOpenDays),0,100):0, 'down');
-        setText('#v-ci', R.calvingInterval? (R.calvingInterval+' يوم') : null); setRing('r-ci', R.calvingInterval? clamp(500 - Math.min(500,R.calvingInterval),0,100):0, 'down');
-        setText('#v-abortion', R.abortionRate, '%');         setRing('r-abortion', (R.abortionRate!=null)? (100 - R.abortionRate) : 0, 'down');
-        setText('#v-deadCalv', R.deadCalvingRate, '%');      setRing('r-deadCalv', (R.deadCalvingRate!=null)? (100 - R.deadCalvingRate) : 0, 'down');
-        setText('#v-afc', R.ageFirstCalvingMonths? (R.ageFirstCalvingMonths+' شهر'): null); setRing('r-afc', R.ageFirstCalvingMonths? clamp(36*3 - Math.min(36*3,R.ageFirstCalvingMonths*3),0,100):0, 'down');
+    async function updateAttention(){
+      const j = await fetchJSON(`/api/attention?species=${species}`);
+      const box = document.getElementById("attentionList");
+      if(!box) return;
+      box.innerHTML = "";
 
-        // إنتاجي
-        const P = j.production || {};
-        setText('#v-milkAvg', (P.avgDailyMilk!=null)? P.avgDailyMilk.toFixed?.(1) ?? P.avgDailyMilk : null, ' كجم'); setRing('r-milkAvg', clamp((Number(P.avgDailyMilk)||0)*3,0,100));
-        setText('#v-milkTotal', P.totalDailyMilk, ' كجم');   setRing('r-milkTotal', clamp((Number(P.totalDailyMilk)||0)*0.5,0,100));
-        setText('#v-inMilkPct', P.inMilkPct, '%');           setRing('r-inMilkPct', P.inMilkPct);
-        setText('#v-inMilkCount', P.inMilkCount? (P.inMilkCount+' رأس'): null);
-        setText('#v-dim', P.avgDIM);                         setRing('r-dim', P.avgDIM? clamp(200 - Math.min(200,P.avgDIM),0,100):0, 'down');
-        setText('#v-milkTrend', (P.trendVsYesterdayPct==null)? '—' : (P.trendVsYesterdayPct>0? `↑ ${P.trendVsYesterdayPct}%` : (P.trendVsYesterdayPct<0? `↓ ${Math.abs(P.trendVsYesterdayPct)}%` : 'ثابت 0%')));
+      const make = (txt,link)=>{
+        const d=document.createElement("div");
+        d.style.cursor="pointer";
+        d.style.background="#fff";
+        d.style.border="1px solid var(--border)";
+        d.style.padding="6px 10px";
+        d.style.borderRadius="8px";
+        d.textContent=txt;
+        if(link) d.onclick=()=>location.href=link;
+        box.appendChild(d);
+      };
 
-        // الاستبعاد
-        const C = j.culling || {};
-        setText('#v-cull-prod', C.production, '%'); setRing('r-cull-prod', (C.production??0), 'down');
-        setText('#v-cull-repro', C.reproductive, '%'); setRing('r-cull-repro', (C.reproductive??0), 'down');
-        setText('#v-cull-health', C.health, '%'); setRing('r-cull-health', (C.health??0), 'down');
+      if(j.needInsemination?.length) make(`📍 ${j.needInsemination.length} تحتاج تلقيح`,`groups.html`);
+      if(j.needPregCheck?.length)  make(`🔍 ${j.needPregCheck.length} تحتاج تشخيص حمل`,`groups.html`);
+      if(j.noMilk?.length)         make(`🥛 ${j.noMilk.length} لا لبن منذ 3 أيام`,`milk-reports.html`);
+      if(j.health?.length)         make(`🩺 ${j.health.length} حالات صحية قيد المتابعة`,`alerts.html`);
 
-        // التغذية
-        const N = j.nutrition || {};
-        setText('#v-fce', N.feedToMilkEfficiency); setRing('r-fce', N.feedToMilkEfficiency? clamp(Number(N.feedToMilkEfficiency)*50,0,100):0);
-        setText('#v-dmi', N.dmiPctBW, '%');        setRing('r-dmi', N.dmiPctBW? clamp(Number(N.dmiPctBW)*10,0,100):0);
-        setText('#v-iofc', N.iofc, ' جنيه/رأس');  setRing('r-iofc', N.iofc? clamp(50 + Math.min(50, Number(N.iofc)/10),0,100):0);
-        setText('#v-feces', N.fecesScoreAvg);
-        setText('#v-bcs', N.bcsAvg);
+      if(box.innerHTML===""){ make("✅ لا شيء يحتاج تدخل الآن"); }
+    }
 
-      }catch(e){
-        console.warn('herd-stats fetch error', e);
-      }finally{
-        clearTimeout(timer);
-        timer = setTimeout(pullAndRender, 60000); // تحديث كل دقيقة
+    async function updateRecent(){
+      const j = await fetchJSON(`/api/recent-events?days=7&species=${species}`);
+      const box = document.getElementById("recentList");
+      if(!box) return;
+      box.innerHTML = "";
+
+      if(!j.list?.length){
+        box.innerHTML = `<div style="background:#fff;border:1px solid var(--border);padding:6px 10px;border-radius:8px">لا أحداث</div>`;
+        return;
+      }
+      for(const ev of j.list){
+        const d=document.createElement("div");
+        d.style.cursor="pointer";
+        d.style.background="#fff";
+        d.style.border="1px solid var(--border)";
+        d.style.padding="6px 10px";
+        d.style.borderRadius="8px";
+        d.textContent = `${ev.date} — #${ev.animal} — ${ev.type}`;
+        d.onclick = ()=> location.href=`cow-card.html?number=${ev.animal}`;
+        box.appendChild(d);
       }
     }
 
-    // أول تشغيل
+    async function pullAndRender(){
+      const j = await fetchJSON( species==="all" ? `/api/herd-stats` : `/api/herd-stats?species=${species}` );
+
+      // تناسلي
+      const R = j.repro || {};
+      setText('#v-pregRate21', R.pregnancyRate21, '%');   setRing('r-pregRate21', R.pregnancyRate21);
+      setText('#v-conception', R.conceptionRate, '%');     setRing('r-conception', R.conceptionRate);
+      setText('#v-spc', R.servicesPerConception);          setRing('r-spc', R.servicesPerConception? clamp(100 - (Math.max(1,Math.min(5,Number(R.servicesPerConception)))-1)*20,0,100):0, 'down');
+      setText('#v-openDays', R.avgOpenDays);               setRing('r-openDays', R.avgOpenDays? clamp(150 - Math.min(150,R.avgOpenDays),0,100):0, 'down');
+      setText('#v-ci', R.calvingInterval? (R.calvingInterval+' يوم') : null); setRing('r-ci', R.calvingInterval? clamp(500 - Math.min(500,R.calvingInterval),0,100):0, 'down');
+      setText('#v-abortion', R.abortionRate, '%');         setRing('r-abortion', (R.abortionRate!=null)? (100 - R.abortionRate) : 0, 'down');
+      setText('#v-deadCalv', R.deadCalvingRate, '%');      setRing('r-deadCalv', (R.deadCalvingRate!=null)? (100 - R.deadCalvingRate) : 0, 'down');
+      setText('#v-afc', R.ageFirstCalvingMonths? (R.ageFirstCalvingMonths+' شهر'): null); setRing('r-afc', R.ageFirstCalvingMonths? clamp(36*3 - Math.min(36*3,R.ageFirstCalvingMonths*3),0,100):0, 'down');
+
+      // إنتاجي
+      const P = j.production || {};
+      const avg = Number(P.avgDailyMilk)||0;
+      const tot = Number(P.totalDailyMilk)||0;
+      const trend = Number(P.trendVsYesterdayPct)||0;
+
+      setText('#v-milkAvg', avg>0 ? avg.toFixed(1) : null , ' لتر');
+      setRing('r-milkAvg', clamp(avg*3,0,100));
+      setText('#v-milkTotal', tot>0 ? tot.toFixed(1) : null, ' لتر');
+      const trendEl = $('#v-milkTrend');
+      if(trendEl){
+        if(trend>0) trendEl.textContent = `↑ ${trend}%`;
+        else if(trend<0) trendEl.textContent = `↓ ${Math.abs(trend)}%`;
+        else trendEl.textContent = `ثابت 0%`;
+      }
+      setText('#v-inMilkPct', P.inMilkPct, '%');  setRing('r-inMilkPct', P.inMilkPct);
+      setText('#v-inMilkCount', P.inMilkCount? (P.inMilkCount+' رأس'): null);
+      const dim = Number(P.avgDIM)||0;
+      setText('#v-dim', dim>0 ? dim : null);
+      setRing('r-dim', dim? clamp(200 - Math.min(200,dim),0,100):0, 'down');
+
+      // الاستبعاد
+      const C = j.culling || {};
+      setText('#v-cull-prod', C.production, '%');     setRing('r-cull-prod', (C.production??0), 'down');
+      setText('#v-cull-repro', C.reproductive, '%');  setRing('r-cull-repro', (C.reproductive??0), 'down');
+      setText('#v-cull-health', C.health, '%');       setRing('r-cull-health', (C.health??0), 'down');
+
+      // التغذية
+      const N = j.nutrition || {};
+      setText('#v-fce', N.feedToMilkEfficiency);
+      setText('#v-dmi', N.dmiPctBW, '%');
+      setText('#v-iofc', N.iofc, ' جنيه/رأس');
+      setText('#v-feces', N.fecesScoreAvg);
+      setText('#v-bcs', N.bcsAvg);
+
+      clearTimeout(timer);
+      timer = setTimeout(pullAndRender, 60000);
+
+      await updateAttention();
+      await updateRecent();
+    }
+
     document.addEventListener('DOMContentLoaded', pullAndRender);
   </script>
 
