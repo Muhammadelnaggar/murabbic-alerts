@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <title>لوحة التحكم - مربيك</title>
 
-  <!-- أيقونة مؤكّدة -->
+  <link rel="stylesheet" href="css/forms.css">
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#1b5e20"/>
@@ -18,17 +16,15 @@
     html,body{overflow-x:hidden}
     body{background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;padding:16px;color:#1b5e20}
     h1{margin:0 0 16px;text-align:center;color:#1b5e20}
-
-    /* العنوان */
-    .brand{display:flex;align-items:center;justify-content:center;gap:10px}
-    .brand-icon{height:28px;width:28px;object-fit:contain;display:none}
-    .brand-icon-svg{height:28px;width:28px;display:inline-block;vertical-align:middle}
-
-    /* كروت عامة */
     .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:118px}
+    .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px;margin-bottom:6px}
+    .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px}
+    @media(max-width:560px){.dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.tile{min-height:110px;padding:14px}}
 
-    /* ====== الويدجت القديم (كلاسيك) ====== */
-    #weatherClassic{background:#ffe3e8;border:1.5px solid #ffccd5;border-radius:16px;padding:12px}
+    /* ويدجت الطقس (كما هو) */
+    #weatherClassic{background:#ffe3e8;border:1.5px solid #ffccd5;border-radius:16px;padding:12px;margin-bottom:8px}
     #weatherClassic .bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
     #weatherClassic .seg{appearance:none;border:1px solid #2e7d32;background:#fff;color:#2e7d32;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
     #weatherClassic .seg.active{background:#2e7d32;color:#fff}
@@ -37,83 +33,36 @@
     #weatherClassic .pill{background:#f7fff4;border:1px solid #c5e1a5;border-radius:12px;padding:8px;text-align:center}
     #weatherClassic .pill b{display:block;margin-top:4px}
     #weatherClassic .right{grid-row:1 / span 3;grid-column:2;display:flex;align-items:center;justify-content:center}
-
-    /* ساعة THI */
     .thi-clock{position:relative;width:160px;height:160px}
     .thi-clock .dial{position:absolute;inset:0;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;
-      -webkit-mask:radial-gradient(farthest-side,transparent 55%, #000 56%);
-              mask:radial-gradient(farthest-side,transparent 55%, #000 56%)}
-    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;
-      background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);
-      -webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);
-              mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
-    .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;
-      transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1)}
+    .thi-clock .arc{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side,transparent 55%, #000 56%);mask:radial-gradient(farthest-side,transparent 55%, #000 56%)}
+    .thi-clock .dial::after{content:"";position:absolute;inset:3px;border-radius:50%;background:repeating-conic-gradient(#9e9e9e 0 2deg, transparent 0 18deg);-webkit-mask:radial-gradient(farthest-side,transparent 68%,#000 69%);mask:radial-gradient(farthest-side,transparent 68%,#000 69%);opacity:.33}
+    .thi-clock .needle{position:absolute;left:50%;top:50%;width:2px;height:42%;background:#000;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(var(--angle,-120deg));border-radius:2px;transition:transform .9s cubic-bezier(.22,.8,.2,1)}
     .thi-clock .needle::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:inherit}
     .thi-clock .center{position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#000;transform:translate(-50%,-50%)}
 
-    /* شبكة البلاطات */
-    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-    .tile{position:relative;background:#eafbe7;border:1.5px solid #c5e1a5;border-radius:14px;
-      padding:16px;text-align:center;font-weight:bold;cursor:pointer;display:flex;flex-direction:column;
-      align-items:center;justify-content:center;gap:6px;min-height:118px}
-    .tile .icon{display:block;width:44px;height:44px;line-height:44px;border-radius:50%;border:1px solid var(--border);font-size:24px;margin-bottom:6px}
-    .tile .badge{position:absolute;top:8px;left:8px;background:#f7fff4;border:1px solid var(--border);color:#335c33;border-radius:999px;padding:2px 8px;font-size:11px}
+    /* فلاتر النوع (الخيار A) */
+    #speciesFilter{text-align:center;margin:10px 0}
+    #speciesFilter .filter-btn{background:#fff;border:2px solid var(--green);color:var(--green);padding:6px 14px;border-radius:12px;cursor:pointer;font-weight:bold;margin:0 4px;font-size:15px}
+    #speciesFilter .filter-btn.active{background:var(--green);color:#fff}
 
-    /* المقاييس (herd-gauges) */
-    .gauge{width:100%;aspect-ratio:2/1;position:relative}
-    .gauge svg{width:100%;height:100%;display:block}
-    .gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#065f46;font-size:22px}
-    /* ===== KPIs الحلقية الجديدة ===== */
-.kpi-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
-  gap:10px;
-}
-.kpi{
-  display:flex;align-items:center;gap:10px;
-  border:1px solid var(--border);border-radius:12px;background:#fff;
-  padding:10px;min-height:72px
-}
-.kpi-ring{flex:0 0 auto}
-.kpi-ring svg{width:60px;height:60px;display:block}
-.kpi-ring circle.bg{fill:none;stroke:#e0e0e0;stroke-width:6}
-.kpi-ring circle.fg{
-  fill:none;stroke:#2e7d32;stroke-width:6;stroke-linecap:round;
-  stroke-dasharray:113.097;stroke-dashoffset:113.097;
-  transform:rotate(-90deg);transform-origin:22px 22px;
-  transition:stroke-dashoffset .7s ease, stroke .3s ease
-}
-.kpi-body{display:flex;flex-direction:column;gap:2px}
-.kpi-title{font-weight:800;color:#1b5e20;font-size:13px}
-.kpi-value{font-weight:900;font-size:20px;color:#065f46;line-height:1}
-.kpi-sub{font-size:11px;color:#4f5b62}
-.kpi{ transition: transform .12s ease, box-shadow .12s ease }
-.kpi:hover{ transform: translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,.06) }
-
-
-    @media(max-width:560px){
-      .dashboard{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-      .tile{min-height:110px;padding:14px}
-      .tile-m-full{grid-column:1 / -1}
-    }
+    /* حلقات KPIs */
+    .section{margin-top:12px}
+    .section .title{font-weight:900;color:#1b5e20;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+    .kpi{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:10px;min-height:72px}
+    .kpi-ring svg{width:60px;height:60px;display:block}
+    .kpi-ring circle.bg{fill:none;stroke:#e0e0e0;stroke-width:6}
+    .kpi-ring circle.fg{fill:none;stroke:#2e7d32;stroke-width:6;stroke-linecap:round;stroke-dasharray:113.097;stroke-dashoffset:113.097;transform:rotate(-90deg);transform-origin:22px 22px;transition:stroke-dashoffset .7s ease, stroke .3s ease}
+    .kpi-title{font-weight:800;color:#1b5e20;font-size:13px}
+    .kpi-value{font-weight:900;font-size:20px;color:#065f46;line-height:1}
+    .kpi-sub{font-size:11px;color:#4f5b62}
   </style>
 </head>
 <body>
-  <h1 class="brand">
-    <img id="brandImg" class="brand-icon" alt="لوحة التحكم"/>
-    <svg class="brand-icon-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="لوحة">
-      <path d="M6 38 L18 50 L40 18" fill="none" stroke="#1e88e5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-      <rect x="28" y="46" width="30" height="6" rx="3" fill="#1e88e5"/>
-      <rect x="30" y="30" width="6" height="16" rx="3" fill="#ef5350"/>
-      <rect x="40" y="24" width="6" height="22" rx="3" fill="#fdd835"/>
-      <rect x="50" y="16" width="6" height="30" rx="3" fill="#7cb342"/>
-    </svg>
-    لوحة التحكم - مربيك
-  </h1>
+  <h1>لوحة التحكم - مربيك</h1>
 
-  <!-- ================== الويدجت القديم (كما كان) ================== -->
+  <!-- ويدجت الطقس (كما هو) -->
   <div id="weatherClassic" class="card" aria-label="الطقس و مؤشر THI">
     <div class="bar">
       <button class="btn" id="wxRefresh" type="button">تحديث</button>
@@ -122,7 +71,6 @@
       <button class="seg" id="segFarm" type="button">مزرعتي</button>
       <button class="seg" id="segGPS" type="button">موقعي</button>
     </div>
-
     <div class="grid">
       <div class="pill"><div>الحرارة</div><b id="wxTemp">—°C</b></div>
       <div class="right">
@@ -137,323 +85,218 @@
       <div class="pill" style="grid-column:1 / span 2"><div>الحالة</div><b id="wxState">—</b></div>
     </div>
   </div>
-  <!-- ============================================================= -->
 
-  <!-- شبكة البلاطات / روابط سريعة -->
-  <div class="dashboard" style="margin-top:12px">
+  <!-- فلاتر النوع (الخيار A: أسفل الويدجت مباشرة) -->
+  <div id="speciesFilter">
+    <button class="filter-btn active" data-species="all">🐄🐃 الكل</button>
+    <button class="filter-btn" data-species="cow">🐄 أبقار</button>
+    <button class="filter-btn" data-species="buffalo">🐃 جاموس</button>
+  </div>
+
+  <!-- شبكة البلاطات القديمة كما هي -->
+  <div class="dashboard">
     <div class="tile" onclick="location.href='add-animal.html'"><span class="icon">➕</span>حيوان جديد</div>
     <div class="tile" onclick="location.href='animal-list.html'"><span class="icon">📋</span>حيواناتي</div>
     <div class="tile" onclick="location.href='add-event.html'"><span class="icon">🗓️</span>حدث جديد</div>
     <div class="tile" onclick="location.href='alerts.html'"><span class="icon">🔔</span>أرشيف التنبيهات</div>
     <div class="tile" onclick="location.href='cow-card.html'"><span class="icon">🐮</span>البطاقة الذكية</div>
-    <div class="tile" id="groupsTile" role="button" tabindex="0"
-     onclick="(window.dataLayer=window.dataLayer||[]).push({event:'tile_click',tile:'groups',page:'dashboard'}); location.href='groups.html'">
-  <span class="icon">👥</span>
-  مجموعات مربيك
-</div>
-
+    <div class="tile" onclick="location.href='groups.html'"><span class="icon">👥</span>مجموعات مربيك</div>
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
     <div class="tile" id="sensorsTile" role="button" tabindex="0">
-      <span class="icon">🛰️</span>
-      الأجهزة والحساسات
+      <span class="icon">🛰️</span> الأجهزة والحساسات
       <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
     </div>
-    <div class="tile" id="nutritionEvalTile" role="button" tabindex="0" onclick="location.href='nutrition-eval.html'">
-      تقييم التغذية
-    </div>
-  </div>
-<!-- مقاييس القطيع (إنتاجي + تناسلي) -->
-<div class="card" id="herdGauges" aria-label="مقاييس القطيع" style="margin-top:12px">
-  <div style="font-weight:800;color:#1b5e20;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-    📊 مؤشرات القطيع (إنتاجي + تناسلي)
-    <span id="g-date" style="margin-inline-start:auto;font-size:12px;border:1px solid #c5e1a5;border-radius:999px;padding:2px 8px;background:#fff">—</span>
+    <div class="tile" role="button" tabindex="0" onclick="location.href='nutrition-eval.html'">تقييم التغذية</div>
   </div>
 
-  <div class="kpi-grid">
-    <!-- في الحلاب % -->
-    <div class="kpi" data-key="inMilkPct" data-hint="من إجمالي القطيع">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-inmilk" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">في الحلاب</div>
-        <div class="kpi-value" id="v-inmilk">—%</div>
-        <div class="kpi-sub">نسبة القطيع المنتج الآن</div>
-      </div>
-    </div>
-
-    <!-- نسبة العشار % -->
-    <div class="kpi" data-key="pregRate" data-hint="نسبة العشار من القطيع">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-preg" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">نسبة العشار</div>
-        <div class="kpi-value" id="v-preg">—%</div>
-        <div class="kpi-sub">من إجمالي القطيع</div>
-      </div>
-    </div>
-
-    <!-- حديث الولادة كنسبة من الحلاب -->
-    <div class="kpi" data-key="freshShare" data-hint="حديث الولادة ضمن الحلاب">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-fresh" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">حديث الولادة</div>
-        <div class="kpi-value" id="v-fresh">—%</div>
-        <div class="kpi-sub">من القطيع في الحلاب</div>
-      </div>
-    </div>
-
-    <!-- جاف % -->
-    <div class="kpi" data-key="dryShare" data-hint="نسبة الجاف من القطيع">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-dry" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">جاف</div>
-        <div class="kpi-value" id="v-dry">—%</div>
-        <div class="kpi-sub">من إجمالي القطيع</div>
-      </div>
-    </div>
-
-    <!-- معدل التلقيح 21ي (تقديري) -->
-    <div class="kpi" data-key="serviceRate" data-hint="تقديري/قريبًا">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-service" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">معدل التلقيح 21ي</div>
-        <div class="kpi-value" id="v-service">—%</div>
-        <div class="kpi-sub">يُستكمل لاحقًا</div>
-      </div>
-    </div>
-
-    <!-- معدل الإخصاب -->
-    <div class="kpi" data-key="conceptionRate" data-hint="قريبًا">
-      <div class="kpi-ring" aria-hidden="true">
-        <svg viewBox="0 0 44 44">
-          <circle class="bg" cx="22" cy="22" r="18"></circle>
-          <circle id="r-conception" class="fg" cx="22" cy="22" r="18"
-                  stroke-dasharray="113.097" stroke-dashoffset="113.097"></circle>
-        </svg>
-      </div>
-      <div class="kpi-body">
-        <div class="kpi-title">معدل الإخصاب</div>
-        <div class="kpi-value" id="v-conception">—%</div>
-        <div class="kpi-sub">يُستكمل لاحقًا</div>
-      </div>
+  <!-- مؤشرات القطيع: تناسلي -->
+  <div class="card section" id="sec-repro">
+    <div class="title">🧬 مؤشرات تناسلية</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-pregRate21" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">معدل الحمل 21ي</div><div class="kpi-value" id="v-pregRate21">—%</div><div class="kpi-sub">SR×CR خلال 21 يوم</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-conception" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">معدل الإخصاب (CR)</div><div class="kpi-value" id="v-conception">—%</div><div class="kpi-sub">نجاح التلقيحات</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-spc" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">التلقيحات لكل حمل</div><div class="kpi-value" id="v-spc">—</div><div class="kpi-sub">Services/Conception</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-openDays" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">الأيام المفتوحة</div><div class="kpi-value" id="v-openDays">—</div><div class="kpi-sub">من الولادة للحمل</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-ci" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">فاصل ولادتين</div><div class="kpi-value" id="v-ci">— يوم</div><div class="kpi-sub">Calving Interval</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-abortion" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">نسبة الإجهاض</div><div class="kpi-value" id="v-abortion">—%</div><div class="kpi-sub">آخر 12 شهر</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-deadCalv" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">ولادات نافقة</div><div class="kpi-value" id="v-deadCalv">—%</div><div class="kpi-sub">آخر 12 شهر</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-afc" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">العمر عند أول ولادة</div><div class="kpi-value" id="v-afc">— شهر</div><div class="kpi-sub">Heifers فقط</div></div></div>
     </div>
   </div>
-</div>
 
-  <!-- سكربت الويدجت -->
-<!-- طقس بالمواقع فقط (لا قواعد بيانات) -->
-<!-- طقس حسب بيانات التسجيل (بلد/منطقة/مدينة) + خيار GPS + تثبيت محلي -->
-<script id="wx-reg">
-(function(){
-  // عناصر الواجهة
-  const box = document.getElementById('weatherClassic');
-  const tEl = document.getElementById('wxTemp');
-  const hEl = document.getElementById('wxHum');
-  const thiEl = document.getElementById('wxTHI');
-  const sEl = document.getElementById('wxState');
-  const thiArc = document.getElementById('thiArc');
-  const thiNeedle = document.getElementById('thiNeedle');
-  const btnRefresh = document.getElementById('wxRefresh');
-  const btnPin = document.getElementById('wxPin');
-  const segFarm = document.getElementById('segFarm'); // هنستخدمها كـ "المسجّل"
-  const segGPS  = document.getElementById('segGPS');
+  <!-- مؤشرات القطيع: إنتاجي -->
+  <div class="card section" id="sec-prod">
+    <div class="title">🍼 مؤشرات إنتاجية</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkAvg" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">متوسط إنتاج اليوم</div><div class="kpi-value" id="v-milkAvg">— كجم</div><div class="kpi-sub">لكل رأس في الحلاب</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-milkTotal" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">إجمالي إنتاج اليوم</div><div class="kpi-value" id="v-milkTotal">— كجم</div><div class="kpi-sub" id="v-milkTrend">— مقارنة بأمس</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-inMilkPct" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">في الحلاب</div><div class="kpi-value" id="v-inMilkPct">—%</div><div class="kpi-sub" id="v-inMilkCount">— رأس</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-dim" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">متوسط DIM</div><div class="kpi-value" id="v-dim">—</div><div class="kpi-sub">أيام الحليب</div></div></div>
+    </div>
+  </div>
 
-  if(!box||!tEl||!hEl||!thiEl||!sEl||!thiArc||!thiNeedle||!btnRefresh||!btnPin||!segFarm||!segGPS) return;
+  <!-- مؤشرات القطيع: الاستبعاد -->
+  <div class="card section" id="sec-cull">
+    <div class="title">🚪 مؤشرات الاستبعاد</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-cull-prod" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">استبعاد إنتاجي</div><div class="kpi-value" id="v-cull-prod">—%</div><div class="kpi-sub">من إجمالي الاستبعادات</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-cull-repro" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">استبعاد تناسلي</div><div class="kpi-value" id="v-cull-repro">—%</div><div class="kpi-sub">من إجمالي الاستبعادات</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-cull-health" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">استبعاد صحي</div><div class="kpi-value" id="v-cull-health">—%</div><div class="kpi-sub">من إجمالي الاستبعادات</div></div></div>
+    </div>
+  </div>
 
-  const DEF = { lat:30.0444, lon:31.2357, place:'القاهرة' };               // افتراضي
-  const LS_PIN   = 'mbk_farm';                                              // تثبيت يدوي (GPS)
-  const LS_WX    = 'mbk_wx_cache';                                          // كاش طقس
-  const LS_REG   = 'mbk_reg_geo';                                           // كاش جيوكود لبيانات التسجيل
+  <!-- مؤشرات القطيع: التغذية -->
+  <div class="card section" id="sec-nutri">
+    <div class="title">🥗 مؤشرات كفاءة التغذية</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-fce" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">تحويل العلف → لبن</div><div class="kpi-value" id="v-fce">—</div><div class="kpi-sub">كجم لبن/كجم مادة جافة</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-dmi" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">المادة الجافة المأكولة</div><div class="kpi-value" id="v-dmi">—%</div><div class="kpi-sub">% من وزن الجسم</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-iofc" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">صافي دخل اللبن (IOFC)</div><div class="kpi-value" id="v-iofc">—</div><div class="kpi-sub">(سعر×إنتاج)−تكلفة التغذية</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-feces" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">تقييم الروث</div><div class="kpi-value" id="v-feces">—</div><div class="kpi-sub">متوسط آخر أسبوع</div></div></div>
+      <div class="kpi"><div class="kpi-ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle id="r-bcs" class="fg" cx="22" cy="22" r="18"/></svg></div><div><div class="kpi-title">BCS بالكاميرا</div><div class="kpi-value" id="v-bcs">—</div><div class="kpi-sub">متوسط آخر قياس</div></div></div>
+    </div>
+  </div>
 
-  let mode = 'reg';   // reg(المسجّل) | gps(موقعي)
-  let pinned = null;  // {lat,lon,place} لو المستخدم عمل "ثبّت"
+  <!-- الطقس (كما هو) -->
+  <script>
+    (function(){
+      const box=document.getElementById('weatherClassic');
+      const tEl=wxTemp, hEl=wxHum, thiEl=wxTHI, sEl=wxState, thiArc=document.getElementById('thiArc'), thiNeedle=document.getElementById('thiNeedle');
+      const btnRefresh=wxRefresh, btnPin=wxPin, segFarm=segFarm, segGPS=segGPS;
+      if(!box) return;
+      const DEF={lat:30.0444,lon:31.2357,place:'القاهرة'};
+      const LS_PIN='mbk_farm', LS_WX='mbk_wx_cache', LS_REG='mbk_reg_geo';
+      let mode='reg', pinned=null;
 
-  // ===== THI و الألوان =====
-  function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
-  function bands(){ return {t1:66,t2:70,t3:77,t4:82}; }
-  function colorAndText(thi,b){
-    if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
-    if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
-    if(thi<b.t3) return {bg:'#ffe0b2',txt:'اجهاد متوسط'};
-    if(thi<b.t4) return {bg:'#ffccbc',txt:'اجهاد شديد'};
-    return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
-  }
-  function drawTHI(thi){
-    thiArc.style.background =
-      'conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)';
-    const ang=-120+((thi-50)/40)*240;
-    thiNeedle.style.setProperty('--angle',ang+'deg');
-    const {bg,txt}=colorAndText(thi,bands());
-    box.style.background = bg; sEl.textContent = txt;
-  }
-
-  // ===== Helpers التخزين المحلي =====
-  const readJSON=(k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch{ return null; } };
-  const writeJSON=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
-
-  // ===== مصدر "المسجّل": من window.__TENANT__ =====
-  function readTenantAddress(){
-    const T = window.__TENANT__ || {};
-    const country = T.country || T.countryCode || T.address?.country || T.profile?.country;
-    const region  = T.region  || T.state  || T.governorate || T.address?.region || T.profile?.region;
-    const city    = T.city    || T.town   || T.address?.city || T.profile?.city;
-    return { country, region, city };
-  }
-  function regKey(addr){
-    const parts = [addr.city, addr.region, addr.country].filter(Boolean).join('|').toLowerCase();
-    return parts || 'default';
-  }
-  async function geocodeFromRegistration(){
-    const addr = readTenantAddress();
-    if(!addr.country && !addr.region && !addr.city) return null;
-
-    const key = regKey(addr);
-    const cached = readJSON(LS_REG);
-    if(cached && cached.key===key && cached.lat && cached.lon) return cached;
-
-    // نبني نص بحث معقول
-    const q = encodeURIComponent([addr.city, addr.region, addr.country].filter(Boolean).join(', '));
-    try{
-      // Geocoding من Open-Meteo (بدون مفاتيح)
-      const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
-      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=ar`, ctl);
-      const j = await r.json();
-      const item = j?.results?.[0];
-      if(item){
-        const place = [item.name, item.admin1, item.country].filter(Boolean).join('، ');
-        const res = { lat:item.latitude, lon:item.longitude, place, key };
-        writeJSON(LS_REG, res);
-        return res;
+      function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))*10)/10; }
+      // حساسية أبسط للجاموس: نحرك حدود الإنذار درجتين لأسفل
+      function bandsFor(species){ const base={t1:66,t2:70,t3:77,t4:82}; if(species==='buffalo') return {t1:64,t2:68,t3:75,t4:80}; return base; }
+      // species الحالي من الفلتر
+      function currentSpecies(){ const a=document.querySelector('#speciesFilter .filter-btn.active'); return a?.dataset?.species||'all'; }
+      function colorAndText(thi,s){
+        const b=bandsFor(s);
+        if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
+        if(thi<b.t2) return {bg:'#fff9c4',txt:'إجهاد خفيف'};
+        if(thi<b.t3) return {bg:'#ffe0b2',txt:'إجهاد متوسط'};
+        if(thi<b.t4) return {bg:'#ffccbc',txt:'إجهاد شديد'};
+        return {bg:'#ffcdd2',txt:'إجهاد شديد جدًا'};
       }
-    }catch(e){}
-    return null;
-  }
+      function drawTHI(thi){
+        thiArc.style.background='conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)';
+        const ang=-120+((thi-50)/40)*240; thiNeedle.style.setProperty('--angle',ang+'deg');
+        const {bg,txt}=colorAndText(thi,currentSpecies()); box.style.background=bg; sEl.textContent=txt;
+      }
+      const readJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}};
+      const writeJSON=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+      function readTenantAddress(){const T=window.__TENANT__||{};return{country:T.country||T.address?.country,region:T.region||T.address?.region,city:T.city||T.address?.city}}
+      function regKey(a){return [a.city,a.region,a.country].filter(Boolean).join('|').toLowerCase()||'default'}
+      async function geocodeFromRegistration(){const addr=readTenantAddress();if(!addr.country&&!addr.region&&!addr.city) return null; const key=regKey(addr); const c=readJSON(LS_REG); if(c&&c.key===key&&c.lat&&c.lon) return c; try{const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent([addr.city,addr.region,addr.country].filter(Boolean).join(', '))}&count=1&language=ar`); const j=await r.json(); const it=j?.results?.[0]; if(it){const res={lat:it.latitude,lon:it.longitude,place:[it.name,it.admin1,it.country].filter(Boolean).join('، '),key}; writeJSON(LS_REG,res); return res}}catch{} return null}
+      function getPinned(){return readJSON(LS_PIN)}
+      function savePinned(lat,lon,place){writeJSON(LS_PIN,{lat,lon,place:place||'مزرعتي'})}
+      function getGPS(){return new Promise(res=>{if(!navigator.geolocation) return res(null); navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude,place:'موقعي'}),_=>res(null),{enableHighAccuracy:true,timeout:5000})})}
+      async function pickCoords(){ if(pinned) return pinned; if(mode==='gps'){const g=await getGPS(); if(g) return g} const reg=await geocodeFromRegistration(); if(reg) return reg; return DEF }
+      function wxGetCached(){const x=readJSON(LS_WX); if(x&&Date.now()-x.ts<60000) return x.data; return null}
+      function wxSetCached(d){writeJSON(LS_WX,{ts:Date.now(),data:d})}
+      async function fetchWeather(lat,lon){const cached=wxGetCached(); if(cached&&typeof cached.t==='number'&&typeof cached.h==='number') return cached; try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,{cache:'no-store'}); const j=await r.json(); const d={t:j.current?.temperature_2m,h:j.current?.relative_humidity_2m}; if(typeof d.t==='number'&&typeof d.h==='number') wxSetCached(d); return d}catch{return null}}
+      function activate(w){segFarm.classList.toggle('active',w==='reg'); segGPS.classList.toggle('active',w==='gps')}
+      async function render(){const c=await pickCoords(); const d=await fetchWeather(c.lat,c.lon); if(!d){wxTemp.textContent='—°C'; wxHum.textContent='—%'; wxTHI.textContent='—'; wxState.textContent='—'; return} const t=Math.round(d.t), h=Math.round(d.h), thi=THI(t,h); wxTemp.textContent=`${t}°C`; wxHum.textContent=`${h}%`; wxTHI.textContent=thi; drawTHI(thi)}
+      async function boot(){pinned=getPinned()||null; mode='reg'; activate('reg'); segFarm.addEventListener('click',()=>{mode='reg';activate('reg');render()}); segGPS.addEventListener('click',()=>{mode='gps';activate('gps');render()}); wxRefresh.addEventListener('click',render); wxPin.addEventListener('click',async()=>{mode='gps';const g=await getGPS(); if(g){savePinned(g.lat,g.lon,g.place); pinned=g} mode='reg';activate('reg');render()}); render()}
+      document.addEventListener('DOMContentLoaded', boot);
+      // تحديث حالة النص عند تغيير النوع
+      document.getElementById('speciesFilter').addEventListener('click', (e)=>{ if(e.target.classList.contains('filter-btn')) render(); });
+    })();
+  </script>
 
-  // ===== اختيار الإحداثيات =====
-  function getPinned(){ return readJSON(LS_PIN); }
-  function savePinned(lat,lon,place){ writeJSON(LS_PIN, {lat,lon,place:place||'مزرعتي'}); }
-
-  function getGPS(){
-    return new Promise((resolve)=>{
-      if(!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        p => resolve({ lat:p.coords.latitude, lon:p.coords.longitude, place:'موقعي' }),
-        _ => resolve(null),
-        { enableHighAccuracy:true, timeout:5000 }
-      );
-    });
-  }
-
-  async function pickCoords(){
-    // أولوية: لو المستخدم عامل تثبيت يدوي
-    if(pinned) return pinned;
-
-    if(mode==='gps'){
-      const g = await getGPS();
-      if(g) return g;
+  <!-- نواة المؤشرات عبر /api/herd-stats -->
+  <script>
+    // ============= إعدادات عامة =============
+    const ringLen = 113.097;
+    const $ = (s)=>document.querySelector(s);
+    const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+    function setRing(id, pct, palette='up'){
+      const el = document.getElementById(id); if(!el) return;
+      const p = isFinite(pct)? clamp(pct,0,100) : 0;
+      el.style.strokeDashoffset = (ringLen*(1-p/100)).toFixed(2);
+      let c = '#2e7d32';
+      if(palette==='down'){ // الأقل أفضل
+        if(p<=80) c='#2e7d32'; else if(p<=120) c='#fdd835'; else if(p<=150) c='#ef6c00'; else c='#c62828';
+      }else{ // الأعلى أفضل
+        if(p>=80) c='#2e7d32'; else if(p>=60) c='#7cb342'; else if(p>=40) c='#fdd835'; else if(p>=20) c='#ef6c00'; else c='#c62828';
+      }
+      el.style.stroke = c;
     }
+    function setText(sel,val,suffix=''){const el=$(sel); if(!el) return; el.textContent=(val==null||val==='')?'—':(val+suffix)}
 
-    // موقع التسجيل
-    const reg = await geocodeFromRegistration();
-    if(reg) return reg;
-
-    // افتراضي
-    return DEF;
-  }
-
-  // ===== جلب الطقس + كاش دقيقة =====
-  function wxGetCached(){
-    const x = readJSON(LS_WX);
-    if(x && Date.now()-x.ts < 60_000) return x.data;
-    return null;
-  }
-  function wxSetCached(data){ writeJSON(LS_WX, {ts:Date.now(), data}); }
-
-  async function fetchWeather(lat, lon){
-    const cached = wxGetCached();
-    if(cached && typeof cached.t==='number' && typeof cached.h==='number') return cached;
-    try{
-      const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
-      const r = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
-        { cache:'no-store', ...ctl }
-      );
-      const j=await r.json();
-      const data = { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
-      if(typeof data.t==='number' && typeof data.h==='number') wxSetCached(data);
-      return data;
-    }catch{ return null; }
-  }
-
-  function activate(which){
-    segFarm.classList.toggle('active', which==='reg');
-    segGPS .classList.toggle('active', which==='gps');
-  }
-
-  async function render(){
-    const c = await pickCoords();
-    const data = await fetchWeather(c.lat, c.lon);
-    if(!data || typeof data.t!=='number' || typeof data.h!=='number'){
-      tEl.textContent='—°C'; hEl.textContent='—%'; thiEl.textContent='—'; sEl.textContent='—'; return;
-    }
-    const t=Math.round(data.t), h=Math.round(data.h), thi=THI(t,h);
-    tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
-  }
-
-  async function boot(){
-    pinned = getPinned() || null;       // لو كان فيه تثبيت قديم
-    mode = 'reg';                       // الوضع الافتراضي: بيانات التسجيل
-    activate('reg');
-
-    segFarm.addEventListener('click', ()=>{ mode='reg'; activate('reg'); render(); });
-    segGPS .addEventListener('click', ()=>{ mode='gps'; activate('gps'); render(); });
-    btnRefresh.addEventListener('click', render);
-
-    btnPin.addEventListener('click', async ()=>{
-      mode='gps';
-      const g = await getGPS();
-      if(g){ savePinned(g.lat, g.lon, g.place); pinned = g; }
-      mode='reg'; activate('reg'); render();
-      (window.dataLayer=window.dataLayer||[]).push({event:'farm_pin_local', source:'gps'});
+    // ============= فلتر النوع =============
+    let species='all';
+    document.querySelectorAll('#speciesFilter .filter-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('#speciesFilter .filter-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        species = btn.dataset.species;
+        pullAndRender();
+      });
     });
 
-    render();
-  }
+    // ============= سحب المؤشرات =============
+    let timer=null;
+    async function pullAndRender(){
+      try{
+        // يُفترض أن tenant-bootstrap يحقن الهوية تلقائيًا (الهيدر X-User-Id)
+        const r = await fetch(`/api/herd-stats?species=${species}`, {cache:'no-store'});
+        const j = await r.json();
 
-  document.addEventListener('DOMContentLoaded', boot);
-})();
-</script>
+        // تناسلي
+        const R = j.repro || {};
+        setText('#v-pregRate21', R.pregnancyRate21, '%');   setRing('r-pregRate21', R.pregnancyRate21);
+        setText('#v-conception', R.conceptionRate, '%');     setRing('r-conception', R.conceptionRate);
+        setText('#v-spc', R.servicesPerConception);          setRing('r-spc', R.servicesPerConception? clamp(100 - (Math.max(1,Math.min(5,Number(R.servicesPerConception)))-1)*20,0,100):0, 'down');
+        setText('#v-openDays', R.avgOpenDays);               setRing('r-openDays', R.avgOpenDays? clamp(150 - Math.min(150,R.avgOpenDays),0,100):0, 'down');
+        setText('#v-ci', R.calvingInterval? (R.calvingInterval+' يوم') : null); setRing('r-ci', R.calvingInterval? clamp(500 - Math.min(500,R.calvingInterval),0,100):0, 'down');
+        setText('#v-abortion', R.abortionRate, '%');         setRing('r-abortion', (R.abortionRate!=null)? (100 - R.abortionRate) : 0, 'down');
+        setText('#v-deadCalv', R.deadCalvingRate, '%');      setRing('r-deadCalv', (R.deadCalvingRate!=null)? (100 - R.deadCalvingRate) : 0, 'down');
+        setText('#v-afc', R.ageFirstCalvingMonths? (R.ageFirstCalvingMonths+' شهر'): null); setRing('r-afc', R.ageFirstCalvingMonths? clamp(36*3 - Math.min(36*3,R.ageFirstCalvingMonths*3),0,100):0, 'down');
 
+        // إنتاجي
+        const P = j.production || {};
+        setText('#v-milkAvg', (P.avgDailyMilk!=null)? P.avgDailyMilk.toFixed?.(1) ?? P.avgDailyMilk : null, ' كجم'); setRing('r-milkAvg', clamp((Number(P.avgDailyMilk)||0)*3,0,100));
+        setText('#v-milkTotal', P.totalDailyMilk, ' كجم');   setRing('r-milkTotal', clamp((Number(P.totalDailyMilk)||0)*0.5,0,100));
+        setText('#v-inMilkPct', P.inMilkPct, '%');           setRing('r-inMilkPct', P.inMilkPct);
+        setText('#v-inMilkCount', P.inMilkCount? (P.inMilkCount+' رأس'): null);
+        setText('#v-dim', P.avgDIM);                         setRing('r-dim', P.avgDIM? clamp(200 - Math.min(200,P.avgDIM),0,100):0, 'down');
+        setText('#v-milkTrend', (P.trendVsYesterdayPct==null)? '—' : (P.trendVsYesterdayPct>0? `↑ ${P.trendVsYesterdayPct}%` : (P.trendVsYesterdayPct<0? `↓ ${Math.abs(P.trendVsYesterdayPct)}%` : 'ثابت 0%')));
 
-  <!-- فحص حالة الحساسات -->
+        // الاستبعاد
+        const C = j.culling || {};
+        setText('#v-cull-prod', C.production, '%'); setRing('r-cull-prod', (C.production??0), 'down');
+        setText('#v-cull-repro', C.reproductive, '%'); setRing('r-cull-repro', (C.reproductive??0), 'down');
+        setText('#v-cull-health', C.health, '%'); setRing('r-cull-health', (C.health??0), 'down');
+
+        // التغذية
+        const N = j.nutrition || {};
+        setText('#v-fce', N.feedToMilkEfficiency); setRing('r-fce', N.feedToMilkEfficiency? clamp(Number(N.feedToMilkEfficiency)*50,0,100):0);
+        setText('#v-dmi', N.dmiPctBW, '%');        setRing('r-dmi', N.dmiPctBW? clamp(Number(N.dmiPctBW)*10,0,100):0);
+        setText('#v-iofc', N.iofc, ' جنيه/رأس');  setRing('r-iofc', N.iofc? clamp(50 + Math.min(50, Number(N.iofc)/10),0,100):0);
+        setText('#v-feces', N.fecesScoreAvg);
+        setText('#v-bcs', N.bcsAvg);
+
+      }catch(e){
+        console.warn('herd-stats fetch error', e);
+      }finally{
+        clearTimeout(timer);
+        timer = setTimeout(pullAndRender, 60000); // تحديث كل دقيقة
+      }
+    }
+
+    // أول تشغيل
+    document.addEventListener('DOMContentLoaded', pullAndRender);
+  </script>
+
+  <!-- أساسياتك المركزية -->
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script type="module" src="/js/app-core.js"></script>
+
+  <!-- فحص حالة الحساسات كما هو -->
   <script>
     (function(){
       const tile=document.getElementById('sensorsTile');
@@ -465,267 +308,12 @@
           const r=await fetch('/api/sensors/health');
           if(!r.ok){ setBadge('غير متصل',false); return; }
           const j=await r.json();
-          const n=Number(j?.devices||0);
-          setBadge(`متصل • ${n}`,true);
+          setBadge(`متصل • ${Number(j?.devices||0)}`,true);
         }catch{ setBadge('غير متصل',false); }
       }
       tile?.addEventListener('click',()=>{ location.href='sensor-test.html'; });
       document.addEventListener('DOMContentLoaded',()=>{ ping(); setInterval(ping,60000); });
     })();
   </script>
-  <!-- لازم يكون موجود -->
-<script src="/js/tenant-bootstrap.js"></script>
-<script type="module" src="/js/app-core.js"></script>
-<script>
-  (function(){
-    const t = document.getElementById('groupsTile');
-    if(!t) return;
-    t.addEventListener('keydown', (e)=>{
-      if(e.key === 'Enter' || e.key === ' '){
-        e.preventDefault();
-        t.click();
-      }
-    });
-  })();
-</script>
-
-<script type="module" id="herd-gauges-fs">
-import { db } from '/js/firebase-config.js';
-import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-const $ = s => document.querySelector(s);
-
-// ---------- Helpers ----------
-  const norm = s => String(s||'')
-    
-  .toLowerCase()
-  .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
-  .trim();
-
-const toDate = v => {
-  if(!v) return null;
-  if(typeof v==='string') return new Date(v);
-  if(v instanceof Date) return v;
-  if(typeof v==='object' && typeof v.seconds==='number') return new Date(v.seconds*1000);
-  return null;
-};
-  const isInMilk = an => {
-  if (isDry(an)) return false;                    // الجاف ليس في الحلاب
-  if (an.inMilk === true) return true;            // علم صريح
-  const st = norm(
-    an.productionStatus ||
-    an.lactationStatus ||
-    an.status ||
-    an['الحالة_اللبنية'] || ''
-  );
-  // كلمات مفتاحية للحلاب
-  return /(حلاب|في الحلاب|محلب|منتج|حليب|milk|milking|lact)/.test(st);
-};
-
-const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
-const getDIM = an => {
-  const calv = toDate(an.calvingDate || an.lastCalvingDate || an.calvedAt || an['تاريخ_الولادة']);
-  return calv ? Math.max(0, daysBetween(new Date(), calv)) : 0;
-};
-const isDry = an => {
-  const st = norm(
-    an.productionStatus ||      // ← مهم: "جاف" عندك هنا
-    an.lactationStatus ||
-    an.status ||
-    an['الحالة_اللبنية'] ||
-    an['حالة_الإنتاج'] ||
-    ''
-  );
-  const dryBool = an.dry === true || an.isDry === true || an.dryCow === true || an['جاف'] === true;
-  return dryBool || an.inMilk === false || /(dry|dryoff|dry-off|جاف|جافه|جافة)/.test(st);
-};
-
-
-const isPreg = an => {
-  const rs = String(an.reproductiveStatus || an.pregStatus || an['الحالة_التناسلية'] || '').toLowerCase();
-  return an.pregnant===true || rs.includes('preg') || rs.includes('عشار');
-};
-const isFresh = an => {
-  const d = getDIM(an);
-  const lactNo = Number(an.lactationNumber ?? an.lactNo ?? an.lactNum ?? an['رقم_الحلاب'] ?? 0);
-  return d>=1 && d<=45 && !isDry(an) && lactNo>0;
-};
-
-
-
-function calc(animals){
-  const total = animals.length;
-  let inMilk=0, fresh=0, dry=0, preg=0, open=0, sumDimOpen=0;
-
-  for(const an of animals){
-    const dryF  = isDry(an);
-    const milkF = isInMilk(an);
-
-    if (milkF){ inMilk++; if(isFresh(an)) fresh++; }
-    if (dryF){ dry++; }
-
-    if (isPreg(an)) preg++;
-    else if (milkF){ open++; sumDimOpen += getDIM(an); }
-  }
-
-  const inMilkPct = total? Math.round(inMilk/total*100) : 0;
-  const pregRate  = total? Math.round(preg/total*100)  : 0;
-  const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
-  const dryShare  = total? Math.round(dry/total*100)   : 0;
-  const openDim   = open? Math.round(sumDimOpen/open)  : 0;
-  return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare, open, openDim };
-}
-
-
-// احذف arcPath(...) القديمة
-
-// محيط الحلقة لِـ r=18 => 2πr ≈ 113.097
-const RING_LEN = 113.097;
-
-// لون دلالي بسيط (تقديري) حسب النسبة
-function colorFor(key, pct){
-  // حدود إرشادية عامة
-  if(key==='dryShare'){ // الأقل أفضل عادة
-    if(pct <= 18) return '#2e7d32';
-    if(pct <= 25) return '#fdd835';
-    return '#ef6c00';
-  }
-  // الافتراضي: الأعلى أفضل
-  if(pct >= 80) return '#2e7d32';
-  if(pct >= 60) return '#7cb342';
-  if(pct >= 40) return '#fdd835';
-  if(pct >= 20) return '#ef6c00';
-  return '#c2185b';
-}
-
-function setRing(idSuffix, pct, key){
-  const el = document.getElementById('r-'+idSuffix);
-  if(!el) return;
-  const p = Math.max(0, Math.min(100, Number(pct)||0));
- const off = RING_LEN * (1 - p/100);
-
-
-  // الأفضل والأوضح عبر CSSOM + متوافق مع سفاري/فايرفوكس
-  el.style.setProperty('stroke-dashoffset', off.toFixed(2));
-  el.style.stroke = colorFor(key || idSuffix, p);
-}
-
-function renderGauges(k){
-  // التاريخ
-  const d = document.getElementById('g-date');
-  if(d) d.textContent = new Date().toISOString().slice(0,10);
-
-  // في الحلاب
-  setRing('inmilk', k.inMilkPct, 'inMilkPct');
-  const vIn = document.getElementById('v-inmilk');
-  if(vIn) vIn.textContent = k.inMilkPct + '%';
-
-  // نسبة العشار
-  setRing('preg', k.pregRate, 'pregRate');
-  const vPr = document.getElementById('v-preg');
-  if(vPr) vPr.textContent = k.pregRate + '%';
-
-  // حديث الولادة (من الحلاب)
-  setRing('fresh', k.freshShare, 'freshShare');
-  const vFr = document.getElementById('v-fresh');
-  if(vFr) vFr.textContent = k.freshShare + '%';
-
-  // جاف %
-  setRing('dry', k.dryShare, 'dryShare');
-  const vDr = document.getElementById('v-dry');
-  if(vDr) vDr.textContent = k.dryShare + '%';
-
-  // مستقبلًا (صفر الآن)
-  setRing('service', 0, 'serviceRate');
-  const vSr = document.getElementById('v-service');
-  if(vSr) vSr.textContent = '—%';
-
-  setRing('conception', 0, 'conceptionRate');
-  const vCo = document.getElementById('v-conception');
-  if(vCo) vCo.textContent = '—%';
-}
-
-
-function dedupe(list){
-  const map = new Map();
-  for(const an of list){
-    const key = an.animalNumber ?? an.number ?? an.id ?? an.uid ?? an.tag;
-    if(!map.has(key)) map.set(key, an);
-  }
-  return [...map.values()];
-}
-
-(function startLive(){
-  const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
-  if(!userId){ console.warn('MBK KPIs: لا يوجد userId'); return; }
-
-  // ✅ تعريف المصفوفتين قبل الاستخدام
-  let aSub = [], bSub = [];
-
-  // ✅ دالة القيم التجريبية (fallback) متاحة قبل استخدامها
-  const paintDemoOnError = ()=> renderGauges({ inMilkPct:70, pregRate:70, freshShare:14, dryShare:30 });
-
-  // عدّاد وصول بيانات فعلي
-  let updates = 0;
-
-  const recompute = ()=>{
-    const animals = dedupe([...aSub, ...bSub]);
-    const k = calc(animals);
-    updates++;
-    renderGauges(k);
-    (window.dataLayer=window.dataLayer||[]).push({event:'kpi_render', inMilkPct:k.inMilkPct, pregRate:k.pregRate});
-    try{ localStorage.setItem('animals_cache', JSON.stringify(animals)); }catch{}
-  };
-
-
-  try{
-    const col = collection(db, 'users', userId, 'animals');
-  onSnapshot(col, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-  err=> { console.warn('users/{uid}/animals snapshot error', err); paintDemoOnError(); });
-  }catch(e){ console.warn('users/{uid}/animals not available', e); }
-
-  try{
-    const q = query(collection(db, 'animals'), where('userId','==', userId));
-  onSnapshot(q, snap=>{ bSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); },
-  err=> { console.warn('animals where userId==uid snapshot error', err); paintDemoOnError(); });
-  }catch(e){ console.warn('animals top-level query not available', e); }
-    // ✅ لو مفيش داتا خلال 1200ms: استخدم الكاش أو قيم توضيحية
-  setTimeout(()=>{
-    if (updates === 0) {
-      try{
-        const cached = JSON.parse(localStorage.getItem('animals_cache') || '[]');
-        if (cached.length){ renderGauges(calc(cached)); return; }
-      }catch{}
-      paintDemoOnError();
-    }
-  }, 1200);
-
-})();
-</script>
-
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.kpi').forEach(el => {
-      el.title = el.dataset.hint || '';
-    });
-  });
-</script>
-<script type="module" src="/js/smart-alerts.js"></script>
-
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
