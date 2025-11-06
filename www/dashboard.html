@@ -175,8 +175,7 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     </div>
     <div class="tile" onclick="location.href='milk-reports.html'"><span class="icon">📊</span>تقارير اللبن</div>
     <div class="tile" id="sensorsTile" role="button" tabindex="0">
-      <span class="icon">🛰️</span> الأجهزة والحساسات
-      <span class="badge" id="sensorsStatus">جارٍ الفحص…</span>
+      <span class="badge" id="sensorsStatus">جارٍ الفحص…</span> 🛰️ الأجهزة والحساسات
     </div>
     <div class="tile" id="nutritionEvalTile" role="button" tabindex="0" onclick="location.href='nutrition-eval.html'">
       تقييم التغذية
@@ -277,77 +276,13 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     </div>
   </div>
 
-  <!-- تبويب نوع القطيع -->
-  <div class="card">
-    <div class="herd-type">
-      <b>نوع القطيع:</b>
-      <button class="opt" data-spec="cow" id="opt-cow">أبقار</button>
-      <button class="opt" data-spec="buffalo" id="opt-buffalo">جاموس</button>
-      <span class="badge" id="spec-note" style="margin-inline-start:auto">—</span>
-    </div>
-  </div>
-
-  <!-- تبويبات: إنتاج / تناسل / استبعاد / تغذية -->
-  <div class="card" id="tabsCard">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="prod">إنتاج</button>
-      <button class="tab-btn" data-tab="repro">تناسل</button>
-      <button class="tab-btn" data-tab="cull">استبعاد</button>
-      <button class="tab-btn" data-tab="nut">تغذية</button>
-    </div>
-
-    <!-- إنتاج -->
-    <div class="tab-content active" id="tab-prod">
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-title">متوسط الإنتاج اليومي</div><div id="k-avgMilk" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">إجمالي إنتاج اليوم</div><div id="k-sumMilk" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">عدد الحلاب</div><div id="k-inMilkNum" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">متوسط DIM</div><div id="k-avgDIM" class="kpi-value">—</div></div>
-      </div>
-    </div>
-
-    <!-- تناسل -->
-    <div class="tab-content" id="tab-repro">
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-title">متوسط الأيام المفتوحة</div><div id="k-openDays" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">الفاصل بين ولادتين (يوم)</div><div id="k-ci" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">Conception Rate</div><div id="k-cr" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">Pregnancy Rate (21d)</div><div id="k-pr" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">S/C</div><div id="k-sc" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">Abortion %</div><div id="k-ar" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">Dead Calving %</div><div id="k-dcr" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">العمر عند أول ولادة (شهر)</div><div id="k-afc" class="kpi-value">—</div></div>
-      </div>
-    </div>
-
-    <!-- استبعاد -->
-    <div class="tab-content" id="tab-cull">
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-title">استبعاد إنتاجي</div><div id="k-culProd" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">استبعاد تناسلي</div><div id="k-culRep" class="kpi-value">—%</div></div>
-        <div class="kpi"><div class="kpi-title">استبعاد صحي</div><div id="k-culHealth" class="kpi-value">—%</div></div>
-      </div>
-    </div>
-
-    <!-- تغذية -->
-    <div class="tab-content" id="tab-nut">
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-title">Feed Efficiency</div><div id="k-fe" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">DMI (كجم/رأس)</div><div id="k-dmi" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">IOFC (يومي/رأس)</div><div id="k-iofc" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">BCS (متوسط)</div><div id="k-bcs" class="kpi-value">—</div></div>
-        <div class="kpi"><div class="kpi-title">Feces Score (متوسط)</div><div id="k-feces" class="kpi-value">—</div></div>
-      </div>
-    </div>
-  </div>
-
   <!-- ====== السكربتات الأساسية ====== -->
   <script src="/js/tenant-bootstrap.js"></script>
   <script type="module" src="/js/api.js"></script>
   <script type="module" src="/js/app-core.js"></script>
 
   <!-- ويدجت الطقس + THI الاحترافي (كما هو) -->
-  <script id="wx-reg">
+  <script>
   (function(){
     const box = document.getElementById('weatherClassic');
     const tEl = document.getElementById('wxTemp');
@@ -360,22 +295,15 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     const btnPin = document.getElementById('wxPin');
     const segFarm = document.getElementById('segFarm');
     const segGPS  = document.getElementById('segGPS');
-    if(!box||!tEl||!hEl||!thiEl||!sEl||!thiArc||!thiNeedle||!btnRefresh||!btnPin||!segFarm||!segGPS) return;
+    if(!box||!tEl||!hEl||!thiEl||!sEl||!btnRefresh||!btnPin||!segFarm||!segGPS) return;
 
     const DEF = { lat:30.0444, lon:31.2357, place:'القاهرة' };
     const LS_PIN='mbk_farm', LS_WX='mbk_wx_cache', LS_REG='mbk_reg_geo', LS_SPEC='mbk.herd.species';
     let mode='reg', pinned=null;
 
     const getSpec = ()=> (localStorage.getItem(LS_SPEC) || 'cow');
-
     function THI(c,rh){ const f=c*9/5+32; return Math.round(((f-(0.55-0.0055*rh)*(f-58)))); }
-    function bands(){
-      const spec = getSpec();
-      if(spec==='buffalo'){
-        return {t1:64,t2:68,t3:74,t4:79};
-      }
-      return {t1:66,t2:70,t3:77,t4:82};
-    }
+    function bands(){ return getSpec()==='buffalo'? {t1:64,t2:68,t3:74,t4:79} : {t1:66,t2:70,t3:77,t4:82}; }
     function colorAndText(thi,b){
       if(thi<b.t1) return {bg:'#c8e6c9',txt:'مريح'};
       if(thi<b.t2) return {bg:'#fff9c4',txt:'اجهاد خفيف'};
@@ -384,17 +312,14 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       return {bg:'#ffcdd2',txt:'اجهاد شديد جدا'};
     }
     function drawTHI(thi){
-      thiArc.style.background =
-        'conic-gradient(from -120deg,#90caf9 0% 25%,#fff59d 25% 50%,#ffcc80 50% 75%,#ef5350 75% 100%)';
       const ang=-120+((thi-50)/40)*240;
-      thiNeedle.style.setProperty('--angle',ang+'deg');
+      thiEl.textContent=thi;
+      if(thiNeedle) thiNeedle.style.setProperty('--angle',ang+'deg');
       const {bg,txt}=colorAndText(thi,bands());
-      const specName = (getSpec()==='buffalo'?'(جاموس)':'(أبقار)');
-      box.style.background = bg; sEl.textContent = txt + ' ' + specName;
+      box.style.background = bg; sEl.textContent = txt + (getSpec()==='buffalo'?' (جاموس)':' (أبقار)');
     }
     const readJSON=(k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch{ return null; } };
     const writeJSON=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
-
     function readTenantAddress(){
       const T = window.__TENANT__ || {};
       const country = T.country || T.countryCode || T.address?.country || T.profile?.country;
@@ -402,175 +327,65 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
       const city    = T.city    || T.town   || T.address?.city || T.profile?.city;
       return { country, region, city };
     }
-    function regKey(addr){
-      const parts = [addr.city, addr.region, addr.country].filter(Boolean).join('|').toLowerCase();
-      return parts || 'default';
-    }
+    function regKey(addr){ const parts = [addr.city, addr.region, addr.country].filter(Boolean).join('|').toLowerCase(); return parts || 'default'; }
     async function geocodeFromRegistration(){
-      const addr = readTenantAddress();
-      if(!addr.country && !addr.region && !addr.city) return null;
-      const key = regKey(addr);
-      const cached = readJSON(LS_REG);
-      if(cached && cached.key===key && cached.lat && cached.lon) return cached;
-      const q = encodeURIComponent([addr.city, addr.region, addr.country].filter(Boolean).join(', '));
+      const addr = readTenantAddress(); if(!addr.country && !addr.region && !addr.city) return null;
+      const key = regKey(addr); const cached = readJSON(LS_REG); if(cached && cached.key===key && cached.lat && cached.lon) return cached;
       try{
-        const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
-        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=ar`, ctl);
-        const j = await r.json();
-        const item = j?.results?.[0];
-        if(item){
-          const place = [item.name, item.admin1, item.country].filter(Boolean).join('، ');
-          const res = { lat:item.latitude, lon:item.longitude, place, key };
-          writeJSON(LS_REG, res); return res;
-        }
+        const q = encodeURIComponent([addr.city, addr.region, addr.country].filter(Boolean).join(', '));
+        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=ar`);
+        const j = await r.json(); const item = j?.results?.[0];
+        if(item){ const place = [item.name, item.admin1, item.country].filter(Boolean).join('، ');
+          const res = { lat:item.latitude, lon:item.longitude, place, key }; writeJSON(LS_REG, res); return res; }
       }catch(e){}
       return null;
     }
     function getPinned(){ return readJSON(LS_PIN); }
     function savePinned(lat,lon,place){ writeJSON(LS_PIN, {lat,lon,place:place||'مزرعتي'}); }
-
-    function getGPS(){
-      return new Promise((resolve)=>{
-        if(!navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-          p => resolve({ lat:p.coords.latitude, lon:p.coords.longitude, place:'موقعي' }),
-          _ => resolve(null),
-          { enableHighAccuracy:true, timeout:5000 }
-        );
-      });
-    }
-    async function pickCoords(){
-      if(pinned) return pinned;
-      if(mode==='gps'){ const g = await getGPS(); if(g) return g; }
-      const reg = await geocodeFromRegistration(); if(reg) return reg;
-      return DEF;
-    }
+    function getGPS(){ return new Promise((resolve)=>{ if(!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lon:p.coords.longitude,place:'موقعي'}), _=>resolve(null), {enableHighAccuracy:true, timeout:5000}); }); }
+    async function pickCoords(){ if(pinned) return pinned; if(mode==='gps'){ const g = await getGPS(); if(g) return g; }
+      const reg = await geocodeFromRegistration(); if(reg) return reg; return DEF; }
     function wxGetCached(){ const x = readJSON(LS_WX); if(x && Date.now()-x.ts < 60_000) return x.data; return null; }
     function wxSetCached(data){ writeJSON(LS_WX, {ts:Date.now(), data}); }
     async function fetchWeather(lat, lon){
-      const cached = wxGetCached();
-      if(cached && typeof cached.t==='number' && typeof cached.h==='number') return cached;
+      const cached = wxGetCached(); if(cached && typeof cached.t==='number' && typeof cached.h==='number') return cached;
       try{
-        const ctl = AbortSignal.timeout ? { signal:AbortSignal.timeout(6000) } : {};
-        const r = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
-          { cache:'no-store', ...ctl }
-        );
-        const j=await r.json();
-        const data = { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
-        if(typeof data.t==='number' && typeof data.h==='number') wxSetCached(data);
-        return data;
+        const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`, {cache:'no-store'});
+        const j=await r.json(); const data = { t:j.current?.temperature_2m, h:j.current?.relative_humidity_2m };
+        if(typeof data.t==='number' && typeof data.h==='number') wxSetCached(data); return data;
       }catch{ return null; }
     }
-    function activate(which){
-      segFarm.classList.toggle('active', which==='reg');
-      segGPS .classList.toggle('active', which==='gps');
-    }
+    function activate(which){ segFarm.classList.toggle('active', which==='reg'); segGPS.classList.toggle('active', which==='gps'); }
     async function render(){
-      const c = await pickCoords();
-      const data = await fetchWeather(c.lat, c.lon);
-      if(!data || typeof data.t!=='number' || typeof data.h!=='number'){
-        tEl.textContent='—°C'; hEl.textContent='—%'; thiEl.textContent='—'; sEl.textContent='—'; return;
-      }
-      const t=Math.round(data.t), h=Math.round(data.h), thi=THI(t,h);
-      tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`; thiEl.textContent=thi; drawTHI(thi);
+      const c = await pickCoords(); const data = await fetchWeather(c.lat, c.lon);
+      if(!data){ tEl.textContent='—°C'; hEl.textContent='—%'; thiEl.textContent='—'; sEl.textContent='—'; return; }
+      const t=Math.round(data.t), h=Math.round(data.h); tEl.textContent=`${t}°C`; hEl.textContent=`${h}%`;
+      drawTHI( THI(t,h) );
     }
     async function boot(){
-      pinned = getPinned() || null;
-      mode = 'reg'; activate('reg');
+      pinned = getPinned() || null; mode = 'reg'; activate('reg');
       segFarm.addEventListener('click', ()=>{ mode='reg'; activate('reg'); render(); });
       segGPS .addEventListener('click', ()=>{ mode='gps'; activate('gps'); render(); });
       btnRefresh.addEventListener('click', render);
       btnPin.addEventListener('click', async ()=>{ mode='gps'; const g = await getGPS(); if(g){ savePinned(g.lat,g.lon,g.place); pinned=g; } mode='reg'; activate('reg'); render(); });
-
       window.addEventListener('storage', (e)=>{ if(e.key===LS_SPEC) render(); });
       document.addEventListener('mbk:spec-changed', render);
-
       render();
     }
     document.addEventListener('DOMContentLoaded', boot);
   })();
   </script>
 
-  <!-- فحص حالة الحساسات -->
-  <script>
-    (function(){
-      const tile=document.getElementById('sensorsTile');
-      const badge=document.getElementById('sensorsStatus');
-      function setBadge(txt,ok){ if(!badge) return; badge.textContent=txt; badge.style.background=ok?'#e8f5e9':'#fff8e1'; badge.style.borderColor=ok?'#c5e1a5':'#ffecb3'; }
-      async function ping(){
-        try{
-          setBadge('جارٍ الاتصال…',false);
-          const r=await fetch('/api/sensors/health');
-          if(!r.ok){ setBadge('غير متصل',false); return; }
-          const j=await r.json();
-          const n=Number(j?.devices||0);
-          setBadge(`متصل • ${n}`,true);
-        }catch{ setBadge('غير متصل',false); }
-      }
-      tile?.addEventListener('click',()=>{ location.href='sensor-test.html'; });
-      document.addEventListener('DOMContentLoaded',()=>{ ping(); setInterval(ping,60000); });
-    })();
-  </script>
-
-  <!-- عدادات الإبرة: دوال عامة (بدون اعتماد على /api/herd-stats) -->
-  <script>
-    (function(){
-      function gaugeDesc(v){ if(v<40) return 'ضعيف'; if(v<70) return 'متوسط'; return 'ممتاز'; }
-      function buildGauge(canvasId, value){
-        return new RadialGauge({
-          renderTo: canvasId,
-          width: 140, height: 140,
-          minValue: 0, maxValue: 100, units: "%",
-          majorTicks: ["0","20","40","60","80","100"], minorTicks: 2,
-          strokeTicks: true,
-          highlights:[
-            { from:0,  to:40, color:"#d32f2f" },
-            { from:40,to:70, color:"#fbc02d" },
-            { from:70,to:100,color:"#388e3c" }
-          ],
-          needleType:"arrow", needleWidth:2,
-          animationDuration:900, animationRule:"linear",
-          value: value
-        }).draw();
-      }
-      // نجعلها متاحة للـ module
-      window.mbkGauges = {
-        gaugeDesc,
-        buildGauge,
-        updateNeedles(base, reproRates, prod){
-          const fert   = Number(reproRates?.cr||0);           // خصوبة = CR%
-          const health = Number(base?.inMilkPct||0);           // صحة (مؤقتًا: نسبة في الحلاب)
-          const milk   = prod?.avgMilk ? Math.min(100, Math.round(prod.avgMilk)) : 0; // تقريبي
-          const feed   = 70; // Placeholder لحين توصيل Smart Feeding
-
-          buildGauge('gFert',   fert);
-          buildGauge('gHealth', health);
-          buildGauge('gMilk',   milk);
-          buildGauge('gFeed',   feed);
-
-          document.getElementById('vFert').textContent   = fert + '%';
-          document.getElementById('vHealth').textContent = health + '%';
-          document.getElementById('vMilk').textContent   = milk + '%';
-          document.getElementById('vFeed').textContent   = feed + '%';
-
-          document.getElementById('dFert').textContent   = gaugeDesc(fert);
-          document.getElementById('dHealth').textContent = gaugeDesc(health);
-          document.getElementById('dMilk').textContent   = gaugeDesc(milk);
-          document.getElementById('dFeed').textContent   = gaugeDesc(feed);
-        }
-      };
-    })();
-  </script>
-
-  <!-- مؤشرات القطيع + التبويبات (Firestore) -->
-  <script type="module" id="herd-gauges-fs">
+  <!-- ===== KPIs الحلقية + التبويبات (Firestore) كما كانت ===== -->
+  <script type="module" id="herd-kpis">
   import { db } from '/js/firebase-config.js';
   import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
   const $ = s => document.getElementById(s);
   const RING_LEN = 113.097;
 
+  // تبويبات
   document.querySelectorAll('.tab-btn').forEach(b=>{
     b.addEventListener('click', ()=>{
       document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
@@ -581,8 +396,7 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
   });
 
   const norm = s => String(s||'').toLowerCase()
-      .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
-      .trim();
+    .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'').trim();
   const toDate = v => {
     if(!v) return null;
     if(typeof v==='string') return new Date(v);
@@ -617,18 +431,19 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
   const CALV  = ['ولاده','ولادة','calving'];
   const ABORT = ['اجهاض','abortion'];
   const MILK  = ['لبن','milk'];
+  const HEALTH = ['عرج','lameness','mastitis','تهاب','حمى','fever','treat','علاج'];
   const isType = (t, patterns) => patterns.some(p => new RegExp(p,'i').test(String(t||'')));
 
-  const LS_SPEC = 'mbk.herd.species';
+  const LS_SPEC='mbk.herd.species';
+  const specNote = $('spec-note');
   function setSpecUI(spec){
     document.getElementById('opt-cow').classList.toggle('active', spec==='cow');
     document.getElementById('opt-buffalo').classList.toggle('active', spec==='buffalo');
-    document.getElementById('spec-note').textContent = spec==='cow' ? 'معايير: أبقار' : 'معايير: جاموس';
+    specNote.textContent = spec==='cow' ? 'معايير: أبقار' : 'معايير: جاموس';
   }
   function getStoredSpec(){ return localStorage.getItem(LS_SPEC) || null; }
   function setStoredSpec(s){
-    localStorage.setItem(LS_SPEC, s);
-    setSpecUI(s);
+    localStorage.setItem(LS_SPEC, s); setSpecUI(s);
     document.dispatchEvent(new CustomEvent('mbk:spec-changed', {detail:{spec:s}}));
     recompute();
   }
@@ -647,81 +462,64 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
 
   function getBench(spec){
     if(spec==='buffalo'){
-      return {
-        CR:{good:48, warn:38},
-        PR:{good:20, warn:15},
-        OPEN:{good:130, warn:155, lowerBetter:true},
-        CI:{good:410, warn:450, lowerBetter:true},
-        SC:{good:2.2, warn:2.6, lowerBetter:true}
-      };
+      return { CR:{good:48,warn:38}, PR:{good:20,warn:15}, OPEN:{good:130,warn:155,lowerBetter:true}, CI:{good:410,warn:450,lowerBetter:true}, SC:{good:2.2,warn:2.6,lowerBetter:true} };
     }
-    return {
-      CR:{good:55, warn:45},
-      PR:{good:25, warn:18},
-      OPEN:{good:110, warn:130, lowerBetter:true},
-      CI:{good:380, warn:410, lowerBetter:true},
-      SC:{good:2.0, warn:2.4, lowerBetter:true}
-    };
+    return { CR:{good:55,warn:45}, PR:{good:25,warn:18}, OPEN:{good:110,warn:130,lowerBetter:true}, CI:{good:380,warn:410,lowerBetter:true}, SC:{good:2.0,warn:2.4,lowerBetter:true} };
   }
-
   function kpiColor(value, rule){
     if(value==null || isNaN(value)) return '#065f46';
     const v = Number(value);
-    if(rule.lowerBetter){
-      if(v<=rule.good) return '#2e7d32';
-      if(v<=rule.warn) return '#fdd835';
-      return '#ef6c00';
-    }else{
-      if(v>=rule.good) return '#2e7d32';
-      if(v>=rule.warn) return '#fdd835';
-      return '#ef6c00';
-    }
+    if(rule.lowerBetter){ if(v<=rule.good) return '#2e7d32'; if(v<=rule.warn) return '#fdd835'; return '#ef6c00'; }
+    else{ if(v>=rule.good) return '#2e7d32'; if(v>=rule.warn) return '#fdd835'; return '#ef6c00'; }
   }
-
   function setRing(idSuffix, pct, stroke){
-    const el = document.getElementById('r-'+idSuffix);
-    if(!el) return;
+    const el = document.getElementById('r-'+idSuffix); if(!el) return;
     const p = Math.max(0, Math.min(100, Number(pct)||0));
-    const off = 113.097 * (1 - p/100);
-    el.style.setProperty('stroke-dashoffset', off.toFixed(2));
-    el.style.stroke = stroke || '#2e7d32';
+    const off = RING_LEN * (1 - p/100);
+    el.style.setProperty('stroke-dashoffset', off.toFixed(2)); el.style.stroke = stroke || '#2e7d32';
   }
 
   function calcHerdFromAnimals(animals){
     const total = animals.length;
     let inMilk=0, fresh=0, dry=0, preg=0;
-
     for(const an of animals){
       const dryF  = isDry(an);
       const milkF = isInMilk(an);
-
       if (milkF){ inMilk++; const d = getDIM(an); if(d>=1 && d<=45) fresh++; }
       if (dryF){ dry++; }
       if (isPreg(an)) preg++;
     }
-
     const inMilkPct = total? Math.round(inMilk/total*100) : 0;
     const pregRate  = total? Math.round(preg/total*100)  : 0;
     const freshShare= inMilk? Math.round(fresh/inMilk*100) : 0;
     const dryShare  = total? Math.round(dry/total*100)   : 0;
-
-    return { total, inMilk, inMilkPct, preg, pregRate, fresh, freshShare, dry, dryShare };
+    return { total, inMilk, inMilkPct, pregRate, freshShare, dryShare };
   }
 
-  function calcReproFromEvents(animals, events, spec){
+  // إنتاج اليوم وخلافه
+  function calcProduction(animals, events){
+    const milking = animals.filter(isInMilk);
+    const inMilk = milking.length;
+    const today = new Date().toDateString();
+    const milkToday = events.filter(e => isType(e.type, MILK) && toDate(e.eventDate)?.toDateString()===today);
+    const sumMilk = milkToday.reduce((s,e)=> s + (Number(e.amount)||0), 0);
+    const avgMilk = inMilk ? Math.round((sumMilk/inMilk)*10)/10 : 0;
+    const avgDIM  = inMilk ? Math.round(milking.reduce((s,a)=> s+getDIM(a),0)/inMilk) : 0;
+    return { sumMilk, avgMilk, inMilk, avgDIM };
+  }
+
+  // ربط PD+ بتلقيح سابق لحساب CR/PR/SR سريع
+  function calcReproRates(animals, events){
     const now = new Date();
     const d21 = new Date(now.getTime() - 21*86400000);
     const d90 = new Date(now.getTime() - 90*86400000);
-    const d180 = new Date(now.getTime() - 180*86400000);
+    const d180= new Date(now.getTime() -180*86400000);
 
     const eligible = animals.filter(a => isInMilk(a) && !isPreg(a) && getDIM(a) >= 60).length;
+    const servicesLast21 = events.filter(e => isType(e.type, INSEM) && toDate(e.eventDate) >= d21).length;
+    const serviceRate = eligible ? Math.round((servicesLast21/eligible)*100) : 0;
 
-    const servicesLast21 = events.filter(e =>
-      isType(e.type, INSEM) && toDate(e.eventDate) && toDate(e.eventDate) >= d21
-    ).length;
-    const serviceRate = eligible ? Math.round( (servicesLast21 / eligible) * 100 ) : 0;
-
-    const insems90 = events.filter(e=> isType(e.type,INSEM) && toDate(e.eventDate) && toDate(e.eventDate)>=d90);
+    const insems90 = events.filter(e=> isType(e.type,INSEM) && toDate(e.eventDate)>=d90);
     const pdPos90  = events.filter(e=>{
       const d = toDate(e.eventDate);
       const res = String(e.result || e.outcome || e['النتيجة'] || '').toLowerCase();
@@ -731,30 +529,24 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     const insByAnimal = new Map();
     insems90.forEach(e=>{
       const key = e.animalId || e.animalNumber || e.number || e.tag;
-      if(!key) return;
-      const arr = insByAnimal.get(key)||[];
-      arr.push(e);
-      insByAnimal.set(key,arr);
+      if(!key) return; const arr = insByAnimal.get(key)||[]; arr.push(e); insByAnimal.set(key,arr);
     });
 
     let linkedPreg=0;
     pdPos90.forEach(pd=>{
-      const key = pd.animalId || pd.animalNumber || pd.number || pd.tag;
-      if(!key) return;
+      const key = pd.animalId || pd.animalNumber || pd.number || pd.tag; if(!key) return;
       const dPD = toDate(pd.eventDate);
       const list = (insByAnimal.get(key)||[]).filter(x=> toDate(x.eventDate) && toDate(x.eventDate) <= dPD);
-      if(!list.length) return;
-      list.sort((a,b)=> toDate(b.eventDate)-toDate(a.eventDate));
-      const lastIns = list[0];
-      if(dPD - toDate(lastIns.eventDate) <= 300*86400000) linkedPreg++;
+      if(!list.length) return; list.sort((a,b)=> toDate(b.eventDate)-toDate(a.eventDate));
+      const lastIns = list[0]; if(dPD - toDate(lastIns.eventDate) <= 300*86400000) linkedPreg++;
     });
-
     const cr = insems90.length ? Math.min(100, Math.round((linkedPreg/insems90.length)*100)) : 0;
 
     const newPreg21 = events.filter(e=> isType(e.type,PD)
       && /(عشار|preg|positive|حامل)/i.test(String(e.result||e.outcome||e['النتيجة']||'')) && toDate(e.eventDate)>=d21).length;
     const pr = eligible? Math.round((newPreg21/eligible)*100) : 0;
 
+    // S/C (180 يوم) — معلوماتية فقط في التبويب
     const insems180 = events.filter(e=> isType(e.type,INSEM) && toDate(e.eventDate)>=d180).length;
     const preg180   = events.filter(e=> isType(e.type,PD) && /(عشار|preg|positive|حامل)/i.test(String(e.result||e.outcome||e['النتيجة']||'')) && toDate(e.eventDate)>=d180).length;
     const sc = preg180? (Math.round((insems180/preg180)*10)/10) : (insems180? (insems180).toFixed(1): 0);
@@ -762,86 +554,122 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     return { serviceRate, cr, pr, sc };
   }
 
-  function calcProduction(animals, events){
+  // === «الجوج الأربع» من القطيع بالكامل ===
+
+  // هدف اللبن الديناميكي (أبقار ذروة 38، جاموس ذروة 16) حسب DIM
+  function targetMilkForAnimal(an){
+    const sp = norm(an.species||an.type||an['النوع']||'cow');
+    const peak = /جاموس|buff/.test(sp) ? 16 : 38; // اختيارك
+    const d = getDIM(an);
+    if(d===0) return 0;
+    // منحنى بسيط piecewise (قوي وعملي)
+    if(d<=10)  return peak*0.6*(d/10);       // صعود أولي
+    if(d<=60)  return peak*(0.6 + 0.4*((d-10)/50)); // وصول للذروة
+    if(d<=150) return peak*(1 - 0.0015*(d-60));     // هبوط بطيء
+    if(d<=300) return peak*(0.865 - 0.0025*(d-150)); // هبوط أسرع
+    return Math.max(peak*0.25, 0);
+  }
+
+  function herdMilkScore(animals, events){
     const milking = animals.filter(isInMilk);
     const inMilk = milking.length;
-    const today = new Date().toDateString();
+    if(!inMilk) return {score:0, avgMilk:0, avgTarget:0};
 
+    const today = new Date().toDateString();
     const milkToday = events.filter(e => isType(e.type, MILK) && toDate(e.eventDate)?.toDateString()===today);
     const sumMilk = milkToday.reduce((s,e)=> s + (Number(e.amount)||0), 0);
-    const avgMilk = inMilk ? Math.round((sumMilk/inMilk)*10)/10 : 0;
-    const avgDIM  = inMilk ? Math.round(milking.reduce((s,a)=> s+getDIM(a),0)/inMilk) : 0;
+    const avgMilk = inMilk ? (sumMilk/inMilk) : 0;
 
-    return { sumMilk, avgMilk, inMilk, avgDIM };
+    const avgTarget = milking.reduce((s,a)=> s + targetMilkForAnimal(a), 0) / inMilk || 0;
+
+    const raw = avgTarget>0 ? (avgMilk/avgTarget)*100 : 0;
+    const score = Math.max(0, Math.min(100, Math.round(raw)));
+    return { score, avgMilk:Math.round(avgMilk*10)/10, avgTarget:Math.round(avgTarget*10)/10 };
   }
 
-  function calcReproExtras(animals, events){
+  function herdFertilityScore(animals, events){
+    const spec = getStoredSpec() || autoDetectSpec(animals);
+    const B = getBench(spec);
+
+    const R = calcReproRates(animals, events);
+    // مزج مرجّح: CR 45%، PR 35%، SR 20%
+    const sCR = Math.max(0, Math.min(100, (R.cr / B.CR.good)*100));
+    const sPR = Math.max(0, Math.min(100, (R.pr / B.PR.good)*100));
+    const sSR = Math.max(0, Math.min(100, (R.serviceRate / B.PR.good)*100)); // نقيسه مقابل هدف PR العام 25/20
+    const score = Math.round(0.45*sCR + 0.35*sPR + 0.20*sSR);
+    return { score, cr:R.cr, pr:R.pr, sr:R.serviceRate };
+  }
+
+  function herdHealthScore(animals, events){
     const now = new Date();
-    const d365 = new Date(now.getTime()-365*86400000);
-
-    const open = animals.filter(a=> isInMilk(a) && !isPreg(a) );
-    const openDays = open.length? Math.round(open.reduce((s,a)=> s+getDIM(a),0)/open.length) : 0;
-
-    let ciVals=[];
-    const calvByAnimal = new Map();
-    events.filter(e=> isType(e.type,CALV) && toDate(e.eventDate)).forEach(e=>{
-      const key = e.animalId || e.animalNumber || e.number || e.tag;
-      if(!key) return;
-      const arr = calvByAnimal.get(key) || [];
-      arr.push(toDate(e.eventDate));
-      calvByAnimal.set(key, arr);
-    });
-    for(const arr of calvByAnimal.values()){
-      arr.sort((a,b)=>a-b);
-      if(arr.length>=2){
-        const last = arr[arr.length-1], prev = arr[arr.length-2];
-        ciVals.push(Math.floor((last - prev)/86400000));
+    const d90 = new Date(now.getTime() - 90*86400000);
+    const ids = new Set(animals.map(a=> a.id || a.animalId || a.number || a.animalNumber || a.tag));
+    const sickIds = new Set();
+    events.forEach(e=>{
+      if(isType(e.type, HEALTH) && toDate(e.eventDate)>=d90){
+        const k = e.animalId || e.animalNumber || e.number || e.tag;
+        if(k) sickIds.add(k);
       }
-    }
-    const ci = ciVals.length? Math.round(ciVals.reduce((a,b)=>a+b,0)/ciVals.length):0;
-
-    const aborts = events.filter(e=> isType(e.type,ABORT) && toDate(e.eventDate)>=d365 ).length;
-    const calvs  = events.filter(e=> isType(e.type,CALV)  && toDate(e.eventDate)>=d365 ).length;
-    const deadCalv = events.filter(e=> isType(e.type,CALV) && (/(ميت|نافق|dead|still)/i.test(String(e.outcome||e.calfStatus||e['حالة_العجل']||''))) && toDate(e.eventDate)>=d365).length;
-
-    const afcVals=[];
-    const afc = afcVals.length? Math.round(afcVals.reduce((s,x)=>s+x,0)/afcVals.length):0;
-
-    return {
-      openDays,
-      ci,
-      ar: calvs? Math.round((aborts/Math.max(calvs,1))*100):0,
-      dcr: calvs? Math.round((deadCalv/calvs)*100):0,
-      afc
-    };
+    });
+    const total = ids.size || 1;
+    const healthy = Math.max(0, total - sickIds.size);
+    const pctHealthy = (healthy/total)*100;
+    // Score مباشر = % رؤوس بلا مرض آخر 90 يوم
+    return { score:Math.round(pctHealthy), healthyPct:Math.round(pctHealthy) };
   }
 
-  function renderGauges(base, reproRates, spec){
-    const d = $('g-date'); if(d) d.textContent = new Date().toISOString().slice(0,10);
+  function herdFeedingScore(animals, prod){
+    const milking = animals.filter(isInMilk);
+    const inMilk = milking.length;
+    if(!inMilk) return { score:0, fe:0, dmi:0 };
+
+    // تقدير DMI سريع (وزن تقديري: أبقار 600، جاموس 550؛ معاملات 0.038/0.036)
+    const estimateBW = an=>{
+      const w = Number(an.weight||an.bodyWeight||0);
+      if(w>0) return w;
+      const sp = norm(an.species||an.type||an['النوع']||'cow');
+      return /جاموس|buff/.test(sp)? 550 : 600;
+    };
+    const coef = (a)=> (/جاموس|buff/.test(norm(a.species||a.type||a['النوع']||''))) ? 0.036 : 0.038;
+    const dmiHeads = milking.map(a => Math.round(estimateBW(a)*coef(a)*10)/10);
+    const avgDMI = dmiHeads.reduce((s,x)=>s+x,0)/inMilk;
+    const fe = avgDMI>0 ? (prod.avgMilk/avgDMI) : 0;
+
+    // تحويل FE إلى Score: أبقار good≥1.6 warn≥1.3؛ جاموس good≥1.3 warn≥1.1
+    // لأن القطيع مختلط: نحسب هدف مختلط وزنًا
+    const cowCount = milking.filter(a=>!/جاموس|buff/.test(norm(a.species||a.type||a['النوع']||''))).length;
+    const bufCount = inMilk - cowCount;
+    const good = (cowCount*1.6 + bufCount*1.3)/Math.max(inMilk,1);
+    const warn = (cowCount*1.3 + bufCount*1.1)/Math.max(inMilk,1);
+    let score = 0;
+    if(fe>=good) score = 100;
+    else if(fe>=warn) score = 60 + Math.round((fe-warn)/(good-warn)*40);
+    else score = Math.max(0, Math.round((fe/(warn||1))*60*0.7)); // منحنى محافظ
+    return { score, fe:Math.round(fe*100)/100, dmi:Math.round(avgDMI*10)/10 };
+  }
+
+  // رسم الحلقات المختصرة
+  function renderKpiRings(base, reproRates, currentSpec){
+    const B = getBench(currentSpec);
     const dryClr = (base.dryShare<=18)?'#2e7d32':(base.dryShare<=25?'#fdd835':'#ef6c00');
+    $('g-date').textContent = new Date().toISOString().slice(0,10);
 
     setRing('inmilk', base.inMilkPct, '#2e7d32');  $('v-inmilk').textContent = base.inMilkPct + '%';
-    setRing('preg',   base.pregRate,  (base.pregRate>=55?'#2e7d32':(base.pregRate>=45?'#fdd835':'#ef6c00'))); $('v-preg').textContent   = base.pregRate  + '%';
-    setRing('fresh',  base.freshShare,'#2e7d32');  $('v-fresh').textContent  = base.freshShare+ '%';
+    const pregClr = currentSpec==='buffalo' ? (base.pregRate>=B.CR.good?'#2e7d32':(base.pregRate>=B.CR.warn?'#fdd835':'#ef6c00'))
+                                            : (base.pregRate>=B.CR.good?'#2e7d32':(base.pregRate>=B.CR.warn?'#fdd835':'#ef6c00'));
+    setRing('preg', base.pregRate, pregClr); $('v-preg').textContent = base.pregRate + '%';
+    setRing('fresh', base.freshShare, '#2e7d32'); $('v-fresh').textContent = base.freshShare + '%';
     setRing('dry', base.dryShare, dryClr); $('v-dry').textContent = base.dryShare + '%';
 
-    setRing('service', reproRates.serviceRate, (reproRates.serviceRate>=25?'#2e7d32':(reproRates.serviceRate>=18?'#fdd835':'#ef6c00'))); $('v-service').textContent = reproRates.serviceRate + '%';
-    setRing('conception', reproRates.cr, (reproRates.cr>=55?'#2e7d32':(reproRates.cr>=45?'#fdd835':'#ef6c00'))); $('v-conception').textContent = reproRates.cr + '%';
+    setRing('service', reproRates.serviceRate, kpiColor(reproRates.serviceRate,B.PR)); $('v-service').textContent = reproRates.serviceRate + '%';
+    setRing('conception', reproRates.cr, kpiColor(reproRates.cr,B.CR)); $('v-conception').textContent = reproRates.cr + '%';
   }
 
-  function colorizeTab(spec, base, reproRates, extras){
-    const B = getBench(spec);
-    $('k-openDays').style.color = kpiColor(extras.openDays, B.OPEN);
-    $('k-ci').style.color       = kpiColor(extras.ci, B.CI);
-    $('k-cr').style.color       = kpiColor(reproRates.cr, B.CR);
-    $('k-pr').style.color       = kpiColor(reproRates.pr, B.PR);
-    $('k-sc').style.color       = kpiColor(reproRates.sc, B.SC);
-  }
-
+  // تبويبات (قيم)
   function renderTabs(prod, reproRates, extras, nut){
-    $('k-sumMilk').textContent = String(prod.sumMilk.toFixed ? prod.sumMilk.toFixed(1) : Math.round(prod.sumMilk*10)/10);
+    $('k-sumMilk').textContent = (prod.sumMilk||0).toFixed ? prod.sumMilk.toFixed(1) : String(prod.sumMilk||0);
     $('k-avgMilk').textContent = prod.avgMilk ? (prod.avgMilk+' كجم') : '—';
-    $('k-inMilkNum').textContent = String(prod.inMilk);
+    $('k-inMilkNum').textContent = String(prod.inMilk||0);
     $('k-avgDIM').textContent = prod.avgDIM ? (prod.avgDIM+' يوم') : '—';
 
     $('k-openDays').textContent = extras.openDays || '—';
@@ -853,61 +681,127 @@ h1{margin:0 0 16px;text-align:center;color:#1b5e20;font-weight:900}
     $('k-dcr').textContent= (extras.dcr||0)+'%';
     $('k-afc').textContent= extras.afc || '—';
 
-    $('k-dmi').textContent = nut.avgDMI ? (nut.avgDMI+' كجم') : '—';
+    $('k-dmi').textContent = nut.dmi ? (nut.dmi+' كجم') : '—';
     $('k-fe').textContent  = nut.fe ? nut.fe.toFixed(2) : '—';
-    $('k-iofc').textContent= (nut.iofc || nut.iofc===0) ? (nut.iofc+' جنيه') : '—';
+    $('k-iofc').textContent= '—'; // غير محسوب هنا
   }
 
-  let aSub=[], eSub=[];
+  // حساب إضافي للتبويب (اختياري مبسط)
+  function calcReproExtras(animals, events){
+    const now = new Date();
+    const d365 = new Date(now.getTime()-365*86400000);
+    const open = animals.filter(a=> isInMilk(a) && !isPreg(a) );
+    const openDays = open.length? Math.round(open.reduce((s,a)=> s+getDIM(a),0)/open.length) : 0;
+
+    // CI
+    const calvByAnimal = new Map();
+    events.filter(e=> isType(e.type,CALV) && toDate(e.eventDate)).forEach(e=>{
+      const key = e.animalId || e.animalNumber || e.number || e.tag;
+      if(!key) return; const arr = calvByAnimal.get(key)||[]; arr.push(toDate(e.eventDate)); calvByAnimal.set(key,arr);
+    });
+    let ciVals=[]; for(const arr of calvByAnimal.values()){ arr.sort((a,b)=>a-b);
+      if(arr.length>=2){ const last=arr[arr.length-1], prev=arr[arr.length-2]; ciVals.push(Math.floor((last-prev)/86400000)); } }
+    const ci = ciVals.length? Math.round(ciVals.reduce((a,b)=>a+b,0)/ciVals.length):0;
+
+    const aborts = events.filter(e=> isType(e.type,ABORT) && toDate(e.eventDate)>=d365 ).length;
+    const calvs  = events.filter(e=> isType(e.type,CALV)  && toDate(e.eventDate)>=d365 ).length;
+    const deadCalv = events.filter(e=> isType(e.type,CALV) && (/(ميت|نافق|dead|still)/i.test(String(e.outcome||e.calfStatus||e['حالة_العجل']||''))) && toDate(e.eventDate)>=d365).length;
+
+    return { openDays, ci, ar: calvs? Math.round((aborts/Math.max(calvs,1))*100):0, dcr: calvs? Math.round((deadCalv/calvs)*100):0, afc:'—' };
+  }
+
+  // ===== اشتراك Firestore + إعادة حساب شاملة =====
+  let animals=[], events=[];
   let currentSpec = getStoredSpec() || 'cow';
 
   function recompute(){
-    if(!getStoredSpec() && aSub.length){
-      currentSpec = autoDetectSpec(aSub);
+    if(!getStoredSpec() && animals.length){
+      currentSpec = autoDetectSpec(animals);
       setSpecUI(currentSpec);
     }
     setSpecUI(currentSpec);
 
-    const base = calcHerdFromAnimals(aSub);
-    const prod = calcProduction(aSub, eSub);
-    const reproRates = calcReproFromEvents(aSub, eSub, currentSpec);
-    const extras = calcReproExtras(aSub, eSub);
-    const nut = { avgDMI:0, fe:0, iofc:0 }; // مختصر هنا
+    const base = calcHerdFromAnimals(animals);
+    const prod = calcProduction(animals, events);
+    const reproRates = calcReproRates(animals, events);
+    const extras = calcReproExtras(animals, events);
 
-    renderGauges(base, reproRates, currentSpec);
-    renderTabs(prod, reproRates, extras, nut);
+    // الجوج الأربع:
+    const milk = herdMilkScore(animals, events);
+    const fert = herdFertilityScore(animals, events);
+    const health = herdHealthScore(animals, events);
+    const feed = herdFeedingScore(animals, prod);
+
+    // رسم الحلقات + تبويبات
+    renderKpiRings(base, reproRates, currentSpec);
+    renderTabs(prod, reproRates, extras, { dmi:feed.dmi, fe:feed.fe });
+
+    // دفع قيمة الجوج
+    updateNeedle('gMilk',  milk.score, 'vMilk','dMilk',  `متوسط ${milk.avgMilk} / هدف ${milk.avgTarget}`);
+    updateNeedle('gFert',  fert.score, 'vFert','dFert',  `CR ${fert.cr}% · PR ${fert.pr}% · SR ${fert.sr}%`);
+    updateNeedle('gHealth',health.score,'vHealth','dHealth',`${health.healthyPct}% سليمة آخر 90ي`);
+    updateNeedle('gFeed',  feed.score, 'vFeed','dFeed',  `FE ${feed.fe} · DMI ${feed.dmi}`);
+
     colorizeTab(currentSpec, base, reproRates, extras);
-
-    // ✅ تشغيل عدادات الإبرة من نفس النتائج (بدون /api/herd-stats)
-    window.mbkGauges?.updateNeedles(base, reproRates, prod);
   }
 
   const userId = window.__TENANT__?.userId || localStorage.getItem('userId');
   if(userId){
     try{
-      const qA = query(collection(db, 'animals'), where('userId','==', userId));
-      onSnapshot(qA, snap=>{ aSub = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); });
+      const qA = query(collection(db,'animals'), where('userId','==', userId));
+      onSnapshot(qA, snap=>{ animals = snap.docs.map(d=> ({ id:d.id, ...d.data() })); recompute(); });
     }catch(e){ console.warn('animals query error', e); }
-
     try{
-      const qE = query(collection(db, 'events'), where('userId','==', userId));
+      const qE = query(collection(db,'events'), where('userId','==', userId));
       onSnapshot(qE, snap=>{
-        eSub = snap.docs.map(d=> ({ id:d.id, ...d.data() }))
-          .filter(e => {
-            const d = toDate(e.eventDate);
-            return d ? (Date.now() - d.getTime() <= 420*86400000) : true;
-          });
+        events = snap.docs.map(d=> ({ id:d.id, ...d.data() }))
+          .filter(e => { const d = toDate(e.eventDate); return d ? (Date.now()-d.getTime() <= 420*86400000) : true; });
         recompute();
       });
     }catch(e){ console.warn('events query error', e); }
   }
 
-  document.addEventListener('DOMContentLoaded', ()=>{
-    document.querySelectorAll('.kpi').forEach(el => { el.title = el.dataset.hint || ''; });
-    setSpecUI(currentSpec);
-  });
+  // ===== عدادات الإبرة (إنشاء/تحديث) =====
+  const gauges = {};
+  function gaugeLabel(v){ if(v<40) return 'ضعيف'; if(v<70) return 'متوسط'; return 'ممتاز'; }
+  function ensureGauge(canvasId){
+    if(gauges[canvasId]) return gauges[canvasId];
+    gauges[canvasId] = new RadialGauge({
+      renderTo: canvasId, width:140, height:140, minValue:0, maxValue:100, units:"%",
+      majorTicks:["0","20","40","60","80","100"], minorTicks:2, strokeTicks:true,
+      highlights:[ {from:0,to:40,color:"#d32f2f"}, {from:40,to:70,color:"#fbc02d"}, {from:70,to:100,color:"#388e3c"} ],
+      needleType:"arrow", needleWidth:2, animationDuration:900, animationRule:"linear", value:0
+    }).draw();
+    return gauges[canvasId];
+  }
+  function updateNeedle(canvasId, value, valId, descId, extra){
+    const g = ensureGauge(canvasId);
+    const v = Math.max(0, Math.min(100, Math.round(value||0)));
+    try{ g.value = v; }catch(e){}
+    const valEl = document.getElementById(valId); if(valEl) valEl.textContent = v + '%';
+    const dEl = document.getElementById(descId); if(dEl) dEl.textContent = extra ? `${gaugeLabel(v)} — ${extra}` : gaugeLabel(v);
+  }
+
+  // ألوان التبويب حسب Benchmarks
+  function colorizeTab(spec, base, reproRates, extras){
+    const B = getBench(spec);
+    document.getElementById('k-openDays').style.color = (function(v){ return v<=B.OPEN.good?'#2e7d32':(v<=B.OPEN.warn?'#fdd835':'#ef6c00'); })(extras.openDays||0);
+    document.getElementById('k-ci').style.color       = (function(v){ return v<=B.CI.good?'#2e7d32':(v<=B.CI.warn?'#fdd835':'#ef6c00'); })(extras.ci||0);
+    document.getElementById('k-cr').style.color       = kpiColor(reproRates.cr,B.CR);
+    document.getElementById('k-pr').style.color       = kpiColor(reproRates.pr,B.PR);
+    document.getElementById('k-sc').style.color       = kpiColor(reproRates.sc,B.SC);
+  }
+
+  // مزامنة نوع القطيع
+  function initSpec(){
+    let s = getStoredSpec();
+    if(!s) s = autoDetectSpec(animals);
+    setSpecUI(s||'cow');
+  }
+  document.addEventListener('DOMContentLoaded', initSpec);
   </script>
 
+  <!-- تنبيهات ذكية (كما هي) -->
   <script type="module" src="/js/smart-alerts.js"></script>
 </body>
 </html>
