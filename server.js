@@ -232,7 +232,8 @@ app.get('/api/herd-stats', async (req, res) => {
     const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
 
     if (db) {
-      const adb = admin.firestore();
+   const adb = db;
+
 
       let animalsDocs = [];
       try { animalsDocs = (await adb.collection('animals').where('userId','==',tenant).get()).docs.slice(); } catch {}
@@ -327,7 +328,8 @@ app.get('/api/animals', async (req, res) => {
     const tenant = resolveTenant(req);
 
     if (db) {
-      const adb = admin.firestore();
+    const adb = db;
+
       const seen = new Map();
       const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
 
@@ -364,7 +366,8 @@ app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
     if (!from || !to || !numsParam) return res.status(400).json({ ok:false, error:'from,to,nums required' });
     if (!uidOk(from) || !uidOk(to))  return res.status(400).json({ ok:false, error:'invalid uid' });
     const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
-    const adb = admin.firestore();
+  const adb = db;
+
 
     function uniqPush(set,d){ if(d&&d.exists) set.set(d.ref.path,d); }
     async function findByNumber(val){
@@ -422,7 +425,8 @@ app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
     const dry = String(req.query.dry||'') === '1';
     if (!numsParam) return res.status(400).json({ ok:false, error:'nums required' });
 
-    const adb = admin.firestore();
+   const adb = db;
+
     const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
     const seen = new Map();
     const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
