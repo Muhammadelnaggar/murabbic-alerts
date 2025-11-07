@@ -28,6 +28,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ===== Firebase Admin (best-effort) =====
+// ===== Firebase Admin (best-effort) =====
 let db = null;
 try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : null;
@@ -36,11 +37,15 @@ try {
       credential: sa ? admin.credential.cert(sa) : admin.credential.applicationDefault()
     });
   }
-  db = admin.firestore();
-  console.log('✅ Firebase Admin ready');
+
+  // ✅ النقطة الأساسية هنا:
+  db = admin.firestore(admin.app(), 'murabbikdata');
+
+  console.log('✅ Firebase Admin ready → murabbikdata');
 } catch (e) {
   console.log('⚠️ Firestore disabled:', e.message);
 }
+
 
 // ===== Helpers =====
 const dayMs = 86400000;
