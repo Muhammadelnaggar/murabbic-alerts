@@ -29,22 +29,28 @@ app.use(express.urlencoded({ extended: true }));
 
 // ===== Firebase Admin (best-effort) =====
 // ===== Firebase Admin (best-effort) =====
+// ===== Firebase Admin (best-effort) =====
 let db = null;
 try {
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : null;
+  const sa = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : null;
+
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: sa ? admin.credential.cert(sa) : admin.credential.applicationDefault()
+      credential: sa
+        ? admin.credential.cert(sa)
+        : admin.credential.applicationDefault()
     });
   }
 
-  // ✅ النقطة الأساسية هنا:
+  // ✅ استخدم قاعدة murabbikdata
   db = admin.firestore(admin.app(), 'murabbikdata');
-
   console.log('✅ Firebase Admin ready → murabbikdata');
 } catch (e) {
   console.log('⚠️ Firestore disabled:', e.message);
 }
+
 
 
 // ===== Helpers =====
