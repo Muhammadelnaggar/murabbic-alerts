@@ -69,10 +69,10 @@ const tenantKey = v => (!v ? 'DEFAULT' : String(v));
 function resolveTenant(req){
   return tenantKey(
     req.headers['x-user-id'] || req.query.userId ||
-    req.headers['x-farm-id'] || req.query.farmId ||
     process.env.DEFAULT_TENANT_ID || 'DEFAULT'
   );
 }
+
 function belongs(rec, tenant){
   const t = rec && (rec.userId || rec.farmId) || 'DEFAULT';
   return tenantKey(t) === tenantKey(tenant);
