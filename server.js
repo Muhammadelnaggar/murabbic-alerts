@@ -468,10 +468,20 @@ app.get('/api/sensors/health', async (_req, res) => {
 });
 
 if (ADMIN_DEV_OPEN) {
-  app.get('/api/debug/echo-tenant', (req,res) => {
-    res.json({ header_x_user_id: req.headers['x-user-id']||null, query_userId:req.query.userId||null, resolvedTenant: resolveTenant(req) });
+  app.get('/api/debug/echo-tenant', (req, res) => {
+    const headerUserId = req.headers['x-user-id'] || null;
+    const queryUserId = req.query.userId || null;
+    const resolvedTenant = headerUserId || queryUserId || 'none';
+    res.json({
+      header_x_user_id: headerUserId,
+      query_user_id: queryUserId,
+      resolvedTenant,
+      env: 'DEV',
+      time: new Date().toISOString()
+    });
   });
 }
+
 
 app.get('/alerts/:id', (req, res) => {
   const userId = parseInt(req.params.id, 10);
