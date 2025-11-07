@@ -241,13 +241,12 @@ app.get('/api/herd-stats', async (req, res) => {
    const adb = db;
 
 
-      let animalsDocs = [];
-      try { animalsDocs = (await adb.collection('animals').where('userId','==',tenant).get()).docs.slice(); } catch {}
-      try {
-        const d2 = await adb.collection('animals').where('farmId','==',tenant).get();
-        const seen = new Set(animalsDocs.map(d=>d.id));
-        for (const d of d2.docs) if (!seen.has(d.id)) animalsDocs.push(d);
-      } catch {}
+    let animalsDocs = [];
+try { 
+  animalsDocs = (await adb.collectionGroup('animals')
+    .where('userId','==',tenant)
+    .get()).docs.slice(); 
+} catch {}
 
       const animals = animalsDocs.map(d => ({ id:d.id, ...(d.data()||{}) }));
       const active  = animals.filter(a => a && a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
@@ -340,8 +339,12 @@ app.get('/api/animals', async (req, res) => {
       const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
 
       for (const fld of ['userId','farmId']) {
-        try { (await adb.collection('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
-        try { (await adb.collectionGroup('animals').where(fld,'==',tenant).limit(2000).get()).docs.forEach(push); } catch {}
+       try {
+  (await adb.collectionGroup('animals')
+    .where('userId','==',tenant)
+    .limit(2000).get()).docs.forEach(push);
+} catch {}
+
       }
 
       const arr = [...seen.values()];
