@@ -569,7 +569,10 @@
   <script>
     (function(){
       const statusEl = document.getElementById('statusBar');
-      const API_BASE = ''; // نفس الدومين (murabbic-alerts)
+     const API_BASE = location.origin.includes('render.com')
+  ? location.origin
+  : 'https://murabbic-alerts.onrender.com';
+
 
       function getTenantId(){
         const T = window.__TENANT__ || {};
@@ -734,3 +737,4 @@
   <script src="/js/app-core.js" type="module"></script>
 </body>
 </html>
+
