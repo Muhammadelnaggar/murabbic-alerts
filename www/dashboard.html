@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -41,7 +42,6 @@
       margin-bottom:8px;
       box-shadow:0 1px 4px rgba(0,0,0,.04);
     }
-    /* شريط الحالة العلوي */
     #thiBar{
       display:flex;
       flex-direction:column;
@@ -53,8 +53,6 @@
     }
     #thiBar strong{color:#1b5e20;}
     #thiStatus{font-weight:bold;}
-
-    /* THI mini gauge */
     .thi-mini{
       display:flex;
       gap:10px;
@@ -69,8 +67,6 @@
       border:2px solid #c5e1a5;
       background:#fff;
     }
-
-    /* البلاطات المختصرة */
     .tiles{
       display:grid;
       grid-template-columns:repeat(3,minmax(90px,1fr));
@@ -86,8 +82,6 @@
       font-size:10px;
       cursor:pointer;
     }
-
-    /* عنوان قسم */
     .section-title{
       font-weight:800;
       font-size:13px;
@@ -97,8 +91,6 @@
       align-items:center;
       gap:6px;
     }
-
-    /* كل مؤشرين في صف */
     .kpi-grid{
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
@@ -118,7 +110,6 @@
     .kpi-label{font-weight:700;color:#1b5e20;}
     .kpi-value{font-size:15px;font-weight:800;color:#066b3b;}
     .kpi-sub{font-size:8px;color:#607d8b;}
-
     #statusBar{
       margin-top:4px;
       font-size:9px;
@@ -126,13 +117,16 @@
       color:#388e3c;
     }
   </style>
+
 </head>
 <body>
   <h1>لوحة التحكم - مربيك</h1>
 
   <!-- شريط THI أعلى الصفحة -->
+
   <div id="thiBar" class="card">
-    <div>الحرارة: <strong id="wxTemp">--</strong>°C |
+    <div>
+      الحرارة: <strong id="wxTemp">--</strong>°C |
       الرطوبة: <strong id="wxHum">--</strong>% |
       THI: <strong id="wxTHI">--</strong>
     </div>
@@ -143,6 +137,7 @@
   </div>
 
   <!-- اختصارات -->
+
   <div class="tiles">
     <div class="tile" onclick="location.href='add-animal.html'">➕ حيوان جديد</div>
     <div class="tile" onclick="location.href='animal-list.html'">📋 حيواناتي</div>
@@ -156,33 +151,67 @@
   </div>
 
   <!-- مؤشرات القطيع -->
+
   <div class="card">
     <div class="section-title">📊 مؤشرات القطيع (تناسلي + إنتاجي)</div>
-    <div id="kpiGrid" class="kpi-grid">
-      <!-- يتم ملؤها بالسكربت -->
-    </div>
+    <div id="kpiGrid" class="kpi-grid"></div>
     <div id="statusBar">جارٍ تحميل بيانات القطيع...</div>
   </div>
 
 <script>
-// ================= إعداد API_BASE =================
-// لو الصفحة شغالة من Render أو دومين حقيقي → relative
-// لو من جهازك file:/// → استخدم السيرفر المباشر على Render
+// ================= API_BASE =================
+// على Render أو أي دومين حقيقي: مسار نسبي لنفس السيرفر
+// على بيئات محلية file:// أو منافذ ثابتة يمكن تعديلها يدوياً عند الحاجة
 const API_BASE = (location.origin.startsWith('http') && !location.origin.startsWith('file'))
   ? ''
   : 'https://murabbic-alerts.onrender.com';
 
-// محاولة الحصول على tenant / userId
-function getTenantId(){
-  const T = window.__TENANT__ || {};
-  return T.userId || T.uid || T.id ||
-         localStorage.getItem('userId') ||
-         localStorage.getItem('uid') ||
-         'demo-user';
+// ================= هوية المستخدم / التينانت =================
+function getTenantId() {
+  try {
+    const T = window.__TENANT__ || {};
+    const fromObj = T.userId || T.uid || T.id || T.tenantId;
+    const fromStorage =
+      localStorage.getItem('userId') ||
+      localStorage.getItem('uid') ||
+      localStorage.getItem('tenantId');
+    return fromObj || fromStorage || null;
+  } catch (e) {
+    return null;
+  }
 }
-const TENANT_ID = getTenantId();
 
-// ============= سكربت THI (طقس من Open-Meteo) =============
+async function waitForTenant(maxMs = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const id = getTenantId();
+    if (id) return id;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return getTenantId();
+}
+
+// ================= أداة جلب JSON مع X-User-Id =================
+async function fetchJSON(path){
+  let uid = getTenantId();
+
+  // في الإنتاج (Render) ننتظر tenant-bootstrap لو لسة محقنش
+  if (!uid && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    uid = await waitForTenant();
+  }
+
+  // fallback ديمو فقط لو فعلاً مفيش هوية
+  if (!uid) uid = 'demo-user';
+
+  const headers = { 'Cache-Control':'no-store' };
+  if (uid) headers['X-User-Id'] = uid;
+
+  const res = await fetch(API_BASE + path, { headers, cache:'no-store' });
+  if (!res.ok) throw new Error(path + ' ' + res.status);
+  return res.json();
+}
+
+// ================= THI (طقس) =================
 async function loadWeatherTHI(){
   const tEl = document.getElementById('wxTemp');
   const hEl = document.getElementById('wxHum');
@@ -191,48 +220,39 @@ async function loadWeatherTHI(){
   const circle = document.getElementById('thiCircle');
 
   try{
-    // القاهرة كـ Default؛ تقدر تغيرها لاحقاً من بيانات المزرعة
-    const lat=30.0444, lon=31.2357;
+    const lat = 30.0444, lon = 31.2357; // القاهرة افتراضيًا
     const r = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
-      {cache:'no-store'}
+      { cache:'no-store' }
     );
     const j = await r.json();
     const t = Math.round(j.current.temperature_2m);
     const h = Math.round(j.current.relative_humidity_2m);
     const thi = Math.round(((t*9/5+32) - (0.55-0.0055*h)*((t*9/5+32)-58)));
 
-    tEl.textContent=t;
-    hEl.textContent=h;
-    thiEl.textContent=thi;
-    circle.textContent=thi;
+    tEl.textContent = t;
+    hEl.textContent = h;
+    thiEl.textContent = thi;
+    circle.textContent = thi;
 
-    let txt,bg,color;
-    if(thi<68){txt='راحة';bg='#c8e6c9';color='#2e7d32';}
-    else if(thi<72){txt='إجهاد خفيف';bg='#fff9c4';color='#f9a825';}
-    else if(thi<78){txt='إجهاد متوسط';bg='#ffe0b2';color='#fb8c00';}
-    else{txt='إجهاد عالي';bg='#ffcdd2';color='#e53935';}
-    statusEl.textContent=txt;
-    statusEl.style.color=color;
-    circle.style.background=bg;
-    circle.style.borderColor=color;
-    circle.style.color=color;
+    let txt, bg, color;
+    if (thi < 68){ txt='راحة';         bg='#c8e6c9'; color='#2e7d32'; }
+    else if (thi < 72){ txt='إجهاد خفيف'; bg='#fff9c4'; color='#f9a825'; }
+    else if (thi < 78){ txt='إجهاد متوسط'; bg='#ffe0b2'; color='#fb8c00'; }
+    else { txt='إجهاد عالي';           bg='#ffcdd2'; color='#e53935'; }
+
+    statusEl.textContent = txt;
+    statusEl.style.color = color;
+    circle.style.background = bg;
+    circle.style.borderColor = color;
+    circle.style.color = color;
   }catch(e){
-    statusEl.textContent='غير متاح حالياً';
-    statusEl.style.color='#e53935';
+    statusEl.textContent = 'غير متاح حالياً';
+    statusEl.style.color = '#e53935';
   }
 }
 
-// ============= جلب بيانات القطيع =============
-async function fetchJSON(path){
-  const res = await fetch(API_BASE + path,{
-    headers:{'X-User-Id':TENANT_ID},
-    cache:'no-store'
-  });
-  if(!res.ok) throw new Error(path+' '+res.status);
-  return res.json();
-}
-
+// ================= أدوات مساعدة =================
 function norm(s){
   return String(s||'').toLowerCase()
     .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
@@ -240,24 +260,26 @@ function norm(s){
 }
 function toDate(v){
   if(!v) return null;
-  if(typeof v==='number') return new Date(v);
-  const s=String(v);
+  if(typeof v === 'number') return new Date(v);
+  const s = String(v);
   if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s+'T00:00:00');
-  return new Date(s);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
-function daysBetween(a,b){return Math.floor((a-b)/86400000);}
-
+function daysBetween(a,b){
+  return Math.floor((a - b) / 86400000);
+}
 function isActive(an){
-  const st = norm(an.status||an.lifeStatus||'');
-  if(['sold','dead','died','archived','inactive','مباع','مباعة','نافق','ميت'].includes(st)) return false;
-  if(an.active===false) return false;
+  const st = norm(an.status || an.lifeStatus || '');
+  if (['sold','dead','died','archived','inactive','مباع','مباعة','نافق','ميت'].includes(st)) return false;
+  if (an.active === false) return false;
   return true;
 }
 function isInMilk(an){
-  if(an.inMilk===true) return true;
-  if(an.inMilk===false) return false;
-  const st = norm(an.productionStatus||an.lactationStatus||'');
-  if(st.includes('dry')||st.includes('جاف')) return false;
+  if (an.inMilk === true) return true;
+  if (an.inMilk === false) return false;
+  const st = norm(an.productionStatus || an.lactationStatus || '');
+  if (st.includes('dry') || st.includes('جاف')) return false;
   return /(milk|lact|حلاب|محلب|منتج)/.test(st);
 }
 function getDIM(an){
@@ -266,6 +288,7 @@ function getDIM(an){
   return Math.max(0, daysBetween(new Date(), calv));
 }
 
+// ================= تحميل مؤشرات القطيع =================
 async function loadHerdKPIs(){
   const statusBar = document.getElementById('statusBar');
   const grid = document.getElementById('kpiGrid');
@@ -273,84 +296,115 @@ async function loadHerdKPIs(){
   const box = (label,val,sub='') =>
     `<div class="kpi">
        <div class="kpi-label">${label}</div>
-       <div class="kpi-value">${val ?? '-'}</div>
-       ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+       <div class="kpi-value">${(val !== undefined && val !== null && val !== '') ? val : '-'}</div>
+       ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
      </div>`;
 
   try{
-    const [stats, animalsResp] = await Promise.all([
+    const [statsResp, animalsResp] = await Promise.all([
       fetchJSON('/api/herd-stats'),
       fetchJSON('/api/animals')
     ]);
 
-    const animals = (animalsResp || []).filter(isActive);
+    // /api/animals يدعم كل الأشكال الشائعة
+    const animalsArr =
+      Array.isArray(animalsResp) ? animalsResp :
+      Array.isArray(animalsResp?.items) ? animalsResp.items :
+      Array.isArray(animalsResp?.data) ? animalsResp.data :
+      Array.isArray(animalsResp?.animals) ? animalsResp.animals :
+      [];
+
+    const animals = animalsArr.filter(isActive);
     const total = animals.length;
 
     // حليب
-    let inMilk=0, dimSum=0, milkTotal=0, milkCount=0;
-    for(const an of animals){
-      if(isInMilk(an)){
+    let inMilk = 0, dimSum = 0, milkTotal = 0, milkCount = 0;
+    for (const an of animals){
+      if (isInMilk(an)){
         inMilk++;
         dimSum += getDIM(an);
       }
       const m = Number(an.dailyMilk || an.lastMilkKg || 0);
-      if(m>0){milkTotal+=m;milkCount++;}
+      if (m > 0){
+        milkTotal += m;
+        milkCount++;
+      }
     }
-    const inMilkPct = total ? Math.round(inMilk*100/total) : 0;
-    const avgDIM = inMilk ? Math.round(dimSum/inMilk) : 0;
-    const avgMilk = milkCount ? +(milkTotal/milkCount).toFixed(1) : 0;
-    if(!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk*inMilk);
+    const inMilkPct = total ? Math.round(inMilk * 100 / total) : 0;
+    const avgDIM = inMilk ? Math.round(dimSum / inMilk) : 0;
+    const avgMilk = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
+    if (!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk * inMilk);
 
-    // من /api/herd-stats
+    // /api/herd-stats
+    const stats = statsResp || {};
     const t = stats.totals || {};
     const fert = stats.fertility || {};
-    const pregPct = t.pregnant?.pct ?? 0;
 
-    // بناء الكروت (كل 2 في صف)
+    const totalActive = t.totalActive ?? total;
+    const pregPct = (t.pregnant && t.pregnant.pct != null)
+      ? t.pregnant.pct
+      : (t.pregnantPct != null ? t.pregnantPct : 0);
+
     grid.innerHTML =
-      // تناسلي
-      box('إجمالي الحيوانات النشطة', t.totalActive ?? total, 'مستبعد منها المباعة/النافقة/المؤرشفة') +
+      box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة') +
       box('عدد الأبقار في الحليب', inMilk ? `${inMilk} (${inMilkPct}%)` : '0', 'نسبتهم من القطيع') +
-      box('نسبة العشار', pregPct ? pregPct+'%' : '0%', 'من إجمالي النشط') +
-      box('معدل الإخصاب %', fert.conceptionRatePct!=null? fert.conceptionRatePct+'%' : '0%', 'من أحداث التلقيح المسجلة') +
-      box('متوسط الأيام المفتوحة', '--', 'من الولادة حتى الحمل (يُستكمل من الأحداث)') +
-      box('معدل الحمل (نافذة 21 يوم)', '--', 'يتطلب أحداث شياع/تلقيح منتظمة') +
-      box('خدمات لكل حمل (S/C)', '--', 'عدد التلقيحات / عدد الحمول') +
-      box('نسبة الإجهاض', '--', 'من إجمالي الحمول') +
-      box('نسبة الولادات النافقة', '--', 'Dead Calving Rate') +
-      box('العمر عند أول ولادة (شهر)', '--') +
-      // إنتاجي
-      box('متوسط إنتاج اللبن/بقرة', avgMilk? avgMilk+' كجم':'--', 'حسب بيانات اللبن المسجلة') +
-      box('إجمالي إنتاج اللبن اليومي', milkTotal? milkTotal+' كجم':'--', 'تقديري من المتوسط × عدد الحلاب') +
+      box('نسبة العشار', pregPct ? pregPct + '%' : '0%', 'من إجمالي النشط') +
+      box('معدل الإخصاب %', (fert.conceptionRatePct != null) ? fert.conceptionRatePct + '%' : '0%', 'من أحداث التلقيح المسجلة') +
+      box('متوسط الأيام المفتوحة', stats.openDaysAvg ?? '--', 'من الولادة حتى الحمل (إن وُجدت بيانات)') +
+      box('معدل الحمل (نافذة 21 يوم)', stats.pregRate21d ?? '--', 'يتطلب أحداث شياع/تلقيح منتظمة') +
+      box('خدمات لكل حمل (S/C)', stats.servicesPerConception ?? '--', 'عدد التلقيحات / عدد الحمول') +
+      box('نسبة الإجهاض', stats.abortionRatePct != null ? stats.abortionRatePct + '%' : '--', 'من إجمالي الحمول') +
+      box('نسبة الولادات النافقة', stats.deadCalvingRatePct != null ? stats.deadCalvingRatePct + '%' : '--') +
+      box('العمر عند أول ولادة (شهر)', stats.ageAtFirstCalvingMonths ?? '--') +
+      box('متوسط إنتاج اللبن/بقرة', avgMilk ? avgMilk + ' كجم' : '--', 'حسب أحدث بيانات اللبن المسجلة') +
+      box('إجمالي إنتاج اللبن اليومي', milkTotal ? milkTotal + ' كجم' : '--', 'تقديري من المتوسط × عدد الحلاب') +
       box('متوسط DIM', avgDIM || '--', 'أيام في الحليب للأبقار المنتجة') +
-      box('نسبة الأبقار في الحليب', inMilkPct? inMilkPct+'%':'--', 'من إجمالي النشط') +
-      // استبعاد
-      box('استبعاد إنتاجي', '--') +
-      box('استبعاد تناسلي', '--') +
-      box('استبعاد صحي', '--') +
-      // تغذية
-      box('كفاءة تحويل العلف إلي لبن', '--', 'يتطلب بيانات تغذية') +
-      box('كمية المادة الجافة المأكولة', '--') +
-      box('صافي دخل اللبن بعد خصم التغذية', '--') +
-      box('تقييم الروث', '--') +
-      box('تقييم الحالة الجسمية بالكاميرا', '--');
+      box('نسبة الأبقار في الحليب', inMilkPct ? inMilkPct + '%' : '--', 'من إجمالي النشط') +
+      box('استبعاد إنتاجي', stats.cullProdPct != null ? stats.cullProdPct + '%' : '--') +
+      box('استبعاد تناسلي', stats.cullReproPct != null ? stats.cullReproPct + '%' : '--') +
+      box('استبعاد صحي', stats.cullHealthPct != null ? stats.cullHealthPct + '%' : '--') +
+      box('كفاءة تحويل العلف إلي لبن', stats.feedEfficiency ?? '--', 'يتطلب بيانات تغذية') +
+      box('كمية المادة الجافة المأكولة', stats.dmiAvg ?? '--') +
+      box('صافي دخل اللبن بعد خصم التغذية', stats.iofc ?? '--') +
+      box('تقييم الروث', stats.fecesScore ?? '--') +
+      box('تقييم الحالة الجسمية بالكاميرا', stats.bcsCamera ?? '--');
 
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }catch(e){
     console.error('herd stats error', e);
-    statusBar.textContent = 'فشل تحميل البيانات من /api/herd-stats أو /api/animals.';
+    document.getElementById('statusBar').textContent =
+      'فشل تحميل بيانات /api/herd-stats أو /api/animals. تأكد من تسجيل الدخول وربط الحساب.';
   }
 }
 
-// تشغيل عند التحميل
-document.addEventListener('DOMContentLoaded',()=>{
+// ================= تشغيل عند التحميل =================
+document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
 });
 </script>
 
-<!-- سكربتات المشروع الأصلية إن وجدت -->
+<!-- تتبع + هوية + نواة التطبيق (بالترتيب الصحيح) -->
+
+<script>
+  (function(){
+    window.dataLayer = window.dataLayer || [];
+    if (!window.t) {
+      window.t = {
+        event: function(name, props){
+          try{
+            window.dataLayer.push({event:name, ts:Date.now(), ...(props||{})});
+          }catch(e){}
+        }
+      };
+    }
+    window.t.event('page_view', {page:'/dashboard.html'});
+  })();
+</script>
+
 <script src="/js/tenant-bootstrap.js"></script>
-<script src="/js/app-core.js" type="module"></script>
+
+<script type="module" src="/js/app-core.js"></script>
+
 </body>
 </html>
