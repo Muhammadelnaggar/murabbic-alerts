@@ -1,115 +1,79 @@
-// server.js — النسخة النهائية المستقرة (Murabbik Render Ready)
-// =======================================================
+// server.js — نسخة مبسطة 100% (تشتغل على Render بدون مشاكل)
 import express from "express";
-import path from "path";
 import cors from "cors";
-import admin from "firebase-admin";
+import path from "path";
+import { fileURLToPath } from "url";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// ===== Middleware =====
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ===== Firebase Admin (Render-safe, murabbikdata enforced) =====
-let db;
-try {
-  const saJSON = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!saJSON) throw new Error("Missing FIREBASE_SERVICE_ACCOUNT");
-
-  const sa = JSON.parse(saJSON);
-
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(sa),
-      projectId: sa.project_id, // تأكيد التطابق
-    });
-  }
-
-  // 🔹 الاتصال الإجباري بقاعدة murabbikdata وليس الافتراضية
-  db = admin.firestore(admin.app(), "murabbikdata");
-
-  console.log("✅ Firestore connected to project:", sa.project_id);
-  console.log("✅ Database ID:", db._databaseId.database);
-} catch (err) {
-  console.error("❌ Firestore init failed:", err);
-}
-
-// ===== Static Files =====
-const __dirname = path.resolve();
+// ===== تحديد المسار للملفات الثابتة =====
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "www")));
 
-// ===== API Routes =====
+// ===== Firebase Client SDK =====
+const firebaseConfig = {
+  apiKey: process.env.FB_API_KEY,
+  authDomain: process.env.FB_AUTH_DOMAIN,
+  projectId: process.env.FB_PROJECT_ID,
+  appId: process.env.FB_APP_ID
+};
 
-// 🔸 /api/animals — جلب كل الحيوانات للمستخدم الحالي
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp, "murabbikdata");
+console.log("✅ Connected to Firestore (murabbikdata)");
+
+// ===== API Routes =====
 app.get("/api/animals", async (req, res) => {
   try {
     const userId = req.header("X-User-Id") || req.query.userId;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
 
-    const snapshot = await db.collection("animals")
-      .where("userId", "==", userId)
-      .get();
-
-    const animals = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    res.json(animals);
+    const q = query(collection(db, "animals"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    res.json(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
   } catch (err) {
-    console.error("Error fetching animals:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch animals" });
   }
 });
 
-// 🔸 /api/events — إضافة حدث جديد
 app.post("/api/events", async (req, res) => {
   try {
     const data = req.body;
     if (!data.userId) return res.status(400).json({ error: "Missing userId" });
-
-    data.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    const docRef = await db.collection("events").add(data);
-
+    data.createdAt = serverTimestamp();
+    const docRef = await addDoc(collection(db, "events"), data);
     res.json({ success: true, id: docRef.id });
   } catch (err) {
-    console.error("Error adding event:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ error: "Failed to add event" });
   }
 });
 
-// 🔸 /api/herd-stats — مؤشرات القطيع
 app.get("/api/herd-stats", async (req, res) => {
   try {
     const userId = req.header("X-User-Id") || req.query.userId;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
 
-    const animalsSnap = await db.collection("animals")
-      .where("userId", "==", userId)
-      .get();
+    const aSnap = await getDocs(query(collection(db, "animals"), where("userId", "==", userId)));
+    const eSnap = await getDocs(query(collection(db, "events"), where("userId", "==", userId)));
 
-    const eventsSnap = await db.collection("events")
-      .where("userId", "==", userId)
-      .get();
-
-    const animals = animalsSnap.docs.map(d => d.data());
-    const events = eventsSnap.docs.map(d => d.data());
-
-    res.json({
-      animalsCount: animals.length,
-      eventsCount: events.length,
-    });
+    res.json({ animalsCount: aSnap.size, eventsCount: eSnap.size });
   } catch (err) {
-    console.error("Error fetching herd stats:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ error: "Failed to get stats" });
   }
 });
 
-// ===== Fallback: Serve index.html =====
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "www", "index.html"));
 });
 
-// ===== Start Server =====
-app.listen(PORT, () => {
-  console.log(`🚀 Murabbik server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Murabbik server running on port ${PORT}`));
