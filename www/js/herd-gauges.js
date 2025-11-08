@@ -33,15 +33,18 @@
     if (el) el.textContent = text;
   }
 
-  async function getJSON(url) {
-    try {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(r.status);
-      return await r.json();
-    } catch (_) {
-      return null;
-    }
+ async function getJSON(url) {
+  try {
+    const uid = localStorage.getItem('userId');
+    const headers = uid ? { 'X-User-Id': uid } : {};
+    const r = await fetch(url, { headers, cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch {
+    return null;
   }
+}
+
 
   async function load() {
     // النوع المختار (جاموس/أبقار)
@@ -64,7 +67,8 @@
       conceptionPct: 0
     };
 
-    if (stats && stats.ok && stats.totals) {
+    if (stats && stats.totals)
+ {
       S.totalActive     = +stats.totals.totalActive || 0;
       S.pregnantCnt     = +(stats.totals.pregnant?.count || 0);
       S.pregnantPct     = +(stats.totals.pregnant?.pct || 0);
