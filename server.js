@@ -131,7 +131,7 @@ app.post('/api/events', requireUserId, async (req, res) => {
 });
 
 // ============================================================
-//                       API: HERD STATS
+//                       API: HERD STATS  ✅ Fixed (ownerUid + userId)
 // ============================================================
 app.get('/api/herd-stats', async (req, res) => {
   try {
@@ -142,29 +142,30 @@ app.get('/api/herd-stats', async (req, res) => {
     if (db) {
       const adb = db;
 
-      // 🔹 الحيوانات المملوكة للـ tenant من مجموعة animals
-      const seen = new Map();
-      const push = d => {
-        if (d && d.exists) {
-          const data = d.data() || {};
-          seen.set(d.id, { id: d.id, ...data });
-        }
-      };
+      // 🔹 نحاول أولاً باستخدام ownerUid
+      let q = await adb.collection('animals')
+        .where('ownerUid', '==', tenant)
+        .get();
 
-      try {
-        (await adb.collection('animals').where('userId','==',tenant).get()).docs.forEach(push);
-      } catch (e) {
-        console.error('herd-stats animals userId error:', e.message);
+      // 🔁 لو مفيش نتائج، نحاول userId بدلها
+      if (q.empty) {
+        q = await adb.collection('animals')
+          .where('userId', '==', tenant)
+          .get();
       }
 
-      let animals = [...seen.values()];
+      const animals = q.docs.map(d => ({ id: d.id, ...d.data() }));
+      let filtered = animals;
+
+      // 🔹 فلترة حسب النوع لو مطلوب
       if (speciesParam !== 'all') {
-        animals = animals.filter(a =>
+        filtered = filtered.filter(a =>
           String(a.animaltype || a.species || '').toLowerCase() === speciesParam
         );
       }
 
-      const active = animals.filter(a => {
+      // 🔹 استبعاد الحيوانات المباعة أو النافقة
+      const active = filtered.filter(a => {
         const st = String(a.status || a.lifeStatus || '').toLowerCase();
         if (['sold','dead','died','archived','inactive','مباع','مباعة','نافق','ميت'].includes(st)) return false;
         if (a.active === false) return false;
@@ -180,6 +181,7 @@ app.get('/api/herd-stats', async (req, res) => {
         });
       }
 
+      // 🔹 تجهيز تواريخ التحليل
       const since    = new Date(Date.now() - (analysisDays + 340) * dayMs);
       const sinceStr = toYYYYMMDD(since);
       const winStart = new Date(Date.now() - analysisDays * dayMs);
@@ -232,7 +234,7 @@ app.get('/api/herd-stats', async (req, res) => {
       });
     }
 
-    // 🔹 fallback لو مفيش Firestore
+    // 🔹 fallback لو Firestore مش شغالة
     const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
     const active = animalsAll.filter(a => a.active !== false &&
       !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
