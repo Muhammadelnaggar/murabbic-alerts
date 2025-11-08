@@ -27,7 +27,8 @@ try {
   }
 
   // ✅ القاعدة الافتراضية (بدون اسم فرعي)
-  db = admin.firestore();
+db = admin.firestore(admin.app(), "murabbikdata");
+
   console.log("✅ Firestore connected (default DB)");
 } catch (e) {
   console.log("⚠️ Firestore init failed:", e.message);
