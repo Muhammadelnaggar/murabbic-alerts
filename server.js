@@ -1,9 +1,9 @@
 // server.js — النسخة النهائية المستقرة (Murabbik Render Ready)
 // =======================================================
-const path = require("path");
-const express = require("express");
-const cors = require("cors");
-const admin = require("firebase-admin");
+import express from "express";
+import path from "path";
+import cors from "cors";
+import admin from "firebase-admin";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,231 +13,103 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-// ===== Firebase Admin (Render-safe) =====
-let db = null;
+// ===== Firebase Admin (Render-safe, murabbikdata enforced) =====
+let db;
 try {
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : null;
+  const saJSON = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!saJSON) throw new Error("Missing FIREBASE_SERVICE_ACCOUNT");
+
+  const sa = JSON.parse(saJSON);
 
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: sa ? admin.credential.cert(sa) : admin.credential.applicationDefault(),
+      credential: admin.credential.cert(sa),
+      projectId: sa.project_id, // تأكيد التطابق
     });
   }
 
-  // 🔹 الاتصال بقاعدة البيانات الصحيحة murabbikdata
+  // 🔹 الاتصال الإجباري بقاعدة murabbikdata وليس الافتراضية
   db = admin.firestore(admin.app(), "murabbikdata");
 
-  console.log("✅ Firestore connected to:", db._databaseId?.database || "(default)");
-} catch (e) {
-  console.log("⚠️ Firestore init failed:", e.message);
+  console.log("✅ Firestore connected to project:", sa.project_id);
+  console.log("✅ Database ID:", db._databaseId.database);
+} catch (err) {
+  console.error("❌ Firestore init failed:", err);
 }
 
-// ===== Helpers =====
-const dayMs = 86400000;
-function toYYYYMMDD(d) {
-  return new Date(d).toISOString().slice(0, 10);
-}
-function toDate(v) {
-  if (!v) return null;
-  if (v._seconds) return new Date(v._seconds * 1000);
-  if (typeof v === "number") return new Date(v);
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T00:00:00Z");
-  return new Date(s);
-}
-function resolveTenant(req) {
-  return (
-    req.headers["x-user-id"] ||
-    req.query.userId ||
-    process.env.DEFAULT_TENANT_ID ||
-    "DEFAULT"
-  );
-}
+// ===== Static Files =====
+const __dirname = path.resolve();
+app.use(express.static(path.join(__dirname, "www")));
 
-// ============================================================
-//                       API: HERD STATS
-// ============================================================
-app.get("/api/herd-stats", async (req, res) => {
-  try {
-    const tenant = resolveTenant(req);
-    if (!tenant || tenant === "DEFAULT")
-      return res.status(400).json({ ok: false, error: "userId_required" });
+// ===== API Routes =====
 
-    if (!db)
-      return res.status(500).json({ ok: false, error: "firestore_not_ready" });
-
-    const adb = db;
-    console.log("📡 Fetching herd stats for", tenant);
-
-    // 🟢 جلب الحيوانات من أي مستوى باستخدام ownerUid أو userId
-    let animalsDocs = [];
-    try {
-      const snap1 = await adb
-        .collectionGroup("animals")
-        .where("ownerUid", "==", tenant)
-        .get();
-      animalsDocs = snap1.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      if (animalsDocs.length === 0) {
-        const snap2 = await adb
-          .collectionGroup("animals")
-          .where("userId", "==", tenant)
-          .get();
-        animalsDocs = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
-      }
-    } catch (e) {
-      console.error("❌ herd-stats Firestore read failed:", e.message);
-    }
-
-    if (!animalsDocs.length) {
-      console.log("⚠️ No animals found for user:", tenant);
-      return res.json({
-        ok: true,
-        totals: {
-          totalActive: 0,
-          pregnant: { count: 0, pct: 0 },
-          inseminated: { count: 0, pct: 0 },
-          open: { count: 0, pct: 0 },
-        },
-        fertility: { conceptionRatePct: 0 },
-      });
-    }
-
-    const active = animalsDocs.filter((a) => {
-      const st = String(a.status || a.lifeStatus || "").toLowerCase();
-      if (
-        ["sold", "dead", "died", "archived", "inactive", "مباع", "مباعة", "نافق", "ميت"].includes(
-          st
-        )
-      )
-        return false;
-      if (a.active === false) return false;
-      return true;
-    });
-
-    const totalActive = active.length;
-    const analysisDays = 90;
-    const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
-    const sinceStr = toYYYYMMDD(since);
-    const winStart = new Date(Date.now() - analysisDays * dayMs);
-
-    const activeIds = new Set(
-      active.map((a) => String(a.id || a.number || "").trim()).filter(Boolean)
-    );
-
-    async function fetchType(type) {
-      const out = [];
-      try {
-        const s = await adb
-          .collection("events")
-          .where("userId", "==", tenant)
-          .where("type", "==", type)
-          .where("date", ">=", sinceStr)
-          .get();
-        out.push(...s.docs);
-      } catch (e) {
-        console.log("⚠️ fetchType error", type, e.message);
-      }
-      return out.map((d) => ({ id: d.id, ...(d.data() || {}) }));
-    }
-
-    const [ins, preg] = await Promise.all([
-      fetchType("insemination"),
-      fetchType("pregnancy"),
-    ]);
-
-    const insWin = ins.filter(
-      (e) =>
-        activeIds.has(String(e.animalId || "").trim()) &&
-        toDate(e.date || e.createdAt) >= winStart
-    );
-    const pregPos = preg.filter(
-      (e) =>
-        activeIds.has(String(e.animalId || "").trim()) &&
-        /preg|positive|حمل|ايجاب/i.test(
-          String(e.result || e.status || e.outcome || "")
-        )
-    );
-
-    const pregSet = new Set(
-      pregPos.map((e) => String(e.animalId || "").trim()).filter(Boolean)
-    );
-    const openCount = Math.max(0, totalActive - pregSet.size);
-    const insAnimals = new Set(
-      insWin.map((e) => String(e.animalId || "").trim()).filter(Boolean)
-    );
-    const conceptionRate = insWin.length
-      ? +(
-          (pregPos.filter(
-            (e) => toDate(e.date || e.createdAt) >= winStart
-          ).length /
-            insWin.length) *
-          100
-        ).toFixed(1)
-      : 0;
-
-    res.json({
-      ok: true,
-      totals: {
-        totalActive,
-        pregnant: {
-          count: pregSet.size,
-          pct: +((pregSet.size / totalActive) * 100).toFixed(1),
-        },
-        inseminated: {
-          count: insAnimals.size,
-          pct: +((insAnimals.size / totalActive) * 100).toFixed(1),
-        },
-        open: {
-          count: openCount,
-          pct: +((openCount / totalActive) * 100).toFixed(1),
-        },
-      },
-      fertility: { conceptionRatePct: conceptionRate },
-    });
-  } catch (e) {
-    console.error("❌ herd-stats error:", e);
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
-});
-// ============================================================
-//                 API: ANIMALS (for dashboard summary)
-// ============================================================
+// 🔸 /api/animals — جلب كل الحيوانات للمستخدم الحالي
 app.get("/api/animals", async (req, res) => {
   try {
-    const tenant = req.headers["x-user-id"] || req.query.userId;
-    if (!tenant) return res.status(400).json({ ok: false, error: "userId_required" });
-    if (!db) return res.status(500).json({ ok: false, error: "firestore_not_ready" });
+    const userId = req.header("X-User-Id") || req.query.userId;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
 
-    let animalsDocs = [];
-    const snap1 = await db
-      .collectionGroup("animals")
-      .where("ownerUid", "==", tenant)
+    const snapshot = await db.collection("animals")
+      .where("userId", "==", userId)
       .get();
-    animalsDocs = snap1.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    if (animalsDocs.length === 0) {
-      const snap2 = await db
-        .collectionGroup("animals")
-        .where("userId", "==", tenant)
-        .get();
-      animalsDocs = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
-    }
-
-    res.json({ ok: true, animals: animalsDocs });
-  } catch (e) {
-    console.error("❌ /api/animals error:", e);
-    res.status(500).json({ ok: false, error: e.message });
+    const animals = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    res.json(animals);
+  } catch (err) {
+    console.error("Error fetching animals:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// ============================================================
-//                       STATIC FRONTEND
-// ============================================================
-app.use(express.static(path.join(__dirname, "www")));
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on port ${PORT}`);
+// 🔸 /api/events — إضافة حدث جديد
+app.post("/api/events", async (req, res) => {
+  try {
+    const data = req.body;
+    if (!data.userId) return res.status(400).json({ error: "Missing userId" });
+
+    data.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    const docRef = await db.collection("events").add(data);
+
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error("Error adding event:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// 🔸 /api/herd-stats — مؤشرات القطيع
+app.get("/api/herd-stats", async (req, res) => {
+  try {
+    const userId = req.header("X-User-Id") || req.query.userId;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    const animalsSnap = await db.collection("animals")
+      .where("userId", "==", userId)
+      .get();
+
+    const eventsSnap = await db.collection("events")
+      .where("userId", "==", userId)
+      .get();
+
+    const animals = animalsSnap.docs.map(d => d.data());
+    const events = eventsSnap.docs.map(d => d.data());
+
+    res.json({
+      animalsCount: animals.length,
+      eventsCount: events.length,
+    });
+  } catch (err) {
+    console.error("Error fetching herd stats:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ===== Fallback: Serve index.html =====
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "www", "index.html"));
+});
+
+// ===== Start Server =====
+app.listen(PORT, () => {
+  console.log(`🚀 Murabbik server running on port ${PORT}`);
 });
