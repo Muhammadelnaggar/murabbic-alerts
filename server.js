@@ -1,7 +1,6 @@
-// server.js — النسخة النهائية المستقرة (Render Ready)
+// server.js — النسخة النهائية المستقرة (Murabbik Render Ready)
 // =======================================================
 const path = require("path");
-const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
@@ -27,7 +26,7 @@ try {
     });
   }
 
-  // ✅ استخدم القاعدة الافتراضية وليس المسماة لتفادي مشكلة Render
+  // ✅ القاعدة الافتراضية (بدون اسم فرعي)
   db = admin.firestore();
   console.log("✅ Firestore connected (default DB)");
 } catch (e) {
@@ -71,7 +70,7 @@ app.get("/api/herd-stats", async (req, res) => {
     const adb = db;
     console.log("📡 Fetching herd stats for", tenant);
 
-    // 🟢 جلب الحيوانات من أي مستوى (collectionGroup) باستخدام ownerUid أو userId
+    // 🟢 جلب الحيوانات من أي مستوى باستخدام ownerUid أو userId
     let animalsDocs = [];
     try {
       const snap1 = await adb
@@ -85,4 +84,128 @@ app.get("/api/herd-stats", async (req, res) => {
           .collectionGroup("animals")
           .where("userId", "==", tenant)
           .get();
-        animalsDocs
+        animalsDocs = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+    } catch (e) {
+      console.error("❌ herd-stats Firestore read failed:", e.message);
+    }
+
+    if (!animalsDocs.length) {
+      console.log("⚠️ No animals found for user:", tenant);
+      return res.json({
+        ok: true,
+        totals: {
+          totalActive: 0,
+          pregnant: { count: 0, pct: 0 },
+          inseminated: { count: 0, pct: 0 },
+          open: { count: 0, pct: 0 },
+        },
+        fertility: { conceptionRatePct: 0 },
+      });
+    }
+
+    const active = animalsDocs.filter((a) => {
+      const st = String(a.status || a.lifeStatus || "").toLowerCase();
+      if (
+        ["sold", "dead", "died", "archived", "inactive", "مباع", "مباعة", "نافق", "ميت"].includes(
+          st
+        )
+      )
+        return false;
+      if (a.active === false) return false;
+      return true;
+    });
+
+    const totalActive = active.length;
+    const analysisDays = 90;
+    const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
+    const sinceStr = toYYYYMMDD(since);
+    const winStart = new Date(Date.now() - analysisDays * dayMs);
+
+    const activeIds = new Set(
+      active.map((a) => String(a.id || a.number || "").trim()).filter(Boolean)
+    );
+
+    async function fetchType(type) {
+      const out = [];
+      try {
+        const s = await adb
+          .collection("events")
+          .where("userId", "==", tenant)
+          .where("type", "==", type)
+          .where("date", ">=", sinceStr)
+          .get();
+        out.push(...s.docs);
+      } catch (e) {
+        console.log("⚠️ fetchType error", type, e.message);
+      }
+      return out.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+    }
+
+    const [ins, preg] = await Promise.all([
+      fetchType("insemination"),
+      fetchType("pregnancy"),
+    ]);
+
+    const insWin = ins.filter(
+      (e) =>
+        activeIds.has(String(e.animalId || "").trim()) &&
+        toDate(e.date || e.createdAt) >= winStart
+    );
+    const pregPos = preg.filter(
+      (e) =>
+        activeIds.has(String(e.animalId || "").trim()) &&
+        /preg|positive|حمل|ايجاب/i.test(
+          String(e.result || e.status || e.outcome || "")
+        )
+    );
+
+    const pregSet = new Set(
+      pregPos.map((e) => String(e.animalId || "").trim()).filter(Boolean)
+    );
+    const openCount = Math.max(0, totalActive - pregSet.size);
+    const insAnimals = new Set(
+      insWin.map((e) => String(e.animalId || "").trim()).filter(Boolean)
+    );
+    const conceptionRate = insWin.length
+      ? +(
+          (pregPos.filter(
+            (e) => toDate(e.date || e.createdAt) >= winStart
+          ).length /
+            insWin.length) *
+          100
+        ).toFixed(1)
+      : 0;
+
+    res.json({
+      ok: true,
+      totals: {
+        totalActive,
+        pregnant: {
+          count: pregSet.size,
+          pct: +((pregSet.size / totalActive) * 100).toFixed(1),
+        },
+        inseminated: {
+          count: insAnimals.size,
+          pct: +((insAnimals.size / totalActive) * 100).toFixed(1),
+        },
+        open: {
+          count: openCount,
+          pct: +((openCount / totalActive) * 100).toFixed(1),
+        },
+      },
+      fertility: { conceptionRatePct: conceptionRate },
+    });
+  } catch (e) {
+    console.error("❌ herd-stats error:", e);
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// ============================================================
+//                       STATIC FRONTEND
+// ============================================================
+app.use(express.static(path.join(__dirname, "www")));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
