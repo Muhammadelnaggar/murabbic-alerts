@@ -241,9 +241,9 @@ app.get('/api/herd-stats', async (req, res) => {
    const adb = db;
 
 
-  let animalsDocs = [];
+    let animalsDocs = [];
 try { 
-  animalsDocs = (await adb.collection('animals')
+  animalsDocs = (await adb.collectionGroup('animals')
     .where('userId','==',tenant)
     .get()).docs.slice(); 
 } catch {}
@@ -338,14 +338,14 @@ app.get('/api/animals', async (req, res) => {
       const seen = new Map();
       const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
 
-   for (const fld of ['userId','farmId']) {
-  try {
-    (await adb.collection('animals')
-      .where(fld,'==',tenant)
-      .limit(2000).get()).docs.forEach(push);
-  } catch {}
-}
+      for (const fld of ['userId','farmId']) {
+       try {
+  (await adb.collectionGroup('animals')
+    .where('userId','==',tenant)
+    .limit(2000).get()).docs.forEach(push);
+} catch {}
 
+      }
 
       const arr = [...seen.values()];
       arr.sort((a,b)=> String(a.number||'').localeCompare(String(b.number||''),'en',{numeric:true}));
