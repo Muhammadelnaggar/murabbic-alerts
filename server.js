@@ -201,6 +201,36 @@ app.get("/api/herd-stats", async (req, res) => {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
+// ============================================================
+//                 API: ANIMALS (for dashboard summary)
+// ============================================================
+app.get("/api/animals", async (req, res) => {
+  try {
+    const tenant = req.headers["x-user-id"] || req.query.userId;
+    if (!tenant) return res.status(400).json({ ok: false, error: "userId_required" });
+    if (!db) return res.status(500).json({ ok: false, error: "firestore_not_ready" });
+
+    let animalsDocs = [];
+    const snap1 = await db
+      .collectionGroup("animals")
+      .where("ownerUid", "==", tenant)
+      .get();
+    animalsDocs = snap1.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    if (animalsDocs.length === 0) {
+      const snap2 = await db
+        .collectionGroup("animals")
+        .where("userId", "==", tenant)
+        .get();
+      animalsDocs = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }
+
+    res.json({ ok: true, animals: animalsDocs });
+  } catch (e) {
+    console.error("❌ /api/animals error:", e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // ============================================================
 //                       STATIC FRONTEND
