@@ -301,10 +301,12 @@ async function loadHerdKPIs(){
      </div>`;
 
   try{
-    const [statsResp, animalsResp] = await Promise.all([
-      fetchJSON('/api/herd-stats'),
-      fetchJSON('/api/animals')
-    ]);
+ const uid = getTenantId();
+const [statsResp, animalsResp] = await Promise.all([
+  fetchJSON(`/api/herd-stats?userId=${uid}`),
+  fetchJSON(`/api/animals?userId=${uid}`)
+]);
+
 
     // /api/animals يدعم كل الأشكال الشائعة
     const animalsArr =
@@ -408,3 +410,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
