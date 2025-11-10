@@ -42,8 +42,8 @@ try {
         : admin.credential.applicationDefault(),
     });
   }
-  db = admin.firestore(admin.app(), "murabbikdata");
-  console.log("✅ Firebase Admin ready → murabbikdata");
+  db = admin.firestore(admin.app());
+  console.log("✅ Firestore connected:", db._databaseId?.database || "(default)");
 } catch (e) {
   console.log("⚠️ Firestore disabled:", e.message);
 }
@@ -63,9 +63,7 @@ function toDate(v) {
 }
 const tenantKey = (v) => (!v ? "DEFAULT" : String(v));
 function resolveTenant(req) {
-  return tenantKey(
-    req.headers["x-user-id"] || req.query.userId || "DEFAULT"
-  );
+  return tenantKey(req.headers["x-user-id"] || req.query.userId || "DEFAULT");
 }
 function belongs(rec, tenant) {
   const t = rec && rec.userId ? rec.userId : "DEFAULT";
@@ -138,6 +136,8 @@ app.post("/api/events", requireUserId, async (req, res) => {
 app.get("/api/herd-stats", async (req, res) => {
   try {
     const tenant = resolveTenant(req);
+    console.log("🔥 Querying animals for tenant:", tenant);
+
     const analysisDays = parseInt(req.query.analysisDays || "90", 10);
 
     if (db) {
@@ -324,6 +324,8 @@ app.get("/api/herd-stats", async (req, res) => {
 app.get("/api/animals", async (req, res) => {
   try {
     const tenant = resolveTenant(req);
+    console.log("🐄 Fetching animals for user:", tenant);
+
     if (db) {
       const adb = db;
       const seen = new Map();
