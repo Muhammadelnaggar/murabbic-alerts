@@ -30,11 +30,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------- Firebase ----------
+// ---------- Firebase ----------
 let db = null;
 try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : null;
+
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: sa
@@ -42,11 +44,15 @@ try {
         : admin.credential.applicationDefault(),
     });
   }
-  db = admin.firestore(admin.app());
-  console.log("✅ Firestore connected:", db._databaseId?.database || "(default)");
+
+  // ✅ شبك صريح على قاعدة murabbikdata الصحيحة
+  db = admin.firestore(admin.app(), "murabbikdata");
+
+  console.log("✅ Firestore connected to:", db._databaseId?.database || "(default)");
 } catch (e) {
-  console.log("⚠️ Firestore disabled:", e.message);
+  console.log("⚠️ Firestore init failed:", e.message);
 }
+
 
 // ---------- Helpers ----------
 const dayMs = 86400000;
