@@ -243,9 +243,10 @@ app.get('/api/herd-stats', async (req, res) => {
 
     let animalsDocs = [];
 try { 
-  animalsDocs = (await adb.collectionGroup('animals')
-    .where('userId','==',tenant)
-    .get()).docs.slice(); 
+ animalsDocs = (await adb.collection('animals')
+  .where('userId','==',tenant)
+  .get()).docs.slice();
+
 } catch {}
 
       const animals = animalsDocs.map(d => ({ id:d.id, ...(d.data()||{}) }));
@@ -339,10 +340,10 @@ app.get('/api/animals', async (req, res) => {
       const push = d => { if (d && d.exists) seen.set(d.ref.path, { id: d.id, ...d.data() }); };
 
       for (const fld of ['userId','farmId']) {
-       try {
-  (await adb.collectionGroup('animals')
-    .where('userId','==',tenant)
-    .limit(2000).get()).docs.forEach(push);
+ (await adb.collection('animals')
+  .where('userId','==',tenant)
+  .limit(2000).get()).docs.forEach(push);
+
 } catch {}
 
       }
