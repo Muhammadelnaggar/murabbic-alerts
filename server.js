@@ -1,8 +1,7 @@
-// =======================================================
-// server.js — Murabbik Production Build (Render)
-// =======================================================
+// server.js — Murabbik stable Render build (Firestore: murabbikdata)
 
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
@@ -10,116 +9,168 @@ const admin = require("firebase-admin");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== Middleware =====
+// ================== Middleware ==================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// =======================================================
-// 🔹 Firebase Admin Initialization — explicit murabbikdata DB
-// =======================================================
+// ================== Firebase Admin ==================
 let db = null;
 
 try {
-  // تحميل بيانات الحساب الخدمي (Service Account) من متغير البيئة
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : null;
+  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT || null;
+  let credential = null;
 
-  // إنشاء التطبيق إذا لم يكن موجوداً
+  if (saJson) {
+    try {
+      const sa = JSON.parse(saJson);
+      credential = admin.credential.cert(sa);
+    } catch (e) {
+      console.error("⚠️ فشل في قراءة FIREBASE_SERVICE_ACCOUNT، هنستخدم applicationDefault:", e.message);
+    }
+  }
+
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: sa
-        ? admin.credential.cert(sa)
-        : admin.credential.applicationDefault(),
+      credential: credential || admin.credential.applicationDefault(),
     });
   }
 
-  // ✅ الاتصال الصريح بقاعدة البيانات المسماة murabbikdata
-  const appInstance = admin.app();
-  db = admin.firestore(appInstance, "murabbikdata");
+  // ✅ ربط صريح بقاعدة murabbikdata (وليست default)
+  db = admin.firestore(admin.app(), "murabbikdata");
 
-  // 🔍 طباعة تأكيد في اللوج لتتبع الاتصال
-  const dbName =
-    db._databaseId && db._databaseId.database
-      ? db._databaseId.database
-      : "(default)";
-  console.log("✅ Firestore connected successfully to:", dbName);
+  console.log("✅ Firestore متصل بقاعدة:", db._databaseId.database);
 } catch (err) {
-  console.error("❌ Firestore initialization failed:", err);
+  console.error("❌ خطأ في تهيئة Firestore:", err);
+  db = null;
 }
 
-// =======================================================
-// 🔸 REST API Endpoints
-// =======================================================
+// ================== Local Fallback (اختياري) ==================
+const dataDir = path.join(__dirname, "data");
+const animalsPath = path.join(dataDir, "animals.json");
+const eventsPath = path.join(dataDir, "events.json");
 
-// اختبار الاتصال
-app.get("/api/ping", (req, res) => {
-  res.json({ ok: true, service: "murabbik-alerts", time: new Date().toISOString() });
-});
-
-// إرجاع بيانات الحيوانات (من Firestore murabbikdata)
-app.get("/api/animals", async (req, res) => {
+function ensureFile(filePath) {
   try {
-    const userId = req.query.userId || req.header("X-User-Id");
-    if (!userId) return res.status(400).json({ ok: false, error: "Missing userId" });
-
-    const snapshot = await db
-      .collection("animals")
-      .where("userId", "==", userId)
-      .get();
-
-    const animals = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    res.json({ ok: true, animals });
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, "[]", "utf8");
   } catch (err) {
-    console.error("❌ /api/animals error:", err);
-    res.status(500).json({ ok: false, error: "Server error" });
+    console.error("⚠️ تعذر إنشاء ملف fallback:", filePath, err.message);
   }
+}
+
+ensureFile(animalsPath);
+ensureFile(eventsPath);
+
+async function readFallback(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8") || "[]";
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function getCollectionDocs(colName, where = []) {
+  // 🔹 المسار الأساسي: Firestore murabbikdata
+  if (db) {
+    let ref = db.collection(colName);
+    where.forEach(([field, op, value]) => {
+      ref = ref.where(field, op, value);
+    });
+    const snap = await ref.get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+
+  // 🔹 في حالة غياب db: fallback محلي
+  const filePath =
+    colName === "animals"
+      ? animalsPath
+      : colName === "events"
+      ? eventsPath
+      : null;
+
+  if (!filePath) return [];
+
+  const all = await readFallback(filePath);
+
+  if (!where.length) return all;
+
+  // فلتر بسيط فقط لـ "=="
+  return all.filter((row) =>
+    where.every(([field, op, value]) => {
+      if (op === "==") return row[field] === value;
+      return true;
+    })
+  );
+}
+
+// ================== API Routes ==================
+
+// Ping للتأكد من الربط
+app.get("/api/ping", (req, res) => {
+  res.json({
+    ok: true,
+    db: !!db,
+    databaseId: db ? db._databaseId.database : null,
+  });
 });
 
-// إرجاع إحصاءات القطيع
+// herd-stats — مبني على userId / X-User-Id (بدون لعب بالـ farmId)
 app.get("/api/herd-stats", async (req, res) => {
   try {
-    const userId = req.query.userId || req.header("X-User-Id");
-    if (!userId) return res.status(400).json({ ok: false, error: "Missing userId" });
+    const userId =
+      (req.header("X-User-Id") || req.query.userId || "").trim();
 
-    const animalsSnap = await db
-      .collection("animals")
-      .where("userId", "==", userId)
-      .get();
+    if (!userId) {
+      return res.status(400).json({
+        ok: false,
+        error: "MISSING_USER_ID",
+        message: "يجب إرسال X-User-Id في الهيدر أو userId في الكويري.",
+      });
+    }
 
-    const animals = animalsSnap.docs.map(d => d.data());
-    const totalActive = animals.length;
-    const pregnant = animals.filter(a => a.reproductiveStatus === "عشار").length;
-    const lactating = animals.filter(a => a.productionStatus === "حلاب").length;
+    const animals = await getCollectionDocs("animals", [
+      ["userId", "==", userId],
+    ]);
+    const events = await getCollectionDocs("events", [
+      ["userId", "==", userId],
+    ]);
 
+    const totalAnimals = animals.length;
+
+    const lactating = animals.filter((a) => {
+      return (
+        a.isLactating === true ||
+        a.reproductiveStatus === "حلاب" ||
+        a.reproductiveStatus === "حلابه"
+      );
+    }).length;
+
+    // هنا ممكن نكمل حساب KPIs لاحقًا بدون ما نكسر الكود الحالي
     res.json({
       ok: true,
-      totals: {
-        totalActive,
-        pregnant: { count: pregnant, pct: totalActive ? Math.round((pregnant / totalActive) * 100) : 0 },
-        inMilk: { count: lactating, pct: totalActive ? Math.round((lactating / totalActive) * 100) : 0 },
-      },
+      source: db ? "firestore:murabbikdata" : "local-fallback",
+      totalAnimals,
+      animalsCount: totalAnimals,
+      lactating,
+      eventsCount: events.length,
     });
   } catch (err) {
     console.error("❌ /api/herd-stats error:", err);
-    res.status(500).json({ ok: false, error: "Server error" });
+    res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 });
 
-// =======================================================
-// 🔹 Static files (Dashboard frontend)
-// =======================================================
+// ================== Static Frontend ==================
 app.use(express.static(path.join(__dirname, "www")));
 
+// أي Route تاني يرجع الداشبورد (SPA بسيطة)
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "www", "index.html"));
+  res.sendFile(path.join(__dirname, "www", "dashboard.html"));
 });
 
-// =======================================================
-// 🚀 Start Server
-// =======================================================
+// ================== Start Server ==================
 app.listen(PORT, () => {
-  console.log(`✅ Murabbik Alerts service running on port ${PORT}`);
-  console.log(`🌍 Visit: https://murabbic-alerts.onrender.com`);
+  console.log(`🚀 Murabbik server running on port ${PORT}`);
 });
