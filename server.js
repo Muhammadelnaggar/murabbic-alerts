@@ -248,10 +248,13 @@ try {
   .get()).docs.slice();
 
 } catch {}
+// 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
+const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
-      const animals = animalsDocs.map(d => ({ id:d.id, ...(d.data()||{}) }));
-      const active  = animals.filter(a => a && a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
-      const totalActive = active.length;
+// ✅ جميع الحيوانات تعتبر نشطة مؤقتاً (لا يوجد حقل active/status حالياً)
+const active = animals;
+const totalActive = animals.length;
+
 
       const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
       const sinceStr = toYYYYMMDD(since);
