@@ -265,21 +265,36 @@ const totalActive = animals.length;
       const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
       const sinceStr = toYYYYMMDD(since);
 
-      async function fetchType(type) {
-        const out = [];
-        async function tryQ(field) {
-          try {
-            const s = await adb.collection('events').where(field,'==',tenant).where('type','==',type).where('date','>=',sinceStr).get();
-            out.push(...s.docs);
-          } catch {
-            const s = await adb.collection('events').where(field,'==',tenant).where('type','==',type).orderBy('date','desc').limit(2000).get().catch(()=>({docs:[]}));
-            (s.docs||[]).forEach(d=>{ if ((d.get('date')||'') >= sinceStr) out.push(d); });
-          }
-        }
-        await tryQ('userId'); await tryQ('farmId');
-        const map = new Map(); out.forEach(d=>map.set(d.id,d));
-        return [...map.values()].map(d=>({ id:d.id, ...(d.data()||{}) }));
-      }
+  async function fetchType(type) {
+  const out = [];
+  async function tryQ(field) {
+    try {
+      const s = await adb.collection('events')
+        .where(field, '==', tenant)
+        .where('eventType', '==', type)
+        .where('eventDate', '>=', sinceStr)
+        .get();
+      out.push(...s.docs);
+    } catch {
+      const s = await adb.collection('events')
+        .where(field, '==', tenant)
+        .where('eventType', '==', type)
+        .orderBy('eventDate', 'desc')
+        .limit(2000)
+        .get()
+        .catch(() => ({ docs: [] }));
+      (s.docs || []).forEach(d => {
+        if ((d.get('eventDate') || '') >= sinceStr) out.push(d);
+      });
+    }
+  }
+  await tryQ('userId');
+  await tryQ('farmId');
+  const map = new Map();
+  out.forEach(d => map.set(d.id, d));
+  return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
+}
+
 
       const [ins, preg] = await Promise.all([fetchType('insemination'), fetchType('pregnancy')]);
 
