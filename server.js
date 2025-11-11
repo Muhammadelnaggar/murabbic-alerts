@@ -30,7 +30,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------- Firebase ----------
-// ---------- Firebase ----------
+// ---------- Firebase Admin ----------
 let db = null;
 try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
@@ -45,13 +45,14 @@ try {
     });
   }
 
-  // ✅ شبك صريح على قاعدة murabbikdata الصحيحة
+  // ✅ الاتصال بقاعدة البيانات الصحيحة (murabbikdata)
   db = admin.firestore(admin.app(), "murabbikdata");
 
   console.log("✅ Firestore connected to:", db._databaseId?.database || "(default)");
-} catch (e) {
-  console.log("⚠️ Firestore init failed:", e.message);
+} catch (err) {
+  console.error("❌ Firestore init error:", err);
 }
+
 
 
 // ---------- Helpers ----------
