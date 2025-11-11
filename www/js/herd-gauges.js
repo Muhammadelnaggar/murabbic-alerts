@@ -56,7 +56,22 @@
                        : Array.isArray(animals.items) ? animals.items.length : 0;
 
     // 2) إحصاءات القطيع
-    const stats = await getJSON(API(`/api/herd-stats?species=${encodeURIComponent(species)}&analysisDays=90`));
+   // 2) إحصاءات القطيع — نمرر userId كما يطلب السيرفر الحالي
+const userId =
+  window.userId ||
+  localStorage.getItem("userId") ||
+  sessionStorage.getItem("userId") ||
+  "";
+
+let stats = null;
+if (userId) {
+  stats = await getJSON(
+    `/api/herd-stats?userId=${encodeURIComponent(userId)}&species=${encodeURIComponent(species)}&analysisDays=90`
+  );
+} else {
+  console.warn("⚠️ userId غير متاح بعد، لن تُعرض إحصاءات القطيع");
+}
+
 
     // إعداد القيم الافتراضية (لو حصل خطأ، ما نرميش 500 للواجهة)
     const S = {
