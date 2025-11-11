@@ -250,6 +250,8 @@ try {
 } catch {}
 // 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
 const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      console.log("🧭 herd-stats tenant =", tenant);
+
 
 // ✅ جميع الحيوانات تعتبر نشطة مؤقتاً (لا يوجد حقل active/status حالياً)
 const active = animals;
