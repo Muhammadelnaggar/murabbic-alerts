@@ -243,9 +243,10 @@ app.get('/api/herd-stats', async (req, res) => {
 
     let animalsDocs = [];
 try { 
-  animalsDocs = (await adb.collectionGroup('animals')
-    .where('userId','==',tenant)
-    .get()).docs.slice(); 
+ animalsDocs = (await adb.collection('animals')
+  .where('userId', '==', tenant)
+  .get()).docs.slice();
+
 } catch {}
 
       const animals = animalsDocs.map(d => ({ id:d.id, ...(d.data()||{}) }));
