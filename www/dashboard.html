@@ -120,6 +120,11 @@
 
 </head>
 <body>
+  <script>
+    window.API_BASE = "https://murabbic-alerts.onrender.com";
+  </script>
+
+
   <h1>لوحة التحكم - مربيك</h1>
 
   <!-- شريط THI أعلى الصفحة -->
@@ -162,9 +167,7 @@
 // ================= API_BASE =================
 // على Render أو أي دومين حقيقي: مسار نسبي لنفس السيرفر
 // على بيئات محلية file:// أو منافذ ثابتة يمكن تعديلها يدوياً عند الحاجة
-const API_BASE = (location.origin.startsWith('http') && !location.origin.startsWith('file'))
-  ? ''
-  : 'https://murabbic-alerts.onrender.com';
+const API_BASE = "https://murabbic-alerts.onrender.com";
 
 // ================= هوية المستخدم / التينانت =================
 function getTenantId() {
@@ -410,4 +413,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
