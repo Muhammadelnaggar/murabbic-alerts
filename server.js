@@ -66,12 +66,16 @@ function toDate(v){
 }
 
 const tenantKey = v => (!v ? 'DEFAULT' : String(v));
-function resolveTenant(req){
-  return tenantKey(
-    req.headers['x-user-id'] || req.query.userId ||
-    process.env.DEFAULT_TENANT_ID || 'DEFAULT'
-  );
+function resolveTenant(req) {
+  const uid =
+    req.get("X-User-Id") ||  // الشكل القياسي للهيدر
+    req.headers["x-user-id"] || // fallback إذا Express حوّلها
+    req.query.userId ||
+    process.env.DEFAULT_TENANT_ID ||
+    "DEFAULT";
+  return tenantKey(uid);
 }
+
 
 function belongs(rec, tenant){
   const t = rec && (rec.userId || rec.farmId) || 'DEFAULT';
