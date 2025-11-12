@@ -45,13 +45,14 @@
   async function load() {
     const species = (localStorage.getItem("herdProfile") || "buffalo").toLowerCase();
 
-    // 1️⃣ تحميل الحيوانات (تأكيد الظهور)
-    const animals = await getJSON("/api/animals") || [];
-    const totalAnimals = Array.isArray(animals)
-      ? animals.length
-      : Array.isArray(animals.items)
-      ? animals.items.length
-      : 0;
+   const animalsData = await getJSON("/api/animals");
+const totalAnimals =
+  (animalsData && animalsData.totals && Number.isFinite(animalsData.totals.totalActive))
+    ? animalsData.totals.totalActive
+    : Array.isArray(animalsData)
+    ? animalsData.length
+    : 0;
+
 
     // 2️⃣ تحميل إحصاءات القطيع مع userId
     const userId =
