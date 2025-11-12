@@ -247,11 +247,11 @@ app.get('/api/herd-stats', async (req, res) => {
 let animalsDocs = [];
 try {
   // 🟢 استخدم Firestore الافتراضي مباشرة بدل murabbikdata
-  const snap = await admin.firestore()
-    .collection('animals')
-    .where('userId','==',tenant)
-    .limit(2000)
-    .get();
+ const snap = await db.collection('animals')
+  .where('userId','==',tenant)
+  .limit(2000)
+  .get();
+
   animalsDocs = snap.docs;
   console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
 } catch (e) {
