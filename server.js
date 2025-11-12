@@ -246,14 +246,18 @@ app.get('/api/herd-stats', async (req, res) => {
 
 let animalsDocs = [];
 try {
-  animalsDocs = (await admin.firestore(admin.app(), 'murabbikdata')
+  // 🟢 استخدم Firestore الافتراضي مباشرة بدل murabbikdata
+  const snap = await admin.firestore()
     .collection('animals')
-    .where('userId', '==', tenant)
+    .where('userId','==',tenant)
     .limit(2000)
-    .get()).docs;
+    .get();
+  animalsDocs = snap.docs;
+  console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
 } catch (e) {
-  console.error('❌ animals query failed:', e.message);
+  console.error('❌ animals query failed:', e.code || e.message);
 }
+
 
 // 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
 const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
