@@ -1,4 +1,13 @@
+
 // /www/js/tenant-bootstrap.js
+// ✅ Fix API base for Render deployment (murabbic-alerts)
+if (!localStorage.getItem('API_BASE')) {
+  localStorage.setItem('API_BASE', 'https://murabbic-alerts.onrender.com');
+}
+
+const API_BASE = localStorage.getItem('API_BASE');
+console.log("🌐 API_BASE =", API_BASE);
+
 (() => {
   // دالة تجيب الـ UID لحظيًا (مش مرة واحدة وقت التحميل)
   function getUid() {
