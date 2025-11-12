@@ -5,7 +5,8 @@ if (!localStorage.getItem('API_BASE')) {
   localStorage.setItem('API_BASE', 'https://murabbic-alerts.onrender.com');
 }
 
-const API_BASE = localStorage.getItem('API_BASE');
+window.API_BASE = window.API_BASE || localStorage.getItem('API_BASE');
+
 console.log("🌐 API_BASE =", API_BASE);
 
 (() => {
