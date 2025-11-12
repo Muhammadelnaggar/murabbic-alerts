@@ -360,7 +360,7 @@ const totalActive = animals.length;
 // ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
-app.get('/api/herd-stats', async (req, res) => {
+app.get('/api/animals', async (req, res) => {
   try {
     const tenant = resolveTenant(req);
     const analysisDays = parseInt(req.query.analysisDays || '90', 10);
@@ -487,7 +487,7 @@ app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
       const set=new Map(); const cand=[val]; const n=Number(val); if(!Number.isNaN(n)) cand.push(n);
       for (const v of cand) {
         try { (await adb.collection('animals').where('number','==',v).limit(50).get()).docs.forEach(d=>uniqPush(set,d)); } catch {}
-        try { (await adb.collectionGroup('animals').where('number','==',v).limit(50).get()).docs.forEach(d=>uniqPush(set,d)); } catch {}
+       
       }
       try { const d=await adb.collection('animals').doc(String(val)).get(); uniqPush(set,d); } catch {}
       return [...set.values()];
@@ -548,7 +548,7 @@ app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
       const cand=[v]; const n=Number(v); if(!Number.isNaN(n)) cand.push(n);
       for(const x of cand){
         try{ (await adb.collection('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
-        try{ (await adb.collectionGroup('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
+       
       }
       try{ const d=await adb.collection('animals').doc(String(v)).get(); push(d);}catch{}
     }
