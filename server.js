@@ -244,14 +244,17 @@ app.get('/api/herd-stats', async (req, res) => {
     if (db) {
    const adb = db;
 
+let animalsDocs = [];
+try {
+  animalsDocs = (await admin.firestore(admin.app(), 'murabbikdata')
+    .collection('animals')
+    .where('userId', '==', tenant)
+    .limit(2000)
+    .get()).docs;
+} catch (e) {
+  console.error('❌ animals query failed:', e.message);
+}
 
-    let animalsDocs = [];
-try { 
- animalsDocs = (await adb.collection('animals')
-  .where('userId', '==', tenant)
-  .get()).docs.slice();
-
-} catch {}
 // 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
 const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
       console.log("🧭 herd-stats tenant =", tenant);
