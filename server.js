@@ -371,16 +371,18 @@ app.get('/api/herd-stats', async (req, res) => {
 
       // ✅ جلب الحيوانات عبر collectionGroup
       let animalsDocs = [];
-      try {
-        const snap = await adb.collectionGroup('animals')
-          .where('userId', '==', tenant)
-          .limit(2000)
-          .get();
-        animalsDocs = snap.docs;
-        console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
-      } catch (e) {
-        console.error('❌ animals query failed:', e.code || e.message);
-      }
+     try {
+  const snap = await adb.collection('animals')
+    .where('userId', '==', tenant)
+    .limit(2000)
+    .get();
+
+  animalsDocs = snap.docs;
+  console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
+} catch (e) {
+  console.error('❌ animals query failed:', e.code || e.message);
+}
+
 
       const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
       const totalActive = animals.length;
