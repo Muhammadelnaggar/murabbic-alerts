@@ -27,7 +27,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ===== Firebase Admin (best-effort) =====
+
+
 // ===== Firebase Admin (best-effort) =====
 // ===== Firebase Admin (best-effort) =====
 let db = null;
@@ -40,17 +41,16 @@ try {
     admin.initializeApp({
       credential: sa
         ? admin.credential.cert(sa)
-        : admin.credential.applicationDefault()
+        : admin.credential.applicationDefault(),
+      projectId: "murabbik", // 🔹 ضروري لتحديد المشروع الصحيح
     });
   }
 
-  // ✅ استخدم قاعدة murabbikdata
-  db = admin.firestore(admin.app(), 'murabbikdata');
-  console.log('✅ Firebase Admin ready → murabbikdata');
+  db = admin.firestore(admin.app(), "murabbikdata");
+  console.log("✅ Firebase Admin ready → murabbikdata");
 } catch (e) {
-  console.log('⚠️ Firestore disabled:', e.message);
+  console.log("⚠️ Firestore disabled:", e.message);
 }
-
 
 
 // ===== Helpers =====
