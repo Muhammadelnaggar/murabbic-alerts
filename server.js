@@ -45,6 +45,8 @@ try {
       projectId: "murabbik", // 🔹 ضروري لتحديد المشروع الصحيح
     });
   }
+  console.log("🔥 Admin SDK Auth Identity:", admin.app().options?.credential?.cert);
+
 
   db = admin.firestore(admin.app(), "murabbikdata");
   console.log("✅ Firebase Admin ready → murabbikdata");
