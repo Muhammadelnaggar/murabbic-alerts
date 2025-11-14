@@ -564,6 +564,31 @@ app.get('/timeline.html', ensureAdmin, (_req, res) => {
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'index.html'));
 });
+// ============================================================
+//            DEBUG: Dump all animals in Firestore
+// ============================================================
+app.get('/api/debug/animals/all', async (req, res) => {
+  try {
+    if (!db) return res.json({ ok:false, error:'firestore_disabled' });
+
+    const snap = await db.collection('animals').limit(5000).get();
+    const arr = snap.docs.map(d => ({
+      id: d.id,
+      number: d.get('number'),
+      userId: d.get('userId'),
+      farmId: d.get('farmId'),
+      type: d.get('type'),
+      species: d.get('species'),
+      createdAt: d.get('createdAt')
+    }));
+
+    res.json({ ok:true, count: arr.length, animals: arr });
+
+  } catch (e) {
+    console.error('debug dump', e);
+    res.status(500).json({ ok:false, error:'dump_failed' });
+  }
+});
 
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
