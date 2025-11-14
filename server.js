@@ -361,20 +361,39 @@ const totalActive = animals.length;
 //                       API: ANIMALS (robust)
 // ============================================================
 app.get('/api/animals', async (req, res) => {
+  const tenant = resolveTenant(req);
+
   try {
-    const tenant = resolveTenant(req);
-    if (!db) return res.json({ ok:false, error:'firestore_disabled' });
+    // لو Firestore متاح جرّب أولاً
+    if (db) {
+      try {
+        const snap = await db.collection('animals')
+          .where('userId', '==', tenant)
+          .limit(2000)
+          .get();
 
-    const snap = await db.collection('animals')
-      .where('userId','==',tenant)
-      .limit(2000)
-      .get();
+        const animals = snap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() || {})
+        }));
 
-    const animals = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+        // حتى لو فاضي → تظل استجابة ناجحة
+        return res.json({ ok: true, animals });
+      } catch (e) {
+        // نطبع الخطأ في اللوج لكن ما نكسّرش الـ API
+        console.error('animals firestore error:', e.code || e.message || e);
+        // نكمل على الـ fallback المحلي
+      }
+    }
 
-    return res.json({ ok:true, animals });
-  } catch(e) {
-    res.status(500).json({ ok:false, error:'animals_failed' });
+    // إما db=null أو Firestore فشل → fallback محلي
+    const animalsLocal = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    return res.json({ ok: true, animals: animalsLocal });
+
+  } catch (e) {
+    console.error('animals fatal error:', e);
+    // الحالة دي نادرة جداً (كسر في السيرفر نفسه)
+    return res.status(500).json({ ok: false, error: 'animals_fatal' });
   }
 });
 
@@ -487,21 +506,32 @@ app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
 });
 
 // ============================================================
-//                 DEBUG + PAGES
+//                 DEBUG: SENSORS HEALTH (always safe)
 // ============================================================
 app.get('/api/sensors/health', async (_req, res) => {
-  if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
+  // لو مفيش Firestore أصلاً → نعتبر مفيش أجهزة ونرجّع 0
+  if (!db) {
+    return res.json({ ok: true, devices: 0 });
+  }
+
   try {
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
-    const snap = await db.collection('devices').where('lastSeen', '>=', tenMinAgo).get();
+    const snap = await db.collection('devices')
+      .where('lastSeen', '>=', tenMinAgo)
+      .get();
+
     const count = snap.docs
       .map(d => (d.data().type || '').toLowerCase())
       .filter(t => t !== 'env' && t !== 'thi').length;
-    return res.json({ ok:true, devices: count });
-  } catch {
-    return res.status(500).json({ ok:false, error:'health_failed' });
+
+    return res.json({ ok: true, devices: count });
+  } catch (e) {
+    console.error('sensors/health error:', e.code || e.message || e);
+    // لا نكسّر الداشبورد أبداً بسبب الحساسات
+    return res.json({ ok: true, devices: 0 });
   }
 });
+
 
 if (ADMIN_DEV_OPEN) {
   app.get('/api/debug/echo-tenant', (req, res) => {
