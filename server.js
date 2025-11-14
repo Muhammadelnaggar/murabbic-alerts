@@ -43,11 +43,12 @@ try {
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: "murabbik",
+        projectId: sa.project_id,
         clientEmail: sa.client_email,
         privateKey: sa.private_key
       }),
-      projectId: "murabbik"
+      projectId: sa.project_id,
+      
     });
   }
 
