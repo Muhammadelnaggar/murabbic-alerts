@@ -34,6 +34,9 @@ app.use(express.urlencoded({ extended: true }));
 let db = null;
 try {
   const sa = require("/etc/secrets/murabbik-470511-firebase-adminsdk-fbsvc-650a6ab6ef.json");
+  console.log("SA project_id:", sa.project_id);
+console.log("SA client_email:", sa.client_email);
+
 
   if (!admin.apps.length) {
     admin.initializeApp({
