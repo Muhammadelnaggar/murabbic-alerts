@@ -116,6 +116,20 @@
       text-align:center;
       color:#388e3c;
     }
+    .mini-gauge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  margin: 4px auto;
+  background: conic-gradient(#2e7d32 0deg, #e0e0e0 0deg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  font-weight:bold;
+  color:#2e7d32;
+}
+
   </style>
 
 </head>
@@ -290,18 +304,25 @@ function getDIM(an){
   if(!calv) return 0;
   return Math.max(0, daysBetween(new Date(), calv));
 }
+function box(label, value, sub='', gaugeId=null){
+  const gaugeHTML = gaugeId
+    ? `<div id="${gaugeId}" class="mini-gauge"></div>`
+    : '';
+
+  return `
+    <div class="kpi">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${value ?? '--'}</div>
+      ${gaugeHTML}
+      ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+    </div>
+  `;
+}
 
 // ================= تحميل مؤشرات القطيع =================
 async function loadHerdKPIs(){
   const statusBar = document.getElementById('statusBar');
   const grid = document.getElementById('kpiGrid');
-
-  const box = (label,val,sub='') =>
-    `<div class="kpi">
-       <div class="kpi-label">${label}</div>
-       <div class="kpi-value">${(val !== undefined && val !== null && val !== '') ? val : '-'}</div>
-       ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
-     </div>`;
 
   try{
  const uid = getTenantId();
@@ -350,29 +371,52 @@ const [statsResp, animalsResp] = await Promise.all([
       ? t.pregnant.pct
       : (t.pregnantPct != null ? t.pregnantPct : 0);
 
-    grid.innerHTML =
-      box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة') +
-      box('عدد الأبقار في الحليب', inMilk ? `${inMilk} (${inMilkPct}%)` : '0', 'نسبتهم من القطيع') +
-      box('نسبة العشار', pregPct ? pregPct + '%' : '0%', 'من إجمالي النشط') +
-      box('معدل الإخصاب %', (fert.conceptionRatePct != null) ? fert.conceptionRatePct + '%' : '0%', 'من أحداث التلقيح المسجلة') +
-      box('متوسط الأيام المفتوحة', stats.openDaysAvg ?? '--', 'من الولادة حتى الحمل (إن وُجدت بيانات)') +
-      box('معدل الحمل (نافذة 21 يوم)', stats.pregRate21d ?? '--', 'يتطلب أحداث شياع/تلقيح منتظمة') +
-      box('خدمات لكل حمل (S/C)', stats.servicesPerConception ?? '--', 'عدد التلقيحات / عدد الحمول') +
-      box('نسبة الإجهاض', stats.abortionRatePct != null ? stats.abortionRatePct + '%' : '--', 'من إجمالي الحمول') +
-      box('نسبة الولادات النافقة', stats.deadCalvingRatePct != null ? stats.deadCalvingRatePct + '%' : '--') +
-      box('العمر عند أول ولادة (شهر)', stats.ageAtFirstCalvingMonths ?? '--') +
-      box('متوسط إنتاج اللبن/بقرة', avgMilk ? avgMilk + ' كجم' : '--', 'حسب أحدث بيانات اللبن المسجلة') +
-      box('إجمالي إنتاج اللبن اليومي', milkTotal ? milkTotal + ' كجم' : '--', 'تقديري من المتوسط × عدد الحلاب') +
-      box('متوسط DIM', avgDIM || '--', 'أيام في الحليب للأبقار المنتجة') +
-      box('نسبة الأبقار في الحليب', inMilkPct ? inMilkPct + '%' : '--', 'من إجمالي النشط') +
-      box('استبعاد إنتاجي', stats.cullProdPct != null ? stats.cullProdPct + '%' : '--') +
-      box('استبعاد تناسلي', stats.cullReproPct != null ? stats.cullReproPct + '%' : '--') +
-      box('استبعاد صحي', stats.cullHealthPct != null ? stats.cullHealthPct + '%' : '--') +
-      box('كفاءة تحويل العلف إلي لبن', stats.feedEfficiency ?? '--', 'يتطلب بيانات تغذية') +
-      box('كمية المادة الجافة المأكولة', stats.dmiAvg ?? '--') +
-      box('صافي دخل اللبن بعد خصم التغذية', stats.iofc ?? '--') +
-      box('تقييم الروث', stats.fecesScore ?? '--') +
-      box('تقييم الحالة الجسمية بالكاميرا', stats.bcsCamera ?? '--');
+  grid.innerHTML =
+  box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active') +
+  box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk') +
+  box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg') +
+  box('معدل الإخصاب %', fert.conceptionRatePct ?? 0 + '%', 'أحداث التلقيح', 'g_fert') +
+  box('متوسط الأيام المفتوحة', stats.openDaysAvg ?? 0, 'من الولادة للحمل', 'g_openDays') +
+  box('معدل الحمل (21 يوم)', stats.pregRate21d ?? 0, '', 'g_pregRate') +
+  box('خدمات لكل حمل (S/C)', stats.servicesPerConception ?? 0, '', 'g_sc') +
+  box('نسبة الإجهاض', stats.abortionRatePct ?? 0 + '%', '', 'g_abort') +
+  box('نسبة الولادات النافقة', stats.deadCalvingRatePct ?? 0 + '%', '', 'g_deadCalving') +
+  box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc') +
+  box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk') +
+  box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk') +
+  box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim') +
+  box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct') +
+  box('استبعاد إنتاجي', stats.cullProdPct ?? 0 + '%', '', 'g_cullProd') +
+  box('استبعاد تناسلي', stats.cullReproPct ?? 0 + '%', '', 'g_cullRepro') +
+  box('استبعاد صحي', stats.cullHealthPct ?? 0 + '%', '', 'g_cullHealth') +
+  box('كفاءة تحويل العلف', stats.feedEfficiency ?? 0, '', 'g_fe') +
+  box('المادة الجافة المأكولة', stats.dmiAvg ?? 0, '', 'g_dmi') +
+  box('صافي دخل اللبن IOFC', stats.iofc ?? 0, '', 'g_iofc') +
+  box('تقييم الروث', stats.fecesScore ?? 0, '', 'g_feces') +
+  box('BCS بالكاميرا', stats.bcsCamera ?? 0, '', 'g_bcs');
+
+renderMiniGauge("g_active", totalActive ? 100 : 0);
+renderMiniGauge("g_inmilk", inMilkPct);
+renderMiniGauge("g_preg", pregPct);
+renderMiniGauge("g_fert", fert.conceptionRatePct ?? 0);
+renderMiniGauge("g_openDays", stats.openDaysAvg ?? 0);
+renderMiniGauge("g_pregRate", stats.pregRate21d ?? 0);
+renderMiniGauge("g_sc", stats.servicesPerConception ?? 0);
+renderMiniGauge("g_abort", stats.abortionRatePct ?? 0);
+renderMiniGauge("g_deadCalving", stats.deadCalvingRatePct ?? 0);
+renderMiniGauge("g_afc", stats.ageAtFirstCalvingMonths ?? 0);
+renderMiniGauge("g_avgMilk", avgMilk ?? 0);
+renderMiniGauge("g_totalMilk", milkTotal ?? 0);
+renderMiniGauge("g_dim", avgDIM ?? 0);
+renderMiniGauge("g_inmilkPct", inMilkPct ?? 0);
+renderMiniGauge("g_cullProd", stats.cullProdPct ?? 0);
+renderMiniGauge("g_cullRepro", stats.cullReproPct ?? 0);
+renderMiniGauge("g_cullHealth", stats.cullHealthPct ?? 0);
+renderMiniGauge("g_fe", stats.feedEfficiency ?? 0);
+renderMiniGauge("g_dmi", stats.dmiAvg ?? 0);
+renderMiniGauge("g_iofc", stats.iofc ?? 0);
+renderMiniGauge("g_feces", stats.fecesScore ?? 0);
+renderMiniGauge("g_bcs", stats.bcsCamera ?? 0);
 
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }catch(e){
@@ -380,6 +424,14 @@ const [statsResp, animalsResp] = await Promise.all([
     document.getElementById('statusBar').textContent =
       'فشل تحميل بيانات /api/herd-stats أو /api/animals. تأكد من تسجيل الدخول وربط الحساب.';
   }
+}
+function renderMiniGauge(id, percent, color="#2e7d32"){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const val = Math.max(0, Math.min(100, percent));
+  el.style.background = `conic-gradient(${color} ${val*3.6}deg, #e0e0e0 ${val*3.6}deg)`;
+  el.style.color = color;
+  el.textContent = val + '%';
 }
 
 // ================= تشغيل عند التحميل =================
@@ -413,5 +465,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
