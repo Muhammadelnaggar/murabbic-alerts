@@ -24,6 +24,7 @@
       background:var(--bg);
       font-family:Arial,Helvetica,sans-serif;
       color:var(--text);
+      direction:rtl;
     }
     h1{
       margin:8px 0 10px;
@@ -131,93 +132,331 @@
 
 </head>
 <body>
-  <script> window.API_BASE = "https://murabbic-alerts.onrender.com"; </script>
 
-  <h1>لوحة التحكم - مربيك</h1>
-
-  <!-- شريط THI -->
-  <div id="thiBar" class="card">
-    <div>
-      الحرارة: <strong id="wxTemp">--</strong>°C |
-      الرطوبة: <strong id="wxHum">--</strong>% |
-      THI: <strong id="wxTHI">--</strong>
-    </div>
-    <div class="thi-mini">
-      <div class="thi-circle" id="thiCircle">--</div>
-      <div>الحالة: <span id="thiStatus">جاري الحساب…</span></div>
-    </div>
-  </div>
-
-  <!-- اختصارات -->
-  <div class="tiles">
-    <div class="tile" onclick="location.href='add-animal.html'">➕ حيوان جديد</div>
-    <div class="tile" onclick="location.href='animal-list.html'">📋 حيواناتي</div>
-    <div class="tile" onclick="location.href='add-event.html'">🗓️ حدث جديد</div>
-    <div class="tile" onclick="location.href='alerts.html'">🔔 أرشيف التنبيهات</div>
-    <div class="tile" onclick="location.href='cow-card.html'">🐮 البطاقة الذكية</div>
-    <div class="tile" onclick="location.href='groups.html'">👥 مجموعات</div>
-    <div class="tile" onclick="location.href='milk-reports.html'">📊 تقارير اللبن</div>
-    <div class="tile" onclick="location.href='sensor-test.html'">🛰️ الحساسات</div>
-    <div class="tile" onclick="location.href='nutrition-eval.html'">🥗 تقييم التغذية</div>
-  </div>
-
-  <!-- مؤشرات القطيع -->
-  <div class="card">
-    <div class="section-title">📊 مؤشرات القطيع (تناسلي + إنتاجي)</div>
-    <div id="kpiGrid" class="kpi-grid"></div>
-    <div id="statusBar">جارٍ تحميل البيانات…</div>
-  </div>
-
-
-<!-- ===========================
-      كود الداشبوورد الأساسي
-     =========================== -->
 <script>
-/* كل دوال الداشبوورد كما هي (fetchJSON – loadTHI – loadHerdKPIs … )
-   بدون أي تغيير، لأنك بالفعل تمتلك نسخة صحيحة.
-   وأنا حافظتها لك ومراجعاها. */
-
+  window.API_BASE = "https://murabbic-alerts.onrender.com";
 </script>
 
+<h1>لوحة التحكم - مربيك</h1>
 
-<!-- ===========================
-     ترتيب سكربتات مربيّك الرسمي
-     =========================== -->
+<!-- شريط THI أعلى الصفحة -->
+<div id="thiBar" class="card">
+  <div>
+    الحرارة: <strong id="wxTemp">--</strong>°C |
+    الرطوبة: <strong id="wxHum">--</strong>% |
+    THI: <strong id="wxTHI">--</strong>
+  </div>
+  <div class="thi-mini">
+    <div class="thi-circle" id="thiCircle">--</div>
+    <div>الحالة: <span id="thiStatus">جاري حساب المؤشر...</span></div>
+  </div>
+</div>
 
-<!-- 1) dataLayer + tracking -->
+<!-- اختصارات -->
+<div class="tiles">
+  <div class="tile" onclick="location.href='add-animal.html'">➕ حيوان جديد</div>
+  <div class="tile" onclick="location.href='animal-list.html'">📋 حيواناتي</div>
+  <div class="tile" onclick="location.href='add-event.html'">🗓️ حدث جديد</div>
+  <div class="tile" onclick="location.href='alerts.html'">🔔 أرشيف التنبيهات</div>
+  <div class="tile" onclick="location.href='cow-card.html'">🐮 البطاقة الذكية</div>
+  <div class="tile" onclick="location.href='groups.html'">👥 مجموعات مربيك</div>
+  <div class="tile" onclick="location.href='milk-reports.html'">📊 تقارير اللبن</div>
+  <div class="tile" onclick="location.href='sensor-test.html'">🛰️ الأجهزة والحساسات</div>
+  <div class="tile" onclick="location.href='nutrition-eval.html'">🥗 تقييم التغذية</div>
+</div>
+
+<!-- مؤشرات القطيع -->
+<div class="card">
+  <div class="section-title">📊 مؤشرات القطيع (تناسلي + إنتاجي)</div>
+  <div id="kpiGrid" class="kpi-grid"></div>
+  <div id="statusBar">جارٍ تحميل بيانات القطيع...</div>
+</div>
+
 <script>
-  window.dataLayer = window.dataLayer || [];
-  if (!window.t) {
-    window.t = {
-      event: (name, props) => {
-        try { window.dataLayer.push({event:name, ...(props||{}), ts:Date.now()}); }
-        catch(e){}
-      }
-    };
+// ============ API BASE ============
+const API_BASE = "https://murabbic-alerts.onrender.com";
+
+// ============ هوية المستخدم ============
+function getTenantId() {
+  try {
+    const T = window.__TENANT__ || {};
+    const fromObj = T.userId || T.uid || T.id || T.tenantId;
+    const fromStorage =
+      localStorage.getItem('userId') ||
+      localStorage.getItem('uid') ||
+      localStorage.getItem('tenantId');
+    return fromObj || fromStorage || null;
+  } catch (e) {
+    return null;
   }
-  window.t.event('page_view', {page:'/dashboard.html'});
-</script>
+}
 
-<!-- 2) نواة التطبيق -->
-<script type="module" src="/js/app-core.js"></script>
+async function waitForTenant(maxMs = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const id = getTenantId();
+    if (id) return id;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return getTenantId();
+}
 
-<!-- 3) ملفات التنبؤ + التايملاين -->
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
+async function fetchJSON(path){
+  let uid = getTenantId();
+  if (!uid && location.hostname !== 'localhost') {
+    uid = await waitForTenant();
+  }
+  if (!uid) uid = 'demo-user';
 
-<!-- 4) حقن الهوية -->
-<script src="/js/tenant-bootstrap.js"></script>
+  const headers = { 'Cache-Control':'no-store' };
+  if (uid) headers['X-User-Id'] = uid;
 
-<!-- 5) API wrapper -->
-<script type="module" src="/js/api.js"></script>
+  const res = await fetch(API_BASE + path, { headers, cache:'no-store' });
+  if (!res.ok) throw new Error(path + ' ' + res.status);
+  return res.json();
+}
 
-<!-- 6) سكربت الداشبوورد (الكود الطويل) -->
-<script>
+// ============ THI ============
+async function loadWeatherTHI(){
+  const tEl = document.getElementById('wxTemp');
+  const hEl = document.getElementById('wxHum');
+  const thiEl = document.getElementById('wxTHI');
+  const statusEl = document.getElementById('thiStatus');
+  const circle = document.getElementById('thiCircle');
+
+  try{
+    const lat = 30.0444, lon = 31.2357; // القاهرة
+    const r = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
+      { cache:'no-store' }
+    );
+    const j = await r.json();
+    const t = Math.round(j.current.temperature_2m);
+    const h = Math.round(j.current.relative_humidity_2m);
+    const thi = Math.round(((t*9/5+32) - (0.55-0.0055*h)*((t*9/5+32)-58)));
+
+    tEl.textContent = t;
+    hEl.textContent = h;
+    thiEl.textContent = thi;
+    circle.textContent = thi;
+
+    let txt, bg, color;
+    if (thi < 68){ txt='راحة'; bg='#c8e6c9'; color='#2e7d32'; }
+    else if (thi < 72){ txt='إجهاد خفيف'; bg='#fff9c4'; color='#f9a825'; }
+    else if (thi < 78){ txt='إجهاد متوسط'; bg='#ffe0b2'; color='#fb8c00'; }
+    else { txt='إجهاد عالي'; bg='#ffcdd2'; color='#e53935'; }
+
+    statusEl.textContent = txt;
+    statusEl.style.color = color;
+    circle.style.background = bg;
+    circle.style.borderColor = color;
+    circle.style.color = color;
+  }catch(e){
+    statusEl.textContent = 'غير متاح حالياً';
+    statusEl.style.color = '#e53935';
+  }
+}
+
+// ============ مساعدات ============
+function norm(s){
+  return String(s||'').toLowerCase()
+    .replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'')
+    .trim();
+}
+
+function toDate(v){
+  if(!v) return null;
+  if(typeof v === 'number') return new Date(v);
+  const s = String(v);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s+'T00:00:00');
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(a,b){
+  return Math.floor((a - b) / 86400000);
+}
+
+function isActive(an){
+  const st = norm(an.status || an.lifeStatus || '');
+  if (['sold','dead','died','archived','inactive','مباع','مباعة','نافق','ميت'].includes(st)) return false;
+  if (an.active === false) return false;
+  return true;
+}
+
+function isInMilk(an){
+  if (an.inMilk === true) return true;
+  if (an.inMilk === false) return false;
+  const st = norm(an.productionStatus || an.lactationStatus || '');
+  if (st.includes('dry') || st.includes('جاف')) return false;
+  return /(milk|lact|حلاب|محلب|منتج)/.test(st);
+}
+
+function getDIM(an){
+  const calv = toDate(an.lastCalvingDate || an.calvingDate);
+  if(!calv) return 0;
+  return Math.max(0, daysBetween(new Date(), calv));
+}
+
+function box(label, value, sub='', gaugeId=null){
+  const gaugeHTML = gaugeId
+    ? `<div id="${gaugeId}" class="mini-gauge"></div>`
+    : '';
+  return `
+    <div class="kpi">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${value ?? '--'}</div>
+      ${gaugeHTML}
+      ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+    </div>
+  `;
+}
+
+// ============ تحميل مؤشرات القطيع ============
+async function loadHerdKPIs(){
+  const statusBar = document.getElementById('statusBar');
+  const grid = document.getElementById('kpiGrid');
+
+  try{
+    const [statsResp, animalsResp] = await Promise.all([
+      fetchJSON(`/api/herd-stats`),
+      fetchJSON(`/api/animals`)
+    ]);
+
+    const animalsArr =
+      Array.isArray(animalsResp) ? animalsResp :
+      Array.isArray(animalsResp?.items) ? animalsResp.items :
+      Array.isArray(animalsResp?.data) ? animalsResp.data :
+      Array.isArray(animalsResp?.animals) ? animalsResp.animals : [];
+
+    const animals = animalsArr.filter(isActive);
+    const total = animals.length;
+
+    let inMilk = 0, dimSum = 0, milkTotal = 0, milkCount = 0;
+
+    for (const an of animals){
+      if (isInMilk(an)){
+        inMilk++;
+        dimSum += getDIM(an);
+      }
+      const m = Number(an.dailyMilk || an.lastMilkKg || 0);
+      if (m > 0){
+        milkTotal += m;
+        milkCount++;
+      }
+    }
+
+    const inMilkPct = total ? Math.round(inMilk * 100 / total) : 0;
+    const avgDIM = inMilk ? Math.round(dimSum / inMilk) : 0;
+    const avgMilk = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
+    if (!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk * inMilk);
+
+    const stats = statsResp || {};
+    const t = stats.totals || {};
+    const fert = stats.fertility || {};
+
+    const totalActive =
+      t.totalActive != null ? t.totalActive : total;
+
+    const pregPct =
+      t?.pregnant?.pct != null ? t.pregnant.pct :
+      (t.pregnantPct != null ? t.pregnantPct : 0);
+
+    grid.innerHTML =
+      box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active') +
+      box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk') +
+      box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg') +
+      box('معدل الإخصاب %', fert.conceptionRatePct ?? 0 + '%', 'أحداث التلقيح', 'g_fert') +
+      box('متوسط الأيام المفتوحة', stats.openDaysAvg ?? 0, 'من الولادة للحمل', 'g_openDays') +
+      box('معدل الحمل (21 يوم)', stats.pregRate21d ?? 0, '', 'g_pregRate') +
+      box('خدمات لكل حمل (S/C)', stats.servicesPerConception ?? 0, '', 'g_sc') +
+      box('نسبة الإجهاض', stats.abortionRatePct ?? 0 + '%', '', 'g_abort') +
+      box('نسبة الولادات النافقة', stats.deadCalvingRatePct ?? 0 + '%', '', 'g_deadCalving') +
+      box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc') +
+      box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk') +
+      box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk') +
+      box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim') +
+      box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct') +
+      box('استبعاد إنتاجي', stats.cullProdPct ?? 0 + '%', '', 'g_cullProd') +
+      box('استبعاد تناسلي', stats.cullReproPct ?? 0 + '%', '', 'g_cullRepro') +
+      box('استبعاد صحي', stats.cullHealthPct ?? 0 + '%', '', 'g_cullHealth') +
+      box('كفاءة تحويل العلف', stats.feedEfficiency ?? 0, '', 'g_fe') +
+      box('المادة الجافة المأكولة', stats.dmiAvg ?? 0, '', 'g_dmi') +
+      box('صافي دخل اللبن IOFC', stats.iofc ?? 0, 'جنيه/بقرة/يوم', 'g_iofc') +
+      box('تقييم الروث', stats.fecesScore ?? 0, '', 'g_feces') +
+      box('BCS بالكاميرا', stats.bcsCamera ?? 0, '', 'g_bcs');
+
+    renderMiniGauge("g_active", totalActive ? 100 : 0);
+    renderMiniGauge("g_inmilk", inMilkPct);
+    renderMiniGauge("g_preg", pregPct);
+    renderMiniGauge("g_fert", fert.conceptionRatePct ?? 0);
+    renderMiniGauge("g_openDays", stats.openDaysAvg ?? 0);
+    renderMiniGauge("g_pregRate", stats.pregRate21d ?? 0);
+    renderMiniGauge("g_sc", stats.servicesPerConception ?? 0);
+    renderMiniGauge("g_abort", stats.abortionRatePct ?? 0);
+    renderMiniGauge("g_deadCalving", stats.deadCalvingRatePct ?? 0);
+    renderMiniGauge("g_afc", stats.ageAtFirstCalvingMonths ?? 0);
+    renderMiniGauge("g_avgMilk", avgMilk ?? 0);
+    renderMiniGauge("g_totalMilk", milkTotal ?? 0);
+    renderMiniGauge("g_dim", avgDIM ?? 0);
+    renderMiniGauge("g_inmilkPct", inMilkPct ?? 0);
+    renderMiniGauge("g_cullProd", stats.cullProdPct ?? 0);
+    renderMiniGauge("g_cullRepro", stats.cullReproPct ?? 0);
+    renderMiniGauge("g_cullHealth", stats.cullHealthPct ?? 0);
+    renderMiniGauge("g_fe", stats.feedEfficiency ?? 0);
+    renderMiniGauge("g_dmi", stats.dmiAvg ?? 0);
+    renderMiniGauge("g_iofc", stats.iofc ?? 0);
+    renderMiniGauge("g_feces", stats.fecesScore ?? 0);
+    renderMiniGauge("g_bcs", stats.bcsCamera ?? 0);
+
+    statusBar.textContent = 'تم التحديث من بيانات حسابك.';
+  }
+  catch(e){
+    console.error('herd stats error', e);
+    document.getElementById('statusBar').textContent =
+      'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
+  }
+}
+
+// ============ mini-gauge ============
+function renderMiniGauge(id, percent){
+  const el = document.getElementById(id);
+  if(!el) return;
+
+  const val = Math.max(0, Math.min(100, percent));
+  el.style.background =
+    `conic-gradient(#2e7d32 ${val*3.6}deg, #e0e0e0 ${val*3.6}deg)`;
+  el.style.color = '#2e7d32';
+  el.textContent = val + '%';
+}
+
+// ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
 });
 </script>
+
+<!-- تتبع + هوية + نواة التطبيق -->
+<script>
+  (function(){
+    window.dataLayer = window.dataLayer || [];
+    if (!window.t) {
+      window.t = {
+        event: function(name, props){
+          try{
+            window.dataLayer.push({event:name, ts:Date.now(), ...(props||{})});
+          }catch(e){}
+        }
+      };
+    }
+    window.t.event('page_view', {page:'/dashboard.html'});
+  })();
+</script>
+
+<script src="/js/tenant-bootstrap.js"></script>
+<script type="module" src="/js/api.js"></script>
+<script type="module" src="/js/app-core.js"></script>
 
 </body>
 </html>
