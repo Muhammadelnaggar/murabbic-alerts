@@ -366,107 +366,21 @@ const totalActive = animals.length;
 app.get('/api/animals', async (req, res) => {
   try {
     const tenant = resolveTenant(req);
-    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
+    if (!db) return res.json({ ok:false, error:'firestore_disabled' });
 
-    if (db) {
-      const adb = db;
-      console.log('🧭 herd-stats tenant =', tenant);
+    const snap = await db.collection('animals')
+      .where('userId','==',tenant)
+      .limit(2000)
+      .get();
 
-      // ✅ جلب الحيوانات عبر collectionGroup
-      let animalsDocs = [];
-     try {
-  const snap = await adb.collection('animals')
-    .where('userId', '==', tenant)
-    .limit(2000)
-    .get();
+    const animals = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
-  animalsDocs = snap.docs;
-  console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
-} catch (e) {
-  console.error('❌ animals query failed:', e.code || e.message);
-}
-
-
-      const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-      const totalActive = animals.length;
-
-      const since = new Date(Date.now() - (analysisDays + 340) * 86400000);
-      const sinceStr = since.toISOString().slice(0, 10);
-
-      async function fetchType(type) {
-        const out = [];
-        for (const field of ['userId', 'farmId']) {
-          try {
-            const s = await adb.collection('events')
-              .where(field, '==', tenant)
-              .where('eventType', '==', type)
-              .where('eventDate', '>=', sinceStr)
-              .get();
-            out.push(...s.docs);
-          } catch {}
-        }
-        const map = new Map();
-        out.forEach(d => map.set(d.id, d));
-        return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
-      }
-
-      const [ins, preg] = await Promise.all([
-        fetchType('insemination'),
-        fetchType('pregnancy')
-      ]);
-
-      const activeIds = new Set(animals.map(a => String(a.id)));
-      const winStart = new Date(Date.now() - analysisDays * 86400000);
-
-      const insWin = ins.filter(e => activeIds.has(String(e.animalId)));
-      const pregPos = preg.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        /preg|positive|حمل|ايجاب/i.test(String(e.result || e.status || e.outcome || ''))
-      );
-
-      const pregSet = new Set(pregPos.map(e => String(e.animalId)));
-      const openCount = Math.max(0, totalActive - pregSet.size);
-      const conceptionRate = insWin.length
-        ? +((pregPos.length / insWin.length) * 100).toFixed(1)
-        : 0;
-
-      return res.json({
-        ok: true,
-        totals: {
-          totalActive,
-          pregnant: {
-            count: pregSet.size,
-            pct: totalActive
-              ? +((pregSet.size / totalActive) * 100).toFixed(1)
-              : 0
-          },
-          inseminated: {
-            count: new Set(insWin.map(e => String(e.animalId))).size,
-            pct: totalActive
-              ? +(
-                  (new Set(insWin.map(e => String(e.animalId))).size /
-                    totalActive) *
-                  100
-                ).toFixed(1)
-              : 0
-          },
-          open: {
-            count: openCount,
-            pct: totalActive
-              ? +((openCount / totalActive) * 100).toFixed(1)
-              : 0
-          }
-        },
-        fertility: { conceptionRatePct: conceptionRate }
-      });
-    } else {
-      return res.json({ ok: false, error: 'firestore_disabled' });
-    }
-  } catch (e) {
-    console.error('herd-stats', e);
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+    return res.json({ ok:true, animals });
+  } catch(e) {
+    res.status(500).json({ ok:false, error:'animals_failed' });
   }
 });
+
 
 // ============================================================
 //                 ADMIN: transfer owner (safe)
