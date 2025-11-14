@@ -33,23 +33,24 @@ app.use(express.urlencoded({ extended: true }));
 // ===== Firebase Admin (best-effort) =====
 let db = null;
 try {
-  const sa = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : null;
+  const sa = require("/etc/secrets/murabbik-470511-firebase-adminsdk-fbsvc-650a6ab6ef.json");
 
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: sa
-        ? admin.credential.cert(sa)
-        : admin.credential.applicationDefault(),
-      projectId: "murabbik", // 🔹 ضروري لتحديد المشروع الصحيح
+      credential: admin.credential.cert({
+        projectId: "murabbik",
+        clientEmail: sa.client_email,
+        privateKey: sa.private_key
+      }),
+      projectId: "murabbik",
     });
   }
-  console.log("🔥 Admin SDK Auth Identity:", admin.app().options?.credential?.cert);
 
+  console.log("🔥 Admin SDK Auth Identity:", sa.client_email);
 
   db = admin.firestore(admin.app(), "murabbikdata");
   console.log("✅ Firebase Admin ready → murabbikdata");
+
 } catch (e) {
   console.log("⚠️ Firestore disabled:", e.message);
 }
