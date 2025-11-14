@@ -37,23 +37,20 @@ try {
 
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: "murabbik",
-        clientEmail: sa.client_email,
-        privateKey: sa.private_key
-      }),
-      projectId: "murabbik",
+      credential: admin.credential.cert(sa)
     });
   }
 
   console.log("🔥 Admin SDK Auth Identity:", sa.client_email);
 
+  // اتصال Firestore الصحيح → murabbikdata
   db = admin.firestore(admin.app(), "murabbikdata");
   console.log("✅ Firebase Admin ready → murabbikdata");
 
 } catch (e) {
   console.log("⚠️ Firestore disabled:", e.message);
 }
+
 
 
 // ===== Helpers =====
