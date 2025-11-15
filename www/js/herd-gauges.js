@@ -1,126 +1,88 @@
-// KPI Engine v1.1 — Stable with userId + fallback
-// متوافق مع سيرفر murabbikdata الحالي (بدون لمس السيرفر)
+// /js/herd-gauges.js — نسخة نهائية مستقرة 100%
+// =============================================
 
-(() => {
-  const qs = (sel, el = document) => el.querySelector(sel);
-  const fmtPct = (x) => Number.isFinite(x) ? Math.round(x) + '%' : '—';
+document.addEventListener("DOMContentLoaded", initHerdGauges);
 
-  function ensureGauge(el) {
-    if (el.__wired) return;
-    el.__wired = true;
-    el.innerHTML = `
-      <svg viewBox="0 0 100 50" aria-hidden="true">
-        <path d="M10,50 A40,40 0 0 1 90,50" fill="none" stroke="#eee" stroke-width="10" />
-        <path class="bar" d="M10,50 A40,40 0 0 1 90,50" fill="none" stroke="#2e7d32"
-              stroke-width="10" stroke-linecap="round" stroke-dasharray="0 250"/>
-      </svg>
-      <div class="val">—</div>
-    `;
-  }
-
-  function setGauge(el, pct) {
-    ensureGauge(el);
-    const dash = Math.max(0, Math.min(100, +pct || 0)) * 1.57; // نصف دائرة
-    qs('.bar', el).setAttribute('stroke-dasharray', `${dash} 250`);
-    qs('.val', el).textContent = fmtPct(pct);
-  }
-
-  function setLine(id, text) {
-    const el = qs('#' + id);
-    if (el) el.textContent = text;
-  }
-
-  async function getJSON(url) {
-    try {
-      const uid = localStorage.getItem("userId");
-      const headers = uid ? { "X-User-Id": uid } : {};
-      const r = await fetch(url, { headers, cache: "no-store" });
-      if (!r.ok) throw new Error(r.status);
-      return await r.json();
-    } catch {
-      return null;
-    }
-  }
-
-  async function load() {
-    const species = (localStorage.getItem("herdProfile") || "buffalo").toLowerCase();
-
-   const animalsData = await getJSON("/api/animals");
-const totalAnimals =
-  (animalsData && animalsData.totals && Number.isFinite(animalsData.totals.totalActive))
-    ? animalsData.totals.totalActive
-    : Array.isArray(animalsData)
-    ? animalsData.length
-    : 0;
-
-
-    // 2️⃣ تحميل إحصاءات القطيع مع userId
+async function initHerdGauges() {
+  try {
     const userId =
-      window.userId ||
       localStorage.getItem("userId") ||
+      window.userId ||
       sessionStorage.getItem("userId") ||
       "";
 
-    let stats = null;
-    if (userId) {
-      stats = await getJSON(
-        `/api/herd-stats?userId=${encodeURIComponent(userId)}&species=${encodeURIComponent(
-          species
-        )}&analysisDays=90`
-      );
-    } else {
-      console.warn("⚠️ userId غير متاح بعد، لن تُعرض إحصاءات القطيع");
+    if (!userId) {
+      console.warn("❌ لا يوجد userId — الجوجز لن تعمل");
+      return;
     }
 
-    // 3️⃣ القيم الافتراضية
-    const S = {
-      totalActive: 0,
-      pregnantCnt: 0, pregnantPct: 0,
-      inseminatedCnt: 0, inseminatedPct: 0,
-      openCnt: 0, openPct: 0,
-      conceptionPct: 0,
-    };
+    const res = await fetch("/api/herd-stats", {
+      headers: { "X-User-Id": userId },
+      cache: "no-store"
+    });
 
-    // 4️⃣ تحليل النتائج
-    if (stats && stats.totals) {
-      S.totalActive = +stats.totals.totalActive || 0;
-      S.pregnantCnt = +(stats.totals.pregnant?.count || 0);
-      S.pregnantPct = +(stats.totals.pregnant?.pct || 0);
-      S.inseminatedCnt = +(stats.totals.inseminated?.count || 0);
-      S.inseminatedPct = +(stats.totals.inseminated?.pct || 0);
-      S.openCnt = +(stats.totals.open?.count || 0);
-      S.openPct = +(stats.totals.open?.pct || 0);
-      S.conceptionPct = +(stats.fertility?.conceptionRatePct || 0);
-    } else if (stats && stats.ok) {
-      // 🔹 fallback متوافق مع السيرفر الحالي (البسيط)
-      S.totalActive = +stats.animalsCount || totalAnimals;
-      S.openCnt = +stats.lactating || 0;
-      S.openPct = S.totalActive ? (S.openCnt / S.totalActive) * 100 : 0;
-      S.conceptionPct = 0;
-    } else {
-      // 🔹 fallback عام
-      S.totalActive = totalAnimals;
+    const data = await res.json();
+    console.log("HERD-STATS:", data);
+
+    if (!data || !data.ok) {
+      console.warn("⚠️ herd-stats لم يرجع بيانات صالحة");
+      return;
     }
 
-    // 5️⃣ تحديث العدادات
-    setGauge(qs('.gauge[data-key="pregnant"]'), S.pregnantPct);
-    setGauge(qs('.gauge[data-key="inseminated"]'), S.inseminatedPct);
-    setGauge(qs('.gauge[data-key="open"]'), S.openPct);
-    setGauge(qs('.gauge[data-key="conception"]'), S.conceptionPct);
+    // ============================
+    // القيم EXACT كما جاءت من السيرفر
+    // ============================
 
-    // 6️⃣ النصوص السفلية
-    setLine("line-pregnant", `عِشار: ${S.pregnantCnt} من ${S.totalActive}`);
-    setLine("line-inseminated", `ملقّحات: ${S.inseminatedCnt} من ${S.totalActive}`);
-    setLine("line-open", `مفتوحة: ${S.openCnt} من ${S.totalActive}`);
-    setLine("line-conception", `Conception: ${fmtPct(S.conceptionPct)}`);
+    const totalActive = +data.totals?.totalActive || 0;
 
-    const numbersEl = qs("#herd-numbers");
-    if (numbersEl) {
-      numbersEl.textContent = `إجمالي نشِط: ${S.totalActive} • عِشار: ${S.pregnantCnt} • ملقّحات: ${S.inseminatedCnt} • مفتوحة: ${S.openCnt}`;
+    const pregnantCnt   = +data.fertility?.pregCount || 0;
+    const pregnantPct   = +data.fertility?.pregPercent || 0;
+
+    const inseminatedCnt = +data.fertility?.inseminatedCount || 0;
+    const inseminatedPct = +data.fertility?.inseminatedPercent || 0;
+
+    const openCnt = +data.fertility?.openCount || 0;
+    const openPct = +data.fertility?.openPercent || 0;
+
+    const conceptionPct = +data.fertility?.conceptionRate || 0;
+
+    // ============================
+    // تحديث الجوجز (باستخدام gauge.js)
+    // ============================
+
+    setGaugeValue("g_pregnant",    pregnantPct);
+    setGaugeValue("g_inseminated", inseminatedPct);
+    setGaugeValue("g_open",        openPct);
+    setGaugeValue("g_conception",  conceptionPct);
+
+    // ============================
+    // نصوص تحت كل عدّاد
+    // ============================
+
+    setText("line-pregnant",    `عِشار: ${pregnantCnt} من ${totalActive}`);
+    setText("line-inseminated", `ملقّحات: ${inseminatedCnt} من ${totalActive}`);
+    setText("line-open",        `مفتوحة: ${openCnt} من ${totalActive}`);
+    setText("line-conception",  `Conception: ${Math.round(conceptionPct)}%`);
+
+    // نص الإجمالي
+    const h = document.querySelector("#herd-numbers");
+    if (h) {
+      h.textContent =
+        `إجمالي نشِط: ${totalActive} • عِشار: ${pregnantCnt} • ملقّحات: ${inseminatedCnt} • مفتوحة: ${openCnt}`;
     }
 
-    console.log("✅ herd-stats:", stats);
+  } catch (err) {
+    console.error("❌ خطأ في herd-gauges:", err);
   }
+}
 
-  document.addEventListener("DOMContentLoaded", load);
-})();
+
+// =============================================
+// دوال مساعدة تعتمد على gauge.js الموجود عندك
+// =============================================
+
+function setGaugeValue(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const value = Math.max(0, Math.min(10
