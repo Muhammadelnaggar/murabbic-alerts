@@ -1,114 +1,64 @@
-// ================================================================
-//  animal-update.js — تحديث تلقائي لوثيقة الحيوان حسب الحدث
-//  يعمل من أي صفحة حدث بدون أي تعديل إضافي
-// ================================================================
+// www/js/animal-update.js
+import { db } from "/js/firebase-config.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+  setDoc,
+  doc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getFirestore, collection, query, where, limit, getDocs, updateDoc } 
-  from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-
-import config from "/js/firebase-config.js";
-
-const app = initializeApp(config);
-const db  = getFirestore(app, "murabbikdata");
-
-export async function updateAnimalByEvent(event) {
+export async function updateAnimalByEvent(ev) {
   try {
-    if (!event || !event.animalId) return;
+    const tenant = (ev.userId || "").trim();
+    const num    = ev.animalId || ev.animalNumber;
 
-    const animalId = String(event.animalId).trim();
-    const evType   = String(event.type || "").toLowerCase();
-    const result   = String(event.result || event.status || "").toLowerCase();
-    const evDate   = toYYYYMMDD(Number(event.ts || Date.now()));
+    if (!tenant || !num) return;
 
-    const patch = {};
+    // تجهيز الحقول
+    const upd = {};
+    const date = ev.eventDate;
 
-    // ====================================================
-    //  الحالة التناسلية
-    // ====================================================
-
-    // تشخيص حمل + إيجابي
-    if (/preg|حمل/.test(evType) && /(ايجاب|عشار|positive|pregnant|حامل)/.test(result)) {
-      patch.reproductiveStatus = "pregnant";
-      patch.lastDiagnosisDate  = evDate;
+    if (ev.type === "daily_milk") {
+      upd.productionStatus = "milking";
+      upd.lastMilkDate = date;
     }
 
-    // تشخيص حمل + سلبي
-    else if (/preg|حمل/.test(evType) && /(neg|فارغ|negative)/.test(result)) {
-      patch.reproductiveStatus = "open";
-      patch.lastDiagnosisDate  = evDate;
+    if (ev.type === "insemination") {
+      upd.reproductiveStatus = "inseminated";
+      upd.lastInseminationDate = date;
     }
 
-    // تلقيح
-    else if (/insemin|تلقيح/.test(evType)) {
-      patch.reproductiveStatus   = "inseminated";
-      patch.lastInseminationDate = evDate;
+    if (ev.type === "calving") {
+      upd.reproductiveStatus = "fresh";
+      upd.productionStatus = "milking";
+      upd.lastCalvingDate = date;
     }
 
-    // ولادة
-    else if (/calv|birth|ولادة/.test(evType)) {
-      patch.reproductiveStatus = "fresh";
-      patch.lastCalvingDate    = evDate;
+    if (ev.type === "dry_off") {
+      upd.productionStatus = "dry";
+      upd.lastDryOffDate = date;
     }
 
-    // إجهاض
-    else if (/abortion|اجهاض/.test(evType)) {
-      patch.reproductiveStatus = "aborted";
-      patch.lastAbortionDate   = evDate;
-    }
+    if (!Object.keys(upd).length) return;
 
-    // ====================================================
-    //  الحالة الإنتاجية
-    // ====================================================
-
-    if (/milk|لبن/.test(evType)) {
-      patch.productionStatus = "milking";
-    }
-
-    if (/dry|جاف|تجفيف/.test(evType)) {
-      patch.productionStatus = "dry";
-      patch.lastDryOffDate   = evDate;
-    }
-
-    if (/close|تحضير/.test(evType)) {
-      patch.productionStatus = "close_up";
-      patch.lastCloseUpDate  = evDate;
-    }
-
-    if (/calv|birth|ولادة/.test(evType)) {
-      patch.productionStatus = "milking";
-    }
-
-    // ====================================================
-    //  تطبيق التحديث على وثيقة الحيوان
-    // ====================================================
-    if (Object.keys(patch).length === 0) return;
-
+    // البحث عن الحيوان برقم animalId
     const q = query(
       collection(db, "animals"),
-      where("number", "==", animalId),
-      limit(1)
+      where("userId", "==", tenant),
+      where("number", "==", Number(num)),
+      limit(5)
     );
 
     const snap = await getDocs(q);
-    if (snap.empty) return;
 
-    const ref = snap.docs[0].ref;
-    await updateDoc(ref, patch);
-
-    console.log("🔥 animal updated (frontend):", animalId, patch);
-
+    for (const d of snap.docs) {
+      await setDoc(doc(db, "animals", d.id), upd, { merge: true });
+      console.log("🔥 updated animal:", d.id, upd);
+    }
   } catch (e) {
-    console.error("animal-update failed:", e);
+    console.error("updateAnimalByEvent error:", e);
   }
-}
-
-// ======================================================
-// مساعد لتنسيق التاريخ YYYY-MM-DD
-// ======================================================
-function toYYYYMMDD(ms) {
-  const d = new Date(ms);
-  const m = (`0${d.getMonth()+1}`).slice(-2);
-  const dd= (`0${d.getDate()}`).slice(-2);
-  return `${d.getFullYear()}-${m}-${dd}`;
 }
