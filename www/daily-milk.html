@@ -218,7 +218,12 @@
 
       try{
         await addDoc(collection(db, 'events'), payload);
-         await updateAnimalByEvent(payload);
+       try {
+  await window.updateAnimalByEvent(payload);
+} catch (e) {
+  console.error("Frontend animal update failed:", e);
+}
+
         localStorage.setItem('lastAnimalId', animalId);
         localStorage.setItem('currentAnimalId', animalId);
         localStorage.setItem('eventDate', eventDate);
@@ -245,6 +250,7 @@
   </script>
 </body>
 </html>
+
 
 
 
