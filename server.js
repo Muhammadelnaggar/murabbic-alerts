@@ -390,10 +390,13 @@ app.get('/api/herd-stats', async (req, res) => {
         toDate(e.date || e.eventDate || e.createdAt) >= winStart
       );
 
-      const pregPos = preg.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        /preg|positive|حمل|ايجاب/i.test(String(e.result || e.status || e.outcome || ''))
-      );
+    const pregPos = preg.filter(e =>
+  activeIds.has(String(e.animalId)) &&
+  /preg|positive|حمل|حامل|ايجاب|عشار|عِشار/i
+    .test(String(e.result || e.status || e.outcome || e.resultNorm || ''))
+);
+
+      
 
       const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
       const openCount    = Math.max(0, totalActive - pregSet.size);
@@ -439,10 +442,12 @@ app.get('/api/herd-stats', async (req, res) => {
       /insemination|تلقيح/i.test(e.type || '') &&
       toDate(e.ts || e.date) >= winStart
     );
-    const pregPos = evAll.filter(e =>
-      /pregnancy|حمل/i.test(e.type || '') &&
-      /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || ''))
-    );
+  const pregPos = evAll.filter(e =>
+  /pregnancy|حمل|حامل|عشار|عِشار/i.test(e.type || '') &&
+  /positive|ايجاب|عشار|عِشار/i
+    .test(String(e.result || e.status || e.outcome || ''))
+);
+
 
     const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
     const openCount    = Math.max(0, totalActive - pregSet.size);
