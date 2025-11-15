@@ -277,135 +277,203 @@ app.get('/api/animal-timeline', async (req, res) => {
 // ============================================================
 //                       API: HERD STATS
 // ============================================================
+// ============================================================
+//                       API: HERD STATS
+// ============================================================
 app.get('/api/herd-stats', async (req, res) => {
   try {
-    const tenant  = resolveTenant(req);
-    const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
+    const tenant      = resolveTenant(req);
+    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
 
     if (db) {
-   const adb = db;
+      const adb = db;
 
-let animalsDocs = [];
-try {
-  // 🟢 استخدم Firestore الافتراضي مباشرة بدل murabbikdata
- const snap = await db.collection('animals')
-  .where('userId','==',tenant)
-  .limit(2000)
-  .get();
+      // ---------- 1) جلب الحيوانات ----------
+      let animalsDocs = [];
+      try {
+        const snap = await adb.collection('animals')
+          .where('userId', '==', tenant)
+          .limit(2000)
+          .get();
 
-  animalsDocs = snap.docs;
-  console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
-} catch (e) {
-  console.error('❌ animals query failed:', e.code || e.message);
-}
+        animalsDocs = snap.docs;
+        console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
+      } catch (e) {
+        console.error('❌ animals query failed:', e.code || e.message);
+      }
 
-
-// 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
-const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
       console.log("🧭 herd-stats tenant =", tenant);
 
+      // نعتبر كل الحيوانات نشطة مؤقتًا
+      const active      = animals;
+      const totalActive = animals.length;
 
-// ✅ جميع الحيوانات تعتبر نشطة مؤقتاً (لا يوجد حقل active/status حالياً)
-const active = animals;
-const totalActive = animals.length;
-
-
-      const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
+      // نافذة الزمن: 90 يوم تحليل + 340 يوم حمل
+      const since    = new Date(Date.now() - (analysisDays + 340) * dayMs);
       const sinceStr = toYYYYMMDD(since);
 
-  async function fetchType(type) {
-  const out = [];
-  async function tryQ(field) {
-    try {
-      const s = await adb.collection('events')
-        .where(field, '==', tenant)
-       .where('eventTypeNorm', '==', type)
+      // ---------- 2) دالة مساعده لأنواع الأحداث ----------
+      function wantedEventTypes(normKey) {
+        switch (normKey) {
+          case 'insemination':
+            return ['insemination']; // عندنا نوع واحد
+          case 'pregnancy':
+            // تشمل تشخيص الحمل كـ pregnancy_diagnosis
+            return ['pregnancy', 'pregnancy_diagnosis'];
+          default:
+            return [normKey];
+        }
+      }
 
-        .where('eventDate', '>=', sinceStr)
-        .get();
-      out.push(...s.docs);
-    } catch {
-      const s = await adb.collection('events')
-        .where(field, '==', tenant)
-        .where('eventType', '==', type)
-        .orderBy('eventDate', 'desc')
-        .limit(2000)
-        .get()
-        .catch(() => ({ docs: [] }));
-      (s.docs || []).forEach(d => {
-        if ((d.get('eventDate') || '') >= sinceStr) out.push(d);
-      });
-    }
-  }
-  await tryQ('userId');
- 
-  const map = new Map();
-  out.forEach(d => map.set(d.id, d));
-  return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
-}
+      // ---------- 3) جلب أحداث نوع معيّن (تلقيح / حمل) ----------
+      async function fetchType(normKey) {
+        const out = [];
+        const wanted = wantedEventTypes(normKey);
 
+        // 3-A) لو عندي الحدث حديث وبه eventTypeNorm
+        const snapNorm = await adb.collection('events')
+          .where('userId', '==', tenant)
+          .where('eventTypeNorm', '==', normKey)
+          .where('eventDate', '>=', sinceStr)
+          .get()
+          .catch(() => ({ docs: [] }));
+        out.push(...(snapNorm.docs || []));
 
-      const [ins, preg] = await Promise.all([fetchType('insemination'), fetchType('pregnancy')]);
+        // 3-B) الأحداث القديمة اللي فيها eventType فقط
+        for (const evType of wanted) {
+          const s = await adb.collection('events')
+            .where('userId', '==', tenant)
+            .where('eventType', '==', evType)
+            .where('eventDate', '>=', sinceStr)
+            .get()
+            .catch(() => ({ docs: [] }));
+          out.push(...(s.docs || []));
+        }
 
-      const activeIds = new Set(active.map(a=>String(a.id)));
-      const winStart = new Date(Date.now() - analysisDays * dayMs);
-// دالة التطبيع
-const normalizeEventType = (raw) => {
-  const t = String(raw || '').toLowerCase();
-  for (const [norm, arr] of Object.entries(EVENT_SYNONYMS)) {
-    for (const w of arr) {
-      if (t.includes(w.toLowerCase())) return norm;
-    }
-  }
-  return t;
-};
-      
-      const insWin  = ins .filter(e => activeIds.has(String(e.animalId)) && toDate(e.date||e.createdAt) >= winStart);
-      const pregPos = preg.filter(e => activeIds.has(String(e.animalId)) && /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
+        // 3-C) لو ما زال مفيش، فلترة حسب type النصّي (عربي/إنجليزي)
+        if (!out.length) {
+          const s = await adb.collection('events')
+            .where('userId', '==', tenant)
+            .orderBy('eventDate', 'desc')
+            .limit(2000)
+            .get()
+            .catch(() => ({ docs: [] }));
 
-      const pregSet = new Set(pregPos.map(e=>String(e.animalId)));
-      const openCount = Math.max(0, totalActive - pregSet.size);
-      const conceptionRate = insWin.length ? +((pregPos.filter(e=>toDate(e.date||e.createdAt) >= winStart).length / insWin.length) * 100).toFixed(1) : 0;
+          for (const d of (s.docs || [])) {
+            const evDate = d.get('eventDate') || '';
+            if (!evDate || evDate < sinceStr) continue;
+
+            const rawType = d.get('type') || d.get('eventType') || '';
+            const norm    = normalizeEventType(rawType);
+            if (norm === normKey) out.push(d);
+          }
+        }
+
+        // إزالة التكرار
+        const map = new Map();
+        out.forEach(d => map.set(d.id, d));
+        return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
+      }
+
+      // ---------- 4) جلب التلقيحات وتشخيصات الحمل ----------
+      const [ins, preg] = await Promise.all([
+        fetchType('insemination'),
+        fetchType('pregnancy')
+      ]);
+
+      const activeIds = new Set(active.map(a => String(a.id)));
+      const winStart  = new Date(Date.now() - analysisDays * dayMs);
+
+      const insWin = ins.filter(e =>
+        activeIds.has(String(e.animalId)) &&
+        toDate(e.date || e.eventDate || e.createdAt) >= winStart
+      );
+
+      const pregPos = preg.filter(e =>
+        activeIds.has(String(e.animalId)) &&
+        /preg|positive|حمل|ايجاب/i.test(String(e.result || e.status || e.outcome || ''))
+      );
+
+      const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
+      const openCount    = Math.max(0, totalActive - pregSet.size);
+      const conceptionRate = insWin.length
+        ? +((pregPos.filter(e => toDate(e.date || e.eventDate || e.createdAt) >= winStart).length / insWin.length) * 100).toFixed(1)
+        : 0;
 
       return res.json({
-        ok:true,
-        totals:{
+        ok: true,
+        totals: {
           totalActive,
-          pregnant:   { count: pregSet.size, pct: totalActive? +((pregSet.size/totalActive)*100).toFixed(1):0 },
-          inseminated:{ count: new Set(insWin.map(e=>String(e.animalId))).size, pct: totalActive? +((new Set(insWin.map(e=>String(e.animalId))).size/totalActive)*100).toFixed(1):0 },
-          open:       { count: openCount, pct: totalActive? +((openCount/totalActive)*100).toFixed(1):0 }
+          pregnant: {
+            count: pregSet.size,
+            pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0
+          },
+          inseminated: {
+            count: new Set(insWin.map(e => String(e.animalId))).size,
+            pct: totalActive ? +((new Set(insWin.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0
+          },
+          open: {
+            count: openCount,
+            pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0
+          }
         },
-        fertility:{ conceptionRatePct: conceptionRate }
+        fertility: {
+          conceptionRatePct: conceptionRate
+        }
       });
     }
 
-    // Local fallback
-    const animalsAll = readJson(animalsPath, []).filter(a=>belongs(a,tenant));
-    const active  = animalsAll.filter(a => a.active !== false && !['sold','dead','archived','inactive'].includes(String(a.status||'').toLowerCase()));
+    // ---------- 5) Fallback محلّي (لو db=null) ----------
+    const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    const active     = animalsAll.filter(a =>
+      a.active !== false &&
+      !['sold', 'dead', 'archived', 'inactive'].includes(String(a.status || '').toLowerCase())
+    );
     const totalActive = active.length;
 
-    const evAll   = readJson(eventsPath, []).filter(e=>belongs(e,tenant));
+    const evAll    = readJson(eventsPath, []).filter(e => belongs(e, tenant));
     const winStart = new Date(Date.now() - analysisDays * dayMs);
-    const insWin  = evAll.filter(e => /insemination|تلقيح/i.test(e.type||'') && toDate(e.ts||e.date) >= winStart);
-    const pregPos = evAll.filter(e => /pregnancy|حمل/i.test(e.type||'') && /positive|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
 
-    const pregSet = new Set(pregPos.map(e=>String(e.animalId)));
-    const openCount = Math.max(0, totalActive - pregSet.size);
-    const conceptionRate = insWin.length ? +((pregPos.filter(e=>toDate(e.ts||e.date) >= winStart).length / insWin.length) * 100).toFixed(1) : 0;
+    const insWin  = evAll.filter(e =>
+      /insemination|تلقيح/i.test(e.type || '') &&
+      toDate(e.ts || e.date) >= winStart
+    );
+    const pregPos = evAll.filter(e =>
+      /pregnancy|حمل/i.test(e.type || '') &&
+      /positive|ايجاب/i.test(String(e.result || e.status || e.outcome || ''))
+    );
+
+    const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
+    const openCount    = Math.max(0, totalActive - pregSet.size);
+    const conceptionRate = insWin.length
+      ? +((pregPos.filter(e => toDate(e.ts || e.date) >= winStart).length / insWin.length) * 100).toFixed(1)
+      : 0;
 
     res.json({
-      ok:true,
-      totals:{
+      ok: true,
+      totals: {
         totalActive,
-        pregnant:   { count: pregSet.size, pct: totalActive? +((pregSet.size/totalActive)*100).toFixed(1):0 },
-        inseminated:{ count: new Set(insWin.map(e=>String(e.animalId))).size, pct: totalActive? +((new Set(insWin.map(e=>String(e.animalId))).size/totalActive)*100).toFixed(1):0 },
-        open:       { count: openCount, pct: totalActive? +((openCount/totalActive)*100).toFixed(1):0 }
+        pregnant: {
+          count: pregSet.size,
+          pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0
+        },
+        inseminated: {
+          count: new Set(insWin.map(e => String(e.animalId))).size,
+          pct: totalActive ? +((new Set(insWin.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0
+        },
+        open: {
+          count: openCount,
+          pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0
+        }
       },
-      fertility:{ conceptionRatePct: conceptionRate }
+      fertility: {
+        conceptionRatePct: conceptionRate
+      }
     });
   } catch (e) {
     console.error('herd-stats', e);
-    res.status(500).json({ ok:false, error:String(e?.message||e) });
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
