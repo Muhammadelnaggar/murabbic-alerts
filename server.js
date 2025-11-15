@@ -47,7 +47,9 @@ console.log("SA client_email:", sa.client_email);
   console.log("🔥 Admin SDK Auth Identity:", sa.client_email);
 
   // اتصال Firestore الصحيح → murabbikdata
-db = admin.firestore(admin.app(), "murabbikdata");
+ const firestore = admin.firestore();
+firestore.settings({ databaseId: "murabbikdata" });
+db = firestore;
 
   console.log("✅ Firebase Admin ready → murabbikdata");
 
