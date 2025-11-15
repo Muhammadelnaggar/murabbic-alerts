@@ -389,12 +389,20 @@ app.get('/api/herd-stats', async (req, res) => {
         activeIds.has(String(e.animalId)) &&
         toDate(e.date || e.eventDate || e.createdAt) >= winStart
       );
+const pregPos = preg.filter(e => {
+  if (!activeIds.has(String(e.animalId))) return false;
 
-    const pregPos = preg.filter(e =>
-  activeIds.has(String(e.animalId)) &&
-  /preg|positive|حمل|حامل|ايجاب|عشار|عِشار/i
-    .test(String(e.result || e.status || e.outcome || e.resultNorm || ''))
-);
+  const result =
+    String(e.result || e.status || e.outcome || "").trim();
+
+  const type =
+    String(e.type || e.eventType || e.eventTypeNorm || "").trim();
+
+  return (
+    /preg|positive|ايجاب|حامل|عشار|عِشار/i.test(result) ||
+    /pregnancy|diagnosis|pregnant|حمل|عشار|عِشار/i.test(type)
+  );
+});
 
       
 
