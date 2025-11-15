@@ -716,6 +716,24 @@ app.get('/api/debug/animals/all', async (req, res) => {
     });
   }
 });
+// =======================================================
+// DEBUG — طباعة جميع الأحداث Events
+// =======================================================
+app.get('/api/debug/events/all', async (req, res) => {
+  try {
+    if (!db) {
+      return res.json({ ok: false, error: "Firestore not initialized" });
+    }
+
+    const snap = await db.collection('events').limit(2000).get();
+    const out  = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+    res.json({ ok: true, count: out.length, events: out });
+  } catch (e) {
+    console.error("debug/events/all", e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 
 // Static last
