@@ -13,35 +13,44 @@ import {
 export async function updateAnimalByEvent(ev) {
   try {
     const tenant = (ev.userId || "").trim();
-    const num    = ev.animalId || ev.animalNumber;
+    const num    = (ev.animalId || ev.animalNumber || "").trim();
 
-    if (!tenant || !num) return;
+    if (!tenant || !num) {
+      console.warn("⛔ updateAnimalByEvent: missing tenant or number");
+      return;
+    }
 
     const upd = {};
     const date = ev.eventDate;
 
-    // تحديث الحالة الإنتاجية فقط للـ daily milk
+    // ====== daily milk ======
     if (ev.type === "daily_milk") {
       upd.productionStatus = "milking";
       upd.lastMilkDate = date;
     }
 
-    if (!Object.keys(upd).length) return;
+    if (Object.keys(upd).length === 0) return;
 
-    // البحث عن الحيوان برقم number
+    // 🔥 =============== البحث الصحيح =============== 🔥
     const q = query(
       collection(db, "animals"),
       where("userId", "==", tenant),
-      where("number", "==", Number(num)),
+      where("number", "==", String(num)),    // ←← أهم سطر
       limit(5)
     );
 
     const snap = await getDocs(q);
 
+    if (snap.empty) {
+      console.warn("⛔ animal not found for update:", num);
+      return;
+    }
+
     for (const d of snap.docs) {
       await setDoc(doc(db, "animals", d.id), upd, { merge: true });
       console.log("🔥 animal updated:", d.id, upd);
     }
+
   } catch (e) {
     console.error("updateAnimalByEvent error:", e);
   }
