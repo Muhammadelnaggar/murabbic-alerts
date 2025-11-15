@@ -382,7 +382,17 @@ app.get('/api/herd-stats', async (req, res) => {
         fetchType('pregnancy')
       ]);
 
-      const activeIds = new Set(active.map(a => String(a.id)));
+     const activeIds = new Set(
+  active.map(a =>
+    String(
+      a.animalId ||        // لو موجود
+      a.number   ||        // رقم الحيوان الحقيقي
+      a.animalNumber ||    // لو اسمه animalNumber
+      a.id               // fallback أخير فقط
+    )
+  )
+);
+
       const winStart  = new Date(Date.now() - analysisDays * dayMs);
 
       const insWin = ins.filter(e =>
