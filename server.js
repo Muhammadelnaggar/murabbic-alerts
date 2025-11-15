@@ -517,6 +517,51 @@ app.get('/api/animals', async (req, res) => {
   }
 });
 
+// ===== Helper: compute eventDate from any shape =====
+function computeEventDateFromDoc(data = {}) {
+  // 1) قيم جاهزة بصيغة YYYY-MM-DD
+  if (typeof data.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.eventDate)) {
+    return data.eventDate;
+  }
+
+  const dateFields = [
+    'date',
+    'event_date',
+    'calvingDate',
+    'dryOffDate',
+    'abortionDate',
+    'closeupDate'
+  ];
+
+  for (const f of dateFields) {
+    const v = data[f];
+    if (!v) continue;
+
+    if (typeof v === 'string') {
+      // لو فيها تاريخ كامل أو ISO → ناخد أول 10 حروف
+      const m = v.match(/\d{4}-\d{2}-\d{2}/);
+      if (m) return m[0];
+    }
+  }
+
+  // 2) eventDateUtc
+  if (typeof data.eventDateUtc === 'string') {
+    const m = data.eventDateUtc.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+  }
+
+  // 3) طوابع زمنية
+  const ts = data.ts || data.createdAt;
+  if (ts && typeof ts === 'object' && typeof ts._seconds === 'number') {
+    return toYYYYMMDD(ts._seconds * 1000);
+  }
+  if (typeof ts === 'number') {
+    return toYYYYMMDD(ts);
+  }
+
+  // مفيش تاريخ واضح
+  return null;
+}
 
 // ============================================================
 //                 ADMIN: transfer owner (safe)
@@ -732,6 +777,117 @@ app.get('/api/debug/events/all', async (req, res) => {
   } catch (e) {
     console.error("debug/events/all", e);
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+// =======================================================
+// ADMIN: Normalize all events (eventType / eventTypeNorm / eventDate)
+// =======================================================
+app.post('/api/admin/events/normalize', ensureAdmin, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ ok: false, error: 'firestore_disabled' });
+    }
+
+    const adb   = db;
+    const limit = parseInt(req.query.limit || '2000', 10);
+
+    const snap = await adb.collection('events')
+      .limit(limit)
+      .get();
+
+    let total   = 0;
+    let touched = 0;
+
+    let batch = adb.batch();
+    let ops   = 0;
+
+    for (const d of snap.docs) {
+      total++;
+      const data = d.data() || {};
+
+      // -------- 1) تحديد النوع الخام --------
+      const rawType =
+        data.eventType ||
+        data.type ||
+        data.kind ||
+        data.alertRule ||
+        '';
+
+      const norm = normalizeEventType(rawType);
+      let   eventType = data.eventType || '';
+
+      // -------- 2) ضبط eventType القياسي لو فاضي --------
+      if (!eventType) {
+        switch (norm) {
+          case 'insemination':
+            eventType = 'insemination';
+            break;
+          case 'pregnancy_diagnosis':
+            eventType = 'pregnancy_diagnosis';
+            break;
+          case 'calving':
+            eventType = 'calving';
+            break;
+          case 'dry_off':
+            eventType = 'dry_off';
+            break;
+          case 'daily_milk':
+            eventType = 'daily_milk';
+            break;
+          case 'lameness':
+            eventType = 'lameness';
+            break;
+          case 'nutrition':
+            eventType = 'nutrition';
+            break;
+          default:
+            eventType = rawType || norm || 'event';
+        }
+      }
+
+      // -------- 3) حساب eventDate --------
+      const evDate = computeEventDateFromDoc(data);
+
+      const update = {};
+
+      if (norm && data.eventTypeNorm !== norm) {
+        update.eventTypeNorm = norm;
+      }
+      if (eventType && data.eventType !== eventType) {
+        update.eventType = eventType;
+      }
+      if (evDate && data.eventDate !== evDate) {
+        update.eventDate = evDate;
+      }
+
+      if (Object.keys(update).length) {
+        batch.set(d.ref, update, { merge: true });
+        touched++;
+        ops++;
+
+        if (ops >= 400) {
+          await batch.commit();
+          batch = adb.batch();
+          ops   = 0;
+        }
+      }
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+    }
+
+    return res.json({
+      ok: true,
+      total,
+      normalized: touched
+    });
+  } catch (e) {
+    console.error('admin/events/normalize', e);
+    return res.status(500).json({
+      ok: false,
+      error: e.message || 'normalize_failed'
+    });
   }
 });
 
