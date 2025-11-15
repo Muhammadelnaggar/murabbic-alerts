@@ -244,39 +244,33 @@ app.get('/api/herd-stats', async (req, res) => {
     const tenant  = resolveTenant(req);
     const analysisDays  = parseInt(req.query.analysisDays || '90', 10);
 
-if (db) {
-  const adb = db;
+    if (db) {
+   const adb = db;
 
-  let animals = [];
+let animalsDocs = [];
+try {
+  // 🟢 استخدم Firestore الافتراضي مباشرة بدل murabbikdata
+ const snap = await db.collection('animals')
+  .where('userId','==',tenant)
+  .limit(2000)
+  .get();
 
-  try {
-    // نفس منطق /api/animals بالظبط
-    let animalsDocs = [];
-    try {
-      const snap = await db.collection('animals')
-        .where('userId','==',tenant)
-        .limit(2000)
-        .get();
-      animalsDocs = snap.docs;
-      console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
-      animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-    } catch (e) {
-      console.error('❌ animals query failed (primary):', e.code || e.message);
+  animalsDocs = snap.docs;
+  console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
+} catch (e) {
+  console.error('❌ animals query failed:', e.code || e.message);
+}
 
-      const snap2 = await db.collection('animals')
-        .limit(2000)
-        .get();
-      const all = snap2.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-      animals = all.filter(a =>
-        String(a.userId || a.ownerUid || '').trim() === String(tenant).trim()
-      );
-      console.log(`✅ animals fallback count = ${animals.length} for`, tenant);
-    }
 
-    // من هنا ورايح استخدم animals مباشرة
-    const active = animals; // أو فلترة الحالة لو حابب
-    const totalActive = active.length;
-    ...
+// 🔹 تحويل نتائج Firestore إلى مصفوفة حيوانات
+const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      console.log("🧭 herd-stats tenant =", tenant);
+
+
+// ✅ جميع الحيوانات تعتبر نشطة مؤقتاً (لا يوجد حقل active/status حالياً)
+const active = animals;
+const totalActive = animals.length;
+
 
       const since = new Date(Date.now() - (analysisDays + 340) * dayMs);
       const sinceStr = toYYYYMMDD(since);
@@ -373,53 +367,35 @@ app.get('/api/animals', async (req, res) => {
   const tenant = resolveTenant(req);
 
   try {
-    let animals = [];
-
+    // لو Firestore متاح جرّب أولاً
     if (db) {
       try {
-        // المحاولة الأولى: كويري مباشر على userId
         const snap = await db.collection('animals')
           .where('userId', '==', tenant)
           .limit(2000)
           .get();
 
-        animals = snap.docs.map(d => ({
+        const animals = snap.docs.map(d => ({
           id: d.id,
           ...(d.data() || {})
         }));
+
+        // حتى لو فاضي → تظل استجابة ناجحة
+        return res.json({ ok: true, animals });
       } catch (e) {
-        console.error('animals firestore error (primary):', e.code || e.message || e);
-
-        // المحاولة الثانية: بدون where ثم فلترة بالكود
-        try {
-          const snap2 = await db.collection('animals')
-            .limit(2000)
-            .get();
-
-          const all = snap2.docs.map(d => ({
-            id: d.id,
-            ...(d.data() || {})
-          }));
-
-          animals = all.filter(a =>
-            String(a.userId || a.ownerUid || '').trim() === String(tenant).trim()
-          );
-
-          console.log('animals fallback count =', animals.length);
-        } catch (e2) {
-          console.error('animals firestore error (fallback):', e2.code || e2.message || e2);
-        }
+        // نطبع الخطأ في اللوج لكن ما نكسّرش الـ API
+        console.error('animals firestore error:', e.code || e.message || e);
+        // نكمل على الـ fallback المحلي
       }
-
-      return res.json({ ok: true, animals });
     }
 
-    // لو مفيش db → fallback للملف المحلي (زي ما هو)
+    // إما db=null أو Firestore فشل → fallback محلي
     const animalsLocal = readJson(animalsPath, []).filter(a => belongs(a, tenant));
     return res.json({ ok: true, animals: animalsLocal });
 
   } catch (e) {
     console.error('animals fatal error:', e);
+    // الحالة دي نادرة جداً (كسر في السيرفر نفسه)
     return res.status(500).json({ ok: false, error: 'animals_fatal' });
   }
 });
