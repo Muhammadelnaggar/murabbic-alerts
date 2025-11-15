@@ -17,34 +17,18 @@ export async function updateAnimalByEvent(ev) {
 
     if (!tenant || !num) return;
 
-    // تجهيز الحقول
     const upd = {};
     const date = ev.eventDate;
 
+    // تحديث الحالة الإنتاجية فقط للـ daily milk
     if (ev.type === "daily_milk") {
       upd.productionStatus = "milking";
       upd.lastMilkDate = date;
     }
 
-    if (ev.type === "insemination") {
-      upd.reproductiveStatus = "inseminated";
-      upd.lastInseminationDate = date;
-    }
-
-    if (ev.type === "calving") {
-      upd.reproductiveStatus = "fresh";
-      upd.productionStatus = "milking";
-      upd.lastCalvingDate = date;
-    }
-
-    if (ev.type === "dry_off") {
-      upd.productionStatus = "dry";
-      upd.lastDryOffDate = date;
-    }
-
     if (!Object.keys(upd).length) return;
 
-    // البحث عن الحيوان برقم animalId
+    // البحث عن الحيوان برقم number
     const q = query(
       collection(db, "animals"),
       where("userId", "==", tenant),
@@ -56,7 +40,7 @@ export async function updateAnimalByEvent(ev) {
 
     for (const d of snap.docs) {
       await setDoc(doc(db, "animals", d.id), upd, { merge: true });
-      console.log("🔥 updated animal:", d.id, upd);
+      console.log("🔥 animal updated:", d.id, upd);
     }
   } catch (e) {
     console.error("updateAnimalByEvent error:", e);
