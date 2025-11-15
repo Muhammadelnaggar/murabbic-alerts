@@ -83,11 +83,16 @@
       const snap = await getDoc(doc(db,"users", uid));
       const u = snap.exists() ? snap.data() : {};
 
-      // خزّن الـ UID لاستخدامه في صفحات الإضافة/الداشبورد
-      localStorage.setItem("userId", uid);
-      if (u.phone)   localStorage.setItem("userPhone", u.phone);
-      if (u.country) localStorage.setItem("userCountry", u.country);
-      if (u.region)  localStorage.setItem("userRegion",  u.region);
+// userId الحقيقي الخاص بالمزرعة (وليس UID)
+const tenant = u.userId || uid;
+
+// خزِّن الـ tenant لاستخدامه في الداشبورد ونداءات الـ API
+localStorage.setItem("userId", tenant);
+
+// اختياري: تخزين بيانات إضافية
+if (u.phone)   localStorage.setItem("userPhone", u.phone);
+if (u.country) localStorage.setItem("userCountry", u.country);
+if (u.region)  localStorage.setItem("userRegion",  u.region);
 
       setMsg("✅ تم تسجيل الدخول — تحويل…", true);
       setTimeout(()=> location.href="dashboard.html", 600);
@@ -114,6 +119,7 @@
   </form>
 </body>
 </html>
+
 
 
 
