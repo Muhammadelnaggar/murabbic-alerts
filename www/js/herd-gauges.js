@@ -1,5 +1,4 @@
-// /js/herd-gauges.js — نسخة نهائية مستقرة 100%
-// =============================================
+// /js/herd-gauges.js — النسخة النهائية المتوافقة مع السيرفر 100%
 
 document.addEventListener("DOMContentLoaded", initHerdGauges);
 
@@ -8,12 +7,11 @@ async function initHerdGauges() {
     const userId =
       localStorage.getItem("userId") ||
       window.userId ||
-      sessionStorage.getItem("userId") ||
-      "";
+      sessionStorage.getItem("userId") || "";
 
     if (!userId) {
-      console.warn("❌ لا يوجد userId — الجوجز لن تعمل");
-      return;
+      console.warn("❌ لا يوجد userId — إيقاف تشغيل الجوجز");
+      return setTimeout(initHerdGauges, 300);
     }
 
     const res = await fetch("/api/herd-stats", {
@@ -24,47 +22,46 @@ async function initHerdGauges() {
     const data = await res.json();
     console.log("HERD-STATS:", data);
 
-    if (!data || !data.ok) {
-      console.warn("⚠️ herd-stats لم يرجع بيانات صالحة");
+    if (!data || !data.ok || !data.totals) {
+      console.warn("⚠️ بيانات herd-stats غير صالحة");
       return;
     }
 
-    // ============================
-    // القيم EXACT كما جاءت من السيرفر
-    // ============================
+    // =========================
+    // القيم EXACT من السيرفر
+    // =========================
+    const T  = data.totals;
+    const F  = data.fertility || {};
 
-    const totalActive = +data.totals?.totalActive || 0;
+    const totalActive      = +T.totalActive || 0;
 
-    const pregnantCnt   = +data.fertility?.pregCount || 0;
-    const pregnantPct   = +data.fertility?.pregPercent || 0;
+    const pregnantCnt      = +T.pregnant.count || 0;
+    const pregnantPct      = +T.pregnant.pct   || 0;
 
-    const inseminatedCnt = +data.fertility?.inseminatedCount || 0;
-    const inseminatedPct = +data.fertility?.inseminatedPercent || 0;
+    const inseminatedCnt   = +T.inseminated.count || 0;
+    const inseminatedPct   = +T.inseminated.pct   || 0;
 
-    const openCnt = +data.fertility?.openCount || 0;
-    const openPct = +data.fertility?.openPercent || 0;
+    const openCnt          = +T.open.count || 0;
+    const openPct          = +T.open.pct   || 0;
 
-    const conceptionPct = +data.fertility?.conceptionRate || 0;
+    const conceptionPct    = +F.conceptionRatePct || 0;
 
-    // ============================
-    // تحديث الجوجز (باستخدام gauge.js)
-    // ============================
-
+    // =========================
+    // تحديث الجوجز
+    // =========================
     setGaugeValue("g_pregnant",    pregnantPct);
     setGaugeValue("g_inseminated", inseminatedPct);
     setGaugeValue("g_open",        openPct);
     setGaugeValue("g_conception",  conceptionPct);
 
-    // ============================
-    // نصوص تحت كل عدّاد
-    // ============================
-
+    // =========================
+    // كتابة النصوص
+    // =========================
     setText("line-pregnant",    `عِشار: ${pregnantCnt} من ${totalActive}`);
     setText("line-inseminated", `ملقّحات: ${inseminatedCnt} من ${totalActive}`);
     setText("line-open",        `مفتوحة: ${openCnt} من ${totalActive}`);
     setText("line-conception",  `Conception: ${Math.round(conceptionPct)}%`);
 
-    // نص الإجمالي
     const h = document.querySelector("#herd-numbers");
     if (h) {
       h.textContent =
@@ -76,13 +73,23 @@ async function initHerdGauges() {
   }
 }
 
-
-// =============================================
-// دوال مساعدة تعتمد على gauge.js الموجود عندك
-// =============================================
+// =========================
+// أدوات تعتمد على gauge.js
+// =========================
 
 function setGaugeValue(id, pct) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  const value = Math.max(0, Math.min(10
+  const v = Math.max(0, Math.min(100, +pct || 0));
+  const bar = el.querySelector(".bar");
+  const txt = el.querySelector(".value");
+
+  if (bar)  bar.style.strokeDasharray = `${v * 1.57} 250`;
+  if (txt)  txt.textContent = Math.round(v) + "%";
+}
+
+function setText(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
