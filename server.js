@@ -5,6 +5,22 @@ const fs      = require('fs');
 const express = require('express');
 const cors    = require('cors');
 const admin   = require('firebase-admin');
+const EVENT_SYNONYMS = {
+  insemination: ['insemination', 'تلقيح'],
+  pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
+  calving: ['calving', 'birth', 'ولادة'],
+  dry_off: ['dry_off', 'dry-off', 'تجفيف', 'dry', 'جاف'],
+  close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'],
+  daily_milk: ['daily milk', 'daily_milk', 'لبن يومي', 'اللبن اليومي', 'لبن'],
+  nutrition: ['nutrition', 'تغذية', 'عليقة'],
+  weaning: ['weaning', 'فطام'],
+  lameness: ['lameness', 'عرج'],
+  hoof_trimming: ['hoof trimming', 'تقليم حوافر', 'حافر'],
+  vaccination: ['vaccination', 'تحصين', 'تطعيم'],
+  milking_status: ['milking', 'milking status', 'حلاب'],
+  fresh: ['fresh', 'حديث الولادة', 'فريش'],
+  diagnosis: ['diagnosis', 'التشخيص', 'فحص', 'كشف']
+};
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -121,6 +137,19 @@ async function ensureAdmin(req, res, next) {
 // ============================================================
 //                       API: EVENTS
 // ============================================================
+// ========================
+//  Event Type Normalizer
+// ========================
+function normalizeEventType(raw) {
+  const t = String(raw || '').toLowerCase();
+  for (const [norm, arr] of Object.entries(EVENT_SYNONYMS)) {
+    for (const w of arr) {
+      if (t.includes(w.toLowerCase())) return norm;
+    }
+  }
+  return t;
+}
+
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
     const event = req.body || {};
@@ -157,6 +186,8 @@ app.post('/api/events', requireUserId, async (req, res) => {
   result: event.result || event.status || '',
   note: event.note || ''
 };
+// 🔥 نوع الحدث الموحّد (عربي/إنجليزي)
+doc.eventTypeNorm = normalizeEventType(event.type);
 
       try { await db.collection('events').add(doc); } catch {}
     }
@@ -288,7 +319,8 @@ const totalActive = animals.length;
     try {
       const s = await adb.collection('events')
         .where(field, '==', tenant)
-        .where('eventType', '==', type)
+       .where('eventTypeNorm', '==', type)
+
         .where('eventDate', '>=', sinceStr)
         .get();
       out.push(...s.docs);
@@ -317,7 +349,17 @@ const totalActive = animals.length;
 
       const activeIds = new Set(active.map(a=>String(a.id)));
       const winStart = new Date(Date.now() - analysisDays * dayMs);
-
+// دالة التطبيع
+const normalizeEventType = (raw) => {
+  const t = String(raw || '').toLowerCase();
+  for (const [norm, arr] of Object.entries(EVENT_SYNONYMS)) {
+    for (const w of arr) {
+      if (t.includes(w.toLowerCase())) return norm;
+    }
+  }
+  return t;
+};
+      
       const insWin  = ins .filter(e => activeIds.has(String(e.animalId)) && toDate(e.date||e.createdAt) >= winStart);
       const pregPos = preg.filter(e => activeIds.has(String(e.animalId)) && /preg|positive|حمل|ايجاب/i.test(String(e.result||e.status||e.outcome||'')));
 
