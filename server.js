@@ -47,7 +47,10 @@ console.log("SA client_email:", sa.client_email);
   console.log("🔥 Admin SDK Auth Identity:", sa.client_email);
 
   // اتصال Firestore الصحيح → murabbikdata
-  db = admin.firestore(admin.app(), "murabbikdata");
+ const firestore = admin.firestore();
+firestore.settings({ databaseId: "murabbikdata" });
+db = firestore;
+
   console.log("✅ Firebase Admin ready → murabbikdata");
 
 } catch (e) {
@@ -68,28 +71,31 @@ function toDate(v){
   return new Date(s);
 }
 
-const tenantKey = v => (!v ? 'DEFAULT' : String(v));
+const tenantKey = v => String(v || '').trim();
+
 function resolveTenant(req) {
   const uid =
-    req.get("X-User-Id") ||  // الشكل القياسي للهيدر
-    req.headers["x-user-id"] || // fallback إذا Express حوّلها
+    req.get("X-User-Id") ||
+    req.headers["x-user-id"] ||
     req.query.userId ||
-    process.env.DEFAULT_TENANT_ID ||
-    "DEFAULT";
-  return tenantKey(uid);
+    null;
+  return uid ? tenantKey(uid) : null;
 }
+
 
 
 function belongs(rec, tenant){
-  const t = rec && (rec.userId || rec.farmId) || 'DEFAULT';
+  const t = rec && rec.userId ? rec.userId : '';
   return tenantKey(t) === tenantKey(tenant);
 }
+
 function requireUserId(req, res, next){
   const t = resolveTenant(req);
-  if (!t || t === 'DEFAULT') return res.status(400).json({ ok:false, error:'userId_required' });
+  if (!t) return res.status(400).json({ ok:false, error:'userId_required' });
   req.userId = t;
   next();
 }
+
 
 // ===== Admin gate (optional) =====
 const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -120,7 +126,7 @@ app.post('/api/events', requireUserId, async (req, res) => {
     const event = req.body || {};
     const tenant = req.userId;
     event.userId = tenant;
-    event.farmId = event.farmId || tenant;
+   
 
     if (!event.type || !event.animalId) {
       return res.status(400).json({ ok:false, error:'missing_fields' });
@@ -141,17 +147,17 @@ app.post('/api/events', requireUserId, async (req, res) => {
         t.includes('heat')    || t.includes('شياع')   ? 'heat'        : 'event';
 
       const whenMs  = Number(event.ts || Date.now());
-      const doc = {
-        userId: tenant,
-        farmId: tenant,
-        animalId: String(event.animalId || ''),
-        type: typeNorm,
-        date: toYYYYMMDD(whenMs),
-        createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
-        species: (event.species || 'buffalo').toLowerCase(),
-        result: event.result || event.status || '',
-        note: event.note || ''
-      };
+     const doc = {
+  userId: tenant,
+  animalId: String(event.animalId || ''),
+  type: typeNorm,
+  date: toYYYYMMDD(whenMs),
+  createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
+  species: (event.species || 'buffalo').toLowerCase(),
+  result: event.result || event.status || '',
+  note: event.note || ''
+};
+
       try { await db.collection('events').add(doc); } catch {}
     }
 
@@ -174,7 +180,8 @@ app.get('/api/alerts', async (req, res) => {
     const days     = Number(req.query.days || 0);
     const limit    = Math.min(Number(req.query.limit || 100), 2000);
 
-    let q = db.collection('alerts').where('farmId','==', tenant);
+   let q = db.collection('alerts').where('userId','==', tenant);
+
     if (animalId) q = q.where('subject.animalId', '==', animalId);
 
     let since = sinceMs;
@@ -299,7 +306,7 @@ const totalActive = animals.length;
     }
   }
   await tryQ('userId');
-  await tryQ('farmId');
+ 
   const map = new Map();
   out.forEach(d => map.set(d.id, d));
   return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
@@ -446,7 +453,8 @@ app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
       for (const p of plan) {
         if (!p.willUpdate) continue;
         const ref = adb.doc(p.path);
-        batch.set(ref, { userId: to, farmId: to }, { merge:true });
+       batch.set(ref, { userId: to }, { merge:true });
+
         updated++; ops++;
         if (ops>=450) { await batch.commit(); batch=adb.batch(); ops=0; }
       }
@@ -497,7 +505,8 @@ app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
       const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
       const can = !owner || allow.has(String(owner).trim());
       plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before:owner??null, willUpdate:!!can });
-      if (can && !dry) await d.ref.set({ userId: tenant, farmId: tenant }, { merge:true });
+      if (can && !dry) await d.ref.set({ userId: tenant }, { merge:true });
+
     }
 
     res.json({ ok:true, dryRun:dry, tenant, found:plan.length,
