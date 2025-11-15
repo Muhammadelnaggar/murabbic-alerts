@@ -167,29 +167,111 @@ app.post('/api/events', requireUserId, async (req, res) => {
     events.push(event);
     fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
 
-    if (db) {
-      const t = String(event.type||'').toLowerCase();
+      if (db) {
+      const t = String(event.type || "").toLowerCase();
       const typeNorm =
-        t.includes('insemin') || t.includes('تلقيح') ? 'insemination' :
-        t.includes('preg')    || t.includes('حمل')    ? 'pregnancy'   :
-        t.includes('calv')    || t.includes('ولادة')  ? 'birth'       :
-        t.includes('heat')    || t.includes('شياع')   ? 'heat'        : 'event';
+        t.includes("insemin") || t.includes("تلقيح")
+          ? "insemination"
+          : t.includes("preg") || t.includes("حمل")
+          ? "pregnancy"
+          : t.includes("calv") || t.includes("ولادة")
+          ? "birth"
+          : t.includes("heat") || t.includes("شياع")
+          ? "heat"
+          : "event";
 
-      const whenMs  = Number(event.ts || Date.now());
-     const doc = {
-  userId: tenant,
-  animalId: String(event.animalId || ''),
-  type: typeNorm,
-  date: toYYYYMMDD(whenMs),
-  createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
-  species: (event.species || 'buffalo').toLowerCase(),
-  result: event.result || event.status || '',
-  note: event.note || ''
-};
-// 🔥 نوع الحدث الموحّد (عربي/إنجليزي)
-doc.eventTypeNorm = normalizeEventType(event.type);
+      const whenMs = Number(event.ts || Date.now());
 
-      try { await db.collection('events').add(doc); } catch {}
+      // -------- 1) حفظ الحدث في events --------
+      const doc = {
+        userId: tenant,
+        animalId: String(event.animalId || ""),
+        type: typeNorm,
+        date: toYYYYMMDD(whenMs),
+        createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
+        species: (event.species || "buffalo").toLowerCase(),
+        result: event.result || event.status || "",
+        note: event.note || "",
+      };
+
+      doc.eventTypeNorm = normalizeEventType(event.type);
+
+      try {
+        await db.collection("events").add(doc);
+      } catch (e) {
+        console.error("events.save error:", e.message || e);
+      }
+
+      // -------- 2) تجهيز تحديث وثيقة الحيوان --------
+      const update = {};
+      const evDate = toYYYYMMDD(whenMs);
+      const raw    = t;
+      const result = String(event.result || event.status || "").toLowerCase();
+
+      // ===== الحالة التناسلية =====
+      if (/preg|حمل/.test(raw) && /(positive|ايجاب|عشار|حامل)/.test(result)) {
+        update.reproductiveStatus = "pregnant";
+        update.lastDiagnosisDate  = evDate;
+      }
+      else if (/preg|حمل/.test(raw) && /(neg|سلب|فارغ)/.test(result)) {
+        update.reproductiveStatus = "open";
+        update.lastDiagnosisDate  = evDate;
+      }
+      else if (/insemin|تلقيح/.test(raw)) {
+        update.reproductiveStatus   = "inseminated";
+        update.lastInseminationDate = evDate;
+      }
+      else if (/calv|birth|ولادة/.test(raw)) {
+        update.reproductiveStatus = "fresh";
+        update.lastCalvingDate    = evDate;
+      }
+      else if (/abortion|اجهاض/.test(raw)) {
+        update.reproductiveStatus = "aborted";
+        update.lastAbortionDate   = evDate;
+      }
+
+      // ===== الحالة الإنتاجية =====
+      if (/milk|لبن/.test(raw)) {
+        update.productionStatus = "milking";
+      }
+
+      if (/dry|تجفيف|جاف/.test(raw)) {
+        update.productionStatus = "dry";
+        update.lastDryOffDate   = evDate;
+      }
+
+      if (/calv|birth|ولادة/.test(raw)) {
+        update.productionStatus = "milking";
+      }
+
+      if (/close|تحضير/.test(raw)) {
+        update.productionStatus = "close_up";
+        update.lastCloseUpDate  = evDate;
+      }
+
+      // -------- 3) تطبيق التحديث على animals --------
+          // -------- 3) تطبيق التحديث على animals --------
+      if (Object.keys(update).length > 0 && event.animalId) {
+        try {
+          const num = isNaN(Number(event.animalId))
+            ? String(event.animalId)
+            : Number(event.animalId);
+
+          const snapAnimals = await db
+            .collection("animals")
+            .where("userId", "==", tenant)
+            .where("number", "==", num)
+            .limit(10)
+            .get();
+
+          for (const d of snapAnimals.docs) {
+            await d.ref.set(update, { merge: true });
+            console.log("🔥 animal updated:", d.id, update);
+          }
+        } catch (e) {
+          console.error("animals.update error:", e.message || e);
+        }
+      }
     }
 
     res.json({ ok:true, event });
@@ -198,6 +280,9 @@ doc.eventTypeNorm = normalizeEventType(event.type);
     res.status(500).json({ ok:false, error:'failed_to_save_event' });
   }
 });
+
+
+
 
 // ============================================================
 //                       API: ALERTS
