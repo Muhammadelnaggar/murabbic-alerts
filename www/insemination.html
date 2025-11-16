@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <script src="/js/animal-update.js"></script>
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل حدث التلقيح — مُرَبِّك</title>
@@ -493,6 +494,8 @@
 
       try{
         const ref = await addDoc(collection(db, 'events'), payload);
+        await window.updateAnimalByEvent(payload);
+
         if (!ref?.id) throw new Error('no id');
         const addDaysISO = (iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
         const tips = [`موعد فحص حمل مقترح: ${addDaysISO(eventDate,30)}`, `متابعة شياع بعد 21 يوم: ${addDaysISO(eventDate,21)}`];
@@ -504,6 +507,7 @@
     }
     document.getElementById('saveBtn')?.addEventListener('click', onSave);
     document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
+      
       const number = (numEl?.value||'').trim();
       if(!number){ return showMsg('من فضلك أدخل رقم الحيوان لفتح البطاقة', true); }
       location.href = `cow-card.html?number=${encodeURIComponent(number)}`;
@@ -700,3 +704,4 @@
   </script>
 </body>
 </html>
+
