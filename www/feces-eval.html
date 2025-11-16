@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <script type="module" src="/js/animal-update.js"></script>
+
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تقييم الروث بالكاميرا — مُرَبِّك</title>
@@ -541,68 +543,93 @@
       setTimeout(()=>{ msgBox.style.display="none"; }, 4000);
     }
 
-    btn?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      if (btn.disabled) return;
+   btn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (btn.disabled) return;
 
-      const score = Number(window.fecesScore ?? 0);
-      if (!score) { showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false); return; }
+  const score = Number(window.fecesScore ?? 0);
+  if (!score) {
+    showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false);
+    return;
+  }
 
-      const oldText = btn.textContent;
-      btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "جارٍ الحفظ…";
 
-      const animalId     = (animalIdHidden?.value?.trim()) || localStorage.getItem("currentAnimalId") || "";
-      const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
-      const eventDate    = (eventDateInput?.value) || localStorage.getItem("currentEventDate") || todayCairo();
+  const animalId     = animalIdHidden?.value?.trim() || localStorage.getItem("currentAnimalId") || "";
+  const animalNumber = localStorage.getItem("currentAnimalNumber") || "";
+  const eventDate    = eventDateInput?.value || localStorage.getItem("currentEventDate") || todayCairo();
 
-     const userId  = auth.currentUser?.uid || null;
- const tenantId = localStorage.getItem("tenantId") || null;
-      // لازم دخول عشان نمر الرولز ونكتب userId
-try { 
-  await requireAuth(); 
-} catch {
-  // نمرر السياق لصفحة الدخول ونرجع تلقائيًا
-  const params = new URLSearchParams();
-  const num = localStorage.getItem("currentAnimalNumber") || "";
-  const dt  = eventDateInput?.value || localStorage.getItem("currentEventDate") || todayCairo();
-  if (num) params.set("number", num);
-  if (dt)  params.set("date", dt);
-  location.href = "/login.html?next=" + encodeURIComponent(location.pathname + "?" + params.toString());
-  return;
-}
+  const userId  = auth.currentUser?.uid || null;
+  const tenantId = localStorage.getItem("tenantId") || null;
 
-      try {
-        await addDoc(collection(db, "events"), {
-          type: "تقييم الروث بالكاميرا",
-          eventType: "feces_eval",
-          eventDate,
-          eventDateUtc: new Date(eventDate + "T00:00:00Z").toISOString(),
-          animalId,
-          animalNumber,
-          fecesScore: score,            // الرقم
-          description: fecesDesc(score),// الوصف البرمجي
-          value: score,                 // نفس الرقم لتوحيد التقارير
-          userId,                       // مهم لتمرير الرولز
-          uid: userId,                  // (اختياري) للتوافق مع أي كود قديم
-          tenantId,
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-          source: location.href,
-          createdAt: serverTimestamp()
-        });
-       showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
-       setTimeout(()=>{
-       const params = new URLSearchParams();
-       if (animalId)     params.set("animalId", animalId);
-       if (animalNumber) params.set("number",   animalNumber);
-       if (eventDate)    params.set("date",     eventDate);
-       location.href = "add-event.html?" + params.toString();
-       }, 900);
-      } catch (err) {
-        console.error("Firestore save error:", err);
-        showMsg("❌ حدث خطأ أثناء الحفظ", false);
-      } finally {
-        btn.disabled = false; btn.textContent = oldText;
-      }
+  // تأكيد الدخول
+  try { 
+    await requireAuth();
+  } catch {
+    const params = new URLSearchParams();
+    const num = animalNumber;
+    const dt  = eventDate;
+    if (num) params.set("number", num);
+    if (dt)  params.set("date", dt);
+    location.href = "/login.html?next=" + encodeURIComponent(location.pathname + "?" + params.toString());
+    return;
+  }
+  try {
+    // حفظ الحدث
+    await addDoc(collection(db, "events"), {
+      type: "تقييم الروث بالكاميرا",
+      eventType: "feces_eval",
+      eventDate,
+      eventDateUtc: new Date(eventDate + "T00:00:00Z").toISOString(),
+      animalId,
+      animalNumber,
+      fecesScore: score,
+      description: fecesDesc(score),
+      value: score,
+      userId,
+      uid: userId,
+      tenantId,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      source: location.href,
+      createdAt: serverTimestamp()
     });
-  });
+
+    // تحديث وثيقة الحيوان
+    try {
+      await window.updateAnimalByEvent({
+        type: "feces_eval",
+        eventType: "feces_eval",
+        animalId,
+        animalNumber,
+        userId,
+        eventDate
+      });
+    } catch (e) {
+      console.warn("updateAnimalByEvent failed", e);
+    }
+
+    showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+
+    // إعادة التوجيه
+    setTimeout(() => {
+      const params = new URLSearchParams();
+      if (animalId)     params.set("animalId", animalId);
+      if (animalNumber) params.set("number",   animalNumber);
+      if (eventDate)    params.set("date",     eventDate);
+      location.href = "add-event.html?" + params.toString();
+    }, 900);
+
+  } catch (err) {
+    console.error("Firestore save error:", err);
+    showMsg("❌ حدث خطأ أثناء الحفظ", false);
+
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+
+}); // ← إغلاق event listener للزر
+}); // ← إغلاق DOMContentLoaded
 </script>
