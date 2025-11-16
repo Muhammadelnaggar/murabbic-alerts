@@ -1,4 +1,6 @@
-// /js/form-rules.js — نسخة مصححة 100%
+// ===================================================================
+//   /js/form-rules.js — Murabbik Final Validation (Document-Based)
+// ===================================================================
 
 // ===================== ثوابت عامة =====================
 export const thresholds = {
@@ -9,160 +11,211 @@ export const thresholds = {
 // حد أدنى لتشخيص الحمل حسب وسيلة التشخيص
 const MIN_PD_BY_METHOD = { "سونار": 26, "جس يدوي": 40 };
 
-// حد أدنى لأيام ما بعد الولادة قبل التلقيح حسب النوع
+// حد أدنى لأيام ما بعد الولادة قبل التلقيح
 const MIN_DAYS_POST_CALVING_FOR_AI = { "أبقار": 56, "جاموس": 45 };
 
 // ===================== أدوات مساعدة =====================
-const toDate = (v) => (v instanceof Date ? v : (v ? new Date(v) : null));
+const toDate = (v) =>
+  v instanceof Date ? v : (v ? new Date(v) : null);
+
 const daysBetween = (a, b) => {
   const d1 = toDate(a), d2 = toDate(b);
   if (!d1 || !d2) return NaN;
   return Math.round((d2.setHours(0,0,0,0) - d1.setHours(0,0,0,0)) / 86400000);
 };
+
 const req    = (v) => !(v === undefined || v === null || String(v).trim() === "");
 const isDate = (v) => !Number.isNaN(toDate(v)?.getTime());
 const isNum  = (v) => (v === "" ? true : !Number.isNaN(Number(v)));
 
+
 // ===================== الحقول المشتركة =====================
 const commonFields = {
-  animalId:  { required: true,  msg: "رقم/معرّف الحيوان مفقود." },
+  animalId:  { required: true,  msg: "رقم الحيوان مطلوب." },
   eventDate: { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
+  // ⚠️ مبدأ جديد مهم:
+  //     documentData = وثيقة الحيوان كاملة
+  documentData: { required: true, msg: "بيانات الحيوان غير متاحة." }
 };
 
-// ===================== سكيمات الأحداث =====================
+
+// ===================================================================
+//                         سكيمات الأحداث
+// ===================================================================
 export const eventSchemas = {
-  // — الولادة —
+
+  // ------------------- الولادة -------------------
   "ولادة": {
     fields: {
       ...commonFields,
-      species: { required: true, enum: ["أبقار","جاموس"], msg: "نوع القطيع مطلوب." },
-      reproStatus: { required: true, enum: ["عشار"], msg: "الولادة تتطلّب الحالة «عِشار»." },
-      lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
-      gestationOverrideDays: { type: "number" },
+      species: { required: true },
+      documentData: { required: true },
     },
     guards: ["calvingDecision"],
   },
 
-  // — التلقيح —
+  // ------------------- التلقيح -------------------
   "تلقيح": {
     fields: {
       ...commonFields,
-      species: { required: true, enum: ["أبقار","جاموس"], msg: "نوع القطيع مطلوب." },
-      reproStatus: { required: true, enum: ["ملقح","ملقّح","ملقحة","ملقّحة","مفتوحة"], msg: "الحالة يجب أن تكون «ملقح/ملقّحة» أو «مفتوحة»." },
-      lastCalvingDate: { required: true, type: "date", msg: "تاريخ آخر ولادة مطلوب." },
-      hasInseminationSameDay: { type: "boolean" },
-      method: { required: false },
+      species: { required: true },
+      documentData: { required: true },
     },
     guards: ["inseminationDecision"],
   },
 
-  // — تشخيص الحمل —
+  // ---------------- تشخيص الحمل -----------------
   "تشخيص حمل": {
     fields: {
       ...commonFields,
-      reproStatus: { required: true, enum: ["ملقح","ملقّح","ملقحة","ملقّحة"], msg: "تشخيص الحمل يتطلّب الحالة «ملقّح/ملقّحة»." },
-      method: { required: true, enum: ["سونار","جس يدوي"], msg: "اختَر وسيلة التشخيص (سونار/جس يدوي)." },
-      lastInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مطلوب." },
-      result: { required: false, enum: ["عشار","فارغة"] },
+      method: { required: true, enum: ["سونار","جس يدوي"], msg: "اختَر وسيلة التشخيص." },
+      documentData: { required: true },
     },
     guards: ["pregnancyDiagnosisDecision"],
   },
 
-  // — الإجهاض —
+  // ------------------- الإجهاض -------------------
   "إجهاض": {
     fields: {
       ...commonFields,
-      reproStatus: { required: true, msg: "الحالة التناسلية مطلوبة." },
-      lastFertileInseminationDate: { type: "date" },
+      documentData: { required: true },
     },
     guards: ["abortionDecision"],
   },
 
-  // — التجفيف —
+  // ------------------- التجفيف -------------------
   "تجفيف": {
     fields: {
       ...commonFields,
-      reproStatus: { required: true, enum: ["عشار","غير عشار"], msg: "حدّث الحالة التناسلية قبل التجفيف." },
       reason: { required: true, msg: "سبب التجفيف مطلوب." },
+      documentData: { required: true },
     },
-    guards: [],
+    guards: ["dryOffDecision"],
   },
 };
 
-// ===================== الحُرّاس =====================
+
+
+// ===================================================================
+//                          الحُرّاس (GUARDS)
+// ===================================================================
 const guards = {
-  // — الولادة —
+
+  // ------------------- الولادة -------------------
   calvingDecision(fd) {
-    const { species, reproStatus, lastFertileInseminationDate, eventDate, gestationOverrideDays } = fd;
-    if (reproStatus !== "عشار") return "الولادة تتطلّب أن تكون الحالة «عِشار».";
-    const th = thresholds[species]?.minGestationDays; if (!th) return "نوع القطيع غير معروف لتحديد حدّ عمر الحمل.";
+    const doc = fd.documentData;
+    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    const gDays = req(gestationOverrideDays)
-      ? Number(gestationOverrideDays)
-      : daysBetween(lastFertileInseminationDate, eventDate);
+    if (doc.reproductiveStatus !== "عشار")
+      return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
 
-    if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
-    if (gDays < th) return `عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th} يوم.`;
+    const th = thresholds[doc.species]?.minGestationDays;
+    if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+
+    const gDays = daysBetween(doc.lastFertileInseminationDate, fd.eventDate);
+    if (Number.isNaN(gDays)) return "لا يوجد تلقيح مُخصِّب سابق.";
+    if (gDays < th) return `عمر الحمل ${gDays} أقل من الحد الأدنى ${th}.`;
+
     return null;
   },
 
-  // — التلقيح —
+
+  // ------------------- التلقيح -------------------
   inseminationDecision(fd) {
-    const { species, reproStatus, lastCalvingDate, eventDate, hasInseminationSameDay } = fd;
-    const okStatus = new Set(["ملقح","ملقّح","ملقحة","ملقّحة","مفتوحة"]);
-    if (!okStatus.has(String(reproStatus || "").trim())) return "الحالة يجب أن تكون «ملقح/ملقّحة» أو «مفتوحة».";
+    const doc = fd.documentData;
+    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    const th = MIN_DAYS_POST_CALVING_FOR_AI[species];
-    if (!th) return "نوع القطيع غير معروف لحساب الحد الأدنى للأيام.";
-    if (!isDate(lastCalvingDate)) return "تاريخ آخر ولادة غير متاح.";
-    const d = daysBetween(lastCalvingDate, eventDate);
-    if (Number.isNaN(d)) return "تعذّر حساب المدة منذ آخر ولادة.";
-    if (d < th) return `التلقيح مبكّر: يلزم ≥ ${th} يوم بعد الولادة (الحالي ${d}).`;
-    if (hasInseminationSameDay === true) return "يوجد تلقيح مُسجَّل لنفس الحيوان اليوم.";
+    const status = String(doc.reproductiveStatus || "").trim();
+
+    const okStatus = new Set(["مفتوحة","ملقح","ملقّح","ملقحة","ملقّحة"]);
+    if (!okStatus.has(status))
+      return "الحالة الحالية لا تسمح بالتلقيح.";
+
+    if (!isDate(doc.lastCalvingDate))
+      return "تاريخ الولادة غير مسجل.";
+
+    const th = MIN_DAYS_POST_CALVING_FOR_AI[doc.species];
+    const d = daysBetween(doc.lastCalvingDate, fd.eventDate);
+    if (d < th) return `التلقيح مبكر: ${d} يوم فقط (الحد الأدنى ${th}).`;
+
     return null;
   },
 
-  // — تشخيص الحمل —
+
+  // -------------- تشخيص الحمل ---------------------
   pregnancyDiagnosisDecision(fd) {
-    const { reproStatus, lastInseminationDate, eventDate, method } = fd;
-    const okPregStatus = new Set(["ملقح","ملقّح","ملقحة","ملقّحة"]);
-    if (!okPregStatus.has(String(reproStatus || "").trim())) return "تشخيص الحمل يتطلّب الحالة «ملقّح/ملقّحة».";
+    const doc = fd.documentData;
 
-    if (!isDate(lastInseminationDate)) return "لا يوجد تلقيح سابق مسجَّل.";
-    const need = MIN_PD_BY_METHOD[method]; if (!need) return "طريقة التشخيص غير معروفة.";
+    const status = String(doc.reproductiveStatus || "");
+    const okStatus = new Set(["ملقح","ملقّح","ملقحة","ملقّحة"]);
+    if (!okStatus.has(status))
+      return "لا يمكن تشخيص الحمل — الحيوان غير مُلقّح.";
 
-    const d = daysBetween(lastInseminationDate, eventDate);
-    if (Number.isNaN(d)) return "تعذّر حساب الأيام منذ آخر تلقيح.";
-    if (d < need) return `${method} يتطلّب ≥ ${need} يوم من آخر تلقيح (الحالي ${d}).`;
+    if (!isDate(doc.lastInseminationDate))
+      return "لا يوجد تلقيح سابق.";
+
+    const need = MIN_PD_BY_METHOD[fd.method];
+
+    const d = daysBetween(doc.lastInseminationDate, fd.eventDate);
+    if (d < need)
+      return `${fd.method} يتطلّب ≥ ${need} يوم (الحالي ${d}).`;
+
     return null;
   },
 
-  // — الإجهاض — ✅ القاعدة الوحيدة المطلوبة
+
+  // ------------------- الإجهاض --------------------
   abortionDecision(fd) {
-    const { reproStatus } = fd;
-    if (reproStatus !== "عشار") return "❌ الحيوان ليس عِشار، لا يمكن تسجيل الإجهاض.";
+    const doc = fd.documentData;
+    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+    if (doc.reproductiveStatus !== "عشار")
+      return "❌ الحيوان ليس عِشار — لا يمكن تسجيل إجهاض.";
+
+    return null;
+  },
+
+
+  // ------------------- التجفيف --------------------
+  dryOffDecision(fd) {
+    const doc = fd.documentData;
+    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+    // يسمح بالتجفيف لو:
+    // 1) عِشار
+    // 2) أو إنتاج منخفض
+    // 3) أو قرار طبي
+    // القرار عندك → الفاليوديشن بسيط:
+    if (!["عشار","غير عشار"].includes(doc.reproductiveStatus))
+      return "الحالة التناسلية غير مناسبة للتجفيف.";
+
     return null;
   },
 };
 
-// ===================== الدالة المركزية =====================
+
+
+// ===================================================================
+//                   الدالة المركزية للـ Validation
+// ===================================================================
 export function validateEvent(eventType, payload = {}) {
   const schema = eventSchemas[eventType];
   if (!schema) return { ok: false, errors: ["نوع حدث غير معروف."] };
 
   const errors = [];
+
+  // فحص الحقول
   for (const [key, rule] of Object.entries(schema.fields || {})) {
     const err = validateField(key, rule, payload[key]);
     if (err) errors.push(err);
   }
   if (errors.length) return { ok: false, errors };
 
+  // فحص الحراس
   for (const gName of (schema.guards || [])) {
     const guardFn = guards[gName];
-    if (typeof guardFn === "function") {
-      const gErr = guardFn(payload);
-      if (gErr) errors.push(gErr);
-    }
+    const gErr = guardFn(payload);
+    if (gErr) errors.push(gErr);
   }
 
   return { ok: errors.length === 0, errors };
@@ -172,9 +225,7 @@ function validateField(key, rule, value) {
   if (rule.required && !req(value)) return rule.msg || `الحقل «${key}» مطلوب.`;
   if (rule.type === "date" && value && !isDate(value)) return rule.msg || `قيمة «${key}» يجب أن تكون تاريخًا صالحًا.`;
   if (rule.type === "number" && !isNum(value)) return rule.msg || `قيمة «${key}» يجب أن تكون رقمًا.`;
-  if (rule.enum && value && !rule.enum.includes(value)) return rule.msg || `قيمة «${key}» خارج القيم المسموحة.`;
-  if (rule.min !== undefined && Number(value) < rule.min) return rule.msg || `قيمة «${key}» أقل من الحد الأدنى.`;
-  if (rule.max !== undefined && Number(value) > rule.max) return rule.msg || `قيمة «${key}» أكبر من الحد الأقصى.`;
+  if (rule.enum && value && !rule.enum.includes(value)) return rule.msg || `«${key}» خارج القيم المسموحة.`;
   return null;
 }
 
