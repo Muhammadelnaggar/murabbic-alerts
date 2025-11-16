@@ -365,28 +365,27 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get("/api/herd-stats", async (req, res) => {
   try {
     const uid = req.headers["x-user-id"];
-    if (!uid) return res.json({ ok: false, error: "NO_USER" });
+    if (!uid) return res.json({ ok:false, error:"NO_USER" });
 
-    // ------------------------------------------
-    // جلب الحيوانات (الحية فقط)
-    // ------------------------------------------
+    // --------------------------------------
+    // 🔥 1) جلب الحيوانات
+    // --------------------------------------
     const snap = await db
       .collection("animals")
       .where("userId", "==", uid)
       .get();
 
     const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
     const active = animals.filter(a => {
       const st = String(a.status || a.lifeStatus || "").toLowerCase();
-      return !["dead", "died", "sold", "archived", "inactive", "nafaq", "نافق"].includes(st);
+      return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
     });
 
     const total = active.length;
 
-    // ==========================================
-    //          🔥 الخصوبة من الوثيقة
-    // ==========================================
+    // --------------------------------------
+    // 🔥 2) خصوبة من الوثيقة
+    // --------------------------------------
     let preg = 0,
         aborts = 0,
         servicesSum = 0,
@@ -395,27 +394,26 @@ app.get("/api/herd-stats", async (req, res) => {
         openDaysN = 0;
 
     for (const a of active) {
-
-      const rep = String(a.reproductiveStatus || "").toLowerCase();
+      const rep  = String(a.reproductiveStatus || "").toLowerCase();
       const diag = String(a.lastDiagnosisResult || "").toLowerCase();
+
       const isPreg =
         rep.includes("عشار") ||
-        diag === "عشار" ||
-        rep.includes("pregnant");
+        rep.includes("preg") ||
+        diag.includes("عشار");
 
       if (isPreg) {
         preg++;
 
-        // S/C
         const sc = Number(a.servicesCount || 0);
         if (sc > 0) {
           servicesSum += sc;
           servicesN++;
         }
 
-        // Open days
         const calv = a.lastCalvingDate ? new Date(a.lastCalvingDate) : null;
         const ins  = a.lastInseminationDate ? new Date(a.lastInseminationDate) : null;
+
         if (calv && ins) {
           const d = Math.floor((ins - calv) / 86400000);
           if (d >= 0 && d < 400) {
@@ -425,7 +423,6 @@ app.get("/api/herd-stats", async (req, res) => {
         }
       }
 
-      // إجهاض
       if (a.lastAbortionDate) aborts++;
     }
 
@@ -439,87 +436,125 @@ app.get("/api/herd-stats", async (req, res) => {
     const abortPct =
       (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
 
-    // ==========================================
-    //          🔥 النفوق + الاستبعاد
-    // ==========================================
-    const dead = animals.filter(a =>
-      ["dead", "died", "نافق", "ميت"].includes(
-        String(a.status || a.lifeStatus || "").toLowerCase()
-      )
-    ).length;
-
-    const cullProd = animals.filter(a =>
-      a.cullReason === "productivity"
-    ).length;
-
-    const cullRepro = animals.filter(a =>
-      a.cullReason === "reproduction"
-    ).length;
-
-    const cullHealth = animals.filter(a =>
-      a.cullReason === "health"
-    ).length;
+    // --------------------------------------
+    // 🔥 3) نفوق + استبعاد
+    // --------------------------------------
+    const cullProd   = animals.filter(a => a.cullReason === "productivity").length;
+    const cullRepro  = animals.filter(a => a.cullReason === "reproduction").length;
+    const cullHealth = animals.filter(a => a.cullReason === "health").length;
 
     const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
     const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
     const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 
-    // ==========================================
-    //          🔥 تقييم الكاميرا
-    // ==========================================
-    // متوسط BCS من آخر BCS Eval مسجل في الوثيقة
-    const bcsVals = active.map(a => Number(a.lastBCS || 0)).filter(x => x > 0);
-    const bcsCamera =
-      bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0) / bcsVals.length).toFixed(2) : 0;
+    // --------------------------------------
+    // 🔥 4) كاميرا
+    // --------------------------------------
+    const bcsVals = active.map(a => Number(a.lastBCS || 0)).filter(x=>x>0);
+    const fecesVals = active.map(a => Number(a.lastFecesScore || 0)).filter(x=>x>0);
 
-    // تقييم الروث
-    const fecesVals = active.map(a => Number(a.lastFecesScore || 0)).filter(x => x > 0);
-    const fecesScore =
-      fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0) / fecesVals.length).toFixed(2) : 0;
+    const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
+    const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
 
-    // ==========================================
-    //     PregRate21d (بعد إضافة HEAT)
-    // ==========================================
-    // placeholder الآن = 0
-    const pregRate21d = 0;
+    // --------------------------------------
+    // 🔥 5) خصوبة 21 يوم من الأحداث (FERTILITY EVENTS)
+    // --------------------------------------
+    let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0 };
 
-    // ==========================================
-    //      🔥 نتيجة كاملة للداشبورد
-    // ==========================================
+    try {
+      const evSnap = await db.collection("events")
+        .where("userId", "==", uid)
+        .limit(5000)
+        .get();
+
+      const ev = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const heats = ev.filter(e => e.eventTypeNorm === "heat" && e.eventDate);
+      const ins   = ev.filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
+      const pregP = ev.filter(e =>
+        e.eventTypeNorm === "pregnancy_diagnosis" &&
+        (String(e.result).includes("عشار") || String(e.result).includes("positive"))
+      );
+
+      heats.forEach(e => e.ms = new Date(e.eventDate).getTime());
+      ins.forEach(e => e.ms = new Date(e.eventDate).getTime());
+      pregP.forEach(e => e.ms = new Date(e.eventDate).getTime());
+
+      // --- S/C+ ---
+      let sc_total=0, sc_conc=0;
+      for (const p of pregP) {
+        const linked = ins.filter(i =>
+          i.animalId === p.animalId &&
+          i.ms <= p.ms &&
+          (p.ms - i.ms) <= 90*86400000
+        );
+        if (linked.length) {
+          sc_conc++;
+          sc_total += linked.length;
+        }
+      }
+      const scPlus = sc_conc ? +(sc_total / sc_conc).toFixed(2) : 0;
+
+      // --- 21d window ---
+      const now = Date.now();
+      const win = now - 21*86400000;
+
+      const heats21 = heats.filter(e=>e.ms >= win);
+      const ins21   = ins.filter(e=>e.ms >= win);
+      const preg21  = pregP.filter(e=>e.ms >= win);
+
+      const eligible = active.filter(a=>{
+        if (!a.lastCalvingDate) return false;
+        const dim = (now - new Date(a.lastCalvingDate)) / 86400000;
+        return dim>=40 && dim<=300 &&
+               !String(a.reproductiveStatus).includes("عشار");
+      }).length;
+
+      const hdr21 = eligible ? Math.round((heats21.length*100)/eligible) : 0;
+      const cr21  = ins21.length ? Math.round((preg21.length*100)/ins21.length) : 0;
+      const pr21  = Math.round((hdr21/100) * cr21);
+
+      extraFertility = { scPlus, hdr21, cr21, pr21 };
+
+    } catch(e){
+      console.error("FERTILITY EVENT ERROR", e);
+    }
+
+    // --------------------------------------
+    // 🔥 6) RETURN — النتيجة النهائية للداشبورد
+    // --------------------------------------
     return res.json({
       ok: true,
       totals: {
         totalActive: total,
-        pregnant: { count: preg, pct: pregPct }
+        pregnant: { count: preg, pct: pregPct },
       },
+
       fertility: {
         servicesPerConception,
-        conceptionRatePct: conceptionPct
+        conceptionRatePct: conceptionPct,
+        scPlus: extraFertility.scPlus,
+        hdr21:  extraFertility.hdr21,
+        cr21:   extraFertility.cr21,
+        pr21:   extraFertility.pr21
       },
+
       openDaysAvg,
       abortionRatePct: abortPct,
-      pregRate21d,
-      deadCalvingRatePct: 0,
-      ageAtFirstCalvingMonths: 0,
 
-      // استبعاد
-      cullProdPct,
-      cullReproPct,
-      cullHealthPct,
+      culling: {
+        productivity: cullProdPct,
+        reproduction: cullReproPct,
+        health: cullHealthPct
+      },
 
-      // تغذية
-      feedEfficiency: 0,
-      dmiAvg: 0,
-      iofc: 0,
-
-      // الكاميرا
       bcsCamera,
       fecesScore
     });
 
   } catch (e) {
-    console.error("HERD-STATS ERROR", e);
-    return res.json({ ok:false, error: e.message });
+    console.error("HERD-STATS ERROR:", e);
+    return res.json({ ok:false, error:e.message });
   }
 });
 
