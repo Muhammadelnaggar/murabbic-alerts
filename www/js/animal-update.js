@@ -1,4 +1,4 @@
-// www/js/animal-update.js — Murabbik FINAL CLEAN EDITION
+// www/js/animal-update.js — النسخة النهائية مع إعادة تفعيل اللبن اليومي فقط
 //---------------------------------------------------------
 import { db } from "/js/firebase-config.js";
 import {
@@ -11,99 +11,92 @@ import {
   doc
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-// ----------------------------------------------------------
-//  تحديث وثيقة الحيوان بناءً على الأحداث الأساسية فقط
-//  (ولادة – تلقيح – تشخيص حمل – إجهاض – تجفيف)
-// ----------------------------------------------------------
 export async function updateAnimalByEvent(ev) {
   try {
     const tenant = (ev.userId || "").trim();
     const num    = (ev.animalId || ev.animalNumber || "").trim();
-    const date   = ev.eventDate;
 
-    if (!tenant || !num || !date) {
-      console.warn("⛔ updateAnimalByEvent: missing tenant / number / date");
+    if (!tenant || !num) {
+      console.warn("⛔ updateAnimalByEvent: missing tenant or number");
       return;
     }
 
+    const date = ev.eventDate;
     const upd = {};
 
-    // ------------------------------------------------------
-    // 🟩 1) CALVING — ولادة
-    // ------------------------------------------------------
+    // ============================================================
+    // 🟩 DAILY MILK — إنتاج اللبن اليومي (نُبقي عليه)
+    // ============================================================
+    if (ev.type === "daily_milk") {
+      upd.productionStatus = "milking"; // الحيوان بيحلب
+      upd.lastMilkDate     = date;       // آخر يوم تسجيل
+      upd.dailyMilk        = Number(ev.milkKg) || null; // قيمة اللبن
+    }
+
+    // ============================================================
+    // 🟩 CALVING — ولادة
+    // ============================================================
     if (ev.type === "calving") {
-      upd.lastCalvingDate    = date;
-      upd.reproductiveStatus = "ولدت";
-      upd.productionStatus   = "milking";
-      upd.daysInMilk         = 0;
-      if (ev.lactationNumber) upd.lactationNumber = Number(ev.lactationNumber);
+      upd.lastCalvingDate     = date;
+      upd.reproductiveStatus  = "ولدت";
+      upd.productionStatus    = "fresh";
+      upd.daysInMilk          = 0;
+      upd.lactationNumber     = Number(ev.lactationNumber) || undefined;
     }
 
-    // ------------------------------------------------------
-    // 🟩 2) DRY-OFF — تجفيف
-    // ------------------------------------------------------
-    if (ev.type === "dry_off") {
-      upd.productionStatus = "dry";
-      // daysInMilk تتجمد عند يوم التجفيف
-      if (ev.lastCalvingDate) {
-        const diff = Math.floor(
-          (new Date(date) - new Date(ev.lastCalvingDate)) / 86400000
-        );
-        upd.daysInMilk = diff >= 0 ? diff : null;
-      }
+    // ============================================================
+    // 🟩 CLOSE-UP — تحضير للولادة
+    // ============================================================
+    if (ev.type === "close_up" || ev.eventType === "تحضير ولادة") {
+      upd.lastCloseUpDate    = date;
+      upd.reproductiveStatus = "تحضير ولادة";
     }
 
-    // ------------------------------------------------------
-    // 🟩 3) INSEMINATION — تلقيح
-    // ------------------------------------------------------
+    // ============================================================
+    // 🟩 HEAT — شياع
+    // ============================================================
+    if (ev.type === "heat" || ev.eventType === "شياع") {
+      upd.lastHeatDate       = date;
+      upd.reproductiveStatus = "شياع";
+    }
+
+    // ============================================================
+    // 🟩 INSEMINATION — تلقيح
+    // ============================================================
     if (ev.type === "insemination") {
       upd.lastInseminationDate = date;
       upd.reproductiveStatus   = "ملقح";
-      if (ev.servicesCount !== undefined)
-        upd.servicesCount = ev.servicesCount;
+      upd.servicesCount        = ev.servicesCount ?? null;
     }
 
-    // ------------------------------------------------------
-    // 🟩 4) PREGNANCY DIAGNOSIS — تشخيص حمل
-    // ------------------------------------------------------
+    // ============================================================
+    // 🟩 PREGNANCY DIAGNOSIS — تشخيص حمل
+    // ============================================================
     if (ev.type === "pregnancy_diagnosis") {
       upd.lastDiagnosisDate   = date;
-      upd.lastDiagnosisResult = ev.result; // عشار / فارغة
-      upd.reproductiveStatus  = (ev.result === "عشار") ? "عشار" : "فارغ";
+      upd.lastDiagnosisResult = ev.result;
+      upd.reproductiveStatus  = (ev.result === "عشار" ? "عشار" : "فارغ");
     }
 
-    // ------------------------------------------------------
-    // 🟩 5) ABORTION — إجهاض
-    // ------------------------------------------------------
+    // ============================================================
+    // 🟩 ABORTION — إجهاض
+    // ============================================================
     if (ev.type === "abortion") {
-      upd.lastAbortionDate  = date;
+      upd.lastAbortionDate   = date;
       upd.reproductiveStatus = "فارغ";
     }
 
-    // ------------------------------------------------------
-    // ❌ 6) IGNORE — لا نحدّث وثيقة الحيوان من:
-    //    - daily milk
-    //    - nutrition
-    //    - BCS camera
-    //    - feces camera
-    //    - weight camera
-    // ------------------------------------------------------
+    // ============================================================
+    // ❌ لا نحدّث الوثيقة لهذه الأحداث:
+    //    - التغذية Nutrition
+    //    - BCS
+    //    - Feces
+    //    - وزن
+    //    - أي كاميرا
+    // ============================================================
 
-    if (
-      ev.type === "daily_milk" ||
-      ev.type === "nutrition"  ||
-      ev.type === "تغذية"     ||
-      ev.type === "bcs_eval"   ||
-      ev.type === "feces_eval" ||
-      ev.type === "weight"
-    ) {
-      console.warn("ℹ️ هذا الحدث لا يحدّث وثيقة الحيوان:", ev.type);
-    }
-
-    // ------------------------------------------------------
-    // لو مفيش تحديثات — خروج
-    // ------------------------------------------------------
     if (Object.keys(upd).length === 0) {
+      console.warn("⚠️ No animal fields to update for event:", ev.type);
       return;
     }
 
@@ -119,19 +112,19 @@ export async function updateAnimalByEvent(ev) {
 
     const snap = await getDocs(q);
     if (snap.empty) {
-      console.warn("⛔ animal not found:", num);
+      console.warn("⛔ animal not found for update:", num);
       return;
     }
 
     // ------------------------------------------------------
-    // 🔥 كتابة التحديث
+    // 🔥 الكتابة (merge: true)
     // ------------------------------------------------------
     for (const d of snap.docs) {
       await setDoc(doc(db, "animals", d.id), upd, { merge: true });
-      console.log("🔥 updated animal:", d.id, upd);
+      console.log("🔥 animal updated:", d.id, upd);
     }
 
-  } catch (err) {
-    console.error("updateAnimalByEvent error:", err);
+  } catch (e) {
+    console.error("updateAnimalByEvent error:", e);
   }
 }
