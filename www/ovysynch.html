@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="/js/animal-update.js"></script>
+
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>بروتوكول تزامن التبويض والتلقيح الإجباري</title>
@@ -265,16 +267,30 @@
       const ctx = getCtx(); if(!ctx) return;
       saveBtn.disabled = true; saveBtn.textContent = '... جاري الحفظ';
       try{
-        if(db) await addDoc(collection(db,'events'), {
-          type:'ovysynch', eventType:'بروتوكول تزامن',
-          animalId: ctx.animalId, animalNumber: ctx.animalId,
-          startDate: ctx.start,
-          program: ctx.program,
-          steps: ctx.steps,
-          userId: auth?.currentUser?.uid || null,
-          createdAt: serverTimestamp()
-        });
-        hideMsg(); showMsg('✅ تم تسجيل البروتوكول بنجاح');
+       const payload = {
+  type: 'ovysynch',
+  eventType: 'بروتوكول تزامن',
+  animalId: ctx.animalId,
+  animalNumber: ctx.animalId,
+  startDate: ctx.start,
+  program: ctx.program,
+  steps: ctx.steps,              // مصفوفة الخطوات
+  userId: auth?.currentUser?.uid || null,
+  createdAt: serverTimestamp()
+};
+
+// 1) حفظ الحدث
+if (db) {
+  await addDoc(collection(db, 'events'), payload);
+}
+
+// 2) تحديث وثيقة الحيوان
+await window.updateAnimalByEvent(payload);
+
+// 3) رسالة النجاح
+hideMsg();
+showMsg('✅ تم تسجيل البروتوكول بنجاح');
+
       }catch(e){ console.error(e); showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.'); }
       finally{ saveBtn.disabled=false; saveBtn.textContent='💾 تسجيل البروتوكول'; }
     }
