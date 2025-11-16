@@ -332,9 +332,21 @@ async function loadHerdKPIs(){
     const animals = animalsArr.filter(isActive);
     const total = animals.length;
 
-    let inMilk = 0, dimSum = 0, milkTotal = 0, milkCount = 0;
+    let inMilk = 0,
+        dimSum = 0,
+        milkTotal = 0,
+        milkCount = 0;
+
+    // مؤشرات الخصوبة من وثيقة الحيوان
+    let pregCount = 0;                // عدد العشار
+    let abortCount = 0;               // عدد من لديهم إجهاض مسجّل
+    let servicesSum = 0;              // مجموع الخدمات (للحاملين فقط)
+    let servicesNForSPC = 0;          // عدد الحيوانات المستخدمة في SPC
+    let openDaysSum = 0;              // مجموع الأيام المفتوحة
+    let openDaysN = 0;                // عدد الأبقار التي حسبنا لها الأيام المفتوحة
 
     for (const an of animals){
+      // في الحليب + DIM + اللبن
       if (isInMilk(an)){
         inMilk++;
         dimSum += getDIM(an);
@@ -344,70 +356,146 @@ async function loadHerdKPIs(){
         milkTotal += m;
         milkCount++;
       }
+
+      // حالة تناسلية
+      const rep   = norm(an.reproductiveStatus || an.reproStatus || '');
+      const diagR = norm(an.lastDiagnosisResult || '');
+      const isPreg =
+        rep.includes('عشار') ||
+        diagR === 'عشار' ||
+        rep.includes('pregnant');
+
+      if (isPreg){
+        pregCount++;
+
+        // خدمات لكل حمل (من servicesCount في الوثيقة)
+        const services = Number(an.servicesCount || an.serviceCount || 0);
+        if (services > 0){
+          servicesSum += services;
+          servicesNForSPC++;
+        }
+
+        // الأيام المفتوحة = من الولادة حتى التلقيح المخصب
+        const calv = toDate(an.lastCalvingDate || an.calvingDate);
+        const ins  = toDate(an.lastInseminationDate || an.serviceDate);
+        if (calv && ins){
+          const d = daysBetween(ins, calv);
+          if (d >= 0 && d < 400){ // فلتر أرقام شاذة
+            openDaysSum += d;
+            openDaysN++;
+          }
+        }
+      }
+
+      // إجهاض
+      if (an.lastAbortionDate || an.abortionDate){
+        abortCount++;
+      }
     }
 
     const inMilkPct = total ? Math.round(inMilk * 100 / total) : 0;
-    const avgDIM = inMilk ? Math.round(dimSum / inMilk) : 0;
-    const avgMilk = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
+    const avgDIM    = inMilk ? Math.round(dimSum / inMilk) : 0;
+    const avgMilk   = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
     if (!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk * inMilk);
 
+    // خصوبة من الوثيقة
+    const pregPctDoc = total ? Math.round(pregCount * 100 / total) : 0;
+    const servicesPerConceptionDoc =
+      servicesNForSPC ? +(servicesSum / servicesNForSPC).toFixed(2) : 0;
+    const conceptionRatePctDoc =
+      servicesPerConceptionDoc ? Math.round(100 / servicesPerConceptionDoc) : 0;
+    const openDaysAvgDoc =
+      openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
+    const abortionRatePctDoc =
+      (pregCount + abortCount)
+        ? Math.round(abortCount * 100 / (pregCount + abortCount))
+        : 0;
+
     const stats = statsResp || {};
-    const t = stats.totals || {};
-    const fert = stats.fertility || {};
+    const t     = stats.totals    || {};
+    const fert  = stats.fertility || {};
 
     const totalActive =
       t.totalActive != null ? t.totalActive : total;
 
     const pregPct =
       t?.pregnant?.pct != null ? t.pregnant.pct :
-      (t.pregnantPct != null ? t.pregnantPct : 0);
+      (t.pregnantPct != null ? t.pregnantPct : pregPctDoc);
+
+    const conceptionRatePct =
+      fert.conceptionRatePct != null ? fert.conceptionRatePct : conceptionRatePctDoc;
+
+    const openDaysAvg =
+      stats.openDaysAvg != null ? stats.openDaysAvg : openDaysAvgDoc;
+
+    const pregRate21d =
+      stats.pregRate21d != null ? stats.pregRate21d : 0; // هنكمّله لاحقًا من أحداث الشياع
+
+    const servicesPerConception =
+      stats.servicesPerConception != null
+        ? stats.servicesPerConception
+        : servicesPerConceptionDoc;
+
+    const abortionRatePct =
+      stats.abortionRatePct != null ? stats.abortionRatePct : abortionRatePctDoc;
+
+    // تغذية / استبعاد / … تبقى كما هي من السيرفر (0 الآن لو مش محسوبة)
+    const cullProdPct   = stats.cullProdPct   ?? 0;
+    const cullReproPct  = stats.cullReproPct  ?? 0;
+    const cullHealthPct = stats.cullHealthPct ?? 0;
+    const feedEfficiency= stats.feedEfficiency ?? 0;
+    const dmiAvg        = stats.dmiAvg ?? 0;
+    const iofc          = stats.iofc ?? 0;
+    const fecesScore    = stats.fecesScore ?? 0;
+    const bcsCamera     = stats.bcsCamera ?? 0;
 
     grid.innerHTML =
       box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active') +
       box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk') +
       box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg') +
-      box('معدل الإخصاب %', fert.conceptionRatePct ?? 0 + '%', 'أحداث التلقيح', 'g_fert') +
-      box('متوسط الأيام المفتوحة', stats.openDaysAvg ?? 0, 'من الولادة للحمل', 'g_openDays') +
-      box('معدل الحمل (21 يوم)', stats.pregRate21d ?? 0, '', 'g_pregRate') +
-      box('خدمات لكل حمل (S/C)', stats.servicesPerConception ?? 0, '', 'g_sc') +
-      box('نسبة الإجهاض', stats.abortionRatePct ?? 0 + '%', '', 'g_abort') +
+      box('معدل الإخصاب %', conceptionRatePct + '%', 'محسوب من S/C', 'g_fert') +
+      box('متوسط الأيام المفتوحة', openDaysAvg, 'من الولادة للحمل', 'g_openDays') +
+      box('معدل الحمل (21 يوم)', pregRate21d, '', 'g_pregRate') +
+      box('خدمات لكل حمل (S/C)', servicesPerConception, '', 'g_sc') +
+      box('نسبة الإجهاض', abortionRatePct + '%', '', 'g_abort') +
       box('نسبة الولادات النافقة', stats.deadCalvingRatePct ?? 0 + '%', '', 'g_deadCalving') +
       box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc') +
       box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk') +
       box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk') +
       box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim') +
       box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct') +
-      box('استبعاد إنتاجي', stats.cullProdPct ?? 0 + '%', '', 'g_cullProd') +
-      box('استبعاد تناسلي', stats.cullReproPct ?? 0 + '%', '', 'g_cullRepro') +
-      box('استبعاد صحي', stats.cullHealthPct ?? 0 + '%', '', 'g_cullHealth') +
-      box('كفاءة تحويل العلف', stats.feedEfficiency ?? 0, '', 'g_fe') +
-      box('المادة الجافة المأكولة', stats.dmiAvg ?? 0, '', 'g_dmi') +
-      box('صافي دخل اللبن IOFC', stats.iofc ?? 0, 'جنيه/بقرة/يوم', 'g_iofc') +
-      box('تقييم الروث', stats.fecesScore ?? 0, '', 'g_feces') +
-      box('BCS بالكاميرا', stats.bcsCamera ?? 0, '', 'g_bcs');
+      box('استبعاد إنتاجي', cullProdPct + '%', '', 'g_cullProd') +
+      box('استبعاد تناسلي', cullReproPct + '%', '', 'g_cullRepro') +
+      box('استبعاد صحي', cullHealthPct + '%', '', 'g_cullHealth') +
+      box('كفاءة تحويل العلف', feedEfficiency, '', 'g_fe') +
+      box('المادة الجافة المأكولة', dmiAvg, '', 'g_dmi') +
+      box('صافي دخل اللبن IOFC', iofc, 'جنيه/بقرة/يوم', 'g_iofc') +
+      box('تقييم الروث', fecesScore, '', 'g_feces') +
+      box('BCS بالكاميرا', bcsCamera, '', 'g_bcs');
 
+    // الجوجز
     renderMiniGauge("g_active", totalActive ? 100 : 0);
     renderMiniGauge("g_inmilk", inMilkPct);
     renderMiniGauge("g_preg", pregPct);
-    renderMiniGauge("g_fert", fert.conceptionRatePct ?? 0);
-    renderMiniGauge("g_openDays", stats.openDaysAvg ?? 0);
-    renderMiniGauge("g_pregRate", stats.pregRate21d ?? 0);
-    renderMiniGauge("g_sc", stats.servicesPerConception ?? 0);
-    renderMiniGauge("g_abort", stats.abortionRatePct ?? 0);
+    renderMiniGauge("g_fert", conceptionRatePct);
+    renderMiniGauge("g_openDays", openDaysAvg);
+    renderMiniGauge("g_pregRate", pregRate21d);
+    renderMiniGauge("g_sc", servicesPerConception * 25); // تقريبي عشان النسبة (1–4 خدمات)
+    renderMiniGauge("g_abort", abortionRatePct);
     renderMiniGauge("g_deadCalving", stats.deadCalvingRatePct ?? 0);
     renderMiniGauge("g_afc", stats.ageAtFirstCalvingMonths ?? 0);
     renderMiniGauge("g_avgMilk", avgMilk ?? 0);
     renderMiniGauge("g_totalMilk", milkTotal ?? 0);
     renderMiniGauge("g_dim", avgDIM ?? 0);
     renderMiniGauge("g_inmilkPct", inMilkPct ?? 0);
-    renderMiniGauge("g_cullProd", stats.cullProdPct ?? 0);
-    renderMiniGauge("g_cullRepro", stats.cullReproPct ?? 0);
-    renderMiniGauge("g_cullHealth", stats.cullHealthPct ?? 0);
-    renderMiniGauge("g_fe", stats.feedEfficiency ?? 0);
-    renderMiniGauge("g_dmi", stats.dmiAvg ?? 0);
-    renderMiniGauge("g_iofc", stats.iofc ?? 0);
-    renderMiniGauge("g_feces", stats.fecesScore ?? 0);
-    renderMiniGauge("g_bcs", stats.bcsCamera ?? 0);
+    renderMiniGauge("g_cullProd", cullProdPct);
+    renderMiniGauge("g_cullRepro", cullReproPct);
+    renderMiniGauge("g_cullHealth", cullHealthPct);
+    renderMiniGauge("g_fe", feedEfficiency);
+    renderMiniGauge("g_dmi", dmiAvg);
+    renderMiniGauge("g_iofc", iofc);
+    renderMiniGauge("g_feces", fecesScore);
+    renderMiniGauge("g_bcs", bcsCamera);
 
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }
@@ -437,26 +525,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<!-- تتبع + هوية + نواة التطبيق -->
-<script>
-  (function(){
-    window.dataLayer = window.dataLayer || [];
-    if (!window.t) {
-      window.t = {
-        event: function(name, props){
-          try{
-            window.dataLayer.push({event:name, ts:Date.now(), ...(props||{})});
-          }catch(e){}
-        }
-      };
-    }
-    window.t.event('page_view', {page:'/dashboard.html'});
-  })();
-</script>
-
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
 
 </body>
 </html>
+
