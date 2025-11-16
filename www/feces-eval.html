@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <script type="module" src="/js/animal-update.js"></script>
-
+ 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تقييم الروث بالكاميرا — مُرَبِّك</title>
@@ -595,20 +594,6 @@
       source: location.href,
       createdAt: serverTimestamp()
     });
-
-    // تحديث وثيقة الحيوان
-    try {
-      await window.updateAnimalByEvent({
-        type: "feces_eval",
-        eventType: "feces_eval",
-        animalId,
-        animalNumber,
-        userId,
-        eventDate
-      });
-    } catch (e) {
-      console.warn("updateAnimalByEvent failed", e);
-    }
 
     showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
 
