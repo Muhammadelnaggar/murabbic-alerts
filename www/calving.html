@@ -35,6 +35,8 @@
   </style>
 </head>
 <body>
+  <script src="/js/animal-update.js"></script>
+
   <script>window.dataLayer = window.dataLayer || [];</script>
 
   <header>
@@ -548,6 +550,8 @@ if (!(g >= MIN_GD[sp])){
 
       try{
         await addDoc(collection(db, 'events'), payload);
+       await window.updateAnimalByEvent(payload);
+
         show('تم حفظ الولادة ✅');
         setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
       }catch(err){
@@ -565,6 +569,7 @@ if (!(g >= MIN_GD[sp])){
 
 </body>
 </html>
+
 
 
 
