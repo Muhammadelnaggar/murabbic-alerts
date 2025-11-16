@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <title>تشخيص الحمل</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="/js/animal-update.js"></script>
+
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
@@ -261,6 +263,7 @@
 
     try {
       await addDoc(collection(db, "events"), payload);
+      await window.updateAnimalByEvent(payload);
 
       // آخر سياق محلي
       localStorage.setItem("lastAnimalId", animalNum);
