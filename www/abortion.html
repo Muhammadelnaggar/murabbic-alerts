@@ -1,3 +1,4 @@
+// كده تمام؟
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" data-page="abortion">
 <head>
@@ -50,8 +51,20 @@
   <script type="module">
     // نفس النمط الذي يعمل لديك
     import { db, auth } from '/js/firebase-config.js';
-    import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp }
-      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  doc,
+  updateDoc,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+     
 
     const $ = id => document.getElementById(id);
     const info = $("info");
@@ -88,7 +101,8 @@
         }
 
         const animal = aSnap.docs[0].data();
-        const status = (animal.reproductiveStatus || animal.reproStatus || "").trim();
+       const status = (animal.reproductiveStatus || "").trim();
+
         const isPregnant = status === "عِشار";
 
         if (!isPregnant) {
@@ -112,12 +126,28 @@
 
         const insemSnap = await getDocs(qInsem);
 
-        let lastInsem =
-          (!insemSnap.empty ? insemSnap.docs[0].data()?.eventDate : null) ||
-          animal.lastInseminationDate || animal.lastInsemDate || animal.lastServiceDate;
+       let lastInsem = null;
 
-        if (lastInsem?.toDate) lastInsem = lastInsem.toDate().toISOString().slice(0,10);
-        if (typeof lastInsem === "string") lastInsem = lastInsem.slice(0,10);
+// من الأحداث
+if (!insemSnap.empty) {
+  const d = insemSnap.docs[0].data()?.eventDate;
+  if (d?.toDate) {
+    lastInsem = d.toDate().toISOString().slice(0, 10);
+  } else if (typeof d === "string") {
+    lastInsem = d.slice(0, 10);
+  }
+}
+
+// fallback من وثيقة الحيوان
+if (!lastInsem && animal.lastInseminationDate) {
+  const d = animal.lastInseminationDate;
+  if (d?.toDate) {
+    lastInsem = d.toDate().toISOString().slice(0, 10);
+  } else {
+    lastInsem = String(d).slice(0, 10);
+  }
+}
+
 
         const d1 = lastInsem ? new Date(lastInsem) : null;
         const d2 = new Date(dt);
@@ -163,7 +193,29 @@
 await addDoc(collection(db,"events"), payload);
 
 // تحديث وثيقة الحيوان
-await window.updateAnimalByEvent(payload);
+if (typeof window.updateAnimalByEvent === "function") {
+  await window.updateAnimalByEvent(payload);
+}
+// تحديث وثيقة الحيوان مباشرة
+const aSnap2 = await getDocs(
+  query(
+    collection(db, "animals"),
+    where("animalNumber", "==", num),
+    limit(1)
+  )
+);
+
+if (!aSnap2.empty) {
+  const animalDocId = aSnap2.docs[0].id;
+  const animalRef   = doc(db, "animals", animalDocId);
+
+  await updateDoc(animalRef, {
+    reproductiveStatus: "فارغة",
+    lastAbortionDate: dt,
+    lastAbortion: { date: dt }
+  });
+}
+
 
 // رسالة ناجحة
 msg("تم تسجيل الإجهاض بنجاح", true);
