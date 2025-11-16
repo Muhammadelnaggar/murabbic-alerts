@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
- <script type="module" src="/js/animal-update.js"></script>
+ 
 
 
   <link rel="stylesheet" href="css/forms.css">
@@ -396,7 +396,7 @@
 
         // 5) الحفظ
         await addDoc(collection(db,'events'), payload);
-        await window.updateAnimalByEvent(payload);
+      
 
         setMsg('✅ تم حفظ نتيجة التقييم (بدون صور)', true);
         try{ (window.dataLayer = window.dataLayer || []).push({event:'milking_traits_save', overall}); }catch{}
