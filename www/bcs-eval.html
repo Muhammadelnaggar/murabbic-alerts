@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <script type="module" src="/js/animal-update.js"></script>
+
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تقييم حالة الجسم (BCS) بالكاميرا — مُرَبِّك</title>
@@ -627,6 +629,8 @@
       try {
         saveBtn.disabled = true;
         await addDoc(collection(db,"events"), payload);
+        await window.updateAnimalByEvent(payload);
+
         try {
           localStorage.setItem("currentEventDate", eventDate);
           if (animalId)  localStorage.setItem("currentAnimalId",  animalId);
