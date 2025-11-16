@@ -359,231 +359,170 @@ app.get('/api/animal-timeline', async (req, res) => {
   }
 });
 
-// ============================================================
-//                       API: HERD STATS
-// ============================================================
-// ============================================================
-//                       API: HERD STATS
-// ============================================================
-app.get('/api/herd-stats', async (req, res) => {
+// =============================================
+//   /api/herd-stats  —  Murabbik Full Edition
+// =============================================
+app.get("/api/herd-stats", async (req, res) => {
   try {
-    const tenant      = resolveTenant(req);
-    const analysisDays = parseInt(req.query.analysisDays || '90', 10);
+    const uid = req.headers["x-user-id"];
+    if (!uid) return res.json({ ok: false, error: "NO_USER" });
 
-    if (db) {
-      const adb = db;
+    // ------------------------------------------
+    // جلب الحيوانات (الحية فقط)
+    // ------------------------------------------
+    const snap = await db
+      .collection("animals")
+      .where("userId", "==", uid)
+      .get();
 
-      // ---------- 1) جلب الحيوانات ----------
-      let animalsDocs = [];
-      try {
-        const snap = await adb.collection('animals')
-          .where('userId', '==', tenant)
-          .limit(2000)
-          .get();
+    const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        animalsDocs = snap.docs;
-        console.log(`✅ Found ${animalsDocs.length} animals for`, tenant);
-      } catch (e) {
-        console.error('❌ animals query failed:', e.code || e.message);
-      }
+    const active = animals.filter(a => {
+      const st = String(a.status || a.lifeStatus || "").toLowerCase();
+      return !["dead", "died", "sold", "archived", "inactive", "nafaq", "نافق"].includes(st);
+    });
 
-      const animals = animalsDocs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-      console.log("🧭 herd-stats tenant =", tenant);
+    const total = active.length;
 
-      // نعتبر كل الحيوانات نشطة مؤقتًا
-      const active      = animals;
-      const totalActive = animals.length;
+    // ==========================================
+    //          🔥 الخصوبة من الوثيقة
+    // ==========================================
+    let preg = 0,
+        aborts = 0,
+        servicesSum = 0,
+        servicesN = 0,
+        openDaysSum = 0,
+        openDaysN = 0;
 
-      // نافذة الزمن: 90 يوم تحليل + 340 يوم حمل
-      const since    = new Date(Date.now() - (analysisDays + 340) * dayMs);
-      const sinceStr = toYYYYMMDD(since);
+    for (const a of active) {
 
-      // ---------- 2) دالة مساعده لأنواع الأحداث ----------
-      function wantedEventTypes(normKey) {
-        switch (normKey) {
-          case 'insemination':
-            return ['insemination']; // عندنا نوع واحد
-          case 'pregnancy':
-            // تشمل تشخيص الحمل كـ pregnancy_diagnosis
-            return ['pregnancy', 'pregnancy_diagnosis'];
-          default:
-            return [normKey];
-        }
-      }
+      const rep = String(a.reproductiveStatus || "").toLowerCase();
+      const diag = String(a.lastDiagnosisResult || "").toLowerCase();
+      const isPreg =
+        rep.includes("عشار") ||
+        diag === "عشار" ||
+        rep.includes("pregnant");
 
-      // ---------- 3) جلب أحداث نوع معيّن (تلقيح / حمل) ----------
-      async function fetchType(normKey) {
-        const out = [];
-        const wanted = wantedEventTypes(normKey);
+      if (isPreg) {
+        preg++;
 
-        // 3-A) لو عندي الحدث حديث وبه eventTypeNorm
-        const snapNorm = await adb.collection('events')
-          .where('userId', '==', tenant)
-          .where('eventTypeNorm', '==', normKey)
-          .where('eventDate', '>=', sinceStr)
-          .get()
-          .catch(() => ({ docs: [] }));
-        out.push(...(snapNorm.docs || []));
-
-        // 3-B) الأحداث القديمة اللي فيها eventType فقط
-        for (const evType of wanted) {
-          const s = await adb.collection('events')
-            .where('userId', '==', tenant)
-            .where('eventType', '==', evType)
-            .where('eventDate', '>=', sinceStr)
-            .get()
-            .catch(() => ({ docs: [] }));
-          out.push(...(s.docs || []));
+        // S/C
+        const sc = Number(a.servicesCount || 0);
+        if (sc > 0) {
+          servicesSum += sc;
+          servicesN++;
         }
 
-        // 3-C) لو ما زال مفيش، فلترة حسب type النصّي (عربي/إنجليزي)
-        if (!out.length) {
-          const s = await adb.collection('events')
-            .where('userId', '==', tenant)
-            .orderBy('eventDate', 'desc')
-            .limit(2000)
-            .get()
-            .catch(() => ({ docs: [] }));
-
-          for (const d of (s.docs || [])) {
-            const evDate = d.get('eventDate') || '';
-            if (!evDate || evDate < sinceStr) continue;
-
-            const rawType = d.get('type') || d.get('eventType') || '';
-            const norm    = normalizeEventType(rawType);
-            if (norm === normKey) out.push(d);
+        // Open days
+        const calv = a.lastCalvingDate ? new Date(a.lastCalvingDate) : null;
+        const ins  = a.lastInseminationDate ? new Date(a.lastInseminationDate) : null;
+        if (calv && ins) {
+          const d = Math.floor((ins - calv) / 86400000);
+          if (d >= 0 && d < 400) {
+            openDaysSum += d;
+            openDaysN++;
           }
         }
-
-        // إزالة التكرار
-        const map = new Map();
-        out.forEach(d => map.set(d.id, d));
-        return [...map.values()].map(d => ({ id: d.id, ...(d.data() || {}) }));
       }
 
-      // ---------- 4) جلب التلقيحات وتشخيصات الحمل ----------
-      const [ins, preg] = await Promise.all([
-        fetchType('insemination'),
-        fetchType('pregnancy')
-      ]);
-
-     const activeIds = new Set(
-  active.map(a =>
-    String(
-      a.animalId ||        // لو موجود
-      a.number   ||        // رقم الحيوان الحقيقي
-      a.animalNumber ||    // لو اسمه animalNumber
-      a.id               // fallback أخير فقط
-    )
-  )
-);
-
-      const winStart  = new Date(Date.now() - analysisDays * dayMs);
-
-      const insWin = ins.filter(e =>
-        activeIds.has(String(e.animalId)) &&
-        toDate(e.date || e.eventDate || e.createdAt) >= winStart
-      );
-const pregPos = preg.filter(e => {
-  if (!activeIds.has(String(e.animalId))) return false;
-
-  const result =
-    String(e.result || e.status || e.outcome || "").trim();
-
-  const type =
-    String(e.type || e.eventType || e.eventTypeNorm || "").trim();
-
-  return (
-    /preg|positive|ايجاب|حامل|عشار|عِشار/i.test(result) ||
-    /pregnancy|diagnosis|pregnant|حمل|عشار|عِشار/i.test(type)
-  );
-});
-
-      
-
-      const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
-      const openCount    = Math.max(0, totalActive - pregSet.size);
-      const conceptionRate = insWin.length
-        ? +((pregPos.filter(e => toDate(e.date || e.eventDate || e.createdAt) >= winStart).length / insWin.length) * 100).toFixed(1)
-        : 0;
-
-      return res.json({
-        ok: true,
-        totals: {
-          totalActive,
-          pregnant: {
-            count: pregSet.size,
-            pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0
-          },
-          inseminated: {
-            count: new Set(insWin.map(e => String(e.animalId))).size,
-            pct: totalActive ? +((new Set(insWin.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0
-          },
-          open: {
-            count: openCount,
-            pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0
-          }
-        },
-        fertility: {
-          conceptionRatePct: conceptionRate
-        }
-      });
+      // إجهاض
+      if (a.lastAbortionDate) aborts++;
     }
 
-    // ---------- 5) Fallback محلّي (لو db=null) ----------
-    const animalsAll = readJson(animalsPath, []).filter(a => belongs(a, tenant));
-    const active     = animalsAll.filter(a =>
-      a.active !== false &&
-      !['sold', 'dead', 'archived', 'inactive'].includes(String(a.status || '').toLowerCase())
-    );
-    const totalActive = active.length;
+    const pregPct = total ? Math.round((preg * 100) / total) : 0;
+    const servicesPerConception =
+      servicesN ? +(servicesSum / servicesN).toFixed(2) : 0;
+    const conceptionPct =
+      servicesPerConception ? Math.round(100 / servicesPerConception) : 0;
+    const openDaysAvg =
+      openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
+    const abortPct =
+      (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
 
-    const evAll    = readJson(eventsPath, []).filter(e => belongs(e, tenant));
-    const winStart = new Date(Date.now() - analysisDays * dayMs);
+    // ==========================================
+    //          🔥 النفوق + الاستبعاد
+    // ==========================================
+    const dead = animals.filter(a =>
+      ["dead", "died", "نافق", "ميت"].includes(
+        String(a.status || a.lifeStatus || "").toLowerCase()
+      )
+    ).length;
 
-    const insWin  = evAll.filter(e =>
-      /insemination|تلقيح/i.test(e.type || '') &&
-      toDate(e.ts || e.date) >= winStart
-    );
-  const pregPos = evAll.filter(e =>
-  /pregnancy|حمل|حامل|عشار|عِشار/i.test(e.type || '') &&
-  /positive|ايجاب|عشار|عِشار/i
-    .test(String(e.result || e.status || e.outcome || ''))
-);
+    const cullProd = animals.filter(a =>
+      a.cullReason === "productivity"
+    ).length;
 
+    const cullRepro = animals.filter(a =>
+      a.cullReason === "reproduction"
+    ).length;
 
-    const pregSet      = new Set(pregPos.map(e => String(e.animalId)));
-    const openCount    = Math.max(0, totalActive - pregSet.size);
-    const conceptionRate = insWin.length
-      ? +((pregPos.filter(e => toDate(e.ts || e.date) >= winStart).length / insWin.length) * 100).toFixed(1)
-      : 0;
+    const cullHealth = animals.filter(a =>
+      a.cullReason === "health"
+    ).length;
 
-    res.json({
+    const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
+    const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
+    const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
+
+    // ==========================================
+    //          🔥 تقييم الكاميرا
+    // ==========================================
+    // متوسط BCS من آخر BCS Eval مسجل في الوثيقة
+    const bcsVals = active.map(a => Number(a.lastBCS || 0)).filter(x => x > 0);
+    const bcsCamera =
+      bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0) / bcsVals.length).toFixed(2) : 0;
+
+    // تقييم الروث
+    const fecesVals = active.map(a => Number(a.lastFecesScore || 0)).filter(x => x > 0);
+    const fecesScore =
+      fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0) / fecesVals.length).toFixed(2) : 0;
+
+    // ==========================================
+    //     PregRate21d (بعد إضافة HEAT)
+    // ==========================================
+    // placeholder الآن = 0
+    const pregRate21d = 0;
+
+    // ==========================================
+    //      🔥 نتيجة كاملة للداشبورد
+    // ==========================================
+    return res.json({
       ok: true,
       totals: {
-        totalActive,
-        pregnant: {
-          count: pregSet.size,
-          pct: totalActive ? +((pregSet.size / totalActive) * 100).toFixed(1) : 0
-        },
-        inseminated: {
-          count: new Set(insWin.map(e => String(e.animalId))).size,
-          pct: totalActive ? +((new Set(insWin.map(e => String(e.animalId))).size / totalActive) * 100).toFixed(1) : 0
-        },
-        open: {
-          count: openCount,
-          pct: totalActive ? +((openCount / totalActive) * 100).toFixed(1) : 0
-        }
+        totalActive: total,
+        pregnant: { count: preg, pct: pregPct }
       },
       fertility: {
-        conceptionRatePct: conceptionRate
-      }
+        servicesPerConception,
+        conceptionRatePct: conceptionPct
+      },
+      openDaysAvg,
+      abortionRatePct: abortPct,
+      pregRate21d,
+      deadCalvingRatePct: 0,
+      ageAtFirstCalvingMonths: 0,
+
+      // استبعاد
+      cullProdPct,
+      cullReproPct,
+      cullHealthPct,
+
+      // تغذية
+      feedEfficiency: 0,
+      dmiAvg: 0,
+      iofc: 0,
+
+      // الكاميرا
+      bcsCamera,
+      fecesScore
     });
+
   } catch (e) {
-    console.error('herd-stats', e);
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+    console.error("HERD-STATS ERROR", e);
+    return res.json({ ok:false, error: e.message });
   }
 });
+
 
 // ============================================================
 //                       API: ANIMALS (robust)
