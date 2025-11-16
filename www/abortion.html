@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <script src="/js/animal-update.js"></script>
+
   <title>تسجيل إجهاض — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
@@ -30,7 +32,8 @@
     <input id="animalNumber" readonly />
 
     <label>تاريخ الإجهاض</label>
-    <input id="eventDate" type="date" readonly />
+   <input id="eventDate" type="date" />
+
 
     <label>عمر الإجهاض (بالشهور)</label>
     <input id="abortionAge" readonly />
@@ -99,13 +102,14 @@
         btn.disabled = false;
 
         // حساب عمر الحمل من آخر تلقيح (اختياري)
-        const qInsem = query(
-          collection(db,"events"),
-          where("animalNumber","==",num),
-          where("eventType","in",["تلقيح","تلقيح مُخصِّب","insemination"]),
-          orderBy("eventDate","desc"),
-          limit(1)
-        );
+      const qInsem = query(
+  collection(db,"events"),
+  where("animalNumber","==",num),
+  where("type","==","insemination"),
+  orderBy("eventDate","desc"),
+  limit(1)
+);
+
         const insemSnap = await getDocs(qInsem);
 
         let lastInsem =
@@ -142,21 +146,34 @@
 
     // الحفظ
     btn.onclick = async ()=> {
-      try{
-        await addDoc(collection(db,"events"),{
-          animalNumber:num,
-          eventType:"إجهاض",
-          eventDate:dt,
-          abortionAgeMonths:parseFloat($("abortionAge").value)||null,
-          probableCause:$("probableCause").value||"",
-          notes:$("notes").value||"",
-          userId:auth.currentUser?.uid||null,
-          createdAt:serverTimestamp()
-        });
-        msg("✅ تم حفظ حدث الإجهاض بنجاح.", true);
-        localStorage.setItem("lastAnimalNumber", num);
-        localStorage.setItem("lastEventDate", dt);
-        setTimeout(()=>location.href=`cow-card.html?number=${num}`, 1200);
+      try{const payload = {
+  animalNumber: num,
+  animalId: num,
+  eventType: "إجهاض",
+  type: "abortion",
+  eventDate: dt,
+  abortionAgeMonths: parseFloat($("abortionAge").value) || null,
+  probableCause: $("probableCause").value || "",
+  notes: $("notes").value || "",
+  userId: auth.currentUser?.uid || null,
+  createdAt: serverTimestamp()
+};
+
+// حفظ الحدث
+await addDoc(collection(db,"events"), payload);
+
+// تحديث وثيقة الحيوان
+await window.updateAnimalByEvent(payload);
+
+// رسالة ناجحة
+msg("تم تسجيل الإجهاض بنجاح", true);
+
+// حفظ السياق
+localStorage.setItem("lastAnimalNumber", num);
+localStorage.setItem("lastEventDate", dt);
+
+setTimeout(()=>location.href=`cow-card.html?number=${num}`, 1200);
+
       }catch(err){
         console.error(err);
         msg("❌ فشل في الحفظ.", false);
