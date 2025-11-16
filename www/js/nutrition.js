@@ -119,6 +119,11 @@ async function saveEvent(e){
   let modeSaved = 'api';
   try{ await postAPI(payload); }
   catch(err){ console.warn('API error; fallback to Firestore', err); await saveFirestore(payload); modeSaved = 'firestore'; }
+try {
+  await window.updateAnimalByEvent(payload);
+} catch (e) {
+  console.warn('updateAnimalByEvent failed', e);
+}
 
   try{ onNutritionSave({ animalId, date: eventDate, rows: rows.length, mode: modeSaved, source: 'nutrition.html' }); }catch(e){}
   redirectSmart();
