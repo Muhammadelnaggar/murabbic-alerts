@@ -118,4 +118,36 @@ async function fetchEventsUntil(userId, animalNumber, uptoISO){
     arr.sort((a,b)=> a.eventDate < b.eventDate ? 1 : -1); // تنازلي
     return arr;
   }catch(e){
-    console.warn('fetchEventsUntil faile
+      console.warn('fetchEventsUntil failed:', e);
+    return [];
+  }
+}
+
+/* ========= فحص بسيط بدون Popup ========= */
+async function check(userId, number, uptoISO, rulesFn){
+  const events = await fetchEventsUntil(userId, number, uptoISO);
+  return rulesFn(events);
+}
+
+/* ========= فحص + Popup ========= */
+async function checkWithPopup(userId, number, uptoISO, rulesFn, messageFn){
+  const events = await fetchEventsUntil(userId, number, uptoISO);
+  const res = rulesFn(events);
+  if (!res.ok){
+    await popup(messageFn(res), 'error', { okText:'موافق', cancelText:'إغلاق' });
+  }
+  return res.ok;
+}
+
+/* ========= init + log الأساسيين ========= */
+export function initTimeline(){
+  // مستقبلاً نضيف أي عمليات تهيئة عامة هنا
+  console.log("📌 timeline.js initialized");
+}
+export async function logActivity(tenantId, payload){
+  _q.push({ tenantId, payload });
+  _flush();
+}
+
+/* ========= export popup ========= */
+export { popup, check, checkWithPopup };
