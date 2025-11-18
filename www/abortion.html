@@ -197,14 +197,24 @@ await addDoc(collection(db,"events"), payload);
 if (typeof window.updateAnimalByEvent === "function") {
   await window.updateAnimalByEvent(payload);
 }
-// تحديث وثيقة الحيوان مباشرة
-const aSnap2 = await getDocs(
+// تحديث وثيقة الحيوان
+let aSnap2 = await getDocs(
   query(
     collection(db, "animals"),
-    where("animalNumber", "==", num),
+    where("animalNumber", "==", Number(num)),
     limit(1)
   )
 );
+
+if (aSnap2.empty) {
+  aSnap2 = await getDocs(
+    query(
+      collection(db, "animals"),
+      where("number", "==", String(num)),
+      limit(1)
+    )
+  );
+}
 
 if (!aSnap2.empty) {
   const animalDocId = aSnap2.docs[0].id;
