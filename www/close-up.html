@@ -4,10 +4,9 @@
   <meta charset="UTF-8" />
   <title>تحضير للولادة — مُرَبِّك</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <script src="/js/animal-update.js"></script>
-
+ 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+   <script type="module" src="js/forms-init.js"></script>
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
@@ -103,21 +102,20 @@
 
   <!-- منطق الصفحة + ربط فايرستور (كلّه في سكربت واحد) -->
   <script type="module">
-    // 1) تحميل Firebase app (من مشروعك) + Firestore SDK
-    async function getDb(){
-      let appOrDb;
-      try {
-        // تفضيل firestore-config.js إن كان عندك
-        appOrDb = await import('/js/firestore-config.js');
-      } catch(e1){
-        try { appOrDb = await import('/js/firebase-config.js'); }
-        catch(e2){ showErr('لم أجد /js/firestore-config.js ولا /js/firebase-config.js'); throw e2; }
-      }
-      const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-      const app = appOrDb.app || appOrDb.default || appOrDb; // يدعم أشكال التصدير الشائعة
-      const db  = appOrDb.db || mod.getFirestore(app.app || app);
-      return { db, ...mod };
-    }
+    // 🔹 نستخدم ملف firestore-config.js الموجود عندك فعلاً
+    import * as fsCfg from "/js/firestore-config.js";
+    import { updateAnimalByEvent } from "/js/animal-update.js";
+    import {
+      collection,
+      addDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // نحاول نقرأ db بأي شكل من الأشكال الشائعة
+    const db =
+      fsCfg.db ||
+      (fsCfg.default && fsCfg.default.db) ||
+      fsCfg;
 
     // 2) أدوات صغيرة
     const $ = (id)=> document.getElementById(id);
@@ -137,8 +135,19 @@
     // 3) تهيئة الحقول من السياق (addevent → animalId/date)
     const inputAnimal = $('animalId');
     const inputDate = $('eventDate');
-    const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'), localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
-    const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'), localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
+    const qsAnimal = firstNonEmpty(
+      getQS('animalId'),
+      getQS('number'),
+      getQS('animalNumber'),
+      localStorage.getItem('lastAnimalId'),
+      localStorage.getItem('currentAnimalId')
+    );
+    const qsDate   = firstNonEmpty(
+      getQS('date'),
+      getQS('eventDate'),
+      localStorage.getItem('eventDate'),
+      localStorage.getItem('lastEventDate')
+    );
     if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
     if (!inputDate.value && qsDate)     inputDate.value   = qsDate;
 
@@ -151,16 +160,11 @@
     const ndYes = $('nd_yes');
     const ndNo  = $('nd_no');
 
-    let db, addDoc, collection, serverTimestamp;
-    (async () => {
-      try {
-        const mod = await getDb();
-        db = mod.db; addDoc = mod.addDoc; collection = mod.collection; serverTimestamp = mod.serverTimestamp;
-      } catch (e) {
-        showErr('تعذّر تهيئة الاتصال بفايرستور.');
-        console.error(e);
-      }
-    })();
+    if (!db) {
+      // لو في مشكلة في firestore-config.js نفسها
+      showErr('تعذّر تهيئة الاتصال بفايرستور من firestore-config.js');
+      console.error("Firestore db is undefined from firestore-config.js", fsCfg);
+    }
 
     form.addEventListener('submit', async (e)=>{
       e.preventDefault(); hideErr();
@@ -174,7 +178,10 @@
         showErr('من فضلك أدخل رقم الحيوان وتاريخ التحضير.');
         return;
       }
-      if (!db){ showErr('قاعدة البيانات غير جاهزة بعد. حدّث الصفحة أو راجع ملف Firebase config.'); return; }
+      if (!db){
+        showErr('قاعدة البيانات غير جاهزة بعد. راجع ملف firestore-config.js.');
+        return;
+      }
 
       const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
       const payload = {
@@ -186,8 +193,7 @@
 
       try {
         await addDoc(collection(db, 'events'), payload);
-        await window.updateAnimalByEvent(payload);
-
+        await updateAnimalByEvent(payload); // ✅ من الموديول مباشرة
 
         // حفظ سياق سهل للصفحات التالية
         localStorage.setItem('lastAnimalId', animalId);
@@ -221,8 +227,10 @@
     ndYes?.addEventListener('click', goNutrition);
     ndNo?.addEventListener('click', ()=>{ dialog.style.display = 'none'; });
   </script>
+
 </body>
 </html>
+
 
 
 
