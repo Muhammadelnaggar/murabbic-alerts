@@ -27,6 +27,44 @@
     @keyframes toast-pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
     @keyframes toast-shrink{from{width:100%}to{width:0%}}
     #msg.toast.show { display: block; }
+    /* === Popup رسالة وسط الصفحة === */
+.mbk-popup{
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.25);
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+.mbk-popup-content{
+  background: #ffffff;
+  padding: 20px 25px;
+  border-radius: 14px;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.15);
+  font-size: 17px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 80%;
+  line-height: 1.6;
+  border-inline-start: 6px solid #2e7d32;
+}
+
+.mbk-popup-success{
+  border-inline-start-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.mbk-popup-error{
+  border-inline-start-color: #c62828;
+  color: #c62828;
+}
+
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
 </head>
@@ -103,6 +141,10 @@
 
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
+    <div id="popupBox" class="mbk-popup">
+  <div class="mbk-popup-content" id="popupContent"></div>
+</div>
+
   </form>
 
   <!-- واجهة النموذج (سلالات/حسابات تلقائية) -->
@@ -315,6 +357,17 @@
     if (s==="buffalo" || ar==="جاموسة") return "buffalo";
     return "cow";
   };
+function showPopup(msg, ok=true){
+  const box = document.getElementById("popupBox");
+  const content = document.getElementById("popupContent");
+
+  content.textContent = msg;
+  content.className = "mbk-popup-content " + (ok ? "mbk-popup-success" : "mbk-popup-error");
+
+  box.style.display = "flex";
+
+  setTimeout(() => { box.style.display = "none"; }, 1800);
+}
 
  form.addEventListener("submit", async (e)=>{
   e.preventDefault();
@@ -362,7 +415,8 @@
     const dupSnap = await getDocs(dupQ);
 
     if (!dupSnap.empty){
-      setMsg(`⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`, false);
+     showPopup(`⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`, false);
+
       return;
     }
 
@@ -393,7 +447,8 @@
       demo: true
     });
 
-    window.flashOK?.("تم تسجيل الحيوان بنجاح ✅");
+  showPopup("تم تسجيل الحيوان بنجاح ✅", true);
+
     localStorage.setItem("currentAnimalId", ref.id);
     localStorage.setItem("currentAnimalNumber", numberStr);
     const d = todayLocal();
@@ -414,6 +469,7 @@
   <script src="/js/tenant-bootstrap.js"></script>
 </body>
 </html>
+
 
 
 
