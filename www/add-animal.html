@@ -316,67 +316,97 @@
     return "cow";
   };
 
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); msgDiv.style.display="none";
-    if (!CURRENT_UID){ setMsg("فضلاً سجّل الدخول أولاً.", false); return; }
+ form.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  msgDiv.style.display = "none";
 
-    const numberStr            = $("animalNumber").value.trim();
-    const animalTypeAr         = $("animalType").value;
-    const breed                = $("breed").value;
-    const productionStatus     = $("productionStatus").value;
-    const dailyMilkVal         = $("dailyMilk").value.trim();
-    const reproductiveStatus   = $("reproductiveStatus").value;
-    const servicesCount        = Number($("servicesCount").value || 0);
-    const lactationNumber      = Number($("lactationNumber").value || 0);
-    const birthDate            = $("birthDate").value || null;
-    const lastCalvingDate      = $("lastCalvingDate").value;
-    const lastInseminationInp  = $("lastInseminationDate").value || null;
-    const daysInMilkVal        = Number($("daysInMilk").value || 0);
+  if (!CURRENT_UID){
+    setMsg("فضلاً سجّل الدخول أولاً.", false);
+    return;
+  }
 
-    if (!numberStr || !animalTypeAr){ setMsg("أكمل الحقول المطلوبة.", false); return; }
-    if (lactationNumber > 0 && !lastCalvingDate){ setMsg("أدخل تاريخ آخر ولادة.", false); return; }
-    if (productionStatus === "جاف" && !lastInseminationInp){ setMsg("أدخل تاريخ آخر تلقيح.", false); return; }
+  const numberStr            = $("animalNumber").value.trim();
+  const animalTypeAr         = $("animalType").value;
+  const breed                = $("breed").value;
+  const productionStatus     = $("productionStatus").value;
+  const dailyMilkVal         = $("dailyMilk").value.trim();
+  const reproductiveStatus   = $("reproductiveStatus").value;
+  const servicesCount        = Number($("servicesCount").value || 0);
+  const lactationNumber      = Number($("lactationNumber").value || 0);
+  const birthDate            = $("birthDate").value || null;
+  const lastCalvingDate      = $("lastCalvingDate").value;
+  const lastInseminationInp  = $("lastInseminationDate").value || null;
+  const daysInMilkVal        = Number($("daysInMilk").value || 0);
 
-    try{
-      const ref = await addDoc(collection(db,"animals"), {
-        // مطلوب حسب الرولز
-        ownerUid: CURRENT_UID,
+  if (!numberStr || !animalTypeAr){
+    setMsg("أكمل الحقول المطلوبة.", false);
+    return;
+  }
+  if (lactationNumber > 0 && !lastCalvingDate){
+    setMsg("أدخل تاريخ آخر ولادة.", false);
+    return;
+  }
+  if (productionStatus === "جاف" && !lastInseminationInp){
+    setMsg("أدخل تاريخ آخر تلقيح.", false);
+    return;
+  }
 
-        // للربط الداخلي
-        userId: CURRENT_UID,
-        userId_number: `${CURRENT_UID}#${numberStr}`,
+  try{
+    // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
+    const key = `${CURRENT_UID}#${numberStr}`;
+    const dupQ = query(
+      collection(db, "animals"),
+      where("userId_number", "==", key),
+      limit(1)
+    );
+    const dupSnap = await getDocs(dupQ);
 
-        number: numberStr,
-        animalNumber: Number(numberStr),
-        animaltype: normAnimaltype(animalTypeAr),
-        animalTypeAr,
-        breed,
-        productionStatus,
-        dailyMilk: productionStatus==="حلاب" ? Number(dailyMilkVal||0) : null,
-        reproductiveStatus,
-        servicesCount,
-        lactationNumber,
-        birthDate,
-        lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
-        lastInseminationDate:
-          (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
-            ? (lastInseminationInp || null) : null,
-        daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
-        createdAt: serverTimestamp(),
-        demo: true
-      });
-
-      window.flashOK?.("تم تسجيل الحيوان بنجاح ✅");
-      localStorage.setItem("currentAnimalId", ref.id);
-      localStorage.setItem("currentAnimalNumber", numberStr);
-      const d=todayLocal();
-      setTimeout(()=>{ location.href=`add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`; }, 1200);
-
-    }catch(err){
-      console.error(err);
-      setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
+    if (!dupSnap.empty){
+      setMsg(`⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`, false);
+      return;
     }
-  });
+
+    // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
+    const ref = await addDoc(collection(db,"animals"), {
+      ownerUid: CURRENT_UID,
+
+      userId: CURRENT_UID,
+      userId_number: key,
+
+      number: numberStr,
+      animalNumber: Number(numberStr),
+      animaltype: normAnimaltype(animalTypeAr),
+      animalTypeAr,
+      breed,
+      productionStatus,
+      dailyMilk: productionStatus==="حلاب" ? Number(dailyMilkVal||0) : null,
+      reproductiveStatus,
+      servicesCount,
+      lactationNumber,
+      birthDate,
+      lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
+      lastInseminationDate:
+        (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
+          ? (lastInseminationInp || null) : null,
+      daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
+      createdAt: serverTimestamp(),
+      demo: true
+    });
+
+    window.flashOK?.("تم تسجيل الحيوان بنجاح ✅");
+    localStorage.setItem("currentAnimalId", ref.id);
+    localStorage.setItem("currentAnimalNumber", numberStr);
+    const d = todayLocal();
+    setTimeout(()=>{
+      location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
+    }, 1200);
+
+  }catch(err){
+    console.error(err);
+    setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
+  }
+});
+
 </script>
 
   <script type="module" src="/js/timeline.js"></script>
@@ -384,6 +414,7 @@
   <script src="/js/tenant-bootstrap.js"></script>
 </body>
 </html>
+
 
 
 
