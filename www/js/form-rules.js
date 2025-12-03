@@ -2,6 +2,16 @@
 //   /js/form-rules.js — Murabbik Final Validation (Document-Based)
 // ===================================================================
 
+// ===================== Imports لـ Firestore (للـ uniqueAnimalNumber) =====================
+import { db } from "./firebase-config.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 // ===================== ثوابت عامة =====================
 export const thresholds = {
   "أبقار": { minGestationDays: 255 },
@@ -21,7 +31,9 @@ const toDate = (v) =>
 const daysBetween = (a, b) => {
   const d1 = toDate(a), d2 = toDate(b);
   if (!d1 || !d2) return NaN;
-  return Math.round((d2.setHours(0,0,0,0) - d1.setHours(0,0,0,0)) / 86400000);
+  d1.setHours(0,0,0,0);
+  d2.setHours(0,0,0,0);
+  return Math.round((d2 - d1) / 86400000);
 };
 
 const req    = (v) => !(v === undefined || v === null || String(v).trim() === "");
@@ -35,7 +47,7 @@ const commonFields = {
   eventDate: { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
   // ⚠️ مبدأ جديد مهم:
   //     documentData = وثيقة الحيوان كاملة
-  documentData: { required: true, msg: "بيانات الحيوان غير متاحة." }
+  documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
 };
 
 
@@ -68,7 +80,11 @@ export const eventSchemas = {
   "تشخيص حمل": {
     fields: {
       ...commonFields,
-      method: { required: true, enum: ["سونار","جس يدوي"], msg: "اختَر وسيلة التشخيص." },
+      method: {
+        required: true,
+        enum: ["سونار", "جس يدوي"],
+        msg: "اختَر وسيلة التشخيص.",
+      },
       documentData: { required: true },
     },
     guards: ["pregnancyDiagnosisDecision"],
@@ -97,9 +113,9 @@ export const eventSchemas = {
 
 
 // ===================================================================
-//                          الحُرّاس (GUARDS)
+//                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
-const guards = {
+export const guards = {
 
   // ------------------- الولادة -------------------
   calvingDecision(fd) {
@@ -119,7 +135,6 @@ const guards = {
     return null;
   },
 
-
   // ------------------- التلقيح -------------------
   inseminationDecision(fd) {
     const doc = fd.documentData;
@@ -127,7 +142,7 @@ const guards = {
 
     const status = String(doc.reproductiveStatus || "").trim();
 
-    const okStatus = new Set(["مفتوحة","ملقح","ملقّح","ملقحة","ملقّحة"]);
+    const okStatus = new Set(["مفتوحة", "ملقح", "ملقّح", "ملقحة", "ملقّحة"]);
     if (!okStatus.has(status))
       return "الحالة الحالية لا تسمح بالتلقيح.";
 
@@ -135,19 +150,19 @@ const guards = {
       return "تاريخ الولادة غير مسجل.";
 
     const th = MIN_DAYS_POST_CALVING_FOR_AI[doc.species];
-    const d = daysBetween(doc.lastCalvingDate, fd.eventDate);
+    const d  = daysBetween(doc.lastCalvingDate, fd.eventDate);
     if (d < th) return `التلقيح مبكر: ${d} يوم فقط (الحد الأدنى ${th}).`;
 
     return null;
   },
 
-
   // -------------- تشخيص الحمل ---------------------
   pregnancyDiagnosisDecision(fd) {
     const doc = fd.documentData;
+    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
     const status = String(doc.reproductiveStatus || "");
-    const okStatus = new Set(["ملقح","ملقّح","ملقحة","ملقّحة"]);
+    const okStatus = new Set(["ملقح", "ملقّح", "ملقحة", "ملقّحة"]);
     if (!okStatus.has(status))
       return "لا يمكن تشخيص الحمل — الحيوان غير مُلقّح.";
 
@@ -155,14 +170,13 @@ const guards = {
       return "لا يوجد تلقيح سابق.";
 
     const need = MIN_PD_BY_METHOD[fd.method];
+    const d    = daysBetween(doc.lastInseminationDate, fd.eventDate);
 
-    const d = daysBetween(doc.lastInseminationDate, fd.eventDate);
     if (d < need)
       return `${fd.method} يتطلّب ≥ ${need} يوم (الحالي ${d}).`;
 
     return null;
   },
-
 
   // ------------------- الإجهاض --------------------
   abortionDecision(fd) {
@@ -175,23 +189,54 @@ const guards = {
     return null;
   },
 
-
   // ------------------- التجفيف --------------------
   dryOffDecision(fd) {
     const doc = fd.documentData;
     if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    // يسمح بالتجفيف لو:
-    // 1) عِشار
-    // 2) أو إنتاج منخفض
-    // 3) أو قرار طبي
-    // القرار عندك → الفاليوديشن بسيط:
-    if (!["عشار","غير عشار"].includes(doc.reproductiveStatus))
+    // هنا الفاليديشن بسيط، التفاصيل الطبية في المنطق التشغيلي
+    if (!["عشار", "غير عشار"].includes(doc.reproductiveStatus))
       return "الحالة التناسلية غير مناسبة للتجفيف.";
 
     return null;
   },
 };
+
+
+
+// ===================================================================
+//      قاعدة منفصلة: منع تكرار رقم الحيوان لنفس المستخدم فقط
+// ===================================================================
+export async function uniqueAnimalNumber(ctx) {
+  // ctx.userId  = معرف المستخدم الحالي
+  // ctx.number  = رقم الحيوان الذي أدخله المستخدم
+
+  const userId = ctx.userId;
+  const number = String(ctx.number || "").trim();
+
+  if (!userId || !number) {
+    return { ok: false, msg: "البيانات غير مكتملة." };
+  }
+
+  const key = `${userId}#${number}`;
+
+  const q = query(
+    collection(db, "animals"),
+    where("userId_number", "==", key),
+    limit(1)
+  );
+
+  const snap = await getDocs(q);
+
+  if (!snap.empty) {
+    return {
+      ok: false,
+      msg: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${number} في حسابك.`,
+    };
+  }
+
+  return { ok: true };
+}
 
 
 
@@ -211,9 +256,10 @@ export function validateEvent(eventType, payload = {}) {
   }
   if (errors.length) return { ok: false, errors };
 
-  // فحص الحراس
+  // فحص الحراس (كلهم متزامنين sync)
   for (const gName of (schema.guards || [])) {
     const guardFn = guards[gName];
+    if (typeof guardFn !== "function") continue;
     const gErr = guardFn(payload);
     if (gErr) errors.push(gErr);
   }
@@ -222,10 +268,18 @@ export function validateEvent(eventType, payload = {}) {
 }
 
 function validateField(key, rule, value) {
-  if (rule.required && !req(value)) return rule.msg || `الحقل «${key}» مطلوب.`;
-  if (rule.type === "date" && value && !isDate(value)) return rule.msg || `قيمة «${key}» يجب أن تكون تاريخًا صالحًا.`;
-  if (rule.type === "number" && !isNum(value)) return rule.msg || `قيمة «${key}» يجب أن تكون رقمًا.`;
-  if (rule.enum && value && !rule.enum.includes(value)) return rule.msg || `«${key}» خارج القيم المسموحة.`;
+  if (rule.required && !req(value))
+    return rule.msg || `الحقل «${key}» مطلوب.`;
+
+  if (rule.type === "date" && value && !isDate(value))
+    return rule.msg || `قيمة «${key}» يجب أن تكون تاريخًا صالحًا.`;
+
+  if (rule.type === "number" && !isNum(value))
+    return rule.msg || `قيمة «${key}» يجب أن تكون رقمًا.`;
+
+  if (rule.enum && value && !rule.enum.includes(value))
+    return rule.msg || `«${key}» خارج القيم المسموحة.`;
+
   return null;
 }
 
