@@ -23,6 +23,42 @@
     .btn:hover{background:var(--green);border-color:var(--green);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--green-600);text-align:center}
+    /* ===== شريط إبحار سفلي ===== */
+.mbk-bottom-nav{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  height:58px;
+  background:#ffffff;
+  border-top:1px solid var(--green-200);
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  z-index:9999;
+}
+
+.mbk-bottom-nav .mbk-nav-link{
+  text-decoration:none;
+  padding:8px 14px;
+  border-radius:999px;
+  border:1px solid var(--green-200);
+  background:#ffffff;
+  color:var(--green-600);
+  font-size:0.9rem;
+  white-space:nowrap;
+}
+
+.mbk-bottom-nav .mbk-nav-link:hover{
+  background:var(--green-200);
+  color:#fff;
+}
+
+.mbk-nav-link-disabled{
+  opacity:0.5;
+  pointer-events:none;
+}
+
   </style>
 </head>
 <body>
@@ -65,6 +101,19 @@
   <script src="/js/api.js"></script>
 
   <script>
+    function updateCowCardNav(number){
+  const link = document.querySelector('[data-nav="cow-card"]');
+  if (!link) return;
+
+  if (number){
+    link.href = 'cow-card.html?number=' + encodeURIComponent(number);
+    link.classList.remove('mbk-nav-link-disabled');
+  } else {
+    link.href = '#';
+    link.classList.add('mbk-nav-link-disabled');
+  }
+}
+
   (function(){
     const $ = s=>document.querySelector(s);
     const $$ = s=>document.querySelectorAll(s);
@@ -87,19 +136,23 @@
     $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${number}`;
     if ($('#animalNumber')) $('#animalNumber').value = number;
   }
-
+updateCowCardNav(number);
 }
 
-  function ctxOrWarn(){
+
+function ctxOrWarn(){
   const number = toLatinDigits(norm($('#animalNumber').value));
   let date = norm($('#eventDate').value) || todayISO();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
   if (!number){
     $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
+    updateCowCardNav(null);   // تعطيل زر بطاقة الحيوان
     return null;
   }
+
   $('#warn').textContent = '';
+  updateCowCardNav(number);   // تفعيل زر بطاقة الحيوان
   return { number, date };
 }
 
@@ -121,9 +174,17 @@
           const target = btn.getAttribute('data-page');
           if(target){ location.href = buildUrl(target, ctx); }
         }, {passive:true});
+       
+
       });
     }
-
+ const numInput = $('#animalNumber');
+if (numInput){
+  numInput.addEventListener('input', ()=>{
+    const n = toLatinDigits(norm(numInput.value));
+    updateCowCardNav(n || null);
+  });
+}
     async function saveTrimmingInline(){
       const ctx = ctxOrWarn(); if(!ctx) return;
       try{
@@ -155,9 +216,15 @@
     wireTrimming();
   })();
   </script>
- 
+ <!-- شريط إبحار سفلي ثابت -->
+<nav class="mbk-bottom-nav">
+  <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
+  <a href="#" class="mbk-nav-link mbk-nav-link-disabled" data-nav="cow-card">🧾 بطاقة الحيوان</a>
+</nav>
+
 </body>
 </html>
+
 
 
 
