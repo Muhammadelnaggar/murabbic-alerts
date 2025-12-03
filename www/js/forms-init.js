@@ -1,10 +1,9 @@
 // /js/forms-init.js — ESM
 // يركّب تلقائيًا على أي <form data-validate="true" data-event="اسم الحدث">
 // يجمع كل [data-field] ويُظهر رسائل في infobar أعلى النموذج.
-// لا يُغيّر أي تصميم؛ لو مفيش infobar يصنع شريطًا صغيرًا فقط للرسالة.
 // عند النجاح: يطلق حدثًا "mbk:valid" ويحمل البيانات في detail.formData.
 
-import { validateEvent } from './form-rules.js';
+import { validateEvent, uniqueAnimalNumber } from './form-rules.js';
 
 function ensureInfoBar(form) {
   let bar = form.querySelector('.infobar');
@@ -28,7 +27,9 @@ function showMsg(bar, msgs, type="error") {
   bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
   bar.style.background   = type === "error" ? "#ffebee" : "#ecfdf5";
   bar.style.color        = type === "error" ? "#b71c1c" : "#065f46";
-  bar.innerHTML = Array.isArray(msgs) ? `<ul style="margin:0;padding-left:18px">${msgs.map(m=>`<li>${m}</li>`).join("")}</ul>` : msgs;
+  bar.innerHTML = Array.isArray(msgs)
+    ? `<ul style="margin:0;padding-left:18px">${msgs.map(m=>`<li>${m}</li>`).join("")}</ul>`
+    : msgs;
 }
 
 function collectFormData(form) {
@@ -80,8 +81,61 @@ function attachOne(form) {
   });
 }
 
+/* ====================================================
+   ربط فوري للتحقق من رقم الحيوان في صفحة add-animal
+   ==================================================== */
+function attachUniqueAnimalNumberWatcher() {
+  const form  = document.getElementById('animalForm');
+  const input = form?.querySelector('#animalNumber');
+  if (!form || !input) return;   // لو مش في صفحة إضافة حيوان، تجاهل
+
+  const bar = ensureInfoBar(form);
+  let timer = null;
+  let lastValue = "";
+
+  input.addEventListener('input', () => {
+    const num = String(input.value || "").trim();
+
+    // لو اتغير الرقم، امسح أي حالة قديمة
+    form.dataset.numberOk = "";
+    if (!num) {
+      bar.style.display = 'none';
+      lastValue = "";
+      return;
+    }
+
+    if (num === lastValue) return;
+    lastValue = num;
+
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return; // لسه ما تسجلش الدخول أو الـ userId مش محفوظ
+
+      try {
+        const res = await uniqueAnimalNumber({ userId, number: num });
+        if (!res.ok) {
+          showMsg(bar, res.msg || "هذا الرقم مستخدم بالفعل.", "error");
+          form.dataset.numberOk = "0";
+        } else {
+          showMsg(bar, "✅ رقم الحيوان متاح في حسابك.", "ok");
+          form.dataset.numberOk = "1";
+        }
+      } catch (e) {
+        console.error("uniqueAnimalNumber check failed", e);
+        // ما نطلعش رسالة خطأ للمستخدم هنا عشان ما نزعجهش
+      }
+    }, 400); // تأخير بسيط عشان ما نضربش على Firestore مع كل حرف
+  });
+}
+
 function autoAttach() {
-  document.querySelectorAll('form[data-validate="true"][data-event]').forEach(attachOne);
+  document
+    .querySelectorAll('form[data-validate="true"][data-event]')
+    .forEach(attachOne);
+
+  // ربط التحقق المبكر من رقم الحيوان في نموذج إضافة حيوان
+  attachUniqueAnimalNumberWatcher();
 }
 
 if (document.readyState === 'loading') {
