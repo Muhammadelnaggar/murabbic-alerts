@@ -17,7 +17,13 @@
     .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
     .form{margin:12px;padding:14px;background:var(--card);border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.08);display:grid;gap:12px}
     .form input{width:100%;padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:12px}
+    .grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+  margin:12px 12px 80px; /* 👈 مسافة إضافية تحت عشان شريط الإبحار */
+}
+
     @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);}}
     .btn{padding:14px;background:#fff;border:2px solid var(--green-200);border-radius:12px;font-weight:700;cursor:pointer;text-align:center;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.06);font-size:16px}
     .btn:hover{background:var(--green);border-color:var(--green);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
@@ -224,6 +230,7 @@ if (numInput){
 
 </body>
 </html>
+
 
 
 
