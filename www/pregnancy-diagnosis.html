@@ -100,23 +100,36 @@
   }
   function hideMsg(){ msgBox.style.display = "none"; }
 
-  // صندوق قائمة الحيوانات المشخَّصة في هذه الجلسة
-  const sessionBox = document.createElement("div");
-  sessionBox.style.marginTop = "18px";
-  sessionBox.style.padding = "10px 12px";
-  sessionBox.style.borderRadius = "8px";
-  sessionBox.style.background = "#fffde7";
-  sessionBox.style.border = "1px solid #c5e1a5";
-  const sessionTitle = document.createElement("div");
-  sessionTitle.textContent = "الحيوانات التي تم تشخيصها في هذه الجلسة:";
-  sessionTitle.style.fontWeight = "bold";
-  sessionTitle.style.marginBottom = "6px";
-  const sessionList = document.createElement("ul");
-  sessionList.style.margin = "0";
-  sessionList.style.paddingInlineStart = "18px";
-  sessionBox.appendChild(sessionTitle);
-  sessionBox.appendChild(sessionList);
-  form.parentNode.insertBefore(sessionBox, form.nextSibling);
+  // صندوق قائمة الحيوانات في الدفعة (يُنشأ ديناميكيًا)
+  const batchBox = document.createElement("div");
+  batchBox.style.marginTop = "18px";
+  batchBox.style.padding = "10px 12px";
+  batchBox.style.borderRadius = "8px";
+  batchBox.style.background = "#fffde7";
+  batchBox.style.border = "1px solid #c5e1a5";
+
+  const batchTitle = document.createElement("div");
+  batchTitle.textContent = "قائمة أرقام الحيوانات في هذه الدفعة:";
+  batchTitle.style.fontWeight = "bold";
+  batchTitle.style.marginBottom = "6px";
+
+  const batchHint = document.createElement("div");
+  batchHint.textContent = "اكتب رقم الحيوان واضغط Enter لإضافته للقائمة، ثم اضغط «تسجيل التشخيص» لتشخيص وتسجيل الدفعة.";
+  batchHint.style.fontSize = "13px";
+  batchHint.style.color = "#555";
+  batchHint.style.marginBottom = "6px";
+
+  const batchList = document.createElement("ul");
+  batchList.style.margin = "0";
+  batchList.style.paddingInlineStart = "18px";
+
+  batchBox.appendChild(batchTitle);
+  batchBox.appendChild(batchHint);
+  batchBox.appendChild(batchList);
+  form.parentNode.insertBefore(batchBox, form.nextSibling);
+
+  // مصفوفة الدفعة في الذاكرة
+  const batch = []; // عناصر { number, li }
 
   // تهيئة الحقول من URL/localStorage
   const qp = new URLSearchParams(location.search);
@@ -147,141 +160,184 @@
     return null;
   }
 
-  // ===== Precheck بسيط حسب الحالة التناسلية فقط =====
-  async function precheck(){
+  // إضافة رقم إلى الدفعة (بدون أي اتصال بفايرستور)
+  function addNumberToBatch() {
     hideMsg();
-    const animalNum = $("#animalId").value.trim();
-    const eventDate = $("#diagnosisDate").value || new Date().toISOString().slice(0,10);
+    const raw = $("#animalId").value.trim();
+    const num = normalizeNumber(raw);
 
-    if (!animalNum){ showMsg("err","اكتب رقم الحيوان."); return; }
-    if (!eventDate){ showMsg("err","اختر تاريخ التشخيص."); return; }
-
-    const a = await fetchAnimalDocByNumber(animalNum);
-    if (!a){
-      showMsg("err","رقم الحيوان غير موجود في قاعدة البيانات.");
+    if (!num){
+      showMsg("err", "اكتب رقم الحيوان ثم اضغط Enter لإضافته للقائمة.");
       return;
     }
 
-    const repro = String(a.data.reproductiveStatus || "").trim();
-    if (repro !== "ملقحة" && repro !== "ملقّحة"){
-      showMsg("err","لا يُسمح بتشخيص الحمل: الحالة التناسلية ليست «ملقحة».");
+    if (batch.some(item => item.number === num)) {
+      showMsg("err", `رقم ${num} مضاف بالفعل في الدفعة.`);
+      $("#animalId").value = "";
+      $("#animalId").focus();
       return;
     }
 
-    showMsg("ok","جاهز للتسجيل ✅");
+    const li = document.createElement("li");
+    li.textContent = `رقم ${num} — في الانتظار…`;
+    li.dataset.status = "pending";
+    batchList.appendChild(li);
+
+    batch.push({ number: num, li });
+
+    $("#animalId").value = "";
+    $("#animalId").focus();
   }
 
-  window.addEventListener("DOMContentLoaded", precheck);
-  $("#animalId").addEventListener("change", precheck);
-  $("#animalId").addEventListener("blur", precheck);
-  $("#diagnosisDate").addEventListener("change", precheck);
+  // إضافة بالضغط على Enter في خانة رقم الحيوان
+  $("#animalId").addEventListener("keydown", (e)=>{
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addNumberToBatch();
+    }
+  });
 
-  // ===== الحفظ =====
+  // ===== الحفظ الجماعي (فاليديشن + تسجيل) =====
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
     hideMsg();
 
-    const animalNum = $("#animalId").value.trim();
     const eventDate = $("#diagnosisDate").value;
     const methodEl  = document.querySelector('input[name="method"]:checked');
     const resultEl  = document.querySelector('input[name="result"]:checked');
 
-    if (!animalNum){ showMsg("err","اكتب رقم الحيوان."); $("#animalId").focus(); return; }
-    if (!eventDate){ showMsg("err","اختر تاريخ التشخيص."); $("#diagnosisDate").focus(); return; }
-    if (!methodEl){ showMsg("err","اختر طريقة التشخيص."); return; }
-    if (!resultEl){ showMsg("err","اختر نتيجة التشخيص."); return; }
+    if (!eventDate){
+      showMsg("err","اختر تاريخ التشخيص.");
+      $("#diagnosisDate").focus();
+      return;
+    }
+    if (!methodEl){
+      showMsg("err","اختر طريقة التشخيص.");
+      return;
+    }
+    if (!resultEl){
+      showMsg("err","اختر نتيجة التشخيص.");
+      return;
+    }
+
+    // لو المستخدم نسي يضغط Enter بعد آخر رقم، نلتقطه
+    const currentRaw = $("#animalId").value.trim();
+    if (currentRaw){
+      addNumberToBatch();
+    }
+
+    if (batch.length === 0){
+      showMsg("err","أضف أرقام الحيوانات أولًا (اكتب الرقم ثم Enter لكل حيوان).");
+      return;
+    }
 
     const methodForRules = (methodEl.value === "ultrasound") ? "سونار" : "جس يدوي";
+    const resultValue    = resultEl.value;
+    const vetValue       = $("#vet").value || "";
 
-    // جلب وثيقة الحيوان لاستخدامها في الفاليديشن documentData
-    const a = await fetchAnimalDocByNumber(animalNum);
-    if (!a || !a.data){
-      showMsg("err","بيانات الحيوان غير متاحة.");
-      return;
-    }
-
-    const v = validateEvent("تشخيص حمل", {
-      animalId: animalNum,
-      eventDate,
-      documentData: a.data,
-      method: methodForRules,
-      result: resultEl.value,
-    });
-
-    if (!v.ok){
-      showMsg("err", v.errors?.join(" — ") || "لا يمكن تسجيل التشخيص. تحقق من البيانات.");
-      return;
-    }
-
-    // من هنا الفاليديشن عدى
     saveBtn.disabled = true;
 
-    const payload = {
-      userId: auth.currentUser.uid,
-      animalId: animalNum,
-      animalNumber: animalNum,
-      eventDate,
-      type: "تشخيص حمل",
-      eventType: "تشخيص حمل",
-      method: methodForRules,
-      result: resultEl.value,
-      vet: $("#vet").value || "",
-      source: location.pathname,
-      createdAt: serverTimestamp()
-    };
+    let okCount  = 0;
+    let errCount = 0;
+    let lastOkAnimal = null;
 
-    try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: animalNum}); } catch {}
+    for (const item of batch){
+      const num = item.number;
+      const li  = item.li;
 
-    try {
-      await addDoc(collection(db, "events"), payload);
-      await updateAnimalByEvent(payload);
+      li.textContent = `رقم ${num} — جارٍ الفحص...`;
 
-      // تخزين آخر سياق
-      localStorage.setItem("lastAnimalId", animalNum);
-      localStorage.setItem("lastEventDate", eventDate);
-
-      // تحديث وثيقة الحيوان (آخر تشخيص + الحالة التناسلية)
       try {
-        const animalsRef = collection(db, "animals");
-        const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
-        const snap = await getDocs(q1);
-        const match = snap.docs.find(d=>{
-          const ad = d.data() || {};
-          const candidates = [ad.animalId, ad.number, ad.animalNumber, ad.tag, ad.earTag]
-            .filter(v=>v!=null).map(v=>String(v).trim());
-          return candidates.includes(String(animalNum));
-        });
-        if (match) {
-          const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
-          if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
-          if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
-          await updateDoc(doc(db,"animals",match.id), updates);
+        const a = await fetchAnimalDocByNumber(num);
+        if (!a || !a.data){
+          li.textContent = `رقم ${num} — ❌ الحيوان غير موجود في قاعدة البيانات.`;
+          errCount++;
+          continue;
         }
-      } catch {}
 
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
+        const v = validateEvent("تشخيص حمل", {
+          animalId: num,
+          eventDate,
+          documentData: a.data,
+          method: methodForRules,
+          result: resultValue,
+        });
 
-      // إضافة الحيوان إلى قائمة "تم تشخيصها في هذه الجلسة"
-      const li = document.createElement("li");
-      li.textContent = `رقم ${animalNum} — ${resultEl.value} — ${eventDate}`;
-      sessionList.appendChild(li);
+        if (!v.ok){
+          li.textContent = `رقم ${num} — ❌ مرفوض: ${v.errors.join(" / ")}`;
+          errCount++;
+          continue;
+        }
 
-      showMsg("ok","✅ تم تشخيص الحمل بنجاح");
+        const payload = {
+          userId: auth.currentUser.uid,
+          animalId: num,
+          animalNumber: num,
+          eventDate,
+          type: "تشخيص حمل",
+          eventType: "تشخيص حمل",
+          method: methodForRules,
+          result: resultValue,
+          vet: vetValue,
+          source: location.pathname,
+          createdAt: serverTimestamp()
+        };
 
-      // تجهيز الإدخال الجماعي: نفرّغ رقم الحيوان فقط ونركّز عليه
-      $("#animalId").value = "";
-      $("#animalId").focus();
+        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: num}); } catch {}
 
-      saveBtn.disabled = false;
+        // حفظ الحدث + تحديث وثيقة الحيوان
+        await addDoc(collection(db, "events"), payload);
+        await updateAnimalByEvent(payload);
 
-    } catch (err) {
-      console.error("Firestore save error:", err);
-      try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err)}); } catch {}
-      showMsg("err","❌ حدث خطأ أثناء التسجيل. تحقق من الاتصال والصلاحيات.");
-      saveBtn.disabled = false;
+        try {
+          const animalsRef = collection(db, "animals");
+          const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
+          const snap = await getDocs(q1);
+          const match = snap.docs.find(d=>{
+            const ad = d.data() || {};
+            const candidates = [ad.animalId, ad.number, ad.animalNumber, ad.tag, ad.earTag]
+              .filter(v=>v!=null).map(v=>String(v).trim());
+            return candidates.includes(String(num));
+          });
+          if (match) {
+            const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
+            if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
+            if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
+            await updateDoc(doc(db,"animals",match.id), updates);
+          }
+        } catch {}
+
+        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: num}); } catch {}
+
+        li.textContent = `رقم ${num} — ✅ تم التسجيل (${resultValue})`;
+        okCount++;
+        lastOkAnimal = num;
+
+      } catch (err) {
+        console.error("Firestore save error (batch PD):", err);
+        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err), animal:num}); } catch {}
+        li.textContent = `رقم ${num} — ❌ خطأ أثناء التسجيل.`;
+        errCount++;
+      }
     }
+
+    saveBtn.disabled = false;
+
+    if (lastOkAnimal){
+      localStorage.setItem("lastAnimalId", lastOkAnimal);
+      localStorage.setItem("lastEventDate", eventDate);
+    }
+
+    if (okCount > 0){
+      showMsg("ok", `✅ تم تسجيل ${okCount} حيوان في هذه الدفعة. توجد مشاكل في ${errCount} رقم (انظر القائمة).`);
+    } else {
+      showMsg("err", `❌ لم يتم تسجيل أي حيوان. كل الأرقام بها مشاكل (انظر القائمة).`);
+    }
+
+    // تبقى القائمة كـ log للدفعة، ولو حابب تبدأ دفعة جديدة ممكن تحدفهم يدوي أو نضيف زر لاحقًا لمسحها.
   });
 </script>
+
 
 </body>
 </html>
