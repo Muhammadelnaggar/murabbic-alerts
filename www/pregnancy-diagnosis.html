@@ -364,12 +364,40 @@
           method: methodForRules,
           result: resultValue,
         });
+if (!v.ok){
+  const doc = a.data || {};
+  const species = String(doc.species || "");
+  let animalWord = "الحيوان";
 
-        if (!v.ok){
-          li.textContent = `رقم ${num} — ❌ لا يمكن تشخيص الحمل: ${v.errors.join(" / ")}`;
-          errCount++;
-          continue;
-        }
+  // محاولة بسيطة لتحديد النوع لكتابة الرسالة
+  if (species.includes("بقر")) {
+    animalWord = "البقرة";
+  } else if (species.includes("جاموس")) {
+    animalWord = "الجاموسة";
+  }
+
+  const status = String(doc.reproductiveStatus || "").trim();
+  let reason;
+
+  if (status === "عشار") {
+    reason = `${animalWord} عشار بالفعل`;
+  } else if (
+    status === "مفتوحة" ||
+    status === "فارغة"  ||
+    status === "غير عشار"
+  ) {
+    reason = `${animalWord} غير ملقحة`;
+  } else if (!status) {
+    reason = "لا توجد حالة تناسلية مسجَّلة";
+  } else {
+    reason = `الحالة التناسلية الحالية (${status}) لا تسمح بالتشخيص`;
+  }
+
+  li.textContent = `رقم ${num} — ❌ لا يمكن تشخيص الحمل (${reason}).`;
+  errCount++;
+  continue;
+}
+
 
         const payload = {
           userId: auth.currentUser.uid,
