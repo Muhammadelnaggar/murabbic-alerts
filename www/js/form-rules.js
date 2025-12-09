@@ -45,8 +45,9 @@ const isNum  = (v) => (v === "" ? true : !Number.isNaN(Number(v)));
 const commonFields = {
   animalId:  { required: true,  msg: "رقم الحيوان مطلوب." },
   eventDate: { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
-  // ⚠️ مبدأ جديد مهم:
+  // ⚠️ مبدأ جديد:
   //     documentData = وثيقة الحيوان كاملة
+  // ملاحظة: بعض الأحداث (زي تشخيص الحمل) مش بتستخدمه.
   documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
 };
 
@@ -76,16 +77,23 @@ export const eventSchemas = {
     guards: ["inseminationDecision"],
   },
 
-  // ---------------- تشخيص الحمل -----------------
+  // ================= تشخيص الحمل =================
+  // 💡 هنا لا نستخدم commonFields عمداً حتى لا يكون documentData مطلوباً
   "تشخيص حمل": {
     fields: {
-      ...commonFields,
-      method: {
+      animalId:  { required: true,  msg: "رقم الحيوان مطلوب." },
+      eventDate: { required: true, type: "date", msg: "تاريخ التشخيص غير صالح." },
+      method:    { required: true,  msg: "طريقة التشخيص مطلوبة." },           // "سونار" | "جس يدوي"
+      result:    { required: true,  msg: "نتيجة التشخيص مطلوبة." },           // "عشار" | "فارغة"
+      reproStatus: {
         required: true,
-        enum: ["سونار", "جس يدوي"],
-        msg: "اختَر وسيلة التشخيص.",
+        msg: "الحالة التناسلية مطلوبة لتشخيص الحمل.",
       },
-      documentData: { required: true },
+      lastInseminationDate: {
+        required: true,
+        type: "date",
+        msg: "تاريخ آخر تلقيح غير صالح.",
+      },
     },
     guards: ["pregnancyDiagnosisDecision"],
   },
@@ -158,22 +166,23 @@ export const guards = {
 
   // -------------- تشخيص الحمل ---------------------
   pregnancyDiagnosisDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
-
-    const status = String(doc.reproductiveStatus || "");
+    // هنا نعتمد على payload القادم من صفحة تشخيص الحمل
+    const status = String(fd.reproStatus || "").trim();
     const okStatus = new Set(["ملقح", "ملقّح", "ملقحة", "ملقّحة"]);
-    if (!okStatus.has(status))
-      return "لا يمكن تشخيص الحمل — الحيوان غير مُلقّح.";
 
-    if (!isDate(doc.lastInseminationDate))
-      return "لا يوجد تلقيح سابق.";
+    if (!okStatus.has(status))
+      return "لا يُسمح بتشخيص الحمل إلا للحيوانات الملقّحة.";
+
+    if (!isDate(fd.lastInseminationDate))
+      return "لا يوجد تاريخ تلقيح سابق قبل هذا التاريخ؛ لا يمكن تشخيص الحمل.";
 
     const need = MIN_PD_BY_METHOD[fd.method];
-    const d    = daysBetween(doc.lastInseminationDate, fd.eventDate);
+    if (!need) return null; // طريقة غير معروفة، نتجاهل الحارس بهدوء
 
-    if (d < need)
-      return `${fd.method} يتطلّب ≥ ${need} يوم (الحالي ${d}).`;
+    const d = daysBetween(fd.lastInseminationDate, fd.eventDate);
+
+    if (Number.isNaN(d) || d < need)
+      return `لا يمكن تشخيص الحمل الآن: طريقة ${fd.method} تتطلّب مرور ${need} يومًا على الأقل من آخر تلقيح (الفارق الحالي ${d} يوم).`;
 
     return null;
   },
