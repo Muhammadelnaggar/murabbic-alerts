@@ -9,20 +9,95 @@
   <script type="module" src="js/forms-init.js"></script>
 
   <style>
-    body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
-    h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
-    fieldset { border: 2px solid #2e7d32; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
-    legend { font-weight: bold; font-size: 18px; color: #2e7d32; padding: 0 10px; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input[type="text"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .radio-group { margin: 6px 0; }
-    .radio-group label { display: inline-block; margin-left: 15px; font-weight: normal; }
-    button { background-color: #2e7d32; color: white; padding: 14px 20px; font-size: 18px; border: none; border-radius: 8px; width: 100%; cursor: pointer; }
-    button:hover { background-color: #27642a; }
+    body {
+      direction: rtl;
+      background-color: #fff9db;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+      color: #1b5e20;
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 30px;
+      color: #2e7d32;
+    }
+    fieldset {
+      border: 2px solid #2e7d32;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 25px;
+    }
+    legend {
+      font-weight: bold;
+      font-size: 18px;
+      color: #2e7d32;
+      padding: 0 10px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="date"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .radio-group {
+      margin: 6px 0;
+    }
+    .radio-group label {
+      display: inline-block;
+      margin-left: 15px;
+      font-weight: normal;
+    }
+    button {
+      background-color: #2e7d32;
+      color: white;
+      padding: 14px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      width: 100%;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #27642a;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Popup عام لمربيك -->
+  <div id="mbkPopup" style="
+    position: fixed;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffebee;
+    color: #b71c1c;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 17px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    z-index: 9999;
+    transition: top 0.35s ease;
+    max-width: 90%;
+    text-align: center;
+  "></div>
+
   <h1>تشخيص الحمل</h1>
 
   <form id="diagnosisForm" autocomplete="off">
@@ -61,44 +136,53 @@
   </form>
 
 <script type="module">
+  // ====== Popup مربيك العام ======
+  function showPopup(msg, ok = false) {
+    const p = document.getElementById("mbkPopup");
+    if (!p) return;
+    p.textContent = msg;
+
+    if (ok) {
+      p.style.background = "#e8f5e9";
+      p.style.color = "#1b5e20";
+    } else {
+      p.style.background = "#ffebee";
+      p.style.color = "#b71c1c";
+    }
+
+    p.style.top = "20px";
+    setTimeout(() => { p.style.top = "-120px"; }, 3500);
+  }
+  // لا نحتاج لإخفاء صندوق داخلي، لكن نترك دالة فارغة للتوافق
+  function hideMsg() {}
+
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
-    collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, limit
+    collection,
+    query,
+    where,
+    getDocs,
+    addDoc,
+    serverTimestamp,
+    doc,
+    updateDoc,
+    limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { validateEvent } from "/js/form-rules.js";
   import { updateAnimalByEvent } from "/js/animal-update.js";
 
   // تتبّع خفيف
-  try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
-  try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event: "page_view", page: location.pathname });
+  } catch {}
+  try {
+    if (window.t?.event) t.event("page_view", { page: location.pathname });
+  } catch {}
 
   const $ = (s)=>document.querySelector(s);
   const form    = $("#diagnosisForm");
   const saveBtn = $("#saveBtn");
-
-  // حاوية رسالة واحدة يعاد استخدامها
-  const msgBox = document.createElement("div");
-  msgBox.style.marginTop = "12px";
-  msgBox.style.borderRadius = "6px";
-  msgBox.style.padding = "12px";
-  msgBox.style.textAlign = "center";
-  msgBox.style.fontWeight = "bold";
-  msgBox.style.display = "none";
-  form.appendChild(msgBox);
-
-  function showMsg(kind, text){
-    msgBox.style.display = "block";
-    if (kind === "ok"){
-      msgBox.style.background = "#c8e6c9"; // أخضر فاتح
-      msgBox.style.color = "#1b5e20";
-    } else {
-      msgBox.style.background = "#ffcdd2"; // أحمر فاتح
-      msgBox.style.color = "#b71c1c";
-    }
-    msgBox.textContent = text;
-    msgBox.scrollIntoView({behavior:"smooth", block:"center"});
-  }
-  function hideMsg(){ msgBox.style.display = "none"; }
 
   // صندوق قائمة الحيوانات في الدفعة (يُنشأ ديناميكيًا)
   const batchBox = document.createElement("div");
@@ -114,7 +198,8 @@
   batchTitle.style.marginBottom = "6px";
 
   const batchHint = document.createElement("div");
-  batchHint.textContent = "اكتب رقم الحيوان واضغط Enter لإضافته للقائمة، ثم اضغط «تسجيل التشخيص» لتشخيص وتسجيل الدفعة.";
+  batchHint.textContent =
+    "اكتب رقم الحيوان واضغط Enter لإضافته للقائمة، ثم اضغط «تسجيل التشخيص» لتشخيص وتسجيل الدفعة.";
   batchHint.style.fontSize = "13px";
   batchHint.style.color = "#555";
   batchHint.style.marginBottom = "6px";
@@ -133,29 +218,46 @@
 
   // تهيئة الحقول من URL/localStorage
   const qp = new URLSearchParams(location.search);
-  const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-  const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
-  $("#animalId").value      = (animalFromURL||"").toString().trim();
-  $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
+  const animalFromURL =
+    qp.get("animalId") ||
+    qp.get("number") ||
+    qp.get("animalNumber") ||
+    localStorage.getItem("lastAnimalId") ||
+    "";
+  const dateFromURL = qp.get("date") || localStorage.getItem("lastEventDate") || "";
+  $("#animalId").value      = (animalFromURL || "").toString().trim();
+  $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0, 10);
 
   await ensureAuth("/login.html");
 
   // ===== أدوات مساعدة =====
-  const mapDigits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const normalizeNumber = (s)=> String(s||'').trim().replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g,d=>mapDigits[d]);
+  const mapDigits = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4",
+    "٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4",
+    "۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+  const normalizeNumber = (s)=>
+    String(s || "")
+      .trim()
+      .replace(/[^\d٠-٩۰-۹]/g, "")
+      .replace(/[٠-٩۰-۹]/g, d => mapDigits[d]);
 
   async function fetchAnimalDocByNumber(number){
     const num = normalizeNumber(number);
     if (!num) return null;
 
     const tries = [
-      ['animalNumber','==',num], ['number','==',num],
-      ['animalId','==',num], ['tag','==',num], ['earTag','==',num],
+      ["animalNumber", "==", num],
+      ["number", "==", num],
+      ["animalId", "==", num],
+      ["tag", "==", num],
+      ["earTag", "==", num],
     ];
-    for (const [field,op,val] of tries){
-      const q1 = query(collection(db,'animals'), where(field,op,val), limit(1));
+    for (const [field, op, val] of tries) {
+      const q1 = query(collection(db, "animals"), where(field, op, val), limit(1));
       const snap = await getDocs(q1);
-      if (!snap.empty) return { id: snap.docs[0].id, data: snap.docs[0].data()||{} };
+      if (!snap.empty) return { id: snap.docs[0].id, data: snap.docs[0].data() || {} };
     }
     return null;
   }
@@ -166,13 +268,13 @@
     const raw = $("#animalId").value.trim();
     const num = normalizeNumber(raw);
 
-    if (!num){
-      showMsg("err", "اكتب رقم الحيوان ثم اضغط Enter لإضافته للقائمة.");
+    if (!num) {
+      showPopup("❌ لا يمكن تشخيص الحمل — اكتب رقم الحيوان ثم اضغط Enter لإضافته للقائمة.");
       return;
     }
 
     if (batch.some(item => item.number === num)) {
-      showMsg("err", `رقم ${num} مضاف بالفعل في الدفعة.`);
+      showPopup(`❌ لا يمكن تشخيص الحمل — رقم ${num} مضاف بالفعل في هذه الدفعة.`);
       $("#animalId").value = "";
       $("#animalId").focus();
       return;
@@ -206,17 +308,17 @@
     const methodEl  = document.querySelector('input[name="method"]:checked');
     const resultEl  = document.querySelector('input[name="result"]:checked');
 
-    if (!eventDate){
-      showMsg("err","اختر تاريخ التشخيص.");
+    if (!eventDate) {
+      showPopup("❌ لا يمكن تشخيص الحمل — اختر تاريخ التشخيص أولًا.");
       $("#diagnosisDate").focus();
       return;
     }
-    if (!methodEl){
-      showMsg("err","اختر طريقة التشخيص.");
+    if (!methodEl) {
+      showPopup("❌ لا يمكن تشخيص الحمل — اختر طريقة التشخيص (سونار أو يدوي).");
       return;
     }
-    if (!resultEl){
-      showMsg("err","اختر نتيجة التشخيص.");
+    if (!resultEl) {
+      showPopup("❌ لا يمكن تشخيص الحمل — اختر نتيجة التشخيص (عشار أو فارغة).");
       return;
     }
 
@@ -227,7 +329,7 @@
     }
 
     if (batch.length === 0){
-      showMsg("err","أضف أرقام الحيوانات أولًا (اكتب الرقم ثم Enter لكل حيوان).");
+      showPopup("❌ لا يمكن تشخيص الحمل — أضف أرقام الحيوانات أولًا (اكتب الرقم ثم Enter لكل حيوان).");
       return;
     }
 
@@ -264,7 +366,7 @@
         });
 
         if (!v.ok){
-          li.textContent = `رقم ${num} — ❌ مرفوض: ${v.errors.join(" / ")}`;
+          li.textContent = `رقم ${num} — ❌ لا يمكن تشخيص الحمل: ${v.errors.join(" / ")}`;
           errCount++;
           continue;
         }
@@ -283,7 +385,9 @@
           createdAt: serverTimestamp()
         };
 
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal: num}); } catch {}
+        try {
+          if (window.t?.event) t.event("pregnancy_diagnosis_save_click", { animal: num });
+        } catch {}
 
         // حفظ الحدث + تحديث وثيقة الحيوان
         await addDoc(collection(db, "events"), payload);
@@ -296,26 +400,35 @@
           const match = snap.docs.find(d=>{
             const ad = d.data() || {};
             const candidates = [ad.animalId, ad.number, ad.animalNumber, ad.tag, ad.earTag]
-              .filter(v=>v!=null).map(v=>String(v).trim());
+              .filter(v => v != null)
+              .map(v => String(v).trim());
             return candidates.includes(String(num));
           });
           if (match) {
-            const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate: eventDate };
+            const updates = { lastDiagnosis: "تشخيص حمل", lastDiagnosisDate: eventDate };
             if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
             if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
-            await updateDoc(doc(db,"animals",match.id), updates);
+            await updateDoc(doc(db, "animals", match.id), updates);
           }
         } catch {}
 
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: num}); } catch {}
+        try {
+          if (window.t?.event) t.event("pregnancy_diagnosis_save_done", { animal: num });
+        } catch {}
 
-        li.textContent = `رقم ${num} — ✅ تم التسجيل (${resultValue})`;
+        li.textContent = `رقم ${num} — ✅ تم تسجيل التشخيص (${resultValue}).`;
         okCount++;
         lastOkAnimal = num;
 
       } catch (err) {
         console.error("Firestore save error (batch PD):", err);
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message: String(err?.message||err), animal:num}); } catch {}
+        try {
+          if (window.t?.event)
+            t.event("pregnancy_diagnosis_save_error", {
+              message: String(err?.message || err),
+              animal: num
+            });
+        } catch {}
         li.textContent = `رقم ${num} — ❌ خطأ أثناء التسجيل.`;
         errCount++;
       }
@@ -329,15 +442,16 @@
     }
 
     if (okCount > 0){
-      showMsg("ok", `✅ تم تسجيل ${okCount} حيوان في هذه الدفعة. توجد مشاكل في ${errCount} رقم (انظر القائمة).`);
+      showPopup(
+        `✅ تم تشخيص وتسجيل الحمل لـ ${okCount} حيوان في هذه الدفعة. يوجد ${errCount} رقم لم يُسجَّل (راجع القائمة).`,
+        true
+      );
     } else {
-      showMsg("err", `❌ لم يتم تسجيل أي حيوان. كل الأرقام بها مشاكل (انظر القائمة).`);
+      showPopup("❌ لا يمكن تشخيص الحمل — لم يتم تسجيل أي حيوان، كل الأرقام بها مشاكل (راجع القائمة).");
     }
-
-    // تبقى القائمة كـ log للدفعة، ولو حابب تبدأ دفعة جديدة ممكن تحدفهم يدوي أو نضيف زر لاحقًا لمسحها.
+    // تبقى القائمة كـ log للدفعة الحالية.
   });
 </script>
-
 
 </body>
 </html>
