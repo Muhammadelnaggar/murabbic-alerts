@@ -100,6 +100,24 @@
   }
   function hideMsg(){ msgBox.style.display = "none"; }
 
+  // صندوق قائمة الحيوانات المشخَّصة في هذه الجلسة
+  const sessionBox = document.createElement("div");
+  sessionBox.style.marginTop = "18px";
+  sessionBox.style.padding = "10px 12px";
+  sessionBox.style.borderRadius = "8px";
+  sessionBox.style.background = "#fffde7";
+  sessionBox.style.border = "1px solid #c5e1a5";
+  const sessionTitle = document.createElement("div");
+  sessionTitle.textContent = "الحيوانات التي تم تشخيصها في هذه الجلسة:";
+  sessionTitle.style.fontWeight = "bold";
+  sessionTitle.style.marginBottom = "6px";
+  const sessionList = document.createElement("ul");
+  sessionList.style.margin = "0";
+  sessionList.style.paddingInlineStart = "18px";
+  sessionBox.appendChild(sessionTitle);
+  sessionBox.appendChild(sessionList);
+  form.parentNode.insertBefore(sessionBox, form.nextSibling);
+
   // تهيئة الحقول من URL/localStorage
   const qp = new URLSearchParams(location.search);
   const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
@@ -185,7 +203,7 @@
     const v = validateEvent("تشخيص حمل", {
       animalId: animalNum,
       eventDate,
-      documentData: a.data,          // ← الأساس في الفاليديشن الجديد
+      documentData: a.data,
       method: methodForRules,
       result: resultEl.value,
     });
@@ -243,10 +261,18 @@
 
       try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal: animalNum}); } catch {}
 
+      // إضافة الحيوان إلى قائمة "تم تشخيصها في هذه الجلسة"
+      const li = document.createElement("li");
+      li.textContent = `رقم ${animalNum} — ${resultEl.value} — ${eventDate}`;
+      sessionList.appendChild(li);
+
       showMsg("ok","✅ تم تشخيص الحمل بنجاح");
-      setTimeout(()=>{
-        location.href = `add-event.html?number=${encodeURIComponent(animalNum)}&date=${encodeURIComponent(eventDate)}`;
-      }, 2000);
+
+      // تجهيز الإدخال الجماعي: نفرّغ رقم الحيوان فقط ونركّز عليه
+      $("#animalId").value = "";
+      $("#animalId").focus();
+
+      saveBtn.disabled = false;
 
     } catch (err) {
       console.error("Firestore save error:", err);
