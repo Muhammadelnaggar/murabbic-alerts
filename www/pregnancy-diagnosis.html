@@ -63,8 +63,7 @@
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
-    collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc,
-    orderBy, limit
+    collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { validateEvent } from "/js/form-rules.js";
   import { updateAnimalByEvent } from "/js/animal-update.js";
@@ -74,8 +73,8 @@
   try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
 
   const $ = (s)=>document.querySelector(s);
-  const form   = $("#diagnosisForm");
-  const saveBtn= $("#saveBtn");
+  const form    = $("#diagnosisForm");
+  const saveBtn = $("#saveBtn");
 
   // حاوية رسالة واحدة يعاد استخدامها
   const msgBox = document.createElement("div");
@@ -105,7 +104,7 @@
   const qp = new URLSearchParams(location.search);
   const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
   const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
-  $("#animalId").value = (animalFromURL||"").toString().trim();
+  $("#animalId").value      = (animalFromURL||"").toString().trim();
   $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
 
   await ensureAuth("/login.html");
@@ -114,15 +113,10 @@
   const mapDigits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
   const normalizeNumber = (s)=> String(s||'').trim().replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g,d=>mapDigits[d]);
 
-  function daysBetweenISO(a,b){
-    const A=new Date(a), B=new Date(b);
-    if (isNaN(A)||isNaN(B)) return NaN;
-    A.setHours(0,0,0,0); B.setHours(0,0,0,0);
-    return Math.round((B-A)/86400000);
-  }
-
   async function fetchAnimalDocByNumber(number){
     const num = normalizeNumber(number);
+    if (!num) return null;
+
     const tries = [
       ['animalNumber','==',num], ['number','==',num],
       ['animalId','==',num], ['tag','==',num], ['earTag','==',num],
@@ -135,64 +129,24 @@
     return null;
   }
 
-  async function fetchLastInseminationDate(number, untilISO){
-    const uid = auth.currentUser?.uid;
-    const num = normalizeNumber(number);
-    const qEv = query(
-      collection(db,'events'),
-      where('userId','==', uid),
-      where('animalNumber','==', num),
-      orderBy('eventDate','desc'),
-      limit(80)
-    );
-    const snap = await getDocs(qEv);
-    const isInsemination = (t)=>{
-      const s = String(t||'').trim().toLowerCase();
-      return s.includes('تلقيح') || s==='خدمة' || s.includes('insemin') || s==='ai' || s==='service';
-    };
-    const until = new Date(untilISO).setHours(0,0,0,0);
-    let last = null;
-    for (const d of snap.docs){
-      const ev = d.data()||{};
-      const type = ev.eventType ?? ev.type;
-      const dt = ev.eventDate;
-      if (!dt || !isInsemination(type)) continue;
-      const t = new Date(dt).setHours(0,0,0,0);
-      if (t <= until && (!last || t > last)) last = t;
-      if (t < until && last) break;
-    }
-    return last ? new Date(last).toISOString().slice(0,10) : "";
-  }
-
-  // ===== Precheck =====
+  // ===== Precheck بسيط حسب الحالة التناسلية فقط =====
   async function precheck(){
     hideMsg();
     const animalNum = $("#animalId").value.trim();
     const eventDate = $("#diagnosisDate").value || new Date().toISOString().slice(0,10);
+
     if (!animalNum){ showMsg("err","اكتب رقم الحيوان."); return; }
     if (!eventDate){ showMsg("err","اختر تاريخ التشخيص."); return; }
 
     const a = await fetchAnimalDocByNumber(animalNum);
-    if (!a){ showMsg("err","رقم الحيوان غير موجود في قاعدة البيانات."); return; }
-
-    const repro = String(
-      a.data.reproductiveStatus || a.data.reproStatus || a.data.repro || ""
-    ).trim();
-
-    const okStatus = new Set(["ملقح","ملقّح","ملقحة","ملقّحة"]);
-    if (!okStatus.has(repro)){
-      showMsg("err",'لا يُسمح بتشخيص الحمل: الحالة التناسلية ليست "ملقّح/ملقّحة".');
+    if (!a){
+      showMsg("err","رقم الحيوان غير موجود في قاعدة البيانات.");
       return;
     }
 
-    const lastIns = await fetchLastInseminationDate(animalNum, eventDate);
-    if (!lastIns){
-      showMsg("err","لا يوجد تلقيح سابق مسجَّل قبل هذا التاريخ.");
-      return;
-    }
-    const d = daysBetweenISO(lastIns, eventDate);
-    if (Number.isNaN(d) || d < 26){
-      showMsg("err",`غير مؤهَّل الآن: يلزم مرور ≥ 26 يوم من آخر تلقيح للتشخيص. آخر تلقيح: ${lastIns}`);
+    const repro = String(a.data.reproductiveStatus || "").trim();
+    if (repro !== "ملقحة" && repro !== "ملقّحة"){
+      showMsg("err","لا يُسمح بتشخيص الحمل: الحالة التناسلية ليست «ملقحة».");
       return;
     }
 
@@ -221,19 +175,19 @@
 
     const methodForRules = (methodEl.value === "ultrasound") ? "سونار" : "جس يدوي";
 
+    // جلب وثيقة الحيوان لاستخدامها في الفاليديشن documentData
     const a = await fetchAnimalDocByNumber(animalNum);
-    const lastInseminationDate = await fetchLastInseminationDate(animalNum, eventDate);
-    const reproStatus = String(
-      a?.data?.reproductiveStatus || a?.data?.reproStatus || a?.data?.repro || ""
-    ).trim();
+    if (!a || !a.data){
+      showMsg("err","بيانات الحيوان غير متاحة.");
+      return;
+    }
 
     const v = validateEvent("تشخيص حمل", {
       animalId: animalNum,
       eventDate,
+      documentData: a.data,          // ← الأساس في الفاليديشن الجديد
       method: methodForRules,
       result: resultEl.value,
-      reproStatus,
-      lastInseminationDate
     });
 
     if (!v.ok){
@@ -241,6 +195,7 @@
       return;
     }
 
+    // من هنا الفاليديشن عدى
     saveBtn.disabled = true;
 
     const payload = {
@@ -263,18 +218,18 @@
       await addDoc(collection(db, "events"), payload);
       await updateAnimalByEvent(payload);
 
-      // آخر سياق محلي
+      // تخزين آخر سياق
       localStorage.setItem("lastAnimalId", animalNum);
       localStorage.setItem("lastEventDate", eventDate);
 
-      // تحديث وثيقة الحيوان لهذا الحدث (آخر تشخيص + حالة تناسلية)
+      // تحديث وثيقة الحيوان (آخر تشخيص + الحالة التناسلية)
       try {
         const animalsRef = collection(db, "animals");
         const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
         const snap = await getDocs(q1);
         const match = snap.docs.find(d=>{
-          const a = d.data() || {};
-          const candidates = [a.animalId, a.number, a.animalNumber, a.tag, a.earTag]
+          const ad = d.data() || {};
+          const candidates = [ad.animalId, ad.number, ad.animalNumber, ad.tag, ad.earTag]
             .filter(v=>v!=null).map(v=>String(v).trim());
           return candidates.includes(String(animalNum));
         });
@@ -301,5 +256,6 @@
     }
   });
 </script>
+
 </body>
 </html>
