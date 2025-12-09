@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <title>تشخيص الحمل</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script src="/js/animal-update.js"></script>
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+
   <style>
     body { direction: rtl; background-color: #fff9db; font-family: 'Arial', sans-serif; padding: 20px; color: #1b5e20; }
     h1 { text-align: center; font-size: 28px; margin-bottom: 30px; color: #2e7d32; }
@@ -59,6 +59,7 @@
 
     <button type="submit" id="saveBtn">تسجيل التشخيص</button>
   </form>
+
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
@@ -66,6 +67,7 @@
     orderBy, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { validateEvent } from "/js/form-rules.js";
+  import { updateAnimalByEvent } from "/js/animal-update.js";
 
   // تتبّع خفيف
   try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
@@ -75,7 +77,7 @@
   const form   = $("#diagnosisForm");
   const saveBtn= $("#saveBtn");
 
-  // حاوية رسالة واحدة يعاد استخدامها (نفس أسلوب الولادة)
+  // حاوية رسالة واحدة يعاد استخدامها
   const msgBox = document.createElement("div");
   msgBox.style.marginTop = "12px";
   msgBox.style.borderRadius = "6px";
@@ -99,7 +101,7 @@
   }
   function hideMsg(){ msgBox.style.display = "none"; }
 
-  // تهيئة الحقول من URL/localStorage (كما هي)
+  // تهيئة الحقول من URL/localStorage
   const qp = new URLSearchParams(location.search);
   const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
   const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
@@ -108,7 +110,7 @@
 
   await ensureAuth("/login.html");
 
-  // ===== أدوات مساعدة بنفس روح الولادة =====
+  // ===== أدوات مساعدة =====
   const mapDigits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
   const normalizeNumber = (s)=> String(s||'').trim().replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g,d=>mapDigits[d]);
 
@@ -146,7 +148,6 @@
     const snap = await getDocs(qEv);
     const isInsemination = (t)=>{
       const s = String(t||'').trim().toLowerCase();
-      // يغطي العربي والإنجليزي
       return s.includes('تلقيح') || s==='خدمة' || s.includes('insemin') || s==='ai' || s==='service';
     };
     const until = new Date(untilISO).setHours(0,0,0,0);
@@ -163,7 +164,7 @@
     return last ? new Date(last).toISOString().slice(0,10) : "";
   }
 
-  // ===== Precheck عند التحميل/التغيير (بدون تعطيل زر) =====
+  // ===== Precheck =====
   async function precheck(){
     hideMsg();
     const animalNum = $("#animalId").value.trim();
@@ -203,7 +204,7 @@
   $("#animalId").addEventListener("blur", precheck);
   $("#diagnosisDate").addEventListener("change", precheck);
 
-  // ===== الحفظ: فاليديشن مركزي بنفس أسلوب الولادة =====
+  // ===== الحفظ =====
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
     hideMsg();
@@ -218,10 +219,8 @@
     if (!methodEl){ showMsg("err","اختر طريقة التشخيص."); return; }
     if (!resultEl){ showMsg("err","اختر نتيجة التشخيص."); return; }
 
-    // تحويل قيم الطريقة للّغة التي يعتمدها الملف المركزي
     const methodForRules = (methodEl.value === "ultrasound") ? "سونار" : "جس يدوي";
 
-    // سياق DB للفاليديشن المركزي
     const a = await fetchAnimalDocByNumber(animalNum);
     const lastInseminationDate = await fetchLastInseminationDate(animalNum, eventDate);
     const reproStatus = String(
@@ -231,8 +230,8 @@
     const v = validateEvent("تشخيص حمل", {
       animalId: animalNum,
       eventDate,
-      method: methodForRules,         // "سونار" | "جس يدوي"
-      result: resultEl.value,         // "عشار" | "فارغة"
+      method: methodForRules,
+      result: resultEl.value,
       reproStatus,
       lastInseminationDate
     });
@@ -242,7 +241,6 @@
       return;
     }
 
-    // تعطيل الزر أثناء الحفظ فقط (نفس ما عندك)
     saveBtn.disabled = true;
 
     const payload = {
@@ -252,7 +250,7 @@
       eventDate,
       type: "تشخيص حمل",
       eventType: "تشخيص حمل",
-      method: methodForRules,       // نخزّن بالعربي لثبات التقارير
+      method: methodForRules,
       result: resultEl.value,
       vet: $("#vet").value || "",
       source: location.pathname,
@@ -263,15 +261,14 @@
 
     try {
       await addDoc(collection(db, "events"), payload);
-      await window.updateAnimalByEvent(payload);
+      await updateAnimalByEvent(payload);
 
       // آخر سياق محلي
       localStorage.setItem("lastAnimalId", animalNum);
       localStorage.setItem("lastEventDate", eventDate);
 
-      // تحديث بطاقة الحيوان
+      // تحديث وثيقة الحيوان لهذا الحدث (آخر تشخيص + حالة تناسلية)
       try {
-        // نبحث داخل animals لنفس المستخدم
         const animalsRef = collection(db, "animals");
         const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
         const snap = await getDocs(q1);
@@ -304,7 +301,5 @@
     }
   });
 </script>
-
-
 </body>
 </html>
