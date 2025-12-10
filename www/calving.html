@@ -699,10 +699,21 @@
         createdAt: serverTimestamp()
       };
 
-      try{
+           try{
         disableForm(true);
+
+        // 1) نحفظ الحدث كما هو (بالعربي)
         await addDoc(collection(db, 'events'), payload);
-        await updateAnimalByEvent(payload);
+
+        // 2) نبعَت نسخة "مُوحَّدة" لمحرّك تحديث الحيوان
+        const updatePayload = {
+          ...payload,
+          type: 'calving',      // 👈 النوع الموَّحد اللي animal-update.js فاهمه
+          eventType: 'calving'  // 👈 نفس الشيء، حتى لو الملف يستخدم eventType
+        };
+
+        await updateAnimalByEvent(updatePayload);
+
 
         // تسجيل العجول في مجموعة calves
         const damId     = payload.animalId;
@@ -760,3 +771,4 @@
 
 </body>
 </html>
+
