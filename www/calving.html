@@ -497,34 +497,76 @@
       return { pregnant, lastFertileDate, lastBoundary };
     }
 
-    function offerAbort(number, evISO, g, sp){
-      const msg =
-        `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).`;
-      showPopup(msg, false, ()=>{
-        // بعد إغلاق الرسالة، نعرض زرّين في الـ infobar كبديل (اختياري)
-        info.className = 'infobar show error';
-        info.innerHTML =
-          `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).<br>` +
-          `<div style="margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
-             <button id="goAbort"
-                     style="padding:8px 12px;border-radius:10px;border:0;background:#ef4444;color:#fff;font-weight:700;cursor:pointer">
-               تسجيل إجهاض الآن
-             </button>
-             <button id="editDate"
-                     style="padding:8px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">
-               تعديل تاريخ الولادة
-             </button>
-           </div>`;
-        document.getElementById('goAbort')?.addEventListener('click', ()=>{
-          const url = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
-          location.href = url;
-        });
-        document.getElementById('editDate')?.addEventListener('click', ()=>{
-          dateEl?.focus({preventScroll:true});
-          dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
-        });
-      });
-    }
+  function offerAbort(number, evISO, g, sp){
+  // نص الرسالة
+  const msg =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).\n\n` +
+    `هل تريد تسجيل إجهاض الآن؟`;
+
+  // نعرض Popup مخصص بزرّين
+  modalText.innerHTML =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).` +
+    `<br><br><strong>هل تريد تسجيل إجهاض الآن؟</strong>`;
+
+  // نغيّر زر البوب-أب الواحد إلى زرين
+  modalBtn.style.display = 'none'; // نخفي الزر القديم
+
+  // نضيف زرين ديناميكياً
+  const btns = document.createElement('div');
+  btns.style.display = "flex";
+  btns.style.gap = "10px";
+  btns.style.marginTop = "12px";
+
+  const yesBtn = document.createElement('button');
+  yesBtn.textContent = "نعم — تسجيل إجهاض";
+  yesBtn.style.flex = "1";
+  yesBtn.style.padding = "10px";
+  yesBtn.style.borderRadius = "12px";
+  yesBtn.style.border = "0";
+  yesBtn.style.fontWeight = "700";
+  yesBtn.style.cursor = "pointer";
+  yesBtn.style.background = "#dc2626";
+  yesBtn.style.color = "#fff";
+
+  const noBtn = document.createElement('button');
+  noBtn.textContent = "لا — تعديل التاريخ";
+  noBtn.style.flex = "1";
+  noBtn.style.padding = "10px";
+  noBtn.style.borderRadius = "12px";
+  noBtn.style.border = "1px solid #ccc";
+  noBtn.style.fontWeight = "700";
+  noBtn.style.cursor = "pointer";
+  noBtn.style.background = "#fff";
+  noBtn.style.color = "#0f172a";
+
+  // تصرّف زرّ (نعم)
+  yesBtn.addEventListener('click', ()=>{
+    modalOverlay.style.display = 'none';
+    const url = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
+    location.href = url;
+  });
+
+  // تصرّف زرّ (لا)
+  noBtn.addEventListener('click', ()=>{
+    modalOverlay.style.display = 'none';
+    dateEl?.focus({preventScroll:true});
+    dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+
+  btns.appendChild(yesBtn);
+  btns.appendChild(noBtn);
+
+  // تنظيف popup القديم
+  const modal = document.getElementById('mbkModal');
+  modal.querySelectorAll('.dynamic-btns').forEach(el=>el.remove());
+  btns.classList.add('dynamic-btns');
+
+  modal.appendChild(btns);
+
+  // عرض البوب أب
+  modalOverlay.style.display = 'flex';
+}
+
 
     async function precheck(number){
       disableForm(true);
@@ -785,5 +827,6 @@
 
 </body>
 </html>
+
 
 
