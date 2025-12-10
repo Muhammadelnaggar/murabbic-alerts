@@ -317,11 +317,17 @@
     let modalCallback  = null;
 
     function showPopup(msg, ok=false, cb){
-      modalText.textContent = msg;
-      modalCallback = typeof cb === 'function' ? cb : null;
-      modalBtn.style.background = ok ? '#16a34a' : '#dc2626';
-      modalOverlay.style.display = 'flex';
-    }
+  // 🔁 تنظيف أي أزرار ديناميكية سابقة وإرجاع زر "حسناً"
+  const modal = document.getElementById('mbkModal');
+  modal.querySelectorAll('.dynamic-btns').forEach(el => el.remove());
+  modalBtn.style.display = 'block';
+
+  modalText.textContent = msg;
+  modalCallback = typeof cb === 'function' ? cb : null;
+  modalBtn.style.background = ok ? '#16a34a' : '#dc2626';
+  modalOverlay.style.display = 'flex';
+}
+
     modalBtn.addEventListener('click', ()=>{
       modalOverlay.style.display = 'none';
       if (modalCallback){ const fn = modalCallback; modalCallback=null; fn(); }
@@ -623,13 +629,19 @@
         return;
       }
 
-      const evISO = (dateEl?.value && dateEl.value.trim()) || todayISO();
-      const g = daysBetweenISO(lf, evISO);
-      if (!(g >= MIN_GD[sp])){
-        offerAbort(number, evISO, g, sp);
-        disableForm(false);
-        return;
-      }
+     const evISO = (dateEl?.value && dateEl.value.trim()) || todayISO();
+const g = daysBetweenISO(lf, evISO);
+if (!(g >= MIN_GD[sp])){
+  // نحط شريط رسالة أحمر ونمنع هذه المحاولة من الحفظ
+  info.className = 'infobar show error';
+  info.textContent =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).`;
+
+  offerAbort(number, evISO, g, sp);
+  disableForm(false);
+  return;
+}
+
 
       if (speciesEl)  speciesEl.value  = sp;
       if (animalIdEl) animalIdEl.value = a.id;
@@ -827,6 +839,7 @@
 
 </body>
 </html>
+
 
 
 
