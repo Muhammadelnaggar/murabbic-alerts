@@ -339,37 +339,51 @@
     const lastFertileEl = document.getElementById('lastFertile');
 
     /* مزامنة مجموعات العجول */
-    function syncCalfGroups(){
-      const isDead = (kindEl.value === 'نافقة');
-      const count = parseInt(
-        form.querySelector('input[name="calfCount"]:checked')?.value || '1',
-        10
-      );
+   function syncCalfGroups(){
+  const isDead = (kindEl.value === 'نافقة');
+  const count = parseInt(
+    form.querySelector('input[name="calfCount"]:checked')?.value || '1',
+    10
+  );
 
-      document.querySelectorAll('.live-only').forEach(el=>{
-        el.style.display = isDead ? 'none' : '';
-      });
+  document.querySelectorAll('.live-only').forEach(el=>{
+    el.style.display = isDead ? 'none' : '';
+  });
 
-      const calfId1 = document.getElementById('calfId');
-      const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
-      const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
-      const enableLive = !isDead;
+  const calfId1 = document.getElementById('calfId');
+  const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
+  const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
+  const enableLive = !isDead;
 
-      if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
-      calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-      calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-
-      [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
-        const group = document.getElementById(id);
-        const vis = enableLive && count >= idx;
-        if (group) group.style.display = vis ? '' : 'none';
-
-        const idEl   = document.getElementById(`calf${idx}Id`);
-        const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
-        if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
-        sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
-      });
+  // 🔹 إصلاح calfCount لما الولادة "نافقة"
+  const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
+  calfCountRadios.forEach((r, i)=>{
+    if (enableLive) {
+      // في الولادة الحية نخلي أول اختيار required (أو اللي تحب)
+      r.required = (i === 0);
+    } else {
+      // في الولادة النافقة نشيل الـ required ونفضي الاختيارات
+      r.required = false;
+      r.checked  = false;
     }
+  });
+
+  if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
+  calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+  calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+
+  [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
+    const group = document.getElementById(id);
+    const vis = enableLive && count >= idx;
+    if (group) group.style.display = vis ? '' : 'none';
+
+    const idEl   = document.getElementById(`calf${idx}Id`);
+    const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
+    if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
+    sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
+  });
+}
+
     kindEl?.addEventListener('change', syncCalfGroups);
     form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
     document.addEventListener('DOMContentLoaded', syncCalfGroups);
@@ -771,4 +785,5 @@
 
 </body>
 </html>
+
 
