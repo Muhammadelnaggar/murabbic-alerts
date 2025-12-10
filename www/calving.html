@@ -7,52 +7,155 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل حدث الولادة — مُرَبِّك</title>
   <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--muted:#64748b;--card:#ffffff}
+    :root{
+      --green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;
+      --muted:#64748b;--card:#ffffff
+    }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
-    body{margin:0;font-family:'Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e2e8f0;box-shadow:0 2px 4px rgba(0,0,0,.05)}
-    .bar{max-width:920px;margin:0 auto;padding:14px 18px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    body{
+      margin:0;
+      font-family:'Cairo',Tahoma,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    header{
+      position:sticky;top:0;z-index:10;
+      background:#fff;
+      border-bottom:1px solid #e2e8f0;
+      box-shadow:0 2px 4px rgba(0,0,0,.05)
+    }
+    .bar{
+      max-width:920px;margin:0 auto;
+      padding:14px 18px;
+      display:flex;gap:8px;
+      align-items:center;justify-content:space-between
+    }
     .title{font-weight:700;color:var(--green-600);font-size:18px}
-    main{max-width:920px;margin:20px auto;padding:16px;padding-bottom:110px}
-    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    main{
+      max-width:920px;
+      margin:20px auto;
+      padding:16px;
+      padding-bottom:110px
+    }
+    .card{
+      background:var(--card);
+      border:1px solid #e2e8f0;
+      border-radius:16px;
+      padding:20px;
+      box-shadow:0 2px 6px rgba(0,0,0,.05)
+    }
     .grid{display:grid;grid-template-columns:1fr;gap:16px}
     .row{display:grid;gap:14px;min-width:0}
     @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
-    label{font-weight:600;font-size:15px;color:#0f172a;display:block;margin-bottom:6px}
-    input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:16px}
-    .radio-group{display:flex;flex-wrap:wrap;gap:10px;padding:6px 0}
-    .radio-group label{font-weight:500;font-size:14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;cursor:pointer}
+    label{
+      font-weight:600;font-size:15px;
+      color:#0f172a;
+      display:block;margin-bottom:6px
+    }
+    input,select{
+      width:100%;padding:12px;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      background:#fff;font-size:16px
+    }
+    .radio-group{
+      display:flex;flex-wrap:wrap;
+      gap:10px;padding:6px 0
+    }
+    .radio-group label{
+      font-weight:500;font-size:14px;
+      background:#f1f5f9;
+      border:1px solid #cbd5e1;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer
+    }
     .radio-group input{margin-inline-start:6px}
-    .actions-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -2px 6px rgba(0,0,0,.08);display:flex;gap:10px;padding:12px;z-index:20}
-    .actions-bar button{flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:12px;cursor:pointer;border:0}
+    .actions-bar{
+      position:fixed;bottom:0;left:0;right:0;
+      background:#fff;
+      border-top:1px solid #e2e8f0;
+      box-shadow:0 -2px 6px rgba(0,0,0,.08);
+      display:flex;gap:10px;
+      padding:12px;z-index:20
+    }
+    .actions-bar button{
+      flex:1;padding:14px;
+      font-size:16px;font-weight:700;
+      border-radius:12px;cursor:pointer;border:0
+    }
     .actions-bar .save{background:var(--green);color:#fff}
     .actions-bar .ghost{background:#eef2f7;color:#0f172a}
-    .infobar{display:none;margin-top:14px;padding:12px;border-radius:10px;font-size:14px;font-weight:700;text-align:center;margin-inline:auto;max-width:560px}
+    .infobar{
+      display:none;margin-top:14px;padding:12px;
+      border-radius:10px;font-size:14px;font-weight:700;
+      text-align:center;margin-inline:auto;max-width:560px
+    }
     .infobar.show{display:block}
-    .infobar.error{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
-    .infobar:not(.error){background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46}
+    .infobar.error{
+      background:#fff7ed;border:1px solid #fed7aa;color:#9a3412
+    }
+    .infobar:not(.error){
+      background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46
+    }
+
+    /* Popup وسط الشاشة */
+    #mbkModalOverlay{
+      position:fixed;inset:0;
+      background:rgba(15,23,42,0.40);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    }
+    #mbkModal{
+      background:#ffffff;
+      border-radius:18px;
+      padding:18px 20px 16px;
+      max-width:320px;
+      width:90%;
+      text-align:center;
+      box-shadow:0 18px 40px rgba(0,0,0,.22);
+    }
+    #mbkModalText{
+      font-weight:700;
+      font-size:15px;
+      margin-bottom:14px;
+      line-height:1.6;
+    }
+    #mbkModalBtn{
+      margin-top:4px;
+      padding:10px 14px;
+      width:100%;
+      border-radius:999px;
+      border:0;
+      cursor:pointer;
+      background:#16a34a;
+      color:#fff;
+      font-weight:700;
+      font-size:15px;
+    }
   </style>
 </head>
 <body>
 
-  <!-- تتبع -->
+  <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
-  <!-- بوب-أب مركزي -->
-  <div id="mbkOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:9999;">
-    <div id="mbkPopup" style="background:#ffffff;border-radius:18px;padding:18px 20px;max-width:320px;width:90%;box-shadow:0 10px 25px rgba(15,23,42,.25);text-align:center;">
-      <div id="mbkPopupMsg" style="margin-bottom:14px;font-weight:700;font-size:16px;color:#b91c1c;line-height:1.5;"></div>
-      <button id="mbkPopupBtn" style="margin-top:4px;padding:10px 14px;border-radius:999px;border:0;background:#16a34a;color:#fff;font-weight:700;font-size:15px;cursor:pointer;min-width:120px;">
-        حسنًا
-      </button>
+  <!-- Popup -->
+  <div id="mbkModalOverlay">
+    <div id="mbkModal">
+      <div id="mbkModalText"></div>
+      <button id="mbkModalBtn" type="button">حسناً</button>
     </div>
   </div>
 
   <header>
     <div class="bar">
       <div class="title">تسجيل حدث الولادة</div>
-      <a class="ghost" href="add-event.html" style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
+      <a class="ghost" href="add-event.html"
+         style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
   </header>
 
@@ -66,7 +169,8 @@
       <div class="row">
         <div>
           <label>رقم الحيوان</label>
-          <input id="animalNumber" data-field="animalNumber" inputmode="numeric" placeholder="مثال: 1023" required />
+          <input id="animalNumber" data-field="animalNumber" inputmode="numeric"
+                 placeholder="مثال: 1023" required />
         </div>
         <div>
           <label>تاريخ الولادة</label>
@@ -177,11 +281,9 @@
   </div>
 
   <script src="/js/app-core.js"></script>
-  <script type="module" src="/js/firebase-config.js"></script>
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
 
   <script>
+    /* ملء الرقم والتاريخ من add-event */
     (function(){
       const qs = new URLSearchParams(location.search);
       const $  = (id)=> document.getElementById(id);
@@ -202,10 +304,28 @@
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
     import {
-      collection, addDoc, serverTimestamp, query, where, limit, getDocs, orderBy
+      collection, addDoc, serverTimestamp, query, where, limit,
+      getDocs, orderBy
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { updateAnimalByEvent } from '/js/animal-update.js';
+
+    /* ===== Popup helper ===== */
+    const modalOverlay = document.getElementById('mbkModalOverlay');
+    const modalText    = document.getElementById('mbkModalText');
+    const modalBtn     = document.getElementById('mbkModalBtn');
+    let modalCallback  = null;
+
+    function showPopup(msg, ok=false, cb){
+      modalText.textContent = msg;
+      modalCallback = typeof cb === 'function' ? cb : null;
+      modalBtn.style.background = ok ? '#16a34a' : '#dc2626';
+      modalOverlay.style.display = 'flex';
+    }
+    modalBtn.addEventListener('click', ()=>{
+      modalOverlay.style.display = 'none';
+      if (modalCallback){ const fn = modalCallback; modalCallback=null; fn(); }
+    });
 
     const form   = document.querySelector('#calving-form');
     const info   = document.getElementById('info');
@@ -214,26 +334,17 @@
     const kindEl = document.getElementById('calvingKind');
     const saveBtn= document.getElementById('saveBtn');
 
-    const animalIdEl    = document.getElementById('animalId');
-    const speciesEl     = document.getElementById('species');
+    const animalIdEl = document.getElementById('animalId');
+    const speciesEl  = document.getElementById('species');
     const lastFertileEl = document.getElementById('lastFertile');
 
-    /* ===== بوب-أب عام ===== */
-    function showPopup(msg, isErr = true){
-      const ov   = document.getElementById('mbkOverlay');
-      const msgEl= document.getElementById('mbkPopupMsg');
-      const btn  = document.getElementById('mbkPopupBtn');
-      if (!ov || !msgEl || !btn) return;
-      msgEl.textContent = msg;
-      msgEl.style.color = isErr ? '#b91c1c' : '#166534';
-      ov.style.display = 'flex';
-      btn.onclick = ()=>{ ov.style.display = 'none'; };
-    }
-
-    /* ===== ضبط مجموعات المواليد الحية/النافقة ===== */
+    /* مزامنة مجموعات العجول */
     function syncCalfGroups(){
       const isDead = (kindEl.value === 'نافقة');
-      const count = parseInt(form.querySelector('input[name="calfCount"]:checked')?.value || '1', 10);
+      const count = parseInt(
+        form.querySelector('input[name="calfCount"]:checked')?.value || '1',
+        10
+      );
 
       document.querySelectorAll('.live-only').forEach(el=>{
         el.style.display = isDead ? 'none' : '';
@@ -242,8 +353,8 @@
       const calfId1 = document.getElementById('calfId');
       const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
       const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
-
       const enableLive = !isDead;
+
       if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
       calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
       calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
@@ -263,64 +374,61 @@
     form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
     document.addEventListener('DOMContentLoaded', syncCalfGroups);
 
-    /* ===== أدوات مساعدة ===== */
-    async function existsCalvingSameDay(uid, number, dateISO){
-      const num = String(number || '').trim();
-      const q1 = query(
-        collection(db, 'events'),
-        where('userId', '==', uid),
-        where('animalNumber', '==', num),
-        where('eventType', '==', 'ولادة'),
-        where('eventDate', '==', dateISO),
-        limit(1)
-      );
-      const snap = await getDocs(q1);
-      return !snap.empty;
+    /* أدوات عامة */
+    function todayISO(){
+      const d=new Date(); d.setHours(0,0,0,0);
+      return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
     }
-
-    function show(msg, isErr=false){
-      info.textContent = msg;
-      info.className = 'infobar show' + (isErr ? ' error' : '');
-      showPopup(msg, isErr);
+    async function getUid(){
+      if (auth.currentUser) return auth.currentUser.uid;
+      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
+      return u?.uid || '';
     }
-
     function disableForm(disabled=true){
       form.querySelectorAll('input, select, button').forEach(el=>{
         if (el.id === 'toCardBtn') return;
         el.disabled = disabled;
       });
     }
+    const MIN_GD = { 'أبقار': 255, 'جاموس': 285 };
 
-    function todayISO(){
-      const d=new Date(); d.setHours(0,0,0,0);
-      return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    function normSpecies(data){
+      const s = String(
+        data.animalTypeAr || data.animalType || data.species || ''
+      ).trim();
+      if (s === 'cow' || /بقر/i.test(s))       return 'أبقار';
+      if (s === 'buffalo' || /جاموس/i.test(s)) return 'جاموس';
+      return s;
     }
-
-    async function getUid(){
-      if (auth.currentUser) return auth.currentUser.uid;
-      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
-      return u?.uid || '';
+    function daysBetweenISO(a,b){
+      const A = new Date(a), B = new Date(b);
+      if (isNaN(A) || isNaN(B)) return NaN;
+      A.setHours(0,0,0,0); B.setHours(0,0,0,0);
+      return Math.round((B - A)/86400000);
     }
+    function cmpISO(a,b){ return new Date(a) - new Date(b); }
 
+    /* قراءة رقم الحيوان من عدة حقول وبأنواع مختلفة */
     async function fetchAnimalDocByNumber(number){
       const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
                    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-      const raw = String(number || '').trim()
+      const raw = String(number || '')
+        .trim()
         .replace(/[^\d٠-٩۰-۹]/g,'')
         .replace(/[٠-٩۰-۹]/g, d=>map[d]);
       const asStr = raw;
       const asNum = raw ? Number(raw) : NaN;
 
       const tries = [
-        ['animalNumber', '==', asStr],
-        ['animalNumber', '==', asNum],
-        ['number',       '==', asStr],
-        ['number',       '==', asNum],
-        ['animalNo',     '==', asStr],
-        ['animalNo',     '==', asNum],
+        ['animalNumber','==',asStr],
+        ['animalNumber','==',asNum],
+        ['number','==',asStr],
+        ['number','==',asNum],
+        ['animalNo','==',asStr],
+        ['animalNo','==',asNum],
       ].filter(t => !(typeof t[2] === 'number' && Number.isNaN(t[2])));
 
-      for (const [field, op, val] of tries){
+      for (const [field,op,val] of tries){
         const q1 = query(collection(db,'animals'), where(field, op, val), limit(1));
         const snap = await getDocs(q1);
         if (!snap.empty){
@@ -330,24 +438,6 @@
       }
       return null;
     }
-
-    const MIN_GD = { 'أبقار': 255, 'جاموس': 285 };
-
-    function normSpecies(data){
-      const s = String(data.animalTypeAr || data.animalType || data.species || '').trim();
-      if (s === 'cow' || /بقر/i.test(s))       return 'أبقار';
-      if (s === 'buffalo' || /جاموس/i.test(s)) return 'جاموس';
-      return s;
-    }
-
-    function daysBetweenISO(a,b){
-      const A = new Date(a), B = new Date(b);
-      if (isNaN(A) || isNaN(B)) return NaN;
-      A.setHours(0,0,0,0); B.setHours(0,0,0,0);
-      return Math.round((B - A)/86400000);
-    }
-
-    function cmpISO(a, b){ return new Date(a) - new Date(b); }
 
     async function fetchSignalsFromEvents(number){
       const uid = await getUid();
@@ -377,16 +467,16 @@
           if (pregnant === null) pregnant = false;
           continue;
         }
-
         if (type === 'تشخيص حمل'){
-          if ((res === 'عشار' || res === 'حامل') && pregnant === null)     pregnant = true;
-          if ((res === 'فارغة' || res === 'غير حامل') && pregnant === null) pregnant = false;
+          const normRes = String(res).replace(/\s+/g,'').replace(/[ًٌٍَُِّْ]/g,'');
+          if (normRes.includes('عشار') && pregnant === null) pregnant = true;
+          if (normRes.includes('فارغه') || normRes.includes('فارغة')){
+            if (pregnant === null) pregnant = false;
+          }
         }
-
         if (!lastFertileDate && (type === 'تلقيح مخصب' || ev.fertile === true || res === 'مخصب')){
           lastFertileDate = dt;
         }
-
         if (pregnant !== null && lastFertileDate) break;
       }
 
@@ -394,68 +484,86 @@
     }
 
     function offerAbort(number, evISO, g, sp){
-      info.className = 'infobar show error';
-      info.innerHTML =
-        `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).<br>` +
-        `<div style="margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
-           <button id="goAbort"
-                   style="padding:10px 14px;border-radius:10px;border:0;background:#ef4444;color:#fff;font-weight:700;cursor:pointer">
-             تسجيل إجهاض الآن
-           </button>
-           <button id="editDate"
-                   style="padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">
-             تعديل تاريخ الولادة
-           </button>
-         </div>`;
-
-      showPopup('لا يمكن تسجيل الولادة (عمر الحمل أقل من الحد الأدنى).', true);
-
-      document.getElementById('goAbort')?.addEventListener('click', ()=>{
-        const url = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
-        location.href = url;
-      });
-
-      document.getElementById('editDate')?.addEventListener('click', ()=>{
-        dateEl?.focus({preventScroll:true});
-        dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
+      const msg =
+        `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).`;
+      showPopup(msg, false, ()=>{
+        // بعد إغلاق الرسالة، نعرض زرّين في الـ infobar كبديل (اختياري)
+        info.className = 'infobar show error';
+        info.innerHTML =
+          `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم وهو أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).<br>` +
+          `<div style="margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
+             <button id="goAbort"
+                     style="padding:8px 12px;border-radius:10px;border:0;background:#ef4444;color:#fff;font-weight:700;cursor:pointer">
+               تسجيل إجهاض الآن
+             </button>
+             <button id="editDate"
+                     style="padding:8px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">
+               تعديل تاريخ الولادة
+             </button>
+           </div>`;
+        document.getElementById('goAbort')?.addEventListener('click', ()=>{
+          const url = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
+          location.href = url;
+        });
+        document.getElementById('editDate')?.addEventListener('click', ()=>{
+          dateEl?.focus({preventScroll:true});
+          dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
+        });
       });
     }
 
     async function precheck(number){
       disableForm(true);
-      show('جارِ التحقق المبدئي من بيانات الحيوان…', false);
+      info.className = 'infobar show';
+      info.textContent = 'جارِ التحقق المبدئي من بيانات الحيوان…';
 
       const a = await fetchAnimalDocByNumber(number);
       if (!a){
-        show('رقم الحيوان غير موجود في قاعدة البيانات.', true);
+        info.className = 'infobar show error';
+        info.textContent = 'رقم الحيوان غير موجود في قاعدة البيانات.';
+        showPopup('لا يمكن متابعة التسجيل: رقم الحيوان غير موجود في قاعدة البيانات.', false);
         return;
       }
 
       const sp = normSpecies(a.data);
       if (!sp || !MIN_GD[sp]) {
-        show('نوع القطيع غير معروف/غير مدعوم لهذا الحيوان.', true);
+        info.className = 'infobar show error';
+        info.textContent = 'نوع القطيع غير معروف/غير مدعوم لهذا الحيوان.';
+        showPopup('نوع القطيع غير معروف أو غير مدعوم لهذا الحيوان.', false);
         return;
       }
 
       const rsDoc = a.data.reproductiveStatus || a.data.reproStatus || '';
+      const rsNorm = String(rsDoc)
+        .replace(/\s+/g,'')
+        .replace(/[ًٌٍَُِّْ]/g,''); // إزالة التشكيل
+      const isPregDoc = /عشار|حامل/i.test(rsNorm);
+
+      const { pregnant: pregEv, lastFertileDate: lfEv, lastBoundary } =
+        await fetchSignalsFromEvents(number);
+
+      const isPreg = (pregEv !== null) ? pregEv : isPregDoc;
+
       const lfDoc = a.data.lastInseminationDate || a.data.lastFertileInseminationDate || '';
-
-      const { pregnant: pregEv, lastFertileDate: lfEv, lastBoundary } = await fetchSignalsFromEvents(number);
-
-      const isPreg = (pregEv !== null) ? pregEv : (rsDoc === 'عشار');
-
       const lf = lfEv || lfDoc;
+
       if (!isPreg){
-        show('لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عِشار".', true);
+        info.className = 'infobar show error';
+        info.textContent = 'لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عشار".';
+        showPopup('لا يمكن تسجيل الولادة: الحالة التناسلية ليست "عشار".', false);
         return;
       }
       if (!lf){
-        show('لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".', true);
+        info.className = 'infobar show error';
+        info.textContent = 'لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".';
+        showPopup('لا يمكن تسجيل الولادة: لا يوجد تاريخ لآخر تلقيح مُخصِّب.', false);
         return;
       }
 
       if (lastBoundary && cmpISO(lastBoundary, lf) >= 0){
-        show(`لا يُسمح بتسجيل الولادة: آخر حدث (${lastBoundary}) يلغي أي حمل حالي.`, true);
+        info.className = 'infobar show error';
+        info.textContent = `لا يُسمح بتسجيل الولادة: آخر حدث (${lastBoundary}) يلغي أي حمل حالي.`;
+        showPopup('لا يمكن تسجيل الولادة: يوجد حدث ولادة/إجهاض أحدث من التلقيح المخصِّب.', false);
         return;
       }
 
@@ -463,7 +571,7 @@
       const g = daysBetweenISO(lf, evISO);
       if (!(g >= MIN_GD[sp])){
         offerAbort(number, evISO, g, sp);
-        disableForm(true);
+        disableForm(false);
         return;
       }
 
@@ -472,16 +580,16 @@
       if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
       if (dateEl && !dateEl.value) dateEl.value = evISO;
 
-      disableForm(false);
       info.className = 'infobar show';
       info.textContent = 'جاهز للتسجيل ✅';
-      showPopup('جاهز لتسجيل الولادة ✅', false);
+      disableForm(false);
     }
 
     function kickPrecheck(){
       const n = (numEl?.value||'').trim();
       if (!n){
-        show('أدخل رقم الحيوان أولًا.', true);
+        info.className = 'infobar show error';
+        info.textContent = 'أدخل رقم الحيوان أولًا.';
         disableForm(true);
         return;
       }
@@ -491,68 +599,57 @@
     info.setAttribute('role','status');
     info.setAttribute('aria-live','polite');
 
-    saveBtn?.addEventListener('click', ()=> show('جارِ التحقق...', false));
-
     onAuthStateChanged(auth, ()=> kickPrecheck());
     numEl?.addEventListener('change', kickPrecheck);
-    numEl?.addEventListener('blur',   kickPrecheck);
+    numEl?.addEventListener('blur', kickPrecheck);
 
-    /* ===== حفظ العجول في calves ===== */
-    async function saveCalves(payload){
-      const uid = payload.userId;
-      if (!uid) return;
-
-      const calvesCol = collection(db,'calves');
-      const count = Number(payload.calfCount || 1);
-
-      for (let i = 1; i <= count; i++){
-        const id  = payload[`calf${i}Id`]  || '';
-        const sex = payload[`calf${i}Sex`] || '';
-        if (!id || !sex) continue;
-
-        const calfPayload = {
-          userId: uid,
-          calfId: id,
-          sex: sex,
-          motherNumber: payload.animalNumber,
-          motherId: payload.animalId,
-          birthDate: payload.eventDate,
-          species: payload.species || '',
-          calfFate: payload.calfFate || '',
-          notes: payload.notes || '',
-          createdAt: serverTimestamp()
-        };
-
-        await addDoc(calvesCol, calfPayload);
-      }
+    /* منع تكرار ولادة لنفس اليوم */
+    async function existsCalvingSameDay(uid, number, dateISO){
+      const num = String(number || '').trim();
+      const q1 = query(
+        collection(db, 'events'),
+        where('userId', '==', uid),
+        where('animalNumber', '==', num),
+        where('eventType', '==', 'ولادة'),
+        where('eventDate', '==', dateISO),
+        limit(1)
+      );
+      const snap = await getDocs(q1);
+      return !snap.empty;
     }
 
-    /* ===== إرسال النموذج ===== */
+    /* إرسال النموذج: نطلق mbk:valid يدويًا بعد كل الفحوصات */
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
 
-      const uid = await getUid();
-      if (!uid){ show('سجّل الدخول أولًا.', true); return; }
+      const uid    = await getUid();
+      if (!uid){
+        showPopup('سجّل الدخول أولًا.', false);
+        return;
+      }
 
       const number = (numEl?.value || '').trim();
       const evISO  = (dateEl?.value || '').trim();
-      if (!number || !evISO){ show('رقم الحيوان وتاريخ الولادة مطلوبان.', true); return; }
+      if (!number || !evISO){
+        showPopup('رقم الحيوان وتاريخ الولادة مطلوبان.', false);
+        return;
+      }
 
       if (evISO > todayISO()){
-        show('تاريخ الولادة لا يمكن أن يكون في المستقبل.', true);
+        showPopup('تاريخ الولادة لا يمكن أن يكون في المستقبل.', false);
         return;
       }
 
       await precheck(number);
       if (info.classList.contains('error')) return;
 
-      if (!form.reportValidity()) {
-        show('أكمل الحقول المطلوبة.', true);
+      if (!form.reportValidity()){
+        showPopup('أكمل الحقول المطلوبة قبل حفظ الحدث.', false);
         return;
       }
 
       if (await existsCalvingSameDay(uid, number, evISO)){
-        show('منع: هناك ولادة مسجّلة لهذا الحيوان في نفس التاريخ.', true);
+        showPopup('لا يمكن تسجيل ولادة مكررة لنفس الحيوان في نفس التاريخ.', false);
         return;
       }
 
@@ -572,11 +669,11 @@
       document.dispatchEvent(new CustomEvent('mbk:valid', { detail:{ formData } }));
     });
 
+    /* الحفظ الفعلي للحدث + العجول */
     document.addEventListener('mbk:valid', async (e)=>{
       const { formData } = e.detail;
-
       const uid = await getUid();
-      if (!uid){ show('سجّل الدخول أولًا.', true); return; }
+      if (!uid){ showPopup('سجّل الدخول أولًا.', false); return; }
 
       const payload = {
         userId: uid,
@@ -603,21 +700,60 @@
       };
 
       try{
+        disableForm(true);
         await addDoc(collection(db, 'events'), payload);
-        await updateAnimalByEvent(payload);   // 🔁 تحديث وثيقة الحيوان
-        await saveCalves(payload);            // 🐄 حفظ العجول
+        await updateAnimalByEvent(payload);
 
-        show('تم حفظ الولادة ✅', false);
-        setTimeout(()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`, 600);
+        // تسجيل العجول في مجموعة calves
+        const damId     = payload.animalId;
+        const damNumber = payload.animalNumber;
+        const birthDate = payload.eventDate;
+        const species   = payload.species;
+
+        const calvesToSave = [];
+        const count = parseInt(payload.calfCount || '1',10) || 1;
+
+        const pushCalf = (idx, calfIdField, calfSexField)=>{
+          const id  = (formData[calfIdField] || '').trim();
+          const sex = (formData[calfSexField] || '').trim();
+          if (!id || !sex) return;
+          calvesToSave.push({
+            userId: uid,
+            damId,
+            damNumber,
+            birthDate,
+            calfNumber: id,
+            sex,
+            species,
+            createdAt: serverTimestamp()
+          });
+        };
+
+        pushCalf(1,'calfId','calf1Sex');
+        if (count >= 2) pushCalf(2,'calf2Id','calf2Sex');
+        if (count >= 3) pushCalf(3,'calf3Id','calf3Sex');
+
+        for (const calf of calvesToSave){
+          await addDoc(collection(db,'calves'), calf);
+        }
+
+        showPopup('تم حفظ الولادة وتسجيل العجول بنجاح ✅', true, ()=>{
+          location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`;
+        });
+
       }catch(err){
         console.error(err);
-        show('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', true);
+        disableForm(false);
+        showPopup('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', false);
       }
     });
 
     document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
       const num = (numEl?.value || '').trim();
-      if (!num){ show('أدخل رقم الحيوان أولًا.', true); return; }
+      if (!num){
+        showPopup('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', false);
+        return;
+      }
       location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
     });
   </script>
