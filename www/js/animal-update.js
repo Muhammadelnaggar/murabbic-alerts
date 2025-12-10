@@ -110,7 +110,7 @@ export async function updateAnimalByEvent(ev) {
     // ============================================================
     if (type === "calving") {
       upd.lastCalvingDate    = date;
-      upd.reproductiveStatus = "ولادة";   // ✅ التصحيح هنا
+      upd.reproductiveStatus = "حديث الولادة";
       upd.productionStatus   = "fresh";
       upd.daysInMilk         = 0;
       if (ev.lactationNumber != null) {
