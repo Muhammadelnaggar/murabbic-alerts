@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
 </head>
-<body>
+
+<body data-page="heat">
   <header class="mbk-header">تسجيل شياع</header>
 
   <main class="mbk-form">
@@ -19,6 +20,12 @@
     <label>تاريخ الشياع</label>
     <input id="eventDate" type="date" />
 
+    <label>الحالة التناسلية الحالية</label>
+    <input id="reproStatus" readonly />
+
+    <label>أيام الحليب (DIM)</label>
+    <input id="daysInMilk" readonly />
+
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
 
@@ -28,16 +35,21 @@
   <script type="module">
     import { db, auth, ensureAuth } from "/js/firebase-config.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      collection, addDoc, serverTimestamp,
+      getDocs, query, where, limit
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
     const info = $("info");
-    const btn = $("saveBtn");
+    const btn  = $("saveBtn");
 
     function msg(t, ok=false){
       info.className = "infobar " + (ok ? "ok" : "err");
       info.textContent = t;
     }
+
+    btn.disabled = true;
 
     const p = new URLSearchParams(location.search);
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
@@ -46,11 +58,67 @@
     $("animalNumber").value = num;
     $("eventDate").value = dt;
 
+    let _animal = null;
+
+    async function loadAnimal(){
+      if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); btn.disabled = true; return false; }
+
+      try{
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) { msg("⚠️ لم يتم تسجيل الدخول.", false); btn.disabled = true; return false; }
+
+        const animalsRef = collection(db, "animals");
+
+        // 1) number (string)
+        let aSnap = await getDocs(query(
+          animalsRef,
+          where("userId", "==", uid),
+          where("number", "==", String(num)),
+          limit(1)
+        ));
+
+        // 2) animalNumber (number)
+        if (aSnap.empty) {
+          aSnap = await getDocs(query(
+            animalsRef,
+            where("userId", "==", uid),
+            where("animalNumber", "==", Number(num)),
+            limit(1)
+          ));
+        }
+
+        if (aSnap.empty){
+          msg("⚠️ الحيوان غير موجود.", false);
+          btn.disabled = true;
+          return false;
+        }
+
+        _animal = aSnap.docs[0].data();
+
+        $("reproStatus").value = (_animal.reproductiveStatus || "").toString().trim();
+        $("daysInMilk").value  = (_animal.daysInMilk != null) ? String(_animal.daysInMilk) : "";
+
+        msg("✅ تم تحميل بيانات الحيوان.", true);
+        btn.disabled = false;
+        return true;
+
+      }catch(e){
+        console.error(e);
+        msg("⚠️ خطأ أثناء تحميل بيانات الحيوان.", false);
+        btn.disabled = true;
+        return false;
+      }
+    }
+
+    await loadAnimal();
+
     btn.onclick = async () => {
       try {
         await ensureAuth();
         const uid = auth.currentUser?.uid;
         if (!uid) throw new Error("NO_AUTH");
+        if (!num) throw new Error("NO_NUMBER");
 
         const eventDate = $("eventDate").value || dt;
 
@@ -72,6 +140,7 @@
         msg("تم تسجيل الشياع بنجاح ✅", true);
         localStorage.setItem("lastAnimalNumber", String(num));
         localStorage.setItem("lastEventDate", eventDate);
+
         setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
 
       } catch (e) {
