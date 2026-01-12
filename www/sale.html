@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="sale">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل بيع — مُرَبِّك</title>
+  <link rel="stylesheet" href="css/forms.css" />
+  <script type="module" src="js/forms-init.js"></script>
+</head>
+<body>
+  <header class="mbk-header">تسجيل بيع</header>
+
+  <main class="mbk-form">
+    <div id="info" class="infobar"></div>
+
+    <label>رقم الحيوان</label>
+    <input id="animalNumber" readonly />
+
+    <label>تاريخ البيع</label>
+    <input id="eventDate" type="date" />
+
+    <label>سعر البيع (اختياري)</label>
+    <input id="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
+
+    <label>ملاحظات</label>
+    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+
+    <button id="saveBtn" data-validate="true">حفظ البيع ✅</button>
+  </main>
+
+  <script type="module">
+    import { db, auth, ensureAuth } from "/js/firebase-config.js";
+    import { updateAnimalByEvent } from "/js/animal-update.js";
+    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const info = $("info");
+    const btn = $("saveBtn");
+
+    function msg(t, ok=false){
+      info.className = "infobar " + (ok ? "ok" : "err");
+      info.textContent = t;
+    }
+
+    const p = new URLSearchParams(location.search);
+    const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
+    const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+
+    $("animalNumber").value = num;
+    $("eventDate").value = dt;
+
+    btn.onclick = async () => {
+      try {
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error("NO_AUTH");
+
+        const eventDate = $("eventDate").value || dt;
+
+        const payload = {
+          animalNumber: String(num),
+          animalId: String(num),
+          type: "بيع",
+          eventType: "بيع",
+          eventDate,
+          price: Number($("price").value) || null,
+          notes: ($("notes").value || "").trim(),
+          userId: uid,
+          source: "/sale.html",
+          createdAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "events"), payload);
+        await updateAnimalByEvent(payload);
+
+        msg("تم تسجيل البيع بنجاح ✅", true);
+        localStorage.setItem("lastAnimalNumber", String(num));
+        localStorage.setItem("lastEventDate", eventDate);
+        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
+
+      } catch (e) {
+        console.error(e);
+        msg("❌ فشل في الحفظ.", false);
+      }
+    };
+  </script>
+</body>
+</html>
