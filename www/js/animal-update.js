@@ -157,10 +157,19 @@ export async function updateAnimalByEvent(ev) {
     // ============================================================
     // 🟩 ABORTION — إجهاض
     // ============================================================
-    if (type === "abortion") {
-      upd.lastAbortionDate   = date;
-      upd.reproductiveStatus = "فارغ";
-    }
+   if (type === "abortion") {
+  upd.lastAbortionDate = date;
+
+  const m = Number(ev.abortionAgeMonths);
+  if (Number.isFinite(m)) {
+    upd.reproductiveStatus = (m < 5) ? "مفتوحة" : "حديث الولادة";
+    upd.productionStatus   = (m < 5) ? upd.productionStatus : "fresh";
+  } else {
+    // لو العمر مش متاح: نخليها "مفتوحة" كـ safe default
+    upd.reproductiveStatus = "مفتوحة";
+  }
+}
+
 
     // ============================================================
     // ❌ لا نحدّث الوثيقة لهذه الأحداث:
