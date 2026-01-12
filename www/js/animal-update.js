@@ -157,15 +157,14 @@ export async function updateAnimalByEvent(ev) {
     // ============================================================
     // 🟩 ABORTION — إجهاض
     // ============================================================
-   if (type === "abortion") {
+ if (type === "abortion") {
   upd.lastAbortionDate = date;
 
   const m = Number(ev.abortionAgeMonths);
   if (Number.isFinite(m)) {
     upd.reproductiveStatus = (m < 5) ? "مفتوحة" : "حديث الولادة";
-    upd.productionStatus   = (m < 5) ? upd.productionStatus : "fresh";
+    if (m >= 5) upd.productionStatus = "fresh";
   } else {
-    // لو العمر مش متاح: نخليها "مفتوحة" كـ safe default
     upd.reproductiveStatus = "مفتوحة";
   }
 }
@@ -199,17 +198,18 @@ export async function updateAnimalByEvent(ev) {
       )
     );
 
-    if (snap.empty) {
-      // محاولة ثانية على animalNumber احتياطيًا
-      snap = await getDocs(
-        query(
-          animalsRef,
-          where("userId", "==", tenant),
-          where("animalNumber", "==", String(num)),
-          limit(5)
-        )
-      );
-    }
+   if (snap.empty) {
+  // محاولة ثانية على animalNumber (رقمي)
+  snap = await getDocs(
+    query(
+      animalsRef,
+      where("userId", "==", tenant),
+      where("animalNumber", "==", Number(num)),
+      limit(5)
+    )
+  );
+}
+
 
     if (snap.empty) {
       console.warn("⛔ animal not found for update:", { tenant, num, ev });
