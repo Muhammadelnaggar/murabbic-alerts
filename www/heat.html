@@ -8,146 +8,135 @@
   <script type="module" src="js/forms-init.js"></script>
 </head>
 
-<body data-page="heat">
-  <header class="mbk-header">تسجيل شياع</header>
+<body>
+  <header class="mbk-header">
+    تسجيل شياع
+  </header>
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
 
+    <!-- رقم الحيوان -->
     <label>رقم الحيوان</label>
     <input id="animalNumber" readonly />
 
+    <!-- تاريخ الشياع -->
     <label>تاريخ الشياع</label>
     <input id="eventDate" type="date" />
 
+    <!-- الحالة التناسلية (تلقائي) -->
     <label>الحالة التناسلية الحالية</label>
     <input id="reproStatus" readonly />
 
+    <!-- DIM (تلقائي) -->
     <label>أيام الحليب (DIM)</label>
-    <input id="daysInMilk" readonly />
+    <input id="dim" readonly />
 
+    <!-- ملاحظات -->
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
 
     <button id="saveBtn" data-validate="true">حفظ الشياع ✅</button>
   </main>
 
-  <script type="module">
-    import { db, auth, ensureAuth } from "/js/firebase-config.js";
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    import {
-      collection, addDoc, serverTimestamp,
-      getDocs, query, where, limit
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script type="module">
+  import { db, auth, ensureAuth } from "/js/firebase-config.js";
+  import { updateAnimalByEvent } from "/js/animal-update.js";
+  import {
+    collection, addDoc, serverTimestamp,
+    query, where, limit, getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const $ = (id) => document.getElementById(id);
-    const info = $("info");
-    const btn  = $("saveBtn");
+  const $ = id => document.getElementById(id);
+  const info = $("info");
+  const btn  = $("saveBtn");
 
-    function msg(t, ok=false){
-      info.className = "infobar " + (ok ? "ok" : "err");
-      info.textContent = t;
+  const p = new URLSearchParams(location.search);
+  const num = p.get("number") || localStorage.getItem("lastAnimalNumber") || "";
+  const dt  = p.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+
+  $("animalNumber").value = num;
+  $("eventDate").value    = dt;
+
+  function msg(t, ok=false){
+    info.className = "infobar " + (ok ? "ok" : "err");
+    info.textContent = t;
+  }
+
+  // تحميل بيانات الحيوان (حالة تناسلية + DIM)
+  async function loadAnimalMeta(){
+    await ensureAuth();
+    const uid = auth.currentUser?.uid;
+    if (!uid || !num) return;
+
+    let snap = await getDocs(query(
+      collection(db,"animals"),
+      where("userId","==",uid),
+      where("number","==",String(num)),
+      limit(1)
+    ));
+
+    if (snap.empty){
+      snap = await getDocs(query(
+        collection(db,"animals"),
+        where("userId","==",uid),
+        where("animalNumber","==",Number(num)),
+        limit(1)
+      ));
     }
 
-    btn.disabled = true;
+    if (snap.empty) return;
 
-    const p = new URLSearchParams(location.search);
-    const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
-    const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+    const a = snap.docs[0].data();
 
-    $("animalNumber").value = num;
-    $("eventDate").value = dt;
-
-    let _animal = null;
-
-    async function loadAnimal(){
-      if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); btn.disabled = true; return false; }
-
-      try{
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) { msg("⚠️ لم يتم تسجيل الدخول.", false); btn.disabled = true; return false; }
-
-        const animalsRef = collection(db, "animals");
-
-        // 1) number (string)
-        let aSnap = await getDocs(query(
-          animalsRef,
-          where("userId", "==", uid),
-          where("number", "==", String(num)),
-          limit(1)
-        ));
-
-        // 2) animalNumber (number)
-        if (aSnap.empty) {
-          aSnap = await getDocs(query(
-            animalsRef,
-            where("userId", "==", uid),
-            where("animalNumber", "==", Number(num)),
-            limit(1)
-          ));
-        }
-
-        if (aSnap.empty){
-          msg("⚠️ الحيوان غير موجود.", false);
-          btn.disabled = true;
-          return false;
-        }
-
-        _animal = aSnap.docs[0].data();
-
-        $("reproStatus").value = (_animal.reproductiveStatus || "").toString().trim();
-        $("daysInMilk").value  = (_animal.daysInMilk != null) ? String(_animal.daysInMilk) : "";
-
-        msg("✅ تم تحميل بيانات الحيوان.", true);
-        btn.disabled = false;
-        return true;
-
-      }catch(e){
-        console.error(e);
-        msg("⚠️ خطأ أثناء تحميل بيانات الحيوان.", false);
-        btn.disabled = true;
-        return false;
-      }
+    $("reproStatus").value = a.reproductiveStatus || "";
+    if (a.lastCalvingDate){
+      const d1 = new Date(a.lastCalvingDate);
+      const d2 = new Date($("eventDate").value || dt);
+      const dim = Math.max(0, Math.floor((d2 - d1)/(1000*60*60*24)));
+      $("dim").value = dim;
+    } else {
+      $("dim").value = "";
     }
+  }
 
-    await loadAnimal();
+  await loadAnimalMeta();
+  $("eventDate").addEventListener("change", loadAnimalMeta);
 
-    btn.onclick = async () => {
-      try {
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) throw new Error("NO_AUTH");
-        if (!num) throw new Error("NO_NUMBER");
+  // حفظ
+  btn.onclick = async () => {
+    try {
+      await ensureAuth();
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error("NO_AUTH");
 
-        const eventDate = $("eventDate").value || dt;
+      const eventDate = $("eventDate").value || dt;
 
-        const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
-          type: "شياع",
-          eventType: "شياع",
-          eventDate,
-          notes: ($("notes").value || "").trim(),
-          userId: uid,
-          source: "/heat.html",
-          createdAt: serverTimestamp()
-        };
+      const payload = {
+        animalNumber: String(num),
+        animalId: String(num),
+        type: "شياع",
+        eventType: "شياع",
+        eventDate,
+        notes: ($("notes").value || "").trim(),
+        userId: uid,
+        source: "/heat.html",
+        createdAt: serverTimestamp()
+      };
 
-        await addDoc(collection(db, "events"), payload);
-        await updateAnimalByEvent(payload);
+      await addDoc(collection(db,"events"), payload);
+      await updateAnimalByEvent(payload);
 
-        msg("تم تسجيل الشياع بنجاح ✅", true);
-        localStorage.setItem("lastAnimalNumber", String(num));
-        localStorage.setItem("lastEventDate", eventDate);
+      msg("تم تسجيل الشياع بنجاح ✅", true);
+      localStorage.setItem("lastAnimalNumber", String(num));
+      localStorage.setItem("lastEventDate", eventDate);
 
-        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
-
-      } catch (e) {
-        console.error(e);
-        msg("❌ فشل في الحفظ.", false);
-      }
-    };
-  </script>
+      setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
+    } catch(e){
+      console.error(e);
+      msg("❌ فشل في الحفظ.", false);
+    }
+  };
+</script>
 </body>
 </html>
