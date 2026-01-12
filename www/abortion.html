@@ -82,6 +82,28 @@
     $("eventDate").value    = dt;
 
     function msg(t, ok=false){ info.className = "infobar " + (ok ? "ok" : "err"); info.textContent = t; }
+    let _animal = null;
+
+function calcAgeAndCause(){
+  if (!_animal) return;
+
+  const eventDate = $("eventDate").value || dt;
+
+  // آخر تلقيح من وثيقة الحيوان (موجود عندك)
+  const lastInsem = (_animal.lastInseminationDate || "").toString().slice(0,10);
+  if (!lastInsem) { $("abortionAge").value=""; $("probableCause").value=""; return; }
+
+  const d1 = new Date(lastInsem);
+  const d2 = new Date(eventDate);
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) { $("abortionAge").value=""; $("probableCause").value=""; return; }
+
+  const months = ((d2 - d1) / (1000*60*60*24*30.44));
+  const m = Math.max(0, months);
+
+  $("abortionAge").value = m.toFixed(1);
+  $("probableCause").value = (m >= 6) ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
+}
+
 
     // ✅ بوابة التحقق: الشرط الوحيد = عِشار
    async function checkAnimal() {
@@ -126,6 +148,9 @@
     }
 
     const animal = aSnap.docs[0].data();
+    _animal = animal;
+calcAgeAndCause();
+
     const status = (animal.reproductiveStatus || "").trim(); // عندك = "عشار"
 
     if (status !== "عشار") {
@@ -147,6 +172,7 @@
 }
 
     await checkAnimal(); // تشغيل البوابة مرة واحدة عند الفتح
+$("eventDate").addEventListener("change", calcAgeAndCause);
 
     // الحفظ
  btn.onclick = async () => {
