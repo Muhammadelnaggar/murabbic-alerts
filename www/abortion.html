@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<script type="module" src="/js/animal-update.js"></script>
+
 
 
   <title>تسجيل إجهاض — مُرَبِّك</title>
@@ -51,7 +51,8 @@
 
   <script type="module">
     // نفس النمط الذي يعمل لديك
-    import { db, auth } from '/js/firebase-config.js';
+  import { db, auth, ensureAuth } from '/js/firebase-config.js';
+
     import {
   collection,
   addDoc,
@@ -65,7 +66,8 @@
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-     
+   import { updateAnimalByEvent } from "/js/animal-update.js";
+  
 
     const $ = id => document.getElementById(id);
     const info = $("info");
@@ -82,166 +84,109 @@
     function msg(t, ok=false){ info.className = "infobar " + (ok ? "ok" : "err"); info.textContent = t; }
 
     // ✅ بوابة التحقق: الشرط الوحيد = عِشار
-    async function checkAnimal() {
-      if (!num) {
-        msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
-        btn.disabled = true;
-        return false;
-      }
-
-      try {
-        // جلب الحيوان
-        let aSnap = await getDocs(query(collection(db, "animals"), where("animalNumber","==",num), limit(1)));
-        if (aSnap.empty)
-          aSnap = await getDocs(query(collection(db, "animals"), where("number","==",num), limit(1)));
-
-        if (aSnap.empty) {
-          msg("⚠️ الحيوان غير موجود.", false);
-          btn.disabled = true;
-          return false;
-        }
-
-        const animal = aSnap.docs[0].data();
-       const status = (animal.reproductiveStatus || "").trim();
-
-        const isPregnant = status === "عِشار";
-
-        if (!isPregnant) {
-          msg("❌ لا يمكن تسجيل إجهاض لحيوان غير عِشار.", false);
-          btn.disabled = true;
-          return false;
-        }
-
-        // الحالة صحيحة
-        msg("✅ تم التحقق: الحيوان عِشار، يمكن تسجيل الإجهاض.", true);
-        btn.disabled = false;
-
-        // حساب عمر الحمل من آخر تلقيح (اختياري)
-      const qInsem = query(
-  collection(db,"events"),
-  where("animalNumber","==",num),
-  where("type","==","insemination"),
-  orderBy("eventDate","desc"),
-  limit(1)
-);
-
-        const insemSnap = await getDocs(qInsem);
-
-       let lastInsem = null;
-
-// من الأحداث
-if (!insemSnap.empty) {
-  const d = insemSnap.docs[0].data()?.eventDate;
-  if (d?.toDate) {
-    lastInsem = d.toDate().toISOString().slice(0, 10);
-  } else if (typeof d === "string") {
-    lastInsem = d.slice(0, 10);
+   async function checkAnimal() {
+  if (!num) {
+    msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
+    btn.disabled = true;
+    return false;
   }
-}
 
-// fallback من وثيقة الحيوان
-if (!lastInsem && animal.lastInseminationDate) {
-  const d = animal.lastInseminationDate;
-  if (d?.toDate) {
-    lastInsem = d.toDate().toISOString().slice(0, 10);
-  } else {
-    lastInsem = String(d).slice(0, 10);
-  }
-}
+  try {
+    await ensureAuth();
 
-
-        const d1 = lastInsem ? new Date(lastInsem) : null;
-        const d2 = new Date(dt);
-
-        if (!d1 || isNaN(d1.getTime())) {
-          $("abortionAge").value = "";
-          $("probableCause").value = "";
-          return true;
-        }
-
-        const months = ((d2 - d1) / (1000*60*60*24*30.44)).toFixed(1);
-        $("abortionAge").value = months;
-        $("probableCause").value = months >= 6 ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
-        msg(`✅ تم التحقق: عمر الحمل ${months} شهر.`, true);
-        return true;
-
-      } catch (err) {
-        console.error(err);
-        msg("⚠️ خطأ أثناء التحقق.", false);
-        btn.disabled = true;
-        return false;
-      }
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      msg("⚠️ لم يتم تسجيل الدخول.", false);
+      btn.disabled = true;
+      return false;
     }
+
+    // ✅ نبحث أولاً بالحقل number (نصي)
+    let aSnap = await getDocs(query(
+      collection(db, "animals"),
+      where("userId", "==", uid),
+      where("number", "==", String(num)),
+      limit(1)
+    ));
+
+    // ✅ لو لم نجد، نبحث بالحقل animalNumber (رقمي)
+    if (aSnap.empty) {
+      aSnap = await getDocs(query(
+        collection(db, "animals"),
+        where("userId", "==", uid),
+        where("animalNumber", "==", Number(num)),
+        limit(1)
+      ));
+    }
+
+    if (aSnap.empty) {
+      msg("⚠️ الحيوان غير موجود.", false);
+      btn.disabled = true;
+      return false;
+    }
+
+    const animal = aSnap.docs[0].data();
+    const status = (animal.reproductiveStatus || "").trim(); // عندك = "عشار"
+
+    if (status !== "عشار") {
+      msg("❌ لا يمكن تسجيل إجهاض لحيوان غير عشار.", false);
+      btn.disabled = true;
+      return false;
+    }
+
+    msg("✅ تم التحقق: الحيوان عشار، يمكن تسجيل الإجهاض.", true);
+    btn.disabled = false;
+    return true;
+
+  } catch (err) {
+    console.error(err);
+    msg("⚠️ خطأ أثناء التحقق.", false);
+    btn.disabled = true;
+    return false;
+  }
+}
 
     await checkAnimal(); // تشغيل البوابة مرة واحدة عند الفتح
 
     // الحفظ
-    btn.onclick = async ()=> {
-      try{const payload = {
-  animalNumber: num,
-  animalId: num,
-  eventType: "إجهاض",
-  type: "abortion",
-  eventDate: dt,
-  abortionAgeMonths: parseFloat($("abortionAge").value) || null,
-  probableCause: $("probableCause").value || "",
-  notes: $("notes").value || "",
-  userId: auth.currentUser?.uid || null,
-  createdAt: serverTimestamp()
-};
+ btn.onclick = async () => {
+  try {
+    await ensureAuth();
 
-// حفظ الحدث
-await addDoc(collection(db,"events"), payload);
+    const eventDate = $("eventDate").value || dt;
 
-// تحديث وثيقة الحيوان
-if (typeof window.updateAnimalByEvent === "function") {
-  await window.updateAnimalByEvent(payload);
-}
-// تحديث وثيقة الحيوان
-let aSnap2 = await getDocs(
-  query(
-    collection(db, "animals"),
-    where("animalNumber", "==", Number(num)),
-    limit(1)
-  )
-);
-
-if (aSnap2.empty) {
-  aSnap2 = await getDocs(
-    query(
-      collection(db, "animals"),
-      where("number", "==", String(num)),
-      limit(1)
-    )
-  );
-}
-
-if (!aSnap2.empty) {
-  const animalDocId = aSnap2.docs[0].id;
-  const animalRef   = doc(db, "animals", animalDocId);
-
-  await updateDoc(animalRef, {
-    reproductiveStatus: "فارغة",
-    lastAbortionDate: dt,
-    lastAbortion: { date: dt }
-  });
-}
-
-
-// رسالة ناجحة
-msg("تم تسجيل الإجهاض بنجاح", true);
-
-// حفظ السياق
-localStorage.setItem("lastAnimalNumber", num);
-localStorage.setItem("lastEventDate", dt);
-
-setTimeout(()=>location.href=`cow-card.html?number=${num}`, 1200);
-
-      }catch(err){
-        console.error(err);
-        msg("❌ فشل في الحفظ.", false);
-      }
+    const payload = {
+      animalNumber: String(num),
+      animalId: String(num),
+      type: "إجهاض",
+      eventType: "إجهاض",
+      eventDate,
+      abortionAgeMonths: parseFloat($("abortionAge").value) || null,
+      probableCause: $("probableCause").value || "",
+      notes: $("notes").value || "",
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp()
     };
+
+    await addDoc(collection(db, "events"), payload);
+
+    // ✅ تحديث وثيقة الحيوان عبر الملف المركزي فقط
+    await updateAnimalByEvent(payload);
+
+    msg("تم تسجيل الإجهاض بنجاح", true);
+
+    localStorage.setItem("lastAnimalNumber", String(num));
+    localStorage.setItem("lastEventDate", eventDate);
+
+    setTimeout(() => {
+      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+    }, 1200);
+
+  } catch (err) {
+    console.error(err);
+    msg("❌ فشل في الحفظ.", false);
+  }
+};
 
     // تتبّع موحّد
     window.dataLayer = window.dataLayer || [];
