@@ -211,3 +211,7 @@ body{
 .mbk-form button:active{ transform: translateY(1px); }
 .mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
 
+input[type="date"]{
+  direction: ltr;
+  text-align: right;
+}
