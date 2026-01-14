@@ -128,11 +128,18 @@ export async function updateAnimalByEvent(ev) {
 
     // ============================================================
     // 🟩 HEAT — شياع
-    // ============================================================
-    if (type === "heat") {
-      upd.lastHeatDate       = date;
-      upd.reproductiveStatus = "شياع";
-    }
+    // ===== HEAT (شياع) =====
+if (type === "شياع" || type === "heat") {
+  // دايمًا نسجل آخر شياع كتاريخ (معلومة مفيدة)
+  upd.lastHeatDate = date;
+
+  // لا نغيّر الحالة التناسلية إلا لو كانت "عشار"
+  const current = String(a.reproductiveStatus || a.reproStatus || "").trim();
+  if (current === "عشار") {
+    upd.reproductiveStatus = "مفتوحة";
+  }
+}
+
 
     // ============================================================
     // 🟩 INSEMINATION — تلقيح
