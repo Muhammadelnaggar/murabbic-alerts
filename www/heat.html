@@ -4,139 +4,177 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل شياع — مُرَبِّك</title>
+
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
 </head>
 
-<body>
+<body data-page="heat">
+  <!-- نفس هيدر مربيك (زي الولادة): عنوان + رجوع -->
   <header class="mbk-header">
-    تسجيل شياع
+    <a class="mbk-back" href="add-event.html">عودة للأحداث</a>
+    <div class="mbk-title">تسجيل شياع</div>
   </header>
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
 
-    <!-- رقم الحيوان -->
     <label>رقم الحيوان</label>
     <input id="animalNumber" readonly />
 
-    <!-- تاريخ الشياع -->
     <label>تاريخ الشياع</label>
     <input id="eventDate" type="date" />
 
-    <!-- الحالة التناسلية (تلقائي) -->
     <label>الحالة التناسلية الحالية</label>
     <input id="reproStatus" readonly />
 
-    <!-- DIM (تلقائي) -->
     <label>أيام الحليب (DIM)</label>
     <input id="dim" readonly />
 
-    <!-- ملاحظات -->
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
 
     <button id="saveBtn" data-validate="true">حفظ الشياع ✅</button>
   </main>
 
-<script type="module">
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import { updateAnimalByEvent } from "/js/animal-update.js";
-  import {
-    collection, addDoc, serverTimestamp,
-    query, where, limit, getDocs
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script type="module">
+    import { db, auth, ensureAuth } from "/js/firebase-config.js";
+    import { updateAnimalByEvent } from "/js/animal-update.js";
+    import {
+      collection, addDoc, serverTimestamp,
+      getDocs, query, where, limit
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const $ = id => document.getElementById(id);
-  const info = $("info");
-  const btn  = $("saveBtn");
+    const $ = (id) => document.getElementById(id);
+    const info = $("info");
+    const btn  = $("saveBtn");
 
-  const p = new URLSearchParams(location.search);
-  const num = p.get("number") || localStorage.getItem("lastAnimalNumber") || "";
-  const dt  = p.get("date") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
-
-  $("animalNumber").value = num;
-  $("eventDate").value    = dt;
-
-  function msg(t, ok=false){
-    info.className = "infobar " + (ok ? "ok" : "err");
-    info.textContent = t;
-  }
-
-  // تحميل بيانات الحيوان (حالة تناسلية + DIM)
-  async function loadAnimalMeta(){
-    await ensureAuth();
-    const uid = auth.currentUser?.uid;
-    if (!uid || !num) return;
-
-    let snap = await getDocs(query(
-      collection(db,"animals"),
-      where("userId","==",uid),
-      where("number","==",String(num)),
-      limit(1)
-    ));
-
-    if (snap.empty){
-      snap = await getDocs(query(
-        collection(db,"animals"),
-        where("userId","==",uid),
-        where("animalNumber","==",Number(num)),
-        limit(1)
-      ));
+    function msg(t, ok=false){
+      info.className = "infobar " + (ok ? "ok" : "err");
+      info.textContent = t;
     }
 
-    if (snap.empty) return;
+    const p = new URLSearchParams(location.search);
+    const num = (p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "").toString().trim();
+    const dt  = (p.get("date")   || p.get("eventDate")    || localStorage.getItem("lastEventDate")   || new Date().toISOString().slice(0,10)).toString().slice(0,10);
 
-    const a = snap.docs[0].data();
+    $("animalNumber").value = num;
+    $("eventDate").value = dt;
 
-    $("reproStatus").value = a.reproductiveStatus || "";
-    if (a.lastCalvingDate){
-      const d1 = new Date(a.lastCalvingDate);
-      const d2 = new Date($("eventDate").value || dt);
-      const dim = Math.max(0, Math.floor((d2 - d1)/(1000*60*60*24)));
-      $("dim").value = dim;
-    } else {
-      $("dim").value = "";
+    let _animal = null;
+
+    function toDate(s){
+      const d = new Date(String(s || "").slice(0,10));
+      return isNaN(d.getTime()) ? null : d;
     }
-  }
 
-  await loadAnimalMeta();
-  $("eventDate").addEventListener("change", loadAnimalMeta);
+    function calcDIM(){
+      if (!_animal) { $("dim").value = ""; return; }
 
-  // حفظ
-  btn.onclick = async () => {
-    try {
-      await ensureAuth();
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("NO_AUTH");
+      const calv = toDate(_animal.lastCalvingDate);
+      const evd  = toDate($("eventDate").value || dt);
 
-      const eventDate = $("eventDate").value || dt;
+      if (!calv || !evd) { $("dim").value = ""; return; }
 
-      const payload = {
-        animalNumber: String(num),
-        animalId: String(num),
-        type: "شياع",
-        eventType: "شياع",
-        eventDate,
-        notes: ($("notes").value || "").trim(),
-        userId: uid,
-        source: "/heat.html",
-        createdAt: serverTimestamp()
-      };
-
-      await addDoc(collection(db,"events"), payload);
-      await updateAnimalByEvent(payload);
-
-      msg("تم تسجيل الشياع بنجاح ✅", true);
-      localStorage.setItem("lastAnimalNumber", String(num));
-      localStorage.setItem("lastEventDate", eventDate);
-
-      setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
-    } catch(e){
-      console.error(e);
-      msg("❌ فشل في الحفظ.", false);
+      const days = Math.floor((evd - calv) / (1000*60*60*24));
+      $("dim").value = String(Math.max(0, days));
     }
-  };
-</script>
+
+    async function loadAnimalAndFill(){
+      if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+
+      try{
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) { msg("⚠️ لم يتم تسجيل الدخول.", false); return; }
+
+        const animalsRef = collection(db, "animals");
+
+        let snap = await getDocs(query(
+          animalsRef,
+          where("userId", "==", uid),
+          where("number", "==", String(num)),
+          limit(1)
+        ));
+
+        if (snap.empty) {
+          snap = await getDocs(query(
+            animalsRef,
+            where("userId", "==", uid),
+            where("animalNumber", "==", Number(num)),
+            limit(1)
+          ));
+        }
+
+        if (snap.empty) {
+          msg("⚠️ الحيوان غير موجود.", false);
+          return;
+        }
+
+        _animal = snap.docs[0].data() || {};
+        $("reproStatus").value = (_animal.reproductiveStatus || "").toString().trim();
+        calcDIM();
+
+        msg("✅ تم تحميل بيانات الحيوان.", true);
+
+      }catch(e){
+        console.error(e);
+        msg("⚠️ تعذّر تحميل بيانات الحيوان.", false);
+      }
+    }
+
+    await loadAnimalAndFill();
+    $("eventDate").addEventListener("change", () => {
+      calcDIM();
+    });
+
+    btn.onclick = async () => {
+      try {
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error("NO_AUTH");
+
+        const eventDate = ($("eventDate").value || dt).slice(0,10);
+
+        const payload = {
+          animalNumber: String(num),
+          animalId: String(num),
+          type: "شياع",
+          eventType: "شياع",
+          eventDate,
+          notes: ($("notes").value || "").trim(),
+          // snapshot مفيد للتقارير
+          reproductiveStatusSnapshot: ($("reproStatus").value || "").trim(),
+          dimAtEvent: Number($("dim").value) || null,
+          userId: uid,
+          source: "/heat.html",
+          createdAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "events"), payload);
+
+        // تحديث وثيقة الحيوان (reproductiveStatus = "شياع" + lastHeatDate) من animal-update.js
+        await updateAnimalByEvent(payload);
+
+        msg("تم تسجيل الشياع بنجاح ✅", true);
+
+        localStorage.setItem("lastAnimalNumber", String(num));
+        localStorage.setItem("lastEventDate", eventDate);
+
+        setTimeout(() => {
+          location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+        }, 900);
+
+      } catch (e) {
+        console.error(e);
+        msg("❌ فشل في الحفظ.", false);
+      }
+    };
+
+    // تتبّع
+    window.dataLayer = window.dataLayer || [];
+    const t = window.t || { event:(n,d)=>window.dataLayer.push({event:n, ...d}) };
+    t.event("page_view", { page: "heat", title: "تسجيل شياع" });
+  </script>
 </body>
 </html>
