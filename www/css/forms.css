@@ -111,4 +111,103 @@ html, body {
   margin: 12px auto 0;
   display: block;
 }
+/* ===============================
+   Murabbik – Canonical Form UI
+   (ضعه آخر forms.css)
+   =============================== */
+
+body{
+  margin:0;
+  background:#f7faf7;
+  color:var(--ink);
+  font-family: system-ui, "Cairo", "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.mbk-header{
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  padding: 10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.mbk-title{
+  font-weight:800;
+  color:var(--brand-600);
+  font-size:18px;
+  line-height:1.2;
+  text-align:center;
+  flex:1;
+}
+
+.mbk-back{
+  color:var(--brand-600);
+  text-decoration:none;
+  font-weight:700;
+  font-size:14px;
+  white-space:nowrap;
+}
+
+.mbk-form{
+  width:100%;
+  max-width:520px;
+  margin: 12px auto 24px;
+  padding: 0 12px;
+}
+
+.mbk-card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding: 14px;
+  box-shadow: 0 1px 0 rgba(15,23,42,.04);
+  margin-bottom: 12px;
+}
+
+.mbk-form label{
+  display:block;
+  margin: 10px 0 6px;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.infobar{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:14px;
+  padding:10px 12px;
+  margin: 10px 0 12px;
+  font-weight:700;
+  color: var(--muted);
+}
+.infobar.ok{
+  border-color:#bbf7d0;
+  background:#ecfdf5;
+  color:#065f46;
+}
+.infobar.err{
+  border-color:#fed7aa;
+  background:#fff7ed;
+  color:#9a3412;
+}
+
+.mbk-form button{
+  width:100%;
+  border:0;
+  border-radius:14px;
+  padding:12px 14px;
+  background: var(--brand);
+  color:#fff;
+  font-weight: 800;
+  font-size:16px;
+  cursor:pointer;
+}
+.mbk-form button:active{ transform: translateY(1px); }
+.mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
 
