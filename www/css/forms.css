@@ -215,3 +215,15 @@ input[type="date"]{
   direction: ltr;
   text-align: right;
 }
+.mbk-form{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mbk-card,
+.mbk-form button,
+.infobar{
+  width: 100%;
+  max-width: 520px;
+}
