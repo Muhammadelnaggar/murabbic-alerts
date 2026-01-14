@@ -6,34 +6,45 @@
   <title>تسجيل شياع — مُرَبِّك</title>
 
   <link rel="stylesheet" href="css/forms.css" />
+
+  <!-- Tracking (مرة واحدة فقط) -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="/js/app-core.js"></script>
+
+  <!-- Validation / Forms init -->
   <script type="module" src="js/forms-init.js"></script>
 </head>
 
 <body data-page="heat">
-  <!-- نفس هيدر مربيك (زي الولادة): عنوان + رجوع -->
+  <!-- نفس هيدر مربيك -->
   <header class="mbk-header">
-    <a class="mbk-back" href="add-event.html">عودة للأحداث</a>
+    <a class="mbk-back" href="dashboard.html">الداشبورد</a>
     <div class="mbk-title">تسجيل شياع</div>
+    <a class="mbk-back" href="add-event.html">الأحداث</a>
   </header>
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
 
-    <label>رقم الحيوان</label>
-    <input id="animalNumber" readonly />
+    <!-- نفس “الكارت” الأساسي بتاع صفحات مربيك -->
+    <section class="mbk-card">
+      <label>رقم الحيوان</label>
+      <input id="animalNumber" readonly />
 
-    <label>تاريخ الشياع</label>
-    <input id="eventDate" type="date" />
+      <label>تاريخ الشياع</label>
+      <input id="eventDate" type="date" />
 
-    <label>الحالة التناسلية الحالية</label>
-    <input id="reproStatus" readonly />
+      <label>الحالة التناسلية الحالية</label>
+      <input id="reproStatus" readonly />
 
-    <label>أيام الحليب (DIM)</label>
-    <input id="dim" readonly />
+      <label>أيام الحليب (DIM)</label>
+      <input id="dim" readonly />
 
-    <label>ملاحظات</label>
-    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+      <label>ملاحظات</label>
+      <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+    </section>
 
+    <!-- زر بنفس نمط مربيك (forms.css بيظبطه) -->
     <button id="saveBtn" data-validate="true">حفظ الشياع ✅</button>
   </main>
 
@@ -70,12 +81,9 @@
 
     function calcDIM(){
       if (!_animal) { $("dim").value = ""; return; }
-
       const calv = toDate(_animal.lastCalvingDate);
       const evd  = toDate($("eventDate").value || dt);
-
       if (!calv || !evd) { $("dim").value = ""; return; }
-
       const days = Math.floor((evd - calv) / (1000*60*60*24));
       $("dim").value = String(Math.max(0, days));
     }
@@ -90,6 +98,7 @@
 
         const animalsRef = collection(db, "animals");
 
+        // محاولة 1: number كنص
         let snap = await getDocs(query(
           animalsRef,
           where("userId", "==", uid),
@@ -97,6 +106,7 @@
           limit(1)
         ));
 
+        // محاولة 2: animalNumber كرقم
         if (snap.empty) {
           snap = await getDocs(query(
             animalsRef,
@@ -114,7 +124,6 @@
         _animal = snap.docs[0].data() || {};
         $("reproStatus").value = (_animal.reproductiveStatus || "").toString().trim();
         calcDIM();
-
         msg("✅ تم تحميل بيانات الحيوان.", true);
 
       }catch(e){
@@ -124,9 +133,7 @@
     }
 
     await loadAnimalAndFill();
-    $("eventDate").addEventListener("change", () => {
-      calcDIM();
-    });
+    $("eventDate").addEventListener("change", calcDIM);
 
     btn.onclick = async () => {
       try {
@@ -143,7 +150,6 @@
           eventType: "شياع",
           eventDate,
           notes: ($("notes").value || "").trim(),
-          // snapshot مفيد للتقارير
           reproductiveStatusSnapshot: ($("reproStatus").value || "").trim(),
           dimAtEvent: Number($("dim").value) || null,
           userId: uid,
@@ -153,7 +159,7 @@
 
         await addDoc(collection(db, "events"), payload);
 
-        // تحديث وثيقة الحيوان (reproductiveStatus = "شياع" + lastHeatDate) من animal-update.js
+        // تحديث وثيقة الحيوان من ملفك المركزي
         await updateAnimalByEvent(payload);
 
         msg("تم تسجيل الشياع بنجاح ✅", true);
@@ -171,8 +177,7 @@
       }
     };
 
-    // تتبّع
-    window.dataLayer = window.dataLayer || [];
+    // تتبع (بدون تعريف dataLayer هنا)
     const t = window.t || { event:(n,d)=>window.dataLayer.push({event:n, ...d}) };
     t.event("page_view", { page: "heat", title: "تسجيل شياع" });
   </script>
