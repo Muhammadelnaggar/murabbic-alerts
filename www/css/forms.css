@@ -12,69 +12,17 @@
   --error-br: #fecaca;
 }
 
-/* حاوية الحقل (اختياري لترك مسافات ثابتة) */
-.field{ margin-bottom: 12px; }
-
-/* الحقول الأساسية */
-input, select, textarea{
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font: inherit;
-  background: #fff;
-  color: var(--ink);
-}
-
-/* تلميح تحت الحقل */
-.field-msg{
-  color: var(--error);
-  font-size: 12px;
-  line-height: 1.4;
-  margin-top: 4px;
-  display: block;
-}
-
-/* تمييز الحقل غير الصحيح */
-.invalid{
-  border-color: var(--error-br) !important;
-  background: var(--error-bg);
-}
-
-/* تركيز الحقل غير الصحيح */
-.invalid:focus{
-  outline: 2px solid var(--error);
-  outline-offset: 2px;
-}
-
-/* لاصقة “مطلوب” (اختياري) */
-label .req::after{
-  content: " *";
-  color: var(--error);
-  font-weight: 700;
-}
-
-/* Placeholder أفتح شوية */
-::placeholder{ color: #94a3b8; }
-
-/* دعم RTL/LTR بدون كسر */
-html[dir="rtl"] .field { text-align: right; }
-html[dir="ltr"] .field { text-align: left; }
-
-/* داكن (اختياري لو عندك dark class على body) */
-.dark input,.dark select,.dark textarea{
-  background:#0b0f14;color:#e5eef5;border-color:#22303c;
-}
-.dark .field-msg{ color:#ffb4b4; }
-.dark .invalid{ background:#381a1f;border-color:#ff8b8b; }
-.dark .invalid:focus{ outline-color:#ff8b8b; }
 /* ===============================
-   Murabbik – Global Form Layout
-   قاعدة موحدة لكل فورمات مربيك
+   Global box sizing (يمنع القص/البروز)
    =============================== */
+*, *::before, *::after{
+  box-sizing: border-box;
+}
 
-/* الصفحة كلها */
-html, body {
+/* ===============================
+   Base Page
+   =============================== */
+html, body{
   width: 100%;
   max-width: 100%;
   margin: 0;
@@ -82,48 +30,19 @@ html, body {
   overflow-x: hidden;
 }
 
-/* الهيدر */
-.mbk-header {
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-}
-
-/* الحاوية الأساسية للفورم */
-.mbk-form {
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-  padding-inline: 12px; /* مسافة مريحة للموبايل */
-}
-
-/* الكارت الأبيض */
-.mbk-card {
-  width: 100%;
-  max-width: 520px;   /* عرض مربيك القياسي */
-  margin: 0 auto 16px;
-}
-
-/* زر الحفظ */
-.mbk-form button {
-  width: 100%;
-  max-width: 520px;
-  margin: 12px auto 0;
-  display: block;
-}
-/* ===============================
-   Murabbik – Canonical Form UI
-   (ضعه آخر forms.css)
-   =============================== */
-
 body{
-  margin:0;
   background:#f7faf7;
   color:var(--ink);
   font-family: system-ui, "Cairo", "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
+/* ===============================
+   Header (Murabbik)
+   =============================== */
 .mbk-header{
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -153,23 +72,41 @@ body{
   white-space:nowrap;
 }
 
+/* ===============================
+   Form Layout (Canonical)
+   =============================== */
 .mbk-form{
   width:100%;
   max-width:520px;
   margin: 12px auto 24px;
   padding: 0 12px;
+
+  display:flex;
+  flex-direction: column;
+  align-items: stretch; /* مهم: يمنع الزحلقة/القص */
 }
 
 .mbk-card{
+  width:100%;
+  max-width:520px;
+  margin: 0 auto 12px;
+
   background:#fff;
   border:1px solid var(--border);
   border-radius:16px;
   padding: 14px;
   box-shadow: 0 1px 0 rgba(15,23,42,.04);
-  margin-bottom: 12px;
+
+  overflow: hidden; /* مهم: يمنع بروز الحقول خارج الكارت */
 }
 
-.mbk-form label{
+/* ===============================
+   Fields
+   =============================== */
+.field{ margin-bottom: 12px; }
+
+.mbk-form label,
+label{
   display:block;
   margin: 10px 0 6px;
   color: var(--ink);
@@ -177,15 +114,77 @@ body{
   font-size: 14px;
 }
 
+/* الحقول الأساسية */
+input, select, textarea{
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+
+/* Placeholder أفتح شوية */
+::placeholder{ color: #94a3b8; }
+
+/* دعم RTL/LTR بدون كسر */
+html[dir="rtl"] .field { text-align: right; }
+html[dir="ltr"] .field { text-align: left; }
+
+/* ===============================
+   Date input (RTL safe)
+   =============================== */
+html[dir="rtl"] input[type="date"]{
+  direction: ltr !important;
+  text-align: left !important;
+  padding-right: 44px !important; /* مساحة أيقونة التقويم */
+}
+
+/* ===============================
+   Validation
+   =============================== */
+.field-msg{
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+  display: block;
+}
+
+.invalid{
+  border-color: var(--error-br) !important;
+  background: var(--error-bg);
+}
+
+.invalid:focus{
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+label .req::after{
+  content: " *";
+  color: var(--error);
+  font-weight: 700;
+}
+
+/* ===============================
+   Infobar
+   =============================== */
 .infobar{
+  width:100%;
+  max-width:520px;
+  margin: 10px auto 12px;
+
   border:1px solid var(--border);
   background:#fff;
   border-radius:14px;
   padding:10px 12px;
-  margin: 10px 0 12px;
   font-weight:700;
   color: var(--muted);
 }
+
 .infobar.ok{
   border-color:#bbf7d0;
   background:#ecfdf5;
@@ -197,8 +196,15 @@ body{
   color:#9a3412;
 }
 
+/* ===============================
+   Button
+   =============================== */
 .mbk-form button{
   width:100%;
+  max-width:520px;
+  margin: 12px auto 0;
+  display:block;
+
   border:0;
   border-radius:14px;
   padding:12px 14px;
@@ -208,25 +214,21 @@ body{
   font-size:16px;
   cursor:pointer;
 }
+
 .mbk-form button:active{ transform: translateY(1px); }
 .mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
 
-input[type="date"]{
-  direction: ltr;
-  text-align: right;
+/* ===============================
+   Dark mode (اختياري)
+   =============================== */
+.dark input,.dark select,.dark textarea{
+  background:#0b0f14;color:#e5eef5;border-color:#22303c;
 }
-.mbk-form{
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.dark .field-msg{ color:#ffb4b4; }
+.dark .invalid{ background:#381a1f;border-color:#ff8b8b; }
+.dark .invalid:focus{ outline-color:#ff8b8b; }
+.dark .infobar{
+  background:#0b0f14;
+  border-color:#22303c;
+  color:#cbd5e1;
 }
-
-.mbk-card,
-.mbk-form button,
-.infobar{
-  width: 100%;
-  max-width: 520px;
-}
-/* Fix: prevent left clipping on small screens */
-.mbk-form, .mbk-card { box-sizing: border-box; }
-.mbk-form { max-width: 520px; width: 100%; padding: 0 12px; margin: 12px auto 24px; }
