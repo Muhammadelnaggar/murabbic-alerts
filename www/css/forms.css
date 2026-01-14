@@ -227,3 +227,6 @@ input[type="date"]{
   width: 100%;
   max-width: 520px;
 }
+/* Fix: prevent left clipping on small screens */
+.mbk-form, .mbk-card { box-sizing: border-box; }
+.mbk-form { max-width: 520px; width: 100%; padding: 0 12px; margin: 12px auto 24px; }
