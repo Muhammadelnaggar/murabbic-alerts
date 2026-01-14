@@ -68,3 +68,47 @@ html[dir="ltr"] .field { text-align: left; }
 .dark .field-msg{ color:#ffb4b4; }
 .dark .invalid{ background:#381a1f;border-color:#ff8b8b; }
 .dark .invalid:focus{ outline-color:#ff8b8b; }
+/* ===============================
+   Murabbik – Global Form Layout
+   قاعدة موحدة لكل فورمات مربيك
+   =============================== */
+
+/* الصفحة كلها */
+html, body {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* الهيدر */
+.mbk-header {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* الحاوية الأساسية للفورم */
+.mbk-form {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-inline: 12px; /* مسافة مريحة للموبايل */
+}
+
+/* الكارت الأبيض */
+.mbk-card {
+  width: 100%;
+  max-width: 520px;   /* عرض مربيك القياسي */
+  margin: 0 auto 16px;
+}
+
+/* زر الحفظ */
+.mbk-form button {
+  width: 100%;
+  max-width: 520px;
+  margin: 12px auto 0;
+  display: block;
+}
+
