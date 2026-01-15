@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="fix-status">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تهيئة حالة الحيوانات — مُرَبِّك</title>
+  <link rel="stylesheet" href="css/forms.css" />
+  <script type="module" src="js/forms-init.js"></script>
+</head>
+<body>
+  <header class="mbk-header">
+    <a class="mbk-back" href="dashboard.html">عودة</a>
+    <div class="mbk-title">تهيئة status للحيوانات</div>
+  </header>
+
+  <main class="mbk-form">
+    <div id="info" class="infobar"></div>
+
+    <section class="mbk-card">
+      <p style="margin:0;color:#64748b;font-weight:700">
+        هذه العملية تُضاف مرة واحدة: أي حيوان لا يحتوي على <b>status</b> سيتم تعيينه تلقائيًا:
+        <br>• <b>active</b> للحيوانات العادية
+        <br>• <b>inactive</b> إذا كان عليه علامات نفوق/أرشفة
+      </p>
+    </section>
+
+    <button id="runBtn">تشغيل التهيئة الآن ✅</button>
+  </main>
+
+  <script type="module">
+    import { db, auth, ensureAuth } from "/js/firebase-config.js";
+    import {
+      collection, query, where, orderBy, limit, startAfter, getDocs,
+      writeBatch, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const $ = (id) => document.getElementById(id);
+    const info = $("info");
+    const btn  = $("runBtn");
+
+    function msg(t, ok=false){
+      info.className = "infobar " + (ok ? "ok" : "err");
+      info.textContent = t;
+    }
+
+    function decideStatus(a){
+      // لو عليه علامات نفوق/أرشفة -> inactive
+      const isDead = (a.status === "نافق") || !!a.deathDate || (a.archived === true);
+      if (isDead) {
+        return {
+          status: "inactive",
+          inactiveReason: "death",
+          inactiveDate: String(a.deathDate || "").slice(0,10) || null
+        };
+      }
+      // غير كده -> active
+      return { status: "active" };
+    }
+
+    btn.onclick = async () => {
+      try {
+        btn.disabled = true;
+        msg("جاري التشغيل…", true);
+
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error("NO_AUTH");
+
+        const animalsRef = collection(db, "animals");
+
+        let last = null;
+        let scanned = 0, updated = 0;
+
+        while (true) {
+          let qy = query(
+            animalsRef,
+            where("userId", "==", uid),
+            orderBy("number"),
+            limit(400)
+          );
+          if (last) qy = query(qy, startAfter(last));
+
+          const snap = await getDocs(qy);
+          if (snap.empty) break;
+
+          const batch = writeBatch(db);
+
+          snap.docs.forEach((d) => {
+            scanned++;
+            const a = d.data() || {};
+
+            // فقط اللي ناقصه status
+            if (a.status == null || String(a.status).trim() === "") {
+              const patch = decideStatus(a);
+              batch.set(d.ref, {
+                ...patch,
+                statusUpdatedAt: serverTimestamp()
+              }, { merge: true });
+              updated++;
+            }
+          });
+
+          await batch.commit();
+          last = snap.docs[snap.docs.length - 1];
+
+          if (snap.size < 400) break;
+        }
+
+        msg(`تمت التهيئة ✅ (تم فحص ${scanned} حيوان — تم تحديث ${updated} حيوان)`, true);
+
+      } catch (e) {
+        console.error(e);
+        msg("❌ فشل التشغيل. تأكد من تسجيل الدخول وصلاحيات Firestore Rules.", false);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
