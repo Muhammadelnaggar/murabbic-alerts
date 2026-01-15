@@ -53,107 +53,119 @@
     <button id="saveBtn" data-validate="true">حفظ النفوق ✅</button>
   </main>
 
- <script type="module">
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-    collection, addDoc, serverTimestamp,
-    doc, updateDoc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script type="module">
+    import { db, auth, ensureAuth } from "/js/firebase-config.js";
+    import {
+      collection, addDoc, serverTimestamp,
+      doc, updateDoc, getDocs, query, where, limit
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const $ = (id) => document.getElementById(id);
-  const info = $("info");
-  const btn  = $("saveBtn");
+    const $ = (id) => document.getElementById(id);
+    const info = $("info");
+    const btn  = $("saveBtn");
 
-  function msg(t, ok=false){
-    info.className = "infobar " + (ok ? "ok" : "err");
-    info.textContent = t;
-  }
+    function msg(t, ok=false){
+      info.className = "infobar " + (ok ? "ok" : "err");
+      info.textContent = t;
+    }
 
-  const p = new URLSearchParams(location.search);
-  const num = (p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "").toString().trim();
-  const dt  = (p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10)).toString().slice(0,10);
+    // --- قراءة الكونتكست (يدعم كل المفاتيح الشائعة) ---
+    const p = new URLSearchParams(location.search);
+    const num = (
+      p.get("number") ||
+      p.get("animalNumber") ||
+      p.get("animalId") ||
+      p.get("id") ||
+      localStorage.getItem("lastAnimalNumber") ||
+      localStorage.getItem("lastAnimalId") ||
+      localStorage.getItem("currentAnimalNumber") ||
+      ""
+    ).toString().trim();
 
-  $("animalNumber").value = num;
-  $("eventDate").value = dt;
+    const dt = (
+      p.get("date") ||
+      p.get("eventDate") ||
+      localStorage.getItem("lastEventDate") ||
+      new Date().toISOString().slice(0,10)
+    ).toString().slice(0,10);
 
-  // قائمة الأسباب (لو عندك select)
-  function getReason(){
-    const sel = document.getElementById("reasonSelect");
-    if (sel){
-      const v = (sel.value || "").trim();
-      if (v === "أخرى"){
-        return (document.getElementById("reasonOther")?.value || "").trim();
-      }
+    $("animalNumber").value = num;
+    $("eventDate").value = dt;
+
+    // --- أخرى ---
+    const reasonSelect = $("reasonSelect");
+    const otherWrap = $("otherWrap");
+    reasonSelect.addEventListener("change", () => {
+      otherWrap.style.display = (reasonSelect.value === "أخرى") ? "block" : "none";
+    });
+
+    function getReason(){
+      const v = (reasonSelect.value || "").trim();
+      if (v === "أخرى") return ($("reasonOther").value || "").trim();
       return v;
     }
-    // fallback لو لسه input
-    return ($("reason")?.value || "").trim();
-  }
 
-  btn.onclick = async () => {
-    try {
-      await ensureAuth();
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("NO_AUTH");
-      if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+    btn.onclick = async () => {
+      try {
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error("NO_AUTH");
+        if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
 
-      const eventDate = ($("eventDate").value || dt).slice(0,10);
-      const reason = getReason();
+        const eventDate = ($("eventDate").value || dt).slice(0,10);
+        const reason = getReason();
 
-      // 1) سجل حدث النفوق
-      const payload = {
-        animalNumber: String(num),
-        animalId: String(num),
-        type: "نفوق",
-        eventType: "نفوق",
-        eventDate,
-        reason,
-        notes: ($("notes").value || "").trim(),
-        userId: uid,
-        source: "/death.html",
-        createdAt: serverTimestamp()
-      };
+        // 1) سجل حدث النفوق
+        const payload = {
+          animalNumber: String(num),
+          animalId: String(num),
+          type: "نفوق",
+          eventType: "نفوق",
+          eventDate,
+          reason,
+          notes: ($("notes").value || "").trim(),
+          userId: uid,
+          source: "/death.html",
+          createdAt: serverTimestamp()
+        };
 
-      await addDoc(collection(db, "events"), payload);
+        await addDoc(collection(db, "events"), payload);
 
-      // 2) حدّث الحيوان (داخل animals) — بدون أرشيف منفصل
-      // ملاحظة مهمة: هذا السطر يفترض أن الـ Document ID = رقم الحيوان
-      import {
-  collection, query, where, limit, getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // 2) تحديث الحيوان: archived + status=نافق (بـ docId الحقيقي)
+        const snap = await getDocs(query(
+          collection(db, "animals"),
+          where("userId", "==", uid),
+          where("number", "==", String(num)),
+          limit(1)
+        ));
 
-const animalsRef = collection(db, "animals");
-const snap = await getDocs(query(
-  animalsRef,
-  where("userId", "==", uid),
-  where("number", "==", String(num)),
-  limit(1)
-));
+        if (snap.empty) {
+          msg("❌ الحيوان غير موجود في الحيوانات.", false);
+          return;
+        }
 
-if (snap.empty) {
-  msg("❌ الحيوان غير موجود.", false);
-  return;
-}
+        const animalRef = snap.docs[0].ref;
 
-const animalDoc = snap.docs[0];
-await updateDoc(animalDoc.ref, {
-  archived: true,
-  status: "نافق",
-  deathDate: eventDate,
-  deathReason: reason || null,
-  updatedAt: serverTimestamp()
-});
+        await updateDoc(animalRef, {
+          archived: true,
+          status: "نافق",
+          deathDate: eventDate,
+          deathReason: reason || null,
+          updatedAt: serverTimestamp()
+        });
 
+        msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
 
-      msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
-      localStorage.setItem("lastAnimalNumber", String(num));
-      localStorage.setItem("lastEventDate", eventDate);
+        localStorage.setItem("lastAnimalNumber", String(num));
+        localStorage.setItem("lastEventDate", eventDate);
 
-      setTimeout(()=>location.href="dashboard.html", 900);
+        setTimeout(()=>location.href="dashboard.html", 900);
 
-    } catch (e) {
-      console.error(e);
-      msg("❌ فشل في الحفظ.", false);
-    }
-  };
-</script>
+      } catch (e) {
+        console.error(e);
+        msg("❌ فشل في الحفظ.", false);
+      }
+    };
+  </script>
+</body>
+</html>
