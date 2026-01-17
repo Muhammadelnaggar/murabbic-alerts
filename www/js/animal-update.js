@@ -91,6 +91,11 @@ export async function updateAnimalByEvent(ev) {
       case "إجهاض":
         type = "abortion";
         break;
+     // استبعاد
+case "cull":
+case "استبعاد":
+  type = "استبعاد";
+  break;
 
       default:
         type = rawType; // احتياطي لو فيه أنواع تانية
@@ -126,18 +131,10 @@ export async function updateAnimalByEvent(ev) {
       upd.reproductiveStatus = "تحضير ولادة";
     }
 
-    // ============================================================
-    // 🟩 HEAT — شياع
-    // ===== HEAT (شياع) =====
-if (type === "شياع" || type === "heat") {
-  // دايمًا نسجل آخر شياع كتاريخ (معلومة مفيدة)
+  // 🟩 HEAT — شياع (حدث فقط)
+if (type === "heat") {
   upd.lastHeatDate = date;
-
-  // لا نغيّر الحالة التناسلية إلا لو كانت "عشار"
-  const current = String(a.reproductiveStatus || a.reproStatus || "").trim();
-  if (current === "عشار") {
-    upd.reproductiveStatus = "مفتوحة";
-  }
+  // لا نغيّر reproductiveStatus هنا
 }
 
 
@@ -174,6 +171,13 @@ if (type === "شياع" || type === "heat") {
   } else {
     upd.reproductiveStatus = "مفتوحة";
   }
+}
+// 🟩 CULL — استبعاد (يظل نشط + منع تلقيح)
+if (type === "استبعاد") {
+  upd.reproductiveStatus = "لا تُلقّح مرة أخرى";
+  upd.breedingBlocked = true;
+  upd.breedingBlockReason = "استبعاد";
+  upd.breedingBlockDate = date;
 }
 
 
