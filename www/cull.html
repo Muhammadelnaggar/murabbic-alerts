@@ -19,8 +19,18 @@
     <label>تاريخ الاستبعاد</label>
     <input id="eventDate" type="date" />
 
-    <label>سبب الاستبعاد</label>
-    <input id="reason" placeholder="مثال: ضعف إنتاج / عرج مزمن / التهاب ضرع..." />
+    <label>سبب الاستبعاد (رئيسي)</label>
+    <select id="cullMain" required>
+      <option value="">— اختر —</option>
+      <option value="انتاجي">إنتاجي</option>
+      <option value="تناسلي">تناسلي</option>
+      <option value="صحي">صحي</option>
+    </select>
+
+    <label>تفصيل السبب</label>
+    <select id="cullDetail" required>
+      <option value="">— اختر السبب الرئيسي أولاً —</option>
+    </select>
 
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
@@ -46,8 +56,48 @@
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
     const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
-    $("animalNumber").value = num;
-    $("eventDate").value = dt;
+    $("animalNumber").value = String(num || "").trim();
+    $("eventDate").value = String(dt || "").slice(0,10);
+
+    // ✅ قوائم التفاصيل
+    const DETAILS = {
+      "انتاجي": [
+        "انخفاض إنتاج اللبن",
+        "موسم ضعيف متكرر",
+        "جودة لبن ضعيفة / SCC مرتفع",
+        "عمر إنتاجي كبير",
+        "مشاكل حليب متكررة"
+      ],
+      "تناسلي": [
+        "تكرار تلقيح بدون حمل",
+        "تأخر عشار / طول فترة مفتوحة",
+        "التهاب رحم مزمن",
+        "تكرار إجهاض",
+        "مشاكل ولادة متكررة"
+      ],
+      "صحي": [
+        "التهاب ضرع مزمن",
+        "عرج مزمن",
+        "هزال شديد / BCS منخفض",
+        "أمراض متكررة (تنفسي/هضمي)",
+        "إصابة/كسر",
+        "اضطرابات أيضية متكررة"
+      ]
+    };
+
+    const mainEl = $("cullMain");
+    const detailEl = $("cullDetail");
+
+    function fillDetails(){
+      const m = (mainEl.value || "").trim();
+      const arr = DETAILS[m] || [];
+      detailEl.innerHTML =
+        `<option value="">— اختر —</option>` +
+        arr.map(x => `<option value="${x}">${x}</option>`).join("");
+    }
+
+    mainEl.addEventListener("change", fillDetails);
+    fillDetails();
 
     btn.onclick = async () => {
       try {
@@ -55,15 +105,28 @@
         const uid = auth.currentUser?.uid;
         if (!uid) throw new Error("NO_AUTH");
 
-        const eventDate = $("eventDate").value || dt;
+        const n = String(num || "").trim();
+        if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+
+        const eventDate = ($("eventDate").value || dt).slice(0,10);
+
+        const cullMain = (mainEl.value || "").trim();
+        const cullDetail = (detailEl.value || "").trim();
+        if (!cullMain) { msg("⚠️ اختر سبب الاستبعاد (رئيسي).", false); return; }
+        if (!cullDetail) { msg("⚠️ اختر تفصيل السبب.", false); return; }
 
         const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
+          animalNumber: n,
+          animalId: n,
           type: "استبعاد",
           eventType: "استبعاد",
           eventDate,
-          reason: ($("reason").value || "").trim(),
+
+          // ✅ السبب من القائمتين
+          cullMain,
+          cullDetail,
+          reason: `${cullMain} — ${cullDetail}`,
+
           notes: ($("notes").value || "").trim(),
           userId: uid,
           source: "/cull.html",
@@ -74,9 +137,9 @@
         await updateAnimalByEvent(payload);
 
         msg("تم تسجيل الاستبعاد بنجاح ✅", true);
-        localStorage.setItem("lastAnimalNumber", String(num));
+        localStorage.setItem("lastAnimalNumber", n);
         localStorage.setItem("lastEventDate", eventDate);
-        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
+        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(n)}`, 900);
 
       } catch (e) {
         console.error(e);
