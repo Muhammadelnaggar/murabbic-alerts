@@ -21,6 +21,8 @@
 
     <label>سعر البيع (اختياري)</label>
     <input id="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
+    <label>سبب البيع</label>
+<input id="saleReason" placeholder="يتسحب تلقائيًا من آخر استبعاد (لو موجود)" />
 
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
@@ -31,7 +33,11 @@
   <script type="module">
     import { db, auth, ensureAuth } from "/js/firebase-config.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   import {
+  collection, addDoc, serverTimestamp,
+  getDocs, query, where, orderBy, limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
     const $ = (id) => document.getElementById(id);
     const info = $("info");
@@ -48,6 +54,41 @@
 
     $("animalNumber").value = num;
     $("eventDate").value = dt;
+async function prefillSaleReason(){
+  try{
+    await ensureAuth();
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const n = String(num || "").trim();
+    if (!n) return;
+
+    const evRef = collection(db, "events");
+    const qy = query(
+      evRef,
+      where("userId", "==", uid),
+     where("number", "==", n),
+
+      where("eventType", "==", "استبعاد"),
+      orderBy("eventDate", "desc"),
+      limit(1)
+    );
+
+    const snap = await getDocs(qy);
+    if (snap.empty) return;
+
+    const lastCull = snap.docs[0].data() || {};
+    const autoReason =
+      (lastCull.reason || "").trim() ||
+      `${(lastCull.cullMain||"").trim()} — ${(lastCull.cullDetail||"").trim()}`.trim();
+
+    if (autoReason) $("saleReason").value = autoReason;
+
+  }catch(e){
+    console.warn("prefillSaleReason failed", e);
+  }
+}
+prefillSaleReason();
 
     btn.onclick = async () => {
       try {
@@ -64,6 +105,8 @@
           eventType: "بيع",
           eventDate,
           price: Number($("price").value) || null,
+          saleReason: ($("saleReason").value || "").trim(),
+
           notes: ($("notes").value || "").trim(),
           userId: uid,
           source: "/sale.html",
