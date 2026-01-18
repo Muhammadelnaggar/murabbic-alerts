@@ -234,6 +234,12 @@ export function validateEvent(eventType, payload = {}) {
   }
   if (errors.length) return { ok: false, errors };
 
+  // ✅ قفل مركزي: منع أي تسجيل لحيوان خارج القطيع (بيع/نفوق)
+  const doc = payload.documentData;
+  if (doc && String(doc.status || "").toLowerCase() === "inactive") {
+    return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/خروجه من القطيع."] };
+  }
+
   // فحص الحراس (كلهم متزامنين sync)
   for (const gName of (schema.guards || [])) {
     const guardFn = guards[gName];
@@ -244,6 +250,7 @@ export function validateEvent(eventType, payload = {}) {
 
   return { ok: errors.length === 0, errors };
 }
+
 
 function validateField(key, rule, value) {
   if (rule.required && !req(value))
