@@ -236,7 +236,11 @@ export function validateEvent(eventType, payload = {}) {
 
   // ✅ قفل مركزي: منع أي تسجيل لحيوان خارج القطيع (بيع/نفوق)
   const doc = payload.documentData;
-  if (doc && String(doc.status || "").toLowerCase() === "inactive") {
+ const st = String(doc?.status ?? "").trim().toLowerCase();
+if (st === "inactive") {
+  return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/خروجه من القطيع."] };
+}
+
     return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/خروجه من القطيع."] };
   }
 
