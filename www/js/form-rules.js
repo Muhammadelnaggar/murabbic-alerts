@@ -89,6 +89,7 @@ export const eventSchemas = {
     },
     guards: ["abortionDecision"],
   },
+"لبن يومي": { fields: { ...commonFields }, guards: [] },
 
   // ------------------- التجفيف -------------------
   "تجفيف": {
