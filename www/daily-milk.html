@@ -110,6 +110,8 @@
 
   <script type="module">
     // ===== إعداد وضع التطوير الاختياري =====
+    import { validateEvent } from "/js/form-rules.js";
+
     const DEV = new URL(location.href).searchParams.get('debug') === '1' || localStorage.getItem('debug') === '1';
     const devbar = document.getElementById('devbar');
     function dev(msg){ if(DEV){ devbar.style.display='block'; devbar.textContent = String(msg); } console.error(msg); }
@@ -215,6 +217,37 @@
         source: location.pathname,
         createdAt: serverTimestamp()
       };
+// ✅ 1) هات وثيقة الحيوان (documentData)
+try {
+  const uid = (payload.userId || "").trim();
+  if (!uid) { showMsg("تعذّر تحديد المستخدم."); return; }
+
+  const mod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+  const qy = mod.query(
+    mod.collection(db, "animals"),
+    mod.where("userId", "==", uid),
+    mod.where("number", "==", String(payload.animalId || "").trim()),
+    mod.limit(1)
+  );
+
+  const snap = await mod.getDocs(qy);
+  if (snap.empty) { showMsg("هذا الحيوان غير موجود في حسابك."); return; }
+
+  const animalDoc = snap.docs[0].data();
+
+  // ✅ 2) ارفق documentData في payload
+  payload.documentData = animalDoc;
+  payload.species = animalDoc.species || payload.species || "";
+
+  // ✅ 3) نفّذ الفاليديشن المركزي
+  const v = validateEvent("لبن يومي", payload);
+  if (!v.ok) { showMsg(v.errors?.[0] || "غير مسموح."); return; }
+
+} catch (e) {
+  dev("Gate/validate failed: " + (e?.message || e));
+  showMsg("تعذّر التحقق الآن. أعد المحاولة.");
+  return;
+}
 
       try{
         await addDoc(collection(db, 'events'), payload);
@@ -250,6 +283,7 @@
   </script>
 </body>
 </html>
+
 
 
 
