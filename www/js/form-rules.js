@@ -223,7 +223,22 @@ export async function uniqueAnimalNumber(ctx) {
 // ===================================================================
 export function validateEvent(eventType, payload = {}) {
   const schema = eventSchemas[eventType];
-  if (!schema) return { ok: false, errors: ["نوع حدث غير معروف."] };
+ // ✅ قفل عام حتى لو الحدث غير مُعرّف (زي "لبن يومي")
+const doc = payload.documentData;
+const st = String(doc?.status ?? "").trim().toLowerCase();
+if (st === "inactive") {
+  return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."] };
+}
+// ✅ قفل عام حتى لو الحدث غير مُعرّف (زي "لبن يومي")
+const doc = payload.documentData;
+const st = String(doc?.status ?? "").trim().toLowerCase();
+if (st === "inactive") {
+  return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."] };
+}
+if (!schema) return { ok: false, errors: ["نوع حدث غير معروف."] };
+
+  
+
 
   const errors = [];
 
