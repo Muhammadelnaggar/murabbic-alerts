@@ -1,223 +1,165 @@
-// /js/forms-init.js — ESM
+// /js/forms-init.js — Murabbik Global Early Gate (ESM)
+// هدفه: منع أي submit لحيوان status=inactive فور فتح الصفحة + تعبئة الرقم/التاريخ من URL
+// يعمل على أي <form> حتى لو الصفحة عندها كود حفظ مباشر (بـ capture)
 
-import { validateEvent, uniqueAnimalNumber } from "./form-rules.js";
 import { db } from "./firebase-config.js";
+import { validateEvent, uniqueAnimalNumber } from "./form-rules.js";
 import {
   collection, query, where, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ---------------- UI helpers ---------------- */
-function ensureInfoBar(form) {
-  let bar = form.querySelector(".infobar");
+/* =============== Helpers =============== */
+function qs(k){ return new URL(location.href).searchParams.get(k) || ""; }
+function firstNonEmpty(...v){ return v.find(x => String(x||"").trim() !== "") || ""; }
+function today(){ return new Date().toISOString().slice(0,10); }
+
+function getUserId(){
+  return String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
+}
+
+function getNumberFromCtx(){
+  return String(firstNonEmpty(
+    qs("number"), qs("animalId"), qs("animalNumber"),
+    localStorage.getItem("currentAnimalId"),
+    localStorage.getItem("lastAnimalId"),
+    localStorage.getItem("lastAnimalNumber")
+  )).trim();
+}
+
+function getDateFromCtx(){
+  return String(firstNonEmpty(
+    qs("date"), qs("eventDate"),
+    localStorage.getItem("eventDate"),
+    localStorage.getItem("lastEventDate"),
+    today()
+  )).trim();
+}
+
+function ensureInfoBar(form){
+  let bar = form.querySelector(".infobar") || document.getElementById("info");
   if (!bar) {
     bar = document.createElement("div");
     bar.className = "infobar";
     bar.style.cssText = `
       margin:8px 0; padding:10px 12px; border-radius:10px;
-      font: 14px/1.4 system-ui, 'Cairo', Arial;
-      display:none; background:#fff; border:1px solid #e2e8f0; color:#0f172a;
+      font: 14px/1.4 system-ui,'Cairo',Arial;
+      display:none; background:#ffebee; border:1px solid #ef9a9a; color:#b71c1c;
     `;
     form.prepend(bar);
   }
   return bar;
 }
 
-function showMsg(bar, msgs, type = "error") {
-  if (!bar) return;
+function showBar(bar, msg, ok=false){
   bar.style.display = "block";
-  bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
-  bar.style.background = type === "error" ? "#ffebee" : "#ecfdf5";
-  bar.style.color = type === "error" ? "#b71c1c" : "#065f46";
-  bar.innerHTML = Array.isArray(msgs)
-    ? `<ul style="margin:0;padding-left:18px">${msgs.map(m => `<li>${m}</li>`).join("")}</ul>`
-    : msgs;
+  bar.style.borderColor = ok ? "#bbf7d0" : "#ef9a9a";
+  bar.style.background   = ok ? "#ecfdf5" : "#ffebee";
+  bar.style.color        = ok ? "#065f46" : "#b71c1c";
+  bar.textContent = msg;
 }
 
-function lockFormControls(form, locked) {
-  form.querySelectorAll("input, select, textarea, button").forEach(el => {
+function lock(form, locked){
+  form.querySelectorAll("input,select,textarea,button").forEach(el => {
     if (el.dataset && el.dataset.nav === "1") return;
     el.disabled = !!locked;
   });
-
-  const saveBtn = form.querySelector('button[type="submit"], #saveBtn, .btn-save');
-  if (saveBtn) saveBtn.style.display = locked ? "none" : "";
+  const btn = form.querySelector('button[type="submit"], #saveBtn, .btn-save');
+  if (btn) btn.style.display = locked ? "none" : "";
 }
 
-/* ---------------- data helpers ---------------- */
-function collectFormData(form) {
-  const data = {};
-  form.querySelectorAll("[data-field]").forEach(el => {
-    const k = el.getAttribute("data-field");
-    let v =
-      el.type === "checkbox" ? (el.checked ? (el.value || true) : "") :
-      el.type === "radio" ? (el.checked ? el.value : (data[k] || "")) :
-      el.value;
-    data[k] = v;
-  });
+function prefill(form){
+  const num = getNumberFromCtx();
+  const dt  = getDateFromCtx();
 
-  if (!data.species && localStorage.getItem("herdSpecies")) {
-    data.species = localStorage.getItem("herdSpecies");
-  }
-  return data;
+  const numEl = form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber'],[data-field='animalId'],[data-field='animalNumber']");
+  const dtEl  = form.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
+
+  if (numEl && !String(numEl.value||"").trim() && num) numEl.value = num;
+  if (dtEl && !String(dtEl.value||"").trim() && dt) dtEl.value = dt;
 }
 
-function getCtxNumber() {
-  const u = new URL(location.href);
-  const n =
-    u.searchParams.get("number") ||
-    u.searchParams.get("animalNumber") ||
-    u.searchParams.get("animalId") ||
-    localStorage.getItem("currentAnimalNumber") ||
-    localStorage.getItem("lastAnimalNumber") ||
-    localStorage.getItem("lastAnimalId") ||
-    "";
-  return String(n || "").trim();
-}
-
-function getCtxDate() {
-  const u = new URL(location.href);
-  const d =
-    u.searchParams.get("date") ||
-    u.searchParams.get("eventDate") ||
-    localStorage.getItem("lastEventDate") ||
-    "";
-  return String(d || new Date().toISOString().slice(0, 10)).trim();
-}
-
-async function fetchAnimalDocByNumber(userId, number) {
-  if (!userId || !number) return null;
-
+async function fetchAnimalDocByKey(uid, number){
+  const key = `${uid}#${number}`;
   const qy = query(
     collection(db, "animals"),
-    where("userId", "==", userId),
-    where("number", "==", String(number)),
+    where("userId_number", "==", key),
     limit(1)
   );
-
   const snap = await getDocs(qy);
   if (snap.empty) return null;
-
-  const docSnap = snap.docs[0];
-  return { id: docSnap.id, ...docSnap.data() };
+  return snap.docs[0].data();
 }
 
-/* ---------------- Gate (before any input) ---------------- */
-async function preGateForm(form, eventName, bar) {
-  const page = document.documentElement.getAttribute("data-page") || "";
-  if (page === "add-animal" || eventName === "إضافة حيوان") return;
-
-  // start locked
-  form.dataset.gated = "0";
-  lockFormControls(form, true);
-  showMsg(bar, "جارٍ التحقق من حالة الحيوان…", "ok");
-
-  const userId = String(localStorage.getItem("userId") || "").trim();
-  const numberFromCtx = getCtxNumber();
-  const dateFromCtx = getCtxDate();
-
-  const numField = form.querySelector('[data-field="animalId"], [data-field="animalNumber"], #animalNumber, #animalId');
-  const dateField = form.querySelector('[data-field="eventDate"], #eventDate');
-
-  const number = String((numField?.value || numberFromCtx) || "").trim();
-  const eventDate = String((dateField?.value || dateFromCtx) || "").trim();
-
-  if (!userId) {
-    showMsg(bar, "تعذّر تحديد المستخدم. افتح الصفحة من داخل النظام.", "error");
-    return;
-  }
-  if (!number) {
-    showMsg(bar, "رقم الحيوان غير متاح.", "error");
-    return;
-  }
-
-  let doc = null;
-  try {
-    doc = await fetchAnimalDocByNumber(userId, number);
-  } catch (e) {
-    console.error("fetchAnimalDocByNumber failed", e);
-  }
-
-  if (!doc) {
-    showMsg(bar, `تعذّر العثور على الحيوان رقم ${number}.`, "error");
-    return;
-  }
-
-  form._mbk_doc = doc;
-  form._mbk_ctx = { number, eventDate };
-
-  const probe = {
-    animalId: number,
-    eventDate: eventDate || new Date().toISOString().slice(0, 10),
-    documentData: doc,
-    species: doc.species,
-  };
-
-  const res = validateEvent(eventName, probe);
-  if (!res.ok) {
-    showMsg(bar, res.errors?.[0] || "غير مسموح.", "error");
-    return; // keep locked
-  }
-
-  // unlock
-  form.dataset.gated = "1";
-  bar.style.display = "none";
-  lockFormControls(form, false);
-
-  if (numField && !numField.value) numField.value = number;
-  if (dateField && !dateField.value) dateField.value = probe.eventDate;
-}
-
-/* ---------------- attach per-form ---------------- */
-async function attachOne(form) {
+/* =============== Core Gate =============== */
+async function runGate(form){
   const bar = ensureInfoBar(form);
-  const eventName = form.getAttribute("data-event");
-  if (!eventName) return;
 
-  await preGateForm(form, eventName, bar);
+  form.dataset.gated = "0";
+  lock(form, true);
+  prefill(form);
 
-  // لو الرقم/التاريخ اتغيروا (في صفحات فيها تعديل)، نعيد Gate
-  const numField = form.querySelector('[data-field="animalId"], [data-field="animalNumber"], #animalNumber, #animalId');
-  const dateField = form.querySelector('[data-field="eventDate"], #eventDate');
+  const uid = getUserId();
+  const number = String(
+    form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber']")?.value || getNumberFromCtx()
+  ).trim();
 
-  const reGate = async () => {
-    await preGateForm(form, eventName, bar);
-  };
+  if (!uid) { showBar(bar, "تعذّر تحديد المستخدم. افتح الصفحة من داخل النظام."); return; }
+  if (!number) { showBar(bar, "رقم الحيوان غير متاح."); return; }
 
-  if (numField) numField.addEventListener("change", reGate);
-  if (dateField) dateField.addEventListener("change", reGate);
+  showBar(bar, "جارٍ التحقق من حالة الحيوان…", true);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  let animalDoc = null;
+  try {
+    animalDoc = await fetchAnimalDocByKey(uid, number);
+  } catch (e) {
+    console.error("Gate fetch failed:", e);
+  }
 
-    if (form.dataset.gated !== "1") {
-      showMsg(bar, "⚠️ جارٍ التحقق… انتظر لحظة.", "error");
-      return;
-    }
+  if (!animalDoc) { showBar(bar, `تعذّر العثور على الحيوان رقم ${number}.`); return; }
 
-    const formData = collectFormData(form);
+  // ✅ استخدم الفاليديشن المركزي نفسه
+  const eventDate = String(
+    form.querySelector("#eventDate,[name='eventDate']")?.value || getDateFromCtx()
+  ).trim();
 
-    // inject doc + ctx
-    if (!formData.documentData) formData.documentData = form._mbk_doc || null;
-    if (!formData.animalId) formData.animalId = form._mbk_ctx?.number || formData.animalNumber || "";
-    if (!formData.eventDate) formData.eventDate = form._mbk_ctx?.eventDate || "";
+  const res = validateEvent("لبن يومي", { animalId: number, eventDate, documentData: animalDoc }); // مجرد استدعاء للـ inactive lock
+  if (!res.ok) {
+    showBar(bar, res.errors?.[0] || "غير مسموح.");
+    return; // يظل مقفول
+  }
 
-    const { ok, errors } = validateEvent(eventName, formData);
-
-    if (!ok) {
-      showMsg(bar, errors, "error");
-      form.dataset.valid = "0";
-      return;
-    }
-
-    form.dataset.valid = "1";
-    showMsg(bar, "✅ البيانات سليمة — جاري الحفظ...", "ok");
-
-    const ev = new CustomEvent("mbk:valid", { detail: { formData, eventName, form } });
-    form.dispatchEvent(ev);
-  });
+  // ✅ OK
+  bar.style.display = "none";
+  form.dataset.gated = "1";
+  form._mbk_doc = animalDoc;
+  lock(form, false);
 }
 
-/* ---------------- unique number watcher (add-animal) ---------------- */
+function attachGateToForm(form){
+  if (!form || form.dataset.mbkGateBound === "1") return;
+  form.dataset.mbkGateBound = "1";
+
+  // ✅ capture: يمنع أي submit handlers أخرى لو gate غير ناجح
+  form.addEventListener("submit", (e) => {
+    if (form.dataset.gated !== "1") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const bar = ensureInfoBar(form);
+      showBar(bar, "⚠️ لا يمكن الحفظ قبل التحقق من حالة الحيوان.");
+    }
+  }, true);
+
+  runGate(form);
+
+  const numEl = form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber']");
+  const dtEl  = form.querySelector("#eventDate,[name='eventDate']");
+  const rerun = () => { clearTimeout(form._mbkGateT); form._mbkGateT = setTimeout(()=>runGate(form), 200); };
+  numEl?.addEventListener("input", rerun);
+  numEl?.addEventListener("change", rerun);
+  dtEl?.addEventListener("change", rerun);
+}
+
+/* =============== add-animal unique check (اختياري) =============== */
 function attachUniqueAnimalNumberWatcher() {
   const form = document.getElementById("animalForm");
   const input = form?.querySelector("#animalNumber");
@@ -231,11 +173,7 @@ function attachUniqueAnimalNumberWatcher() {
     const num = String(input.value || "").trim();
     form.dataset.numberOk = "";
 
-    if (!num) {
-      bar.style.display = "none";
-      lastValue = "";
-      return;
-    }
+    if (!num) { bar.style.display = "none"; lastValue = ""; return; }
     if (num === lastValue) return;
     lastValue = num;
 
@@ -245,12 +183,12 @@ function attachUniqueAnimalNumberWatcher() {
       if (!userId) return;
 
       try {
-        const res = await uniqueAnimalNumber({ userId, number: num });
-        if (!res.ok) {
-          showMsg(bar, res.msg || "هذا الرقم مستخدم بالفعل.", "error");
+        const r = await uniqueAnimalNumber({ userId, number: num });
+        if (!r.ok) {
+          showBar(bar, r.msg || "هذا الرقم مستخدم بالفعل.");
           form.dataset.numberOk = "0";
         } else {
-          showMsg(bar, "✅ رقم الحيوان متاح في حسابك.", "ok");
+          showBar(bar, "✅ رقم الحيوان متاح في حسابك.", true);
           form.dataset.numberOk = "1";
         }
       } catch (e) {
@@ -260,11 +198,9 @@ function attachUniqueAnimalNumberWatcher() {
   });
 }
 
-/* ---------------- auto attach ---------------- */
-function autoAttach() {
-  document.querySelectorAll('form[data-validate="true"][data-event]').forEach(form => {
-    attachOne(form);
-  });
+/* =============== Boot =============== */
+function autoAttach(){
+  document.querySelectorAll("form").forEach(attachGateToForm);
   attachUniqueAnimalNumberWatcher();
 }
 
