@@ -241,8 +241,6 @@ if (st === "inactive") {
   return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/خروجه من القطيع."] };
 }
 
-    return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/خروجه من القطيع."] };
-  }
 
   // فحص الحراس (كلهم متزامنين sync)
   for (const gName of (schema.guards || [])) {
