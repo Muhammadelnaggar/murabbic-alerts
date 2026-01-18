@@ -573,19 +573,33 @@
   modalOverlay.style.display = 'flex';
 }
 
+async function guardNotInactive(number){
+  const a = await fetchAnimalDocByNumber(number);
+  if (!a) return { ok:false, msg:"رقم الحيوان غير موجود في قاعدة البيانات." };
+
+  const st = String(a.data?.status || "").trim().toLowerCase();
+  if (st === "inactive") {
+    return { ok:false, msg:"❌ لا يمكن تسجيل أي حدث — هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد)." };
+  }
+
+  return { ok:true, a };
+}
 
     async function precheck(number){
       disableForm(true);
       info.className = 'infobar show';
       info.textContent = 'جارِ التحقق المبدئي من بيانات الحيوان…';
+const gate = await guardNotInactive(number);
+if (!gate.ok){
+  info.className = 'infobar show error';
+  info.textContent = gate.msg;
+  showPopup(gate.msg, false);
+  disableForm(true);
+  return;
+}
+const a = gate.a;
 
-      const a = await fetchAnimalDocByNumber(number);
-      if (!a){
-        info.className = 'infobar show error';
-        info.textContent = 'رقم الحيوان غير موجود في قاعدة البيانات.';
-        showPopup('لا يمكن متابعة التسجيل: رقم الحيوان غير موجود في قاعدة البيانات.', false);
-        return;
-      }
+
 
       const sp = normSpecies(a.data);
       if (!sp || !MIN_GD[sp]) {
@@ -839,6 +853,7 @@ if (!(g >= MIN_GD[sp])){
 
 </body>
 </html>
+
 
 
 
