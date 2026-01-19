@@ -238,6 +238,32 @@
       query, where, limit, getDocs, orderBy
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { validateEvent } from "/js/form-rules.js";
+
+// ✅ حارس موحّد: يمنع أي حفظ لحيوان خارج القطيع + يمر على validateEvent المركزي
+async function mbkCanSave(number, eventDate){
+  const a = await fetchAnimalDocByNumber(number);
+  if (!a) return { ok:false, msg:"رقم غير موجود" };
+
+  // قفل خارج القطيع
+  const st = String(a.data?.status || "").trim().toLowerCase();
+ if (st === "inactive") {
+  const sp = normSpecies(a.data);
+  const label = (sp === "جاموس") ? "هذه الجاموسة" : (sp === "أبقار") ? "هذه البقرة" : "هذا الحيوان";
+  return { ok:false, msg: `${label} غير موجودة بالقطيع` };
+}
+
+  // قفل مركزي (أي قواعد أخرى مستقبلًا)
+  const v = validateEvent("تلقيح", {
+    animalId: String(number).trim(),
+    eventDate: String(eventDate).trim(),
+    documentData: a.data,
+    species: normSpecies(a.data)
+  });
+  if (!v.ok) return { ok:false, msg: (v.errors?.[0] || "غير مسموح") };
+
+  return { ok:true };
+}
 
     // عناصر أساسية
     const info     = document.getElementById('info');
@@ -403,6 +429,8 @@
       await ensureAuth();
       const uid = await getUid();
       if (!uid){ showMsg('سجّل الدخول أولًا.', true); return; }
+const gate0 = await mbkCanSave(number, evISO);
+if (!gate0.ok){ showMsg(gate0.msg, true); return; }
 
       const a = await fetchAnimalDocByNumber(number);
       if (!a){ showMsg('رقم الحيوان غير موجود في قاعدة البيانات.', true); return; }
@@ -491,6 +519,8 @@
         inseminationTime: timeOfDay, heatStatus: heatState,
         notes: notes || null, source: location.pathname, createdAt: serverTimestamp()
       };
+const gate = await mbkCanSave(animalNumber, eventDate);
+if (!gate.ok){ showMsg(gate.msg, true); lockForm(false); return; }
 
       try{
         const ref = await addDoc(collection(db, 'events'), payload);
@@ -561,6 +591,9 @@
       if (!a){ result.status='ERROR'; result.messages.push('رقم غير موجود'); return result; }
 
       result.species = normSpecies(a.data);
+      const st = String(a.data?.status || "").trim().toLowerCase();
+if (st === "inactive"){ result.status="ERROR"; result.messages.push("خارج القطيع"); return result; }
+
       const facts = await fetchFacts(number);
       result.facts = facts;
 
@@ -679,6 +712,9 @@
             heatStatus: (mode==='heat'? heat : 'برنامج'),
             notes: null, source: location.pathname, createdAt: serverTimestamp()
           };
+          const gate = await mbkCanSave(number, date);
+if (!gate.ok){ fail++; continue; }
+
           try{
             const ref = await addDoc(collection(db,'events'), payload);
             if (ref?.id) ok++; else fail++;
@@ -704,4 +740,5 @@
   </script>
 </body>
 </html>
+
 
