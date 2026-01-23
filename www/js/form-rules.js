@@ -42,10 +42,17 @@ const commonFields = {
 //                         سكيمات الأحداث
 // ===================================================================
 export const eventSchemas = {
-  "ولادة": {
-    fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
-    guards: ["calvingDecision"],
+ "ولادة": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
+    species: { required: true, msg: "نوع الحيوان مطلوب." },
+    lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
+    documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
   },
+  guards: ["calvingDecision"],
+},
+
 
   "تلقيح": {
     fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
@@ -82,22 +89,32 @@ export const eventSchemas = {
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
 export const guards = {
-  calvingDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+calvingDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    if (doc.reproductiveStatus !== "عشار")
-      return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
+  // 1) منع غير Active
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل ولادة — هذا الحيوان خارج القطيع.";
 
-    const th = thresholds[doc.species]?.minGestationDays;
-    if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+  // 2) لازم تكون عشار (من الوثيقة أو من نتيجة حساب مركزي لو هتضيفها)
+  const rs = String(doc.reproductiveStatus || "").trim();
+  if (rs !== "عشار") return "لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عشار».";
 
-    const gDays = daysBetween(doc.lastFertileInseminationDate, fd.eventDate);
-    if (Number.isNaN(gDays)) return "لا يوجد تلقيح مُخصِّب سابق.";
-    if (gDays < th) return `عمر الحمل ${gDays} أقل من الحد الأدنى ${th}.`;
+  // 3) حد أدنى عمر حمل حسب النوع
+  const sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  const th = thresholds[sp]?.minGestationDays;
+  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
 
-    return null;
-  },
+  // 4) حساب عمر الحمل من آخر تلقيح مخصب
+  const lf = fd.lastFertileInseminationDate || doc.lastFertileInseminationDate || "";
+  const gDays = daysBetween(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) return "لا يوجد تلقيح مُخصِّب سابق.";
+  if (gDays < th) return `عمر الحمل ${gDays} أقل من الحد الأدنى ${th}.`;
+
+  return null;
+},
+
 
   inseminationDecision(fd) {
     const doc = fd.documentData;
