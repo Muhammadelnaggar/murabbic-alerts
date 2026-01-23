@@ -172,11 +172,21 @@ async function mbkEarlyGate(){
   const uid = await getUid();
   const number = getNumberAny();
 
-  if (!uid || !number){
-    hide();
-    lockAll(false);
-    return;
-  }
+if (!uid){
+  hide();
+  lockAll(false);
+  return;
+}
+
+// ⛔ صفحة حدث بدون رقم حيوان = قفل
+if (EVENT_PAGES.includes(page) && !number){
+  window.__MBK_INACTIVE = true;
+  window.__MBK_INACTIVE_MSG = "يجب اختيار رقم الحيوان أولاً.";
+  installHardBlock();
+  show(window.__MBK_INACTIVE_MSG);
+  return;
+}
+
 
   const doc = await fetchAnimalDoc(uid, number);
   if (!doc){
