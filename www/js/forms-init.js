@@ -3,7 +3,7 @@
 // ✅ UI مركزي (Infobar) يدعم Actions بدون أعطال DOM
 // ✅ لا تُجمّد الصفحة: تترك إدخال رقم الحيوان متاح دائمًا وتمنع "الحفظ فقط"
 
-import { db } from "./firebase-config.js";
+import { db, auth } from "./firebase-config.js";   // ✅ بدل db فقط
 import { uniqueAnimalNumber } from "./form-rules.js";
 import {
   collection, query, where, limit, getDocs
@@ -15,7 +15,9 @@ function firstNonEmpty(...v){ return v.find(x => String(x||"").trim() !== "") ||
 function today(){ return new Date().toISOString().slice(0,10); }
 
 function getUid(){
+  const a = auth?.currentUser?.uid || "";
   return String(
+    a ||
     window.__tenant?.userId ||
     localStorage.getItem("userId") ||
     localStorage.getItem("tenantId") ||
