@@ -6,14 +6,10 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل حدث الولادة — مُرَبِّك</title>
-
   <style>
     :root{
       --green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;
-      --muted:#64748b;--card:#ffffff;--border:#e2e8f0;
-      --ok-bg:#ecfdf5;--ok-text:#065f46;--ok-br:#bbf7d0;
-      --err-bg:#fff7ed;--err-text:#9a3412;--err-br:#fed7aa;
-      --warn-bg:#fefce8;--warn-text:#854d0e;--warn-br:#fde68a;
+      --muted:#64748b;--card:#ffffff
     }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
@@ -26,61 +22,34 @@
     header{
       position:sticky;top:0;z-index:10;
       background:#fff;
-      border-bottom:1px solid var(--border);
+      border-bottom:1px solid #e2e8f0;
       box-shadow:0 2px 4px rgba(0,0,0,.05)
     }
     .bar{
       max-width:920px;margin:0 auto;
-      padding:12px 16px;
-      display:flex;gap:10px;
+      padding:14px 18px;
+      display:flex;gap:8px;
       align-items:center;justify-content:space-between
     }
-    .brand{
-      display:flex;align-items:center;gap:10px;min-width:0;
-    }
-    .brand img{width:28px;height:28px;object-fit:contain}
-    .title{
-      font-weight:800;color:var(--green-600);
-      font-size:18px;line-height:1.2;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-    .brandname{
-      font-weight:800;color:var(--green-600);
-      font-size:16px;opacity:.95;
-      white-space:nowrap;
-    }
-    .hdr-actions{
-      display:flex;gap:8px;align-items:center;
-    }
-    .ghost-link{
-      text-decoration:none;
-      padding:10px 12px;
-      border-radius:10px;
-      background:#eef2f7;
-      color:#0f172a;
-      font-weight:700;
-      border:1px solid #e5e7eb;
-      white-space:nowrap;
-    }
-
+    .title{font-weight:700;color:var(--green-600);font-size:18px}
     main{
       max-width:920px;
-      margin:18px auto;
+      margin:20px auto;
       padding:16px;
-      padding-bottom:120px;
+      padding-bottom:110px
     }
     .card{
       background:var(--card);
-      border:1px solid var(--border);
+      border:1px solid #e2e8f0;
       border-radius:16px;
-      padding:18px;
+      padding:20px;
       box-shadow:0 2px 6px rgba(0,0,0,.05)
     }
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
     .row{display:grid;gap:14px;min-width:0}
     @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
     label{
-      font-weight:700;font-size:15px;
+      font-weight:600;font-size:15px;
       color:#0f172a;
       display:block;margin-bottom:6px
     }
@@ -90,13 +59,12 @@
       border-radius:10px;
       background:#fff;font-size:16px
     }
-
     .radio-group{
       display:flex;flex-wrap:wrap;
       gap:10px;padding:6px 0
     }
     .radio-group label{
-      font-weight:600;font-size:14px;
+      font-weight:500;font-size:14px;
       background:#f1f5f9;
       border:1px solid #cbd5e1;
       border-radius:8px;
@@ -104,96 +72,90 @@
       cursor:pointer
     }
     .radio-group input{margin-inline-start:6px}
-
-    /* ✅ Infobar ثابت — لا يختفي إلا بزر */
-    .infobar{
-      display:none;
-      border-radius:12px;
-      padding:12px 12px;
-      border:1px solid var(--border);
-      background:#fff;
-    }
-    .infobar.show{display:block}
-    .infobar[data-type="ok"]{background:var(--ok-bg);border-color:var(--ok-br);color:var(--ok-text)}
-    .infobar[data-type="error"]{background:var(--err-bg);border-color:var(--err-br);color:var(--err-text)}
-    .infobar[data-type="warn"]{background:var(--warn-bg);border-color:var(--warn-br);color:var(--warn-text)}
-    .info-row{
-      display:flex;gap:10px;align-items:flex-start;justify-content:space-between;
-    }
-    .info-text{
-      font-weight:800;
-      font-size:14px;
-      line-height:1.7;
-      white-space:pre-wrap;
-      flex:1;
-    }
-    .info-actions{
-      display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;
-    }
-    .info-actions button{
-      border:0;cursor:pointer;
-      border-radius:999px;
-      padding:9px 12px;
-      font-weight:800;
-      font-size:13px;
-      white-space:nowrap;
-    }
-    .btn-ok{background:#16a34a;color:#fff}
-    .btn-danger{background:#dc2626;color:#fff}
-    .btn-ghost{background:#ffffff;color:#0f172a;border:1px solid #cbd5e1}
-    .btn-warn{background:#f59e0b;color:#111827}
-
     .actions-bar{
       position:fixed;bottom:0;left:0;right:0;
       background:#fff;
-      border-top:1px solid var(--border);
+      border-top:1px solid #e2e8f0;
       box-shadow:0 -2px 6px rgba(0,0,0,.08);
       display:flex;gap:10px;
       padding:12px;z-index:20
     }
     .actions-bar button{
       flex:1;padding:14px;
-      font-size:16px;font-weight:900;
+      font-size:16px;font-weight:700;
       border-radius:12px;cursor:pointer;border:0
     }
     .actions-bar .save{background:var(--green);color:#fff}
     .actions-bar .ghost{background:#eef2f7;color:#0f172a}
-
-    .back-bottom{
-      margin-top:14px;
-      display:flex;
+    .infobar{
+      display:none;margin-top:14px;padding:12px;
+      border-radius:10px;font-size:14px;font-weight:700;
+      text-align:center;margin-inline:auto;max-width:560px
     }
-    .back-bottom a{
-      width:100%;
-      text-align:center;
-      text-decoration:none;
-      padding:12px 12px;
-      border-radius:12px;
+    .infobar.show{display:block}
+    .infobar.error{
+      background:#fff7ed;border:1px solid #fed7aa;color:#9a3412
+    }
+    .infobar:not(.error){
+      background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46
+    }
+
+    /* Popup وسط الشاشة */
+    #mbkModalOverlay{
+      position:fixed;inset:0;
+      background:rgba(15,23,42,0.40);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    }
+    #mbkModal{
       background:#ffffff;
-      border:1px solid #e5e7eb;
-      color:#0f172a;
-      font-weight:900;
+      border-radius:18px;
+      padding:18px 20px 16px;
+      max-width:320px;
+      width:90%;
+      text-align:center;
+      box-shadow:0 18px 40px rgba(0,0,0,.22);
+    }
+    #mbkModalText{
+      font-weight:700;
+      font-size:15px;
+      margin-bottom:14px;
+      line-height:1.6;
+    }
+    #mbkModalBtn{
+      margin-top:4px;
+      padding:10px 14px;
+      width:100%;
+      border-radius:999px;
+      border:0;
+      cursor:pointer;
+      background:#16a34a;
+      color:#fff;
+      font-weight:700;
+      font-size:15px;
     }
   </style>
 </head>
-
 <body>
+
   <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
+  <!-- Popup -->
+  <div id="mbkModalOverlay">
+    <div id="mbkModal">
+      <div id="mbkModalText"></div>
+      <button id="mbkModalBtn" type="button">حسناً</button>
+    </div>
+  </div>
+
   <header>
     <div class="bar">
-      <div class="brand">
-        <img src="logo.png" alt="مُرَبِّك">
-        <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-          <div class="title">تسجيل حدث الولادة</div>
-          <div class="brandname">مُرَبِّك</div>
-        </div>
-      </div>
-
-      <div class="hdr-actions">
-        <a class="ghost-link" href="add-event.html">عودة للأحداث</a>
-      </div>
+      <div class="title">تسجيل حدث الولادة</div>
+      <a class="ghost" href="add-event.html"
+         style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
     </div>
   </header>
 
@@ -203,14 +165,6 @@
       <input type="hidden" data-field="animalId" id="animalId">
       <input type="hidden" data-field="species" id="species">
       <input type="hidden" data-field="reproStatus" value="عشار">
-
-      <!-- ✅ شريط المعلومات أعلى النموذج -->
-      <div id="info" class="infobar" role="status" aria-live="polite" data-type="ok">
-        <div class="info-row">
-          <div id="infoText" class="info-text"></div>
-          <div id="infoActions" class="info-actions"></div>
-        </div>
-      </div>
 
       <div class="row">
         <div>
@@ -316,17 +270,14 @@
           <input id="notes" data-field="notes" placeholder="اختياري" />
         </div>
       </div>
-    </form>
 
-    <!-- ✅ زر العودة أسفل النموذج -->
-    <div class="back-bottom">
-      <a href="add-event.html">⬅️ العودة لصفحة الأحداث</a>
-    </div>
+      <div id="info" class="infobar"></div>
+    </form>
   </main>
 
   <div class="actions-bar">
     <button class="save" id="saveBtn" type="submit" form="calving-form">حفظ الولادة ✅</button>
-    <button class="ghost" id="toCardBtn" type="button">فتح بطاقة الحيوان</button>
+    <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
   </div>
 
   <script src="/js/app-core.js"></script>
@@ -359,56 +310,91 @@
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { updateAnimalByEvent } from '/js/animal-update.js';
 
+    /* ===== Popup helper ===== */
+    const modalOverlay = document.getElementById('mbkModalOverlay');
+    const modalText    = document.getElementById('mbkModalText');
+    const modalBtn     = document.getElementById('mbkModalBtn');
+    let modalCallback  = null;
+
+    function showPopup(msg, ok=false, cb){
+  // 🔁 تنظيف أي أزرار ديناميكية سابقة وإرجاع زر "حسناً"
+  const modal = document.getElementById('mbkModal');
+  modal.querySelectorAll('.dynamic-btns').forEach(el => el.remove());
+  modalBtn.style.display = 'block';
+
+  modalText.textContent = msg;
+  modalCallback = typeof cb === 'function' ? cb : null;
+  modalBtn.style.background = ok ? '#16a34a' : '#dc2626';
+  modalOverlay.style.display = 'flex';
+}
+
+    modalBtn.addEventListener('click', ()=>{
+      modalOverlay.style.display = 'none';
+      if (modalCallback){ const fn = modalCallback; modalCallback=null; fn(); }
+    });
+
     const form   = document.querySelector('#calving-form');
-
-    const infoBox     = document.getElementById('info');
-    const infoText    = document.getElementById('infoText');
-    const infoActions = document.getElementById('infoActions');
-
+    const info   = document.getElementById('info');
     const numEl  = document.getElementById('animalNumber');
     const dateEl = document.getElementById('eventDate');
     const kindEl = document.getElementById('calvingKind');
+    const saveBtn= document.getElementById('saveBtn');
 
     const animalIdEl = document.getElementById('animalId');
     const speciesEl  = document.getElementById('species');
     const lastFertileEl = document.getElementById('lastFertile');
 
-    function clearInfoActions(){
-      infoActions.innerHTML = '';
-    }
-    function addInfoBtn({text, cls, onClick}){
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = cls;
-      b.textContent = text;
-      b.addEventListener('click', onClick);
-      infoActions.appendChild(b);
-    }
-    function showInfo(msg, type='ok', actions=[]){
-      infoBox.dataset.type = type;
-      infoBox.classList.add('show');
-      infoText.textContent = String(msg || '');
-      clearInfoActions();
+    /* مزامنة مجموعات العجول */
+   function syncCalfGroups(){
+  const isDead = (kindEl.value === 'نافقة');
+  const count = parseInt(
+    form.querySelector('input[name="calfCount"]:checked')?.value || '1',
+    10
+  );
 
-      actions.forEach(a => addInfoBtn(a));
+  document.querySelectorAll('.live-only').forEach(el=>{
+    el.style.display = isDead ? 'none' : '';
+  });
 
-      // ✅ لازم رد المستخدم؟ لو مفيش أكشن، بنضيف "حسناً" افتراضي
-      if (!infoActions.children.length){
-        addInfoBtn({
-          text:'حسناً',
-          cls:'btn-ghost',
-          onClick: ()=>{ infoBox.classList.remove('show'); }
-        });
-      }
-    }
-    function showInfoSilent(msg, type='ok'){
-      // رسائل تشغيل/تحميل بدون زر افتراضي (لكن تظل ظاهرة)
-      infoBox.dataset.type = type;
-      infoBox.classList.add('show');
-      infoText.textContent = String(msg || '');
-      clearInfoActions();
-    }
+  const calfId1 = document.getElementById('calfId');
+  const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
+  const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
+  const enableLive = !isDead;
 
+  // 🔹 إصلاح calfCount لما الولادة "نافقة"
+  const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
+  calfCountRadios.forEach((r, i)=>{
+    if (enableLive) {
+      // في الولادة الحية نخلي أول اختيار required (أو اللي تحب)
+      r.required = (i === 0);
+    } else {
+      // في الولادة النافقة نشيل الـ required ونفضي الاختيارات
+      r.required = false;
+      r.checked  = false;
+    }
+  });
+
+  if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
+  calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+  calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+
+  [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
+    const group = document.getElementById(id);
+    const vis = enableLive && count >= idx;
+    if (group) group.style.display = vis ? '' : 'none';
+
+    const idEl   = document.getElementById(`calf${idx}Id`);
+    const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
+    if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
+    sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
+  });
+}
+
+    kindEl?.addEventListener('change', syncCalfGroups);
+    form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
+    document.addEventListener('DOMContentLoaded', syncCalfGroups);
+
+    /* أدوات عامة */
     function todayISO(){
       const d=new Date(); d.setHours(0,0,0,0);
       return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -418,14 +404,12 @@
       const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
       return u?.uid || '';
     }
-
     function disableForm(disabled=true){
       form.querySelectorAll('input, select, button').forEach(el=>{
         if (el.id === 'toCardBtn') return;
         el.disabled = disabled;
       });
     }
-
     const MIN_GD = { 'أبقار': 255, 'جاموس': 285 };
 
     function normSpecies(data){
@@ -443,53 +427,6 @@
       return Math.round((B - A)/86400000);
     }
     function cmpISO(a,b){ return new Date(a) - new Date(b); }
-
-    /* مزامنة مجموعات العجول */
-    function syncCalfGroups(){
-      const isDead = (kindEl.value === 'نافقة');
-      const count = parseInt(
-        form.querySelector('input[name="calfCount"]:checked')?.value || '1',
-        10
-      );
-
-      document.querySelectorAll('.live-only').forEach(el=>{
-        el.style.display = isDead ? 'none' : '';
-      });
-
-      const calfId1 = document.getElementById('calfId');
-      const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
-      const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
-
-      const enableLive = !isDead;
-
-      const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
-      calfCountRadios.forEach((r, i)=>{
-        if (enableLive) {
-          r.required = (i === 0);
-        } else {
-          r.required = false;
-          r.checked  = false;
-        }
-      });
-
-      if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
-      calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-      calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-
-      [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
-        const group = document.getElementById(id);
-        const vis = enableLive && count >= idx;
-        if (group) group.style.display = vis ? '' : 'none';
-
-        const idEl   = document.getElementById(`calf${idx}Id`);
-        const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
-        if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
-        sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
-      });
-    }
-    kindEl?.addEventListener('change', syncCalfGroups);
-    form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
-    document.addEventListener('DOMContentLoaded', syncCalfGroups);
 
     /* قراءة رقم الحيوان من عدة حقول وبأنواع مختلفة */
     async function fetchAnimalDocByNumber(number){
@@ -566,64 +503,116 @@
       return { pregnant, lastFertileDate, lastBoundary };
     }
 
-    async function guardNotInactive(number){
-      const a = await fetchAnimalDocByNumber(number);
-      if (!a) return { ok:false, msg:"رقم الحيوان غير موجود في قاعدة البيانات." };
+  function offerAbort(number, evISO, g, sp){
+  // نص الرسالة
+  const msg =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).\n\n` +
+    `هل تريد تسجيل إجهاض الآن؟`;
 
-      const st = String(a.data?.status || "").trim().toLowerCase();
-      if (st === "inactive") {
-        return { ok:false, msg:"❌ لا يمكن تسجيل أي حدث — هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد)." };
-      }
-      return { ok:true, a };
-    }
+  // نعرض Popup مخصص بزرّين
+  modalText.innerHTML =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).` +
+    `<br><br><strong>هل تريد تسجيل إجهاض الآن؟</strong>`;
 
-    function focusDate(){
-      dateEl?.focus({preventScroll:true});
-      dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
-    }
+  // نغيّر زر البوب-أب الواحد إلى زرين
+  modalBtn.style.display = 'none'; // نخفي الزر القديم
 
-    function offerAbort(number, evISO, g, sp){
-      showInfo(
-        `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).\nهل تريد تسجيل إجهاض الآن؟`,
-        'error',
-        [
-          {
-            text:'نعم — تسجيل إجهاض',
-            cls:'btn-danger',
-            onClick: ()=>{
-              location.href = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
-            }
-          },
-          {
-            text:'لا — تعديل التاريخ',
-            cls:'btn-ghost',
-            onClick: ()=> focusDate()
-          }
-        ]
-      );
-    }
+  // نضيف زرين ديناميكياً
+  const btns = document.createElement('div');
+  btns.style.display = "flex";
+  btns.style.gap = "10px";
+  btns.style.marginTop = "12px";
+
+  const yesBtn = document.createElement('button');
+  yesBtn.textContent = "نعم — تسجيل إجهاض";
+  yesBtn.style.flex = "1";
+  yesBtn.style.padding = "10px";
+  yesBtn.style.borderRadius = "12px";
+  yesBtn.style.border = "0";
+  yesBtn.style.fontWeight = "700";
+  yesBtn.style.cursor = "pointer";
+  yesBtn.style.background = "#dc2626";
+  yesBtn.style.color = "#fff";
+
+  const noBtn = document.createElement('button');
+  noBtn.textContent = "لا — تعديل التاريخ";
+  noBtn.style.flex = "1";
+  noBtn.style.padding = "10px";
+  noBtn.style.borderRadius = "12px";
+  noBtn.style.border = "1px solid #ccc";
+  noBtn.style.fontWeight = "700";
+  noBtn.style.cursor = "pointer";
+  noBtn.style.background = "#fff";
+  noBtn.style.color = "#0f172a";
+
+  // تصرّف زرّ (نعم)
+  yesBtn.addEventListener('click', ()=>{
+    modalOverlay.style.display = 'none';
+    const url = `/abortion.html?number=${encodeURIComponent(String(number||''))}&date=${encodeURIComponent(evISO)}`;
+    location.href = url;
+  });
+
+  // تصرّف زرّ (لا)
+  noBtn.addEventListener('click', ()=>{
+    modalOverlay.style.display = 'none';
+    dateEl?.focus({preventScroll:true});
+    dateEl?.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+
+  btns.appendChild(yesBtn);
+  btns.appendChild(noBtn);
+
+  // تنظيف popup القديم
+  const modal = document.getElementById('mbkModal');
+  modal.querySelectorAll('.dynamic-btns').forEach(el=>el.remove());
+  btns.classList.add('dynamic-btns');
+
+  modal.appendChild(btns);
+
+  // عرض البوب أب
+  modalOverlay.style.display = 'flex';
+}
+
+async function guardNotInactive(number){
+  const a = await fetchAnimalDocByNumber(number);
+  if (!a) return { ok:false, msg:"رقم الحيوان غير موجود في قاعدة البيانات." };
+
+  const st = String(a.data?.status || "").trim().toLowerCase();
+  if (st === "inactive") {
+    return { ok:false, msg:"❌ لا يمكن تسجيل أي حدث — هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد)." };
+  }
+
+  return { ok:true, a };
+}
 
     async function precheck(number){
       disableForm(true);
-      showInfoSilent('جارِ التحقق المبدئي من بيانات الحيوان…', 'warn');
+      info.className = 'infobar show';
+      info.textContent = 'جارِ التحقق المبدئي من بيانات الحيوان…';
+const gate = await guardNotInactive(number);
+if (!gate.ok){
+  info.className = 'infobar show error';
+  info.textContent = gate.msg;
+  showPopup(gate.msg, false);
+  disableForm(true);
+  return;
+}
+const a = gate.a;
 
-      const gate = await guardNotInactive(number);
-      if (!gate.ok){
-        showInfo(gate.msg, 'error');
-        disableForm(true);
-        return;
-      }
-      const a = gate.a;
+
 
       const sp = normSpecies(a.data);
       if (!sp || !MIN_GD[sp]) {
-        showInfo('نوع القطيع غير معروف/غير مدعوم لهذا الحيوان.', 'error');
-        disableForm(true);
+        info.className = 'infobar show error';
+        info.textContent = 'نوع القطيع غير معروف/غير مدعوم لهذا الحيوان.';
+        showPopup('نوع القطيع غير معروف أو غير مدعوم لهذا الحيوان.', false);
         return;
       }
 
       const rsDoc = a.data.reproductiveStatus || a.data.reproStatus || '';
-      const rsNorm = String(rsDoc).replace(/\s+/g,'').replace(/[ًٌٍَُِّْ]/g,'');
+      const rsNorm = String(rsDoc)
+        .replace(/\s+/g,'')
+        .replace(/[ًٌٍَُِّْ]/g,''); // إزالة التشكيل
       const isPregDoc = /عشار|حامل/i.test(rsNorm);
 
       const { pregnant: pregEv, lastFertileDate: lfEv, lastBoundary } =
@@ -635,53 +624,62 @@
       const lf = lfEv || lfDoc;
 
       if (!isPreg){
-        showInfo('لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عشار".', 'error');
-        disableForm(true);
+        info.className = 'infobar show error';
+        info.textContent = 'لا يُسمح بتسجيل الولادة: الحالة التناسلية ليست "عشار".';
+        showPopup('لا يمكن تسجيل الولادة: الحالة التناسلية ليست "عشار".', false);
         return;
       }
       if (!lf){
-        showInfo('لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".', 'error');
-        disableForm(true);
+        info.className = 'infobar show error';
+        info.textContent = 'لا يُسمح بتسجيل الولادة: لا يوجد "آخر تلقيح مُخصِّب".';
+        showPopup('لا يمكن تسجيل الولادة: لا يوجد تاريخ لآخر تلقيح مُخصِّب.', false);
         return;
       }
 
       if (lastBoundary && cmpISO(lastBoundary, lf) >= 0){
-        showInfo(`لا يُسمح بتسجيل الولادة: آخر حدث (${lastBoundary}) يلغي أي حمل حالي.`, 'error');
-        disableForm(true);
+        info.className = 'infobar show error';
+        info.textContent = `لا يُسمح بتسجيل الولادة: آخر حدث (${lastBoundary}) يلغي أي حمل حالي.`;
+        showPopup('لا يمكن تسجيل الولادة: يوجد حدث ولادة/إجهاض أحدث من التلقيح المخصِّب.', false);
         return;
       }
 
-      const evISO = (dateEl?.value && dateEl.value.trim()) || todayISO();
-      const g = daysBetweenISO(lf, evISO);
+     const evISO = (dateEl?.value && dateEl.value.trim()) || todayISO();
+const g = daysBetweenISO(lf, evISO);
+if (!(g >= MIN_GD[sp])){
+  // نحط شريط رسالة أحمر ونمنع هذه المحاولة من الحفظ
+  info.className = 'infobar show error';
+  info.textContent =
+    `لا يُسمح بتسجيل الولادة: عمر الحمل ${g} يوم، أقل من الحد الأدنى (${MIN_GD[sp]} يوم للـ${sp}).`;
 
-      if (!(g >= MIN_GD[sp])){
-        offerAbort(number, evISO, g, sp);
-        disableForm(false); // يسمح بتعديل التاريخ
-        return;
-      }
+  offerAbort(number, evISO, g, sp);
+  disableForm(false);
+  return;
+}
+
 
       if (speciesEl)  speciesEl.value  = sp;
       if (animalIdEl) animalIdEl.value = a.id;
       if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
       if (dateEl && !dateEl.value) dateEl.value = evISO;
 
-      showInfo('جاهز للتسجيل ✅', 'ok', [
-        { text:'حسناً', cls:'btn-ok', onClick: ()=> infoBox.classList.remove('show') }
-      ]);
+      info.className = 'infobar show';
+      info.textContent = 'جاهز للتسجيل ✅';
       disableForm(false);
     }
 
     function kickPrecheck(){
       const n = (numEl?.value||'').trim();
       if (!n){
-        showInfo('أدخل رقم الحيوان أولًا.', 'warn', [
-          { text:'حسناً', cls:'btn-ghost', onClick: ()=> infoBox.classList.remove('show') }
-        ]);
+        info.className = 'infobar show error';
+        info.textContent = 'أدخل رقم الحيوان أولًا.';
         disableForm(true);
         return;
       }
       precheck(n);
     }
+
+    info.setAttribute('role','status');
+    info.setAttribute('aria-live','polite');
 
     onAuthStateChanged(auth, ()=> kickPrecheck());
     numEl?.addEventListener('change', kickPrecheck);
@@ -706,36 +704,34 @@
     form.addEventListener('submit', async (e)=>{
       e.preventDefault();
 
-      const uid = await getUid();
+      const uid    = await getUid();
       if (!uid){
-        showInfo('سجّل الدخول أولًا.', 'error');
+        showPopup('سجّل الدخول أولًا.', false);
         return;
       }
 
       const number = (numEl?.value || '').trim();
       const evISO  = (dateEl?.value || '').trim();
-
       if (!number || !evISO){
-        showInfo('رقم الحيوان وتاريخ الولادة مطلوبان.', 'error');
+        showPopup('رقم الحيوان وتاريخ الولادة مطلوبان.', false);
         return;
       }
+
       if (evISO > todayISO()){
-        showInfo('تاريخ الولادة لا يمكن أن يكون في المستقبل.', 'error', [
-          { text:'تعديل التاريخ', cls:'btn-ghost', onClick: ()=> focusDate() }
-        ]);
+        showPopup('تاريخ الولادة لا يمكن أن يكون في المستقبل.', false);
         return;
       }
 
       await precheck(number);
-      if (infoBox.dataset.type === 'error') return;
+      if (info.classList.contains('error')) return;
 
       if (!form.reportValidity()){
-        showInfo('أكمل الحقول المطلوبة قبل حفظ الحدث.', 'warn');
+        showPopup('أكمل الحقول المطلوبة قبل حفظ الحدث.', false);
         return;
       }
 
       if (await existsCalvingSameDay(uid, number, evISO)){
-        showInfo('لا يمكن تسجيل ولادة مكررة لنفس الحيوان في نفس التاريخ.', 'error');
+        showPopup('لا يمكن تسجيل ولادة مكررة لنفس الحيوان في نفس التاريخ.', false);
         return;
       }
 
@@ -759,10 +755,7 @@
     document.addEventListener('mbk:valid', async (e)=>{
       const { formData } = e.detail;
       const uid = await getUid();
-      if (!uid){
-        showInfo('سجّل الدخول أولًا.', 'error');
-        return;
-      }
+      if (!uid){ showPopup('سجّل الدخول أولًا.', false); return; }
 
       const payload = {
         userId: uid,
@@ -788,18 +781,23 @@
         createdAt: serverTimestamp()
       };
 
-      try{
+           try{
         disableForm(true);
-        showInfoSilent('جارِ الحفظ…', 'warn');
 
-        // 1) حفظ الحدث
+        // 1) نحفظ الحدث كما هو (بالعربي)
         await addDoc(collection(db, 'events'), payload);
 
-        // 2) تحديث وثيقة الحيوان (موحّد)
-        const updatePayload = { ...payload, type:'calving', eventType:'calving' };
+        // 2) نبعَت نسخة "مُوحَّدة" لمحرّك تحديث الحيوان
+        const updatePayload = {
+          ...payload,
+          type: 'calving',      // 👈 النوع الموَّحد اللي animal-update.js فاهمه
+          eventType: 'calving'  // 👈 نفس الشيء، حتى لو الملف يستخدم eventType
+        };
+
         await updateAnimalByEvent(updatePayload);
 
-        // 3) تسجيل العجول
+
+        // تسجيل العجول في مجموعة calves
         const damId     = payload.animalId;
         const damNumber = payload.animalNumber;
         const birthDate = payload.eventDate;
@@ -808,7 +806,7 @@
         const calvesToSave = [];
         const count = parseInt(payload.calfCount || '1',10) || 1;
 
-        const pushCalf = (calfIdField, calfSexField)=>{
+        const pushCalf = (idx, calfIdField, calfSexField)=>{
           const id  = (formData[calfIdField] || '').trim();
           const sex = (formData[calfSexField] || '').trim();
           if (!id || !sex) return;
@@ -824,44 +822,38 @@
           });
         };
 
-        pushCalf('calfId','calf1Sex');
-        if (count >= 2) pushCalf('calf2Id','calf2Sex');
-        if (count >= 3) pushCalf('calf3Id','calf3Sex');
+        pushCalf(1,'calfId','calf1Sex');
+        if (count >= 2) pushCalf(2,'calf2Id','calf2Sex');
+        if (count >= 3) pushCalf(3,'calf3Id','calf3Sex');
 
         for (const calf of calvesToSave){
           await addDoc(collection(db,'calves'), calf);
         }
 
-        showInfo('تم حفظ الولادة وتسجيل العجول بنجاح ✅', 'ok', [
-          {
-            text:'فتح قائمة أحداث الحيوان',
-            cls:'btn-ok',
-            onClick: ()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
-          },
-          {
-            text:'فتح بطاقة الحيوان',
-            cls:'btn-ghost',
-            onClick: ()=> location.href = `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
-          }
-        ]);
+        showPopup('تم حفظ الولادة وتسجيل العجول بنجاح ✅', true, ()=>{
+          location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`;
+        });
 
       }catch(err){
         console.error(err);
         disableForm(false);
-        showInfo('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', 'error', [
-          { text:'حسناً', cls:'btn-ghost', onClick: ()=>{} }
-        ]);
+        showPopup('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', false);
       }
     });
 
     document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
       const num = (numEl?.value || '').trim();
       if (!num){
-        showInfo('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', 'warn');
+        showPopup('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', false);
         return;
       }
       location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
     });
   </script>
+
 </body>
 </html>
+
+
+
+
