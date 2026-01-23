@@ -5,30 +5,11 @@ import { db, auth } from "/js/firebase-config.js";
 import { uniqueAnimalNumber } from "/js/form-rules.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 const page = document.documentElement.dataset.page || "";
 
-const EVENT_PAGES = [
-  // أحداث مباشرة
-  "add-event",
-  "insemination",
-  "daily-milk",
-  "lameness",
-  "mastitis",
-  "calving",
-  "abortion",
-  "pregnancy-diagnosis",
-  "dry-off",
-  "heat",
-  "trimming",
-  "vaccination",
-  "sale",
-  "death",
-
-  // أدوات ذكية = أحداث
-  "smart-camera",
-  "nutrition",
-  "pregnancy-diagnosis"
-];
+// صفحات أدوات ذكية لازم Gate حتى لو مفيهاش input رقم (تعتمد على URL/Storage)
+const FORCE_GATE_PAGES = ["smart-camera", "nutrition", "pregnancy-diagnosis"];
 
 // -------- helpers
 function normDigits(s){
@@ -157,7 +138,18 @@ function installHardBlock(){
   }, true);
 }
 
+function shouldRunGate(){
+  const hasAnimalField =
+    !!document.getElementById("animalNumber") ||
+    !!document.getElementById("animalId");
+
+  return hasAnimalField || FORCE_GATE_PAGES.includes(page);
+}
+
 async function mbkEarlyGate(){
+  // لو الصفحة مش محتاجة Gate (login/register/dashboard...) اخرج فورًا
+  if (!shouldRunGate()) return;
+
   lockAll(true);
   show("جارِ التحقق…", true);
 
@@ -172,21 +164,20 @@ async function mbkEarlyGate(){
   const uid = await getUid();
   const number = getNumberAny();
 
-if (!uid){
-  hide();
-  lockAll(false);
-  return;
-}
+  if (!uid){
+    hide();
+    lockAll(false);
+    return;
+  }
 
-// ⛔ صفحة حدث بدون رقم حيوان = قفل
-if (EVENT_PAGES.includes(page) && !number){
-  window.__MBK_INACTIVE = true;
-  window.__MBK_INACTIVE_MSG = "يجب اختيار رقم الحيوان أولاً.";
-  installHardBlock();
-  show(window.__MBK_INACTIVE_MSG);
-  return;
-}
-
+  // ⛔ صفحات الـ Gate لازم رقم حيوان
+  if (!number){
+    window.__MBK_INACTIVE = true;
+    window.__MBK_INACTIVE_MSG = "يجب اختيار رقم الحيوان أولاً.";
+    installHardBlock();
+    show(window.__MBK_INACTIVE_MSG);
+    return;
+  }
 
   const doc = await fetchAnimalDoc(uid, number);
   if (!doc){
@@ -246,8 +237,8 @@ function attachUniqueAnimalNumberWatcher() {
 // boot
 document.addEventListener("DOMContentLoaded", ()=>{
 
-  // 🔒 التحقق الحيواني فقط في صفحات الأحداث
-  if (EVENT_PAGES.includes(page)) {
+  // Gate يعمل تلقائيًا (زي زمان) على أي صفحة فيها رقم حيوان + صفحات الأدوات الذكية
+  if (shouldRunGate()) {
     mbkEarlyGate();
 
     const numEl = document.getElementById("animalNumber") || document.getElementById("animalId");
@@ -262,7 +253,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     }
   }
 
-  // ✅ ده يفضل شغال كما هو (خاص بإضافة حيوان)
+  // إضافة حيوان كما هي
   attachUniqueAnimalNumberWatcher();
-
 });
