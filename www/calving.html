@@ -327,6 +327,7 @@
       });
     })();
   </script>
+<script type="module" src="/js/forms-init.js"></script>
 
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
@@ -345,43 +346,7 @@
     const saveBtn= document.getElementById('saveBtn');
 
     // ===== Infobar helper =====
-    const infoText    = document.getElementById('infoText');
-    const infoClose   = document.getElementById('infoClose');
-    const infoActions = document.getElementById('infoActions');
-
-    function clearInfoActions(){
-      while (infoActions && infoActions.firstChild) infoActions.removeChild(infoActions.firstChild);
-    }
-
-    function showBar(msg, isError=false, actions=[]){
-      if (!info) return;
-
-      info.className = 'infobar show' + (isError ? ' error' : '');
-      if (infoText) infoText.textContent = String(msg || '');
-
-      clearInfoActions();
-
-      (actions || []).forEach(a=>{
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = a.label || 'زر';
-        b.className = a.className || 'btn-ghost';
-        b.addEventListener('click', ()=>{ if (typeof a.onClick === 'function') a.onClick(); });
-        infoActions.appendChild(b);
-      });
-
-      info.scrollIntoView({behavior:'smooth', block:'nearest'});
-    }
-
-    function hideBar(){
-      if (!info) return;
-      info.className = 'infobar';
-      if (infoText) infoText.textContent = '';
-      clearInfoActions();
-    }
-
-    infoClose?.addEventListener('click', hideBar);
-
+ 
     const animalIdEl = document.getElementById('animalId');
     const speciesEl  = document.getElementById('species');
     const lastFertileEl = document.getElementById('lastFertile');
@@ -838,6 +803,18 @@
       location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
     });
   </script>
+<script>
+  // ربط البوابة المركزية بالصفحة
+  window.renderGateResult = function (res) {
+    if (!res) return;
+
+    // forms-init.js هو المسؤول عن العرض
+    if (typeof window.mbkShowBar === 'function') {
+      window.mbkShowBar(res);
+    }
+  };
+</script>
 
 </body>
 </html>
+
