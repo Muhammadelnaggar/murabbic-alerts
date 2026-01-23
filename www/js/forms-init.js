@@ -127,7 +127,13 @@ async function runGate(form){
   );
 
   if (!uid) { showBar(bar, "تعذّر تحديد المستخدم."); return; }
-  if (!number) { showBar(bar, "أدخل رقم الحيوان أولًا."); return; }
+ if (!number) {
+  showBar(bar, "أدخل رقم الحيوان أولًا.");
+  form.dataset.gated = "0";
+  lock(form, true);
+  return;
+}
+
 
   // رسالة خفيفة (اختياري)
   showBar(bar, "جارِ التحقق…", true);
@@ -175,6 +181,12 @@ function attachGate(form){
   numEl?.addEventListener("change", rerun);
   dtEl?.addEventListener("change", rerun);
 }
+function runGateWithoutForm(){
+  const fakeForm = document.createElement("form");
+  fakeForm.style.display = "none";
+  document.body.appendChild(fakeForm);
+  attachGate(fakeForm);
+}
 
 /* ---------- add-animal unique check (كما كان) ---------- */
 function attachUniqueAnimalNumberWatcher() {
@@ -215,14 +227,28 @@ function attachUniqueAnimalNumberWatcher() {
 
 /* ---------- Boot ---------- */
 function autoAttach(){
-  document.querySelectorAll("form").forEach(attachGate);
+  const forms = Array.from(document.querySelectorAll("form"));
+  let gated = false;
+
+  forms.forEach(f=>{
+    // Gate على الفورمز اللي فيها رقم حيوان
+    const hasNum = f.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']");
+    if (hasNum){
+      attachGate(f);
+      gated = true;
+    }
+  });
+
+  // ✅ لو الصفحة مفيهاش فورم (كاميرا / تغذية / تشخيص)
+  // لكن الرقم جاي من URL أو localStorage → شغّل Gate افتراضي
+  if (!gated && getNumberFromCtx()){
+    runGateWithoutForm();
+  }
+
   attachUniqueAnimalNumberWatcher();
 }
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", autoAttach);
 } else {
   autoAttach();
 }
-
-export { autoAttach };
