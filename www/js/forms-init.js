@@ -5,6 +5,24 @@ import { db, auth } from "/js/firebase-config.js";
 import { uniqueAnimalNumber } from "/js/form-rules.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const page = document.documentElement.dataset.page || "";
+
+const EVENT_PAGES = [
+  "add-event",
+  "insemination",
+  "daily-milk",
+  "lameness",
+  "mastitis",
+  "calving",
+  "abortion",
+  "pregnancy-diagnosis",
+  "dry-off",
+  "heat",
+  "trimming",
+  "vaccination",
+  "sale",
+  "death"
+];
 
 // -------- helpers
 function normDigits(s){
@@ -211,14 +229,24 @@ function attachUniqueAnimalNumberWatcher() {
 
 // boot
 document.addEventListener("DOMContentLoaded", ()=>{
-  mbkEarlyGate();
+
+  // 🔒 التحقق الحيواني فقط في صفحات الأحداث
+  if (EVENT_PAGES.includes(page)) {
+    mbkEarlyGate();
+
+    const numEl = document.getElementById("animalNumber") || document.getElementById("animalId");
+    if (numEl){
+      const rerun = ()=>{ 
+        clearTimeout(window.__mbkGateT); 
+        window.__mbkGateT = setTimeout(mbkEarlyGate, 250); 
+      };
+      numEl.addEventListener("input", rerun);
+      numEl.addEventListener("change", rerun);
+      numEl.addEventListener("blur", rerun);
+    }
+  }
+
+  // ✅ ده يفضل شغال كما هو (خاص بإضافة حيوان)
   attachUniqueAnimalNumberWatcher();
 
-  const numEl = document.getElementById("animalNumber") || document.getElementById("animalId");
-  if (numEl){
-    const rerun = ()=>{ clearTimeout(window.__mbkGateT); window.__mbkGateT = setTimeout(mbkEarlyGate, 250); };
-    numEl.addEventListener("input", rerun);
-    numEl.addEventListener("change", rerun);
-    numEl.addEventListener("blur", rerun);
-  }
 });
