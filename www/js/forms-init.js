@@ -1,5 +1,6 @@
 // /js/forms-init.js — Murabbik Central Gate (ESM)
-// يمنع الحفظ لأي حيوان خارج القطيع (inactive) قبل تعبئة النموذج — مركزي 100%
+// Gate مركزي يمنع الحفظ/التسجيل لأي حيوان خارج القطيع (inactive)
+// يعمل مع الصفحات التي لا تحتوي <form> (زر حفظ onclick) ويعطي فرصة لتغيير الرقم بدون تجميد.
 
 import { db } from "./firebase-config.js";
 import { uniqueAnimalNumber } from "./form-rules.js";
@@ -11,7 +12,6 @@ function firstNonEmpty(...v){ return v.find(x => String(x||"").trim() !== "") ||
 function today(){ return new Date().toISOString().slice(0,10); }
 
 function getUid(){
-  // ✅ مركزي: لا نفترض مفتاح واحد
   return String(
     window.__tenant?.userId ||
     localStorage.getItem("userId") ||
@@ -24,67 +24,131 @@ function getUid(){
 function normDigits(s){
   const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
                '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  return String(s||"").trim().replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g, d=>map[d]);
+  return String(s||"")
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d=>map[d]);
 }
 
 function getNumberFromCtx(){
   return normDigits(firstNonEmpty(
     qs("number"), qs("animalNumber"), qs("animalId"),
-    localStorage.getItem("lastAnimalId"),
+    localStorage.getItem("currentAnimalNumber"),
+    localStorage.getItem("lastAnimalNumber"),
     localStorage.getItem("currentAnimalId"),
-    localStorage.getItem("lastAnimalNumber")
+    localStorage.getItem("lastAnimalId")
   ));
 }
 
 function getDateFromCtx(){
-  return String(firstNonEmpty(qs("date"), qs("eventDate"), localStorage.getItem("lastEventDate"), localStorage.getItem("eventDate"), today())).trim();
+  return String(firstNonEmpty(
+    qs("date"), qs("eventDate"),
+    localStorage.getItem("lastEventDate"),
+    localStorage.getItem("eventDate"),
+    today()
+  )).trim();
 }
 
-function ensureInfoBar(form){
-  let bar = form.querySelector(".infobar") || document.getElementById("info");
+/* ---------- UI: Infobar / Warn ---------- */
+function ensureInfoBar(){
+  // يلتقط الموجود (صفحات فورم/غير فورم)
+  let bar = document.querySelector(".infobar") || document.getElementById("info");
+
   if (!bar) {
+    // لو مفيش infobar في الصفحة، ننشئ واحد بدون تغيير شكل الصفحة (نفس ستايل النسخة السابقة)
     bar = document.createElement("div");
     bar.className = "infobar";
     bar.style.cssText = `
-      margin:8px 0; padding:10px 12px; border-radius:10px;
+      margin:10px 12px; padding:10px 12px; border-radius:10px;
       font:14px/1.4 system-ui,'Cairo',Arial; display:none;
-      background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-weight:700; text-align:center;
+      background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-weight:800; text-align:center;
     `;
-    form.prepend(bar);
+    const main = document.querySelector("main") || document.body;
+    main.prepend(bar);
   }
   return bar;
 }
 
-function showBar(bar, msg, ok=false){
+function showBar(msg, ok=false){
+  const bar = ensureInfoBar();
   bar.style.display = "block";
   bar.style.borderColor = ok ? "#bbf7d0" : "#fed7aa";
   bar.style.background   = ok ? "#ecfdf5" : "#fff7ed";
   bar.style.color        = ok ? "#065f46" : "#9a3412";
   bar.textContent = msg;
+  return bar;
 }
 
-function lock(form, locked){
-  form.querySelectorAll("input,select,textarea,button").forEach(el => {
-    if (el.dataset && el.dataset.nav === "1") return;
-    el.disabled = !!locked;
+function hideBar(){
+  const bar = document.querySelector(".infobar") || document.getElementById("info");
+  if (bar) bar.style.display = "none";
+}
+
+function showWarnIfExists(msg){
+  const w = document.getElementById("warn");
+  if (!w) return;
+  w.style.display = "block";
+  w.textContent = msg;
+}
+
+/* ---------- Detect number input + save targets ---------- */
+function getNumberInput(){
+  return document.querySelector(
+    "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']"
+  );
+}
+
+function getDateInput(){
+  return document.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
+}
+
+function isEventLikePage(){
+  // صفحة أحداث = فيها زر حفظ/تسجيل
+  return !!document.querySelector("#saveBtn,[data-validate='true'],button[type='submit'],.btn-save");
+}
+
+function guardTargets(){
+  // كل ما يمكنه تنفيذ حفظ/تسجيل
+  const arr = [
+    ...document.querySelectorAll("#saveBtn,[data-validate='true'],.btn-save,button[type='submit']")
+  ];
+
+  // صفحات الكاميرا الذكية: الأدوات تعتبر “تنفيذ” لكن فقط لو في رقم بالحقيقة
+  if (document.querySelector(".tool[data-page]")) {
+    arr.push(...document.querySelectorAll(".tool[data-page]"));
+  }
+
+  // إزالة تكرارات
+  return Array.from(new Set(arr));
+}
+
+function setTargetsEnabled(enabled, opts={}){
+  const { keepNav=true } = opts;
+  guardTargets().forEach(el=>{
+    if (keepNav && el.dataset && el.dataset.nav === "1") return;
+    // لا نكسر back button في smart-camera (id=backBtn)
+    if (el.id === "backBtn") return;
+
+    // لو tool buttons: نقفلها فقط عندما نقرر gate إلزامي
+    el.disabled = !enabled;
+    if (!enabled) el.setAttribute("aria-disabled","true");
+    else el.removeAttribute("aria-disabled");
   });
-  const btn = form.querySelector('button[type="submit"], #saveBtn, .btn-save');
-  if (btn) btn.style.display = locked ? "none" : "";
 }
 
-function prefill(form){
+/* ---------- Prefill ---------- */
+function prefillCtx(){
   const num = getNumberFromCtx();
   const dt  = getDateFromCtx();
 
-  const numEl = form.querySelector(
-    "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']"
-  );
-  const dtEl = form.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
+  const numEl = getNumberInput();
+  const dtEl  = getDateInput();
 
   if (numEl && !String(numEl.value||"").trim() && num) numEl.value = num;
-  if (dtEl && !String(dtEl.value||"").trim() && dt)  dtEl.value  = dt;
+  if (dtEl  && !String(dtEl.value||"").trim()  && dt)  dtEl.value  = dt;
 }
 
+/* ---------- Animal label ---------- */
 function animalLabel(doc){
   const sp = String(doc?.species || doc?.animalTypeAr || doc?.animalType || "").trim();
   if (/جاموس/i.test(sp) || sp === "جاموس") return "هذه الجاموسة";
@@ -94,8 +158,9 @@ function animalLabel(doc){
 
 /* ---------- Fetch animal doc (no assumptions) ---------- */
 async function fetchAnimalDoc(uid, number){
-  // 1) الأفضل: userId_number
   const key = `${uid}#${number}`;
+
+  // 1) الأفضل: userId_number
   let qy = query(collection(db,"animals"), where("userId_number","==", key), limit(1));
   let snap = await getDocs(qy);
   if (!snap.empty) return snap.docs[0].data();
@@ -113,79 +178,179 @@ async function fetchAnimalDoc(uid, number){
   return null;
 }
 
-/* ---------- Central Gate ---------- */
-async function runGate(form){
-  const bar = ensureInfoBar(form);
+/* ---------- Allow editing number when blocked ---------- */
+function allowNumberEdit(){
+  const numEl = getNumberInput();
+  if (!numEl) return;
 
-  form.dataset.gated = "0";
-  lock(form, true);
-  prefill(form);
+  // حفظ حالة readonly الأصلية
+  if (numEl.dataset.origReadonly == null) {
+    numEl.dataset.origReadonly = numEl.hasAttribute("readonly") ? "1" : "0";
+  }
 
-  const uid = getUid();
-  const number = normDigits(
-    form.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId']")?.value || getNumberFromCtx()
-  );
+  numEl.removeAttribute("readonly");
+  numEl.disabled = false;
 
-  if (!uid) { showBar(bar, "تعذّر تحديد المستخدم."); return; }
- if (!number) {
-  showBar(bar, "أدخل رقم الحيوان أولًا.");
-  form.dataset.gated = "0";
-  lock(form, true);
-  return;
+  // اختياري: نظف لو قيمته فاضية/غير صالحة
+  // لا نمسح لو المستخدم كتب بالفعل
+  try{ numEl.focus({preventScroll:true}); }catch{}
 }
 
+function restoreNumberReadonly(){
+  const numEl = getNumberInput();
+  if (!numEl) return;
 
-  // رسالة خفيفة (اختياري)
-  showBar(bar, "جارِ التحقق…", true);
+  if (numEl.dataset.origReadonly === "1") numEl.setAttribute("readonly","");
+  // لو الأصل كان مش readonly، لا نغيره
+}
 
-  const doc = await fetchAnimalDoc(uid, number);
-  if (!doc) {
-    showBar(bar, "هذا الحيوان غير موجود بالقطيع.");
+/* ---------- Gate State ---------- */
+function setGate(ok, doc=null){
+  window.__mbkGate = window.__mbkGate || {};
+  window.__mbkGate.ok  = !!ok;
+  window.__mbkGate.doc = doc || null;
+
+  // لو صفحة أحداث: نقفل/نفتح الحفظ
+  if (isEventLikePage()) {
+    setTargetsEnabled(!!ok, {keepNav:true});
+  } else {
+    // صفحات غير أحداث: لا نقفل حاجة
+    setTargetsEnabled(true, {keepNav:true});
+  }
+}
+
+/* ---------- Central Gate Run ---------- */
+let _gateBusy = false;
+async function runGate(){
+  if (_gateBusy) return;
+  _gateBusy = true;
+
+  prefillCtx();
+
+  const uid = getUid();
+  const numEl = getNumberInput();
+  const number = normDigits(String(numEl?.value || getNumberFromCtx() || ""));
+
+  // مبدئياً: لو صفحة أحداث → اقفل التنفيذ لحد ما نتحقق
+  if (isEventLikePage()) setTargetsEnabled(false, {keepNav:true});
+
+  // حالة: لا يوجد userId
+  if (!uid){
+    setGate(false);
+    if (isEventLikePage()){
+      showBar("تعذّر تحديد المستخدم.", false);
+      showWarnIfExists("تعذّر تحديد المستخدم.");
+    }
+    _gateBusy = false;
     return;
   }
 
-  const st = String(doc.status || "").trim().toLowerCase();
-  if (st === "inactive") {
-    showBar(bar, `${animalLabel(doc)} غير موجودة بالقطيع.`);
-    return; // يظل مقفول
+  // حالة: لا يوجد رقم
+  if (!number){
+    setGate(false);
+    if (isEventLikePage()){
+      showBar("اكتب رقم الحيوان أولًا.", false);
+      allowNumberEdit();
+    } else {
+      // صفحات غير أحداث (مثل smart-camera) لا نجمدها
+      showWarnIfExists("⚠️ لم يتم تحديد رقم الحيوان.");
+      setGate(true);
+    }
+    _gateBusy = false;
+    return;
   }
 
-  // ✅ OK
-  bar.style.display = "none";
-  form.dataset.gated = "1";
-  form._mbk_doc = doc;
-  lock(form, false);
+  // تحقق
+  if (isEventLikePage()) showBar("جارِ التحقق…", true);
+
+  try{
+    const doc = await fetchAnimalDoc(uid, number);
+
+    if (!doc){
+      setGate(false);
+      if (isEventLikePage()){
+        showBar("هذا الحيوان غير موجود بالقطيع. اكتب رقمًا آخر.", false);
+        allowNumberEdit();
+      } else {
+        showWarnIfExists("⚠️ الحيوان غير موجود بالقطيع.");
+        // صفحات غير أحداث: لا نقفلها
+        setGate(true);
+      }
+      _gateBusy = false;
+      return;
+    }
+
+    const st = String(doc.status || "").trim().toLowerCase();
+    if (st === "inactive"){
+      setGate(false);
+      const m = `${animalLabel(doc)} غير موجودة بالقطيع. اكتب رقمًا آخر.`;
+      if (isEventLikePage()){
+        showBar(m, false);
+        allowNumberEdit();
+      } else {
+        showWarnIfExists(m);
+        // لو عندنا أدوات camera/tool ومعها رقم: اقفلها
+        setTargetsEnabled(false, {keepNav:true});
+      }
+      _gateBusy = false;
+      return;
+    }
+
+    // ✅ OK
+    hideBar();
+    showWarnIfExists("");
+    setGate(true, doc);
+    restoreNumberReadonly();
+
+    // خزّن آخر رقم/تاريخ لتسهيل الصفحات
+    localStorage.setItem("lastAnimalNumber", String(number));
+    const dt = getDateInput()?.value || getDateFromCtx();
+    if (dt) localStorage.setItem("lastEventDate", String(dt).slice(0,10));
+
+  }catch(e){
+    console.error(e);
+    setGate(false);
+    if (isEventLikePage()){
+      showBar("تعذّر التحقق الآن. حاول مرة أخرى.", false);
+      allowNumberEdit();
+    } else {
+      // غير أحداث: لا نجمد
+      setGate(true);
+    }
+  }finally{
+    _gateBusy = false;
+  }
 }
 
-function attachGate(form){
-  if (!form || form.dataset.mbkGateBound === "1") return;
-  form.dataset.mbkGateBound = "1";
+/* ---------- Hard block clicks (حتى لو الصفحة بتستخدم btn.onclick) ---------- */
+function installHardBlock(){
+  if (document.body.dataset.mbkHardBlock === "1") return;
+  document.body.dataset.mbkHardBlock = "1";
 
-  // ✅ يمنع أي submit handlers أخرى (مركزي) لو gate غير ناجح
-  form.addEventListener("submit", (e) => {
-    if (form.dataset.gated !== "1") {
+  document.addEventListener("click", (e)=>{
+    const t = e.target?.closest?.("#saveBtn,[data-validate='true'],.btn-save,button[type='submit'],.tool[data-page]");
+    if (!t) return;
+
+    // Back button لا يتقفل
+    if (t.id === "backBtn") return;
+
+    // لو page مش أحداث وtool والرقم غير موجود: نسمح (smart-camera بدون رقم)
+    if (t.classList?.contains("tool") && !getNumberFromCtx() && !getNumberInput()) return;
+
+    const ok = !!window.__mbkGate?.ok;
+    if (!ok){
       e.preventDefault();
       e.stopImmediatePropagation();
-      const bar = ensureInfoBar(form);
-      showBar(bar, "⚠️ لا يمكن الحفظ.", false);
+
+      // رسالة مناسبة
+      if (isEventLikePage()){
+        showBar("⚠️ لا يمكن الحفظ قبل إدخال رقم صحيح لحيوان داخل القطيع.", false);
+        allowNumberEdit();
+      } else {
+        showWarnIfExists("⚠️ لا يمكن المتابعة: الحيوان خارج القطيع.");
+      }
     }
   }, true);
-
-  runGate(form);
-
-  const numEl = form.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId']");
-  const dtEl  = form.querySelector("#eventDate,[name='eventDate']");
-  const rerun = () => { clearTimeout(form._mbkGateT); form._mbkGateT = setTimeout(()=>runGate(form), 200); };
-
-  numEl?.addEventListener("input", rerun);
-  numEl?.addEventListener("change", rerun);
-  dtEl?.addEventListener("change", rerun);
-}
-function runGateWithoutForm(){
-  const fakeForm = document.createElement("form");
-  fakeForm.style.display = "none";
-  document.body.appendChild(fakeForm);
-  attachGate(fakeForm);
 }
 
 /* ---------- add-animal unique check (كما كان) ---------- */
@@ -194,7 +359,7 @@ function attachUniqueAnimalNumberWatcher() {
   const input = form?.querySelector("#animalNumber");
   if (!form || !input) return;
 
-  const bar = ensureInfoBar(form);
+  const bar = ensureInfoBar();
   let timer = null;
   let lastValue = "";
 
@@ -214,10 +379,10 @@ function attachUniqueAnimalNumberWatcher() {
       try {
         const r = await uniqueAnimalNumber({ userId, number: num });
         if (!r.ok) {
-          showBar(bar, r.msg || "هذا الرقم مستخدم بالفعل.");
+          showBar(r.msg || "هذا الرقم مستخدم بالفعل.", false);
           form.dataset.numberOk = "0";
         } else {
-          showBar(bar, "✅ رقم الحيوان متاح.", true);
+          showBar("✅ رقم الحيوان متاح.", true);
           form.dataset.numberOk = "1";
         }
       } catch {}
@@ -227,28 +392,33 @@ function attachUniqueAnimalNumberWatcher() {
 
 /* ---------- Boot ---------- */
 function autoAttach(){
-  const forms = Array.from(document.querySelectorAll("form"));
-  let gated = false;
+  installHardBlock();
+  // gate يشتغل فقط لما الصفحة “تشبه” صفحة أحداث (زر حفظ) أو فيها رقم حيوان فعلاً
+  const hasNumEl = !!getNumberInput();
+  if (isEventLikePage() || hasNumEl) {
+    // اقفل الأهداف لحين تحقق (صفحات أحداث فقط)
+    if (isEventLikePage()) setTargetsEnabled(false, {keepNav:true});
+    runGate();
 
-  forms.forEach(f=>{
-    // Gate على الفورمز اللي فيها رقم حيوان
-    const hasNum = f.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']");
-    if (hasNum){
-      attachGate(f);
-      gated = true;
-    }
-  });
+    const numEl = getNumberInput();
+    const dtEl  = getDateInput();
+    const rerun = () => { clearTimeout(window.__mbkGateT); window.__mbkGateT = setTimeout(runGate, 200); };
 
-  // ✅ لو الصفحة مفيهاش فورم (كاميرا / تغذية / تشخيص)
-  // لكن الرقم جاي من URL أو localStorage → شغّل Gate افتراضي
-  if (!gated && getNumberFromCtx()){
-    runGateWithoutForm();
+    numEl?.addEventListener("input", rerun);
+    numEl?.addEventListener("change", rerun);
+    dtEl?.addEventListener("change", rerun);
+  } else {
+    // صفحات ليست أحداث ولا رقم — لا نتدخل
+    setGate(true);
   }
 
   attachUniqueAnimalNumberWatcher();
 }
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", autoAttach);
 } else {
   autoAttach();
 }
+
+export { autoAttach, runGate };
