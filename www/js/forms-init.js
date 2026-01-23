@@ -6,11 +6,6 @@ import { uniqueAnimalNumber } from "/js/form-rules.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const page = document.documentElement.dataset.page || "";
-
-// صفحات أدوات ذكية لازم Gate حتى لو مفيهاش input رقم (تعتمد على URL/Storage)
-const FORCE_GATE_PAGES = ["smart-camera", "nutrition", "pregnancy-diagnosis"];
-
 // -------- helpers
 function normDigits(s){
   const map={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
@@ -138,18 +133,7 @@ function installHardBlock(){
   }, true);
 }
 
-function shouldRunGate(){
-  const hasAnimalField =
-    !!document.getElementById("animalNumber") ||
-    !!document.getElementById("animalId");
-
-  return hasAnimalField || FORCE_GATE_PAGES.includes(page);
-}
-
 async function mbkEarlyGate(){
-  // لو الصفحة مش محتاجة Gate (login/register/dashboard...) اخرج فورًا
-  if (!shouldRunGate()) return;
-
   lockAll(true);
   show("جارِ التحقق…", true);
 
@@ -164,18 +148,9 @@ async function mbkEarlyGate(){
   const uid = await getUid();
   const number = getNumberAny();
 
-  if (!uid){
+  if (!uid || !number){
     hide();
     lockAll(false);
-    return;
-  }
-
-  // ⛔ صفحات الـ Gate لازم رقم حيوان
-  if (!number){
-    window.__MBK_INACTIVE = true;
-    window.__MBK_INACTIVE_MSG = "يجب اختيار رقم الحيوان أولاً.";
-    installHardBlock();
-    show(window.__MBK_INACTIVE_MSG);
     return;
   }
 
@@ -236,23 +211,14 @@ function attachUniqueAnimalNumberWatcher() {
 
 // boot
 document.addEventListener("DOMContentLoaded", ()=>{
-
-  // Gate يعمل تلقائيًا (زي زمان) على أي صفحة فيها رقم حيوان + صفحات الأدوات الذكية
-  if (shouldRunGate()) {
-    mbkEarlyGate();
-
-    const numEl = document.getElementById("animalNumber") || document.getElementById("animalId");
-    if (numEl){
-      const rerun = ()=>{ 
-        clearTimeout(window.__mbkGateT); 
-        window.__mbkGateT = setTimeout(mbkEarlyGate, 250); 
-      };
-      numEl.addEventListener("input", rerun);
-      numEl.addEventListener("change", rerun);
-      numEl.addEventListener("blur", rerun);
-    }
-  }
-
-  // إضافة حيوان كما هي
+  mbkEarlyGate();
   attachUniqueAnimalNumberWatcher();
+
+  const numEl = document.getElementById("animalNumber") || document.getElementById("animalId");
+  if (numEl){
+    const rerun = ()=>{ clearTimeout(window.__mbkGateT); window.__mbkGateT = setTimeout(mbkEarlyGate, 250); };
+    numEl.addEventListener("input", rerun);
+    numEl.addEventListener("change", rerun);
+    numEl.addEventListener("blur", rerun);
+  }
 });
