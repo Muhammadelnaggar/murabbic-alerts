@@ -111,6 +111,43 @@
     }
     .actions-bar .save{background:var(--green);color:#fff}
     .actions-bar .ghost{background:#eef2f7;color:#0f172a}
+    /* عنوان الصفحة */
+.page-title{
+  font-size:20px;
+  font-weight:900;
+  color:var(--green-600);
+}
+
+/* الشعار */
+.brand img{
+  width:52px;       /* أكبر شوية */
+  height:52px;
+}
+
+.brand .name{
+  font-size:18px;
+  font-weight:900;  /* خط عريض */
+  letter-spacing:.5px;
+}
+
+/* زر العودة */
+.back-btn{
+  text-decoration:none;
+  padding:10px 14px;
+  border-radius:12px;
+  font-weight:700;
+  font-size:14px;
+  color:#0f172a;
+  background:#f1f5f9;
+  border:1px solid #cbd5e1;
+  transition:.15s ease;
+}
+
+.back-btn:hover{
+  background:#e2e8f0;
+  border-color:#94a3b8;
+}
+
   </style>
 </head>
 <body>
@@ -118,33 +155,38 @@
   <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
-  <header>
-    <div class="bar">
-      <div class="bar-right">
-        <div class="title">تسجيل حدث الولادة</div>
-      </div>
-
-      <div class="bar-left">
-        <a class="brand" href="dashboard.html" aria-label="Murabbik">
-          <img src="logo.png" alt="شعار مُرَبِّك">
-          <span class="name">مُرَبِّك</span>
-        </a>
-
-        <a class="ghost" href="add-event.html"
-          style="text-decoration:none;padding:10px 12px;border-radius:10px">عودة للأحداث</a>
-      </div>
+ <header>
+  <div class="bar">
+    <!-- اليمين: العنوان -->
+    <div class="bar-right">
+      <div class="page-title">الولادة</div>
     </div>
 
-    <div class="infobar-wrap">
-      <div id="info" class="infobar" role="status" aria-live="polite">
-        <div class="msg-row">
-          <div id="infoText" class="msg-text"></div>
-          <button id="infoClose" class="msg-close" type="button" aria-label="إغلاق">×</button>
-        </div>
-        <div id="infoActions" class="msg-actions"></div>
-      </div>
+    <!-- اليسار: زر الرجوع + الشعار -->
+    <div class="bar-left">
+      <a href="add-event.html" class="back-btn">
+        ← العودة للأحداث
+      </a>
+
+      <a class="brand" href="dashboard.html" aria-label="Murabbik">
+        <img src="logo.png" alt="شعار مُرَبِّك">
+        <span class="name">مُرَبِّك</span>
+      </a>
     </div>
-  </header>
+  </div>
+
+  <!-- infobar زي ما هو (مهم) -->
+  <div class="infobar-wrap">
+    <div id="info" class="infobar" role="status" aria-live="polite">
+      <div class="msg-row">
+        <div id="infoText" class="msg-text"></div>
+        <button id="infoClose" class="msg-close" type="button">×</button>
+      </div>
+      <div id="infoActions" class="msg-actions"></div>
+    </div>
+  </div>
+</header>
+
 
   <main>
     <form id="calving-form" class="card grid" autocomplete="off" novalidate
@@ -495,6 +537,7 @@ payload.idempotencyKey = `${payload.animalNumber}-ولادة-${payload.eventDate
 
 </body>
 </html>
+
 
 
 
