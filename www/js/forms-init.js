@@ -8,6 +8,7 @@ import { collection, query, where, limit, getDocs } from "https://www.gstatic.co
 const page = document.documentElement.dataset.page || "";
 
 const EVENT_PAGES = [
+  // أحداث مباشرة
   "add-event",
   "insemination",
   "daily-milk",
@@ -21,7 +22,12 @@ const EVENT_PAGES = [
   "trimming",
   "vaccination",
   "sale",
-  "death"
+  "death",
+
+  // أدوات ذكية = أحداث
+  "smart-camera",
+  "nutrition",
+  "pregnancy-diagnosis"
 ];
 
 // -------- helpers
