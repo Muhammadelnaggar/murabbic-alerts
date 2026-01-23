@@ -96,7 +96,6 @@ function ensureBar(){
       "margin:8px 0;padding:10px 12px;border-radius:12px;font:14px/1.6 system-ui,'Cairo',Arial;" +
       "display:none;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:800;";
 
-    // بنية موحدة تدعم actions
     bar.innerHTML = `
       <div class="msg-row" style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between">
         <div id="infoText" class="msg-text" style="flex:1;min-width:0;word-break:break-word"></div>
@@ -110,44 +109,53 @@ function ensureBar(){
     host.prepend(bar);
   }
 
-  // تأكد من وجود العناصر الداخلية (حتى لو HTML قديم)
-  if (!document.getElementById("infoText")){
-    const t = document.createElement("div");
-    t.id = "infoText";
-    bar.appendChild(t);
+  // ✅ تأكد من العناصر الداخلية *داخل الـbar نفسه* (بدون تلخبط بين صفحات)
+  let infoText = bar.querySelector("#infoText");
+  if (!infoText){
+    infoText = document.createElement("div");
+    infoText.id = "infoText";
+    infoText.className = "msg-text";
+    bar.appendChild(infoText);
   }
-  if (!document.getElementById("infoActions")){
-    const a = document.createElement("div");
-    a.id = "infoActions";
-    bar.appendChild(a);
+
+  let infoActions = bar.querySelector("#infoActions");
+  if (!infoActions){
+    infoActions = document.createElement("div");
+    infoActions.id = "infoActions";
+    infoActions.className = "msg-actions";
+    bar.appendChild(infoActions);
   }
-  if (!document.getElementById("infoClose")){
-    const c = document.createElement("button");
-    c.id = "infoClose";
-    c.type = "button";
-    c.textContent = "×";
-    bar.appendChild(c);
+
+  let infoClose = bar.querySelector("#infoClose");
+  if (!infoClose){
+    infoClose = document.createElement("button");
+    infoClose.id = "infoClose";
+    infoClose.type = "button";
+    infoClose.textContent = "×";
+    infoClose.className = "msg-close";
+    bar.appendChild(infoClose);
   }
 
   // اربط زر الإغلاق مرة واحدة
   if (!bar.__closeBound){
     bar.__closeBound = true;
-    document.getElementById("infoClose")?.addEventListener("click", ()=> mbkHideBar());
+    infoClose.addEventListener("click", ()=> mbkHideBar());
   }
 
   return bar;
 }
 
 function clearActions(){
-  const box = document.getElementById("infoActions");
+  const bar = ensureBar();
+  const box = bar.querySelector("#infoActions");
   if (!box) return;
   while (box.firstChild) box.removeChild(box.firstChild);
 }
 
 function mbkShowBar(msg, isError=false, actions=[]){
   const bar = ensureBar();
-  const text = document.getElementById("infoText");
-  const box  = document.getElementById("infoActions");
+  const text = bar.querySelector("#infoText");
+  const box  = bar.querySelector("#infoActions");
 
   bar.style.display = "block";
   bar.classList.toggle("show", true);
@@ -168,6 +176,7 @@ function mbkShowBar(msg, isError=false, actions=[]){
       b.type = "button";
       b.textContent = a?.label || "زر";
       b.className = a?.className || "btn-ghost";
+
       // fallback style لو الصفحة مش فيها CSS للأزرار
       if (!b.className || b.className === "btn-ghost"){
         b.style.cssText = "border:1px solid #cbd5e1;background:#eef2f7;color:#0f172a;border-radius:12px;padding:10px 12px;font-weight:900;cursor:pointer;font-size:14px";
@@ -184,13 +193,21 @@ function mbkHideBar(){
   const bar = ensureBar();
   bar.style.display = "none";
   clearActions();
-  const text = document.getElementById("infoText");
+  const text = bar.querySelector("#infoText");
   if (text) text.textContent = "";
 }
 
 // expose globally for any page (central UI)
 window.mbkShowBar = mbkShowBar;
 window.mbkHideBar = mbkHideBar;
+
+// ===== Compatibility aliases (UI only) =====
+window.showBar = function(msg, isError=false, actions=[]){
+  try{ window.mbkShowBar?.(msg, !!isError, actions || []); } catch {}
+};
+window.hideBar = function(){
+  try{ window.mbkHideBar?.(); } catch {}
+};
 
 /* ----------------- Gate Targets ----------------- */
 const SAVE_SEL = "#saveBtn,.save,.btn-save,#bulkSaveBtn,[data-validate],button[type='submit'],input[type='submit']";
@@ -258,18 +275,10 @@ async function fetchAnimalDoc(uid, number){
 
 /* ----------------- Status: treat any non-active as out of herd ----------------- */
 function isOutOfHerd(doc){
-  // قواعدك: status = "active" أو "inactive"
   const st = String(doc?.status ?? "").trim().toLowerCase();
-
-  // لو مكتوب inactive → خارج القطيع
   if (st === "inactive") return true;
-
-  // لو مكتوب قيمة أخرى (sale/dead/cull/…) → خارج القطيع
   if (st && st !== "active") return true;
-
-  // دعم أعلام أخرى لو موجودة
   if (doc?.isActive === false || doc?.active === false) return true;
-
   return false;
 }
 
@@ -345,7 +354,7 @@ function attachUniqueAnimalNumberWatcher(){
     const num = normDigits(input.value);
     form.dataset.numberOk = "";
 
-    if (!num){ window.mbkHideBar?.(); lastValue=""; return; }
+    if (!num){ mbkHideBar(); lastValue=""; return; }
     if (num === lastValue) return;
     lastValue = num;
 
