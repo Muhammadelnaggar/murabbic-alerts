@@ -443,30 +443,61 @@
     function cmpISO(a,b){ return new Date(a) - new Date(b); }
 
     /* قراءة رقم الحيوان من عدة حقول وبأنواع مختلفة */
-    async function fetchAnimalDocByNumber(number){
-      const raw = normNumberDigits(number);
-      const asStr = raw;
-      const asNum = raw ? Number(raw) : NaN;
+  async function fetchAnimalDocByNumber(number){
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+               '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  const raw = String(number || '')
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d=>map[d]);
 
-      const tries = [
-        ['animalNumber','==',asStr],
-        ['animalNumber','==',asNum],
-        ['number','==',asStr],
-        ['number','==',asNum],
-        ['animalNo','==',asStr],
-        ['animalNo','==',asNum],
-      ].filter(t => !(typeof t[2] === 'number' && Number.isNaN(t[2])));
+  const asStr = raw;
+  const asNum = raw ? Number(raw) : NaN;
 
-      for (const [field,op,val] of tries){
-        const q1 = query(collection(db,'animals'), where(field, op, val), limit(1));
-        const snap = await getDocs(q1);
-        if (!snap.empty){
-          const d = snap.docs[0];
-          return { id: d.id, data: d.data() || {} };
-        }
-      }
-      return null;
+  const uid = await getUid();
+  if (!uid) return null;
+
+  const tries = [
+    ['number', asStr],
+    ['number', asNum],
+    ['animalNumber', asStr],
+    ['animalNumber', asNum],
+    ['animalNo', asStr],
+    ['animalNo', asNum],
+  ].filter(([f,v]) => !(typeof v === 'number' && Number.isNaN(v)));
+
+  // ✅ مهم: فلترة على userId/ownerUid عشان مايمسكش حيوان حد تاني
+  for (const [field,val] of tries){
+    // userId
+    let q1 = query(
+      collection(db,'animals'),
+      where('userId','==', uid),
+      where(field,'==', val),
+      limit(1)
+    );
+    let snap = await getDocs(q1);
+    if (!snap.empty){
+      const d = snap.docs[0];
+      return { id: d.id, data: d.data() || {} };
     }
+
+    // ownerUid (احتياطي للبيانات القديمة)
+    q1 = query(
+      collection(db,'animals'),
+      where('ownerUid','==', uid),
+      where(field,'==', val),
+      limit(1)
+    );
+    snap = await getDocs(q1);
+    if (!snap.empty){
+      const d = snap.docs[0];
+      return { id: d.id, data: d.data() || {} };
+    }
+  }
+
+  return null; // ✅ هنا لازم يرجع null لو “201” مش بتاعت المستخدم
+}
+
 
     /* ✅ نفس التطبيع قبل Query events */
     async function fetchSignalsFromEvents(number){
@@ -817,4 +848,5 @@
 
 </body>
 </html>
+
 
