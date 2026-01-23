@@ -1,13 +1,13 @@
 // /js/forms-init.js — Murabbik Central Gate (ESM)
-// ✅ يمنع أي تسجيل لحيوان غير موجود/Inactive عبر: submit + onclick + tool buttons (مركزي)
+// ✅ بوابة قطيع مركزية: تمنع أي حفظ/تسجيل لحيوان غير موجود أو inactive
+// ✅ تعمل على الصفحات بدون <form> (saveBtn / data-validate / tool buttons)
+// ✅ لا تُجمّد الصفحة: تترك إدخال رقم الحيوان متاح دائمًا وتمنع "الحفظ فقط"
 
 import { db } from "./firebase-config.js";
 import { uniqueAnimalNumber } from "./form-rules.js";
-import {
-  collection, query, where, limit, getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ---------- Helpers ---------- */
+/* ----------------- Helpers ----------------- */
 function qs(k){ return new URL(location.href).searchParams.get(k) || ""; }
 function firstNonEmpty(...v){ return v.find(x => String(x||"").trim() !== "") || ""; }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -23,9 +23,11 @@ function getUid(){
 }
 
 function normDigits(s){
-  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-               '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  return String(s||"").trim().replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩۰-۹]/g, d=>map[d]);
+  const map={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+             '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  return String(s||"").trim()
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d=>map[d]);
 }
 
 function getNumberFromCtx(){
@@ -33,9 +35,7 @@ function getNumberFromCtx(){
     qs("number"), qs("animalNumber"), qs("animalId"),
     localStorage.getItem("lastAnimalId"),
     localStorage.getItem("currentAnimalId"),
-    localStorage.getItem("lastAnimalNumber"),
-    localStorage.getItem("animalNumber"),
-    localStorage.getItem("animalId")
+    localStorage.getItem("lastAnimalNumber")
   ));
 }
 
@@ -48,47 +48,24 @@ function getDateFromCtx(){
   )).trim();
 }
 
-function pageHasSaveTargets(){
-  return !!document.querySelector(SAVE_TARGETS);
+function getNumberFromDom(){
+  const el = document.querySelector(
+    "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']"
+  );
+  return normDigits(el?.value || "");
 }
 
-function pageHasAnimalNumberField(){
-  return !!document.querySelector(ANIMAL_FIELDS);
-}
+function prefillCtx(){
+  const n = getNumberFromCtx();
+  const d = getDateFromCtx();
 
-/* ---------- UI ---------- */
-function ensureInfoBar(){
-  // يفضّل الموجود أصلاً
-  let bar = document.getElementById("info") || document.querySelector(".infobar");
-  if (bar) return bar;
+  const numEl = document.querySelector(
+    "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']"
+  );
+  const dtEl  = document.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
 
-  // لو فيه فورم حطها فوقه
-  const host = document.querySelector("form") || document.body;
-  bar = document.createElement("div");
-  bar.id = "info";
-  bar.className = "infobar";
-  bar.style.cssText = `
-    margin:8px 0; padding:10px 12px; border-radius:10px;
-    font:14px/1.4 system-ui,'Cairo',Arial; display:none;
-    background:#fff7ed; border:1px solid #fed7aa; color:#9a3412;
-    font-weight:700; text-align:center;
-  `;
-  host.prepend(bar);
-  return bar;
-}
-
-function show(msg, ok=false){
-  const bar = ensureInfoBar();
-  bar.style.display = "block";
-  bar.style.borderColor = ok ? "#bbf7d0" : "#fed7aa";
-  bar.style.background   = ok ? "#ecfdf5" : "#fff7ed";
-  bar.style.color        = ok ? "#065f46" : "#9a3412";
-  bar.textContent = msg;
-}
-
-function hide(){
-  const bar = ensureInfoBar();
-  bar.style.display = "none";
+  if (numEl && !String(numEl.value||"").trim() && n) numEl.value = n;
+  if (dtEl  && !String(dtEl.value||"").trim() && d) dtEl.value  = d;
 }
 
 function animalLabel(doc){
@@ -98,28 +75,97 @@ function animalLabel(doc){
   return "هذا الحيوان";
 }
 
-/* ---------- Gate Targets ---------- */
-const ANIMAL_FIELDS =
-  "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']";
+/* ----------------- UI: Infobar ----------------- */
+function ensureBar(){
+  const host = document.querySelector(".mbk-form") || document.querySelector("main") || document.body;
+  let bar = document.getElementById("info") || host.querySelector(".infobar");
+  if (!bar){
+    bar = document.createElement("div");
+    bar.id = "info";
+    bar.className = "infobar";
+    bar.style.cssText =
+      "margin:8px 0;padding:10px 12px;border-radius:10px;font:14px/1.4 system-ui,'Cairo',Arial;display:none;" +
+      "background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:700;text-align:center;";
+    host.prepend(bar);
+  }
+  return bar;
+}
+function show(msg, ok=false){
+  const bar = ensureBar();
+  bar.style.display = "block";
+  bar.style.borderColor = ok ? "#bbf7d0" : "#fed7aa";
+  bar.style.background   = ok ? "#ecfdf5" : "#fff7ed";
+  bar.style.color        = ok ? "#065f46" : "#9a3412";
+  bar.textContent = msg;
+}
+function hide(){
+  const bar = ensureBar();
+  bar.style.display = "none";
+}
 
-const SAVE_TARGETS =
-  "#saveBtn,.btn-save,.save,#bulkSaveBtn,button[type='submit'],input[type='submit'],[data-validate],.tool[data-page]";
+/* ----------------- Gate Targets ----------------- */
+const SAVE_SEL = "#saveBtn,.save,.btn-save,#bulkSaveBtn,[data-validate],button[type='submit'],input[type='submit']";
+const TOOL_SEL = ".tool[data-page]";
 
-/* ---------- Fetch animal doc (no assumptions) ---------- */
+/* بوابة تطبّق فقط لو الصفحة فيها زر حفظ/أداة تسجل */
+function shouldGateThisPage(){
+  return !!document.querySelector(SAVE_SEL + "," + TOOL_SEL);
+}
+
+function setSaveEnabled(on){
+  // لا نقفل إدخال الرقم أبداً
+  document.querySelectorAll(SAVE_SEL).forEach(el=>{
+    // استثناء أزرار التنقل لو عندك data-nav=1
+    if (el?.dataset?.nav === "1") return;
+    el.disabled = !on;
+    if (el.id === "saveBtn" || el.classList.contains("btn-save") || el.hasAttribute("data-validate")) {
+      el.style.opacity = on ? "" : "0.55";
+    }
+  });
+
+  // أدوات الكاميرا الذكية (tool buttons)
+  document.querySelectorAll(TOOL_SEL).forEach(el=>{
+    if (el?.dataset?.nav === "1") return;
+    el.style.pointerEvents = on ? "" : "none";
+    el.style.opacity = on ? "" : "0.55";
+  });
+
+  window.__MBK_GATE_OK = !!on;
+}
+
+function installHardBlock(){
+  if (window.__MBK_BLOCK_INSTALLED) return;
+  window.__MBK_BLOCK_INSTALLED = true;
+
+  document.addEventListener("click", (e)=>{
+    if (window.__MBK_GATE_OK) return;
+
+    const hit = e.target.closest(SAVE_SEL + "," + TOOL_SEL);
+    if (!hit) return;
+
+    e.preventDefault(); e.stopImmediatePropagation();
+    show(window.__MBK_GATE_MSG || "لا يمكن الحفظ.");
+  }, true);
+
+  document.addEventListener("submit", (e)=>{
+    if (window.__MBK_GATE_OK) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    show(window.__MBK_GATE_MSG || "لا يمكن الحفظ.");
+  }, true);
+}
+
+/* ----------------- Firestore: fetch animal doc ----------------- */
 async function fetchAnimalDoc(uid, number){
   const key = `${uid}#${number}`;
 
-  // 1) userId_number
   let qy = query(collection(db,"animals"), where("userId_number","==", key), limit(1));
   let snap = await getDocs(qy);
   if (!snap.empty) return snap.docs[0].data();
 
-  // 2) userId + number
   qy = query(collection(db,"animals"), where("userId","==", uid), where("number","==", String(number)), limit(1));
   snap = await getDocs(qy);
   if (!snap.empty) return snap.docs[0].data();
 
-  // 3) ownerUid + number
   qy = query(collection(db,"animals"), where("ownerUid","==", uid), where("number","==", String(number)), limit(1));
   snap = await getDocs(qy);
   if (!snap.empty) return snap.docs[0].data();
@@ -127,150 +173,118 @@ async function fetchAnimalDoc(uid, number){
   return null;
 }
 
-/* ---------- Central Gate Core ---------- */
-async function runGateOnce(){
-  // بوابة لا تعمل إلا لو الصفحة “تنفّذ تسجيل”
-  if (!pageHasSaveTargets() && !pageHasAnimalNumberField() && !getNumberFromCtx()) {
-    window.__mbkGate = { ok:true, skip:true };
-    return window.__mbkGate;
-  }
+/* ----------------- Run Gate ----------------- */
+async function runGate(){
+  if (!shouldGateThisPage()) return;
+
+  installHardBlock();
+  prefillCtx();
 
   const uid = getUid();
   if (!uid){
-    window.__mbkGate = { ok:false, reason:"no_uid" };
-    show("تعذّر تحديد المستخدم.");
-    return window.__mbkGate;
+    // لو مفيش مستخدم: ما نغيّرش سلوك صفحات غير التسجيل
+    window.__MBK_GATE_OK = true;
+    hide();
+    return;
   }
 
-  // رقم الحيوان: من الحقل لو موجود، وإلا من الكونتكست
-  const field = document.querySelector(ANIMAL_FIELDS);
-  let number = normDigits(field?.value || getNumberFromCtx());
+  const number = getNumberFromDom() || getNumberFromCtx();
 
-  // ✅ لا تجميد: لو مفيش رقم، امنع الحفظ فقط وخلّي المستخدم يكتب
+  // ✅ لو الصفحة بتسجل بس الرقم فاضي: امنع الحفظ فقط، واترك الإدخال مفتوح
   if (!number){
-    if (field){
-      field.removeAttribute("readonly");
-      field.disabled = false;
-      try{ field.focus(); }catch{}
-    }
-    window.__mbkGate = { ok:false, reason:"no_number" };
-    show("أدخل رقم الحيوان أولًا.");
-    return window.__mbkGate;
+    window.__MBK_GATE_OK = false;
+    window.__MBK_GATE_MSG = "اكتب رقم الحيوان أولاً.";
+    setSaveEnabled(false);
+    show(window.__MBK_GATE_MSG);
+    return;
   }
 
-  // لو فيه تاريخ وحقل، prefll اختياري
-  const dt = getDateFromCtx();
-  const dtEl = document.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
-  if (dtEl && !String(dtEl.value||"").trim() && dt) dtEl.value = dt;
-
+  // تحقق
+  window.__MBK_GATE_OK = false;
+  window.__MBK_GATE_MSG = "جارِ التحقق…";
+  setSaveEnabled(false);
   show("جارِ التحقق…", true);
 
-  const doc = await fetchAnimalDoc(uid, number);
-  if (!doc){
-    if (field){
-      field.removeAttribute("readonly");
-      field.disabled = false;
-      try{ field.focus(); field.select?.(); }catch{}
-    }
-    window.__mbkGate = { ok:false, reason:"not_found" };
-    show("هذا الحيوان غير موجود بالقطيع.");
-    return window.__mbkGate;
-  }
+  try{
+    const doc = await fetchAnimalDoc(uid, number);
 
-  const st = String(doc.status || "").trim().toLowerCase();
-  if (st === "inactive"){
-    if (field){
-      field.removeAttribute("readonly");
-      field.disabled = false;
-      try{ field.focus(); field.select?.(); }catch{}
+    if (!doc){
+      window.__MBK_GATE_OK = false;
+      window.__MBK_GATE_MSG = "هذا الحيوان غير موجود بالقطيع.";
+      setSaveEnabled(false);
+      show(window.__MBK_GATE_MSG);
+      return;
     }
-    window.__mbkGate = { ok:false, reason:"inactive" };
-    show(`${animalLabel(doc)} غير موجودة بالقطيع.`);
-    return window.__mbkGate;
-  }
 
-  hide();
-  window.__mbkGate = { ok:true, doc };
-  return window.__mbkGate;
+    const st = String(doc.status || "").trim().toLowerCase();
+    if (st === "inactive"){
+      window.__MBK_GATE_OK = false;
+      window.__MBK_GATE_MSG = `${animalLabel(doc)} غير موجودة بالقطيع.`;
+      setSaveEnabled(false);
+      show(window.__MBK_GATE_MSG);
+      return;
+    }
+
+    // ✅ OK
+    window.__MBK_GATE_OK = true;
+    window.__MBK_GATE_MSG = "";
+    hide();
+    setSaveEnabled(true);
+  } catch (e){
+    window.__MBK_GATE_OK = false;
+    window.__MBK_GATE_MSG = "تعذّر التحقق الآن.";
+    setSaveEnabled(false);
+    show(window.__MBK_GATE_MSG);
+  }
 }
 
-/* ---------- Hard Block (submit + onclick + tools) ---------- */
-function installUniversalBlocker(){
-  if (window.__MBK_BLOCKER_INSTALLED) return;
-  window.__MBK_BLOCKER_INSTALLED = true;
-
-  // 1) منع submit لو gate مش ok
-  document.addEventListener("submit", async (e)=>{
-    if (!pageHasSaveTargets() && !pageHasAnimalNumberField() && !getNumberFromCtx()) return;
-
-    const g = window.__mbkGate?.ok ? window.__mbkGate : await runGateOnce();
-    if (!g.ok){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  }, true);
-
-  // 2) منع أي click على أزرار/أدوات الحفظ لو gate مش ok
-  document.addEventListener("click", async (e)=>{
-    const hit = e.target.closest(SAVE_TARGETS);
-    if (!hit) return;
-
-    // لو ده زر/لينك تنقّل صِرف سِيبُه
-    if (hit.dataset && hit.dataset.nav === "1") return;
-
-    const g = window.__mbkGate?.ok ? window.__mbkGate : await runGateOnce();
-    if (!g.ok){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  }, true);
-}
-
-/* ---------- add-animal unique check (كما كان) ---------- */
-function attachUniqueAnimalNumberWatcher() {
+/* ---------- add-animal unique check (كما هو) ---------- */
+function attachUniqueAnimalNumberWatcher(){
   const form = document.getElementById("animalForm");
   const input = form?.querySelector("#animalNumber");
   if (!form || !input) return;
 
-  const bar = ensureInfoBar();
-  let timer = null;
-  let lastValue = "";
+  const bar = ensureBar();
+  let timer=null, lastValue="";
 
-  input.addEventListener("input", () => {
+  input.addEventListener("input", ()=>{
     const num = normDigits(input.value);
     form.dataset.numberOk = "";
 
-    if (!num) { bar.style.display = "none"; lastValue = ""; return; }
+    if (!num){ bar.style.display="none"; lastValue=""; return; }
     if (num === lastValue) return;
     lastValue = num;
 
     if (timer) clearTimeout(timer);
-    timer = setTimeout(async () => {
+    timer = setTimeout(async ()=>{
       const userId = localStorage.getItem("userId");
       if (!userId) return;
 
-      try {
+      try{
         const r = await uniqueAnimalNumber({ userId, number: num });
-        if (!r.ok) show(r.msg || "هذا الرقم مستخدم بالفعل.");
-        else show("✅ رقم الحيوان متاح.", true);
+        if (!r.ok){
+          show(r.msg || "هذا الرقم مستخدم بالفعل.");
+          form.dataset.numberOk="0";
+        } else {
+          show("✅ رقم الحيوان متاح.", true);
+          form.dataset.numberOk="1";
+        }
       } catch {}
     }, 400);
   });
 }
 
-/* ---------- Boot ---------- */
+/* ----------------- Boot ----------------- */
 function boot(){
-  installUniversalBlocker();
+  // أول تشغيل
+  runGate();
 
-  // تشغيل gate عند التحميل لو الصفحة “تنفّذ”
-  if (pageHasSaveTargets() || pageHasAnimalNumberField() || getNumberFromCtx()){
-    runGateOnce();
-  }
-
-  // إعادة تشغيل gate عند تغيير الرقم
-  const numEl = document.querySelector(ANIMAL_FIELDS);
+  // إعادة التحقق عند تغيير الرقم
+  const numEl = document.querySelector(
+    "#animalNumber,#animalId,[name='animalNumber'],[name='animalId'],[data-field='animalNumber'],[data-field='animalId']"
+  );
   if (numEl){
-    const rerun = ()=>{ clearTimeout(window.__mbkGateT); window.__mbkGateT = setTimeout(runGateOnce, 180); };
+    const rerun = ()=>{ clearTimeout(window.__mbkGateT); window.__mbkGateT = setTimeout(runGate, 250); };
     numEl.addEventListener("input", rerun);
     numEl.addEventListener("change", rerun);
     numEl.addEventListener("blur", rerun);
@@ -284,3 +298,5 @@ if (document.readyState === "loading") {
 } else {
   boot();
 }
+
+export { boot };
