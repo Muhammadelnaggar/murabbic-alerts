@@ -257,14 +257,46 @@ label .req::after{
   opacity:.9;
 }
 
-/* لوجو خفيف في الخلفية */
-.mbk-event-header::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:url("/images/logo.png") center no-repeat;
-  background-size:120px;
-  opacity:.06;
-  pointer-events:none;
+
+
+/* ===============================
+   Event Header with Logo Beside
+   =============================== */
+.mbk-event-header{
+  background:#ffffff;
+  border-bottom:1px solid var(--border);
+  padding:14px 12px;
+  display:flex;
+  justify-content:center;
 }
 
+.mbk-event-headline{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  text-align:right;
+}
+
+.mbk-event-logo{
+  width:42px;
+  height:auto;
+  opacity:.9;
+}
+
+.mbk-event-text{
+  display:flex;
+  flex-direction:column;
+  line-height:1.2;
+}
+
+.mbk-event-title{
+  font-size:20px;
+  font-weight:900;
+  color:#0f172a;
+}
+
+.mbk-event-brand{
+  font-size:13px;
+  font-weight:800;
+  color:var(--brand-600);
+}
