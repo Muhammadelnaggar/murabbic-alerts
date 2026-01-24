@@ -47,6 +47,9 @@ export const eventSchemas = {
     animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
     eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
     species: { required: true, msg: "نوع الحيوان مطلوب." },
+    const a = (ctx && ctx.animalDoc) ? ctx.animalDoc : null;
+if (!ctx.fertileInsemDate && a?.lastInseminationDate) ctx.fertileInsemDate = String(a.lastInseminationDate).slice(0,10);
+
     lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
     // fallback من وثيقة الحيوان إذا لم يوجد حدث تلقيح مُخصب
 if (!ctx.fertileInsemDate && ctx.animalDoc) {
