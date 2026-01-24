@@ -339,6 +339,12 @@ window.__MBK_GATE_MSG = "";
 window.__MBK_UID = uid;
 window.__MBK_ANIMAL_NUMBER = String(number);
 window.__MBK_ANIMAL_DOC = doc;   // ✅ مهم للـ validateEvent(documentData)
+// تعبئة الحقول المخفية المطلوبة لصفحات الأحداث (زي الولادة)
+const idEl = document.querySelector("#animalId,[data-field='animalId']");
+const spEl = document.querySelector("#species,[data-field='species']");
+
+if (idEl && !idEl.value) idEl.value = String(number);
+if (spEl && !spEl.value) spEl.value = String(doc?.species || doc?.animalTypeAr || doc?.animalType || "");
 
 mbkHideBar();
 setSaveEnabled(true);
