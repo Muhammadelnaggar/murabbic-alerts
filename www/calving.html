@@ -345,7 +345,8 @@
   // ✅ اعرض رسائل عبر النظام المركزي (forms-init.js)
  function showBar(msg, isError=false, actions=[]){
   if (typeof window.mbkShowBar === 'function') {
-    window.mbkShowBar({ msg, isError, actions });
+   window.mbkShowBar(msg, isError, actions);
+
 
     return;
   }
@@ -428,7 +429,8 @@
   }
 
   document.addEventListener('mbk:valid', async (e)=>{
-    const { formData } = e.detail || {};
+    const formData = e.detail || {};
+
     const uid = await getUid();
     if (!uid){ showBar('سجّل الدخول أولًا.', true); return; }
 
@@ -471,7 +473,8 @@ payload.idempotencyKey = `${payload.animalNumber}-ولادة-${payload.eventDate
       await addDoc(collection(db, 'events'), payload);
 
       // 2) update animal doc (نفس ملفك)
-      await updateAnimalByEvent({ ...payload, type:'calving', eventType:'calving' });
+     await updateAnimalByEvent({ ...payload, type:'ولادة', eventType:'ولادة' });
+
 
       // 3) save calves (Idempotent) only if not dead
       if (!isDead) {
@@ -537,6 +540,7 @@ payload.idempotencyKey = `${payload.animalNumber}-ولادة-${payload.eventDate
 
 </body>
 </html>
+
 
 
 
