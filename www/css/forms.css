@@ -320,3 +320,42 @@ label .req::after{
 .mbk-back-btn:active{
   transform:translateY(-50%) scale(.96);
 }
+/* ===== Header Fix: Logo Left + Title Center ===== */
+.mbk-event-header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px 12px;
+  background:#ffffff;
+  border-bottom:1px solid var(--border);
+}
+
+/* اللوجو ثابت على الشمال وكبير */
+.mbk-event-logo{
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  width:72px;
+  height:auto;
+}
+
+/* النص في المنتصف */
+.mbk-event-center{
+  text-align:center;
+  line-height:1.2;
+}
+
+.mbk-event-title{
+  font-size:20px;
+  font-weight:900;
+  color:#0f172a;
+}
+
+.mbk-event-brand{
+  font-size:13px;
+  font-weight:800;
+  color:var(--brand-600);
+  margin-top:4px;
+}
