@@ -3,7 +3,7 @@
 // ✅ UI مركزي (Infobar) يدعم Actions بدون أعطال DOM
 // ✅ لا تُجمّد الصفحة: تترك إدخال رقم الحيوان متاح دائمًا وتمنع "الحفظ فقط"
 
-import { db, auth } from "./firebase-config.js";   // ✅ بدل db فقط
+import { db, auth } from "./firebase-config.js";
 import { uniqueAnimalNumber, validateEvent } from "./form-rules.js";
 
 import {
@@ -82,10 +82,8 @@ function animalLabel(doc){
 
 /* ----------------- UI: Infobar (Central, with actions) ----------------- */
 function ensureBar(){
-  // لو الصفحة عاملة Infobar متقدم (زي calving) استخدمه كما هو
   let bar = document.getElementById("info");
 
-  // fallback: أنشئ Infobar موحد إن لم يوجد
   if (!bar){
     const host = document.querySelector(".infobar-wrap")
       || document.querySelector(".mbk-form")
@@ -112,7 +110,6 @@ function ensureBar(){
     host.prepend(bar);
   }
 
-  // ✅ تأكد من العناصر الداخلية *داخل الـbar نفسه* (بدون تلخبط بين صفحات)
   let infoText = bar.querySelector("#infoText");
   if (!infoText){
     infoText = document.createElement("div");
@@ -139,7 +136,6 @@ function ensureBar(){
     bar.appendChild(infoClose);
   }
 
-  // اربط زر الإغلاق مرة واحدة
   if (!bar.__closeBound){
     bar.__closeBound = true;
     infoClose.addEventListener("click", ()=> mbkHideBar());
@@ -164,7 +160,6 @@ function mbkShowBar(msg, isError=false, actions=[]){
   bar.classList.toggle("show", true);
   bar.classList.toggle("error", !!isError);
 
-  // ألوان fallback (لو forms.css مش مديها)
   bar.style.borderColor = isError ? "#fed7aa" : "#bbf7d0";
   bar.style.background  = isError ? "#fff7ed" : "#ecfdf5";
   bar.style.color       = isError ? "#9a3412" : "#065f46";
@@ -180,7 +175,6 @@ function mbkShowBar(msg, isError=false, actions=[]){
       b.textContent = a?.label || "زر";
       b.className = a?.className || "btn-ghost";
 
-      // fallback style لو الصفحة مش فيها CSS للأزرار
       if (!b.className || b.className === "btn-ghost"){
         b.style.cssText = "border:1px solid #cbd5e1;background:#eef2f7;color:#0f172a;border-radius:12px;padding:10px 12px;font-weight:900;cursor:pointer;font-size:14px";
       }
@@ -200,11 +194,9 @@ function mbkHideBar(){
   if (text) text.textContent = "";
 }
 
-// expose globally for any page (central UI)
 window.mbkShowBar = mbkShowBar;
 window.mbkHideBar = mbkHideBar;
 
-// ===== Compatibility aliases (UI only) =====
 window.showBar = function(msg, isError=false, actions=[]){
   try{ window.mbkShowBar?.(msg, !!isError, actions || []); } catch {}
 };
@@ -285,6 +277,86 @@ function isOutOfHerd(doc){
   return false;
 }
 
+/* ----------------- Page -> Event Type ----------------- */
+function pageToEventType(){
+  const p = String(document.documentElement?.dataset?.page || document.body?.dataset?.page || "").trim().toLowerCase();
+  const map = {
+    "calving": "ولادة",
+    "abortion": "إجهاض",
+    "insemination": "تلقيح",
+    "pregnancy-diagnosis": "تشخيص حمل",
+    "dry-off": "تجفيف",
+    "daily-milk": "لبن يومي",
+    "mastitis": "التهاب ضرع",
+    "lameness": "عرج",
+    "heat": "شياع",
+    "vaccination": "تحصين"
+  };
+  return map[p] || "";
+}
+
+/* ----------------- Payload Collector ----------------- */
+function collectPayload(){
+  const payload = {};
+
+  document.querySelectorAll("[data-field]").forEach(el=>{
+    const k = String(el.getAttribute("data-field") || "").trim();
+    if (!k) return;
+    payload[k] = (el.type === "checkbox") ? !!el.checked : String(el.value || "").trim();
+  });
+
+  const nEl = document.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId']");
+  const dEl = document.querySelector("#eventDate,[name='eventDate']");
+  const sEl = document.querySelector("#species,[name='species']");
+
+  if (!payload.animalNumber && !payload.animalId) payload.animalNumber = normDigits(nEl?.value || "") || "";
+  if (!payload.eventDate) payload.eventDate = String(dEl?.value || "").trim() || getDateFromCtx();
+  if (!payload.species) payload.species = String(sEl?.value || "").trim();
+
+  payload.documentData = window.__MBK_ANIMAL_DOC || null;
+  return payload;
+}
+
+function dispatchValid(payload){
+  const ev = new CustomEvent("mbk:valid", { detail: payload });
+  window.dispatchEvent(ev);
+  document.dispatchEvent(ev);
+}
+
+/* ----------------- Quick Validation (show early, without save) ----------------- */
+function quickValidateCalving(){
+  const eventType = pageToEventType();
+  if (eventType !== "ولادة") return;
+
+  const doc = window.__MBK_ANIMAL_DOC || null;
+  if (!doc) return;
+
+  // ✅ اعرض "غير عشار" فورًا (بدون انتظار ملء باقي الحقول)
+  const rs = String(doc.reproductiveStatus || doc.reproStatus || "").trim();
+  if (rs && rs !== "عشار"){
+    mbkShowBar(`❌ لا يمكن تسجيل الولادة: الحالة التناسلية الحالية (${rs}).`, true);
+    return;
+  }
+
+  // لو لسه البيانات ناقصة، متزعّجش المستخدم برسائل "مطلوب" بدري
+  const dEl  = document.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
+  const lfEl = document.querySelector("[data-field='lastFertileInseminationDate'],[name='lastFertileInseminationDate'],#lastFertileInseminationDate,#lastFertile");
+
+  const eventDate = String(dEl?.value || "").trim();
+  const lastFert  = String(lfEl?.value || "").trim();
+
+  if (!eventDate || !lastFert) return;
+
+  const payload = collectPayload();
+  const r = validateEvent("ولادة", payload);
+
+  if (!r.ok){
+    mbkShowBar((r.errors && r.errors[0]) ? r.errors[0] : "لا يمكن الحفظ.", true);
+  } else {
+    mbkHideBar();
+  }
+}
+
 /* ----------------- Run Gate ----------------- */
 async function runGate(){
   if (!shouldGateThisPage()) return;
@@ -294,8 +366,10 @@ async function runGate(){
 
   const uid = getUid();
   if (!uid){
-    window.__MBK_GATE_OK = true;
-    mbkHideBar();
+    window.__MBK_GATE_OK = false;
+    window.__MBK_GATE_MSG = "سجّل الدخول أولاً.";
+    setSaveEnabled(false);
+    mbkShowBar(window.__MBK_GATE_MSG, true);
     return;
   }
 
@@ -333,34 +407,30 @@ async function runGate(){
       return;
     }
 
-  window.__MBK_GATE_OK = true;
-window.__MBK_GATE_MSG = "";
+    window.__MBK_GATE_OK = true;
+    window.__MBK_GATE_MSG = "";
 
-window.__MBK_UID = uid;
-window.__MBK_ANIMAL_NUMBER = String(number);
-window.__MBK_ANIMAL_DOC = doc;   // ✅ مهم للـ validateEvent(documentData)
-    // ✅ فحص فوري لصفحة الولادة (قبل الضغط على حفظ)
-const page = String(document.documentElement?.dataset?.page || document.body?.dataset?.page || "").trim().toLowerCase();
-if (page === "calving") {
-  const rs = String(doc?.reproductiveStatus || doc?.reproStatus || "").trim();
-  if (rs && /مفتوح|مفتوحة|فارغ|فارغة|open/i.test(rs)) {
-    window.__MBK_GATE_OK = false;
-    window.__MBK_GATE_MSG = "لا يمكن تسجيل الولادة: الحالة التناسلية الحالية (مفتوحة/فارغة).";
-    setSaveEnabled(false);
-    mbkShowBar(window.__MBK_GATE_MSG, true);
-    return;
-  }
-}
+    window.__MBK_UID = uid;
+    window.__MBK_ANIMAL_NUMBER = String(number);
+    window.__MBK_ANIMAL_DOC = doc;
 
-// تعبئة الحقول المخفية المطلوبة لصفحات الأحداث (زي الولادة)
-const idEl = document.querySelector("#animalId,[data-field='animalId']");
-const spEl = document.querySelector("#species,[data-field='species']");
+    // تعبئة الحقول المخفية المطلوبة
+    const idEl = document.querySelector("#animalId,[data-field='animalId']");
+    const spEl = document.querySelector("#species,[data-field='species']");
 
-if (idEl && !idEl.value) idEl.value = String(number);
-if (spEl && !spEl.value) spEl.value = String(doc?.species || doc?.animalTypeAr || doc?.animalType || "");
+    if (idEl && !idEl.value) idEl.value = String(number);
+    if (spEl && !spEl.value) spEl.value = String(doc?.species || doc?.animalTypeAr || doc?.animalType || "");
 
-mbkHideBar();
-setSaveEnabled(true);
+    // ✅ فعّل الحفظ (الفاليديشن المركزي سيمنع عند الحاجة)
+    setSaveEnabled(true);
+
+    // ✅ اعرض رسالة "غير عشار" فورًا إن وجدت
+    quickValidateCalving();
+
+    // لو مفيش رسالة، اخفي
+    if (!document.getElementById("info")?.style?.display || document.getElementById("info")?.style?.display === "none"){
+      mbkHideBar();
+    }
 
   } catch (e){
     window.__MBK_GATE_OK = false;
@@ -404,96 +474,24 @@ function attachUniqueAnimalNumberWatcher(){
     }, 400);
   });
 }
+
 /* ================== Validation Dispatcher (Central) ================== */
-
-function pageToEventType(){
-  const p = String(document.documentElement?.dataset?.page || document.body?.dataset?.page || "").trim().toLowerCase();
-  const map = {
-    "calving": "ولادة",
-    "abortion": "إجهاض",
-    "insemination": "تلقيح",
-    "pregnancy-diagnosis": "تشخيص حمل",
-    "dry-off": "تجفيف",
-    "daily-milk": "لبن يومي",
-    "mastitis": "التهاب ضرع",
-    "lameness": "عرج",
-    "heat": "شياع",
-    "vaccination": "تحصين"
-  };
-  return map[p] || "";
-}
-
-function collectPayload(){
-  const payload = {};
-
-  // كل حقول الفورم المعيارية (data-field)
-  document.querySelectorAll("[data-field]").forEach(el=>{
-    const k = String(el.getAttribute("data-field") || "").trim();
-    if (!k) return;
-    payload[k] = (el.type === "checkbox") ? !!el.checked : String(el.value || "").trim();
-  });
-
-  // توافق للأسماء الشائعة
-  const nEl = document.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId']");
-  const dEl = document.querySelector("#eventDate,[name='eventDate']");
-  const sEl = document.querySelector("#species,[name='species']");
-
-  if (!payload.animalNumber && !payload.animalId) payload.animalNumber = normDigits(nEl?.value || "") || "";
-  if (!payload.eventDate) payload.eventDate = String(dEl?.value || "").trim() || getDateFromCtx();
-  if (!payload.species) payload.species = String(sEl?.value || "").trim();
-
-  // ✅ وثيقة الحيوان من Gate
-  payload.documentData = window.__MBK_ANIMAL_DOC || null;
-
-  return payload;
-}
-
-function dispatchValid(payload){
-  const ev = new CustomEvent("mbk:valid", { detail: payload });
-  window.dispatchEvent(ev);
-  document.dispatchEvent(ev);
-}
-
 function installValidationDispatcher(){
   if (window.__MBK_VALID_DISPATCHER) return;
   window.__MBK_VALID_DISPATCHER = true;
 
   const doValidate = (e)=>{
-    // لازم Gate يكون OK
     if (!window.__MBK_GATE_OK) return;
 
     const eventType = pageToEventType();
-    if (!eventType) return; // صفحات غير مدعومة في rules
+    if (!eventType) return;
 
-    // زر حفظ/submit فقط
     const hit = e.target?.closest?.(SAVE_SEL);
     if (!hit) return;
 
-    // امنع أي تنفيذ افتراضي/حفظ محلي
     e.preventDefault(); e.stopImmediatePropagation();
 
     const payload = collectPayload();
-   
-
-// ✅ قفل مركزي نهائي للولادة
-if (eventType === "ولادة") {
-  if (!payload.documentData) {
-    mbkShowBar("لا يمكن التحقق من حالة الحيوان الآن.", true);
-    return;
-  }
-
-  const rs = String(payload.documentData.reproductiveStatus || "").trim();
-
-  // ❗ لا يسمح بالولادة إلا لو الحالة = عشار
-  if (rs !== "عشار") {
-    mbkShowBar(
-      `❌ لا يمكن تسجيل الولادة: الحالة التناسلية الحالية (${rs})`,
-      true
-    );
-    return;
-  }
-}
-
     const r = validateEvent(eventType, payload);
 
     if (!r.ok){
@@ -501,11 +499,9 @@ if (eventType === "ولادة") {
       return;
     }
 
-    // ✅ نجاح: اطلق الحدث المركزي لتكمل الصفحة الحفظ
     dispatchValid(payload);
   };
 
-  // click (للأزرار type=button) + submit (لو فيه form submit)
   document.addEventListener("click", doValidate, true);
   document.addEventListener("submit", doValidate, true);
 }
@@ -522,7 +518,18 @@ function boot(){
     numEl.addEventListener("input", rerun);
     numEl.addEventListener("change", rerun);
     numEl.addEventListener("blur", rerun);
+    numEl.addEventListener("keyup", rerun);
   }
+
+  // ✅ اظهار رسالة الولادة بدري عند تغيير التاريخ/آخر تلقيح مخصّب
+  const dEl  = document.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
+  const lfEl = document.querySelector("[data-field='lastFertileInseminationDate'],[name='lastFertileInseminationDate'],#lastFertileInseminationDate,#lastFertile");
+
+  const rerunQuick = ()=>{ clearTimeout(window.__mbkQV); window.__mbkQV = setTimeout(quickValidateCalving, 150); };
+  dEl?.addEventListener("input", rerunQuick);
+  dEl?.addEventListener("change", rerunQuick);
+  lfEl?.addEventListener("input", rerunQuick);
+  lfEl?.addEventListener("change", rerunQuick);
 
   attachUniqueAnimalNumberWatcher();
   installValidationDispatcher();
