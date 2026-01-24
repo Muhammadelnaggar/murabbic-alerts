@@ -1,211 +1,145 @@
-// /js/forms-init.js — Murabbik Global Early Gate (ESM)
-// هدفه: منع أي submit لحيوان status=inactive فور فتح الصفحة + تعبئة الرقم/التاريخ من URL
-// يعمل على أي <form> حتى لو الصفحة عندها كود حفظ مباشر (بـ capture)
+// /js/forms-init.js — ESM
+// يركّب تلقائيًا على أي <form data-validate="true" data-event="اسم الحدث">
+// يجمع كل [data-field] ويُظهر رسائل في infobar أعلى النموذج.
+// عند النجاح: يطلق حدثًا "mbk:valid" ويحمل البيانات في detail.formData.
 
-import { db } from "./firebase-config.js";
-import { validateEvent, uniqueAnimalNumber } from "./form-rules.js";
-import {
-  collection, query, where, limit, getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { validateEvent, uniqueAnimalNumber } from './form-rules.js';
 
-/* =============== Helpers =============== */
-function qs(k){ return new URL(location.href).searchParams.get(k) || ""; }
-function firstNonEmpty(...v){ return v.find(x => String(x||"").trim() !== "") || ""; }
-function today(){ return new Date().toISOString().slice(0,10); }
-
-function getUserId(){
-  return String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
-}
-
-function getNumberFromCtx(){
-  return String(firstNonEmpty(
-    qs("number"), qs("animalId"), qs("animalNumber"),
-    localStorage.getItem("currentAnimalId"),
-    localStorage.getItem("lastAnimalId"),
-    localStorage.getItem("lastAnimalNumber")
-  )).trim();
-}
-
-function getDateFromCtx(){
-  return String(firstNonEmpty(
-    qs("date"), qs("eventDate"),
-    localStorage.getItem("eventDate"),
-    localStorage.getItem("lastEventDate"),
-    today()
-  )).trim();
-}
-
-function ensureInfoBar(form){
-  let bar = form.querySelector(".infobar") || document.getElementById("info");
+function ensureInfoBar(form) {
+  let bar = form.querySelector('.infobar');
   if (!bar) {
-    bar = document.createElement("div");
-    bar.className = "infobar";
+    bar = document.createElement('div');
+    bar.className = 'infobar';
+    // ستايل خفيف غير مخرّب للتصميم القائم
     bar.style.cssText = `
       margin:8px 0; padding:10px 12px; border-radius:10px;
-      font: 14px/1.4 system-ui,'Cairo',Arial;
-      display:none; background:#ffebee; border:1px solid #ef9a9a; color:#b71c1c;
+      font: 14px/1.4 system-ui, 'Cairo', Arial;
+      display:none; background:#fff; border:1px solid #e2e8f0; color:#0f172a;
     `;
     form.prepend(bar);
   }
   return bar;
 }
 
-function showBar(bar, msg, ok=false){
-  bar.style.display = "block";
-  bar.style.borderColor = ok ? "#bbf7d0" : "#ef9a9a";
-  bar.style.background   = ok ? "#ecfdf5" : "#ffebee";
-  bar.style.color        = ok ? "#065f46" : "#b71c1c";
-  bar.textContent = msg;
+function showMsg(bar, msgs, type="error") {
+  if (!bar) return;
+  bar.style.display = 'block';
+  bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
+  bar.style.background   = type === "error" ? "#ffebee" : "#ecfdf5";
+  bar.style.color        = type === "error" ? "#b71c1c" : "#065f46";
+  bar.innerHTML = Array.isArray(msgs)
+    ? `<ul style="margin:0;padding-left:18px">${msgs.map(m=>`<li>${m}</li>`).join("")}</ul>`
+    : msgs;
 }
 
-function lock(form, locked){
-  form.querySelectorAll("input,select,textarea,button").forEach(el => {
-    if (el.dataset && el.dataset.nav === "1") return;
-    el.disabled = !!locked;
+function collectFormData(form) {
+  const data = {};
+  form.querySelectorAll('[data-field]').forEach(el => {
+    const k = el.getAttribute('data-field');
+    let v = (el.type === 'checkbox') ? (el.checked ? (el.value || true) : "") :
+            (el.type === 'radio') ? (el.checked ? el.value : data[k] || "") :
+            el.value;
+    data[k] = v;
   });
-  const btn = form.querySelector('button[type="submit"], #saveBtn, .btn-save');
-  if (btn) btn.style.display = locked ? "none" : "";
+  // تطبيع شائع: لو فيه species فارغ حاول قراءته من localStorage
+  if (!data.species && localStorage.getItem('herdSpecies')) {
+    data.species = localStorage.getItem('herdSpecies'); // "أبقار"|"جاموس"
+  }
+  return data;
 }
 
-function prefill(form){
-  const num = getNumberFromCtx();
-  const dt  = getDateFromCtx();
-
-  const numEl = form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber'],[data-field='animalId'],[data-field='animalNumber']");
-  const dtEl  = form.querySelector("#eventDate,[name='eventDate'],[data-field='eventDate']");
-
-  if (numEl && !String(numEl.value||"").trim() && num) numEl.value = num;
-  if (dtEl && !String(dtEl.value||"").trim() && dt) dtEl.value = dt;
-}
-
-async function fetchAnimalDocByKey(uid, number){
-  const key = `${uid}#${number}`;
-  const qy = query(
-    collection(db, "animals"),
-    where("userId_number", "==", key),
-    limit(1)
-  );
-  const snap = await getDocs(qy);
-  if (snap.empty) return null;
-  return snap.docs[0].data();
-}
-
-/* =============== Core Gate =============== */
-async function runGate(form){
+function attachOne(form) {
   const bar = ensureInfoBar(form);
+  const eventName = form.getAttribute('data-event');
+  if (!eventName) return;
 
-  form.dataset.gated = "0";
-  lock(form, true);
-  prefill(form);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
 
-  const uid = getUserId();
-  const number = String(
-    form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber']")?.value || getNumberFromCtx()
-  ).trim();
+    const formData = collectFormData(form);
+    const { ok, errors } = validateEvent(eventName, formData);
 
-  if (!uid) { showBar(bar, "تعذّر تحديد المستخدم. افتح الصفحة من داخل النظام."); return; }
-  if (!number) { showBar(bar, "رقم الحيوان غير متاح."); return; }
-
-  showBar(bar, "جارٍ التحقق من حالة الحيوان…", true);
-
-  let animalDoc = null;
-  try {
-    animalDoc = await fetchAnimalDocByKey(uid, number);
-  } catch (e) {
-    console.error("Gate fetch failed:", e);
-  }
-
-  if (!animalDoc) { showBar(bar, `تعذّر العثور على الحيوان رقم ${number}.`); return; }
-
-  // ✅ استخدم الفاليديشن المركزي نفسه
-  const eventDate = String(
-    form.querySelector("#eventDate,[name='eventDate']")?.value || getDateFromCtx()
-  ).trim();
-
-  const res = validateEvent("لبن يومي", { animalId: number, eventDate, documentData: animalDoc }); // مجرد استدعاء للـ inactive lock
-  if (!res.ok) {
-    showBar(bar, res.errors?.[0] || "غير مسموح.");
-    return; // يظل مقفول
-  }
-
-  // ✅ OK
-  bar.style.display = "none";
-  form.dataset.gated = "1";
-  form._mbk_doc = animalDoc;
-  lock(form, false);
-}
-
-function attachGateToForm(form){
-  if (!form || form.dataset.mbkGateBound === "1") return;
-  form.dataset.mbkGateBound = "1";
-
-  // ✅ capture: يمنع أي submit handlers أخرى لو gate غير ناجح
-  form.addEventListener("submit", (e) => {
-    if (form.dataset.gated !== "1") {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const bar = ensureInfoBar(form);
-      showBar(bar, "⚠️ لا يمكن الحفظ قبل التحقق من حالة الحيوان.");
+    if (!ok) {
+      showMsg(bar, errors, "error");
+      form.dataset.valid = "0";
+      // تركيز أول خطأ إن أمكن
+      const firstFieldName = (errors[0] || "").match(/«(.+?)»/)?.[1];
+      if (firstFieldName) {
+        const el = form.querySelector(`[data-field="${firstFieldName}"]`);
+        if (el?.focus) el.focus();
+      }
+      return;
     }
-  }, true);
 
-  runGate(form);
+    // نجاح ✅
+    form.dataset.valid = "1";
+    showMsg(bar, "✅ البيانات سليمة — جاري الحفظ...", "ok");
 
-  const numEl = form.querySelector("#animalId,#animalNumber,[name='animalId'],[name='animalNumber']");
-  const dtEl  = form.querySelector("#eventDate,[name='eventDate']");
-  const rerun = () => { clearTimeout(form._mbkGateT); form._mbkGateT = setTimeout(()=>runGate(form), 200); };
-  numEl?.addEventListener("input", rerun);
-  numEl?.addEventListener("change", rerun);
-  dtEl?.addEventListener("change", rerun);
+    // أطلِق حدث نجاح شامل؛ صفحة الحدث تتولّى onSave
+    const ev = new CustomEvent('mbk:valid', { detail: { formData, eventName, form } });
+    form.dispatchEvent(ev);
+  });
 }
 
-/* =============== add-animal unique check (اختياري) =============== */
+/* ====================================================
+   ربط فوري للتحقق من رقم الحيوان في صفحة add-animal
+   ==================================================== */
 function attachUniqueAnimalNumberWatcher() {
-  const form = document.getElementById("animalForm");
-  const input = form?.querySelector("#animalNumber");
-  if (!form || !input) return;
+  const form  = document.getElementById('animalForm');
+  const input = form?.querySelector('#animalNumber');
+  if (!form || !input) return;   // لو مش في صفحة إضافة حيوان، تجاهل
 
   const bar = ensureInfoBar(form);
   let timer = null;
   let lastValue = "";
 
-  input.addEventListener("input", () => {
+  input.addEventListener('input', () => {
     const num = String(input.value || "").trim();
-    form.dataset.numberOk = "";
 
-    if (!num) { bar.style.display = "none"; lastValue = ""; return; }
+    // لو اتغير الرقم، امسح أي حالة قديمة
+    form.dataset.numberOk = "";
+    if (!num) {
+      bar.style.display = 'none';
+      lastValue = "";
+      return;
+    }
+
     if (num === lastValue) return;
     lastValue = num;
 
     if (timer) clearTimeout(timer);
     timer = setTimeout(async () => {
-      const userId = localStorage.getItem("userId");
-      if (!userId) return;
+      const userId = localStorage.getItem('userId');
+      if (!userId) return; // لسه ما تسجلش الدخول أو الـ userId مش محفوظ
 
       try {
-        const r = await uniqueAnimalNumber({ userId, number: num });
-        if (!r.ok) {
-          showBar(bar, r.msg || "هذا الرقم مستخدم بالفعل.");
+        const res = await uniqueAnimalNumber({ userId, number: num });
+        if (!res.ok) {
+          showMsg(bar, res.msg || "هذا الرقم مستخدم بالفعل.", "error");
           form.dataset.numberOk = "0";
         } else {
-          showBar(bar, "✅ رقم الحيوان متاح في حسابك.", true);
+          showMsg(bar, "✅ رقم الحيوان متاح في حسابك.", "ok");
           form.dataset.numberOk = "1";
         }
       } catch (e) {
         console.error("uniqueAnimalNumber check failed", e);
+        // ما نطلعش رسالة خطأ للمستخدم هنا عشان ما نزعجهش
       }
-    }, 400);
+    }, 400); // تأخير بسيط عشان ما نضربش على Firestore مع كل حرف
   });
 }
 
-/* =============== Boot =============== */
-function autoAttach(){
-  document.querySelectorAll("form").forEach(attachGateToForm);
+function autoAttach() {
+  document
+    .querySelectorAll('form[data-validate="true"][data-event]')
+    .forEach(attachOne);
+
+  // ربط التحقق المبكر من رقم الحيوان في نموذج إضافة حيوان
   attachUniqueAnimalNumberWatcher();
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", autoAttach);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', autoAttach);
 } else {
   autoAttach();
 }
