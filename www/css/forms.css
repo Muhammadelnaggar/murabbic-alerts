@@ -232,3 +232,39 @@ label .req::after{
   border-color:#22303c;
   color:#cbd5e1;
 }
+/* ===============================
+   Event Pages Header (NEW)
+   =============================== */
+.mbk-event-header{
+  position: relative;
+  text-align: center;
+  padding: 18px 10px 14px;
+  background:#ffffff;
+  border-bottom:1px solid var(--border);
+}
+
+.mbk-event-title{
+  font-size:20px;
+  font-weight:800;
+  color:#0f172a;
+}
+
+.mbk-event-brand{
+  font-size:13px;
+  font-weight:700;
+  color:var(--brand);
+  margin-top:4px;
+  opacity:.9;
+}
+
+/* لوجو خفيف في الخلفية */
+.mbk-event-header::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:url("/images/logo.png") center no-repeat;
+  background-size:120px;
+  opacity:.06;
+  pointer-events:none;
+}
+
