@@ -43,14 +43,7 @@ const commonFields = {
 // ===================================================================
 export const eventSchemas = {
   "ولادة": {
-    fields: {
-      animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
-      eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
-      species: { required: true, msg: "نوع الحيوان مطلوب." },
-      // ⚠️ نتركه مطلوب كما هو عندك — ولو لم يأتِ من الفورم سيقوم الجارد بعمل fallback من الوثيقة
-      lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
-      documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
-    },
+    fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
     guards: ["calvingDecision"],
   },
 
@@ -93,35 +86,13 @@ export const guards = {
     const doc = fd.documentData;
     if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    // 1) منع غير Active
-    const st = String(doc?.status ?? "").trim().toLowerCase();
-    if (st === "inactive") return "❌ لا يمكن تسجيل ولادة — هذا الحيوان خارج القطيع.";
+    if (doc.reproductiveStatus !== "عشار")
+      return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
 
-    // 2) لازم تكون عشار
-    const rs = String(doc.reproductiveStatus || "").trim();
-    if (rs !== "عشار") return "لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عشار».";
-
-    // 3) حد أدنى عمر حمل حسب النوع
-    const sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
-    const th = thresholds[sp]?.minGestationDays;
+    const th = thresholds[doc.species]?.minGestationDays;
     if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
 
-    // ✅ 4) Fallback لآخر تلقيح مُخصِّب من وثيقة الحيوان (لو الفورم/الأحداث ما جابوه)
-    // عندك في Firestore: lastInseminationDate: "YYYY-MM-DD"
-    if (!fd.lastFertileInseminationDate) {
-      const cand =
-        doc.lastFertileInseminationDate ||
-        doc.lastInseminationDate ||   // ✅ الحقل الموجود عندك
-        doc.lastBreedDate ||
-        doc.lastServiceDate ||
-        "";
-
-      if (cand) fd.lastFertileInseminationDate = String(cand).slice(0, 10);
-    }
-
-    // 5) حساب عمر الحمل من آخر تلقيح
-    const lf = fd.lastFertileInseminationDate || doc.lastFertileInseminationDate || doc.lastInseminationDate || "";
-    const gDays = daysBetween(lf, fd.eventDate);
+    const gDays = daysBetween(doc.lastFertileInseminationDate, fd.eventDate);
     if (Number.isNaN(gDays)) return "لا يوجد تلقيح مُخصِّب سابق.";
     if (gDays < th) return `عمر الحمل ${gDays} أقل من الحد الأدنى ${th}.`;
 
