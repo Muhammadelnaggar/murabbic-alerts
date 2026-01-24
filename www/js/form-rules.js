@@ -48,6 +48,23 @@ export const eventSchemas = {
     eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
     species: { required: true, msg: "نوع الحيوان مطلوب." },
     lastFertileInseminationDate: { required: true, type: "date", msg: "تاريخ آخر تلقيح مُخصِّب مطلوب." },
+    // fallback من وثيقة الحيوان إذا لم يوجد حدث تلقيح مُخصب
+if (!ctx.fertileInsemDate && ctx.animalDoc) {
+  const a = ctx.animalDoc;
+
+  const cand =
+    a.lastFertileInseminationDate ||
+    a.lastInseminationDate ||   // ✅ ده الموجود عندك
+    a.lastBreedDate ||
+    a.lastServiceDate ||
+    "";
+
+  if (cand) {
+    ctx.fertileInsemDate = String(cand).slice(0,10);
+    ctx.fertileInsemSource = "animal_doc";
+  }
+}
+
     documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
   },
   guards: ["calvingDecision"],
