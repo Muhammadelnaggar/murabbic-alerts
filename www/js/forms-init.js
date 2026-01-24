@@ -460,6 +460,27 @@ function installValidationDispatcher(){
     e.preventDefault(); e.stopImmediatePropagation();
 
     const payload = collectPayload();
+   
+
+// ✅ قفل مركزي نهائي للولادة
+if (eventType === "ولادة") {
+  if (!payload.documentData) {
+    mbkShowBar("لا يمكن التحقق من حالة الحيوان الآن.", true);
+    return;
+  }
+
+  const rs = String(payload.documentData.reproductiveStatus || "").trim();
+
+  // ❗ لا يسمح بالولادة إلا لو الحالة = عشار
+  if (rs !== "عشار") {
+    mbkShowBar(
+      `❌ لا يمكن تسجيل الولادة: الحالة التناسلية الحالية (${rs})`,
+      true
+    );
+    return;
+  }
+}
+
     const r = validateEvent(eventType, payload);
 
     if (!r.ok){
