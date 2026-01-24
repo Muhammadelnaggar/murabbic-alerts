@@ -339,6 +339,19 @@ window.__MBK_GATE_MSG = "";
 window.__MBK_UID = uid;
 window.__MBK_ANIMAL_NUMBER = String(number);
 window.__MBK_ANIMAL_DOC = doc;   // ✅ مهم للـ validateEvent(documentData)
+    // ✅ فحص فوري لصفحة الولادة (قبل الضغط على حفظ)
+const page = String(document.documentElement?.dataset?.page || document.body?.dataset?.page || "").trim().toLowerCase();
+if (page === "calving") {
+  const rs = String(doc?.reproductiveStatus || doc?.reproStatus || "").trim();
+  if (rs && /مفتوح|مفتوحة|فارغ|فارغة|open/i.test(rs)) {
+    window.__MBK_GATE_OK = false;
+    window.__MBK_GATE_MSG = "لا يمكن تسجيل الولادة: الحالة التناسلية الحالية (مفتوحة/فارغة).";
+    setSaveEnabled(false);
+    mbkShowBar(window.__MBK_GATE_MSG, true);
+    return;
+  }
+}
+
 // تعبئة الحقول المخفية المطلوبة لصفحات الأحداث (زي الولادة)
 const idEl = document.querySelector("#animalId,[data-field='animalId']");
 const spEl = document.querySelector("#species,[data-field='species']");
