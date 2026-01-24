@@ -194,6 +194,16 @@
 }
 
   </style>
+  <style>
+  .mbk-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .mbk-title{display:flex;flex-direction:column;gap:2px}
+  .mbk-page{font-weight:900;font-size:18px}
+  .mbk-brand{font-weight:800;font-size:13px;opacity:.85}
+  .mbk-logo{height:34px;opacity:.6}
+  .mbk-top-actions{margin:8px 0 0}
+  .mbk-back{display:inline-block;padding:10px 12px;border-radius:12px;text-decoration:none}
+</style>
+
 </head>
 <body>
 <a href="add-event.html" class="floating-back" aria-label="العودة للأحداث"></a>
@@ -201,28 +211,18 @@
   <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
-<header>
-  <div class="bar">
-    <div class="bar-right">
-      <div class="page-title">الولادة</div>
-      <div class="app-name">مُرَبِّيك</div>
-    </div>
-
-    <div class="bar-left">
-      <img class="brand-logo" src="logo.png" alt="شعار مُرَبِّيك">
-    </div>
+<header class="mbk-header">
+  <div class="mbk-title">
+    <div class="mbk-page">الولادة</div>
+    <div class="mbk-brand">مُرَبِّيك</div>
   </div>
-
-  <div class="infobar-wrap">
-    <div id="info" class="infobar" role="status" aria-live="polite">
-      <div class="msg-row">
-        <div id="infoText" class="msg-text"></div>
-        <button id="infoClose" class="msg-close" type="button">×</button>
-      </div>
-      <div id="infoActions" class="msg-actions"></div>
-    </div>
-  </div>
+  <img class="mbk-logo" src="logo.png" alt="مُرَبِّيك" />
 </header>
+
+<div class="mbk-top-actions">
+  <a class="mbk-back" href="add-event.html">العودة للأحداث</a>
+</div>
+
 
 
   <main>
@@ -578,6 +578,7 @@ payload.idempotencyKey = `${payload.animalNumber}-ولادة-${payload.eventDate
 
 </body>
 </html>
+
 
 
 
