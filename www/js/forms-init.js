@@ -4,7 +4,8 @@
 // ✅ لا تُجمّد الصفحة: تترك إدخال رقم الحيوان متاح دائمًا وتمنع "الحفظ فقط"
 
 import { db, auth } from "./firebase-config.js";   // ✅ بدل db فقط
-import { uniqueAnimalNumber } from "./form-rules.js";
+import { uniqueAnimalNumber, validateEvent } from "./form-rules.js";
+
 import {
   collection, query, where, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -332,10 +333,16 @@ async function runGate(){
       return;
     }
 
-    window.__MBK_GATE_OK = true;
-    window.__MBK_GATE_MSG = "";
-    mbkHideBar();
-    setSaveEnabled(true);
+  window.__MBK_GATE_OK = true;
+window.__MBK_GATE_MSG = "";
+
+window.__MBK_UID = uid;
+window.__MBK_ANIMAL_NUMBER = String(number);
+window.__MBK_ANIMAL_DOC = doc;   // ✅ مهم للـ validateEvent(documentData)
+
+mbkHideBar();
+setSaveEnabled(true);
+
   } catch (e){
     window.__MBK_GATE_OK = false;
     window.__MBK_GATE_MSG = "تعذّر التحقق الآن.";
@@ -378,6 +385,90 @@ function attachUniqueAnimalNumberWatcher(){
     }, 400);
   });
 }
+/* ================== Validation Dispatcher (Central) ================== */
+
+function pageToEventType(){
+  const p = String(document.documentElement?.dataset?.page || document.body?.dataset?.page || "").trim().toLowerCase();
+  const map = {
+    "calving": "ولادة",
+    "abortion": "إجهاض",
+    "insemination": "تلقيح",
+    "pregnancy-diagnosis": "تشخيص حمل",
+    "dry-off": "تجفيف",
+    "daily-milk": "لبن يومي",
+    "mastitis": "التهاب ضرع",
+    "lameness": "عرج",
+    "heat": "شياع",
+    "vaccination": "تحصين"
+  };
+  return map[p] || "";
+}
+
+function collectPayload(){
+  const payload = {};
+
+  // كل حقول الفورم المعيارية (data-field)
+  document.querySelectorAll("[data-field]").forEach(el=>{
+    const k = String(el.getAttribute("data-field") || "").trim();
+    if (!k) return;
+    payload[k] = (el.type === "checkbox") ? !!el.checked : String(el.value || "").trim();
+  });
+
+  // توافق للأسماء الشائعة
+  const nEl = document.querySelector("#animalNumber,#animalId,[name='animalNumber'],[name='animalId']");
+  const dEl = document.querySelector("#eventDate,[name='eventDate']");
+  const sEl = document.querySelector("#species,[name='species']");
+
+  if (!payload.animalNumber && !payload.animalId) payload.animalNumber = normDigits(nEl?.value || "") || "";
+  if (!payload.eventDate) payload.eventDate = String(dEl?.value || "").trim() || getDateFromCtx();
+  if (!payload.species) payload.species = String(sEl?.value || "").trim();
+
+  // ✅ وثيقة الحيوان من Gate
+  payload.documentData = window.__MBK_ANIMAL_DOC || null;
+
+  return payload;
+}
+
+function dispatchValid(payload){
+  const ev = new CustomEvent("mbk:valid", { detail: payload });
+  window.dispatchEvent(ev);
+  document.dispatchEvent(ev);
+}
+
+function installValidationDispatcher(){
+  if (window.__MBK_VALID_DISPATCHER) return;
+  window.__MBK_VALID_DISPATCHER = true;
+
+  const doValidate = (e)=>{
+    // لازم Gate يكون OK
+    if (!window.__MBK_GATE_OK) return;
+
+    const eventType = pageToEventType();
+    if (!eventType) return; // صفحات غير مدعومة في rules
+
+    // زر حفظ/submit فقط
+    const hit = e.target?.closest?.(SAVE_SEL);
+    if (!hit) return;
+
+    // امنع أي تنفيذ افتراضي/حفظ محلي
+    e.preventDefault(); e.stopImmediatePropagation();
+
+    const payload = collectPayload();
+    const r = validateEvent(eventType, payload);
+
+    if (!r.ok){
+      mbkShowBar((r.errors && r.errors[0]) ? r.errors[0] : "لا يمكن الحفظ.", true);
+      return;
+    }
+
+    // ✅ نجاح: اطلق الحدث المركزي لتكمل الصفحة الحفظ
+    dispatchValid(payload);
+  };
+
+  // click (للأزرار type=button) + submit (لو فيه form submit)
+  document.addEventListener("click", doValidate, true);
+  document.addEventListener("submit", doValidate, true);
+}
 
 /* ----------------- Boot ----------------- */
 function boot(){
@@ -394,6 +485,7 @@ function boot(){
   }
 
   attachUniqueAnimalNumberWatcher();
+  installValidationDispatcher();
 }
 
 if (document.readyState === "loading") {
