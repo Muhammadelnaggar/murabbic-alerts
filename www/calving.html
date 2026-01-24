@@ -148,35 +148,71 @@
   background:#e2e8f0;
   border-color:#94a3b8;
 }
+.page-title{
+  font-size:20px;
+  font-weight:900;
+  color:var(--green-600);
+  line-height:1.1;
+}
+
+.app-name{
+  margin-top:2px;
+  font-size:14px;
+  font-weight:800;
+  color:#0f172a;
+  opacity:.85;
+}
+
+.brand-logo{
+  width:46px;
+  height:46px;
+  object-fit:contain;
+  opacity:.60; /* الشفافية 60% */
+}
+
+.floating-back{
+  position: fixed;
+  top: 14px;
+  right: 14px; /* RTL */
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  z-index: 1000;
+}
+
+.floating-back::before{
+  content: "←";
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--green);
+}
 
   </style>
 </head>
 <body>
+<a href="add-event.html" class="floating-back" aria-label="العودة للأحداث"></a>
 
   <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
- <header>
+<header>
   <div class="bar">
-    <!-- اليمين: العنوان -->
     <div class="bar-right">
       <div class="page-title">الولادة</div>
+      <div class="app-name">مُرَبِّيك</div>
     </div>
 
-    <!-- اليسار: زر الرجوع + الشعار -->
     <div class="bar-left">
-      <a href="add-event.html" class="back-btn">
-        ← العودة للأحداث
-      </a>
-
-      <a class="brand" href="dashboard.html" aria-label="Murabbik">
-        <img src="logo.png" alt="شعار مُرَبِّك">
-        <span class="name">مُرَبِّك</span>
-      </a>
+      <img class="brand-logo" src="logo.png" alt="شعار مُرَبِّيك">
     </div>
   </div>
 
-  <!-- infobar زي ما هو (مهم) -->
   <div class="infobar-wrap">
     <div id="info" class="infobar" role="status" aria-live="polite">
       <div class="msg-row">
@@ -542,6 +578,7 @@ payload.idempotencyKey = `${payload.animalNumber}-ولادة-${payload.eventDate
 
 </body>
 </html>
+
 
 
 
