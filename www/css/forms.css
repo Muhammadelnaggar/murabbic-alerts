@@ -300,3 +300,23 @@ label .req::after{
   font-weight:800;
   color:var(--brand-600);
 }
+/* زر رجوع أخضر أنيق */
+.mbk-back-btn{
+  position:absolute;
+  right:12px;              /* لأنه RTL */
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--brand-600);
+  border:2px solid var(--brand-600);
+  padding:6px 14px;
+  border-radius:20px;
+  font-weight:800;
+  font-size:14px;
+  text-decoration:none;
+  background:#fff;
+  transition:.2s;
+}
+
+.mbk-back-btn:active{
+  transform:translateY(-50%) scale(.96);
+}
