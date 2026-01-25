@@ -116,7 +116,6 @@
     }
     #sysbar.show{display:block}
 
-    /* أزرار تفاعلية داخل الانفوبار */
     .infobar .sys-actions{
       margin-top:10px;
       display:flex;
@@ -144,7 +143,6 @@
       background:#dc2626;
     }
 
-    /* ✅ FORCE sysbar colors (wins over forms.css) */
     #sysbar.infobar.show:not(.error){
       background:#ecfdf5 !important;
       border:1px solid #bbf7d0 !important;
@@ -161,8 +159,6 @@
 </head>
 
 <body>
-
-  <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
   <header>
@@ -178,13 +174,11 @@
     </div>
   </header>
 
-  <!-- ✅ رسائل النظام -->
   <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 
   <main>
     <form id="calving-form" class="card grid" autocomplete="off" novalidate
           data-validate="true" data-event="ولادة">
-
       <input type="hidden" data-field="animalId" id="animalId">
       <input type="hidden" data-field="species" id="species">
       <input type="hidden" data-field="reproStatus" value="عشار">
@@ -325,7 +319,9 @@
 
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
-    import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import {
+      collection, addDoc, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { updateAnimalByEvent } from '/js/animal-update.js';
 
@@ -334,9 +330,16 @@
     const numEl  = document.getElementById('animalNumber');
     const kindEl = document.getElementById('calvingKind');
 
+    let SYS_LOCKED = false;
+
     function showSysbar(msg, { error=false, actions=[], lock=false } = {}){
+      if (SYS_LOCKED && !error) return;
+      if (lock) SYS_LOCKED = true;
+
       sysbar.style.display = 'block';
-      sysbar.className = 'infobar show' + (error ? ' error' : '');
+      sysbar.className = 'infobar show';
+      if (error) sysbar.classList.add('error');
+
       const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
 
@@ -415,9 +418,10 @@
     form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
     document.addEventListener('DOMContentLoaded', syncCalfGroups);
 
-    /* ✅ الحفظ الفعلي: يستقبل mbk:valid من forms-init.js فقط */
-    form.addEventListener('mbk:valid', async (e)=>{
-      const { formData } = e.detail || {};
+    /* ✅ الحفظ الفعلي — لا نلمسه (وفيه حفظ العجول) */
+    document.addEventListener('mbk:valid', async (e)=>{
+      const { formData } = e.detail;
+
       const uid = await getUid();
       if (!uid){ showSysbar('سجّل الدخول أولًا.', { error:true }); return; }
 
@@ -451,10 +455,13 @@
 
         await addDoc(collection(db, 'events'), payload);
 
-        const updatePayload = { ...payload, type: 'calving', eventType: 'calving' };
+        const updatePayload = {
+          ...payload,
+          type: 'calving',
+          eventType: 'calving'
+        };
         await updateAnimalByEvent(updatePayload);
 
-        /* ✅ لا تلمس حفظ العجول */
         const damId     = payload.animalId;
         const damNumber = payload.animalNumber;
         const birthDate = payload.eventDate;
@@ -488,6 +495,7 @@
         }
 
         showSysbar('✅ تم حفظ الولادة وتسجيل العجول بنجاح', {
+          lock: true,
           actions:[
             {
               label:'فتح قائمة الأحداث',
