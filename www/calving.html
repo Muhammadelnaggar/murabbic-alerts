@@ -660,55 +660,7 @@
     }
 
     /* إرسال النموذج */
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-
-      const uid = await getUid();
-      if (!uid){
-        showSysbar('سجّل الدخول أولًا.', { error:true });
-        return;
-      }
-
-      const number = (numEl?.value || '').trim();
-      const evISO  = (dateEl?.value || '').trim();
-      if (!number || !evISO){
-        showSysbar('رقم الحيوان وتاريخ الولادة مطلوبان.', { error:true });
-        return;
-      }
-
-      if (evISO > todayISO()){
-        showSysbar('تاريخ الولادة لا يمكن أن يكون في المستقبل.', { error:true });
-        return;
-      }
-
-      await precheck(number);
-      if (sysbar.classList.contains('error')) return;
-
-      if (!form.reportValidity()){
-        showSysbar('أكمل الحقول المطلوبة قبل حفظ الحدث.', { error:true });
-        return;
-      }
-
-      if (await existsCalvingSameDay(uid, number, evISO)){
-        showSysbar('لا يمكن تسجيل ولادة مكررة لنفس الحيوان في نفس التاريخ.', { error:true });
-        return;
-      }
-
-      const formData = {};
-      form.querySelectorAll('[data-field]').forEach(el=>{
-        const key = el.getAttribute('data-field');
-        let val = '';
-        if (el.type === 'radio') {
-          const chosen = form.querySelector(`input[name="${el.name}"]:checked`);
-          val = chosen ? chosen.value : '';
-        } else {
-          val = (el.value||'').trim();
-        }
-        formData[key] = val;
-      });
-
-      document.dispatchEvent(new CustomEvent('mbk:valid', { detail:{ formData } }));
-    });
+ 
 
     /* الحفظ الفعلي */
     document.addEventListener('mbk:valid', async (e)=>{
@@ -818,3 +770,4 @@
 
 </body>
 </html>
+
