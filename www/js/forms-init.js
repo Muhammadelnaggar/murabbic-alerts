@@ -326,7 +326,7 @@ if (!ok) {
     showMsg(bar, "✅ البيانات سليمة — جاري الحفظ...", "ok");
 
     const ev = new CustomEvent("mbk:valid", { detail: { formData, eventName, form } });
-    form.dispatchEvent(ev);
+    document.dispatchEvent(ev);;
   });
 }
 
