@@ -43,9 +43,19 @@ const commonFields = {
 // ===================================================================
 export const eventSchemas = {
   "ولادة": {
-    fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
-    guards: ["calvingDecision"],
+  fields: {
+    // ✅ للتحقق قبل ملء النموذج: لا نُجبر animalId/species هنا
+    eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
+
+    // اختياري (يُملأ لاحقًا بعد السماح)
+    animalId: { required: false },
+    species: { required: false },
   },
+  guards: ["calvingDecision"],
+},
+
 
   "تلقيح": {
     fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
@@ -82,24 +92,38 @@ export const eventSchemas = {
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
 export const guards = {
- calvingDecision(fd) {
+calvingDecision(fd) {
   const doc = fd.documentData;
-  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+  if (!doc) return "تعذّر العثور على الحيوان — تحقق من الرقم.";
 
-  if (String(doc.reproductiveStatus || "").trim() !== "عشار")
-    return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
+  // ✅ خارج القطيع (احتياطي إضافي حتى لو موجود في validateEvent)
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل ولادة — الحيوان خارج القطيع.";
 
-  const th = thresholds[String(doc.species || "").trim()]?.minGestationDays;
+  // ✅ الحالة التناسلية
+  const rs = String(doc.reproductiveStatus || doc.reproStatus || "").trim();
+  if (rs !== "عشار") return "لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عِشار».";
+
+  // ✅ تحديد النوع من الوثيقة أو من الـ payload لو موجود
+  const sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
+  const th = thresholds[sp]?.minGestationDays;
   if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
 
-  const lf = doc.lastFertileInseminationDate;
-  const gDays = daysBetween(lf, fd.eventDate);
+  // ✅ آخر تلقيح مخصّب من الوثيقة (مع دعم أكثر من اسم حقل)
+  const lf =
+    doc.lastFertileInseminationDate ||
+    doc.lastFertileInsemination ||
+    doc.lastInseminationDate ||
+    "";
 
   if (!isDate(lf)) return 'لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح مُخصِّب".';
   if (!isDate(fd.eventDate)) return "تاريخ الولادة غير صالح.";
 
+  const gDays = daysBetween(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
+
   if (gDays < th) {
-    return `لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th}. انتقل لتسجيل «إجهاض» بدلًا من الولادة.`;
+    return `لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th}. سجّل «إجهاض» بدلًا من الولادة.`;
   }
 
   return null;
