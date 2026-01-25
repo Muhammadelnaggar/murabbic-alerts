@@ -100,20 +100,25 @@ calvingDecision(fd) {
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ لا يمكن تسجيل ولادة — الحيوان خارج القطيع.";
 
-  // ✅ تحديد النوع (وتطبيع cow/buffalo)
+  // ✅ تحديد النوع (Normalize)
   let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
-  if (sp === "cow" || /بقر/i.test(sp)) sp = "أبقار";
-  if (sp === "buffalo" || /جاموس/i.test(sp)) sp = "جاموس";
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
   const th = thresholds[sp]?.minGestationDays;
   if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
 
-  // ✅ الحالة التناسلية: events أقوى من الوثيقة
-  const rs =
-    String(fd.reproStatusFromEvents || doc.reproductiveStatus || doc.reproStatus || "").trim();
-  const rsNorm = rs.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
-  if (!(/عشار|حامل/i.test(rsNorm))) {
-    return "لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عِشار».";
+  // ✅ الحالة التناسلية: events أولًا ثم الوثيقة
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    doc.reproStatus ||
+    ""
+  ).trim();
+
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+  if (!rsNorm.includes("عشار")) {
+    return "❌ لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عِشار».";
   }
 
   // ✅ آخر تلقيح مُخصِّب: events أولًا ثم الوثيقة
@@ -124,26 +129,26 @@ calvingDecision(fd) {
     doc.lastInseminationDate ||
     "";
 
-  if (!isDate(lf)) return 'لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح مُخصِّب".';
-  if (!isDate(fd.eventDate)) return "تاريخ الولادة غير صالح.";
+  if (!isDate(lf)) return '❌ لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح مُخصِّب".';
+  if (!isDate(fd.eventDate)) return "❌ تاريخ الولادة غير صالح.";
 
-  // ✅ Boundary: ولادة/إجهاض أحدث من التلقيح يلغي الحمل
-  if (fd.lastBoundary && isDate(fd.lastBoundary)) {
-    const b = toDate(fd.lastBoundary); b.setHours(0,0,0,0);
-    const l = toDate(lf);            l.setHours(0,0,0,0);
+  // ✅ Boundary: لو في (ولادة/إجهاض) أحدث من التلقيح → يلغي الحمل
+  const boundary = String(fd.lastBoundary || "").trim();
+  if (boundary && isDate(boundary)) {
+    const b = new Date(boundary); b.setHours(0,0,0,0);
+    const l = new Date(lf);       l.setHours(0,0,0,0);
     if (b.getTime() >= l.getTime()) {
-      return `لا يُسمح بتسجيل الولادة: آخر حدث (${fd.lastBoundary}) يلغي أي حمل حالي.`;
+      return `❌ لا يُسمح بتسجيل الولادة: آخر حدث (${boundary}) يلغي أي حمل حالي.`;
     }
   }
 
   const gDays = daysBetween(lf, fd.eventDate);
   if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
 
-  // ✅ بدل رسالة عامة: نرجع “علامة” تخلي forms-init يعرض زر الإجهاض
- if (gDays < th) {
-  return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th}. سجّل «إجهاض» بدلًا من الولادة.`;
-}
-
+  if (gDays < th) {
+    // ✅ Prefix خاص عشان forms-init يعرف يعرض زر “تسجيل إجهاض”
+    return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th} يوم للـ${sp}.`;
+  }
 
   return null;
 },
