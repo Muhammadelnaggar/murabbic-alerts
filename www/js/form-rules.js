@@ -82,22 +82,29 @@ export const eventSchemas = {
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
 export const guards = {
-  calvingDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+ calvingDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    if (doc.reproductiveStatus !== "عشار")
-      return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
+  if (String(doc.reproductiveStatus || "").trim() !== "عشار")
+    return "لا يمكن تسجيل ولادة — الحيوان ليس عِشار.";
 
-    const th = thresholds[doc.species]?.minGestationDays;
-    if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+  const th = thresholds[String(doc.species || "").trim()]?.minGestationDays;
+  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
 
-    const gDays = daysBetween(doc.lastFertileInseminationDate, fd.eventDate);
-    if (Number.isNaN(gDays)) return "لا يوجد تلقيح مُخصِّب سابق.";
-    if (gDays < th) return `عمر الحمل ${gDays} أقل من الحد الأدنى ${th}.`;
+  const lf = doc.lastFertileInseminationDate;
+  const gDays = daysBetween(lf, fd.eventDate);
 
-    return null;
-  },
+  if (!isDate(lf)) return 'لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح مُخصِّب".';
+  if (!isDate(fd.eventDate)) return "تاريخ الولادة غير صالح.";
+
+  if (gDays < th) {
+    return `لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th}. انتقل لتسجيل «إجهاض» بدلًا من الولادة.`;
+  }
+
+  return null;
+},
+
 
   inseminationDecision(fd) {
     const doc = fd.documentData;
@@ -109,7 +116,8 @@ export const guards = {
 
     if (!isDate(doc.lastCalvingDate)) return "تاريخ الولادة غير مسجل.";
 
-    const th = MIN_DAYS_POST_CALVING_FOR_AI[doc.species];
+   const th = MIN_DAYS_POST_CALVING_FOR_AI[String(doc.species || "").trim()];
+
     const d = daysBetween(doc.lastCalvingDate, fd.eventDate);
     if (d < th) return `التلقيح مبكر: ${d} يوم فقط (الحد الأدنى ${th}).`;
 
