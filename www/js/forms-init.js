@@ -168,6 +168,74 @@ const tries = [
 
   return null;
 }
+function normArDigits(s){
+  return normalizeDigits(s); // نفس normalizeDigits الحالية
+}
+
+function stripTashkeel(s){
+  return String(s||"").replace(/\s+/g,"").replace(/[ًٌٍَُِّْ]/g,"");
+}
+
+// ✅ يقرأ أقوى إشارات من events (زي صفحة الولادة)
+async function fetchCalvingSignalsFromEvents(uid, number){
+  const num = String(normArDigits(number||"")).trim();
+  if (!uid || !num) return { reproStatusFromEvents:"", lastFertileInseminationDate:"", lastBoundary:"" };
+
+  // ملحوظة: هنا بدون orderBy لتجنب index إضافي
+  // نجيب آخر 60 حدث ونرتب محليًا بالتاريخ
+  const qEv = query(
+    collection(db,"events"),
+    where("userId","==", uid),
+    where("animalNumber","==", num),
+    limit(60)
+  );
+
+  const snap = await getDocs(qEv);
+  const arr = snap.docs.map(d=> (d.data()||{}))
+    .filter(ev => ev.eventDate)
+    .sort((a,b)=> String(b.eventDate).localeCompare(String(a.eventDate)));
+
+  let reproStatusFromEvents = "";
+  let lastFertileInseminationDate = "";
+  let lastBoundary = "";
+
+  for (const ev of arr){
+    const type = String(ev.eventType || ev.type || "").trim();
+    const res  = String(ev.result || ev.status || "").trim();
+    const dt   = String(ev.eventDate || "").trim();
+
+    // Boundary: ولادة/إجهاض تلغي حمل قبلها
+    if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
+      lastBoundary = dt;
+      // لو وصلنا لحد هنا ولم نحدد repro بعد، غالبًا ليست عشار حاليًا
+      if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
+      continue;
+    }
+
+    // تشخيص حمل يحدد عشار/فارغة
+    if (type === "تشخيص حمل"){
+      const r = stripTashkeel(res);
+      if (!reproStatusFromEvents) {
+        if (r.includes("عشار")) reproStatusFromEvents = "عشار";
+        if (r.includes("فارغه") || r.includes("فارغة")) reproStatusFromEvents = "مفتوحة";
+      }
+    }
+
+    // آخر تلقيح مخصب
+    const fertile =
+      (type === "تلقيح مخصب") ||
+      (ev.fertile === true) ||
+      (stripTashkeel(res).includes("مخصب"));
+
+    if (!lastFertileInseminationDate && fertile) {
+      lastFertileInseminationDate = dt;
+    }
+
+    if (reproStatusFromEvents && lastFertileInseminationDate) break;
+  }
+
+  return { reproStatusFromEvents, lastFertileInseminationDate, lastBoundary };
+}
 
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
@@ -274,44 +342,64 @@ function attachOne(form) {
     const okAnimal = await ensureAnimalExistsGate(form, bar);
     if (!okAnimal) return;
 
-    const formData = collectFormData(form);
-    formData.documentData = form.__mbkDoc || null;
-    if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+   const formData = collectFormData(form);
+formData.documentData = form.__mbkDoc || null;
+if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+
+// ✅ ولادة فقط: enrichment من events (بدون لمس الصفحة)
+if (eventName === "ولادة") {
+  const uid = await getUid();
+  const n = normalizeDigits(getFieldEl(form,"animalNumber")?.value || "");
+  const sig = await fetchCalvingSignalsFromEvents(uid, n);
+
+  // لو events قالت حاجة نخليها تتقدم (زي صفحة الولادة)
+  if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
+  if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
+  if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
+}
+
 
     const { ok, errors } = validateEvent(eventName, formData);
 
 if (!ok) {
   const isCalving = (eventName === "ولادة");
 
-  const hasAbortHint = Array.isArray(errors) && errors.some(e =>
-    String(e || "").includes("انتقل لتسجيل «إجهاض»") ||
-    String(e || "").includes("تسجيل «إجهاض»")
-  );
+ const hasAbortHint = Array.isArray(errors) && errors.some(e =>
+  String(e||"").startsWith("OFFER_ABORT|") ||
+  String(e||"").includes("تسجيل إجهاض")
+);
+
 
   // زر الإجهاض يظهر فقط لو الخطأ فعلاً عمر حمل أقل من الحد
   if (isCalving && hasAbortHint) {
     const n = normalizeDigits((getFieldEl(form, "animalNumber")?.value || ""));
     let d = String(getFieldEl(form, "eventDate")?.value || "").trim();
     if (!d) d = new Date().toISOString().slice(0, 10);
+const cleanedErrors = (errors || []).map(e => String(e || "").replace(/^OFFER_ABORT\|/, ""));
 
-    showMsg(bar, errors, "error", [
-      {
-        label: "نعم — تسجيل إجهاض",
-        primary: true,
-        onClick: () => {
-          const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-          location.href = url;
-        }
-      },
-      {
-        label: "لا — تعديل التاريخ",
-        onClick: () => {
-          const el = getFieldEl(form, "eventDate");
-          el?.focus?.();
-          el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-        }
-      }
-    ]);
+showMsg(bar, cleanedErrors, "error", [
+  {
+    label: "نعم — تسجيل إجهاض",
+    primary: true,
+    onClick: () => {
+      const n = normalizeDigits((getFieldEl(form, "animalNumber")?.value || ""));
+      let d = String(getFieldEl(form, "eventDate")?.value || "").trim();
+      if (!d) d = new Date().toISOString().slice(0, 10);
+
+      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+      location.href = url;
+    }
+  },
+  {
+    label: "لا — تعديل التاريخ",
+    onClick: () => {
+      const el = getFieldEl(form, "eventDate");
+      el?.focus?.();
+      el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }
+  }
+]);
+
   } else {
     showMsg(bar, errors, "error");
   }
