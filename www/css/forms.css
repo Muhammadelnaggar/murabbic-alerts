@@ -195,6 +195,21 @@ label .req::after{
   background:#fff7ed;
   color:#9a3412;
 }
+/* دعم كلاسات النظام الجديدة */
+.infobar.show{ display:block; }
+
+.infobar.error{
+  border-color:#fed7aa;
+  background:#fff7ed;
+  color:#9a3412;
+}
+
+/* النجاح الافتراضي لما مفيش error */
+.infobar.show:not(.error){
+  border-color:#bbf7d0;
+  background:#ecfdf5;
+  color:#065f46;
+}
 
 /* ===============================
    Button
