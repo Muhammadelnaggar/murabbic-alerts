@@ -1,14 +1,19 @@
 // /js/forms-init.js — ESM (Central Gate + Validation)
-// ✅ يتحقق من وجود الحيوان أولًا (ويمنع ملء باقي الحقول حتى يثبت وجوده)
+// ✅ Gate: يتحقق من وجود الحيوان أولًا (ويمنع ملء باقي الحقول حتى يثبت وجوده)
+// ✅ Validation: عند الحفظ فقط (لتجنب Deadlock قبل إدخال الحقول)
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
 import { validateEvent, uniqueAnimalNumber } from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
-import { collection, query, where, limit, getDocs }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ===================== UI: Infobar ===================== */
 function ensureInfoBar(form) {
@@ -32,18 +37,21 @@ function showMsg(bar, msgs, type = "error", actions = []) {
 
   bar.style.display = "block";
   bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
-  bar.style.background   = type === "error" ? "#ffebee" : "#ecfdf5";
-  bar.style.color        = type === "error" ? "#b71c1c" : "#065f46";
+  bar.style.background = type === "error" ? "#ffebee" : "#ecfdf5";
+  bar.style.color = type === "error" ? "#b71c1c" : "#065f46";
 
   const html = Array.isArray(msgs)
-    ? `<ul style="margin:0;padding-left:18px">${msgs.map(m=>`<li>${String(m||"")}</li>`).join("")}</ul>`
+    ? `<ul style="margin:0;padding-left:18px">${msgs
+        .map((m) => `<li>${String(m || "")}</li>`)
+        .join("")}</ul>`
     : `<div>${String(msgs || "")}</div>`;
 
   bar.innerHTML = html;
 
   if (Array.isArray(actions) && actions.length) {
     const wrap = document.createElement("div");
-    wrap.style.cssText = "margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;";
+    wrap.style.cssText =
+      "margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;";
 
     actions.forEach((a) => {
       const btn = document.createElement("button");
@@ -56,7 +64,11 @@ function showMsg(bar, msgs, type = "error", actions = []) {
         btn.style.background = "#0ea05a";
         btn.style.color = "#fff";
       }
-      btn.addEventListener("click", () => { try { a.onClick && a.onClick(); } catch(_){} });
+      btn.addEventListener("click", () => {
+        try {
+          a.onClick && a.onClick();
+        } catch (_) {}
+      });
       wrap.appendChild(btn);
     });
 
@@ -64,14 +76,15 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   }
 }
 
-
 /* ===================== Helpers ===================== */
 async function getUid() {
   if (auth?.currentUser?.uid) return auth.currentUser.uid;
 
   return await new Promise((res) => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      unsub && unsub();
+      try {
+        unsub && unsub();
+      } catch (_) {}
       res(u?.uid || "");
     });
   });
@@ -79,8 +92,26 @@ async function getUid() {
 
 function normalizeDigits(number) {
   const map = {
-    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    "٠": "0",
+    "١": "1",
+    "٢": "2",
+    "٣": "3",
+    "٤": "4",
+    "٥": "5",
+    "٦": "6",
+    "٧": "7",
+    "٨": "8",
+    "٩": "9",
+    "۰": "0",
+    "۱": "1",
+    "۲": "2",
+    "۳": "3",
+    "۴": "4",
+    "۵": "5",
+    "۶": "6",
+    "۷": "7",
+    "۸": "8",
+    "۹": "9"
   };
   return String(number || "")
     .trim()
@@ -88,13 +119,10 @@ function normalizeDigits(number) {
     .replace(/[٠-٩۰-۹]/g, (d) => map[d]);
 }
 
-function setFormInputsDisabled(form, disabled, allowIds = []) {
-  const allow = new Set(allowIds.filter(Boolean));
-  form.querySelectorAll("input, select, textarea, button").forEach((el) => {
-    if (allow.has(el.id)) return;
-    if (allow.has(el.getAttribute("data-field"))) return;
-    el.disabled = !!disabled;
-  });
+function stripTashkeel(s) {
+  return String(s || "")
+    .replace(/\s+/g, "")
+    .replace(/[ًٌٍَُِّْ]/g, "");
 }
 
 function getFieldEl(form, name) {
@@ -105,6 +133,15 @@ function getFieldEl(form, name) {
   );
 }
 
+function setFormInputsDisabled(form, disabled, allowIds = []) {
+  const allow = new Set((allowIds || []).filter(Boolean));
+  form.querySelectorAll("input, select, textarea, button").forEach((el) => {
+    if (allow.has(el.id)) return;
+    if (allow.has(el.getAttribute("data-field"))) return;
+    el.disabled = !!disabled;
+  });
+}
+
 /* ===================== Data: Collect ===================== */
 function collectFormData(form) {
   const data = {};
@@ -112,9 +149,13 @@ function collectFormData(form) {
     const k = el.getAttribute("data-field");
     let v =
       el.type === "checkbox"
-        ? (el.checked ? (el.value || true) : "")
+        ? el.checked
+          ? el.value || true
+          : ""
         : el.type === "radio"
-          ? (el.checked ? el.value : (data[k] || ""))
+          ? el.checked
+            ? el.value
+            : data[k] || ""
           : el.value;
 
     data[k] = v;
@@ -132,9 +173,14 @@ async function fetchAnimalByNumberForUser(uid, number) {
   const num = normalizeDigits(number);
   if (!uid || !num) return null;
 
+  // 1) Fast path: userId_number المركّب
   try {
     const key = `${uid}#${num}`;
-    const q1 = query(collection(db, "animals"), where("userId_number", "==", key), limit(1));
+    const q1 = query(
+      collection(db, "animals"),
+      where("userId_number", "==", key),
+      limit(1)
+    );
     const s1 = await getDocs(q1);
     if (!s1.empty) {
       const d = s1.docs[0];
@@ -142,13 +188,12 @@ async function fetchAnimalByNumberForUser(uid, number) {
     }
   } catch (_) {}
 
-const tries = [
-  ["number", num],
-  ["animalNumber", num],
-  ["animalNumber", Number(num)],
-].filter(t => !(typeof t[1] === "number" && Number.isNaN(t[1])));
-
-  
+  // 2) Fallbacks: number / animalNumber (string/number)
+  const tries = [
+    ["number", num],
+    ["animalNumber", num],
+    ["animalNumber", Number(num)]
+  ].filter((t) => !(typeof t[1] === "number" && Number.isNaN(t[1])));
 
   for (const [field, val] of tries) {
     try {
@@ -168,64 +213,62 @@ const tries = [
 
   return null;
 }
-function normArDigits(s){
-  return normalizeDigits(s); // نفس normalizeDigits الحالية
-}
 
-function stripTashkeel(s){
-  return String(s||"").replace(/\s+/g,"").replace(/[ًٌٍَُِّْ]/g,"");
-}
+// ✅ يقرأ أقوى إشارات من events (لا نطلب orderBy لتجنب Index)
+async function fetchCalvingSignalsFromEvents(uid, number) {
+  const num = String(normalizeDigits(number || "")).trim();
+  if (!uid || !num) {
+    return {
+      reproStatusFromEvents: "",
+      lastFertileInseminationDate: "",
+      lastBoundary: ""
+    };
+  }
 
-// ✅ يقرأ أقوى إشارات من events (زي صفحة الولادة)
-async function fetchCalvingSignalsFromEvents(uid, number){
-  const num = String(normArDigits(number||"")).trim();
-  if (!uid || !num) return { reproStatusFromEvents:"", lastFertileInseminationDate:"", lastBoundary:"" };
-
-  // ملحوظة: هنا بدون orderBy لتجنب index إضافي
-  // نجيب آخر 60 حدث ونرتب محليًا بالتاريخ
   const qEv = query(
-    collection(db,"events"),
-    where("userId","==", uid),
-    where("animalNumber","==", num),
+    collection(db, "events"),
+    where("userId", "==", uid),
+    where("animalNumber", "==", num),
     limit(60)
   );
 
   const snap = await getDocs(qEv);
-  const arr = snap.docs.map(d=> (d.data()||{}))
-    .filter(ev => ev.eventDate)
-    .sort((a,b)=> String(b.eventDate).localeCompare(String(a.eventDate)));
+  const arr = snap.docs
+    .map((d) => d.data() || {})
+    .filter((ev) => ev.eventDate)
+    .sort((a, b) => String(b.eventDate).localeCompare(String(a.eventDate)));
 
   let reproStatusFromEvents = "";
   let lastFertileInseminationDate = "";
   let lastBoundary = "";
 
-  for (const ev of arr){
+  for (const ev of arr) {
     const type = String(ev.eventType || ev.type || "").trim();
-    const res  = String(ev.result || ev.status || "").trim();
-    const dt   = String(ev.eventDate || "").trim();
+    const res = String(ev.result || ev.status || "").trim();
+    const dt = String(ev.eventDate || "").trim();
 
-    // Boundary: ولادة/إجهاض تلغي حمل قبلها
+    // Boundary: ولادة/إجهاض يلغي قبلها
     if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
       lastBoundary = dt;
-      // لو وصلنا لحد هنا ولم نحدد repro بعد، غالبًا ليست عشار حاليًا
       if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
       continue;
     }
 
-    // تشخيص حمل يحدد عشار/فارغة
-    if (type === "تشخيص حمل"){
+    // تشخيص حمل
+    if (type === "تشخيص حمل") {
       const r = stripTashkeel(res);
       if (!reproStatusFromEvents) {
         if (r.includes("عشار")) reproStatusFromEvents = "عشار";
-        if (r.includes("فارغه") || r.includes("فارغة")) reproStatusFromEvents = "مفتوحة";
+        if (r.includes("فارغه") || r.includes("فارغة"))
+          reproStatusFromEvents = "مفتوحة";
       }
     }
 
     // آخر تلقيح مخصب
     const fertile =
-      (type === "تلقيح مخصب") ||
-      (ev.fertile === true) ||
-      (stripTashkeel(res).includes("مخصب"));
+      type === "تلقيح مخصب" ||
+      ev.fertile === true ||
+      stripTashkeel(res).includes("مخصب");
 
     if (!lastFertileInseminationDate && fertile) {
       lastFertileInseminationDate = dt;
@@ -245,9 +288,12 @@ function applyAnimalToForm(form, animal) {
   if (animalIdEl) animalIdEl.value = form.__mbkAnimalId || "";
 
   const speciesEl = getFieldEl(form, "species");
-  let sp = String(animal?.data?.species || animal?.data?.animalTypeAr || "").trim();
-if (/cow|بقر/i.test(sp)) sp = "أبقار";
-if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+  let sp = String(
+    animal?.data?.species || animal?.data?.animalTypeAr || ""
+  ).trim();
+
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
   if (speciesEl && sp) speciesEl.value = sp;
 }
@@ -257,11 +303,14 @@ async function ensureAnimalExistsGate(form, bar) {
   const numEl = getFieldEl(form, "animalNumber");
   const n = normalizeDigits(numEl?.value || "");
 
+  // ✅ السماح دائمًا برقم الحيوان + التاريخ (مايتقفلش eventDate)
+  const ALLOW = ["animalNumber", "eventDate"];
+
   if (!uid) {
     applyAnimalToForm(form, null);
     showMsg(bar, "سجّل الدخول أولًا.", "error");
     form.dataset.animalOk = "0";
-    setFormInputsDisabled(form, true, ["animalNumber"]);
+    setFormInputsDisabled(form, true, ALLOW);
     return false;
   }
 
@@ -269,7 +318,7 @@ async function ensureAnimalExistsGate(form, bar) {
     applyAnimalToForm(form, null);
     bar.style.display = "none";
     form.dataset.animalOk = "0";
-    setFormInputsDisabled(form, true, ["animalNumber"]);
+    setFormInputsDisabled(form, true, ALLOW);
     return false;
   }
 
@@ -282,13 +331,13 @@ async function ensureAnimalExistsGate(form, bar) {
   applyAnimalToForm(form, null);
 
   showMsg(bar, "جارِ التحقق من رقم الحيوان…", "ok");
-  setFormInputsDisabled(form, true, ["animalNumber"]);
+  setFormInputsDisabled(form, true, ALLOW);
 
   const animal = await fetchAnimalByNumberForUser(uid, n);
   if (!animal) {
     showMsg(bar, "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا.", "error");
     form.dataset.animalOk = "0";
-    setFormInputsDisabled(form, true, ["animalNumber"]);
+    setFormInputsDisabled(form, true, ALLOW);
     return false;
   }
 
@@ -296,13 +345,13 @@ async function ensureAnimalExistsGate(form, bar) {
   if (st === "inactive") {
     showMsg(bar, "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له.", "error");
     form.dataset.animalOk = "0";
-    setFormInputsDisabled(form, true, ["animalNumber"]);
+    setFormInputsDisabled(form, true, ALLOW);
     return false;
   }
 
   applyAnimalToForm(form, animal);
   form.dataset.animalOk = "1";
-  setFormInputsDisabled(form, false, ["animalNumber"]);
+  setFormInputsDisabled(form, false, ALLOW);
   showMsg(bar, "✅ تم العثور على الحيوان — أكمل البيانات.", "ok");
   return true;
 }
@@ -313,114 +362,131 @@ function attachOne(form) {
   const eventName = form.getAttribute("data-event");
   if (!eventName) return;
 
-  setFormInputsDisabled(form, true, ["animalNumber"]);
-
-  const numEl = getFieldEl(form, "animalNumber");
-  if (numEl) {
-    const kick = async () => {
-      await ensureAnimalExistsGate(form, bar);
-    };
-    numEl.addEventListener("change", kick);
-    numEl.addEventListener("blur", kick);
-    numEl.addEventListener("input", () => {
-      form.dataset.animalOk = "0";
-      applyAnimalToForm(form, null);
-      setFormInputsDisabled(form, true, ["animalNumber"]);
-      bar.style.display = "none";
+  // 🔒 يقفل/يفتح كل الفورم (ماعدا رقم الحيوان + التاريخ)
+  function lockForm(locked) {
+    form.dataset.locked = locked ? "1" : "0";
+    form.querySelectorAll("input, select, textarea, button").forEach((el) => {
+      const key = el.id || el.getAttribute("data-field") || "";
+      if (key === "animalNumber" || key === "eventDate") return;
+      el.disabled = !!locked;
     });
   }
 
-  setTimeout(() => {
-    if (numEl && normalizeDigits(numEl.value)) {
-      ensureAnimalExistsGate(form, bar);
-    }
-  }, 0);
+  // ✅ أول ما الصفحة تفتح: اقفل كل شيء لحد ما Gate يقول "أخضر"
+  lockForm(true);
 
+  // Gate فقط (بدون validateEvent الكامل) لتجنب Deadlock
+  async function runGateOnly() {
+    const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+    const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
+
+    if (!n || !d) {
+      bar.style.display = "none";
+      lockForm(true);
+      return false;
+    }
+
+    const okAnimal = await ensureAnimalExistsGate(form, bar);
+    if (!okAnimal) {
+      lockForm(true);
+      return false;
+    }
+
+    // ✅ أخضر: افتح الإدخال
+    showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
+    lockForm(false);
+    return true;
+  }
+
+  // Full validation + إطلاق mbk:valid (وقت الحفظ فقط)
+  async function runFullValidationAndDispatch() {
+    const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+    const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
+
+    if (!n || !d) {
+      showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
+      lockForm(true);
+      return false;
+    }
+
+    // 1) Gate وجود الحيوان
+    const okAnimal = await ensureAnimalExistsGate(form, bar);
+    if (!okAnimal) {
+      lockForm(true);
+      return false;
+    }
+
+    // 2) جهّز formData
+    const formData = collectFormData(form);
+    formData.documentData = form.__mbkDoc || null;
+    if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+
+    // 3) enrichment للولادة فقط
+    if (eventName === "ولادة") {
+      const uid = await getUid();
+      const sig = await fetchCalvingSignalsFromEvents(uid, n);
+      if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
+      if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
+      if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
+    }
+
+    // 4) Validation الحقيقي (المركزي)
+    const { ok, errors } = validateEvent(eventName, formData);
+
+    if (!ok) {
+      const errs = errors || [];
+      const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+
+      const hasAbortHint =
+        eventName === "ولادة" &&
+        errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
+
+      if (hasAbortHint) {
+        const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+        showMsg(bar, cleaned, "error", [
+          { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
+          { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
+        ]);
+      } else {
+        showMsg(bar, cleaned, "error");
+      }
+
+      lockForm(true);
+      return false;
+    }
+
+    // ✅ نجاح: اطلق الحدث من الفورم (أفضل من document)
+    showMsg(bar, "✅ البيانات صحيحة — جارٍ الحفظ…", "ok");
+    form.dispatchEvent(
+      new CustomEvent("mbk:valid", {
+        bubbles: true,
+        detail: { formData, eventName, form }
+      })
+    );
+    return true;
+  }
+
+  // ✅ شغّل Gate بعد ما الصفحة تحمل
+  setTimeout(runGateOnly, 0);
+
+  // ✅ شغّل Gate عند تغيير الرقم أو التاريخ
+  getFieldEl(form, "animalNumber")?.addEventListener("change", runGateOnly);
+  getFieldEl(form, "eventDate")?.addEventListener("change", runGateOnly);
+
+  // ✅ وقت الحفظ: ممنوع لو مقفول… وإلا نفذ Full validation ثم اطلق mbk:valid
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const okAnimal = await ensureAnimalExistsGate(form, bar);
-    if (!okAnimal) return;
+    if (form.dataset.locked === "1") return;
 
-   const formData = collectFormData(form);
-formData.documentData = form.__mbkDoc || null;
-if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
-
-// ✅ ولادة فقط: enrichment من events (بدون لمس الصفحة)
-if (eventName === "ولادة") {
-  const uid = await getUid();
-  const n = normalizeDigits(getFieldEl(form,"animalNumber")?.value || "");
-  const sig = await fetchCalvingSignalsFromEvents(uid, n);
-
-  // لو events قالت حاجة نخليها تتقدم (زي صفحة الولادة)
-  if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
-  if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
-  if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
-}
-
-
-    const { ok, errors } = validateEvent(eventName, formData);
-
-if (!ok) {
-  const isCalving = (eventName === "ولادة");
-
- const hasAbortHint = Array.isArray(errors) && errors.some(e =>
-  String(e||"").startsWith("OFFER_ABORT|") ||
-  String(e||"").includes("تسجيل إجهاض")
-);
-
-
-  // زر الإجهاض يظهر فقط لو الخطأ فعلاً عمر حمل أقل من الحد
-  if (isCalving && hasAbortHint) {
-    const n = normalizeDigits((getFieldEl(form, "animalNumber")?.value || ""));
-    let d = String(getFieldEl(form, "eventDate")?.value || "").trim();
-    if (!d) d = new Date().toISOString().slice(0, 10);
-const cleanedErrors = (errors || []).map(e => String(e || "").replace(/^OFFER_ABORT\|/, ""));
-
-showMsg(bar, cleanedErrors, "error", [
-  {
-    label: "نعم — تسجيل إجهاض",
-    primary: true,
-    onClick: () => {
-      const n = normalizeDigits((getFieldEl(form, "animalNumber")?.value || ""));
-      let d = String(getFieldEl(form, "eventDate")?.value || "").trim();
-      if (!d) d = new Date().toISOString().slice(0, 10);
-
-      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-      location.href = url;
-    }
-  },
-  {
-    label: "لا — تعديل التاريخ",
-    onClick: () => {
-      const el = getFieldEl(form, "eventDate");
-      el?.focus?.();
-      el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-    }
-  }
-]);
-
-  } else {
-    showMsg(bar, errors, "error");
-  }
-
-  form.dataset.valid = "0";
-  return;
-}
-
-
-
-    form.dataset.valid = "1";
-    showMsg(bar, "✅ البيانات سليمة — جاري الحفظ...", "ok");
-
-    const ev = new CustomEvent("mbk:valid", { detail: { formData, eventName, form } });
-    document.dispatchEvent(ev);;
+    const ok = await runFullValidationAndDispatch();
+    if (!ok) return;
   });
 }
 
 /* ===================== add-animal watcher (كما هو) ===================== */
 function attachUniqueAnimalNumberWatcher() {
-  const form  = document.getElementById("animalForm");
+  const form = document.getElementById("animalForm");
   const input = form?.querySelector("#animalNumber");
   if (!form || !input) return;
 
