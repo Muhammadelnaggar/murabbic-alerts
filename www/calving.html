@@ -353,7 +353,9 @@
   if (lock) SYS_LOCKED = true;        // ✅ اقفل بعد النجاح
 
       sysbar.style.display = 'block';
-      sysbar.className = 'infobar show' + (error ? ' error' : '');
+     sysbar.className = 'infobar show';   // يمسح أي error قديم
+if (error) sysbar.classList.add('error');
+
       const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
       sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
@@ -828,5 +830,6 @@
 
 </body>
 </html>
+
 
 
