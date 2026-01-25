@@ -156,6 +156,22 @@
     .infobar.error .sys-btn.primary{
       background:#dc2626;
     }
+    /* ✅ FORCE sysbar colors (wins over forms.css) */
+#sysbar.infobar.show:not(.error){
+  background:#ecfdf5 !important;
+  border:1px solid #bbf7d0 !important;
+  color:#065f46 !important;
+}
+#sysbar.infobar.show.error{
+  background:#fff7ed !important;
+  border:1px solid #fed7aa !important;
+  color:#9a3412 !important;
+}
+
+/* لو forms.css ملوّن نص الرسالة نفسه */
+#sysbar.infobar.show:not(.error) .sys-msg{ color:#065f46 !important; }
+#sysbar.infobar.show.error .sys-msg{ color:#9a3412 !important; }
+
   </style>
 </head>
 <body>
@@ -829,6 +845,7 @@
 
 </body>
 </html>
+
 
 
 
