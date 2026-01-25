@@ -334,11 +334,12 @@
     const numEl  = document.getElementById('animalNumber');
     const dateEl = document.getElementById('eventDate');
     const kindEl = document.getElementById('calvingKind');
-    const saveBtn= document.getElementById('saveBtn');
+   
 
     const animalIdEl = document.getElementById('animalId');
     const speciesEl  = document.getElementById('species');
     const lastFertileEl = document.getElementById('lastFertile');
+    let SYS_LOCKED = false;
 
     /* ===== Infobar Helper (بديل Popup) ===== */
     function clearSysbar(){
@@ -347,7 +348,10 @@
       sysbar.style.display = 'none';
     }
 
-    function showSysbar(msg, { error=false, actions=[] } = {}){
+    function showSysbar(msg, { error=false, actions=[], lock=false } = {}){
+  if (SYS_LOCKED && !error) return;   // ✅ لو مقفول، ما تكتبش رسائل نجاح/معلومات
+  if (lock) SYS_LOCKED = true;        // ✅ اقفل بعد النجاح
+
       sysbar.style.display = 'block';
       sysbar.className = 'infobar show' + (error ? ' error' : '');
       const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -568,6 +572,7 @@
     }
 
     async function precheck(number){
+       if (SYS_LOCKED) return;  // ✅ بعد النجاح لا تعمل أي تحقق جديد تلقائيًا
       disableForm(true);
       showSysbar('جارِ التحقق المبدئي من بيانات الحيوان…');
 
@@ -631,14 +636,17 @@
     }
 
     function kickPrecheck(){
-      const n = (numEl?.value||'').trim();
-      if (!n){
-        showSysbar('أدخل رقم الحيوان أولًا.', { error:true });
-        disableForm(true);
-        return;
-      }
-      precheck(n);
-    }
+  SYS_LOCKED = false;   // ✅ مهم جدًا: فك القفل عند بدء تحقق جديد
+
+  const n = (numEl?.value||'').trim();
+  if (!n){
+    showSysbar('أدخل رقم الحيوان أولًا.', { error:true });
+    disableForm(true);
+    return;
+  }
+  precheck(n);
+}
+
 
     onAuthStateChanged(auth, ()=> kickPrecheck());
     numEl?.addEventListener('change', kickPrecheck);
@@ -785,19 +793,21 @@
           await addDoc(collection(db,'calves'), calf);
         }
 
-        showSysbar('تم حفظ الولادة وتسجيل العجول بنجاح ✅', {
-          actions:[
-            {
-              label:'فتح قائمة الأحداث',
-              primary:true,
-              onClick:()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
-            },
-            {
-              label:'فتح بطاقة الحيوان',
-              onClick:()=> location.href = `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
-            }
-          ]
-        });
+      showSysbar('✅ تم حفظ الولادة وتسجيل العجول بنجاح', {
+  lock: true,
+  actions:[
+    {
+      label:'فتح قائمة الأحداث',
+      primary:true,
+      onClick:()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
+    },
+    {
+      label:'فتح بطاقة الحيوان',
+      onClick:()=> location.href = `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
+    }
+  ]
+});
+
 
       }catch(err){
         console.error(err);
@@ -818,4 +828,5 @@
 
 </body>
 </html>
+
 
