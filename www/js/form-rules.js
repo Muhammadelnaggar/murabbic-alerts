@@ -140,9 +140,10 @@ calvingDecision(fd) {
   if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
 
   // ✅ بدل رسالة عامة: نرجع “علامة” تخلي forms-init يعرض زر الإجهاض
-  if (gDays < th) {
-    return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى (${th} يوم للـ${sp}).`;
-  }
+ if (gDays < th) {
+  return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th}. سجّل «إجهاض» بدلًا من الولادة.`;
+}
+
 
   return null;
 },
