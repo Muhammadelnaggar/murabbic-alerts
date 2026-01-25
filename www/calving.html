@@ -348,36 +348,35 @@
       sysbar.style.display = 'none';
     }
 
-    function showSysbar(msg, { error=false, actions=[], lock=false } = {}){
-  if (SYS_LOCKED && !error) return;   // ✅ لو مقفول، ما تكتبش رسائل نجاح/معلومات
-  if (lock) SYS_LOCKED = true;        // ✅ اقفل بعد النجاح
+   function showSysbar(msg, { error=false, actions=[], lock=false } = {}){
+  if (SYS_LOCKED && !error) return;   // لو مقفول، ما تكتبش نجاح/معلومات
+  if (lock) SYS_LOCKED = true;        // اقفل بعد النجاح
 
-      sysbar.style.display = 'block';
-     sysbar.className = 'infobar show';   // يمسح أي error قديم
-if (error) sysbar.classList.add('error');
+  sysbar.style.display = 'block';
 
-      const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // ✅ أهم سطرين: امسح أي error قديم
+  sysbar.className = 'infobar show';
+  if (error) sysbar.classList.add('error');
 
-      sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
+  const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
 
-      if (Array.isArray(actions) && actions.length){
-        const wrap = document.createElement('div');
-        wrap.className = 'sys-actions';
+  if (Array.isArray(actions) && actions.length){
+    const wrap = document.createElement('div');
+    wrap.className = 'sys-actions';
 
-        actions.forEach((a)=>{
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
-          btn.textContent = a.label || 'إجراء';
-          btn.addEventListener('click', ()=>{
-            try{ a.onClick && a.onClick(); }catch(_){}
-          });
-          wrap.appendChild(btn);
-        });
+    actions.forEach((a)=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
+      btn.textContent = a.label || 'إجراء';
+      btn.addEventListener('click', ()=>{ try{ a.onClick && a.onClick(); }catch(_){ } });
+      wrap.appendChild(btn);
+    });
 
-        sysbar.appendChild(wrap);
-      }
-    }
+    sysbar.appendChild(wrap);
+  }
+}
 
     /* مزامنة مجموعات العجول */
     function syncCalfGroups(){
@@ -830,6 +829,7 @@ if (error) sysbar.classList.add('error');
 
 </body>
 </html>
+
 
 
 
