@@ -285,39 +285,54 @@ export async function uniqueAnimalNumber(ctx) {
 // ===================================================================
 export function validateEvent(eventType, payload = {}) {
   const schema = eventSchemas[eventType];
-  if (!schema) return { ok: false, errors: ["نوع حدث غير معروف."] };
+  if (!schema) return { ok: false, errors: ["نوع حدث غير معروف."], fieldErrors: {}, guardErrors: [] };
 
-  // ✅ قفل مركزي واحد: يمنع أي حدث لحيوان خارج القطيع (بيع/نفوق/استبعاد)
+  // ✅ قفل مركزي واحد: يمنع أي حدث لحيوان خارج القطيع
   const doc = payload.documentData;
   const st = String(doc?.status ?? "").trim().toLowerCase();
   if (st === "inactive") {
-    return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."] };
+    return {
+      ok: false,
+      errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."],
+      fieldErrors: {},
+      guardErrors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."]
+    };
   }
-  // ✅ Fallback مركزي لحدث "ولادة": لو lastInseminationDate مش جاي من الفورم
-  // خده من وثيقة الحيوان (حسب الاتفاق)
+
+  // ✅ Fallback مركزي لحدث "ولادة": آخر تلقيح من الوثيقة فقط (حسب الاتفاق)
   if (eventType === "ولادة") {
-    const doc = payload.documentData || {};
+    const d = payload.documentData || {};
     if (!payload.lastInseminationDate) {
-      payload.lastInseminationDate = String(doc.lastInseminationDate || "").trim();
+      payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
     }
   }
 
   const errors = [];
+  const fieldErrors = {};
+  const guardErrors = [];
 
+  // 1) Field validation
   for (const [key, rule] of Object.entries(schema.fields || {})) {
-    const err = validateField(key, rule, payload[key]);
-    if (err) errors.push(err);
+    const msg = validateField(key, rule, payload[key]);
+    if (msg) {
+      fieldErrors[key] = msg;
+      errors.push(msg);
+    }
   }
-  if (errors.length) return { ok: false, errors };
+  if (errors.length) return { ok: false, errors, fieldErrors, guardErrors };
 
+  // 2) Guards
   for (const gName of (schema.guards || [])) {
     const guardFn = guards[gName];
     if (typeof guardFn !== "function") continue;
     const gErr = guardFn(payload);
-    if (gErr) errors.push(gErr);
+    if (gErr) {
+      guardErrors.push(gErr);
+      errors.push(gErr);
+    }
   }
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, fieldErrors, guardErrors };
 }
 
 function validateField(key, rule, value) {
