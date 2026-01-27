@@ -329,46 +329,45 @@ export function validateEvent(eventType, payload = {}) {
   const guardErrors = [];
 
   // 1) Field validation
- for (const [key, rule] of Object.entries(schema.fields || {})) {
-  const err = validateField(key, rule, payload[key]);
-  if (err) {
-    fieldErrors[key] = err;     // ✅ فوق الحقل
-    errors.push(err);           // ✅ احتياطي عام
+  for (const [key, rule] of Object.entries(schema.fields || {})) {
+    const err = validateField(key, rule, payload[key]);
+    if (err) {
+      fieldErrors[key] = err;
+      errors.push(err);
+    }
   }
-}
-if (Object.keys(fieldErrors).length) {
-  return { ok: false, errors, fieldErrors, guardErrors };
-}
-
+  if (Object.keys(fieldErrors).length) {
+    return { ok: false, errors, fieldErrors, guardErrors };
+  }
 
   // 2) Guards
   for (const gName of (schema.guards || [])) {
-  const guardFn = guards[gName];
-  if (typeof guardFn !== "function") continue;
+    const guardFn = guards[gName];
+    if (typeof guardFn !== "function") continue;
 
-  const gErr = guardFn(payload);
+    const gErr = guardFn(payload);
+    if (!gErr) continue;
 
-  if (!gErr) continue;
+    // ✅ لو Guard رجّع { field, msg }
+    if (typeof gErr === "object" && gErr.field) {
+      const m = gErr.msg || "خطأ في هذا الحقل.";
+      fieldErrors[gErr.field] = m;
+      guardErrors.push(m);
+      errors.push(m);
+      continue;
+    }
 
-  // ✅ لو Guard رجّع { field, msg } نحطها فوق الحقل
-  if (typeof gErr === "object" && gErr.field) {
-    fieldErrors[gErr.field] = gErr.msg || "خطأ في هذا الحقل.";
-    guardErrors.push(gErr.msg || "خطأ في هذا الحقل.");
-    errors.push(gErr.msg || "خطأ في هذا الحقل.");
-    continue;
+    // ✅ لو string
+    guardErrors.push(gErr);
+    errors.push(gErr);
   }
 
-  // ✅ لو string
-  guardErrors.push(gErr);
-  errors.push(gErr);
-}
+  if (Object.keys(fieldErrors).length) {
+    return { ok: false, errors, fieldErrors, guardErrors };
+  }
 
-if (Object.keys(fieldErrors).length) {
-  return { ok: false, errors, fieldErrors, guardErrors };
-}
-
-return { ok: errors.length === 0, errors, fieldErrors, guardErrors };
-
+  return { ok: errors.length === 0, errors, fieldErrors, guardErrors };
+} // ✅ اقفال validateEvent
 
 function validateField(key, rule, value) {
   if (rule.required && !req(value)) return rule.msg || `الحقل «${key}» مطلوب.`;
