@@ -242,13 +242,13 @@
           <div>
             <label>جنس المولود</label>
             <div class="radio-group">
-              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="ذكر"> ذكر</label>
-              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="أنثى"> أنثى</label>
+             <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="ذكر" required> ذكر</label>
+             <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="أنثى"> أنثى</label>
             </div>
           </div>
           <div>
             <label>رقم العجل</label>
-            <input id="calf2Id" data-field="calf2Id" placeholder="رقم تعريف العجل الثاني" />
+           <input id="calf2Id" data-field="calf2Id" placeholder="رقم تعريف العجل الثاني" required />
           </div>
         </div>
       </div>
@@ -259,13 +259,13 @@
           <div>
             <label>جنس المولود</label>
             <div class="radio-group">
-              <label><input type="radio" name="calf3Sex" data-field="calf3Sex" value="ذكر"> ذكر</label>
+              <label><input type="radio" name="calf3Sex" data-field="calf3Sex" value="ذكر" required> ذكر</label>
               <label><input type="radio" name="calf3Sex" data-field="calf3Sex" value="أنثى"> أنثى</label>
             </div>
           </div>
           <div>
             <label>رقم العجل</label>
-            <input id="calf3Id" data-field="calf3Id" placeholder="رقم تعريف العجل الثالث" />
+           <input id="calf3Id" data-field="calf3Id" placeholder="رقم تعريف العجل الثالث" required />
           </div>
         </div>
       </div>
@@ -342,14 +342,17 @@
 
     /* ===== Infobar Helper (بديل Popup) ===== */
     function clearSysbar(){
-      sysbar.className = 'infobar';
+     sysbar.classList.remove('show','error');
+
       sysbar.innerHTML = '';
       sysbar.style.display = 'none';
     }
 
     function showSysbar(msg, { error=false, actions=[] } = {}){
       sysbar.style.display = 'block';
-      sysbar.className = 'infobar show' + (error ? ' error' : '');
+      sysbar.classList.add('show');
+sysbar.classList.toggle('error', !!error);
+
       const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
       sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
@@ -695,6 +698,18 @@
       try{
         disableForm(true);
         showSysbar('جارِ الحفظ…');
+        // 🛑 منع تكرار تسجيل ولادة في نفس اليوم
+const alreadyExists = await existsCalvingSameDay(
+  uid,
+  payload.animalNumber,
+  payload.eventDate
+);
+
+if (alreadyExists) {
+  disableForm(false);
+  showSysbar("⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل.", { error: true });
+  return;
+}
 
         await addDoc(collection(db, 'events'), payload);
 
@@ -770,5 +785,6 @@
 
 </body>
 </html>
+
 
 
