@@ -432,10 +432,13 @@ function attachOne(form) {
 
     // 4) Validation الحقيقي (المركزي)
     const { ok, errors } = validateEvent(eventName, formData);
+if (!ok) {
+  // 🔴 ضمان: أي فشل Validation يفرض الأحمر فورًا (يلغي أي حالة خضراء سابقة)
+  bar.style.display = "none";
 
-    if (!ok) {
-      const errs = errors || [];
-      const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+  const errs = errors || [];
+  const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+
 
       const hasAbortHint =
         eventName === "ولادة" &&
