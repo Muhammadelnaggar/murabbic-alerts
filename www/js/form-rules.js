@@ -186,26 +186,43 @@ calvingRequiredFields(fd) {
   if (kind === "نافقة") return null;
 
   // 4) غير نافقة → بيانات العجول إجبارية
+  // 4) غير نافقة → بيانات العجول إجبارية
   const count = Number(String(fd.calfCount || "").trim());
-  if (!(count === 1 || count === 2 || count === 3)) return "❌ عدد المواليد مطلوب (1 أو 2 أو 3).";
+  if (!(count === 1 || count === 2 || count === 3)) {
+    return { field: "calfCount", msg: "❌ عدد المواليد مطلوب (1 أو 2 أو 3)." };
+  }
 
   // المولود 1
-  if (!String(fd.calf1Sex || "").trim()) return "❌ جنس المولود (1) مطلوب.";
-  if (!String(fd.calfId || "").trim())   return "❌ رقم العجل (1) مطلوب.";
+  if (!String(fd.calf1Sex || "").trim()) {
+    return { field: "calf1Sex", msg: "❌ جنس المولود (1) مطلوب." };
+  }
+  if (!String(fd.calfId || "").trim()) {
+    return { field: "calfId", msg: "❌ رقم العجل (1) مطلوب." };
+  }
 
   // مصير العجل
-  if (!String(fd.calfFate || "").trim()) return "❌ مصير العجل مطلوب.";
+  if (!String(fd.calfFate || "").trim()) {
+    return { field: "calfFate", msg: "❌ مصير العجل مطلوب." };
+  }
 
   // المولود 2
   if (count >= 2) {
-    if (!String(fd.calf2Sex || "").trim()) return "❌ جنس المولود (2) مطلوب.";
-    if (!String(fd.calf2Id || "").trim())  return "❌ رقم العجل (2) مطلوب.";
+    if (!String(fd.calf2Sex || "").trim()) {
+      return { field: "calf2Sex", msg: "❌ جنس المولود (2) مطلوب." };
+    }
+    if (!String(fd.calf2Id || "").trim()) {
+      return { field: "calf2Id", msg: "❌ رقم العجل (2) مطلوب." };
+    }
   }
 
   // المولود 3
   if (count >= 3) {
-    if (!String(fd.calf3Sex || "").trim()) return "❌ جنس المولود (3) مطلوب.";
-    if (!String(fd.calf3Id || "").trim())  return "❌ رقم العجل (3) مطلوب.";
+    if (!String(fd.calf3Sex || "").trim()) {
+      return { field: "calf3Sex", msg: "❌ جنس المولود (3) مطلوب." };
+    }
+    if (!String(fd.calf3Id || "").trim()) {
+      return { field: "calf3Id", msg: "❌ رقم العجل (3) مطلوب." };
+    }
   }
 
   return null;
@@ -312,28 +329,46 @@ export function validateEvent(eventType, payload = {}) {
   const guardErrors = [];
 
   // 1) Field validation
-  for (const [key, rule] of Object.entries(schema.fields || {})) {
-    const msg = validateField(key, rule, payload[key]);
-    if (msg) {
-      fieldErrors[key] = msg;
-      errors.push(msg);
-    }
+ for (const [key, rule] of Object.entries(schema.fields || {})) {
+  const err = validateField(key, rule, payload[key]);
+  if (err) {
+    fieldErrors[key] = err;     // ✅ فوق الحقل
+    errors.push(err);           // ✅ احتياطي عام
   }
-  if (errors.length) return { ok: false, errors, fieldErrors, guardErrors };
+}
+if (Object.keys(fieldErrors).length) {
+  return { ok: false, errors, fieldErrors, guardErrors };
+}
+
 
   // 2) Guards
   for (const gName of (schema.guards || [])) {
-    const guardFn = guards[gName];
-    if (typeof guardFn !== "function") continue;
-    const gErr = guardFn(payload);
-    if (gErr) {
-      guardErrors.push(gErr);
-      errors.push(gErr);
-    }
+  const guardFn = guards[gName];
+  if (typeof guardFn !== "function") continue;
+
+  const gErr = guardFn(payload);
+
+  if (!gErr) continue;
+
+  // ✅ لو Guard رجّع { field, msg } نحطها فوق الحقل
+  if (typeof gErr === "object" && gErr.field) {
+    fieldErrors[gErr.field] = gErr.msg || "خطأ في هذا الحقل.";
+    guardErrors.push(gErr.msg || "خطأ في هذا الحقل.");
+    errors.push(gErr.msg || "خطأ في هذا الحقل.");
+    continue;
   }
 
-  return { ok: errors.length === 0, errors, fieldErrors, guardErrors };
+  // ✅ لو string
+  guardErrors.push(gErr);
+  errors.push(gErr);
 }
+
+if (Object.keys(fieldErrors).length) {
+  return { ok: false, errors, fieldErrors, guardErrors };
+}
+
+return { ok: errors.length === 0, errors, fieldErrors, guardErrors };
+
 
 function validateField(key, rule, value) {
   if (rule.required && !req(value)) return rule.msg || `الحقل «${key}» مطلوب.`;
