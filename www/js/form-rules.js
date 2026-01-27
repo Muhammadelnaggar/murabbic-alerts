@@ -51,7 +51,7 @@ export const eventSchemas = {
 
     // إجباري (حسب طلبك)
     calvingKind: { required: true, msg: "نوع الولادة مطلوب." },
-    lastFertileInseminationDate: { required: true, type: "date", msg: "آخر تلقيح مُخصِّب مطلوب." },
+    lastInseminationDate: { required: true, type: "date", msg: "آخر تلقيح مُخصِّب مطلوب." },
 
     // ملحوظة: notes مش إجباري
     notes: { required: false },
@@ -179,7 +179,7 @@ calvingRequiredFields(fd) {
   if (!kind) return "❌ نوع الولادة مطلوب.";
 
   // 2) آخر تلقيح مُخصِّب لازم موجود وصالح
-  const lf = String(fd.lastFertileInseminationDate || "").trim();
+  const lf = String(fd.lastInseminationDate || "").trim();
   if (!isDate(lf)) return '❌ "آخر تلقيح مُخصِّب" مطلوب (تاريخ صحيح).';
 
   // 3) لو الولادة "نافقة" → لا نطلب أي بيانات عجول
@@ -292,6 +292,14 @@ export function validateEvent(eventType, payload = {}) {
   const st = String(doc?.status ?? "").trim().toLowerCase();
   if (st === "inactive") {
     return { ok: false, errors: ["❌ لا يمكن تسجيل أحداث لحيوان تم بيعه/نفوقه/استبعاده من القطيع."] };
+  }
+  // ✅ Fallback مركزي لحدث "ولادة": لو lastInseminationDate مش جاي من الفورم
+  // خده من وثيقة الحيوان (حسب الاتفاق)
+  if (eventType === "ولادة") {
+    const doc = payload.documentData || {};
+    if (!payload.lastInseminationDate) {
+      payload.lastInseminationDate = String(doc.lastInseminationDate || "").trim();
+    }
   }
 
   const errors = [];
