@@ -411,6 +411,13 @@ function attachOne(form) {
       if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
       if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
       if (sig.lastBoundaryType) formData.lastBoundaryType = sig.lastBoundaryType;
+      // ✅ تعبئة حقل آخر تلقيح مخصّب في النموذج
+const lfEl = getFieldEl(form, "lastFertileInseminationDate") || document.getElementById("lastFertile");
+if (lfEl && sig.lastFertileInseminationDate) {
+  lfEl.value = sig.lastFertileInseminationDate;
+}
+
+      
 
       const rsRaw = String(
         formData.reproStatusFromEvents || formData.documentData?.reproductiveStatus || ""
