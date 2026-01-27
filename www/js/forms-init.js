@@ -489,19 +489,30 @@ const minGD =
   if (!isNaN(A) && !isNaN(B)) {
     A.setHours(0,0,0,0); B.setHours(0,0,0,0);
     const g = Math.round((B - A) / 86400000);
-    if (g < minGD) {
-      // هنا نعرض خيار الإجهاض حتى قبل الفتح (كما اتفقنا)
-      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-      showMsg(bar, [`❌ لا يمكن فتح نموذج الولادة: عمر الحمل ${g} يوم أقل من الحد الأدنى (${minGD}).`], "error", [
-        { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
-        { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
-      ]);
-      lockForm(true);
-      return false;
-    }
-  }
-}
+  if (g < minGD) {
+  const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
 
+  showMsg(
+    bar,
+    "❌ لا يمكن تسجيل ولادة — عمر الحمل تحت الحد الأدنى للولادة",
+    "error",
+    [
+      {
+        label: "تسجيل إجهاض",
+        primary: true,
+        onClick: () => (location.href = url)
+      },
+      {
+        label: "رجوع",
+        onClick: () => history.back()
+      }
+    ]
+  );
+
+  lockForm(true);
+  return false;
+ }
+}
 // ✅ أخضر: افتح الإدخال
 showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
 lockForm(false);
