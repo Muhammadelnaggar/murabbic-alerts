@@ -214,18 +214,17 @@ async function fetchAnimalByNumberForUser(uid, number) {
 
   return null;
 }
-
 // ✅ يقرأ أقوى إشارات من events (لا نطلب orderBy لتجنب Index)
 async function fetchCalvingSignalsFromEvents(uid, number) {
   const num = String(normalizeDigits(number || "")).trim();
-  if (!uid || !num) {
-   return {
-  reproStatusFromEvents: "",
-  lastFertileInseminationDate: "",
-  lastBoundary: "",
-  lastBoundaryType: ""
-};
 
+  // ✅ لو مفيش uid/رقم
+  if (!uid || !num) {
+    return {
+      reproStatusFromEvents: "",
+      lastBoundary: "",
+      lastBoundaryType: ""
+    };
   }
 
   const qEv = query(
@@ -242,44 +241,36 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
     .sort((a, b) => String(b.eventDate).localeCompare(String(a.eventDate)));
 
   let reproStatusFromEvents = "";
-  let lastFertileInseminationDate = "";
   let lastBoundary = "";
-  let lastBoundaryType = ""; // ✅ "ولادة" أو "إجهاض"
+  let lastBoundaryType = ""; // "ولادة" أو "إجهاض"
 
   for (const ev of arr) {
     const type = String(ev.eventType || ev.type || "").trim();
-    const res = String(ev.result || ev.status || "").trim();
-    const dt = String(ev.eventDate || "").trim();
+    const res  = String(ev.result || ev.status || "").trim();
+    const dt   = String(ev.eventDate || "").trim();
 
-  if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
-  lastBoundary = dt;
-  lastBoundaryType = type; // ✅ مهم للرسائل
-  if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
-  continue;
-}
-
+    // Boundary (آخر ولادة/إجهاض)
+    if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
+      lastBoundary = dt;
+      lastBoundaryType = type;
+      if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
+      continue;
+    }
 
     // تشخيص حمل
     if (type === "تشخيص حمل") {
       const r = stripTashkeel(res);
       if (!reproStatusFromEvents) {
         if (r.includes("عشار")) reproStatusFromEvents = "عشار";
-        if (r.includes("فارغه") || r.includes("فارغة"))
-          reproStatusFromEvents = "مفتوحة";
+        if (r.includes("فارغه") || r.includes("فارغة")) reproStatusFromEvents = "مفتوحة";
       }
     }
 
-   const lfEl =
-  getFieldEl(form, "lastInseminationDate") ||
-  getFieldEl(form, "lastFertileInseminationDate") ||
-  document.getElementById("lastFertile");
+    if (reproStatusFromEvents && lastBoundary) break;
+  }
 
-const lf =
-  (sig.lastFertileInseminationDate || "").trim() ||
-  String(form.__mbkDoc?.lastInseminationDate || "").trim();
-
-if (lfEl && lf) lfEl.value = lf;
-
+  return { reproStatusFromEvents, lastBoundary, lastBoundaryType };
+}
 
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
@@ -289,28 +280,15 @@ function applyAnimalToForm(form, animal) {
   if (animalIdEl) animalIdEl.value = form.__mbkAnimalId || "";
 
   const speciesEl = getFieldEl(form, "species");
-  let sp = String(
-    animal?.data?.species || animal?.data?.animalTypeAr || ""
-  ).trim();
-
+  let sp = String(animal?.data?.species || animal?.data?.animalTypeAr || "").trim();
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-
   if (speciesEl && sp) speciesEl.value = sp;
-    // ✅ تعبئة آخر تلقيح من وثيقة الحيوان مباشرة
+
+  // ✅ (حسب طلبك) تعبئة آخر تلقيح من وثيقة الحيوان فقط
   const lastAIEl = getFieldEl(form, "lastInseminationDate");
-  const lastAI = String(
-    animal?.data?.lastInseminationDate ||
-    animal?.data?.lastAI ||
-    animal?.data?.lastInsemination ||
-    animal?.data?.lastServiceDate ||
-    ""
-  ).trim();
-
-  if (lastAIEl && lastAI && !lastAIEl.value) {
-    lastAIEl.value = lastAI;
-  }
-
+  const lastAI = String(animal?.data?.lastInseminationDate || "").trim();
+  if (lastAIEl && lastAI && !lastAIEl.value) lastAIEl.value = lastAI;
 }
 
 async function ensureAnimalExistsGate(form, bar) {
@@ -441,18 +419,18 @@ function attachOne(form) {
       const uid = await getUid();
       const sig = await fetchCalvingSignalsFromEvents(uid, n);
       if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
-      if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
+    
       if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
       if (sig.lastBoundaryType) formData.lastBoundaryType = sig.lastBoundaryType;
+      // ✅ آخر تلقيح: من وثيقة الحيوان فقط
+formData.lastInseminationDate = String(form.__mbkDoc?.lastInseminationDate || "").trim();
+
 
     }
 
     // 4) Validation الحقيقي (المركزي)
     const { ok, errors } = validateEvent(eventName, formData);
 if (!ok) {
-  // 🔴 ضمان: أي فشل Validation يفرض الأحمر فورًا (يلغي أي حالة خضراء سابقة)
-  bar.style.display = "none";
-
   const errs = errors || [];
   const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
 
