@@ -297,6 +297,20 @@ function applyAnimalToForm(form, animal) {
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
   if (speciesEl && sp) speciesEl.value = sp;
+    // ✅ تعبئة آخر تلقيح من وثيقة الحيوان مباشرة
+  const lastAIEl = getFieldEl(form, "lastInseminationDate");
+  const lastAI = String(
+    animal?.data?.lastInseminationDate ||
+    animal?.data?.lastAI ||
+    animal?.data?.lastInsemination ||
+    animal?.data?.lastServiceDate ||
+    ""
+  ).trim();
+
+  if (lastAIEl && lastAI && !lastAIEl.value) {
+    lastAIEl.value = lastAI;
+  }
+
 }
 
 async function ensureAnimalExistsGate(form, bar) {
