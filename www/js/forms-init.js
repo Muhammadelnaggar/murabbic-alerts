@@ -76,6 +76,40 @@ function showMsg(bar, msgs, type = "error", actions = []) {
     bar.appendChild(wrap);
   }
 }
+/* ===================== UI: Field Errors (Inline) ===================== */
+function clearFieldErrors(form){
+  form.querySelectorAll(".mbk-field-error").forEach(el => el.remove());
+  form.querySelectorAll(".mbk-field-error-target").forEach(el => el.classList.remove("mbk-field-error-target"));
+}
+
+function placeFieldError(form, fieldName, msg){
+  const el =
+    form.querySelector(`[data-field="${fieldName}"]`) ||
+    form.querySelector(`#${fieldName}`) ||
+    null;
+
+  if (!el) return null;
+
+  const box = document.createElement("div");
+  box.className = "mbk-field-error";
+  box.style.cssText = "margin:6px 0 6px; padding:8px 10px; border-radius:10px; background:#ffebee; border:1px solid #ef9a9a; color:#b71c1c; font: 13px/1.4 system-ui,'Cairo',Arial;";
+  box.textContent = String(msg || "خطأ في هذا الحقل.");
+
+  // ✅ “فوق الحقل”: نحط الرسالة قبل input/select/textarea مباشرة
+  el.parentNode.insertBefore(box, el);
+
+  el.classList.add("mbk-field-error-target");
+  el.setAttribute("aria-invalid", "true");
+
+  return box;
+}
+
+function scrollToFirstFieldError(form){
+  const first = form.querySelector(".mbk-field-error");
+  if (first) {
+    first.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
 
 /* ===================== Helpers ===================== */
 async function getUid() {
@@ -398,7 +432,7 @@ function attachOne(form) {
 
     if (!n || !d) {
       showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
-      lockForm(true);
+      lockForm(false);
       return false;
     }
 
@@ -429,31 +463,48 @@ formData.lastInseminationDate = String(form.__mbkDoc?.lastInseminationDate || ""
     }
 
     // 4) Validation الحقيقي (المركزي)
-    const { ok, errors } = validateEvent(eventName, formData);
-if (!ok) {
-  const errs = errors || [];
+   const res = validateEvent(eventName, formData);
+
+if (!res.ok) {
+  clearFieldErrors(form);
+
+  const errs = res.errors || [];
+  const fieldErrors = res.fieldErrors || {};
+  const guardErrors = res.guardErrors || [];
+
+  // ✅ لو في أخطاء حقول → تظهر فوق الحقول (بدون infobar)
+  const fieldKeys = Object.keys(fieldErrors);
+  if (fieldKeys.length) {
+    bar.style.display = "none";
+    fieldKeys.forEach((k) => placeFieldError(form, k, fieldErrors[k]));
+    scrollToFirstFieldError(form);
+    lockForm(false); // خليه يقدر يعدّل الحقول
+    return false;
+  }
+
+  // ✅ لو مفيش أخطاء حقول (يعني Guards) → استخدم infobar
   const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+  const hasAbortHint =
+    eventName === "ولادة" &&
+    errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
 
+  if (hasAbortHint) {
+    const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+    showMsg(bar, cleaned, "error", [
+      { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
+      { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
+    ]);
+  } else {
+    showMsg(bar, cleaned, "error");
+  }
 
-      const hasAbortHint =
-        eventName === "ولادة" &&
-        errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
-
-      if (hasAbortHint) {
-        const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-        showMsg(bar, cleaned, "error", [
-          { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
-          { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
-        ]);
-      } else {
-        showMsg(bar, cleaned, "error");
-      }
-
-      lockForm(true);
-      return false;
-    }
+  lockForm(true);
+  return false;
+}
 
     // ✅ نجاح: اطلق الحدث من الفورم (أفضل من document)
+    clearFieldErrors(form);
+
     showMsg(bar, "✅ البيانات صحيحة — جارٍ الحفظ…", "ok");
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
@@ -477,7 +528,8 @@ if (!ok) {
 
     if (form.dataset.locked === "1") return;
 
-    const ok = await runFullValidationAndDispatch();
+    const ok = await runFullVal
+    idationAndDispatch();
     if (!ok) return;
   });
 }
