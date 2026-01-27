@@ -503,7 +503,7 @@ if (!res.ok) {
     showMsg(bar, cleaned, "error");
   }
 
-  lockForm(true);
+  lockForm(false);
   return false;
 }
 
