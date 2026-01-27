@@ -141,14 +141,16 @@ calvingDecision(fd) {
   }
 
   // ✅ آخر تلقيح مُخصِّب: events أولًا ثم الوثيقة
-  const lf =
-    fd.lastFertileInseminationDate ||
-    doc.lastFertileInseminationDate ||
-    doc.lastFertileInsemination ||
-    doc.lastInseminationDate ||
-    "";
+ const lf =
+  fd.lastInseminationDate ||
+  doc.lastInseminationDate ||
+  doc.lastAI ||
+  doc.lastInsemination ||
+  doc.lastServiceDate ||
+  "";
 
-  if (!isDate(lf)) return '❌ لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح مُخصِّب".';
+  if (!isDate(lf)) return '❌ لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح".';
+
   if (!isDate(fd.eventDate)) return "❌ تاريخ الولادة غير صالح.";
 
   // ✅ Boundary: لو في (ولادة/إجهاض) أحدث من التلقيح → يلغي الحمل
