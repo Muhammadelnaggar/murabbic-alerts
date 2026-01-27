@@ -79,8 +79,12 @@ function showMsg(bar, msgs, type = "error", actions = []) {
 /* ===================== UI: Field Errors (Inline) ===================== */
 function clearFieldErrors(form){
   form.querySelectorAll(".mbk-field-error").forEach(el => el.remove());
-  form.querySelectorAll(".mbk-field-error-target").forEach(el => el.classList.remove("mbk-field-error-target"));
+  form.querySelectorAll(".mbk-field-error-target").forEach(el => {
+    el.classList.remove("mbk-field-error-target");
+    el.removeAttribute("aria-invalid");
+  });
 }
+
 
 function placeFieldError(form, fieldName, msg){
   const el =
@@ -406,6 +410,7 @@ function attachOne(form) {
   async function runGateOnly() {
     const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
     const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
+     clearFieldErrors(form); // ✅ امسح أي أخطاء حقول قديمة
 
     if (!n || !d) {
       bar.style.display = "none";
@@ -528,8 +533,8 @@ if (!res.ok) {
 
     if (form.dataset.locked === "1") return;
 
-    const ok = await runFullVal
-    idationAndDispatch();
+   const ok = await runFullValidationAndDispatch();
+
     if (!ok) return;
   });
 }
