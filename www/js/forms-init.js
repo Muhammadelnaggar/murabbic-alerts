@@ -4,7 +4,8 @@
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
-import { validateEvent, uniqueAnimalNumber } from "./form-rules.js";
+import { validateEvent, uniqueAnimalNumber, thresholds } from "./form-rules.js";
+
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
@@ -218,11 +219,13 @@ async function fetchAnimalByNumberForUser(uid, number) {
 async function fetchCalvingSignalsFromEvents(uid, number) {
   const num = String(normalizeDigits(number || "")).trim();
   if (!uid || !num) {
-    return {
-      reproStatusFromEvents: "",
-      lastFertileInseminationDate: "",
-      lastBoundary: ""
-    };
+   return {
+  reproStatusFromEvents: "",
+  lastFertileInseminationDate: "",
+  lastBoundary: "",
+  lastBoundaryType: ""
+};
+
   }
 
   const qEv = query(
@@ -241,18 +244,20 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
   let reproStatusFromEvents = "";
   let lastFertileInseminationDate = "";
   let lastBoundary = "";
+  let lastBoundaryType = ""; // ✅ "ولادة" أو "إجهاض"
 
   for (const ev of arr) {
     const type = String(ev.eventType || ev.type || "").trim();
     const res = String(ev.result || ev.status || "").trim();
     const dt = String(ev.eventDate || "").trim();
 
-    // Boundary: ولادة/إجهاض يلغي قبلها
-    if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
-      lastBoundary = dt;
-      if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
-      continue;
-    }
+  if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
+  lastBoundary = dt;
+  lastBoundaryType = type; // ✅ مهم للرسائل
+  if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
+  continue;
+}
+
 
     // تشخيص حمل
     if (type === "تشخيص حمل") {
@@ -277,7 +282,8 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
     if (reproStatusFromEvents && lastFertileInseminationDate) break;
   }
 
-  return { reproStatusFromEvents, lastFertileInseminationDate, lastBoundary };
+ return { reproStatusFromEvents, lastFertileInseminationDate, lastBoundary, lastBoundaryType };
+
 }
 
 function applyAnimalToForm(form, animal) {
@@ -392,11 +398,115 @@ function attachOne(form) {
       return false;
     }
 
-    // ✅ أخضر: افتح الإدخال
-    showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
-    lockForm(false);
-    return true;
+  // ✅ Gate إضافي للولادة قبل فتح الحقول (عشان مايفتحش لو مش عِشار)
+if (eventName === "ولادة") {
+  const uid = await getUid();
+  const formData = collectFormData(form);
+  formData.documentData = form.__mbkDoc || null;
+  if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+
+  // إشارات من الأحداث (الحالة التناسلية + آخر تلقيح مخصب + boundary)
+  const sig = await fetchCalvingSignalsFromEvents(uid, n);
+  if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
+  if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
+  if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
+  if (sig.lastBoundaryType) formData.lastBoundaryType = sig.lastBoundaryType;
+
+  
+
+  // ✅ الحالة التناسلية + نوع الحيوان للرسالة (بقرة/جاموسة)
+const rsRaw = String(formData.reproStatusFromEvents || formData.documentData?.reproductiveStatus || "").trim();
+const rs = stripTashkeel(rsRaw);
+
+const rawSpecies = String(
+  formData.species ||
+  formData.documentData?.species ||
+  formData.documentData?.animalTypeAr ||
+  formData.documentData?.animalType ||
+  ""
+).trim();
+
+const sp = /جاموس/i.test(rawSpecies) ? "الجاموسة" : "البقرة";
+
+// ✅ نوع آخر Boundary (ولادة/إجهاض) جاء من fetchCalvingSignalsFromEvents
+const bType = String(formData.lastBoundaryType || "").trim();
+
+// ✅ رسائلك بالترتيب المطلوب
+let msg = "";
+
+// 1) ملقح وليست عشار
+if (rs.includes("ملقح") && !rs.includes("عشار")) {
+  msg = `❌ لا يمكن تسجيل ولادة ${sp} ملقحة وليست عشار`;
+}
+// 2) حديثة الولادة وليست عشار
+else if (bType === "ولادة" && !rs.includes("عشار")) {
+  msg = `❌ لا يمكن تسجيل ولادة ${sp} حديثة الولادة وليست عشار`;
+}
+// 3) إجهاض وليست عشار
+else if (bType === "إجهاض" && !rs.includes("عشار")) {
+  msg = `❌ لا يمكن تسجيل ولادة ${sp} اجهاض وليست عشار`;
+}
+// 4) مفتوحة وغير عشار
+else if ((rs.includes("مفتوحة") || rs.includes("فارغة")) && !rs.includes("عشار")) {
+  msg = `❌ لا يمكن تسجيل ولادة ${sp} مفتوحة وغير عشار`;
+}
+// 5) استبعاد تناسلي وليست عشار
+else if (rsRaw === "لا تُلقّح مرة أخرى") {
+  msg = `❌ لا يمكن تسجيل ولادة ${sp} استبعاد تناسلي وليست عشار`;
+}
+
+
+if (msg) {
+  showMsg(bar, msg, "error");
+  lockForm(true);
+  return false;
+}
+
+
+  // ✅ لازم يوجد آخر تلقيح مخصب (من الأحداث أو الوثيقة)
+  const lf = String(formData.lastFertileInseminationDate || formData.documentData?.lastFertileInseminationDate || formData.documentData?.lastInseminationDate || "").trim();
+  if (!lf) {
+    showMsg(bar, "❌ لا يمكن فتح نموذج الولادة: لا يوجد «آخر تلقيح مُخصِّب».", "error");
+    lockForm(true);
+    return false;
   }
+
+  // ✅ عمر الحمل (أبقار/جاموس)
+ const speciesStr = String(
+  formData.species ||
+  formData.documentData?.species ||
+  formData.documentData?.animalTypeAr ||
+  ""
+).trim();
+
+const minGD =
+  (speciesStr.includes("جاموس")
+    ? thresholds["جاموس"]?.minGestationDays
+    : thresholds["أبقار"]?.minGestationDays) || 255;
+
+
+  const A = new Date(lf), B = new Date(d);
+  if (!isNaN(A) && !isNaN(B)) {
+    A.setHours(0,0,0,0); B.setHours(0,0,0,0);
+    const g = Math.round((B - A) / 86400000);
+    if (g < minGD) {
+      // هنا نعرض خيار الإجهاض حتى قبل الفتح (كما اتفقنا)
+      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+      showMsg(bar, [`❌ لا يمكن فتح نموذج الولادة: عمر الحمل ${g} يوم أقل من الحد الأدنى (${minGD}).`], "error", [
+        { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
+        { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
+      ]);
+      lockForm(true);
+      return false;
+    }
+  }
+}
+
+// ✅ أخضر: افتح الإدخال
+showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
+lockForm(false);
+return true;
+}
 
   // Full validation + إطلاق mbk:valid (وقت الحفظ فقط)
   async function runFullValidationAndDispatch() {
@@ -428,6 +538,8 @@ function attachOne(form) {
       if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
       if (sig.lastFertileInseminationDate) formData.lastFertileInseminationDate = sig.lastFertileInseminationDate;
       if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
+      if (sig.lastBoundaryType) formData.lastBoundaryType = sig.lastBoundaryType;
+
     }
 
     // 4) Validation الحقيقي (المركزي)
