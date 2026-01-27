@@ -42,19 +42,38 @@ const commonFields = {
 //                         سكيمات الأحداث
 // ===================================================================
 export const eventSchemas = {
-  "ولادة": {
+"ولادة": {
   fields: {
-    // ✅ للتحقق قبل ملء النموذج: لا نُجبر animalId/species هنا
+    // أساسيات
     eventDate: { required: true, type: "date", msg: "تاريخ الولادة غير صالح." },
     animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
     documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
 
-    // اختياري (يُملأ لاحقًا بعد السماح)
+    // إجباري (حسب طلبك)
+    calvingKind: { required: true, msg: "نوع الولادة مطلوب." },
+    lastFertileInseminationDate: { required: true, type: "date", msg: "آخر تلقيح مُخصِّب مطلوب." },
+
+    // ملحوظة: notes مش إجباري
+    notes: { required: false },
+
+    // تُملأ لاحقًا من البوابة/الكونتكست (مش شرط هنا)
     animalId: { required: false },
     species: { required: false },
+    reproStatus: { required: false },
+
+    // حقول العجول (هتتأكد مركزيًا في Guard)
+    calfCount: { required: false },
+    calf1Sex:  { required: false },
+    calfId:    { required: false },
+    calf2Sex:  { required: false },
+    calf2Id:   { required: false },
+    calf3Sex:  { required: false },
+    calf3Id:   { required: false },
+    calfFate:  { required: false },
   },
-  guards: ["calvingDecision"],
+  guards: ["calvingDecision", "calvingRequiredFields"],
 },
+
 
 
   "تلقيح": {
@@ -148,6 +167,43 @@ calvingDecision(fd) {
   if (gDays < th) {
     // ✅ Prefix خاص عشان forms-init يعرف يعرض زر “تسجيل إجهاض”
     return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th} يوم للـ${sp}.`;
+  }
+
+  return null;
+},
+calvingRequiredFields(fd) {
+  // 1) نوع الولادة لازم موجود
+  const kind = String(fd.calvingKind || "").trim();
+  if (!kind) return "❌ نوع الولادة مطلوب.";
+
+  // 2) آخر تلقيح مُخصِّب لازم موجود وصالح
+  const lf = String(fd.lastFertileInseminationDate || "").trim();
+  if (!isDate(lf)) return '❌ "آخر تلقيح مُخصِّب" مطلوب (تاريخ صحيح).';
+
+  // 3) لو الولادة "نافقة" → لا نطلب أي بيانات عجول
+  if (kind === "نافقة") return null;
+
+  // 4) غير نافقة → بيانات العجول إجبارية
+  const count = Number(String(fd.calfCount || "").trim());
+  if (!(count === 1 || count === 2 || count === 3)) return "❌ عدد المواليد مطلوب (1 أو 2 أو 3).";
+
+  // المولود 1
+  if (!String(fd.calf1Sex || "").trim()) return "❌ جنس المولود (1) مطلوب.";
+  if (!String(fd.calfId || "").trim())   return "❌ رقم العجل (1) مطلوب.";
+
+  // مصير العجل
+  if (!String(fd.calfFate || "").trim()) return "❌ مصير العجل مطلوب.";
+
+  // المولود 2
+  if (count >= 2) {
+    if (!String(fd.calf2Sex || "").trim()) return "❌ جنس المولود (2) مطلوب.";
+    if (!String(fd.calf2Id || "").trim())  return "❌ رقم العجل (2) مطلوب.";
+  }
+
+  // المولود 3
+  if (count >= 3) {
+    if (!String(fd.calf3Sex || "").trim()) return "❌ جنس المولود (3) مطلوب.";
+    if (!String(fd.calf3Id || "").trim())  return "❌ رقم العجل (3) مطلوب.";
   }
 
   return null;
