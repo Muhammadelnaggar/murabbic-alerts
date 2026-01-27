@@ -626,7 +626,7 @@
       if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
       if (dateEl && !dateEl.value) dateEl.value = evISO;
 
-      showSysbar('جاهز للتسجيل ✅');
+      //showSysbar('جاهز للتسجيل ✅');
       disableForm(false);
     }
 
@@ -640,9 +640,9 @@
       precheck(n);
     }
 
-    onAuthStateChanged(auth, ()=> kickPrecheck());
-    numEl?.addEventListener('change', kickPrecheck);
-    numEl?.addEventListener('blur', kickPrecheck);
+   // onAuthStateChanged(auth, ()=> kickPrecheck());
+   // numEl?.addEventListener('change', kickPrecheck);
+   // numEl?.addEventListener('blur', kickPrecheck);
 
     /* منع تكرار ولادة لنفس اليوم */
     async function existsCalvingSameDay(uid, number, dateISO){
@@ -770,4 +770,5 @@
 
 </body>
 </html>
+
 
