@@ -269,22 +269,17 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
       }
     }
 
-    // آخر تلقيح مخصب
-    const fertile =
-      type === "تلقيح مخصب" ||
-      ev.fertile === true ||
-      stripTashkeel(res).includes("مخصب");
+   const lfEl =
+  getFieldEl(form, "lastInseminationDate") ||
+  getFieldEl(form, "lastFertileInseminationDate") ||
+  document.getElementById("lastFertile");
 
-    if (!lastFertileInseminationDate && fertile) {
-      lastFertileInseminationDate = dt;
-    }
+const lf =
+  (sig.lastFertileInseminationDate || "").trim() ||
+  String(form.__mbkDoc?.lastInseminationDate || "").trim();
 
-    if (reproStatusFromEvents && lastFertileInseminationDate) break;
-  }
+if (lfEl && lf) lfEl.value = lf;
 
- return { reproStatusFromEvents, lastFertileInseminationDate, lastBoundary, lastBoundaryType };
-
-}
 
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
