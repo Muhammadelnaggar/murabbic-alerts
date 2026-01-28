@@ -317,6 +317,8 @@
         const date = qs.get('date')   || qs.get('dt') || '';
         if (num  && $('animalNumber')) $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
         if (date && $('eventDate'))    $('eventDate').value    = toISO(date);
+        $('animalNumber')?.dispatchEvent(new Event('change', { bubbles:true }));
+        $('eventDate')?.dispatchEvent(new Event('change', { bubbles:true }));
       });
     })();
   </script>
@@ -572,3 +574,4 @@
     location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
   });
 </script>
+
