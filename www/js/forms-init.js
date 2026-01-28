@@ -4,8 +4,7 @@
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
-import { validateEvent, uniqueAnimalNumber, thresholds } from "./form-rules.js";
-
+import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers } from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
@@ -510,7 +509,31 @@ if (!res.ok) {
     // ✅ نجاح: اطلق الحدث من الفورم (أفضل من document)
     clearFieldErrors(form);
 
-    showMsg(bar, "✅ البيانات صحيحة — جارٍ الحفظ…", "ok");
+    // 4.5) ✅ DB-level: منع تكرار رقم العجل لنفس المستخدم (لـ "ولادة" فقط)
+if (eventName === "ولادة") {
+  const uid = await getUid();
+
+  const kind = String(formData.calvingKind || "").trim();
+  if (kind !== "نافقة") {
+    const count = parseInt(String(formData.calfCount || "1"), 10) || 1;
+
+    const calfNums = [
+      formData.calfId,
+      count >= 2 ? formData.calf2Id : "",
+      count >= 3 ? formData.calf3Id : ""
+    ].filter(Boolean);
+
+    const chk = await uniqueCalfNumbers({ userId: uid, calfNumbers: calfNums });
+
+    if (!chk.ok) {
+      clearFieldErrors(form);
+      showMsg(bar, chk.msg || "⚠️ رقم عجل مكرر في حسابك.", "error");
+      lockForm(false);
+      return false;
+    }
+  }
+}
+ showMsg(bar, "✅ البيانات صحيحة — جارٍ الحفظ…", "ok");
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
         bubbles: true,
