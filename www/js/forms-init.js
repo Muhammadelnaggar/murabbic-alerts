@@ -6,7 +6,13 @@
 
 import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers, guards } from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
-import { collection, query, where, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ===================== UI: Infobar ===================== */
@@ -35,11 +41,13 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   bar.style.color = type === "error" ? "#b71c1c" : "#065f46";
 
   const html = Array.isArray(msgs)
-    ? `<ul style="margin:0;padding-left:18px">${msgs.map((m) => `<li>${String(m || "")}</li>`).join("")}</ul>`
+    ? `<ul style="margin:0;padding-left:18px">${msgs
+        .map((m) => `<li>${String(m || "")}</li>`)
+        .join("")}</ul>`
     : `<div>${String(msgs || "")}</div>`;
 
   bar.innerHTML = html;
-  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
   if (Array.isArray(actions) && actions.length) {
     const wrap = document.createElement("div");
@@ -58,7 +66,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
         btn.style.color = "#fff";
       }
       btn.addEventListener("click", () => {
-        try { a.onClick && a.onClick(); } catch (_) {}
+        try { a.onClick && a.onClick(); } catch(_) {}
       });
       wrap.appendChild(btn);
     });
@@ -68,26 +76,25 @@ function showMsg(bar, msgs, type = "error", actions = []) {
 }
 
 /* ===================== UI: Field Errors (Inline) ===================== */
-function clearFieldErrors(form) {
-  form.querySelectorAll(".mbk-field-error").forEach((el) => el.remove());
-  form.querySelectorAll(".mbk-field-error-target").forEach((el) => {
+function clearFieldErrors(form){
+  form.querySelectorAll(".mbk-field-error").forEach(el => el.remove());
+  form.querySelectorAll(".mbk-field-error-target").forEach(el => {
     el.classList.remove("mbk-field-error-target");
     el.removeAttribute("aria-invalid");
   });
 }
 
-function placeFieldError(form, fieldName, msg) {
+function placeFieldError(form, fieldName, msg){
   const el =
     form.querySelector(`[data-field="${fieldName}"]`) ||
     form.querySelector(`#${fieldName}`) ||
     null;
 
-  if (!el) return null;
+  if (!el || !el.parentNode) return null;
 
   const box = document.createElement("div");
   box.className = "mbk-field-error";
-  box.style.cssText =
-    "margin:6px 0 6px; padding:8px 10px; border-radius:10px; background:#ffebee; border:1px solid #ef9a9a; color:#b71c1c; font: 13px/1.4 system-ui,'Cairo',Arial;";
+  box.style.cssText = "margin:6px 0 6px; padding:8px 10px; border-radius:10px; background:#ffebee; border:1px solid #ef9a9a; color:#b71c1c; font: 13px/1.4 system-ui,'Cairo',Arial;";
   box.textContent = String(msg || "خطأ في هذا الحقل.");
 
   el.parentNode.insertBefore(box, el);
@@ -96,9 +103,11 @@ function placeFieldError(form, fieldName, msg) {
   return box;
 }
 
-function scrollToFirstFieldError(form) {
+function scrollToFirstFieldError(form){
   const first = form.querySelector(".mbk-field-error");
-  if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (first) {
+    first.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 }
 
 /* ===================== Helpers ===================== */
@@ -107,7 +116,7 @@ async function getUid() {
 
   return await new Promise((res) => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      try { unsub && unsub(); } catch (_) {}
+      try { unsub && unsub(); } catch(_) {}
       res(u?.uid || "");
     });
   });
@@ -115,10 +124,8 @@ async function getUid() {
 
 function normalizeDigits(number) {
   const map = {
-    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
-    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
-    "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
-    "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9"
+    "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
+    "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
   };
   return String(number || "")
     .trim()
@@ -164,9 +171,7 @@ function readFieldValue(form, el) {
   }
 
   if (type === "checkbox") return !!el.checked;
-
   if (tag === "select") return String(el.value || "").trim();
-
   return String(el.value || "").trim();
 }
 
@@ -261,8 +266,8 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
 
   for (const ev of arr) {
     const type = String(ev.eventType || ev.type || "").trim();
-    const res = String(ev.result || ev.status || "").trim();
-    const dt = String(ev.eventDate || "").trim();
+    const res  = String(ev.result || ev.status || "").trim();
+    const dt   = String(ev.eventDate || "").trim();
 
     if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
       lastBoundary = dt;
@@ -467,7 +472,7 @@ function attachOne(form) {
 
     if (!n || !d) {
       showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
-      lockForm(false);
+      lockForm(true);
       return false;
     }
 
@@ -481,60 +486,6 @@ function attachOne(form) {
     formData.documentData = form.__mbkDoc || null;
     if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
 
-    // ✅ enrichment للولادة فقط (مهم لقرارات/قواعد الولادة)
-    if (eventName === "ولادة") {
-      const uid = await getUid();
-      const sig = await fetchCalvingSignalsFromEvents(uid, n);
-
-      if (sig.reproStatusFromEvents) formData.reproStatusFromEvents = sig.reproStatusFromEvents;
-      if (sig.lastBoundary) formData.lastBoundary = sig.lastBoundary;
-      if (sig.lastBoundaryType) formData.lastBoundaryType = sig.lastBoundaryType;
-
-      formData.lastInseminationDate = String(form.__mbkDoc?.lastInseminationDate || "").trim();
-    }
-
-    // ✅ 1) Validation المركزي (لازم قبل DB check)
-    const res = validateEvent(eventName, formData);
-
-    if (!res.ok) {
-      clearFieldErrors(form);
-
-      const errs = res.errors || [];
-      const fieldErrors = res.fieldErrors || {};
-      const fieldMap =
-        (fieldErrors && typeof fieldErrors === "object" && !Array.isArray(fieldErrors))
-          ? fieldErrors
-          : {};
-
-      const fieldKeys = Object.keys(fieldMap);
-
-      if (fieldKeys.length) {
-        bar.style.display = "none";
-        fieldKeys.forEach((k) => placeFieldError(form, k, fieldMap[k]));
-        scrollToFirstFieldError(form);
-        lockForm(false);
-        return false;
-      }
-
-      const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
-      const hasAbortHint =
-        eventName === "ولادة" && errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
-
-      if (hasAbortHint) {
-        const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-        showMsg(bar, cleaned, "error", [
-          { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
-          { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
-        ]);
-      } else {
-        showMsg(bar, cleaned.length ? cleaned : "تحقق من البيانات.", "error");
-      }
-
-      lockForm(false);
-      return false;
-    }
-
-    // ✅ 2) DB-level: منع تكرار رقم العجل (بعد نجاح validateEvent فقط)
     if (eventName === "ولادة") {
       const uid = await getUid();
       const kind = String(formData.calvingKind || "").trim();
@@ -568,21 +519,17 @@ function attachOne(form) {
       }
     }
 
-    clearFieldErrors(form);
-
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
         bubbles: true,
         detail: { formData, eventName, form }
       })
     );
-
     return true;
   }
 
-  // ✅ شغّل Gate بعد ما الصفحة تحمل
+  // ✅ Gate startup watcher
   let gateStarted = false;
-
   const watcher = setInterval(() => {
     if (gateStarted) return;
 
@@ -596,12 +543,24 @@ function attachOne(form) {
     }
   }, 120);
 
-  getFieldEl(form, "animalNumber")?.addEventListener("input", runGateOnly);
-  getFieldEl(form, "eventDate")?.addEventListener("input", runGateOnly);
+  // ✅ هنا الإصلاح الحقيقي: input + change (خصوصًا للتاريخ)
+  const numEl = getFieldEl(form, "animalNumber");
+  const dateEl = getFieldEl(form, "eventDate");
 
+  ["input", "change"].forEach(evt => {
+    numEl?.addEventListener(evt, runGateOnly);
+    dateEl?.addEventListener(evt, runGateOnly);
+  });
+
+  // ✅ submit
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (form.dataset.locked === "1") return;
+
+    // بدل الصمت: لو لسه مقفول
+    if (form.dataset.locked === "1") {
+      showMsg(bar, "⚠️ أكمل إدخال رقم الحيوان والتاريخ وانتظر التحقق الأخضر أولًا.", "error");
+      return;
+    }
 
     const ok = await runFullValidationAndDispatch();
     if (!ok) return;
@@ -653,7 +612,10 @@ function attachUniqueAnimalNumberWatcher() {
 }
 
 function autoAttach() {
-  document.querySelectorAll('form[data-validate="true"][data-event]').forEach(attachOne);
+  document
+    .querySelectorAll('form[data-validate="true"][data-event]')
+    .forEach(attachOne);
+
   attachUniqueAnimalNumberWatcher();
 }
 
