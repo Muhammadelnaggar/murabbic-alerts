@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" data-page="calving">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -27,13 +26,6 @@
       border-bottom:1px solid #e2e8f0;
       box-shadow:0 2px 4px rgba(0,0,0,.05)
     }
-    .bar{
-      max-width:920px;margin:0 auto;
-      padding:14px 18px;
-      display:flex;gap:8px;
-      align-items:center;justify-content:space-between
-    }
-    .title{font-weight:700;color:var(--green-600);font-size:18px}
     main{
       max-width:920px;
       margin:20px auto;
@@ -74,6 +66,7 @@
       cursor:pointer
     }
     .radio-group input{margin-inline-start:6px}
+
     .actions-bar{
       position:fixed;bottom:0;left:0;right:0;
       background:#fff;
@@ -156,32 +149,34 @@
     .infobar.error .sys-btn.primary{
       background:#dc2626;
     }
+
+    /* مسافة خفيفة بين مجموعات المواليد */
+    .offspring-group{padding-top:4px}
   </style>
 </head>
-<body>
 
+<body>
   <!-- تتبّع أساسي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
 
-<header>
-  <div class="mbk-head">
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-
-    <div class="mbk-center">
-      <div class="mbk-page-title">تسجيل ولادة</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">تسجيل ولادة</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
     </div>
+  </header>
 
-    <a class="mbk-back" href="add-event.html">رجوع</a>
-  </div>
-</header>
-
-<!-- ✅ كل رسائل النظام هنا تحت العنوان مباشرة -->
-<div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
+  <!-- ✅ كل رسائل النظام هنا تحت العنوان مباشرة -->
+  <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 
   <main>
     <form id="calving-form" class="card grid" autocomplete="off" novalidate
           data-validate="true" data-event="ولادة">
+
       <input type="hidden" data-field="animalId" id="animalId">
       <input type="hidden" data-field="species" id="species">
       <input type="hidden" data-field="reproStatus" value="عشار">
@@ -219,8 +214,10 @@
         </div>
       </div>
 
+      <!-- ===================== مولود (1) ===================== -->
       <div class="offspring-group live-only" id="offspring1">
         <label>المولود (1)</label>
+
         <div class="row">
           <div>
             <label>جنس المولود</label>
@@ -234,27 +231,51 @@
             <input id="calfId" data-field="calfId" placeholder="رقم تعريف العجل" required />
           </div>
         </div>
-      </div>
 
-      <div class="offspring-group live-only" id="offspring2" style="display:none">
-        <label>المولود (2)</label>
         <div class="row">
           <div>
-            <label>جنس المولود</label>
+            <label>مصير العجل (1)</label>
             <div class="radio-group">
-             <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="ذكر" required> ذكر</label>
-             <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="أنثى"> أنثى</label>
+              <label><input type="radio" name="calf1Fate" data-field="calf1Fate" value="تربية" required> تربية</label>
+              <label><input type="radio" name="calf1Fate" data-field="calf1Fate" value="بيع"> بيع</label>
             </div>
-          </div>
-          <div>
-            <label>رقم العجل</label>
-           <input id="calf2Id" data-field="calf2Id" placeholder="رقم تعريف العجل الثاني" required />
           </div>
         </div>
       </div>
 
+      <!-- ===================== مولود (2) ===================== -->
+      <div class="offspring-group live-only" id="offspring2" style="display:none">
+        <label>المولود (2)</label>
+
+        <div class="row">
+          <div>
+            <label>جنس المولود</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="ذكر" required> ذكر</label>
+              <label><input type="radio" name="calf2Sex" data-field="calf2Sex" value="أنثى"> أنثى</label>
+            </div>
+          </div>
+          <div>
+            <label>رقم العجل</label>
+            <input id="calf2Id" data-field="calf2Id" placeholder="رقم تعريف العجل الثاني" required />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>مصير العجل (2)</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf2Fate" data-field="calf2Fate" value="تربية" required> تربية</label>
+              <label><input type="radio" name="calf2Fate" data-field="calf2Fate" value="بيع"> بيع</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== مولود (3) ===================== -->
       <div class="offspring-group live-only" id="offspring3" style="display:none">
         <label>المولود (3)</label>
+
         <div class="row">
           <div>
             <label>جنس المولود</label>
@@ -265,17 +286,17 @@
           </div>
           <div>
             <label>رقم العجل</label>
-           <input id="calf3Id" data-field="calf3Id" placeholder="رقم تعريف العجل الثالث" required />
+            <input id="calf3Id" data-field="calf3Id" placeholder="رقم تعريف العجل الثالث" required />
           </div>
         </div>
-      </div>
 
-      <div class="row live-only">
-        <div>
-          <label>مصير العجل</label>
-          <div class="radio-group">
-            <label><input type="radio" name="calfFate" data-field="calfFate" value="تربية" required> تربية</label>
-            <label><input type="radio" name="calfFate" data-field="calfFate" value="بيع"> بيع</label>
+        <div class="row">
+          <div>
+            <label>مصير العجل (3)</label>
+            <div class="radio-group">
+              <label><input type="radio" name="calf3Fate" data-field="calf3Fate" value="تربية" required> تربية</label>
+              <label><input type="radio" name="calf3Fate" data-field="calf3Fate" value="بيع"> بيع</label>
+            </div>
           </div>
         </div>
       </div>
@@ -283,8 +304,7 @@
       <div class="row">
         <div>
           <label>آخر تلقيح مُخصِّب</label>
-        <input id="lastInseminationDate" type="date" data-field="lastInseminationDate" required />
-
+          <input id="lastInseminationDate" type="date" data-field="lastInseminationDate" required />
         </div>
         <div>
           <label>ملاحظات</label>
@@ -297,7 +317,7 @@
 
   <div class="actions-bar">
     <button class="save" id="saveBtn" type="submit" form="calving-form">حفظ الولادة ✅</button>
-    <button class="ghost" id="toCardBtn">فتح بطاقة الحيوان</button>
+    <button class="ghost" id="toCardBtn" type="button">فتح بطاقة الحيوان</button>
   </div>
 
   <script src="/js/app-core.js"></script>
@@ -314,278 +334,272 @@
       }
       document.addEventListener('DOMContentLoaded', ()=>{
         const num  = qs.get('number') || qs.get('animalNumber') || '';
-        const date = qs.get('date')   || qs.get('dt') || '';
-       if (num && $('animalNumber')) {
-  $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
-  $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
-}
-
-if (date && $('eventDate')) {
-  $('eventDate').value = toISO(date);
-  $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
-}
-
-        $('animalNumber')?.dispatchEvent(new Event('change', { bubbles:true }));
-        $('eventDate')?.dispatchEvent(new Event('change', { bubbles:true }));
+        const date = qs.get('date')   || qs.get('dt') || qs.get('eventDate') || '';
+        if (num && $('animalNumber')) {
+          $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
+          $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
+          $('animalNumber').dispatchEvent(new Event('change', { bubbles:true }));
+        }
+        if (date && $('eventDate')) {
+          $('eventDate').value = toISO(date);
+          $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
+          $('eventDate').dispatchEvent(new Event('change', { bubbles:true }));
+        }
       });
     })();
   </script>
 
-<script type="module">
-  import { db, auth } from '/js/firebase-config.js';
-  import {
-    collection, addDoc, serverTimestamp, query, where, limit, getDocs
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { updateAnimalByEvent } from '/js/animal-update.js';
+  <script type="module">
+    import { db, auth } from '/js/firebase-config.js';
+    import {
+      collection, addDoc, serverTimestamp, query, where, limit, getDocs
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { updateAnimalByEvent } from '/js/animal-update.js';
 
-  const form   = document.querySelector('#calving-form');
-  const sysbar = document.getElementById('sysbar');
-  const numEl  = document.getElementById('animalNumber');
-  const dateEl = document.getElementById('eventDate');
-  const kindEl = document.getElementById('calvingKind');
+    const form   = document.querySelector('#calving-form');
+    const sysbar = document.getElementById('sysbar');
+    const numEl  = document.getElementById('animalNumber');
+    const kindEl = document.getElementById('calvingKind');
 
-  /* ===== Infobar Helper ===== */
-  function clearSysbar(){
-    sysbar.classList.remove('show','error');
-    sysbar.innerHTML = '';
-    sysbar.style.display = 'none';
-  }
+    function scrollToSysbar(){
+      try{ sysbar?.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
+    }
 
-  function scrollToSysbar(){
-    try{ sysbar?.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
-  }
+    function showSysbar(msg, { error=false, actions=[] } = {}){
+      sysbar.style.display = 'block';
+      sysbar.classList.add('show');
+      sysbar.classList.toggle('error', !!error);
 
-  function showSysbar(msg, { error=false, actions=[] } = {}){
-    sysbar.style.display = 'block';
-    sysbar.classList.add('show');
-    sysbar.classList.toggle('error', !!error);
+      const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
 
-    const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
+      if (Array.isArray(actions) && actions.length){
+        const wrap = document.createElement('div');
+        wrap.className = 'sys-actions';
 
-    if (Array.isArray(actions) && actions.length){
-      const wrap = document.createElement('div');
-      wrap.className = 'sys-actions';
+        actions.forEach((a)=>{
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
+          btn.textContent = a.label || 'إجراء';
+          btn.addEventListener('click', ()=>{ try{ a.onClick && a.onClick(); }catch(_){ } });
+          wrap.appendChild(btn);
+        });
 
-      actions.forEach((a)=>{
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
-        btn.textContent = a.label || 'إجراء';
-        btn.addEventListener('click', ()=>{ try{ a.onClick && a.onClick(); }catch(_){ } });
-        wrap.appendChild(btn);
+        sysbar.appendChild(wrap);
+      }
+
+      scrollToSysbar();
+    }
+
+    /* مزامنة مجموعات العجول (UI فقط) */
+    function syncCalfGroups(){
+      const isDead = (kindEl.value === 'نافقة');
+      const count = parseInt(
+        form.querySelector('input[name="calfCount"]:checked')?.value || '1',
+        10
+      );
+
+      document.querySelectorAll('.live-only').forEach(el=>{
+        el.style.display = isDead ? 'none' : '';
       });
 
-      sysbar.appendChild(wrap);
+      const enableLive = !isDead;
+
+      // required/checked للعدد
+      const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
+      calfCountRadios.forEach((r, i)=>{
+        if (enableLive) r.required = (i === 0);
+        else { r.required = false; r.checked = false; }
+      });
+
+      // مولود (1)
+      const calfId1 = document.getElementById('calfId');
+      const calf1SexRadios  = form.querySelectorAll('input[name="calf1Sex"]');
+      const calf1FateRadios = form.querySelectorAll('input[name="calf1Fate"]');
+
+      if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
+      calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+      calf1FateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
+
+      // مولود (2) و(3)
+      [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
+        const group = document.getElementById(id);
+        const vis = enableLive && count >= idx;
+        if (group) group.style.display = vis ? '' : 'none';
+
+        const idEl   = document.getElementById(`calf${idx}Id`);
+        const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
+        const fateRad= form.querySelectorAll(`input[name="calf${idx}Fate"]`);
+
+        if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
+        sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
+        fateRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
+      });
     }
 
-    // ✅ حسب طلبك: أي رسالة حفظ/فشل تظهر ونسكرول لها
-    scrollToSysbar();
-  }
+    kindEl?.addEventListener('change', syncCalfGroups);
+    form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
+    document.addEventListener('DOMContentLoaded', syncCalfGroups);
 
-  /* مزامنة مجموعات العجول (UI فقط) */
-  function syncCalfGroups(){
-    const isDead = (kindEl.value === 'نافقة');
-    const count = parseInt(
-      form.querySelector('input[name="calfCount"]:checked')?.value || '1',
-      10
-    );
-
-    document.querySelectorAll('.live-only').forEach(el=>{
-      el.style.display = isDead ? 'none' : '';
-    });
-
-    const calfId1 = document.getElementById('calfId');
-    const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
-    const calfFateRadios = form.querySelectorAll('input[name="calfFate"]');
-    const enableLive = !isDead;
-
-    const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
-    calfCountRadios.forEach((r, i)=>{
-      if (enableLive) {
-        r.required = (i === 0);
-      } else {
-        r.required = false;
-        r.checked  = false;
-      }
-    });
-
-    if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
-    calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-    calfFateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-
-    [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
-      const group = document.getElementById(id);
-      const vis = enableLive && count >= idx;
-      if (group) group.style.display = vis ? '' : 'none';
-
-      const idEl   = document.getElementById(`calf${idx}Id`);
-      const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
-      if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
-      sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
-    });
-  }
-
-  kindEl?.addEventListener('change', syncCalfGroups);
-  form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
-  document.addEventListener('DOMContentLoaded', syncCalfGroups);
-
-  /* أدوات عامة */
-  async function getUid(){
-    if (auth.currentUser) return auth.currentUser.uid;
-    const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
-    return u?.uid || '';
-  }
-
-  function disableForm(disabled=true){
-    form.querySelectorAll('input, select, button').forEach(el=>{
-      if (el.id === 'toCardBtn') return;
-      el.disabled = disabled;
-    });
-  }
-
-  /* منع تكرار ولادة لنفس اليوم */
-  async function existsCalvingSameDay(uid, number, dateISO){
-    const num = String(number || '').trim();
-    const q1 = query(
-      collection(db, 'events'),
-      where('userId', '==', uid),
-      where('animalNumber', '==', num),
-      where('eventType', '==', 'ولادة'),
-      where('eventDate', '==', dateISO),
-      limit(1)
-    );
-    const snap = await getDocs(q1);
-    return !snap.empty;
-  }
-
-  /* الحفظ الفعلي — بعد mbk:valid من forms-init.js */
-  document.addEventListener('mbk:valid', async (e)=>{
-    const { formData } = e.detail;
-
-    const uid = await getUid();
-    if (!uid){
-      showSysbar('سجّل الدخول أولًا.', { error:true });
-      return;
+    async function getUid(){
+      if (auth.currentUser) return auth.currentUser.uid;
+      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
+      return u?.uid || '';
     }
-const _animalNumber = (formData.animalNumber || '').trim();
-const _eventDate    = (formData.eventDate || '').trim();
 
-    const payload = {
-      userId: uid,
-      type: 'ولادة',
-      eventType: 'ولادة',
-      eventDate: _eventDate,
-      animalNumber: _animalNumber,
-      animalId: (formData.animalId || '').trim(),
-      species: formData.species || '',
-      reproStatus: formData.reproStatus || 'عشار',
-      lastInseminationDate: (formData.lastInseminationDate || '').trim(),
-      lastFertileInseminationDate: (formData.lastInseminationDate || '').trim(), // توافق قديم
+    function disableForm(disabled=true){
+      form.querySelectorAll('input, select, button').forEach(el=>{
+        if (el.id === 'toCardBtn') return;
+        el.disabled = disabled;
+      });
+    }
 
-      calvingKind: formData.calvingKind || '',
-      calfCount: formData.calfCount || '',
-      calf1Sex:  formData.calf1Sex || '',
-      calfId:    formData.calfId || '',
-      calf2Sex:  formData.calf2Sex || '',
-      calf2Id:   formData.calf2Id || '',
-      calf3Sex:  formData.calf3Sex || '',
-      calf3Id:   formData.calf3Id || '',
-      calfFate:  formData.calfFate || '',
-      notes:     formData.notes || '',
-     idempotencyKey: `${_animalNumber}-ولادة-${_eventDate}`,
-      createdAt: serverTimestamp()
-    };
+    /* منع تكرار ولادة لنفس اليوم */
+    async function existsCalvingSameDay(uid, number, dateISO){
+      const num = String(number || '').trim();
+      const q1 = query(
+        collection(db, 'events'),
+        where('userId', '==', uid),
+        where('animalNumber', '==', num),
+        where('eventType', '==', 'ولادة'),
+        where('eventDate', '==', dateISO),
+        limit(1)
+      );
+      const snap = await getDocs(q1);
+      return !snap.empty;
+    }
 
-    try{
-      disableForm(true);
+    /* الحفظ الفعلي — بعد mbk:valid من forms-init.js */
+    document.addEventListener('mbk:valid', async (e)=>{
+      const { formData } = e.detail;
 
-      // ✅ 1) أولًا: منع تكرار ولادة لنفس اليوم (قبل “جارِ الحفظ…”)
-      const alreadyExists = await existsCalvingSameDay(uid, payload.animalNumber, payload.eventDate);
-      if (alreadyExists) {
-        disableForm(false);
-        showSysbar("⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل.", { error: true });
+      const uid = await getUid();
+      if (!uid){
+        showSysbar('سجّل الدخول أولًا.', { error:true });
         return;
       }
 
-      // ✅ 2) دلوقتي فقط نظهر “جارِ الحفظ…”
-      showSysbar('جارِ الحفظ…');
+      const _animalNumber = (formData.animalNumber || '').trim();
+      const _eventDate    = (formData.eventDate || '').trim();
 
-      // ✅ حفظ حدث الولادة
-      await addDoc(collection(db, 'events'), payload);
+      const payload = {
+        userId: uid,
+        type: 'ولادة',
+        eventType: 'ولادة',
+        eventDate: _eventDate,
+        animalNumber: _animalNumber,
+        animalId: (formData.animalId || '').trim(),
+        species: formData.species || '',
+        reproStatus: formData.reproStatus || 'عشار',
+        lastInseminationDate: (formData.lastInseminationDate || '').trim(),
+        lastFertileInseminationDate: (formData.lastInseminationDate || '').trim(), // توافق قديم
 
-      // ✅ تحديث وثيقة الحيوان
-      await updateAnimalByEvent({ ...payload, type:'calving', eventType:'calving' });
+        calvingKind: formData.calvingKind || '',
+        calfCount: formData.calfCount || '',
+        calf1Sex:  formData.calf1Sex || '',
+        calfId:    formData.calfId || '',
+        calf2Sex:  formData.calf2Sex || '',
+        calf2Id:   formData.calf2Id || '',
+        calf3Sex:  formData.calf3Sex || '',
+        calf3Id:   formData.calf3Id || '',
 
-      // ✅ حفظ العجول في calves (لو مش نافقة)
-      const isDead = (String(payload.calvingKind || '').trim() === 'نافقة');
-      if (!isDead) {
-        const damId     = payload.animalId;
-        const damNumber = payload.animalNumber;
-        const birthDate = payload.eventDate;
-        const species   = payload.species;
+        calf1Fate: formData.calf1Fate || '',
+        calf2Fate: formData.calf2Fate || '',
+        calf3Fate: formData.calf3Fate || '',
 
-        const calvesToSave = [];
-        const count = parseInt(payload.calfCount || '1',10) || 1;
+        notes:     formData.notes || '',
+        idempotencyKey: `${_animalNumber}-ولادة-${_eventDate}`,
+        createdAt: serverTimestamp()
+      };
 
-        const pushCalf = (calfIdField, calfSexField)=>{
-          const id  = (formData[calfIdField] || '').trim();
-          const sex = (formData[calfSexField] || '').trim();
-          if (!id || !sex) return;
-          calvesToSave.push({
-            userId: uid,
-            damId,
-            damNumber,
-            birthDate,
-            calfNumber: id,
-            sex,
-            species,
-            createdAt: serverTimestamp()
-          });
-        };
+      try{
+        disableForm(true);
 
-        pushCalf('calfId','calf1Sex');
-        if (count >= 2) pushCalf('calf2Id','calf2Sex');
-        if (count >= 3) pushCalf('calf3Id','calf3Sex');
-
-        for (const calf of calvesToSave){
-          await addDoc(collection(db,'calves'), calf);
+        const alreadyExists = await existsCalvingSameDay(uid, payload.animalNumber, payload.eventDate);
+        if (alreadyExists) {
+          disableForm(false);
+          showSysbar('⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل.', { error: true });
+          return;
         }
-      }
 
-      showSysbar('تم حفظ الولادة وتسجيل العجول بنجاح ✅', {
-        actions:[
-          {
-            label:'فتح قائمة الأحداث',
-            primary:true,
-            onClick:()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
-          },
-          {
-            label:'فتح بطاقة الحيوان',
-            onClick:()=> location.href = `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
+        showSysbar('جارِ الحفظ…');
+
+        // حفظ حدث الولادة
+        await addDoc(collection(db, 'events'), payload);
+
+        // تحديث وثيقة الحيوان
+        await updateAnimalByEvent({ ...payload, type:'calving', eventType:'calving' });
+
+        // حفظ العجول في calves (لو مش نافقة)
+        const isDead = (String(payload.calvingKind || '').trim() === 'نافقة');
+        if (!isDead) {
+          const damId     = payload.animalId;
+          const damNumber = payload.animalNumber;
+          const birthDate = payload.eventDate;
+          const species   = payload.species;
+
+          const calvesToSave = [];
+          const count = parseInt(payload.calfCount || '1',10) || 1;
+
+          // ✅ دالة واحدة صحيحة (بدون تكرار)
+          const pushCalf = (calfIdField, calfSexField, calfFateField)=>{
+            const id   = (formData[calfIdField] || '').trim();
+            const sex  = (formData[calfSexField] || '').trim();
+            const fate = (formData[calfFateField] || '').trim();
+            if (!id || !sex) return;
+            calvesToSave.push({
+              userId: uid,
+              damId,
+              damNumber,
+              birthDate,
+              calfNumber: id,
+              sex,
+              fate,
+              species,
+              createdAt: serverTimestamp()
+            });
+          };
+
+          pushCalf('calfId','calf1Sex','calf1Fate');
+          if (count >= 2) pushCalf('calf2Id','calf2Sex','calf2Fate');
+          if (count >= 3) pushCalf('calf3Id','calf3Sex','calf3Fate');
+
+          for (const calf of calvesToSave){
+            await addDoc(collection(db,'calves'), calf);
           }
-        ]
-      });
+        }
 
-    }catch(err){
-      console.error(err);
-      disableForm(false);
-      showSysbar('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', { error:true });
-    }
-  });
+        showSysbar('تم حفظ الولادة وتسجيل العجول بنجاح ✅', {
+          actions:[
+            {
+              label:'فتح قائمة الأحداث',
+              primary:true,
+              onClick:()=> location.href = `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
+            },
+            {
+              label:'فتح بطاقة الحيوان',
+              onClick:()=> location.href = `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
+            }
+          ]
+        });
 
-  document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
-    const num = (numEl?.value || '').trim();
-    if (!num){
-      showSysbar('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', { error:true });
-      return;
-    }
-    location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
-  });
-</script>
+      }catch(err){
+        console.error(err);
+        disableForm(false);
+        showSysbar('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', { error:true });
+      }
+    });
 
+    document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
+      const num = (numEl?.value || '').trim();
+      if (!num){
+        showSysbar('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', { error:true });
+        return;
+      }
+      location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
+    });
+  </script>
 </body>
 </html>
-
-
