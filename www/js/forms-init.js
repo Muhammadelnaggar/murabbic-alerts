@@ -617,11 +617,16 @@ if (eventName === "ولادة") {
   }
 
   // ✅ شغّل Gate بعد ما الصفحة تحمل
-  setTimeout(runGateOnly, 0);
+ // شغل Gate بعد ما الصفحة تملأ الرقم والتاريخ من الـ URL
+window.addEventListener("load", () => {
+  setTimeout(runGateOnly, 100);
+});
+
 
   // ✅ شغّل Gate عند تغيير الرقم أو التاريخ
-  getFieldEl(form, "animalNumber")?.addEventListener("change", runGateOnly);
-  getFieldEl(form, "eventDate")?.addEventListener("change", runGateOnly);
+ getFieldEl(form, "animalNumber")?.addEventListener("input", runGateOnly);
+getFieldEl(form, "eventDate")?.addEventListener("input", runGateOnly);
+
 
   // ✅ وقت الحفظ: ممنوع لو مقفول… وإلا نفذ Full validation ثم اطلق mbk:valid
   form.addEventListener("submit", async (e) => {
