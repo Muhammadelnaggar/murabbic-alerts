@@ -315,8 +315,16 @@
       document.addEventListener('DOMContentLoaded', ()=>{
         const num  = qs.get('number') || qs.get('animalNumber') || '';
         const date = qs.get('date')   || qs.get('dt') || '';
-        if (num  && $('animalNumber')) $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
-        if (date && $('eventDate'))    $('eventDate').value    = toISO(date);
+       if (num && $('animalNumber')) {
+  $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
+  $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
+}
+
+if (date && $('eventDate')) {
+  $('eventDate').value = toISO(date);
+  $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
+}
+
         $('animalNumber')?.dispatchEvent(new Event('change', { bubbles:true }));
         $('eventDate')?.dispatchEvent(new Event('change', { bubbles:true }));
       });
@@ -574,4 +582,5 @@
     location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
   });
 </script>
+
 
