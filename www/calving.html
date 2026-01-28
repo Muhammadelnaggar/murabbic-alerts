@@ -469,13 +469,15 @@ if (date && $('eventDate')) {
       showSysbar('سجّل الدخول أولًا.', { error:true });
       return;
     }
+const _animalNumber = (formData.animalNumber || '').trim();
+const _eventDate    = (formData.eventDate || '').trim();
 
     const payload = {
       userId: uid,
       type: 'ولادة',
       eventType: 'ولادة',
-      eventDate: (formData.eventDate || '').trim(),
-      animalNumber: (formData.animalNumber || '').trim(),
+      eventDate: _eventDate,
+      animalNumber: _animalNumber,
       animalId: (formData.animalId || '').trim(),
       species: formData.species || '',
       reproStatus: formData.reproStatus || 'عشار',
@@ -492,7 +494,7 @@ if (date && $('eventDate')) {
       calf3Id:   formData.calf3Id || '',
       calfFate:  formData.calfFate || '',
       notes:     formData.notes || '',
-      idempotencyKey: `${(payload.animalNumber||'')}-ولادة-${(payload.eventDate||'')}`,
+     idempotencyKey: `${_animalNumber}-ولادة-${_eventDate}`,
       createdAt: serverTimestamp()
     };
 
@@ -582,5 +584,8 @@ if (date && $('eventDate')) {
     location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
   });
 </script>
+
+</body>
+</html>
 
 
