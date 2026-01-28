@@ -427,28 +427,73 @@ function attachOne(form) {
       lockForm(true);
       return false;
     }
-   // ✅ (للولادة فقط) تحقق شروط الولادة قبل فتح الحقول
-// ✅ (للولادة فقط) Gate const g = guards.calvingDecision(gateData);
+// ✅ (للولادة فقط) Gate شروط الولادة قبل فتح الحقول
+if (eventName === "ولادة") {
 
-// ✅ calvingDecision في form-rules.js بيرجع: null | string
-if (g) {
-  const errs = Array.isArray(g) ? g : [String(g)];
-  const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
-  const hasAbortHint = errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
-
-  if (hasAbortHint) {
-    const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-    showMsg(bar, cleaned, "error", [
-      { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
-      { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
-    ]);
-  } else {
-    showMsg(bar, cleaned, "error");
+  // 0) لو قواعد الولادة مش محمّلة: ممنوع ندي ✅
+  if (typeof guards?.calvingDecision !== "function") {
+    showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (calvingDecision). حدّث الصفحة أو راجع form-rules.js", "error");
+    lockForm(true);
+    return false;
   }
 
-  lockForm(true);
-  return false;
+  const uid = await getUid();
+  const sig = await fetchCalvingSignalsFromEvents(uid, n);
+
+  const doc = form.__mbkDoc || {};
+  const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+
+  // ✅ species: من الحقل إن وُجد، وإلا من الوثيقة
+  let sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  // ✅ reproductiveStatus: أولوية للأحداث ثم الوثيقة
+  const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
+  const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+  const repro = reproFromEvents || reproFromDoc || "";
+
+  // ✅ آخر تلقيح: من الوثيقة فقط
+  const lastAI = String(doc.lastInseminationDate || "").trim();
+
+  const gateData = {
+    animalNumber: n,
+    eventDate: d,
+    animalId: form.__mbkAnimalId || "",
+    species: sp,
+
+    documentData: doc,
+    reproductiveStatus: repro,
+    reproStatusFromEvents: reproFromEvents,
+
+    lastInseminationDate: lastAI,
+    lastBoundary: String(sig.lastBoundary || "").trim(),
+    lastBoundaryType: String(sig.lastBoundaryType || "").trim()
+  };
+
+  const g = guards.calvingDecision(gateData); // ✅ هنا تعريف g الحقيقي
+
+  // ✅ g = null لو تمام، أو string لو فيه منع
+  if (g) {
+    const errs = [String(g)];
+    const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+    const hasAbortHint = errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
+
+    if (hasAbortHint) {
+      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+      showMsg(bar, cleaned, "error", [
+        { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
+        { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
+      ]);
+    } else {
+      showMsg(bar, cleaned, "error");
+    }
+
+    lockForm(true);
+    return false;
+  }
 }
+
 
 
     // ✅ أخضر: افتح الإدخال
