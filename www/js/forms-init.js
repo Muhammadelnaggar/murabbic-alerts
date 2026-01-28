@@ -4,7 +4,7 @@
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
-import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers } from "./form-rules.js";
+import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers, guards } from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
@@ -47,6 +47,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
     : `<div>${String(msgs || "")}</div>`;
 
   bar.innerHTML = html;
+  try{ bar.scrollIntoView({ behavior:"smooth", block:"start" }); }catch(_){}
 
   if (Array.isArray(actions) && actions.length) {
     const wrap = document.createElement("div");
@@ -329,6 +330,12 @@ function applyAnimalToForm(form, animal) {
 }
 
 async function ensureAnimalExistsGate(form, bar) {
+  if (!localStorage.getItem("userId") && !auth?.currentUser) {
+  showMsg(bar, "سجّل الدخول أولًا.", "error");
+  lockForm(true);
+  return false;
+}
+
   const uid = await getUid();
   const numEl = getFieldEl(form, "animalNumber");
   const n = normalizeDigits(numEl?.value || "");
@@ -382,7 +389,6 @@ async function ensureAnimalExistsGate(form, bar) {
   applyAnimalToForm(form, animal);
   form.dataset.animalOk = "1";
   setFormInputsDisabled(form, false, ALLOW);
-  showMsg(bar, "✅ تم العثور على الحيوان — أكمل البيانات.", "ok");
   return true;
 }
 
@@ -422,6 +428,51 @@ function attachOne(form) {
       lockForm(true);
       return false;
     }
+   // ✅ (للولادة فقط) تحقق شروط الولادة قبل فتح الحقول
+if (eventName === "ولادة" && typeof guards?.calvingDecision === "function") {
+  const uid = await getUid();
+
+  // حضّر بيانات بوابة الولادة من وثيقة الحيوان + إشارات الأحداث
+  const sig = await fetchCalvingSignalsFromEvents(uid, n);
+
+  const gateData = {
+    animalNumber: n,
+    eventDate: d,
+    animalId: form.__mbkAnimalId || "",
+    species: String(getFieldEl(form, "species")?.value || "").trim(),
+    documentData: form.__mbkDoc || null,
+
+    // مهم: آخر تلقيح من وثيقة الحيوان (زي اتفاقنا)
+    lastInseminationDate: String(form.__mbkDoc?.lastInseminationDate || "").trim(),
+
+    // إشارات من الأحداث
+    reproStatusFromEvents: sig.reproStatusFromEvents || "",
+    lastBoundary: sig.lastBoundary || "",
+    lastBoundaryType: sig.lastBoundaryType || ""
+  };
+
+  const g = guards.calvingDecision(gateData);
+
+  if (g && g.ok === false) {
+    // لو فيه عرض “تسجيل إجهاض” (OFFER_ABORT)
+    const errs = Array.isArray(g.errors) ? g.errors : [g.msg || "لا يُسمح بتسجيل الولادة."];
+    const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
+    const hasAbortHint = errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
+
+    if (hasAbortHint) {
+      const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+      showMsg(bar, cleaned, "error", [
+        { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
+        { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
+      ]);
+    } else {
+      showMsg(bar, cleaned, "error");
+    }
+
+    lockForm(true);
+    return false;
+  }
+}
 
     // ✅ أخضر: افتح الإدخال
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
@@ -533,7 +584,7 @@ if (eventName === "ولادة") {
     }
   }
 }
- showMsg(bar, "✅ البيانات صحيحة — جارٍ الحفظ…", "ok");
+
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
         bubbles: true,
