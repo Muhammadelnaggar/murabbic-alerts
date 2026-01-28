@@ -323,6 +323,7 @@
 
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
+
     import {
       collection, addDoc, serverTimestamp, query, where, limit,
       getDocs, orderBy
@@ -339,7 +340,8 @@
 
     const animalIdEl = document.getElementById('animalId');
     const speciesEl  = document.getElementById('species');
-    const lastFertileEl = document.getElementById('lastFertile');
+    const lastInsemEl = document.getElementById('lastInseminationDate');
+
 
     /* ===== Infobar Helper (بديل Popup) ===== */
     function clearSysbar(){
@@ -627,7 +629,8 @@ sysbar.classList.toggle('error', !!error);
 
       if (speciesEl)  speciesEl.value  = sp;
       if (animalIdEl) animalIdEl.value = a.id;
-      if (lastFertileEl && !lastFertileEl.value) lastFertileEl.value = lf;
+     if (lastInsemEl && !lastInsemEl.value) lastInsemEl.value = lf;
+
       if (dateEl && !dateEl.value) dateEl.value = evISO;
 
       //showSysbar('جاهز للتسجيل ✅');
@@ -681,7 +684,9 @@ sysbar.classList.toggle('error', !!error);
         animalId: (formData.animalId || '').trim(),
         species: formData.species || '',
         reproStatus: formData.reproStatus || 'عشار',
-        lastFertileInseminationDate: formData.lastFertileInseminationDate || '',
+        lastInseminationDate: (formData.lastInseminationDate || '').trim(),
+lastFertileInseminationDate: (formData.lastInseminationDate || '').trim(), // اختياري للتوافق القديم
+
         calvingKind: formData.calvingKind || '',
         calfCount: formData.calfCount || '',
         calf1Sex:  formData.calf1Sex || '',
@@ -786,6 +791,7 @@ if (alreadyExists) {
 
 </body>
 </html>
+
 
 
 
