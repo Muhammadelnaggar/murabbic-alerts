@@ -30,6 +30,17 @@ const daysBetween = (a, b) => {
 const req = (v) => !(v === undefined || v === null || String(v).trim() === "");
 const isDate = (v) => !Number.isNaN(toDate(v)?.getTime());
 const isNum = (v) => (v === "" ? true : !Number.isNaN(Number(v)));
+// ===================== Calves helpers =====================
+function normDigitsOnly(s){
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+               '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  return String(s||'')
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d=>map[d]);
+}
+function isOdd(n){ return Number(n) % 2 === 1; }
+function isEven(n){ return Number(n) % 2 === 0; }
 
 // ===================== الحقول المشتركة =====================
 const commonFields = {
@@ -224,6 +235,36 @@ calvingRequiredFields(fd) {
       return { field: "calf3Id", msg: "❌ رقم العجل (3) مطلوب." };
     }
   }
+  // 5) قواعد أرقام العجول: الذكر فردي، الأنثى زوجي + منع تكرار داخل الولادة
+  const nums = [];
+  const checkOne = (sexKey, idKey, label) => {
+    const sex = String(fd[sexKey] || "").trim();
+    const id  = normDigitsOnly(fd[idKey]);
+    if (!sex || !id) return null;
+
+    nums.push(id);
+
+    const n = Number(id);
+    if (!Number.isFinite(n)) return { field: idKey, msg: `❌ رقم العجل (${label}) غير صالح.` };
+
+    if (sex === "ذكر" && !isOdd(n)) {
+      return { field: idKey, msg: `❌ رقم العجل الذكر يجب أن يكون فردي. (${id})` };
+    }
+    if (sex === "أنثى" && !isEven(n)) {
+      return { field: idKey, msg: `❌ رقم العجل الأنثى يجب أن يكون زوجي. (${id})` };
+    }
+    return null;
+  };
+
+  let e;
+  e = checkOne("calf1Sex", "calfId", "1");   if (e) return e;
+  if (count >= 2) { e = checkOne("calf2Sex", "calf2Id", "2"); if (e) return e; }
+  if (count >= 3) { e = checkOne("calf3Sex", "calf3Id", "3"); if (e) return e; }
+
+  const s2 = new Set(nums);
+  if (s2.size !== nums.length) {
+    return { field: "calfId", msg: "❌ لا يجوز تكرار رقم العجل داخل نفس الولادة." };
+  }
 
   return null;
 },
@@ -295,6 +336,42 @@ export async function uniqueAnimalNumber(ctx) {
     return { ok: false, msg: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${number} في حسابك.` };
   }
   return { ok: true };
+}
+// ===================================================================
+//      قاعدة منفصلة: منع تكرار رقم العجل لنفس المستخدم فقط (DB-level)
+// ===================================================================
+export async function uniqueCalfNumbers(ctx) {
+  const userId = String(ctx.userId || "").trim();
+  const nums = Array.isArray(ctx.calfNumbers) ? ctx.calfNumbers : [];
+
+  const cleaned = nums
+    .map(normDigitsOnly)
+    .filter(Boolean);
+
+  if (!userId || cleaned.length === 0) return { ok: true };
+
+  // منع تكرار داخل نفس الطلب
+  const s = new Set();
+  for (const n of cleaned){
+    if (s.has(n)) return { ok:false, msg:`⚠️ رقم العجل "${n}" مكرر داخل نفس الولادة.` };
+    s.add(n);
+  }
+
+  // شيك قاعدة البيانات
+  for (const n of cleaned){
+    const q1 = query(
+      collection(db, "calves"),
+      where("userId", "==", userId),
+      where("calfNumber", "==", n),
+      limit(1)
+    );
+    const snap = await getDocs(q1);
+    if (!snap.empty){
+      return { ok:false, msg:`⚠️ رقم العجل "${n}" موجود بالفعل في حسابك — اختر رقمًا آخر.` };
+    }
+  }
+
+  return { ok:true };
 }
 
 // ===================================================================
