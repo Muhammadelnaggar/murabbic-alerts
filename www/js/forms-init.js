@@ -617,10 +617,21 @@ if (eventName === "ولادة") {
   }
 
   // ✅ شغّل Gate بعد ما الصفحة تحمل
- // شغل Gate بعد ما الصفحة تملأ الرقم والتاريخ من الـ URL
-window.addEventListener("load", () => {
-  setTimeout(runGateOnly, 100);
-});
+// راقب الحقول لحد ما يتم تعبئة الرقم والتاريخ ثم شغّل Gate
+let gateStarted = false;
+
+const watcher = setInterval(() => {
+  if (gateStarted) return;
+
+  const n = getFieldEl(form, "animalNumber")?.value?.trim();
+  const d = getFieldEl(form, "eventDate")?.value?.trim();
+
+  if (n && d) {
+    gateStarted = true;
+    clearInterval(watcher);
+    runGateOnly(); // ← التحقق يشتغل هنا فعليًا
+  }
+}, 120);
 
 
   // ✅ شغّل Gate عند تغيير الرقم أو التاريخ
