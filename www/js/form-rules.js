@@ -146,10 +146,36 @@ calvingDecision(fd) {
     ""
   ).trim();
 
-  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
-  if (!rsNorm.includes("عشار")) {
-    return "❌ لا يمكن تسجيل ولادة — الحالة التناسلية ليست «عِشار».";
+ const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+
+// ✅ تسمية الحيوان لغويًا
+const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
+
+// ✅ عرض الحالة الفعلية للمستخدم
+const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+
+// ✅ رسائل أدق حسب الحالة
+if (!rsNorm.includes("عشار")) {
+
+  // ملقحة
+  if (rsNorm.includes("ملقح")) {
+    return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
   }
+
+  // مفتوحة/فارغة
+  if (rsNorm.includes("مفتوح") || rsNorm.includes("فارغ")) {
+    return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
+  }
+
+  // حديثة الولادة (لو عندك هذا النص في النظام)
+  if (rsNorm.includes("حديث") || rsNorm.includes("ولاد")) {
+    return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
+  }
+
+  // أي حالة أخرى
+  return `❌ لا يمكن تسجيل ولادة لـ${animalWord} — الحالة التناسلية الحالية: ${shownStatus}.`;
+}
+
 
   // ✅ آخر تلقيح مُخصِّب: events أولًا ثم الوثيقة
  const lf =
