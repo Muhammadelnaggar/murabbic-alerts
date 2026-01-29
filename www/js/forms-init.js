@@ -461,6 +461,50 @@ function attachOne(form) {
         return false;
       }
     }
+       // ✅ Gate خاص لحدث "إجهاض" (لا يفتح النموذج إلا إذا كانت عِشار فعلاً)
+    if (eventName === "إجهاض") {
+      if (typeof guards?.abortionDecision !== "function") {
+        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (abortionDecision). حدّث الصفحة أو راجع form-rules.js", "error");
+        lockForm(true);
+        return false;
+      }
+
+      const uid = await getUid();
+      const sig = await fetchCalvingSignalsFromEvents(uid, n);
+
+      const doc = form.__mbkDoc || {};
+      const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+
+      let sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
+      if (/cow|بقر/i.test(sp)) sp = "أبقار";
+      if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+      const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+      const repro = reproFromEvents || reproFromDoc || "";
+
+      const lastAI = String(doc.lastInseminationDate || "").trim();
+
+      const gateData = {
+        animalNumber: n,
+        eventDate: d,
+        animalId: form.__mbkAnimalId || "",
+        species: sp,
+        documentData: doc,
+        reproductiveStatus: repro,
+        reproStatusFromEvents: reproFromEvents,
+        lastInseminationDate: lastAI,
+        lastBoundary: String(sig.lastBoundary || "").trim(),
+        lastBoundaryType: String(sig.lastBoundaryType || "").trim()
+      };
+
+      const g = guards.abortionDecision(gateData);
+      if (g) {
+        showMsg(bar, [String(g)], "error");
+        lockForm(true);
+        return false;
+      }
+    }
 
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
