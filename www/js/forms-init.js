@@ -36,6 +36,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   if (!bar) return;
 
   bar.style.display = "block";
+  bar.className = "infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
   bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
   bar.style.background = type === "error" ? "#ffebee" : "#ecfdf5";
   bar.style.color = type === "error" ? "#b71c1c" : "#065f46";
