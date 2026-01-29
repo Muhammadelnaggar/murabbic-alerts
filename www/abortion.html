@@ -10,7 +10,7 @@
   <style>
     :root{
       --green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;
-      --muted:#64748b;--card:#ffffff;
+      --muted:#64748b;--card:#ffffff
     }
     *{box-sizing:border-box}
     html,body{max-width:100%;overflow-x:hidden}
@@ -47,7 +47,7 @@
       color:#0f172a;
       display:block;margin-bottom:6px
     }
-    input,select,textarea{
+    input,textarea{
       width:100%;padding:12px;
       border:1px solid #cbd5e1;
       border-radius:10px;
@@ -143,14 +143,14 @@
     </div>
   </header>
 
-  <!-- ✅ sysbar تحت العنوان مباشرة (forms-init + حفظ الصفحة يستخدموه) -->
+  <!-- ✅ sysbar تحت العنوان مباشرة -->
   <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 
   <main>
     <form id="abortion-form" class="card grid" autocomplete="off" novalidate
           data-validate="true" data-event="إجهاض">
 
-      <!-- حقول قياسية لازم تكون موجودة -->
+      <!-- قياسي -->
       <input type="hidden" data-field="animalId" id="animalId">
       <input type="hidden" data-field="species" id="species">
 
@@ -168,19 +168,19 @@
 
       <div class="row">
         <div>
-          <label>عمر الإجهاض (بالشهور)</label>
-          <input id="abortionAgeMonths" data-field="abortionAgeMonths" readonly />
+          <label>آخر تلقيح (من الوثيقة)</label>
+          <input id="lastInseminationDate" type="date" readonly />
         </div>
         <div>
-          <label>السبب المحتمل</label>
-          <input id="probableCause" data-field="probableCause" readonly />
+          <label>عمر الإجهاض (بالشهور)</label>
+          <input id="abortionAgeMonths" readonly />
         </div>
       </div>
 
       <div class="row">
         <div>
-          <label>آخر تلقيح (من الوثيقة)</label>
-          <input id="lastInseminationDate" type="date" data-field="lastInseminationDate" readonly />
+          <label>السبب المحتمل</label>
+          <input id="probableCause" readonly />
         </div>
         <div>
           <label>ملاحظات</label>
@@ -198,7 +198,7 @@
 
   <script src="/js/app-core.js"></script>
 
-  <!-- Prefill من add-event (number/date) + تحريك Gate المركزي -->
+  <!-- Prefill من add-event (number/date) -->
   <script>
     (function(){
       const qs = new URLSearchParams(location.search);
@@ -285,7 +285,6 @@
       });
     }
 
-    // حساب عمر الإجهاض + سبب محتمل اعتمادًا على آخر تلقيح من وثيقة الحيوان
     function calcAgeAndCauseFrom(lastAI, eventDate){
       const a = String(lastAI || '').slice(0,10);
       const d = String(eventDate || '').slice(0,10);
@@ -301,36 +300,23 @@
       return { months:m, cause };
     }
 
-    // مزامنة حقول readonly عندما يصبح doc متاحًا (بعد Gate المركزي)
-    function trySyncReadonly(){
-      const doc = form?.__mbkDoc || null;
-      if (!doc) return;
+    // إعادة حساب عند تغيير التاريخ (بدون أي Gate/تحقق محلي)
+    function recalcWithDoc(doc){
+      const lastAI = String(doc?.lastInseminationDate || '').slice(0,10);
+      if (lastAIEl) lastAIEl.value = lastAI || '';
 
-      const lastAI = String(doc.lastInseminationDate || '').slice(0,10);
-      if (lastAI && lastAIEl && !lastAIEl.value) lastAIEl.value = lastAI;
-
-      const eventDate = (dateEl?.value || '').slice(0,10);
-      const { months, cause } = calcAgeAndCauseFrom(lastAI, eventDate);
-
+      const { months, cause } = calcAgeAndCauseFrom(lastAI, dateEl?.value || '');
       if (ageEl)   ageEl.value   = (months === null) ? '' : String(months);
       if (causeEl) causeEl.value = cause || '';
+      return { lastAI, months, cause };
     }
 
-    // راقب لفترة قصيرة لحد ما Gate يحمّل doc
-    let tries = 0;
-    const poll = setInterval(()=>{
-      tries++;
-      trySyncReadonly();
-      if ((form?.__mbkDoc && (String(form.__mbkDoc.lastInseminationDate||'').trim() !== '')) || tries > 80){
-        clearInterval(poll);
-      }
-    }, 120);
+    dateEl?.addEventListener('change', ()=>{
+      // doc مش مضمون هنا… الحساب الحقيقي سيتم وقت mbk:valid
+      try{ recalcWithDoc({ lastInseminationDate: lastAIEl?.value || '' }); }catch(_){}
+    });
 
-    // إعادة حساب عند تغيير التاريخ
-    dateEl?.addEventListener('input', ()=> trySyncReadonly());
-    dateEl?.addEventListener('change', ()=> trySyncReadonly());
-
-    // حفظ فعلي بعد mbk:valid (من forms-init.js)
+    // ✅ الحفظ بعد mbk:valid فقط (لا تحقق محلي)
     document.addEventListener('mbk:valid', async (e)=>{
       const { formData } = e.detail || {};
       const uid = await getUid();
@@ -344,16 +330,8 @@
       const animalId     = String(formData.animalId || '').trim();
       const species      = String(formData.species || '').trim();
 
-      // doc موجود من forms-init (formData.documentData)
-      const doc = formData.documentData || form.__mbkDoc || {};
-      const lastAI = String(doc.lastInseminationDate || '').slice(0,10);
-
-      const { months, cause } = calcAgeAndCauseFrom(lastAI, eventDate);
-
-      // عبي readonly في الفورم (للعرض)
-      if (lastAIEl) lastAIEl.value = lastAI || '';
-      if (ageEl)    ageEl.value    = (months === null) ? '' : String(months);
-      if (causeEl)  causeEl.value  = cause || '';
+      const doc = formData.documentData || {};
+      const { lastAI, months, cause } = recalcWithDoc(doc);
 
       const payload = {
         userId: uid,
@@ -377,8 +355,8 @@
 
         await addDoc(collection(db, 'events'), payload);
 
-        // تحديث الحيوان عبر الملف المركزي
-        await updateAnimalByEvent({ ...payload, type:'abortion', eventType:'abortion' });
+        // ✅ آمن: أرسل payload العربي فقط (أقل افتراضات)
+        await updateAnimalByEvent(payload);
 
         showSysbar('تم حفظ الإجهاض بنجاح ✅', {
           actions:[
@@ -401,7 +379,6 @@
       }
     });
 
-    // زر بطاقة الحيوان
     document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
       const n = String(numEl?.value || '').trim();
       if (!n){
