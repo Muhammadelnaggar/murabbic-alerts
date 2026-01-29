@@ -256,9 +256,17 @@ calvingRequiredFields(fd) {
   }
 
   // مصير العجل
-  if (!String(fd.calfFate || "").trim()) {
-    return { field: "calfFate", msg: "❌ مصير العجل مطلوب." };
+  // مصير العجل/العجول حسب العدد
+  if (!String(fd.calf1Fate || "").trim()) {
+    return { field: "calf1Fate", msg: "❌ مصير العجل (1) مطلوب." };
   }
+  if (count >= 2 && !String(fd.calf2Fate || "").trim()) {
+    return { field: "calf2Fate", msg: "❌ مصير العجل (2) مطلوب." };
+  }
+  if (count >= 3 && !String(fd.calf3Fate || "").trim()) {
+    return { field: "calf3Fate", msg: "❌ مصير العجل (3) مطلوب." };
+  }
+
 
   // المولود 2
   if (count >= 2) {
