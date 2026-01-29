@@ -486,6 +486,37 @@ function attachOne(form) {
     const formData = collectFormData(form);
     formData.documentData = form.__mbkDoc || null;
     if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+        // ✅ Auto-calc للإجهاض: يحسب عمر الإجهاض + السبب من آخر تلقيح (من الوثيقة)
+    if (eventName === "إجهاض") {
+      const doc = formData.documentData || {};
+      const lastAI = String(formData.lastInseminationDate || doc.lastInseminationDate || "").slice(0,10);
+      const evDate = String(formData.eventDate || "").slice(0,10);
+
+      formData.lastInseminationDate = lastAI;
+      if (!formData.species) formData.species = String(doc.species || doc.animalTypeAr || "").trim();
+
+      let months = "";
+      let cause = "";
+
+      if (lastAI && evDate) {
+        const d1 = new Date(lastAI);
+        const d2 = new Date(evDate);
+        if (!Number.isNaN(d1.getTime()) && !Number.isNaN(d2.getTime())) {
+          const m = Math.max(0, (d2 - d1) / (1000*60*60*24*30.44));
+          months = Number.isFinite(m) ? Number(m.toFixed(1)) : "";
+          cause = (months !== "" && months >= 6) ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
+        }
+      }
+
+      formData.abortionAgeMonths = months;
+      formData.probableCause = cause;
+
+      // ✅ اكتبهم في الحقول (بدون ما يعتمد على سكربت الصفحة)
+      const ageEl = document.getElementById("abortionAgeMonths");
+      const causeEl = document.getElementById("probableCause");
+      if (ageEl) ageEl.value = months === "" ? "" : String(months);
+      if (causeEl) causeEl.value = cause || "";
+    }
 
     if (eventName === "ولادة") {
       const uid = await getUid();
