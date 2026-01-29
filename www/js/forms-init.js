@@ -345,7 +345,7 @@ async function ensureAnimalExistsGate(form, bar) {
   form.dataset.animalOk = "0";
   applyAnimalToForm(form, null);
 
-  showMsg(bar, "جارِ التحقق من رقم الحيوان…", "ok");
+  showMsg(bar, "جارِ التحقق من رقم الحيوان…", "info");
   setFormInputsDisabled(form, true, ALLOW);
 
   const animal = await fetchAnimalByNumberForUser(uid, n);
@@ -462,7 +462,7 @@ function attachOne(form) {
       }
     }
 
-    showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
+    showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
     return true;
   }
@@ -518,6 +518,30 @@ function attachOne(form) {
           }
         }
       }
+    }
+    // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
+    const v = validateEvent(eventName, formData);
+
+    if (!v || v.ok === false) {
+      clearFieldErrors(form);
+
+      // Inline field errors
+      if (v?.fieldErrors && typeof v.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(v.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      // رسائل أعلى النموذج
+      const topMsgs =
+        (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
+        (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
+        ["❌ البيانات غير صحيحة — راجع الحقول."];
+
+      showMsg(bar, topMsgs, "error");
+      lockForm(false);
+      return false;
     }
 
     form.dispatchEvent(
