@@ -29,7 +29,13 @@ const daysBetween = (a, b) => {
 
 const req = (v) => !(v === undefined || v === null || String(v).trim() === "");
 const isDate = (v) => !Number.isNaN(toDate(v)?.getTime());
-const isNum = (v) => (v === "" ? true : !Number.isNaN(Number(v)));
+const isNum = (v) => {
+  if (v === undefined || v === null) return true;   // ✅ اختياري ومش موجود
+  const s = String(v).trim();
+  if (s === "") return true;                        // ✅ فاضي = مسموح لو مش required
+  return !Number.isNaN(Number(s));
+};
+
 // ===================== Calves helpers =====================
 function normDigitsOnly(s){
   const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
