@@ -6,6 +6,12 @@
   <script src="/js/animal-update.js"></script>
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+ <script type="module">
+  import { initEventShell } from "/js/event-shell.js";
+  initEventShell({ pageId: "insemination", title: "تسجيل تلقيح", logoSrc: "/images/logo.png", backHref: "add-event.html" });
+</script>
+
+
   <title>تسجيل حدث التلقيح — مُرَبِّك</title>
   <style>
     /* شريط تنبيه أعلى الصفحة (داخل الهيدر) */
@@ -740,5 +746,6 @@ if (!gate.ok){ fail++; continue; }
   </script>
 </body>
 </html>
+
 
 
