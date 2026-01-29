@@ -3,215 +3,413 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-
-
-
-  <title>تسجيل إجهاض — مُرَبِّك</title>
-  <link rel="stylesheet" href="css/forms.css" />
+  <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+  <title>تسجيل إجهاض — مُرَبِّيك</title>
+
   <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;--card:#ffffff;
-      --ok-bg:#ecfdf5;--ok-text:#065f46;--err-bg:#fff7ed;--err-text:#9a3412}
+    :root{
+      --green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;
+      --muted:#64748b;--card:#ffffff;
+    }
     *{box-sizing:border-box}
-    body{margin:0;font-family:'Cairo',system-ui;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px;text-align:center;font-weight:800;color:var(--green-600)}
-    main{padding:16px;max-width:600px;margin:auto}
-    label{display:block;margin-top:12px;font-weight:700}
-    input,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
-    button{width:100%;margin-top:20px;padding:14px;background:var(--green);color:#fff;border:0;border-radius:10px;font-weight:800;font-size:16px;cursor:pointer}
-    .infobar{margin-top:10px;padding:10px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
-    .ok{background:var(--ok-bg);color:var(--ok-text);border:1px solid #bbf7d0}
-    .err{background:var(--err-bg);color:var(--err-text);border:1px solid #fed7aa}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{
+      margin:0;
+      font-family:'Cairo',Tahoma,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    header{
+      position:sticky;top:0;z-index:10;
+      background:#fff;
+      border-bottom:1px solid #e2e8f0;
+      box-shadow:0 2px 4px rgba(0,0,0,.05)
+    }
+    main{
+      max-width:920px;
+      margin:20px auto;
+      padding:16px;
+      padding-bottom:110px
+    }
+    .card{
+      background:var(--card);
+      border:1px solid #e2e8f0;
+      border-radius:16px;
+      padding:20px;
+      box-shadow:0 2px 6px rgba(0,0,0,.05)
+    }
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    .row{display:grid;gap:14px;min-width:0}
+    @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
+    label{
+      font-weight:600;font-size:15px;
+      color:#0f172a;
+      display:block;margin-bottom:6px
+    }
+    input,select,textarea{
+      width:100%;padding:12px;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      background:#fff;font-size:16px
+    }
+    textarea{min-height:84px;resize:vertical}
+
+    .actions-bar{
+      position:fixed;bottom:0;left:0;right:0;
+      background:#fff;
+      border-top:1px solid #e2e8f0;
+      box-shadow:0 -2px 6px rgba(0,0,0,.08);
+      display:flex;gap:10px;
+      padding:12px;z-index:20
+    }
+    .actions-bar button{
+      flex:1;padding:14px;
+      font-size:16px;font-weight:700;
+      border-radius:12px;cursor:pointer;border:0
+    }
+    .actions-bar .save{background:var(--green);color:#fff}
+    .actions-bar .ghost{background:#eef2f7;color:#0f172a}
+
+    /* ===== Header (Standard) ===== */
+    .mbk-head{
+      max-width:920px;margin:0 auto;
+      padding:12px 16px;
+      display:flex;align-items:center;justify-content:space-between;
+      gap:12px;
+    }
+    .mbk-logo{height:56px;width:auto;object-fit:contain;opacity:.70}
+    .mbk-center{flex:1;text-align:center;line-height:1.15}
+    .mbk-page-title{font-weight:900;color:var(--green-600);font-size:18px}
+    .mbk-app-name{font-weight:800;font-size:13px;opacity:.85;margin-top:4px}
+    .mbk-back{
+      width:44px;height:44px;border-radius:999px;
+      background:#f1f5f9;border:1px solid #cbd5e1;
+      color:#0f172a;text-decoration:none;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:900;font-size:12px;
+    }
+
+    /* sysbar ثابت تحت الهيدر */
+    #sysbar{
+      display:none;
+      max-width:920px;
+      margin:10px auto 0;
+    }
+    #sysbar.show{display:block}
+
+    /* أزرار داخل sysbar */
+    .infobar .sys-actions{
+      margin-top:10px;
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .infobar .sys-btn{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #cbd5e1;
+      background:#fff;
+      cursor:pointer;
+      font-weight:800;
+      font-size:14px;
+      color:#0f172a;
+      min-width:140px;
+    }
+    .infobar .sys-btn.primary{
+      border:0;
+      background:var(--green);
+      color:#fff;
+    }
+    .infobar.error .sys-btn.primary{
+      background:#dc2626;
+    }
   </style>
 </head>
-<body data-page="abortion">
-  <header>تسجيل إجهاض</header>
+
+<body>
+  <!-- تتبّع أساسي -->
+  <script>window.dataLayer = window.dataLayer || [];</script>
+
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">تسجيل إجهاض</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
+    </div>
+  </header>
+
+  <!-- ✅ sysbar تحت العنوان مباشرة (forms-init + حفظ الصفحة يستخدموه) -->
+  <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
+
   <main>
-    <div id="info" class="infobar"></div>
+    <form id="abortion-form" class="card grid" autocomplete="off" novalidate
+          data-validate="true" data-event="إجهاض">
 
-    <label>رقم الحيوان</label>
-    <input id="animalNumber" readonly />
+      <!-- حقول قياسية لازم تكون موجودة -->
+      <input type="hidden" data-field="animalId" id="animalId">
+      <input type="hidden" data-field="species" id="species">
 
-    <label>تاريخ الإجهاض</label>
-   <input id="eventDate" type="date" />
+      <div class="row">
+        <div>
+          <label>رقم الحيوان</label>
+          <input id="animalNumber" data-field="animalNumber" inputmode="numeric"
+                 placeholder="مثال: 1023" required />
+        </div>
+        <div>
+          <label>تاريخ الإجهاض</label>
+          <input id="eventDate" data-field="eventDate" type="date" required />
+        </div>
+      </div>
 
+      <div class="row">
+        <div>
+          <label>عمر الإجهاض (بالشهور)</label>
+          <input id="abortionAgeMonths" data-field="abortionAgeMonths" readonly />
+        </div>
+        <div>
+          <label>السبب المحتمل</label>
+          <input id="probableCause" data-field="probableCause" readonly />
+        </div>
+      </div>
 
-    <label>عمر الإجهاض (بالشهور)</label>
-    <input id="abortionAge" readonly />
+      <div class="row">
+        <div>
+          <label>آخر تلقيح (من الوثيقة)</label>
+          <input id="lastInseminationDate" type="date" data-field="lastInseminationDate" readonly />
+        </div>
+        <div>
+          <label>ملاحظات</label>
+          <textarea id="notes" data-field="notes" placeholder="اختياري"></textarea>
+        </div>
+      </div>
 
-    <label>السبب المحتمل</label>
-    <input id="probableCause" readonly />
-
-    <label>ملاحظات</label>
-    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
-
-    <button id="saveBtn" data-validate="true">حفظ الإجهاض ✅</button>
+    </form>
   </main>
 
+  <div class="actions-bar">
+    <button class="save" id="saveBtn" type="submit" form="abortion-form">حفظ الإجهاض ✅</button>
+    <button class="ghost" id="toCardBtn" type="button">فتح بطاقة الحيوان</button>
+  </div>
+
+  <script src="/js/app-core.js"></script>
+
+  <!-- Prefill من add-event (number/date) + تحريك Gate المركزي -->
+  <script>
+    (function(){
+      const qs = new URLSearchParams(location.search);
+      const $  = (id)=> document.getElementById(id);
+
+      function toISO(s){
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const d = new Date(s); if (isNaN(d)) return '';
+        return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      }
+
+      document.addEventListener('DOMContentLoaded', ()=>{
+        const num  = qs.get('number') || qs.get('animalNumber') || '';
+        const date = qs.get('date')   || qs.get('dt') || qs.get('eventDate') || '';
+        if (num && $('animalNumber')) {
+          $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
+          $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
+          $('animalNumber').dispatchEvent(new Event('change', { bubbles:true }));
+        }
+        if (date && $('eventDate')) {
+          $('eventDate').value = toISO(date);
+          $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
+          $('eventDate').dispatchEvent(new Event('change', { bubbles:true }));
+        }
+      });
+    })();
+  </script>
+
   <script type="module">
-    // نفس النمط الذي يعمل لديك
-  import { db, auth, ensureAuth } from '/js/firebase-config.js';
+    import { db, auth } from '/js/firebase-config.js';
+    import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { updateAnimalByEvent } from '/js/animal-update.js';
 
-    import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-  doc,
-  updateDoc,
-  serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    const form   = document.getElementById('abortion-form');
+    const sysbar = document.getElementById('sysbar');
 
-   import { updateAnimalByEvent } from "/js/animal-update.js";
-  
+    const numEl  = document.getElementById('animalNumber');
+    const dateEl = document.getElementById('eventDate');
 
-    const $ = id => document.getElementById(id);
-    const info = $("info");
-    const btn  = $("saveBtn");
-    btn.disabled = true; // منع الحفظ حتى انتهاء التحقق
+    const lastAIEl = document.getElementById('lastInseminationDate');
+    const ageEl    = document.getElementById('abortionAgeMonths');
+    const causeEl  = document.getElementById('probableCause');
 
-    // تعبئة الرقم والتاريخ فورًا
-    const p   = new URLSearchParams(location.search);
-    const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
-    const dt  = p.get("date")   || p.get("eventDate")    || localStorage.getItem("lastEventDate")   || new Date().toISOString().slice(0,10);
-    $("animalNumber").value = num;
-    $("eventDate").value    = dt;
-
-    function msg(t, ok=false){ info.className = "infobar " + (ok ? "ok" : "err"); info.textContent = t; }
-    let _animal = null;
-
-function calcAgeAndCause(){
-  if (!_animal) return;
-
-  const eventDate = $("eventDate").value || dt;
-
-  // آخر تلقيح من وثيقة الحيوان (موجود عندك)
-  const lastInsem = (_animal.lastInseminationDate || "").toString().slice(0,10);
-  if (!lastInsem) { $("abortionAge").value=""; $("probableCause").value=""; return; }
-
-  const d1 = new Date(lastInsem);
-  const d2 = new Date(eventDate);
-  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) { $("abortionAge").value=""; $("probableCause").value=""; return; }
-
-  const months = ((d2 - d1) / (1000*60*60*24*30.44));
-  const m = Math.max(0, months);
-
-  $("abortionAge").value = m.toFixed(1);
-  $("probableCause").value = (m >= 6) ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
-}
-
-
-    // ✅ بوابة التحقق: الشرط الوحيد = عِشار
-   async function checkAnimal() {
-  if (!num) {
-    msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
-    btn.disabled = true;
-    return false;
-  }
-
-  try {
-    await ensureAuth();
-
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
-      msg("⚠️ لم يتم تسجيل الدخول.", false);
-      btn.disabled = true;
-      return false;
+    function scrollToSysbar(){
+      try{ sysbar?.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
     }
 
-    // ✅ نبحث أولاً بالحقل number (نصي)
-    let aSnap = await getDocs(query(
-      collection(db, "animals"),
-      where("userId", "==", uid),
-      where("number", "==", String(num)),
-      limit(1)
-    ));
+    function showSysbar(msg, { error=false, actions=[] } = {}){
+      sysbar.style.display = 'block';
+      sysbar.classList.add('show');
+      sysbar.classList.toggle('error', !!error);
 
-    // ✅ لو لم نجد، نبحث بالحقل animalNumber (رقمي)
-    if (aSnap.empty) {
-      aSnap = await getDocs(query(
-        collection(db, "animals"),
-        where("userId", "==", uid),
-        where("animalNumber", "==", Number(num)),
-        limit(1)
-      ));
+      const safe = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      sysbar.innerHTML = `<div class="sys-msg">${safe}</div>`;
+
+      if (Array.isArray(actions) && actions.length){
+        const wrap = document.createElement('div');
+        wrap.className = 'sys-actions';
+        actions.forEach((a)=>{
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
+          btn.textContent = a.label || 'إجراء';
+          btn.addEventListener('click', ()=>{ try{ a.onClick && a.onClick(); }catch(_){ } });
+          wrap.appendChild(btn);
+        });
+        sysbar.appendChild(wrap);
+      }
+
+      scrollToSysbar();
     }
 
-    if (aSnap.empty) {
-      msg("⚠️ الحيوان غير موجود.", false);
-      btn.disabled = true;
-      return false;
+    async function getUid(){
+      if (auth?.currentUser?.uid) return auth.currentUser.uid;
+      const u = await new Promise(res => onAuthStateChanged(auth, u => res(u)));
+      return u?.uid || '';
     }
 
-    const animal = aSnap.docs[0].data();
-    _animal = animal;
-calcAgeAndCause();
-
-    const status = (animal.reproductiveStatus || "").trim(); // عندك = "عشار"
-
-    if (status !== "عشار") {
-      msg("❌ لا يمكن تسجيل إجهاض لحيوان غير عشار.", false);
-      btn.disabled = true;
-      return false;
+    function disableForm(disabled=true){
+      form.querySelectorAll('input, textarea, select, button').forEach(el=>{
+        if (el.id === 'toCardBtn') return;
+        el.disabled = disabled;
+      });
     }
 
-    msg("✅ تم التحقق: الحيوان عشار، يمكن تسجيل الإجهاض.", true);
-    btn.disabled = false;
-    return true;
+    // حساب عمر الإجهاض + سبب محتمل اعتمادًا على آخر تلقيح من وثيقة الحيوان
+    function calcAgeAndCauseFrom(lastAI, eventDate){
+      const a = String(lastAI || '').slice(0,10);
+      const d = String(eventDate || '').slice(0,10);
+      if (!a || !d) return { months:null, cause:'' };
 
-  } catch (err) {
-    console.error(err);
-    msg("⚠️ خطأ أثناء التحقق.", false);
-    btn.disabled = true;
-    return false;
-  }
-}
+      const d1 = new Date(a);
+      const d2 = new Date(d);
+      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return { months:null, cause:'' };
 
-    await checkAnimal(); // تشغيل البوابة مرة واحدة عند الفتح
-$("eventDate").addEventListener("change", calcAgeAndCause);
+      const months = Math.max(0, (d2 - d1) / (1000*60*60*24*30.44));
+      const m = Number.isFinite(months) ? Number(months.toFixed(1)) : null;
+      const cause = (m !== null && m >= 6) ? 'احتمال بروسيلا (≥6 شهور)' : 'احتمال BVD (<6 شهور)';
+      return { months:m, cause };
+    }
 
-    // الحفظ
- btn.onclick = async () => {
-  try {
-    await ensureAuth();
+    // مزامنة حقول readonly عندما يصبح doc متاحًا (بعد Gate المركزي)
+    function trySyncReadonly(){
+      const doc = form?.__mbkDoc || null;
+      if (!doc) return;
 
-    const eventDate = $("eventDate").value || dt;
+      const lastAI = String(doc.lastInseminationDate || '').slice(0,10);
+      if (lastAI && lastAIEl && !lastAIEl.value) lastAIEl.value = lastAI;
 
-    const payload = {
-      animalNumber: String(num),
-      animalId: String(num),
-      type: "إجهاض",
-      eventType: "إجهاض",
-      eventDate,
-      abortionAgeMonths: parseFloat($("abortionAge").value) || null,
-      probableCause: $("probableCause").value || "",
-      notes: $("notes").value || "",
-      userId: auth.currentUser.uid,
-      createdAt: serverTimestamp()
-    };
+      const eventDate = (dateEl?.value || '').slice(0,10);
+      const { months, cause } = calcAgeAndCauseFrom(lastAI, eventDate);
 
-    await addDoc(collection(db, "events"), payload);
+      if (ageEl)   ageEl.value   = (months === null) ? '' : String(months);
+      if (causeEl) causeEl.value = cause || '';
+    }
 
-    // ✅ تحديث وثيقة الحيوان عبر الملف المركزي فقط
-    await updateAnimalByEvent(payload);
+    // راقب لفترة قصيرة لحد ما Gate يحمّل doc
+    let tries = 0;
+    const poll = setInterval(()=>{
+      tries++;
+      trySyncReadonly();
+      if ((form?.__mbkDoc && (String(form.__mbkDoc.lastInseminationDate||'').trim() !== '')) || tries > 80){
+        clearInterval(poll);
+      }
+    }, 120);
 
-    msg("تم تسجيل الإجهاض بنجاح", true);
+    // إعادة حساب عند تغيير التاريخ
+    dateEl?.addEventListener('input', ()=> trySyncReadonly());
+    dateEl?.addEventListener('change', ()=> trySyncReadonly());
 
-    localStorage.setItem("lastAnimalNumber", String(num));
-    localStorage.setItem("lastEventDate", eventDate);
+    // حفظ فعلي بعد mbk:valid (من forms-init.js)
+    document.addEventListener('mbk:valid', async (e)=>{
+      const { formData } = e.detail || {};
+      const uid = await getUid();
+      if (!uid){
+        showSysbar('سجّل الدخول أولًا.', { error:true });
+        return;
+      }
 
-    setTimeout(() => {
-      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-    }, 1200);
+      const animalNumber = String(formData.animalNumber || '').trim();
+      const eventDate    = String(formData.eventDate || '').trim();
+      const animalId     = String(formData.animalId || '').trim();
+      const species      = String(formData.species || '').trim();
 
-  } catch (err) {
-    console.error(err);
-    msg("❌ فشل في الحفظ.", false);
-  }
-};
+      // doc موجود من forms-init (formData.documentData)
+      const doc = formData.documentData || form.__mbkDoc || {};
+      const lastAI = String(doc.lastInseminationDate || '').slice(0,10);
+
+      const { months, cause } = calcAgeAndCauseFrom(lastAI, eventDate);
+
+      // عبي readonly في الفورم (للعرض)
+      if (lastAIEl) lastAIEl.value = lastAI || '';
+      if (ageEl)    ageEl.value    = (months === null) ? '' : String(months);
+      if (causeEl)  causeEl.value  = cause || '';
+
+      const payload = {
+        userId: uid,
+        type: 'إجهاض',
+        eventType: 'إجهاض',
+        eventDate,
+        animalNumber,
+        animalId,
+        species,
+        lastInseminationDate: lastAI || '',
+        abortionAgeMonths: (months === null ? null : months),
+        probableCause: cause || '',
+        notes: String(formData.notes || '').trim(),
+        idempotencyKey: `${animalNumber}-إجهاض-${eventDate}`,
+        createdAt: serverTimestamp()
+      };
+
+      try{
+        disableForm(true);
+        showSysbar('جارِ الحفظ…');
+
+        await addDoc(collection(db, 'events'), payload);
+
+        // تحديث الحيوان عبر الملف المركزي
+        await updateAnimalByEvent({ ...payload, type:'abortion', eventType:'abortion' });
+
+        showSysbar('تم حفظ الإجهاض بنجاح ✅', {
+          actions:[
+            {
+              label:'فتح قائمة الأحداث',
+              primary:true,
+              onClick:()=> location.href = `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+            },
+            {
+              label:'فتح بطاقة الحيوان',
+              onClick:()=> location.href = `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+            }
+          ]
+        });
+
+      }catch(err){
+        console.error(err);
+        disableForm(false);
+        showSysbar('تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات.', { error:true });
+      }
+    });
+
+    // زر بطاقة الحيوان
+    document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
+      const n = String(numEl?.value || '').trim();
+      if (!n){
+        showSysbar('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', { error:true });
+        return;
+      }
+      location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+    });
 
     // تتبّع موحّد
     window.dataLayer = window.dataLayer || [];
