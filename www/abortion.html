@@ -173,7 +173,7 @@
         </div>
         <div>
           <label>عمر الإجهاض (بالشهور)</label>
-          <input id="abortionAgeMonths" data-field="abortionAgeMonths" readonly />
+          <input id="abortionAgeMonths" data-field="abortionAgeMonths" type="number" step="0.1" inputmode="decimal" readonly />
         </div>
       </div>
 
@@ -242,6 +242,41 @@
     const lastAIEl = document.getElementById('lastInseminationDate');
     const ageEl    = document.getElementById('abortionAgeMonths');
     const causeEl  = document.getElementById('probableCause');
+    // ✅ Auto-fill abortionAgeMonths + probableCause BEFORE central validation
+function fillDerivedFieldsNow(){
+  const lastAI = String(lastAIEl?.value || '').slice(0,10);
+  const evDate = String(dateEl?.value || '').slice(0,10);
+  const { months, cause } = calcAgeAndCauseFrom(lastAI, evDate);
+
+  if (ageEl)   ageEl.value   = (months === null) ? '' : String(months);
+  if (causeEl) causeEl.value = cause || '';
+  return { lastAI, evDate, months, cause };
+}
+
+// ✅ Watcher: لأن forms-init بيحط lastInseminationDate بعد الـ gate (ممكن بدون events)
+let __ab_fill_timer = null;
+function startFillWatcher(){
+  if (__ab_fill_timer) clearInterval(__ab_fill_timer);
+
+  let tries = 0;
+  __ab_fill_timer = setInterval(()=>{
+    tries++;
+    const r = fillDerivedFieldsNow();
+
+    // نقفل الوتشر لو اتملّى العمر أو بعد 5 ثواني
+    if ((r.months !== null && r.evDate && r.lastAI) || tries >= 25){
+      clearInterval(__ab_fill_timer);
+      __ab_fill_timer = null;
+    }
+  }, 200);
+}
+
+// شغّل الوتشر عند التحميل + عند تغيير رقم الحيوان/التاريخ
+document.addEventListener('DOMContentLoaded', startFillWatcher);
+numEl?.addEventListener('change', startFillWatcher);
+numEl?.addEventListener('input', startFillWatcher);
+dateEl?.addEventListener('change', startFillWatcher);
+
 
     function scrollToSysbar(){
       try{ sysbar?.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
