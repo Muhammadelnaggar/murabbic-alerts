@@ -88,13 +88,27 @@
       border-radius:10px;font-size:14px;font-weight:700;
       text-align:center;margin-inline:auto;max-width:560px
     }
-    .infobar.show{display:block}
-    .infobar.error{
-      background:#fff7ed;border:1px solid #fed7aa;color:#9a3412
-    }
-    .infobar:not(.error){
-      background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46
-    }
+    /* رسالة خطأ */
+.infobar.error{
+  background:#fff1f2;
+  border:1px solid #fecaca;
+  color:#b91c1c;
+}
+
+/* رسالة نجاح */
+.infobar.success{
+  background:#ecfdf5;
+  border:1px solid #bbf7d0;
+  color:#065f46;
+}
+
+/* رسالة عادية (معلومة / جاري التحقق) */
+.infobar.info{
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  color:#1e40af;
+}
+
 
     /* ===== Header (Calving) ===== */
     .mbk-head{
@@ -603,3 +617,4 @@
   </script>
 </body>
 </html>
+
