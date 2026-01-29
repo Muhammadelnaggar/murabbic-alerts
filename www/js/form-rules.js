@@ -116,7 +116,7 @@ export const eventSchemas = {
   },
   guards: ["abortionDecision"],
 },
-,
+
 
   // ✅ إضافة لبن يومي
   "لبن يومي": {
@@ -490,7 +490,16 @@ export function validateEvent(eventType, payload = {}) {
       payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
     }
   }
-
+// ✅ Fallback مركزي لحدث "إجهاض": آخر تلقيح من الوثيقة (لأن الصفحة قد لا تُرسله)
+if (eventType === "إجهاض") {
+  const d = payload.documentData || {};
+  if (!payload.lastInseminationDate) {
+    payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
+  }
+  if (!payload.species) {
+    payload.species = String(d.species || d.animalTypeAr || "").trim();
+  }
+}
   const errors = [];
   const fieldErrors = {};
   const guardErrors = [];
@@ -543,13 +552,4 @@ function validateField(key, rule, value) {
   if (rule.enum && value && !rule.enum.includes(value)) return rule.msg || `«${key}» خارج القيم المسموحة.`;
   return null;
 }
-// ✅ Fallback مركزي لحدث "إجهاض": آخر تلقيح من الوثيقة (لأن الصفحة قد لا تُرسله)
-if (eventType === "إجهاض") {
-  const d = payload.documentData || {};
-  if (!payload.lastInseminationDate) {
-    payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
-  }
-  if (!payload.species) {
-    payload.species = String(d.species || d.animalTypeAr || "").trim();
-  }
-}
+
