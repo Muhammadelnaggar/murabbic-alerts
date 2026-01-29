@@ -100,11 +100,23 @@ export const eventSchemas = {
     },
     guards: ["pregnancyDiagnosisDecision"],
   },
+"إجهاض": {
+  fields: {
+    ...commonFields,
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
 
-  "إجهاض": {
-    fields: { ...commonFields },
-    guards: ["abortionDecision"],
+    // اختياري (للعرض فقط)
+    abortionAgeMonths: { required: false, type: "number" },
+    probableCause: { required: false },
+    notes: { required: false },
+
+    // هيتعمل له fallback من documentData لو مش موجود
+    lastInseminationDate: { required: false, type: "date" },
+    species: { required: false },
   },
+  guards: ["abortionDecision"],
+},
+,
 
   // ✅ إضافة لبن يومي
   "لبن يومي": {
@@ -324,15 +336,67 @@ calvingRequiredFields(fd) {
     return null;
   },
 
-  abortionDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+abortionDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    if (doc.reproductiveStatus !== "عشار")
-      return "❌ الحيوان ليس عِشار — لا يمكن تسجيل إجهاض.";
+  // ✅ خارج القطيع (احتياطي - رغم إن validateEvent بيقفله)
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل إجهاض — الحيوان خارج القطيع.";
 
-    return null;
-  },
+  // ✅ لازم تاريخ صالح
+  if (!isDate(fd.eventDate)) return "❌ تاريخ الإجهاض غير صالح.";
+
+  // ✅ تحديد النوع (Normalize)
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const th = thresholds[sp]?.minGestationDays;
+  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+
+  // ✅ لازم يكون عِشار (الأحداث أولًا لو أنت مررت reproStatusFromEvents، وإلا الوثيقة)
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+
+  if (!rsNorm.includes("عشار")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ الحيوان ليس عِشار — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  // ✅ لازم آخر تلقيح
+  const lf =
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    "";
+
+  if (!isDate(lf)) return '❌ لا يمكن تسجيل إجهاض — لا يوجد "آخر تلقيح".';
+
+  // ✅ Boundary: لو في (ولادة/إجهاض) بعد التلقيح → الحمل اتلغى
+  const boundary = String(fd.lastBoundary || "").trim();
+  if (boundary && isDate(boundary)) {
+    const b = new Date(boundary); b.setHours(0,0,0,0);
+    const l = new Date(lf);       l.setHours(0,0,0,0);
+    if (b.getTime() >= l.getTime()) {
+      return `❌ لا يُسمح بتسجيل الإجهاض: آخر حدث (${boundary}) يلغي أي حمل حالي.`;
+    }
+  }
+
+  // ✅ حساب عمر الحمل
+  const gDays = daysBetween(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
+
+  // ✅ لو عمر الحمل وصل/تخطى الحد الأدنى للولادة… غالبًا دي “ولادة مبكرة/نافقة”
+  if (gDays >= th) {
+    return `❌ عمر الحمل ${gDays} يوم — هذا أقرب لولادة وليس إجهاض (الحد الأدنى للولادة ${th} يوم).`;
+  }
+
+  // ✅ مسموح: أقل من حد الولادة
+  return null;
+},
 
   dryOffDecision(fd) {
     const doc = fd.documentData;
@@ -478,4 +542,14 @@ function validateField(key, rule, value) {
   if (rule.type === "number" && !isNum(value)) return rule.msg || `قيمة «${key}» يجب أن تكون رقمًا.`;
   if (rule.enum && value && !rule.enum.includes(value)) return rule.msg || `«${key}» خارج القيم المسموحة.`;
   return null;
+}
+// ✅ Fallback مركزي لحدث "إجهاض": آخر تلقيح من الوثيقة (لأن الصفحة قد لا تُرسله)
+if (eventType === "إجهاض") {
+  const d = payload.documentData || {};
+  if (!payload.lastInseminationDate) {
+    payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
+  }
+  if (!payload.species) {
+    payload.species = String(d.species || d.animalTypeAr || "").trim();
+  }
 }
