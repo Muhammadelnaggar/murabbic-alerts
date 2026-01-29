@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+  <script type="module" src="js/event-shell.js"></script>
+
   <title>تسجيل ولادة — مُرَبِّيك</title>
 
   <style>
@@ -362,6 +364,10 @@
       });
     })();
   </script>
+<script type="module">
+  import { initEventShell } from "/js/event-shell.js";
+  initEventShell({ pageId: "calving", title: "تسجيل ولادة", logoSrc: "/images/logo.png", backHref: "add-event.html" });
+</script>
 
   <script type="module">
     import { db, auth } from '/js/firebase-config.js';
@@ -617,4 +623,5 @@
   </script>
 </body>
 </html>
+
 
