@@ -7,22 +7,37 @@
   <!-- ستايل ونظام الفورم المركزي -->
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
-
-  <!-- شِلّ الهيدر الموحد -->
-  <script type="module">
-    import { initEventShell } from "/js/event-shell.js";
-    initEventShell({
-      pageId: "insemination",
-      title: "تسجيل التلقيح",
-      logoSrc: "/images/logo.png",
-      backHref: "add-event.html"
-    });
-  </script>
-
+  
   <title>تسجيل التلقيح — مُرَبِّيك</title>
+  <style>
+  .mbk-topbar{padding:10px 14px 6px;background:#fff;border-bottom:1px solid #e5e7eb}
+  .mbk-topbar__row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .mbk-title{font-family:'Cairo',Tahoma,Arial,sans-serif;font-weight:800;font-size:18px;color:#0b7f47}
+  .mbk-topbar__left{display:flex;align-items:center;gap:10px}
+  .mbk-logo{width:30px;height:30px;object-fit:contain;opacity:.6}
+  .mbk-brand{font-family:'Cairo',Tahoma,Arial,sans-serif;font-weight:800;opacity:.6;color:#0f172a}
+  .mbk-back{display:inline-flex;align-items:center;justify-content:center;margin-top:8px;
+    padding:10px 12px;border-radius:12px;border:1px solid #d1d5db;text-decoration:none;
+    color:#0f172a;background:#f8fafc;font-weight:700}
+</style>
+
 </head>
 
 <body>
+<header class="mbk-topbar" role="banner">
+  <div class="mbk-topbar__row">
+    <div class="mbk-topbar__right">
+      <div class="mbk-title">تسجيل التلقيح</div>
+    </div>
+
+    <div class="mbk-topbar__left">
+      <img class="mbk-logo" src="images/logo.png" alt="مُرَبِّيك" />
+      <div class="mbk-brand">مُرَبِّيك</div>
+    </div>
+  </div>
+
+  <a class="mbk-back" href="add-event.html">عودة للأحداث</a>
+</header>
 
 <script>window.dataLayer = window.dataLayer || [];</script>
 
@@ -131,4 +146,5 @@ document.addEventListener("mbk:valid", async (e) => {
 
 </body>
 </html>
+
 
