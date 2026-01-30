@@ -1,6 +1,5 @@
 /* ========= Murabbik Form Styles ========= */
 
-/* ألوان افتراضية لو متغيّرات :root مش موجودة */
 :root{
   --brand: #0ea05a;
   --brand-600: #0b7f47;
@@ -12,161 +11,142 @@
   --error-br: #fecaca;
 }
 
-/* ===============================
-   Global box sizing (يمنع القص/البروز)
-   =============================== */
-*, *::before, *::after{
-  box-sizing: border-box;
-}
+*, *::before, *::after{ box-sizing: border-box; }
 
-/* ===============================
-   Base Page
-   =============================== */
 html, body{
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
+  width:100%;
+  max-width:100%;
+  margin:0;
+  padding:0;
+  overflow-x:hidden;
 }
 
 body{
   background:#f7faf7;
   color:var(--ink);
-  font-family: system-ui, "Cairo", "Segoe UI", Tahoma, Arial, sans-serif;
+  font-family:system-ui,"Cairo","Segoe UI",Tahoma,Arial,sans-serif;
 }
 
 /* ===============================
-   Header (Murabbik)
+   Unified Header (Birth Style)
    =============================== */
-.mbk-header{
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background:#fff;
-  border-bottom:1px solid var(--border);
-  padding: 10px 12px;
+.mbk-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
+  gap:12px;
+  padding:10px 12px;
+  background:#fff;
+  border-bottom:1px solid var(--border);
 }
 
-.mbk-title{
+.mbk-head .mbk-logo{
+  width:42px;
+  height:auto;
+  object-fit:contain;
+  flex-shrink:0;
+}
+
+.mbk-center{
+  flex:1;
+  text-align:center;
+  line-height:1.2;
+}
+
+.mbk-page-title{
+  font-size:18px;
+  font-weight:900;
+  color:var(--ink);
+}
+
+.mbk-app-name{
+  font-size:13px;
   font-weight:800;
   color:var(--brand-600);
-  font-size:18px;
-  line-height:1.2;
-  text-align:center;
-  flex:1;
+  opacity:.9;
 }
 
-.mbk-back{
-  color:var(--brand-600);
+.mbk-head .mbk-back{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   text-decoration:none;
-  font-weight:700;
-  font-size:14px;
-  white-space:nowrap;
+  font-weight:900;
+  color:var(--brand-600);
+  border:2px solid var(--brand-600);
+  background:#fff;
+  flex-shrink:0;
 }
 
 /* ===============================
-   Form Layout (Canonical)
+   Form Layout
    =============================== */
 .mbk-form{
   width:100%;
   max-width:520px;
-  margin: 12px auto 24px;
-  padding: 0 12px;
-
+  margin:12px auto 24px;
+  padding:0 12px;
   display:flex;
-  flex-direction: column;
-  align-items: stretch; /* مهم: يمنع الزحلقة/القص */
+  flex-direction:column;
 }
 
 .mbk-card{
   width:100%;
   max-width:520px;
-  margin: 0 auto 12px;
-
+  margin:0 auto 12px;
   background:#fff;
   border:1px solid var(--border);
   border-radius:16px;
-  padding: 14px;
-  box-shadow: 0 1px 0 rgba(15,23,42,.04);
-
-  overflow: hidden; /* مهم: يمنع بروز الحقول خارج الكارت */
+  padding:14px;
+  box-shadow:0 1px 0 rgba(15,23,42,.04);
+  overflow:hidden;
 }
 
 /* ===============================
    Fields
    =============================== */
-.field{ margin-bottom: 12px; }
+.field{ margin-bottom:12px; }
 
-.mbk-form label,
 label{
   display:block;
-  margin: 10px 0 6px;
-  color: var(--ink);
-  font-weight: 700;
-  font-size: 14px;
+  margin:10px 0 6px;
+  font-weight:700;
+  font-size:14px;
 }
 
-/* الحقول الأساسية */
 input, select, textarea{
-  width: 100%;
-  max-width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font: inherit;
-  background: #fff;
-  color: var(--ink);
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  font:inherit;
+  background:#fff;
+  color:var(--ink);
 }
 
-/* Placeholder أفتح شوية */
-::placeholder{ color: #94a3b8; }
+::placeholder{ color:#94a3b8; }
 
-/* دعم RTL/LTR بدون كسر */
-html[dir="rtl"] .field { text-align: right; }
-html[dir="ltr"] .field { text-align: left; }
-
-/* ===============================
-   Date input (RTL safe)
-   =============================== */
 html[dir="rtl"] input[type="date"]{
-  direction: ltr !important;
-  text-align: left !important;
-  padding-right: 44px !important; /* مساحة أيقونة التقويم */
+  direction:ltr !important;
+  text-align:left !important;
+  padding-right:44px !important;
 }
 
 /* ===============================
    Validation
    =============================== */
 .field-msg{
-  color: var(--error);
-  font-size: 12px;
-  line-height: 1.4;
-  margin-top: 4px;
-  display: block;
+  color:var(--error);
+  font-size:12px;
+  margin-top:4px;
 }
 
 .invalid{
-  border-color: var(--error-br) !important;
-  background: var(--error-bg);
-}
-
-.invalid:focus{
-  outline: 2px solid var(--error);
-  outline-offset: 2px;
-}
-
-label .req::after{
-  content: " *";
-  color: var(--error);
-  font-weight: 700;
+  border-color:var(--error-br) !important;
+  background:var(--error-bg);
 }
 
 /* ===============================
@@ -175,28 +155,20 @@ label .req::after{
 .infobar{
   width:100%;
   max-width:520px;
-  margin: 10px auto 12px;
-
+  margin:10px auto 12px;
   border:1px solid var(--border);
   background:#fff;
   border-radius:14px;
   padding:10px 12px;
   font-weight:700;
-  color: var(--muted);
+  color:var(--muted);
 }
 
-.infobar.ok{
+.infobar.show:not(.error){
   border-color:#bbf7d0;
   background:#ecfdf5;
   color:#065f46;
 }
-.infobar.err{
-  border-color:#fed7aa;
-  background:#fff7ed;
-  color:#9a3412;
-}
-/* دعم كلاسات النظام الجديدة */
-.infobar.show{ display:block; }
 
 .infobar.error{
   border-color:#fed7aa;
@@ -204,173 +176,21 @@ label .req::after{
   color:#9a3412;
 }
 
-/* النجاح الافتراضي لما مفيش error */
-.infobar.show:not(.error){
-  border-color:#bbf7d0;
-  background:#ecfdf5;
-  color:#065f46;
-}
-
 /* ===============================
    Button
    =============================== */
 .mbk-form button{
   width:100%;
-  max-width:520px;
-  margin: 12px auto 0;
-  display:block;
-
+  margin:12px auto 0;
   border:0;
   border-radius:14px;
   padding:12px 14px;
-  background: var(--brand);
+  background:var(--brand);
   color:#fff;
-  font-weight: 800;
+  font-weight:800;
   font-size:16px;
   cursor:pointer;
 }
 
-.mbk-form button:active{ transform: translateY(1px); }
+.mbk-form button:active{ transform:translateY(1px); }
 .mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
-
-/* ===============================
-   Dark mode (اختياري)
-   =============================== */
-.dark input,.dark select,.dark textarea{
-  background:#0b0f14;color:#e5eef5;border-color:#22303c;
-}
-.dark .field-msg{ color:#ffb4b4; }
-.dark .invalid{ background:#381a1f;border-color:#ff8b8b; }
-.dark .invalid:focus{ outline-color:#ff8b8b; }
-.dark .infobar{
-  background:#0b0f14;
-  border-color:#22303c;
-  color:#cbd5e1;
-}
-/* ===============================
-   Event Pages Header (NEW)
-   =============================== */
-.mbk-event-header{
-  position: relative;
-  text-align: center;
-  padding: 18px 10px 14px;
-  background:#ffffff;
-  border-bottom:1px solid var(--border);
-}
-
-.mbk-event-title{
-  font-size:20px;
-  font-weight:800;
-  color:#0f172a;
-}
-
-.mbk-event-brand{
-  font-size:13px;
-  font-weight:700;
-  color:var(--brand);
-  margin-top:4px;
-  opacity:.9;
-}
-
-
-
-/* ===============================
-   Event Header with Logo Beside
-   =============================== */
-.mbk-event-header{
-  background:#ffffff;
-  border-bottom:1px solid var(--border);
-  padding:14px 12px;
-  display:flex;
-  justify-content:center;
-}
-
-.mbk-event-headline{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  text-align:right;
-}
-
-.mbk-event-logo{
-  width:42px;
-  height:auto;
-  opacity:.9;
-}
-
-.mbk-event-text{
-  display:flex;
-  flex-direction:column;
-  line-height:1.2;
-}
-
-.mbk-event-title{
-  font-size:20px;
-  font-weight:900;
-  color:#0f172a;
-}
-
-.mbk-event-brand{
-  font-size:13px;
-  font-weight:800;
-  color:var(--brand-600);
-}
-/* زر رجوع أخضر أنيق */
-.mbk-back-btn{
-  position:absolute;
-  right:12px;              /* لأنه RTL */
-  top:50%;
-  transform:translateY(-50%);
-  color:var(--brand-600);
-  border:2px solid var(--brand-600);
-  padding:6px 14px;
-  border-radius:20px;
-  font-weight:800;
-  font-size:14px;
-  text-decoration:none;
-  background:#fff;
-  transition:.2s;
-}
-
-.mbk-back-btn:active{
-  transform:translateY(-50%) scale(.96);
-}
-/* ===== Header Fix: Logo Left + Title Center ===== */
-.mbk-event-header{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:18px 12px;
-  background:#ffffff;
-  border-bottom:1px solid var(--border);
-}
-
-/* اللوجو ثابت على الشمال وكبير */
-.mbk-event-logo{
-  position:absolute;
-  left:14px;
-  top:50%;
-  transform:translateY(-50%);
-  width:72px;
-  height:auto;
-}
-
-/* النص في المنتصف */
-.mbk-event-center{
-  text-align:center;
-  line-height:1.2;
-}
-
-.mbk-event-title{
-  font-size:20px;
-  font-weight:900;
-  color:#0f172a;
-}
-
-.mbk-event-brand{
-  font-size:13px;
-  font-weight:800;
-  color:var(--brand-600);
-  margin-top:4px;
-}
