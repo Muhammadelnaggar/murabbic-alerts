@@ -100,6 +100,61 @@ function _renderActions(sysbar, actions){
  *  - backHref: "add-event.html" (اختياري)
  *  - prefill: { numberId:"animalNumber", dateId:"eventDate" } (اختياري)
  */
+function _ensureHeader({ titleText="", backHref="add-event.html", logoSrc="/images/logo.png" }){
+  // لو فيه header موجود خلاص
+  if (document.querySelector("header.mbk-header, header")) return;
+
+  const header = document.createElement("header");
+  header.className = "mbk-header";
+  header.style.cssText = `
+    position:sticky; top:0; z-index:10;
+    background:#fff; border-bottom:1px solid #e2e8f0;
+    padding:12px 12px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px;
+  `;
+
+  // يمين: العنوان
+  const t = document.createElement("div");
+  t.className = "mbk-title";
+  t.textContent = titleText || "حدث";
+  t.style.cssText = `font-weight:900; font-size:16px; color:#0b7f47;`;
+
+  // يسار: لوجو + زر رجوع
+  const left = document.createElement("div");
+  left.style.cssText = `display:flex; align-items:center; gap:10px;`;
+
+  const logo = document.createElement("img");
+  logo.className = "mbk-logo";
+  logo.src = logoSrc || "/images/logo.png";
+  logo.alt = "مُرَبِّيك";
+  logo.style.cssText = `height:30px; opacity:.6;`;
+
+  const back = document.createElement("a");
+  back.className = "mbk-back";
+  back.href = backHref || "add-event.html";
+  back.textContent = "عودة للأحداث";
+  back.style.cssText = `
+    text-decoration:none;
+    padding:8px 10px;
+    border-radius:12px;
+    border:1px solid #cbd5e1;
+    background:#f8fafc;
+    color:#0f172a;
+    font-weight:800;
+    font-size:13px;
+  `;
+
+  left.appendChild(logo);
+  left.appendChild(back);
+
+  header.appendChild(t);
+  header.appendChild(left);
+
+  // ضع الهيدر أول عنصر داخل body
+  document.body.insertBefore(header, document.body.firstChild);
+}
+
 export function initEventShell(options = {}){
   const {
     pageId = document.documentElement?.dataset?.page || "",
@@ -110,6 +165,7 @@ export function initEventShell(options = {}){
   } = options;
 
   _ensureDataLayer();
+    _ensureHeader({ titleText: options?.title || "", backHref, logoSrc });
 
   // 1) sysbar موحد
   const sysbar = _findOrCreateSysbar();
