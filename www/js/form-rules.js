@@ -348,14 +348,18 @@ inseminationDecision(fd) {
   const minPostCalving = { "أبقار": 60, "جاموس": 45 };
 
   // ❌ عشار
-  const repro = String(doc.reproductiveStatus || "").trim();
+  const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
   if (repro.includes("عشار"))
     return "❌ الحيوان مسجل عِشار — لا يمكن تلقيحه.";
 
   // ❌ لازم تاريخ ولادة
-  if (!doc.lastCalvingDate) return "❌ لا يوجد تاريخ آخر ولادة.";
+   const lastCalving =
+    String(doc.lastCalvingDate || "").trim() ||
+    (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
-  const gapCalving = daysBetween(doc.lastCalvingDate, fd.eventDate);
+  if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
+  const gapCalving = daysBetween(lastCalving, fd.eventDate);
+
   if (gapCalving < minPostCalving[sp])
     return `❌ التلقيح مبكر بعد الولادة (${gapCalving} يوم). الحد الأدنى ${minPostCalving[sp]} يوم.`;
 
