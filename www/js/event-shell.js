@@ -218,6 +218,31 @@ export function initEventShell(options = {}){
       dEl.dispatchEvent(new Event("change", { bubbles:true }));
     }
   }catch(_){}
+  // 5) Prefill مركزي (number/date) — بدون لمس منطق الصفحة لو موجود
+  try{
+    ...
+  }catch(_){}
+
+  // ✅ هنا حط الكود ده (زر فتح بطاقة الحيوان)
+  try{
+    const btn = document.getElementById("openCowCardBtn");
+    if (btn){
+      btn.addEventListener("click", ()=>{
+        const qs = _qs();
+        const n =
+          qs.get("number") ||
+          (document.querySelector('[data-field="animalNumber"]')?.value || "");
+        const nn = _normDigitsOnly(n);
+        if (!nn) return;
+        location.href = `cow-card.html?number=${encodeURIComponent(nn)}`;
+      });
+    }
+  }catch(_){}
+
+  // 6) تتبع موحد
+  try{
+    ...
+  }catch(_){}
 
   // 6) تتبع موحد
   try{
