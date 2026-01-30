@@ -13,6 +13,7 @@
 
 <body>
 
+  <!-- نفس هيدر الولادة القياسي -->
   <header>
     <div class="mbk-head">
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
@@ -30,7 +31,6 @@
 
     <div id="info" class="infobar"></div>
 
-    <!-- الفورم المركزي -->
     <form id="eventForm"
           data-validate="true"
           data-event="تلقيح"
@@ -92,12 +92,10 @@
   import { db } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  /* تعبئة الرقم والتاريخ من الرابط */
   const p = new URLSearchParams(location.search);
   document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
   document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
 
-  /* انتظار الفاليديشن المركزي */
   document.addEventListener("mbk:valid", async (e) => {
     if (e.detail?.eventType !== "تلقيح") return;
 
