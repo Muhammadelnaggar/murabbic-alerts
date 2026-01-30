@@ -241,7 +241,7 @@ export function initEventShell(options = {}){
 
   // 6) تتبع موحد
   try{
-    ...
+    
   }catch(_){}
 
   // 6) تتبع موحد
