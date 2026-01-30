@@ -239,10 +239,7 @@ export function initEventShell(options = {}){
     }
   }catch(_){}
 
-  // 6) تتبع موحد
-  try{
-    
-  }catch(_){}
+ 
 
   // 6) تتبع موحد
   try{
