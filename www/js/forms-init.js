@@ -505,6 +505,43 @@ function attachOne(form) {
         return false;
       }
     }
+        // ✅ Gate خاص لحدث "تلقيح" قبل فتح النموذج (60 يوم بعد آخر ولادة)
+    if (eventName === "تلقيح") {
+      if (typeof guards?.inseminationDecision !== "function") {
+        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (inseminationDecision).", "error");
+        lockForm(true);
+        return false;
+      }
+
+      const uid2 = await getUid();
+      const sig2 = await fetchCalvingSignalsFromEvents(uid2, n);
+
+      const doc2 = form.__mbkDoc || {};
+      const docSpecies2 = String(doc2.species || doc2.animalTypeAr || "").trim();
+
+      let sp2 = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies2;
+      if (/cow|بقر/i.test(sp2)) sp2 = "أبقار";
+      if (/buffalo|جاموس/i.test(sp2)) sp2 = "جاموس";
+
+      const gateData2 = {
+        animalNumber: n,
+        eventDate: d,
+        species: sp2,
+        documentData: doc2,
+        reproStatusFromEvents: String(sig2.reproStatusFromEvents || "").trim(),
+        lastBoundary: String(sig2.lastBoundary || "").trim(),
+        lastBoundaryType: String(sig2.lastBoundaryType || "").trim()
+      };
+
+      const g2 = guards.inseminationDecision(gateData2);
+
+      // لو رجع تحذير/منع
+      if (g2) {
+        showMsg(bar, [String(g2)], "error");
+        lockForm(true);
+        return false;
+      }
+    }
 
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
