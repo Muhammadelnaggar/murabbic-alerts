@@ -220,7 +220,7 @@ export function initEventShell(options = {}){
   }catch(_){}
   // 5) Prefill مركزي (number/date) — بدون لمس منطق الصفحة لو موجود
   try{
-    ...
+    
   }catch(_){}
 
   // ✅ هنا حط الكود ده (زر فتح بطاقة الحيوان)
