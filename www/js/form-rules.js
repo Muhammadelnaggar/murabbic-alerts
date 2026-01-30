@@ -93,10 +93,21 @@ export const eventSchemas = {
 
 
 
-  "تلقيح": {
-    fields: { ...commonFields, species: { required: true, msg: "نوع الحيوان مطلوب." } },
-    guards: ["inseminationDecision"],
+ "تلقيح": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ التلقيح غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+    species: { required: true, msg: "نوع الحيوان غير محدد." },
+    inseminationMethod: { required: true, msg: "طريقة التلقيح مطلوبة." },
+    semenCode: { required: true, msg: "كود السائل المنوي مطلوب." },
+    inseminator: { required: true, msg: "اسم الملقّح مطلوب." },
+    inseminationTime: { required: true, msg: "وقت التلقيح مطلوب." },
+    heatStatus: { required: true, msg: "حالة الشياع مطلوبة." }
   },
+  guards: ["inseminationDecision"]
+},
+
 
   "تشخيص حمل": {
     fields: {
@@ -321,23 +332,43 @@ calvingRequiredFields(fd) {
   return null;
 },
 
-  inseminationDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+inseminationDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    const status = String(doc.reproductiveStatus || "").trim();
-    const okStatus = new Set(["مفتوحة", "ملقح", "ملقّح", "ملقحة", "ملقّحة"]);
-    if (!okStatus.has(status)) return "الحالة الحالية لا تسمح بالتلقيح.";
+  // ❌ خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل تلقيح — الحيوان خارج القطيع.";
 
-    if (!isDate(doc.lastCalvingDate)) return "تاريخ الولادة غير مسجل.";
+  // ✅ تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
-   const th = MIN_DAYS_POST_CALVING_FOR_AI[String(doc.species || "").trim()];
+  const minPostCalving = { "أبقار": 60, "جاموس": 45 };
 
-    const d = daysBetween(doc.lastCalvingDate, fd.eventDate);
-    if (d < th) return `التلقيح مبكر: ${d} يوم فقط (الحد الأدنى ${th}).`;
+  // ❌ عشار
+  const repro = String(doc.reproductiveStatus || "").trim();
+  if (repro.includes("عشار"))
+    return "❌ الحيوان مسجل عِشار — لا يمكن تلقيحه.";
 
-    return null;
-  },
+  // ❌ لازم تاريخ ولادة
+  if (!doc.lastCalvingDate) return "❌ لا يوجد تاريخ آخر ولادة.";
+
+  const gapCalving = daysBetween(doc.lastCalvingDate, fd.eventDate);
+  if (gapCalving < minPostCalving[sp])
+    return `❌ التلقيح مبكر بعد الولادة (${gapCalving} يوم). الحد الأدنى ${minPostCalving[sp]} يوم.`;
+
+  // ⚠️ تلقيح متقارب
+  if (doc.lastInseminationDate) {
+    const gapAI = daysBetween(doc.lastInseminationDate, fd.eventDate);
+    if (gapAI < 11)
+      return "⚠️ آخر تلقيح منذ أقل من 11 يوم (حالة غير منتظمة).";
+  }
+
+  return null;
+},
+
 
   pregnancyDiagnosisDecision(fd) {
     const doc = fd.documentData;
