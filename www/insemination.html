@@ -7,144 +7,127 @@
   <!-- ستايل ونظام الفورم المركزي -->
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
-  
-  <title>تسجيل التلقيح — مُرَبِّيك</title>
-  <style>
-  .mbk-topbar{padding:10px 14px 6px;background:#fff;border-bottom:1px solid #e5e7eb}
-  .mbk-topbar__row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .mbk-title{font-family:'Cairo',Tahoma,Arial,sans-serif;font-weight:800;font-size:18px;color:#0b7f47}
-  .mbk-topbar__left{display:flex;align-items:center;gap:10px}
-  .mbk-logo{width:30px;height:30px;object-fit:contain;opacity:.6}
-  .mbk-brand{font-family:'Cairo',Tahoma,Arial,sans-serif;font-weight:800;opacity:.6;color:#0f172a}
-  .mbk-back{display:inline-flex;align-items:center;justify-content:center;margin-top:8px;
-    padding:10px 12px;border-radius:12px;border:1px solid #d1d5db;text-decoration:none;
-    color:#0f172a;background:#f8fafc;font-weight:700}
-</style>
 
+  <title>تسجيل التلقيح — مُرَبِّيك</title>
 </head>
 
 <body>
-<header class="mbk-topbar" role="banner">
-  <div class="mbk-topbar__row">
-    <div class="mbk-topbar__right">
-      <div class="mbk-title">تسجيل التلقيح</div>
+
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">تسجيل التلقيح</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
     </div>
+  </header>
 
-    <div class="mbk-topbar__left">
-      <img class="mbk-logo" src="images/logo.png" alt="مُرَبِّيك" />
-      <div class="mbk-brand">مُرَبِّيك</div>
-    </div>
-  </div>
+  <script>window.dataLayer = window.dataLayer || [];</script>
 
-  <a class="mbk-back" href="add-event.html">عودة للأحداث</a>
-</header>
+  <main class="mbk-form">
 
-<script>window.dataLayer = window.dataLayer || [];</script>
+    <div id="info" class="infobar"></div>
 
-<main class="mbk-form">
+    <!-- الفورم المركزي -->
+    <form id="eventForm"
+          data-validate="true"
+          data-event="تلقيح"
+          autocomplete="off"
+          novalidate>
 
-  <div id="info" class="infobar"></div>
+      <label>رقم الحيوان *</label>
+      <input data-field="animalNumber" inputmode="numeric" />
 
-  <!-- الفورم المركزي -->
-  <form id="eventForm"
-        data-validate="true"
-        data-event="تلقيح"
-        autocomplete="off"
-        novalidate>
+      <label>تاريخ التلقيح *</label>
+      <input type="date" data-field="eventDate" />
 
-    <label>رقم الحيوان *</label>
-    <input data-field="animalNumber" inputmode="numeric" />
+      <label>طريقة التلقيح *</label>
+      <select data-field="inseminationMethod">
+        <option value="">اختر</option>
+        <option>طبيعي</option>
+        <option>اصطناعي</option>
+      </select>
 
-    <label>تاريخ التلقيح *</label>
-    <input type="date" data-field="eventDate" />
+      <label>كود السائل المنوي *</label>
+      <input data-field="semenCode" />
 
-    <label>طريقة التلقيح *</label>
-    <select data-field="inseminationMethod">
-      <option value="">اختر</option>
-      <option>طبيعي</option>
-      <option>اصطناعي</option>
-    </select>
+      <label>اسم الملقّح *</label>
+      <input data-field="inseminator" />
 
-    <label>كود السائل المنوي *</label>
-    <input data-field="semenCode" />
+      <label>وقت التلقيح *</label>
+      <div class="radio-group">
+        <label><input type="radio" name="inseminationTime" value="صباحا" data-field="inseminationTime"> صباحا</label>
+        <label><input type="radio" name="inseminationTime" value="مساءا" data-field="inseminationTime"> مساءا</label>
+      </div>
 
-    <label>اسم الملقّح *</label>
-    <input data-field="inseminator" />
+      <label>حالة الشياع *</label>
+      <div class="radio-group">
+        <label><input type="radio" name="heatStatus" value="صباحا" data-field="heatStatus"> صباحا</label>
+        <label><input type="radio" name="heatStatus" value="مساءا" data-field="heatStatus"> مساءا</label>
+      </div>
 
-    <label>وقت التلقيح *</label>
-    <div class="radio-group">
-      <label><input type="radio" name="inseminationTime" value="صباحا" data-field="inseminationTime"> صباحا</label>
-      <label><input type="radio" name="inseminationTime" value="مساءا" data-field="inseminationTime"> مساءا</label>
-    </div>
+      <label>ملاحظات</label>
+      <textarea data-field="notes"></textarea>
 
-    <label>حالة الشياع *</label>
-    <div class="radio-group">
-      <label><input type="radio" name="heatStatus" value="صباحا" data-field="heatStatus"> صباحا</label>
-      <label><input type="radio" name="heatStatus" value="مساءا" data-field="heatStatus"> مساءا</label>
-    </div>
+      <button type="submit" class="save-btn">حفظ التلقيح</button>
 
-    <label>ملاحظات</label>
-    <textarea data-field="notes"></textarea>
+      <button type="button" id="openCowCardBtn" class="save-btn"
+              style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;margin-top:10px;">
+        فتح بطاقة الحيوان
+      </button>
 
-    <button type="submit" class="save-btn">حفظ التلقيح</button>
-    <button type="button" id="openCowCardBtn" class="save-btn" style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;margin-top:10px;">
-  فتح بطاقة الحيوان
-</button>
+    </form>
 
-  </form>
+  </main>
 
-</main>
+  <!-- Firebase & النظام -->
+  <script type="module" src="/js/firebase-config.js"></script>
+  <script src="/js/tenant-bootstrap.js"></script>
+  <script src="/js/app-core.js"></script>
 
-<!-- Firebase & النظام -->
-<script type="module" src="/js/firebase-config.js"></script>
-<script src="/js/tenant-bootstrap.js"></script>
-<script src="/js/app-core.js"></script>
+  <!-- منطق الحفظ بعد الفاليديشن -->
+  <script type="module">
+  import { db } from "/js/firebase-config.js";
+  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-<!-- منطق الحفظ بعد الفاليديشن -->
-<script type="module">
-import { db } from "/js/firebase-config.js";
-import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  /* تعبئة الرقم والتاريخ من الرابط */
+  const p = new URLSearchParams(location.search);
+  document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
+  document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
 
-/* تعبئة الرقم والتاريخ من الرابط */
-const p = new URLSearchParams(location.search);
-document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
-document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
+  /* انتظار الفاليديشن المركزي */
+  document.addEventListener("mbk:valid", async (e) => {
+    if (e.detail?.eventType !== "تلقيح") return;
 
-/* انتظار الفاليديشن المركزي */
-document.addEventListener("mbk:valid", async (e) => {
+    const d = e.detail.formData;
 
-  if (e.detail?.eventType !== "تلقيح") return;
+    const payload = {
+      userId: localStorage.getItem("userId"),
+      eventType: "insemination",
+      type: "insemination",
+      animalNumber: d.animalNumber,
+      eventDate: d.eventDate,
+      inseminationMethod: d.inseminationMethod,
+      semenCode: d.semenCode,
+      inseminator: d.inseminator,
+      inseminationTime: d.inseminationTime,
+      heatStatus: d.heatStatus,
+      notes: d.notes || null,
+      createdAt: serverTimestamp(),
+      source: location.pathname
+    };
 
-  const d = e.detail.formData;
-
-  const payload = {
-    userId: localStorage.getItem("userId"),
-    eventType: "insemination",
-    type: "insemination",
-    animalNumber: d.animalNumber,
-    eventDate: d.eventDate,
-    inseminationMethod: d.inseminationMethod,
-    semenCode: d.semenCode,
-    inseminator: d.inseminator,
-    inseminationTime: d.inseminationTime,
-    heatStatus: d.heatStatus,
-    notes: d.notes || null,
-    createdAt: serverTimestamp(),
-    source: location.pathname
-  };
-
-  try {
-    await addDoc(collection(db, "events"), payload);
-    document.getElementById("info").innerHTML = "✅ تم حفظ التلقيح بنجاح";
-    setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
-  } catch (err) {
-    document.getElementById("info").innerHTML = "❌ فشل الحفظ";
-  }
-
-});
-</script>
+    try {
+      await addDoc(collection(db, "events"), payload);
+      document.getElementById("info").innerHTML = "✅ تم حفظ التلقيح بنجاح";
+      setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
+    } catch (err) {
+      document.getElementById("info").innerHTML = "❌ فشل الحفظ";
+    }
+  });
+  </script>
 
 </body>
 </html>
-
-
