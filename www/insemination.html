@@ -93,6 +93,25 @@
   <script type="module">
   import { db } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   const info = document.getElementById("info");
+
+  function setInfo(msg, type = "ok") {
+    if (!info) return;
+
+    info.style.display = "block";
+    info.className =
+      "infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
+
+    // نفس ألوان forms-init تقريبًا بدون ما نغيّر التصميم العام
+    info.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
+    info.style.background  = type === "error" ? "#ffebee" : "#ecfdf5";
+    info.style.color       = type === "error" ? "#b71c1c" : "#065f46";
+
+    info.textContent = msg;
+
+    try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
+   
 
   const p = new URLSearchParams(location.search);
   document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
@@ -121,14 +140,15 @@
 
     try {
       await addDoc(collection(db, "events"), payload);
-      document.getElementById("info").innerHTML = "✅ تم حفظ التلقيح بنجاح";
+            setInfo("✅ تم حفظ التلقيح بنجاح", "ok");
       setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
     } catch (err) {
-      document.getElementById("info").innerHTML = "❌ فشل الحفظ";
+            setInfo("❌ فشل الحفظ", "error");
     }
   });
   </script>
 
 </body>
 </html>
+
 
