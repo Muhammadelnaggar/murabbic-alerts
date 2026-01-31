@@ -538,12 +538,17 @@ function attachOne(form) {
       const g2 = guards.inseminationDecision(gateData2);
 
       // لو رجع تحذير/منع
-      if (g2) {
-        showMsg(bar, [String(g2)], "error");
-        lockForm(true);
-        return false;
-      }
-    }
+    if (g2) {
+  const s = String(g2);
+  if (s.startsWith("WARN|")) {
+    showMsg(bar, [s.replace(/^WARN\|/, "")], "info");
+    lockForm(false);
+    return true;
+  }
+  showMsg(bar, [s], "error");
+  lockForm(true);
+  return false;
+}
 
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
