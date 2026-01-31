@@ -363,15 +363,21 @@ inseminationDecision(fd) {
   if (gapCalving < minPostCalving[sp])
     return `❌ التلقيح مبكر بعد الولادة (${gapCalving} يوم). الحد الأدنى ${minPostCalving[sp]} يوم.`;
 
-  // ⚠️ تلقيح متقارب
-  if (doc.lastInseminationDate) {
-    const gapAI = daysBetween(doc.lastInseminationDate, fd.eventDate);
-    if (gapAI < 11)
-     return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
+  // ✅ آخر تلقيح: من الأحداث أولًا ثم الوثيقة
+const lastAI = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
+if (lastAI) {
+  const gapAI = daysBetween(lastAI, fd.eventDate);
+
+  // ❌ منع تكرار نفس اليوم
+  if (gapAI === 0) {
+    return "❌ لا يمكن تسجيل تلقيح مرتين في نفس اليوم.";
   }
 
-  return null;
-},
+  // ⚠️ تحذير لو أقل من 11 يوم
+  if (gapAI < 11) {
+    return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
+  }
+}
 
 
   pregnancyDiagnosisDecision(fd) {
