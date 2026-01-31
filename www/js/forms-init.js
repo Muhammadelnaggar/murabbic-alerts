@@ -299,7 +299,8 @@ function applyAnimalToForm(form, animal) {
   if (animalIdEl) animalIdEl.value = form.__mbkAnimalId || "";
 
   const speciesEl = getFieldEl(form, "species");
-  let sp = String(animal?.data?.species || animal?.data?.animalTypeAr || "").trim();
+ let sp = String(animal?.data?.species || animal?.data?.animalTypeAr || animal?.data?.animalType || animal?.data?.animaltype || animal?.data?.type || "").trim();
+
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
   if (speciesEl && sp) speciesEl.value = sp;
@@ -517,7 +518,8 @@ function attachOne(form) {
       const sig2 = await fetchCalvingSignalsFromEvents(uid2, n);
 
       const doc2 = form.__mbkDoc || {};
-      const docSpecies2 = String(doc2.species || doc2.animalTypeAr || "").trim();
+      const docSpecies2 = String(doc2.species || doc2.animalTypeAr || doc2.animalType || doc2.animaltype || doc2.type || "").trim();
+
 
       let sp2 = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies2;
       if (/cow|بقر/i.test(sp2)) sp2 = "أبقار";
