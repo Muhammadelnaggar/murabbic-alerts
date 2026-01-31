@@ -332,7 +332,7 @@ calvingRequiredFields(fd) {
   return null;
 },
 
-inseminationDecision(fd) 
+inseminationDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
@@ -349,47 +349,51 @@ inseminationDecision(fd)
 
   // ❌ عشار
   const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
-  if (repro.includes("عشار"))
+  if (repro.includes("عشار")) {
     return "❌ الحيوان مسجل عِشار — لا يمكن تلقيحه.";
+  }
 
   // ❌ لازم تاريخ ولادة
-   const lastCalving =
+  const lastCalving =
     String(doc.lastCalvingDate || "").trim() ||
     (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
   if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
   const gapCalving = daysBetween(lastCalving, fd.eventDate);
 
-  if (gapCalving < minPostCalving[sp])
-    return `❌ التلقيح مبكر بعد الولادة (${gapCalving} يوم). الحد الأدنى ${minPostCalving[sp]} يوم.`;
+  if (gapCalving < (minPostCalving[sp] || 60)) {
+    return `❌ التلقيح مبكر بعد الولادة (${gapCalving} يوم). الحد الأدنى ${minPostCalving[sp] || 60} يوم.`;
+  }
 
   // ✅ آخر تلقيح: من الأحداث أولًا ثم الوثيقة
-const lastAI = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
-if (lastAI) {
-  const gapAI = daysBetween(lastAI, fd.eventDate);
+  const lastAI = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
+  if (lastAI) {
+    const gapAI = daysBetween(lastAI, fd.eventDate);
 
-  // ❌ منع تكرار نفس اليوم
-  if (gapAI === 0) {
-    return "❌ لا يمكن تسجيل تلقيح مرتين في نفس اليوم.";
-  }
-
-  // ⚠️ تحذير لو أقل من 11 يوم
-  if (gapAI < 11) {
-    return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
-  }
-}
-
-
-  pregnancyDiagnosisDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
-
-    const status = String(doc.reproductiveStatus || "").trim();
-    if (status !== "ملقحة" && status !== "ملقّحة") {
-      return "❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.";
+    // ❌ منع تكرار نفس اليوم
+    if (gapAI === 0) {
+      return "❌ لا يمكن تسجيل تلقيح مرتين في نفس اليوم.";
     }
-    return null;
-  },
+
+    // ⚠️ تحذير لو أقل من 11 يوم
+    if (gapAI < 11) {
+      return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
+    }
+  }
+
+  return null;
+},
+
+pregnancyDiagnosisDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  const status = String(doc.reproductiveStatus || "").trim();
+  if (status !== "ملقحة" && status !== "ملقّحة") {
+    return "❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.";
+  }
+  return null;
+},
 
 abortionDecision(fd) {
   const doc = fd.documentData;
