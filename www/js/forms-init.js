@@ -245,7 +245,8 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
   const num = String(normalizeDigits(number || "")).trim();
 
   if (!uid || !num) {
-    return { reproStatusFromEvents: "", lastBoundary: "", lastBoundaryType: "" };
+   return { reproStatusFromEvents: "", lastBoundary: "", lastBoundaryType: "", lastInseminationDateFromEvents: "" };
+
   }
 
   const qEv = query(
@@ -264,6 +265,8 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
   let reproStatusFromEvents = "";
   let lastBoundary = "";
   let lastBoundaryType = "";
+  let lastInseminationDateFromEvents = "";
+
 
   for (const ev of arr) {
     const type = String(ev.eventType || ev.type || "").trim();
@@ -276,6 +279,10 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
       if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
       continue;
     }
+   // ✅ آخر تلقيح من الأحداث (حتى لو وثيقة الحيوان لم تتحدث بعد)
+if ((type === "تلقيح" || type === "insemination") && !lastInseminationDateFromEvents) {
+  lastInseminationDateFromEvents = dt;
+}
 
     if (type === "تشخيص حمل") {
       const r = stripTashkeel(res);
@@ -288,7 +295,8 @@ async function fetchCalvingSignalsFromEvents(uid, number) {
     if (reproStatusFromEvents && lastBoundary) break;
   }
 
-  return { reproStatusFromEvents, lastBoundary, lastBoundaryType };
+  return { reproStatusFromEvents, lastBoundary, lastBoundaryType, lastInseminationDateFromEvents };
+
 }
 
 function applyAnimalToForm(form, animal) {
@@ -530,6 +538,8 @@ function attachOne(form) {
         eventDate: d,
         species: sp2,
         documentData: doc2,
+        lastInseminationDate: String(sig2.lastInseminationDateFromEvents || "").trim(),
+
         reproStatusFromEvents: String(sig2.reproStatusFromEvents || "").trim(),
         lastBoundary: String(sig2.lastBoundary || "").trim(),
         lastBoundaryType: String(sig2.lastBoundaryType || "").trim()
