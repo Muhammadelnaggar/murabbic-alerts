@@ -71,12 +71,14 @@
       <label>ملاحظات</label>
       <textarea data-field="notes"></textarea>
 
-      <button type="submit" class="save-btn">حفظ التلقيح</button>
+     <div class="btn-row">
+  <button type="submit" class="save-btn">حفظ التلقيح</button>
 
-      <button type="button" id="openCowCardBtn" class="save-btn"
-              style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;margin-top:10px;">
-        فتح بطاقة الحيوان
-      </button>
+  <button type="button" id="openCowCardBtn" class="save-btn open-card">
+    فتح بطاقة الحيوان
+  </button>
+</div>
+
 
     </form>
 
@@ -97,7 +99,7 @@
   document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
 
   document.addEventListener("mbk:valid", async (e) => {
-    if (e.detail?.eventType !== "تلقيح") return;
+   if (e.detail?.eventName !== "تلقيح") return;
 
     const d = e.detail.formData;
 
@@ -129,3 +131,4 @@
 
 </body>
 </html>
+
