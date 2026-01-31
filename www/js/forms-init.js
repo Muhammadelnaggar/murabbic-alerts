@@ -549,7 +549,7 @@ function attachOne(form) {
   lockForm(true);
   return false;
 }
-
+}
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
     return true;
