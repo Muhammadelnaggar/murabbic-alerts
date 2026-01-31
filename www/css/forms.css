@@ -194,3 +194,6 @@ html[dir="rtl"] input[type="date"]{
 
 .mbk-form button:active{ transform:translateY(1px); }
 .mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
+.btn-row{display:flex;gap:10px;margin-top:12px}
+.btn-row .save-btn{flex:1;width:auto;margin:0}
+.btn-row .open-card{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}
