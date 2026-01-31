@@ -367,7 +367,7 @@ inseminationDecision(fd) {
   if (doc.lastInseminationDate) {
     const gapAI = daysBetween(doc.lastInseminationDate, fd.eventDate);
     if (gapAI < 11)
-      return "⚠️ آخر تلقيح منذ أقل من 11 يوم (حالة غير منتظمة).";
+     return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
   }
 
   return null;
@@ -549,6 +549,17 @@ if (eventType === "إجهاض") {
     payload.species = String(d.species || d.animalTypeAr || "").trim();
   }
 }
+  // ✅ Fallback مركزي لحدث "تلقيح": تحديد النوع تلقائيًا من documentData
+if (eventType === "تلقيح") {
+  const d = payload.documentData || {};
+  if (!payload.species) {
+    let sp = String(d.species || d.animalTypeAr || d.animalType || "").trim();
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+    payload.species = sp;
+  }
+}
+
   const errors = [];
   const fieldErrors = {};
   const guardErrors = [];
@@ -572,6 +583,9 @@ if (eventType === "إجهاض") {
 
     const gErr = guardFn(payload);
     if (!gErr) continue;
+    // ✅ تحذيرات لا تمنع الحفظ
+if (typeof gErr === "string" && gErr.startsWith("WARN|")) continue;
+
 
     // ✅ لو Guard رجّع { field, msg }
     if (typeof gErr === "object" && gErr.field) {
