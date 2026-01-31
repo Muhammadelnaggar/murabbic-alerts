@@ -92,6 +92,8 @@
   <script type="module">
   import { db } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { updateAnimalByEvent } from "/js/animal-update.js";
+  
    const info = document.getElementById("sysbar");
 
   function setInfo(msg, type = "ok") {
@@ -149,6 +151,7 @@
 
 </body>
 </html>
+
 
 
 
