@@ -561,13 +561,11 @@ closeupDecision(fd) {
   const gDays = daysBetween(lf, fd.eventDate);
   if (Number.isNaN(gDays)) return "❌ تعذّر حساب عمر الحمل.";
 
- const remaining = th - gDays;
+const remaining = th - gDays;
 
-if (remaining > 30) {
-  return `❌ لا يمكن تسجيل التحضير — المتبقي على أقل موعد ولادة ${remaining} يوم (أكثر من 30 يوم).`;
+if (remaining > 40) {
+  return `❌ لا يمكن تسجيل التحضير — المتبقي على أقل موعد ولادة ${remaining} يوم (أكثر من 40 يوم).`;
 }
-
-
   return null;
 },
 
