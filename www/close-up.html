@@ -115,7 +115,7 @@ header{
   <div class="wrap">
     <div id="err" class="err"></div>
 
-   <form id="closeupForm" data-event="تحضير للولادة">
+   <form id="closeupForm" data-validate="true" data-event="تحضير للولادة">
       <label for="animalId">رقم الحيوان</label>
       <input id="animalNumber" name="animalNumber" data-field="animalNumber" inputmode="numeric" autocomplete="off" required />
 
@@ -125,14 +125,16 @@ header{
 
       <label>عليقة التحضير</label>
       <div class="radio-group">
-        <label><input type="radio" name="ration" value="نعم" required> نعم</label>
-        <label><input type="radio" name="ration" value="لا"> لا</label>
+       <label><input type="radio" data-field="ration" name="ration" value="نعم" required> نعم</label>
+<label><input type="radio" data-field="ration" name="ration" value="لا" required> لا</label>
+
       </div>
 
       <label>الأملاح الأنيونية</label>
       <div class="radio-group">
-        <label><input type="radio" name="anionicSalts" value="نعم" required> نعم</label>
-        <label><input type="radio" name="anionicSalts" value="لا"> لا</label>
+        <label><input type="radio" data-field="anionicSalts" name="anionicSalts" value="نعم" required> نعم</label>
+<label><input type="radio" data-field="anionicSalts" name="anionicSalts" value="لا" required> لا</label>
+
       </div>
 
       <button class="btn btn-primary submit" type="submit">تسجيل التحضير</button>
@@ -287,6 +289,7 @@ form.addEventListener('mbk:valid', async (e)=>{
 
 </body>
 </html>
+
 
 
 
