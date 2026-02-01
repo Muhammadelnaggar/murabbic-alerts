@@ -153,13 +153,19 @@ export async function updateAnimalByEvent(ev) {
     }
 
     // ============================================================
-    // 🟩 CLOSE-UP — تحضير للولادة
-    // ============================================================
-    if (type === "close_up") {
-      upd.lastCloseUpDate    = date;
-      upd.reproductiveStatus = "تحضير ولادة";
-      upd.status = "active";
-    }
+// 🟩 CLOSE-UP — تحضير للولادة (حدث إنتاجي فقط)
+// ❌ ممنوع يغيّر reproductiveStatus
+// ============================================================
+if (type === "close_up") {
+  upd.lastCloseUpDate = date;
+
+  // (اختياري مفيد للتقارير فقط — لا يلمس الحالة التناسلية)
+  if (ev.ration != null)       upd.closeUpRation = String(ev.ration).trim();
+  if (ev.anionicSalts != null) upd.anionicSalts  = String(ev.anionicSalts).trim();
+
+  upd.status = "active";
+}
+
 
     // ============================================================
     // 🟩 HEAT — شياع (حدث فقط)
@@ -257,6 +263,12 @@ export async function updateAnimalByEvent(ev) {
     // ============================================================
     // لو مفيش أي تحديثات
     // ============================================================
+    // ✅ تنظيف احتياطي: تحضير للولادة لا يغيّر الحالة التناسلية إطلاقًا
+if (type === "close_up") {
+  delete upd.reproductiveStatus;
+  delete upd.reproStatus;
+}
+
     if (Object.keys(upd).length === 0) {
       console.warn("⚠️ No animal fields to update for event:", type, ev);
       return;
