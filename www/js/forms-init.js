@@ -582,8 +582,20 @@ function attachOne(form) {
     }
 
     const formData = collectFormData(form);
+    // =======================
+// Murabbik — Daily Milk: force numeric fields
+// =======================
+if (eventName === "لبن يومي") {
+  ["milkS1","milkS2","milkS3"].forEach(k => {
+    if (!(k in formData)) return;
+    const v = String(formData[k] ?? "").trim();
+    formData[k] = v === "" ? "" : Number(v);
+  });
+}
+
     formData.documentData = form.__mbkDoc || null;
     if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+    
         // ✅ Auto-calc للإجهاض: يحسب عمر الإجهاض + السبب من آخر تلقيح (من الوثيقة)
     if (eventName === "إجهاض") {
       const doc = formData.documentData || {};
