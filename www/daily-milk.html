@@ -81,12 +81,6 @@
         </div>
       </div>
 
-      <label>نوع الحيوان</label>
-      <div class="radio-group" id="kindGroup">
-        <label><input type="radio" name="kind" value="cow"> بقرة</label>
-        <label><input type="radio" name="kind" value="buffalo"> جاموسة</label>
-      </div>
-
       <div id="sessions">
         <div class="row">
           <div class="col">
@@ -155,7 +149,7 @@
     // ===== تهيئة السياق =====
     const inputAnimal = $('animalId');
     const inputDate   = $('eventDate');
-    const kindRadios  = Array.from(document.querySelectorAll('input[name="kind"]'));
+   
     const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
                                    localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
     const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
@@ -163,11 +157,7 @@
     const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
     if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
     if (!inputDate.value   && qsDate)   inputDate.value   = qsDate;
-    let currentKind = (qsKind === 'buffalo' || qsKind === 'cow') ? qsKind : 'buffalo';
-    kindRadios.forEach(r => { r.checked = (r.value === currentKind); r.addEventListener('change', ()=> {
-      if (r.checked){ currentKind = r.value; localStorage.setItem('lastKind', currentKind); applyKindUI(currentKind); }
-    })});
-    applyKindUI(currentKind);
+   
 
     // ===== ربط فايرستور (من غير أي رسائل تقنية للمستخدم) =====
     let db, addDoc, collection, serverTimestamp;
@@ -197,9 +187,9 @@
 
       const animalId = inputAnimal.value.trim();
       const eventDate = inputDate.value.trim();
-      const kind = currentKind;
       const s1 = toNum($('s1').value), s2 = toNum($('s2').value), s3 = toNum($('s3').value);
-      const total = kind === 'buffalo' ? (s1 + s2) : (s1 + s2 + s3);
+     const total = s1 + s2 + s3;
+
 
       if (!animalId || !eventDate){
         showMsg('من فضلك أدخل رقم الحيوان وتاريخ اليوم.');
@@ -293,6 +283,7 @@ try {
   </script>
 </body>
 </html>
+
 
 
 
