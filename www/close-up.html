@@ -137,7 +137,11 @@ header{
 
       </div>
 
-      <button class="btn btn-primary submit" type="submit">تسجيل التحضير</button>
+<div class="btn-row">
+  <button class="save-btn" type="submit">حفظ التحضير</button>
+  <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
+</div>
+
 
       <!-- ✅ تأكيد داخلي -->
       <div id="confirmBox" class="confirm" aria-live="polite">
@@ -231,6 +235,14 @@ header{
 
     // 4) الحفظ في Firestore
     const form = $('closeupForm');
+    const openCowCardBtn = $('openCowCard');
+
+openCowCardBtn?.addEventListener("click", ()=>{
+  const n = (inputAnimal.value || "").trim();
+  if (!n) return;
+  location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+});
+
     const confirmBox = $('confirmBox');
     const dialog = $('nutritionDialog');
     const goNutritionBtn = $('goNutrition');
@@ -327,6 +339,7 @@ if (bar) {
 
 </body>
 </html>
+
 
 
 
