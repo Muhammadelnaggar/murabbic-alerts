@@ -48,10 +48,68 @@
     .dialog .card{background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)}
     .dialog h3{margin:0 0 8px 0;color:var(--green-600)}
     .muted{color:var(--muted);font-size:14px}
+    /* ===== Murabbik Standard Header ===== */
+header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#ffffff;
+  border-bottom:1px solid var(--border);
+}
+
+.mbk-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+}
+
+.mbk-logo{
+  height:34px;
+  opacity:.95;
+}
+
+.mbk-center{
+  text-align:center;
+  line-height:1.2;
+}
+
+.mbk-page-title{
+  font-weight:800;
+  font-size:16px;
+  color:var(--green-600);
+}
+
+.mbk-app-name{
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted);
+}
+
+.mbk-back{
+  text-decoration:none;
+  font-weight:700;
+  font-size:14px;
+  color:var(--green-600);
+  background:#e8f7f0;
+  padding:6px 10px;
+  border-radius:8px;
+}
+
   </style>
 </head>
 <body>
-  <header><h1>📦 تحضير للولادة</h1></header>
+ <header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">التحضير للولادة</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
+
 
   <div class="wrap">
     <div id="err" class="err"></div>
@@ -230,6 +288,7 @@
 
 </body>
 </html>
+
 
 
 
