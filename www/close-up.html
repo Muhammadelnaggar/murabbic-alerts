@@ -183,7 +183,22 @@ header{
     // 2) أدوات صغيرة
     const $ = (id)=> document.getElementById(id);
     const errBox = $('err');
-    function showErr(msg){ errBox.textContent = '⚠️ ' + msg; errBox.style.display = 'block'; }
+   function showErr(msg){
+  const bar = document.getElementById("sysbar") || form?.querySelector?.(".infobar") || null;
+  if (bar){
+    bar.style.display = "block";
+    bar.className = "infobar show error";
+    bar.style.borderColor = "#ef9a9a";
+    bar.style.background = "#ffebee";
+    bar.style.color = "#b71c1c";
+    bar.innerHTML = `<div>⚠️ ${msg}</div>`;
+    try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
+    return;
+  }
+  errBox.textContent = '⚠️ ' + msg;
+  errBox.style.display = 'block';
+}
+
     function hideErr(){ errBox.style.display = 'none'; errBox.textContent=''; }
     function getQS(name){ return new URL(location.href).searchParams.get(name) || ''; }
     function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
@@ -267,7 +282,30 @@ form.addEventListener('mbk:valid', async (e)=>{
     localStorage.setItem('eventDate', eventDate);
     localStorage.setItem('lastEventDate', eventDate);
 
-    confirmBox.style.display = 'block';
+   // ✅ اعرض رسالة الحفظ في infobar (الهيدر) بدل أسفل الصفحة
+const bar = document.getElementById("sysbar") || form.querySelector(".infobar") || null;
+
+if (bar) {
+  bar.style.display = "block";
+  bar.className = "infobar show success";
+  bar.style.borderColor = "#bbf7d0";
+  bar.style.background = "#ecfdf5";
+  bar.style.color = "#065f46";
+
+  // انقل صندوق التأكيد إلى داخل الـ infobar مرة واحدة
+  if (!confirmBox.dataset.moved) {
+    bar.appendChild(confirmBox);
+    confirmBox.dataset.moved = "1";
+  }
+
+  confirmBox.style.display = "block";
+
+  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(_) {}
+} else {
+  // fallback لو لأي سبب infobar مش موجود
+  confirmBox.style.display = "block";
+}
+
     if (ration === 'نعم') dialog.style.display = 'flex';
   } catch (err) {
     console.error('Firestore save error:', err);
@@ -289,6 +327,7 @@ form.addEventListener('mbk:valid', async (e)=>{
 
 </body>
 </html>
+
 
 
 
