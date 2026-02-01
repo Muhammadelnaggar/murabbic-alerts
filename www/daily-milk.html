@@ -152,7 +152,7 @@
 
 
       <!-- ✅ تأكيد داخل النموذج -->
-      <div id="confirmBox" class="confirm" aria-live="polite">
+      <div id="confirmBox" class="confirm" style="display:none" aria-live="polite">
         <div class="title">✅ تم تسجيل اللبن اليومي بنجاح</div>
         <div class="muted" id="totalLine"></div>
         <div class="row" style="margin-top:8px">
@@ -228,6 +228,21 @@
     // ===== منطق الإرسال =====
     const form = $('milkForm');
     const confirmBox = $('confirmBox');
+    const sysbar = document.getElementById("sysbar");
+function showSaveOK(text){
+  if (!sysbar) return;
+  sysbar.style.display = "block";
+  sysbar.style.border = "1px solid #86efac";
+  sysbar.style.background = "#ecfdf5";
+  sysbar.style.color = "#065f46";
+  sysbar.style.padding = "12px 14px";
+  sysbar.style.borderRadius = "12px";
+  sysbar.style.margin = "12px 0";
+  sysbar.style.fontWeight = "800";
+  sysbar.textContent = text;
+  try { sysbar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+}
+
     const totalLine = $('totalLine');
     const goAddEventBtn = $('goAddEvent');
     const backDashBtn = $('backDash');
@@ -295,8 +310,9 @@ form.addEventListener("mbk:valid", async (ev) => {
     localStorage.setItem("lastEventDate", eventDate);
     localStorage.setItem("lastKind", kind);
 
-    totalLine.textContent = "الإجمالي: " + payload.milkKg.toFixed(1) + " كجم";
-    confirmBox.style.display = "block";
+   showSaveOK(`✅ تم تسجيل اللبن اليومي بنجاح — الإجمالي: ${payload.milkKg.toFixed(1)} كجم`);
+if (confirmBox) confirmBox.style.display = "none";
+
 
     // ✅ (اختياري) سكرول لفوق بعد النجاح عشان الرسالة تتشاف بسرعة
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
@@ -320,6 +336,7 @@ form.addEventListener("mbk:valid", async (ev) => {
   </script>
 </body>
 </html>
+
 
 
 
