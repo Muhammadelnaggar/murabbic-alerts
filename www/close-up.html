@@ -96,6 +96,46 @@ header{
   padding:6px 10px;
   border-radius:8px;
 }
+/* ===============================
+   Bottom actions (Murabbik style)
+   =============================== */
+.btn-row{
+  display:flex;
+  gap:10px;
+  margin-top:12px;
+}
+
+.btn-row .save-btn,
+.btn-row .open-card{
+  flex:1;
+  width:auto;
+  border-radius:14px;
+  padding:12px 14px;
+  font-weight:900;
+  font-size:16px;
+}
+
+/* Primary */
+.btn-row .save-btn{
+  background: var(--brand);
+  color:#fff;
+  border:0;
+}
+
+/* Secondary (outline) — لازم يغلب mbk-form button */
+.btn-row .open-card{
+  background:#fff !important;
+  color: var(--brand-600) !important;
+  border:2px solid var(--brand-600) !important;
+}
+.btn-row{
+  position: sticky;
+  bottom: 10px;
+  background: #fff;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
 
   </style>
 </head>
@@ -339,6 +379,7 @@ if (bar) {
 
 </body>
 </html>
+
 
 
 
