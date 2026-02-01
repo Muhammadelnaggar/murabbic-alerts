@@ -25,7 +25,7 @@
       width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none
     }
     input:focus{border-color:var(--green-600)}
-     #animalId{
+  #animalNumber{ ... }
     font-size:20px;
     padding:14px 16px;
     border-radius:12px;
@@ -115,12 +115,13 @@ header{
   <div class="wrap">
     <div id="err" class="err"></div>
 
-    <form id="closeupForm">
+   <form id="closeupForm" data-event="تحضير للولادة">
       <label for="animalId">رقم الحيوان</label>
-      <input id="animalId" name="animalId" inputmode="numeric" autocomplete="off" required />
+      <input id="animalNumber" name="animalNumber" data-field="animalNumber" inputmode="numeric" autocomplete="off" required />
+
 
       <label for="eventDate">تاريخ التحضير</label>
-      <input id="eventDate" name="eventDate" type="date" required />
+     <input id="eventDate" name="eventDate" data-field="eventDate" type="date" required />
 
       <label>عليقة التحضير</label>
       <div class="radio-group">
@@ -193,7 +194,7 @@ header{
     }
 
     // 3) تهيئة الحقول من السياق (addevent → animalId/date)
-    const inputAnimal = $('animalId');
+   const inputAnimal = $('animalNumber');
     const inputDate = $('eventDate');
     const qsAnimal = firstNonEmpty(
       getQS('animalId'),
@@ -225,56 +226,52 @@ header{
       showErr('تعذّر تهيئة الاتصال بفايرستور من firestore-config.js');
       console.error("Firestore db is undefined from firestore-config.js", fsCfg);
     }
+form.addEventListener('mbk:valid', async (e)=>{
+  hideErr();
 
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault(); hideErr();
+  const fd = e.detail?.formData || {};
 
-      const animalId = inputAnimal.value.trim();
-      const eventDate = inputDate.value.trim();
-      const ration = (form.querySelector('input[name="ration"]:checked')?.value || '').trim();
-      const anionicSalts = (form.querySelector('input[name="anionicSalts"]:checked')?.value || '').trim();
+  const animalId = String(fd.animalNumber || "").trim();
+  const eventDate = String(fd.eventDate || "").trim();
+  const ration = String(fd.ration || "").trim();
+  const anionicSalts = String(fd.anionicSalts || "").trim();
 
-      if (!animalId || !eventDate){
-        showErr('من فضلك أدخل رقم الحيوان وتاريخ التحضير.');
-        return;
-      }
-      if (!db){
-        showErr('قاعدة البيانات غير جاهزة بعد. راجع ملف firestore-config.js.');
-        return;
-      }
+  if (!db){
+    showErr('قاعدة البيانات غير جاهزة بعد. راجع ملف firebase-config.js.');
+    return;
+  }
 
-      const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
-      const payload = {
-        userId, animalId, animalNumber: animalId,
-        eventType: 'تحضير للولادة', type: 'closeup',
-        eventDate, ration, anionicSalts,
-        source: location.pathname, createdAt: serverTimestamp()
-      };
+  const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
 
-      try {
-        await addDoc(collection(db, 'events'), payload);
-        await updateAnimalByEvent(payload); // ✅ من الموديول مباشرة
+  const payload = {
+    userId,
+    animalId,
+    animalNumber: animalId,
+    eventType: 'تحضير للولادة',
+    type: 'closeup',
+    eventDate,
+    ration,
+    anionicSalts,
+    source: location.pathname,
+    createdAt: serverTimestamp()
+  };
 
-        // حفظ سياق سهل للصفحات التالية
-        localStorage.setItem('lastAnimalId', animalId);
-        localStorage.setItem('currentAnimalId', animalId);
-        localStorage.setItem('eventDate', eventDate);
-        localStorage.setItem('lastEventDate', eventDate);
+  try {
+    await addDoc(collection(db, 'events'), payload);
+    await updateAnimalByEvent(payload);
 
-        // تأكيد داخل النموذج
-        confirmBox.style.display = 'block';
+    localStorage.setItem('lastAnimalId', animalId);
+    localStorage.setItem('currentAnimalId', animalId);
+    localStorage.setItem('eventDate', eventDate);
+    localStorage.setItem('lastEventDate', eventDate);
 
-        // لو المختار "نعم" لعليقة التحضير → اسأل الانتقال
-        if (ration === 'نعم') dialog.style.display = 'flex';
-      } catch (err) {
-        console.error('Firestore save error:', err);
-        showErr('تعذّر حفظ التحضير. تأكّد من الصلاحيات/الاتصال وأعد المحاولة.');
-      }
-    });
-
-    backDashBtn?.addEventListener('click', ()=>{
-      location.href = '/dashboard.html';
-    });
+    confirmBox.style.display = 'block';
+    if (ration === 'نعم') dialog.style.display = 'flex';
+  } catch (err) {
+    console.error('Firestore save error:', err);
+    showErr('تعذّر حفظ التحضير. تأكّد من الصلاحيات/الاتصال وأعد المحاولة.');
+  }
+});
 
     function goNutrition(){
       const url = buildUrl('/nutrition.html', {
@@ -290,6 +287,7 @@ header{
 
 </body>
 </html>
+
 
 
 
