@@ -49,6 +49,44 @@
     .hide{display:none !important}
     /* شريط ديباچ اختياري للمطور (يظهر مع ?debug=1) */
     #devbar{display:none;position:fixed;top:0;left:0;right:0;z-index:99;background:#111;color:#0f0;font:12px/1.4 monospace;padding:6px}
+    /* ===== أزرار مُرَبِّيك القياسية ===== */
+.btn-row{
+  display:flex;
+  gap:10px;
+  margin-top:18px;
+}
+
+.save-btn{
+  flex:1;
+  height:48px;
+  border-radius:14px;
+  font-weight:800;
+  font-size:16px;
+  cursor:pointer;
+  border:none;
+  transition:.2s ease;
+}
+
+/* زر الحفظ (أخضر مربيك) */
+.save-btn:not(.open-card){
+  background:#0ea05a;
+  color:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.08);
+}
+.save-btn:not(.open-card):active{
+  transform:scale(.98);
+}
+
+/* زر فتح البطاقة (فاتح بحد أخضر) */
+.open-card{
+  background:#fff;
+  color:#0b7f47;
+  border:2px solid #0ea05a;
+}
+.open-card:active{
+  transform:scale(.98);
+}
+
   </style>
 </head>
 <body>
@@ -298,6 +336,7 @@ try {
   </script>
 </body>
 </html>
+
 
 
 
