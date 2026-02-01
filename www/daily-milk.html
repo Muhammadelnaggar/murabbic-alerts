@@ -98,7 +98,14 @@
         </div>
       </div>
 
-      <button class="btn btn-primary submit" type="submit">تسجيل اللبن اليومي</button>
+     <div class="btn-row">
+  <button type="submit" class="save-btn">حفظ اللبن اليومي</button>
+
+  <button type="button" id="openCowCardBtn" class="save-btn open-card">
+    فتح بطاقة الحيوان
+  </button>
+</div>
+
 
       <!-- ✅ تأكيد داخل النموذج -->
       <div id="confirmBox" class="confirm" aria-live="polite">
@@ -181,6 +188,13 @@
     const totalLine = $('totalLine');
     const goAddEventBtn = $('goAddEvent');
     const backDashBtn = $('backDash');
+    const openCowCardBtn = $('openCowCardBtn');
+openCowCardBtn?.addEventListener('click', () => {
+  const n = inputAnimal.value.trim();
+  if (!n) return;
+  location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+});
+
 
     form.addEventListener('submit', async (e)=>{
       e.preventDefault(); hideMsg();
@@ -283,6 +297,7 @@ try {
   </script>
 </body>
 </html>
+
 
 
 
