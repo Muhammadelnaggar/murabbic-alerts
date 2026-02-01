@@ -135,11 +135,22 @@ export const eventSchemas = {
 },
 
 
-  // ✅ إضافة لبن يومي
-  "لبن يومي": {
-    fields: { ...commonFields },
-    guards: [],
+"لبن يومي": {
+  fields: {
+    ...commonFields,
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+
+    // الحلبات (قد تكون 2 أو 3 حسب النوع)
+    milkS1: { required: false, type: "number", msg: "حلبة 1 يجب أن تكون رقمًا." },
+    milkS2: { required: false, type: "number", msg: "حلبة 2 يجب أن تكون رقمًا." },
+    milkS3: { required: false, type: "number", msg: "حلبة 3 يجب أن تكون رقمًا." },
+
+    // هنحسبه مركزيًا قبل الفيلد-فاليديشن
+    milkKg: { required: true, type: "number", msg: "إجمالي اللبن غير صالح." },
   },
+  guards: ["dailyMilkDecision"],
+},
+
 
   "تجفيف": {
     fields: { ...commonFields, reason: { required: true, msg: "سبب التجفيف مطلوب." } },
@@ -456,6 +467,36 @@ abortionDecision(fd) {
   // ✅ مسموح: أقل من حد الولادة
   return null;
 },
+dailyMilkDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  // تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const isBuffalo = (sp === "جاموس");
+
+  const s1 = Number(String(fd.milkS1 || "").trim() || "0");
+  const s2 = Number(String(fd.milkS2 || "").trim() || "0");
+  const s3 = Number(String(fd.milkS3 || "").trim() || "0");
+
+  const total = isBuffalo ? (s1 + s2) : (s1 + s2 + s3);
+
+  // لازم يكون في لبن فعلي
+  if (total <= 0) {
+    return "❌ أدخل كمية اللبن (حلبة واحدة على الأقل) — لا يمكن الحفظ بإجمالي صفر.";
+  }
+
+  // تحذير منطقي (مش منع)
+  const max = isBuffalo ? 40 : 80;
+  if (total > max) {
+    return `WARN|⚠️ تنبيه: إجمالي اللبن ${total.toFixed(1)} كجم رقم كبير جدًا — راجع الحلبات قبل الحفظ.`;
+  }
+
+  return null;
+},
 
   dryOffDecision(fd) {
     const doc = fd.documentData;
@@ -573,6 +614,22 @@ if (eventType === "تلقيح") {
   const errors = [];
   const fieldErrors = {};
   const guardErrors = [];
+// ✅ Pre-calc مركزي لحدث "لبن يومي": احسب milkKg قبل فحص الحقول
+if (eventType === "لبن يومي") {
+  const d = payload.documentData || {};
+  let sp = String(payload.species || d.species || d.animalTypeAr || d.animalType || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const isBuffalo = (sp === "جاموس");
+
+  const s1 = Number(String(payload.milkS1 || "").trim() || "0");
+  const s2 = Number(String(payload.milkS2 || "").trim() || "0");
+  const s3 = Number(String(payload.milkS3 || "").trim() || "0");
+
+  const total = isBuffalo ? (s1 + s2) : (s1 + s2 + s3);
+  payload.milkKg = Number.isFinite(total) ? Number(total.toFixed(1)) : "";
+}
 
   // 1) Field validation
   for (const [key, rule] of Object.entries(schema.fields || {})) {
