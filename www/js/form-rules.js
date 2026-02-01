@@ -151,6 +151,21 @@ export const eventSchemas = {
   guards: ["dailyMilkDecision"],
 },
 
+"تحضير للولادة": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate:    { required: true, type: "date", msg: "تاريخ التحضير غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+
+    ration: { required: true, msg: "يجب تحديد هل تم تقديم عليقة التحضير." },
+    anionicSalts: { required: true, msg: "يجب تحديد هل تم استخدام الأملاح الأنيونية." },
+
+    species: { required: false },
+    reproStatus: { required: false },
+    lastInseminationDate: { required: false, type: "date" },
+  },
+  guards: ["closeupDecision"],
+},
 
   "تجفيف": {
     fields: { ...commonFields, reason: { required: true, msg: "سبب التجفيف مطلوب." } },
@@ -497,6 +512,64 @@ dailyMilkDecision(fd) {
 
   return null;
 },
+closeupDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "❌ تعذّر العثور على الحيوان.";
+
+  // خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
+  }
+
+  // تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const th = thresholds[sp]?.minGestationDays;
+  if (!th) return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
+
+  // الحالة التناسلية
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    ""
+  ).trim();
+
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+  if (!rsNorm.includes("عشار")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  // آخر تلقيح
+  const lf =
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    "";
+
+  if (!isDate(lf)) {
+    return '❌ لا يمكن تسجيل التحضير — لا يوجد "آخر تلقيح مُخصِّب".';
+  }
+
+  if (!isDate(fd.eventDate)) return "❌ تاريخ التحضير غير صالح.";
+
+  const gDays = daysBetween(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) return "❌ تعذّر حساب عمر الحمل.";
+
+ const remaining = th - gDays;
+
+if (remaining > 30) {
+  return `❌ لا يمكن تسجيل التحضير — المتبقي على أقل موعد ولادة ${remaining} يوم (أكثر من 30 يوم).`;
+}
+
+
+  return null;
+},
 
   dryOffDecision(fd) {
     const doc = fd.documentData;
@@ -608,6 +681,16 @@ if (eventType === "تلقيح") {
     if (/cow|بقر/i.test(sp)) sp = "أبقار";
     if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
     payload.species = sp;
+  }
+}
+// ✅ Fallback مركزي لحدث "تحضير للولادة"
+if (eventType === "تحضير للولادة") {
+  const d = payload.documentData || {};
+  if (!payload.lastInseminationDate) {
+    payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
+  }
+  if (!payload.species) {
+    payload.species = String(d.species || d.animalTypeAr || "").trim();
   }
 }
 
