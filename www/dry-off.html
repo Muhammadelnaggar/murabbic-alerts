@@ -101,6 +101,70 @@
       font-size:14px;
     }
     .option-group input{ width:auto; padding:0; margin:0; }
+/* ✅ RADIO / OPTION GROUP — واضح ومتناسق */
+.option-group{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:center;      /* يخليهم في وسط النموذج */
+  align-items:center;
+  margin-top:8px;
+}
+
+.option-group label{
+  flex:1 1 140px;              /* نفس العرض تقريبًا */
+  max-width: 220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;      /* النص في المنتصف */
+  gap:10px;
+  padding:12px 14px;
+  border-radius:14px;
+  border:2px solid var(--border, #e2e8f0);
+  background:#fff;
+  cursor:pointer;
+  font-weight:900;
+  font-size:15px;
+  color: var(--ink, #0f172a);
+  user-select:none;
+  transition: .12s ease;
+}
+
+/* نخفي الراديو الافتراضي ونرسم دائرة واضحة */
+.option-group input[type="radio"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  border:2px solid var(--border, #cbd5e1);
+  background:#fff;
+  display:inline-block;
+  position:relative;
+}
+
+/* النقطة الداخلية عند الاختيار */
+.option-group input[type="radio"]:checked{
+  border-color: var(--brand-600, #0b7f47);
+}
+.option-group input[type="radio"]:checked::after{
+  content:"";
+  position:absolute;
+  inset:4px;
+  border-radius:50%;
+  background: var(--brand, #0ea05a);
+}
+
+/* تلوين الـ label كله عند الاختيار */
+.option-group label:has(input[type="radio"]:checked){
+  border-color: var(--brand-600, #0b7f47);
+  background: #f0fff6;
+}
+
+/* تحسين للضغط بالموبايل */
+.option-group label:active{
+  transform: scale(0.99);
+}
 
     /* ✅ Bottom actions (Murabbik style) */
     .btn-row{
@@ -155,67 +219,59 @@
     </div>
   </header>
 
-  <div class="wrap">
-    <!-- ✅ Infobar (سيستخدمه showMsg) -->
-    <div id="info" class="infobar"></div>
+ <div class="wrap">
+  <!-- ✅ Infobar (سيستخدمه showMsg) -->
+  <div id="info" class="infobar"></div>
 
-    <form id="dryOffForm" class="mbk-card" data-validate="true" data-event="تجفيف">
+  <form id="dryOffForm" class="mbk-card" data-validate="true" data-event="تجفيف">
 
-      <div class="field">
-        <label for="animal-id">رقم الحيوان</label>
-       <input type="text" id="animalNumber" data-field="animalNumber" required />
-      </div>
+    <div class="field">
+      <label for="animalNumber">رقم الحيوان</label>
+      <input type="text" id="animalNumber" data-field="animalNumber" required />
+    </div>
 
-      <div class="field">
-        <label for="date">تاريخ التجفيف</label>
+    <div class="field">
+      <label for="eventDate">تاريخ التجفيف</label>
       <input type="date" id="eventDate" data-field="eventDate" required />
+    </div>
 
-      </div>
-           <div class="field">
-  <label for="gestationDays">أيام الحمل (محسوبة تلقائيًا)</label>
-  <input type="number" id="gestationDays" data-field="gestationDays" required readonly />
-</div>
+    <div class="field">
+      <label for="gestationDays">أيام الحمل (محسوبة تلقائيًا)</label>
+      <input type="number" id="gestationDays" data-field="gestationDays" required readonly />
+    </div>
 
-
-      <div class="field">
-        <label>سبب التجفيف</label>
+    <div class="field">
+      <label>سبب التجفيف</label>
       <div class="option-group">
-  <label><input type="radio" data-field="reason" name="reason" value="طبيعي" required /> طبيعي</label>
-  <label><input type="radio" data-field="reason" name="reason" value="اضطراري" required /> اضطراري</label>
+        <label><input type="radio" data-field="reason" name="reason" value="طبيعي" required /> طبيعي</label>
+        <label><input type="radio" data-field="reason" name="reason" value="اضطراري" required /> اضطراري</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>تأكيد الحمل</label>
+      <div class="option-group">
+        <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required /> عشار</label>
+        <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="فارغة" required /> فارغة</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>تم استخدام محاقن التجفيف؟</label>
+      <div class="option-group">
+        <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
+        <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
+      </div>
+    </div>
+
+    <!-- ✅ Bottom actions -->
+    <div class="btn-row">
+      <button class="save-btn" type="submit">حفظ التجفيف</button>
+      <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
+    </div>
+
+  </form>
 </div>
-
-        </div>
-      </div>
-
-      <div class="field">
-        <label>تأكيد الحمل</label>
-        <div class="option-group">
-         <div class="option-group">
-  <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required /> عشار</label>
-  <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="فارغة" required /> فارغة</label>
-</div>
-
-        </div>
-      </div>
-
-      <div class="field">
-        <label>تم استخدام محاقن التجفيف؟</label>
-        <div class="option-group">
-        <div class="option-group">
-  <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
-  <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
-</div>
-
-        </div>
-      </div>
-
-      <!-- ✅ Bottom actions -->
-      <div class="btn-row">
-        <button class="save-btn" type="submit">حفظ التجفيف</button>
-        <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
-      </div>
-    </form>
-  </div>
 
   <script type="module">
     import { db, auth, requireAuth } from "/js/firebase-config.js";
@@ -320,6 +376,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
