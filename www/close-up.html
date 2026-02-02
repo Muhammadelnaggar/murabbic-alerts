@@ -183,14 +183,7 @@ header{
 </div>
 
 
-      <!-- ✅ تأكيد داخلي -->
-      <div id="confirmBox" class="confirm" aria-live="polite">
-        <div class="title">✅ تم تسجيل تحضير الولادة بنجاح</div>
-        <div class="row">
-          <button type="button" id="goNutrition" class="btn btn-primary">إدخال العليقة الآن</button>
-          <button type="button" id="backDash" class="btn btn-ghost">العودة للوحة التحكم</button>
-        </div>
-      </div>
+     
     </form>
   </div>
 
@@ -235,7 +228,24 @@ header{
     bar.style.borderColor = "#ef9a9a";
     bar.style.background = "#ffebee";
     bar.style.color = "#b71c1c";
-    bar.innerHTML = `<div>⚠️ ${msg}</div>`;
+   bar.innerHTML = `
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>⚠️ ${msg}</span>
+    <button id="errOkBtn" style="
+      background:#b91c1c;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      padding:4px 10px;
+      font-weight:700;
+      cursor:pointer;
+      font-size:13px;
+    ">حسنًا</button>
+  </div>
+`;
+setTimeout(()=>document.getElementById("errOkBtn")?.focus(), 50);
+document.getElementById("errOkBtn")?.addEventListener("click", ()=>{ bar.style.display="none"; });
+
     try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
     return;
   }
@@ -283,10 +293,7 @@ openCowCardBtn?.addEventListener("click", ()=>{
   location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
 });
 
-    const confirmBox = $('confirmBox');
     const dialog = $('nutritionDialog');
-    const goNutritionBtn = $('goNutrition');
-    const backDashBtn = $('backDash');
     const ndYes = $('nd_yes');
     const ndNo  = $('nd_no');
 
@@ -343,16 +350,10 @@ if (bar) {
   bar.style.borderColor = "#bbf7d0";
   bar.style.background = "#ecfdf5";
   bar.style.color = "#065f46";
-
-  // انقل صندوق التأكيد إلى داخل الـ infobar مرة واحدة
-  if (!confirmBox.dataset.moved) {
-    bar.appendChild(confirmBox);
-    confirmBox.dataset.moved = "1";
-  }
-
-  confirmBox.style.display = "block";
+  bar.innerHTML = "✅ تم تسجيل تحضير الولادة بنجاح";
 
   try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(_) {}
+  setTimeout(() => { bar.style.display = "none"; }, 4000);
 } else {
   // fallback لو لأي سبب infobar مش موجود
   confirmBox.style.display = "block";
@@ -372,13 +373,13 @@ if (bar) {
       });
       location.href = url;
     }
-    goNutritionBtn?.addEventListener('click', goNutrition);
     ndYes?.addEventListener('click', goNutrition);
     ndNo?.addEventListener('click', ()=>{ dialog.style.display = 'none'; });
   </script>
 
 </body>
 </html>
+
 
 
 
