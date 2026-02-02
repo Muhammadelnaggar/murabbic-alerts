@@ -1,218 +1,316 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+
+  <title>التجفيف — مُرَبِّيك</title>
+
+  <!-- ✅ Murabbik global styles + central validation/gate -->
+  <link rel="stylesheet" href="css/forms.css">
+  <script type="module" src="js/forms-init.js"></script>
+
+  <!-- (اتركه كما هو الآن حتى لا نكسر منطقك الحالي) -->
   <script src="/js/animal-update.js"></script>
 
-  <link rel="stylesheet" href="css/forms.css">
-  
-  <script type="module" src="js/forms-init.js"></script>
-  <title>تجفيف الحيوان</title>
   <style>
-    body {
-      direction: rtl;
-      background-color: #fffde7;
-      font-family: 'Arial', sans-serif;
-      padding: 20px;
+    /* ✅ Header (Murabbik standard) */
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #fff;
+      border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    .mbk-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 12px;
+    }
+    .mbk-logo{
+      width:54px;
+      height:auto;
+      object-fit:contain;
+      opacity:.95;
+      flex-shrink:0;
+    }
+    .mbk-center{
+      flex:1;
+      text-align:center;
+      line-height:1.2;
+    }
+    .mbk-page-title{
+      font-size:18px;
+      font-weight:900;
+      color: var(--ink, #0f172a);
+    }
+    .mbk-app-name{
+      font-size:13px;
+      font-weight:800;
+      color: var(--brand-600, #0b7f47);
+      opacity:.9;
+    }
+    .mbk-back{
+      width:42px;
+      height:42px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-decoration:none;
+      font-weight:900;
+      color: var(--brand-600, #0b7f47);
+      border:2px solid var(--brand-600, #0b7f47);
+      background:#fff;
+      flex-shrink:0;
     }
 
-    h1 {
-      text-align: center;
-      color: #2e7d32;
-      margin-bottom: 20px;
+    /* ✅ Page layout uses forms.css tokens */
+    .wrap{
+      max-width:520px;
+      margin:12px auto 24px;
+      padding:0 12px;
     }
-
-    form {
-      background-color: #f1f8e9;
-      border: 1px solid #c5e1a5;
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 500px;
-      margin: auto;
+    .mbk-card{
+      background:#fff;
+      border:1px solid var(--border, #e2e8f0);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 1px 0 rgba(15,23,42,.04);
     }
+    .field{ margin-bottom:12px; }
 
-    label {
-      display: block;
-      margin-top: 15px;
-      font-weight: bold;
+    /* ✅ option-group chips (Murabbik style) */
+    .option-group{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:8px;
+      margin-bottom:8px;
     }
+    .option-group label{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border, #e2e8f0);
+      background:#fff;
+      cursor:pointer;
+      font-weight:800;
+      font-size:14px;
+    }
+    .option-group input{ width:auto; padding:0; margin:0; }
 
-    input, select {
-      width: 100%;
+    /* ✅ Bottom actions (Murabbik style) */
+    .btn-row{
+      position: sticky;
+      bottom: 10px;
+      background: #fff;
       padding: 10px;
-      margin-top: 5px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 16px;
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+    }
+    .btn-row .save-btn,
+    .btn-row .open-card{
+      flex:1;
+      width:auto;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:900;
+      font-size:16px;
+      cursor:pointer;
+    }
+    .btn-row .save-btn{
+      background: var(--brand, #0ea05a);
+      color:#fff;
+      border:0;
+    }
+    .btn-row .open-card{
+      background:#fff !important;
+      color: var(--brand-600, #0b7f47) !important;
+      border:2px solid var(--brand-600, #0b7f47) !important;
     }
 
-    button {
-      background-color: #388e3c;
-      color: white;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      width: 100%;
-      margin-top: 20px;
-      cursor: pointer;
-    }
-    .option-group {
-      display: flex;
-      gap: 15px;
-      margin-top: 8px;
-      margin-bottom: 15px;
-    }
-
-    .option-group label {
-      background-color: #dcedc8;
-      padding: 10px 15px;
-      border-radius: 8px;
-      border: 1px solid #8bc34a;
-      cursor: pointer;
-      font-size: 16px;
-    }
+    /* ✅ keep infobar clean */
+    #info.infobar{ display:none; }
   </style>
 </head>
+
 <body>
-  <h1>📄 تسجيل تجفيف الحيوان</h1>
+  <!-- ✅ Murabbik Standard Header -->
+  <header>
+    <div class="mbk-head">
+      <a class="mbk-back" href="add-event.html" title="رجوع">رجوع</a>
 
-  <form id="dryOffForm">
-    
+      <div class="mbk-center">
+        <div class="mbk-page-title">التجفيف</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
 
-    <label for="animal-id">رقم الحيوان:</label>
-    <input type="text" id="animal-id" required />
-
-    <label for="date">تاريخ التجفيف:</label>
-    <input type="date" id="date" required />
-
-    <label>سبب التجفيف:</label>
-    <div class="option-group">
-      <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
-      <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
+  </header>
 
-    <label>تأكيد الحمل:</label>
-    <div class="option-group">
-      <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
-      <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
-    </div>
+  <div class="wrap">
+    <!-- ✅ Infobar (سيستخدمه showMsg) -->
+    <div id="info" class="infobar"></div>
 
-    <label>تم استخدام محاقن التجفيف؟</label>
-    <div class="option-group">
-      <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
-      <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
-    </div>
+    <form id="dryOffForm" class="mbk-card">
+      <div class="field">
+        <label for="animal-id">رقم الحيوان</label>
+        <input type="text" id="animal-id" required />
+      </div>
 
-    <button type="submit">💾 تسجيل التجفيف</button>
-  </form>
-<div id="info" class="infobar" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-weight:700;text-align:center"></div>
-<script type="module">
- import { db, auth, requireAuth } from "/js/firebase-config.js";
- import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+      <div class="field">
+        <label for="date">تاريخ التجفيف</label>
+        <input type="date" id="date" required />
+      </div>
 
-  // عناصر DOM
-  const form = document.getElementById("dryOffForm");
-  const idEl = document.getElementById("animal-id");
-  const dateEl = document.getElementById("date");
-  // شريط الرسائل داخل النموذج
-const info = document.getElementById("info");
-function showMsg(txt, isErr=false){
-  if(!info) return;
-  info.textContent = txt;
-  info.style.display   = "block";
-  info.style.background= isErr ? "#fff7ed" : "#ecfdf5";
-  info.style.border    = "1px solid " + (isErr ? "#fed7aa" : "#bbf7d0");
-  info.style.color     = isErr ? "#9a3412" : "#065f46";
-  try{ info.scrollIntoView({behavior:"smooth", block:"center"}); }catch{}
-}
+      <div class="field">
+        <label>سبب التجفيف</label>
+        <div class="option-group">
+          <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
+          <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
+        </div>
+      </div>
 
+      <div class="field">
+        <label>تأكيد الحمل</label>
+        <div class="option-group">
+          <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
+          <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
+        </div>
+      </div>
 
-  function todayYYYYMMDD(){
-    const d = new Date();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${d.getFullYear()}-${m}-${day}`;
-  }
+      <div class="field">
+        <label>تم استخدام محاقن التجفيف؟</label>
+        <div class="option-group">
+          <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
+          <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
+        </div>
+      </div>
 
- window.onload = function () {
-  const qp = new URLSearchParams(location.search);
- const qpId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || "";
-  const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
-  const id = qpId || storedAnimalId;
+      <!-- ✅ Bottom actions -->
+      <div class="btn-row">
+        <button class="save-btn" type="submit">حفظ التجفيف</button>
+        <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
+      </div>
+    </form>
+  </div>
 
-  if (id) {
-    idEl.value = id;
-    idEl.readOnly = true;
-  } else {
-    showMsg("❗ لم يتم تحديد الحيوان — سيتم تحويلك لتسجيل حيوان جديد", true);
-    setTimeout(()=>{ window.location.href = "add-animal.html"; }, 900);
-    return;
-  }
- // لو الرقم جاي من URL، حدِّث الذاكرة لتفادي الرجوع لرقم قديم لاحقًا
-  if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
-  if (!dateEl.value) {
-    dateEl.value = todayYYYYMMDD();
-  }
-};
+  <script type="module">
+    import { db, auth, requireAuth } from "/js/firebase-config.js";
+    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+    const form  = document.getElementById("dryOffForm");
+    const idEl  = document.getElementById("animal-id");
+    const dateEl= document.getElementById("date");
+    const info  = document.getElementById("info");
+    const openCardBtn = document.getElementById("openCowCard");
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-   // لازم نكون داخلين عشان نضيف userId متوافق مع الرولز
- try { await requireAuth(); }
- catch {
-   window.location.href = "/login.html?next=" + encodeURIComponent(location.href);
-   return;
- }
-    const data = {
-      animalId: idEl.value.trim(),
-      dryOffDate: dateEl.value,
-       eventDate: dateEl.value,
-      reason: document.querySelector('input[name="reason"]:checked')?.value || null,
-      pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
-      usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
-      type: "تجفيف",
-      eventType: "dry_off",
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      source: location.href,
-      userId: auth.currentUser?.uid || null, // مهم للرولز
-      isSmartAlert: true,
-      alertRule: "تجفيف",
-      createdAt: serverTimestamp()
+    function showMsg(txt, isErr=false){
+      if(!info) return;
+      info.style.display = "block";
+      info.className = "infobar " + (isErr ? "error" : "show");
+      info.textContent = txt;
+
+      // ✅ اختفاء تلقائي للرسائل (احترافي)
+      setTimeout(()=>{ info.style.display = "none"; }, 3500);
+
+      try{ info.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+    }
+
+    function todayYYYYMMDD(){
+      const d = new Date();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${d.getFullYear()}-${m}-${day}`;
+    }
+
+    window.onload = function () {
+      const qp = new URLSearchParams(location.search);
+      const qpId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || "";
+      const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
+      const id = qpId || storedAnimalId;
+
+      if (id) {
+        idEl.value = id;
+        idEl.readOnly = true;
+      } else {
+        showMsg("❗ لم يتم تحديد الحيوان — سيتم تحويلك لتسجيل حيوان جديد", true);
+        setTimeout(()=>{ window.location.href = "add-animal.html"; }, 900);
+        return;
+      }
+
+      if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
+      if (!dateEl.value) dateEl.value = todayYYYYMMDD();
     };
 
-  if (!data.animalId || !data.dryOffDate) {
-      showMsg("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولًا", true);
-      return;
-    }
-try {
-  const btn = form.querySelector('button[type="submit"]');
-  if (btn) btn.disabled = true;
+    // ✅ فتح بطاقة الحيوان
+    openCardBtn?.addEventListener("click", ()=>{
+      const n = (idEl.value || "").trim();
+      if (!n) return;
+      location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+    });
 
-  await addDoc(collection(db, "events"), data);
- await window.updateAnimalByEvent(data);
+    // (منطقك الحالي كما هو — لم نكمله الآن)
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
-  try { localStorage.setItem("lastAnimalId", data.animalId); } catch {}
+      try { await requireAuth(); }
+      catch {
+        window.location.href = "/login.html?next=" + encodeURIComponent(location.href);
+        return;
+      }
 
-  showMsg("✅ تم تسجيل التجفيف بنجاح");
-  setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
-} catch (error) {
-  console.error("❌ خطأ:", error);
-  showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
-  const btn = form.querySelector('button[type="submit"]');
-  if (btn) btn.disabled = false;
-}
+      const data = {
+        animalId: idEl.value.trim(),
+        dryOffDate: dateEl.value,
+        eventDate: dateEl.value,
+        reason: document.querySelector('input[name="reason"]:checked')?.value || null,
+        pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
+        usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
+        type: "تجفيف",
+        eventType: "dry_off",
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        source: location.href,
+        userId: auth.currentUser?.uid || null,
+        isSmartAlert: true,
+        alertRule: "تجفيف",
+        createdAt: serverTimestamp()
+      };
 
-  });
-</script>
+      if (!data.animalId || !data.dryOffDate) {
+        showMsg("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولًا", true);
+        return;
+      }
 
+      try {
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+
+        await addDoc(collection(db, "events"), data);
+        if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
+
+        try { localStorage.setItem("lastAnimalId", data.animalId); } catch {}
+        showMsg("✅ تم حفظ التجفيف بنجاح");
+
+        // (اترك التحويل كما هو عندك حالياً)
+        setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
+
+      } catch (error) {
+        console.error("❌ خطأ:", error);
+        showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
-
-
-
-
-
-
