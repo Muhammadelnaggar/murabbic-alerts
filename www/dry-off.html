@@ -430,7 +430,99 @@ async function calcGestation(){
       if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
       if (!dateEl.value) dateEl.value = todayYYYYMMDD();
       calcGestation().catch(()=>{});
+      setTimeout(fillGestMonths, 400);
+
     };
+     async function fillGestMonths(){
+  try{
+    const n = (idEl.value || "").trim();
+    const d = (dateEl.value || "").trim();
+    if (!n || !d || !gestEl || !badgeEl || !noteEl) return;
+
+    gestEl.value = "جاري الحساب...";
+    badgeEl.textContent = "...";
+    badgeEl.className = "gest-badge";
+    noteEl.textContent = "";
+
+    const uid = (window.__tenant?.userId || localStorage.getItem("userId") || auth.currentUser?.uid || "").trim();
+    if (!uid){
+      gestEl.value = "—";
+      badgeEl.textContent = "!";
+      badgeEl.className = "gest-badge warn";
+      noteEl.textContent = "لا يوجد userId";
+      return;
+    }
+
+    // نبحث عن آخر تلقيح مسجّل لهذا الحيوان
+    const qy = query(
+      collection(db, "events"),
+      where("userId", "==", uid),
+      where("animalNumber", "==", n),
+      orderBy("eventDate", "desc"),
+      limit(40)
+    );
+
+    const snap = await getDocs(qy);
+
+    let insDate = "";
+    snap.forEach(doc=>{
+      const ev = doc.data() || {};
+      const t = String(ev.type || "").trim();
+      const et = String(ev.eventType || "").trim();
+      if (!insDate && (t === "insemination" || et === "insemination" || et === "تلقيح" || et === "تلقيح مخصب") && ev.eventDate){
+        insDate = ev.eventDate;
+      }
+    });
+
+    if (!insDate){
+      gestEl.value = "—";
+      badgeEl.textContent = "✗";
+      badgeEl.className = "gest-badge bad";
+      noteEl.textContent = "لا يوجد تلقيح مسجل";
+      return;
+    }
+
+    const diffDays = Math.floor((new Date(d) - new Date(insDate)) / 86400000);
+    const months = diffDays / 30.4;
+
+    gestEl.value = months.toFixed(1) + " شهر";
+
+    // ✅ أخضر: 6 إلى 7
+    if (months >= 6 && months <= 7){
+      badgeEl.textContent = "✓";
+      badgeEl.className = "gest-badge ok";
+      noteEl.textContent = "مناسب (6–7)";
+      return;
+    }
+
+    // ❌ أحمر: أقل من 6
+    if (months < 6){
+      badgeEl.textContent = "✗";
+      badgeEl.className = "gest-badge bad";
+      noteEl.textContent = "أقل من 6 شهور";
+      return;
+    }
+
+    // ❌ أحمر: أكثر من 7.5
+    if (months > 7.5){
+      badgeEl.textContent = "✗";
+      badgeEl.className = "gest-badge bad";
+      noteEl.textContent = "أكثر من 7.5 شهور";
+      return;
+    }
+
+    // بين 7 و 7.5 (اختياري) نخليه تحذير
+    badgeEl.textContent = "!";
+    badgeEl.className = "gest-badge warn";
+    noteEl.textContent = "قريب من الحد الأعلى";
+
+  } catch (e){
+    console.error("fillGestMonths error:", e);
+    if (gestEl){ gestEl.value = "—"; }
+    if (badgeEl){ badgeEl.textContent = "!"; badgeEl.className = "gest-badge warn"; }
+    if (noteEl){ noteEl.textContent = "تعذّر الحساب"; }
+  }
+}
 
     // ✅ فتح بطاقة الحيوان
     openCardBtn?.addEventListener("click", ()=>{
@@ -498,6 +590,7 @@ idEl?.addEventListener("input", ()=>{ calcGestation().catch(()=>{}); });
   </script>
 </body>
 </html>
+
 
 
 
