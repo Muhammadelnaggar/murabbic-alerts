@@ -221,30 +221,25 @@ header{
     const $ = (id)=> document.getElementById(id);
     const errBox = $('err');
    function showErr(msg){
-  const bar = document.getElementById("sysbar") || form?.querySelector?.(".infobar") || null;
-  if (bar){
-    bar.style.display = "block";
-    bar.className = "infobar show error";
-    bar.style.borderColor = "#ef9a9a";
-    bar.style.background = "#ffebee";
-    bar.style.color = "#b71c1c";
-   bar.innerHTML = `
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-    <span>⚠️ ${msg}</span>
-    <button id="errOkBtn" style="
-      background:#b91c1c;
-      color:#fff;
-      border:none;
-      border-radius:8px;
-      padding:4px 10px;
-      font-weight:700;
-      cursor:pointer;
-      font-size:13px;
-    ">حسنًا</button>
-  </div>
-`;
-setTimeout(()=>document.getElementById("errOkBtn")?.focus(), 50);
-document.getElementById("errOkBtn")?.addEventListener("click", ()=>{ bar.style.display="none"; });
+ const bar =
+  document.getElementById("sysbar") ||
+  document.getElementById("info") ||
+  form.querySelector(".infobar");
+
+if (bar) {
+  bar.style.display = "block";
+  bar.className = "infobar show";   // ✅ success style من forms.css
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span>✅ تم تسجيل تحضير الولادة بنجاح</span>
+    </div>
+  `;
+
+  // ✅ اختفاء تلقائي بعد 4 ثواني
+  setTimeout(() => { bar.style.display = "none"; }, 4000);
+
+  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(_) {}
+}
 
     try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
     return;
@@ -379,6 +374,7 @@ if (bar) {
 
 </body>
 </html>
+
 
 
 
