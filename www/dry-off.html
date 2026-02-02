@@ -164,12 +164,17 @@
     <form id="dryOffForm" class="mbk-card">
       <div class="field">
         <label for="animal-id">رقم الحيوان</label>
-        <input type="text" id="animal-id" required />
+        <input type="text" id="animal-id" name="number" required />
       </div>
 
       <div class="field">
         <label for="date">تاريخ التجفيف</label>
-        <input type="date" id="date" required />
+       <input type="date" id="date" name="date" required />
+
+      </div>
+           <div class="field">
+        <label for="gestDays">أيام الحمل (محسوبة تلقائيًا)</label>
+        <input type="number" id="gestDays" name="gestationDays" min="0" step="1" required readonly />
       </div>
 
       <div class="field">
@@ -213,6 +218,63 @@
     const dateEl= document.getElementById("date");
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
+        const gestEl = document.getElementById("gestDays");
+
+    // ✅ الصفحة لا تعمل submit — تنتظر mbk:valid فقط
+    form.addEventListener("mbk:valid", async (e) => {
+      const fd = e?.detail?.formData || {};
+
+      // كل الحقول مطلوبة
+      const animalId = String(fd.number || idEl.value || "").trim();
+      const dryOffDate = String(fd.date || dateEl.value || "").trim();
+      const reason = String(fd.reason || "").trim();
+      const pregnancyStatus = String(fd.pregnancy || "").trim();
+      const usedDryingAntibiotics = String(fd.antibiotics || "").trim();
+      const gestationDays = Number(fd.gestationDays ?? gestEl?.value ?? NaN);
+
+      if (!animalId || !dryOffDate || !reason || !pregnancyStatus || !usedDryingAntibiotics || !Number.isFinite(gestationDays)) {
+        showMsg("⚠️ أكمل كل الحقول المطلوبة أولًا.", true);
+        return;
+      }
+
+      const data = {
+        animalId,
+        dryOffDate,
+        eventDate: dryOffDate,
+        reason,
+        pregnancyStatus,
+        usedDryingAntibiotics,
+        gestationDays,
+
+        type: "تجفيف",
+        eventType: "dry_off",
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        source: location.href,
+        userId: auth.currentUser?.uid || null,
+        isSmartAlert: true,
+        alertRule: "تجفيف",
+        createdAt: serverTimestamp()
+      };
+
+      try {
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+
+        await addDoc(collection(db, "events"), data);
+        if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
+
+        try { localStorage.setItem("lastAnimalId", animalId); } catch {}
+        showMsg("✅ تم حفظ التجفيف بنجاح");
+        setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
+
+      } catch (error) {
+        console.error("❌ خطأ:", error);
+        showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = false;
+      }
+    });
+
 
     function showMsg(txt, isErr=false){
       if(!info) return;
@@ -259,59 +321,8 @@
       location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
     });
 
-    // (منطقك الحالي كما هو — لم نكمله الآن)
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      try { await requireAuth(); }
-      catch {
-        window.location.href = "/login.html?next=" + encodeURIComponent(location.href);
-        return;
-      }
-
-      const data = {
-        animalId: idEl.value.trim(),
-        dryOffDate: dateEl.value,
-        eventDate: dateEl.value,
-        reason: document.querySelector('input[name="reason"]:checked')?.value || null,
-        pregnancyStatus: document.querySelector('input[name="pregnancy"]:checked')?.value || null,
-        usedDryingAntibiotics: document.querySelector('input[name="antibiotics"]:checked')?.value || null,
-        type: "تجفيف",
-        eventType: "dry_off",
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        source: location.href,
-        userId: auth.currentUser?.uid || null,
-        isSmartAlert: true,
-        alertRule: "تجفيف",
-        createdAt: serverTimestamp()
-      };
-
-      if (!data.animalId || !data.dryOffDate) {
-        showMsg("يرجى إدخال رقم الحيوان وتاريخ التجفيف أولًا", true);
-        return;
-      }
-
-      try {
-        const btn = form.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = true;
-
-        await addDoc(collection(db, "events"), data);
-        if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
-
-        try { localStorage.setItem("lastAnimalId", data.animalId); } catch {}
-        showMsg("✅ تم حفظ التجفيف بنجاح");
-
-        // (اترك التحويل كما هو عندك حالياً)
-        setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
-
-      } catch (error) {
-        console.error("❌ خطأ:", error);
-        showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
-        const btn = form.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = false;
-      }
-    });
   </script>
 </body>
 </html>
+
 
