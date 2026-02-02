@@ -139,6 +139,13 @@ function stripTashkeel(s) {
     .replace(/\s+/g, "")
     .replace(/[ًٌٍَُِّْ]/g, "");
 }
+function daysBetweenISO(a, b){
+  const d1 = new Date(String(a || "").slice(0,10));
+  const d2 = new Date(String(b || "").slice(0,10));
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
+  d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
+  return Math.round((d2 - d1) / 86400000);
+}
 
 function getFieldEl(form, name) {
   return (
@@ -608,7 +615,36 @@ function attachOne(form) {
         return false;
       }
     }
+   // ✅ Gate خاص لحدث "تجفيف": حساب أيام الحمل وملء الحقل تلقائيًا
+if (eventName === "تجفيف") {
+  const uid4 = await getUid();
+  const sig4 = await fetchCalvingSignalsFromEvents(uid4, n);
 
+  const doc4 = form.__mbkDoc || {};
+
+  // آخر تلقيح: من الأحداث أولًا ثم الوثيقة
+  const lastAI4 = String(sig4.lastInseminationDateFromEvents || doc4.lastInseminationDate || "").trim();
+
+  if (!lastAI4) {
+    showMsg(bar, '❌ لا يمكن حساب أيام الحمل — لا يوجد "آخر تلقيح" لهذا الحيوان.', "error");
+    lockForm(true);
+    return false;
+  }
+
+  const g = daysBetweenISO(lastAI4, d);
+  if (!Number.isFinite(g) || g < 0) {
+    showMsg(bar, "❌ تعذّر حساب أيام الحمل — راجع تاريخ التجفيف.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  // اكتبها في الحقل (مطلوب + readonly)
+  const gEl = getFieldEl(form, "gestationDays");
+  if (gEl) gEl.value = String(g);
+
+  // خزّن آخر تلقيح في الفورم لاستخدامه عند الحفظ
+  form.__mbkDryOffLastAI = lastAI4;
+}
     showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
     lockForm(false);
     return true;
@@ -631,6 +667,11 @@ function attachOne(form) {
     }
 
     const formData = collectFormData(form);
+    // ✅ Dry-off: احفظ آخر تلقيح المحسوب من الـ Gate داخل payload
+if (eventName === "تجفيف" && form.__mbkDryOffLastAI && !formData.lastInseminationDate) {
+  formData.lastInseminationDate = String(form.__mbkDryOffLastAI).slice(0,10);
+}
+
     // =======================
 // Murabbik — Daily Milk: force numeric fields
 // =======================
