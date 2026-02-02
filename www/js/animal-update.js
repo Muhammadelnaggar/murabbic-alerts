@@ -117,6 +117,12 @@ export async function updateAnimalByEvent(ev) {
       case "نفوق":
         type = "death";
         break;
+      // تجفيف
+      case "dry_off":
+      case "dryoff":
+      case "تجفيف":
+        type = "dry_off";
+        break;
 
       default:
         type = rawType; // احتياطي لو فيه أنواع تانية
@@ -165,6 +171,15 @@ if (type === "close_up") {
 
   upd.status = "active";
 }
+    // ============================================================
+    // 🟩 DRY-OFF — تجفيف
+    // ✅ لازم يحدّث الحالة الإنتاجية إلى "جاف"
+    // ============================================================
+    if (type === "dry_off") {
+      upd.lastDryOffDate   = date;
+      upd.productionStatus = "dry";   // 👈 دي أهم سطر
+      upd.status = "active";
+    }
 
 
     // ============================================================
