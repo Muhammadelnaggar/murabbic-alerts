@@ -255,10 +255,10 @@
 
   <script type="module">
     import { db, auth, requireAuth } from "/js/firebase-config.js";
-   import {
-  collection, addDoc, serverTimestamp,
-  getDocs, query, where, orderBy, limit
+  import {
+  collection, doc, getDoc, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
     const form  = document.getElementById("dryOffForm");
     const idEl  = document.getElementById("animal-id");
@@ -328,53 +328,6 @@ function setGestBadge(months){
   }
 }
 
-async function fetchLastInseminationDate(uid, animalNumber){
-  // نجرب animalNumber (الأكثر شيوعًا عندك) ثم fallback على animalId
-  const tryQueries = [
-    query(
-      collection(db, "events"),
-      where("userId", "==", uid),
-      where("animalNumber", "==", String(animalNumber)),
-      orderBy("eventDate", "desc"),
-      limit(40)
-    ),
-    query(
-      collection(db, "events"),
-      where("userId", "==", uid),
-      where("animalId", "==", String(animalNumber)),
-      orderBy("eventDate", "desc"),
-      limit(40)
-    )
-  ];
-
-  for (const qy of tryQueries){
-    try{
-      const snap = await getDocs(qy);
-      if (snap.empty) continue;
-
-      for (const d of snap.docs){
-        const ev = d.data() || {};
-        const t  = String(ev.type || ev.normalizedType || ev.eventType || "").trim();
-
-        // اعتبره تلقيح لو يساوي أي من دول
-        if (
-          t === "insemination" ||
-          t === "تلقيح" ||
-          t === "تلقيح مخصب" ||
-          t === "تلقيح مخصَّب"
-        ){
-          const dt = String(ev.eventDate || "").trim();
-          if (dt) return dt;
-        }
-      }
-    } catch(e){
-      // لو محتاج index أو query فشلت نكمل للمحاولة التالية
-      console.warn("fetchLastInseminationDate query failed:", e);
-    }
-  }
-
-  return "";
-}
 
 async function calcGestation(){
   if (!gestEl || !badgeEl) return;
@@ -395,7 +348,25 @@ async function calcGestation(){
   const uid = auth.currentUser?.uid;
   if (!uid) return;
 
-  const insDate = await fetchLastInseminationDate(uid, animalNumber);
+ // جلب وثيقة الحيوان
+const animalRef = doc(db, "animals", animalNumber);
+const animalSnap = await getDoc(animalRef);
+
+if (!animalSnap.exists()) {
+  gestEl.value = "لا يوجد حيوان";
+  if (noteEl) noteEl.textContent = "لم يتم العثور على وثيقة الحيوان";
+  return;
+}
+
+const animalData = animalSnap.data() || {};
+const insDate = animalData.lastInseminationDate || "";
+
+if (!insDate) {
+  gestEl.value = "لا يوجد تلقيح";
+  if (noteEl) noteEl.textContent = "لا يوجد تاريخ آخر تلقيح مسجل في بطاقة الحيوان";
+  return;
+}
+
 
   if (!insDate){
     gestEl.value = "لا يوجد تلقيح";
@@ -432,100 +403,10 @@ async function calcGestation(){
       if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
       if (!dateEl.value) dateEl.value = todayYYYYMMDD();
       calcGestation().catch(()=>{});
-      setTimeout(fillGestMonths, 400);
+    
 
     };
-     async function fillGestMonths(){
-  try{
-    const n = (idEl.value || "").trim();
-    const d = (dateEl.value || "").trim();
-    if (!n || !d || !gestEl || !badgeEl || !noteEl) return;
-
-    gestEl.value = "جاري الحساب...";
-    badgeEl.textContent = "...";
-    badgeEl.className = "gest-badge";
-    noteEl.textContent = "";
-
-    const uid = (window.__tenant?.userId || localStorage.getItem("userId") || auth.currentUser?.uid || "").trim();
-    if (!uid){
-      gestEl.value = "—";
-      badgeEl.textContent = "!";
-      badgeEl.className = "gest-badge warn";
-      noteEl.textContent = "لا يوجد userId";
-      return;
-    }
-
-    // نبحث عن آخر تلقيح مسجّل لهذا الحيوان
-    const qy = query(
-      collection(db, "events"),
-      where("userId", "==", uid),
-      where("animalNumber", "==", n),
-      orderBy("eventDate", "desc"),
-      limit(40)
-    );
-
-    const snap = await getDocs(qy);
-
-    let insDate = "";
-    snap.forEach(doc=>{
-      const ev = doc.data() || {};
-      const t = String(ev.type || "").trim();
-      const et = String(ev.eventType || "").trim();
-      if (!insDate && (t === "insemination" || et === "insemination" || et === "تلقيح" || et === "تلقيح مخصب") && ev.eventDate){
-        insDate = ev.eventDate;
-      }
-    });
-
-    if (!insDate){
-      gestEl.value = "—";
-      badgeEl.textContent = "✗";
-      badgeEl.className = "gest-badge bad";
-      noteEl.textContent = "لا يوجد تلقيح مسجل";
-      return;
-    }
-
-    const diffDays = Math.floor((new Date(d) - new Date(insDate)) / 86400000);
-    const months = diffDays / 30.4;
-
-    gestEl.value = months.toFixed(1) + " شهر";
-
-    // ✅ أخضر: 6 إلى 7
-    if (months >= 6 && months <= 7){
-      badgeEl.textContent = "✓";
-      badgeEl.className = "gest-badge ok";
-      noteEl.textContent = "مناسب (6–7)";
-      return;
-    }
-
-    // ❌ أحمر: أقل من 6
-    if (months < 6){
-      badgeEl.textContent = "✗";
-      badgeEl.className = "gest-badge bad";
-      noteEl.textContent = "أقل من 6 شهور";
-      return;
-    }
-
-    // ❌ أحمر: أكثر من 7.5
-    if (months > 7.5){
-      badgeEl.textContent = "✗";
-      badgeEl.className = "gest-badge bad";
-      noteEl.textContent = "أكثر من 7.5 شهور";
-      return;
-    }
-
-    // بين 7 و 7.5 (اختياري) نخليه تحذير
-    badgeEl.textContent = "!";
-    badgeEl.className = "gest-badge warn";
-    noteEl.textContent = "قريب من الحد الأعلى";
-
-  } catch (e){
-    console.error("fillGestMonths error:", e);
-    if (gestEl){ gestEl.value = "—"; }
-    if (badgeEl){ badgeEl.textContent = "!"; badgeEl.className = "gest-badge warn"; }
-    if (noteEl){ noteEl.textContent = "تعذّر الحساب"; }
-  }
-}
-
+ 
     // ✅ فتح بطاقة الحيوان
     openCardBtn?.addEventListener("click", ()=>{
       const n = (idEl.value || "").trim();
@@ -585,13 +466,14 @@ async function calcGestation(){
         if (btn) btn.disabled = false;
       }
     });
-    dateEl?.addEventListener("change", ()=>{ calcGestation().catch(()=>{}); });
+   
     dateEl?.addEventListener("change", ()=>{ calcGestation().catch(()=>{}); });
 idEl?.addEventListener("input", ()=>{ calcGestation().catch(()=>{}); });
 
   </script>
 </body>
 </html>
+
 
 
 
