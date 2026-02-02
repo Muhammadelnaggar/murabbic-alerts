@@ -164,23 +164,24 @@
     <form id="dryOffForm" class="mbk-card">
       <div class="field">
         <label for="animal-id">رقم الحيوان</label>
-        <input type="text" id="animal-id" name="number" required />
+       <input type="text" id="animalNumber" data-field="animalNumber" required />
       </div>
 
       <div class="field">
         <label for="date">تاريخ التجفيف</label>
-       <input type="date" id="date" name="date" required />
+      <input type="date" id="eventDate" data-field="eventDate" required />
 
       </div>
            <div class="field">
-        <label for="gestDays">أيام الحمل (محسوبة تلقائيًا)</label>
-        <input type="number" id="gestDays" name="gestationDays" min="0" step="1" required readonly />
-      </div>
+  <label for="gestationDays">أيام الحمل (محسوبة تلقائيًا)</label>
+  <input type="number" id="gestationDays" data-field="gestationDays" required readonly />
+</div>
+
 
       <div class="field">
         <label>سبب التجفيف</label>
         <div class="option-group">
-          <label><input type="radio" name="reason" value="طبيعي" required /> طبيعي</label>
+        <input type="radio" data-field="reason" name="reason" value="طبيعي" required />
           <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
         </div>
       </div>
@@ -188,16 +189,16 @@
       <div class="field">
         <label>تأكيد الحمل</label>
         <div class="option-group">
-          <label><input type="radio" name="pregnancy" value="عشار" required /> عشار</label>
-          <label><input type="radio" name="pregnancy" value="فارغة" required /> فارغة</label>
+          <input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required />
+          <input type="radio" name="pregnancyStatus" value="فارغة" required />
         </div>
       </div>
 
       <div class="field">
         <label>تم استخدام محاقن التجفيف؟</label>
         <div class="option-group">
-          <label><input type="radio" name="antibiotics" value="نعم" required /> نعم</label>
-          <label><input type="radio" name="antibiotics" value="لا" required /> لا</label>
+         <input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required />
+         <input type="radio" name="usedDryingAntibiotics" value="لا" required />
         </div>
       </div>
 
@@ -320,9 +321,49 @@
       if (!n) return;
       location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
     });
+form.addEventListener("mbk:valid", async (e) => {
+  const fd = e?.detail?.formData || {};
+
+  const data = {
+    animalNumber: String(fd.animalNumber || "").trim(),
+    eventDate: String(fd.eventDate || "").trim(),
+    reason: String(fd.reason || "").trim(),
+    pregnancyStatus: String(fd.pregnancyStatus || "").trim(),
+    usedDryingAntibiotics: String(fd.usedDryingAntibiotics || "").trim(),
+    gestationDays: Number(fd.gestationDays),
+
+    type: "تجفيف",
+    eventType: "dry_off",
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    source: location.href,
+    userId: auth.currentUser?.uid || null,
+    isSmartAlert: true,
+    alertRule: "تجفيف",
+    createdAt: serverTimestamp()
+  };
+
+  try {
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+
+    await addDoc(collection(db, "events"), data);
+    if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
+
+    try { localStorage.setItem("lastAnimalId", data.animalNumber); } catch {}
+    showMsg("✅ تم حفظ التجفيف بنجاح");
+    setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
+
+  } catch (err) {
+    console.error(err);
+    showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = false;
+  }
+});
 
   </script>
 </body>
 </html>
+
 
 
