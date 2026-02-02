@@ -255,9 +255,11 @@
 
   <script type="module">
     import { db, auth, requireAuth } from "/js/firebase-config.js";
-  import {
-  collection, doc, getDoc, addDoc, serverTimestamp
+ import {
+  collection, addDoc, serverTimestamp,
+  getDocs, query, where, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
 
     const form  = document.getElementById("dryOffForm");
@@ -348,31 +350,28 @@ async function calcGestation(){
   const uid = auth.currentUser?.uid;
   if (!uid) return;
 
- // جلب وثيقة الحيوان
-const animalRef = doc(db, "animals", animalNumber);
-const animalSnap = await getDoc(animalRef);
+// ✅ جلب وثيقة الحيوان بالبحث عن (userId_number) لأن docId ليس رقم الحيوان
+const qy = query(
+  collection(db, "animals"),
+  where("userId_number", "==", `${uid}#${animalNumber}`),
+  limit(1)
+);
+const snap = await getDocs(qy);
 
-if (!animalSnap.exists()) {
+if (snap.empty) {
   gestEl.value = "لا يوجد حيوان";
-  if (noteEl) noteEl.textContent = "لم يتم العثور على وثيقة الحيوان";
+  if (noteEl) noteEl.textContent = "لم يتم العثور على بطاقة الحيوان لهذا الرقم";
   return;
 }
 
-const animalData = animalSnap.data() || {};
-const insDate = animalData.lastInseminationDate || "";
+const animalData = snap.docs[0].data() || {};
+const insDate = String(animalData.lastInseminationDate || "").trim();
 
 if (!insDate) {
   gestEl.value = "لا يوجد تلقيح";
   if (noteEl) noteEl.textContent = "لا يوجد تاريخ آخر تلقيح مسجل في بطاقة الحيوان";
   return;
 }
-
-
-  if (!insDate){
-    gestEl.value = "لا يوجد تلقيح";
-    if (noteEl) noteEl.textContent = "لم يتم العثور على آخر تلقيح مسجّل لهذا الحيوان.";
-    return;
-  }
 
   const d = daysBetween(insDate, dryDate);
   const months = +(d / 30.5).toFixed(1);
@@ -473,6 +472,7 @@ idEl?.addEventListener("input", ()=>{ calcGestation().catch(()=>{}); });
   </script>
 </body>
 </html>
+
 
 
 
