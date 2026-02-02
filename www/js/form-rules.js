@@ -167,10 +167,25 @@ export const eventSchemas = {
   guards: ["closeupDecision"],
 },
 
-  "تجفيف": {
-    fields: { ...commonFields, reason: { required: true, msg: "سبب التجفيف مطلوب." } },
-    guards: ["dryOffDecision"],
+ "تجفيف": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ التجفيف غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+
+    reason: { required: true, msg: "سبب التجفيف مطلوب." },
+    pregnancyStatus: { required: true, msg: "تأكيد الحمل مطلوب." },
+    usedDryingAntibiotics: { required: true, msg: "حدد هل تم استخدام محاقن التجفيف." },
+
+    gestationDays: { required: true, type: "number", msg: "أيام الحمل مطلوبة (محسوبة تلقائيًا)." },
+
+    // اختياري للتوثيق لو حبينا نسجله
+    lastInseminationDate: { required: false, type: "date" },
+    species: { required: false }
   },
+  guards: ["dryOffDecision"],
+},
+
 };
 
 // ===================================================================
@@ -585,15 +600,28 @@ if (remaining > 40) {
   return null;
 },
 
-  dryOffDecision(fd) {
-    const doc = fd.documentData;
-    if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+dryOffDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-    if (!["عشار", "غير عشار"].includes(doc.reproductiveStatus))
-      return "الحالة التناسلية غير مناسبة للتجفيف.";
+  // خارج القطيع
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
 
-    return null;
-  },
+  // لازم أيام الحمل رقم (محسوبة)
+  const g = Number(fd.gestationDays);
+  if (!Number.isFinite(g)) return "❌ تعذّر حساب أيام الحمل — راجع آخر تلقيح وتاريخ التجفيف.";
+
+  // لو المستخدم أكد عشار: لازم يكون فيه آخر تلقيح (من البوابة)
+  const preg = String(fd.pregnancyStatus || "").trim();
+  if (preg === "عشار") {
+    const lf = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
+    if (!isDate(lf)) return '❌ لا يمكن تجفيف "عشار" بدون "آخر تلقيح" صحيح.';
+  }
+
+  return null;
+},
+
 };
 
 // ===================================================================
@@ -705,6 +733,16 @@ if (eventType === "تحضير للولادة") {
   }
   if (!payload.species) {
     payload.species = String(d.species || d.animalTypeAr || "").trim();
+  }
+}
+// ✅ Fallback مركزي لحدث "تجفيف"
+if (eventType === "تجفيف") {
+  const d = payload.documentData || {};
+  if (!payload.species) {
+    payload.species = String(d.species || d.animalTypeAr || d.animalType || "").trim();
+  }
+  if (!payload.lastInseminationDate) {
+    payload.lastInseminationDate = String(d.lastInseminationDate || "").trim();
   }
 }
 
