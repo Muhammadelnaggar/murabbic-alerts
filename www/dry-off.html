@@ -136,6 +136,47 @@
       color: var(--brand-600, #0b7f47) !important;
       border:2px solid var(--brand-600, #0b7f47) !important;
     }
+     .gest-box{
+  display:flex; gap:10px; align-items:center;
+}
+.gest-box input{
+  flex:1;
+}
+.gest-badge{
+  min-width:44px;
+  height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:12px;
+  padding:0 10px;
+  font-weight:900;
+  border:2px solid #cbd5e1;
+  background:#f8fafc;
+  color:#0f172a;
+}
+.gest-badge.ok{
+  border-color:#16a34a;
+  background:#ecfdf5;
+  color:#065f46;
+}
+.gest-badge.warn{
+  border-color:#f59e0b;
+  background:#fffbeb;
+  color:#92400e;
+}
+.gest-badge.bad{
+  border-color:#ef4444;
+  background:#fff1f2;
+  color:#991b1b;
+}
+.gest-note{
+  display:block;
+  margin-top:6px;
+  color:#64748b;
+  font-weight:700;
+  font-size:12px;
+}
 
     /* ✅ keep infobar clean */
     #info.infobar{ display:none; }
@@ -171,6 +212,12 @@
         <label for="date">تاريخ التجفيف</label>
         <input type="date" id="date" required />
       </div>
+<label>شهور الحمل (تلقائي)</label>
+<div class="gest-box">
+  <input id="gestMonths" type="text" readonly value="—" />
+  <span id="gestBadge" class="gest-badge">—</span>
+</div>
+<small class="gest-note" id="gestNote"></small>
 
       <div class="field">
         <label>سبب التجفيف</label>
@@ -206,25 +253,47 @@
 
   <script type="module">
     import { db, auth, requireAuth } from "/js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   import {
+  collection, addDoc, serverTimestamp,
+  getDocs, query, where, orderBy, limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const form  = document.getElementById("dryOffForm");
     const idEl  = document.getElementById("animal-id");
     const dateEl= document.getElementById("date");
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
+    const gestEl   = document.getElementById("gestMonths");
+const badgeEl  = document.getElementById("gestBadge");
+const noteEl   = document.getElementById("gestNote");
 
-    function showMsg(txt, isErr=false){
-      if(!info) return;
-      info.style.display = "block";
-      info.className = "infobar " + (isErr ? "error" : "show");
-      info.textContent = txt;
 
-      // ✅ اختفاء تلقائي للرسائل (احترافي)
-      setTimeout(()=>{ info.style.display = "none"; }, 3500);
+   function showMsg(txt, isErr=false){
+  if(!info) return;
 
-      try{ info.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
-    }
+  info.style.display = "block";
+  info.className = "infobar " + (isErr ? "error" : "show");
+
+  if (isErr){
+    info.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span>${txt}</span>
+        <button type="button" id="infoOkBtn"
+          style="border:0;border-radius:12px;padding:8px 12px;font-weight:900;cursor:pointer;
+                 background:#fff;color:inherit;border:1px solid rgba(0,0,0,.12)">
+          حسنًا
+        </button>
+      </div>
+    `;
+    const ok = document.getElementById("infoOkBtn");
+    ok?.addEventListener("click", ()=>{ info.style.display="none"; });
+  } else {
+    info.textContent = txt;
+    setTimeout(()=>{ info.style.display = "none"; }, 3500);
+  }
+
+  try{ info.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+}
 
     function todayYYYYMMDD(){
       const d = new Date();
@@ -232,6 +301,116 @@
       const day = String(d.getDate()).padStart(2,'0');
       return `${d.getFullYear()}-${m}-${day}`;
     }
+    function daysBetween(aISO, bISO){
+  const a = new Date(aISO + "T00:00:00");
+  const b = new Date(bISO + "T00:00:00");
+  const ms = b - a;
+  return Math.floor(ms / 86400000);
+}
+
+function setGestBadge(months){
+  if (!badgeEl) return;
+
+  badgeEl.classList.remove("ok","warn","bad");
+
+  // 🟢 6–7 / 🔴 <6 / 🔴 >7.5 / 🟠 7–7.5
+  if (months >= 6 && months <= 7){
+    badgeEl.textContent = "✔";
+    badgeEl.classList.add("ok");
+  } else if (months < 6 || months > 7.5){
+    badgeEl.textContent = "✖";
+    badgeEl.classList.add("bad");
+  } else {
+    badgeEl.textContent = "!";
+    badgeEl.classList.add("warn");
+  }
+}
+
+async function fetchLastInseminationDate(uid, animalNumber){
+  // نجرب animalNumber (الأكثر شيوعًا عندك) ثم fallback على animalId
+  const tryQueries = [
+    query(
+      collection(db, "events"),
+      where("userId", "==", uid),
+      where("animalNumber", "==", String(animalNumber)),
+      orderBy("eventDate", "desc"),
+      limit(40)
+    ),
+    query(
+      collection(db, "events"),
+      where("userId", "==", uid),
+      where("animalId", "==", String(animalNumber)),
+      orderBy("eventDate", "desc"),
+      limit(40)
+    )
+  ];
+
+  for (const qy of tryQueries){
+    try{
+      const snap = await getDocs(qy);
+      if (snap.empty) continue;
+
+      for (const d of snap.docs){
+        const ev = d.data() || {};
+        const t  = String(ev.type || ev.normalizedType || ev.eventType || "").trim();
+
+        // اعتبره تلقيح لو يساوي أي من دول
+        if (
+          t === "insemination" ||
+          t === "تلقيح" ||
+          t === "تلقيح مخصب" ||
+          t === "تلقيح مخصَّب"
+        ){
+          const dt = String(ev.eventDate || "").trim();
+          if (dt) return dt;
+        }
+      }
+    } catch(e){
+      // لو محتاج index أو query فشلت نكمل للمحاولة التالية
+      console.warn("fetchLastInseminationDate query failed:", e);
+    }
+  }
+
+  return "";
+}
+
+async function calcGestation(){
+  if (!gestEl || !badgeEl) return;
+
+  const animalNumber = (idEl.value || "").trim();
+  const dryDate      = (dateEl.value || "").trim();
+
+  gestEl.value = "—";
+  badgeEl.textContent = "—";
+  badgeEl.classList.remove("ok","warn","bad");
+  if (noteEl) noteEl.textContent = "";
+
+  if (!animalNumber || !dryDate) return;
+
+  // لازم يكون login علشان نقرأ events
+  try { await requireAuth(); } catch { return; }
+
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+
+  const insDate = await fetchLastInseminationDate(uid, animalNumber);
+
+  if (!insDate){
+    gestEl.value = "لا يوجد تلقيح";
+    if (noteEl) noteEl.textContent = "لم يتم العثور على آخر تلقيح مسجّل لهذا الحيوان.";
+    return;
+  }
+
+  const d = daysBetween(insDate, dryDate);
+  const months = +(d / 30.5).toFixed(1);
+
+  gestEl.value = `${months} شهر`;
+  setGestBadge(months);
+
+  if (noteEl) {
+    noteEl.textContent = `آخر تلقيح: ${insDate} — فرق ${d} يوم`;
+  }
+}
 
     window.onload = function () {
       const qp = new URLSearchParams(location.search);
@@ -250,6 +429,7 @@
 
       if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
       if (!dateEl.value) dateEl.value = todayYYYYMMDD();
+      calcGestation().catch(()=>{});
     };
 
     // ✅ فتح بطاقة الحيوان
@@ -311,8 +491,13 @@
         if (btn) btn.disabled = false;
       }
     });
+    dateEl?.addEventListener("change", ()=>{ calcGestation().catch(()=>{}); });
+    dateEl?.addEventListener("change", ()=>{ calcGestation().catch(()=>{}); });
+idEl?.addEventListener("input", ()=>{ calcGestation().catch(()=>{}); });
+
   </script>
 </body>
 </html>
+
 
 
