@@ -220,35 +220,29 @@ header{
     // 2) أدوات صغيرة
     const $ = (id)=> document.getElementById(id);
     const errBox = $('err');
-   function showErr(msg){
- const bar =
-  document.getElementById("sysbar") ||
-  document.getElementById("info") ||
-  form.querySelector(".infobar");
+function showErr(msg){
+  const bar =
+    document.getElementById("sysbar") ||
+    document.getElementById("info") ||
+    document.querySelector(".infobar");
 
-if (bar) {
-  bar.style.display = "block";
-  bar.className = "infobar show";   // ✅ success style من forms.css
-  bar.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <span>✅ تم تسجيل تحضير الولادة بنجاح</span>
-    </div>
-  `;
-
-  // ✅ اختفاء تلقائي بعد 4 ثواني
-  setTimeout(() => { bar.style.display = "none"; }, 4000);
-
-  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(_) {}
-}
-
+  if (bar){
+    bar.style.display = "block";
+    bar.className = "infobar error";
+    bar.textContent = "⚠️ " + msg;
     try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
     return;
   }
-  errBox.textContent = '⚠️ ' + msg;
-  errBox.style.display = 'block';
+
+  errBox.textContent = "⚠️ " + msg;
+  errBox.style.display = "block";
 }
 
-    function hideErr(){ errBox.style.display = 'none'; errBox.textContent=''; }
+function hideErr(){
+  errBox.style.display = "none";
+  errBox.textContent = "";
+}
+
     function getQS(name){ return new URL(location.href).searchParams.get(name) || ''; }
     function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
     function buildUrl(path, params){
@@ -341,7 +335,7 @@ const bar = document.getElementById("sysbar") || form.querySelector(".infobar") 
 
 if (bar) {
   bar.style.display = "block";
-  bar.className = "infobar show success";
+ bar.className = "infobar show";
   bar.style.borderColor = "#bbf7d0";
   bar.style.background = "#ecfdf5";
   bar.style.color = "#065f46";
@@ -351,7 +345,6 @@ if (bar) {
   setTimeout(() => { bar.style.display = "none"; }, 4000);
 } else {
   // fallback لو لأي سبب infobar مش موجود
-  confirmBox.style.display = "block";
 }
 
     if (ration === 'نعم') dialog.style.display = 'flex';
@@ -374,6 +367,7 @@ if (bar) {
 
 </body>
 </html>
+
 
 
 
