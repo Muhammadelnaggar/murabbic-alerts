@@ -515,6 +515,22 @@ dailyMilkDecision(fd) {
 closeupDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "❌ تعذّر العثور على الحيوان.";
+  // ✅ منع تكرار "تحضير للولادة" داخل نفس الموسم (نفس اللاكتشن)
+  const lastCloseUp = String(doc.lastCloseUpDate || "").trim();
+  const lastCalving = String(doc.lastCalvingDate || "").trim();
+
+  if (isDate(lastCloseUp)) {
+    // لو مفيش آخر ولادة مسجلة: أي تحضير سابق يعتبر تكرار
+    if (!isDate(lastCalving)) {
+      return `❌ تم تسجيل تحضير للولادة مسبقًا بتاريخ ${lastCloseUp} — لا يمكن تكراره في نفس الموسم.`;
+    }
+
+    // لو آخر تحضير حصل بعد/منذ آخر ولادة => يبقى داخل نفس الموسم الحالي
+    const gapFromCalvingToCloseUp = daysBetween(lastCalving, lastCloseUp);
+    if (!Number.isNaN(gapFromCalvingToCloseUp) && gapFromCalvingToCloseUp >= 0) {
+      return `❌ تم تسجيل تحضير للولادة مسبقًا في هذا الموسم بتاريخ ${lastCloseUp} — لا يمكن تكراره.`;
+    }
+  }
 
   // خارج القطيع
   const st = String(doc.status ?? "").trim().toLowerCase();
