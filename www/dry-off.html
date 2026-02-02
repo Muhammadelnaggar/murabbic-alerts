@@ -10,8 +10,6 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
 
-  <!-- (اتركه كما هو الآن حتى لا نكسر منطقك الحالي) -->
-  <script src="/js/animal-update.js"></script>
 
   <style>
     /* ✅ Header (Murabbik standard) */
@@ -161,7 +159,8 @@
     <!-- ✅ Infobar (سيستخدمه showMsg) -->
     <div id="info" class="infobar"></div>
 
-    <form id="dryOffForm" class="mbk-card">
+    <form id="dryOffForm" class="mbk-card" data-validate="true" data-event="تجفيف">
+
       <div class="field">
         <label for="animal-id">رقم الحيوان</label>
        <input type="text" id="animalNumber" data-field="animalNumber" required />
@@ -303,7 +302,8 @@ form.addEventListener("mbk:valid", async (e) => {
     if (btn) btn.disabled = true;
 
     await addDoc(collection(db, "events"), data);
-    if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
+  await updateAnimalByEvent(data);
+
 
     try { localStorage.setItem("lastAnimalId", data.animalNumber); } catch {}
     showMsg("✅ تم حفظ التجفيف بنجاح");
@@ -320,6 +320,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
