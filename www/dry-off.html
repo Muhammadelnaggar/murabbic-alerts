@@ -345,10 +345,25 @@ async function calcGestation(){
   if (!animalNumber || !dryDate) return;
 
   // لازم يكون login علشان نقرأ events
-  try { await requireAuth(); } catch { return; }
+ try { await requireAuth(); }
+catch {
+  gestEl.value = "—";
+  badgeEl.textContent = "!";
+  badgeEl.classList.add("warn");
+  if (noteEl) noteEl.textContent = "يلزم تسجيل الدخول لحساب شهور الحمل.";
+  return;
+}
 
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
+
+ const uid = String(auth.currentUser?.uid || "").trim();
+if (!uid){
+  gestEl.value = "—";
+  badgeEl.textContent = "!";
+  badgeEl.classList.add("warn");
+  if (noteEl) noteEl.textContent = "لم يتم تحميل هوية المستخدم بعد (auth). أعد فتح الصفحة.";
+  return;
+}
+
 
 // ✅ جلب وثيقة الحيوان بالبحث عن (userId_number) لأن docId ليس رقم الحيوان
 const qy = query(
@@ -472,6 +487,7 @@ idEl?.addEventListener("input", ()=>{ calcGestation().catch(()=>{}); });
   </script>
 </body>
 </html>
+
 
 
 
