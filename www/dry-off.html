@@ -180,25 +180,33 @@
 
       <div class="field">
         <label>سبب التجفيف</label>
-        <div class="option-group">
-        <input type="radio" data-field="reason" name="reason" value="طبيعي" required />
-          <label><input type="radio" name="reason" value="اضطراري" required /> اضطراري</label>
+      <div class="option-group">
+  <label><input type="radio" data-field="reason" name="reason" value="طبيعي" required /> طبيعي</label>
+  <label><input type="radio" data-field="reason" name="reason" value="اضطراري" required /> اضطراري</label>
+</div>
+
         </div>
       </div>
 
       <div class="field">
         <label>تأكيد الحمل</label>
         <div class="option-group">
-          <input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required />
-          <input type="radio" name="pregnancyStatus" value="فارغة" required />
+         <div class="option-group">
+  <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required /> عشار</label>
+  <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="فارغة" required /> فارغة</label>
+</div>
+
         </div>
       </div>
 
       <div class="field">
         <label>تم استخدام محاقن التجفيف؟</label>
         <div class="option-group">
-         <input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required />
-         <input type="radio" name="usedDryingAntibiotics" value="لا" required />
+        <div class="option-group">
+  <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
+  <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
+</div>
+
         </div>
       </div>
 
@@ -215,68 +223,16 @@
     import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const form  = document.getElementById("dryOffForm");
-    const idEl  = document.getElementById("animal-id");
-    const dateEl= document.getElementById("date");
+   const idEl  = document.getElementById("animalNumber");
+const dateEl= document.getElementById("eventDate");
+
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
-        const gestEl = document.getElementById("gestDays");
+       const gestEl = document.getElementById("gestationDays");
+
 
     // ✅ الصفحة لا تعمل submit — تنتظر mbk:valid فقط
-    form.addEventListener("mbk:valid", async (e) => {
-      const fd = e?.detail?.formData || {};
-
-      // كل الحقول مطلوبة
-      const animalId = String(fd.number || idEl.value || "").trim();
-      const dryOffDate = String(fd.date || dateEl.value || "").trim();
-      const reason = String(fd.reason || "").trim();
-      const pregnancyStatus = String(fd.pregnancy || "").trim();
-      const usedDryingAntibiotics = String(fd.antibiotics || "").trim();
-      const gestationDays = Number(fd.gestationDays ?? gestEl?.value ?? NaN);
-
-      if (!animalId || !dryOffDate || !reason || !pregnancyStatus || !usedDryingAntibiotics || !Number.isFinite(gestationDays)) {
-        showMsg("⚠️ أكمل كل الحقول المطلوبة أولًا.", true);
-        return;
-      }
-
-      const data = {
-        animalId,
-        dryOffDate,
-        eventDate: dryOffDate,
-        reason,
-        pregnancyStatus,
-        usedDryingAntibiotics,
-        gestationDays,
-
-        type: "تجفيف",
-        eventType: "dry_off",
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-        source: location.href,
-        userId: auth.currentUser?.uid || null,
-        isSmartAlert: true,
-        alertRule: "تجفيف",
-        createdAt: serverTimestamp()
-      };
-
-      try {
-        const btn = form.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = true;
-
-        await addDoc(collection(db, "events"), data);
-        if (window.updateAnimalByEvent) await window.updateAnimalByEvent(data);
-
-        try { localStorage.setItem("lastAnimalId", animalId); } catch {}
-        showMsg("✅ تم حفظ التجفيف بنجاح");
-        setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
-
-      } catch (error) {
-        console.error("❌ خطأ:", error);
-        showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
-        const btn = form.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = false;
-      }
-    });
-
-
+   
     function showMsg(txt, isErr=false){
       if(!info) return;
       info.style.display = "block";
@@ -364,6 +320,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
