@@ -125,6 +125,60 @@
           });
         }
       }
+      // --- Rule 6: تذكير خطوات بروتوكول اليوم (من tasks) ---
+      if (page.includes('dashboard') || page.includes('add-event')) {
+; (async function(){
+
+  try{
+    // smart-checks غالبًا بيتحمّل type="module" عندك في الداشبورد
+    // فـ import() شغال. لو مش شغال، هنرجع نعمله بطريقة تانية لاحقًا.
+    const mod = await import('/js/firebase-config.js?v=1');
+    const db = mod?.db;
+    const auth = mod?.auth;
+    if(!db) return;
+
+    const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+    if(!uid) return;
+
+    const { collection, query, where, getDocs, limit } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+    const today = todayISO();
+    const onceKey = `seen_protocol_due_${today}`;
+if (localStorage.getItem(onceKey)) return;
+
+
+    // نجيب أول خطوة pending لليوم (بدون تعقيد indexes)
+    const q = query(
+      collection(db, 'tasks'),
+      where('userId','==', uid),
+      where('type','==','protocol_step'),
+      where('status','==','pending'),
+      where('plannedDate','==', today),
+      limit(1)
+    );
+
+    const snap = await getDocs(q);
+    if(snap.empty) return;
+
+    const doc0 = snap.docs[0].data() || {};
+    const an = doc0.animalNumber || '';
+    const step = doc0.stepName || 'خطوة بروتوكول';
+    const program = doc0.program || '';
+
+    fire(onAlert, {
+      ruleId:'protocol_step_due_today',
+      severity:'info',
+      animalId: an,
+      program,
+      message: `🔔 اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
+    });
+      localStorage.setItem(onceKey, '1');
+  }catch(e){
+    // صامت
+  }
+})();
+
     }
 
     if (document.readyState === 'loading')
