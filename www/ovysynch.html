@@ -2,236 +2,263 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+
+  <!-- (هنرجع لملاحظة animal-update.js لاحقًا كما اتفقنا) -->
   <script src="/js/animal-update.js"></script>
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
-  <title>بروتوكول تزامن التبويض والتلقيح الإجباري</title>
- <style>
-  body{
-    margin:0;
-    padding:0;
-    background: var(--bg, #f7faf7);
-    color: var(--text, #0f172a);
-    font-family:'Cairo',Tahoma,Arial,sans-serif;
-    direction: rtl;
-  }
 
-  header{
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: #fff;
-    border-bottom: 1px solid var(--border, #e2e8f0);
-  }
-  .mbk-head{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:10px 12px;
-  }
-  .mbk-logo{
-    width:auto;
-    height:48px;
-    object-fit:contain;
-    opacity:.95;
-    flex-shrink:0;
-  }
-  .mbk-center{
-    flex:1;
-    text-align:center;
-    line-height:1.2;
-  }
-  .mbk-page-title{
-    font-size:18px;
-    font-weight:900;
-    color: var(--ink, #0f172a);
-  }
-  .mbk-app-name{
-    font-size:13px;
-    font-weight:800;
-    color: var(--brand-600, #0b7f47);
-    opacity:.9;
-  }
-  .mbk-back{
-    width:42px;
-    height:42px;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    text-decoration:none;
-    font-weight:900;
-    color: var(--brand-600, #0b7f47);
-    border:2px solid var(--brand-600, #0b7f47);
-    background:#fff;
-    flex-shrink:0;
-  }
+  <title>بروتوكول تزامن التبويض والتلقيح الإجباري — مُرَبِّيك</title>
 
-  .wrap{
-    max-width:520px;
-    margin:12px auto 24px;
-    padding:0 12px;
-  }
-  .mbk-card{
-    background:#fff;
-    border:1px solid var(--border, #e2e8f0);
-    border-radius:16px;
-    padding:14px;
-    box-shadow:0 1px 0 rgba(15,23,42,.04);
-  }
+  <style>
+    body{
+      margin:0;padding:0;
+      background: var(--bg, #f7faf7);
+      color: var(--text, #0f172a);
+      font-family:'Cairo',Tahoma,Arial,sans-serif;
+      direction: rtl;
+    }
 
-  .btn-row{
-    position: sticky;
-    bottom: 10px;
-    background: #fff;
-    padding: 10px;
-    border: 1px solid var(--border, #e2e8f0);
-    border-radius: 16px;
-    display:flex;
-    gap:10px;
-    margin-top:14px;
-  }
-  .btn-row .save-btn,
-  .btn-row .open-card{
-    flex:1;
-    width:auto;
-    border-radius:14px;
-    padding:12px 14px;
-    font-weight:900;
-    font-size:16px;
-    cursor:pointer;
-  }
-  .btn-row .save-btn{
-    background: var(--brand, #0ea05a);
-    color:#fff;
-    border:0;
-  }
-  .btn-row .open-card{
-    background:#fff !important;
-    color: var(--brand-600, #0b7f47) !important;
-    border:2px solid var(--brand-600, #0b7f47) !important;
-  }
-   .hint{
-  font-size: 12px;
-  opacity: .65;
-  line-height: 1.4;
-}
+    header{
+      position: sticky; top: 0; z-index: 20;
+      background: #fff;
+      border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    .mbk-head{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; padding:10px 12px;
+    }
+    .mbk-logo{ height:48px; width:auto; object-fit:contain; opacity:.95; flex-shrink:0; }
+    .mbk-center{ flex:1; text-align:center; line-height:1.2; }
+    .mbk-page-title{ font-size:18px; font-weight:900; color: var(--ink, #0f172a); }
+    .mbk-app-name{ font-size:13px; font-weight:800; color: var(--brand-600, #0b7f47); opacity:.9; }
+    .mbk-back{
+      width:42px; height:42px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      text-decoration:none; font-weight:900;
+      color: var(--brand-600, #0b7f47);
+      border:2px solid var(--brand-600, #0b7f47);
+      background:#fff; flex-shrink:0;
+    }
 
-</style>
+    .wrap{ max-width:520px; margin:12px auto 24px; padding:0 12px; }
+    .mbk-card{
+      background:#fff;
+      border:1px solid var(--border, #e2e8f0);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 1px 0 rgba(15,23,42,.04);
+    }
 
+    /* تخطيط الحقول */
+    .row{ display:grid; grid-template-columns:1fr; gap:12px; }
+    @media(min-width:640px){ .row-2{ grid-template-columns:1fr 1fr; } }
+
+    .hint{ font-size:12px; opacity:.65; line-height:1.4; }
+
+    /* صندوق الخطوات */
+    .steps{
+      margin-top:12px;
+      border:1px solid var(--border, #e2e8f0);
+      border-radius:14px;
+      background:#fff;
+      overflow:hidden;
+    }
+    .step{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:center;
+      padding:12px;
+      border-bottom:1px dashed var(--border, #e2e8f0);
+    }
+    .step:last-child{ border-bottom:none; }
+    .step .name{ font-weight:900; }
+    .step .date{ font-size:13px; opacity:.85; white-space:nowrap; }
+    .step .chk{ display:flex; align-items:center; gap:8px; justify-content:flex-start; }
+    .step input[type="checkbox"]{ width:18px; height:18px; }
+
+    /* شارة في الموعد/مؤكدة */
+    .on-time{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border, #e2e8f0); }
+    .ok{ background:#f0fff6; border-color:#bbf7d0; }
+    .late{ background:#fff7ed; border-color:#fed7aa; }
+
+    /* رسائل */
+    #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
+    #info.infobar{ display:none; margin-bottom:10px; }
+
+    /* أزرار أسفل الصفحة */
+    .btn-row{
+      position: sticky;
+      bottom: 10px;
+      background: #fff;
+      padding: 10px;
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 16px;
+      display:flex;
+      gap:10px;
+      margin:14px 12px 18px;
+      max-width:520px;
+      margin-left:auto; margin-right:auto;
+    }
+    .btn-row .save-btn,
+    .btn-row .open-card{
+      flex:1; width:auto;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:900;
+      font-size:16px;
+      cursor:pointer;
+    }
+    .btn-row .save-btn{
+      background: var(--brand, #0ea05a);
+      color:#fff; border:0;
+    }
+    .btn-row .open-card{
+      background:#fff !important;
+      color: var(--brand-600, #0b7f47) !important;
+      border:2px solid var(--brand-600, #0b7f47) !important;
+    }
+  </style>
 </head>
+
 <body>
-<header>
-  <div class="mbk-head">
-    <a class="mbk-back" href="add-event.html" title="رجوع">رجوع</a>
+  <header>
+    <div class="mbk-head">
+      <a class="mbk-back" href="add-event.html" title="رجوع">رجوع</a>
 
-    <div class="mbk-center">
-      <div class="mbk-page-title">بروتوكول التزامن والتلقيح</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
+      <div class="mbk-center">
+        <div class="mbk-page-title">بروتوكول التزامن والتلقيح</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
+  </header>
 
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  <div class="wrap">
+    <div id="info" class="infobar"></div>
+
+    <div class="mbk-card">
+      <form id="ovForm" autocomplete="off">
+
+        <div class="row row-2">
+          <div class="field">
+            <label for="animalId">رقم الحيوان</label>
+            <input id="animalId" type="text" placeholder="مثال: 105" />
+          </div>
+
+          <div class="field">
+            <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
+            <input id="startDate" type="date" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="field">
+            <label for="program">نوع البرنامج</label>
+            <select id="program">
+              <option value="" selected disabled>اختر البرنامج</option>
+              <option value="ovsynch">Ovsynch</option>
+              <option value="cosynch72">Cosynch-72</option>
+              <option value="presynch_ovsynch">Presynch + Ovsynch</option>
+            </select>
+            <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
+          </div>
+        </div>
+
+        <div id="stepsBox" class="steps" aria-live="polite"></div>
+
+        <div id="warn"></div>
+      </form>
+    </div>
   </div>
-</header>
-<div class="wrap">
-  <div id="info" class="infobar"></div>
-  <div class="card mbk-card">
-    <form id="ovForm">
 
-      <div class="row row-2">
-        <div>
-          <label for="animalId">رقم الحيوان</label>
-          <input id="animalId" type="text" placeholder="مثال: 105"/>
-        </div>
-        <div>
-          <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
-          <input id="startDate" type="date"/>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="program">نوع البرنامج</label>
-          <select id="program">
-            <option value="" selected disabled>اختر البرنامج</option>
-            <option value="ovsynch">Ovsynch</option>
-            <option value="cosynch72">Cosynch-72</option>
-            <option value="presynch_ovsynch">Presynch + Ovsynch</option>
-          </select>
-          <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
-        </div>
-      </div>
-
-      <div id="stepsBox" class="steps" aria-live="polite"></div>
-
-      <div id="warn" class="warn"></div>
-   </form>
-</div>
-</div>
-
-<div class="btn-row">
-  <button id="saveBtn" class="save-btn" type="button">تسجيل البروتوكول</button>
-  <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
-</div>
-
+  <div class="btn-row">
+    <button id="saveBtn" class="save-btn" type="button">تسجيل البروتوكول</button>
+    <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    
     const form        = document.getElementById('ovForm');
     const animalIdEl  = document.getElementById('animalId');
     const startDateEl = document.getElementById('startDate');
     const programEl   = document.getElementById('program');
     const stepsBox    = document.getElementById('stepsBox');
 
-    const saveBtn = document.getElementById('saveBtn');
+    const saveBtn     = document.getElementById('saveBtn');
     const openCardBtn = document.getElementById("openCowCard");
 
-openCardBtn?.addEventListener("click", ()=>{
-  const id = animalIdEl.value.trim();
-  if(!id) return;
-  location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
-});
+    const warnEl = document.getElementById('warn');
+    const infoEl = document.getElementById('info');
 
-    const resetBtn= document.getElementById('resetBtn');
-    const warn    = document.getElementById('warn');
+    let dbRef = null, authRef = null;
+    let stepsState = [];
 
-    const msgBox  = document.getElementById('inlineMsg');
-    const msgText = msgBox.querySelector('.text');
-   
+    function todayLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
 
-    let dbRef=null, authRef=null; // نستخدمها داخل مستمع checkbox
+    function showWarn(t){ warnEl.textContent = t || ""; }
+    function clearWarn(){ warnEl.textContent = ""; }
 
-    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-    function showWarn(t){ warn.textContent=t; }
-    function clearWarn(){ warn.textContent=''; }
-    function showMsg(text){ msgText.textContent=text; msgBox.style.display='block'; }
-    function hideMsg(){ msgBox.style.display='none'; msgText.textContent=''; }
+    function showInfo(text, isErr=false){
+      if(!infoEl) return;
+      infoEl.style.display = "block";
+      infoEl.className = "infobar " + (isErr ? "error" : "show");
+      infoEl.textContent = text;
+      try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+      setTimeout(()=>{ infoEl.style.display="none"; }, 2800);
+    }
 
+    // ✅ فتح بطاقة الحيوان
+    openCardBtn?.addEventListener("click", ()=>{
+      const id = (animalIdEl.value || "").trim();
+      if(!id) return;
+      location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
+    });
+
+    // ✅ قراءة الكونتكست من add-event (number/date) + بدائل + localStorage
     function hydrate(){
       const qp = new URLSearchParams(location.search);
-      const id = qp.get('animalId') || qp.get('animalIdd') || qp.get('number') || localStorage.getItem('lastAnimalId') || '';
-      const dt = qp.get('date') || todayLocal();
-      animalIdEl.value = id; if(id) animalIdEl.readOnly = true;
+
+      const id =
+        (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || qp.get('animalIdd') || "").trim() ||
+        (localStorage.getItem('lastAnimalId') || "").trim();
+
+      const dt =
+        (qp.get('date') || qp.get('eventDate') || "").trim() ||
+        (localStorage.getItem('lastEventDate') || "").trim() ||
+        todayLocal();
+
+      if (id){
+        animalIdEl.value = id;
+        animalIdEl.readOnly = true;
+        try{ localStorage.setItem('lastAnimalId', id); }catch{}
+      }
+
       startDateEl.value = dt;
-      
+      try{ localStorage.setItem('lastEventDate', dt); }catch{}
+    }
 
-    hydrate();
+    function addDays(baseISO, days){
+      const d = new Date(baseISO);
+      d.setDate(d.getDate() + days);
+      return d;
+    }
 
-    animalIdEl.addEventListener('input', ()=>{ ctxAnimal.textContent = `الحيوان: ${animalIdEl.value.trim()||'غير محدد'}`; });
-    startDateEl.addEventListener('input', ()=>{ try{ ctxDate.textContent = `تاريخ البدء: ${new Date(startDateEl.value).toLocaleDateString('ar-EG')}`;}catch{ ctxDate.textContent = `تاريخ البدء: ${startDateEl.value}`; } updateSteps(); });
-    programEl.addEventListener('change', updateSteps);
+    function fmt(d){
+      try{ return d.toLocaleDateString('ar-EG'); }catch{ return d.toISOString().slice(0,10); }
+    }
 
-    function addDays(base, days){ const d=new Date(base); d.setDate(d.getDate()+days); return d; }
-    function fmt(d){ try{ return d.toLocaleDateString('ar-EG'); }catch{ return d.toISOString().slice(0,10); } }
-
-    // قوالب البرامج (أيام نسبية من يوم 0)
     const PROGRAMS = {
       ovsynch:[
         { day: 0,  name:'GnRH (اليوم 0)' },
@@ -254,23 +281,25 @@ openCardBtn?.addEventListener("click", ()=>{
       ]
     };
 
-    let stepsState = [];
-
     function updateSteps(){
       stepsBox.innerHTML = '';
-      const start = startDateEl.value;
-      const program = programEl.value;
+
+      const start = (startDateEl.value || "").trim();
+      const program = (programEl.value || "").trim();
       if(!start || !program) return;
 
       const tpl = PROGRAMS[program] || [];
       const prev = stepsState;
+
       stepsState = tpl.map((s)=>{
-        const dateISO = addDays(start, s.day).toISOString().slice(0,10);
-        const keep = prev.find(p=>p.name===s.name && p.day===s.day);
+        const dateISO = addDays(start, s.day);
+        const iso = new Date(dateISO.getTime() - dateISO.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        const keep = prev.find(p => p.name===s.name && p.day===s.day);
+
         return {
           day: s.day,
           name: s.name,
-          date: dateISO,
+          date: iso,
           done: keep ? !!keep.done : false,
           confirmedOn: keep ? keep.confirmedOn || null : null,
           onSchedule: keep ? !!keep.onSchedule : false,
@@ -281,23 +310,34 @@ openCardBtn?.addEventListener("click", ()=>{
       stepsState.forEach((st, idx)=>{
         const row = document.createElement('div');
         row.className = 'step';
-        const chip = st.done ? `<span class="on-time ${st.onSchedule? 'ok':'late'}">${st.onSchedule? '✓ في الموعد':'✓ مؤكدة'}</span>` : '';
+
+        const chip = st.done
+          ? `<span class="on-time ${st.onSchedule ? 'ok' : 'late'}">${st.onSchedule ? '✓ في الموعد' : '✓ مؤكدة'}</span>`
+          : '';
+
         row.innerHTML = `
-          <div class="name">${st.name}</div>
-          <div class="date">📅 ${fmt(new Date(st.date))} ${chip}</div>
-          <label class="chk"><input data-idx="${idx}" type="checkbox" ${st.done? 'checked':''}/> تم</label>
+          <div>
+            <div class="name">${st.name}</div>
+            <div class="date">📅 ${fmt(new Date(st.date))} ${chip}</div>
+          </div>
+          <label class="chk">
+            <input data-idx="${idx}" type="checkbox" ${st.done ? 'checked' : ''}/>
+            تم
+          </label>
         `;
         stepsBox.appendChild(row);
       });
     }
 
-    // حفظ خطوة منفصلة عند التأكيد
     async function saveStepEvent(i){
       try{
-        if(!dbRef) return; // لا تحطم الصفحة إن لم تتوفر قاعدة البيانات
+        if(!dbRef) return;
         const st = stepsState[i];
-        if(!st || st._savedOnce) return; // منع التكرار داخل نفس الجلسة
-        const animalId = (animalIdEl.value||'').trim();
+        if(!st || st._savedOnce) return;
+
+        const animalId = (animalIdEl.value || '').trim();
+        if(!animalId) return;
+
         const payload = {
           type: 'ovysynch-step',
           eventType: 'خطوة بروتوكول',
@@ -313,84 +353,121 @@ openCardBtn?.addEventListener("click", ()=>{
           userId: authRef?.currentUser?.uid || null,
           createdAt: serverTimestamp()
         };
+
         await addDoc(collection(dbRef,'events'), payload);
         st._savedOnce = true;
-      }catch(err){ console.error('saveStepEvent failed', err); }
+      }catch(err){
+        console.error('saveStepEvent failed', err);
+      }
     }
 
     stepsBox.addEventListener('change', async (e)=>{
       const el = e.target.closest('input[type="checkbox"][data-idx]');
       if(!el) return;
+
       const i = Number(el.getAttribute('data-idx'));
-      const today = todayLocal();
       const st = stepsState[i];
+      if(!st) return;
+
+      const today = todayLocal();
       st.done = el.checked;
       st.confirmedOn = el.checked ? today : null;
       st.onSchedule = el.checked ? (today === st.date) : false;
-      if (el.checked) { await saveStepEvent(i); }
+
+      if(el.checked) await saveStepEvent(i);
       updateSteps();
     });
 
-    // Firebase
+    // Firebase setup (نفس منطقك، لكن آمن)
     async function setupFirebase(){
       try{
         const mod = await import('./js/firebase-config.js?v=5');
-        if(mod?.db && mod?.auth){ return { db:mod.db, auth:mod.auth }; }
-        if(mod?.firebaseConfig){ const app=initializeApp(mod.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }
+        if(mod?.db && mod?.auth) return { db:mod.db, auth:mod.auth };
+        if(mod?.firebaseConfig){
+          const app = initializeApp(mod.firebaseConfig);
+          return { db:getFirestore(app), auth:getAuth(app) };
+        }
       }catch(e){ /* ignore */ }
-      try{ const cfg = await import('./config.js?v=5'); const app=initializeApp(cfg.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }catch(e2){ showWarn('❌ تعذّر تحميل إعدادات Firebase.'); return { db:null, auth:null }; }
+
+      try{
+        const cfg = await import('./config.js?v=5');
+        const app = initializeApp(cfg.firebaseConfig);
+        return { db:getFirestore(app), auth:getAuth(app) };
+      }catch(e2){
+        showWarn('❌ تعذّر تحميل إعدادات Firebase.');
+        return { db:null, auth:null };
+      }
     }
 
     const { db, auth } = await setupFirebase();
-    dbRef = db; authRef = auth;
+    dbRef = db;
+    authRef = auth;
 
     function getCtx(){
-      const animalId = animalIdEl.value.trim();
-      const start = startDateEl.value.trim();
-      const program = programEl.value;
-      if(!animalId || !start || !program){ showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.'); return null; }
-      clearWarn(); localStorage.setItem('lastAnimalId', animalId);
+      const animalId = (animalIdEl.value||'').trim();
+      const start = (startDateEl.value||'').trim();
+      const program = (programEl.value||'').trim();
+
+      if(!animalId || !start || !program){
+        showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
+        return null;
+      }
+
+      clearWarn();
+      try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
+      try{ localStorage.setItem('lastEventDate', start); }catch{}
       return { animalId, start, program, steps: stepsState };
     }
 
     async function saveProtocol(){
-      const ctx = getCtx(); if(!ctx) return;
-      saveBtn.disabled = true; saveBtn.textContent = '... جاري الحفظ';
+      const ctx = getCtx();
+      if(!ctx) return;
+
+      saveBtn.disabled = true;
+      const oldTxt = saveBtn.textContent;
+      saveBtn.textContent = '... جاري الحفظ';
+
       try{
-       const payload = {
-  type: 'ovysynch',
-  eventType: 'بروتوكول تزامن',
-  animalId: ctx.animalId,
-  animalNumber: ctx.animalId,
-  startDate: ctx.start,
-  program: ctx.program,
-  steps: ctx.steps,              // مصفوفة الخطوات
-  userId: auth?.currentUser?.uid || null,
-  createdAt: serverTimestamp()
-};
+        const payload = {
+          type: 'ovysynch',
+          eventType: 'بروتوكول تزامن',
+          animalId: ctx.animalId,
+          animalNumber: ctx.animalId,
+          startDate: ctx.start,
+          program: ctx.program,
+          steps: ctx.steps,
+          userId: authRef?.currentUser?.uid || null,
+          createdAt: serverTimestamp()
+        };
 
-// 1) حفظ الحدث
-if (db) {
-  await addDoc(collection(db, 'events'), payload);
-}
+        if(dbRef){
+          await addDoc(collection(dbRef,'events'), payload);
+        }
 
-// 2) تحديث وثيقة الحيوان
-await window.updateAnimalByEvent(payload);
+        // تحديث الحيوان (لو الدالة متاحة)
+        if(typeof window.updateAnimalByEvent === "function"){
+          await window.updateAnimalByEvent(payload);
+        }
 
-// 3) رسالة النجاح
-hideMsg();
-showMsg('✅ تم تسجيل البروتوكول بنجاح');
-
-      }catch(e){ console.error(e); showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.'); }
-      finally{ saveBtn.disabled=false; saveBtn.textContent='💾 تسجيل البروتوكول'; }
+        showInfo('✅ تم تسجيل البروتوكول بنجاح');
+      }catch(e){
+        console.error(e);
+        showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.');
+      }finally{
+        saveBtn.disabled = false;
+        saveBtn.textContent = oldTxt;
+      }
     }
 
     saveBtn.addEventListener('click', saveProtocol);
     form.addEventListener('submit', (e)=>{ e.preventDefault(); saveProtocol(); });
 
-    resetBtn.addEventListener('click', ()=>{ form.reset(); hydrate(); stepsState=[]; stepsBox.innerHTML=''; hideMsg(); clearWarn(); });
+    // ✅ تشغيل الصفحة
+    hydrate();
+    startDateEl.addEventListener('input', updateSteps);
+    programEl.addEventListener('change', updateSteps);
+    animalIdEl.addEventListener('input', ()=>{ try{ localStorage.setItem('lastAnimalId', (animalIdEl.value||'').trim()); }catch{} });
 
-    // أول عرض
     updateSteps();
   </script>
 </body>
