@@ -9,7 +9,14 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>بروتوكول تزامن التبويض والتلقيح الإجباري</title>
   <style>
-    body{direction:rtl;background:#fffde7;font-family:'Arial',sans-serif;margin:0;padding:18px;color:#1b5e20}
+   body{
+  direction:rtl;
+  margin:0;
+  padding:0;                 /* بدل 18px */
+  background: var(--bg, #f7faf7);   /* ✅ خلفية مربيك */
+  color: var(--text, #0f172a);
+  font-family:'Cairo',Tahoma,Arial,sans-serif;
+}
     h1{margin:0 0 12px;text-align:center;color:#2e7d32;font-size:24px}
     .pill{display:inline-block;padding:4px 10px;border:1px solid #8bc34a;border-radius:999px;background:#dcedc8;color:#1b5e20;font-size:14px}
     .context{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 12px}
