@@ -181,11 +181,12 @@
     <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+ <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+  (async () => {
     const form        = document.getElementById('ovForm');
     const animalIdEl  = document.getElementById('animalId');
     const startDateEl = document.getElementById('startDate');
@@ -201,14 +202,16 @@
     let dbRef = null, authRef = null;
     let stepsState = [];
 
+    // === تشخيص سريع عشان نتأكد إن السكربت الجديد اتشغّل ===
+    console.log("✅ ovsynch script loaded v2");
+
     function todayLocal(){
       const d = new Date();
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       return d.toISOString().slice(0,10);
     }
-
-    function showWarn(t){ warnEl.textContent = t || ""; }
-    function clearWarn(){ warnEl.textContent = ""; }
+    function showWarn(t){ if(warnEl) warnEl.textContent = t || ""; }
+    function clearWarn(){ if(warnEl) warnEl.textContent = ""; }
 
     function showInfo(text, isErr=false){
       if(!infoEl) return;
@@ -216,7 +219,7 @@
       infoEl.className = "infobar " + (isErr ? "error" : "show");
       infoEl.textContent = text;
       try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
-      setTimeout(()=>{ infoEl.style.display="none"; }, 2800);
+      setTimeout(()=>{ infoEl.style.display="none"; }, 2500);
     }
 
     // ✅ فتح بطاقة الحيوان
@@ -226,7 +229,7 @@
       location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
     });
 
-    // ✅ قراءة الكونتكست من add-event (number/date) + بدائل + localStorage
+    // ✅ قراءة الكونتكست من add-event (number/date/eventDate…)
     function hydrate(){
       const qp = new URLSearchParams(location.search);
 
@@ -254,7 +257,6 @@
       d.setDate(d.getDate() + days);
       return d;
     }
-
     function fmt(d){
       try{ return d.toLocaleDateString('ar-EG'); }catch{ return d.toISOString().slice(0,10); }
     }
@@ -292,10 +294,9 @@
       const prev = stepsState;
 
       stepsState = tpl.map((s)=>{
-        const dateISO = addDays(start, s.day);
-        const iso = new Date(dateISO.getTime() - dateISO.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        const dd = addDays(start, s.day);
+        const iso = new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
         const keep = prev.find(p => p.name===s.name && p.day===s.day);
-
         return {
           day: s.day,
           name: s.name,
@@ -378,7 +379,6 @@
       updateSteps();
     });
 
-    // Firebase setup (نفس منطقك، لكن آمن)
     async function setupFirebase(){
       try{
         const mod = await import('./js/firebase-config.js?v=5');
@@ -444,7 +444,7 @@
           await addDoc(collection(dbRef,'events'), payload);
         }
 
-        // تحديث الحيوان (لو الدالة متاحة)
+        // تحديث الحيوان (لو الدالة موجودة)
         if(typeof window.updateAnimalByEvent === "function"){
           await window.updateAnimalByEvent(payload);
         }
@@ -466,9 +466,11 @@
     hydrate();
     startDateEl.addEventListener('input', updateSteps);
     programEl.addEventListener('change', updateSteps);
-    animalIdEl.addEventListener('input', ()=>{ try{ localStorage.setItem('lastAnimalId', (animalIdEl.value||'').trim()); }catch{} });
 
     updateSteps();
-  </script>
+
+  })();
+</script>
+
 </body>
 </html>
