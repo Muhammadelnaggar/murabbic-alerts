@@ -114,6 +114,12 @@
     color: var(--brand-600, #0b7f47) !important;
     border:2px solid var(--brand-600, #0b7f47) !important;
   }
+   .hint{
+  font-size: 12px;
+  opacity: .65;
+  line-height: 1.4;
+}
+
 </style>
 
 </head>
@@ -130,12 +136,6 @@
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
-
-  <div class="context">
-    <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
-    <span id="ctxDate" class="pill">تاريخ البدء: —</span>
-  </div>
-
 <div class="wrap">
   <div id="info" class="infobar"></div>
   <div class="card mbk-card">
@@ -161,21 +161,13 @@
             <option value="cosynch72">Cosynch-72</option>
             <option value="presynch_ovsynch">Presynch + Ovsynch</option>
           </select>
-          <div class="muted">يتم توليد خطوات البرنامج تلقائيًا حسب تاريخ البدء. ضع علامة ✔️ عند تنفيذ كل خطوة ليتم حفظها فورًا كـ"خطوة بروتوكول".</div>
+          <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
         </div>
       </div>
 
       <div id="stepsBox" class="steps" aria-live="polite"></div>
 
       <div id="warn" class="warn"></div>
-
-      <div id="inlineMsg" class="notice" role="status" aria-live="polite">
-        <div class="text"></div>
-        <div class="actions">
-          <button type="button" id="msgYes" class="btn-primary">تسجيل أحداث أخرى</button>
-          <button type="button" id="msgNo"  class="btn-ghost">لوحة التحكم</button>
-        </div>
-      </div>
    </form>
 </div>
 </div>
@@ -191,8 +183,7 @@
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const ctxAnimal   = document.getElementById('ctxAnimal');
-    const ctxDate     = document.getElementById('ctxDate');
+    
     const form        = document.getElementById('ovForm');
     const animalIdEl  = document.getElementById('animalId');
     const startDateEl = document.getElementById('startDate');
@@ -213,8 +204,7 @@ openCardBtn?.addEventListener("click", ()=>{
 
     const msgBox  = document.getElementById('inlineMsg');
     const msgText = msgBox.querySelector('.text');
-    const btnYes  = document.getElementById('msgYes');
-    const btnNo   = document.getElementById('msgNo');
+   
 
     let dbRef=null, authRef=null; // نستخدمها داخل مستمع checkbox
 
@@ -230,9 +220,7 @@ openCardBtn?.addEventListener("click", ()=>{
       const dt = qp.get('date') || todayLocal();
       animalIdEl.value = id; if(id) animalIdEl.readOnly = true;
       startDateEl.value = dt;
-      ctxAnimal.textContent = `الحيوان: ${id||'غير محدد'}`;
-      try{ ctxDate.textContent = `تاريخ البدء: ${new Date(dt).toLocaleDateString('ar-EG')}`; }catch{ ctxDate.textContent = `تاريخ البدء: ${dt}`; }
-    }
+      
 
     hydrate();
 
@@ -399,14 +387,6 @@ showMsg('✅ تم تسجيل البروتوكول بنجاح');
 
     saveBtn.addEventListener('click', saveProtocol);
     form.addEventListener('submit', (e)=>{ e.preventDefault(); saveProtocol(); });
-
-    btnYes.addEventListener('click', ()=>{
-      const id = animalIdEl.value.trim();
-      const dt = startDateEl.value.trim();
-      hideMsg();
-      location.href = `add-event.html?animalId=${encodeURIComponent(id)}&animalIdd=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
-    });
-    btnNo.addEventListener('click', ()=>{ hideMsg(); location.href = 'dashboard.html'; });
 
     resetBtn.addEventListener('click', ()=>{ form.reset(); hydrate(); stepsState=[]; stepsBox.innerHTML=''; hideMsg(); clearWarn(); });
 
