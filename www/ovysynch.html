@@ -143,6 +143,22 @@
 
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off">
+<div class="row" style="margin-bottom:12px">
+  <div class="field">
+    <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
+    <textarea id="bulkAnimals" rows="4" placeholder="مثال:
+105
+106
+110"></textarea>
+    <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
+  </div>
+
+  <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">
+    تطبيق القائمة
+  </button>
+
+  <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
+</div>
 
         <div class="row row-2">
           <div class="field">
@@ -197,6 +213,11 @@
     const animalIdEl  = document.getElementById('animalId');
     const startDateEl = document.getElementById('startDate');
     const startTimeEl = document.getElementById('startTime');
+    const bulkEl      = document.getElementById('bulkAnimals');
+const applyBulkBtn= document.getElementById('applyBulk');
+const bulkHintEl  = document.getElementById('bulkHint');
+
+let bulkList = []; // قائمة أرقام الحيوانات
 
     const programEl   = document.getElementById('program');
     const stepsBox    = document.getElementById('stepsBox');
@@ -220,6 +241,38 @@
     }
     function showWarn(t){ if(warnEl) warnEl.textContent = t || ""; }
     function clearWarn(){ if(warnEl) warnEl.textContent = ""; }
+function parseBulkList(){
+  const raw = (bulkEl?.value || "").trim();
+  if(!raw){ bulkList = []; return []; }
+
+  const arr = raw
+    .split(/\n|,|;/g)
+    .map(s => String(s||"").trim())
+    .filter(Boolean);
+
+  // إزالة التكرار مع الحفاظ على الترتيب
+  const seen = new Set();
+  bulkList = arr.filter(x => (seen.has(x) ? false : (seen.add(x), true)));
+
+  if(bulkHintEl){
+    bulkHintEl.textContent = bulkList.length
+      ? `✅ تم تحميل ${bulkList.length} حيوان: ${bulkList.slice(0,8).join("، ")}${bulkList.length>8?" ...":""}`
+      : "";
+  }
+  return bulkList;
+}
+
+applyBulkBtn?.addEventListener("click", ()=>{
+  const list = parseBulkList();
+  if(!list.length){
+    showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي.");
+    return;
+  }
+  clearWarn();
+  // اختياري: لو الحيوان الواحد فاضي نخلي أول رقم يظهر في الحقل
+  if(animalIdEl && !animalIdEl.value) animalIdEl.value = list[0];
+  showInfo(`✅ قائمة جماعية جاهزة: ${list.length} حيوان`);
+});
 
     function showInfo(text, isErr=false){
       if(!infoEl) return;
@@ -325,10 +378,13 @@ async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, u
    const baseTime = (startTimeEl?.value || "08:00");
 
 let extraHours = 0;
-if (s.name.includes('GnRH') && s.day === 9) extraHours = 56;
-if (s.name.includes('تلقيح')) extraHours = 72; // 56 + 16
+if (program === "ovsynch" && s.day === 9) extraHours = 56;
+if (program === "ovsynch" && s.name.includes("تلقيح")) extraHours = 72;
 
-const plannedDate = toISODateLocal(addDays(protocolStartDate, baseTime, s.day, extraHours));
+
+const plannedDateTime = addDays(protocolStartDate, baseTime, s.day, extraHours);
+const plannedDate = toISODateLocal(plannedDateTime);
+
 
     const taskId = makeTaskId({
       animalNumber,
@@ -517,7 +573,9 @@ st._savedOnce = true;
     authRef = auth;
 
     function getCtx(){
-      const animalId = (animalIdEl.value||'').trim();
+      const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
+const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
+
       const start = (startDateEl.value||'').trim();
       const program = (programEl.value||'').trim();
 
@@ -529,12 +587,19 @@ st._savedOnce = true;
       clearWarn();
       try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
       try{ localStorage.setItem('lastEventDate', start); }catch{}
-      return { animalId, start, program, steps: stepsState };
+     const list = parseBulkList();
+return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
     }
 
     async function saveProtocol(){
       const ctx = getCtx();
       if(!ctx) return;
+      const ids = (ctx.animalIds || []).filter(Boolean);
+if(!ids.length){
+  showWarn("⚠️ لا يوجد أرقام حيوانات.");
+  return;
+}
+
 
       saveBtn.disabled = true;
       const oldTxt = saveBtn.textContent;
@@ -552,30 +617,46 @@ st._savedOnce = true;
           userId: authRef?.currentUser?.uid || null,
           createdAt: serverTimestamp()
         };
+for (let idx = 0; idx < ids.length; idx++){
+  const animalNo = ids[idx];
 
-        if(dbRef){
-  const protocolId = [
-    "ovsynch",
-    String(ctx.animalId).trim(),
-    String(ctx.program).trim(),
-    String(ctx.start).trim()
-  ].join("__");
-
-  await setDoc(doc(dbRef, "events", protocolId), payload, { merge:true });
+  const payload = {
+    type: 'ovysynch',
+    eventType: 'بروتوكول تزامن',
+    animalId: animalNo,
+    animalNumber: animalNo,
+    startDate: ctx.start,
+    program: ctx.program,
+    steps: ctx.steps,
+    userId: authRef?.currentUser?.uid || null,
+    createdAt: serverTimestamp()
+  };
+if(typeof window.updateAnimalByEvent === "function"){
+  await window.updateAnimalByEvent(payload);
 }
 
-        // ✅ إنشاء مهام الخطوات في tasks (مرة واحدة/بدون تكرار)
-await ensureProtocolTasks({
-  animalNumber: ctx.animalId,
-  protocolStartDate: ctx.start,
-  program: ctx.program,
-  userId: authRef?.currentUser?.uid || null
-});
+  if(dbRef){
+    const protocolId = [
+      "ovsynch",
+      String(animalNo).trim(),
+      String(ctx.program).trim(),
+      String(ctx.start).trim()
+    ].join("__");
 
-        // تحديث الحيوان (لو الدالة موجودة)
-        if(typeof window.updateAnimalByEvent === "function"){
-          await window.updateAnimalByEvent(payload);
-        }
+    await setDoc(doc(dbRef, "events", protocolId), payload, { merge:true });
+  }
+
+  await ensureProtocolTasks({
+    animalNumber: animalNo,
+    protocolStartDate: ctx.start,
+    program: ctx.program,
+    userId: authRef?.currentUser?.uid || null
+  });
+
+  // تقدم بسيط
+  showInfo(`✅ تم حفظ (${idx+1}/${ids.length}) رقم ${animalNo}`);
+}
+
 
         showInfo('✅ تم تسجيل البروتوكول بنجاح');
       }catch(e){
