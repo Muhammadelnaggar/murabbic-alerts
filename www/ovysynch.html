@@ -25,11 +25,6 @@
     .step .date{color:#1b5e20;white-space:nowrap}
     .step .chk{display:flex;align-items:center;gap:6px}
     .muted{color:#5f6f64;font-size:13px;margin-top:6px}
-    .actions{position:sticky;bottom:0;left:0;right:0;background:rgba(255,255,255,.9);border-top:1px solid #c5e1a5;padding:10px 0;margin-top:14px}
-    .actions .wrap{max-width:560px;margin:0 auto;display:flex;gap:8px}
-    button{appearance:none;border:0;border-radius:8px;padding:12px 14px;font-weight:bold;font-size:16px;cursor:pointer}
-    .btn-primary{background:#2e7d32;color:#fff}
-    .btn-ghost{background:#fff;border:1px solid #2e7d32;color:#2e7d32}
     .notice{display:none;margin-top:10px;padding:12px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46}
     .notice .actions{display:flex;gap:8px;margin-top:10px;position:static;border:0;background:transparent;padding:0}
     .warn{color:#c62828;text-align:center;min-height:22px;margin-top:8px}
@@ -39,14 +34,29 @@
   </style>
 </head>
 <body>
-  <h1>بروتوكول تزامن التبويض والتلقيح الإجباري</h1>
+<header>
+  <div class="mbk-head">
+    <a class="mbk-back" href="add-event.html" title="رجوع">رجوع</a>
+
+    <div class="mbk-center">
+      <div class="mbk-page-title">بروتوكول التزامن والتلقيح</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+
   <div class="context">
     <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
     <span id="ctxDate" class="pill">تاريخ البدء: —</span>
   </div>
 
-  <div class="card">
+<div class="wrap">
+  <div id="info" class="infobar"></div>
+  <div class="card mbk-card">
     <form id="ovForm">
+
       <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
@@ -82,15 +92,15 @@
           <button type="button" id="msgNo"  class="btn-ghost">لوحة التحكم</button>
         </div>
       </div>
-    </form>
-  </div>
+   </form>
+</div>
+</div>
 
-  <div class="actions">
-    <div class="wrap">
-      <button id="saveBtn" class="btn-primary" type="button">💾 تسجيل البروتوكول</button>
-      <button id="resetBtn" class="btn-ghost" type="button">مسح الحقول</button>
-    </div>
-  </div>
+<div class="btn-row">
+  <button id="saveBtn" class="save-btn" type="button">تسجيل البروتوكول</button>
+  <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
+</div>
+
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -106,6 +116,14 @@
     const stepsBox    = document.getElementById('stepsBox');
 
     const saveBtn = document.getElementById('saveBtn');
+    const openCardBtn = document.getElementById("openCowCard");
+
+openCardBtn?.addEventListener("click", ()=>{
+  const id = animalIdEl.value.trim();
+  if(!id) return;
+  location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
+});
+
     const resetBtn= document.getElementById('resetBtn');
     const warn    = document.getElementById('warn');
 
