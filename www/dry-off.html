@@ -100,23 +100,23 @@
       font-weight:800;
       font-size:14px;
     }
-    .option-group input{ width:auto; padding:0; margin:0; }
-/* ✅ RADIO / OPTION GROUP — واضح ومتناسق */
+/* ✅ RADIO / OPTION GROUP — واضح ومتناسق (بدون :has) */
 .option-group{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
-  justify-content:center;      /* يخليهم في وسط النموذج */
+  justify-content:center;
   align-items:center;
   margin-top:8px;
+  margin-bottom:8px;
 }
 
 .option-group label{
-  flex:1 1 140px;              /* نفس العرض تقريبًا */
-  max-width: 220px;
+  flex:1 1 140px;
+  max-width:220px;
   display:flex;
   align-items:center;
-  justify-content:center;      /* النص في المنتصف */
+  justify-content:center;
   gap:10px;
   padding:12px 14px;
   border-radius:14px;
@@ -127,7 +127,7 @@
   font-size:15px;
   color: var(--ink, #0f172a);
   user-select:none;
-  transition: .12s ease;
+  transition:.12s ease;
 }
 
 /* نخفي الراديو الافتراضي ونرسم دائرة واضحة */
@@ -155,16 +155,13 @@
   background: var(--brand, #0ea05a);
 }
 
-/* تلوين الـ label كله عند الاختيار */
-.option-group label:has(input[type="radio"]:checked){
+/* ✅ تلوين اللابل بالـ JS عبر class */
+.option-group label.is-checked{
   border-color: var(--brand-600, #0b7f47);
-  background: #f0fff6;
+  background:#f0fff6;
 }
 
-/* تحسين للضغط بالموبايل */
-.option-group label:active{
-  transform: scale(0.99);
-}
+.option-group label:active{ transform:scale(.99); }
 
     /* ✅ Bottom actions (Murabbik style) */
     .btn-row{
@@ -276,7 +273,7 @@
   <script type="module">
     import { db, auth, requireAuth } from "/js/firebase-config.js";
     import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+    import { updateAnimalByEvent } from "/js/animal-update.js";
     const form  = document.getElementById("dryOffForm");
    const idEl  = document.getElementById("animalNumber");
 const dateEl= document.getElementById("eventDate");
@@ -284,6 +281,19 @@ const dateEl= document.getElementById("eventDate");
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
        const gestEl = document.getElementById("gestationDays");
+// ✅ تلوين اختيارات الراديو بدون :has (متوافق مع كل المتصفحات)
+document.querySelectorAll('.option-group input[type="radio"]').forEach(r => {
+  const paint = () => {
+    const name = r.name;
+    document.querySelectorAll(`.option-group input[name="${name}"]`).forEach(x=>{
+      const lab = x.closest("label");
+      if (!lab) return;
+      lab.classList.toggle("is-checked", x.checked);
+    });
+  };
+  r.addEventListener("change", paint);
+  paint();
+});
 
 
     // ✅ الصفحة لا تعمل submit — تنتظر mbk:valid فقط
@@ -335,23 +345,24 @@ const dateEl= document.getElementById("eventDate");
 form.addEventListener("mbk:valid", async (e) => {
   const fd = e?.detail?.formData || {};
 
-  const data = {
-    animalNumber: String(fd.animalNumber || "").trim(),
-    eventDate: String(fd.eventDate || "").trim(),
-    reason: String(fd.reason || "").trim(),
-    pregnancyStatus: String(fd.pregnancyStatus || "").trim(),
-    usedDryingAntibiotics: String(fd.usedDryingAntibiotics || "").trim(),
-    gestationDays: Number(fd.gestationDays),
+ const data = {
+  animalNumber: String(fd.animalNumber || "").trim(),
+  eventDate: String(fd.eventDate || "").trim(),
+  dryOffDate: String(fd.eventDate || "").trim(),   // ✅ نفس تاريخ الحدث
+  reason: String(fd.reason || "").trim(),
+  pregnancyStatus: String(fd.pregnancyStatus || "").trim(),
+  usedDryingAntibiotics: String(fd.usedDryingAntibiotics || "").trim(),
+  gestationDays: Number(fd.gestationDays),
 
-    type: "تجفيف",
-    eventType: "dry_off",
-    tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    source: location.href,
-    userId: auth.currentUser?.uid || null,
-    isSmartAlert: true,
-    alertRule: "تجفيف",
-    createdAt: serverTimestamp()
-  };
+  type: "تجفيف",
+  eventType: "dry_off",
+
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  source: location.href,
+  userId: auth.currentUser?.uid || null,
+  createdAt: serverTimestamp()
+};
+
 
   try {
     const btn = form.querySelector('button[type="submit"]');
@@ -376,6 +387,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
