@@ -183,7 +183,7 @@
 
  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   (async () => {
@@ -282,6 +282,73 @@
         { day: 10, name:'Ovsynch: تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
       ]
     };
+// ===================== Tasks helpers (مركزي) =====================
+function safeKey(s){
+  return String(s||"").trim()
+    .replace(/\s+/g,'_')
+    .replace(/[^\w\u0600-\u06FF\-]+/g,'');
+}
+function toISODateLocal(d){
+  const dd = new Date(d);
+  return new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
+function makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName }){
+  // ID ثابت يمنع التكرار حتى لو اتعمل Save أكتر من مرة
+  return [
+    "task",
+    safeKey(animalNumber),
+    safeKey(program),
+    safeKey(protocolStartDate),
+    safeKey(plannedDate),
+    safeKey(stepName).slice(0,40)
+  ].join("__");
+}
+
+async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, userId }){
+  if(!dbRef) return;
+
+  const tpl = PROGRAMS[program] || [];
+  if(!tpl.length) return;
+
+  // ننشئ/نحدّث task لكل خطوة (setDoc مع merge يمنع التكرار)
+  for (const s of tpl){
+    const plannedDate = toISODateLocal(addDays(protocolStartDate, s.day));
+    const taskId = makeTaskId({
+      animalNumber,
+      protocolStartDate,
+      program,
+      plannedDate,
+      stepName: s.name
+    });
+
+    const ref = doc(dbRef, "tasks", taskId);
+    await setDoc(ref, {
+      type: "protocol_step",
+      protocolType: "ovsynch",
+      program: program,
+      stepName: s.name,
+      plannedDay: s.day,
+      plannedDate: plannedDate,
+
+      animalNumber: String(animalNumber||"").trim(),
+      protocolStartDate: String(protocolStartDate||"").trim(),
+
+      status: "pending",
+      userId: userId || null,
+      createdAt: serverTimestamp()
+    }, { merge: true });
+  }
+}
+
+async function markTaskDone({ animalNumber, protocolStartDate, program, plannedDate, stepName }){
+  if(!dbRef) return;
+  const taskId = makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName });
+  const ref = doc(dbRef, "tasks", taskId);
+  await updateDoc(ref, {
+    status: "done",
+    doneAt: serverTimestamp()
+  });
+}
 
     function updateSteps(){
       stepsBox.innerHTML = '';
@@ -356,7 +423,18 @@
         };
 
         await addDoc(collection(dbRef,'events'), payload);
-        st._savedOnce = true;
+
+// ✅ تحديث الـ task المقابل كـ done (مركزي)
+await markTaskDone({
+  animalNumber: animalId,
+  protocolStartDate: (startDateEl.value||'').trim(),
+  program: (programEl.value||'').trim(),
+  plannedDate: st.date,
+  stepName: st.name
+});
+
+st._savedOnce = true;
+
       }catch(err){
         console.error('saveStepEvent failed', err);
       }
@@ -443,6 +521,13 @@
         if(dbRef){
           await addDoc(collection(dbRef,'events'), payload);
         }
+        // ✅ إنشاء مهام الخطوات في tasks (مرة واحدة/بدون تكرار)
+await ensureProtocolTasks({
+  animalNumber: ctx.animalId,
+  protocolStartDate: ctx.start,
+  program: ctx.program,
+  userId: authRef?.currentUser?.uid || null
+});
 
         // تحديث الحيوان (لو الدالة موجودة)
         if(typeof window.updateAnimalByEvent === "function"){
