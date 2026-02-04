@@ -150,11 +150,17 @@
             <input id="animalId" type="text" placeholder="مثال: 105" />
           </div>
 
-          <div class="field">
-            <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
-            <input id="startDate" type="date" />
-          </div>
-        </div>
+         <div class="field">
+  <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
+  <input id="startDate" type="date" />
+</div>
+
+<div class="field">
+  <label for="startTime">ساعة بدء البروتوكول</label>
+  <input id="startTime" type="time" value="08:00" />
+  <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
+</div>
+</div>
 
         <div class="row" style="margin-top:12px">
           <div class="field">
@@ -190,6 +196,8 @@
     const form        = document.getElementById('ovForm');
     const animalIdEl  = document.getElementById('animalId');
     const startDateEl = document.getElementById('startDate');
+    const startTimeEl = document.getElementById('startTime');
+
     const programEl   = document.getElementById('program');
     const stepsBox    = document.getElementById('stepsBox');
 
@@ -252,11 +260,13 @@
       try{ localStorage.setItem('lastEventDate', dt); }catch{}
     }
 
-    function addDays(baseISO, days){
-      const d = new Date(baseISO);
-      d.setDate(d.getDate() + days);
-      return d;
-    }
+    function addDays(baseISO, baseTime, days, extraHours = 0){
+  const d = new Date(baseISO + "T" + (baseTime || "08:00"));
+  d.setDate(d.getDate() + days);
+  d.setHours(d.getHours() + extraHours);
+  return d;
+}
+
     function fmt(d){
       try{ return d.toLocaleDateString('ar-EG'); }catch{ return d.toISOString().slice(0,10); }
     }
@@ -312,7 +322,14 @@ async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, u
 
   // ننشئ/نحدّث task لكل خطوة (setDoc مع merge يمنع التكرار)
   for (const s of tpl){
-    const plannedDate = toISODateLocal(addDays(protocolStartDate, s.day));
+   const baseTime = (startTimeEl?.value || "08:00");
+
+let extraHours = 0;
+if (s.name.includes('GnRH') && s.day === 9) extraHours = 56;
+if (s.name.includes('تلقيح')) extraHours = 72; // 56 + 16
+
+const plannedDate = toISODateLocal(addDays(protocolStartDate, baseTime, s.day, extraHours));
+
     const taskId = makeTaskId({
       animalNumber,
       protocolStartDate,
@@ -329,6 +346,8 @@ async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, u
       stepName: s.name,
       plannedDay: s.day,
       plannedDate: plannedDate,
+      plannedDateTime: plannedDateTime.toISOString(),
+
 
       animalNumber: String(animalNumber||"").trim(),
       protocolStartDate: String(protocolStartDate||"").trim(),
@@ -361,8 +380,22 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
       const prev = stepsState;
 
       stepsState = tpl.map((s)=>{
-        const dd = addDays(start, s.day);
-        const iso = new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        const baseTime = (startTimeEl.value || "08:00");
+
+// لو الخطوة فيها توقيت خاص نضيفه
+let extraHours = 0;
+
+// GnRH الثانية بعد PGF بـ 56 ساعة
+if (s.name.includes('GnRH') && s.day === 9) extraHours = 56;
+
+// التلقيح بعد GnRH الثانية بـ 16 ساعة
+if (s.name.includes('تلقيح')) extraHours = 72; // 56 + 16
+
+const dd = addDays(start, baseTime, s.day, extraHours);
+
+        const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
+const iso = local.toISOString().slice(0,16); // تاريخ + وقت
+
         const keep = prev.find(p => p.name===s.name && p.day===s.day);
         return {
           day: s.day,
@@ -386,7 +419,7 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
         row.innerHTML = `
           <div>
             <div class="name">${st.name}</div>
-            <div class="date">📅 ${fmt(new Date(st.date))} ${chip}</div>
+            <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')} ${chip}</div>
           </div>
           <label class="chk">
             <input data-idx="${idx}" type="checkbox" ${st.done ? 'checked' : ''}/>
@@ -413,7 +446,9 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
           program: programEl.value || null,
           protocolStartDate: (startDateEl.value||'').trim() || null,
           plannedDay: st.day,
-          plannedDate: st.date,
+         plannedDate: String(st.date).slice(0,10),
+plannedDateTime: st.date,
+
           confirmedOn: st.confirmedOn,
           onSchedule: !!st.onSchedule,
           animalId,
@@ -429,7 +464,7 @@ await markTaskDone({
   animalNumber: animalId,
   protocolStartDate: (startDateEl.value||'').trim(),
   program: (programEl.value||'').trim(),
-  plannedDate: st.date,
+  plannedDate: String(st.date).slice(0,10), // ✅ تاريخ فقط عشان يطابق task
   stepName: st.name
 });
 
@@ -451,7 +486,7 @@ st._savedOnce = true;
       const today = todayLocal();
       st.done = el.checked;
       st.confirmedOn = el.checked ? today : null;
-      st.onSchedule = el.checked ? (today === st.date) : false;
+     st.onSchedule = el.checked ? (today === String(st.date).slice(0,10)) : false;
 
       if(el.checked) await saveStepEvent(i);
       updateSteps();
@@ -519,8 +554,16 @@ st._savedOnce = true;
         };
 
         if(dbRef){
-          await addDoc(collection(dbRef,'events'), payload);
-        }
+  const protocolId = [
+    "ovsynch",
+    String(ctx.animalId).trim(),
+    String(ctx.program).trim(),
+    String(ctx.start).trim()
+  ].join("__");
+
+  await setDoc(doc(dbRef, "events", protocolId), payload, { merge:true });
+}
+
         // ✅ إنشاء مهام الخطوات في tasks (مرة واحدة/بدون تكرار)
 await ensureProtocolTasks({
   animalNumber: ctx.animalId,
