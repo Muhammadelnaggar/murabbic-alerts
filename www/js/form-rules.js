@@ -185,7 +185,17 @@ export const eventSchemas = {
   },
   guards: ["dryOffDecision"],
 },
-
+"بروتوكول تزامن": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ بدء البروتوكول غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+    species: { required: false },
+    reproStatusFromEvents: { required: false },
+    lastCalvingDate: { required: false }
+  },
+  guards: ["ovsynchEligibilityDecision"]
+},
 };
 
 // ===================================================================
@@ -620,6 +630,52 @@ dryOffDecision(fd) {
   }
 
   return null;
+},ovsynchEligibilityDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة بيانات الحيوان.";
+
+  // ❌ خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ الحيوان خارج القطيع.";
+
+  // ❌ مسجّل في بروتوكول بالفعل
+  if (doc.currentProtocol === "ovsynch_active") {
+    return "❌ هذا الحيوان مسجّل بالفعل داخل بروتوكول تزامن نشط.";
+  }
+
+  // تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const minDays = sp === "جاموس" ? 39 : 49;
+
+  // الحالة التناسلية
+  const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+
+  // 🟢 مفتوحة = مسموح
+  if (repro.includes("مفتوح") || repro.includes("فارغ")) {
+    return null;
+  }
+
+  // 🟡 حديثة الولادة
+  if (repro.includes("ولاد") || repro.includes("حديث")) {
+    const lastCalving = String(doc.lastCalvingDate || "").trim();
+    if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
+
+    const gap = daysBetween(lastCalving, fd.eventDate);
+    if (gap < minDays) {
+      return `❌ لا يمكن بدء بروتوكول — مرّ ${gap} يوم فقط منذ الولادة (المطلوب ${minDays}).`;
+    }
+    return null;
+  }
+
+  // ❌ عشار
+  if (repro.includes("عشار")) {
+    return "❌ الحيوان عِشار — لا يمكن إدخاله في بروتوكول تزامن.";
+  }
+
+  return `❌ الحالة التناسلية الحالية: «${repro || "غير معروفة"}» غير مناسبة للبروتوكول.`;
 },
 
 };
