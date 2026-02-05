@@ -491,6 +491,8 @@ const iso = local.toISOString().slice(0,16); // تاريخ + وقت
     }
 
     async function saveStepEvent(i){
+      if(!authRef?.currentUser) return;
+
       try{
         if(!dbRef) return;
         const st = stepsState[i];
@@ -627,10 +629,10 @@ if(!ids.length){
 
       try{
         const user = await waitForUser(2000);
-if(!user){
-  showWarn("⚠️ لا توجد جلسة دخول نشطة، لا يمكن الحفظ على السحابة الآن.");
-  return;
+if(!user) return;
 }
+const user = await waitForUser(2000);
+if(!user) return;
 
         const payload = {
           type: 'ovysynch',
@@ -640,7 +642,7 @@ if(!user){
           startDate: ctx.start,
           program: ctx.program,
           steps: ctx.steps,
-          userId: authRef?.currentUser?.uid || null,
+          userId: user.uid,
           createdAt: serverTimestamp()
         };
 for (let idx = 0; idx < ids.length; idx++){
@@ -654,7 +656,7 @@ for (let idx = 0; idx < ids.length; idx++){
     startDate: ctx.start,
     program: ctx.program,
     steps: ctx.steps,
-    userId: authRef?.currentUser?.uid || null,
+    userId: user.uid,
     createdAt: serverTimestamp()
   };
 if(typeof window.updateAnimalByEvent === "function"){
