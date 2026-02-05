@@ -41,6 +41,8 @@ export async function updateAnimalByEvent(ev) {
 
     const date = (ev.eventDate || "").toString().trim();
     const upd  = {};
+// ✅ بروتوكول تزامن: دخول الحيوان في البروتوكول
+
 
     // ============================================================
     // ✅ تطبيع نوع الحدث (عربي / إنجليزي) إلى نوع واحد قياسي
@@ -123,10 +125,43 @@ export async function updateAnimalByEvent(ev) {
       case "تجفيف":
         type = "dry_off";
         break;
+      // بروتوكول تزامن
+case "ovysynch":
+case "بروتوكول تزامن":
+  type = "ovysynch";
+  break;
+
+// خطوة بروتوكول
+case "ovysynch-step":
+case "خطوة بروتوكول":
+  type = "ovysynch-step";
+  break;
 
       default:
-        type = rawType; // احتياطي لو فيه أنواع تانية
+        type = rawType; 
     }
+    // ✅ بروتوكول تزامن: دخول الحيوان في البروتوكول
+if (type === "ovysynch" || type === "بروتوكول تزامن") {
+  upd.currentProtocol = "ovsynch";
+  upd.protocolStatus = "active";
+  upd.protocolStartDate =
+    (ev.startDate || ev.eventDate || "").toString().trim() || null;
+  upd.status = "active";
+}
+
+
+// ✅ خطوة بروتوكول: لو كانت آخر خطوة (TAI) نُنهي البروتوكول
+if (type === "ovysynch-step" || type === "خطوة بروتوكول") {
+  const stepName = String(ev.stepName || "").trim();
+
+  // لو اسم الخطوة فيه "تلقيح" أو TAI → دي آخر خطوة
+  if (stepName.includes("تلقيح") || stepName.includes("TAI")) {
+    upd.currentProtocol = null;
+    upd.protocolStatus = "completed";
+    upd.protocolExitDate =
+      (ev.confirmedOn || ev.eventDate || "").toString().trim() || null;
+  }
+}
 
     // ============================================================
     // 🟩 DAILY MILK — إنتاج اللبن اليومي
@@ -188,6 +223,11 @@ if (type === "close_up") {
     if (type === "heat") {
       upd.lastHeatDate = date;
       upd.status = "active";
+      // ✅ لو كانت داخل بروتوكول: تخرج تلقائيًا عند الشياع
+upd.currentProtocol = null;
+upd.protocolStatus = "exited_heat";
+upd.protocolExitDate = date;
+
     }
 
     // ============================================================
@@ -198,6 +238,11 @@ if (type === "close_up") {
       upd.reproductiveStatus   = "ملقح";
       if (ev.servicesCount != null) upd.servicesCount = ev.servicesCount;
       upd.status = "active";
+      // ✅ لو كانت داخل بروتوكول: تخرج تلقائيًا عند التلقيح
+upd.currentProtocol = null;
+upd.protocolStatus = "exited_inseminated";
+upd.protocolExitDate = date;
+
     }
 
     // ============================================================
