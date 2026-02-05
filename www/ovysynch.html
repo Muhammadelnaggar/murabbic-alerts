@@ -209,7 +209,8 @@
 
  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
- import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   (async () => {
@@ -670,10 +671,15 @@ if(typeof window.updateAnimalByEvent === "function"){
       String(ctx.program).trim(),
       String(ctx.start).trim()
     ].join("__");
+const evRef = doc(dbRef, "events", protocolId);
+const snap = await getDoc(evRef);
 
-    await setDoc(doc(dbRef, "events", protocolId), payload, { merge:true });
+if (!snap.exists()) {
+  await setDoc(evRef, payload); // ✅ create فقط
+} else {
+  // ✅ موجود بالفعل — لا نعمل update عشان rules تمنع
   }
-
+}
   await ensureProtocolTasks({
     animalNumber: animalNo,
     protocolStartDate: ctx.start,
