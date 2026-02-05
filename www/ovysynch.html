@@ -423,11 +423,15 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
   if(!dbRef) return;
   const taskId = makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName });
   const ref = doc(dbRef, "tasks", taskId);
-  await updateDoc(ref, {
+
+  // ✅ يعمل Update لو موجود، أو Create لو مش موجود (بدون خطأ)
+  await setDoc(ref, {
     status: "done",
-    doneAt: serverTimestamp()
-  });
+    doneAt: serverTimestamp(),
+    userId: authRef?.currentUser?.uid || null
+  }, { merge: true });
 }
+
 
     function updateSteps(){
       stepsBox.innerHTML = '';
