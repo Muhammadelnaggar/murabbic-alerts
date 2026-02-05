@@ -400,23 +400,24 @@ const plannedDate = toISODateLocal(plannedDateTime);
     });
 
     const ref = doc(dbRef, "tasks", taskId);
-    await setDoc(ref, {
-      type: "protocol_step",
-      protocolType: "ovsynch",
-      program: program,
-      stepName: s.name,
-      plannedDay: s.day,
-      plannedDate: plannedDate,
-      plannedDateTime: plannedDateTime.toISOString(),
+   const snap = await getDoc(ref);
+if (!snap.exists()) {
+  await setDoc(ref, {
+    type: "protocol_step",
+    protocolType: "ovsynch",
+    program: program,
+    stepName: s.name,
+    plannedDay: s.day,
+    plannedDate: plannedDate,
+    plannedDateTime: plannedDateTime.toISOString(),
+    animalNumber: String(animalNumber||"").trim(),
+    protocolStartDate: String(protocolStartDate||"").trim(),
+    status: "pending",
+    userId: userId || null,
+    createdAt: serverTimestamp()
+  });
+}
 
-
-      animalNumber: String(animalNumber||"").trim(),
-      protocolStartDate: String(protocolStartDate||"").trim(),
-
-      status: "pending",
-      userId: userId || null,
-      createdAt: serverTimestamp()
-    }, { merge: true });
   }
 }
 
