@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 
   <!-- (هنرجع لملاحظة animal-update.js لاحقًا كما اتفقنا) -->
-  <script src="/js/animal-update.js"></script>
+ <script type="module">
+  import { updateAnimalByEvent } from "/js/animal-update.js";
+  window.updateAnimalByEvent = updateAnimalByEvent;
+</script>
+
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
@@ -572,25 +576,24 @@ st._savedOnce = true;
     dbRef = db;
     authRef = auth;
 
-    function getCtx(){
-      const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
-const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
+  function getCtx(){
+  const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
+  const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
 
-      const start = (startDateEl.value||'').trim();
-      const program = (programEl.value||'').trim();
+  const start = (startDateEl.value||'').trim();
+  const program = (programEl.value||'').trim();
 
-      if(!animalId || !start || !program){
-        showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
-        return null;
-      }
+  if(!animalId || !start || !program){
+    showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
+    return null;
+  }
 
-      clearWarn();
-      try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
-      try{ localStorage.setItem('lastEventDate', start); }catch{}
-     const list = parseBulkList();
-return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
-    }
+  clearWarn();
+  try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
+  try{ localStorage.setItem('lastEventDate', start); }catch{}
 
+  return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
+}
     async function saveProtocol(){
       const ctx = getCtx();
       if(!ctx) return;
