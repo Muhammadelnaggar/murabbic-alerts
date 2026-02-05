@@ -210,7 +210,7 @@
  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
  import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   (async () => {
     const form        = document.getElementById('ovForm');
@@ -554,7 +554,7 @@ st._savedOnce = true;
 
     async function setupFirebase(){
       try{
-        const mod = await import('./js/firebase-config.js?v=5');
+       const mod = await import('/js/firebase-config.js?v=5');
         if(mod?.db && mod?.auth) return { db:mod.db, auth:mod.auth };
         if(mod?.firebaseConfig){
           const app = initializeApp(mod.firebaseConfig);
@@ -575,6 +575,23 @@ st._savedOnce = true;
     const { db, auth } = await setupFirebase();
     dbRef = db;
     authRef = auth;
+    // ✅ انتظر استرجاع جلسة الدخول (بدون redirect)
+async function waitForUser(ms=1500){
+  if(!authRef) return null;
+  return await new Promise((resolve)=>{
+    const t = setTimeout(()=>resolve(authRef.currentUser || null), ms);
+    try{
+      onAuthStateChanged(authRef, (u)=>{
+        clearTimeout(t);
+        resolve(u || null);
+      });
+    }catch{
+      clearTimeout(t);
+      resolve(authRef.currentUser || null);
+    }
+  });
+}
+
 
   function getCtx(){
   const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
@@ -609,6 +626,12 @@ if(!ids.length){
       saveBtn.textContent = '... جاري الحفظ';
 
       try{
+        const user = await waitForUser(2000);
+if(!user){
+  showWarn("⚠️ لا توجد جلسة دخول نشطة، لا يمكن الحفظ على السحابة الآن.");
+  return;
+}
+
         const payload = {
           type: 'ovysynch',
           eventType: 'بروتوكول تزامن',
