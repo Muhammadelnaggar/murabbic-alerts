@@ -294,9 +294,40 @@ applyBulkBtn?.addEventListener("click", ()=>{
     return;
   }
   clearWarn();
-  // اختياري: لو الحيوان الواحد فاضي نخلي أول رقم يظهر في الحقل
-  if(animalIdEl && !animalIdEl.value) animalIdEl.value = list[0];
-  showInfo(`✅ قائمة جماعية جاهزة: ${list.length} حيوان`);
+
+  (async ()=>{
+
+  const okList = [];
+  const bad = [];
+
+  for(const n of list){
+    const r = await checkAnimalQuick(n);
+    if(r.ok) okList.push(n);
+    else bad.push({ n, reason:r.reason });
+  }
+
+  if(bad.length){
+    // امسح الغلط من التكسيت اريا
+    bulkEl.value = okList.join("\n");
+    parseBulkList();
+
+    // رسالة فورية
+    const first = bad[0];
+    showInfo(`⚠️ تم حذف ${bad.length} رقم غير صالح. مثال: ${invalidAnimalMessage(first.reason, first.n)}`, true);
+  }else{
+    showInfo(`✅ كل الأرقام صحيحة: ${okList.length} حيوان`);
+  }
+
+  // لو الرقم الفردي فاضي خليه أول رقم صحيح
+  if(animalIdEl && !animalIdEl.value && okList.length) animalIdEl.value = okList[0];
+})();
+
+  if(!list.length){
+    showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي.");
+    return;
+  }
+  clearWarn();
+ 
 });
 async function loadGroupsList(){
   if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
@@ -385,6 +416,74 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
       try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
       setTimeout(()=>{ infoEl.style.display="none"; }, 2500);
     }
+    async function checkAnimalQuick(num){
+  if(!dbRef || !authRef?.currentUser) return { ok:true }; // لو أوفلاين/مش جاهز ما نعطلش
+
+  const uid = authRef.currentUser.uid;
+  const animalsRef = collection(dbRef, "animals");
+
+  // 1) number كنص
+  const { query, where, limit, getDocs } =
+    await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+  let snap = await getDocs(query(
+    animalsRef,
+    where("userId","==",uid),
+    where("number","==",String(num)),
+    limit(1)
+  ));
+
+  // 2) animalNumber كرقم
+  if(snap.empty){
+    snap = await getDocs(query(
+      animalsRef,
+      where("userId","==",uid),
+      where("animalNumber","==",Number(num)),
+      limit(1)
+    ));
+  }
+
+  if(snap.empty){
+    return { ok:false, reason:"not_found" };
+  }
+
+  const a = snap.docs[0].data() || {};
+  const status = String(a.status || "active").toLowerCase(); // active/inactive
+  const inactiveReason = String(a.inactiveReason || "").toLowerCase(); // sale/death...
+  const breedingBlocked = !!a.breedingBlocked;
+  const repro = String(a.reproductiveStatus || "").trim();
+
+  // مباع/نافق
+  if(status === "inactive"){
+    if(inactiveReason === "sale")  return { ok:false, reason:"sale" };
+    if(inactiveReason === "death") return { ok:false, reason:"death" };
+    return { ok:false, reason:"inactive" };
+  }
+
+  // استبعاد (حسب نظامك: breedingBlocked أو reproductiveStatus)
+  if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
+    return { ok:false, reason:"cull" };
+  }
+
+  return { ok:true, animal:a };
+}
+
+function invalidAnimalMessage(reason, num){
+  if(reason === "not_found") return `⛔ الحيوان رقم ${num} غير موجود.`;
+  if(reason === "sale")      return `⛔ الحيوان رقم ${num} مباع (خارج القطيع).`;
+  if(reason === "death")     return `⛔ الحيوان رقم ${num} نافق (خارج القطيع).`;
+  if(reason === "cull")      return `⛔ الحيوان رقم ${num} مستبعد (لا يُطبق عليه البروتوكول).`;
+  return `⛔ الحيوان رقم ${num} خارج القطيع.`;
+}
+
+async function rejectNumberSoft(num){
+  // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
+  showInfo(invalidAnimalMessage("not_found", num), true);
+  if(animalIdEl){
+    animalIdEl.value = "";
+    try{ animalIdEl.focus(); }catch{}
+  }
+}
 
     // ✅ فتح بطاقة الحيوان
     openCardBtn?.addEventListener("click", ()=>{
@@ -408,13 +507,24 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
 
       if (id){
         animalIdEl.value = id;
-        animalIdEl.readOnly = true;
+        
         try{ localStorage.setItem('lastAnimalId', id); }catch{}
       }
 
       startDateEl.value = dt;
       try{ localStorage.setItem('lastEventDate', dt); }catch{}
     }
+animalIdEl?.addEventListener("change", async ()=>{
+  const num = (animalIdEl.value||"").trim();
+  if(!num) return;
+
+  const r = await checkAnimalQuick(num);
+  if(!r.ok){
+    showInfo(invalidAnimalMessage(r.reason, num), true);
+    animalIdEl.value = "";
+    try{ animalIdEl.focus(); }catch{}
+  }
+});
 
     function addDays(baseISO, baseTime, days, extraHours = 0){
   const d = new Date(baseISO + "T" + (baseTime || "08:00"));
@@ -478,14 +588,35 @@ async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, u
 
   // ننشئ/نحدّث task لكل خطوة (setDoc مع merge يمنع التكرار)
   for (const s of tpl){
-   const baseTime = (startTimeEl?.value || "08:00");
+  const baseTime = (startTimeEl?.value || "08:00");
 
-let extraHours = 0;
-if (program === "ovsynch" && s.day === 9) extraHours = 56;
-if (program === "ovsynch" && s.name.includes("تلقيح")) extraHours = 72;
+// ✅ حساب صحيح من PGF (اليوم 7)
+let plannedDateTime;
 
+if (program === "ovsynch" || program === "presynch_ovsynch") {
+  const pgfDT = addDays(protocolStartDate, baseTime, 7, 0);
 
-const plannedDateTime = addDays(protocolStartDate, baseTime, s.day, extraHours);
+  if (s.day === 9 && String(s.name).includes("GnRH")) {
+    plannedDateTime = new Date(pgfDT.getTime() + 56 * 3600 * 1000);
+  } else if (String(s.name).includes("تلقيح")) {
+    plannedDateTime = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+  } else {
+    plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
+  }
+
+} else if (program === "cosynch72") {
+  const pgfDT = addDays(protocolStartDate, baseTime, 7, 0);
+
+  if (String(s.name).includes("تلقيح") || (String(s.name).includes("GnRH") && s.day === 10)) {
+    plannedDateTime = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+  } else {
+    plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
+  }
+
+} else {
+  plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
+}
+
 const plannedDate = toISODateLocal(plannedDateTime);
 
 
@@ -502,7 +633,8 @@ const plannedDate = toISODateLocal(plannedDateTime);
 if (!snap.exists()) {
   await setDoc(ref, {
     type: "protocol_step",
-    protocolType: "ovsynch",
+   protocolType: program,
+
     program: program,
     stepName: s.name,
     plannedDay: s.day,
@@ -544,18 +676,39 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
       const prev = stepsState;
 
       stepsState = tpl.map((s)=>{
-        const baseTime = (startTimeEl.value || "08:00");
+      const baseTime = (startTimeEl.value || "08:00");
 
-// لو الخطوة فيها توقيت خاص نضيفه
-let extraHours = 0;
+// ✅ حساب صحيح: ساعات البروتوكول تُحسب من PGF (اليوم 7) وليس من (اليوم + 9)
+let dd;
 
-// GnRH الثانية بعد PGF بـ 56 ساعة
-if (s.name.includes('GnRH') && s.day === 9) extraHours = 56;
+if (program === "ovsynch" || program === "presynch_ovsynch") {
+  // وقت PGF = اليوم 7 على الساعة الأساسية
+  const pgfDT = addDays(start, baseTime, 7, 0);
 
-// التلقيح بعد GnRH الثانية بـ 16 ساعة
-if (s.name.includes('تلقيح')) extraHours = 72; // 56 + 16
+  if (s.day === 9 && String(s.name).includes("GnRH")) {
+    // GnRH الثانية = 56 ساعة بعد PGF
+    dd = new Date(pgfDT.getTime() + 56 * 3600 * 1000);
+  } else if (String(s.name).includes("تلقيح")) {
+    // TAI = 72 ساعة بعد PGF (56 + 16)
+    dd = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+  } else {
+    // باقي الخطوات بأيامها العادية
+    dd = addDays(start, baseTime, s.day, 0);
+  }
 
-const dd = addDays(start, baseTime, s.day, extraHours);
+} else if (program === "cosynch72") {
+  const pgfDT = addDays(start, baseTime, 7, 0);
+
+  if (String(s.name).includes("تلقيح") || (String(s.name).includes("GnRH") && s.day === 10)) {
+    // GnRH+TAI = 72 ساعة بعد PGF
+    dd = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+  } else {
+    dd = addDays(start, baseTime, s.day, 0);
+  }
+
+} else {
+  dd = addDays(start, baseTime, s.day, 0);
+}
 
         const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
 const iso = local.toISOString().slice(0,16); // تاريخ + وقت
@@ -606,7 +759,7 @@ const iso = local.toISOString().slice(0,16); // تاريخ + وقت
         if(!animalId) return;
 
         const payload = {
-          type: 'ovysynch-step',
+          type: 'ovsynch-step',
           eventType: 'خطوة بروتوكول',
           stepName: st.name,
           program: programEl.value || null,
@@ -724,7 +877,36 @@ if(user){
     async function saveProtocol(){
       const ctx = getCtx();
       if(!ctx) return;
-      const ids = (ctx.animalIds || []).filter(Boolean);
+      // ✅ تأكد من أول رقم (وأيضًا القائمة لو موجودة)
+const ids = (ctx.animalIds || []).filter(Boolean);
+const okIds = [];
+const badIds = [];
+
+for(const n of ids){
+  const r = await checkAnimalQuick(n);
+  if(r.ok) okIds.push(n);
+  else badIds.push({ n, reason:r.reason });
+}
+
+if(badIds.length){
+  // احذف الغلط من القائمة واظهر رسالة
+  bulkEl.value = okIds.join("\n");
+  parseBulkList();
+
+  const first = badIds[0];
+  showInfo(`⛔ تم حذف ${badIds.length} رقم غير صالح قبل التسجيل. مثال: ${invalidAnimalMessage(first.reason, first.n)}`, true);
+}
+
+if(!okIds.length){
+  showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true);
+  return;
+}
+
+// ✅ استبدل القائمة بالصالحة فقط
+ctx.animalIds = okIds;
+ctx.animalId  = okIds[0];
+
+      const ids2 = (ctx.animalIds || []).filter(Boolean);
 if(!ids.length){
   showWarn("⚠️ لا يوجد أرقام حيوانات.");
   return;
