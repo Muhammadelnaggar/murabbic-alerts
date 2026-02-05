@@ -164,6 +164,22 @@
   <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
 </div>
 
+<!-- 👇 إضافة المجموعات المحفوظة -->
+<div class="row" style="margin-top:10px">
+  <div class="field">
+    <label for="groupSelect">المجموعة المحفوظة</label>
+    <select id="groupSelect">
+      <option value="" selected>— اختر مجموعة —</option>
+    </select>
+    <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
+  </div>
+
+  <div class="row row-2">
+    <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
+    <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
+  </div>
+</div>
+
         <div class="row row-2">
           <div class="field">
             <label for="animalId">رقم الحيوان</label>
@@ -221,6 +237,10 @@
     const bulkEl      = document.getElementById('bulkAnimals');
 const applyBulkBtn= document.getElementById('applyBulk');
 const bulkHintEl  = document.getElementById('bulkHint');
+const groupSelectEl = document.getElementById('groupSelect');
+const loadGroupBtn  = document.getElementById('loadGroup');
+const saveGroupBtn  = document.getElementById('saveGroup');
+
 
 let bulkList = []; // قائمة أرقام الحيوانات
 
@@ -278,6 +298,84 @@ applyBulkBtn?.addEventListener("click", ()=>{
   if(animalIdEl && !animalIdEl.value) animalIdEl.value = list[0];
   showInfo(`✅ قائمة جماعية جاهزة: ${list.length} حيوان`);
 });
+async function loadGroupsList(){
+  if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
+
+  // هات كل مجموعات المستخدم (المزرعة)
+  const { collection, query, where, getDocs, orderBy } =
+    await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+  const q = query(
+    collection(dbRef, "protocolGroups"),
+    where("userId", "==", authRef.currentUser.uid),
+    orderBy("createdAt", "desc")
+  );
+
+  const snap = await getDocs(q);
+
+  // امسح الخيارات القديمة
+  groupSelectEl.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
+
+  snap.forEach(docSnap=>{
+    const d = docSnap.data() || {};
+    const opt = document.createElement("option");
+    opt.value = docSnap.id;
+    opt.textContent = d.name || docSnap.id;
+    groupSelectEl.appendChild(opt);
+  });
+}
+
+async function saveCurrentAsGroup(){
+  const list = parseBulkList();
+  if(!list.length){
+    showWarn("⚠️ اكتب أرقام الحيوانات أولاً ثم احفظ كمجموعة.");
+    return;
+  }
+  if(!dbRef || !authRef?.currentUser){
+    showWarn("⚠️ تأكد من تسجيل الدخول ثم حاول مرة أخرى.");
+    return;
+  }
+
+  const name = prompt("اسم المجموعة؟ مثال: دفعة 25 بقرة - فبراير");
+  if(!name) return;
+
+  // ID ثابت من الاسم + uid (اختياري) أو auto id
+  await addDoc(collection(dbRef, "protocolGroups"), {
+    userId: authRef.currentUser.uid,
+    name: String(name).trim(),
+    animals: list.map(x=>String(x).trim()),
+    createdAt: serverTimestamp()
+  });
+
+  showInfo("✅ تم حفظ المجموعة على السحابة");
+  await loadGroupsList();
+}
+
+async function loadSelectedGroup(){
+  const gid = (groupSelectEl?.value || "").trim();
+  if(!gid){
+    showWarn("⚠️ اختر مجموعة أولاً.");
+    return;
+  }
+  if(!dbRef) return;
+
+  const snap = await getDoc(doc(dbRef, "protocolGroups", gid));
+  if(!snap.exists()){
+    showWarn("⚠️ المجموعة غير موجودة.");
+    return;
+  }
+
+  const d = snap.data() || {};
+  const arr = Array.isArray(d.animals) ? d.animals : [];
+
+  bulkEl.value = arr.join("\n");
+  parseBulkList();            // يحدث bulkList + hint
+  if(!animalIdEl.value && bulkList.length) animalIdEl.value = bulkList[0];
+
+  showInfo(`✅ تم تحميل المجموعة: ${d.name || gid}`);
+}
+loadGroupBtn?.addEventListener("click", loadSelectedGroup);
+saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
 
     function showInfo(text, isErr=false){
       if(!infoEl) return;
@@ -583,6 +681,7 @@ st._savedOnce = true;
     const { db, auth } = await setupFirebase();
     dbRef = db;
     authRef = auth;
+   
     // ✅ انتظر استرجاع جلسة الدخول (بدون redirect)
 async function waitForUser(ms=1500){
   if(!authRef) return null;
@@ -599,7 +698,10 @@ async function waitForUser(ms=1500){
     }
   });
 }
-
+ const user = await waitForUser(2000);
+if(user){
+  await loadGroupsList();
+}
 
   function getCtx(){
   const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
