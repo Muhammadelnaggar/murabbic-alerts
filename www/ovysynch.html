@@ -626,13 +626,9 @@ if(!ids.length){
       saveBtn.disabled = true;
       const oldTxt = saveBtn.textContent;
       saveBtn.textContent = '... جاري الحفظ';
-
-      try{
-        const user = await waitForUser(2000);
-if(!user) return;
-}
-const user = await waitForUser(2000);
-if(!user) return;
+try{
+  const user = await waitForUser(2000);
+  if(!user) return;
 
         const payload = {
           type: 'ovysynch',
