@@ -303,7 +303,7 @@ applyBulkBtn?.addEventListener("click", ()=>{
   for(const n of list){
     const r = await checkAnimalQuick(n);
     if(r.ok) okList.push(n);
-    else bad.push({ n, reason:r.reason });
+   else bad.push({ n, reason:r.reason, extra:r });
   }
 
   if(bad.length){
@@ -313,7 +313,7 @@ applyBulkBtn?.addEventListener("click", ()=>{
 
     // رسالة فورية
     const first = bad[0];
-    showInfo(`⚠️ تم حذف ${bad.length} رقم غير صالح. مثال: ${invalidAnimalMessage(first.reason, first.n)}`, true);
+   showInfo(`⚠️ تم حذف ${bad.length} رقم غير صالح. مثال: ${invalidAnimalMessage(first.reason, first.n, first.extra)}`, true);;
   }else{
     showInfo(`✅ كل الأرقام صحيحة: ${okList.length} حيوان`);
   }
@@ -448,42 +448,85 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
   }
 
   const a = snap.docs[0].data() || {};
+  const animalType = String(a.type || a.animalType || a.kind || "").trim();
   const status = String(a.status || "active").toLowerCase(); // active/inactive
   const inactiveReason = String(a.inactiveReason || "").toLowerCase(); // sale/death...
   const breedingBlocked = !!a.breedingBlocked;
   const repro = String(a.reproductiveStatus || "").trim();
+      if(repro === "عشار") return { ok:false, reason:"pregnant", animalType };
+if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType };
+if(repro === "حديث الولادة") return { ok:false, reason:"fresh_postpartum", dpp: 0, minDpp: postpartumMinDaysByType(a), animalType };
+
+      // 🔒 منع البروتوكول قبل الحد الأدنى بعد الولادة (حسب النوع)
+const startRef = (startDateEl?.value || todayLocal());  // نستخدم تاريخ بدء البروتوكول كمرجع
+const dpp = daysSinceISO(a.lastCalvingDate, startRef);  // days postpartum
+const minDpp = postpartumMinDaysByType(a);
+
+if(dpp !== null && dpp >= 0 && dpp < minDpp){
+ return { ok:false, reason:"fresh_postpartum", dpp, minDpp, animalType };
+}
 
   // مباع/نافق
-  if(status === "inactive"){
-    if(inactiveReason === "sale")  return { ok:false, reason:"sale" };
-    if(inactiveReason === "death") return { ok:false, reason:"death" };
-    return { ok:false, reason:"inactive" };
-  }
+ if(status === "inactive"){
+  if(inactiveReason === "sale")  return { ok:false, reason:"sale", animalType };
+  if(inactiveReason === "death") return { ok:false, reason:"death", animalType };
+  return { ok:false, reason:"inactive", animalType };
+}
+
 
   // استبعاد (حسب نظامك: breedingBlocked أو reproductiveStatus)
   if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
-    // ❌ لا يسمح ببروتوكول لحيوان غير مفتوح
-if(repro === "عشار") return { ok:false, reason:"pregnant" };
-if(repro === "ملقح") return { ok:false, reason:"inseminated" };
-if(repro === "حديث الولادة") return { ok:false, reason:"fresh" };
-
+   
     return { ok:false, reason:"cull" };
   }
 
-  return { ok:true, animal:a };
+  return { ok:true, animal:a, animalType };
+}
+function daysSinceISO(isoDate, refISO){
+  if(!isoDate) return null;
+  const a = new Date(String(isoDate).slice(0,10) + "T00:00:00");
+  const b = new Date(String(refISO || todayLocal()).slice(0,10) + "T00:00:00");
+  if(isNaN(a) || isNaN(b)) return null;
+  return Math.floor((b - a) / (1000*60*60*24));
 }
 
-function invalidAnimalMessage(reason, num){
-  if(reason === "not_found") return `⛔ الحيوان رقم ${num} غير موجود.`;
-  if(reason === "sale")      return `⛔ الحيوان رقم ${num} مباع (خارج القطيع).`;
-  if(reason === "death")     return `⛔ الحيوان رقم ${num} نافق (خارج القطيع).`;
-  if(reason === "cull")      return `⛔ الحيوان رقم ${num} مستبعد (لا يُطبق عليه البروتوكول).`;
-  if(reason === "pregnant") return `⛔ الحيوان رقم ${num} عِشار.`;
-if(reason === "inseminated") return `⛔ الحيوان رقم ${num} مُلقّح بالفعل.`;
-if(reason === "fresh") return `⛔ الحيوان رقم ${num} حديث الولادة.`;
-
-  return `⛔ الحيوان رقم ${num} خارج القطيع.`;
+function postpartumMinDaysByType(animalDoc){
+  const t = String(animalDoc?.type || animalDoc?.animalType || animalDoc?.kind || "").trim();
+  return (t.includes("جاموس") ? 45 : 49); // ✅ جاموس 45 / أبقار 49
 }
+
+function invalidAnimalMessage(reason, num, extra){
+
+  const type = extra?.animalType || "";
+  const label = type.includes("جاموس") ? "جاموس" : "أبقار";
+  const head = `⛔ لا يمكن بدء بروتوكول ${label} للحيوان رقم ${num}.`;
+
+  if(reason === "not_found") 
+    return `⛔ الحيوان رقم ${num} غير موجود.`;
+
+  if(reason === "sale")      
+    return `${head} الحيوان مباع (خارج القطيع).`;
+
+  if(reason === "death")     
+    return `${head} الحيوان نافق (خارج القطيع).`;
+
+  if(reason === "inactive")  
+    return `${head} الحيوان خارج القطيع.`;
+
+  if(reason === "cull")      
+    return `${head} الحيوان مستبعد (لا يُطبق عليه البروتوكول).`;
+
+  if(reason === "pregnant")     
+    return `${head} الحيوان عِشار.`;
+
+  if(reason === "inseminated")  
+    return `${head} الحيوان مُلقّح بالفعل.`;
+
+  if(reason === "fresh_postpartum"){
+    const dpp = extra?.dpp ?? "؟";
+    const min = extra?.minDpp ?? "؟";
+    return `${head} حديث الولادة: مرّ ${dpp} يوم بعد الولادة، والحد الأدنى ${min} يوم.`;
+  }
 
 async function rejectNumberSoft(num){
   // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
@@ -529,7 +572,8 @@ animalIdEl?.addEventListener("change", async ()=>{
 
   const r = await checkAnimalQuick(num);
   if(!r.ok){
-    showInfo(invalidAnimalMessage(r.reason, num), true);
+    
+   showInfo(invalidAnimalMessage(r.reason, num, r), true);
     animalIdEl.value = "";
     try{ animalIdEl.focus(); }catch{}
   }
@@ -662,16 +706,26 @@ if (!snap.exists()) {
 
 async function markTaskDone({ animalNumber, protocolStartDate, program, plannedDate, stepName }){
   if(!dbRef) return;
+
   const taskId = makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName });
   const ref = doc(dbRef, "tasks", taskId);
 
-  // ✅ يعمل Update لو موجود، أو Create لو مش موجود (بدون خطأ)
-  await setDoc(ref, {
+  const snap = await getDoc(ref);
+
+  // ✅ لو التاسك مش موجود: لا ننشئه هنا (عشان الـ Rules)
+  if(!snap.exists()){
+    console.warn("⚠️ Task not found to mark done:", taskId);
+    return;
+  }
+
+  // ✅ تحديث فقط
+  await updateDoc(ref, {
     status: "done",
     doneAt: serverTimestamp(),
     userId: authRef?.currentUser?.uid || null
-  }, { merge: true });
+  });
 }
+
 
 
     function updateSteps(){
@@ -899,7 +953,8 @@ const badIds = [];
 for(const n of ids){
   const r = await checkAnimalQuick(n);
   if(r.ok) okIds.push(n);
-  else badIds.push({ n, reason:r.reason });
+ else badIds.push({ n, reason:r.reason, extra:r });
+
 }
 
 if(badIds.length){
@@ -908,7 +963,8 @@ if(badIds.length){
   parseBulkList();
 
   const first = badIds[0];
-  showInfo(`⛔ تم حذف ${badIds.length} رقم غير صالح قبل التسجيل. مثال: ${invalidAnimalMessage(first.reason, first.n)}`, true);
+  showInfo(`⛔ تم حذف ${badIds.length} رقم غير صالح قبل التسجيل. مثال: ${invalidAnimalMessage(first.reason, first.n, first.extra)}`, true);
+
 }
 
 if(!okIds.length){
@@ -940,7 +996,7 @@ for (let idx = 0; idx < ctx.animalIds.length; idx++){
 
 
   const payload = {
-    type: 'ovysynch',
+    type: 'ovsynch',
     eventType: 'بروتوكول تزامن',
     animalId: animalNo,
     animalNumber: animalNo,
