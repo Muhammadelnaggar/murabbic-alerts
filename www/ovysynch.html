@@ -287,7 +287,8 @@ function parseBulkList(){
   return bulkList;
 }
 
-applyBulkBtn?.addEventListener("click", ()=>{
+applyBulkBtn?.addEventListener("click", async ()=>{
+
   const list = parseBulkList();
   if(!list.length){
     showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي.");
@@ -527,6 +528,9 @@ function invalidAnimalMessage(reason, num, extra){
     const min = extra?.minDpp ?? "؟";
     return `${head} حديث الولادة: مرّ ${dpp} يوم بعد الولادة، والحد الأدنى ${min} يوم.`;
   }
+    return `${head} غير صالح للتسجيل.`;
+}
+
 
 async function rejectNumberSoft(num){
   // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
