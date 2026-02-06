@@ -225,7 +225,7 @@
 
  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
- import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, getDoc }
+import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, getDoc, query, where, limit, getDocs, orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -303,6 +303,7 @@ applyBulkBtn?.addEventListener("click", async ()=>{
 
   for(const n of list){
     const r = await checkAnimalQuick(n);
+    if(r.reason === "auth_blocked_silent") return; // اخرج بصمت
     if(r.ok) okList.push(n);
    else bad.push({ n, reason:r.reason, extra:r });
   }
@@ -332,11 +333,6 @@ applyBulkBtn?.addEventListener("click", async ()=>{
 });
 async function loadGroupsList(){
   if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
-
-  // هات كل مجموعات المستخدم (المزرعة)
-  const { collection, query, where, getDocs, orderBy } =
-    await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
   const q = query(
     collection(dbRef, "protocolGroups"),
     where("userId", "==", authRef.currentUser.uid),
@@ -418,15 +414,13 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
       setTimeout(()=>{ infoEl.style.display="none"; }, 2500);
     }
     async function checkAnimalQuick(num){
-  if(!dbRef || !authRef?.currentUser) return { ok:true }; // لو أوفلاين/مش جاهز ما نعطلش
+ if(!dbRef) return { ok:true }; // لو مفيش DB (أوفلاين) ما نعطلش
+
+// ✅ لو الجلسة لسه ما رجعتش: نمنع التحقق (بدون رسائل)
+if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
 
   const uid = authRef.currentUser.uid;
   const animalsRef = collection(dbRef, "animals");
-
-  // 1) number كنص
-  const { query, where, limit, getDocs } =
-    await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
   let snap = await getDocs(query(
     animalsRef,
     where("userId","==",uid),
