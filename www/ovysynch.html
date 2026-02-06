@@ -141,9 +141,9 @@
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
   </header>
-
+ <div id="info" class="infobar"></div>
   <div class="wrap">
-    <div id="info" class="infobar"></div>
+   
 
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off">
@@ -462,6 +462,11 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
 
   // استبعاد (حسب نظامك: breedingBlocked أو reproductiveStatus)
   if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
+    // ❌ لا يسمح ببروتوكول لحيوان غير مفتوح
+if(repro === "عشار") return { ok:false, reason:"pregnant" };
+if(repro === "ملقح") return { ok:false, reason:"inseminated" };
+if(repro === "حديث الولادة") return { ok:false, reason:"fresh" };
+
     return { ok:false, reason:"cull" };
   }
 
@@ -473,6 +478,10 @@ function invalidAnimalMessage(reason, num){
   if(reason === "sale")      return `⛔ الحيوان رقم ${num} مباع (خارج القطيع).`;
   if(reason === "death")     return `⛔ الحيوان رقم ${num} نافق (خارج القطيع).`;
   if(reason === "cull")      return `⛔ الحيوان رقم ${num} مستبعد (لا يُطبق عليه البروتوكول).`;
+  if(reason === "pregnant") return `⛔ الحيوان رقم ${num} عِشار.`;
+if(reason === "inseminated") return `⛔ الحيوان رقم ${num} مُلقّح بالفعل.`;
+if(reason === "fresh") return `⛔ الحيوان رقم ${num} حديث الولادة.`;
+
   return `⛔ الحيوان رقم ${num} خارج القطيع.`;
 }
 
@@ -906,7 +915,7 @@ if(!okIds.length){
 ctx.animalIds = okIds;
 ctx.animalId  = okIds[0];
 
-      const ids2 = (ctx.animalIds || []).filter(Boolean);
+     
 if(!ids.length){
   showWarn("⚠️ لا يوجد أرقام حيوانات.");
   return;
@@ -920,19 +929,10 @@ try{
   const user = await waitForUser(2000);
   if(!user) return;
 
-        const payload = {
-          type: 'ovysynch',
-          eventType: 'بروتوكول تزامن',
-          animalId: ctx.animalId,
-          animalNumber: ctx.animalId,
-          startDate: ctx.start,
-          program: ctx.program,
-          steps: ctx.steps,
-          userId: user.uid,
-          createdAt: serverTimestamp()
-        };
-for (let idx = 0; idx < ids.length; idx++){
-  const animalNo = ids[idx];
+       
+for (let idx = 0; idx < ctx.animalIds.length; idx++){
+  const animalNo = ctx.animalIds[idx];
+
 
   const payload = {
     type: 'ovysynch',
@@ -965,15 +965,43 @@ if (!snap.exists()) {
   // ✅ موجود بالفعل — لا نعمل update عشان rules تمنع
   }
 }
-  await ensureProtocolTasks({
-    animalNumber: animalNo,
-    protocolStartDate: ctx.start,
-    program: ctx.program,
-    userId: authRef?.currentUser?.uid || null
-  });
+  // ✅ منع تكرار إنشاء التاسكات عند إعادة الحفظ
+  if (dbRef){
+    const batchLockId = [
+      "ovsynch_tasks",
+      String(animalNo).trim(),
+      String(ctx.program).trim(),
+      String(ctx.start).trim()
+    ].join("__");
+
+    const lockRef = doc(dbRef, "protocolTaskBatches", batchLockId);
+    const lockSnap = await getDoc(lockRef);
+
+    if (!lockSnap.exists()){
+      // اقفل أول مرة فقط
+     await setDoc(lockRef, {
+  userId: user.uid,
+  animalNumber: String(animalNo).trim(),
+  program: String(ctx.program).trim(),
+  startDate: String(ctx.start).trim(),
+  createdAt: serverTimestamp()
+}, { merge: true });
+
+
+      // ✅ إنشاء التاسكات مرة واحدة فقط
+      await ensureProtocolTasks({
+        animalNumber: animalNo,
+        protocolStartDate: ctx.start,
+        program: ctx.program,
+        userId: user.uid
+      });
+    }
+  }
+
 
   // تقدم بسيط
-  showInfo(`✅ تم حفظ (${idx+1}/${ids.length}) رقم ${animalNo}`);
+ showInfo(`✅ تم حفظ (${idx+1}/${ctx.animalIds.length}) رقم ${animalNo}`);
+
 }
 
 
