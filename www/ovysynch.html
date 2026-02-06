@@ -721,12 +721,14 @@ if (program === "ovsynch" || program === "presynch_ovsynch") {
 
         const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
 const iso = local.toISOString().slice(0,16); // تاريخ + وقت
+const plannedDate = toISODateLocal(dd); // ✅ نفس منطق tasks
 
         const keep = prev.find(p => p.name===s.name && p.day===s.day);
         return {
           day: s.day,
           name: s.name,
           date: iso,
+          plannedDate: plannedDate,
           done: keep ? !!keep.done : false,
           confirmedOn: keep ? keep.confirmedOn || null : null,
           onSchedule: keep ? !!keep.onSchedule : false,
@@ -774,7 +776,8 @@ const iso = local.toISOString().slice(0,16); // تاريخ + وقت
           program: programEl.value || null,
           protocolStartDate: (startDateEl.value||'').trim() || null,
           plannedDay: st.day,
-         plannedDate: String(st.date).slice(0,10),
+        plannedDate: st.plannedDate,
+
 plannedDateTime: st.date,
 
           confirmedOn: st.confirmedOn,
@@ -792,7 +795,8 @@ await markTaskDone({
   animalNumber: animalId,
   protocolStartDate: (startDateEl.value||'').trim(),
   program: (programEl.value||'').trim(),
-  plannedDate: String(st.date).slice(0,10), // ✅ تاريخ فقط عشان يطابق task
+ plannedDate: st.plannedDate,
+
   stepName: st.name
 });
 
@@ -814,7 +818,8 @@ st._savedOnce = true;
       const today = todayLocal();
       st.done = el.checked;
       st.confirmedOn = el.checked ? today : null;
-     st.onSchedule = el.checked ? (today === String(st.date).slice(0,10)) : false;
+    st.onSchedule = el.checked ? (today === st.plannedDate) : false;
+
 
       if(el.checked) await saveStepEvent(i);
       updateSteps();
