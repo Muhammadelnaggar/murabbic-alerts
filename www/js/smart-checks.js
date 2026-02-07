@@ -44,8 +44,9 @@
   window.smart.onInseminationRecorded  = window.smart.onInseminationRecorded  || (async ()=>{});
 
   // ======= المراقب العام للقواعد =======
+  // ======= المراقب العام للقواعد =======
   window.smart.startAlertsWatcher = function ({ tenantId, userId, onAlert } = {}){
-   
+
     function checkAll(){
       const cfg = window.smart.cfg || {};
       const page = (location.pathname.split('/').pop() || '').toLowerCase();
@@ -123,74 +124,67 @@
           });
         }
       }
+
       // --- Rule 6: تذكير خطوات بروتوكول اليوم (من tasks) ---
       if (page.includes('dashboard') || page.includes('add-event')) {
-; (async function(){
+        (async function(){
+          try{
+            const mod = await import('/js/firebase-config.js');
+            const db = mod?.db;
+            const auth = mod?.auth;
+            if(!db) return;
 
-  try{
-    // smart-checks غالبًا بيتحمّل type="module" عندك في الداشبورد
-    // فـ import() شغال. لو مش شغال، هنرجع نعمله بطريقة تانية لاحقًا.
-    const mod = await import('/js/firebase-config.js?v=1');
-    const db = mod?.db;
-    const auth = mod?.auth;
-    if(!db) return;
+            const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+            if(!uid) return;
 
-    const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
-    if(!uid) return;
+            const { collection, query, where, getDocs, limit } =
+              await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-    const { collection, query, where, getDocs, limit } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+            const today = todayISO();
+            const onceKey = `seen_protocol_due_${today}`;
+            if (localStorage.getItem(onceKey)) return;
 
-  const today = todayISO();
-const previewDays = 1; // ✅ غيّرها: 1 أو 2 أو 3 حسب ما تحب
-const onceKey = `seen_protocol_preview_${today}`;
-if (localStorage.getItem(onceKey)) return;
-    // نجيب أول خطوة pending لليوم (بدون تعقيد indexes)
-    const q = query(
-      collection(db, 'tasks'),
-      where('userId','==', uid),
-      where('type','==','protocol_step'),
-      where('status','==','pending'),
-      where('plannedDate','==', today),
-      limit(1)
-    );
+            const q = query(
+              collection(db, 'tasks'),
+              where('userId','==', uid),
+              where('type','==','protocol_step'),
+              where('status','==','pending'),
+              where('plannedDate','==', today),
+              limit(1)
+            );
 
-    const snap = await getDocs(q);
-    if(snap.empty) return;
-// نلف على كل الوثائق ونشوف فيهم واحدة موعدها اليوم أو قبل اليوم
-const dueDoc = snap.docs.find(d => {
-  const data = d.data() || {};
-  return data.plannedDate && data.plannedDate <= today;
-});
+            const snap = await getDocs(q);
+            if(snap.empty) return;
 
-if (!dueDoc) return;   // لو مفيش واحدة مستحقة، خلاص نوقف
+            const doc0 = snap.docs[0].data() || {};
+            const an = doc0.animalNumber || '';
+            const step = doc0.stepName || 'خطوة بروتوكول';
+            const program = doc0.program || '';
 
-const doc0 = dueDoc.data() || {};
+            fire(onAlert, {
+              ruleId:'protocol_step_due_today',
+              severity:'info',
+              animalId: an,
+              program,
+              message: `🔔 اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
+            });
 
-    const an = doc0.animalNumber || '';
-    const step = doc0.stepName || 'خطوة بروتوكول';
-    const program = doc0.program || '';
+            localStorage.setItem(onceKey, '1');
+          }catch(e){
+            // صامت
+          }
+        })();
+      }
+    } // ✅ نهاية checkAll
 
-    fire(onAlert, {
-      ruleId:'protocol_step_due_today',
-      severity:'info',
-      animalId: an,
-      program,
-      message: `🔔 اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
-    });
-      localStorage.setItem(onceKey, '1');
-  }catch(e){
-    // صامت
-  }
-})();
-
-    }
-
+    // ✅ تشغيل checkAll مرة واحدة عند فتح الصفحة
     if (document.readyState === 'loading')
       document.addEventListener('DOMContentLoaded', checkAll, { once:true });
     else
       setTimeout(checkAll, 0);
 
     return function stop(){ /* لا شيء حاليًا */ };
+  };
+
   };
 })();
