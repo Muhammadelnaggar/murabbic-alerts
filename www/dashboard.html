@@ -579,6 +579,7 @@ function showSyncPopup(payload){
         transition:all .35s ease; z-index:999999;
         cursor:pointer;
       }
+      
       .mbk-sync-popup.show{ right:12px; }
       .mbk-sync-popup .t{font-weight:900; margin-bottom:4px;}
       .mbk-sync-popup .m{line-height:1.4; opacity:.98;}
@@ -598,18 +599,24 @@ function showSyncPopup(payload){
 
     const el = document.createElement('div');
     el.className = `mbk-sync-popup ${cls}`;
-    el.innerHTML = `
-      <div class="t">🔔 تنبيه بروتوكول</div>
-      <div class="m">${payload?.message || 'تنبيه جديد'}</div>
-    `;
+   el.innerHTML = `
+  <div class="t">🔔 تنبيه بروتوكول</div>
+  <div class="m">${payload?.message || 'تنبيه جديد'}</div>
+  <div style="margin-top:10px;display:flex;justify-content:flex-start">
+    <button type="button" class="mbk-ok">حسناً</button>
+  </div>
+`;
+
 
     document.body.appendChild(el);
     setTimeout(()=> el.classList.add('show'), 30);
     const kill = ()=>{ el.classList.remove('show'); setTimeout(()=> el.remove(), 250); };
-    el.addEventListener('click', kill);
-    setTimeout(kill, 15000);
-  }catch(e){}
-}
+  el.addEventListener('click', (e)=>{
+  if (e.target && e.target.classList && e.target.classList.contains('mbk-ok')) {
+    kill();
+  }
+});
+
 
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
@@ -628,6 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </body>
 </html>
+
 
 
 
