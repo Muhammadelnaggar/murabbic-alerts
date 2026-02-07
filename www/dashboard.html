@@ -9,14 +9,16 @@
   <link rel="stylesheet" href="/css/forms.css">
 
   <style>
-    :root{
-      --bg:#fff9db;
-      --card:#ffffff;
-      --muted:#e8f5e9;
-      --green:#2e7d32;
-      --border:#c5e1a5;
-      --text:#1b5e20;
-    }
+  :root{
+  --bg:#f7faf7;
+  --card:#ffffff;
+  --text:#0f172a;
+  --muted:#64748b;
+  --border:#e2e8f0;
+  --brand:#0ea05a;
+  --brand-600:#0b7f47;
+}
+
     *{box-sizing:border-box;}
     body{
       margin:0;
@@ -128,6 +130,33 @@
       font-weight:bold;
       color:#2e7d32;
     }
+    body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Cairo',Tahoma,Arial,sans-serif; }
+
+.mbk-top{
+  position: sticky; top:0; z-index:50;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+}
+.mbk-head{
+  max-width:980px;
+  margin:0 auto;
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.mbk-title{ line-height:1.1; }
+.mbk-page{ font-size:18px; font-weight:900; color:var(--text); }
+.mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
+.mbk-logo{ height:46px; width:auto; object-fit:contain; opacity:.95; }
+
+.page{
+  max-width:980px;
+  margin:10px auto 16px;
+  padding:0 10px;
+}
+
   </style>
 
 </head>
@@ -137,8 +166,16 @@
   window.API_BASE = "https://murabbic-alerts.onrender.com";
 </script>
 
-<h1>لوحة التحكم - مربيك</h1>
-
+<header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page">لوحة التحكم</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+<div class="page">
 <!-- شريط THI أعلى الصفحة -->
 <div id="thiBar" class="card">
   <div>
@@ -171,7 +208,9 @@
   <div id="kpiGrid" class="kpi-grid"></div>
   <div id="statusBar">جارٍ تحميل بيانات القطيع...</div>
 </div>
-
+<script src="/js/tenant-bootstrap.js"></script>
+<script type="module" src="/js/api.js"></script>
+<script type="module" src="/js/app-core.js"></script>
 <script>
 // ============ API BASE ============
 const API_BASE = "https://murabbic-alerts.onrender.com";
@@ -525,10 +564,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<script src="/js/tenant-bootstrap.js"></script>
-<script type="module" src="/js/api.js"></script>
-<script type="module" src="/js/app-core.js"></script>
 
+</div>
 </body>
 </html>
+
 
