@@ -125,64 +125,77 @@
         }
       }
 
-      // --- Rule 6: تذكير خطوات بروتوكول اليوم (من tasks) ---
-      if (page.includes('dashboard') || page.includes('add-event')) {
-        (async function(){
-          try{
-            const mod = await import('/js/firebase-config.js');
-            const db = mod?.db;
-            const auth = mod?.auth;
-            if(!db) return;
+    (async function(){
+  try{
+    const mod = await import('/js/firebase-config.js');
+    const db = mod?.db;
+    const auth = mod?.auth;
+    if(!db) return;
 
-            const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
-            if(!uid) return;
+    const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+    if(!uid) return;
 
-            const { collection, query, where, getDocs, limit } =
-              await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { collection, query, where, getDocs, limit } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-            const today = todayISO();
-            const onceKey = `seen_protocol_due_${today}`;
-            if (localStorage.getItem(onceKey)) return;
+    const today = todayISO();
 
-            const q = query(
-              collection(db, 'tasks'),
-              where('userId','==', uid),
-              where('type','==','protocol_step'),
-              where('status','==','pending'),
-              where('plannedDate','==', today),
-              limit(1)
-            );
+    // ✅ نجيب شوية Tasks pending وبنفلتر محليًا (بدون تعقيد query/Indexes)
+    const q = query(
+      collection(db, 'tasks'),
+      where('userId','==', uid),
+      where('type','==','protocol_step'),
+      where('status','==','pending'),
+      limit(30)
+    );
 
-            const snap = await getDocs(q);
-            if(snap.empty) return;
+    const snap = await getDocs(q);
+    if(snap.empty) return;
 
-            const doc0 = snap.docs[0].data() || {};
-            const an = doc0.animalNumber || '';
-            const step = doc0.stepName || 'خطوة بروتوكول';
-            const program = doc0.program || '';
+    // ✅ نحول docs لبيانات + نفلتر على plannedDate النصي
+    const items = snap.docs
+      .map(d => (d.data() || {}))
+      .filter(x => x.plannedDate && typeof x.plannedDate === 'string')
+      .sort((a,b) => String(a.plannedDate).localeCompare(String(b.plannedDate)));
 
-            fire(onAlert, {
-              ruleId:'protocol_step_due_today',
-              severity:'info',
-              animalId: an,
-              program,
-              message: `🔔 اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
-            });
+    // ✅ 1) اليوم (مستحق اليوم)
+    const dueToday = items.find(x => x.plannedDate === today);
 
-            localStorage.setItem(onceKey, '1');
-          }catch(e){
-            // صامت
-          }
-        })();
-      }
-    } // ✅ نهاية checkAll
+    // ✅ 2) بكرة (تنبيه قبل الموعد بيوم)
+    const tomorrow = (function(){
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    })();
+    const dueTomorrow = items.find(x => x.plannedDate === tomorrow);
 
-    // ✅ تشغيل checkAll مرة واحدة عند فتح الصفحة
-    if (document.readyState === 'loading')
-      document.addEventListener('DOMContentLoaded', checkAll, { once:true });
-    else
-      setTimeout(checkAll, 0);
+    // ✅ لو مفيش لا اليوم ولا بكرة، مفيش تنبيه
+    if (!dueToday && !dueTomorrow) return;
 
-    return function stop(){ /* لا شيء حاليًا */ };
-  };
+    // ✅ أولوية: اليوم أولاً
+    const doc0 = dueToday || dueTomorrow;
+
+    const an = doc0.animalNumber || '';
+    const step = doc0.stepName || 'خطوة بروتوكول';
+
+    if (dueToday){
+      fire(onAlert, {
+        ruleId:'protocol_step_due_today',
+        severity:'info',
+        animalId: an,
+        message: `اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
+      });
+    } else {
+      fire(onAlert, {
+        ruleId:'protocol_step_due_tomorrow',
+        severity:'tip',
+        animalId: an,
+        message: `غدًا خطوة بروتوكول للحيوان ${an}: ${step}`
+      });
+    }
+
+  }catch(e){
+    // صامت
+  }
 })();
