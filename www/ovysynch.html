@@ -243,6 +243,9 @@ const saveGroupBtn  = document.getElementById('saveGroup');
 
 
 let bulkList = []; // قائمة أرقام الحيوانات
+    let currentGroupId = "";
+let currentGroupName = "";
+let currentGroupFromCloud = false;
 
     const programEl   = document.getElementById('program');
     const stepsBox    = document.getElementById('stepsBox');
@@ -395,6 +398,9 @@ async function loadSelectedGroup(){
 
   const d = snap.data() || {};
   const arr = Array.isArray(d.animals) ? d.animals : [];
+  currentGroupId = gid;
+currentGroupName = String(d.name || gid).trim();
+currentGroupFromCloud = true;
 
   bulkEl.value = arr.join("\n");
   parseBulkList();            // يحدث bulkList + hint
@@ -631,7 +637,18 @@ function makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, ste
   ].join("__");
 }
 
-async function ensureProtocolTasks({ animalNumber, protocolStartDate, program, userId }){
+async function ensureProtocolTasks({
+  animalNumber,
+  protocolStartDate,
+  program,
+  userId,
+  scope = "animal",          // "animal" | "group"
+  groupId = "",
+  groupName = "",
+  animalsCount = 0,
+  alertEnabled = true        // ✅ group tasks = true / silent animal tasks = false
+}){
+
   if(!dbRef) return;
 
   const tpl = PROGRAMS[program] || [];
@@ -695,6 +712,12 @@ if (!snap.exists()) {
     animalNumber: String(animalNumber||"").trim(),
     protocolStartDate: String(protocolStartDate||"").trim(),
     status: "pending",
+    scope: scope,
+groupId: groupId || null,
+groupName: groupName || null,
+animalsCount: animalsCount || null,
+alertEnabled: !!alertEnabled,
+
     userId: userId || null,
     createdAt: serverTimestamp()
   });
@@ -974,6 +997,30 @@ if(!okIds.length){
 // ✅ استبدل القائمة بالصالحة فقط
 ctx.animalIds = okIds;
 ctx.animalId  = okIds[0];
+// ✅ تحديد هل التسجيل "مجموعة" أم "فردي"
+const isGroupMode =
+  (Array.isArray(ctx.animalIds) && ctx.animalIds.length > 1) ||
+  !!(groupSelectEl?.value || "").trim();
+
+let groupId = "";
+let groupName = "";
+
+// 1) لو مجموعة سحابية محمّلة
+if ((groupSelectEl?.value || "").trim()) {
+  groupId = String(groupSelectEl.value).trim();
+  groupName = String(currentGroupName || groupId).trim();
+} else if (isGroupMode) {
+  // 2) Bulk Group (مش محفوظة على السحابة)
+  groupName = "قائمة جماعية";
+  // ID ثابت قدر الإمكان من (program + start + count + أول رقم)
+  groupId = [
+    "bulk",
+    String(ctx.program||"").trim(),
+    String(ctx.start||"").trim(),
+    String(ctx.animalIds.length),
+    String(ctx.animalIds[0]||"").trim()
+  ].join("__");
+}
 
      
 if(!ids.length){
@@ -1027,25 +1074,59 @@ if (!snap.exists()) {
 }
   // ✅ منع تكرار إنشاء التاسكات عند إعادة الحفظ
   if (dbRef){
-    const batchLockId = [
-      "ovsynch_tasks",
-      String(animalNo).trim(),
-      String(ctx.program).trim(),
-      String(ctx.start).trim()
-    ].join("__");
+   // ✅ Lock: لو Group يبقى Lock واحد للمجموعة، لو فردي يبقى لكل حيوان
+const batchLockId = isGroupMode
+  ? ["ovsynch_tasks_group", String(groupId).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__")
+  : ["ovsynch_tasks_animal", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
 
     const lockRef = doc(dbRef, "protocolTaskBatches", batchLockId);
     const lockSnap = await getDoc(lockRef);
 
-    if (!lockSnap.exists()){
-      // اقفل أول مرة فقط
-     await setDoc(lockRef, {
-  userId: user.uid,
-  animalNumber: String(animalNo).trim(),
-  program: String(ctx.program).trim(),
-  startDate: String(ctx.start).trim(),
-  createdAt: serverTimestamp()
-}, { merge: true });
+   if (!lockSnap.exists()) {
+
+  await setDoc(lockRef, {
+    userId: user.uid,
+    scope: isGroupMode ? "group" : "animal",
+    groupId: isGroupMode ? groupId : null,
+    groupName: isGroupMode ? groupName : null,
+    animalsCount: isGroupMode ? ctx.animalIds.length : null,
+    animalNumber: isGroupMode ? null : animalNo,
+    program: ctx.program,
+    startDate: ctx.start,
+    createdAt: serverTimestamp()
+  }, { merge: true });
+
+
+  // 👇 هنا الجزء اللي كنت مش فاهمه
+  if (isGroupMode) {
+
+    // ✅ تنبيه واحد فقط للمجموعة
+    await ensureProtocolTasks({
+      protocolStartDate: ctx.start,
+      program: ctx.program,
+      userId: user.uid,
+      scope: "group",
+      groupId: groupId,
+      groupName: groupName,
+      animalsCount: ctx.animalIds.length,
+      alertEnabled: true
+    });
+
+  } else {
+
+    // ✅ فردي
+    await ensureProtocolTasks({
+      animalNumber: animalNo,
+      protocolStartDate: ctx.start,
+      program: ctx.program,
+      user-named?? 
+      userId: user.uid,
+      scope: "animal",
+      alertEnabled: true
+    });
+
+  }
+}
 
 
       // ✅ إنشاء التاسكات مرة واحدة فقط
