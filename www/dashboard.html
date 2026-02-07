@@ -212,6 +212,8 @@
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
   <script src="/js/smart-checks.js"></script>
+  <script src="/js/alerts-ui.js"></script>
+
 
 <script>
 // ============ API BASE ============
@@ -613,7 +615,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
     try{
-    window.smart?.startAlertsWatcher({ userId: getTenantId(), onAlert: showSyncPopup });
+   window.smart?.startAlertsWatcher({
+  userId: getTenantId(),
+  onAlert: (p)=> window.mbk?.alertsUI?.show(p)
+});
+
   }catch(e){}
 });
 </script>
@@ -622,6 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </body>
 </html>
+
 
 
 
