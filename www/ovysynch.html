@@ -691,6 +691,7 @@ if (!snap.exists()) {
     plannedDay: s.day,
     plannedDate: plannedDate,
     plannedDateTime: plannedDateTime.toISOString(),
+    plannedTime: (startTimeEl?.value || "08:00"),
     animalNumber: String(animalNumber||"").trim(),
     protocolStartDate: String(protocolStartDate||"").trim(),
     status: "pending",
