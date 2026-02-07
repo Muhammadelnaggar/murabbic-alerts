@@ -45,9 +45,7 @@
 
   // ======= المراقب العام للقواعد =======
   window.smart.startAlertsWatcher = function ({ tenantId, userId, onAlert } = {}){
-    // مفتاح تشغيل يدوي: لا يعمل إلا إذا فعّلته صراحةً
-    if (localStorage.getItem('SMART_ON') !== '1') return function stop(){};
-
+   
     function checkAll(){
       const cfg = window.smart.cfg || {};
       const page = (location.pathname.split('/').pop() || '').toLowerCase();
@@ -143,11 +141,10 @@
     const { collection, query, where, getDocs, limit } =
       await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-    const today = todayISO();
-    const onceKey = `seen_protocol_due_${today}`;
+  const today = todayISO();
+const previewDays = 1; // ✅ غيّرها: 1 أو 2 أو 3 حسب ما تحب
+const onceKey = `seen_protocol_preview_${today}`;
 if (localStorage.getItem(onceKey)) return;
-
-
     // نجيب أول خطوة pending لليوم (بدون تعقيد indexes)
     const q = query(
       collection(db, 'tasks'),
@@ -161,7 +158,18 @@ if (localStorage.getItem(onceKey)) return;
     const snap = await getDocs(q);
     if(snap.empty) return;
 
-    const doc0 = snap.docs[0].data() || {};
+    const today = todayISO();
+
+// نلف على كل الوثائق ونشوف فيهم واحدة موعدها اليوم أو قبل اليوم
+const dueDoc = snap.docs.find(d => {
+  const data = d.data() || {};
+  return data.plannedDate && data.plannedDate <= today;
+});
+
+if (!dueDoc) return;   // لو مفيش واحدة مستحقة، خلاص نوقف
+
+const doc0 = dueDoc.data() || {};
+
     const an = doc0.animalNumber || '';
     const step = doc0.stepName || 'خطوة بروتوكول';
     const program = doc0.program || '';
