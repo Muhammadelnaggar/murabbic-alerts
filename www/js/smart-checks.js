@@ -294,3 +294,14 @@
           tickProtocol();
         }
       }
+    } // نهاية checkAll()
+
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', checkAll, { once:true });
+    else
+      setTimeout(checkAll, 0);
+
+    return function stop(){};
+  }; // نهاية startAlertsWatcher
+
+})(); // نهاية IIFE
