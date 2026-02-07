@@ -25,30 +25,46 @@
       }
     } catch {}
   };
+
   const QS = new URLSearchParams(location.search);
   const pick = (k, fb=null)=> QS.get(k) || localStorage.getItem(k) || sessionStorage.getItem(k) || fb;
+
   const isValidDate = (d)=> d instanceof Date && !isNaN(d);
-  const parse = (s)=> { if(!s) return null; try{ const d=new Date(s); return isValidDate(d)?d:null; }catch{ return null; } };
+  const parse = (s)=> {
+    if(!s) return null;
+    try{ const d=new Date(s); return isValidDate(d)?d:null; }catch{ return null; }
+  };
+
   const daysBetween  = (a,b)=> { if(!a||!b) return NaN; const ms=+parse(b)-(+parse(a)); return Math.floor(ms/86400000); };
   const hoursBetween = (a,b)=> { if(!a||!b) return NaN; const ms=+parse(b)-(+parse(a)); return Math.floor(ms/3600000); };
-  const todayISO = ()=> { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+
+  const todayISO = ()=> {
+    const d=new Date();
+    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  };
+
+  const tomorrowISO = ()=> {
+    const d=new Date();
+    d.setDate(d.getDate()+1);
+    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  };
 
   function fire(onAlert, payload){
     dlPush('smart_alert_triggered', payload);
     try { if (typeof onAlert==='function') onAlert(payload); else alert('🔔 ' + payload.message); } catch {}
   }
 
-  // ======= Stubs يمكن للتطبيق استدعاؤها لاحقًا =======
+  // ======= Stubs =======
   window.smart.beforeInsemination      = window.smart.beforeInsemination      || (async ()=> true);
   window.smart.onCalvingRecorded       = window.smart.onCalvingRecorded       || (async ()=>{});
   window.smart.onInseminationRecorded  = window.smart.onInseminationRecorded  || (async ()=>{});
 
   // ======= المراقب العام للقواعد =======
-  // ======= المراقب العام للقواعد =======
   window.smart.startAlertsWatcher = function ({ tenantId, userId, onAlert } = {}){
-
     function checkAll(){
-      const cfg = window.smart.cfg || {};
+      const cfg  = window.smart.cfg || {};
       const page = (location.pathname.split('/').pop() || '').toLowerCase();
 
       // سياق موحّد
@@ -75,7 +91,7 @@
         const h = hoursBetween(calv, eventDate);
         const key = calv ? `seen_placenta_${calv}` : '';
         if (Number.isFinite(h) && h >= Number(cfg.placentaCheckHours) && key && !localStorage.getItem(key)){
-          localStorage.setItem(key,'1'); // منع التكرار لكل ولادة
+          localStorage.setItem(key,'1');
           fire(onAlert, {
             ruleId:'placenta_check_24h', severity:'info', animalId, hours:h,
             message:`مر ${h} ساعة منذ الولادة للحيوان ${animalId}. هل نزلت المشيمة؟`
@@ -125,77 +141,78 @@
         }
       }
 
-    (async function(){
-  try{
-    const mod = await import('/js/firebase-config.js');
-    const db = mod?.db;
-    const auth = mod?.auth;
-    if(!db) return;
+      // --- Rule 6: تذكير خطوات بروتوكول اليوم + قبلها بيوم (من tasks) ---
+      if (page.includes('dashboard') || page.includes('add-event')){
+        (async function(){
+          try{
+            const mod  = await import('/js/firebase-config.js');
+            const db   = mod?.db;
+            const auth = mod?.auth;
+            if(!db) return;
 
-    const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
-    if(!uid) return;
+            const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+            if(!uid) return;
 
-    const { collection, query, where, getDocs, limit } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+            const { collection, query, where, getDocs, limit } =
+              await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-    const today = todayISO();
+            const today    = todayISO();
+            const tomorrow = tomorrowISO();
 
-    // ✅ نجيب شوية Tasks pending وبنفلتر محليًا (بدون تعقيد query/Indexes)
-    const q = query(
-      collection(db, 'tasks'),
-      where('userId','==', uid),
-      where('type','==','protocol_step'),
-      where('status','==','pending'),
-      limit(30)
-    );
+            // نجيب مجموعة من pending ثم نفلتر محليًا على plannedDate (عشان الindexes)
+            const q = query(
+              collection(db, 'tasks'),
+              where('userId','==', uid),
+              where('type','==','protocol_step'),
+              where('status','==','pending'),
+              limit(40)
+            );
 
-    const snap = await getDocs(q);
-    if(snap.empty) return;
+            const snap = await getDocs(q);
+            if(snap.empty) return;
 
-    // ✅ نحول docs لبيانات + نفلتر على plannedDate النصي
-    const items = snap.docs
-      .map(d => (d.data() || {}))
-      .filter(x => x.plannedDate && typeof x.plannedDate === 'string')
-      .sort((a,b) => String(a.plannedDate).localeCompare(String(b.plannedDate)));
+            const items = snap.docs
+              .map(d => (d.data() || {}))
+              .filter(x => x.plannedDate && typeof x.plannedDate === 'string')
+              .sort((a,b) => String(a.plannedDate).localeCompare(String(b.plannedDate)));
 
-    // ✅ 1) اليوم (مستحق اليوم)
-    const dueToday = items.find(x => x.plannedDate === today);
+            const dueToday    = items.find(x => x.plannedDate === today);
+            const dueTomorrow = items.find(x => x.plannedDate === tomorrow);
 
-    // ✅ 2) بكرة (تنبيه قبل الموعد بيوم)
-    const tomorrow = (function(){
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    })();
-    const dueTomorrow = items.find(x => x.plannedDate === tomorrow);
+            if (!dueToday && !dueTomorrow) return;
 
-    // ✅ لو مفيش لا اليوم ولا بكرة، مفيش تنبيه
-    if (!dueToday && !dueTomorrow) return;
+            const doc0 = dueToday || dueTomorrow;
+            const an   = doc0.animalNumber || '';
+            const step = doc0.stepName || 'خطوة بروتوكول';
 
-    // ✅ أولوية: اليوم أولاً
-    const doc0 = dueToday || dueTomorrow;
-
-    const an = doc0.animalNumber || '';
-    const step = doc0.stepName || 'خطوة بروتوكول';
-
-    if (dueToday){
-      fire(onAlert, {
-        ruleId:'protocol_step_due_today',
-        severity:'info',
-        animalId: an,
-        message: `اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
-      });
-    } else {
-      fire(onAlert, {
-        ruleId:'protocol_step_due_tomorrow',
-        severity:'tip',
-        animalId: an,
-        message: `غدًا خطوة بروتوكول للحيوان ${an}: ${step}`
-      });
+            if (dueToday){
+              fire(onAlert, {
+                ruleId:'protocol_step_due_today',
+                severity:'info',
+                animalId: an,
+                message: `اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
+              });
+            } else {
+              fire(onAlert, {
+                ruleId:'protocol_step_due_tomorrow',
+                severity:'tip',
+                animalId: an,
+                message: `غدًا خطوة بروتوكول للحيوان ${an}: ${step}`
+              });
+            }
+          }catch(e){
+            // صامت
+          }
+        })();
+      }
     }
 
-  }catch(e){
-    // صامت
-  }
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', checkAll, { once:true });
+    else
+      setTimeout(checkAll, 0);
+
+    return function stop(){};
+  };
+
 })();
