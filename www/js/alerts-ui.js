@@ -1,313 +1,326 @@
-// /js/alerts-ui.js — Murabbik Smart Alerts UI (v1)
-// ✅ تنبيهات شيك + RTL + زر "حسنًا" للإغلاق
-// ✅ بدون تعديل تصميم الصفحات: يضيف Overlay خفيف + Cards
-// ✅ Dedup + Stack + صوت خفيف اختياري
+// /js/alerts-ui.js — Murabbik Alerts UI (v1)
+// UI فقط: كروت تنبيه + زر "حسنًا" + تجميع تنبيهات البروتوكول.
+// لا يعتمد على أي تعديل في التصميم العام، ويحقن CSS خفيف مرة واحدة.
 
 (function(){
-  "use strict";
-  if (window.mbkAlerts) return;
+  'use strict';
+  if (!window.mbk) window.mbk = {};
+  if (window.mbk.alertsUI) return; // منع تحميل مزدوج
 
-  const state = {
-    root: null,
-    list: null,
-    seen: new Set(),
-    max: 6
-  };
+  const LS_SEEN_PREFIX = 'mbk_alert_seen__';
 
-  function el(tag, cls){
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    return e;
+  function esc(s){
+    return String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
   }
 
-  function ensureUI(){
-    if (state.root) return;
+  function nowTs(){ return Date.now(); }
 
-    const style = document.createElement("style");
-    style.textContent = `
-      :root{
-        --mbk-brand: var(--brand, #0ea05a);
-        --mbk-brand-600: var(--brand-600, #0b7f47);
-        --mbk-bg: rgba(15,23,42,.45);
-        --mbk-card: #fff;
-        --mbk-border: var(--border, #e2e8f0);
-        --mbk-text: var(--text, #0f172a);
-        --mbk-muted: var(--muted, #64748b);
-        --mbk-radius: 18px;
-        --mbk-shadow: 0 10px 30px rgba(2,8,23,.18);
-      }
+  function injectStyleOnce(){
+    if (document.getElementById('mbk-alerts-ui-style')) return;
+    const st = document.createElement('style');
+    st.id = 'mbk-alerts-ui-style';
+    st.textContent = `
+/* ===== Murabbik Alerts UI ===== */
+.mbk-alerts-stack{
+  position:fixed;
+  top:86px;
+  right:12px;
+  width:340px;
+  max-width: calc(100vw - 24px);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  z-index:999999;
+}
+@media(max-width:420px){
+  .mbk-alerts-stack{ right:10px; top:78px; width: calc(100vw - 20px); }
+}
+.mbk-alert{
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:16px;
+  box-shadow:0 10px 26px rgba(0,0,0,.14);
+  overflow:hidden;
+  transform: translateX(360px);
+  opacity:0;
+  transition: transform .28s ease, opacity .28s ease;
+  font-family:'Cairo',Tahoma,Arial,sans-serif;
+}
+.mbk-alert.show{ transform: translateX(0); opacity:1; }
 
-      .mbk-alerts{
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: none;
-        align-items: flex-end;
-        justify-content: center;
-        background: var(--mbk-bg);
-        padding: 14px;
-      }
-      .mbk-alerts.show{ display:flex; }
+.mbk-alert__top{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:12px 12px 10px;
+}
+.mbk-alert__icon{
+  width:38px; height:38px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  flex-shrink:0;
+  border:1px solid var(--border, #e2e8f0);
+  background:#f7faf7;
+}
+.mbk-alert__body{ flex:1; min-width:0; }
+.mbk-alert__title{
+  font-size:13px;
+  font-weight:900;
+  color: var(--text, #0f172a);
+  line-height:1.3;
+  margin:0 0 4px;
+}
+.mbk-alert__msg{
+  font-size:12px;
+  color:#334155;
+  line-height:1.55;
+  margin:0;
+  word-break:break-word;
+}
+.mbk-alert__meta{
+  margin-top:6px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+}
+.mbk-chip{
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid var(--border, #e2e8f0);
+  background:#f8fafc;
+  color:#0f172a;
+  white-space:nowrap;
+}
+.mbk-chip.ok{ background:#ecfdf5; border-color:#bbf7d0; color:#065f46; }
+.mbk-chip.warn{ background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+.mbk-chip.info{ background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+.mbk-chip.danger{ background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 
-      .mbk-alerts-panel{
-        width: min(560px, 100%);
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
+.mbk-alert__actions{
+  display:flex;
+  gap:10px;
+  padding:10px 12px 12px;
+  border-top:1px solid var(--border, #e2e8f0);
+  background:#fff;
+}
+.mbk-btn{
+  appearance:none;
+  border:0;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:900;
+  font-size:13px;
+  flex:1;
+}
+.mbk-btn.primary{
+  background: var(--brand, #0ea05a);
+  color:#fff;
+}
+.mbk-btn.ghost{
+  background:#fff;
+  color: var(--brand-600, #0b7f47);
+  border:2px solid var(--brand-600, #0b7f47);
+}
+.mbk-btn:active{ transform: scale(.99); }
 
-      .mbk-alert{
-        background: var(--mbk-card);
-        border: 1px solid var(--mbk-border);
-        border-radius: var(--mbk-radius);
-        box-shadow: var(--mbk-shadow);
-        overflow: hidden;
-        transform: translateY(12px);
-        opacity: 0;
-        animation: mbkIn .18s ease-out forwards;
-      }
-      @keyframes mbkIn{
-        to{ transform: translateY(0); opacity: 1; }
-      }
+.mbk-alert__close{
+  width:32px;height:32px;
+  border-radius:10px;
+  border:1px solid var(--border, #e2e8f0);
+  background:#fff;
+  color:#0f172a;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  flex-shrink:0;
+  margin-right:2px;
+}
 
-      .mbk-alert-head{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:10px;
-        padding: 12px 12px 8px;
-      }
-      .mbk-alert-title{
-        display:flex;
-        align-items:center;
-        gap:10px;
-        font-weight: 900;
-        color: var(--mbk-text);
-        font-size: 15px;
-      }
-      .mbk-pill{
-        font-size: 12px;
-        font-weight: 900;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid var(--mbk-border);
-        color: var(--mbk-brand-600);
-        background: rgba(14,160,90,.08);
-        white-space: nowrap;
-      }
-      .mbk-x{
-        width: 38px;
-        height: 38px;
-        border-radius: 12px;
-        border: 1px solid var(--mbk-border);
-        background: #fff;
-        cursor: pointer;
-        font-weight: 900;
-        color: var(--mbk-muted);
-      }
-
-      .mbk-alert-body{
-        padding: 0 12px 12px;
-        color: var(--mbk-text);
-        line-height: 1.55;
-        font-size: 14px;
-      }
-      .mbk-alert-meta{
-        margin-top: 6px;
-        font-size: 12px;
-        color: var(--mbk-muted);
-        display:flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .mbk-chip{
-        border: 1px solid var(--mbk-border);
-        border-radius: 999px;
-        padding: 3px 8px;
-        background: #fff;
-      }
-
-      .mbk-alert-actions{
-        display:flex;
-        gap:10px;
-        padding: 10px 12px 12px;
-        border-top: 1px dashed var(--mbk-border);
-      }
-      .mbk-btn{
-        flex:1;
-        border-radius: 14px;
-        padding: 12px 12px;
-        cursor:pointer;
-        font-weight: 900;
-        border: 1px solid var(--mbk-border);
-        background: #fff;
-        color: var(--mbk-brand-600);
-      }
-      .mbk-btn.primary{
-        border-color: transparent;
-        background: var(--mbk-brand);
-        color:#fff;
-      }
-
-      /* مستويات */
-      .mbk-alert[data-sev="warn"] .mbk-pill{
-        color:#9a3412;
-        background: rgba(251,146,60,.14);
-        border-color: rgba(251,146,60,.35);
-      }
-      .mbk-alert[data-sev="info"] .mbk-pill{
-        color:#1d4ed8;
-        background: rgba(59,130,246,.12);
-        border-color: rgba(59,130,246,.25);
-      }
-      .mbk-alert[data-sev="tip"] .mbk-pill{
-        color: var(--mbk-brand-600);
-        background: rgba(14,160,90,.10);
-      }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(st);
+  }
 
-    const root = el("div", "mbk-alerts");
-    const panel = el("div", "mbk-alerts-panel");
-    root.appendChild(panel);
+  function ensureStack(){
+    injectStyleOnce();
+    let stack = document.getElementById('mbkAlertsStack');
+    if (!stack){
+      stack = document.createElement('div');
+      stack.id = 'mbkAlertsStack';
+      stack.className = 'mbk-alerts-stack';
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
 
-    root.addEventListener("click", (e)=>{
-      // لو المستخدم ضغط في الخلفية يقفل كل شيء
-      if (e.target === root) hideAll();
+  function severityInfo(sev){
+    const s = String(sev||'info').toLowerCase();
+    if (s.includes('warn'))  return { cls:'warn',  icon:'⚠️', title:'تنبيه' };
+    if (s.includes('tip'))   return { cls:'ok',    icon:'✅', title:'إرشاد' };
+    if (s.includes('alert')) return { cls:'danger',icon:'⛔', title:'تنبيه هام' };
+    return { cls:'info', icon:'ℹ️', title:'معلومة' };
+  }
+
+  function makeKey(p){
+    // مفتاح يمنع التكرار على مستوى التنبيه
+    // الأفضل: taskId لو موجود - وإلا ruleId + animalId + plannedDate + plannedTime
+    const rule = p?.ruleId || 'rule';
+    const tid  = p?.taskId || '';
+    const an   = p?.animalId || p?.animalNumber || '';
+    const dt   = p?.plannedDate || p?.date || '';
+    const tm   = p?.plannedTime || '';
+    const g    = p?.groupId || p?.groupName || '';
+    return [rule, tid, g, an, dt, tm].filter(Boolean).join('||');
+  }
+
+  function isSeen(key){
+    try{ return !!localStorage.getItem(LS_SEEN_PREFIX + key); }catch{ return false; }
+  }
+  function markSeen(key){
+    try{ localStorage.setItem(LS_SEEN_PREFIX + key, String(nowTs())); }catch{}
+  }
+
+  // ===== تجميع (Aggregation) للبروتوكول =====
+  // لو وصلنا payload فيه: ruleId protocol_step_due / protocol_step_tomorrow
+  // وبدون groupId… هنجمّع تلقائيًا حسب: (ruleId + plannedDate + plannedTime + stepName)
+  const agg = new Map(); // aggKey -> { payload0, animals:Set, timer }
+  function aggKey(p){
+    const rid = p?.ruleId || '';
+    const dt  = p?.plannedDate || '';
+    const tm  = p?.plannedTime || '';
+    const step= p?.stepName || '';
+    return [rid, dt, tm, step].join('__');
+  }
+  function shouldAggregate(p){
+    const rid = String(p?.ruleId||'');
+    return (rid === 'protocol_step_due' || rid === 'protocol_step_tomorrow');
+  }
+
+  function showCard(payload){
+    const stack = ensureStack();
+
+    const sev = severityInfo(payload?.severity);
+    const key = makeKey(payload);
+
+    if (isSeen(key)) return; // منع التكرار بعد "حسنًا"
+    markSeen(key);
+
+    const title = payload?.title || sev.title;
+    const msg   = payload?.message || 'تنبيه جديد';
+    const planned = payload?.plannedDate || '';
+    const time    = payload?.plannedTime || '';
+    const step    = payload?.stepName || '';
+    const animal  = payload?.animalId || payload?.animalNumber || '';
+    const groupName = payload?.groupName || payload?.groupId || '';
+
+    const metaChips = [];
+    if (groupName) metaChips.push(`<span class="mbk-chip ${sev.cls}">المجموعة: ${esc(groupName)}</span>`);
+    if (animal && !groupName) metaChips.push(`<span class="mbk-chip ${sev.cls}">الحيوان: ${esc(animal)}</span>`);
+    if (step) metaChips.push(`<span class="mbk-chip">${esc(step)}</span>`);
+    if (planned) metaChips.push(`<span class="mbk-chip">${esc(planned)}${time?(' • '+esc(time)):""}</span>`);
+
+    const el = document.createElement('div');
+    el.className = 'mbk-alert';
+    el.innerHTML = `
+      <div class="mbk-alert__top">
+        <div class="mbk-alert__icon">${sev.icon}</div>
+        <div class="mbk-alert__body">
+          <div class="mbk-alert__title">${esc(title)}</div>
+          <p class="mbk-alert__msg">${esc(msg)}</p>
+          <div class="mbk-alert__meta">${metaChips.join('')}</div>
+        </div>
+        <button class="mbk-alert__close" title="إغلاق">✕</button>
+      </div>
+      <div class="mbk-alert__actions">
+        <button class="mbk-btn primary" data-act="ok">حسنًا</button>
+        ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">فتح</button>` : ``}
+      </div>
+    `;
+
+    const kill = ()=>{
+      el.classList.remove('show');
+      setTimeout(()=>{ try{ el.remove(); }catch{} }, 220);
+      try{
+        if (window.t?.event) window.t.event('smart_alert_ack', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
+      }catch{}
+    };
+
+    el.querySelector('.mbk-alert__close')?.addEventListener('click', kill);
+    el.querySelector('[data-act="ok"]')?.addEventListener('click', kill);
+
+    el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
+      try{
+        if (payload.actionUrl) location.href = payload.actionUrl;
+      }catch{}
+      kill();
     });
 
-    document.body.appendChild(root);
+    stack.prepend(el);
+    setTimeout(()=> el.classList.add('show'), 20);
 
-    state.root = root;
-    state.list = panel;
-  }
+    // إغلاق تلقائي خفيف (اختياري) — 20 ثانية
+    setTimeout(()=>{ if (document.body.contains(el)) kill(); }, 20000);
 
-  function sevLabel(sev){
-    if (sev === "warn") return "تنبيه";
-    if (sev === "info") return "معلومة";
-    if (sev === "tip") return "اقتراح";
-    return "تنبيه";
-  }
-
-  function keyOf(p){
-    // مفتاح ذكي يمنع التكرار (Rule + animal + date + taskId)
-    const r = p?.ruleId || "";
-    const a = p?.animalId || p?.animalNumber || "";
-    const d = p?.plannedDate || p?.eventDate || "";
-    const t = p?.taskId || "";
-    return [r,a,d,t].join("|");
-  }
-
-  function hideAll(){
-    if (!state.root) return;
-    state.root.classList.remove("show");
-    // امسح الموجود بعد انيميشن صغيرة
-    setTimeout(()=>{
-      if (state.list) state.list.innerHTML = "";
-    }, 120);
-  }
-
-  function removeCard(card){
     try{
-      card.style.opacity = "0";
-      card.style.transform = "translateY(10px)";
+      if (window.t?.event) window.t.event('smart_alert_shown', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
     }catch{}
-    setTimeout(()=>{
-      try{ card.remove(); }catch{}
-      if (state.list && state.list.children.length === 0) hideAll();
-    }, 140);
   }
 
   function show(payload){
-    ensureUI();
+    // Aggregation للبروتوكول
+    if (shouldAggregate(payload)){
+      const k = aggKey(payload);
+      const rec = agg.get(k) || { payload0: payload, animals: new Set(), timer:null };
+      const an = (payload?.animalId || payload?.animalNumber || '').trim();
+      if (an) rec.animals.add(an);
 
-    const k = keyOf(payload);
-    if (k && state.seen.has(k)) return; // dedupe
-    if (k) state.seen.add(k);
+      // خزن آخر نسخة payload كـ base
+      rec.payload0 = Object.assign({}, rec.payload0, payload);
 
-    // حافظ على حد أقصى
-    while (state.list.children.length >= state.max){
-      state.list.removeChild(state.list.lastElementChild);
+      // جدولة عرض بعد 400ms لتجميع اللي جاي بسرعة
+      if (rec.timer) clearTimeout(rec.timer);
+      rec.timer = setTimeout(()=>{
+        agg.delete(k);
+
+        const p0 = rec.payload0 || payload;
+        const arr = Array.from(rec.animals);
+        const count = arr.length;
+
+        // لو أكتر من 1 => اعرض كـ "كتلة"
+        if (count >= 2){
+          const brief = arr.slice(0,8).join('، ') + (count>8 ? ' ...' : '');
+          const step  = p0.stepName ? ` — ${p0.stepName}` : '';
+          const when  = `${p0.plannedDate||''}${p0.plannedTime?(' '+p0.plannedTime):''}`.trim();
+
+          showCard(Object.assign({}, p0, {
+            severity: p0.severity || 'warn',
+            title: (p0.ruleId === 'protocol_step_tomorrow') ? 'تنبيه بروتوكول (غدًا)' : 'تنبيه بروتوكول (اليوم)',
+            groupName: `دفعة (${count} حيوان)`,
+            message: `${count} حيوان عليهم نفس الخطوة${step}${when?(' • '+when):''}. أمثلة: ${brief}`,
+          }));
+          return;
+        }
+        // لو واحد => اعرض عادي
+        showCard(p0);
+      }, 400);
+
+      agg.set(k, rec);
+      return;
     }
 
-    const sev = (payload?.severity || "warn");
-    const card = el("div", "mbk-alert");
-    card.dataset.sev = sev;
-
-    const head = el("div", "mbk-alert-head");
-    const title = el("div", "mbk-alert-title");
-
-    const pill = el("span", "mbk-pill");
-    pill.textContent = sevLabel(sev);
-
-    const t = el("div");
-    t.textContent = payload?.title || "تنبيه ذكي";
-
-    title.appendChild(pill);
-    title.appendChild(t);
-
-    const x = el("button", "mbk-x");
-    x.type = "button";
-    x.textContent = "✕";
-    x.addEventListener("click", ()=> removeCard(card));
-
-    head.appendChild(title);
-    head.appendChild(x);
-
-    const body = el("div", "mbk-alert-body");
-    body.textContent = payload?.message || "—";
-
-    const meta = el("div", "mbk-alert-meta");
-    const animal = payload?.animalId || payload?.animalNumber;
-    if (animal) {
-      const c = el("span", "mbk-chip");
-      c.textContent = `رقم: ${animal}`;
-      meta.appendChild(c);
-    }
-    if (payload?.plannedDate){
-      const c = el("span", "mbk-chip");
-      c.textContent = `التاريخ: ${payload.plannedDate}`;
-      meta.appendChild(c);
-    }
-    if (payload?.plannedTime){
-      const c = el("span", "mbk-chip");
-      c.textContent = `الوقت: ${payload.plannedTime}`;
-      meta.appendChild(c);
-    }
-    if (meta.children.length) body.appendChild(meta);
-
-    const actions = el("div", "mbk-alert-actions");
-
-    const ok = el("button", "mbk-btn primary");
-    ok.type = "button";
-    ok.textContent = "حسنًا";
-    ok.addEventListener("click", ()=> removeCard(card));
-
-    // زر اختياري “افتح البطاقة”
-    const open = el("button", "mbk-btn");
-    open.type = "button";
-    open.textContent = "بطاقة الحيوان";
-    open.addEventListener("click", ()=>{
-      const num = (payload?.animalId || payload?.animalNumber || "").trim();
-      if (!num) return;
-      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-    });
-
-    // لو مفيش رقم حيوان نخفي زر البطاقة
-    if (!(payload?.animalId || payload?.animalNumber)) {
-      open.style.display = "none";
-    }
-
-    actions.appendChild(open);
-    actions.appendChild(ok);
-
-    card.appendChild(head);
-    card.appendChild(body);
-    card.appendChild(actions);
-
-    state.list.insertBefore(card, state.list.firstChild);
-    state.root.classList.add("show");
+    showCard(payload);
   }
 
-  window.mbkAlerts = { show, hideAll };
+  window.mbk.alertsUI = { show };
 })();
