@@ -211,6 +211,8 @@
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
+  <script src="/js/smart-checks.js"></script>
+
 <script>
 // ============ API BASE ============
 const API_BASE = "https://murabbic-alerts.onrender.com";
@@ -558,9 +560,61 @@ function renderMiniGauge(id, percent){
 }
 
 // ============ تشغيل ============
+  // ============ Sync Popup (non-blocking) ============
+function showSyncPopup(payload){
+  try{
+    // inject style مرة واحدة
+    if(!document.getElementById('mbk-sync-popup-style')){
+      const st = document.createElement('style');
+      st.id = 'mbk-sync-popup-style';
+      st.textContent = `
+      .mbk-sync-popup{
+        position:fixed; top:16px; right:-420px;
+        width:300px; max-width: calc(100vw - 24px);
+        padding:12px 14px; border-radius:14px;
+        color:#fff; font:14px 'Cairo',Tahoma,Arial,sans-serif;
+        box-shadow:0 6px 16px rgba(0,0,0,.18);
+        transition:all .35s ease; z-index:999999;
+        cursor:pointer;
+      }
+      .mbk-sync-popup.show{ right:12px; }
+      .mbk-sync-popup .t{font-weight:900; margin-bottom:4px;}
+      .mbk-sync-popup .m{line-height:1.4; opacity:.98;}
+      .mbk-sync-popup.info{background:#0ea05a;}
+      .mbk-sync-popup.warn{background:#fb923c;}
+      .mbk-sync-popup.tip{background:#0b7f47;}
+      .mbk-sync-popup.alert{background:#dc2626;}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const level = (payload?.severity || 'info').toLowerCase();
+    const cls =
+      level.includes('warn') ? 'warn' :
+      level.includes('tip')  ? 'tip'  :
+      level.includes('alert')? 'alert': 'info';
+
+    const el = document.createElement('div');
+    el.className = `mbk-sync-popup ${cls}`;
+    el.innerHTML = `
+      <div class="t">🔔 تنبيه بروتوكول</div>
+      <div class="m">${payload?.message || 'تنبيه جديد'}</div>
+    `;
+
+    document.body.appendChild(el);
+    setTimeout(()=> el.classList.add('show'), 30);
+    const kill = ()=>{ el.classList.remove('show'); setTimeout(()=> el.remove(), 250); };
+    el.addEventListener('click', kill);
+    setTimeout(kill, 15000);
+  }catch(e){}
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
+    try{
+    window.smart?.startAlertsWatcher({ userId: getTenantId(), onAlert: showSyncPopup });
+  }catch(e){}
 });
 </script>
 
@@ -568,5 +622,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </body>
 </html>
+
 
 
