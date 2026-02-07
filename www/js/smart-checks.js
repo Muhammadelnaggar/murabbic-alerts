@@ -157,9 +157,6 @@ if (localStorage.getItem(onceKey)) return;
 
     const snap = await getDocs(q);
     if(snap.empty) return;
-
-    const today = todayISO();
-
 // نلف على كل الوثائق ونشوف فيهم واحدة موعدها اليوم أو قبل اليوم
 const dueDoc = snap.docs.find(d => {
   const data = d.data() || {};
