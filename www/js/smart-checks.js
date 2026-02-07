@@ -141,78 +141,156 @@
         }
       }
 
-      // --- Rule 6: تذكير خطوات بروتوكول اليوم + قبلها بيوم (من tasks) ---
+           // --- Rule 6: بروتوكول (قبل يوم: تنبيه واحد) + (يوم التنفيذ: قبلها بساعتين ثم كل 30 دقيقة حتى تتسجل) ---
       if (page.includes('dashboard') || page.includes('add-event')){
-        (async function(){
+
+        // ✅ ابدأ مؤقّت واحد فقط لقاعدة البروتوكول (بدون تكرار)
+        if (!window.smart._proto6) window.smart._proto6 = { started:false, lastRefresh:0, tasks:[], db:null, auth:null, uid:'' };
+        const P = window.smart._proto6;
+
+        const toLocalISO = (d)=>{
+          const x = new Date(d);
+          x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+          return x.toISOString().slice(0,10);
+        };
+
+        const buildTaskDateTime = (plannedDate, plannedTime)=>{
+          const dt = new Date(plannedDate); // plannedDate = YYYY-MM-DD
+          const [hh, mm] = String(plannedTime || '00:00').split(':').map(n=>Number(n));
+          dt.setHours(Number.isFinite(hh)?hh:0, Number.isFinite(mm)?mm:0, 0, 0);
+          return dt;
+        };
+
+        const shouldFireEvery30m = (key)=>{
+          const last = Number(localStorage.getItem(key) || 0);
+          const now  = Date.now();
+          if (!last || (now - last) >= 30*60*1000){
+            localStorage.setItem(key, String(now));
+            return true;
+          }
+          return false;
+        };
+
+        const fireOnceKey = (key)=>{
+          if (localStorage.getItem(key)) return false;
+          localStorage.setItem(key,'1');
+          return true;
+        };
+
+        async function refreshTasksIfNeeded(uid){
+          const now = Date.now();
+          if (P.tasks.length && (now - P.lastRefresh) < 10*60*1000) return; // كل 10 دقائق فقط
+          P.lastRefresh = now;
+
+          const { collection, query, where, getDocs, limit } =
+            await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+          const q = query(
+            collection(P.db, 'tasks'),
+            where('userId','==', uid),
+            where('type','==','protocol_step'),
+            where('status','==','pending'),
+            limit(80)
+          );
+
+          const snap = await getDocs(q);
+          const out = [];
+          snap.forEach(ds => {
+            const t0 = ds.data() || {};
+            out.push({ id: ds.id, ...t0 });
+          });
+          P.tasks = out;
+        }
+
+        async function tickProtocol(){
           try{
-            const mod  = await import('/js/firebase-config.js');
-            const db   = mod?.db;
-            const auth = mod?.auth;
-            if(!db) return;
-
-            const uid = (userId || auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
-            if(!uid) return;
-
-            const { collection, query, where, getDocs, limit } =
-              await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
-            const today    = todayISO();
-            const tomorrow = tomorrowISO();
-
-            // نجيب مجموعة من pending ثم نفلتر محليًا على plannedDate (عشان الindexes)
-            const q = query(
-              collection(db, 'tasks'),
-              where('userId','==', uid),
-              where('type','==','protocol_step'),
-              where('status','==','pending'),
-              limit(40)
-            );
-
-            const snap = await getDocs(q);
-            if(snap.empty) return;
-
-            const items = snap.docs
-              .map(d => (d.data() || {}))
-              .filter(x => x.plannedDate && typeof x.plannedDate === 'string')
-              .sort((a,b) => String(a.plannedDate).localeCompare(String(b.plannedDate)));
-
-            const dueToday    = items.find(x => x.plannedDate === today);
-            const dueTomorrow = items.find(x => x.plannedDate === tomorrow);
-
-            if (!dueToday && !dueTomorrow) return;
-
-            const doc0 = dueToday || dueTomorrow;
-            const an   = doc0.animalNumber || '';
-            const step = doc0.stepName || 'خطوة بروتوكول';
-
-            if (dueToday){
-              fire(onAlert, {
-                ruleId:'protocol_step_due_today',
-                severity:'info',
-                animalId: an,
-                message: `اليوم خطوة بروتوكول للحيوان ${an}: ${step}`
-              });
-            } else {
-              fire(onAlert, {
-                ruleId:'protocol_step_due_tomorrow',
-                severity:'tip',
-                animalId: an,
-                message: `غدًا خطوة بروتوكول للحيوان ${an}: ${step}`
-              });
+            // ✅ جهّز Firebase مرة واحدة
+            if (!P.db){
+              const mod = await import('/js/firebase-config.js');
+              P.db   = mod?.db;
+              P.auth = mod?.auth;
+              if (!P.db) return;
             }
-          }catch(e){
+
+            // ✅ uid
+            const uid = (userId || P.auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+            if (!uid) return;
+            P.uid = uid;
+
+            // ✅ جلب/تحديث التاسكات (كل 10 دقائق)
+            await refreshTasksIfNeeded(uid);
+            if (!Array.isArray(P.tasks) || !P.tasks.length) return;
+
+            const now = new Date();
+            const today = toLocalISO(now);
+
+            for (const t0 of P.tasks){
+              const taskId = t0.id;
+              const plannedDate = t0.plannedDate;
+              if (!plannedDate || typeof plannedDate !== 'string') continue;
+
+              const plannedTime = t0.plannedTime || '00:00';
+              const taskDt = buildTaskDateTime(plannedDate, plannedTime);
+
+              const taskDay = toLocalISO(taskDt);
+
+             const an   = t0.animalNumber || t0.number || t0.groupName || t0.groupId || '';
+
+              const step = t0.stepName || t0.title || 'خطوة بروتوكول';
+
+              // ===== 1) قبل يوم: تنبيه واحد فقط =====
+              const dayBefore = new Date(taskDt);
+              dayBefore.setDate(dayBefore.getDate() - 1);
+              const dayBeforeISO = toLocalISO(dayBefore);
+
+              if (today === dayBeforeISO){
+                const onceKey = `proto6_prev_${uid}_${taskId}_${dayBeforeISO}`;
+                if (fireOnceKey(onceKey)){
+                  fire(onAlert, {
+                    ruleId:'protocol_step_tomorrow',
+                    severity:'info',
+                    taskId,
+                    animalId: an,
+                    plannedDate: taskDay,
+                    plannedTime,
+                    message:`غدًا خطوة بروتوكول للحيوان ${an}: ${step} (${taskDay} ${plannedTime})`
+                  });
+                }
+                continue;
+              }
+
+              // ===== 2) يوم التنفيذ: قبلها بساعتين ثم كل 30 دقيقة حتى تسجيل الخطوة =====
+              if (today !== taskDay) continue;
+
+              const twoHoursBefore = new Date(taskDt.getTime() - 2*60*60*1000);
+              if (now < twoHoursBefore) continue;
+
+              // مفتاح تكرار كل 30 دقيقة
+              const repeatKey = `proto6_repeat_${uid}_${taskId}_${today}`;
+              if (shouldFireEvery30m(repeatKey)){
+                fire(onAlert, {
+                  ruleId:'protocol_step_due',
+                  severity:'warn',
+                  taskId,
+                  animalId: an,
+                  plannedDate: taskDay,
+                  plannedTime,
+                  message:`اليوم خطوة بروتوكول للحيوان ${an}: ${step} (الموعد ${plannedTime})`
+                });
+              }
+            }
+          } catch(e){
             // صامت
           }
-        })();
+        }
+
+        // ✅ شغّل tick فورًا + كل دقيقة (والتكرار الحقيقي كل 30 دقيقة بالمفاتيح)
+        if (!P.started){
+          P.started = true;
+          tickProtocol();
+          setInterval(tickProtocol, 60*1000);
+        } else {
+          // لو checkAll اتنادى مرة ثانية، اكتفي بـ tick سريع
+          tickProtocol();
+        }
       }
-    }
-
-    if (document.readyState === 'loading')
-      document.addEventListener('DOMContentLoaded', checkAll, { once:true });
-    else
-      setTimeout(checkAll, 0);
-
-    return function stop(){};
-  };
-
-})();
