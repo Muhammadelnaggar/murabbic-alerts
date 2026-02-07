@@ -875,6 +875,35 @@ await markTaskDone({
 
   stepName: st.name
 });
+// ✅ لو وضع مجموعة: علّم Task المجموعة Done أيضًا
+const isGroupModeNow =
+  (Array.isArray(parseBulkList()) && parseBulkList().length > 1) ||
+  !!(groupSelectEl?.value || "").trim();
+
+if (isGroupModeNow) {
+  let gid = "";
+  if ((groupSelectEl?.value || "").trim()) {
+    gid = String(groupSelectEl.value).trim();
+  } else {
+    // Bulk groupId بنفس منطق الحفظ
+    const listNow = parseBulkList();
+    gid = [
+      "bulk",
+      String(programEl.value||"").trim(),
+      String(startDateEl.value||"").trim(),
+      String(listNow.length),
+      String(listNow[0]||"").trim()
+    ].join("__");
+  }
+
+  await markTaskDone({
+    animalNumber: `group:${String(gid || "").trim()}`,
+    protocolStartDate: (startDateEl.value||'').trim(),
+    program: (programEl.value||'').trim(),
+    plannedDate: st.plannedDate,
+    stepName: st.name
+  });
+}
 
 st._savedOnce = true;
 
@@ -1103,7 +1132,7 @@ if (isGroupMode) {
 
   // ✅ تنبيه واحد فقط للمجموعة
   await ensureProtocolTasks({
-    animalNumber: "",                 // مهم للمجموعة
+    animalNumber: `group:${String(groupId || "").trim()}`,              
     protocolStartDate: ctx.start,
     program: ctx.program,
     userId: user.uid,
