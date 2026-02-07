@@ -229,8 +229,31 @@
               const plannedDate = t0.plannedDate;
               if (!plannedDate || typeof plannedDate !== 'string') continue;
 
-              const plannedTime = t0.plannedTime || '00:00';
-              const taskDt = buildTaskDateTime(plannedDate, plannedTime);
+             // ✅ plannedTime fallback: لو مش موجود، استخرجه من plannedDateTime
+let plannedTime = (t0.plannedTime || '').trim();
+
+if (!plannedTime && t0.plannedDateTime){
+  try{
+    const dtx = new Date(t0.plannedDateTime);
+    if (!isNaN(dtx.getTime())){
+      const hh = String(dtx.getHours()).padStart(2,'0');
+      const mm = String(dtx.getMinutes()).padStart(2,'0');
+      plannedTime = `${hh}:${mm}`;
+    }
+  }catch{}
+}
+
+if (!plannedTime) plannedTime = '00:00';
+
+// ✅ لو plannedDateTime موجودة استخدمها مباشرة (أدق)
+let taskDt;
+if (t0.plannedDateTime){
+  const dtx = new Date(t0.plannedDateTime);
+  taskDt = isNaN(dtx.getTime()) ? buildTaskDateTime(plannedDate, plannedTime) : dtx;
+} else {
+  taskDt = buildTaskDateTime(plannedDate, plannedTime);
+}
+
 
               const taskDay = toLocalISO(taskDt);
 
