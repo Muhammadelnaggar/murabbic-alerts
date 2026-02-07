@@ -185,13 +185,15 @@
           const { collection, query, where, getDocs, limit } =
             await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-          const q = query(
-            collection(P.db, 'tasks'),
-            where('userId','==', uid),
-            where('type','==','protocol_step'),
-            where('status','==','pending'),
-            limit(80)
-          );
+         const q = query(
+  collection(P.db, 'tasks'),
+  where('userId','==', uid),
+  where('type','==','protocol_step'),
+  where('status','==','pending'),
+  where('alertEnabled','==', true),   // ✅ لا تقرأ إلا تنبيهات المجموعة/الفردي فقط
+  limit(80)
+);
+
 
           const snap = await getDocs(q);
           const out = [];
@@ -257,7 +259,13 @@ if (t0.plannedDateTime){
 
               const taskDay = toLocalISO(taskDt);
 
-             const an   = t0.animalNumber || t0.number || t0.groupName || t0.groupId || '';
+            const scope = String(t0.scope || '').toLowerCase();
+const an =
+  (scope === 'group')
+    ? (t0.groupName || t0.groupId || 'مجموعة')
+    : (t0.animalNumber || t0.number || '');
+const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
+
 
               const step = t0.stepName || t0.title || 'خطوة بروتوكول';
 
@@ -276,7 +284,10 @@ if (t0.plannedDateTime){
                     animalId: an,
                     plannedDate: taskDay,
                     plannedTime,
-                    message:`غدًا خطوة بروتوكول للحيوان ${an}: ${step} (${taskDay} ${plannedTime})`
+                   message: (scope === 'group')
+  ? `غدًا خطوة بروتوكول للمجموعة ${an}${nCount?` (${nCount} حيوان)`:''}: ${step} (${taskDay} ${plannedTime})`
+  : `غدًا خطوة بروتوكول للحيوان ${an}: ${step} (${taskDay} ${plannedTime})`
+
                   });
                 }
                 continue;
@@ -298,7 +309,10 @@ if (t0.plannedDateTime){
                   animalId: an,
                   plannedDate: taskDay,
                   plannedTime,
-                  message:`اليوم خطوة بروتوكول للحيوان ${an}: ${step} (الموعد ${plannedTime})`
+                  message: (scope === 'group')
+  ? `اليوم خطوة بروتوكول للمجموعة ${an}${nCount?` (${nCount} حيوان)`:''}: ${step} (الموعد ${plannedTime})`
+  : `اليوم خطوة بروتوكول للحيوان ${an}: ${step} (الموعد ${plannedTime})`
+
                 });
               }
             }
