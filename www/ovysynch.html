@@ -1098,52 +1098,43 @@ const batchLockId = isGroupMode
 
 
   // 👇 هنا الجزء اللي كنت مش فاهمه
-  if (isGroupMode) {
+// ✅ إنشاء التاسكات مرة واحدة فقط (حسب Group / Animal)
+if (isGroupMode) {
 
-    // ✅ تنبيه واحد فقط للمجموعة
-    await ensureProtocolTasks({
-      protocolStartDate: ctx.start,
-      program: ctx.program,
-      userId: user.uid,
-      scope: "group",
-      groupId: groupId,
-      groupName: groupName,
-      animalsCount: ctx.animalIds.length,
-      alertEnabled: true
-    });
+  // ✅ تنبيه واحد فقط للمجموعة
+  await ensureProtocolTasks({
+    animalNumber: "",                 // مهم للمجموعة
+    protocolStartDate: ctx.start,
+    program: ctx.program,
+    userId: user.uid,
+    scope: "group",
+    groupId: String(groupId || "").trim(),
+    groupName: String(groupName || "").trim(),
+    animalsCount: Number(ctx.animalIds.length),
+    alertEnabled: true
+  });
 
-  } else {
+} else {
 
-    // ✅ فردي
-    await ensureProtocolTasks({
-      animalNumber: animalNo,
-      protocolStartDate: ctx.start,
-      program: ctx.program,
-      user-named?? 
-      userId: user.uid,
-      scope: "animal",
-      alertEnabled: true
-    });
+  // ✅ فردي (تنبيه للحيوان فقط)
+  await ensureProtocolTasks({
+    animalNumber: String(animalNo || "").trim(),
+    protocolStartDate: ctx.start,
+    program: ctx.program,
+    userId: user.uid,
+    scope: "animal",
+    alertEnabled: true
+  });
 
-  }
 }
-
-
-      // ✅ إنشاء التاسكات مرة واحدة فقط
-      await ensureProtocolTasks({
-        animalNumber: animalNo,
-        protocolStartDate: ctx.start,
-        program: ctx.program,
-        userId: user.uid
-      });
-    }
-  }
-
 
   // تقدم بسيط
  showInfo(`✅ تم حفظ (${idx+1}/${ctx.animalIds.length}) رقم ${animalNo}`);
 
 }
+
+} // ✅ قفل if (dbRef)
+} // ✅ قفل for
 
 
         showInfo('✅ تم تسجيل البروتوكول بنجاح');
