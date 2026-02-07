@@ -740,12 +740,12 @@ async function markTaskDone({ animalNumber, protocolStartDate, program, plannedD
     return;
   }
 
-  // ✅ تحديث فقط
-  await updateDoc(ref, {
+   await updateDoc(ref, {
     status: "done",
     doneAt: serverTimestamp(),
-    userId: authRef?.currentUser?.uid || null
+    updatedAt: serverTimestamp()
   });
+
 }
 
 
@@ -908,7 +908,9 @@ if (isGroupModeNow) {
 st._savedOnce = true;
 
       }catch(err){
-        console.error('saveStepEvent failed', err);
+       console.error('saveStepEvent failed', err);
+showInfo("⚠️ تم حفظ الحدث لكن تعذّر تحديث حالة التنبيه (Task). راجع قواعد tasks.", true);
+
       }
     }
 
@@ -1040,7 +1042,9 @@ if ((groupSelectEl?.value || "").trim()) {
   groupName = String(currentGroupName || groupId).trim();
 } else if (isGroupMode) {
   // 2) Bulk Group (مش محفوظة على السحابة)
-  groupName = "قائمة جماعية";
+   const preview = ctx.animalIds.slice(0,6).join("، ");
+  groupName = `أوفسينك جماعي (${ctx.animalIds.length}): ${preview}${ctx.animalIds.length>6?" ...":""}`;
+
   // ID ثابت قدر الإمكان من (program + start + count + أول رقم)
   groupId = [
     "bulk",
