@@ -163,6 +163,24 @@
     <div id="info" class="infobar"></div>
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off">
+        <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
+<div class="field" style="margin-bottom:12px">
+  <div style="display:flex;gap:12px;align-items:center;font-weight:900">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="radio" name="mbkMode" id="modeSingle" value="single" checked>
+      ⬤ تسجيل لحيوان واحد
+    </label>
+
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="radio" name="mbkMode" id="modeGroup" value="group">
+      ⬤ تسجيل لمجموعة حيوانات
+    </label>
+  </div>
+  <div class="hint" id="modeHint" style="margin-top:6px">
+    اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.
+  </div>
+</div>
+        <div id="modeBulkBox">
         <div class="row" style="margin-bottom:12px">
           <div class="field">
             <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
@@ -180,27 +198,30 @@
           <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
         </div>
 
-        <div class="row" style="margin-top:10px">
-          <div class="field">
-            <label for="groupSelect">المجموعة المحفوظة</label>
-            <select id="groupSelect">
-              <option value="" selected>— اختر مجموعة —</option>
-            </select>
-            <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
-          </div>
+      <div class="row" style="margin-top:10px">
+  <div class="field">
+    <label for="groupSelect">المجموعة المحفوظة</label>
+    <select id="groupSelect">
+      <option value="" selected>— اختر مجموعة —</option>
+    </select>
+    <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
+  </div>
 
-          <div class="row row-2">
-            <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
-            <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
-          </div>
-        </div>
+  <div class="row row-2">
+    <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
+    <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
+  </div>
+</div>
+</div>          
+
 
         <div class="row row-2">
+          <div id="modeSingleBox">
           <div class="field">
             <label for="animalId">رقم الحيوان</label>
             <input id="animalId" type="text" placeholder="مثال: 105" />
           </div>
-
+          </div>
           <div class="field">
             <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
             <input id="startDate" type="date" />
@@ -267,6 +288,62 @@
 
       const warnEl        = document.getElementById('warn');
       const infoEl        = document.getElementById('info');
+      // ===================== UI Mode (Single / Group) =====================
+const modeSingleEl = document.getElementById('modeSingle');
+const modeGroupEl  = document.getElementById('modeGroup');
+const modeHintEl   = document.getElementById('modeHint');
+
+const modeBulkBox  = document.getElementById('modeBulkBox');
+const modeSingleBox= document.getElementById('modeSingleBox');
+
+function getMode(){
+  return (modeGroupEl && modeGroupEl.checked) ? "group" : "single";
+}
+
+function setMode(mode){
+  const m = (mode === "group") ? "group" : "single";
+  try{ localStorage.setItem("mbk_ov_mode", m); }catch{}
+
+  if (modeSingleEl) modeSingleEl.checked = (m === "single");
+  if (modeGroupEl)  modeGroupEl.checked  = (m === "group");
+
+  // show/hide
+  if (modeBulkBox)   modeBulkBox.style.display   = (m === "group") ? "block" : "none";
+  if (modeSingleBox) modeSingleBox.style.display = (m === "single") ? "block" : "none";
+
+  // Hint واضح للمستخدم
+  if (modeHintEl){
+    modeHintEl.textContent = (m === "single")
+      ? "✅ الوضع الحالي: تسجيل لحيوان واحد (اكتب رقم الحيوان بالأسفل)."
+      : "✅ الوضع الحالي: تسجيل لمجموعة (اكتب الأرقام أو حمّل مجموعة محفوظة).";
+  }
+
+  // 🔥 عبقرية بسيطة: لو المستخدم دخل رقم فردي ثم اختار مجموعة… لا نضيّعه
+  if (m === "group"){
+    const singleNum = (animalIdEl?.value || "").trim();
+    const bulkRaw = (bulkEl?.value || "").trim();
+    if (singleNum && !bulkRaw){
+      bulkEl.value = singleNum;
+      parseBulkList();
+    } else if (singleNum && bulkRaw){
+      // لو الرقم مش موجود في القائمة، أضفه أول سطر
+      const lines = bulkRaw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
+      if (!lines.includes(singleNum)){
+        bulkEl.value = [singleNum, ...lines].join("\n");
+        parseBulkList();
+      }
+    }
+  }
+}
+
+// تشغيل اختيار الوضع
+modeSingleEl?.addEventListener("change", ()=> setMode("single"));
+modeGroupEl?.addEventListener("change",  ()=> setMode("group"));
+
+// كليك ذكي: لو ركّز على الإدخال الجماعي -> يتحول لمجموعة
+bulkEl?.addEventListener("focus", ()=> setMode("group"));
+// لو ركّز على رقم الحيوان -> يتحول لفردي
+animalIdEl?.addEventListener("focus", ()=> setMode("single"));
 
       let dbRef = null, authRef = null;
       let stepsState = [];
@@ -619,26 +696,46 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
         if(!id) return;
         location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
       });
+// ✅ قراءة الكونتكست
+function hydrate(){
+  const qp = new URLSearchParams(location.search);
 
-      // ✅ قراءة الكونتكست
-      function hydrate(){
-        const qp = new URLSearchParams(location.search);
-        const id =
-          (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
-          (localStorage.getItem('lastAnimalId') || "").trim();
+  const id =
+    (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
+    (localStorage.getItem('lastAnimalId') || "").trim();
 
-        const dt =
-          (qp.get('date') || qp.get('eventDate') || "").trim() ||
-          (localStorage.getItem('lastEventDate') || "").trim() ||
-          todayLocal();
+  const dt =
+    (qp.get('date') || qp.get('eventDate') || "").trim() ||
+    (localStorage.getItem('lastEventDate') || "").trim() ||
+    todayLocal();
 
-        if (id){
-          animalIdEl.value = id;
-          try{ localStorage.setItem('lastAnimalId', id); }catch{}
-        }
-        startDateEl.value = dt;
-        try{ localStorage.setItem('lastEventDate', dt); }catch{}
+  // ✅ التاريخ
+  if (dt){
+    startDateEl.value = dt;
+    try{ localStorage.setItem('lastEventDate', dt); }catch{}
+  }
+
+  // ✅ الرقم
+  if (id){
+    try{ localStorage.setItem('lastAnimalId', id); }catch{}
+
+    const savedMode = (localStorage.getItem("mbk_ov_mode") || "single");
+
+    if (savedMode === "group"){
+      const raw = (bulkEl?.value || "").trim();
+      if(!raw){
+        bulkEl.value = id;
+      }else{
+        const lines = raw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
+        if(!lines.includes(id)) bulkEl.value = [id, ...lines].join("\n");
       }
+      parseBulkList();
+    }else{
+      animalIdEl.value = id;
+    }
+  }
+}
+
 
       // ✅ تحقّق عند تغيير الرقم الفردي
       animalIdEl?.addEventListener("change", async ()=>{
@@ -909,8 +1006,14 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
       });
 
       function getCtx(){
-        const list = parseBulkList();
-        const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
+       const mode = getMode();
+
+const list = parseBulkList();
+const singleId = (animalIdEl.value||'').trim();
+
+const animalIds = (mode === "group") ? list : (singleId ? [singleId] : []);
+const animalId  = animalIds[0] || "";
+
         const start = (startDateEl.value||'').trim();
         const program = (programEl.value||'').trim();
 
@@ -922,7 +1025,7 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
         clearWarn();
         try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
         try{ localStorage.setItem('lastEventDate', start); }catch{}
-        return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
+        return { animalId, animalIds, start, program, steps: stepsState };
       }
 
       async function saveProtocol(){
@@ -1005,6 +1108,8 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
 
       // ✅ تشغيل الصفحة
       hydrate();
+        setMode(localStorage.getItem("mbk_ov_mode") || "single");
+
       startDateEl.addEventListener('input', updateSteps);
       startTimeEl.addEventListener('input', updateSteps);
       programEl.addEventListener('change', updateSteps);
