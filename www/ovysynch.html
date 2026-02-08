@@ -332,17 +332,23 @@ applyBulkBtn?.addEventListener("click", async ()=>{
    else bad.push({ n, reason:r.reason, extra:r });
   }
 
-  if(bad.length){
-    // امسح الغلط من التكسيت اريا
-    bulkEl.value = okList.join("\n");
-    parseBulkList();
+if(bad.length){
 
-    // رسالة فورية
-    const first = bad[0];
-   showInfo(`⚠️ تم حذف ${bad.length} رقم غير صالح. مثال: ${invalidAnimalMessage(first.reason, first.n, first.extra)}`, true);;
-  }else{
-    showInfo(`✅ كل الأرقام صحيحة: ${okList.length} حيوان`);
-  }
+  bulkEl.value = okList.join("\n");
+  parseBulkList();
+
+  const details = bad.map(b =>
+    invalidAnimalMessage(b.reason, b.n, b.extra)
+  ).join("\n");
+
+  showInfo(
+    `تم استبعاد ${bad.length} حيوان لعدم الأهلية للتزامن:\n${details}`,
+    { isErr:true, requireAck:true }
+  );
+
+}else{
+  showInfo(`تم قبول ${okList.length} حيوان للتسجيل.`);
+}
 
   // لو الرقم الفردي فاضي خليه أول رقم صحيح
   if(animalIdEl && !animalIdEl.value && okList.length) animalIdEl.value = okList[0];
@@ -442,7 +448,7 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
   // ✅ محتوى + زر "حسنًا"
   infoEl.innerHTML = `
     <div class="msgrow">
-      <div class="msgtext">${String(text||"")}</div>
+     <div class="msgtext" style="white-space:pre-line">${String(text||"")}</div>
       <button type="button" class="okbtn" id="infoOkBtn">حسنًا</button>
     </div>
   `;
@@ -456,16 +462,6 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
       infoEl.style.display = "none";
       infoEl.innerHTML = "";
     };
-  }
-
-  // ✅ لو مش requireAck: اختياري نخفي تلقائيًا
-  if(!o.requireAck){
-    setTimeout(()=>{ 
-      if(infoEl.style.display !== "none"){
-        infoEl.style.display="none";
-        infoEl.innerHTML="";
-      }
-    }, 2500);
   }
 }
 
@@ -1063,14 +1059,20 @@ for(const n of ids){
 }
 
 if(badIds.length){
-  // احذف الغلط من القائمة واظهر رسالة
+
   bulkEl.value = okIds.join("\n");
   parseBulkList();
 
-  const first = badIds[0];
-  showInfo(`⛔ تم حذف ${badIds.length} رقم غير صالح قبل التسجيل. مثال: ${invalidAnimalMessage(first.reason, first.n, first.extra)}`, true);
+  const details = badIds.map(b =>
+    invalidAnimalMessage(b.reason, b.n, b.extra)
+  ).join("\n");
 
+  showInfo(
+    `تم استبعاد ${badIds.length} حيوان لعدم الأهلية للتزامن:\n${details}`,
+    { isErr:true, requireAck:true }
+  );
 }
+
 
 if(!okIds.length){
   showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true);
