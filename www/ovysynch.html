@@ -499,11 +499,6 @@ if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
   const status = String(a.status || "active").toLowerCase(); // active/inactive
   const inactiveReason = String(a.inactiveReason || "").toLowerCase(); // sale/death...
   const breedingBlocked = !!a.breedingBlocked;
-  const repro = String(a.reproductiveStatus || "").trim();
-      if(repro === "عشار") return { ok:false, reason:"pregnant", animalType };
-if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType };
-if (repro === "حديث الولادة") {
- 
   const calv = String(a.lastCalvingDate || "").slice(0,10);
   const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
 
@@ -564,6 +559,10 @@ if (dim !== null && dim >= 0 && dim < minDim) {
   if(inactiveReason === "sale")  return { ok:false, reason:"sale", animalType };
   if(inactiveReason === "death") return { ok:false, reason:"death", animalType };
   return { ok:false, reason:"inactive", animalType };
+    const repro = String(a.reproductiveStatus || "").trim();
+      if(repro === "عشار") return { ok:false, reason:"pregnant", animalType };
+if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType };
+if (repro === "حديث الولادة") {
 }
 
 
