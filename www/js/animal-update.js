@@ -307,6 +307,15 @@ upd.protocolExitDate = date;
       if (ev.price != null) upd.salePrice = Number(ev.price) || null;
       if (ev.saleReason) upd.saleReason = String(ev.saleReason).trim();
       upd.statusUpdatedAt = date;
+        // ✅ تاريخ خروج موحد
+  upd.inactiveDate = date;
+
+  // ✅ تنظيف بصري (مش تاريخي) لتجنب الالتباس في الصفحات
+  upd.productionStatus = "inactive";
+  upd.currentProtocol = null;
+  upd.protocolStatus = null;
+  upd.protocolExitDate = date;
+
     }
 
     // ============================================================
@@ -318,6 +327,15 @@ upd.protocolExitDate = date;
       upd.deathDate = date;
       if (ev.reason) upd.deathReason = String(ev.reason).trim();
       upd.statusUpdatedAt = date;
+        // ✅ تاريخ خروج موحد
+  upd.inactiveDate = date;
+
+  // ✅ تنظيف بصري
+  upd.productionStatus = "inactive";
+  upd.currentProtocol = null;
+  upd.protocolStatus = null;
+  upd.protocolExitDate = date;
+
     }
 
     // ============================================================
