@@ -531,13 +531,29 @@ if (repro === "حديث الولادة") {
 
 
       // 🔒 منع البروتوكول قبل الحد الأدنى بعد الولادة (حسب النوع)
-const startRef = (startDateEl?.value || todayLocal());  // نستخدم تاريخ بدء البروتوكول كمرجع
-const dpp = daysSinceISO(a.lastCalvingDate, startRef);  // days postpartum
-const minDpp = postpartumMinDaysByType(a);
+// 🔒 منع البروتوكول قبل الحد الأدنى بعد آخر (ولادة/إجهاض) — بدون الاعتماد على reproductiveStatus
+const startRef = (startDateEl?.value || todayLocal());
 
-if(dpp !== null && dpp >= 0 && dpp < minDpp){
- return { ok:false, reason:"fresh_postpartum", dpp, minDpp, animalType };
+const calv = String(a.lastCalvingDate || "").slice(0,10);
+const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
+
+// اختر الأحدث بين (ولادة/إجهاض)
+let refType = "calving";
+let refDate = calv;
+
+if (abrt && (!calv || abrt > calv)) {
+  refType = "abortion";
+  refDate = abrt;
 }
+
+const dim = daysSinceISO(refDate, startRef);
+const minDim = postpartumMinDaysByType(a);
+
+// لو التاريخ موجود وحساب الأيام ممكن
+if (dim !== null && dim >= 0 && dim < minDim) {
+  return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType };
+}
+
 
   // مباع/نافق
  if(status === "inactive"){
