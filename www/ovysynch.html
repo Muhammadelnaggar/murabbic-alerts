@@ -372,7 +372,7 @@ function isBuffaloType(animalDoc){
 }
 
       function postpartumMinDaysByType(animalDoc){
-        return isBuffaloType(animalDoc) ? 45 : 49;
+        return isBuffaloType(animalDoc) ? 40 : 49;
       }
       function daysSinceISO(isoDate, refISO){
         if(!isoDate) return null;
@@ -399,7 +399,10 @@ function isBuffaloType(animalDoc){
           if(dim !== null && min !== null){
             return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — الأيام ${dim} (الحد الأدنى ${min} حسب النوع).`;
           }
-          return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — أقل من الحد الأدنى حسب النوع.`;
+          return `⛔ ${label} رقم ${num} لا يمكن بدء التزامن لها
+لأنها بعد ولادة ${dim} يوم
+والحد الأدنى لبدء التزامن هو ${min} يوم.`;
+
         }
         return `⛔ رقم ${num} غير صالح للتزامن.`;
       }
@@ -593,9 +596,13 @@ const dim = daysSinceISO(refDate, refISO); // ✅ مصدر واحد: lastCalving
 
         const minDim = postpartumMinDaysByType(a);
 
-        if (dim !== null && dim >= 0 && dim < minDim) {
-          return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animal:a };
-        }
+       const dimN = Number(dim);
+const minN = Number(minDim);
+
+if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) {
+  return { ok:false, reason:"fresh_postpartum", refType, dim: dimN, minDim: minN, animalType, animal:a };
+}
+
 
         // ✅ لو مكتوب حديث الولادة حتى مع نقص المراجع
         if (repro === "حديث الولادة") {
