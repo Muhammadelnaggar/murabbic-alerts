@@ -107,7 +107,8 @@ export async function runReproAutoOnce(options = {}){
     animalsRef,
     where("userId", "==", userId),
     where("status", "==", "active"),
-    where("reproductiveStatus", "==", "حديثة الولادة"),
+    where("reproductiveStatus", "in", ["حديثة الولادة", "حديث الولاده"]),
+
     limit(maxScan)
   );
 
