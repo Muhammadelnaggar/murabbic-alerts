@@ -648,7 +648,7 @@ function invalidAnimalMessage(reason, num, extra){
 
   return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — أقل من الحد الأدنى حسب النوع.`;
 }
-
+}
 async function rejectNumberSoft(num){
   // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
   showInfo(invalidAnimalMessage("not_found", num), true);
