@@ -86,11 +86,17 @@ async function safeWaitUser(ms=2000){
 
 /* ---------------- Settings (49/44) ---------------- */
 function getThresholdDays(type){
-  const cows = parseInt(localStorage.getItem("mbk_open_after_days_cows") || "49", 10);
-  const buff = parseInt(localStorage.getItem("mbk_open_after_days_buffalo") || "44", 10);
-  if (String(type || "").trim() === "جاموس") return Number.isFinite(buff) ? buff : 44;
-  return Number.isFinite(cows) ? cows : 49;
+  const t = String(type || "").trim().toLowerCase();
+
+  const isBuffalo =
+    t.includes("جاموس") ||
+    t.includes("buffalo");
+
+  // 👇 الشرط الجديد
+  if (isBuffalo) return 41;   // > 40 يوم
+  return 50;                  // > 49 يوم
 }
+
 
 function pickAnimalType(a){
   return (a.type || a.animalType || a.species || "أبقار").trim();
