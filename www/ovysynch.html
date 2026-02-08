@@ -503,9 +503,7 @@ if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
       if(repro === "عشار") return { ok:false, reason:"pregnant", animalType };
 if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType };
 if (repro === "حديث الولادة") {
-  // ✅ ممكن تكون بعد ولادة أو بعد إجهاض — نختار الأحدث
-  const startRef = (startDateEl?.value || todayLocal());
-
+ 
   const calv = String(a.lastCalvingDate || "").slice(0,10);
   const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
 
@@ -518,8 +516,12 @@ if (repro === "حديث الولادة") {
     refDate = abrt;
   }
 
-  const dim = daysSinceISO(refDate, startRef);   // ✅ أيام منذ آخر ولادة/إجهاض
-  const minDim = postpartumMinDaysByType(a);
+ // ✅ DIM من الوثيقة أولاً (daysInMilk) — وإلا نحسب من آخر ولادة/إجهاض مقابل "اليوم"
+const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
+const refISO = todayLocal(); // ✅ تجاهل startDate نهائيًا
+const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
+const minDim = postpartumMinDaysByType(a);
+
 
   // لو مش قادرين نحسب (مفيش تاريخ) نعرض سبب عام بدون أرقام
   if (dim === null) {
@@ -532,8 +534,6 @@ if (repro === "حديث الولادة") {
 
       // 🔒 منع البروتوكول قبل الحد الأدنى بعد الولادة (حسب النوع)
 // 🔒 منع البروتوكول قبل الحد الأدنى بعد آخر (ولادة/إجهاض) — بدون الاعتماد على reproductiveStatus
-const startRef = (startDateEl?.value || todayLocal());
-
 const calv = String(a.lastCalvingDate || "").slice(0,10);
 const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
 
@@ -546,8 +546,12 @@ if (abrt && (!calv || abrt > calv)) {
   refDate = abrt;
 }
 
-const dim = daysSinceISO(refDate, startRef);
+// ✅ DIM من الوثيقة أولاً (daysInMilk) — وإلا نحسب من آخر ولادة/إجهاض مقابل "اليوم"
+const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
+const refISO = todayLocal(); // ✅ تجاهل startDate نهائيًا
+const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
 const minDim = postpartumMinDaysByType(a);
+
 
 // لو التاريخ موجود وحساب الأيام ممكن
 if (dim !== null && dim >= 0 && dim < minDim) {
