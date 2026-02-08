@@ -588,9 +588,9 @@ function isBuffaloType(animalDoc){
           refDate = abrt;
         }
 
-        const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
-        const refISO = todayLocal();
-        const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
+       const refISO = todayLocal();
+const dim = daysSinceISO(refDate, refISO); // ✅ مصدر واحد: lastCalvingDate/lastAbortionDate
+
         const minDim = postpartumMinDaysByType(a);
 
         if (dim !== null && dim >= 0 && dim < minDim) {
