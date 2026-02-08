@@ -16,6 +16,9 @@ import {
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// ✅ بصمة واضحة إن الملف اتحمّل
+console.log("[repro-auto] loaded ✅");
+
 /* ---------------- Helpers ---------------- */
 function toISODate(v){
   if(!v) return "";
@@ -49,25 +52,26 @@ function getUserId(){
   const uid = auth?.currentUser?.uid;
   if(uid) return uid;
 
-  // 2) لو عندك تخزين محلي للهوية
-  const ls = localStorage.getItem("userId") || localStorage.getItem("tenantId") || "";
+  // 2) لو عندك تخزين محلي للهوية (Tenant Bootstrap)
+  const ls =
+    localStorage.getItem("userId") ||
+    localStorage.getItem("uid") ||
+    localStorage.getItem("tenantId") ||
+    "";
   return (ls || "").trim();
 }
 
-async function safeWaitAuth(ms=600){
+async function safeWaitAuth(ms=2000){
   const t0 = Date.now();
   while(Date.now() - t0 < ms){
     if (auth?.currentUser?.uid) return true;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 80));
   }
   return !!auth?.currentUser?.uid;
 }
 
 /* ---------------- Settings (49/44) ---------------- */
 function getThresholdDays(type){
-  // ✅ تقدر تغيّرها لاحقًا بدون كود:
-  // localStorage.setItem("mbk_open_after_days_cows","49")
-  // localStorage.setItem("mbk_open_after_days_buffalo","44")
   const cows = parseInt(localStorage.getItem("mbk_open_after_days_cows") || "49", 10);
   const buff = parseInt(localStorage.getItem("mbk_open_after_days_buffalo") || "44", 10);
 
@@ -88,7 +92,8 @@ function pickCalvingDate(a){
 export async function runReproAutoOnce(options = {}){
   const { maxScan = 500, dryRun = false } = options;
 
-  await safeWaitAuth(600);
+  // ✅ ننتظر auth/tenant قليلًا علشان ما يرجعش no_user بدري
+  await safeWaitAuth(2000);
 
   const userId = getUserId();
   if(!userId){
@@ -98,7 +103,6 @@ export async function runReproAutoOnce(options = {}){
 
   const animalsRef = collection(db, "animals");
 
-  // ✅ نفحص فقط: active + حديثة الولادة + لنفس المستخدم
   const qy = query(
     animalsRef,
     where("userId", "==", userId),
@@ -153,19 +157,28 @@ export async function runReproAutoOnce(options = {}){
 }
 
 /* ---------------- Auto-run: once per day ---------------- */
-(function autoRun(){
+async function autoRun(){
   const key = "mbk_repro_auto_last_run";
   const today = todayISO();
   const last = localStorage.getItem(key) || "";
   if(last === today) return;
 
+  // ✅ تأخير بسيط بعد تحميل الصفحة
+  await new Promise(r => setTimeout(r, 800));
+
   runReproAutoOnce({ maxScan: 500, dryRun: false })
     .then(res => {
       localStorage.setItem(key, today);
+      localStorage.setItem("mbk_repro_auto_last_result", JSON.stringify(res));
       console.log("[repro-auto] done:", res);
     })
     .catch(err => {
       console.warn("[repro-auto] failed:", err);
-      // لا نكتب last_run عند الفشل
     });
-})();
+}
+
+// ✅ تشغيل تلقائي
+autoRun();
+
+// ✅ علشان تجرب من الكونسول مباشرة بدون import
+window.runReproAutoOnce = runReproAutoOnce;
