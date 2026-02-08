@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 
   <!-- (هنرجع لملاحظة animal-update.js لاحقًا كما اتفقنا) -->
- <script type="module">
-  import { updateAnimalByEvent } from "/js/animal-update.js";
-  window.updateAnimalByEvent = updateAnimalByEvent;
-</script>
-
+  <script type="module">
+    import { updateAnimalByEvent } from "/js/animal-update.js";
+    window.updateAnimalByEvent = updateAnimalByEvent;
+  </script>
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
@@ -56,13 +55,11 @@
       box-shadow:0 1px 0 rgba(15,23,42,.04);
     }
 
-    /* تخطيط الحقول */
     .row{ display:grid; grid-template-columns:1fr; gap:12px; }
     @media(min-width:640px){ .row-2{ grid-template-columns:1fr 1fr; } }
 
     .hint{ font-size:12px; opacity:.65; line-height:1.4; }
 
-    /* صندوق الخطوات */
     .steps{
       margin-top:12px;
       border:1px solid var(--border, #e2e8f0);
@@ -84,39 +81,36 @@
     .step .chk{ display:flex; align-items:center; gap:8px; justify-content:flex-start; }
     .step input[type="checkbox"]{ width:18px; height:18px; }
 
-    /* شارة في الموعد/مؤكدة */
     .on-time{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border, #e2e8f0); }
     .ok{ background:#f0fff6; border-color:#bbf7d0; }
     .late{ background:#fff7ed; border-color:#fed7aa; }
 
-    /* رسائل */
     #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
-   #info.infobar{
-  display:none;
-  position: sticky;
-  top: 72px;           /* تحت الهيدر مباشرة */
-  z-index: 19;
-  margin: 10px 0 10px;
-}
-#info .msgrow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-}
-#info .okbtn{
-  flex-shrink:0;
-  border-radius:12px;
-  padding:8px 12px;
-  font-weight:900;
-  border:2px solid var(--brand-600, #0b7f47);
-  background:#fff;
-  color: var(--brand-600, #0b7f47);
-  cursor:pointer;
-}
 
+    #info.infobar{
+      display:none;
+      position: sticky;
+      top: 72px;
+      z-index: 19;
+      margin: 10px 0 10px;
+    }
+    #info .msgrow{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    #info .okbtn{
+      flex-shrink:0;
+      border-radius:12px;
+      padding:8px 12px;
+      font-weight:900;
+      border:2px solid var(--brand-600, #0b7f47);
+      background:#fff;
+      color: var(--brand-600, #0b7f47);
+      cursor:pointer;
+    }
 
-    /* أزرار أسفل الصفحة */
     .btn-row{
       position: sticky;
       bottom: 10px;
@@ -164,42 +158,42 @@
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
   </header>
+
   <div class="wrap">
-    <div id="info" class="infobar"></div> 
+    <div id="info" class="infobar"></div>
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off">
-<div class="row" style="margin-bottom:12px">
-  <div class="field">
-    <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
-    <textarea id="bulkAnimals" rows="4" placeholder="مثال:
+        <div class="row" style="margin-bottom:12px">
+          <div class="field">
+            <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
+            <textarea id="bulkAnimals" rows="4" placeholder="مثال:
 105
 106
 110"></textarea>
-    <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
-  </div>
+            <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
+          </div>
 
-  <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">
-    تطبيق القائمة
-  </button>
+          <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">
+            تطبيق القائمة
+          </button>
 
-  <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
-</div>
+          <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
+        </div>
 
-<!-- 👇 إضافة المجموعات المحفوظة -->
-<div class="row" style="margin-top:10px">
-  <div class="field">
-    <label for="groupSelect">المجموعة المحفوظة</label>
-    <select id="groupSelect">
-      <option value="" selected>— اختر مجموعة —</option>
-    </select>
-    <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
-  </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field">
+            <label for="groupSelect">المجموعة المحفوظة</label>
+            <select id="groupSelect">
+              <option value="" selected>— اختر مجموعة —</option>
+            </select>
+            <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
+          </div>
 
-  <div class="row row-2">
-    <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
-    <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
-  </div>
-</div>
+          <div class="row row-2">
+            <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
+            <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
+          </div>
+        </div>
 
         <div class="row row-2">
           <div class="field">
@@ -207,17 +201,17 @@
             <input id="animalId" type="text" placeholder="مثال: 105" />
           </div>
 
-         <div class="field">
-  <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
-  <input id="startDate" type="date" />
-</div>
+          <div class="field">
+            <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
+            <input id="startDate" type="date" />
+          </div>
 
-<div class="field">
-  <label for="startTime">ساعة بدء البروتوكول</label>
-  <input id="startTime" type="time" value="08:00" />
-  <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
-</div>
-</div>
+          <div class="field">
+            <label for="startTime">ساعة بدء البروتوكول</label>
+            <input id="startTime" type="time" value="08:00" />
+            <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
+          </div>
+        </div>
 
         <div class="row" style="margin-top:12px">
           <div class="field">
@@ -233,7 +227,6 @@
         </div>
 
         <div id="stepsBox" class="steps" aria-live="polite"></div>
-
         <div id="warn"></div>
       </form>
     </div>
@@ -244,1059 +237,747 @@
     <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
   </div>
 
- <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, updateDoc, getDoc, query, where, limit, getDocs, orderBy }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
- import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  (async () => {
-    const form        = document.getElementById('ovForm');
-    const animalIdEl  = document.getElementById('animalId');
-    const startDateEl = document.getElementById('startDate');
-    const startTimeEl = document.getElementById('startTime');
-    const bulkEl      = document.getElementById('bulkAnimals');
-const applyBulkBtn= document.getElementById('applyBulk');
-const bulkHintEl  = document.getElementById('bulkHint');
-const groupSelectEl = document.getElementById('groupSelect');
-const loadGroupBtn  = document.getElementById('loadGroup');
-const saveGroupBtn  = document.getElementById('saveGroup');
-
-
-let bulkList = []; // قائمة أرقام الحيوانات
-    let currentGroupId = "";
-let currentGroupName = "";
-let currentGroupFromCloud = false;
-
-    const programEl   = document.getElementById('program');
-    const stepsBox    = document.getElementById('stepsBox');
-
-    const saveBtn     = document.getElementById('saveBtn');
-    const openCardBtn = document.getElementById("openCowCard");
-
-    const warnEl = document.getElementById('warn');
-    const infoEl = document.getElementById('info');
-
-    let dbRef = null, authRef = null;
-    let stepsState = [];
-
-    // === تشخيص سريع عشان نتأكد إن السكربت الجديد اتشغّل ===
-    console.log("✅ ovsynch script loaded v2");
-
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-    function showWarn(t){ if(warnEl) warnEl.textContent = t || ""; }
-    function clearWarn(){ if(warnEl) warnEl.textContent = ""; }
-function parseBulkList(){
-  const raw = (bulkEl?.value || "").trim();
-  if(!raw){ bulkList = []; return []; }
-
-  const arr = raw
-    .split(/\n|,|;/g)
-    .map(s => String(s||"").trim())
-    .filter(Boolean);
-
-  // إزالة التكرار مع الحفاظ على الترتيب
-  const seen = new Set();
-  bulkList = arr.filter(x => (seen.has(x) ? false : (seen.add(x), true)));
-
-  if(bulkHintEl){
-    bulkHintEl.textContent = bulkList.length
-      ? `✅ تم تحميل ${bulkList.length} حيوان: ${bulkList.slice(0,8).join("، ")}${bulkList.length>8?" ...":""}`
-      : "";
-  }
-  return bulkList;
-}
-
-applyBulkBtn?.addEventListener("click", async ()=>{
-
-  const list = parseBulkList();
-  if(!list.length){
-    showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي.");
-    return;
-  }
-  clearWarn();
-
-  (async ()=>{
-
-  const okList = [];
-  const bad = [];
-
-  for(const n of list){
-    const r = await checkAnimalQuick(n);
-    if(r.reason === "auth_blocked_silent") return; // اخرج بصمت
-    if(r.ok) okList.push(n);
-   else bad.push({ n, reason:r.reason, extra:r });
-  }
-
-if(bad.length){
-
-  bulkEl.value = okList.join("\n");
-  parseBulkList();
-
-  const details = bad.map(b =>
-    invalidAnimalMessage(b.reason, b.n, b.extra)
-  ).join("\n");
-
-  showInfo(
-    `تم استبعاد ${bad.length} حيوان لعدم الأهلية للتزامن:\n${details}`,
-    { isErr:true, requireAck:true }
-  );
-
-}else{
-  showInfo(`تم قبول ${okList.length} حيوان للتسجيل.`);
-}
-
-  // لو الرقم الفردي فاضي خليه أول رقم صحيح
-  if(animalIdEl && !animalIdEl.value && okList.length) animalIdEl.value = okList[0];
-})();
-
-  if(!list.length){
-    showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي.");
-    return;
-  }
-  clearWarn();
- 
-});
-async function loadGroupsList(){
-  if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
-  const q = query(
-    collection(dbRef, "protocolGroups"),
-    where("userId", "==", authRef.currentUser.uid),
-    orderBy("createdAt", "desc")
-  );
-
-  const snap = await getDocs(q);
-
-  // امسح الخيارات القديمة
-  groupSelectEl.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
-
-  snap.forEach(docSnap=>{
-    const d = docSnap.data() || {};
-    const opt = document.createElement("option");
-    opt.value = docSnap.id;
-    opt.textContent = d.name || docSnap.id;
-    groupSelectEl.appendChild(opt);
-  });
-}
-
-async function saveCurrentAsGroup(){
-  const list = parseBulkList();
-  if(!list.length){
-    showWarn("⚠️ اكتب أرقام الحيوانات أولاً ثم احفظ كمجموعة.");
-    return;
-  }
-  if(!dbRef || !authRef?.currentUser){
-    showWarn("⚠️ تأكد من تسجيل الدخول ثم حاول مرة أخرى.");
-    return;
-  }
-
-  const name = prompt("اسم المجموعة؟ مثال: دفعة 25 بقرة - فبراير");
-  if(!name) return;
-
-  // ID ثابت من الاسم + uid (اختياري) أو auto id
-  await addDoc(collection(dbRef, "protocolGroups"), {
-    userId: authRef.currentUser.uid,
-    name: String(name).trim(),
-    animals: list.map(x=>String(x).trim()),
-    createdAt: serverTimestamp()
-  });
-
-  showInfo("✅ تم حفظ المجموعة على السحابة");
-  await loadGroupsList();
-}
-
-async function loadSelectedGroup(){
-  const gid = (groupSelectEl?.value || "").trim();
-  if(!gid){
-    showWarn("⚠️ اختر مجموعة أولاً.");
-    return;
-  }
-  if(!dbRef) return;
-
-  const snap = await getDoc(doc(dbRef, "protocolGroups", gid));
-  if(!snap.exists()){
-    showWarn("⚠️ المجموعة غير موجودة.");
-    return;
-  }
-
-  const d = snap.data() || {};
-  const arr = Array.isArray(d.animals) ? d.animals : [];
-  currentGroupId = gid;
-currentGroupName = String(d.name || gid).trim();
-currentGroupFromCloud = true;
-
-  bulkEl.value = arr.join("\n");
-  parseBulkList();            // يحدث bulkList + hint
-  if(!animalIdEl.value && bulkList.length) animalIdEl.value = bulkList[0];
-
-  showInfo(`✅ تم تحميل المجموعة: ${d.name || gid}`);
-}
-loadGroupBtn?.addEventListener("click", loadSelectedGroup);
-saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
-
-  function showInfo(text, opts){
-  const o = (typeof opts === "object" && opts) ? opts : { isErr: !!opts, requireAck: false };
-
-  if(!infoEl) return;
-  infoEl.style.display = "block";
-  infoEl.className = "infobar " + (o.isErr ? "error" : "show");
-
-  // ✅ محتوى + زر "حسنًا"
-  infoEl.innerHTML = `
-    <div class="msgrow">
-     <div class="msgtext" style="white-space:pre-line">${String(text||"")}</div>
-      <button type="button" class="okbtn" id="infoOkBtn">حسنًا</button>
-    </div>
-  `;
-
-  try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
-
-  // ✅ زر إغلاق إلزامي عند requireAck
-  const btn = document.getElementById("infoOkBtn");
-  if(btn){
-    btn.onclick = () => {
-      infoEl.style.display = "none";
-      infoEl.innerHTML = "";
-    };
-  }
-}
-
- async function checkAnimalQuick(num){
-  if(!dbRef) return { ok:true }; // أوفلاين: لا نعطل
-
-  // ✅ لو الجلسة لسه ما رجعتش: نمنع التحقق (بدون رسائل)
-  if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
-
-  const uid = authRef.currentUser.uid;
-  const animalsRef = collection(dbRef, "animals");
-
-  // 1) number كنص
-  let snap = await getDocs(query(
-    animalsRef,
-    where("userId","==",uid),
-    where("number","==",String(num)),
-    limit(1)
-  ));
-
-  // 2) animalNumber كرقم
-  if(snap.empty){
-    snap = await getDocs(query(
-      animalsRef,
-      where("userId","==",uid),
-      where("animalNumber","==",Number(num)),
-      limit(1)
-    ));
-  }
-
-  if(snap.empty){
-    return { ok:false, reason:"not_found" };
-  }
-
-  const a = snap.docs[0].data() || {};
-  const animalType = String(a.type || a.animalType || a.kind || "").trim();
-
-  const status = String(a.status || "active").toLowerCase(); // active/inactive
-  const inactiveReason = String(a.inactiveReason || "").toLowerCase(); // sale/death...
-
-  const breedingBlocked = !!a.breedingBlocked;
-  const repro = String(a.reproductiveStatus || "").trim();
-
-  // ✅ 1) خارج القطيع (الأولوية)
-  if(status === "inactive"){
-    if(inactiveReason === "sale")  return { ok:false, reason:"sale", animalType, animal:a };
-    if(inactiveReason === "death") return { ok:false, reason:"death", animalType, animal:a };
-    return { ok:false, reason:"inactive", animalType, animal:a };
-  }
-
-  // ✅ 2) مستبعدة (لا تُلقّح)
-  if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
-    return { ok:false, reason:"cull", animalType, animal:a };
-  }
-
-  // ✅ 3) عشار/ملقّحة
-  if(repro === "عشار") return { ok:false, reason:"pregnant", animalType, animal:a };
-  if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType, animal:a };
-
-  // ✅ 4) حديث ولادة / حد أدنى بعد (آخر ولادة/إجهاض)
-  const calv = String(a.lastCalvingDate || "").slice(0,10);
-  const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
-
-  let refType = "calving";
-  let refDate = calv;
-
-  if (abrt && (!calv || abrt > calv)) {
-    refType = "abortion";
-    refDate = abrt;
-  }
-
-  const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
-  const refISO = todayLocal();
-  const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
-  const minDim = postpartumMinDaysByType(a);
-
-  if (dim !== null && dim >= 0 && dim < minDim) {
-    return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType, animal:a };
-  }
-
-  // ✅ لو مكتوب "حديث الولادة" حتى لو مفيش تاريخ واضح
-  if (repro === "حديث الولادة") {
-    // لو dim null → نرجّع سبب عام
-    if (dim === null) {
-      return { ok:false, reason:"fresh_postpartum", refType, animalType, animal:a };
-    }
-    return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType, animal:a };
-  }
-
-  return { ok:true, animal:a, animalType };
-}
-
-function daysSinceISO(isoDate, refISO){
-  if(!isoDate) return null;
-  const a = new Date(String(isoDate).slice(0,10) + "T00:00:00");
-  const b = new Date(String(refISO || todayLocal()).slice(0,10) + "T00:00:00");
-  if(isNaN(a) || isNaN(b)) return null;
-  return Math.floor((b - a) / (1000*60*60*24));
-}
-
-function isBuffaloType(animalDoc){
-  const tRaw = String(
-    animalDoc?.type ??
-    animalDoc?.animalType ??
-    animalDoc?.kind ??
-    animalDoc?.species ??
-    animalDoc?.animalSpecies ??
-    ""
-  );
-
-  const t = tRaw.toLowerCase().trim();
-
-  // ✅ عربي
-  if (t.includes("جاموس") || t.includes("جاموسه") || t.includes("جاموسة")) return true;
-
-  // ✅ إنجليزي (مع الأخطاء الشائعة)
-  // buffalo / buffloe / bufflo / buff / water buffalo
-  if (t.includes("buffalo")) return true;
-  if (t.includes("buffloe")) return true;
-  if (t.includes("bufflo")) return true;
-  if (t.includes("water") && t.includes("buff")) return true;
-  if (t.includes("buff")) return true; // تشمل buf/buff
-
-  return false;
-}
-
-function postpartumMinDaysByType(animalDoc){
-  return isBuffaloType(animalDoc) ? 45 : 49; // ✅ جاموس 45 / أبقار 49
-}
-
-
-function invalidAnimalMessage(reason, num, extra){
- const label = isBuffaloType(extra?.animal) ? "جاموسة" : "بقرة";
-
-  if(reason === "not_found")
-    return `⛔ الحيوان رقم ${num} غير موجود.`;
-
-  if(reason === "sale")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (مباعة).`;
-
-  if(reason === "death")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (نافقة).`;
-
-  if(reason === "inactive")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع.`;
-
-  if(reason === "cull")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مستبعدة (لا تُلقّح مرة أخرى).`;
-
-  if(reason === "pregnant")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: عِشار.`;
-
-  if(reason === "inseminated")
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مُلقّحة.`;
-
- if(reason === "fresh_postpartum"){
-  const dim = Number.isFinite(extra?.dim) ? extra.dim : null;
-  const min = Number.isFinite(extra?.minDim) ? extra.minDim : null;
-
-  const refType = String(extra?.refType || "calving");
-  const refLabel = (refType === "abortion") ? "بعد إجهاض" : "بعد ولادة";
-
-  if(dim !== null && min !== null){
-    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — الأيام ${dim} (الحد الأدنى ${min} حسب النوع).`;
-  }
-
-  return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — أقل من الحد الأدنى حسب النوع.`;
-}
-}
-async function rejectNumberSoft(num){
-  // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
-  showInfo(invalidAnimalMessage("not_found", num), true);
-  if(animalIdEl){
-    animalIdEl.value = "";
-    try{ animalIdEl.focus(); }catch{}
-  }
-}
-
-    // ✅ فتح بطاقة الحيوان
-    openCardBtn?.addEventListener("click", ()=>{
-      const id = (animalIdEl.value || "").trim();
-      if(!id) return;
-      location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
-    });
-
-    // ✅ قراءة الكونتكست من add-event (number/date/eventDate…)
-    function hydrate(){
-      const qp = new URLSearchParams(location.search);
-
-      const id =
-        (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || qp.get('animalIdd') || "").trim() ||
-        (localStorage.getItem('lastAnimalId') || "").trim();
-
-      const dt =
-        (qp.get('date') || qp.get('eventDate') || "").trim() ||
-        (localStorage.getItem('lastEventDate') || "").trim() ||
-        todayLocal();
-
-      if (id){
-        animalIdEl.value = id;
-        
-        try{ localStorage.setItem('lastAnimalId', id); }catch{}
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, getDoc,
+      query, where, limit, getDocs, orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    (async () => {
+      const form          = document.getElementById('ovForm');
+      const animalIdEl    = document.getElementById('animalId');
+      const startDateEl   = document.getElementById('startDate');
+      const startTimeEl   = document.getElementById('startTime');
+
+      const bulkEl        = document.getElementById('bulkAnimals');
+      const applyBulkBtn  = document.getElementById('applyBulk');
+      const bulkHintEl    = document.getElementById('bulkHint');
+
+      const groupSelectEl = document.getElementById('groupSelect');
+      const loadGroupBtn  = document.getElementById('loadGroup');
+      const saveGroupBtn  = document.getElementById('saveGroup');
+
+      const programEl     = document.getElementById('program');
+      const stepsBox      = document.getElementById('stepsBox');
+
+      const saveBtn       = document.getElementById('saveBtn');
+      const openCardBtn   = document.getElementById("openCowCard");
+
+      const warnEl        = document.getElementById('warn');
+      const infoEl        = document.getElementById('info');
+
+      let dbRef = null, authRef = null;
+      let stepsState = [];
+
+      let bulkList = [];
+      let currentGroupId = "";
+      let currentGroupName = "";
+      let currentGroupFromCloud = false;
+
+      function todayLocal(){
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().slice(0,10);
       }
+      function showWarn(t){ if(warnEl) warnEl.textContent = t || ""; }
+      function clearWarn(){ if(warnEl) warnEl.textContent = ""; }
 
-      startDateEl.value = dt;
-      try{ localStorage.setItem('lastEventDate', dt); }catch{}
-    }
-animalIdEl?.addEventListener("change", async ()=>{
-  const num = (animalIdEl.value||"").trim();
-  if(!num) return;
-
-  const r = await checkAnimalQuick(num);
-  if(!r.ok){
-    
-   showInfo(invalidAnimalMessage(r.reason, num, r), true);
-    animalIdEl.value = "";
-    try{ animalIdEl.focus(); }catch{}
-  }
-});
-
-    function addDays(baseISO, baseTime, days, extraHours = 0){
-  const d = new Date(baseISO + "T" + (baseTime || "08:00"));
-  d.setDate(d.getDate() + days);
-  d.setHours(d.getHours() + extraHours);
-  return d;
-}
-
-    function fmt(d){
-      try{ return d.toLocaleDateString('ar-EG'); }catch{ return d.toISOString().slice(0,10); }
-    }
-
-    const PROGRAMS = {
-      ovsynch:[
-        { day: 0,  name:'GnRH (اليوم 0)' },
-        { day: 7,  name:'PGF2α (اليوم 7)' },
-        { day: 9,  name:'GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
-        { day: 10, name:'تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
-      ],
-      cosynch72:[
-        { day: 0,  name:'GnRH (اليوم 0)' },
-        { day: 7,  name:'PGF2α (اليوم 7)' },
-        { day: 10, name:'GnRH + تلقيح مُوقّت TAI (اليوم 10 ≈ 72 ساعة بعد PGF)' },
-      ],
-      presynch_ovsynch:[
-        { day:-28, name:'Presynch: PGF2α (اليوم -28)' },
-        { day:-14, name:'Presynch: PGF2α (اليوم -14)' },
-        { day: 0,  name:'Ovsynch: GnRH (اليوم 0)' },
-        { day: 7,  name:'Ovsynch: PGF2α (اليوم 7)' },
-        { day: 9,  name:'Ovsynch: GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
-        { day: 10, name:'Ovsynch: تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
-      ]
-    };
-// ===================== Tasks helpers (مركزي) =====================
-function safeKey(s){
-  return String(s||"").trim()
-    .replace(/\s+/g,'_')
-    .replace(/[^\w\u0600-\u06FF\-]+/g,'');
-}
-function toISODateLocal(d){
-  const dd = new Date(d);
-  return new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
-}
-function makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName }){
-  // ID ثابت يمنع التكرار حتى لو اتعمل Save أكتر من مرة
-  return [
-    "task",
-    safeKey(animalNumber),
-    safeKey(program),
-    safeKey(protocolStartDate),
-    safeKey(plannedDate),
-    safeKey(stepName).slice(0,40)
-  ].join("__");
-}
-
-async function ensureProtocolTasks({
-  animalNumber,
-  protocolStartDate,
-  program,
-  userId,
-  scope = "animal",          // "animal" | "group"
-  groupId = "",
-  groupName = "",
-  animalsCount = 0,
-  alertEnabled = true        // ✅ group tasks = true / silent animal tasks = false
-}){
-
-  if(!dbRef) return;
-
-  const tpl = PROGRAMS[program] || [];
-  if(!tpl.length) return;
-
-  // ننشئ/نحدّث task لكل خطوة (setDoc مع merge يمنع التكرار)
-  for (const s of tpl){
-  const baseTime = (startTimeEl?.value || "08:00");
-
-// ✅ حساب صحيح من PGF (اليوم 7)
-let plannedDateTime;
-
-if (program === "ovsynch" || program === "presynch_ovsynch") {
-  const pgfDT = addDays(protocolStartDate, baseTime, 7, 0);
-
-  if (s.day === 9 && String(s.name).includes("GnRH")) {
-    plannedDateTime = new Date(pgfDT.getTime() + 56 * 3600 * 1000);
-  } else if (String(s.name).includes("تلقيح")) {
-    plannedDateTime = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-  } else {
-    plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
-  }
-
-} else if (program === "cosynch72") {
-  const pgfDT = addDays(protocolStartDate, baseTime, 7, 0);
-
-  if (String(s.name).includes("تلقيح") || (String(s.name).includes("GnRH") && s.day === 10)) {
-    plannedDateTime = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-  } else {
-    plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
-  }
-
-} else {
-  plannedDateTime = addDays(protocolStartDate, baseTime, s.day, 0);
-}
-
-const plannedDate = toISODateLocal(plannedDateTime);
-
-
-    const taskId = makeTaskId({
-      animalNumber,
-      protocolStartDate,
-      program,
-      plannedDate,
-      stepName: s.name
-    });
-
-    const ref = doc(dbRef, "tasks", taskId);
-   const snap = await getDoc(ref);
-if (!snap.exists()) {
-  await setDoc(ref, {
-    type: "protocol_step",
-   protocolType: program,
-
-    program: program,
-    stepName: s.name,
-    plannedDay: s.day,
-    plannedDate: plannedDate,
-    plannedDateTime: plannedDateTime.toISOString(),
-    plannedTime: (startTimeEl?.value || "08:00"),
-    animalNumber: String(animalNumber||"").trim(),
-    protocolStartDate: String(protocolStartDate||"").trim(),
-    status: "pending",
-    scope: scope,
-groupId: groupId || null,
-groupName: groupName || null,
-animalsCount: animalsCount || null,
-alertEnabled: !!alertEnabled,
-
-    userId: userId || null,
-    createdAt: serverTimestamp()
-  });
-}
-
-  }
-}
-
-async function markTaskDone({ animalNumber, protocolStartDate, program, plannedDate, stepName }){
-  if(!dbRef) return;
-
-  const taskId = makeTaskId({ animalNumber, protocolStartDate, program, plannedDate, stepName });
-  const ref = doc(dbRef, "tasks", taskId);
-
-  const snap = await getDoc(ref);
-
-  // ✅ لو التاسك مش موجود: لا ننشئه هنا (عشان الـ Rules)
-  if(!snap.exists()){
-    console.warn("⚠️ Task not found to mark done:", taskId);
-    return;
-  }
-
-   await updateDoc(ref, {
-    status: "done",
-    doneAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-
-}
-
-
-
-    function updateSteps(){
-      stepsBox.innerHTML = '';
-
-      const start = (startDateEl.value || "").trim();
-      const program = (programEl.value || "").trim();
-      if(!start || !program) return;
-
-      const tpl = PROGRAMS[program] || [];
-      const prev = stepsState;
-
-      stepsState = tpl.map((s)=>{
-      const baseTime = (startTimeEl.value || "08:00");
-
-// ✅ حساب صحيح: ساعات البروتوكول تُحسب من PGF (اليوم 7) وليس من (اليوم + 9)
-let dd;
-
-if (program === "ovsynch" || program === "presynch_ovsynch") {
-  // وقت PGF = اليوم 7 على الساعة الأساسية
-  const pgfDT = addDays(start, baseTime, 7, 0);
-
-  if (s.day === 9 && String(s.name).includes("GnRH")) {
-    // GnRH الثانية = 56 ساعة بعد PGF
-    dd = new Date(pgfDT.getTime() + 56 * 3600 * 1000);
-  } else if (String(s.name).includes("تلقيح")) {
-    // TAI = 72 ساعة بعد PGF (56 + 16)
-    dd = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-  } else {
-    // باقي الخطوات بأيامها العادية
-    dd = addDays(start, baseTime, s.day, 0);
-  }
-
-} else if (program === "cosynch72") {
-  const pgfDT = addDays(start, baseTime, 7, 0);
-
-  if (String(s.name).includes("تلقيح") || (String(s.name).includes("GnRH") && s.day === 10)) {
-    // GnRH+TAI = 72 ساعة بعد PGF
-    dd = new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-  } else {
-    dd = addDays(start, baseTime, s.day, 0);
-  }
-
-} else {
-  dd = addDays(start, baseTime, s.day, 0);
-}
-
-        const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
-const iso = local.toISOString().slice(0,16); // تاريخ + وقت
-const plannedDate = toISODateLocal(dd); // ✅ نفس منطق tasks
-
-        const keep = prev.find(p => p.name===s.name && p.day===s.day);
-        return {
-          day: s.day,
-          name: s.name,
-          date: iso,
-          plannedDate: plannedDate,
-          done: keep ? !!keep.done : false,
-          confirmedOn: keep ? keep.confirmedOn || null : null,
-          onSchedule: keep ? !!keep.onSchedule : false,
-          _savedOnce: keep ? !!keep._savedOnce : false,
-        };
-      });
-
-      stepsState.forEach((st, idx)=>{
-        const row = document.createElement('div');
-        row.className = 'step';
-
-        const chip = st.done
-          ? `<span class="on-time ${st.onSchedule ? 'ok' : 'late'}">${st.onSchedule ? '✓ في الموعد' : '✓ مؤكدة'}</span>`
-          : '';
-
-        row.innerHTML = `
-          <div>
-            <div class="name">${st.name}</div>
-            <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')} ${chip}</div>
+      function showInfo(text, isErr){
+        if(!infoEl) return;
+        infoEl.style.display = "block";
+        infoEl.className = "infobar " + (isErr ? "error" : "show");
+        infoEl.innerHTML = `
+          <div class="msgrow">
+            <div class="msgtext" style="white-space:pre-line">${String(text||"")}</div>
+            <button type="button" class="okbtn" id="infoOkBtn">حسنًا</button>
           </div>
-          <label class="chk">
-            <input data-idx="${idx}" type="checkbox" ${st.done ? 'checked' : ''}/>
-            تم
-          </label>
         `;
-        stepsBox.appendChild(row);
-      });
-    }
-
-    async function saveStepEvent(i){
-      if(!authRef?.currentUser) return;
-
-      try{
-        if(!dbRef) return;
-        const st = stepsState[i];
-        if(!st || st._savedOnce) return;
-
-        const animalId = (animalIdEl.value || '').trim();
-        if(!animalId) return;
-
-        const payload = {
-          type: 'ovsynch-step',
-          eventType: 'خطوة بروتوكول',
-          stepName: st.name,
-          program: programEl.value || null,
-          protocolStartDate: (startDateEl.value||'').trim() || null,
-          plannedDay: st.day,
-        plannedDate: st.plannedDate,
-
-plannedDateTime: st.date,
-
-          confirmedOn: st.confirmedOn,
-          onSchedule: !!st.onSchedule,
-          animalId,
-          animalNumber: animalId,
-          userId: authRef?.currentUser?.uid || null,
-          createdAt: serverTimestamp()
-        };
-
-        await addDoc(collection(dbRef,'events'), payload);
-
-// ✅ تحديث الـ task المقابل كـ done (مركزي)
-await markTaskDone({
-  animalNumber: animalId,
-  protocolStartDate: (startDateEl.value||'').trim(),
-  program: (programEl.value||'').trim(),
- plannedDate: st.plannedDate,
-
-  stepName: st.name
-});
-// ✅ لو وضع مجموعة: علّم Task المجموعة Done أيضًا
-const isGroupModeNow =
-  (Array.isArray(parseBulkList()) && parseBulkList().length > 1) ||
-  !!(groupSelectEl?.value || "").trim();
-
-if (isGroupModeNow) {
-  let gid = "";
-  if ((groupSelectEl?.value || "").trim()) {
-    gid = String(groupSelectEl.value).trim();
-  } else {
-    // Bulk groupId بنفس منطق الحفظ
-    const listNow = parseBulkList();
-    gid = [
-      "bulk",
-      String(programEl.value||"").trim(),
-      String(startDateEl.value||"").trim(),
-      String(listNow.length),
-      String(listNow[0]||"").trim()
-    ].join("__");
-  }
-
-  await markTaskDone({
-    animalNumber: `group:${String(gid || "").trim()}`,
-    protocolStartDate: (startDateEl.value||'').trim(),
-    program: (programEl.value||'').trim(),
-    plannedDate: st.plannedDate,
-    stepName: st.name
-  });
-}
-
-st._savedOnce = true;
-
-      }catch(err){
-       console.error('saveStepEvent failed', err);
-showInfo("⚠️ تم حفظ الحدث لكن تعذّر تحديث حالة التنبيه (Task). راجع قواعد tasks.", true);
-
-      }
-    }
-
-    stepsBox.addEventListener('change', async (e)=>{
-      const el = e.target.closest('input[type="checkbox"][data-idx]');
-      if(!el) return;
-
-      const i = Number(el.getAttribute('data-idx'));
-      const st = stepsState[i];
-      if(!st) return;
-
-      const today = todayLocal();
-      st.done = el.checked;
-      st.confirmedOn = el.checked ? today : null;
-    st.onSchedule = el.checked ? (today === st.plannedDate) : false;
-
-
-      if(el.checked) await saveStepEvent(i);
-      updateSteps();
-    });
-
-    async function setupFirebase(){
-      try{
-       const mod = await import('/js/firebase-config.js?v=5');
-        if(mod?.db && mod?.auth) return { db:mod.db, auth:mod.auth };
-        if(mod?.firebaseConfig){
-          const app = initializeApp(mod.firebaseConfig);
-          return { db:getFirestore(app), auth:getAuth(app) };
+        try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+        const btn = document.getElementById("infoOkBtn");
+        if(btn){
+          btn.onclick = () => { infoEl.style.display="none"; infoEl.innerHTML=""; };
         }
-      }catch(e){ /* ignore */ }
-
-      try{
-        const cfg = await import('./config.js?v=5');
-        const app = initializeApp(cfg.firebaseConfig);
-        return { db:getFirestore(app), auth:getAuth(app) };
-      }catch(e2){
-        showWarn('❌ تعذّر تحميل إعدادات Firebase.');
-        return { db:null, auth:null };
       }
-    }
 
-    const { db, auth } = await setupFirebase();
-    dbRef = db;
-    authRef = auth;
-   
-    // ✅ انتظر استرجاع جلسة الدخول (بدون redirect)
-async function waitForUser(ms=1500){
-  if(!authRef) return null;
-  return await new Promise((resolve)=>{
-    const t = setTimeout(()=>resolve(authRef.currentUser || null), ms);
-    try{
-      onAuthStateChanged(authRef, (u)=>{
-        clearTimeout(t);
-        resolve(u || null);
+      function parseBulkList(){
+        const raw = (bulkEl?.value || "").trim();
+        if(!raw){
+          bulkList = [];
+          if(bulkHintEl) bulkHintEl.textContent = "";
+          return [];
+        }
+        const arr = raw
+          .split(/\n|,|;/g)
+          .map(s => String(s||"").trim())
+          .filter(Boolean);
+
+        const seen = new Set();
+        bulkList = arr.filter(x => (seen.has(x) ? false : (seen.add(x), true)));
+
+        if(bulkHintEl){
+          bulkHintEl.textContent = bulkList.length
+            ? `✅ تم تحميل ${bulkList.length} حيوان: ${bulkList.slice(0,8).join("، ")}${bulkList.length>8?" ...":""}`
+            : "";
+        }
+        return bulkList;
+      }
+
+      function isBuffaloType(animalDoc){
+        const tRaw = String(
+          animalDoc?.type ??
+          animalDoc?.animalType ??
+          animalDoc?.kind ??
+          animalDoc?.species ??
+          animalDoc?.animalSpecies ??
+          ""
+        );
+        const t = tRaw.toLowerCase().trim();
+        if (t.includes("جاموس") || t.includes("جاموسه") || t.includes("جاموسة")) return true;
+        if (t.includes("buffalo")) return true;
+        if (t.includes("buffloe")) return true;
+        if (t.includes("bufflo")) return true;
+        if (t.includes("water") && t.includes("buff")) return true;
+        if (t.includes("buff")) return true;
+        return false;
+      }
+      function postpartumMinDaysByType(animalDoc){
+        return isBuffaloType(animalDoc) ? 45 : 49;
+      }
+      function daysSinceISO(isoDate, refISO){
+        if(!isoDate) return null;
+        const a = new Date(String(isoDate).slice(0,10) + "T00:00:00");
+        const b = new Date(String(refISO || todayLocal()).slice(0,10) + "T00:00:00");
+        if(isNaN(a) || isNaN(b)) return null;
+        return Math.floor((b - a) / (1000*60*60*24));
+      }
+
+      function invalidAnimalMessage(reason, num, extra){
+        const label = isBuffaloType(extra?.animal) ? "جاموسة" : "بقرة";
+        if(reason === "not_found") return `⛔ الحيوان رقم ${num} غير موجود.`;
+        if(reason === "sale") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (مباعة).`;
+        if(reason === "death") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (نافقة).`;
+        if(reason === "inactive") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع.`;
+        if(reason === "cull") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مستبعدة (لا تُلقّح مرة أخرى).`;
+        if(reason === "pregnant") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: عِشار.`;
+        if(reason === "inseminated") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مُلقّحة.`;
+        if(reason === "fresh_postpartum"){
+          const dim = Number.isFinite(extra?.dim) ? extra.dim : null;
+          const min = Number.isFinite(extra?.minDim) ? extra.minDim : null;
+          const refType = String(extra?.refType || "calving");
+          const refLabel = (refType === "abortion") ? "بعد إجهاض" : "بعد ولادة";
+          if(dim !== null && min !== null){
+            return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — الأيام ${dim} (الحد الأدنى ${min} حسب النوع).`;
+          }
+          return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — أقل من الحد الأدنى حسب النوع.`;
+        }
+        return `⛔ رقم ${num} غير صالح للتزامن.`;
+      }
+
+      // ===================== EVENTS helpers (Smart fallback فقط) =====================
+      function pickISO(d){
+        const s = String(d || "").slice(0,10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+      }
+      function eventISO(ev){
+        return pickISO(ev?.eventDate) || pickISO(ev?.date) || pickISO(ev?.startDate) || pickISO(ev?.protocolStartDate);
+      }
+      function normType(ev){ return String(ev?.type || "").trim().toLowerCase(); }
+      function normEventType(ev){ return String(ev?.eventType || "").trim().toLowerCase(); }
+
+      function classifyReproFromEvent(ev){
+        const t = normType(ev);
+        const et = normEventType(ev);
+
+        // ✅ ولادة
+        if (t.includes("calv") || et.includes("ولادة")) return { repro:"حديث الولادة", kind:"calving" };
+
+        // ✅ إجهاض
+        if (t.includes("abort") || et.includes("إجهاض")) return { repro:"حديث الولادة", kind:"abortion" };
+
+        // ✅ تشخيص حمل
+        if (t.includes("preg") || et.includes("تشخيص حمل")) {
+          const res = String(ev?.result || ev?.diagnosisResult || "").trim();
+          if (res === "عشار") return { repro:"عشار", kind:"pregnant" };
+          if (res === "فارغة") return { repro:"مفتوحه", kind:"open" };
+          return { repro:"", kind:"pd_unknown" };
+        }
+
+        // ✅ تلقيح
+        if (t.includes("insemin") || et.includes("تلقيح")) return { repro:"ملقح", kind:"inseminated" };
+
+        return { repro:"", kind:"" };
+      }
+
+      // ✅ قرار SMART: متى نشك في الوثيقة ونحتاج events؟
+      function needsEventsFallback(animalDoc){
+        if(!animalDoc) return true;
+
+        const repro = String(animalDoc.reproductiveStatus || "").trim();
+        const hasDIM = Number.isFinite(Number(animalDoc.daysInMilk));
+        const calv = pickISO(animalDoc.lastCalvingDate);
+        const abrt = pickISO(animalDoc.lastAbortionDate || animalDoc.lastAbortDate);
+
+        // 1) الحالة فاضية/غير معروفة
+        if(!repro) return true;
+
+        // 2) مكتوب "حديث الولادة" لكن مفيش مرجع واضح (لا DIM ولا تواريخ)
+        if(repro === "حديث الولادة" && !hasDIM && !calv && !abrt) return true;
+
+        // 3) مفيش تواريخ ولادة/إجهاض ولا DIM (ومع ذلك احنا محتاجين مرجع للبوستبارتم)
+        if(!hasDIM && !calv && !abrt) return true;
+
+        return false;
+      }
+
+      async function getActualReproFromEvents(animalNumber, uid){
+        if(!dbRef || !uid) return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
+
+        const evRef = collection(dbRef, "events");
+        let snap = null;
+
+        // 1) الأفضل: orderBy(eventDate desc)
+        try{
+          snap = await getDocs(query(
+            evRef,
+            where("userId","==",uid),
+            where("animalNumber","==",String(animalNumber).trim()),
+            orderBy("eventDate","desc"),
+            limit(25)
+          ));
+        }catch(e1){
+          // 2) fallback: orderBy(createdAt desc)
+          try{
+            snap = await getDocs(query(
+              evRef,
+              where("userId","==",uid),
+              where("animalNumber","==",String(animalNumber).trim()),
+              orderBy("createdAt","desc"),
+              limit(25)
+            ));
+          }catch(e2){
+            return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
+          }
+        }
+
+        const list = snap?.docs?.map(d=>d.data()||{}) || [];
+        if(!list.length) return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
+
+        let lastCalv = "";
+        let lastAbrt = "";
+        for(const ev of list){
+          const iso = eventISO(ev);
+          if(!iso) continue;
+
+          const c = classifyReproFromEvent(ev);
+          if(c.kind === "calving" && (!lastCalv || iso > lastCalv)) lastCalv = iso;
+          if(c.kind === "abortion" && (!lastAbrt || iso > lastAbrt)) lastAbrt = iso;
+        }
+
+        // ✅ الحالة الفعلية = أول حدث “حاسِم” في الأحدث
+        for(const ev of list){
+          const c = classifyReproFromEvent(ev);
+          if(c.repro) return { repro:c.repro, lastCalvingDate:lastCalv, lastAbortionDate:lastAbrt };
+        }
+
+        return { repro:"", lastCalvingDate:lastCalv, lastAbortionDate:lastAbrt };
+      }
+      // ===================== /EVENTS helpers =====================
+
+      async function checkAnimalQuick(num){
+        if(!dbRef) return { ok:true };
+        if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
+
+        const uid = authRef.currentUser.uid;
+        const animalsRef = collection(dbRef, "animals");
+
+        // 1) number كنص
+        let snap = await getDocs(query(
+          animalsRef,
+          where("userId","==",uid),
+          where("number","==",String(num)),
+          limit(1)
+        ));
+
+        // 2) animalNumber كرقم
+        if(snap.empty){
+          snap = await getDocs(query(
+            animalsRef,
+            where("userId","==",uid),
+            where("animalNumber","==",Number(num)),
+            limit(1)
+          ));
+        }
+
+        if(snap.empty) return { ok:false, reason:"not_found" };
+
+        const a = snap.docs[0].data() || {};
+
+        // ✅ أولوية: خارج القطيع
+        const status = String(a.status || "active").toLowerCase();
+        const inactiveReason = String(a.inactiveReason || "").toLowerCase();
+        if(status === "inactive"){
+          if(inactiveReason === "sale")  return { ok:false, reason:"sale", animal:a };
+          if(inactiveReason === "death") return { ok:false, reason:"death", animal:a };
+          return { ok:false, reason:"inactive", animal:a };
+        }
+
+        // ✅ مستبعدة (لا تُلقّح)
+        const breedingBlocked = !!a.breedingBlocked;
+        const reproDoc = String(a.reproductiveStatus || "").trim();
+        if(breedingBlocked || reproDoc === "لا تُلقّح مرة أخرى"){
+          return { ok:false, reason:"cull", animal:a };
+        }
+
+        // ✅ SMART: نعتمد على الوثيقة أولًا، ونلجأ للأحداث فقط عند الشك
+        let repro = reproDoc;
+        let calv = pickISO(a.lastCalvingDate);
+        let abrt = pickISO(a.lastAbortionDate || a.lastAbortDate);
+
+        if(needsEventsFallback(a)){
+          const actual = await getActualReproFromEvents(String(num).trim(), uid);
+
+          // تحديثات فقط لو الأحداث أعطت قيمة مفيدة
+          if(actual?.repro) repro = actual.repro;
+
+          // تواريخ مرجعية للبوستبارتم عند الحاجة
+          if(actual?.lastCalvingDate) calv = actual.lastCalvingDate;
+          if(actual?.lastAbortionDate) abrt = actual.lastAbortionDate;
+        }
+
+        // ✅ منع عشار/ملقح
+        if(repro === "عشار") return { ok:false, reason:"pregnant", animal:a };
+        if(repro === "ملقح") return { ok:false, reason:"inseminated", animal:a };
+
+        // ✅ بوستبارتم: من (أحدث ولادة/إجهاض) أو DIM إن موجود
+        let refType = "calving";
+        let refDate = calv;
+
+        if (abrt && (!calv || abrt > calv)) {
+          refType = "abortion";
+          refDate = abrt;
+        }
+
+        const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
+        const refISO = todayLocal();
+        const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
+        const minDim = postpartumMinDaysByType(a);
+
+        if (dim !== null && dim >= 0 && dim < minDim) {
+          return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animal:a };
+        }
+
+        // ✅ لو مكتوب حديث الولادة حتى مع نقص المراجع
+        if (repro === "حديث الولادة") {
+          if (dim === null) return { ok:false, reason:"fresh_postpartum", refType, animal:a };
+          return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animal:a };
+        }
+
+        return { ok:true, animal:a };
+      }
+
+      // ✅ فتح بطاقة الحيوان
+      openCardBtn?.addEventListener("click", ()=>{
+        const id = (animalIdEl.value || "").trim();
+        if(!id) return;
+        location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
       });
-    }catch{
-      clearTimeout(t);
-      resolve(authRef.currentUser || null);
-    }
-  });
-}
- const user = await waitForUser(2000);
-if(user){
-  await loadGroupsList();
-}
 
-  function getCtx(){
-  const list = parseBulkList(); // لو مربع الجماعي فيه أرقام، هنستخدمه
-  const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
+      // ✅ قراءة الكونتكست
+      function hydrate(){
+        const qp = new URLSearchParams(location.search);
+        const id =
+          (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
+          (localStorage.getItem('lastAnimalId') || "").trim();
 
-  const start = (startDateEl.value||'').trim();
-  const program = (programEl.value||'').trim();
+        const dt =
+          (qp.get('date') || qp.get('eventDate') || "").trim() ||
+          (localStorage.getItem('lastEventDate') || "").trim() ||
+          todayLocal();
 
-  if(!animalId || !start || !program){
-    showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
-    return null;
-  }
-
-  clearWarn();
-  try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
-  try{ localStorage.setItem('lastEventDate', start); }catch{}
-
-  return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
-}
-    async function saveProtocol(){
-      const ctx = getCtx();
-      if(!ctx) return;
-      // ✅ تأكد من أول رقم (وأيضًا القائمة لو موجودة)
-const ids = (ctx.animalIds || []).filter(Boolean);
-const okIds = [];
-const badIds = [];
-
-for(const n of ids){
-  const r = await checkAnimalQuick(n);
-  if(r.ok) okIds.push(n);
- else badIds.push({ n, reason:r.reason, extra:r });
-
-}
-
-if(badIds.length){
-
-  bulkEl.value = okIds.join("\n");
-  parseBulkList();
-
-  const details = badIds.map(b =>
-    invalidAnimalMessage(b.reason, b.n, b.extra)
-  ).join("\n");
-
-  showInfo(
-    `تم استبعاد ${badIds.length} حيوان لعدم الأهلية للتزامن:\n${details}`,
-    { isErr:true, requireAck:true }
-  );
-}
-
-
-if(!okIds.length){
-  showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true);
-  return;
-}
-
-// ✅ استبدل القائمة بالصالحة فقط
-ctx.animalIds = okIds;
-ctx.animalId  = okIds[0];
-// ✅ تحديد هل التسجيل "مجموعة" أم "فردي"
-const isGroupMode =
-  (Array.isArray(ctx.animalIds) && ctx.animalIds.length > 1) ||
-  !!(groupSelectEl?.value || "").trim();
-
-let groupId = "";
-let groupName = "";
-
-// 1) لو مجموعة سحابية محمّلة
-if ((groupSelectEl?.value || "").trim()) {
-  groupId = String(groupSelectEl.value).trim();
-  groupName = String(currentGroupName || groupId).trim();
-} else if (isGroupMode) {
-  // 2) Bulk Group (مش محفوظة على السحابة)
-   const preview = ctx.animalIds.slice(0,6).join("، ");
-  groupName = `أوفسينك جماعي (${ctx.animalIds.length}): ${preview}${ctx.animalIds.length>6?" ...":""}`;
-
-  // ID ثابت قدر الإمكان من (program + start + count + أول رقم)
-  groupId = [
-    "bulk",
-    String(ctx.program||"").trim(),
-    String(ctx.start||"").trim(),
-    String(ctx.animalIds.length),
-    String(ctx.animalIds[0]||"").trim()
-  ].join("__");
-}
-
-     
-if(!ids.length){
-  showWarn("⚠️ لا يوجد أرقام حيوانات.");
-  return;
-}
-
-
-      saveBtn.disabled = true;
-      const oldTxt = saveBtn.textContent;
-      saveBtn.textContent = '... جاري الحفظ';
-try{
-  const user = await waitForUser(2000);
-  if(!user) return;
-
-       
-for (let idx = 0; idx < ctx.animalIds.length; idx++){
-  const animalNo = ctx.animalIds[idx];
-
-
-  const payload = {
-    type: 'ovsynch',
-    eventType: 'بروتوكول تزامن',
-    animalId: animalNo,
-    animalNumber: animalNo,
-    startDate: ctx.start,
-    program: ctx.program,
-    steps: ctx.steps,
-    userId: user.uid,
-    createdAt: serverTimestamp()
-  };
-if(typeof window.updateAnimalByEvent === "function"){
-  await window.updateAnimalByEvent(payload);
-}
-
-  if(dbRef){
-    const protocolId = [
-      "ovsynch",
-      String(animalNo).trim(),
-      String(ctx.program).trim(),
-      String(ctx.start).trim()
-    ].join("__");
-const evRef = doc(dbRef, "events", protocolId);
-const snap = await getDoc(evRef);
-
-if (!snap.exists()) {
-  await setDoc(evRef, payload); // ✅ create فقط
-} else {
-  // ✅ موجود بالفعل — لا نعمل update عشان rules تمنع
-  }
-}
-  // ✅ منع تكرار إنشاء التاسكات عند إعادة الحفظ
-  if (dbRef){
-   // ✅ Lock: لو Group يبقى Lock واحد للمجموعة، لو فردي يبقى لكل حيوان
-const batchLockId = isGroupMode
-  ? ["ovsynch_tasks_group", String(groupId).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__")
-  : ["ovsynch_tasks_animal", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
-
-    const lockRef = doc(dbRef, "protocolTaskBatches", batchLockId);
-    const lockSnap = await getDoc(lockRef);
-
-   if (!lockSnap.exists()) {
-
-  await setDoc(lockRef, {
-    userId: user.uid,
-    scope: isGroupMode ? "group" : "animal",
-    groupId: isGroupMode ? groupId : null,
-    groupName: isGroupMode ? groupName : null,
-    animalsCount: isGroupMode ? ctx.animalIds.length : null,
-    animalNumber: isGroupMode ? null : animalNo,
-    program: ctx.program,
-    startDate: ctx.start,
-    createdAt: serverTimestamp()
-  }, { merge: true });
-
-
-  // 👇 هنا الجزء اللي كنت مش فاهمه
-// ✅ إنشاء التاسكات مرة واحدة فقط (حسب Group / Animal)
-if (isGroupMode) {
-
-  // ✅ تنبيه واحد فقط للمجموعة
-  await ensureProtocolTasks({
-    animalNumber: `group:${String(groupId || "").trim()}`,              
-    protocolStartDate: ctx.start,
-    program: ctx.program,
-    userId: user.uid,
-    scope: "group",
-    groupId: String(groupId || "").trim(),
-    groupName: String(groupName || "").trim(),
-    animalsCount: Number(ctx.animalIds.length),
-    alertEnabled: true
-  });
-
-} else {
-
-  // ✅ فردي (تنبيه للحيوان فقط)
-  await ensureProtocolTasks({
-    animalNumber: String(animalNo || "").trim(),
-    protocolStartDate: ctx.start,
-    program: ctx.program,
-    userId: user.uid,
-    scope: "animal",
-    alertEnabled: true
-  });
-
-}
-
-  // تقدم بسيط
- showInfo(`✅ تم حفظ (${idx+1}/${ctx.animalIds.length}) رقم ${animalNo}`);
-
-}
-
-} // ✅ قفل if (dbRef)
-} // ✅ قفل for
-
-
-        showInfo('✅ تم تسجيل البروتوكول بنجاح');
-      }catch(e){
-        console.error(e);
-        showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.');
-      }finally{
-        saveBtn.disabled = false;
-        saveBtn.textContent = oldTxt;
+        if (id){
+          animalIdEl.value = id;
+          try{ localStorage.setItem('lastAnimalId', id); }catch{}
+        }
+        startDateEl.value = dt;
+        try{ localStorage.setItem('lastEventDate', dt); }catch{}
       }
-    }
 
-    saveBtn.addEventListener('click', saveProtocol);
-    form.addEventListener('submit', (e)=>{ e.preventDefault(); saveProtocol(); });
+      // ✅ تحقّق عند تغيير الرقم الفردي
+      animalIdEl?.addEventListener("change", async ()=>{
+        const num = (animalIdEl.value||"").trim();
+        if(!num) return;
 
-    // ✅ تشغيل الصفحة
-    hydrate();
-    startDateEl.addEventListener('input', updateSteps);
-    programEl.addEventListener('change', updateSteps);
+        const r = await checkAnimalQuick(num);
+        if(r.reason === "auth_blocked_silent") return;
 
-    updateSteps();
+        if(!r.ok){
+          showInfo(invalidAnimalMessage(r.reason, num, r), true);
+          animalIdEl.value = "";
+          try{ animalIdEl.focus(); }catch{}
+        }
+      });
 
-  })();
-</script>
+      function toISODateLocal(d){
+        const dd = new Date(d);
+        return new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      }
 
+      const PROGRAMS = {
+        ovsynch:[
+          { day: 0,  name:'GnRH (اليوم 0)' },
+          { day: 7,  name:'PGF2α (اليوم 7)' },
+          { day: 9,  name:'GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
+          { day: 10, name:'تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
+        ],
+        cosynch72:[
+          { day: 0,  name:'GnRH (اليوم 0)' },
+          { day: 7,  name:'PGF2α (اليوم 7)' },
+          { day: 10, name:'GnRH + تلقيح مُوقّت TAI (اليوم 10 ≈ 72 ساعة بعد PGF)' },
+        ],
+        presynch_ovsynch:[
+          { day:-28, name:'Presynch: PGF2α (اليوم -28)' },
+          { day:-14, name:'Presynch: PGF2α (اليوم -14)' },
+          { day: 0,  name:'Ovsynch: GnRH (اليوم 0)' },
+          { day: 7,  name:'Ovsynch: PGF2α (اليوم 7)' },
+          { day: 9,  name:'Ovsynch: GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
+          { day: 10, name:'Ovsynch: تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
+        ]
+      };
+
+      function calcStepDateTime(program, startISO, baseTime, step){
+        if (program === "ovsynch" || program === "presynch_ovsynch") {
+          const pgfDT = new Date(startISO + "T" + (baseTime||"08:00"));
+          pgfDT.setDate(pgfDT.getDate() + 7);
+
+          if (step.day === 9 && String(step.name).includes("GnRH")) {
+            return new Date(pgfDT.getTime() + 56 * 3600 * 1000);
+          }
+          if (String(step.name).includes("تلقيح")) {
+            return new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+          }
+          const d = new Date(startISO + "T" + (baseTime||"08:00"));
+          d.setDate(d.getDate() + step.day);
+          return d;
+        }
+
+        if (program === "cosynch72") {
+          const pgfDT = new Date(startISO + "T" + (baseTime||"08:00"));
+          pgfDT.setDate(pgfDT.getDate() + 7);
+
+          if (String(step.name).includes("تلقيح") || (String(step.name).includes("GnRH") && step.day === 10)) {
+            return new Date(pgfDT.getTime() + 72 * 3600 * 1000);
+          }
+          const d = new Date(startISO + "T" + (baseTime||"08:00"));
+          d.setDate(d.getDate() + step.day);
+          return d;
+        }
+
+        const d = new Date(startISO + "T" + (baseTime||"08:00"));
+        d.setDate(d.getDate() + step.day);
+        return d;
+      }
+
+      function updateSteps(){
+        stepsBox.innerHTML = '';
+        const start = (startDateEl.value || "").trim();
+        const program = (programEl.value || "").trim();
+        const baseTime = (startTimeEl.value || "08:00").trim();
+        if(!start || !program) return;
+
+        const tpl = PROGRAMS[program] || [];
+        const prev = stepsState;
+
+        stepsState = tpl.map((s)=>{
+          const dd = calcStepDateTime(program, start, baseTime, s);
+          const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
+          const isoDT = local.toISOString().slice(0,16);
+          const plannedDate = toISODateLocal(dd);
+
+          const keep = prev.find(p => p.name===s.name && p.day===s.day);
+          return {
+            day: s.day,
+            name: s.name,
+            date: isoDT,
+            plannedDate,
+            done: keep ? !!keep.done : false,
+            confirmedOn: keep ? keep.confirmedOn || null : null,
+            onSchedule: keep ? !!keep.onSchedule : false,
+            _savedOnce: keep ? !!keep._savedOnce : false,
+          };
+        });
+
+        stepsState.forEach((st, idx)=>{
+          const row = document.createElement('div');
+          row.className = 'step';
+
+          const chip = st.done
+            ? `<span class="on-time ${st.onSchedule ? 'ok' : 'late'}">${st.onSchedule ? '✓ في الموعد' : '✓ مؤكدة'}</span>`
+            : '';
+
+          row.innerHTML = `
+            <div>
+              <div class="name">${st.name}</div>
+              <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')} ${chip}</div>
+            </div>
+            <label class="chk">
+              <input data-idx="${idx}" type="checkbox" ${st.done ? 'checked' : ''}/>
+              تم
+            </label>
+          `;
+          stepsBox.appendChild(row);
+        });
+      }
+
+      stepsBox.addEventListener('change', (e)=>{
+        const el = e.target.closest('input[type="checkbox"][data-idx]');
+        if(!el) return;
+
+        const i = Number(el.getAttribute('data-idx'));
+        const st = stepsState[i];
+        if(!st) return;
+
+        const today = todayLocal();
+        st.done = el.checked;
+        st.confirmedOn = el.checked ? today : null;
+        st.onSchedule = el.checked ? (today === st.plannedDate) : false;
+
+        updateSteps(); // واجهة فقط
+      });
+
+      async function setupFirebase(){
+        try{
+          const mod = await import('/js/firebase-config.js?v=5');
+          if(mod?.db && mod?.auth) return { db: mod.db, auth: mod.auth };
+          if(mod?.firebaseConfig){
+            const app = initializeApp(mod.firebaseConfig);
+            return { db: getFirestore(app, "murabbikdata"), auth: getAuth(app) };
+          }
+        }catch(e){}
+
+        try{
+          const cfg = await import('./config.js?v=5');
+          const app = initializeApp(cfg.firebaseConfig);
+          return { db: getFirestore(app, "murabbikdata"), auth: getAuth(app) };
+        }catch(e2){
+          showWarn('❌ تعذّر تحميل إعدادات Firebase.');
+          return { db:null, auth:null };
+        }
+      }
+
+      const { db, auth } = await setupFirebase();
+      dbRef = db;
+      authRef = auth;
+
+      async function waitForUser(ms=1500){
+        if(!authRef) return null;
+        return await new Promise((resolve)=>{
+          const t = setTimeout(()=>resolve(authRef.currentUser || null), ms);
+          try{
+            onAuthStateChanged(authRef, (u)=>{ clearTimeout(t); resolve(u || null); });
+          }catch{
+            clearTimeout(t);
+            resolve(authRef.currentUser || null);
+          }
+        });
+      }
+
+      async function loadGroupsList(){
+        if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
+
+        const q = query(
+          collection(dbRef, "protocolGroups"),
+          where("userId", "==", authRef.currentUser.uid),
+          orderBy("createdAt", "desc")
+        );
+
+        const snap = await getDocs(q);
+        groupSelectEl.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
+        snap.forEach(docSnap=>{
+          const d = docSnap.data() || {};
+          const opt = document.createElement("option");
+          opt.value = docSnap.id;
+          opt.textContent = d.name || docSnap.id;
+          groupSelectEl.appendChild(opt);
+        });
+      }
+
+      async function saveCurrentAsGroup(){
+        const list = parseBulkList();
+        if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات أولاً ثم احفظ كمجموعة."); return; }
+        const u = await waitForUser(2000);
+        if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد.", true); return; }
+
+        const name = prompt("اسم المجموعة؟ مثال: دفعة 25 بقرة - فبراير");
+        if(!name) return;
+
+        await addDoc(collection(dbRef, "protocolGroups"), {
+          userId: u.uid,
+          name: String(name).trim(),
+          animals: list.map(x=>String(x).trim()),
+          createdAt: serverTimestamp()
+        });
+
+        showInfo("✅ تم حفظ المجموعة على السحابة");
+        await loadGroupsList();
+      }
+
+      async function loadSelectedGroup(){
+        const gid = (groupSelectEl?.value || "").trim();
+        if(!gid){ showWarn("⚠️ اختر مجموعة أولاً."); return; }
+        const snap = await getDoc(doc(dbRef, "protocolGroups", gid));
+        if(!snap.exists()){ showWarn("⚠️ المجموعة غير موجودة."); return; }
+
+        const d = snap.data() || {};
+        const arr = Array.isArray(d.animals) ? d.animals : [];
+
+        currentGroupId = gid;
+        currentGroupName = String(d.name || gid).trim();
+        currentGroupFromCloud = true;
+
+        bulkEl.value = arr.join("\n");
+        parseBulkList();
+        if(!animalIdEl.value && bulkList.length) animalIdEl.value = bulkList[0];
+        showInfo(`✅ تم تحميل المجموعة: ${d.name || gid}`);
+      }
+
+      loadGroupBtn?.addEventListener("click", loadSelectedGroup);
+      saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
+
+      applyBulkBtn?.addEventListener("click", async ()=>{
+        const list = parseBulkList();
+        if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي."); return; }
+        clearWarn();
+
+        const okList = [];
+        const bad = [];
+
+        for(const n of list){
+          const r = await checkAnimalQuick(n);
+          if(r.reason === "auth_blocked_silent") return;
+          if(r.ok) okList.push(n);
+          else bad.push({ n, reason:r.reason, extra:r });
+        }
+
+        if(bad.length){
+          bulkEl.value = okList.join("\n");
+          parseBulkList();
+          const details = bad.map(b => invalidAnimalMessage(b.reason, b.n, b.extra)).join("\n");
+          showInfo(`تم استبعاد ${bad.length} حيوان لعدم الأهلية للتزامن:\n${details}`, true);
+        }else{
+          showInfo(`✅ تم قبول ${okList.length} حيوان للتسجيل.`);
+        }
+
+        if(animalIdEl && !animalIdEl.value && okList.length) animalIdEl.value = okList[0];
+      });
+
+      function getCtx(){
+        const list = parseBulkList();
+        const animalId = list.length ? list[0] : (animalIdEl.value||'').trim();
+        const start = (startDateEl.value||'').trim();
+        const program = (programEl.value||'').trim();
+
+        if(!animalId || !start || !program){
+          showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
+          return null;
+        }
+
+        clearWarn();
+        try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
+        try{ localStorage.setItem('lastEventDate', start); }catch{}
+        return { animalId, animalIds: (list.length ? list : [animalId]), start, program, steps: stepsState };
+      }
+
+      async function saveProtocol(){
+        const ctx = getCtx();
+        if(!ctx) return;
+
+        const u = await waitForUser(2000);
+        if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد. أعد الضغط بعد ثانيتين.", true); return; }
+
+        const ids = (ctx.animalIds||[]).filter(Boolean);
+        if(!ids.length){ showWarn("⚠️ لا يوجد أرقام حيوانات."); return; }
+
+        const okIds = [];
+        const badIds = [];
+        for(const n of ids){
+          const r = await checkAnimalQuick(n);
+          if(r.reason === "auth_blocked_silent") return;
+          if(r.ok) okIds.push(n);
+          else badIds.push({ n, reason:r.reason, extra:r });
+        }
+
+        if(badIds.length){
+          bulkEl.value = okIds.join("\n");
+          parseBulkList();
+          const details = badIds.map(b => invalidAnimalMessage(b.reason, b.n, b.extra)).join("\n");
+          showInfo(`تم استبعاد ${badIds.length} حيوان لعدم الأهلية للتزامن:\n${details}`, true);
+        }
+
+        if(!okIds.length){ showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true); return; }
+
+        saveBtn.disabled = true;
+        const oldTxt = saveBtn.textContent;
+        saveBtn.textContent = '... جاري الحفظ';
+
+        try{
+          for(let i=0;i<okIds.length;i++){
+            const animalNo = okIds[i];
+
+            const payload = {
+              type: 'ovsynch',
+              eventType: 'بروتوكول تزامن',
+              animalId: animalNo,
+              animalNumber: animalNo,
+              startDate: ctx.start,
+              program: ctx.program,
+              steps: ctx.steps,
+              userId: u.uid,
+              createdAt: serverTimestamp()
+            };
+
+            if(typeof window.updateAnimalByEvent === "function"){
+              await window.updateAnimalByEvent(payload);
+            }
+
+            // ✅ منع التكرار برسالة واضحة
+            const protocolId = ["ovsynch", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
+            const evRef = doc(dbRef, "events", protocolId);
+            const snap = await getDoc(evRef);
+
+            if(snap.exists()){
+              showInfo(`⛔ البروتوكول مسجّل بالفعل للحيوان رقم ${animalNo} بنفس البرنامج ونفس تاريخ البدء.`, true);
+              continue;
+            }
+
+            await setDoc(evRef, payload);
+            showInfo(`✅ تم حفظ (${i+1}/${okIds.length}) رقم ${animalNo}`);
+          }
+
+          showInfo("✅ تم تسجيل البروتوكول بنجاح");
+        }catch(e){
+          console.error(e);
+          showInfo("❌ تعذّر الحفظ. حاول مرة أخرى.", true);
+        }finally{
+          saveBtn.disabled = false;
+          saveBtn.textContent = oldTxt;
+        }
+      }
+
+      saveBtn.addEventListener('click', saveProtocol);
+
+      // ✅ تشغيل الصفحة
+      hydrate();
+      startDateEl.addEventListener('input', updateSteps);
+      startTimeEl.addEventListener('input', updateSteps);
+      programEl.addEventListener('change', updateSteps);
+      updateSteps();
+
+      const u = await waitForUser(2000);
+      if(u) await loadGroupsList();
+
+    })();
+  </script>
 </body>
 </html>
