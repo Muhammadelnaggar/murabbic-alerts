@@ -324,24 +324,52 @@
         return bulkList;
       }
 
-      function isBuffaloType(animalDoc){
-        const tRaw = String(
-          animalDoc?.type ??
-          animalDoc?.animalType ??
-          animalDoc?.kind ??
-          animalDoc?.species ??
-          animalDoc?.animalSpecies ??
-          ""
-        );
-        const t = tRaw.toLowerCase().trim();
-        if (t.includes("جاموس") || t.includes("جاموسه") || t.includes("جاموسة")) return true;
-        if (t.includes("buffalo")) return true;
-        if (t.includes("buffloe")) return true;
-        if (t.includes("bufflo")) return true;
-        if (t.includes("water") && t.includes("buff")) return true;
-        if (t.includes("buff")) return true;
-        return false;
-      }
+     function _normTypeText(v){
+  // تطبيع عربي بسيط + إزالة تشكيل + توحيد الهاء/التاء المربوطة + مسافات
+  return String(v ?? "")
+    .replace(/[\u064B-\u0652\u0670]/g, "")   // تشكيل
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .toLowerCase()
+    .trim();
+}
+
+function isBuffaloType(animalDoc){
+  // ✅ افحص أكبر عدد من الحقول المحتملة (لأن بعض الصفحات تكتب type في مكان مختلف)
+  const candidates = [
+    animalDoc?.type,
+    animalDoc?.animalType,
+    animalDoc?.kind,
+    animalDoc?.species,
+    animalDoc?.animalSpecies,
+    animalDoc?.category,
+    animalDoc?.animalCategory,
+    animalDoc?.speciesName,
+    animalDoc?.breed,          // أحيانًا الناس تكتب "جاموس" في السلالة
+    animalDoc?.breedName,
+    animalDoc?.animalBreed,
+    animalDoc?.notes
+  ];
+
+  const joined = _normTypeText(candidates.filter(Boolean).join(" | "));
+
+  // ✅ عربي
+  if (joined.includes("جاموس")) return true;      // جاموس / جاموسه / جاموسة → بعد التطبيع تبقى جاموس
+  if (joined.includes("buffalo")) return true;
+  if (joined.includes("water buffalo")) return true;
+
+  // ✅ أخطاء شائعة إنجليزي
+  if (joined.includes("buffloe")) return true;
+  if (joined.includes("bufflo")) return true;
+
+  // ✅ لو مكتوب اختصار
+  // (لو عندك قيم زي: "buf" / "buff" / "wbuff")
+  if (/\b(buf|buff|wbuff)\b/.test(joined)) return true;
+
+  return false;
+}
+
       function postpartumMinDaysByType(animalDoc){
         return isBuffaloType(animalDoc) ? 45 : 49;
       }
