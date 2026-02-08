@@ -2,7 +2,7 @@
 // ✅ الأبقار: 49 يوم | الجاموس: 44 يوم
 // ✅ بدون أي حدث جديد — مجرد تحديث لوثيقة الحيوان
 // ✅ يعمل مرة واحدة يوميًا عند فتح الداشبورد
-// ✅ يقرأ تاريخ الولادة من الحقل: Lastcalvingdate (كما في قاعدة البيانات)
+// ✅ يقرأ تاريخ الولادة من الحقل: lastCalvingDate (كما في قاعدة البيانات) + بدائل
 
 import { db, auth } from "./firebase-config.js";
 
@@ -16,7 +16,6 @@ import {
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ✅ بصمة واضحة إن الملف اتحمّل
 console.log("[repro-auto] loaded ✅");
 
 /* ---------------- Helpers ---------------- */
@@ -35,46 +34,60 @@ function toISODate(v){
   return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 }
 
-function todayISO(){
-  return new Date().toISOString().slice(0,10);
-}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 function daysBetweenISO(aISO, bISO){
   if(!aISO || !bISO) return null;
   const a = new Date(aISO + "T00:00:00");
   const b = new Date(bISO + "T00:00:00");
-  const ms = b.getTime() - a.getTime();
-  return Math.floor(ms / 86400000);
+  return Math.floor((b.getTime() - a.getTime()) / 86400000);
+}
+
+function normAr(s){
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
+}
+
+function isNewbornStatus(v){
+  const n = normAr(v);
+  // تقبل كل الصيغ الشائعة
+  return (
+    n === "حديثه الولاده" ||
+    n === "حديثه الولاده " ||
+    n.includes("حديث") && n.includes("ولاد")
+  );
 }
 
 function getUserId(){
-  // 1) Firebase Auth
   const uid = auth?.currentUser?.uid;
   if(uid) return uid;
 
-  // 2) لو عندك تخزين محلي للهوية (Tenant Bootstrap)
-  const ls =
-    localStorage.getItem("userId") ||
-    localStorage.getItem("uid") ||
-    localStorage.getItem("tenantId") ||
-    "";
-  return (ls || "").trim();
+  return (
+    (localStorage.getItem("userId") ||
+     localStorage.getItem("uid") ||
+     localStorage.getItem("tenantId") ||
+     "").trim()
+  );
 }
 
-async function safeWaitAuth(ms=2000){
+async function safeWaitUser(ms=2000){
   const t0 = Date.now();
   while(Date.now() - t0 < ms){
-    if (auth?.currentUser?.uid) return true;
+    const u = getUserId();
+    if(u) return true;
     await new Promise(r => setTimeout(r, 80));
   }
-  return !!auth?.currentUser?.uid;
+  return !!getUserId();
 }
 
 /* ---------------- Settings (49/44) ---------------- */
 function getThresholdDays(type){
   const cows = parseInt(localStorage.getItem("mbk_open_after_days_cows") || "49", 10);
   const buff = parseInt(localStorage.getItem("mbk_open_after_days_buffalo") || "44", 10);
-
   if (String(type || "").trim() === "جاموس") return Number.isFinite(buff) ? buff : 44;
   return Number.isFinite(cows) ? cows : 49;
 }
@@ -83,17 +96,24 @@ function pickAnimalType(a){
   return (a.type || a.animalType || a.species || "أبقار").trim();
 }
 
-// ✅ تاريخ آخر ولادة: زي قاعدة البيانات حرفيًا
+// ✅ تاريخ آخر ولادة: زي قاعدة البيانات + بدائل
 function pickCalvingDate(a){
-  return toISODate(a.Lastcalvingdate || "");
+  return toISODate(
+    a.lastCalvingDate ??
+    a.LastCalvingDate ??
+    a.lastcalvingdate ??
+    a.Lastcalvingdate ??
+    a.calvingDate ??
+    a.lastCalving ??
+    ""
+  );
 }
 
 /* ---------------- Main ---------------- */
 export async function runReproAutoOnce(options = {}){
   const { maxScan = 500, dryRun = false } = options;
 
-  // ✅ ننتظر auth/tenant قليلًا علشان ما يرجعش no_user بدري
-  await safeWaitAuth(2000);
+  await safeWaitUser(2000);
 
   const userId = getUserId();
   if(!userId){
@@ -103,12 +123,11 @@ export async function runReproAutoOnce(options = {}){
 
   const animalsRef = collection(db, "animals");
 
+  // ✅ فلترة آمنة: نفس المستخدم + active فقط
   const qy = query(
     animalsRef,
     where("userId", "==", userId),
     where("status", "==", "active"),
-    where("reproductiveStatus", "in", ["حديثة الولادة", "حديث الولاده"]),
-
     limit(maxScan)
   );
 
@@ -120,8 +139,12 @@ export async function runReproAutoOnce(options = {}){
   const batch = writeBatch(db);
 
   snap.forEach(docSnap => {
-    scanned++;
     const a = docSnap.data() || {};
+
+    // نفحص فقط حديث الولادة (بكل صيغها)
+    if (!isNewbornStatus(a.reproductiveStatus)) { return; }
+
+    scanned++;
 
     // تجاهل المستبعدة من التلقيح
     if (a.breedingBlocked === true) { skipped++; return; }
@@ -161,10 +184,8 @@ export async function runReproAutoOnce(options = {}){
 async function autoRun(){
   const key = "mbk_repro_auto_last_run";
   const today = todayISO();
-  const last = localStorage.getItem(key) || "";
-  if(last === today) return;
+  if ((localStorage.getItem(key) || "") === today) return;
 
-  // ✅ تأخير بسيط بعد تحميل الصفحة
   await new Promise(r => setTimeout(r, 800));
 
   runReproAutoOnce({ maxScan: 500, dryRun: false })
@@ -173,13 +194,10 @@ async function autoRun(){
       localStorage.setItem("mbk_repro_auto_last_result", JSON.stringify(res));
       console.log("[repro-auto] done:", res);
     })
-    .catch(err => {
-      console.warn("[repro-auto] failed:", err);
-    });
+    .catch(err => console.warn("[repro-auto] failed:", err));
 }
 
-// ✅ تشغيل تلقائي
 autoRun();
 
-// ✅ علشان تجرب من الكونسول مباشرة بدون import
+// ✅ للتجربة من الكونسول مباشرة
 window.runReproAutoOnce = runReproAutoOnce;
