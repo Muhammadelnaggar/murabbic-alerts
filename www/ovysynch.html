@@ -91,7 +91,30 @@
 
     /* رسائل */
     #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
-    #info.infobar{ display:none; margin-bottom:10px; }
+   #info.infobar{
+  display:none;
+  position: sticky;
+  top: 72px;           /* تحت الهيدر مباشرة */
+  z-index: 19;
+  margin: 10px 0 10px;
+}
+#info .msgrow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+#info .okbtn{
+  flex-shrink:0;
+  border-radius:12px;
+  padding:8px 12px;
+  font-weight:900;
+  border:2px solid var(--brand-600, #0b7f47);
+  background:#fff;
+  color: var(--brand-600, #0b7f47);
+  cursor:pointer;
+}
+
 
     /* أزرار أسفل الصفحة */
     .btn-row{
@@ -141,10 +164,8 @@
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
   </header>
- <div id="info" class="infobar"></div>
   <div class="wrap">
-   
-
+    <div id="info" class="infobar"></div> 
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off">
 <div class="row" style="margin-bottom:12px">
@@ -411,14 +432,43 @@ currentGroupFromCloud = true;
 loadGroupBtn?.addEventListener("click", loadSelectedGroup);
 saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
 
-    function showInfo(text, isErr=false){
-      if(!infoEl) return;
-      infoEl.style.display = "block";
-      infoEl.className = "infobar " + (isErr ? "error" : "show");
-      infoEl.textContent = text;
-      try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
-      setTimeout(()=>{ infoEl.style.display="none"; }, 2500);
-    }
+  function showInfo(text, opts){
+  const o = (typeof opts === "object" && opts) ? opts : { isErr: !!opts, requireAck: false };
+
+  if(!infoEl) return;
+  infoEl.style.display = "block";
+  infoEl.className = "infobar " + (o.isErr ? "error" : "show");
+
+  // ✅ محتوى + زر "حسنًا"
+  infoEl.innerHTML = `
+    <div class="msgrow">
+      <div class="msgtext">${String(text||"")}</div>
+      <button type="button" class="okbtn" id="infoOkBtn">حسنًا</button>
+    </div>
+  `;
+
+  try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+
+  // ✅ زر إغلاق إلزامي عند requireAck
+  const btn = document.getElementById("infoOkBtn");
+  if(btn){
+    btn.onclick = () => {
+      infoEl.style.display = "none";
+      infoEl.innerHTML = "";
+    };
+  }
+
+  // ✅ لو مش requireAck: اختياري نخفي تلقائيًا
+  if(!o.requireAck){
+    setTimeout(()=>{ 
+      if(infoEl.style.display !== "none"){
+        infoEl.style.display="none";
+        infoEl.innerHTML="";
+      }
+    }, 2500);
+  }
+}
+
     async function checkAnimalQuick(num){
  if(!dbRef) return { ok:true }; // لو مفيش DB (أوفلاين) ما نعطلش
 
@@ -497,40 +547,42 @@ function postpartumMinDaysByType(animalDoc){
 }
 
 function invalidAnimalMessage(reason, num, extra){
+  const type = String(extra?.animalType || "");
+  const label = type.includes("جاموس") ? "جاموسة" : "بقرة";
 
-  const type = extra?.animalType || "";
-  const label = type.includes("جاموس") ? "جاموس" : "أبقار";
-  const head = `⛔ لا يمكن بدء بروتوكول ${label} للحيوان رقم ${num}.`;
-
-  if(reason === "not_found") 
+  if(reason === "not_found")
     return `⛔ الحيوان رقم ${num} غير موجود.`;
 
-  if(reason === "sale")      
-    return `${head} الحيوان مباع (خارج القطيع).`;
+  if(reason === "sale")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (مباعة).`;
 
-  if(reason === "death")     
-    return `${head} الحيوان نافق (خارج القطيع).`;
+  if(reason === "death")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (نافقة).`;
 
-  if(reason === "inactive")  
-    return `${head} الحيوان خارج القطيع.`;
+  if(reason === "inactive")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع.`;
 
-  if(reason === "cull")      
-    return `${head} الحيوان مستبعد (لا يُطبق عليه البروتوكول).`;
+  if(reason === "cull")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مستبعدة (لا تُلقّح مرة أخرى).`;
 
-  if(reason === "pregnant")     
-    return `${head} الحيوان عِشار.`;
+  if(reason === "pregnant")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: عِشار.`;
 
-  if(reason === "inseminated")  
-    return `${head} الحيوان مُلقّح بالفعل.`;
+  if(reason === "inseminated")
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مُلقّحة.`;
 
   if(reason === "fresh_postpartum"){
-    const dpp = extra?.dpp ?? "؟";
-    const min = extra?.minDpp ?? "؟";
-    return `${head} حديث الولادة: مرّ ${dpp} يوم بعد الولادة، والحد الأدنى ${min} يوم.`;
-  }
-    return `${head} غير صالح للتسجيل.`;
-}
+    const dpp = Number.isFinite(extra?.dpp) ? extra.dpp : null;
+    const min = Number.isFinite(extra?.minDpp) ? extra.minDpp : null;
 
+    if(dpp !== null && min !== null){
+      return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: حديثة الولادة (${dpp} يوم) — الحد الأدنى ${min} يوم حسب النوع.`;
+    }
+    return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: حديثة الولادة (أقل من الحد الأدنى حسب النوع).`;
+  }
+
+  return `⛔ ${label} رقم ${num} غير صالحة للتزامن.`;
+}
 
 async function rejectNumberSoft(num){
   // ✅ لا تجميد — فقط امسح الرقم وأظهر رسالة
