@@ -465,14 +465,16 @@ saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
   }
 }
 
-    async function checkAnimalQuick(num){
- if(!dbRef) return { ok:true }; // لو مفيش DB (أوفلاين) ما نعطلش
+ async function checkAnimalQuick(num){
+  if(!dbRef) return { ok:true }; // أوفلاين: لا نعطل
 
-// ✅ لو الجلسة لسه ما رجعتش: نمنع التحقق (بدون رسائل)
-if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
+  // ✅ لو الجلسة لسه ما رجعتش: نمنع التحقق (بدون رسائل)
+  if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
 
   const uid = authRef.currentUser.uid;
   const animalsRef = collection(dbRef, "animals");
+
+  // 1) number كنص
   let snap = await getDocs(query(
     animalsRef,
     where("userId","==",uid),
@@ -496,13 +498,33 @@ if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
 
   const a = snap.docs[0].data() || {};
   const animalType = String(a.type || a.animalType || a.kind || "").trim();
+
   const status = String(a.status || "active").toLowerCase(); // active/inactive
   const inactiveReason = String(a.inactiveReason || "").toLowerCase(); // sale/death...
+
   const breedingBlocked = !!a.breedingBlocked;
+  const repro = String(a.reproductiveStatus || "").trim();
+
+  // ✅ 1) خارج القطيع (الأولوية)
+  if(status === "inactive"){
+    if(inactiveReason === "sale")  return { ok:false, reason:"sale", animalType, animal:a };
+    if(inactiveReason === "death") return { ok:false, reason:"death", animalType, animal:a };
+    return { ok:false, reason:"inactive", animalType, animal:a };
+  }
+
+  // ✅ 2) مستبعدة (لا تُلقّح)
+  if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
+    return { ok:false, reason:"cull", animalType, animal:a };
+  }
+
+  // ✅ 3) عشار/ملقّحة
+  if(repro === "عشار") return { ok:false, reason:"pregnant", animalType, animal:a };
+  if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType, animal:a };
+
+  // ✅ 4) حديث ولادة / حد أدنى بعد (آخر ولادة/إجهاض)
   const calv = String(a.lastCalvingDate || "").slice(0,10);
   const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
 
-  // اختر التاريخ الأحدث بينهما (لو الاثنين موجودين)
   let refType = "calving";
   let refDate = calv;
 
@@ -511,69 +533,27 @@ if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
     refDate = abrt;
   }
 
- // ✅ DIM من الوثيقة أولاً (daysInMilk) — وإلا نحسب من آخر ولادة/إجهاض مقابل "اليوم"
-const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
-const refISO = todayLocal(); // ✅ تجاهل startDate نهائيًا
-const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
-const minDim = postpartumMinDaysByType(a);
+  const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
+  const refISO = todayLocal();
+  const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
+  const minDim = postpartumMinDaysByType(a);
 
-
-  // لو مش قادرين نحسب (مفيش تاريخ) نعرض سبب عام بدون أرقام
-  if (dim === null) {
-    return { ok:false, reason:"fresh_postpartum", refType, animalType };
+  if (dim !== null && dim >= 0 && dim < minDim) {
+    return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType, animal:a };
   }
 
-  return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType };
-}
-
-
-      // 🔒 منع البروتوكول قبل الحد الأدنى بعد الولادة (حسب النوع)
-// 🔒 منع البروتوكول قبل الحد الأدنى بعد آخر (ولادة/إجهاض) — بدون الاعتماد على reproductiveStatus
-const calv = String(a.lastCalvingDate || "").slice(0,10);
-const abrt = String(a.lastAbortionDate || a.lastAbortDate || "").slice(0,10);
-
-// اختر الأحدث بين (ولادة/إجهاض)
-let refType = "calving";
-let refDate = calv;
-
-if (abrt && (!calv || abrt > calv)) {
-  refType = "abortion";
-  refDate = abrt;
-}
-
-// ✅ DIM من الوثيقة أولاً (daysInMilk) — وإلا نحسب من آخر ولادة/إجهاض مقابل "اليوم"
-const dimDoc = Number.isFinite(Number(a.daysInMilk)) ? Number(a.daysInMilk) : null;
-const refISO = todayLocal(); // ✅ تجاهل startDate نهائيًا
-const dim = (dimDoc !== null) ? dimDoc : daysSinceISO(refDate, refISO);
-const minDim = postpartumMinDaysByType(a);
-
-
-// لو التاريخ موجود وحساب الأيام ممكن
-if (dim !== null && dim >= 0 && dim < minDim) {
-  return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType };
-}
-
-
-  // مباع/نافق
- if(status === "inactive"){
-  if(inactiveReason === "sale")  return { ok:false, reason:"sale", animalType };
-  if(inactiveReason === "death") return { ok:false, reason:"death", animalType };
-  return { ok:false, reason:"inactive", animalType };
-    const repro = String(a.reproductiveStatus || "").trim();
-      if(repro === "عشار") return { ok:false, reason:"pregnant", animalType };
-if(repro === "ملقح") return { ok:false, reason:"inseminated", animalType };
-if (repro === "حديث الولادة") {
-}
-
-
-  // استبعاد (حسب نظامك: breedingBlocked أو reproductiveStatus)
-  if(breedingBlocked || repro === "لا تُلقّح مرة أخرى"){
-   
-    return { ok:false, reason:"cull" };
+  // ✅ لو مكتوب "حديث الولادة" حتى لو مفيش تاريخ واضح
+  if (repro === "حديث الولادة") {
+    // لو dim null → نرجّع سبب عام
+    if (dim === null) {
+      return { ok:false, reason:"fresh_postpartum", refType, animalType, animal:a };
+    }
+    return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animalType, animal:a };
   }
 
   return { ok:true, animal:a, animalType };
 }
+
 function daysSinceISO(isoDate, refISO){
   if(!isoDate) return null;
   const a = new Date(String(isoDate).slice(0,10) + "T00:00:00");
@@ -614,8 +594,7 @@ function postpartumMinDaysByType(animalDoc){
 
 
 function invalidAnimalMessage(reason, num, extra){
- const label = isBuffaloType(extra?.animal || extra) ? "جاموسة" : "بقرة";
-
+ const label = isBuffaloType(extra?.animal) ? "جاموسة" : "بقرة";
 
   if(reason === "not_found")
     return `⛔ الحيوان رقم ${num} غير موجود.`;
