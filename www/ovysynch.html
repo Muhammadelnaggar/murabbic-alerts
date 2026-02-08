@@ -323,21 +323,9 @@
         }
         return bulkList;
       }
-
-     function _normTypeText(v){
-  // تطبيع عربي بسيط + إزالة تشكيل + توحيد الهاء/التاء المربوطة + مسافات
-  return String(v ?? "")
-    .replace(/[\u064B-\u0652\u0670]/g, "")   // تشكيل
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .toLowerCase()
-    .trim();
-}
-
-fufunction _normTypeText(v){
-  return String(v ?? "")
-    .replace(/[\u064B-\u0652\u0670]/g, "")   // تشكيل
+function _normTypeText(v){
+  return String(v || "")
+    .replace(/[\u064B-\u0652\u0670]/g, "")
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
