@@ -81,10 +81,6 @@
     .step .chk{ display:flex; align-items:center; gap:8px; justify-content:flex-start; }
     .step input[type="checkbox"]{ width:18px; height:18px; }
 
-    .on-time{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border, #e2e8f0); }
-    .ok{ background:#f0fff6; border-color:#bbf7d0; }
-    .late{ background:#fff7ed; border-color:#fed7aa; }
-
     #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
 
     #info.infobar{
@@ -142,6 +138,10 @@
       color: var(--brand-600, #0b7f47) !important;
       border:2px solid var(--brand-600, #0b7f47) !important;
     }
+
+    /* ✅ إخفاء/إظهار وضع */
+    #modeBulkBox[hidden],
+    #modeSingleBox[hidden]{ display:none !important; }
   </style>
 </head>
 
@@ -161,104 +161,104 @@
 
   <div class="wrap">
     <div id="info" class="infobar"></div>
+
     <div class="mbk-card">
-     <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
-       <!-- ✅ حقول ربط للمسار المركزي (بدون تغيير واجهة الصفحة) -->
-       <input type="hidden" id="animalNumber" data-field="animalNumber" value="">
-       <input type="hidden" id="eventDate" data-field="eventDate" value="">
-       <input type="hidden" id="species" data-field="species" value="">
-       <input type="hidden" id="steps" data-field="steps" value="">
-       <input type="hidden" id="animalId" data-field="animalId" value="">
+      <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
+        <!-- ✅ حقول ربط للمسار المركزي -->
+        <input type="hidden" id="animalNumber" data-field="animalNumber" value="">
+        <input type="hidden" id="eventDate" data-field="eventDate" value="">
+        <input type="hidden" id="species" data-field="species" value="">
+        <input type="hidden" id="steps" data-field="steps" value="">
+        <input type="hidden" id="animalId" data-field="animalId" value="">
 
-       <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
-       <div class="field" style="margin-bottom:12px">
-         <div style="display:flex;gap:12px;align-items:center;font-weight:900">
-           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-             <input type="radio" name="mbkMode" id="modeSingle" value="single" checked>
-             ⬤ تسجيل لحيوان واحد
-           </label>
+        <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
+        <div class="field" style="margin-bottom:12px">
+          <div style="display:flex;gap:12px;align-items:center;font-weight:900">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="radio" name="mbkMode" id="modeSingle" value="single" checked>
+              ⬤ تسجيل لحيوان واحد
+            </label>
 
-           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-             <input type="radio" name="mbkMode" id="modeGroup" value="group">
-             ⬤ تسجيل لمجموعة حيوانات
-           </label>
-         </div>
-         <div class="hint" id="modeHint" style="margin-top:6px">
-           اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.
-         </div>
-       </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="radio" name="mbkMode" id="modeGroup" value="group">
+              ⬤ تسجيل لمجموعة حيوانات
+            </label>
+          </div>
+          <div class="hint" id="modeHint" style="margin-top:6px">اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.</div>
+        </div>
 
-       <div id="modeBulkBox">
-         <div class="row" style="margin-bottom:12px">
-           <div class="field">
-             <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
-             <textarea id="bulkAnimals" rows="4" placeholder="مثال:
+        <!-- ✅ وضع المجموعة -->
+        <div id="modeBulkBox" hidden>
+          <div class="row" style="margin-bottom:12px">
+            <div class="field">
+              <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
+              <textarea id="bulkAnimals" rows="4" placeholder="مثال:
 105
 106
 110"></textarea>
-             <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
-           </div>
+              <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
+            </div>
 
-           <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">
-             تطبيق القائمة
-           </button>
+            <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">تطبيق القائمة</button>
+            <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
+          </div>
 
-           <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
-         </div>
+          <div class="row" style="margin-top:10px">
+            <div class="field">
+              <label for="groupSelect">المجموعة المحفوظة</label>
+              <select id="groupSelect">
+                <option value="" selected>— اختر مجموعة —</option>
+              </select>
+              <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
+            </div>
 
-         <div class="row" style="margin-top:10px">
-           <div class="field">
-             <label for="groupSelect">المجموعة المحفوظة</label>
-             <select id="groupSelect">
-               <option value="" selected>— اختر مجموعة —</option>
-             </select>
-             <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
-           </div>
+            <div class="row row-2">
+              <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
+              <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
+            </div>
+          </div>
+        </div>
 
-           <div class="row row-2">
-             <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
-             <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
-           </div>
-         </div>
-       </div>
+        <!-- ✅ وضع الفردي -->
+        <div id="modeSingleBox">
+          <div class="field">
+            <label for="animalNumberUI">رقم الحيوان</label>
+            <input id="animalNumberUI" type="text" placeholder="مثال: 105" />
+          </div>
+        </div>
 
-       <div class="row row-2">
-         <div id="modeSingleBox">
-           <div class="field">
-             <label for="animalNumberUI">رقم الحيوان</label>
-             <input id="animalNumberUI" type="text" placeholder="مثال: 105" />
-           </div>
-         </div>
+        <div class="row row-2" style="margin-top:12px">
+          <div class="field">
+            <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
+            <input id="startDate" type="date" />
+          </div>
 
-         <div class="field">
-           <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
-           <input id="startDate" type="date" />
-         </div>
+          <div class="field">
+            <label for="startTime">ساعة بدء البروتوكول</label>
+            <input id="startTime" type="time" value="08:00" />
+            <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
+          </div>
+        </div>
 
-         <div class="field">
-           <label for="startTime">ساعة بدء البروتوكول</label>
-           <input id="startTime" type="time" value="08:00" />
-           <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
-         </div>
-       </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field">
+            <label for="program">نوع البرنامج</label>
+            <select id="program" data-field="program">
+              <option value="" selected disabled>اختر البرنامج</option>
+              <option value="ovsynch">Ovsynch</option>
+              <option value="cosynch72">Cosynch-72</option>
+              <option value="presynch_ovsynch">Presynch + Ovsynch</option>
+            </select>
+            <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
+          </div>
+        </div>
 
-       <div class="row" style="margin-top:12px">
-         <div class="field">
-           <label for="program">نوع البرنامج</label>
-           <select id="program" data-field="program">
-             <option value="" selected disabled>اختر البرنامج</option>
-             <option value="ovsynch">Ovsynch</option>
-             <option value="cosynch72">Cosynch-72</option>
-             <option value="presynch_ovsynch">Presynch + Ovsynch</option>
-           </select>
-           <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
-         </div>
-       </div>
+        <div id="stepsBox" class="steps" aria-live="polite"></div>
+        <div id="warn"></div>
 
-       <div id="stepsBox" class="steps" aria-live="polite"></div>
-       <div id="warn"></div>
-       <button type="submit" id="hiddenSubmit" style="display:none"></button>
-     </form>
+        <!-- مهم للمسار المركزي -->
+        <button type="submit" id="hiddenSubmit" style="display:none"></button>
+      </form>
     </div>
   </div>
 
@@ -267,417 +267,446 @@
     <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
   </div>
 
-  <script type="module">
-    /* ✅ التعديل 1: منع تكرار initializeApp (بسبب forms-init) */
-    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, serverTimestamp, doc, setDoc, getDoc,
+  query, where, getDocs, orderBy, limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    import {
-      getFirestore, collection, serverTimestamp, doc, setDoc, getDoc,
-      query, where, getDocs, orderBy, limit
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+(async () => {
+  const form        = document.getElementById('ovForm');
+  const animalUI    = document.getElementById('animalNumberUI');
+  const startDateEl = document.getElementById('startDate');
+  const startTimeEl = document.getElementById('startTime');
+  const bulkEl      = document.getElementById('bulkAnimals');
+  const applyBulk   = document.getElementById('applyBulk');
+  const programEl   = document.getElementById('program');
+  const stepsBox    = document.getElementById('stepsBox');
+  const saveBtn     = document.getElementById('saveBtn');
+  const openCowCard = document.getElementById('openCowCard');
+  const infoEl      = document.getElementById('info');
+  const warnEl      = document.getElementById('warn');
 
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  const modeSingle  = document.getElementById('modeSingle');
+  const modeGroup   = document.getElementById('modeGroup');
+  const modeBulkBox = document.getElementById('modeBulkBox');
+  const modeSingleBox = document.getElementById('modeSingleBox');
 
-    (async () => {
+  const animalHidden = document.getElementById("animalNumber");
+  const eventHidden  = document.getElementById("eventDate");
+  const stepsHidden  = document.getElementById("steps");
 
-      const form        = document.getElementById('ovForm');
-      const animalUI    = document.getElementById('animalNumberUI');
-      const startDateEl = document.getElementById('startDate');
-      const startTimeEl = document.getElementById('startTime');
-      const bulkEl      = document.getElementById('bulkAnimals');
-      const applyBulk   = document.getElementById('applyBulk');
-      const programEl   = document.getElementById('program');
-      const stepsBox    = document.getElementById('stepsBox');
-      const saveBtn     = document.getElementById('saveBtn');
-      const openCowCard = document.getElementById('openCowCard');
-      const modeSingle  = document.getElementById('modeSingle');
-const modeGroup   = document.getElementById('modeGroup');
+  let dbRef=null, authRef=null, stepsState=[], bulkList=[];
+  let fbReady = false;
 
-      const infoEl      = document.getElementById('info');
-      const warnEl      = document.getElementById('warn');
+  /* ========= Helpers ========= */
+  function todayISO(){
+    const d=new Date();
+    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+  function showWarn(t){ warnEl.textContent=t||""; }
+  function clearWarn(){ warnEl.textContent=""; }
 
-      const animalHidden = document.getElementById("animalNumber");
-      const eventHidden  = document.getElementById("eventDate");
-      const stepsHidden  = document.getElementById("steps");
+  function showInfo(text, isErr=false){
+    infoEl.style.display="block";
+    infoEl.className="infobar "+(isErr?"error":"show");
+    infoEl.innerHTML=`
+      <div class="msgrow">
+        <div style="white-space:pre-line">${text}</div>
+        <button type="button" class="okbtn" onclick="this.closest('#info').style.display='none'">حسنًا</button>
+      </div>`;
+    infoEl.scrollIntoView({behavior:"smooth",block:"start"});
+  }
 
-      let dbRef=null, authRef=null, stepsState=[], bulkList=[];
+  function parseBulk(){
+    const raw=(bulkEl?.value||"").trim();
+    if(!raw){ bulkList=[]; return []; }
+    const arr=raw.split(/\n|,|;/g).map(x=>x.trim()).filter(Boolean);
+    bulkList=[...new Set(arr)];
+    return bulkList;
+  }
 
-      /* ========= Helpers ========= */
+  function normSpecies(sp){
+    sp = String(sp || "").trim();
+    if (/cow|بقر/i.test(sp)) return "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) return "جاموس";
+    return sp || "غير معروف";
+  }
+  function animalWordFromSpecies(sp){ return (sp === "جاموس") ? "جاموسة" : "بقرة"; }
 
-      function todayISO(){
-        const d=new Date();
-        d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-        return d.toISOString().slice(0,10);
-      }
+  function daysBetweenISO(a, b){
+    const d1 = new Date(String(a||"").slice(0,10));
+    const d2 = new Date(String(b||"").slice(0,10));
+    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
+    d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
+    return Math.round((d2 - d1) / 86400000);
+  }
 
-      function normSpecies(sp){
-        sp = String(sp || "").trim();
-        if (/cow|بقر/i.test(sp)) return "أبقار";
-        if (/buffalo|جاموس/i.test(sp)) return "جاموس";
-        return sp || "غير معروف";
-      }
+  function getMode(){
+    return (modeGroup.checked ? "group" : "single");
+  }
+  function setMode(m){
+    const isGroup = (m === "group");
+    modeGroup.checked = isGroup;
+    modeSingle.checked = !isGroup;
+    modeBulkBox.hidden = !isGroup;
+    modeSingleBox.hidden = isGroup;
+    try{ localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single"); }catch{}
+    clearWarn();
+  }
 
-      function animalWordFromSpecies(sp){
-        return (sp === "جاموس") ? "جاموسة" : "بقرة";
-      }
+  function syncCentral(){
+    const first=(getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
+    animalHidden.value=first;
+    eventHidden.value=(startDateEl.value||"").trim();
+    stepsHidden.value=JSON.stringify(stepsState||[]);
+  }
 
-      function daysBetweenISO(a, b){
-        const d1 = new Date(String(a||"").slice(0,10));
-        const d2 = new Date(String(b||"").slice(0,10));
-        if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
-        d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
-        return Math.round((d2 - d1) / 86400000);
-      }
+  openCowCard.addEventListener("click", () => {
+    const num = (getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
+    if (!num) { showWarn("⚠️ اكتب رقم الحيوان أولًا."); return; }
+    location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+  });
 
-      function showWarn(t){ warnEl.textContent=t||""; }
-      function clearWarn(){ warnEl.textContent=""; }
+  // ✅ اجعل التاريخ Today تلقائيًا
+  if (!startDateEl.value) startDateEl.value = todayISO();
 
-      function showInfo(text, isErr=false){
-        infoEl.style.display="block";
-        infoEl.className="infobar "+(isErr?"error":"show");
-        infoEl.innerHTML=`
-          <div class="msgrow">
-            <div style="white-space:pre-line">${text}</div>
-            <button type="button" class="okbtn" onclick="this.closest('#info').style.display='none'">حسنًا</button>
-          </div>`;
-        infoEl.scrollIntoView({behavior:"smooth",block:"start"});
-      }
+  // ✅ قراءة باراميتر الوضع + الرقم/التاريخ (بدون أي تحقق)
+  (function hydrateFromURL(){
+    const qp = new URLSearchParams(location.search);
 
-      function parseBulk(){
-        const raw=(bulkEl.value||"").trim();
-        if(!raw){ bulkList=[]; return []; }
-        const arr=raw.split(/\n|,|;/g).map(x=>x.trim()).filter(Boolean);
-        bulkList=[...new Set(arr)];
-        return bulkList;
-      }
-function syncCentral(){
-  const first = (parseBulk()[0] || animalUI.value || "").trim();
-  animalHidden.value = first;
-  eventHidden.value  = (startDateEl.value || todayISO()).trim();   // ✅ Today افتراضي
-  stepsHidden.value  = JSON.stringify(stepsState || []);
-}
+    const m = (qp.get("mbkMode") || "").trim().toLowerCase();
+    const saved = (localStorage.getItem("mbk_ov_mode") || "single");
+    setMode(m === "group" ? "group" : saved);
 
+    const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
+    const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
 
-      async function waitUser(ms=1500){
-        return await new Promise(res=>{
-          const t=setTimeout(()=>res(authRef.currentUser||null),ms);
-          onAuthStateChanged(authRef,u=>{clearTimeout(t);res(u||null);});
-        });
-      }
+    if (num) animalUI.value = num;
+    if (dt)  startDateEl.value = dt || todayISO();
 
-      async function getLastOvsynchForAnimal(uid, animalNumber){
-        const num = String(animalNumber || "").trim();
-        if (!uid || !num) return null;
+    syncCentral();
+  })();
 
-        const q = query(
-          collection(dbRef, "events"),
-          where("userId", "==", uid),
-          where("animalNumber", "==", num),
-          where("eventType", "==", "بروتوكول تزامن"),
-          where("program", "==", "ovsynch"),
-          orderBy("eventDate", "desc"),
-          limit(1)
-        );
+  modeSingle.addEventListener("change", ()=>setMode("single"));
+  modeGroup.addEventListener("change", ()=>setMode("group"));
 
-        const snap = await getDocs(q);
-        if (snap.empty) return null;
+  animalUI.addEventListener("input",syncCentral);
+  bulkEl?.addEventListener("input",syncCentral);
+  startDateEl.addEventListener("input",syncCentral);
 
-        const d = snap.docs[0].data() || {};
-        return { eventDate: String(d.eventDate || "").slice(0,10), id: snap.docs[0].id };
-      }
+  /* ========= Programs ========= */
+  const PROGRAMS = {
+    ovsynch: [
+      { day: 0,  name: "GnRH (اليوم 0)" },
+      { day: 7,  name: "PGF2α (اليوم 7)" },
+      { day: 9,  name: "GnRH (اليوم 9)" },
+      { day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" },
+    ],
+    cosynch72: [
+      { day: 0,  name: "GnRH (اليوم 0)" },
+      { day: 7,  name: "PGF2α (اليوم 7)" },
+      { day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" },
+    ],
+    presynch_ovsynch: [
+      { day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" },
+      { day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" },
+      { day: 28, name: "GnRH (Ovsynch) (اليوم 28)" },
+      { day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" },
+      { day: 37, name: "GnRH (Ovsynch) (اليوم 37)" },
+      { day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" },
+    ],
+  };
 
-      /* ========= زر بطاقة الحيوان ========= */
-      openCowCard.addEventListener("click", () => {
-        const num = (animalUI.value || parseBulk()[0] || "").trim();
-        if (!num) { showWarn("⚠️ اكتب رقم الحيوان أولًا."); return; }
-        location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-      });
+  function updateSteps(){
+    stepsBox.innerHTML='';
+    const start=startDateEl.value, program=programEl.value;
+    if(!start||!program) { stepsState=[]; syncCentral(); return; }
 
-      animalUI.addEventListener("input",syncCentral);
-      bulkEl.addEventListener("input",syncCentral);
-      startDateEl.addEventListener("input",syncCentral);
+    stepsState=(PROGRAMS[program]||[]).map(s=>{
+      const d=new Date(start+"T"+(startTimeEl.value||"08:00"));
+      d.setDate(d.getDate()+s.day);
+      return { day:s.day, name:s.name, date:d.toISOString().slice(0,16), done:false };
+    });
 
-      /* ========= Hydrate from URL ========= */
-     (function hydrateFromURL(){
-  const qp = new URLSearchParams(location.search);
+    for (let i=0;i<stepsState.length;i++){
+      const st = stepsState[i];
+      const row=document.createElement("div");
+      row.className="step";
+      row.innerHTML=`
+        <div>
+          <div class="name">${st.name}</div>
+          <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div>
+        </div>
+        <label class="chk">
+          <input type="checkbox" data-i="${i}">
+          تم
+        </label>`;
+      stepsBox.appendChild(row);
+    }
+    syncCentral();
+  }
 
-  const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
-  const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
+  stepsBox.addEventListener("change",(e)=>{
+    const i=e.target?.dataset?.i;
+    if(i===undefined) return;
+    stepsState[i].done=!!e.target.checked;
+    syncCentral();
+  });
 
-  if (num) animalUI.value = num;
+  programEl.addEventListener("change",updateSteps);
+  startDateEl.addEventListener("change",updateSteps);
+  startTimeEl.addEventListener("change",updateSteps);
 
-  // ✅ Today افتراضي
-  startDateEl.value = dt || todayISO();
+  /* ========= Firebase (Robust) ========= */
+  async function waitUser(ms=1500){
+    return await new Promise(res=>{
+      const t=setTimeout(()=>res(authRef?.currentUser||null),ms);
+      onAuthStateChanged(authRef,u=>{ clearTimeout(t); res(u||null); });
+    });
+  }
 
-  syncCentral();
-})();
-
-
-      const PROGRAMS = {
-        ovsynch: [
-          { day: 0,  name: "GnRH (اليوم 0)" },
-          { day: 7,  name: "PGF2α (اليوم 7)" },
-          { day: 9,  name: "GnRH (اليوم 9)" },
-          { day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" },
-        ],
-        cosynch72: [
-          { day: 0,  name: "GnRH (اليوم 0)" },
-          { day: 7,  name: "PGF2α (اليوم 7)" },
-          { day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" },
-        ],
-        presynch_ovsynch: [
-          { day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" },
-          { day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" },
-          { day: 28, name: "GnRH (Ovsynch) (اليوم 28)" },
-          { day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" },
-          { day: 37, name: "GnRH (Ovsynch) (اليوم 37)" },
-          { day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" },
-        ],
-      };
-
-      function updateSteps(){
-        stepsBox.innerHTML='';
-        const start=startDateEl.value, program=programEl.value;
-        if(!start||!program) return;
-
-        stepsState=(PROGRAMS[program]||[]).map(s=>{
-          const d=new Date(start+"T"+(startTimeEl.value||"08:00"));
-          d.setDate(d.getDate()+s.day);
-          return { day:s.day, name:s.name, date:d.toISOString().slice(0,16), done:false };
-        });
-
-        stepsState.forEach((st,i)=>{
-          const row=document.createElement("div");
-          row.className="step";
-          row.innerHTML=`
-            <div>
-              <div class="name">${st.name}</div>
-              <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div>
-            </div>
-            <label class="chk">
-              <input type="checkbox" data-i="${i}">
-              تم
-            </label>`;
-          stepsBox.appendChild(row);
-        });
-
-        syncCentral();
-      }
-
-      stepsBox.addEventListener("change",(e)=>{
-        const i=e.target?.dataset?.i;
-        if(i===undefined) return;
-        stepsState[i].done=!!e.target.checked;
-        syncCentral();
-      });
-
-      programEl.addEventListener("change",updateSteps);
-      startDateEl.addEventListener("change",updateSteps);
-      startTimeEl.addEventListener("change",updateSteps);
-
-      /* ========= Firebase (SAFE) ========= */
+  async function initFirebase(){
+    try{
       const mod = await import('/js/firebase-config.js');
 
-      const cfg = mod.default || mod.firebaseConfig || null;
-
-      /* ✅ التعديل 2: لا تعيد initializeApp لو فيه App جاهز */
-      const app =
-        mod.app ||
-        (getApps().length ? getApp() : (cfg ? initializeApp(cfg) : null));
+      const cfg = mod.firebaseConfig || mod.config || mod.default || null;
+      const app = (cfg ? initializeApp(cfg) : (mod.app || null));
 
       dbRef   = mod.db   || getFirestore(app, "murabbikdata");
       authRef = mod.auth || getAuth(app);
 
       window.mbk = window.mbk || {};
-
-      /* ========= Preview list (Bulk) ========= */
-      window.mbk.previewOvsynchList = async function(list, startISO){
-        const u = await waitUser();
-        if (!u) return { ok:false, rejected:[{ reason:"⚠️ لم يتم تأكيد الدخول." }] };
-
-        const dt = String(startISO || "").slice(0,10);
-        const wantedProgram = String(programEl.value || "").trim();
-
-        const valid = [];
-        const rejected = [];
-
-        async function fetchAnimalDoc(uid, num){
-          const qA = query(
-            collection(dbRef, "animals"),
-            where("userId", "==", uid),
-            where("number", "==", String(num)),
-            limit(1)
-          );
-          const sA = await getDocs(qA);
-          if (sA.empty) return null;
-          return { id: sA.docs[0].id, data: sA.docs[0].data() || {} };
-        }
-
-        for (const raw of (list||[])){
-          const num = String(raw||"").trim();
-          if (!num) continue;
-
-          try {
-            const a = await fetchAnimalDoc(u.uid, num);
-            if (!a){
-              rejected.push({ number:num, reason:`🚫 [${num}] — غير موجود في حسابك.` });
-              continue;
-            }
-
-            const sp = normSpecies(a.data?.species || a.data?.animalTypeAr || a.data?.animalType || "");
-            const word = animalWordFromSpecies(sp);
-
-            const st = String(a.data?.status || "").trim().toLowerCase();
-            if (st === "inactive"){
-              rejected.push({ number:num, reason:`🚫 [${num}] ${word} — خارج القطيع (بيع/نفوق/استبعاد).` });
-              continue;
-            }
-
-            if (a.data?.breedingBlocked === true || String(a.data?.reproductiveStatus||"").trim() === "لا تُلقّح مرة أخرى"){
-              rejected.push({ number:num, reason:`🚫 [${num}] ${word} — مستبعدة (لا تُلقّح مرة أخرى).` });
-              continue;
-            }
-
-            if (wantedProgram === "ovsynch"){
-              const last = await getLastOvsynchForAnimal(u.uid, num);
-              if (last?.eventDate){
-                const gap = daysBetweenISO(last.eventDate, dt);
-                if (Number.isFinite(gap) && gap >= 0 && gap < 14){
-                  rejected.push({
-                    number:num,
-                    reason:`🚫 [${num}] ${word} — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم). استخدم Presynch + Ovsynch بدلًا منه.`
-                  });
-                  continue;
-                }
-              }
-            }
-
-            valid.push(num);
-
-          } catch (e){
-            rejected.push({ number:num, reason:`🚫 [${num}] — تعذّر فحصه الآن.` });
-          }
-        }
-
-        return { ok:true, valid, rejected };
-      };
-
-      applyBulk.addEventListener("click", async () => {
-        const list = parseBulk();
-        if (!startDateEl.value) startDateEl.value = todayISO();   // ✅ Today افتراضي
-syncCentral();                                            // ✅ تحديث الحقول المخفية
-
-        if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
-
-        const dt = (startDateEl.value || todayISO()).trim();
-        const r = await (window.mbk?.previewOvsynchList ? window.mbk.previewOvsynchList(list, dt) : Promise.resolve(null));
-
-        if (!r || r.ok === false) {
-          showInfo(r?.rejected?.[0]?.reason || "⚠️ تعذّر فحص القائمة الآن.", true);
-          return;
-        }
-
-        bulkList = r.valid;
-        bulkEl.value = bulkList.join("\n");
-
-        if (!animalUI.value && bulkList[0]) animalUI.value = bulkList[0];
-
-        const bad = r.rejected || [];
-        const badPreview = bad.slice(0, 6).map(x => x.reason).join("\n");
-        const msg =
-          `✅ صالح للتسجيل: ${bulkList.length} رقم\n` +
-          (bad.length ? `\n🚫 تم حذف: ${bad.length} رقم للأسباب التالية:\n${badPreview}${bad.length>6 ? "\n…" : ""}` : "");
-
-        showInfo(msg, false);
-        clearWarn();
-        syncCentral();
-      });
-
-      /* ========= Save ========= */
-      saveBtn.addEventListener("click",()=>{
-        syncCentral();
-        form.requestSubmit(); // ✅ مركزي فقط
-      });
-form.addEventListener("mbk:valid", async ()=>{
-  const start   = (startDateEl.value || todayISO()).trim();
-  const program = (programEl.value || "").trim();
-
-  // ✅ اختر القائمة حسب الوضع
-  const isGroup = !!modeGroup?.checked;
-  const list = isGroup ? (bulkList.length ? bulkList : parseBulk()) : [(animalUI.value||"").trim()].filter(Boolean);
-
-  if(!list.length || !start || !program){
-    showWarn("⚠️ البيانات ناقصة.");
-    return;
-  }
-
-  const u = await waitUser();
-  if(!u){ showInfo("⚠️ لم يتم تأكيد الدخول.",true); return; }
-
-  const saved = [];
-  const skipped = [];
-
-  for (const animal of list){
-    const num = String(animal||"").trim();
-    if(!num) continue;
-
-    try{
-      // ✅ شرط منع Ovsynch خلال 14 يوم (لكل حيوان)
-      if (program === "ovsynch") {
-        const last = await getLastOvsynchForAnimal(u.uid, num);
-        if (last?.eventDate) {
-          const gap = daysBetweenISO(last.eventDate, start);
-          if (Number.isFinite(gap) && gap >= 0 && gap < 14) {
-            skipped.push(`🚫 [${num}] — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم). استخدم Presynch + Ovsynch.`);
-            continue;
-          }
-        }
-      }
-
-      const id  = ["ovsynch", num, program, start].join("__");
-      const ref = doc(dbRef, "events", id);
-
-      if((await getDoc(ref)).exists()){
-        skipped.push(`⛔ [${num}] — البروتوكول مسجل بالفعل.`);
-        continue;
-      }
-
-      const payload={
-        type:'ovsynch',
-        eventType:'بروتوكول تزامن',
-        animalNumber:num,
-        eventDate:start,
-        program,
-        steps:stepsState,
-        userId:u.uid,
-        createdAt:serverTimestamp()
-      };
-
-      await setDoc(ref, payload);
-
-      if(typeof window.updateAnimalByEvent==="function"){
-        await window.updateAnimalByEvent(payload);
-      }
-
-      saved.push(num);
-
+      fbReady = true;
+      return true;
     }catch(e){
-      skipped.push(`🚫 [${num}] — تعذّر الحفظ الآن.`);
+      fbReady = false;
+      showInfo("⛔ تعذّر تحميل Firebase في هذه الصفحة.\nافتح Console > Network وتأكد أن /js/firebase-config.js موجود.", true);
+      return false;
     }
   }
 
-  // ✅ رسالة واحدة واضحة
-  const msg =
-    `✅ تم التسجيل: ${saved.length} رقم\n` +
-    (skipped.length ? `\n🚫 تم تخطي: ${skipped.length}\n` + skipped.slice(0,10).join("\n") + (skipped.length>10 ? "\n…" : "") : "");
+  await initFirebase();
 
-  showInfo(msg, skipped.length>0 && saved.length===0);
-});
+  async function fetchAnimalDoc(uid, num){
+    const qA = query(
+      collection(dbRef, "animals"),
+      where("userId", "==", uid),
+      where("number", "==", String(num)),
+      limit(1)
+    );
+    const sA = await getDocs(qA);
+    if (sA.empty) return null;
+    return { id: sA.docs[0].id, data: sA.docs[0].data() || {} };
+  }
 
-      syncCentral();
+  async function getLastOvsynchForAnimal(uid, animalNumber){
+    const num = String(animalNumber || "").trim();
+    if (!uid || !num) return null;
 
-    })();
-  </script>
+    const qx = query(
+      collection(dbRef, "events"),
+      where("userId", "==", uid),
+      where("animalNumber", "==", num),
+      where("eventType", "==", "بروتوكول تزامن"),
+      where("program", "==", "ovsynch"),
+      orderBy("eventDate", "desc"),
+      limit(1)
+    );
+
+    const snap = await getDocs(qx);
+    if (snap.empty) return null;
+
+    const d = snap.docs[0].data() || {};
+    return { eventDate: String(d.eventDate || "").slice(0,10), id: snap.docs[0].id };
+  }
+
+  // ✅ previewOvsynchList بعد جاهزية Firebase (ده كان سبب توقّف Apply)
+  window.mbk = window.mbk || {};
+  window.mbk.previewOvsynchList = async function(list, startISO){
+    const u = await waitUser();
+    if (!u) return { ok:false, rejected:[{ reason:"⚠️ لم يتم تأكيد الدخول." }] };
+
+    const dt = String(startISO || "").slice(0,10);
+    const wantedProgram = String(programEl.value || "").trim();
+
+    const valid = [];
+    const rejected = [];
+
+    for (const raw of (list||[])){
+      const num = String(raw||"").trim();
+      if (!num) continue;
+
+      try{
+        const a = await fetchAnimalDoc(u.uid, num);
+        if (!a){
+          rejected.push({ number:num, reason:`🚫 [${num}] — غير موجود في حسابك.` });
+          continue;
+        }
+
+        const sp = normSpecies(a.data?.species || a.data?.animalTypeAr || a.data?.animalType || "");
+        const word = animalWordFromSpecies(sp);
+
+        const st = String(a.data?.status || "").trim().toLowerCase();
+        if (st === "inactive"){
+          rejected.push({ number:num, reason:`🚫 [${num}] ${word} — خارج القطيع (بيع/نفوق/استبعاد).` });
+          continue;
+        }
+        if (a.data?.breedingBlocked === true || String(a.data?.reproductiveStatus||"").trim() === "لا تُلقّح مرة أخرى"){
+          rejected.push({ number:num, reason:`🚫 [${num}] ${word} — مستبعدة (لا تُلقّح مرة أخرى).` });
+          continue;
+        }
+
+        // ✅ منع Ovsynch لو اتعمل خلال أسبوعين
+        if (wantedProgram === "ovsynch"){
+          const last = await getLastOvsynchForAnimal(u.uid, num);
+          if (last?.eventDate){
+            const gap = daysBetweenISO(last.eventDate, dt);
+            if (Number.isFinite(gap) && gap >= 0 && gap < 14){
+              rejected.push({
+                number:num,
+                reason:`🚫 [${num}] ${word} — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم).\nاستخدم Presynch + Ovsynch بدلًا منه.`
+              });
+              continue;
+            }
+          }
+        }
+
+        valid.push(num);
+      }catch(e){
+        rejected.push({ number:num, reason:`🚫 [${num}] — تعذّر فحصه الآن.` });
+      }
+    }
+
+    return { ok:true, valid, rejected };
+  };
+
+  // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
+  applyBulk?.addEventListener("click", async () => {
+    if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
+
+    const list = parseBulk();
+    if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
+
+    const dt = (startDateEl.value || todayISO()).trim();
+    const r = await window.mbk.previewOvsynchList(list, dt);
+
+    if (!r || r.ok === false) {
+      showInfo(r?.rejected?.[0]?.reason || "⚠️ تعذّر فحص القائمة الآن.", true);
+      return;
+    }
+
+    bulkList = r.valid;
+    bulkEl.value = bulkList.join("\n");
+
+    const bad = r.rejected || [];
+    const badPreview = bad.slice(0, 6).map(x => x.reason).join("\n");
+    const msg =
+      `✅ صالح للتسجيل: ${bulkList.length} رقم\n` +
+      (bad.length ? `\n🚫 تم حذف: ${bad.length} رقم للأسباب التالية:\n${badPreview}${bad.length>6 ? "\n…" : ""}` : "");
+
+    showInfo(msg, false);
+    clearWarn();
+    syncCentral();
+  });
+
+  /* ========= Save ========= */
+  saveBtn.addEventListener("click",()=>{
+    syncCentral();
+    form.requestSubmit(); // ✅ مركزي فقط
+  });
+
+  // ✅ حفظ فعلي: فردي أو جماعي بعد mbk:valid
+  form.addEventListener("mbk:valid", async ()=>{
+    if (!fbReady){ showInfo("⛔ Firebase غير جاهز الآن.", true); return; }
+
+    const start = (startDateEl.value || "").trim() || todayISO();
+    if (!startDateEl.value) startDateEl.value = start;
+
+    const program = (programEl.value || "").trim();
+    if (!program){ showWarn("⚠️ اختر نوع البرنامج."); return; }
+
+    const u = await waitUser();
+    if (!u){ showInfo("⚠️ لم يتم تأكيد الدخول.", true); return; }
+
+    // ✅ حدد قائمة الحيوانات حسب الوضع
+    const targets = (getMode()==="group")
+      ? (parseBulk().map(x=>String(x).trim()).filter(Boolean))
+      : [String(animalUI.value||"").trim()].filter(Boolean);
+
+    if (!targets.length){ showWarn("⚠️ اكتب رقم الحيوان."); return; }
+
+    // ✅ فلترة نهائية (منع ovsynch خلال أسبوعين + استبعاد/خارج القطيع)
+    const check = await window.mbk.previewOvsynchList(targets, start);
+    if (!check.ok){
+      showInfo(check?.rejected?.[0]?.reason || "⚠️ تعذّر الفحص الآن.", true);
+      return;
+    }
+
+    const finalList = check.valid || [];
+    const rejected = check.rejected || [];
+
+    if (!finalList.length){
+      showInfo(rejected.slice(0,6).map(x=>x.reason).join("\n") || "🚫 لا يوجد رقم صالح للتسجيل.", true);
+      return;
+    }
+
+    // ✅ بناء payload ثابت للخطوات
+    const payloadBase = {
+      type: "ovsynch",
+      eventType: "بروتوكول تزامن",
+      eventDate: start,
+      program,
+      steps: stepsState,
+      userId: u.uid,
+      createdAt: serverTimestamp()
+    };
+
+    let saved = 0;
+    let already = 0;
+
+    for (const animal of finalList){
+      const id = ["ovsynch", animal, program, start].join("__");
+      const ref = doc(dbRef, "events", id);
+
+      const ex = await getDoc(ref);
+      if (ex.exists()){
+        already++;
+        continue;
+      }
+
+      const payload = Object.assign({}, payloadBase, { animalNumber: animal });
+      await setDoc(ref, payload);
+
+      if (typeof window.updateAnimalByEvent === "function"){
+        try{ await window.updateAnimalByEvent(payload); }catch{}
+      }
+
+      saved++;
+    }
+
+    // ✅ رسالة نهائية واضحة
+    let msg = `✅ تم التسجيل بنجاح: ${saved} رقم`;
+    if (already) msg += `\n⛔ مسجل مسبقًا: ${already} رقم`;
+    if (rejected.length){
+      const prev = rejected.slice(0,6).map(x=>x.reason).join("\n");
+      msg += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length>6 ? "\n…" : ""}`;
+    }
+
+    showInfo(msg, false);
+    clearWarn();
+
+    // ✅ مزامنة الكونتكست بعد الحفظ
+    syncCentral();
+  });
+
+  // ✅ أول مزامنة
+  syncCentral();
+})();
+</script>
 
 </body>
 </html>
