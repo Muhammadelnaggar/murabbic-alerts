@@ -290,6 +290,8 @@
       const stepsBox    = document.getElementById('stepsBox');
       const saveBtn     = document.getElementById('saveBtn');
       const openCowCard = document.getElementById('openCowCard');
+      const modeSingle  = document.getElementById('modeSingle');
+const modeGroup   = document.getElementById('modeGroup');
 
       const infoEl      = document.getElementById('info');
       const warnEl      = document.getElementById('warn');
@@ -348,13 +350,13 @@
         bulkList=[...new Set(arr)];
         return bulkList;
       }
+function syncCentral(){
+  const first = (parseBulk()[0] || animalUI.value || "").trim();
+  animalHidden.value = first;
+  eventHidden.value  = (startDateEl.value || todayISO()).trim();   // ✅ Today افتراضي
+  stepsHidden.value  = JSON.stringify(stepsState || []);
+}
 
-      function syncCentral(){
-        const first=(parseBulk()[0]||animalUI.value||"").trim();
-        animalHidden.value=first;
-        eventHidden.value=(startDateEl.value||"").trim();
-        stepsHidden.value=JSON.stringify(stepsState||[]);
-      }
 
       async function waitUser(ms=1500){
         return await new Promise(res=>{
@@ -396,14 +398,20 @@
       startDateEl.addEventListener("input",syncCentral);
 
       /* ========= Hydrate from URL ========= */
-      (function hydrateFromURL(){
-        const qp = new URLSearchParams(location.search);
-        const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
-        const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
-        if(num) animalUI.value = num;
-        if(dt)  startDateEl.value = dt;
-        syncCentral();
-      })();
+     (function hydrateFromURL(){
+  const qp = new URLSearchParams(location.search);
+
+  const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
+  const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
+
+  if (num) animalUI.value = num;
+
+  // ✅ Today افتراضي
+  startDateEl.value = dt || todayISO();
+
+  syncCentral();
+})();
+
 
       const PROGRAMS = {
         ovsynch: [
@@ -556,6 +564,9 @@
 
       applyBulk.addEventListener("click", async () => {
         const list = parseBulk();
+        if (!startDateEl.value) startDateEl.value = todayISO();   // ✅ Today افتراضي
+syncCentral();                                            // ✅ تحديث الحقول المخفية
+
         if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
 
         const dt = (startDateEl.value || todayISO()).trim();
@@ -587,58 +598,81 @@
         syncCentral();
         form.requestSubmit(); // ✅ مركزي فقط
       });
+form.addEventListener("mbk:valid", async ()=>{
+  const start   = (startDateEl.value || todayISO()).trim();
+  const program = (programEl.value || "").trim();
 
-      form.addEventListener("mbk:valid", async ()=>{
-        const animal=(animalUI.value||parseBulk()[0]||"").trim();
-        const start=(startDateEl.value||"").trim();
-        const program=(programEl.value||"").trim();
+  // ✅ اختر القائمة حسب الوضع
+  const isGroup = !!modeGroup?.checked;
+  const list = isGroup ? (bulkList.length ? bulkList : parseBulk()) : [(animalUI.value||"").trim()].filter(Boolean);
 
-        if(!animal||!start||!program){
-          showWarn("⚠️ البيانات ناقصة.");
-          return;
-        }
+  if(!list.length || !start || !program){
+    showWarn("⚠️ البيانات ناقصة.");
+    return;
+  }
 
-        const u=await waitUser();
-        if(!u){ showInfo("⚠️ لم يتم تأكيد الدخول.",true); return; }
+  const u = await waitUser();
+  if(!u){ showInfo("⚠️ لم يتم تأكيد الدخول.",true); return; }
 
-        if (program === "ovsynch") {
-          const last = await getLastOvsynchForAnimal(u.uid, animal);
-          if (last?.eventDate) {
-            const gap = daysBetweenISO(last.eventDate, start);
-            if (Number.isFinite(gap) && gap >= 0 && gap < 14) {
-              showInfo(`🚫 [${animal}] — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم). استخدم Presynch + Ovsynch بدلًا منه.`, true);
-              return;
-            }
+  const saved = [];
+  const skipped = [];
+
+  for (const animal of list){
+    const num = String(animal||"").trim();
+    if(!num) continue;
+
+    try{
+      // ✅ شرط منع Ovsynch خلال 14 يوم (لكل حيوان)
+      if (program === "ovsynch") {
+        const last = await getLastOvsynchForAnimal(u.uid, num);
+        if (last?.eventDate) {
+          const gap = daysBetweenISO(last.eventDate, start);
+          if (Number.isFinite(gap) && gap >= 0 && gap < 14) {
+            skipped.push(`🚫 [${num}] — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم). استخدم Presynch + Ovsynch.`);
+            continue;
           }
         }
+      }
 
-        const id=["ovsynch",animal,program,start].join("__");
-        const ref=doc(dbRef,"events",id);
+      const id  = ["ovsynch", num, program, start].join("__");
+      const ref = doc(dbRef, "events", id);
 
-        if((await getDoc(ref)).exists()){
-          showInfo("⛔ البروتوكول مسجل بالفعل.",true);
-          return;
-        }
+      if((await getDoc(ref)).exists()){
+        skipped.push(`⛔ [${num}] — البروتوكول مسجل بالفعل.`);
+        continue;
+      }
 
-        const payload={
-          type:'ovsynch',
-          eventType:'بروتوكول تزامن',
-          animalNumber:animal,
-          eventDate:start,
-          program,
-          steps:stepsState,
-          userId:u.uid,
-          createdAt:serverTimestamp()
-        };
+      const payload={
+        type:'ovsynch',
+        eventType:'بروتوكول تزامن',
+        animalNumber:num,
+        eventDate:start,
+        program,
+        steps:stepsState,
+        userId:u.uid,
+        createdAt:serverTimestamp()
+      };
 
-        await setDoc(ref,payload);
+      await setDoc(ref, payload);
 
-        if(typeof window.updateAnimalByEvent==="function"){
-          await window.updateAnimalByEvent(payload);
-        }
+      if(typeof window.updateAnimalByEvent==="function"){
+        await window.updateAnimalByEvent(payload);
+      }
 
-        showInfo("✅ تم تسجيل البروتوكول بنجاح");
-      });
+      saved.push(num);
+
+    }catch(e){
+      skipped.push(`🚫 [${num}] — تعذّر الحفظ الآن.`);
+    }
+  }
+
+  // ✅ رسالة واحدة واضحة
+  const msg =
+    `✅ تم التسجيل: ${saved.length} رقم\n` +
+    (skipped.length ? `\n🚫 تم تخطي: ${skipped.length}\n` + skipped.slice(0,10).join("\n") + (skipped.length>10 ? "\n…" : "") : "");
+
+  showInfo(msg, skipped.length>0 && saved.length===0);
+});
 
       syncCentral();
 
