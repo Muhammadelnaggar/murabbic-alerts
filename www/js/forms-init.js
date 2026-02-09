@@ -305,6 +305,77 @@ if ((type === "تلقيح" || type === "insemination") && !lastInseminationDateF
   return { reproStatusFromEvents, lastBoundary, lastBoundaryType, lastInseminationDateFromEvents };
 
 }
+// ======================================================
+// ✅ Murabbik Central: Ovsynch Bulk Preview (NO LOCK, NO SUBMIT)
+// يتحقق أثناء بناء القائمة فقط، ويحذف غير الصالح مع سبب واضح
+// ======================================================
+async function previewOvsynchList(numbers = [], eventDate = "") {
+  const uid = await getUid();
+  const dt = String(eventDate || "").trim();
+
+  if (!uid) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ لم يتم تأكيد الدخول." }] };
+  }
+  if (!dt) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ اختر تاريخ بدء البروتوكول أولًا." }] };
+  }
+
+  const clean = Array.isArray(numbers) ? numbers.map(normalizeDigits).filter(Boolean) : [];
+  const uniq = [...new Set(clean)];
+
+  const valid = [];
+  const rejected = [];
+
+  for (const num of uniq) {
+    // 1) الحيوان موجود؟
+    const animal = await fetchAnimalByNumberForUser(uid, num);
+    if (!animal) {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في حسابك.` });
+      continue;
+    }
+
+    // 2) خارج القطيع؟
+    const st = String(animal.data?.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (بيع/نفوق/استبعاد).` });
+      continue;
+    }
+
+    // 3) إشارات من الأحداث (الحالة/آخر ولادة/إجهاض)
+    const sig = await fetchCalvingSignalsFromEvents(uid, num);
+
+    // 4) جهّز payload للحارس المركزي الموجود عندك
+    const doc = animal.data || {};
+    let sp = String(doc.species || doc.animalTypeAr || doc.animalType || doc.type || "").trim();
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+    const fd = {
+      animalNumber: num,
+      eventDate: dt,
+      species: sp,
+      documentData: doc,
+      reproStatusFromEvents: String(sig.reproStatusFromEvents || "").trim(),
+      lastBoundary: String(sig.lastBoundary || "").trim(),
+      lastBoundaryType: String(sig.lastBoundaryType || "").trim(),
+    };
+
+    const g = guards?.ovsynchEligibilityDecision ? guards.ovsynchEligibilityDecision(fd) : "❌ قواعد التزامن غير محمّلة.";
+
+    if (g) {
+      rejected.push({ number:num, reason:`${String(g).replace(/^WARN\|/, "⚠️ ")}` });
+      continue;
+    }
+
+    valid.push(num);
+  }
+
+  return { ok:true, valid, rejected };
+}
+
+// ✅ اجعلها متاحة للصفحات بدون استيراد
+window.mbk = window.mbk || {};
+window.mbk.previewOvsynchList = previewOvsynchList;
 
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
@@ -868,9 +939,13 @@ function attachUniqueAnimalNumberWatcher() {
 }
 
 function autoAttach() {
-  document
-    .querySelectorAll('form[data-validate="true"][data-event]')
-    .forEach(attachOne);
+ document
+  .querySelectorAll('form[data-validate="true"][data-event]')
+  .forEach((f) => {
+    const ev = String(f.getAttribute("data-event") || "").trim();
+    if (ev === "بروتوكول تزامن") return; // ✅ لا Gate ولا Validation ولا Lock
+    attachOne(f);
+  });
 
   attachUniqueAnimalNumberWatcher();
 }
