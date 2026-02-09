@@ -286,6 +286,14 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
   const programEl   = document.getElementById('program');
   const stepsBox    = document.getElementById('stepsBox');
   const saveBtn     = document.getElementById('saveBtn');
+  const openCowCard = document.getElementById('openCowCard');
+
+openCowCard.addEventListener("click", () => {
+  const num = (animalUI.value || parseBulk()[0] || "").trim();
+  if (!num) { showWarn("⚠️ اكتب رقم الحيوان أولًا."); return; }
+  location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+});
+
   const infoEl      = document.getElementById('info');
   const warnEl      = document.getElementById('warn');
 
@@ -404,14 +412,37 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
   startDateEl.addEventListener("change",updateSteps);
   startTimeEl.addEventListener("change",updateSteps);
 
-  applyBulk.addEventListener("click",()=>{
-    const list=parseBulk();
-    if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
-    clearWarn();
-    showInfo(`✅ تم تحميل ${list.length} رقم للتسجيل.`);
-    if(!animalUI.value) animalUI.value=list[0];
-    syncCentral();
-  });
+ applyBulk.addEventListener("click", async () => {
+  const list = parseBulk();
+  if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
+
+  const dt = (startDateEl.value || todayISO()).trim();
+  const r = await (window.mbk?.previewOvsynchList ? window.mbk.previewOvsynchList(list, dt) : Promise.resolve(null));
+
+  if (!r || r.ok === false) {
+    showInfo(r?.rejected?.[0]?.reason || "⚠️ تعذّر فحص القائمة الآن.", true);
+    return;
+  }
+
+  // ✅ حدّث القائمة إلى الصالح فقط
+  bulkList = r.valid;
+  bulkEl.value = bulkList.join("\n");
+
+  // ✅ ضع أول رقم صالح في خانة الفردي لو فاضية
+  if (!animalUI.value && bulkList[0]) animalUI.value = bulkList[0];
+
+  // ✅ رسالة واضحة مختصرة
+  const bad = r.rejected || [];
+  const badPreview = bad.slice(0, 6).map(x => x.reason).join("\n");
+  const msg =
+    `✅ صالح للتسجيل: ${bulkList.length} رقم\n` +
+    (bad.length ? `\n🚫 تم حذف: ${bad.length} رقم للأسباب التالية:\n${badPreview}${bad.length>6 ? "\n…" : ""}` : "");
+
+  showInfo(msg, false);
+  clearWarn();
+  syncCentral();
+});
+
 
   /* ========= Firebase ========= */
 
