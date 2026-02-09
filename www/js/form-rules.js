@@ -189,6 +189,10 @@ export const eventSchemas = {
   fields: {
     animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
     eventDate: { required: true, type: "date", msg: "تاريخ بدء البروتوكول غير صالح." },
+
+    program: { required: true, msg: "نوع البرنامج مطلوب." },   // ✅ أضف
+    steps: { required: true, msg: "خطوات البروتوكول غير متاحة." }, // ✅ أضف
+
     documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
     species: { required: false },
     reproStatusFromEvents: { required: false },
@@ -630,52 +634,72 @@ dryOffDecision(fd) {
   }
 
   return null;
-},ovsynchEligibilityDecision(fd) {
+ovsynchEligibilityDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة بيانات الحيوان.";
 
-  // ❌ خارج القطيع
+  // ✅ خارج القطيع
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ الحيوان خارج القطيع.";
 
-  // ❌ مسجّل في بروتوكول بالفعل
-  if (doc.currentProtocol === "ovsynch_active") {
-    return "❌ هذا الحيوان مسجّل بالفعل داخل بروتوكول تزامن نشط.";
+  // ✅ مستبعدة (لا تُلقّح)
+  if (doc.breedingBlocked === true || String(doc.reproductiveStatus || "").trim() === "لا تُلقّح مرة أخرى") {
+    return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
   }
 
-  // تحديد النوع
-  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  // ✅ تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || doc.animaltype || doc.type || "").trim();
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
-  const minDays = sp === "جاموس" ? 39 : 49;
+  const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
 
-  // الحالة التناسلية
-  const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  // ✅ الحد الأدنى بعد آخر (ولادة/إجهاض)
+  const minDays = (sp === "جاموس") ? 40 : 49;
 
-  // 🟢 مفتوحة = مسموح
-  if (repro.includes("مفتوح") || repro.includes("فارغ")) {
-    return null;
+  // ✅ الحالة التناسلية الفعلية (events أولًا ثم الوثيقة)
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+  const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+
+  // ❌ عشار / ملقحة
+  if (rsNorm.includes("عشار")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
+  if (rsNorm.includes("ملقح")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
+
+  // ✅ لازم تاريخ الحدث صالح
+  if (!isDate(fd.eventDate)) return "❌ تاريخ بدء البروتوكول غير صالح.";
+
+  // ✅ مرجع ما بعد الولادة/الإجهاض: نأخذ الأحدث
+  const lastCalving = String(doc.lastCalvingDate || "").trim();
+  const lastAbortion = String(doc.lastAbortionDate || doc.lastAbortDate || "").trim();
+
+  let refDate = "";
+  let refLabel = "بعد ولادة";
+
+  if (isDate(lastCalving)) refDate = lastCalving;
+  if (isDate(lastAbortion) && (!refDate || String(lastAbortion) > String(refDate))) {
+    refDate = lastAbortion;
+    refLabel = "بعد إجهاض";
   }
 
-  // 🟡 حديثة الولادة
-  if (repro.includes("ولاد") || repro.includes("حديث")) {
-    const lastCalving = String(doc.lastCalvingDate || "").trim();
-    if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
+  // ✅ لو الحالة "حديث الولادة" أو يوجد مرجع ولادة/إجهاض → طبّق شرط الأيام
+  const looksFresh = rsNorm.includes("حديث") || rsNorm.includes("ولاد") || !!refDate;
 
-    const gap = daysBetween(lastCalving, fd.eventDate);
-    if (gap < minDays) {
-      return `❌ لا يمكن بدء بروتوكول — مرّ ${gap} يوم فقط منذ الولادة (المطلوب ${minDays}).`;
+  if (looksFresh) {
+    if (!refDate) {
+      return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}، ولا يوجد تاريخ مرجعي (آخر ولادة/إجهاض) للحساب.`;
     }
-    return null;
+
+    const gap = daysBetween(refDate, fd.eventDate);
+    if (Number.isNaN(gap) || gap < 0) return "❌ تعذّر حساب الأيام منذ آخر ولادة/إجهاض.";
+    if (gap < minDays) {
+      return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord}: ${refLabel} — مرّ ${gap} يوم فقط (الحد الأدنى ${minDays} يوم حسب النوع).`;
+    }
   }
 
-  // ❌ عشار
-  if (repro.includes("عشار")) {
-    return "❌ الحيوان عِشار — لا يمكن إدخاله في بروتوكول تزامن.";
-  }
-
-  return `❌ الحالة التناسلية الحالية: «${repro || "غير معروفة"}» غير مناسبة للبروتوكول.`;
+  // ✅ مسموح فقط لو مفتوحة/فارغة/غير محددة بشكل لا يمنع
+  // (لو الحالة “مفتوحة/فارغة” ممتاز — لو غير معروفة لا نمنع)
+  return null;
 },
 
 };
