@@ -937,15 +937,56 @@ function attachUniqueAnimalNumberWatcher() {
     }, 400);
   });
 }
+/* ===================== Special: Ovsynch Protocol (NO GATE / NO LOCK / NO VALIDATION) ===================== */
+function attachOvsynchProtocol(form){
+  const bar = ensureInfoBar(form);
+  const eventName = String(form.getAttribute("data-event") || "").trim();
+
+  // أمان: ما نشتغلش إلا على بروتوكول التزامن
+  if (eventName !== "بروتوكول تزامن") return;
+
+  // لا Lock ولا Gate
+  form.dataset.locked = "0";
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = collectFormData(form);
+
+    const n = normalizeDigits(formData.animalNumber || "");
+    const d = String(formData.eventDate || "").trim();
+
+    if (!n || !d) {
+      showMsg(bar, "⚠️ أدخل رقم الحيوان وتاريخ بدء البروتوكول أولًا.", "error");
+      return;
+    }
+
+    // مهم: نظّف الرقم داخل الـpayload
+    formData.animalNumber = n;
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:valid", {
+        bubbles: true,
+        detail: { formData, eventName, form }
+      })
+    );
+  });
+}
 
 function autoAttach() {
- document
+document
   .querySelectorAll('form[data-validate="true"][data-event]')
   .forEach((f) => {
     const ev = String(f.getAttribute("data-event") || "").trim();
-    if (ev === "بروتوكول تزامن") return; // ✅ لا Gate ولا Validation ولا Lock
+
+    if (ev === "بروتوكول تزامن") {
+      attachOvsynchProtocol(f);   // ✅ Attach خفيف يطلق mbk:valid فقط
+      return;
+    }
+
     attachOne(f);
   });
+
 
   attachUniqueAnimalNumberWatcher();
 }
