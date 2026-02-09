@@ -195,8 +195,7 @@ export const eventSchemas = {
 
     documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
     species: { required: false },
-    reproStatusFromEvents: { required: false },
-    lastCalvingDate: { required: false }
+
   },
   guards: ["ovsynchEligibilityDecision"]
 },
@@ -655,9 +654,6 @@ ovsynchEligibilityDecision(fd) {
 
   const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
 
-  // ✅ الحد الأدنى بعد آخر (ولادة/إجهاض)
-  const minDays = (sp === "جاموس") ? 40 : 49;
-
   // ✅ الحالة التناسلية الفعلية (events أولًا ثم الوثيقة)
   const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
   const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
@@ -670,41 +666,10 @@ ovsynchEligibilityDecision(fd) {
   // ✅ لازم تاريخ الحدث صالح
   if (!isDate(fd.eventDate)) return "❌ تاريخ بدء البروتوكول غير صالح.";
 
-  // ✅ مرجع ما بعد الولادة/الإجهاض: نأخذ الأحدث
-  const lastCalving = String(doc.lastCalvingDate || "").trim();
-  const lastAbortion = String(doc.lastAbortionDate || doc.lastAbortDate || "").trim();
-
-  let refDate = "";
-  let refLabel = "بعد ولادة";
-
-  if (isDate(lastCalving)) refDate = lastCalving;
-  if (isDate(lastAbortion) && (!refDate || String(lastAbortion) > String(refDate))) {
-    refDate = lastAbortion;
-    refLabel = "بعد إجهاض";
-  }
-
-  // ✅ لو الحالة "حديث الولادة" أو يوجد مرجع ولادة/إجهاض → طبّق شرط الأيام
-  const looksFresh = rsNorm.includes("حديث") || rsNorm.includes("ولاد") || !!refDate;
-
-  if (looksFresh) {
-    if (!refDate) {
-      return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}، ولا يوجد تاريخ مرجعي (آخر ولادة/إجهاض) للحساب.`;
-    }
-
-    const gap = daysBetween(refDate, fd.eventDate);
-    if (Number.isNaN(gap) || gap < 0) return "❌ تعذّر حساب الأيام منذ آخر ولادة/إجهاض.";
-    if (gap < minDays) {
-      return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord}: ${refLabel} — مرّ ${gap} يوم فقط (الحد الأدنى ${minDays} يوم حسب النوع).`;
-    }
-  }
-
-  // ✅ مسموح فقط لو مفتوحة/فارغة/غير محددة بشكل لا يمنع
-  // (لو الحالة “مفتوحة/فارغة” ممتاز — لو غير معروفة لا نمنع)
+  // ✅ لا يوجد أي شرط 49/40 بعد الولادة/الإجهاض (تم إلغاؤه بالكامل)
   return null;
 },
-
-};
-
+},
 // ===================================================================
 //      قاعدة منفصلة: منع تكرار رقم الحيوان لنفس المستخدم فقط
 // ===================================================================
