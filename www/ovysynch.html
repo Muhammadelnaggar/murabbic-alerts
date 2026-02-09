@@ -737,28 +737,11 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
         location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
       });
 // ✅ قراءة الكونتكست
+// ✅ قراءة الكونتكست (Fix نهائي)
 function hydrate(){
   const qp = new URLSearchParams(location.search);
 
-  const id =
-      // ✅ تنظيف الرقم: ممنوع يدخل DocID أو أي حروف
-  let cleanId = String(id || "").trim();
-
-  // لو فيه أي حرف (DocID غالبًا) → تجاهله
-  if (/[a-zA-Z]/.test(cleanId)) cleanId = "";
-
-  // لو الرقم طويل بشكل غير منطقي (DocID) → تجاهله
-  if (cleanId.length > 10) cleanId = "";
-
-  // خلّيها أرقام فقط (يدعم العربي/الفارسي)
-  cleanId = cleanId
-    .replace(/[^\d٠-٩۰-۹]/g,'')
-    .replace(/[٠-٩۰-۹]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-                                '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[d]));
-
-  // لو بعد التنظيف مش رقم → امسحه
-  if (!/^\d+$/.test(cleanId)) cleanId = "";
-
+  const rawId =
     (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
     (localStorage.getItem('lastAnimalId') || "").trim();
 
@@ -766,6 +749,25 @@ function hydrate(){
     (qp.get('date') || qp.get('eventDate') || "").trim() ||
     (localStorage.getItem('lastEventDate') || "").trim() ||
     todayLocal();
+
+  // ✅ تنظيف الرقم: ممنوع DocID/حروف/رموز
+  let cleanId = String(rawId || "").trim();
+
+  // لو فيه أي حرف (DocID غالبًا) → تجاهله
+  if (/[a-zA-Z]/.test(cleanId)) cleanId = "";
+
+  // لو طويل بشكل غير منطقي → تجاهله
+  if (cleanId.length > 10) cleanId = "";
+
+  // أرقام فقط (يدعم العربي/الفارسي)
+  cleanId = cleanId
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d => ({
+      '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+    }[d]));
+
+  if (!/^\d+$/.test(cleanId)) cleanId = "";
 
   // ✅ التاريخ
   if (dt){
@@ -775,17 +777,17 @@ function hydrate(){
 
   // ✅ الرقم
   if (cleanId){
-   try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
+    try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
 
     const savedMode = (localStorage.getItem("mbk_ov_mode") || "single");
 
     if (savedMode === "group"){
       const raw = (bulkEl?.value || "").trim();
       if(!raw){
-       bulkEl.value = cleanId;
+        bulkEl.value = cleanId;
       }else{
         const lines = raw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
-        if(!lines.includes(id)) bulkEl.value = [id, ...lines].join("\n");
+        if(!lines.includes(cleanId)) bulkEl.value = [cleanId, ...lines].join("\n");
       }
       parseBulkList();
     }else{
@@ -1171,11 +1173,11 @@ const animalId  = animalIds[0] || "";
 });
 
 
-      // ✅ تشغيل الصفحة
+       setMode(localStorage.getItem("mbk_ov_mode") || "single");ة
       hydrate();
       syncCentralFields();
 
-        setMode(localStorage.getItem("mbk_ov_mode") || "single");
+       
 
       startDateEl.addEventListener('input', updateSteps);
       startTimeEl.addEventListener('input', updateSteps);
