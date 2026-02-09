@@ -10,9 +10,11 @@ import {
   collection,
   query,
   where,
+  orderBy,
   limit,
   getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ===================== UI: Infobar ===================== */
@@ -145,6 +147,14 @@ function daysBetweenISO(a, b){
   if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
   d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
   return Math.round((d2 - d1) / 86400000);
+}
+function mbkOvsynchIgnoreFreshRule(){
+  try{
+    // 1 = تجاهل قاعدة حديث الولادة / ما بعد الولادة
+    return localStorage.getItem("mbk_ov_ignore_fresh") === "1";
+  }catch(_){
+    return false;
+  }
 }
 
 function getFieldEl(form, name) {
@@ -396,24 +406,7 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
       continue;
     }
 
-    // 5) VWP: حديث ولادة (49 بقري / 44 جاموسي) من الوثيقة فقط
-    const sp = normSpeciesFromDoc(doc);
-    const vwp = (sp === "جاموس") ? 44 : 49;
-
-    const lastCalving = String(
-      doc.lastCalvingDate || doc.lastCalving || doc._lastCalvingDate || doc.calvingDate || ""
-    ).slice(0,10);
-
-    if (lastCalving) {
-      const gap = daysBetweenISO(lastCalving, dt);
-      if (Number.isFinite(gap) && gap >= 0 && gap < vwp) {
-        rejected.push({
-          number:num,
-          reason:`❌ رقم ${num}: حديث ولادة — آخر ولادة ${lastCalving} (منذ ${gap} يوم). الحد الأدنى ${vwp} يوم.`
-        });
-        continue;
-      }
-    }
+}
 
     // 6) ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
     const last = await getLastOvsynchEvent(uid, num);
