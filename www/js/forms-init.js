@@ -306,12 +306,13 @@ if ((type === "تلقيح" || type === "insemination") && !lastInseminationDateF
 
 }
 // ======================================================
-// ✅ Murabbik Central: Ovsynch Bulk Preview (NO LOCK, NO SUBMIT)
-// يتحقق أثناء بناء القائمة فقط، ويحذف غير الصالح مع سبب واضح
+// ✅ Murabbik Central: Ovsynch Bulk Preview (DOC-BASED)
+// يعتمد على وثيقة الحيوان فقط للحالة التناسلية + آخر ولادة + inactive
+// + يمنع Ovsynch خلال آخر 14 يوم ويقترح Presynch + Ovsynch
 // ======================================================
 async function previewOvsynchList(numbers = [], eventDate = "") {
   const uid = await getUid();
-  const dt = String(eventDate || "").trim();
+  const dt = String(eventDate || "").trim().slice(0,10);
 
   if (!uid) {
     return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ لم يتم تأكيد الدخول." }] };
@@ -326,45 +327,105 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
   const valid = [];
   const rejected = [];
 
+  // ✅ helper: species normalize
+  function normSpeciesFromDoc(doc){
+    let sp = String(doc?.species || doc?.animalTypeAr || doc?.animalType || doc?.animaltype || doc?.type || "").trim();
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+    return sp || "أبقار";
+  }
+
+  // ✅ helper: last ovsynch check (14 days)
+  async function getLastOvsynchEvent(uid, animalNumber){
+    const num = String(animalNumber||"").trim();
+    try{
+      // أقل تعقيدًا لتقليل مشاكل الـindex: userId + animalNumber + eventType ثم orderBy eventDate
+      const qx = query(
+        collection(db, "events"),
+        where("userId", "==", uid),
+        where("animalNumber", "==", num),
+        where("eventType", "==", "بروتوكول تزامن"),
+        orderBy("eventDate", "desc"),
+        limit(1)
+      );
+      const s = await getDocs(qx);
+      if (s.empty) return null;
+      const d = s.docs[0].data() || {};
+      return {
+        eventDate: String(d.eventDate || "").slice(0,10),
+        program: String(d.program || "").trim()
+      };
+    }catch(_){
+      return null;
+    }
+  }
+
   for (const num of uniq) {
     // 1) الحيوان موجود؟
     const animal = await fetchAnimalByNumberForUser(uid, num);
     if (!animal) {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في حسابك.` });
+      rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في القطيع/حسابك.` });
       continue;
     }
 
-    // 2) خارج القطيع؟
-    const st = String(animal.data?.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (بيع/نفوق/استبعاد).` });
-      continue;
-    }
-
-    // 3) إشارات من الأحداث (الحالة/آخر ولادة/إجهاض)
-    const sig = await fetchCalvingSignalsFromEvents(uid, num);
-
-    // 4) جهّز payload للحارس المركزي الموجود عندك
     const doc = animal.data || {};
-    let sp = String(doc.species || doc.animalTypeAr || doc.animalType || doc.type || "").trim();
-    if (/cow|بقر/i.test(sp)) sp = "أبقار";
-    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
-    const fd = {
-      animalNumber: num,
-      eventDate: dt,
-      species: sp,
-      documentData: doc,
-      reproStatusFromEvents: String(sig.reproStatusFromEvents || "").trim(),
-      lastBoundary: String(sig.lastBoundary || "").trim(),
-      lastBoundaryType: String(sig.lastBoundaryType || "").trim(),
-    };
-
-    const g = guards?.ovsynchEligibilityDecision ? guards.ovsynchEligibilityDecision(fd) : "❌ قواعد التزامن غير محمّلة.";
-
-    if (g) {
-      rejected.push({ number:num, reason:`${String(g).replace(/^WARN\|/, "⚠️ ")}` });
+    // 2) status: inactive ممنوع (نافقة/بيع/استبعاد يتم تخزينها inactive)
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (inactive).` });
       continue;
+    }
+
+    // 3) مستبعدة (لا تُلقح مرة أخرى)
+    const reproDocRaw = String(doc.reproductiveStatus || "").trim();
+    const reproDoc = stripTashkeel(reproDocRaw);
+
+    if (doc.breedingBlocked === true || reproDoc.includes("لاتلقحمرةاخرى") || reproDoc.includes("لاتلقحمرهاخرى") || reproDoc.includes("لاتلقحمرةاخري") || reproDoc.includes("لاتلقح")) {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: مستبعدة (لا تُلقّح مرة أخرى).` });
+      continue;
+    }
+
+    // 4) ممنوع لو عشار أو ملقح (من الوثيقة فقط)
+    if (reproDoc.includes("عشار")) {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (عشار).` });
+      continue;
+    }
+    if (reproDoc.includes("ملقح") || reproDoc.includes("ملقحة")) {
+      rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (ملقّح).` });
+      continue;
+    }
+
+    // 5) VWP: حديث ولادة (49 بقري / 44 جاموسي) من الوثيقة فقط
+    const sp = normSpeciesFromDoc(doc);
+    const vwp = (sp === "جاموس") ? 44 : 49;
+
+    const lastCalving = String(
+      doc.lastCalvingDate || doc.lastCalving || doc._lastCalvingDate || doc.calvingDate || ""
+    ).slice(0,10);
+
+    if (lastCalving) {
+      const gap = daysBetweenISO(lastCalving, dt);
+      if (Number.isFinite(gap) && gap >= 0 && gap < vwp) {
+        rejected.push({
+          number:num,
+          reason:`❌ رقم ${num}: حديث ولادة — آخر ولادة ${lastCalving} (منذ ${gap} يوم). الحد الأدنى ${vwp} يوم.`
+        });
+        continue;
+      }
+    }
+
+    // 6) ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
+    const last = await getLastOvsynchEvent(uid, num);
+    if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
+      const g14 = daysBetweenISO(last.eventDate, dt);
+      if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
+        rejected.push({
+          number:num,
+          reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+        });
+        continue;
+      }
     }
 
     valid.push(num);
@@ -963,6 +1024,21 @@ function attachOvsynchProtocol(form){
 
     // مهم: نظّف الرقم داخل الـpayload
     formData.animalNumber = n;
+   // ✅ تحقق فردي مركزي (نفس قواعد الجماعي)
+try{
+  if (typeof window.mbk?.previewOvsynchList === "function") {
+    const r = await window.mbk.previewOvsynchList([n], String(d).slice(0,10));
+    if (!r || r.ok === false || !(r.valid || []).length) {
+      const msg = (r?.rejected?.[0]?.reason) ? String(r.rejected[0].reason) : "❌ هذا الرقم غير صالح للتزامن.";
+      showMsg(bar, msg, "error");
+      return;
+    }
+  }
+}catch(_){
+  // لو حصل خطأ، امنع الحفظ بدل ما نسجل غلط
+  showMsg(bar, "❌ تعذّر التحقق من صلاحية الرقم الآن. جرّب مرة أخرى.", "error");
+  return;
+}
 
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
