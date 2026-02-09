@@ -612,6 +612,50 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
     clearWarn();
     syncCentral();
   });
+/* ========= Tasks: Ovsynch Protocol ========= */
+async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr){
+  if (!uid || !animalNumber || !startISO) return;
+
+  const steps = Array.isArray(stepsArr) ? stepsArr : [];
+  if (!steps.length) return;
+
+  // نفس ID الحدث عندك
+  const baseId = ["ovsynch", animalNumber, program, startISO].join("__");
+
+  for (let i = 0; i < steps.length; i++){
+    const st = steps[i] || {};
+    const dueISO = String(st.date || "").slice(0,16); // "YYYY-MM-DDTHH:mm"
+    const dueDate = dueISO ? dueISO.slice(0,10) : String(startISO).slice(0,10);
+
+    // ✅ ID ثابت يمنع التكرار
+    const taskId = `${baseId}__step_${i}`;
+
+    const taskPayload = {
+      userId: uid,
+      animalNumber: String(animalNumber),
+      type: "ovsynch_step",
+      protocolType: "ovsynch",
+      protocolProgram: String(program || ""),
+      protocolStartDate: String(startISO).slice(0,10),
+
+      stepIndex: i,
+      stepDay: Number(st.day ?? 0),
+      stepName: String(st.name || ""),
+      dueAt: dueISO || "",     // لتوقيت الخطوة
+      dueDate: dueDate || "",  // لتجميع اليوم
+
+      status: st.done ? "done" : "pending",
+      done: !!st.done,
+
+      // تواريخ فنية
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    // ✅ merge true: لو موجود يحدثه بدل ما يكرر
+    await setDoc(doc(dbRef, "tasks", taskId), taskPayload, { merge: true });
+  }
+}
 
   /* ========= Save ========= */
   saveBtn.addEventListener("click",()=>{
@@ -628,7 +672,10 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
     const program = (programEl.value || "").trim();
     if (!program){ showWarn("⚠️ اختر نوع البرنامج."); return; }
-
+    if (!Array.isArray(stepsState) || !stepsState.length){
+  showWarn("⚠️ لازم تختار البرنامج علشان الجدول يظهر، وبعدها سجّل.");
+  return;
+}
     const u = await waitUser();
     if (!u){ showInfo("⚠️ لم يتم تأكيد الدخول.", true); return; }
 
@@ -680,6 +727,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
       const payload = Object.assign({}, payloadBase, { animalNumber: animal });
       await setDoc(ref, payload);
+      await upsertOvsynchTasks(u.uid, animal, start, program, stepsState);
 
       if (typeof window.updateAnimalByEvent === "function"){
         try{ await window.updateAnimalByEvent(payload); }catch{}
