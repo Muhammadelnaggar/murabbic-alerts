@@ -741,16 +741,12 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
 function hydrate(){
   const qp = new URLSearchParams(location.search);
 
+  // 1) اقرأ الرقم الخام من URL أو من التخزين
   const rawId =
     (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
     (localStorage.getItem('lastAnimalId') || "").trim();
 
-  const dt =
-    (qp.get('date') || qp.get('eventDate') || "").trim() ||
-    (localStorage.getItem('lastEventDate') || "").trim() ||
-    todayLocal();
-
-  // ✅ تنظيف الرقم: ممنوع DocID/حروف/رموز
+  // 2) نظّف الرقم: امنع DocID/حروف/طول غير منطقي، واسمح بالأرقام فقط (عربي/فارسي)
   let cleanId = String(rawId || "").trim();
 
   // لو فيه أي حرف (DocID غالبًا) → تجاهله
@@ -759,7 +755,7 @@ function hydrate(){
   // لو طويل بشكل غير منطقي → تجاهله
   if (cleanId.length > 10) cleanId = "";
 
-  // أرقام فقط (يدعم العربي/الفارسي)
+  // أرقام فقط + تحويل العربي/الفارسي لإنجليزي
   cleanId = cleanId
     .replace(/[^\d٠-٩۰-۹]/g,'')
     .replace(/[٠-٩۰-۹]/g, d => ({
@@ -769,13 +765,18 @@ function hydrate(){
 
   if (!/^\d+$/.test(cleanId)) cleanId = "";
 
-  // ✅ التاريخ
+  // 3) التاريخ
+  const dt =
+    (qp.get('date') || qp.get('eventDate') || "").trim() ||
+    (localStorage.getItem('lastEventDate') || "").trim() ||
+    todayLocal();
+
   if (dt){
     startDateEl.value = dt;
     try{ localStorage.setItem('lastEventDate', dt); }catch{}
   }
 
-  // ✅ الرقم
+  // 4) طبق الرقم حسب وضع Single/Group
   if (cleanId){
     try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
 
