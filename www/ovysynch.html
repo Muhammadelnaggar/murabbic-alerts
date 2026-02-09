@@ -267,921 +267,214 @@
     <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, getDoc,
-      query, where, limit, getDocs, orderBy
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+ <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp, doc, setDoc, getDoc,
+  query, where, getDocs, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    (async () => {
-      const form          = document.getElementById('ovForm');
-     const animalIdEl    = document.getElementById('animalNumberUI');
+(async () => {
 
-      const startDateEl   = document.getElementById('startDate');
-      const startTimeEl   = document.getElementById('startTime');
+  const form        = document.getElementById('ovForm');
+  const animalUI    = document.getElementById('animalNumberUI');
+  const startDateEl = document.getElementById('startDate');
+  const startTimeEl = document.getElementById('startTime');
+  const bulkEl      = document.getElementById('bulkAnimals');
+  const applyBulk   = document.getElementById('applyBulk');
+  const programEl   = document.getElementById('program');
+  const stepsBox    = document.getElementById('stepsBox');
+  const saveBtn     = document.getElementById('saveBtn');
+  const infoEl      = document.getElementById('info');
+  const warnEl      = document.getElementById('warn');
 
-      const bulkEl        = document.getElementById('bulkAnimals');
-      const applyBulkBtn  = document.getElementById('applyBulk');
-      const bulkHintEl    = document.getElementById('bulkHint');
+  const animalHidden = document.getElementById("animalNumber");
+  const eventHidden  = document.getElementById("eventDate");
+  const stepsHidden  = document.getElementById("steps");
 
-      const groupSelectEl = document.getElementById('groupSelect');
-      const loadGroupBtn  = document.getElementById('loadGroup');
-      const saveGroupBtn  = document.getElementById('saveGroup');
+  let dbRef=null, authRef=null, stepsState=[], bulkList=[];
 
-      const programEl     = document.getElementById('program');
-      const stepsBox      = document.getElementById('stepsBox');
+  /* ========= Helpers ========= */
 
-      const saveBtn       = document.getElementById('saveBtn');
-      const openCardBtn   = document.getElementById("openCowCard");
-
-      const warnEl        = document.getElementById('warn');
-      const infoEl        = document.getElementById('info');
-      // ===================== UI Mode (Single / Group) =====================
-const modeSingleEl = document.getElementById('modeSingle');
-const modeGroupEl  = document.getElementById('modeGroup');
-const modeHintEl   = document.getElementById('modeHint');
-
-const modeBulkBox  = document.getElementById('modeBulkBox');
-const modeSingleBox= document.getElementById('modeSingleBox');
-// ✅ ربط حقول UI مع الحقول المركزية (forms-init)
-const animalNumberHidden = document.getElementById("animalNumber");
-const eventDateHidden    = document.getElementById("eventDate");
-const speciesHidden      = document.getElementById("species");
-const stepsHidden        = document.getElementById("steps");
-
-
-function syncCentralFields(){
-  const mode = getMode();
-  const list = parseBulkList();
-  const single = (animalIdEl?.value || "").trim();
-  const first = (mode === "group") ? (list[0] || "") : single;
-
-  if (animalNumberHidden) animalNumberHidden.value = first || "";
-  if (eventDateHidden)    eventDateHidden.value    = (startDateEl?.value || "").trim();
-
-  // مبدئيًا نخليه فاضي.. forms-init هيملأه من وثيقة الحيوان
-  if (speciesHidden && !speciesHidden.value) speciesHidden.value = "";
-    // ✅ steps لازم تروح للمركزي كـ JSON
-  if (stepsHidden) {
-    try { stepsHidden.value = JSON.stringify(stepsState || []); }
-    catch { stepsHidden.value = "[]"; }
+  function todayISO(){
+    const d=new Date();
+    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
   }
 
-}
+  function showWarn(t){ warnEl.textContent=t||""; }
+  function clearWarn(){ warnEl.textContent=""; }
 
-animalIdEl?.addEventListener("input", syncCentralFields);
-startDateEl?.addEventListener("input", syncCentralFields);
-bulkEl?.addEventListener("input", syncCentralFields);
-modeSingleEl?.addEventListener("change", syncCentralFields);
-modeGroupEl?.addEventListener("change", syncCentralFields);
-
-
-function getMode(){
-  return (modeGroupEl && modeGroupEl.checked) ? "group" : "single";
-}
-
-function setMode(mode){
-  const m = (mode === "group") ? "group" : "single";
-  try{ localStorage.setItem("mbk_ov_mode", m); }catch{}
-
-  if (modeSingleEl) modeSingleEl.checked = (m === "single");
-  if (modeGroupEl)  modeGroupEl.checked  = (m === "group");
-
-  // show/hide
-  if (modeBulkBox)   modeBulkBox.style.display   = (m === "group") ? "block" : "none";
-  if (modeSingleBox) modeSingleBox.style.display = (m === "single") ? "block" : "none";
-
-  // Hint واضح للمستخدم
-  if (modeHintEl){
-    modeHintEl.textContent = (m === "single")
-      ? "✅ الوضع الحالي: تسجيل لحيوان واحد (اكتب رقم الحيوان بالأسفل)."
-      : "✅ الوضع الحالي: تسجيل لمجموعة (اكتب الأرقام أو حمّل مجموعة محفوظة).";
+  function showInfo(text, isErr=false){
+    infoEl.style.display="block";
+    infoEl.className="infobar "+(isErr?"error":"show");
+    infoEl.innerHTML=`
+      <div class="msgrow">
+        <div style="white-space:pre-line">${text}</div>
+        <button type="button" class="okbtn" onclick="this.closest('#info').style.display='none'">حسنًا</button>
+      </div>`;
+    infoEl.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
-  // 🔥 عبقرية بسيطة: لو المستخدم دخل رقم فردي ثم اختار مجموعة… لا نضيّعه
-  if (m === "group"){
-    const singleNum = (animalIdEl?.value || "").trim();
-    const bulkRaw = (bulkEl?.value || "").trim();
-    if (singleNum && !bulkRaw){
-      bulkEl.value = singleNum;
-      parseBulkList();
-    } else if (singleNum && bulkRaw){
-      // لو الرقم مش موجود في القائمة، أضفه أول سطر
-      const lines = bulkRaw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
-      if (!lines.includes(singleNum)){
-        bulkEl.value = [singleNum, ...lines].join("\n");
-        parseBulkList();
-      }
-    }
+  function parseBulk(){
+    const raw=(bulkEl.value||"").trim();
+    if(!raw){ bulkList=[]; return []; }
+    const arr=raw.split(/\n|,|;/g).map(x=>x.trim()).filter(Boolean);
+    bulkList=[...new Set(arr)];
+    return bulkList;
   }
-}
 
-// تشغيل اختيار الوضع
-modeSingleEl?.addEventListener("change", ()=> setMode("single"));
-modeGroupEl?.addEventListener("change",  ()=> setMode("group"));
-
-// كليك ذكي: لو ركّز على الإدخال الجماعي -> يتحول لمجموعة
-bulkEl?.addEventListener("focus", ()=> setMode("group"));
-// لو ركّز على رقم الحيوان -> يتحول لفردي
-animalIdEl?.addEventListener("focus", ()=> setMode("single"));
-
-      let dbRef = null, authRef = null;
-      let stepsState = [];
-
-      let bulkList = [];
-      let currentGroupId = "";
-      let currentGroupName = "";
-      let currentGroupFromCloud = false;
-
-      function todayLocal(){
-        const d = new Date();
-        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-        return d.toISOString().slice(0,10);
-      }
-      function showWarn(t){ if(warnEl) warnEl.textContent = t || ""; }
-      function clearWarn(){ if(warnEl) warnEl.textContent = ""; }
-
-      function showInfo(text, isErr){
-        if(!infoEl) return;
-        infoEl.style.display = "block";
-        infoEl.className = "infobar " + (isErr ? "error" : "show");
-        infoEl.innerHTML = `
-          <div class="msgrow">
-            <div class="msgtext" style="white-space:pre-line">${String(text||"")}</div>
-            <button type="button" class="okbtn" id="infoOkBtn">حسنًا</button>
-          </div>
-        `;
-        try{ infoEl.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
-        const btn = document.getElementById("infoOkBtn");
-        if(btn){
-          btn.onclick = () => { infoEl.style.display="none"; infoEl.innerHTML=""; };
-        }
-      }
-
-      function parseBulkList(){
-        const raw = (bulkEl?.value || "").trim();
-        if(!raw){
-          bulkList = [];
-          if(bulkHintEl) bulkHintEl.textContent = "";
-          return [];
-        }
-        const arr = raw
-          .split(/\n|,|;/g)
-          .map(s => String(s||"").trim())
-          .filter(Boolean);
-
-        const seen = new Set();
-        bulkList = arr.filter(x => (seen.has(x) ? false : (seen.add(x), true)));
-
-        if(bulkHintEl){
-          bulkHintEl.textContent = bulkList.length
-            ? `✅ تم تحميل ${bulkList.length} حيوان: ${bulkList.slice(0,8).join("، ")}${bulkList.length>8?" ...":""}`
-            : "";
-        }
-        return bulkList;
-      }
-function _normTypeText(v){
-  return String(v || "")
-    .replace(/[\u064B-\u0652\u0670]/g, "")
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .toLowerCase()
-    .trim();
-}
-
-function isBuffaloType(animalDoc){
-  // ✅ تغطية كل مفاتيح النوع الموجودة فعليًا في قواعد بياناتك (ومنها animaltype + animalTypeAr)
-  const candidates = [
-    animalDoc?.type,
-    animalDoc?.animalType,
-    animalDoc?.animaltype,        // ✅ مهم جدًا (زي الصورة)
-    animalDoc?.animalTypeAr,      // ✅ مهم جدًا (زي الصورة)
-    animalDoc?.kind,
-    animalDoc?.species,
-    animalDoc?.animalSpecies,
-    animalDoc?.category,
-    animalDoc?.animalCategory,
-    animalDoc?.speciesName,
-    animalDoc?.breed,
-    animalDoc?.breedName,
-    animalDoc?.animalBreed,
-    animalDoc?.notes
-  ];
-
-  const joined = _normTypeText(candidates.filter(Boolean).join(" | "));
-
-  // ✅ عربي
-  if (joined.includes("جاموس")) return true;
-
-  // ✅ إنجليزي
-  if (joined.includes("buffalo")) return true;
-  if (joined.includes("water buffalo")) return true;
-
-  // ✅ أخطاء شائعة
-  if (joined.includes("buffloe")) return true;
-  if (joined.includes("bufflo")) return true;
-
-  // ✅ اختصارات محتملة
-  if (/\b(buf|buff|wbuff)\b/.test(joined)) return true;
-
-  return false;
-}
-
-      function postpartumMinDaysByType(animalDoc){
-        return isBuffaloType(animalDoc) ? 40 : 49;
-      }
-      function daysSinceISO(isoDate, refISO){
-        if(!isoDate) return null;
-        const a = new Date(String(isoDate).slice(0,10) + "T00:00:00");
-        const b = new Date(String(refISO || todayLocal()).slice(0,10) + "T00:00:00");
-        if(isNaN(a) || isNaN(b)) return null;
-        return Math.floor((b - a) / (1000*60*60*24));
-      }
-
-      function invalidAnimalMessage(reason, num, extra){
-        const label = isBuffaloType(extra?.animal) ? "جاموسة" : "بقرة";
-        if(reason === "not_found") return `⛔ الحيوان رقم ${num} غير موجود.`;
-        if(reason === "sale") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (مباعة).`;
-        if(reason === "death") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع (نافقة).`;
-        if(reason === "inactive") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: خارج القطيع.`;
-        if(reason === "cull") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مستبعدة (لا تُلقّح مرة أخرى).`;
-        if(reason === "pregnant") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: عِشار.`;
-        if(reason === "inseminated") return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: مُلقّحة.`;
-        if(reason === "fresh_postpartum"){
-          const dim = Number.isFinite(extra?.dim) ? extra.dim : null;
-          const min = Number.isFinite(extra?.minDim) ? extra.minDim : null;
-          const refType = String(extra?.refType || "calving");
-          const refLabel = (refType === "abortion") ? "بعد إجهاض" : "بعد ولادة";
-          if(dim !== null && min !== null){
-            return `⛔ ${label} رقم ${num} غير صالحة للتزامن لأنها: ${refLabel} — الأيام ${dim} (الحد الأدنى ${min} حسب النوع).`;
-          }
-          return `⛔ ${label} رقم ${num} لا يمكن بدء التزامن لها
-لأنها بعد ولادة ${dim} يوم
-والحد الأدنى لبدء التزامن هو ${min} يوم.`;
-
-        }
-        return `⛔ رقم ${num} غير صالح للتزامن.`;
-      }
-
-      // ===================== EVENTS helpers (Smart fallback فقط) =====================
-      function pickISO(d){
-        const s = String(d || "").slice(0,10);
-        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
-      }
-      function eventISO(ev){
-        return pickISO(ev?.eventDate) || pickISO(ev?.date) || pickISO(ev?.startDate) || pickISO(ev?.protocolStartDate);
-      }
-      function normType(ev){ return String(ev?.type || "").trim().toLowerCase(); }
-      function normEventType(ev){ return String(ev?.eventType || "").trim().toLowerCase(); }
-
-      function classifyReproFromEvent(ev){
-        const t = normType(ev);
-        const et = normEventType(ev);
-
-        // ✅ ولادة
-        if (t.includes("calv") || et.includes("ولادة")) return { repro:"حديث الولادة", kind:"calving" };
-
-        // ✅ إجهاض
-        if (t.includes("abort") || et.includes("إجهاض")) return { repro:"حديث الولادة", kind:"abortion" };
-
-        // ✅ تشخيص حمل
-        if (t.includes("preg") || et.includes("تشخيص حمل")) {
-          const res = String(ev?.result || ev?.diagnosisResult || "").trim();
-          if (res === "عشار") return { repro:"عشار", kind:"pregnant" };
-          if (res === "فارغة") return { repro:"مفتوحه", kind:"open" };
-          return { repro:"", kind:"pd_unknown" };
-        }
-
-        // ✅ تلقيح
-        if (t.includes("insemin") || et.includes("تلقيح")) return { repro:"ملقح", kind:"inseminated" };
-
-        return { repro:"", kind:"" };
-      }
-
-      // ✅ قرار SMART: متى نشك في الوثيقة ونحتاج events؟
-      function needsEventsFallback(animalDoc){
-        if(!animalDoc) return true;
-
-        const repro = String(animalDoc.reproductiveStatus || "").trim();
-        const hasDIM = Number.isFinite(Number(animalDoc.daysInMilk));
-        const calv = pickISO(animalDoc.lastCalvingDate);
-        const abrt = pickISO(animalDoc.lastAbortionDate || animalDoc.lastAbortDate);
-
-        // 1) الحالة فاضية/غير معروفة
-        if(!repro) return true;
-
-        // 2) مكتوب "حديث الولادة" لكن مفيش مرجع واضح (لا DIM ولا تواريخ)
-        if(repro === "حديث الولادة" && !hasDIM && !calv && !abrt) return true;
-
-        // 3) مفيش تواريخ ولادة/إجهاض ولا DIM (ومع ذلك احنا محتاجين مرجع للبوستبارتم)
-        if(!hasDIM && !calv && !abrt) return true;
-
-        return false;
-      }
-
-      async function getActualReproFromEvents(animalNumber, uid){
-        if(!dbRef || !uid) return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
-
-        const evRef = collection(dbRef, "events");
-        let snap = null;
-
-        // 1) الأفضل: orderBy(eventDate desc)
-        try{
-          snap = await getDocs(query(
-            evRef,
-            where("userId","==",uid),
-            where("animalNumber","==",String(animalNumber).trim()),
-            orderBy("eventDate","desc"),
-            limit(25)
-          ));
-        }catch(e1){
-          // 2) fallback: orderBy(createdAt desc)
-          try{
-            snap = await getDocs(query(
-              evRef,
-              where("userId","==",uid),
-              where("animalNumber","==",String(animalNumber).trim()),
-              orderBy("createdAt","desc"),
-              limit(25)
-            ));
-          }catch(e2){
-            return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
-          }
-        }
-
-        const list = snap?.docs?.map(d=>d.data()||{}) || [];
-        if(!list.length) return { repro:"", lastCalvingDate:"", lastAbortionDate:"" };
-
-        let lastCalv = "";
-        let lastAbrt = "";
-        for(const ev of list){
-          const iso = eventISO(ev);
-          if(!iso) continue;
-
-          const c = classifyReproFromEvent(ev);
-          if(c.kind === "calving" && (!lastCalv || iso > lastCalv)) lastCalv = iso;
-          if(c.kind === "abortion" && (!lastAbrt || iso > lastAbrt)) lastAbrt = iso;
-        }
-
-        // ✅ الحالة الفعلية = أول حدث “حاسِم” في الأحدث
-        for(const ev of list){
-          const c = classifyReproFromEvent(ev);
-          if(c.repro) return { repro:c.repro, lastCalvingDate:lastCalv, lastAbortionDate:lastAbrt };
-        }
-
-        return { repro:"", lastCalvingDate:lastCalv, lastAbortionDate:lastAbrt };
-      }
-      // ===================== /EVENTS helpers =====================
-
-      async function checkAnimalQuick(num){
-        if(!dbRef) return { ok:true };
-        if(!authRef?.currentUser) return { ok:false, reason:"auth_blocked_silent" };
-
-        const uid = authRef.currentUser.uid;
-        const animalsRef = collection(dbRef, "animals");
-
-        // 1) number كنص
-        let snap = await getDocs(query(
-          animalsRef,
-          where("userId","==",uid),
-          where("number","==",String(num)),
-          limit(1)
-        ));
-
-        // 2) animalNumber كرقم
-        if(snap.empty){
-          snap = await getDocs(query(
-            animalsRef,
-            where("userId","==",uid),
-            where("animalNumber","==",Number(num)),
-            limit(1)
-          ));
-        }
-
-        if(snap.empty) return { ok:false, reason:"not_found" };
-
-        const a = snap.docs[0].data() || {};
-
-        // ✅ أولوية: خارج القطيع
-        const status = String(a.status || "active").toLowerCase();
-        const inactiveReason = String(a.inactiveReason || "").toLowerCase();
-        if(status === "inactive"){
-          if(inactiveReason === "sale")  return { ok:false, reason:"sale", animal:a };
-          if(inactiveReason === "death") return { ok:false, reason:"death", animal:a };
-          return { ok:false, reason:"inactive", animal:a };
-        }
-
-        // ✅ مستبعدة (لا تُلقّح)
-        const breedingBlocked = !!a.breedingBlocked;
-        const reproDoc = String(a.reproductiveStatus || "").trim();
-        if(breedingBlocked || reproDoc === "لا تُلقّح مرة أخرى"){
-          return { ok:false, reason:"cull", animal:a };
-        }
-
-        // ✅ SMART: نعتمد على الوثيقة أولًا، ونلجأ للأحداث فقط عند الشك
-        let repro = reproDoc;
-        let calv = pickISO(a.lastCalvingDate);
-        let abrt = pickISO(a.lastAbortionDate || a.lastAbortDate);
-
-        if(needsEventsFallback(a)){
-          const actual = await getActualReproFromEvents(String(num).trim(), uid);
-
-          // تحديثات فقط لو الأحداث أعطت قيمة مفيدة
-          if(actual?.repro) repro = actual.repro;
-
-          // تواريخ مرجعية للبوستبارتم عند الحاجة
-          if(actual?.lastCalvingDate) calv = actual.lastCalvingDate;
-          if(actual?.lastAbortionDate) abrt = actual.lastAbortionDate;
-        }
-
-        // ✅ منع عشار/ملقح
-        if(repro === "عشار") return { ok:false, reason:"pregnant", animal:a };
-        if(repro === "ملقح") return { ok:false, reason:"inseminated", animal:a };
-
-        // ✅ بوستبارتم: من (أحدث ولادة/إجهاض) أو DIM إن موجود
-        let refType = "calving";
-        let refDate = calv;
-
-        if (abrt && (!calv || abrt > calv)) {
-          refType = "abortion";
-          refDate = abrt;
-        }
-
-       const refISO = todayLocal();
-const dim = daysSinceISO(refDate, refISO); // ✅ مصدر واحد: lastCalvingDate/lastAbortionDate
-
-        const minDim = postpartumMinDaysByType(a);
-
-       const dimN = Number(dim);
-const minN = Number(minDim);
-
-if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) {
-  return { ok:false, reason:"fresh_postpartum", refType, dim: dimN, minDim: minN, animal:a };
-
-}
-
-
-        // ✅ لو مكتوب حديث الولادة حتى مع نقص المراجع
-        if (repro === "حديث الولادة") {
-          if (dim === null) return { ok:false, reason:"fresh_postpartum", refType, animal:a };
-          return { ok:false, reason:"fresh_postpartum", refType, dim, minDim, animal:a };
-        }
-
-        return { ok:true, animal:a };
-      }
-
-      // ✅ فتح بطاقة الحيوان
-      openCardBtn?.addEventListener("click", ()=>{
-        const id = (animalIdEl.value || "").trim();
-        if(!id) return;
-        location.href = `cow-card.html?number=${encodeURIComponent(id)}`;
-      });
-// ✅ قراءة الكونتكست
-// ✅ قراءة الكونتكست (Fix نهائي)
-function hydrate(){
+  function syncCentral(){
+    const first=(parseBulk()[0]||animalUI.value||"").trim();
+    animalHidden.value=first;
+    eventHidden.value=(startDateEl.value||"").trim();
+    stepsHidden.value=JSON.stringify(stepsState||[]);
+  }
+
+  animalUI.addEventListener("input",syncCentral);
+  bulkEl.addEventListener("input",syncCentral);
+  startDateEl.addEventListener("input",syncCentral);
+
+  /* ========= Programs ========= */
+// ✅ قراءة الرقم والتاريخ من add-event فقط (بدون أي تحقق)
+(function hydrateFromURL(){
   const qp = new URLSearchParams(location.search);
 
-  // 1) اقرأ الرقم الخام من URL أو التخزين
-  const rawId =
-    (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
-    (localStorage.getItem('lastAnimalId') || "").trim();
+  const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
+  const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
 
-  // 2) نظّف الرقم (ممنوع DocID/حروف/رموز)
-  let cleanId = String(rawId || "").trim();
-
-  // لو فيه أي حرف (DocID غالبًا) → تجاهله
-   // ✅ لو اللي جاي مش رقم (DocID/UID) امسحه فورًا من الصفحة ومن التخزين
-  if (/[a-zA-Z]/.test(cleanId) || cleanId.length > 10) {
-    try{ localStorage.removeItem('lastAnimalId'); }catch{}
-    if (animalIdEl) animalIdEl.value = "";
-    if (bulkEl) bulkEl.value = "";
-    cleanId = "";
+  if(num){
+    animalUI.value = num;
   }
 
-  if (/[a-zA-Z]/.test(cleanId)) cleanId = "";
-
-  // لو طويل بشكل غير منطقي → تجاهله
-  if (cleanId.length > 10) cleanId = "";
-
-  // أرقام فقط (يدعم العربي/الفارسي)
-  cleanId = cleanId
-    .replace(/[^\d٠-٩۰-۹]/g,'')
-    .replace(/[٠-٩۰-۹]/g, d => ({
-      '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
-    }[d]));
-
-  if (!/^\d+$/.test(cleanId)) cleanId = "";
-
-  // 3) التاريخ
-  const dt =
-    (qp.get('date') || qp.get('eventDate') || "").trim() ||
-    (localStorage.getItem('lastEventDate') || "").trim() ||
-    todayLocal();
-
-  if (dt){
+  if(dt){
     startDateEl.value = dt;
-    try{ localStorage.setItem('lastEventDate', dt); }catch{}
   }
 
-  // 4) طبق الرقم حسب وضع الصفحة
-  if (cleanId){
-    try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
+  syncCentral();
+})();
 
-    const savedMode = (localStorage.getItem("mbk_ov_mode") || "single");
+  const PROGRAMS={
+    ovsynch:[
+      {day:0,name:'GnRH (اليوم 0)'},
+      {day:7,name:'PGF2α (اليوم 7)'},
+      {day:9,name:'GnRH (اليوم 9)'},
+      {day:10,name:'تلقيح مُوقّت TAI (اليوم 10)'},
+    ]
+  };
 
-    if (savedMode === "group"){
-      const raw = (bulkEl?.value || "").trim();
-      if(!raw){
-        bulkEl.value = cleanId;
-      }else{
-        const lines = raw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
-        if(!lines.includes(cleanId)) bulkEl.value = [cleanId, ...lines].join("\n");
-      }
-      parseBulkList();
-    }else{
-      animalIdEl.value = cleanId;
+  function updateSteps(){
+    stepsBox.innerHTML='';
+    const start=startDateEl.value, program=programEl.value;
+    if(!start||!program) return;
+    stepsState=(PROGRAMS[program]||[]).map(s=>{
+      const d=new Date(start+"T"+(startTimeEl.value||"08:00"));
+      d.setDate(d.getDate()+s.day);
+      return {
+        day:s.day,
+        name:s.name,
+        date:d.toISOString().slice(0,16),
+        done:false
+      };
+    });
+    stepsState.forEach((st,i)=>{
+      const row=document.createElement("div");
+      row.className="step";
+      row.innerHTML=`
+        <div><div class="name">${st.name}</div>
+        <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div></div>
+        <label class="chk">
+          <input type="checkbox" data-i="${i}">
+          تم
+        </label>`;
+      stepsBox.appendChild(row);
+    });
+    syncCentral();
+  }
+
+  stepsBox.addEventListener("change",(e)=>{
+    const i=e.target.dataset.i;
+    if(i===undefined) return;
+    stepsState[i].done=e.target.checked;
+    syncCentral();
+  });
+
+  programEl.addEventListener("change",updateSteps);
+  startDateEl.addEventListener("change",updateSteps);
+  startTimeEl.addEventListener("change",updateSteps);
+
+  applyBulk.addEventListener("click",()=>{
+    const list=parseBulk();
+    if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
+    clearWarn();
+    showInfo(`✅ تم تحميل ${list.length} رقم للتسجيل.`);
+    if(!animalUI.value) animalUI.value=list[0];
+    syncCentral();
+  });
+
+  /* ========= Firebase ========= */
+
+  const mod=await import('/js/firebase-config.js');
+  const app=mod.firebaseConfig?initializeApp(mod.firebaseConfig):null;
+  dbRef=mod.db||getFirestore(app,"murabbikdata");
+  authRef=mod.auth||getAuth(app);
+
+  async function waitUser(ms=1500){
+    return await new Promise(res=>{
+      const t=setTimeout(()=>res(authRef.currentUser||null),ms);
+      onAuthStateChanged(authRef,u=>{clearTimeout(t);res(u||null);});
+    });
+  }
+
+  /* ========= Save ========= */
+
+  saveBtn.addEventListener("click",()=>{
+    syncCentral();
+    form.requestSubmit(); // 🔥 مركزي فقط
+  });
+
+  form.addEventListener("mbk:valid",async()=>{
+    const animal=(animalUI.value||parseBulk()[0]||"").trim();
+    const start=(startDateEl.value||"").trim();
+    const program=(programEl.value||"").trim();
+    if(!animal||!start||!program){
+      showWarn("⚠️ البيانات ناقصة.");
+      return;
     }
-  }
-}
 
+    const u=await waitUser();
+    if(!u){ showInfo("⚠️ لم يتم تأكيد الدخول.",true); return; }
 
-      // ✅ تحقّق عند تغيير الرقم الفردي
-      animalIdEl?.addEventListener("change", async ()=>{
-        const num = (animalIdEl.value||"").trim();
-        if(!num) return;
+    const id=["ovsynch",animal,program,start].join("__");
+    const ref=doc(dbRef,"events",id);
 
-        const r = await checkAnimalQuick(num);
-        if(r.reason === "auth_blocked_silent") return;
+    if((await getDoc(ref)).exists()){
+      showInfo("⛔ البروتوكول مسجل بالفعل.",true);
+      return;
+    }
 
-        if(!r.ok){
-          showInfo(invalidAnimalMessage(r.reason, num, r), true);
-          animalIdEl.value = "";
-          try{ animalIdEl.focus(); }catch{}
-        }
-      });
+    const payload={
+      type:'ovsynch',
+      eventType:'بروتوكول تزامن',
+      animalNumber:animal,
+      eventDate:start,
+      program,
+      steps:stepsState,
+      userId:u.uid,
+      createdAt:serverTimestamp()
+    };
 
-      function toISODateLocal(d){
-        const dd = new Date(d);
-        return new Date(dd.getTime() - dd.getTimezoneOffset()*60000).toISOString().slice(0,10);
-      }
-
-      const PROGRAMS = {
-        ovsynch:[
-          { day: 0,  name:'GnRH (اليوم 0)' },
-          { day: 7,  name:'PGF2α (اليوم 7)' },
-          { day: 9,  name:'GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
-          { day: 10, name:'تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
-        ],
-        cosynch72:[
-          { day: 0,  name:'GnRH (اليوم 0)' },
-          { day: 7,  name:'PGF2α (اليوم 7)' },
-          { day: 10, name:'GnRH + تلقيح مُوقّت TAI (اليوم 10 ≈ 72 ساعة بعد PGF)' },
-        ],
-        presynch_ovsynch:[
-          { day:-28, name:'Presynch: PGF2α (اليوم -28)' },
-          { day:-14, name:'Presynch: PGF2α (اليوم -14)' },
-          { day: 0,  name:'Ovsynch: GnRH (اليوم 0)' },
-          { day: 7,  name:'Ovsynch: PGF2α (اليوم 7)' },
-          { day: 9,  name:'Ovsynch: GnRH (اليوم 9 ~ بعد ~56 ساعة)' },
-          { day: 10, name:'Ovsynch: تلقيح مُوقّت TAI (اليوم 10 ~ بعد ~16 ساعة)' },
-        ]
-      };
-
-      function calcStepDateTime(program, startISO, baseTime, step){
-        if (program === "ovsynch" || program === "presynch_ovsynch") {
-          const pgfDT = new Date(startISO + "T" + (baseTime||"08:00"));
-          pgfDT.setDate(pgfDT.getDate() + 7);
-
-          if (step.day === 9 && String(step.name).includes("GnRH")) {
-            return new Date(pgfDT.getTime() + 56 * 3600 * 1000);
-          }
-          if (String(step.name).includes("تلقيح")) {
-            return new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-          }
-          const d = new Date(startISO + "T" + (baseTime||"08:00"));
-          d.setDate(d.getDate() + step.day);
-          return d;
-        }
-
-        if (program === "cosynch72") {
-          const pgfDT = new Date(startISO + "T" + (baseTime||"08:00"));
-          pgfDT.setDate(pgfDT.getDate() + 7);
-
-          if (String(step.name).includes("تلقيح") || (String(step.name).includes("GnRH") && step.day === 10)) {
-            return new Date(pgfDT.getTime() + 72 * 3600 * 1000);
-          }
-          const d = new Date(startISO + "T" + (baseTime||"08:00"));
-          d.setDate(d.getDate() + step.day);
-          return d;
-        }
-
-        const d = new Date(startISO + "T" + (baseTime||"08:00"));
-        d.setDate(d.getDate() + step.day);
-        return d;
-      }
-
-      function updateSteps(){
-        stepsBox.innerHTML = '';
-        const start = (startDateEl.value || "").trim();
-        const program = (programEl.value || "").trim();
-        const baseTime = (startTimeEl.value || "08:00").trim();
-        if(!start || !program) return;
-
-        const tpl = PROGRAMS[program] || [];
-        const prev = stepsState;
-
-        stepsState = tpl.map((s)=>{
-          const dd = calcStepDateTime(program, start, baseTime, s);
-          const local = new Date(dd.getTime() - dd.getTimezoneOffset()*60000);
-          const isoDT = local.toISOString().slice(0,16);
-          const plannedDate = toISODateLocal(dd);
-
-          const keep = prev.find(p => p.name===s.name && p.day===s.day);
-          return {
-            day: s.day,
-            name: s.name,
-            date: isoDT,
-            plannedDate,
-            done: keep ? !!keep.done : false,
-            confirmedOn: keep ? keep.confirmedOn || null : null,
-            onSchedule: keep ? !!keep.onSchedule : false,
-            _savedOnce: keep ? !!keep._savedOnce : false,
-          };
-        });
-
-        stepsState.forEach((st, idx)=>{
-          const row = document.createElement('div');
-          row.className = 'step';
-
-          const chip = st.done
-            ? `<span class="on-time ${st.onSchedule ? 'ok' : 'late'}">${st.onSchedule ? '✓ في الموعد' : '✓ مؤكدة'}</span>`
-            : '';
-
-          row.innerHTML = `
-            <div>
-              <div class="name">${st.name}</div>
-              <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')} ${chip}</div>
-            </div>
-            <label class="chk">
-              <input data-idx="${idx}" type="checkbox" ${st.done ? 'checked' : ''}/>
-              تم
-            </label>
-          `;
-          stepsBox.appendChild(row);
-        });
-        syncCentralFields();
-      }
-
-      stepsBox.addEventListener('change', (e)=>{
-        const el = e.target.closest('input[type="checkbox"][data-idx]');
-        if(!el) return;
-
-        const i = Number(el.getAttribute('data-idx'));
-        const st = stepsState[i];
-        if(!st) return;
-
-        const today = todayLocal();
-        st.done = el.checked;
-        st.confirmedOn = el.checked ? today : null;
-        st.onSchedule = el.checked ? (today === st.plannedDate) : false;
-
-        updateSteps(); // واجهة فقط
-      });
-
-      async function setupFirebase(){
-        try{
-          const mod = await import('/js/firebase-config.js?v=5');
-          if(mod?.db && mod?.auth) return { db: mod.db, auth: mod.auth };
-          if(mod?.firebaseConfig){
-            const app = initializeApp(mod.firebaseConfig);
-            return { db: getFirestore(app, "murabbikdata"), auth: getAuth(app) };
-          }
-        }catch(e){}
-
-        try{
-          const cfg = await import('./config.js?v=5');
-          const app = initializeApp(cfg.firebaseConfig);
-          return { db: getFirestore(app, "murabbikdata"), auth: getAuth(app) };
-        }catch(e2){
-          showWarn('❌ تعذّر تحميل إعدادات Firebase.');
-          return { db:null, auth:null };
-        }
-      }
-
-      const { db, auth } = await setupFirebase();
-      dbRef = db;
-      authRef = auth;
-
-      async function waitForUser(ms=1500){
-        if(!authRef) return null;
-        return await new Promise((resolve)=>{
-          const t = setTimeout(()=>resolve(authRef.currentUser || null), ms);
-          try{
-            onAuthStateChanged(authRef, (u)=>{ clearTimeout(t); resolve(u || null); });
-          }catch{
-            clearTimeout(t);
-            resolve(authRef.currentUser || null);
-          }
-        });
-      }
-
-      async function loadGroupsList(){
-        if(!dbRef || !authRef?.currentUser || !groupSelectEl) return;
-
-        const q = query(
-          collection(dbRef, "protocolGroups"),
-          where("userId", "==", authRef.currentUser.uid),
-          orderBy("createdAt", "desc")
-        );
-
-        const snap = await getDocs(q);
-        groupSelectEl.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
-        snap.forEach(docSnap=>{
-          const d = docSnap.data() || {};
-          const opt = document.createElement("option");
-          opt.value = docSnap.id;
-          opt.textContent = d.name || docSnap.id;
-          groupSelectEl.appendChild(opt);
-        });
-      }
-
-      async function saveCurrentAsGroup(){
-        const list = parseBulkList();
-        if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات أولاً ثم احفظ كمجموعة."); return; }
-        const u = await waitForUser(2000);
-        if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد.", true); return; }
-
-        const name = prompt("اسم المجموعة؟ مثال: دفعة 25 بقرة - فبراير");
-        if(!name) return;
-
-        await addDoc(collection(dbRef, "protocolGroups"), {
-          userId: u.uid,
-          name: String(name).trim(),
-          animals: list.map(x=>String(x).trim()),
-          createdAt: serverTimestamp()
-        });
-
-        showInfo("✅ تم حفظ المجموعة على السحابة");
-        await loadGroupsList();
-      }
-
-      async function loadSelectedGroup(){
-        const gid = (groupSelectEl?.value || "").trim();
-        if(!gid){ showWarn("⚠️ اختر مجموعة أولاً."); return; }
-        const snap = await getDoc(doc(dbRef, "protocolGroups", gid));
-        if(!snap.exists()){ showWarn("⚠️ المجموعة غير موجودة."); return; }
-
-        const d = snap.data() || {};
-        const arr = Array.isArray(d.animals) ? d.animals : [];
-
-        currentGroupId = gid;
-        currentGroupName = String(d.name || gid).trim();
-        currentGroupFromCloud = true;
-
-        bulkEl.value = arr.join("\n");
-        parseBulkList();
-        if(!animalIdEl.value && bulkList.length) animalIdEl.value = bulkList[0];
-        showInfo(`✅ تم تحميل المجموعة: ${d.name || gid}`);
-      }
-
-      loadGroupBtn?.addEventListener("click", loadSelectedGroup);
-      saveGroupBtn?.addEventListener("click", saveCurrentAsGroup);
-
-      applyBulkBtn?.addEventListener("click", async ()=>{
-        const list = parseBulkList();
-        if(!list.length){ showWarn("⚠️ اكتب أرقام الحيوانات في مربع الإدخال الجماعي."); return; }
-        clearWarn();
-
-        const okList = [];
-        const bad = [];
-
-        for(const n of list){
-          const r = await checkAnimalQuick(n);
-          if(r.reason === "auth_blocked_silent") return;
-          if(r.ok) okList.push(n);
-          else bad.push({ n, reason:r.reason, extra:r });
-        }
-
-        if(bad.length){
-          bulkEl.value = okList.join("\n");
-          parseBulkList();
-          const details = bad.map(b => invalidAnimalMessage(b.reason, b.n, b.extra)).join("\n");
-          showInfo(`تم استبعاد ${bad.length} حيوان لعدم الأهلية للتزامن:\n${details}`, true);
-        }else{
-          showInfo(`✅ تم قبول ${okList.length} حيوان للتسجيل.`);
-        }
-
-        if(animalIdEl && !animalIdEl.value && okList.length) animalIdEl.value = okList[0];
-      });
-
-      function getCtx(){
-       const mode = getMode();
-
-const list = parseBulkList();
-const singleId = (animalIdEl.value||'').trim();
-
-const animalIds = (mode === "group") ? list : (singleId ? [singleId] : []);
-const animalId  = animalIds[0] || "";
-
-        const start = (startDateEl.value||'').trim();
-        const program = (programEl.value||'').trim();
-
-        if(!animalId || !start || !program){
-          showWarn('⚠️ أدخل رقم الحيوان، تاريخ البدء ونوع البرنامج.');
-          return null;
-        }
-
-        clearWarn();
-        try{ localStorage.setItem('lastAnimalId', animalId); }catch{}
-        try{ localStorage.setItem('lastEventDate', start); }catch{}
-        return { animalId, animalIds, start, program, steps: stepsState };
-      }
-
-     saveBtn.addEventListener('click', ()=> {
-  syncCentralFields();
-  form.requestSubmit(); // ✅ يشغّل forms-init (Gate + Validation) ثم mbk:valid    
-});
-
-       setMode(localStorage.getItem("mbk_ov_mode") || "single");
-      hydrate();
-      syncCentralFields();
-
-      startDateEl.addEventListener('input', updateSteps);
-      startTimeEl.addEventListener('input', updateSteps);
-      programEl.addEventListener('change', updateSteps);
-      updateSteps();
-
-      const u = await waitForUser(2000);
-      if(u) await loadGroupsList();
-      // ✅ بعد نجاح الـ Central Gate + Validation
-form.addEventListener("mbk:valid", async (e)=>{
-  // forms-init سيجهّز documentData + يسمح/يمنع حسب ovsynchEligibilityDecision
-  // هنا ننفذ الحفظ الفعلي للبروتوكول فقط
-
-  const ctx = getCtx();
-  if(!ctx) return;
-
-  // تأكيد الدخول (كما عندك)
-  const u = await waitForUser(2000);
-  if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد. أعد المحاولة.", true); return; }
-
-  // ⛔️ مهم: في وضع المجموعة استخدم القائمة بعد تطبيق الاستبعاد
-  const ids = (ctx.animalIds||[]).filter(Boolean);
-  if(!ids.length){ showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true); return; }
-
-  saveBtn.disabled = true;
-  const oldTxt = saveBtn.textContent;
-  saveBtn.textContent = '... جاري الحفظ';
-
-  try{
-    for(let i=0;i<ids.length;i++){
-      const animalNo = ids[i];
-
-      const payload = {
-        type: 'ovsynch',
-        eventType: 'بروتوكول تزامن',
-        animalId: animalNo,
-        animalNumber: animalNo,
-        eventDate: ctx.start,     // ✅ اسم مركزي
-        startDate: ctx.start,     // ✅ احتفاظًا بتوافقك الحالي
-        program: ctx.program,
-        steps: ctx.steps,
-        userId: u.uid,
-        createdAt: serverTimestamp()
-      };
-
-      if(typeof window.updateAnimalByEvent === "function"){
-        await window.updateAnimalByEvent(payload);
-      }
-
-      // ✅ منع التكرار
-      const protocolId = ["ovsynch", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
-      const evRef = doc(dbRef, "events", protocolId);
-      const snap = await getDoc(evRef);
-      if(snap.exists()){
-        showInfo(`⛔ البروتوكول مسجّل بالفعل للحيوان رقم ${animalNo} بنفس البرنامج ونفس تاريخ البدء.`, true);
-        continue;
-      }
-
-      await setDoc(evRef, payload);
-      showInfo(`✅ تم حفظ (${i+1}/${ids.length}) رقم ${animalNo}`);
+    await setDoc(ref,payload);
+    if(typeof window.updateAnimalByEvent==="function"){
+      await window.updateAnimalByEvent(payload);
     }
 
     showInfo("✅ تم تسجيل البروتوكول بنجاح");
-  }catch(err){
-    console.error(err);
-    showInfo("❌ تعذّر الحفظ. حاول مرة أخرى.", true);
-  }finally{
-    saveBtn.disabled = false;
-    saveBtn.textContent = oldTxt;
-  }
-});
+  });
 
-    })();
-  </script>
+})();
+</script>
+
 </body>
 </html>
