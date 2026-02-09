@@ -167,6 +167,8 @@
 <input type="hidden" id="animalNumber" data-field="animalNumber" value="">
 <input type="hidden" id="eventDate" data-field="eventDate" value="">
 <input type="hidden" id="species" data-field="species" value="">
+       <input type="hidden" id="steps" data-field="steps" value="">
+
 
         <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
 <div class="field" style="margin-bottom:12px">
@@ -242,7 +244,7 @@
         <div class="row" style="margin-top:12px">
           <div class="field">
             <label for="program">نوع البرنامج</label>
-            <select id="program">
+            <select id="program" data-field="program">
               <option value="" selected disabled>اختر البرنامج</option>
               <option value="ovsynch">Ovsynch</option>
               <option value="cosynch72">Cosynch-72</option>
@@ -304,6 +306,8 @@ const modeSingleBox= document.getElementById('modeSingleBox');
 const animalNumberHidden = document.getElementById("animalNumber");
 const eventDateHidden    = document.getElementById("eventDate");
 const speciesHidden      = document.getElementById("species");
+const stepsHidden        = document.getElementById("steps");
+
 
 function syncCentralFields(){
   const mode = getMode();
@@ -316,6 +320,12 @@ function syncCentralFields(){
 
   // مبدئيًا نخليه فاضي.. forms-init هيملأه من وثيقة الحيوان
   if (speciesHidden && !speciesHidden.value) speciesHidden.value = "";
+    // ✅ steps لازم تروح للمركزي كـ JSON
+  if (stepsHidden) {
+    try { stepsHidden.value = JSON.stringify(stepsState || []); }
+    catch { stepsHidden.value = "[]"; }
+  }
+
 }
 
 animalIdEl?.addEventListener("input", syncCentralFields);
@@ -891,6 +901,7 @@ function hydrate(){
           `;
           stepsBox.appendChild(row);
         });
+        syncCentralFields();
       }
 
       stepsBox.addEventListener('change', (e)=>{
