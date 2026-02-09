@@ -168,7 +168,7 @@
 <input type="hidden" id="eventDate" data-field="eventDate" value="">
 <input type="hidden" id="species" data-field="species" value="">
        <input type="hidden" id="steps" data-field="steps" value="">
-
+       <input type="hidden" id="animalId" data-field="animalId" value="">
 
         <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
 <div class="field" style="margin-bottom:12px">
@@ -225,8 +225,9 @@
         <div class="row row-2">
           <div id="modeSingleBox">
           <div class="field">
-            <label for="animalId">رقم الحيوان</label>
-            <input id="animalId" type="text" placeholder="مثال: 105" />
+           <label for="animalNumberUI">رقم الحيوان</label>
+<input id="animalNumberUI" type="text" placeholder="مثال: 105" />
+
           </div>
           </div>
           <div class="field">
@@ -276,7 +277,8 @@
 
     (async () => {
       const form          = document.getElementById('ovForm');
-      const animalIdEl    = document.getElementById('animalId');
+     const animalIdEl    = document.getElementById('animalNumberUI');
+
       const startDateEl   = document.getElementById('startDate');
       const startTimeEl   = document.getElementById('startTime');
 
