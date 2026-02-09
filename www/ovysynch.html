@@ -741,6 +741,24 @@ function hydrate(){
   const qp = new URLSearchParams(location.search);
 
   const id =
+      // ✅ تنظيف الرقم: ممنوع يدخل DocID أو أي حروف
+  let cleanId = String(id || "").trim();
+
+  // لو فيه أي حرف (DocID غالبًا) → تجاهله
+  if (/[a-zA-Z]/.test(cleanId)) cleanId = "";
+
+  // لو الرقم طويل بشكل غير منطقي (DocID) → تجاهله
+  if (cleanId.length > 10) cleanId = "";
+
+  // خلّيها أرقام فقط (يدعم العربي/الفارسي)
+  cleanId = cleanId
+    .replace(/[^\d٠-٩۰-۹]/g,'')
+    .replace(/[٠-٩۰-۹]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+                                '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[d]));
+
+  // لو بعد التنظيف مش رقم → امسحه
+  if (!/^\d+$/.test(cleanId)) cleanId = "";
+
     (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
     (localStorage.getItem('lastAnimalId') || "").trim();
 
@@ -756,22 +774,22 @@ function hydrate(){
   }
 
   // ✅ الرقم
-  if (id){
-    try{ localStorage.setItem('lastAnimalId', id); }catch{}
+  if (cleanId){
+   try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
 
     const savedMode = (localStorage.getItem("mbk_ov_mode") || "single");
 
     if (savedMode === "group"){
       const raw = (bulkEl?.value || "").trim();
       if(!raw){
-        bulkEl.value = id;
+       bulkEl.value = cleanId;
       }else{
         const lines = raw.split(/\n|,|;/g).map(x=>String(x||"").trim()).filter(Boolean);
         if(!lines.includes(id)) bulkEl.value = [id, ...lines].join("\n");
       }
       parseBulkList();
     }else{
-      animalIdEl.value = id;
+      animalIdEl.value = cleanId;
     }
   }
 }
