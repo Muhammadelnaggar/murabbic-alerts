@@ -634,6 +634,7 @@ dryOffDecision(fd) {
   }
 
   return null;
+  },
 ovsynchEligibilityDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة بيانات الحيوان.";
