@@ -524,66 +524,6 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
     return { eventDate: String(d.eventDate || "").slice(0,10), id: snap.docs[0].id };
   }
 
-  // ✅ previewOvsynchList بعد جاهزية Firebase (ده كان سبب توقّف Apply)
-  window.mbk = window.mbk || {};
-  window.mbk.previewOvsynchList = async function(list, startISO){
-    const u = await waitUser();
-    if (!u) return { ok:false, rejected:[{ reason:"⚠️ لم يتم تأكيد الدخول." }] };
-
-    const dt = String(startISO || "").slice(0,10);
-    const wantedProgram = String(programEl.value || "").trim();
-
-    const valid = [];
-    const rejected = [];
-
-    for (const raw of (list||[])){
-      const num = String(raw||"").trim();
-      if (!num) continue;
-
-      try{
-        const a = await fetchAnimalDoc(u.uid, num);
-        if (!a){
-          rejected.push({ number:num, reason:`🚫 [${num}] — غير موجود في حسابك.` });
-          continue;
-        }
-
-        const sp = normSpecies(a.data?.species || a.data?.animalTypeAr || a.data?.animalType || "");
-        const word = animalWordFromSpecies(sp);
-
-        const st = String(a.data?.status || "").trim().toLowerCase();
-        if (st === "inactive"){
-          rejected.push({ number:num, reason:`🚫 [${num}] ${word} — خارج القطيع (بيع/نفوق/استبعاد).` });
-          continue;
-        }
-        if (a.data?.breedingBlocked === true || String(a.data?.reproductiveStatus||"").trim() === "لا تُلقّح مرة أخرى"){
-          rejected.push({ number:num, reason:`🚫 [${num}] ${word} — مستبعدة (لا تُلقّح مرة أخرى).` });
-          continue;
-        }
-
-        // ✅ منع Ovsynch لو اتعمل خلال أسبوعين
-        if (wantedProgram === "ovsynch"){
-          const last = await getLastOvsynchForAnimal(u.uid, num);
-          if (last?.eventDate){
-            const gap = daysBetweenISO(last.eventDate, dt);
-            if (Number.isFinite(gap) && gap >= 0 && gap < 14){
-              rejected.push({
-                number:num,
-                reason:`🚫 [${num}] ${word} — تم تسجيل Ovsynch بتاريخ ${last.eventDate} (منذ ${gap} يوم).\nاستخدم Presynch + Ovsynch بدلًا منه.`
-              });
-              continue;
-            }
-          }
-        }
-
-        valid.push(num);
-      }catch(e){
-        rejected.push({ number:num, reason:`🚫 [${num}] — تعذّر فحصه الآن.` });
-      }
-    }
-
-    return { ok:true, valid, rejected };
-  };
-
   // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
   applyBulk?.addEventListener("click", async () => {
     if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
