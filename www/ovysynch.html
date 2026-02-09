@@ -751,6 +751,14 @@ function hydrate(){
   let cleanId = String(rawId || "").trim();
 
   // لو فيه أي حرف (DocID غالبًا) → تجاهله
+   // ✅ لو اللي جاي مش رقم (DocID/UID) امسحه فورًا من الصفحة ومن التخزين
+  if (/[a-zA-Z]/.test(cleanId) || cleanId.length > 10) {
+    try{ localStorage.removeItem('lastAnimalId'); }catch{}
+    if (animalIdEl) animalIdEl.value = "";
+    if (bulkEl) bulkEl.value = "";
+    cleanId = "";
+  }
+
   if (/[a-zA-Z]/.test(cleanId)) cleanId = "";
 
   // لو طويل بشكل غير منطقي → تجاهله
