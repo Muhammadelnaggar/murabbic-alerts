@@ -162,7 +162,12 @@
   <div class="wrap">
     <div id="info" class="infobar"></div>
     <div class="mbk-card">
-      <form id="ovForm" autocomplete="off">
+     <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
+       <!-- ✅ حقول ربط للمسار المركزي (بدون تغيير واجهة الصفحة) -->
+<input type="hidden" id="animalNumber" data-field="animalNumber" value="">
+<input type="hidden" id="eventDate" data-field="eventDate" value="">
+<input type="hidden" id="species" data-field="species" value="">
+
         <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
 <div class="field" style="margin-bottom:12px">
   <div style="display:flex;gap:12px;align-items:center;font-weight:900">
@@ -295,6 +300,30 @@ const modeHintEl   = document.getElementById('modeHint');
 
 const modeBulkBox  = document.getElementById('modeBulkBox');
 const modeSingleBox= document.getElementById('modeSingleBox');
+// ✅ ربط حقول UI مع الحقول المركزية (forms-init)
+const animalNumberHidden = document.getElementById("animalNumber");
+const eventDateHidden    = document.getElementById("eventDate");
+const speciesHidden      = document.getElementById("species");
+
+function syncCentralFields(){
+  const mode = getMode();
+  const list = parseBulkList();
+  const single = (animalIdEl?.value || "").trim();
+  const first = (mode === "group") ? (list[0] || "") : single;
+
+  if (animalNumberHidden) animalNumberHidden.value = first || "";
+  if (eventDateHidden)    eventDateHidden.value    = (startDateEl?.value || "").trim();
+
+  // مبدئيًا نخليه فاضي.. forms-init هيملأه من وثيقة الحيوان
+  if (speciesHidden && !speciesHidden.value) speciesHidden.value = "";
+}
+
+animalIdEl?.addEventListener("input", syncCentralFields);
+startDateEl?.addEventListener("input", syncCentralFields);
+bulkEl?.addEventListener("input", syncCentralFields);
+modeSingleEl?.addEventListener("change", syncCentralFields);
+modeGroupEl?.addEventListener("change", syncCentralFields);
+
 
 function getMode(){
   return (modeGroupEl && modeGroupEl.checked) ? "group" : "single";
@@ -677,7 +706,8 @@ const dim = daysSinceISO(refDate, refISO); // ✅ مصدر واحد: lastCalving
 const minN = Number(minDim);
 
 if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) {
-  return { ok:false, reason:"fresh_postpartum", refType, dim: dimN, minDim: minN, animalType, animal:a };
+  return { ok:false, reason:"fresh_postpartum", refType, dim: dimN, minDim: minN, animal:a };
+
 }
 
 
@@ -1064,17 +1094,19 @@ const animalId  = animalIds[0] || "";
           for(let i=0;i<okIds.length;i++){
             const animalNo = okIds[i];
 
-            const payload = {
-              type: 'ovsynch',
-              eventType: 'بروتوكول تزامن',
-              animalId: animalNo,
-              animalNumber: animalNo,
-              startDate: ctx.start,
-              program: ctx.program,
-              steps: ctx.steps,
-              userId: u.uid,
-              createdAt: serverTimestamp()
-            };
+           const payload = {
+  type: 'ovsynch',
+  eventType: 'بروتوكول تزامن',
+  animalId: animalNo,
+  animalNumber: animalNo,
+  eventDate: ctx.start,          // ✅ أضف هذا السطر
+  startDate: ctx.start,
+  program: ctx.program,
+  steps: ctx.steps,
+  userId: u.uid,
+  createdAt: serverTimestamp()
+};
+
 
             if(typeof window.updateAnimalByEvent === "function"){
               await window.updateAnimalByEvent(payload);
@@ -1104,10 +1136,16 @@ const animalId  = animalIds[0] || "";
         }
       }
 
-      saveBtn.addEventListener('click', saveProtocol);
+     saveBtn.addEventListener('click', ()=> {
+  syncCentralFields();
+  form.requestSubmit(); // ✅ يشغّل forms-init (Gate + Validation) ثم mbk:valid
+});
+
 
       // ✅ تشغيل الصفحة
       hydrate();
+      syncCentralFields();
+
         setMode(localStorage.getItem("mbk_ov_mode") || "single");
 
       startDateEl.addEventListener('input', updateSteps);
@@ -1117,6 +1155,69 @@ const animalId  = animalIds[0] || "";
 
       const u = await waitForUser(2000);
       if(u) await loadGroupsList();
+      // ✅ بعد نجاح الـ Central Gate + Validation
+form.addEventListener("mbk:valid", async (e)=>{
+  // forms-init سيجهّز documentData + يسمح/يمنع حسب ovsynchEligibilityDecision
+  // هنا ننفذ الحفظ الفعلي للبروتوكول فقط
+
+  const ctx = getCtx();
+  if(!ctx) return;
+
+  // تأكيد الدخول (كما عندك)
+  const u = await waitForUser(2000);
+  if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد. أعد المحاولة.", true); return; }
+
+  // ⛔️ مهم: في وضع المجموعة استخدم القائمة بعد تطبيق الاستبعاد
+  const ids = (ctx.animalIds||[]).filter(Boolean);
+  if(!ids.length){ showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true); return; }
+
+  saveBtn.disabled = true;
+  const oldTxt = saveBtn.textContent;
+  saveBtn.textContent = '... جاري الحفظ';
+
+  try{
+    for(let i=0;i<ids.length;i++){
+      const animalNo = ids[i];
+
+      const payload = {
+        type: 'ovsynch',
+        eventType: 'بروتوكول تزامن',
+        animalId: animalNo,
+        animalNumber: animalNo,
+        eventDate: ctx.start,     // ✅ اسم مركزي
+        startDate: ctx.start,     // ✅ احتفاظًا بتوافقك الحالي
+        program: ctx.program,
+        steps: ctx.steps,
+        userId: u.uid,
+        createdAt: serverTimestamp()
+      };
+
+      if(typeof window.updateAnimalByEvent === "function"){
+        await window.updateAnimalByEvent(payload);
+      }
+
+      // ✅ منع التكرار
+      const protocolId = ["ovsynch", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
+      const evRef = doc(dbRef, "events", protocolId);
+      const snap = await getDoc(evRef);
+      if(snap.exists()){
+        showInfo(`⛔ البروتوكول مسجّل بالفعل للحيوان رقم ${animalNo} بنفس البرنامج ونفس تاريخ البدء.`, true);
+        continue;
+      }
+
+      await setDoc(evRef, payload);
+      showInfo(`✅ تم حفظ (${i+1}/${ids.length}) رقم ${animalNo}`);
+    }
+
+    showInfo("✅ تم تسجيل البروتوكول بنجاح");
+  }catch(err){
+    console.error(err);
+    showInfo("❌ تعذّر الحفظ. حاول مرة أخرى.", true);
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = oldTxt;
+  }
+});
 
     })();
   </script>
