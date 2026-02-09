@@ -256,6 +256,7 @@
 
         <div id="stepsBox" class="steps" aria-live="polite"></div>
         <div id="warn"></div>
+       <button type="submit" id="hiddenSubmit" style="display:none"></button>
       </form>
     </div>
   </div>
@@ -741,12 +742,12 @@ if (Number.isFinite(dimN) && Number.isFinite(minN) && dimN >= 0 && dimN < minN) 
 function hydrate(){
   const qp = new URLSearchParams(location.search);
 
-  // 1) اقرأ الرقم الخام من URL أو من التخزين
+  // 1) اقرأ الرقم الخام من URL أو التخزين
   const rawId =
     (qp.get('number') || qp.get('animalNumber') || qp.get('animalId') || "").trim() ||
     (localStorage.getItem('lastAnimalId') || "").trim();
 
-  // 2) نظّف الرقم: امنع DocID/حروف/طول غير منطقي، واسمح بالأرقام فقط (عربي/فارسي)
+  // 2) نظّف الرقم (ممنوع DocID/حروف/رموز)
   let cleanId = String(rawId || "").trim();
 
   // لو فيه أي حرف (DocID غالبًا) → تجاهله
@@ -755,7 +756,7 @@ function hydrate(){
   // لو طويل بشكل غير منطقي → تجاهله
   if (cleanId.length > 10) cleanId = "";
 
-  // أرقام فقط + تحويل العربي/الفارسي لإنجليزي
+  // أرقام فقط (يدعم العربي/الفارسي)
   cleanId = cleanId
     .replace(/[^\d٠-٩۰-۹]/g,'')
     .replace(/[٠-٩۰-۹]/g, d => ({
@@ -776,7 +777,7 @@ function hydrate(){
     try{ localStorage.setItem('lastEventDate', dt); }catch{}
   }
 
-  // 4) طبق الرقم حسب وضع Single/Group
+  // 4) طبق الرقم حسب وضع الصفحة
   if (cleanId){
     try{ localStorage.setItem('lastAnimalId', cleanId); }catch{}
 
@@ -1090,95 +1091,14 @@ const animalId  = animalIds[0] || "";
         return { animalId, animalIds, start, program, steps: stepsState };
       }
 
-      async function saveProtocol(){
-        const ctx = getCtx();
-        if(!ctx) return;
-
-        const u = await waitForUser(2000);
-        if(!u){ showInfo("⚠️ لم يتم تأكيد جلسة الدخول بعد. أعد الضغط بعد ثانيتين.", true); return; }
-
-        const ids = (ctx.animalIds||[]).filter(Boolean);
-        if(!ids.length){ showWarn("⚠️ لا يوجد أرقام حيوانات."); return; }
-
-        const okIds = [];
-        const badIds = [];
-        for(const n of ids){
-          const r = await checkAnimalQuick(n);
-          if(r.reason === "auth_blocked_silent") return;
-          if(r.ok) okIds.push(n);
-          else badIds.push({ n, reason:r.reason, extra:r });
-        }
-
-        if(badIds.length){
-          bulkEl.value = okIds.join("\n");
-          parseBulkList();
-          const details = badIds.map(b => invalidAnimalMessage(b.reason, b.n, b.extra)).join("\n");
-          showInfo(`تم استبعاد ${badIds.length} حيوان لعدم الأهلية للتزامن:\n${details}`, true);
-        }
-
-        if(!okIds.length){ showInfo("⛔ لا يوجد أرقام صالحة للتسجيل.", true); return; }
-
-        saveBtn.disabled = true;
-        const oldTxt = saveBtn.textContent;
-        saveBtn.textContent = '... جاري الحفظ';
-
-        try{
-          for(let i=0;i<okIds.length;i++){
-            const animalNo = okIds[i];
-
-           const payload = {
-  type: 'ovsynch',
-  eventType: 'بروتوكول تزامن',
-  animalId: animalNo,
-  animalNumber: animalNo,
-  eventDate: ctx.start,          // ✅ أضف هذا السطر
-  startDate: ctx.start,
-  program: ctx.program,
-  steps: ctx.steps,
-  userId: u.uid,
-  createdAt: serverTimestamp()
-};
-
-
-            if(typeof window.updateAnimalByEvent === "function"){
-              await window.updateAnimalByEvent(payload);
-            }
-
-            // ✅ منع التكرار برسالة واضحة
-            const protocolId = ["ovsynch", String(animalNo).trim(), String(ctx.program).trim(), String(ctx.start).trim()].join("__");
-            const evRef = doc(dbRef, "events", protocolId);
-            const snap = await getDoc(evRef);
-
-            if(snap.exists()){
-              showInfo(`⛔ البروتوكول مسجّل بالفعل للحيوان رقم ${animalNo} بنفس البرنامج ونفس تاريخ البدء.`, true);
-              continue;
-            }
-
-            await setDoc(evRef, payload);
-            showInfo(`✅ تم حفظ (${i+1}/${okIds.length}) رقم ${animalNo}`);
-          }
-
-          showInfo("✅ تم تسجيل البروتوكول بنجاح");
-        }catch(e){
-          console.error(e);
-          showInfo("❌ تعذّر الحفظ. حاول مرة أخرى.", true);
-        }finally{
-          saveBtn.disabled = false;
-          saveBtn.textContent = oldTxt;
-        }
-      }
-
      saveBtn.addEventListener('click', ()=> {
   syncCentralFields();
-  form.requestSubmit(); // ✅ يشغّل forms-init (Gate + Validation) ثم mbk:valid
+  form.requestSubmit(); // ✅ يشغّل forms-init (Gate + Validation) ثم mbk:valid    
 });
 
-
-       setMode(localStorage.getItem("mbk_ov_mode") || "single");ة
+       setMode(localStorage.getItem("mbk_ov_mode") || "single");
       hydrate();
       syncCentralFields();
-
-       
 
       startDateEl.addEventListener('input', updateSteps);
       startTimeEl.addEventListener('input', updateSteps);
