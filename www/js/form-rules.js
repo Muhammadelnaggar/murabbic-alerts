@@ -35,6 +35,42 @@ const isNum = (v) => {
   if (s === "") return true;                        // ✅ فاضي = مسموح لو مش required
   return !Number.isNaN(Number(s));
 };
+// ===================== Repro helpers (Unified) =====================
+function stripAr(s){
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[ًٌٍَُِّْ]/g, "");
+}
+
+function reproCategory(raw){
+  const n = stripAr(raw);
+
+  // مستبعدة
+  if (n.includes("لاتلقح") || n.includes("لاتلقحمرةاخرى")) return "blocked";
+
+  // عشار
+  if (n.includes("عشار")) return "pregnant";
+
+  // ملقح/ملقحة/ملقّحة
+  if (n.includes("ملقح") || n.includes("ملقحة") || n.includes("ملقّحة")) return "inseminated";
+
+  // مفتوح/فارغ/فارغة
+  if (n.includes("مفتوح") || n.includes("فارغ") || n.includes("فارغة")) return "open";
+
+  return "unknown";
+}
+
+function normalizeSpecies(spRaw){
+  let sp = String(spRaw || "").trim();
+  if (/cow|بقر/i.test(sp)) return "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) return "جاموس";
+  return sp;
+}
+
+function animalWord(sp){
+  return (sp === "جاموس") ? "جاموسة" : "بقرة";
+}
 
 // ===================== Calves helpers =====================
 function normDigitsOnly(s){
@@ -642,42 +678,44 @@ ovsynchEligibilityDecision(fd) {
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ الحيوان خارج القطيع.";
 
-  // ✅ مستبعدة (لا تُلقّح مرة أخرى)
-  const reproDocRaw0 = String(doc.reproductiveStatus || "").trim();
-  const reproDoc0 = reproDocRaw0.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
-  if (doc.breedingBlocked === true || reproDoc0.includes("لاتلقحمرةاخرى") || reproDoc0.includes("لاتلقح")) {
+  // ✅ مستبعدة (لا تُلقّح مرة أخرى) — من الوثيقة نفسها
+  const reproDocRaw = String(doc.reproductiveStatus || "").trim();
+  const reproDocCat = reproCategory(reproDocRaw);
+  if (doc.breedingBlocked === true || reproDocCat === "blocked") {
     return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
   }
 
   // ✅ تحديد النوع
-  let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || doc.animaltype || doc.type || "").trim();
-  if (/cow|بقر/i.test(sp)) sp = "أبقار";
-  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-
-  const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
+  const sp = normalizeSpecies(fd.species || doc.species || doc.animalTypeAr || doc.animalType || doc.animaltype || doc.type || "");
+  const w  = animalWord(sp);
 
   // ✅ الحالة التناسلية الفعلية (الأحداث أولًا ثم الوثيقة)
   const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
-  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+  const cat   = reproCategory(rsRaw);
   const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
-  // ❌ ممنوع: عشار / ملقّحة / مستبعدة
-  if (rsNorm.includes("عشار")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
-  if (rsNorm.includes("ملقح")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
-  if (rsNorm.includes("لاتلقح")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
+  // ❌ ممنوع: عشار / ملقحة / مستبعدة
+  if (cat === "pregnant" || cat === "inseminated" || cat === "blocked") {
+    return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — الحالة: ${shownStatus}.`;
+  }
 
-  // ✅ المسموح فقط: مفتوحة/فارغة (تعريف واحد واضح)
-  const isOpen =
-    rsNorm.includes("مفتوح") ||
-    rsNorm.includes("فارغ") ||
-    rsNorm.includes("فارغة");
-
-  if (!isOpen) {
-    return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — المسموح فقط للحيوانات المفتوحة.\nالحالة الحالية: ${shownStatus}.`;
+  // ✅ المسموح فقط: مفتوحة/فارغة
+  if (cat !== "open") {
+    return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — المسموح فقط للحيوانات المفتوحة.\nالحالة الحالية: ${shownStatus}.`;
   }
 
   // ✅ لازم تاريخ الحدث صالح
   if (!isDate(fd.eventDate)) return "❌ تاريخ بدء البروتوكول غير صالح.";
+
+  // ✅ قاعدة 14 يوم: منع تكرار Ovsynch خلال آخر 14 يوم
+  // (لازم forms-init يملأ fd.lastOvsynchDate)
+  const last = String(fd.lastOvsynchDate || "").trim();
+  if (last && isDate(last)) {
+    const diff = daysBetween(last, fd.eventDate);
+    if (!Number.isNaN(diff) && diff >= 0 && diff < 14) {
+      return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — تم تسجيل بروتوكول تزامن خلال آخر ${diff} يوم.\nاقترح: استخدم Presynch + Ovsynch بدلًا من ذلك.`;
+    }
+  }
 
   return null;
 },
