@@ -1028,19 +1028,124 @@ function attachOvsynchProtocol(form){
   const animalUIEl  = document.getElementById("animalNumberUI");
   const bulkEl      = document.getElementById("bulkAnimals");
   const programEl   = document.getElementById("program");
+  const startDateUIEl = document.getElementById("startDate"); // تاريخ بدء البروتوكول في الصفحة
 
   function parseBulkLocal(){
     const raw = String(bulkEl?.value || "").trim();
     if (!raw) return [];
     return [...new Set(raw.split(/\n|,|;/g).map(x=>normalizeDigits(x)).filter(Boolean))];
   }
+// ===============================
+// ✅ Gate فردي قبل إدخال أي بيانات
+// ===============================
+function lockOvsynchUI(locked){
+  // ✅ مسموح حتى مع القفل: الوضع + رقم الفردي + تاريخ البدء + وقت البدء + إدخال الجماعي
+  const allowIds = new Set([
+    "modeSingle","modeGroup",
+    "animalNumberUI","startDate","startTime","bulkAnimals",
+    "applyBulk","groupSelect","loadGroup","saveGroup"
+  ]);
+
+  // اقفل/افتح عناصر الفورم الداخلية
+  form.querySelectorAll("input, select, textarea, button").forEach(el=>{
+    if (allowIds.has(el.id)) return;
+    el.disabled = !!locked;
+  });
+
+  // اقفل/افتح checkboxes الخاصة بالخطوات (إن وجدت)
+  document.querySelectorAll('#stepsBox input[type="checkbox"]').forEach(cb=>{
+    cb.disabled = !!locked;
+  });
+
+  form.dataset.ov_single_ok = locked ? "0" : "1";
+}
+
+async function runSingleGateIfReady(){
+  const isGroup = !!modeGroupEl?.checked;
+  if (isGroup) return; // الفردي فقط
+
+  const num = normalizeDigits(animalUIEl?.value || "");
+  const dt  = String(startDateUIEl?.value || "").trim().slice(0,10);
+
+  // لو لسه ناقص رقم/تاريخ: ما نزعجش المستخدم
+  if (!num || !dt){
+    form.dataset.ov_single_ok = "0";
+    return;
+  }
+
+  if (typeof window.mbk?.previewOvsynchList !== "function"){
+    form.dataset.ov_single_ok = "0";
+    showMsg(bar, "❌ تعذّر تحميل نظام التحقق المركزي (previewOvsynchList). حدّث الصفحة.", "error");
+    return;
+  }
+
+  showMsg(bar, "⏳ جارِ التحقق من أهلية الرقم…", "info");
+
+  const r = await window.mbk.previewOvsynchList([num], dt);
+
+  if (!r || r.ok === false){
+    form.dataset.ov_single_ok = "0";
+    // ✅ امسح الرقم زي الجماعي
+    animalUIEl.value = "";
+    const hiddenNum = form.querySelector('[data-field="animalNumber"]');
+    if (hiddenNum) hiddenNum.value = "";
+    showMsg(bar, (r?.rejected?.[0]?.reason || "❌ تعذّر التحقق الآن."), "error");
+    try{ animalUIEl.focus(); }catch(_){}
+    return;
+  }
+
+  const valid = Array.isArray(r.valid) ? r.valid : [];
+  const rejected = Array.isArray(r.rejected) ? r.rejected : [];
+
+  if (!valid.includes(num)){
+    form.dataset.ov_single_ok = "0";
+    // ✅ امسح الرقم زي الجماعي
+    animalUIEl.value = "";
+    const hiddenNum = form.querySelector('[data-field="animalNumber"]');
+    if (hiddenNum) hiddenNum.value = "";
+    showMsg(bar, rejected[0]?.reason || `❌ رقم ${num}: غير مؤهل للتزامن.`, "error");
+    try{ animalUIEl.focus(); }catch(_){}
+    return;
+  }
+
+  // ✅ مؤهل
+  form.dataset.ov_single_ok = "1";
+  const hiddenNum = form.querySelector('[data-field="animalNumber"]');
+  if (hiddenNum) hiddenNum.value = num;
+  showMsg(bar, `✅ رقم ${num} مؤهل لبروتوكول التزامن بتاريخ ${dt}.`, "ok");
+}
+
+// ✅ شغّل Gate الفردي تلقائيًا عند تغيير الرقم/التاريخ/الوضع
+["input","change","blur"].forEach(evt=>{
+  animalUIEl?.addEventListener(evt, runSingleGateIfReady);
+  startDateUIEl?.addEventListener(evt, runSingleGateIfReady);
+});
+
+modeGroupEl?.addEventListener("change", runSingleGateIfReady);
+document.getElementById("modeSingle")?.addEventListener("change", runSingleGateIfReady);
+
+// ✅ عند فتح الصفحة: اقفل فورًا ثم حاول Gate لو الرقم/التاريخ موجودين
+lockOvsynchUI(true);
+setTimeout(runSingleGateIfReady, 50);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+// ✅ لو فردي ولم ينجح الـGate: امنع أي حفظ
+const isGroupNow = !!modeGroupEl?.checked;
+if (!isGroupNow && form.dataset.ov_single_ok !== "1"){
+  showMsg(bar, "⚠️ اكتب رقم الحيوان واختر التاريخ… وانتظر رسالة الأهلية ✅ قبل إدخال أي بيانات أو حفظ.", "error");
+  return;
+}
 
     const formData = collectFormData(form);
 
-    const dt = String(formData.eventDate || "").trim().slice(0,10);
+   // ✅ مصدر التاريخ في Ovsynch لازم يكون من UI (startDate) لأن hidden قد يكون غير متزامن
+const startDateUI = document.getElementById("startDate");
+const dt = String((startDateUI?.value || formData.eventDate || "")).trim().slice(0,10);
+
+// ✅ تأكيد مزامنة payload قبل التحقق/الحفظ
+formData.eventDate = dt;
+
     const program = String(programEl?.value || formData.program || "").trim();
 
     // ✅ فحوصات UI بسيطة (وليست أهلية)
