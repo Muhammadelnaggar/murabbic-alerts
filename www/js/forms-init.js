@@ -402,31 +402,50 @@ for (const num of uniq) {
     continue;
   }
 
-  // 4) ممنوع لو عشار أو ملقح (من الوثيقة فقط)
-  if (reproDoc.includes("عشار")) {
-    rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (عشار).` });
-    continue;
-  }
-  if (reproDoc.includes("ملقح") || reproDoc.includes("ملقحة")) {
-    rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (ملقّح).` });
-    continue;
-  }
+     // 4) ✅ قرار الأهلية = نفس Guard المركزي (مصدر واحد)
+    // جهّز fd للـGuard
+    const sp = normSpeciesFromDoc(doc);
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
 
-  // 6) ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
-  const last = await getLastOvsynchEvent(uid, num);
-  if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
-    const g14 = daysBetweenISO(last.eventDate, dt);
-    if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
-      rejected.push({
-        number:num,
-        reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
-      });
+    const fd = {
+      animalNumber: num,
+      eventDate: dt,
+      species: sp,
+      documentData: doc,
+      // في بروتوكول التزامن: نعتمد على الوثيقة (كما اتفقنا)
+      reproStatusFromEvents: "", 
+    };
+
+    // ✅ نفّذ Guard المركزي نفسه
+    try{
+      const g = (typeof guards?.ovsynchEligibilityDecision === "function")
+        ? guards.ovsynchEligibilityDecision(fd)
+        : null;
+
+      if (g) {
+        rejected.push({ number:num, reason:`❌ رقم ${num}: ${String(g).replace(/^❌\s*/,"")}` });
+        continue;
+      }
+    }catch(_){
+      rejected.push({ number:num, reason:`❌ رقم ${num}: تعذّر التحقق من الأهلية الآن.` });
       continue;
     }
-  }
 
-  valid.push(num);
-}
+    // 5) ✅ قاعدة 14 يوم: ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
+    const last = await getLastOvsynchEvent(uid, num);
+    if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
+      const g14 = daysBetweenISO(last.eventDate, dt);
+      if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
+        rejected.push({
+          number:num,
+          reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+        });
+        continue;
+      }
+    }
+
+    valid.push(num);
+
 
 
   return { ok:true, valid, rejected };
@@ -1000,43 +1019,104 @@ function attachUniqueAnimalNumberWatcher() {
 function attachOvsynchProtocol(form){
   const bar = ensureInfoBar(form);
   const eventName = String(form.getAttribute("data-event") || "").trim();
-
-  // أمان: ما نشتغلش إلا على بروتوكول التزامن
   if (eventName !== "بروتوكول تزامن") return;
 
-  // لا Lock ولا Gate
+  // لا Lock ولا Gate عام
   form.dataset.locked = "0";
+
+  // Helpers محلية للصفحة (لو موجودة عناصرها)
+  const modeGroupEl = document.getElementById("modeGroup");
+  const animalUIEl  = document.getElementById("animalNumberUI");
+  const bulkEl      = document.getElementById("bulkAnimals");
+  const programEl   = document.getElementById("program");
+
+  function parseBulkLocal(){
+    const raw = String(bulkEl?.value || "").trim();
+    if (!raw) return [];
+    return [...new Set(raw.split(/\n|,|;/g).map(x=>normalizeDigits(x)).filter(Boolean))];
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const formData = collectFormData(form);
 
-    const n = normalizeDigits(formData.animalNumber || "");
-    const d = String(formData.eventDate || "").trim();
+    const dt = String(formData.eventDate || "").trim().slice(0,10);
+    const program = String(programEl?.value || formData.program || "").trim();
 
-    if (!n || !d) {
-      showMsg(bar, "⚠️ أدخل رقم الحيوان وتاريخ بدء البروتوكول أولًا.", "error");
+    // ✅ فحوصات UI بسيطة (وليست أهلية)
+    if (!dt) { showMsg(bar, "⚠️ اختر تاريخ بدء البروتوكول أولًا.", "error"); return; }
+    if (!program) { showMsg(bar, "⚠️ اختر نوع البرنامج أولًا.", "error"); return; }
+
+    // ✅ steps لازم تكون موجودة وصالحة (مركزيًا مطلوب)
+    let stepsArr = [];
+    try{
+      stepsArr = JSON.parse(String(formData.steps || "[]"));
+    }catch(_){
+      stepsArr = [];
+    }
+    if (!Array.isArray(stepsArr) || !stepsArr.length){
+      showMsg(bar, "⚠️ لازم تختار البرنامج علشان الجدول يظهر، وبعدها سجّل.", "error");
       return;
     }
 
-    // مهم: نظّف الرقم داخل الـpayload
-    formData.animalNumber = n;
-   // ✅ تحقق فردي مركزي (نفس قواعد الجماعي)
-try{
-  if (typeof window.mbk?.previewOvsynchList === "function") {
-    const r = await window.mbk.previewOvsynchList([n], String(d).slice(0,10));
-    if (!r || r.ok === false || !(r.valid || []).length) {
-      const msg = (r?.rejected?.[0]?.reason) ? String(r.rejected[0].reason) : "❌ هذا الرقم غير صالح للتزامن.";
+    // ✅ حدّد targets حسب الوضع
+    const isGroup = !!modeGroupEl?.checked;
+    let targets = [];
+
+    if (isGroup){
+      targets = parseBulkLocal();
+    }else{
+      const one = normalizeDigits(animalUIEl?.value || formData.animalNumber || "");
+      if (one) targets = [one];
+    }
+
+    if (!targets.length){
+      showMsg(bar, "⚠️ اكتب رقم الحيوان (أو قائمة الأرقام) أولًا.", "error");
+      return;
+    }
+
+    // ✅ تحقق الدخول
+    const uid = await getUid();
+    if (!uid){
+      showMsg(bar, "⚠️ لم يتم تأكيد الدخول.", "error");
+      return;
+    }
+
+    // ✅ التحقق المركزي (أهلية + 14 يوم) = previewOvsynchList (الذي يستدعي Guard)
+    if (typeof window.mbk?.previewOvsynchList !== "function"){
+      showMsg(bar, "❌ تعذّر تحميل نظام التحقق المركزي (previewOvsynchList).", "error");
+      return;
+    }
+
+    const r = await window.mbk.previewOvsynchList(targets, dt);
+    if (!r || r.ok === false){
+      const msg = (r?.rejected?.[0]?.reason) ? String(r.rejected[0].reason) : "❌ تعذّر التحقق الآن.";
       showMsg(bar, msg, "error");
       return;
     }
-  }
-}catch(_){
-  // لو حصل خطأ، امنع الحفظ بدل ما نسجل غلط
-  showMsg(bar, "❌ تعذّر التحقق من صلاحية الرقم الآن. جرّب مرة أخرى.", "error");
-  return;
-}
+
+    const valid = Array.isArray(r.valid) ? r.valid : [];
+    const rejected = Array.isArray(r.rejected) ? r.rejected : [];
+
+    if (!valid.length){
+      const prev = rejected.slice(0,6).map(x=>x.reason).join("\n");
+      showMsg(bar, prev || "🚫 لا يوجد رقم صالح للتسجيل.", "error");
+      return;
+    }
+
+    // ✅ لو جماعي: رجّع القائمة بعد التنظيف
+    if (isGroup && bulkEl){
+      bulkEl.value = valid.join("\n");
+    }
+
+    // ✅ جهّز formData لإطلاق mbk:valid (مرّة واحدة)
+    formData.userId = uid;
+    formData.program = program;
+    formData.steps = JSON.stringify(stepsArr);
+    formData.animalNumber = valid[0];        // للتوافق
+    formData.animalNumbers = valid;          // ✅ قائمة كاملة
+    formData.rejected = rejected;            // ✅ لأجل الرسالة النهائية
 
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
@@ -1046,6 +1126,7 @@ try{
     );
   });
 }
+
 
 function autoAttach() {
 document
