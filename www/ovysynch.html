@@ -83,29 +83,30 @@
 
     #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
 
-    #info.infobar{
+   #sysbar.infobar{
       display:none;
       position: sticky;
       top: 72px;
       z-index: 19;
       margin: 10px 0 10px;
     }
-    #info .msgrow{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:10px;
-    }
-    #info .okbtn{
-      flex-shrink:0;
-      border-radius:12px;
-      padding:8px 12px;
-      font-weight:900;
-      border:2px solid var(--brand-600, #0b7f47);
-      background:#fff;
-      color: var(--brand-600, #0b7f47);
-      cursor:pointer;
-    }
+   #sysbar .msgrow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+#sysbar .okbtn{
+  flex-shrink:0;
+  border-radius:12px;
+  padding:8px 12px;
+  font-weight:900;
+  border:2px solid var(--brand-600, #0b7f47);
+  background:#fff;
+  color: var(--brand-600, #0b7f47);
+  cursor:pointer;
+}
+
 
     .btn-row{
       position: sticky;
@@ -160,8 +161,7 @@
   </header>
 
   <div class="wrap">
-    <div id="info" class="infobar"></div>
-
+   <div id="sysbar" class="infobar"></div>
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
         <!-- ✅ حقول ربط للمسار المركزي -->
@@ -286,7 +286,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
   const stepsBox    = document.getElementById('stepsBox');
   const saveBtn     = document.getElementById('saveBtn');
   const openCowCard = document.getElementById('openCowCard');
-  const infoEl      = document.getElementById('info');
+const infoEl      = document.getElementById('sysbar');
   const warnEl      = document.getElementById('warn');
 
   const modeSingle  = document.getElementById('modeSingle');
@@ -316,7 +316,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
     infoEl.innerHTML=`
       <div class="msgrow">
         <div style="white-space:pre-line">${text}</div>
-        <button type="button" class="okbtn" onclick="this.closest('#info').style.display='none'">حسنًا</button>
+        <button type="button" class="okbtn" onclick="this.closest('#sysbar').style.display='none'">حسنًا</button>
       </div>`;
     infoEl.scrollIntoView({behavior:"smooth",block:"start"});
   }
@@ -604,18 +604,12 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
   });
 
   // ✅ حفظ فعلي: فردي أو جماعي بعد mbk:valid
-  form.addEventListener("mbk:valid", async ()=>{
+ form.addEventListener("mbk:valid", async (ev)=> {
     if (!fbReady){ showInfo("⛔ Firebase غير جاهز الآن.", true); return; }
 
     const start = (startDateEl.value || "").trim() || todayISO();
     if (!startDateEl.value) startDateEl.value = start;
-
-    const program = (programEl.value || "").trim();
-    if (!program){ showWarn("⚠️ اختر نوع البرنامج."); return; }
-    if (!Array.isArray(stepsState) || !stepsState.length){
-  showWarn("⚠️ لازم تختار البرنامج علشان الجدول يظهر، وبعدها سجّل.");
-  return;
-}
+   const program = (programEl.value || "").trim();
     const u = await waitUser();
     if (!u){ showInfo("⚠️ لم يتم تأكيد الدخول.", true); return; }
 
@@ -626,20 +620,11 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
 
     if (!targets.length){ showWarn("⚠️ اكتب رقم الحيوان."); return; }
 
-    // ✅ فلترة نهائية (منع ovsynch خلال أسبوعين + استبعاد/خارج القطيع)
-    const check = await window.mbk.previewOvsynchList(targets, start);
-    if (!check.ok){
-      showInfo(check?.rejected?.[0]?.reason || "⚠️ تعذّر الفحص الآن.", true);
-      return;
-    }
+   // ✅ القائمة النهائية تأتي من forms-init (مركزي)
+const fd = ev?.detail?.formData || null;
+const finalList = Array.isArray(fd?.animalNumbers) ? fd.animalNumbers : targets;
+const rejected  = Array.isArray(fd?.rejected) ? fd.rejected : [];
 
-    const finalList = check.valid || [];
-    const rejected = check.rejected || [];
-
-    if (!finalList.length){
-      showInfo(rejected.slice(0,6).map(x=>x.reason).join("\n") || "🚫 لا يوجد رقم صالح للتسجيل.", true);
-      return;
-    }
 
     // ✅ بناء payload ثابت للخطوات
     const payloadBase = {
