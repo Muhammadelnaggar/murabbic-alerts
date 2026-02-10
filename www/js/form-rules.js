@@ -707,18 +707,31 @@ ovsynchEligibilityDecision(fd) {
   // ✅ لازم تاريخ الحدث صالح
   if (!isDate(fd.eventDate)) return "❌ تاريخ بدء البروتوكول غير صالح.";
 
-  // ✅ قاعدة 14 يوم: منع تكرار Ovsynch خلال آخر 14 يوم
-  // (لازم forms-init يملأ fd.lastOvsynchDate)
-  const last = String(fd.lastOvsynchDate || "").trim();
-  if (last && isDate(last)) {
-    const diff = daysBetween(last, fd.eventDate);
-    if (!Number.isNaN(diff) && diff >= 0 && diff < 14) {
-      return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — تم تسجيل بروتوكول تزامن خلال آخر ${diff} يوم.\nاقترح: استخدم Presynch + Ovsynch بدلًا من ذلك.`;
+    // ✅ منع "حديثة الولادة" (رسالة مهنية واضحة)
+  // (يمكن لاحقًا جعلها إعداد/Config، الآن ثابتة مثل التلقيح)
+  const lastCalving = String(doc.lastCalvingDate || "").trim();
+  if (lastCalving && isDate(lastCalving)) {
+    // نفس حدودك المعتمدة: أبقار 60 / جاموس 45
+    const minAfterCalving = (sp === "جاموس") ? 45 : 60;
+    const sinceCalving = daysBetween(lastCalving, fd.eventDate);
+    if (Number.isFinite(sinceCalving) && sinceCalving >= 0 && sinceCalving < minAfterCalving) {
+      return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — حديثة الولادة (منذ ${sinceCalving} يوم).`;
+    }
+  }
+
+  // ✅ قاعدة 14 يوم — تُحسب من نهاية آخر Ovsynch (وليس من بدايته)
+  // forms-init سيمرّر fd.lastOvsynchEndDate
+  const lastEnd = String(fd.lastOvsynchEndDate || "").trim();
+  if (lastEnd && isDate(lastEnd)) {
+    const diff = daysBetween(lastEnd, fd.eventDate);
+    if (Number.isFinite(diff) && diff >= 0 && diff < 14) {
+      // كود خاص: عشان preview يستبعده من القائمة بدل ما يوقف الدنيا كخطأ
+      return `SKIP_OV_ACTIVE|${w} ضمن برنامج تزامن حديث — يلزم مرور 14 يوم بعد انتهاء آخر Ovsynch (انتهى ${lastEnd}).`;
     }
   }
 
   return null;
-  return null;
+
 }
 };
 // ===================================================================
