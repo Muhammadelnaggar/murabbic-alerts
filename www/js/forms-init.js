@@ -343,6 +343,8 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
     if (/cow|بقر/i.test(sp)) sp = "أبقار";
     if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
     return sp || "أبقار";
+    const animalLabel = (sp === "جاموس") ? "الجاموسة" : "البقرة";
+
   }
 
   // ✅ helper: last ovsynch check (14 days)
@@ -374,7 +376,7 @@ for (const num of uniq) {
   // 1) الحيوان موجود؟
   const animal = await fetchAnimalByNumberForUser(uid, num);
   if (!animal) {
-    rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في القطيع/حسابك.` });
+    rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: غير موجود في القطيع/حسابك.` });
     continue;
   }
 
@@ -383,7 +385,7 @@ for (const num of uniq) {
   // 2) status: inactive ممنوع
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive") {
-    rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (inactive).` });
+    rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: خارج القطيع (inactive).` });
     continue;
   }
 
@@ -398,7 +400,7 @@ for (const num of uniq) {
     reproDoc.includes("لاتلقحمرةاخري") ||
     reproDoc.includes("لاتلقح")
   ) {
-    rejected.push({ number:num, reason:`❌ رقم ${num}: مستبعدة (لا تُلقّح مرة أخرى).` });
+    rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: مستبعدة (لا تُلقّح مرة أخرى).` });
     continue;
   }
 
@@ -423,11 +425,11 @@ for (const num of uniq) {
         : null;
 
       if (g) {
-        rejected.push({ number:num, reason:`❌ رقم ${num}: ${String(g).replace(/^❌\s*/,"")}` });
+        rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: ${String(g).replace(/^❌\s*/,"")}` });
         continue;
       }
     }catch(_){
-      rejected.push({ number:num, reason:`❌ رقم ${num}: تعذّر التحقق من الأهلية الآن.` });
+      rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: تعذّر التحقق من الأهلية الآن.` });
       continue;
     }
 
@@ -438,7 +440,7 @@ for (const num of uniq) {
       if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
         rejected.push({
           number:num,
-          reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+          reason:`❌ ${animalLabel} رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
         });
         continue;
       }
@@ -447,7 +449,29 @@ for (const num of uniq) {
     valid.push(num);
 }
   
-  return { ok:true, valid, rejected };
+ // ===============================
+// Murabbik Official Message Style
+// ===============================
+if (!valid.length) {
+
+  const reasons = rejected.map(r => r.reason);
+
+  const finalMessage =
+    "🔎 تم فحص القائمة\n" +
+    "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
+    "هذه الحيوانات غير مؤهلة للدخول في برنامج التزامن للأسباب التالية:\n\n" +
+    reasons.join("\n");
+
+  return {
+    ok: true,
+    valid: [],
+    rejected,
+    message: finalMessage
+  };
+}
+
+return { ok:true, valid, rejected };
+
 }
 
 // ✅ اجعلها متاحة للصفحات بدون استيراد
