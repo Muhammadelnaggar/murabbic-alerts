@@ -622,8 +622,16 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
 
    // ✅ القائمة النهائية تأتي من forms-init (مركزي)
 const fd = ev?.detail?.formData || null;
-const finalList = Array.isArray(fd?.animalNumbers) ? fd.animalNumbers : targets;
-const rejected  = Array.isArray(fd?.rejected) ? fd.rejected : [];
+
+// ✅ قفل أمان: ممنوع حفظ بدون نتيجة تحقق صريحة من forms-init
+if (!fd || !Array.isArray(fd.animalNumbers)) {
+  showInfo("⛔ لم يكتمل التحقق المركزي.\nمن فضلك اضغط (تسجيل البروتوكول) مرة أخرى بعد ثانية.", true);
+  return;
+}
+
+const finalList = fd.animalNumbers;
+const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
+;
 
 
     // ✅ بناء payload ثابت للخطوات
