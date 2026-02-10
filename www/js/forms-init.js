@@ -344,24 +344,6 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
     if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
     return sp || "أبقار";
   }
-function addDaysISO(dateISO, days){
-  const d = new Date(String(dateISO || "").slice(0,10));
-  if (Number.isNaN(d.getTime())) return "";
-  d.setHours(0,0,0,0);
-  d.setDate(d.getDate() + Number(days || 0));
-  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-}
-
-function getMaxStepDay(steps){
-  if (!Array.isArray(steps)) return 0;
-  let mx = 0;
-  for (const s of steps){
-    const v =
-      Number(s?.day ?? s?.d ?? s?.offsetDays ?? s?.offset ?? s?.dayOffset ?? 0);
-    if (Number.isFinite(v)) mx = Math.max(mx, v);
-  }
-  return mx;
-}
 
   // ✅ helper: last ovsynch check (14 days)
   async function getLastOvsynchEvent(uid, animalNumber){
@@ -425,20 +407,14 @@ for (const num of uniq) {
     const sp = normSpeciesFromDoc(doc);
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
 
-   // ✅ آخر Ovsynch (نهاية البروتوكول) لتطبيق قاعدة 14 يوم من الانتهاء
-const lastOv = await getLastOvsynchEvent(uid, num);
-
-const fd = {
-  animalNumber: num,
-  eventDate: dt,
-  species: sp,
-  documentData: doc,
-  reproStatusFromEvents: "",
-
-  // ✅ الجديد: نهاية آخر بروتوكول
-  lastOvsynchEndDate: String(lastOv?.endDate || "").trim()
-};
-
+    const fd = {
+      animalNumber: num,
+      eventDate: dt,
+      species: sp,
+      documentData: doc,
+      // في بروتوكول التزامن: نعتمد على الوثيقة (كما اتفقنا)
+      reproStatusFromEvents: "", 
+    };
 
     // ✅ نفّذ Guard المركزي نفسه
     try{
@@ -446,22 +422,26 @@ const fd = {
         ? guards.ovsynchEligibilityDecision(fd)
         : null;
 
-     if (g) {
-  const s = String(g);
-
-  // ✅ استبعاد صامت/معلوماتي (ضمن برنامج نشط)
-  if (s.startsWith("SKIP_OV_ACTIVE|")) {
-    rejected.push({ number:num, reason:`ℹ️ رقم ${num}: ${s.replace(/^SKIP_OV_ACTIVE\|/,"")}` });
-    continue;
-  }
-
-  rejected.push({ number:num, reason:`❌ رقم ${num}: ${s.replace(/^❌\s*/,"")}` });
-  continue;
-}
-
+      if (g) {
+        rejected.push({ number:num, reason:`❌ رقم ${num}: ${String(g).replace(/^❌\s*/,"")}` });
+        continue;
+      }
     }catch(_){
       rejected.push({ number:num, reason:`❌ رقم ${num}: تعذّر التحقق من الأهلية الآن.` });
       continue;
+    }
+
+    // 5) ✅ قاعدة 14 يوم: ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
+    const last = await getLastOvsynchEvent(uid, num);
+    if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
+      const g14 = daysBetweenISO(last.eventDate, dt);
+      if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
+        rejected.push({
+          number:num,
+          reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+        });
+        continue;
+      }
     }
 
     valid.push(num);
@@ -1170,5 +1150,4 @@ if (document.readyState === "loading") {
 } else {
   autoAttach();
 }
-
 
