@@ -370,59 +370,64 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
     }
   }
 
-  for (const num of uniq) {
-    // 1) الحيوان موجود؟
-    const animal = await fetchAnimalByNumberForUser(uid, num);
-    if (!animal) {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في القطيع/حسابك.` });
+for (const num of uniq) {
+  // 1) الحيوان موجود؟
+  const animal = await fetchAnimalByNumberForUser(uid, num);
+  if (!animal) {
+    rejected.push({ number:num, reason:`❌ رقم ${num}: غير موجود في القطيع/حسابك.` });
+    continue;
+  }
+
+  const doc = animal.data || {};
+
+  // 2) status: inactive ممنوع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (inactive).` });
+    continue;
+  }
+
+  // 3) مستبعدة (لا تُلقّح مرة أخرى)
+  const reproDocRaw = String(doc.reproductiveStatus || "").trim();
+  const reproDoc = stripTashkeel(reproDocRaw);
+
+  if (
+    doc.breedingBlocked === true ||
+    reproDoc.includes("لاتلقحمرةاخرى") ||
+    reproDoc.includes("لاتلقحمرهاخرى") ||
+    reproDoc.includes("لاتلقحمرةاخري") ||
+    reproDoc.includes("لاتلقح")
+  ) {
+    rejected.push({ number:num, reason:`❌ رقم ${num}: مستبعدة (لا تُلقّح مرة أخرى).` });
+    continue;
+  }
+
+  // 4) ممنوع لو عشار أو ملقح (من الوثيقة فقط)
+  if (reproDoc.includes("عشار")) {
+    rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (عشار).` });
+    continue;
+  }
+  if (reproDoc.includes("ملقح") || reproDoc.includes("ملقحة")) {
+    rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (ملقّح).` });
+    continue;
+  }
+
+  // 6) ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
+  const last = await getLastOvsynchEvent(uid, num);
+  if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
+    const g14 = daysBetweenISO(last.eventDate, dt);
+    if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
+      rejected.push({
+        number:num,
+        reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+      });
       continue;
     }
+  }
 
-    const doc = animal.data || {};
-
-    // 2) status: inactive ممنوع (نافقة/بيع/استبعاد يتم تخزينها inactive)
-    const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: خارج القطيع (inactive).` });
-      continue;
-    }
-
-    // 3) مستبعدة (لا تُلقح مرة أخرى)
-    const reproDocRaw = String(doc.reproductiveStatus || "").trim();
-    const reproDoc = stripTashkeel(reproDocRaw);
-
-    if (doc.breedingBlocked === true || reproDoc.includes("لاتلقحمرةاخرى") || reproDoc.includes("لاتلقحمرهاخرى") || reproDoc.includes("لاتلقحمرةاخري") || reproDoc.includes("لاتلقح")) {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: مستبعدة (لا تُلقّح مرة أخرى).` });
-      continue;
-    }
-
-    // 4) ممنوع لو عشار أو ملقح (من الوثيقة فقط)
-    if (reproDoc.includes("عشار")) {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (عشار).` });
-      continue;
-    }
-    if (reproDoc.includes("ملقح") || reproDoc.includes("ملقحة")) {
-      rejected.push({ number:num, reason:`❌ رقم ${num}: ممنوع Ovsynch — الحالة التناسلية (ملقّح).` });
-      continue;
-    }
-
+  valid.push(num);
 }
 
-    // 6) ممنوع Ovsynch لو اتعمل Ovsynch خلال 14 يوم
-    const last = await getLastOvsynchEvent(uid, num);
-    if (last?.eventDate && String(last.program||"").trim() === "ovsynch") {
-      const g14 = daysBetweenISO(last.eventDate, dt);
-      if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
-        rejected.push({
-          number:num,
-          reason:`❌ رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
-        });
-        continue;
-      }
-    }
-
-    valid.push(num);
-  }
 
   return { ok:true, valid, rejected };
 }
