@@ -534,10 +534,16 @@ const infoEl      = document.getElementById('sysbar');
     const dt = (startDateEl.value || todayISO()).trim();
     const r = await window.mbk.previewOvsynchList(list, dt);
 
-    if (!r || r.ok === false) {
-      showInfo(r?.rejected?.[0]?.reason || "⚠️ تعذّر فحص القائمة الآن.", true);
-      return;
-    }
+  if (!r || r.ok === false) {
+  showInfo("⚠️ تعذّر فحص القائمة الآن.", true);
+  return;
+}
+
+if (r.message) {
+  showInfo(r.message, true);
+  return;
+}
+
 
     bulkList = r.valid;
     bulkEl.value = bulkList.join("\n");
