@@ -642,8 +642,10 @@ ovsynchEligibilityDecision(fd) {
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ الحيوان خارج القطيع.";
 
-  // ✅ مستبعدة (لا تُلقّح)
-  if (doc.breedingBlocked === true || String(doc.reproductiveStatus || "").trim() === "لا تُلقّح مرة أخرى") {
+  // ✅ مستبعدة (لا تُلقّح مرة أخرى)
+  const reproDocRaw0 = String(doc.reproductiveStatus || "").trim();
+  const reproDoc0 = reproDocRaw0.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+  if (doc.breedingBlocked === true || reproDoc0.includes("لاتلقحمرةاخرى") || reproDoc0.includes("لاتلقح")) {
     return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
   }
 
@@ -654,21 +656,32 @@ ovsynchEligibilityDecision(fd) {
 
   const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
 
-  // ✅ الحالة التناسلية الفعلية (events أولًا ثم الوثيقة)
+  // ✅ الحالة التناسلية الفعلية (الأحداث أولًا ثم الوثيقة)
   const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
   const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
   const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
-  // ❌ عشار / ملقحة
+  // ❌ ممنوع: عشار / ملقّحة / مستبعدة
   if (rsNorm.includes("عشار")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
   if (rsNorm.includes("ملقح")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
+  if (rsNorm.includes("لاتلقح")) return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — الحالة: ${shownStatus}.`;
+
+  // ✅ المسموح فقط: مفتوحة/فارغة (تعريف واحد واضح)
+  const isOpen =
+    rsNorm.includes("مفتوح") ||
+    rsNorm.includes("فارغ") ||
+    rsNorm.includes("فارغة");
+
+  if (!isOpen) {
+    return `❌ لا يمكن بدء بروتوكول تزامن لـ${animalWord} — المسموح فقط للحيوانات المفتوحة.\nالحالة الحالية: ${shownStatus}.`;
+  }
 
   // ✅ لازم تاريخ الحدث صالح
   if (!isDate(fd.eventDate)) return "❌ تاريخ بدء البروتوكول غير صالح.";
 
-  // ✅ لا يوجد أي شرط 49/40 بعد الولادة/الإجهاض (تم إلغاؤه بالكامل)
   return null;
 },
+
 },
 // ===================================================================
 //      قاعدة منفصلة: منع تكرار رقم الحيوان لنفس المستخدم فقط
