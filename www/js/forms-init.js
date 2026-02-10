@@ -445,11 +445,12 @@ for (const num of uniq) {
     }
 
     valid.push(num);
-
+}
+  
 
 
   return { ok:true, valid, rejected };
-}
+
 
 // ✅ اجعلها متاحة للصفحات بدون استيراد
 window.mbk = window.mbk || {};
@@ -1152,4 +1153,4 @@ if (document.readyState === "loading") {
   autoAttach();
 }
 
-export { autoAttach };
+
