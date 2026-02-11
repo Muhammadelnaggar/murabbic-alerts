@@ -197,3 +197,60 @@ html[dir="rtl"] input[type="date"]{
 .btn-row{display:flex;gap:10px;margin-top:12px}
 .btn-row .save-btn{flex:1;width:auto;margin:0}
 .btn-row .open-card{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}
+/* ===============================
+   Murabbik Infobar — Types (Unified)
+   =============================== */
+
+/* اجعل الافتراضي مخفي؛ يظهر فقط عند .show */
+.infobar{ display:none; }
+.infobar.show{ display:block; }
+
+/* Success */
+.infobar.success,
+.infobar.ok{
+  border-color:#bbf7d0;
+  background:#ecfdf5;
+  color:#065f46;
+}
+
+/* Error */
+.infobar.error{
+  border-color:#fecaca;
+  background:#fef2f2;
+  color:#991b1b;
+}
+
+/* Info */
+.infobar.info{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1e3a8a;
+}
+
+/* Warning */
+.infobar.warn,
+.infobar.warning{
+  border-color:#fde68a;
+  background:#fffbeb;
+  color:#92400e;
+}
+
+/* Layout inside bar */
+.infobar .msgrow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+/* OK button */
+.infobar .okbtn{
+  flex-shrink:0;
+  border-radius:12px;
+  padding:8px 12px;
+  font-weight:900;
+  border:2px solid var(--brand-600, #0b7f47);
+  background:#fff;
+  color:var(--brand-600, #0b7f47);
+  cursor:pointer;
+}
