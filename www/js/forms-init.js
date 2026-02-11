@@ -61,12 +61,19 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   if (!bar) return;
 
   bar.style.display = "block";
-  bar.className = "infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
+ const cls =
+  (type === "error") ? "error" :
+  (type === "ok" || type === "success") ? "success" :
+  (type === "warn" || type === "warning") ? "warning" :
+  "info";
+
+bar.className = "infobar show " + cls;
+
 
   const isErr = (type === "error");
-  bar.style.borderColor = isErr ? "#ef9a9a" : "#86efac";
-  bar.style.background  = isErr ? "#ffebee" : "#ecfdf5";
-  bar.style.color       = isErr ? "#b71c1c" : "#065f46";
+ // bar.style.borderColor = isErr ? "#ef9a9a" : "#86efac";
+  //bar.style.background  = isErr ? "#ffebee" : "#ecfdf5";
+ // bar.style.color       = isErr ? "#b71c1c" : "#065f46";
 
   const lines = Array.isArray(msgs) ? msgs : [msgs];
   const safeLines = lines.filter(Boolean).map(_escapeHtml);
