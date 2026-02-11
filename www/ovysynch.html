@@ -556,23 +556,7 @@ const infoEl      = document.getElementById('sysbar');
   bulkList = valid;
   bulkEl.value = valid.join("\n");
 
-  // ✍️ اكتب سبب كل رقم غير مؤهل
-  const details = rejected.map(x => {
-    const num = String(x?.number ?? x?.animalNumber ?? "").trim();
-    const rs  = String(x?.reason || "").trim();
-    return num ? `✖ رقم ${num}: ${rs}` : `✖ ${rs}`;
-  }).filter(Boolean);
-
-  let msg =
-    `🔎 تم فحص القائمة\n` +
-    `✅ مقبول: ${valid.length}\n` +
-    `🚫 مرفوض: ${rejected.length}`;
-
-  if (details.length) {
-    msg += `\n\nالأسباب:\n` + details.join("\n");
-  }
-
-  showInfo(msg, !valid.length);
+ showInfo((r.message || `🔎 تم فحص القائمة\n✅ مقبول: ${valid.length}\n🚫 مرفوض: ${rejected.length}`), !valid.length);
 
   clearWarn();
   syncCentral();
