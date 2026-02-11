@@ -63,7 +63,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
       </div>
       <button type="button" class="okbtn"
         style="flex-shrink:0;border-radius:16px;padding:10px 14px;font-weight:900;border:2px solid #0b7f47;background:#fff;color:#0b7f47;cursor:pointer"
-        onclick="this.closest('.infobar').style.display='none'">حسنًا</button>
+       <button type="button" class="okbtn" style="...">حسنًا</button>
     </div>
   `;
 
@@ -1395,6 +1395,22 @@ formData.eventDate = dt;
   });
 }
 
+// ✅ Global OK button handler (delegation) — fixes "حسنًا" not closing
+(function attachGlobalInfobarOk(){
+  if (window.__MBK_OKBTN_BOUND__) return;
+  window.__MBK_OKBTN_BOUND__ = true;
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.(".infobar .okbtn");
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const bar = btn.closest(".infobar");
+    if (bar) bar.style.display = "none";
+  }, true); // ✅ capture
+})();
 
 function autoAttach() {
 document
