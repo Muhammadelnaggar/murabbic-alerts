@@ -1265,10 +1265,11 @@ form.dataset.ov_single_ok = "1";
 }
 
 // ✅ شغّل Gate الفردي تلقائيًا عند تغيير الرقم/التاريخ/الوضع
-["input","change","blur"].forEach(evt=>{
+["input","change"].forEach(evt=>{
   animalUIEl?.addEventListener(evt, runSingleGateIfReady);
   startDateUIEl?.addEventListener(evt, runSingleGateIfReady);
 });
+
 // ✅ تنظيف تلقائي للأرقام غير المؤهلة في الإدخال الجماعي
 bulkEl?.addEventListener("blur", previewAndCleanBulk);
 bulkEl?.addEventListener("change", previewAndCleanBulk);
