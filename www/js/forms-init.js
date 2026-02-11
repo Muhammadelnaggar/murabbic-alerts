@@ -17,21 +17,36 @@ import {
 
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* ===================== UI: Infobar ===================== */
 function ensureInfoBar(form) {
- let bar = form.querySelector("#sysbar") || form.querySelector(".infobar");
+  // 1) لو موجود sysbar أو infobar بالفعل (داخل الفورم أو خارجه) استخدمه
+  let bar =
+    document.getElementById("sysbar") ||
+    form.querySelector("#sysbar") ||
+    form.querySelector(".infobar") ||
+    document.querySelector(".infobar");
+
+  // 2) لو مش موجود: أنشئ واحد “قياسي” لمُرَبِّيك
   if (!bar) {
     bar = document.createElement("div");
-    bar.className = "infobar";
-    bar.style.cssText = `
-      margin:8px 0; padding:10px 12px; border-radius:10px;
-      font: 14px/1.4 system-ui, 'Cairo', Arial;
-      display:none; background:#fff; border:1px solid #e2e8f0; color:#0f172a;
-    `;
-    form.prepend(bar);
+    bar.id = "sysbar";
+    bar.className = "infobar mbk-infobar";
+    bar.setAttribute("role", "status");
+    bar.setAttribute("aria-live", "polite");
+
+    // 3) حطه في مكان ثابت قدر الإمكان:
+    // - لو فيه header: ضعه بعده مباشرة
+    // - وإلا ضعه أعلى الفورم
+    const header = document.querySelector("header");
+    if (header && header.parentNode) {
+      header.insertAdjacentElement("afterend", bar);
+    } else {
+      form.prepend(bar);
+    }
   }
+
   return bar;
 }
+
 
 function _escapeHtml(s){
   return String(s ?? "")
