@@ -286,6 +286,11 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
   const stepsBox    = document.getElementById('stepsBox');
   const saveBtn     = document.getElementById('saveBtn');
   const openCowCard = document.getElementById('openCowCard');
+  const groupSelect = document.getElementById('groupSelect');
+const loadGroupBtn = document.getElementById('loadGroup');
+const saveGroupBtn = document.getElementById('saveGroup');
+const bulkHintEl = document.getElementById('bulkHint');
+
 const infoEl      = document.getElementById('sysbar');
   const warnEl      = document.getElementById('warn');
 
@@ -489,6 +494,100 @@ if (!dbRef || !authRef){
 if (!fbReady || !dbRef || !authRef) {
   // خليك ساكت… forms-init هو اللي هيمنع الحفظ ويعرض الرسائل
 }
+/* ========= Groups (Cloud) =========
+   نحفظ المجموعات في: users/{uid}/ovsynch_groups/{groupId}
+   بدون أي تغيير UI — اسم المجموعة يتولد تلقائيًا لو المستخدم لم يختر اسمًا.
+*/
+async function refreshGroups(uid){
+  if (!uid || !dbRef || !groupSelect) return;
+  try{
+    const qg = query(
+      collection(dbRef, "users", uid, "ovsynch_groups"),
+      orderBy("updatedAt", "desc"),
+      limit(50)
+    );
+    const snap = await getDocs(qg);
+
+    // امسح القديم وارجّع الاختيار الافتراضي
+    groupSelect.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
+
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.textContent = data.name || d.id;
+      groupSelect.appendChild(opt);
+    });
+
+  }catch(e){
+    console.error("refreshGroups failed", e);
+  }
+}
+
+function makeAutoGroupName(){
+  const d = (startDateEl.value || todayISO()).replaceAll("-", "/");
+  const t = (startTimeEl.value || "08:00");
+  return `مجموعة ${d} — ${t}`;
+}
+
+async function saveCurrentAsGroup(uid){
+  if (!uid || !dbRef) return;
+
+  setMode("group");
+  const list = parseBulk();
+  if (!list.length){
+    showWarn("⚠️ اكتب أرقام الحيوانات أولًا ثم احفظ كـ مجموعة.");
+    return;
+  }
+
+  // ✅ اسم المجموعة: لو فيه اختيار سابق هنحدّثه، لو لا هننشئ اسم تلقائي
+  const chosenId = (groupSelect?.value || "").trim();
+  const name = chosenId ? (groupSelect.options[groupSelect.selectedIndex]?.textContent || chosenId) : makeAutoGroupName();
+  const safeId = chosenId || name.replace(/[^\w\u0600-\u06FF\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40);
+
+  const ref = doc(dbRef, "users", uid, "ovsynch_groups", safeId);
+  await setDoc(ref, {
+    name,
+    numbers: list.map(x => String(x)),
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  }, { merge:true });
+
+  await refreshGroups(uid);
+  if (groupSelect) groupSelect.value = safeId;
+
+  showWarn(`✅ تم حفظ المجموعة (${list.length} رقم).`);
+  if (bulkHintEl) bulkHintEl.textContent = `آخر حفظ: ${name}`;
+}
+
+async function loadSelectedGroup(uid){
+  if (!uid || !dbRef) return;
+
+  const id = (groupSelect?.value || "").trim();
+  if (!id){
+    showWarn("⚠️ اختر مجموعة أولًا ثم اضغط تحميل المجموعة.");
+    return;
+  }
+
+  const ref = doc(dbRef, "users", uid, "ovsynch_groups", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()){
+    showWarn("⚠️ هذه المجموعة غير موجودة أو حُذفت.");
+    return;
+  }
+
+  const data = snap.data() || {};
+  const nums = Array.isArray(data.numbers) ? data.numbers : [];
+  setMode("group");
+  bulkEl.value = nums.join("\n");
+
+  // ✅ فعّل نفس منطق “تطبيق القائمة”
+  const list = parseBulk();
+  syncCentral();
+  if (programEl.value) updateSteps();
+
+  showWarn(`✅ تم تحميل المجموعة: ${list.length} رقم.`);
+}
 
   async function fetchAnimalDoc(uid, num){
     const qA = query(
@@ -591,6 +690,18 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
     await setDoc(doc(dbRef, "tasks", taskId), taskPayload, { merge: true });
   }
 }
+// ========= ربط أزرار المجموعة =========
+loadGroupBtn?.addEventListener("click", async ()=> {
+  const u = await waitUser();
+  if (!u) return;
+  await loadSelectedGroup(u.uid);
+});
+
+saveGroupBtn?.addEventListener("click", async ()=> {
+  const u = await waitUser();
+  if (!u) return;
+  await saveCurrentAsGroup(u.uid);
+});
 
   /* ========= Save ========= */
   saveBtn.addEventListener("click",()=>{
