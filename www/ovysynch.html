@@ -203,20 +203,25 @@
             <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
           </div>
 
-          <div class="row" style="margin-top:10px">
-            <div class="field">
-              <label for="groupSelect">المجموعة المحفوظة</label>
-              <select id="groupSelect">
-                <div class="field" style="margin-top:10px">
-  <label for="groupName">اسم المجموعة</label>
-  <input id="groupName" type="text" placeholder="اكتب اسم المجموعة (مثال: دفعة فبراير 1)" />
-  <div class="hint">الاسم إلزامي عند الحفظ.</div>
-</div>
+        <div class="row" style="margin-top:10px">
 
-                <option value="" selected>— اختر مجموعة —</option>
-              </select>
-              <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
-            </div>
+  <div class="field">
+    <label for="groupSelect">المجموعة المحفوظة</label>
+    <select id="groupSelect">
+      <option value="" selected>— اختر مجموعة —</option>
+    </select>
+    <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
+  </div>
+
+  <div class="field" style="margin-top:10px">
+    <label for="groupName">اسم المجموعة</label>
+    <input id="groupName"
+           type="text"
+           placeholder="اكتب اسم المجموعة (مثال: دفعة فبراير 1)" />
+    <div class="hint">الاسم إلزامي عند الحفظ.</div>
+  </div>
+
+</div>
 
             <div class="row row-2">
               <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
