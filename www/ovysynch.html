@@ -525,7 +525,7 @@ const infoEl      = document.getElementById('sysbar');
   }
 
   // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
-  applyBulk?.addEventListener("click", async () => {
+ 
   applyBulk?.addEventListener("click", async () => {
   if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
 
@@ -657,7 +657,7 @@ if (!fd || !Array.isArray(fd.animalNumbers)) {
 
 const finalList = fd.animalNumbers;
 const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
-;
+
 
 
     // ✅ بناء payload ثابت للخطوات
