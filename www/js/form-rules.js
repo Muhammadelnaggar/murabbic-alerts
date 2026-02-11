@@ -684,6 +684,15 @@ ovsynchEligibilityDecision(fd) {
   if (doc.breedingBlocked === true || reproDocCat === "blocked") {
     return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
   }
+  // ✅ منع بدء بروتوكول جديد إذا كان الحيوان داخل بروتوكول نشط بالفعل (وثيقة الحيوان)
+  const curProto = String(doc.currentProtocol || "").trim().toLowerCase();
+  const protoStatus = String(doc.protocolStatus || "").trim().toLowerCase();
+  const protoStart = String(doc.protocolStartDate || "").trim();
+
+  if (curProto === "ovsynch" && protoStatus === "active") {
+    const d = protoStart || "غير معروف";
+    return `❌ لا يمكن بدء بروتوكول جديد — الحيوان بالفعل داخل بروتوكول تزامن نشط (بدأ ${d}).`;
+  }
 
   // ✅ تحديد النوع
   const sp = normalizeSpecies(fd.species || doc.species || doc.animalTypeAr || doc.animalType || doc.animaltype || doc.type || "");
