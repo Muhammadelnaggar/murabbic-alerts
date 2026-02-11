@@ -526,52 +526,52 @@ const infoEl      = document.getElementById('sysbar');
 
   // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
  
-  applyBulk?.addEventListener("click", async () => {
-  if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
+ applyBulk?.addEventListener("click", async () => {
+
+  if (!fbReady) {
+    showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true);
+    return;
+  }
 
   const list = parseBulk();
-  if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
+  if (!list.length) {
+    showWarn("⚠️ اكتب أرقام الحيوانات أولًا.");
+    return;
+  }
 
   const dt = (startDateEl.value || todayISO()).trim();
 
-  // ✅ استدعاء التحقق المركزي (forms-init.js)
+  // استدعاء التحقق المركزي
   const r = await window.mbk.previewOvsynchList(list, dt);
 
-  // ✅ فشل عام
   if (!r || r.ok === false) {
-    // لا نلمس القائمة في الفشل العام
     showInfo("⚠️ تعذّر فحص القائمة الآن.", true);
     return;
   }
 
-  // ✅ استخرج القوائم
-  const valid = Array.isArray(r.valid) ? r.valid : [];
+  const valid    = Array.isArray(r.valid) ? r.valid : [];
   const rejected = Array.isArray(r.rejected) ? r.rejected : [];
 
-  // ✅ (1) احذف غير المؤهلين فورًا من مربع الإدخال
+  // 🔥 امسح غير المؤهلين فورًا من القائمة
   bulkList = valid;
-  bulkEl.value = valid.join("\n");     // لو valid=0 → هيفضيها
+  bulkEl.value = valid.join("\n");
 
-  // ✅ (2) ابنِ رسالة أسباب “لكل رقم تم حذفه”
-  const reasonsAll = rejected.map(x => String(x.reason || "")).filter(Boolean);
-  const reasonsPreview = reasonsAll.slice(0, 12); // اعرض أول 12 سبب (تقدر تغيّرها)
+  // ✍️ اكتب سبب كل رقم غير مؤهل
+  const details = rejected.map(x => {
+    const num = String(x?.number ?? x?.animalNumber ?? "").trim();
+    const rs  = String(x?.reason || "").trim();
+    return num ? `✖ رقم ${num}: ${rs}` : `✖ ${rs}`;
+  }).filter(Boolean);
 
-  let msg = "";
-  if (valid.length) {
-    msg += `✅ تم قبول: ${valid.length} رقم\n`;
-  } else {
-    msg += `🔎 تم فحص القائمة\nلا يوجد أرقام مؤهلة حاليًا.\n`;
+  let msg =
+    `🔎 تم فحص القائمة\n` +
+    `✅ مقبول: ${valid.length}\n` +
+    `🚫 مرفوض: ${rejected.length}`;
+
+  if (details.length) {
+    msg += `\n\nالأسباب:\n` + details.join("\n");
   }
 
-  if (rejected.length) {
-    msg += `\n🚫 تم حذف: ${rejected.length} رقم غير مؤهل للأسباب التالية:\n` +
-           reasonsPreview.join("\n") +
-           (rejected.length > reasonsPreview.length ? "\n…" : "");
-  } else {
-    msg += `\n✅ لا توجد أرقام مرفوضة.`;
-  }
-
-  // ✅ (3) لو لا يوجد مؤهلين: اعتبرها رسالة “خطأ/تنبيه” (لون أحمر)
   showInfo(msg, !valid.length);
 
   clearWarn();
