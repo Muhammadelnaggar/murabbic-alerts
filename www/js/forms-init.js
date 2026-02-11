@@ -68,6 +68,16 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   `;
 
   bar.innerHTML = html;
+    // ✅ زر "حسنًا" بدون onclick (مركزي – ثابت)
+  const ok = bar.querySelector(".okbtn");
+  if (ok) {
+    ok.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      bar.style.display = "none";
+    });
+  }
+
 
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
