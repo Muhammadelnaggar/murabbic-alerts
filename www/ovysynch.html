@@ -297,6 +297,8 @@ const infoEl      = document.getElementById('sysbar');
   const animalHidden = document.getElementById("animalNumber");
   const eventHidden  = document.getElementById("eventDate");
   const stepsHidden  = document.getElementById("steps");
+  // ✅ ربط زر "تطبيق القائمة" (مرة واحدة فقط)
+const applyBulkBtn = document.getElementById('applyBulk');
 
   let dbRef=null, authRef=null, stepsState=[], bulkList=[];
   let fbReady = false;
@@ -343,6 +345,8 @@ const infoEl      = document.getElementById('sysbar');
     modeBulkBox.hidden = !isGroup;
     modeSingleBox.hidden = isGroup;
     try{ localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single"); }catch{}
+    updateSteps();
+
     clearWarn();
   }
 
@@ -519,11 +523,27 @@ if (!fbReady || !dbRef || !authRef) {
     return { eventDate: String(d.eventDate || "").slice(0,10), id: snap.docs[0].id };
   }
 
-  // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
- applyBulk?.addEventListener("click", () => {
-  parseBulk();      // يقرأ الأرقام ويعمل unique
-  syncCentral();    // يملأ hidden fields للمسار المركزي
-  showWarn(`✅ تم تطبيق القائمة: ${bulkList.length} رقم`);
+applyBulk?.addEventListener("click", () => {
+  setMode("group");
+
+  const list = parseBulk();
+  if (!list.length){
+    showWarn("⚠️ اكتب أرقام الحيوانات أولًا (كل رقم في سطر).");
+    syncCentral();
+    return;
+  }
+
+  // ✅ مزامنة دائمًا
+  syncCentral();
+
+  // ✅ ابنِ الخطوات فقط لو البرنامج متحدد
+  if (programEl.value){
+    updateSteps();
+    syncCentral();
+    showWarn(`✅ تم تطبيق القائمة: ${list.length} رقم — تم تجهيز الخطوات.`);
+  } else {
+    showWarn(`✅ تم تطبيق القائمة: ${list.length} رقم — اختر البرنامج لإظهار الخطوات.`);
+  }
 });
 
 
