@@ -1199,11 +1199,12 @@ function attachOvsynchProtocol(form){
 // ===============================
 function lockOvsynchUI(locked){
   // ✅ مسموح حتى مع القفل: الوضع + رقم الفردي + تاريخ البدء + وقت البدء + إدخال الجماعي
-  const allowIds = new Set([
-    "modeSingle","modeGroup",
-    "animalNumberUI","startDate","startTime","bulkAnimals",
-    "applyBulk","groupSelect","loadGroup","saveGroup"
-  ]);
+ const allowIds = new Set([
+  "modeSingle","modeGroup",
+  "animalNumberUI","startDate","startTime","bulkAnimals",
+  "applyBulk","groupSelect","groupName","loadGroup","saveGroup"
+]);
+
 
   // اقفل/افتح عناصر الفورم الداخلية
   form.querySelectorAll("input, select, textarea, button").forEach(el=>{
