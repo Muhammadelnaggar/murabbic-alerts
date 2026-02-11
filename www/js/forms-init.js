@@ -19,8 +19,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 
 /* ===================== UI: Infobar ===================== */
 function ensureInfoBar(form) {
-  let bar = document.getElementById("sysbar") || form.querySelector(".infobar");
-
+ let bar = form.querySelector("#sysbar") || form.querySelector(".infobar");
   if (!bar) {
     bar = document.createElement("div");
     bar.className = "infobar";
@@ -530,8 +529,6 @@ if (!accepted) {
 // ✅ ضمّن الرسالة في نتيجة الدالة
 return { ok:true, valid, rejected, message };
 
-return { ok:true, valid, rejected };
-
 }
 
 // ✅ اجعلها متاحة للصفحات بدون استيراد
@@ -622,6 +619,9 @@ async function ensureAnimalExistsGate(form, bar) {
 function attachOne(form) {
   const bar = ensureInfoBar(form);
   const eventName = form.getAttribute("data-event");
+  if (form.dataset.mbkOvsynchAttached === "1") return;
+form.dataset.mbkOvsynchAttached = "1";
+
   if (!eventName) return;
 
   function lockForm(locked) {
@@ -877,7 +877,7 @@ if (eventName === "تجفيف") {
   // خزّن آخر تلقيح في الفورم لاستخدامه عند الحفظ
   form.__mbkDryOffLastAI = lastAI4;
 }
-    showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "info");
+   showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
     lockForm(false);
     return true;
   }
@@ -1189,7 +1189,6 @@ function lockOvsynchUI(locked){
     cb.disabled = !!locked;
   });
 
-  form.dataset.ov_single_ok = locked ? "0" : "1";
 }
 
 async function runSingleGateIfReady(){
@@ -1201,12 +1200,18 @@ async function runSingleGateIfReady(){
 
   // لو لسه ناقص رقم/تاريخ: ما نزعجش المستخدم
   if (!num || !dt){
-    form.dataset.ov_single_ok = "0";
+    
+    lockOvsynchUI(true);
+form.dataset.ov_single_ok = "0";
+
     return;
   }
 
   if (typeof window.mbk?.previewOvsynchList !== "function"){
-    form.dataset.ov_single_ok = "0";
+   
+    lockOvsynchUI(true);
+form.dataset.ov_single_ok = "0";
+
     showMsg(bar, "❌ تعذّر تحميل نظام التحقق المركزي (previewOvsynchList). حدّث الصفحة.", "error");
     return;
   }
@@ -1216,7 +1221,10 @@ async function runSingleGateIfReady(){
   const r = await window.mbk.previewOvsynchList([num], dt);
 
   if (!r || r.ok === false){
-    form.dataset.ov_single_ok = "0";
+  
+    lockOvsynchUI(true);
+   form.dataset.ov_single_ok = "0";
+
     // ✅ امسح الرقم زي الجماعي
     animalUIEl.value = "";
     const hiddenNum = form.querySelector('[data-field="animalNumber"]');
@@ -1230,7 +1238,9 @@ async function runSingleGateIfReady(){
   const rejected = Array.isArray(r.rejected) ? r.rejected : [];
 
   if (!valid.includes(num)){
-    form.dataset.ov_single_ok = "0";
+   
+    lockOvsynchUI(true);
+form.dataset.ov_single_ok = "0";
     // ✅ امسح الرقم زي الجماعي
     animalUIEl.value = "";
     const hiddenNum = form.querySelector('[data-field="animalNumber"]');
@@ -1241,7 +1251,9 @@ async function runSingleGateIfReady(){
   }
 
   // ✅ مؤهل
-  form.dataset.ov_single_ok = "1";
+form.dataset.ov_single_ok = "1";
+  lockOvsynchUI(false);
+
   const hiddenNum = form.querySelector('[data-field="animalNumber"]');
   if (hiddenNum) hiddenNum.value = num;
   showMsg(bar, `✅ رقم ${num} مؤهل لبروتوكول التزامن بتاريخ ${dt}.`, "ok");
