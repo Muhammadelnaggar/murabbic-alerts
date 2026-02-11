@@ -34,28 +34,48 @@ function ensureInfoBar(form) {
   return bar;
 }
 
+function _escapeHtml(s){
+  return String(s ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
 function showMsg(bar, msgs, type = "error", actions = []) {
   if (!bar) return;
 
   bar.style.display = "block";
   bar.className = "infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
-  bar.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
-  bar.style.background = type === "error" ? "#ffebee" : "#ecfdf5";
-  bar.style.color = type === "error" ? "#b71c1c" : "#065f46";
 
-  const html = Array.isArray(msgs)
-    ? `<ul style="margin:0;padding-left:18px">${msgs
-        .map((m) => `<li>${String(m || "")}</li>`)
-        .join("")}</ul>`
-    : `<div>${String(msgs || "")}</div>`;
+  const isErr = (type === "error");
+  bar.style.borderColor = isErr ? "#ef9a9a" : "#86efac";
+  bar.style.background  = isErr ? "#ffebee" : "#ecfdf5";
+  bar.style.color       = isErr ? "#b71c1c" : "#065f46";
+
+  const lines = Array.isArray(msgs) ? msgs : [msgs];
+  const safeLines = lines.filter(Boolean).map(_escapeHtml);
+
+  const html = `
+    <div class="msgrow" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div style="white-space:pre-line;font-weight:900;font-size:18px;line-height:1.6">
+        ${safeLines.join("<br>")}
+      </div>
+      <button type="button" class="okbtn"
+        style="flex-shrink:0;border-radius:16px;padding:10px 14px;font-weight:900;border:2px solid #0b7f47;background:#fff;color:#0b7f47;cursor:pointer"
+        onclick="this.closest('.infobar').style.display='none'">حسنًا</button>
+    </div>
+  `;
 
   bar.innerHTML = html;
+
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
+  // actions (اختياري)
   if (Array.isArray(actions) && actions.length) {
     const wrap = document.createElement("div");
-    wrap.style.cssText =
-      "margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;";
+    wrap.style.cssText = "margin-top:10px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;";
 
     actions.forEach((a) => {
       const btn = document.createElement("button");
@@ -68,9 +88,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
         btn.style.background = "#0ea05a";
         btn.style.color = "#fff";
       }
-      btn.addEventListener("click", () => {
-        try { a.onClick && a.onClick(); } catch(_) {}
-      });
+      btn.addEventListener("click", () => { try { a.onClick && a.onClick(); } catch(_) {} });
       wrap.appendChild(btn);
     });
 
@@ -1100,16 +1118,13 @@ function attachOvsynchProtocol(form){
     const raw = String(bulkEl?.value || "").trim();
     if (!raw) return [];
     return [...new Set(raw.split(/\n|,|;/g).map(x=>normalizeDigits(x)).filter(Boolean))];
-  }
-  async function previewAndCleanBulk(){
+  }async function previewAndCleanBulk(){
   if (!bulkEl) return;
 
   const dt  = String(startDateUIEl?.value || "").trim().slice(0,10);
   const list = parseBulkLocal();
 
-  if (!dt || !list.length){
-    return; // لا رسائل مزعجة
-  }
+  if (!dt || !list.length) return;
 
   if (typeof window.mbk?.previewOvsynchList !== "function"){
     showMsg(bar, "❌ تعذّر تحميل نظام التحقق المركزي. حدّث الصفحة.", "error");
@@ -1119,7 +1134,6 @@ function attachOvsynchProtocol(form){
   showMsg(bar, "⏳ جارِ فحص القائمة…", "info");
 
   const r = await window.mbk.previewOvsynchList(list, dt);
-
   if (!r || r.ok === false){
     showMsg(bar, (r?.rejected?.[0]?.reason || "❌ تعذّر التحقق الآن."), "error");
     return;
@@ -1128,28 +1142,29 @@ function attachOvsynchProtocol(form){
   const valid = Array.isArray(r.valid) ? r.valid : [];
   const rejected = Array.isArray(r.rejected) ? r.rejected : [];
 
-  // ✅ امسح غير المؤهلين من مربع الإدخال فورًا
+  // ✅ امسح غير المؤهلين فورًا
   bulkEl.value = valid.join("\n");
 
-  // ✅ رسالة مختصرة واحترافية
-  const rejShort = rejected.slice(0,6).map(x => String(x.reason || ""));
-  if (!valid.length){
-    // لو لا يوجد مؤهلين: امسح المربع بالكامل
-    bulkEl.value = "";
-    showMsg(bar, r.message || "🚫 لا يوجد أرقام مؤهلة حاليًا.", "error");
-    return;
-  }
+  // ✅ نفس رسائل الأحمر ولكن بتنسيق أخضر “محترم”
+  const lines = [];
+  lines.push(`✅ صالح للتسجيل: ${valid.length} رقم`);
 
-  const summary =
-    `✅ تم قبول ${valid.length} رقم` +
-    (rejected.length ? `، واستبعاد ${rejected.length} رقم.` : ".");
-
-  // لو فيه مستبعدين: اعرض أول 6 أسباب فقط
   if (rejected.length){
-    showMsg(bar, [summary, ...rejShort], "info");
-  }else{
-    showMsg(bar, summary, "ok");
+    lines.push(`🚫 تم حذف: ${rejected.length} رقم للأسباب التالية:`);
+    rejected.forEach(x=>{
+      const num = String(x?.number ?? x?.animalNumber ?? "").trim();
+      const rs  = String(x?.reason || "").trim().replace(/^❌\s*/,"");
+      lines.push(num ? `✖ رقم ${num}: ${rs}` : `✖ ${rs}`);
+    });
   }
+
+  // ✅ لو لا يوجد مؤهلين: فضّي القائمة
+  if (!valid.length){
+    bulkEl.value = "";
+  }
+
+  // 🔥 هنا سر “النسخة الخضراء”: حتى لو فيها رفض، نخليها ok (أخضر)
+  showMsg(bar, lines, "ok");
 }
 
 // ===============================
