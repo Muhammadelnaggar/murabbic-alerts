@@ -207,6 +207,12 @@
             <div class="field">
               <label for="groupSelect">المجموعة المحفوظة</label>
               <select id="groupSelect">
+                <div class="field" style="margin-top:10px">
+  <label for="groupName">اسم المجموعة</label>
+  <input id="groupName" type="text" placeholder="اكتب اسم المجموعة (مثال: دفعة فبراير 1)" />
+  <div class="hint">الاسم إلزامي عند الحفظ.</div>
+</div>
+
                 <option value="" selected>— اختر مجموعة —</option>
               </select>
               <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
@@ -290,6 +296,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const loadGroupBtn = document.getElementById('loadGroup');
 const saveGroupBtn = document.getElementById('saveGroup');
 const bulkHintEl = document.getElementById('bulkHint');
+const groupNameEl = document.getElementById('groupName');
 
 const infoEl      = document.getElementById('sysbar');
   const warnEl      = document.getElementById('warn');
@@ -497,21 +504,23 @@ if (!fbReady || !dbRef || !authRef) {
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
-/* ========= Groups (Cloud) =========
-   نحفظ المجموعات في: users/{uid}/ovsynch_groups/{groupId}
-   بدون أي تغيير UI — اسم المجموعة يتولد تلقائيًا لو المستخدم لم يختر اسمًا.
+/* ========= Groups (Cloud) — ROOT protocolGroups =========
+   ✅ نكتب في: protocolGroups/{docId}
+   ✅ الروولز الحالية بتسمح بشرط userId == uid
+   ✅ اسم المجموعة من المستخدم (إلزامي)
 */
+
 async function refreshGroups(uid){
   if (!uid || !dbRef || !groupSelect) return;
   try{
     const qg = query(
-      collection(dbRef, "users", uid, "ovsynch_groups"),
+      collection(dbRef, "protocolGroups"),
+      where("userId", "==", uid),
       orderBy("updatedAt", "desc"),
       limit(50)
     );
     const snap = await getDocs(qg);
 
-    // امسح القديم وارجّع الاختيار الافتراضي
     groupSelect.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
 
     snap.forEach(d => {
@@ -527,10 +536,12 @@ async function refreshGroups(uid){
   }
 }
 
-function makeAutoGroupName(){
-  const d = (startDateEl.value || todayISO()).replaceAll("-", "/");
-  const t = (startTimeEl.value || "08:00");
-  return `مجموعة ${d} — ${t}`;
+function safeGroupIdFromName(name){
+  return String(name || "")
+    .trim()
+    .replace(/[^\w\u0600-\u06FF\- ]+/g, "")
+    .replace(/\s+/g, "_")
+    .slice(0, 60) || ("group_" + Date.now());
 }
 
 async function saveCurrentAsGroup(uid){
@@ -543,24 +554,28 @@ async function saveCurrentAsGroup(uid){
     return;
   }
 
-  // ✅ اسم المجموعة: لو فيه اختيار سابق هنحدّثه، لو لا هننشئ اسم تلقائي
-  const chosenId = (groupSelect?.value || "").trim();
-  const name = chosenId ? (groupSelect.options[groupSelect.selectedIndex]?.textContent || chosenId) : makeAutoGroupName();
-  const safeId = chosenId || name.replace(/[^\w\u0600-\u06FF\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40);
+  const name = String(groupNameEl?.value || "").trim();
+  if (!name){
+    showWarn("⚠️ اكتب اسم المجموعة أولًا.");
+    return;
+  }
 
-  const ref = doc(dbRef, "users", uid, "ovsynch_groups", safeId);
- await setDoc(ref, {
-  userId: uid,
-  name,
-  numbers: list.map(x => String(x)),
-  updatedAt: serverTimestamp(),
-  createdAt: serverTimestamp()
-}, { merge:true });
+  const docId = safeGroupIdFromName(name);
+  const ref = doc(dbRef, "protocolGroups", docId);
+
+  await setDoc(ref, {
+    userId: uid,
+    kind: "ovsynch",          // علشان نقدر نميز لاحقًا بروتوكولات أخرى
+    name,
+    numbers: list.map(x => String(x)),
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  }, { merge:true });
 
   await refreshGroups(uid);
-  if (groupSelect) groupSelect.value = safeId;
+  if (groupSelect) groupSelect.value = docId;
 
-  showWarn(`✅ تم حفظ المجموعة (${list.length} رقم).`);
+  showWarn(`✅ تم حفظ المجموعة: ${name} (${list.length} رقم).`);
   if (bulkHintEl) bulkHintEl.textContent = `آخر حفظ: ${name}`;
 }
 
@@ -573,7 +588,7 @@ async function loadSelectedGroup(uid){
     return;
   }
 
-  const ref = doc(dbRef, "users", uid, "ovsynch_groups", id);
+  const ref = doc(dbRef, "protocolGroups", id);
   const snap = await getDoc(ref);
   if (!snap.exists()){
     showWarn("⚠️ هذه المجموعة غير موجودة أو حُذفت.");
@@ -581,73 +596,24 @@ async function loadSelectedGroup(uid){
   }
 
   const data = snap.data() || {};
+  if (String(data.userId || "") !== String(uid)){
+    showWarn("⚠️ هذه المجموعة ليست ضمن حسابك.");
+    return;
+  }
+
   const nums = Array.isArray(data.numbers) ? data.numbers : [];
+  const gname = String(data.name || "").trim();
+
   setMode("group");
   bulkEl.value = nums.join("\n");
+  if (groupNameEl) groupNameEl.value = gname;
 
-  // ✅ فعّل نفس منطق “تطبيق القائمة”
   const list = parseBulk();
   syncCentral();
   if (programEl.value) updateSteps();
 
-  showWarn(`✅ تم تحميل المجموعة: ${list.length} رقم.`);
+  showWarn(`✅ تم تحميل المجموعة: ${gname || id} (${list.length} رقم).`);
 }
-
-  async function fetchAnimalDoc(uid, num){
-    const qA = query(
-      collection(dbRef, "animals"),
-      where("userId", "==", uid),
-      where("number", "==", String(num)),
-      limit(1)
-    );
-    const sA = await getDocs(qA);
-    if (sA.empty) return null;
-    return { id: sA.docs[0].id, data: sA.docs[0].data() || {} };
-  }
-
-  async function getLastOvsynchForAnimal(uid, animalNumber){
-    const num = String(animalNumber || "").trim();
-    if (!uid || !num) return null;
-
-    const qx = query(
-      collection(dbRef, "events"),
-      where("userId", "==", uid),
-      where("animalNumber", "==", num),
-      where("eventType", "==", "بروتوكول تزامن"),
-      where("program", "==", "ovsynch"),
-      orderBy("eventDate", "desc"),
-      limit(1)
-    );
-
-    const snap = await getDocs(qx);
-    if (snap.empty) return null;
-
-    const d = snap.docs[0].data() || {};
-    return { eventDate: String(d.eventDate || "").slice(0,10), id: snap.docs[0].id };
-  }
-
-applyBulk?.addEventListener("click", () => {
-  setMode("group");
-
-  const list = parseBulk();
-  if (!list.length){
-    showWarn("⚠️ اكتب أرقام الحيوانات أولًا (كل رقم في سطر).");
-    syncCentral();
-    return;
-  }
-
-  // ✅ مزامنة دائمًا
-  syncCentral();
-
-  // ✅ ابنِ الخطوات فقط لو البرنامج متحدد
-  if (programEl.value){
-    updateSteps();
-    syncCentral();
-    showWarn(`✅ تم تطبيق القائمة: ${list.length} رقم — تم تجهيز الخطوات.`);
-  } else {
-    showWarn(`✅ تم تطبيق القائمة: ${list.length} رقم — اختر البرنامج لإظهار الخطوات.`);
-  }
-});
 
 
 /* ========= Tasks: Ovsynch Protocol ========= */
@@ -706,6 +672,11 @@ saveGroupBtn?.addEventListener("click", async ()=> {
   if (!u) return;
   await saveCurrentAsGroup(u.uid);
 });
+// ✅ أول ما يبقى المستخدم جاهز: حمّل قائمة المجموعات
+(async ()=>{
+  const u = await waitUser();
+  if (u) await refreshGroups(u.uid);
+})();
 
   /* ========= Save ========= */
   saveBtn.addEventListener("click",()=>{
