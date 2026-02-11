@@ -343,9 +343,12 @@ async function previewOvsynchList(numbers = [], eventDate = "") {
     if (/cow|بقر/i.test(sp)) sp = "أبقار";
     if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
     return sp || "أبقار";
-    const animalLabel = (sp === "جاموس") ? "الجاموسة" : "البقرة";
 
   }
+function animalLabelFromDoc(doc){
+  const sp = normSpeciesFromDoc(doc);
+  return (sp === "جاموس") ? "الجاموسة" : "البقرة";
+}
 
   // ✅ helper: last ovsynch check (14 days)
   async function getLastOvsynchEvent(uid, animalNumber){
@@ -381,6 +384,7 @@ for (const num of uniq) {
   }
 
   const doc = animal.data || {};
+const animalLabel = animalLabelFromDoc(doc);
 
   // 2) status: inactive ممنوع
   const st = String(doc.status ?? "").trim().toLowerCase();
@@ -440,7 +444,7 @@ for (const num of uniq) {
       if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
         rejected.push({
           number:num,
-          reason:`❌ ${animalLabel} رقم ${num}: تم عمل Ovsynch بتاريخ ${last.eventDate} (منذ ${g14} يوم).\n✅ المقترح: استخدم Presynch + Ovsynch بدلًا منه.`
+          reason:`❌ ${animalLabel} رقم ${num}: مسجّلة بالفعل في برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
         });
         continue;
       }
