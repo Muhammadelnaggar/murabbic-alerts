@@ -309,18 +309,6 @@ const infoEl      = document.getElementById('sysbar');
   }
   function showWarn(t){ warnEl.textContent=t||""; }
   function clearWarn(){ warnEl.textContent=""; }
-
-  function showInfo(text, isErr=false){
-    infoEl.style.display="block";
-    infoEl.className="infobar "+(isErr?"error":"show");
-    infoEl.innerHTML=`
-      <div class="msgrow">
-        <div style="white-space:pre-line">${text}</div>
-        <button type="button" class="okbtn" onclick="this.closest('#sysbar').style.display='none'">حسنًا</button>
-      </div>`;
-    infoEl.scrollIntoView({behavior:"smooth",block:"start"});
-  }
-
   function parseBulk(){
     const raw=(bulkEl?.value||"").trim();
     if(!raw){ bulkList=[]; return []; }
@@ -473,23 +461,30 @@ const infoEl      = document.getElementById('sysbar');
     try{
       const mod = await import('/js/firebase-config.js');
 
-      const cfg = mod.firebaseConfig || mod.config || mod.default || null;
-      const app = (cfg ? initializeApp(cfg) : (mod.app || null));
+     dbRef   = mod.db || null;
+authRef = mod.auth || null;
 
-      dbRef   = mod.db   || getFirestore(app, "murabbikdata");
-      authRef = mod.auth || getAuth(app);
+if (!dbRef || !authRef){
+  const cfg = mod.firebaseConfig || mod.config || mod.default || null;
+  const app = cfg ? initializeApp(cfg) : (mod.app || null);
+  dbRef   = dbRef   || getFirestore(app, "murabbikdata");
+  authRef = authRef || getAuth(app);
+}
 
       window.mbk = window.mbk || {};
       fbReady = true;
       return true;
     }catch(e){
       fbReady = false;
-      showInfo("⛔ تعذّر تحميل Firebase في هذه الصفحة.\nافتح Console > Network وتأكد أن /js/firebase-config.js موجود.", true);
+     
       return false;
     }
   }
 
   await initFirebase();
+if (!fbReady || !dbRef || !authRef) {
+  // خليك ساكت… forms-init هو اللي هيمنع الحفظ ويعرض الرسائل
+}
 
   async function fetchAnimalDoc(uid, num){
     const qA = query(
@@ -525,42 +520,12 @@ const infoEl      = document.getElementById('sysbar');
   }
 
   // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
- 
- applyBulk?.addEventListener("click", async () => {
-
-  if (!fbReady) {
-    showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true);
-    return;
-  }
-
-  const list = parseBulk();
-  if (!list.length) {
-    showWarn("⚠️ اكتب أرقام الحيوانات أولًا.");
-    return;
-  }
-
-  const dt = (startDateEl.value || todayISO()).trim();
-
-  // استدعاء التحقق المركزي
-  const r = await window.mbk.previewOvsynchList(list, dt);
-
-  if (!r || r.ok === false) {
-    showInfo("⚠️ تعذّر فحص القائمة الآن.", true);
-    return;
-  }
-
-  const valid    = Array.isArray(r.valid) ? r.valid : [];
-  const rejected = Array.isArray(r.rejected) ? r.rejected : [];
-
-  // 🔥 امسح غير المؤهلين فورًا من القائمة
-  bulkList = valid;
-  bulkEl.value = valid.join("\n");
-
- showInfo((r.message || `🔎 تم فحص القائمة\n✅ مقبول: ${valid.length}\n🚫 مرفوض: ${rejected.length}`), !valid.length);
-
-  clearWarn();
-  syncCentral();
+ applyBulk?.addEventListener("click", () => {
+  parseBulk();      // يقرأ الأرقام ويعمل unique
+  syncCentral();    // يملأ hidden fields للمسار المركزي
+  showWarn(`✅ تم تطبيق القائمة: ${bulkList.length} رقم`);
 });
+
 
 /* ========= Tasks: Ovsynch Protocol ========= */
 async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr){
@@ -615,13 +580,16 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
 
   // ✅ حفظ فعلي: فردي أو جماعي بعد mbk:valid
  form.addEventListener("mbk:valid", async (ev)=> {
-    if (!fbReady){ showInfo("⛔ Firebase غير جاهز الآن.", true); return; }
+   
 
     const start = (startDateEl.value || "").trim() || todayISO();
     if (!startDateEl.value) startDateEl.value = start;
    const program = (programEl.value || "").trim();
-    const u = await waitUser();
-    if (!u){ showInfo("⚠️ لم يتم تأكيد الدخول.", true); return; }
+   if (!fbReady || !dbRef || !authRef) return;
+
+const u = await waitUser();
+if (!u) return;
+
 
     // ✅ حدد قائمة الحيوانات حسب الوضع
     const targets = (getMode()==="group")
@@ -635,7 +603,7 @@ const fd = ev?.detail?.formData || null;
 
 // ✅ قفل أمان: ممنوع حفظ بدون نتيجة تحقق صريحة من forms-init
 if (!fd || !Array.isArray(fd.animalNumbers)) {
-  showInfo("⛔ لم يكتمل التحقق المركزي.\nمن فضلك اضغط (تسجيل البروتوكول) مرة أخرى بعد ثانية.", true);
+ 
   return;
 }
 
@@ -687,7 +655,14 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
       msg += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length>6 ? "\n…" : ""}`;
     }
 
-    showInfo(msg, false);
+    if (typeof window.showMsg === "function") {
+  window.showMsg(infoEl, msg.split("\n"), "ok");
+} else {
+  // fallback بسيط لو حصل أي شيء
+  infoEl.style.display="block";
+  infoEl.textContent = msg;
+}
+
     clearWarn();
 
     // ✅ مزامنة الكونتكست بعد الحفظ
