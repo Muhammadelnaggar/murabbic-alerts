@@ -349,6 +349,25 @@ function animalLabelFromDoc(doc){
   const sp = normSpeciesFromDoc(doc);
   return (sp === "جاموس") ? "الجاموسة" : "البقرة";
 }
+function compactOvsynchReason(reason){
+  let s = String(reason || "").trim();
+
+  // وحّد النص
+  s = s.replace(/^\s*❌\s*/,"");
+  s = s.replace(/\s+/g," ").trim();
+
+  // اختصار “الحالة الحالية”
+  s = s.replace(/الحالة الحالية:\s*«?\s*حديث(?:ة)? الولادة\s*»?/g, "حديثة الولادة");
+  s = s.replace(/الحالة الحالية:\s*«?\s*تحضير(?: لل)?ولادة\s*»?/g, "تحضير للولادة");
+  s = s.replace(/الحالة الحالية:\s*«?\s*ملقح(?:ة)?\s*»?/g, "ملقحة");
+  s = s.replace(/الحالة الحالية:\s*«?\s*عشار\s*»?/g, "عشار");
+  s = s.replace(/الحالة الحالية:\s*«?\s*مفتوح(?:ة)?\s*»?/g, "مفتوحة");
+
+  // قص أي ذيل طويل بعد “—”
+  s = s.replace(/\s*—\s*المسموح.*$/,"").trim();
+
+  return "❌ " + s;
+}
 
   // ✅ helper: last ovsynch check (14 days)
   async function getLastOvsynchEvent(uid, animalNumber){
@@ -379,12 +398,12 @@ for (const num of uniq) {
   // 1) الحيوان موجود؟
   const animal = await fetchAnimalByNumberForUser(uid, num);
   if (!animal) {
-    rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: غير موجود في القطيع/حسابك.` });
+    rejected.push({ number:num, reason:`❌ الحيوان رقم ${num}: غير موجود في القطيع/حسابك.` });
     continue;
   }
 
   const doc = animal.data || {};
-const animalLabel = animalLabelFromDoc(doc);
+  const animalLabel = animalLabelFromDoc(doc);
 
   // 2) status: inactive ممنوع
   const st = String(doc.status ?? "").trim().toLowerCase();
@@ -458,7 +477,8 @@ const animalLabel = animalLabelFromDoc(doc);
 // ===============================
 if (!valid.length) {
 
-  const reasons = rejected.map(r => r.reason);
+ const reasons = rejected.map(r => compactOvsynchReason(r.reason));
+
 
   const finalMessage =
     "🔎 تم فحص القائمة\n" +
@@ -1063,6 +1083,57 @@ function attachOvsynchProtocol(form){
     if (!raw) return [];
     return [...new Set(raw.split(/\n|,|;/g).map(x=>normalizeDigits(x)).filter(Boolean))];
   }
+  async function previewAndCleanBulk(){
+  if (!bulkEl) return;
+
+  const dt  = String(startDateUIEl?.value || "").trim().slice(0,10);
+  const list = parseBulkLocal();
+
+  if (!dt || !list.length){
+    return; // لا رسائل مزعجة
+  }
+
+  if (typeof window.mbk?.previewOvsynchList !== "function"){
+    showMsg(bar, "❌ تعذّر تحميل نظام التحقق المركزي. حدّث الصفحة.", "error");
+    return;
+  }
+
+  showMsg(bar, "⏳ جارِ فحص القائمة…", "info");
+
+  const r = await window.mbk.previewOvsynchList(list, dt);
+
+  if (!r || r.ok === false){
+    showMsg(bar, (r?.rejected?.[0]?.reason || "❌ تعذّر التحقق الآن."), "error");
+    return;
+  }
+
+  const valid = Array.isArray(r.valid) ? r.valid : [];
+  const rejected = Array.isArray(r.rejected) ? r.rejected : [];
+
+  // ✅ امسح غير المؤهلين من مربع الإدخال فورًا
+  bulkEl.value = valid.join("\n");
+
+  // ✅ رسالة مختصرة واحترافية
+  const rejShort = rejected.slice(0,6).map(x => String(x.reason || ""));
+  if (!valid.length){
+    // لو لا يوجد مؤهلين: امسح المربع بالكامل
+    bulkEl.value = "";
+    showMsg(bar, r.message || "🚫 لا يوجد أرقام مؤهلة حاليًا.", "error");
+    return;
+  }
+
+  const summary =
+    `✅ تم قبول ${valid.length} رقم` +
+    (rejected.length ? `، واستبعاد ${rejected.length} رقم.` : ".");
+
+  // لو فيه مستبعدين: اعرض أول 6 أسباب فقط
+  if (rejected.length){
+    showMsg(bar, [summary, ...rejShort], "info");
+  }else{
+    showMsg(bar, summary, "ok");
+  }
+}
+
 // ===============================
 // ✅ Gate فردي قبل إدخال أي بيانات
 // ===============================
@@ -1147,6 +1218,16 @@ async function runSingleGateIfReady(){
 ["input","change","blur"].forEach(evt=>{
   animalUIEl?.addEventListener(evt, runSingleGateIfReady);
   startDateUIEl?.addEventListener(evt, runSingleGateIfReady);
+});
+// ✅ تنظيف تلقائي للأرقام غير المؤهلة في الإدخال الجماعي
+bulkEl?.addEventListener("blur", previewAndCleanBulk);
+bulkEl?.addEventListener("change", previewAndCleanBulk);
+startDateUIEl?.addEventListener("change", previewAndCleanBulk);
+
+// لو عندك زر “تطبيق” للأرقام الجماعية
+document.getElementById("applyBulk")?.addEventListener("click", (e)=>{
+  e.preventDefault();
+  previewAndCleanBulk();
 });
 
 modeGroupEl?.addEventListener("change", runSingleGateIfReady);
