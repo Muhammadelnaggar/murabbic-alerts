@@ -61,23 +61,15 @@ function showMsg(bar, msgs, type = "error", actions = []) {
       <div style="white-space:pre-line;font-weight:900;font-size:18px;line-height:1.6">
         ${safeLines.join("<br>")}
       </div>
+
       <button type="button" class="okbtn"
-        style="flex-shrink:0;border-radius:16px;padding:10px 14px;font-weight:900;border:2px solid #0b7f47;background:#fff;color:#0b7f47;cursor:pointer"
-       <button type="button" class="okbtn" style="...">حسنًا</button>
+        style="flex-shrink:0;border-radius:16px;padding:10px 14px;font-weight:900;border:2px solid #0b7f47;background:#fff;color:#0b7f47;cursor:pointer">
+        حسنًا
+      </button>
     </div>
   `;
 
   bar.innerHTML = html;
-    // ✅ زر "حسنًا" بدون onclick (مركزي – ثابت)
-  const ok = bar.querySelector(".okbtn");
-  if (ok) {
-    ok.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      bar.style.display = "none";
-    });
-  }
-
 
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
@@ -104,6 +96,9 @@ function showMsg(bar, msgs, type = "error", actions = []) {
     bar.appendChild(wrap);
   }
 }
+// ✅ expose for other pages (ovsynch.html uses it)
+window.showMsg = showMsg;
+window.ensureInfoBar = ensureInfoBar;
 
 /* ===================== UI: Field Errors (Inline) ===================== */
 function clearFieldErrors(form){
