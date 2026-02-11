@@ -350,7 +350,7 @@ const applyBulkBtn = document.getElementById('applyBulk');
     modeBulkBox.hidden = !isGroup;
     modeSingleBox.hidden = isGroup;
     try{ localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single"); }catch{}
-    updateSteps();
+ 
 
     clearWarn();
   }
@@ -494,6 +494,9 @@ if (!dbRef || !authRef){
 if (!fbReady || !dbRef || !authRef) {
   // خليك ساكت… forms-init هو اللي هيمنع الحفظ ويعرض الرسائل
 }
+  const u0 = await waitUser();
+if (u0) await refreshGroups(u0.uid);
+
 /* ========= Groups (Cloud) =========
    نحفظ المجموعات في: users/{uid}/ovsynch_groups/{groupId}
    بدون أي تغيير UI — اسم المجموعة يتولد تلقائيًا لو المستخدم لم يختر اسمًا.
@@ -546,12 +549,13 @@ async function saveCurrentAsGroup(uid){
   const safeId = chosenId || name.replace(/[^\w\u0600-\u06FF\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40);
 
   const ref = doc(dbRef, "users", uid, "ovsynch_groups", safeId);
-  await setDoc(ref, {
-    name,
-    numbers: list.map(x => String(x)),
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp()
-  }, { merge:true });
+ await setDoc(ref, {
+  userId: uid,
+  name,
+  numbers: list.map(x => String(x)),
+  updatedAt: serverTimestamp(),
+  createdAt: serverTimestamp()
+}, { merge:true });
 
   await refreshGroups(uid);
   if (groupSelect) groupSelect.value = safeId;
