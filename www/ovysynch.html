@@ -203,7 +203,7 @@
             <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
           </div>
 
-        <div class="row" style="margin-top:10px">
+       <div class="row" style="margin-top:10px">
 
   <div class="field">
     <label for="groupSelect">المجموعة المحفوظة</label>
@@ -215,13 +215,13 @@
 
   <div class="field" style="margin-top:10px">
     <label for="groupName">اسم المجموعة</label>
-    <input id="groupName"
-           type="text"
+    <input id="groupName" type="text"
            placeholder="اكتب اسم المجموعة (مثال: دفعة فبراير 1)" />
     <div class="hint">الاسم إلزامي عند الحفظ.</div>
   </div>
 
 </div>
+
 
             <div class="row row-2">
               <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
@@ -509,18 +509,25 @@ if (!fbReady || !dbRef || !authRef) {
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
-/* ========= Groups (Cloud) — ROOT protocolGroups =========
-   ✅ نكتب في: protocolGroups/{docId}
-   ✅ الروولز الحالية بتسمح بشرط userId == uid
+/* ========= Groups (Cloud) — (B) under users/{uid}/ovsynch_groups =========
+   ✅ نكتب في: users/{uid}/ovsynch_groups/{docId}
+   ✅ الروولز (B) بتسمح بشرط userId == uid
    ✅ اسم المجموعة من المستخدم (إلزامي)
 */
+
+function groupsCol(uid){
+  return collection(dbRef, "users", uid, "ovsynch_groups");
+}
+
+function groupDoc(uid, id){
+  return doc(dbRef, "users", uid, "ovsynch_groups", id);
+}
 
 async function refreshGroups(uid){
   if (!uid || !dbRef || !groupSelect) return;
   try{
     const qg = query(
-      collection(dbRef, "protocolGroups"),
-      where("userId", "==", uid),
+      groupsCol(uid),
       orderBy("updatedAt", "desc"),
       limit(50)
     );
@@ -535,9 +542,9 @@ async function refreshGroups(uid){
       opt.textContent = data.name || d.id;
       groupSelect.appendChild(opt);
     });
-
   }catch(e){
     console.error("refreshGroups failed", e);
+    showWarn("⚠️ تعذّر تحميل المجموعات من السحابة.");
   }
 }
 
@@ -566,11 +573,11 @@ async function saveCurrentAsGroup(uid){
   }
 
   const docId = safeGroupIdFromName(name);
-  const ref = doc(dbRef, "protocolGroups", docId);
+  const ref = groupDoc(uid, docId);
 
   await setDoc(ref, {
     userId: uid,
-    kind: "ovsynch",          // علشان نقدر نميز لاحقًا بروتوكولات أخرى
+    kind: "ovsynch",
     name,
     numbers: list.map(x => String(x)),
     updatedAt: serverTimestamp(),
@@ -593,7 +600,7 @@ async function loadSelectedGroup(uid){
     return;
   }
 
-  const ref = doc(dbRef, "protocolGroups", id);
+  const ref = groupDoc(uid, id);
   const snap = await getDoc(ref);
   if (!snap.exists()){
     showWarn("⚠️ هذه المجموعة غير موجودة أو حُذفت.");
