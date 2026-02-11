@@ -526,38 +526,58 @@ const infoEl      = document.getElementById('sysbar');
 
   // ✅ Apply Bulk (بعد ما Firebase بقت جاهزة)
   applyBulk?.addEventListener("click", async () => {
-    if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
+  applyBulk?.addEventListener("click", async () => {
+  if (!fbReady) { showInfo("⏳ جاري تحميل النظام… جرّب بعد ثانية.", true); return; }
 
-    const list = parseBulk();
-    if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
+  const list = parseBulk();
+  if (!list.length) { showWarn("⚠️ اكتب أرقام الحيوانات."); return; }
 
-    const dt = (startDateEl.value || todayISO()).trim();
-    const r = await window.mbk.previewOvsynchList(list, dt);
+  const dt = (startDateEl.value || todayISO()).trim();
 
+  // ✅ استدعاء التحقق المركزي (forms-init.js)
+  const r = await window.mbk.previewOvsynchList(list, dt);
+
+  // ✅ فشل عام
   if (!r || r.ok === false) {
-  showInfo("⚠️ تعذّر فحص القائمة الآن.", true);
-  return;
-}
+    // لا نلمس القائمة في الفشل العام
+    showInfo("⚠️ تعذّر فحص القائمة الآن.", true);
+    return;
+  }
 
-if (r.message) {
-  showInfo(r.message, true);
-  return;
-}
+  // ✅ استخرج القوائم
+  const valid = Array.isArray(r.valid) ? r.valid : [];
+  const rejected = Array.isArray(r.rejected) ? r.rejected : [];
 
+  // ✅ (1) احذف غير المؤهلين فورًا من مربع الإدخال
+  bulkList = valid;
+  bulkEl.value = valid.join("\n");     // لو valid=0 → هيفضيها
 
-    bulkList = r.valid;
-    bulkEl.value = bulkList.join("\n");
+  // ✅ (2) ابنِ رسالة أسباب “لكل رقم تم حذفه”
+  const reasonsAll = rejected.map(x => String(x.reason || "")).filter(Boolean);
+  const reasonsPreview = reasonsAll.slice(0, 12); // اعرض أول 12 سبب (تقدر تغيّرها)
 
-    const bad = r.rejected || [];
-    const badPreview = bad.slice(0, 6).map(x => x.reason).join("\n");
-    const msg =
-      `✅ صالح للتسجيل: ${bulkList.length} رقم\n` +
-      (bad.length ? `\n🚫 تم حذف: ${bad.length} رقم للأسباب التالية:\n${badPreview}${bad.length>6 ? "\n…" : ""}` : "");
+  let msg = "";
+  if (valid.length) {
+    msg += `✅ تم قبول: ${valid.length} رقم\n`;
+  } else {
+    msg += `🔎 تم فحص القائمة\nلا يوجد أرقام مؤهلة حاليًا.\n`;
+  }
 
-    showInfo(msg, false);
-    clearWarn();
-    syncCentral();
-  });
+  if (rejected.length) {
+    msg += `\n🚫 تم حذف: ${rejected.length} رقم غير مؤهل للأسباب التالية:\n` +
+           reasonsPreview.join("\n") +
+           (rejected.length > reasonsPreview.length ? "\n…" : "");
+  } else {
+    msg += `\n✅ لا توجد أرقام مرفوضة.`;
+  }
+
+  // ✅ (3) لو لا يوجد مؤهلين: اعتبرها رسالة “خطأ/تنبيه” (لون أحمر)
+  showInfo(msg, !valid.length);
+
+  clearWarn();
+  syncCentral();
+});
+
 /* ========= Tasks: Ovsynch Protocol ========= */
 async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr){
   if (!uid || !animalNumber || !startISO) return;
