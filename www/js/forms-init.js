@@ -1130,6 +1130,9 @@ function attachOvsynchProtocol(form){
   const bar = ensureInfoBar(form);
   const eventName = String(form.getAttribute("data-event") || "").trim();
   if (eventName !== "بروتوكول تزامن") return;
+  if (form.dataset.mbkOvsynchAttached === "1") return;
+form.dataset.mbkOvsynchAttached = "1";
+
 
   // لا Lock ولا Gate عام
   form.dataset.locked = "0";
