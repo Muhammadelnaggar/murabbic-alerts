@@ -166,6 +166,7 @@
       <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
         <!-- ✅ حقول ربط للمسار المركزي -->
         <input type="hidden" id="animalNumber" data-field="animalNumber" value="">
+        <input type="hidden" id="animalNumbers" data-field="animalNumbers" value="">
         <input type="hidden" id="eventDate" data-field="eventDate" value="">
         <input type="hidden" id="species" data-field="species" value="">
         <input type="hidden" id="steps" data-field="steps" value="">
@@ -279,7 +280,7 @@
   </div>
 
 <script type="module">
-import { db as dbRef, auth as authRef } from "/js/firebase-config.js";
+import { db as fbDb, auth as fbAuth } from "/js/firebase-config.js";
 import {
   collection, serverTimestamp, doc, setDoc, getDoc,
   query, where, getDocs, orderBy, limit
@@ -318,8 +319,9 @@ const infoEl      = document.getElementById('sysbar');
   // ✅ ربط زر "تطبيق القائمة" (مرة واحدة فقط)
 const applyBulkBtn = document.getElementById('applyBulk');
 
-  let dbRef=null, authRef=null, stepsState=[], bulkList=[];
-  let fbReady = false;
+let stepsState = [], bulkList = [];
+let fbReady = !!fbDb && !!fbAuth;
+
 
   /* ========= Helpers ========= */
   function todayISO(){
@@ -368,12 +370,23 @@ const applyBulkBtn = document.getElementById('applyBulk');
     clearWarn();
   }
 
-  function syncCentral(){
-    const first=(getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
-    animalHidden.value=first;
-    eventHidden.value=(startDateEl.value||"").trim();
-    stepsHidden.value=JSON.stringify(stepsState||[]);
-  }
+ function syncCentral(){
+  const mode = getMode();
+  const list = (mode === "group")
+    ? parseBulk().map(x => String(x).trim()).filter(Boolean)
+    : [String(animalUI.value || "").trim()].filter(Boolean);
+
+  // ✅ الفردي فقط: animalNumber
+  animalHidden.value = (mode === "single" ? (list[0] || "") : "");
+
+  // ✅ الجديد: القائمة كلها
+  const animalNumbersHidden = document.getElementById("animalNumbers");
+  if (animalNumbersHidden) animalNumbersHidden.value = JSON.stringify(list);
+
+  eventHidden.value = (startDateEl.value || "").trim();
+  stepsHidden.value = JSON.stringify(stepsState || []);
+}
+
 
   openCowCard.addEventListener("click", () => {
     const num = (getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
@@ -477,11 +490,11 @@ startTimeEl?.addEventListener("change", syncCentral);
   /* ========= Firebase (Robust) ========= */
   async function waitUser(ms=1500){
     return await new Promise(res=>{
-      const t=setTimeout(()=>res(authRef?.currentUser||null),ms);
-      onAuthStateChanged(authRef,u=>{ clearTimeout(t); res(u||null); });
+      const t=setTimeout(()=>res(fbAuth?.currentUser||null),ms);
+      onAuthStateChanged(fbAuth,u=>{ clearTimeout(t); res(u||null); });
     });
   }
-}
+
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
@@ -492,15 +505,15 @@ if (u0) await refreshGroups(u0.uid);
 */
 
 function groupsCol(uid){
-  return collection(dbRef, "users", uid, "ovsynch_groups");
+  return collection(fbDb, "users", uid, "ovsynch_groups");
 }
 
 function groupDoc(uid, id){
-  return doc(dbRef, "users", uid, "ovsynch_groups", id);
+  return doc(fbDb, "users", uid, "ovsynch_groups", id);
 }
 
 async function refreshGroups(uid){
-  if (!uid || !dbRef || !groupSelect) return;
+  if (!uid || !fbDb || !groupSelect) return;
   try{
     const qg = query(
       groupsCol(uid),
@@ -533,7 +546,7 @@ function safeGroupIdFromName(name){
 }
 
 async function saveCurrentAsGroup(uid){
-  if (!uid || !dbRef) return;
+  if (!uid || !fbDb) return;
 
   setMode("group");
   const list = parseBulk();
@@ -568,7 +581,7 @@ async function saveCurrentAsGroup(uid){
 }
 
 async function loadSelectedGroup(uid){
-  if (!uid || !dbRef) return;
+  if (!uid || !fbDb) return;
 
   const id = (groupSelect?.value || "").trim();
   if (!id){
@@ -611,7 +624,6 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
   const steps = Array.isArray(stepsArr) ? stepsArr : [];
   if (!steps.length) return;
 
-  // نفس ID الحدث عندك
   const baseId = ["ovsynch", animalNumber, program, startISO].join("__");
 
   for (let i = 0; i < steps.length; i++){
@@ -619,7 +631,6 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
     const dueISO = String(st.date || "").slice(0,16); // "YYYY-MM-DDTHH:mm"
     const dueDate = dueISO ? dueISO.slice(0,10) : String(startISO).slice(0,10);
 
-    // ✅ ID ثابت يمنع التكرار
     const taskId = `${baseId}__step_${i}`;
 
     const taskPayload = {
@@ -633,21 +644,20 @@ async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr
       stepIndex: i,
       stepDay: Number(st.day ?? 0),
       stepName: String(st.name || ""),
-      dueAt: dueISO || "",     // لتوقيت الخطوة
-      dueDate: dueDate || "",  // لتجميع اليوم
+      dueAt: dueISO || "",
+      dueDate: dueDate || "",
 
       status: st.done ? "done" : "pending",
       done: !!st.done,
 
-      // تواريخ فنية
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    // ✅ merge true: لو موجود يحدثه بدل ما يكرر
-    await setDoc(doc(dbRef, "tasks", taskId), taskPayload, { merge: true });
+    await setDoc(doc(fbDb, "tasks", taskId), taskPayload, { merge: true });
   }
 }
+
 // ========= ربط أزرار المجموعة =========
 loadGroupBtn?.addEventListener("click", async ()=> {
   const u = await waitUser();
@@ -679,7 +689,7 @@ saveGroupBtn?.addEventListener("click", async ()=> {
     const start = (startDateEl.value || "").trim() || todayISO();
     if (!startDateEl.value) startDateEl.value = start;
    const program = (programEl.value || "").trim();
-   if (!fbReady || !dbRef || !authRef) return;
+   if (!fbReady || !fbDb || !fbAuth) return;
 
 const u = await waitUser();
 if (!u) return;
@@ -702,6 +712,30 @@ if (!fd || !Array.isArray(fd.animalNumbers)) {
 }
 
 const finalList = fd.animalNumbers;
+   let groupId = "";
+let groupName = "";
+
+if (getMode() === "group") {
+  groupName = String(groupNameEl?.value || "").trim();
+  if (!groupName) { showWarn("⚠️ اكتب اسم المجموعة أولًا."); return; }
+
+  groupId = safeGroupIdFromName(groupName);
+
+  // ✅ احفظ/حدّث المجموعة تلقائيًا وقت حفظ البروتوكول
+  await setDoc(groupDoc(u.uid, groupId), {
+    userId: u.uid,
+    kind: "ovsynch",
+    name: groupName,
+    numbers: finalList.map(x => String(x)),
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  }, { merge: true });
+
+  await refreshGroups(u.uid);
+  if (groupSelect) groupSelect.value = groupId;
+}
+
+
 const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
 
 
@@ -714,6 +748,9 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
       program,
       steps: stepsState,
       userId: u.uid,
+        groupId: groupId || "",
+  groupName: groupName || "",
+
       createdAt: serverTimestamp()
     };
 
@@ -722,7 +759,7 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
 
     for (const animal of finalList){
       const id = ["ovsynch", animal, program, start].join("__");
-      const ref = doc(dbRef, "events", id);
+      const ref = doc(fbDb, "events", id);
 
       const ex = await getDoc(ref);
       if (ex.exists()){
