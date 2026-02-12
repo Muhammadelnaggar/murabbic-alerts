@@ -212,6 +212,16 @@
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
   <script src="/js/smart-checks.js"></script>
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.smart?.startAlertsWatcher) {
+      window.smart.startAlertsWatcher({
+        userId: (window.__TENANT__?.userId || localStorage.getItem("userId") || "")
+      });
+    }
+  });
+</script>
+
   <script src="/js/alerts-ui.js"></script>
   <script type="module" src="/js/repro-auto.js"></script>
 
@@ -639,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </body>
 </html>
+
 
 
 
