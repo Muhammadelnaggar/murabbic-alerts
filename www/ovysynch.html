@@ -279,12 +279,13 @@
   </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { db as dbRef, auth as authRef } from "/js/firebase-config.js";
 import {
-  getFirestore, collection, serverTimestamp, doc, setDoc, getDoc,
+  collection, serverTimestamp, doc, setDoc, getDoc,
   query, where, getDocs, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 
 (async () => {
   const form        = document.getElementById('ovForm');
@@ -406,6 +407,9 @@ const applyBulkBtn = document.getElementById('applyBulk');
   animalUI.addEventListener("input",syncCentral);
   bulkEl?.addEventListener("input",syncCentral);
   startDateEl.addEventListener("input",syncCentral);
+  programEl?.addEventListener("change", syncCentral);
+startTimeEl?.addEventListener("change", syncCentral);
+
 
   /* ========= Programs ========= */
   const PROGRAMS = {
@@ -477,34 +481,6 @@ const applyBulkBtn = document.getElementById('applyBulk');
       onAuthStateChanged(authRef,u=>{ clearTimeout(t); res(u||null); });
     });
   }
-
-  async function initFirebase(){
-    try{
-      const mod = await import('/js/firebase-config.js');
-
-     dbRef   = mod.db || null;
-authRef = mod.auth || null;
-
-if (!dbRef || !authRef){
-  const cfg = mod.firebaseConfig || mod.config || mod.default || null;
-  const app = cfg ? initializeApp(cfg) : (mod.app || null);
-  dbRef   = dbRef   || getFirestore(app, "murabbikdata");
-  authRef = authRef || getAuth(app);
-}
-
-      window.mbk = window.mbk || {};
-      fbReady = true;
-      return true;
-    }catch(e){
-      fbReady = false;
-     
-      return false;
-    }
-  }
-
-  await initFirebase();
-if (!fbReady || !dbRef || !authRef) {
-  // خليك ساكت… forms-init هو اللي هيمنع الحفظ ويعرض الرسائل
 }
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
