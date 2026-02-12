@@ -376,8 +376,8 @@ let fbReady = !!fbDb && !!fbAuth;
     ? parseBulk().map(x => String(x).trim()).filter(Boolean)
     : [String(animalUI.value || "").trim()].filter(Boolean);
 
-  // ✅ الفردي فقط: animalNumber
-  animalHidden.value = (mode === "single" ? (list[0] || "") : "");
+  // ✅ لازم دايمًا يبقى فيه animalNumber “ممثل” (أول رقم) عشان forms-init ما يقفلش
+  animalHidden.value = (list[0] || "");
 
   // ✅ الجديد: القائمة كلها
   const animalNumbersHidden = document.getElementById("animalNumbers");
