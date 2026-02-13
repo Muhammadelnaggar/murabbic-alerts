@@ -3,71 +3,99 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>مرحبًا بك في مربيك</title>
+  <title>مُرَبِّيك</title>
+
   <style>
+    :root{
+      --green:#0ea05a;
+      --green-dark:#0b7f47;
+      --bg:#f7faf7;
+      --text:#ffffff;
+    }
+
+    *{box-sizing:border-box}
+
     body {
       margin: 0;
       padding: 0;
-      background-color: #e8f5e9;
-      font-family: 'Tahoma', sans-serif;
+      font-family: 'Cairo', Tahoma, sans-serif;
+      background: linear-gradient(135deg, var(--green), var(--green-dark));
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
       overflow: hidden;
+      color: var(--text);
+      text-align: center;
     }
 
     .logo {
-      width: 150px;
-      height: 150px;
-      animation: zoomIn 2s ease-in-out forwards;
+      width: 120px;
+      margin-bottom: 25px;
+      animation: float 2.5s ease-in-out infinite alternate;
     }
 
-    @keyframes zoomIn {
-      0% {
-        transform: scale(0.5);
+    @keyframes float {
+      from { transform: translateY(0px); }
+      to { transform: translateY(-12px); }
+    }
+
+    .brand {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      opacity: 0;
+      animation: fadeInUp 1.5s ease forwards;
+    }
+
+    .slogan {
+      margin-top: 12px;
+      font-size: 18px;
+      opacity: 0;
+      animation: fadeInUp 1.5s ease 0.5s forwards;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        transform: translateY(20px);
         opacity: 0;
       }
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-
-    h1 {
-      margin-top: 20px;
-      font-size: 28px;
-      color: #2e7d32;
-      opacity: 0;
-      animation: fadeIn 2s ease-in-out 1s forwards;
-    }
-
-    p {
-      margin-top: 10px;
-      font-size: 16px;
-      color: #555;
-      opacity: 0;
-      animation: fadeIn 2s ease-in-out 1.5s forwards;
-    }
-
-    @keyframes fadeIn {
       to {
+        transform: translateY(0);
         opacity: 1;
       }
     }
+
+    .loader {
+      margin-top: 35px;
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
   </style>
 </head>
+
 <body>
 
   <img src="images/logo.png" alt="شعار مربيك" class="logo">
-  <h1>مرحبًا بك في مربيك</h1>
-  <p>نحو إدارة ذكية لمزرعتك</p>
+
+  <div class="brand">مُرَبِّيك</div>
+  <div class="slogan">نظام خبير يصنع القرار.</div>
+
+  <div class="loader"></div>
 
   <script>
-    // بعد 3 ثواني توجيه إلى صفحة التسجيل
     setTimeout(() => {
-      window.location.href = "register.html";
+      window.location.href = "login.html";
     }, 3000);
   </script>
 
