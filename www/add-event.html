@@ -9,8 +9,28 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{ --green:#2e7d32; --green-200:#a5d6a7; --green-600:#1b5e20; --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --danger:#c62828; }
-    *{box-sizing:border-box}
+    :root{ --green:#2e7d32; --green-200:#a5d6a7; --green-600:#1b5e20; --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --danger:#c62828;  --text:#0f172a; --border:#e2e8f0; --brand:#0ea05a; --brand-600:#0b7f47; --muted:#64748b;}
+    
+    .mbk-top{
+      position: sticky; top:0; z-index:50;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+    }
+    .mbk-head{
+      max-width:980px;
+      margin:0 auto;
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .mbk-title{ line-height:1.1; }
+    .mbk-page{ font-size:18px; font-weight:900; color:var(--text); }
+    .mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
+    .mbk-logo{ height:46px; width:auto; object-fit:contain; opacity:.95; }
+
+*{box-sizing:border-box}
   body{
   margin:0;
   padding-bottom:70px; /* مسافة تحت لكل المحتوى عشان شريط الإبحار */
@@ -18,8 +38,6 @@
   font-family:'Cairo','Arial',sans-serif;
   color:var(--green-600);
 }
-
-    h1{margin:0;padding:18px;text-align:center;background:var(--green);color:#fff;border-bottom-left-radius:20px;border-bottom-right-radius:20px;box-shadow:0 3px 6px rgba(0,0,0,.2);font-size:24px}
     .meta{padding:8px 10px;text-align:center;font-size:16px}
     .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
     .form{margin:12px;padding:14px;background:var(--card);border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.08);display:grid;gap:12px}
@@ -76,7 +94,15 @@
   </style>
 </head>
 <body>
-  <h1>تسجيل حدث</h1>
+  <header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page">تسجيل حدث</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
   <div class="meta" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
   <div class="meta" id="dateInfo"></div>
   <div class="warning" id="warn"></div>
@@ -122,7 +148,7 @@
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js"></script>
+  <script type="module" src="/js/api.js"></script>
 
   <script>
     function updateCowCardNav(number){
