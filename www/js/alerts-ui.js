@@ -262,7 +262,7 @@
       <div class="mbk-alert__actions">
         <button class="mbk-btn primary" data-act="ok">حسنًا</button>
         <button class="mbk-btn ghost" data-act="snooze">تأجيل 30د</button>
-        ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">فتح</button>` : ``}
+        ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">تسجيل الإن</button>` : ``}
       </div>
     `;
 
