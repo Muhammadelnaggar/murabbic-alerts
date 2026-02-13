@@ -3,42 +3,204 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل الدخول — مُرَبِّيك</title>
+
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
-  <title>تسجيل الدخول</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
+
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap" rel="stylesheet">
+
   <style>
-    body {
-      direction: rtl;
-      font-family: 'Cairo', 'Arial', sans-serif;
-      background: linear-gradient(to bottom right, #ffffcc, #eeffdd);
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; margin: 0; padding: 20px;
+    :root{
+      --bg:#f7faf7;
+      --bg-top:#eef7f1;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e2e8f0;
+      --brand:#0ea05a;
+      --brand-600:#0b7f47;
+      --danger:#c2410c;
     }
-    form {
-      background-color: #ffffff;
-      padding: 30px 25px;
-      border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-      max-width: 400px; width: 90%; text-align: center;
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:'Cairo',sans-serif;
+      background:linear-gradient(180deg,var(--bg-top) 0%, var(--bg) 60%);
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      color:var(--text);
+      padding:20px;
     }
-    h2 { color: #28a745; font-size: 28px; margin-bottom: 16px; }
-    .msg {
-      display: none; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-weight: 700;
-      text-align: center; font-size: 14px;
+
+    /* Header */
+    .topbar{
+      position:absolute;
+      top:20px;
+      left:0;
+      right:0;
+      display:flex;
+      justify-content:center;
+      align-items:center;
     }
-    .msg.ok  { display:block; background:#dcfce7; border:1px solid #86efac; color:#14532d; }
-    .msg.err { display:block; background:#fee2e2; border:1px solid #fca5a5; color:#7f1d1d; }
-    input, button {
-      width: 100%; padding: 12px; margin-bottom: 12px; font-size: 1em;
-      border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box;
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
     }
-    button {
-      background-color: #28a745; color: white; font-weight: bold; border: none; cursor: pointer;
+
+    .brand img{
+      width:48px;
+      height:48px;
+      object-fit:contain;
     }
-    button:hover { background-color: #218838; }
-    button:disabled { opacity:.7; cursor:not-allowed; }
+
+    .brand-text{
+      display:flex;
+      flex-direction:column;
+      line-height:1.1;
+    }
+
+    .brand-text .main{
+      font-weight:900;
+      font-size:26px;
+    }
+
+    .brand-text .sub{
+      font-size:14px;
+      color:var(--brand-600);
+      font-weight:800;
+      opacity:.8;
+    }
+
+    /* Card */
+    .card{
+      width:100%;
+      max-width:380px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow:0 10px 26px rgba(2,6,23,.08);
+      padding:24px 20px 18px;
+      text-align:center;
+    }
+
+    .card h2{
+      margin:0 0 6px;
+      font-size:22px;
+      font-weight:900;
+      color:var(--brand-600);
+    }
+
+    .desc{
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:18px;
+    }
+
+    .msg{
+      display:none;
+      margin-bottom:12px;
+      padding:10px 12px;
+      border-radius:12px;
+      font-weight:800;
+      font-size:14px;
+      border:1px solid transparent;
+    }
+    .msg.ok{ display:block;background:#dcfce7;border-color:#86efac;color:#14532d;}
+    .msg.err{ display:block;background:#fee2e2;border-color:#fca5a5;color:#7f1d1d;}
+
+    input{
+      width:100%;
+      padding:13px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      font-size:15px;
+      margin-bottom:12px;
+      outline:none;
+    }
+
+    input:focus{
+      border-color:rgba(14,160,90,.55);
+      box-shadow:0 0 0 4px rgba(14,160,90,.12);
+    }
+
+    button{
+      width:100%;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid var(--brand);
+      background:var(--brand);
+      color:#fff;
+      font-weight:900;
+      font-size:16px;
+      cursor:pointer;
+      transition:.15s ease;
+    }
+
+    button:hover{
+      background:var(--brand-600);
+      border-color:var(--brand-600);
+    }
+
+    button:disabled{
+      opacity:.7;
+      cursor:not-allowed;
+    }
+
+    .hint{
+      margin-top:14px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    footer{
+      position:absolute;
+      bottom:16px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
   </style>
+</head>
+
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <img src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="brand-text">
+        <div class="main">مُرَبِّيك</div>
+        <div class="sub">نظام خبير يصنع القرار.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>تسجيل الدخول</h2>
+    <div class="desc">أدخل رقم هاتفك للمتابعة</div>
+
+    <div id="formMsg" class="msg"></div>
+
+    <form id="loginForm">
+      <input type="text" id="phone" placeholder="رقم الهاتف" required />
+      <input type="password" id="password" placeholder="كلمة المرور" required />
+      <button id="submitBtn" type="submit">دخول</button>
+    </form>
+
+    <div class="hint">
+      نظام ذكي لتحليل القطيع وتبسيط القرار للمربي
+    </div>
+  </div>
+
+  <footer>
+    © 2026 Murabbik. All rights reserved.
+  </footer>
 
 <script type="module">
   import { db } from "./js/firebase-config.js";
@@ -55,7 +217,7 @@
     msg.className   = "msg " + (ok ? "ok" : "err");
     msg.style.display = "block";
   }
-  // توحيد الأرقام العربية وترك أرقام فقط
+
   function phoneKeyOf(raw){
     const s = (raw||"").trim()
       .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
@@ -64,35 +226,33 @@
   }
 
   form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); msg.style.display="none";
-    const prev = btn.textContent; btn.disabled=true; btn.textContent="جارٍ التحقق…";
+    e.preventDefault(); 
+    msg.style.display="none";
+    const prev = btn.textContent; 
+    btn.disabled=true; 
+    btn.textContent="جارٍ التحقق…";
+
     try{
       const phoneIn = document.getElementById("phone").value;
       const passIn  = document.getElementById("password").value;
       const phoneKey = phoneKeyOf(phoneIn);
-      if (!phoneKey || !passIn){ setMsg("أدخل رقم الهاتف وكلمة المرور."); return; }
+
+      if (!phoneKey || !passIn){ 
+        setMsg("أدخل رقم الهاتف وكلمة المرور."); 
+        return; 
+      }
 
       const auth = getAuth();
       const pseudoEmail = `${phoneKey}@murabbik.local`;
 
-      // ✅ تسجيل دخول فعلي على Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, pseudoEmail, passIn);
       const uid  = cred.user.uid;
 
-      // حمّل بروفايل المستخدم من users/{uid}
       const snap = await getDoc(doc(db,"users", uid));
       const u = snap.exists() ? snap.data() : {};
+      const tenant = u.userId || uid;
 
-// userId الحقيقي الخاص بالمزرعة (وليس UID)
-const tenant = u.userId || uid;
-
-// خزِّن الـ tenant لاستخدامه في الداشبورد ونداءات الـ API
-localStorage.setItem("userId", tenant);
-
-// اختياري: تخزين بيانات إضافية
-if (u.phone)   localStorage.setItem("userPhone", u.phone);
-if (u.country) localStorage.setItem("userCountry", u.country);
-if (u.region)  localStorage.setItem("userRegion",  u.region);
+      localStorage.setItem("userId", tenant);
 
       setMsg("✅ تم تسجيل الدخول — تحويل…", true);
       setTimeout(()=> location.href="dashboard.html", 600);
@@ -100,28 +260,11 @@ if (u.region)  localStorage.setItem("userRegion",  u.region);
     }catch(err){
       setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.");
     }finally{
-      btn.disabled=false; btn.textContent=prev;
+      btn.disabled=false; 
+      btn.textContent=prev;
     }
   });
 </script>
 
-
-
-
-</head>
-<body>
-  <form id="loginForm" novalidate>
-    <h2>تسجيل الدخول</h2>
-    <div id="formMsg" class="msg" role="status" aria-live="polite"></div>
-    <input type="text" id="phone" placeholder="رقم الهاتف" autocomplete="username" required />
-    <input type="password" id="password" placeholder="كلمة المرور" autocomplete="current-password" required />
-    <button id="submitBtn" type="submit">دخول</button>
-  </form>
 </body>
 </html>
-
-
-
-
-
-
