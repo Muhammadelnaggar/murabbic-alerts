@@ -9,7 +9,16 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{ --green:#2e7d32; --green-200:#a5d6a7; --green-600:#1b5e20; --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --danger:#c62828;  --text:#0f172a; --border:#e2e8f0; --brand:#0ea05a; --brand-600:#0b7f47; --muted:#64748b;}
+    :root{
+      --bg:#f7faf7;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e2e8f0;
+      --brand:#0ea05a;
+      --brand-600:#0b7f47;
+      --danger:#c2410c;
+    }
     
     .mbk-top{
       position: sticky; top:0; z-index:50;
@@ -36,7 +45,7 @@
   padding-bottom:70px; /* مسافة تحت لكل المحتوى عشان شريط الإبحار */
   background:linear-gradient(to bottom,var(--bg1),var(--bg2));
   font-family:'Cairo','Arial',sans-serif;
-  color:var(--green-600);
+  color:var(--text);
 }
     .meta{padding:8px 10px;text-align:center;font-size:16px}
     .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
@@ -51,10 +60,10 @@
 
 
     @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);}}
-    .btn{padding:14px;background:#fff;border:2px solid var(--green-200);border-radius:12px;font-weight:700;cursor:pointer;text-align:center;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.06);font-size:16px}
-    .btn:hover{background:var(--green);border-color:var(--green);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
+    .btn{padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;font-weight:700;cursor:pointer;text-align:center;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.06);font-size:16px}
+    .btn:hover{background:var(--brand);border-color:var(--brand);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
-    #inlineMsg .text{font-size:14px;font-weight:700;color:var(--green-600);text-align:center}
+    #inlineMsg .text{font-size:14px;font-weight:700;color:var(--text);text-align:center}
     /* ===== شريط إبحار سفلي ===== */
 .mbk-bottom-nav{
   position:fixed;
@@ -63,7 +72,7 @@
   right:0;
   height:58px;
   background:#ffffff;
-  border-top:1px solid var(--green-200);
+  border-top:1px solid var(--border);
   display:flex;
   justify-content:space-around;
   align-items:center;
@@ -74,9 +83,9 @@
   text-decoration:none;
   padding:8px 14px;
   border-radius:999px;
-  border:1px solid var(--green-200);
+  border:1px solid var(--border);
   background:#ffffff;
-  color:var(--green-600);
+  color:var(--text);
   font-size:0.9rem;
   white-space:nowrap;
 }
