@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
+        <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0ea05a">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>مرحبًا بك في مربيك</title>
   <style>
@@ -72,16 +75,15 @@
   </script>
 
 
-  <!-- ✅ Install (PWA) — يظهر فقط لو التثبيت متاح -->
-  <button id="mbkInstallTile" type="button"
-          style="display:none;position:fixed;left:16px;bottom:16px;z-index:9999;
-                 padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.55);
-                 background:rgba(255,255,255,.12);color:#fff;font-weight:900;
-                 backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-                 box-shadow:0 10px 26px rgba(0,0,0,.12);">
-    تثبيت مُرَبِّيك
-  </button>
+  <script>
+  (function(){
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(function(e){
+        console.warn('SW register failed', e);
+      });
+    }
+  })();
+  </script>
 
-  <script type="module" src="/js/install-ui.js"></script>
 </body>
 </html>
