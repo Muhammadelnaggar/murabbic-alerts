@@ -212,14 +212,6 @@
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
   <script src="/js/smart-checks.js"></script>
-  <script>
-    if (window.smart?.startAlertsWatcher) {
-      window.smart.startAlertsWatcher({
-        userId: (window.__TENANT__?.userId || localStorage.getItem("userId") || "")
-      });
-    }
-</script>
-
   <script src="/js/alerts-ui.js"></script>
   <script type="module" src="/js/repro-auto.js"></script>
 
@@ -636,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try{
    window.smart?.startAlertsWatcher({
   userId: getTenantId(),
-  onAlert: (p)=> window.mbk?.alertsUI?.show(p)
+  onAlert: (p)=> (window.mbk?.alertsUI?.show ? window.mbk.alertsUI.show(p) : (typeof showSyncPopup==='function' ? showSyncPopup(p) : void 0))
 });
 
   }catch(e){}
