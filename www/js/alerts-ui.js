@@ -8,6 +8,7 @@
   if (window.mbk.alertsUI) return; // منع تحميل مزدوج
 
   const LS_SEEN_PREFIX = 'mbk_alert_seen__';
+  const LS_SNOOZE_PREFIX = 'mbk_alert_snooze__';
 
   function esc(s){
     return String(s ?? '')
@@ -191,6 +192,21 @@
     try{ localStorage.setItem(LS_SEEN_PREFIX + key, String(nowTs())); }catch{}
   }
 
+
+  function snoozeUntil(key){
+    try{ return Number(localStorage.getItem(LS_SNOOZE_PREFIX + key) || 0) || 0; }catch{ return 0; }
+  }
+  function setSnooze(key, minutes){
+    try{
+      const until = Date.now() + (Number(minutes||30) * 60 * 1000);
+      localStorage.setItem(LS_SNOOZE_PREFIX + key, String(until));
+    }catch{}
+  }
+  function clearSnooze(key){
+    try{ localStorage.removeItem(LS_SNOOZE_PREFIX + key); }catch{}
+  }
+
+
   // ===== تجميع (Aggregation) للبروتوكول =====
   // لو وصلنا payload فيه: ruleId protocol_step_due / protocol_step_tomorrow
   // وبدون groupId… هنجمّع تلقائيًا حسب: (ruleId + plannedDate + plannedTime + stepName)
@@ -214,7 +230,8 @@
     const key = makeKey(payload);
 
     if (isSeen(key)) return; // منع التكرار بعد "حسنًا"
-    markSeen(key);
+    const su = snoozeUntil(key);
+    if (su && Date.now() < su) return; // مؤجّل
 
     const title = payload?.title || sev.title;
     const msg   = payload?.message || 'تنبيه جديد';
@@ -244,26 +261,32 @@
       </div>
       <div class="mbk-alert__actions">
         <button class="mbk-btn primary" data-act="ok">حسنًا</button>
+        <button class="mbk-btn ghost" data-act="snooze">تأجيل 30د</button>
         ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">فتح</button>` : ``}
       </div>
     `;
 
-    const kill = ()=>{
+    const kill = (ack=true)=>{
       el.classList.remove('show');
       setTimeout(()=>{ try{ el.remove(); }catch{} }, 220);
-      try{
-        if (window.t?.event) window.t.event('smart_alert_ack', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
-      }catch{}
+      if (ack){
+        markSeen(key);
+        clearSnooze(key);
+        try{
+          if (window.t?.event) window.t.event('smart_alert_ack', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
+        }catch{}
+      }
     };
 
-    el.querySelector('.mbk-alert__close')?.addEventListener('click', kill);
-    el.querySelector('[data-act="ok"]')?.addEventListener('click', kill);
+    el.querySelector('.mbk-alert__close')?.addEventListener('click', ()=> kill(true));
+    el.querySelector('[data-act="ok"]')?.addEventListener('click', ()=> kill(true));
+    el.querySelector('[data-act="snooze"]')?.addEventListener('click', ()=>{ setSnooze(key, 30); kill(false); });
 
     el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
       try{
         if (payload.actionUrl) location.href = payload.actionUrl;
       }catch{}
-      kill();
+      kill(true);
     });
 
     stack.prepend(el);
