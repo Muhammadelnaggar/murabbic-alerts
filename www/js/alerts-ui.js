@@ -292,9 +292,6 @@
     stack.prepend(el);
     setTimeout(()=> el.classList.add('show'), 20);
 
-    // إغلاق تلقائي خفيف (اختياري) — 20 ثانية
-    setTimeout(()=>{ if (document.body.contains(el)) kill(); }, 20000);
-
     try{
       if (window.t?.event) window.t.event('smart_alert_shown', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
     }catch{}
@@ -347,3 +344,4 @@
 
   window.mbk.alertsUI = { show };
 })();
+
