@@ -281,10 +281,15 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
                     ruleId:'protocol_step_tomorrow',
                     severity:'info',
                     taskId,
-                    animalId: an,
+                    scope,
+                    stepName: step,
                     plannedDate: taskDay,
                     plannedTime,
-                   message: (scope === 'group')
+                    groupName: (scope === 'group') ? an : '',
+                    animalsCount: (scope === 'group') ? nCount : 0,
+                    animalNumber: (scope === 'group') ? '' : an,
+                    animalId: (scope === 'group') ? '' : an,
+                    message: (scope === 'group')
   ? `غدًا خطوة بروتوكول للمجموعة ${an}${nCount?` (${nCount} حيوان)`:''}: ${step} (${taskDay} ${plannedTime})`
   : `غدًا خطوة بروتوكول للحيوان ${an}: ${step} (${taskDay} ${plannedTime})`
 
@@ -306,9 +311,14 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
                   ruleId:'protocol_step_due',
                   severity:'warn',
                   taskId,
-                  animalId: an,
+                  scope,
+                  stepName: step,
                   plannedDate: taskDay,
                   plannedTime,
+                  groupName: (scope === 'group') ? an : '',
+                  animalsCount: (scope === 'group') ? nCount : 0,
+                  animalNumber: (scope === 'group') ? '' : an,
+                  animalId: (scope === 'group') ? '' : an,
                   message: (scope === 'group')
   ? `اليوم خطوة بروتوكول للمجموعة ${an}${nCount?` (${nCount} حيوان)`:''}: ${step} (الموعد ${plannedTime})`
   : `اليوم خطوة بروتوكول للحيوان ${an}: ${step} (الموعد ${plannedTime})`
