@@ -2,7 +2,6 @@
   "name": "مُرَبِّيك",
   "short_name": "مربيك",
   "start_url": "/index.html",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#0ea05a",
   "theme_color": "#0ea05a",
