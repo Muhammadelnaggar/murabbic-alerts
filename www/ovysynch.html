@@ -681,21 +681,34 @@ if (u0) await refreshGroups(u0.uid);
           if (stt === "done" || stt === "cancelled") continue;
         }
 
-        const payload = {
-          userId: uid,
-          animalNumber: String(animalNumber),
-          type: "protocol_step",
-          protocol: "ovsynch",
-          program: programKey || "ovsynch",
-          protocolStartDate: startDay,
-          stepIndex: i,
-          stepDay,
-          stepKey: `ovsynch_d${stepDay}`,
-          stepName,
-          dueDate,
-          status: "pending",
-          updatedAt: serverTimestamp(),
-        };
+      const isDone = !!st.done;
+
+const payload = {
+  userId: uid,
+  animalNumber: String(animalNumber),
+  type: "protocol_step",
+  protocol: "ovsynch",
+  program: programKey || "ovsynch",
+  protocolStartDate: startDay,
+  stepIndex: i,
+  stepDay,
+  stepKey: `ovsynch_d${stepDay}`,
+  stepName,
+  dueDate,
+
+  // ✅ الحالة حسب ✓
+  status: isDone ? "done" : "pending",
+  done: isDone ? true : false,
+  doneAt: isDone ? serverTimestamp() : null,
+
+  updatedAt: serverTimestamp(),
+};
+
+if (!snap.exists()) payload.createdAt = serverTimestamp();
+
+// ✅ لو موجودة ومقفولة مسبقًا سيبها زي ما هي (نفس منطقك)
+await setDoc(ref, payload, { merge: true });
+
         if (!snap.exists()) payload.createdAt = serverTimestamp();
 
 
