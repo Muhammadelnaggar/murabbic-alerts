@@ -643,6 +643,11 @@ startTimeEl?.addEventListener("change", syncCentral);
     });
   }
 
+
+  // ✅ Groups feature removed (we no longer use protocolGroups/users groups).
+  // Keep a no-op refreshGroups to avoid breaking older calls.
+  async function refreshGroups(){ return; }
+
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
