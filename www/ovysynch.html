@@ -648,62 +648,64 @@ startTimeEl?.addEventListener("change", syncCentral);
   // Keep a no-op refreshGroups to avoid breaking older calls.
   async function refreshGroups(){ return; }
 
-  // ✅ Tasks: إنشاء/تحديث مهام البروتوكول في Root collection "tasks"
-  // - تُنشأ مرة واحدة عند تسجيل البروتوكول
-  // - لا تُعيد فتح Task تم إنهاؤها (done/cancelled)
-  async function upsertOvsynchTasks(userId, animalNumber, protocolStartDate, program, stepsState){
-    try{
-      if (!fbDb) return;
-      const steps = Array.isArray(stepsState) ? stepsState : [];
-      if (!steps.length) return;
-
-      for (let i=0;i<steps.length;i++){
-        const st = steps[i] || {};
-        const plannedDT = String(st.date || "").trim(); // YYYY-MM-DDTHH:mm
-        const plannedDate = plannedDT ? plannedDT.slice(0,10) : String(protocolStartDate||"").slice(0,10);
-        const stepName = String(st.name || (`الخطوة رقم ${i}`));
-
-        // ✅ ID ثابت يمنع التكرار
-        const taskId = ["task", String(animalNumber), String(program), String(protocolStartDate), String(i)].join("__");
-        const ref = doc(fbDb, "tasks", taskId);
-
-        // لو موجود ومقفول خلاص: سيبه
-        let ex = null;
-        try{ ex = await getDoc(ref); }catch{}
-        const exData = ex && ex.exists() ? (ex.data()||{}) : null;
-        const exStatus = String(exData?.status || "");
-        if (exStatus === "done" || exStatus === "cancelled") continue;
-
-        const payload = {
-          type: "ovsynch_step",
-          program: String(program),
-          protocolType: "ovsynch",
-          protocolStartDate: String(protocolStartDate),
-          animalNumber: String(animalNumber),
-          stepIndex: i,
-          stepKey: `ov_${i}`,       // مفتاح ثابت للربط في الداشبورد
-          stepName,
-          plannedDay: Number(st.day ?? i),
-          plannedDate,              // YYYY-MM-DD
-          plannedDateTime: plannedDT ? (plannedDT + ":00.000Z") : null,
-          dueDate: plannedDate,     // ✅ نستخدم dueDate في التنبيهات
-          status: "pending",
-          userId: String(userId),
-          createdAt: serverTimestamp()
-        };
-
-        await setDoc(ref, payload, { merge: true });
-      }
-    }catch(e){
-      console.warn("upsertOvsynchTasks failed", e);
-    }
-  }
-
-
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
 
+
+
+/* ========= Tasks: Ovsynch ========= */
+  async function upsertOvsynchTasks(uid, animalNumber, protocolStartISO, programKey, stepsArr){
+    try{
+      if (!uid || !animalNumber || !protocolStartISO || !Array.isArray(stepsArr) || !stepsArr.length) return;
+
+      // نحول التاريخ إلى YYYY-MM-DD
+      const startDay = String(protocolStartISO).slice(0,10);
+
+      for (let i=0;i<stepsArr.length;i++){
+        const st = stepsArr[i] || {};
+        const stepDay  = (typeof st.day === "number") ? st.day : i;
+        const stepName = st.name || `Step ${i}`;
+        const stepDT   = (st.date || "").toString(); // قد يكون "YYYY-MM-DDTHH:mm"
+        const dueDate  = (stepDT.slice(0,10) || startDay);
+
+        // ✅ ID ثابت يمنع التكرار بين البروتوكولات (يدمج startDate)
+        const taskId = `task__${animalNumber}__ovsynch__${startDay}__d${stepDay}`;
+        const ref = doc(fbDb, "tasks", taskId);
+
+        // ✅ لو الـ task موجودة ومقفولة (done/cancelled) لا نعيد فتحها
+        const snap = await getDoc(ref);
+        if (snap.exists()){
+          const cur = snap.data() || {};
+          const stt = (cur.status || "").toLowerCase();
+          if (stt === "done" || stt === "cancelled") continue;
+        }
+
+        const payload = {
+          userId: uid,
+          animalNumber: String(animalNumber),
+          type: "protocol_step",
+          protocol: "ovsynch",
+          program: programKey || "ovsynch",
+          protocolStartDate: startDay,
+          stepIndex: i,
+          stepDay,
+          stepKey: `ovsynch_d${stepDay}`,
+          stepName,
+          dueDate,
+          status: "pending",
+          updatedAt: serverTimestamp(),
+        };
+        if (!snap.exists()) payload.createdAt = serverTimestamp();
+
+
+        await setDoc(ref, payload, { merge: true });
+      }
+    }catch(err){
+      console.error("upsertOvsynchTasks failed:", err);
+      throw err;
+    }
+  }
 
 /* ========= Save ========= */
   saveBtn.addEventListener("click", async ()=>{
