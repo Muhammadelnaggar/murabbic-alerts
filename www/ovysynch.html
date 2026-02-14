@@ -204,34 +204,9 @@
             <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
           </div>
 
-       <div class="row" style="margin-top:10px">
+       
 
-  <div class="field">
-    <label for="groupSelect">المجموعة المحفوظة</label>
-    <select id="groupSelect">
-      <option value="" selected>— اختر مجموعة —</option>
-    </select>
-    <div class="hint">المجموعات محفوظة على السحابة (نفس حساب المزرعة).</div>
-  </div>
-
-  <div class="field" style="margin-top:10px">
-    <label for="groupName">اسم المجموعة</label>
-    <input id="groupName" type="text"
-           placeholder="اكتب اسم المجموعة (مثال: دفعة فبراير 1)" />
-    <div class="hint">الاسم إلزامي عند الحفظ.</div>
-  </div>
-
-</div>
-
-
-            <div class="row row-2">
-              <button id="loadGroup" type="button" class="open-card">تحميل المجموعة</button>
-              <button id="saveGroup" type="button" class="open-card">حفظ كـ مجموعة</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ✅ وضع الفردي -->
+<!-- ✅ وضع الفردي -->
         <div id="modeSingleBox">
           <div class="field">
             <label for="animalNumberUI">رقم الحيوان</label>
@@ -299,11 +274,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
   const stepsBox    = document.getElementById('stepsBox');
   const saveBtn     = document.getElementById('saveBtn');
   const openCowCard = document.getElementById('openCowCard');
-  const groupSelect = document.getElementById('groupSelect');
-const loadGroupBtn = document.getElementById('loadGroup');
-const saveGroupBtn = document.getElementById('saveGroup');
 const bulkHintEl = document.getElementById('bulkHint');
-const groupNameEl = document.getElementById('groupName');
 
 const infoEl      = document.getElementById('sysbar');
   const warnEl      = document.getElementById('warn');
@@ -370,7 +341,157 @@ let fbReady = !!fbDb && !!fbAuth;
     clearWarn();
   }
 
- function syncCentral(){
+ 
+  // ===================== Step Mode (تنفيذ خطوة من التنبيه) =====================
+  const qp = new URLSearchParams(location.search);
+  const stepParam = (qp.get("step") || qp.get("stepIndex") || "").trim();
+  const STEP_MODE = !!stepParam;
+  const STEP_INDEX = STEP_MODE ? Math.max(0, parseInt(stepParam, 10) || 0) : -1;
+
+  async function loadStepTargets(){
+    if (!STEP_MODE) return;
+    // ✅ في Step Mode: نجبر الوضع إلى "مجموعة" لأن التنفيذ يكون على قائمة أرقام
+    setMode("group");
+    modeSingle.disabled = true;
+    modeGroup.disabled = true;
+
+    // ✅ اقفل حفظ البروتوكول (هنستخدم نفس الزر للتأكيد)
+    saveBtn.textContent = "تأكيد تنفيذ الخطوة";
+    openCowCard.textContent = "رجوع للداشبورد";
+
+    const u = await waitUser();
+    if (!u) { showWarn("⚠️ سجّل الدخول أولًا."); return; }
+
+    const due = todayISO();
+
+    // ✅ اجلب مهام اليوم ثم فلترها محليًا لتجنب مشاكل الـ Index
+    const qAll = query(
+      collection(fbDb, "tasks"),
+      where("userId", "==", u.uid),
+      where("dueDate", "==", due),
+      where("status", "==", "pending"),
+      limit(500)
+    );
+
+    const snap = await getDocs(qAll);
+
+    const nums = [];
+    let meta = null;
+
+    snap.forEach(d=>{
+      const t = d.data() || {};
+      if (t.type !== "ovsynch_step") return;
+      if (Number(t.stepIndex) !== STEP_INDEX) return;
+      nums.push(String(t.animalNumber||"").trim());
+      if (!meta) meta = t;
+    });
+
+    const uniq = [...new Set(nums)].filter(Boolean);
+
+    if (!uniq.length){
+      showWarn("✅ لا يوجد حيوانات مطلوبة لهذه الخطوة اليوم.");
+      try{ bulkEl.value = ""; }catch{}
+      try{ bulkHintEl.textContent = ""; }catch{}
+      return;
+    }
+
+    // ✅ هيدر واضح للمستخدم
+    const stepName = String(meta?.stepName || "");
+    showWarn(`خطوات اليوم — ${stepName || ("الخطوة رقم " + STEP_INDEX)} — ${uniq.length} حيوان`);
+
+    // ✅ ظبط البرنامج وتاريخ البداية (من أول مهمة) ثم اعرض جدول الخطوات
+    if (meta?.protocolProgram) programEl.value = String(meta.protocolProgram);
+    if (meta?.protocolStartDate) startDateEl.value = String(meta.protocolStartDate).slice(0,10);
+
+    programEl.disabled = true;
+    startDateEl.disabled = true;
+    startTimeEl.disabled = true;
+
+    updateSteps();
+
+    // ✅ املأ القائمة تلقائيًا (قابلة للتعديل — B)
+    bulkEl.value = uniq.join("\n");
+    try{ bulkHintEl.textContent = `تم تحميل ${uniq.length} رقم تلقائيًا من مهام اليوم — يمكنك حذف/إضافة أرقام قبل التأكيد.`; }catch{}
+
+    // ✅ عطّل كل checkboxes ما عدا خطوة اليوم
+    const boxes = stepsBox.querySelectorAll('input[type="checkbox"][data-i]');
+    boxes.forEach(b=>{
+      const i = parseInt(b.dataset.i||"-1",10);
+      if (i !== STEP_INDEX){
+        b.disabled = true;
+        b.closest('.step')?.classList.add("disabled");
+      } else {
+        b.disabled = false;
+      }
+    });
+
+    // ✅ اسحب المستخدم لخطوة اليوم
+    const targetBox = stepsBox.querySelector(`input[type="checkbox"][data-i="${STEP_INDEX}"]`);
+    targetBox?.closest(".step")?.scrollIntoView({ behavior:"smooth", block:"center" });
+  }
+
+  async function confirmStepExecution(){
+    if (!STEP_MODE) return;
+
+    clearWarn();
+    const u = await waitUser();
+    if (!u) { showWarn("⚠️ سجّل الدخول أولًا."); return; }
+
+    const list = parseBulk().map(x=>String(x).trim()).filter(Boolean);
+    if (!list.length){ showWarn("⚠️ القائمة فارغة."); return; }
+
+    // ✅ لازم يكون عندنا stepsState (تولدت من updateSteps)
+    const st = stepsState[STEP_INDEX] || {};
+    const program = (programEl.value || "").trim();
+    const startISO = (startDateEl.value || "").trim() || todayISO();
+
+    // ✅ احفظ خطوة اليوم لكل رقم: events + tasks
+    let done = 0;
+
+    for (const animal of list){
+      const baseId = ["ovsynch", animal, program, startISO].join("__");
+      const taskId = `${baseId}__step_${STEP_INDEX}`;
+      const stepEventId = `${baseId}__step_event_${STEP_INDEX}`;
+
+      // 1) حدث خطوة في Root events (بدون تكرار)
+      await setDoc(doc(fbDb, "events", stepEventId), {
+        userId: u.uid,
+        ownerUid: u.uid,
+        type: "ovsynch_step",
+        eventType: "خطوة تزامن",
+        eventDate: todayISO(),
+        animalNumber: String(animal),
+        protocolType: "ovsynch",
+        protocolProgram: String(program || ""),
+        protocolStartDate: String(startISO).slice(0,10),
+        stepIndex: STEP_INDEX,
+        stepDay: Number(st.day ?? 0),
+        stepName: String(st.name || ""),
+        source: location.pathname,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      // 2) اقفل الـ task
+      await setDoc(doc(fbDb, "tasks", taskId), {
+        status: "done",
+        done: true,
+        doneAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      done++;
+    }
+
+    showWarn(`✅ تم تأكيد تنفيذ الخطوة لـ ${done} حيوان.`);
+    // رجّع المستخدم للداشبورد لو يحب
+    try{
+      setTimeout(()=>{ location.href = "/dashboard.html"; }, 700);
+    }catch{}
+  }
+
+
+function syncCentral(){
   const mode = getMode();
   const list = (mode === "group")
     ? parseBulk().map(x => String(x).trim()).filter(Boolean)
@@ -389,6 +510,10 @@ let fbReady = !!fbDb && !!fbAuth;
 
 
   openCowCard.addEventListener("click", () => {
+    if (STEP_MODE){
+      location.href = "/dashboard.html";
+      return;
+    }
     const num = (getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
     if (!num) { showWarn("⚠️ اكتب رقم الحيوان أولًا."); return; }
     location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
@@ -476,16 +601,39 @@ startTimeEl?.addEventListener("change", syncCentral);
     syncCentral();
   }
 
-  stepsBox.addEventListener("change",(e)=>{
-    const i=e.target?.dataset?.i;
-    if(i===undefined) return;
-    stepsState[i].done=!!e.target.checked;
+  stepsBox.addEventListener("change", async (e)=>{
+    const i = e.target?.dataset?.i;
+    if (i === undefined) return;
+
+    const idx = parseInt(i, 10);
+
+    // ✅ Step Mode: ممنوع غير خطوة اليوم
+    if (STEP_MODE){
+      if (idx !== STEP_INDEX){
+        e.target.checked = false;
+        return;
+      }
+      // ✅ عند ✓ على خطوة اليوم: نفّذها فورًا
+      if (!!e.target.checked){
+        await confirmStepExecution();
+      } else {
+        // لا نسمح بإلغاء بعد التأكيد
+        e.target.checked = true;
+      }
+      return;
+    }
+
+    // ✅ الوضع العادي: مجرد تعليم/إلغاء تعليم داخلي قبل الحفظ
+    stepsState[idx].done = !!e.target.checked;
     syncCentral();
   });
 
   programEl.addEventListener("change",updateSteps);
   startDateEl.addEventListener("change",updateSteps);
   startTimeEl.addEventListener("change",updateSteps);
+
+  // ✅ Step Mode: تحميل قائمة مهام اليوم تلقائيًا
+  loadStepTargets();
 
   /* ========= Firebase (Robust) ========= */
   async function waitUser(ms=1500){
@@ -498,186 +646,15 @@ startTimeEl?.addEventListener("change", syncCentral);
   const u0 = await waitUser();
 if (u0) await refreshGroups(u0.uid);
 
-/* ========= Groups (Cloud) — (B) under users/{uid}/ovsynch_groups =========
-   ✅ نكتب في: users/{uid}/ovsynch_groups/{docId}
-   ✅ الروولز (B) بتسمح بشرط userId == uid
-   ✅ اسم المجموعة من المستخدم (إلزامي)
-*/
-
-function groupsCol(uid){
-  return collection(fbDb, "users", uid, "ovsynch_groups");
-}
-
-function groupDoc(uid, id){
-  return doc(fbDb, "users", uid, "ovsynch_groups", id);
-}
-
-async function refreshGroups(uid){
-  if (!uid || !fbDb || !groupSelect) return;
-  try{
-    const qg = query(
-      groupsCol(uid),
-      orderBy("updatedAt", "desc"),
-      limit(50)
-    );
-    const snap = await getDocs(qg);
-
-    groupSelect.innerHTML = `<option value="" selected>— اختر مجموعة —</option>`;
-
-    snap.forEach(d => {
-      const data = d.data() || {};
-      const opt = document.createElement("option");
-      opt.value = d.id;
-      opt.textContent = data.name || d.id;
-      groupSelect.appendChild(opt);
-    });
-  }catch(e){
-    console.error("refreshGroups failed", e);
-    showWarn("⚠️ تعذّر تحميل المجموعات من السحابة.");
-  }
-}
-
-function safeGroupIdFromName(name){
-  return String(name || "")
-    .trim()
-    .replace(/[^\w\u0600-\u06FF\- ]+/g, "")
-    .replace(/\s+/g, "_")
-    .slice(0, 60) || ("group_" + Date.now());
-}
-
-async function saveCurrentAsGroup(uid){
-  if (!uid || !fbDb) return;
-
-  setMode("group");
-  const list = parseBulk();
-  if (!list.length){
-    showWarn("⚠️ اكتب أرقام الحيوانات أولًا ثم احفظ كـ مجموعة.");
-    return;
-  }
-
-  const name = String(groupNameEl?.value || "").trim();
-  if (!name){
-    showWarn("⚠️ اكتب اسم المجموعة أولًا.");
-    return;
-  }
-
-  const docId = safeGroupIdFromName(name);
-  const ref = groupDoc(uid, docId);
-
-  await setDoc(ref, {
-    userId: uid,
-    kind: "ovsynch",
-    name,
-    numbers: list.map(x => String(x)),
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp()
-  }, { merge:true });
-
-  await refreshGroups(uid);
-  if (groupSelect) groupSelect.value = docId;
-
-  showWarn(`✅ تم حفظ المجموعة: ${name} (${list.length} رقم).`);
-  if (bulkHintEl) bulkHintEl.textContent = `آخر حفظ: ${name}`;
-}
-
-async function loadSelectedGroup(uid){
-  if (!uid || !fbDb) return;
-
-  const id = (groupSelect?.value || "").trim();
-  if (!id){
-    showWarn("⚠️ اختر مجموعة أولًا ثم اضغط تحميل المجموعة.");
-    return;
-  }
-
-  const ref = groupDoc(uid, id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()){
-    showWarn("⚠️ هذه المجموعة غير موجودة أو حُذفت.");
-    return;
-  }
-
-  const data = snap.data() || {};
-  if (String(data.userId || "") !== String(uid)){
-    showWarn("⚠️ هذه المجموعة ليست ضمن حسابك.");
-    return;
-  }
-
-  const nums = Array.isArray(data.numbers) ? data.numbers : [];
-  const gname = String(data.name || "").trim();
-
-  setMode("group");
-  bulkEl.value = nums.join("\n");
-  if (groupNameEl) groupNameEl.value = gname;
-
-  const list = parseBulk();
-  syncCentral();
-  if (programEl.value) updateSteps();
-
-  showWarn(`✅ تم تحميل المجموعة: ${gname || id} (${list.length} رقم).`);
-}
 
 
-/* ========= Tasks: Ovsynch Protocol ========= */
-async function upsertOvsynchTasks(uid, animalNumber, startISO, program, stepsArr){
-  if (!uid || !animalNumber || !startISO) return;
-
-  const steps = Array.isArray(stepsArr) ? stepsArr : [];
-  if (!steps.length) return;
-
-  const baseId = ["ovsynch", animalNumber, program, startISO].join("__");
-
-  for (let i = 0; i < steps.length; i++){
-    const st = steps[i] || {};
-    const dueISO = String(st.date || "").slice(0,16); // "YYYY-MM-DDTHH:mm"
-    const dueDate = dueISO ? dueISO.slice(0,10) : String(startISO).slice(0,10);
-
-    const taskId = `${baseId}__step_${i}`;
-
-    const taskPayload = {
-      userId: uid,
-      animalNumber: String(animalNumber),
-      type: "ovsynch_step",
-      protocolType: "ovsynch",
-      protocolProgram: String(program || ""),
-      protocolStartDate: String(startISO).slice(0,10),
-
-      stepIndex: i,
-      stepDay: Number(st.day ?? 0),
-      stepName: String(st.name || ""),
-      dueAt: dueISO || "",
-      dueDate: dueDate || "",
-
-      status: st.done ? "done" : "pending",
-      done: !!st.done,
-
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    await setDoc(doc(fbDb, "tasks", taskId), taskPayload, { merge: true });
-  }
-}
-
-// ========= ربط أزرار المجموعة =========
-loadGroupBtn?.addEventListener("click", async ()=> {
-  const u = await waitUser();
-  if (!u) return;
-  await loadSelectedGroup(u.uid);
-});
-
-saveGroupBtn?.addEventListener("click", async ()=> {
-  const u = await waitUser();
-  if (!u) return;
-  await saveCurrentAsGroup(u.uid);
-});
-// ✅ أول ما يبقى المستخدم جاهز: حمّل قائمة المجموعات
-(async ()=>{
-  const u = await waitUser();
-  if (u) await refreshGroups(u.uid);
-})();
-
-  /* ========= Save ========= */
-  saveBtn.addEventListener("click",()=>{
+/* ========= Save ========= */
+  saveBtn.addEventListener("click", async ()=>{
+    // ✅ Step Mode: تنفيذ خطوة اليوم (بدون حفظ بروتوكول)
+    if (STEP_MODE){
+      await confirmStepExecution();
+      return;
+    }
     syncCentral();
     form.requestSubmit(); // ✅ مركزي فقط
   });
@@ -712,29 +689,7 @@ if (!fd || !Array.isArray(fd.animalNumbers)) {
 }
 
 const finalList = fd.animalNumbers;
-   let groupId = "";
-let groupName = "";
-
-if (getMode() === "group") {
-  groupName = String(groupNameEl?.value || "").trim();
-  if (!groupName) { showWarn("⚠️ اكتب اسم المجموعة أولًا."); return; }
-
-  groupId = safeGroupIdFromName(groupName);
-
-  // ✅ احفظ/حدّث المجموعة تلقائيًا وقت حفظ البروتوكول
-  await setDoc(groupDoc(u.uid, groupId), {
-    userId: u.uid,
-    kind: "ovsynch",
-    name: groupName,
-    numbers: finalList.map(x => String(x)),
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp()
-  }, { merge: true });
-
-  await refreshGroups(u.uid);
-  if (groupSelect) groupSelect.value = groupId;
-}
-
+   
 
 const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
 
@@ -748,8 +703,6 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
       program,
       steps: stepsState,
       userId: u.uid,
-        groupId: groupId || "",
-  groupName: groupName || "",
 
       createdAt: serverTimestamp()
     };
