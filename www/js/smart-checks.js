@@ -226,9 +226,17 @@ const q = query(
             const today = toLocalISO(now);
 
             for (const t0 of P.tasks){
-              const taskId = t0.id;
-              const plannedDate = t0.plannedDate;
-              if (!plannedDate || typeof plannedDate !== 'string') continue;
+             const taskId = t0.id;
+
+// ✅ مصدر التاريخ الحقيقي عندنا هو dueDate (وممكن plannedDate لو موجودة لاحقًا)
+const plannedDate =
+  (typeof t0.plannedDate === "string" && t0.plannedDate) ||
+  (typeof t0.dueDate === "string" && t0.dueDate) ||
+  (typeof t0.protocolStartDate === "string" && t0.protocolStartDate) ||
+  "";
+
+if (!plannedDate) continue;
+
 
              // ✅ plannedTime fallback: لو مش موجود، استخرجه من plannedDateTime
 let plannedTime = (t0.plannedTime || '').trim();
