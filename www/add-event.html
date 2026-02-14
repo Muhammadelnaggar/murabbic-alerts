@@ -280,9 +280,68 @@ if (numInput){
   <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
   <a href="#" class="mbk-nav-link mbk-nav-link-disabled" data-nav="cow-card">🧾 بطاقة الحيوان</a>
 </nav>
+<script>
+(function(){
+  "use strict";
+
+  // ✅ التقط أي ضغط على زر/لينك التزامن
+  document.addEventListener("click", (e)=>{
+    const el = e.target.closest('a,button');
+    if (!el) return;
+
+    // زر التزامن: أي لينك يفتح ovsynch.html أو زر عليه data-go="ovsynch"
+    const href = (el.tagName === "A") ? (el.getAttribute("href") || "") : "";
+    const isOvsynch =
+      /ovsynch\.html/i.test(href) ||
+      (el.getAttribute("data-go") === "ovsynch") ||
+      (el.getAttribute("data-target") === "ovsynch");
+
+    if (!isOvsynch) return;
+
+    // ✅ خانة الرقم في add-event (جرّب أشهر ids + fallback لأي input رقمي)
+    const numEl =
+      document.getElementById("number") ||
+      document.getElementById("animalNumber") ||
+      document.getElementById("animalNumberUI") ||
+      document.querySelector('input[name="number"]') ||
+      document.querySelector('input[name="animalNumber"]') ||
+      document.querySelector('input[type="text"]');
+
+    // ✅ خانة التاريخ في add-event
+    const dateEl =
+      document.getElementById("date") ||
+      document.getElementById("eventDate") ||
+      document.querySelector('input[type="date"]');
+
+    const rawNums = String(numEl?.value || "").trim();
+    const dt = String(dateEl?.value || "").trim().slice(0,10);
+
+    // لو مفيش رقم أو تاريخ، سيب السلوك القديم
+    if (!rawNums || !dt) return;
+
+    // ✅ استخرج قائمة أرقام (يدعم: فاصلة/سطر جديد/؛)
+    const list = rawNums
+      .split(/\n|,|؛|;/g)
+      .map(s => String(s||"").trim())
+      .filter(Boolean);
+
+    // رقم واحد = فردي (سيب الرابط القديم)
+    if (list.length <= 1) return;
+
+    // ✅ جماعي: امنع السلوك القديم وافتح الرابط الجديد
+    e.preventDefault();
+    e.stopPropagation();
+
+    const bulk = encodeURIComponent(list.join(","));
+    const url = `ovsynch.html?mbkMode=group&date=${encodeURIComponent(dt)}&bulk=${bulk}`;
+    location.href = url;
+  }, true);
+})();
+</script>
 
 </body>
 </html>
+
 
 
 
