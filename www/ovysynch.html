@@ -403,10 +403,7 @@ let fbReady = !!fbDb && !!fbAuth;
     if (meta?.protocolProgram) programEl.value = String(meta.protocolProgram);
     if (meta?.protocolStartDate) startDateEl.value = String(meta.protocolStartDate).slice(0,10);
 
-    programEl.disabled = true;
-    startDateEl.disabled = true;
-    startTimeEl.disabled = true;
-
+   
     updateSteps();
 
     // ✅ املأ القائمة تلقائيًا (قابلة للتعديل — B)
