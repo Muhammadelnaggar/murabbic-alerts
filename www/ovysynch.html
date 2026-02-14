@@ -532,6 +532,30 @@ try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
 
     const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
     const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
+    const bulk = (qp.get("bulk") || "").trim();
+
+if (bulk) {
+  // 1️⃣ نحول الصفحة لجماعي
+  setMode("group");
+
+  // 2️⃣ نفك ترميز الرابط
+  const decoded = decodeURIComponent(bulk);
+
+  // 3️⃣ نملأ textarea
+  bulkEl.value = decoded.split(",").join("\n");
+
+  // 4️⃣ نحط أول رقم كممثل للـ Gate
+  const first = decoded.split(",")[0]?.trim() || "";
+  animalHidden.value = first;
+
+  // 5️⃣ نشغل events عشان forms-init يفتح الحقول
+  try { animalHidden.dispatchEvent(new Event('input', { bubbles:true })); } catch {}
+  try { animalHidden.dispatchEvent(new Event('change', { bubbles:true })); } catch {}
+
+  // 6️⃣ نشغل preview وتنظيف
+  syncCentral();
+}
+
 
     if (num) animalUI.value = num;
     if (dt)  startDateEl.value = dt || todayISO();
