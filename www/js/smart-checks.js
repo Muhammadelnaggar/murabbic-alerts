@@ -184,15 +184,14 @@
 
           const { collection, query, where, getDocs, limit } =
             await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
-         const q = query(
+const q = query(
   collection(P.db, 'tasks'),
   where('userId','==', uid),
   where('type','==','protocol_step'),
   where('status','==','pending'),
-  where('alertEnabled','==', true),   // ✅ لا تقرأ إلا تنبيهات المجموعة/الفردي فقط
   limit(80)
 );
+
 
 
           const snap = await getDocs(q);
