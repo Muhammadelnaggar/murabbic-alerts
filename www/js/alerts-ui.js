@@ -325,9 +325,16 @@
 
           showCard(Object.assign({}, p0, {
             severity: p0.severity || 'warn',
-            title: (p0.ruleId === 'protocol_step_tomorrow') ? 'تنبيه بروتوكول (غدًا)' : 'تنبيه بروتوكول (اليوم)',
+           title:
+  (p0.ruleId === 'protocol_step_tomorrow')
+    ? `تنبيه بروتوكول غدًا: ${esc(p0.stepName||'')}`
+    : `تنبيه بروتوكول اليوم: ${esc(p0.stepName||'')}`,
+
             groupName: `دفعة (${count} حيوان)`,
-            message: `${count} حيوان عليهم نفس الخطوة${step}${when?(' • '+when):''}. أمثلة: ${brief}`,
+           message:
+  `📅 ${esc(p0.plannedDate||'')} | ⏰ ${esc(p0.plannedTime||'')}\n` +
+  `للـبقرة/الجاموسة: ${esc(brief.replace(/،/g,'–'))}`,
+
           }));
           return;
         }
