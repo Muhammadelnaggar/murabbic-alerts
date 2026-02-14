@@ -292,7 +292,7 @@ if (numInput){
     // زر التزامن: أي لينك يفتح ovsynch.html أو زر عليه data-go="ovsynch"
     const href = (el.tagName === "A") ? (el.getAttribute("href") || "") : "";
     const isOvsynch =
-      /ovsynch\.html/i.test(href) ||
+      /ovysynch\.html/i.test(href) ||
       (el.getAttribute("data-go") === "ovsynch") ||
       (el.getAttribute("data-target") === "ovsynch");
 
@@ -341,6 +341,7 @@ if (numInput){
 
 </body>
 </html>
+
 
 
 
