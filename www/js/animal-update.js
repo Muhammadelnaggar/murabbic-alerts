@@ -21,48 +21,6 @@ function normDigitsOnly(s){
     .replace(/[٠-٩۰-۹]/g, d=>map[d]);
 }
 
-
-/* ===================== Ovsynch Smart Cleanup ===================== */
-/**
- * ✅ عند حدوث "تلقيح" أو خروج الحيوان من القطيع (بيع/نفوق) نُلغي كل مهام Ovsynch المعلّقة فورًا
- * - يمنع ظهور تنبيهات غير منطقية
- * - يجعل Step Mode "نظيف" تلقائيًا
- */
-async function cancelPendingOvsynchTasks(userId, animalNum, reason, whenISO){
-  try{
-    const uid = String(userId||"").trim();
-    const num = String(animalNum||"").trim();
-    if (!uid || !num) return;
-
-    const tasksRef = collection(db, "tasks");
-    const snap = await getDocs(query(
-      tasksRef,
-      where("userId","==",uid),
-      where("animalNumber","==",num),
-      where("type","==","ovsynch_step"),
-      where("status","==","pending"),
-      limit(250)
-    ));
-
-    if (snap.empty) return;
-
-    const payload = {
-      status: "cancelled",
-      done: false,
-      cancelledAt: whenISO || null,
-      cancelReason: String(reason||"").trim() || "cancelled",
-      updatedAt: new Date().toISOString()
-    };
-
-    for (const d of snap.docs){
-      await setDoc(doc(db, "tasks", d.id), payload, { merge:true });
-    }
-  }catch(e){
-    console.warn("cancelPendingOvsynchTasks failed", e);
-  }
-}
-
-
 export async function updateAnimalByEvent(ev) {
   try {
     // ✅ المالك + رقم الحيوان (نفضّل animalNumber ثم number)
@@ -286,10 +244,6 @@ upd.protocolStatus = "exited_inseminated";
 upd.protocolExitDate = date;
 
     }
-      // ✅ أغلق كل مهام Ovsynch المعلّقة فورًا بعد أي تلقيح
-      await cancelPendingOvsynchTasks(tenant, String(num), "inseminated_already", date);
-
-    }
 
     // ============================================================
     // 🟩 PREGNANCY DIAGNOSIS — تشخيص حمل
@@ -364,11 +318,6 @@ upd.protocolExitDate = date;
 
     }
 
-      // ✅ بيع: ألغِ مهام Ovsynch المعلّقة فورًا
-      await cancelPendingOvsynchTasks(tenant, String(num), "sold_or_inactive", date);
-
-    }
-
     // ============================================================
     // 🟩 DEATH — نفوق (يخرج من القطيع)
     // ============================================================
@@ -386,11 +335,6 @@ upd.protocolExitDate = date;
   upd.currentProtocol = null;
   upd.protocolStatus = null;
   upd.protocolExitDate = date;
-
-    }
-
-      // ✅ نفوق: ألغِ مهام Ovsynch المعلّقة فورًا
-      await cancelPendingOvsynchTasks(tenant, String(num), "sold_or_inactive", date);
 
     }
 
