@@ -1202,9 +1202,9 @@ form.dataset.mbkOvsynchAttached = "1";
 // ===============================
 function lockOvsynchUI(locked){
   // ✅ مسموح حتى مع القفل: الوضع + رقم الفردي + تاريخ البدء + وقت البدء + إدخال الجماعي
- const allowIds = new Set([
+const allowIds = new Set([
   "modeSingle","modeGroup",
-  "animalNumberUI","startDate","startTime","bulkAnimals",
+  "animalNumberUI","startDate","startTime","program","bulkAnimals",
   "applyBulk","groupSelect","groupName","loadGroup","saveGroup"
 ]);
 
@@ -1224,7 +1224,13 @@ function lockOvsynchUI(locked){
 
 async function runSingleGateIfReady(){
   const isGroup = !!modeGroupEl?.checked;
-  if (isGroup) return; // الفردي فقط
+if (isGroup){
+  // ✅ في الجماعي: لا يوجد Gate فردي، فلا نقفل UI
+  lockOvsynchUI(false);
+  form.dataset.ov_single_ok = "1";
+  return;
+}
+
 
   const num = normalizeDigits(animalUIEl?.value || "");
   const dt  = String(startDateUIEl?.value || "").trim().slice(0,10);
