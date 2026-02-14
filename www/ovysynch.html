@@ -695,6 +695,9 @@ const payload = {
   stepKey: `ovsynch_d${stepDay}`,
   stepName,
   dueDate,
+    plannedDate: dueDate,
+  plannedTime: (stepDT && stepDT.length >= 16) ? stepDT.slice(11,16) : "08:00",
+  plannedDateTime: stepDT || (dueDate + "T08:00"),
 
   // ✅ الحالة حسب ✓
   status: isDone ? "done" : "pending",
