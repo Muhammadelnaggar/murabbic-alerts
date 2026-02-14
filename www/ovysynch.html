@@ -496,6 +496,9 @@ function syncCentral(){
 
   // ✅ لازم دايمًا يبقى فيه animalNumber “ممثل” (أول رقم) عشان forms-init ما يقفلش
   animalHidden.value = (list[0] || "");
+  try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
+try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
+
 
   // ✅ الجديد: القائمة كلها
   const animalNumbersHidden = document.getElementById("animalNumbers");
