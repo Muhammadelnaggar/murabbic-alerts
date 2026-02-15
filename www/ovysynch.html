@@ -83,30 +83,29 @@
 
     #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
 
-   #sysbar.infobar{
-       display:block; 
+    #sysbar.infobar{
+      display:block;
       position: sticky;
       top: 72px;
       z-index: 19;
       margin: 10px 0 10px;
     }
-   #sysbar .msgrow{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-}
-#sysbar .okbtn{
-  flex-shrink:0;
-  border-radius:12px;
-  padding:8px 12px;
-  font-weight:900;
-  border:2px solid var(--brand-600, #0b7f47);
-  background:#fff;
-  color: var(--brand-600, #0b7f47);
-  cursor:pointer;
-}
-
+    #sysbar .msgrow{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    #sysbar .okbtn{
+      flex-shrink:0;
+      border-radius:12px;
+      padding:8px 12px;
+      font-weight:900;
+      border:2px solid var(--brand-600, #0b7f47);
+      background:#fff;
+      color: var(--brand-600, #0b7f47);
+      cursor:pointer;
+    }
 
     .btn-row{
       position: sticky;
@@ -161,7 +160,7 @@
   </header>
 
   <div class="wrap">
-   <div id="sysbar" class="infobar"></div>
+    <div id="sysbar" class="infobar"></div>
     <div class="mbk-card">
       <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
         <!-- ✅ حقول ربط للمسار المركزي -->
@@ -204,9 +203,8 @@
             <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
           </div>
         </div>
-       
 
-<!-- ✅ وضع الفردي -->
+        <!-- ✅ وضع الفردي -->
         <div id="modeSingleBox">
           <div class="field">
             <label for="animalNumberUI">رقم الحيوان</label>
@@ -262,7 +260,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-
 (async () => {
   const form        = document.getElementById('ovForm');
   const animalUI    = document.getElementById('animalNumberUI');
@@ -274,9 +271,9 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
   const stepsBox    = document.getElementById('stepsBox');
   const saveBtn     = document.getElementById('saveBtn');
   const openCowCard = document.getElementById('openCowCard');
-const bulkHintEl = document.getElementById('bulkHint');
+  const bulkHintEl  = document.getElementById('bulkHint');
 
-const infoEl      = document.getElementById('sysbar');
+  const infoEl      = document.getElementById('sysbar');
   const warnEl      = document.getElementById('warn');
 
   const modeSingle  = document.getElementById('modeSingle');
@@ -287,12 +284,11 @@ const infoEl      = document.getElementById('sysbar');
   const animalHidden = document.getElementById("animalNumber");
   const eventHidden  = document.getElementById("eventDate");
   const stepsHidden  = document.getElementById("steps");
-  // ✅ ربط زر "تطبيق القائمة" (مرة واحدة فقط)
-const applyBulkBtn = document.getElementById('applyBulk');
 
-let stepsState = [], bulkList = [];
-let fbReady = !!fbDb && !!fbAuth;
+  const applyBulkBtn = document.getElementById('applyBulk');
 
+  let stepsState = [], bulkList = [];
+  let fbReady = !!fbDb && !!fbAuth;
 
   /* ========= Helpers ========= */
   function todayISO(){
@@ -310,25 +306,7 @@ let fbReady = !!fbDb && !!fbAuth;
     return bulkList;
   }
 
-  function normSpecies(sp){
-    sp = String(sp || "").trim();
-    if (/cow|بقر/i.test(sp)) return "أبقار";
-    if (/buffalo|جاموس/i.test(sp)) return "جاموس";
-    return sp || "غير معروف";
-  }
-  function animalWordFromSpecies(sp){ return (sp === "جاموس") ? "جاموسة" : "بقرة"; }
-
-  function daysBetweenISO(a, b){
-    const d1 = new Date(String(a||"").slice(0,10));
-    const d2 = new Date(String(b||"").slice(0,10));
-    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
-    d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
-    return Math.round((d2 - d1) / 86400000);
-  }
-
-  function getMode(){
-    return (modeGroup.checked ? "group" : "single");
-  }
+  function getMode(){ return (modeGroup.checked ? "group" : "single"); }
   function setMode(m){
     const isGroup = (m === "group");
     modeGroup.checked = isGroup;
@@ -336,12 +314,9 @@ let fbReady = !!fbDb && !!fbAuth;
     modeBulkBox.hidden = !isGroup;
     modeSingleBox.hidden = isGroup;
     try{ localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single"); }catch{}
- 
-
     clearWarn();
   }
 
- 
   // ===================== Step Mode (تنفيذ خطوة من التنبيه) =====================
   const qp = new URLSearchParams(location.search);
   const stepParam = (qp.get("step") || qp.get("stepIndex") || "").trim();
@@ -350,12 +325,10 @@ let fbReady = !!fbDb && !!fbAuth;
 
   async function loadStepTargets(){
     if (!STEP_MODE) return;
-    // ✅ في Step Mode: نجبر الوضع إلى "مجموعة" لأن التنفيذ يكون على قائمة أرقام
     setMode("group");
     modeSingle.disabled = true;
     modeGroup.disabled = true;
 
-    // ✅ اقفل حفظ البروتوكول (هنستخدم نفس الزر للتأكيد)
     saveBtn.textContent = "تأكيد تنفيذ الخطوة";
     openCowCard.textContent = "رجوع للداشبورد";
 
@@ -364,7 +337,6 @@ let fbReady = !!fbDb && !!fbAuth;
 
     const due = todayISO();
 
-    // ✅ اجلب مهام اليوم ثم فلترها محليًا لتجنب مشاكل الـ Index
     const qAll = query(
       collection(fbDb, "tasks"),
       where("userId", "==", u.uid),
@@ -395,11 +367,9 @@ let fbReady = !!fbDb && !!fbAuth;
       return;
     }
 
-    // ✅ هيدر واضح للمستخدم
     const stepName = String(meta?.stepName || "");
     showWarn(`خطوات اليوم — ${stepName || ("الخطوة رقم " + STEP_INDEX)} — ${uniq.length} حيوان`);
 
-    // ✅ ظبط البرنامج وتاريخ البداية (من أول مهمة) ثم اعرض جدول الخطوات
     if (meta?.protocolProgram) programEl.value = String(meta.protocolProgram);
     if (meta?.protocolStartDate) startDateEl.value = String(meta.protocolStartDate).slice(0,10);
 
@@ -409,11 +379,9 @@ let fbReady = !!fbDb && !!fbAuth;
 
     updateSteps();
 
-    // ✅ املأ القائمة تلقائيًا (قابلة للتعديل — B)
     bulkEl.value = uniq.join("\n");
     try{ bulkHintEl.textContent = `تم تحميل ${uniq.length} رقم تلقائيًا من مهام اليوم — يمكنك حذف/إضافة أرقام قبل التأكيد.`; }catch{}
 
-    // ✅ عطّل كل checkboxes ما عدا خطوة اليوم
     const boxes = stepsBox.querySelectorAll('input[type="checkbox"][data-i]');
     boxes.forEach(b=>{
       const i = parseInt(b.dataset.i||"-1",10);
@@ -425,7 +393,6 @@ let fbReady = !!fbDb && !!fbAuth;
       }
     });
 
-    // ✅ اسحب المستخدم لخطوة اليوم
     const targetBox = stepsBox.querySelector(`input[type="checkbox"][data-i="${STEP_INDEX}"]`);
     targetBox?.closest(".step")?.scrollIntoView({ behavior:"smooth", block:"center" });
   }
@@ -440,12 +407,10 @@ let fbReady = !!fbDb && !!fbAuth;
     const list = parseBulk().map(x=>String(x).trim()).filter(Boolean);
     if (!list.length){ showWarn("⚠️ القائمة فارغة."); return; }
 
-    // ✅ لازم يكون عندنا stepsState (تولدت من updateSteps)
     const st = stepsState[STEP_INDEX] || {};
     const program = (programEl.value || "").trim();
     const startISO = (startDateEl.value || "").trim() || todayISO();
 
-    // ✅ احفظ خطوة اليوم لكل رقم: events + tasks
     let done = 0;
 
     for (const animal of list){
@@ -453,7 +418,6 @@ let fbReady = !!fbDb && !!fbAuth;
       const taskId = `${baseId}__step_${STEP_INDEX}`;
       const stepEventId = `${baseId}__step_event_${STEP_INDEX}`;
 
-      // 1) حدث خطوة في Root events (بدون تكرار)
       await setDoc(doc(fbDb, "events", stepEventId), {
         userId: u.uid,
         ownerUid: u.uid,
@@ -472,7 +436,6 @@ let fbReady = !!fbDb && !!fbAuth;
         createdAt: serverTimestamp()
       }, { merge: true });
 
-      // 2) اقفل الـ task
       await setDoc(doc(fbDb, "tasks", taskId), {
         status: "done",
         done: true,
@@ -484,34 +447,26 @@ let fbReady = !!fbDb && !!fbAuth;
     }
 
     showWarn(`✅ تم تأكيد تنفيذ الخطوة لـ ${done} حيوان.`);
-    // رجّع المستخدم للداشبورد لو يحب
-    try{
-      setTimeout(()=>{ location.href = "/dashboard.html"; }, 700);
-    }catch{}
+    try{ setTimeout(()=>{ location.href = "/dashboard.html"; }, 700); }catch{}
   }
 
+  function syncCentral(){
+    const mode = getMode();
+    const list = (mode === "group")
+      ? parseBulk().map(x => String(x).trim()).filter(Boolean)
+      : [String(animalUI.value || "").trim()].filter(Boolean);
 
-function syncCentral(){
-  const mode = getMode();
-  const list = (mode === "group")
-    ? parseBulk().map(x => String(x).trim()).filter(Boolean)
-    : [String(animalUI.value || "").trim()].filter(Boolean);
+    animalHidden.value = (list[0] || "");
 
-  // ✅ لازم دايمًا يبقى فيه animalNumber “ممثل” (أول رقم) عشان forms-init ما يقفلش
-  animalHidden.value = (list[0] || "");
+    try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
+    try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
 
-  // ✅ إطلاق event للـ Gate المركزي (يفك تعطيل الحقول في وضع الجماعي)
-  try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
-  try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
+    const animalNumbersHidden = document.getElementById("animalNumbers");
+    if (animalNumbersHidden) animalNumbersHidden.value = JSON.stringify(list);
 
-  // ✅ الجديد: القائمة كلها
-  const animalNumbersHidden = document.getElementById("animalNumbers");
-  if (animalNumbersHidden) animalNumbersHidden.value = JSON.stringify(list);
-
-  eventHidden.value = (startDateEl.value || "").trim();
-  stepsHidden.value = JSON.stringify(stepsState || []);
-}
-
+    eventHidden.value = (startDateEl.value || "").trim();
+    stepsHidden.value = JSON.stringify(stepsState || []);
+  }
 
   openCowCard.addEventListener("click", () => {
     if (STEP_MODE){
@@ -523,53 +478,69 @@ function syncCentral(){
     location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
   });
 
-  // ✅ اجعل التاريخ Today تلقائيًا
   if (!startDateEl.value) startDateEl.value = todayISO();
 
   // ✅ قراءة باراميتر الوضع + الرقم/التاريخ (بدون أي تحقق)
   (function hydrateFromURL(){
     const qp = new URLSearchParams(location.search);
 
-    const m = (qp.get("mbkMode") || "").trim().toLowerCase();
+    // Step mode سبق وبيفرض group فوق — لا نكسره هنا
+    if (STEP_MODE){
+      setMode("group");
+      syncCentral();
+      return;
+    }
+
     const saved = (localStorage.getItem("mbk_ov_mode") || "single");
-    setMode(m === "group" ? "group" : saved);
+    const m = (qp.get("mbkMode") || "").trim().toLowerCase();
 
-    
-const bulkRaw = (qp.get("bulk") || qp.get("numbers") || qp.get("list") || "").trim();
-if (bulkRaw){
-  // لو جاي من صفحة الأحداث كقائمة أرقام: افتح وضع جماعي واملأ الـ textarea
-  setMode("group");
-  try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
-  if (bulkEl){
-    // نقبل فواصل/مسافات/أسطر/فاصلة عربية
-    const cleaned = bulkRaw
-      .replace(/[،;,]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
-    bulkEl.value = arr.join("\n");
-  }
-}
+    const bulkRaw = (qp.get("bulk") || qp.get("numbers") || qp.get("list") || "").trim();
+    const numRaw  = (qp.get("number") || qp.get("animalNumber") || "").trim();
+    const dt      = (qp.get("date") || qp.get("eventDate") || "").trim();
 
-    const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
-    const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
+    // ✅ 1) لو جاي bulk: group (أعلى أولوية)
+    if (bulkRaw){
+      setMode("group");
+      try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
 
-    
-if (num){
-  // لو المستخدم لصق أكتر من رقم في خانة الفردي، اعتبره جماعي تلقائيًا
-  const multi = /[\s،,;\n]/.test(num);
-  if (multi){
-    setMode("group");
-    try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
-    const cleaned = num.replace(/[،,;]+/g," ").replace(/\s+/g," ").trim();
-    const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
-    if (bulkEl) bulkEl.value = arr.join("\n");
-    animalUI.value = ""; // ما تخليش الفردي يطلع أنه فردي
-  }else{
-    animalUI.value = num;
-  }
-}
-    if (dt)  startDateEl.value = dt || todayISO();
+      if (bulkEl){
+        const cleaned = bulkRaw
+          .replace(/[،;,]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
+        bulkEl.value = arr.join("\n");
+      }
+
+      // في حالة bulk لا نملأ الفردي
+      animalUI.value = "";
+    }
+    // ✅ 2) لو جاي number واحد: single (حتى لو saved=group)
+    else if (numRaw && !/[\s،,;\n]/.test(numRaw)){
+      setMode("single");
+      try{ localStorage.setItem("mbk_ov_mode","single"); }catch{}
+      animalUI.value = numRaw;
+      if (bulkEl) bulkEl.value = "";
+    }
+    // ✅ 3) لو جاي number متعدد (ملصوق): group
+    else if (numRaw && /[\s،,;\n]/.test(numRaw)){
+      setMode("group");
+      try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
+      const cleaned = numRaw.replace(/[،,;]+/g," ").replace(/\s+/g," ").trim();
+      const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
+      if (bulkEl) bulkEl.value = arr.join("\n");
+      animalUI.value = "";
+    }
+    // ✅ 4) لو mbkMode موجود صراحةً: احترمه
+    else if (m === "group" || m === "single"){
+      setMode(m);
+    }
+    // ✅ 5) fallback: آخر وضع محفوظ
+    else {
+      setMode(saved === "group" ? "group" : "single");
+    }
+
+    if (dt) startDateEl.value = dt || todayISO();
 
     syncCentral();
   })();
@@ -581,8 +552,7 @@ if (num){
   bulkEl?.addEventListener("input",syncCentral);
   startDateEl.addEventListener("input",syncCentral);
   programEl?.addEventListener("change", syncCentral);
-startTimeEl?.addEventListener("change", syncCentral);
-
+  startTimeEl?.addEventListener("change", syncCentral);
 
   /* ========= Programs ========= */
   const PROGRAMS = {
@@ -642,23 +612,19 @@ startTimeEl?.addEventListener("change", syncCentral);
 
     const idx = parseInt(i, 10);
 
-    // ✅ Step Mode: ممنوع غير خطوة اليوم
     if (STEP_MODE){
       if (idx !== STEP_INDEX){
         e.target.checked = false;
         return;
       }
-      // ✅ عند ✓ على خطوة اليوم: نفّذها فورًا
       if (!!e.target.checked){
         await confirmStepExecution();
       } else {
-        // لا نسمح بإلغاء بعد التأكيد
         e.target.checked = true;
       }
       return;
     }
 
-    // ✅ الوضع العادي: مجرد تعليم/إلغاء تعليم داخلي قبل الحفظ
     stepsState[idx].done = !!e.target.checked;
     syncCentral();
   });
@@ -667,7 +633,6 @@ startTimeEl?.addEventListener("change", syncCentral);
   startDateEl.addEventListener("change",updateSteps);
   startTimeEl.addEventListener("change",updateSteps);
 
-  // ✅ Step Mode: تحميل قائمة مهام اليوم تلقائيًا
   loadStepTargets();
 
   /* ========= Firebase (Robust) ========= */
@@ -678,37 +643,28 @@ startTimeEl?.addEventListener("change", syncCentral);
     });
   }
 
-
-  // ✅ Groups feature removed (we no longer use protocolGroups/users groups).
-  // Keep a no-op refreshGroups to avoid breaking older calls.
   async function refreshGroups(){ return; }
 
   const u0 = await waitUser();
-if (u0) await refreshGroups(u0.uid);
+  if (u0) await refreshGroups(u0.uid);
 
-
-
-
-/* ========= Tasks: Ovsynch ========= */
+  /* ========= Tasks: Ovsynch ========= */
   async function upsertOvsynchTasks(uid, animalNumber, protocolStartISO, programKey, stepsArr){
     try{
       if (!uid || !animalNumber || !protocolStartISO || !Array.isArray(stepsArr) || !stepsArr.length) return;
 
-      // نحول التاريخ إلى YYYY-MM-DD
       const startDay = String(protocolStartISO).slice(0,10);
 
       for (let i=0;i<stepsArr.length;i++){
         const st = stepsArr[i] || {};
         const stepDay  = (typeof st.day === "number") ? st.day : i;
         const stepName = st.name || `Step ${i}`;
-        const stepDT   = (st.date || "").toString(); // قد يكون "YYYY-MM-DDTHH:mm"
+        const stepDT   = (st.date || "").toString();
         const dueDate  = (stepDT.slice(0,10) || startDay);
 
-        // ✅ ID ثابت يمنع التكرار بين البروتوكولات (يدمج startDate)
         const taskId = `task__${animalNumber}__ovsynch__${startDay}__d${stepDay}`;
         const ref = doc(fbDb, "tasks", taskId);
 
-        // ✅ لو الـ task موجودة ومقفولة (done/cancelled) لا نعيد فتحها
         const snap = await getDoc(ref);
         if (snap.exists()){
           const cur = snap.data() || {};
@@ -716,40 +672,34 @@ if (u0) await refreshGroups(u0.uid);
           if (stt === "done" || stt === "cancelled") continue;
         }
 
-      const isDone = !!st.done;
+        const isDone = !!st.done;
 
-const payload = {
-  userId: uid,
-  animalNumber: String(animalNumber),
-  type: "protocol_step",
-  protocol: "ovsynch",
-  program: programKey || "ovsynch",
-  protocolStartDate: startDay,
-  stepIndex: i,
-  stepDay,
-  stepKey: `ovsynch_d${stepDay}`,
-  stepName,
-  dueDate,
-    plannedDate: dueDate,
-  plannedTime: (stepDT && stepDT.length >= 16) ? stepDT.slice(11,16) : "08:00",
-  plannedDateTime: stepDT || (dueDate + "T08:00"),
+        const payload = {
+          userId: uid,
+          animalNumber: String(animalNumber),
+          type: "protocol_step",
+          protocol: "ovsynch",
+          program: programKey || "ovsynch",
+          protocolStartDate: startDay,
+          stepIndex: i,
+          stepDay,
+          stepKey: `ovsynch_d${stepDay}`,
+          stepName,
+          dueDate,
+          plannedDate: dueDate,
+          plannedTime: (stepDT && stepDT.length >= 16) ? stepDT.slice(11,16) : "08:00",
+          plannedDateTime: stepDT || (dueDate + "T08:00"),
 
-  // ✅ الحالة حسب ✓
-  status: isDone ? "done" : "pending",
-  done: isDone ? true : false,
-  doneAt: isDone ? serverTimestamp() : null,
+          status: isDone ? "done" : "pending",
+          done: isDone ? true : false,
+          doneAt: isDone ? serverTimestamp() : null,
 
-  updatedAt: serverTimestamp(),
-};
-
-if (!snap.exists()) payload.createdAt = serverTimestamp();
-
-// ✅ لو موجودة ومقفولة مسبقًا سيبها زي ما هي (نفس منطقك)
-await setDoc(ref, payload, { merge: true });
+          updatedAt: serverTimestamp(),
+        };
 
         if (!snap.exists()) payload.createdAt = serverTimestamp();
 
-
+        // ✅ (Fix) setDoc مرة واحدة فقط
         await setDoc(ref, payload, { merge: true });
       }
     }catch(err){
@@ -758,54 +708,32 @@ await setDoc(ref, payload, { merge: true });
     }
   }
 
-/* ========= Save ========= */
+  /* ========= Save ========= */
   saveBtn.addEventListener("click", async ()=>{
-    // ✅ Step Mode: تنفيذ خطوة اليوم (بدون حفظ بروتوكول)
     if (STEP_MODE){
       await confirmStepExecution();
       return;
     }
     syncCentral();
-    form.requestSubmit(); // ✅ مركزي فقط
+    form.requestSubmit();
   });
 
-  // ✅ حفظ فعلي: فردي أو جماعي بعد mbk:valid
- form.addEventListener("mbk:valid", async (ev)=> {
-   
-
+  form.addEventListener("mbk:valid", async (ev)=> {
     const start = (startDateEl.value || "").trim() || todayISO();
     if (!startDateEl.value) startDateEl.value = start;
-   const program = (programEl.value || "").trim();
-   if (!fbReady || !fbDb || !fbAuth) return;
 
-const u = await waitUser();
-if (!u) return;
+    const program = (programEl.value || "").trim();
+    if (!fbReady || !fbDb || !fbAuth) return;
 
+    const u = await waitUser();
+    if (!u) return;
 
-    // ✅ حدد قائمة الحيوانات حسب الوضع
-    const targets = (getMode()==="group")
-      ? (parseBulk().map(x=>String(x).trim()).filter(Boolean))
-      : [String(animalUI.value||"").trim()].filter(Boolean);
+    const fd = ev?.detail?.formData || null;
+    if (!fd || !Array.isArray(fd.animalNumbers)) return;
 
-    if (!targets.length){ showWarn("⚠️ اكتب رقم الحيوان."); return; }
+    const finalList = fd.animalNumbers;
+    const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
 
-   // ✅ القائمة النهائية تأتي من forms-init (مركزي)
-const fd = ev?.detail?.formData || null;
-
-// ✅ قفل أمان: ممنوع حفظ بدون نتيجة تحقق صريحة من forms-init
-if (!fd || !Array.isArray(fd.animalNumbers)) {
- 
-  return;
-}
-
-const finalList = fd.animalNumbers;
-   
-
-const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
-
-
-
-    // ✅ بناء payload ثابت للخطوات
     const payloadBase = {
       type: "ovsynch",
       eventType: "بروتوكول تزامن",
@@ -813,7 +741,6 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
       program,
       steps: stepsState,
       userId: u.uid,
-
       createdAt: serverTimestamp()
     };
 
@@ -841,7 +768,6 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
       saved++;
     }
 
-    // ✅ رسالة نهائية واضحة
     let msg = `✅ تم التسجيل بنجاح: ${saved} رقم`;
     if (already) msg += `\n⛔ مسجل مسبقًا: ${already} رقم`;
     if (rejected.length){
@@ -850,20 +776,16 @@ const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
     }
 
     if (typeof window.showMsg === "function") {
-  window.showMsg(infoEl, msg.split("\n"), "ok");
-} else {
-  // fallback بسيط لو حصل أي شيء
-  infoEl.style.display="block";
-  infoEl.textContent = msg;
-}
+      window.showMsg(infoEl, msg.split("\n"), "ok");
+    } else {
+      infoEl.style.display="block";
+      infoEl.textContent = msg;
+    }
 
     clearWarn();
-
-    // ✅ مزامنة الكونتكست بعد الحفظ
     syncCentral();
   });
 
-  // ✅ أول مزامنة
   syncCentral();
 })();
 </script>
