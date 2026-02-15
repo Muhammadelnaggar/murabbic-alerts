@@ -357,9 +357,26 @@ if (numInput){
   }, true);
 })();
 </script>
+<script>
+// toggle bulk textarea (Ovsynch only)
+(function(){
+  const t = document.getElementById('ovBulkToggle');
+  const box = document.getElementById('ovBulkNumbers');
+  if(!t || !box) return;
+
+  const apply = ()=>{
+    const on = !!t.checked;
+    box.style.display = on ? 'block' : 'none';
+  };
+
+  t.addEventListener('change', apply);
+  apply();
+})();
+</script>
 
 </body>
 </html>
+
 
 
 
