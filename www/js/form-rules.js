@@ -240,9 +240,14 @@ export const eventSchemas = {
   fields: {
     animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
     eventDate: { required: true, type: "date", msg: "تاريخ الشياع غير صالح." },
-    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
 
-    intensity: { required: false, msg: "شدة الشياع غير صالحة." },
+    // ✅ إجباري (حسب طلبك)
+    heatTime: { required: true, msg: "وقت ملاحظة الشياع مطلوب (ص/م)." },
+    reproductiveStatusSnapshot: { required: true, msg: "تعذّر قراءة الحالة التناسلية — انتظر التحقق الأخضر." },
+    dimAtEvent: { required: true, msg: "تعذّر حساب أيام الحليب (DIM) — انتظر التحقق الأخضر." },
+
+    // ✅ اختياري
     notes: { required: false }
   },
   guards: ["heatDecision"]
@@ -489,22 +494,28 @@ heatDecision(fd) {
   const d = fd.documentData;
   if (!d) return "تعذّر قراءة بيانات الحيوان.";
 
+  // ✅ خارج القطيع (أمان إضافي — الـGate يمنعها أصلًا)
   const st = String(d.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ الحيوان خارج القطيع.";
 
+  // ✅ تحديد النوع لغويًا: بقرة/جاموسة
+  const sp = normalizeSpecies(fd.species || d.species || d.animalTypeAr || d.animalType || "");
+  const aw = animalWord(sp);
+
+  // ❌ مستبعدة تناسليًا
   const rsRaw = String(fd.reproStatusFromEvents || d.reproductiveStatus || "").trim();
   const cat = reproCategory(rsRaw);
-
-  if (d.breedingBlocked === true || cat === "blocked") return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
-  if (cat === "pregnant") return "❌ الحيوان عِشار ولا يمكن تسجيل شياع.";
-  if (cat === "inseminated") return "❌ الحيوان مُلقّح بالفعل ولا يمكن تسجيل شياع.";
-
-  // ✅ المسموح فقط: مفتوحة
-  if (cat !== "open") {
-    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ لا يمكن تسجيل شياع — الحالة التناسلية الحالية: ${shown}.`;
+  if (d.breedingBlocked === true || cat === "blocked") {
+    return `❌ هذه ${aw} مستبعدة تناسليًا (لا تُلقّح مرة أخرى).`;
   }
 
+  // ❌ عِشار: امنع + اعرض زر "تأكيد الحمل"
+  if (cat === "pregnant") {
+    return `OFFER_PREG|❌ هذه ${aw} عِشار — لا يمكن تسجيل شياع.
+هل تريد فتح صفحة تشخيص الحمل للتأكيد؟`;
+  }
+
+  // ✅ باقي الحالات التناسلية مسموح تسجيلها شياع (مفتوحة/ملقحة/غير معروفة…)
   return null;
 },
 
