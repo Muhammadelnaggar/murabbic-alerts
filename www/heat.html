@@ -11,11 +11,10 @@
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
 
-  <!-- Validation / Forms init -->
+  <!-- Validation / Forms init (Central Gate + Validation) -->
   <script type="module" src="js/forms-init.js"></script>
 
   <style>
-    /* ✅ Header (Murabbik standard) */
     header{
       position: sticky;
       top: 0;
@@ -36,7 +35,7 @@
       height:48px;
       width:auto;
       object-fit:contain;
-      opacity:.6; /* ✅ الشعار بشفافية 60% كما اتفقنا */
+      opacity:.6;
       flex-shrink:0;
     }
     .mbk-center{ flex:1; text-align:center; line-height:1.15; }
@@ -58,7 +57,7 @@
       flex-shrink:0;
     }
 
-    /* ✅ Infobar تحت الهيدر */
+    /* Infobar تحت الهيدر */
     #sysbar.infobar{
       display:block;
       position: sticky;
@@ -70,7 +69,6 @@
       margin-right:auto;
     }
 
-    /* ✅ Layout */
     .wrap{ max-width:520px; margin:12px auto 24px; padding:0 12px; }
     .mbk-card{
       background:#fff;
@@ -80,7 +78,6 @@
       box-shadow:0 1px 0 rgba(15,23,42,.04);
     }
 
-    /* ✅ الأزرار السفلية (جنب بعض) */
     .btn-row{
       position: sticky;
       bottom: 10px;
@@ -121,7 +118,6 @@
 
 <body data-page="heat">
 
-  <!-- ✅ هيدر مُرَبِّيك القياسي -->
   <header>
     <div class="mbk-head">
       <a class="mbk-back" href="add-event.html" title="رجوع">رجوع</a>
@@ -135,182 +131,211 @@
     </div>
   </header>
 
-  <!-- ✅ infobar تحت الهيدر -->
+  <!-- infobar -->
   <div id="sysbar" class="infobar"></div>
 
   <div class="wrap">
-    <section class="mbk-card">
+
+    <!-- ✅ لازم Form علشان forms-init يشتغل -->
+    <form id="heatForm" class="mbk-card" data-validate="true" data-event="شياع" novalidate>
+
+      <!-- Hidden: علشان forms-init يحقن animalId -->
+      <input id="animalId" data-field="animalId" type="hidden" />
+
       <label>رقم الحيوان</label>
-      <input id="animalNumber" readonly />
+      <input id="animalNumber" data-field="animalNumber" readonly />
 
       <label>تاريخ الشياع</label>
-      <input id="eventDate" type="date" />
+      <input id="eventDate" data-field="eventDate" type="date" />
 
       <label>الحالة التناسلية الحالية</label>
-      <input id="reproStatus" readonly />
+      <input id="reproStatus" data-field="reproductiveStatusSnapshot" readonly />
 
       <label>أيام الحليب (DIM)</label>
-      <input id="dim" readonly />
-
+      <input id="dim" data-field="dimAtEvent" readonly />
+      <label>عدد الأيام منذ آخر شياع / تلقيح</label>
+<input id="daysSinceLastHeatOrAI" readonly />
       <label>ملاحظات</label>
-      <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+      <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 
-      <!-- ✅ زر الحفظ القديم اتشال من هنا (هنستخدم الزر السفلي) -->
-      <button id="saveBtn" data-validate="true" style="display:none"></button>
-    </section>
+      <!-- زر داخلي مخفي فقط للتوافق لو احتجناه -->
+      <button type="submit" id="saveBtn" style="display:none"></button>
+    </form>
   </div>
 
-  <!-- ✅ زرين جنب بعض أسفل النموذج -->
   <div class="btn-row">
-    <button id="saveBtnUI" class="save-btn" type="button">✅ تسجيل الشياع</button>
+    <!-- ✅ زر الحفظ = submit (بدون onclick) -->
+    <button id="saveBtnUI" class="save-btn" type="submit" form="heatForm">✅ تسجيل الشياع</button>
     <button id="openCowCard" class="open-card" type="button">🧾 بطاقة الحيوان</button>
   </div>
 
   <script type="module">
-    import { db, auth, ensureAuth } from "/js/firebase-config.js";
+    import { db, auth } from "/js/firebase-config.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
     import {
-      collection, addDoc, serverTimestamp,
-      getDocs, query, where, limit
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  collection, addDoc, serverTimestamp,
+  getDocs, query, where, orderBy, limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
     const $ = (id) => document.getElementById(id);
-
-    const info = $("sysbar");
-    const btn  = $("saveBtn");      // زر الحفظ الأصلي (مخفي)
-    const btnUI = $("saveBtnUI");   // زر الحفظ الجديد (الظاهر)
-    const openCowCard = $("openCowCard");
+    const form = $("heatForm");
+    const bar  = $("sysbar");
 
     function msg(t, ok=false){
-      info.className = "infobar " + (ok ? "ok" : "err");
-      info.textContent = t;
+      bar.className = "infobar " + (ok ? "success" : "error");
+      bar.style.display = "block";
+      bar.textContent = t;
+      try{ bar.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){}
     }
 
-    const p = new URLSearchParams(location.search);
+    // ✅ Prefill من URL / localStorage
+    const p  = new URLSearchParams(location.search);
     const num = (p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "").toString().trim();
     const dt  = (p.get("date")   || p.get("eventDate")    || localStorage.getItem("lastEventDate")   || new Date().toISOString().slice(0,10)).toString().slice(0,10);
 
     $("animalNumber").value = num;
     $("eventDate").value = dt;
 
-    let _animal = null;
-
     function toDate(s){
       const d = new Date(String(s || "").slice(0,10));
       return isNaN(d.getTime()) ? null : d;
     }
+async function calcDaysSinceLastHeatOrAI(){
+  const doc = form.__mbkDoc;
+  if (!doc) return;
 
-    function calcDIM(){
-      if (!_animal) { $("dim").value = ""; return; }
-      const calv = toDate(_animal.lastCalvingDate);
+  const uid = auth?.currentUser?.uid || localStorage.getItem("userId");
+  if (!uid) return;
+
+  const animalNumber = $("animalNumber").value.trim();
+  const eventDate = $("eventDate").value;
+
+  if (!animalNumber || !eventDate) return;
+
+  try{
+    const eventsRef = collection(db, "events");
+
+    const snap = await getDocs(query(
+      eventsRef,
+      where("userId", "==", uid),
+      where("animalNumber", "==", animalNumber),
+      where("type", "in", ["شياع","تلقيح"]),
+      orderBy("eventDate", "desc"),
+      limit(1)
+    ));
+
+    if (snap.empty){
+      $("daysSinceLastHeatOrAI").value = "";
+      return;
+    }
+
+    const last = snap.docs[0].data();
+    const lastDate = new Date(last.eventDate);
+    const currentDate = new Date(eventDate);
+
+    const diff = Math.floor((currentDate - lastDate) / 86400000);
+
+    $("daysSinceLastHeatOrAI").value = diff >= 0 ? diff : "";
+
+  }catch(e){
+    console.error(e);
+  }
+}
+
+    function calcDIMFromDoc(){
+      const doc = form.__mbkDoc || null;
+      if (!doc) { $("dim").value = ""; return; }
+
+      const calv = toDate(doc.lastCalvingDate);
       const evd  = toDate($("eventDate").value || dt);
       if (!calv || !evd) { $("dim").value = ""; return; }
-      const days = Math.floor((evd - calv) / (1000*60*60*24));
+
+      const days = Math.floor((evd - calv) / 86400000);
       $("dim").value = String(Math.max(0, days));
     }
 
-    async function loadAnimalAndFill(){
-      if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+    function fillFromDocIfReady(){
+      if (form?.dataset?.animalOk !== "1") return;
+      const doc = form.__mbkDoc || null;
+      if (!doc) return;
 
-      try{
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) { msg("⚠️ لم يتم تسجيل الدخول.", false); return; }
-
-        const animalsRef = collection(db, "animals");
-
-        // محاولة 1: number كنص
-        let snap = await getDocs(query(
-          animalsRef,
-          where("userId", "==", uid),
-          where("number", "==", String(num)),
-          limit(1)
-        ));
-
-        // محاولة 2: animalNumber كرقم
-        if (snap.empty) {
-          snap = await getDocs(query(
-            animalsRef,
-            where("userId", "==", uid),
-            where("animalNumber", "==", Number(num)),
-            limit(1)
-          ));
-        }
-
-        if (snap.empty) {
-          msg("⚠️ الحيوان غير موجود.", false);
-          return;
-        }
-
-        _animal = snap.docs[0].data() || {};
-        $("reproStatus").value = (_animal.reproductiveStatus || "").toString().trim();
-        calcDIM();
-        msg("✅ تم تحميل بيانات الحيوان.", true);
-
-      }catch(e){
-        console.error(e);
-        msg("⚠️ تعذّر تحميل بيانات الحيوان.", false);
-      }
+      $("reproStatus").value = String(doc.reproductiveStatus || "").trim();
+      calcDIMFromDoc();
     }
 
-    await loadAnimalAndFill();
-    $("eventDate").addEventListener("change", calcDIM);
+    // بعد نجاح الـGate، forms-init سيملأ form.__mbkDoc و dataset.animalOk
+   const docWatcher = setInterval(async () => {
+  fillFromDocIfReady();
+  await calcDaysSinceLastHeatOrAI();
 
-    // ✅ زر "بطاقة الحيوان"
-    openCowCard.addEventListener("click", ()=>{
-      if (!num) { msg("⚠️ اكتب رقم الحيوان أولًا.", false); return; }
-      location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+      if (form?.dataset?.animalOk === "1" && form.__mbkDoc) {
+        clearInterval(docWatcher);
+      }
+    }, 120);
+
+   $("eventDate").addEventListener("change", async () => {
+  calcDIMFromDoc();
+  await calcDaysSinceLastHeatOrAI();
+});
+
+    // ✅ زر بطاقة الحيوان
+    $("openCowCard").addEventListener("click", ()=> {
+      const n = String($("animalNumber").value || "").trim();
+      if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
     });
 
-    // ✅ الحفظ (نفس كودك)
-    btn.onclick = async () => {
-      try {
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) throw new Error("NO_AUTH");
+    // ✅ الحفظ المركزي: ممنوع submit محلي — ننتظر mbk:valid
+    document.addEventListener("mbk:valid", async (e) => {
+      const d = e?.detail || {};
+      if (!d || d.eventName !== "شياع") return;
+      if (d.form !== form) return;
 
-        const eventDate = ($("eventDate").value || dt).slice(0,10);
+      try{
+        const uid = auth?.currentUser?.uid || localStorage.getItem("userId") || "";
+        if (!uid) { msg("⚠️ لم يتم تأكيد الدخول.", false); return; }
+
+        const fd = d.formData || {};
+        const eventDate = String(fd.eventDate || "").slice(0,10);
+        const animalNumber = String(fd.animalNumber || "").trim();
 
         const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
+          animalNumber,
+          animalId: String(fd.animalId || animalNumber),
           type: "شياع",
           eventType: "شياع",
           eventDate,
-          notes: ($("notes").value || "").trim(),
-          reproductiveStatusSnapshot: ($("reproStatus").value || "").trim(),
-          dimAtEvent: Number($("dim").value) || null,
+          notes: String(fd.notes || "").trim(),
+          reproductiveStatusSnapshot: String(fd.reproductiveStatusSnapshot || "").trim(),
+          dimAtEvent: (fd.dimAtEvent === "" ? null : (Number(fd.dimAtEvent) || null)),
           userId: uid,
           source: "/heat.html",
           createdAt: serverTimestamp()
         };
 
         await addDoc(collection(db, "events"), payload);
-
-        // تحديث وثيقة الحيوان من ملفك المركزي
         await updateAnimalByEvent(payload);
 
         msg("تم تسجيل الشياع بنجاح ✅", true);
 
-        localStorage.setItem("lastAnimalNumber", String(num));
-        localStorage.setItem("lastEventDate", eventDate);
+        localStorage.setItem("lastAnimalNumber", String(animalNumber));
+        localStorage.setItem("lastEventDate", String(eventDate));
 
         setTimeout(() => {
-          location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+          location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
         }, 900);
 
-      } catch (e) {
-        console.error(e);
+      }catch(err){
+        console.error(err);
         msg("❌ فشل في الحفظ.", false);
       }
-    };
+    });
 
-    // ✅ الزر السفلي يستدعي نفس حفظك
-    btnUI.addEventListener("click", ()=> btn.onclick());
-
-    // تتبع (بدون تعريف dataLayer هنا)
+    // Tracking
     const t = window.t || { event:(n,d)=>window.dataLayer.push({event:n, ...d}) };
     t.event("page_view", { page: "heat", title: "تسجيل شياع" });
   </script>
+
 </body>
 </html>
