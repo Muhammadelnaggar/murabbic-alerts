@@ -243,7 +243,8 @@ export const eventSchemas = {
   fields: {
     animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
     eventDate: { required: true, type: "date", msg: "تاريخ الشياع غير صالح." },
-    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+    heatTime: { required: true, msg: "حدد وقت ملاحظة الشياع (ص/م)." },
+   documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
     species: { required: false },
     daysSinceLastHeatOrAI: { required: false, type: "number" }
   },
