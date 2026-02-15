@@ -138,7 +138,11 @@ export const eventSchemas = {
     inseminationMethod: { required: true, msg: "طريقة التلقيح مطلوبة." },
     semenCode: { required: true, msg: "كود السائل المنوي مطلوب." },
     inseminator: { required: true, msg: "اسم الملقّح مطلوب." },
-    inseminationTime: { required: true, msg: "وقت التلقيح مطلوب." },
+    inseminationTime: {
+  required: true,
+  enum: ["صباحًا", "مساءً"],
+  msg: "وقت التلقيح مطلوب (صباحًا / مساءً)."
+},
     heatStatus: { required: true, msg: "حالة الشياع مطلوبة." }
   },
   guards: ["inseminationDecision"]
