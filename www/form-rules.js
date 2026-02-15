@@ -235,6 +235,16 @@ export const eventSchemas = {
   },
   guards: ["ovsynchEligibilityDecision"]
 },
+  "شياع": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ الشياع غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+    species: { required: false },
+    daysSinceLastHeatOrAI: { required: false, type: "number" }
+  },
+  guards: ["heatDecision"]
+},
 };
 
 // ===================================================================
@@ -506,9 +516,10 @@ abortionDecision(fd) {
 
   // ✅ لازم يكون عِشار (الأحداث أولًا لو أنت مررت reproStatusFromEvents، وإلا الوثيقة)
   const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
-  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+const cat = reproCategory(rsRaw);
 
-  if (!rsNorm.includes("عشار")) {
+if (cat === "pregnant") {
+
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
     return `❌ الحيوان ليس عِشار — الحالة التناسلية الحالية: ${shown}.`;
   }
@@ -741,6 +752,42 @@ ovsynchEligibilityDecision(fd) {
 
   return null;
 
+}
+
+heatDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    return "❌ لا يمكن تسجيل الشياع — الحيوان خارج القطيع.";
+  }
+
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const w = (sp === "جاموس") ? "الجاموسة" : "البقرة";
+
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+
+  // ❌ لو عشار
+  if (rsNorm.includes("عشار")) {
+
+    let label = "عشار";
+    if (rsNorm.includes("جاف")) label = "عشار جاف";
+    if (rsNorm.includes("انتظار")) label = "عشار انتظار ولادة";
+    if (rsNorm.includes("حلاب")) label = "عشار حلاب";
+
+    return {
+      field: "animalNumber",
+      msg: `❌ ${w} مسجلة كـ ${label}.\nتأكد من حمل ${w} قبل تسجيل الشياع.`,
+      action: "confirmPregnancy"
+    };
+  }
+
+  return null;
 }
 };
 // ===================================================================
