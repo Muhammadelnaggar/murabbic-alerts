@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+
   <style>
     :root{
       --bg:#f7faf7;
@@ -19,7 +20,16 @@
       --brand-600:#0b7f47;
       --danger:#c2410c;
     }
-    
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      padding-bottom:70px;
+      background: var(--bg);
+      font-family:'Cairo','Arial',sans-serif;
+      color:var(--text);
+    }
+
     .mbk-top{
       position: sticky; top:0; z-index:50;
       background:#fff;
@@ -39,91 +49,154 @@
     .mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
     .mbk-logo{ height:46px; width:auto; object-fit:contain; opacity:.95; }
 
-*{box-sizing:border-box}
-  body{
-  margin:0;
-  padding-bottom:70px; /* مسافة تحت لكل المحتوى عشان شريط الإبحار */
-  background:linear-gradient(to bottom,var(--bg1),var(--bg2));
-  font-family:'Cairo','Arial',sans-serif;
-  color:var(--text);
-}
     .meta{padding:8px 10px;text-align:center;font-size:16px}
     .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
-    .form{margin:12px;padding:14px;background:var(--card);border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.08);display:grid;gap:12px}
-    .form input{width:100%;padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px}
-   .grid{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:12px;
-  margin:12px;
-}
 
+    .form{
+      margin:12px;
+      padding:14px;
+      background:var(--card);
+      border-radius:12px;
+      box-shadow:0 2px 5px rgba(0,0,0,.08);
+      display:grid;
+      gap:10px
+    }
 
-    @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);}}
-    .btn{padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;font-weight:700;cursor:pointer;text-align:center;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.06);font-size:16px}
-    .btn:hover{background:var(--brand);border-color:var(--brand);color:#fff;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.12)}
-    #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
+    .form input, .form textarea{
+      width:100%;
+      padding:12px;
+      border:1px solid #ccc;
+      border-radius:10px;
+      font-size:16px;
+      font-family:inherit;
+    }
+
+    .bulkRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding-top:4px;
+    }
+    .bulkRow label{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-weight:800;
+      color:var(--text);
+      cursor:pointer;
+      user-select:none;
+    }
+    #ovBulkNumbers{
+      display:none;
+      min-height:110px;
+      line-height:1.6;
+      resize:vertical;
+    }
+    .bulkHint{
+      font-size:13px;
+      color:var(--muted);
+      padding:0 2px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+      margin:12px;
+    }
+    @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);} }
+
+    .btn{
+      padding:14px;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      font-weight:700;
+      cursor:pointer;
+      text-align:center;
+      transition:.2s;
+      box-shadow:0 2px 5px rgba(0,0,0,.06);
+      font-size:16px
+    }
+    .btn:hover{
+      background:var(--brand);
+      border-color:var(--brand);
+      color:#fff;
+      transform:translateY(-2px);
+      box-shadow:0 6px 12px rgba(0,0,0,.12)
+    }
+
+    #inlineMsg{
+      margin:12px;
+      padding:10px;
+      background:#f1f8e9;
+      border:1px solid #c5e1a5;
+      border-radius:10px;
+      display:none
+    }
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--text);text-align:center}
-    /* ===== شريط إبحار سفلي ===== */
-.mbk-bottom-nav{
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  height:58px;
-  background:#ffffff;
-  border-top:1px solid var(--border);
-  display:flex;
-  justify-content:space-around;
-  align-items:center;
-  z-index:9999;
-}
 
-.mbk-bottom-nav .mbk-nav-link{
-  text-decoration:none;
-  padding:8px 14px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:#ffffff;
-  color:var(--text);
-  font-size:0.9rem;
-  white-space:nowrap;
-}
-
-.mbk-bottom-nav .mbk-nav-link:hover{
-  background:var(--green-200);
-  color:#fff;
-}
-
-.mbk-nav-link-disabled{
-  opacity:0.5;
-  pointer-events:none;
-}
-
+    .mbk-bottom-nav{
+      position:fixed;
+      bottom:0; left:0; right:0;
+      height:58px;
+      background:#ffffff;
+      border-top:1px solid var(--border);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:9999;
+    }
+    .mbk-bottom-nav .mbk-nav-link{
+      text-decoration:none;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#ffffff;
+      color:var(--text);
+      font-size:0.9rem;
+      white-space:nowrap;
+    }
+    .mbk-nav-link-disabled{opacity:0.5; pointer-events:none;}
   </style>
 </head>
+
 <body>
   <header class="mbk-top">
-  <div class="mbk-head">
-    <div class="mbk-title">
-      <div class="mbk-page">تسجيل حدث</div>
-      <div class="mbk-app">مُرَبِّيك</div>
+    <div class="mbk-head">
+      <div class="mbk-title">
+        <div class="mbk-page">تسجيل حدث</div>
+        <div class="mbk-app">مُرَبِّيك</div>
+      </div>
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     </div>
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-  </div>
-</header>
+  </header>
+
   <div class="meta" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
   <div class="meta" id="dateInfo"></div>
   <div class="warning" id="warn"></div>
 
   <div class="form">
-    <input id="animalNumber" type="text" placeholder="رقم الحيوان" inputmode="numeric" />
+    <input id="animalNumber" type="text" placeholder="رقم الحيوان (فردي) أو اكتب رقم واحد هنا" inputmode="numeric" />
     <input id="eventDate" type="date" />
+
+    <!-- ✅ إدخال جماعي للتزامن فقط (سهل للموبايل: كل رقم في سطر) -->
+    <div class="bulkRow">
+      <label>
+        <input type="checkbox" id="ovBulkToggle">
+        إدخال جماعي للتزامن
+      </label>
+    </div>
+    <div class="bulkHint" id="bulkHint" style="display:none;">
+      اكتب كل رقم في سطر (Enter). مثال:
+      <b>31</b> ثم Enter ثم <b>32</b>
+    </div>
+    <textarea id="ovBulkNumbers" inputmode="numeric" placeholder="أرقام التزامن (كل رقم في سطر)"></textarea>
   </div>
 
   <div id="inlineMsg"><div class="text"></div></div>
 
-  <!-- الشبكة الرئيسية للأحداث -->
   <div class="grid" id="eventButtons">
     <button class="btn" data-page="calving.html">👶 ولادة</button>
     <button class="btn" data-page="insemination.html">📅 تلقيح</button>
@@ -137,20 +210,15 @@
     <button class="btn" id="btnTrimming" data-action="trimming">🦶 تقليم الحوافر</button>
     <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
     <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
+
+    <!-- ✅ نفس اسم ملفك الحالي -->
     <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
+
     <button class="btn" data-page="event-list.html">📜 قائمة الأحداث</button>
-    <!-- داخل grid الأزرار في add-event.html -->
-<button class="btn" data-page="heat.html">🔥 شياع</button>
-
-<button class="btn" data-page="death.html">☠️ نفوق</button>
-
-<button class="btn" data-page="cull.html">🚫 استبعاد</button>
-
-<button class="btn" data-page="sale.html">💰 بيع</button>
-
-
-
-    <!-- زر موحّد للكاميرا الذكية بدل كل أدوات الكاميرا المتفرّقة -->
+    <button class="btn" data-page="heat.html">🔥 شياع</button>
+    <button class="btn" data-page="death.html">☠️ نفوق</button>
+    <button class="btn" data-page="cull.html">🚫 استبعاد</button>
+    <button class="btn" data-page="sale.html">💰 بيع</button>
     <button class="btn" data-page="smart-camera.html">🤖 الكاميرا الذكية</button>
   </div>
 
@@ -161,227 +229,185 @@
 
   <script>
     function updateCowCardNav(number){
-  const link = document.querySelector('[data-nav="cow-card"]');
-  if (!link) return;
-
-  if (number){
-    link.href = 'cow-card.html?number=' + encodeURIComponent(number);
-    link.classList.remove('mbk-nav-link-disabled');
-  } else {
-    link.href = '#';
-    link.classList.add('mbk-nav-link-disabled');
-  }
-}
-
-  (function(){
-    const $ = s=>document.querySelector(s);
-    const $$ = s=>document.querySelectorAll(s);
-    const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
-    const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
-     const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const toLatinDigits = s => String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d]).replace(/[^\d]/g,'');
-   function hydrate(){
-  const qs = new URLSearchParams(location.search);
-  const rawDate = norm(qs.get('eventDate') || qs.get('date') || '');
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
-
-  const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
-  const number = toLatinDigits(rawNum);
-
-  $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
-  if (!norm($('#eventDate').value)) $('#eventDate').value = date;
-
-  if (number){
-    $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${number}`;
-    if ($('#animalNumber')) $('#animalNumber').value = number;
-  }
-updateCowCardNav(number);
-}
-
-
-function ctxOrWarn(){
-  const number = toLatinDigits(norm($('#animalNumber').value));
-  let date = norm($('#eventDate').value) || todayISO();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-
-  if (!number){
-    $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
-    updateCowCardNav(null);   // تعطيل زر بطاقة الحيوان
-    return null;
-  }
-
-  $('#warn').textContent = '';
-  updateCowCardNav(number);   // تفعيل زر بطاقة الحيوان
-  return { number, date };
-}
-
-
-  function buildUrl(page, ctx){
-  const u = new URL(page, location.href);
-
-  // ✅ لو صفحة التزامن (ovysynch) وجاي أكتر من رقم: مرّرها كـ bulk بدل number
-  const isOvsynch = /ovysynch/i.test(String(page));
-  const rawNum = String(ctx.number || "").trim();
-  const hasMulti = /[\s،,;]+/.test(rawNum);
-
-  if (isOvsynch && hasMulti){
-    // نقبل: مسافات / أسطر / فاصلة عربية / فاصلة إنجليزية
-    const cleaned = rawNum
-      .replace(/[\r\n]+/g, " ")
-      .replace(/[،,;]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    u.searchParams.set('bulk', cleaned);   // ✅ ستتحول لأسطر داخل ovysynch
-    u.searchParams.set('mode', 'group');
-  }else{
-    u.searchParams.set('number', rawNum);
-  }
-
-  // دعم مفاتيح التاريخ
-  u.searchParams.set('date', ctx.date);
-  u.searchParams.set('eventDate', ctx.date);
-
-  return u.toString();
-}
-
-    function wireButtons(){
-      $$('#eventButtons .btn[data-page]').forEach(btn=>{
-        btn.addEventListener('click', e=>{
-          e.preventDefault();
-          const ctx = ctxOrWarn(); if(!ctx) return;
-          const target = btn.getAttribute('data-page');
-          if(target){ location.href = buildUrl(target, ctx); }
-        }, {passive:true});
-       
-
-      });
-    }
- const numInput = $('#animalNumber');
-if (numInput){
-  numInput.addEventListener('input', ()=>{
-    const n = toLatinDigits(norm(numInput.value));
-    updateCowCardNav(n || null);
-  });
-}
-    async function saveTrimmingInline(){
-      const ctx = ctxOrWarn(); if(!ctx) return;
-      try{
-        const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
-        if(typeof window.api?.post === 'function'){
-          await window.api.post('/api/events', payload);
-        }
-        const box = document.getElementById('inlineMsg');
-        box.querySelector('.text').textContent = `✅ تم تسجيل تقليم الحوافر للحيوان رقم ${ctx.number} بتاريخ ${ctx.date}.`;
-        box.style.display = 'block';
-        window.dataLayer.push({event:'event_saved', eventType:'trimming', number:ctx.number, date:ctx.date});
-      }catch(err){
-        const box = document.getElementById('inlineMsg');
-        box.querySelector('.text').textContent = `❌ تعذر التسجيل الآن. جرّب لاحقًا.`;
-        box.style.display = 'block';
-        console.error('Trimming save failed', err);
+      const link = document.querySelector('[data-nav="cow-card"]');
+      if (!link) return;
+      if (number){
+        link.href = 'cow-card.html?number=' + encodeURIComponent(number);
+        link.classList.remove('mbk-nav-link-disabled');
+      } else {
+        link.href = '#';
+        link.classList.add('mbk-nav-link-disabled');
       }
     }
 
-    function wireTrimming(){
-      $('#btnTrimming')?.addEventListener('click', e=>{
-        e.preventDefault();
-        saveTrimmingInline();
-      }, {passive:false});
-    }
+    (function(){
+      const $ = s=>document.querySelector(s);
+      const $$ = s=>document.querySelectorAll(s);
+      const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
+      const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
 
-    hydrate();
-    wireButtons();
-    wireTrimming();
-  })();
+      // ✅ نحول الأرقام العربية للاتينية "بدون ما نمسح الفواصل/الأسطر"
+      const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+      const toLatinKeepSep = (s)=> String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+      const toDigitsOnly = (s)=> String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d).replace(/[^\d]/g,'');
+
+      function hydrate(){
+        const qs = new URLSearchParams(location.search);
+        const rawDate = norm(qs.get('eventDate') || qs.get('date') || '');
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
+
+        const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
+        const one = toDigitsOnly(rawNum);
+
+        $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
+        if (!norm($('#eventDate').value)) $('#eventDate').value = date;
+
+        if (one){
+          $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${one}`;
+          $('#animalNumber').value = one;
+        }
+        updateCowCardNav(one || null);
+      }
+
+      function getCtx(){
+        const dtRaw = norm($('#eventDate').value) || todayISO();
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(dtRaw) ? dtRaw : todayISO();
+
+        const bulkOn = !!$('#ovBulkToggle')?.checked;
+        const bulkRaw = toLatinKeepSep(norm($('#ovBulkNumbers')?.value || ''));
+
+        const singleRaw = toDigitsOnly(norm($('#animalNumber')?.value || ''));
+
+        // ✅ لو جماعي مفعّل: لازم فيه على الأقل رقمين
+        if (bulkOn){
+          const list = bulkRaw
+            .split(/\n|,|،|;|؛|\s+/g)
+            .map(x=>toDigitsOnly(x))
+            .filter(Boolean);
+
+          if (list.length < 2){
+            $('#warn').textContent = '⚠️ اكتب رقمين على الأقل (كل رقم في سطر) لإدخال جماعي للتزامن.';
+            updateCowCardNav(null);
+            return null;
+          }
+          $('#warn').textContent = '';
+          updateCowCardNav(null);
+          return { mode:'group', bulk:list.join(','), date };
+        }
+
+        // ✅ فردي
+        if (!singleRaw){
+          $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
+          updateCowCardNav(null);
+          return null;
+        }
+        $('#warn').textContent = '';
+        updateCowCardNav(singleRaw);
+        return { mode:'single', number:singleRaw, date };
+      }
+
+      function buildUrl(page, ctx){
+        const u = new URL(page, location.href);
+
+        // ✅ إذا صفحة التزامن فقط: ندعم فردي/جماعي
+        const isOvs = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
+        if (isOvs && ctx.mode === 'group'){
+          u.searchParams.set('mbkMode','group');
+          u.searchParams.set('bulk', ctx.bulk);
+        } else {
+          const n = ctx.number || '';
+          u.searchParams.set('number', n);
+        }
+
+        u.searchParams.set('date', ctx.date);
+        u.searchParams.set('eventDate', ctx.date);
+        return u.toString();
+      }
+
+      function wireButtons(){
+        $$('#eventButtons .btn[data-page]').forEach(btn=>{
+          btn.addEventListener('click', (e)=>{
+            e.preventDefault();
+            const ctx = getCtx(); if(!ctx) return;
+            const target = btn.getAttribute('data-page');
+            if(target){ location.href = buildUrl(target, ctx); }
+          }, {passive:false}); // ✅ مهم
+        });
+      }
+
+      // ✅ UI: إظهار/إخفاء الإدخال الجماعي
+      function wireBulkUI(){
+        const t = $('#ovBulkToggle');
+        const box = $('#ovBulkNumbers');
+        const hint = $('#bulkHint');
+        if(!t || !box) return;
+
+        const apply = ()=>{
+          const on = !!t.checked;
+          box.style.display = on ? 'block' : 'none';
+          hint.style.display = on ? 'block' : 'none';
+          if (on){
+            // نخلي خانة الفردي ثانوية
+            $('#animalNumber').setAttribute('placeholder','(اختياري) رقم فردي — أو استخدم الإدخال الجماعي');
+          } else {
+            $('#animalNumber').setAttribute('placeholder','رقم الحيوان (فردي) أو اكتب رقم واحد هنا');
+          }
+        };
+        t.addEventListener('change', apply, {passive:true});
+        apply();
+      }
+
+      async function saveTrimmingInline(){
+        const ctx = getCtx(); if(!ctx) return;
+        // التقليم فردي فقط
+        if (ctx.mode !== 'single'){
+          $('#warn').textContent = '⚠️ تقليم الحوافر يُسجل لفرد واحد فقط.';
+          return;
+        }
+        try{
+          const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
+          if(typeof window.api?.post === 'function'){
+            await window.api.post('/api/events', payload);
+          }
+          const box = document.getElementById('inlineMsg');
+          box.querySelector('.text').textContent = `✅ تم تسجيل تقليم الحوافر للحيوان رقم ${ctx.number} بتاريخ ${ctx.date}.`;
+          box.style.display = 'block';
+          window.dataLayer.push({event:'event_saved', eventType:'trimming', number:ctx.number, date:ctx.date});
+        }catch(err){
+          const box = document.getElementById('inlineMsg');
+          box.querySelector('.text').textContent = `❌ تعذر التسجيل الآن. جرّب لاحقًا.`;
+          box.style.display = 'block';
+          console.error('Trimming save failed', err);
+        }
+      }
+
+      function wireTrimming(){
+        document.getElementById('btnTrimming')?.addEventListener('click', (e)=>{
+          e.preventDefault();
+          saveTrimmingInline();
+        }, {passive:false});
+      }
+
+      // تحديث زر بطاقة الحيوان أثناء الكتابة
+      const numInput = $('#animalNumber');
+      if (numInput){
+        numInput.addEventListener('input', ()=>{
+          const n = toDigitsOnly(norm(numInput.value));
+          updateCowCardNav(n || null);
+        }, {passive:true});
+      }
+
+      hydrate();
+      wireBulkUI();
+      wireButtons();
+      wireTrimming();
+    })();
   </script>
- <!-- شريط إبحار سفلي ثابت -->
-<nav class="mbk-bottom-nav">
-  <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
-  <a href="#" class="mbk-nav-link mbk-nav-link-disabled" data-nav="cow-card">🧾 بطاقة الحيوان</a>
-</nav>
-<script>
-(function(){
-  "use strict";
 
-  // ✅ التقط أي ضغط على زر/لينك التزامن
-  document.addEventListener("click", (e)=>{
-    const el = e.target.closest('a,button');
-    if (!el) return;
-
-    // زر التزامن: أي لينك يفتح ovsynch.html أو زر عليه data-go="ovsynch"
-    const href = (el.tagName === "A") ? (el.getAttribute("href") || "") : "";
-    const isOvsynch =
-      /ovsynch\.html/i.test(href) ||
-      (el.getAttribute("data-go") === "ovsynch") ||
-      (el.getAttribute("data-target") === "ovsynch");
-
-    if (!isOvsynch) return;
-
-    // ✅ خانة الرقم في add-event (جرّب أشهر ids + fallback لأي input رقمي)
-    const numEl =
-      document.getElementById("number") ||
-      document.getElementById("animalNumber") ||
-      document.getElementById("animalNumberUI") ||
-      document.querySelector('input[name="number"]') ||
-      document.querySelector('input[name="animalNumber"]') ||
-      document.querySelector('input[type="text"]');
-
-    // ✅ خانة التاريخ في add-event
-    const dateEl =
-      document.getElementById("date") ||
-      document.getElementById("eventDate") ||
-      document.querySelector('input[type="date"]');
-
-    const rawNums = String(numEl?.value || "").trim();
-    const dt = String(dateEl?.value || "").trim().slice(0,10);
-
-    // لو مفيش رقم أو تاريخ، سيب السلوك القديم
-    if (!rawNums || !dt) return;
-
-    // ✅ استخرج قائمة أرقام (يدعم: فاصلة/سطر جديد/؛)
-    const list = rawNums
-      .split(/\n|,|؛|;/g)
-      .map(s => String(s||"").trim())
-      .filter(Boolean);
-
-    // رقم واحد = فردي (سيب الرابط القديم)
-    if (list.length <= 1) return;
-
-    // ✅ جماعي: امنع السلوك القديم وافتح الرابط الجديد
-    e.preventDefault();
-    e.stopPropagation();
-
-    const bulk = encodeURIComponent(list.join(","));
-    const url = `ovsynch.html?mbkMode=group&date=${encodeURIComponent(dt)}&bulk=${bulk}`;
-    location.href = url;
-  }, true);
-})();
-</script>
-<script>
-// toggle bulk textarea (Ovsynch only)
-(function(){
-  const t = document.getElementById('ovBulkToggle');
-  const box = document.getElementById('ovBulkNumbers');
-  if(!t || !box) return;
-
-  const apply = ()=>{
-    const on = !!t.checked;
-    box.style.display = on ? 'block' : 'none';
-  };
-
-  t.addEventListener('change', apply);
-  apply();
-})();
-</script>
+  <nav class="mbk-bottom-nav">
+    <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
+    <a href="#" class="mbk-nav-link mbk-nav-link-disabled" data-nav="cow-card">🧾 بطاقة الحيوان</a>
+  </nav>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
