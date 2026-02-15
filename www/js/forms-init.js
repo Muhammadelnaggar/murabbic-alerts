@@ -679,7 +679,69 @@ form.dataset.mbkOvsynchAttached = "1";
       return false;
     }
 
-    if (eventName === "ولادة") {
+    
+    // ===============================
+    // ✅ Gate خاص بصفحة الشياع (حسب طلبك)
+    // - يمنع: عِشار + مستبعدة تناسليًا + غير موجودة (مغطاة بالـGate)
+    // - يسمح: باقي الحالات
+    // ===============================
+    if (eventName === "شياع") {
+      if (typeof guards?.heatDecision !== "function") {
+        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (heatDecision). حدّث الصفحة أو راجع form-rules.js", "error");
+        lockForm(true);
+        return false;
+      }
+
+      const uid = await getUid();
+      const sig = await fetchCalvingSignalsFromEvents(uid, n); // ✅ لاستخراج الحالة التناسلية من الأحداث إن وجدت
+
+      const doc = form.__mbkDoc || {};
+      const docSpecies = String(doc.species || doc.animalTypeAr || doc.animalType || "").trim();
+
+      let sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
+      if (/cow|بقر/i.test(sp)) sp = "أبقار";
+      if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+      const reproFromEvents = String(sig?.reproStatusFromEvents || "").trim();
+
+      const gateData = {
+        animalNumber: n,
+        eventDate: d,
+        animalId: form.__mbkAnimalId || "",
+        species: sp,
+        documentData: doc,
+        reproStatusFromEvents: reproFromEvents
+      };
+
+      const g = guards.heatDecision(gateData);
+
+      if (g) {
+        const raw = String(g || "");
+        if (raw.startsWith("OFFER_PREG|")) {
+          const cleaned = raw.replace(/^OFFER_PREG\|/, "");
+          showMsg(bar, cleaned, "error", [
+            {
+              label: "✅ تأكيد الحمل",
+              primary: true,
+              onClick: () => {
+                const url = `pregnancy-diagnosis.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+                location.href = url;
+              }
+            }
+          ]);
+        } else {
+          showMsg(bar, raw, "error");
+        }
+        lockForm(true);
+        return false;
+      }
+
+      showMsg(bar, "✅ تم التحقق — أكمل تسجيل الشياع.", "success");
+      lockForm(false);
+      return true;
+    }
+
+if (eventName === "ولادة") {
       if (typeof guards?.calvingDecision !== "function") {
         showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (calvingDecision). حدّث الصفحة أو راجع form-rules.js", "error");
         lockForm(true);
