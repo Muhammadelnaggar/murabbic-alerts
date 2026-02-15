@@ -1001,6 +1001,30 @@ if (eventName === "تجفيف") {
     }
 
     const formData = collectFormData(form);
+    // =======================
+// Murabbik — Insemination: force time slot (صباحًا/مساءً)
+// يقبل:
+// - "08:30" => صباحًا
+// - "16:10" => مساءً
+// - "صباح" / "مساء" => يحولها لصيغة موحدة
+// =======================
+if (eventName === "تلقيح") {
+  let t = String(formData.inseminationTime ?? "").trim();
+
+  // Normalize Arabic variants
+  if (t === "صباح" || t === "صباحا" || t === "صباحاً") t = "صباحًا";
+  if (t === "مساء" || t === "مساءا" || t === "مساءً") t = "مساءً";
+
+  // If user input is HH:MM => map to slot
+  const m = t.match(/^(\d{1,2})\s*:\s*(\d{2})/);
+  if (m) {
+    const hh = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
+    t = (hh < 12) ? "صباحًا" : "مساءً";
+  }
+
+  formData.inseminationTime = t;
+}
+
     // ✅ Dry-off: احفظ آخر تلقيح المحسوب من الـ Gate داخل payload
 if (eventName === "تجفيف" && form.__mbkDryOffLastAI && !formData.lastInseminationDate) {
   formData.lastInseminationDate = String(form.__mbkDryOffLastAI).slice(0,10);
