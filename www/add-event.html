@@ -218,10 +218,29 @@ function ctxOrWarn(){
 
   function buildUrl(page, ctx){
   const u = new URL(page, location.href);
-  u.searchParams.set('number', ctx.number);
-  // دعم الصفحتين: الولادة كانت تقرأ "date"، والتلقيح تقرأ "eventDate"
+
+  // ✅ لو صفحة التزامن (ovysynch) وجاي أكتر من رقم: مرّرها كـ bulk بدل number
+  const isOvsynch = /ovysynch/i.test(String(page));
+  const rawNum = String(ctx.number || "").trim();
+  const hasMulti = /[\s،,;]+/.test(rawNum);
+
+  if (isOvsynch && hasMulti){
+    // نقبل: مسافات / أسطر / فاصلة عربية / فاصلة إنجليزية
+    const cleaned = rawNum
+      .replace(/[\r\n]+/g, " ")
+      .replace(/[،,;]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    u.searchParams.set('bulk', cleaned);   // ✅ ستتحول لأسطر داخل ovysynch
+    u.searchParams.set('mode', 'group');
+  }else{
+    u.searchParams.set('number', rawNum);
+  }
+
+  // دعم مفاتيح التاريخ
   u.searchParams.set('date', ctx.date);
   u.searchParams.set('eventDate', ctx.date);
+
   return u.toString();
 }
 
@@ -292,7 +311,7 @@ if (numInput){
     // زر التزامن: أي لينك يفتح ovsynch.html أو زر عليه data-go="ovsynch"
     const href = (el.tagName === "A") ? (el.getAttribute("href") || "") : "";
     const isOvsynch =
-      /ovysynch\.html/i.test(href) ||
+      /ovsynch\.html/i.test(href) ||
       (el.getAttribute("data-go") === "ovsynch") ||
       (el.getAttribute("data-target") === "ovsynch");
 
@@ -341,7 +360,6 @@ if (numInput){
 
 </body>
 </html>
-
 
 
 
