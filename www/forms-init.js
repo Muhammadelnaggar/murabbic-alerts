@@ -854,6 +854,53 @@ form.dataset.mbkOvsynchAttached = "1";
   return false;
 }
 }
+    // ✅ Gate خاص لحدث "شياع"
+if (eventName === "شياع") {
+
+  const uidH = await getUid();
+  const sigH = await fetchCalvingSignalsFromEvents(uidH, n);
+
+  const docH = form.__mbkDoc || {};
+  const docSpeciesH = String(docH.species || docH.animalTypeAr || "").trim();
+
+  let spH = String(getFieldEl(form, "species")?.value || "").trim() || docSpeciesH;
+  if (/cow|بقر/i.test(spH)) spH = "أبقار";
+  if (/buffalo|جاموس/i.test(spH)) spH = "جاموس";
+
+  const reproFromEventsH = String(sigH.reproStatusFromEvents || "").trim();
+  const reproFromDocH = String(docH.reproductiveStatus || "").trim();
+
+  const gateDataH = {
+    animalNumber: n,
+    eventDate: d,
+    species: spH,
+    documentData: docH,
+    reproStatusFromEvents: reproFromEventsH || reproFromDocH
+  };
+
+  const gH = guards.heatDecision(gateDataH);
+
+  if (gH) {
+
+    if (gH.action === "confirmPregnancy") {
+      showMsg(bar, gH.msg, "error", [
+        {
+          label: "تأكيد الحمل",
+          primary: true,
+          onClick: () => {
+            location.href = `/pregnancy-diagnosis.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+          }
+        }
+      ]);
+    } else {
+      showMsg(bar, gH.msg, "error");
+    }
+
+    lockForm(true);
+    return false;
+  }
+}
+
         // ✅ Gate خاص لحدث "تحضير للولادة" قبل فتح النموذج
     if (eventName === "تحضير للولادة") {
       if (typeof guards?.closeupDecision !== "function") {
