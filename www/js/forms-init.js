@@ -4,7 +4,7 @@
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
-import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers, guards } from "./form-rules.js";
+import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers, guards, recentHeatCheck } from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
@@ -1071,6 +1071,19 @@ if (eventName === "لبن يومي") {
         }
       }
     }
+    // ✅ (شياع) منع تكرار التسجيل خلال 3 أيام
+if (eventName === "شياع") {
+  const uid = await getUid();
+  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
+
+  const dupMsg = await recentHeatCheck(uid, num, dt, 3);
+  if (dupMsg) {
+    showMsg(bar, dupMsg, "error");
+    return; // ⛔ وقف الحفظ
+  }
+}
+
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
