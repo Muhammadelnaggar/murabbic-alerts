@@ -309,6 +309,7 @@ async function calcDaysSinceLastHeatOrAI(){
           notes: String(fd.notes || "").trim(),
           reproductiveStatusSnapshot: String(fd.reproductiveStatusSnapshot || "").trim(),
           dimAtEvent: (fd.dimAtEvent === "" ? null : (Number(fd.dimAtEvent) || null)),
+          daysSinceLastHeatOrAI: Number(document.getElementById("daysSinceLastHeatOrAI")?.value) || null,
           userId: uid,
           source: "/heat.html",
           createdAt: serverTimestamp()
