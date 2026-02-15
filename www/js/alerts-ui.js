@@ -5,7 +5,7 @@
 (function(){
   'use strict';
   if (!window.mbk) window.mbk = {};
-  if (window.mbk.alertsUI) return; //منع تحميل مزدوج
+  if (window.mbk.alertsUI) return; // منع تحميل مزدوج
 
   const LS_SEEN_PREFIX = 'mbk_alert_seen__';
   const LS_SNOOZE_PREFIX = 'mbk_alert_snooze__';
@@ -262,10 +262,7 @@
       <div class="mbk-alert__actions">
         <button class="mbk-btn primary" data-act="ok">حسنًا</button>
         <button class="mbk-btn ghost" data-act="snooze">تأجيل 30د</button>
-       ${(payload?.ruleId === 'protocol_step_due' && (payload?.actionUrl || payload?.stepIndex !== undefined))
-  ? `<button class="mbk-btn ghost" data-act="open">تسجيل الخطوة الآن</button>`
-  : ``}
-
+        ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">تسجيل الإن</button>` : ``}
       </div>
     `;
 
@@ -285,23 +282,12 @@
     el.querySelector('[data-act="ok"]')?.addEventListener('click', ()=> kill(true));
     el.querySelector('[data-act="snooze"]')?.addEventListener('click', ()=>{ setSnooze(key, 30); kill(false); });
 
-   el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
-  try{
-    // ✅ فتح التسجيل فقط في "يوم الخطوة"
-    if (payload?.ruleId !== 'protocol_step_due') { kill(true); return; }
-
-    let url = payload.actionUrl;
-
-    // ✅ لو مفيش actionUrl لكن فيه stepIndex ابنِ الرابط
-    if (!url && payload.stepIndex !== undefined) {
-      url = `ovsynch.html?step=${payload.stepIndex}`;
-    }
-
-    if (url) location.href = url;
-  }catch{}
-  kill(true);
-});
-
+    el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
+      try{
+        if (payload.actionUrl) location.href = payload.actionUrl;
+      }catch{}
+      kill(true);
+    });
 
     stack.prepend(el);
     setTimeout(()=> el.classList.add('show'), 20);
@@ -312,11 +298,32 @@
   }
 
   function show(payload){
+    // ✅ تجاهل أي تنبيه لخطوة مكتملة (done) — حتى لو وصل من مصدر قديم
+    try{
+      const st = String(payload?.status || '').toLowerCase();
+      if (st === 'done' || st === 'completed') return;
+      if (payload?.done === true) return;
+      // بعض المصادر القديمة ترسل type=protocol_step ومعها status=done
+      if (String(payload?.type||'').toLowerCase() === 'protocol_step' && st === 'done') return;
+    }catch(e){}
+
     // Aggregation للبروتوكول
     if (shouldAggregate(payload)){
       const k = aggKey(payload);
       const rec = agg.get(k) || { payload0: payload, animals: new Set(), timer:null };
-      const an = (payload?.animalId || payload?.animalNumber || '').trim();
+      // اجمع أرقام الحيوانات من كل المصادر الممكنة
+      const candidates = [];
+      const a1 = (payload?.animalNumber || payload?.animalId || '').trim();
+      if (a1) candidates.push(a1);
+      const list = payload?.animals || payload?.animalNumbers || payload?.numbers || null;
+      if (Array.isArray(list)) list.forEach(x=>{ const s=String(x||'').trim(); if (s) candidates.push(s); });
+      const csv = (payload?.bulk || payload?.list || '').trim();
+      if (csv) csv.split(/[\s،,;\r\n]+/).forEach(x=>{ const s=String(x||'').trim(); if (s) candidates.push(s); });
+
+      candidates.forEach(an=>{
+        if (an) rec.animals.add(an);
+      });
+
       if (an) rec.animals.add(an);
 
       // خزن آخر نسخة payload كـ base
