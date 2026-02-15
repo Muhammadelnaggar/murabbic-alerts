@@ -756,9 +756,7 @@ ovsynchEligibilityDecision(fd) {
   }
 
   return null;
-
-}
-
+},
 heatDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
