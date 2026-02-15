@@ -403,7 +403,10 @@ let fbReady = !!fbDb && !!fbAuth;
     if (meta?.protocolProgram) programEl.value = String(meta.protocolProgram);
     if (meta?.protocolStartDate) startDateEl.value = String(meta.protocolStartDate).slice(0,10);
 
-   
+    programEl.disabled = true;
+    startDateEl.disabled = true;
+    startTimeEl.disabled = true;
+
     updateSteps();
 
     // ✅ املأ القائمة تلقائيًا (قابلة للتعديل — B)
@@ -496,9 +499,10 @@ function syncCentral(){
 
   // ✅ لازم دايمًا يبقى فيه animalNumber “ممثل” (أول رقم) عشان forms-init ما يقفلش
   animalHidden.value = (list[0] || "");
-  try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
-try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
 
+  // ✅ إطلاق event للـ Gate المركزي (يفك تعطيل الحقول في وضع الجماعي)
+  try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
+  try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
 
   // ✅ الجديد: القائمة كلها
   const animalNumbersHidden = document.getElementById("animalNumbers");
@@ -530,34 +534,41 @@ try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
     const saved = (localStorage.getItem("mbk_ov_mode") || "single");
     setMode(m === "group" ? "group" : saved);
 
-    const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
-    const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
-    const bulk = (qp.get("bulk") || "").trim();
-
-if (bulk) {
-  // 1️⃣ نحول الصفحة لجماعي
+    
+const bulkRaw = (qp.get("bulk") || qp.get("numbers") || qp.get("list") || "").trim();
+if (bulkRaw){
+  // لو جاي من صفحة الأحداث كقائمة أرقام: افتح وضع جماعي واملأ الـ textarea
   setMode("group");
-
-  // 2️⃣ نفك ترميز الرابط
-  const decoded = decodeURIComponent(bulk);
-
-  // 3️⃣ نملأ textarea
-  bulkEl.value = decoded.split(",").join("\n");
-
-  // 4️⃣ نحط أول رقم كممثل للـ Gate
-  const first = decoded.split(",")[0]?.trim() || "";
-  animalHidden.value = first;
-
-  // 5️⃣ نشغل events عشان forms-init يفتح الحقول
-  try { animalHidden.dispatchEvent(new Event('input', { bubbles:true })); } catch {}
-  try { animalHidden.dispatchEvent(new Event('change', { bubbles:true })); } catch {}
-
-  // 6️⃣ نشغل preview وتنظيف
-  syncCentral();
+  try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
+  if (bulkEl){
+    // نقبل فواصل/مسافات/أسطر/فاصلة عربية
+    const cleaned = bulkRaw
+      .replace(/[،;,]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
+    bulkEl.value = arr.join("\n");
+  }
 }
 
+    const num = (qp.get("number") || qp.get("animalNumber") || "").trim();
+    const dt  = (qp.get("date") || qp.get("eventDate") || "").trim();
 
-    if (num) animalUI.value = num;
+    
+if (num){
+  // لو المستخدم لصق أكتر من رقم في خانة الفردي، اعتبره جماعي تلقائيًا
+  const multi = /[\s،,;\n]/.test(num);
+  if (multi){
+    setMode("group");
+    try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
+    const cleaned = num.replace(/[،,;]+/g," ").replace(/\s+/g," ").trim();
+    const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
+    if (bulkEl) bulkEl.value = arr.join("\n");
+    animalUI.value = ""; // ما تخليش الفردي يطلع أنه فردي
+  }else{
+    animalUI.value = num;
+  }
+}
     if (dt)  startDateEl.value = dt || todayISO();
 
     syncCentral();
