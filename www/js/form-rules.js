@@ -236,6 +236,17 @@ export const eventSchemas = {
   },
   guards: ["ovsynchEligibilityDecision"]
 },
+ "شياع": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ الشياع غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان." },
+
+    intensity: { required: false, msg: "شدة الشياع غير صالحة." },
+    notes: { required: false }
+  },
+  guards: ["heatDecision"]
+},
 };
 
 // ===================================================================
@@ -474,6 +485,29 @@ inseminationDecision(fd) {
 
   return null;
 },
+heatDecision(fd) {
+  const d = fd.documentData;
+  if (!d) return "تعذّر قراءة بيانات الحيوان.";
+
+  const st = String(d.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ الحيوان خارج القطيع.";
+
+  const rsRaw = String(fd.reproStatusFromEvents || d.reproductiveStatus || "").trim();
+  const cat = reproCategory(rsRaw);
+
+  if (d.breedingBlocked === true || cat === "blocked") return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
+  if (cat === "pregnant") return "❌ الحيوان عِشار ولا يمكن تسجيل شياع.";
+  if (cat === "inseminated") return "❌ الحيوان مُلقّح بالفعل ولا يمكن تسجيل شياع.";
+
+  // ✅ المسموح فقط: مفتوحة
+  if (cat !== "open") {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تسجيل شياع — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  return null;
+},
+
 
 pregnancyDiagnosisDecision(fd) {
   const doc = fd.documentData;
