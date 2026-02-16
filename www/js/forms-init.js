@@ -192,6 +192,69 @@ function daysBetweenISO(a, b){
   d1.setHours(0,0,0,0); d2.setHours(0,0,0,0);
   return Math.round((d2 - d1) / 86400000);
 }
+// ✅ Heat duplicate guard: يمنع تسجيل "شياع" لنفس الرقم خلال 72 ساعة (3 أيام)
+async function checkHeatDuplicate72h(uid, animalNumber, eventDateISO){
+  try{
+    const num = String(animalNumber || "").trim();
+    const dt  = String(eventDateISO || "").slice(0,10);
+    if (!uid || !num || !dt) return null;
+
+    // نجيب آخر 120 حدث للحيوان (بدون orderBy عشان ما نحتاجش index)
+    const qx = query(
+      collection(db, "events"),
+      where("userId", "==", uid),
+      where("animalNumber", "==", num),
+      limit(120)
+    );
+
+    const snap = await getDocs(qx);
+    if (snap.empty) return null;
+
+    // تاريخ التسجيل الحالي
+    const cur = new Date(dt);
+    cur.setHours(0,0,0,0);
+
+    // ابحث عن أحدث "شياع" قبل/نفس التاريخ الحالي
+    let bestDate = "";
+    let bestDiffDays = 999999;
+
+    snap.forEach(ds=>{
+      const ev = ds.data() || {};
+      const t  = String(ev.eventType || ev.type || "").trim();
+      if (t !== "شياع") return;
+
+      const d = String(ev.eventDate || "").slice(0,10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+
+      const last = new Date(d);
+      last.setHours(0,0,0,0);
+
+      const diffDays = Math.floor((cur - last) / 86400000); // أيام
+      if (diffDays < 0) return; // حدث في المستقبل بالنسبة للتاريخ الحالي
+
+      if (diffDays < bestDiffDays){
+        bestDiffDays = diffDays;
+        bestDate = d;
+      }
+    });
+
+    if (!bestDate) return null;
+
+    // ✅ 72 ساعة = 3 أيام
+    if (bestDiffDays <= 2){ // 0,1,2 أيام = أقل من 72 ساعة
+      if (bestDiffDays === 0){
+        return `❌ تم تسجيل شياع للحيوان رقم ${num} في نفس اليوم (${dt}).`;
+      }
+      return `❌ تم تسجيل شياع للحيوان رقم ${num} بتاريخ ${bestDate}. لا يمكن إعادة التسجيل قبل مرور 72 ساعة.`;
+    }
+
+    return null;
+  }catch(e){
+    // هنا نخليها "Strict" عشان ما يعدّيش تكرار بسبب خطأ قراءة
+    return "⚠️ تعذّر التحقق من تكرار الشياع الآن (اتصال/قراءة). أعد المحاولة بعد لحظات.";
+  }
+}
+
 function mbkOvsynchIgnoreFreshRule(){
   try{
     // 1 = تجاهل قاعدة حديث الولادة / ما بعد الولادة
@@ -986,6 +1049,20 @@ if (eventName === "تجفيف") {
       lockForm(true);
       return false;
     }
+// ✅ (شياع) منع التكرار خلال 72 ساعة قبل أي حفظ
+if (eventName === "شياع") {
+  const uid = await getUid();
+  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
+
+  const dupMsg = await checkHeatDuplicate72h(uid, num, dt);
+  if (dupMsg) {
+    clearFieldErrors(form);
+    showMsg(bar, dupMsg, "error");
+    lockForm(false);
+    return false; // ⛔ امنع إطلاق mbk:valid وبالتالي لن يتم الحفظ
+  }
+}
 
     const formData = collectFormData(form);
     // ✅ Dry-off: احفظ آخر تلقيح المحسوب من الـ Gate داخل payload
@@ -1071,32 +1148,7 @@ if (eventName === "لبن يومي") {
         }
       }
     }
-    // ✅ (شياع) منع تكرار التسجيل خلال 3 أيام
-if (eventName === "شياع") {
-  const uid = await getUid();
-  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
-  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
-
-  const dupMsg = await recentHeatCheck(uid, num, dt, 3);
-  if (dupMsg) {
-    showMsg(bar, dupMsg, "error");
-    return; // ⛔ وقف الحفظ
-  }
-}
-    // ✅ منع تكرار الشياع خلال 3 أيام
-if (eventName === "شياع") {
-  const uid = await getUid();
-  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
-  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
-
-  const dupMsg = await recentHeatCheck(uid, num, dt, 3);
-  if (dupMsg) {
-    clearFieldErrors(form);
-    showMsg(bar, dupMsg, "error");
-    lockForm(false);
-    return false;
-  }
-}
+   
 
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
