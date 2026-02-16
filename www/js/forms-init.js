@@ -1185,22 +1185,33 @@ if (eventName === "تجفيف") {
   }
 
   async function runFullValidationAndDispatch() {
-    const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+    const rawNum = String(getFieldEl(form, "animalNumber")?.value || "");
+const n = normalizeDigits(rawNum);
     const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
+// ✅ Heat Bulk submit: لو فيه أكتر من رقم → ممنوع نفحص existence كرقم واحد
+const latin2 = (s)=> String(s||"").replace(/[٠-٩۰-۹]/g, ch => ({
+  '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+  '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+}[ch]||ch));
+
+const numsBulk = [...new Set((latin2(rawNum).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
+const isHeatBulk = (eventName === "شياع" && numsBulk.length > 1);
 
     if (!n || !d) {
       showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
       lockForm(true);
       return false;
     }
-
-    const okAnimal = await ensureAnimalExistsGate(form, bar);
-    if (!okAnimal) {
-      lockForm(true);
-      return false;
-    }
+   // ✅ في الشياع الجماعي: لا تعمل ensureAnimalExistsGate لأنه يحوّل "33,34" إلى "3334"
+if (!isHeatBulk) {
+  const okAnimal = await ensureAnimalExistsGate(form, bar);
+  if (!okAnimal) {
+    lockForm(true);
+    return false;
+  }
+}
 // ✅ (شياع) منع التكرار خلال 72 ساعة قبل أي حفظ
-if (eventName === "شياع") {
+if (eventName === "شياع" && !isHeatBulk) {
   const uid = await getUid();
   const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
   const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
