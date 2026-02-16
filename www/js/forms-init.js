@@ -206,6 +206,38 @@ function normalizeDigits(number) {
     .replace(/[٠-٩۰-۹]/g, (d) => map[d]);
 }
 
+
+function parseNumberList(raw){
+  // يقبل: 215 أو 215,216 أو 215 216 أو أسطر متعددة
+  const s = String(raw || "").trim();
+  if (!s) return [];
+  const parts = s.split(/[\s,،;]+/g).map(x=>normalizeDigits(x)).filter(Boolean);
+  const out = [];
+  const seen = new Set();
+  for (const n of parts){
+    if (!seen.has(n)){
+      seen.add(n);
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+function calcDIM(doc, eventDateISO){
+  try{
+    const calv = String(doc?.lastCalvingDate || "").slice(0,10);
+    const d = String(eventDateISO || "").slice(0,10);
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(calv)) return "";
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)) return "";
+    const diff = daysBetweenISO(calv, d);
+    if (!Number.isFinite(diff)) return "";
+    return String(Math.max(0, diff));
+  }catch(_){
+    return "";
+  }
+}
+
+
 function stripTashkeel(s) {
   return String(s || "")
     .replace(/\s+/g, "")
@@ -651,104 +683,6 @@ return { ok:true, valid, rejected, message };
 window.mbk = window.mbk || {};
 window.mbk.previewOvsynchList = previewOvsynchList;
 
-// ======================================================
-// ✅ Murabbik Central: Heat Bulk Preview (72h + Eligibility)
-// - نفس Gate الشياع الفردي (heatDecision)
-// - + منع التكرار خلال 72 ساعة (قبل الحفظ)
-// ======================================================
-async function previewHeatList(numbers = [], eventDate = "") {
-  const uid = await getUid();
-  const dt = String(eventDate || "").trim().slice(0,10);
-
-  if (!uid) {
-    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ لم يتم تأكيد الدخول." }] };
-  }
-  if (!dt) {
-    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ اختر تاريخ الشياع أولًا." }] };
-  }
-  if (typeof guards?.heatDecision !== "function") {
-    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ تعذّر تحميل قواعد الشياع (heatDecision)." }] };
-  }
-
-  const clean = Array.isArray(numbers) ? numbers.map(normalizeDigits).filter(Boolean) : [];
-  const uniq  = [...new Set(clean)];
-
-  const valid = [];
-  const rejected = [];
-
-  function normSpeciesFromDoc(doc){
-    let sp = String(doc?.species || doc?.animalTypeAr || doc?.animalType || doc?.animaltype || doc?.type || "").trim();
-    if (/cow|بقر/i.test(sp)) sp = "أبقار";
-    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-    return sp || "أبقار";
-  }
-  function animalLabelFromDoc(doc){
-    const sp = normSpeciesFromDoc(doc);
-    return (sp === "جاموس") ? "الجاموسة" : "البقرة";
-  }
-
-  for (const num of uniq) {
-    const animal = await fetchAnimalByNumberForUser(uid, num);
-    if (!animal) {
-      rejected.push({ number:num, reason:`❌ الحيوان رقم ${num}: غير موجود في القطيع/حسابك.` });
-      continue;
-    }
-
-    const doc = animal.data || {};
-    const animalLabel = animalLabelFromDoc(doc);
-
-    // ✅ status: inactive ممنوع
-    const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
-      rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: خارج القطيع (inactive).` });
-      continue;
-    }
-
-    // ✅ heatDecision (لا يمنع “ملقحة” — يمنع فقط: مستبعدة/غير نشطة/عشار... إلخ حسب القواعد)
-    const gateData = {
-      animalNumber: num,
-      eventDate: dt,
-      animalId: String(animal.id || ""),
-      species: normSpeciesFromDoc(doc),
-      documentData: doc,
-      reproStatusFromEvents: ""
-    };
-
-    const g = guards.heatDecision(gateData);
-    if (g) {
-      const raw = String(g || "");
-      const msg = raw.replace(/^OFFER_PREG\|/, "");
-      rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: ${msg.replace(/^❌\s*/, "")}` });
-      continue;
-    }
-
-    // ✅ 72h duplicate
-    const dup = await checkHeatDuplicate72h(uid, num, dt);
-    if (dup) {
-      rejected.push({ number:num, reason: dup });
-      continue;
-    }
-
-    valid.push(num);
-  }
-
-  const accepted = valid.length;
-  const refused  = rejected.length;
-
-  const message =
-    "🔎 تم فحص القائمة\n" +
-    `✅ مقبول: ${accepted}\n` +
-    `🚫 مرفوض: ${refused}` +
-    (refused ? ("\n\n" + rejected.map(r => String(r.reason||"")).join("\n")) : "");
-
-  return { ok:true, valid, rejected, message };
-}
-
-// ✅ متاحة للصفحات
-window.mbk = window.mbk || {};
-window.mbk.previewHeatList = previewHeatList;
-
-
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
   form.__mbkAnimalId = animal?.id || "";
@@ -768,6 +702,7 @@ function applyAnimalToForm(form, animal) {
   if (lastAIEl && lastAI && !lastAIEl.value) lastAIEl.value = lastAI;
 }
 
+
 async function ensureAnimalExistsGate(form, bar) {
   if (!localStorage.getItem("userId") && !auth?.currentUser) {
     showMsg(bar, "سجّل الدخول أولًا.", "error");
@@ -776,7 +711,11 @@ async function ensureAnimalExistsGate(form, bar) {
 
   const uid = await getUid();
   const numEl = getFieldEl(form, "animalNumber");
-  const n = normalizeDigits(numEl?.value || "");
+  const raw = String(numEl?.value || "").trim();
+  const nums = parseNumberList(raw);
+
+  const eventName = String(form.getAttribute("data-event") || "").trim();
+  const dateISO = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
 
   const ALLOW = ["animalNumber", "eventDate"];
 
@@ -788,7 +727,7 @@ async function ensureAnimalExistsGate(form, bar) {
     return false;
   }
 
-  if (!n) {
+  if (!nums.length) {
     applyAnimalToForm(form, null);
     bar.style.display = "none";
     form.dataset.animalOk = "0";
@@ -796,8 +735,74 @@ async function ensureAnimalExistsGate(form, bar) {
     return false;
   }
 
-  if (form.__mbkLastCheckedNumber === n && form.dataset.animalOk === "1") {
+  // ===================== HEAT: Bulk + 72h check in Gate =====================
+  if (eventName === "شياع" && nums.length > 1) {
+    form.dataset.animalOk = "0";
+    applyAnimalToForm(form, null);
+    form.__mbkHeatBulk = [];
+    form.__mbkHeatDocs = {};
+    showMsg(bar, "جارِ التحقق من الأرقام (جماعي)…", "info");
+    setFormInputsDisabled(form, true, ALLOW);
+
+    const ok = [];
+    const docsMap = {};
+    const blocked = [];
+
+    for (const n of nums) {
+      const animal = await fetchAnimalByNumberForUser(uid, n);
+      if (!animal) {
+        blocked.push(`${n}: غير موجود`);
+        continue;
+      }
+      const st = String(animal.data?.status ?? "").trim().toLowerCase();
+      if (st === "inactive") {
+        blocked.push(`${n}: خارج القطيع`);
+        continue;
+      }
+
+      // ✅ منع التكرار 72h قبل ما نكمل (حفاظًا على وقت المستخدم)
+      if (dateISO) {
+        const dupMsg = await checkHeatDuplicate72h(uid, n, dateISO);
+        if (dupMsg) {
+          blocked.push(`${n}: تكرار 72 ساعة`);
+          continue;
+        }
+      }
+
+      ok.push(n);
+      docsMap[n] = animal;
+    }
+
+    if (!ok.length) {
+      showMsg(bar, `❌ لا يوجد أي رقم صالح للتسجيل. (${blocked.join(" — ")})`, "error");
+      form.dataset.animalOk = "0";
+      setFormInputsDisabled(form, true, ALLOW);
+      return false;
+    }
+
+    form.__mbkHeatBulk = ok;
+    form.__mbkHeatDocs = docsMap;
+
+    const msgOk = `✅ جاهز للتسجيل (جماعي): ${ok.length} رقم`;
+    const msgBlk = blocked.length ? ` — تم استبعاد: ${blocked.length}` : "";
+    showMsg(bar, msgOk + msgBlk, "ok");
+
+    // في الجماعي: لا يوجد Doc واحد للفورم
+    form.__mbkDoc = null;
+    form.__mbkSig = null;
+    form.dataset.animalOk = "1";
+    setFormInputsDisabled(form, false, ALLOW);
     return true;
+  }
+
+  // ===================== Single number (default) =====================
+  const n = nums[0];
+
+  // Cache: نفس الرقم اتأكد قبل كده
+  if (form.__mbkLastCheckedNumber === n && form.dataset.animalOk === "1") {
+    // ✅ في الشياع: لو اتغير التاريخ، لازم نعيد فحص 72 ساعة
+    if (eventName !== "شياع") return true;
+    if (String(form.__mbkLastHeatDateChecked || "") === String(dateISO || "")) return true;
   }
 
   form.__mbkLastCheckedNumber = n;
@@ -823,11 +828,26 @@ async function ensureAnimalExistsGate(form, bar) {
     return false;
   }
 
+  // ✅ Heat: 72h check in Gate (قبل ملء النموذج)
+  if (eventName === "شياع" && dateISO) {
+    const dupMsg = await checkHeatDuplicate72h(uid, n, dateISO);
+    form.__mbkLastHeatDateChecked = dateISO;
+    if (dupMsg) {
+      showMsg(bar, dupMsg, "error");
+      form.dataset.animalOk = "0";
+      setFormInputsDisabled(form, true, ALLOW);
+      return false;
+    }
+  }
+
   applyAnimalToForm(form, animal);
+  form.__mbkHeatBulk = [];
+  form.__mbkHeatDocs = {};
   form.dataset.animalOk = "1";
   setFormInputsDisabled(form, false, ALLOW);
   return true;
 }
+
 
 /* ===================== Attach ===================== */
 function attachOne(form) {
@@ -850,15 +870,17 @@ form.dataset.mbkOvsynchAttached = "1";
   lockForm(true);
 
   async function runGateOnly() {
-    const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+    const raw = String(getFieldEl(form, "animalNumber")?.value || "").trim();
+    const nums = parseNumberList(raw);
     const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
     clearFieldErrors(form);
 
-    if (!n || !d) {
+    if (!nums.length || !d) {
       bar.style.display = "none";
       lockForm(true);
       return false;
     }
+
 
     const okAnimal = await ensureAnimalExistsGate(form, bar);
     if (!okAnimal) {
@@ -919,15 +941,6 @@ form.dataset.mbkOvsynchAttached = "1";
         } else {
           showMsg(bar, raw, "error");
         }
-        lockForm(true);
-        return false;
-      }
-
-
-      // ✅ منع تكرار الشياع خلال 72 ساعة (Gate مبكرًا قبل ما المستخدم يكمّل النموذج)
-      const dupMsg = await checkHeatDuplicate72h(uid, n, d);
-      if (dupMsg) {
-        showMsg(bar, dupMsg, "error");
         lockForm(true);
         return false;
       }
@@ -1168,10 +1181,11 @@ if (eventName === "تجفيف") {
   }
 
   async function runFullValidationAndDispatch() {
-    const n = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+    const raw = String(getFieldEl(form, "animalNumber")?.value || "").trim();
+    const nums = parseNumberList(raw);
     const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
 
-    if (!n || !d) {
+    if (!nums.length || !d) {
       showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
       lockForm(true);
       return false;
@@ -1182,128 +1196,99 @@ if (eventName === "تجفيف") {
       lockForm(true);
       return false;
     }
-// ✅ (شياع) منع التكرار خلال 72 ساعة قبل أي حفظ
-if (eventName === "شياع") {
-  const uid = await getUid();
-  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
-  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
 
-  const dupMsg = await checkHeatDuplicate72h(uid, num, dt);
-  if (dupMsg) {
-    clearFieldErrors(form);
-    showMsg(bar, dupMsg, "error");
-    lockForm(false);
-    return false; // ⛔ امنع إطلاق mbk:valid وبالتالي لن يتم الحفظ
-  }
-}
+    // ✅ Base form data (غير شامل documentData)
+    const base = collectFormData(form);
+    base.eventDate = String(d).slice(0,10);
 
-    const formData = collectFormData(form);
-    // ✅ Dry-off: احفظ آخر تلقيح المحسوب من الـ Gate داخل payload
-if (eventName === "تجفيف" && form.__mbkDryOffLastAI && !formData.lastInseminationDate) {
-  formData.lastInseminationDate = String(form.__mbkDryOffLastAI).slice(0,10);
-}
-
-    // =======================
-// Murabbik — Daily Milk: force numeric fields
-// =======================
-if (eventName === "لبن يومي") {
-  ["milkS1","milkS2","milkS3"].forEach(k => {
-    if (!(k in formData)) return;
-    const v = String(formData[k] ?? "").trim();
-    formData[k] = v === "" ? "" : Number(v);
-  });
-}
-
-    formData.documentData = form.__mbkDoc || null;
-    if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
-    
-        // ✅ Auto-calc للإجهاض: يحسب عمر الإجهاض + السبب من آخر تلقيح (من الوثيقة)
-    if (eventName === "إجهاض") {
-      const doc = formData.documentData || {};
-      const lastAI = String(formData.lastInseminationDate || doc.lastInseminationDate || "").slice(0,10);
-      const evDate = String(formData.eventDate || "").slice(0,10);
-
-      formData.lastInseminationDate = lastAI;
-      if (!formData.species) formData.species = String(doc.species || doc.animalTypeAr || "").trim();
-
-      let months = "";
-      let cause = "";
-
-      if (lastAI && evDate) {
-        const d1 = new Date(lastAI);
-        const d2 = new Date(evDate);
-        if (!Number.isNaN(d1.getTime()) && !Number.isNaN(d2.getTime())) {
-          const m = Math.max(0, (d2 - d1) / (1000*60*60*24*30.44));
-          months = Number.isFinite(m) ? Number(m.toFixed(1)) : "";
-          cause = (months !== "" && months >= 6) ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
-        }
-      }
-
-      formData.abortionAgeMonths = months;
-      formData.probableCause = cause;
-
-      // ✅ اكتبهم في الحقول (بدون ما يعتمد على سكربت الصفحة)
-      const ageEl = document.getElementById("abortionAgeMonths");
-      const causeEl = document.getElementById("probableCause");
-      if (ageEl) ageEl.value = months === "" ? "" : String(months);
-      if (causeEl) causeEl.value = cause || "";
-    }
-
-    if (eventName === "ولادة") {
+    // ===================== HEAT: Bulk validation per-animal =====================
+    if (eventName === "شياع" && Array.isArray(form.__mbkHeatBulk) && form.__mbkHeatBulk.length > 1) {
       const uid = await getUid();
-      const kind = String(formData.calvingKind || "").trim();
+      const okList = form.__mbkHeatBulk.slice();
+      const docsMap = form.__mbkHeatDocs || {};
 
-      if (kind !== "نافقة") {
-        const count = parseInt(String(formData.calfCount || "1"), 10) || 1;
+      const bulkEvents = [];
 
-        const calfNums = [
-          String(formData.calfId || "").trim(),
-          count >= 2 ? String(formData.calf2Id || "").trim() : "",
-          count >= 3 ? String(formData.calf3Id || "").trim() : ""
-        ].filter(Boolean);
+      for (const num of okList) {
+        const a = docsMap[num];
+        const docData = a?.data || null;
 
-        if (calfNums.length) {
-          try {
-            const chk = await uniqueCalfNumbers({ userId: uid, calfNumbers: calfNums });
-            if (!chk || chk.ok === false) {
-              clearFieldErrors(form);
-              showMsg(bar, (chk && chk.msg) ? chk.msg : "⚠️ رقم عجل مكرر في حسابك.", "error");
-              lockForm(false);
-              return false;
-            }
-          } catch (err) {
-            console.error("uniqueCalfNumbers failed:", err);
-            clearFieldErrors(form);
-            showMsg(bar, "تعذّر التحقق من تكرار أرقام العجول الآن. جرّب مرة أخرى.", "error");
-            lockForm(false);
+        if (!docData) {
+          showMsg(bar, `❌ تعذّر قراءة بيانات الحيوان رقم ${num}.`, "error");
+          return false;
+        }
+
+        const fd = Object.assign({}, base, {
+          animalNumber: num,
+          animalId: String(a?.id || ""),
+          documentData: docData,
+          // لقطة للحالة التناسلية
+          reproductiveStatusSnapshot: String(docData.reproductiveStatus || "").trim() || "غير معروفة",
+          // DIM محسوب من lastCalvingDate
+          dimAtEvent: calcDIM(docData, base.eventDate) || "0"
+        });
+
+        // ✅ أمان إضافي: 72h (حتى لو مرّت في الـGate)
+        if (uid) {
+          const dupMsg = await checkHeatDuplicate72h(uid, num, base.eventDate);
+          if (dupMsg) {
+            showMsg(bar, dupMsg, "error");
             return false;
           }
         }
+
+        const res = await validateEvent(eventName, fd);
+        if (!res?.ok) {
+          clearFieldErrors(form);
+          // اعرض أول خطأ مرتبط بهذا الرقم
+          showMsg(bar, `❌ (${num}) ${res?.msg || "بيانات غير صالحة."}`, "error");
+          lockForm(false);
+          return false;
+        }
+
+        bulkEvents.push(fd);
+      }
+
+      // ✅ اطلق mbk:valid مع الباقة
+      form.dispatchEvent(
+        new CustomEvent("mbk:valid", {
+          bubbles: true,
+          detail: {
+            eventName,
+            bulk: true,
+            bulkEvents
+          }
+        })
+      );
+
+      return true;
+    }
+
+    // ===================== Default: Single =====================
+    const n = nums[0];
+
+    // ✅ (شياع) منع التكرار خلال 72 ساعة قبل أي حفظ (لزيادة الأمان)
+    if (eventName === "شياع") {
+      const uid = await getUid();
+      const dt  = String(base.eventDate || "").slice(0,10);
+      const dupMsg = await checkHeatDuplicate72h(uid, n, dt);
+      if (dupMsg) {
+        clearFieldErrors(form);
+        showMsg(bar, dupMsg, "error");
+        lockForm(false);
+        return false;
       }
     }
-   
 
-    // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
-    const v = validateEvent(eventName, formData);
+    // ✅ أضف documentData من الـGate (Single فقط)
+    base.animalNumber = n;
+    base.animalId = String(form.__mbkAnimalId || form.__mbkDocId || form.__mbkId || "");
+    base.documentData = form.__mbkDoc || base.documentData || null;
 
-    if (!v || v.ok === false) {
+    const v = await validateEvent(eventName, base);
+    if (!v?.ok) {
       clearFieldErrors(form);
-
-      // Inline field errors
-      if (v?.fieldErrors && typeof v.fieldErrors === "object") {
-        for (const [fname, msg] of Object.entries(v.fieldErrors)) {
-          placeFieldError(form, fname, msg);
-        }
-        scrollToFirstFieldError(form);
-      }
-
-      // رسائل أعلى النموذج
-      const topMsgs =
-        (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
-        (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
-        ["❌ البيانات غير صحيحة — راجع الحقول."];
-
-      showMsg(bar, topMsgs, "error");
+      showMsg(bar, v?.msg || "بيانات غير صالحة.", "error");
       lockForm(false);
       return false;
     }
@@ -1311,11 +1296,16 @@ if (eventName === "لبن يومي") {
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
         bubbles: true,
-        detail: { formData, eventName, form }
+        detail: {
+          eventName,
+          formData: base
+        }
       })
     );
+
     return true;
   }
+
 
   // ✅ Gate startup watcher
   let gateStarted = false;
