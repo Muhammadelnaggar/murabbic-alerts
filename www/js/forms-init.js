@@ -159,12 +159,38 @@ function scrollToFirstFieldError(form){
 
 /* ===================== Helpers ===================== */
 async function getUid() {
+  // 1) لو Firebase Auth جاهز
   if (auth?.currentUser?.uid) return auth.currentUser.uid;
 
+  // 2) Fallback: لو المستخدم مختار "عدم إجباره يسجل دخول تاني" (UID محفوظ محليًا)
+  try {
+    const s =
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      "";
+    const v = String(s || "").trim();
+    if (v) return v;
+  } catch (_) {}
+
+  // 3) آخر محاولة: استنى Auth state (ولو فاضي برضه رجّع فاضي)
   return await new Promise((res) => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      try { unsub && unsub(); } catch(_) {}
-      res(u?.uid || "");
+      try { unsub && unsub(); } catch (_) {}
+      const uid = String(u?.uid || "").trim();
+      if (uid) return res(uid);
+
+      // fallback تاني بعد onAuthStateChanged
+      try {
+        const s =
+          localStorage.getItem("userId") ||
+          localStorage.getItem("uid") ||
+          localStorage.getItem("tenantId") ||
+          "";
+        res(String(s || "").trim());
+      } catch (_) {
+        res("");
+      }
     });
   });
 }
