@@ -1083,6 +1083,20 @@ if (eventName === "شياع") {
     return; // ⛔ وقف الحفظ
   }
 }
+    // ✅ منع تكرار الشياع خلال 3 أيام
+if (eventName === "شياع") {
+  const uid = await getUid();
+  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
+  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
+
+  const dupMsg = await recentHeatCheck(uid, num, dt, 3);
+  if (dupMsg) {
+    clearFieldErrors(form);
+    showMsg(bar, dupMsg, "error");
+    lockForm(false);
+    return false;
+  }
+}
 
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
