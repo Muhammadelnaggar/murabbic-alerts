@@ -202,13 +202,33 @@
       try{ bar.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){}
     }
 
-    // ✅ Prefill من URL / localStorage
-    const p  = new URLSearchParams(location.search);
-    const num = (p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "").toString().trim();
-    const dt  = (p.get("date")   || p.get("eventDate")    || localStorage.getItem("lastEventDate")   || new Date().toISOString().slice(0,10)).toString().slice(0,10);
+   // ✅ Prefill من URL / localStorage (يدعم فردي + جماعي من add-event)
+const p  = new URLSearchParams(location.search);
 
-    $("animalNumber").value = num;
-    $("eventDate").value = dt;
+// ✅ لو جاي جماعي من add-event: mbkMode=group&bulk=33,34,35
+const mode = (p.get("mbkMode") || "").toString().trim().toLowerCase();
+const bulk = (p.get("bulk") || "").toString().trim();
+
+// ✅ رقم مفرد (لو موجود)
+const numSingle = (p.get("number") || p.get("animalNumber") || "").toString().trim();
+
+// ✅ الأسبقية: bulk (لو group) → single → localStorage
+const num =
+  (mode === "group" && bulk ? bulk : "") ||
+  numSingle ||
+  (localStorage.getItem("lastAnimalNumber") || "").toString().trim() ||
+  "";
+
+const dt =
+  (p.get("date") || p.get("eventDate") ||
+   localStorage.getItem("lastEventDate") ||
+   new Date().toISOString().slice(0,10)
+  ).toString().slice(0,10);
+
+// ✅ تعبئة الحقول
+$("animalNumber").value = num;
+$("eventDate").value = dt;
+
 
     function toDate(s){
       const d = new Date(String(s || "").slice(0,10));
@@ -292,12 +312,14 @@ async function calcDaysSinceLastHeatOrAI(){
   await calcDaysSinceLastHeatOrAI();
 });
 
-    // ✅ زر بطاقة الحيوان
-    $("openCowCard").addEventListener("click", ()=> {
-      const n = String($("animalNumber").value || "").trim();
-      if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    });
+   $("openCowCard").addEventListener("click", ()=> {
+  const n = String($("animalNumber").value || "").trim();
+  if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+  // ✅ لو جماعي (فواصل/مسافات) امنع فتح البطاقة
+  if (/[\s,]/.test(n)) { msg("⚠️ بطاقة الحيوان تعمل مع رقم واحد فقط.", false); return; }
+  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+});
+
 
     // ✅ الحفظ المركزي: ممنوع submit محلي — ننتظر mbk:valid
     
