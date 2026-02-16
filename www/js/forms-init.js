@@ -678,8 +678,6 @@ async function ensureAnimalExistsGate(form, bar) {
 
   const uid = await getUid();
  const numEl = getFieldEl(form, "animalNumber");
-if (numEl) numEl.value = okNums.join("\n"); // ✅ زي التزامن: سطر لكل رقم
-
   const n = normalizeDigits(numEl?.value || "");
 
   const ALLOW = ["animalNumber", "eventDate"];
