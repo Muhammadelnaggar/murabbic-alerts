@@ -677,7 +677,9 @@ async function ensureAnimalExistsGate(form, bar) {
   }
 
   const uid = await getUid();
-  const numEl = getFieldEl(form, "animalNumber");
+ const numEl = getFieldEl(form, "animalNumber");
+if (numEl) numEl.value = okNums.join("\n"); // ✅ زي التزامن: سطر لكل رقم
+
   const n = normalizeDigits(numEl?.value || "");
 
   const ALLOW = ["animalNumber", "eventDate"];
@@ -760,7 +762,8 @@ form.dataset.mbkOvsynchAttached = "1";
     const _latin = (s)=> String(s||"").replace(/[٠-٩۰-۹]/g, ch => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[ch]||ch));
     const _digits = (s)=> (_latin(s).match(/\d+/g) || []);
     const bulkList = [...new Set(_digits(rawN).map(x=> String(x).replace(/\D/g,"")).filter(Boolean))];
-    const looksBulk = /[,\s;\n،]/.test(rawN); // ✅ أي فواصل/مسافات/سطر/فاصلة عربية
+   const looksBulk = (bulkList.length > 1) || /[,\s;\n،]/.test(rawN);
+// ✅ أي فواصل/مسافات/سطر/فاصلة عربية
 
     // ✅ رقم مفرد (للأحداث الفردية)
     const n = normalizeDigits(rawN);
