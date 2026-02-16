@@ -1313,6 +1313,28 @@ if (eventName === "لبن يومي") {
       }
     }
    
+// ✅ Heat Bulk: في الشياع الجماعي لا نعتمد على validateEvent لأنه يحتاج documentData
+if (eventName === "شياع" && isHeatBulk) {
+  const rawNumForDispatch = String(getFieldEl(form, "animalNumber")?.value || "");
+  const nums2 = [...new Set((latin2(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
+
+  const formData2 = collectFormData(form);
+  formData2.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
+
+  const bulkEvents = nums2.map(nn => Object.assign({}, formData2, { animalNumber: nn }));
+
+  const excludedRaw = form?.dataset?.mbkHeatExcluded
+    ? (()=>{ try{return JSON.parse(form.dataset.mbkHeatExcluded)}catch{return []} })()
+    : [];
+
+  form.dispatchEvent(
+    new CustomEvent("mbk:valid", {
+      bubbles: true,
+      detail: { formData: formData2, eventName, form, bulk: true, bulkEvents, excluded: excludedRaw }
+    })
+  );
+  return true;
+}
 
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
