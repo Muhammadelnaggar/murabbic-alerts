@@ -5,7 +5,7 @@ export const BUILD_ID = "rules-2026-02-15-B";
 
 // ===================== Imports لـ Firestore (للـ uniqueAnimalNumber) =====================
 import { db } from "./firebase-config.js";
-import { collection, query, where, orderBy, limit, getDocs }
+import { collection, query, where, limit, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ===================== ثوابت عامة =====================
@@ -95,45 +95,62 @@ const commonFields = {
 // ===================================================================
 //                         سكيمات الأحداث
 // ===================================================================
-// ✅ منع تكرار الشياع لنفس الحيوان خلال نافذة أيام (افتراضي 3 أيام)
+// ✅ منع تكرار "شياع" لنفس الحيوان خلال 3 أيام (بدون Index)
 export async function recentHeatCheck(uid, animalNumber, eventDate, windowDays = 3){
   try{
     const num = String(animalNumber || "").trim();
     const dt  = String(eventDate || "").slice(0,10);
     if (!uid || !num || !dt) return null;
 
-    const end = new Date(dt); end.setHours(0,0,0,0);
-    const start = new Date(end.getTime() - (Number(windowDays) * 86400000));
-    const startISO = new Date(start.getTime() - start.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    const endISO   = new Date(end.getTime()   - end.getTimezoneOffset()*60000).toISOString().slice(0,10);
-
+    // ✅ هات آخر (50) حدث للحيوان (بدون orderBy/inequality عشان ما نحتاج index)
     const qx = query(
       collection(db, "events"),
       where("userId", "==", uid),
       where("animalNumber", "==", num),
-      where("type", "==", "شياع"),
-      where("eventDate", ">=", startISO),
-      where("eventDate", "<=", endISO),
-      orderBy("eventDate", "desc"),
-      limit(1)
+      limit(50)
     );
 
     const s = await getDocs(qx);
     if (s.empty) return null;
 
-    const last = s.docs[0].data() || {};
-    const lastDate = String(last.eventDate || "").slice(0,10);
+    const cur = new Date(dt); cur.setHours(0,0,0,0);
 
-    if (!lastDate) return null;
+    let bestDate = "";       // أحدث تاريخ شياع
+    let bestDiff = 999999;
 
-    if (lastDate === dt){
+    s.forEach(docSnap => {
+      const ev = docSnap.data() || {};
+      const t = String(ev.type || ev.eventType || "").trim();
+
+      // ✅ شياع فقط
+      if (t !== "شياع") return;
+
+      const d = String(ev.eventDate || "").slice(0,10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+
+      const last = new Date(d); last.setHours(0,0,0,0);
+      const diff = Math.floor((cur - last) / 86400000); // أيام
+
+      // diff>=0 يعني الشياع السابق قبل/نفس اليوم
+      if (diff >= 0 && diff <= Number(windowDays)) {
+        // خليك دايمًا على أحدث شياع
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestDate = d;
+        }
+      }
+    });
+
+    if (!bestDate) return null;
+
+    if (bestDate === dt){
       return `❌ تم تسجيل شياع للحيوان رقم ${num} في نفس اليوم (${dt}).`;
     }
+    return `❌ تم تسجيل شياع للحيوان رقم ${num} بتاريخ ${bestDate}. لا يمكن تكرار التسجيل خلال ${windowDays} أيام.`;
 
-    return `❌ تم تسجيل شياع للحيوان رقم ${num} بتاريخ ${lastDate}. لا يمكن تكرار التسجيل خلال ${windowDays} أيام.`;
-  }catch(_){
-    // لو النت/الاستعلام فشل: ما نقفلش الصفحة (تقدر تحوّلها Strict لو تحب)
-    return null;
+  }catch(e){
+    // ✅ هنا نخليها Strict: أي خطأ = امنع الحفظ عشان ما يحصل تكرار
+    return "⚠️ تعذّر التحقق من تكرار الشياع الآن (مشكلة اتصال/قراءة). أعد المحاولة بعد لحظات.";
   }
 }
 
