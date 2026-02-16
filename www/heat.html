@@ -145,6 +145,23 @@
       <label>رقم الحيوان</label>
       <input id="animalNumber" data-field="animalNumber" readonly />
 
+      <div class="hint" style="margin-top:10px;color:var(--muted,#64748b);font-weight:800">
+        أو إدخال جماعي (كل رقم في سطر) — نفس شروط وتحقق الفردي.
+      </div>
+      <textarea id="bulkNumbers" data-field="bulkNumbers" rows="4"
+        placeholder="مثال:
+31
+45
+209"
+        style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--border,#e2e8f0);background:#fff;font-weight:900;line-height:1.6;resize:vertical"></textarea>
+
+      <button id="btnPreviewBulk" type="button" class="btn"
+        style="margin-top:10px;width:100%;border-radius:14px;padding:12px 14px;font-weight:900;border:2px solid #0b7f47;background:#fff;color:#0b7f47;cursor:pointer">
+        🔎 فحص القائمة
+      </button>
+
+
+
       <label>تاريخ الشياع</label>
       <input id="eventDate" data-field="eventDate" type="date" />
      <label>وقت ملاحظة الشياع</label>
@@ -200,6 +217,47 @@
       bar.textContent = t;
       try{ bar.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){}
     }
+    // ✅ فحص القائمة (جماعي) — يستخدم نفس Gate المركزي + قاعدة 72 ساعة
+    const btnPreviewBulk = $("btnPreviewBulk");
+    btnPreviewBulk?.addEventListener("click", async () => {
+      try{
+        const bulkRaw = String($("bulkNumbers")?.value || "").trim();
+        const dt = String($("eventDate")?.value || "").slice(0,10);
+        if (!bulkRaw){
+          msg("اكتب أرقام الحيوانات في الإدخال الجماعي أولًا.", false);
+          return;
+        }
+        if (!dt){
+          msg("اختر تاريخ الشياع أولًا.", false);
+          return;
+        }
+
+        const nums = bulkRaw.split(/\s+/).map(s=>s.trim()).filter(Boolean);
+        if (!nums.length){
+          msg("اكتب أرقام صحيحة في الإدخال الجماعي.", false);
+          return;
+        }
+
+        if (!window.mbk?.previewHeatList){
+          msg("⚠️ لم يتم تحميل أداة فحص الشياع الجماعي (previewHeatList). حدّث الصفحة.", false);
+          return;
+        }
+
+        const r = await window.mbk.previewHeatList(nums, dt);
+        form.__mbkBulkHeat = r || null;
+
+        if (window.showMsg && window.ensureInfoBar){
+          const b = window.ensureInfoBar(form);
+          window.showMsg(b, (r?.message || "تم الفحص."), (r?.valid?.length ? "success" : "error"));
+        } else {
+          msg(r?.message || "تم الفحص.", !!(r?.valid?.length));
+        }
+      }catch(_){
+        msg("تعذّر فحص القائمة الآن.", false);
+      }
+    });
+
+
 
     // ✅ Prefill من URL / localStorage
     const p  = new URLSearchParams(location.search);
@@ -308,36 +366,94 @@ async function calcDaysSinceLastHeatOrAI(){
         const uid = auth?.currentUser?.uid || localStorage.getItem("userId") || "";
         if (!uid) { msg("⚠️ لم يتم تأكيد الدخول.", false); return; }
 
+        
         const fd = d.formData || {};
         const eventDate = String(fd.eventDate || "").slice(0,10);
-        const animalNumber = String(fd.animalNumber || "").trim();
+        const heatTime  = String(fd.heatTime || "").trim(); // ص / م
+        const bulkRaw   = String(fd.bulkNumbers || "").trim();
+        const singleNum = String(fd.animalNumber || "").trim();
 
-        const payload = {
-          animalNumber,
-          animalId: String(fd.animalId || animalNumber),
-          type: "شياع",
-          eventType: "شياع",
-          eventDate,
-          notes: String(fd.notes || "").trim(),
-          reproductiveStatusSnapshot: String(fd.reproductiveStatusSnapshot || "").trim(),
-          dimAtEvent: (fd.dimAtEvent === "" ? null : (Number(fd.dimAtEvent) || null)),
-          daysSinceLastHeatOrAI: Number(document.getElementById("daysSinceLastHeatOrAI")?.value) || null,
-          userId: uid,
-          source: "/heat.html",
-          createdAt: serverTimestamp()
-        };
+        // ✅ اختَر قائمة الأرقام (جماعي أو فردي)
+        let numbers = [];
+        if (bulkRaw) {
+          numbers = bulkRaw.split(/\s+/).map(s=>s.trim()).filter(Boolean);
+        } else if (singleNum) {
+          numbers = [singleNum];
+        }
 
-        await addDoc(collection(db, "events"), payload);
-        await updateAnimalByEvent(payload);
+        if (!numbers.length){
+          msg("اكتب رقم الحيوان أو أدخل قائمة أرقام.", false);
+          return;
+        }
 
-        msg("تم تسجيل الشياع بنجاح ✅", true);
+        // ✅ فحص مركزي قبل الحفظ (نفس شروط الفردي + قاعدة 72 ساعة)
+        let checked = form.__mbkBulkHeat;
+        if (!checked || !checked.ok || String(checked?.eventDate || "") !== eventDate) {
+          if (!window.mbk?.previewHeatList){
+            msg("⚠️ لم يتم تحميل أداة فحص الشياع (previewHeatList). حدّث الصفحة.", false);
+            return;
+          }
+          checked = await window.mbk.previewHeatList(numbers, eventDate);
+          form.__mbkBulkHeat = checked;
+        }
 
-        localStorage.setItem("lastAnimalNumber", String(animalNumber));
-        localStorage.setItem("lastEventDate", String(eventDate));
+        const valid = Array.isArray(checked?.valid) ? checked.valid : [];
+        const rejected = Array.isArray(checked?.rejected) ? checked.rejected : [];
 
-        setTimeout(() => {
-          location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-        }, 900);
+        if (!valid.length){
+          // ✅ لا شيء مؤهل للحفظ
+          if (window.showMsg && window.ensureInfoBar){
+            const b = window.ensureInfoBar(form);
+            window.showMsg(b, checked?.message || "لا يوجد أرقام مؤهلة للحفظ.", "error");
+          } else {
+            msg(checked?.message || "لا يوجد أرقام مؤهلة للحفظ.", false);
+          }
+          return;
+        }
+
+        // ✅ احفظ حدث شياع لكل رقم مؤهل
+        let saved = 0;
+        for (const animalNumber of valid) {
+          const payload = {
+            animalNumber,
+            animalId: String(fd.animalId || animalNumber),
+            type: "شياع",
+            eventType: "شياع",
+            eventDate,
+            heatTime: heatTime || null,          // ✅ حفظ وقت الملاحظة
+            notes: String(fd.notes || "").trim(),
+            reproductiveStatusSnapshot: String(fd.reproductiveStatusSnapshot || "").trim(),
+            dimAtEvent: (fd.dimAtEvent === "" ? null : (Number(fd.dimAtEvent) || null)),
+            daysSinceLastHeatOrAI: Number(document.getElementById("daysSinceLastHeatOrAI")?.value) || null,
+            userId: uid,
+            source: "/heat.html",
+            createdAt: serverTimestamp()
+          };
+
+          await addDoc(collection(db, "events"), payload);
+          try{ await updateAnimalByEvent(payload); }catch(_){}
+          saved++;
+        }
+
+
+        // ✅ رسالة نجاح
+        if (bulkRaw) {
+          const rejectedCount = rejected.length;
+          msg(`✅ تم تسجيل الشياع لعدد ${saved} حيوان. (مرفوض: ${rejectedCount})`, true);
+          // لا نعمل Redirect في الجماعي
+          try{ localStorage.setItem("lastEventDate", String(eventDate)); }catch(_){}
+        } else {
+          const lastNum = valid[0] || singleNum;
+          msg("تم تسجيل الشياع بنجاح ✅", true);
+          try{
+            localStorage.setItem("lastAnimalNumber", String(lastNum));
+            localStorage.setItem("lastEventDate", String(eventDate));
+          }catch(_){}
+          setTimeout(() => {
+            location.href = `cow-card.html?number=${encodeURIComponent(lastNum)}`;
+          }, 900);
+        }
+
 
       }catch(err){
         console.error(err);
