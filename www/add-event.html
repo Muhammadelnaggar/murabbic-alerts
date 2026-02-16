@@ -232,7 +232,8 @@
         const s = toLatinKeepSep(raw || '');
         // ✅ استخراج كل سلاسل الأرقام كما هي (يدعم فواصل/مسافات/أسطر)
         // يمنع تكوين رقم "32" بالخطأ لو الكيبورد أدخل فاصل بين رقمين داخل نفس الرقم
-        const matches = s.match(/\\d+/g) || [];
+       const matches = s.match(/\d+/g) || [];
+
         const list = matches.map(x=>toDigitsOnly(x)).filter(Boolean);
         // unique مع الحفاظ على ترتيب الإدخال
         return [...new Set(list)];
@@ -400,3 +401,4 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
