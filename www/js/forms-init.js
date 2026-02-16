@@ -651,6 +651,104 @@ return { ok:true, valid, rejected, message };
 window.mbk = window.mbk || {};
 window.mbk.previewOvsynchList = previewOvsynchList;
 
+// ======================================================
+// ✅ Murabbik Central: Heat Bulk Preview (72h + Eligibility)
+// - نفس Gate الشياع الفردي (heatDecision)
+// - + منع التكرار خلال 72 ساعة (قبل الحفظ)
+// ======================================================
+async function previewHeatList(numbers = [], eventDate = "") {
+  const uid = await getUid();
+  const dt = String(eventDate || "").trim().slice(0,10);
+
+  if (!uid) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ لم يتم تأكيد الدخول." }] };
+  }
+  if (!dt) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ اختر تاريخ الشياع أولًا." }] };
+  }
+  if (typeof guards?.heatDecision !== "function") {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ تعذّر تحميل قواعد الشياع (heatDecision)." }] };
+  }
+
+  const clean = Array.isArray(numbers) ? numbers.map(normalizeDigits).filter(Boolean) : [];
+  const uniq  = [...new Set(clean)];
+
+  const valid = [];
+  const rejected = [];
+
+  function normSpeciesFromDoc(doc){
+    let sp = String(doc?.species || doc?.animalTypeAr || doc?.animalType || doc?.animaltype || doc?.type || "").trim();
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+    return sp || "أبقار";
+  }
+  function animalLabelFromDoc(doc){
+    const sp = normSpeciesFromDoc(doc);
+    return (sp === "جاموس") ? "الجاموسة" : "البقرة";
+  }
+
+  for (const num of uniq) {
+    const animal = await fetchAnimalByNumberForUser(uid, num);
+    if (!animal) {
+      rejected.push({ number:num, reason:`❌ الحيوان رقم ${num}: غير موجود في القطيع/حسابك.` });
+      continue;
+    }
+
+    const doc = animal.data || {};
+    const animalLabel = animalLabelFromDoc(doc);
+
+    // ✅ status: inactive ممنوع
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: خارج القطيع (inactive).` });
+      continue;
+    }
+
+    // ✅ heatDecision (لا يمنع “ملقحة” — يمنع فقط: مستبعدة/غير نشطة/عشار... إلخ حسب القواعد)
+    const gateData = {
+      animalNumber: num,
+      eventDate: dt,
+      animalId: String(animal.id || ""),
+      species: normSpeciesFromDoc(doc),
+      documentData: doc,
+      reproStatusFromEvents: ""
+    };
+
+    const g = guards.heatDecision(gateData);
+    if (g) {
+      const raw = String(g || "");
+      const msg = raw.replace(/^OFFER_PREG\|/, "");
+      rejected.push({ number:num, reason:`❌ ${animalLabel} رقم ${num}: ${msg.replace(/^❌\s*/, "")}` });
+      continue;
+    }
+
+    // ✅ 72h duplicate
+    const dup = await checkHeatDuplicate72h(uid, num, dt);
+    if (dup) {
+      rejected.push({ number:num, reason: dup });
+      continue;
+    }
+
+    valid.push(num);
+  }
+
+  const accepted = valid.length;
+  const refused  = rejected.length;
+
+  const message =
+    "🔎 تم فحص القائمة\n" +
+    `✅ مقبول: ${accepted}\n` +
+    `🚫 مرفوض: ${refused}` +
+    (refused ? ("\n\n" + rejected.map(r => String(r.reason||"")).join("\n")) : "");
+
+  return { ok:true, valid, rejected, message };
+}
+
+// ✅ متاحة للصفحات
+window.mbk = window.mbk || {};
+window.mbk.previewHeatList = previewHeatList;
+
+
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
   form.__mbkAnimalId = animal?.id || "";
@@ -825,11 +923,10 @@ form.dataset.mbkOvsynchAttached = "1";
         return false;
       }
 
-      
-      // ✅ (مُرَبِّيك) منع تكرار الشياع خلال 72 ساعة داخل الـGate (قبل فتح النموذج)
+
+      // ✅ منع تكرار الشياع خلال 72 ساعة (Gate مبكرًا قبل ما المستخدم يكمّل النموذج)
       const dupMsg = await checkHeatDuplicate72h(uid, n, d);
       if (dupMsg) {
-        clearFieldErrors(form);
         showMsg(bar, dupMsg, "error");
         lockForm(true);
         return false;
