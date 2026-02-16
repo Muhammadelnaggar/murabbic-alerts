@@ -833,15 +833,17 @@ if (bulkList.length <= 1) {
           };
 
           const g = (typeof guards?.heatDecision === "function") ? guards.heatDecision(gateData) : "تعذّر تحميل قواعد الشياع.";
-          if (g) {
-            const raw = String(g || "");
-            if (raw.startsWith("OFFER_PREG|")) {
-              bad.push({n:num, r: raw.replace(/^OFFER_PREG\|/, "")});
-            } else {
-              bad.push({n:num, r: raw});
-            }
-            continue;
-          }
+        if (g) {
+  const raw = String(g || "");
+
+  if (raw.startsWith("OFFER_PREG|")) {
+    const animalLabel = (sp === "جاموس") ? "الجاموسة" : "البقرة";
+    bad.push({ n:num, r: `🚫 لا يمكن تسجيل شياع لـ ${animalLabel} رقم ${num} لأنها «عِشار».` });
+  } else {
+    bad.push({ n:num, r: raw });
+  }
+  continue;
+}
 
           // 3) منع التكرار 72 ساعة (في الـGate)
           const dup = await checkHeatDuplicate72h(uid, num, d);
@@ -904,26 +906,37 @@ if (bulkList.length <= 1) {
 
       const g = guards.heatDecision(gateData);
 
-      if (g) {
-        const raw = String(g || "");
-        if (raw.startsWith("OFFER_PREG|")) {
-          const cleaned = raw.replace(/^OFFER_PREG\|/, "");
-          showMsg(bar, cleaned, "error", [
-            {
-              label: "✅ تأكيد الحمل",
-              primary: true,
-              onClick: () => {
-                const url = `pregnancy-diagnosis.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-                location.href = url;
-              }
-            }
-          ]);
-        } else {
-          showMsg(bar, raw, "error");
+     if (g) {
+  const raw = String(g || "");
+
+  // ✅ رسالة مُرَبِّيك الرسمية عند كون الحيوان "عِشار"
+  if (raw.startsWith("OFFER_PREG|")) {
+    const animalLabel = (sp === "جاموس") ? "الجاموسة" : "البقرة";
+
+    showMsg(bar, [
+      `🚫 لا يمكن تسجيل شياع لـ ${animalLabel} رقم ${n} لأنها «عِشار».`,
+      `إذا كنت تريد التأكد: افتح صفحة «تشخيص حمل» وسجّل النتيجة.`
+    ], "error", [
+      {
+        label: "✅ تأكيد الحمل",
+        primary: true,
+        onClick: () => {
+          const url = `pregnancy-diagnosis.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
+          location.href = url;
         }
-        lockForm(true);
-        return false;
       }
+    ]);
+
+    lockForm(true);
+    return false;
+  }
+
+  // باقي أسباب المنع كما هي
+  showMsg(bar, raw, "error");
+  lockForm(true);
+  return false;
+}
+
 
             // ✅ منع تكرار الشياع خلال 72 ساعة (في الـGate لتوفير وقت المستخدم)
       const dup = await checkHeatDuplicate72h(uid, n, d);
