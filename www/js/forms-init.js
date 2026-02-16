@@ -825,6 +825,16 @@ form.dataset.mbkOvsynchAttached = "1";
         return false;
       }
 
+      
+      // ✅ (مُرَبِّيك) منع تكرار الشياع خلال 72 ساعة داخل الـGate (قبل فتح النموذج)
+      const dupMsg = await checkHeatDuplicate72h(uid, n, d);
+      if (dupMsg) {
+        clearFieldErrors(form);
+        showMsg(bar, dupMsg, "error");
+        lockForm(true);
+        return false;
+      }
+
       showMsg(bar, "✅ تم التحقق — أكمل تسجيل الشياع.", "success");
       lockForm(false);
       return true;
