@@ -281,17 +281,20 @@
         }
 
         const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
+        const isHeat = /heat\.html/i.test(String(targetPage||''));
+const isGroupAllowed = isOvsynch || isHeat;
 
         // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
           updateCowCardNav('', true);
 
-          // مسموح جماعي فقط لـ Ovsynch حاليًا
-          if (!isOvsynch){
-            $('#warn').textContent = '⚠️ هذا الحدث فردي فقط حاليًا. اكتب رقمًا واحدًا.';
-            return null;
-          }
+         // ✅ مسموح جماعي فقط للأحداث المحددة (Ovsynch + Heat)
+if (!isGroupAllowed){
+  $('#warn').textContent = '⚠️ هذا الحدث فردي فقط حاليًا. اكتب رقمًا واحدًا.';
+  return null;
+}
+
 
           $('#warn').textContent = '';
           $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
@@ -307,14 +310,16 @@
 
       function buildUrl(page, ctx){
         const u = new URL(page, location.href);
-        const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
+       const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
+const isHeat = /heat\.html/i.test(String(page));
 
-        if (isOvsynch && ctx.mode === 'group'){
-          u.searchParams.set('mbkMode','group');
-          u.searchParams.set('bulk', ctx.bulk);
-        } else {
-          u.searchParams.set('number', ctx.number);
-        }
+if ((isOvsynch || isHeat) && ctx.mode === 'group'){
+  u.searchParams.set('mbkMode','group');
+  u.searchParams.set('bulk', ctx.bulk);
+} else {
+  u.searchParams.set('number', ctx.number);
+}
+
 
         u.searchParams.set('date', ctx.date);
         u.searchParams.set('eventDate', ctx.date);
@@ -395,3 +400,4 @@
 
 </body>
 </html>
+
