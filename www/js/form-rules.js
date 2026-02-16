@@ -1,7 +1,6 @@
 // ===================================================================
 //   /js/form-rules.js — Murabbik Final Validation (Document-Based)
 // ===================================================================
-export const BUILD_ID = "rules-2026-02-15-B";
 
 // ===================== Imports لـ Firestore (للـ uniqueAnimalNumber) =====================
 import { db } from "./firebase-config.js";
