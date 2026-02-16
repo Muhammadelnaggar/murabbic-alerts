@@ -760,6 +760,7 @@ form.dataset.mbkOvsynchAttached = "1";
     const _latin = (s)=> String(s||"").replace(/[٠-٩۰-۹]/g, ch => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[ch]||ch));
     const _digits = (s)=> (_latin(s).match(/\d+/g) || []);
     const bulkList = [...new Set(_digits(rawN).map(x=> String(x).replace(/\D/g,"")).filter(Boolean))];
+    const looksBulk = /[,\s;\n،]/.test(rawN); // ✅ أي فواصل/مسافات/سطر/فاصلة عربية
 
     // ✅ رقم مفرد (للأحداث الفردية)
     const n = normalizeDigits(rawN);
@@ -774,14 +775,16 @@ if (!hasAnyNumber || !d) {
   return false;
 }
 
-// ✅ فحص وجود الحيوان الفردي فقط (لو رقم واحد). لو جماعي: الفحص يتم داخل Gate الشياع لكل رقم.
-if (bulkList.length <= 1) {
+// ✅ فحص وجود الحيوان الفردي فقط لو الإدخال "فردي فعلاً"
+// لو الإدخال فيه فواصل/مسافات => Bulk حتى لو bulkList اتفسّر غلط
+if (bulkList.length <= 1 && !looksBulk) {
   const okAnimal = await ensureAnimalExistsGate(form, bar);
   if (!okAnimal) {
     lockForm(true);
     return false;
   }
 }
+
 // ===============================
     // ✅ Gate خاص بصفحة الشياع (حسب طلبك)
     // - يمنع: عِشار + مستبعدة تناسليًا + غير موجودة (مغطاة بالـGate)
@@ -789,7 +792,7 @@ if (bulkList.length <= 1) {
     // ===============================
     if (eventName === "شياع") {
       // ✅ لو إدخال جماعي (أكثر من رقم): نفذ Gate + 72h لكل رقم
-      if (bulkList.length > 1) {
+     if (bulkList.length > 1 || looksBulk) {
         const uid = await getUid();
         if (!uid) {
           showMsg(bar, "سجّل الدخول أولًا.", "error");
