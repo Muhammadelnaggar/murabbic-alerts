@@ -230,11 +230,11 @@
 
       function parseNumbers(raw){
         const s = toLatinKeepSep(raw || '');
-        const list = s
-          .split(/\n|,|،|;|؛|\s+/g)
-          .map(x=>toDigitsOnly(x))
-          .filter(Boolean);
-        // unique
+        // ✅ استخراج كل سلاسل الأرقام كما هي (يدعم فواصل/مسافات/أسطر)
+        // يمنع تكوين رقم "32" بالخطأ لو الكيبورد أدخل فاصل بين رقمين داخل نفس الرقم
+        const matches = s.match(/\\d+/g) || [];
+        const list = matches.map(x=>toDigitsOnly(x)).filter(Boolean);
+        // unique مع الحفاظ على ترتيب الإدخال
         return [...new Set(list)];
       }
 
@@ -281,20 +281,20 @@
         }
 
         const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
-        const isHeat = /heat\.html/i.test(String(targetPage||''));
-const isGroupAllowed = isOvsynch || isHeat;
 
-        // ✅ لو أكتر من رقم:
+        
+        const isHeat = /heat\.html/i.test(String(targetPage||''));
+        const isGroupAllowed = isOvsynch || isHeat;
+// ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
           updateCowCardNav('', true);
 
-         // ✅ مسموح جماعي فقط للأحداث المحددة (Ovsynch + Heat)
-if (!isGroupAllowed){
-  $('#warn').textContent = '⚠️ هذا الحدث فردي فقط حاليًا. اكتب رقمًا واحدًا.';
-  return null;
-}
-
+          // مسموح جماعي فقط لـ Ovsynch حاليًا
+          if (!isGroupAllowed){
+            $('#warn').textContent = '⚠️ هذا الحدث فردي فقط حاليًا. اكتب رقمًا واحدًا.';
+            return null;
+          }
 
           $('#warn').textContent = '';
           $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
@@ -310,16 +310,16 @@ if (!isGroupAllowed){
 
       function buildUrl(page, ctx){
         const u = new URL(page, location.href);
-       const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
-const isHeat = /heat\.html/i.test(String(page));
+        const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
 
+        
+        const isHeat = /heat\.html/i.test(String(page));
 if ((isOvsynch || isHeat) && ctx.mode === 'group'){
-  u.searchParams.set('mbkMode','group');
-  u.searchParams.set('bulk', ctx.bulk);
-} else {
-  u.searchParams.set('number', ctx.number);
-}
-
+          u.searchParams.set('mbkMode','group');
+          u.searchParams.set('bulk', ctx.bulk);
+        } else {
+          u.searchParams.set('number', ctx.number);
+        }
 
         u.searchParams.set('date', ctx.date);
         u.searchParams.set('eventDate', ctx.date);
@@ -400,4 +400,3 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
-
