@@ -764,21 +764,25 @@ form.dataset.mbkOvsynchAttached = "1";
     // ✅ رقم مفرد (للأحداث الفردية)
     const n = normalizeDigits(rawN);
 
+// ✅ في الشياع الجماعي: قد يكون الحقل "33,34,35" وبالتالي n يصبح "333435" (غلط للفحص الفردي)
+// لذلك: نتحقق من وجود "أي رقم" عبر bulkList، ونؤجل فحص الوجود الفردي عند اللزوم.
+const hasAnyNumber = Array.isArray(bulkList) && bulkList.length > 0;
 
-    if (!n || !d) {
-      bar.style.display = "none";
-      lockForm(true);
-      return false;
-    }
+if (!hasAnyNumber || !d) {
+  bar.style.display = "none";
+  lockForm(true);
+  return false;
+}
 
-    const okAnimal = await ensureAnimalExistsGate(form, bar);
-    if (!okAnimal) {
-      lockForm(true);
-      return false;
-    }
-
-    
-    // ===============================
+// ✅ فحص وجود الحيوان الفردي فقط (لو رقم واحد). لو جماعي: الفحص يتم داخل Gate الشياع لكل رقم.
+if (bulkList.length <= 1) {
+  const okAnimal = await ensureAnimalExistsGate(form, bar);
+  if (!okAnimal) {
+    lockForm(true);
+    return false;
+  }
+}
+// ===============================
     // ✅ Gate خاص بصفحة الشياع (حسب طلبك)
     // - يمنع: عِشار + مستبعدة تناسليًا + غير موجودة (مغطاة بالـGate)
     // - يسمح: باقي الحالات
