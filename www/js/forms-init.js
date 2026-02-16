@@ -863,8 +863,14 @@ if (bulkList.length <= 1) {
         }
 
         // رسالة نجاح + ملخص المستبعدين
-        const badMsg = bad.length ? ` (تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x=>x.n).join("، ")}${bad.length>3?"…":""})` : "";
-        showMsg(bar, `✅ تم التحقق — جاهز لتسجيل الشياع لعدد ${okNums.length}.${badMsg}`, "success");
+        // ✅ خزّن أسباب الاستبعاد للاستخدام عند الحفظ (وللشفافية)
+  try { form.dataset.mbkHeatExcluded = JSON.stringify(bad); } catch(e) {}
+
+  const badMsg = bad.length
+    ? ` (تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x=>`${x.n} (${String(x.r).replace(/\s+/g,' ').trim()})`).join("، ")}${bad.length>3?"…":""})`
+    : "";
+
+  showMsg(bar, `✅ تم التحقق — جاهز لتسجيل الشياع لعدد ${okNums.length}.${badMsg}`, "success");
         lockForm(false);
         return true;
       }
@@ -1301,6 +1307,24 @@ if (eventName === "لبن يومي") {
       showMsg(bar, topMsgs, "error");
       lockForm(false);
       return false;
+    }
+
+    // ✅ Bulk dispatch for Heat (شياع): لو أكتر من رقم في نفس الحقل → نحولها إلى bulkEvents
+    const rawNumForDispatch = String(getFieldEl(form, "animalNumber")?.value || "");
+    const latin2 = (s)=> String(s||"").replace(/[٠-٩۰-۹]/g, ch => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[ch]||ch));
+    const nums2 = [...new Set((latin2(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
+
+    if (eventName === "شياع" && nums2.length > 1) {
+      // 👇 بنبني payload لكل رقم (نفس البيانات الأخرى)
+      const bulkEvents = nums2.map(nn => Object.assign({}, formData, { animalNumber: nn }));
+      const excludedRaw = form?.dataset?.mbkHeatExcluded ? (()=>{ try{return JSON.parse(form.dataset.mbkHeatExcluded)}catch{return []} })() : [];
+      form.dispatchEvent(
+        new CustomEvent("mbk:valid", {
+          bubbles: true,
+          detail: { formData, eventName, form, bulk: true, bulkEvents, excluded: excludedRaw }
+        })
+      );
+      return true;
     }
 
     form.dispatchEvent(
