@@ -111,6 +111,113 @@ function requireUserId(req, res, next){
   req.userId = t;
   next();
 }
+// ============================================================
+//                  DIM: Daily updater (server-side)
+// ============================================================
+function cairoTodayISO(){
+  // "YYYY-MM-DD" بتوقيت القاهرة (لتحديد اليوم الصحيح فقط)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function isoToUtcMidnightMs(iso){
+  const [y,m,d] = String(iso).split("-").map(Number);
+  return Date.UTC(y, m-1, d);
+}
+
+function diffDaysISO(fromISO, toISO){
+  // فرق أيام “تاريخ فقط” (بدون ساعات/دقائق)
+  const ms = isoToUtcMidnightMs(toISO) - isoToUtcMidnightMs(fromISO);
+  return Math.floor(ms / 86400000);
+}
+
+async function updateAllDIM(){
+  try{
+    if (!db) {
+      console.log("⚠️ DIM skipped: Firestore disabled");
+      return;
+    }
+
+    const todayISO = cairoTodayISO();
+
+    const snap = await db.collection("animals").get();
+
+    let updated = 0;
+    let scanned = 0;
+
+    let batch = db.batch();
+    let ops = 0;
+
+    for (const doc of snap.docs){
+      scanned++;
+      const a = doc.data() || {};
+
+      const st = String(a.status || "active").toLowerCase();
+      if (st === "inactive") continue;
+
+      const lcd = String(a.lastCalvingDate || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(lcd)) continue;
+
+      let dim = diffDaysISO(lcd, todayISO);
+      if (!Number.isFinite(dim) || dim < 0) dim = 0;
+
+      if (Number(a.daysInMilk) === dim) continue;
+
+      batch.set(doc.ref, { daysInMilk: dim, _dimUpdatedAt: todayISO }, { merge:true });
+      updated++;
+      ops++;
+
+      if (ops >= 400){
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    if (ops > 0) await batch.commit();
+
+    console.log("✅ DIM updated:", { todayISO, scanned, updated });
+  } catch (e){
+    console.error("❌ DIM update failed:", e.message || e);
+  }
+}
+
+function msUntilNextCairo0010(){
+  // تشغيل يومي 00:10 بتوقيت القاهرة
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Cairo",
+    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  }).formatToParts(now).reduce((acc,p)=>{ acc[p.type]=p.value; return acc; }, {});
+
+  const y = Number(parts.year), m = Number(parts.month), d = Number(parts.day);
+  const hh = Number(parts.hour), mm = Number(parts.minute), ss = Number(parts.second);
+
+  const nowCairoUtcMs = Date.UTC(y, m-1, d, hh, mm, ss);
+
+  const targetTodayUtcMs = Date.UTC(y, m-1, d, 0, 10, 0);
+  const targetUtcMs = (nowCairoUtcMs < targetTodayUtcMs)
+    ? targetTodayUtcMs
+    : Date.UTC(y, m-1, d+1, 0, 10, 0);
+
+  return Math.max(1000, targetUtcMs - nowCairoUtcMs);
+}
+
+function startDailyDimJob(){
+  const first = msUntilNextCairo0010();
+  console.log("⏳ DIM job scheduled (ms):", first);
+
+  setTimeout(async () => {
+    await updateAllDIM();
+    setInterval(updateAllDIM, 24 * 60 * 60 * 1000);
+  }, first);
+}
 
 
 // ===== Admin gate (optional) =====
@@ -976,7 +1083,10 @@ app.post('/api/admin/events/normalize', ensureAdmin, async (req, res) => {
 
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
-
+// ✅ DIM job
+startDailyDimJob();
+// (اختياري ومفيد) تشغيل مرة واحدة فورًا بعد كل Deploy:
+updateAllDIM();
 // Start
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
