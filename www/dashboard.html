@@ -155,23 +155,24 @@
   max-width:980px;
   margin:10px auto 16px;
   padding:0 10px;
-  padding-bottom:100px; /* مساحة للزر العائم */
+  padding-bottom:70px; /* مساحة للزر العائم */
 }
-/* ===== زر تسجيل الخروج العائم ===== */
 .logout-floating{
   position:fixed;
-  bottom:18px;
+  bottom:14px;
   left:50%;
   transform:translateX(-50%);
   width:90%;
   max-width:420px;
-  background:#ffffff;
-  border:1px solid #e2e8f0;
-  border-radius:14px;
-  box-shadow:0 8px 22px rgba(0,0,0,.08);
   padding:6px;
+  border-radius:14px;
+  background:rgba(255,255,255,.75);  /* شفافية */
+  backdrop-filter: blur(8px);        /* إحساس عائم */
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 6px 18px rgba(0,0,0,.08);
   z-index:999;
 }
+
 
 .logout-floating button{
   width:100%;
@@ -630,6 +631,7 @@ import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
 
 </body>
 </html>
+
 
 
 
