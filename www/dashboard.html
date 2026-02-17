@@ -194,6 +194,14 @@
   </style>
 </head>
 <body>
+<script>
+  // منع الرجوع بعد Logout
+  try{
+    if (sessionStorage.getItem("mbkLoggedOut") === "1"){
+      location.replace("login.html");
+    }
+  }catch(e){}
+</script>
 
 <script>
   window.API_BASE = "https://murabbic-alerts.onrender.com";
@@ -623,6 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
 
