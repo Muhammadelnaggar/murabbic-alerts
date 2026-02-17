@@ -156,9 +156,40 @@
   margin:10px auto 16px;
   padding:0 10px;
 }
+/* ===== زر تسجيل الخروج العائم ===== */
+.logout-floating{
+  position:fixed;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%);
+  width:90%;
+  max-width:420px;
+  background:#ffffff;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  box-shadow:0 8px 22px rgba(0,0,0,.08);
+  padding:6px;
+  z-index:999;
+}
 
+.logout-floating button{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid #fb8c00;
+  background:#ffb74d;
+  color:#5d2a00;
+  font-weight:900;
+  font-size:15px;
+  cursor:pointer;
+  transition:.15s ease;
+}
+
+.logout-floating button:hover{
+  background:#ffa726;
+  border-color:#ffa726;
+}
   </style>
-
 </head>
 <body>
 
@@ -575,12 +606,30 @@ document.addEventListener('DOMContentLoaded', () => {
   onAlert: (p)=> window.mbk?.alertsUI?.show && window.mbk.alertsUI.show(p)
 });}catch(e){}
 });
+import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
+  .then(({ getAuth, signOut }) => {
+    const btn = document.getElementById("logoutBtn");
+    if(!btn) return;
+
+    btn.addEventListener("click", async ()=>{
+      const auth = getAuth();
+      await signOut(auth);
+      localStorage.clear();
+      location.href="login.html";
+    });
+  });
+  
 </script>
 
 
 </div>
+  <div class="logout-floating">
+  <button id="logoutBtn">تسجيل الخروج</button>
+</div>
+
 </body>
 </html>
+
 
 
 
