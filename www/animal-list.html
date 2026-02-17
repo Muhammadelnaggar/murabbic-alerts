@@ -38,6 +38,11 @@
   </style>
 </head>
 <body>
+  <script type="module">
+  import { protectPage, lockBackButton } from "/js/nav-guard.js";
+  protectPage();
+  lockBackButton();
+</script>
   <h1>📋 قائمة الحيوانات المسجلة</h1>
 
   <div class="controls">
@@ -230,6 +235,7 @@
 
 </body>
 </html>
+
 
 
 
