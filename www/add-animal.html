@@ -69,6 +69,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <script type="module">
+  import { protectPage, lockBackButton } from "/js/nav-guard.js";
+  protectPage();
+  lockBackButton();
+</script>
   <h1>➕ إضافة حيوان جديد</h1>
   <form id="animalForm">
     <div id="msg"></div>
@@ -469,6 +474,7 @@ function showPopup(msg, ok=true){
   <script src="/js/tenant-bootstrap.js"></script>
 </body>
 </html>
+
 
 
 
