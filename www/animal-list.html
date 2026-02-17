@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <title>قائمة الحيوانات</title>
@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-   body { font-family: 'Arial', sans-serif; background-color: #f6fbf8;
+  body { font-family: 'Arial', sans-serif; background-color: #f6fbf8; direction: rtl; padding: 10px; margin: 0; }
     /* ===== Murabbik Standard Header ===== */
 .mbk-head{
   background: linear-gradient(135deg,#0ea05a,#0b7f47);
@@ -42,6 +42,8 @@
    .controls button:hover { background-color: #0b7f47; }
     .table-wrapper { overflow-x: auto; background: #fefefc; border-radius: 10px; box-shadow: 0 0 5px #ccc; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; min-width: 950px; }
+    .table-wrapper { direction: rtl; }
+#animalTable { direction: rtl; }
     th, td { padding: 10px; text-align: center; border: 1px solid #cddc39; font-size: 15px; }
    th { background-color: #e8f5e9; color: #0b7f47; font-weight:600; }
     tr:nth-child(even) { background-color: #f9fbe7; }
@@ -52,16 +54,35 @@
     .no-data { text-align: center; color: #c62828; margin-top: 30px; font-size: 18px; }
     .back-button { display: block; text-align: center; background-color: #4caf50; color: white; font-size: 16px; padding: 10px; border-radius: 8px; text-decoration: none; }
 
-    :root{ --sticky-col1: 140px; --sticky-col2: 120px; }
-    #animalTable { border-collapse: separate; border-spacing: 0; }
-    #animalTable th, #animalTable td { background-clip: padding-box; }
-    #animalTable th:nth-child(1), #animalTable td:nth-child(1) { position: sticky; right: 0; z-index: 4; min-width: var(--sticky-col1); }
-    #animalTable th:nth-child(1) { background: #dcedc8; }
-    #animalTable td:nth-child(1) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
-    #animalTable th:nth-child(2), #animalTable td:nth-child(2) { position: sticky; right: var(--sticky-col1); z-index: 3; min-width: var(--sticky-col2); }
-    #animalTable th:nth-child(2) { background: #dcedc8; }
-    #animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
-    .table-wrapper { overflow-x: auto; }
+  :root{ --sticky-col1: 140px; }
+
+#animalTable { border-collapse: separate; border-spacing: 0; }
+#animalTable th, #animalTable td { background-clip: padding-box; }
+
+/* ✅ العمود 1: رقم الحيوان */
+#animalTable th:nth-child(1), #animalTable td:nth-child(1){
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  width: 1%;
+  min-width: 0;
+  white-space: nowrap;
+}
+#animalTable th:nth-child(1){ background: #e8f5e9; color:#0b7f47; }
+#animalTable td:nth-child(1){ background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+
+/* ✅ العمود 2: النوع */
+#animalTable th:nth-child(2), #animalTable td:nth-child(2){
+  position: sticky;
+  right: var(--sticky-col1);
+  z-index: 3;
+  width: 1%;
+  min-width: 0;
+  white-space: nowrap;
+}
+#animalTable th:nth-child(2){ background: #e8f5e9; color:#0b7f47; }
+#animalTable td:nth-child(2){ background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
+
      /* ===== Murabbik Buttons Override ===== */
 .controls button,
 .button,
@@ -155,6 +176,13 @@
 
   const $  = id => document.getElementById(id);
   let animalsData = [];
+   function updateStickyCols(){
+  const th1 = document.querySelector("#animalTable thead th:nth-child(1)");
+  if (!th1) return;
+  document.documentElement.style.setProperty("--sticky-col1", th1.offsetWidth + "px");
+}
+window.addEventListener("resize", updateStickyCols);
+
 
   // انتظر جلسة مستخدم حقيقية؛ مفيش مجهول هنا
   onAuthStateChanged(auth, async (u) => {
@@ -232,6 +260,7 @@
       `;
       tbody.appendChild(tr);
     });
+    updateStickyCols();
   }
 
   // أزرار الجدول (global)
@@ -283,6 +312,7 @@
 
 </body>
 </html>
+
 
 
 
