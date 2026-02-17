@@ -1,46 +1,33 @@
-// /js/nav-guard.js — Murabbik Navigation + Auth Hardening (ESM)
-// الهدف: جعل مُرَبِّيك "قائم بذاته" (Standalone) ومنع الرجوع لصفحات الدخول بعد التسجيل/الخروج
-// ✅ protectPage(): يحمي الصفحات الداخلية ويحوّل غير المُسجّل إلى login.html باستخدام location.replace
-// ✅ lockBackButton(): (اختياري) يقفل زر الرجوع داخل التطبيق (PWA/Standalone)
-// ✅ safeReplace(): helper
-// ملاحظة: هذا الملف لا يغيّر أي تصميم — منطق فقط.
+// /js/nav-guard.js — مُرَبِّيك | Standalone Navigation Guard (ESM)
+// BUILD_ID: nav-2026-02-17-C
+// الهدف: تطبيق مُرَبِّيك كـ Standalone:
+// 1) حماية الصفحات الداخلية: لو المستخدم غير مسجل -> login.html (location.replace)
+// 2) منع الرجوع (Back) داخل التطبيق قدر الإمكان (PWA/Standalone)
+// ملاحظة: لا يمكن منع زر الرجوع 100% على كل الأجهزة، لكن هذا يمنع الرجوع داخل صفحات مُرَبِّيك.
+// =====================================================================
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/** True إذا الصفحة الحالية هي صفحة دخول/تسجيل */
+// ✅ علامة للتأكد أنه اتحمّل
+try { window.__MBK_NAV_GUARD__ = "loaded"; } catch {}
+
 export function isAuthPage() {
   const p = (location.pathname || "").toLowerCase();
   return p.endsWith("/login.html") || p.endsWith("/register.html");
 }
 
-/** تحويل آمن */
 export function safeReplace(url) {
-  try {
-    location.replace(url);
-  } catch (e) {
-    location.href = url;
-  }
+  try { location.replace(url); } catch { location.href = url; }
 }
 
 /**
- * حماية الصفحة الداخلية:
- * - لو الصفحة auth => لا تفعل شيئًا
- * - لو لا يوجد Firebase Auth session => تحويل لـ login.html (replace)
- *
- * options:
- *  - loginUrl: default "login.html"
- *  - rememberRedirect: default true (يحفظ الصفحة المطلوبة ليعود لها بعد الدخول لاحقًا)
+ * protectPage({ loginUrl="login.html", rememberRedirect=true })
  */
 export function protectPage(options = {}) {
-  const {
-    loginUrl = "login.html",
-    rememberRedirect = true,
-  } = options;
+  const { loginUrl = "login.html", rememberRedirect = true } = options;
 
-  // لا نحمي صفحات auth
   if (isAuthPage()) return;
 
-  // حفظ الهدف (اختياري)
   if (rememberRedirect) {
     try {
       const target = location.pathname + location.search + location.hash;
@@ -49,28 +36,53 @@ export function protectPage(options = {}) {
   }
 
   const auth = getAuth();
-
   onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      safeReplace(loginUrl);
-    }
+    if (!user) safeReplace(loginUrl);
   });
 }
 
 /**
- * قفل زر الرجوع داخل التطبيق (اختياري):
- * - مناسب للتطبيق Standalone/PWA
- * - قد يكون مزعجًا لو فعلته في كل الصفحات
+ * هل التطبيق مفتوح كـ Standalone بالفعل؟
+ * - Android/Chrome: display-mode: standalone
+ * - iOS (Safari): navigator.standalone
  */
-export function lockBackButton() {
+export function isStandalone() {
   try {
-    history.pushState({ mbkLock: true }, "", location.href);
-    window.addEventListener("popstate", () => {
-      try {
-        history.pushState({ mbkLock: true }, "", location.href);
-      } catch {}
-    });
-  } catch {}
+    const mq = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+    const ios = !!navigator.standalone;
+    return !!(mq || ios);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * lockBackButton({ onlyStandalone=true })
+ * - onlyStandalone: افتراضي true (يقفل الرجوع فقط عند التشغيل Standalone)
+ * - لو عايز تقفله حتى داخل المتصفح للاختبار: onlyStandalone:false
+ */
+export function lockBackButton(opts = {}) {
+  const { onlyStandalone = true } = opts;
+
+  // ✅ لو مطلوب Standalone فقط، وتطبيقك مش Standalone الآن، نخرج بدون قفل
+  if (onlyStandalone && !isStandalone()) return;
+
+  const arm = () => {
+    try {
+      // ندخل حالتين متتاليتين عشان أول Back مايمشيش خطوة حقيقية
+      history.pushState({ mbkLock: 1 }, "", location.href);
+      history.pushState({ mbkLock: 2 }, "", location.href);
+    } catch {}
+  };
+
+  // Arm الآن + عند الرجوع من BFCache
+  arm();
+  window.addEventListener("pageshow", arm);
+
+  // على popstate: نعيد إدخال الحالة فورًا
+  window.addEventListener("popstate", () => {
+    try { history.pushState({ mbkLock: 2 }, "", location.href); } catch {}
+  });
 }
 
 /**
