@@ -594,34 +594,19 @@ function renderMiniGauge(id, percent){
   el.style.color = '#2e7d32';
   el.textContent = val + '%';
 }
-
-// ============ تشغيل ============
-
-
+  // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
-    try{
-   window.smart?.startAlertsWatcher({
-  userId: getTenantId(),
-  onAlert: (p)=> window.mbk?.alertsUI?.show && window.mbk.alertsUI.show(p)
-});}catch(e){}
+
+  try{
+    window.smart?.startAlertsWatcher({
+      userId: getTenantId(),
+      onAlert: (p)=> window.mbk?.alertsUI?.show && window.mbk.alertsUI.show(p)
+    });
+  }catch(e){}
 });
-    // ✅ اربط زر logout بعد تحميل الصفحة (مهم)
-    window.addEventListener("DOMContentLoaded", () => {
-      const btn = document.getElementById("logoutBtn");
-      if(!btn) return;
 
-      btn.addEventListener("click", async ()=>{
-        try{ await signOut(auth); }catch(e){}
-        try{ localStorage.clear(); }catch(e){}
-        try{ sessionStorage.clear(); }catch(e){}
-        location.replace("login.html"); // ✅ خروج نهائي + يمنع الرجوع للداش
-      });
-    }, { once:true });
-  });
-
-  
 </script>
 
 
@@ -638,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
 
