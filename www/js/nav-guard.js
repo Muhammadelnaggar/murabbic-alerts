@@ -61,19 +61,53 @@ export function isStandalone() {
  * - onlyStandalone: افتراضي true (يقفل الرجوع فقط عند التشغيل Standalone)
  * - لو عايز تقفله حتى داخل المتصفح للاختبار: onlyStandalone:false
  */
-export function lockBackButton(opts = {}) {
-  const { onlyStandalone = true } = opts;
+export function lockBackButton() {
+  // ✅ قفل الرجوع على الداشبوورد فقط (حسب اختيارك B)
+  const p = (location.pathname || "").toLowerCase();
+  if (!p.endsWith("/dashboard.html")) return;
 
-  // ✅ لو مطلوب Standalone فقط، وتطبيقك مش Standalone الآن، نخرج بدون قفل
-  if (onlyStandalone && !isStandalone()) return;
+  function lock(){
+    try{
+      history.pushState({ mbkLock: true }, "", location.href);
+      history.pushState({ mbkLock2: true }, "", location.href);
+    }catch{}
+  }
 
-  const arm = () => {
-    try {
-      // ندخل حالتين متتاليتين عشان أول Back مايمشيش خطوة حقيقية
-      history.pushState({ mbkLock: 1 }, "", location.href);
-      history.pushState({ mbkLock: 2 }, "", location.href);
-    } catch {}
-  };
+  lock();
+
+  window.addEventListener("popstate", () => lock());
+  window.addEventListener("pageshow", () => lock());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) lock();
+  });
+}
+export function bindLogout(options = {}) {
+  const { loginUrl = "login.html" } = options;
+
+  function run(){
+    const btn = document.getElementById("logoutBtn");
+    if(!btn) return;
+
+    btn.addEventListener("click", async ()=>{
+      try{
+        const auth = getAuth();
+        await signOut(auth);
+      }catch{}
+
+      try{ localStorage.clear(); }catch{}
+      try{ sessionStorage.clear(); }catch{}
+
+      safeReplace(loginUrl); // ✅ خروج نهائي + يمنع الرجوع للداش
+    }, { passive:true });
+  }
+
+  if (document.readyState === "loading"){
+    window.addEventListener("DOMContentLoaded", run, { once:true });
+  } else {
+    run();
+  }
+}
+
 
   // Arm الآن + عند الرجوع من BFCache
   arm();
