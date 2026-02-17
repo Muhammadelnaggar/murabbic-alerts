@@ -7,16 +7,43 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    body { font-family: 'Arial', sans-serif; background-color: #fffde9; direction: rtl; padding: 10px; margin: 0; }
+   body { font-family: 'Arial', sans-serif; background-color: #f6fbf8;
+    /* ===== Murabbik Standard Header ===== */
+.mbk-head{
+  background: linear-gradient(135deg,#0ea05a,#0b7f47);
+  padding: 14px 12px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.mbk-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.mbk-page{
+  font-size:18px;
+  font-weight:bold;
+  color:#fff;
+}
+
+.mbk-brand{
+  font-size:16px;
+  font-weight:bold;
+  color:rgba(255,255,255,0.7);
+}
+
     h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
     .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
     .controls input, .controls select { padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px; }
-    .controls button { padding: 8px 12px; background-color: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-    .controls button:hover { background-color: #388e3c; }
+    .controls button { padding: 8px 12px; background-color:#0ea05a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+   .controls button:hover { background-color: #0b7f47; }
     .table-wrapper { overflow-x: auto; background: #fefefc; border-radius: 10px; box-shadow: 0 0 5px #ccc; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; min-width: 950px; }
     th, td { padding: 10px; text-align: center; border: 1px solid #cddc39; font-size: 15px; }
-    th { background-color: #dcedc8; color: #33691e; }
+   th { background-color: #e8f5e9; color: #0b7f47; font-weight:600; }
     tr:nth-child(even) { background-color: #f9fbe7; }
     .button { padding: 5px 10px; background-color: #43a047; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .button:hover { background-color: #388e3c; }
@@ -35,6 +62,19 @@
     #animalTable th:nth-child(2) { background: #dcedc8; }
     #animalTable td:nth-child(2) { background: inherit; box-shadow: -1px 0 0 #cddc39 inset; }
     .table-wrapper { overflow-x: auto; }
+     /* ===== Murabbik Buttons Override ===== */
+.controls button,
+.button,
+.back-button {
+  background-color: #0ea05a !important;
+}
+
+.controls button:hover,
+.button:hover,
+.back-button:hover {
+  background-color: #0b7f47 !important;
+}
+    
   </style>
 </head>
 <body>
@@ -43,8 +83,12 @@
   protectPage();
   lockBackButton();
 </script>
-  <h1>📋 قائمة الحيوانات المسجلة</h1>
-
+ <header class="mbk-head">
+  <div class="mbk-title">
+    <span class="mbk-page">قائمة الحيوانات</span>
+    <span class="mbk-brand">مُرَبِّيك</span>
+  </div>
+</header>
   <div class="controls">
     <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
     <select id="typeSelector" onchange="filterType(this.value)">
@@ -235,6 +279,7 @@
 
 </body>
 </html>
+
 
 
 
