@@ -8,7 +8,16 @@
   <script type="module" src="js/forms-init.js"></script>
 </head>
 <body>
-  <header class="mbk-header">تسجيل استبعاد</header>
+ <header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page">تسجيل الإستبعاد</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
@@ -35,7 +44,16 @@
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
 
-    <button id="saveBtn" data-validate="true">حفظ الاستبعاد ✅</button>
+   <div style="display:flex; gap:10px; margin-top:15px;">
+  <button id="saveBtn" data-validate="true" style="flex:1;">
+    حفظ الاستبعاد ✅
+  </button>
+
+  <button type="button" id="openCardBtn" style="flex:1; background:#0ea05a;">
+    فتح بطاقة الحيوان 📄
+  </button>
+</div>
+
   </main>
 
   <script type="module">
@@ -46,6 +64,13 @@
     const $ = (id) => document.getElementById(id);
     const info = $("info");
     const btn = $("saveBtn");
+    const openBtn = $("openCardBtn");
+
+openBtn.onclick = () => {
+  const n = String($("animalNumber").value || "").trim();
+  if (!n) return;
+  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+};
 
     function msg(t, ok=false){
       info.className = "infobar " + (ok ? "ok" : "err");
