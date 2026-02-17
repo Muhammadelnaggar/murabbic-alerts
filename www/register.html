@@ -9,22 +9,20 @@
   <style>
     :root{--bg1:#eeffdd;--bg2:#fffedc;--green:#2e7d32;--border:#c5e1a5;--card:#ffffff}
     *{box-sizing:border-box}
-    body{
-      font-family: Arial, Helvetica, sans-serif;
-      background: linear-gradient(to bottom right, var(--bg1), var(--bg2));
+   body{
+  font-family:'Cairo',sans-serif;
+  background:#f7faf7;
+  margin:0;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+}
       display:flex;align-items:center;justify-content:center;min-height:100vh;
       margin:0;padding:16px;color:#1b5e20;
     }
-    <header class="mbk-head">
-  <div class="mbk-brand">
-    <img src="images/logo.svg" alt="مُرَبِّيك" class="mbk-logo">
-    <div>
-      <div class="mbk-title">مُرَبِّيك</div>
-      <div class="mbk-sub">مزرعتك في جيبك… وقرارك في ثانية</div>
-    </div>
-  </div>
-</header>
-
+  
     .container{
       width:100%;max-width:460px;background:var(--card);
       border:1px solid var(--border);border-radius:14px;padding:24px;
@@ -120,6 +118,39 @@
   opacity:.9;
   font-weight:700;
 }
+.reg-header{
+  width:100%;
+  max-width:460px;
+  margin-bottom:18px;
+}
+
+.reg-brand{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
+  padding:16px 18px;
+  border-radius:18px;
+  color:#fff;
+  box-shadow:0 8px 22px rgba(0,0,0,.12);
+}
+
+.reg-title{
+  font-size:20px;
+  font-weight:800;
+}
+
+.reg-sub{
+  font-size:16px;
+  font-weight:900;
+  opacity:.9;
+}
+
+.reg-brand img{
+  width:48px;
+  height:48px;
+  object-fit:contain;
+}
 
   </style>
 </head>
@@ -132,16 +163,20 @@
     <div class="welcome-foot">جارٍ تجهيز لوحة مزرعتك…</div>
   </div>
 </div>
+<header class="reg-header">
+  <div class="reg-brand">
+    <div class="reg-text">
+      <div class="reg-title">تسجيل</div>
+      <div class="reg-sub">مُرَبِّيك</div>
+    </div>
+    <img src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
 
   <div class="container">
-    <h2>تسجيل مستخدم جديد</h2>
     <p class="hero-text">
 أنت لا تسجل في تطبيق…  
 أنت تدخل غرفة التحكم في مزرعتك.
-<br><br>
-من اليوم… كل ولادة محسوبة،  
-كل تلقيح في موعده،  
-كل كيلو لبن له تفسير.
 </p>
 
     <div id="msg" class="message" role="status" aria-live="polite"></div>
@@ -378,6 +413,7 @@ setTimeout(()=> location.href='login.html', 1800);
 
   
   
+
 
 
 
