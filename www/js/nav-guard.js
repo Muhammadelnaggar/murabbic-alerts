@@ -13,24 +13,23 @@ function pageName(){
 }
 
 export function lockBackButton(){
-  // ✅ تعطيل الرجوع في الداش فقط
   if (pageName() !== "dashboard.html") return;
 
-  const lock = () => {
+  const block = () => {
     try{
-      history.pushState({mbk:"dash_lock_1"}, "", location.href);
-      history.pushState({mbk:"dash_lock_2"}, "", location.href);
+      history.pushState({mbk:"dash_lock"}, "", location.href);
     }catch(e){}
   };
 
-  lock();
+  block();
 
-  window.addEventListener("popstate", () => lock());
-  window.addEventListener("pageshow", () => lock());
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) lock();
+  window.addEventListener("popstate", function(e){
+    block();
   });
+
+  window.addEventListener("pageshow", block);
 }
+
 
 export async function protectPage(){
   // لا تحمي صفحات الدخول
