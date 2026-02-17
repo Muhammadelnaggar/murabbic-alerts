@@ -8,33 +8,6 @@
   <script type="module" src="js/forms-init.js"></script>
   <style>
   body { font-family: 'Arial', sans-serif; background-color: #f6fbf8; direction: rtl; padding: 10px; margin: 0; }
-    /* ===== Murabbik Standard Header ===== */
-.mbk-head{
-  background: linear-gradient(135deg,#0ea05a,#0b7f47);
-  padding: 14px 12px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.mbk-title{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
-.mbk-page{
-  font-size:18px;
-  font-weight:bold;
-  color:#fff;
-}
-
-.mbk-brand{
-  font-size:16px;
-  font-weight:bold;
-  color:rgba(255,255,255,0.7);
-}
-
     h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
     .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
     .controls input, .controls select { padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px; }
@@ -95,7 +68,51 @@
 .back-button:hover {
   background-color: #0b7f47 !important;
 }
-    
+ /* =========================
+   Murabbik Standard Colors
+   (Override Local Page Only)
+   ========================= */
+:root{
+  --mbk-green: #0ea05a;
+  --mbk-green-dark: #0b7f47;
+  --mbk-cream: #fffde9;
+  --mbk-soft: #f6fbf8;
+  --mbk-th: #e8f5e9;
+  --mbk-border: #cddc39;
+}
+
+/* Page base */
+body{ background: var(--mbk-cream) !important; direction: rtl !important; }
+
+/* Controls */
+.controls button,
+.button,
+.back-button{
+  background-color: var(--mbk-green) !important;
+}
+.controls button:hover,
+.button:hover,
+.back-button:hover{
+  background-color: var(--mbk-green-dark) !important;
+}
+
+/* Table + headers */
+.table-wrapper{ background:#fff !important; direction: rtl !important; }
+#animalTable{ direction: rtl !important; }
+
+th, td{ border-color: var(--mbk-border) !important; }
+th{ background: var(--mbk-th) !important; color: var(--mbk-green-dark) !important; }
+
+/* Sticky columns headers follow same th color */
+#animalTable th:nth-child(1),
+#animalTable th:nth-child(2){
+  background: var(--mbk-th) !important;
+  color: var(--mbk-green-dark) !important;
+}
+
+/* Row zebra */
+tr:nth-child(even){ background-color: var(--mbk-soft) !important; }
+   
   </style>
 </head>
 <body>
@@ -312,6 +329,7 @@ window.addEventListener("resize", updateStickyCols);
 
 </body>
 </html>
+
 
 
 
