@@ -83,12 +83,16 @@
   protectPage();
   lockBackButton();
 </script>
- <header class="mbk-head">
-  <div class="mbk-title">
-    <span class="mbk-page">قائمة الحيوانات</span>
-    <span class="mbk-brand">مُرَبِّيك</span>
+<header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page">قائمة الحيوانات</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
+
   <div class="controls">
     <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
     <select id="typeSelector" onchange="filterType(this.value)">
@@ -279,6 +283,7 @@
 
 </body>
 </html>
+
 
 
 
