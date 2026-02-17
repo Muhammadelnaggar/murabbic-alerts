@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
 
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap" rel="stylesheet">
 
@@ -267,7 +267,8 @@
       localStorage.setItem("userId", tenant);
 
       setMsg("✅ تم تسجيل الدخول — تحويل…", true);
-      setTimeout(()=> location.href="dashboard.html", 600);
+     setTimeout(()=> location.replace("dashboard.html"), 600);
+
 
     }catch(err){
       setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.");
@@ -286,4 +287,5 @@
 
 </body>
 </html>
+
 
