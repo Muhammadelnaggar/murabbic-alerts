@@ -15,6 +15,16 @@
       display:flex;align-items:center;justify-content:center;min-height:100vh;
       margin:0;padding:16px;color:#1b5e20;
     }
+    <header class="mbk-head">
+  <div class="mbk-brand">
+    <img src="images/logo.svg" alt="مُرَبِّيك" class="mbk-logo">
+    <div>
+      <div class="mbk-title">مُرَبِّيك</div>
+      <div class="mbk-sub">مزرعتك في جيبك… وقرارك في ثانية</div>
+    </div>
+  </div>
+</header>
+
     .container{
       width:100%;max-width:460px;background:var(--card);
       border:1px solid var(--border);border-radius:14px;padding:24px;
@@ -37,11 +47,103 @@
     .muted{font-size:13px;opacity:.85}
     .link{margin-top:6px;text-align:center}
     .link a{color:var(--green);text-decoration:none;font-weight:bold}
+    .mbk-head{
+  width:100%;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
+  padding:18px 16px;
+  border-radius:16px;
+  margin-bottom:18px;
+  color:#fff;
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+}
+.mbk-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.mbk-logo{
+  width:48px;
+  height:48px;
+}
+.mbk-title{
+  font-size:22px;
+  font-weight:bold;
+}
+.mbk-sub{
+  font-size:14px;
+  opacity:.9;
+}
+.hero-text{
+  text-align:center;
+  font-size:15px;
+  margin-bottom:18px;
+  line-height:1.6;
+  font-weight:bold;
+}
+/* ===== مُرَبِّيك: شاشة ترحيب انتقالية بعد التسجيل ===== */
+.welcome-overlay{
+  position:fixed; inset:0;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
+  display:none;
+  align-items:center; justify-content:center;
+  padding:24px;
+  z-index:9999;
+  color:#fff;
+  text-align:center;
+}
+.welcome-card{
+  width:100%;
+  max-width:520px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:18px;
+  padding:22px 18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px);
+}
+.welcome-title{
+  font-size:22px;
+  font-weight:800;
+  margin:0 0 10px;
+}
+.welcome-body{
+  font-size:15px;
+  line-height:1.8;
+  font-weight:700;
+  opacity:.96;
+  margin:0;
+  white-space:pre-line;
+}
+.welcome-foot{
+  margin-top:14px;
+  font-size:13px;
+  opacity:.9;
+  font-weight:700;
+}
+
   </style>
 </head>
 <body>
+  <!-- ✅ مُرَبِّيك: شاشة ترحيب انتقالية -->
+<div id="welcomeOverlay" class="welcome-overlay" role="status" aria-live="polite" aria-hidden="true">
+  <div class="welcome-card">
+    <div id="welcomeTitle" class="welcome-title">مرحبًا بك</div>
+    <p id="welcomeBody" class="welcome-body"></p>
+    <div class="welcome-foot">جارٍ تجهيز لوحة مزرعتك…</div>
+  </div>
+</div>
+
   <div class="container">
     <h2>تسجيل مستخدم جديد</h2>
+    <p class="hero-text">
+أنت لا تسجل في تطبيق…  
+أنت تدخل غرفة التحكم في مزرعتك.
+<br><br>
+من اليوم… كل ولادة محسوبة،  
+كل تلقيح في موعده،  
+كل كيلو لبن له تفسير.
+</p>
+
     <div id="msg" class="message" role="status" aria-live="polite"></div>
 
     <form id="registerForm" novalidate>
@@ -168,7 +270,34 @@
 
   function showMessage(text,type='error'){ msg.textContent=text; msg.className=`message ${type}`; msg.style.display='block'; }
   function clearMessage(){ msg.textContent=''; msg.style.display='none'; }
+  function showWelcomeOverlay(fullName, role){
+  const ov = document.getElementById('welcomeOverlay');
+  const title = document.getElementById('welcomeTitle');
+  const body  = document.getElementById('welcomeBody');
+  if (!ov || !title || !body) return;
 
+  const roleTitle =
+    role === 'طبيب بيطري' ? 'طبيب القطيع الذكي' :
+    role === 'مهندس إنتاج' ? 'مهندس الإنتاج الذكي' :
+    role === 'مدير مزرعة' ? 'مدير المزرعة الذكي' :
+    role === 'صاحب مزرعة' ? 'قائد المزرعة' :
+    role === 'استشاري' ? 'مستشار الأداء' :
+    'مربي القطيع';
+
+  title.textContent = `مرحبًا بك يا ${fullName}`;
+  body.textContent =
+`✅ ${roleTitle}… مُرَبِّيك الآن في صفّك.
+
+من هذه اللحظة:
+• قرارات التلقيح في وقتها
+• تنبيهات الولادة قبل الموعد
+• تقارير اللبن واضحة… للأبقار والجاموس
+
+مزرعتك أصبحت تحت السيطرة.`;
+
+  ov.style.display = 'flex';
+  ov.setAttribute('aria-hidden','false');
+}
   async function hashPassword(password){
     const enc = new TextEncoder();
     const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
@@ -231,8 +360,8 @@ form.addEventListener('submit', async (e)=>{
     localStorage.setItem('country', country);
     localStorage.setItem('region', region);
 
-    showMessage('✅ تم التسجيل بنجاح، سيتم تحويلك لصفحة الدخول...', 'success');
-    setTimeout(()=> location.href='login.html', 900);
+   showWelcomeOverlay(fullName, role);
+setTimeout(()=> location.href='login.html', 1800);
 
   }catch(err){
     showMessage('تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى');
@@ -249,6 +378,7 @@ form.addEventListener('submit', async (e)=>{
 
   
   
+
 
 
 
