@@ -137,6 +137,11 @@
   </style>
 </head>
 <body>
+  <script type="module">
+  import { protectPage, lockBackButton } from "/js/nav-guard.js";
+  protectPage();
+  lockBackButton();
+</script>
   <div class="wrap">
     <div class="openbar" id="openbar">
       <small>افتح بالرقم:</small>
@@ -1336,6 +1341,7 @@ if (numberParam || idParam){
 
 </body>
 </html>
+
 
 
 
