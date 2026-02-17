@@ -135,6 +135,11 @@
 </head>
 
 <body>
+  <script type="module">
+  import { protectPage, lockBackButton } from "/js/nav-guard.js";
+  protectPage();
+  lockBackButton();
+</script>
   <header class="mbk-top">
     <div class="mbk-head">
       <div class="mbk-title">
@@ -401,4 +406,5 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
