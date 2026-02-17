@@ -597,8 +597,17 @@ function renderMiniGauge(id, percent){
 }
 
 // ============ تشغيل ============
+// ====== منع الخروج المفاجئ بزر الرجوع في Standalone ======
+if (window.matchMedia('(display-mode: standalone)').matches) {
+  history.pushState({ page: 'dashboard' }, '', location.href);
 
-
+  window.addEventListener('popstate', function (e) {
+    const confirmExit = confirm("هل تريد الخروج من مُرَبِّيك؟");
+    if (!confirmExit) {
+      history.pushState({ page: 'dashboard' }, '', location.href);
+    }
+  });
+}
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
@@ -631,6 +640,7 @@ import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
 
 </body>
 </html>
+
 
 
 
