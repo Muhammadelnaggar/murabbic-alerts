@@ -198,27 +198,6 @@
 <script>
   window.API_BASE = "https://murabbic-alerts.onrender.com";
 </script>
-  
-<script>
-  // ====== تعطيل زر الرجوع داخل الداشبوورد نهائيًا ======
-  (function(){
-    function lock(){
-      try{ history.pushState({mbk:"dash_lock"}, "", location.href); }catch(e){}
-    }
-    // قفلين لضمان عدم الخروج بالضغطة التالية
-    lock(); lock();
-
-    window.addEventListener("popstate", function(){
-      lock(); lock();
-    });
-
-    document.addEventListener("visibilitychange", function(){
-      if (!document.hidden){ lock(); lock(); }
-    });
-  })();
-</script>
-
-
 <header class="mbk-top">
   <div class="mbk-head">
     <div class="mbk-title">
@@ -617,17 +596,8 @@ function renderMiniGauge(id, percent){
 }
 
 // ============ تشغيل ============
-// ====== منع الخروج المفاجئ بزر الرجوع في Standalone ======
-if (window.matchMedia('(display-mode: standalone)').matches) {
-  history.pushState({ page: 'dashboard' }, '', location.href);
 
-  window.addEventListener('popstate', function (e) {
-    const confirmExit = confirm("هل تريد الخروج من مُرَبِّيك؟");
-    if (!confirmExit) {
-      history.pushState({ page: 'dashboard' }, '', location.href);
-    }
-  });
-}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
@@ -637,7 +607,20 @@ document.addEventListener('DOMContentLoaded', () => {
   onAlert: (p)=> window.mbk?.alertsUI?.show && window.mbk.alertsUI.show(p)
 });}catch(e){}
 });
-import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
+    // ✅ اربط زر logout بعد تحميل الصفحة (مهم)
+    window.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById("logoutBtn");
+      if(!btn) return;
+
+      btn.addEventListener("click", async ()=>{
+        try{ await signOut(auth); }catch(e){}
+        try{ localStorage.clear(); }catch(e){}
+        try{ sessionStorage.clear(); }catch(e){}
+        location.replace("login.html"); // ✅ خروج نهائي + يمنع الرجوع للداش
+      });
+    }, { once:true });
+  });
+
   
 </script>
 
@@ -655,6 +638,7 @@ import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
 
 </body>
 </html>
+
 
 
 
