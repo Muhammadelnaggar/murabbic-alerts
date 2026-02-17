@@ -646,9 +646,16 @@ import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
   <div class="logout-floating">
   <button id="logoutBtn">تسجيل الخروج</button>
 </div>
+<script type="module">
+  import { protectPage, lockBackButton, bindLogout } from "/js/nav-guard.js";
+  protectPage();
+  lockBackButton();     // ✅ تعطيل الرجوع على الداش فقط
+  bindLogout();         // ✅ إصلاح زر Logout حتى لو الزر آخر الصفحة
+</script>
 
 </body>
 </html>
+
 
 
 
