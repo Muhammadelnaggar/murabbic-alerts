@@ -1,77 +1,27 @@
-// /js/nav-guard.js — مُرَبِّيك | Standalone Navigation Guard (ESM)
-// BUILD_ID: nav-2026-02-17-C
-// الهدف: تطبيق مُرَبِّيك كـ Standalone:
-// 1) حماية الصفحات الداخلية: لو المستخدم غير مسجل -> login.html (location.replace)
-// 2) منع الرجوع (Back) داخل التطبيق قدر الإمكان (PWA/Standalone)
-// ملاحظة: لا يمكن منع زر الرجوع 100% على كل الأجهزة، لكن هذا يمنع الرجوع داخل صفحات مُرَبِّيك.
-// =====================================================================
+// /js/nav-guard.js — Murabbik Navigation System (ESM)
+// ✅ protectPage(): يطرد غير المسجل إلى login.html (replace)
+// ✅ lockBackButton(): يعطّل زر الرجوع في dashboard فقط (اختيار B)
+// ✅ bindLogout(): يفعّل زر logoutBtn (خروج نهائي)
 
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+function safeReplace(url){
+  try{ location.replace(url); }catch(e){ location.href = url; }
+}
 
-// ✅ علامة للتأكد أنه اتحمّل
-try { window.__MBK_NAV_GUARD__ = "loaded"; } catch {}
-
-export function isAuthPage() {
+function pageName(){
   const p = (location.pathname || "").toLowerCase();
-  return p.endsWith("/login.html") || p.endsWith("/register.html");
+  return (p.split("/").pop() || "");
 }
 
-export function safeReplace(url) {
-  try { location.replace(url); } catch { location.href = url; }
-}
+export function lockBackButton(){
+  // ✅ تعطيل الرجوع في الداش فقط
+  if (pageName() !== "dashboard.html") return;
 
-/**
- * protectPage({ loginUrl="login.html", rememberRedirect=true })
- */
-export function protectPage(options = {}) {
-  const { loginUrl = "login.html", rememberRedirect = true } = options;
-
-  if (isAuthPage()) return;
-
-  if (rememberRedirect) {
-    try {
-      const target = location.pathname + location.search + location.hash;
-      localStorage.setItem("mbk_redirect_after_login", target);
-    } catch {}
-  }
-
-  const auth = getAuth();
-  onAuthStateChanged(auth, (user) => {
-    if (!user) safeReplace(loginUrl);
-  });
-}
-
-/**
- * هل التطبيق مفتوح كـ Standalone بالفعل؟
- * - Android/Chrome: display-mode: standalone
- * - iOS (Safari): navigator.standalone
- */
-export function isStandalone() {
-  try {
-    const mq = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
-    const ios = !!navigator.standalone;
-    return !!(mq || ios);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * lockBackButton({ onlyStandalone=true })
- * - onlyStandalone: افتراضي true (يقفل الرجوع فقط عند التشغيل Standalone)
- * - لو عايز تقفله حتى داخل المتصفح للاختبار: onlyStandalone:false
- */
-export function lockBackButton() {
-  // ✅ قفل الرجوع على الداشبوورد فقط (حسب اختيارك B)
-  const p = (location.pathname || "").toLowerCase();
-  if (!p.endsWith("/dashboard.html")) return;
-
-  function lock(){
+  const lock = () => {
     try{
-      history.pushState({ mbkLock: true }, "", location.href);
-      history.pushState({ mbkLock2: true }, "", location.href);
-    }catch{}
-  }
+      history.pushState({mbk:"dash_lock_1"}, "", location.href);
+      history.pushState({mbk:"dash_lock_2"}, "", location.href);
+    }catch(e){}
+  };
 
   lock();
 
@@ -81,53 +31,48 @@ export function lockBackButton() {
     if (!document.hidden) lock();
   });
 }
-export function bindLogout(options = {}) {
-  const { loginUrl = "login.html" } = options;
 
-  function run(){
-    const btn = document.getElementById("logoutBtn");
-    if(!btn) return;
+export async function protectPage(){
+  // لا تحمي صفحات الدخول
+  const pg = pageName();
+  if (pg === "login.html" || pg === "register.html") return;
 
-    btn.addEventListener("click", async ()=>{
-      try{
-        const auth = getAuth();
-        await signOut(auth);
-      }catch{}
+  try{
+    const { getAuth, onAuthStateChanged } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
 
-      try{ localStorage.clear(); }catch{}
-      try{ sessionStorage.clear(); }catch{}
-
-      safeReplace(loginUrl); // ✅ خروج نهائي + يمنع الرجوع للداش
-    }, { passive:true });
+    const auth = getAuth();
+    onAuthStateChanged(auth, (user) => {
+      if (!user) safeReplace("login.html");
+    });
+  }catch(e){
+    // لو حصل فشل تحميل auth لا نكسر الصفحة
+    // (لكن غالبًا عندك Firebase شغال)
   }
+}
+
+export function bindLogout(){
+  const run = async () => {
+    const btn = document.getElementById("logoutBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      try{
+        const { getAuth, signOut } =
+          await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+        await signOut(getAuth());
+      }catch(e){}
+
+      try{ localStorage.clear(); }catch(e){}
+      try{ sessionStorage.clear(); }catch(e){}
+
+      safeReplace("login.html"); // ✅ خروج نهائي
+    });
+  };
 
   if (document.readyState === "loading"){
     window.addEventListener("DOMContentLoaded", run, { once:true });
   } else {
     run();
-  }
-}
-
-
-  // Arm الآن + عند الرجوع من BFCache
-  arm();
-  window.addEventListener("pageshow", arm);
-
-  // على popstate: نعيد إدخال الحالة فورًا
-  window.addEventListener("popstate", () => {
-    try { history.pushState({ mbkLock: 2 }, "", location.href); } catch {}
-  });
-}
-
-/**
- * استرجاع redirect المحفوظ بعد الدخول (اختياري)
- */
-export function consumeRedirectAfterLogin() {
-  try {
-    const t = localStorage.getItem("mbk_redirect_after_login");
-    if (t) localStorage.removeItem("mbk_redirect_after_login");
-    return t || null;
-  } catch {
-    return null;
   }
 }
