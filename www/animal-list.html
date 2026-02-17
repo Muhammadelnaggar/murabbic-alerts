@@ -7,7 +7,20 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-  body { font-family: 'Arial', sans-serif; background-color: #f6fbf8; direction: rtl; padding: 10px; margin: 0; }
+body{
+  font-family: 'Arial', sans-serif;
+  background-color: #f6fbf8;
+  direction: rtl;
+  margin: 0;
+
+  height: 100vh;              /* طول الشاشة */
+  overflow: hidden;           /* ✅ يمنع سكرول الصفحة نفسها */
+  display: flex;
+  flex-direction: column;     /* هيدر فوق + جدول في النص + زر تحت */
+  padding: 10px;
+  box-sizing: border-box;
+}
+
     h1 { color: #2e7d32; text-align: center; font-size: 22px; margin-bottom: 15px; }
     .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
     .controls input, .controls select { padding: 8px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px; }
@@ -88,8 +101,17 @@ body{ background: var(--mbk-cream) !important; direction: rtl !important; }
 .controls button,
 .button,
 .back-button{
-  background-color: var(--mbk-green) !important;
+  flex: 0 0 auto;             /* ✅ ثابت تحت */
+  display: block;
+  text-align: center;
+  background-color: #0ea05a;
+  color: white;
+  font-size: 16px;
+  padding: 10px;
+  border-radius: 8px;
+  text-decoration: none;
 }
+
 .controls button:hover,
 .button:hover,
 .back-button:hover{
@@ -97,7 +119,16 @@ body{ background: var(--mbk-cream) !important; direction: rtl !important; }
 }
 
 /* Table + headers */
-.table-wrapper{ background:#fff !important; direction: rtl !important; }
+.table-wrapper{
+  flex: 1;                    /* ✅ ياخد كل المساحة المتبقية */
+  overflow-y: auto;           /* ✅ سكرول رأسي داخل الجدول */
+  overflow-x: auto;           /* سكرول أفقي عند الحاجة */
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 0 5px #ccc;
+  margin-bottom: 10px;        /* مسافة بسيطة قبل زر الرجوع */
+}
+
 #animalTable{ direction: rtl !important; }
 
 th, td{ border-color: var(--mbk-border) !important; }
@@ -338,6 +369,7 @@ window.addEventListener("resize", updateStickyCols);
 
 </body>
 </html>
+
 
 
 
