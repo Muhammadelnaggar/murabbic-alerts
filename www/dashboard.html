@@ -198,18 +198,26 @@
 <script>
   window.API_BASE = "https://murabbic-alerts.onrender.com";
 </script>
+  
 <script>
   // ====== تعطيل زر الرجوع داخل الداشبوورد نهائيًا ======
   (function(){
-    try{
-      history.pushState({ mbk: "dash_lock" }, "", location.href);
-      window.addEventListener("popstate", function(){
-        // أي محاولة رجوع: نرجّع القفل فورًا
-        history.pushState({ mbk: "dash_lock" }, "", location.href);
-      });
-    }catch(e){}
+    function lock(){
+      try{ history.pushState({mbk:"dash_lock"}, "", location.href); }catch(e){}
+    }
+    // قفلين لضمان عدم الخروج بالضغطة التالية
+    lock(); lock();
+
+    window.addEventListener("popstate", function(){
+      lock(); lock();
+    });
+
+    document.addEventListener("visibilitychange", function(){
+      if (!document.hidden){ lock(); lock(); }
+    });
   })();
 </script>
+
 
 <header class="mbk-top">
   <div class="mbk-head">
@@ -630,26 +638,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });}catch(e){}
 });
 import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
-  .then(({ getAuth, signOut, onAuthStateChanged }) => {
-
-    const auth = getAuth();
-
-    // ✅ Guard: لو مش مسجل دخول -> ارجع Login بدون تاريخ
-    onAuthStateChanged(auth, (user) => {
-      if (!user) location.replace("login.html");
-    });
-
-    const btn = document.getElementById("logoutBtn");
-    if(!btn) return;
-
-    btn.addEventListener("click", async ()=>{
-      try{ await signOut(auth); }catch(e){}
-      try{ localStorage.clear(); }catch(e){}
-      // ✅ خروج نهائي + يمنع الرجوع للداش
-      location.replace("login.html");
-    });
-  });
-
   
 </script>
 
@@ -661,6 +649,7 @@ import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js")
 
 </body>
 </html>
+
 
 
 
