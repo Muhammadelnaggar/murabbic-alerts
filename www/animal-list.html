@@ -112,7 +112,16 @@ th{ background: var(--mbk-th) !important; color: var(--mbk-green-dark) !importan
 
 /* Row zebra */
 tr:nth-child(even){ background-color: var(--mbk-soft) !important; }
-   
+   /* ===== Fix Murabbik page background (override forms.css) ===== */
+html, body{
+  background: #f6fbf8 !important;   /* أخضر فاتح مريح (مش أصفر) */
+}
+
+/* خلي منطقة المحتوى بيضا زي باقي صفحات مربيك */
+.table-wrapper{
+  background: #ffffff !important;
+}
+
   </style>
 </head>
 <body>
@@ -329,6 +338,7 @@ window.addEventListener("resize", updateStickyCols);
 
 </body>
 </html>
+
 
 
 
