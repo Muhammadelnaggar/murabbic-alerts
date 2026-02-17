@@ -152,6 +152,55 @@ html, body{
 .table-wrapper{
   background: #ffffff !important;
 }
+/* ===============================
+   Murabbik Professional Sticky Table
+   =============================== */
+
+/* تأكد أن السكرول داخلي */
+.table-wrapper{
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  background:#ffffff;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.06);
+}
+
+/* رأس الجدول ثابت */
+#animalTable thead th{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #e8f5e9;
+  color:#0b7f47;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+/* العمود 1 مجمّد */
+#animalTable th:nth-child(1),
+#animalTable td:nth-child(1){
+  position: sticky;
+  right: 0;
+  z-index: 20;
+  background:#ffffff;
+}
+
+/* العمود 2 مجمّد */
+#animalTable th:nth-child(2),
+#animalTable td:nth-child(2){
+  position: sticky;
+  right: var(--sticky-col1);
+  z-index: 19;
+  background:#ffffff;
+}
+
+/* تقاطع رأس الجدول مع الأعمدة المجمّدة */
+#animalTable thead th:nth-child(1){
+  z-index: 30;
+}
+#animalTable thead th:nth-child(2){
+  z-index: 29;
+}
 
   </style>
 </head>
@@ -369,6 +418,7 @@ window.addEventListener("resize", updateStickyCols);
 
 </body>
 </html>
+
 
 
 
