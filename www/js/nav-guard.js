@@ -42,9 +42,14 @@ export async function protectPage(){
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
 
     const auth = getAuth();
-    onAuthStateChanged(auth, (user) => {
-      if (!user) safeReplace("login.html");
-    });
+   onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    // منع الرجوع للداش من اللوجين
+    try{ sessionStorage.setItem("mbkLoggedOut","1"); }catch(e){}
+    safeReplace("login.html");
+  }
+});
+
   }catch(e){
     // لو حصل فشل تحميل auth لا نكسر الصفحة
     // (لكن غالبًا عندك Firebase شغال)
