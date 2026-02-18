@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script src="/js/animal-update.js"></script>
+  <script type="module">
+  import { updateAnimalByEvent } from "/js/animal-update.js";
+  window.updateAnimalByEvent = updateAnimalByEvent;
+</script>
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل التحصين</title>
   <style>
-   <style>
   .mbk-head-vax{
     max-width: 780px;
     margin: 12px auto 16px;
@@ -53,25 +55,82 @@
     height: 70px;
     object-fit: contain;
   }
-</style>
+/* ===== Header Style ===== */
 
-  </style>
+.mbk-head-vax{
+  max-width: 780px;
+  margin: 12px auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+
+.mbk-right,
+.mbk-left{
+  width: 80px;
+  display: flex;
+  justify-content: center;
+}
+
+.mbk-center{
+  text-align: center;
+  flex: 1;
+  line-height: 1.1;
+}
+
+.mbk-page-title{
+  color:#000;
+  font-weight: 900;
+  font-size: 24px;
+}
+
+.mbk-brand{
+  color:#0ea05a;
+  font-weight: 900;
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.mbk-logo-vax{
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+}
+
+.mbk-back-pill{
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid #0ea05a;
+  color: #0b7f47;
+  font-weight: 900;
+  cursor: pointer;
+}
+    
+</style>
 </head>
 <body>
-  <header class="mbk-head-vax">
+ <header class="mbk-head-vax">
   
-  <button type="button" id="backToEventsBtn" class="mbk-back-pill">
-    رجوع
-  </button>
+  <div class="mbk-right">
+    <button type="button" id="backToEventsBtn" class="mbk-back-pill">
+      رجوع
+    </button>
+  </div>
 
   <div class="mbk-center">
     <div class="mbk-page-title">تسجيل التحصين</div>
     <div class="mbk-brand">مُرَبِّيك</div>
   </div>
 
-  <img src="/images/logo.png" class="mbk-logo-vax" alt="مُرَبِّيك">
+  <div class="mbk-left">
+    <img src="/images/logo.png" class="mbk-logo-vax" alt="مُرَبِّيك">
+  </div>
 
 </header>
+
 
   <div class="context">
     <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
@@ -234,6 +293,7 @@
   </script>
 </body>
 </html>
+
 
 
 
