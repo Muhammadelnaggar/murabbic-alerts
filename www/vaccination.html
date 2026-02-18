@@ -77,6 +77,44 @@
   padding:0;
 }
 .notice{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46}
+/* ===== Bottom Bar (Murabbik) ===== */
+.mbk-bottombar{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,.96);
+  border-top: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  z-index: 20;
+}
+
+.mbk-bottombar-wrap{
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+}
+
+.mbk-btn{
+  flex: 1;
+  appearance: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 900;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.mbk-btn-primary{
+  border: 0;
+  background: #0ea05a;
+  color: #fff;
+}
+
+.mbk-btn-ghost{
+  background: #fff;
+  border: 2px solid #0ea05a;
+  color: #0b7f47;
+}
 
 </style>
 </head>
@@ -152,12 +190,13 @@
 
     </form>
   </div>
-
-  <div class="actions">
-    <div class="wrap">
-      <button id="saveBtn" class="btn-primary" type="button">💾 تسجيل التحصين</button>
-    </div>
+<div class="mbk-bottombar">
+  <div class="mbk-bottombar-wrap">
+    <button id="saveBtn" class="mbk-btn mbk-btn-primary" type="button">💾 تسجيل التحصين</button>
+    <button id="dashBtn" class="mbk-btn mbk-btn-ghost" type="button">لوحة التحكم</button>
   </div>
+</div>
+
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -172,6 +211,8 @@
     const dateEl    = document.getElementById('date');
     const vaccineEl = document.getElementById('vaccine');
     const saveBtn   = document.getElementById('saveBtn');
+    const dashBtn = document.getElementById('dashBtn');
+dashBtn?.addEventListener('click', () => location.href = 'dashboard.html');
     const warn      = document.getElementById('warn');
    const msgBox  = document.getElementById('inlineMsg');
 const msgText = msgBox ? msgBox.querySelector('.text') : null;
@@ -262,6 +303,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
