@@ -12,103 +12,71 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل التحصين</title>
   <style>
-  .mbk-head-vax{
-    max-width: 780px;
-    margin: 12px auto 16px;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    padding: 10px 14px;
-  }
-
-  .mbk-back-pill{
-    width: 56px;
-    height: 56px;
-    border-radius: 999px;
-    background: #fff;
-    border: 2px solid #0ea05a;
-    color: #0b7f47;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .mbk-center{
-    text-align: center;
-    line-height: 1.1;
-  }
-
-  .mbk-page-title{
-    color:#000;
-    font-weight: 900;
-    font-size: 23px;
-  }
-
-  .mbk-brand{
-    color:#0ea05a;
-    font-weight: 900;
-    font-size: 18px;
-    margin-top: 4px;
-  }
-
-  .mbk-logo-vax{
-    width: 70px;
-    height: 70px;
-    object-fit: contain;
-  }
-/* ===== Header Style ===== */
+ /* ===== Header Style (ONE VERSION) ===== */
 
 .mbk-head-vax{
   max-width: 780px;
-  margin: 12px auto 16px;
+  margin: 10px auto 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 8px 12px;
 }
 
 .mbk-right,
 .mbk-left{
-  width: 80px;
+  width: 64px;
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
 .mbk-center{
   text-align: center;
   flex: 1;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .mbk-page-title{
   color:#000;
   font-weight: 900;
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .mbk-brand{
   color:#0ea05a;
   font-weight: 900;
-  font-size: 18px;
-  margin-top: 4px;
+  font-size: 15px;
+  margin-top: 3px;
 }
 
 .mbk-logo-vax{
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
 }
 
 .mbk-back-pill{
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: #fff;
   border: 2px solid #0ea05a;
   color: #0b7f47;
   font-weight: 900;
+  font-size: 13px;
   cursor: pointer;
 }
-    
+.notice .notice-actions{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  position:static;
+  border:0;
+  background:transparent;
+  padding:0;
+}
+
 </style>
 </head>
 <body>
@@ -172,12 +140,8 @@
         <label><input type="radio" name="doseType" value="primary"/> أولية</label>
         <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
       </div>
-
       <div id="warn" class="warn"></div>
-
-      <div id="inlineMsg" class="notice" role="status" aria-live="polite">
-        <div class="text"></div>
-        <div class="actions">
+     <div class="notice-actions">
           <button type="button" id="msgYes" class="btn-primary">تسجيل أحداث أخرى</button>
           <button type="button" id="msgNo"  class="btn-ghost">لوحة التحكم</button>
         </div>
@@ -293,6 +257,7 @@
   </script>
 </body>
 </html>
+
 
 
 
