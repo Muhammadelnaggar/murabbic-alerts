@@ -22,6 +22,9 @@
   justify-content: space-between;
   padding: 8px 12px;
 }
+.mbk-head-vax{
+  max-width: 520px; /* بدل 780 */
+}
 
 .mbk-right,
 .mbk-left{
@@ -120,6 +123,7 @@
   max-width: 520px;
   margin: 0 auto;
   padding: 0 12px;
+  box-sizing: border-box;
 }
 
 </style>
@@ -143,16 +147,7 @@
   </div>
 
 </header>
-</header>
-
-<main class="mbk-main">
-  <div class="context">...</div>
-  <div class="card">...</div>
-</main>
-
-<div class="mbk-bottombar">...</div>
-
-
+  <main class="mbk-main">
   <div class="context">
     <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
     <span id="ctxDate" class="pill">التاريخ: —</span>
@@ -204,6 +199,7 @@
 
     </form>
   </div>
+   </main> 
 <div class="mbk-bottombar">
   <div class="mbk-bottombar-wrap">
     <button id="saveBtn" class="mbk-btn mbk-btn-primary" type="button">💾 تسجيل التحصين</button>
@@ -317,6 +313,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
