@@ -9,29 +9,70 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل التحصين</title>
   <style>
-    body{direction:rtl;background:#fffde7;font-family:'Arial',sans-serif;margin:0;padding:18px;color:#1b5e20}
-    h1{margin:0 0 12px;text-align:center;color:#2e7d32;font-size:24px}
-    .pill{display:inline-block;padding:4px 10px;border:1px solid #8bc34a;border-radius:999px;background:#dcedc8;color:#1b5e20;font-size:14px}
-    .context{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 12px}
-    .card{max-width:520px;margin:0 auto;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:12px;padding:16px}
-    label{display:block;margin-top:12px;font-weight:bold;color:#2e7d32}
-    input,select{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin-top:6px;font-size:16px;box-sizing:border-box}
-    .row{display:grid;grid-template-columns:1fr;gap:10px}
-    @media(min-width:640px){.row-2{grid-template-columns:1fr 1fr}}
-    .radio-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
-    .radio-group label{display:flex;align-items:center;gap:8px;background:#dcedc8;border:1px solid #8bc34a;border-radius:8px;padding:8px 12px;cursor:pointer}
-    .actions{position:sticky;bottom:0;left:0;right:0;background:rgba(255,255,255,.9);backdrop-filter:saturate(1.1) blur(2px);border-top:1px solid #c5e1a5;padding:10px 0;margin-top:14px}
-    .actions .wrap{max-width:520px;margin:0 auto;display:flex;gap:8px}
-    button{appearance:none;border:0;border-radius:8px;padding:12px 14px;font-weight:bold;font-size:16px;cursor:pointer}
-    .btn-primary{background:#2e7d32;color:#fff}
-    .btn-ghost{background:#fff;border:1px solid #2e7d32;color:#2e7d32}
-    .notice{display:none;margin-top:10px;padding:12px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46}
-    .notice .actions{display:flex;gap:8px;margin-top:10px;position:static;border:0;background:transparent;padding:0}
-    .warn{color:#c62828;text-align:center;min-height:22px;margin-top:8px}
+   <style>
+  .mbk-head-vax{
+    max-width: 780px;
+    margin: 12px auto 16px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 10px 14px;
+  }
+
+  .mbk-back-pill{
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid #0ea05a;
+    color: #0b7f47;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .mbk-center{
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  .mbk-page-title{
+    color:#000;
+    font-weight: 900;
+    font-size: 23px;
+  }
+
+  .mbk-brand{
+    color:#0ea05a;
+    font-weight: 900;
+    font-size: 18px;
+    margin-top: 4px;
+  }
+
+  .mbk-logo-vax{
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+  }
+</style>
+
   </style>
 </head>
 <body>
-  <h1>تسجيل التحصين</h1>
+  <header class="mbk-head-vax">
+  
+  <button type="button" id="backToEventsBtn" class="mbk-back-pill">
+    رجوع
+  </button>
+
+  <div class="mbk-center">
+    <div class="mbk-page-title">تسجيل التحصين</div>
+    <div class="mbk-brand">مُرَبِّيك</div>
+  </div>
+
+  <img src="/images/logo.png" class="mbk-logo-vax" alt="مُرَبِّيك">
+
+</header>
+
   <div class="context">
     <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
     <span id="ctxDate" class="pill">التاريخ: —</span>
@@ -88,7 +129,6 @@
   <div class="actions">
     <div class="wrap">
       <button id="saveBtn" class="btn-primary" type="button">💾 تسجيل التحصين</button>
-      <button id="resetBtn" class="btn-ghost" type="button">مسح الحقول</button>
     </div>
   </div>
 
@@ -104,11 +144,8 @@
     const animalIdEl= document.getElementById('animalId');
     const dateEl    = document.getElementById('date');
     const vaccineEl = document.getElementById('vaccine');
-
     const saveBtn   = document.getElementById('saveBtn');
-    const resetBtn  = document.getElementById('resetBtn');
     const warn      = document.getElementById('warn');
-
     const msgBox    = document.getElementById('inlineMsg');
     const msgText   = msgBox.querySelector('.text');
     const btnYes    = document.getElementById('msgYes');
@@ -194,11 +231,10 @@
       location.href = `add-event.html?animalId=${encodeURIComponent(id)}&animalIdd=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
     });
     btnNo.addEventListener('click', ()=>{ hideMsg(); location.href = 'dashboard.html'; });
-
-    resetBtn.addEventListener('click', ()=>{ form.reset(); hydrate(); hideMsg(); clearWarn(); });
   </script>
 </body>
 </html>
+
 
 
 
