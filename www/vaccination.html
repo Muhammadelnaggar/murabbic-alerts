@@ -141,7 +141,37 @@
   font-weight: 600;
   cursor: pointer;
 }
+/* ===== Dose White Container ===== */
+.dose-container{
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 12px;
+  margin-top: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
+}
 
+/* Radio buttons inside */
+.radio-group{
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: center; /* توسيط كامل */
+}
+
+.radio-group label{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"]{
+  accent-color: #0ea05a; /* لون مربيك */
+}
+
+    
 </style>
 </head>
 <body>
@@ -199,11 +229,15 @@
         </div>
       </div>
 
-      <label>نوع الجرعة</label>
-      <div class="radio-group">
-        <label><input type="radio" name="doseType" value="primary"/> أولية</label>
-        <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
-      </div>
+     <label>نوع الجرعة</label>
+
+<div class="dose-container">
+  <div class="radio-group">
+    <label><input type="radio" name="doseType" value="primary"/> أولية</label>
+    <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
+  </div>
+</div>
+
      <div id="warn" class="warn"></div>
 
 <div id="inlineMsg" class="notice" role="status" aria-live="polite">
@@ -329,6 +363,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
