@@ -118,7 +118,7 @@
 .mbk-main{
   max-width: 520px;
   margin: 0 auto;
-  padding: 0 12px;
+  padding: 0 12px 92px; /* ✅ مساحة تحت عشان الشريط السفلي ما يغطيش المحتوى */
   box-sizing: border-box;
 }
 /* ===== Dose Type Container ===== */
@@ -328,7 +328,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     // عناصر
     const ctxAnimal = document.getElementById('ctxAnimal');
@@ -482,12 +482,32 @@ async function loadMyAnimalsToBulk(){
     showWarn('❌ تعذّر تحميل أرقام الحيوانات من حسابك.');
   }
 }
-await loadMyAnimalsToBulk();
-    document.querySelectorAll('input[name="entryMode"]').forEach(r=>{
+ let bulkLoaded = false;
+
+onAuthStateChanged(auth, (user) => {
+  if (user && !bulkLoaded) {
+    bulkLoaded = true;
+    loadMyAnimalsToBulk();
+  }
+});
+   
+  document.querySelectorAll('input[name="entryMode"]').forEach(r=>{
   r.addEventListener('change', ()=>{
-    bulkBox.style.display = (getMode()==='bulk') ? 'block' : 'none';
+    const isBulk = (getMode()==='bulk');
+    bulkBox.style.display = isBulk ? 'block' : 'none';
+
+    if (isBulk) {
+      // لو Auth جهّز بعد فتح الصفحة، أو لو التحميل ما حصلش قبل كده
+      if (auth?.currentUser?.uid && !bulkLoaded) {
+        bulkLoaded = true;
+        loadMyAnimalsToBulk();
+      }
+      // لو اتحمّل قبل كده، اعرض القائمة فورًا
+      renderBulkList(bulkSearch?.value || '');
+    }
   });
 });
+
 
 bulkSearch?.addEventListener('input', ()=> renderBulkList(bulkSearch.value));
 
@@ -576,6 +596,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
