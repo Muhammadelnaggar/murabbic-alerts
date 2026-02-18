@@ -246,7 +246,40 @@
 .mode-switch input[type="radio"]{
   accent-color:#0ea05a; /* لون مربيك */
 }
-   
+ /* ===== Entry Mode Pills ===== */
+
+.mode-container{
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  padding:10px;
+  margin-top:6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
+}
+
+.mode-pills{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+}
+
+.mode-pills .pill{
+  padding:8px 22px;
+  border-radius:999px;
+  border:2px solid #0ea05a;
+  font-weight:900;
+  cursor:pointer;
+  color:#0b7f47;
+  transition:all .2s ease;
+  user-select:none;
+}
+
+/* الحالة المختارة */
+#modeSingle:checked + label,
+#modeBulk:checked + label{
+  background:#0ea05a;
+  color:#fff;
+}
 </style>
 </head>
 <body>
@@ -279,12 +312,16 @@
       <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
-         <div class="mode-container">
-  <div class="mode-switch">
-    <label><input type="radio" name="entryMode" value="single" checked> فردي</label>
-    <label><input type="radio" name="entryMode" value="bulk"> جماعي</label>
+        <div class="mode-container">
+  <div class="mode-pills">
+    <input type="radio" id="modeSingle" name="entryMode" value="single" checked hidden>
+    <label for="modeSingle" class="pill">فردي</label>
+
+    <input type="radio" id="modeBulk" name="entryMode" value="bulk" hidden>
+    <label for="modeBulk" class="pill">جماعي</label>
   </div>
 </div>
+
 
 
 <div id="bulkBox" class="bulk-box" style="display:none;">
@@ -628,6 +665,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
