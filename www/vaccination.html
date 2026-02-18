@@ -115,6 +115,12 @@
   border: 2px solid #0ea05a;
   color: #0b7f47;
 }
+/* ===== Center everything between header & bottom bar ===== */
+.mbk-main{
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
 
 </style>
 </head>
@@ -137,6 +143,14 @@
   </div>
 
 </header>
+</header>
+
+<main class="mbk-main">
+  <div class="context">...</div>
+  <div class="card">...</div>
+</main>
+
+<div class="mbk-bottombar">...</div>
 
 
   <div class="context">
@@ -303,6 +317,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
