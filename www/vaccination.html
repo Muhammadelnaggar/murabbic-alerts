@@ -76,6 +76,7 @@
   background:transparent;
   padding:0;
 }
+.notice{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46}
 
 </style>
 </head>
@@ -140,12 +141,15 @@
         <label><input type="radio" name="doseType" value="primary"/> أولية</label>
         <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
       </div>
-      <div id="warn" class="warn"></div>
-     <div class="notice-actions">
-          <button type="button" id="msgYes" class="btn-primary">تسجيل أحداث أخرى</button>
-          <button type="button" id="msgNo"  class="btn-ghost">لوحة التحكم</button>
-        </div>
-      </div>
+     <div id="warn" class="warn"></div>
+
+<div id="inlineMsg" class="notice" role="status" aria-live="polite">
+  <div class="text"></div>
+  <div class="notice-actions">
+    <button type="button" id="msgNo" class="btn-ghost">لوحة التحكم</button>
+  </div>
+</div>
+
     </form>
   </div>
 
@@ -169,10 +173,10 @@
     const vaccineEl = document.getElementById('vaccine');
     const saveBtn   = document.getElementById('saveBtn');
     const warn      = document.getElementById('warn');
-    const msgBox    = document.getElementById('inlineMsg');
-    const msgText   = msgBox.querySelector('.text');
-    const btnYes    = document.getElementById('msgYes');
-    const btnNo     = document.getElementById('msgNo');
+   const msgBox  = document.getElementById('inlineMsg');
+const msgText = msgBox ? msgBox.querySelector('.text') : null;
+const btnNo   = document.getElementById('msgNo');
+
 
     function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
     function showWarn(t){ warn.textContent=t; }
@@ -246,17 +250,19 @@
     saveBtn.addEventListener('click', saveVaccination);
     form.addEventListener('submit', (e)=>{ e.preventDefault(); saveVaccination(); });
 
-    btnYes.addEventListener('click', ()=>{
-      const qp = new URLSearchParams(location.search);
-      const id = animalIdEl.value.trim() || qp.get('animalId') || qp.get('animalIdd') || qp.get('number') || '';
-      const dt = dateEl.value.trim() || qp.get('date') || todayLocal();
-      hideMsg();
-      location.href = `add-event.html?animalId=${encodeURIComponent(id)}&animalIdd=${encodeURIComponent(id)}&number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
-    });
     btnNo.addEventListener('click', ()=>{ hideMsg(); location.href = 'dashboard.html'; });
+    const backBtn = document.getElementById('backToEventsBtn');
+backBtn?.addEventListener('click', () => {
+  const qp = new URLSearchParams(location.search);
+  const id = animalIdEl.value.trim() || qp.get('number') || localStorage.getItem('lastAnimalId') || '';
+  const dt = dateEl.value.trim() || qp.get('date') || todayLocal();
+  location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
+});
+
   </script>
 </body>
 </html>
+
 
 
 
