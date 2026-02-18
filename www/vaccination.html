@@ -22,10 +22,6 @@
   justify-content: space-between;
   padding: 8px 12px;
 }
-.mbk-head-vax{
-  max-width: 520px; /* بدل 780 */
-}
-
 .mbk-right,
 .mbk-left{
   width: 64px;
@@ -170,8 +166,58 @@
 .radio-group input[type="radio"]{
   accent-color: #0ea05a; /* لون مربيك */
 }
+/* ===== Bulk (Mobile First) ===== */
+.bulk-box{
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  padding:12px;
+  margin-top:8px;
+}
 
-    
+.bulk-tools{
+  display:grid;
+  grid-template-columns: 1fr auto auto;
+  gap:8px;
+  align-items:center;
+  margin-top:8px;
+}
+
+#bulkSearch{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  font-size:16px;
+  box-sizing:border-box;
+}
+
+.bulk-list{
+  margin-top:10px;
+  max-height: 220px;
+  overflow:auto;
+  border:1px solid #e2e8f0;
+  border-radius:12px;
+  padding:6px;
+}
+
+.bulk-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 10px;
+  border-radius:10px;
+  border:1px solid transparent;
+  cursor:pointer;
+  user-select:none;
+}
+
+.bulk-item:hover{ border-color:#cfe7d8; background:#f7faf7; }
+.bulk-item input{ width:18px; height:18px; accent-color:#0ea05a; }
+
+.bulk-num{ font-weight:900; color:#0f172a; }
+.bulk-hint{ margin-top:8px; font-size:12px; color:#64748b; text-align:center; }   
 </style>
 </head>
 <body>
@@ -204,6 +250,26 @@
       <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
+          <div class="mode-switch">
+  <label><input type="radio" name="entryMode" value="single" checked> فردي</label>
+  <label><input type="radio" name="entryMode" value="bulk"> جماعي</label>
+</div>
+
+<div id="bulkBox" class="bulk-box" style="display:none;">
+  <label>اختيار الحيوانات (جماعي)</label>
+
+  <div class="bulk-tools">
+    <input id="bulkSearch" type="text" placeholder="ابحث بالرقم..." inputmode="numeric">
+    <button type="button" id="bulkSelectAll" class="btn-ghost">تحديد الكل</button>
+    <button type="button" id="bulkClearAll" class="btn-ghost">مسح</button>
+  </div>
+
+  <div id="bulkList" class="bulk-list" role="listbox" aria-label="قائمة الحيوانات"></div>
+
+  <div class="bulk-hint">اضغط لاختيار أكثر من رقم (مناسب للموبايل).</div>
+</div>
+
+
           <input id="animalId" type="text" placeholder="مثال: 105"/>
         </div>
         <div>
@@ -260,7 +326,8 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     // عناصر
@@ -277,6 +344,17 @@ dashBtn?.addEventListener('click', () => location.href = 'dashboard.html');
    const msgBox  = document.getElementById('inlineMsg');
 const msgText = msgBox ? msgBox.querySelector('.text') : null;
 const btnNo   = document.getElementById('msgNo');
+    // Bulk UI
+const bulkBox = document.getElementById('bulkBox');
+const bulkList = document.getElementById('bulkList');
+const bulkSearch = document.getElementById('bulkSearch');
+const bulkSelectAll = document.getElementById('bulkSelectAll');
+const bulkClearAll = document.getElementById('bulkClearAll');
+
+const bulkSelected = new Set();   // الأرقام المختارة
+let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
+
+    
 
 
     function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
@@ -325,28 +403,163 @@ const btnNo   = document.getElementById('msgNo');
     }
 
     const { db, auth } = await setupFirebase();
+    function getMode(){
+  return document.querySelector('input[name="entryMode"]:checked')?.value || 'single';
+}
 
-    async function saveVaccination(){
-      const ctx = getCtx(); if(!ctx) return;
+function renderBulkList(filterText=''){
+  if(!bulkList) return;
+  const f = String(filterText||'').trim();
+  const list = f ? bulkAllNumbers.filter(n => n.includes(f)) : bulkAllNumbers;
+
+  bulkList.innerHTML = '';
+  for(const num of list){
+    const row = document.createElement('div');
+    row.className = 'bulk-item';
+    row.setAttribute('role','option');
+
+    const left = document.createElement('div');
+    left.className = 'bulk-num';
+    left.textContent = num;
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = bulkSelected.has(num);
+
+    row.addEventListener('click', (e)=>{
+      // منع الدبل كليك على الـcheckbox من تقليب مرتين
+      if(e.target === chk) return;
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event('change'));
+    });
+
+    chk.addEventListener('change', ()=>{
+      if(chk.checked) bulkSelected.add(num);
+      else bulkSelected.delete(num);
+    });
+
+    row.appendChild(left);
+    row.appendChild(chk);
+    bulkList.appendChild(row);
+  }
+}
+
+async function loadMyAnimalsToBulk(){
+  if(!db){ showWarn('❌ قاعدة البيانات غير جاهزة.'); return; }
+
+  const uid = auth?.currentUser?.uid;
+  if(!uid){ showWarn('⚠️ يجب تسجيل الدخول أولاً.'); return; }
+
+  try{
+    // الأفضل: where userId + orderBy animalNumber (لو متاح)
+    let snap;
+    try{
+      const q = query(
+        collection(db,'animals'),
+        where('userId','==',uid),
+        orderBy('animalNumber','asc')
+      );
+      snap = await getDocs(q);
+    }catch{
+      // fallback: where userId فقط (لو الـindex/ordering مش متاح)
+      const q = query(collection(db,'animals'), where('userId','==',uid));
+      snap = await getDocs(q);
+    }
+
+    const nums = [];
+    snap.forEach(d=>{
+      const a = d.data() || {};
+      if((a.status || 'active') === 'active' && a.number){
+        nums.push(String(a.number));
+      }
+    });
+
+    nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
+    bulkAllNumbers = nums;
+    renderBulkList(bulkSearch?.value || '');
+  }catch(e){
+    console.error(e);
+    showWarn('❌ تعذّر تحميل أرقام الحيوانات من حسابك.');
+  }
+}
+await loadMyAnimalsToBulk();
+    document.querySelectorAll('input[name="entryMode"]').forEach(r=>{
+  r.addEventListener('change', ()=>{
+    bulkBox.style.display = (getMode()==='bulk') ? 'block' : 'none';
+  });
+});
+
+bulkSearch?.addEventListener('input', ()=> renderBulkList(bulkSearch.value));
+
+bulkSelectAll?.addEventListener('click', ()=>{
+  for(const n of bulkAllNumbers) bulkSelected.add(n);
+  renderBulkList(bulkSearch?.value || '');
+});
+
+bulkClearAll?.addEventListener('click', ()=>{
+  bulkSelected.clear();
+  renderBulkList(bulkSearch?.value || '');
+});
+
+ async function saveVaccination(){
+  // 1) تحديد الوضع (فردي/جماعي)
+  const mode = document.querySelector('input[name="entryMode"]:checked')?.value || 'single';
+
+  // 2) حقول مشتركة لازم تكون موجودة
+  const dt = dateEl.value.trim();
+  const vaccine = vaccineEl.value;
+  const doseType = getDoseType();
+
+  if(!dt || !vaccine || !doseType){
+    showWarn('⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.');
+    return;
+  }
+
+  // 3) بناء قائمة الأهداف targets = الأرقام التي سنسجل لها
+  let targets = [];
+
+  if(mode === 'single'){
+    const one = animalIdEl.value.trim();
+    if(!one){ showWarn('⚠️ أدخل رقم الحيوان.'); return; }
+    targets = [one];
+  }else{
+    // bulkSelected Set فيها الأرقام المختارة من قائمة الـcheckboxes
+    targets = Array.from(bulkSelected);
+    if(targets.length === 0){ showWarn('⚠️ اختر حيوانات على الأقل.'); return; }
+  }
+
+  // 4) حفظ (Loop) على كل رقم في targets
+  saveBtn.disabled = true;
+  saveBtn.textContent = '... جاري الحفظ';
+
+  try{
+    for(const animalNumber of targets){
       const payload = {
-        type:'vaccination', eventType:'تحصين',
-        animalId: ctx.animalId, animalNumber: ctx.animalId,
-        date: ctx.dt,
-        vaccine: ctx.vaccine,
-        doseType: ctx.doseType, // primary | booster
+        type:'vaccination',
+        eventType:'تحصين',
+        animalId: animalNumber,
+        animalNumber: animalNumber,
+        date: dt,
+        vaccine: vaccine,
+        doseType: doseType,
         userId: auth?.currentUser?.uid || null,
         createdAt: serverTimestamp()
       };
 
-      saveBtn.disabled = true; saveBtn.textContent = '... جاري الحفظ';
-      try{
-        if(db) await addDoc(collection(db,'events'), payload);
-        await window.updateAnimalByEvent(payload);
-
-        hideMsg(); showMsg('✅ تم تسجيل التحصين بنجاح');
-      }catch(e){ console.error(e); showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.'); }
-      finally{ saveBtn.disabled=false; saveBtn.textContent='💾 تسجيل التحصين'; }
+      if(db) await addDoc(collection(db,'events'), payload);
+      await window.updateAnimalByEvent(payload);
     }
+
+    hideMsg();
+    showMsg('✅ تم تسجيل التحصين بنجاح');
+  }catch(e){
+    console.error(e);
+    showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.');
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = '💾 تسجيل التحصين';
+  }
+}
 
     saveBtn.addEventListener('click', saveVaccination);
     form.addEventListener('submit', (e)=>{ e.preventDefault(); saveVaccination(); });
@@ -363,6 +576,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
