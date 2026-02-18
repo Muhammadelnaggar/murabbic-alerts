@@ -218,6 +218,35 @@
 
 .bulk-num{ font-weight:900; color:#0f172a; }
 .bulk-hint{ margin-top:8px; font-size:12px; color:#64748b; text-align:center; }   
+ /* ===== Entry Mode Container ===== */
+.mode-container{
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  padding:12px 10px;
+  margin-top:6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
+}
+
+.mode-switch{
+  display:flex;
+  justify-content:center;   /* توسيط أفقي */
+  align-items:center;
+  gap:24px;
+}
+
+.mode-switch label{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.mode-switch input[type="radio"]{
+  accent-color:#0ea05a; /* لون مربيك */
+}
+   
 </style>
 </head>
 <body>
@@ -250,10 +279,13 @@
       <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
-          <div class="mode-switch">
-  <label><input type="radio" name="entryMode" value="single" checked> فردي</label>
-  <label><input type="radio" name="entryMode" value="bulk"> جماعي</label>
+         <div class="mode-container">
+  <div class="mode-switch">
+    <label><input type="radio" name="entryMode" value="single" checked> فردي</label>
+    <label><input type="radio" name="entryMode" value="bulk"> جماعي</label>
+  </div>
 </div>
+
 
 <div id="bulkBox" class="bulk-box" style="display:none;">
   <label>اختيار الحيوانات (جماعي)</label>
@@ -596,6 +628,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
