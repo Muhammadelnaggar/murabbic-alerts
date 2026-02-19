@@ -310,6 +310,22 @@ export const eventSchemas = {
   },
   guards: ["heatDecision"]
 },
+  "تحصين": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ التحصين غير صالح." },
+
+    // ✅ لا نجبر documentData هنا عشان التحصين الجماعي (هنضيف Gate جماعي لاحقًا)
+    documentData: { required: false },
+
+    vaccine: { required: true, msg: "نوع التحصين مطلوب." },
+    doseType: { required: true, msg: "نوع الجرعة مطلوب." },
+
+    notes: { required: false }
+  },
+  guards: []
+},
+
 };
 
 // ===================================================================
