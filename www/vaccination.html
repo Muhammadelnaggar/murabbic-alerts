@@ -392,42 +392,6 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
     const dashBtn = document.getElementById('dashBtn');
 dashBtn?.addEventListener('click', () => location.href = 'dashboard.html');
     const warn      = document.getElementById('warn');
-    function ensureInfoBar(){
-  // نضمن Infobar قياسي داخل mbk-main (تحت الهيدر)
-  let bar =
-    document.getElementById('infobar') ||
-    document.querySelector('.infobar') ||
-    document.querySelector('[data-infobar]');
-
-  if(!bar){
-    bar = document.createElement('div');
-    bar.id = 'infobar';
-    bar.className = 'infobar';
-    bar.style.display = 'none';
-
-    const main = document.querySelector('.mbk-main');
-    if(main){
-      // أول عنصر داخل الـmain (تحت الهيدر فورًا)
-      main.insertBefore(bar, main.firstChild);
-    }else{
-      // fallback
-      document.body.insertBefore(bar, document.body.firstChild);
-    }
-  }
-  return bar;
-}
-
-function setInfoBar(type, text){
-  const bar = ensureInfoBar();
-  bar.style.display = 'block';
-  bar.textContent = text;
-
-  bar.classList.remove('ok','err','warn','success','error');
-  if(type === 'success') bar.classList.add('ok');
-  else if(type === 'error') bar.classList.add('err');
-  else bar.classList.add('warn');
-}
-
     // Bulk UI
 const bulkBox = document.getElementById('bulkBox');
 const bulkList = document.getElementById('bulkList');
@@ -437,10 +401,6 @@ const bulkClearAll = document.getElementById('bulkClearAll');
 
 const bulkSelected = new Set();   // الأرقام المختارة
 let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
-
-    
-
-
     function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
     function showWarn(t){ warn.textContent=t; }
     function clearWarn(){ warn.textContent=''; }
@@ -601,7 +561,7 @@ bulkClearAll?.addEventListener('click', ()=>{
   const doseType = getDoseType();
 
   if(!dt || !vaccine || !doseType){
-   setInfoBar('warn','⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.');
+   window.showMsg(window.ensureInfoBar(form), '⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.', 'warning');
     return;
   }
 
@@ -643,12 +603,11 @@ bulkClearAll?.addEventListener('click', ()=>{
     }
 
   clearWarn();
-setInfoBar('success','✅ تم تسجيل التحصين بنجاح');
-
+window.showMsg(window.ensureInfoBar(form), '✅ تم تسجيل التحصين بنجاح', 'success');
 
   }catch(e){
     console.error(e);
-    setInfoBar('error','❌ تعذّر الحفظ. حاول مرة أخرى.');
+  window.showMsg(window.ensureInfoBar(form), '❌ تعذّر الحفظ. حاول مرة أخرى.', 'error');
   }finally{
     saveBtn.disabled = false;
     saveBtn.textContent = '💾 تسجيل التحصين';
@@ -664,6 +623,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
