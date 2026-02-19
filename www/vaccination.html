@@ -298,7 +298,7 @@
   </div>
 
   <div class="card">
-    <form id="vaccinationForm">
+  <form id="vaccinationForm" data-validate="true" data-event="تحصين">
       <div class="row row-2">
         <div>
           <label for="animalId">رقم الحيوان</label>
@@ -327,20 +327,18 @@
 
   <div class="bulk-hint">اضغط لاختيار أكثر من رقم (مناسب للموبايل).</div>
 </div>
-
-
-          <input id="animalId" type="text" placeholder="مثال: 105"/>
+          <input id="animalNumber" data-field="animalNumber" type="text" placeholder="مثال: 105"/>
         </div>
         <div>
           <label for="date">التاريخ</label>
-          <input id="date" type="date"/>
+         <input id="eventDate" data-field="eventDate" type="date"/>
         </div>
       </div>
 
       <div class="row">
         <div>
           <label for="vaccine">نوع التحصين</label>
-          <select id="vaccine">
+         <select id="vaccine" data-field="vaccine">
             <option value="" selected disabled>اختر نوع التحصين</option>
             <option value="الحمى القلاعية (FMD)">الحمى القلاعية (FMD)</option>
             <option value="الجلد العقدي (LSD)">الجلد العقدي (LSD)</option>
@@ -358,8 +356,8 @@
 
 <div class="dose-container">
   <div class="radio-group">
-    <label><input type="radio" name="doseType" value="primary"/> أولية</label>
-    <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
+    <input type="radio" name="doseType" value="primary" data-field="doseType"/>
+<input type="radio" name="doseType" value="booster" data-field="doseType"/>
   </div>
 </div>
      <div id="warn" class="warn"></div>
@@ -551,68 +549,61 @@ bulkClearAll?.addEventListener('click', ()=>{
   renderBulkList(bulkSearch?.value || '');
 });
 
- async function saveVaccination(){
-  // 1) تحديد الوضع (فردي/جماعي)
-  const mode = document.querySelector('input[name="entryMode"]:checked')?.value || 'single';
+form.addEventListener("mbk:valid", async (e) => {
+  const bar = window.ensureInfoBar ? window.ensureInfoBar(form) : null;
 
-  // 2) حقول مشتركة لازم تكون موجودة
-  const dt = dateEl.value.trim();
-  const vaccine = vaccineEl.value;
-  const doseType = getDoseType();
+  const ev = e?.detail?.formData || {};
+  const uid = auth?.currentUser?.uid || null;
 
-  if(!dt || !vaccine || !doseType){
-   window.showMsg(window.ensureInfoBar(form), '⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.', 'warning');
+  // ✅ targets: فردي أو جماعي (لو دخل أرقام متعددة في animalNumber)
+  const rawNums = String(ev.animalNumber || "").trim();
+  const targets = [...new Set((rawNums.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
+
+  if (!targets.length) {
+    if (window.showMsg && bar) window.showMsg(bar, "⚠️ أدخل رقم الحيوان.", "warning");
     return;
   }
 
-  // 3) بناء قائمة الأهداف targets = الأرقام التي سنسجل لها
-  let targets = [];
+  const dt = String(ev.eventDate || "").trim();
+  const vaccine = String(ev.vaccine || "").trim();
+  const doseType = String(ev.doseType || "").trim();
 
-  if(mode === 'single'){
-    const one = animalIdEl.value.trim();
-    if(!one){ setInfoBar('warn','⚠️ أدخل رقم الحيوان.');
- return; }
-    targets = [one];
-  }else{
-    // bulkSelected Set فيها الأرقام المختارة من قائمة الـcheckboxes
-    targets = Array.from(bulkSelected);
-    if(targets.length === 0){ setInfoBar('warn','⚠️ اختر حيوانات على الأقل.');
- return; }
+  if (!dt || !vaccine || !doseType) {
+    if (window.showMsg && bar) window.showMsg(bar, "⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.", "warning");
+    return;
   }
 
-  // 4) حفظ (Loop) على كل رقم في targets
-  saveBtn.disabled = true;
-  saveBtn.textContent = '... جاري الحفظ';
+  const saveBtn = document.getElementById("saveBtn");
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "... جاري الحفظ"; }
 
-  try{
-    for(const animalNumber of targets){
+  try {
+    for (const animalNumber of targets) {
       const payload = {
-        type:'vaccination',
-        eventType:'تحصين',
+        type: "vaccination",
+        eventType: "تحصين",
+        animalNumber,
         animalId: animalNumber,
-        animalNumber: animalNumber,
-        date: dt,
-        vaccine: vaccine,
-        doseType: doseType,
-        userId: auth?.currentUser?.uid || null,
-        createdAt: serverTimestamp()
+        eventDate: dt,
+        vaccine,
+        doseType,
+        userId: uid,
+        createdAt: serverTimestamp(),
+        source: "vaccination.html"
       };
 
-      if(db) await addDoc(collection(db,'events'), payload);
-      await window.updateAnimalByEvent(payload);
+      await addDoc(collection(db, "events"), payload);
+      if (window.updateAnimalByEvent) await window.updateAnimalByEvent(payload);
     }
 
-  clearWarn();
-window.showMsg(window.ensureInfoBar(form), '✅ تم تسجيل التحصين بنجاح', 'success');
-
-  }catch(e){
-    console.error(e);
-  window.showMsg(window.ensureInfoBar(form), '❌ تعذّر الحفظ. حاول مرة أخرى.', 'error');
-  }finally{
-    saveBtn.disabled = false;
-    saveBtn.textContent = '💾 تسجيل التحصين';
+    if (window.showMsg && bar) window.showMsg(bar, "✅ تم تسجيل التحصين بنجاح", "success");
+  } catch (err) {
+    console.error(err);
+    if (window.showMsg && bar) window.showMsg(bar, "❌ تعذّر الحفظ. حاول مرة أخرى.", "error");
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 تسجيل التحصين"; }
   }
-}
+});
+
     const backBtn = document.getElementById('backToEventsBtn');
 backBtn?.addEventListener('click', () => {
   const qp = new URLSearchParams(location.search);
@@ -623,6 +614,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
