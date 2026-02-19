@@ -444,29 +444,6 @@ let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
     function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
     function showWarn(t){ warn.textContent=t; }
     function clearWarn(){ warn.textContent=''; }
-    function setInfoBar(type, text){
-  // forms-init بيعمل infobar قياسي — نخبط عليه
-  const bar =
-    document.getElementById('infobar') ||
-    document.querySelector('.infobar') ||
-    document.querySelector('[data-infobar]');
-
-  if(!bar){
-    // لو لأي سبب infobar مش موجود، نرجع لـ warn بدل ما نعمل UI جديد
-    showWarn(text);
-    return;
-  }
-
-  bar.style.display = 'block';
-  bar.textContent = text;
-
-  // نحاول ندي hint للستايل لو موجود
-  bar.classList.remove('ok','err','warn','success','error');
-  if(type === 'success') bar.classList.add('ok');
-  else if(type === 'error') bar.classList.add('err');
-  else bar.classList.add('warn');
-}
-
     function hydrate(){
       const qp = new URLSearchParams(location.search);
       const id = qp.get('animalId') || qp.get('animalIdd') || qp.get('number') || localStorage.getItem('lastAnimalId') || '';
@@ -666,9 +643,8 @@ bulkClearAll?.addEventListener('click', ()=>{
     }
 
   clearWarn();
-form.dispatchEvent(new CustomEvent('mbk:valid', {
-  detail: { message: '✅ تم تسجيل التحصين بنجاح' }
-}));
+setInfoBar('success','✅ تم تسجيل التحصين بنجاح');
+
 
   }catch(e){
     console.error(e);
@@ -685,14 +661,10 @@ backBtn?.addEventListener('click', () => {
   const dt = dateEl.value.trim() || qp.get('date') || todayLocal();
   location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
 });
-form.addEventListener('mbk:valid', async (e) => {
-  // forms-init هو اللي ضمن الـinfobar، وإحنا هنا ننفذ الحفظ فقط
-  await saveVaccination();
-});
-
   </script>
 </body>
 </html>
+
 
 
 
