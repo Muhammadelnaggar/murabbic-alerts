@@ -66,16 +66,6 @@
   font-size: 13px;
   cursor: pointer;
 }
-.notice .notice-actions{
-  display:flex;
-  gap:8px;
-  margin-top:10px;
-  position:static;
-  border:0;
-  background:transparent;
-  padding:0;
-}
-.notice{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46}
 /* ===== Bottom Bar (Murabbik) ===== */
 .mbk-bottombar{
   position: fixed;
@@ -372,16 +362,7 @@
     <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
   </div>
 </div>
-
      <div id="warn" class="warn"></div>
-
-<div id="inlineMsg" class="notice" role="status" aria-live="polite">
-  <div class="text"></div>
-  <div class="notice-actions">
-    <button type="button" id="msgNo" class="btn-ghost">لوحة التحكم</button>
-  </div>
-</div>
-
     </form>
   </div>
    </main> 
@@ -394,10 +375,11 @@
 
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
+    import { db, auth } from "/js/firebase-config.js";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 
     // عناصر
     const ctxAnimal = document.getElementById('ctxAnimal');
@@ -410,9 +392,6 @@
     const dashBtn = document.getElementById('dashBtn');
 dashBtn?.addEventListener('click', () => location.href = 'dashboard.html');
     const warn      = document.getElementById('warn');
-   const msgBox  = document.getElementById('inlineMsg');
-const msgText = msgBox ? msgBox.querySelector('.text') : null;
-const btnNo   = document.getElementById('msgNo');
     // Bulk UI
 const bulkBox = document.getElementById('bulkBox');
 const bulkList = document.getElementById('bulkList');
@@ -429,8 +408,28 @@ let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
     function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
     function showWarn(t){ warn.textContent=t; }
     function clearWarn(){ warn.textContent=''; }
-    function showMsg(text){ msgText.textContent=text; msgBox.style.display='block'; }
-    function hideMsg(){ msgBox.style.display='none'; msgText.textContent=''; }
+    function setInfoBar(type, text){
+  // forms-init بيعمل infobar قياسي — نخبط عليه
+  const bar =
+    document.getElementById('infobar') ||
+    document.querySelector('.infobar') ||
+    document.querySelector('[data-infobar]');
+
+  if(!bar){
+    // لو لأي سبب infobar مش موجود، نرجع لـ warn بدل ما نعمل UI جديد
+    showWarn(text);
+    return;
+  }
+
+  bar.style.display = 'block';
+  bar.textContent = text;
+
+  // نحاول ندي hint للستايل لو موجود
+  bar.classList.remove('ok','err','warn','success','error');
+  if(type === 'success') bar.classList.add('ok');
+  else if(type === 'error') bar.classList.add('err');
+  else bar.classList.add('warn');
+}
 
     function hydrate(){
       const qp = new URLSearchParams(location.search);
@@ -447,15 +446,6 @@ let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
     animalIdEl.addEventListener('input', ()=>{ ctxAnimal.textContent = `الحيوان: ${animalIdEl.value.trim()||'غير محدد'}`; });
     dateEl.addEventListener('input', ()=>{ try{ ctxDate.textContent = `التاريخ: ${new Date(dateEl.value).toLocaleDateString('ar-EG')}`;}catch{ ctxDate.textContent = `التاريخ: ${dateEl.value}`; } });
 
-    async function setupFirebase(){
-      try{
-        const mod = await import('./js/firebase-config.js?v=4');
-        if(mod?.db && mod?.auth){ return { db:mod.db, auth:mod.auth }; }
-        if(mod?.firebaseConfig){ const app=initializeApp(mod.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }
-      }catch(e){ console.warn('fb cfg import failed', e); }
-      try{ const cfg = await import('./config.js?v=4'); const app=initializeApp(cfg.firebaseConfig); return { db:getFirestore(app), auth:getAuth(app) }; }catch(e2){ showWarn('❌ تعذّر تحميل إعدادات Firebase.'); return { db:null, auth:null }; }
-    }
-
     function getDoseType(){
       const el = document.querySelector('input[name="doseType"]:checked');
       return el ? el.value : null;
@@ -470,8 +460,6 @@ let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
       clearWarn(); localStorage.setItem('lastAnimalId', animalId);
       return { animalId, dt, vaccine, doseType };
     }
-
-    const { db, auth } = await setupFirebase();
     function getMode(){
   return document.querySelector('input[name="entryMode"]:checked')?.value || 'single';
 }
@@ -564,7 +552,7 @@ onAuthStateChanged(auth, (user) => {
   r.addEventListener('change', ()=>{
     const isBulk = (getMode()==='bulk');
     bulkBox.style.display = isBulk ? 'block' : 'none';
-
+    animalIdEl.disabled = isBulk;
     if (isBulk) {
       // لو Auth جهّز بعد فتح الصفحة، أو لو التحميل ما حصلش قبل كده
       if (auth?.currentUser?.uid && !bulkLoaded) {
@@ -600,7 +588,7 @@ bulkClearAll?.addEventListener('click', ()=>{
   const doseType = getDoseType();
 
   if(!dt || !vaccine || !doseType){
-    showWarn('⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.');
+   setInfoBar('warn','⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.');
     return;
   }
 
@@ -609,12 +597,14 @@ bulkClearAll?.addEventListener('click', ()=>{
 
   if(mode === 'single'){
     const one = animalIdEl.value.trim();
-    if(!one){ showWarn('⚠️ أدخل رقم الحيوان.'); return; }
+    if(!one){ setInfoBar('warn','⚠️ أدخل رقم الحيوان.');
+ return; }
     targets = [one];
   }else{
     // bulkSelected Set فيها الأرقام المختارة من قائمة الـcheckboxes
     targets = Array.from(bulkSelected);
-    if(targets.length === 0){ showWarn('⚠️ اختر حيوانات على الأقل.'); return; }
+    if(targets.length === 0){ setInfoBar('warn','⚠️ اختر حيوانات على الأقل.');
+ return; }
   }
 
   // 4) حفظ (Loop) على كل رقم في targets
@@ -639,11 +629,11 @@ bulkClearAll?.addEventListener('click', ()=>{
       await window.updateAnimalByEvent(payload);
     }
 
-    hideMsg();
-    showMsg('✅ تم تسجيل التحصين بنجاح');
+  clearWarn();
+setInfoBar('success', '✅ تم تسجيل التحصين بنجاح');
   }catch(e){
     console.error(e);
-    showWarn('❌ تعذّر الحفظ. حاول مرة أخرى.');
+    setInfoBar('error','❌ تعذّر الحفظ. حاول مرة أخرى.');
   }finally{
     saveBtn.disabled = false;
     saveBtn.textContent = '💾 تسجيل التحصين';
@@ -651,9 +641,6 @@ bulkClearAll?.addEventListener('click', ()=>{
 }
 
     saveBtn.addEventListener('click', saveVaccination);
-    form.addEventListener('submit', (e)=>{ e.preventDefault(); saveVaccination(); });
-
-    btnNo.addEventListener('click', ()=>{ hideMsg(); location.href = 'dashboard.html'; });
     const backBtn = document.getElementById('backToEventsBtn');
 backBtn?.addEventListener('click', () => {
   const qp = new URLSearchParams(location.search);
@@ -665,6 +652,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
