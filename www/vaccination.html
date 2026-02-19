@@ -630,7 +630,10 @@ bulkClearAll?.addEventListener('click', ()=>{
     }
 
   clearWarn();
-setInfoBar('success', '✅ تم تسجيل التحصين بنجاح');
+form.dispatchEvent(new CustomEvent('mbk:valid', {
+  detail: { message: '✅ تم تسجيل التحصين بنجاح' }
+}));
+
   }catch(e){
     console.error(e);
     setInfoBar('error','❌ تعذّر الحفظ. حاول مرة أخرى.');
@@ -652,6 +655,7 @@ backBtn?.addEventListener('click', () => {
   </script>
 </body>
 </html>
+
 
 
 
