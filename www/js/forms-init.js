@@ -1875,7 +1875,7 @@ formData.eventDate = dt;
 
 function autoAttach() {
 document
-  .querySelectorAll('form[data-validate="true"][data-event]')
+ .querySelectorAll('form[data-event]')
   .forEach((f) => {
     const ev = String(f.getAttribute("data-event") || "").trim();
 
