@@ -318,7 +318,7 @@
   import { collection, addDoc, doc, setDoc, serverTimestamp, getDocs, query, where, orderBy, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
+   import { vaccinationTasksFromEvent } from "/js/form-rules.js";
     // عناصر
     const ctxAnimal  = document.getElementById("ctxAnimal");
     const ctxDate    = document.getElementById("ctxDate");
@@ -407,108 +407,60 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
       x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
       return x.toISOString().slice(0,10);
     }
-  async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
-  const num  = String(animalNumber||"").trim();
-  const dt   = String(eventDate||"").slice(0,10);
-  const vx   = String(vaccine||"").trim();
-  const dose = String(doseType||"").trim();
+async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType, campaignId){
+  const num = String(animalNumber || "").trim();
+  const dt  = String(eventDate || "").slice(0,10);
+  const vx  = String(vaccine || "").trim();
+  const dose = String(doseType || "").trim();
 
   if (!uid || !num || !dt || !vx) return;
 
-  const tasks = [];
+  // ✅ المصدر الوحيد للحقيقة: المولّد المركزي
+  const tasks = vaccinationTasksFromEvent({
+    vaccine: vx,
+    doseType: dose,
+    eventDate: dt,
+    campaignId
+  }) || [];
 
-  // نفس اختيارات الـ <select> عندك بالضبط:
-  const isFMD      = vx.includes("FMD")        || vx.includes("الحمى القلاعية");
-  const isLSD      = vx.includes("LSD")        || vx.includes("الجلد العقدي");
-  const isClost    = vx.includes("Clostridial")|| vx.includes("التسمم المعوي") || vx.includes("اللاهوائيات");
-  const isBruc     = vx.includes("Brucella")   || vx.includes("البروسيلا");
-  const isIBR      = vx === "IBR"              || vx.includes("IBR");
-  const isBVD      = vx === "BVD"              || vx.includes("BVD");
-  const isAnthrax  = vx.includes("Anthrax")    || vx.includes("الجمرة");
-  const isPaste    = vx.includes("باستر")      || vx.includes("Paste") || vx.includes("HS/");
+  if (!tasks.length) return;
 
-  // ✅ FMD: أولية = Booster 21 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
-  if (isFMD){
-    if (dose ==="prime"){
-      tasks.push({ dueDate: addDays(dt, 21),  title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "periodic"){
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    }
+  // ✅ اكتب Tasks بصيغة واحدة ثابتة (taskType=vaccination) عشان الداش/التنبيهات ما تتلخبطش
+  for (const t of tasks){
+    const dueDate = String(t.dueDate || "").slice(0,10);
+    if (!dueDate) continue;
 
-  // ✅ LSD: سنوي
-  } else if (isLSD){
-    tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+    // taskId ثابت (زي سكة التزامن) لمنع التكرار
+    const keySafe = String(t.vaccineKey || vx).replace(/\s+/g,'_');
+    const taskId  = `vax__${num}__${keySafe}__${dueDate}__${String(t.doseType || dose || '').replace(/\s+/g,'_')}`;
 
-  // ✅ Clostridial: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
-  } else if (isClost){
-    if (dose ==="prime"){
-      tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "periodic"){
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    }
+    const payload = {
+      userId: uid,
+      animalNumber: num,
 
-  // ✅ Pasteurella/HS: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
-  } else if (isPaste){
-    if (dose ==="prime"){
-      tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "periodic"){
-      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    }
+      // ✅ تصنيف واضح
+      type: "task",
+      taskType: "vaccination",
 
-  // ✅ IBR / BVD / Anthrax: سنوي
-  } else if (isIBR || isBVD || isAnthrax){
-    tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+      // ✅ مفاتيح التحصين
+      vaccineKey: String(t.vaccineKey || vx),
+      dueDate,
+      windowStart: String(t.windowStart || dueDate),
+      windowEnd: String(t.windowEnd || dueDate),
 
-  // ✅ Brucella: مرة واحدة (بدون تاسكات تلقائيًا)
-  } else if (isBruc){
-    // لا Tasks تلقائية للبروسيلا (مرة واحدة غالبًا)
+      // ✅ ميتاداتا
+      doseType: String(t.doseType || dose || ""),
+      campaignId: campaignId || (t.campaignId || ""),
+      status: "pending",
+      done: false,
+
+      createdAt: serverTimestamp(),
+      source: "vaccination.html"
+    };
+
+    await setDoc(doc(db, "tasks", taskId), payload, { merge: true });
   }
-
-for (const t of tasks){
-  if (!t.dueDate) continue;
-
-  // ✅ نفس سكة التزامن: taskId ثابت + setDoc
-  const dueDate = String(t.dueDate).slice(0,10);
-  const taskId  = `vax__${String(num)}__${String(vx).replace(/\s+/g,'_')}__${dueDate}__${String(t.stage||'')}`;
-
-  const payload = {
-    userId: uid,
-    animalNumber: String(num),
-
-    // ✅ مهم جدًا: smart-checks يقرأ فقط protocol_step + pending
-    type: "protocol_step",
-    protocol: "vaccination",
-    program: String(vx),
-
-    // تواريخ التخطيط (smart-checks يستخدم plannedDate / plannedTime)
-    dueDate,
-    plannedDate: dueDate,
-    plannedTime: "08:00",
-    plannedDateTime: dueDate + "T08:00",
-
-    // معلومات العرض
-    stepName: String(t.title || "تحصين"),
-    stage: String(t.stage || ""),
-    vaccineKey: String(vx),
-    doseType: String(dose),
-
-    // نافذة 7 أيام (جاهزة لأي عرض لاحق)
-    windowStart: dueDate,
-    windowEnd: addDays(dueDate, 6),
-
-    status: "pending",
-    done: false,
-    createdAt: serverTimestamp(),
-    source: "vaccination.html"
-  };
-
-  await setDoc(doc(db, "tasks", taskId), payload, { merge: true });
-}
-}
-    async function saveFromCentral(fd){
+}   async function saveFromCentral(fd){
       const uid = auth?.currentUser?.uid;
       if (!uid){
         msg("سجّل الدخول أولًا.", "error");
@@ -858,6 +810,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
