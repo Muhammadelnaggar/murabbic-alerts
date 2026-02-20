@@ -395,92 +395,93 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
       x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
       return x.toISOString().slice(0,10);
     }
-    // ✅ إنشاء المهام تلقائيًا حسب البروتوكول (نسخة أولى)
-    async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
-      const num = String(animalNumber||"").trim();
-      const dt  = String(eventDate||"").slice(0,10);
-      const vx  = String(vaccine||"").trim();
-      const dose= String(doseType||"").trim();
+  async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
+  const num  = String(animalNumber||"").trim();
+  const dt   = String(eventDate||"").slice(0,10);
+  const vx   = String(vaccine||"").trim();
+  const dose = String(doseType||"").trim();
 
-      if (!uid || !num || !dt || !vx) return;
+  if (!uid || !num || !dt || !vx) return;
 
-      const tasks = [];
-const isFMD = vx.includes("FMD") || vx.includes("الحمى القلاعية");
-const isLSD = vx.includes("LSD") || vx.includes("الجلد العقدي");
-const isClost = vx.includes("Clostridial") || vx.includes("التسمم المعوي") || vx.includes("اللاهوائيات");
-const isBruc = vx.includes("Brucella") || vx.includes("البروسيلا");
-const isIBR = vx === "IBR" || vx.includes("IBR");
-const isBVD = vx === "BVD" || vx.includes("BVD");
-const isAnthrax = vx.includes("Anthrax") || vx.includes("الجمرة");
-const isPaste = vx.includes("باستر") || vx.includes("Paste") || vx.includes("HS/");
+  const tasks = [];
 
-// ✅ FMD: أولية = Booster 21 + إعادة 6 شهور | منشطة = إعادة 6 شهور
-if (isFMD){
-  if (dose === "primary"){
-    tasks.push({ dueDate: addDays(dt, 21),  title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  } else if (dose === "booster"){
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  }
+  // نفس اختيارات الـ <select> عندك بالضبط:
+  const isFMD      = vx.includes("FMD")        || vx.includes("الحمى القلاعية");
+  const isLSD      = vx.includes("LSD")        || vx.includes("الجلد العقدي");
+  const isClost    = vx.includes("Clostridial")|| vx.includes("التسمم المعوي") || vx.includes("اللاهوائيات");
+  const isBruc     = vx.includes("Brucella")   || vx.includes("البروسيلا");
+  const isIBR      = vx === "IBR"              || vx.includes("IBR");
+  const isBVD      = vx === "BVD"              || vx.includes("BVD");
+  const isAnthrax  = vx.includes("Anthrax")    || vx.includes("الجمرة");
+  const isPaste    = vx.includes("باستر")      || vx.includes("Paste") || vx.includes("HS/");
 
-// ✅ LSD: سنوي
-} else if (isLSD){
-  tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
-
-// ✅ Clostridial: أولية = Booster 30 + إعادة 6 شهور | منشطة = إعادة 6 شهور
-} else if (isClost){
-  if (dose === "primary"){
-    tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  } else if (dose === "booster"){
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  }
-
-// ✅ Pasteurella/HS: أولية = Booster 30 + إعادة 6 شهور | منشطة = إعادة 6 شهور
-} else if (isPaste){
-  if (dose === "primary"){
-    tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  } else if (dose === "booster"){
-    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-  }
-
-// ✅ IBR / BVD / Anthrax: سنوي (افتراضي آمن الآن)
-} else if (isIBR || isBVD || isAnthrax){
-  tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
-
-// ✅ Brucella: مرة واحدة (بدون تاسك تلقائي)
-} else if (isBruc){
-  // لا Tasks تلقائية للبروسيلا (مرة واحدة غالبًا)
-}
-      for (const t of tasks){
-        if (!t.dueDate) continue;
-       await addDoc(collection(db,"tasks"), {
-  // ✅ Murabbik Tasks (Vaccination)
-  type: "task",
-  taskType: "vaccination",
-  title: t.title,
-  stage: t.stage,
-
-  vaccineKey: vx,         // مفتاح البروتوكول (FMD, LSD, ... أو Bundle_*)
-  vaccine: vx,            // توافق للخلف لو في كود قديم بيقرأ vaccine
-
-  doseType: dose,         // primary | booster | repeat6m | repeat12m | ...
-  dueDate: t.dueDate,
-
-  windowStart: t.dueDate,
-  windowEnd: addDays(t.dueDate, 6),  // نافذة 7 أيام ثابتة
-
-  animalNumber: String(num),
-  userId: uid,
-
-  status: "pending",
-  createdAt: serverTimestamp(),
-  source: "vaccination.html"
-});
-      }
+  // ✅ FMD: أولية = Booster 21 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
+  if (isFMD){
+    if (dose === "primary"){
+      tasks.push({ dueDate: addDays(dt, 21),  title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+    } else if (dose === "booster"){
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
     }
 
+  // ✅ LSD: سنوي
+  } else if (isLSD){
+    tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+
+  // ✅ Clostridial: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
+  } else if (isClost){
+    if (dose === "primary"){
+      tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+    } else if (dose === "booster"){
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+    }
+
+  // ✅ Pasteurella/HS: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
+  } else if (isPaste){
+    if (dose === "primary"){
+      tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+    } else if (dose === "booster"){
+      tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+    }
+
+  // ✅ IBR / BVD / Anthrax: سنوي
+  } else if (isIBR || isBVD || isAnthrax){
+    tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+
+  // ✅ Brucella: مرة واحدة (بدون تاسكات تلقائيًا)
+  } else if (isBruc){
+    // لا Tasks تلقائية للبروسيلا (مرة واحدة غالبًا)
+  }
+
+  // اكتب الـTasks (إن وجدت)
+  for (const t of tasks){
+    if (!t.dueDate) continue;
+    await addDoc(collection(db,"tasks"), {
+      // ✅ Murabbik Tasks (Vaccination)
+      type: "task",
+      taskType: "vaccination",
+      title: t.title,
+      stage: t.stage,
+
+      vaccineKey: vx,
+      vaccine: vx,
+      doseType: dose,
+
+      dueDate: t.dueDate,
+      windowStart: t.dueDate,
+      windowEnd: addDays(t.dueDate, 6),  // نافذة 7 أيام ثابتة
+
+      animalNumber: String(num),
+      userId: uid,
+
+      status: "pending",
+      createdAt: serverTimestamp(),
+      source: "vaccination.html"
+    });
+  }
+}
     async function saveFromCentral(fd){
       const uid = auth?.currentUser?.uid;
       if (!uid){
@@ -831,6 +832,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
