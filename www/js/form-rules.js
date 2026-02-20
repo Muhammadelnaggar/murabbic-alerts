@@ -332,17 +332,19 @@ export const eventSchemas = {
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
 export const guards = {
+  
 vaccinationDecision(fd) {
   const doc = fd.documentData;
-  if (!doc) return "❌ تعذّر العثور على الحيوان — تحقق من الرقم.";
+
+  // ✅ التحصين الجماعي: ممكن لا يتوفر documentData داخل نفس الفورم
+  // ساعتها لا نمنع الحفظ هنا (وجود/أهلية كل رقم تُحسم عند مرحلة الحفظ/التحميل)
+  if (!doc) return null;
 
   // ✅ خارج القطيع
   const st = String(doc?.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ لا يمكن تسجيل تحصين — الحيوان خارج القطيع.";
 
-  // ✅ ملاحظة مهمة: الحيوان المستبعد تناسليًا *يُحصَّن عادي* (حسب سياسة مُرَبِّيك)
-  // لذلك لا يوجد منع بناءً على reproductiveStatus / breedingBlocked هنا.
-
+  // ✅ المستبعد تناسليًا يُحصَّن عادي
   return null;
 },
 
@@ -877,6 +879,97 @@ ovsynchEligibilityDecision(fd) {
 
 }
 };
+// ===================================================================
+//  Vaccination Tasks Generator (Egypt v1) — Central Source of Truth
+// ===================================================================
+function ymdAddDays(ymd, days){
+  const d = new Date(String(ymd||"").slice(0,10));
+  if (Number.isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() + Number(days||0));
+  const x = new Date(d.getTime());
+  x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+  return x.toISOString().slice(0,10);
+}
+
+// ✅ نافذة 7 أيام ثابتة: start = dueDate ، end = dueDate + 6
+function makeTask(typeKey, dueDate, meta = {}){
+  const dd = String(dueDate||"").slice(0,10);
+  return {
+    taskType: "vaccination",
+    vaccineKey: typeKey,
+    dueDate: dd,
+    windowStart: dd,
+    windowEnd: ymdAddDays(dd, 6),
+    status: "open",
+    ...meta
+  };
+}
+
+// ✅ المصدر المركزي للبروتوكولات (مصر v1)
+// تُرجع قائمة Tasks (واحدة أو أكثر) بناءً على Event التحصين الحالي
+export function vaccinationTasksFromEvent({ vaccine, doseType, eventDate, campaignId }){
+  const v = String(vaccine||"").trim();
+  const dose = String(doseType||"").trim(); // primary | booster
+  const dt = String(eventDate||"").slice(0,10);
+  if (!v || !dose || !dt) return [];
+
+  const meta = campaignId ? { campaignId } : {};
+
+  // قاعدة Zero History (Booster 21 يوم) عند الجرعة الأولية
+  if (dose === "primary"){
+    // Task Booster بعد 21 يوم
+    return [
+      makeTask(v, ymdAddDays(dt, 21), { ...meta, doseType: "booster", basedOn: "primary+21" })
+    ];
+  }
+
+  // جرعة منشطة (Booster): مواعيد التكرار حسب البروتوكول
+  // ملاحظة: لو احتجت "أولي + سنوي" لبعض اللقاحات، ده يُدار من صفحة "أولي" أعلاه (بوستر)
+  // هنا نضبط تكرار الجرعة المنشطة نفسها:
+
+  // 6 شهور ≈ 182 يوم
+  const SIX_MONTHS = 182;
+  // سنة ≈ 365 يوم
+  const ONE_YEAR = 365;
+
+  // بروتوكولات مصر v1 (مبسطة مركزياً)
+  // - FMD: كل 6 شهور
+  // - تنفسي ميت/منفصل: كل 6 شهور
+  // - باسترِيلا: كل 6 شهور
+  // - LSD حي: سنوي
+  // - تنفسي حي: سنوي
+  // - 3 أيام: سنوي
+  // - بروسيلا: مرة واحدة (لا تكرار)
+  // - لاهوائيات للعجول: كل 6 شهور حتى سنة (ده يُحسم لاحقًا من عمر الحيوان في Engine/Save)
+
+  if (v.includes("FMD") || v.includes("الحمى القلاعية")) {
+    return [ makeTask(v, ymdAddDays(dt, SIX_MONTHS), { ...meta, doseType: "booster", cycle: "6m" }) ];
+  }
+
+  if (v.includes("Pasteurella") || v.includes("الباستريلا") || v.includes("HS")) {
+    return [ makeTask(v, ymdAddDays(dt, SIX_MONTHS), { ...meta, doseType: "booster", cycle: "6m" }) ];
+  }
+
+  if (v.includes("Clostridial") || v.includes("التسمم المعوي")) {
+    return [ makeTask(v, ymdAddDays(dt, SIX_MONTHS), { ...meta, doseType: "booster", cycle: "6m" }) ];
+  }
+
+  if (v.includes("LSD") || v.includes("الجلد العقدي")) {
+    return [ makeTask(v, ymdAddDays(dt, ONE_YEAR), { ...meta, doseType: "booster", cycle: "1y" }) ];
+  }
+
+  if (v === "IBR" || v === "BVD" || v.includes("تنفسي")) {
+    return [ makeTask(v, ymdAddDays(dt, ONE_YEAR), { ...meta, doseType: "booster", cycle: "1y" }) ];
+  }
+
+  if (v.includes("Brucella") || v.includes("البروسيلا")) {
+    // مرة واحدة — لا مهام لاحقة
+    return [];
+  }
+
+  // Default: سنوي احتياطي
+  return [ makeTask(v, ymdAddDays(dt, ONE_YEAR), { ...meta, doseType: "booster", cycle: "1y" }) ];
+}
 // ===================================================================
 
 // ===================================================================
