@@ -405,45 +405,54 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
       if (!uid || !num || !dt || !vx) return;
 
       const tasks = [];
+const isFMD = vx.includes("FMD") || vx.includes("الحمى القلاعية");
+const isLSD = vx.includes("LSD") || vx.includes("الجلد العقدي");
+const isClost = vx.includes("Clostridial") || vx.includes("التسمم المعوي") || vx.includes("اللاهوائيات");
+const isBruc = vx.includes("Brucella") || vx.includes("البروسيلا");
+const isIBR = vx === "IBR" || vx.includes("IBR");
+const isBVD = vx === "BVD" || vx.includes("BVD");
+const isAnthrax = vx.includes("Anthrax") || vx.includes("الجمرة");
+const isPaste = vx.includes("باستر") || vx.includes("Paste") || vx.includes("HS/");
 
-      const isFMD = vx.includes("FMD") || vx.includes("الحمى القلاعية");
-      const isLSD = vx.includes("LSD") || vx.includes("الجلد العقدي");
-      const is3d  = vx.includes("3 أيام") || vx.includes("3 ايام") || vx.includes("ثلاث");
-      const isPaste = vx.includes("باستر") || vx.includes("Paste") || vx.includes("HS/");
-      const isRespLive = vx.includes("تنفسي حي");
-      const isRespDead = vx.includes("تنفسي ميت") || vx.includes("منفصل");
+// ✅ FMD: أولية = Booster 21 + إعادة 6 شهور | منشطة = إعادة 6 شهور
+if (isFMD){
+  if (dose === "primary"){
+    tasks.push({ dueDate: addDays(dt, 21),  title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  } else if (dose === "booster"){
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  }
 
-      if (isFMD){
-        if (dose === "primary"){
-          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
-        } else if (dose === "booster"){
-          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-        }
-      } else if (isLSD || is3d){
-        tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
-      } else if (isPaste){
-        if (dose === "primary"){
-          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-        } else if (dose === "booster"){
-          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-        }
-      } else if (isRespLive){
-        if (dose === "primary"){
-          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
-          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
-        } else if (dose === "booster"){
-          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
-        }
-      } else if (isRespDead){
-        if (dose === "primary"){
-          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
-          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-        } else if (dose === "booster"){
-          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-        }
-      }
+// ✅ LSD: سنوي
+} else if (isLSD){
+  tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
 
+// ✅ Clostridial: أولية = Booster 30 + إعادة 6 شهور | منشطة = إعادة 6 شهور
+} else if (isClost){
+  if (dose === "primary"){
+    tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  } else if (dose === "booster"){
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  }
+
+// ✅ Pasteurella/HS: أولية = Booster 30 + إعادة 6 شهور | منشطة = إعادة 6 شهور
+} else if (isPaste){
+  if (dose === "primary"){
+    tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  } else if (dose === "booster"){
+    tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+  }
+
+// ✅ IBR / BVD / Anthrax: سنوي (افتراضي آمن الآن)
+} else if (isIBR || isBVD || isAnthrax){
+  tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+
+// ✅ Brucella: مرة واحدة (بدون تاسك تلقائي)
+} else if (isBruc){
+  // لا Tasks تلقائية للبروسيلا (مرة واحدة غالبًا)
+}
       for (const t of tasks){
         if (!t.dueDate) continue;
        await addDoc(collection(db,"tasks"), {
@@ -822,6 +831,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
