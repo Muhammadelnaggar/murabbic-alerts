@@ -726,13 +726,22 @@
           snap = await getDocs(q);
         }
 
-        const nums = [];
-        snap.forEach(d=>{
-          const a = d.data() || {};
-          if ((a.status || "active") === "active" && a.number){
-            nums.push(String(a.number));
-          }
-        });
+       const nums = [];
+snap.forEach(d=>{
+  const a = d.data() || {};
+  const status = (a.status || "active");
+
+  const n =
+    a.number ??
+    a.animalNumber ??
+    a.animalNo ??
+    a.animalId ??
+    a.id;
+
+  if (status === "active" && n !== undefined && n !== null && String(n).trim()){
+    nums.push(String(n).trim());
+  }
+});
 
         nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
         bulkAllNumbers = nums;
@@ -764,5 +773,6 @@
   </script>
 </body>
 </html>
+
 
 
