@@ -309,8 +309,8 @@
 
   <script type="module">
     import { db, auth } from "/js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, limit }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     // عناصر
@@ -725,7 +725,11 @@
           const q = query(collection(db,"animals"), where("userId","==",uid));
           snap = await getDocs(q);
         }
-
+// ✅ Fallback: لو مفيش نتائج بـ userId، هات أول 500 حيوان لعرض القائمة الجماعية
+if (!snap || snap.size === 0){
+  const q2 = query(collection(db,"animals"), limit(500));
+  snap = await getDocs(q2);
+}
        const nums = [];
 snap.forEach(d=>{
   const a = d.data() || {};
@@ -773,6 +777,7 @@ snap.forEach(d=>{
   </script>
 </body>
 </html>
+
 
 
 
