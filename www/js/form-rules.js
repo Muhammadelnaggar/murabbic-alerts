@@ -374,6 +374,7 @@ export function addDaysISO(iso, days){
 
 // ✅ بناء Tasks التحصين (يرجع Array من {dueDate,title,stage})
 function buildVaccinationTasks({ vaccineKey, doseType, eventDate }){
+    throw new Error("buildVaccinationTasks is DISABLED. Use vaccinationTasksFromEvent() only.");
   const key = String(vaccineKey||"").trim();
   const dose = String(doseType||"").trim();
   const dt = toISODate(eventDate);
