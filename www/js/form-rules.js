@@ -86,7 +86,7 @@ function isEven(n){ return Number(n) % 2 === 0; }
 
 // ===================== الحقول المشتركة =====================
 const commonFields = {
-  animalId: { required: true, msg: "رقم الحيوان مطلوب." },
+   animalId: { required: false },
   eventDate: { required: true, type: "date", msg: "تاريخ الحدث غير صالح." },
   documentData: { required: true, msg: "بيانات الحيوان غير متاحة." },
 };
@@ -119,10 +119,10 @@ export async function recentHeatCheck(uid, animalNumber, eventDate, windowDays =
 
     s.forEach(docSnap => {
       const ev = docSnap.data() || {};
-      const t = String(ev.type || ev.eventType || "").trim();
+     const t = String(ev.eventType || ev.type || "").trim();
 
-      // ✅ شياع فقط
-      if (t !== "شياع") return;
+// ✅ شياع فقط (يدعم type="heat" لو موجود)
+if (t !== "شياع" && t !== "heat") return;
 
       const d = String(ev.eventDate || "").slice(0,10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
@@ -204,14 +204,15 @@ export const eventSchemas = {
 },
 
 
-  "تشخيص حمل": {
-    fields: {
-      ...commonFields,
-      method: { required: true, msg: "طريقة التشخيص مطلوبة." },
-      result: { required: true, msg: "نتيجة التشخيص مطلوبة." },
-    },
-    guards: ["pregnancyDiagnosisDecision"],
+ "تشخيص حمل": {
+  fields: {
+    ...commonFields,
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    method: { required: true, msg: "طريقة التشخيص مطلوبة." },
+    result: { required: true, msg: "نتيجة التشخيص مطلوبة." },
   },
+  guards: ["pregnancyDiagnosisDecision"],
+},
 "إجهاض": {
   fields: {
     ...commonFields,
@@ -330,13 +331,15 @@ export const eventSchemas = {
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
 // ===================================================================
-
-export const vaccinationProtocols = {
+// ===================== (DISABLED) Old vaccination generator =====================
+// NOTE: We use vaccinationTasksFromEvent() as the ONLY source of truth. Do not use buildVaccinationTasks().
+const vaccinationProtocols = {
   // ✅ FMD: 4 شهور + Booster 21 يوم + كل 6 شهور
   FMD: {
     key: "FMD",
     schedule({ eventDate, doseType }) {
       const tasks = [];
+       
       if (doseType === "primary") {
         tasks.push({ dueDate: addDaysISO(eventDate, 21), title: "معزز الحمى القلاعية (بعد 21 يوم)", stage: "booster21" });
         tasks.push({ dueDate: addDaysISO(eventDate, 180), title: "إعادة الحمى القلاعية (بعد 6 شهور)", stage: "repeat6m" });
@@ -369,7 +372,7 @@ export function addDaysISO(iso, days){
 }
 
 // ✅ بناء Tasks التحصين (يرجع Array من {dueDate,title,stage})
-export function buildVaccinationTasks({ vaccineKey, doseType, eventDate }){
+function buildVaccinationTasks({ vaccineKey, doseType, eventDate }){
   const key = String(vaccineKey||"").trim();
   const dose = String(doseType||"").trim();
   const dt = toISODate(eventDate);
@@ -665,10 +668,39 @@ pregnancyDiagnosisDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-  const status = String(doc.reproductiveStatus || "").trim();
-  if (status !== "ملقحة" && status !== "ملقّحة") {
-    return "❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.";
+  // ✅ الحالة التناسلية: من الأحداث أولًا ثم الوثيقة
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const cat = reproCategory(rsRaw);
+
+  // لازم تكون "ملقحة"
+  if (cat !== "inseminated") {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.\nالحالة الحالية: ${shown}.`;
   }
+
+  // ✅ طريقة التشخيص
+  const method = String(fd.method || "").trim();
+  const isSono = (method === "سونار");
+  const isManual = (method === "جس يدوي");
+  if (!isSono && !isManual) return "❌ طريقة التشخيص غير معروفة.";
+
+  const minDays = isSono ? 26 : 40;
+
+  // ✅ آخر تلقيح (أي تلقيح) — من البوابة/الأحداث أولًا ثم الوثيقة
+  const lastAI =
+    String(fd.lastInseminationDate || doc.lastInseminationDate || doc.lastAI || doc.lastInsemination || "").trim();
+
+  if (!isDate(lastAI)) return '❌ لا يمكن تشخيص الحمل — لا يوجد "آخر تلقيح" صحيح.';
+
+  if (!isDate(fd.eventDate)) return "❌ تاريخ التشخيص غير صالح.";
+
+  const diff = daysBetween(lastAI, fd.eventDate);
+  if (!Number.isFinite(diff)) return "❌ تعذّر حساب الأيام منذ آخر تلقيح.";
+
+  if (diff < minDays) {
+    return `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لطريقة «${method}» هو ${minDays} يوم.`;
+  }
+
   return null;
 },
 
@@ -961,13 +993,18 @@ function makeTask(typeKey, dueDate, meta = {}){
 export function vaccinationTasksFromEvent({ vaccine, doseType, eventDate, campaignId }){
   const v = String(vaccine||"").trim();
   const dose = String(doseType||"").trim(); // primary | booster
+  const normalizedDose =
+  dose === "prime" ? "primary" :
+  dose === "periodic" ? "booster" :
+  dose;
+ 
   const dt = String(eventDate||"").slice(0,10);
-  if (!v || !dose || !dt) return [];
+  if (!v || !normalizedDose || !dt) return [];
 
   const meta = campaignId ? { campaignId } : {};
 
   // قاعدة Zero History (Booster 21 يوم) عند الجرعة الأولية
-  if (dose === "primary"){
+  if (normalizedDose === "primary") {
     // Task Booster بعد 21 يوم
     return [
       makeTask(v, ymdAddDays(dt, 21), { ...meta, doseType: "booster", basedOn: "primary+21" })
