@@ -309,7 +309,7 @@
 
   <script type="module">
     import { db, auth } from "/js/firebase-config.js";
-   import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, limit }
+  import { collection, addDoc, doc, setDoc, serverTimestamp, getDocs, query, where, orderBy, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -455,32 +455,46 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
     // لا Tasks تلقائية للبروسيلا (مرة واحدة غالبًا)
   }
 
-  // اكتب الـTasks (إن وجدت)
-  for (const t of tasks){
-    if (!t.dueDate) continue;
-    await addDoc(collection(db,"tasks"), {
-      // ✅ Murabbik Tasks (Vaccination)
-      type: "task",
-      taskType: "vaccination",
-      title: t.title,
-      stage: t.stage,
+for (const t of tasks){
+  if (!t.dueDate) continue;
 
-      vaccineKey: vx,
-      vaccine: vx,
-      doseType: dose,
+  // ✅ نفس سكة التزامن: taskId ثابت + setDoc
+  const dueDate = String(t.dueDate).slice(0,10);
+  const taskId  = `vax__${String(num)}__${String(vx).replace(/\s+/g,'_')}__${dueDate}__${String(t.stage||'')}`;
 
-      dueDate: t.dueDate,
-      windowStart: t.dueDate,
-      windowEnd: addDays(t.dueDate, 6),  // نافذة 7 أيام ثابتة
+  const payload = {
+    userId: uid,
+    animalNumber: String(num),
 
-      animalNumber: String(num),
-      userId: uid,
+    // ✅ مهم جدًا: smart-checks يقرأ فقط protocol_step + pending
+    type: "protocol_step",
+    protocol: "vaccination",
+    program: String(vx),
 
-      status: "pending",
-      createdAt: serverTimestamp(),
-      source: "vaccination.html"
-    });
-  }
+    // تواريخ التخطيط (smart-checks يستخدم plannedDate / plannedTime)
+    dueDate,
+    plannedDate: dueDate,
+    plannedTime: "08:00",
+    plannedDateTime: dueDate + "T08:00",
+
+    // معلومات العرض
+    stepName: String(t.title || "تحصين"),
+    stage: String(t.stage || ""),
+    vaccineKey: String(vx),
+    doseType: String(dose),
+
+    // نافذة 7 أيام (جاهزة لأي عرض لاحق)
+    windowStart: dueDate,
+    windowEnd: addDays(dueDate, 6),
+
+    status: "pending",
+    done: false,
+    createdAt: serverTimestamp(),
+    source: "vaccination.html"
+  };
+
+  await setDoc(doc(db, "tasks", taskId), payload, { merge: true });
+}
 }
     async function saveFromCentral(fd){
       const uid = auth?.currentUser?.uid;
@@ -832,6 +846,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
