@@ -232,10 +232,10 @@
     </div>
 
     <div class="card">
-      <form id="vaccinationForm" novalidate>
+      <form id="vaccinationForm" data-event="تحصين" novalidate>
         <div class="row row-2">
           <div>
-            <label for="animalId">رقم الحيوان</label>
+            <label for="animalNumber">رقم الحيوان</label>
 
             <div class="mode-container">
               <div class="mode-pills">
@@ -261,19 +261,19 @@
               <div class="bulk-hint">اضغط لاختيار أكثر من رقم (مناسب للموبايل).</div>
             </div>
 
-            <input id="animalId" type="text" placeholder="مثال: 105"/>
+            <input id="animalNumber" data-field="animalNumber" type="text" placeholder="مثال: 105"/>
           </div>
 
           <div>
-            <label for="date">التاريخ</label>
-            <input id="date" type="date"/>
+            <label for="eventDate">التاريخ</label>
+            <input id="eventDate" data-field="eventDate" type="date"/>
           </div>
         </div>
 
         <div class="row">
           <div>
             <label for="vaccine">نوع التحصين</label>
-            <select id="vaccine">
+            <select id="vaccine" data-field="vaccine">
               <option value="" selected disabled>اختر نوع التحصين</option>
               <option value="الحمى القلاعية (FMD)">الحمى القلاعية (FMD)</option>
               <option value="الجلد العقدي (LSD)">الجلد العقدي (LSD)</option>
@@ -290,8 +290,8 @@
         <label>نوع الجرعة</label>
         <div class="dose-container">
           <div class="radio-group">
-            <label><input type="radio" name="doseType" value="primary"/> أولية</label>
-            <label><input type="radio" name="doseType" value="booster"/> منشطة</label>
+            <label><input type="radio" name="doseType" data-field="doseType" value="primary"/> أولية</label>
+            <label><input type="radio" name="doseType" data-field="doseType" value="booster"/> منشطة</label>
           </div>
         </div>
 
@@ -317,8 +317,8 @@
     const ctxAnimal  = document.getElementById("ctxAnimal");
     const ctxDate    = document.getElementById("ctxDate");
     const form       = document.getElementById("vaccinationForm");
-    const animalIdEl = document.getElementById("animalId");  // (قد تكون null لو الصفحة المخدومة قديمة)
-    const dateEl     = document.getElementById("date");
+    const animalNumberEl = document.getElementById("animalNumber");  // (قد تكون null لو الصفحة المخدومة قديمة)
+    const eventDateEl = document.getElementById("eventDate");
     const vaccineEl  = document.getElementById("vaccine");
     const saveBtn    = document.getElementById("saveBtn");
     const dashBtn    = document.getElementById("dashBtn");
@@ -372,6 +372,287 @@
     function showWarn(t){ if (warn) warn.textContent = t; }
     function clearWarn(){ if (warn) warn.textContent = ""; }
 
+    // =========================================================
+    // ✅ Murabbik: Save happens ONLY after Central Validation (mbk:valid)
+    // - no local form submit handler
+    // - vaccination bulk/single handled here safely
+    // =========================================================
+    function parseNumbers(raw){
+      const s = String(raw||"");
+      const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+                   '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+      const latin = s.replace(/[٠-٩۰-۹]/g, ch => map[ch] || ch);
+      const arr = latin.match(/\d+/g) || [];
+      return [...new Set(arr.map(x=>String(x).replace(/\D/g,'')).filter(Boolean))];
+    }
+
+    function addDays(ymd, days){
+      const d = new Date(String(ymd||"").slice(0,10));
+      if (Number.isNaN(d.getTime())) return "";
+      d.setDate(d.getDate() + Number(days||0));
+      const x = new Date(d.getTime());
+      x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+      return x.toISOString().slice(0,10);
+    }
+
+    async function fetchAnimalDocByNumber(uid, num){
+      const n = String(num||"").trim();
+      if (!uid || !n) return null;
+
+      // ✅ أسرع مسار: userId_number
+      try{
+        const key = `${uid}#${n}`;
+        const q1 = query(collection(db,"animals"), where("userId_number","==", key));
+        const s1 = await getDocs(q1);
+        if (!s1.empty){
+          const d = s1.docs[0];
+          return { id: d.id, data: d.data() || {} };
+        }
+      }catch(_){}
+
+      // fallback: userId + number / animalNumber
+      const tries = [
+        ["number", n],
+        ["animalNumber", n],
+        ["animalNumber", Number(n)]
+      ].filter(t => !(typeof t[1] === "number" && Number.isNaN(t[1])));
+
+      for (const [field,val] of tries){
+        try{
+          const q2 = query(collection(db,"animals"), where("userId","==", uid), where(field,"==", val));
+          const s2 = await getDocs(q2);
+          if (!s2.empty){
+            const d = s2.docs[0];
+            return { id: d.id, data: d.data() || {} };
+          }
+        }catch(_){}
+      }
+
+      return null;
+    }
+
+    // ✅ منع تكرار نفس اللقاح في نفس اليوم (بدون Index)
+    async function checkVaccinationDuplicateSameDay(uid, animalNumber, eventDate, vaccine){
+      try{
+        const num = String(animalNumber||"").trim();
+        const dt  = String(eventDate||"").slice(0,10);
+        const vx  = String(vaccine||"").trim();
+        if (!uid || !num || !dt || !vx) return null;
+
+        const qx = query(
+          collection(db,"events"),
+          where("userId","==", uid),
+          where("animalNumber","==", num),
+          limit(80)
+        );
+
+        const s = await getDocs(qx);
+        if (s.empty) return null;
+
+        let found = false;
+        s.forEach(ds=>{
+          const ev = ds.data() || {};
+          const t  = String(ev.eventType || ev.type || "").trim();
+          const d  = String(ev.eventDate || ev.date || "").slice(0,10);
+          const v  = String(ev.vaccine || "").trim();
+          if (t === "تحصين" && d === dt && v === vx) found = true;
+        });
+
+        if (found){
+          return `❌ تم تسجيل "${vx}" للحيوان رقم ${num} في نفس اليوم (${dt}).`;
+        }
+        return null;
+      }catch(_){
+        return "⚠️ تعذّر التحقق من تكرار التحصين الآن. أعد المحاولة بعد لحظات.";
+      }
+    }
+
+    // ✅ إنشاء المهام تلقائيًا حسب البروتوكول (نسخة أولى)
+    async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
+      const num = String(animalNumber||"").trim();
+      const dt  = String(eventDate||"").slice(0,10);
+      const vx  = String(vaccine||"").trim();
+      const dose= String(doseType||"").trim();
+
+      if (!uid || !num || !dt || !vx) return;
+
+      const tasks = [];
+
+      const isFMD = vx.includes("FMD") || vx.includes("الحمى القلاعية");
+      const isLSD = vx.includes("LSD") || vx.includes("الجلد العقدي");
+      const is3d  = vx.includes("3 أيام") || vx.includes("3 ايام") || vx.includes("ثلاث");
+      const isPaste = vx.includes("باستر") || vx.includes("Paste") || vx.includes("HS/");
+      const isRespLive = vx.includes("تنفسي حي");
+      const isRespDead = vx.includes("تنفسي ميت") || vx.includes("منفصل");
+
+      if (isFMD){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      } else if (isLSD || is3d){
+        tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+      } else if (isPaste){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      } else if (isRespLive){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+        }
+      } else if (isRespDead){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      }
+
+      for (const t of tasks){
+        if (!t.dueDate) continue;
+        await addDoc(collection(db,"tasks"), {
+          type: "task",
+          taskType: "تحصين",
+          title: t.title,
+          stage: t.stage,
+          dueDate: t.dueDate,
+          vaccine: vx,
+          doseType: dose,
+          animalNumber: num,
+          userId: uid,
+          status: "open",
+          createdAt: serverTimestamp(),
+          source: "vaccination.html"
+        });
+      }
+    }
+
+    async function saveFromCentral(fd){
+      const uid = auth?.currentUser?.uid;
+      if (!uid){
+        msg("سجّل الدخول أولًا.", "error");
+        return;
+      }
+
+      const vaccine = String(fd.vaccine || vaccineEl?.value || "").trim();
+      const doseType = String(fd.doseType || "").trim();
+      const dt = String(fd.eventDate || eventDateEl?.value || "").slice(0,10);
+
+      // targets: من bulkSelected لو المستخدم اختار (جماعي)، وإلا من الحقل
+      let targets = [];
+      const mode = document.getElementById("modeBulk")?.checked ? "bulk" : "single";
+      if (mode === "bulk" && bulkSelected.size){
+        targets = [...bulkSelected].map(String);
+      } else {
+        targets = parseNumbers(fd.animalNumber || fd.animalId || "");
+      }
+      targets = [...new Set(targets.filter(Boolean))];
+
+      if (!targets.length){
+        msg("اكتب رقم الحيوان (أو اختر من القائمة).", "error");
+        return;
+      }
+      if (!dt){
+        msg("اختر تاريخ التحصين.", "error");
+        return;
+      }
+      if (!vaccine){
+        msg("اختر نوع التحصين.", "error");
+        return;
+      }
+      if (!doseType){
+        msg("اختر نوع الجرعة.", "error");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      let ok = 0;
+      const skipped = [];
+
+      for (const animalNumber of targets){
+        // 1) تأكد الحيوان موجود + ليس inactive
+        const an = await fetchAnimalDocByNumber(uid, animalNumber);
+        if (!an){
+          skipped.push(`🚫 ${animalNumber}: غير موجود في القطيع/حسابك.`);
+          continue;
+        }
+        const st = String(an?.data?.status ?? "").trim().toLowerCase();
+        if (st === "inactive"){
+          skipped.push(`🚫 ${animalNumber}: خارج القطيع (inactive).`);
+          continue;
+        }
+
+        // 2) منع تكرار نفس اللقاح في نفس اليوم
+        const dup = await checkVaccinationDuplicateSameDay(uid, animalNumber, dt, vaccine);
+        if (dup){
+          skipped.push(`🚫 ${animalNumber}: مكرر نفس اليوم.`);
+          continue;
+        }
+
+        // 3) احفظ الحدث (مستبعد تناسليًا مسموح)
+        const payload = {
+          animalId: String(animalNumber),
+          animalNumber: String(animalNumber),
+          userId: uid,
+          eventType: "تحصين",
+          type: "vaccination",
+          vaccine,
+          doseType,
+          eventDate: dt,
+          date: dt,
+          source: "vaccination.html",
+          createdAt: serverTimestamp(),
+        };
+
+        await addDoc(collection(db,"events"), payload);
+        if (window.updateAnimalByEvent) {
+          try{ await window.updateAnimalByEvent(payload); }catch(_){}
+        }
+
+        // 4) ذكاء التحصين: Tasks
+        await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
+
+        ok++;
+      }
+
+      saveBtn.disabled = false;
+
+      if (!ok){
+        const lines = [
+          "🔎 لم يتم تسجيل أي تحصين.",
+          ...(skipped.length ? ["\nالأسباب:", ...skipped] : [])
+        ];
+        msg(lines.join("\n"), "error");
+        return;
+      }
+
+      const lines = [
+        `✅ تم تسجيل التحصين لعدد: ${ok}`,
+      ];
+      if (skipped.length){
+        lines.push(`🚫 تم تخطي: ${skipped.length}`);
+        // اعرض أول 8 أسباب فقط لتجنب رسالة طويلة
+        lines.push(...skipped.slice(0,8));
+        if (skipped.length > 8) lines.push("…");
+      }
+      msg(lines.join("\n"), "success");
+    }
+
+
+    // ✅ استقبال الإشارة المركزية بعد نجاح البوابة + الفاليديشن
+    form.addEventListener("mbk:valid", (e)=>{
+      const fd = e?.detail?.formData || {};
+      saveFromCentral(fd);
+    });
+
     // ✅ لا تسمح لأي كراش في hydrate (اللي كان حاصل عندك)
     function hydrate(){
       const qp = new URLSearchParams(location.search);
@@ -402,12 +683,12 @@
         if (r) r.checked = true;
       }
 
-      if (animalIdEl){
-        animalIdEl.value = id;
-        if (id) animalIdEl.readOnly = true;
+      if (animalNumberEl){
+        animalNumberEl.value = id;
+        if (id) animalNumberEl.readOnly = true;
       }
 
-      if (dateEl) dateEl.value = dt;
+      if (eventDateEl) eventDateEl.value = dt;
 
       if (ctxAnimal) ctxAnimal.textContent = `الحيوان: ${id || "غير محدد"}`;
       try{
@@ -431,7 +712,7 @@
     function applyModeUI(){
       const isBulk = (getMode() === "bulk");
       if (bulkBox) bulkBox.style.display = isBulk ? "block" : "none";
-      if (animalIdEl) animalIdEl.disabled = isBulk;
+      if (animalNumberEl) animalNumberEl.disabled = isBulk;
 
       if (isBulk){
         // لو Auth جهّز بعد فتح الصفحة، أو لو التحميل ما حصلش قبل كده
@@ -446,14 +727,14 @@
     hydrate();
 
     // listeners UI context
-    animalIdEl?.addEventListener("input", ()=>{
-      if (ctxAnimal) ctxAnimal.textContent = `الحيوان: ${animalIdEl.value.trim() || "غير محدد"}`;
+    animalNumberEl?.addEventListener("input", ()=>{
+      if (ctxAnimal) ctxAnimal.textContent = `الحيوان: ${animalNumberEl.value.trim() || "غير محدد"}`;
     });
-    dateEl?.addEventListener("input", ()=>{
+    eventDateEl?.addEventListener("input", ()=>{
       try{
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${new Date(dateEl.value).toLocaleDateString("ar-EG")}`;
+        if (ctxDate) ctxDate.textContent = `التاريخ: ${new Date(eventDateEl.value).toLocaleDateString("ar-EG")}`;
       }catch(_){
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${dateEl.value}`;
+        if (ctxDate) ctxDate.textContent = `التاريخ: ${eventDateEl.value}`;
       }
     });
 
@@ -559,21 +840,10 @@
     });
 
     // ✅ الحفظ: (كان عندك موجود لكن مش مربوط بأي زر)
-    async function saveVaccination(){
-      const mode = getMode();
-
-      const dt = String(dateEl?.value || "").trim();
-      const vaccine = String(vaccineEl?.value || "").trim();
-      const doseType = getDoseType();
-
-      if (!dt || !vaccine || !doseType){
-        msg("⚠️ أدخل التاريخ، نوع التحصين ونوع الجرعة.", "warning");
-        return;
-      }
-
+    
       let targets = [];
       if (mode === "single"){
-        const one = String(animalIdEl?.value || "").trim();
+        const one = String(animalNumberEl?.value || "").trim();
         if (!one){
           msg("⚠️ أدخل رقم الحيوان.", "warning");
           return;
@@ -622,22 +892,17 @@
     }
 
     // ✅ اربط زر الحفظ + submit (كانوا مفقودين)
-    form?.addEventListener("submit", (e)=>{
-      e.preventDefault();
-      saveVaccination();
+    saveVaccination();
     });
-    saveBtn?.addEventListener("click", (e)=>{
-      // احتياطًا لو المتصفح ما ربطش submit
-      e.preventDefault();
-      saveVaccination();
+    saveVaccination();
     });
 
     // Back button
     const backBtn = document.getElementById("backToEventsBtn");
     backBtn?.addEventListener("click", ()=>{
       const qp = new URLSearchParams(location.search);
-      const id = String(animalIdEl?.value || "").trim() || qp.get("number") || localStorage.getItem("lastAnimalId") || "";
-      const dt = String(dateEl?.value || "").trim() || qp.get("date") || todayLocal();
+      const id = String(animalNumberEl?.value || "").trim() || qp.get("number") || localStorage.getItem("lastAnimalId") || "";
+      const dt = String(eventDateEl?.value || "").trim() || qp.get("date") || todayLocal();
       location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
     });
   </script>
