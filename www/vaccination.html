@@ -839,64 +839,6 @@
       }
     });
 
-    // ✅ الحفظ: (كان عندك موجود لكن مش مربوط بأي زر)
-    
-      let targets = [];
-      if (mode === "single"){
-        const one = String(animalNumberEl?.value || "").trim();
-        if (!one){
-          msg("⚠️ أدخل رقم الحيوان.", "warning");
-          return;
-        }
-        targets = [one];
-      }else{
-        targets = Array.from(bulkSelected);
-        if (!targets.length){
-          msg("⚠️ اختر حيوانات على الأقل.", "warning");
-          return;
-        }
-      }
-
-      saveBtn && (saveBtn.disabled = true);
-      if (saveBtn) saveBtn.textContent = "... جاري الحفظ";
-
-      try{
-        for (const animalNumber of targets){
-          const payload = {
-            type: "vaccination",
-            eventType: "تحصين",
-            animalId: animalNumber,
-            animalNumber: animalNumber,
-            date: dt,
-            eventDate: dt,
-            vaccine: vaccine,
-            doseType: doseType,
-            userId: auth?.currentUser?.uid || null,
-            createdAt: serverTimestamp(),
-            source: "vaccination.html"
-          };
-
-          if (db) await addDoc(collection(db,"events"), payload);
-          if (window.updateAnimalByEvent) await window.updateAnimalByEvent(payload);
-        }
-
-        clearWarn();
-        msg("✅ تم تسجيل التحصين بنجاح", "success");
-      }catch(e){
-        console.error(e);
-        msg("❌ تعذّر الحفظ. حاول مرة أخرى.", "error");
-      }finally{
-        saveBtn && (saveBtn.disabled = false);
-        if (saveBtn) saveBtn.textContent = "💾 تسجيل التحصين";
-      }
-    }
-
-    // ✅ اربط زر الحفظ + submit (كانوا مفقودين)
-    saveVaccination();
-    });
-    saveVaccination();
-    });
-
     // Back button
     const backBtn = document.getElementById("backToEventsBtn");
     backBtn?.addEventListener("click", ()=>{
@@ -908,3 +850,4 @@
   </script>
 </body>
 </html>
+
