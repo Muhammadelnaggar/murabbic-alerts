@@ -67,8 +67,7 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   (type === "warn" || type === "warning") ? "warning" :
   "info";
 
-bar.className = "infobar show " + cls;
-
+bar.className = "infobar mbk-infobar show " + cls;
 
   const isErr = (type === "error");
  // bar.style.borderColor = isErr ? "#ef9a9a" : "#86efac";
