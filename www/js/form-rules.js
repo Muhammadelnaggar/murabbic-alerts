@@ -327,7 +327,58 @@ export const eventSchemas = {
 },
 
 };
+// ===================================================================
+//                 Vaccination Protocols (Egypt v1) + Helpers
+// ===================================================================
 
+export const vaccinationProtocols = {
+  // ✅ FMD: 4 شهور + Booster 21 يوم + كل 6 شهور
+  FMD: {
+    key: "FMD",
+    schedule({ eventDate, doseType }) {
+      const tasks = [];
+      if (doseType === "primary") {
+        tasks.push({ dueDate: addDaysISO(eventDate, 21), title: "معزز الحمى القلاعية (بعد 21 يوم)", stage: "booster21" });
+        tasks.push({ dueDate: addDaysISO(eventDate, 180), title: "إعادة الحمى القلاعية (بعد 6 شهور)", stage: "repeat6m" });
+      } else if (doseType === "booster") {
+        tasks.push({ dueDate: addDaysISO(eventDate, 180), title: "إعادة الحمى القلاعية (بعد 6 شهور)", stage: "repeat6m" });
+      }
+      return tasks;
+    }
+  },
+};
+
+function toISODate(d){
+  if (!d) return null;
+  if (typeof d === "string") return d.slice(0,10);
+  try {
+    const x = new Date(d);
+    if (isNaN(x)) return null;
+    x.setMinutes(x.getMinutes()-x.getTimezoneOffset());
+    return x.toISOString().slice(0,10);
+  } catch { return null; }
+}
+
+export function addDaysISO(iso, days){
+  const s = String(iso||"").slice(0,10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + "T00:00:00");
+  d.setDate(d.getDate() + Number(days||0));
+  d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+  return d.toISOString().slice(0,10);
+}
+
+// ✅ بناء Tasks التحصين (يرجع Array من {dueDate,title,stage})
+export function buildVaccinationTasks({ vaccineKey, doseType, eventDate }){
+  const key = String(vaccineKey||"").trim();
+  const dose = String(doseType||"").trim();
+  const dt = toISODate(eventDate);
+  if (!key || !dt) return [];
+  const proto = vaccinationProtocols[key];
+  if (!proto || typeof proto.schedule !== "function") return [];
+  const out = proto.schedule({ eventDate: dt, doseType: dose }) || [];
+  return out.filter(t => t && t.dueDate && t.title);
+}
 // ===================================================================
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
