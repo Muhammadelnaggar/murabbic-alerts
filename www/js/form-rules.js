@@ -323,7 +323,7 @@ export const eventSchemas = {
 
     notes: { required: false }
   },
-  guards: []
+  guards: ["vaccinationDecision"]
 },
 
 };
@@ -332,6 +332,20 @@ export const eventSchemas = {
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
 export const guards = {
+vaccinationDecision(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "❌ تعذّر العثور على الحيوان — تحقق من الرقم.";
+
+  // ✅ خارج القطيع
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل تحصين — الحيوان خارج القطيع.";
+
+  // ✅ ملاحظة مهمة: الحيوان المستبعد تناسليًا *يُحصَّن عادي* (حسب سياسة مُرَبِّيك)
+  // لذلك لا يوجد منع بناءً على reproductiveStatus / breedingBlocked هنا.
+
+  return null;
+},
+
 calvingDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر العثور على الحيوان — تحقق من الرقم.";
