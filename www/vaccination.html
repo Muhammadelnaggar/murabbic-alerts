@@ -309,7 +309,6 @@
 
   <script type="module">
     import { db, auth } from "/js/firebase-config.js";
-    import { vaccinationTasksFromEvent } from "/js/form-rules.js";
     import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy }
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -340,34 +339,29 @@
 
     // ✅ Infobar: استخدم المركزي لو موجود (forms-init) وإلا fallback بسيط
     function getBar(){
-      // ✅ Central only (forms-init.js يضمن وجود sysbar قياسي)
       try{
-        if (typeof window.ensureInfoBar === "function") return window.ensureInfoBar(form);
+        if (window.ensureInfoBar) return window.ensureInfoBar(form);
       }catch(_){}
-
-      // fallback آمن جدًا (نفس منطق forms-init) — فقط لو forms-init لم يُحمّل
-      let bar = document.getElementById("sysbar") || document.querySelector(".infobar");
+      // fallback
+      let bar = document.getElementById("sysbar") || document.getElementById("infobar") || document.querySelector(".infobar");
       if (!bar){
         bar = document.createElement("div");
-        bar.id = "sysbar";
-        bar.className = "infobar mbk-infobar";
-        const header = document.querySelector("header");
-        if (header) header.insertAdjacentElement("afterend", bar);
-        else (document.body || document.documentElement).prepend(bar);
+        bar.id = "infobar";
+        bar.className = "infobar";
+        bar.style.display = "none";
+        const main = document.querySelector(".mbk-main");
+        (main || document.body).insertBefore(bar, (main || document.body).firstChild);
       }
       return bar;
     }
-
     function msg(text, type="warning"){
       const bar = getBar();
       if (!bar) return;
-      const payload = (Array.isArray(text) ? text : String(text||""));
       try{
-        if (typeof window.showMsg === "function") { window.showMsg(bar, payload, type); return; }
+        if (window.showMsg) return window.showMsg(bar, text, type);
       }catch(_){}
       bar.style.display = "block";
-      bar.textContent = Array.isArray(payload) ? payload.join("
-") : payload;
+      bar.textContent = String(text||"");
     }
 
     function todayLocal(){
@@ -474,50 +468,71 @@
     }
 
     // ✅ إنشاء المهام تلقائيًا حسب البروتوكول (نسخة أولى)
-    async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType, campaignId){
+    async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
       const num = String(animalNumber||"").trim();
       const dt  = String(eventDate||"").slice(0,10);
       const vx  = String(vaccine||"").trim();
       const dose= String(doseType||"").trim();
 
-      if (!uid || !num || !dt || !vx) return { ok:true, created:0 };
+      if (!uid || !num || !dt || !vx) return;
 
-      // ✅ Central generator (Egypt v1)
-      const plan = (typeof vaccinationTasksFromEvent === "function")
-        ? vaccinationTasksFromEvent({ vaccine: vx, doseType: dose, eventDate: dt })
-        : [];
+      const tasks = [];
 
-      if (!Array.isArray(plan) || !plan.length) return { ok:true, created:0 };
+      const isFMD = vx.includes("FMD") || vx.includes("الحمى القلاعية");
+      const isLSD = vx.includes("LSD") || vx.includes("الجلد العقدي");
+      const is3d  = vx.includes("3 أيام") || vx.includes("3 ايام") || vx.includes("ثلاث");
+      const isPaste = vx.includes("باستر") || vx.includes("Paste") || vx.includes("HS/");
+      const isRespLive = vx.includes("تنفسي حي");
+      const isRespDead = vx.includes("تنفسي ميت") || vx.includes("منفصل");
 
-      let created = 0;
+      if (isFMD){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      } else if (isLSD || is3d){
+        tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+      } else if (isPaste){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      } else if (isRespLive){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 30), title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
+          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 365), title: `إعادة ${vx} (سنوي)`, stage: "annual" });
+        }
+      } else if (isRespDead){
+        if (dose === "primary"){
+          tasks.push({ dueDate: addDays(dt, 21), title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        } else if (dose === "booster"){
+          tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
+        }
+      }
 
-      for (const t of plan){
-        const due = String(t?.dueDate||"").slice(0,10);
-        if (!due) continue;
-
-        const doc = {
+      for (const t of tasks){
+        if (!t.dueDate) continue;
+        await addDoc(collection(db,"tasks"), {
           type: "task",
           taskType: "تحصين",
-          title: String(t.title || `تحصين: ${vx}`).trim(),
-          stage: String(t.stage || "").trim(),
-          dueDate: due,
-          windowStart: due,
-          windowEnd: addDays(due, 6), // ✅ نافذة 7 أيام ثابتة
+          title: t.title,
+          stage: t.stage,
+          dueDate: t.dueDate,
           vaccine: vx,
           doseType: dose,
           animalNumber: num,
           userId: uid,
           status: "open",
-          campaignId: campaignId || null,
           createdAt: serverTimestamp(),
           source: "vaccination.html"
-        };
-
-        await addDoc(collection(db,"tasks"), doc);
-        created++;
+        });
       }
-
-      return { ok:true, created };
     }
 
     async function saveFromCentral(fd){
@@ -559,13 +574,10 @@
       }
 
       saveBtn.disabled = true;
-      const campaignId = (mode === "bulk") ? (`vax-${dt}-${Date.now().toString(36)}`) : null;
       let ok = 0;
       const skipped = [];
 
-      try{
       for (const animalNumber of targets){
-        try{
         // 1) تأكد الحيوان موجود + ليس inactive
         const an = await fetchAnimalDocByNumber(uid, animalNumber);
         if (!an){
@@ -606,23 +618,12 @@
         }
 
         // 4) ذكاء التحصين: Tasks
-        try{
-          await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType, campaignId);
-        }catch(err){
-          skipped.push(`⚠️ ${animalNumber}: تم تسجيل التحصين لكن فشل إنشاء المهام.`);
-        }
+        await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
 
         ok++;
-        }catch(err){
-          skipped.push(`⚠️ ${animalNumber}: خطأ غير متوقع أثناء الحفظ.`);
-          try{ console.error("vaccination save error", animalNumber, err); }catch(_){ }
-        }
       }
 
-      }
-      finally{
-        saveBtn.disabled = false;
-      }
+      saveBtn.disabled = false;
 
       if (!ok){
         const lines = [
@@ -849,4 +850,3 @@
   </script>
 </body>
 </html>
-
