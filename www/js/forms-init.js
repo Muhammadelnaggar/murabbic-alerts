@@ -880,7 +880,98 @@ if (bulkList.length <= 1 && !looksBulk) {
         lockForm(false);
         return true;
       }
+  // ===============================
+// ✅ Gate خاص بصفحة التحصين (مركزي)
+// - يستبعد: غير موجود / inactive / مكرر نفس اللقاح في نفس اليوم
+// - يكتب الأرقام المؤهلة فقط داخل خانة animalNumber
+// ===============================
+if (eventName === "تحصين") {
+  if (bulkList.length > 1 || looksBulk) {
+    const uid = await getUid();
+    if (!uid) {
+      showMsg(bar, "سجّل الدخول أولًا.", "error");
+      lockForm(true);
+      return false;
+    }
 
+    const vaccineEl = getFieldEl(form, "vaccine");
+    const vx = String(vaccineEl?.value || "").trim();
+    if (!vx) {
+      showMsg(bar, "اختر نوع التحصين أولًا.", "error");
+      lockForm(true);
+      return false;
+    }
+
+    const okNums = [];
+    const bad = []; // {n, r}
+
+    showMsg(bar, "جارِ التحقق من قائمة أرقام التحصين…", "info");
+    lockForm(true);
+
+    // helper: منع تكرار نفس اللقاح في نفس اليوم (بدون Index)
+    async function hasVaxSameDay(num) {
+      const qx = query(
+        collection(db,"events"),
+        where("userId","==", uid),
+        where("animalNumber","==", String(num)),
+        limit(80)
+      );
+      const s = await getDocs(qx);
+      if (s.empty) return false;
+
+      const dt = String(d).slice(0,10);
+      let found = false;
+      s.forEach(ds=>{
+        const ev = ds.data() || {};
+        const t  = String(ev.eventType || ev.type || "").trim();
+        const ed = String(ev.eventDate || ev.date || "").slice(0,10);
+        const v  = String(ev.vaccine || "").trim();
+        if (t === "تحصين" && ed === dt && v === vx) found = true;
+      });
+      return found;
+    }
+
+    for (const num of bulkList) {
+      // 1) وجود الحيوان في الحساب + ليس inactive
+      const animal = await fetchAnimalByNumberForUser(uid, num);
+      if (!animal) { bad.push({n:num, r:"❌ غير موجود في حسابك"}); continue; }
+
+      const st = String(animal.data?.status ?? "").trim().toLowerCase();
+      if (st === "inactive") { bad.push({n:num, r:"❌ خارج القطيع (inactive)"}); continue; }
+
+      // 2) منع تكرار نفس اللقاح في نفس اليوم
+      let dup = false;
+      try { dup = await hasVaxSameDay(num); }
+      catch(e){ bad.push({n:num, r:"⚠️ تعذّر التحقق من التكرار الآن"}); continue; }
+
+      if (dup) { bad.push({n:num, r:"🚫 مكرر نفس اليوم"}); continue; }
+
+      okNums.push(num);
+    }
+
+    // ضع الأرقام المؤهلة فقط في الخانة (ده يخلّي الحفظ يعتمد على المركزي)
+    const numEl = getFieldEl(form, "animalNumber");
+    if (numEl) numEl.value = okNums.join(",");
+
+    if (!okNums.length) {
+      const preview = bad.slice(0,5).map(x=> `${x.n}: ${x.r}`).join(" — ");
+      showMsg(bar, `❌ لا يوجد أي رقم مؤهل لتسجيل التحصين. ${preview}${bad.length>5?" …":""}`, "error");
+      lockForm(true);
+      return false;
+    }
+
+    // خزّن المستبعدين للشفافية وقت الحفظ
+    try { form.dataset.mbkVaxExcluded = JSON.stringify(bad); } catch(e) {}
+
+    const badMsg = bad.length
+      ? ` (تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x=>`${x.n} (${String(x.r).replace(/\s+/g,' ').trim()})`).join("، ")}${bad.length>3?"…":""})`
+      : "";
+
+    showMsg(bar, `✅ تم التحقق — جاهز لتسجيل التحصين لعدد ${okNums.length}.${badMsg}`, "success");
+    lockForm(false);
+    return true;
+  }
+}
       if (typeof guards?.heatDecision !== "function") {
         showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (heatDecision). حدّث الصفحة أو راجع form-rules.js", "error");
         lockForm(true);
