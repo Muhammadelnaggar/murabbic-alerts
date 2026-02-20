@@ -527,10 +527,11 @@
         }
 
         // 4) ذكاء التحصين: Tasks
-        try{
+      try{
   await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
-}catch(_){
-  skipped.push(`${animalNumber}: تم تسجيل التحصين لكن تعذّر إنشاء التذكيرات (Tasks).`);
+}catch(err){
+  const reason = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : "";
+  skipped.push(`${animalNumber}: تم تسجيل التحصين لكن تعذّر إنشاء التذكيرات (Tasks)${reason}.`);
 }
 
         ok++;
@@ -763,4 +764,5 @@
   </script>
 </body>
 </html>
+
 
