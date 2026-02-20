@@ -394,79 +394,6 @@
       x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
       return x.toISOString().slice(0,10);
     }
-
-    async function fetchAnimalDocByNumber(uid, num){
-      const n = String(num||"").trim();
-      if (!uid || !n) return null;
-
-      // ✅ أسرع مسار: userId_number
-      try{
-        const key = `${uid}#${n}`;
-        const q1 = query(collection(db,"animals"), where("userId_number","==", key));
-        const s1 = await getDocs(q1);
-        if (!s1.empty){
-          const d = s1.docs[0];
-          return { id: d.id, data: d.data() || {} };
-        }
-      }catch(_){}
-
-      // fallback: userId + number / animalNumber
-      const tries = [
-        ["number", n],
-        ["animalNumber", n],
-        ["animalNumber", Number(n)]
-      ].filter(t => !(typeof t[1] === "number" && Number.isNaN(t[1])));
-
-      for (const [field,val] of tries){
-        try{
-          const q2 = query(collection(db,"animals"), where("userId","==", uid), where(field,"==", val));
-          const s2 = await getDocs(q2);
-          if (!s2.empty){
-            const d = s2.docs[0];
-            return { id: d.id, data: d.data() || {} };
-          }
-        }catch(_){}
-      }
-
-      return null;
-    }
-
-    // ✅ منع تكرار نفس اللقاح في نفس اليوم (بدون Index)
-    async function checkVaccinationDuplicateSameDay(uid, animalNumber, eventDate, vaccine){
-      try{
-        const num = String(animalNumber||"").trim();
-        const dt  = String(eventDate||"").slice(0,10);
-        const vx  = String(vaccine||"").trim();
-        if (!uid || !num || !dt || !vx) return null;
-
-        const qx = query(
-          collection(db,"events"),
-          where("userId","==", uid),
-          where("animalNumber","==", num),
-          limit(80)
-        );
-
-        const s = await getDocs(qx);
-        if (s.empty) return null;
-
-        let found = false;
-        s.forEach(ds=>{
-          const ev = ds.data() || {};
-          const t  = String(ev.eventType || ev.type || "").trim();
-          const d  = String(ev.eventDate || ev.date || "").slice(0,10);
-          const v  = String(ev.vaccine || "").trim();
-          if (t === "تحصين" && d === dt && v === vx) found = true;
-        });
-
-        if (found){
-          return `❌ تم تسجيل "${vx}" للحيوان رقم ${num} في نفس اليوم (${dt}).`;
-        }
-        return null;
-      }catch(_){
-        return "⚠️ تعذّر التحقق من تكرار التحصين الآن. أعد المحاولة بعد لحظات.";
-      }
-    }
-
     // ✅ إنشاء المهام تلقائيًا حسب البروتوكول (نسخة أولى)
     async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType){
       const num = String(animalNumber||"").trim();
@@ -578,25 +505,7 @@
       const skipped = [];
 
       for (const animalNumber of targets){
-        // 1) تأكد الحيوان موجود + ليس inactive
-        const an = await fetchAnimalDocByNumber(uid, animalNumber);
-        if (!an){
-          skipped.push(`🚫 ${animalNumber}: غير موجود في القطيع/حسابك.`);
-          continue;
-        }
-        const st = String(an?.data?.status ?? "").trim().toLowerCase();
-        if (st === "inactive"){
-          skipped.push(`🚫 ${animalNumber}: خارج القطيع (inactive).`);
-          continue;
-        }
-
-        // 2) منع تكرار نفس اللقاح في نفس اليوم
-        const dup = await checkVaccinationDuplicateSameDay(uid, animalNumber, dt, vaccine);
-        if (dup){
-          skipped.push(`🚫 ${animalNumber}: مكرر نفس اليوم.`);
-          continue;
-        }
-
+        
         // 3) احفظ الحدث (مستبعد تناسليًا مسموح)
         const payload = {
           animalId: String(animalNumber),
@@ -618,7 +527,11 @@
         }
 
         // 4) ذكاء التحصين: Tasks
-        await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
+        try{
+  await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
+}catch(_){
+  skipped.push(`${animalNumber}: تم تسجيل التحصين لكن تعذّر إنشاء التذكيرات (Tasks).`);
+}
 
         ok++;
       }
@@ -850,3 +763,4 @@
   </script>
 </body>
 </html>
+
