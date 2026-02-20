@@ -3,6 +3,7 @@
 // ===================================================================
 
 // ===================== Imports لـ Firestore (للـ uniqueAnimalNumber) =====================
+export const BUILD_ID = "rules-2026-02-21-A";
 import { db } from "./firebase-config.js";
 import { collection, query, where, limit, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
