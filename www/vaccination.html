@@ -446,20 +446,29 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
 
       for (const t of tasks){
         if (!t.dueDate) continue;
-        await addDoc(collection(db,"tasks"), {
-          type: "task",
-          taskType: "تحصين",
-          title: t.title,
-          stage: t.stage,
-          dueDate: t.dueDate,
-          vaccine: vx,
-          doseType: dose,
-          animalNumber: num,
-          userId: uid,
-          status: "open",
-          createdAt: serverTimestamp(),
-          source: "vaccination.html"
-        });
+       await addDoc(collection(db,"tasks"), {
+  // ✅ Murabbik Tasks (Vaccination)
+  type: "task",
+  taskType: "vaccination",
+  title: t.title,
+  stage: t.stage,
+
+  vaccineKey: vx,         // مفتاح البروتوكول (FMD, LSD, ... أو Bundle_*)
+  vaccine: vx,            // توافق للخلف لو في كود قديم بيقرأ vaccine
+
+  doseType: dose,         // primary | booster | repeat6m | repeat12m | ...
+  dueDate: t.dueDate,
+
+  windowStart: t.dueDate,
+  windowEnd: addDays(t.dueDate, 6),  // نافذة 7 أيام ثابتة
+
+  animalNumber: String(num),
+  userId: uid,
+
+  status: "pending",
+  createdAt: serverTimestamp(),
+  source: "vaccination.html"
+});
       }
     }
 
@@ -813,6 +822,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
