@@ -287,13 +287,19 @@
           </div>
         </div>
 
-        <label>نوع الجرعة</label>
-        <div class="dose-container">
-          <div class="radio-group">
-            <label><input type="radio" name="doseType" data-field="doseType" value="primary"/> أولية</label>
-            <label><input type="radio" name="doseType" data-field="doseType" value="booster"/> منشطة</label>
-          </div>
-        </div>
+       <label>نوع الجرعة</label>
+<div class="dose-container">
+  <div class="radio-group">
+    <label>
+      <input type="radio" name="doseType" data-field="doseType" value="prime"/>
+      تأسيس لأول مرة
+    </label>
+    <label>
+      <input type="radio" name="doseType" data-field="doseType" value="periodic"/>
+      جرعة دورية (متابعة)
+    </label>
+  </div>
+</div>
 
         <div id="warn" class="warn"></div>
       </form>
@@ -355,15 +361,21 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
       }
       return bar;
     }
-    function msg(text, type="warning"){
-      const bar = getBar();
-      if (!bar) return;
-      try{
-        if (window.showMsg) return window.showMsg(bar, text, type);
-      }catch(_){}
-      bar.style.display = "block";
-      bar.textContent = String(text||"");
-    }
+   function msg(text, type="warning"){
+  const bar = getBar();
+  if (!bar) return;
+
+  // لو forms-init موفّر showMsg استخدمه
+  try{
+    if (window.showMsg) return window.showMsg(bar, text, type);
+  }catch(_){}
+
+  // ✅ مهم: ثبّت الكلاسات عشان الـCSS يمسك
+  const cls = (type === "success") ? "success" : (type === "error" ? "error" : "warning");
+  bar.className = `infobar mbk-infobar show ${cls}`;
+  bar.style.display = "block";
+  bar.textContent = String(text || "");
+}
 
     function todayLocal(){
       const d = new Date();
@@ -417,10 +429,10 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
 
   // ✅ FMD: أولية = Booster 21 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
   if (isFMD){
-    if (dose === "primary"){
+    if (dose ==="prime"){
       tasks.push({ dueDate: addDays(dt, 21),  title: `منشّط ${vx} (+21 يوم)`, stage: "booster21" });
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "booster"){
+    } else if (dose === "periodic"){
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
     }
 
@@ -430,19 +442,19 @@ let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
 
   // ✅ Clostridial: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
   } else if (isClost){
-    if (dose === "primary"){
+    if (dose ==="prime"){
       tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "booster"){
+    } else if (dose === "periodic"){
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
     }
 
   // ✅ Pasteurella/HS: أولية = Booster 30 يوم + إعادة 6 شهور | منشطة = إعادة 6 شهور
   } else if (isPaste){
-    if (dose === "primary"){
+    if (dose ==="prime"){
       tasks.push({ dueDate: addDays(dt, 30),  title: `منشّط ${vx} (+30 يوم)`, stage: "booster30" });
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
-    } else if (dose === "booster"){
+    } else if (dose === "periodic"){
       tasks.push({ dueDate: addDays(dt, 180), title: `إعادة ${vx} (بعد 6 شهور)`, stage: "repeat6m" });
     }
 
@@ -626,7 +638,7 @@ for (const t of tasks){
 
       // doseType from URL
       const dose = (qp.get("doseType") || "").toLowerCase();
-      if (dose === "primary" || dose === "booster"){
+      if (dose ==="prime" || dose === "periodic"){
         const r = document.querySelector(`input[name="doseType"][value="${dose}"]`);
         if (r) r.checked = true;
       }
@@ -846,6 +858,7 @@ if (!bulkHasData){
   </script>
 </body>
 </html>
+
 
 
 
