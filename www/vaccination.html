@@ -333,7 +333,8 @@
 
     const bulkSelected = new Set();   // الأرقام المختارة
     let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
-    let bulkLoaded = false;
+    let bulkHasData = false;   // ✅ true فقط لما فعلاً نجيب أرقام
+let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
 
     dashBtn?.addEventListener("click", () => (location.href = "dashboard.html"));
 
@@ -628,14 +629,13 @@
       if (bulkBox) bulkBox.style.display = isBulk ? "block" : "none";
       if (animalNumberEl) animalNumberEl.disabled = isBulk;
 
-      if (isBulk){
-        // لو Auth جهّز بعد فتح الصفحة، أو لو التحميل ما حصلش قبل كده
-        if (auth?.currentUser?.uid && !bulkLoaded){
-          bulkLoaded = true;
-          loadMyAnimalsToBulk();
-        }
-        renderBulkList(bulkSearch?.value || "");
-      }
+    if (isBulk){
+  // ✅ لو مفيش بيانات فعلية لسه… حمّل
+  if (auth?.currentUser?.uid && !bulkHasData && !bulkLoading){
+    loadMyAnimalsToBulk();
+  }
+  renderBulkList(bulkSearch?.value || "");
+}
     }
 
     hydrate();
@@ -705,12 +705,33 @@
       bulkSelected.clear();
       renderBulkList(bulkSearch?.value || "");
     });
-
+    async function fetchAnimalsFromApi(uid){
+  try{
+    const res = await fetch(`/api/animals?limit=800`, {
+      headers: { "X-User-Id": uid }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : (Array.isArray(data?.animals) ? data.animals : []);
+    const nums = [];
+    for (const a of arr){
+      const n = a?.animalNumber ?? a?.number ?? a?.animalNo ?? a?.id;
+      if (n !== undefined && n !== null && String(n).trim()){
+        nums.push(String(n).trim());
+      }
+    }
+    return nums;
+  }catch(_){
+    return [];
+  }
+}
     async function loadMyAnimalsToBulk(){
       if (!db){ msg("❌ قاعدة البيانات غير جاهزة.", "error"); return; }
 
       const uid = auth?.currentUser?.uid;
       if (!uid){ msg("⚠️ يجب تسجيل الدخول أولاً.", "warning"); return; }
+      if (bulkLoading) return;
+bulkLoading = true;
 
       try{
         let snap;
@@ -725,10 +746,22 @@
           const q = query(collection(db,"animals"), where("userId","==",uid));
           snap = await getDocs(q);
         }
-// ✅ Fallback: لو مفيش نتائج بـ userId، هات أول 500 حيوان لعرض القائمة الجماعية
+// ✅ Fallback حقيقي: لو Firestore رجّع 0 (أو rules مانعة)، هات من /api/animals
 if (!snap || snap.size === 0){
-  const q2 = query(collection(db,"animals"), limit(500));
-  snap = await getDocs(q2);
+  const apiNums = await fetchAnimalsFromApi(uid);
+  const nums = apiNums;
+
+  nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
+  bulkAllNumbers = nums;
+  bulkHasData = nums.length > 0;
+
+  if (!bulkHasData){
+    msg("⚠️ لم يتم العثور على أرقام للقطيع (لا من Firestore ولا من /api).", "warning");
+  }
+
+  renderBulkList(bulkSearch?.value || "");
+  bulkLoading = false;
+  return;
 }
        const nums = [];
 snap.forEach(d=>{
@@ -749,22 +782,25 @@ snap.forEach(d=>{
 
         nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
         bulkAllNumbers = nums;
+        bulkHasData = nums.length > 0;
+if (!bulkHasData){
+  msg("⚠️ لم يتم العثور على أرقام قطيع للعرض (راجع ملكية animals/userId).", "warning");
+}
         renderBulkList(bulkSearch?.value || "");
       }catch(e){
         console.error(e);
         msg("❌ تعذّر تحميل أرقام الحيوانات من حسابك.", "error");
       }
+      bulkLoading = false;
     }
 
-    onAuthStateChanged(auth, (user)=>{
-      if (user && !bulkLoaded){
-        bulkLoaded = true;
-        // لا نحمل إلا إذا وضع جماعي مفتوح أو المستخدم حوّل له
-        if (getMode() === "bulk"){
-          loadMyAnimalsToBulk();
-        }
-      }
-    });
+   onAuthStateChanged(auth, (user)=>{
+  if (!user) return;
+  // ✅ لو المستخدم فاتح جماعي ولسه مفيش بيانات فعلية… حمّل
+  if (getMode() === "bulk" && !bulkHasData && !bulkLoading){
+    loadMyAnimalsToBulk();
+  }
+});
 
     // Back button
     const backBtn = document.getElementById("backToEventsBtn");
@@ -777,6 +813,7 @@ snap.forEach(d=>{
   </script>
 </body>
 </html>
+
 
 
 
