@@ -348,8 +348,8 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
           // لو checkAll اتنادى مرة ثانية، اكتفي بـ tick سريع
           tickProtocol();
         }
-        }
-      }
+             } 
+     
           // --- Rule 7: تحصينات مستحقة خلال 7 أيام (Dashboard فقط) ---
       if (page.includes('dashboard')){
 
@@ -425,6 +425,8 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
         }else{
           checkVaccinations();
         }
+               }
+             }
     
     // نهاية checkAll()
 
