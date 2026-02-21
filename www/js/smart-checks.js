@@ -425,7 +425,7 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
         }else{
           checkVaccinations();
         }
-      }
+    
     // نهاية checkAll()
 
     if (document.readyState === 'loading')
