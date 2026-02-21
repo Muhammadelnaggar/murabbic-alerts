@@ -255,15 +255,15 @@
         <div class="mbk-alert__body">
           <div class="mbk-alert__title">${esc(title)}</div>
           <p class="mbk-alert__msg">${esc(msg)}</p>
+          ${ buildVaxDetails(payload) }
           <div class="mbk-alert__meta">${metaChips.join('')}</div>
         </div>
         <button class="mbk-alert__close" title="إغلاق">✕</button>
       </div>
-      <div class="mbk-alert__actions">
-        <button class="mbk-btn primary" data-act="ok">حسنًا</button>
-        <button class="mbk-btn ghost" data-act="snooze">تأجيل 30د</button>
-        ${payload?.actionUrl ? `<button class="mbk-btn ghost" data-act="open">تسجيل الإن</button>` : ``}
-      </div>
+     <div class="mbk-alert__actions">
+  ${ (payload?.ruleId === 'vaccination_due_7days') ? `<button class="mbk-btn primary" data-act="now">تسجيل الآن</button>` : ``}
+  <button class="mbk-btn ${ (payload?.ruleId === 'vaccination_due_7days') ? `ghost` : `primary` }" data-act="ok">حسنًا</button>
+</div>
     `;
 
     const kill = (ack=true)=>{
@@ -280,7 +280,33 @@
 
     el.querySelector('.mbk-alert__close')?.addEventListener('click', ()=> kill(true));
     el.querySelector('[data-act="ok"]')?.addEventListener('click', ()=> kill(true));
-    el.querySelector('[data-act="snooze"]')?.addEventListener('click', ()=>{ setSnooze(key, 30); kill(false); });
+    el.querySelector('[data-act="now"]')?.addEventListener('click', ()=>{
+  try{
+    const nums = Array.isArray(payload?.vaxNumbers) ? payload.vaxNumbers : [];
+    const items = Array.isArray(payload?.vaxItems) ? payload.vaxItems : [];
+    const first = items[0] || {};
+    const date = String(first.dueDate || '').trim();
+
+    // نحط نفس المفاتيح بأكثر من اسم عشان أي صفحة تلتقطها
+    if (nums.length <= 1){
+      const n = nums[0] || '';
+      if (n) {
+        localStorage.setItem('lastAnimalId', n);
+        localStorage.setItem('lastAnimalNumber', n);
+        localStorage.setItem('currentAnimalId', n);
+      }
+    } else {
+      localStorage.setItem('bulkList', JSON.stringify(nums));
+      localStorage.setItem('bulkNumbers', JSON.stringify(nums));
+      localStorage.setItem('mbk_bulk_numbers', JSON.stringify(nums));
+    }
+    if (date) localStorage.setItem('lastEventDate', date);
+
+    // افتح صفحة التحصين
+    location.href = '/vaccination.html';
+  }catch{}
+  kill(true);
+});
 
     el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
       try{
@@ -296,7 +322,27 @@
       if (window.t?.event) window.t.event('smart_alert_shown', { key, ruleId: payload?.ruleId, taskId: payload?.taskId, ts:Date.now() });
     }catch{}
   }
+function buildVaxDetails(payload){
+  if (payload?.ruleId !== 'vaccination_due_7days') return '';
+  const items = Array.isArray(payload?.vaxItems) ? payload.vaxItems : [];
+  const nums  = Array.isArray(payload?.vaxNumbers) ? payload.vaxNumbers : [];
 
+  // فردي: سطر واحد واضح
+  if (nums.length === 1){
+    const it = items.find(x => x.animalNumber === nums[0]) || items[0];
+    const title = it?.title ? esc(it.title) : 'تحصين';
+    const due   = it?.dueDate ? esc(it.dueDate) : '';
+    return `<div class="mbk-alert__vax">الحيوان <b>${esc(nums[0])}</b> — ${title}${due?` (${due})`:''}</div>`;
+  }
+
+  // جماعي: قائمة أرقام
+  const list = nums.slice(0, 18).map(n=>`<span class="mbk-vax-chip">${esc(n)}</span>`).join('');
+  const more = (nums.length > 18) ? `<span class="mbk-vax-more">+${nums.length-18}</span>` : '';
+  return `<div class="mbk-alert__vax">
+    <div class="mbk-alert__vax-title">الأرقام:</div>
+    <div class="mbk-alert__vax-list">${list}${more}</div>
+  </div>`;
+}
   function show(payload){
     // ✅ تجاهل أي تنبيه لخطوة مكتملة (done) — حتى لو وصل من مصدر قديم
     try{
