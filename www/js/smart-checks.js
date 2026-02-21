@@ -408,13 +408,32 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
 
             if (!due.length) return;
 
-            fire(onAlert,{
-              ruleId:'vaccination_due_7days',
-              severity:'warn',
-              count: due.length,
-              message:`لديك ${due.length} تحصين مستحق خلال 7 أيام.`
-            });
+          // ✅ تجهيز تفاصيل التحصين (فردي/جماعي)
+const items = due.map(t => ({
+  animalNumber: String(t.animalNumber || t.number || '').trim(),
+  title: String(t.title || t.vaccine || t.vaccineKey || 'تحصين').trim(),
+  dueDate: String(t.dueDate || '').trim(),
+  vaccineKey: String(t.vaccineKey || t.vaccine || '').trim(),
+  doseType: String(t.doseType || '').trim(),
+  stage: String(t.stage || '').trim()
+})).filter(x => x.animalNumber && x.dueDate);
 
+const numbers = Array.from(new Set(items.map(x => x.animalNumber)));
+
+fire(onAlert,{
+  ruleId:'vaccination_due_7days',
+  severity:'warn',
+  count: items.length || due.length,
+
+  // ✅ للعرض في الرسالة
+  vaxMode: (numbers.length <= 1 ? 'single' : 'bulk'),
+  vaxNumbers: numbers,
+  vaxItems: items,
+
+  message: (numbers.length <= 1)
+    ? `تحصين مستحق خلال 7 أيام للحيوان ${numbers[0]}.`
+    : `لديك ${numbers.length} تحصين مستحق خلال 7 أيام.`
+});
           }catch{}
         }
 
