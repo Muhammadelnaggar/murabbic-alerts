@@ -344,11 +344,12 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
           tickProtocol();
           setInterval(tickProtocol, 60*1000);
         } else {
+          
           // لو checkAll اتنادى مرة ثانية، اكتفي بـ tick سريع
           tickProtocol();
         }
+        }
       }
-    } 
           // --- Rule 7: تحصينات مستحقة خلال 7 أيام (Dashboard فقط) ---
       if (page.includes('dashboard')){
 
