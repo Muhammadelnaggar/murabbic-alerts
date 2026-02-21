@@ -230,9 +230,6 @@
     const key = makeKey(payload);
 
     if (isSeen(key)) return; // منع التكرار بعد "حسنًا"
-    const su = snoozeUntil(key);
-    if (su && Date.now() < su) return; // مؤجّل
-
     const title = payload?.title || sev.title;
     const msg   = payload?.message || 'تنبيه جديد';
     const planned = payload?.plannedDate || '';
@@ -260,9 +257,9 @@
         </div>
         <button class="mbk-alert__close" title="إغلاق">✕</button>
       </div>
-     <div class="mbk-alert__actions">
-  ${ (payload?.ruleId === 'vaccination_due_7days') ? `<button class="mbk-btn primary" data-act="now">تسجيل الآن</button>` : ``}
-  <button class="mbk-btn ${ (payload?.ruleId === 'vaccination_due_7days') ? `ghost` : `primary` }" data-act="ok">حسنًا</button>
+    <div class="mbk-alert__actions">
+  <button class="mbk-btn primary" data-act="now">تسجيل الآن</button>
+  <button class="mbk-btn ghost" data-act="ok">حسنًا</button>
 </div>
     `;
 
@@ -281,6 +278,17 @@
     el.querySelector('.mbk-alert__close')?.addEventListener('click', ()=> kill(true));
     el.querySelector('[data-act="ok"]')?.addEventListener('click', ()=> kill(true));
     el.querySelector('[data-act="now"]')?.addEventListener('click', ()=>{
+  try{
+    const rid = String(payload?.ruleId || '');
+    const url =
+      (payload?.actionUrl && String(payload.actionUrl).trim()) ||
+      (rid === 'vaccination_due_7days' ? '/vaccination.html' : '/add-event.html');
+
+    location.href = url;
+  }catch{}
+  kill(true);
+});
+    
   try{
     const nums = Array.isArray(payload?.vaxNumbers) ? payload.vaxNumbers : [];
     const items = Array.isArray(payload?.vaxItems) ? payload.vaxItems : [];
