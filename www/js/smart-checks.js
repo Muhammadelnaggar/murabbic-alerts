@@ -348,7 +348,84 @@ const nCount = Number(t0.animalsCount || t0.count || 0) || 0;
           tickProtocol();
         }
       }
-    } // نهاية checkAll()
+    } 
+          // --- Rule 7: تحصينات مستحقة خلال 7 أيام (Dashboard فقط) ---
+      if (page.includes('dashboard')){
+
+        if (!window.smart._vacc7)
+          window.smart._vacc7 = { started:false, lastCheck:0, db:null, auth:null };
+
+        const V = window.smart._vacc7;
+
+        async function checkVaccinations(){
+          try{
+            if (!V.db){
+              const mod = await import('/js/firebase-config.js');
+              V.db   = mod?.db;
+              V.auth = mod?.auth;
+              if (!V.db) return;
+            }
+
+            const uid = (userId || V.auth?.currentUser?.uid || localStorage.getItem('userId') || '').trim();
+            if (!uid) return;
+
+            const now = Date.now();
+            if (now - V.lastCheck < 10*60*1000) return; // كل 10 دقائق
+            V.lastCheck = now;
+
+            const { collection, query, where, getDocs } =
+              await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+            const q = query(
+              collection(V.db, 'tasks'),
+              where('userId','==', uid),
+              where('taskType','==','vaccination'),
+              where('status','==','pending')
+            );
+
+            const snap = await getDocs(q);
+            if (!snap.size) return;
+
+            const today = new Date();
+            today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
+            const todayISO = today.toISOString().slice(0,10);
+
+            const end = new Date();
+            end.setDate(end.getDate()+6);
+            end.setMinutes(end.getMinutes()-end.getTimezoneOffset());
+            const endISO = end.toISOString().slice(0,10);
+
+            const due = [];
+
+            snap.forEach(ds=>{
+              const t = ds.data() || {};
+              const d = String(t.dueDate || '');
+              if (d >= todayISO && d <= endISO){
+                due.push(t);
+              }
+            });
+
+            if (!due.length) return;
+
+            fire(onAlert,{
+              ruleId:'vaccination_due_7days',
+              severity:'warn',
+              count: due.length,
+              message:`لديك ${due.length} تحصين مستحق خلال 7 أيام.`
+            });
+
+          }catch{}
+        }
+
+        if (!V.started){
+          V.started = true;
+          checkVaccinations();
+          setInterval(checkVaccinations, 60*1000);
+        }else{
+          checkVaccinations();
+        }
+      }
+    // نهاية checkAll()
 
     if (document.readyState === 'loading')
       document.addEventListener('DOMContentLoaded', checkAll, { once:true });
