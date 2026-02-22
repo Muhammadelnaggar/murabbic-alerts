@@ -1745,6 +1745,7 @@ if (!isGroupNow && form.dataset.ov_single_ok !== "1"){
 }
 
     const formData = collectFormData(form);
+    formData.documentData = form.__mbkDoc || null;
 
    // ✅ مصدر التاريخ في Ovsynch لازم يكون من UI (startDate) لأن hidden قد يكون غير متزامن
 const startDateUI = document.getElementById("startDate");
