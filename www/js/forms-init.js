@@ -1504,7 +1504,8 @@ clearFieldErrors(form);
 
 const formData = collectFormData(form);
 formData.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
-
+formData.documentData = form.__mbkDoc || null;
+if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
 const v = validateEvent(eventName, formData);
 
 if (!v || v.ok === false) {
