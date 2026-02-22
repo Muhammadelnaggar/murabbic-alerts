@@ -131,23 +131,22 @@
   import { db } from "/js/firebase-config.js";
   import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { updateAnimalByEvent } from "/js/animal-update.js";
-  
-   const info = document.getElementById("sysbar");
+  const formEl = document.getElementById("eventForm");
+const bar = window.ensureInfoBar ? window.ensureInfoBar(formEl) : document.getElementById("sysbar");
 
-  function setInfo(msg, type = "ok") {
-    if (!info) return;
-
-    info.style.display = "block";
-   info.className =
-  "infobar mbk-infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
-
-
-    info.textContent = msg;
-
-    try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+function showBar(msg, type = "success") {
+  if (!bar) return;
+  // استخدم نفس Renderer المركزي لضمان نفس الشكل على الموبايل
+  if (window.showMsg) {
+    window.showMsg(bar, msg, type);
+    return;
   }
-   
-
+  // (احتياطي نادر) لو showMsg غير متاح لأي سبب
+  bar.style.display = "block";
+  bar.className = "infobar mbk-infobar show " + (type === "error" ? "error" : "success");
+  bar.textContent = msg;
+  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+}
   const p = new URLSearchParams(location.search);
   document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
   document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
@@ -175,16 +174,17 @@
 
     try {
       await addDoc(collection(db, "events"), payload);
-            setInfo("✅ تم حفظ التلقيح بنجاح", "ok");
+           showBar("✅ تم حفظ التلقيح بنجاح", "success");
       setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
     } catch (err) {
-            setInfo("❌ فشل الحفظ", "error");
+            showBar("❌ فشل الحفظ", "error");
     }
   });
   </script>
 
 </body>
 </html>
+
 
 
 
