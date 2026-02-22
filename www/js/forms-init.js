@@ -1499,8 +1499,39 @@ if (eventName === "تجفيف") {
       return;
     }
 
-    const ok = await runFullValidationAndDispatch();
-    if (!ok) return;
+   // ✅ Full Validation عند الحفظ فقط + إطلاق mbk:valid
+clearFieldErrors(form);
+
+const formData = collectFormData(form);
+formData.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
+
+const v = validateEvent(eventName, formData);
+
+if (!v || v.ok === false) {
+  // Inline field errors
+  if (v?.fieldErrors && typeof v.fieldErrors === "object") {
+    for (const [fname, msg] of Object.entries(v.fieldErrors)) {
+      placeFieldError(form, fname, msg);
+    }
+    scrollToFirstFieldError(form);
+  }
+
+  const topMsgs =
+    (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
+    (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
+    ["❌ البيانات غير صحيحة — راجع الحقول."];
+
+  showMsg(bar, topMsgs, "error");
+  return;
+}
+
+// ✅ OK → ارسل mbk:valid (الصفحة نفسها هتعمل الحفظ)
+form.dispatchEvent(
+  new CustomEvent("mbk:valid", {
+    bubbles: true,
+    detail: { formData, eventName, form }
+  })
+);
   });
 }
 
