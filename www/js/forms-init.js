@@ -1408,7 +1408,12 @@ if (eventName === "شياع" && isHeatBulk) {
   );
   return true;
 }
-
+// ✅ Dry-Off: Gate فقط — لا تعمل validateEvent هنا
+if (eventName === "تجفيف") {
+  showMsg(bar, "✅ تم التحقق — أكمل إدخال البيانات ثم اضغط حفظ.", "success");
+  lockForm(false);
+  return true;
+}
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
