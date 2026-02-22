@@ -1414,6 +1414,12 @@ if (eventName === "تجفيف") {
   lockForm(false);
   return true;
 }
+    // ✅ Insemination: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "تلقيح") {
+  showMsg(bar, "✅ تم التحقق — أكمل إدخال بيانات التلقيح ثم اضغط حفظ.", "success");
+  lockForm(false);
+  return true;
+}
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
