@@ -126,7 +126,7 @@ export async function recentHeatCheck(uid, animalNumber, eventDate, windowDays =
 if (t !== "شياع" && t !== "heat") return;
 
       const d = String(ev.eventDate || "").slice(0,10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
 
       const last = new Date(d); last.setHours(0,0,0,0);
       const diff = Math.floor((cur - last) / 86400000); // أيام
@@ -874,19 +874,69 @@ dryOffDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-  // خارج القطيع
+  // 1) خارج القطيع ممنوع
   const st = String(doc?.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
 
-  // لازم أيام الحمل رقم (محسوبة)
+  // Helpers
+  const norm = (s) => String(s || "").trim();
+  const reason = norm(fd.reason);
+  const pregConfirm = norm(fd.pregnancyStatus);
   const g = Number(fd.gestationDays);
+
+  // 2) أيام الحمل لازم رقم (محسوبة)
   if (!Number.isFinite(g)) return "❌ تعذّر حساب أيام الحمل — راجع آخر تلقيح وتاريخ التجفيف.";
 
-  // لو المستخدم أكد عشار: لازم يكون فيه آخر تلقيح (من البوابة)
-  const preg = String(fd.pregnancyStatus || "").trim();
-  if (preg === "عشار") {
-    const lf = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
-    if (!isDate(lf)) return '❌ لا يمكن تجفيف "عشار" بدون "آخر تلقيح" صحيح.';
+  // 3) تحديد هل الحيوان مستبعد تناسليًا
+  const reproDocRaw = norm(doc.reproductiveStatus);
+  const isBlockedDoc =
+    doc.breedingBlocked === true ||
+    reproCategory(reproDocRaw) === "blocked";
+
+  // 4) بيع: مسموح فقط لو مستبعد تناسليًا + السبب بيع
+  // نقبل صيغ متعددة (حسب الصفحة)
+  const isSaleReason =
+    reason === "تجفيف للبيع" || reason === "للبيع" || reason === "بيع";
+
+  if (isBlockedDoc) {
+    if (!isSaleReason) {
+      return "❌ الحيوان مستبعد تناسليًا — مسموح فقط بـ «تجفيف للبيع».";
+    }
+    // تأكيد الحمل و محاقن التجفيف مازالوا Required في schema كإجراء روتيني
+    // لذلك لا نرفض هنا بناءً على pregConfirm
+    return null;
+  }
+
+  // 5) غير مستبعد: لازم يكون عِشار فعلًا (Source of Truth)
+  const reproEventsRaw = norm(fd.reproStatusFromEvents);
+  const cat = reproCategory(reproEventsRaw || reproDocRaw);
+  const shown = reproEventsRaw || reproDocRaw || "غير معروفة";
+
+  if (cat !== "pregnant") {
+    return `❌ لا يمكن تسجيل تجفيف — التجفيف مسموح فقط للحيوانات العِشار.\nالحالة الحالية: «${shown}».`;
+  }
+
+  // 6) تأكيد الحمل إجباري وروتيني: لازم يساوي "عشار" (مش مجرد أي قيمة)
+  if (pregConfirm !== "عشار") {
+    return "❌ لا يمكن تسجيل تجفيف — يجب تأكيد الحمل «عشار» كإجراء روتيني قبل الحفظ.";
+  }
+
+  // 7) لازم آخر تلقيح صحيح (للتوثيق ومنع العك)
+  const lf = norm(fd.lastInseminationDate || doc.lastInseminationDate);
+  if (!isDate(lf)) return '❌ لا يمكن تجفيف "عشار" بدون "آخر تلقيح" صحيح.';
+
+  // 8) تحقق سبب التجفيف من عمر الحمل (6.5 شهر = 198 يوم تقريبًا)
+  // نقبل صيغ قديمة/جديدة للسبب حسب الصفحة
+  const isNatural = (reason === "تجفيف طبيعي" || reason === "طبيعي");
+  const isUrgent  = (reason === "تجفيف اضطراري" || reason === "اضطراري");
+
+  if (g < 198) {
+    if (!isUrgent) return "❌ سبب التجفيف غير مطابق لعمر الحمل: أقل من 6.5 شهر ⇒ «تجفيف اضطراري».";
+  } else {
+    // 6.5–7.5 شهر طبيعي (نسمح أيضًا لو أعلى من 7.5 بدون منع)
+    if (g <= 228 && !isNatural) {
+      return "❌ سبب التجفيف غير مطابق لعمر الحمل: 6.5–7.5 شهر ⇒ «تجفيف طبيعي».";
+    }
   }
 
   return null;
