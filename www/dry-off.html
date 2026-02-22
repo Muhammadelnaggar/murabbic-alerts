@@ -107,29 +107,29 @@
   flex-wrap:wrap;
   justify-content:center;
   align-items:center;
-  margin-top:8px;
-  margin-bottom:8px;
 }
 
 .option-group label{
-  flex:1 1 140px;
-  max-width:220px;
   display:flex;
   align-items:center;
-  justify-content:center;
-  gap:10px;
-  padding:12px 14px;
-  border-radius:14px;
-  border:2px solid var(--border, #e2e8f0);
-  background:#fff;
+  gap:8px;
+  padding:8px 10px;
+  border:none;
+  background:none;
   cursor:pointer;
-  font-weight:900;
-  font-size:15px;
-  color: var(--ink, #0f172a);
-  user-select:none;
-  transition:.12s ease;
+  font-weight:800;
+  font-size:14px;
 }
-
+.radio-container{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:#f8fafc;
+  border-radius:14px;
+  padding:10px 8px;
+  margin-top:8px;
+  margin-bottom:10px;
+}
 /* نخفي الراديو الافتراضي ونرسم دائرة واضحة */
 .option-group input[type="radio"]{
   appearance:none;
@@ -137,28 +137,21 @@
   width:18px;
   height:18px;
   border-radius:50%;
-  border:2px solid var(--border, #cbd5e1);
+  border:2px solid #cbd5e1;
   background:#fff;
-  display:inline-block;
   position:relative;
 }
 
-/* النقطة الداخلية عند الاختيار */
 .option-group input[type="radio"]:checked{
-  border-color: var(--brand-600, #0b7f47);
+  border-color:#0ea05a;
 }
+
 .option-group input[type="radio"]:checked::after{
   content:"";
   position:absolute;
   inset:4px;
   border-radius:50%;
-  background: var(--brand, #0ea05a);
-}
-
-/* ✅ تلوين اللابل بالـ JS عبر class */
-.option-group label.is-checked{
-  border-color: var(--brand-600, #0b7f47);
-  background:#f0fff6;
+  background:#0ea05a;
 }
 
 .option-group label:active{ transform:scale(.99); }
@@ -242,29 +235,26 @@
   <input type="text" id="reason" data-field="reason" readonly required />
 </div>
 
-<div class="field">
-  <label>هل التجفيف بغرض البيع؟</label>
-  <div class="option-group">
-    <label><input type="radio" name="saleMode" value="no" checked /> لا</label>
-    <label><input type="radio" name="saleMode" value="yes" /> نعم (بيع)</label>
-  </div>
-</div>
 
     <div class="field">
       <label>تأكيد الحمل</label>
-      <div class="option-group">
+      <div class="radio-container"> 
+        <div class="option-group"> 
         <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required /> عشار</label>
         <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="فارغة" required /> فارغة</label>
       </div>
     </div>
+  </div>
 
     <div class="field">
       <label>تم استخدام محاقن التجفيف؟</label>
-      <div class="option-group">
+      <div class="radio-container"> 
+        <div class="option-group">   
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
       </div>
     </div>
+  </div>
 
     <!-- ✅ Bottom actions -->
     <div class="btn-row">
@@ -286,12 +276,15 @@ const dateEl= document.getElementById("eventDate");
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
        const gestEl = document.getElementById("gestationDays");
-    function calculateDryReason() {
+function calculateDryReason() {
   const days = Number(gestEl.value || 0);
-  const saleMode = document.querySelector('input[name="saleMode"]:checked')?.value;
   const reasonEl = document.getElementById("reason");
 
-  if (saleMode === "yes") {
+  // لو الحيوان مستبعد تناسليًا → بيع
+  const repro = String(form.__mbkDoc?.reproductiveStatus || "").trim();
+  const blocked = form.__mbkDoc?.breedingBlocked === true;
+
+  if (blocked || repro.includes("لا تُلقّح")) {
     reasonEl.value = "تجفيف للبيع";
     return;
   }
@@ -417,6 +410,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
