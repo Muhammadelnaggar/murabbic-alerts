@@ -34,7 +34,7 @@
           data-event="تلقيح"
           autocomplete="off"
           novalidate>
-<div id="sysbar" class="infobar"></div>
+<div id="sysbar" class="infobar mbk-infobar"></div>
 
       <label>رقم الحيوان *</label>
       <input data-field="animalNumber" inputmode="numeric" />
@@ -100,13 +100,9 @@
     if (!info) return;
 
     info.style.display = "block";
-    info.className =
-      "infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
+   info.className =
+  "infobar mbk-infobar show " + (type === "error" ? "error" : type === "ok" ? "success" : "info");
 
-    // نفس ألوان forms-init تقريبًا بدون ما نغيّر التصميم العام
-    info.style.borderColor = type === "error" ? "#ef9a9a" : "#bbf7d0";
-    info.style.background  = type === "error" ? "#ffebee" : "#ecfdf5";
-    info.style.color       = type === "error" ? "#b71c1c" : "#065f46";
 
     info.textContent = msg;
 
@@ -151,6 +147,7 @@
 
 </body>
 </html>
+
 
 
 
