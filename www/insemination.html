@@ -206,9 +206,26 @@ function showBar(msg, type = "success") {
     }
   });
   </script>
+<script>
+  // ✅ Make "حسنًا" button close the sysbar (page-only)
+  (function () {
+    document.addEventListener("click", function (e) {
+      const ok = e.target.closest("#sysbar .okbtn");
+      if (!ok) return;
 
+      const bar = document.getElementById("sysbar");
+      if (!bar) return;
+
+      bar.classList.remove("show", "error", "success", "warn", "warning", "info", "ok");
+      bar.style.display = "none";
+      bar.innerHTML = "";
+    }, true);
+  })();
+</script>
+  
 </body>
 </html>
+
 
 
 
