@@ -27,6 +27,23 @@
   min-height: auto !important;
 }
   #sysbar.show{ display:block !important; }
+    /* ✅ Make Gate/Infobar clickable (page-only, no central edits) */
+#sysbar{
+  position: relative;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+#sysbar *{
+  pointer-events: auto;
+}
+
+/* لو زر "حسناً" Button أو Link */
+#sysbar button,
+#sysbar a{
+  pointer-events: auto;
+  cursor: pointer;
+}
 </style>
 
   <title>تسجيل التلقيح — مُرَبِّيك</title>
@@ -168,6 +185,7 @@
 
 </body>
 </html>
+
 
 
 
