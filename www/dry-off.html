@@ -237,13 +237,18 @@
       <input type="number" id="gestationDays" data-field="gestationDays" required readonly />
     </div>
 
-    <div class="field">
-      <label>سبب التجفيف</label>
-      <div class="option-group">
-        <label><input type="radio" data-field="reason" name="reason" value="طبيعي" required /> طبيعي</label>
-        <label><input type="radio" data-field="reason" name="reason" value="اضطراري" required /> اضطراري</label>
-      </div>
-    </div>
+   <div class="field">
+  <label for="reason">سبب التجفيف (يُحدد تلقائيًا)</label>
+  <input type="text" id="reason" data-field="reason" readonly required />
+</div>
+
+<div class="field">
+  <label>هل التجفيف بغرض البيع؟</label>
+  <div class="option-group">
+    <label><input type="radio" name="saleMode" value="no" checked /> لا</label>
+    <label><input type="radio" name="saleMode" value="yes" /> نعم (بيع)</label>
+  </div>
+</div>
 
     <div class="field">
       <label>تأكيد الحمل</label>
@@ -281,6 +286,31 @@ const dateEl= document.getElementById("eventDate");
     const info  = document.getElementById("info");
     const openCardBtn = document.getElementById("openCowCard");
        const gestEl = document.getElementById("gestationDays");
+    function calculateDryReason() {
+  const days = Number(gestEl.value || 0);
+  const saleMode = document.querySelector('input[name="saleMode"]:checked')?.value;
+  const reasonEl = document.getElementById("reason");
+
+  if (saleMode === "yes") {
+    reasonEl.value = "تجفيف للبيع";
+    return;
+  }
+
+  const months = days / 30;
+
+  if (months >= 6.5 && months <= 7.5) {
+    reasonEl.value = "تجفيف طبيعي";
+  } else if (months < 6.5) {
+    reasonEl.value = "تجفيف اضطراري";
+  } else {
+    reasonEl.value = "تجفيف متأخر";
+  }
+}
+gestEl.addEventListener("input", calculateDryReason);
+
+document.querySelectorAll('input[name="saleMode"]').forEach(r=>{
+  r.addEventListener("change", calculateDryReason);
+});    
 // ✅ تلوين اختيارات الراديو بدون :has (متوافق مع كل المتصفحات)
 document.querySelectorAll('.option-group input[type="radio"]').forEach(r => {
   const paint = () => {
@@ -387,6 +417,7 @@ form.addEventListener("mbk:valid", async (e) => {
   </script>
 </body>
 </html>
+
 
 
 
