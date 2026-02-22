@@ -7,6 +7,20 @@
   <!-- ستايل ونظام الفورم المركزي -->
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
+  <style>
+  /* Fix infobar layout on mobile (page-only) */
+  #sysbar{
+    box-sizing: border-box;
+    width: min(520px, calc(100% - 24px));
+    margin: 10px auto 0;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 10px 12px;
+    line-height: 1.5;
+    white-space: normal;
+  }
+  #sysbar.show{ display:block !important; }
+</style>
 
   <title>تسجيل التلقيح — مُرَبِّيك</title>
 </head>
@@ -147,6 +161,7 @@
 
 </body>
 </html>
+
 
 
 
