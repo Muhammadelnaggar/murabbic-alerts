@@ -873,72 +873,65 @@ dryOffDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
-  const norm = (s) => String(s || "").trim();
-
   // خارج القطيع
-  const st = norm(doc.status).toLowerCase();
-  if (st === "inactive") {
-    return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
-  }
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
 
-  // ممنوع لو بالفعل جاف
-  const ps = norm(doc.productionStatus).toLowerCase();
+  // ✅ يمنع التجفيف لو الحالة الإنتاجية جاف
+  const ps = String(doc?.productionStatus ?? "").trim().toLowerCase();
   if (ps === "dry" || ps === "جاف") {
     return "❌ لا يمكن تسجيل تجفيف — الحيوان مُسجّل بالفعل كـ «جاف».";
   }
 
-  // منع تكرار قبل الولادة
-  const lastDry = norm(doc.lastDryOffDate).slice(0,10);
-  const lastCalv = norm(doc.lastCalvingDate).slice(0,10);
+  // ✅ يمنع تكرار التجفيف قبل الولادة
+  const lastDry = String(doc?.lastDryOffDate ?? "").slice(0, 10);
+  const lastCalv = String(doc?.lastCalvingDate ?? "").slice(0, 10);
   if (isDate(lastDry)) {
     if (!isDate(lastCalv) || lastCalv <= lastDry) {
-      return `❌ لا يمكن تسجيل تجفيف مرة أخرى قبل الولادة.\nآخر تجفيف: ${lastDry}`;
+      return `❌ لا يمكن تسجيل تجفيف مرة أخرى قبل الولادة.\nآخر تجفيف مسجّل: ${lastDry}.`;
     }
   }
 
-  // تحديد الاستبعاد التناسلي
-  const reproDocRaw = norm(doc.reproductiveStatus);
+  const reason = String(fd.reason || "").trim();
+
+  // ✅ الاستبعاد التناسلي: يسمح فقط للبيع
+  const reproDocRaw = String(doc?.reproductiveStatus || "").trim();
   const blocked =
     doc.breedingBlocked === true ||
     reproCategory(reproDocRaw) === "blocked";
 
-  const reason = norm(fd.reason);
-
-  // 🟢 حالة البيع (مستبعد تناسليًا)
   if (blocked) {
     if (reason !== "تجفيف للبيع") {
-      return "❌ الحيوان مستبعد تناسليًا — مسموح فقط بـ «تجفيف للبيع».";
+      return "❌ الحيوان مستبعد تناسليًا — مسموح فقط بـ «تجفيف للبيع» (يتحدد تلقائيًا).";
     }
     return null;
   }
 
-  // 🔴 غير مستبعد → لازم يكون عشار
-  const reproEventsRaw = norm(fd.reproStatusFromEvents);
-  const cat = reproCategory(reproEventsRaw || reproDocRaw);
-
+  // ✅ غير مستبعد: لازم يكون عشار فعليًا (من الأحداث أولاً ثم الوثيقة)
+  const rs = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const cat = reproCategory(rs);
   if (cat !== "pregnant") {
-    return "❌ لا يمكن تسجيل تجفيف — الحيوان ليس عِشار.";
+    return `❌ لا يمكن تسجيل تجفيف — التجفيف مسموح فقط للحيوانات العِشار.\nالحالة الحالية: «${rs || "غير معروفة"}».`;
   }
 
-  // الآن فقط نحسب الحمل
-  const g = Number(fd.gestationDays);
-  if (!Number.isFinite(g)) {
-    return "❌ تعذّر حساب أيام الحمل — لا يوجد آخر تلقيح.";
-  }
-
-  const pregConfirm = norm(fd.pregnancyStatus);
-  if (pregConfirm !== "عشار") {
+  // ✅ تأكيد الحمل روتيني وإجباري: لازم "عشار"
+  if (String(fd.pregnancyStatus || "").trim() !== "عشار") {
     return "❌ يجب تأكيد الحمل «عشار» قبل الحفظ.";
   }
 
-  // 6.5 شهر = 198 يوم
+  // ✅ الآن فقط نتحقق من أيام الحمل
+  const g = Number(fd.gestationDays);
+  if (!Number.isFinite(g)) {
+    return "❌ تعذّر حساب أيام الحمل — راجع آخر تلقيح وتاريخ التجفيف.";
+  }
+
+  // ✅ مطابقة السبب لعمر الحمل (6.5 شهر ≈ 198 يوم، 7.5 شهر ≈ 228 يوم)
   const isNatural = (reason === "تجفيف طبيعي");
   const isUrgent  = (reason === "تجفيف اضطراري");
 
   if (g < 198 && !isUrgent) {
     return "❌ أقل من 6.5 شهر ⇒ «تجفيف اضطراري».";
   }
-
   if (g >= 198 && g <= 228 && !isNatural) {
     return "❌ من 6.5 إلى 7.5 شهر ⇒ «تجفيف طبيعي».";
   }
