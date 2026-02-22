@@ -876,7 +876,22 @@ dryOffDecision(fd) {
   // 1) خارج القطيع ممنوع
   const st = String(doc?.status ?? "").trim().toLowerCase();
   if (st === "inactive") return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
+    // ✅ ممنوع التجفيف لو الحيوان بالفعل جاف
+  const ps = String(doc?.productionStatus ?? "").trim().toLowerCase();
+  if (ps === "dry" || ps === "جاف") {
+    return "❌ لا يمكن تسجيل تجفيف — الحيوان مُسجّل بالفعل كـ «جاف».";
+  }
 
+  // ✅ ممنوع تكرار التجفيف قبل حدوث ولادة
+  const lastDry = String(doc?.lastDryOffDate ?? "").slice(0, 10);
+  const lastCalv = String(doc?.lastCalvingDate ?? "").slice(0, 10);
+
+  // لو عندنا تجفيف سابق: لازم تكون فيه ولادة بعده
+  if (isDate(lastDry)) {
+    if (!isDate(lastCalv) || lastCalv <= lastDry) {
+      return `❌ لا يمكن تسجيل تجفيف مرة أخرى قبل الولادة.\nآخر تجفيف مسجّل: ${lastDry}.`;
+    }
+  }
   const norm = (s) => String(s || "").trim();
   const reason = norm(fd.reason);
   const pregConfirm = norm(fd.pregnancyStatus);
