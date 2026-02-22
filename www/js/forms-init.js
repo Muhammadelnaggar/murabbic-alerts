@@ -1240,86 +1240,69 @@ if (eventName === "ولادة") {
         return false;
       }
     }
-   // ✅ Gate خاص لحدث "تجفيف": حساب أيام الحمل وملء الحقل تلقائيًا
+ // ✅ Gate خاص لحدث "تجفيف": (1) أهلية أولاً (عشار/بيع) ثم (2) حساب حمل
 if (eventName === "تجفيف") {
   const uid4 = await getUid();
   const sig4 = await fetchCalvingSignalsFromEvents(uid4, n);
 
   const doc4 = form.__mbkDoc || {};
 
-  // آخر تلقيح: من الأحداث أولًا ثم الوثيقة
-  const lastAI4 = String(sig4.lastInseminationDateFromEvents || doc4.lastInseminationDate || "").trim();
+  // 1) تحديد الاستبعاد التناسلي (للبيع)
+  const reproDoc = String(doc4.reproductiveStatus || "").trim();
+  const blocked =
+    doc4.breedingBlocked === true ||
+    reproDoc.includes("لا تُلقّح") ||
+    reproDoc.includes("لا تلقح") ||
+    reproDoc.includes("مستبعد");
 
-  if (!lastAI4) {
-    showMsg(bar, '❌ لا يمكن حساب أيام الحمل — لا يوجد "آخر تلقيح" لهذا الحيوان.', "error");
-    lockForm(true);
-    return false;
-  }
+  // 2) تحديد العِشار (من الأحداث أولاً ثم الوثيقة)
+  const pregnant =
+    String(sig4.reproStatusFromEvents || "").trim() === "عشار" ||
+    reproDoc.includes("عشار");
 
-  const g = daysBetweenISO(lastAI4, d);
-  if (!Number.isFinite(g) || g < 0) {
-    showMsg(bar, "❌ تعذّر حساب أيام الحمل — راجع تاريخ التجفيف.", "error");
-    lockForm(true);
-    return false;
-  }
+  // ✅ لو مستبعد: يُسمح بيع + نملأ السبب تلقائيًا + لا نحسب حمل
+  if (blocked) {
+    const reasonEl = getFieldEl(form, "reason");
+    if (reasonEl) reasonEl.value = "تجفيف للبيع";
 
-  // اكتبها في الحقل (مطلوب + readonly)
-  const gEl = getFieldEl(form, "gestationDays");
-  if (gEl) gEl.value = String(g);
+    // علشان الفورم ما يتعطلش لو عندك required على أيام الحمل
+    const gEl0 = getFieldEl(form, "gestationDays");
+    if (gEl0 && !gEl0.value) gEl0.value = "0";
 
-  // خزّن آخر تلقيح في الفورم لاستخدامه عند الحفظ
-  form.__mbkDryOffLastAI = lastAI4;
-}
-   showMsg(bar, "✅ التحقق صحيح — يمكنك إدخال البيانات", "ok");
-    lockForm(false);
-    return true;
-  }
-
-  async function runFullValidationAndDispatch() {
-    const rawNum = String(getFieldEl(form, "animalNumber")?.value || "");
-const n = normalizeDigits(rawNum);
-    const d = String(getFieldEl(form, "eventDate")?.value || "").trim();
-// ✅ Heat Bulk submit: لو فيه أكتر من رقم → ممنوع نفحص existence كرقم واحد
-const latin2 = (s)=> String(s||"").replace(/[٠-٩۰-۹]/g, ch => ({
-  '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-  '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
-}[ch]||ch));
-
-const numsBulk = [...new Set((latin2(rawNum).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
-const isHeatBulk = (eventName === "شياع" && numsBulk.length > 1);
-
-    if (!n || !d) {
-      showMsg(bar, "أدخل رقم الحيوان وتاريخ الحدث أولًا.", "error");
+    // لا نغلق الفورم
+  } else {
+    // ✅ غير مستبعد: لازم يكون عشار، وإلا نرفض قبل أي حساب حمل
+    if (!pregnant) {
+      showMsg(bar, "❌ لا يمكن تسجيل تجفيف — الحيوان ليس «عِشار».", "error");
       lockForm(true);
       return false;
     }
-   // ✅ في الشياع الجماعي: لا تعمل ensureAnimalExistsGate لأنه يحوّل "33,34" إلى "3334"
-if (!isHeatBulk) {
-  const okAnimal = await ensureAnimalExistsGate(form, bar);
-  if (!okAnimal) {
-    lockForm(true);
-    return false;
-  }
-}
-// ✅ (شياع) منع التكرار خلال 72 ساعة قبل أي حفظ
-if (eventName === "شياع" && !isHeatBulk) {
-  const uid = await getUid();
-  const num = normalizeDigits(getFieldEl(form, "animalNumber")?.value || "");
-  const dt  = String(getFieldEl(form, "eventDate")?.value || "").slice(0,10);
 
-  const dupMsg = await checkHeatDuplicate72h(uid, num, dt);
-  if (dupMsg) {
-    clearFieldErrors(form);
-    showMsg(bar, dupMsg, "error");
-    lockForm(false);
-    return false; // ⛔ امنع إطلاق mbk:valid وبالتالي لن يتم الحفظ
-  }
-}
+    // 3) الآن فقط نحسب الحمل (لأنه عشار)
+    const lastAI4 = String(sig4.lastInseminationDateFromEvents || doc4.lastInseminationDate || "").trim();
 
-    const formData = collectFormData(form);
-    // ✅ Dry-off: احفظ آخر تلقيح المحسوب من الـ Gate داخل payload
-if (eventName === "تجفيف" && form.__mbkDryOffLastAI && !formData.lastInseminationDate) {
-  formData.lastInseminationDate = String(form.__mbkDryOffLastAI).slice(0,10);
+    if (!lastAI4) {
+      showMsg(bar, '❌ لا يمكن حساب أيام الحمل — لا يوجد "آخر تلقيح" لهذا الحيوان.', "error");
+      lockForm(true);
+      return false;
+    }
+
+    const g = daysBetweenISO(lastAI4, d);
+    if (!Number.isFinite(g) || g < 0) {
+      showMsg(bar, "❌ تعذّر حساب أيام الحمل — راجع تاريخ التجفيف.", "error");
+      lockForm(true);
+      return false;
+    }
+
+    const gEl = getFieldEl(form, "gestationDays");
+    if (gEl) {
+      gEl.value = String(g);
+      // لو عندك حساب سبب التجفيف مربوط بـ input
+      gEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    form.__mbkDryOffLastAI = lastAI4;
+  }
 }
 
     // =======================
