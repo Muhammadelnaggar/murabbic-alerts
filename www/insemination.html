@@ -44,6 +44,31 @@
   pointer-events: auto;
   cursor: pointer;
 }
+    /* ✅ Fix msgrow wrap (page-only) — prevents mobile “broken” layout */
+#sysbar .msgrow{
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+}
+
+#sysbar .msgrow > div{
+  min-width: 0 !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* زر "حسنًا" */
+#sysbar .okbtn{
+  white-space: nowrap;
+}
+
+@media (max-width: 420px){
+  /* على الموبايل: الزر ينزل تحت الرسالة بعرض كامل */
+  #sysbar .okbtn{
+    width: 100% !important;
+    display: block !important;
+    margin-top: 8px !important;
+  }
+}
 </style>
 
   <title>تسجيل التلقيح — مُرَبِّيك</title>
@@ -184,6 +209,7 @@ function showBar(msg, type = "success") {
 
 </body>
 </html>
+
 
 
 
