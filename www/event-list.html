@@ -100,7 +100,6 @@
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
     const fType = document.getElementById('f-type');
-    //const btnApply = document.getElementById('btn-apply');
     const btnClear = document.getElementById('btn-clear');
     const evBody = document.getElementById('evBody');
 
@@ -182,9 +181,6 @@
 
       renderRows(filtered);
     }
-
-    // ربط الأزرار
-    btnApply.addEventListener('click', loadAndFilter);
     // ✅ فلترة تلقائية بمجرد اختيار النوع من القائمة
 fType.addEventListener('change', loadAndFilter);
     // تحديث تلقائي عند مسح رقم الحيوان
