@@ -14,14 +14,13 @@
   <style>
     :root{ --green:#2e7d32; --green-600:#1b5e20; --bg:#fff9db; --card:#fff; --border:#c5e1a5; --ink:#143b24; }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;line-height:1.45;color:var(--ink);padding:12px}
-    .wrap{max-width:1100px;margin:0 auto}
-    h1{margin:0 0 10px;font-size:20px;color:var(--green-600);text-align:center}
+   body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;line-height:1.45;color:var(--ink);padding:0}
+    .wrap{max-width:520px;margin:0 auto;padding:12px}
     .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;margin:10px 0 12px}
     .controls input,.controls select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font:14px system-ui}
-    .controls button{padding:10px 14px;border-radius:10px;border:1px solid var(--green-600);background:var(--green);color:#fff;font-weight:700;cursor:pointer}
-    .controls .ghost{background:#fff;color:var(--green-600)}
-    .table{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+   .controls button{padding:12px 14px;border-radius:12px;border:1px solid var(--green-600);background:var(--green);color:#fff;font-weight:800;cursor:pointer}
+   .controls .ghost{background:#fff;color:var(--green-600);border:1px solid var(--green-600)}
+   .table{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
     thead th{position:sticky;top:0;background:#f6fff2;color:#2e7d32;font-weight:800;z-index:1}
@@ -34,8 +33,18 @@
   <!-- حمِّل إعدادات Firebase كملف عادي (غير ESM) ليضع firebaseConfig على window -->
   </head>
 <body>
+    <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">قائمة أحداث الحيوان</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
+    </div>
+  </header>
   <div class="wrap">
-    <h1>قائمة أحداث الحيوان</h1>
+   
 
     <div class="controls">
       <input id="f-num" type="text" inputmode="numeric" placeholder="رقم الحيوان (مثال 108)" aria-label="رقم الحيوان">
