@@ -20,7 +20,7 @@
     .controls input,.controls select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font:14px system-ui}
    .controls button{padding:12px 14px;border-radius:12px;border:1px solid var(--green-600);background:var(--green);color:#fff;font-weight:800;cursor:pointer}
    .controls .ghost{background:#fff;color:var(--green-600);border:1px solid var(--green-600)}
-   .table{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .table{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:auto;-webkit-overflow-scrolling:touch}
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
     thead th{position:sticky;top:0;background:#f6fff2;color:#2e7d32;font-weight:800;z-index:1}
@@ -69,6 +69,40 @@
 /* عشان المحتوى مايتغطاش */
 body{
   padding-bottom:65px;
+}
+    /* ✅ تفعيل السحب الأفقي */
+#evTable{ min-width: 860px; }
+
+/* ✅ عمودان Sticky (في RTL من اليمين) */
+.sticky-col{
+  position: sticky;
+  z-index: 5;
+}
+
+thead .sticky-col{
+  background:#f6fff2;
+  z-index: 6;
+}
+
+tbody .sticky-col{
+  background:#fff;
+}
+
+/* ترتيب الأعمدة الثابتة */
+.sticky-date{ right: 0; }
+.sticky-type{ right: 140px; } /* = عرض عمود التاريخ */
+
+/* فاصل بسيط بعد العمود الثابت الثاني */
+thead .sticky-type,
+tbody .sticky-type{
+  box-shadow: -1px 0 0 rgba(0,0,0,0.08);
+}
+
+/* تفاصيل الحدث: سطرين مقروءين */
+td:last-child{
+  text-align:right;
+  white-space:normal;
+  line-height:1.4;
 }
   </style>
   <!-- حمِّل إعدادات Firebase كملف عادي (غير ESM) ليضع firebaseConfig على window -->
@@ -119,14 +153,13 @@ body{
       <table id="evTable" dir="rtl">
         <thead>
           <tr>
-            <th style="width:120px">تاريخ الحدث</th>
-            <th style="width:90px">رقم الحيوان</th>
-            <th style="width:130px">نوع الحدث</th>
-            <th>تفاصيل</th>
+           <th class="sticky-col sticky-date" style="width:140px">تاريخ الحدث</th>
+<th class="sticky-col sticky-type" style="width:150px">نوع الحدث</th>
+<th style="min-width:520px">تفاصيل الحدث</th>
           </tr>
         </thead>
         <tbody id="evBody">
-          <tr><td colspan="4" class="empty">لا توجد بيانات بعد…</td></tr>
+         <tr><td colspan="3" class="empty">لا توجد بيانات بعد…</td></tr>
         </tbody>
       </table>
     </div>
@@ -177,7 +210,21 @@ body{
       const result = pick(ev, ['result','النتيجة'], '');
       return [note, result].filter(Boolean).join(' — ');
     }
+if(t === 'تحصين'){
+  const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
+  const dose = pick(ev, ['doseType','dose','جرعة'], '');
+  const p1 = v ? `اللقاح: ${v}` : '';
+  const p2 = dose ? `الجرعة: ${dose}` : '';
+  return [p1,p2].filter(Boolean).join(' — ');
+}
 
+if(t === 'تشخيص حمل'){
+  const method = pick(ev, ['method','طريقة'], '');
+  const result = pick(ev, ['result','النتيجة'], '');
+  const p1 = method ? `الطريقة: ${method}` : '';
+  const p2 = result ? `النتيجة: ${result}` : '';
+  return [p1,p2].filter(Boolean).join(' — ');
+}
     function renderRows(events){
       evBody.innerHTML = '';
       if(!events.length){
@@ -186,13 +233,21 @@ body{
       }
       const frag = document.createDocumentFragment();
       for(const ev of events){
-        const tr = document.createElement('tr');
-        const cDate  = document.createElement('td'); cDate.textContent  = pick(ev, ['eventDate','date','dt'], '');
-        const cNum   = document.createElement('td'); cNum.textContent   = pick(ev, ['animalNumber','number','animalId','id'], '');
-        const cType  = document.createElement('td'); cType.innerHTML    = `<span class="pill">${pick(ev, ['type','eventType','event_name','name'], '')}</span>`;
-        const cDet   = document.createElement('td'); cDet.textContent   = detailsFor(ev);
-        tr.append(cDate,cNum,cType,cDet);
-        frag.appendChild(tr);
+       const tr = document.createElement('tr');
+
+const cDate  = document.createElement('td');
+cDate.textContent = pick(ev, ['eventDate','date','dt'], '');
+cDate.className = 'sticky-col sticky-date';
+
+const cType  = document.createElement('td');
+cType.innerHTML = `<span class="pill">${pick(ev, ['type','eventType','event_name','name'], '')}</span>`;
+cType.className = 'sticky-col sticky-type';
+
+const cDet   = document.createElement('td');
+cDet.textContent = detailsFor(ev);
+
+tr.append(cDate, cType, cDet);
+frag.appendChild(tr);
       }
       evBody.appendChild(frag);
     }
