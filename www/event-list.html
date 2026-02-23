@@ -174,8 +174,10 @@ td:last-child{
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
     const fType = document.getElementById('f-type');
-    const btnClear = document.getElementById('btn-clear');
     const evBody = document.getElementById('evBody');
+    if(!evBody){
+  console.error('[event-list] evBody not found (#evBody). Check tbody id.');
+}
 
     // أدوات مساعدة
     const pick = (obj, keys, def='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return def; };
@@ -341,7 +343,7 @@ function detailsFor(ev){
 }   function renderRows(events){
       evBody.innerHTML = '';
       if(!events.length){
-        evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
+       evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
         return;
       }
       const frag = document.createDocumentFragment();
@@ -405,11 +407,6 @@ fType.addEventListener('change', loadAndFilter);
 fNum.addEventListener('input', () => {
   if (!fNum.value.trim()) loadAndFilter();
 });
-
-// تحديث تلقائي عند تغيير نوع الحدث
-fType.addEventListener('change', loadAndFilter);
-    //btnClear.addEventListener('click', () => { fNum.value=''; fType.value=''; loadAndFilter(); });
-
     // إقلاع الصفحة
     window.addEventListener('DOMContentLoaded', () => {
       const fixedNumber =
