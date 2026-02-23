@@ -70,8 +70,7 @@
 body{
   padding-bottom:65px;
 }
-    /* ✅ تفعيل السحب الأفقي */
-#evTable{ min-width: 860px; }
+  
 
 /* ✅ عمودان Sticky (في RTL من اليمين) */
 .sticky-col{
@@ -88,10 +87,6 @@ tbody .sticky-col{
   background:#fff;
 }
 
-/* ترتيب الأعمدة الثابتة */
-.sticky-date{ right: 0; }
-.sticky-type{ right: 140px; } /* = عرض عمود التاريخ */
-
 /* فاصل بسيط بعد العمود الثابت الثاني */
 thead .sticky-type,
 tbody .sticky-type{
@@ -104,6 +99,48 @@ td:last-child{
   white-space:normal;
   line-height:1.4;
 }
+    /* ✅ Sticky header للصف العلوي كله */
+thead th{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f6fff2;
+}
+
+/* ✅ متغيرات عرض العمودين (هتتملّي من JS) */
+:root{
+  --w-date: 0px;
+  --w-type: 0px;
+}
+
+/* ✅ عمود التاريخ: sticky يمين */
+.sticky-date{
+  position: sticky;
+  right: 0;
+  z-index: 9;
+  background: #fff;
+  white-space: nowrap;
+  width: 1%;
+}
+
+/* ✅ عمود النوع: sticky بعد التاريخ مباشرة */
+.sticky-type{
+  position: sticky;
+  right: var(--w-date);
+  z-index: 9;
+  background: #fff;
+  white-space: nowrap;
+  width: 1%;
+}
+
+/* ✅ نفس الخلفية في الهيدر للعمودين */
+thead .sticky-date,
+thead .sticky-type{
+  background: #f6fff2;
+  z-index: 11;
+}
+/* ✅ سكرول طبيعي للجدول */
+.table{ overflow:auto; }
   </style>
   <!-- حمِّل إعدادات Firebase كملف عادي (غير ESM) ليضع firebaseConfig على window -->
   </head>
@@ -153,8 +190,8 @@ td:last-child{
       <table id="evTable" dir="rtl">
         <thead>
           <tr>
-           <th class="sticky-col sticky-date" style="width:140px">تاريخ الحدث</th>
-<th class="sticky-col sticky-type" style="width:150px">نوع الحدث</th>
+         <th class="sticky-col sticky-date">تاريخ الحدث</th>
+<th class="sticky-col sticky-type">نوع الحدث</th>
 <th style="min-width:520px">تفاصيل الحدث</th>
           </tr>
         </thead>
@@ -435,7 +472,19 @@ function detailsFor(ev){
   const note = pick(ev, ['note','notes','ملاحظة','description'], '');
   const result = pick(ev, ['result','النتيجة'], '');
   return [note, result].filter(Boolean).join(' — ') || '—';
-}    function renderRows(events){
+}  
+  function updateStickyWidths(){
+  const thDate = document.querySelector('thead th.sticky-date');
+  const thType = document.querySelector('thead th.sticky-type');
+  if(!thDate || !thType) return;
+
+  const wDate = Math.ceil(thDate.getBoundingClientRect().width);
+  const wType = Math.ceil(thType.getBoundingClientRect().width);
+
+  document.documentElement.style.setProperty('--w-date', wDate + 'px');
+  document.documentElement.style.setProperty('--w-type', wType + 'px');
+}  
+    function renderRows(events){
   if(!evBody){
   console.error('[event-list] evBody is missing (#evBody).');
   return;
@@ -464,6 +513,7 @@ tr.append(cDate, cType, cDet);
 frag.appendChild(tr);
       }
       evBody.appendChild(frag);
+      updateStickyWidths();
     }
 
     async function loadAndFilter(){
@@ -529,6 +579,8 @@ if(cowBtn && fixedNumber){
         // fallback بسيط بعد ثانيتين
         setTimeout(loadAndFilter, 2000);
       }
+      window.addEventListener('resize', updateStickyWidths);
+setTimeout(updateStickyWidths, 0);
     });
   </script>
   <!-- ===== Bottom Fixed Bar ===== -->
