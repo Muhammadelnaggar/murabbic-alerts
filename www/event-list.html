@@ -188,51 +188,160 @@ td:last-child{
       const u = auth.currentUser; return u?.uid || '';
     }
 
- function detailsFor(ev){
-  const t = pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '').trim();
+ function normalizeTypeKey(ev){
+  // نفضل eventTypeNorm ثم eventType ثم type
+  const raw =
+    String(pick(ev, ['eventTypeNorm','eventType','type','event_name','name','نوع الحدث'], '')).trim();
 
-  if(t === 'تلقيح'){
+  // key موحد: lowercase + تحويل مسافات/شرطات لنفس الشكل
+  const k = raw
+    .toLowerCase()
+    .replace(/\s+/g,'_')
+    .replace(/-/g,'_');
+
+  // خريطة التطبيع (ضيفنا daily_milk + feces_eval حسب بياناتك)
+  const map = {
+    // milk
+    'لبن_يومي': 'daily_milk',
+    'daily_milk': 'daily_milk',
+    'daily-milk': 'daily_milk',
+    'dailymilk': 'daily_milk',
+
+    // insemination
+    'تلقيح': 'insemination',
+    'insemination': 'insemination',
+
+    // vaccination
+    'تحصين': 'vaccination',
+    'vaccination': 'vaccination',
+
+    // pregnancy diagnosis
+    'تشخيص_حمل': 'pregnancy_diagnosis',
+    'pregnancy_diagnosis': 'pregnancy_diagnosis',
+
+    // calving
+    'ولادة': 'calving',
+    'calving': 'calving',
+
+    // heat
+    'شياع': 'heat',
+    'heat': 'heat',
+
+    // dry-off
+    'تجفيف': 'dry_off',
+    'dryoff': 'dry_off',
+    'dry_off': 'dry_off',
+
+    // abortion
+    'إجهاض': 'abortion',
+    'abortion': 'abortion',
+
+    // feces / bcs
+    'feces_eval': 'feces_eval',
+    'تقييم_الروث_بالكاميرا': 'feces_eval',
+    'تقييم_الروث': 'feces_eval',
+
+    'bcs_eval': 'bcs_eval',
+    'تقييم_حالة_الجسم': 'bcs_eval',
+    'فحص_حالة_الجسم': 'bcs_eval',
+  };
+
+  return map[k] || k; // لو مش موجود، نرجّع key بعد التطبيع
+}
+
+function typeLabel(ev){
+  // نطلع لابل عربي ثابت للعرض
+  const key = normalizeTypeKey(ev);
+  const labels = {
+    daily_milk: 'لبن يومي',
+    insemination: 'تلقيح',
+    vaccination: 'تحصين',
+    pregnancy_diagnosis: 'تشخيص حمل',
+    calving: 'ولادة',
+    heat: 'شياع',
+    dry_off: 'تجفيف',
+    abortion: 'إجهاض',
+    feces_eval: 'تقييم الروث',
+    bcs_eval: 'فحص حالة الجسم',
+  };
+  // لو عندك eventType عربي أصلاً خده، وإلا استخدم اللابل
+  const direct = String(pick(ev, ['eventType'], '')).trim();
+  return direct || labels[key] || String(pick(ev, ['type'], '')).trim() || 'حدث';
+}
+
+function detailsFor(ev){
+  const key = normalizeTypeKey(ev);
+
+  if(key === 'insemination'){
     const at  = pick(ev, ['time','eventTime','وقت','ساعة','at'], '').toString();
     const bull= pick(ev, ['bull','bullName','طلوقة','اسم الطلوقة'], '');
     const straw=pick(ev, ['straw','strawCode','القشة','كود القشة'], '');
-    const timePart = at ? `الوقت: ${at}` : '';
-    const bullPart = bull? `الطلوقة: ${bull}`: '';
-    const stPart   = straw?`القشة: ${straw}`: '';
-    return [timePart,bullPart,stPart].filter(Boolean).join(' — ');
+    return [
+      at ? `الوقت: ${at}` : '',
+      bull ? `الطلوقة: ${bull}` : '',
+      straw ? `القشة: ${straw}` : ''
+    ].filter(Boolean).join(' — ');
   }
 
-  if(t === 'لبن يومي'){
-    const kg   = pick(ev, ['milkKg','kg','milk','لبن_كجم','كمية اللبن كجم'], '');
-    const shift= pick(ev, ['shift','milkingShift','الوردية','وردية'], '');
-    const p1 = kg!=='' ? `كجم: ${kg}` : '';
-    const p2 = shift? `الوردية: ${shift}`: '';
-    return [p1,p2].filter(Boolean).join(' — ');
+  if(key === 'daily_milk'){
+    const total = pick(ev, ['milkKg','kg','milk'], '');
+    const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
+    const sText = sessions.length
+      ? `الحلبات: ${sessions.map(s=>s?.kg).filter(v=>v!=null).join('+')}`
+      : '';
+    return [
+      total!=='' ? `إجمالي: ${total} كجم` : '',
+      sessions.length ? `عدد الحلبات: ${sessions.length}` : '',
+      sText
+    ].filter(Boolean).join(' — ');
   }
 
-  if(t === 'تحصين'){
+  if(key === 'vaccination'){
     const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
     const dose = pick(ev, ['doseType','dose','جرعة'], '');
-    const p1 = v ? `اللقاح: ${v}` : '';
-    const p2 = dose ? `الجرعة: ${dose}` : '';
-    return [p1,p2].filter(Boolean).join(' — ');
+    return [
+      v ? `اللقاح: ${v}` : '',
+      dose ? `الجرعة: ${dose}` : ''
+    ].filter(Boolean).join(' — ');
   }
 
-  if(t === 'تشخيص حمل'){
+  if(key === 'pregnancy_diagnosis'){
     const method = pick(ev, ['method','طريقة'], '');
     const result = pick(ev, ['result','النتيجة'], '');
-    const p1 = method ? `الطريقة: ${method}` : '';
-    const p2 = result ? `النتيجة: ${result}` : '';
-    return [p1,p2].filter(Boolean).join(' — ');
+    return [
+      method ? `الطريقة: ${method}` : '',
+      result ? `النتيجة: ${result}` : ''
+    ].filter(Boolean).join(' — ');
   }
 
-  const note = pick(ev, ['note','ملاحظة'], '');
+  if(key === 'calving'){
+    const cnt = pick(ev, ['calfCount'], '');
+    const calfId = pick(ev, ['calfId'], '');
+    const kind = pick(ev, ['calvingKind'], '');
+    return [
+      kind ? `الولادة: ${kind}` : '',
+      cnt ? `عدد العجول: ${cnt}` : '',
+      calfId ? `رقم العجل: ${calfId}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  if(key === 'feces_eval'){
+    const score = pick(ev, ['fecesScore','value'], '');
+    const desc  = pick(ev, ['description','note','notes','ملاحظة'], '');
+    return [
+      score!=='' ? `الدرجة: ${score}` : '',
+      desc ? `الوصف: ${desc}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // fallback عام (خليته يدعم notes كمان — عندك في الولادة)
+  const note = pick(ev, ['note','notes','ملاحظة','description'], '');
   const result = pick(ev, ['result','النتيجة'], '');
   return [note, result].filter(Boolean).join(' — ');
-}
-    function renderRows(events){
+}   function renderRows(events){
       evBody.innerHTML = '';
       if(!events.length){
-        evBody.innerHTML = '<tr><td colspan="4" class="empty">لا توجد نتائج مطابقة…</td></tr>';
+        evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
         return;
       }
       const frag = document.createDocumentFragment();
@@ -244,7 +353,7 @@ cDate.textContent = pick(ev, ['eventDate','date','dt'], '');
 cDate.className = 'sticky-col sticky-date';
 
 const cType  = document.createElement('td');
-cType.innerHTML = `<span class="pill">${pick(ev, ['type','eventType','event_name','name'], '')}</span>`;
+cType.cType.innerHTML = `<span class="pill">${typeLabel(ev)}</span>`;
 cType.className = 'sticky-col sticky-type';
 
 const cDet   = document.createElement('td');
@@ -283,8 +392,8 @@ if(!fixedNumber){
 
       const filtered = rows.filter(r => {
         const okNum  = !num  || (String(pick(r,['animalNumber','number','animalId'],'')).trim() === num);
-        const tval   = String(pick(r,['type','eventType','event_name','name'],'')).trim();
-        const okType = !type || (tval === type);
+        const tvalLabel = typeLabel(r);
+const okType = !type || (tvalLabel === type);
         return okNum && okType;
       });
 
