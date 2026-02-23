@@ -188,42 +188,46 @@ td:last-child{
       const u = auth.currentUser; return u?.uid || '';
     }
 
-    function detailsFor(ev){
-      const t = pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '').trim();
-      if(t === 'تلقيح'){
-        const at  = pick(ev, ['time','eventTime','وقت','ساعة','at'], '').toString();
-        const bull= pick(ev, ['bull','bullName','طلوقة','اسم الطلوقة'], '');
-        const straw=pick(ev, ['straw','strawCode','القشة','كود القشة'], '');
-        const timePart = at ? `الوقت: ${at}` : '';
-        const bullPart = bull? `الطلوقة: ${bull}`: '';
-        const stPart   = straw?`القشة: ${straw}`: '';
-        return [timePart,bullPart,stPart].filter(Boolean).join(' — ');
-      }
-      if(t === 'لبن يومي'){
-        const kg   = pick(ev, ['milkKg','kg','milk','لبن_كجم','كمية اللبن كجم'], '');
-        const shift= pick(ev, ['shift','milkingShift','الوردية','وردية'], '');
-        const p1 = kg!=='' ? `كجم: ${kg}` : '';
-        const p2 = shift? `الوردية: ${shift}`: '';
-        return [p1,p2].filter(Boolean).join(' — ');
-      }
-      const note = pick(ev, ['note','ملاحظة'], '');
-      const result = pick(ev, ['result','النتيجة'], '');
-      return [note, result].filter(Boolean).join(' — ');
-    }
-if(t === 'تحصين'){
-  const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
-  const dose = pick(ev, ['doseType','dose','جرعة'], '');
-  const p1 = v ? `اللقاح: ${v}` : '';
-  const p2 = dose ? `الجرعة: ${dose}` : '';
-  return [p1,p2].filter(Boolean).join(' — ');
-}
+ function detailsFor(ev){
+  const t = pick(ev, ['type','eventType','event_name','name','نوع الحدث'], '').trim();
 
-if(t === 'تشخيص حمل'){
-  const method = pick(ev, ['method','طريقة'], '');
+  if(t === 'تلقيح'){
+    const at  = pick(ev, ['time','eventTime','وقت','ساعة','at'], '').toString();
+    const bull= pick(ev, ['bull','bullName','طلوقة','اسم الطلوقة'], '');
+    const straw=pick(ev, ['straw','strawCode','القشة','كود القشة'], '');
+    const timePart = at ? `الوقت: ${at}` : '';
+    const bullPart = bull? `الطلوقة: ${bull}`: '';
+    const stPart   = straw?`القشة: ${straw}`: '';
+    return [timePart,bullPart,stPart].filter(Boolean).join(' — ');
+  }
+
+  if(t === 'لبن يومي'){
+    const kg   = pick(ev, ['milkKg','kg','milk','لبن_كجم','كمية اللبن كجم'], '');
+    const shift= pick(ev, ['shift','milkingShift','الوردية','وردية'], '');
+    const p1 = kg!=='' ? `كجم: ${kg}` : '';
+    const p2 = shift? `الوردية: ${shift}`: '';
+    return [p1,p2].filter(Boolean).join(' — ');
+  }
+
+  if(t === 'تحصين'){
+    const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
+    const dose = pick(ev, ['doseType','dose','جرعة'], '');
+    const p1 = v ? `اللقاح: ${v}` : '';
+    const p2 = dose ? `الجرعة: ${dose}` : '';
+    return [p1,p2].filter(Boolean).join(' — ');
+  }
+
+  if(t === 'تشخيص حمل'){
+    const method = pick(ev, ['method','طريقة'], '');
+    const result = pick(ev, ['result','النتيجة'], '');
+    const p1 = method ? `الطريقة: ${method}` : '';
+    const p2 = result ? `النتيجة: ${result}` : '';
+    return [p1,p2].filter(Boolean).join(' — ');
+  }
+
+  const note = pick(ev, ['note','ملاحظة'], '');
   const result = pick(ev, ['result','النتيجة'], '');
-  const p1 = method ? `الطريقة: ${method}` : '';
-  const p2 = result ? `النتيجة: ${result}` : '';
-  return [p1,p2].filter(Boolean).join(' — ');
+  return [note, result].filter(Boolean).join(' — ');
 }
     function renderRows(events){
       evBody.innerHTML = '';
