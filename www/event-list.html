@@ -311,8 +311,7 @@ function typeLabel(ev){
     bcs_eval: 'فحص حالة الجسم',
   };
   // لو عندك eventType عربي أصلاً خده، وإلا استخدم اللابل
-  const direct = String(pick(ev, ['eventType'], '')).trim();
-  return direct || labels[key] || String(pick(ev, ['type'], '')).trim() || 'حدث';
+ return labels[key] || 'حدث';
 }
 
 function detailsFor(ev){
