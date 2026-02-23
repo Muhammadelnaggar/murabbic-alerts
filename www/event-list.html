@@ -274,22 +274,29 @@ function typeLabel(ev){
 function detailsFor(ev){
   const key = normalizeTypeKey(ev);
 
+  // ================== تلقيح ==================
   if(key === 'insemination'){
-    const at  = pick(ev, ['time','eventTime','وقت','ساعة','at'], '').toString();
-    const bull= pick(ev, ['bull','bullName','طلوقة','اسم الطلوقة'], '');
-    const straw=pick(ev, ['straw','strawCode','القشة','كود القشة'], '');
+    const at = pick(ev, ['inseminationTime','time','eventTime','at','وقت','ساعة'], '');
+    const method = pick(ev, ['inseminationMethod','method','طريقة'], '');
+    const semen = pick(ev, ['semenCode','strawCode','straw','القشة','كود القشة'], '');
+    const who = pick(ev, ['inseminator','by','الملقح'], '');
+    const heat = pick(ev, ['heatStatus','heatTime','الشياع'], '');
+
     return [
       at ? `الوقت: ${at}` : '',
-      bull ? `الطلوقة: ${bull}` : '',
-      straw ? `القشة: ${straw}` : ''
+      method ? `الطريقة: ${method}` : '',
+      semen ? `السائل/القشة: ${semen}` : '',
+      who ? `الملقّح: ${who}` : '',
+      heat ? `الشياع: ${heat}` : ''
     ].filter(Boolean).join(' — ');
   }
 
+  // ================== لبن يومي ==================
   if(key === 'daily_milk'){
-    const total = pick(ev, ['milkKg','kg','milk'], '');
+    const total = pick(ev, ['milkKg','dailyMilk','kg','milk','milkTotalKg'], '');
     const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
     const sText = sessions.length
-      ? `الحلبات: ${sessions.map(s=>s?.kg).filter(v=>v!=null).join('+')}`
+      ? `الحلبات: ${sessions.map(s=>s?.kg ?? s?.milkKg ?? s?.value).filter(v=>v!=null).join('+')}`
       : '';
     return [
       total!=='' ? `إجمالي: ${total} كجم` : '',
@@ -298,6 +305,7 @@ function detailsFor(ev){
     ].filter(Boolean).join(' — ');
   }
 
+  // ================== تحصين ==================
   if(key === 'vaccination'){
     const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
     const dose = pick(ev, ['doseType','dose','جرعة'], '');
@@ -307,19 +315,23 @@ function detailsFor(ev){
     ].filter(Boolean).join(' — ');
   }
 
+  // ================== تشخيص حمل ==================
   if(key === 'pregnancy_diagnosis'){
     const method = pick(ev, ['method','طريقة'], '');
     const result = pick(ev, ['result','النتيجة'], '');
+    const vet = pick(ev, ['vet','doctor','الطبيب'], '');
     return [
       method ? `الطريقة: ${method}` : '',
-      result ? `النتيجة: ${result}` : ''
+      result ? `النتيجة: ${result}` : '',
+      vet ? `الطبيب: ${vet}` : ''
     ].filter(Boolean).join(' — ');
   }
 
+  // ================== ولادة ==================
   if(key === 'calving'){
+    const kind = pick(ev, ['calvingKind'], '');
     const cnt = pick(ev, ['calfCount'], '');
     const calfId = pick(ev, ['calfId'], '');
-    const kind = pick(ev, ['calvingKind'], '');
     return [
       kind ? `الولادة: ${kind}` : '',
       cnt ? `عدد العجول: ${cnt}` : '',
@@ -327,6 +339,33 @@ function detailsFor(ev){
     ].filter(Boolean).join(' — ');
   }
 
+  // ================== إجهاض ==================
+  if(key === 'abortion'){
+    const cause = pick(ev, ['probableCause','cause','reason','سبب','السبب'], '');
+    const age = pick(ev, ['abortionAgeMonths','ageMonths'], '');
+    const lastAI = pick(ev, ['lastInseminationDate'], '');
+    return [
+      cause ? `السبب المحتمل: ${cause}` : '',
+      age!=='' ? `عمر الحمل: ${age} شهر` : '',
+      lastAI ? `آخر تلقيح: ${lastAI}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== تجفيف ==================
+  if(key === 'dry_off'){
+    const reason = pick(ev, ['reason','سبب','السبب'], '');
+    const ab = pick(ev, ['usedDryingAntibiotics','dryingAntibiotics'], '');
+    const preg = pick(ev, ['pregnancyStatus','reproStatus'], '');
+    const dt = pick(ev, ['dryOffDate','eventDate'], '');
+    return [
+      dt ? `تاريخ: ${dt}` : '',
+      preg ? `الحالة: ${preg}` : '',
+      reason ? `السبب: ${reason}` : '',
+      ab ? `مضاد تجفيف: ${ab}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== تقييم الروث ==================
   if(key === 'feces_eval'){
     const score = pick(ev, ['fecesScore','value'], '');
     const desc  = pick(ev, ['description','note','notes','ملاحظة'], '');
@@ -336,11 +375,67 @@ function detailsFor(ev){
     ].filter(Boolean).join(' — ');
   }
 
-  // fallback عام (خليته يدعم notes كمان — عندك في الولادة)
+  // ================== مرض / Health ==================
+  if(key === 'health'){
+    const name = pick(ev, ['diseaseName','disease','name'], '');
+    const code = pick(ev, ['diseaseCode'], '');
+    return [
+      name ? `المرض: ${name}` : '',
+      code ? `الكود: ${code}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== تزامن / Ovsynch ==================
+  if(key === 'ovsynch' || key === 'ovysynch'){
+    const prog = pick(ev, ['program','type'], '');
+    const start = pick(ev, ['startDate','eventDate'], '');
+    const steps = Array.isArray(ev.steps) ? ev.steps : [];
+    const next = steps.find(s => !s?.done);
+    const nextTxt = next ? `التالي: ${next.name} (${next.date || ''})` : '';
+    return [
+      prog ? `البرنامج: ${prog}` : '',
+      start ? `البداية: ${start}` : '',
+      nextTxt
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== استبعاد ==================
+  if(key === 'cull'){
+    const r = pick(ev, ['reason','cullMain','cullDetail'], '');
+    return r ? `السبب: ${r}` : 'استبعاد';
+  }
+
+  // ================== بيع ==================
+  if(key === 'sale'){
+    const price = pick(ev, ['price'], '');
+    const why = pick(ev, ['saleReason','reason'], '');
+    return [
+      price!=='' ? `السعر: ${price}` : '',
+      why ? `السبب: ${why}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== تحضير للولادة (Close-up) ==================
+  if(key === 'closeup'){
+    const ration = pick(ev, ['ration'], '');
+    const an = pick(ev, ['anionicSalts'], '');
+    return [
+      ration ? `عليقة: ${ration}` : '',
+      an ? `أملاح أنيونية: ${an}` : ''
+    ].filter(Boolean).join(' — ');
+  }
+
+  // ================== تقييم صفات اللبن (Milking traits) ==================
+  if(key === 'milking_traits_eval' || key === 'milking_traits'){
+    const score = pick(ev, ['kpi.overallScore','overallScore'], '');
+    return score!=='' ? `الدرجة الكلية: ${score}` : 'تقييم صفات اللبن';
+  }
+
+  // fallback عام
   const note = pick(ev, ['note','notes','ملاحظة','description'], '');
   const result = pick(ev, ['result','النتيجة'], '');
-  return [note, result].filter(Boolean).join(' — ');
-}   function renderRows(events){
+  return [note, result].filter(Boolean).join(' — ') || '—';
+}    function renderRows(events){
   if(!evBody){
   console.error('[event-list] evBody is missing (#evBody).');
   return;
