@@ -359,7 +359,7 @@ cDate.textContent = pick(ev, ['eventDate','date','dt'], '');
 cDate.className = 'sticky-col sticky-date';
 
 const cType  = document.createElement('td');
-cType.cType.innerHTML = `<span class="pill">${typeLabel(ev)}</span>`;
+cType.innerHTML = `<span class="pill">${typeLabel(ev)}</span>`;
 cType.className = 'sticky-col sticky-type';
 
 const cDet   = document.createElement('td');
