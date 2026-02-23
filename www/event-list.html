@@ -20,15 +20,12 @@
     .controls input,.controls select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font:14px system-ui}
    .controls button{padding:12px 14px;border-radius:12px;border:1px solid var(--green-600);background:var(--green);color:#fff;font-weight:800;cursor:pointer}
    .controls .ghost{background:#fff;color:var(--green-600);border:1px solid var(--green-600)}
-  .table{background:var(--card).table{
+ .table{
   background:var(--card);
   border:1px solid var(--border);
   border-radius:14px;
-
-  /* ✅ هنا السر: خلي السِكرول جوه الجدول */
   max-height: calc(100vh - 260px);
   overflow:auto;
-
   -webkit-overflow-scrolling:touch;
 }
     table{width:100%;border-collapse:separate;border-spacing:0}
@@ -202,7 +199,7 @@ thead .sticky-type{
           <tr>
          <th class="sticky-col sticky-date">تاريخ الحدث</th>
 <th class="sticky-col sticky-type">نوع الحدث</th>
-<th style="min-width:520px">تفاصيل الحدث</th>
+<th>تفاصيل الحدث</th>
           </tr>
         </thead>
         <tbody id="evBody">
