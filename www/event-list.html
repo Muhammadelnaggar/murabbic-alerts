@@ -341,6 +341,10 @@ function detailsFor(ev){
   const result = pick(ev, ['result','النتيجة'], '');
   return [note, result].filter(Boolean).join(' — ');
 }   function renderRows(events){
+  if(!evBody){
+  console.error('[event-list] evBody is missing (#evBody).');
+  return;
+}
       evBody.innerHTML = '';
       if(!events.length){
        evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
