@@ -20,7 +20,17 @@
     .controls input,.controls select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font:14px system-ui}
    .controls button{padding:12px 14px;border-radius:12px;border:1px solid var(--green-600);background:var(--green);color:#fff;font-weight:800;cursor:pointer}
    .controls .ghost{background:#fff;color:var(--green-600);border:1px solid var(--green-600)}
-  .table{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:auto;-webkit-overflow-scrolling:touch}
+  .table{background:var(--card).table{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+
+  /* ✅ هنا السر: خلي السِكرول جوه الجدول */
+  max-height: calc(100vh - 260px);
+  overflow:auto;
+
+  -webkit-overflow-scrolling:touch;
+}
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
     thead th{position:sticky;top:0;background:#f6fff2;color:#2e7d32;font-weight:800;z-index:1}
