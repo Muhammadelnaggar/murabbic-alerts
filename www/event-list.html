@@ -12,7 +12,7 @@
   <script type="module" src="js/forms-init.js"></script>
 
   <style>
-    :root{ --green:#2e7d32; --green-600:#1b5e20; --bg:#fff9db; --card:#fff; --border:#c5e1a5; --ink:#143b24; }
+    :root{ --green:#2e7d32; --green-600:#1b5e20; --bg:#f7faf7; --card:#fff; --border:#c5e1a5; --ink:#143b24; }
     *{box-sizing:border-box}
    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;line-height:1.45;color:var(--ink);padding:0}
     .wrap{max-width:520px;margin:0 auto;padding:12px}
@@ -58,9 +58,20 @@
         <option>تقليم الحوافر</option>
         <option>عرج</option>
         <option>التهاب الضرع</option>
+        <option>شياع</option>
+<option>تزامن</option>
+<option>تجفيف</option>
+<option>إجهاض</option>
+<option>ولادة (عجل)</option>
+<option>نفوق</option>
+<option>استبعاد</option>
+<option>فحص حالة الجسم</option>
+<option>تقييم الروث</option>
+<option>تغذية</option>
+<option>مرض</option>
       </select>
-      <button id="btn-apply">تطبيق الفلترة</button>
-      <button id="btn-clear" class="ghost">تصفير</button>
+     
+     
     </div>
 
     <div class="table">
@@ -89,7 +100,7 @@
     // ثوابت DOM
     const fNum  = document.getElementById('f-num');
     const fType = document.getElementById('f-type');
-    const btnApply = document.getElementById('btn-apply');
+    //const btnApply = document.getElementById('btn-apply');
     const btnClear = document.getElementById('btn-clear');
     const evBody = document.getElementById('evBody');
 
@@ -174,7 +185,16 @@
 
     // ربط الأزرار
     btnApply.addEventListener('click', loadAndFilter);
-    btnClear.addEventListener('click', () => { fNum.value=''; fType.value=''; loadAndFilter(); });
+    // ✅ فلترة تلقائية بمجرد اختيار النوع من القائمة
+fType.addEventListener('change', loadAndFilter);
+    // تحديث تلقائي عند مسح رقم الحيوان
+fNum.addEventListener('input', () => {
+  if (!fNum.value.trim()) loadAndFilter();
+});
+
+// تحديث تلقائي عند تغيير نوع الحدث
+fType.addEventListener('change', loadAndFilter);
+    //btnClear.addEventListener('click', () => { fNum.value=''; fType.value=''; loadAndFilter(); });
 
     // إقلاع الصفحة
     window.addEventListener('DOMContentLoaded', () => {
