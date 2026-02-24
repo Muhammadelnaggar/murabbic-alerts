@@ -290,6 +290,8 @@ thead .sticky-type{
     'bcs_eval': 'bcs_eval',
     'تقييم_حالة_الجسم': 'bcs_eval',
     'فحص_حالة_الجسم': 'bcs_eval',
+    'بيع': 'sale',
+'sale': 'sale',
   };
 
   return map[k] || k; // لو مش موجود، نرجّع key بعد التطبيع
@@ -309,6 +311,7 @@ function typeLabel(ev){
     abortion: 'إجهاض',
     feces_eval: 'تقييم الروث',
     bcs_eval: 'فحص حالة الجسم',
+    sale: 'بيع',
   };
   // لو عندك eventType عربي أصلاً خده، وإلا استخدم اللابل
  return labels[key] || 'حدث';
