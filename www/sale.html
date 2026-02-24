@@ -63,8 +63,8 @@
 
     <div class="row-gap"></div>
 
-    <!-- ✅ هذا هو الحقل الذي يُحفظ فعليًا في Firestore -->
-    <input id="saleReason" data-field="saleReason" placeholder="سيتم ملؤه تلقائيًا حسب اختيارك" readonly />
+   <input id="saleReason" data-field="saleReason" placeholder="سيتم ملؤه تلقائيًا حسب اختيارك" readonly style="display:none" />
+    <input id="saleReasonCustom" placeholder="اكتب سبب البيع" style="display:none" />
 
     <div id="cullHint" class="field-hint" style="display:none;"></div>
 
@@ -72,7 +72,12 @@
     <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 
     <!-- ✅ زر يطلب التحقق المركزي فقط -->
-    <button id="saveBtn" type="button" data-validate="true">حفظ البيع ✅</button>
+    <div style="display:flex; gap:10px; margin-top:12px;">
+  <button id="saveBtn" type="button" data-validate="true" style="flex:1;">حفظ البيع ✅</button>
+  <button id="cardBtn" type="button" style="flex:1; background:#fff; color:#1b5e20; border:2px solid #1b5e20; border-radius:14px; font-weight:800;">
+    بطاقة الحيوان
+  </button>
+</div>
   </main>
 
   <script type="module">
@@ -97,6 +102,13 @@
 
     $("animalNumber").value = String(num || "");
     $("eventDate").value = dt;
+    const cardBtn = $("cardBtn");
+if (cardBtn) {
+  cardBtn.onclick = () => {
+    const n = String(num || "").trim();
+    if (n) location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+  };
+}
 
     let lastCullAutoReason = ""; // آخر سبب استبعاد (لو موجود)
 
@@ -135,44 +147,79 @@
       }
     }
 
-    function applyPresetToSaleReason(){
-      const preset = String($("saleReasonPreset").value || "").trim();
-      const saleReason = $("saleReason");
-      const hint = $("cullHint");
+function addOptionIfMissing(val){
+  val = String(val || "").trim();
+  if(!val) return;
+  const sel = $("saleReasonPreset");
+  const exists = Array.from(sel.options).some(o => String(o.value).trim() === val);
+  if(exists) return;
+  const opt = document.createElement("option");
+  opt.value = val;
+  opt.textContent = val;
+  const other = Array.from(sel.options).find(o => o.value === "أخرى");
+  sel.insertBefore(opt, other || null);
+}
 
-      // default
-      hint.style.display = "none";
-      hint.textContent = "";
+function applyPresetToSaleReason(){
+  const preset = String($("saleReasonPreset").value || "").trim();
+  const saleReason = $("saleReason");         // مخفي دائمًا (إلا استبعاد)
+  const hint = $("cullHint");
+  const custom = $("saleReasonCustom");       // يظهر فقط عند "أخرى"
 
-      if (preset === "استبعاد"){
-        const val = (lastCullAutoReason || "استبعاد").trim();
-        saleReason.value = val;
-        saleReason.readOnly = true;
+  // reset
+  if (hint){ hint.style.display = "none"; hint.textContent = ""; }
+  if (custom){ custom.style.display = "none"; }
 
-        hint.style.display = "block";
-        hint.textContent = lastCullAutoReason
-          ? "تم سحب سبب الاستبعاد تلقائيًا من آخر استبعاد مسجل."
-          : "لا يوجد استبعاد سابق — تم ضبط السبب على: استبعاد.";
-        return;
-      }
+  if (preset === "استبعاد"){
+    // ✅ يظهر saleReason فقط هنا (لإظهار السبب المسحوب)
+    const val = (lastCullAutoReason || "استبعاد").trim();
+    saleReason.value = val;
+    saleReason.readOnly = true;
+    saleReason.style.display = "";
 
-      if (preset === "أخرى"){
-        saleReason.value = "";
-        saleReason.readOnly = false;
-        saleReason.placeholder = "اكتب سبب البيع";
-        return;
-      }
-
-      // ذبح اضطراري / حادثة
-      saleReason.value = preset;
-      saleReason.readOnly = true;
+    if (hint){
+      hint.style.display = "block";
+      hint.textContent = lastCullAutoReason
+        ? "تم سحب سبب الاستبعاد تلقائيًا من آخر استبعاد مسجل."
+        : "لا يوجد استبعاد سابق — تم ضبط السبب على: استبعاد.";
     }
+    return;
+  }
 
+  if (preset === "أخرى"){
+    // ✅ نخفي saleReason ونظهر حقل كتابة
+    saleReason.value = "";
+    saleReason.style.display = "none";
+    saleReason.readOnly = true;
+
+    custom.style.display = "";
+    custom.value = "";
+    custom.focus();
+    return;
+  }
+
+  // ✅ باقي الاختيارات: saleReason مخفي ويتسجل بالقيمة المختارة
+  saleReason.value = preset;
+  saleReason.readOnly = true;
+  saleReason.style.display = "none";
+}
     // ابدأ بالسحب ثم طبّق القيمة الافتراضية
     await prefillLastCullReason();
     applyPresetToSaleReason();
     $("saleReasonPreset").addEventListener("change", applyPresetToSaleReason);
+    $("saleReasonCustom")?.addEventListener("blur", () => {
+  const typed = String($("saleReasonCustom").value || "").trim();
+  if(!typed) return;
 
+  // أضف السبب للدروب داون واختره
+  addOptionIfMissing(typed);
+  $("saleReasonPreset").value = typed;
+
+  // خزّن القيمة الرسمية في saleReason (المخفي)
+  const saleReason = $("saleReason");
+  saleReason.value = typed;
+  saleReason.style.display = "none";
+});
     // ✅ حفظ فقط بعد نجاح التحقق المركزي
     window.addEventListener("mbk:valid", async (ev) => {
       try{
