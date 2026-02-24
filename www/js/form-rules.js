@@ -327,7 +327,24 @@ export const eventSchemas = {
   },
   guards: ["vaccinationDecision"]
 },
+"بيع": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate:    { required: true, type: "date", msg: "تاريخ البيع غير صالح." },
 
+    // ✅ لازم Gate يجيب الحيوان
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
+
+    // ✅ سبب البيع أساسي
+    saleReason:   { required: true, msg: "سبب البيع مطلوب." },
+
+    // اختياري
+    season: { required: false, type: "number", msg: "رقم الموسم غير صالح." },
+    price:  { required: false, type: "number", msg: "سعر البيع غير صالح." },
+    notes:  { required: false }
+  },
+  guards: []
+},
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
