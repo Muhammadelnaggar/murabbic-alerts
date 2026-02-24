@@ -31,9 +31,12 @@
   </script>
 
   <style>
-    :root{--bg:#fff9db;--card:#f1f8e9;--border:#c5e1a5;--green:#2e7d32;--muted:#5f6f64}
     *{box-sizing:border-box}
-    body{direction:rtl;background:var(--bg);font-family:Arial,Helvetica,sans-serif;margin:0;color:#1b5e20;padding:12px}
+   body{
+  direction:rtl;
+  margin:0;
+  font-family:system-ui,"Cairo","Segoe UI",Tahoma,Arial,sans-serif;
+}
     h1{margin:0 0 8px;text-align:center;color:var(--green);font-size:22px}
     .wrap{max-width:1080px;margin:0 auto}
     .info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
@@ -68,8 +71,15 @@
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>📄 تسجيل تركيبة التغذية</h1>
+<div class="mbk-form">
+ <header class="mbk-head">
+  <a href="/dashboard.html" class="mbk-back">←</a>
+  <div class="mbk-center">
+    <div class="mbk-page-title">تسجيل تركيبة التغذية</div>
+    <div class="mbk-app-name">مُرَبِّيك</div>
+  </div>
+  <img src="/logo.png" class="mbk-logo" alt="Murabbik">
+</header>
 
   <div class="info">
     <span class="pill">🐄 الحيوان/المجموعة: <b id="animalInfo">—</b></span>
@@ -91,7 +101,7 @@
   </div>
   <div class="warning" id="warn"></div>
 
-  <div class="card">
+  <div class="mbk-card">
     <div class="row stack">
       <div class="grow">
         <label class="muted">طريقة الإدخال</label>
