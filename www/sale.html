@@ -161,27 +161,20 @@ async function prefillSeason(){
     const seasonInput = document.getElementById("season");
     if(!seasonInput) return;
 
-    // ✅ جلب وثيقة الحيوان (الأثبت)
-    const animalsRef = collection(db, "animals");
-    const qy = query(
-      animalsRef,
-      where("userId", "==", uid),
-      where("animalNumber", "==", n),
-      limit(1)
-    );
+    // ✅ نجيب وثيقة الحيوان مباشرة بالـ ID
+    const docRef = doc(db, "animals", n);
+    const snap = await getDoc(docRef);
 
-    const snap = await getDocs(qy);
-    if(snap.empty) return;
+    if(!snap.exists()) return;
 
-    const animal = snap.docs[0].data() || {};
+    const animal = snap.data() || {};
 
-    // حاول قراءة الموسم من أكثر من اسم محتمل بدون اختراع حقول جديدة
-    const s =
-      Number(animal.season ?? animal.lactation ?? animal.lactationNumber ?? animal.parity ?? "");
+    const s = Number(animal.lactationNumber);
 
     if(Number.isFinite(s) && s > 0){
       seasonInput.value = String(s);
     }
+
   }catch(e){
     console.warn("[sale] prefillSeason failed", e);
   }
