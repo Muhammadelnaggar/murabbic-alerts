@@ -47,7 +47,7 @@
     <input id="animalNumber" data-field="animalNumber" readonly />
 
     <label>تاريخ البيع</label>
-    <input id="eventDate" data-field="eventDate" type="date" />
+    <input id="eventDate" data-field="eventDate" type="date" required />
 
     <label>سعر البيع (اختياري)</label>
     <input id="price" data-field="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
@@ -123,14 +123,14 @@ if (cardBtn) {
 
         // ✅ تصحيح مهم: بياناتك تستخدم animalNumber/animalId وليس number
         const evRef = collection(db, "events");
-        const qy = query(
-          evRef,
-          where("userId", "==", uid),
-          where("animalNumber", "==", n),
-          where("eventType", "==", "استبعاد"),
-          orderBy("eventDate", "desc"),
-          limit(1)
-        );
+      const qy = query(
+  collection(db, "events"),
+  where("userId", "==", uid),
+  where("animalNumber", "==", n),
+  where("type", "==", "استبعاد"),
+  orderBy("eventDate", "desc"),
+  limit(1)
+);
 
         const snap = await getDocs(qy);
         if (snap.empty) return;
