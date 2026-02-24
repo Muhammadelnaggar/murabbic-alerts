@@ -454,12 +454,13 @@ function detailsFor(ev){
   }
 
   // ================== بيع ==================
- if(key === 'sale'){
+if(key === 'sale'){
   const price = pick(ev, ['price'], '');
-  const why = pick(ev, ['saleReason','reason','notes','note'], '');
+  const reason = String(pick(ev, ['saleReason','reason','notes','note'], '')).trim();
+
   return [
     price!=='' ? `السعر: ${price}` : '',
-    why ? `السبب: ${why}` : ''
+    reason ? `السبب: ${reason}` : 'السبب: غير مسجل'
   ].filter(Boolean).join(' — ') || '—';
 }
 
