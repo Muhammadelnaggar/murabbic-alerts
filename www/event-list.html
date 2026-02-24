@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0">
   <title>قائمة أحداث الحيوان — مُرَبِّك</title>
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
@@ -314,7 +315,8 @@ function typeLabel(ev){
     sale: 'بيع',
   };
   // لو عندك eventType عربي أصلاً خده، وإلا استخدم اللابل
- return labels[key] || 'حدث';
+const rawAr = String(pick(ev, ['eventType','type'], '')).trim();
+return rawAr || labels[key] || 'حدث';
 }
 
 function detailsFor(ev){
