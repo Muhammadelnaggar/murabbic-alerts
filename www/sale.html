@@ -99,18 +99,19 @@
     const $ = (id) => document.getElementById(id);
     const info = $("info");
 
-   function msg(t, ok=false){
-  // استخدم الرسام المركزي القياسي
-  const bar = document.getElementById("sysbar") || info;
+  function msg(t, ok=false){
+  const bar = document.getElementById("sysbar") || document.getElementById("info");
+  if (!bar) { console.warn("[msg] no infobar on page"); return; }
+
   if (window.showMsg) {
     window.showMsg(bar, t, ok ? "success" : "error");
-  } else {
-    bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
-    bar.style.display = "block";
-    bar.textContent = t;
+    return;
   }
-}
 
+  bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
+  bar.style.display = "block";
+  bar.textContent = t;
+}
     const p = new URLSearchParams(location.search);
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
     const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
