@@ -86,10 +86,11 @@
   <script type="module">
     import { db, auth, ensureAuth } from "/js/firebase-config.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
-    import {
-      collection, addDoc, serverTimestamp,
-      getDocs, query, where, orderBy, limit
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   import {
+  collection, addDoc, serverTimestamp,
+  getDocs, query, where, orderBy, limit,
+  doc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
     const info = $("info");
