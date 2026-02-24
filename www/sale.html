@@ -41,6 +41,7 @@
   </header>
 
   <main class="mbk-form">
+    <form id="saleForm" novalidate>
     <div id="info" class="infobar"></div>
 
     <label>رقم الحيوان</label>
@@ -76,11 +77,14 @@
 
     <!-- ✅ زر يطلب التحقق المركزي فقط -->
     <div style="display:flex; gap:10px; margin-top:12px;">
-  <button id="saveBtn" type="button" data-validate="true" style="flex:1;">حفظ البيع ✅</button>
+ <button id="saveBtn" type="submit" data-validate="true">
+  حفظ البيع ✅
+</button>
   <button id="cardBtn" type="button" style="flex:1; background:#fff; color:#1b5e20; border:2px solid #1b5e20; border-radius:14px; font-weight:800;">
     بطاقة الحيوان
   </button>
 </div>
+      </form>
   </main>
 
   <script type="module">
