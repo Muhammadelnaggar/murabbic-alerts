@@ -245,6 +245,9 @@ html[dir="rtl"] input[type="date"]{
 
 /* OK button */
 .infobar .okbtn{
+  width:auto !important;
+  max-width:140px;
+  white-space:nowrap;
   flex-shrink:0;
   border-radius:12px;
   padding:8px 12px;
