@@ -94,7 +94,15 @@ bar.classList.remove("ok", "err"); // لو صفحة قديمة استخدمته�
   `;
 
   bar.innerHTML = html;
-
+// ✅ زر "حسنًا" يغلق الرسالة (مركزي لكل الصفحات)
+const ok = bar.querySelector(".okbtn");
+if (ok) {
+  ok.onclick = () => {
+    bar.style.display = "none";
+    bar.innerHTML = "";
+    bar.className = "infobar mbk-infobar";
+  };
+}
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
   // actions (اختياري)
