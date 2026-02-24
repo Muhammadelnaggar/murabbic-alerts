@@ -162,16 +162,49 @@ async function prefillSeason(){
     const seasonInput = document.getElementById("season");
     if(!seasonInput) return;
 
-    // ✅ نجيب وثيقة الحيوان مباشرة بالـ ID
-    const docRef = doc(db, "animals", n);
-    const snap = await getDoc(docRef);
+    // 1) جرّب أولاً لو عندك بالفعل docId = رقم الحيوان (احتياط)
+    try{
+      const directRef = doc(db, "animals", n);
+      const directSnap = await getDoc(directRef);
+      if (directSnap.exists()){
+        const a = directSnap.data() || {};
+        const s = Number(a.lactationNumber);
+        if(Number.isFinite(s) && s > 0){
+          seasonInput.value = String(s);
+          return;
+        }
+      }
+    }catch(_){}
 
-    if(!snap.exists()) return;
+    // 2) الوضع الحقيقي عندك غالبًا: البحث في animals حسب userId + animalNumber/animalId
+    // ملاحظة: قد يطلب Firestore Index لأول مرة (تعمله مرة واحدة فقط)
+    const aq = query(
+      collection(db, "animals"),
+      where("userId", "==", uid),
+      where("animalNumber", "==", n),
+      limit(1)
+    );
 
-    const animal = snap.data() || {};
+    const snap = await getDocs(aq);
+    if(snap.empty){
+      // fallback: بعض بياناتك تستخدم animalId بدل animalNumber
+      const aq2 = query(
+        collection(db, "animals"),
+        where("userId", "==", uid),
+        where("animalId", "==", n),
+        limit(1)
+      );
+      const snap2 = await getDocs(aq2);
+      if(snap2.empty) return;
 
-    const s = Number(animal.lactationNumber);
+      const a2 = snap2.docs[0].data() || {};
+      const s2 = Number(a2.lactationNumber);
+      if(Number.isFinite(s2) && s2 > 0) seasonInput.value = String(s2);
+      return;
+    }
 
+    const a = snap.docs[0].data() || {};
+    const s = Number(a.lactationNumber);
     if(Number.isFinite(s) && s > 0){
       seasonInput.value = String(s);
     }
