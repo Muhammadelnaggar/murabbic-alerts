@@ -43,13 +43,7 @@ function ensureInfoBar(form) {
       form.prepend(bar);
     }
   }
-  // ✅ normalize: اجعل أي بار "قياسي مُرَبِّيك" حتى لو كان موجودًا مسبقًا (مثل #info)
-  try {
-    if (!bar.id) bar.id = "sysbar";
-    bar.classList.add("infobar", "mbk-infobar");
-    bar.setAttribute("role", "status");
-    bar.setAttribute("aria-live", "polite");
-  } catch (_) {}
+
   return bar;
 }
 
@@ -74,9 +68,12 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   "info";
 
 bar.className = "infobar mbk-infobar show " + cls;
-bar.classList.add("infobar", "mbk-infobar");
-bar.classList.remove("ok", "err"); // لو صفحة قديمة استخدمتهم
+
   const isErr = (type === "error");
+ // bar.style.borderColor = isErr ? "#ef9a9a" : "#86efac";
+  //bar.style.background  = isErr ? "#ffebee" : "#ecfdf5";
+ // bar.style.color       = isErr ? "#b71c1c" : "#065f46";
+
   const lines = Array.isArray(msgs) ? msgs : [msgs];
   const safeLines = lines.filter(Boolean).map(_escapeHtml);
 
