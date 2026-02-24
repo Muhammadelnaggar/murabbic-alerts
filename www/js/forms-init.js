@@ -371,11 +371,12 @@ async function fetchAnimalByNumberForUser(uid, number) {
     ["animalNumber", Number(num)]
   ].filter((t) => !(typeof t[1] === "number" && Number.isNaN(t[1])));
 
-  for (const [field, val] of tries) {
+for (const [field, val] of tries) {
+  for (const ownerField of ["userId", "ownerUid"]) {
     try {
       const q2 = query(
         collection(db, "animals"),
-        where("userId", "==", uid),
+        where(ownerField, "==", uid),
         where(field, "==", val),
         limit(1)
       );
@@ -386,6 +387,7 @@ async function fetchAnimalByNumberForUser(uid, number) {
       }
     } catch (_) {}
   }
+}
 
   return null;
 }
