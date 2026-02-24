@@ -1422,6 +1422,12 @@ if (eventName === "تلقيح") {
   lockForm(false);
   return true;
 }
+   // ✅ Sale: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "بيع") {
+  showMsg(bar, "✅ تم التحقق — أكمل إدخال بيانات البيع ثم اضغط حفظ.", "success");
+  lockForm(false);
+  return true;
+}
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
