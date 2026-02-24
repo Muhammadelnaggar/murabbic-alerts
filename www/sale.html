@@ -3,45 +3,88 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>تسجيل بيع — مُرَبِّك</title>
+  <title>تسجيل بيع — مُرَبِّيك</title>
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
+
+  <style>
+    /* بدون تغيير تصميم مُرَبِّيك — فقط ترتيب بسيط */
+    .wrap{max-width:520px;margin:0 auto;padding:12px}
+    .mbk-form{max-width:520px;margin:0 auto}
+    .field-hint{font-size:12px;color:#556;margin-top:6px}
+    .row-gap{height:6px}
+    select,input,textarea{width:100%}
+    .inline-readonly{
+      padding:10px 12px;
+      border:1px solid rgba(46,125,50,0.25);
+      border-radius:12px;
+      background:#fff;
+      color:#143b24;
+      font-size:14px;
+    }
+  </style>
 </head>
+
 <body>
-  <header class="mbk-header">تسجيل بيع</header>
+  <!-- ✅ هيدر مُرَبِّيك القياسي -->
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">تسجيل بيع</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
+    </div>
+  </header>
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
 
     <label>رقم الحيوان</label>
-    <input id="animalNumber" readonly />
+    <input id="animalNumber" data-field="animalNumber" readonly />
 
     <label>تاريخ البيع</label>
-    <input id="eventDate" type="date" />
+    <input id="eventDate" data-field="eventDate" type="date" />
 
     <label>سعر البيع (اختياري)</label>
-    <input id="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
+    <input id="price" data-field="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
+
     <label>سبب البيع</label>
-<input id="saleReason" placeholder="يتسحب تلقائيًا من آخر استبعاد (لو موجود)" />
+    <!-- ✅ قائمة منسدلة -->
+    <select id="saleReasonPreset" aria-label="سبب البيع">
+      <option value="ذبح اضطراري">ذبح اضطراري</option>
+      <option value="استبعاد">استبعاد</option>
+      <option value="حادثة">حادثة</option>
+      <option value="أخرى">أخرى</option>
+    </select>
+
+    <div class="row-gap"></div>
+
+    <!-- ✅ هذا هو الحقل الذي يُحفظ فعليًا في Firestore -->
+    <input id="saleReason" data-field="saleReason" placeholder="سيتم ملؤه تلقائيًا حسب اختيارك" readonly />
+
+    <div id="cullHint" class="field-hint" style="display:none;"></div>
 
     <label>ملاحظات</label>
-    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+    <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 
-    <button id="saveBtn" data-validate="true">حفظ البيع ✅</button>
+    <!-- ✅ زر يطلب التحقق المركزي فقط -->
+    <button id="saveBtn" type="button" data-validate="true">حفظ البيع ✅</button>
   </main>
 
   <script type="module">
     import { db, auth, ensureAuth } from "/js/firebase-config.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
-   import {
-  collection, addDoc, serverTimestamp,
-  getDocs, query, where, orderBy, limit
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+    import {
+      collection, addDoc, serverTimestamp,
+      getDocs, query, where, orderBy, limit
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const $ = (id) => document.getElementById(id);
     const info = $("info");
-    const btn = $("saveBtn");
 
     function msg(t, ok=false){
       info.className = "infobar " + (ok ? "ok" : "err");
@@ -52,62 +95,102 @@
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
     const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
-    $("animalNumber").value = num;
+    $("animalNumber").value = String(num || "");
     $("eventDate").value = dt;
-async function prefillSaleReason(){
-  try{
-    await ensureAuth();
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
 
-    const n = String(num || "").trim();
-    if (!n) return;
+    let lastCullAutoReason = ""; // آخر سبب استبعاد (لو موجود)
 
-    const evRef = collection(db, "events");
-    const qy = query(
-      evRef,
-      where("userId", "==", uid),
-     where("number", "==", n),
+    async function prefillLastCullReason(){
+      try{
+        await ensureAuth();
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
 
-      where("eventType", "==", "استبعاد"),
-      orderBy("eventDate", "desc"),
-      limit(1)
-    );
+        const n = String(num || "").trim();
+        if (!n) return;
 
-    const snap = await getDocs(qy);
-    if (snap.empty) return;
+        // ✅ تصحيح مهم: بياناتك تستخدم animalNumber/animalId وليس number
+        const evRef = collection(db, "events");
+        const qy = query(
+          evRef,
+          where("userId", "==", uid),
+          where("animalNumber", "==", n),
+          where("eventType", "==", "استبعاد"),
+          orderBy("eventDate", "desc"),
+          limit(1)
+        );
 
-    const lastCull = snap.docs[0].data() || {};
-    const autoReason =
-      (lastCull.reason || "").trim() ||
-      `${(lastCull.cullMain||"").trim()} — ${(lastCull.cullDetail||"").trim()}`.trim();
+        const snap = await getDocs(qy);
+        if (snap.empty) return;
 
-    if (autoReason) $("saleReason").value = autoReason;
+        const lastCull = snap.docs[0].data() || {};
+        const autoReason =
+          (String(lastCull.reason || "").trim()) ||
+          `${String(lastCull.cullMain||"").trim()} — ${String(lastCull.cullDetail||"").trim()}`.trim();
 
-  }catch(e){
-    console.warn("prefillSaleReason failed", e);
-  }
-}
-prefillSaleReason();
+        lastCullAutoReason = String(autoReason || "").trim();
 
-    btn.onclick = async () => {
-      try {
+      }catch(e){
+        console.warn("[sale] prefillLastCullReason failed", e);
+      }
+    }
+
+    function applyPresetToSaleReason(){
+      const preset = String($("saleReasonPreset").value || "").trim();
+      const saleReason = $("saleReason");
+      const hint = $("cullHint");
+
+      // default
+      hint.style.display = "none";
+      hint.textContent = "";
+
+      if (preset === "استبعاد"){
+        const val = (lastCullAutoReason || "استبعاد").trim();
+        saleReason.value = val;
+        saleReason.readOnly = true;
+
+        hint.style.display = "block";
+        hint.textContent = lastCullAutoReason
+          ? "تم سحب سبب الاستبعاد تلقائيًا من آخر استبعاد مسجل."
+          : "لا يوجد استبعاد سابق — تم ضبط السبب على: استبعاد.";
+        return;
+      }
+
+      if (preset === "أخرى"){
+        saleReason.value = "";
+        saleReason.readOnly = false;
+        saleReason.placeholder = "اكتب سبب البيع";
+        return;
+      }
+
+      // ذبح اضطراري / حادثة
+      saleReason.value = preset;
+      saleReason.readOnly = true;
+    }
+
+    // ابدأ بالسحب ثم طبّق القيمة الافتراضية
+    await prefillLastCullReason();
+    applyPresetToSaleReason();
+    $("saleReasonPreset").addEventListener("change", applyPresetToSaleReason);
+
+    // ✅ حفظ فقط بعد نجاح التحقق المركزي
+    window.addEventListener("mbk:valid", async (ev) => {
+      try{
         await ensureAuth();
         const uid = auth.currentUser?.uid;
         if (!uid) throw new Error("NO_AUTH");
 
-        const eventDate = $("eventDate").value || dt;
+        const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
 
         const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
+          animalNumber: String(formData.animalNumber || num || ""),
+          animalId: String(formData.animalNumber || num || ""),
           type: "بيع",
           eventType: "بيع",
-          eventDate,
-          price: Number($("price").value) || null,
-          saleReason: ($("saleReason").value || "").trim(),
-
-          notes: ($("notes").value || "").trim(),
+          eventDate: String(formData.eventDate || dt || ""),
+          price: Number(formData.price) || null,
+          saleReason: String(formData.saleReason || "").trim(),
+          notes: String(formData.notes || "").trim(),
           userId: uid,
           source: "/sale.html",
           createdAt: serverTimestamp()
@@ -117,15 +200,17 @@ prefillSaleReason();
         await updateAnimalByEvent(payload);
 
         msg("تم تسجيل البيع بنجاح ✅", true);
-        localStorage.setItem("lastAnimalNumber", String(num));
-        localStorage.setItem("lastEventDate", eventDate);
-        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(num)}`, 900);
+        localStorage.setItem("lastAnimalNumber", String(payload.animalNumber));
+        localStorage.setItem("lastEventDate", String(payload.eventDate));
 
-      } catch (e) {
+        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`, 900);
+
+      }catch(e){
         console.error(e);
         msg("❌ فشل في الحفظ.", false);
       }
-    };
+    }, { passive: true });
+
   </script>
 </body>
 </html>
