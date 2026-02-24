@@ -42,7 +42,7 @@
 
   <main class="mbk-form">
    <form id="saleForm" data-event="بيع" novalidate>
-    <div id="info" class="infobar"></div>
+    <div id="sysbar" class="infobar mbk-infobar"></div>
 
     <label>رقم الحيوان</label>
     <input id="animalNumber" data-field="animalNumber" readonly />
@@ -99,10 +99,17 @@
     const $ = (id) => document.getElementById(id);
     const info = $("info");
 
-    function msg(t, ok=false){
-      info.className = "infobar " + (ok ? "ok" : "err");
-      info.textContent = t;
-    }
+   function msg(t, ok=false){
+  // استخدم الرسام المركزي القياسي
+  const bar = document.getElementById("sysbar") || info;
+  if (window.showMsg) {
+    window.showMsg(bar, t, ok ? "success" : "error");
+  } else {
+    bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
+    bar.style.display = "block";
+    bar.textContent = t;
+  }
+}
 
     const p = new URLSearchParams(location.search);
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
