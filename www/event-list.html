@@ -452,14 +452,14 @@ function detailsFor(ev){
   }
 
   // ================== بيع ==================
-  if(key === 'sale'){
-    const price = pick(ev, ['price'], '');
-    const why = pick(ev, ['saleReason','reason'], '');
-    return [
-      price!=='' ? `السعر: ${price}` : '',
-      why ? `السبب: ${why}` : ''
-    ].filter(Boolean).join(' — ');
-  }
+ if(key === 'sale'){
+  const price = pick(ev, ['price'], '');
+  const why = pick(ev, ['saleReason','reason','notes','note'], '');
+  return [
+    price!=='' ? `السعر: ${price}` : '',
+    why ? `السبب: ${why}` : ''
+  ].filter(Boolean).join(' — ') || '—';
+}
 
   // ================== تحضير للولادة (Close-up) ==================
   if(key === 'closeup'){
