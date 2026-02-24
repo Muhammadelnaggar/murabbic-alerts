@@ -48,6 +48,9 @@
 
     <label>تاريخ البيع</label>
     <input id="eventDate" data-field="eventDate" type="date" required />
+   <label>الموسم</label>
+<input id="season" data-field="season" type="number" inputmode="numeric" placeholder="مثال: 3" />
+<div class="field-hint">يتم تحميل رقم الموسم تلقائيًا من بيانات الحيوان.</div>
 
     <label>سعر البيع (اختياري)</label>
     <input id="price" data-field="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
@@ -146,7 +149,43 @@ if (cardBtn) {
         console.warn("[sale] prefillLastCullReason failed", e);
       }
     }
+async function prefillSeason(){
+  try{
+    await ensureAuth();
+    const uid = auth.currentUser?.uid;
+    if(!uid) return;
 
+    const n = String(num || "").trim();
+    if(!n) return;
+
+    const seasonInput = document.getElementById("season");
+    if(!seasonInput) return;
+
+    // ✅ جلب وثيقة الحيوان (الأثبت)
+    const animalsRef = collection(db, "animals");
+    const qy = query(
+      animalsRef,
+      where("userId", "==", uid),
+      where("animalNumber", "==", n),
+      limit(1)
+    );
+
+    const snap = await getDocs(qy);
+    if(snap.empty) return;
+
+    const animal = snap.docs[0].data() || {};
+
+    // حاول قراءة الموسم من أكثر من اسم محتمل بدون اختراع حقول جديدة
+    const s =
+      Number(animal.season ?? animal.lactation ?? animal.lactationNumber ?? animal.parity ?? "");
+
+    if(Number.isFinite(s) && s > 0){
+      seasonInput.value = String(s);
+    }
+  }catch(e){
+    console.warn("[sale] prefillSeason failed", e);
+  }
+}
 function addOptionIfMissing(val){
   val = String(val || "").trim();
   if(!val) return;
@@ -206,6 +245,7 @@ function applyPresetToSaleReason(){
     // ابدأ بالسحب ثم طبّق القيمة الافتراضية
     await prefillLastCullReason();
     applyPresetToSaleReason();
+    await prefillSeason();
     $("saleReasonPreset").addEventListener("change", applyPresetToSaleReason);
     $("saleReasonCustom")?.addEventListener("blur", () => {
   const typed = String($("saleReasonCustom").value || "").trim();
@@ -231,6 +271,7 @@ function applyPresetToSaleReason(){
 
         const payload = {
           animalNumber: String(formData.animalNumber || num || ""),
+          season: Number(formData.season) || null,
           animalId: String(formData.animalNumber || num || ""),
           type: "بيع",
           eventType: "بيع",
