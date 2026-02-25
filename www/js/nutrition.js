@@ -46,180 +46,118 @@ function updateCtxView(){
   setElText('dtcVal', (dtc===null ? '—' : dtc));
 }
 async function loadCtxFromAnimal(animalNumberOrId, eventDate){
-  try{
-    const { db, auth } = await import('/js/firebase-config.js');
-    const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { collection, query, where, limit, getDocs } = fs;
+  const nStr = String(animalNumberOrId||'').trim();
+  if(!nStr) return { ok:false, reason:'no_number' };
 
-    const uid = auth?.currentUser?.uid;
-    if(!uid) return { ok:false, reason:'no_uid' };
+  const API_BASE = window.API_BASE || "";
+  const userId = window.currentUserId || localStorage.getItem("userId") || "";
+  const headers = { "Accept":"application/json" };
+  if(userId) headers["X-User-Id"] = userId;
 
-    const nStr = String(animalNumberOrId||'').trim();
-    if(!nStr) return { ok:false, reason:'no_number' };
-    const nNum = Number(nStr);
-
-    async function tryQuery(ownerField, val){
-      const q = query(collection(db,'animals'),
-        where(ownerField,'==', uid),
-        where('animalNumber','==', val),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if(!snap.empty) return snap.docs[0].data();
-      return null;
-    }
-
-
-    
-    async function fetchAvgMilkKg(days=7){
-      // نحسب متوسط إنتاج اللبن من أحداث اللبن خلال آخر (days) أيام
-      // مصدر الحقيقة: events (مش dailyMilk داخل animals)
-      const { collection, query, where, limit, getDocs, orderBy } = fs;
-      const candidates = [];
-      async function pull(val, ownerField){
-        try{
-          const q = query(
-            collection(db,'events'),
-            where(ownerField,'==', uid),
-            where('animalNumber','==', val),
-            orderBy('createdAt','desc'),
-            limit(60)
-          );
-          const snap = await getDocs(q);
-          snap.forEach(d=>candidates.push(d.data()));
-        }catch(e){
-          // fallback بدون orderBy (لو احتاج index)
-          try{
-            const q = query(
-              collection(db,'events'),
-              where(ownerField,'==', uid),
-              where('animalNumber','==', val),
-              limit(60)
-            );
-            const snap = await getDocs(q);
-            snap.forEach(d=>candidates.push(d.data()));
-          }catch(_){}
-        }
-      }
-      // جرّب userId ثم ownerUid، وجرّب رقم/نص
-      if(Number.isFinite(nNum)) { await pull(nNum,'userId'); await pull(nNum,'ownerUid'); }
-      await pull(nStr,'userId'); await pull(nStr,'ownerUid');
-
-      function isMilkEvent(ev){
-        const t = String(ev.type||'').toLowerCase();
-        const et = String(ev.eventType||'');
-        return (t==='daily-milk' || t==='daily_milk' || t==='milk' || t==='dailymilk' || et.includes('لبن'));
-      }
-      function getMilkKg(ev){
-        const v = ev.milkKg ?? ev.milk ?? ev.value ?? ev.yieldKg ?? ev.kg;
-        const num = Number(v);
-        return Number.isFinite(num) ? num : null;
-      }
-      function getEventDay(ev){
-        const d = ev.eventDate || ev.date;
-        if(d){
-          const s = String(d).slice(0,10);
-          // نتأكد صيغة YYYY-MM-DD
-          if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        }
-        const c = ev.createdAt;
-        if(c && typeof c.toDate==='function'){
-          try{
-            const dt = c.toDate();
-            dt.setMinutes(dt.getMinutes()-dt.getTimezoneOffset());
-            return dt.toISOString().slice(0,10);
-          }catch(e){}
-        }
-        if(c && c.seconds){
-          const dt = new Date(c.seconds*1000);
-          dt.setMinutes(dt.getMinutes()-dt.getTimezoneOffset());
-          return dt.toISOString().slice(0,10);
-        }
-        return null;
-      }
-      function evTime(ev){
-        const day = getEventDay(ev);
-        if(day){
-          const x = new Date(day);
-          if(!isNaN(x.getTime())) return x.getTime();
-        }
-        const c = ev.createdAt;
-        if(c && typeof c.toDate==='function'){ try{ return c.toDate().getTime(); }catch(e){} }
-        if(c && c.seconds){ return c.seconds*1000; }
-        return 0;
-      }
-
-      const milkEvents = candidates.filter(isMilkEvent);
-      if(!milkEvents.length) return { avg:null, count:0 };
-
-      // نافذة الأيام (نستخدم تاريخ الصفحة لو موجود وإلا اليوم)
-      const endDay = (eventDate || todayLocal()).slice(0,10);
-      const endTs = new Date(endDay).getTime();
-      const startTs = endTs - (Math.max(1, Number(days)||7)-1)*86400000;
-
-      // نجمع آخر قيمة لكل يوم داخل النافذة
-      const perDay = new Map(); // day -> {kg, t}
-      milkEvents.sort((a,b)=>evTime(b)-evTime(a)); // الأحدث أولاً
-      for(const ev of milkEvents){
-        const day = getEventDay(ev);
-        if(!day) continue;
-        const ts = new Date(day).getTime();
-        if(isNaN(ts)) continue;
-        if(ts < startTs || ts > endTs) continue;
-
-        const kg = getMilkKg(ev);
-        if(kg==null) continue;
-
-        // لأننا ماشيين من الأحدث للأقدم: أول واحد لكل يوم هو الأخير فعليًا
-        if(!perDay.has(day)) perDay.set(day, { kg, t: evTime(ev) });
-      }
-
-      const vals = Array.from(perDay.values()).map(x=>x.kg).filter(v=>Number.isFinite(v));
-      if(!vals.length) return { avg:null, count:0 };
-
-      const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
-      return { avg, count: vals.length };
-    }
-let doc = null;
-    if(Number.isFinite(nNum)){
-      doc = await tryQuery('userId', nNum) || await tryQuery('ownerUid', nNum);
-    }
-    if(!doc){
-      doc = await tryQuery('userId', nStr) || await tryQuery('ownerUid', nStr);
-    }
-    if(!doc) return { ok:false, reason:'not_found' };
-
-    // نوع
-    const typeAr = doc.animalTypeAr || (doc.animaltype==='buffalo' ? 'جاموس' : (doc.animaltype==='cow' ? 'بقر' : ''));
-    if(typeAr==='جاموس' || typeAr==='بقر') document.getElementById('ctxSpecies').value = typeAr;
-
-    // DIM/لبن
-    if(doc.daysInMilk!=null) document.getElementById('ctxDIM').value = Number(doc.daysInMilk);
-    const milk7 = await fetchAvgMilkKg(7);
-    if(milk7 && milk7.avg!=null) document.getElementById('ctxAvgMilk').value = Number(milk7.avg);
-    else document.getElementById('ctxAvgMilk').value = '';
-
-    // حالة تناسلية -> حالة حمل
-    const repro = doc.reproductiveStatus || '';
-    if(repro==='عشار' || repro==='فارغة') document.getElementById('ctxPreg').value = repro;
-
-    // DCC من آخر تلقيح مُخصّب لو موجود
-    const lastIns = doc.lastInseminationDate;
-    const ed = eventDate || todayLocal();
-    if(lastIns && (repro==='عشار')){
-      const a = new Date(lastIns);
-      const b = new Date(ed);
-      if(!isNaN(a.getTime()) && !isNaN(b.getTime())){
-        const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-        if(diff>=0) document.getElementById('ctxDCC').value = diff;
-      }
-    }
-
-    updateCtxView();
-    return { ok:true, doc };
-  }catch(e){
-    return { ok:false, reason:'error', error:String(e?.message||e) };
+  // ---- helpers
+  async function getJSON(path){
+    const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+    const res = await fetch(url, { headers, cache:'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   }
+  function pick(obj, keys, def=''){
+    for(const k of keys){
+      if(obj && obj[k]!==undefined && obj[k]!==null && obj[k]!=='') return obj[k];
+    }
+    return def;
+  }
+  function toNum(v){
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  }
+
+  // ---- 1) fetch animal doc via API (server-admin → Firestore)
+  let animal = null;
+  const tries = [
+    `/api/animals?number=${encodeURIComponent(nStr)}`,
+    `/api/animals?animalNumber=${encodeURIComponent(nStr)}`,
+    `/api/animals?q=${encodeURIComponent(nStr)}`
+  ];
+  for(const path of tries){
+    try{
+      const data = await getJSON(path);
+      if(Array.isArray(data)) animal = data[0] || null;
+      else if(data && Array.isArray(data.items)) animal = data.items[0] || null;
+      else if(data && data.animal) animal = data.animal;
+      else if(data && data.animalNumber!==undefined) animal = data;
+      if(animal) break;
+    }catch(e){}
+  }
+
+  // ---- 2) compute DIM from animal doc
+  const dim = toNum(pick(animal, ['daysInMilk','DIM','dim'], null));
+
+  // ---- 3) milk avg last 7 days from events (preferred)
+  const baseDate = (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate)) ? eventDate : todayLocal();
+  const end = new Date(baseDate+"T00:00:00");
+  const start = new Date(end); start.setDate(start.getDate()-6);
+  const from = start.toISOString().slice(0,10);
+  const to = end.toISOString().slice(0,10);
+
+  let avgMilk = null;
+  async function fetchMilkEvents(){
+    const paths = [
+      `/api/events?type=daily-milk&number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
+      `/api/events?eventType=لبن&number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
+      `/api/animal-timeline?number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
+      `/api/animal-timeline?animalNumber=${encodeURIComponent(nStr)}&from=${from}&to=${to}`
+    ];
+    for(const path of paths){
+      try{
+        const data = await getJSON(path);
+        if(Array.isArray(data)) return data;
+        if(data && Array.isArray(data.events)) return data.events;
+        if(data && Array.isArray(data.items)) return data.items;
+      }catch(e){}
+    }
+    return [];
+  }
+
+  const milkEvents = await fetchMilkEvents();
+
+  // normalize milk events to (date -> last value)
+  const byDay = new Map();
+  for(const ev of (milkEvents||[])){
+    const d = String(pick(ev, ['eventDate','date','day'], '')).slice(0,10);
+    if(!d || d < from || d > to) continue;
+    const v = pick(ev, ['milkKg','milk','value','kg','amount','dailyMilk'], null);
+    const num = toNum(v);
+    if(num===null) continue;
+    // overwrite → last record for that day wins
+    byDay.set(d, num);
+  }
+  if(byDay.size){
+    let sum=0;
+    for(const v of byDay.values()) sum += v;
+    avgMilk = sum / byDay.size;
+  }else{
+    // fallback to animal.dailyMilk only if we have lastMilkDate within the window
+    const lastMilkDate = String(pick(animal, ['lastMilkDate','lastMilkDateStr'], '')).slice(0,10);
+    const dm = toNum(pick(animal, ['dailyMilk'], null));
+    if(dm!==null && lastMilkDate && lastMilkDate >= from && lastMilkDate <= to) avgMilk = dm;
+  }
+
+  // ---- 4) other context fields
+  const species = pick(animal, ['animalTypeAr','speciesAr','animaltype','species'], '');
+  const dcc = toNum(pick(animal, ['dcc','daysCarried','pregDays','DCC'], null));
+  const preg = pick(animal, ['reproductiveStatus','pregStatus','lastDiagnosis','preg'], '');
+
+  return {
+    ok: true,
+    animal: animal || null,
+    dim: dim,
+    avgMilk: avgMilk,
+    species: species,
+    dcc: dcc,
+    preg: preg,
+    window: {from,to}
+  };
 }
 
 
