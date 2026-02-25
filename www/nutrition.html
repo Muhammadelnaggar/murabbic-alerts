@@ -85,20 +85,27 @@
     <span class="pill">🐄 الحيوان/المجموعة: <b id="animalInfo">—</b></span>
     <span class="pill">📅 التاريخ: <b id="dateInfo">—</b></span>
   </div>
-  <div class="info">
-    <span class="pill">🕒 أيام الحليب: <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
-    <span class="pill">🐃 النوع:
-      <select id="ctxSpecies"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
-    </span>
-    <span class="pill">🥛 متوسط إنتاج/رأس: <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="width:90px"></span>
-    <span class="pill">🧭 أيام الحمل (DCC): <input id="ctxDCC" type="number" inputmode="numeric" step="1" min="0" style="width:90px"></span>
+  <div class="info" id="ctxList">
+    <span class="pill">🕒 أيام الحليب: <b id="ctxDIM_txt">—</b></span>
+    <span class="pill">🐃 النوع: <b id="ctxSpecies_txt">—</b></span>
+    <span class="pill">🥛 متوسط إنتاج/رأس: <b id="ctxAvgMilk_txt">—</b></span>
+    <span class="pill">🧭 أيام الحمل (DCC): <b id="ctxDCC_txt">—</b></span>
     <span class="pill">🍼 متبقي للولادة (يوم): <b id="dtcVal">—</b></span>
-    <span class="pill"><label><input id="ctxEarlyDry" type="checkbox"> جاف مبكّر</label></span>
-    <span class="pill"><label><input id="ctxCloseUp" type="checkbox"> تحضير ولادة</label></span>
-    <span class="pill">🤰 حالة الحمل:
-      <select id="ctxPreg"><option value="">—</option><option value="عشار">عشار</option><option value="فارغة">فارغة</option></select>
-    </span>
+    <span class="pill">🤰 حالة الحمل: <b id="ctxPreg_txt">—</b></span>
+    <span class="pill">🟡 جاف مبكّر: <b id="ctxEarlyDry_txt">—</b></span>
+    <span class="pill">🟠 تحضير ولادة: <b id="ctxCloseUp_txt">—</b></span>
+    <span class="pill"><button type="button" id="ctxReloadBtn" class="btn" style="padding:6px 10px;">تحديث من الحيوان</button></span>
+
+    <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
+    <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
+    <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
+    <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="display:none">
+    <input id="ctxDCC" type="number" inputmode="numeric" step="1" min="0" style="display:none">
+    <input id="ctxEarlyDry" type="checkbox" style="display:none">
+    <input id="ctxCloseUp" type="checkbox" style="display:none">
+    <select id="ctxPreg" style="display:none"><option value="">—</option><option value="عشار">عشار</option><option value="فارغة">فارغة</option></select>
   </div>
+
   <div class="warning" id="warn"></div>
 
   <div class="mbk-card">
