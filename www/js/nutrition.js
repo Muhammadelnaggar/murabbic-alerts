@@ -69,7 +69,118 @@ async function loadCtxFromAnimal(animalNumberOrId, eventDate){
       return null;
     }
 
-    let doc = null;
+
+    
+    async function fetchAvgMilkKg(days=7){
+      // نحسب متوسط إنتاج اللبن من أحداث اللبن خلال آخر (days) أيام
+      // مصدر الحقيقة: events (مش dailyMilk داخل animals)
+      const { collection, query, where, limit, getDocs, orderBy } = fs;
+      const candidates = [];
+      async function pull(val, ownerField){
+        try{
+          const q = query(
+            collection(db,'events'),
+            where(ownerField,'==', uid),
+            where('animalNumber','==', val),
+            orderBy('createdAt','desc'),
+            limit(60)
+          );
+          const snap = await getDocs(q);
+          snap.forEach(d=>candidates.push(d.data()));
+        }catch(e){
+          // fallback بدون orderBy (لو احتاج index)
+          try{
+            const q = query(
+              collection(db,'events'),
+              where(ownerField,'==', uid),
+              where('animalNumber','==', val),
+              limit(60)
+            );
+            const snap = await getDocs(q);
+            snap.forEach(d=>candidates.push(d.data()));
+          }catch(_){}
+        }
+      }
+      // جرّب userId ثم ownerUid، وجرّب رقم/نص
+      if(Number.isFinite(nNum)) { await pull(nNum,'userId'); await pull(nNum,'ownerUid'); }
+      await pull(nStr,'userId'); await pull(nStr,'ownerUid');
+
+      function isMilkEvent(ev){
+        const t = String(ev.type||'').toLowerCase();
+        const et = String(ev.eventType||'');
+        return (t==='daily-milk' || t==='daily_milk' || t==='milk' || t==='dailymilk' || et.includes('لبن'));
+      }
+      function getMilkKg(ev){
+        const v = ev.milkKg ?? ev.milk ?? ev.value ?? ev.yieldKg ?? ev.kg;
+        const num = Number(v);
+        return Number.isFinite(num) ? num : null;
+      }
+      function getEventDay(ev){
+        const d = ev.eventDate || ev.date;
+        if(d){
+          const s = String(d).slice(0,10);
+          // نتأكد صيغة YYYY-MM-DD
+          if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        }
+        const c = ev.createdAt;
+        if(c && typeof c.toDate==='function'){
+          try{
+            const dt = c.toDate();
+            dt.setMinutes(dt.getMinutes()-dt.getTimezoneOffset());
+            return dt.toISOString().slice(0,10);
+          }catch(e){}
+        }
+        if(c && c.seconds){
+          const dt = new Date(c.seconds*1000);
+          dt.setMinutes(dt.getMinutes()-dt.getTimezoneOffset());
+          return dt.toISOString().slice(0,10);
+        }
+        return null;
+      }
+      function evTime(ev){
+        const day = getEventDay(ev);
+        if(day){
+          const x = new Date(day);
+          if(!isNaN(x.getTime())) return x.getTime();
+        }
+        const c = ev.createdAt;
+        if(c && typeof c.toDate==='function'){ try{ return c.toDate().getTime(); }catch(e){} }
+        if(c && c.seconds){ return c.seconds*1000; }
+        return 0;
+      }
+
+      const milkEvents = candidates.filter(isMilkEvent);
+      if(!milkEvents.length) return { avg:null, count:0 };
+
+      // نافذة الأيام (نستخدم تاريخ الصفحة لو موجود وإلا اليوم)
+      const endDay = (eventDate || todayLocal()).slice(0,10);
+      const endTs = new Date(endDay).getTime();
+      const startTs = endTs - (Math.max(1, Number(days)||7)-1)*86400000;
+
+      // نجمع آخر قيمة لكل يوم داخل النافذة
+      const perDay = new Map(); // day -> {kg, t}
+      milkEvents.sort((a,b)=>evTime(b)-evTime(a)); // الأحدث أولاً
+      for(const ev of milkEvents){
+        const day = getEventDay(ev);
+        if(!day) continue;
+        const ts = new Date(day).getTime();
+        if(isNaN(ts)) continue;
+        if(ts < startTs || ts > endTs) continue;
+
+        const kg = getMilkKg(ev);
+        if(kg==null) continue;
+
+        // لأننا ماشيين من الأحدث للأقدم: أول واحد لكل يوم هو الأخير فعليًا
+        if(!perDay.has(day)) perDay.set(day, { kg, t: evTime(ev) });
+      }
+
+      const vals = Array.from(perDay.values()).map(x=>x.kg).filter(v=>Number.isFinite(v));
+      if(!vals.length) return { avg:null, count:0 };
+
+      const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+      return { avg, count: vals.length };
+    }
+let doc = null;
     if(Number.isFinite(nNum)){
       doc = await tryQuery('userId', nNum) || await tryQuery('ownerUid', nNum);
     }
@@ -84,7 +195,9 @@ async function loadCtxFromAnimal(animalNumberOrId, eventDate){
 
     // DIM/لبن
     if(doc.daysInMilk!=null) document.getElementById('ctxDIM').value = Number(doc.daysInMilk);
-    if(doc.dailyMilk!=null) document.getElementById('ctxAvgMilk').value = Number(doc.dailyMilk);
+    const milk7 = await fetchAvgMilkKg(7);
+    if(milk7 && milk7.avg!=null) document.getElementById('ctxAvgMilk').value = Number(milk7.avg);
+    else document.getElementById('ctxAvgMilk').value = '';
 
     // حالة تناسلية -> حالة حمل
     const repro = doc.reproductiveStatus || '';
