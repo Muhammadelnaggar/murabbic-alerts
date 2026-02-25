@@ -495,7 +495,28 @@ async function saveEvent(e){
     msgWarn('❌ فشل الحفظ على السحابة. تأكد من الاتصال وتسجيل الدخول.');
   }
 }
+async function waitForAuthReady(timeoutMs = 5000){
+  const { auth } = await import('/js/firebase-config.js');
+  const fa = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+  const { onAuthStateChanged } = fa;
 
+  return await new Promise(resolve=>{
+    let done = false;
+    const t = setTimeout(()=>{
+      if(done) return;
+      done = true;
+      resolve(auth?.currentUser || null);
+    }, timeoutMs);
+
+    const unsub = onAuthStateChanged(auth, (user)=>{
+      if(done) return;
+      done = true;
+      clearTimeout(t);
+      try{ unsub(); }catch(_){}
+      resolve(user || null);
+    });
+  });
+}
 // =====================
 // Bind
 // =====================
@@ -510,8 +531,15 @@ async function saveEvent(e){
   try{
     setHiddenCtxFromQuery();
     updateCtxView();
+   disableSave(true);
+waitForAuthReady().then(user=>{
+  if(!user){
     disableSave(true);
-    loadCtxAuto();
+    msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
+    return;
+  }
+  loadCtxAuto();
+});
   }catch(e){
     console.error(e);
     disableSave(true);
