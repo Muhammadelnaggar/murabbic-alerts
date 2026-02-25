@@ -231,7 +231,7 @@
 
   function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
   const qp = new URLSearchParams(location.search);
-  const animalId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
+  const animalId = qp.get('animaconst animalId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || '';
   const groupName = qp.get('group') || '';
   const eventDate= qp.get('date') || todayLocal();
 
@@ -595,10 +595,6 @@
 <script src="/js/app-core.js" defer></script>
 <script type="module" src="/js/timeline.js"></script>
 <script type="module" src="/js/smart-checks.js"></script>
-<!-- الهوية قبل أي نداءات /api -->
-<script src="/js/tenant-bootstrap.js"></script>
-<script type="module" src="/js/api.js"></script>
-
 <!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
 <script type="module" src="/js/event-core.js"></script>
 <script type="module" src="/js/track-core.js"></script>
