@@ -8,37 +8,6 @@ import { onNutritionSave } from '/js/track-nutrition.js';
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-// =====================
-// Auth helper (انتظار تهيئة جلسة Firebase Auth بدون أي تخزين محلي)
-// =====================
-async function waitForUid(auth, timeoutMs = 8000){
-  try{
-    if (auth?.currentUser?.uid) return auth.currentUser.uid;
-    const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-    const { onAuthStateChanged } = authMod;
-
-    return await new Promise((resolve) => {
-      let done = false;
-      const t = setTimeout(() => {
-        if (done) return;
-        done = true;
-        try { unsub && unsub(); } catch {}
-        resolve(auth?.currentUser?.uid || null);
-      }, timeoutMs);
-
-      const unsub = onAuthStateChanged(auth, (user) => {
-        if (done) return;
-        done = true;
-        clearTimeout(t);
-        try { unsub && unsub(); } catch {}
-        resolve(user?.uid || null);
-      });
-    });
-  }catch(_){
-    return auth?.currentUser?.uid || null;
-  }
-}
-
 
 function setElText(id, val){
   const el = document.getElementById(id);
@@ -49,8 +18,14 @@ function setElText(id, val){
 function msgWarn(text){
   const w = document.getElementById('warn');
   if(!w) return;
-  w.textContent = text || '';
-  w.style.display = text ? 'block' : 'none';
+  const s = String(text||'');
+  w.textContent = s;
+  w.style.display = s ? 'block' : 'none';
+  // ✅ نجاح = أخضر، ⚠️/⛔ = أحمر (بدون تغيير CSS العام)
+  if(!s){ w.style.color=''; return; }
+  if(s.trim().startsWith('✅')){ w.style.color = '#2e7d32'; }
+  else if(s.trim().startsWith('⚠️') || s.trim().startsWith('⛔')){ w.style.color = '#c62828'; }
+  else { w.style.color=''; }
 }
 
 function disableSave(disabled){
@@ -100,7 +75,7 @@ function updateCtxView(){
 // =====================
 function isMilkEvent(ev){
   const t = String(ev?.type || ev?.eventType || '').trim();
-  return (t === 'daily-milk' || t === 'لبن' || t === 'لبن يومي' || t === 'تسجيل اللبن اليومي');
+  return (t === 'daily_milk' || t === 'daily-milk' || t === 'dailyMilk' || t === 'لبن' || t === 'لبن يومي' || t === 'تسجيل اللبن اليومي');
 }
 function getEventDay(ev){
   const d = ev?.eventDate || ev?.date || ev?.day || '';
@@ -153,19 +128,13 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   if(isNaN(end.getTime())) return { avg:null, days:0 };
   const start = new Date(end); start.setDate(start.getDate() - (days-1));
 
-  // مهم: animalNumber في events ممكن يكون Number أو String
-  const tries = [];
-  const nNum = Number(String(animalVal).trim());
-  if(Number.isFinite(nNum)) tries.push(nNum);
-  tries.push(String(animalVal).trim());
-
   const candidates = [];
-  async function pull(ownerField, v){
+  async function pull(ownerField){
     try{
       const q = query(
         collection(db,'events'),
         where(ownerField,'==', uid),
-        where('animalNumber','==', v),
+        where('animalNumber','==', animalVal),
         orderBy('createdAt','desc'),
         limit(160)
       );
@@ -176,7 +145,7 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
         const q = query(
           collection(db,'events'),
           where(ownerField,'==', uid),
-          where('animalNumber','==', v),
+          where('animalNumber','==', animalVal),
           limit(160)
         );
         const snap = await getDocs(q);
@@ -185,11 +154,8 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
     }
   }
 
-  for(const ownerField of ['userId','ownerUid']){
-    for(const v of tries){
-      await pull(ownerField, v);
-    }
-  }
+  await pull('userId');
+  await pull('ownerUid');
 
   const byDay = new Map();
   for(const ev of candidates){
@@ -214,10 +180,9 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   return { avg, days: vals.length };
 }
 
-
 function parseNumbersList(){
   const p = qp();
-  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalId') || p.get('number') || p.get('animalNumber') || '').toString();
+  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalNumber') || p.get('number') || p.get('animalId') || '').toString();
   const list = raw.split(/[,،;\s]+/).map(s=>s.trim()).filter(Boolean);
   return [...new Set(list)];
 }
@@ -225,7 +190,7 @@ function parseNumbersList(){
 function readUrlCtx(){
   const p = qp();
   const rawNumber =
-    p.get('number') || p.get('animalNumber') || p.get('animalId') ||
+    p.get('animalNumber') || p.get('number') || p.get('animalId') ||
     p.get('numbers') || p.get('groupNumbers') || '';
 
   const rawDate = p.get('eventDate') || p.get('date') || '';
@@ -241,7 +206,7 @@ async function loadCtxFromAnimal(numberStr, eventDate){
   const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  const uid = await waitForUid(auth);
+  const uid = auth?.currentUser?.uid;
   if(!uid) return { ok:false, reason:'no_uid' };
 
   const animal = await findAnimalDocByNumber(db, fs, uid, numberStr);
@@ -267,10 +232,15 @@ async function loadCtxFromAnimal(numberStr, eventDate){
     }
   }
 
-  // متوسط اللبن (آخر 7 أيام)
-  const nNum = Number(numberStr);
-  const animalVal = Number.isFinite(nNum) ? nNum : numberStr;
-  const avgRes = await fetchAvgMilkKgFor(fs, db, uid, animalVal, eventDate, 7);
+# متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
+  let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
+  if((avgRes?.avg==null) && String(numberStr).trim()!==''){
+    const nNum = Number(numberStr);
+    if(Number.isFinite(nNum)){
+      const alt = await fetchAvgMilkKgFor(fs, db, uid, nNum, eventDate, 7);
+      if(alt?.avg!=null) avgRes = alt;
+    }
+  }
   const avgMilk = (avgRes?.avg!=null) ? Number(avgRes.avg) : null;
 
   // اكتب القيم في الحقول المخفية
@@ -293,7 +263,7 @@ async function loadCtxFromGroup(numbers, eventDate){
   const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  const uid = await waitForUid(auth);
+  const uid = auth?.currentUser?.uid;
   if(!uid) return { ok:false, reason:'no_uid' };
 
   const docs = [];
@@ -443,7 +413,7 @@ async function saveToFirestore(payload){
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   const { collection, addDoc, serverTimestamp } = fs;
 
-  const uid = await waitForUid(auth);
+  const uid = auth?.currentUser?.uid;
   if(!uid) throw new Error('NO_AUTH');
 
   await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
@@ -459,7 +429,7 @@ async function saveEvent(e){
 
   const p = qp();
   const rawNumber =
-    p.get('number') || p.get('animalNumber') || p.get('animalId') ||
+    p.get('animalNumber') || p.get('number') || p.get('animalId') ||
     p.get('numbers') || p.get('groupNumbers') || '';
 
   const rawDate = p.get('eventDate') || p.get('date') || '';
@@ -496,7 +466,7 @@ async function saveEvent(e){
   // userId من auth (Cloud-only)
   try{
     const { auth } = await import('/js/firebase-config.js');
-    payload.userId = (await waitForUid(auth)) || null;
+    payload.userId = auth?.currentUser?.uid || null;
     payload.tenantId = payload.userId || null;
   }catch(_){}
 
