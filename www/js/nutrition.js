@@ -4,6 +4,111 @@ import { onNutritionSave } from '/js/track-nutrition.js';
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
 
+
+function setElText(id, val){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
+}
+function setHiddenCtxFromQuery(){
+  const p = qp();
+  const setVal = (id, v) => { const el=document.getElementById(id); if(el && v!==null && v!==undefined && v!=='') el.value = v; };
+  const setChk = (id, v) => { const el=document.getElementById(id); if(el) el.checked = (v==='1' || v==='true' || v==='yes'); };
+  setVal('ctxDIM', p.get('dim') || p.get('DIM'));
+  setVal('ctxSpecies', p.get('species'));
+  setVal('ctxAvgMilk', p.get('avgMilk'));
+  setVal('ctxDCC', p.get('dcc'));
+  setVal('ctxPreg', p.get('preg'));
+  setChk('ctxEarlyDry', p.get('earlyDry'));
+  setChk('ctxCloseUp', p.get('closeUp'));
+}
+function updateCtxView(){
+  const species = document.getElementById('ctxSpecies')?.value || '';
+  const dim = document.getElementById('ctxDIM')?.value || '';
+  const avgMilk = document.getElementById('ctxAvgMilk')?.value || '';
+  const dcc = document.getElementById('ctxDCC')?.value || '';
+  const preg = document.getElementById('ctxPreg')?.value || '';
+  const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
+  const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
+
+  setElText('ctxSpecies_txt', species || '—');
+  setElText('ctxDIM_txt', dim || '—');
+  setElText('ctxAvgMilk_txt', avgMilk ? Number(avgMilk).toFixed(1) : '—');
+  setElText('ctxDCC_txt', dcc || '—');
+  setElText('ctxPreg_txt', preg || '—');
+  setElText('ctxEarlyDry_txt', earlyDry ? 'نعم' : 'لا');
+  setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
+
+  // متبقي للولادة
+  const dccNum = dcc!=='' ? Number(dcc) : NaN;
+  const gest = (species==='جاموس') ? 310 : 280;
+  const dtc = Number.isFinite(dccNum) ? (gest - dccNum) : null;
+  setElText('dtcVal', (dtc===null ? '—' : dtc));
+}
+async function loadCtxFromAnimal(animalNumberOrId, eventDate){
+  try{
+    const { db, auth } = await import('/js/firebase-config.js');
+    const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { collection, query, where, limit, getDocs } = fs;
+
+    const uid = auth?.currentUser?.uid;
+    if(!uid) return { ok:false, reason:'no_uid' };
+
+    const nStr = String(animalNumberOrId||'').trim();
+    if(!nStr) return { ok:false, reason:'no_number' };
+    const nNum = Number(nStr);
+
+    async function tryQuery(ownerField, val){
+      const q = query(collection(db,'animals'),
+        where(ownerField,'==', uid),
+        where('animalNumber','==', val),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if(!snap.empty) return snap.docs[0].data();
+      return null;
+    }
+
+    let doc = null;
+    if(Number.isFinite(nNum)){
+      doc = await tryQuery('userId', nNum) || await tryQuery('ownerUid', nNum);
+    }
+    if(!doc){
+      doc = await tryQuery('userId', nStr) || await tryQuery('ownerUid', nStr);
+    }
+    if(!doc) return { ok:false, reason:'not_found' };
+
+    // نوع
+    const typeAr = doc.animalTypeAr || (doc.animaltype==='buffalo' ? 'جاموس' : (doc.animaltype==='cow' ? 'بقر' : ''));
+    if(typeAr==='جاموس' || typeAr==='بقر') document.getElementById('ctxSpecies').value = typeAr;
+
+    // DIM/لبن
+    if(doc.daysInMilk!=null) document.getElementById('ctxDIM').value = Number(doc.daysInMilk);
+    if(doc.dailyMilk!=null) document.getElementById('ctxAvgMilk').value = Number(doc.dailyMilk);
+
+    // حالة تناسلية -> حالة حمل
+    const repro = doc.reproductiveStatus || '';
+    if(repro==='عشار' || repro==='فارغة') document.getElementById('ctxPreg').value = repro;
+
+    // DCC من آخر تلقيح مُخصّب لو موجود
+    const lastIns = doc.lastInseminationDate;
+    const ed = eventDate || todayLocal();
+    if(lastIns && (repro==='عشار')){
+      const a = new Date(lastIns);
+      const b = new Date(ed);
+      if(!isNaN(a.getTime()) && !isNaN(b.getTime())){
+        const diff = Math.floor((b.getTime()-a.getTime())/86400000);
+        if(diff>=0) document.getElementById('ctxDCC').value = diff;
+      }
+    }
+
+    updateCtxView();
+    return { ok:true, doc };
+  }catch(e){
+    return { ok:false, reason:'error', error:String(e?.message||e) };
+  }
+}
+
 function deriveCtx(){
   const p = qp();
   const animalId = p.get('animalId') || p.get('number') || p.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
@@ -134,4 +239,26 @@ try {
   if (form) form.addEventListener('submit', saveEvent);
   const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
   if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
+
+  // تهيئة عرض السياق كقائمة (Read-only) + تحميل من الرابط + زر تحديث من الحيوان
+  try{
+    setHiddenCtxFromQuery();
+    updateCtxView();
+    const reloadBtn = document.getElementById('ctxReloadBtn');
+    if(reloadBtn){
+      reloadBtn.addEventListener('click', async ()=>{
+        const { animalId, eventDate } = deriveCtx();
+        const res = await loadCtxFromAnimal(animalId, eventDate);
+        // لا نستخدم alert؛ فقط نحدث شريط تحذير إن وجد
+        const w = document.getElementById('warn');
+        if(w){
+          if(res.ok) { w.textContent = '✅ تم تحديث بيانات المجموعة من بطاقة الحيوان.'; w.style.display='block'; }
+          else if(res.reason==='not_found'){ w.textContent = '⚠️ لم يتم العثور على الحيوان في القطيع (راجع الرقم/المالك).'; w.style.display='block'; }
+          else if(res.reason==='no_uid'){ w.textContent = '⚠️ يلزم تسجيل الدخول أولاً.'; w.style.display='block'; }
+          else { w.textContent = '⚠️ تعذر التحديث.'; w.style.display='block'; }
+        }
+      });
+    }
+  }catch(e){}
+
 })();
