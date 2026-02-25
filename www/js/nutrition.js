@@ -153,13 +153,19 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   if(isNaN(end.getTime())) return { avg:null, days:0 };
   const start = new Date(end); start.setDate(start.getDate() - (days-1));
 
+  // مهم: animalNumber في events ممكن يكون Number أو String
+  const tries = [];
+  const nNum = Number(String(animalVal).trim());
+  if(Number.isFinite(nNum)) tries.push(nNum);
+  tries.push(String(animalVal).trim());
+
   const candidates = [];
-  async function pull(ownerField){
+  async function pull(ownerField, v){
     try{
       const q = query(
         collection(db,'events'),
         where(ownerField,'==', uid),
-        where('animalNumber','==', animalVal),
+        where('animalNumber','==', v),
         orderBy('createdAt','desc'),
         limit(160)
       );
@@ -170,7 +176,7 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
         const q = query(
           collection(db,'events'),
           where(ownerField,'==', uid),
-          where('animalNumber','==', animalVal),
+          where('animalNumber','==', v),
           limit(160)
         );
         const snap = await getDocs(q);
@@ -179,8 +185,11 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
     }
   }
 
-  await pull('userId');
-  await pull('ownerUid');
+  for(const ownerField of ['userId','ownerUid']){
+    for(const v of tries){
+      await pull(ownerField, v);
+    }
+  }
 
   const byDay = new Map();
   for(const ev of candidates){
@@ -204,6 +213,7 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
   return { avg, days: vals.length };
 }
+
 
 function parseNumbersList(){
   const p = qp();
