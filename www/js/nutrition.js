@@ -222,6 +222,194 @@ let doc = null;
   }
 }
 
+
+// ✅ تحميل السياق تلقائيًا (بدون زر) — يدعم: حيوان واحد أو "مجموعة مؤقتة" (قائمة أرقام)
+// المجموعة المؤقتة تُمرَّر عبر:
+// - animalId/number = "201,203,206"  أو
+// - numbers=201,203,206  أو
+// - groupNumbers=...
+function parseNumbersList(){
+  const p = qp();
+  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalId') || p.get('number') || p.get('animalNumber') || '').toString();
+  const list = raw.split(/[,،;\s]+/).map(s=>s.trim()).filter(Boolean);
+  // لو الرقم مفصول بشرطة (مثال 201-205) نتجاهله الآن لتفادي أخطاء
+  const clean = [];
+  for(const x of list){
+    if(x.includes('-')) { clean.push(x); continue; }
+    clean.push(x);
+  }
+  // unique
+  return [...new Set(clean)];
+}
+
+async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
+  const { collection, query, where, limit, getDocs, orderBy } = fs;
+  const end = new Date(endDateStr || todayLocal());
+  if(isNaN(end.getTime())) return { avg:null, days:0 };
+  const start = new Date(end); start.setDate(start.getDate() - (days-1));
+
+  const candidates = [];
+  async function pull(ownerField){
+    try{
+      const q = query(
+        collection(db,'events'),
+        where(ownerField,'==', uid),
+        where('animalNumber','==', animalVal),
+        orderBy('createdAt','desc'),
+        limit(120)
+      );
+      const snap = await getDocs(q);
+      snap.forEach(d=>candidates.push(d.data()));
+    }catch(e){
+      // fallback بدون orderBy
+      try{
+        const q = query(
+          collection(db,'events'),
+          where(ownerField,'==', uid),
+          where('animalNumber','==', animalVal),
+          limit(120)
+        );
+        const snap = await getDocs(q);
+        snap.forEach(d=>candidates.push(d.data()));
+      }catch(_){}
+    }
+  }
+
+  await pull('userId');
+  await pull('ownerUid');
+
+  const byDay = new Map();
+  for(const ev of candidates){
+    if(!isMilkEvent(ev)) continue;
+    const day = getEventDay(ev);
+    if(!day) continue;
+    const d = new Date(day);
+    if(isNaN(d.getTime())) continue;
+    if(d < start || d > end) continue;
+    const kg = getMilkKg(ev);
+    if(!Number.isFinite(kg) || kg<=0) continue;
+
+    // احتفظ بآخر قراءة في اليوم (الأحدث)
+    const prev = byDay.get(day);
+    const t = evTime(ev);
+    if(!prev || t > prev.t){
+      byDay.set(day, { kg, t });
+    }
+  }
+
+  const vals = [...byDay.values()].map(x=>x.kg);
+  if(!vals.length) return { avg:null, days:0 };
+  const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+  return { avg, days: vals.length };
+}
+
+async function loadCtxFromGroup(numbers, eventDate){
+  try{
+    const { db, auth } = await import('/js/firebase-config.js');
+    const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { collection, query, where, limit, getDocs } = fs;
+
+    const uid = auth?.currentUser?.uid;
+    if(!uid) return { ok:false, reason:'no_uid' };
+
+    const docs = [];
+    async function findAnimalDoc(val){
+      // جرّب userId ثم ownerUid، وجرّب رقم/نص
+      const tries = [];
+      const nStr = String(val).trim();
+      const nNum = Number(nStr);
+      if(Number.isFinite(nNum)) tries.push(nNum);
+      tries.push(nStr);
+
+      const ownerFields = ['userId','ownerUid'];
+      for(const ownerField of ownerFields){
+        for(const v of tries){
+          try{
+            const qy = query(
+              collection(db,'animals'),
+              where(ownerField,'==', uid),
+              where('animalNumber','==', v),
+              limit(1)
+            );
+            const snap = await getDocs(qy);
+            if(!snap.empty) return snap.docs[0].data();
+          }catch(e){}
+        }
+      }
+      return null;
+    }
+
+    // اجمع بيانات كل حيوان
+    for(const n of numbers){
+      const doc = await findAnimalDoc(n);
+      if(!doc) continue;
+      docs.push(doc);
+    }
+    if(!docs.length) return { ok:false, reason:'not_found' };
+
+    // احسب متوسط DIM
+    const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
+    const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
+
+    // نوع القطيع (من أول حيوان كمصدر)
+    const first = docs[0] || {};
+    const typeAr = (first.animalTypeAr || (first.animaltype==='buffalo' ? 'جاموس' : (first.animaltype==='cow' ? 'بقر' : '')));
+    const species = (typeAr==='جاموس' || typeAr==='بقر') ? typeAr : '';
+
+    // متوسط لبن 7 أيام (نحسب لكل حيوان ثم ناخد المتوسط على الحيوانات اللي عندها بيانات)
+    const ed = eventDate || todayLocal();
+    const milks = [];
+    for(const d of docs){
+      const an = d.animalNumber;
+      const val = Number.isFinite(Number(an)) ? Number(an) : String(an);
+      const r = await fetchAvgMilkKgFor(fs, db, uid, val, ed, 7);
+      if(r.avg!=null) milks.push(Number(r.avg));
+    }
+    const avgMilk = milks.length ? (milks.reduce((a,b)=>a+b,0)/milks.length) : null;
+
+    // متوسط DCC (للعشار فقط) من lastInseminationDate
+    const dccs = [];
+    for(const d of docs){
+      const repro = d.reproductiveStatus || '';
+      if(repro!=='عشار') continue;
+      const lastIns = d.lastInseminationDate;
+      if(!lastIns) continue;
+      const a = new Date(lastIns);
+      const b = new Date(ed);
+      if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
+      const diff = Math.floor((b.getTime()-a.getTime())/86400000);
+      if(diff>=0) dccs.push(diff);
+    }
+    const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
+
+    // اكتب القيم في الحقول المخفية (حتى لا نكسر منطق الحفظ)
+    if(species) document.getElementById('ctxSpecies').value = species;
+    if(avgDIM!=null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
+    document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
+    if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
+
+    // العرض
+    const animalInfo = document.getElementById('animalInfo');
+    if(animalInfo) animalInfo.textContent = `مجموعة (${docs.length} رأس)`;
+    updateCtxView();
+
+    return { ok:true, count: docs.length };
+  }catch(e){
+    return { ok:false, reason:'error', error:String(e?.message||e) };
+  }
+}
+
+async function loadCtxAuto(){
+  const { animalId, eventDate } = deriveCtx();
+  const nums = parseNumbersList();
+  // إذا كانت قائمة أرقام >1 نعتبرها مجموعة مؤقتة
+  if(nums.length > 1){
+    return await loadCtxFromGroup(nums, eventDate);
+  }
+  // حيوان واحد
+  return await loadCtxFromAnimal(animalId, eventDate);
+}
+
 function deriveCtx(){
   const p = qp();
   const animalId = p.get('animalId') || p.get('number') || p.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
@@ -353,25 +541,21 @@ try {
   const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
   if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
 
-  // تهيئة عرض السياق كقائمة (Read-only) + تحميل من الرابط + زر تحديث من الحيوان
+  // تهيئة عرض السياق كقائمة (Read-only) + تحميل تلقائي من الحيوان/المجموعة
   try{
     setHiddenCtxFromQuery();
     updateCtxView();
-    const reloadBtn = document.getElementById('ctxReloadBtn');
-    if(reloadBtn){
-      reloadBtn.addEventListener('click', async ()=>{
-        const { animalId, eventDate } = deriveCtx();
-        const res = await loadCtxFromAnimal(animalId, eventDate);
-        // لا نستخدم alert؛ فقط نحدث شريط تحذير إن وجد
-        const w = document.getElementById('warn');
-        if(w){
-          if(res.ok) { w.textContent = '✅ تم تحديث بيانات المجموعة من بطاقة الحيوان.'; w.style.display='block'; }
-          else if(res.reason==='not_found'){ w.textContent = '⚠️ لم يتم العثور على الحيوان في القطيع (راجع الرقم/المالك).'; w.style.display='block'; }
-          else if(res.reason==='no_uid'){ w.textContent = '⚠️ يلزم تسجيل الدخول أولاً.'; w.style.display='block'; }
-          else { w.textContent = '⚠️ تعذر التحديث.'; w.style.display='block'; }
-        }
-      });
-    }
+    (async ()=>{
+      const res = await loadCtxAuto();
+      const w = document.getElementById('warn');
+      if(w){
+        if(res?.ok) { w.textContent = '✅ تم تحميل بيانات السياق تلقائيًا.'; w.style.display='block'; }
+        else if(res?.reason==='not_found'){ w.textContent = '⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.'; w.style.display='block'; }
+        else if(res?.reason==='no_uid'){ w.textContent = '⚠️ يلزم تسجيل الدخول أولاً.'; w.style.display='block'; }
+        else { w.textContent = '⚠️ تعذر تحميل البيانات تلقائيًا.'; w.style.display='block'; }
+      }
+    })();
   }catch(e){}
+
 
 })();
