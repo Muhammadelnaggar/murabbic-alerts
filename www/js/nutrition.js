@@ -232,7 +232,7 @@ async function loadCtxFromAnimal(numberStr, eventDate){
     }
   }
 
-# متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
+// متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
   let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
   if((avgRes?.avg==null) && String(numberStr).trim()!==''){
     const nNum = Number(numberStr);
