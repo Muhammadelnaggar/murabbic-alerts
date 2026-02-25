@@ -1,15 +1,32 @@
-// حفظ حدث التغذية إلى /api/events + Fallback Firestore — بدون أي تغيير بصري
+// مُرَبِّيك — صفحة التغذية (Cloud-only)
+// ✅ لا LocalStorage / لا API
+// ✅ تحميل سياق الحيوان/المجموعة من Firestore فقط
+// ✅ حفظ حدث التغذية إلى Firestore فقط (events)
+
 import { onNutritionSave } from '/js/track-nutrition.js';
 
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
-
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function setElText(id, val){
   const el = document.getElementById(id);
   if(!el) return;
   el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
 }
+
+function msgWarn(text){
+  const w = document.getElementById('warn');
+  if(!w) return;
+  w.textContent = text || '';
+  w.style.display = text ? 'block' : 'none';
+}
+
+function disableSave(disabled){
+  const btn = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
+  if(btn) btn.disabled = !!disabled;
+}
+
 function setHiddenCtxFromQuery(){
   const p = qp();
   const setVal = (id, v) => { const el=document.getElementById(id); if(el && v!==null && v!==undefined && v!=='') el.value = v; };
@@ -22,6 +39,7 @@ function setHiddenCtxFromQuery(){
   setChk('ctxEarlyDry', p.get('earlyDry'));
   setChk('ctxCloseUp', p.get('closeUp'));
 }
+
 function updateCtxView(){
   const species = document.getElementById('ctxSpecies')?.value || '';
   const dim = document.getElementById('ctxDIM')?.value || '';
@@ -45,143 +63,61 @@ function updateCtxView(){
   const dtc = Number.isFinite(dccNum) ? (gest - dccNum) : null;
   setElText('dtcVal', (dtc===null ? '—' : dtc));
 }
-async function loadCtxFromAnimal(animalNumberOrId, eventDate){
-  const nStr = String(animalNumberOrId||'').trim();
-  if(!nStr) return { ok:false, reason:'no_number' };
 
-  const API_BASE = window.API_BASE || "";
-  const userId = window.currentUserId || localStorage.getItem("userId") || "";
-  const headers = { "Accept":"application/json" };
-  if(userId) headers["X-User-Id"] = userId;
-
-  // ---- helpers
-  async function getJSON(path){
-    const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-    const res = await fetch(url, { headers, cache:'no-store' });
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  }
-  function pick(obj, keys, def=''){
-    for(const k of keys){
-      if(obj && obj[k]!==undefined && obj[k]!==null && obj[k]!=='') return obj[k];
-    }
-    return def;
-  }
-  function toNum(v){
-    const x = Number(v);
-    return Number.isFinite(x) ? x : null;
-  }
-
-  // ---- 1) fetch animal doc via API (server-admin → Firestore)
-  let animal = null;
-  const tries = [
-    `/api/animals?number=${encodeURIComponent(nStr)}`,
-    `/api/animals?animalNumber=${encodeURIComponent(nStr)}`,
-    `/api/animals?q=${encodeURIComponent(nStr)}`
-  ];
-  for(const path of tries){
-    try{
-      const data = await getJSON(path);
-      if(Array.isArray(data)) animal = data[0] || null;
-      else if(data && Array.isArray(data.items)) animal = data.items[0] || null;
-      else if(data && data.animal) animal = data.animal;
-      else if(data && data.animalNumber!==undefined) animal = data;
-      if(animal) break;
-    }catch(e){}
-  }
-
-  // ---- 2) compute DIM from animal doc
-  const dim = toNum(pick(animal, ['daysInMilk','DIM','dim'], null));
-
-  // ---- 3) milk avg last 7 days from events (preferred)
-  const baseDate = (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate)) ? eventDate : todayLocal();
-  const end = new Date(baseDate+"T00:00:00");
-  const start = new Date(end); start.setDate(start.getDate()-6);
-  const from = start.toISOString().slice(0,10);
-  const to = end.toISOString().slice(0,10);
-
-  let avgMilk = null;
-  async function fetchMilkEvents(){
-    const paths = [
-      `/api/events?type=daily-milk&number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
-      `/api/events?eventType=لبن&number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
-      `/api/animal-timeline?number=${encodeURIComponent(nStr)}&from=${from}&to=${to}`,
-      `/api/animal-timeline?animalNumber=${encodeURIComponent(nStr)}&from=${from}&to=${to}`
-    ];
-    for(const path of paths){
-      try{
-        const data = await getJSON(path);
-        if(Array.isArray(data)) return data;
-        if(data && Array.isArray(data.events)) return data.events;
-        if(data && Array.isArray(data.items)) return data.items;
-      }catch(e){}
-    }
-    return [];
-  }
-
-  const milkEvents = await fetchMilkEvents();
-
-  // normalize milk events to (date -> last value)
-  const byDay = new Map();
-  for(const ev of (milkEvents||[])){
-    const d = String(pick(ev, ['eventDate','date','day'], '')).slice(0,10);
-    if(!d || d < from || d > to) continue;
-    const v = pick(ev, ['milkKg','milk','value','kg','amount','dailyMilk'], null);
-    const num = toNum(v);
-    if(num===null) continue;
-    // overwrite → last record for that day wins
-    byDay.set(d, num);
-  }
-  if(byDay.size){
-    let sum=0;
-    for(const v of byDay.values()) sum += v;
-    avgMilk = sum / byDay.size;
-  }else{
-    // fallback to animal.dailyMilk only if we have lastMilkDate within the window
-    const lastMilkDate = String(pick(animal, ['lastMilkDate','lastMilkDateStr'], '')).slice(0,10);
-    const dm = toNum(pick(animal, ['dailyMilk'], null));
-    if(dm!==null && lastMilkDate && lastMilkDate >= from && lastMilkDate <= to) avgMilk = dm;
-  }
-
-  // ---- 4) other context fields
-  const species = pick(animal, ['animalTypeAr','speciesAr','animaltype','species'], '');
-  const dcc = toNum(pick(animal, ['dcc','daysCarried','pregDays','DCC'], null));
-  const preg = pick(animal, ['reproductiveStatus','pregStatus','lastDiagnosis','preg'], '');
-
-  return {
-    ok: true,
-    animal: animal || null,
-    dim: dim,
-    avgMilk: avgMilk,
-    species: species,
-    dcc: dcc,
-    preg: preg,
-    window: {from,to}
-  };
+// =====================
+// Firestore helpers (سياق)
+// =====================
+function isMilkEvent(ev){
+  const t = String(ev?.type || ev?.eventType || '').trim();
+  return (t === 'daily-milk' || t === 'لبن' || t === 'لبن يومي' || t === 'تسجيل اللبن اليومي');
+}
+function getEventDay(ev){
+  const d = ev?.eventDate || ev?.date || ev?.day || '';
+  return String(d || '').slice(0,10);
+}
+function getMilkKg(ev){
+  const v = ev?.milkKg ?? ev?.milk ?? ev?.value ?? ev?.kg ?? ev?.amount ?? ev?.dailyMilk;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
+function evTime(ev){
+  const ca = ev?.createdAt;
+  try{ if(ca && typeof ca.toDate === 'function') return ca.toDate().getTime(); }catch(_){}
+  const s = ev?.createdAt?.seconds;
+  if(Number.isFinite(s)) return s * 1000;
+  const d = new Date(ev?.createdAt);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : 0;
 }
 
+async function findAnimalDocByNumber(db, fs, uid, nStr){
+  const { collection, query, where, limit, getDocs } = fs;
 
-// ✅ تحميل السياق تلقائيًا (بدون زر) — يدعم: حيوان واحد أو "مجموعة مؤقتة" (قائمة أرقام)
-// المجموعة المؤقتة تُمرَّر عبر:
-// - animalId/number = "201,203,206"  أو
-// - numbers=201,203,206  أو
-// - groupNumbers=...
-function parseNumbersList(){
-  const p = qp();
-  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalId') || p.get('number') || p.get('animalNumber') || '').toString();
-  const list = raw.split(/[,،;\s]+/).map(s=>s.trim()).filter(Boolean);
-  // لو الرقم مفصول بشرطة (مثال 201-205) نتجاهله الآن لتفادي أخطاء
-  const clean = [];
-  for(const x of list){
-    if(x.includes('-')) { clean.push(x); continue; }
-    clean.push(x);
+  const tries = [];
+  const nNum = Number(String(nStr).trim());
+  if(Number.isFinite(nNum)) tries.push(nNum);
+  tries.push(String(nStr).trim());
+
+  for(const ownerField of ['userId','ownerUid']){
+    for(const v of tries){
+      try{
+        const qy = query(
+          collection(db,'animals'),
+          where(ownerField,'==', uid),
+          where('animalNumber','==', v),
+          limit(1)
+        );
+        const snap = await getDocs(qy);
+        if(!snap.empty) return snap.docs[0].data();
+      }catch(_){}
+    }
   }
-  // unique
-  return [...new Set(clean)];
+  return null;
 }
 
 async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   const { collection, query, where, limit, getDocs, orderBy } = fs;
+
   const end = new Date(endDateStr || todayLocal());
   if(isNaN(end.getTime())) return { avg:null, days:0 };
   const start = new Date(end); start.setDate(start.getDate() - (days-1));
@@ -194,22 +130,21 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
         where(ownerField,'==', uid),
         where('animalNumber','==', animalVal),
         orderBy('createdAt','desc'),
-        limit(120)
+        limit(160)
       );
       const snap = await getDocs(q);
       snap.forEach(d=>candidates.push(d.data()));
-    }catch(e){
-      // fallback بدون orderBy
+    }catch(_){
       try{
         const q = query(
           collection(db,'events'),
           where(ownerField,'==', uid),
           where('animalNumber','==', animalVal),
-          limit(120)
+          limit(160)
         );
         const snap = await getDocs(q);
         snap.forEach(d=>candidates.push(d.data()));
-      }catch(_){}
+      }catch(__){}
     }
   }
 
@@ -224,15 +159,13 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
     const d = new Date(day);
     if(isNaN(d.getTime())) continue;
     if(d < start || d > end) continue;
+
     const kg = getMilkKg(ev);
     if(!Number.isFinite(kg) || kg<=0) continue;
 
-    // احتفظ بآخر قراءة في اليوم (الأحدث)
     const prev = byDay.get(day);
     const t = evTime(ev);
-    if(!prev || t > prev.t){
-      byDay.set(day, { kg, t });
-    }
+    if(!prev || t > prev.t) byDay.set(day, { kg, t });
   }
 
   const vals = [...byDay.values()].map(x=>x.kg);
@@ -241,124 +174,170 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   return { avg, days: vals.length };
 }
 
-async function loadCtxFromGroup(numbers, eventDate){
-  try{
-    const { db, auth } = await import('/js/firebase-config.js');
-    const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { collection, query, where, limit, getDocs } = fs;
+function parseNumbersList(){
+  const p = qp();
+  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalId') || p.get('number') || p.get('animalNumber') || '').toString();
+  const list = raw.split(/[,،;\s]+/).map(s=>s.trim()).filter(Boolean);
+  return [...new Set(list)];
+}
 
-    const uid = auth?.currentUser?.uid;
-    if(!uid) return { ok:false, reason:'no_uid' };
+function readUrlCtx(){
+  const p = qp();
+  const rawNumber =
+    p.get('number') || p.get('animalNumber') || p.get('animalId') ||
+    p.get('numbers') || p.get('groupNumbers') || '';
 
-    const docs = [];
-    async function findAnimalDoc(val){
-      // جرّب userId ثم ownerUid، وجرّب رقم/نص
-      const tries = [];
-      const nStr = String(val).trim();
-      const nNum = Number(nStr);
-      if(Number.isFinite(nNum)) tries.push(nNum);
-      tries.push(nStr);
+  const rawDate = p.get('eventDate') || p.get('date') || '';
+  const eventDate = DATE_RE.test(String(rawDate||'')) ? String(rawDate) : todayLocal();
 
-      const ownerFields = ['userId','ownerUid'];
-      for(const ownerField of ownerFields){
-        for(const v of tries){
-          try{
-            const qy = query(
-              collection(db,'animals'),
-              where(ownerField,'==', uid),
-              where('animalNumber','==', v),
-              limit(1)
-            );
-            const snap = await getDocs(qy);
-            if(!snap.empty) return snap.docs[0].data();
-          }catch(e){}
-        }
-      }
-      return null;
-    }
+  const nums = parseNumbersList();
+  return { rawNumber: String(rawNumber||'').trim(), nums, eventDate };
+}
 
-    // اجمع بيانات كل حيوان
-    for(const n of numbers){
-      const doc = await findAnimalDoc(n);
-      if(!doc) continue;
-      docs.push(doc);
-    }
-    if(!docs.length) return { ok:false, reason:'not_found' };
+async function loadCtxFromAnimal(numberStr, eventDate){
+  if(!numberStr) return { ok:false, reason:'no_number' };
 
-    // احسب متوسط DIM
-    const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
-    const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
+  const { db, auth } = await import('/js/firebase-config.js');
+  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-    // نوع القطيع (من أول حيوان كمصدر)
-    const first = docs[0] || {};
-    const typeAr = (first.animalTypeAr || (first.animaltype==='buffalo' ? 'جاموس' : (first.animaltype==='cow' ? 'بقر' : '')));
-    const species = (typeAr==='جاموس' || typeAr==='بقر') ? typeAr : '';
+  const uid = auth?.currentUser?.uid;
+  if(!uid) return { ok:false, reason:'no_uid' };
 
-    // متوسط لبن 7 أيام (نحسب لكل حيوان ثم ناخد المتوسط على الحيوانات اللي عندها بيانات)
-    const ed = eventDate || todayLocal();
-    const milks = [];
-    for(const d of docs){
-      const an = d.animalNumber;
-      const val = Number.isFinite(Number(an)) ? Number(an) : String(an);
-      const r = await fetchAvgMilkKgFor(fs, db, uid, val, ed, 7);
-      if(r.avg!=null) milks.push(Number(r.avg));
-    }
-    const avgMilk = milks.length ? (milks.reduce((a,b)=>a+b,0)/milks.length) : null;
+  const animal = await findAnimalDocByNumber(db, fs, uid, numberStr);
+  if(!animal) return { ok:false, reason:'not_found' };
 
-    // متوسط DCC (للعشار فقط) من lastInseminationDate
-    const dccs = [];
-    for(const d of docs){
-      const repro = d.reproductiveStatus || '';
-      if(repro!=='عشار') continue;
-      const lastIns = d.lastInseminationDate;
-      if(!lastIns) continue;
-      const a = new Date(lastIns);
-      const b = new Date(ed);
-      if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
+  const dim = Number.isFinite(Number(animal?.daysInMilk)) ? Number(animal.daysInMilk) : null;
+
+  const species =
+    (animal?.animalTypeAr) ||
+    (animal?.animaltype === 'buffalo' ? 'جاموس' : (animal?.animaltype === 'cow' ? 'بقر' : '')) ||
+    '';
+
+  const preg = (animal?.reproductiveStatus || animal?.lastDiagnosis || animal?.pregStatus || '') || '';
+
+  // DCC من lastInseminationDate (فقط لو عشار)
+  let dcc = null;
+  if(preg === 'عشار' && animal?.lastInseminationDate){
+    const a = new Date(animal.lastInseminationDate);
+    const b = new Date(eventDate || todayLocal());
+    if(!isNaN(a.getTime()) && !isNaN(b.getTime())){
       const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-      if(diff>=0) dccs.push(diff);
+      if(diff >= 0) dcc = diff;
     }
-    const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
-
-    // اكتب القيم في الحقول المخفية (حتى لا نكسر منطق الحفظ)
-    if(species) document.getElementById('ctxSpecies').value = species;
-    if(avgDIM!=null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
-    document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
-    if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
-
-    // العرض
-    const animalInfo = document.getElementById('animalInfo');
-    if(animalInfo) animalInfo.textContent = `مجموعة (${docs.length} رأس)`;
-    updateCtxView();
-
-    return { ok:true, count: docs.length };
-  }catch(e){
-    return { ok:false, reason:'error', error:String(e?.message||e) };
   }
+
+  // متوسط اللبن (آخر 7 أيام)
+  const nNum = Number(numberStr);
+  const animalVal = Number.isFinite(nNum) ? nNum : numberStr;
+  const avgRes = await fetchAvgMilkKgFor(fs, db, uid, animalVal, eventDate, 7);
+  const avgMilk = (avgRes?.avg!=null) ? Number(avgRes.avg) : null;
+
+  // اكتب القيم في الحقول المخفية
+  if(species) document.getElementById('ctxSpecies').value = species;
+  if(dim!=null) document.getElementById('ctxDIM').value = Math.round(dim);
+  document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
+  if(dcc!=null) document.getElementById('ctxDCC').value = Math.round(dcc);
+  if(preg) document.getElementById('ctxPreg').value = preg;
+
+  const animalInfo = document.getElementById('animalInfo');
+  if(animalInfo) animalInfo.textContent = String(animal?.animalNumber ?? numberStr);
+
+  updateCtxView();
+  return { ok:true, animal, dim, avgMilk, species, dcc, preg };
+}
+
+async function loadCtxFromGroup(numbers, eventDate){
+  if(!numbers?.length) return { ok:false, reason:'no_number' };
+
+  const { db, auth } = await import('/js/firebase-config.js');
+  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  const uid = auth?.currentUser?.uid;
+  if(!uid) return { ok:false, reason:'no_uid' };
+
+  const docs = [];
+  for(const n of numbers){
+    const doc = await findAnimalDocByNumber(db, fs, uid, n);
+    if(doc) docs.push(doc);
+  }
+  if(!docs.length) return { ok:false, reason:'not_found' };
+
+  const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
+  const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
+
+  const first = docs[0] || {};
+  const typeAr = (first.animalTypeAr || (first.animaltype==='buffalo' ? 'جاموس' : (first.animaltype==='cow' ? 'بقر' : '')));
+  const species = (typeAr==='جاموس' || typeAr==='بقر') ? typeAr : '';
+
+  const milks = [];
+  for(const d of docs){
+    const an = d.animalNumber;
+    const val = Number.isFinite(Number(an)) ? Number(an) : String(an);
+    const r = await fetchAvgMilkKgFor(fs, db, uid, val, eventDate, 7);
+    if(r.avg!=null) milks.push(Number(r.avg));
+  }
+  const avgMilk = milks.length ? (milks.reduce((a,b)=>a+b,0)/milks.length) : null;
+
+  const dccs = [];
+  for(const d of docs){
+    const repro = d.reproductiveStatus || '';
+    if(repro!=='عشار') continue;
+    const lastIns = d.lastInseminationDate;
+    if(!lastIns) continue;
+    const a = new Date(lastIns);
+    const b = new Date(eventDate);
+    if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
+    const diff = Math.floor((b.getTime()-a.getTime())/86400000);
+    if(diff>=0) dccs.push(diff);
+  }
+  const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
+
+  if(species) document.getElementById('ctxSpecies').value = species;
+  if(avgDIM!=null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
+  document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
+  if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
+
+  const animalInfo = document.getElementById('animalInfo');
+  if(animalInfo) animalInfo.textContent = `مجموعة (${docs.length} رأس)`;
+
+  updateCtxView();
+  return { ok:true, count: docs.length };
 }
 
 async function loadCtxAuto(){
-  const { animalId, eventDate } = deriveCtx();
-  const nums = parseNumbersList();
-  // إذا كانت قائمة أرقام >1 نعتبرها مجموعة مؤقتة
-  if(nums.length > 1){
-    return await loadCtxFromGroup(nums, eventDate);
+  const { rawNumber, nums, eventDate } = readUrlCtx();
+
+  // لازم رقم (فردي أو قائمة) من الـURL
+  if(!rawNumber){
+    disableSave(true);
+    msgWarn('⚠️ افتح صفحة التغذية من داخل مُرَبِّيك (لازم رقم الحيوان/المجموعة في الرابط).');
+    return { ok:false, reason:'no_number' };
   }
-  // حيوان واحد
-  return await loadCtxFromAnimal(animalId, eventDate);
+
+  // فردي/جماعي
+  const res = (nums.length > 1)
+    ? await loadCtxFromGroup(nums, eventDate)
+    : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
+
+  if(res?.ok){
+    disableSave(false);
+    msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
+  }else if(res?.reason==='no_uid'){
+    disableSave(true);
+    msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
+  }else if(res?.reason==='not_found'){
+    disableSave(true);
+    msgWarn('⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.');
+  }else{
+    disableSave(true);
+    msgWarn('⚠️ تعذر تحميل البيانات تلقائيًا.');
+  }
+  return res;
 }
 
-function deriveCtx(){
-  const p = qp();
-  const animalId = p.get('animalId') || p.get('number') || p.get('animalNumber') || localStorage.getItem('lastAnimalId') || '';
-  let eventDate  = p.get('eventDate') || p.get('date') || p.get('dt') || p.get('Date') || localStorage.getItem('eventDate') || localStorage.getItem('lastEventDate') || todayLocal();
-  try{
-    if(animalId){ localStorage.setItem('currentAnimalId', animalId); localStorage.setItem('lastAnimalId', animalId); }
-    if(eventDate){ localStorage.setItem('eventDate', eventDate); localStorage.setItem('lastEventDate', eventDate); }
-  }catch{}
-  return { animalId, eventDate };
-}
-
+// =====================
+// جمع البيانات + حفظ Firestore فقط
+// =====================
 function collectRows(){
   const rows = [];
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
@@ -399,6 +378,7 @@ function readKPIs(){
 function readContext(){
   const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
   const getSel = id => document.getElementById(id)?.value || null;
+
   const species = getSel('ctxSpecies');
   const dcc = getNum('ctxDCC');
   const gest = (species==='جاموس') ? 310 : 280;
@@ -417,21 +397,14 @@ function readContext(){
   };
 }
 
-async function postAPI(payload){
-  const API_BASE = (localStorage.getItem('API_BASE') || '').replace(/\/$/, '');
-  const url = (API_BASE ? API_BASE : '') + '/api/events';
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  if (!r.ok) throw new Error('API failed: '+r.status);
-  return r.json().catch(()=>({}));
-}
+async function saveToFirestore(payload){
+  const { db, auth } = await import('/js/firebase-config.js');
+  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const { collection, addDoc, serverTimestamp } = fs;
 
-async function saveFirestore(payload){
-  const cfgMod = await import('/js/firebase-config.js');
-  const firebaseConfig = cfgMod.default || cfgMod.firebaseConfig || cfgMod.config;
-  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
-  const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const uid = auth?.currentUser?.uid;
+  if(!uid) throw new Error('NO_AUTH');
+
   await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
 }
 
@@ -442,16 +415,35 @@ function redirectSmart(){
 
 async function saveEvent(e){
   e?.preventDefault?.();
-  const { animalId, eventDate } = deriveCtx();
-  if (!animalId || !eventDate){ alert('⚠️ يرجى التأكد من رقم الحيوان والتاريخ.'); return; }
+
+  const p = qp();
+  const rawNumber =
+    p.get('number') || p.get('animalNumber') || p.get('animalId') ||
+    p.get('numbers') || p.get('groupNumbers') || '';
+
+  const rawDate = p.get('eventDate') || p.get('date') || '';
+  const animalId = String(rawNumber||'').trim();
+  const eventDate = DATE_RE.test(String(rawDate||'')) ? String(rawDate) : todayLocal();
+
+  if(!animalId){
+    msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
+    return;
+  }
+
+  // منع الحفظ لو السياق لم يُحمَّل
+  if((document.getElementById('ctxSpecies')?.value || '') === '' &&
+     (document.getElementById('ctxDIM')?.value || '') === '' &&
+     (document.getElementById('ctxAvgMilk')?.value || '') === ''){
+    msgWarn('⚠️ تم منع الحفظ: لم يتم تحميل بيانات السياق.');
+    return;
+  }
 
   const rows = collectRows();
   const payload = {
-    type: 'تغذية',
+    type: 'nutrition',
     eventType: 'تغذية',
-    userId: localStorage.getItem('userId'),
-    tenantId: localStorage.getItem('tenantId') || 'default',
-    animalId, animalNumber: animalId,
+    animalId,
+    animalNumber: animalId,
     eventDate,
     nutritionMode: (document.getElementById('mode')?.value || 'tmr_asfed'),
     nutritionRows: rows,
@@ -460,40 +452,58 @@ async function saveEvent(e){
     source: 'nutrition.html'
   };
 
-  let modeSaved = 'api';
-  try{ await postAPI(payload); }
-  catch(err){ console.warn('API error; fallback to Firestore', err); await saveFirestore(payload); modeSaved = 'firestore'; }
-try {
-  await window.updateAnimalByEvent(payload);
-} catch (e) {
-  console.warn('updateAnimalByEvent failed', e);
+  // userId من auth (Cloud-only)
+  try{
+    const { auth } = await import('/js/firebase-config.js');
+    payload.userId = auth?.currentUser?.uid || null;
+    payload.tenantId = payload.userId || null;
+  }catch(_){}
+
+  disableSave(true);
+  msgWarn('⏳ جارٍ الحفظ...');
+
+  try{
+    await saveToFirestore(payload);
+    try { await window.updateAnimalByEvent?.(payload); } catch (e) { console.warn('updateAnimalByEvent failed', e); }
+
+    try{
+      onNutritionSave({
+        animalId,
+        date: eventDate,
+        rows: rows.length,
+        mode: 'firestore',
+        source: 'nutrition.html'
+      });
+    }catch(_){}
+
+    msgWarn('✅ تم الحفظ على السحابة.');
+    redirectSmart();
+  }catch(err){
+    console.error(err);
+    disableSave(false);
+    msgWarn('❌ فشل الحفظ على السحابة. تأكد من الاتصال وتسجيل الدخول.');
+  }
 }
 
-  try{ onNutritionSave({ animalId, date: eventDate, rows: rows.length, mode: modeSaved, source: 'nutrition.html' }); }catch(e){}
-  redirectSmart();
-}
-
+// =====================
+// Bind
+// =====================
 (function bind(){
   const form = document.getElementById('nutritionForm') || document.querySelector('form[data-event="nutrition"]');
   if (form) form.addEventListener('submit', saveEvent);
+
   const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
   if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
 
-  // تهيئة عرض السياق كقائمة (Read-only) + تحميل تلقائي من الحيوان/المجموعة
+  // init
   try{
     setHiddenCtxFromQuery();
     updateCtxView();
-    (async ()=>{
-      const res = await loadCtxAuto();
-      const w = document.getElementById('warn');
-      if(w){
-        if(res?.ok) { w.textContent = '✅ تم تحميل بيانات السياق تلقائيًا.'; w.style.display='block'; }
-        else if(res?.reason==='not_found'){ w.textContent = '⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.'; w.style.display='block'; }
-        else if(res?.reason==='no_uid'){ w.textContent = '⚠️ يلزم تسجيل الدخول أولاً.'; w.style.display='block'; }
-        else { w.textContent = '⚠️ تعذر تحميل البيانات تلقائيًا.'; w.style.display='block'; }
-      }
-    })();
-  }catch(e){}
-
-
+    disableSave(true);
+    loadCtxAuto();
+  }catch(e){
+    console.error(e);
+    disableSave(true);
+    msgWarn('⚠️ تعذر تهيئة الصفحة.');
+  }
 })();
