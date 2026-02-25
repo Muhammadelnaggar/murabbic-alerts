@@ -8,6 +8,37 @@ import { onNutritionSave } from '/js/track-nutrition.js';
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// =====================
+// Auth helper (انتظار تهيئة جلسة Firebase Auth بدون أي تخزين محلي)
+// =====================
+async function waitForUid(auth, timeoutMs = 8000){
+  try{
+    if (auth?.currentUser?.uid) return auth.currentUser.uid;
+    const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+    const { onAuthStateChanged } = authMod;
+
+    return await new Promise((resolve) => {
+      let done = false;
+      const t = setTimeout(() => {
+        if (done) return;
+        done = true;
+        try { unsub && unsub(); } catch {}
+        resolve(auth?.currentUser?.uid || null);
+      }, timeoutMs);
+
+      const unsub = onAuthStateChanged(auth, (user) => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        try { unsub && unsub(); } catch {}
+        resolve(user?.uid || null);
+      });
+    });
+  }catch(_){
+    return auth?.currentUser?.uid || null;
+  }
+}
+
 
 function setElText(id, val){
   const el = document.getElementById(id);
@@ -200,7 +231,7 @@ async function loadCtxFromAnimal(numberStr, eventDate){
   const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  const uid = auth?.currentUser?.uid;
+  const uid = await waitForUid(auth);
   if(!uid) return { ok:false, reason:'no_uid' };
 
   const animal = await findAnimalDocByNumber(db, fs, uid, numberStr);
@@ -252,7 +283,7 @@ async function loadCtxFromGroup(numbers, eventDate){
   const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  const uid = auth?.currentUser?.uid;
+  const uid = await waitForUid(auth);
   if(!uid) return { ok:false, reason:'no_uid' };
 
   const docs = [];
@@ -402,7 +433,7 @@ async function saveToFirestore(payload){
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
   const { collection, addDoc, serverTimestamp } = fs;
 
-  const uid = auth?.currentUser?.uid;
+  const uid = await waitForUid(auth);
   if(!uid) throw new Error('NO_AUTH');
 
   await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
@@ -455,7 +486,7 @@ async function saveEvent(e){
   // userId من auth (Cloud-only)
   try{
     const { auth } = await import('/js/firebase-config.js');
-    payload.userId = auth?.currentUser?.uid || null;
+    payload.userId = (await waitForUid(auth)) || null;
     payload.tenantId = payload.userId || null;
   }catch(_){}
 
