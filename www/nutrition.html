@@ -251,34 +251,67 @@
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
 
-  // قائمة الخامات (كاملة)
-  const FEEDS = [
-    { name:'ذرة صفراء مجروشة', dm:88 }, { name:'شعير', dm:88 },
-    { name:'قمح مطحون', dm:88 }, { name:'ردة قمح (نخالة)', dm:89 },
-    { name:'ردة أرز', dm:90 }, { name:'ذرة رفيعة (سورجم)', dm:88 },
-    { name:'شوفان', dm:90 }, { name:'فول بلدي (فابا)', dm:88 },
-    { name:'بازلاء علفية', dm:88 }, { name:'DDGS (ذرة)', dm:90 },
-    { name:'جلوتين فيد (CGF)', dm:90 }, { name:'جلوتين ميل (CGM)', dm:90 },
-    { name:'قشور فول صويا (Soy Hulls)', dm:90 }, { name:'لب بنجر مجفف', dm:90 },
-    { name:'لب بنجر مبلل', dm:25 }, { name:'لب حمضيات مجفف', dm:90 },
-    { name:'مولاس', dm:75 }, { name:'كسب فول صويا 44%', dm:89 },
-    { name:'كسب فول صويا 48%', dm:89 }, { name:'كسب عباد الشمس', dm:89 },
-    { name:'كسب كانولا', dm:90 }, { name:'كسب قطن', dm:92 },
-    { name:'كسب نخيل', dm:90 }, { name:'كسب فول سوداني', dm:90 },
-    { name:'كسب سمسم', dm:90 }, { name:'كسب كتان', dm:90 },
-    { name:'بذرة قطن كاملة', dm:92 }, { name:'قشور بذرة قطن (Hulls)', dm:90 },
-    { name:'سيلاج ذرة', dm:33 }, { name:'سيلاج سورجم', dm:30 },
-    { name:'برسيم أخضر', dm:18 }, { name:'دريس برسيم', dm:90 },
-    { name:'دريس حشيشة/نجيل', dm:90 }, { name:'تبن قمح', dm:90 },
-    { name:'قش أرز', dm:90 }, { name:'دهون محمية', dm:99 },
-    { name:'زيت نباتي علفي', dm:99 }, { name:'يوريا علفية', dm:100 },
-    { name:'حجر جيري (كالسيوم)', dm:100 }, { name:'فوسفات ثنائي الكالسيوم (DCP)', dm:100 },
-    { name:'ملح طعام', dm:100 }, { name:'بيكربونات صوديوم', dm:100 },
-    { name:'أكسيد ماغنسيوم', dm:100 }, { name:'بنتونيت', dm:100 },
-    { name:'خميرة حية/مستنبت خمائري', dm:95 }, { name:'مخلوط معادن/فيتامينات', dm:95 },
-  ];
-  FEEDS.forEach((f,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=f.name; presetSel.appendChild(o); });
+  // ===== مكتبة خامات مصر من Firestore (لا علاقة ببقر/جاموس) =====
+  const { db } = await import('/js/firebase-config.js');
+  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const { collection, query, where, getDocs } = fs;
 
+  let FEEDS = [];                 // [{id,name,dm}]
+  const FEEDS_BY_ID = new Map();  // id -> feed
+
+  function rebuildFeedUI(){
+    // 1) rebuild preset select
+    presetSel.innerHTML = '<option value="">— اختر —</option>';
+    FEEDS.forEach(f=>{
+      const o = document.createElement('option');
+      o.value = f.id;           // ✅ docId بدل index
+      o.textContent = f.name;
+      presetSel.appendChild(o);
+    });
+
+    // 2) rebuild datalist feedlist
+    const old = document.getElementById('feedlist');
+    if(old) old.remove();
+    const dl = document.createElement('datalist');
+    dl.id = 'feedlist';
+    FEEDS.forEach(f=>{
+      const o = document.createElement('option');
+      o.value = f.name;
+      dl.appendChild(o);
+    });
+    document.body.appendChild(dl);
+  }
+
+  async function loadFeedLibrary(){
+    FEEDS = [];
+    FEEDS_BY_ID.clear();
+
+    // ✅ كل الخامات المفعّلة فقط
+    const snap = await getDocs(query(
+      collection(db, 'feed_items'),
+      where('enabled', '==', true)
+    ));
+
+    const list = [];
+    snap.forEach(docSnap=>{
+      const d = docSnap.data() || {};
+      const name = String(d.nameAr || '').trim();
+      if(!name) return;
+      const dm = Number(d.dmPct);
+      list.push({
+        id: docSnap.id,
+        name,
+        dm: Number.isFinite(dm) ? dm : null
+      });
+    });
+
+    // ترتيب عربي
+    list.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
+
+    FEEDS = list;
+    FEEDS.forEach(f=> FEEDS_BY_ID.set(f.id, f));
+    rebuildFeedUI();
+  }
   const TEMPLATES = [
     { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
       { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
@@ -319,10 +352,6 @@
     ]},
   ];
   TEMPLATES.forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.name; tplSel.appendChild(o); });
-
-  const dl = document.createElement('datalist'); dl.id = 'feedlist';
-  FEEDS.forEach(f => { const o = document.createElement('option'); o.value = f.name; dl.appendChild(o); });
-  document.body.appendChild(dl);
 
   const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
@@ -522,7 +551,11 @@
   addEmptyRow();
   ensureEditableForMode();
   recalc();
-
+  // ✅ تحميل مكتبة الخامات من Firestore
+  loadFeedLibrary().catch(err=>{
+    console.error(err);
+    warn.textContent = '⚠️ تعذر تحميل مكتبة الخامات من السحابة.';
+  });
   document.getElementById('applyTpl')?.addEventListener('click', ()=>{
     const key = document.getElementById('tpl')?.value || '';
     const tpl = TEMPLATES.find(t=> t.key===key); if(!tpl) return;
@@ -537,10 +570,14 @@
     updateModeUI(); recalc();
   });
 
-  document.getElementById('addPreset')?.addEventListener('click', ()=>{
-    const idx = parseInt(presetSel.value); if (isNaN(idx)) return;
-    const f = FEEDS[idx]; addRow({ name:f.name, dm:f.dm, cat: guessCat(f.name) }); recalc();
-  });
+document.getElementById('addPreset')?.addEventListener('click', ()=>{
+  const id = (presetSel.value || '').trim();
+  if(!id) return;
+  const f = FEEDS_BY_ID.get(id);
+  if(!f) return;
+  addRow({ name: f.name, dm: (f.dm ?? ''), cat: guessCat(f.name) });
+  recalc();
+});
 
   document.getElementById('addBySearch')?.addEventListener('click', ()=>{
     const q = (feedSearch?.value || '').trim(); if(!q) return;
