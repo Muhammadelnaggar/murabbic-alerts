@@ -318,8 +318,12 @@ async function loadCtxFromGroup(numbers, eventDate){
   const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
 
   const first = docs[0] || {};
-  const typeAr = (first.animalTypeAr || (first.animaltype==='buffalo' ? 'جاموس' : (first.animaltype==='cow' ? 'بقر' : '')));
-  const species = (typeAr==='جاموس' || typeAr==='بقر') ? typeAr : '';
+ let species = animal?.animalTypeAr || '';
+
+if(!species){
+  if(animal?.animaltype === 'buffalo') species = 'جاموسة';
+  if(animal?.animaltype === 'cow') species = 'بقرة';
+}
 
   const milks = [];
   for(const d of docs){
