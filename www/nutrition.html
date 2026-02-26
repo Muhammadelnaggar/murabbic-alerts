@@ -125,6 +125,15 @@
       <div class="grow">
         <label class="muted">بحث سريع</label>
         <input id="feedSearch" list="feedlist" placeholder="اكتب للبحث عن خامة" style="width:100%">
+        <select id="feedTypeFilter" style="width:100%;margin-top:6px">
+  <option value="all">كل الخامات</option>
+  <option value="grain">حبوب</option>
+  <option value="protein">بروتين</option>
+  <option value="rough">أعلاف خشنة</option>
+  <option value="silage">سيلاج وأخضر</option>
+  <option value="byproduct">مخلفات مصانع</option>
+  <option value="additive">إضافات</option>
+</select>
       </div>
       <div class="grow">
         <label class="muted">نموذج تركيبة</label>
@@ -663,6 +672,42 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   applyDCCRules();
 
   updateModeUI();
+ const feedTypeFilter = document.getElementById('feedTypeFilter');
+
+function classifyFeed(f){
+  const n = (f.name || '').toLowerCase();
+
+  if(n.includes('ذرة') || n.includes('قمح') || n.includes('شعير')) return 'grain';
+  if(n.includes('كسب') || n.includes('جلوتين')) return 'protein';
+  if(n.includes('سيلاج') || n.includes('برسيم') || n.includes('دريس')) return 'silage';
+  if(n.includes('قش') || n.includes('تبن')) return 'rough';
+  if(n.includes('مولاس') || n.includes('فيناس') || n.includes('بيرة') || n.includes('لب')) return 'byproduct';
+  if(n.includes('فيتامين') || n.includes('ماغنسيوم') || n.includes('بيكربونات') || n.includes('ملح') || n.includes('يوريا') || n.includes('دهون')) return 'additive';
+
+  return 'other';
+}
+
+function filterFeeds(){
+  const q = (feedSearch.value || '').toLowerCase();
+  const type = feedTypeFilter.value;
+
+  const filtered = FEEDS.filter(f=>{
+    const matchName = f.name.toLowerCase().includes(q);
+    const matchType = (type==='all') || (classifyFeed(f)===type);
+    return matchName && matchType;
+  });
+
+  presetSel.innerHTML = '<option value="">— اختر —</option>';
+  filtered.forEach(f=>{
+    const o = document.createElement('option');
+    o.value = f.id;
+    o.textContent = f.name;
+    presetSel.appendChild(o);
+  });
+}
+
+feedSearch.addEventListener('input', filterFeeds);
+feedTypeFilter.addEventListener('change', filterFeeds); 
 </script>
 
 <!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
