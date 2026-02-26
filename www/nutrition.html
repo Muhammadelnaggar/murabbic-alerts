@@ -96,6 +96,18 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 .btn-ghost{background:transparent;border:1px solid rgba(0,0,0,.12)}
 #advancedKPIs{margin-top:10px}
 
+
+    /* ===== Animal / Group compact strip (2 rows, mobile-first) ===== */
+    .animal-strip{padding:8px 10px;margin:6px 8px 10px;background:#fff;border:1px solid #eef2f7;border-radius:12px}
+    .animal-strip.top-strip{margin-top:10px}
+    .strip-row{display:flex;gap:8px}
+    .strip-row + .strip-row{margin-top:8px}
+    .strip-item{flex:1;min-width:0;text-align:center}
+    .strip-item .lbl{display:block;font-size:11px;line-height:1.1;color:#6b7280;font-weight:600}
+    .strip-item .val{display:block;margin-top:3px;font-size:14px;line-height:1.2;font-weight:800;color:#0b7f47;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (max-width:420px){
+      .strip-item .val{font-size:13px}
+    }
 </style>
 </head>
 <body>
@@ -109,20 +121,29 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   <img src="/logo.png" class="mbk-logo" alt="Murabbik">
 </header>
 
-  <div class="info">
-    <span class="pill"><span class="k">🐄 الحيوان / المجموعة</span><b id="animalInfo">—</b></span>
-    <span class="pill"><span class="k">📅 التاريخ</span><b id="dateInfo">—</b></span>
+  <div class="animal-strip top-strip">
+  <div class="strip-row">
+    <div class="strip-item"><span class="lbl">الحيوان / المجموعة</span><span class="val" id="animalInfo">—</span></div>
+    <div class="strip-item"><span class="lbl">التاريخ</span><span class="val" id="dateInfo">—</span></div>
   </div>
-  <div class="info" id="ctxList">
-    <span class="pill"><span class="k">🕒 أيام الحليب (DIM)</span><b id="ctxDIM_txt">—</b></span>
-    <span class="pill"><span class="k">🐃 النوع</span><b id="ctxSpecies_txt">—</b></span>
-    <span class="pill"><span class="k">🥛 متوسط اللبن/رأس</span><b id="ctxAvgMilk_txt">—</b></span>
-    <span class="pill"><span class="k">🧭 أيام الحمل (DCC)</span><b id="ctxDCC_txt">—</b></span>
-    <span class="pill"><span class="k">🍼 متبقي للولادة</span><b id="dtcVal">—</b></span>
-    <span class="pill"><span class="k">🤰 حالة الحمل</span><b id="ctxPreg_txt">—</b></span>
-    <span class="pill">🟡 جاف مبكّر: <b id="ctxEarlyDry_txt">—</b></span>
-    <span class="pill">🟠 تحضير ولادة: <b id="ctxCloseUp_txt">—</b></span>
-<!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
+</div>
+  <div class="animal-strip" id="ctxList">
+  <div class="strip-row">
+    <div class="strip-item"><span class="lbl">أيام الحليب (DIM)</span><span class="val" id="ctxDIM_txt">—</span></div>
+    <div class="strip-item"><span class="lbl">النوع</span><span class="val" id="ctxSpecies_txt">—</span></div>
+    <div class="strip-item"><span class="lbl">متوسط اللبن/رأس</span><span class="val" id="ctxAvgMilk_txt">—</span></div>
+    <div class="strip-item"><span class="lbl">أيام الحمل (DCC)</span><span class="val" id="ctxDCC_txt">—</span></div>
+  </div>
+
+  <div class="strip-row">
+    <div class="strip-item"><span class="lbl">متبقي للولادة</span><span class="val" id="dtcVal">—</span></div>
+    <div class="strip-item"><span class="lbl">حالة الحمل</span><span class="val" id="ctxPreg_txt">—</span></div>
+    <div class="strip-item"><span class="lbl">جاف مبكّر</span><span class="val" id="ctxEarlyDry_txt">—</span></div>
+    <div class="strip-item"><span class="lbl">تحضير ولادة</span><span class="val" id="ctxCloseUp_txt">—</span></div>
+  </div>
+
+  <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
+
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
     <input id="ctxAvgMilk" type="number" inputmode="decimal" step="0.1" style="display:none">
