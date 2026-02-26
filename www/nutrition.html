@@ -68,7 +68,35 @@
       td::before{content:attr(data-label);font-weight:bold;color:#2e7d32;flex:0 0 48%}
       td > input, td > select{width:48%}
     }
-  </style>
+  
+/* ===== Murabbik Nutrition Mobile polish (Simple/Effective/Creative) ===== */
+.info{display:grid;gap:8px;margin:10px auto;max-width:860px;padding:0 12px}
+.info .pill{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;line-height:1.1}
+.info .pill b{font-size:15px}
+.info .pill .k{font-size:12px;opacity:.75}
+#ctxList{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:720px){#ctxList{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* Hide template + search buttons (keep DOM for safety) */
+#tpl, #applyTpl, #addBySearch{display:none !important}
+/* Make controls row wrap nicely on mobile */
+.row.controls{flex-wrap:wrap;gap:10px}
+.row.controls .grow{min-width:160px}
+/* Hide per-item DM-kg and cost columns (we compute totals in analysis cards) */
+th[data-col="dm"], th[data-col="dmkg"], td[data-col="dm"], td[data-col="dmkg"],
+th[data-col="cost"], td[data-col="cost"]{display:none !important}
+/* Analysis cards bottom */
+#analysisSection{max-width:860px;margin:14px auto 22px;padding:0 12px}
+.mbk-card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;box-shadow:0 10px 22px rgba(16,24,40,.06);padding:14px 14px 12px;margin-top:14px}
+.mbk-card h3{margin:0 0 10px;font-size:15px}
+.kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kpi{background:#f8fafc;border:1px solid rgba(0,0,0,.05);border-radius:14px;padding:10px}
+.kpi .k{font-size:12px;opacity:.75}
+.kpi .v{font-weight:800;font-size:15px;margin-top:2px}
+.kpi-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-ghost{background:transparent;border:1px solid rgba(0,0,0,.12)}
+#advancedKPIs{margin-top:10px}
+
+</style>
 </head>
 <body>
 <div class="mbk-form">
@@ -82,16 +110,16 @@
 </header>
 
   <div class="info">
-    <span class="pill">🐄 الحيوان/المجموعة: <b id="animalInfo">—</b></span>
-    <span class="pill">📅 التاريخ: <b id="dateInfo">—</b></span>
+    <span class="pill"><span class="k">🐄 الحيوان / المجموعة</span><b id="animalInfo">—</b></span>
+    <span class="pill"><span class="k">📅 التاريخ</span><b id="dateInfo">—</b></span>
   </div>
   <div class="info" id="ctxList">
-    <span class="pill">🕒 أيام الحليب: <b id="ctxDIM_txt">—</b></span>
-    <span class="pill">🐃 النوع: <b id="ctxSpecies_txt">—</b></span>
-    <span class="pill">🥛 متوسط إنتاج/رأس: <b id="ctxAvgMilk_txt">—</b></span>
-    <span class="pill">🧭 أيام الحمل (DCC): <b id="ctxDCC_txt">—</b></span>
-    <span class="pill">🍼 متبقي للولادة (يوم): <b id="dtcVal">—</b></span>
-    <span class="pill">🤰 حالة الحمل: <b id="ctxPreg_txt">—</b></span>
+    <span class="pill"><span class="k">🕒 أيام الحليب (DIM)</span><b id="ctxDIM_txt">—</b></span>
+    <span class="pill"><span class="k">🐃 النوع</span><b id="ctxSpecies_txt">—</b></span>
+    <span class="pill"><span class="k">🥛 متوسط اللبن/رأس</span><b id="ctxAvgMilk_txt">—</b></span>
+    <span class="pill"><span class="k">🧭 أيام الحمل (DCC)</span><b id="ctxDCC_txt">—</b></span>
+    <span class="pill"><span class="k">🍼 متبقي للولادة</span><b id="dtcVal">—</b></span>
+    <span class="pill"><span class="k">🤰 حالة الحمل</span><b id="ctxPreg_txt">—</b></span>
     <span class="pill">🟡 جاف مبكّر: <b id="ctxEarlyDry_txt">—</b></span>
     <span class="pill">🟠 تحضير ولادة: <b id="ctxCloseUp_txt">—</b></span>
 <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
@@ -107,7 +135,7 @@
   <div class="warning" id="warn"></div>
 
   <div class="mbk-card">
-    <div class="row stack">
+    <div class="row stack controls">
       <div class="grow">
         <label class="muted">طريقة الإدخال</label>
         <select id="mode" style="width:100%">
@@ -203,16 +231,20 @@
       <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
         <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
       </form>
-      <!-- ===== Nutrition Analysis ===== -->
-<div style="margin-top:20px;padding:16px;border-radius:12px;background:#f8fafc">
-  <h3>📊 التحليل الغذائي للعليقة</h3>
-  <div id="nutritionKPIs"></div>
-</div>
+      <!-- ===== Analysis (Bottom) ===== -->
+<div id="analysisSection">
+  <div class="mbk-card" id="nutritionAnalysisCard">
+    <h3>📊 التحليل الغذائي للعليقة</h3>
+    <div id="nutritionKPIs" class="kpi-grid"></div>
+    <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
+    <div id="advancedKPIs" style="display:none" class="kpi-grid"></div>
+  </div>
 
-<!-- ===== Economic Analysis ===== -->
-<div style="margin-top:16px;padding:16px;border-radius:12px;background:#f1f5f9">
-  <h3>💰 التحليل الاقتصادي</h3>
-  <div id="economicKPIs"></div>
+  <div class="mbk-card" id="economicAnalysisCard">
+    <h3>💰 التحليل الاقتصادي</h3>
+    <div id="economicKPIs" class="kpi-grid"></div>
+  </div>
+</div>
 </div>
     </div>
     <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
@@ -730,5 +762,94 @@ feedTypeFilter.addEventListener('change', filterFeeds);
 <script type="module" src="/js/track-core.js"></script>
 <script type="module" src="/js/track-nutrition.js"></script>
 <script type="module" src="/js/nutrition.js"></script>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const fmt = (v, suf="")=>{
+    if(v==null) return "—";
+    const s=String(v).trim();
+    if(!s || s==="—") return "—";
+    return s + suf;
+  };
+  const num = (id)=>{
+    const el=$(id);
+    if(!el) return null;
+    const t=String(el.textContent||"").replace(/[^\d.\-]/g,"");
+    const n=parseFloat(t);
+    return isFinite(n)?n:null;
+  };
+
+  function showIfHasData(){
+    const tot = num("totDM") || 0;
+    const sec = $("analysisSection");
+    if(!sec) return;
+    sec.style.display = tot>0 ? "block" : "none";
+  }
+
+  function render(){
+    // ===== غذائي =====
+    const n = $("nutritionKPIs");
+    if(n){
+      const items = [
+        ["DMI / إجمالي DM", fmt($("totDM")?.textContent, " كجم/رأس/يوم")],
+        ["مجموع النِّسب", fmt($("sumPct")?.textContent, "")],
+        ["خشن DM", fmt($("roughDM")?.textContent, " كجم")],
+        ["مركز DM", fmt($("concKgDM")?.textContent, " كجم")],
+        ["%DM للمركز", fmt($("concDMpct")?.textContent, "")],
+        ["F:C", fmt($("fcRatio")?.textContent, "")],
+      ];
+      n.innerHTML = items.map(([k,v])=>(
+        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+      )).join("");
+    }
+
+    // ===== اقتصادي =====
+    const e = $("economicKPIs");
+    if(e){
+      const items = [
+        ["إجمالي تكلفة العليقة", fmt($("totCost")?.textContent, "")],
+        ["خشن — تكلفة/رأس", fmt($("roughCost")?.textContent, "")],
+        ["مركز — تكلفة/رأس", fmt($("concCost")?.textContent, "")],
+        ["سعر طن TMR (DM)", fmt($("mixPriceDM")?.textContent, "")],
+        ["سعر طن مركز (DM)", fmt($("concPriceDM")?.textContent, "")],
+        ["إجمالي as-fed", fmt($("totalAsFed")?.textContent, " كجم")],
+      ];
+      e.innerHTML = items.map(([k,v])=>(
+        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+      )).join("");
+    }
+
+    showIfHasData();
+  }
+
+  // Toggle advanced
+  document.addEventListener("click",(ev)=>{
+    const btn = ev.target && ev.target.id==="toggleAdvancedBtn" ? ev.target : null;
+    if(!btn) return;
+    const adv = $("advancedKPIs");
+    if(!adv) return;
+    adv.style.display = (adv.style.display==="none"||!adv.style.display) ? "grid" : "none";
+    if(adv.innerHTML.trim()) return;
+    // fill once
+    const items = [
+      ["NEL", fmt($("nelTotal")?.textContent, "")],
+      ["MP", fmt($("mpTotal")?.textContent, "")],
+      ["CP%", fmt($("cpPct")?.textContent, "")],
+      ["NDF%", fmt($("ndfPct")?.textContent, "")],
+      ["Fat%", fmt($("fatPct")?.textContent, "")],
+      ["Starch%", fmt($("starchPct")?.textContent, "")],
+    ];
+    adv.innerHTML = items.map(([k,v])=>(
+      '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+    )).join("");
+  });
+
+  // Re-render periodically (live)
+  setInterval(render, 600);
+  render();
+})();
+</script>
+
 </body>
 </html>
