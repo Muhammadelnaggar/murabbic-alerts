@@ -298,11 +298,15 @@
       const name = String(d.nameAr || '').trim();
       if(!name) return;
       const dm = Number(d.dmPct);
-      list.push({
-        id: docSnap.id,
-        name,
-        dm: Number.isFinite(dm) ? dm : null
-      });
+     list.push({
+  id: docSnap.id,
+  name,
+  dm: Number(d.dmPct ?? null),
+  cp: Number(d.cpPct ?? null),
+  nel: Number(d.nelMcalPerKgDM ?? null),
+  ndf: Number(d.ndfPct ?? null),
+  mp: Number(d.mpGPerKgDM ?? null),   // 🔥 جديد
+});
     });
 
     // ترتيب عربي
