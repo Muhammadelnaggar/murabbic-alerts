@@ -336,11 +336,58 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   ctxAvgMilk.value  = qp.get('avgMilk') || '';
   ctxDCC.value      = qp.get('dcc') || '';
   ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
+  // ===== تحميل نوع الحيوان تلقائياً من animals =====
+async function loadSpeciesFromAnimals(){
+  try{
+    if(!animalId) return;
+
+    const { db, auth } = await import('/js/firebase-config.js');
+    const { collection, query, where, getDocs } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+    const uid = auth?.currentUser?.uid;
+
+    // جرّب animalNumber رقم
+    let snap = await getDocs(query(
+      collection(db,'animals'),
+      where('animalNumber','==', Number(animalId))
+    ));
+
+    // لو فاضي جرّب كنص
+    if(snap.empty){
+      snap = await getDocs(query(
+        collection(db,'animals'),
+        where('animalNumber','==', animalId)
+      ));
+    }
+
+    if(snap.empty) return;
+
+    let data = snap.docs[0].data();
+
+    let typeAr =
+      data.animalTypeAr ||
+      (data.animaltype==='buffalo' ? 'جاموسة' :
+       data.animaltype==='cow' ? 'بقرة' : '');
+
+    if(!typeAr) return;
+
+    // للعرض في الشريط
+    document.getElementById('ctxSpecies_txt').textContent = typeAr;
+
+    // للقيمة الداخلية (لازم تكون بقر أو جاموس للحسابات)
+    ctxSpecies.value =
+      typeAr.includes('جاموس') ? 'جاموس' : 'بقر';
+
+  }catch(e){
+    console.warn(e);
+  }
+}
   if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
   if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
 
   // ===== مكتبة خامات مصر من Firestore (لا علاقة ببقر/جاموس) =====
-  const { db } = await import('/js/firebase-config.js');
+ const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
  const { collection, query, where, getDocs, doc, getDoc } = fs;
 
@@ -673,6 +720,7 @@ FEEDS = list2;;
   ensureEditableForMode();
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
+  loadSpeciesFromAnimals();
   loadFeedLibrary().catch(err=>{
     console.error(err);
     warn.textContent = '⚠️ تعذر تحميل مكتبة الخامات من السحابة.';
