@@ -402,42 +402,34 @@ function escapeHtml(s){
   return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-function updateFeedSummary(){
+function renderRationSummary(){
   if(!feedSummaryBox) return;
-  const mode = modeSel.value;
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const items = [];
 
-  for(const tr of rows){
-    const name = tr.querySelector('.name')?.value?.trim();
-    if(!name) continue;
-
-    const kg = parseFloat(tr.querySelector('.kg')?.value)||0;
-    const pct= parseFloat(tr.querySelector('.pct')?.value)||0;
-    const kgDMtxt = tr.querySelector('.kgDM')?.textContent || '—';
-
-    let left = '';
-    if(mode==='tmr_percent' || (mode==='split' && (tr.querySelector('.cat')?.value||'')!=='rough')){
-      left = (pct? (nf(pct)+'%') : '—') + ' as-fed';
-    } else {
-      left = (kg? (nf(kg)+' كجم') : '—') + ' as-fed';
-    }
-
-    items.push({name, left, kgDMtxt});
-  }
-
-  if(items.length===0){
+  if(rationItems.length===0){
     feedSummaryBox.innerHTML = '<div style="opacity:.75">لم يتم إدخال خامات بعد.</div>';
     return;
   }
 
-  feedSummaryBox.innerHTML = items.map(it=>(
-    '<div class="feed-item"><span class="a">'+escapeHtml(it.name)+'</span><span class="b">'+escapeHtml(it.left)+' | DM '+escapeHtml(it.kgDMtxt)+'</span></div>'
-  )).join('');
+  feedSummaryBox.innerHTML = rationItems.map((it, i)=>{
+    const left = it.pct ? (nf(it.pct)+'%') : (nf(it.kg)+' كجم');
+    return `
+      <div class="feed-item">
+        <span class="a">${escapeHtml(it.name)}</span>
+        <span class="b">${escapeHtml(left)}</span>
+        <button type="button" class="mini-btn" onclick="window.__rmRation(${i})">إزالة</button>
+      </div>
+    `;
+  }).join('');
 }
+
+window.__rmRation = (i)=>{
+  rationItems.splice(i,1);
+  renderRationSummary();
+};
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
   const tbody = document.querySelector('#tbl tbody');
+  let rationItems = [];
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
 
@@ -714,6 +706,31 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
       else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
     }, 0);
   }
+ function fillCurrentRowWithFeed(feedName, cat){
+  let tr = tbody.querySelector('tr');         // السطر الوحيد
+  if(!tr){
+    addEmptyRow();
+    tr = tbody.querySelector('tr');
+  }
+
+  // اكتب اسم الخامة
+  const nameEl = tr.querySelector('.name');
+  if(nameEl) nameEl.value = feedName || '';
+
+  // اكتب النوع
+  const catEl = tr.querySelector('.cat');
+  if(catEl) catEl.value = cat || 'conc';
+
+  // فضّي الكمية/النسبة عشان المستخدم يدخل
+  const kgEl = tr.querySelector('.kg');
+  const pctEl = tr.querySelector('.pct');
+  if(kgEl) kgEl.value = '';
+  if(pctEl) pctEl.value = '';
+
+  // خلّي السطر جاهز للإدخال
+  setRowState(tr);
+  focusEditable(tr);
+}
  function ensureEditableForMode(){
   const tr = tbody.querySelector('tr');
   if(!tr) return;   // 🔥 مهم جدًا
@@ -827,7 +844,7 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
     });
     if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
     warn.textContent = w;
- updateFeedSummary();   
+ updaterenderRationSummary( 
   }
   function hookRow(tr){
     const nameEl = tr.querySelector('.name');
@@ -881,10 +898,37 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
   });
 
 document.getElementById('addPreset')?.addEventListener('click', ()=>{
-  // إضافة سطر خامة جديد للإدخال اليدوي
-  addEmptyRow();
-  showFeedUI();
-  recalc();
+  const tr = tbody.querySelector('tr');
+  if(!tr) return;
+
+  const name = tr.querySelector('.name')?.value?.trim();
+  const cat  = tr.querySelector('.cat')?.value || 'conc';
+  const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
+  const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
+  const pct  = parseFloat(tr.querySelector('.pct')?.value)||0;
+
+  if(!name){
+    alert('اختر خامة أولاً');
+    return;
+  }
+
+  // لو Split أو Percent لازم نسبة، لو TMR Kg لازم كجم
+  const mode = modeSel.value;
+  const needPct = (mode==='tmr_percent' || (mode==='split' && cat!=='rough'));
+  if(needPct && !pct){ alert('ادخل نسبة as-fed'); return; }
+  if(!needPct && !kg){ alert('ادخل كجم as-fed'); return; }
+
+  // أضف/حدّث الخامة في القائمة
+  const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
+  const item = {name, cat, dm, kg, pct};
+  if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
+
+  // نظّف سطر الإدخال لخامة جديدة
+  tr.querySelector('.name').value='';
+  tr.querySelector('.kg').value='';
+  tr.querySelector('.pct').value='';
+
+  renderRationSummary();
 });
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
    if(confirm('مسح كل الصفوف؟')){
@@ -972,7 +1016,6 @@ function filterFeeds(){
 feedTypeFilter.addEventListener('change', filterFeeds); 
 // ✅ عند اختيار خامة: افتح نموذج الإدخال فورًا
 presetSel.addEventListener('change', ()=>{
-  // 1) لازم يختار نوع خامة أولاً
   const selectedType = (feedTypeFilter.value || '').trim();
   if(!selectedType || selectedType === 'all'){
     alert("اختر نوع الخامه أولاً (مركزات/خشن/إضافات)");
@@ -980,24 +1023,18 @@ presetSel.addEventListener('change', ()=>{
     return;
   }
 
-  // 2) اسم الخامة
   const id = (presetSel.value || '').trim();
   if(!id) return;
 
   const f = FEEDS_BY_ID.get(id);
   if(!f) return;
 
-  // 3) إضافة سطر بالخامة + تمرير النوع تلقائيًا
-  addRow({
-    name: f.name,          // ✅ اسم الخامة
-    dm: (f.dm ?? ''),
-    cat: selectedType      // ✅ نوعها من الفلتر
-  });
+  // ✅ بدل addRow: املأ السطر الحالي فقط
+  fillCurrentRowWithFeed(f.name, selectedType);
 
   showFeedUI();
   recalc();
 
-  // يرجّع القائمة فاضية لاختيار خامة أخرى
   presetSel.value = '';
 });
 </script>
