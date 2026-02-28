@@ -193,29 +193,24 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   font-size:13px;
 }
 
+
 .feed-item{
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:10px;
-  padding:8px 0;
+  padding:6px 0;
   border-bottom:1px solid #e0ebd3;
 }
 .feed-item:last-child{border-bottom:none}
-.feed-item .a{font-weight:800;color:#0b7f47}
-.feed-item .b{opacity:.9} 
- /* ===== Ration list (checkbox row) ===== */
-.feed-item{
-  align-items: center;           /* مهم */
-}
-
 .feed-item label{
   display:flex;
   align-items:center;
   gap:8px;
   flex:1;
-  min-width:0;                  /* علشان ellipsis يشتغل */
+  min-width:0;
+  margin:0;
 }
-
 .rationPick{
   width:18px;
   height:18px;
@@ -223,19 +218,20 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   accent-color:#0ea05a;
   flex:0 0 auto;
 }
-
 .feed-item .a{
+  font-weight:800;
+  color:#0b7f47;
   flex:1;
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  text-align:right;
+}
+.feed-item .b{
+  opacity:.9;
+  white-space:nowrap;
 }
 
-.feed-item .b{
-  white-space:nowrap;
-}   
 </style>
 </head>
 <body>
@@ -320,12 +316,12 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
     </div>
   </div>
   
- <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
+  <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
 
-<div id="rationActions" class="mini-actions" style="display:none">
-  <button id="rationEdit" class="mini-btn" type="button">تعديل</button>
-  <button id="rationRemove" class="mini-btn" type="button">إزالة</button>
-</div>
+  <div id="rationActions" class="mini-actions" style="display:none;justify-content:flex-end;margin-top:8px">
+    <button id="rationEdit" class="mini-btn" type="button" disabled>تعديل</button>
+    <button id="rationRemove" class="mini-btn" type="button" disabled>إزالة</button>
+  </div>
 
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
@@ -339,12 +335,12 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
     </div>
 
    <div class="table-wrap" id="feedInputBox" style="display:none">
-      <table id="tbl">
       <div class="mini-actions" id="miniActions" style="display:none">
   <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
   <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
 </div>  
-        <thead>
+        <table id="tbl">
+      <thead>
           <tr>
             <th data-col="name">الخامة</th>
             <th data-col="cat">الفئة</th>
@@ -355,8 +351,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
             <th data-col="kg">كجم as-fed/رأس</th>
             <th data-col="kgDM">كجم DM/رأس</th>
             <th data-col="cost">تكلفة/رأس/يوم</th>
-            <th data-col="rm">حذف</th>
-          </tr>
+</tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -428,17 +423,6 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   const presetSel = document.getElementById('preset');
   const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
-const miniActions = document.getElementById('miniActions');
-
-function showFeedUI(){
-  if(feedInputBox) feedInputBox.style.display = 'block';
-  if(feedSummaryBox) feedSummaryBox.style.display = 'block';
-  if(miniActions) miniActions.style.display = 'flex';
-}
-
-function escapeHtml(s){
-  return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
 
 const rationActions = document.getElementById('rationActions');
 const btnRationEdit = document.getElementById('rationEdit');
@@ -449,15 +433,9 @@ let selectedRation = new Set(); // indices
 function updateRationActionsUI(){
   const any = selectedRation.size > 0;
   if(rationActions) rationActions.style.display = any ? 'flex' : 'none';
-
-  // زر "تعديل" فقط لو اختيار واحد
   if(btnRationEdit) btnRationEdit.disabled = (selectedRation.size !== 1);
   if(btnRationRemove) btnRationRemove.disabled = !any;
-
-  if(btnRationEdit) btnRationEdit.style.opacity = btnRationEdit.disabled ? 0.6 : 1;
-  if(btnRationRemove) btnRationRemove.style.opacity = btnRationRemove.disabled ? 0.6 : 1;
 }
-
 function renderRationSummary(){
   if(!feedSummaryBox) return;
 
@@ -471,80 +449,82 @@ function renderRationSummary(){
   feedSummaryBox.innerHTML = rationItems.map((it, i)=>{
     const left = it.pct ? (nf(it.pct)+'%') : (nf(it.kg)+' كجم');
     const checked = selectedRation.has(i) ? 'checked' : '';
-   return `
-  <div class="feed-item" data-idx="${i}">
-    <label>
-      <input class="rationPick" type="checkbox" data-idx="${i}" ${checked}>
-      <span class="a">${escapeHtml(it.name)}</span>
-    </label>
-    <span class="b">${escapeHtml(left)}</span>
-  </div>
-`;
+    return `
+      <div class="feed-item" data-idx="${i}">
+        <label>
+          <input class="rationPick" type="checkbox" data-idx="${i}" ${checked}>
+          <span class="a">${escapeHtml(it.name)}</span>
+        </label>
+        <span class="b">${escapeHtml(left)}</span>
+      </div>
+    `;
   }).join('');
 
   updateRationActionsUI();
 }
 
-// التبديل بالـ checkbox
+
+// اختيار خامات التركيبة (Checkbox)
 feedSummaryBox?.addEventListener('change', (e)=>{
   const cb = e.target?.closest?.('.rationPick');
   if(!cb) return;
   const i = Number(cb.dataset.idx);
   if(!Number.isFinite(i)) return;
-
   if(cb.checked) selectedRation.add(i);
   else selectedRation.delete(i);
-
   updateRationActionsUI();
 });
 
 // إزالة المختار
 btnRationRemove?.addEventListener('click', ()=>{
   if(!selectedRation.size) return;
-
-  // احذف من الأكبر للأصغر عشان الـ indices
   const arr = Array.from(selectedRation).sort((a,b)=>b-a);
   arr.forEach(i=>{
     if(i>=0 && i<rationItems.length) rationItems.splice(i,1);
   });
-
   selectedRation.clear();
   renderRationSummary();
   recalc();
 });
 
-// تعديل المختار (اختيار واحد فقط)
+// تعديل المختار (خامة واحدة فقط)
 btnRationEdit?.addEventListener('click', ()=>{
   if(selectedRation.size !== 1) return;
-
   const i = Array.from(selectedRation)[0];
   const it = rationItems[i];
   if(!it) return;
 
-  // املأ السطر الحالي بالخامة/الفئة
   fillCurrentRowWithFeed(it.name, it.cat);
 
-  // اكتب DM + الكمية/النسبة داخل نفس السطر
   const tr = tbody.querySelector('tr');
   if(tr){
     const dmEl = tr.querySelector('.dm');
     const kgEl = tr.querySelector('.kg');
     const pctEl = tr.querySelector('.pct');
     if(dmEl && it.dm!=null && it.dm!==0) dmEl.value = it.dm;
-
-    // حسب نوع الإدخال الحالي
     if(kgEl) kgEl.value = it.kg ? it.kg : '';
     if(pctEl) pctEl.value = it.pct ? it.pct : '';
-
     setRowState(tr);
     focusEditable(tr);
   }
 
-  // فضّي الاختيار بعد فتح التعديل
   selectedRation.clear();
   renderRationSummary();
   recalc();
 });
+
+
+const miniActions = document.getElementById('miniActions');
+
+function showFeedUI(){
+  if(feedInputBox) feedInputBox.style.display = 'block';
+  if(feedSummaryBox) feedSummaryBox.style.display = 'block';
+  if(miniActions) miniActions.style.display = 'flex';
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
 
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
@@ -784,8 +764,7 @@ FEEDS = list2;;
     tr.appendChild(td('كجم as-fed/رأس', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
     tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
     tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
-tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة هذه الخامة من التركيبة فقط" aria-label="إزالة خامة من التركيبة" type="button">إزالة</button>`, 'rm'));
-    tbody.appendChild(tr);
+tbody.appendChild(tr);
     hookRow(tr);
   }
 
@@ -974,7 +953,8 @@ function hookRow(tr){
   const pctEl  = tr.querySelector('.pct');
   const catEl  = tr.querySelector('.cat');
 
-  tr.querySelector('.rm').onclick = ()=>{
+  const rmBtn = tr.querySelector('.rm');
+  if(rmBtn) rmBtn.onclick = ()=>{
     tr.remove();
     recalc();
   };
