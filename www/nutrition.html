@@ -81,6 +81,13 @@
 /* Make controls row wrap nicely on mobile */
 .row.controls{flex-wrap:wrap;gap:10px}
 .row.controls .grow{min-width:160px}
+ .controls-box{
+  background:#fff;
+  border:1px solid rgba(0,0,0,.06);
+  border-radius:18px;
+  padding:12px;
+}
+.controls-box .controls{margin:0}   
 /* Hide per-item DM-kg and cost columns (we compute totals in analysis cards) */
 th[data-col="dm"], th[data-col="dmkg"], td[data-col="dm"], td[data-col="dmkg"],
 th[data-col="cost"], td[data-col="cost"]{display:none !important}
@@ -169,48 +176,43 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   </div>
 
   <div class="warning" id="warn"></div>
-
-  <div class="mbk-card">
+<div class="mbk-card">
+  <div class="controls-box">
     <div class="row stack controls">
+
+      <!-- 1) طريقة الإدخال -->
       <div class="grow">
-        <label class="muted">طريقة الإدخال</label>
         <select id="mode" style="width:100%">
-          <option value="tmr_asfed" selected>خلطة كاملة TMR — as-fed/رأس</option>
+          <option value="" selected disabled>اختر طريقة الإدخال</option>
+          <option value="tmr_asfed">خلطة كاملة TMR — as-fed/رأس</option>
           <option value="tmr_percent">خلطة كاملة TMR — نسب as-fed للطن</option>
           <option value="split">مركزات وخشن — منفصل</option>
         </select>
       </div>
-      <div class="grow">
-        <label class="muted">إضافة خامة جاهزة</label>
-        <select id="preset" style="width:100%">
-          <option value="">— اختر —</option>
-        </select>
-      </div>
-      <div class="grow">
-        <label class="muted">بحث سريع</label>
-        <input id="feedSearch" list="feedlist" placeholder="اكتب للبحث عن خامة" style="width:100%">
-        <select id="feedTypeFilter" style="width:100%;margin-top:6px">
-  <option value="all">كل الخامات</option>
-  <option value="grain">حبوب</option>
-  <option value="protein">بروتين</option>
-  <option value="rough">أعلاف خشنة</option>
-  <option value="silage">سيلاج وأخضر</option>
-  <option value="byproduct">مخلفات مصانع</option>
-  <option value="additive">إضافات</option>
-</select>
-      </div>
-      <div class="grow">
-        <label class="muted">نموذج تركيبة</label>
-        <select id="tpl" style="width:100%">
-          <option value="">— اختر نموذج —</option>
-        </select>
-      </div>
-      <button id="applyTpl" class="btn">تحميل النموذج</button>
-      <button id="addPreset" class="btn">إضافة</button>
-      <button id="addBySearch" class="btn">إضافة بالبحث</button>
-      <button id="clearAll" class="btn">مسح</button>
-    </div>
 
+      <!-- 2) نوع الخامه (قبل اختر خامة) -->
+      <div class="grow">
+        <select id="feedTypeFilter" style="width:100%">
+          <option value="" selected disabled>اختر نوع الخامه</option>
+          <option value="conc">مركزات</option>
+          <option value="rough">خشن</option>
+          <option value="add">إضافات</option>
+          <option value="all">كل الخامات</option>
+        </select>
+      </div>
+
+      <!-- 3) اختر خامة -->
+      <div class="grow">
+        <select id="preset" style="width:100%">
+          <option value="" selected disabled>اختر خامة</option>
+        </select>
+      </div>
+
+      <button id="addPreset" class="btn">إضافة</button>
+      <button id="clearAll" class="btn">مسح</button>
+
+    </div>
+  </div>
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
         <label class="muted">كمية المركز as-fed كجم/رأس/يوم</label>
@@ -307,12 +309,8 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   const ctxPreg = document.getElementById('ctxPreg');
 
   const presetSel = document.getElementById('preset');
-  const addPresetBtn = document.getElementById('addPreset');
   const clearBtn = document.getElementById('clearAll');
-  const feedSearch = document.getElementById('feedSearch');
   const addBySearchBtn = document.getElementById('addBySearch');
-  const tplSel = document.getElementById('tpl');
-  const applyTplBtn = document.getElementById('applyTpl');
   const tbody = document.querySelector('#tbl tbody');
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
@@ -801,30 +799,28 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   updateModeUI();
  const feedTypeFilter = document.getElementById('feedTypeFilter');
 
-function classifyFeed(f){
+function classifyFeed3(f){
   const n = (f.name || '').toLowerCase();
 
-  if(n.includes('ذرة') || n.includes('قمح') || n.includes('شعير')) return 'grain';
-  if(n.includes('كسب') || n.includes('جلوتين')) return 'protein';
-  if(n.includes('سيلاج') || n.includes('برسيم') || n.includes('دريس')) return 'silage';
-  if(n.includes('قش') || n.includes('تبن')) return 'rough';
-  if(n.includes('مولاس') || n.includes('فيناس') || n.includes('بيرة') || n.includes('لب')) return 'byproduct';
-  if(n.includes('فيتامين') || n.includes('ماغنسيوم') || n.includes('بيكربونات') || n.includes('ملح') || n.includes('يوريا') || n.includes('دهون')) return 'additive';
+  // إضافات
+  if(n.includes('فيتامين') || n.includes('ماغنسيوم') || n.includes('بيكربونات') || n.includes('ملح') || n.includes('يوريا') || n.includes('دهون')) return 'add';
 
-  return 'other';
+  // خشن
+  if(n.includes('سيلاج') || n.includes('برسيم') || n.includes('دريس') || n.includes('قش') || n.includes('تبن')) return 'rough';
+
+  // الباقي مركزات (حبوب/بروتين/مخلفات…)
+  return 'conc';
 }
 
 function filterFeeds(){
-  const q = (feedSearch.value || '').toLowerCase();
-  const type = feedTypeFilter.value;
+  const type = feedTypeFilter.value || 'all';
 
   const filtered = FEEDS.filter(f=>{
-    const matchName = f.name.toLowerCase().includes(q);
-    const matchType = (type==='all') || (classifyFeed(f)===type);
-    return matchName && matchType;
+    if(type === 'all') return true;
+    return classifyFeed3(f) === type;
   });
 
-  presetSel.innerHTML = '<option value="">— اختر —</option>';
+  presetSel.innerHTML = '<option value="" selected disabled>اختر خامة</option>';
   filtered.forEach(f=>{
     const o = document.createElement('option');
     o.value = f.id;
@@ -832,8 +828,7 @@ function filterFeeds(){
     presetSel.appendChild(o);
   });
 }
-
-feedSearch.addEventListener('input', filterFeeds);
+  
 feedTypeFilter.addEventListener('change', filterFeeds); 
 </script>
 
