@@ -79,13 +79,13 @@
 /* Hide template + search buttons (keep DOM for safety) */
 #tpl, #applyTpl, #addBySearch{display:none !important}
 /* Make controls row wrap nicely on mobile */
-.row.controls{flex-wrap:wrap;gap:10px}
+.row.controls{flex-wrap:wrap;gap:6px}
 .row.controls .grow{min-width:160px}
  .controls-box{
   background:#fff;
   border:1px solid rgba(0,0,0,.06);
-  border-radius:18px;
-  padding:12px;
+  border-radius:16px;
+  padding:8px;   /* كان 12 */
 }
 .controls-box .controls{margin:0}   
 /* Hide per-item DM-kg and cost columns (we compute totals in analysis cards) */
@@ -93,7 +93,13 @@ th[data-col="dm"], th[data-col="dmkg"], td[data-col="dm"], td[data-col="dmkg"],
 th[data-col="cost"], td[data-col="cost"]{display:none !important}
 /* Analysis cards bottom */
 #analysisSection{max-width:860px;margin:14px auto 22px;padding:0 12px}
-.mbk-card{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;box-shadow:0 10px 22px rgba(16,24,40,.06);padding:14px 14px 12px;margin-top:14px}
+.mbk-card{
+  background:#fff;
+  border:1px solid rgba(0,0,0,.06);
+  border-radius:16px;
+  padding:10px;      /* كان 14 */
+  margin:8px 0;      /* كان 14 */
+}
 .mbk-card h3{margin:0 0 10px;font-size:15px}
 .kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .kpi{background:#f8fafc;border:1px solid rgba(0,0,0,.05);border-radius:14px;padding:10px}
@@ -130,6 +136,10 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
     @media (max-width:420px){
       .strip-item .val{font-size:13px}
     }
+ .controls-box select{
+  height:38px;
+  padding:4px 10px;
+}   
 </style>
 </head>
 <body>
