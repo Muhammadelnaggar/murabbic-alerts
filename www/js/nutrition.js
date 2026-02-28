@@ -86,7 +86,22 @@ function setHiddenCtxFromQuery(){
   setChk('ctxEarlyDry', p.get('earlyDry'));
   setChk('ctxCloseUp', p.get('closeUp'));
 }
+function normalizeSpecies(raw){
+  const s = String(raw || '').trim();
+  if(!s) return '';
+  const low = s.toLowerCase();
 
+  if (s.includes('جاموس') || low.includes('buffalo')) return 'جاموس';
+  if (s.includes('بقر') || s.includes('بقرة') || s.includes('أبقار') || low.includes('cow')) return 'بقر';
+
+  return '';
+}
+
+function displaySpeciesLabel(v){
+  if (v === 'بقر') return 'بقرة';
+  if (v === 'جاموس') return 'جاموس';
+  return v || '—';
+}
 function updateCtxView(){
   const species = document.getElementById('ctxSpecies')?.value || '';
   const dim = document.getElementById('ctxDIM')?.value || '';
@@ -96,7 +111,7 @@ function updateCtxView(){
   const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
   const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
 
-  setElText('ctxSpecies_txt', species || '—');
+  setElText('ctxSpecies_txt', displaySpeciesLabel(species));
   setElText('ctxDIM_txt', dim || '—');
   setElText('ctxAvgMilk_txt', avgMilk ? Number(avgMilk).toFixed(1) : '—');
   setElText('ctxDCC_txt', dcc || '—');
@@ -255,10 +270,12 @@ async function loadCtxFromAnimal(numberStr, eventDate){
 
   const dim = Number.isFinite(Number(animal?.daysInMilk)) ? Number(animal.daysInMilk) : null;
 
-  const species =
-    (animal?.animalTypeAr) ||
-    (animal?.animaltype === 'buffalo' ? 'جاموس' : (animal?.animaltype === 'cow' ? 'بقر' : '')) ||
-    '';
+  const speciesRaw =
+  (animal?.animalTypeAr) ||
+  (animal?.animaltype === 'buffalo' ? 'جاموس' : (animal?.animaltype === 'cow' ? 'بقر' : '')) ||
+  '';
+
+const species = normalizeSpecies(speciesRaw);
 
   const preg = (animal?.reproductiveStatus || animal?.lastDiagnosis || animal?.pregStatus || '') || '';
 
@@ -285,7 +302,7 @@ async function loadCtxFromAnimal(numberStr, eventDate){
   const avgMilk = (avgRes?.avg!=null) ? Number(avgRes.avg) : null;
 
   // اكتب القيم في الحقول المخفية
-  if(species) document.getElementById('ctxSpecies').value = species;
+ if (species) document.getElementById('ctxSpecies').value = species;
   if(dim!=null) document.getElementById('ctxDIM').value = Math.round(dim);
   document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
   if(dcc!=null) document.getElementById('ctxDCC').value = Math.round(dcc);
@@ -317,13 +334,12 @@ async function loadCtxFromGroup(numbers, eventDate){
   const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
   const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
 
-  const first = docs[0] || {};
- let species = animal?.animalTypeAr || '';
-
-if(!species){
-  if(animal?.animaltype === 'buffalo') species = 'جاموسة';
-  if(animal?.animaltype === 'cow') species = 'بقرة';
-}
+const first = docs[0] || {};
+const species = normalizeSpecies(
+  first?.animalTypeAr ||
+  (first?.animaltype === 'buffalo' ? 'جاموس' : (first?.animaltype === 'cow' ? 'بقر' : '')) ||
+  ''
+);
 
   const milks = [];
   for(const d of docs){
