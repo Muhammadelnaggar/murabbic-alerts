@@ -844,7 +844,7 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
     });
     if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
     warn.textContent = w;
- updaterenderRationSummary( 
+try{ renderRationSummary(); }catch(e){}
   }
 function hookRow(tr){
   const nameEl = tr.querySelector('.name');
