@@ -288,10 +288,6 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   
   <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
 
-  <div class="mini-actions" id="miniActions" style="display:none">
-    <button id="addPreset" class="mini-btn" type="button">إضافة</button>
-    <button id="clearAll" class="mini-btn" type="button">مسح</button>
-  </div>
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
         <label class="muted">كمية المركز as-fed كجم/رأس/يوم</label>
@@ -305,6 +301,10 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 
    <div class="table-wrap" id="feedInputBox" style="display:none">
       <table id="tbl">
+      <div class="mini-actions" id="miniActions" style="display:none">
+  <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
+  <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
+</div>  
         <thead>
           <tr>
             <th data-col="name">الخامة</th>
@@ -671,7 +671,7 @@ FEEDS = list2;;
     tr.appendChild(td('كجم as-fed/رأس', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
     tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
     tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
-    tr.appendChild(td('حذف', `<button class="rm mini-btn" aria-label="حذف السطر" type="button">حذف</button>`, 'rm'));
+tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة هذه الخامة من التركيبة فقط" aria-label="إزالة خامة من التركيبة" type="button">إزالة</button>`, 'rm'));
     tbody.appendChild(tr);
     hookRow(tr);
   }
@@ -877,25 +877,11 @@ FEEDS = list2;;
   });
 
 document.getElementById('addPreset')?.addEventListener('click', ()=>{
-  const id = (presetSel.value || '').trim();
-  if(!id) return;
-
-  const f = FEEDS_BY_ID.get(id);
-  if(!f) return;
-
-  // 🔥 ناخد الفئة المختارة من قائمة النوع
-  const selectedType = (feedTypeFilter.value || '').trim();
-
-  addRow({
-    name: f.name,
-    dm: (f.dm ?? ''),
-    cat: selectedType || 'conc'   // لو مفيش اختيار نخليه مركز افتراضي
-  });
-
+  // إضافة سطر خامة جديد للإدخال اليدوي
+  addEmptyRow();
   showFeedUI();
   recalc();
 });
-
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
     if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); }
   });
