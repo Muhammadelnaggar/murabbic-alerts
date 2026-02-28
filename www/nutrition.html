@@ -824,26 +824,6 @@ FEEDS = list2;;
     warn.textContent = w;
  updateFeedSummary();   
   }
-  function updateFeedSummary(){
-  const box = document.getElementById('feedSummaryBox');
-  box.innerHTML = '';
-  
-  tbody.querySelectorAll('tr').forEach(tr=>{
-    const name = tr.querySelector('.name')?.value;
-    const kg = tr.querySelector('.kg')?.value;
-    const kgDM = tr.querySelector('.kgDM')?.textContent;
-
-    if(name && kg){
-      const div = document.createElement('div');
-      div.className='feed-item';
-      div.innerHTML = `
-        <span>${name}</span>
-        <span>${kg} كجم | DM ${kgDM}</span>
-      `;
-      box.appendChild(div);
-    }
-  });
-}
   function hookRow(tr){
     const nameEl = tr.querySelector('.name');
     const dmEl   = tr.querySelector('.dm');
