@@ -202,7 +202,40 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 }
 .feed-item:last-child{border-bottom:none}
 .feed-item .a{font-weight:800;color:#0b7f47}
-.feed-item .b{opacity:.9}    
+.feed-item .b{opacity:.9} 
+ /* ===== Ration list (checkbox row) ===== */
+.feed-item{
+  align-items: center;           /* مهم */
+}
+
+.feed-item label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:1;
+  min-width:0;                  /* علشان ellipsis يشتغل */
+}
+
+.rationPick{
+  width:18px;
+  height:18px;
+  margin:0;
+  accent-color:#0ea05a;
+  flex:0 0 auto;
+}
+
+.feed-item .a{
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-align:right;
+}
+
+.feed-item .b{
+  white-space:nowrap;
+}   
 </style>
 </head>
 <body>
@@ -438,15 +471,15 @@ function renderRationSummary(){
   feedSummaryBox.innerHTML = rationItems.map((it, i)=>{
     const left = it.pct ? (nf(it.pct)+'%') : (nf(it.kg)+' كجم');
     const checked = selectedRation.has(i) ? 'checked' : '';
-    return `
-      <div class="feed-item" data-idx="${i}">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0">
-          <input class="rationPick" type="checkbox" data-idx="${i}" ${checked} style="transform:scale(1.2);margin:0">
-          <span class="a" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
-        </label>
-        <span class="b">${escapeHtml(left)}</span>
-      </div>
-    `;
+   return `
+  <div class="feed-item" data-idx="${i}">
+    <label>
+      <input class="rationPick" type="checkbox" data-idx="${i}" ${checked}>
+      <span class="a">${escapeHtml(it.name)}</span>
+    </label>
+    <span class="b">${escapeHtml(left)}</span>
+  </div>
+`;
   }).join('');
 
   updateRationActionsUI();
