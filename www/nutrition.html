@@ -715,7 +715,6 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
   }
   function ensureEditableForMode(){
     let tr = tbody.querySelector('tr');
-    if (!tr){ addEmptyRow(); tr = tbody.querySelector('tr'); }
     if (modeSel.value==='split' && tr){
       const catEl = tr.querySelector('.cat');
       if (catEl && catEl.value!=='rough' && isRowEmpty(tr)) catEl.value='rough';
@@ -849,7 +848,6 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
   }
 
   // init
-  addEmptyRow();
   ensureEditableForMode();
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
@@ -883,7 +881,14 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   recalc();
 });
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
-    if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); }
+   if(confirm('مسح كل الصفوف؟')){
+  tbody.innerHTML='';
+  recalc();
+  document.getElementById('feedInputBox').style.display='none';
+  document.getElementById('feedSummaryBox').style.display='none';
+  document.getElementById('miniActions').style.display='none';
+}
+  
   });
 
   function updateModeUI(){
