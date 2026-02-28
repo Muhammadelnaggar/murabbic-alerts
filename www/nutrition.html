@@ -140,6 +140,68 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   height:38px;
   padding:4px 10px;
 }   
+  .mini-actions{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+.mini-btn{
+  background:#fff;
+  color:var(--green);
+  border:1px solid var(--green);
+  border-radius:8px;
+  padding:6px 10px;
+  font-size:13px;
+  font-weight:600;
+}  
+/* ===== Nutrition UX tweaks (Murabbik) ===== */
+#feedInputBox{
+  background: rgba(14,160,90,.10);
+  border: 1px solid rgba(14,160,90,.25);
+  border-radius: 16px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.mini-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:flex-start;
+  margin-top:10px;
+}
+
+.mini-btn{
+  background:#fff;
+  color:var(--green);
+  border:1px solid var(--green);
+  border-radius:10px;
+  padding:8px 12px;
+  font-size:13px;
+  font-weight:800;
+  min-height:40px;
+}
+
+.feed-summary{
+  margin-top:10px;
+  background:#f3fbf5;
+  border:1px dashed rgba(14,160,90,.35);
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:13px;
+}
+
+.feed-item{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid #e0ebd3;
+}
+.feed-item:last-child{border-bottom:none}
+.feed-item .a{font-weight:800;color:#0b7f47}
+.feed-item .b{opacity:.9}    
 </style>
 </head>
 <body>
@@ -218,10 +280,17 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
         </select>
       </div>
 
-      <button id="addPreset" class="btn">إضافة</button>
-      <button id="clearAll" class="btn">مسح</button>
+     <div class="mini-actions">
+</div>
 
     </div>
+  </div>
+  
+  <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
+
+  <div class="mini-actions" id="miniActions" style="display:none">
+    <button id="addPreset" class="mini-btn" type="button">إضافة</button>
+    <button id="clearAll" class="mini-btn" type="button">مسح</button>
   </div>
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
@@ -234,7 +303,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
       </div>
     </div>
 
-    <div class="table-wrap">
+   <div class="table-wrap" id="feedInputBox" style="display:none">
       <table id="tbl">
         <thead>
           <tr>
@@ -318,6 +387,53 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   const ctxCloseUp = document.getElementById('ctxCloseUp');
   const ctxPreg = document.getElementById('ctxPreg');
   const presetSel = document.getElementById('preset');
+  const feedInputBox = document.getElementById('feedInputBox');
+const feedSummaryBox = document.getElementById('feedSummaryBox');
+const miniActions = document.getElementById('miniActions');
+
+function showFeedUI(){
+  if(feedInputBox) feedInputBox.style.display = 'block';
+  if(feedSummaryBox) feedSummaryBox.style.display = 'block';
+  if(miniActions) miniActions.style.display = 'flex';
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function updateFeedSummary(){
+  if(!feedSummaryBox) return;
+  const mode = modeSel.value;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const items = [];
+
+  for(const tr of rows){
+    const name = tr.querySelector('.name')?.value?.trim();
+    if(!name) continue;
+
+    const kg = parseFloat(tr.querySelector('.kg')?.value)||0;
+    const pct= parseFloat(tr.querySelector('.pct')?.value)||0;
+    const kgDMtxt = tr.querySelector('.kgDM')?.textContent || '—';
+
+    let left = '';
+    if(mode==='tmr_percent' || (mode==='split' && (tr.querySelector('.cat')?.value||'')!=='rough')){
+      left = (pct? (nf(pct)+'%') : '—') + ' as-fed';
+    } else {
+      left = (kg? (nf(kg)+' كجم') : '—') + ' as-fed';
+    }
+
+    items.push({name, left, kgDMtxt});
+  }
+
+  if(items.length===0){
+    feedSummaryBox.innerHTML = '<div style="opacity:.75">لم يتم إدخال خامات بعد.</div>';
+    return;
+  }
+
+  feedSummaryBox.innerHTML = items.map(it=>(
+    '<div class="feed-item"><span class="a">'+escapeHtml(it.name)+'</span><span class="b">'+escapeHtml(it.left)+' | DM '+escapeHtml(it.kgDMtxt)+'</span></div>'
+  )).join('');
+}
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
   const tbody = document.querySelector('#tbl tbody');
@@ -539,7 +655,11 @@ FEEDS = list2;;
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
 
   function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
-
+if(!feedTypeFilter.value){
+  alert("اختر نوع الخامه أولاً");
+  presetSel.value = '';
+  return;
+}
   function addRow(feed={}){
     const tr = document.createElement('tr');
     const catVal = feed?.cat || guessCat(feed?.name);
@@ -552,7 +672,7 @@ FEEDS = list2;;
     tr.appendChild(td('كجم as-fed/رأس', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
     tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
     tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
-    tr.appendChild(td('حذف', `<button class="rm btn" aria-label="حذف السطر">×</button>`, 'rm'));
+    tr.appendChild(td('حذف', `<button class="rm mini-btn" aria-label="حذف السطر" type="button">حذف</button>`, 'rm'));
     tbody.appendChild(tr);
     hookRow(tr);
   }
@@ -703,8 +823,28 @@ FEEDS = list2;;
     });
     if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
     warn.textContent = w;
+ updateFeedSummary();   
   }
+  function updateFeedSummary(){
+  const box = document.getElementById('feedSummaryBox');
+  box.innerHTML = '';
+  
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const name = tr.querySelector('.name')?.value;
+    const kg = tr.querySelector('.kg')?.value;
+    const kgDM = tr.querySelector('.kgDM')?.textContent;
 
+    if(name && kg){
+      const div = document.createElement('div');
+      div.className='feed-item';
+      div.innerHTML = `
+        <span>${name}</span>
+        <span>${kg} كجم | DM ${kgDM}</span>
+      `;
+      box.appendChild(div);
+    }
+  });
+}
   function hookRow(tr){
     const nameEl = tr.querySelector('.name');
     const dmEl   = tr.querySelector('.dm');
@@ -760,12 +900,22 @@ FEEDS = list2;;
 document.getElementById('addPreset')?.addEventListener('click', ()=>{
   const id = (presetSel.value || '').trim();
   if(!id) return;
+
   const f = FEEDS_BY_ID.get(id);
   if(!f) return;
-  addRow({ name: f.name, dm: (f.dm ?? ''), cat: guessCat(f.name) });
+
+  // 🔥 ناخد الفئة المختارة من قائمة النوع
+  const selectedType = (feedTypeFilter.value || '').trim();
+
+  addRow({
+    name: f.name,
+    dm: (f.dm ?? ''),
+    cat: selectedType || 'conc'   // لو مفيش اختيار نخليه مركز افتراضي
+  });
+
+  showFeedUI();
   recalc();
 });
-
 
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
     if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); }
@@ -842,8 +992,36 @@ function filterFeeds(){
     presetSel.appendChild(o);
   });
 }
-  
+ // إظهار نموذج الإدخال عند اختيار خامة
+presetSel.addEventListener('change', ()=>{
+  const box = document.getElementById('feedInputBox');
+  if(presetSel.value){
+    box.style.display = 'block';
+  }
+}); 
 feedTypeFilter.addEventListener('change', filterFeeds); 
+// ✅ عند اختيار خامة: افتح نموذج الإدخال فورًا
+presetSel.addEventListener('change', ()=>{
+  const id = (presetSel.value || '').trim();
+  if(!id) return;
+
+  const f = FEEDS_BY_ID.get(id);
+  if(!f) return;
+
+  const selectedType = (feedTypeFilter.value || '').trim();
+
+  addRow({
+    name: f.name,
+    dm: (f.dm ?? ''),
+    cat: selectedType || 'conc'
+  });
+
+  showFeedUI();
+  recalc();
+
+  // نرجع القائمة فاضية عشان يقدر يختار تاني
+  presetSel.value = '';
+});
 </script>
 
 <!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
