@@ -307,10 +307,9 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   const ctxEarlyDry = document.getElementById('ctxEarlyDry');
   const ctxCloseUp = document.getElementById('ctxCloseUp');
   const ctxPreg = document.getElementById('ctxPreg');
-
   const presetSel = document.getElementById('preset');
   const clearBtn = document.getElementById('clearAll');
-  const addBySearchBtn = document.getElementById('addBySearch');
+  const tplSel = document.getElementById('tpl');
   const tbody = document.querySelector('#tbl tbody');
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
@@ -517,7 +516,14 @@ FEEDS = list2;;
       { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:4 },
     ]},
   ];
-  TEMPLATES.forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.name; tplSel.appendChild(o); });
+ if (tplSel) {
+  TEMPLATES.forEach(t=>{
+    const o=document.createElement('option');
+    o.value=t.key; 
+    o.textContent=t.name; 
+    tplSel.appendChild(o);
+  });
+}
 
   const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
@@ -719,7 +725,11 @@ FEEDS = list2;;
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
   loadSpeciesFromAnimals();
-  loadFeedLibrary().catch(err=>{
+ loadFeedLibrary()
+  .then(()=>{ 
+    try{ filterFeeds(); }catch(e){} 
+  })
+  .catch(err=>{
     console.error(err);
     warn.textContent = '⚠️ تعذر تحميل مكتبة الخامات من السحابة.';
   });
@@ -746,12 +756,6 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   recalc();
 });
 
-  document.getElementById('addBySearch')?.addEventListener('click', ()=>{
-    const q = (feedSearch?.value || '').trim(); if(!q) return;
-    const f = FEEDS.find(x=> x.name === q) || FEEDS.find(x=> x.name.includes(q)) || FEEDS.find(x=> x.name.toLowerCase().includes(q.toLowerCase()));
-    if (f){ addRow({ name:f.name, dm:f.dm, cat: guessCat(f.name) }); recalc(); feedSearch.value=''; }
-  });
-  feedSearch?.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); const btn=document.getElementById('addBySearch'); btn?.click(); } });
 
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
     if(confirm('مسح كل الصفوف؟')){ tbody.innerHTML=''; addEmptyRow(); recalc(); }
