@@ -1,3 +1,4 @@
+
 <!-- nutrition.html (نسخة ثابتة: تصميم + حسابات كما هي، وتتبع منضبط، وحفظ خارجي) -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -713,14 +714,19 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
       else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
     }, 0);
   }
-  function ensureEditableForMode(){
-    let tr = tbody.querySelector('tr');
-    if (modeSel.value==='split' && tr){
-      const catEl = tr.querySelector('.cat');
-      if (catEl && catEl.value!=='rough' && isRowEmpty(tr)) catEl.value='rough';
+ function ensureEditableForMode(){
+  const tr = tbody.querySelector('tr');
+  if(!tr) return;   // 🔥 مهم جدًا
+
+  if (modeSel.value==='split'){
+    const catEl = tr.querySelector('.cat');
+    if (catEl && catEl.value!=='rough' && isRowEmpty(tr)){
+      catEl.value='rough';
     }
-    focusEditable(tr);
   }
+
+  focusEditable(tr);
+}
 
   function recalc(){
     const mode = modeSel.value;
