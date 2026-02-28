@@ -655,16 +655,15 @@ FEEDS = list2;;
   function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
 
   function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
-if(!feedTypeFilter.value){
-  alert("اختر نوع الخامه أولاً");
-  presetSel.value = '';
-  return;
-}
   function addRow(feed={}){
     const tr = document.createElement('tr');
     const catVal = feed?.cat || guessCat(feed?.name);
     tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
-    tr.appendChild(td('الفئة', `<select class="cat"><option value="rough" ${catVal==='rough'?'selected':''}>خشن</option><option value="conc" ${catVal==='conc'?'selected':''}>مركز</option></select>`, 'cat'));
+    tr.appendChild(td('الفئة', `<select class="cat">
+  <option value="rough" ${catVal==='rough'?'selected':''}>خشن</option>
+  <option value="conc" ${catVal==='conc'?'selected':''}>مركز</option>
+  <option value="add" ${catVal==='add'?'selected':''}>إضافات</option>
+</select>`, 'cat'));
     tr.appendChild(td('% DM', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="%" style="width:100px">`, 'dm'));
     tr.appendChild(td('سعر الطن (as-fed)', `<input class="pTon" type="number" inputmode="decimal" step="0.01" value="${feed?.price||''}" placeholder="جنيه/طن" style="width:140px">`, 'pTon'));
     tr.appendChild(td('سعر/طن DM', `<span class="pTonDM">—</span>`, 'pTonDM'));
@@ -992,34 +991,36 @@ function filterFeeds(){
     presetSel.appendChild(o);
   });
 }
- // إظهار نموذج الإدخال عند اختيار خامة
-presetSel.addEventListener('change', ()=>{
-  const box = document.getElementById('feedInputBox');
-  if(presetSel.value){
-    box.style.display = 'block';
-  }
-}); 
+
 feedTypeFilter.addEventListener('change', filterFeeds); 
 // ✅ عند اختيار خامة: افتح نموذج الإدخال فورًا
 presetSel.addEventListener('change', ()=>{
+  // 1) لازم يختار نوع خامة أولاً
+  const selectedType = (feedTypeFilter.value || '').trim();
+  if(!selectedType || selectedType === 'all'){
+    alert("اختر نوع الخامه أولاً (مركزات/خشن/إضافات)");
+    presetSel.value = '';
+    return;
+  }
+
+  // 2) اسم الخامة
   const id = (presetSel.value || '').trim();
   if(!id) return;
 
   const f = FEEDS_BY_ID.get(id);
   if(!f) return;
 
-  const selectedType = (feedTypeFilter.value || '').trim();
-
+  // 3) إضافة سطر بالخامة + تمرير النوع تلقائيًا
   addRow({
-    name: f.name,
+    name: f.name,          // ✅ اسم الخامة
     dm: (f.dm ?? ''),
-    cat: selectedType || 'conc'
+    cat: selectedType      // ✅ نوعها من الفلتر
   });
 
   showFeedUI();
   recalc();
 
-  // نرجع القائمة فاضية عشان يقدر يختار تاني
+  // يرجّع القائمة فاضية لاختيار خامة أخرى
   presetSel.value = '';
 });
 </script>
