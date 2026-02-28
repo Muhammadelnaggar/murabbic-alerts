@@ -846,30 +846,42 @@ tr.appendChild(td('إزالة', `<button class="rm mini-btn" title="إزالة �
     warn.textContent = w;
  updaterenderRationSummary( 
   }
-  function hookRow(tr){
-    const nameEl = tr.querySelector('.name');
-    const dmEl   = tr.querySelector('.dm');
-    const pEl    = tr.querySelector('.pTon');
-    const kgEl   = tr.querySelector('.kg');
-    const pctEl  = tr.querySelector('.pct');
-    const catEl  = tr.querySelector('.cat');
-    tr.querySelector('.rm').onclick = ()=>{ tr.remove(); recalc(); };
+function hookRow(tr){
+  const nameEl = tr.querySelector('.name');
+  const dmEl   = tr.querySelector('.dm');
+  const pEl    = tr.querySelector('.pTon');
+  const kgEl   = tr.querySelector('.kg');
+  const pctEl  = tr.querySelector('.pct');
+  const catEl  = tr.querySelector('.cat');
 
-    nameEl.addEventListener('change', ()=>{
-      const f = FEEDS.find(x=>x.name===nameEl.value.trim());
-      if (f && !dmEl.value) dmEl.value = f.dm;
-      setRowState(tr); recalc(); ensureEditableForMode();
-    });
-    [dmEl,pEl,kgEl,pctEl,catEl].forEach(el=> el.addEventListener('input', ()=>{ setRowState(tr); recalc(); }));
+  tr.querySelector('.rm').onclick = ()=>{
+    tr.remove();
+    recalc();
+  };
+
+  nameEl.addEventListener('change', ()=>{
+    const f = FEEDS.find(x=>x.name===nameEl.value.trim());
+    if (f && !dmEl.value) dmEl.value = f.dm;
     setRowState(tr);
-  }
+    recalc();
+    ensureEditableForMode();
+  });
 
-  function addEmptyRow(){
-    const mode = modeSel.value;
-    const cat  = (mode==='split') ? 'rough' : 'conc';
-    addRow({ cat });
-  }
+  [dmEl,pEl,kgEl,pctEl,catEl].forEach(el=>{
+    el.addEventListener('input', ()=>{
+      setRowState(tr);
+      recalc();
+    });
+  });
 
+  setRowState(tr);
+}
+
+function addEmptyRow(){
+  const mode = modeSel.value;
+  const cat  = (mode==='split') ? 'rough' : 'conc';
+  addRow({ cat });
+}
   // init
   ensureEditableForMode();
   recalc();
