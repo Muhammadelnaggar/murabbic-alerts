@@ -287,7 +287,12 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
     </div>
   </div>
   
-  <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
+ <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
+
+<div id="rationActions" class="mini-actions" style="display:none">
+  <button id="rationEdit" class="mini-btn" type="button">تعديل</button>
+  <button id="rationRemove" class="mini-btn" type="button">إزالة</button>
+</div>
 
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
@@ -402,30 +407,112 @@ function escapeHtml(s){
   return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
+const rationActions = document.getElementById('rationActions');
+const btnRationEdit = document.getElementById('rationEdit');
+const btnRationRemove = document.getElementById('rationRemove');
+
+let selectedRation = new Set(); // indices
+
+function updateRationActionsUI(){
+  const any = selectedRation.size > 0;
+  if(rationActions) rationActions.style.display = any ? 'flex' : 'none';
+
+  // زر "تعديل" فقط لو اختيار واحد
+  if(btnRationEdit) btnRationEdit.disabled = (selectedRation.size !== 1);
+  if(btnRationRemove) btnRationRemove.disabled = !any;
+
+  if(btnRationEdit) btnRationEdit.style.opacity = btnRationEdit.disabled ? 0.6 : 1;
+  if(btnRationRemove) btnRationRemove.style.opacity = btnRationRemove.disabled ? 0.6 : 1;
+}
+
 function renderRationSummary(){
   if(!feedSummaryBox) return;
 
   if(rationItems.length===0){
     feedSummaryBox.innerHTML = '<div style="opacity:.75">لم يتم إدخال خامات بعد.</div>';
+    selectedRation.clear();
+    updateRationActionsUI();
     return;
   }
 
   feedSummaryBox.innerHTML = rationItems.map((it, i)=>{
     const left = it.pct ? (nf(it.pct)+'%') : (nf(it.kg)+' كجم');
+    const checked = selectedRation.has(i) ? 'checked' : '';
     return `
-      <div class="feed-item">
-        <span class="a">${escapeHtml(it.name)}</span>
+      <div class="feed-item" data-idx="${i}">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0">
+          <input class="rationPick" type="checkbox" data-idx="${i}" ${checked} style="transform:scale(1.2);margin:0">
+          <span class="a" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
+        </label>
         <span class="b">${escapeHtml(left)}</span>
-        <button type="button" class="mini-btn" onclick="window.__rmRation(${i})">إزالة</button>
       </div>
     `;
   }).join('');
+
+  updateRationActionsUI();
 }
 
-window.__rmRation = (i)=>{
-  rationItems.splice(i,1);
+// التبديل بالـ checkbox
+feedSummaryBox?.addEventListener('change', (e)=>{
+  const cb = e.target?.closest?.('.rationPick');
+  if(!cb) return;
+  const i = Number(cb.dataset.idx);
+  if(!Number.isFinite(i)) return;
+
+  if(cb.checked) selectedRation.add(i);
+  else selectedRation.delete(i);
+
+  updateRationActionsUI();
+});
+
+// إزالة المختار
+btnRationRemove?.addEventListener('click', ()=>{
+  if(!selectedRation.size) return;
+
+  // احذف من الأكبر للأصغر عشان الـ indices
+  const arr = Array.from(selectedRation).sort((a,b)=>b-a);
+  arr.forEach(i=>{
+    if(i>=0 && i<rationItems.length) rationItems.splice(i,1);
+  });
+
+  selectedRation.clear();
   renderRationSummary();
-};
+  recalc();
+});
+
+// تعديل المختار (اختيار واحد فقط)
+btnRationEdit?.addEventListener('click', ()=>{
+  if(selectedRation.size !== 1) return;
+
+  const i = Array.from(selectedRation)[0];
+  const it = rationItems[i];
+  if(!it) return;
+
+  // املأ السطر الحالي بالخامة/الفئة
+  fillCurrentRowWithFeed(it.name, it.cat);
+
+  // اكتب DM + الكمية/النسبة داخل نفس السطر
+  const tr = tbody.querySelector('tr');
+  if(tr){
+    const dmEl = tr.querySelector('.dm');
+    const kgEl = tr.querySelector('.kg');
+    const pctEl = tr.querySelector('.pct');
+    if(dmEl && it.dm!=null && it.dm!==0) dmEl.value = it.dm;
+
+    // حسب نوع الإدخال الحالي
+    if(kgEl) kgEl.value = it.kg ? it.kg : '';
+    if(pctEl) pctEl.value = it.pct ? it.pct : '';
+
+    setRowState(tr);
+    focusEditable(tr);
+  }
+
+  // فضّي الاختيار بعد فتح التعديل
+  selectedRation.clear();
+  renderRationSummary();
+  recalc();
+});
+
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
   const tbody = document.querySelector('#tbl tbody');
