@@ -275,7 +275,162 @@ padding: 6px 0;
     border-radius:12px;
   }
 }
+/* ===== Nutrition Input Modern Form ===== */
 
+#feedInputBox #tbl tbody tr{
+  display:block;
+  background:#ffffff;
+  border:1px solid #e4efe6;
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.04);
+}
+
+#feedInputBox #tbl tbody tr td{
+  display:flex !important;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  border:none !important;
+  padding:6px 0 !important;
+  background:transparent !important;
+}
+
+#feedInputBox #tbl tbody tr td::before{
+  content:attr(data-label);
+  font-weight:800;
+  font-size:13px;
+  color:#0b7f47;
+  margin-bottom:4px;
+}
+
+#feedInputBox input,
+#feedInputBox select{
+  width:100%;
+  height:42px;
+  border-radius:12px;
+  border:1px solid #d4e5d9;
+  padding:6px 10px;
+  font-weight:600;
+  background:#f9fdfb;
+}
+
+#feedInputBox input:focus,
+#feedInputBox select:focus{
+  border-color:#0ea05a;
+  outline:none;
+  background:#ffffff;
+  box-shadow:0 0 0 2px rgba(14,160,90,0.15);
+}
+    /* ===== Premium Layout (Design 2) — Modern split rows + visible labels ===== */
+
+/* حوّل سطر الإدخال لكارت منظم (على كل المقاسات) */
+#feedInputBox #tbl{
+  border:0;
+  background:transparent;
+}
+#feedInputBox #tbl thead{display:none;}
+#feedInputBox #tbl tbody{display:block;}
+#feedInputBox #tbl tbody tr{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:14px;
+  margin:10px 0;
+  border:1px solid rgba(14,160,90,.20);
+  border-radius:16px;
+  background:#ffffff;
+}
+
+/* كل "خلية" تبقى حقل بلابل فوقه */
+#feedInputBox #tbl tbody tr td{
+  display:flex !important;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:6px;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  min-height:auto !important;
+}
+
+/* رجّع العناوين (Override مهم لأن عندك كود قديم بيخفيها على الموبايل) */
+#feedInputBox #tbl tbody tr td::before{
+  content:attr(data-label) !important;
+  display:block;
+  font-weight:900;
+  font-size:13px;
+  color:#0b7f47;
+  opacity:.95;
+}
+
+/* شكل الحقول */
+#feedInputBox #tbl input,
+#feedInputBox #tbl select{
+  width:100%;
+  height:42px;
+  border-radius:12px;
+  border:1px solid #d7e7dd;
+  padding:8px 10px;
+  font-weight:700;
+  background:#f9fdfb;
+}
+#feedInputBox #tbl input:focus,
+#feedInputBox #tbl select:focus{
+  outline:none;
+  border-color:#0ea05a;
+  background:#fff;
+  box-shadow:0 0 0 2px rgba(14,160,90,.14);
+}
+
+/* ===== توزيع Premium (سطور واضحة) ===== */
+/* 100% */
+#feedInputBox #tbl td[data-col="name"]{flex:1 1 100%;}
+/* صف: الفئة + سعر الطن */
+#feedInputBox #tbl td[data-col="cat"]{flex:1 1 30%;}
+#feedInputBox #tbl td[data-col="pTon"]{flex:1 1 30%;}
+#feedInputBox #tbl td[data-col="pTonDM"]{flex:1 1 30%;}
+
+/* صف: DM + CP */
+#feedInputBox #tbl td[data-col="dm"]{flex:1 1 30%;}
+#feedInputBox #tbl td[data-col="cp"]{flex:1 1 30%;}
+
+/* صف: النسبة + الكجم (حسب المود هيتعطل واحد منهم تلقائياً من JS) */
+#feedInputBox #tbl td[data-col="pct"]{flex:1 1 30%;}
+#feedInputBox #tbl td[data-col="kg"]{flex:1 1 30%;}
+
+/* النتائج */
+#feedInputBox #tbl td[data-col="kgDM"]{flex:1 1 30%;}
+#feedInputBox #tbl td[data-col="cost"]{flex:1 1 30%;}
+
+/* تحسين عرض الـ spans (—) */
+#feedInputBox #tbl .pTonDM,
+#feedInputBox #tbl .kgDM,
+#feedInputBox #tbl .cost{
+  display:block;
+  height:42px;
+  border-radius:12px;
+  border:1px dashed rgba(14,160,90,.25);
+  background:rgba(14,160,90,.06);
+  padding:10px 10px;
+  font-weight:900;
+  color:#0b7f47;
+}
+
+/* موبايل: خليها صفين أجمل */
+@media (max-width:640px){
+  #feedInputBox #tbl td[data-col="cat"],
+  #feedInputBox #tbl td[data-col="pTon"]{flex:1 1 48%;}
+  #feedInputBox #tbl td[data-col="pTonDM"]{flex:1 1 100%;}
+  #feedInputBox #tbl td[data-col="dm"],
+  #feedInputBox #tbl td[data-col="cp"]{flex:1 1 48%;}
+  #feedInputBox #tbl td[data-col="pct"],
+  #feedInputBox #tbl td[data-col="kg"]{flex:1 1 48%;}
+  #feedInputBox #tbl td[data-col="kgDM"],
+  #feedInputBox #tbl td[data-col="cost"]{flex:1 1 48%;}
+}
 </style>
 </head>
 <body>
