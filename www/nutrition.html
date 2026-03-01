@@ -733,17 +733,21 @@ async function loadSpeciesFromAnimals(){
     const list = [];
     snap.forEach(docSnap=>{
       const d = docSnap.data() || {};
-      const name = String(d.nameAr || '').trim();
-      if(!name) return;
-     
-     list.push({
+     const name = String(d.nameAr || d.name || d.id || docSnap.id || '').trim();
+if(!name) return;
+
+const cat = String(d.cat || '').trim().toLowerCase();
+const normCat = (cat === 'conc' || cat === 'rough' || cat === 'add') ? cat : '';
+
+list.push({
   id: docSnap.id,
   name,
+  cat: normCat, // ✅ فئة حقيقية من Firestore
   dm: Number(d.dmPct ?? null),
   cp: Number(d.cpPct ?? null),
   nel: Number(d.nelMcalPerKgDM ?? null),
   ndf: Number(d.ndfPct ?? null),
-  mp: Number(d.mpGPerKgDM ?? null),   // 🔥 جديد
+  mp: Number(d.mpGPerKgDM ?? null),
 });
     });
 // ===== دمج تعديلات المستخدم (Overrides) فوق قيم NRC =====
@@ -1200,7 +1204,7 @@ function filterFeeds(){
 
   const filtered = FEEDS.filter(f=>{
     if(type === 'all') return true;
-    return classifyFeed3(f) === type;
+   return (f.cat || classifyFeed3(f)) === type;
   });
 
   presetSel.innerHTML = '<option value="" selected disabled>اختر خامة</option>';
