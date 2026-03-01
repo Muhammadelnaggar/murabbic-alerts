@@ -217,25 +217,24 @@ padding: 6px 0;
 #feedInputBox #tbl{ border:0; background:transparent; min-width:unset; }
 #feedInputBox #tbl thead{ display:none; }
 #feedInputBox #tbl tbody{ display:block; }
-
+#feedInputBox #tbl td[data-col="cost"]{ grid-area:cost; }
 #feedInputBox #tbl tbody tr{
   display:grid;
   grid-template-columns: 1fr 1fr;
-  gap:12px 10px;
-  padding:14px;
+  gap:10px8px;
+  padding:8px;
   margin:10px 0;
   border:1px solid rgba(14,160,90,.20);
   border-radius:16px;
   background:#fff;
 
-  grid-template-areas:
-    "name name"
-    "cat  cat"
-    "dm   cp"
-    "pTon pTon"
-    "pTonDM pTonDM"
-    "pct  kg"
-    "kgDM cost";
+ grid-template-areas:
+  "name name"
+  "cat  pTon"
+  "dm   cp"
+  "pTonDM pTonDM"
+ "pct  kg"
+"kgDM kgDM";
 }
 
 #feedInputBox #tbl td{
@@ -263,10 +262,9 @@ padding: 6px 0;
 #feedInputBox #tbl td[data-col="pct"]    { grid-area:pct; }
 #feedInputBox #tbl td[data-col="kg"]     { grid-area:kg; }
 #feedInputBox #tbl td[data-col="kgDM"]   { grid-area:kgDM; }
-#feedInputBox #tbl td[data-col="cost"]   { grid-area:cost; }
-
 #feedInputBox #tbl input,
 #feedInputBox #tbl select{
+#feedInputBox #tbl td[data-col="cost"]{display:none !important;}
   width:100%;
   height:42px;
   border-radius:12px;
@@ -290,7 +288,7 @@ padding: 6px 0;
   display:flex;
   align-items:center;
   justify-content:center;
-  height:42px;
+  height:40px;
   border-radius:12px;
   border:1px dashed rgba(14,160,90,.25);
   background:rgba(14,160,90,.06);
@@ -300,18 +298,15 @@ padding: 6px 0;
 
 @media (max-width:380px){
   #feedInputBox #tbl tbody tr{
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     grid-template-columns: 1fr;
     grid-template-areas:
-      "name"
-      "cat"
-      "dm"
-      "cp"
-      "pTon"
-      "pTonDM"
-      "pct"
-      "kg"
-      "kgDM"
-      "cost";
+ grid-template-areas:
+  "name name"
+  "cat  pTon"
+  "dm   cp"
+  "pTonDM pct"
+  "kg   kgDM";
   }
 }
 
