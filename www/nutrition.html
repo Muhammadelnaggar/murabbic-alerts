@@ -427,7 +427,8 @@ line-height:1.15;
           <tr>
             <th data-col="name">الخامة</th>
             <th data-col="cat">الفئة</th>
-            <th data-col="dm">% DM</th>
+            <th data-col="dm">المادة الجافة %</th>
+            <th data-col="cp">البروتين الخام %</th>
             <th data-col="pTon">سعر الطن (as-fed)</th>
             <th data-col="pTonDM">سعر/طن DM</th>
             <th data-col="pct">نسبة as-fed %</th>
@@ -589,6 +590,8 @@ btnRationEdit?.addEventListener('click', ()=>{
     const kgEl = tr.querySelector('.kg');
     const pctEl = tr.querySelector('.pct');
     if(dmEl && it.dm!=null && it.dm!==0) dmEl.value = it.dm;
+    const cpEl = tr.querySelector('.cp');
+    if(cpEl && it.cp!=null && it.cp!==0) cpEl.value = it.cp;
     if(kgEl) kgEl.value = it.kg ? it.kg : '';
     if(pctEl) pctEl.value = it.pct ? it.pct : '';
     setRowState(tr);
@@ -848,7 +851,8 @@ FEEDS = list2;;
   <option value="conc" ${catVal==='conc'?'selected':''}>مركز</option>
   <option value="add" ${catVal==='add'?'selected':''}>إضافات</option>
 </select>`, 'cat'));
-    tr.appendChild(td('% DM', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="%" style="width:100px">`, 'dm'));
+    tr.appendChild(td('% DM', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="المادة الجافة %" style="width:100px">`, 'dm'));
+    tr.appendChild(td('% CP', `<input class="cp" type="number" inputmode="decimal" step="0.1" value="${feed?.cp ?? ''}" placeholder="البروتين %" style="width:100px">`, 'cp'));
     tr.appendChild(td('سعر الطن (as-fed)', `<input class="pTon" type="number" inputmode="decimal" step="0.01" value="${feed?.price||''}" placeholder="جنيه/طن" style="width:140px">`, 'pTon'));
     tr.appendChild(td('سعر/طن DM', `<span class="pTonDM">—</span>`, 'pTonDM'));
     tr.appendChild(td('نسبة as-fed %', `<input class="pct" type="number" inputmode="decimal" step="0.01" value="${feed?.pct||''}" placeholder="%" style="width:100px">`, 'pct'));
@@ -1032,13 +1036,14 @@ tbody.appendChild(tr);
       const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
       return !dm && hasVal;
     });
-    if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+    if (!w && dmMissing) w = '⚠️ يمكنك تعديل المادة الجافة % والبروتين % لكل خامة إذا كان لديك تحليل معمل.';
     warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
   }
 function hookRow(tr){
   const nameEl = tr.querySelector('.name');
   const dmEl   = tr.querySelector('.dm');
+  const cpEl   = tr.querySelector('.cp');
   const pEl    = tr.querySelector('.pTon');
   const kgEl   = tr.querySelector('.kg');
   const pctEl  = tr.querySelector('.pct');
@@ -1053,12 +1058,13 @@ function hookRow(tr){
   nameEl.addEventListener('change', ()=>{
     const f = FEEDS.find(x=>x.name===nameEl.value.trim());
     if (f && !dmEl.value) dmEl.value = f.dm;
+    if (f && cpEl && !cpEl.value) cpEl.value = f.cp;
     setRowState(tr);
     recalc();
     ensureEditableForMode();
   });
 
-  [dmEl,pEl,kgEl,pctEl,catEl].forEach(el=>{
+ [dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
     el.addEventListener('input', ()=>{
       setRowState(tr);
       recalc();
@@ -1107,6 +1113,7 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   const name = tr.querySelector('.name')?.value?.trim();
   const cat  = tr.querySelector('.cat')?.value || 'conc';
   const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
+  const cp   = parseFloat(tr.querySelector('.cp')?.value)||0;
   const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
   const pct  = parseFloat(tr.querySelector('.pct')?.value)||0;
 
@@ -1123,7 +1130,7 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
 
   // أضف/حدّث الخامة في القائمة
   const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
-  const item = {name, cat, dm, kg, pct};
+  const item = {name, cat, dm, cp, kg, pct};
   if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
 
   // نظّف سطر الإدخال لخامة جديدة
