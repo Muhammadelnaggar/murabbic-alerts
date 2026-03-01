@@ -1132,6 +1132,10 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   tr.querySelector('.pct').value='';
 
   renderRationSummary();
+   // ✅ اسكرول لأعلى فورم الإدخال بعد إضافة الخامة
+  const box = document.getElementById('feedInputBox');
+  box?.scrollIntoView({ behavior:'smooth', block:'start' });
+  tr.querySelector('.name')?.focus();
 });
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
    if(confirm('مسح كل الصفوف؟')){
