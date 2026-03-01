@@ -257,6 +257,70 @@ line-height:1.15;
 .mbk-form > .animal-strip{ margin-bottom:0 !important; }
 .mbk-form > .mbk-card{ margin: 0 8px !important; }
 .mbk-form > .card{ margin: 0 8px !important; }
+    /* ===== Murabbik: Simple Feed Input Form ===== */
+#feedInputBox{
+  background:#ffffff;
+  border:1px solid rgba(14,160,90,.18);
+  border-radius:16px;
+  padding:10px 10px 12px;
+}
+
+#feedInputBox .form-actions{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+}
+
+#feedInputBox .white-btn{
+  background:#fff;
+  color:#0b2a16;
+  border:1px solid rgba(0,0,0,.18);
+  border-radius:12px;
+  padding:10px 14px;
+  font-weight:800;
+  min-height:40px;
+}
+
+/* جدول الإدخال: أقل ارتفاع + أوضح */
+#tbl{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0 6px;
+  margin-top:6px;
+}
+
+#tbl thead th{
+  font-size:12px;
+  opacity:.85;
+  padding:6px 6px;
+  white-space:nowrap;
+}
+
+#tbl td{
+  padding:6px 6px;
+  vertical-align:middle;
+}
+
+#tbl input, #tbl select{
+  min-height:34px;
+  padding:6px 8px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.15);
+  font-size:13px;
+  font-weight:700;
+  background:#fff;
+}
+
+/* تبسيط: إخفاء الأعمدة المحسوبة داخل جدول الإدخال */
+#tbl th[data-col="pTonDM"], #tbl td[data-col="pTonDM"],
+#tbl th[data-col="kgDM"],   #tbl td[data-col="kgDM"],
+#tbl th[data-col="cost"],   #tbl td[data-col="cost"]{
+  display:none !important;
+}
+
+/* قائمة عرض المدخلات: صفوف على قد الكلام */
+.feed-summary{ padding:2px 0 !important; }
+.feed-item{ padding:2px 0 !important; line-height:1.15 !important; }
 </style>
 </head>
 <body>
@@ -334,9 +398,6 @@ line-height:1.15;
           <option value="" selected disabled>اختر خامة</option>
         </select>
       </div>
-
-     <div class="mini-actions">
-</div>
 
     </div>
   </div>
