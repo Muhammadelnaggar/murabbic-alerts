@@ -235,6 +235,28 @@ line-height:1.15;
   min-height:44px;
 }
 .white-btn:active{ transform:scale(.99); }
+    /* ===== توحيد المسافات بين الكونتينرز (مثل مسافة الهيدر → أول كونتينر) ===== */
+:root{ --sec-gap: 10px; }  /* لو عايزها أكبر/أصغر غيّر الرقم هنا فقط */
+
+.mbk-form > header ~ div{
+  margin-top: var(--sec-gap) !important;   /* نفس المسافة بعد الهيدر */
+  margin-bottom: 0 !important;             /* منع تكديس المسافات */
+}
+
+/* توحيد الهامش يمين/يسار لكل الكونتينرز */
+.mbk-form > .animal-strip,
+.mbk-form > .mbk-card,
+.mbk-form > .card,
+.mbk-form > #inlineMsg,
+.mbk-form > .warning{
+  margin-left: 8px !important;
+  margin-right: 8px !important;
+}
+
+/* إلغاء أي margins داخلية كانت بتكبر الفواصل */
+.mbk-form > .animal-strip{ margin-bottom:0 !important; }
+.mbk-form > .mbk-card{ margin: 0 8px !important; }
+.mbk-form > .card{ margin: 0 8px !important; }
 </style>
 </head>
 <body>
