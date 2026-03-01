@@ -217,7 +217,6 @@ padding: 6px 0;
 #feedInputBox #tbl{ border:0; background:transparent; min-width:unset; }
 #feedInputBox #tbl thead{ display:none; }
 #feedInputBox #tbl tbody{ display:block; }
-#feedInputBox #tbl td[data-col="cost"]{ grid-area:cost; }
 #feedInputBox #tbl tbody tr{
   display:grid;
   grid-template-columns: 1fr 1fr;
@@ -716,27 +715,38 @@ async function loadSpeciesFromAnimals(){
     FEEDS = [];
     FEEDS_BY_ID.clear();
 
-    // ✅ كل الخامات المفعّلة فقط
-    const snap = await getDocs(query(
-      collection(db, 'feed_items'),
-      where('enabled', '==', true)
-    ));
+   // ✅ حمّل كل الخامات (حتى لو enabled غير موجود) ثم فلترها داخل الكود
+const snap = await getDocs(collection(db, 'feed_items'));
 
     const list = [];
+    const pickNum = (obj, keys) => {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v === null || v === undefined || v === "") continue;
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return null;
+};
     snap.forEach(docSnap=>{
       const d = docSnap.data() || {};
+      // لو الخامة متعطلة صراحةً
+if (d.enabled === false) return;
       const name = String(d.nameAr || '').trim();
       if(!name) return;
      
-     list.push({
+    list.push({
   id: docSnap.id,
   name,
-  cat: String(d.cat || d.category || '').trim() || null,
-  dm: (d.dmPct==null || d.dmPct==='') ? null : Number(d.dmPct),
-  cp: (d.cpPct==null || d.cpPct==='') ? null : Number(d.cpPct),
-  nel: Number(d.nelMcalPerKgDM ?? null),
-  ndf: Number(d.ndfPct ?? null),
-  mp: Number(d.mpGPerKgDM ?? null),   // 🔥 جديد
+  cat: String(d.cat || d.category || d.type || '').trim() || null,
+
+  // ✅ DM% + CP% بأكثر من اسم محتمل (NRC أو عربي قديم أو جديد)
+  dm: pickNum(d, ['dmPct','dm','DM','dm_percent','dryMatterPct','dryMatter','dmP']),
+  cp: pickNum(d, ['cpPct','cp','CP','proteinPct','protein','crudeProteinPct','cp_percent','cpP']),
+
+  nel: pickNum(d, ['nelMcalPerKgDM','nel','NEL']),
+  ndf: pickNum(d, ['ndfPct','ndf','NDF']),
+  mp:  pickNum(d, ['mpGPerKgDM','mp','MP']),
 });
     });
 // ===== دمج تعديلات المستخدم (Overrides) فوق قيم NRC =====
