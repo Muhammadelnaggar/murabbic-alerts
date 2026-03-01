@@ -61,22 +61,15 @@
     .total .pill{background:#fff}
     @media (max-width: 640px){
       .row.stack > *{flex:1 1 100%}
-      table, thead, tbody, th, td, tr{display:block;min-width:unset}
-      thead{display:none}
-      tbody tr{margin:0 0 12px 0;border:1px solid #e0ebd3;border-radius:12px;background:#fff}
-      tbody tr > td{display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid #eef3e4;padding:10px 12px}
-      tbody tr > td:last-child{border-bottom:0}
-      td::before{content:attr(data-label);font-weight:bold;color:#2e7d32;flex:0 0 48%}
-      td > input, td > select{width:48%}
-    }
-  
-/* ===== Murabbik Nutrition Mobile polish (Simple/Effective/Creative) ===== */
+      /* ===== Murabbik Nutrition Mobile polish (Simple/Effective/Creative) ===== */
 .info{display:grid;gap:8px;margin:10px auto;max-width:860px;padding:0 12px}
 .info .pill{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;line-height:1.1}
 .info .pill b{font-size:15px}
 .info .pill .k{font-size:12px;opacity:.75}
 #ctxList{grid-template-columns:repeat(2,minmax(0,1fr))}
-@media (min-width:720px){#ctxList{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:720px){
+  #ctxList{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
 /* Hide template + search buttons (keep DOM for safety) */
 #tpl, #applyTpl, #addBySearch{display:none !important}
 /* Make controls row wrap nicely on mobile */
@@ -111,6 +104,9 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 #advancedKPIs{margin-top:10px}
 
 
+   }
+  
+
     /* ===== Animal / Group compact strip (2 rows, mobile-first) ===== */
     .animal-strip{padding:8px 10px;margin:6px 8px 10px;background:#fff;border:1px solid #eef2f7;border-radius:12px}
     .animal-strip.top-strip{margin-top:10px}
@@ -141,21 +137,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   height:38px;
   padding:4px 10px;
 }   
-  .mini-actions{
-  display:flex;
-  gap:6px;
-  align-items:center;
-}
-
-.mini-btn{
-  background:#fff;
-  color:var(--green);
-  border:1px solid var(--green);
-  border-radius:8px;
-  padding:6px 10px;
-  font-size:13px;
-  font-weight:600;
-}  
+ 
 /* ===== Nutrition UX tweaks (Murabbik) ===== */
 #feedInputBox{
   background: rgba(14,160,90,.10);
@@ -231,142 +213,58 @@ padding: 6px 0;
   opacity:.9;
   white-space:nowrap;
 }
-
-
-/* ===== تصميم 1 (مضغوط) لسطر إدخال الخامة على الموبايل ===== */
-@media (max-width: 640px){
-  /* لا نحول جدول الإدخال لكروت طويلة */
-  #feedInputBox #tbl thead{display:none;}
-  #feedInputBox #tbl{display:block; width:100%; border:0; background:transparent;}
-  #feedInputBox #tbl tbody{display:block;}
-  #feedInputBox #tbl tbody tr{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    padding:12px;
-    border:1px solid #d6eadf;
-    border-radius:14px;
-    background:#f6fff9;
-    box-shadow:none;
-  }
-  /* كل خلية تبقى "حقل" صغير بدون لابل قبلها */
-  #feedInputBox #tbl td{
-    display:flex !important;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    padding:0 !important;
-    border:0 !important;
-    background:transparent !important;
-    min-height:auto !important;
-  }
-  #feedInputBox #tbl td::before{content:none !important;}
-  /* التوزيع */
-  #feedInputBox #tbl td[data-col="name"]{flex:1 1 100%;}
-  #feedInputBox #tbl td[data-col="cat"]{flex:1 1 40%;}
-  #feedInputBox #tbl td[data-col="dm"]{flex:1 1 28%;}
-  #feedInputBox #tbl td[data-col="cp"]{flex:1 1 28%;}
-  #feedInputBox #tbl td[data-col="pTon"]{flex:1 1 48%;}
-  #feedInputBox #tbl td[data-col="pct"]{flex:1 1 48%;}
-  #feedInputBox #tbl td[data-col="kg"]{flex:1 1 48%;}
-  #feedInputBox #tbl input, 
-  #feedInputBox #tbl select{
-    height:38px;
-    border-radius:12px;
-  }
-}
-/* ===== Nutrition Input Modern Form ===== */
+/* ===== Feed Input (Premium Grid) — ONE clean version ===== */
+#feedInputBox #tbl{ border:0; background:transparent; min-width:unset; }
+#feedInputBox #tbl thead{ display:none; }
+#feedInputBox #tbl tbody{ display:block; }
 
 #feedInputBox #tbl tbody tr{
-  display:block;
-  background:#ffffff;
-  border:1px solid #e4efe6;
-  border-radius:18px;
-  padding:14px;
-  margin-bottom:14px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.04);
-}
-
-#feedInputBox #tbl tbody tr td{
-  display:flex !important;
-  flex-direction:column;
-  align-items:flex-start;
-  justify-content:center;
-  border:none !important;
-  padding:6px 0 !important;
-  background:transparent !important;
-}
-
-#feedInputBox #tbl tbody tr td::before{
-  content:attr(data-label);
-  font-weight:800;
-  font-size:13px;
-  color:#0b7f47;
-  margin-bottom:4px;
-}
-
-#feedInputBox input,
-#feedInputBox select{
-  width:100%;
-  height:42px;
-  border-radius:12px;
-  border:1px solid #d4e5d9;
-  padding:6px 10px;
-  font-weight:600;
-  background:#f9fdfb;
-}
-
-#feedInputBox input:focus,
-#feedInputBox select:focus{
-  border-color:#0ea05a;
-  outline:none;
-  background:#ffffff;
-  box-shadow:0 0 0 2px rgba(14,160,90,0.15);
-}
-    /* ===== Premium Layout (Design 2) — Modern split rows + visible labels ===== */
-
-/* حوّل سطر الإدخال لكارت منظم (على كل المقاسات) */
-#feedInputBox #tbl{
-  border:0;
-  background:transparent;
-}
-#feedInputBox #tbl thead{display:none;}
-#feedInputBox #tbl tbody{display:block;}
-#feedInputBox #tbl tbody tr{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:12px 10px;
   padding:14px;
   margin:10px 0;
   border:1px solid rgba(14,160,90,.20);
   border-radius:16px;
-  background:#ffffff;
+  background:#fff;
+
+  grid-template-areas:
+    "name name"
+    "cat  cat"
+    "dm   cp"
+    "pTon pTon"
+    "pTonDM pTonDM"
+    "pct  kg"
+    "kgDM cost";
 }
 
-/* كل "خلية" تبقى حقل بلابل فوقه */
-#feedInputBox #tbl tbody tr td{
+#feedInputBox #tbl td{
   display:flex !important;
-  flex-direction:column;
-  align-items:stretch;
-  justify-content:flex-start;
-  gap:6px;
+  flex-direction:column !important;
+  gap:6px !important;
   padding:0 !important;
   border:0 !important;
   background:transparent !important;
-  min-height:auto !important;
 }
 
-/* رجّع العناوين (Override مهم لأن عندك كود قديم بيخفيها على الموبايل) */
-#feedInputBox #tbl tbody tr td::before{
-  content:attr(data-label) !important;
-  display:block;
+#feedInputBox #tbl td::before{
+  content:attr(data-label);
   font-weight:900;
   font-size:13px;
   color:#0b7f47;
-  opacity:.95;
 }
 
-/* شكل الحقول */
+#feedInputBox #tbl td[data-col="name"]   { grid-area:name; }
+#feedInputBox #tbl td[data-col="cat"]    { grid-area:cat; }
+#feedInputBox #tbl td[data-col="dm"]     { grid-area:dm; }
+#feedInputBox #tbl td[data-col="cp"]     { grid-area:cp; }
+#feedInputBox #tbl td[data-col="pTon"]   { grid-area:pTon; }
+#feedInputBox #tbl td[data-col="pTonDM"] { grid-area:pTonDM; }
+#feedInputBox #tbl td[data-col="pct"]    { grid-area:pct; }
+#feedInputBox #tbl td[data-col="kg"]     { grid-area:kg; }
+#feedInputBox #tbl td[data-col="kgDM"]   { grid-area:kgDM; }
+#feedInputBox #tbl td[data-col="cost"]   { grid-area:cost; }
+
 #feedInputBox #tbl input,
 #feedInputBox #tbl select{
   width:100%;
@@ -374,9 +272,10 @@ padding: 6px 0;
   border-radius:12px;
   border:1px solid #d7e7dd;
   padding:8px 10px;
-  font-weight:700;
+  font-weight:800;
   background:#f9fdfb;
 }
+
 #feedInputBox #tbl input:focus,
 #feedInputBox #tbl select:focus{
   outline:none;
@@ -385,52 +284,37 @@ padding: 6px 0;
   box-shadow:0 0 0 2px rgba(14,160,90,.14);
 }
 
-/* ===== توزيع Premium (سطور واضحة) ===== */
-/* 100% */
-#feedInputBox #tbl td[data-col="name"]{flex:1 1 100%;}
-/* صف: الفئة + سعر الطن */
-#feedInputBox #tbl td[data-col="cat"]{flex:1 1 30%;}
-#feedInputBox #tbl td[data-col="pTon"]{flex:1 1 30%;}
-#feedInputBox #tbl td[data-col="pTonDM"]{flex:1 1 30%;}
-
-/* صف: DM + CP */
-#feedInputBox #tbl td[data-col="dm"]{flex:1 1 30%;}
-#feedInputBox #tbl td[data-col="cp"]{flex:1 1 30%;}
-
-/* صف: النسبة + الكجم (حسب المود هيتعطل واحد منهم تلقائياً من JS) */
-#feedInputBox #tbl td[data-col="pct"]{flex:1 1 30%;}
-#feedInputBox #tbl td[data-col="kg"]{flex:1 1 30%;}
-
-/* النتائج */
-#feedInputBox #tbl td[data-col="kgDM"]{flex:1 1 30%;}
-#feedInputBox #tbl td[data-col="cost"]{flex:1 1 30%;}
-
-/* تحسين عرض الـ spans (—) */
 #feedInputBox #tbl .pTonDM,
 #feedInputBox #tbl .kgDM,
 #feedInputBox #tbl .cost{
-  display:block;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   height:42px;
   border-radius:12px;
   border:1px dashed rgba(14,160,90,.25);
   background:rgba(14,160,90,.06);
-  padding:10px 10px;
   font-weight:900;
   color:#0b7f47;
 }
 
-/* موبايل: خليها صفين أجمل */
-@media (max-width:640px){
-  #feedInputBox #tbl td[data-col="cat"],
-  #feedInputBox #tbl td[data-col="pTon"]{flex:1 1 48%;}
-  #feedInputBox #tbl td[data-col="pTonDM"]{flex:1 1 100%;}
-  #feedInputBox #tbl td[data-col="dm"],
-  #feedInputBox #tbl td[data-col="cp"]{flex:1 1 48%;}
-  #feedInputBox #tbl td[data-col="pct"],
-  #feedInputBox #tbl td[data-col="kg"]{flex:1 1 48%;}
-  #feedInputBox #tbl td[data-col="kgDM"],
-  #feedInputBox #tbl td[data-col="cost"]{flex:1 1 48%;}
+@media (max-width:380px){
+  #feedInputBox #tbl tbody tr{
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "name"
+      "cat"
+      "dm"
+      "cp"
+      "pTon"
+      "pTonDM"
+      "pct"
+      "kg"
+      "kgDM"
+      "cost";
+  }
 }
+
 </style>
 </head>
 <body>
