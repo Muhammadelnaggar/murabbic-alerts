@@ -810,7 +810,7 @@ tbody.appendChild(tr);
       else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
     }, 0);
   }
- function fillCurrentRowWithFeed(feedName, cat){
+function fillCurrentRowWithFeed(feedObj, cat){
   let tr = tbody.querySelector('tr');         // السطر الوحيد
   if(!tr){
     addEmptyRow();
@@ -819,19 +819,19 @@ tbody.appendChild(tr);
 
   // اكتب اسم الخامة
   const nameEl = tr.querySelector('.name');
-  if(nameEl) nameEl.value = feedName || '';
+  if(nameEl) nameEl.value = (feedObj?.name || '');
 
-  // اكتب النوع
+  // ثبت الفئة (مركزات/خشن/إضافات)
   const catEl = tr.querySelector('.cat');
-  if(catEl) catEl.value = cat || 'conc';
+  if(catEl && cat) catEl.value = cat;
 
-  // فضّي الكمية/النسبة عشان المستخدم يدخل
-  const kgEl = tr.querySelector('.kg');
-  const pctEl = tr.querySelector('.pct');
-  if(kgEl) kgEl.value = '';
-  if(pctEl) pctEl.value = '';
+  // ✅ حمّل المادة الجافة والبروتين مباشرة من Firestore
+  const dmEl = tr.querySelector('.dm');
+  const cpEl = tr.querySelector('.cp');
 
-  // خلّي السطر جاهز للإدخال
+  if(dmEl) dmEl.value = (feedObj?.dm ?? '');
+  if(cpEl) cpEl.value = (feedObj?.cp ?? '');
+
   setRowState(tr);
   focusEditable(tr);
 }
@@ -1152,7 +1152,7 @@ presetSel.addEventListener('change', ()=>{
   if(!f) return;
 
   // ✅ بدل addRow: املأ السطر الحالي فقط
-  fillCurrentRowWithFeed(f.name, selectedType);
+ fillCurrentRowWithFeed(f, selectedType);
 
   showFeedUI();
   recalc();
