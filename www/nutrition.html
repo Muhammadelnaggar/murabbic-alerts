@@ -533,6 +533,8 @@
 
   let rationItems = [];
   function renderRationSummary(){
+    const sec = $("analysisSection");
+if(sec) sec.style.display = "block";
     if(!feedSummaryBox) return;
 
     if(rationItems.length===0){
@@ -1188,13 +1190,6 @@
     return isFinite(n)?n:null;
   };
 
-  function showIfHasData(){
-    const tot = num("totDM") || 0;
-    const sec = $("analysisSection");
-    if(!sec) return;
-    sec.style.display = tot>0 ? "block" : "none";
-  }
-
   function render(){
     const n = $("nutritionKPIs");
     if(n){
@@ -1226,7 +1221,7 @@
       )).join("");
     }
 
-    showIfHasData();
+  
   }
 
   document.addEventListener("click",(ev)=>{
@@ -1249,9 +1244,22 @@
       '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr">—</div></div></div>'
     )).join("");
   });
+let raf = 0;
+function scheduleRender(){
+  if(raf) return;
+  raf = requestAnimationFrame(()=>{
+    raf = 0;
+    render();
+  });
+}
 
-  setInterval(render, 600);
-  render();
+// تحديث فوري مع أي إدخال/تغيير
+document.addEventListener("input", scheduleRender, true);
+document.addEventListener("change", scheduleRender, true);
+document.addEventListener("keyup", scheduleRender, true);
+
+// أول رندر عند الفتح
+render();
 })();
 </script>
 
