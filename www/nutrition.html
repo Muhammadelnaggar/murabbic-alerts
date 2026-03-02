@@ -488,8 +488,6 @@ padding: 6px 0;
 
 <!-- ===== منطق الحسابات والـUI فقط (لا حفظ ولا تتبّع هنا) ===== -->
 <script type="module">
-
-  const $ = (id)=>document.getElementById(id);
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
   const ctxDIM = document.getElementById('ctxDIM');
@@ -504,35 +502,20 @@ padding: 6px 0;
   const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
 
+  // ✅ Helpers (لا تعتمد على jQuery)
+  const $ = (id) => document.getElementById(id);
+  const qs = (sel, root=document) => root.querySelector(sel);
+  const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  // ✅ ثابت: tbody للجدول (لا تستخدمه قبل تعريفه)
+  const tbody = document.querySelector('#tbl tbody');
+
+
 const rationActions = document.getElementById('rationActions');
 const btnRationEdit = document.getElementById('rationEdit');
 const btnRationRemove = document.getElementById('rationRemove');
 
 let selectedRation = new Set(); // indices
-
-let activeRowIndex = 0; // آخر سطر تم التفاعل معه
-function getRowByIndex(i){ return tbody.querySelectorAll('tr')[i] || null; }
-function ensureRowIndex(i){
-  while(tbody.querySelectorAll('tr').length <= i){ addEmptyRow(); }
-  return getRowByIndex(i);
-}
-function pickActiveRow(){
-  if(selectedRation.size===1){
-    const i = Array.from(selectedRation)[0];
-    activeRowIndex = i;
-    return ensureRowIndex(i);
-  }
-  return ensureRowIndex(activeRowIndex||0);
-}
-
-tbody.addEventListener('focusin', (e)=>{
-  const tr = e.target?.closest?.('tr');
-  if(!tr) return;
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const i = rows.indexOf(tr);
-  if(i>=0) activeRowIndex = i;
-});
-
 
 function updateRationActionsUI(){
   const any = selectedRation.size > 0;
@@ -600,7 +583,7 @@ btnRationEdit?.addEventListener('click', ()=>{
 
   fillCurrentRowWithFeed(it.name, it.cat);
 
-  const tr = getRowByIndex(i);
+  const tr = tbody.querySelector('tr');
   if(tr){
     const dmEl = tr.querySelector('.dm');
     const kgEl = tr.querySelector('.kg');
@@ -632,7 +615,7 @@ function escapeHtml(s){
 
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
-  const tbody = document.querySelector('#tbl tbody');
+
   let rationItems = [];
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
@@ -923,10 +906,10 @@ tbody.appendChild(tr);
     }, 0);
   }
  function fillCurrentRowWithFeed(feed, cat){
-  let tr = pickActiveRow();
+  let tr = tbody.querySelector('tr');         // السطر الوحيد
   if(!tr){
     addEmptyRow();
-    tr = pickActiveRow();
+    tr = tbody.querySelector('tr');
   }
 
   // اكتب اسم الخامة
@@ -954,7 +937,7 @@ tbody.appendChild(tr);
   focusEditable(tr);
 }
  function ensureEditableForMode(){
-  const tr = getRowByIndex(i);
+  const tr = tbody.querySelector('tr');
   if(!tr) return;   // 🔥 مهم جدًا
 
   if (modeSel.value==='split'){
@@ -1135,7 +1118,7 @@ function addEmptyRow(){
   });
 
 document.getElementById('addPreset')?.addEventListener('click', ()=>{
-  const tr = getRowByIndex(i);
+  const tr = tbody.querySelector('tr');
   if(!tr) return;
 
   const name = tr.querySelector('.name')?.value?.trim();
