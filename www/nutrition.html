@@ -101,6 +101,9 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 .kpi .v{font-weight:800;font-size:15px;margin-top:2px}
 .kpi-row{display:flex;gap:8px;flex-wrap:wrap}
 .btn-ghost{background:transparent;border:1px solid rgba(0,0,0,.12)}
+.kpi{ border-radius:14px; padding:12px; background:#fff; border:1px solid #eef2f7; }
+.kpi .vrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.kpi .arr{ font-size:18px; line-height:1; }      
 #advancedKPIs{margin-top:10px}
 
 
@@ -437,8 +440,6 @@ padding: 6px 0;
 
     <div class="total" id="totalsBase">
       <span class="pill" id="pillSumPct" style="display:none">مجموع النِّسب: <b id="sumPct">0%</b></span>
-      <span class="pill">إجمالي كجم DM/رأس: <b id="totDM">0</b></span>
-      <span class="pill">تكلفة/رأس/يوم: <b id="totCost">0</b></span>
       <span class="pill" id="pillMix">سعر طن TMR (DM): <b id="mixPriceDM">—</b></span>
     </div>
 
@@ -457,10 +458,7 @@ padding: 6px 0;
 
   <div class="card">
     <div class="row stack">
-      <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
-        <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
-      </form>
-      <!-- ===== Analysis (Bottom) ===== -->
+       <!-- ===== Analysis (Bottom) ===== -->
 <div id="analysisSection">
   <div class="mbk-card" id="nutritionAnalysisCard">
     <h3>📊 التحليل الغذائي للعليقة</h3>
@@ -468,7 +466,9 @@ padding: 6px 0;
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
     <div id="advancedKPIs" style="display:none" class="kpi-grid"></div>
   </div>
-
+      <form id="nutritionForm" data-event="nutrition" data-redirect="/dashboard.html" style="width:100%">
+        <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
+      </form>
   <div class="mbk-card" id="economicAnalysisCard">
     <h3>💰 التحليل الاقتصادي</h3>
     <div id="economicKPIs" class="kpi-grid"></div>
@@ -1301,7 +1301,7 @@ presetSel.addEventListener('change', ()=>{
         ["F:C", fmt($("fcRatio")?.textContent, "")],
       ];
       n.innerHTML = items.map(([k,v])=>(
-        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+       '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr">—</div></div></div>'
       )).join("");
     }
 
