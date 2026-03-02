@@ -6,38 +6,15 @@
 import { onNutritionSave } from '/js/track-nutrition.js';
 
 // Engines (targets)
-import { computeBuffalo } from '/js/engine-buffalo.js';
-import { computeCow } from '/js/engine-cow.js';
+import { computeTargets } from '/js/nutrition-engine.js';
 
-function computeTargetsFromCtx(ctx){
-  const species = String(ctx?.species||'').trim();
-  // ctx.species في صفحتك: 'جاموس' أو 'بقر' (وأحيانًا animalTypeAr)
-  if(species.includes('جاموس')) return computeBuffalo({
-    bodyWeightKg: ctx?.bodyWeightKg,
-    avgMilkKg: ctx?.avgMilkKg,
-    milkFatPct: ctx?.milkFatPct,
-    pregnancyDays: ctx?.pregnancyDays,
-    earlyDry: ctx?.earlyDry,
-    closeUp: ctx?.closeUp,
-    breed: ctx?.breed
-  });
-  return computeCow({
-    bodyWeightKg: ctx?.bodyWeightKg,
-    avgMilkKg: ctx?.avgMilkKg,
-    milkFatPct: ctx?.milkFatPct,
-    pregnancyDays: ctx?.pregnancyDays,
-    earlyDry: ctx?.earlyDry,
-    closeUp: ctx?.closeUp,
-    assumedDietNelMcalPerKgDM: ctx?.assumedDietNelMcalPerKgDM
-  });
-}
 
 // ✅ للتجربة من الكونسول: window.mbkNutrition.computeTargets()
 window.mbkNutrition = window.mbkNutrition || {};
 window.mbkNutrition.computeTargets = () => {
   const ctx = readContext();
   // readContext يرجّع species + avgMilkKg + pregnancyDays + flags
-  return computeTargetsFromCtx({
+ return computeTargets({
     species: ctx?.species,
     avgMilkKg: ctx?.avgMilkKg,
     pregnancyDays: ctx?.pregnancyDays,
