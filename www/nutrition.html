@@ -583,7 +583,7 @@ btnRationEdit?.addEventListener('click', ()=>{
 
   fillCurrentRowWithFeed(it.name, it.cat);
 
-  const tr = tbody.querySelector('tr');
+  const tr = tbody.querySelector('tr:last-child');
   if(tr){
     const dmEl = tr.querySelector('.dm');
     const kgEl = tr.querySelector('.kg');
@@ -906,7 +906,7 @@ tbody.appendChild(tr);
     }, 0);
   }
  function fillCurrentRowWithFeed(feed, cat){
-  let tr = tbody.querySelector('tr');         // السطر الوحيد
+  let tr = tbody.querySelector('tr:last-child');         // السطر الوحيد
   if(!tr){
     addEmptyRow();
     tr = tbody.querySelector('tr');
@@ -937,7 +937,7 @@ tbody.appendChild(tr);
   focusEditable(tr);
 }
  function ensureEditableForMode(){
-  const tr = tbody.querySelector('tr');
+  const tr = tbody.querySelector('tr:last-child');
   if(!tr) return;   // 🔥 مهم جدًا
 
   if (modeSel.value==='split'){
@@ -953,9 +953,12 @@ tbody.appendChild(tr);
   function recalc(){
     const mode = modeSel.value;
     let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
+    let totalAsFed=0;
+    let cpKg=0;
     let roughDM=0, roughCost=0;
     let concMixAsFed=0, concDmFrac=0, concSumPct=0;
     const concKg = parseFloat(concKgInput.value)||0;
+    if(mode==="split"){ totalAsFed += concKg; }
 
     tbody.querySelectorAll('tr').forEach(tr=>{
       const dm = parseFloat(tr.querySelector('.dm').value)||0;
@@ -968,6 +971,9 @@ tbody.appendChild(tr);
 
       if (mode==='tmr_asfed'){
         const kgDM = kg*(dm/100);
+        totalAsFed += kg;
+        const cp = parseFloat(tr.querySelector('.cp').value)||0;
+        cpKg += kgDM * (cp/100);
         const cost = (kgDM/1000)*pDM;
         tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
         tr.querySelector('.cost').textContent = cost? nf(cost):'—';
@@ -975,10 +981,13 @@ tbody.appendChild(tr);
       } else if (mode==='tmr_percent'){
         tr.querySelector('.kgDM').textContent = '—';
         tr.querySelector('.cost').textContent = '—';
-        if (pc>0){ mixAsFed+=(pc/100)*p; dmFrac+=(pc/100)*(dm/100); sumPct+=pc; }
+        if (pc>0){ mixAsFed+=(pc/100)*p; dmFrac+=(pc/100)*(dm/100); sumPct+=pc; const cp=parseFloat(tr.querySelector(".cp").value)||0; cpKg += (pc/100)*(dm/100)*(cp/100); }
       } else {
         if (cat==='rough'){
           const kgDM = kg*(dm/100);
+          totalAsFed += kg;
+          const cp = parseFloat(tr.querySelector('.cp').value)||0;
+          cpKg += kgDM * (cp/100);
           const cost = (kgDM/1000)*pDM;
           tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
           tr.querySelector('.cost').textContent = cost? nf(cost):'—';
@@ -1048,6 +1057,23 @@ tbody.appendChild(tr);
       return !dm && hasVal;
     });
     if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+    // ===== مؤشرات التحليل الأساسية =====
+    // إجمالي المأكول/رأس/يوم
+    const asfedOut = (mode==="tmr_percent") ? "—" : nf(totalAsFed||0);
+    const asfedEl = document.getElementById("totAsFed");
+    if(asfedEl) asfedEl.textContent = asfedOut;
+
+    // % البروتين الخام الكلي (على أساس DM)
+    let cpPctTotal = null;
+    if(mode==="tmr_percent"){
+      if(dmFrac>0) cpPctTotal = (cpKg/dmFrac)*100;
+    } else {
+      if(totalDM>0) cpPctTotal = (cpKg/totalDM)*100;
+    }
+    const cpElOut = document.getElementById("cpPctTotal");
+    if(cpElOut) cpElOut.textContent = (cpPctTotal!=null && isFinite(cpPctTotal)) ? (cpPctTotal.toFixed(1)+"%") : "—";
+
+    try{ render(); }catch(e){}
     warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
   }
@@ -1290,24 +1316,17 @@ presetSel.addEventListener('change', ()=>{
     return isFinite(n)?n:null;
   };
 
-  function showIfHasData(){
-    const tot = num("totDM") || 0;
-    const sec = $("analysisSection");
-    if(!sec) return;
-    sec.style.display = tot>0 ? "block" : "none";
-  }
-
   function render(){
-    // ===== غذائي =====
+    const sec = document.getElementById("analysisSection");
+    if(sec) sec.style.display = "block";
+// ===== غذائي =====
     const n = $("nutritionKPIs");
     if(n){
       const items = [
-        ["DMI / إجمالي DM", fmt($("totDM")?.textContent, " كجم/رأس/يوم")],
-        ["مجموع النِّسب", fmt($("sumPct")?.textContent, "")],
-        ["خشن DM", fmt($("roughDM")?.textContent, " كجم")],
-        ["مركز DM", fmt($("concKgDM")?.textContent, " كجم")],
-        ["%DM للمركز", fmt($("concDMpct")?.textContent, "")],
-        ["F:C", fmt($("fcRatio")?.textContent, "")],
+        ["إجمالي المادة الجافة/رأس/يوم", fmt($("totDM")?.textContent, " كجم")],
+        ["إجمالي المأكول/رأس/يوم", fmt($("totAsFed")?.textContent, " كجم")],
+        ["نسبة البروتين الخام في العليقة", fmt($("cpPctTotal")?.textContent, "")],
+        ["نسبة الخشن إلى المركزات (F:C)", fmt($("fcRatio")?.textContent, "")],
       ];
       n.innerHTML = items.map(([k,v])=>(
        '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr">—</div></div></div>'
@@ -1330,8 +1349,7 @@ presetSel.addEventListener('change', ()=>{
       )).join("");
     }
 
-    showIfHasData();
-  }
+    }
 
   // Toggle advanced
   document.addEventListener("click",(ev)=>{
