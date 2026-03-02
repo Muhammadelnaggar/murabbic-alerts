@@ -997,14 +997,14 @@ tbody.appendChild(tr);
         mix = mixDM;
       }
       pillMix.style.display=''; pillSumPct.style.display='none';
-      document.getElementById('totDM').textContent = nf(totalDM);
-      document.getElementById('totCost').textContent = nf(totalCost);
+     if($("totDM")) $("totDM").textContent = nf(totalDM);
+      if($("totCost")) $("totCost").textContent = nf(totalCost);
     } else if (mode==='tmr_percent'){
       mix = dmFrac>0? (mixAsFed/dmFrac) : 0;
       document.getElementById('sumPct').textContent = nf(sumPct)+'%';
       pillMix.style.display=''; pillSumPct.style.display='inline-flex';
-      document.getElementById('totDM').textContent = '—';
-      document.getElementById('totCost').textContent = '—';
+      if($("totDM")) $("totDM").textContent = '—';
+      if($("totCost")) $("totCost").textContent = '—';
     } else {
       const concPriceDM = concDmFrac>0? (concMixAsFed/concDmFrac) : 0;
       const concKgDM    = concKg * concDmFrac;
@@ -1022,8 +1022,8 @@ tbody.appendChild(tr);
       document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
       document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
 
-      document.getElementById('totDM').textContent = totalDMAll? nf(totalDMAll):'—';
-      document.getElementById('totCost').textContent = totalCostAll? nf(totalCostAll):'—';
+      if($("totDM")) $("totDM").textContent = totalDMAll? nf(totalDMAll):'—';
+      if($("totCost")) $("totCost").textContent = totalCostAll? nf(totalCostAll):'—';
 
       pillMix.style.display='none'; pillSumPct.style.display='none';
     }
