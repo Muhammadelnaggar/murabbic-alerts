@@ -1100,7 +1100,7 @@ function priceKgFromTon(pTon){
           const dm=parseFloat(tr.querySelector('.dm').value)||0;
           const p=parseFloat(tr.querySelector('.pTon').value)||0;
           const kg=parseFloat(tr.querySelector('.kg').value)||0;
-          const pDM= dm>0? (pTon/(dm/100)) : 0;
+          const pDM= dm>0? (p/(dm/100)) : 0;
           const share=(kg*(dm/100))/totalDM; mixDM += share*pDM;
         });
         mix = mixDM;
