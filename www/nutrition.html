@@ -264,9 +264,10 @@ padding: 6px 0;
 #feedInputBox #tbl td[data-col="pct"]    { grid-area:pct; }
 #feedInputBox #tbl td[data-col="kg"]     { grid-area:kg; }
 #feedInputBox #tbl td[data-col="kgDM"]   { grid-area:kgDM; }
+#feedInputBox #tbl td[data-col="cost"]{display:none !important;}    
 #feedInputBox #tbl input,
 #feedInputBox #tbl select{
-#feedInputBox #tbl td[data-col="cost"]{display:none !important;}
+
   width:100%;
   height:42px;
   border-radius:12px;
@@ -652,6 +653,9 @@ function showFeedUI(){
   if(feedInputBox) feedInputBox.style.display = 'block';
   if(feedSummaryBox) feedSummaryBox.style.display = 'block';
   if(miniActions) miniActions.style.display = 'flex';
+   if(tbody && tbody.querySelectorAll('tr').length === 0){
+    addEmptyRow();
+  }
 }
 
 function escapeHtml(s){
@@ -817,7 +821,6 @@ if (d.enabled === false) return;
 });
     });
 // ===== دمج تعديلات المستخدم (Overrides) فوق قيم NRC =====
-const { auth } = await import('/js/firebase-config.js');
 const uid = auth?.currentUser?.uid;
 
 if (uid) {
@@ -850,6 +853,19 @@ const list2 = list.filter(x => !x._hiddenByUser);
 list2.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
 
 FEEDS = list2;;
+  // ترتيب عربي
+list2.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
+
+FEEDS = list2;
+
+// ✅ (أضِف هذا هنا بالضبط)
+FEEDS_BY_NAME.clear();
+FEEDS.forEach(f=>{
+  FEEDS_BY_NAME.set(normName(f.name), f);
+});
+
+FEEDS.forEach(f=> FEEDS_BY_ID.set(f.id, f));
+rebuildFeedUI();  
     FEEDS.forEach(f=> FEEDS_BY_ID.set(f.id, f));
     rebuildFeedUI();
   }
@@ -1069,7 +1085,7 @@ function priceKgFromTon(pTon){
         totalAsFed += kg;
         if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
 
-        const f = FEEDS_BY_NAME.get(nm);
+        const f = FEEDS_BY_NAME.get(normName(nm));
         if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
         if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
 
@@ -1290,41 +1306,24 @@ function hookRow(tr){
     recalc();
   };
 
-  function applyFeedDefaults(){
-    const key = nameEl.value.trim();
-    if(!key) return;
-    const f = findFeedByName(key);
-    if(!f) return;
-    // املأ القيم لو فاضية فقط (يسمح بتعديل يدوي)
-    if(dmEl && (dmEl.value==='' || dmEl.value===null)) dmEl.value = (f.dm ?? '');
-    if(cpEl && (cpEl.value==='' || cpEl.value===null)) cpEl.value = (f.cp ?? '');
-    if(pEl  && (pEl.value===''  || pEl.value===null) && (f.price!=null)) pEl.value = f.price;
-  }
   // datalist يطلق input عند الاختيار، فبنسمع input + change
   nameEl.addEventListener('input', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); });
   function applyFeedDefaults(){
   const key = String(nameEl.value || '').trim();
   if(!key) return;
-  const f = FEEDS.find(x => x.name === key);
+ const f = findFeedByName(key);
   if(!f) return;
 
   // حمّل تلقائيًا من المكتبة (يسمح بتعديل يدوي بعد ذلك)
-  if(dmEl) dmEl.value = (f.dm ?? '');
-  if(cpEl) cpEl.value = (f.cp ?? '');
+ if(dmEl && (dmEl.value==='' || dmEl.value==null)) dmEl.value = (f.dm ?? '');
+if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
 }
-
-nameEl.addEventListener('input', ()=>{
-  applyFeedDefaults();
-  setRowState(tr);
-  recalc();
-});
-
 nameEl.addEventListener('change', ()=>{
   applyFeedDefaults();
   setRowState(tr);
   recalc();
   ensureEditableForMode();
-});;
+});
 [dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
     el.addEventListener('input', ()=>{
       setRowState(tr);
