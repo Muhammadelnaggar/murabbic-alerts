@@ -945,6 +945,19 @@ function priceKgFromTon(pTon){
   function isRowEmpty(tr){
     if (!tr) return true;
     const name = tr.querySelector('.name')?.value?.trim();
+  // ✅ لو المستخدم اختار من datalist وضغط إضافة بسرعة قبل blur
+  // املى DM/CP/السعر تلقائياً لو فاضية
+  if(name){
+    const f = FEEDS.find(x=>x.name===name);
+    if(f){
+      const dmEl = tr.querySelector('.dm');
+      const cpEl = tr.querySelector('.cp');
+      const pEl  = tr.querySelector('.pTon');
+      if(dmEl && (dmEl.value===''||dmEl.value==null)) dmEl.value = (f.dm ?? '');
+      if(cpEl && (cpEl.value===''||cpEl.value==null)) cpEl.value = (f.cp ?? '');
+      if(pEl  && (pEl.value==='' ||pEl.value==null) && (f.price!=null)) pEl.value = f.price;
+    }
+  }
     const kg   = tr.querySelector('.kg')?.value;
     const pct  = tr.querySelector('.pct')?.value;
     return (!name && !kg && !pct);
@@ -1265,16 +1278,20 @@ function hookRow(tr){
     recalc();
   };
 
-  nameEl.addEventListener('change', ()=>{
-    const f = FEEDS.find(x=>x.name===nameEl.value.trim());
-    if (f && !dmEl.value) dmEl.value = f.dm;
-    if (f && cpEl && !cpEl.value) cpEl.value = f.cp;
-    setRowState(tr);
-    recalc();
-    ensureEditableForMode();
-  });
-
-  [dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
+  function applyFeedDefaults(){
+    const key = nameEl.value.trim();
+    if(!key) return;
+    const f = FEEDS.find(x=>x.name===key);
+    if(!f) return;
+    // املأ القيم لو فاضية فقط (يسمح بتعديل يدوي)
+    if(dmEl && (dmEl.value==='' || dmEl.value===null)) dmEl.value = (f.dm ?? '');
+    if(cpEl && (cpEl.value==='' || cpEl.value===null)) cpEl.value = (f.cp ?? '');
+    if(pEl  && (pEl.value===''  || pEl.value===null) && (f.price!=null)) pEl.value = f.price;
+  }
+  // datalist يطلق input عند الاختيار، فبنسمع input + change
+  nameEl.addEventListener('input', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); });
+  nameEl.addEventListener('change', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); ensureEditableForMode(); });
+[dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
     el.addEventListener('input', ()=>{
       setRowState(tr);
       recalc();
