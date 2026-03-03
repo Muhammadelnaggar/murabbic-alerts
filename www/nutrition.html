@@ -616,7 +616,8 @@ btnRationRemove?.addEventListener('click', ()=>{
   selectedRation.clear();
   renderRationSummary();
   recalc();
-  recalc();
+
+  
 });
 
 // تعديل المختار (خامة واحدة فقط)
@@ -626,7 +627,7 @@ btnRationEdit?.addEventListener('click', ()=>{
   const it = rationItems[i];
   if(!it) return;
 
-  fillCurrentRowWithFeed(it.name, it.cat);
+ fillCurrentRowWithFeed(it, it.cat);
 
   const tr = tbody.querySelector('tr:last-child');
   if(tr){
@@ -984,8 +985,8 @@ function priceKgFromTon(pTon){
       const dmEl = tr.querySelector('.dm');
       const cpEl = tr.querySelector('.cp');
       const pEl  = tr.querySelector('.pTon');
-      if(dmEl) dmEl.value = (f.dm ?? '');
-      if(cpEl) cpEl.value = (f.cp ?? '');
+     if(dmEl && (dmEl.value==='' || dmEl.value==null)) dmEl.value = (f.dm ?? '');
+if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
       if(pEl  && (pEl.value==='' ||pEl.value==null) && (f.price!=null)) pEl.value = f.price;
     }
   }
@@ -1023,8 +1024,8 @@ function priceKgFromTon(pTon){
   // حمّل القيم الافتراضية من فايرستور (وقابلة للتعديل)
   const dmEl = tr.querySelector('.dm');
   const cpEl = tr.querySelector('.cp');
-  if(dmEl) dmEl.value = (feed?.dm ?? '') === null ? '' : (feed?.dm ?? '');
-  if(cpEl) cpEl.value = (feed?.cp ?? '') === null ? '' : (feed?.cp ?? '');
+ if(dmEl) dmEl.value = (feed && feed.dm != null) ? feed.dm : '';
+if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
 
   // فضّي الكمية/النسبة عشان المستخدم يدخل
   const kgEl = tr.querySelector('.kg');
@@ -1251,7 +1252,8 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
     if(mode==="tmr_percent"){
       if(dmFrac>0) cpPctTotal = (cpKg/dmFrac)*100;
     } else {
-      if(totalDM>0) cpPctTotal = (cpKg/totalDM)*100;
+      const baseDM = (mode==="tmr_percent") ? dmFrac : totalDM;
+if(baseDM>0) cpPctTotal = (cpKg/baseDM)*100;
     }
     const cpElOut = document.getElementById("cpPctTotal");
     if(cpElOut) cpElOut.textContent = (cpPctTotal!=null && isFinite(cpPctTotal)) ? (cpPctTotal.toFixed(1)+"%") : "—";
@@ -1259,6 +1261,9 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
     // ===== F:C Ratio (DM basis) =====
     let fc = null;
     if(concDM_forFC>0) fc = roughDM_forFC / concDM_forFC;
+    if(concDM_forFC>0 && roughDM_forFC>=0){
+  fc = roughDM_forFC / concDM_forFC;
+}
     const fcEl = document.getElementById("fcRatio");
     if(fcEl) fcEl.textContent = (fc!=null && isFinite(fc)) ? fc.toFixed(2) : "—";
 
@@ -1293,7 +1298,15 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
     if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : "—";
 
     // ===== إجماليات نهائية (للكروت) =====
-    const totDMVal = (mode==="tmr_percent") ? null : (mode==="split" ? (roughDM + (concKg*concDmFrac)) : totalDM);
+    let totDMVal = 0;
+
+if(mode==="tmr_percent"){
+  totDMVal = dmFrac || 0;   // بدل null
+} else if(mode==="split"){
+  totDMVal = roughDM + (concKg * concDmFrac);
+} else {
+  totDMVal = totalDM;
+}
     const totCostVal = (mode==="tmr_percent") ? null : (mode==="split" ? (roughCost + ((concKg*concDmFrac)/1000) * (concDmFrac>0 ? (concMixAsFed/concDmFrac) : 0)) : totalCost);
     const setNum = (id,val,fmtFn)=>{ const el=document.getElementById(id); if(!el) return; el.textContent = (val==null || !isFinite(val)) ? "—" : (fmtFn?fmtFn(val):String(val)); };
     setNum("totDM", totDMVal, (v)=>nf(v));
@@ -1335,15 +1348,27 @@ function hookRow(tr){
 
   // datalist يطلق input عند الاختيار، فبنسمع input + change
   nameEl.addEventListener('input', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); });
-  function applyFeedDefaults(){
+function applyFeedDefaults(){
   const key = String(nameEl.value || '').trim();
   if(!key) return;
- const f = findFeedByName(key);
+
+  const f = findFeedByName(key);
   if(!f) return;
 
-  // حمّل تلقائيًا من المكتبة (يسمح بتعديل يدوي بعد ذلك)
- if(dmEl && (dmEl.value==='' || dmEl.value==null)) dmEl.value = (f.dm ?? '');
-if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
+  // المادة الجافة
+  if(dmEl){
+    dmEl.value = (f.dm != null) ? f.dm : '';
+  }
+
+  // البروتين
+  if(cpEl){
+    cpEl.value = (f.cp != null) ? f.cp : '';
+  }
+
+  // السعر
+  if(pEl && (pEl.value==='' || pEl.value==null) && f.price!=null){
+    pEl.value = f.price;
+  }
 }
 nameEl.addEventListener('change', ()=>{
   applyFeedDefaults();
