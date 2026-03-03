@@ -1302,7 +1302,29 @@ function hookRow(tr){
   }
   // datalist يطلق input عند الاختيار، فبنسمع input + change
   nameEl.addEventListener('input', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); });
-  nameEl.addEventListener('change', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); ensureEditableForMode(); });
+  function applyFeedDefaults(){
+  const key = String(nameEl.value || '').trim();
+  if(!key) return;
+  const f = FEEDS.find(x => x.name === key);
+  if(!f) return;
+
+  // حمّل تلقائيًا من المكتبة (يسمح بتعديل يدوي بعد ذلك)
+  if(dmEl) dmEl.value = (f.dm ?? '');
+  if(cpEl) cpEl.value = (f.cp ?? '');
+}
+
+nameEl.addEventListener('input', ()=>{
+  applyFeedDefaults();
+  setRowState(tr);
+  recalc();
+});
+
+nameEl.addEventListener('change', ()=>{
+  applyFeedDefaults();
+  setRowState(tr);
+  recalc();
+  ensureEditableForMode();
+});;
 [dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
     el.addEventListener('input', ()=>{
       setRowState(tr);
@@ -1350,6 +1372,16 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   if(!tr) return;
 
   const name = tr.querySelector('.name')?.value?.trim();
+  // ✅ لو المستخدم اختار من القائمة وضغط "إضافة" بسرعة قبل blur
+if(name){
+  const f0 = FEEDS.find(x => x.name === String(name).trim());
+  if(f0){
+    const dmEl0 = tr.querySelector('.dm');
+    const cpEl0 = tr.querySelector('.cp');
+    if(dmEl0 && (dmEl0.value==='' || dmEl0.value==null)) dmEl0.value = (f0.dm ?? '');
+    if(cpEl0 && (cpEl0.value==='' || cpEl0.value==null)) cpEl0.value = (f0.cp ?? '');
+  }
+}
   const cat  = tr.querySelector('.cat')?.value || 'conc';
   const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
   const cp   = parseFloat(tr.querySelector('.cp')?.value)||0;
