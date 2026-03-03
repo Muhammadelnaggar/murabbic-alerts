@@ -696,6 +696,7 @@ async function loadSpeciesFromAnimals(){
 
   let FEEDS = [];                 // [{id,name,dm}]
   const FEEDS_BY_ID = new Map();  // id -> feed
+  const FEEDS_BY_NAME = new Map(); // nameAr -> feed (for analysis)
 
   function rebuildFeedUI(){
     // 1) rebuild preset select
@@ -956,6 +957,9 @@ tbody.appendChild(tr);
     let totalAsFed=0;
     let cpKg=0;
     let roughDM=0, roughCost=0;
+    let roughDM_forFC=0, concDM_forFC=0; // DM for F:C (DM basis)
+    let nelSupplied=0; // Mcal/day when possible
+    let ndfKg=0;       // kg NDF/day when possible
     let concMixAsFed=0, concDmFrac=0, concSumPct=0;
     const concKg = parseFloat(concKgInput.value)||0;
     if(mode==="split"){ totalAsFed += concKg; }
@@ -972,6 +976,12 @@ tbody.appendChild(tr);
       if (mode==='tmr_asfed'){
         const kgDM = kg*(dm/100);
         totalAsFed += kg;
+        // F:C (DM) + NEL/NDF from library (if found)
+        if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
+        const nm = (tr.querySelector('.name')?.value||'').trim();
+        const f = FEEDS_BY_NAME.get(nm);
+        if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
+        if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
         const cp = parseFloat(tr.querySelector('.cp').value)||0;
         cpKg += kgDM * (cp/100);
         const cost = (kgDM/1000)*pDM;
@@ -981,11 +991,30 @@ tbody.appendChild(tr);
       } else if (mode==='tmr_percent'){
         tr.querySelector('.kgDM').textContent = '—';
         tr.querySelector('.cost').textContent = '—';
-        if (pc>0){ mixAsFed+=(pc/100)*p; dmFrac+=(pc/100)*(dm/100); sumPct+=pc; const cp=parseFloat(tr.querySelector(".cp").value)||0; cpKg += (pc/100)*(dm/100)*(cp/100); }
+        if (pc>0){
+          mixAsFed+=(pc/100)*p;
+          const dmPart = (pc/100)*(dm/100); // fraction of DM per 1 ton as-fed
+          dmFrac+=dmPart;
+          sumPct+=pc;
+          const cp=parseFloat(tr.querySelector('.cp').value)||0;
+          cpKg += dmPart*(cp/100);
+          // F:C + NEL/NDF (per ton as-fed basis)
+          if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
+          const nm = (tr.querySelector('.name')?.value||'').trim();
+          const f = FEEDS_BY_NAME.get(nm);
+          if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
+          if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
+        }
       } else {
         if (cat==='rough'){
           const kgDM = kg*(dm/100);
           totalAsFed += kg;
+          // F:C (DM) + NEL/NDF from library (if found)
+          roughDM_forFC += kgDM;
+          const nm = (tr.querySelector('.name')?.value||'').trim();
+          const f = FEEDS_BY_NAME.get(nm);
+          if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
+          if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
           const cp = parseFloat(tr.querySelector('.cp').value)||0;
           cpKg += kgDM * (cp/100);
           const cost = (kgDM/1000)*pDM;
@@ -999,6 +1028,13 @@ tbody.appendChild(tr);
         }
       }
     });
+
+    // split: add concentrate DM for F:C (DM basis)
+    if(mode==='split'){
+      concDM_forFC += concKg * concDmFrac;
+      // NEL/NDF for concentrate part (approx using dm fraction per 1 kg as-fed)
+      // nelSupplied / ndfKg already accumulated for rough; for conc we can approximate from library if names exist (handled in percent loops).
+    }
 
     const pillMix = document.getElementById('pillMix');
     const pillSumPct = document.getElementById('pillSumPct');
@@ -1377,6 +1413,18 @@ presetSel.addEventListener('change', ()=>{
   setInterval(render, 600);
   render();
 })();
+
+// ===== زر "عرض متقدم" =====
+const toggleBtn = document.getElementById('toggleAdvancedBtn');
+const advBox = document.getElementById('advancedKPIs');
+if(toggleBtn && advBox){
+  toggleBtn.addEventListener('click', ()=>{
+    const isOn = advBox.style.display === 'grid';
+    advBox.style.display = isOn ? 'none' : 'grid';
+    toggleBtn.textContent = isOn ? 'عرض متقدم' : 'إخفاء العرض المتقدم';
+  });
+}
+
 </script>
 
 </body>
