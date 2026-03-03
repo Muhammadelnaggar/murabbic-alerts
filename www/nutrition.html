@@ -792,8 +792,14 @@ const snap = await getDocs(collection(db, 'feed_items'));
     const list = [];
     const pickNum = (obj, keys) => {
   for (const k of keys) {
-    const v = obj?.[k];
+    let v = obj?.[k];
     if (v === null || v === undefined || v === "") continue;
+
+    // لو String (مثلاً "33%" أو "33.5")
+    if (typeof v === "string") {
+      v = v.replace(/[^\d.\-]/g, ""); // يشيل % وأي رموز
+    }
+
     const n = Number(v);
     if (!Number.isNaN(n)) return n;
   }
@@ -847,27 +853,24 @@ if (uid) {
   }
 }
    // شيل الخامات اللي المستخدم مخفيها
-const list2 = list.filter(x => !x._hiddenByUser);
-
 // ترتيب عربي
+const list2 = list.filter(x => !x._hiddenByUser);
 list2.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
 
-FEEDS = list2;;
-  // ترتيب عربي
-list2.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
-
+// ✅ المصدر النهائي
 FEEDS = list2;
 
-// ✅ (أضِف هذا هنا بالضبط)
+// ✅ خرائط سريعة
+FEEDS_BY_ID.clear();
 FEEDS_BY_NAME.clear();
+
 FEEDS.forEach(f=>{
-  FEEDS_BY_NAME.set(normName(f.name), f);
+  FEEDS_BY_ID.set(f.id, f);
+  FEEDS_BY_NAME.set(normName(f.name), f); // ✅ بالاسم المُنظَّف
 });
 
-FEEDS.forEach(f=> FEEDS_BY_ID.set(f.id, f));
-rebuildFeedUI();  
-    FEEDS.forEach(f=> FEEDS_BY_ID.set(f.id, f));
-    rebuildFeedUI();
+// ✅ تحديث UI
+rebuildFeedUI();
   }
   const TEMPLATES = [
     { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
@@ -1059,7 +1062,26 @@ function priceKgFromTon(pTon){
     let concMixAsFed=0, concDmFrac=0, concSumPct=0;
     const concKg = parseFloat(concKgInput.value)||0;
     if(mode==="split"){ totalAsFed += concKg; }
+    // ✅ تحديث سطر الإدخال الحالي دائمًا (حتى لو الحساب الكلي يعتمد على rationItems)
+Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
+  const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
+  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
+  const pKg  = normalizeKgPrice(pRaw);
+  const pTon = pKg * 1000;
+  const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
 
+  const pDM  = (dm>0) ? (pTon/(dm/100)) : 0;
+  const kgDM = kg*(dm/100);
+  const cost = kg*pKg;
+
+  const pTonDMEl = tr.querySelector('.pTonDM');
+  const kgDMEl   = tr.querySelector('.kgDM');
+  const costEl   = tr.querySelector('.cost');
+
+  if(pTonDMEl) pTonDMEl.textContent = pDM ? nf(pDM) : '—';
+  if(kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
+  if(costEl)   costEl.textContent   = cost ? nf(cost) : '—';
+});
     // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
 // وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
     const entries = (Array.isArray(rationItems) && rationItems.length)
@@ -1110,7 +1132,7 @@ function priceKgFromTon(pTon){
           cpKg += dmPart*(cpIn/100);
           if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
 
-          const f = FEEDS_BY_NAME.get(nm);
+          const f = FEEDS_BY_NAME.get(normName(nm));
           if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
           if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
         }
@@ -1121,7 +1143,7 @@ function priceKgFromTon(pTon){
           totalAsFed += kg;
           roughDM_forFC += kgDM;
 
-          const f = FEEDS_BY_NAME.get(nm);
+          const f = FEEDS_BY_NAME.get(normName(nm));
           if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
           if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
 
@@ -1161,13 +1183,18 @@ function priceKgFromTon(pTon){
 
     if (mode==='tmr_asfed'){
       if (totalDM>0){
-        let mixDM=0; document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-          const dm=parseFloat(tr.querySelector('.dm').value)||0;
-          const p=parseFloat(tr.querySelector('.pTon').value)||0;
-          const kg=parseFloat(tr.querySelector('.kg').value)||0;
-          const pDM= dm>0? (p/(dm/100)) : 0;
-          const share=(kg*(dm/100))/totalDM; mixDM += share*pDM;
-        });
+        let mixDM=0;
+    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
+  const dm = parseFloat(tr.querySelector('.dm')?.value)||0;
+  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
+  const pKg = normalizeKgPrice(pRaw);
+  const pTon = pKg*1000;
+  const kg = parseFloat(tr.querySelector('.kg')?.value)||0;
+
+  const pDM = dm>0 ? (pTon/(dm/100)) : 0;
+  const share = totalDM>0 ? ((kg*(dm/100))/totalDM) : 0;
+  mixDM += share * pDM;
+});
         mix = mixDM;
       }
       pillMix.style.display=''; pillSumPct.style.display='none';
@@ -1373,7 +1400,7 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   const name = tr.querySelector('.name')?.value?.trim();
   // ✅ لو المستخدم اختار من القائمة وضغط "إضافة" بسرعة قبل blur
 if(name){
-  const f0 = FEEDS.find(x => x.name === String(name).trim());
+  const f0 = findFeedByName(name);
   if(f0){
     const dmEl0 = tr.querySelector('.dm');
     const cpEl0 = tr.querySelector('.cp');
@@ -1625,7 +1652,7 @@ presetSel.addEventListener('change', ()=>{
     const adv = $("advancedKPIs");
     if(!adv) return;
     adv.style.display = (adv.style.display==="none"||!adv.style.display) ? "grid" : "none";
-    if(adv.innerHTML.trim()) return;
+   
     // fill once
     const items = [
       ["الهدف: DMI (كجم DM/يوم)", fmt($("dmiTarget")?.textContent, "")],
