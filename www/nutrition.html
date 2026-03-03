@@ -741,6 +741,18 @@ async function loadSpeciesFromAnimals(){
 
   let FEEDS = [];                 // [{id,name,dm}]
   const FEEDS_BY_ID = new Map();  // id -> feed
+  const normName = (s)=> String(s||'').trim().replace(/\s+/g,' ');
+  function findFeedByName(name){
+    const key = normName(name);
+    if(!key) return null;
+    // exact match first
+    let f = FEEDS.find(x=> normName(x.name)===key);
+    if(f) return f;
+    // fallback: startsWith/contains (يحمي من اختلاف بسيط)
+    f = FEEDS.find(x=> normName(x.name).includes(key) || key.includes(normName(x.name)));
+    return f || null;
+  }
+
   const FEEDS_BY_NAME = new Map(); // nameAr -> feed (for analysis)
 
   function rebuildFeedUI(){
@@ -948,13 +960,13 @@ function priceKgFromTon(pTon){
   // ✅ لو المستخدم اختار من datalist وضغط إضافة بسرعة قبل blur
   // املى DM/CP/السعر تلقائياً لو فاضية
   if(name){
-    const f = FEEDS.find(x=>x.name===name);
+    const f = findFeedByName(name);
     if(f){
       const dmEl = tr.querySelector('.dm');
       const cpEl = tr.querySelector('.cp');
       const pEl  = tr.querySelector('.pTon');
-      if(dmEl && (dmEl.value===''||dmEl.value==null)) dmEl.value = (f.dm ?? '');
-      if(cpEl && (cpEl.value===''||cpEl.value==null)) cpEl.value = (f.cp ?? '');
+      if(dmEl) dmEl.value = (f.dm ?? '');
+      if(cpEl) cpEl.value = (f.cp ?? '');
       if(pEl  && (pEl.value==='' ||pEl.value==null) && (f.price!=null)) pEl.value = f.price;
     }
   }
@@ -1281,7 +1293,7 @@ function hookRow(tr){
   function applyFeedDefaults(){
     const key = nameEl.value.trim();
     if(!key) return;
-    const f = FEEDS.find(x=>x.name===key);
+    const f = findFeedByName(key);
     if(!f) return;
     // املأ القيم لو فاضية فقط (يسمح بتعديل يدوي)
     if(dmEl && (dmEl.value==='' || dmEl.value===null)) dmEl.value = (f.dm ?? '');
