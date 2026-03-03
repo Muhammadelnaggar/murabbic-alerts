@@ -615,6 +615,7 @@ btnRationRemove?.addEventListener('click', ()=>{
   selectedRation.clear();
   renderRationSummary();
   recalc();
+  recalc();
 });
 
 // تعديل المختار (خامة واحدة فقط)
@@ -640,6 +641,7 @@ btnRationEdit?.addEventListener('click', ()=>{
 
   selectedRation.clear();
   renderRationSummary();
+  recalc();
   recalc();
 });
 
@@ -1017,72 +1019,94 @@ function priceKgFromTon(pTon){
     const concKg = parseFloat(concKgInput.value)||0;
     if(mode==="split"){ totalAsFed += concKg; }
 
-    tbody.querySelectorAll('tr').forEach(tr=>{
-      const dm = parseFloat(tr.querySelector('.dm').value)||0;
-      const pRaw  = parseFloat(tr.querySelector('.pTon').value)||0;
+    // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
+// وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
+    const entries = (Array.isArray(rationItems) && rationItems.length)
+      ? rationItems.map(it=>({it}))
+      : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
+
+    entries.forEach(({tr,it})=>{
+      const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
+      const cpIn = it ? (Number(it.cp)||0) : (parseFloat(tr.querySelector('.cp')?.value)||0);
+      const pRaw = it ? (Number(it.pTonRaw)||0) : (parseFloat(tr.querySelector('.pTon')?.value)||0);
       const pKg = normalizeKgPrice(pRaw);
       const pTon = pKg * 1000;
-      const kg = parseFloat(tr.querySelector('.kg').value)||0;
-      const pc = parseFloat(tr.querySelector('.pct').value)||0;
-      const cat= (tr.querySelector('.cat')?.value)||'conc';
-      const pDM= dm>0? (pTon/(dm/100)) : 0;
-      tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
+      const kg = it ? (Number(it.kg)||0) : (parseFloat(tr.querySelector('.kg')?.value)||0);
+      const pc = it ? (Number(it.pct)||0) : (parseFloat(tr.querySelector('.pct')?.value)||0);
+      const cat= it ? (String(it.cat||'conc')) : ((tr.querySelector('.cat')?.value)||'conc');
+      const nm = it ? String(it.name||'').trim() : (tr.querySelector('.name')?.value||'').trim();
+
+      const pDM = dm>0? (pTon/(dm/100)) : 0;
+      if(tr && tr.querySelector('.pTonDM')) tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
 
       if (mode==='tmr_asfed'){
         const kgDM = kg*(dm/100);
         totalAsFed += kg;
-        // F:C (DM) + NEL/NDF from library (if found)
         if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
-        const nm = (tr.querySelector('.name')?.value||'').trim();
+
         const f = FEEDS_BY_NAME.get(nm);
         if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
         if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-        const cp = parseFloat(tr.querySelector('.cp').value)||0;
-        cpKg += kgDM * (cp/100);
-        const cost = (kgDM/1000)*pDM;
-        tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-        tr.querySelector('.cost').textContent = cost? nf(cost):'—';
-        totalDM+=kgDM; totalCost+=cost;
+
+        const cost = kg * pKg;
+        const cpPct = cpIn;
+        const cpAdd = kgDM*(cpPct/100);
+
+        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+
+        totalDM+=kgDM; totalCost+=cost; cpKg += cpAdd;
+
       } else if (mode==='tmr_percent'){
-        tr.querySelector('.kgDM').textContent = '—';
-        tr.querySelector('.cost').textContent = '—';
+        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
+        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
+
         if (pc>0){
           mixAsFed+=(pc/100)*pTon;
-          const dmPart = (pc/100)*(dm/100); // fraction of DM per 1 ton as-fed
+          const dmPart = (pc/100)*(dm/100);
           dmFrac+=dmPart;
           sumPct+=pc;
-          const cp=parseFloat(tr.querySelector('.cp').value)||0;
-          cpKg += dmPart*(cp/100);
-          // F:C + NEL/NDF (per ton as-fed basis)
+          cpKg += dmPart*(cpIn/100);
           if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
-          const nm = (tr.querySelector('.name')?.value||'').trim();
+
           const f = FEEDS_BY_NAME.get(nm);
           if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
           if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
         }
-      } else {
+
+      } else { // split
         if (cat==='rough'){
           const kgDM = kg*(dm/100);
           totalAsFed += kg;
-          // F:C (DM) + NEL/NDF from library (if found)
           roughDM_forFC += kgDM;
-          const nm = (tr.querySelector('.name')?.value||'').trim();
+
           const f = FEEDS_BY_NAME.get(nm);
           if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
           if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-          const cp = parseFloat(tr.querySelector('.cp').value)||0;
-          cpKg += kgDM * (cp/100);
-          const cost = (kgDM/1000)*pDM;
-          tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-          tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+
+          const cost = kg * pKg;
+          cpKg += kgDM*(cpIn/100);
+
+          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+
+          totalDM+=kgDM; totalCost+=cost;
           roughDM+=kgDM; roughCost+=cost;
+
         } else {
-          tr.querySelector('.kgDM').textContent = '—';
-          tr.querySelector('.cost').textContent = '—';
-          if (pc>0){ concMixAsFed+=(pc/100)*pTon; concDmFrac+=(pc/100)*(dm/100); concSumPct+=pc; }
+          // مكونات المركزات كنسبة as-fed من "إجمالي المركزات"
+          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
+          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
+          if (pc>0){
+            concMixAsFed += (pc/100)*pTon;
+            const dmPart = (pc/100)*(dm/100);
+            concDmFrac += dmPart;
+            concSumPct += pc;
+          }
         }
       }
     });
+
 
     // split: add concentrate DM for F:C (DM basis)
     if(mode==='split'){
@@ -1316,7 +1340,8 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
 
   // أضف/حدّث الخامة في القائمة
   const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
-  const item = {name, cat, dm, cp, kg, pct};
+  const pTonRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
+  const item = {name, cat, dm, cp, kg, pct, pTonRaw};
   if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
 
   // نظّف سطر الإدخال لخامة جديدة
@@ -1327,10 +1352,14 @@ document.getElementById('addPreset')?.addEventListener('click', ()=>{
   tr.querySelector('.cp').value='';
 
   renderRationSummary();
+  recalc();
 });
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
    if(confirm('مسح كل الصفوف؟')){
   tbody.innerHTML='';
+  rationItems.length = 0;
+  selectedRation.clear();
+  renderRationSummary();
   recalc();
   document.getElementById('feedInputBox').style.display='none';
   document.getElementById('feedSummaryBox').style.display='none';
