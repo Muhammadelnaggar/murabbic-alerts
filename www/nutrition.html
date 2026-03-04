@@ -554,6 +554,53 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
   // ✅ ثابت: tbody للجدول (لا تستخدمه قبل تعريفه)
   const tbody = document.querySelector('#tbl tbody');
 
+let activeRow = null;
+tbody.addEventListener('focusin', (e) => {
+  const tr = e.target.closest('tr');
+  if (tr) activeRow = tr;
+});
+
+function getActiveRow() {
+  return activeRow || tbody.querySelector('tr:last-child');
+}
+
+function autofillRowFromName(tr) {
+  if (!tr) return;
+  const nameEl = tr.querySelector('input.name');
+  if (!nameEl) return;
+  const v = String(nameEl.value || '').trim();
+  if (!v) return;
+  const feed = findFeedByName(v);
+  if (!feed) return;
+
+  // DM% + CP% (and category if available)
+  const dmEl = tr.querySelector('input.dm');
+  const cpEl = tr.querySelector('input.cp');
+  const catEl = tr.querySelector('select.cat');
+
+  const dm = (feed.dm ?? feed.dmPct);
+  const cp = (feed.cp ?? feed.cpPct);
+
+  if (dmEl && (dm !== undefined && dm !== null && dm !== '')) dmEl.value = String(dm);
+  if (cpEl && (cp !== undefined && cp !== null && cp !== '')) cpEl.value = String(cp);
+  if (catEl && feed.cat) catEl.value = feed.cat;
+}
+
+// Auto-fill when user selects a feed name (datalist selection triggers change/input)
+tbody.addEventListener('change', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('name')) {
+    autofillRowFromName(e.target.closest('tr'));
+    recalc();
+  }
+});
+tbody.addEventListener('input', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('name')) {
+    // input is needed for mobile where datalist doesn't always fire change
+    autofillRowFromName(e.target.closest('tr'));
+    recalc();
+  }
+});
+
 
 const rationActions = document.getElementById('rationActions');
 const btnRationEdit = document.getElementById('rationEdit');
@@ -1083,11 +1130,11 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
   if(kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
   if(costEl)   costEl.textContent   = cost ? nf(cost) : '—';
 });
-    // ✅ مصدر الحقيقة للحساب هو "الملخص" (rationItems) بعد الضغط "إضافة خامة".
-    // في حال لم تُضَف أي خامات بعد، نحسب مؤقتًا من صفوف الإدخال الحالية.
-    const entries = (rationItems && rationItems.length)
-      ? rationItems.map(it => ({ it, tr: null }))
-      : Array.from(tbody.querySelectorAll('tr')).map(tr => ({ tr, it: null }));
+    // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
+// وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
+    const entries = (Array.isArray(rationItems) && rationItems.length)
+      ? rationItems.map(it=>({it}))
+      : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
 
     entries.forEach(({tr,it})=>{
       const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
@@ -1664,25 +1711,6 @@ presetSel.addEventListener('change', ()=>{
         ["هامش لبن - علف/رأس/يوم (اختياري)", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
       ];
       e.innerHTML = items.map(([k,v])=>(
-        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
-      )).join("");
-    }
-
-    // ===== تحديث العرض المتقدم لو مفتوح =====
-    const adv = $("advancedKPIs");
-    if(adv && adv.style.display !== "none"){
-      const items = [
-        ["الهدف: DMI (كجم DM/يوم)", fmt($("dmiTarget")?.textContent, "")],
-        ["الفعلي: إجمالي DM", fmt($("totDM")?.textContent, " كجم")],
-        ["الهدف: NEL (Mcal/يوم)", fmt($("nelTarget")?.textContent, "")],
-        ["الفعلي: NEL (Mcal/يوم)", fmt($("nelActual")?.textContent, "")],
-        ["الهدف: CP%", fmt($("cpTarget")?.textContent, "%")],
-        ["الفعلي: CP%", fmt($("cpPctTotal")?.textContent, "")],
-        ["الهدف: NDF%", fmt($("ndfTarget")?.textContent, "%")],
-        ["الفعلي: NDF%", fmt($("ndfPctActual")?.textContent, "")],
-        ["حد أقصى نشا (اختياري)", fmt($("starchMax")?.textContent, "%")],
-      ];
-      adv.innerHTML = items.map(([k,v])=>(
         '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
       )).join("");
     }
