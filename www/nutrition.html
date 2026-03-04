@@ -792,29 +792,17 @@ const snap = await getDocs(collection(db, 'feed_items'));
 
     const list = [];
     const pickNum = (obj, keys) => {
-  // ✅ يدعم القيم سواء في جذر الوثيقة أو داخل nrc2021 / patch / patch.nrc2021
-  const pools = [
-    obj,
-    obj?.nrc2021,
-    obj?.patch,
-    obj?.patch?.nrc2021,
-    obj?.patch?.NRC2021,
-    obj?.NRC2021,
-  ].filter(Boolean);
-
   for (const k of keys) {
-    for (const src of pools) {
-      let v = src?.[k];
-      if (v === null || v === undefined || v === "") continue;
+    let v = obj?.[k];
+    if (v === null || v === undefined || v === "") continue;
 
-      // لو String (مثلاً "33%" أو "33.5")
-      if (typeof v === "string") {
-        v = v.replace(/[^\d.\-]/g, ""); // يشيل % وأي رموز
-      }
-
-      const n = Number(v);
-      if (!Number.isNaN(n)) return n;
+    // لو String (مثلاً "33%" أو "33.5")
+    if (typeof v === "string") {
+      v = v.replace(/[^\d.\-]/g, ""); // يشيل % وأي رموز
     }
+
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
   }
   return null;
 };
@@ -1095,11 +1083,11 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
   if(kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
   if(costEl)   costEl.textContent   = cost ? nf(cost) : '—';
 });
-    // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
-// وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
-    const entries = (Array.isArray(rationItems) && rationItems.length)
-      ? rationItems.map(it=>({it}))
-      : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
+    // ✅ مصدر الحقيقة للحساب هو "الملخص" (rationItems) بعد الضغط "إضافة خامة".
+    // في حال لم تُضَف أي خامات بعد، نحسب مؤقتًا من صفوف الإدخال الحالية.
+    const entries = (rationItems && rationItems.length)
+      ? rationItems.map(it => ({ it, tr: null }))
+      : Array.from(tbody.querySelectorAll('tr')).map(tr => ({ tr, it: null }));
 
     entries.forEach(({tr,it})=>{
       const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
@@ -1680,6 +1668,25 @@ presetSel.addEventListener('change', ()=>{
       )).join("");
     }
 
+    // ===== تحديث العرض المتقدم لو مفتوح =====
+    const adv = $("advancedKPIs");
+    if(adv && adv.style.display !== "none"){
+      const items = [
+        ["الهدف: DMI (كجم DM/يوم)", fmt($("dmiTarget")?.textContent, "")],
+        ["الفعلي: إجمالي DM", fmt($("totDM")?.textContent, " كجم")],
+        ["الهدف: NEL (Mcal/يوم)", fmt($("nelTarget")?.textContent, "")],
+        ["الفعلي: NEL (Mcal/يوم)", fmt($("nelActual")?.textContent, "")],
+        ["الهدف: CP%", fmt($("cpTarget")?.textContent, "%")],
+        ["الفعلي: CP%", fmt($("cpPctTotal")?.textContent, "")],
+        ["الهدف: NDF%", fmt($("ndfTarget")?.textContent, "%")],
+        ["الفعلي: NDF%", fmt($("ndfPctActual")?.textContent, "")],
+        ["حد أقصى نشا (اختياري)", fmt($("starchMax")?.textContent, "%")],
+      ];
+      adv.innerHTML = items.map(([k,v])=>(
+        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+      )).join("");
+    }
+
     }
 
   // Toggle advanced
@@ -1716,4 +1723,3 @@ presetSel.addEventListener('change', ()=>{
 
 </body>
 </html>
-
