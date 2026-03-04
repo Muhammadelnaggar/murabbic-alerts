@@ -532,6 +532,62 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
   const qs = (sel, root=document) => root.querySelector(sel);
   const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
+  // ===== عرض متقدم (Live) =====
+  const advBtn = document.getElementById('toggleAdvancedBtn');
+  const advBox = document.getElementById('advancedKPIs');
+  let advOpen = false;
+
+  function kpiCell(label, value){
+    return `<div class="kpi"><div class="k">${label}</div><div class="v">${value}</div></div>`;
+  }
+
+  function updateAdvancedKPIs(state){
+    if(!advBox) return;
+    if(!advOpen){ return; }
+    const {
+      totalDM, totalAsFed, cpPctTotal, fcRatio,
+      nelSupplied, ndfKg, totalCost, milkKg
+    } = state;
+
+    const dmStr = isFinite(totalDM) ? `${nf(totalDM)} كجم` : '—';
+    const asfedStr = isFinite(totalAsFed) ? `${nf(totalAsFed)} كجم` : '—';
+    const cpStr = (cpPctTotal!=null && isFinite(cpPctTotal)) ? `${cpPctTotal.toFixed(1)}%` : '—';
+    const fcStr = (fcRatio!=null && isFinite(fcRatio)) ? fcRatio.toFixed(2) : '—';
+    const nelStr = isFinite(nelSupplied) && nelSupplied>0 ? `${nf(nelSupplied)} م.كال` : '—';
+    const ndfStr = isFinite(ndfKg) && ndfKg>0 ? `${nf(ndfKg)} كجم` : '—';
+    const costStr = isFinite(totalCost) ? `${nf(totalCost)} ج` : '—';
+
+    let dmPerKgMilk = '—';
+    if(isFinite(milkKg) && milkKg>0 && isFinite(totalDM)){
+      dmPerKgMilk = nf(totalDM / milkKg);
+    }
+
+    advBox.innerHTML = [
+      kpiCell('إجمالي المادة الجافة/رأس/يوم', dmStr),
+      kpiCell('إجمالي المأكول/رأس/يوم', asfedStr),
+      kpiCell('نسبة البروتين الخام (DM)', cpStr),
+      kpiCell('نسبة الخشن:المركزات (DM)', fcStr),
+      kpiCell('الطاقة المقدّمة NEL/يوم', nelStr),
+      kpiCell('NDF كجم/يوم', ndfStr),
+      kpiCell('إجمالي تكلفة العليقة/رأس/يوم', costStr),
+      kpiCell('DM / كجم لبن', dmPerKgMilk !== '—' ? dmPerKgMilk : '—')
+    ].join('');
+  }
+
+  function setAdvancedOpen(open){
+    advOpen = !!open;
+    if(!advBox || !advBtn) return;
+    advBox.style.display = advOpen ? '' : 'none';
+    advBtn.textContent = advOpen ? 'إخفاء العرض المتقدم' : 'عرض متقدم';
+  }
+
+  advBtn?.addEventListener('click', ()=>{
+    setAdvancedOpen(!advOpen);
+    // تحديث فوري عند الفتح
+    try{ recalc(); }catch(_){}
+  });
+
+
   // ✅ تحويل السعر: لو المستخدم كتب "سعر/كجم" (مثلاً 13.5) نحوله تلقائياً إلى "سعر/طن" (×1000)
   function normalizeKgPrice(v){
     const n = Number(v);
@@ -1340,7 +1396,10 @@ if(mode==="tmr_percent"){
     setNum("milkMargin", margin, (v)=>nf(v));
 
     try{ render(); }catch(e){}
-    warn.textContent = w;
+    
+    // تحديث العرض المتقدم (طالما مفتوح)
+    try{ updateAdvancedKPIs({ totalDM, totalAsFed, cpPctTotal, fcRatio: fc, nelSupplied, ndfKg, totalCost, milkKg: (readContext()?.avgMilkKg||0) }); }catch(_){ }
+warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
   }
 function hookRow(tr){
