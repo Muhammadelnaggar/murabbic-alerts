@@ -1157,6 +1157,7 @@ if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
 }
 
   function recalc(){
+    const ctx = (window.mbkNutrition?.readContext ? window.mbkNutrition.readContext() : (typeof readContext==="function" ? readContext() : {}));
     const mode = modeSel.value;
     let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
     let totalAsFed=0;
