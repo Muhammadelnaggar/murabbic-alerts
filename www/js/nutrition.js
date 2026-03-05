@@ -253,6 +253,9 @@ async function loadCtxFromAnimal(numberStr, eventDate){
   const animal = await findAnimalDocByNumber(db, fs, uid, numberStr);
   if(!animal) return { ok:false, reason:'not_found' };
 
+  // ✅ تخزين الحيوان الحالي ليُستخدم في الاحتياجات (breed/weight)
+  window.currentAnimal = animal;
+
   const dim = Number.isFinite(Number(animal?.daysInMilk)) ? Number(animal.daysInMilk) : null;
 
   const speciesRaw =
@@ -452,7 +455,7 @@ function readContext(){
   return {
     group: qp().get('group') || null,
     species,
-    breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || null),
+    breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || window.currentAnimal?.breed || null),
     daysInMilk: getNum('ctxDIM'),
     avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
     earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
