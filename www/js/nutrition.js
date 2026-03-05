@@ -11,19 +11,26 @@ import { computeTargets } from '/js/nutrition-engine.js';
 
 // ✅ للتجربة من الكونسول: window.mbkNutrition.computeTargets()
 window.mbkNutrition = window.mbkNutrition || {};
-window.mbkNutrition.computeTargets = () => {
-  const ctx = readContext();
-  // readContext يرجّع species + avgMilkKg + pregnancyDays + flags
- return computeTargets({
-    species: ctx?.species,
-    breed: ctx?.breed,
-    daysInMilk: ctx?.daysInMilk,
-    avgMilkKg: ctx?.avgMilkKg,
-    pregnancyDays: ctx?.pregnancyDays,
-    earlyDry: ctx?.earlyDry,
-    closeUp: ctx?.closeUp
+window.mbkNutrition.BUILD_ID = 'nutrition-2026-03-05-B';
+
+// ✅ للتجربة من الكونسول
+// window.mbkNutrition.readContext()
+// window.mbkNutrition.computeTargets()
+window.mbkNutrition.readContext = () => readContext();
+
+window.mbkNutrition.computeTargets = (ctx) => {
+  const _ctx = ctx || readContext();
+  return computeTargets({
+    species: _ctx?.species,
+    breed: _ctx?.breed,
+    daysInMilk: _ctx?.daysInMilk,
+    avgMilkKg: _ctx?.avgMilkKg,
+    pregnancyDays: _ctx?.pregnancyDays,
+    earlyDry: _ctx?.earlyDry,
+    closeUp: _ctx?.closeUp
   });
 };
+
 
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
