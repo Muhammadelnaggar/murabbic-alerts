@@ -31,7 +31,8 @@ export function computeTargets(ctx){
     milkKg,
     pregDays,
     closeUp,
-    dim
+    dim,
+    breed
   });
 }
 
@@ -69,7 +70,38 @@ function getStandardWeight(species, breed){
 /*          COW ENGINE           */
 /* ============================= */
 
-function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim }){
+
+function isDualPurposeBreed(breed){
+  const b = String(breed || '').trim().toLowerCase()
+    .replace(/[أإآ]/g,'ا')
+    .replace(/ة/g,'ه');
+  return (
+    b.includes('مونبليار') || b.includes('مونبيليار') || b.includes('montb') || b.includes('montbeli') ||
+    b.includes('سيمينتال') || b.includes('simmental')
+  );
+}
+
+function cowBreedFactors(breed){
+  // افتراضات مُرَبِّيك الميدانية للسلالات ثنائية الغرض
+  if(isDualPurposeBreed(breed)){
+    return {
+      cpBonusPct: 2.0,      // +2% CP دائمًا
+      dmiFactor: 0.96,      // استهلاك أقل قليلًا
+      nelMilkFactor: 1.03,  // دهن أعلى → طاقة لبن أعلى قليلًا
+      ndfTarget: 33,        // يتحمل/يستفيد من خشن أعلى
+      starchMax: 25         // نحد النشا لتفادي beef side
+    };
+  }
+  return {
+    cpBonusPct: 0.0,
+    dmiFactor: 1.0,
+    nelMilkFactor: 1.0,
+    ndfTarget: cowBreedFactors(breed).ndfTarget,
+    starchMax: cowBreedFactors(breed).starchMax
+  };
+}
+
+function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
 
   // 1) DMI (NASEM-lite)
   // Base practical intake (field-robust)
@@ -79,12 +111,15 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim }){
   const wol = Number.isFinite(dim) && dim > 0 ? (dim / 7) : 0;
   const lactFactor = 1 - Math.exp(-0.192 * (wol + 3.67)); // 0→1 smoothly
 
-  const dmi = baseDmi * (wol ? lactFactor : 1);
+  const f = cowBreedFactors(breed);
+
+  let dmi = baseDmi * (wol ? lactFactor : 1);
+  dmi = dmi * f.dmiFactor;
 
   // 2) NEL Requirement (Mcal/day) — lite
   const bw075 = Math.pow(bodyWeight, 0.75);
   const nelMaintenance = 0.08 * bw075;
-  const nelMilk = 0.74 * milkKg;
+  const nelMilk = (0.74 * milkKg) * cowBreedFactors(breed).nelMilkFactor;
 
   let nelPreg = 0;
   if(pregDays > 190){
@@ -97,7 +132,8 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim }){
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
   // 3) CP target (dynamic, user-facing)
-  const cpTarget = clamp(13 + (0.10 * milkKg), 13, 18);
+  let cpTarget = clamp(13 + (0.10 * milkKg), 13, 18);
+  cpTarget = clamp(cpTarget + cowBreedFactors(breed).cpBonusPct, 13, 20);
 
   return {
     species: 'cow',
@@ -106,8 +142,8 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim }){
     dmi: round(dmi),
     nel: round(nelTotal),
     cpTarget: round(cpTarget),
-    ndfTarget: 30,
-    starchMax: 26
+    ndfTarget: cowBreedFactors(breed).ndfTarget,
+    starchMax: cowBreedFactors(breed).starchMax
   };
 }
 
