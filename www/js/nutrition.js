@@ -20,15 +20,14 @@ window.mbkNutrition.readContext = () => readContext();
 
 window.mbkNutrition.computeTargets = (ctx) => {
   const _ctx = ctx || readContext();
-  return computeTargets({
-    species: _ctx?.species,
-    breed: _ctx?.breed,
-    daysInMilk: _ctx?.daysInMilk,
-    avgMilkKg: _ctx?.avgMilkKg,
-    pregnancyDays: _ctx?.pregnancyDays,
-    earlyDry: _ctx?.earlyDry,
-    closeUp: _ctx?.closeUp
-  });
+ return computeTargets({
+  species: (ctx?.species === 'بقر') ? 'بقرة' : ctx?.species,
+  breed: ctx?.breed || window.currentAnimal?.breed || null,
+  daysInMilk: ctx?.daysInMilk,
+  avgMilkKg: ctx?.avgMilkKg,
+  pregnancyDays: ctx?.pregnancyDays,
+  closeUp: ctx?.closeUp
+});
 };
 
 
