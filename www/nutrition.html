@@ -106,6 +106,28 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 .kpi .arr{ font-size:18px; line-height:1; }      
 #advancedKPIs{margin-top:10px}
 
+/* === Murabbik Nutrition KPI cards: compact, mobile-first (surgical) === */
+.kpi-grid{gap:8px}
+.kpi{padding:10px}
+.kpi .k{
+  font-size:11px;
+  font-weight:900;
+  color:#334155;
+  opacity:1;
+  line-height:1.2;
+  min-height:28px;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.kpi .v{font-weight:900;font-size:16px;margin-top:0}
+@media (max-width:420px){
+  .kpi{padding:9px}
+  .kpi .v{font-size:16px}
+}
+
+
 
    }
   
@@ -531,62 +553,6 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
   const $ = (id) => document.getElementById(id);
   const qs = (sel, root=document) => root.querySelector(sel);
   const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-
-  // ===== عرض متقدم (Live) =====
-  const advBtn = document.getElementById('toggleAdvancedBtn');
-  const advBox = document.getElementById('advancedKPIs');
-  let advOpen = false;
-
-  function kpiCell(label, value){
-    return `<div class="kpi"><div class="k">${label}</div><div class="v">${value}</div></div>`;
-  }
-
-  function updateAdvancedKPIs(state){
-    if(!advBox) return;
-    if(!advOpen){ return; }
-    const {
-      totalDM, totalAsFed, cpPctTotal, fcRatio,
-      nelSupplied, ndfKg, totalCost, milkKg
-    } = state;
-
-    const dmStr = isFinite(totalDM) ? `${nf(totalDM)} كجم` : '—';
-    const asfedStr = isFinite(totalAsFed) ? `${nf(totalAsFed)} كجم` : '—';
-    const cpStr = (cpPctTotal!=null && isFinite(cpPctTotal)) ? `${cpPctTotal.toFixed(1)}%` : '—';
-    const fcStr = (fcRatio!=null && isFinite(fcRatio)) ? fcRatio.toFixed(2) : '—';
-    const nelStr = isFinite(nelSupplied) && nelSupplied>0 ? `${nf(nelSupplied)} م.كال` : '—';
-    const ndfStr = isFinite(ndfKg) && ndfKg>0 ? `${nf(ndfKg)} كجم` : '—';
-    const costStr = isFinite(totalCost) ? `${nf(totalCost)} ج` : '—';
-
-    let dmPerKgMilk = '—';
-    if(isFinite(milkKg) && milkKg>0 && isFinite(totalDM)){
-      dmPerKgMilk = nf(totalDM / milkKg);
-    }
-
-    advBox.innerHTML = [
-      kpiCell('إجمالي المادة الجافة/رأس/يوم', dmStr),
-      kpiCell('إجمالي المأكول/رأس/يوم', asfedStr),
-      kpiCell('نسبة البروتين الخام (DM)', cpStr),
-      kpiCell('نسبة الخشن:المركزات (DM)', fcStr),
-      kpiCell('الطاقة المقدّمة NEL/يوم', nelStr),
-      kpiCell('NDF كجم/يوم', ndfStr),
-      kpiCell('إجمالي تكلفة العليقة/رأس/يوم', costStr),
-      kpiCell('DM / كجم لبن', dmPerKgMilk !== '—' ? dmPerKgMilk : '—')
-    ].join('');
-  }
-
-  function setAdvancedOpen(open){
-    advOpen = !!open;
-    if(!advBox || !advBtn) return;
-    advBox.style.display = advOpen ? '' : 'none';
-    advBtn.textContent = advOpen ? 'إخفاء العرض المتقدم' : 'عرض متقدم';
-  }
-
-  advBtn?.addEventListener('click', ()=>{
-    setAdvancedOpen(!advOpen);
-    // تحديث فوري عند الفتح
-    try{ recalc(); }catch(_){}
-  });
-
 
   // ✅ تحويل السعر: لو المستخدم كتب "سعر/كجم" (مثلاً 13.5) نحوله تلقائياً إلى "سعر/طن" (×1000)
   function normalizeKgPrice(v){
@@ -1396,10 +1362,7 @@ if(mode==="tmr_percent"){
     setNum("milkMargin", margin, (v)=>nf(v));
 
     try{ render(); }catch(e){}
-    
-    // تحديث العرض المتقدم (طالما مفتوح)
-    try{ updateAdvancedKPIs({ totalDM, totalAsFed, cpPctTotal, fcRatio: fc, nelSupplied, ndfKg, totalCost, milkKg: (readContext()?.avgMilkKg||0) }); }catch(_){ }
-warn.textContent = w;
+    warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
   }
 function hookRow(tr){
@@ -1700,10 +1663,10 @@ presetSel.addEventListener('change', ()=>{
     const n = $("nutritionKPIs");
     if(n){
       const items = [
-        ["إجمالي المادة الجافة/رأس/يوم", fmt($("totDM")?.textContent, " كجم")],
-        ["إجمالي المأكول/رأس/يوم", fmt($("totAsFed")?.textContent, " كجم")],
-        ["نسبة البروتين الخام في العليقة", fmt($("cpPctTotal")?.textContent, "")],
-        ["نسبة الخشن إلى المركزات (F:C)", fmt($("fcRatio")?.textContent, "")],
+        ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+        ["المأكول", fmt($("totAsFed")?.textContent, " كجم")],
+        ["البروتين", fmt($("cpPctTotal")?.textContent, "")],
+        ["سلامة الكرش", fmt($("fcRatio")?.textContent, "")],
       ];
       n.innerHTML = items.map(([k,v])=>{
         let st = {sym:"—", color:"#64748b"};
@@ -1726,17 +1689,31 @@ presetSel.addEventListener('change', ()=>{
     const e = $("economicKPIs");
     if(e){
       const items = [
-        ["إجمالي تكلفة العليقة/رأس/يوم", fmt($("totCost")?.textContent, "") + " ج"],
-        ["تكلفة كجم اللبن من العليقة", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-        ["كفاءة التحويل (DM/لبن)", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? (fmt($("dmPerKgMilk")?.textContent, "") + " كجم DM/كجم لبن") : "—"],
-        ["سعر طن TMR (DM)", fmt($("mixPriceDM")?.textContent, "")],
-        ["إجمالي as-fed/رأس/يوم", fmt($("totAsFed")?.textContent, " كجم")],
-        ["إيراد اللبن/رأس/يوم (اختياري)", fmt($("milkRevenue")?.textContent, "") !== "—" ? (fmt($("milkRevenue")?.textContent, "") + " ج") : "—"],
-        ["هامش لبن - علف/رأس/يوم (اختياري)", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+        ["التكلفة/رأس", fmt($("totCost")?.textContent, "") + " ج"],
+        ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+        ["طن TMR (DM)", fmt($("mixPriceDM")?.textContent, "")],
+        ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
       ];
       e.innerHTML = items.map(([k,v])=>(
         '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
       )).join("");
+
+    // ===== عرض متقدم (Live) =====
+    const adv = $("advancedKPIs");
+    if(adv && adv.style.display==="grid"){
+      const items = [
+        ["هدف DM", fmt($("dmiTarget")?.textContent, "")],
+        ["DM فعلي", fmt($("totDM")?.textContent, " كجم")],
+        ["هدف بروتين", fmt($("cpTarget")?.textContent, "%")],
+        ["بروتين فعلي", fmt($("cpPctTotal")?.textContent, "")],
+        ["هدف طاقة", fmt($("nelTarget")?.textContent, "")],
+        ["طاقة فعلية", fmt($("nelActual")?.textContent, "")],
+      ];
+      adv.innerHTML = items.map(([k,v])=>(
+        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+      )).join("");
+    }
+
     }
 
     }
@@ -1749,22 +1726,12 @@ presetSel.addEventListener('change', ()=>{
     if(!adv) return;
     adv.style.display = (adv.style.display==="none"||!adv.style.display) ? "grid" : "none";
    
-    // fill once
-    const items = [
-      ["الهدف: DMI (كجم DM/يوم)", fmt($("dmiTarget")?.textContent, "")],
-      ["الفعلي: إجمالي DM", fmt($("totDM")?.textContent, " كجم")],
-      ["الهدف: NEL (Mcal/يوم)", fmt($("nelTarget")?.textContent, "")],
-      ["الفعلي: NEL (Mcal/يوم)", fmt($("nelActual")?.textContent, "")],
-      ["الهدف: CP%", fmt($("cpTarget")?.textContent, "%")],
-      ["الفعلي: CP%", fmt($("cpPctTotal")?.textContent, "")],
-      ["الهدف: NDF%", fmt($("ndfTarget")?.textContent, "%")],
-      ["الفعلي: NDF%", fmt($("ndfPctActual")?.textContent, "")],
-      ["حد أقصى نشا (اختياري)", fmt($("starchMax")?.textContent, "%")],
-    ];
-    adv.innerHTML = items.map(([k,v])=>(
-      '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
-    )).join("");
+    // (live) render happens inside render() when advanced is visible
+    btn.textContent = (adv.style.display==="grid") ? "إخفاء العرض المتقدم" : "عرض متقدم";
+    return;
   });
+
+});
 
   // Re-render periodically (live)
   setInterval(render, 600);
