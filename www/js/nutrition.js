@@ -16,6 +16,8 @@ window.mbkNutrition.computeTargets = () => {
   // readContext يرجّع species + avgMilkKg + pregnancyDays + flags
  return computeTargets({
     species: ctx?.species,
+    breed: ctx?.breed,
+    daysInMilk: ctx?.daysInMilk,
     avgMilkKg: ctx?.avgMilkKg,
     pregnancyDays: ctx?.pregnancyDays,
     earlyDry: ctx?.earlyDry,
@@ -256,6 +258,14 @@ const species = normalizeSpecies(speciesRaw);
 
   const preg = (animal?.reproductiveStatus || animal?.lastDiagnosis || animal?.pregStatus || '') || '';
 
+  // breed (لرفع دقة الاحتياجات حسب السلالة)
+  try{
+    const br = String(animal?.breed || '').trim();
+    const el = document.getElementById('ctxBreed');
+    if(el && br) el.value = br;
+  }catch(_){ }
+
+
   // DCC من lastInseminationDate (فقط لو عشار)
   let dcc = null;
   if(preg === 'عشار' && animal?.lastInseminationDate){
@@ -436,6 +446,7 @@ function readContext(){
   return {
     group: qp().get('group') || null,
     species,
+    breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || null),
     daysInMilk: getNum('ctxDIM'),
     avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
     earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
