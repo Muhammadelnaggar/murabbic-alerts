@@ -335,12 +335,6 @@ padding: 6px 0;
   }
 }
 
-
-/* منع اهتزاز الأرقام داخل الكروت */
-.kpi .v, .kpi .k, .kpi { font-variant-numeric: tabular-nums; }
-.kpi { min-height: 64px; }
-.kpi .vrow { min-height: 34px; }
-
 </style>
 </head>
 <body>
@@ -1647,23 +1641,6 @@ presetSel.addEventListener('change', ()=>{
   };
 
   function render(){
-    // منع الارتعاش: لا نُعيد رسم الكروت إلا عند تغيّر القيم فعليًا
-    const sigParts = [
-      document.getElementById("totDM")?.textContent,
-      document.getElementById("totAsFed")?.textContent,
-      document.getElementById("cpPctTotal")?.textContent,
-      document.getElementById("fcRatio")?.textContent,
-      document.getElementById("totCost")?.textContent,
-      document.getElementById("costPerKgMilk")?.textContent,
-      document.getElementById("mixPriceDM")?.textContent,
-      document.getElementById("milkMargin")?.textContent,
-      document.getElementById("dmiTarget")?.textContent,
-      document.getElementById("cpTarget")?.textContent,
-      document.getElementById("nelTarget")?.textContent,
-      document.getElementById("nelTotal")?.textContent,
-    ].map(v=>String(v||"")).join("|");
-    if(window.__mbkNutLastSig === sigParts) return;
-    window.__mbkNutLastSig = sigParts;
     const sec = document.getElementById("analysisSection");
     if(sec) sec.style.display = "block";
     function toNum(txt){
@@ -1756,13 +1733,7 @@ presetSel.addEventListener('change', ()=>{
 
 
   // Re-render periodically (live)
-  let __mbkNutRaf = 0;
-  function scheduleRender(){
-    if(__mbkNutRaf) return;
-    __mbkNutRaf = requestAnimationFrame(()=>{ __mbkNutRaf = 0; render(); });
-  }
-  // إعادة رسم هادئة: تراقب التغيّر بدون اهتزاز
-  setInterval(scheduleRender, 900);
+  setInterval(render, 600);
   render();
 })();
 
