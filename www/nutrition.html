@@ -335,6 +335,77 @@ padding: 6px 0;
   }
 }
 
+
+/* === Murabbik KPI Visual Intelligence (surgical, no new buttons) === */
+.kpi{
+  position:relative;
+  background:#fff !important;
+  border:1px solid rgba(0,0,0,.06) !important;
+  box-shadow:0 6px 18px rgba(15,23,42,.06);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.kpi::before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:5px;
+  background:var(--kpi-accent, rgba(15,23,42,.18));
+}
+.kpi:hover{ transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.10); }
+.kpi .k{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.kpi-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  font-weight:900;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(15,23,42,.06);
+  color:#0f172a;
+  white-space:nowrap;
+}
+.kpi-badge .dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--kpi-accent, rgba(15,23,42,.18));
+  box-shadow:0 0 0 3px rgba(15,23,42,.06);
+}
+.kpi.ok{ --kpi-accent:#0ea05a; }
+.kpi.warn{ --kpi-accent:#f59e0b; }
+.kpi.bad{ --kpi-accent:#ef4444; }
+.kpi.ok .kpi-badge{ background:rgba(14,160,90,.10); color:#0b7f47; }
+.kpi.warn .kpi-badge{ background:rgba(245,158,11,.12); color:#92400e; }
+.kpi.bad .kpi-badge{ background:rgba(239,68,68,.10); color:#991b1b; }
+
+.kpi-meter{
+  margin-top:8px;
+  height:7px;
+  background:rgba(15,23,42,.07);
+  border-radius:999px;
+  overflow:hidden;
+}
+.kpi-meter > span{
+  display:block;
+  height:100%;
+  width:0%;
+  background:var(--kpi-accent, rgba(15,23,42,.18));
+  border-radius:999px;
+  transition:width .18s ease;
+}
+.kpi-hint{
+  margin-top:6px;
+  font-size:11px;
+  font-weight:800;
+  color:#334155;
+  opacity:.9;
+  line-height:1.2;
+}
+
 </style>
 </head>
 <body>
@@ -1640,6 +1711,8 @@ presetSel.addEventListener('change', ()=>{
     return isFinite(n)?n:null;
   };
 
+  let __lastSig = "";
+
   function render(){
     const sec = document.getElementById("analysisSection");
     if(sec) sec.style.display = "block";
@@ -1658,6 +1731,28 @@ presetSel.addEventListener('change', ()=>{
       if(d < -band) return {sym:"▼", color:"#c62828"};   // أقل من المطلوب
       return {sym:"▲", color:"#f57c00"};                // أعلى من المطلوب
     }
+
+
+    // منع الارتعاش: لا نعيد رسم الكروت إلا إذا تغيّرت القيم فعليًا
+    const adv = $("advancedKPIs");
+    const sig = [
+      $("totDM")?.textContent || "",
+      $("totAsFed")?.textContent || "",
+      $("cpPctTotal")?.textContent || "",
+      $("fcRatio")?.textContent || "",
+      $("dmiTarget")?.textContent || "",
+      $("cpTarget")?.textContent || "",
+      $("nelActual")?.textContent || "",
+      $("nelTarget")?.textContent || "",
+      $("totCost")?.textContent || "",
+      $("costPerKgMilk")?.textContent || "",
+      $("mixPriceDM")?.textContent || "",
+      $("milkMargin")?.textContent || "",
+      adv ? (adv.style.display || "") : ""
+    ].join("|").trim();
+
+    if(sig === __lastSig) return;
+    __lastSig = sig;
 
 // ===== غذائي =====
     const n = $("nutritionKPIs");
@@ -1737,6 +1832,183 @@ presetSel.addEventListener('change', ()=>{
   render();
 })();
 
+</script>
+
+
+<script>
+(function(){
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+  function numFromText(t){
+    if(!t) return NaN;
+    // Arabic-Indic digits to Latin
+    const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','٫':'.','،':'.'};
+    t = String(t).trim().replace(/[٠-٩٫،]/g, ch => map[ch] ?? ch);
+    t = t.replace(/[^0-9.\-]/g,'');
+    const v = parseFloat(t);
+    return Number.isFinite(v) ? v : NaN;
+  }
+
+  function ensureBadge(card){
+    let b = card.querySelector('.kpi-badge');
+    if(!b){
+      b = document.createElement('span');
+      b.className = 'kpi-badge';
+      b.innerHTML = '<span class="dot"></span><span class="txt">—</span>';
+      const k = card.querySelector('.k');
+      if(k) k.appendChild(b);
+      else card.prepend(b);
+    }
+    let m = card.querySelector('.kpi-meter');
+    if(!m){
+      m = document.createElement('div');
+      m.className = 'kpi-meter';
+      m.innerHTML = '<span></span>';
+      card.appendChild(m);
+    }
+    let h = card.querySelector('.kpi-hint');
+    if(!h){
+      h = document.createElement('div');
+      h.className = 'kpi-hint';
+      h.textContent = '';
+      card.appendChild(h);
+    }
+    return b;
+  }
+
+  function setStatus(card, status, badgeText, hintText, meterPct){
+    card.classList.remove('ok','warn','bad');
+    if(status) card.classList.add(status);
+    const b = ensureBadge(card);
+    const txt = b.querySelector('.txt');
+    if(txt) txt.textContent = badgeText || '—';
+    const hint = card.querySelector('.kpi-hint');
+    if(hint) hint.textContent = hintText || '';
+    const bar = card.querySelector('.kpi-meter > span');
+    if(bar && Number.isFinite(meterPct)){
+      const p = Math.max(0, Math.min(100, meterPct));
+      bar.style.width = p.toFixed(0) + '%';
+    }
+  }
+
+  function labelOf(card){
+    const k = card.querySelector('.k');
+    return (k ? k.textContent : card.textContent).trim();
+  }
+
+  function valueOf(card){
+    const v = card.querySelector('.v');
+    return numFromText(v ? v.textContent : '');
+  }
+
+  function findCardByLabelIncludes(root, includes){
+    const arr = $$('.kpi', root);
+    for(const c of arr){
+      const lab = labelOf(c);
+      if(includes.every(x => lab.includes(x))) return c;
+    }
+    return null;
+  }
+
+  function enhance(){
+    const root = $('#analysisSection') || document;
+    const cards = $$('.kpi', root);
+    if(!cards.length) return;
+
+    // Basic cards (actuals)
+    const fcCard = findCardByLabelIncludes(root, ['سلامة الكرش']);
+    if(fcCard){
+      const fc = valueOf(fcCard);
+      if(Number.isFinite(fc)){
+        if(fc >= 0.55 && fc <= 0.70) setStatus(fcCard,'ok','ممتاز','توازن جيد للكرش', 100*( (fc-0.50)/0.40 ));
+        else if((fc > 0.70 && fc <= 0.80) || (fc >=0.50 && fc <0.55)) setStatus(fcCard,'warn','انتبه','زود خشن/قلل مركزات', 100*( (fc-0.50)/0.40 ));
+        else setStatus(fcCard,'bad','خطر','خطر حموضة/اختلال كرش', 100*( (fc-0.50)/0.40 ));
+      }
+    }
+
+    // Advanced target vs actual (if present)
+    const dmA = findCardByLabelIncludes(root, ['DM','فعلي']);
+    const dmT = findCardByLabelIncludes(root, ['DM','هدف']);
+    if(dmA && dmT){
+      const a = valueOf(dmA), t = valueOf(dmT);
+      if(Number.isFinite(a) && Number.isFinite(t) && t>0){
+        const r = a/t;
+        const diff = (a - t);
+        const meter = 100*Math.min(1.2, Math.max(0, r));
+        if(r >= 0.92 && r <= 1.05) setStatus(dmA,'ok','مناسب', `فرق ${diff.toFixed(2)} كجم`, meter);
+        else if(r >= 0.85 && r < 0.92) setStatus(dmA,'warn','ناقص', `نقص ${Math.abs(diff).toFixed(2)} كجم`, meter);
+        else if(r > 1.05 && r <= 1.12) setStatus(dmA,'warn','زيادة', `زيادة ${Math.abs(diff).toFixed(2)} كجم`, meter);
+        else setStatus(dmA,'bad', r<1 ? 'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(2)} كجم`, meter);
+        // target card looks neutral
+        setStatus(dmT,'', 'هدف', '', 100);
+      }
+    }
+
+    const cpA = findCardByLabelIncludes(root, ['بروتين','فعلي']);
+    const cpT = findCardByLabelIncludes(root, ['هدف','بروتين']);
+    if(cpA && cpT){
+      const a = valueOf(cpA), t = valueOf(cpT);
+      if(Number.isFinite(a) && Number.isFinite(t)){
+        const diff = a - t;
+        const meter = 100*Math.min(1.2, Math.max(0, (a/(t||1))));
+        if(Math.abs(diff) <= 0.3) setStatus(cpA,'ok','مناسب', `فرق ${diff.toFixed(1)}%`, meter);
+        else if(Math.abs(diff) <= 0.8) setStatus(cpA,'warn', diff<0?'ناقص':'زيادة', `فرق ${diff.toFixed(1)}%`, meter);
+        else setStatus(cpA,'bad', diff<0?'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(1)}%`, meter);
+        setStatus(cpT,'', 'هدف', '', 100);
+      }
+    }
+
+    const enA = findCardByLabelIncludes(root, ['طاقة','فعل']);
+    const enT = findCardByLabelIncludes(root, ['هدف','طاقة']);
+    if(enA && enT){
+      const a = valueOf(enA), t = valueOf(enT);
+      if(Number.isFinite(a) && Number.isFinite(t) && t>0){
+        const r = a/t;
+        const diff = a - t;
+        const meter = 100*Math.min(1.2, Math.max(0, r));
+        if(r >= 0.95 && r <= 1.06) setStatus(enA,'ok','مناسب', `فرق ${diff.toFixed(1)}`, meter);
+        else if(r >= 0.88 && r < 0.95) setStatus(enA,'warn','ناقص', `نقص ${Math.abs(diff).toFixed(1)}`, meter);
+        else if(r > 1.06 && r <= 1.12) setStatus(enA,'warn','زيادة', `زيادة ${Math.abs(diff).toFixed(1)}`, meter);
+        else setStatus(enA,'bad', r<1?'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(1)}`, meter);
+        setStatus(enT,'', 'هدف', '', 100);
+      }
+    }
+
+    // Protein summary card (basic) if exists
+    const cpBasic = findCardByLabelIncludes(root, ['البروتين']) && !cpA ? findCardByLabelIncludes(root, ['البروتين']) : null;
+    if(cpBasic && !cpA){
+      const a = valueOf(cpBasic);
+      if(Number.isFinite(a)){
+        // heuristic: ok 15.5-17.0
+        if(a>=15.5 && a<=17.0) setStatus(cpBasic,'ok','مناسب','', 90);
+        else if((a>=14.5 && a<15.5) || (a>17.0 && a<=18.0)) setStatus(cpBasic,'warn','انتبه','', 70);
+        else setStatus(cpBasic,'bad','غير مناسب','', 60);
+      }
+    }
+
+    // Clean meters/hints on cards that shouldn't have them (economic cards): only set badge if not set
+    for(const c of cards){
+      if(!c.classList.contains('ok') && !c.classList.contains('warn') && !c.classList.contains('bad')){
+        // still ensure badge exists but minimal
+        const b = ensureBadge(c);
+        const txt = b.querySelector('.txt');
+        if(txt && (txt.textContent==='—' || txt.textContent.trim()==='')) txt.textContent = 'معلومة';
+        const hint = c.querySelector('.kpi-hint'); if(hint) hint.textContent = '';
+        const bar = c.querySelector('.kpi-meter > span'); if(bar) bar.style.width = '0%';
+      }
+    }
+  }
+
+  // Run now and keep in sync (no new buttons)
+  let last = 0;
+  function tick(){
+    const now = Date.now();
+    if(now - last > 300){ last = now; enhance(); }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
 </script>
 
 </body>
