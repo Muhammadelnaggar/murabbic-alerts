@@ -13,6 +13,7 @@
 
   <!-- تتبّع واحد آمن في <head> (يمنع تكرار page_view) -->
   <script>
+     (function(){
       window.dataLayer = window.dataLayer || [];
       const fired = new Set();
       function push(name, props){ try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} }
@@ -1868,6 +1869,7 @@ if(adv && adv.style.display==="grid"){
 
  setInterval(render, 600);
 render();
+   })(); 
 </script>
 
 
