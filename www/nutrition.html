@@ -555,6 +555,7 @@ padding: 6px 0;
     <span id="totDM">—</span>
     <span id="totCost">—</span>
     <span id="totAsFed">—</span>
+    <span id="mixPriceAsFed">—</span>
     <span id="cpPctTotal">—</span>
     <span id="fcRatio">—</span>
 
@@ -1246,6 +1247,7 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
           const f = FEEDS_BY_NAME.get(normName(nm));
           if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
           if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
+          if(f && Number.isFinite(f.fat)) fatKg += dmPart * (Number(f.fat)/100);
         }
 
       } else { // split
@@ -1256,7 +1258,8 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
 
           const f = FEEDS_BY_NAME.get(normName(nm));
           if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
-          if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
+if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
+if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
 
           const cost = kg * pKg;
           cpKg += kgDM*(cpIn/100);
@@ -1955,6 +1958,13 @@ if(adv && adv.style.display==="grid"){
 
     // Basic cards (actuals)
    const fcCard = findCardByLabelIncludes(root, ['سلامة الكرش']);
+
+const fcRatioEl = document.getElementById("fcRatio");
+if(fcRatioEl && fcCard){
+  fcCard.dataset.roughDm = fcRatioEl.dataset.roughDm;
+  fcCard.dataset.concDm = fcRatioEl.dataset.concDm;
+  fcCard.dataset.foragePct = fcRatioEl.dataset.foragePct;
+}
 if(fcCard){
   const fc = valueOf(fcCard); // roughDM/concDM ratio
   if(Number.isFinite(fc)){
