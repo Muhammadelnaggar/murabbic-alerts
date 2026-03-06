@@ -1790,11 +1790,10 @@ presetSel.addEventListener('change', ()=>{
     const n = $("nutritionKPIs");
     if(n){
      const items = [
-  ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+    ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
     ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
     ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
- 
 ];
       n.innerHTML = items.map(([k,v])=>{
         let st = {sym:"—", color:"#64748b"};
@@ -1869,7 +1868,7 @@ if(adv && adv.style.display==="grid"){
 
  setInterval(render, 600);
 render();
- 
+ })();
 </script>
 
 
