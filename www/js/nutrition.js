@@ -422,7 +422,43 @@ function collectRows(){
   });
   return rows;
 }
+function readAnalysis(){
+  const txt = id => (document.getElementById(id)?.textContent || '').trim();
 
+  return {
+    totals: {
+      totDM: txt('totDM'),
+      totAsFed: txt('totAsFed'),
+      totCost: txt('totCost'),
+      mixPriceDM: txt('mixPriceDM'),
+      mixPriceAsFed: txt('mixPriceAsFed'),
+    },
+
+    nutrition: {
+      cpPctTotal: txt('cpPctTotal'),
+      fcRatio: txt('fcRatio'),
+      nelActual: txt('nelActual'),
+      ndfPctActual: txt('ndfPctActual'),
+      fatPctActual: txt('fatPctActual'),
+    },
+
+    targets: {
+      dmiTarget: txt('dmiTarget'),
+      nelTarget: txt('nelTarget'),
+      cpTarget: txt('cpTarget'),
+      ndfTarget: txt('ndfTarget'),
+      fatTarget: txt('fatTarget'),
+      starchMax: txt('starchMax'),
+    },
+
+    economics: {
+      costPerKgMilk: txt('costPerKgMilk'),
+      dmPerKgMilk: txt('dmPerKgMilk'),
+      milkRevenue: txt('milkRevenue'),
+      milkMargin: txt('milkMargin'),
+    }
+  };
+}
 function readKPIs(){
   const txt = id => (document.getElementById(id)?.textContent||'').trim();
   return {
@@ -442,7 +478,78 @@ function readKPIs(){
     }
   };
 }
+function parseUiNumber(v){
+  if(v===null || v===undefined) return null;
+  let s = String(v).trim();
+  if(!s || s==='—') return null;
 
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','٫':'.','،':'.'};
+  s = s.replace(/[٠-٩٫،]/g, ch => map[ch] ?? ch);
+  s = s.replace(/[^\d.\-]/g,'');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function cleanDeep(obj){
+  if(Array.isArray(obj)){
+    return obj
+      .map(cleanDeep)
+      .filter(v => v !== undefined);
+  }
+
+  if(obj && typeof obj === 'object'){
+    const out = {};
+    Object.entries(obj).forEach(([k,v])=>{
+      const vv = cleanDeep(v);
+      if(vv === undefined) return;
+      if(typeof vv === 'object' && !Array.isArray(vv) && vv && Object.keys(vv).length === 0) return;
+      if(Array.isArray(vv) && vv.length === 0) return;
+      out[k] = vv;
+    });
+    return out;
+  }
+
+  if(obj === '' || obj === '—' || obj === null || obj === undefined) return undefined;
+  return obj;
+}
+
+function readAnalysis(){
+  const txt = id => (document.getElementById(id)?.textContent || '').trim();
+
+  return cleanDeep({
+    totals: {
+      totDM: parseUiNumber(txt('totDM')),
+      totAsFed: parseUiNumber(txt('totAsFed')),
+      totCost: parseUiNumber(txt('totCost')),
+      mixPriceDM: parseUiNumber(txt('mixPriceDM')),
+      mixPriceAsFed: parseUiNumber(txt('mixPriceAsFed')),
+    },
+
+    nutrition: {
+      cpPctTotal: parseUiNumber(txt('cpPctTotal')),
+      fcRatio: parseUiNumber(txt('fcRatio')),
+      nelActual: parseUiNumber(txt('nelActual')),
+      ndfPctActual: parseUiNumber(txt('ndfPctActual')),
+      fatPctActual: parseUiNumber(txt('fatPctActual')),
+    },
+
+    targets: {
+      dmiTarget: parseUiNumber(txt('dmiTarget')),
+      nelTarget: parseUiNumber(txt('nelTarget')),
+      cpTarget: parseUiNumber(txt('cpTarget')),
+      ndfTarget: parseUiNumber(txt('ndfTarget')),
+      fatTarget: parseUiNumber(txt('fatTarget')),
+      starchMax: parseUiNumber(txt('starchMax')),
+    },
+
+    economics: {
+      costPerKgMilk: parseUiNumber(txt('costPerKgMilk')),
+      dmPerKgMilk: parseUiNumber(txt('dmPerKgMilk')),
+      milkRevenue: parseUiNumber(txt('milkRevenue')),
+      milkMargin: parseUiNumber(txt('milkMargin')),
+    }
+  });
+}
 function readContext(){
   const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
   const getSel = id => document.getElementById(id)?.value || null;
@@ -507,19 +614,24 @@ async function saveEvent(e){
     return;
   }
 
-  const rows = collectRows();
-  const payload = {
-    type: 'nutrition',
-    eventType: 'تغذية',
-    animalId,
-    animalNumber: animalId,
-    eventDate,
-    nutritionMode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-    nutritionRows: rows,
-    nutritionKPIs: readKPIs(),
-    nutritionContext: readContext(),
-    source: 'nutrition.html'
-  };
+ const rows =
+  (window.rationItems && Array.isArray(window.rationItems))
+  ? window.rationItems
+  : collectRows();
+const payload = cleanDeep({
+  type: 'nutrition',
+  eventType: 'تغذية',
+  animalNumber: animalId,
+  eventDate,
+  source: 'nutrition.html',
+
+  nutrition: {
+    mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+    rows,
+    context: readContext(),
+    analysis: readAnalysis()
+  }
+});
 
   // userId من auth (Cloud-only)
   try{
