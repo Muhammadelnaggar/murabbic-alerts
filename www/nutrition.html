@@ -558,16 +558,16 @@ padding: 6px 0;
     <span id="cpPctTotal">—</span>
     <span id="fcRatio">—</span>
 
-    <span id="nelActual">—</span>
+  <span id="nelActual">—</span>
 <span id="ndfPctActual">—</span>
 <span id="fatPctActual">—</span>
-<span id="mixPriceAsFed">—</span>
 
-    <span id="dmiTarget">—</span>
-    <span id="nelTarget">—</span>
-    <span id="cpTarget">—</span>
-    <span id="ndfTarget">—</span>
-    <span id="starchMax">—</span>
+<span id="dmiTarget">—</span>
+<span id="nelTarget">—</span>
+<span id="cpTarget">—</span>
+<span id="ndfTarget">—</span>
+<span id="fatTarget">6.0%</span>
+<span id="starchMax">—</span>
 
     <span id="costPerKgMilk">—</span>
     <span id="dmPerKgMilk">—</span>
@@ -1788,11 +1788,10 @@ presetSel.addEventListener('change', ()=>{
     if(n){
      const items = [
   ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
-  ["المأكول", fmt($("totAsFed")?.textContent, " كجم")],
-  ["البروتين", fmt($("cpPctTotal")?.textContent, "")],
-  ["الألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
-  ["سلامة الكرش", fmt($("fcRatio")?.textContent, "")],
-  ["دهن العليقة", fmt($("fatPctActual")?.textContent, "")],
+    ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
+    ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
+    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
+ 
 ];
       n.innerHTML = items.map(([k,v])=>{
         let st = {sym:"—", color:"#64748b"};
@@ -1826,27 +1825,29 @@ presetSel.addEventListener('change', ()=>{
       )).join("");
 
     // ===== عرض متقدم (Live) =====
-    const adv = $("advancedKPIs");
-    if(adv && adv.style.display==="grid"){
-     const items = [
-  ["هدف DM", fmt($("dmiTarget")?.textContent, " كجم")],
-  ["DM فعلي", fmt($("totDM")?.textContent, " كجم")],
+  const adv = $("advancedKPIs");
+if(adv && adv.style.display==="grid"){
+  const items = [
+    ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
+    ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
 
-  ["هدف بروتين", fmt($("cpTarget")?.textContent, "%")],
-  ["بروتين فعلي", fmt($("cpPctTotal")?.textContent, "")],
+    ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
+    ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
 
-  ["هدف ألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
-  ["ألياف NDF فعلية", fmt($("ndfPctActual")?.textContent, "")],
+    ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
+    ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
 
-  ["دهن فعلي", fmt($("fatPctActual")?.textContent, "")],
+    ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
+    ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
 
-  ["هدف طاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
-  ["طاقة فعلية", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")],
-];
-      adv.innerHTML = items.map(([k,v])=>(
-        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
-      )).join("");
-    }
+    ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
+    ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
+  ];
+
+  adv.innerHTML = items.map(([k,v])=>(
+    '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+  )).join("");
+}}
 
     }
 
