@@ -1810,22 +1810,23 @@ presetSel.addEventListener('change', ()=>{
       }).join("");
     }
 
-    // ===== اقتصادي =====
-    const e = $("economicKPIs");
-    if(e){
-      const items = [
-  ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
-  ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-  ["FCR (DM)", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? (fmt($("dmPerKgMilk")?.textContent, "") + " كجم DM/كجم لبن") : "—"],
-  ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
-  ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
-];
-      e.innerHTML = items.map(([k,v])=>(
-        '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
-      )).join("");
+   // ===== اقتصادي =====
+const e = $("economicKPIs");
+if(e){
+  const items = [
+    ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+    ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+    ["FCR (DM)", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? (fmt($("dmPerKgMilk")?.textContent, "") + " كجم DM/كجم لبن") : "—"],
+    ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+    ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+  ];
+  e.innerHTML = items.map(([k,v])=>(
+    '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
+  )).join("");
+}
 
-    // ===== عرض متقدم (Live) =====
-  const adv = $("advancedKPIs");
+// ===== عرض متقدم (Live) =====
+const adv = $("advancedKPIs");
 if(adv && adv.style.display==="grid"){
   const items = [
     ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
@@ -1847,11 +1848,7 @@ if(adv && adv.style.display==="grid"){
   adv.innerHTML = items.map(([k,v])=>(
     '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
   )).join("");
-}}
-
-    }
-
-    }
+}
 
   // Toggle advanced
   document.addEventListener("click",(ev)=>{
