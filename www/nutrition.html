@@ -559,7 +559,9 @@ padding: 6px 0;
     <span id="fcRatio">—</span>
 
     <span id="nelActual">—</span>
-    <span id="ndfPctActual">—</span>
+<span id="ndfPctActual">—</span>
+<span id="fatPctActual">—</span>
+<span id="mixPriceAsFed">—</span>
 
     <span id="dmiTarget">—</span>
     <span id="nelTarget">—</span>
@@ -918,17 +920,17 @@ if (d.enabled === false) return;
       const name = String(d.nameAr || '').trim();
       if(!name) return;
      
-    list.push({
+   list.push({
   id: docSnap.id,
   name,
   cat: String(d.cat || d.category || d.type || '').trim() || null,
 
-  // ✅ DM% + CP% بأكثر من اسم محتمل (NRC أو عربي قديم أو جديد)
   dm: pickNum(d, ['dmPct','dm','DM','dm_percent','dryMatterPct','dryMatter','dmP']),
   cp: pickNum(d, ['cpPct','cp','CP','proteinPct','protein','crudeProteinPct','cp_percent','cpP']),
 
   nel: pickNum(d, ['nelMcalPerKgDM','nel','NEL']),
   ndf: pickNum(d, ['ndfPct','ndf','NDF']),
+  fat: pickNum(d, ['fatPct','fat','Fat','EE','etherExtractPct','fat_percent']),
   mp:  pickNum(d, ['mpGPerKgDM','mp','MP']),
 });
     });
@@ -948,11 +950,12 @@ if (uid) {
       if (o.enabled === false) { f._hiddenByUser = true; continue; }
 
       // Override لأي قيمة فقط إذا كانت موجودة
-      if (o.dmPct != null) f.dm = Number(o.dmPct);
-      if (o.cpPct != null) f.cp = Number(o.cpPct);
-      if (o.nelMcalPerKgDM != null) f.nel = Number(o.nelMcalPerKgDM);
-      if (o.ndfPct != null) f.ndf = Number(o.ndfPct);
-      if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
+    if (o.dmPct != null) f.dm = Number(o.dmPct);
+if (o.cpPct != null) f.cp = Number(o.cpPct);
+if (o.nelMcalPerKgDM != null) f.nel = Number(o.nelMcalPerKgDM);
+if (o.ndfPct != null) f.ndf = Number(o.ndfPct);
+if (o.fatPct != null) f.fat = Number(o.fatPct);
+if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
     } catch (e) {
       console.warn('override read failed for', f.id, e);
     }
@@ -1166,6 +1169,7 @@ if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
     let roughDM_forFC=0, concDM_forFC=0; // DM for F:C (DM basis)
     let nelSupplied=0; // Mcal/day when possible
     let ndfKg=0;       // kg NDF/day when possible
+    let fatKg=0;       // kg fat/day on DM basis
     let concMixAsFed=0, concDmFrac=0, concSumPct=0;
     const concKg = parseFloat(concKgInput.value)||0;
     if(mode==="split"){ totalAsFed += concKg; }
@@ -1217,7 +1221,7 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
         const f = FEEDS_BY_NAME.get(normName(nm));
         if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
         if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-
+        if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
         const cost = kg * pKg;
         const cpPct = cpIn;
         const cpAdd = kgDM*(cpPct/100);
@@ -1337,7 +1341,9 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
     }
 
     document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
-
+    const mixAsFedTon = (totalAsFed>0 && totalCost>0) ? ((totalCost / totalAsFed) * 1000) : null;
+const mixAsFedEl = document.getElementById("mixPriceAsFed");
+if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedTon)) ? nf(mixAsFedTon) : "—";
     let w = '';
     if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
     if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
@@ -1414,11 +1420,16 @@ if(targets){
 }
     // ===== Actual NEL/NDF (لو متاحين من المكتبة) =====
     const dmForAct = (mode==="tmr_percent") ? (dmFrac||0) : (totalDM||0);
-    const nelEl = document.getElementById("nelActual");
-    if(nelEl) nelEl.textContent = (nelSupplied>0 && dmForAct>0) ? nf(nelSupplied) : "—";
-    const ndfPct = (ndfKg>0 && dmForAct>0) ? ((ndfKg/dmForAct)*100) : null;
-    const ndfEl = document.getElementById("ndfPctActual");
-    if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : "—";
+   const nelEl = document.getElementById("nelActual");
+if(nelEl) nelEl.textContent = (nelSupplied>0 && dmForAct>0) ? nf(nelSupplied) : "—";
+
+const ndfPct = (ndfKg>0 && dmForAct>0) ? ((ndfKg/dmForAct)*100) : null;
+const ndfEl = document.getElementById("ndfPctActual");
+if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : "—";
+
+const fatPct = (fatKg>0 && dmForAct>0) ? ((fatKg/dmForAct)*100) : null;
+const fatEl = document.getElementById("fatPctActual");
+if(fatEl) fatEl.textContent = (fatPct!=null && isFinite(fatPct)) ? (fatPct.toFixed(1)+"%") : "—";
 
     // ===== إجماليات نهائية (للكروت) =====
     let totDMVal = 0;
@@ -1775,12 +1786,14 @@ presetSel.addEventListener('change', ()=>{
 // ===== غذائي =====
     const n = $("nutritionKPIs");
     if(n){
-      const items = [
-        ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
-        ["المأكول", fmt($("totAsFed")?.textContent, " كجم")],
-        ["البروتين", fmt($("cpPctTotal")?.textContent, "")],
-        ["سلامة الكرش", fmt($("fcRatio")?.textContent, "")],
-      ];
+     const items = [
+  ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+  ["المأكول", fmt($("totAsFed")?.textContent, " كجم")],
+  ["البروتين", fmt($("cpPctTotal")?.textContent, "")],
+  ["الألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
+  ["سلامة الكرش", fmt($("fcRatio")?.textContent, "")],
+  ["دهن العليقة", fmt($("fatPctActual")?.textContent, "")],
+];
       n.innerHTML = items.map(([k,v])=>{
         let st = {sym:"—", color:"#64748b"};
         if(k.startsWith("إجمالي المادة الجافة")){
@@ -1802,11 +1815,12 @@ presetSel.addEventListener('change', ()=>{
     const e = $("economicKPIs");
     if(e){
       const items = [
-        ["التكلفة/رأس", fmt($("totCost")?.textContent, "") + " ج"],
-        ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-        ["طن TMR (DM)", fmt($("mixPriceDM")?.textContent, "")],
-        ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
-      ];
+  ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+  ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+  ["FCR (DM)", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? (fmt($("dmPerKgMilk")?.textContent, "") + " كجم DM/كجم لبن") : "—"],
+  ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+  ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+];
       e.innerHTML = items.map(([k,v])=>(
         '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
       )).join("");
@@ -1814,14 +1828,21 @@ presetSel.addEventListener('change', ()=>{
     // ===== عرض متقدم (Live) =====
     const adv = $("advancedKPIs");
     if(adv && adv.style.display==="grid"){
-      const items = [
-        ["هدف DM", fmt($("dmiTarget")?.textContent, "")],
-        ["DM فعلي", fmt($("totDM")?.textContent, " كجم")],
-        ["هدف بروتين", fmt($("cpTarget")?.textContent, "%")],
-        ["بروتين فعلي", fmt($("cpPctTotal")?.textContent, "")],
-        ["هدف طاقة", fmt($("nelTarget")?.textContent, "")],
-        ["طاقة فعلية", fmt($("nelActual")?.textContent, "")],
-      ];
+     const items = [
+  ["هدف DM", fmt($("dmiTarget")?.textContent, " كجم")],
+  ["DM فعلي", fmt($("totDM")?.textContent, " كجم")],
+
+  ["هدف بروتين", fmt($("cpTarget")?.textContent, "%")],
+  ["بروتين فعلي", fmt($("cpPctTotal")?.textContent, "")],
+
+  ["هدف ألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
+  ["ألياف NDF فعلية", fmt($("ndfPctActual")?.textContent, "")],
+
+  ["دهن فعلي", fmt($("fatPctActual")?.textContent, "")],
+
+  ["هدف طاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
+  ["طاقة فعلية", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")],
+];
       adv.innerHTML = items.map(([k,v])=>(
         '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'
       )).join("");
@@ -1945,9 +1966,9 @@ if(fcCard){
     const concDm  = Number(fcCard.dataset.concDm  || "");
     const foragePct = Number(fcCard.dataset.foragePct || "");
 
-    const detail = (Number.isFinite(roughDm) && Number.isFinite(concDm) && concDm>0)
-      ? `خشن ${roughDm.toFixed(1)} : مركز ${concDm.toFixed(1)} (خشن ${Math.round((roughDm/(roughDm+concDm))*100)}%)`
-      : (Number.isFinite(foragePct) ? `خشن ${foragePct.toFixed(0)}% من DM` : "");
+    const detail = (Number.isFinite(roughDm) && Number.isFinite(concDm) && (roughDm + concDm) > 0)
+  ? `مركزات ${Math.round((concDm/(roughDm+concDm))*100)}% : خشن ${Math.round((roughDm/(roughDm+concDm))*100)}% — على أساس المادة الجافة`
+  : (Number.isFinite(foragePct) ? `خشن ${foragePct.toFixed(0)}% من المادة الجافة` : "");
 
     // ✅ تقييم الحموضة الصحيح:
     // الخطر الحقيقي لما الخشن قليل (ratio منخفض) وليس لما الخشن عالي
