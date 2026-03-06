@@ -1954,7 +1954,7 @@ render();
     if(!cards.length) return;
 
     // Basic cards (actuals)
-   const fcCard = findCardByLabelIncludes(root, ['سلامة الكرش']);
+   const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
 
 const fcRatioEl = document.getElementById("fcRatio");
 if(fcRatioEl && fcCard){
@@ -1991,8 +1991,8 @@ if(fcCard){
 }
 
     // Advanced target vs actual (if present)
-    const dmA = findCardByLabelIncludes(root, ['DM','فعلي']);
-    const dmT = findCardByLabelIncludes(root, ['DM','هدف']);
+  const dmA = findCardByLabelIncludes(root, ['العليقة الحالية','مادة جافة']);
+   const dmT = findCardByLabelIncludes(root, ['احتياجات','المادة الجافة']);
     if(dmA && dmT){
       const a = valueOf(dmA), t = valueOf(dmT);
       if(Number.isFinite(a) && Number.isFinite(t) && t>0){
@@ -2008,8 +2008,8 @@ if(fcCard){
       }
     }
 
-    const cpA = findCardByLabelIncludes(root, ['بروتين','فعلي']);
-    const cpT = findCardByLabelIncludes(root, ['هدف','بروتين']);
+   const cpA = findCardByLabelIncludes(root, ['العليقة الحالية','بروتين خام']);
+   const cpT = findCardByLabelIncludes(root, ['احتياجات','البروتين الخام']);
     if(cpA && cpT){
       const a = valueOf(cpA), t = valueOf(cpT);
       if(Number.isFinite(a) && Number.isFinite(t)){
@@ -2022,8 +2022,8 @@ if(fcCard){
       }
     }
 
-    const enA = findCardByLabelIncludes(root, ['طاقة','فعل']);
-    const enT = findCardByLabelIncludes(root, ['هدف','طاقة']);
+   const enA = findCardByLabelIncludes(root, ['العليقة الحالية','طاقة']);
+   const enT = findCardByLabelIncludes(root, ['احتياجات','الطاقة']);
     if(enA && enT){
       const a = valueOf(enA), t = valueOf(enT);
       if(Number.isFinite(a) && Number.isFinite(t) && t>0){
@@ -2049,7 +2049,23 @@ if(fcCard){
         else setStatus(cpBasic,'bad','غير مناسب','', 60);
       }
     }
+    // بلوك الطاقة
+.......
+.......
 
+// 👇 ضع الكود هنا
+const ndfA = findCardByLabelIncludes(root, ['العليقة الحالية','ألياف NDF']);
+const ndfT = findCardByLabelIncludes(root, ['احتياجات','الألياف NDF']);
+....
+....
+
+const fatA = findCardByLabelIncludes(root, ['العليقة الحالية','دهن']);
+const fatT = findCardByLabelIncludes(root, ['الحد المستهدف','دهن']);
+....
+....
+
+// 👇 هذا السطر موجود أصلاً
+for(const c of cards){
     // Clean meters/hints on cards that shouldn't have them (economic cards): only set badge if not set
     for(const c of cards){
       if(!c.classList.contains('ok') && !c.classList.contains('warn') && !c.classList.contains('bad')){
