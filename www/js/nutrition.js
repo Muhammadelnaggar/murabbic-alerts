@@ -763,25 +763,32 @@ async function waitForAuthReady(timeoutMs = 5000){
 // Bind
 // =====================
 (function bind(){
-  const form = document.getElementById('nutritionForm') || document.querySelector('form[data-event="nutrition"]');
-  if (form) form.addEventListener('submit', saveEvent);
+  const form = document.getElementById('nutritionForm');
+  if (form) {
+    form.addEventListener('mbk:valid', saveEvent);
+  }
 
-  const btn  = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
-  if (btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); form?.requestSubmit?.(); });
+  const btn = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      form?.requestSubmit?.();
+    });
+  }
 
-  // init
   try{
     setHiddenCtxFromQuery();
     updateCtxView();
-   disableSave(true);
-waitForAuthReady().then(user=>{
-  if(!user){
     disableSave(true);
-    msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
-    return;
-  }
-  loadCtxAuto();
-});
+
+    waitForAuthReady().then(user=>{
+      if(!user){
+        disableSave(true);
+        msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
+        return;
+      }
+      loadCtxAuto();
+    });
   }catch(e){
     console.error(e);
     disableSave(true);
