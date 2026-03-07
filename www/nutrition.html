@@ -692,9 +692,9 @@ btnRationRemove?.addEventListener('click', ()=>{
   });
   selectedRation.clear();
   renderRationSummary();
-  recif (window.mbkNutrition?.recalc) {
+  if (window.mbkNutrition?.recalc) {
   window.mbkNutrition.recalc();
-}alc();
+}recalc();
 
   
 });
