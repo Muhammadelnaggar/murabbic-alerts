@@ -743,7 +743,8 @@ function escapeHtml(s){
   const clearBtn = document.getElementById('clearAll');
   const tplSel = document.getElementById('tpl');
 
-  let rationItems = [];
+ window.rationItems = window.rationItems || [];
+let rationItems = window.rationItems;
   const splitBox = document.getElementById('splitBox');
   const concKgInput = document.getElementById('concKgInput');
 
