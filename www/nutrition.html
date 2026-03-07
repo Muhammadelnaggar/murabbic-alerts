@@ -567,9 +567,13 @@ padding: 6px 0;
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
     <div id="advancedKPIs" style="display:none" class="kpi-grid"></div>
   </div>
-      <fo<form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
-        <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
-      </form>
+      <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
+  <input type="hidden" id="nutritionAnimalNumber" data-field="animalNumber">
+  <input type="hidden" id="nutritionEventDate" data-field="eventDate">
+  <input type="hidden" id="nutritionAnimalId" data-field="animalId">
+
+  <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
+</form>
   <div class="mbk-card" id="economicAnalysisCard">
     <h3>💰 التحليل الاقتصادي</h3>
     <div id="economicKPIs" class="kpi-grid"></div>
