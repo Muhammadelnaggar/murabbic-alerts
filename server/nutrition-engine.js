@@ -85,19 +85,21 @@ function cowBreedFactors(breed){
   // افتراضات مُرَبِّيك الميدانية للسلالات ثنائية الغرض
   if(isDualPurposeBreed(breed)){
     return {
-      cpBonusPct: 2.0,      // +2% CP دائمًا
-      dmiFactor: 0.96,      // استهلاك أقل قليلًا
-      nelMilkFactor: 1.03,  // دهن أعلى → طاقة لبن أعلى قليلًا
-      ndfTarget: 33,        // يتحمل/يستفيد من خشن أعلى
-      starchMax: 25         // نحد النشا لتفادي beef side
+      cpBonusPct: 2.0,
+      dmiFactor: 0.96,
+      nelMilkFactor: 1.03,
+      ndfTarget: 33,
+      starchMax: 25
     };
   }
+
+  // السلالات العادية
   return {
     cpBonusPct: 0.0,
     dmiFactor: 1.0,
     nelMilkFactor: 1.0,
-    ndfTarget: cowBreedFactors(breed).ndfTarget,
-    starchMax: cowBreedFactors(breed).starchMax
+    ndfTarget: 30,
+    starchMax: 28
   };
 }
 
@@ -119,7 +121,7 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
   // 2) NEL Requirement (Mcal/day) — lite
   const bw075 = Math.pow(bodyWeight, 0.75);
   const nelMaintenance = 0.08 * bw075;
-  const nelMilk = (0.74 * milkKg) * cowBreedFactors(breed).nelMilkFactor;
+  const nelMilk = (0.74 * milkKg) * f.nelMilkFactor;
 
   let nelPreg = 0;
   if(pregDays > 190){
@@ -133,7 +135,7 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
 
   // 3) CP target (dynamic, user-facing)
   let cpTarget = clamp(13 + (0.10 * milkKg), 13, 18);
-  cpTarget = clamp(cpTarget + cowBreedFactors(breed).cpBonusPct, 13, 20);
+ cpTarget = clamp(cpTarget + f.cpBonusPct, 13, 20);;
 
   return {
     species: 'cow',
@@ -142,8 +144,8 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
     dmi: round(dmi),
     nel: round(nelTotal),
     cpTarget: round(cpTarget),
-    ndfTarget: cowBreedFactors(breed).ndfTarget,
-    starchMax: cowBreedFactors(breed).starchMax
+    ndfTarget: f.ndfTarget,
+starchMax: f.starchMax
   };
 }
 
