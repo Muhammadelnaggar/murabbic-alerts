@@ -1818,13 +1818,22 @@ render();
 async function refreshRationAndRender(){
   try{
     const rows = Array.isArray(window.rationItems) ? window.rationItems : [];
+
+    if (!rows.length) {
+      if (window.mbkNutrition) {
+        window.mbkNutrition.rationAnalysis = null;
+        window.mbkNutrition.rationAnalysisKey = '';
+      }
+      render();
+      return;
+    }
+
     if (window.mbkNutrition?.fetchRationAnalysis) {
       await window.mbkNutrition.fetchRationAnalysis(rows);
       render();
     }
   }catch(_){}
 }
-
 refreshRationAndRender();
 setInterval(refreshRationAndRender, 1200);
 
