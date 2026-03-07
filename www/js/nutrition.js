@@ -611,7 +611,17 @@ async function saveEvent(e){
   msgWarn('⏳ جارٍ الحفظ...');
 
   try{
-       const result = await saveToServer(payload);
+     const result = await saveToServer(payload);
+
+try{
+  const bar =
+    document.getElementById("sysbar") ||
+    document.querySelector(".infobar");
+
+  if (bar && window.showMsg) {
+    showMsg(bar, "✅ تم حفظ حدث التغذية بنجاح", "success");
+  }
+}catch(_){}
 
 window.dispatchEvent(
   new CustomEvent('mbk:success', {
