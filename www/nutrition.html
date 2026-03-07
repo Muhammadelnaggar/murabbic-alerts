@@ -692,11 +692,7 @@ btnRationRemove?.addEventListener('click', ()=>{
   });
   selectedRation.clear();
   renderRationSummary();
-  if (window.mbkNutrition?.recalc) {
-  window.mbkNutrition.recalc();
-}recalc();
-
-  
+ recalc();
 });
 
 // تعديل المختار (خامة واحدة فقط)
@@ -722,7 +718,6 @@ btnRationEdit?.addEventListener('click', ()=>{
 
   selectedRation.clear();
   renderRationSummary();
-  recalc();
   recalc();
 });
 
@@ -1395,7 +1390,7 @@ if(mode==="tmr_percent"){
     setNum("milkRevenue", rev, (v)=>nf(v));
     const margin = (rev!=null && totCostVal!=null) ? (rev - totCostVal) : null;
     setNum("milkMargin", margin, (v)=>nf(v));
-
+    window.rationItems = rationItems;
     try{ render(); }catch(e){}
     warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
