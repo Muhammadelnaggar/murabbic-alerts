@@ -422,43 +422,7 @@ function collectRows(){
   });
   return rows;
 }
-function readAnalysis(){
-  const txt = id => (document.getElementById(id)?.textContent || '').trim();
 
-  return {
-    totals: {
-      totDM: txt('totDM'),
-      totAsFed: txt('totAsFed'),
-      totCost: txt('totCost'),
-      mixPriceDM: txt('mixPriceDM'),
-      mixPriceAsFed: txt('mixPriceAsFed'),
-    },
-
-    nutrition: {
-      cpPctTotal: txt('cpPctTotal'),
-      fcRatio: txt('fcRatio'),
-      nelActual: txt('nelActual'),
-      ndfPctActual: txt('ndfPctActual'),
-      fatPctActual: txt('fatPctActual'),
-    },
-
-    targets: {
-      dmiTarget: txt('dmiTarget'),
-      nelTarget: txt('nelTarget'),
-      cpTarget: txt('cpTarget'),
-      ndfTarget: txt('ndfTarget'),
-      fatTarget: txt('fatTarget'),
-      starchMax: txt('starchMax'),
-    },
-
-    economics: {
-      costPerKgMilk: txt('costPerKgMilk'),
-      dmPerKgMilk: txt('dmPerKgMilk'),
-      milkRevenue: txt('milkRevenue'),
-      milkMargin: txt('milkMargin'),
-    }
-  };
-}
 function readKPIs(){
   const txt = id => (document.getElementById(id)?.textContent||'').trim();
   return {
