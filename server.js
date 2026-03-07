@@ -6,6 +6,7 @@ const express = require('express');
 const cors    = require('cors');
 const admin   = require('firebase-admin');
 const { computeTargets } = require('./server/nutrition-engine.js');
+const { analyzeRation } = require('./server/ration-engine.js');
 const EVENT_SYNONYMS = {
   insemination: ['insemination', 'تلقيح'],
   pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
@@ -406,6 +407,33 @@ app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'nutrition_targets_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: 'nutrition_rows_required'
+      });
+    }
+
+    const analysis = analyzeRation(rows);
+
+    return res.json({
+      ok: true,
+      analysis
+    });
+  } catch (e) {
+    console.error('nutrition.analyze-ration error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_analyze_failed',
       message: e.message || String(e)
     });
   }
