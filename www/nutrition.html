@@ -1817,6 +1817,8 @@ render();
 
 async function refreshRationAndRender(){
   try{
+    const { auth } = await import('/js/firebase-config.js');
+    if (!auth?.currentUser) return;
 
     const rows = Array.isArray(window.rationItems)
       ? window.rationItems
@@ -1837,9 +1839,8 @@ async function refreshRationAndRender(){
 
     recalc();
     render();
-
   }catch(err){
-    console.error("refreshRationAndRender failed:",err);
+    console.error('refreshRationAndRender failed:', err);
   }
 }
 refreshRationAndRender();
@@ -1847,13 +1848,16 @@ setInterval(refreshRationAndRender, 1200);
 
 async function refreshTargetsAndRender(){
   try{
+    const { auth } = await import('/js/firebase-config.js');
+    if (!auth?.currentUser) return;
+
     if (window.mbkNutrition?.refreshTargets) {
       await window.mbkNutrition.refreshTargets();
       render();
     }
- }catch(err){
-  console.error('refreshTargetsAndRender failed:', err);
-}
+  }catch(err){
+    console.error('refreshTargetsAndRender failed:', err);
+  }
 }
 
 refreshTargetsAndRender();
