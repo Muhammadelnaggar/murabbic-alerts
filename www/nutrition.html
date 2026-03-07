@@ -589,7 +589,7 @@ padding: 6px 0;
 
 <!-- ===== منطق الحسابات والـUI فقط (لا حفظ ولا تتبّع هنا) ===== -->
 <script type="module">
-  import { computeTargets } from '/js/nutrition-engine.js';
+ 
   const warn = document.getElementById('warn');
   const modeSel = document.getElementById('mode');
   const ctxDIM = document.getElementById('ctxDIM');
@@ -1372,36 +1372,25 @@ if (fcEl){
   fcEl.dataset.concDm  = (isFinite(concDM_forFC)  ? String(concDM_forFC)  : "");
   fcEl.dataset.foragePct = (foragePct!=null && isFinite(foragePct)) ? foragePct.toFixed(0) : "";
 }
-   // ===== Targets (Nutrition Engine) =====
-let targets = null;
-
-try{
-  // ✅ استخدم المحرك الجديد (namespaced)
-  if(window.mbkNutrition?.computeTargets){
-    // الأفضل: سياق المحرك نفسه (يشمل breed/ DIM / milk...)
-    targets = window.mbkNutrition.computeTargets();
-  } else if (typeof computeTargets === "function") {
-    // fallback قديم إن وجد
-    const ctx = (typeof readContext==="function") ? readContext() : {};
-    targets = computeTargets({
-      species: ctx.species,
-      avgMilkKg: ctx.avgMilkKg,
-      pregnancyDays: ctx.pregnancyDays,
-      closeUp: ctx.closeUp,
-      earlyDry: ctx.earlyDry
-    });
-  }
-}catch(_){ targets = null; }
+// ===== Targets (from server cache) =====
+const targets = window.mbkNutrition?.targets || null;
 
 if(targets){
   const num = (v, d=2)=> (v==null || !isFinite(Number(v))) ? "—" : Number(v).toFixed(d);
   const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
 
-  set("dmiTarget", num(targets.dmi, 2));        // كجم DM/يوم
-  set("nelTarget", num(targets.nel, 2));        // م.كال/يوم
-  set("cpTarget",  num(targets.cpTarget, 1));   // %
+  set("dmiTarget", num(targets.dmi, 2));
+  set("nelTarget", num(targets.nel, 2));
+  set("cpTarget",  num(targets.cpTarget, 1));
   set("ndfTarget", (targets.ndfTarget!=null ? String(targets.ndfTarget) : "—"));
   set("starchMax", (targets.starchMax!=null ? String(targets.starchMax) : "—"));
+} else {
+  const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
+  set("dmiTarget", "—");
+  set("nelTarget", "—");
+  set("cpTarget", "—");
+  set("ndfTarget", "—");
+  set("starchMax", "—");
 }
     // ===== Actual NEL/NDF (لو متاحين من المكتبة) =====
     const dmForAct = (mode==="tmr_percent") ? (dmFrac||0) : (totalDM||0);
@@ -1848,8 +1837,20 @@ if(adv && adv.style.display==="grid"){
   });
 }
 
- setInterval(render, 600);
+setInterval(render, 600);
 render();
+
+async function refreshTargetsAndRender(){
+  try{
+    if (window.mbkNutrition?.refreshTargets) {
+      await window.mbkNutrition.refreshTargets();
+      render();
+    }
+  }catch(_){}
+}
+
+refreshTargetsAndRender();
+setInterval(refreshTargetsAndRender, 2000);
  })();
 </script>
 
