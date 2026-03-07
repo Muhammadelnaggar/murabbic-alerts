@@ -5,9 +5,6 @@
 
 import { onNutritionSave } from '/js/track-nutrition.js';
 
-// Engines (targets)
-import { computeTargets } from '/js/nutrition-engine.js';
-
 
 // ✅ للتجربة من الكونسول: window.mbkNutrition.computeTargets()
 window.mbkNutrition = window.mbkNutrition || {};
@@ -18,16 +15,63 @@ window.mbkNutrition.BUILD_ID = 'nutrition-2026-03-05-B';
 // window.mbkNutrition.computeTargets()
 window.mbkNutrition.readContext = () => readContext();
 
-window.mbkNutrition.computeTargets = (ctx) => {
+window.mbkNutrition.targets = null;
+window.mbkNutrition.targetsKey = '';
+
+window.mbkNutrition.fetchTargets = async (ctx) => {
   const _ctx = ctx || readContext();
-  return computeTargets({
-    species: (_ctx?.species === 'بقر') ? 'بقرة' : _ctx?.species,
-    breed: _ctx?.breed || window.currentAnimal?.breed || null,
-    daysInMilk: _ctx?.daysInMilk,
-    avgMilkKg: _ctx?.avgMilkKg,
-    pregnancyDays: _ctx?.pregnancyDays,
-    closeUp: _ctx?.closeUp
+
+  const payload = {
+    context: {
+      species: _ctx?.species,
+      breed: _ctx?.breed || window.currentAnimal?.breed || null,
+      daysInMilk: _ctx?.daysInMilk,
+      avgMilkKg: _ctx?.avgMilkKg,
+      pregnancyDays: _ctx?.pregnancyDays,
+      closeUp: _ctx?.closeUp
+    }
+  };
+
+  const { auth } = await import('/js/firebase-config.js');
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/targets`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': uid
+    },
+    body: JSON.stringify(payload)
   });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+
+  window.mbkNutrition.targets = data.targets || null;
+  return window.mbkNutrition.targets;
+};
+
+window.mbkNutrition.refreshTargets = async () => {
+  const ctx = readContext();
+  const key = JSON.stringify({
+    species: ctx?.species || '',
+    breed: ctx?.breed || window.currentAnimal?.breed || '',
+    daysInMilk: ctx?.daysInMilk ?? '',
+    avgMilkKg: ctx?.avgMilkKg ?? '',
+    pregnancyDays: ctx?.pregnancyDays ?? '',
+    closeUp: !!ctx?.closeUp
+  });
+
+  if (key === window.mbkNutrition.targetsKey && window.mbkNutrition.targets) {
+    return window.mbkNutrition.targets;
+  }
+
+  window.mbkNutrition.targetsKey = key;
+  return await window.mbkNutrition.fetchTargets(ctx);
 };
 
 
