@@ -4,7 +4,121 @@
 // ✅ حفظ حدث التغذية إلى Firestore فقط (events)
 
 import { onNutritionSave } from '/js/track-nutrition.js';
+const NUTRITION_BUILD_ID = 'nutrition-2026-03-05-B';
 
+let targetsCache = null;
+let targetsCacheKey = '';
+
+async function fetchTargets(ctx) {
+  const _ctx = ctx || readContext();
+
+  const payload = {
+    context: {
+      species: _ctx?.species,
+      breed: _ctx?.breed || window.currentAnimal?.breed || null,
+      daysInMilk: _ctx?.daysInMilk,
+      avgMilkKg: _ctx?.avgMilkKg,
+      pregnancyDays: _ctx?.pregnancyDays,
+      closeUp: _ctx?.closeUp
+    }
+  };
+
+  const { auth } = await import('/js/firebase-config.js');
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/targets`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': uid
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+
+  targetsCache = data.targets || null;
+  return targetsCache;
+}
+
+async function refreshTargets() {
+  const ctx = readContext();
+  const key = JSON.stringify({
+    species: ctx?.species || '',
+    breed: ctx?.breed || window.currentAnimal?.breed || '',
+    daysInMilk: ctx?.daysInMilk ?? '',
+    avgMilkKg: ctx?.avgMilkKg ?? '',
+    pregnancyDays: ctx?.pregnancyDays ?? '',
+    closeUp: !!ctx?.closeUp
+  });
+
+  if (key === targetsCacheKey && targetsCache) {
+    return targetsCache;
+  }
+
+  targetsCacheKey = key;
+  return await fetchTargets(ctx);
+}
+
+let rationAnalysisCache = null;
+let rationAnalysisCacheKey = '';
+
+async function fetchRationAnalysis(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    rationAnalysisCache = null;
+    return null;
+  }
+
+  const { auth } = await import('/js/firebase-config.js');
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/analyze-ration`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': uid
+    },
+    body: JSON.stringify({
+      mode: document.getElementById('mode')?.value || 'tmr_asfed',
+      rows: list,
+      concKg: document.getElementById('concKgInput')?.value || null
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+
+  rationAnalysisCache = data.analysis || null;
+  return rationAnalysisCache;
+}
+
+async function refreshRationAnalysis(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    rationAnalysisCache = null;
+    rationAnalysisCacheKey = '';
+    return null;
+  }
+
+  const key = JSON.stringify(list);
+
+  if (key === rationAnalysisCacheKey && rationAnalysisCache) {
+    return rationAnalysisCache;
+  }
+
+  rationAnalysisCacheKey = key;
+  return await fetchRationAnalysis(list);
+}
 
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
