@@ -11,25 +11,6 @@
   <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل تركيبة التغذية</title>
 
-  <!-- تتبّع واحد آمن في <head> (يمنع تكرار page_view) -->
-  <script>
-     (function(){
-      window.dataLayer = window.dataLayer || [];
-      const fired = new Set();
-      function push(name, props){ try{ dataLayer.push({ event:name, ts:Date.now(), ...(props||{}) }); }catch(e){} }
-      window.t = window.t || {};
-      window.t.event = function(name, props){
-        if(name==='page_view'){
-          const key = (props && props.page) || location.pathname;
-          if(fired.has(key)) return;
-          fired.add(key);
-          setTimeout(()=>fired.delete(key), 2000);
-        }
-        push(name, props);
-      };
-      t.event('page_view', { page: location.pathname });
-    })();
-  </script>
 
   <style>
     *{box-sizing:border-box}
