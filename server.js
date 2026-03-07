@@ -387,6 +387,29 @@ async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
   return null;
 }
 // ============================================================
+//                API: NUTRITION TARGETS (CENTRAL)
+// ============================================================
+app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const ctx = body.context || {};
+
+    const targets = computeTargets(ctx);
+
+    return res.json({
+      ok: true,
+      targets
+    });
+  } catch (e) {
+    console.error('nutrition.targets error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_targets_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+// ============================================================
 //                  API: NUTRITION SAVE (CENTRAL)
 // ============================================================
 app.post('/api/nutrition/save', requireUserId, async (req, res) => {
