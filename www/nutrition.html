@@ -1831,12 +1831,14 @@ async function refreshRationAndRender(){
       return;
     }
 
-   if (window.mbkNutrition?.fetchRationAnalysis) {
-  await window.mbkNutrition.fetchRationAnalysis(rows);
+   if (window.mbkNutrition?.refreshRationAnalysis) {
+  await window.mbkNutrition.refreshRationAnalysis(rows);
   recalc();
   render();
 }
-  }catch(_){}
+ }catch(err){
+  console.error('refreshRationAndRender failed:', err);
+}
 }
 refreshRationAndRender();
 setInterval(refreshRationAndRender, 1200);
@@ -1847,7 +1849,9 @@ async function refreshTargetsAndRender(){
       await window.mbkNutrition.refreshTargets();
       render();
     }
-  }catch(_){}
+ }catch(err){
+  console.error('refreshTargetsAndRender failed:', err);
+}
 }
 
 refreshTargetsAndRender();
