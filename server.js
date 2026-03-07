@@ -256,7 +256,229 @@ function normalizeEventType(raw) {
   }
   return t;
 }
+// ============================================================
+//                 NUTRITION: CENTRAL SAVE HELPERS
+// ============================================================
+function cleanObj(x){
+  if (Array.isArray(x)) {
+    return x
+      .map(cleanObj)
+      .filter(v => v !== undefined);
+  }
+  if (x && typeof x === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(x)) {
+      const cv = cleanObj(v);
+      if (cv !== undefined) out[k] = cv;
+    }
+    return out;
+  }
+  if (x === undefined) return undefined;
+  return x;
+}
 
+function asYMD(v){
+  const s = String(v || '').trim();
+  const m = s.match(/\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : '';
+}
+
+function toNumOrNull(v){
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeNutritionContext(ctx = {}) {
+  const speciesRaw = String(ctx.species || '').trim();
+  let species = speciesRaw;
+  if (/cow|بقر|بقرة|أبقار/i.test(speciesRaw)) species = 'بقر';
+  if (/buffalo|جاموس/i.test(speciesRaw)) species = 'جاموس';
+
+  return cleanObj({
+    group: ctx.group || null,
+    species,
+    breed: ctx.breed || null,
+    daysInMilk: toNumOrNull(ctx.daysInMilk),
+    avgMilkKg: toNumOrNull(ctx.avgMilkKg),
+    earlyDry: !!ctx.earlyDry,
+    closeUp: !!ctx.closeUp,
+    pregnancyStatus: ctx.pregnancyStatus || null,
+    pregnancyDays: toNumOrNull(ctx.pregnancyDays),
+    daysToCalving: toNumOrNull(ctx.daysToCalving)
+  });
+}
+
+function normalizeNutritionAnalysis(a = {}) {
+  return cleanObj({
+    totals: {
+      asFedKg: toNumOrNull(a?.totals?.asFedKg),
+      dmKg: toNumOrNull(a?.totals?.dmKg)
+    },
+    nutrition: {
+      cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
+      fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
+      nelActual: toNumOrNull(a?.nutrition?.nelActual),
+      ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
+      fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual)
+    },
+    targets: {
+      dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
+      nelTarget: toNumOrNull(a?.targets?.nelTarget),
+      cpTarget: toNumOrNull(a?.targets?.cpTarget),
+      ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
+      fatTarget: toNumOrNull(a?.targets?.fatTarget),
+      starchMax: toNumOrNull(a?.targets?.starchMax)
+    },
+    economics: {
+      costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
+      dmPerKgMilk: toNumOrNull(a?.economics?.dmPerKgMilk),
+      milkRevenue: toNumOrNull(a?.economics?.milkRevenue),
+      milkMargin: toNumOrNull(a?.economics?.milkMargin)
+    }
+  });
+}
+
+function normalizeNutritionRows(rows = []) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => cleanObj({
+    id: r?.id || null,
+    name: r?.name || r?.feedName || null,
+    cat: r?.cat || r?.category || null,
+    asFedKg: toNumOrNull(r?.asFedKg ?? r?.kg ?? r?.amount),
+    pct: toNumOrNull(r?.pct),
+    dmPct: toNumOrNull(r?.dmPct ?? r?.dm),
+    cpPct: toNumOrNull(r?.cpPct ?? r?.cp),
+    pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon),
+    pricePerTonDM: toNumOrNull(r?.pricePerTonDM ?? r?.pTonDM),
+    nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
+    ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
+    fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
+    mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
+  }));
+}
+
+async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
+  if (!db) return null;
+
+  const tries = [];
+  const s = String(rawNumber || '').trim();
+  const n = Number(s);
+
+  if (s) tries.push(s);
+  if (Number.isFinite(n)) tries.push(n);
+
+  for (const ownerField of ['userId', 'ownerUid']) {
+    for (const numberField of ['animalNumber', 'number']) {
+      for (const val of tries) {
+        try {
+          const snap = await db.collection('animals')
+            .where(ownerField, '==', tenant)
+            .where(numberField, '==', val)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) return snap.docs[0];
+        } catch (_) {}
+      }
+    }
+  }
+
+  return null;
+}
+// ============================================================
+//                  API: NUTRITION SAVE (CENTRAL)
+// ============================================================
+app.post('/api/nutrition/save', requireUserId, async (req, res) => {
+  try {
+    const tenant = req.userId;
+    const body = req.body || {};
+
+    const rawNumber =
+      body.animalNumber ||
+      body.number ||
+      body.animalId ||
+      '';
+
+    const animalNumber = String(rawNumber || '').trim();
+    const eventDate = asYMD(body.eventDate) || toYYYYMMDD(Date.now());
+
+    if (!animalNumber) {
+      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    }
+
+    const nutrition = body.nutrition || {};
+    const rows = normalizeNutritionRows(nutrition.rows || []);
+    if (!rows.length) {
+      return res.status(400).json({ ok:false, error:'nutrition_rows_required' });
+    }
+
+    let animalDoc = null;
+    let animalDocId = '';
+    if (db) {
+      animalDoc = await findAnimalDocRefByNumberForTenant(tenant, animalNumber);
+      if (!animalDoc) {
+        return res.status(404).json({ ok:false, error:'animal_not_found' });
+      }
+      animalDocId = animalDoc.id;
+    }
+
+    const nowMs = Date.now();
+
+    const doc = cleanObj({
+      userId: tenant,
+      ownerUid: tenant,
+
+      animalId: animalDocId || animalNumber,
+      animalNumber: Number.isFinite(Number(animalNumber)) ? Number(animalNumber) : animalNumber,
+
+      type: 'nutrition',
+      eventType: 'تغذية',
+      eventTypeNorm: 'nutrition',
+
+      eventDate,
+      date: eventDate,
+      ts: nowMs,
+      source: '/nutrition.html',
+
+      nutrition: {
+        mode: nutrition.mode || 'tmr_asfed',
+        rows,
+        context: normalizeNutritionContext(nutrition.context || {}),
+        analysis: normalizeNutritionAnalysis(nutrition.analysis || {})
+      }
+    });
+
+    const localEvents = readJson(eventsPath, []);
+    localEvents.push({ id: localEvents.length + 1, ...doc });
+    fs.writeFileSync(eventsPath, JSON.stringify(localEvents, null, 2));
+
+    let firestoreId = null;
+
+    if (db) {
+      const fireDoc = {
+        ...doc,
+        createdAt: admin.firestore.Timestamp.fromMillis(nowMs)
+      };
+
+      const ref = await db.collection('events').add(fireDoc);
+      firestoreId = ref.id;
+    }
+
+    return res.json({
+      ok: true,
+      saved: true,
+      eventType: 'nutrition',
+      animalNumber,
+      eventDate,
+      firestoreId
+    });
+
+  } catch (e) {
+    console.error('nutrition.save error:', e);
+    return res.status(500).json({ ok:false, error:'nutrition_save_failed', message: e.message || String(e) });
+  }
+});
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
     const event = req.body || {};
