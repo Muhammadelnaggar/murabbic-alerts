@@ -78,7 +78,10 @@ window.mbkNutrition.rationAnalysisKey = '';
 
 window.mbkNutrition.fetchRationAnalysis = async (rows) => {
   const list = Array.isArray(rows) ? rows : [];
-
+if (!list.length) {
+  window.mbkNutrition.rationAnalysis = null;
+  return null;
+}
   const { auth } = await import('/js/firebase-config.js');
   const uid = auth?.currentUser?.uid;
   if (!uid) throw new Error('NO_AUTH');
@@ -104,6 +107,12 @@ window.mbkNutrition.fetchRationAnalysis = async (rows) => {
 
 window.mbkNutrition.refreshRationAnalysis = async (rows) => {
   const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+  window.mbkNutrition.rationAnalysis = null;
+  window.mbkNutrition.rationAnalysisKey = '';
+  return null;
+}
+  
   const key = JSON.stringify(list);
 
   if (key === window.mbkNutrition.rationAnalysisKey && window.mbkNutrition.rationAnalysis) {
