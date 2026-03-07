@@ -407,11 +407,27 @@ app.post('/api/nutrition/save', requireUserId, async (req, res) => {
       return res.status(400).json({ ok:false, error:'animalNumber_required' });
     }
 
-    const nutrition = body.nutrition || {};
-    const rows = normalizeNutritionRows(nutrition.rows || []);
-    if (!rows.length) {
-      return res.status(400).json({ ok:false, error:'nutrition_rows_required' });
+   const nutrition = body.nutrition || {};
+const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
+const rows = normalizeNutritionRows(rawRows);
+
+console.log('NUTRITION SAVE rawRows.length =', rawRows.length);
+console.log('NUTRITION SAVE rawRows[0] =', rawRows[0] || null);
+console.log('NUTRITION SAVE normalizedRows.length =', rows.length);
+console.log('NUTRITION SAVE normalizedRows[0] =', rows[0] || null);
+
+if (!rows.length) {
+  return res.status(400).json({
+    ok:false,
+    error:'nutrition_rows_required',
+    debug: {
+      rawRowsLength: rawRows.length,
+      firstRawRow: rawRows[0] || null,
+      normalizedRowsLength: rows.length,
+      firstNormalizedRow: rows[0] || null
     }
+  });
+}
 
     let animalDoc = null;
     let animalDocId = '';
