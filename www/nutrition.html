@@ -1815,14 +1815,14 @@ if(adv && adv.style.display==="grid"){
 setInterval(render, 600);
 render();
 
-async function refreshRationAndRender(){
+aasync function refreshRationAndRender(){
   try{
-    const rows =
-      (Array.isArray(window.rationItems) && window.rationItems.length)
-        ? window.rationItems
-        : rationItems;
 
-    if (!Array.isArray(rows) || !rows.length) {
+    const rows = Array.isArray(window.rationItems)
+      ? window.rationItems
+      : [];
+
+    if (!rows.length) {
       if (window.mbkNutrition) {
         window.mbkNutrition.rationAnalysis = null;
         window.mbkNutrition.rationAnalysisKey = '';
@@ -1831,14 +1831,16 @@ async function refreshRationAndRender(){
       return;
     }
 
-   if (window.mbkNutrition?.refreshRationAnalysis) {
-  await window.mbkNutrition.refreshRationAnalysis(rows);
-  recalc();
-  render();
-}
- }catch(err){
-  console.error('refreshRationAndRender failed:', err);
-}
+    if (window.mbkNutrition?.refreshRationAnalysis) {
+      await window.mbkNutrition.refreshRationAnalysis(rows);
+    }
+
+    recalc();
+    render();
+
+  }catch(err){
+    console.error("refreshRationAndRender failed:",err);
+  }
 }
 refreshRationAndRender();
 setInterval(refreshRationAndRender, 1200);
