@@ -73,7 +73,46 @@ window.mbkNutrition.refreshTargets = async () => {
   window.mbkNutrition.targetsKey = key;
   return await window.mbkNutrition.fetchTargets(ctx);
 };
+window.mbkNutrition.rationAnalysis = null;
+window.mbkNutrition.rationAnalysisKey = '';
 
+window.mbkNutrition.fetchRationAnalysis = async (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+
+  const { auth } = await import('/js/firebase-config.js');
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/analyze-ration`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': uid
+    },
+    body: JSON.stringify({ rows: list })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+
+  window.mbkNutrition.rationAnalysis = data.analysis || null;
+  return window.mbkNutrition.rationAnalysis;
+};
+
+window.mbkNutrition.refreshRationAnalysis = async (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  const key = JSON.stringify(list);
+
+  if (key === window.mbkNutrition.rationAnalysisKey && window.mbkNutrition.rationAnalysis) {
+    return window.mbkNutrition.rationAnalysis;
+  }
+
+  window.mbkNutrition.rationAnalysisKey = key;
+  return await window.mbkNutrition.fetchRationAnalysis(list);
+};
 
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function qp(){ return new URLSearchParams(location.search); }
