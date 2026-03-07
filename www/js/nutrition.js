@@ -93,7 +93,11 @@ if (!list.length) {
       'Content-Type': 'application/json',
       'X-User-Id': uid
     },
-    body: JSON.stringify({ rows: list })
+   body: JSON.stringify({
+  mode: document.getElementById('mode')?.value || 'tmr_asfed',
+  rows: list,
+  concKg: document.getElementById('concKgInput')?.value || null
+})
   });
 
   const data = await res.json().catch(() => ({}));
