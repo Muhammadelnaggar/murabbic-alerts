@@ -611,9 +611,9 @@ async function saveEvent(e){
   msgWarn('⏳ جارٍ الحفظ...');
 
   try{
-        await saveToServer(payload);
+       const result = await saveToServer(payload);
 
-document.dispatchEvent(
+window.dispatchEvent(
   new CustomEvent('mbk:success', {
     detail: { message: 'تم حفظ حدث التغذية بنجاح' }
   })
