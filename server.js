@@ -290,16 +290,15 @@ app.post('/api/events', requireUserId, async (req, res) => {
       const whenMs = Number(event.ts || Date.now());
 
       // -------- 1) حفظ الحدث في events --------
-      const doc = {
-        userId: tenant,
-        animalId: String(event.animalId || ""),
-        type: typeNorm,
-        date: toYYYYMMDD(whenMs),
-        createdAt: admin.firestore.Timestamp.fromMillis(whenMs),
-        species: (event.species || "buffalo").toLowerCase(),
-        result: event.result || event.status || "",
-        note: event.note || "",
-      };
+     const doc = {
+  ...event,   // ← يحفظ كل البيانات القادمة من الصفحة
+
+  userId: tenant,
+  animalId: String(event.animalId || ""),
+  type: typeNorm,
+  date: toYYYYMMDD(whenMs),
+  createdAt: admin.firestore.Timestamp.fromMillis(whenMs)
+};
 
       doc.eventTypeNorm = normalizeEventType(event.type);
 
