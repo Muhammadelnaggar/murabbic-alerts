@@ -345,6 +345,22 @@ export const eventSchemas = {
   },
   guards: []
 },
+  "تغذية": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ التغذية غير صالح." },
+
+    documentData: { required: false },
+
+    rationDM: { required: false, type: "number" },
+    rationCP: { required: false, type: "number" },
+    rationNEL: { required: false, type: "number" },
+    rationCost: { required: false, type: "number" },
+
+    notes: { required: false }
+  },
+  guards: []
+},
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
