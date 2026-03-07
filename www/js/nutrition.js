@@ -537,17 +537,29 @@ function readContext(){
   };
 }
 
-async function saveToFirestore(payload){
-  const { db, auth } = await import('/js/firebase-config.js');
-  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const { collection, addDoc, serverTimestamp } = fs;
+async function saveToServer(payload){
+  const { auth } = await import('/js/firebase-config.js');
 
   const uid = auth?.currentUser?.uid;
   if(!uid) throw new Error('NO_AUTH');
 
-  await addDoc(collection(db, 'events'), { ...payload, createdAt: serverTimestamp() });
-}
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/save`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': uid
+    },
+    body: JSON.stringify(payload)
+  });
 
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || data?.ok === false){
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+
+  return data;
+}
 function redirectSmart(){
   const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
   setTimeout(()=>{ location.href = to; }, 250);
@@ -582,33 +594,24 @@ async function saveEvent(e){
   (window.rationItems && Array.isArray(window.rationItems))
   ? window.rationItems
   : collectRows();
-const payload = cleanDeep({
-  type: 'nutrition',
-  eventType: 'تغذية',
-  animalNumber: animalId,
-  eventDate,
-  source: 'nutrition.html',
+  const payload = cleanDeep({
+    animalNumber: animalId,
+    eventDate,
 
-  nutrition: {
-    mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-    rows,
-    context: readContext(),
-    analysis: readAnalysis()
-  }
-});
-
+    nutrition: {
+      mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+      rows,
+      context: readContext(),
+      analysis: readAnalysis()
+    }
+  });
   // userId من auth (Cloud-only)
-  try{
-    const { auth } = await import('/js/firebase-config.js');
-    payload.userId = auth?.currentUser?.uid || null;
-    payload.tenantId = payload.userId || null;
-  }catch(_){}
-
+ 
   disableSave(true);
   msgWarn('⏳ جارٍ الحفظ...');
 
   try{
-    await saveToFirestore(payload);
+        await saveToServer(payload);
     try { await window.updateAnimalByEvent?.(payload); } catch (e) { console.warn('updateAnimalByEvent failed', e); }
 
     try{
