@@ -459,14 +459,16 @@ app.post('/api/nutrition/save', requireUserId, async (req, res) => {
       return res.status(400).json({ ok:false, error:'animalNumber_required' });
     }
 
-   const nutrition = body.nutrition || {};
+const nutrition = body.nutrition || {};
 const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
 const rows = normalizeNutritionRows(rawRows);
+const context = normalizeNutritionContext(nutrition.context || {});
 
 console.log('NUTRITION SAVE rawRows.length =', rawRows.length);
 console.log('NUTRITION SAVE rawRows[0] =', rawRows[0] || null);
 console.log('NUTRITION SAVE normalizedRows.length =', rows.length);
 console.log('NUTRITION SAVE normalizedRows[0] =', rows[0] || null);
+console.log('NUTRITION SAVE normalizedContext =', context);
 
 if (!rows.length) {
   return res.status(400).json({
@@ -481,6 +483,49 @@ if (!rows.length) {
   });
 }
 
+const rationCore = analyzeRation(
+  rows.map(r => ({
+    kg: r.asFedKg,
+    dm: r.dmPct,
+    cp: r.cpPct,
+    nel: r.nelMcalPerKgDM,
+    ndf: r.ndfPct,
+    fat: r.fatPct,
+    cat: r.cat
+  }))
+);
+
+const targetsCore = computeTargets({
+  species: context.species,
+  breed: context.breed,
+  daysInMilk: context.daysInMilk,
+  avgMilkKg: context.avgMilkKg,
+  pregnancyDays: context.pregnancyDays,
+  closeUp: context.closeUp
+});
+
+const centralAnalysis = normalizeNutritionAnalysis({
+  totals: {
+    asFedKg: rationCore?.totals?.asFedKg ?? null,
+    dmKg: rationCore?.totals?.dmKg ?? null
+  },
+  nutrition: {
+    cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
+    fcRatio: rationCore?.nutrition?.fcRatio ?? null,
+    nelActual: rationCore?.nutrition?.nelActual ?? null,
+    ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+    fatPctActual: rationCore?.nutrition?.fatPctActual ?? null
+  },
+  targets: {
+    dmiTarget: targetsCore?.dmi ?? null,
+    nelTarget: targetsCore?.nel ?? null,
+    cpTarget: targetsCore?.cpTarget ?? null,
+    ndfTarget: targetsCore?.ndfTarget ?? null,
+    fatTarget: null,
+    starchMax: targetsCore?.starchMax ?? null
+  },
+  economics: {}
+});
     let animalDoc = null;
     let animalDocId = '';
     if (db) {
@@ -509,12 +554,12 @@ if (!rows.length) {
       ts: nowMs,
       source: '/nutrition.html',
 
-      nutrition: {
-        mode: nutrition.mode || 'tmr_asfed',
-        rows,
-        context: normalizeNutritionContext(nutrition.context || {}),
-        analysis: normalizeNutritionAnalysis(nutrition.analysis || {})
-      }
+     nutrition: {
+  mode: nutrition.mode || 'tmr_asfed',
+  rows,
+  context,
+  analysis: centralAnalysis
+}
     });
 
     const localEvents = readJson(eventsPath, []);
