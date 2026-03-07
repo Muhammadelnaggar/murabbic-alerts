@@ -1817,9 +1817,12 @@ render();
 
 async function refreshRationAndRender(){
   try{
-    const rows = Array.isArray(window.rationItems) ? window.rationItems : [];
+    const rows =
+      (Array.isArray(window.rationItems) && window.rationItems.length)
+        ? window.rationItems
+        : rationItems;
 
-    if (!rows.length) {
+    if (!Array.isArray(rows) || !rows.length) {
       if (window.mbkNutrition) {
         window.mbkNutrition.rationAnalysis = null;
         window.mbkNutrition.rationAnalysisKey = '';
