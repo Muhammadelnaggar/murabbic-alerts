@@ -5,6 +5,7 @@ const fs      = require('fs');
 const express = require('express');
 const cors    = require('cors');
 const admin   = require('firebase-admin');
+const { computeTargets } = require('./server/nutrition-engine.js');
 const EVENT_SYNONYMS = {
   insemination: ['insemination', 'تلقيح'],
   pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
