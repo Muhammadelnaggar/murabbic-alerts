@@ -3,7 +3,7 @@
 // Cow = NASEM-lite (DMI/DIM curve + NEL)
 // Buffalo = Cow base + Adjustment Layer
 
-export function computeTargets(ctx){
+function computeTargets(ctx){
 
   const species  = String(ctx?.species || '').trim();
   const breed    = String(ctx?.breed || '').trim();
@@ -203,3 +203,6 @@ function clamp(x, a, b){
   if(!Number.isFinite(x)) return a;
   return Math.max(a, Math.min(b, x));
 }
+module.exports = {
+  computeTargets
+};
