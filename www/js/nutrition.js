@@ -612,6 +612,12 @@ async function saveEvent(e){
 
   try{
         await saveToServer(payload);
+
+document.dispatchEvent(
+  new CustomEvent('mbk:success', {
+    detail: { message: 'تم حفظ حدث التغذية بنجاح' }
+  })
+);
     try { await window.updateAnimalByEvent?.(payload); } catch (e) { console.warn('updateAnimalByEvent failed', e); }
 
     try{
