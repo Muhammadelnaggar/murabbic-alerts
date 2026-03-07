@@ -692,7 +692,9 @@ btnRationRemove?.addEventListener('click', ()=>{
   });
   selectedRation.clear();
   renderRationSummary();
- recalc();
+  recalc();
+
+  
 });
 
 // تعديل المختار (خامة واحدة فقط)
@@ -718,6 +720,7 @@ btnRationEdit?.addEventListener('click', ()=>{
 
   selectedRation.clear();
   renderRationSummary();
+  recalc();
   recalc();
 });
 
@@ -1142,7 +1145,6 @@ if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
   function recalc(){
     const ctx = (window.mbkNutrition?.readContext ? window.mbkNutrition.readContext() : (typeof readContext==="function" ? readContext() : {}));
     const mode = modeSel.value;
-    /* LOCAL_RATION_ANALYSIS_OLD
     let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
     let totalAsFed=0;
     let cpKg=0;
@@ -1181,31 +1183,89 @@ Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
       : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
 
     entries.forEach(({tr,it})=>{
-    */
-    let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
-let totalAsFed=0;
-let cpKg=0;
-let roughDM=0, roughCost=0;
-let roughDM_forFC=0, concDM_forFC=0;
-let nelSupplied=0;
-let ndfKg=0;
-let fatKg=0;
-let concMixAsFed=0, concDmFrac=0, concSumPct=0;
-const concKg = parseFloat(concKgInput.value)||0;
+      const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
+      const cpIn = it ? (Number(it.cp)||0) : (parseFloat(tr.querySelector('.cp')?.value)||0);
+      const pRaw = it ? (Number(it.pTonRaw)||0) : (parseFloat(tr.querySelector('.pTon')?.value)||0);
+      const pKg = normalizeKgPrice(pRaw);
+      const pTon = pKg * 1000;
+      const kg = it ? (Number(it.kg)||0) : (parseFloat(tr.querySelector('.kg')?.value)||0);
+      const pc = it ? (Number(it.pct)||0) : (parseFloat(tr.querySelector('.pct')?.value)||0);
+      const cat= it ? (String(it.cat||'conc')) : ((tr.querySelector('.cat')?.value)||'conc');
+      const nm = it ? String(it.name||'').trim() : (tr.querySelector('.name')?.value||'').trim();
 
-const analysis = window.mbkNutrition?.rationAnalysis || null;
+      const pDM = dm>0? (pTon/(dm/100)) : 0;
+      if(tr && tr.querySelector('.pTonDM')) tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
 
-if (analysis) {
-  totalAsFed     = Number(analysis?.totals?.asFedKg || 0);
-  totalDM        = Number(analysis?.totals?.dmKg || 0);
-  cpKg           = Number(analysis?.totals?.cpKg || 0);
-  nelSupplied    = Number(analysis?.totals?.nelMcal || 0);
-  ndfKg          = Number(analysis?.totals?.ndfKg || 0);
-  fatKg          = Number(analysis?.totals?.fatKg || 0);
-  roughDM_forFC  = Number(analysis?.totals?.forageDmKg || 0);
-  concDM_forFC   = Number(analysis?.totals?.concDmKg || 0);
-}
-     
+      if (mode==='tmr_asfed'){
+        const kgDM = kg*(dm/100);
+        totalAsFed += kg;
+        if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
+
+        const f = FEEDS_BY_NAME.get(normName(nm));
+        if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
+        if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
+        if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
+        const cost = kg * pKg;
+        const cpPct = cpIn;
+        const cpAdd = kgDM*(cpPct/100);
+
+        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+
+        totalDM+=kgDM; totalCost+=cost; cpKg += cpAdd;
+
+      } else if (mode==='tmr_percent'){
+        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
+        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
+
+        if (pc>0){
+          mixAsFed+=(pc/100)*pTon;
+          const dmPart = (pc/100)*(dm/100);
+          dmFrac+=dmPart;
+          sumPct+=pc;
+          cpKg += dmPart*(cpIn/100);
+          if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
+
+          const f = FEEDS_BY_NAME.get(normName(nm));
+          if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
+          if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
+          if(f && Number.isFinite(f.fat)) fatKg += dmPart * (Number(f.fat)/100);
+        }
+
+      } else { // split
+        if (cat==='rough'){
+          const kgDM = kg*(dm/100);
+          totalAsFed += kg;
+          roughDM_forFC += kgDM;
+
+          const f = FEEDS_BY_NAME.get(normName(nm));
+          if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
+if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
+if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
+
+          const cost = kg * pKg;
+          cpKg += kgDM*(cpIn/100);
+
+          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
+          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
+
+          totalDM+=kgDM; totalCost+=cost;
+          roughDM+=kgDM; roughCost+=cost;
+
+        } else {
+          // مكونات المركزات كنسبة as-fed من "إجمالي المركزات"
+          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
+          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
+          if (pc>0){
+            concMixAsFed += (pc/100)*pTon;
+            const dmPart = (pc/100)*(dm/100);
+            concDmFrac += dmPart;
+            concSumPct += pc;
+          }
+        }
+      }
+    });
+
 
     // split: add concentrate DM for F:C (DM basis)
     if(mode==='split'){
@@ -1285,27 +1345,20 @@ if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedT
     if(asfedEl) asfedEl.textContent = asfedOut;
 
     // % البروتين الخام الكلي (على أساس DM)
-   let cpPctTotal = null;
-
-if (analysis?.nutrition?.cpPctTotal != null) {
-  cpPctTotal = Number(analysis.nutrition.cpPctTotal);
-} else if(mode==="tmr_percent"){
-  if(dmFrac>0) cpPctTotal = (cpKg/dmFrac)*100;
-} else {
-  const baseDM = (mode==="tmr_percent") ? dmFrac : totalDM;
-  if(baseDM>0) cpPctTotal = (cpKg/baseDM)*100;
-}
+    let cpPctTotal = null;
+    if(mode==="tmr_percent"){
+      if(dmFrac>0) cpPctTotal = (cpKg/dmFrac)*100;
+    } else {
+      const baseDM = (mode==="tmr_percent") ? dmFrac : totalDM;
+if(baseDM>0) cpPctTotal = (cpKg/baseDM)*100;
+    }
     const cpElOut = document.getElementById("cpPctTotal");
     if(cpElOut) cpElOut.textContent = (cpPctTotal!=null && isFinite(cpPctTotal)) ? (cpPctTotal.toFixed(1)+"%") : "—";
 
   // ===== F:C Ratio (DM basis) =====
 // fc = RoughDM / ConcDM  (ratio)
 let fc = null;
-if (analysis?.nutrition?.fcRatio != null) {
-  fc = Number(analysis.nutrition.fcRatio);
-} else if (concDM_forFC > 0) {
-  fc = roughDM_forFC / concDM_forFC;
-}
+if (concDM_forFC > 0) fc = roughDM_forFC / concDM_forFC;
 
 const fcEl = document.getElementById("fcRatio");
 if (fcEl){
@@ -1341,21 +1394,12 @@ if(targets){
 }
     // ===== Actual NEL/NDF (لو متاحين من المكتبة) =====
     const dmForAct = (mode==="tmr_percent") ? (dmFrac||0) : (totalDM||0);
- const nelActualVal =
-  (analysis?.nutrition?.nelActual != null)
-    ? Number(analysis.nutrition.nelActual)
-    : ((nelSupplied>0 && dmForAct>0) ? nelSupplied : null);
+   const nelEl = document.getElementById("nelActual");
+if(nelEl) nelEl.textContent = (nelSupplied>0 && dmForAct>0) ? nf(nelSupplied) : "—";
 
-const nelEl = document.getElementById("nelActual");
-if(nelEl) nelEl.textContent = (nelActualVal!=null && isFinite(nelActualVal)) ? nf(nelActualVal) : '—';
-
-const ndfPct =
-  (analysis?.nutrition?.ndfPctActual != null)
-    ? Number(analysis.nutrition.ndfPctActual)
-    : ((ndfKg>0 && dmForAct>0) ? ((ndfKg/dmForAct)*100) : null);
-
+const ndfPct = (ndfKg>0 && dmForAct>0) ? ((ndfKg/dmForAct)*100) : null;
 const ndfEl = document.getElementById("ndfPctActual");
-if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : '—';
+if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : "—";
 
 const fatPct = (fatKg>0 && dmForAct>0) ? ((fatKg/dmForAct)*100) : null;
 const fatEl = document.getElementById("fatPctActual");
@@ -1390,7 +1434,7 @@ if(mode==="tmr_percent"){
     setNum("milkRevenue", rev, (v)=>nf(v));
     const margin = (rev!=null && totCostVal!=null) ? (rev - totCostVal) : null;
     setNum("milkMargin", margin, (v)=>nf(v));
-    window.rationItems = rationItems;
+
     try{ render(); }catch(e){}
     warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
@@ -1812,49 +1856,13 @@ if(adv && adv.style.display==="grid"){
 setInterval(render, 600);
 render();
 
-async function refreshRationAndRender(){
-  try{
-    const { auth } = await import('/js/firebase-config.js');
-    if (!auth?.currentUser) return;
-
-    const rows = Array.isArray(window.rationItems)
-      ? window.rationItems
-      : [];
-
-    if (!rows.length) {
-      if (window.mbkNutrition) {
-        window.mbkNutrition.rationAnalysis = null;
-        window.mbkNutrition.rationAnalysisKey = '';
-      }
-      render();
-      return;
-    }
-
-    if (window.mbkNutrition?.refreshRationAnalysis) {
-      await window.mbkNutrition.refreshRationAnalysis(rows);
-    }
-
-    recalc();
-    render();
-  }catch(err){
-    console.error('refreshRationAndRender failed:', err);
-  }
-}
-refreshRationAndRender();
-setInterval(refreshRationAndRender, 1200);
-
 async function refreshTargetsAndRender(){
   try{
-    const { auth } = await import('/js/firebase-config.js');
-    if (!auth?.currentUser) return;
-
     if (window.mbkNutrition?.refreshTargets) {
       await window.mbkNutrition.refreshTargets();
       render();
     }
-  }catch(err){
-    console.error('refreshTargetsAndRender failed:', err);
-  }
+  }catch(_){}
 }
 
 refreshTargetsAndRender();
