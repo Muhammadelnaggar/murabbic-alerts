@@ -568,15 +568,8 @@ function redirectSmart(){
 async function saveEvent(e){
   e?.preventDefault?.();
 
-  const p = qp();
-  const rawNumber =
-    p.get('animalNumber') || p.get('number') || p.get('animalId') ||
-    p.get('numbers') || p.get('groupNumbers') || '';
-
-  const rawDate = p.get('eventDate') || p.get('date') || '';
-  const animalId = String(rawNumber||'').trim();
-  const eventDate = DATE_RE.test(String(rawDate||'')) ? String(rawDate) : todayLocal();
-
+  const { rawNumber, eventDate } = readUrlCtx();
+  const animalId = String(rawNumber || '').trim();
   if(!animalId){
     msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
     return;
@@ -590,10 +583,17 @@ async function saveEvent(e){
     return;
   }
 
- const rows =
-  (window.rationItems && Array.isArray(window.rationItems))
-  ? window.rationItems
-  : collectRows();
+  let rows = [];
+  if (Array.isArray(window.rationItems) && window.rationItems.length) {
+    rows = window.rationItems;
+  } else {
+    rows = collectRows();
+  }
+
+  if (!rows.length) {
+    msgWarn('⚠️ لا يمكن الحفظ بدون خامات في العليقة.');
+    return;
+  }
   const payload = cleanDeep({
     animalNumber: animalId,
     eventDate,
