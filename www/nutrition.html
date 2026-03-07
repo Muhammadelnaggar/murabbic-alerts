@@ -1831,10 +1831,11 @@ async function refreshRationAndRender(){
       return;
     }
 
-    if (window.mbkNutrition?.fetchRationAnalysis) {
-      await window.mbkNutrition.fetchRationAnalysis(rows);
-      render();
-    }
+   if (window.mbkNutrition?.fetchRationAnalysis) {
+  await window.mbkNutrition.fetchRationAnalysis(rows);
+  recalc();
+  render();
+}
   }catch(_){}
 }
 refreshRationAndRender();
