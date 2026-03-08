@@ -476,10 +476,32 @@ async function loadCtxAuto(){
     ? await loadCtxFromGroup(nums, eventDate)
     : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
 
-  if(res?.ok){
-    disableSave(false);
-    msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
-  }else if(res?.reason==='no_uid'){
+ if(res?.ok){
+  const numEl  = document.getElementById('nutritionAnimalNumber');
+  const dateEl = document.getElementById('nutritionEventDate');
+  const idEl   = document.getElementById('nutritionAnimalId');
+
+  const currentNum = String(nums[0] || rawNumber || '').trim();
+  const currentDate = String(eventDate || '').trim();
+
+  if (numEl) {
+    numEl.value = currentNum;
+    numEl.disabled = false;
+  }
+
+  if (dateEl) {
+    dateEl.value = currentDate;
+    dateEl.disabled = false;
+  }
+
+  if (idEl) {
+    idEl.value = currentNum;
+    idEl.disabled = false;
+  }
+
+  disableSave(false);
+  msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
+}else if(res?.reason==='no_uid'){
     disableSave(true);
     msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
   }else if(res?.reason==='not_found'){
@@ -776,20 +798,55 @@ async function waitForAuthReady(timeoutMs = 5000){
     });
   }
 
-  try{
-    setHiddenCtxFromQuery();
-    updateCtxView();
-    disableSave(true);
+try{
+  setHiddenCtxFromQuery();
+  updateCtxView();
+  disableSave(true);
 
-    waitForAuthReady().then(user=>{
-      if(!user){
-        disableSave(true);
-        msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
-        return;
-      }
-      loadCtxAuto();
-    });
-  }catch(e){
+  const formNumEl  = document.getElementById('nutritionAnimalNumber');
+  const formDateEl = document.getElementById('nutritionEventDate');
+  const formIdEl   = document.getElementById('nutritionAnimalId');
+
+  const p = new URLSearchParams(location.search);
+  const initialNum =
+    String(
+      p.get('animalNumber') ||
+      p.get('number') ||
+      p.get('animalId') ||
+      ''
+    ).trim();
+
+  const initialDate =
+    String(
+      p.get('eventDate') ||
+      p.get('date') ||
+      ''
+    ).trim();
+
+  if (formNumEl) {
+    formNumEl.value = initialNum;
+    formNumEl.disabled = false;
+  }
+
+  if (formDateEl) {
+    formDateEl.value = initialDate;
+    formDateEl.disabled = false;
+  }
+
+  if (formIdEl) {
+    formIdEl.value = initialNum;
+    formIdEl.disabled = false;
+  }
+
+  waitForAuthReady().then(user=>{
+    if(!user){
+      disableSave(true);
+      msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
+      return;
+    }
+    loadCtxAuto();
+  });
+}catch(e){
     console.error(e);
     disableSave(true);
     msgWarn('⚠️ تعذر تهيئة الصفحة.');
