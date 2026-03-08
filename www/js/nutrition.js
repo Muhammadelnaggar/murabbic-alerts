@@ -62,7 +62,10 @@ async function refreshTargets() {
   }
 
   targetsCacheKey = key;
-  return await fetchTargets(ctx);
+  const out = await fetchTargets(ctx);
+window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.targets = out || null;
+return out;
 }
 
 let rationAnalysisCache = null;
@@ -119,7 +122,11 @@ async function refreshRationAnalysis(rows) {
   }
 
   rationAnalysisCacheKey = key;
-  return await fetchRationAnalysis(list);
+  const out = await fetchRationAnalysis(list);
+window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.rationAnalysis = out || null;
+applyServerAnalysisToDom(out, window.mbkNutrition.targets || null);
+return out;
 }
 
 function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
@@ -131,7 +138,44 @@ function setElText(id, val){
   if(!el) return;
   el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
 }
+function applyServerAnalysisToDom(analysis, targets){
+  const a = analysis || {};
+  const t = targets || {};
 
+  const setNum = (id, v, suffix = '', d = 2) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (v === null || v === undefined || !Number.isFinite(Number(v))) {
+      el.textContent = '—';
+      return;
+    }
+    const n = Number(v);
+    el.textContent = (Number.isInteger(n) ? String(n) : n.toFixed(d)) + suffix;
+  };
+
+  setNum('totDM', a?.totals?.dmKg, '', 2);
+  setNum('totAsFed', a?.totals?.asFedKg, '', 2);
+  setNum('totCost', a?.totals?.totCost, '', 2);
+  setNum('mixPriceDM', a?.totals?.mixPriceDM, '', 2);
+  setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
+
+  setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '%', 1);
+  setNum('fcRatio', a?.nutrition?.fcRatio, '', 2);
+  setNum('nelActual', a?.nutrition?.nelActual, '', 2);
+  setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
+  setNum('fatPctActual', a?.nutrition?.fatPctActual, '%', 1);
+
+  setNum('dmiTarget', t?.dmi ?? a?.targets?.dmiTarget, '', 2);
+  setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
+  setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
+  setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
+  setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
+
+  setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
+  setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+  setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
+  setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+}
 function msgWarn(text){
   const w = document.getElementById('warn');
   if(!w) return;
@@ -590,43 +634,7 @@ function cleanDeep(obj){
   return obj;
 }
 
-function readAnalysis(){
-  const txt = id => (document.getElementById(id)?.textContent || '').trim();
 
-  return cleanDeep({
-    totals: {
-      totDM: parseUiNumber(txt('totDM')),
-      totAsFed: parseUiNumber(txt('totAsFed')),
-      totCost: parseUiNumber(txt('totCost')),
-      mixPriceDM: parseUiNumber(txt('mixPriceDM')),
-      mixPriceAsFed: parseUiNumber(txt('mixPriceAsFed')),
-    },
-
-    nutrition: {
-      cpPctTotal: parseUiNumber(txt('cpPctTotal')),
-      fcRatio: parseUiNumber(txt('fcRatio')),
-      nelActual: parseUiNumber(txt('nelActual')),
-      ndfPctActual: parseUiNumber(txt('ndfPctActual')),
-      fatPctActual: parseUiNumber(txt('fatPctActual')),
-    },
-
-    targets: {
-      dmiTarget: parseUiNumber(txt('dmiTarget')),
-      nelTarget: parseUiNumber(txt('nelTarget')),
-      cpTarget: parseUiNumber(txt('cpTarget')),
-      ndfTarget: parseUiNumber(txt('ndfTarget')),
-      fatTarget: parseUiNumber(txt('fatTarget')),
-      starchMax: parseUiNumber(txt('starchMax')),
-    },
-
-    economics: {
-      costPerKgMilk: parseUiNumber(txt('costPerKgMilk')),
-      dmPerKgMilk: parseUiNumber(txt('dmPerKgMilk')),
-      milkRevenue: parseUiNumber(txt('milkRevenue')),
-      milkMargin: parseUiNumber(txt('milkMargin')),
-    }
-  });
-}
 function readContext(){
   const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
   const getSel = id => document.getElementById(id)?.value || null;
@@ -851,3 +859,7 @@ const formIdEl   = document.getElementById('animalId');
     msgWarn('⚠️ تعذر تهيئة الصفحة.');
   }
 })();
+window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.refreshTargets = refreshTargets;
+window.mbkNutrition.refreshRationAnalysis = refreshRationAnalysis;
+window.mbkNutrition.readContext = readContext;
