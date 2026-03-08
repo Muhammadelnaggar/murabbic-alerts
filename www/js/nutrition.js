@@ -477,9 +477,9 @@ async function loadCtxAuto(){
     : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
 
  if(res?.ok){
-  const numEl  = document.getElementById('nutritionAnimalNumber');
-  const dateEl = document.getElementById('nutritionEventDate');
-  const idEl   = document.getElementById('nutritionAnimalId');
+ const numEl  = document.getElementById('animalNumber');
+const dateEl = document.getElementById('eventDate');
+const idEl   = document.getElementById('animalId');
 
   const currentNum = String(nums[0] || rawNumber || '').trim();
   const currentDate = String(eventDate || '').trim();
@@ -803,9 +803,9 @@ try{
   updateCtxView();
   disableSave(true);
 
-  const formNumEl  = document.getElementById('nutritionAnimalNumber');
-  const formDateEl = document.getElementById('nutritionEventDate');
-  const formIdEl   = document.getElementById('nutritionAnimalId');
+const formNumEl  = document.getElementById('animalNumber');
+const formDateEl = document.getElementById('eventDate');
+const formIdEl   = document.getElementById('animalId');
 
   const p = new URLSearchParams(location.search);
   const initialNum =
