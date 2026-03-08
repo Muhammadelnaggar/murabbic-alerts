@@ -790,14 +790,10 @@ async function waitForAuthReady(timeoutMs = 5000){
     form.addEventListener('mbk:valid', saveEvent);
   }
 
-  const btn = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
-  if (btn) {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      form?.requestSubmit?.();
-    });
-  }
-
+ const btn = document.getElementById('saveEvent');
+if (btn) {
+  btn.type = 'submit';
+}
 try{
   setHiddenCtxFromQuery();
   updateCtxView();
