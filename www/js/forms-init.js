@@ -1428,6 +1428,12 @@ if (eventName === "بيع") {
   lockForm(false);
   return true;
 }
+ // ✅ Nutrition: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "تغذية") {
+  showMsg(bar, "✅ تم التحقق — أكمل إدخال العليقة ثم اضغط حفظ.", "success");
+  lockForm(false);
+  return true;
+}   
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
