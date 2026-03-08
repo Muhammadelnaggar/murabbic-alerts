@@ -1341,40 +1341,28 @@ if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedT
       const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
       return !dm && hasVal;
     });
+    if (!w && dmMissing) w = '⚠️    let w = '';
+    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
+    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+
+    const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
+      const dm = parseFloat(tr.querySelector('.dm').value);
+      const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
+      return !dm && hasVal;
+    });
     if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
-    // ===== مؤشرات التحليل الأساسية =====
-    // إجمالي المأكول/رأس/يوم
-    const asfedOut = (mode==="tmr_percent") ? "—" : nf(totalAsFed||0);
-    const asfedEl = document.getElementById("totAsFed");
-    if(asfedEl) asfedEl.textContent = asfedOut;
 
-    // % البروتين الخام الكلي (على أساس DM)
-    let cpPctTotal = null;
-    if(mode==="tmr_percent"){
-      if(dmFrac>0) cpPctTotal = (cpKg/dmFrac)*100;
-    } else {
-      const baseDM = (mode==="tmr_percent") ? dmFrac : totalDM;
-if(baseDM>0) cpPctTotal = (cpKg/baseDM)*100;
-    }
-    const cpElOut = document.getElementById("cpPctTotal");
-    if(cpElOut) cpElOut.textContent = (cpPctTotal!=null && isFinite(cpPctTotal)) ? (cpPctTotal.toFixed(1)+"%") : "—";
-
-// ===== التحليل المركزي من السيرفر فقط =====
-Promise.resolve()
-  .then(() => window.mbkNutrition?.refreshTargets?.())
-  .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
-  .catch(() => {})
-  .finally(() => {
-    try{ render(); }catch(e){}
-    warn.textContent = w;
-    try{ renderRationSummary(); }catch(e){}
-  });
-
-return;
-    try{ render(); }catch(e){}
-    warn.textContent = w;
-try{ renderRationSummary(); }catch(e){}
+    Promise.resolve()
+      .then(() => window.mbkNutrition?.refreshTargets?.())
+      .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
+      .catch(() => {})
+      .finally(() => {
+        warn.textContent = w;
+        try{ render(); }catch(e){}
+        try{ renderRationSummary(); }catch(e){}
+      });
   }
+
 function hookRow(tr){
   const nameEl = tr.querySelector('.name');
   const dmEl   = tr.querySelector('.dm');
