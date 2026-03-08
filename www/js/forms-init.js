@@ -1391,7 +1391,7 @@ if (eventName === "لبن يومي") {
 // ✅ Heat Bulk: في الشياع الجماعي لا نعتمد على validateEvent لأنه يحتاج documentData
 if (eventName === "شياع" && isHeatBulk) {
   const rawNumForDispatch = String(getFieldEl(form, "animalNumber")?.value || "");
-  const nums2 = [...new Set((latin2(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
+  const nums2 = [...new Set((_latin(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
 
   const formData2 = collectFormData(form);
   formData2.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
@@ -1455,7 +1455,7 @@ if (eventName === "بيع") {
 
     // ✅ Bulk dispatch for Heat (شياع): لو أكتر من رقم في نفس الحقل → نحولها إلى bulkEvents
     const rawNumForDispatch = String(getFieldEl(form, "animalNumber")?.value || "");
-    const nums2 = [...new Set((latin2(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
+    const nums2 = [...new Set((_latin(rawNumForDispatch).match(/\d+/g) || []).map(x=>x.replace(/\D/g,'')).filter(Boolean))];
 
     if (eventName === "شياع" && nums2.length > 1) {
       // 👇 بنبني payload لكل رقم (نفس البيانات الأخرى)
