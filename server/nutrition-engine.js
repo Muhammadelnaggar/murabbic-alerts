@@ -45,7 +45,11 @@ function getStandardWeight(species, breed){
 
   const b = String(breed || '').trim();
 
- if(species === 'جاموس'){
+if(
+  species === 'جاموس' ||
+  species === 'جاموسة' ||
+  species === 'buffalo'
+){
   if (b.includes('مصري')) return 600;
   if (b.includes('هجين') && (b.includes('ايطالي') || b.includes('إيطالي'))) return 700;
   if (b.includes('هجين') && b.includes('مورا')) return 750;
