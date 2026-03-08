@@ -86,11 +86,13 @@ async function fetchRationAnalysis(rows) {
       'Content-Type': 'application/json',
       'X-User-Id': uid
     },
-    body: JSON.stringify({
-      mode: document.getElementById('mode')?.value || 'tmr_asfed',
-      rows: list,
-      concKg: document.getElementById('concKgInput')?.value || null
-    })
+  body: JSON.stringify({
+  mode: document.getElementById('mode')?.value || 'tmr_asfed',
+  rows: list,
+  concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
+  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null),
+  context: readContext()
+})
   });
 
   const data = await res.json().catch(() => ({}));
@@ -709,12 +711,13 @@ async function saveEvent(e){
     animalNumber: animalId,
     eventDate,
 
-    nutrition: {
-      mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-      rows,
-      context: readContext(),
-      analysis: readAnalysis()
-    }
+   nutrition: {
+  mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+  rows,
+  context: readContext(),
+  concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
+  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
+}
   });
   // userId من auth (Cloud-only)
  
