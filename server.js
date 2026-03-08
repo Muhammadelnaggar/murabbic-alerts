@@ -320,13 +320,18 @@ function normalizeNutritionAnalysis(a = {}) {
   mixPriceDM: toNumOrNull(a?.totals?.mixPriceDM),
   mixPriceAsFed: toNumOrNull(a?.totals?.mixPriceAsFed)
 },
-    nutrition: {
-      cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
-      fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
-      nelActual: toNumOrNull(a?.nutrition?.nelActual),
-      ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
-      fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual)
-    },
+   nutrition: {
+  cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
+  fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
+  nelActual: toNumOrNull(a?.nutrition?.nelActual),      // فعلي /يوم
+  nelDensity: toNumOrNull(a?.nutrition?.nelDensity),    // فعلي /كجم DM
+  ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
+  fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
+  roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
+  concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
+  rumenStatus: a?.nutrition?.rumenStatus || null,
+  rumenNote: a?.nutrition?.rumenNote || null
+},
     targets: {
       dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
       nelTarget: toNumOrNull(a?.targets?.nelTarget),
@@ -479,13 +484,53 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
     }
   }
 
-  const milkKg = Number(context?.avgMilkKg || 0);
-  const milkPriceNum = Number(milkPrice || 0);
+ const milkKg = Number(context?.avgMilkKg || 0);
+const milkPriceNum = Number(milkPrice || 0);
 
-  const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
-  const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
-  const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
-  const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue - totCost) : null;
+// ===== الطاقة: لازم الفعلي والاحتياج بنفس المقياس =====
+// الفعلي هنا /يوم = إجمالي طاقة العليقة اليومية
+const nelActualDay = round2(rationCore?.totals?.nelMcal ?? null);
+
+// اختياري للعرض المتقدم فقط: كثافة الطاقة /كجم DM
+const nelDensity = (rationCore?.totals?.dmKg > 0)
+  ? round2((rationCore?.totals?.nelMcal || 0) / rationCore.totals.dmKg)
+  : null;
+
+// ===== صحة الكرش: نسبة خشن/مركز على أساس DM =====
+const forageDm = Number(rationCore?.totals?.forageDmKg || 0);
+const concDm   = Number(rationCore?.totals?.concDmKg || 0);
+const totalDmForRumen = forageDm + concDm;
+
+const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : null;
+const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : null;
+
+let rumenStatus = null;
+let rumenNote = null;
+
+if (roughPctDM != null) {
+  const isBuffalo = String(context?.species || '').includes('جاموس');
+
+  // أبقار: ممتاز 40–60
+  // جاموس: نزود 25% خشن عن الأبقار => 50–75
+  const low  = isBuffalo ? 50 : 40;
+  const high = isBuffalo ? 75 : 60;
+
+  if (roughPctDM < low) {
+    rumenStatus = 'danger';
+    rumenNote = 'خطر الحموضة مرتفع';
+  } else if (roughPctDM > high) {
+    rumenStatus = 'warn';
+    rumenNote = 'الخشن مرتفع وقد يقل المأكول';
+  } else {
+    rumenStatus = 'good';
+    rumenNote = 'النسبة ممتازة لصحة الكرش';
+  }
+}
+
+const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
+const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
+const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
+const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue - totCost) : null;
 
   return normalizeNutritionAnalysis({
     totals: {
@@ -495,13 +540,18 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
       mixPriceDM,
       mixPriceAsFed
     },
-    nutrition: {
-      cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
-      fcRatio: rationCore?.nutrition?.fcRatio ?? null,
-      nelActual: rationCore?.nutrition?.nelActual ?? null,
-      ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
-      fatPctActual: rationCore?.nutrition?.fatPctActual ?? null
-    },
+   nutrition: {
+  cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
+  fcRatio: concDm > 0 ? round2(forageDm / concDm) : null,
+  nelActual: nelActualDay,             // /يوم
+  nelDensity: nelDensity,              // /كجم DM للعرض المتقدم فقط
+  ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+  fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
+  roughPctDM,
+  concPctDM,
+  rumenStatus,
+  rumenNote
+},
     targets: {
       dmiTarget: targetsCore?.dmi ?? null,
       nelTarget: targetsCore?.nel ?? null,
