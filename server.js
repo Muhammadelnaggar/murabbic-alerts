@@ -313,10 +313,13 @@ function normalizeNutritionContext(ctx = {}) {
 
 function normalizeNutritionAnalysis(a = {}) {
   return cleanObj({
-    totals: {
-      asFedKg: toNumOrNull(a?.totals?.asFedKg),
-      dmKg: toNumOrNull(a?.totals?.dmKg)
-    },
+   totals: {
+  asFedKg: toNumOrNull(a?.totals?.asFedKg),
+  dmKg: toNumOrNull(a?.totals?.dmKg),
+  totCost: toNumOrNull(a?.totals?.totCost),
+  mixPriceDM: toNumOrNull(a?.totals?.mixPriceDM),
+  mixPriceAsFed: toNumOrNull(a?.totals?.mixPriceAsFed)
+},
     nutrition: {
       cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
       fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
@@ -351,7 +354,7 @@ function normalizeNutritionRows(rows = []) {
     pct: toNumOrNull(r?.pct),
     dmPct: toNumOrNull(r?.dmPct ?? r?.dm),
     cpPct: toNumOrNull(r?.cpPct ?? r?.cp),
-    pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon),
+   pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon ?? r?.price ?? r?.pTonRaw),
     pricePerTonDM: toNumOrNull(r?.pricePerTonDM ?? r?.pTonDM),
     nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
     ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
