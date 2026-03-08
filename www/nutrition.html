@@ -1333,24 +1333,28 @@ if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
     const mixAsFedTon = (totalAsFed>0 && totalCost>0) ? ((totalCost / totalAsFed) * 1000) : null;
 const mixAsFedEl = document.getElementById("mixPriceAsFed");
 if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedTon)) ? nf(mixAsFedTon) : "—";
-    let w = '';
-    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
-    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
-    const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
-      const dm = parseFloat(tr.querySelector('.dm').value);
-      const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
-      return !dm && hasVal;
-    });
-    if (!w && dmMissing) w = '⚠️    let w = '';
-    if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
-    if (mode==='split' && (concSumPct && (concSumPct<99 || concSumPct>101))) w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+   let w = '';
 
-    const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
-      const dm = parseFloat(tr.querySelector('.dm').value);
-      const hasVal = (parseFloat(tr.querySelector('.kg').value)||0) > 0 || (parseFloat(tr.querySelector('.pct').value)||0) > 0;
-      return !dm && hasVal;
-    });
-    if (!w && dmMissing) w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) {
+  w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
+}
+
+if (mode==='split' && concSumPct && (concSumPct<99 || concSumPct>101)) {
+  w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+}
+
+const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
+  const dm = parseFloat(tr.querySelector('.dm').value);
+  const hasVal =
+    (parseFloat(tr.querySelector('.kg').value)||0) > 0 ||
+    (parseFloat(tr.querySelector('.pct').value)||0) > 0;
+  return !dm && hasVal;
+});
+
+if (!w && dmMissing) {
+  w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
+}
+   
 
     Promise.resolve()
       .then(() => window.mbkNutrition?.refreshTargets?.())
