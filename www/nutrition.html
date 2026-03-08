@@ -1359,86 +1359,18 @@ if(baseDM>0) cpPctTotal = (cpKg/baseDM)*100;
     const cpElOut = document.getElementById("cpPctTotal");
     if(cpElOut) cpElOut.textContent = (cpPctTotal!=null && isFinite(cpPctTotal)) ? (cpPctTotal.toFixed(1)+"%") : "—";
 
-  // ===== F:C Ratio (DM basis) =====
-// fc = RoughDM / ConcDM  (ratio)
-let fc = null;
-if (concDM_forFC > 0) fc = roughDM_forFC / concDM_forFC;
+// ===== التحليل المركزي من السيرفر فقط =====
+Promise.resolve()
+  .then(() => window.mbkNutrition?.refreshTargets?.())
+  .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
+  .catch(() => {})
+  .finally(() => {
+    try{ render(); }catch(e){}
+    warn.textContent = w;
+    try{ renderRationSummary(); }catch(e){}
+  });
 
-const fcEl = document.getElementById("fcRatio");
-if (fcEl){
-  fcEl.textContent = (fc!=null && isFinite(fc)) ? fc.toFixed(2) : "—";
-
-  // ✅ نخزّن "كام لكام" علشان نعرضه للمستخدم ونستخدمه في تقييم الحموضة
-  const total = roughDM_forFC + concDM_forFC;
-  const foragePct = (total > 0) ? (roughDM_forFC / total * 100) : null;
-
-  fcEl.dataset.roughDm = (isFinite(roughDM_forFC) ? String(roughDM_forFC) : "");
-  fcEl.dataset.concDm  = (isFinite(concDM_forFC)  ? String(concDM_forFC)  : "");
-  fcEl.dataset.foragePct = (foragePct!=null && isFinite(foragePct)) ? foragePct.toFixed(0) : "";
-}
-// ===== Targets (from server cache) =====
-const targets = window.mbkNutrition?.targets || null;
-
-if(targets){
-  const num = (v, d=2)=> (v==null || !isFinite(Number(v))) ? "—" : Number(v).toFixed(d);
-  const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
-
-  set("dmiTarget", num(targets.dmi, 2));
-  set("nelTarget", num(targets.nel, 2));
-  set("cpTarget",  num(targets.cpTarget, 1));
-  set("ndfTarget", (targets.ndfTarget!=null ? String(targets.ndfTarget) : "—"));
-  set("starchMax", (targets.starchMax!=null ? String(targets.starchMax) : "—"));
-} else {
-  const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
-  set("dmiTarget", "—");
-  set("nelTarget", "—");
-  set("cpTarget", "—");
-  set("ndfTarget", "—");
-  set("starchMax", "—");
-}
-    // ===== Actual NEL/NDF (لو متاحين من المكتبة) =====
-    const dmForAct = (mode==="tmr_percent") ? (dmFrac||0) : (totalDM||0);
-   const nelEl = document.getElementById("nelActual");
-if(nelEl) nelEl.textContent = (nelSupplied>0 && dmForAct>0) ? nf(nelSupplied) : "—";
-
-const ndfPct = (ndfKg>0 && dmForAct>0) ? ((ndfKg/dmForAct)*100) : null;
-const ndfEl = document.getElementById("ndfPctActual");
-if(ndfEl) ndfEl.textContent = (ndfPct!=null && isFinite(ndfPct)) ? (ndfPct.toFixed(1)+"%") : "—";
-
-const fatPct = (fatKg>0 && dmForAct>0) ? ((fatKg/dmForAct)*100) : null;
-const fatEl = document.getElementById("fatPctActual");
-if(fatEl) fatEl.textContent = (fatPct!=null && isFinite(fatPct)) ? (fatPct.toFixed(1)+"%") : "—";
-
-    // ===== إجماليات نهائية (للكروت) =====
-    let totDMVal = 0;
-
-if(mode==="tmr_percent"){
-  totDMVal = dmFrac || 0;   // بدل null
-} else if(mode==="split"){
-  totDMVal = roughDM + (concKg * concDmFrac);
-} else {
-  totDMVal = totalDM;
-}
-    const totCostVal = (mode==="tmr_percent") ? null : (mode==="split" ? (roughCost + ((concKg*concDmFrac)/1000) * (concDmFrac>0 ? (concMixAsFed/concDmFrac) : 0)) : totalCost);
-    const setNum = (id,val,fmtFn)=>{ const el=document.getElementById(id); if(!el) return; el.textContent = (val==null || !isFinite(val)) ? "—" : (fmtFn?fmtFn(val):String(val)); };
-    setNum("totDM", totDMVal, (v)=>nf(v));
-    setNum("totCost", totCostVal, (v)=>nf(v));
-    setNum("totAsFed", (mode==="tmr_percent") ? null : (totalAsFed||0), (v)=>nf(v));
-
-    // ===== كفاءة التحويل + اقتصاد اللبن (لو avgMilk موجود) =====
-    const milkKg = Number(ctx.avgMilkKg||0);
-    const costPerKg = (milkKg>0 && totCostVal!=null && isFinite(totCostVal)) ? (totCostVal/milkKg) : null;
-    setNum("costPerKgMilk", costPerKg, (v)=>v.toFixed(2));
-    const dmPerKg = (milkKg>0 && totDMVal!=null && isFinite(totDMVal) && totDMVal>0) ? (milkKg/totDMVal) : null;
-    setNum("dmPerKgMilk", dmPerKg, (v)=>v.toFixed(2));
-
-    // إيراد/هامش (اختياري من milkPrice في الرابط)
-    const mp = Number(new URLSearchParams(location.search).get('milkPrice')||0);
-    const rev = (milkKg>0 && mp>0) ? (milkKg*mp) : null;
-    setNum("milkRevenue", rev, (v)=>nf(v));
-    const margin = (rev!=null && totCostVal!=null) ? (rev - totCostVal) : null;
-    setNum("milkMargin", margin, (v)=>nf(v));
-
+return;
     try{ render(); }catch(e){}
     warn.textContent = w;
 try{ renderRationSummary(); }catch(e){}
