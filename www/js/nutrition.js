@@ -159,8 +159,23 @@ function applyServerAnalysisToDom(analysis, targets){
   setNum('mixPriceDM', a?.totals?.mixPriceDM, '', 2);
   setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
 
-  setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '%', 1);
-  setNum('fcRatio', a?.nutrition?.fcRatio, '', 2);
+   setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '%', 1);
+
+  const fcEl = document.getElementById('fcRatio');
+  if (fcEl) {
+    const rough = Number(a?.nutrition?.roughPctDM);
+    const conc  = Number(a?.nutrition?.concPctDM);
+    const note  = a?.nutrition?.rumenNote || '';
+
+    if (Number.isFinite(rough) && Number.isFinite(conc)) {
+      fcEl.textContent = `خشن ${rough.toFixed(0)}% / مركز ${conc.toFixed(0)}%`;
+    } else {
+      fcEl.textContent = '—';
+    }
+
+    fcEl.dataset.rumenNote = note;
+  }
+
   setNum('nelActual', a?.nutrition?.nelActual, '', 2);
   setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
   setNum('fatPctActual', a?.nutrition?.fatPctActual, '%', 1);
@@ -175,6 +190,11 @@ function applyServerAnalysisToDom(analysis, targets){
   setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
   setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
   setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+   const fcEl2 = document.getElementById('fcRatio');
+  const rumenHintEl = document.getElementById('rumenHint');
+  if (rumenHintEl) {
+    rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
+  } 
 }
 function msgWarn(text){
   const w = document.getElementById('warn');
