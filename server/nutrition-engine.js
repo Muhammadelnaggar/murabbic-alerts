@@ -45,13 +45,15 @@ function getStandardWeight(species, breed){
 
   const b = String(breed || '').trim();
 
-  if(species === 'جاموس'){
-    // (سنوسعها لاحقًا: مصري/إيطالي…)
-    if(b.includes('مصري')) return 630;
-    if(b.includes('ايطالي') || b.includes('إيطالي')) return 720;
-    if(b.includes('خليط')) return 600;
-    return 650;
-  }
+ if(species === 'جاموس'){
+  if (b.includes('مصري')) return 600;
+  if (b.includes('هجين') && (b.includes('ايطالي') || b.includes('إيطالي'))) return 700;
+  if (b.includes('هجين') && b.includes('مورا')) return 750;
+  if (b.includes('ايطالي') || b.includes('إيطالي')) return 720;
+  if (b.includes('مورا')) return 800;
+  if (b.includes('خليط')) return 650;
+  return 650;
+}
 
   // أبقار
   if(b.includes('هولشتاين')) return 650;
@@ -179,7 +181,8 @@ function computeBuffalo({ bodyWeight, milkKg, pregDays, closeUp, dim }){
 
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
-  const cpTarget = clamp(12.8 + (0.08 * milkKg), 13, 17);
+ let cpTarget = 12 + (0.18 * milkKg);
+cpTarget = clamp(cpTarget, 12, 15);
 
   return {
     species: 'buffalo',
@@ -188,8 +191,9 @@ function computeBuffalo({ bodyWeight, milkKg, pregDays, closeUp, dim }){
     dmi: round(dmi),
     nel: round(nelTotal),
     cpTarget: round(cpTarget),
-    ndfTarget: 32,
-    starchMax: 24
+    ndfTarget: 34,
+    starchMax: 26,
+    roughageMin: 50
   };
 }
 
