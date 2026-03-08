@@ -497,7 +497,34 @@ const nelDensity = (rationCore?.totals?.dmKg > 0)
   : null;
 
 // ===== صحة الكرش: نسبة خشن/مركز على أساس DM =====
-const forageDm = Number(rationCore?.totals?.forageDmKg || 0);
+let forageDm = 0;
+let concDm = 0;
+
+for (const r of cleanRows) {
+  const kg = Number(r.asFedKg || 0);
+  const dmPct = Number(r.dmPct || 0);
+  const dmKg = kg * (dmPct / 100);
+
+  if (String(r.cat) === 'rough') {
+    forageDm += dmKg;
+  }
+
+  if (String(r.cat) === 'conc') {
+    concDm += dmKg;
+  }
+}
+
+const totalDmForRumen = forageDm + concDm;
+
+const roughPctDM =
+  totalDmForRumen > 0
+    ? round2((forageDm / totalDmForRumen) * 100)
+    : 0;
+
+const concPctDM =
+  totalDmForRumen > 0
+    ? round2((concDm / totalDmForRumen) * 100)
+    : 0;
 const concDm   = Number(rationCore?.totals?.concDmKg || 0);
 const totalDmForRumen = forageDm + concDm;
 
