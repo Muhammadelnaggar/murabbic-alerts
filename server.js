@@ -362,7 +362,162 @@ function normalizeNutritionRows(rows = []) {
     mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
   }));
 }
+function round2(v){
+  return Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : null;
+}
 
+function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
+  const cleanRows = Array.isArray(rows) ? rows : [];
+  const modeNorm = String(mode || 'tmr_asfed').trim();
+
+  const rationCore = analyzeRation(
+    cleanRows.map(r => ({
+      kg: r.asFedKg,
+      dm: r.dmPct,
+      cp: r.cpPct,
+      nel: r.nelMcalPerKgDM,
+      ndf: r.ndfPct,
+      fat: r.fatPct,
+      cat: r.cat
+    }))
+  );
+
+  const targetsCore = computeTargets({
+    species: context.species,
+    breed: context.breed,
+    daysInMilk: context.daysInMilk,
+    avgMilkKg: context.avgMilkKg,
+    pregnancyDays: context.pregnancyDays,
+    closeUp: context.closeUp
+  });
+
+  let totCost = null;
+  let mixPriceDM = null;
+  let mixPriceAsFed = null;
+
+  if (modeNorm === 'tmr_asfed') {
+    let totalAsFed = 0;
+    let totalDmKg = 0;
+    let totalCostVal = 0;
+
+    for (const r of cleanRows) {
+      const kg = Number(r.asFedKg || 0);
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+
+      const dmKg = kg * (dmPct / 100);
+      const cost = (kg / 1000) * pricePerTon;
+
+      totalAsFed += kg;
+      totalDmKg += dmKg;
+      totalCostVal += cost;
+    }
+
+    totCost = round2(totalCostVal);
+    mixPriceAsFed = totalAsFed > 0 ? round2((totalCostVal / totalAsFed) * 1000) : null;
+    mixPriceDM = totalDmKg > 0 ? round2((totalCostVal / totalDmKg) * 1000) : null;
+  }
+
+  if (modeNorm === 'tmr_percent') {
+    let dmFrac = 0;
+    let mixAsFed = 0;
+
+    for (const r of cleanRows) {
+      const pct = Number(r.pct || 0) / 100;
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+
+      dmFrac += pct * (dmPct / 100);
+      mixAsFed += pct * pricePerTon;
+    }
+
+    mixPriceAsFed = mixAsFed > 0 ? round2(mixAsFed) : null;
+    mixPriceDM = dmFrac > 0 ? round2(mixAsFed / dmFrac) : null;
+  }
+
+  if (modeNorm === 'split') {
+    const concKgNum = Number(concKg || 0);
+
+    let roughDm = 0;
+    let roughCost = 0;
+    let concDmFrac = 0;
+    let concMixAsFed = 0;
+
+    for (const r of cleanRows) {
+      const cat = String(r.cat || '').trim();
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+      const kg = Number(r.asFedKg || 0);
+      const pct = Number(r.pct || 0);
+
+      if (cat === 'rough') {
+        const dmKg = kg * (dmPct / 100);
+        const cost = (kg / 1000) * pricePerTon;
+        roughDm += dmKg;
+        roughCost += cost;
+      }
+
+      if (cat === 'conc') {
+        const frac = pct / 100;
+        concDmFrac += frac * (dmPct / 100);
+        concMixAsFed += frac * pricePerTon;
+      }
+    }
+
+    const concKgDM = concKgNum * concDmFrac;
+    const concCost = (concKgNum / 1000) * concMixAsFed;
+    const totalCostAll = roughCost + concCost;
+    const totalDmAll = roughDm + concKgDM;
+
+    totCost = round2(totalCostAll);
+    mixPriceAsFed = concMixAsFed > 0 ? round2(concMixAsFed) : null;
+    mixPriceDM = concDmFrac > 0 ? round2(concMixAsFed / concDmFrac) : null;
+
+    if (rationCore?.totals) {
+      rationCore.totals.asFedKg = round2((rationCore.totals.asFedKg || 0) + concKgNum);
+      rationCore.totals.dmKg = round2(totalDmAll);
+    }
+  }
+
+  const milkKg = Number(context?.avgMilkKg || 0);
+  const milkPriceNum = Number(milkPrice || 0);
+
+  const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
+  const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
+  const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
+  const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue - totCost) : null;
+
+  return normalizeNutritionAnalysis({
+    totals: {
+      asFedKg: rationCore?.totals?.asFedKg ?? null,
+      dmKg: rationCore?.totals?.dmKg ?? null,
+      totCost,
+      mixPriceDM,
+      mixPriceAsFed
+    },
+    nutrition: {
+      cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
+      fcRatio: rationCore?.nutrition?.fcRatio ?? null,
+      nelActual: rationCore?.nutrition?.nelActual ?? null,
+      ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+      fatPctActual: rationCore?.nutrition?.fatPctActual ?? null
+    },
+    targets: {
+      dmiTarget: targetsCore?.dmi ?? null,
+      nelTarget: targetsCore?.nel ?? null,
+      cpTarget: targetsCore?.cpTarget ?? null,
+      ndfTarget: targetsCore?.ndfTarget ?? null,
+      fatTarget: null,
+      starchMax: targetsCore?.starchMax ?? null
+    },
+    economics: {
+      costPerKgMilk,
+      dmPerKgMilk,
+      milkRevenue,
+      milkMargin
+    }
+  });
+}
 async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
   if (!db) return null;
 
@@ -426,12 +581,23 @@ app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
       });
     }
 
-    const analysis = analyzeRation(rows);
+   const context = normalizeNutritionContext(body.context || {});
+const mode = body.mode || 'tmr_asfed';
+const concKg = toNumOrNull(body.concKg);
+const milkPrice = toNumOrNull(body.milkPrice);
 
-    return res.json({
-      ok: true,
-      analysis
-    });
+const analysis = buildNutritionCentralAnalysis({
+  rows: normalizeNutritionRows(rows),
+  context,
+  mode,
+  concKg,
+  milkPrice
+});
+
+return res.json({
+  ok: true,
+  analysis
+});
   } catch (e) {
     console.error('nutrition.analyze-ration error:', e);
     return res.status(500).json({
@@ -486,48 +652,16 @@ if (!rows.length) {
   });
 }
 
-const rationCore = analyzeRation(
-  rows.map(r => ({
-    kg: r.asFedKg,
-    dm: r.dmPct,
-    cp: r.cpPct,
-    nel: r.nelMcalPerKgDM,
-    ndf: r.ndfPct,
-    fat: r.fatPct,
-    cat: r.cat
-  }))
-);
+const mode = nutrition.mode || 'tmr_asfed';
+const concKg = toNumOrNull(nutrition.concKg);
+const milkPrice = toNumOrNull(nutrition.milkPrice);
 
-const targetsCore = computeTargets({
-  species: context.species,
-  breed: context.breed,
-  daysInMilk: context.daysInMilk,
-  avgMilkKg: context.avgMilkKg,
-  pregnancyDays: context.pregnancyDays,
-  closeUp: context.closeUp
-});
-
-const centralAnalysis = normalizeNutritionAnalysis({
-  totals: {
-    asFedKg: rationCore?.totals?.asFedKg ?? null,
-    dmKg: rationCore?.totals?.dmKg ?? null
-  },
-  nutrition: {
-    cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
-    fcRatio: rationCore?.nutrition?.fcRatio ?? null,
-    nelActual: rationCore?.nutrition?.nelActual ?? null,
-    ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
-    fatPctActual: rationCore?.nutrition?.fatPctActual ?? null
-  },
-  targets: {
-    dmiTarget: targetsCore?.dmi ?? null,
-    nelTarget: targetsCore?.nel ?? null,
-    cpTarget: targetsCore?.cpTarget ?? null,
-    ndfTarget: targetsCore?.ndfTarget ?? null,
-    fatTarget: null,
-    starchMax: targetsCore?.starchMax ?? null
-  },
-  economics: {}
+const centralAnalysis = buildNutritionCentralAnalysis({
+  rows,
+  context,
+  mode,
+  concKg,
+  milkPrice
 });
     let animalDoc = null;
     let animalDocId = '';
