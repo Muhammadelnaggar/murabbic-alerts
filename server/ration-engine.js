@@ -56,6 +56,7 @@ function analyzeRation(rows){
     const nel  = num(r.nel);
     const ndf  = num(r.ndf);
     const fat  = num(r.fat);
+    const starch = num(r.starchPct ?? r.starch);
     const cat  = String(r.cat || '').trim();
 
     const dmItemKg = kg * (dm / 100);
