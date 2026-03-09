@@ -1890,30 +1890,26 @@ if(fcRatioEl && fcCard){
   fcCard.dataset.foragePct = fcRatioEl.dataset.foragePct;
 }
 if(fcCard){
-  const fc = valueOf(fcCard); // roughDM/concDM ratio
-  if(Number.isFinite(fc)){
+  const fcRatioEl = document.getElementById("fcRatio");
+  const serverNote = String(fcRatioEl?.dataset?.rumenNote || "").trim();
+  const txt = String(fcRatioEl?.textContent || "").trim();
 
-    // ✅ تفاصيل "كام لكام" + %خشن (DM)
-    const roughDm = Number(fcCard.dataset.roughDm || "");
-    const concDm  = Number(fcCard.dataset.concDm  || "");
-    const foragePct = Number(fcCard.dataset.foragePct || "");
+  const m = txt.match(/خشن\s+(\d+(?:\.\d+)?)%\s*\/\s*مركز\s+(\d+(?:\.\d+)?)%/);
+  const roughPct = m ? Number(m[1]) : NaN;
+  const concPct  = m ? Number(m[2]) : NaN;
 
-    const detail = (Number.isFinite(roughDm) && Number.isFinite(concDm) && (roughDm + concDm) > 0)
-  ? `مركزات ${Math.round((concDm/(roughDm+concDm))*100)}% : خشن ${Math.round((roughDm/(roughDm+concDm))*100)}% — على أساس المادة الجافة`
-  : (Number.isFinite(foragePct) ? `خشن ${foragePct.toFixed(0)}% من المادة الجافة` : "");
+  const detail = (Number.isFinite(roughPct) && Number.isFinite(concPct))
+    ? `خشن ${Math.round(roughPct)}% / مركز ${Math.round(concPct)}%`
+    : txt;
 
-    // ✅ تقييم الحموضة الصحيح:
-    // الخطر الحقيقي لما الخشن قليل (ratio منخفض) وليس لما الخشن عالي
-    if(fc < 0.65){
-      setStatus(fcCard,'bad','خطر', detail || 'خشن قليل جدًا → خطر حموضة', 25);
-    }else if(fc < 0.85){
-      setStatus(fcCard,'warn','غير مناسب', detail || 'الخشن منخفض', 45);
-    }else if(fc <= 1.60){
-      setStatus(fcCard,'ok','ممتاز', detail || 'توازن مناسب للكرش', 85);
-    }else{
-      // خشن عالي = ليست حموضة… لكنها قد تعني طاقة أقل
-      setStatus(fcCard,'warn','معلومة', detail || 'الخشن مرتفع (قد يقلل الطاقة)', 70);
-    }
+  if (serverNote.includes('خطر الحموضة') || serverNote.includes('100% مركزات')) {
+    setStatus(fcCard, 'bad', 'خطر', serverNote || detail, 25);
+  } else if (serverNote.includes('الخشن منخفض')) {
+    setStatus(fcCard, 'warn', 'تحذير', serverNote || detail, 45);
+  } else if (serverNote.includes('الخشن مرتفع')) {
+    setStatus(fcCard, 'warn', 'معلومة', serverNote || detail, 70);
+  } else {
+    setStatus(fcCard, 'ok', 'ممتاز', serverNote || detail || 'توازن مناسب للكرش', 85);
   }
 }
 
