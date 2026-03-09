@@ -173,7 +173,7 @@ function computeBuffalo({ bodyWeight, milkKg, pregDays, closeUp, dim }){
 
   const bw075 = Math.pow(bodyWeight, 0.75);
   const nelMaintenance = 0.075 * bw075;
-  const nelMilk = 0.80 * milkKg;
+  const nelMilk = 1.0 * milkKg;
 
   let nelPreg = 0;
   if(pregDays > 200){
