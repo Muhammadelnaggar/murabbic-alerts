@@ -490,10 +490,7 @@ padding: 6px 0;
     </div>
 
    <div class="table-wrap" id="feedInputBox" style="display:none">
-      <div class="mini-actions" id="miniActions" style="display:none">
-  <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
-  <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
-</div>  
+     
         <table id="tbl">
       <thead>
           <tr>
@@ -512,7 +509,10 @@ padding: 6px 0;
         <tbody></tbody>
       </table>
     </div>
-
+ <div class="mini-actions" id="miniActions" style="display:none">
+  <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
+  <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
+</div>  
     <div class="total" id="totalsBase">
       <span class="pill" id="pillSumPct" style="display:none">مجموع النِّسب: <b id="sumPct">0%</b></span>
       <span class="pill" id="pillMix">سعر طن TMR (DM): <b id="mixPriceDM">—</b></span>
@@ -567,13 +567,7 @@ padding: 6px 0;
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
     <div id="advancedKPIs" style="display:none" class="kpi-grid"></div>
   </div>
-      <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
- <input type="hidden" id="animalNumber" data-field="animalNumber">
-<input type="hidden" id="eventDate" data-field="eventDate">
-<input type="hidden" id="animalId" data-field="animalId">
-
-  <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
-</form>
+     
   <div class="mbk-card" id="economicAnalysisCard">
     <h3>💰 التحليل الاقتصادي</h3>
     <div id="economicKPIs" class="kpi-grid"></div>
@@ -590,7 +584,13 @@ padding: 6px 0;
     </div>
   </div>
 </div>
+ <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
+ <input type="hidden" id="animalNumber" data-field="animalNumber">
+<input type="hidden" id="eventDate" data-field="eventDate">
+<input type="hidden" id="animalId" data-field="animalId">
 
+  <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
+</form>
 <!-- ===== منطق الحسابات والـUI فقط (لا حفظ ولا تتبّع هنا) ===== -->
 <script type="module">
  
@@ -1514,9 +1514,16 @@ if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
   tr.querySelector('.pct').value='';
   tr.querySelector('.dm').value='';
   tr.querySelector('.cp').value='';
-
   renderRationSummary();
   recalc();
+
+try{
+  document.querySelector('.controls-box')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  setTimeout(()=>{
+    document.getElementById('feedTypeFilter')?.focus();
+  }, 250);
+}catch(e){}
+
 });
   document.getElementById('clearAll')?.addEventListener('click', ()=>{
    if(confirm('مسح كل الصفوف؟')){
