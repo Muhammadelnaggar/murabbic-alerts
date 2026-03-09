@@ -2,7 +2,20 @@
 // يعتمد على وزن قياسي حسب النوع والسلالة
 // Cow = NASEM-lite (DMI/DIM curve + NEL)
 // Buffalo = Cow base + Adjustment Layer
+function resolveFeedingCategory(ctx){
 
+  const milkKg   = Number(ctx?.avgMilkKg || 0);
+  const pregDays = Number(ctx?.pregnancyDays || 0);
+  const closeUp  = !!ctx?.closeUp;
+
+  if (milkKg > 0) return 'lactating';
+
+  if (closeUp) return 'close_up';
+
+  if (pregDays > 0) return 'dry_pregnant';
+
+  return 'heifer';
+}
 function computeTargets(ctx){
 
   const species  = String(ctx?.species || '').trim();
@@ -10,30 +23,64 @@ function computeTargets(ctx){
   const milkKg   = Number(ctx?.avgMilkKg || 0);
   const pregDays = Number(ctx?.pregnancyDays || 0);
   const closeUp  = !!ctx?.closeUp;
-
+  const category = resolveFeedingCategory(ctx);
   // DIM (أيام الحليب) — مهم جدًا لتأثير مرحلة الإدرار على الاستهلاك
   const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
 
   const bodyWeight = getStandardWeight(species, breed);
-
-  if(species === 'جاموس'){
-    return computeBuffalo({
+if (category === 'heifer') {
+  if (species === 'جاموس') {
+    return computeBuffaloHeifer({
       bodyWeight,
-      milkKg,
       pregDays,
       closeUp,
-      dim
+      breed
     });
   }
 
-  return computeCow({
+  return computeCowHeifer({
+    bodyWeight,
+    pregDays,
+    closeUp,
+    breed
+  });
+}
+
+if (category === 'heifer') {
+  if (species === 'جاموس') {
+    return computeBuffaloHeifer({
+      bodyWeight,
+      pregDays,
+      closeUp
+    });
+  }
+
+  return computeCowHeiferNASEM({
+    bodyWeight,
+    pregDays,
+    closeUp,
+    breed
+  });
+}
+
+if(species === 'جاموس'){
+  return computeBuffalo({
     bodyWeight,
     milkKg,
     pregDays,
     closeUp,
-    dim,
-    breed
+    dim
   });
+}
+
+return computeCow({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  closeUp,
+  dim,
+  breed
+});
 }
 
 
@@ -154,7 +201,71 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
 starchMax: f.starchMax
   };
 }
+function resolveHeiferTargetGain(bodyWeight){
+  const bw = Number(bodyWeight || 0);
 
+  if (bw <= 250) return 0.80;
+  if (bw <= 350) return 0.90;
+  if (bw <= 450) return 0.85;
+  return 0.75;
+}
+
+function estimateHeiferGrowthNEL(bodyWeight, species){
+  const bw = Number(bodyWeight || 0);
+  const adg = resolveHeiferTargetGain(bw);
+
+  // معادلة تشغيلية متدرجة بدل رقم ثابت
+  // أساس Cow heifer ثم نخفض قليلًا للجاموس
+  let nelGrowth = 2.2 + (adg * 1.4) + (bw / 500);
+
+  if (String(species || '').includes('جاموس')) {
+    nelGrowth = nelGrowth * 0.95;
+  }
+
+  return round(nelGrowth);
+}
+function computeCowHeiferNASEM({ bodyWeight, pregDays, closeUp, breed }){
+
+  const f = cowBreedFactors(breed);
+  const bw075 = Math.pow(bodyWeight, 0.75);
+
+  // صيانة
+  const nelMaintenance = 0.08 * bw075;
+
+  // نمو مبدئي عملي لعجلات الأبقار
+  const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'cow');
+
+  // حمل
+  let nelPreg = 0;
+  if (pregDays > 190) {
+    nelPreg = 0.00318 * pregDays;
+  }
+  if (closeUp) {
+    nelPreg += 2.0;
+  }
+
+  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+
+  // DMI تشغيلي لعجلات الأبقار
+ let dmi = bodyWeight * (bodyWeight < 300 ? 0.024 : 0.022);
+  dmi = dmi * f.dmiFactor;
+
+  // CP دعم نمو
+  let cpTarget = 15.0 + f.cpBonusPct;
+  cpTarget = clamp(cpTarget, 14.5, 17.5);
+
+  return {
+    species: 'cow',
+    category: 'heifer',
+    bodyWeight,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    cpTarget: round(cpTarget),
+    ndfTarget: f.ndfTarget,
+    starchMax: f.starchMax
+  };
+}
 
 /* ============================= */
 /*        BUFFALO ENGINE         */
@@ -200,8 +311,46 @@ cpTarget = clamp(cpTarget, 12, 15);
     roughageMin: 50
   };
 }
+function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
 
+  const bw075 = Math.pow(bodyWeight, 0.75);
 
+  // صيانة
+  const nelMaintenance = 0.075 * bw075;
+
+  // نمو مبدئي لعجلات الجاموس
+const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'جاموس');
+
+  // حمل
+  let nelPreg = 0;
+  if (pregDays > 200) {
+    nelPreg = 0.0035 * pregDays;
+  }
+  if (closeUp) {
+    nelPreg += 2.5;
+  }
+
+  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+
+  // DMI أقل قليلًا من الأبقار
+ const dmi = bodyWeight * (bodyWeight < 300 ? 0.023 : 0.021);
+
+  let cpTarget = 14.0;
+  cpTarget = clamp(cpTarget, 13.5, 15.5);
+
+  return {
+    species: 'buffalo',
+    category: 'heifer',
+    bodyWeight,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    cpTarget: round(cpTarget),
+    ndfTarget: 34,
+    starchMax: 26,
+    roughageMin: 50
+  };
+}
 /* ============================= */
 
 function round(n){
