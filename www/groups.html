@@ -3,50 +3,233 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>مجموعات مربيك</title>
+ <title>المجموعات | مُرَبِّيك</title>
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <style>
-    :root{ --green:#2e7d32; --green-600:#1b5e20; --bg:#fff9db; --card:#ffffff; --ink:#143b24; --border:#c5e1a5; --muted:#f6fff2; }
-    *{box-sizing:border-box}
-    html,body{max-width:100%;overflow-x:hidden}
-    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;line-height:1.45;color:var(--ink)}
+    :root{
+  --mbk-green:#0ea05a;
+  --mbk-green-dark:#0b7f47;
+  --mbk-cream:#f8f5ea;
+  --mbk-card:#ffffff;
+  --mbk-text:#173126;
+  --mbk-border:#dfe9d7;
+  --mbk-soft:#f3f8f1;
+}
 
-    /* رأس أنيق */
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border)}
-    .title-wrap{max-width:1040px;margin:0 auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-    .page-title{font-weight:900;color:var(--green-600);font-size:22px;text-align:center}
-    .head-actions{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
-    .back-btn{appearance:none;border:1px solid var(--border);background:#fff;color:var(--green-600);border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}
-    .chips{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
-    .chip{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
-    .chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+*{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
+body{
+  margin:0;
+  background:var(--mbk-cream);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial,sans-serif;
+  line-height:1.45;
+  color:var(--mbk-text);
+}
 
-    .wrap{max-width:1040px;margin:0 auto;padding:14px}
+/* هيدر مُرَبِّيك القياسي */
+header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#fff;
+  border-bottom:1px solid var(--mbk-border);
+}
+.mbk-head{
+  width:min(100%, 520px);
+  margin:0 auto;
+  min-height:76px;
+  display:grid;
+  grid-template-columns:84px 1fr 84px;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+}
+.mbk-logo{
+  width:54px;
+  max-height:54px;
+  object-fit:contain;
+  justify-self:end;
+  opacity:.60;
+}
+.mbk-center{
+  text-align:center;
+  line-height:1.15;
+}
+.mbk-page-title{
+  margin:0;
+  color:var(--mbk-green-dark);
+  font-size:31px;
+  font-weight:900;
+  letter-spacing:-.3px;
+}
+.mbk-app-name{
+  margin-top:2px;
+  font-size:13px;
+  color:#7a8a7a;
+  font-weight:700;
+}
+.mbk-back{
+  justify-self:start;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:58px;
+  height:42px;
+  padding:0 14px;
+  border-radius:999px;
+  border:2px solid var(--mbk-green);
+  background:#fff;
+  color:var(--mbk-green-dark);
+  text-decoration:none;
+  font-weight:800;
+  font-size:15px;
+}
+
+/* إطار الصفحة */
+.wrap{
+  width:min(100%, 520px);
+  margin:0 auto;
+  padding:14px 12px 100px;
+}
+
+/* chips */
+.chips{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin:10px 0 14px;
+}
+.chip{
+  padding:9px 12px;
+  border:1px solid var(--mbk-border);
+  border-radius:999px;
+  background:#fff;
+  cursor:pointer;
+  font-size:13px;
+  color:var(--mbk-text);
+}
+.chip.active{
+  background:var(--mbk-green);
+  color:#fff;
+  border-color:var(--mbk-green);
+}
     .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;justify-content:center}
     .search{flex:1;min-width:220px;max-width:520px}
-    .search input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff}
-    .btn{appearance:none;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#fff;cursor:pointer}
-    .btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+   .search input{
+  width:100%;
+  height:48px;
+  padding:0 14px;
+  border:1px solid var(--mbk-border);
+  border-radius:16px;
+  background:#fff;
+  color:var(--mbk-text);
+  font-size:16px;
+}
+
+.btn{
+  appearance:none;
+  min-height:44px;
+  padding:10px 14px;
+  border-radius:14px;
+  border:1px solid var(--mbk-border);
+  background:#fff;
+  color:var(--mbk-green-dark);
+  cursor:pointer;
+  font-weight:800;
+}
+
+.btn.primary{
+  background:var(--mbk-green);
+  color:#fff;
+  border-color:var(--mbk-green);
+}
     .hint{font:12px system-ui;color:#666}
 
     /* إعدادات */
-    .settings{margin:14px 0;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fff}
-    .settings h4{margin:0 0 10px;color:var(--green)}
-    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-    .radio-row{margin-bottom:10px;display:flex;gap:14px;align-items:center}
-    .settings label{font:12px system-ui;color:#333}
-    .settings input{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.settings{
+  margin:14px 0;
+  padding:14px;
+  border:1px solid var(--mbk-border);
+  border-radius:24px;
+  background:#fff;
+}
+
+.settings h4{
+  margin:0 0 12px;
+  color:var(--mbk-green-dark);
+  font-size:22px;
+  font-weight:900;
+}
+
+.row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+}
+
+.radio-row{
+  margin-bottom:12px;
+  display:flex;
+  gap:16px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.settings label{
+  font-size:14px;
+  color:#425348;
+  font-weight:700;
+}
+
+.settings input{
+  height:40px;
+  margin-top:6px;
+  padding:0 12px;
+  border:1px solid var(--mbk-border);
+  border-radius:14px;
+  background:#fff;
+}
 
     /* مجموعات */
     .group-sec{margin-top:16px;display:none}
     .group-sec.show{display:block}
-    .group-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer}
-    .group-head .name{font-weight:800;color:var(--green-600)}
-    .group-head .count{font:12px system-ui;color:#555}
-    .list{margin-top:8px;display:none}
+   .group-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  background:#fff;
+  border:1px solid var(--mbk-border);
+  border-radius:18px;
+  cursor:pointer;
+}
+
+.group-head .name{
+  font-weight:900;
+  color:var(--mbk-green-dark);
+  font-size:16px;
+}
+
+.group-head .count{
+  font-size:13px;
+  color:#6a786d;
+  font-weight:700;
+}
+
+.list .empty{
+  padding:20px;
+  background:#fff;
+  border:1px dashed var(--mbk-border);
+  border-radius:18px;
+  color:#777;
+  text-align:center;
+}
     .list.show{display:block}
     .list .empty{padding:20px;background:#fff;border:1px dashed var(--border);border-radius:12px;color:#777;text-align:center}
 
@@ -54,31 +237,93 @@
     .grid{display:grid;grid-template-columns:1fr;gap:10px}
     @media(min-width:680px){ .grid{grid-template-columns:1fr 1fr} }
     @media(min-width:980px){ .grid{grid-template-columns:1fr 1fr 1fr} }
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-    .card h3{margin:0 0 8px;font-size:16px;color:var(--green)}
-    .meta{display:flex;flex-wrap:wrap;gap:8px;font:13px system-ui}
-    .tag{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:4px 8px}
-    .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#333}
+   .card{
+  background:var(--mbk-card);
+  border:1px solid var(--mbk-border);
+  border-radius:20px;
+  padding:14px;
+  box-shadow:0 2px 10px rgba(0,0,0,.04);
+}
+
+.card h3{
+  margin:0 0 10px;
+  font-size:17px;
+  color:var(--mbk-green-dark);
+  font-weight:900;
+}
+
+.meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  font-size:13px;
+}
+
+.tag{
+  background:var(--mbk-soft);
+  border:1px solid var(--mbk-border);
+  border-radius:999px;
+  padding:5px 9px;
+}
+
+.pill{
+  display:inline-block;
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid var(--mbk-border);
+  background:#fff;
+  color:#333;
+}
 
     /* زر عودة للموبايل */
-    .mobile-footer{position:sticky;bottom:0;z-index:9;background:linear-gradient(0deg, rgba(255,249,219,0.95), rgba(255,249,219,0.7));padding:10px;border-top:1px solid var(--border)}
-    .mobile-footer .back-wide{width:100%;padding:14px;border-radius:14px;border:1px solid var(--green);background:var(--green);color:#fff;font-weight:800}
-    @media(min-width:860px){ .mobile-footer{display:none} }
-    @media(max-width:859px){ .back-btn{display:none} }
+   .mobile-footer{
+  position:sticky;
+  bottom:0;
+  z-index:9;
+  background:linear-gradient(0deg, rgba(248,245,234,.98), rgba(248,245,234,.75));
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--mbk-border);
+}
+
+.mobile-footer .back-wide{
+  width:100%;
+  padding:14px;
+  border-radius:16px;
+  border:1px solid var(--mbk-green);
+  background:var(--mbk-green);
+  color:#fff;
+  font-weight:900;
+  text-decoration:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+@media(min-width:860px){
+  .mobile-footer{display:none}
+}
+@media(max-width:859px){
+  .mbk-back{display:none}
+}
   </style>
 </head>
 <body>
-  <header>
-    <div class="title-wrap">
-      <div class="page-title">مجموعات مربيك</div>
-      <div class="head-actions">
-        <a class="back-btn" href="/dashboard.html">← العودة للوحة التحكّم</a>
-        <div class="chips" id="quickChips"></div>
-      </div>
+<header>
+  <div class="mbk-head">
+    <a class="mbk-back" href="/dashboard.html">رجوع</a>
+
+    <div class="mbk-center">
+      <div class="mbk-page-title">المجموعات</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-  </header>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
 
   <main class="wrap">
+    <div class="chips" id="quickChips"></div>
     <section class="group-sec" id="sec-all">
   <div class="group-head" data-id="all">
     <span class="name">كل الحيوانات</span>
