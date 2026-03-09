@@ -534,10 +534,10 @@ if (totalDmForRumen <= 0) {
 
   if (roughPctDM === 0 || concPctDM === 100) {
     rumenStatus = 'danger';
-    rumenNote = 'العليقة 100% مركزات وخطر الحموضة مرتفع';
+    rumenNote = 'العليقة 100% مركزات وخطر الحموضة وقلة دسم الحليب مرتفع';
   } else if (roughPctDM < low) {
     rumenStatus = 'danger';
-    rumenNote = 'الخشن منخفض وخطر الحموضة مرتفع';
+    rumenNote = 'الخشن منخفض وخطر الحموضة وقلة دسم الحليب مرتفع';
   } else if (roughPctDM > high) {
     rumenStatus = 'warn';
     rumenNote = 'الخشن مرتفع وقد يقل المأكول';
