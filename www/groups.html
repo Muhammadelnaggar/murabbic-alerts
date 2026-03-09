@@ -12,7 +12,7 @@
     :root{
   --mbk-green:#0ea05a;
   --mbk-green-dark:#0b7f47;
-  --mbk-cream:#f8f5ea;
+ --mbk-cream:#f6fbf7;
   --mbk-card:#ffffff;
   --mbk-text:#173126;
   --mbk-border:#dfe9d7;
@@ -23,7 +23,7 @@
 html,body{max-width:100%;overflow-x:hidden}
 body{
   margin:0;
-  background:var(--mbk-cream);
+  background:#f6fbf7;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial,sans-serif;
   line-height:1.45;
   color:var(--mbk-text);
@@ -173,13 +173,6 @@ header{
   align-items:center;
 }
 
-.radio-row{
-  margin-bottom:12px;
-  display:flex;
-  gap:16px;
-  align-items:center;
-  flex-wrap:wrap;
-}
 
 .settings label{
   font-size:14px;
@@ -277,11 +270,11 @@ header{
 }
 
     /* زر عودة للموبايل */
-   .mobile-footer{
+  .mobile-footer{
   position:sticky;
   bottom:0;
   z-index:9;
-  background:linear-gradient(0deg, rgba(248,245,234,.98), rgba(248,245,234,.75));
+  background:linear-gradient(0deg, rgba(246,251,247,.98), rgba(246,251,247,.78));
   padding:10px 12px calc(10px + env(safe-area-inset-bottom));
   border-top:1px solid var(--mbk-border);
 }
@@ -305,6 +298,63 @@ header{
 }
 @media(max-width:859px){
   .mbk-back{display:none}
+}
+    /* Murabbik custom radio */
+.radio-row{
+  margin-bottom:12px;
+  display:flex;
+  gap:14px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.radio-row label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:700;
+  color:#425348;
+}
+
+.radio-row input[type="radio"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:18px;
+  height:18px;
+  margin:0;
+  border:1.8px solid #bfd3c2;
+  border-radius:50%;
+  background:#fff;
+  display:inline-grid;
+  place-items:center;
+  position:relative;
+  transition:.15s ease;
+}
+
+.radio-row input[type="radio"]::before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  transform:scale(0);
+  transition:.15s ease;
+  background:var(--mbk-green);
+}
+
+.radio-row input[type="radio"]:checked{
+  border-color:var(--mbk-green);
+  background:#fff;
+}
+
+.radio-row input[type="radio"]:checked::before{
+  transform:scale(1);
+}
+
+.radio-row input[type="radio"]:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(14,160,90,.12);
 }
   </style>
 </head>
