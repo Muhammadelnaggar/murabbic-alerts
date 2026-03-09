@@ -497,17 +497,34 @@ const nelDensity = (rationCore?.totals?.dmKg > 0)
   : null;
 
 // ===== صحة الكرش: نسبة خشن/مركز على أساس DM =====
-const forageDm = Number(rationCore?.totals?.forageDmKg || 0);
-const concDm   = Number(rationCore?.totals?.concDmKg || 0);
+let forageDm = 0;
+let concDm = 0;
+
+for (const r of cleanRows) {
+  const kg = Number(r.asFedKg || 0);
+  const dmPct = Number(r.dmPct || 0);
+  const dmKg = kg * (dmPct / 100);
+  const cat = String(r.cat || '').trim();
+
+  if (cat === 'rough') forageDm += dmKg;
+  if (cat === 'conc') concDm += dmKg;
+}
+
+forageDm = round2(forageDm) || 0;
+concDm = round2(concDm) || 0;
+
 const totalDmForRumen = forageDm + concDm;
 
-const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : null;
-const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : null;
+const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : 0;
+const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : 0;
 
 let rumenStatus = null;
 let rumenNote = null;
 
-if (roughPctDM != null) {
+if (totalDmForRumen <= 0) {
+  rumenStatus = 'warn';
+  rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
+} else {
   const isBuffalo = String(context?.species || '').includes('جاموس');
 
   // أبقار: ممتاز 40–60
@@ -515,9 +532,12 @@ if (roughPctDM != null) {
   const low  = isBuffalo ? 50 : 40;
   const high = isBuffalo ? 75 : 60;
 
-  if (roughPctDM < low) {
+  if (roughPctDM === 0 || concPctDM === 100) {
     rumenStatus = 'danger';
-    rumenNote = 'خطر الحموضة مرتفع';
+    rumenNote = 'العليقة 100% مركزات وخطر الحموضة مرتفع';
+  } else if (roughPctDM < low) {
+    rumenStatus = 'danger';
+    rumenNote = 'الخشن منخفض وخطر الحموضة مرتفع';
   } else if (roughPctDM > high) {
     rumenStatus = 'warn';
     rumenNote = 'الخشن مرتفع وقد يقل المأكول';
@@ -526,7 +546,6 @@ if (roughPctDM != null) {
     rumenNote = 'النسبة ممتازة لصحة الكرش';
   }
 }
-
 const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
 const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
 const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
@@ -550,7 +569,8 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   roughPctDM,
   concPctDM,
   rumenStatus,
-  rumenNote
+  rumenNote,
+  rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
 },
     targets: {
       dmiTarget: targetsCore?.dmi ?? null,
