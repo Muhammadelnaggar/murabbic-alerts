@@ -15,15 +15,100 @@
     body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;line-height:1.45;color:var(--ink)}
 
     /* رأس أنيق */
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border)}
-    .title-wrap{max-width:1040px;margin:0 auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-    .page-title{font-weight:900;color:var(--green-600);font-size:22px;text-align:center}
-    .head-actions{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
-    .back-btn{appearance:none;border:1px solid var(--border);background:#fff;color:var(--green-600);border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}
-    .chips{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
-    .chip{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
-    .chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+   header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(14,160,90,.12);
+}
 
+.mbk-head{
+  max-width:1040px;
+  margin:0 auto;
+  padding:12px 14px;
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:10px;
+}
+
+.mbk-logo{
+  width:44px;
+  height:44px;
+  object-fit:contain;
+}
+
+.mbk-center{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  text-align:center;
+}
+
+.mbk-page-title{
+  font-size:18px;
+  line-height:1.1;
+  font-weight:900;
+  color:#0d5c36;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.mbk-app-name{
+  font-size:12px;
+  color:#6b7c72;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+
+.mbk-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:42px;
+  padding:0 14px;
+  border-radius:999px;
+  background:#fff;
+  color:#0b7f47;
+  border:1px solid #d8ead7;
+  font-weight:800;
+  white-space:nowrap;
+  text-decoration:none;
+  box-shadow:0 2px 8px rgba(16,24,40,.04);
+}
+
+@media(max-width:859px){
+  .mbk-head{
+    grid-template-columns:auto 1fr auto;
+    padding:10px 12px;
+  }
+
+  .mbk-logo{
+    width:40px;
+    height:40px;
+  }
+
+  .mbk-page-title{
+    font-size:16px;
+  }
+
+  .mbk-app-name{
+    font-size:11px;
+  }
+
+  .mbk-back{
+    min-height:38px;
+    padding:0 12px;
+    font-size:13px;
+  }
+}
     .wrap{max-width:1040px;margin:0 auto;padding:14px}
     .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;justify-content:center}
     .search{flex:1;min-width:220px;max-width:520px}
@@ -68,15 +153,16 @@
   </style>
 </head>
 <body>
-  <header>
-    <div class="title-wrap">
-      <div class="page-title">مجموعات مربيك</div>
-      <div class="head-actions">
-        <a class="back-btn" href="/dashboard.html">← العودة للوحة التحكّم</a>
-        <div class="chips" id="quickChips"></div>
-      </div>
+ <header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">المجموعات</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-  </header>
+    <a class="mbk-back" href="/dashboard.html">رجوع</a>
+  </div>
+</header>
 
   <main class="wrap">
     <section class="group-sec" id="sec-all">
