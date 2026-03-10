@@ -685,18 +685,28 @@ app.post('/api/nutrition/save', requireUserId, async (req, res) => {
     const tenant = req.userId;
     const body = req.body || {};
 
-    const rawNumber =
-      body.animalNumber ||
-      body.number ||
-      body.animalId ||
-      '';
+const isGroup = !!body.isGroup;
 
-    const animalNumber = String(rawNumber || '').trim();
-    const eventDate = asYMD(body.eventDate) || toYYYYMMDD(Date.now());
+const rawNumber =
+  body.animalNumber ||
+  body.number ||
+  body.animalId ||
+  '';
 
-    if (!animalNumber) {
-      return res.status(400).json({ ok:false, error:'animalNumber_required' });
-    }
+const animalNumber = String(rawNumber || '').trim();
+const eventDate = asYMD(body.eventDate) || toYYYYMMDD(Date.now());
+
+const groupNumbers = Array.isArray(body.groupNumbers)
+  ? body.groupNumbers.map(x => String(x).trim()).filter(Boolean)
+  : [];
+
+if (!isGroup && !animalNumber) {
+  return res.status(400).json({ ok:false, error:'animalNumber_required' });
+}
+
+if (isGroup && !groupNumbers.length) {
+  return res.status(400).json({ ok:false, error:'groupNumbers_required' });
+}
 
 const nutrition = body.nutrition || {};
 const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
@@ -733,41 +743,47 @@ const centralAnalysis = buildNutritionCentralAnalysis({
   concKg,
   milkPrice
 });
-    let animalDoc = null;
-    let animalDocId = '';
-    if (db) {
-      animalDoc = await findAnimalDocRefByNumberForTenant(tenant, animalNumber);
-      if (!animalDoc) {
-        return res.status(404).json({ ok:false, error:'animal_not_found' });
-      }
-      animalDocId = animalDoc.id;
-    }
+   let animalDoc = null;
+let animalDocId = '';
+
+if (!isGroup && db) {
+  animalDoc = await findAnimalDocRefByNumberForTenant(tenant, animalNumber);
+  if (!animalDoc) {
+    return res.status(404).json({ ok:false, error:'animal_not_found' });
+  }
+  animalDocId = animalDoc.id;
+}
 
     const nowMs = Date.now();
 
-    const doc = cleanObj({
-      userId: tenant,
-      ownerUid: tenant,
+ const doc = cleanObj({
+  userId: tenant,
+  ownerUid: tenant,
 
-      animalId: animalDocId || animalNumber,
-      animalNumber: Number.isFinite(Number(animalNumber)) ? Number(animalNumber) : animalNumber,
+  animalId: isGroup ? null : (animalDocId || animalNumber),
+  animalNumber: isGroup
+    ? null
+    : (Number.isFinite(Number(animalNumber)) ? Number(animalNumber) : animalNumber),
 
-      type: 'nutrition',
-      eventType: 'تغذية',
-      eventTypeNorm: 'nutrition',
+  groupNumbers: isGroup ? groupNumbers : null,
+  groupSize: isGroup ? groupNumbers.length : null,
 
-      eventDate,
-      date: eventDate,
-      ts: nowMs,
-      source: '/nutrition.html',
+  type: isGroup ? 'nutrition_group' : 'nutrition',
+  eventType: isGroup ? 'تغذية مجموعة' : 'تغذية',
+  eventTypeNorm: isGroup ? 'nutrition_group' : 'nutrition',
 
-     nutrition: {
-  mode: nutrition.mode || 'tmr_asfed',
-  rows,
-  context,
-  analysis: centralAnalysis
-}
-    });
+  eventDate,
+  date: eventDate,
+  ts: nowMs,
+  source: '/nutrition.html',
+
+  nutrition: {
+    mode: nutrition.mode || 'tmr_asfed',
+    rows,
+    context,
+    analysis: centralAnalysis
+  }
+});
 
     const localEvents = readJson(eventsPath, []);
     localEvents.push({ id: localEvents.length + 1, ...doc });
