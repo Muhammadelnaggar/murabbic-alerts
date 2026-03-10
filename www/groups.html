@@ -417,21 +417,25 @@ header{
     </section>
 
     <section class="settings" id="settings">
-      <h4>إعدادات العتبات (الإنتاج فقط)</h4>
+     <div class="hint" style="margin-bottom:8px">
+  هذه العتبات يحددها المستخدم بالكامل، ومُرَبِّيك يوزّع الحيوانات على المجموعات حسب الرينجات المدخلة فقط.
+</div>
       <div class="radio-row">
         <label><input type="radio" name="species" value="cow" checked> أبقار</label>
         <label><input type="radio" name="species" value="buffalo"> جاموس</label>
         <span class="hint">تعرض الحقول المناسبة حسب النوع المختار.</span>
       </div>
-      <div class="row" id="cowThresholds">
-        <label>عالي الإدرار <input type="number" id="cowHigh" value="30" min="0" step="0.5"> كجم/يوم</label>
-        <label>متوسط الإدرار <input type="number" id="cowMed" value="15" min="0" step="0.5"> كجم/يوم</label>
-        <label>منخفض الإدرار <input type="number" id="cowLow" value="0" min="0" step="0.5"> كجم/يوم</label>
-      </div>
-      <div class="row" id="buffThresholds" style="display:none">
-        <label>عالي الإدرار <input type="number" id="bufHigh" value="12" min="0" step="0.5"> كجم/يوم</label>
-        <label>متوسط الإدرار <input type="number" id="bufMed" value="7" min="0" step="0.5"> كجم/يوم</label>
-        <label>منخفض الإدرار <input type="number" id="bufLow" value="0" min="0" step="0.5"> كجم/يوم</label>
+     <div class="row" id="cowThresholds">
+  <label>منخفض الإدرار من <input type="number" id="cowLowMin" value="0.1" min="0" step="0.1"> إلى <input type="number" id="cowLowMax" value="19.9" min="0" step="0.1"> كجم/يوم</label>
+  <label>متوسط الإدرار من <input type="number" id="cowMedMin" value="20" min="0" step="0.1"> إلى <input type="number" id="cowMedMax" value="24.9" min="0" step="0.1"> كجم/يوم</label>
+  <label>عالي الإدرار من <input type="number" id="cowHighMin" value="25" min="0" step="0.1"> إلى أعلى</label>
+</div>
+
+<div class="row" id="buffThresholds" style="display:none">
+  <label>منخفض الإدرار من <input type="number" id="bufLowMin" value="0.1" min="0" step="0.1"> إلى <input type="number" id="bufLowMax" value="7.9" min="0" step="0.1"> كجم/يوم</label>
+  <label>متوسط الإدرار من <input type="number" id="bufMedMin" value="8" min="0" step="0.1"> إلى <input type="number" id="bufMedMax" value="11.9" min="0" step="0.1"> كجم/يوم</label>
+  <label>عالي الإدرار من <input type="number" id="bufHighMin" value="12" min="0" step="0.1"> إلى أعلى</label>
+</div>
       </div>
       <div class="row" style="margin-top:8px">
         <button class="btn primary" id="saveSettings">حفظ الإعدادات</button>
@@ -596,22 +600,16 @@ async function waitForUserId(timeoutMs=6000){
 
 /* ============= العتبات (محلي + سحابي) ============= */
 function loadThresholds(){
-  const d = {
-    cowHigh:30, cowMed:15, cowLow:0,
-    bufHigh:12, bufMed:7, bufLow:0,
-    species:'cow',
-    cowSucklingMax:2,
-    cowWeanedMax:5,
-    cowGrowingMax:12,
-    cowHeiferMin:13,
-    cowHeiferMax:15,
-    bufSucklingMax:3,
-    bufWeanedMax:6,
-    bufGrowingMax:15,
-    bufHeiferMin:16,
-    bufHeiferMax:20,
-    cowCloseUpDays:21,
-    bufCloseUpDays:30
+ const d = {
+  cowLowMin:0.1,  cowLowMax:19.9,
+  cowMedMin:20,   cowMedMax:24.9,
+  cowHighMin:25,
+
+  bufLowMin:0.1,  bufLowMax:7.9,
+  bufMedMin:8,    bufMedMax:11.9,
+  bufHighMin:12,
+
+  species:'cow',
   };
   try{ return Object.assign(d, JSON.parse(localStorage.getItem('mbk_group_thresholds')||'{}')); }catch{ return d; }
 }
@@ -853,14 +851,32 @@ function isFresh(an){
 }
 function milkBand(an, milk){
   const t = state.thresholds;
-  if(isBuffalo(an)){
-    if(milk>=t.bufHigh) return 'high';
-    if(milk>=t.bufMed) return 'med';
-    return 'low';
+  const v = Number(milk || 0);
+
+  if (v <= 0) return null;
+
+  if (isBuffalo(an)) {
+    const lowMin  = Number(t.bufLowMin  || 0.1);
+    const lowMax  = Number(t.bufLowMax  || 7.9);
+    const medMin  = Number(t.bufMedMin  || 8);
+    const medMax  = Number(t.bufMedMax  || 11.9);
+    const highMin = Number(t.bufHighMin || 12);
+
+    if (v >= highMin) return 'high';
+    if (v >= medMin && v <= medMax) return 'med';
+    if (v >= lowMin && v <= lowMax) return 'low';
+    return null;
   } else {
-    if(milk>=t.cowHigh) return 'high';
-    if(milk>=t.cowMed) return 'med';
-    return 'low';
+    const lowMin  = Number(t.cowLowMin  || 0.1);
+    const lowMax  = Number(t.cowLowMax  || 19.9);
+    const medMin  = Number(t.cowMedMin  || 20);
+    const medMax  = Number(t.cowMedMax  || 24.9);
+    const highMin = Number(t.cowHighMin || 25);
+
+    if (v >= highMin) return 'high';
+    if (v >= medMin && v <= medMax) return 'med';
+    if (v >= lowMin && v <= lowMax) return 'low';
+    return null;
   }
 }
 
@@ -1027,12 +1043,17 @@ function syncSettingsUIFromState(){
   if ($('#cowExtraThresholds')) $('#cowExtraThresholds').style.display = sp==='cow' ? 'flex' : 'none';
   if ($('#buffExtraThresholds')) $('#buffExtraThresholds').style.display = sp==='buffalo' ? 'flex' : 'none';
 
-  if($('#cowHigh')) $('#cowHigh').value=state.thresholds.cowHigh;
-  if($('#cowMed'))  $('#cowMed').value=state.thresholds.cowMed;
-  if($('#cowLow'))  $('#cowLow').value=state.thresholds.cowLow;
-  if($('#bufHigh')) $('#bufHigh').value=state.thresholds.bufHigh;
-  if($('#bufMed'))  $('#bufMed').value=state.thresholds.bufMed;
-  if($('#bufLow'))  $('#bufLow').value=state.thresholds.bufLow;
+ if($('#cowLowMin'))  $('#cowLowMin').value  = state.thresholds.cowLowMin;
+if($('#cowLowMax'))  $('#cowLowMax').value  = state.thresholds.cowLowMax;
+if($('#cowMedMin'))  $('#cowMedMin').value  = state.thresholds.cowMedMin;
+if($('#cowMedMax'))  $('#cowMedMax').value  = state.thresholds.cowMedMax;
+if($('#cowHighMin')) $('#cowHighMin').value = state.thresholds.cowHighMin;
+
+if($('#bufLowMin'))  $('#bufLowMin').value  = state.thresholds.bufLowMin;
+if($('#bufLowMax'))  $('#bufLowMax').value  = state.thresholds.bufLowMax;
+if($('#bufMedMin'))  $('#bufMedMin').value  = state.thresholds.bufMedMin;
+if($('#bufMedMax'))  $('#bufMedMax').value  = state.thresholds.bufMedMax;
+if($('#bufHighMin')) $('#bufHighMin').value = state.thresholds.bufHighMin;
 
   const ids = [
     'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
@@ -1043,12 +1064,17 @@ function syncSettingsUIFromState(){
 
 function readSettingsFromUI(){
   state.thresholds.species = ($('input[name="species"]:checked')?.value || 'cow');
-  state.thresholds.cowHigh = Number($('#cowHigh')?.value || 30);
-  state.thresholds.cowMed  = Number($('#cowMed')?.value || 15);
-  state.thresholds.cowLow  = Number($('#cowLow')?.value || 0);
-  state.thresholds.bufHigh = Number($('#bufHigh')?.value || 12);
-  state.thresholds.bufMed  = Number($('#bufMed')?.value || 7);
-  state.thresholds.bufLow  = Number($('#bufLow')?.value || 0);
+ state.thresholds.cowLowMin  = Number($('#cowLowMin')?.value  || 0.1);
+state.thresholds.cowLowMax  = Number($('#cowLowMax')?.value  || 19.9);
+state.thresholds.cowMedMin  = Number($('#cowMedMin')?.value  || 20);
+state.thresholds.cowMedMax  = Number($('#cowMedMax')?.value  || 24.9);
+state.thresholds.cowHighMin = Number($('#cowHighMin')?.value || 25);
+
+state.thresholds.bufLowMin  = Number($('#bufLowMin')?.value  || 0.1);
+state.thresholds.bufLowMax  = Number($('#bufLowMax')?.value  || 7.9);
+state.thresholds.bufMedMin  = Number($('#bufMedMin')?.value  || 8);
+state.thresholds.bufMedMax  = Number($('#bufMedMax')?.value  || 11.9);
+state.thresholds.bufHighMin = Number($('#bufHighMin')?.value || 12);
 
   [
     'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
@@ -1098,14 +1124,28 @@ function splitGroups(applyQuery = true){
     g[pref+'all'].push(an);
     if(hasDisease(an)) g[pref+'hospital'].push(an);
 
-   if (isLactatingAdult(an) && hasCalvedBefore(an)) {
-      if (isFresh(an)) g[pref+'fresh'].push(an);
-      const band = milkBand(an, milk);
-      if (band === 'high') g[pref+'high'].push(an);
-      else if (band === 'med') g[pref+'med'].push(an);
-      else g[pref+'low'].push(an);
-      continue;
-    }
+ if (isLactatingAdult(an) && hasCalvedBefore(an)) {
+  if (isFresh(an)) g[pref+'fresh'].push(an);
+
+  const band = milkBand(an, milk);
+
+  if (band === 'high') {
+    g[pref+'high'].push(an);
+    continue;
+  }
+
+  if (band === 'med') {
+    g[pref+'med'].push(an);
+    continue;
+  }
+
+  if (band === 'low') {
+    g[pref+'low'].push(an);
+    continue;
+  }
+
+  continue;
+}
 
     if (isPregnant(an)) {
       if (hasCalvedBefore(an)) {
