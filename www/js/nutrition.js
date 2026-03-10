@@ -378,8 +378,22 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
 
 function parseNumbersList(){
   const p = qp();
-  const raw = (p.get('numbers') || p.get('groupNumbers') || p.get('animalIds') || p.get('animalNumber') || p.get('number') || p.get('animalId') || '').toString();
-  const list = raw.split(/[,،;\s]+/).map(s=>s.trim()).filter(Boolean);
+  const raw = (
+    p.get('bulk') ||
+    p.get('numbers') ||
+    p.get('groupNumbers') ||
+    p.get('animalIds') ||
+    p.get('animalNumber') ||
+    p.get('number') ||
+    p.get('animalId') ||
+    ''
+  ).toString();
+
+  const list = raw
+    .split(/[,،;\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
   return [...new Set(list)];
 }
 
