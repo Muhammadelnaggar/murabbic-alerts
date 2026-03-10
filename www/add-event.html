@@ -300,12 +300,17 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
           const rows = [];
           snap.forEach(doc => {
             const d = doc.data() || {};
-            rows.push({
-              id: doc.id,
-              name: String(d.groupName || d.name || doc.id),
-              members: Array.isArray(d.members) ? d.members : [],
-              animalType: String(d.animalType || d.species || '')
-            });
+           rows.push({
+  id: doc.id,
+  name: String(d.groupName || d.name || doc.id),
+  members: Array.isArray(d.animalNumbers)
+    ? d.animalNumbers
+    : Array.isArray(d.members)
+      ? d.members
+      : [],
+  animalType: String(d.animalType || d.species || ''),
+  animalsCount: Number(d.animalsCount || 0)
+});
           });
 
           if (!rows.length){
@@ -315,7 +320,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
           select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
             const nums = g.members.map(x => String(x).trim()).filter(Boolean).join(',');
-            const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.members.length})`;
+           const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.animalsCount || g.members.length || 0})`;
             return `<option value="${nums}">${label}</option>`;
           }).join('');
         }catch(err){
@@ -539,6 +544,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
