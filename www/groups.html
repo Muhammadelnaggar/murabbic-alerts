@@ -480,7 +480,7 @@ header{
 import { getApps, initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc,
-   orderBy, limit
+  orderBy, limit, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ============= firebase-config (ديناميكي مع fallback) ============= */
@@ -505,6 +505,20 @@ try {
 const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
+  const GROUP_LABELS = {
+  all: 'كل الحيوانات',
+  fresh: 'حديث الولادة',
+  high: 'عالي الإدرار',
+  med: 'متوسط الإدرار',
+  low: 'منخفض الإدرار',
+  dry: 'جاف',
+  suckling: 'رضيع',
+  weaned: 'فطام',
+  growing: 'نامي',
+  breeding: 'تحت التلقيح',
+  pregHeifers: 'عجلات عشار',
+  hospital: 'مجموعة المستشفى'
+};
 function num(v){
   if (v == null) return 0;
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
@@ -784,25 +798,67 @@ function filterByQuery(list){
   if(!q) return list;
   return list.filter(an=>(`${an?.animalNumber||''} ${an?.number||''} ${an?.name||''} ${an?.kind||''} ${an?.type||''}`).toLowerCase().includes(q));
 }
-function splitGroups(){
-  const A = filterByQuery(state.animals);
-  const fresh=[], high=[], med=[], low=[], dry=[], suckling=[], weaned=[], growing=[], breeding=[], pregHeifers=[], hospital=[];
-  for(const an of A){
-    const milk=getMilkKg(an), band=milkBand(an,milk);
-    if(isFresh(an)) fresh.push(an);
-    if(isDry(an)) dry.push(an);
-    else { if(band==='high') high.push(an); else if(band==='med') med.push(an); else low.push(an); }
+function splitGroups(applyQuery = true){
+  const A = applyQuery ? filterByQuery(state.animals) : [...state.animals];
 
-    const m=getAgeMonths(an); const lactNo=Number(an?.lactationNumber||0);
-    if(an?.weaned===false || an?.weaningDate==null){ if(m<12) suckling.push(an); }
-    if(an?.weaned===true){ if(m<5) weaned.push(an); }
-    if(isBuffalo(an)){ if(m>=5 && m<21) growing.push(an);} else { if(m>=5 && m<12) growing.push(an); }
-    if(lactNo===0){ if(isPregnant(an)) pregHeifers.push(an); else if(m>=12) breeding.push(an); }
+  const fresh=[], high=[], med=[], low=[], dry=[],
+        suckling=[], weaned=[], growing=[], breeding=[],
+        pregHeifers=[], hospital=[];
+
+  for(const an of A){
+    const milk = getMilkKg(an);
+    const band = milkBand(an, milk);
+
+    if(isFresh(an)) fresh.push(an);
+
+    if(isDry(an)) {
+      dry.push(an);
+    } else {
+      if(band === 'high') high.push(an);
+      else if(band === 'med') med.push(an);
+      else low.push(an);
+    }
+
+    const m = getAgeMonths(an);
+    const lactNo = Number(an?.lactationNumber || 0);
+
+    if(an?.weaned === false || an?.weaningDate == null){
+      if(m < 12) suckling.push(an);
+    }
+
+    if(an?.weaned === true){
+      if(m < 5) weaned.push(an);
+    }
+
+    if(isBuffalo(an)){
+      if(m >= 5 && m < 21) growing.push(an);
+    } else {
+      if(m >= 5 && m < 12) growing.push(an);
+    }
+
+    if(lactNo === 0){
+      if(isPregnant(an)) pregHeifers.push(an);
+      else if(m >= 12) breeding.push(an);
+    }
+
     if(hasDisease(an)) hospital.push(an);
   }
-  return { all:A, fresh, high, med, low, dry, suckling, weaned, growing, breeding, pregHeifers, hospital };
-}
 
+  return {
+    all: A,
+    fresh,
+    high,
+    med,
+    low,
+    dry,
+    suckling,
+    weaned,
+    growing,
+    breeding,
+    pregHeifers,
+    hospital
+  };
+}
 /* ============= عدادات + عرض ============= */
 function updateCounters(){
   const g = splitGroups();
@@ -858,7 +914,193 @@ function bindGroupHeaders(){
     });
   });
 }
+function buildGroupDoc(groupKey, list){
+  const count = list.length || 0;
+  const milkVals = list.map(getMilkKg).filter(v => Number.isFinite(v));
+  const dimVals  = list.map(getDIM).filter(v => Number.isFinite(v));
 
+  const avgMilkKg = milkVals.length
+    ? +(milkVals.reduce((a,b)=>a+b,0) / milkVals.length).toFixed(2)
+    : 0;
+
+  const avgDim = dimVals.length
+    ? Math.round(dimVals.reduce((a,b)=>a+b,0) / dimVals.length)
+    : 0;
+
+  return {
+    userId: state.userId,
+    groupKey,
+    groupName: GROUP_LABELS[groupKey] || groupKey,
+    animalsCount: count,
+    animalNumbers: list
+      .map(an => String(an?.animalNumber || an?.number || an?.id || '').trim())
+      .filter(Boolean)
+      .slice(0, 500),
+    avgMilkKg,
+    avgDim,
+    thresholds: { ...state.thresholds },
+    updatedAt: serverTimestamp()
+  };
+}
+
+async function syncGroupsToFirestore(){
+  try{
+    if(!db || !state.userId) return;
+
+    const groups = splitGroups(false); // مهم: بدون فلتر البحث
+    const batch = writeBatch(db);
+
+    Object.entries(groups).forEach(([groupKey, list])=>{
+      const ref = doc(db, 'groups', `${state.userId}_${groupKey}`);
+      batch.set(ref, buildGroupDoc(groupKey, list), { merge: true });
+    });
+
+    await batch.commit();
+    console.log('Groups synced to Firestore successfully');
+  }catch(e){
+    console.error('syncGroupsToFirestore error:', e);
+  }
+}
+  function groupDocId(groupKey){
+  return `${state.userId}_${groupKey}`;
+}
+
+function groupMemberDocId(groupKey, animalNumber){
+  return `${state.userId}_${groupKey}_${String(animalNumber).trim()}`;
+}
+
+function buildGroupDoc(groupKey, list){
+  const count = list.length || 0;
+
+  const milkVals = list.map(getMilkKg).filter(v => Number.isFinite(v));
+  const dimVals  = list.map(getDIM).filter(v => Number.isFinite(v));
+
+  const avgMilkKg = milkVals.length
+    ? +(milkVals.reduce((a,b)=>a+b,0) / milkVals.length).toFixed(2)
+    : 0;
+
+  const avgDim = dimVals.length
+    ? Math.round(dimVals.reduce((a,b)=>a+b,0) / dimVals.length)
+    : 0;
+
+  return {
+    userId: state.userId,
+    groupKey,
+    groupName: GROUP_LABELS[groupKey] || groupKey,
+    animalsCount: count,
+    animalNumbers: list
+      .map(an => String(an?.animalNumber ?? an?.number ?? '').trim())
+      .filter(Boolean)
+      .slice(0, 500),
+    avgMilkKg,
+    avgDim,
+    thresholds: { ...state.thresholds },
+    updatedAt: serverTimestamp()
+  };
+}
+
+function buildGroupMemberDoc(groupKey, an){
+  const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
+
+  return {
+    userId: state.userId,
+    groupKey,
+    groupName: GROUP_LABELS[groupKey] || groupKey,
+    groupDocId: groupDocId(groupKey),
+
+    animalId: String(an?.id ?? an?.animalId ?? animalNumber),
+    animalNumber,
+
+    animalType: an?.animaltype || an?.kind || an?.type || '',
+    animalTypeAr: an?.animalTypeAr || '',
+    breed: an?.breed || '',
+
+    milkKg: getMilkKg(an),
+    daysInMilk: getDIM(an),
+
+    reproductiveStatus: an?.reproductiveStatus || '',
+    status: an?.status || '',
+
+    updatedAt: serverTimestamp()
+  };
+}
+
+async function syncGroupsToFirestore(){
+  try{
+    if (!db || !state.userId) return;
+
+    const groups = splitGroups(false);
+    const batch = writeBatch(db);
+
+    Object.entries(groups).forEach(([groupKey, list]) => {
+      const ref = doc(db, 'groups', groupDocId(groupKey));
+      batch.set(ref, buildGroupDoc(groupKey, list), { merge: true });
+    });
+
+    await batch.commit();
+    console.log('groups snapshot synced');
+  }catch(e){
+    console.error('syncGroupsToFirestore error:', e);
+  }
+}
+
+async function syncGroupMembersToFirestore(){
+  try{
+    if (!db || !state.userId) return;
+
+    const groups = splitGroups(false);
+
+    const desiredIds = new Set();
+    const upsertBatch = writeBatch(db);
+
+    Object.entries(groups).forEach(([groupKey, list]) => {
+      list.forEach(an => {
+        const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
+        if (!animalNumber) return;
+
+        const memberId = groupMemberDocId(groupKey, animalNumber);
+        desiredIds.add(memberId);
+
+        const ref = doc(db, 'groups_members', memberId);
+        upsertBatch.set(ref, buildGroupMemberDoc(groupKey, an), { merge: true });
+      });
+    });
+
+    await upsertBatch.commit();
+
+    const oldSnap = await getDocs(
+      query(collection(db, 'groups_members'), where('userId', '==', state.userId))
+    );
+
+    if (!oldSnap.empty) {
+      let deleteBatch = writeBatch(db);
+      let ops = 0;
+
+      oldSnap.forEach(ds => {
+        if (!desiredIds.has(ds.id)) {
+          deleteBatch.delete(ds.ref);
+          ops++;
+          if (ops === 400) {
+            deleteBatch.commit();
+            deleteBatch = writeBatch(db);
+            ops = 0;
+          }
+        }
+      });
+
+      if (ops > 0) await deleteBatch.commit();
+    }
+
+    console.log('groups_members synced');
+  }catch(e){
+    console.error('syncGroupMembersToFirestore error:', e);
+  }
+}
+
+async function syncAllGroupsData(){
+  await syncGroupsToFirestore();
+  await syncGroupMembersToFirestore();
+}
 /* ============= تحميل الحيوانات ============= */
 async function loadAnimalsFromFirestore(){
   try{
@@ -893,19 +1135,25 @@ async function loadAnimals(){
   // ← مهم: نثري من الأحداث دائمًا (subcollection ثم top-level)
   try{ await enrichMilkFromEvents(state.animals); }catch(_){}
 
-  localStorage.setItem('animals_cache', JSON.stringify(state.animals));
-  updateCounters();
-  if (state.currentGroup) renderSelected(state.currentGroup); // إعادة رسم المجموعة المفتوحة إن وُجدت
+localStorage.setItem('animals_cache', JSON.stringify(state.animals));
+updateCounters();
+await syncAllGroupsData();
+if (state.currentGroup) renderSelected(state.currentGroup);
 }
 
 /* ============= ربط الواجهة ============= */
-$$('input[name="species"]').forEach(r=> r.addEventListener('change', ()=>{
+$$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
   state.thresholds.species = r.value;
-  $('#cowThresholds').style.display = r.value==='cow'? 'flex':'none';
-  $('#buffThresholds').style.display = r.value==='buffalo'? 'flex':'none';
-  saveThresholdsLocal(); saveThresholdsToFirestore().catch(()=>{});
+  $('#cowThresholds').style.display = r.value === 'cow' ? 'flex' : 'none';
+  $('#buffThresholds').style.display = r.value === 'buffalo' ? 'flex' : 'none';
+
+  saveThresholdsLocal();
+  saveThresholdsToFirestore().catch(()=>{});
+
   updateCounters();
-  window.dataLayer.push({event:'species_switch', species:r.value});
+  await syncAllGroupsData();
+
+  window.dataLayer.push({ event:'species_switch', species:r.value });
 }));
 $('#saveSettings').addEventListener('click', async ()=>{
   state.thresholds.cowHigh=Number($('#cowHigh').value||30);
@@ -917,6 +1165,7 @@ $('#saveSettings').addEventListener('click', async ()=>{
   saveThresholdsLocal();
   try{ await saveThresholdsToFirestore(); }catch{}
   updateCounters();
+  await syncGroupsToFirestore();
   window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
 });
 $('#q').addEventListener('input', updateCounters);
