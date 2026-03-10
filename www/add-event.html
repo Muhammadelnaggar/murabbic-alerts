@@ -229,6 +229,13 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
   window.mbkAddEventDb = db;
   window.mbkAddEventAuth = auth;
+    window.mbkFs = {
+  collection,
+  query,
+  where,
+  getDocs,
+  limit
+};
 </script>
   <script>
     function updateCowCardNav(number, multi){
@@ -532,6 +539,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
