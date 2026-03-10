@@ -118,6 +118,29 @@ header{
   color:#fff;
   border-color:var(--mbk-green);
 }
+    .species-tabs{
+  display:flex;
+  gap:8px;
+  margin:8px 0 10px;
+  flex-wrap:wrap;
+}
+
+.species-tab{
+  border:1px solid #cfe0d2;
+  background:#fff;
+  color:#1f3b2d;
+  border-radius:999px;
+  padding:10px 16px;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.species-tab.active{
+  background:var(--mbk-green);
+  color:#fff;
+  border-color:var(--mbk-green);
+}
     .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;justify-content:center}
     .search{flex:1;min-width:220px;max-width:520px}
    .search input{
@@ -373,7 +396,12 @@ header{
 </header>
 
   <main class="wrap">
-    <div class="chips" id="quickChips"></div>
+    <div class="species-tabs" id="speciesTabs">
+  <button type="button" class="species-tab active" data-species="cow">أبقار</button>
+  <button type="button" class="species-tab" data-species="buffalo">جاموس</button>
+</div>
+
+<div class="chips" id="quickChips"></div>
     <section class="group-sec" id="sec-all">
   <div class="group-head" data-id="all">
     <span class="name">كل الحيوانات</span>
@@ -551,7 +579,8 @@ const state = {
   animals: [],
   userId: null,
   thresholds: loadThresholds(),
-  currentGroup: null
+  currentGroup: null,
+  viewSpecies: 'cow'
 };
 
 /* ============= انتظار userId ============= */
@@ -1079,23 +1108,64 @@ function renderSelected(id){
   $$('.list').forEach(l=>l.classList.remove('show'));
   list.classList.add('show');
 }
-function buildChips(){
-  const host=$('#quickChips');
+ function buildSpeciesTabs(){
+  const host = $('#speciesTabs');
   if (!host) return;
-  host.innerHTML='';
-  GROUP_DEFS.forEach(def=>{
-    const b=document.createElement('button');
-    b.type='button';
-    b.className='chip';
-    b.textContent=def.label;
-    b.dataset.id=def.id;
-    b.onclick=()=>{
-      state.currentGroup=def.id;
-      $$('#quickChips .chip').forEach(x=>x.classList.toggle('active', x===b));
+
+  $$('#speciesTabs .species-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.species === state.viewSpecies);
+
+    btn.onclick = () => {
+      state.viewSpecies = btn.dataset.species;
+      $$('#speciesTabs .species-tab').forEach(x=>{
+        x.classList.toggle('active', x === btn);
+      });
+
+      buildChips();
+
+      const first = $('#quickChips .chip');
+      if (first) {
+        state.currentGroup = first.dataset.id;
+        first.classList.add('active');
+        renderSelected(first.dataset.id);
+      }
+    };
+  });
+} 
+function buildChips(){
+  const host = $('#quickChips');
+  if (!host) return;
+
+  host.innerHTML = '';
+
+  const defs = GROUP_DEFS.filter(def => def.species === state.viewSpecies);
+
+  defs.forEach(def=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = def.label
+      .replace(/^أبقار\s*/, '')
+      .replace(/^جاموس\s*/, '')
+      .replace(/\s+أبقار$/, '')
+      .replace(/\s+جاموس$/, '');
+
+    b.dataset.id = def.id;
+
+    if (state.currentGroup === def.id) b.classList.add('active');
+
+    b.onclick = () => {
+      state.currentGroup = def.id;
+      $$('#quickChips .chip').forEach(x=>x.classList.toggle('active', x === b));
       renderSelected(def.id);
       const counts = splitGroups();
-      window.dataLayer.push({event:'group_select', group:def.id, count:(counts[def.id]||[]).length});
+      window.dataLayer.push({
+        event:'group_select',
+        group:def.id,
+        count:(counts[def.id]||[]).length
+      });
     };
+
     host.appendChild(b);
   });
 }
@@ -1320,14 +1390,17 @@ window.dataLayer.push({event:'page_view', page:'/groups.html'});
   try{ await loadThresholdsFromFirestore(); }catch{}
   syncSettingsUIFromState();
 
-  buildChips();
-  bindGroupHeaders();
-  await loadAnimals();
+ buildSpeciesTabs();
+buildChips();
+bindGroupHeaders();
 
-  state.currentGroup = 'cow_all';
-  renderSelected('cow_all');
-  const firstChip = $('#quickChips .chip');
-  if(firstChip) firstChip.classList.add('active');
+await loadAnimals();
+
+state.currentGroup = 'cow_all';
+renderSelected('cow_all');
+
+const firstChip = $('#quickChips .chip');
+if (firstChip) firstChip.classList.add('active');
 })();</script>
 
 </body>
