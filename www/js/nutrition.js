@@ -522,14 +522,31 @@ const species = normalizeSpecies(
   ''
 );
 
-  const milks = [];
-  for(const d of docs){
-    const an = d.animalNumber;
-    const val = Number.isFinite(Number(an)) ? Number(an) : String(an);
-    const r = await fetchAvgMilkKgFor(fs, db, uid, val, eventDate, 7);
-    if(r.avg!=null) milks.push(Number(r.avg));
+ const milks = [];
+for (const d of docs) {
+  const raw = String(d.animalNumber || '').trim();
+  const num = Number(raw);
+
+  const tries = [];
+  if (raw) tries.push(raw);
+  if (Number.isFinite(num)) tries.push(num);
+
+  let picked = null;
+
+  for (const key of tries) {
+    const r = await fetchAvgMilkKgFor(fs, db, uid, key, eventDate, 7);
+    if (r && r.avg != null) {
+      picked = Number(r.avg);
+      break;
+    }
   }
-  const avgMilk = milks.length ? (milks.reduce((a,b)=>a+b,0)/milks.length) : null;
+
+  if (picked != null) milks.push(picked);
+}
+
+const avgMilk = milks.length
+  ? (milks.reduce((a, b) => a + b, 0) / milks.length)
+  : null;
 
   const dccs = [];
   for(const d of docs){
