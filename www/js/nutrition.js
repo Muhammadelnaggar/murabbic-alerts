@@ -589,10 +589,13 @@ const avgMilk = milks.length
 
 async function loadCtxAuto(){
   const { rawNumber, nums, eventDate } = readUrlCtx();
-  const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
-  if (mode === 'group' && nums.length){
-  return await loadCtxFromGroup(nums, eventDate);
-}
+const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
+
+let res = null;
+
+if (mode === 'group' && nums.length){
+  res = await loadCtxFromGroup(nums, eventDate);
+} else {
   // لازم رقم (فردي أو قائمة) من الـURL
   if(!rawNumber){
     disableSave(true);
@@ -601,9 +604,10 @@ async function loadCtxAuto(){
   }
 
   // فردي/جماعي
-  const res = (nums.length > 1)
-    ? await loadCtxFromGroup(nums, eventDate)
-    : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
+ res = (nums.length > 1)
+  ? await loadCtxFromGroup(nums, eventDate)
+  : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
+}
 
  if(res?.ok){
  const numEl  = document.getElementById('animalNumber');
