@@ -1321,32 +1321,20 @@ async function loadAnimalsFromFirestore(){
   }
 }
 async function loadAnimals(){
-  try{
-    let arr = [];
-    if (typeof api?.get === 'function') {
-      const res = await api.get('/api/animals');
-      arr = Array.isArray(res?.data)? res.data : (Array.isArray(res)?res:[]);
-    }
-    if(!arr || !arr.length){
-      const fbArr = await loadAnimalsFromFirestore();
-      if(fbArr?.length) arr = fbArr;
-    }
-    state.animals = (arr||[]).map(normalize);
-  }catch(e){
-    try{ state.animals = (await loadAnimalsFromFirestore()).map(normalize); }
-    catch{
-      try{ state.animals = JSON.parse(localStorage.getItem('animals_cache')||'[]').map(normalize);}catch{}
-    }
-  }
 
-  try{ await enrichMilkFromEvents(state.animals); }catch(_){}
+  const animalsSnap = await getDocs(
+    query(collection(db,'animals'), where('userId','==',state.userId))
+  );
 
-  localStorage.setItem('animals_cache', JSON.stringify(state.animals));
-  updateCounters();
-  await syncAllGroupsData();
-  if (state.currentGroup) renderSelected(state.currentGroup);
+  const calvesSnap = await getDocs(
+    query(collection(db,'calves'), where('userId','==',state.userId))
+  );
+
+  const animals = animalsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  const calves  = calvesSnap.docs.map(d => ({ id:d.id, ...d.data(), isCalf:true }));
+
+  state.animals = [...animals, ...calves];
 }
-
 /* ============= ربط الواجهة ============= */
 $$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
   state.thresholds.species = r.value;
