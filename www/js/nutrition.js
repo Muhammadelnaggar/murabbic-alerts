@@ -628,8 +628,18 @@ const idEl   = document.getElementById('animalId');
     idEl.disabled = false;
   }
 
-  disableSave(false);
-  msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
+ disableSave(false);
+
+const btn =
+  document.getElementById('saveEvent') ||
+  document.querySelector('[data-action="save-event"]');
+
+if (btn) {
+  btn.disabled = false;
+  btn.removeAttribute('disabled');
+}
+
+msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
 }else if(res?.reason==='no_uid'){
     disableSave(true);
     msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
@@ -862,10 +872,11 @@ async function waitForAuthReady(timeoutMs = 5000){
 // Bind
 // =====================
 (function bind(){
-  const form = document.getElementById('nutritionForm');
-  if (form) {
-    form.addEventListener('mbk:valid', saveEvent);
-  }
+ const form = document.getElementById('nutritionForm');
+if (form) {
+  form.addEventListener('mbk:valid', saveEvent);
+  form.addEventListener('submit', saveEvent);
+}
 
  const btn = document.getElementById('saveEvent');
 if (btn) {
