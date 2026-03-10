@@ -400,8 +400,13 @@ function parseNumbersList(){
 function readUrlCtx(){
   const p = qp();
   const rawNumber =
-    p.get('animalNumber') || p.get('number') || p.get('animalId') ||
-    p.get('numbers') || p.get('groupNumbers') || '';
+    p.get('bulk') ||
+    p.get('animalNumber') ||
+    p.get('number') ||
+    p.get('animalId') ||
+    p.get('numbers') ||
+    p.get('groupNumbers') ||
+    '';
 
   const rawDate = p.get('eventDate') || p.get('date') || '';
   const eventDate = DATE_RE.test(String(rawDate||'')) ? String(rawDate) : todayLocal();
@@ -543,7 +548,10 @@ const species = normalizeSpecies(
 
 async function loadCtxAuto(){
   const { rawNumber, nums, eventDate } = readUrlCtx();
-
+  const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
+  if (mode === 'group' && nums.length){
+  return await loadCtxFromGroup(nums, eventDate);
+}
   // لازم رقم (فردي أو قائمة) من الـURL
   if(!rawNumber){
     disableSave(true);
