@@ -769,20 +769,25 @@ function redirectSmart(){
   setTimeout(()=>{ location.href = to; }, 250);
 }
 
-const { rawNumber, nums, eventDate } = readUrlCtx();
-const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
-const isGroupMode = (mode === 'group' && Array.isArray(nums) && nums.length > 0);
+async function saveEvent(e){
+  e?.preventDefault?.();
 
-const animalId = String(rawNumber || '').trim();
-if(!animalId && !isGroupMode){
-  msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
-  return;
-}
+  const { rawNumber, nums, eventDate } = readUrlCtx();
+  const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
+  const isGroupMode = (mode === 'group' && Array.isArray(nums) && nums.length > 0);
 
-  // منع الحفظ لو السياق لم يُحمَّل
-  if((document.getElementById('ctxSpecies')?.value || '') === '' &&
-     (document.getElementById('ctxDIM')?.value || '') === '' &&
-     (document.getElementById('ctxAvgMilk')?.value || '') === ''){
+  const animalId = String(rawNumber || '').trim();
+
+  if(!animalId && !isGroupMode){
+    msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
+    return;
+  }
+
+  if(
+    (document.getElementById('ctxSpecies')?.value || '') === '' &&
+    (document.getElementById('ctxDIM')?.value || '') === '' &&
+    (document.getElementById('ctxAvgMilk')?.value || '') === ''
+  ){
     msgWarn('⚠️ تم منع الحفظ: لم يتم تحميل بيانات السياق.');
     return;
   }
@@ -798,65 +803,37 @@ if(!animalId && !isGroupMode){
     msgWarn('⚠️ لا يمكن الحفظ بدون خامات في العليقة.');
     return;
   }
- const payload = cleanDeep({
-  animalNumber: isGroupMode ? null : animalId,
-  eventDate,
-  isGroup: isGroupMode,
-  eventType: isGroupMode ? 'تغذية مجموعة' : 'تغذية',
-  type: isGroupMode ? 'nutrition_group' : 'nutrition',
 
-  groupNumbers: isGroupMode ? nums.map(x => String(x).trim()).filter(Boolean) : null,
-  groupSize: isGroupMode ? nums.length : null,
+  const payload = cleanDeep({
+    animalNumber: isGroupMode ? null : animalId,
+    eventDate,
+    isGroup: isGroupMode,
+    eventType: isGroupMode ? 'تغذية مجموعة' : 'تغذية',
+    type: isGroupMode ? 'nutrition_group' : 'nutrition',
 
-  nutrition: {
-    mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-    rows,
-    context: readContext(),
-    concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-    milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
-  }
-});
-  // userId من auth (Cloud-only)
- 
+    groupNumbers: isGroupMode ? nums.map(x => String(x).trim()).filter(Boolean) : null,
+    groupSize: isGroupMode ? nums.length : null,
+
+    nutrition: {
+      mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+      rows,
+      context: readContext(),
+      concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
+      milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
+    }
+  });
+
   disableSave(true);
   msgWarn('⏳ جارٍ الحفظ...');
 
   try{
-     const result = await saveToServer(payload);
-
-try{
-  const bar =
-    document.getElementById("sysbar") ||
-    document.querySelector(".infobar");
-
-  if (bar && window.showMsg) {
-    showMsg(bar, "✅ تم حفظ حدث التغذية بنجاح", "success");
-  }
-}catch(_){}
-
-window.dispatchEvent(
-  new CustomEvent('mbk:success', {
-    detail: { message: 'تم حفظ حدث التغذية بنجاح' }
-  })
-);
-    try { await window.updateAnimalByEvent?.(payload); } catch (e) { console.warn('updateAnimalByEvent failed', e); }
-
-    try{
-      onNutritionSave({
-        animalId,
-        date: eventDate,
-        rows: rows.length,
-        mode: 'firestore',
-        source: 'nutrition.html'
-      });
-    }catch(_){}
-
+    await saveToServer(payload);
     msgWarn('✅ تم الحفظ على السحابة.');
     redirectSmart();
   }catch(err){
     console.error(err);
     disableSave(false);
-    msgWarn('❌ فشل الحفظ على السحابة. تأكد من الاتصال وتسجيل الدخول.');
+    msgWarn('❌ فشل الحفظ على السحابة.');
   }
 }
 async function waitForAuthReady(timeoutMs = 5000){
