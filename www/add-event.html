@@ -158,7 +158,17 @@
     <!-- ✅ حقل واحد (فردي/جماعي) -->
     <textarea id="animalNumbers" inputmode="numeric" placeholder="أرقام الحيوانات (اكتب رقمًا واحدًا أو عدة أرقام... كل رقم في سطر)"
       style="min-height:110px; line-height:1.6; resize:vertical;"></textarea>
+    <div style="display:grid; gap:8px;">
+  <button type="button" class="btn" id="btnPickGroup">📦 تحميل مجموعة من المجموعات</button>
 
+  <select id="groupSelect" style="display:none; width:100%; padding:12px; border:1px solid #ccc; border-radius:10px; font-size:16px; font-family:inherit;">
+    <option value="">اختر مجموعة...</option>
+  </select>
+
+  <div id="groupHint" class="hint" style="display:none">
+    عند اختيار مجموعة، سيقوم مُرَبِّيك بتحميل أرقام الحيوانات الخام داخل نفس الحقل الحالي، ثم تُرسل لأي صفحة حدث بالطريقة المعتادة.
+  </div>
+</div>
     <div class="hint">
       ✅ للموبايل: اكتب كل رقم في سطر (زر Enter).<br>
       مثال:<br>
@@ -199,7 +209,21 @@
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
   <script type="module" src="/js/api.js"></script>
+  <script type="module">
+  import firebaseConfig from '/js/firebase-config.js';
+  import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  import {
+    getFirestore, collection, query, where, getDocs, limit
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app, "murabbikdata");
+
+  window.mbkAddEventDb = db;
+  window.mbkAddEventAuth = auth;
+</script>
   <script>
     function updateCowCardNav(number, multi){
       const link = document.querySelector('[data-nav="cow-card"]');
@@ -224,7 +248,102 @@
     (function(){
       const $ = s=>document.querySelector(s);
       const $$ = s=>document.querySelectorAll(s);
+           function getCurrentUid(){
+        return window.mbk?.userId
+          || localStorage.getItem('userId')
+          || window.mbkAddEventAuth?.currentUser?.uid
+          || '';
+      }
 
+      async function loadGroupsIntoSelect(){
+        const select = $('#groupSelect');
+        const hint = $('#groupHint');
+        const warn = $('#warn');
+
+        if (!select) return;
+
+        const db = window.mbkAddEventDb;
+        const uid = getCurrentUid();
+
+        if (!db || !uid){
+          warn.textContent = '⚠️ تعذر تحميل المجموعات الآن.';
+          return;
+        }
+
+        try{
+          warn.textContent = '';
+          select.innerHTML = '<option value="">جاري تحميل المجموعات...</option>';
+          select.style.display = 'block';
+          if (hint) hint.style.display = 'block';
+
+          const q1 = query(
+            collection(db, 'groups'),
+            where('userId', '==', uid),
+            limit(100)
+          );
+
+          const snap = await getDocs(q1);
+
+          const rows = [];
+          snap.forEach(doc => {
+            const d = doc.data() || {};
+            rows.push({
+              id: doc.id,
+              name: String(d.groupName || d.name || doc.id),
+              members: Array.isArray(d.members) ? d.members : [],
+              animalType: String(d.animalType || d.species || '')
+            });
+          });
+
+          if (!rows.length){
+            select.innerHTML = '<option value="">لا توجد مجموعات محفوظة</option>';
+            return;
+          }
+
+          select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
+            const nums = g.members.map(x => String(x).trim()).filter(Boolean).join(',');
+            const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.members.length})`;
+            return `<option value="${nums}">${label}</option>`;
+          }).join('');
+        }catch(err){
+          console.error('groups load failed', err);
+          warn.textContent = '⚠️ فشل تحميل المجموعات.';
+          select.innerHTML = '<option value="">تعذر تحميل المجموعات</option>';
+          select.style.display = 'block';
+        }
+      }
+
+      function applySelectedGroupNumbers(raw){
+        const list = parseNumbers(raw || '');
+        const textarea = $('#animalNumbers');
+
+        if (!textarea) return;
+
+        textarea.value = list.join('\n');
+
+        if (list.length === 1){
+          $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
+          updateCowCardNav(list[0], false);
+        } else if (list.length > 1){
+          $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
+          updateCowCardNav('', true);
+        } else {
+          $('#animalInfo').textContent = '🐄 الحيوان الحالي: غير محدد';
+          updateCowCardNav('', false);
+        }
+      }
+
+      function wireGroupsPicker(){
+        $('#btnPickGroup')?.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          await loadGroupsIntoSelect();
+        }, {passive:false});
+
+        $('#groupSelect')?.addEventListener('change', (e)=>{
+          const raw = e.target.value || '';
+          applySelectedGroupNumbers(raw);
+        }, {passive:true});
+      }
       const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
       const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
 
@@ -396,6 +515,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
       wireLive();
       wireButtons();
       wireTrimming();
+      wireGroupsPicker();
     })();
   </script>
 
@@ -406,5 +526,6 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
