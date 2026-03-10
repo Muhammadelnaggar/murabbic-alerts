@@ -778,9 +778,9 @@ async function saveToServer(payload){
 
   return data;
 }
-function redirectSmart(){
+function redirectSmart(delay = 250){
   const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
-  setTimeout(()=>{ location.href = to; }, 250);
+  setTimeout(()=>{ location.href = to; }, delay);
 }
 
 async function saveEvent(e){
@@ -841,9 +841,30 @@ async function saveEvent(e){
   msgWarn('⏳ جارٍ الحفظ...');
 
   try{
-    await saveToServer(payload);
-    msgWarn('✅ تم الحفظ على السحابة.');
-    redirectSmart();
+   await saveToServer(payload);
+
+try{
+  const bar =
+    document.getElementById('sysbar') ||
+    document.querySelector('.infobar') ||
+    document.getElementById('warn');
+
+  if (bar && window.showMsg) {
+    showMsg(bar, '✅ تم حفظ حدث التغذية بنجاح', 'success');
+  } else {
+    msgWarn('✅ تم حفظ حدث التغذية بنجاح');
+  }
+}catch(_){
+  msgWarn('✅ تم حفظ حدث التغذية بنجاح');
+}
+
+window.dispatchEvent(
+  new CustomEvent('mbk:success', {
+    detail: { message: 'تم حفظ حدث التغذية بنجاح' }
+  })
+);
+
+redirectSmart(900);
   }catch(err){
     console.error(err);
     disableSave(false);
