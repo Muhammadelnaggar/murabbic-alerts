@@ -1331,7 +1331,12 @@ async function loadAnimals(){
   );
 
   const animals = animalsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-  const calves  = calvesSnap.docs.map(d => ({ id:d.id, ...d.data(), isCalf:true }));
+ const calves  = calvesSnap.docs.map(d => ({
+  id:d.id,
+  ...d.data(),
+  animalNumber: d.data().calfNumber || d.id,
+  isCalf:true
+}));
 
   state.animals = [...animals, ...calves];
 }
