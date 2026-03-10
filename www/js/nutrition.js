@@ -486,6 +486,9 @@ const species = normalizeSpecies(speciesRaw);
 }
 
 async function loadCtxFromGroup(numbers, eventDate){
+    const nums = (Array.isArray(numbers) ? numbers : [])
+    .map(x => Number(String(x).trim()))
+    .filter(n => Number.isFinite(n));
   if(!numbers?.length) return { ok:false, reason:'no_number' };
 
   const { db, auth } = await import('/js/firebase-config.js');
