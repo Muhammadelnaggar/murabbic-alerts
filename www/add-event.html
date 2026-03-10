@@ -452,16 +452,16 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
       function buildUrl(page, ctx){
         const u = new URL(page, location.href);
-        const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
+       const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
+const isHeat = /heat\.html/i.test(String(page));
+const isNutrition = /nutrition\.html/i.test(String(page));
 
-        
-        const isHeat = /heat\.html/i.test(String(page));
-if ((isOvsynch || isHeat) && ctx.mode === 'group'){
-          u.searchParams.set('mbkMode','group');
-          u.searchParams.set('bulk', ctx.bulk);
-        } else {
-          u.searchParams.set('number', ctx.number);
-        }
+if ((isOvsynch || isHeat || isNutrition) && ctx.mode === 'group'){
+  u.searchParams.set('mbkMode', 'group');
+  u.searchParams.set('bulk', ctx.bulk);
+} else {
+  u.searchParams.set('number', ctx.number);
+}
 
         u.searchParams.set('date', ctx.date);
         u.searchParams.set('eventDate', ctx.date);
@@ -543,6 +543,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
