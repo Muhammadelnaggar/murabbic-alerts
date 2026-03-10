@@ -468,7 +468,7 @@ header{
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/api.js"></script>
+ <script type="module" src="/js/api.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
   <script type="module" src="/js/smart-alerts.js"></script>
  
@@ -969,36 +969,6 @@ function groupMemberDocId(groupKey, animalNumber){
   return `${state.userId}_${groupKey}_${String(animalNumber).trim()}`;
 }
 
-function buildGroupDoc(groupKey, list){
-  const count = list.length || 0;
-
-  const milkVals = list.map(getMilkKg).filter(v => Number.isFinite(v));
-  const dimVals  = list.map(getDIM).filter(v => Number.isFinite(v));
-
-  const avgMilkKg = milkVals.length
-    ? +(milkVals.reduce((a,b)=>a+b,0) / milkVals.length).toFixed(2)
-    : 0;
-
-  const avgDim = dimVals.length
-    ? Math.round(dimVals.reduce((a,b)=>a+b,0) / dimVals.length)
-    : 0;
-
-  return {
-    userId: state.userId,
-    groupKey,
-    groupName: GROUP_LABELS[groupKey] || groupKey,
-    animalsCount: count,
-    animalNumbers: list
-      .map(an => String(an?.animalNumber ?? an?.number ?? '').trim())
-      .filter(Boolean)
-      .slice(0, 500),
-    avgMilkKg,
-    avgDim,
-    thresholds: { ...state.thresholds },
-    updatedAt: serverTimestamp()
-  };
-}
-
 function buildGroupMemberDoc(groupKey, an){
   const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
 
@@ -1023,25 +993,6 @@ function buildGroupMemberDoc(groupKey, an){
 
     updatedAt: serverTimestamp()
   };
-}
-
-async function syncGroupsToFirestore(){
-  try{
-    if (!db || !state.userId) return;
-
-    const groups = splitGroups(false);
-    const batch = writeBatch(db);
-
-    Object.entries(groups).forEach(([groupKey, list]) => {
-      const ref = doc(db, 'groups', groupDocId(groupKey));
-      batch.set(ref, buildGroupDoc(groupKey, list), { merge: true });
-    });
-
-    await batch.commit();
-    console.log('groups snapshot synced');
-  }catch(e){
-    console.error('syncGroupsToFirestore error:', e);
-  }
 }
 
 async function syncGroupMembersToFirestore(){
