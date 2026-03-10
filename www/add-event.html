@@ -277,7 +277,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
         const db = window.mbkAddEventDb;
         const uid = getCurrentUid();
-
+        const { collection, query, where, getDocs, limit } = window.mbkFs || {};
         if (!db || !uid){
           warn.textContent = '⚠️ تعذر تحميل المجموعات الآن.';
           return;
@@ -539,6 +539,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
