@@ -610,6 +610,10 @@ async function saveThresholdsToFirestore(){
 }
 
 /* ============= تواريخ/مقاييس ============= */
+  const num = v => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 const toDate = v => {
   if (!v) return null;
   if (v instanceof Date) return v;
