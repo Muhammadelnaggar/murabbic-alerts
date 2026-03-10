@@ -1035,7 +1035,7 @@ function splitGroups(applyQuery = true){
     g[pref+'all'].push(an);
     if(hasDisease(an)) g[pref+'hospital'].push(an);
 
-    if (isLactatingAdult(an)) {
+   if (isLactatingAdult(an) && hasCalvedBefore(an)) {
       if (isFresh(an)) g[pref+'fresh'].push(an);
       const band = milkBand(an, milk);
       if (band === 'high') g[pref+'high'].push(an);
@@ -1080,14 +1080,16 @@ function splitGroups(applyQuery = true){
 
 /* ============= عدادات + عرض ============= */
 function updateCounters(){
-  const g = splitGroups();
+  const g = state.groupsCache || splitGroups();
+  state.groupsCache = g;
   GROUP_DEFS.forEach(def => {
     const el = $('#c-'+def.id);
     if (el) el.textContent = (g[def.id] || []).length;
   });
 }
 function renderSelected(id){
-  const g = splitGroups();
+  const g = state.groupsCache || splitGroups();
+  state.groupsCache = g;
   const map = g[id] || [];
   const list = $('#list-'+id);
   if (!list) return;
@@ -1339,6 +1341,7 @@ async function loadAnimals(){
 }));
 
   state.animals = [...animals, ...calves];
+  state.groupsCache = null;
 }
 /* ============= ربط الواجهة ============= */
 $$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
@@ -1365,7 +1368,12 @@ $('#q').addEventListener('input', ()=>{
   updateCounters();
   if (state.currentGroup) renderSelected(state.currentGroup);
 });
-$('#refreshBtn').addEventListener('click', loadAnimals);
+$('#refreshBtn').addEventListener('click', async ()=>{
+  await loadAnimals();
+  updateCounters();
+  if(state.currentGroup) renderSelected(state.currentGroup);
+  await syncAllGroupsData();
+});
 
 /* ============= تشخيص للأخطاء العامة ============= */
 window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
