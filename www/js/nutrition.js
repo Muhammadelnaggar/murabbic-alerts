@@ -37,10 +37,18 @@ async function fetchTargets(ctx) {
     body: JSON.stringify(payload)
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || `HTTP ${res.status}`);
-  }
+ const rawText = await res.text().catch(() => '');
+let data = {};
+try { data = rawText ? JSON.parse(rawText) : {}; } catch {}
+
+if (!res.ok || data?.ok === false) {
+  console.error('nutrition/targets failed:', {
+    status: res.status,
+    responseText: rawText,
+    payload
+  });
+  throw new Error(data?.error || rawText || `HTTP ${res.status}`);
+}
 
   targetsCache = data.targets || null;
   return targetsCache;
