@@ -278,8 +278,21 @@ function updateCtxView(){
 // Firestore helpers (سياق)
 // =====================
 function isMilkEvent(ev){
-  const t = String(ev?.type || ev?.eventType || '').trim();
-  return (t === 'daily_milk' || t === 'daily-milk' || t === 'dailyMilk' || t === 'لبن' || t === 'لبن يومي' || t === 'تسجيل اللبن اليومي');
+  const t = String(
+    ev?.eventTypeNorm ||
+    ev?.type ||
+    ev?.eventType ||
+    ''
+  ).trim();
+
+  return (
+    t === 'daily_milk' ||
+    t === 'daily-milk' ||
+    t === 'dailyMilk' ||
+    t === 'لبن' ||
+    t === 'لبن يومي' ||
+    t === 'تسجيل اللبن اليومي'
+  );
 }
 function getEventDay(ev){
   const d = ev?.eventDate || ev?.date || ev?.day || '';
@@ -330,7 +343,7 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
 
   const end = new Date(endDateStr || todayLocal());
   if(isNaN(end.getTime())) return { avg:null, days:0 };
-  const start = new Date(end); start.setDate(start.getDate() - (days-1));
+ const start = new Date(end); start.setDate(start.getDate() - days);
 
   const candidates = [];
   async function pull(ownerField){
