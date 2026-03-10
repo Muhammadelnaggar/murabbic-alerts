@@ -769,15 +769,15 @@ function redirectSmart(){
   setTimeout(()=>{ location.href = to; }, 250);
 }
 
-async function saveEvent(e){
-  e?.preventDefault?.();
+const { rawNumber, nums, eventDate } = readUrlCtx();
+const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
+const isGroupMode = (mode === 'group' && Array.isArray(nums) && nums.length > 0);
 
-  const { rawNumber, eventDate } = readUrlCtx();
-  const animalId = String(rawNumber || '').trim();
-  if(!animalId){
-    msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
-    return;
-  }
+const animalId = String(rawNumber || '').trim();
+if(!animalId && !isGroupMode){
+  msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
+  return;
+}
 
   // منع الحفظ لو السياق لم يُحمَّل
   if((document.getElementById('ctxSpecies')?.value || '') === '' &&
@@ -798,18 +798,24 @@ async function saveEvent(e){
     msgWarn('⚠️ لا يمكن الحفظ بدون خامات في العليقة.');
     return;
   }
-  const payload = cleanDeep({
-    animalNumber: animalId,
-    eventDate,
+ const payload = cleanDeep({
+  animalNumber: isGroupMode ? null : animalId,
+  eventDate,
+  isGroup: isGroupMode,
+  eventType: isGroupMode ? 'تغذية مجموعة' : 'تغذية',
+  type: isGroupMode ? 'nutrition_group' : 'nutrition',
 
-   nutrition: {
-  mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-  rows,
-  context: readContext(),
-  concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
-}
-  });
+  groupNumbers: isGroupMode ? nums.map(x => String(x).trim()).filter(Boolean) : null,
+  groupSize: isGroupMode ? nums.length : null,
+
+  nutrition: {
+    mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
+    rows,
+    context: readContext(),
+    concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
+    milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
+  }
+});
   // userId من auth (Cloud-only)
  
   disableSave(true);
