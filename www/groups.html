@@ -668,6 +668,44 @@ function getAgeMonths(an){
   if(!birth) return 0;
   return Math.max(0, Math.floor((new Date()-birth)/(30.4375*24*3600*1000)));
 }
+  function getBirthDateText(an){
+  const d = toDate(an?.birthDate);
+  if(!d || Number.isNaN(d.getTime())) return 'غير مسجل';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getSexText(an){
+  const raw = [
+    an?.sex,
+    an?.gender,
+    an?.animalSex,
+    an?.sexAr,
+    an?.genderAr
+  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+
+  if (
+    raw.includes('female') ||
+    raw.includes('f') ||
+    raw.includes('أنث') ||
+    raw.includes('نتاي') ||
+    raw.includes('انثى')
+  ) return 'أنثى';
+
+  if (
+    raw.includes('male') ||
+    raw.includes('m') ||
+    raw.includes('ذكر')
+  ) return 'ذكر';
+
+  return 'غير محدد';
+}
+
+function isYoungStock(an){
+  return !hasCalvedBefore(an);
+}
 function getMilkKg(an){
   return num(
     an?.dailyMilk ??
@@ -886,29 +924,54 @@ function normalize(an){
 
 /* ============= بطاقات ============= */
 function card(an){
-  const milk=getMilkKg(an), dim=getDIM(an), ageM=getAgeMonths(an), band=milkBand(an, milk);
-  const tags=[];
-  tags.push(isBuffalo(an)?'جاموس':'أبقار');
-  if(isPregnant(an)) tags.push('عشار');
-  if(isDry(an)) tags.push('جاف');
-  if(an?.bcs) tags.push('BCS '+an.bcs);
-  if(an?.type) tags.push(an.type);
-  const id=(an?.animalNumber||an?.number||an?.id||'').toString();
-  const el=document.createElement('div'); el.className='card';
-  el.innerHTML=`<h3>حيوان رقم ${id} <span class="pill">${band}</span></h3>
+  const milk = getMilkKg(an);
+  const dim = getDIM(an);
+  const ageM = getAgeMonths(an);
+  const band = milkBand(an, milk);
+  const birthDateText = getBirthDateText(an);
+  const sexText = getSexText(an);
+  const young = isYoungStock(an);
+
+  const tags = [];
+  tags.push(isBuffalo(an) ? 'جاموس' : 'أبقار');
+
+  if (young) {
+    tags.push(`الجنس: ${sexText}`);
+    tags.push(`الميلاد: ${birthDateText}`);
+    tags.push(`العمر: ${ageM} شهر`);
+  } else {
+    tags.push(`لبن: ${milk.toFixed(1)} كجم/يوم`);
+    tags.push(`DIM: ${dim}`);
+    if (ageM > 0) tags.push(`العمر: ${ageM} شهر`);
+  }
+
+  if (isPregnant(an)) tags.push('عشار');
+  if (isDry(an)) tags.push('جاف');
+  if (an?.bcs) tags.push('BCS ' + an.bcs);
+  if (an?.breed) tags.push(an.breed);
+
+  const id = (an?.animalNumber || an?.number || an?.id || '').toString();
+
+  let titleText = `حيوان رقم ${id}`;
+  if (young) {
+    if (sexText === 'ذكر') titleText = `عجل رقم ${id}`;
+    else if (sexText === 'أنثى') titleText = `عجلة رقم ${id}`;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `
+    <h3>${titleText} <span class="pill">${young ? 'young' : band}</span></h3>
     <div class="meta">
-      <span class="tag">لبن: ${milk.toFixed(1)} كجم/يوم</span>
-      <span class="tag">DIM: ${dim}</span>
-      <span class="tag">العمر: ${ageM} شهر</span>
-      ${tags.map(t=>`<span class='tag'>${t}</span>`).join('')}
+      ${tags.map(t => `<span class="tag">${t}</span>`).join('')}
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <a class="btn" href="/cow-card.html?number=${encodeURIComponent(id)}&date=${new Date().toISOString().slice(0,10)}">البطاقة</a>
       <a class="btn" href="/add-event.html?number=${encodeURIComponent(id)}&date=${new Date().toISOString().slice(0,10)}">حدث جديد</a>
-    </div>`;
+    </div>
+  `;
   return el;
 }
-
 /* ============= واجهة الإعدادات الديناميكية ============= */
 function ensureSettingsUI(){
   if ($('#cowSucklingMax')) return;
