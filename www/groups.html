@@ -505,26 +505,46 @@ try {
 const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
-  const GROUP_LABELS = {
-  all: 'كل الحيوانات',
-  fresh: 'حديث الولادة',
-  high: 'عالي الإدرار',
-  med: 'متوسط الإدرار',
-  low: 'منخفض الإدرار',
-  dry: 'جاف',
-  suckling: 'رضيع',
-  weaned: 'فطام',
-  growing: 'نامي',
-  breeding: 'تحت التلقيح',
-  pregHeifers: 'عجلات عشار',
-  hospital: 'مجموعة المستشفى'
-};
-function num(v){
-  if (v == null) return 0;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  const n = parseFloat(String(v).replace(/[^\d.,-]/g,'').replace(',','.'));
-  return Number.isFinite(n) ? n : 0;
-}
+
+const GROUP_DEFS = [
+  { id:'cow_all',            species:'cow',     baseKey:'all',           label:'كل الأبقار',                  feedingEligible:false },
+  { id:'cow_fresh',          species:'cow',     baseKey:'fresh',         label:'أبقار حديث الولادة',          feedingEligible:true  },
+  { id:'cow_high',           species:'cow',     baseKey:'high',          label:'أبقار عالية الإدرار',         feedingEligible:true  },
+  { id:'cow_med',            species:'cow',     baseKey:'med',           label:'أبقار متوسطة الإدرار',        feedingEligible:true  },
+  { id:'cow_low',            species:'cow',     baseKey:'low',           label:'أبقار منخفضة الإدرار',        feedingEligible:true  },
+  { id:'cow_dry',            species:'cow',     baseKey:'dry',           label:'أبقار جافة',                  feedingEligible:true  },
+  { id:'cow_closeup',        species:'cow',     baseKey:'closeup',       label:'أبقار انتظار ولادة',          feedingEligible:true  },
+  { id:'cow_suckling',       species:'cow',     baseKey:'suckling',      label:'رضيع أبقار',                  feedingEligible:true  },
+  { id:'cow_weaned',         species:'cow',     baseKey:'weaned',        label:'فطام أبقار',                  feedingEligible:true  },
+  { id:'cow_growing',        species:'cow',     baseKey:'growing',       label:'نامي أبقار',                  feedingEligible:true  },
+  { id:'cow_heiferOpen',     species:'cow',     baseKey:'heiferOpen',    label:'عجلات جاهزة أبقار',           feedingEligible:true  },
+  { id:'cow_breeding',       species:'cow',     baseKey:'breeding',      label:'عجلات تحت التلقيح أبقار',     feedingEligible:true  },
+  { id:'cow_pregHeifers',    species:'cow',     baseKey:'pregHeifers',   label:'عجلات عشار أبقار',            feedingEligible:true  },
+  { id:'cow_heiferCloseup',  species:'cow',     baseKey:'heiferCloseup', label:'عجلات انتظار ولادة أبقار',    feedingEligible:true  },
+  { id:'cow_hospital',       species:'cow',     baseKey:'hospital',      label:'مستشفى أبقار',                feedingEligible:false },
+
+  { id:'buffalo_all',        species:'buffalo', baseKey:'all',           label:'كل الجاموس',                  feedingEligible:false },
+  { id:'buffalo_fresh',      species:'buffalo', baseKey:'fresh',         label:'جاموس حديث الولادة',          feedingEligible:true  },
+  { id:'buffalo_high',       species:'buffalo', baseKey:'high',          label:'جاموس عالي الإدرار',          feedingEligible:true  },
+  { id:'buffalo_med',        species:'buffalo', baseKey:'med',           label:'جاموس متوسط الإدرار',         feedingEligible:true  },
+  { id:'buffalo_low',        species:'buffalo', baseKey:'low',           label:'جاموس منخفض الإدرار',         feedingEligible:true  },
+  { id:'buffalo_dry',        species:'buffalo', baseKey:'dry',           label:'جاموس جاف',                   feedingEligible:true  },
+  { id:'buffalo_closeup',    species:'buffalo', baseKey:'closeup',       label:'جاموس انتظار ولادة',          feedingEligible:true  },
+  { id:'buffalo_suckling',   species:'buffalo', baseKey:'suckling',      label:'رضيع جاموس',                  feedingEligible:true  },
+  { id:'buffalo_weaned',     species:'buffalo', baseKey:'weaned',        label:'فطام جاموس',                  feedingEligible:true  },
+  { id:'buffalo_growing',    species:'buffalo', baseKey:'growing',       label:'نامي جاموس',                  feedingEligible:true  },
+  { id:'buffalo_heiferOpen', species:'buffalo', baseKey:'heiferOpen',    label:'عجلات جاهزة جاموس',           feedingEligible:true  },
+  { id:'buffalo_breeding',   species:'buffalo', baseKey:'breeding',      label:'عجلات تحت التلقيح جاموس',     feedingEligible:true  },
+  { id:'buffalo_pregHeifers',species:'buffalo', baseKey:'pregHeifers',   label:'عجلات عشار جاموس',            feedingEligible:true  },
+  { id:'buffalo_heiferCloseup', species:'buffalo', baseKey:'heiferCloseup', label:'عجلات انتظار ولادة جاموس', feedingEligible:true  },
+  { id:'buffalo_hospital',   species:'buffalo', baseKey:'hospital',      label:'مستشفى جاموس',                feedingEligible:false }
+];
+
+const GROUP_DEF_BY_ID = Object.fromEntries(GROUP_DEFS.map(x => [x.id, x]));
+const LEGACY_SECTION_IDS = [
+  'sec-all','sec-fresh','sec-high','sec-med','sec-low','sec-dry',
+  'sec-suckling','sec-weaned','sec-growing','sec-breeding','sec-pregHeifers','sec-hospital'
+];
 
 /* ============= حالة الصفحة ============= */
 const state = {
@@ -542,12 +562,28 @@ async function waitForUserId(timeoutMs=6000){
     if(uid){ state.userId = uid; return uid; }
     await new Promise(r=>setTimeout(r,100));
   }
-  return null; // نكمل، والـREST/الكاش يشيلوا الموقف
+  return null;
 }
 
 /* ============= العتبات (محلي + سحابي) ============= */
 function loadThresholds(){
-  const d = { cowHigh:30, cowMed:15, cowLow:0, bufHigh:12, bufMed:7, bufLow:0, species:'cow' };
+  const d = {
+    cowHigh:30, cowMed:15, cowLow:0,
+    bufHigh:12, bufMed:7, bufLow:0,
+    species:'cow',
+    cowSucklingMax:2,
+    cowWeanedMax:5,
+    cowGrowingMax:12,
+    cowHeiferMin:13,
+    cowHeiferMax:15,
+    bufSucklingMax:3,
+    bufWeanedMax:6,
+    bufGrowingMax:15,
+    bufHeiferMin:16,
+    bufHeiferMax:20,
+    cowCloseUpDays:21,
+    bufCloseUpDays:30
+  };
   try{ return Object.assign(d, JSON.parse(localStorage.getItem('mbk_group_thresholds')||'{}')); }catch{ return d; }
 }
 function saveThresholdsLocal(){
@@ -585,6 +621,7 @@ const toDate = v => {
   return null;
 };
 const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
+
 function getDIM(an){
   const calv =
     toDate(an?.lastCalvingDate) ||
@@ -600,12 +637,12 @@ function getAgeMonths(an){
 }
 function getMilkKg(an){
   return num(
-    an?.dailyMilk ??          // الحقل الأساسي
+    an?.dailyMilk ??
     an?.daily_milk ??
     an?.milkDaily ??
     an?.milk_per_day ??
     an?.milkPerDay ??
-    an?.lastMilkKg ??         // هنملأه من الأحداث لو موجود
+    an?.lastMilkKg ??
     an?.production?.milkKg ??
     an?.avgMilkKg ??
     an?.milk_today ??
@@ -618,74 +655,29 @@ function getMilkKg(an){
     0
   );
 }
-
-// ——— أدوات قراءة الأحداث ———
-const milkEventNames    = ['dailyMilk','daily_milk','milkDaily','milk_per_day','milkPerDay','daily-milk','dailymilk','milk','milkday','لبن يومي','حليب يومي'];
-const calvingEventNames = ['calving','ولادة','calved','parturition'];
-
-function isTypeOneOf(e, names){
-  const t = (String(e?.type || e?.eventType || e?.name || '')).trim().toLowerCase();
-  return names.some(n => t.includes(String(n).toLowerCase()));
-}
 function getEventDate(e){
-  const v = e?.eventDate ?? e?.date ?? e?.createdAt ?? e?.timestamp;
-  if(!v) return null;
-  if (typeof v === 'string') return new Date(v);
-  if (typeof v === 'object') {
-    if (typeof v.seconds === 'number')   return new Date(v.seconds * 1000);
-    if (typeof v._seconds === 'number')  return new Date(v._seconds * 1000);
-  }
-  return null;
+  return toDate(e?.eventDate) || toDate(e?.date) || toDate(e?.createdAt) || toDate(e?.timestamp);
 }
 function getMilkFromEvent(e){
-  return num(
-    e?.dailyMilk ?? e?.daily_milk ?? e?.milkDaily ??
-    e?.milk_per_day ?? e?.milkPerDay ??
-    e?.milk ?? e?.milkKg ?? e?.milk_kg ??
-    e?.yield ?? e?.quantity ?? e?.amount ?? 0
-  );
+  return num(e?.milkKg ?? e?.dailyMilk ?? e?.milk ?? e?.yield ?? e?.kg);
 }
+function isTypeOneOf(e, names=[]){
+  const txt = [e?.type, e?.eventType, e?.name, e?.kind].map(normTxt).join(' ');
+  return names.some(n => txt.includes(normTxt(n)));
+}
+const milkEventNames = ['daily_milk','لبن يومي','milk','milk report'];
 
-// ——— إثراء الحيوانات من أحدث أحداث اللبن ———
 async function enrichMilkFromEvents(list){
   if(!db || !state.userId || !Array.isArray(list) || !list.length) return;
-
-  // 1) subcollection: animals/{id}/events
-  for (const an of list){
-    const aid = an.id || an.animalId || null;
-    if (!aid) continue;
-    try{
-      const evCol = collection(db, 'animals', aid, 'events');
-      const snap = await getDocs(query(evCol, orderBy('eventDate','desc'), limit(5)));
-      let bestMilk=null, bestDate=null, bestCalv=null;
-      snap.forEach(docu=>{
-        const e = docu.data(); const d = getEventDate(e); if(!d) return;
-        if (isTypeOneOf(e, milkEventNames)) {
-          const m = getMilkFromEvent(e);
-          if(m>0 && (!bestDate || d>bestDate)){ bestDate=d; bestMilk=m; }
-        }
-        if (isTypeOneOf(e, calvingEventNames)) bestCalv = d;
-      });
-    if (bestMilk != null) {
-  an.dailyMilk = bestMilk;
-  an.lastMilkKg = bestMilk;
-  if (bestDate) an._latestMilkDate = bestDate.toISOString();
-}
-
-      if(bestCalv) an.lastCalvingDate = bestCalv.toISOString();
-    }catch(_) { /* تجاهل لو لا صلاحيات/لا يوجد subcollection */ }
-  }
-
-  // 2) top-level: events (للي لسه 0)
   const stillZero = list.filter(an => getMilkKg(an) === 0);
   if(!stillZero.length) return;
 
   try{
     let evQuery;
     try{
-      evQuery = query(collection(db,'events'), where('userId','==', state.userId), orderBy('eventDate','desc'), limit(300));
+      evQuery = query(collection(db,'events'), where('userId','==', state.userId), orderBy('eventDate','desc'), limit(500));
     }catch(_){
-      evQuery = query(collection(db,'events'), where('userId','==', state.userId), limit(300));
+      evQuery = query(collection(db,'events'), where('userId','==', state.userId), limit(500));
     }
     const evSnap = await getDocs(evQuery);
 
@@ -698,28 +690,46 @@ async function enrichMilkFromEvents(list){
       const prev = bestPerAnimal.get(key);
       if(!prev || d > prev.date) bestPerAnimal.set(key, { date:d, milk:getMilkFromEvent(e) });
     });
-for (const an of stillZero) {
-  const key = String(an.id ?? an.animalId ?? an.animalID ?? an.number ?? an.animalNumber ?? '');
-  const rec = bestPerAnimal.get(key);
-  if (rec && rec.milk > 0) {
-    an.dailyMilk = rec.milk;
-    an.lastMilkKg = rec.milk;
-    if (rec.date) an._latestMilkDate = rec.date.toISOString();
-  }
-}
 
+    for (const an of stillZero) {
+      const key = String(an.id ?? an.animalId ?? an.animalID ?? an.number ?? an.animalNumber ?? '');
+      const rec = bestPerAnimal.get(key);
+      if (rec && rec.milk > 0) {
+        an.dailyMilk = rec.milk;
+        an.lastMilkKg = rec.milk;
+        if (rec.date) an._latestMilkDate = rec.date.toISOString();
+      }
+    }
   }catch(e){ console.warn('events top-level read err', e); }
 }
 
-const isBuffalo = an =>
-  ((an?.kind||'').toLowerCase().includes('buff') || (an?.kind||'').includes('جاموس'));
+function speciesOf(an){
+  const txt = [
+    an?.animaltype, an?.animalType, an?.animalTypeAr,
+    an?.kind, an?.type, an?.breed
+  ].map(v => String(v || '').toLowerCase()).join(' ');
+  if (txt.includes('buff') || txt.includes('جاموس')) return 'buffalo';
+  return 'cow';
+}
+const isBuffalo = an => speciesOf(an) === 'buffalo';
 
-const isPregnant = an => {
-  const joined = [an?.reproductiveStatus, an?.pregStatus, an?.['الحالة_التناسلية']]
-    .map(normTxt).join(' ');
+function reproText(an){
+  return [
+    an?.reproductiveStatus, an?.pregStatus, an?.statusRepro, an?.lastDiagnosis,
+    an?.['الحالة_التناسلية'], an?.['الحالة التناسلية']
+  ].map(normTxt).join(' ');
+}
+function isPregnant(an){
+  const joined = reproText(an);
   return an?.pregnant === true || joined.includes('عشار') || joined.includes('preg');
-};
-
+}
+function isBreedingStatus(an){
+  const joined = reproText(an);
+  return joined.includes('ملقح') || joined.includes('تحت التلقيح') || joined.includes('breeding') || joined.includes('insemin');
+}
+function hasCalvedBefore(an){
+  return Number(an?.lactationNumber || 0) > 0 || !!toDate(an?.lastCalvingDate) || getDIM(an) > 0;
+}
 function isDry(an){
   const joined = [
     an?.lactationStatus,
@@ -728,7 +738,6 @@ function isDry(an){
     an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
   ].map(normTxt).join(' ');
 
-  // لو في لبن مُسجّل مؤخرًا (آخر 3 أيام) ⇒ مش جاف
   const milkToday = getMilkKg(an);
   const latest = an._latestMilkDate ? new Date(an._latestMilkDate) : null;
   const recentMilk = milkToday > 0 && (!latest || (Date.now() - +latest) < 3*86400000);
@@ -741,22 +750,89 @@ function isDry(an){
     joined.includes('dry')
   );
 }
-
 const hasDisease = an =>
   an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
 
+function getGestationLengthDays(sp){ return sp === 'buffalo' ? 300 : 270; }
+function getCloseUpDays(sp){ return Number(sp === 'buffalo' ? state.thresholds.bufCloseUpDays : state.thresholds.cowCloseUpDays) || (sp === 'buffalo' ? 30 : 21); }
+function getECD(an, sp){
+  return toDate(an?.expectedCalvingDate) ||
+         toDate(an?.expectedDateOfCalving) ||
+         toDate(an?.ecd) ||
+         (() => {
+           const ins = toDate(an?.lastInseminationDate) || toDate(an?.lastServiceDate) || toDate(an?.conceptionDate);
+           if (!ins) return null;
+           const d = new Date(ins);
+           d.setDate(d.getDate() + getGestationLengthDays(sp));
+           return d;
+         })();
+}
+function isCloseUp(an, sp){
+  if(!isPregnant(an)) return false;
+  const ecd = getECD(an, sp);
+  if(!ecd) return false;
+  const diff = Math.ceil((ecd - new Date()) / 86400000);
+  return diff >= 0 && diff <= getCloseUpDays(sp);
+}
+
 const FRESH_FROM = 1, FRESH_TO = 45;
-const isFresh = an => {
+function isFresh(an){
   const d = getDIM(an);
-  return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && (Number(an?.lactationNumber||0)>0);
-};
+  return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && hasCalvedBefore(an);
+}
 function milkBand(an, milk){
   const t = state.thresholds;
   if(isBuffalo(an)){
-    if(milk>=t.bufHigh) return 'high'; if(milk>=t.bufMed) return 'med'; return 'low';
+    if(milk>=t.bufHigh) return 'high';
+    if(milk>=t.bufMed) return 'med';
+    return 'low';
   } else {
-    if(milk>=t.cowHigh) return 'high'; if(milk>=t.cowMed) return 'med'; return 'low';
+    if(milk>=t.cowHigh) return 'high';
+    if(milk>=t.cowMed) return 'med';
+    return 'low';
   }
+}
+
+function ageCfg(sp){
+  if (sp === 'buffalo') {
+    return {
+      sucklingMax: Number(state.thresholds.bufSucklingMax || 3),
+      weanedMax:   Number(state.thresholds.bufWeanedMax || 6),
+      growingMax:  Number(state.thresholds.bufGrowingMax || 15),
+      heiferMin:   Number(state.thresholds.bufHeiferMin || 16),
+      heiferMax:   Number(state.thresholds.bufHeiferMax || 20)
+    };
+  }
+  return {
+    sucklingMax: Number(state.thresholds.cowSucklingMax || 2),
+    weanedMax:   Number(state.thresholds.cowWeanedMax || 5),
+    growingMax:  Number(state.thresholds.cowGrowingMax || 12),
+    heiferMin:   Number(state.thresholds.cowHeiferMin || 13),
+    heiferMax:   Number(state.thresholds.cowHeiferMax || 15)
+  };
+}
+function isLactatingAdult(an){
+  return !isDry(an) && (getMilkKg(an) > 0 || getDIM(an) > 0 || hasCalvedBefore(an));
+}
+function isSucklingGroup(an, sp){
+  const m = getAgeMonths(an), c = ageCfg(sp);
+  return !hasCalvedBefore(an) && m >= 0 && m <= c.sucklingMax;
+}
+function isWeanedGroup(an, sp){
+  const m = getAgeMonths(an), c = ageCfg(sp);
+  return !hasCalvedBefore(an) && m > c.sucklingMax && m <= c.weanedMax;
+}
+function isGrowingGroup(an, sp){
+  const m = getAgeMonths(an), c = ageCfg(sp);
+  return !hasCalvedBefore(an) && m > c.weanedMax && m <= c.growingMax;
+}
+function isHeiferAge(an, sp){
+  const m = getAgeMonths(an), c = ageCfg(sp);
+  return !hasCalvedBefore(an) && m >= c.heiferMin && m <= c.heiferMax;
+}
+function isMatureOpenNonLactating(an, sp){
+  const m = getAgeMonths(an), c = ageCfg(sp);
+  return !hasCalvedBefore(an) && !isPregnant(an) && !isBreedingStatus(an) && m > c.heiferMax;
 }
 
 /* ============= تنسيق بيانات الحيوان ============= */
@@ -765,9 +841,12 @@ function normalize(an){
   if(!n.number && n.animalNumber) n.number=n.animalNumber;
   if(!n.animalNumber && n.number) n.animalNumber=n.number;
   if(n.kind){
-    const k=n.kind.toLowerCase();
+    const k=String(n.kind).toLowerCase();
     if(k.includes('buff')) n.kind='جاموس';
     if(k.includes('cow'))  n.kind='أبقار';
+  }
+  if(!n.animaltype){
+    n.animaltype = speciesOf(n);
   }
   return n;
 }
@@ -775,7 +854,12 @@ function normalize(an){
 /* ============= بطاقات ============= */
 function card(an){
   const milk=getMilkKg(an), dim=getDIM(an), ageM=getAgeMonths(an), band=milkBand(an, milk);
-  const tags=[]; tags.push(isBuffalo(an)?'جاموس':'أبقار'); if(isPregnant(an)) tags.push('عشار'); if(isDry(an)) tags.push('جاف'); if(an?.bcs) tags.push('BCS '+an.bcs); if(an?.type) tags.push(an.type);
+  const tags=[];
+  tags.push(isBuffalo(an)?'جاموس':'أبقار');
+  if(isPregnant(an)) tags.push('عشار');
+  if(isDry(an)) tags.push('جاف');
+  if(an?.bcs) tags.push('BCS '+an.bcs);
+  if(an?.type) tags.push(an.type);
   const id=(an?.animalNumber||an?.number||an?.id||'').toString();
   const el=document.createElement('div'); el.className='card';
   el.innerHTML=`<h3>حيوان رقم ${id} <span class="pill">${band}</span></h3>
@@ -792,85 +876,199 @@ function card(an){
   return el;
 }
 
-/* ============= تقسيم المجموعات ============= */
+/* ============= واجهة الإعدادات الديناميكية ============= */
+function ensureSettingsUI(){
+  if ($('#cowSucklingMax')) return;
+
+  const cowRow = document.createElement('div');
+  cowRow.className = 'row';
+  cowRow.id = 'cowExtraThresholds';
+  cowRow.style.marginTop = '8px';
+  cowRow.innerHTML = `
+    <label>رضيع أبقار حتى <input type="number" id="cowSucklingMax" min="0" step="1"> شهر</label>
+    <label>فطام أبقار حتى <input type="number" id="cowWeanedMax" min="0" step="1"> شهر</label>
+    <label>نامي أبقار حتى <input type="number" id="cowGrowingMax" min="0" step="1"> شهر</label>
+    <label>بداية العجلات أبقار <input type="number" id="cowHeiferMin" min="0" step="1"> شهر</label>
+    <label>نهاية العجلات أبقار <input type="number" id="cowHeiferMax" min="0" step="1"> شهر</label>
+    <label>انتظار الولادة أبقار <input type="number" id="cowCloseUpDays" min="0" step="1"> يوم</label>
+  `;
+
+  const bufRow = document.createElement('div');
+  bufRow.className = 'row';
+  bufRow.id = 'buffExtraThresholds';
+  bufRow.style.display = 'none';
+  bufRow.style.marginTop = '8px';
+  bufRow.innerHTML = `
+    <label>رضيع جاموس حتى <input type="number" id="bufSucklingMax" min="0" step="1"> شهر</label>
+    <label>فطام جاموس حتى <input type="number" id="bufWeanedMax" min="0" step="1"> شهر</label>
+    <label>نامي جاموس حتى <input type="number" id="bufGrowingMax" min="0" step="1"> شهر</label>
+    <label>بداية العجلات جاموس <input type="number" id="bufHeiferMin" min="0" step="1"> شهر</label>
+    <label>نهاية العجلات جاموس <input type="number" id="bufHeiferMax" min="0" step="1"> شهر</label>
+    <label>انتظار الولادة جاموس <input type="number" id="bufCloseUpDays" min="0" step="1"> يوم</label>
+  `;
+
+  const saveRow = $('#saveSettings')?.closest('.row');
+  if (saveRow) {
+    saveRow.parentNode.insertBefore(cowRow, saveRow);
+    saveRow.parentNode.insertBefore(bufRow, saveRow);
+  } else {
+    $('#settings')?.appendChild(cowRow);
+    $('#settings')?.appendChild(bufRow);
+  }
+
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.style.marginTop = '6px';
+  hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. الحلاب بالإنتاج، الصغار بالعمر، والعجلات بالعمر + الحالة التناسلية.';
+  $('#settings')?.appendChild(hint);
+}
+
+function syncSettingsUIFromState(){
+  const sp = state.thresholds.species === 'buffalo' ? 'buffalo' : 'cow';
+  $$('input[name="species"]').forEach(r=> r.checked = (r.value===sp));
+  $('#cowThresholds').style.display = sp==='cow'? 'flex':'none';
+  $('#buffThresholds').style.display = sp==='buffalo'? 'flex':'none';
+  if ($('#cowExtraThresholds')) $('#cowExtraThresholds').style.display = sp==='cow' ? 'flex' : 'none';
+  if ($('#buffExtraThresholds')) $('#buffExtraThresholds').style.display = sp==='buffalo' ? 'flex' : 'none';
+
+  if($('#cowHigh')) $('#cowHigh').value=state.thresholds.cowHigh;
+  if($('#cowMed'))  $('#cowMed').value=state.thresholds.cowMed;
+  if($('#cowLow'))  $('#cowLow').value=state.thresholds.cowLow;
+  if($('#bufHigh')) $('#bufHigh').value=state.thresholds.bufHigh;
+  if($('#bufMed'))  $('#bufMed').value=state.thresholds.bufMed;
+  if($('#bufLow'))  $('#bufLow').value=state.thresholds.bufLow;
+
+  const ids = [
+    'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
+    'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
+  ];
+  ids.forEach(id => { if($('#'+id)) $('#'+id).value = state.thresholds[id]; });
+}
+
+function readSettingsFromUI(){
+  state.thresholds.species = ($('input[name="species"]:checked')?.value || 'cow');
+  state.thresholds.cowHigh = Number($('#cowHigh')?.value || 30);
+  state.thresholds.cowMed  = Number($('#cowMed')?.value || 15);
+  state.thresholds.cowLow  = Number($('#cowLow')?.value || 0);
+  state.thresholds.bufHigh = Number($('#bufHigh')?.value || 12);
+  state.thresholds.bufMed  = Number($('#bufMed')?.value || 7);
+  state.thresholds.bufLow  = Number($('#bufLow')?.value || 0);
+
+  [
+    'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
+    'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
+  ].forEach(id => {
+    state.thresholds[id] = Number($('#'+id)?.value || state.thresholds[id] || 0);
+  });
+}
+
+/* ============= المجموعات الديناميكية ============= */
+function ensureDynamicGroupsUI(){
+  LEGACY_SECTION_IDS.forEach(id => document.getElementById(id)?.remove());
+  let host = document.getElementById('dynamicGroupsHost');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'dynamicGroupsHost';
+    $('#settings')?.insertAdjacentElement('afterend', host);
+  }
+  host.innerHTML = GROUP_DEFS.map(def => `
+    <section class="group-sec" id="sec-${def.id}">
+      <div class="group-head" data-id="${def.id}">
+        <span class="name">${def.label}</span>
+        <span class="count" id="c-${def.id}">0</span>
+      </div>
+      <div class="list" id="list-${def.id}"></div>
+    </section>
+  `).join('');
+}
+
 function filterByQuery(list){
   const q=$('#q').value.trim().toLowerCase();
   if(!q) return list;
-  return list.filter(an=>(`${an?.animalNumber||''} ${an?.number||''} ${an?.name||''} ${an?.kind||''} ${an?.type||''}`).toLowerCase().includes(q));
+  return list.filter(an=>(`${an?.animalNumber||''} ${an?.number||''} ${an?.name||''} ${an?.kind||''} ${an?.type||''} ${an?.breed||''}`).toLowerCase().includes(q));
 }
+
 function splitGroups(applyQuery = true){
   const A = applyQuery ? filterByQuery(state.animals) : [...state.animals];
-
-  const fresh=[], high=[], med=[], low=[], dry=[],
-        suckling=[], weaned=[], growing=[], breeding=[],
-        pregHeifers=[], hospital=[];
+  const g = Object.fromEntries(GROUP_DEFS.map(def => [def.id, []]));
 
   for(const an of A){
-    const milk = getMilkKg(an);
-    const band = milkBand(an, milk);
-
-    if(isFresh(an)) fresh.push(an);
-
-    if(isDry(an)) {
-      dry.push(an);
-    } else {
-      if(band === 'high') high.push(an);
-      else if(band === 'med') med.push(an);
-      else low.push(an);
-    }
-
+    const sp = speciesOf(an);
+    const pref = sp === 'buffalo' ? 'buffalo_' : 'cow_';
     const m = getAgeMonths(an);
-    const lactNo = Number(an?.lactationNumber || 0);
+    const milk = getMilkKg(an);
+    const c = ageCfg(sp);
 
-    if(an?.weaned === false || an?.weaningDate == null){
-      if(m < 12) suckling.push(an);
+    g[pref+'all'].push(an);
+    if(hasDisease(an)) g[pref+'hospital'].push(an);
+
+    if (isLactatingAdult(an)) {
+      if (isFresh(an)) g[pref+'fresh'].push(an);
+      const band = milkBand(an, milk);
+      if (band === 'high') g[pref+'high'].push(an);
+      else if (band === 'med') g[pref+'med'].push(an);
+      else g[pref+'low'].push(an);
+      continue;
     }
 
-    if(an?.weaned === true){
-      if(m < 5) weaned.push(an);
+    if (isPregnant(an)) {
+      if (hasCalvedBefore(an)) {
+        if (isCloseUp(an, sp)) g[pref+'closeup'].push(an);
+        else g[pref+'dry'].push(an);
+      } else {
+        if (isCloseUp(an, sp)) g[pref+'heiferCloseup'].push(an);
+        else g[pref+'pregHeifers'].push(an);
+      }
+      continue;
     }
 
-    if(isBuffalo(an)){
-      if(m >= 5 && m < 21) growing.push(an);
-    } else {
-      if(m >= 5 && m < 12) growing.push(an);
+    if (isSucklingGroup(an, sp)) { g[pref+'suckling'].push(an); continue; }
+    if (isWeanedGroup(an, sp))   { g[pref+'weaned'].push(an); continue; }
+    if (isGrowingGroup(an, sp))  { g[pref+'growing'].push(an); continue; }
+
+    if (isHeiferAge(an, sp)) {
+      if (isBreedingStatus(an)) g[pref+'breeding'].push(an);
+      else g[pref+'heiferOpen'].push(an);
+      continue;
     }
 
-    if(lactNo === 0){
-      if(isPregnant(an)) pregHeifers.push(an);
-      else if(m >= 12) breeding.push(an);
+    if (isMatureOpenNonLactating(an, sp)) {
+      g[pref+'heiferOpen'].push(an);
+      continue;
     }
 
-    if(hasDisease(an)) hospital.push(an);
+    if (isDry(an) && hasCalvedBefore(an)) {
+      g[pref+'dry'].push(an);
+    }
   }
 
-  return {
-    all: A,
-    fresh,
-    high,
-    med,
-    low,
-    dry,
-    suckling,
-    weaned,
-    growing,
-    breeding,
-    pregHeifers,
-    hospital
-  };
+  return g;
 }
+
 /* ============= عدادات + عرض ============= */
 function updateCounters(){
   const g = splitGroups();
-  $('#c-all').textContent = g.all.length;
-  $('#c-fresh').textContent=g.fresh.length; $('#c-high').textContent=g.high.length; $('#c-med').textContent=g.med.length; $('#c-low').textContent=g.low.length; $('#c-dry').textContent=g.dry.length;
-  $('#c-suckling').textContent=g.suckling.length; $('#c-weaned').textContent=g.weaned.length; $('#c-growing').textContent=g.growing.length; $('#c-breeding').textContent=g.breeding.length; $('#c-pregHeifers').textContent=g.pregHeifers.length; $('#c-hospital').textContent=g.hospital.length;
+  GROUP_DEFS.forEach(def => {
+    const el = $('#c-'+def.id);
+    if (el) el.textContent = (g[def.id] || []).length;
+  });
 }
 function renderSelected(id){
   const g = splitGroups();
-  const map=g[id]||[]; const list=$('#list-'+id); list.innerHTML='';
-  if(!map.length){ list.innerHTML = `<div class="empty">لا عناصر في هذه المجموعة الآن</div>`; }
-  else { const grid=document.createElement('div'); grid.className='grid'; map.forEach(an=>grid.appendChild(card(an))); list.appendChild(grid); }
+  const map = g[id] || [];
+  const list = $('#list-'+id);
+  if (!list) return;
+  list.innerHTML='';
+
+  if(!map.length){
+    list.innerHTML = `<div class="empty">لا عناصر في هذه المجموعة الآن</div>`;
+  } else {
+    const grid=document.createElement('div');
+    grid.className='grid';
+    map.forEach(an=>grid.appendChild(card(an)));
+    list.appendChild(grid);
+  }
+
   $$('.group-sec').forEach(s=>s.classList.remove('show'));
   const sec = document.getElementById('sec-'+id);
   if(sec) sec.classList.add('show');
@@ -878,26 +1076,21 @@ function renderSelected(id){
   list.classList.add('show');
 }
 function buildChips(){
-  const defs = [
-    ['all','الكل'],
-    ['fresh','حديث الولادة'], ['high','عالي الإدرار'], ['med','متوسط'],
-    ['low','منخفض'], ['dry','جاف'], ['suckling','رضيع'], ['weaned','فطام'],
-    ['growing','نامي'], ['breeding','تحت التلقيح'], ['pregHeifers','عجلات عشار'],
-    ['hospital','مستشفى']
-  ];
-  const host=$('#quickChips'); host.innerHTML='';
-  defs.forEach(([id,label])=>{
+  const host=$('#quickChips');
+  if (!host) return;
+  host.innerHTML='';
+  GROUP_DEFS.forEach(def=>{
     const b=document.createElement('button');
     b.type='button';
     b.className='chip';
-    b.textContent=label;
-    b.dataset.id=id;
+    b.textContent=def.label;
+    b.dataset.id=def.id;
     b.onclick=()=>{
-      state.currentGroup=id;
+      state.currentGroup=def.id;
       $$('#quickChips .chip').forEach(x=>x.classList.toggle('active', x===b));
-      renderSelected(id);
+      renderSelected(def.id);
       const counts = splitGroups();
-      window.dataLayer.push({event:'group_select', group:id, count:(counts[id]||[]).length});
+      window.dataLayer.push({event:'group_select', group:def.id, count:(counts[def.id]||[]).length});
     };
     host.appendChild(b);
   });
@@ -914,7 +1107,16 @@ function bindGroupHeaders(){
     });
   });
 }
-function buildGroupDoc(groupKey, list){
+
+/* ============= Firestore snapshot ============= */
+function groupDocId(groupId){
+  return `${state.userId}_${groupId}`;
+}
+function groupMemberDocId(groupId, animalNumber){
+  return `${state.userId}_${groupId}_${String(animalNumber).trim()}`;
+}
+function buildGroupDoc(groupId, list){
+  const def = GROUP_DEF_BY_ID[groupId];
   const count = list.length || 0;
   const milkVals = list.map(getMilkKg).filter(v => Number.isFinite(v));
   const dimVals  = list.map(getDIM).filter(v => Number.isFinite(v));
@@ -929,8 +1131,11 @@ function buildGroupDoc(groupKey, list){
 
   return {
     userId: state.userId,
-    groupKey,
-    groupName: GROUP_LABELS[groupKey] || groupKey,
+    groupId,
+    species: def?.species || 'cow',
+    groupKey: def?.baseKey || groupId,
+    groupName: def?.label || groupId,
+    feedingEligible: !!def?.feedingEligible,
     animalsCount: count,
     animalNumbers: list
       .map(an => String(an?.animalNumber || an?.number || an?.id || '').trim())
@@ -942,81 +1147,60 @@ function buildGroupDoc(groupKey, list){
     updatedAt: serverTimestamp()
   };
 }
-
+function buildGroupMemberDoc(groupId, an){
+  const def = GROUP_DEF_BY_ID[groupId];
+  const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
+  return {
+    userId: state.userId,
+    groupId,
+    species: def?.species || speciesOf(an),
+    groupKey: def?.baseKey || groupId,
+    groupName: def?.label || groupId,
+    groupDocId: groupDocId(groupId),
+    animalId: String(an?.id ?? an?.animalId ?? animalNumber),
+    animalNumber,
+    animalType: an?.animaltype || an?.kind || an?.type || '',
+    animalTypeAr: an?.animalTypeAr || '',
+    breed: an?.breed || '',
+    milkKg: getMilkKg(an),
+    daysInMilk: getDIM(an),
+    reproductiveStatus: an?.reproductiveStatus || '',
+    status: an?.status || '',
+    updatedAt: serverTimestamp()
+  };
+}
 async function syncGroupsToFirestore(){
   try{
     if(!db || !state.userId) return;
-
-    const groups = splitGroups(false); // مهم: بدون فلتر البحث
+    const groups = splitGroups(false);
     const batch = writeBatch(db);
-
-    Object.entries(groups).forEach(([groupKey, list])=>{
-      const ref = doc(db, 'groups', `${state.userId}_${groupKey}`);
-      batch.set(ref, buildGroupDoc(groupKey, list), { merge: true });
+    GROUP_DEFS.forEach(def=>{
+      const ref = doc(db, 'groups', groupDocId(def.id));
+      batch.set(ref, buildGroupDoc(def.id, groups[def.id] || []), { merge: true });
     });
-
     await batch.commit();
-    console.log('Groups synced to Firestore successfully');
+    console.log('groups synced');
   }catch(e){
     console.error('syncGroupsToFirestore error:', e);
   }
 }
-  function groupDocId(groupKey){
-  return `${state.userId}_${groupKey}`;
-}
-
-function groupMemberDocId(groupKey, animalNumber){
-  return `${state.userId}_${groupKey}_${String(animalNumber).trim()}`;
-}
-
-function buildGroupMemberDoc(groupKey, an){
-  const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
-
-  return {
-    userId: state.userId,
-    groupKey,
-    groupName: GROUP_LABELS[groupKey] || groupKey,
-    groupDocId: groupDocId(groupKey),
-
-    animalId: String(an?.id ?? an?.animalId ?? animalNumber),
-    animalNumber,
-
-    animalType: an?.animaltype || an?.kind || an?.type || '',
-    animalTypeAr: an?.animalTypeAr || '',
-    breed: an?.breed || '',
-
-    milkKg: getMilkKg(an),
-    daysInMilk: getDIM(an),
-
-    reproductiveStatus: an?.reproductiveStatus || '',
-    status: an?.status || '',
-
-    updatedAt: serverTimestamp()
-  };
-}
-
 async function syncGroupMembersToFirestore(){
   try{
     if (!db || !state.userId) return;
-
     const groups = splitGroups(false);
-
     const desiredIds = new Set();
     const upsertBatch = writeBatch(db);
 
-    Object.entries(groups).forEach(([groupKey, list]) => {
-      list.forEach(an => {
+    GROUP_DEFS.forEach(def => {
+      (groups[def.id] || []).forEach(an => {
         const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
         if (!animalNumber) return;
-
-        const memberId = groupMemberDocId(groupKey, animalNumber);
+        const memberId = groupMemberDocId(def.id, animalNumber);
         desiredIds.add(memberId);
-
         const ref = doc(db, 'groups_members', memberId);
-        upsertBatch.set(ref, buildGroupMemberDoc(groupKey, an), { merge: true });
+        upsertBatch.set(ref, buildGroupMemberDoc(def.id, an), { merge: true });
       });
     });
-
     await upsertBatch.commit();
 
     const oldSnap = await getDocs(
@@ -1027,31 +1211,29 @@ async function syncGroupMembersToFirestore(){
       let deleteBatch = writeBatch(db);
       let ops = 0;
 
-      oldSnap.forEach(ds => {
+      for (const ds of oldSnap.docs) {
         if (!desiredIds.has(ds.id)) {
           deleteBatch.delete(ds.ref);
           ops++;
           if (ops === 400) {
-            deleteBatch.commit();
+            await deleteBatch.commit();
             deleteBatch = writeBatch(db);
             ops = 0;
           }
         }
-      });
-
+      }
       if (ops > 0) await deleteBatch.commit();
     }
-
     console.log('groups_members synced');
   }catch(e){
     console.error('syncGroupMembersToFirestore error:', e);
   }
 }
-
 async function syncAllGroupsData(){
   await syncGroupsToFirestore();
   await syncGroupMembersToFirestore();
 }
+
 /* ============= تحميل الحيوانات ============= */
 async function loadAnimalsFromFirestore(){
   try{
@@ -1083,43 +1265,39 @@ async function loadAnimals(){
     }
   }
 
-  // ← مهم: نثري من الأحداث دائمًا (subcollection ثم top-level)
   try{ await enrichMilkFromEvents(state.animals); }catch(_){}
 
-localStorage.setItem('animals_cache', JSON.stringify(state.animals));
-updateCounters();
-await syncAllGroupsData();
-if (state.currentGroup) renderSelected(state.currentGroup);
+  localStorage.setItem('animals_cache', JSON.stringify(state.animals));
+  updateCounters();
+  await syncAllGroupsData();
+  if (state.currentGroup) renderSelected(state.currentGroup);
 }
 
 /* ============= ربط الواجهة ============= */
 $$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
   state.thresholds.species = r.value;
-  $('#cowThresholds').style.display = r.value === 'cow' ? 'flex' : 'none';
-  $('#buffThresholds').style.display = r.value === 'buffalo' ? 'flex' : 'none';
-
+  syncSettingsUIFromState();
   saveThresholdsLocal();
   saveThresholdsToFirestore().catch(()=>{});
-
   updateCounters();
   await syncAllGroupsData();
-
   window.dataLayer.push({ event:'species_switch', species:r.value });
 }));
+
 $('#saveSettings').addEventListener('click', async ()=>{
-  state.thresholds.cowHigh=Number($('#cowHigh').value||30);
-  state.thresholds.cowMed =Number($('#cowMed').value||15);
-  state.thresholds.cowLow =Number($('#cowLow').value||0);
-  state.thresholds.bufHigh=Number($('#bufHigh').value||12);
-  state.thresholds.bufMed =Number($('#bufMed').value||7);
-  state.thresholds.bufLow =Number($('#bufLow').value||0);
+  readSettingsFromUI();
   saveThresholdsLocal();
   try{ await saveThresholdsToFirestore(); }catch{}
   updateCounters();
-  await syncGroupsToFirestore();
+  await syncAllGroupsData();
+  if (state.currentGroup) renderSelected(state.currentGroup);
   window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
 });
-$('#q').addEventListener('input', updateCounters);
+
+$('#q').addEventListener('input', ()=>{
+  updateCounters();
+  if (state.currentGroup) renderSelected(state.currentGroup);
+});
 $('#refreshBtn').addEventListener('click', loadAnimals);
 
 /* ============= تشخيص للأخطاء العامة ============= */
@@ -1131,27 +1309,22 @@ window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({event:'page_view', page:'/groups.html'});
 
 (async function start(){
-  await waitForUserId();            // انتظر الهوية
-  try{ await loadThresholdsFromFirestore(); }catch{}
-  // مزامنة UI
-  const sp = state.thresholds.species==='buffalo' ? 'buffalo' : 'cow';
-  $$('input[name="species"]').forEach(r=> r.checked = (r.value===sp));
-  $('#cowThresholds').style.display = sp==='cow'? 'flex':'none';
-  $('#buffThresholds').style.display = sp==='buffalo'? 'flex':'none';
-  $('#cowHigh').value=state.thresholds.cowHigh; $('#cowMed').value=state.thresholds.cowMed; $('#cowLow').value=state.thresholds.cowLow;
-  $('#bufHigh').value=state.thresholds.bufHigh; $('#bufMed').value=state.thresholds.bufMed; $('#bufLow').value=state.thresholds.bufLow;
+  ensureSettingsUI();
+  ensureDynamicGroupsUI();
 
-  buildChips(); bindGroupHeaders(); // اربط الأزرار دايمًا حتى لو Firestore وقع
+  await waitForUserId();
+  try{ await loadThresholdsFromFirestore(); }catch{}
+  syncSettingsUIFromState();
+
+  buildChips();
+  bindGroupHeaders();
   await loadAnimals();
 
-  // افتح "الكل" تلقائيًا
-  state.currentGroup = 'all';
-  renderSelected('all');
+  state.currentGroup = 'cow_all';
+  renderSelected('cow_all');
   const firstChip = $('#quickChips .chip');
-  
   if(firstChip) firstChip.classList.add('active');
-})();
-</script>
+})();</script>
 
 </body>
 </html>
