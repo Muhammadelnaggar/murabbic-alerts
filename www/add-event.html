@@ -210,14 +210,20 @@
   <script src="/js/tenant-bootstrap.js"></script>
   <script type="module" src="/js/api.js"></script>
   <script type="module">
-  import firebaseConfig from '/js/firebase-config.js';
+ import * as firebaseCfg from '/js/firebase-config.js';
   import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
   import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import {
     getFirestore, collection, query, where, getDocs, limit
   } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+ const firebaseConfig =
+  firebaseCfg.default ||
+  firebaseCfg.firebaseConfig ||
+  firebaseCfg.config ||
+  firebaseCfg;
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app, "murabbikdata");
 
@@ -526,6 +532,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
