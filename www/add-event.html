@@ -424,10 +424,9 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
         }
 
         const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
-
-        
         const isHeat = /heat\.html/i.test(String(targetPage||''));
-        const isGroupAllowed = isOvsynch || isHeat;
+       const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
+       const isGroupAllowed = isOvsynch || isHeat || isNutrition;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
@@ -544,6 +543,7 @@ if ((isOvsynch || isHeat) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
