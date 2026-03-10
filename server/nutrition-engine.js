@@ -38,24 +38,7 @@ if (category === 'heifer') {
     });
   }
 
-  return computeCowHeifer({
-    bodyWeight,
-    pregDays,
-    closeUp,
-    breed
-  });
-}
-
-if (category === 'heifer') {
-  if (species === 'جاموس') {
-    return computeBuffaloHeifer({
-      bodyWeight,
-      pregDays,
-      closeUp
-    });
-  }
-
-  return computeCowHeiferNASEM({
+ return computeCowHeiferNASEM({
     bodyWeight,
     pregDays,
     closeUp,
