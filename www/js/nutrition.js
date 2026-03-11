@@ -226,10 +226,7 @@ if (cpCard?.target != null) {
   setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
   setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
 
-  setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
-  setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
-  setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
-  setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+ setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
   const fcEl = document.getElementById('fcRatio');
 if (fcEl) {
   const rumenCard = panelByKey(P.analysisCards, 'rumen');
