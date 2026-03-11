@@ -701,6 +701,19 @@ async function initNutritionUI(){
   const presetSel = document.getElementById('preset');
   const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
+  const advancedBtn = document.getElementById('toggleAdvancedBtn');
+  const advancedBox = document.getElementById('advancedKPIs');
+
+  function bindAdvancedToggle(){
+    if (!advancedBtn || !advancedBox || advancedBtn.dataset.bound === '1') return;
+    advancedBtn.dataset.bound = '1';
+    advancedBtn.addEventListener('click', ()=>{
+      const open = (advancedBox.style.display === 'grid');
+      advancedBox.style.display = open ? 'none' : 'grid';
+      advancedBtn.textContent = open ? 'عرض متقدم' : 'إخفاء العرض المتقدم';
+      try { if (typeof render === 'function') render(); } catch(_){ }
+    });
+  }
 
   // ✅ Helpers (لا تعتمد على jQuery)
   const $ = (id) => document.getElementById(id);
@@ -714,15 +727,6 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
     // ✅ مدخل السعر في نموذج الخامات = سعر/كجم (as-fed)
     // لو المستخدم كتب رقم كبير (غالبًا سعر/طن) هنحوّله تلقائيًا إلى سعر/كجم
     return (n > 200) ? (n / 1000) : n;
-  }
-
-  function readContext(){
-    const species = (document.getElementById('ctxSpecies')?.value)||'';
-    const avgMilkKg = parseFloat(document.getElementById('ctxAvgMilk')?.value)||0;
-    const pregnancyDays = parseFloat(document.getElementById('ctxDCC')?.value)||0;
-    const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
-    const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
-    return { species, avgMilkKg, pregnancyDays, closeUp, earlyDry };
   }
 
 
@@ -859,12 +863,12 @@ let rationItems = window.rationItems;
   document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
-  // تعبئة سياق من الرابط
-  ctxDIM.value      = qp.get('dim') || '';
-  ctxSpecies.value  = qp.get('species') || '';
-  ctxAvgMilk.value  = qp.get('avgMilk') || '';
-  ctxDCC.value      = qp.get('dcc') || '';
-  ctxPreg.value     = qp.get('preg') || qp.get('pregnancy') || '';
+  // تعبئة سياق من الرابط كـ fallback فقط (لا تمسح سياق المجموعة بعد تحميله)
+  if (ctxDIM && !ctxDIM.value) ctxDIM.value = qp.get('dim') || '';
+  if (ctxSpecies && !ctxSpecies.value) ctxSpecies.value = qp.get('species') || '';
+  if (ctxAvgMilk && !ctxAvgMilk.value) ctxAvgMilk.value = qp.get('avgMilk') || '';
+  if (ctxDCC && !ctxDCC.value) ctxDCC.value = qp.get('dcc') || '';
+  if (ctxPreg && !ctxPreg.value) ctxPreg.value = qp.get('preg') || qp.get('pregnancy') || '';
   // ===== تحميل نوع الحيوان تلقائياً من animals =====
 async function loadSpeciesFromAnimals(){
   try{
