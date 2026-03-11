@@ -1856,7 +1856,7 @@ window.render = function renderNutritionPanels(){
       </div>
     `).join("");
   }
-};;
+};
   window.renderNutritionPanels = window.render;
 
   window.enhanceNutritionPanels = function enhanceNutritionPanels(){
