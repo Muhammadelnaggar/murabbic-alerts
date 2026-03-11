@@ -226,7 +226,56 @@ if (cpCard?.target != null) {
   setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
   setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
 
- setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
+ {
+  const ecoCostMilk = panelByKey(P.economicsCards, 'costPerKgMilk');
+  if (ecoCostMilk?.value) {
+    const n = parseFloat(String(ecoCostMilk.value).replace(/[^\d.]/g, ''));
+    if (Number.isFinite(n)) setNum('costPerKgMilk', n, '', 2);
+    else setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
+  } else {
+    setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
+  }
+}
+
+{
+  const ecoDmMilk = panelByKey(P.economicsCards, 'dmPerKgMilk');
+  if (ecoDmMilk?.value) {
+    const m = String(ecoDmMilk.value).match(/([\d.]+)/);
+    if (m) {
+      const n = parseFloat(m[1]);
+      if (Number.isFinite(n)) setNum('dmPerKgMilk', n, '', 2);
+      else setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+    } else {
+      setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+    }
+  } else {
+    setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+  }
+}
+
+setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
+
+{
+  const ecoMargin = panelByKey(P.economicsCards, 'milkMargin');
+  if (ecoMargin?.value) {
+    const n = parseFloat(String(ecoMargin.value).replace(/[^\d.\-]/g, ''));
+    if (Number.isFinite(n)) setNum('milkMargin', n, '', 2);
+    else setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+  } else {
+    setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+  }
+}
+
+{
+  const ecoMixAsFed = panelByKey(P.economicsCards, 'mixPriceAsFed');
+  if (ecoMixAsFed?.value) {
+    const n = parseFloat(String(ecoMixAsFed.value).replace(/[^\d.\-]/g, ''));
+    if (Number.isFinite(n)) setNum('mixPriceAsFed', n, '', 2);
+    else setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
+  } else {
+    setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
+  }
+}
   const fcEl = document.getElementById('fcRatio');
 if (fcEl) {
   const rumenCard = panelByKey(P.analysisCards, 'rumen');
