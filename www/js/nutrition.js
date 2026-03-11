@@ -221,7 +221,8 @@ function applyServerAnalysisToDom(analysis, targets){
   const rumenHintEl = document.getElementById('rumenHint');
   if (rumenHintEl) {
     rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
-  } 
+  }
+  try { window.renderNutritionPanels?.(); } catch(_) {}
 }
 function msgWarn(text){
   const w = document.getElementById('warn');
@@ -714,6 +715,9 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
       try { if (typeof render === 'function') render(); } catch(_){ }
     });
   }
+
+  initNutritionPanels();
+  bindAdvancedToggle();
 
   // ✅ Helpers (لا تعتمد على jQuery)
   const $ = (id) => document.getElementById(id);
@@ -1774,6 +1778,230 @@ function readKPIs(){
       totalCostAll: txt('totalCostAll'),
     }
   };
+}
+
+let __nutritionPanelsStarted = false;
+function initNutritionPanels(){
+  if(__nutritionPanelsStarted) return;
+  __nutritionPanelsStarted = true;
+
+  const $ = (id)=>document.getElementById(id);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+  const fmt = (v, suf="")=>{
+    if(v==null) return "—";
+    const s=String(v).trim();
+    if(!s || s==="—") return "—";
+    return s + suf;
+  };
+
+  const numFromText = (t)=>{
+    if(!t) return NaN;
+    const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','٫':'.','،':'.'};
+    t = String(t).trim().replace(/[٠-٩٫،]/g, ch => map[ch] ?? ch);
+    t = t.replace(/[^0-9.\-]/g,'');
+    const v = parseFloat(t);
+    return Number.isFinite(v) ? v : NaN;
+  };
+
+  window.render = function renderNutritionPanels(){
+    const sec = document.getElementById("analysisSection");
+    if(sec) sec.style.display = "block";
+
+    const toNum = (txt)=>{
+      const s=String(txt||"").replace(/[^\d.\-]/g,"");
+      const n=parseFloat(s);
+      return isFinite(n)?n:null;
+    };
+
+    const kpiState = (actual, target, tol)=>{
+      if(actual==null || target==null) return {sym:"—", color:"#64748b"};
+      const a=Number(actual), t=Number(target);
+      if(!isFinite(a) || !isFinite(t)) return {sym:"—", color:"#64748b"};
+      const d = a - t;
+      const band = (tol!=null?Number(tol):0);
+      if(Math.abs(d) <= band) return {sym:"●", color:"#0b7f47"};
+      if(d < -band) return {sym:"▼", color:"#c62828"};
+      return {sym:"▲", color:"#f57c00"};
+    };
+
+    const n = $("nutritionKPIs");
+    if(n){
+      const items = [
+        ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+        ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
+        ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
+        ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
+      ];
+      n.innerHTML = items.map(([k,v])=>{
+        let st = {sym:"—", color:"#64748b"};
+        if(k==="المادة الجافة"){
+          st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
+        }else if(k==="البروتين الخام"){
+          st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
+        }else if(k==="صحة الكرش"){
+          st = {sym:"●", color:"#0b7f47"};
+        }
+        return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
+      }).join("");
+    }
+
+    const e = $("economicKPIs");
+    if(e){
+      const items = [
+        ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+        ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+        ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
+        ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+        ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+      ];
+      e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+    }
+
+    const adv = $("advancedKPIs");
+    if(adv && adv.style.display==="grid"){
+      const items = [
+        ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
+        ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
+        ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
+        ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
+        ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
+        ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
+        ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
+        ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
+        ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
+        ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
+      ];
+      adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+    }
+
+    try { window.enhanceNutritionPanels?.(); } catch(_) {}
+  };
+  window.renderNutritionPanels = window.render;
+
+  window.enhanceNutritionPanels = function enhanceNutritionPanels(){
+    const root = $('#analysisSection') || document;
+    const cards = $$('.kpi', root);
+    if(!cards.length) return;
+
+    const ensureBadge = (card)=>{
+      let b = card.querySelector('.kpi-badge');
+      if(!b){
+        b = document.createElement('span');
+        b.className = 'kpi-badge';
+        b.innerHTML = '<span class="dot"></span><span class="txt">—</span>';
+        const k = card.querySelector('.k');
+        if(k) k.appendChild(b);
+        else card.prepend(b);
+      }
+      let m = card.querySelector('.kpi-meter');
+      if(!m){
+        m = document.createElement('div');
+        m.className = 'kpi-meter';
+        m.innerHTML = '<span></span>';
+        card.appendChild(m);
+      }
+      let h = card.querySelector('.kpi-hint');
+      if(!h){
+        h = document.createElement('div');
+        h.className = 'kpi-hint';
+        h.textContent = '';
+        card.appendChild(h);
+      }
+      return b;
+    };
+
+    const setStatus = (card, status, badgeText, hintText, meterPct)=>{
+      card.classList.remove('ok','warn','bad');
+      if(status) card.classList.add(status);
+      const b = ensureBadge(card);
+      const txt = b.querySelector('.txt');
+      if(txt) txt.textContent = badgeText || '—';
+      const hint = card.querySelector('.kpi-hint');
+      if(hint) hint.textContent = hintText || '';
+      const bar = card.querySelector('.kpi-meter > span');
+      if(bar && Number.isFinite(meterPct)){
+        const p = Math.max(0, Math.min(100, meterPct));
+        bar.style.width = p.toFixed(0) + '%';
+      }
+    };
+
+    const labelOf = (card)=>{
+      const k = card.querySelector('.k');
+      return (k ? k.textContent : card.textContent).trim();
+    };
+    const valueOf = (card)=>{
+      const v = card.querySelector('.v');
+      return numFromText(v ? v.textContent : '');
+    };
+    const findCardByLabelIncludes = (root, includes)=>{
+      const arr = $$('.kpi', root);
+      for(const c of arr){
+        const lab = labelOf(c);
+        if(includes.every(x => lab.includes(x))) return c;
+      }
+      return null;
+    };
+
+    const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
+    const fcRatioEl = document.getElementById("fcRatio");
+    if(fcCard){
+      const serverNote = String(fcRatioEl?.dataset?.rumenNote || "").trim();
+      const txt = String(fcRatioEl?.textContent || "").trim();
+      const m = txt.match(/خشن\s+(\d+(?:\.\d+)?)%\s*\/\s*مركز\s+(\d+(?:\.\d+)?)%/);
+      const roughPct = m ? Number(m[1]) : NaN;
+      const concPct  = m ? Number(m[2]) : NaN;
+      const detail = (Number.isFinite(roughPct) && Number.isFinite(concPct))
+        ? `خشن ${Math.round(roughPct)}% / مركز ${Math.round(concPct)}%`
+        : txt;
+      if (serverNote.includes('خطر الحموضة') || serverNote.includes('100% مركزات')) setStatus(fcCard, 'bad', 'خطر', serverNote || detail, 25);
+      else if (serverNote.includes('الخشن منخفض')) setStatus(fcCard, 'warn', 'تحذير', serverNote || detail, 45);
+      else if (serverNote.includes('الخشن مرتفع')) setStatus(fcCard, 'warn', 'معلومة', serverNote || detail, 70);
+      else setStatus(fcCard, 'ok', 'ممتاز', serverNote || detail || 'توازن مناسب للكرش', 85);
+    }
+
+    const pairConfigs = [
+      [['العليقة الحالية','مادة جافة'], ['احتياجات','المادة الجافة'], 'كجم', 0.92, 1.05],
+      [['العليقة الحالية','بروتين خام'], ['احتياجات','البروتين الخام'], '%', null, null],
+      [['العليقة الحالية','ألياف NDF'], ['احتياجات','الألياف NDF'], '%', null, null],
+      [['العليقة الحالية','دهن'], ['الحد المستهدف','دهن'], '%', null, null],
+      [['العليقة الحالية','طاقة'], ['احتياجات','الطاقة'], '', 0.95, 1.06],
+    ];
+
+    for(const [actualKeys, targetKeys, unit, lowOk, highOk] of pairConfigs){
+      const aCard = findCardByLabelIncludes(root, actualKeys);
+      const tCard = findCardByLabelIncludes(root, targetKeys);
+      if(!aCard || !tCard) continue;
+      const a = valueOf(aCard), t = valueOf(tCard);
+      if(!Number.isFinite(a) || !Number.isFinite(t) || t===0) continue;
+      const diff = a - t;
+      const ratio = a/(t||1);
+      const meter = 100*Math.min(1.2, Math.max(0, ratio));
+      if(unit==='%' && Math.abs(diff) <= (actualKeys[1].includes('بروتين') ? 0.3 : actualKeys[1].includes('دهن') ? 0.4 : 2.0)) setStatus(aCard,'ok','مناسب', `فرق ${diff.toFixed(1)}${unit}`, meter);
+      else if(unit==='%' && Math.abs(diff) <= (actualKeys[1].includes('بروتين') ? 0.8 : actualKeys[1].includes('دهن') ? 0.8 : 4.0)) setStatus(aCard,'warn', diff<0?'ناقص':'زيادة', `فرق ${diff.toFixed(1)}${unit}`, meter);
+      else if(lowOk!=null && highOk!=null){
+        if(ratio >= lowOk && ratio <= highOk) setStatus(aCard,'ok','مناسب', `فرق ${diff.toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
+        else if(ratio < lowOk) setStatus(aCard,'warn','ناقص', `نقص ${Math.abs(diff).toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
+        else if(ratio <= (highOk + 0.07)) setStatus(aCard,'warn','زيادة', `زيادة ${Math.abs(diff).toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
+        else setStatus(aCard,'bad', ratio<1 ? 'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
+      }else{
+        setStatus(aCard,'bad', diff<0?'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(1)}${unit}`, meter);
+      }
+      setStatus(tCard,'', 'هدف', '', 100);
+    }
+
+    for(const c of cards){
+      if(!c.classList.contains('ok') && !c.classList.contains('warn') && !c.classList.contains('bad')){
+        const b = ensureBadge(c);
+        const txt = b.querySelector('.txt');
+        if(txt && (txt.textContent==='—' || txt.textContent.trim()==='')) txt.textContent = 'معلومة';
+        const hint = c.querySelector('.kpi-hint'); if(hint) hint.textContent = '';
+        const bar = c.querySelector('.kpi-meter > span'); if(bar) bar.style.width = '0%';
+      }
+    }
+  };
+
+  window.render();
 }
 function parseUiNumber(v){
   if(v===null || v===undefined) return null;
