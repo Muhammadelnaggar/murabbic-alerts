@@ -1435,13 +1435,20 @@ async function loadAnimals(){
     query(collection(db,'calves'), where('userId','==',state.userId))
   );
 
-  const animals = animalsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
- const calves  = calvesSnap.docs.map(d => ({
-  id:d.id,
-  ...d.data(),
-  animalNumber: d.data().calfNumber || d.id,
-  isCalf:true
-}));
+ const animals = animalsSnap.docs
+  .map(d => ({ id:d.id, ...d.data() }))
+  .filter(a => (a.status || 'active') === 'active');
+
+const calves  = calvesSnap.docs
+  .map(d => ({
+    id:d.id,
+    ...d.data(),
+    animalNumber: d.data().calfNumber || d.id,
+    isCalf:true
+  }))
+  .filter(a => (a.status || 'active') === 'active');
+
+state.animals = [...animals, ...calves];
 
   state.animals = [...animals, ...calves];
   state.groupsCache = null;
