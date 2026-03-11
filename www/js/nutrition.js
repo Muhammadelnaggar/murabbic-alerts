@@ -146,6 +146,25 @@ function setElText(id, val){
   if(!el) return;
   el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
 }
+function getCentralBar(){
+  return (
+    document.getElementById('sysbar') ||
+    document.querySelector('.infobar') ||
+    document.getElementById('warn') ||
+    null
+  );
+}
+
+function showCentralMsg(text, type = 'info'){
+  const bar = getCentralBar();
+
+  if (bar && typeof window.showMsg === 'function') {
+    window.showMsg(bar, text, type);
+    return;
+  }
+
+  msgWarn(text);
+}
 function applyServerAnalysisToDom(analysis, targets){
   const a = analysis || {};
   const t = targets || {};
@@ -599,7 +618,7 @@ if (mode === 'group' && nums.length){
   // لازم رقم (فردي أو قائمة) من الـURL
   if(!rawNumber){
     disableSave(true);
-    msgWarn('⚠️ افتح صفحة التغذية من داخل مُرَبِّيك (لازم رقم الحيوان/المجموعة في الرابط).');
+  showCentralMsg('⚠️ افتح صفحة التغذية من داخل مُرَبِّيك (لازم رقم الحيوان/المجموعة في الرابط).', 'error');
     return { ok:false, reason:'no_number' };
   }
 
@@ -643,16 +662,16 @@ if (btn) {
   btn.removeAttribute('disabled');
 }
 
-msgWarn('✅ تم تحميل بيانات السياق تلقائيًا.');
+showCentralMsg('✅ تم تحميل بيانات السياق تلقائيًا.', 'success');
 }else if(res?.reason==='no_uid'){
     disableSave(true);
-    msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
+   showCentralMsg('⚠️ يلزم تسجيل الدخول أولاً.', 'error');
   }else if(res?.reason==='not_found'){
     disableSave(true);
-    msgWarn('⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.');
+   showCentralMsg('⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.', 'error');
   }else{
     disableSave(true);
-    msgWarn('⚠️ تعذر تحميل البيانات تلقائيًا.');
+   showCentralMsg('⚠️ تعذر تحميل البيانات تلقائيًا.', 'error');
   }
   return res;
 }
@@ -793,7 +812,7 @@ async function saveEvent(e){
   const animalId = String(rawNumber || '').trim();
 
   if(!animalId && !isGroupMode){
-    msgWarn('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.');
+   showCentralMsg('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.', 'error');
     return;
   }
 
@@ -802,7 +821,7 @@ async function saveEvent(e){
     (document.getElementById('ctxDIM')?.value || '') === '' &&
     (document.getElementById('ctxAvgMilk')?.value || '') === ''
   ){
-    msgWarn('⚠️ تم منع الحفظ: لم يتم تحميل بيانات السياق.');
+   showCentralMsg('⚠️ تم منع الحفظ: لم يتم تحميل بيانات السياق.', 'error');
     return;
   }
 
@@ -814,7 +833,7 @@ async function saveEvent(e){
   }
 
   if (!rows.length) {
-    msgWarn('⚠️ لا يمكن الحفظ بدون خامات في العليقة.');
+   showCentralMsg('⚠️ لا يمكن الحفظ بدون خامات في العليقة.', 'error');
     return;
   }
 
@@ -838,26 +857,13 @@ async function saveEvent(e){
   });
 
   disableSave(true);
-  msgWarn('⏳ جارٍ الحفظ...');
+  showCentralMsg('⏳ جارٍ الحفظ...', 'info');
 
   try{
+    
    await saveToServer(payload);
 
-try{
-  const bar =
-    document.getElementById('sysbar') ||
-    document.querySelector('.infobar') ||
-    document.getElementById('warn');
-
-  if (bar && window.showMsg) {
-    showMsg(bar, '✅ تم حفظ حدث التغذية بنجاح', 'success');
-  } else {
-    msgWarn('✅ تم حفظ حدث التغذية بنجاح');
-  }
-}catch(_){
-  msgWarn('✅ تم حفظ حدث التغذية بنجاح');
-}
-
+showCentralMsg('✅ تم حفظ حدث التغذية بنجاح', 'success');
 window.dispatchEvent(
   new CustomEvent('mbk:success', {
     detail: { message: 'تم حفظ حدث التغذية بنجاح' }
@@ -868,7 +874,7 @@ redirectSmart(900);
   }catch(err){
     console.error(err);
     disableSave(false);
-    msgWarn('❌ فشل الحفظ على السحابة.');
+   showCentralMsg('❌ فشل الحفظ على السحابة.', 'error');
   }
 }
 async function waitForAuthReady(timeoutMs = 5000){
