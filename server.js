@@ -667,12 +667,12 @@ function buildNutritionPanels(analysis = {}, context = {}) {
         : '—'
     },
     {
-      key: 'dmPerKgMilk',
-      title: 'كفاءة تحويل العلف',
-      value: Number.isFinite(Number(economics.dmPerKgMilk))
-        ? `1 كجم مادة جافة → ${num(economics.dmPerKgMilk, 2)} كجم لبن`
-        : '—'
-    },
+  key: 'dmPerKgMilk',
+  title: 'كفاءة تحويل العلف',
+  value: Number.isFinite(Number(economics.dmPerKgMilk)) && Number(economics.dmPerKgMilk) > 0
+    ? `1 كجم مادة جافة → ${num(1 / Number(economics.dmPerKgMilk), 2)} كجم لبن`
+    : '—'
+},
     {
       key: 'mixPriceAsFed',
       title: 'سعر طن العليقة',
