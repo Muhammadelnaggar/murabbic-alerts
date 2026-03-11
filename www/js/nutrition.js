@@ -106,13 +106,17 @@ async function fetchRationAnalysis(rows) {
 })
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || `HTTP ${res.status}`);
-  }
+const data = await res.json().catch(() => ({}));
+if (!res.ok || data?.ok === false) {
+  throw new Error(data?.error || `HTTP ${res.status}`);
+}
 
-  rationAnalysisCache = data.analysis || null;
-  return rationAnalysisCache;
+rationAnalysisCache = data.analysis || null;
+
+window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.panels = data.panels || null;
+
+return rationAnalysisCache;
 }
 
 async function refreshRationAnalysis(rows) {
