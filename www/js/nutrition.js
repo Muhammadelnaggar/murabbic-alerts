@@ -216,12 +216,30 @@ if (cpCard?.target != null) {
 }
 
 
-  setNum('nelActual', a?.nutrition?.nelActual, '', 2);
+ {
+  const advNelActual = panelByKey(P.advancedCards, 'nelActual');
+  if (advNelActual?.value) {
+    const n = parseFloat(String(advNelActual.value).replace(/[^\d.\-]/g, ''));
+    if (Number.isFinite(n)) setNum('nelActual', n, '', 2);
+    else setNum('nelActual', a?.nutrition?.nelActual, '', 2);
+  } else {
+    setNum('nelActual', a?.nutrition?.nelActual, '', 2);
+  }
+}
   setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
   setNum('fatPctActual', a?.nutrition?.fatPctActual, '%', 1);
 
   setNum('dmiTarget', t?.dmi ?? a?.targets?.dmiTarget, '', 2);
-  setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
+  {
+  const advNelTarget = panelByKey(P.advancedCards, 'nelTarget');
+  if (advNelTarget?.value) {
+    const n = parseFloat(String(advNelTarget.value).replace(/[^\d.\-]/g, ''));
+    if (Number.isFinite(n)) setNum('nelTarget', n, '', 2);
+    else setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
+  } else {
+    setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
+  }
+}
   setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
   setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
   setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
