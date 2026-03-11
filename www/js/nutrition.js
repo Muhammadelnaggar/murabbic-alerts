@@ -1808,79 +1808,55 @@ function initNutritionPanels(){
     return Number.isFinite(v) ? v : NaN;
   };
 
-  window.render = function renderNutritionPanels(){
-    const sec = document.getElementById("analysisSection");
-    if(sec) sec.style.display = "block";
+window.render = function renderNutritionPanels(){
+  const $ = (id) => document.getElementById(id);
 
-    const toNum = (txt)=>{
-      const s=String(txt||"").replace(/[^\d.\-]/g,"");
-      const n=parseFloat(s);
-      return isFinite(n)?n:null;
-    };
+  const n = $("nutritionKPIs");
+  if(n){
+    const cards = Array.isArray(window.mbkNutrition?.panels?.analysisCards)
+      ? window.mbkNutrition.panels.analysisCards
+      : [];
 
-    const kpiState = (actual, target, tol)=>{
-      if(actual==null || target==null) return {sym:"—", color:"#64748b"};
-      const a=Number(actual), t=Number(target);
-      if(!isFinite(a) || !isFinite(t)) return {sym:"—", color:"#64748b"};
-      const d = a - t;
-      const band = (tol!=null?Number(tol):0);
-      if(Math.abs(d) <= band) return {sym:"●", color:"#0b7f47"};
-      if(d < -band) return {sym:"▼", color:"#c62828"};
-      return {sym:"▲", color:"#f57c00"};
-    };
+    n.innerHTML = cards.map(card => `
+      <div class="kpi">
+        <div class="k">${card?.title || '—'}</div>
+        <div class="v">${card?.value ?? '—'}${card?.unit ? ' ' + card.unit : ''}</div>
+        ${card?.target != null ? `<div class="sub">المستهدف: ${card.target}${card?.targetUnit ? ' ' + card.targetUnit : ''}</div>` : ''}
+        ${card?.hint ? `<div class="sub">${card.hint}</div>` : ''}
+      </div>
+    `).join("");
+  }
 
-    const n = $("nutritionKPIs");
-    if(n){
-      const items = [
-        ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
-        ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
-        ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
-        ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
-      ];
-      n.innerHTML = items.map(([k,v])=>{
-        let st = {sym:"—", color:"#64748b"};
-        if(k==="المادة الجافة"){
-          st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
-        }else if(k==="البروتين الخام"){
-          st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
-        }else if(k==="صحة الكرش"){
-          st = {sym:"●", color:"#0b7f47"};
-        }
-        return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
-      }).join("");
-    }
+  const e = $("economicKPIs");
+  if(e){
+    const cards = Array.isArray(window.mbkNutrition?.panels?.economicsCards)
+      ? window.mbkNutrition.panels.economicsCards
+      : [];
 
-    const e = $("economicKPIs");
-    if(e){
-      const items = [
-        ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
-        ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-        ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
-        ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
-        ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
-      ];
-      e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-    }
+    e.innerHTML = cards.map(card => `
+      <div class="kpi">
+        <div class="k">${card?.title || '—'}</div>
+        <div class="v">${card?.value ?? '—'}${card?.unit ? ' ' + card.unit : ''}</div>
+        ${card?.hint ? `<div class="sub">${card.hint}</div>` : ''}
+      </div>
+    `).join("");
+  }
 
-    const adv = $("advancedKPIs");
-    if(adv && adv.style.display==="grid"){
-      const items = [
-        ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
-        ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
-        ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
-        ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
-        ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
-        ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
-        ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
-        ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
-        ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
-        ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
-      ];
-      adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-    }
+  const adv = $("advancedKPIs");
+  if(adv && adv.style.display === "grid"){
+    const cards = Array.isArray(window.mbkNutrition?.panels?.advancedCards)
+      ? window.mbkNutrition.panels.advancedCards
+      : [];
 
-    try { window.enhanceNutritionPanels?.(); } catch(_) {}
-  };
+    adv.innerHTML = cards.map(card => `
+      <div class="kpi">
+        <div class="k">${card?.title || '—'}</div>
+        <div class="v">${card?.value ?? '—'}${card?.unit ? ' ' + card.unit : ''}</div>
+        ${card?.target != null ? `<div class="sub">المستهدف: ${card.target}${card?.targetUnit ? ' ' + card.targetUnit : ''}</div>` : ''}
+      </div>
+    `).join("");
+  }
+};;
   window.renderNutritionPanels = window.render;
 
   window.enhanceNutritionPanels = function enhanceNutritionPanels(){
