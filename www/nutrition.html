@@ -623,7 +623,7 @@ padding: 6px 0;
 
   let __lastSig = "";
 
-  function render(){
+  window.render = window.render || function render(){
     const sec = document.getElementById("analysisSection");
     if(sec) sec.style.display = "block";
     function toNum(txt){
@@ -974,6 +974,23 @@ if(fcCard){
     requestAnimationFrame(tick);
   }
   tick();
+})();
+</script>
+
+
+<script>
+(function(){
+  const btn = document.getElementById('toggleAdvancedBtn');
+  const box = document.getElementById('advancedKPIs');
+  if(!btn || !box || btn.dataset.advFixed === '1') return;
+  btn.dataset.advFixed = '1';
+  btn.addEventListener('click', function(){
+    const open = box.style.display === 'grid';
+    box.style.display = open ? 'none' : 'grid';
+    btn.textContent = open ? 'عرض متقدم' : 'إخفاء العرض المتقدم';
+    try { if (typeof window.renderAdvancedKPIs === 'function') window.renderAdvancedKPIs(); } catch(_) {}
+    try { if (typeof window.render === 'function') window.render(); } catch(_) {}
+  });
 })();
 </script>
 
