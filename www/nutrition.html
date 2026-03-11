@@ -730,31 +730,8 @@ if(adv && adv.style.display==="grid"){
   )).join("");
 }
 
-  // Toggle advanced
-  document.addEventListener("click",(ev)=>{
-    const btn = ev.target && ev.target.id==="toggleAdvancedBtn" ? ev.target : null;
-    if(!btn) return;
-    
-    if(!adv) return;
-    adv.style.display = (adv.style.display==="none"||!adv.style.display) ? "grid" : "none";
-   
-    // (live) render happens inside render() when advanced is visible
-    btn.textContent = (adv.style.display==="grid") ? "إخفاء العرض المتقدم" : "عرض متقدم";
-    return;
-  });
 }
 
-
-const advBtn = document.getElementById("toggleAdvancedBtn");
-const advBox = document.getElementById("advancedKPIs");
-if(advBtn && advBox && advBtn.dataset.bound !== "1"){
-  advBtn.dataset.bound = "1";
-  advBtn.addEventListener("click", ()=>{
-    advBox.style.display = (advBox.style.display==="grid") ? "none" : "grid";
-    advBtn.textContent = (advBox.style.display==="grid") ? "إخفاء العرض المتقدم" : "عرض متقدم";
-    render();
-  });
-}
 
 setInterval(render, 600);
 render();
