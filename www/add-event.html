@@ -415,6 +415,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
       }
 
       function getCtxOrWarn(targetPage){
+        const raw = norm($('#animalNumbers').value);
         const currentGroupName = norm($('#groupSelect')?.options?.[$('#groupSelect')?.selectedIndex]?.dataset?.groupName || '');
         const list = parseNumbers(raw);
 
@@ -548,6 +549,7 @@ if ((isOvsynch || isHeat || isNutrition) && ctx.mode === 'group'){
 
 </body>
 </html>
+
 
 
 
