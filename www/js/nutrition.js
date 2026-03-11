@@ -256,13 +256,17 @@ if (cpCard?.target != null) {
 }
 
 {
+{
   const ecoDmMilk = panelByKey(P.economicsCards, 'dmPerKgMilk');
   if (ecoDmMilk?.value) {
-    const m = String(ecoDmMilk.value).match(/([\d.]+)/);
-    if (m) {
-      const n = parseFloat(m[1]);
-      if (Number.isFinite(n)) setNum('dmPerKgMilk', n, '', 2);
-      else setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+    const s = String(ecoDmMilk.value);
+
+    // نأخذ رقم اللبن بعد السهم إن وجد
+    const afterArrow = s.split('→')[1] || s.split('->')[1] || '';
+    const n = parseFloat(String(afterArrow).replace(/[^\d.]/g, ''));
+
+    if (Number.isFinite(n)) {
+      setNum('dmPerKgMilk', n, '', 2);
     } else {
       setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
     }
