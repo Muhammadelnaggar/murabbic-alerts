@@ -215,13 +215,6 @@ if (cpCard?.target != null) {
   setNum('cpTarget', cpCard.target, '', 1);
 }
 
-const rumenCard = panelByKey(P.analysisCards, 'rumen');
-if (fcEl && rumenCard?.value) {
-  fcEl.textContent = String(rumenCard.value);
-}
-if (fcEl && rumenCard?.targetText) {
-  fcEl.dataset.rumenNote = String(rumenCard.targetText);
-}
 
   setNum('nelActual', a?.nutrition?.nelActual, '', 2);
   setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
@@ -237,6 +230,28 @@ if (fcEl && rumenCard?.targetText) {
   setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
   setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
   setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+  const fcEl = document.getElementById('fcRatio');
+if (fcEl) {
+  const rumenCard = panelByKey(P.analysisCards, 'rumen');
+
+  if (rumenCard?.value) {
+    fcEl.textContent = String(rumenCard.value);
+  } else {
+    const rough = Number(a?.nutrition?.roughPctDM);
+    const conc  = Number(a?.nutrition?.concPctDM);
+
+    if (Number.isFinite(rough) && Number.isFinite(conc)) {
+      fcEl.textContent = `خشن ${rough.toFixed(0)}% / مركز ${conc.toFixed(0)}%`;
+    } else {
+      fcEl.textContent = '—';
+    }
+  }
+
+  fcEl.dataset.rumenNote =
+    rumenCard?.targetText ||
+    a?.nutrition?.rumenNote ||
+    '';
+}
    const fcEl2 = document.getElementById('fcRatio');
   const rumenHintEl = document.getElementById('rumenHint');
   if (rumenHintEl) {
