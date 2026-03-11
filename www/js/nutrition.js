@@ -1012,14 +1012,7 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
     return (n > 200) ? (n / 1000) : n;
   }
 
-  function readContext(){
-    const species = (document.getElementById('ctxSpecies')?.value)||'';
-    const avgMilkKg = parseFloat(document.getElementById('ctxAvgMilk')?.value)||0;
-    const pregnancyDays = parseFloat(document.getElementById('ctxDCC')?.value)||0;
-    const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
-    const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
-    return { species, avgMilkKg, pregnancyDays, closeUp, earlyDry };
-  }
+
 
 
   // ✅ ثابت: tbody للجدول (لا تستخدمه قبل تعريفه)
