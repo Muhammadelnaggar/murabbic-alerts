@@ -172,7 +172,9 @@ function showCentralMsg(text, type = 'info'){
 function applyServerAnalysisToDom(analysis, targets){
   const a = analysis || {};
   const t = targets || {};
-
+  const P = window.mbkNutrition?.panels || {};
+const panelByKey = (arr, key) =>
+  (Array.isArray(arr) ? arr.find(x => x?.key === key) : null) || null;
   const setNum = (id, v, suffix = '', d = 2) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -192,20 +194,34 @@ function applyServerAnalysisToDom(analysis, targets){
 
    setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '%', 1);
 
-  const fcEl = document.getElementById('fcRatio');
-  if (fcEl) {
-    const rough = Number(a?.nutrition?.roughPctDM);
-    const conc  = Number(a?.nutrition?.concPctDM);
-    const note  = a?.nutrition?.rumenNote || '';
+const dmCard = panelByKey(P.analysisCards, 'dm');
+if (dmCard?.actual != null) {
+  setNum('totDM', dmCard.actual, '', 2);
+}
+if (dmCard?.target != null) {
+  setNum('dmiTarget', dmCard.target, '', 2);
+}
 
-    if (Number.isFinite(rough) && Number.isFinite(conc)) {
-      fcEl.textContent = `خشن ${rough.toFixed(0)}% / مركز ${conc.toFixed(0)}%`;
-    } else {
-      fcEl.textContent = '—';
-    }
+const asFedCard = panelByKey(P.analysisCards, 'asFed');
+if (asFedCard?.actual != null) {
+  setNum('totAsFed', asFedCard.actual, '', 2);
+}
 
-    fcEl.dataset.rumenNote = note;
-  }
+const cpCard = panelByKey(P.analysisCards, 'cp');
+if (cpCard?.actual != null) {
+  setNum('cpPctTotal', cpCard.actual, '%', 1);
+}
+if (cpCard?.target != null) {
+  setNum('cpTarget', cpCard.target, '', 1);
+}
+
+const rumenCard = panelByKey(P.analysisCards, 'rumen');
+if (fcEl && rumenCard?.value) {
+  fcEl.textContent = String(rumenCard.value);
+}
+if (fcEl && rumenCard?.targetText) {
+  fcEl.dataset.rumenNote = String(rumenCard.targetText);
+}
 
   setNum('nelActual', a?.nutrition?.nelActual, '', 2);
   setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
