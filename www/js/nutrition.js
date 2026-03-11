@@ -600,7 +600,13 @@ const avgMilk = milks.length
   if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
 
   const animalInfo = document.getElementById('animalInfo');
-  if(animalInfo) animalInfo.textContent = `مجموعة (${docs.length} رأس)`;
+  const groupLabel =
+  String(qp().get('group') || qp().get('groupName') || '').trim();
+
+if (animalInfo) {
+  animalInfo.textContent =
+    groupLabel || `مجموعة (${docs.length} رأس)`;
+}
 
   updateCtxView();
   return { ok:true, count: docs.length };
