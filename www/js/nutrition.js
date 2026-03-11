@@ -255,8 +255,7 @@ if (cpCard?.target != null) {
   }
 }
 
-{
-{
+
   const ecoDmMilk = panelByKey(P.economicsCards, 'dmPerKgMilk');
   if (ecoDmMilk?.value) {
     const s = String(ecoDmMilk.value);
