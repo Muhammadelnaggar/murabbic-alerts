@@ -761,7 +761,12 @@ function readContext(){
   const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
 
   return {
-    group: qp().get('group') || null,
+   group: (
+  qp().get('group') ||
+  qp().get('groupName') ||
+  document.getElementById('animalInfo')?.textContent?.trim() ||
+  null
+),
     species,
     breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || window.currentAnimal?.breed || null),
     daysInMilk: getNum('ctxDIM'),
@@ -863,13 +868,19 @@ async function saveEvent(e){
     
    await saveToServer(payload);
 
-showCentralMsg('✅ تم حفظ حدث التغذية بنجاح', 'success');
+const ctx = readContext();
+const groupName = String(ctx?.group || '').trim();
+
+const successMsg = isGroupMode
+  ? `✅ تم حفظ تغذية مجموعة "${groupName || 'بدون اسم'}"`
+  : `✅ تم حفظ تغذية الحيوان رقم ${animalId}`;
+
+showCentralMsg(successMsg, 'success');
 window.dispatchEvent(
   new CustomEvent('mbk:success', {
-    detail: { message: 'تم حفظ حدث التغذية بنجاح' }
+    detail: { message: successMsg }
   })
 );
-
 redirectSmart(900);
   }catch(err){
     console.error(err);
