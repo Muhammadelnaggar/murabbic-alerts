@@ -1807,82 +1807,79 @@ function initNutritionPanels(){
     const v = parseFloat(t);
     return Number.isFinite(v) ? v : NaN;
   };
+window.render = function renderNutritionPanels(){
+  const sec = document.getElementById("analysisSection");
+  if(sec) sec.style.display = "block";
 
-  window.render = function renderNutritionPanels(){
-    const sec = document.getElementById("analysisSection");
-    if(sec) sec.style.display = "block";
-
-    const toNum = (txt)=>{
-      const s=String(txt||"").replace(/[^\d.\-]/g,"");
-      const n=parseFloat(s);
-      return isFinite(n)?n:null;
-    };
-
-    const kpiState = (actual, target, tol)=>{
-      if(actual==null || target==null) return {sym:"—", color:"#64748b"};
-      const a=Number(actual), t=Number(target);
-      if(!isFinite(a) || !isFinite(t)) return {sym:"—", color:"#64748b"};
-      const d = a - t;
-      const band = (tol!=null?Number(tol):0);
-      if(Math.abs(d) <= band) return {sym:"●", color:"#0b7f47"};
-      if(d < -band) return {sym:"▼", color:"#c62828"};
-      return {sym:"▲", color:"#f57c00"};
-    };
-    const P = window.mbkNutrition?.panels || {};
-    const panelByKey = (arr, key) => (Array.isArray(arr) ? arr.find(x => x?.key === key) : null) || null;
-    const n = $("nutritionKPIs");
-    if(n){
-       const items = [
-    ["المادة الجافة", panelByKey(P.analysisCards, "dm")?.value || fmt($("totDM")?.textContent, " كجم")],
-    ["المأكول الكلي", panelByKey(P.analysisCards, "asFed")?.value || fmt($("totAsFed")?.textContent, " كجم")],
-    ["البروتين الخام", panelByKey(P.analysisCards, "cp")?.value || fmt($("cpPctTotal")?.textContent, "")],
-    ["صحة الكرش", panelByKey(P.analysisCards, "rumen")?.value || fmt($("fcRatio")?.textContent, "")]
-  ];
-      n.innerHTML = items.map(([k,v])=>{
-        let st = {sym:"—", color:"#64748b"};
-        if(k==="المادة الجافة"){
-          st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
-        }else if(k==="البروتين الخام"){
-          st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
-        }else if(k==="صحة الكرش"){
-          st = {sym:"●", color:"#0b7f47"};
-        }
-        return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
-      }).join("");
-    }
-
-    const e = $("economicKPIs");
-    if(e){
-      const items = [
-         const items = [
-    ["التكلفة/رأس", panelByKey(P.economicsCards, "totCost")?.value || (fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—")],
-    ["تكلفة كجم لبن", panelByKey(P.economicsCards, "costPerKgMilk")?.value || (fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—")],
-    ["كفاءة تحويل العلف", panelByKey(P.economicsCards, "dmPerKgMilk")?.value || (fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—")],
-    ["سعر طن العليقة", panelByKey(P.economicsCards, "mixPriceAsFed")?.value || (fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—")],
-    ["هامش لبن-علف", panelByKey(P.economicsCards, "milkMargin")?.value || (fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—")],
-  ];
-      e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-    }
-
-    const adv = $("advancedKPIs");
-    if(adv && adv.style.display==="grid"){
-        const items = [
-    ["احتياجات المادة الجافة", panelByKey(P.advancedCards, "dmiTarget")?.value || fmt($("dmiTarget")?.textContent, " كجم")],
-    ["العليقة الحالية — مادة جافة", panelByKey(P.advancedCards, "totDM")?.value || fmt($("totDM")?.textContent, " كجم")],
-    ["احتياجات البروتين الخام", panelByKey(P.advancedCards, "cpTarget")?.value || fmt($("cpTarget")?.textContent, "%")],
-    ["العليقة الحالية — بروتين خام", panelByKey(P.advancedCards, "cpPctTotal")?.value || fmt($("cpPctTotal")?.textContent, "")],
-    ["احتياجات الألياف NDF", panelByKey(P.advancedCards, "ndfTarget")?.value || fmt($("ndfTarget")?.textContent, "%")],
-    ["العليقة الحالية — ألياف NDF", panelByKey(P.advancedCards, "ndfPctActual")?.value || fmt($("ndfPctActual")?.textContent, "")],
-    ["الحد المستهدف لدهن العليقة", panelByKey(P.advancedCards, "fatTarget")?.value || fmt($("fatTarget")?.textContent, "")],
-    ["العليقة الحالية — دهن", panelByKey(P.advancedCards, "fatPctActual")?.value || fmt($("fatPctActual")?.textContent, "")],
-    ["احتياجات الطاقة", panelByKey(P.advancedCards, "nelTarget")?.value || fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
-    ["العليقة الحالية — طاقة", panelByKey(P.advancedCards, "nelActual")?.value || fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
-  ];
-      adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-    }
-
-    try { window.enhanceNutritionPanels?.(); } catch(_) {}
+  const toNum = (txt)=>{
+    const s=String(txt||"").replace(/[^\d.\-]/g,"");
+    const n=parseFloat(s);
+    return isFinite(n)?n:null;
   };
+
+  const kpiState = (actual, target, tol)=>{
+    if(actual==null || target==null) return {sym:"—", color:"#64748b"};
+    const a=Number(actual), t=Number(target);
+    if(!isFinite(a) || !isFinite(t)) return {sym:"—", color:"#64748b"};
+    const d = a - t;
+    const band = (tol!=null?Number(tol):0);
+    if(Math.abs(d) <= band) return {sym:"●", color:"#0b7f47"};
+    if(d < -band) return {sym:"▼", color:"#c62828"};
+    return {sym:"▲", color:"#f57c00"};
+  };
+
+  const n = $("nutritionKPIs");
+  if(n){
+    const items = [
+      ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+      ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
+      ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
+      ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
+    ];
+    n.innerHTML = items.map(([k,v])=>{
+      let st = {sym:"—", color:"#64748b"};
+      if(k==="المادة الجافة"){
+        st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
+      }else if(k==="البروتين الخام"){
+        st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
+      }else if(k==="صحة الكرش"){
+        st = {sym:"●", color:"#0b7f47"};
+      }
+      return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
+    }).join("");
+  }
+
+  const e = $("economicKPIs");
+  if(e){
+    const items = [
+      ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+      ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+      ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
+      ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+      ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+    ];
+    e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+  }
+
+  const adv = $("advancedKPIs");
+  if(adv && adv.style.display==="grid"){
+    const items = [
+      ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
+      ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
+      ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
+      ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
+      ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
+      ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
+      ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
+      ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
+      ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
+      ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
+    ];
+    adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+  }
+
+  try { window.enhanceNutritionPanels?.(); } catch(_) {}
+};
   window.renderNutritionPanels = window.render;
 
   window.enhanceNutritionPanels = function enhanceNutritionPanels(){
