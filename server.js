@@ -598,185 +598,147 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const targets = analysis?.targets || {};
   const economics = analysis?.economics || {};
 
-  const dmKg = Number(totals.dmKg || 0);
-  const asFedKg = Number(totals.asFedKg || 0);
-  const cpPct = Number(nutrition.cpPctTotal || 0);
-  const nelActual = Number(nutrition.nelActual || 0);     // /يوم
-  const nelDensity = Number(nutrition.nelDensity || 0);   // /كجم DM
-  const ndfActual = Number(nutrition.ndfPctActual || 0);
-  const roughPctDM = Number(nutrition.roughPctDM || 0);
-  const concPctDM = Number(nutrition.concPctDM || 0);
+  const num = (v, d = 2) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
+  };
 
-  const dmiTarget = Number(targets.dmiTarget || 0);
-  const nelTarget = Number(targets.nelTarget || 0);       // /يوم
-  const cpTarget = Number(targets.cpTarget || 0);
-  const ndfTarget = Number(targets.ndfTarget || 0);
-  const starchMax = Number(targets.starchMax || 0);
+  const txt = (v, unit = '', d = 2) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    const out = Number.isInteger(n) ? String(n) : n.toFixed(d);
+    return unit ? `${out} ${unit}` : out;
+  };
 
-  const totCost = Number(totals.totCost || 0);
-  const mixPriceDM = Number(totals.mixPriceDM || 0);
-  const mixPriceAsFed = Number(totals.mixPriceAsFed || 0);
-  const costPerKgMilk = Number(economics.costPerKgMilk || 0);
-  const dmPerKgMilk = Number(economics.dmPerKgMilk || 0);
-  const milkRevenue = Number(economics.milkRevenue || 0);
-  const milkMargin = Number(economics.milkMargin || 0);
-
-  function buildStatus(actual, target, lowTol, highTol){
-    if (!Number.isFinite(actual) || !Number.isFinite(target)) return 'warn';
-    const diff = actual - target;
-    if (diff < -Math.abs(lowTol)) return 'danger';
-    if (diff > Math.abs(highTol)) return 'warn';
-    return 'good';
-  }
-
-  const dmStatus = buildStatus(dmKg, dmiTarget, 0.75, 1.5);
-  const cpStatus = buildStatus(cpPct, cpTarget, 1.0, 1.5);
-  const nelStatus = buildStatus(nelActual, nelTarget, 0.8, 1.2);
-
-  let ndfStatus = 'warn';
-  if (Number.isFinite(ndfActual) && Number.isFinite(ndfTarget)) {
-    if (ndfActual < (ndfTarget - 3)) ndfStatus = 'danger';
-    else if (ndfActual > (ndfTarget + 5)) ndfStatus = 'warn';
-    else ndfStatus = 'good';
-  }
+  const rough = num(nutrition.roughPctDM, 0);
+  const conc = num(nutrition.concPctDM, 0);
 
   const analysisCards = [
     {
       key: 'dm',
-      title: 'إجمالي المادة الجافة',
-      value: pctOrNull(dmKg),
-      unit: 'كجم/رأس/يوم',
-      target: pctOrNull(dmiTarget),
-      targetUnit: 'كجم/رأس/يوم',
-      status: dmStatus,
-      hint:
-        dmStatus === 'danger' ? 'المادة الجافة أقل من الاحتياج'
-        : dmStatus === 'warn' ? 'المادة الجافة أعلى من المتوقع'
-        : 'المادة الجافة مناسبة'
+      title: 'المادة الجافة',
+      value: txt(totals.dmKg, 'كجم', 2),
+      actual: num(totals.dmKg, 2),
+      target: num(targets.dmiTarget, 2),
+      targetText: txt(targets.dmiTarget, 'كجم', 2)
+    },
+    {
+      key: 'asFed',
+      title: 'المأكول الكلي',
+      value: txt(totals.asFedKg, 'كجم', 2),
+      actual: num(totals.asFedKg, 2),
+      target: null,
+      targetText: '—'
     },
     {
       key: 'cp',
       title: 'البروتين الخام',
-      value: pctOrNull(cpPct),
-      unit: '%',
-      target: pctOrNull(cpTarget),
-      targetUnit: '%',
-      status: cpStatus,
-      hint:
-        cpStatus === 'danger' ? 'البروتين أقل من المستهدف'
-        : cpStatus === 'warn' ? 'البروتين أعلى من المستهدف'
-        : 'البروتين مناسب'
-    },
-    {
-      key: 'nel',
-      title: 'الطاقة الفعلية',
-      value: pctOrNull(nelActual),
-      unit: 'ميجاكال/يوم',
-      target: pctOrNull(nelTarget),
-      targetUnit: 'ميجاكال/يوم',
-      status: nelStatus,
-      hint:
-        nelStatus === 'danger' ? 'الطاقة أقل من الاحتياج'
-        : nelStatus === 'warn' ? 'الطاقة أعلى من الاحتياج'
-        : 'الطاقة مناسبة'
+      value: txt(nutrition.cpPctTotal, '%', 1),
+      actual: num(nutrition.cpPctTotal, 1),
+      target: num(targets.cpTarget, 1),
+      targetText: txt(targets.cpTarget, '%', 1)
     },
     {
       key: 'rumen',
       title: 'صحة الكرش',
-      value: `${pctOrNull(roughPctDM) ?? 0}:${pctOrNull(concPctDM) ?? 0}`,
-      unit: 'خشن:مركز',
+      value:
+        Number.isFinite(rough) && Number.isFinite(conc)
+          ? `خشن ${rough}% / مركز ${conc}%`
+          : '—',
+      actual: null,
       target: null,
-      targetUnit: null,
-      status: nutrition.rumenStatus || 'warn',
-      hint: nutrition.rumenNote || 'لا توجد ملاحظة'
+      targetText: nutrition.rumenNote || '—'
     }
   ];
 
   const economicsCards = [
     {
       key: 'totCost',
-      title: 'تكلفة التغذية/رأس/يوم',
-      value: pctOrNull(totCost),
-      unit: 'جنيه',
-      status: Number.isFinite(totCost) && totCost > 0 ? 'good' : 'warn',
-      hint: 'إجمالي تكلفة العليقة اليومية'
+      title: 'التكلفة/رأس',
+      value: Number.isFinite(Number(totals.totCost))
+        ? `${num(totals.totCost, 2)} ج`
+        : '—'
     },
     {
-      key: 'costMilk',
-      title: 'تكلفة كجم اللبن',
-      value: pctOrNull(costPerKgMilk),
-      unit: 'جنيه/كجم',
-      status: Number.isFinite(costPerKgMilk) && costPerKgMilk > 0 ? 'good' : 'warn',
-      hint: 'تكلفة التغذية لكل كجم لبن'
+      key: 'costPerKgMilk',
+      title: 'تكلفة كجم لبن',
+      value: Number.isFinite(Number(economics.costPerKgMilk))
+        ? `${num(economics.costPerKgMilk, 2)} ج/كجم`
+        : '—'
     },
     {
-      key: 'revenue',
-      title: 'إيراد اللبن',
-      value: pctOrNull(milkRevenue),
-      unit: 'جنيه/يوم',
-      status: Number.isFinite(milkRevenue) && milkRevenue > 0 ? 'good' : 'warn',
-      hint: 'إجمالي الإيراد اليومي من اللبن'
+      key: 'dmPerKgMilk',
+      title: 'كفاءة تحويل العلف',
+      value: Number.isFinite(Number(economics.dmPerKgMilk))
+        ? `1 كجم مادة جافة → ${num(economics.dmPerKgMilk, 2)} كجم لبن`
+        : '—'
     },
     {
-      key: 'margin',
-      title: 'هامش اللبن فوق التغذية',
-      value: pctOrNull(milkMargin),
-      unit: 'جنيه/يوم',
-      status:
-        !Number.isFinite(milkMargin) ? 'warn'
-        : milkMargin < 0 ? 'danger'
-        : 'good',
-      hint:
-        !Number.isFinite(milkMargin) ? 'أدخل سعر اللبن'
-        : milkMargin < 0 ? 'الهامش سالب'
-        : 'الهامش موجب'
+      key: 'mixPriceAsFed',
+      title: 'سعر طن العليقة',
+      value: Number.isFinite(Number(totals.mixPriceAsFed))
+        ? `${num(totals.mixPriceAsFed, 2)} ج/طن as-fed`
+        : '—'
+    },
+    {
+      key: 'milkMargin',
+      title: 'هامش لبن-علف',
+      value: Number.isFinite(Number(economics.milkMargin))
+        ? `${num(economics.milkMargin, 2)} ج`
+        : '—'
     }
   ];
 
   const advancedCards = [
     {
-      key: 'asFedKg',
-      title: 'إجمالي المأكول',
-      value: pctOrNull(asFedKg),
-      unit: 'كجم/رأس/يوم'
+      key: 'dmiTarget',
+      title: 'احتياجات المادة الجافة',
+      value: txt(targets.dmiTarget, 'كجم', 2)
     },
     {
-      key: 'mixPriceAsFed',
-      title: 'سعر طن العليقة كما هي',
-      value: pctOrNull(mixPriceAsFed),
-      unit: 'جنيه/طن'
+      key: 'totDM',
+      title: 'العليقة الحالية — مادة جافة',
+      value: txt(totals.dmKg, 'كجم', 2)
     },
     {
-      key: 'mixPriceDM',
-      title: 'سعر طن المادة الجافة',
-      value: pctOrNull(mixPriceDM),
-      unit: 'جنيه/طن DM'
+      key: 'cpTarget',
+      title: 'احتياجات البروتين الخام',
+      value: txt(targets.cpTarget, '%', 1)
     },
     {
-      key: 'nelDensity',
-      title: 'كثافة الطاقة',
-      value: pctOrNull(nelDensity),
-      unit: 'ميجاكال/كجم DM'
+      key: 'cpPctTotal',
+      title: 'العليقة الحالية — بروتين خام',
+      value: txt(nutrition.cpPctTotal, '', 1)
     },
     {
-      key: 'ndfActual',
-      title: 'NDF الفعلي',
-      value: pctOrNull(ndfActual),
-      unit: '%',
-      target: pctOrNull(ndfTarget),
-      targetUnit: '%'
+      key: 'ndfTarget',
+      title: 'احتياجات الألياف NDF',
+      value: txt(targets.ndfTarget, '%', 0)
     },
     {
-      key: 'starchMax',
-      title: 'الحد الأقصى للنشا',
-      value: pctOrNull(starchMax),
-      unit: '%'
+      key: 'ndfPctActual',
+      title: 'العليقة الحالية — ألياف NDF',
+      value: txt(nutrition.ndfPctActual, '', 1)
     },
     {
-      key: 'dmPerKgMilk',
-      title: 'كجم DM لكل كجم لبن',
-      value: pctOrNull(dmPerKgMilk),
-      unit: 'كجم DM/كجم لبن'
+      key: 'fatTarget',
+      title: 'الحد المستهدف لدهن العليقة',
+      value: txt(targets.fatTarget, '', 1)
+    },
+    {
+      key: 'fatPctActual',
+      title: 'العليقة الحالية — دهن',
+      value: txt(nutrition.fatPctActual, '', 1)
+    },
+    {
+      key: 'nelTarget',
+      title: 'احتياجات الطاقة',
+      value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
+    },
+    {
+      key: 'nelActual',
+      title: 'العليقة الحالية — طاقة',
+      value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
     }
   ];
 
