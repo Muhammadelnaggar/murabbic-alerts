@@ -67,19 +67,18 @@ body{
 }
 
 .mbk-head .mbk-back{
-  width:42px;
-  height:42px;
-  border-radius:50%;
+  border:1px solid #cfe8d4;
+  background:#f8fff9;
+  color:#166534;
+  border-radius:999px;
+  padding:8px 14px;
+  font-size:13px;
+  font-weight:800;
+  text-decoration:none;
   display:flex;
   align-items:center;
   justify-content:center;
-  text-decoration:none;
-  font-weight:900;
-  color:var(--brand-600);
-  border:2px solid var(--brand-600);
-  background:#fff;
   flex-shrink:0;
-  margin-left:6px;
 }
 
 /* ===============================
