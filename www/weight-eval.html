@@ -470,8 +470,10 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     return ctx.getImageData(0,0,can.width,can.height);
   }
   // ========= CV Helpers =========
-  function detectArucoPxPerCm(imgData){
+function detectArucoPxPerCm(imgData){
     if(!window.cv) return null; const cv = window.cv;
+    const src=cv.matFromImageData(imgData);
+    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
     const src=cv.matFromImageData(imgData);
     const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
    const dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
