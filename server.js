@@ -831,10 +831,7 @@ return res.json({
   analysis,
   panels
 });
-return res.json({
-  ok: true,
-  analysis
-});
+
   } catch (e) {
     console.error('nutrition.analyze-ration error:', e);
     return res.status(500).json({
