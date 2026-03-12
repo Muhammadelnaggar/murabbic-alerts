@@ -783,7 +783,6 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const nutrition = analysis?.nutrition || {};
   const targets = analysis?.targets || {};
   const economics = analysis?.economics || {};
-  const inputs = analysis?.inputs || {};
   const num = (v, d = 2) => {
     const n = Number(v);
     return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
@@ -916,36 +915,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       title: 'العليقة الحالية — دهن',
       value: txt(nutrition.fatPctActual, '', 1)
     },
-    {
-      key: 'bodyWeightUsed',
-      title: 'الوزن المستخدم في الحساب',
-      value: txt(inputs.bodyWeightKgUsed, 'كجم', 0)
-    },
-    {
-      key: 'milkFatUsed',
-      title: 'دهن اللبن المستخدم',
-      value: txt(inputs.milkFatPctUsed, '%', 1)
-    },
-    {
-      key: 'milkProteinUsed',
-      title: 'بروتين اللبن المستخدم',
-      value: txt(inputs.milkProteinPctUsed, '%', 1)
-    },
-    {
-      key: 'lactationUsed',
-      title: 'رقم الموسم المستخدم',
-      value: txt(inputs.lactationNumberUsed, '', 0)
-    },
-    {
-      key: 'thiUsed',
-      title: 'THI المستخدم',
-      value: txt(inputs.thiUsed, '', 0)
-    },
-    {
-      key: 'bcsUsed',
-      title: 'الحالة الجسمية المستخدمة',
-      value: txt(inputs.bcsUsed, '', 2)
-    },
+   
     {
       key: 'nelTarget',
       title: 'احتياجات الطاقة',
