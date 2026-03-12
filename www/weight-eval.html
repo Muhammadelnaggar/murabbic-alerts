@@ -48,6 +48,34 @@
   <script type="module" src="/js/vision-core.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
+  <script>
+window.cvReady = false;
+window.Module = {
+  onRuntimeInitialized() {
+    console.log("OpenCV Ready");
+    window.cvReady = true;
+
+    const bar = document.getElementById("opencvStatus");
+    if (bar) bar.textContent = "OpenCV جاهز للتحليل";
+  }
+};
+</script>
+  <script>
+window.Module = {
+  onRuntimeInitialized() {
+    console.log("OpenCV Ready");
+
+    const el = document.getElementById("opencvStatus");
+    if (el) {
+      el.innerText = "OpenCV جاهز للتحليل";
+      el.style.background = "#e8f5e9";
+      el.style.color = "#0b7f47";
+    }
+
+    window.cvReady = true;
+  }
+};
+</script>
   <script async src="/js/opencv.js"></script>
   
 
@@ -216,7 +244,7 @@
 
   // ========= التقاط/تقدير =========
  btnShot.onclick = async()=>{
-  if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
+ <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
 
   try{
     let imgData = null;
