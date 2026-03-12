@@ -127,7 +127,13 @@ async function refreshRationAnalysis(rows) {
     return null;
   }
 
-  const key = JSON.stringify(list);
+ const key = JSON.stringify({
+  rows: list,
+  mode: document.getElementById('mode')?.value || 'tmr_asfed',
+  concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
+  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null),
+  context: readContext()
+});
 
   if (key === rationAnalysisCacheKey && rationAnalysisCache) {
     return rationAnalysisCache;
@@ -320,11 +326,19 @@ if (fcEl) {
     '';
 }
    const fcEl2 = document.getElementById('fcRatio');
-  const rumenHintEl = document.getElementById('rumenHint');
-  if (rumenHintEl) {
-    rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
-  }
-  try { window.renderNutritionPanels?.(); } catch(_) {}
+const rumenHintEl = document.getElementById('rumenHint');
+if (rumenHintEl) {
+  rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
+}
+
+window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.serverViewModel = {
+  analysis: a,
+  targets: t,
+  panels: P
+};
+
+try { window.renderNutritionPanels?.(); } catch(_) {}
 }
 function msgWarn(text){
   const w = document.getElementById('warn');
@@ -1905,7 +1919,11 @@ function initNutritionPanels(){
     const v = parseFloat(t);
     return Number.isFinite(v) ? v : NaN;
   };
-window.render = function renderNutritionPanels(){
+window.renderNutritionPanels = function renderNutritionPanels(){
+    const vm = window.mbkNutrition?.serverViewModel || {};
+  const P  = vm.panels || {};
+  const panelByKey = (arr, key) =>
+    (Array.isArray(arr) ? arr.find(x => x?.key === key) : null) || null;
   const sec = document.getElementById("analysisSection");
   if(sec) sec.style.display = "block";
 
@@ -1959,25 +1977,23 @@ window.render = function renderNutritionPanels(){
     e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
   }
 
-  const adv = $("advancedKPIs");
-  if(adv && adv.style.display==="grid"){
-    const items = [
-      ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
-      ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
-      ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
-      ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
-      ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
-      ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
-      ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
-      ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
-      ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
-      ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
-    ];
-    adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+   const adv = $("advancedKPIs");
+  if (adv && adv.style.display === "grid") {
+    const cards = Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.advancedCards)
+      ? window.mbkNutrition.serverViewModel.panels.advancedCards
+      : [];
+
+    adv.innerHTML = cards.map(card => (
+      '<div class="kpi">' +
+        '<div class="k">' + (card?.title || '') + '</div>' +
+        '<div class="v">' + (card?.value || '—') + '</div>' +
+      '</div>'
+    )).join("");
   }
 
   try { window.enhanceNutritionPanels?.(); } catch(_) {}
 };
+  window.render = window.renderNutritionPanels;
   window.renderNutritionPanels = window.render;
 
   window.enhanceNutritionPanels = function enhanceNutritionPanels(){
@@ -2306,7 +2322,7 @@ async function waitForAuthReady(timeoutMs = 5000){
  const form = document.getElementById('nutritionForm');
 if (form) {
   form.addEventListener('mbk:valid', saveEvent);
-  form.addEventListener('submit', saveEvent);
+ 
 }
 
  const btn = document.getElementById('saveEvent');
