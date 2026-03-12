@@ -1,2382 +1,1813 @@
-// مُرَبِّيك — صفحة التغذية (Cloud-only)
-// ✅ لا LocalStorage / لا API
-// ✅ تحميل سياق الحيوان/المجموعة من Firestore فقط
-// ✅ حفظ حدث التغذية إلى Firestore فقط (events)
+// server.js — stable build, tenant-aware
+// ----------------------------------------------
+const path    = require('path');
+const fs      = require('fs');
+const express = require('express');
+const cors    = require('cors');
+const admin   = require('firebase-admin');
+const { computeTargets } = require('./server/nutrition-engine.js');
+const { analyzeRation } = require('./server/ration-engine.js');
+const EVENT_SYNONYMS = {
+  insemination: ['insemination', 'تلقيح'],
+  pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
+  calving: ['calving', 'birth', 'ولادة'],
+  dry_off: ['dry_off', 'dry-off', 'تجفيف', 'dry', 'جاف'],
+  close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'],
+  daily_milk: ['daily milk', 'daily_milk', 'لبن يومي', 'اللبن اليومي', 'لبن'],
+  nutrition: ['nutrition', 'تغذية', 'عليقة'],
+  weaning: ['weaning', 'فطام'],
+  lameness: ['lameness', 'عرج'],
+  hoof_trimming: ['hoof trimming', 'تقليم حوافر', 'حافر'],
+  vaccination: ['vaccination', 'تحصين', 'تطعيم'],
+  milking_status: ['milking', 'milking status', 'حلاب'],
+  fresh: ['fresh', 'حديث الولادة', 'فريش'],
+  diagnosis: ['diagnosis', 'التشخيص', 'فحص', 'كشف']
+};
 
-import { onNutritionSave } from '/js/track-nutrition.js';
-const NUTRITION_BUILD_ID = 'nutrition-2026-03-05-B';
+const app  = express();
+const PORT = process.env.PORT || 3000;
 
-let targetsCache = null;
-let targetsCacheKey = '';
+// ===== Local storage (fallback) =====
+const dataDir     = path.join(__dirname, 'data');
+const usersPath   = path.join(dataDir, 'users.json');
+const animalsPath = path.join(dataDir, 'animals.json');
+const eventsPath  = path.join(dataDir, 'events.json');
+const alertsPath  = path.join(dataDir, 'alerts.json');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-async function fetchTargets(ctx) {
-  const _ctx = ctx || readContext();
-
-  const payload = {
-    context: {
-      species: _ctx?.species,
-      breed: _ctx?.breed || window.currentAnimal?.breed || null,
-      daysInMilk: _ctx?.daysInMilk,
-      avgMilkKg: _ctx?.avgMilkKg,
-      pregnancyDays: _ctx?.pregnancyDays,
-      closeUp: _ctx?.closeUp
-    }
-  };
-
-  const { auth } = await import('/js/firebase-config.js');
-  const uid = auth?.currentUser?.uid;
-  if (!uid) throw new Error('NO_AUTH');
-
-  const API_BASE = window.API_BASE || '';
-  const res = await fetch(`${API_BASE}/api/nutrition/targets`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': uid
-    },
-    body: JSON.stringify(payload)
-  });
-
- const rawText = await res.text().catch(() => '');
-let data = {};
-try { data = rawText ? JSON.parse(rawText) : {}; } catch {}
-
-if (!res.ok || data?.ok === false) {
-  console.error('nutrition/targets failed:', {
-    status: res.status,
-    responseText: rawText,
-    payload
-  });
-  throw new Error(data?.error || rawText || `HTTP ${res.status}`);
+function readJson(p, fallback = []) {
+  try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '[]') : fallback; }
+  catch { return fallback; }
 }
 
-  targetsCache = data.targets || null;
-  return targetsCache;
-}
+// ===== Middleware =====
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-async function refreshTargets() {
-  const ctx = readContext();
-  const key = JSON.stringify({
-    species: ctx?.species || '',
-    breed: ctx?.breed || window.currentAnimal?.breed || '',
-    daysInMilk: ctx?.daysInMilk ?? '',
-    avgMilkKg: ctx?.avgMilkKg ?? '',
-    pregnancyDays: ctx?.pregnancyDays ?? '',
-    closeUp: !!ctx?.closeUp
-  });
 
-  if (key === targetsCacheKey && targetsCache) {
-    return targetsCache;
+
+// ===== Firebase Admin (best-effort) =====
+// ===== Firebase Admin (best-effort) =====
+let db = null;
+try {
+  const sa = require("/etc/secrets/murabbik-470511-firebase-adminsdk-fbsvc-650a6ab6ef.json");
+  console.log("SA project_id:", sa.project_id);
+console.log("SA client_email:", sa.client_email);
+
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(sa)
+    });
   }
 
-  targetsCacheKey = key;
-  const out = await fetchTargets(ctx);
-window.mbkNutrition = window.mbkNutrition || {};
-window.mbkNutrition.targets = out || null;
-return out;
+  console.log("🔥 Admin SDK Auth Identity:", sa.client_email);
+
+  // اتصال Firestore الصحيح → murabbikdata
+ const firestore = admin.firestore();
+firestore.settings({ databaseId: "murabbikdata" });
+db = firestore;
+
+  console.log("✅ Firebase Admin ready → murabbikdata");
+
+} catch (e) {
+  console.log("⚠️ Firestore disabled:", e.message);
 }
 
-let rationAnalysisCache = null;
-let rationAnalysisCacheKey = '';
 
-async function fetchRationAnalysis(rows) {
-  const list = Array.isArray(rows) ? rows : [];
-  if (!list.length) {
-    rationAnalysisCache = null;
-    return null;
-  }
 
-  const { auth } = await import('/js/firebase-config.js');
-  const uid = auth?.currentUser?.uid;
-  if (!uid) throw new Error('NO_AUTH');
-
-  const API_BASE = window.API_BASE || '';
-  const res = await fetch(`${API_BASE}/api/nutrition/analyze-ration`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': uid
-    },
-  body: JSON.stringify({
-  mode: document.getElementById('mode')?.value || 'tmr_asfed',
-  rows: list,
-  concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null),
-  context: readContext()
-})
-  });
-
-const data = await res.json().catch(() => ({}));
-if (!res.ok || data?.ok === false) {
-  throw new Error(data?.error || `HTTP ${res.status}`);
+// ===== Helpers =====
+const dayMs = 86400000;
+function toYYYYMMDD(d){ return new Date(d).toISOString().slice(0,10); }
+function toDate(v){
+  if (!v) return null;
+  if (v._seconds) return new Date(v._seconds * 1000);
+  if (typeof v === 'number') return new Date(v);
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00Z');
+  return new Date(s);
 }
 
-rationAnalysisCache = data.analysis || null;
+const tenantKey = v => String(v || '').trim();
 
-window.mbkNutrition = window.mbkNutrition || {};
-window.mbkNutrition.panels = data.panels || null;
-
-return rationAnalysisCache;
+function resolveTenant(req) {
+  const uid =
+    req.get("X-User-Id") ||
+    req.headers["x-user-id"] ||
+    req.query.userId ||
+    null;
+  return uid ? tenantKey(uid) : null;
 }
 
-async function refreshRationAnalysis(rows) {
-  const list = Array.isArray(rows) ? rows : [];
-  if (!list.length) {
-    rationAnalysisCache = null;
-    rationAnalysisCacheKey = '';
-    return null;
-  }
 
-  const key = JSON.stringify(list);
 
-  if (key === rationAnalysisCacheKey && rationAnalysisCache) {
-    return rationAnalysisCache;
-  }
-
-  rationAnalysisCacheKey = key;
-  const out = await fetchRationAnalysis(list);
-window.mbkNutrition = window.mbkNutrition || {};
-window.mbkNutrition.rationAnalysis = out || null;
-applyServerAnalysisToDom(out, window.mbkNutrition.targets || null);
-return out;
+function belongs(rec, tenant){
+  const t = rec && rec.userId ? rec.userId : '';
+  return tenantKey(t) === tenantKey(tenant);
 }
 
-function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-function qp(){ return new URLSearchParams(location.search); }
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function setElText(id, val){
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
+function requireUserId(req, res, next){
+  const t = resolveTenant(req);
+  if (!t) return res.status(400).json({ ok:false, error:'userId_required' });
+  req.userId = t;
+  next();
 }
-function getCentralBar(){
-  return (
-    document.getElementById('sysbar') ||
-    document.querySelector('.infobar') ||
-    document.getElementById('warn') ||
-    null
-  );
+// ============================================================
+//                  DIM: Daily updater (server-side)
+// ============================================================
+function cairoTodayISO(){
+  // "YYYY-MM-DD" بتوقيت القاهرة (لتحديد اليوم الصحيح فقط)
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
 }
 
-function showCentralMsg(text, type = 'info'){
-  const bar = getCentralBar();
-
-  if (bar && typeof window.showMsg === 'function') {
-    window.showMsg(bar, text, type);
-    return;
-  }
-
-  msgWarn(text);
+function isoToUtcMidnightMs(iso){
+  const [y,m,d] = String(iso).split("-").map(Number);
+  return Date.UTC(y, m-1, d);
 }
-function applyServerAnalysisToDom(analysis, targets){
-  const a = analysis || {};
-  const t = targets || {};
-  const P = window.mbkNutrition?.panels || {};
-const panelByKey = (arr, key) =>
-  (Array.isArray(arr) ? arr.find(x => x?.key === key) : null) || null;
-  const setNum = (id, v, suffix = '', d = 2) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (v === null || v === undefined || !Number.isFinite(Number(v))) {
-      el.textContent = '—';
+
+function diffDaysISO(fromISO, toISO){
+  // فرق أيام “تاريخ فقط” (بدون ساعات/دقائق)
+  const ms = isoToUtcMidnightMs(toISO) - isoToUtcMidnightMs(fromISO);
+  return Math.floor(ms / 86400000);
+}
+
+async function updateAllDIM(){
+  try{
+    if (!db) {
+      console.log("⚠️ DIM skipped: Firestore disabled");
       return;
     }
-    const n = Number(v);
-    el.textContent = (Number.isInteger(n) ? String(n) : n.toFixed(d)) + suffix;
-  };
 
-  setNum('totDM', a?.totals?.dmKg, '', 2);
-  setNum('totAsFed', a?.totals?.asFedKg, '', 2);
-  setNum('totCost', a?.totals?.totCost, '', 2);
-  setNum('mixPriceDM', a?.totals?.mixPriceDM, '', 2);
-  setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
+    const todayISO = cairoTodayISO();
 
-   setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '%', 1);
+    const snap = await db.collection("animals").get();
 
-const dmCard = panelByKey(P.analysisCards, 'dm');
-if (dmCard?.actual != null) {
-  setNum('totDM', dmCard.actual, '', 2);
-}
-if (dmCard?.target != null) {
-  setNum('dmiTarget', dmCard.target, '', 2);
-}
+    let updated = 0;
+    let scanned = 0;
 
-const asFedCard = panelByKey(P.analysisCards, 'asFed');
-if (asFedCard?.actual != null) {
-  setNum('totAsFed', asFedCard.actual, '', 2);
-}
+    let batch = db.batch();
+    let ops = 0;
 
-const cpCard = panelByKey(P.analysisCards, 'cp');
-if (cpCard?.actual != null) {
-  setNum('cpPctTotal', cpCard.actual, '%', 1);
-}
-if (cpCard?.target != null) {
-  setNum('cpTarget', cpCard.target, '', 1);
-}
+    for (const doc of snap.docs){
+      scanned++;
+      const a = doc.data() || {};
 
+      const st = String(a.status || "active").toLowerCase();
+      if (st === "inactive") continue;
 
- {
-  const advNelActual = panelByKey(P.advancedCards, 'nelActual');
-  if (advNelActual?.value) {
-    const n = parseFloat(String(advNelActual.value).replace(/[^\d.\-]/g, ''));
-    if (Number.isFinite(n)) setNum('nelActual', n, '', 2);
-    else setNum('nelActual', a?.nutrition?.nelActual, '', 2);
-  } else {
-    setNum('nelActual', a?.nutrition?.nelActual, '', 2);
-  }
-}
-  setNum('ndfPctActual', a?.nutrition?.ndfPctActual, '%', 1);
-  setNum('fatPctActual', a?.nutrition?.fatPctActual, '%', 1);
+      const lcd = String(a.lastCalvingDate || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(lcd)) continue;
 
-  setNum('dmiTarget', t?.dmi ?? a?.targets?.dmiTarget, '', 2);
-  {
-  const advNelTarget = panelByKey(P.advancedCards, 'nelTarget');
-  if (advNelTarget?.value) {
-    const n = parseFloat(String(advNelTarget.value).replace(/[^\d.\-]/g, ''));
-    if (Number.isFinite(n)) setNum('nelTarget', n, '', 2);
-    else setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
-  } else {
-    setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
-  }
-}
-  setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
-  setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
-  setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
+      let dim = diffDaysISO(lcd, todayISO);
+      if (!Number.isFinite(dim) || dim < 0) dim = 0;
 
- {
-  const ecoCostMilk = panelByKey(P.economicsCards, 'costPerKgMilk');
-  if (ecoCostMilk?.value) {
-    const n = parseFloat(String(ecoCostMilk.value).replace(/[^\d.]/g, ''));
-    if (Number.isFinite(n)) setNum('costPerKgMilk', n, '', 2);
-    else setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
-  } else {
-    setNum('costPerKgMilk', a?.economics?.costPerKgMilk, '', 2);
-  }
-}
+      if (Number(a.daysInMilk) === dim) continue;
 
-{
-  const ecoDmMilk = panelByKey(P.economicsCards, 'dmPerKgMilk');
-  if (ecoDmMilk?.value) {
-    const s = String(ecoDmMilk.value);
+      batch.set(doc.ref, { daysInMilk: dim, _dimUpdatedAt: todayISO }, { merge:true });
+      updated++;
+      ops++;
 
-    // نأخذ رقم اللبن بعد السهم إن وجد
-    const afterArrow = s.split('→')[1] || s.split('->')[1] || '';
-    const n = parseFloat(String(afterArrow).replace(/[^\d.]/g, ''));
-
-    if (Number.isFinite(n)) {
-      setNum('dmPerKgMilk', n, '', 2);
-    } else {
-      setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+      if (ops >= 400){
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
     }
-  } else {
-    setNum('dmPerKgMilk', a?.economics?.dmPerKgMilk, '', 2);
+
+    if (ops > 0) await batch.commit();
+
+    console.log("✅ DIM updated:", { todayISO, scanned, updated });
+  } catch (e){
+    console.error("❌ DIM update failed:", e.message || e);
   }
 }
 
-setNum('milkRevenue', a?.economics?.milkRevenue, '', 2);
+function msUntilNextCairo0010(){
+  // تشغيل يومي 00:10 بتوقيت القاهرة
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Cairo",
+    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  }).formatToParts(now).reduce((acc,p)=>{ acc[p.type]=p.value; return acc; }, {});
 
-{
-  const ecoMargin = panelByKey(P.economicsCards, 'milkMargin');
-  if (ecoMargin?.value) {
-    const n = parseFloat(String(ecoMargin.value).replace(/[^\d.\-]/g, ''));
-    if (Number.isFinite(n)) setNum('milkMargin', n, '', 2);
-    else setNum('milkMargin', a?.economics?.milkMargin, '', 2);
-  } else {
-    setNum('milkMargin', a?.economics?.milkMargin, '', 2);
+  const y = Number(parts.year), m = Number(parts.month), d = Number(parts.day);
+  const hh = Number(parts.hour), mm = Number(parts.minute), ss = Number(parts.second);
+
+  const nowCairoUtcMs = Date.UTC(y, m-1, d, hh, mm, ss);
+
+  const targetTodayUtcMs = Date.UTC(y, m-1, d, 0, 10, 0);
+  const targetUtcMs = (nowCairoUtcMs < targetTodayUtcMs)
+    ? targetTodayUtcMs
+    : Date.UTC(y, m-1, d+1, 0, 10, 0);
+
+  return Math.max(1000, targetUtcMs - nowCairoUtcMs);
+}
+
+function startDailyDimJob(){
+  const first = msUntilNextCairo0010();
+  console.log("⏳ DIM job scheduled (ms):", first);
+
+  setTimeout(async () => {
+    await updateAllDIM();
+    setInterval(updateAllDIM, 24 * 60 * 60 * 1000);
+  }, first);
+}
+
+
+// ===== Admin gate (optional) =====
+const ADMIN_EMAILS   = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+const ADMIN_DEV_OPEN = process.env.ADMIN_DEV_OPEN === '1';
+async function ensureAdmin(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const m = header.match(/^Bearer (.+)$/);
+    const idToken = m ? m[1] : (req.query.token || '');
+    if (idToken && admin.apps.length) {
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      const okClaim = decoded.admin === true;
+      const okEmail = decoded.email && ADMIN_EMAILS.includes(decoded.email.toLowerCase());
+      if (okClaim || okEmail) return next();
+    }
+    if (ADMIN_DEV_OPEN && req.query.dev === '1') return next();
+    return res.status(404).send('Not Found');
+  } catch {
+    return res.status(404).send('Not Found');
   }
 }
 
-{
-  const ecoMixAsFed = panelByKey(P.economicsCards, 'mixPriceAsFed');
-  if (ecoMixAsFed?.value) {
-    const n = parseFloat(String(ecoMixAsFed.value).replace(/[^\d.\-]/g, ''));
-    if (Number.isFinite(n)) setNum('mixPriceAsFed', n, '', 2);
-    else setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
-  } else {
-    setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
-  }
-}
-  const fcEl = document.getElementById('fcRatio');
-if (fcEl) {
-  const rumenCard = panelByKey(P.analysisCards, 'rumen');
-
-  if (rumenCard?.value) {
-    fcEl.textContent = String(rumenCard.value);
-  } else {
-    const rough = Number(a?.nutrition?.roughPctDM);
-    const conc  = Number(a?.nutrition?.concPctDM);
-
-    if (Number.isFinite(rough) && Number.isFinite(conc)) {
-      fcEl.textContent = `خشن ${rough.toFixed(0)}% / مركز ${conc.toFixed(0)}%`;
-    } else {
-      fcEl.textContent = '—';
+// ============================================================
+//                       API: EVENTS
+// ============================================================
+// ========================
+//  Event Type Normalizer
+// ========================
+function normalizeEventType(raw) {
+  const t = String(raw || '').toLowerCase();
+  for (const [norm, arr] of Object.entries(EVENT_SYNONYMS)) {
+    for (const w of arr) {
+      if (t.includes(w.toLowerCase())) return norm;
     }
   }
-
-  fcEl.dataset.rumenNote =
-    rumenCard?.targetText ||
-    a?.nutrition?.rumenNote ||
-    '';
+  return t;
 }
-   const fcEl2 = document.getElementById('fcRatio');
-  const rumenHintEl = document.getElementById('rumenHint');
-  if (rumenHintEl) {
-    rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
+// ============================================================
+//                 NUTRITION: CENTRAL SAVE HELPERS
+// ============================================================
+function cleanObj(x){
+  if (Array.isArray(x)) {
+    return x
+      .map(cleanObj)
+      .filter(v => v !== undefined);
   }
-  try { window.renderNutritionPanels?.(); } catch(_) {}
-}
-function msgWarn(text){
-  const w = document.getElementById('warn');
-  if(!w) return;
-  const s = String(text||'');
-  w.textContent = s;
-  w.style.display = s ? 'block' : 'none';
-  // ✅ نجاح = أخضر، ⚠️/⛔ = أحمر (بدون تغيير CSS العام)
-  if(!s){ w.style.color=''; return; }
-  if(s.trim().startsWith('✅')){ w.style.color = '#2e7d32'; }
-  else if(s.trim().startsWith('⚠️') || s.trim().startsWith('⛔')){ w.style.color = '#c62828'; }
-  else { w.style.color=''; }
+  if (x && typeof x === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(x)) {
+      const cv = cleanObj(v);
+      if (cv !== undefined) out[k] = cv;
+    }
+    return out;
+  }
+  if (x === undefined) return undefined;
+  return x;
 }
 
-function disableSave(disabled){
-  const btn = document.getElementById('saveEvent') || document.querySelector('[data-action="save-event"]');
-  if(btn) btn.disabled = !!disabled;
+function asYMD(v){
+  const s = String(v || '').trim();
+  const m = s.match(/\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : '';
 }
 
-function setHiddenCtxFromQuery(){
-  const p = qp();
-  const setVal = (id, v) => { const el=document.getElementById(id); if(el && v!==null && v!==undefined && v!=='') el.value = v; };
-  const setChk = (id, v) => { const el=document.getElementById(id); if(el) el.checked = (v==='1' || v==='true' || v==='yes'); };
-  setVal('ctxDIM', p.get('dim') || p.get('DIM'));
-  setVal('ctxSpecies', p.get('species'));
-  setVal('ctxAvgMilk', p.get('avgMilk'));
-  setVal('ctxDCC', p.get('dcc'));
-  setVal('ctxPreg', p.get('preg'));
-  setChk('ctxEarlyDry', p.get('earlyDry'));
-  setChk('ctxCloseUp', p.get('closeUp'));
-}
-function normalizeSpecies(raw){
-  const s = String(raw || '').trim();
-  if(!s) return '';
-  const low = s.toLowerCase();
-
-  if (s.includes('جاموس') || low.includes('buffalo')) return 'جاموس';
-  if (s.includes('بقر') || s.includes('بقرة') || s.includes('أبقار') || low.includes('cow')) return 'بقر';
-
-  return '';
-}
-
-function displaySpeciesLabel(v){
-  if (v === 'بقر') return 'بقرة';
-  if (v === 'جاموس') return 'جاموس';
-  return v || '—';
-}
-function updateCtxView(){
-  const species = document.getElementById('ctxSpecies')?.value || '';
-  const dim = document.getElementById('ctxDIM')?.value || '';
-  const avgMilk = document.getElementById('ctxAvgMilk')?.value || '';
-  const dcc = document.getElementById('ctxDCC')?.value || '';
-  const preg = document.getElementById('ctxPreg')?.value || '';
-  const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
-  const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
-
-  setElText('ctxSpecies_txt', displaySpeciesLabel(species));
-  setElText('ctxDIM_txt', dim || '—');
-  setElText('ctxAvgMilk_txt', avgMilk ? Number(avgMilk).toFixed(1) : '—');
-  setElText('ctxDCC_txt', dcc || '—');
-  setElText('ctxPreg_txt', preg || '—');
-  setElText('ctxEarlyDry_txt', earlyDry ? 'نعم' : 'لا');
-  setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
-
-  // متبقي للولادة
-  const dccNum = dcc!=='' ? Number(dcc) : NaN;
-  const gest = (species==='جاموس') ? 310 : 280;
-  const dtc = Number.isFinite(dccNum) ? (gest - dccNum) : null;
-  setElText('dtcVal', (dtc===null ? '—' : dtc));
-}
-
-// =====================
-// Firestore helpers (سياق)
-// =====================
-function isMilkEvent(ev){
-  const t = String(
-    ev?.eventTypeNorm ||
-    ev?.type ||
-    ev?.eventType ||
-    ''
-  ).trim();
-
-  return (
-    t === 'daily_milk' ||
-    t === 'daily-milk' ||
-    t === 'dailyMilk' ||
-    t === 'لبن' ||
-    t === 'لبن يومي' ||
-    t === 'تسجيل اللبن اليومي'
-  );
-}
-function getEventDay(ev){
-  const d = ev?.eventDate || ev?.date || ev?.day || '';
-  return String(d || '').slice(0,10);
-}
-function getMilkKg(ev){
-  const v = ev?.milkKg ?? ev?.milk ?? ev?.value ?? ev?.kg ?? ev?.amount ?? ev?.dailyMilk;
+function toNumOrNull(v){
+  if (v === '' || v === null || v === undefined) return null;
   const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-}
-function evTime(ev){
-  const ca = ev?.createdAt;
-  try{ if(ca && typeof ca.toDate === 'function') return ca.toDate().getTime(); }catch(_){}
-  const s = ev?.createdAt?.seconds;
-  if(Number.isFinite(s)) return s * 1000;
-  const d = new Date(ev?.createdAt);
-  const t = d.getTime();
-  return Number.isFinite(t) ? t : 0;
-}
-
-async function findAnimalDocByNumber(db, fs, uid, nStr){
-  const { collection, query, where, limit, getDocs } = fs;
-
-  const tries = [];
-  const nNum = Number(String(nStr).trim());
-  if(Number.isFinite(nNum)) tries.push(nNum);
-  tries.push(String(nStr).trim());
-
-  for(const ownerField of ['userId','ownerUid']){
-    for(const v of tries){
-      try{
-        const qy = query(
-          collection(db,'animals'),
-          where(ownerField,'==', uid),
-          where('animalNumber','==', v),
-          limit(1)
-        );
-        const snap = await getDocs(qy);
-        if(!snap.empty) return snap.docs[0].data();
-      }catch(_){}
-    }
-  }
-  return null;
-}
-
-async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
-  const { collection, query, where, limit, getDocs, orderBy } = fs;
-
-  const end = new Date(endDateStr || todayLocal());
-  if(isNaN(end.getTime())) return { avg:null, days:0 };
- const start = new Date(end); start.setDate(start.getDate() - days);
-
-  const candidates = [];
-  async function pull(ownerField){
-    try{
-      const q = query(
-        collection(db,'events'),
-        where(ownerField,'==', uid),
-        where('animalNumber','==', animalVal),
-        orderBy('createdAt','desc'),
-        limit(160)
-      );
-      const snap = await getDocs(q);
-      snap.forEach(d=>candidates.push(d.data()));
-    }catch(_){
-      try{
-        const q = query(
-          collection(db,'events'),
-          where(ownerField,'==', uid),
-          where('animalNumber','==', animalVal),
-          limit(160)
-        );
-        const snap = await getDocs(q);
-        snap.forEach(d=>candidates.push(d.data()));
-      }catch(__){}
-    }
-  }
-
-  await pull('userId');
-  await pull('ownerUid');
-
-  const byDay = new Map();
-  for(const ev of candidates){
-    if(!isMilkEvent(ev)) continue;
-    const day = getEventDay(ev);
-    if(!day) continue;
-    const d = new Date(day);
-    if(isNaN(d.getTime())) continue;
-    if(d < start || d > end) continue;
-
-    const kg = getMilkKg(ev);
-    if(!Number.isFinite(kg) || kg<=0) continue;
-
-    const prev = byDay.get(day);
-    const t = evTime(ev);
-    if(!prev || t > prev.t) byDay.set(day, { kg, t });
-  }
-
-  const vals = [...byDay.values()].map(x=>x.kg);
-  if(!vals.length) return { avg:null, days:0 };
-  const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
-  return { avg, days: vals.length };
-}
-
-function parseNumbersList(){
-  const p = qp();
-  const raw = (
-    p.get('bulk') ||
-    p.get('numbers') ||
-    p.get('groupNumbers') ||
-    p.get('animalIds') ||
-    p.get('animalNumber') ||
-    p.get('number') ||
-    p.get('animalId') ||
-    ''
-  ).toString();
-
-  const list = raw
-    .split(/[,،;\s]+/)
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  return [...new Set(list)];
-}
-
-function readUrlCtx(){
-  const p = qp();
-  const rawNumber =
-    p.get('bulk') ||
-    p.get('animalNumber') ||
-    p.get('number') ||
-    p.get('animalId') ||
-    p.get('numbers') ||
-    p.get('groupNumbers') ||
-    '';
-
-  const rawDate = p.get('eventDate') || p.get('date') || '';
-  const eventDate = DATE_RE.test(String(rawDate||'')) ? String(rawDate) : todayLocal();
-
-  const nums = parseNumbersList();
-  return { rawNumber: String(rawNumber||'').trim(), nums, eventDate };
-}
-
-async function loadCtxFromAnimal(numberStr, eventDate){
-  if(!numberStr) return { ok:false, reason:'no_number' };
-
-  const { db, auth } = await import('/js/firebase-config.js');
-  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
-  const uid = auth?.currentUser?.uid;
-  if(!uid) return { ok:false, reason:'no_uid' };
-
-  const animal = await findAnimalDocByNumber(db, fs, uid, numberStr);
-  if(!animal) return { ok:false, reason:'not_found' };
-
-  // ✅ تخزين الحيوان الحالي ليُستخدم في الاحتياجات (breed/weight)
-  window.currentAnimal = animal;
-
-  const dim = Number.isFinite(Number(animal?.daysInMilk)) ? Number(animal.daysInMilk) : null;
-
-  const speciesRaw =
-  (animal?.animalTypeAr) ||
-  (animal?.animaltype === 'buffalo' ? 'جاموس' : (animal?.animaltype === 'cow' ? 'بقر' : '')) ||
-  '';
-
-const species = normalizeSpecies(speciesRaw);
-
-  const preg = (animal?.reproductiveStatus || animal?.lastDiagnosis || animal?.pregStatus || '') || '';
-
-  // breed (لرفع دقة الاحتياجات حسب السلالة)
-  try{
-    const br = String(animal?.breed || '').trim();
-    const el = document.getElementById('ctxBreed');
-    if(el && br) el.value = br;
-  }catch(_){ }
-
-
-  // DCC من lastInseminationDate (فقط لو عشار)
-  let dcc = null;
-  if(preg === 'عشار' && animal?.lastInseminationDate){
-    const a = new Date(animal.lastInseminationDate);
-    const b = new Date(eventDate || todayLocal());
-    if(!isNaN(a.getTime()) && !isNaN(b.getTime())){
-      const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-      if(diff >= 0) dcc = diff;
-    }
-  }
-
-// متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
-  let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
-  if((avgRes?.avg==null) && String(numberStr).trim()!==''){
-    const nNum = Number(numberStr);
-    if(Number.isFinite(nNum)){
-      const alt = await fetchAvgMilkKgFor(fs, db, uid, nNum, eventDate, 7);
-      if(alt?.avg!=null) avgRes = alt;
-    }
-  }
-  const avgMilk = (avgRes?.avg!=null) ? Number(avgRes.avg) : null;
-
-  // اكتب القيم في الحقول المخفية
- if (species) document.getElementById('ctxSpecies').value = species;
-  if(dim!=null) document.getElementById('ctxDIM').value = Math.round(dim);
-  document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
-  if(dcc!=null) document.getElementById('ctxDCC').value = Math.round(dcc);
-  if(preg) document.getElementById('ctxPreg').value = preg;
-
-  const animalInfo = document.getElementById('animalInfo');
-  if(animalInfo) animalInfo.textContent = String(animal?.animalNumber ?? numberStr);
-
-  updateCtxView();
-  return { ok:true, animal, dim, avgMilk, species, dcc, preg };
-}
-
-async function loadCtxFromGroup(numbers, eventDate){
-    const nums = (Array.isArray(numbers) ? numbers : [])
-    .map(x => Number(String(x).trim()))
-    .filter(n => Number.isFinite(n));
-  if(!numbers?.length) return { ok:false, reason:'no_number' };
-
-  const { db, auth } = await import('/js/firebase-config.js');
-  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
-  const uid = auth?.currentUser?.uid;
-  if(!uid) return { ok:false, reason:'no_uid' };
-
-  const docs = [];
-  for(const n of numbers){
-    const doc = await findAnimalDocByNumber(db, fs, uid, n);
-    if(doc) docs.push(doc);
-  }
-  if(!docs.length) return { ok:false, reason:'not_found' };
-
-  const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
-  const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
-
-const first = docs[0] || {};
-const species = normalizeSpecies(
-  first?.animalTypeAr ||
-  (first?.animaltype === 'buffalo' ? 'جاموس' : (first?.animaltype === 'cow' ? 'بقر' : '')) ||
-  ''
-);
-
- const milks = [];
-for (const d of docs) {
-  const raw = String(d.animalNumber || '').trim();
-  const num = Number(raw);
-
-  const tries = [];
-  if (raw) tries.push(raw);
-  if (Number.isFinite(num)) tries.push(num);
-
-  let picked = null;
-
-  for (const key of tries) {
-    const r = await fetchAvgMilkKgFor(fs, db, uid, key, eventDate, 7);
-    if (r && r.avg != null) {
-      picked = Number(r.avg);
-      break;
-    }
-  }
-
-  if (picked != null) milks.push(picked);
-}
-
-const avgMilk = milks.length
-  ? (milks.reduce((a, b) => a + b, 0) / milks.length)
-  : null;
-
-  const dccs = [];
-  for(const d of docs){
-    const repro = d.reproductiveStatus || '';
-    if(repro!=='عشار') continue;
-    const lastIns = d.lastInseminationDate;
-    if(!lastIns) continue;
-    const a = new Date(lastIns);
-    const b = new Date(eventDate);
-    if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
-    const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-    if(diff>=0) dccs.push(diff);
-  }
-  const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
-
-  if(species) document.getElementById('ctxSpecies').value = species;
-  if(avgDIM!=null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
-  document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
-  if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
-
-  const animalInfo = document.getElementById('animalInfo');
-  const groupLabel =
-  String(qp().get('group') || qp().get('groupName') || '').trim();
-
-if (animalInfo) {
-  animalInfo.textContent =
-    groupLabel || `مجموعة (${docs.length} رأس)`;
-}
-
-  updateCtxView();
-  return { ok:true, count: docs.length };
-}
-
-async function loadCtxAuto(){
-  const { rawNumber, nums, eventDate } = readUrlCtx();
-const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
-
-let res = null;
-
-if (mode === 'group' && nums.length){
-  res = await loadCtxFromGroup(nums, eventDate);
-} else {
-  // لازم رقم (فردي أو قائمة) من الـURL
-  if(!rawNumber){
-    disableSave(true);
-  showCentralMsg('⚠️ افتح صفحة التغذية من داخل مُرَبِّيك (لازم رقم الحيوان/المجموعة في الرابط).', 'error');
-    return { ok:false, reason:'no_number' };
-  }
-
-  // فردي/جماعي
- res = (nums.length > 1)
-  ? await loadCtxFromGroup(nums, eventDate)
-  : await loadCtxFromAnimal(nums[0] || rawNumber, eventDate);
-}
-
- if(res?.ok){
- const numEl  = document.getElementById('animalNumber');
-const dateEl = document.getElementById('eventDate');
-const idEl   = document.getElementById('animalId');
-
-  const currentNum = String(nums[0] || rawNumber || '').trim();
-  const currentDate = String(eventDate || '').trim();
-
-  if (numEl) {
-    numEl.value = currentNum;
-    numEl.disabled = false;
-  }
-
-  if (dateEl) {
-    dateEl.value = currentDate;
-    dateEl.disabled = false;
-  }
-
-  if (idEl) {
-    idEl.value = currentNum;
-    idEl.disabled = false;
-  }
-
- disableSave(false);
-
-const btn =
-  document.getElementById('saveEvent') ||
-  document.querySelector('[data-action="save-event"]');
-
-if (btn) {
-  btn.disabled = false;
-  btn.removeAttribute('disabled');
-}
-
-showCentralMsg('✅ تم تحميل بيانات السياق تلقائيًا.', 'success');
-}else if(res?.reason==='no_uid'){
-    disableSave(true);
-   showCentralMsg('⚠️ يلزم تسجيل الدخول أولاً.', 'error');
-  }else if(res?.reason==='not_found'){
-    disableSave(true);
-   showCentralMsg('⚠️ لم يتم العثور على الحيوان/المجموعة في القطيع.', 'error');
-  }else{
-    disableSave(true);
-   showCentralMsg('⚠️ تعذر تحميل البيانات تلقائيًا.', 'error');
-  }
-  return res;
-}
-
-
-let __nutritionUiStarted = false;
-async function initNutritionUI(){
-  if(__nutritionUiStarted) return;
-  __nutritionUiStarted = true;
- 
-  const warn = document.getElementById('warn');
-  const modeSel = document.getElementById('mode');
-  const ctxDIM = document.getElementById('ctxDIM');
-  const ctxSpecies = document.getElementById('ctxSpecies');
-  const ctxAvgMilk = document.getElementById('ctxAvgMilk');
-  const ctxDCC = document.getElementById('ctxDCC');
-  const dtcVal = document.getElementById('dtcVal');
-  const ctxEarlyDry = document.getElementById('ctxEarlyDry');
-  const ctxCloseUp = document.getElementById('ctxCloseUp');
-  const ctxPreg = document.getElementById('ctxPreg');
-  const presetSel = document.getElementById('preset');
-  const feedInputBox = document.getElementById('feedInputBox');
-const feedSummaryBox = document.getElementById('feedSummaryBox');
-  const advancedBtn = document.getElementById('toggleAdvancedBtn');
-  const advancedBox = document.getElementById('advancedKPIs');
-
-  function bindAdvancedToggle(){
-    if (!advancedBtn || !advancedBox || advancedBtn.dataset.bound === '1') return;
-    advancedBtn.dataset.bound = '1';
-    advancedBtn.addEventListener('click', ()=>{
-      const open = (advancedBox.style.display === 'grid');
-      advancedBox.style.display = open ? 'none' : 'grid';
-      advancedBtn.textContent = open ? 'عرض متقدم' : 'إخفاء العرض المتقدم';
-      try { if (typeof render === 'function') render(); } catch(_){ }
-    });
-  }
-
-  initNutritionPanels();
-  bindAdvancedToggle();
-
-  // ✅ Helpers (لا تعتمد على jQuery)
-  const $ = (id) => document.getElementById(id);
-  const qs = (sel, root=document) => root.querySelector(sel);
-  const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-
-  // ✅ تحويل السعر: لو المستخدم كتب "سعر/كجم" (مثلاً 13.5) نحوله تلقائياً إلى "سعر/طن" (×1000)
-  function normalizeKgPrice(v){
-    const n = Number(v);
-    if(!isFinite(n) || n<=0) return 0;
-    // ✅ مدخل السعر في نموذج الخامات = سعر/كجم (as-fed)
-    // لو المستخدم كتب رقم كبير (غالبًا سعر/طن) هنحوّله تلقائيًا إلى سعر/كجم
-    return (n > 200) ? (n / 1000) : n;
-  }
-
-
-  // ✅ ثابت: tbody للجدول (لا تستخدمه قبل تعريفه)
-  const tbody = document.querySelector('#tbl tbody');
-
-
-const rationActions = document.getElementById('rationActions');
-const btnRationEdit = document.getElementById('rationEdit');
-const btnRationRemove = document.getElementById('rationRemove');
-
-let selectedRation = new Set(); // indices
-
-function updateRationActionsUI(){
-  const any = selectedRation.size > 0;
-  if(rationActions) rationActions.style.display = any ? 'flex' : 'none';
-  if(btnRationEdit) btnRationEdit.disabled = (selectedRation.size !== 1);
-  if(btnRationRemove) btnRationRemove.disabled = !any;
-}
-function renderRationSummary(){
-  if(!feedSummaryBox) return;
-
-  if(rationItems.length===0){
-    feedSummaryBox.innerHTML = '<div style="opacity:.75">لم يتم إدخال خامات بعد.</div>';
-    selectedRation.clear();
-    updateRationActionsUI();
-    return;
-  }
-
-  feedSummaryBox.innerHTML = rationItems.map((it, i)=>{
-    const left = it.pct ? (nf(it.pct)+'%') : (nf(it.kg)+' كجم');
-    const checked = selectedRation.has(i) ? 'checked' : '';
-    return `
-      <div class="feed-item" data-idx="${i}">
-        <label>
-          <input class="rationPick" type="checkbox" data-idx="${i}" ${checked}>
-          <span class="a">${escapeHtml(it.name)}</span>
-        </label>
-        <span class="b">${escapeHtml(left)}</span>
-      </div>
-    `;
-  }).join('');
-
-  updateRationActionsUI();
-}
-
-
-// اختيار خامات التركيبة (Checkbox)
-feedSummaryBox?.addEventListener('change', (e)=>{
-  const cb = e.target?.closest?.('.rationPick');
-  if(!cb) return;
-  const i = Number(cb.dataset.idx);
-  if(!Number.isFinite(i)) return;
-  if(cb.checked) selectedRation.add(i);
-  else selectedRation.delete(i);
-  updateRationActionsUI();
-});
-
-// إزالة المختار
-btnRationRemove?.addEventListener('click', ()=>{
-  if(!selectedRation.size) return;
-  const arr = Array.from(selectedRation).sort((a,b)=>b-a);
-  arr.forEach(i=>{
-    if(i>=0 && i<rationItems.length) rationItems.splice(i,1);
-  });
-  selectedRation.clear();
-  renderRationSummary();
-  recalc();
-
-  
-});
-
-// تعديل المختار (خامة واحدة فقط)
-btnRationEdit?.addEventListener('click', ()=>{
-  if(selectedRation.size !== 1) return;
-  const i = Array.from(selectedRation)[0];
-  const it = rationItems[i];
-  if(!it) return;
-
- fillCurrentRowWithFeed(it, it.cat);
-
-  const tr = tbody.querySelector('tr:last-child');
-  if(tr){
-    const dmEl = tr.querySelector('.dm');
-    const kgEl = tr.querySelector('.kg');
-    const pctEl = tr.querySelector('.pct');
-    if(dmEl && it.dm!=null && it.dm!==0) dmEl.value = it.dm;
-    if(kgEl) kgEl.value = it.kg ? it.kg : '';
-    if(pctEl) pctEl.value = it.pct ? it.pct : '';
-    setRowState(tr);
-    focusEditable(tr);
-  }
-
-  selectedRation.clear();
-  renderRationSummary();
-  recalc();
-  recalc();
-});
-
-
-const miniActions = document.getElementById('miniActions');
-
-function showFeedUI(){
-  if(feedInputBox) feedInputBox.style.display = 'block';
-  if(feedSummaryBox) feedSummaryBox.style.display = 'block';
-  if(miniActions) miniActions.style.display = 'flex';
-   if(tbody && tbody.querySelectorAll('tr').length === 0){
-    addEmptyRow();
-  }
-}
-
-function escapeHtml(s){
-  return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
-  const clearBtn = document.getElementById('clearAll');
-  const tplSel = document.getElementById('tpl');
-
- window.rationItems = window.rationItems || [];
-let rationItems = window.rationItems;
-  const splitBox = document.getElementById('splitBox');
-  const concKgInput = document.getElementById('concKgInput');
-
-  function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-  const qp = new URLSearchParams(location.search);
- const animalId =
-  qp.get('animalNumber') ||
-  qp.get('number') ||
-  qp.get('animalId') ||
-  '';
-  const groupName = qp.get('group') || '';
-  const eventDate= qp.get('date') || todayLocal();
-
-  document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
-  try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
-
-  // تعبئة سياق من الرابط كـ fallback فقط (لا تمسح سياق المجموعة بعد تحميله)
-  if (ctxDIM && !ctxDIM.value) ctxDIM.value = qp.get('dim') || '';
-  if (ctxSpecies && !ctxSpecies.value) ctxSpecies.value = qp.get('species') || '';
-  if (ctxAvgMilk && !ctxAvgMilk.value) ctxAvgMilk.value = qp.get('avgMilk') || '';
-  if (ctxDCC && !ctxDCC.value) ctxDCC.value = qp.get('dcc') || '';
-  if (ctxPreg && !ctxPreg.value) ctxPreg.value = qp.get('preg') || qp.get('pregnancy') || '';
-  // ===== تحميل نوع الحيوان تلقائياً من animals =====
-async function loadSpeciesFromAnimals(){
-  try{
-    if(!animalId) return;
-
-    const { db, auth } = await import('/js/firebase-config.js');
-    const { collection, query, where, getDocs } =
-      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-
-    const uid = auth?.currentUser?.uid;
-
-    // جرّب animalNumber رقم
-    let snap = await getDocs(query(
-      collection(db,'animals'),
-      where('animalNumber','==', Number(animalId))
-    ));
-
-    // لو فاضي جرّب كنص
-    if(snap.empty){
-      snap = await getDocs(query(
-        collection(db,'animals'),
-        where('animalNumber','==', animalId)
-      ));
-    }
-
-    if(snap.empty) return;
-
-    let data = snap.docs[0].data();
-
-    let typeAr =
-      data.animalTypeAr ||
-      (data.animaltype==='buffalo' ? 'جاموسة' :
-       data.animaltype==='cow' ? 'بقرة' : '');
-
-    if(!typeAr) return;
-
-    // للعرض في الشريط
-    document.getElementById('ctxSpecies_txt').textContent = typeAr;
-
-    // للقيمة الداخلية (لازم تكون بقر أو جاموس للحسابات)
-    ctxSpecies.value =
-      typeAr.includes('جاموس') ? 'جاموس' : 'بقر';
-
-  }catch(e){
-    console.warn(e);
-  }
-}
-  if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
-  if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
-
-  // ===== مكتبة خامات مصر من Firestore (لا علاقة ببقر/جاموس) =====
- const { db, auth } = await import('/js/firebase-config.js');
-  const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
- const { collection, query, where, getDocs, doc, getDoc } = fs;
-
-  let FEEDS = [];                 // [{id,name,dm}]
-  const FEEDS_BY_ID = new Map();  // id -> feed
-  const normName = (s)=> String(s||'').trim().replace(/\s+/g,' ');
-  function findFeedByName(name){
-    const key = normName(name);
-    if(!key) return null;
-    // exact match first
-    let f = FEEDS.find(x=> normName(x.name)===key);
-    if(f) return f;
-    // fallback: startsWith/contains (يحمي من اختلاف بسيط)
-    f = FEEDS.find(x=> normName(x.name).includes(key) || key.includes(normName(x.name)));
-    return f || null;
-  }
-
-  const FEEDS_BY_NAME = new Map(); // nameAr -> feed (for analysis)
-
-  function rebuildFeedUI(){
-    // 1) rebuild preset select
-    presetSel.innerHTML = '<option value="">— اختر —</option>';
-    FEEDS.forEach(f=>{
-      const o = document.createElement('option');
-      o.value = f.id;           // ✅ docId بدل index
-      o.textContent = f.name;
-      presetSel.appendChild(o);
-    });
-
-    // 2) rebuild datalist feedlist
-    const old = document.getElementById('feedlist');
-    if(old) old.remove();
-    const dl = document.createElement('datalist');
-    dl.id = 'feedlist';
-    FEEDS.forEach(f=>{
-      const o = document.createElement('option');
-      o.value = f.name;
-      dl.appendChild(o);
-    });
-    document.body.appendChild(dl);
-  }
-
-  async function loadFeedLibrary(){
-    FEEDS = [];
-    FEEDS_BY_ID.clear();
-
-   // ✅ حمّل كل الخامات (حتى لو enabled غير موجود) ثم فلترها داخل الكود
-const snap = await getDocs(collection(db, 'feed_items'));
-
-    const list = [];
-    const pickNum = (obj, keys) => {
-  // ✅ يدعم القيم سواء في جذر الوثيقة أو داخل nrc2021 / patch / patch.nrc2021
-  const pools = [
-    obj,
-    obj?.nrc2021,
-    obj?.patch,
-    obj?.patch?.nrc2021,
-    obj?.patch?.NRC2021,
-    obj?.NRC2021,
-  ].filter(Boolean);
-
-  for (const k of keys) {
-    for (const src of pools) {
-      let v = src?.[k];
-      if (v === null || v === undefined || v === "") continue;
-
-      // لو String (مثلاً "33%" أو "33.5")
-      if (typeof v === "string") {
-        v = v.replace(/[^\d.\-]/g, ""); // يشيل % وأي رموز
-      }
-
-      const n = Number(v);
-      if (!Number.isNaN(n)) return n;
-    }
-  }
-  return null;
-};
-    snap.forEach(docSnap=>{
-      const d = docSnap.data() || {};
-      // لو الخامة متعطلة صراحةً
-if (d.enabled === false) return;
-      const name = String(d.nameAr || '').trim();
-      if(!name) return;
-     
-   list.push({
-  id: docSnap.id,
-  name,
-  cat: String(d.cat || d.category || d.type || '').trim() || null,
-
-  dm: pickNum(d, ['dmPct','dm','DM','dm_percent','dryMatterPct','dryMatter','dmP']),
-  cp: pickNum(d, ['cpPct','cp','CP','proteinPct','protein','crudeProteinPct','cp_percent','cpP']),
-
-  nel: pickNum(d, ['nelMcalPerKgDM','nel','NEL']),
-  ndf: pickNum(d, ['ndfPct','ndf','NDF']),
-  fat: pickNum(d, ['fatPct','fat','Fat','EE','etherExtractPct','fat_percent']),
-  mp:  pickNum(d, ['mpGPerKgDM','mp','MP']),
-});
-    });
-// ===== دمج تعديلات المستخدم (Overrides) فوق قيم NRC =====
-const uid = auth?.currentUser?.uid;
-
-if (uid) {
-  for (const f of list) {
-    const oid = `${uid}__${f.id}`; // docId ثابت: userId__feedId
-    try {
-      const od = await getDoc(doc(db, 'feed_overrides', oid));
-      if (!od.exists()) continue;
-
-      const o = od.data() || {};
-
-      // لو المستخدم أخفى خامة
-      if (o.enabled === false) { f._hiddenByUser = true; continue; }
-
-      // Override لأي قيمة فقط إذا كانت موجودة
-    if (o.dmPct != null) f.dm = Number(o.dmPct);
-if (o.cpPct != null) f.cp = Number(o.cpPct);
-if (o.nelMcalPerKgDM != null) f.nel = Number(o.nelMcalPerKgDM);
-if (o.ndfPct != null) f.ndf = Number(o.ndfPct);
-if (o.fatPct != null) f.fat = Number(o.fatPct);
-if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
-    } catch (e) {
-      console.warn('override read failed for', f.id, e);
-    }
-  }
-}
-   // شيل الخامات اللي المستخدم مخفيها
-// ترتيب عربي
-const list2 = list.filter(x => !x._hiddenByUser);
-list2.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
-
-// ✅ المصدر النهائي
-FEEDS = list2;
-
-// ✅ خرائط سريعة
-FEEDS_BY_ID.clear();
-FEEDS_BY_NAME.clear();
-
-FEEDS.forEach(f=>{
-  FEEDS_BY_ID.set(f.id, f);
-  FEEDS_BY_NAME.set(normName(f.name), f); // ✅ بالاسم المُنظَّف
-});
-
-// ✅ تحديث UI
-rebuildFeedUI();
-  }
-  const TEMPLATES = [
-    { key: 'tmr_asfed_high_cow', name: 'TMR as-fed — حلابة مرتفعة (بقر)', mode: 'tmr_asfed', items: [
-      { name:'سيلاج ذرة', cat:'rough', dm:33, kg:22 },
-      { name:'دريس برسيم', cat:'rough', dm:90, kg:1.5 },
-      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, kg:6 },
-      { name:'كسب فول صويا 48%', cat:'conc', dm:89, kg:2.5 },
-      { name:'مولاس', cat:'conc', dm:75, kg:0.5 },
-      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, kg:0.15 },
-      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, kg:0.10 },
-      { name:'ملح طعام', cat:'conc', dm:100, kg:0.05 },
-      { name:'بيكربونات صوديوم', cat:'conc', dm:100, kg:0.10 },
-      { name:'دهون محمية', cat:'conc', dm:99, kg:0.30 },
-    ]},
-    { key: 'tmr_percent_mid_cow', name: 'TMR نسب as-fed — حلابة متوسطة (بقر)', mode: 'tmr_percent', items: [
-      { name:'سيلاج ذرة', cat:'rough', dm:33, pct:40 },
-      { name:'دريس برسيم', cat:'rough', dm:90, pct:5 },
-      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:23 },
-      { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:10 },
-      { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:12 },
-      { name:'مولاس', cat:'conc', dm:75, pct:3 },
-      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
-      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
-      { name:'ملح طعام', cat:'conc', dm:100, pct:1 },
-      { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:2 },
-    ]},
-    { key: 'split_conc6', name: 'منفصل — مركز 6 كجم + خشن as-fed', mode: 'split', concKg: 6, items: [
-      { name:'سيلاج ذرة', cat:'rough', dm:33, kg:20 },
-      { name:'دريس برسيم', cat:'rough', dm:90, kg:1 },
-      { name:'ذرة صفراء مجروشة', cat:'conc', dm:88, pct:45 },
-      { name:'ردة قمح (نخالة)', cat:'conc', dm:89, pct:15 },
-      { name:'كسب فول صويا 48%', cat:'conc', dm:89, pct:20 },
-      { name:'جلوتين فيد (CGF)', cat:'conc', dm:90, pct:5 },
-      { name:'مولاس', cat:'conc', dm:75, pct:5 },
-      { name:'مخلوط معادن/فيتامينات', cat:'conc', dm:95, pct:2 },
-      { name:'حجر جيري (كالسيوم)', cat:'conc', dm:100, pct:2 },
-      { name:'ملح طعام', cat:'conc', dm:100, pct:2 },
-      { name:'بيكربونات صوديوم', cat:'conc', dm:100, pct:4 },
-    ]},
-  ];
- if (tplSel) {
-  TEMPLATES.forEach(t=>{
-    const o=document.createElement('option');
-    o.value=t.key; 
-    o.textContent=t.name; 
-    tplSel.appendChild(o);
-  });
-}
-
-  const ROUGH_HINTS = ['سيلاج','برسيم','دريس','قش','تبن','pulp','hay','silage','straw','fresh','green'];
-  function guessCat(name){ const s=(name||'').toLowerCase(); return ROUGH_HINTS.some(k=> s.includes(k) ) ? 'rough':'conc'; }
-
-  function td(label, inner, col){ const td=document.createElement('td'); if(col) td.dataset.col = col; td.setAttribute('data-label', label); td.innerHTML=inner; return td; }
-  function addRow(feed={}){
-    const tr = document.createElement('tr');
-    const catVal = feed?.cat || guessCat(feed?.name);
-    tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
-    tr.appendChild(td('الفئة', `<select class="cat">
-  <option value="rough" ${catVal==='rough'?'selected':''}>خشن</option>
-  <option value="conc" ${catVal==='conc'?'selected':''}>مركز</option>
-  <option value="add" ${catVal==='add'?'selected':''}>إضافات</option>
-</select>`, 'cat'));
-    tr.appendChild(td('المادة الجافة %', `<input class="dm" type="number" inputmode="decimal" step="0.1" value="${feed?.dm ?? ''}" placeholder="%" style="width:100px">`, 'dm'));
-    tr.appendChild(td('البروتين %', `<input class="cp" type="number" inputmode="decimal" step="0.1" value="${feed?.cp ?? ''}" placeholder="%" style="width:100px">`, 'cp'));
-    tr.appendChild(td('سعر الطن (as-fed)', `<input class="pTon" type="number" inputmode="decimal" step="0.01" value="${feed?.price||''}" placeholder="جنيه/طن" style="width:140px">`, 'pTon'));
-    tr.appendChild(td('سعر/طن DM', `<span class="pTonDM">—</span>`, 'pTonDM'));
-    tr.appendChild(td('نسبة as-fed %', `<input class="pct" type="number" inputmode="decimal" step="0.01" value="${feed?.pct||''}" placeholder="%" style="width:100px">`, 'pct'));
-    tr.appendChild(td('كجم as-fed/رأس', `<input class="kg" type="number" inputmode="decimal" step="0.01" value="${feed?.kg||''}" placeholder="كجم" style="width:120px">`, 'kg'));
-    tr.appendChild(td('كجم DM/رأس', `<span class="kgDM">—</span>`, 'kgDM'));
-    tr.appendChild(td('تكلفة/رأس/يوم', `<span class="cost">—</span>`, 'cost'));
-tbody.appendChild(tr);
-    hookRow(tr);
-  }
-
-  function nf(x){ return new Intl.NumberFormat('ar-EG',{maximumFractionDigits:2}).format(x||0); }
-
-// سعر الكيلو = سعر الطن ÷ 1000 (as-fed). لو المستخدم أدخل سعر/كجم بالخطأ (رقم صغير)، نسيبه كما هو.
-function priceKgFromTon(pTon){
-  const p = Number(pTon);
-  if(!Number.isFinite(p) || p<=0) return 0;
-  // heuristic: لو أقل من 100 غالبًا ده سعر/كجم بالفعل
-  if(p < 100) return p;
-  return p / 1000;
-}
-
-
-  function setRowState(tr){
-    const mode = modeSel.value;
-    const cat  = (tr.querySelector('.cat')?.value)||'conc';
-    const kgEl  = tr.querySelector('.kg');
-    const pctEl = tr.querySelector('.pct');
-    if (mode!== 'split'){
-      kgEl.disabled = (mode==='tmr_percent');
-      pctEl.disabled= (mode==='tmr_asfed');
-    } else {
-      if (cat==='rough'){ kgEl.disabled=false; pctEl.disabled=true; }
-      else { kgEl.disabled=true; pctEl.disabled=false; }
-    }
-    kgEl.style.opacity  = kgEl.disabled? .5 : 1;
-    pctEl.style.opacity = pctEl.disabled? .5 : 1;
-  }
-
-  function isRowEmpty(tr){
-    if (!tr) return true;
-    const name = tr.querySelector('.name')?.value?.trim();
-  // ✅ لو المستخدم اختار من datalist وضغط إضافة بسرعة قبل blur
-  // املى DM/CP/السعر تلقائياً لو فاضية
-  if(name){
-    const f = findFeedByName(name);
-    if(f){
-      const dmEl = tr.querySelector('.dm');
-      const cpEl = tr.querySelector('.cp');
-      const pEl  = tr.querySelector('.pTon');
-     if(dmEl && (dmEl.value==='' || dmEl.value==null)) dmEl.value = (f.dm ?? '');
-if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
-      if(pEl  && (pEl.value==='' ||pEl.value==null) && (f.price!=null)) pEl.value = f.price;
-    }
-  }
-    const kg   = tr.querySelector('.kg')?.value;
-    const pct  = tr.querySelector('.pct')?.value;
-    return (!name && !kg && !pct);
-  }
-  function focusEditable(tr){
-    const mode = modeSel.value;
-    const cat  = (tr.querySelector('.cat')?.value)||'conc';
-    const kgEl = tr.querySelector('.kg');
-    const pctEl= tr.querySelector('.pct');
-    setRowState(tr);
-    setTimeout(()=>{
-      if (mode==='tmr_asfed'){ kgEl?.focus(); kgEl?.select?.(); }
-      else if (mode==='tmr_percent'){ pctEl?.focus(); pctEl?.select?.(); }
-      else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
-    }, 0);
-  }
- function fillCurrentRowWithFeed(feed, cat){
-  let tr = tbody.querySelector('tr:last-child');         // السطر الوحيد
-  if(!tr){
-    addEmptyRow();
-    tr = tbody.querySelector('tr');
-  }
-
-  // اكتب اسم الخامة
-  const nameEl = tr.querySelector('.name');
-  if(nameEl) nameEl.value = (feed?.name || '') || '';
-
-  // اكتب النوع
-  const catEl = tr.querySelector('.cat');
-  if(catEl) catEl.value = cat || 'conc';
-
-  // حمّل القيم الافتراضية من فايرستور (وقابلة للتعديل)
-  const dmEl = tr.querySelector('.dm');
-  const cpEl = tr.querySelector('.cp');
- if(dmEl) dmEl.value = (feed && feed.dm != null) ? feed.dm : '';
-if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
-
-  // فضّي الكمية/النسبة عشان المستخدم يدخل
-  const kgEl = tr.querySelector('.kg');
-  const pctEl = tr.querySelector('.pct');
-  if(kgEl) kgEl.value = '';
-  if(pctEl) pctEl.value = '';
-
-  // خلّي السطر جاهز للإدخال
-  setRowState(tr);
-  focusEditable(tr);
-}
- function ensureEditableForMode(){
-  const tr = tbody.querySelector('tr:last-child');
-  if(!tr) return;   // 🔥 مهم جدًا
-
-  if (modeSel.value==='split'){
-    const catEl = tr.querySelector('.cat');
-    if (catEl && catEl.value!=='rough' && isRowEmpty(tr)){
-      catEl.value='rough';
-    }
-  }
-
-  focusEditable(tr);
-}
-
-  function recalc(){
-    const ctx = (window.mbkNutrition?.readContext ? window.mbkNutrition.readContext() : (typeof readContext==="function" ? readContext() : {}));
-    const mode = modeSel.value;
-    let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
-    let totalAsFed=0;
-    let cpKg=0;
-    let roughDM=0, roughCost=0;
-    let roughDM_forFC=0, concDM_forFC=0; // DM for F:C (DM basis)
-    let nelSupplied=0; // Mcal/day when possible
-    let ndfKg=0;       // kg NDF/day when possible
-    let fatKg=0;       // kg fat/day on DM basis
-    let concMixAsFed=0, concDmFrac=0, concSumPct=0;
-    const concKg = parseFloat(concKgInput.value)||0;
-    if(mode==="split"){ totalAsFed += concKg; }
-    // ✅ تحديث سطر الإدخال الحالي دائمًا (حتى لو الحساب الكلي يعتمد على rationItems)
-Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
-  const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
-  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
-  const pKg  = normalizeKgPrice(pRaw);
-  const pTon = pKg * 1000;
-  const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
-
-  const pDM  = (dm>0) ? (pTon/(dm/100)) : 0;
-  const kgDM = kg*(dm/100);
-  const cost = kg*pKg;
-
-  const pTonDMEl = tr.querySelector('.pTonDM');
-  const kgDMEl   = tr.querySelector('.kgDM');
-  const costEl   = tr.querySelector('.cost');
-
-  if(pTonDMEl) pTonDMEl.textContent = pDM ? nf(pDM) : '—';
-  if(kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
-  if(costEl)   costEl.textContent   = cost ? nf(cost) : '—';
-});
-    // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
-// وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
-    const entries = (Array.isArray(rationItems) && rationItems.length)
-      ? rationItems.map(it=>({it}))
-      : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
-
-    entries.forEach(({tr,it})=>{
-      const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
-      const cpIn = it ? (Number(it.cp)||0) : (parseFloat(tr.querySelector('.cp')?.value)||0);
-      const pRaw = it ? (Number(it.pTonRaw)||0) : (parseFloat(tr.querySelector('.pTon')?.value)||0);
-      const pKg = normalizeKgPrice(pRaw);
-      const pTon = pKg * 1000;
-      const kg = it ? (Number(it.kg)||0) : (parseFloat(tr.querySelector('.kg')?.value)||0);
-      const pc = it ? (Number(it.pct)||0) : (parseFloat(tr.querySelector('.pct')?.value)||0);
-      const cat= it ? (String(it.cat||'conc')) : ((tr.querySelector('.cat')?.value)||'conc');
-      const nm = it ? String(it.name||'').trim() : (tr.querySelector('.name')?.value||'').trim();
-
-      const pDM = dm>0? (pTon/(dm/100)) : 0;
-      if(tr && tr.querySelector('.pTonDM')) tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
-
-      if (mode==='tmr_asfed'){
-        const kgDM = kg*(dm/100);
-        totalAsFed += kg;
-        if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
-
-        const f = FEEDS_BY_NAME.get(normName(nm));
-        if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
-        if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-        if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
-        const cost = kg * pKg;
-        const cpPct = cpIn;
-        const cpAdd = kgDM*(cpPct/100);
-
-        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
-
-        totalDM+=kgDM; totalCost+=cost; cpKg += cpAdd;
-
-      } else if (mode==='tmr_percent'){
-        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
-        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
-
-        if (pc>0){
-          mixAsFed+=(pc/100)*pTon;
-          const dmPart = (pc/100)*(dm/100);
-          dmFrac+=dmPart;
-          sumPct+=pc;
-          cpKg += dmPart*(cpIn/100);
-          if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
-
-          const f = FEEDS_BY_NAME.get(normName(nm));
-          if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
-          if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
-          if(f && Number.isFinite(f.fat)) fatKg += dmPart * (Number(f.fat)/100);
-        }
-
-      } else { // split
-        if (cat==='rough'){
-          const kgDM = kg*(dm/100);
-          totalAsFed += kg;
-          roughDM_forFC += kgDM;
-
-          const f = FEEDS_BY_NAME.get(normName(nm));
-          if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
-if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
-
-          const cost = kg * pKg;
-          cpKg += kgDM*(cpIn/100);
-
-          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
-
-          totalDM+=kgDM; totalCost+=cost;
-          roughDM+=kgDM; roughCost+=cost;
-
-        } else {
-          // مكونات المركزات كنسبة as-fed من "إجمالي المركزات"
-          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
-          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
-          if (pc>0){
-            concMixAsFed += (pc/100)*pTon;
-            const dmPart = (pc/100)*(dm/100);
-            concDmFrac += dmPart;
-            concSumPct += pc;
-          }
-        }
-      }
-    });
-
-
-    // split: add concentrate DM for F:C (DM basis)
-    if(mode==='split'){
-      concDM_forFC += concKg * concDmFrac;
-      // NEL/NDF for concentrate part (approx using dm fraction per 1 kg as-fed)
-      // nelSupplied / ndfKg already accumulated for rough; for conc we can approximate from library if names exist (handled in percent loops).
-    }
-
-    const pillMix = document.getElementById('pillMix');
-    const pillSumPct = document.getElementById('pillSumPct');
-
-    if (mode==='tmr_asfed'){
-      if (totalDM>0){
-        let mixDM=0;
-    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-  const dm = parseFloat(tr.querySelector('.dm')?.value)||0;
-  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
-  const pKg = normalizeKgPrice(pRaw);
-  const pTon = pKg*1000;
-  const kg = parseFloat(tr.querySelector('.kg')?.value)||0;
-
-  const pDM = dm>0 ? (pTon/(dm/100)) : 0;
-  const share = totalDM>0 ? ((kg*(dm/100))/totalDM) : 0;
-  mixDM += share * pDM;
-});
-        mix = mixDM;
-      }
-      pillMix.style.display=''; pillSumPct.style.display='none';
-     if($("totDM")) $("totDM").textContent = nf(totalDM);
-      if($("totCost")) $("totCost").textContent = nf(totalCost);
-    } else if (mode==='tmr_percent'){
-      mix = dmFrac>0? (mixAsFed/dmFrac) : 0;
-      document.getElementById('sumPct').textContent = nf(sumPct)+'%';
-      pillMix.style.display=''; pillSumPct.style.display='inline-flex';
-      if($("totDM")) $("totDM").textContent = '—';
-      if($("totCost")) $("totCost").textContent = '—';
-    } else {
-      const concPriceDM = concDmFrac>0? (concMixAsFed/concDmFrac) : 0;
-      const concKgDM    = concKg * concDmFrac;
-      const concCost    = (concKgDM/1000) * concPriceDM;
-      const totalDMAll  = roughDM + concKgDM;
-      const totalCostAll= roughCost + concCost;
-
-      document.getElementById('roughDM').textContent = nf(roughDM);
-      document.getElementById('roughCost').textContent = nf(roughCost);
-      document.getElementById('sumPctConc').textContent = nf(concSumPct)+'%';
-      document.getElementById('concDMpct').textContent = nf(concDmFrac*100)+'%';
-      document.getElementById('concPriceDM').textContent = concPriceDM? nf(concPriceDM):'—';
-      document.getElementById('concKgShow').textContent  = concKg? nf(concKg):'—';
-      document.getElementById('concKgDM').textContent    = concKgDM? nf(concKgDM):'—';
-      document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
-      document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
-
-      if($("totDM")) $("totDM").textContent = totalDMAll? nf(totalDMAll):'—';
-      if($("totCost")) $("totCost").textContent = totalCostAll? nf(totalCostAll):'—';
-
-      pillMix.style.display='none'; pillSumPct.style.display='none';
-    }
-
-    document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
-    const mixAsFedTon = (totalAsFed>0 && totalCost>0) ? ((totalCost / totalAsFed) * 1000) : null;
-const mixAsFedEl = document.getElementById("mixPriceAsFed");
-if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedTon)) ? nf(mixAsFedTon) : "—";
-   let w = '';
-
-if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) {
-  w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
-}
-
-if (mode==='split' && concSumPct && (concSumPct<99 || concSumPct>101)) {
-  w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
-}
-
-const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
-  const dm = parseFloat(tr.querySelector('.dm').value);
-  const hasVal =
-    (parseFloat(tr.querySelector('.kg').value)||0) > 0 ||
-    (parseFloat(tr.querySelector('.pct').value)||0) > 0;
-  return !dm && hasVal;
-});
-
-if (!w && dmMissing) {
-  w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
-}
-   
-
-    Promise.resolve()
-      .then(() => window.mbkNutrition?.refreshTargets?.())
-      .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
-      .catch(() => {})
-      .finally(() => {
-        warn.textContent = w;
-        try{ render(); }catch(e){}
-        try{ renderRationSummary(); }catch(e){}
-      });
-  }
-
-function hookRow(tr){
-  const nameEl = tr.querySelector('.name');
-  const dmEl   = tr.querySelector('.dm');
-  const cpEl   = tr.querySelector('.cp');
-  const pEl    = tr.querySelector('.pTon');
-  const kgEl   = tr.querySelector('.kg');
-  const pctEl  = tr.querySelector('.pct');
-  const catEl  = tr.querySelector('.cat');
-
-  const rmBtn = tr.querySelector('.rm');
-  if(rmBtn) rmBtn.onclick = ()=>{
-    tr.remove();
-    recalc();
-  };
-
-  // datalist يطلق input عند الاختيار، فبنسمع input + change
-  nameEl.addEventListener('input', ()=>{ applyFeedDefaults(); setRowState(tr); recalc(); });
-function applyFeedDefaults(){
-  const key = String(nameEl.value || '').trim();
-  if(!key) return;
-
-  const f = findFeedByName(key);
-  if(!f) return;
-
-  // المادة الجافة
-  if(dmEl){
-    dmEl.value = (f.dm != null) ? f.dm : '';
-  }
-
-  // البروتين
-  if(cpEl){
-    cpEl.value = (f.cp != null) ? f.cp : '';
-  }
-
-  // السعر
-  if(pEl && (pEl.value==='' || pEl.value==null) && f.price!=null){
-    pEl.value = f.price;
-  }
-}
-nameEl.addEventListener('change', ()=>{
-  applyFeedDefaults();
-  setRowState(tr);
-  recalc();
-  ensureEditableForMode();
-});
-[dmEl,cpEl,pEl,kgEl,pctEl,catEl].filter(Boolean).forEach(el=>{
-    el.addEventListener('input', ()=>{
-      setRowState(tr);
-      recalc();
-    });
-  });
-
-  setRowState(tr);
-}
-
-function addEmptyRow(){
-  const mode = modeSel.value;
-  const cat  = (mode==='split') ? 'rough' : 'conc';
-  addRow({ cat });
-}
-  // init
-  ensureEditableForMode();
-  recalc();
-  // ✅ تحميل مكتبة الخامات من Firestore
-  loadSpeciesFromAnimals();
- loadFeedLibrary()
-  .then(()=>{ 
-    try{ filterFeeds(); }catch(e){} 
-  })
-  .catch(err=>{
-    console.error(err);
-    warn.textContent = '⚠️ تعذر تحميل مكتبة الخامات من السحابة.';
-  });
-  document.getElementById('applyTpl')?.addEventListener('click', ()=>{
-    const key = document.getElementById('tpl')?.value || '';
-    const tpl = TEMPLATES.find(t=> t.key===key); if(!tpl) return;
-    modeSel.value = tpl.mode;
-    if (tpl.mode==='split' && typeof tpl.concKg === 'number') concKgInput.value = tpl.concKg;
-    document.querySelector('#tbl tbody').innerHTML='';
-    (tpl.items||[]).forEach(it=>{
-      const def = FEEDS.find(x=> x.name === it.name);
-      const dm  = (it.dm ?? def?.dm ?? '');
-      addRow({ name:it.name, dm, cat:it.cat || (def?guessCat(def.name):'conc'), kg:it.kg, pct:it.pct });
-    });
-    updateModeUI(); recalc();
-  });
-
-document.getElementById('addPreset')?.addEventListener('click', ()=>{
-  const tr = tbody.querySelector('tr');
-  if(!tr) return;
-
-  const name = tr.querySelector('.name')?.value?.trim();
-  // ✅ لو المستخدم اختار من القائمة وضغط "إضافة" بسرعة قبل blur
-if(name){
-  const f0 = findFeedByName(name);
-  if(f0){
-    const dmEl0 = tr.querySelector('.dm');
-    const cpEl0 = tr.querySelector('.cp');
-    if(dmEl0 && (dmEl0.value==='' || dmEl0.value==null)) dmEl0.value = (f0.dm ?? '');
-    if(cpEl0 && (cpEl0.value==='' || cpEl0.value==null)) cpEl0.value = (f0.cp ?? '');
-  }
-}
-  const cat  = tr.querySelector('.cat')?.value || 'conc';
-  const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
-  const cp   = parseFloat(tr.querySelector('.cp')?.value)||0;
-  const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
-  const pct  = parseFloat(tr.querySelector('.pct')?.value)||0;
-
-  if(!name){
-    alert('اختر خامة أولاً');
-    return;
-  }
-
-  // لو Split أو Percent لازم نسبة، لو TMR Kg لازم كجم
-  const mode = modeSel.value;
-  const needPct = (mode==='tmr_percent' || (mode==='split' && cat!=='rough'));
-  if(needPct && !pct){ alert('ادخل نسبة as-fed'); return; }
-  if(!needPct && !kg){ alert('ادخل كجم as-fed'); return; }
-
-  // أضف/حدّث الخامة في القائمة
-const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
-const pTonRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
-
-const feedMeta = FEEDS_BY_NAME.get(normName(name)) || null;
-
-const item = {
-  name,
-  cat,
-  dm,
-  cp,
-  kg,
-  pct,
-  pTonRaw,
-
-  nel: (feedMeta && Number.isFinite(Number(feedMeta.nel))) ? Number(feedMeta.nel) : null,
-  ndf: (feedMeta && Number.isFinite(Number(feedMeta.ndf))) ? Number(feedMeta.ndf) : null,
-  fat: (feedMeta && Number.isFinite(Number(feedMeta.fat))) ? Number(feedMeta.fat) : null,
-  mp:  (feedMeta && Number.isFinite(Number(feedMeta.mp)))  ? Number(feedMeta.mp)  : null
-};
-
-if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
-  // نظّف سطر الإدخال لخامة جديدة
-  tr.querySelector('.name').value='';
-  tr.querySelector('.kg').value='';
-  tr.querySelector('.pct').value='';
-  tr.querySelector('.dm').value='';
-  tr.querySelector('.cp').value='';
-  renderRationSummary();
-  recalc();
-
-try{
-  document.querySelector('.controls-box')?.scrollIntoView({ behavior:'smooth', block:'start' });
-  setTimeout(()=>{
-    document.getElementById('feedTypeFilter')?.focus();
-  }, 250);
-}catch(e){}
-
-});
-  document.getElementById('clearAll')?.addEventListener('click', ()=>{
-   if(confirm('مسح كل الصفوف؟')){
-  tbody.innerHTML='';
-  rationItems.length = 0;
-  selectedRation.clear();
-  renderRationSummary();
-  recalc();
-  document.getElementById('feedInputBox').style.display='none';
-  document.getElementById('feedSummaryBox').style.display='none';
-  document.getElementById('miniActions').style.display='none';
-}
-  
-  });
-
-  function updateModeUI(){
-    const mode = modeSel.value;
-    splitBox.style.display = (mode==='split')? '' : 'none';
-    const showCols = new Set(
-      mode==='tmr_asfed'  ? ['name','cat','dm','cp','pTon','pTonDM','kg','kgDM','cost','rm'] :
-      mode==='tmr_percent'? ['name','cat','dm','cp','pTon','pTonDM','pct','rm'] :
-                            ['name','cat','dm','cp','pTon','pTonDM','pct','kg','kgDM','cost','rm']
-    );
-    document.querySelectorAll('th').forEach(th=>{ const c=th.dataset.col; if(!c)return; th.style.display = showCols.has(c)? '':'none'; });
-    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-      tr.querySelectorAll('td').forEach(td=>{ const c=td.dataset.col; if(!c)return; td.style.display = showCols.has(c)? '':'none'; });
-      setRowState(tr);
-    });
-    document.getElementById('totalsBase').style.display  = (mode!=='split')? '' : 'none';
-    document.getElementById('totalsSplit').style.display = (mode==='split')? '' : 'none';
-    recalc();
-  }
-
-  modeSel.addEventListener('change', updateModeUI);
-  modeSel.addEventListener('change', ensureEditableForMode);
-  concKgInput.addEventListener('input', recalc);
-
-  function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
-  function applyDCCRules(){
-    const dcc = parseInt(ctxDCC?.value);
-    const GL = getGestLen();
-    if (!isNaN(dcc)){
-      const dtc = GL - dcc;
-      if (dtcVal) dtcVal.textContent = isFinite(dtc)? String(dtc) : '—';
-      ctxEarlyDry.checked = (dcc >= (GL - 60));
-      ctxCloseUp.checked  = (dcc >= (GL - 21));
-    } else {
-      if (dtcVal) dtcVal.textContent = '—';
-    }
-  }
-  ctxDCC?.addEventListener('input', applyDCCRules);
-  ctxSpecies?.addEventListener('change', applyDCCRules);
-  applyDCCRules();
-
-  updateModeUI();
- const feedTypeFilter = document.getElementById('feedTypeFilter');
-
-function classifyFeed3(f){
-  const n = (f.name || '').toLowerCase();
-
-  // إضافات
-  if(n.includes('فيتامين') || n.includes('ماغنسيوم') || n.includes('بيكربونات') || n.includes('ملح') || n.includes('يوريا') || n.includes('دهون')) return 'add';
-
-  // خشن
-  if(n.includes('سيلاج') || n.includes('برسيم') || n.includes('دريس') || n.includes('قش') || n.includes('تبن')) return 'rough';
-
-  // الباقي مركزات (حبوب/بروتين/مخلفات…)
-  return 'conc';
-}
-
-function filterFeeds(){
-  const type = feedTypeFilter.value || 'all';
-
-  const filtered = FEEDS.filter(f=>{
-    if(type === 'all') return true;
-    return (f.cat || classifyFeed3(f)) === type;
-  });
-
-  presetSel.innerHTML = '<option value="" selected disabled>اختر خامة</option>';
-  filtered.forEach(f=>{
-    const o = document.createElement('option');
-    o.value = f.id;
-    o.textContent = f.name;
-    presetSel.appendChild(o);
-  });
-}
-
-feedTypeFilter.addEventListener('change', filterFeeds); 
-// ✅ عند اختيار خامة: افتح نموذج الإدخال فورًا
-presetSel.addEventListener('change', ()=>{
-  const selectedType = (feedTypeFilter.value || '').trim();
-  if(!selectedType || selectedType === 'all'){
-    alert("اختر نوع الخامه أولاً (مركزات/خشن/إضافات)");
-    presetSel.value = '';
-    return;
-  }
-
-  const id = (presetSel.value || '').trim();
-  if(!id) return;
-
-  const f = FEEDS_BY_ID.get(id);
-  if(!f) return;
-
-  // ✅ بدل addRow: املأ السطر الحالي فقط
-  fillCurrentRowWithFeed(f, (f.cat || selectedType));
-
-  showFeedUI();
-  recalc();
-  try{ document.getElementById('feedInputBox')?.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){}
-
-  presetSel.value = '';
-});
-}
-
-// =====================
-// جمع البيانات + حفظ Firestore فقط
-// =====================
-function collectRows(){
-  const rows = [];
-  document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-    const get = sel => (tr.querySelector(sel)?.value ?? '').toString().trim();
-    const name = get('.name'); if (!name) return;
-    rows.push({
-      name,
-      cat : (tr.querySelector('.cat')?.value)||'conc',
-      dm  : parseFloat(get('.dm'))||0,
-      price: parseFloat(get('.pTon'))||0,
-      kg  : parseFloat(get('.kg'))||0,
-      pct : parseFloat(get('.pct'))||0,
-    });
-  });
-  return rows;
-}
-
-function readKPIs(){
-  const txt = id => (document.getElementById(id)?.textContent||'').trim();
-  return {
-    mode: document.getElementById('mode')?.value || 'tmr_asfed',
-    mixPriceDM: txt('mixPriceDM'),
-    totDM: txt('totDM'),
-    totCost: txt('totCost'),
-    split: {
-      roughDM : txt('roughDM'),
-      roughCost: txt('roughCost'),
-      concDMpct: txt('concDMpct'),
-      concPriceDM: txt('concPriceDM'),
-      concKgAf: document.getElementById('concKgInput')?.value || '',
-      concKgDM: txt('concKgDM'),
-      concCost: txt('concCost'),
-      totalCostAll: txt('totalCostAll'),
-    }
-  };
-}
-
-let __nutritionPanelsStarted = false;
-function initNutritionPanels(){
-  if(__nutritionPanelsStarted) return;
-  __nutritionPanelsStarted = true;
-
-  const $ = (id)=>document.getElementById(id);
-  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
-
-  const fmt = (v, suf="")=>{
-    if(v==null) return "—";
-    const s=String(v).trim();
-    if(!s || s==="—") return "—";
-    return s + suf;
-  };
-
-  const numFromText = (t)=>{
-    if(!t) return NaN;
-    const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','٫':'.','،':'.'};
-    t = String(t).trim().replace(/[٠-٩٫،]/g, ch => map[ch] ?? ch);
-    t = t.replace(/[^0-9.\-]/g,'');
-    const v = parseFloat(t);
-    return Number.isFinite(v) ? v : NaN;
-  };
-window.render = function renderNutritionPanels(){
-  const sec = document.getElementById("analysisSection");
-  if(sec) sec.style.display = "block";
-
-  const toNum = (txt)=>{
-    const s=String(txt||"").replace(/[^\d.\-]/g,"");
-    const n=parseFloat(s);
-    return isFinite(n)?n:null;
-  };
-
-  const kpiState = (actual, target, tol)=>{
-    if(actual==null || target==null) return {sym:"—", color:"#64748b"};
-    const a=Number(actual), t=Number(target);
-    if(!isFinite(a) || !isFinite(t)) return {sym:"—", color:"#64748b"};
-    const d = a - t;
-    const band = (tol!=null?Number(tol):0);
-    if(Math.abs(d) <= band) return {sym:"●", color:"#0b7f47"};
-    if(d < -band) return {sym:"▼", color:"#c62828"};
-    return {sym:"▲", color:"#f57c00"};
-  };
-
-  const n = $("nutritionKPIs");
-  if(n){
-    const items = [
-      ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
-      ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
-      ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
-      ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
-    ];
-    n.innerHTML = items.map(([k,v])=>{
-      let st = {sym:"—", color:"#64748b"};
-      if(k==="المادة الجافة"){
-        st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
-      }else if(k==="البروتين الخام"){
-        st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
-      }else if(k==="صحة الكرش"){
-        st = {sym:"●", color:"#0b7f47"};
-      }
-      return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
-    }).join("");
-  }
-
-  const e = $("economicKPIs");
-  if(e){
-    const items = [
-      ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
-      ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-      ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
-      ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
-      ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
-    ];
-    e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-  }
-
-  const adv = $("advancedKPIs");
-  if(adv && adv.style.display==="grid"){
-    const items = [
-      ["احتياجات المادة الجافة", fmt($("dmiTarget")?.textContent, " كجم")],
-      ["العليقة الحالية — مادة جافة", fmt($("totDM")?.textContent, " كجم")],
-      ["احتياجات البروتين الخام", fmt($("cpTarget")?.textContent, "%")],
-      ["العليقة الحالية — بروتين خام", fmt($("cpPctTotal")?.textContent, "")],
-      ["احتياجات الألياف NDF", fmt($("ndfTarget")?.textContent, "%")],
-      ["العليقة الحالية — ألياف NDF", fmt($("ndfPctActual")?.textContent, "")],
-      ["الحد المستهدف لدهن العليقة", fmt($("fatTarget")?.textContent, "")],
-      ["العليقة الحالية — دهن", fmt($("fatPctActual")?.textContent, "")],
-      ["احتياجات الطاقة", fmt($("nelTarget")?.textContent, " ميجاكال NEL/يوم")],
-      ["العليقة الحالية — طاقة", fmt($("nelActual")?.textContent, " ميجاكال NEL/يوم")]
-    ];
-    adv.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
-  }
-
-  try { window.enhanceNutritionPanels?.(); } catch(_) {}
-};
-  window.renderNutritionPanels = window.render;
-
-  window.enhanceNutritionPanels = function enhanceNutritionPanels(){
-    const root = $('#analysisSection') || document;
-    const cards = $$('.kpi', root);
-    if(!cards.length) return;
-
-    const ensureBadge = (card)=>{
-      let b = card.querySelector('.kpi-badge');
-      if(!b){
-        b = document.createElement('span');
-        b.className = 'kpi-badge';
-        b.innerHTML = '<span class="dot"></span><span class="txt">—</span>';
-        const k = card.querySelector('.k');
-        if(k) k.appendChild(b);
-        else card.prepend(b);
-      }
-      let m = card.querySelector('.kpi-meter');
-      if(!m){
-        m = document.createElement('div');
-        m.className = 'kpi-meter';
-        m.innerHTML = '<span></span>';
-        card.appendChild(m);
-      }
-      let h = card.querySelector('.kpi-hint');
-      if(!h){
-        h = document.createElement('div');
-        h.className = 'kpi-hint';
-        h.textContent = '';
-        card.appendChild(h);
-      }
-      return b;
-    };
-
-    const setStatus = (card, status, badgeText, hintText, meterPct)=>{
-      card.classList.remove('ok','warn','bad');
-      if(status) card.classList.add(status);
-      const b = ensureBadge(card);
-      const txt = b.querySelector('.txt');
-      if(txt) txt.textContent = badgeText || '—';
-      const hint = card.querySelector('.kpi-hint');
-      if(hint) hint.textContent = hintText || '';
-      const bar = card.querySelector('.kpi-meter > span');
-      if(bar && Number.isFinite(meterPct)){
-        const p = Math.max(0, Math.min(100, meterPct));
-        bar.style.width = p.toFixed(0) + '%';
-      }
-    };
-
-    const labelOf = (card)=>{
-      const k = card.querySelector('.k');
-      return (k ? k.textContent : card.textContent).trim();
-    };
-    const valueOf = (card)=>{
-      const v = card.querySelector('.v');
-      return numFromText(v ? v.textContent : '');
-    };
-    const findCardByLabelIncludes = (root, includes)=>{
-      const arr = $$('.kpi', root);
-      for(const c of arr){
-        const lab = labelOf(c);
-        if(includes.every(x => lab.includes(x))) return c;
-      }
-      return null;
-    };
-
-    const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
-    const fcRatioEl = document.getElementById("fcRatio");
-    if(fcCard){
-      const serverNote = String(fcRatioEl?.dataset?.rumenNote || "").trim();
-      const txt = String(fcRatioEl?.textContent || "").trim();
-      const m = txt.match(/خشن\s+(\d+(?:\.\d+)?)%\s*\/\s*مركز\s+(\d+(?:\.\d+)?)%/);
-      const roughPct = m ? Number(m[1]) : NaN;
-      const concPct  = m ? Number(m[2]) : NaN;
-      const detail = (Number.isFinite(roughPct) && Number.isFinite(concPct))
-        ? `خشن ${Math.round(roughPct)}% / مركز ${Math.round(concPct)}%`
-        : txt;
-      if (serverNote.includes('خطر الحموضة') || serverNote.includes('100% مركزات')) setStatus(fcCard, 'bad', 'خطر', serverNote || detail, 25);
-      else if (serverNote.includes('الخشن منخفض')) setStatus(fcCard, 'warn', 'تحذير', serverNote || detail, 45);
-      else if (serverNote.includes('الخشن مرتفع')) setStatus(fcCard, 'warn', 'معلومة', serverNote || detail, 70);
-      else setStatus(fcCard, 'ok', 'ممتاز', serverNote || detail || 'توازن مناسب للكرش', 85);
-    }
-
-    const pairConfigs = [
-      [['العليقة الحالية','مادة جافة'], ['احتياجات','المادة الجافة'], 'كجم', 0.92, 1.05],
-      [['العليقة الحالية','بروتين خام'], ['احتياجات','البروتين الخام'], '%', null, null],
-      [['العليقة الحالية','ألياف NDF'], ['احتياجات','الألياف NDF'], '%', null, null],
-      [['العليقة الحالية','دهن'], ['الحد المستهدف','دهن'], '%', null, null],
-      [['العليقة الحالية','طاقة'], ['احتياجات','الطاقة'], '', 0.95, 1.06],
-    ];
-
-    for(const [actualKeys, targetKeys, unit, lowOk, highOk] of pairConfigs){
-      const aCard = findCardByLabelIncludes(root, actualKeys);
-      const tCard = findCardByLabelIncludes(root, targetKeys);
-      if(!aCard || !tCard) continue;
-      const a = valueOf(aCard), t = valueOf(tCard);
-      if(!Number.isFinite(a) || !Number.isFinite(t) || t===0) continue;
-      const diff = a - t;
-      const ratio = a/(t||1);
-      const meter = 100*Math.min(1.2, Math.max(0, ratio));
-      if(unit==='%' && Math.abs(diff) <= (actualKeys[1].includes('بروتين') ? 0.3 : actualKeys[1].includes('دهن') ? 0.4 : 2.0)) setStatus(aCard,'ok','مناسب', `فرق ${diff.toFixed(1)}${unit}`, meter);
-      else if(unit==='%' && Math.abs(diff) <= (actualKeys[1].includes('بروتين') ? 0.8 : actualKeys[1].includes('دهن') ? 0.8 : 4.0)) setStatus(aCard,'warn', diff<0?'ناقص':'زيادة', `فرق ${diff.toFixed(1)}${unit}`, meter);
-      else if(lowOk!=null && highOk!=null){
-        if(ratio >= lowOk && ratio <= highOk) setStatus(aCard,'ok','مناسب', `فرق ${diff.toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
-        else if(ratio < lowOk) setStatus(aCard,'warn','ناقص', `نقص ${Math.abs(diff).toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
-        else if(ratio <= (highOk + 0.07)) setStatus(aCard,'warn','زيادة', `زيادة ${Math.abs(diff).toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
-        else setStatus(aCard,'bad', ratio<1 ? 'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(unit==='كجم'?2:1)} ${unit}`.trim(), meter);
-      }else{
-        setStatus(aCard,'bad', diff<0?'ناقص جدًا':'زيادة كبيرة', `فرق ${diff.toFixed(1)}${unit}`, meter);
-      }
-      setStatus(tCard,'', 'هدف', '', 100);
-    }
-
-    for(const c of cards){
-      if(!c.classList.contains('ok') && !c.classList.contains('warn') && !c.classList.contains('bad')){
-        const b = ensureBadge(c);
-        const txt = b.querySelector('.txt');
-        if(txt && (txt.textContent==='—' || txt.textContent.trim()==='')) txt.textContent = 'معلومة';
-        const hint = c.querySelector('.kpi-hint'); if(hint) hint.textContent = '';
-        const bar = c.querySelector('.kpi-meter > span'); if(bar) bar.style.width = '0%';
-      }
-    }
-  };
-
-  window.render();
-}
-function parseUiNumber(v){
-  if(v===null || v===undefined) return null;
-  let s = String(v).trim();
-  if(!s || s==='—') return null;
-
-  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','٫':'.','،':'.'};
-  s = s.replace(/[٠-٩٫،]/g, ch => map[ch] ?? ch);
-  s = s.replace(/[^\d.\-]/g,'');
-  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
-function cleanDeep(obj){
-  if(Array.isArray(obj)){
-    return obj
-      .map(cleanDeep)
-      .filter(v => v !== undefined);
-  }
+function normalizeNutritionContext(ctx = {}) {
+  const speciesRaw = String(ctx.species || '').trim();
+  let species = speciesRaw;
+  if (/cow|بقر|بقرة|أبقار/i.test(speciesRaw)) species = 'بقر';
+  if (/buffalo|جاموس/i.test(speciesRaw)) species = 'جاموس';
 
-  if(obj && typeof obj === 'object'){
-    const out = {};
-    Object.entries(obj).forEach(([k,v])=>{
-      const vv = cleanDeep(v);
-      if(vv === undefined) return;
-      if(typeof vv === 'object' && !Array.isArray(vv) && vv && Object.keys(vv).length === 0) return;
-      if(Array.isArray(vv) && vv.length === 0) return;
-      out[k] = vv;
-    });
-    return out;
-  }
-
-  if(obj === '' || obj === '—' || obj === null || obj === undefined) return undefined;
-  return obj;
+  return cleanObj({
+    group: ctx.group || null,
+    species,
+    breed: ctx.breed || null,
+    daysInMilk: toNumOrNull(ctx.daysInMilk),
+    avgMilkKg: toNumOrNull(ctx.avgMilkKg),
+    earlyDry: !!ctx.earlyDry,
+    closeUp: !!ctx.closeUp,
+    pregnancyStatus: ctx.pregnancyStatus || null,
+    pregnancyDays: toNumOrNull(ctx.pregnancyDays),
+    daysToCalving: toNumOrNull(ctx.daysToCalving)
+  });
 }
 
+function normalizeNutritionAnalysis(a = {}) {
+  return cleanObj({
+   totals: {
+  asFedKg: toNumOrNull(a?.totals?.asFedKg),
+  dmKg: toNumOrNull(a?.totals?.dmKg),
+  totCost: toNumOrNull(a?.totals?.totCost),
+  mixPriceDM: toNumOrNull(a?.totals?.mixPriceDM),
+  mixPriceAsFed: toNumOrNull(a?.totals?.mixPriceAsFed)
+},
+   nutrition: {
+  cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
+  fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
+  nelActual: toNumOrNull(a?.nutrition?.nelActual),      // فعلي /يوم
+  nelDensity: toNumOrNull(a?.nutrition?.nelDensity),    // فعلي /كجم DM
+  ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
+  fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
+  roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
+  concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
+  rumenStatus: a?.nutrition?.rumenStatus || null,
+  rumenNote: a?.nutrition?.rumenNote || null
+},
+    targets: {
+      dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
+      nelTarget: toNumOrNull(a?.targets?.nelTarget),
+      cpTarget: toNumOrNull(a?.targets?.cpTarget),
+      ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
+      fatTarget: toNumOrNull(a?.targets?.fatTarget),
+      starchMax: toNumOrNull(a?.targets?.starchMax)
+    },
+    economics: {
+      costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
+      dmPerKgMilk: toNumOrNull(a?.economics?.dmPerKgMilk),
+      milkRevenue: toNumOrNull(a?.economics?.milkRevenue),
+      milkMargin: toNumOrNull(a?.economics?.milkMargin)
+    }
+  });
+}
 
-function readContext(){
-  const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
-  const getSel = id => document.getElementById(id)?.value || null;
+function normalizeNutritionRows(rows = []) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => cleanObj({
+    id: r?.id || null,
+    name: r?.name || r?.feedName || null,
+    cat: r?.cat || r?.category || null,
+    asFedKg: toNumOrNull(r?.asFedKg ?? r?.kg ?? r?.amount),
+    pct: toNumOrNull(r?.pct),
+    dmPct: toNumOrNull(r?.dmPct ?? r?.dm),
+    cpPct: toNumOrNull(r?.cpPct ?? r?.cp),
+   pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon ?? r?.price ?? r?.pTonRaw),
+    pricePerTonDM: toNumOrNull(r?.pricePerTonDM ?? r?.pTonDM),
+    nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
+    ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
+    fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
+    mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
+  }));
+}
+function round2(v){
+  return Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : null;
+}
 
-  const species = getSel('ctxSpecies');
-  const dcc = getNum('ctxDCC');
-  const gest = (species==='جاموس') ? 310 : 280;
-  const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
+function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
+  const cleanRows = Array.isArray(rows) ? rows : [];
+  const modeNorm = String(mode || 'tmr_asfed').trim();
+
+  const rationCore = analyzeRation(
+    cleanRows.map(r => ({
+      kg: r.asFedKg,
+      dm: r.dmPct,
+      cp: r.cpPct,
+      nel: r.nelMcalPerKgDM,
+      ndf: r.ndfPct,
+      fat: r.fatPct,
+      cat: r.cat
+    }))
+  );
+
+  const targetsCore = computeTargets({
+    species: context.species,
+    breed: context.breed,
+    daysInMilk: context.daysInMilk,
+    avgMilkKg: context.avgMilkKg,
+    pregnancyDays: context.pregnancyDays,
+    closeUp: context.closeUp
+  });
+
+  let totCost = null;
+  let mixPriceDM = null;
+  let mixPriceAsFed = null;
+
+  if (modeNorm === 'tmr_asfed') {
+    let totalAsFed = 0;
+    let totalDmKg = 0;
+    let totalCostVal = 0;
+
+    for (const r of cleanRows) {
+      const kg = Number(r.asFedKg || 0);
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+
+      const dmKg = kg * (dmPct / 100);
+      const cost = (kg / 1000) * pricePerTon;
+
+      totalAsFed += kg;
+      totalDmKg += dmKg;
+      totalCostVal += cost;
+    }
+
+    totCost = round2(totalCostVal);
+    mixPriceAsFed = totalAsFed > 0 ? round2((totalCostVal / totalAsFed) * 1000) : null;
+    mixPriceDM = totalDmKg > 0 ? round2((totalCostVal / totalDmKg) * 1000) : null;
+  }
+
+  if (modeNorm === 'tmr_percent') {
+    let dmFrac = 0;
+    let mixAsFed = 0;
+
+    for (const r of cleanRows) {
+      const pct = Number(r.pct || 0) / 100;
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+
+      dmFrac += pct * (dmPct / 100);
+      mixAsFed += pct * pricePerTon;
+    }
+
+    mixPriceAsFed = mixAsFed > 0 ? round2(mixAsFed) : null;
+    mixPriceDM = dmFrac > 0 ? round2(mixAsFed / dmFrac) : null;
+  }
+
+  if (modeNorm === 'split') {
+    const concKgNum = Number(concKg || 0);
+
+    let roughDm = 0;
+    let roughCost = 0;
+    let concDmFrac = 0;
+    let concMixAsFed = 0;
+
+    for (const r of cleanRows) {
+      const cat = String(r.cat || '').trim();
+      const dmPct = Number(r.dmPct || 0);
+      const pricePerTon = Number(r.pricePerTon || 0);
+      const kg = Number(r.asFedKg || 0);
+      const pct = Number(r.pct || 0);
+
+      if (cat === 'rough') {
+        const dmKg = kg * (dmPct / 100);
+        const cost = (kg / 1000) * pricePerTon;
+        roughDm += dmKg;
+        roughCost += cost;
+      }
+
+      if (cat === 'conc') {
+        const frac = pct / 100;
+        concDmFrac += frac * (dmPct / 100);
+        concMixAsFed += frac * pricePerTon;
+      }
+    }
+
+    const concKgDM = concKgNum * concDmFrac;
+    const concCost = (concKgNum / 1000) * concMixAsFed;
+    const totalCostAll = roughCost + concCost;
+    const totalDmAll = roughDm + concKgDM;
+
+    totCost = round2(totalCostAll);
+    mixPriceAsFed = concMixAsFed > 0 ? round2(concMixAsFed) : null;
+    mixPriceDM = concDmFrac > 0 ? round2(concMixAsFed / concDmFrac) : null;
+
+    if (rationCore?.totals) {
+      rationCore.totals.asFedKg = round2((rationCore.totals.asFedKg || 0) + concKgNum);
+      rationCore.totals.dmKg = round2(totalDmAll);
+    }
+  }
+
+ const milkKg = Number(context?.avgMilkKg || 0);
+const milkPriceNum = Number(milkPrice || 0);
+
+// ===== الطاقة: لازم الفعلي والاحتياج بنفس المقياس =====
+// الفعلي هنا /يوم = إجمالي طاقة العليقة اليومية
+const nelActualDay = round2(rationCore?.totals?.nelMcal ?? null);
+
+// اختياري للعرض المتقدم فقط: كثافة الطاقة /كجم DM
+const nelDensity = (rationCore?.totals?.dmKg > 0)
+  ? round2((rationCore?.totals?.nelMcal || 0) / rationCore.totals.dmKg)
+  : null;
+
+// ===== صحة الكرش: نسبة خشن/مركز على أساس DM =====
+let forageDm = 0;
+let concDm = 0;
+
+for (const r of cleanRows) {
+  const kg = Number(r.asFedKg || 0);
+  const dmPct = Number(r.dmPct || 0);
+  const dmKg = kg * (dmPct / 100);
+  const cat = String(r.cat || '').trim();
+
+  if (cat === 'rough') forageDm += dmKg;
+  if (cat === 'conc') concDm += dmKg;
+}
+
+forageDm = round2(forageDm) || 0;
+concDm = round2(concDm) || 0;
+
+const totalDmForRumen = forageDm + concDm;
+
+const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : 0;
+const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : 0;
+
+let rumenStatus = null;
+let rumenNote = null;
+
+if (totalDmForRumen <= 0) {
+  rumenStatus = 'warn';
+  rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
+} else {
+  const isBuffalo = String(context?.species || '').includes('جاموس');
+
+  // أبقار: ممتاز 40–60
+  // جاموس: نزود 25% خشن عن الأبقار => 50–75
+  const low  = isBuffalo ? 50 : 40;
+  const high = isBuffalo ? 75 : 60;
+
+  if (roughPctDM === 0 || concPctDM === 100) {
+    rumenStatus = 'danger';
+    rumenNote = 'العليقة 100% مركزات وخطر الحموضة وقلة دسم الحليب مرتفع';
+  } else if (roughPctDM < low) {
+    rumenStatus = 'danger';
+    rumenNote = 'الخشن منخفض وخطر الحموضة وقلة دسم الحليب مرتفع';
+  } else if (roughPctDM > high) {
+    rumenStatus = 'warn';
+    rumenNote = 'الخشن مرتفع وقد يقل المأكول';
+  } else {
+    rumenStatus = 'good';
+    rumenNote = 'النسبة ممتازة لصحة الكرش';
+  }
+}
+const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
+const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
+const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
+const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue - totCost) : null;
+
+  return normalizeNutritionAnalysis({
+    totals: {
+      asFedKg: rationCore?.totals?.asFedKg ?? null,
+      dmKg: rationCore?.totals?.dmKg ?? null,
+      totCost,
+      mixPriceDM,
+      mixPriceAsFed
+    },
+   nutrition: {
+  cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
+  fcRatio: concDm > 0 ? round2(forageDm / concDm) : null,
+  nelActual: nelActualDay,             // /يوم
+  nelDensity: nelDensity,              // /كجم DM للعرض المتقدم فقط
+  ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+  fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
+  roughPctDM,
+  concPctDM,
+  rumenStatus,
+  rumenNote,
+  rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
+},
+    targets: {
+      dmiTarget: targetsCore?.dmi ?? null,
+      nelTarget: targetsCore?.nel ?? null,
+      cpTarget: targetsCore?.cpTarget ?? null,
+      ndfTarget: targetsCore?.ndfTarget ?? null,
+      fatTarget: null,
+      starchMax: targetsCore?.starchMax ?? null
+    },
+    economics: {
+      costPerKgMilk,
+      dmPerKgMilk,
+      milkRevenue,
+      milkMargin
+    }
+  });
+}
+function pctOrNull(v){
+  return Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
+}
+
+function buildNutritionPanels(analysis = {}, context = {}) {
+  const totals = analysis?.totals || {};
+  const nutrition = analysis?.nutrition || {};
+  const targets = analysis?.targets || {};
+  const economics = analysis?.economics || {};
+
+  const num = (v, d = 2) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
+  };
+
+  const txt = (v, unit = '', d = 2) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    const out = Number.isInteger(n) ? String(n) : n.toFixed(d);
+    return unit ? `${out} ${unit}` : out;
+  };
+
+  const rough = num(nutrition.roughPctDM, 0);
+  const conc = num(nutrition.concPctDM, 0);
+
+  const analysisCards = [
+    {
+      key: 'dm',
+      title: 'المادة الجافة',
+      value: txt(totals.dmKg, 'كجم', 2),
+      actual: num(totals.dmKg, 2),
+      target: num(targets.dmiTarget, 2),
+      targetText: txt(targets.dmiTarget, 'كجم', 2)
+    },
+    {
+      key: 'asFed',
+      title: 'المأكول الكلي',
+      value: txt(totals.asFedKg, 'كجم', 2),
+      actual: num(totals.asFedKg, 2),
+      target: null,
+      targetText: '—'
+    },
+    {
+      key: 'cp',
+      title: 'البروتين الخام',
+      value: txt(nutrition.cpPctTotal, '%', 1),
+      actual: num(nutrition.cpPctTotal, 1),
+      target: num(targets.cpTarget, 1),
+      targetText: txt(targets.cpTarget, '%', 1)
+    },
+    {
+      key: 'rumen',
+      title: 'صحة الكرش',
+      value:
+        Number.isFinite(rough) && Number.isFinite(conc)
+          ? `خشن ${rough}% / مركز ${conc}%`
+          : '—',
+      actual: null,
+      target: null,
+      targetText: nutrition.rumenNote || '—'
+    }
+  ];
+
+  const economicsCards = [
+    {
+      key: 'totCost',
+      title: 'التكلفة/رأس',
+      value: Number.isFinite(Number(totals.totCost))
+        ? `${num(totals.totCost, 2)} ج`
+        : '—'
+    },
+    {
+      key: 'costPerKgMilk',
+      title: 'تكلفة كجم لبن',
+      value: Number.isFinite(Number(economics.costPerKgMilk))
+        ? `${num(economics.costPerKgMilk, 2)} ج/كجم`
+        : '—'
+    },
+    {
+  key: 'dmPerKgMilk',
+  title: 'كفاءة تحويل العلف',
+  value: Number.isFinite(Number(economics.dmPerKgMilk)) && Number(economics.dmPerKgMilk) > 0
+    ? `1 كجم مادة جافة → ${num(1 / Number(economics.dmPerKgMilk), 2)} كجم لبن`
+    : '—'
+},
+    {
+      key: 'mixPriceAsFed',
+      title: 'سعر طن العليقة',
+      value: Number.isFinite(Number(totals.mixPriceAsFed))
+        ? `${num(totals.mixPriceAsFed, 2)} ج/طن as-fed`
+        : '—'
+    },
+    {
+      key: 'milkMargin',
+      title: 'هامش لبن-علف',
+      value: Number.isFinite(Number(economics.milkMargin))
+        ? `${num(economics.milkMargin, 2)} ج`
+        : '—'
+    }
+  ];
+
+  const advancedCards = [
+    {
+      key: 'dmiTarget',
+      title: 'احتياجات المادة الجافة',
+      value: txt(targets.dmiTarget, 'كجم', 2)
+    },
+    {
+      key: 'totDM',
+      title: 'العليقة الحالية — مادة جافة',
+      value: txt(totals.dmKg, 'كجم', 2)
+    },
+    {
+      key: 'cpTarget',
+      title: 'احتياجات البروتين الخام',
+      value: txt(targets.cpTarget, '%', 1)
+    },
+    {
+      key: 'cpPctTotal',
+      title: 'العليقة الحالية — بروتين خام',
+      value: txt(nutrition.cpPctTotal, '', 1)
+    },
+    {
+      key: 'ndfTarget',
+      title: 'احتياجات الألياف NDF',
+      value: txt(targets.ndfTarget, '%', 0)
+    },
+    {
+      key: 'ndfPctActual',
+      title: 'العليقة الحالية — ألياف NDF',
+      value: txt(nutrition.ndfPctActual, '', 1)
+    },
+    {
+      key: 'fatTarget',
+      title: 'الحد المستهدف لدهن العليقة',
+      value: txt(targets.fatTarget, '', 1)
+    },
+    {
+      key: 'fatPctActual',
+      title: 'العليقة الحالية — دهن',
+      value: txt(nutrition.fatPctActual, '', 1)
+    },
+    {
+      key: 'nelTarget',
+      title: 'احتياجات الطاقة',
+      value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
+    },
+    {
+      key: 'nelActual',
+      title: 'العليقة الحالية — طاقة',
+      value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
+    }
+  ];
 
   return {
-   group: (
-  qp().get('group') ||
-  qp().get('groupName') ||
-  document.getElementById('animalInfo')?.textContent?.trim() ||
-  null
-),
-    species,
-    breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || window.currentAnimal?.breed || null),
-    daysInMilk: getNum('ctxDIM'),
-    avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
-    earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
-    closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
-    pregnancyStatus: getSel('ctxPreg'),
-    pregnancyDays: dcc,
-    daysToCalving
+    analysisCards,
+    economicsCards,
+    advancedCards
   };
 }
+async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
+  if (!db) return null;
 
-async function saveToServer(payload){
-  const { auth } = await import('/js/firebase-config.js');
+  const tries = [];
+  const s = String(rawNumber || '').trim();
+  const n = Number(s);
 
-  const uid = auth?.currentUser?.uid;
-  if(!uid) throw new Error('NO_AUTH');
+  if (s) tries.push(s);
+  if (Number.isFinite(n)) tries.push(n);
 
-  const API_BASE = window.API_BASE || '';
-  const res = await fetch(`${API_BASE}/api/nutrition/save`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': uid
-    },
-    body: JSON.stringify(payload)
-  });
+  for (const ownerField of ['userId', 'ownerUid']) {
+    for (const numberField of ['animalNumber', 'number']) {
+      for (const val of tries) {
+        try {
+          const snap = await db.collection('animals')
+            .where(ownerField, '==', tenant)
+            .where(numberField, '==', val)
+            .limit(1)
+            .get();
 
-  const data = await res.json().catch(() => ({}));
-  if(!res.ok || data?.ok === false){
-    throw new Error(data?.error || `HTTP ${res.status}`);
+          if (!snap.empty) return snap.docs[0];
+        } catch (_) {}
+      }
+    }
   }
 
-  return data;
+  return null;
 }
-function redirectSmart(delay = 250){
-  const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
-  setTimeout(()=>{ location.href = to; }, delay);
+// ============================================================
+//                API: NUTRITION TARGETS (CENTRAL)
+// ============================================================
+app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const ctx = body.context || {};
+
+    const targets = computeTargets(ctx);
+
+    return res.json({
+      ok: true,
+      targets
+    });
+  } catch (e) {
+    console.error('nutrition.targets error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_targets_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: 'nutrition_rows_required'
+      });
+    }
+
+   const context = normalizeNutritionContext(body.context || {});
+const mode = body.mode || 'tmr_asfed';
+const concKg = toNumOrNull(body.concKg);
+const milkPrice = toNumOrNull(body.milkPrice);
+
+const analysis = buildNutritionCentralAnalysis({
+  rows: normalizeNutritionRows(rows),
+  context,
+  mode,
+  concKg,
+  milkPrice
+});
+
+const panels = buildNutritionPanels(analysis, context);
+
+return res.json({
+  ok: true,
+  analysis,
+  panels
+});
+  } catch (e) {
+    console.error('nutrition.analyze-ration error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_analyze_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+// ============================================================
+//                  API: NUTRITION SAVE (CENTRAL)
+// ============================================================
+app.post('/api/nutrition/save', requireUserId, async (req, res) => {
+  try {
+    const tenant = req.userId;
+    const body = req.body || {};
+
+const isGroup = !!body.isGroup;
+
+const rawNumber =
+  body.animalNumber ||
+  body.number ||
+  body.animalId ||
+  '';
+
+const animalNumber = String(rawNumber || '').trim();
+const eventDate = asYMD(body.eventDate) || toYYYYMMDD(Date.now());
+
+const groupNumbers = Array.isArray(body.groupNumbers)
+  ? body.groupNumbers.map(x => String(x).trim()).filter(Boolean)
+  : [];
+
+if (!isGroup && !animalNumber) {
+  return res.status(400).json({ ok:false, error:'animalNumber_required' });
 }
 
-async function saveEvent(e){
-  e?.preventDefault?.();
+if (isGroup && !groupNumbers.length) {
+  return res.status(400).json({ ok:false, error:'groupNumbers_required' });
+}
 
-  const { rawNumber, nums, eventDate } = readUrlCtx();
-  const mode = (qp().get('mbkMode') || '').toString().trim().toLowerCase();
-  const isGroupMode = (mode === 'group' && Array.isArray(nums) && nums.length > 0);
+const nutrition = body.nutrition || {};
+const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
+const rows = normalizeNutritionRows(rawRows);
+const context = normalizeNutritionContext(nutrition.context || {});
 
-  const animalId = String(rawNumber || '').trim();
+console.log('NUTRITION SAVE rawRows.length =', rawRows.length);
+console.log('NUTRITION SAVE rawRows[0] =', rawRows[0] || null);
+console.log('NUTRITION SAVE normalizedRows.length =', rows.length);
+console.log('NUTRITION SAVE normalizedRows[0] =', rows[0] || null);
+console.log('NUTRITION SAVE normalizedContext =', context);
 
-  if(!animalId && !isGroupMode){
-   showCentralMsg('⚠️ لا يمكن الحفظ بدون رقم الحيوان/المجموعة في الرابط.', 'error');
-    return;
-  }
-
-  if(
-    (document.getElementById('ctxSpecies')?.value || '') === '' &&
-    (document.getElementById('ctxDIM')?.value || '') === '' &&
-    (document.getElementById('ctxAvgMilk')?.value || '') === ''
-  ){
-   showCentralMsg('⚠️ تم منع الحفظ: لم يتم تحميل بيانات السياق.', 'error');
-    return;
-  }
-
-  let rows = [];
-  if (Array.isArray(window.rationItems) && window.rationItems.length) {
-    rows = window.rationItems;
-  } else {
-    rows = collectRows();
-  }
-
-  if (!rows.length) {
-   showCentralMsg('⚠️ لا يمكن الحفظ بدون خامات في العليقة.', 'error');
-    return;
-  }
-
-  const payload = cleanDeep({
-    animalNumber: isGroupMode ? null : animalId,
-    eventDate,
-    isGroup: isGroupMode,
-    eventType: isGroupMode ? 'تغذية مجموعة' : 'تغذية',
-    type: isGroupMode ? 'nutrition_group' : 'nutrition',
-
-    groupNumbers: isGroupMode ? nums.map(x => String(x).trim()).filter(Boolean) : null,
-    groupSize: isGroupMode ? nums.length : null,
-
-    nutrition: {
-      mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
-      rows,
-      context: readContext(),
-      concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-      milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
+if (!rows.length) {
+  return res.status(400).json({
+    ok:false,
+    error:'nutrition_rows_required',
+    debug: {
+      rawRowsLength: rawRows.length,
+      firstRawRow: rawRows[0] || null,
+      normalizedRowsLength: rows.length,
+      firstNormalizedRow: rows[0] || null
     }
   });
-
-  disableSave(true);
-  showCentralMsg('⏳ جارٍ الحفظ...', 'info');
-
-  try{
-    
-   await saveToServer(payload);
-
-const ctx = readContext();
-const groupName = String(ctx?.group || '').trim();
-
-const successMsg = isGroupMode
-  ? `✅ تم حفظ تغذية مجموعة "${groupName || 'بدون اسم'}"`
-  : `✅ تم حفظ تغذية الحيوان رقم ${animalId}`;
-
-showCentralMsg(successMsg, 'success');
-window.dispatchEvent(
-  new CustomEvent('mbk:success', {
-    detail: { message: successMsg }
-  })
-);
-redirectSmart(900);
-  }catch(err){
-    console.error(err);
-    disableSave(false);
-   showCentralMsg('❌ فشل الحفظ على السحابة.', 'error');
-  }
 }
-async function waitForAuthReady(timeoutMs = 5000){
-  const { auth } = await import('/js/firebase-config.js');
-  const fa = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-  const { onAuthStateChanged } = fa;
 
-  return await new Promise(resolve=>{
-    let done = false;
-    const t = setTimeout(()=>{
-      if(done) return;
-      done = true;
-      resolve(auth?.currentUser || null);
-    }, timeoutMs);
+const mode = nutrition.mode || 'tmr_asfed';
+const concKg = toNumOrNull(nutrition.concKg);
+const milkPrice = toNumOrNull(nutrition.milkPrice);
 
-    const unsub = onAuthStateChanged(auth, (user)=>{
-      if(done) return;
-      done = true;
-      clearTimeout(t);
-      try{ unsub(); }catch(_){}
-      resolve(user || null);
+const centralAnalysis = buildNutritionCentralAnalysis({
+  rows,
+  context,
+  mode,
+  concKg,
+  milkPrice
+});
+   let animalDoc = null;
+let animalDocId = '';
+
+if (!isGroup && db) {
+  animalDoc = await findAnimalDocRefByNumberForTenant(tenant, animalNumber);
+  if (!animalDoc) {
+    return res.status(404).json({ ok:false, error:'animal_not_found' });
+  }
+  animalDocId = animalDoc.id;
+}
+
+    const nowMs = Date.now();
+
+ const doc = cleanObj({
+  userId: tenant,
+  ownerUid: tenant,
+
+  animalId: isGroup ? null : (animalDocId || animalNumber),
+  animalNumber: isGroup
+    ? null
+    : (Number.isFinite(Number(animalNumber)) ? Number(animalNumber) : animalNumber),
+
+  groupNumbers: isGroup ? groupNumbers : null,
+  groupSize: isGroup ? groupNumbers.length : null,
+
+  type: isGroup ? 'nutrition_group' : 'nutrition',
+  eventType: isGroup ? 'تغذية مجموعة' : 'تغذية',
+  eventTypeNorm: isGroup ? 'nutrition_group' : 'nutrition',
+
+  eventDate,
+  date: eventDate,
+  ts: nowMs,
+  source: '/nutrition.html',
+
+  nutrition: {
+    mode: nutrition.mode || 'tmr_asfed',
+    rows,
+    context,
+    analysis: centralAnalysis
+  }
+});
+
+    const localEvents = readJson(eventsPath, []);
+    localEvents.push({ id: localEvents.length + 1, ...doc });
+    fs.writeFileSync(eventsPath, JSON.stringify(localEvents, null, 2));
+
+    let firestoreId = null;
+
+    if (db) {
+      const fireDoc = {
+        ...doc,
+        createdAt: admin.firestore.Timestamp.fromMillis(nowMs)
+      };
+
+      const ref = await db.collection('events').add(fireDoc);
+      firestoreId = ref.id;
+    }
+
+    return res.json({
+      ok: true,
+      saved: true,
+      eventType: 'nutrition',
+      animalNumber,
+      eventDate,
+      firestoreId
+    });
+
+  } catch (e) {
+    console.error('nutrition.save error:', e);
+    return res.status(500).json({ ok:false, error:'nutrition_save_failed', message: e.message || String(e) });
+  }
+});
+app.post('/api/events', requireUserId, async (req, res) => {
+  try {
+    const event = req.body || {};
+    const tenant = req.userId;
+    event.userId = tenant;
+   
+
+    if (!event.type || !event.animalId) {
+      return res.status(400).json({ ok:false, error:'missing_fields' });
+    }
+
+    const events = readJson(eventsPath, []);
+    event.id = events.length + 1;
+    if (!event.ts) event.ts = Date.now();
+    events.push(event);
+    fs.writeFileSync(eventsPath, JSON.stringify(events, null, 2));
+
+      if (db) {
+      const t = String(event.type || "").toLowerCase();
+      const typeNorm =
+        t.includes("insemin") || t.includes("تلقيح")
+          ? "insemination"
+          : t.includes("preg") || t.includes("حمل")
+          ? "pregnancy"
+          : t.includes("calv") || t.includes("ولادة")
+          ? "birth"
+          : t.includes("heat") || t.includes("شياع")
+          ? "heat"
+          : "event";
+
+      const whenMs = Number(event.ts || Date.now());
+
+      // -------- 1) حفظ الحدث في events --------
+     const doc = {
+  ...event,   // ← يحفظ كل البيانات القادمة من الصفحة
+
+  userId: tenant,
+  animalId: String(event.animalId || ""),
+  type: typeNorm,
+  date: toYYYYMMDD(whenMs),
+  createdAt: admin.firestore.Timestamp.fromMillis(whenMs)
+};
+
+      doc.eventTypeNorm = normalizeEventType(event.type);
+
+      try {
+        await db.collection("events").add(doc);
+      } catch (e) {
+        console.error("events.save error:", e.message || e);
+      }
+
+      // -------- 2) تجهيز تحديث وثيقة الحيوان --------
+      const update = {};
+      const evDate = toYYYYMMDD(whenMs);
+      const raw    = t;
+      const result = String(event.result || event.status || "").toLowerCase();
+
+      // ===== الحالة التناسلية =====
+      if (/preg|حمل/.test(raw) && /(positive|ايجاب|عشار|حامل)/.test(result)) {
+        update.reproductiveStatus = "pregnant";
+        update.lastDiagnosisDate  = evDate;
+      }
+      else if (/preg|حمل/.test(raw) && /(neg|سلب|فارغ)/.test(result)) {
+        update.reproductiveStatus = "open";
+        update.lastDiagnosisDate  = evDate;
+      }
+      else if (/insemin|تلقيح/.test(raw)) {
+        update.reproductiveStatus   = "inseminated";
+        update.lastInseminationDate = evDate;
+      }
+      else if (/calv|birth|ولادة/.test(raw)) {
+        update.reproductiveStatus = "fresh";
+        update.lastCalvingDate    = evDate;
+      }
+      else if (/abortion|اجهاض/.test(raw)) {
+        update.reproductiveStatus = "aborted";
+        update.lastAbortionDate   = evDate;
+      }
+
+      // ===== الحالة الإنتاجية =====
+      if (/milk|لبن/.test(raw)) {
+        update.productionStatus = "milking";
+      }
+
+      if (/dry|تجفيف|جاف/.test(raw)) {
+        update.productionStatus = "dry";
+        update.lastDryOffDate   = evDate;
+      }
+
+      if (/calv|birth|ولادة/.test(raw)) {
+        update.productionStatus = "milking";
+      }
+
+      if (/close|تحضير/.test(raw)) {
+        update.productionStatus = "close_up";
+        update.lastCloseUpDate  = evDate;
+      }
+
+      // -------- 3) تطبيق التحديث على animals --------
+          // -------- 3) تطبيق التحديث على animals --------
+      if (Object.keys(update).length > 0 && event.animalId) {
+        try {
+          const num = isNaN(Number(event.animalId))
+            ? String(event.animalId)
+            : Number(event.animalId);
+
+          const snapAnimals = await db
+            .collection("animals")
+            .where("userId", "==", tenant)
+            .where("number", "==", num)
+            .limit(10)
+            .get();
+
+          for (const d of snapAnimals.docs) {
+            await d.ref.set(update, { merge: true });
+            console.log("🔥 animal updated:", d.id, update);
+          }
+        } catch (e) {
+          console.error("animals.update error:", e.message || e);
+        }
+      }
+    }
+
+    res.json({ ok:true, event });
+  } catch (e) {
+    console.error('events', e);
+    res.status(500).json({ ok:false, error:'failed_to_save_event' });
+  }
+});
+
+
+
+
+// ============================================================
+//                       API: ALERTS
+// ============================================================
+app.get('/api/alerts', async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
+    const tenant   = resolveTenant(req);
+    const animalId = req.query.animalId || null;
+    const sinceMs  = Number(req.query.since || 0);
+    const days     = Number(req.query.days || 0);
+    const limit    = Math.min(Number(req.query.limit || 100), 2000);
+
+   let q = db.collection('alerts').where('userId','==', tenant);
+
+    if (animalId) q = q.where('subject.animalId', '==', animalId);
+
+    let since = sinceMs;
+    if (!since && days > 0) since = Date.now() - days * dayMs;
+    if (since) q = q.where('ts', '>=', since);
+
+    q = q.orderBy('ts', 'desc').limit(limit);
+    const snap = await q.get();
+    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json({ ok:true, count: arr.length, alerts: arr });
+  } catch (e) {
+    console.error('alerts', e);
+    res.status(500).json({ ok:false, error:'alerts_failed' });
+  }
+});
+
+// ============================================================
+//                       API: ANIMAL TIMELINE
+// ============================================================
+app.get('/api/animal-timeline', async (req, res) => {
+  try {
+    const animalId = String(req.query.animalId || '').trim();
+    const limit = Math.min(Number(req.query.limit || 200), 1000);
+    if (!animalId) return res.status(400).json({ ok:false, error:'animalId required' });
+
+    const items = [];
+
+    const events = readJson(eventsPath, []);
+    events.filter(e => String(e.animalId) === animalId)
+      .forEach(e => items.push({
+        kind:'event',
+        ts: e.ts || toDate(e.date)?.getTime() || Date.now(),
+        title: e.type || e.title || 'حدث',
+        summary: e.note || e.notes || ''
+      }));
+
+    if (db) {
+      const alSnap = await db.collection('alerts')
+        .where('subject.animalId', '==', animalId)
+        .orderBy('ts','desc').limit(limit).get().catch(()=>({docs:[]}));
+      for (const d of (alSnap.docs||[])) {
+        items.push({ kind:'alert', ts: d.get('ts'), code: d.get('code'), summary: d.get('message') });
+      }
+      const devSnap = await db.collection('devices')
+        .where('subject.animalId','==', animalId)
+        .limit(50).get().catch(()=>({docs:[]}));
+      for (const d of (devSnap.docs||[])) {
+        const m = d.get('metrics') || {};
+        const summary = Object.entries(m).slice(0,3).map(([k,v]) => `${k}: ${v.value}${v.unit||''}`).join(' • ');
+        items.push({ kind:'reading', ts: d.get('lastSeen') || 0, name: d.id, summary });
+      }
+    }
+
+    items.sort((a,b)=>b.ts-a.ts);
+    res.json({ ok:true, items: items.slice(0, limit) });
+  } catch (e) {
+    console.error('timeline', e);
+    res.status(500).json({ ok:false, error:'timeline_failed' });
+  }
+});
+
+// =============================================
+//   /api/herd-stats  —  Murabbik Full Edition
+// =============================================
+app.get("/api/herd-stats", async (req, res) => {
+  try {
+    const uid = req.headers["x-user-id"];
+    if (!uid) return res.json({ ok:false, error:"NO_USER" });
+
+    // --------------------------------------
+    // 🔥 1) جلب الحيوانات
+    // --------------------------------------
+    const snap = await db
+      .collection("animals")
+      .where("userId", "==", uid)
+      .get();
+
+    const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const active = animals.filter(a => {
+      const st = String(a.status || a.lifeStatus || "").toLowerCase();
+      return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
+    });
+
+    const total = active.length;
+
+    // --------------------------------------
+    // 🔥 2) خصوبة من الوثيقة
+    // --------------------------------------
+    let preg = 0,
+        aborts = 0,
+        servicesSum = 0,
+        servicesN = 0,
+        openDaysSum = 0,
+        openDaysN = 0;
+
+    for (const a of active) {
+      const rep  = String(a.reproductiveStatus || "").toLowerCase();
+      const diag = String(a.lastDiagnosisResult || "").toLowerCase();
+
+      const isPreg =
+        rep.includes("عشار") ||
+        rep.includes("preg") ||
+        diag.includes("عشار");
+
+      if (isPreg) {
+        preg++;
+
+        const sc = Number(a.servicesCount || 0);
+        if (sc > 0) {
+          servicesSum += sc;
+          servicesN++;
+        }
+
+        const calv = a.lastCalvingDate ? new Date(a.lastCalvingDate) : null;
+        const ins  = a.lastInseminationDate ? new Date(a.lastInseminationDate) : null;
+
+        if (calv && ins) {
+          const d = Math.floor((ins - calv) / 86400000);
+          if (d >= 0 && d < 400) {
+            openDaysSum += d;
+            openDaysN++;
+          }
+        }
+      }
+
+      if (a.lastAbortionDate) aborts++;
+    }
+
+    const pregPct = total ? Math.round((preg * 100) / total) : 0;
+    const servicesPerConception =
+      servicesN ? +(servicesSum / servicesN).toFixed(2) : 0;
+    const conceptionPct =
+      servicesPerConception ? Math.round(100 / servicesPerConception) : 0;
+    const openDaysAvg =
+      openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
+    const abortPct =
+      (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
+
+    // --------------------------------------
+    // 🔥 3) نفوق + استبعاد
+    // --------------------------------------
+    const cullProd   = animals.filter(a => a.cullReason === "productivity").length;
+    const cullRepro  = animals.filter(a => a.cullReason === "reproduction").length;
+    const cullHealth = animals.filter(a => a.cullReason === "health").length;
+
+    const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
+    const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
+    const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
+
+    // --------------------------------------
+    // 🔥 4) كاميرا
+    // --------------------------------------
+    const bcsVals = active.map(a => Number(a.lastBCS || 0)).filter(x=>x>0);
+    const fecesVals = active.map(a => Number(a.lastFecesScore || 0)).filter(x=>x>0);
+
+    const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
+    const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
+
+    // --------------------------------------
+    // 🔥 5) خصوبة 21 يوم من الأحداث (FERTILITY EVENTS)
+    // --------------------------------------
+    let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0 };
+
+    try {
+      const evSnap = await db.collection("events")
+        .where("userId", "==", uid)
+        .limit(5000)
+        .get();
+
+      const ev = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const heats = ev.filter(e => e.eventTypeNorm === "heat" && e.eventDate);
+      const ins   = ev.filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
+      const pregP = ev.filter(e =>
+        e.eventTypeNorm === "pregnancy_diagnosis" &&
+        (String(e.result).includes("عشار") || String(e.result).includes("positive"))
+      );
+
+      heats.forEach(e => e.ms = new Date(e.eventDate).getTime());
+      ins.forEach(e => e.ms = new Date(e.eventDate).getTime());
+      pregP.forEach(e => e.ms = new Date(e.eventDate).getTime());
+
+      // --- S/C+ ---
+      let sc_total=0, sc_conc=0;
+      for (const p of pregP) {
+        const linked = ins.filter(i =>
+          i.animalId === p.animalId &&
+          i.ms <= p.ms &&
+          (p.ms - i.ms) <= 90*86400000
+        );
+        if (linked.length) {
+          sc_conc++;
+          sc_total += linked.length;
+        }
+      }
+      const scPlus = sc_conc ? +(sc_total / sc_conc).toFixed(2) : 0;
+
+      // --- 21d window ---
+      const now = Date.now();
+      const win = now - 21*86400000;
+
+      const heats21 = heats.filter(e=>e.ms >= win);
+      const ins21   = ins.filter(e=>e.ms >= win);
+      const preg21  = pregP.filter(e=>e.ms >= win);
+
+      const eligible = active.filter(a=>{
+        if (!a.lastCalvingDate) return false;
+        const dim = (now - new Date(a.lastCalvingDate)) / 86400000;
+        return dim>=40 && dim<=300 &&
+               !String(a.reproductiveStatus).includes("عشار");
+      }).length;
+
+      const hdr21 = eligible ? Math.round((heats21.length*100)/eligible) : 0;
+      const cr21  = ins21.length ? Math.round((preg21.length*100)/ins21.length) : 0;
+      const pr21  = Math.round((hdr21/100) * cr21);
+
+      extraFertility = { scPlus, hdr21, cr21, pr21 };
+
+    } catch(e){
+      console.error("FERTILITY EVENT ERROR", e);
+    }
+
+    // --------------------------------------
+    // 🔥 6) RETURN — النتيجة النهائية للداشبورد
+    // --------------------------------------
+    return res.json({
+      ok: true,
+      totals: {
+        totalActive: total,
+        pregnant: { count: preg, pct: pregPct },
+      },
+
+      fertility: {
+        servicesPerConception,
+        conceptionRatePct: conceptionPct,
+        scPlus: extraFertility.scPlus,
+        hdr21:  extraFertility.hdr21,
+        cr21:   extraFertility.cr21,
+        pr21:   extraFertility.pr21
+      },
+
+      openDaysAvg,
+      abortionRatePct: abortPct,
+
+      culling: {
+        productivity: cullProdPct,
+        reproduction: cullReproPct,
+        health: cullHealthPct
+      },
+
+      bcsCamera,
+      fecesScore
+    });
+
+  } catch (e) {
+    console.error("HERD-STATS ERROR:", e);
+    return res.json({ ok:false, error:e.message });
+  }
+});
+
+
+// ============================================================
+//                       API: ANIMALS (robust)
+// ============================================================
+app.get('/api/animals', async (req, res) => {
+  const tenant = resolveTenant(req);
+
+  try {
+    // لو Firestore متاح جرّب أولاً
+    if (db) {
+      try {
+        const snap = await db.collection('animals')
+          .where('userId', '==', tenant)
+          .limit(2000)
+          .get();
+
+        const animals = snap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() || {})
+        }));
+
+        // حتى لو فاضي → تظل استجابة ناجحة
+        return res.json({ ok: true, animals });
+      } catch (e) {
+        // نطبع الخطأ في اللوج لكن ما نكسّرش الـ API
+        console.error('animals firestore error:', e.code || e.message || e);
+        // نكمل على الـ fallback المحلي
+      }
+    }
+
+    // إما db=null أو Firestore فشل → fallback محلي
+    const animalsLocal = readJson(animalsPath, []).filter(a => belongs(a, tenant));
+    return res.json({ ok: true, animals: animalsLocal });
+
+  } catch (e) {
+    console.error('animals fatal error:', e);
+    // الحالة دي نادرة جداً (كسر في السيرفر نفسه)
+    return res.status(500).json({ ok: false, error: 'animals_fatal' });
+  }
+});
+
+// ===== Helper: compute eventDate from any shape =====
+function computeEventDateFromDoc(data = {}) {
+  // 1) قيم جاهزة بصيغة YYYY-MM-DD
+  if (typeof data.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.eventDate)) {
+    return data.eventDate;
+  }
+
+  const dateFields = [
+    'date',
+    'event_date',
+    'calvingDate',
+    'dryOffDate',
+    'abortionDate',
+    'closeupDate'
+  ];
+
+  for (const f of dateFields) {
+    const v = data[f];
+    if (!v) continue;
+
+    if (typeof v === 'string') {
+      // لو فيها تاريخ كامل أو ISO → ناخد أول 10 حروف
+      const m = v.match(/\d{4}-\d{2}-\d{2}/);
+      if (m) return m[0];
+    }
+  }
+
+  // 2) eventDateUtc
+  if (typeof data.eventDateUtc === 'string') {
+    const m = data.eventDateUtc.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+  }
+
+  // 3) طوابع زمنية
+  const ts = data.ts || data.createdAt;
+  if (ts && typeof ts === 'object' && typeof ts._seconds === 'number') {
+    return toYYYYMMDD(ts._seconds * 1000);
+  }
+  if (typeof ts === 'number') {
+    return toYYYYMMDD(ts);
+  }
+
+  // مفيش تاريخ واضح
+  return null;
+}
+
+// ============================================================
+//                 ADMIN: transfer owner (safe)
+// ============================================================
+app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    const from = String(req.query.from || '').trim();
+    const to   = String(req.query.to   || '').trim();
+    const numsParam = String(req.query.nums || '').trim();
+    const apply = String(req.query.apply || '') === '1';
+    const uidOk = s => /^[A-Za-z0-9_-]{16,64}$/.test(s);
+    if (!from || !to || !numsParam) return res.status(400).json({ ok:false, error:'from,to,nums required' });
+    if (!uidOk(from) || !uidOk(to))  return res.status(400).json({ ok:false, error:'invalid uid' });
+    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
+  const adb = db;
+
+
+    function uniqPush(set,d){ if(d&&d.exists) set.set(d.ref.path,d); }
+    async function findByNumber(val){
+      const set=new Map(); const cand=[val]; const n=Number(val); if(!Number.isNaN(n)) cand.push(n);
+      for (const v of cand) {
+        try { (await adb.collection('animals').where('number','==',v).limit(50).get()).docs.forEach(d=>uniqPush(set,d)); } catch {}
+       
+      }
+      try { const d=await adb.collection('animals').doc(String(val)).get(); uniqPush(set,d); } catch {}
+      return [...set.values()];
+    }
+
+    const plan=[];
+    for (const num of wanted) {
+      const docs = await findByNumber(num);
+      for (const d of docs) {
+        const a=d.data()||{};
+        const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
+        const willUpdate = String(owner||'').trim() === from;
+        plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before: owner??null, willUpdate });
+      }
+    }
+
+    let updated=0;
+    if (apply) {
+      let batch = adb.batch(); let ops=0;
+      for (const p of plan) {
+        if (!p.willUpdate) continue;
+        const ref = adb.doc(p.path);
+       batch.set(ref, { userId: to }, { merge:true });
+
+        updated++; ops++;
+        if (ops>=450) { await batch.commit(); batch=adb.batch(); ops=0; }
+      }
+      if (ops>0) await batch.commit();
+    }
+
+    try { await db.collection('admin_audits').add({ kind:'animals.transfer-owner', ts:Date.now(), apply, from, to, nums:wanted, matched: plan.filter(p=>p.willUpdate).length, updated }); } catch {}
+
+    res.json({ ok:true, dryRun: !apply, from, to, nums:wanted, found: plan.length, matched: plan.filter(p=>p.willUpdate).length, updated, plan });
+  } catch (e) {
+    console.error('transfer-owner', e);
+    res.status(500).json({ ok:false, error: e?.message || 'transfer_failed' });
+  }
+});
+
+// ============================================================
+//                 FIX: claim numbers to current user
+// ============================================================
+app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    const tenant = req.userId;
+    const numsParam = String(req.query.nums || '').trim();
+    const allow = new Set(String(req.query.allow||'').split(',').map(s=>s.trim()).filter(Boolean));
+    const dry = String(req.query.dry||'') === '1';
+    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required' });
+
+   const adb = db;
+
+    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
+    const seen = new Map();
+    const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
+
+    async function findByNumber(v){
+      const cand=[v]; const n=Number(v); if(!Number.isNaN(n)) cand.push(n);
+      for(const x of cand){
+        try{ (await adb.collection('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
+       
+      }
+      try{ const d=await adb.collection('animals').doc(String(v)).get(); push(d);}catch{}
+    }
+
+    for(const num of wanted) await findByNumber(num);
+
+    const plan=[];
+    for(const d of seen.values()){
+      const a=d.data()||{};
+      const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
+      const can = !owner || allow.has(String(owner).trim());
+      plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before:owner??null, willUpdate:!!can });
+      if (can && !dry) await d.ref.set({ userId: tenant }, { merge:true });
+
+    }
+
+    res.json({ ok:true, dryRun:dry, tenant, found:plan.length,
+      updated: dry ? 0 : plan.filter(p=>p.willUpdate).length, plan });
+  } catch (e) {
+    console.error('claim error', e);
+    res.status(500).json({ ok:false, error:e?.message||'claim_failed' });
+  }
+});
+
+// ============================================================
+//                 DEBUG: SENSORS HEALTH (always safe)
+// ============================================================
+app.get('/api/sensors/health', async (_req, res) => {
+  // لو مفيش Firestore أصلاً → نعتبر مفيش أجهزة ونرجّع 0
+  if (!db) {
+    return res.json({ ok: true, devices: 0 });
+  }
+
+  try {
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+    const snap = await db.collection('devices')
+      .where('lastSeen', '>=', tenMinAgo)
+      .get();
+
+    const count = snap.docs
+      .map(d => (d.data().type || '').toLowerCase())
+      .filter(t => t !== 'env' && t !== 'thi').length;
+
+    return res.json({ ok: true, devices: count });
+  } catch (e) {
+    console.error('sensors/health error:', e.code || e.message || e);
+    // لا نكسّر الداشبورد أبداً بسبب الحساسات
+    return res.json({ ok: true, devices: 0 });
+  }
+});
+
+
+if (ADMIN_DEV_OPEN) {
+  app.get('/api/debug/echo-tenant', (req, res) => {
+    const headerUserId = req.headers['x-user-id'] || null;
+    const queryUserId = req.query.userId || null;
+    const resolvedTenant = headerUserId || queryUserId || 'none';
+    res.json({
+      header_x_user_id: headerUserId,
+      query_user_id: queryUserId,
+      resolvedTenant,
+      env: 'DEV',
+      time: new Date().toISOString()
     });
   });
 }
-// =====================
-// Bind
-// =====================
-(function bind(){
- const form = document.getElementById('nutritionForm');
-if (form) {
-  form.addEventListener('mbk:valid', saveEvent);
-  form.addEventListener('submit', saveEvent);
-}
 
- const btn = document.getElementById('saveEvent');
-if (btn) {
-  btn.type = 'submit';
-}
-try{
-  setHiddenCtxFromQuery();
-  updateCtxView();
-  disableSave(true);
 
-const formNumEl  = document.getElementById('animalNumber');
-const formDateEl = document.getElementById('eventDate');
-const formIdEl   = document.getElementById('animalId');
+app.get('/alerts/:id', (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  const oldAlerts = readJson(alertsPath, []);
+  const userAlerts = oldAlerts.filter(a => a.user_id === userId);
+  res.json({ alerts: userAlerts });
+});
 
-  const p = new URLSearchParams(location.search);
-  const initialNum =
-    String(
-      p.get('animalNumber') ||
-      p.get('number') ||
-      p.get('animalId') ||
-      ''
-    ).trim();
+app.get('/timeline.html', ensureAdmin, (_req, res) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'www', 'timeline.html'));
+});
 
-  const initialDate =
-    String(
-      p.get('eventDate') ||
-      p.get('date') ||
-      ''
-    ).trim();
-
-  if (formNumEl) {
-    formNumEl.value = initialNum;
-    formNumEl.disabled = false;
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'www', 'index.html'));
+});// ============================================================
+//  DEBUG: Dump animals with explicit error logging
+// ============================================================
+app.get('/api/debug/animals/all', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ ok:false, error:'firestore_disabled' });
   }
 
-  if (formDateEl) {
-    formDateEl.value = initialDate;
-    formDateEl.disabled = false;
-  }
+  try {
+    const ref = db.collection('animals');
+    const snap = await ref.limit(5000).get();
 
-  if (formIdEl) {
-    formIdEl.value = initialNum;
-    formIdEl.disabled = false;
-  }
+    const animals = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
 
-  waitForAuthReady().then(user=>{
-    if(!user){
-      disableSave(true);
-      msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
-      return;
+    return res.json({
+      ok: true,
+      count: animals.length,
+      animals
+    });
+
+  } catch (e) {
+    console.error("🔥 DUMP ERROR:", e);
+    return res.status(500).json({
+      ok: false,
+      error: e.message || 'dump_failed'
+    });
+  }
+});
+// =======================================================
+// DEBUG — طباعة جميع الأحداث Events
+// =======================================================
+app.get('/api/debug/events/all', async (req, res) => {
+  try {
+    if (!db) {
+      return res.json({ ok: false, error: "Firestore not initialized" });
     }
-    Promise.resolve(loadCtxAuto())
-      .then(() => refreshTargets())
-      .then(() => initNutritionUI())
-      .catch(err => {
-        console.error(err);
-        disableSave(true);
-        showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
-      });
-  });
-}catch(e){
-    console.error(e);
-    disableSave(true);
-    msgWarn('⚠️ تعذر تهيئة الصفحة.');
-  }
-})();
-window.mbkNutrition = window.mbkNutrition || {};
-window.mbkNutrition.refreshTargets = refreshTargets;
-window.mbkNutrition.refreshRationAnalysis = refreshRationAnalysis;
-window.mbkNutrition.readContext = readContext;
 
-window.mbkNutrition.initNutritionUI = initNutritionUI;
+    const snap = await db.collection('events').limit(2000).get();
+    const out  = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+    res.json({ ok: true, count: out.length, events: out });
+  } catch (e) {
+    console.error("debug/events/all", e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+// =======================================================
+// ADMIN: Normalize all events (eventType / eventTypeNorm / eventDate)
+// =======================================================
+app.post('/api/admin/events/normalize', ensureAdmin, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ ok: false, error: 'firestore_disabled' });
+    }
+
+    const adb   = db;
+    const limit = parseInt(req.query.limit || '2000', 10);
+
+    const snap = await adb.collection('events')
+      .limit(limit)
+      .get();
+
+    let total   = 0;
+    let touched = 0;
+
+    let batch = adb.batch();
+    let ops   = 0;
+
+    for (const d of snap.docs) {
+      total++;
+      const data = d.data() || {};
+
+      // -------- 1) تحديد النوع الخام --------
+      const rawType =
+        data.eventType ||
+        data.type ||
+        data.kind ||
+        data.alertRule ||
+        '';
+
+      const norm = normalizeEventType(rawType);
+      let   eventType = data.eventType || '';
+
+      // -------- 2) ضبط eventType القياسي لو فاضي --------
+      if (!eventType) {
+        switch (norm) {
+          case 'insemination':
+            eventType = 'insemination';
+            break;
+          case 'pregnancy_diagnosis':
+            eventType = 'pregnancy_diagnosis';
+            break;
+          case 'calving':
+            eventType = 'calving';
+            break;
+          case 'dry_off':
+            eventType = 'dry_off';
+            break;
+          case 'daily_milk':
+            eventType = 'daily_milk';
+            break;
+          case 'lameness':
+            eventType = 'lameness';
+            break;
+          case 'nutrition':
+            eventType = 'nutrition';
+            break;
+          default:
+            eventType = rawType || norm || 'event';
+        }
+      }
+
+      // -------- 3) حساب eventDate --------
+      const evDate = computeEventDateFromDoc(data);
+
+      const update = {};
+
+      if (norm && data.eventTypeNorm !== norm) {
+        update.eventTypeNorm = norm;
+      }
+      if (eventType && data.eventType !== eventType) {
+        update.eventType = eventType;
+      }
+      if (evDate && data.eventDate !== evDate) {
+        update.eventDate = evDate;
+      }
+
+      if (Object.keys(update).length) {
+        batch.set(d.ref, update, { merge: true });
+        touched++;
+        ops++;
+
+        if (ops >= 400) {
+          await batch.commit();
+          batch = adb.batch();
+          ops   = 0;
+        }
+      }
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+    }
+
+    return res.json({
+      ok: true,
+      total,
+      normalized: touched
+    });
+  } catch (e) {
+    console.error('admin/events/normalize', e);
+    return res.status(500).json({
+      ok: false,
+      error: e.message || 'normalize_failed'
+    });
+  }
+});
+
+
+// Static last
+app.use(express.static(path.join(__dirname, 'www')));
+// ✅ DIM job
+startDailyDimJob();
+// (اختياري ومفيد) تشغيل مرة واحدة فورًا بعد كل Deploy:
+updateAllDIM();
+// Start
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
