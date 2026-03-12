@@ -720,11 +720,11 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       title: 'العليقة الحالية — ألياف NDF',
       value: txt(nutrition.ndfPctActual, '', 1)
     },
-    {
-      key: 'fatTarget',
-      title: 'الحد المستهدف لدهن العليقة',
-      value: txt(targets.fatTarget, '', 1)
-    },
+   {
+  key: 'fatLimit',
+  title: 'الحد المسموح به لدهن العليقة',
+  value: '6–7 % من المادة الجافة'
+},
     {
       key: 'fatPctActual',
       title: 'العليقة الحالية — دهن',
