@@ -49,16 +49,7 @@
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
   <script>
-window.cvReady = false;
-window.Module = {
-  onRuntimeInitialized() {
-    console.log("OpenCV Ready");
-    window.cvReady = true;
 
-    const bar = document.getElementById("opencvStatus");
-    if (bar) bar.textContent = "OpenCV جاهز للتحليل";
-  }
-};
 </script>
   <script>
 window.Module = {
@@ -143,6 +134,7 @@ window.Module = {
       ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
     </div>
+    <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
   </section>
 
   <div id="toast" class="toast"></div>
@@ -244,7 +236,7 @@ window.Module = {
 
   // ========= التقاط/تقدير =========
  btnShot.onclick = async()=>{
- <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
+
 
   try{
     let imgData = null;
