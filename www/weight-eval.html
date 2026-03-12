@@ -10,18 +10,9 @@
     :root{ --green:#0ea05a; --border:#c5e1a5; --card:#ffffff; --bg:#f7faf7; --text:#0f172a; }
     *{box-sizing:border-box;}
     body{margin:0;font-family:'Cairo','Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--text);}
-   <header>
-  <div class="mbk-head">
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-
-    <div class="mbk-center">
-      <div class="mbk-page-title">تقدير الوزن بالكاميرا</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
-    </div>
-
-    <a class="mbk-back" href="add-event.html">رجوع</a>
-  </div>
-</header>
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);
+      padding:12px 16px;display:flex;align-items:center;gap:12px;}
+    h1{margin:0;font-size:18px;color:var(--green);font-weight:800;}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px;}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;}
     label{font-weight:700;color:#14532d;font-size:13px;margin-bottom:4px;display:block}
@@ -59,18 +50,7 @@
   
   
 
-<header>
-  <div class="mbk-head">
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-
-    <div class="mbk-center">
-      <div class="mbk-page-title">تقدير الوزن بالكاميرا</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
-    </div>
-
-    <a class="mbk-back" href="add-event.html">رجوع</a>
-  </div>
-</header>
+  <header><h1>📏 تقدير الوزن بالكاميرا</h1></header>
 
   <section class="card">
     <!-- رقم الحيوان + التاريخ -->
