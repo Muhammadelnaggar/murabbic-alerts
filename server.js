@@ -360,13 +360,15 @@ function normalizeNutritionAnalysis(a = {}) {
       milkRevenue: toNumOrNull(a?.economics?.milkRevenue),
       milkMargin: toNumOrNull(a?.economics?.milkMargin)
     },
-    inputs: {
+       inputs: {
       bodyWeightKgUsed: toNumOrNull(a?.inputs?.bodyWeightKgUsed),
       milkFatPctUsed: toNumOrNull(a?.inputs?.milkFatPctUsed),
       milkProteinPctUsed: toNumOrNull(a?.inputs?.milkProteinPctUsed),
       lactationNumberUsed: toNumOrNull(a?.inputs?.lactationNumberUsed),
       thiUsed: toNumOrNull(a?.inputs?.thiUsed),
-      bcsUsed: toNumOrNull(a?.inputs?.bcsUsed)
+      bcsUsed: toNumOrNull(a?.inputs?.bcsUsed),
+      buffaloMilkEnergyFactor: toNumOrNull(a?.inputs?.buffaloMilkEnergyFactor),
+      buffaloDmiFactor: toNumOrNull(a?.inputs?.buffaloDmiFactor)
     }
   });
 }
@@ -397,12 +399,12 @@ const BREED_NUTRITION_DEFAULTS = {
   montbeliarde:           { bodyWeightKg: 680, milkFatPct: 4.0, milkProteinPct: 3.4 },
   simmental:              { bodyWeightKg: 700, milkFatPct: 4.1, milkProteinPct: 3.5 },
 
-  buffalo_masry:          { bodyWeightKg: 520, milkFatPct: 6.8, milkProteinPct: 4.2 },
-  buffalo_italian_cross:  { bodyWeightKg: 600, milkFatPct: 7.2, milkProteinPct: 4.4 },
+  buffalo_masry:          { bodyWeightKg: 525, milkFatPct: 6.8, milkProteinPct: 4.2 },
+  buffalo_italian_cross:  { bodyWeightKg: 610, milkFatPct: 7.2, milkProteinPct: 4.4 },
   buffalo_murrah_cross:   { bodyWeightKg: 650, milkFatPct: 7.5, milkProteinPct: 4.5 },
 
   default_cow:            { bodyWeightKg: 650, milkFatPct: 3.7, milkProteinPct: 3.2 },
-  default_buffalo:        { bodyWeightKg: 550, milkFatPct: 7.0, milkProteinPct: 4.3 }
+   default_buffalo:        { bodyWeightKg: 560, milkFatPct: 7.0, milkProteinPct: 4.3 }
 };
 
 function pickFirstFinite(...vals) {
@@ -452,7 +454,49 @@ function getGrowthFactor(lactationNumber) {
   if (n === 2) return 1.05;
   return 1;
 }
+function isBuffaloSpecies(species = '') {
+  return /جاموس|buffalo/i.test(String(species || '').trim());
+}
 
+function getBuffaloDmiFactor(species, breed = '') {
+  if (!isBuffaloSpecies(species)) return 1;
+
+  const b = String(breed || '').toLowerCase();
+  if (/مورا|murrah/.test(b)) return 1.03;
+  if (/ايطال|ital/i.test(b)) return 1.02;
+  if (/مصري|masry|egypt/i.test(b)) return 0.98;
+
+  return 1.00;
+}
+
+function getBuffaloMilkEnergyFactor(species, breed = '') {
+  if (!isBuffaloSpecies(species)) return 1;
+
+  const b = String(breed || '').toLowerCase();
+  if (/مورا|murrah/.test(b)) return 1.12;
+  if (/ايطال|ital/i.test(b)) return 1.10;
+  if (/مصري|masry|egypt/i.test(b)) return 1.08;
+
+  return 1.10;
+}
+
+function applyBuffaloNutritionRules(targetsCore = {}, context = {}) {
+  if (!isBuffaloSpecies(context?.species)) return targetsCore;
+
+  const milkKg = Number(context?.avgMilkKg || 0);
+
+  let cpTarget = 12;
+  if (milkKg >= 8 && milkKg < 12) cpTarget = 13;
+  else if (milkKg >= 12 && milkKg < 16) cpTarget = 14;
+  else if (milkKg >= 16) cpTarget = 15;
+
+  targetsCore.cpTarget = cpTarget;
+  targetsCore.ndfTarget = 34;
+  targetsCore.starchMax = 22;
+  targetsCore.roughageMin = 50;
+
+  return targetsCore;
+}
 function getBcsNelFactor(bcs) {
   const n = Number(bcs);
   if (!Number.isFinite(n)) return 1;
@@ -521,9 +565,9 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
     }))
   );
 
-   const runtimeCtx = deriveNutritionRuntimeContext(context);
+  const runtimeCtx = deriveNutritionRuntimeContext(context);
 
-  const targetsCore = computeTargets({
+  let targetsCore = computeTargets({
     species: context.species,
     breed: context.breed,
     daysInMilk: context.daysInMilk,
@@ -538,6 +582,8 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
     thi: runtimeCtx.thiUsed,
     bcs: runtimeCtx.bcsUsed
   });
+
+  targetsCore = applyBuffaloNutritionRules(targetsCore, context);
 
   const refBw = Number(runtimeCtx.breedDefaults?.bodyWeightKg || runtimeCtx.bodyWeightKgUsed || 0);
   const actualBw = Number(runtimeCtx.bodyWeightKgUsed || refBw || 0);
@@ -556,24 +602,43 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
     (0.0547 * Number(runtimeCtx.milkProteinPctUsed || 3.2)) +
     (0.0395 * 4.8);
 
-  const milkEnergyFactor = milkEnergyRef > 0 ? (milkEnergyActual / milkEnergyRef) : 1;
+  const milkEnergyFactorBase = milkEnergyRef > 0 ? (milkEnergyActual / milkEnergyRef) : 1;
+  const buffaloMilkEnergyFactor = getBuffaloMilkEnergyFactor(context.species, context.breed);
+  const buffaloDmiFactor = getBuffaloDmiFactor(context.species, context.breed);
+
   const thiDmiFactor = getThiDmiFactor(runtimeCtx.thiUsed);
   const growthFactor = getGrowthFactor(runtimeCtx.lactationNumberUsed);
   const bcsNelFactor = getBcsNelFactor(runtimeCtx.bcsUsed);
   const proteinFactor = Number(runtimeCtx.milkProteinPctUsed || 3.2) / 3.2;
 
   if (Number.isFinite(Number(targetsCore?.dmi))) {
-    targetsCore.dmi = round2(Number(targetsCore.dmi) * bwFactor * thiDmiFactor);
+    targetsCore.dmi = round2(
+      Number(targetsCore.dmi) *
+      bwFactor *
+      thiDmiFactor *
+      buffaloDmiFactor
+    );
   }
 
   if (Number.isFinite(Number(targetsCore?.nel))) {
-    targetsCore.nel = round2(Number(targetsCore.nel) * bwFactor * milkEnergyFactor * growthFactor * bcsNelFactor);
+    targetsCore.nel = round2(
+      Number(targetsCore.nel) *
+      bwFactor *
+      milkEnergyFactorBase *
+      buffaloMilkEnergyFactor *
+      growthFactor *
+      bcsNelFactor
+    );
   }
 
   if (Number.isFinite(Number(targetsCore?.cpTarget))) {
-    targetsCore.cpTarget = round2(Number(targetsCore.cpTarget) * growthFactor * proteinFactor);
+    const cpAfterProtein = Number(targetsCore.cpTarget) * proteinFactor;
+    targetsCore.cpTarget = round2(
+      isBuffaloSpecies(context.species)
+        ? cpAfterProtein
+        : cpAfterProtein * growthFactor
+    );
   }
-
   let totCost = null;
   let mixPriceDM = null;
   let mixPriceAsFed = null;
@@ -703,12 +768,12 @@ if (totalDmForRumen <= 0) {
   rumenStatus = 'warn';
   rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
 } else {
-  const isBuffalo = String(context?.species || '').includes('جاموس');
+  const isBuffalo = isBuffaloSpecies(context?.species);
 
   // أبقار: ممتاز 40–60
-  // جاموس: نزود 25% خشن عن الأبقار => 50–75
+  // جاموس: حد أدنى 50% خشن مع نطاق عملي أعلى
   const low  = isBuffalo ? 50 : 40;
-  const high = isBuffalo ? 75 : 60;
+  const high = isBuffalo ? 70 : 60;
 
   if (roughPctDM === 0 || concPctDM === 100) {
     rumenStatus = 'danger';
@@ -764,13 +829,15 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
       milkRevenue,
       milkMargin
     },
-    inputs: {
+       inputs: {
       bodyWeightKgUsed: runtimeCtx.bodyWeightKgUsed,
       milkFatPctUsed: runtimeCtx.milkFatPctUsed,
       milkProteinPctUsed: runtimeCtx.milkProteinPctUsed,
       lactationNumberUsed: runtimeCtx.lactationNumberUsed,
       thiUsed: runtimeCtx.thiUsed,
-      bcsUsed: runtimeCtx.bcsUsed
+      bcsUsed: runtimeCtx.bcsUsed,
+      buffaloMilkEnergyFactor: isBuffaloSpecies(context.species) ? buffaloMilkEnergyFactor : 1,
+      buffaloDmiFactor: isBuffaloSpecies(context.species) ? buffaloDmiFactor : 1
     }
   });
 }
@@ -904,6 +971,16 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       key: 'ndfPctActual',
       title: 'العليقة الحالية — ألياف NDF',
       value: txt(nutrition.ndfPctActual, '', 1)
+    },
+        {
+      key: 'starchMax',
+      title: 'الحد الأقصى للنشا',
+      value: txt(targets.starchMax, '%', 0)
+    },
+    {
+      key: 'roughageMin',
+      title: 'الحد الأدنى للخشن',
+      value: txt(targets.roughageMin, '%', 0)
     },
    {
   key: 'fatLimit',
