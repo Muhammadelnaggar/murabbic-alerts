@@ -99,11 +99,17 @@
 
     <canvas id="awCan"></canvas>
 
-    <div class="kpi3">
-      <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
-      <div class="kpi"><div class="lbl">عرض الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
-      <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
-    </div>
+   <div class="kpi3">
+  <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
+  <div class="kpi"><div class="lbl">عرض الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+  <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
+</div>
+
+<div class="kpi3">
+  <div class="kpi"><div class="lbl">حدة الصورة</div><div class="val" id="awSharp">—</div></div>
+  <div class="kpi"><div class="lbl">الإضاءة</div><div class="val" id="awLight">—</div></div>
+  <div class="kpi"><div class="lbl">الثقة</div><div class="val" id="awConf">—</div></div>
+</div>
 
     <div class="hint">
       ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
@@ -122,6 +128,7 @@
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
   const can=$('awCan'), ctx=can.getContext('2d');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
+  const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
@@ -129,6 +136,8 @@
   // ========= ثوابت/حالة =========
   const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
+  let currentConfidence = null, lastMetrics = null;
+  const visionState = {};
   const isDemo = new URLSearchParams(location.search).get('demo') === '1';
 
   // ========= تتبّع =========
@@ -183,14 +192,19 @@
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
 
-  // ========= الكاميرا =========
-  btnStart.onclick=async()=>{
-    try{
-      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
-      v.srcObject=stream;
-      setSource('camera'); fireTrack('camera_start');
-    }catch(e){ showToast('تعذّر فتح الكاميرا', true); }
-  };
+ btnStart.onclick=async()=>{
+  try{
+    stream = await window.vision.startCameraHD({
+      state: visionState,
+      preview: v
+    });
+    setSource('camera');
+    fireTrack('camera_start');
+  }catch(e){
+    console.error(e);
+    showToast('تعذّر فتح الكاميرا', true);
+  }
+};
 
   // ========= اختيار صورة =========
   file.onchange = ()=>{
@@ -202,40 +216,128 @@
   };
 
   // ========= التقاط/تقدير =========
-  btnShot.onclick=()=>{
-    if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
+ btnShot.onclick = async()=>{
+  if(!cvReady) return showToast('انتظر تحميل OpenCV.js', true);
 
-    if(currentSource==='camera'){
+  try{
+    let imgData = null;
+    let sharpness = 0;
+    let brightness = 0;
+
+    if(currentSource === 'camera'){
       if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
-      can.width=v.videoWidth; can.height=v.videoHeight;
-      ctx.drawImage(v,0,0,can.width,can.height);
+
+      const frames = await window.vision.captureBurst({
+        preview: v,
+        count: 5,
+        delayMs: 120
+      });
+
+      const best = window.vision.pickBestFrame(frames);
+      if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
+
+      sharpness = Math.round(best.sharpness || 0);
+      brightness = Math.round(best.brightness || 0);
+
+      imgData = await dataURLToImageData(best.dataURL);
+      lastShot = imgData;
     } else {
       if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
-      can.width = imgPrev.naturalWidth; can.height = imgPrev.naturalHeight;
+
+      can.width = imgPrev.naturalWidth;
+      can.height = imgPrev.naturalHeight;
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
+      imgData = ctx.getImageData(0,0,can.width,can.height);
+      lastShot = imgData;
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = can.width;
+      tempCanvas.height = can.height;
+      tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
+
+      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
+      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
     }
 
-    lastShot=ctx.getImageData(0,0,can.width,can.height);
+    const scale = detectArucoPxPerCm(imgData);
+    if(!scale){
+      outScale.textContent='—';
+      outSharp.textContent = sharpness ? String(sharpness) : '—';
+      outLight.textContent = brightness ? String(brightness) : '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      return showToast('لم تُكتشف علامة ArUco', true);
+    }
 
-    const scale=detectArucoPxPerCm(lastShot);
-    if(!scale){ outScale.textContent='—'; return showToast('لم تُكتشف علامة ArUco', true); }
-    pxPerCm=scale; outScale.textContent=pxPerCm.toFixed(2)+' px/cm';
+    pxPerCm = scale;
+    outScale.textContent = pxPerCm.toFixed(2)+' px/cm';
 
-    const mask=animalMask(lastShot);
-    if(!mask) return showToast('تعذّر تحديد الحيوان', true);
+    const mask = animalMask(imgData);
+    if(!mask){
+      outSharp.textContent = sharpness ? String(sharpness) : '—';
+      outLight.textContent = brightness ? String(brightness) : '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      return showToast('تعذّر تحديد الحيوان', true);
+    }
 
-    const chestPx=measureWidthAtSlice(mask,0.45);
-    if(!chestPx) return showToast('فشل قياس العرض', true);
+    const chestPx = measureWidthAtSlice(mask, 0.45);
+    if(!chestPx){
+      outSharp.textContent = sharpness ? String(sharpness) : '—';
+      outLight.textContent = brightness ? String(brightness) : '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      mask.delete?.();
+      return showToast('فشل قياس العرض', true);
+    }
 
-    const chestCm=chestPx/pxPerCm;
-    outChestW.textContent=chestCm.toFixed(1);
-    const HG=chestCm*GIRTH_FACTOR;
-    const W=Math.round((HG*HG*HG)/10880);
-    outWeight.textContent=W+' كجم';
+    const chestCm = chestPx / pxPerCm;
+    outChestW.textContent = chestCm.toFixed(1);
 
-    fireTrack('weight_estimated', {source: currentSource, px_per_cm:pxPerCm, chest_cm:chestCm, weight_kg:W});
-  };
+    const HG = chestCm * GIRTH_FACTOR;
+    const W = Math.round((HG*HG*HG)/10880);
+    outWeight.textContent = W+' كجم';
 
+    const confidence = scoreConfidence({
+      sharpness,
+      brightness,
+      pxPerCm,
+      chestCm,
+      weightKg: W,
+      hasMarker: true
+    });
+
+    currentConfidence = confidence;
+    lastMetrics = { sharpness, brightness, chestCm, weightKg: W, confidence };
+
+    outSharp.textContent = String(sharpness || '—');
+    outLight.textContent = String(brightness || '—');
+    outConf.textContent = confidence + '%';
+
+    if(confidence < 55){
+      showToast('جودة اللقطة ضعيفة — أعد التصوير من جانب الحيوان وبإضاءة أفضل', true);
+    } else if(confidence < 75){
+      showToast('تم التقدير — يفضّل إعادة لقطة أوضح لرفع الدقة');
+    } else {
+      showToast('✅ تم التقدير بجودة جيدة');
+    }
+
+    fireTrack('weight_estimated', {
+      source: currentSource,
+      px_per_cm: pxPerCm,
+      chest_cm: chestCm,
+      weight_kg: W,
+      sharpness,
+      brightness,
+      confidence
+    });
+
+    try{ mask.delete?.(); }catch(_){}
+  }catch(err){
+    console.error(err);
+    showToast('حدث خطأ أثناء التقدير', true);
+  }
+};
   async function postJSON(url, body){
     const res = await fetch(url, {
       method: 'POST',
@@ -254,6 +356,9 @@
 
     if(!animalNumber) return showToast('أدخل رقم الحيوان أولًا', true);
     if(!weightKg)     return showToast('نفّذ التقدير قبل الحفظ', true);
+    if(currentConfidence !== null && currentConfidence < 40){
+  return showToast('الثقة منخفضة جدًا — أعد التصوير قبل الحفظ', true);
+}
     // اشتراطات التشغيل المتفق عليها:
 if (currentSource === 'image' && !isDemo) {
   return showToast('الحفظ للصورة غير مسموح — استخدم الكاميرا أو فعّل وضع Demo.', true);
@@ -262,18 +367,23 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
 }
 
-    const payload={
-      eventType:'تقدير وزن',
-      feature:'weight_estimation',
-      sourceMode: currentSource,
-      method: 'auto(aruco+mask)',
-      marker_cm: ARUCO_MARKER_CM,
-      px_per_cm: pxPerCm || null,
-      chest_cm: Number(outChestW.textContent)||null,
-      estimatedWeightKg: weightKg,
-      animalNumber, eventDate,
-      source: location.pathname
-    };
+   const payload={
+  eventType:'تقدير وزن',
+  feature:'weight_estimation',
+  sourceMode: currentSource,
+  method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
+  marker_cm: ARUCO_MARKER_CM,
+  px_per_cm: pxPerCm || null,
+  chest_cm: Number(outChestW.textContent)||null,
+  estimatedWeightKg: weightKg,
+  confidence: currentConfidence,
+  quality: {
+    sharpness: lastMetrics?.sharpness || null,
+    brightness: lastMetrics?.brightness || null
+  },
+  animalNumber, eventDate,
+  source: location.pathname
+};
 
     pushContext();
     fireTrack('weight_save_click', {animalNumber, eventDate, weightKg, source: currentSource});
@@ -313,7 +423,33 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
       }
     }
   };
+    function scoreConfidence({ sharpness=0, brightness=0, pxPerCm=0, chestCm=0, weightKg=0, hasMarker=false } = {}){
+    let score = 0;
 
+    if (hasMarker) score += 30;
+
+    if (sharpness >= 1200) score += 25;
+    else if (sharpness >= 700) score += 18;
+    else if (sharpness >= 350) score += 10;
+
+    if (brightness >= 90 && brightness <= 190) score += 15;
+    else if (brightness >= 70 && brightness <= 210) score += 10;
+    else score += 4;
+
+    if (pxPerCm >= 8 && pxPerCm <= 80) score += 10;
+    if (chestCm >= 20 && chestCm <= 160) score += 10;
+    if (weightKg >= 40 && weightKg <= 1200) score += 10;
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  async function dataURLToImageData(dataURL){
+    const img = await window.vision.dataURLToImage(dataURL);
+    can.width = img.naturalWidth;
+    can.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0, can.width, can.height);
+    return ctx.getImageData(0,0,can.width,can.height);
+  }
   // ========= CV Helpers =========
   function detectArucoPxPerCm(imgData){
     if(!window.cv) return null; const cv = window.cv;
