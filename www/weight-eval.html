@@ -474,7 +474,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     if(!window.cv) return null; const cv = window.cv;
     const src=cv.matFromImageData(imgData);
     const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
-    const dict=new cv.aruco_Dictionary(cv.DICT_4X4_50);
+   const dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
     const params=new cv.aruco_DetectorParameters();
     const corners=new cv.MatVector(); const ids=new cv.Mat();
     cv.aruco.detectMarkers(gray,dict,corners,ids,params);
