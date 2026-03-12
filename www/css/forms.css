@@ -79,6 +79,7 @@ body{
   border:2px solid var(--brand-600);
   background:#fff;
   flex-shrink:0;
+  margin-left:6px;
 }
 
 /* ===============================
