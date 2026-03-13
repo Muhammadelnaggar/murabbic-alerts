@@ -98,7 +98,68 @@
       img.src = dataURL;
     });
   }
+  function detectCharucoScale(imgData){
 
+  const cv = window.cv;
+
+  const src = cv.matFromImageData(imgData);
+  const gray = new cv.Mat();
+
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+  const dictionary =
+    cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
+
+  const board =
+    new cv.aruco_CharucoBoard(
+      5,      // squares X
+      7,      // squares Y
+      0.025,  // square size meters
+      0.018,  // marker size meters
+      dictionary
+    );
+
+  const corners = new cv.MatVector();
+  const ids = new cv.Mat();
+
+  cv.aruco.detectMarkers(gray, dictionary, corners, ids);
+
+  if(ids.rows < 1){
+    src.delete(); gray.delete();
+    return null;
+  }
+
+  const charucoCorners = new cv.Mat();
+  const charucoIds = new cv.Mat();
+
+  cv.aruco.interpolateCornersCharuco(
+    corners,
+    ids,
+    gray,
+    board,
+    charucoCorners,
+    charucoIds
+  );
+
+  if(charucoIds.rows < 4){
+    src.delete(); gray.delete();
+    return null;
+  }
+
+  const p1 = charucoCorners.data32F;
+  const dx = p1[2] - p1[0];
+  const dy = p1[3] - p1[1];
+
+  const px = Math.sqrt(dx*dx + dy*dy);
+
+  const cm = 2.5; // square size
+
+  const scale = px / cm;
+
+  src.delete(); gray.delete();
+
+  return scale;
+}
   function drawFrameToCanvas(preview){
     const c = document.createElement('canvas');
     const w = preview.videoWidth || preview.clientWidth;
