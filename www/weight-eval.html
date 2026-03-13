@@ -48,9 +48,7 @@
   <script type="module" src="/js/vision-core.js"></script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
-  <script>
-
-</script>
+ 
   <script>
 window.Module = {
   onRuntimeInitialized() {
@@ -471,25 +469,41 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   }
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
-    if(!window.cv) return null; const cv = window.cv;
-    const src=cv.matFromImageData(imgData);
-    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
-    const src=cv.matFromImageData(imgData);
-    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
-   const dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
-    const params=new cv.aruco_DetectorParameters();
-    const corners=new cv.MatVector(); const ids=new cv.Mat();
-    cv.aruco.detectMarkers(gray,dict,corners,ids,params);
-    let scale=null;
-    if(!ids.empty()){
-      const c=corners.get(0).data32F;
-      const d01=Math.hypot(c[0]-c[2],c[1]-c[3]);
-      const d12=Math.hypot(c[2]-c[4],c[3]-c[5]);
-      const sidePx=(d01+d12)/2; scale=sidePx/ARUCO_MARKER_CM;
-    }
-    src.delete();gray.delete();corners.delete();ids.delete();
-    return scale;
+  if (!window.cv) return null;
+  const cv = window.cv;
+
+  if (!cv.aruco || !cv.aruco.getPredefinedDictionary) {
+    console.warn('OpenCV loaded without aruco module');
+    return null;
   }
+
+  const src = cv.matFromImageData(imgData);
+  const gray = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+  const dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
+  const params = new cv.aruco_DetectorParameters();
+  const corners = new cv.MatVector();
+  const ids = new cv.Mat();
+
+  cv.aruco.detectMarkers(gray, dict, corners, ids, params);
+
+  let scale = null;
+  if (!ids.empty()) {
+    const c = corners.get(0).data32F;
+    const d01 = Math.hypot(c[0] - c[2], c[1] - c[3]);
+    const d12 = Math.hypot(c[2] - c[4], c[3] - c[5]);
+    const sidePx = (d01 + d12) / 2;
+    scale = sidePx / ARUCO_MARKER_CM;
+  }
+
+  src.delete();
+  gray.delete();
+  corners.delete();
+  ids.delete();
+
+  return scale;
+}
   function animalMask(imgData){
     const cv = window.cv; if(!cv) return null;
     const src=cv.matFromImageData(imgData);
@@ -515,9 +529,6 @@ function detectArucoPxPerCm(imgData){
     return (x0>=0&&x1>x0)?(x1-x0):null;
   }
 
-  // ========= جاهزية OpenCV =========
-  window.cv = window.cv || {};
-  window.cv.onRuntimeInitialized = ()=>{ cvReady=true; fireTrack('cv_ready'); };
   </script>
 </body>
 </html>
