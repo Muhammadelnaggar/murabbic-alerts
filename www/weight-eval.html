@@ -504,31 +504,34 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   }
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
-  if (!window.cv) return null;
   const cv = window.cv;
-
-  if (!cv.aruco || !cv.aruco.getPredefinedDictionary) {
-    console.warn('OpenCV loaded without aruco module');
-    return null;
-  }
 
   const src = cv.matFromImageData(imgData);
   const gray = new cv.Mat();
-  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-  const dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_4X4_50);
+  const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
   const params = new cv.aruco_DetectorParameters();
+  const detector = new cv.aruco_ArucoDetector(dict, params);
+
   const corners = new cv.MatVector();
   const ids = new cv.Mat();
+  const rejected = new cv.MatVector();
 
-  cv.aruco.detectMarkers(gray, dict, corners, ids, params);
+  detector.detectMarkers(gray, corners, ids, rejected);
 
   let scale = null;
-  if (!ids.empty()) {
+
+  if (!ids.empty() && corners.size() > 0) {
     const c = corners.get(0).data32F;
-    const d01 = Math.hypot(c[0] - c[2], c[1] - c[3]);
-    const d12 = Math.hypot(c[2] - c[4], c[3] - c[5]);
-    const sidePx = (d01 + d12) / 2;
+
+    const d01 = Math.hypot(c[0]-c[2], c[1]-c[3]);
+    const d12 = Math.hypot(c[2]-c[4], c[3]-c[5]);
+    const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
+    const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
+
+    const sidePx = (d01 + d12 + d23 + d30) / 4;
+
     scale = sidePx / ARUCO_MARKER_CM;
   }
 
@@ -536,6 +539,9 @@ function detectArucoPxPerCm(imgData){
   gray.delete();
   corners.delete();
   ids.delete();
+  rejected.delete();
+  params.delete();
+  detector.delete();
 
   return scale;
 }
