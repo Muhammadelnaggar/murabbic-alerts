@@ -505,12 +505,18 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
   const cv = window.cv;
+  if (!cv) return null;
+
+  if (!cv.getPredefinedDictionary || !cv.aruco_ArucoDetector || !cv.aruco_DetectorParameters) {
+    console.warn('OpenCV loaded without exported ArUco bindings');
+    return null;
+  }
 
   const src = cv.matFromImageData(imgData);
   const gray = new cv.Mat();
-  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-  const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
+  const dict = cv.getPredefinedDictionary(0); // DICT_4X4_50
   const params = new cv.aruco_DetectorParameters();
   const detector = new cv.aruco_ArucoDetector(dict, params);
 
@@ -531,7 +537,6 @@ function detectArucoPxPerCm(imgData){
     const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
 
     const sidePx = (d01 + d12 + d23 + d30) / 4;
-
     scale = sidePx / ARUCO_MARKER_CM;
   }
 
@@ -540,8 +545,8 @@ function detectArucoPxPerCm(imgData){
   corners.delete();
   ids.delete();
   rejected.delete();
-  params.delete();
   detector.delete();
+  params.delete();
 
   return scale;
 }
