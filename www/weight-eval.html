@@ -159,7 +159,7 @@ function markCvReady() {
 </div>
 
     <div class="hint">
-      ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
+      ضع علامة ArUco مربّع 10 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة. 
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
@@ -181,7 +181,7 @@ function markCvReady() {
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
-  const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
+ const ARUCO_MARKER_CM=10, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
@@ -614,7 +614,7 @@ function detectArucoPxPerCm(imgData){
               const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
               const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
 
-              const sidePx = (d01 + d12 + d23 + d30) / 4;
+             const sidePx = Math.max(d01, d12, d23, d30);
               const perimeter = d01 + d12 + d23 + d30;
 
               if (sidePx > 0 && perimeter > bestPerimeter) {
