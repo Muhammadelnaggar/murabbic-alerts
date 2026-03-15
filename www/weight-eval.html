@@ -173,7 +173,7 @@ function markCvReady() {
   // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
-  const can=$('awCan'), ctx=can.getContext('2d');
+ const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
@@ -506,7 +506,7 @@ function detectArucoPxPerCm(imgData){
   if (!cv) return null;
 
   if (!cv.getPredefinedDictionary || !cv.aruco_ArucoDetector || !cv.aruco_DetectorParameters) {
-    console.warn('OpenCV loaded without exported ArUco bindings');
+    console.warn('ArUco API missing');
     return null;
   }
 
@@ -514,41 +514,146 @@ function detectArucoPxPerCm(imgData){
   const gray = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
- const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
-  const params = new cv.aruco_DetectorParameters();
-const refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
-const detector = new cv.aruco_ArucoDetector(dict, params, refine);
+  const candidates = [];
 
-  const corners = new cv.MatVector();
-  const ids = new cv.Mat();
-  const rejected = new cv.MatVector();
+  // 1) الصورة الأصلية
+  candidates.push(gray);
 
-  detector.detectMarkers(gray, corners, ids, rejected);
+  // 2) CLAHE لتحسين التباين
+  const eq = new cv.Mat();
+  try {
+    const clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
+    clahe.apply(gray, eq);
+    clahe.delete();
+    candidates.push(eq);
+  } catch(e) {}
 
-  let scale = null;
+  // 3) Threshold
+  const thr = new cv.Mat();
+  try {
+    cv.adaptiveThreshold(
+      gray, thr, 255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      31, 7
+    );
+    candidates.push(thr);
+  } catch(e) {}
 
-  if (!ids.empty() && corners.size() > 0) {
-    const c = corners.get(0).data32F;
+  // 4) تكبير 2x
+  const up = new cv.Mat();
+  try {
+    cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
+    candidates.push(up);
+  } catch(e) {}
 
-    const d01 = Math.hypot(c[0]-c[2], c[1]-c[3]);
-    const d12 = Math.hypot(c[2]-c[4], c[3]-c[5]);
-    const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
-    const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
+  const dictList = [
+    cv.DICT_4X4_50,
+    cv.DICT_4X4_100,
+    cv.DICT_4X4_250,
+    cv.DICT_4X4_1000,
+    cv.DICT_5X5_50,
+    cv.DICT_5X5_100,
+    cv.DICT_5X5_250,
+    cv.DICT_5X5_1000,
+    cv.DICT_6X6_50,
+    cv.DICT_6X6_100,
+    cv.DICT_6X6_250,
+    cv.DICT_6X6_1000,
+    cv.DICT_7X7_50,
+    cv.DICT_7X7_100,
+    cv.DICT_7X7_250,
+    cv.DICT_7X7_1000,
+    cv.DICT_ARUCO_ORIGINAL
+  ].filter(v => typeof v === 'number');
 
-    const sidePx = (d01 + d12 + d23 + d30) / 4;
-    scale = sidePx / ARUCO_MARKER_CM;
+  let bestScale = null;
+  let bestPerimeter = 0;
+
+  try {
+    for (const img of candidates) {
+      for (const dictId of dictList) {
+        const dict = cv.getPredefinedDictionary(dictId);
+        const params = new cv.aruco_DetectorParameters();
+
+        // إعدادات أكثر مرونة
+        try {
+          params.adaptiveThreshWinSizeMin = 3;
+          params.adaptiveThreshWinSizeMax = 53;
+          params.adaptiveThreshWinSizeStep = 4;
+          params.minMarkerPerimeterRate = 0.01;
+          params.maxMarkerPerimeterRate = 4.0;
+          params.polygonalApproxAccuracyRate = 0.08;
+          params.minCornerDistanceRate = 0.01;
+          params.minDistanceToBorder = 1;
+          params.cornerRefinementMethod = 1;
+        } catch(e) {}
+
+        let detector = null;
+        let refine = null;
+        const corners = new cv.MatVector();
+        const ids = new cv.Mat();
+        const rejected = new cv.MatVector();
+
+        try {
+          if (typeof cv.aruco_RefineParameters === 'function') {
+            refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
+            detector = new cv.aruco_ArucoDetector(dict, params, refine);
+          } else {
+            detector = new cv.aruco_ArucoDetector(dict, params);
+          }
+
+          detector.detectMarkers(img, corners, ids, rejected);
+
+          if (!ids.empty() && corners.size() > 0) {
+            for (let i = 0; i < corners.size(); i++) {
+              const c = corners.get(i).data32F;
+
+              const d01 = Math.hypot(c[0]-c[2], c[1]-c[3]);
+              const d12 = Math.hypot(c[2]-c[4], c[3]-c[5]);
+              const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
+              const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
+
+              const sidePx = (d01 + d12 + d23 + d30) / 4;
+              const perimeter = d01 + d12 + d23 + d30;
+
+              if (sidePx > 0 && perimeter > bestPerimeter) {
+                let correctedSide = sidePx;
+
+                // لو كنا على نسخة مكبرة 2x نرجع القياس للحجم الأصلي
+                if (img === up) correctedSide = sidePx / 2;
+
+                bestPerimeter = perimeter;
+                bestScale = correctedSide / ARUCO_MARKER_CM;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Aruco try failed', err);
+        } finally {
+          corners.delete();
+          ids.delete();
+          rejected.delete();
+          detector?.delete?.();
+          params.delete?.();
+          refine?.delete?.();
+        }
+
+        if (bestScale) break;
+      }
+      if (bestScale) break;
+    }
+  } finally {
+    src.delete();
+    gray.delete();
+    if (eq !== gray) eq.delete?.();
+    thr.delete?.();
+    up.delete?.();
   }
 
-  src.delete();
-  gray.delete();
-  corners.delete();
-  ids.delete();
-  rejected.delete();
-  detector.delete();
-  params.delete();
-  refine.delete();
-  return scale;
+  return bestScale;
 }
+window.detectArucoPxPerCm = detectArucoPxPerCm;
  window.detectArucoPxPerCm = detectArucoPxPerCm;   
   function animalMask(imgData){
     const cv = window.cv; if(!cv) return null;
