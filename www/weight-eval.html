@@ -181,7 +181,7 @@ function markCvReady() {
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
- const ARUCO_MARKER_CM=10, GIRTH_FACTOR=3.05;
+const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.65;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
@@ -341,13 +341,13 @@ if (!window.cvReady || !window.cv) {
       return showToast('فشل قياس عمق الصدر', true);
     }
 
-    const chestCm = chestPx / pxPerCm;
-    outChestW.textContent = chestCm.toFixed(1);
+   const chestCmRaw = chestPx / pxPerCm;
+const chestCm = chestCmRaw * 0.88;   // تصحيح بسيط لتقليل تضخيم القياس من الصورة الجانبية
+outChestW.textContent = chestCm.toFixed(1);
 
-    const HG = chestCm * GIRTH_FACTOR;
-    const W = Math.round((HG*HG*HG)/10880);
-    outWeight.textContent = W+' كجم';
-
+const HG = chestCm * GIRTH_FACTOR;
+const W = Math.round((HG * HG * HG) / 10880);
+outWeight.textContent = W + ' كجم';
     const confidence = scoreConfidence({
       sharpness,
       brightness,
@@ -486,9 +486,9 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     else if (brightness >= 70 && brightness <= 210) score += 10;
     else score += 4;
 
-    if (pxPerCm >= 8 && pxPerCm <= 80) score += 10;
-    if (chestCm >= 20 && chestCm <= 160) score += 10;
-    if (weightKg >= 40 && weightKg <= 1200) score += 10;
+    if (pxPerCm >= 4 && pxPerCm <= 40) score += 10;
+if (chestCm >= 35 && chestCm <= 110) score += 10;
+if (weightKg >= 80 && weightKg <= 1200) score += 10;
 
     return Math.max(0, Math.min(100, Math.round(score)));
   }
