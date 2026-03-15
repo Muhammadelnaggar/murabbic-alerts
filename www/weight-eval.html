@@ -518,7 +518,7 @@ function detectArucoPxPerCm(imgData){
 
   const dict = cv.getPredefinedDictionary(0); // DICT_4X4_50
   const params = new cv.aruco_DetectorParameters();
- const refine = new cv.aruco_RefineParameters();
+const refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
 const detector = new cv.aruco_ArucoDetector(dict, params, refine);
 
   const corners = new cv.MatVector();
