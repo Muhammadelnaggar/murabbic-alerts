@@ -148,7 +148,7 @@ function markCvReady() {
 
    <div class="kpi3">
   <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
-  <div class="kpi"><div class="lbl">عمق الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+  <div class="kpi"><div class="lbl">عرض الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
   <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
 </div>
 
@@ -159,7 +159,7 @@ function markCvReady() {
 </div>
 
     <div class="hint">
-      ضع علامة ArUco مربّع 10 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
+      ضع علامة ArUco مربّع 5 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة.  
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
@@ -173,7 +173,7 @@ function markCvReady() {
   // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
-  const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
+ const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
@@ -181,7 +181,7 @@ function markCvReady() {
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
-  const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.25;
+  const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
@@ -341,22 +341,11 @@ if (!window.cvReady || !window.cv) {
       return showToast('فشل قياس عمق الصدر', true);
     }
 
-    const bodyLenPx = measureBodyLengthPx(mask);
-    if(!bodyLenPx){
-      outSharp.textContent = sharpness ? String(sharpness) : '—';
-      outLight.textContent = brightness ? String(brightness) : '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      mask.delete?.();
-      return showToast('فشل قياس طول الجسم', true);
-    }
-
     const chestCm = chestPx / pxPerCm;
-    const bodyLenCm = bodyLenPx / pxPerCm;
     outChestW.textContent = chestCm.toFixed(1);
 
     const HG = chestCm * GIRTH_FACTOR;
-    const W = Math.round((HG * HG * bodyLenCm) / 10838);
+    const W = Math.round((HG*HG*HG)/10880);
     outWeight.textContent = W+' كجم';
 
     const confidence = scoreConfidence({
@@ -497,9 +486,9 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     else if (brightness >= 70 && brightness <= 210) score += 10;
     else score += 4;
 
-    if (pxPerCm >= 6 && pxPerCm <= 20) score += 10;
-    if (chestCm >= 40 && chestCm <= 110) score += 10;
-    if (weightKg >= 150 && weightKg <= 1200) score += 10;
+    if (pxPerCm >= 8 && pxPerCm <= 80) score += 10;
+    if (chestCm >= 20 && chestCm <= 160) score += 10;
+    if (weightKg >= 40 && weightKg <= 1200) score += 10;
 
     return Math.max(0, Math.min(100, Math.round(score)));
   }
@@ -517,7 +506,7 @@ function detectArucoPxPerCm(imgData){
   if (!cv) return null;
 
   if (!cv.getPredefinedDictionary || !cv.aruco_ArucoDetector || !cv.aruco_DetectorParameters) {
-    console.warn('OpenCV loaded without exported ArUco bindings');
+    console.warn('ArUco API missing');
     return null;
   }
 
@@ -525,131 +514,164 @@ function detectArucoPxPerCm(imgData){
   const gray = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-  const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
-  const params = new cv.aruco_DetectorParameters();
-  let detector = null;
-  let refine = null;
-  const corners = new cv.MatVector();
-  const ids = new cv.Mat();
-  const rejected = new cv.MatVector();
+  const candidates = [];
 
-  let scale = null;
+  // 1) الصورة الأصلية
+  candidates.push(gray);
+
+  // 2) CLAHE لتحسين التباين
+  const eq = new cv.Mat();
+  try {
+    const clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
+    clahe.apply(gray, eq);
+    clahe.delete();
+    candidates.push(eq);
+  } catch(e) {}
+
+  // 3) Threshold
+  const thr = new cv.Mat();
+  try {
+    cv.adaptiveThreshold(
+      gray, thr, 255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      31, 7
+    );
+    candidates.push(thr);
+  } catch(e) {}
+
+  // 4) تكبير 2x
+  const up = new cv.Mat();
+  try {
+    cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
+    candidates.push(up);
+  } catch(e) {}
+
+  const dictList = [
+    cv.DICT_4X4_50,
+    cv.DICT_4X4_100,
+    cv.DICT_4X4_250,
+    cv.DICT_4X4_1000,
+    cv.DICT_5X5_50,
+    cv.DICT_5X5_100,
+    cv.DICT_5X5_250,
+    cv.DICT_5X5_1000,
+    cv.DICT_6X6_50,
+    cv.DICT_6X6_100,
+    cv.DICT_6X6_250,
+    cv.DICT_6X6_1000,
+    cv.DICT_7X7_50,
+    cv.DICT_7X7_100,
+    cv.DICT_7X7_250,
+    cv.DICT_7X7_1000,
+    cv.DICT_ARUCO_ORIGINAL
+  ].filter(v => typeof v === 'number');
+
+  let bestScale = null;
   let bestPerimeter = 0;
 
   try {
-    if (typeof cv.aruco_RefineParameters === 'function') {
-      refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
-      detector = new cv.aruco_ArucoDetector(dict, params, refine);
-    } else {
-      detector = new cv.aruco_ArucoDetector(dict, params);
-    }
+    for (const img of candidates) {
+      for (const dictId of dictList) {
+        const dict = cv.getPredefinedDictionary(dictId);
+        const params = new cv.aruco_DetectorParameters();
 
-    detector.detectMarkers(gray, corners, ids, rejected);
+        // إعدادات أكثر مرونة
+        try {
+          params.adaptiveThreshWinSizeMin = 3;
+          params.adaptiveThreshWinSizeMax = 53;
+          params.adaptiveThreshWinSizeStep = 4;
+          params.minMarkerPerimeterRate = 0.01;
+          params.maxMarkerPerimeterRate = 4.0;
+          params.polygonalApproxAccuracyRate = 0.08;
+          params.minCornerDistanceRate = 0.01;
+          params.minDistanceToBorder = 1;
+          params.cornerRefinementMethod = 1;
+        } catch(e) {}
 
-    if (!ids.empty() && corners.size() > 0) {
-      for (let i = 0; i < corners.size(); i++) {
-        const c = corners.get(i).data32F;
-        const d01 = Math.hypot(c[0]-c[2], c[1]-c[3]);
-        const d12 = Math.hypot(c[2]-c[4], c[3]-c[5]);
-        const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
-        const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
-        const sidePx = Math.max(d01, d12, d23, d30);
-        const perimeter = d01 + d12 + d23 + d30;
+        let detector = null;
+        let refine = null;
+        const corners = new cv.MatVector();
+        const ids = new cv.Mat();
+        const rejected = new cv.MatVector();
 
-        if (sidePx > 0 && perimeter > bestPerimeter) {
-          bestPerimeter = perimeter;
-          scale = sidePx / ARUCO_MARKER_CM;
+        try {
+          if (typeof cv.aruco_RefineParameters === 'function') {
+            refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
+            detector = new cv.aruco_ArucoDetector(dict, params, refine);
+          } else {
+            detector = new cv.aruco_ArucoDetector(dict, params);
+          }
+
+          detector.detectMarkers(img, corners, ids, rejected);
+
+          if (!ids.empty() && corners.size() > 0) {
+            for (let i = 0; i < corners.size(); i++) {
+              const c = corners.get(i).data32F;
+
+              const d01 = Math.hypot(c[0]-c[2], c[1]-c[3]);
+              const d12 = Math.hypot(c[2]-c[4], c[3]-c[5]);
+              const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
+              const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
+
+              const sidePx = (d01 + d12 + d23 + d30) / 4;
+              const perimeter = d01 + d12 + d23 + d30;
+
+              if (sidePx > 0 && perimeter > bestPerimeter) {
+                let correctedSide = sidePx;
+
+                // لو كنا على نسخة مكبرة 2x نرجع القياس للحجم الأصلي
+                if (img === up) correctedSide = sidePx / 2;
+
+                bestPerimeter = perimeter;
+                bestScale = correctedSide / ARUCO_MARKER_CM;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Aruco try failed', err);
+        } finally {
+          corners.delete();
+          ids.delete();
+          rejected.delete();
+          detector?.delete?.();
+          params.delete?.();
+          refine?.delete?.();
         }
-      }
-    }
 
-    if (!scale || !isFinite(scale) || scale < 4 || scale > 40) {
-      console.warn('Aruco scale rejected:', scale);
-      scale = null;
+        if (bestScale) break;
+      }
+      if (bestScale) break;
     }
   } finally {
     src.delete();
     gray.delete();
-    corners.delete();
-    ids.delete();
-    rejected.delete();
-    detector?.delete?.();
-    params.delete?.();
-    refine?.delete?.();
+    if (eq !== gray) eq.delete?.();
+    thr.delete?.();
+    up.delete?.();
   }
 
-  return scale;
+  return bestScale;
 }
 window.detectArucoPxPerCm = detectArucoPxPerCm;
-
-function animalMask(imgData){
-  const cv = window.cv;
-  if(!cv) return null;
-
-  const src = cv.matFromImageData(imgData);
-  const gray = new cv.Mat();
-  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-  cv.GaussianBlur(gray, gray, new cv.Size(5,5), 0, 0, cv.BORDER_DEFAULT);
-
-  const bin1 = new cv.Mat();
-  const bin2 = new cv.Mat();
-  cv.threshold(gray, bin1, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-  cv.threshold(gray, bin2, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-
-  const kernel = cv.Mat.ones(5,5,cv.CV_8U);
-  cv.morphologyEx(bin1, bin1, cv.MORPH_OPEN, kernel);
-  cv.morphologyEx(bin1, bin1, cv.MORPH_CLOSE, kernel);
-  cv.morphologyEx(bin2, bin2, cv.MORPH_OPEN, kernel);
-  cv.morphologyEx(bin2, bin2, cv.MORPH_CLOSE, kernel);
-
-  const candidates = [bin1, bin2];
-  let bestMask = null;
-  let bestScore = -Infinity;
-
-  for (const bin of candidates) {
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
-    cv.findContours(bin, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-    for (let i = 0; i < contours.size(); i++) {
-      const cnt = contours.get(i);
-      const area = cv.contourArea(cnt);
-      if (area < (bin.cols * bin.rows * 0.02)) continue;
-
-      const rect = cv.boundingRect(cnt);
-      const touchesBorder = rect.x <= 1 || rect.y <= 1 || (rect.x + rect.width) >= (bin.cols - 1) || (rect.y + rect.height) >= (bin.rows - 1);
-      const cx = rect.x + rect.width / 2;
-      const cy = rect.y + rect.height / 2;
-      const dx = Math.abs(cx - bin.cols / 2) / (bin.cols / 2);
-      const dy = Math.abs(cy - bin.rows / 2) / (bin.rows / 2);
-
-      let score = area;
-      if (touchesBorder) score -= area * 0.8;
-      score -= (dx + dy) * 50000;
-
-      if (score > bestScore) {
-        const mask = cv.Mat.zeros(bin.rows, bin.cols, cv.CV_8U);
-        cv.drawContours(mask, contours, i, new cv.Scalar(255,255,255,255), -1);
-
-        if (bestMask) bestMask.delete();
-        bestMask = mask;
-        bestScore = score;
-      }
-    }
-
-    contours.delete();
-    hierarchy.delete();
+ window.detectArucoPxPerCm = detectArucoPxPerCm;   
+  function animalMask(imgData){
+    const cv = window.cv; if(!cv) return null;
+    const src=cv.matFromImageData(imgData);
+    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
+    cv.medianBlur(gray,gray,3);
+    const bin=new cv.Mat(); cv.threshold(gray,bin,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
+    const kernel=cv.Mat.ones(5,5,cv.CV_8U); cv.morphologyEx(bin,bin,cv.MORPH_OPEN,kernel);
+    const contours=new cv.MatVector(), hierarchy=new cv.Mat();
+    cv.findContours(bin,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+    let maxA=0,best=-1;
+    for(let i=0;i<contours.size();i++){const a=cv.contourArea(contours.get(i)); if(a>maxA){maxA=a;best=i;}}
+    if(best<0){src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();return null;}
+    const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
+    cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
+    src.delete();gray.delete();bin.delete();contours.delete();hierarchy.delete();
+    return mask;
   }
-
-  src.delete();
-  gray.delete();
-  bin1.delete();
-  bin2.delete();
-  kernel.delete();
-
-  return bestMask;
-}
-
 function getBodyBox(mask){
   let minX = mask.cols, maxX = -1, minY = mask.rows, maxY = -1;
 
@@ -667,19 +689,17 @@ function getBodyBox(mask){
   return (maxX > minX && maxY > minY) ? { minX, maxX, minY, maxY } : null;
 }
 
-function measureBodyLengthPx(mask){
-  const box = getBodyBox(mask);
-  return box ? (box.maxX - box.minX) : null;
-}
-
 function measureVerticalSpanAtX(mask, x, minY, maxY){
   let y0 = -1, y1 = -1;
+
   for(let y=minY; y<=maxY; y++){
     if(mask.ucharPtr(y,x)[0] > 0){ y0 = y; break; }
   }
+
   for(let y=maxY; y>=minY; y--){
     if(mask.ucharPtr(y,x)[0] > 0){ y1 = y; break; }
   }
+
   return (y0 >= 0 && y1 > y0) ? (y1 - y0) : null;
 }
 
@@ -688,6 +708,7 @@ function measureChestDepthAtFront(mask){
   if(!box) return null;
 
   const bodyLen = box.maxX - box.minX;
+
   const x1 = Math.round(box.minX + bodyLen * 0.28);
   const x2 = Math.round(box.minX + bodyLen * 0.34);
   const x3 = Math.round(box.minX + bodyLen * 0.40);
@@ -702,7 +723,6 @@ function measureChestDepthAtFront(mask){
   vals.sort((a,b)=>a-b);
   return vals[Math.floor(vals.length/2)];
 }
-
   </script>
 </body>
 </html>
