@@ -331,14 +331,14 @@ if (!window.cvReady || !window.cv) {
       return showToast('تعذّر تحديد الحيوان', true);
     }
 
-    const chestPx = measureWidthAtSlice(mask, 0.45);
+    const chestPx = measureChestDepthAtFront(mask);
     if(!chestPx){
       outSharp.textContent = sharpness ? String(sharpness) : '—';
       outLight.textContent = brightness ? String(brightness) : '—';
       outConf.textContent = '0%';
       currentConfidence = 0;
       mask.delete?.();
-      return showToast('فشل قياس العرض', true);
+      return showToast('فشل قياس عمق الصدر', true);
     }
 
     const chestCm = chestPx / pxPerCm;
@@ -672,14 +672,57 @@ window.detectArucoPxPerCm = detectArucoPxPerCm;
     src.delete();gray.delete();bin.delete();contours.delete();hierarchy.delete();
     return mask;
   }
-  function measureWidthAtSlice(mask,fracY){
-    const y=Math.round(mask.rows*fracY);
-    let x0=-1,x1=-1;
-    for(let x=0;x<mask.cols;x++){ if(mask.ucharPtr(y,x)[0]>0){x0=x;break;} }
-    for(let x=mask.cols-1;x>=0;x--){ if(mask.ucharPtr(y,x)[0]>0){x1=x;break;} }
-    return (x0>=0&&x1>x0)?(x1-x0):null;
+function getBodyBox(mask){
+  let minX = mask.cols, maxX = -1, minY = mask.rows, maxY = -1;
+
+  for(let y=0; y<mask.rows; y++){
+    for(let x=0; x<mask.cols; x++){
+      if(mask.ucharPtr(y,x)[0] > 0){
+        if(x < minX) minX = x;
+        if(x > maxX) maxX = x;
+        if(y < minY) minY = y;
+        if(y > maxY) maxY = y;
+      }
+    }
   }
 
+  return (maxX > minX && maxY > minY) ? { minX, maxX, minY, maxY } : null;
+}
+
+function measureVerticalSpanAtX(mask, x, minY, maxY){
+  let y0 = -1, y1 = -1;
+
+  for(let y=minY; y<=maxY; y++){
+    if(mask.ucharPtr(y,x)[0] > 0){ y0 = y; break; }
+  }
+
+  for(let y=maxY; y>=minY; y--){
+    if(mask.ucharPtr(y,x)[0] > 0){ y1 = y; break; }
+  }
+
+  return (y0 >= 0 && y1 > y0) ? (y1 - y0) : null;
+}
+
+function measureChestDepthAtFront(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const bodyLen = box.maxX - box.minX;
+
+  const x1 = Math.round(box.minX + bodyLen * 0.28);
+  const x2 = Math.round(box.minX + bodyLen * 0.34);
+  const x3 = Math.round(box.minX + bodyLen * 0.40);
+
+  const d1 = measureVerticalSpanAtX(mask, x1, box.minY, box.maxY);
+  const d2 = measureVerticalSpanAtX(mask, x2, box.minY, box.maxY);
+  const d3 = measureVerticalSpanAtX(mask, x3, box.minY, box.maxY);
+
+  const vals = [d1, d2, d3].filter(v => v && isFinite(v));
+  if(!vals.length) return null;
+
+  vals.sort((a,b)=>a-b);
+  return vals[Math.floor(vals.length/2)];
+}
   </script>
 </body>
 </html>
