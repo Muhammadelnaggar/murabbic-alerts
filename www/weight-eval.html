@@ -502,7 +502,6 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   }
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
-  window.detectArucoPxPerCm = detectArucoPxPerCm;
   const cv = window.cv;
   if (!cv) return null;
 
@@ -515,7 +514,7 @@ function detectArucoPxPerCm(imgData){
   const gray = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-  const dict = cv.getPredefinedDictionary(0); // DICT_4X4_50
+ const dict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
   const params = new cv.aruco_DetectorParameters();
 const refine = new cv.aruco_RefineParameters(10.0, 3.0, true);
 const detector = new cv.aruco_ArucoDetector(dict, params, refine);
