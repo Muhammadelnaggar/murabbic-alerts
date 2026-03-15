@@ -49,10 +49,12 @@
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
  
-  <script>
+ <script>
+window.cvReady = false;
 window.Module = {
   onRuntimeInitialized() {
     console.log("OpenCV Ready");
+    window.cvReady = true;
 
     const el = document.getElementById("opencvStatus");
     if (el) {
@@ -60,11 +62,9 @@ window.Module = {
       el.style.background = "#e8f5e9";
       el.style.color = "#0b7f47";
     }
-
-    window.cvReady = true;
   }
 };
-</script>
+</script>   
  <script async src="/js/opencv_js.js"></script>
   
 
@@ -234,7 +234,9 @@ window.Module = {
 
   // ========= التقاط/تقدير =========
  btnShot.onclick = async()=>{
-
+if (!window.cvReady || !window.cv) {
+  return showToast('OpenCV لم يكتمل تحميله بعد', true);
+}
 
   try{
     let imgData = null;
