@@ -183,6 +183,7 @@ function markCvReady() {
   // ========= ثوابت/حالة =========
   const ARUCO_MARKER_CM=5, GIRTH_FACTOR=3.05;
   let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
+  window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
   const visionState = {};
   const isDemo = new URLSearchParams(location.search).get('demo') === '1';
@@ -501,6 +502,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   }
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
+  window.detectArucoPxPerCm = detectArucoPxPerCm;
   const cv = window.cv;
   if (!cv) return null;
 
@@ -548,6 +550,7 @@ const detector = new cv.aruco_ArucoDetector(dict, params, refine);
   refine.delete();
   return scale;
 }
+ window.detectArucoPxPerCm = detectArucoPxPerCm;   
   function animalMask(imgData){
     const cv = window.cv; if(!cv) return null;
     const src=cv.matFromImageData(imgData);
