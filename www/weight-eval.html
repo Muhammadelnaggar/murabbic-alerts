@@ -64,32 +64,25 @@ function markCvReady() {
   }
 }
 
-window.Module = {
-  onRuntimeInitialized() {
-    markCvReady();
-  }
-};
-
 (function loadOpenCv() {
   const s = document.createElement("script");
-  s.src = "/js/opencv_js.js?v=20260315a";
-  s.onload = () => {
+  s.src = "/js/opencv_js.js?v=20260315b";
+  s.onload = async () => {
     console.log("opencv_js.js loaded");
 
-    setTimeout(() => {
-      if (window.cv && typeof window.cv.then === "function") {
-        window.cv.then((m) => {
-          window.cv = m;
-          if (!window.cvReady) markCvReady();
-        }).catch((err) => {
-          console.error("cv promise failed", err);
-        });
-      } else if (window.cv) {
-        if (!window.cvReady) markCvReady();
-      } else {
-        console.error("opencv_js.js loaded but cv was not created");
+    try {
+      if (typeof window.cv === "function") {
+        window.cv = await window.cv();
       }
-    }, 50);
+
+      if (window.cv) {
+        markCvReady();
+      } else {
+        console.error("cv factory did not return module");
+      }
+    } catch (err) {
+      console.error("OpenCV init failed", err);
+    }
   };
 
   s.onerror = () => {
