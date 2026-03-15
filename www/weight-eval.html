@@ -49,22 +49,62 @@
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
  
- <script>
+<script>
 window.cvReady = false;
+
+function markCvReady() {
+  console.log("OpenCV Ready");
+  window.cvReady = true;
+
+  const el = document.getElementById("opencvStatus");
+  if (el) {
+    el.innerText = "OpenCV جاهز للتحليل";
+    el.style.background = "#e8f5e9";
+    el.style.color = "#0b7f47";
+  }
+}
+
 window.Module = {
   onRuntimeInitialized() {
-    console.log("OpenCV Ready");
-    window.cvReady = true;
-
-    const el = document.getElementById("opencvStatus");
-    if (el) {
-      el.innerText = "OpenCV جاهز للتحليل";
-      el.style.background = "#e8f5e9";
-      el.style.color = "#0b7f47";
-    }
+    markCvReady();
   }
 };
-</script>   
+
+(function loadOpenCv() {
+  const s = document.createElement("script");
+  s.src = "/js/opencv_js.js?v=20260315a";
+  s.onload = () => {
+    console.log("opencv_js.js loaded");
+
+    setTimeout(() => {
+      if (window.cv && typeof window.cv.then === "function") {
+        window.cv.then((m) => {
+          window.cv = m;
+          if (!window.cvReady) markCvReady();
+        }).catch((err) => {
+          console.error("cv promise failed", err);
+        });
+      } else if (window.cv) {
+        if (!window.cvReady) markCvReady();
+      } else {
+        console.error("opencv_js.js loaded but cv was not created");
+      }
+    }, 50);
+  };
+
+  s.onerror = () => {
+    console.error("Failed to load /js/opencv_js.js");
+    const el = document.getElementById("opencvStatus");
+    if (el) {
+      el.innerText = "فشل تحميل OpenCV";
+      el.style.background = "#fff1f2";
+      el.style.color = "#7f1d1d";
+    }
+  };
+
+  document.head.appendChild(s);
+})();
+</script>
  <script async src="/js/opencv_js.js"></script>
   
 
