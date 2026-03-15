@@ -518,7 +518,8 @@ function detectArucoPxPerCm(imgData){
 
   const dict = cv.getPredefinedDictionary(0); // DICT_4X4_50
   const params = new cv.aruco_DetectorParameters();
-  const detector = new cv.aruco_ArucoDetector(dict, params);
+ const refine = new cv.aruco_RefineParameters();
+const detector = new cv.aruco_ArucoDetector(dict, params, refine);
 
   const corners = new cv.MatVector();
   const ids = new cv.Mat();
@@ -547,7 +548,7 @@ function detectArucoPxPerCm(imgData){
   rejected.delete();
   detector.delete();
   params.delete();
-
+  refine.delete();
   return scale;
 }
   function animalMask(imgData){
