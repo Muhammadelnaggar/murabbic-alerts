@@ -22,7 +22,14 @@
     .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e8f5e9;
       font-weight:700;font-size:14px;color:#064e3b;cursor:pointer;}
     video,img.preview{width:100%;border:1px solid var(--border);border-radius:12px;background:#fff}
-    canvas{display:none;}
+    canvas{
+  display:block;
+  width:100%;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  margin-top:10px;
+}
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
     .kpi .lbl{font-size:12px;color:#2b593a;}
@@ -186,7 +193,7 @@ function markCvReady() {
 
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.65;
-  let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
+ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, lastMask=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
   const visionState = {};
@@ -369,6 +376,7 @@ outScale.textContent = (pxPerCm && isFinite(pxPerCm))
       currentConfidence = 0;
       return showToast('تعذّر تحديد الحيوان', true);
     }
+    lastMask = mask;
      const poseResult = analyzeBodyPose(mask);
 if(!poseResult){
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -466,7 +474,14 @@ if (scaleQuality === 'bad') {
 } else {
   showToast('✅ تم التقدير بجودة جيدة');
 }
-
+drawVisionOverlay({
+  imgData,
+  scaleResult,
+  poseResult,
+  chestPx,
+  confidence,
+  scaleTip
+});
     fireTrack('weight_estimated', {
       source: currentSource,
       px_per_cm: pxPerCm,
@@ -476,8 +491,10 @@ if (scaleQuality === 'bad') {
       brightness,
       confidence
     });
-
-    try{ mask.delete?.(); }catch(_){}
+try{
+  if(lastMask && lastMask !== mask) lastMask.delete?.();
+  lastMask = mask;
+}catch(_){}
   }catch(err){
     console.error(err);
     showToast('حدث خطأ أثناء التقدير', true);
@@ -799,7 +816,13 @@ function detectArucoPxPerCm(imgData){
               const sideConsistency = minSide / maxSide;
               const perspectivePenalty = 1 - sideConsistency;
               const pxPerCm = avgSide / ARUCO_MARKER_CM;
-
+              const scaledCorners = [];
+for(let k = 0; k < 8; k += 2){
+  scaledCorners.push({
+    x: c[k] * item.scaleFix,
+    y: c[k + 1] * item.scaleFix
+  });
+}
               const candidate = {
                 pxPerCm,
                 avgSide,
@@ -835,7 +858,8 @@ function detectArucoPxPerCm(imgData){
     thr.delete?.();
     up.delete?.();
   }
-
+if (best) {
+  best.corners = best.corners || null;
   return best;
 }
 window.detectArucoPxPerCm = detectArucoPxPerCm;
@@ -855,6 +879,7 @@ window.detectArucoPxPerCm = detectArucoPxPerCm;
     const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
     cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
     src.delete();gray.delete();bin.delete();contours.delete();hierarchy.delete();
+    kernel.delete();
     return mask;
   }
 function getBodyBox(mask){
@@ -991,6 +1016,76 @@ function measureChestDepthAtFront(mask){
     posePenalty: 1 - sideProfileScore,
     poseQuality
   };
+}
+  function drawVisionOverlay({ imgData, scaleResult, poseResult, chestPx, confidence, scaleTip }){
+  if(!imgData) return;
+
+  can.width = imgData.width;
+  can.height = imgData.height;
+  ctx.putImageData(imgData, 0, 0);
+
+  // إطار الجسم
+  if(poseResult?.box){
+    const b = poseResult.box;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(14,160,90,0.95)';
+    ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+
+    // خط قياس الصدر
+    const bodyLen = b.maxX - b.minX;
+    const x1 = Math.round(b.minX + bodyLen * 0.28);
+    const x2 = Math.round(b.minX + bodyLen * 0.34);
+    const x3 = Math.round(b.minX + bodyLen * 0.40);
+    const xs = [x1, x2, x3];
+
+    ctx.strokeStyle = 'rgba(245,158,11,0.95)';
+    ctx.lineWidth = 2;
+
+    xs.forEach(x=>{
+      let yTop = -1, yBottom = -1;
+      for(let y=b.minY; y<=b.maxY; y++){
+        const px = lastMask?.ucharPtr?.(y, x)?.[0];
+        if(px > 0){ yTop = y; break; }
+      }
+      for(let y=b.maxY; y>=b.minY; y--){
+        const px = lastMask?.ucharPtr?.(y, x)?.[0];
+        if(px > 0){ yBottom = y; break; }
+      }
+      if(yTop >= 0 && yBottom > yTop){
+        ctx.beginPath();
+        ctx.moveTo(x, yTop);
+        ctx.lineTo(x, yBottom);
+        ctx.stroke();
+      }
+    });
+  }
+
+  // إطار الماركر
+  if(scaleResult?.corners && scaleResult.corners.length === 4){
+    ctx.strokeStyle = 'rgba(37,99,235,0.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(scaleResult.corners[0].x, scaleResult.corners[0].y);
+    for(let i=1;i<scaleResult.corners.length;i++){
+      ctx.lineTo(scaleResult.corners[i].x, scaleResult.corners[i].y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // شريط معلومات أعلى الصورة
+  const topText = `الثقة ${confidence}%`;
+  const subText = scaleTip || '';
+
+  ctx.fillStyle = 'rgba(15,23,42,0.78)';
+  ctx.fillRect(12, 12, Math.min(can.width - 24, 420), 54);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 18px Cairo, sans-serif';
+  ctx.fillText(topText, 24, 34);
+
+  ctx.font = '14px Cairo, sans-serif';
+  ctx.fillText(subText.slice(0, 52), 24, 56);
 }
   </script>
 </body>
