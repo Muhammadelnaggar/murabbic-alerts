@@ -369,15 +369,26 @@ outScale.textContent = (pxPerCm && isFinite(pxPerCm))
   ? (pxPerCm.toFixed(2) + ' px/cm')
   : '—';
     const mask = animalMask(imgData);
-    if(!mask){
-      outSharp.textContent = sharpness ? String(sharpness) : '—';
-      outLight.textContent = brightness ? String(brightness) : '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      return showToast('تعذّر تحديد الحيوان', true);
-    }
-    lastMask = mask;
-     const poseResult = analyzeBodyPose(mask);
+if(!mask){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('تعذّر تحديد الحيوان', true);
+}
+
+const maskEval = evaluateAnimalMask(mask);
+if(!maskEval || maskEval.quality === 'bad'){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('تم تحديد شكل غير مناسب كجسم الحيوان — حاول لقطة أوضح بخلفية أبسط.', true);
+}
+
+lastMask = mask;
+const poseResult = analyzeBodyPose(mask);
 if(!poseResult){
   outSharp.textContent = sharpness ? String(sharpness) : '—';
   outLight.textContent = brightness ? String(brightness) : '—';
@@ -415,7 +426,7 @@ const bodyLenCm = bodyLenPx / pxPerCm;
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
 const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
 outWeight.textContent = W + ' كجم';
-   const confidence = scoreConfidence({
+  const confidence = scoreConfidence({
   sharpness,
   brightness,
   pxPerCm,
@@ -425,7 +436,8 @@ outWeight.textContent = W + ' كجم';
   markerConsistency: scaleResult.sideConsistency,
   markerPenalty: scaleResult.perspectivePenalty,
   bodySideScore: poseResult.sideProfileScore,
-  bodyPosePenalty: poseResult.posePenalty
+  bodyPosePenalty: poseResult.posePenalty,
+  maskScore: maskEval.score
 });
    currentConfidence = confidence;
 lastMetrics = {
@@ -439,7 +451,10 @@ lastMetrics = {
   bodySideScore: poseResult.sideProfileScore,
   bodyPosePenalty: poseResult.posePenalty,
   fillRatio: poseResult.fillRatio,
-  aspectRatio: poseResult.aspectRatio
+  aspectRatio: poseResult.aspectRatio,
+  maskScore: maskEval.score,
+  maskQuality: maskEval.quality,
+  maskAreaRatio: maskEval.areaRatioToImage
 };
 
 outSharp.textContent = String(sharpness || '—');
@@ -462,7 +477,10 @@ if (poseResult.poseQuality === 'bad') {
   scaleQuality = 'weak';
   scaleTip = 'القياس ممكن، لكن وضعية الحيوان ليست جانبية بالكامل — لقطة جانبية أوضح سترفع الدقة.';
 }
-
+if (maskEval.quality === 'weak' && scaleQuality !== 'bad') {
+  scaleQuality = 'weak';
+  scaleTip = 'الخلفية أو حدود الجسم ليست واضحة بما يكفي — حاول جعل الحيوان أوضح وخلفيته أبسط.';
+}
 if (scaleQuality === 'bad') {
   showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
 } else if (scaleQuality === 'weak') {
@@ -482,7 +500,8 @@ drawVisionOverlay({
   confidence,
   scaleTip,
   markerConsistency: scaleResult.sideConsistency,
-  bodySideScore: poseResult.sideProfileScore
+  bodySideScore: poseResult.sideProfileScore,
+  maskScore: maskEval.score
 });
     fireTrack('weight_estimated', {
       source: currentSource,
@@ -592,7 +611,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     }
   };
  function scoreConfidence({
-  sharpness=0,
+   sharpness=0,
   brightness=0,
   pxPerCm=0,
   chestCm=0,
@@ -601,7 +620,8 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   markerConsistency=0,
   markerPenalty=1,
   bodySideScore=0,
-  bodyPosePenalty=1
+  bodyPosePenalty=1,
+  maskScore=0
 } = {}){
   let score = 0;
 
@@ -633,6 +653,10 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   if (bodyPosePenalty > 0.55) score -= 12;
   else if (bodyPosePenalty > 0.40) score -= 7;
   else if (bodyPosePenalty > 0.25) score -= 3;
+    if (maskScore >= 0.80) score += 8;
+  else if (maskScore >= 0.65) score += 5;
+  else if (maskScore >= 0.50) score += 2;
+  else score -= 8; 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
   
@@ -1019,7 +1043,56 @@ function measureChestDepthAtFront(mask){
     poseQuality
   };
 }
-  function drawVisionOverlay({
+ function evaluateAnimalMask(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  if(width < 40 || height < 40) return null;
+
+  const imgArea = mask.cols * mask.rows;
+  const boxArea = width * height;
+
+  let maskArea = 0;
+  for(let y = box.minY; y <= box.maxY; y++){
+    for(let x = box.minX; x <= box.maxX; x++){
+      if(mask.ucharPtr(y,x)[0] > 0) maskArea++;
+    }
+  }
+
+  const areaRatioToImage = imgArea > 0 ? (maskArea / imgArea) : 0;
+  const fillRatio = boxArea > 0 ? (maskArea / boxArea) : 0;
+  const aspectRatio = height > 0 ? (width / height) : 0;
+
+  let score = 0;
+
+  if(areaRatioToImage >= 0.08 && areaRatioToImage <= 0.55) score += 0.35;
+  else if(areaRatioToImage >= 0.05 && areaRatioToImage <= 0.70) score += 0.20;
+
+  if(fillRatio >= 0.28 && fillRatio <= 0.82) score += 0.30;
+  else if(fillRatio >= 0.18 && fillRatio <= 0.90) score += 0.15;
+
+  if(aspectRatio >= 1.35 && aspectRatio <= 4.20) score += 0.35;
+  else if(aspectRatio >= 1.10 && aspectRatio <= 4.80) score += 0.20;
+
+  score = Math.max(0, Math.min(1, score));
+
+  let quality = 'good';
+  if(score < 0.45) quality = 'bad';
+  else if(score < 0.65) quality = 'weak';
+
+  return {
+    box,
+    maskArea,
+    areaRatioToImage,
+    fillRatio,
+    aspectRatio,
+    score,
+    quality
+  };
+}   
+ function drawVisionOverlay({
   imgData,
   scaleResult,
   poseResult,
@@ -1027,7 +1100,8 @@ function measureChestDepthAtFront(mask){
   confidence,
   scaleTip,
   markerConsistency,
-  bodySideScore
+  bodySideScore,
+  maskScore
 }){
   if(!imgData) return;
 
@@ -1089,9 +1163,10 @@ function measureChestDepthAtFront(mask){
 const subText = scaleTip || '';
 const q1 = `الماركر ${(markerConsistency ?? 0).toFixed(2)}`;
 const q2 = `وضعية الجسم ${(bodySideScore ?? 0).toFixed(2)}`;
+const q3 = `حدود الجسم ${(maskScore ?? 0).toFixed(2)}`;
 
 ctx.fillStyle = 'rgba(15,23,42,0.78)';
-ctx.fillRect(12, 12, Math.min(can.width - 24, 460), 78);
+ctx.fillText(`${q1} — ${q2}`, 24, 70);
 
 ctx.fillStyle = '#ffffff';
 ctx.font = 'bold 18px Cairo, sans-serif';
@@ -1100,6 +1175,8 @@ ctx.fillText(topText, 24, 32);
 ctx.font = '14px Cairo, sans-serif';
 ctx.fillText(subText.slice(0, 52), 24, 52);
 ctx.fillText(`${q1} — ${q2}`, 24, 70);
+ctx.fillText(q3, 24, 88);
+  }
   </script>
 </body>
 </html>
