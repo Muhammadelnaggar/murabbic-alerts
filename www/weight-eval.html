@@ -327,7 +327,7 @@ if (!window.cvReady || !window.cv) {
      imgData = await dataURLToImageData(best.dataURL);
 imgData = undistortImageData(imgData);
 lastShot = imgData;
-      lastShot = imgData;
+      
     } else {
       if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
 
@@ -358,20 +358,9 @@ lastShot = imgData;
     }
 
   pxPerCm = scale;
-let scaleHint = '';
-
-if (!pxPerCm || !isFinite(pxPerCm)) {
-  scaleHint = 'تعذّر قراءة علامة القياس بوضوح';
-  outScale.textContent = '—';
-} else {
-  outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-
-  if (pxPerCm < 4) {
-    scaleHint = 'علامة القياس صغيرة في اللقطة — قرّبها قليلًا وضعها بجوار الكتف';
-  } else if (pxPerCm > 20) {
-    scaleHint = 'علامة القياس قريبة جدًا أو أكبر من اللازم مقارنة بالحيوان';
-  }
-}
+outScale.textContent = (pxPerCm && isFinite(pxPerCm))
+  ? (pxPerCm.toFixed(2) + ' px/cm')
+  : '—';
     const mask = animalMask(imgData);
     if(!mask){
       outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -428,7 +417,7 @@ outConf.textContent = confidence + '%';
 
 const scaleInfo = getScaleFeedback(pxPerCm);
 const scaleQuality = scaleInfo?.quality || 'bad';
-const scaleTip = scaleInfo?.message || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+const scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
 
 if (scaleQuality === 'bad') {
   showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
