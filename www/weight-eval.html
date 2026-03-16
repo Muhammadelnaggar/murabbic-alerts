@@ -754,6 +754,11 @@ function detectArucoPxPerCm(imgData){
 
   const src = cv.matFromImageData(imgData);
   const gray = new cv.Mat();
+  const dictList = [
+  cv.DICT_4X4_1000,
+  cv.DICT_4X4_250,
+  cv.DICT_5X5_1000
+].filter(v => typeof v === 'number');
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
   const candidates = [];
