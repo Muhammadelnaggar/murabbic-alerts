@@ -320,6 +320,14 @@ if (!window.cvReady || !window.cv) {
     }
 
     pxPerCm = scale;
+    if (!pxPerCm || pxPerCm < 4 || pxPerCm > 20) {
+  outScale.textContent = '—';
+  outChestW.textContent = '—';
+  outWeight.textContent = '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('علامة القياس ArUco غير صالحة في هذه اللقطة — كبّر العلامة وضعها بجوار الكتف وعلى نفس مستوى الجسم', true);
+}
     outScale.textContent = pxPerCm.toFixed(2)+' px/cm';
 
     const mask = animalMask(imgData);
@@ -364,13 +372,15 @@ outWeight.textContent = W + ' كجم';
     outLight.textContent = String(brightness || '—');
     outConf.textContent = confidence + '%';
 
-    if(confidence < 55){
-      showToast('جودة اللقطة ضعيفة — أعد التصوير من جانب الحيوان وبإضاءة أفضل', true);
-    } else if(confidence < 75){
-      showToast('تم التقدير — يفضّل إعادة لقطة أوضح لرفع الدقة');
-    } else {
-      showToast('✅ تم التقدير بجودة جيدة');
-    }
+if (!pxPerCm || pxPerCm < 4 || pxPerCm > 20) {
+  showToast('علامة القياس ArUco غير صالحة في هذه اللقطة — كبّر العلامة وضعها بجوار الكتف وعلى نفس مستوى الجسم', true);
+} else if (confidence < 55) {
+  showToast('اللقطة مقبولة بصعوبة — أعد التصوير لرفع الدقة', true);
+} else if (confidence < 75) {
+  showToast('تم التقدير — يفضّل إعادة لقطة أوضح لرفع الدقة');
+} else {
+  showToast('✅ تم التقدير بجودة جيدة');
+}
 
     fireTrack('weight_estimated', {
       source: currentSource,
