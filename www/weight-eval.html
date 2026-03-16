@@ -369,7 +369,15 @@ outScale.textContent = (pxPerCm && isFinite(pxPerCm))
       currentConfidence = 0;
       return showToast('تعذّر تحديد الحيوان', true);
     }
-
+     const poseResult = analyzeBodyPose(mask);
+if(!poseResult){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('تعذّر تحليل وضعية الحيوان', true);
+}
    const chestPx = measureChestDepthAtFront(mask);
     if(!chestPx){
       outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -399,7 +407,7 @@ const bodyLenCm = bodyLenPx / pxPerCm;
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
 const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
 outWeight.textContent = W + ' كجم';
-    const confidence = scoreConfidence({
+   const confidence = scoreConfidence({
   sharpness,
   brightness,
   pxPerCm,
@@ -407,9 +415,10 @@ outWeight.textContent = W + ' كجم';
   weightKg: W,
   hasMarker: true,
   markerConsistency: scaleResult.sideConsistency,
-  markerPenalty: scaleResult.perspectivePenalty
+  markerPenalty: scaleResult.perspectivePenalty,
+  bodySideScore: poseResult.sideProfileScore,
+  bodyPosePenalty: poseResult.posePenalty
 });
-
    currentConfidence = confidence;
 lastMetrics = {
   sharpness,
@@ -418,7 +427,11 @@ lastMetrics = {
   weightKg: W,
   confidence,
   markerConsistency: scaleResult.sideConsistency,
-  perspectivePenalty: scaleResult.perspectivePenalty
+  perspectivePenalty: scaleResult.perspectivePenalty,
+  bodySideScore: poseResult.sideProfileScore,
+  bodyPosePenalty: poseResult.posePenalty,
+  fillRatio: poseResult.fillRatio,
+  aspectRatio: poseResult.aspectRatio
 };
 
 outSharp.textContent = String(sharpness || '—');
@@ -428,9 +441,18 @@ outConf.textContent = confidence + '%';
 const scaleInfo = getScaleFeedback(pxPerCm);
 let scaleQuality = scaleInfo?.quality || 'bad';
 let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+
 if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20) {
   scaleQuality = 'weak';
   scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
+}
+
+if (poseResult.poseQuality === 'bad') {
+  scaleQuality = 'weak';
+  scaleTip = 'وضعية الحيوان غير مناسبة للقياس — نحتاج لقطة جانبية أوضح مع ظهور الجسم كاملًا بدون ميل واضح.';
+} else if (poseResult.poseQuality === 'weak' && scaleQuality !== 'bad') {
+  scaleQuality = 'weak';
+  scaleTip = 'القياس ممكن، لكن وضعية الحيوان ليست جانبية بالكامل — لقطة جانبية أوضح سترفع الدقة.';
 }
 
 if (scaleQuality === 'bad') {
@@ -500,12 +522,16 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   chest_cm: Number(outChestW.textContent)||null,
   estimatedWeightKg: weightKg,
   confidence: currentConfidence,
-   quality: {
-    sharpness: lastMetrics?.sharpness || null,
-    brightness: lastMetrics?.brightness || null,
-    markerConsistency: lastMetrics?.markerConsistency ?? null,
-    perspectivePenalty: lastMetrics?.perspectivePenalty ?? null
-  },
+  quality: {
+  sharpness: lastMetrics?.sharpness || null,
+  brightness: lastMetrics?.brightness || null,
+  markerConsistency: lastMetrics?.markerConsistency ?? null,
+  perspectivePenalty: lastMetrics?.perspectivePenalty ?? null,
+  bodySideScore: lastMetrics?.bodySideScore ?? null,
+  bodyPosePenalty: lastMetrics?.bodyPosePenalty ?? null,
+  fillRatio: lastMetrics?.fillRatio ?? null,
+  aspectRatio: lastMetrics?.aspectRatio ?? null
+},
   animalNumber, eventDate,
   source: location.pathname
 };
@@ -548,7 +574,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
       }
     }
   };
-   function scoreConfidence({
+ function scoreConfidence({
   sharpness=0,
   brightness=0,
   pxPerCm=0,
@@ -556,7 +582,9 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   weightKg=0,
   hasMarker=false,
   markerConsistency=0,
-  markerPenalty=1
+  markerPenalty=1,
+  bodySideScore=0,
+  bodyPosePenalty=1
 } = {}){
   let score = 0;
 
@@ -581,7 +609,13 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   if (markerPenalty > 0.22) score -= 10;
   else if (markerPenalty > 0.15) score -= 6;
   else if (markerPenalty > 0.10) score -= 3;
+    if (bodySideScore >= 0.82) score += 10;
+  else if (bodySideScore >= 0.68) score += 7;
+  else if (bodySideScore >= 0.50) score += 4;
 
+  if (bodyPosePenalty > 0.55) score -= 12;
+  else if (bodyPosePenalty > 0.40) score -= 7;
+  else if (bodyPosePenalty > 0.25) score -= 3;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
   
@@ -880,7 +914,84 @@ function measureChestDepthAtFront(mask){
   if(!box) return null;
   return box.maxX - box.minX;
 }   
- 
+ function analyzeBodyPose(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  if(width < 40 || height < 40) return null;
+
+  const areaBox = width * height;
+
+  let areaMask = 0;
+  for(let y = box.minY; y <= box.maxY; y++){
+    for(let x = box.minX; x <= box.maxX; x++){
+      if(mask.ucharPtr(y, x)[0] > 0) areaMask++;
+    }
+  }
+
+  const fillRatio = areaBox > 0 ? (areaMask / areaBox) : 0;
+  const aspectRatio = height > 0 ? (width / height) : 0;
+
+  const xA = Math.round(box.minX + width * 0.20);
+  const xB = Math.round(box.minX + width * 0.35);
+  const xC = Math.round(box.minX + width * 0.50);
+  const xD = Math.round(box.minX + width * 0.65);
+  const xE = Math.round(box.minX + width * 0.80);
+
+  const spans = [xA, xB, xC, xD, xE]
+    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
+    .filter(v => v && isFinite(v));
+
+  if(spans.length < 3){
+    return {
+      box,
+      width,
+      height,
+      fillRatio,
+      aspectRatio,
+      sideProfileScore: 0,
+      posePenalty: 1,
+      poseQuality: 'bad'
+    };
+  }
+
+  const minSpan = Math.min(...spans);
+  const maxSpan = Math.max(...spans);
+  const avgSpan = spans.reduce((a,b)=>a+b,0) / spans.length;
+  const spanConsistency = maxSpan > 0 ? (minSpan / maxSpan) : 0;
+
+  let sideProfileScore = 0;
+
+  if(aspectRatio >= 1.6 && aspectRatio <= 3.8) sideProfileScore += 0.40;
+  else if(aspectRatio >= 1.35 && aspectRatio <= 4.2) sideProfileScore += 0.25;
+
+  if(fillRatio >= 0.38 && fillRatio <= 0.78) sideProfileScore += 0.30;
+  else if(fillRatio >= 0.28 && fillRatio <= 0.85) sideProfileScore += 0.18;
+
+  if(spanConsistency >= 0.45) sideProfileScore += 0.30;
+  else if(spanConsistency >= 0.30) sideProfileScore += 0.18;
+
+  sideProfileScore = Math.max(0, Math.min(1, sideProfileScore));
+
+  let poseQuality = 'good';
+  if(sideProfileScore < 0.45) poseQuality = 'bad';
+  else if(sideProfileScore < 0.68) poseQuality = 'weak';
+
+  return {
+    box,
+    width,
+    height,
+    fillRatio,
+    aspectRatio,
+    spans,
+    spanConsistency,
+    sideProfileScore,
+    posePenalty: 1 - sideProfileScore,
+    poseQuality
+  };
+}
   </script>
 </body>
 </html>
