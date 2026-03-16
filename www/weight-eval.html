@@ -173,6 +173,7 @@ function markCvReady() {
   
 
   <script type="module">
+    import { cameraCalibration } from './camera-calibration.js';
   // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
@@ -323,7 +324,9 @@ if (!window.cvReady || !window.cv) {
       sharpness = Math.round(best.sharpness || 0);
       brightness = Math.round(best.brightness || 0);
 
-      imgData = await dataURLToImageData(best.dataURL);
+     imgData = await dataURLToImageData(best.dataURL);
+imgData = undistortImageData(imgData);
+lastShot = imgData;
       lastShot = imgData;
     } else {
       if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
@@ -332,7 +335,8 @@ if (!window.cvReady || !window.cv) {
       can.height = imgPrev.naturalHeight;
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
       imgData = ctx.getImageData(0,0,can.width,can.height);
-      lastShot = imgData;
+imgData = undistortImageData(imgData);
+lastShot = imgData;
 
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = can.width;
@@ -415,12 +419,16 @@ outWeight.textContent = W + ' كجم';
       hasMarker: true
     });
 
-    currentConfidence = confidence;
-    lastMetrics = { sharpness, brightness, chestCm, weightKg: W, confidence };
+   currentConfidence = confidence;
+lastMetrics = { sharpness, brightness, chestCm, weightKg: W, confidence };
 
-    outSharp.textContent = String(sharpness || '—');
-    outLight.textContent = String(brightness || '—');
-    outConf.textContent = confidence + '%';
+outSharp.textContent = String(sharpness || '—');
+outLight.textContent = String(brightness || '—');
+outConf.textContent = confidence + '%';
+
+const scaleInfo = getScaleFeedback(pxPerCm);
+const scaleQuality = scaleInfo?.quality || 'bad';
+const scaleTip = scaleInfo?.message || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
 
 if (scaleQuality === 'bad') {
   showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
@@ -562,6 +570,53 @@ if (weightKg >= 80 && weightKg <= 1200) score += 10;
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
+  function undistortImageData(imgData){
+  const cv = window.cv;
+  if(!cv || !cameraCalibration) return imgData;
+
+  const src = cv.matFromImageData(imgData);
+  const dst = new cv.Mat();
+
+  const cameraMatrix = cv.matFromArray(
+    3, 3, cv.CV_64F,
+    [
+      cameraCalibration.cameraMatrix[0][0], cameraCalibration.cameraMatrix[0][1], cameraCalibration.cameraMatrix[0][2],
+      cameraCalibration.cameraMatrix[1][0], cameraCalibration.cameraMatrix[1][1], cameraCalibration.cameraMatrix[1][2],
+      cameraCalibration.cameraMatrix[2][0], cameraCalibration.cameraMatrix[2][1], cameraCalibration.cameraMatrix[2][2]
+    ]
+  );
+
+  const distCoeffs = cv.matFromArray(
+    1, 5, cv.CV_64F,
+    [
+      cameraCalibration.distCoeffs[0],
+      cameraCalibration.distCoeffs[1],
+      cameraCalibration.distCoeffs[2],
+      cameraCalibration.distCoeffs[3],
+      cameraCalibration.distCoeffs[4]
+    ]
+  );
+
+  try{
+    cv.undistort(src, dst, cameraMatrix, distCoeffs);
+
+    const out = new ImageData(
+      new Uint8ClampedArray(dst.data),
+      dst.cols,
+      dst.rows
+    );
+
+    return out;
+  } catch(err){
+    console.warn('Undistort failed', err);
+    return imgData;
+  } finally {
+    src.delete();
+    dst.delete();
+    cameraMatrix.delete();
+    distCoeffs.delete();
+  }
+}  
   // ========= CV Helpers =========
 function detectArucoPxPerCm(imgData){
   const cv = window.cv;
@@ -716,7 +771,7 @@ function detectArucoPxPerCm(imgData){
   return bestScale;
 }
 window.detectArucoPxPerCm = detectArucoPxPerCm;
- window.detectArucoPxPerCm = detectArucoPxPerCm;   
+   
   function animalMask(imgData){
     const cv = window.cv; if(!cv) return null;
     const src=cv.matFromImageData(imgData);
