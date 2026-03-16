@@ -347,17 +347,17 @@ lastShot = imgData;
       brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
     }
 
-    const scale = detectArucoPxPerCm(imgData);
-    if(!scale){
-      outScale.textContent='—';
-      outSharp.textContent = sharpness ? String(sharpness) : '—';
-      outLight.textContent = brightness ? String(brightness) : '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      return showToast('لم تُكتشف علامة ArUco', true);
-    }
+  const scaleResult = detectArucoPxPerCm(imgData);
+if(!scaleResult || !scaleResult.pxPerCm){
+  outScale.textContent='—';
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('لم تُكتشف علامة ArUco', true);
+}
 
-  pxPerCm = scale;
+pxPerCm = scaleResult.pxPerCm;
 outScale.textContent = (pxPerCm && isFinite(pxPerCm))
   ? (pxPerCm.toFixed(2) + ' px/cm')
   : '—';
@@ -400,13 +400,15 @@ const bodyLenCm = bodyLenPx / pxPerCm;
 const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
 outWeight.textContent = W + ' كجم';
     const confidence = scoreConfidence({
-      sharpness,
-      brightness,
-      pxPerCm,
-      chestCm,
-      weightKg: W,
-      hasMarker: true
-    });
+  sharpness,
+  brightness,
+  pxPerCm,
+  chestCm,
+  weightKg: W,
+  hasMarker: true,
+  markerConsistency: scaleResult.sideConsistency,
+  markerPenalty: scaleResult.perspectivePenalty
+});
 
    currentConfidence = confidence;
 lastMetrics = { sharpness, brightness, chestCm, weightKg: W, confidence };
@@ -416,8 +418,13 @@ outLight.textContent = String(brightness || '—');
 outConf.textContent = confidence + '%';
 
 const scaleInfo = getScaleFeedback(pxPerCm);
-const scaleQuality = scaleInfo?.quality || 'bad';
-const scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+let scaleQuality = scaleInfo?.quality || 'bad';
+let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+
+if (scaleResult.sideConsistency < 0.80) {
+  scaleQuality = 'weak';
+  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان.';
+}
 
 if (scaleQuality === 'bad') {
   showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
@@ -532,7 +539,42 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
       }
     }
   };
-    function scoreConfidence({ sharpness=0, brightness=0, pxPerCm=0, chestCm=0, weightKg=0, hasMarker=false } = {}){
+   function scoreConfidence({
+  sharpness=0,
+  brightness=0,
+  pxPerCm=0,
+  chestCm=0,
+  weightKg=0,
+  hasMarker=false,
+  markerConsistency=0,
+  markerPenalty=1
+} = {}){
+  let score = 0;
+
+  if (hasMarker) score += 22;
+
+  if (sharpness >= 1200) score += 25;
+  else if (sharpness >= 700) score += 18;
+  else if (sharpness >= 350) score += 10;
+
+  if (brightness >= 90 && brightness <= 190) score += 15;
+  else if (brightness >= 70 && brightness <= 210) score += 10;
+  else score += 4;
+
+  if (pxPerCm >= 4 && pxPerCm <= 40) score += 10;
+  if (chestCm >= 35 && chestCm <= 110) score += 10;
+  if (weightKg >= 80 && weightKg <= 1200) score += 10;
+
+  if (markerConsistency >= 0.92) score += 8;
+  else if (markerConsistency >= 0.85) score += 5;
+  else if (markerConsistency >= 0.78) score += 2;
+
+  if (markerPenalty > 0.22) score -= 10;
+  else if (markerPenalty > 0.15) score -= 6;
+  else if (markerPenalty > 0.10) score -= 3;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
     let score = 0;
 
     if (hasMarker) score += 30;
@@ -623,7 +665,7 @@ function detectArucoPxPerCm(imgData){
   const candidates = [];
 
   // 1) الصورة الأصلية
-  candidates.push(gray);
+  candidates.push({ mat: gray, scaleFix: 1 });
 
   // 2) CLAHE لتحسين التباين
   const eq = new cv.Mat();
@@ -631,7 +673,7 @@ function detectArucoPxPerCm(imgData){
     const clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
     clahe.apply(gray, eq);
     clahe.delete();
-    candidates.push(eq);
+    candidates.push({ mat: eq, scaleFix: 1 });
   } catch(e) {}
 
   // 3) Threshold
@@ -643,14 +685,14 @@ function detectArucoPxPerCm(imgData){
       cv.THRESH_BINARY,
       31, 7
     );
-    candidates.push(thr);
+    candidates.push({ mat: thr, scaleFix: 1 });
   } catch(e) {}
 
   // 4) تكبير 2x
   const up = new cv.Mat();
   try {
     cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
-    candidates.push(up);
+    candidates.push({ mat: up, scaleFix: 0.5 });
   } catch(e) {}
 
   const dictList = [
@@ -673,16 +715,14 @@ function detectArucoPxPerCm(imgData){
     cv.DICT_ARUCO_ORIGINAL
   ].filter(v => typeof v === 'number');
 
-  let bestScale = null;
-  let bestPerimeter = 0;
+  let best = null;
 
   try {
-    for (const img of candidates) {
+    for (const item of candidates) {
       for (const dictId of dictList) {
         const dict = cv.getPredefinedDictionary(dictId);
         const params = new cv.aruco_DetectorParameters();
 
-        // إعدادات أكثر مرونة
         try {
           params.adaptiveThreshWinSizeMin = 3;
           params.adaptiveThreshWinSizeMax = 53;
@@ -709,7 +749,7 @@ function detectArucoPxPerCm(imgData){
             detector = new cv.aruco_ArucoDetector(dict, params);
           }
 
-          detector.detectMarkers(img, corners, ids, rejected);
+          detector.detectMarkers(item.mat, corners, ids, rejected);
 
           if (!ids.empty() && corners.size() > 0) {
             for (let i = 0; i < corners.size(); i++) {
@@ -720,17 +760,33 @@ function detectArucoPxPerCm(imgData){
               const d23 = Math.hypot(c[4]-c[6], c[5]-c[7]);
               const d30 = Math.hypot(c[6]-c[0], c[7]-c[1]);
 
-             const sidePx = Math.max(d01, d12, d23, d30);
-              const perimeter = d01 + d12 + d23 + d30;
+              const sides = [d01, d12, d23, d30].map(v => v * item.scaleFix).filter(v => v > 0);
+              if (sides.length !== 4) continue;
 
-              if (sidePx > 0 && perimeter > bestPerimeter) {
-                let correctedSide = sidePx;
+              const minSide = Math.min(...sides);
+              const maxSide = Math.max(...sides);
+              const avgSide = sides.reduce((a,b)=>a+b,0) / sides.length;
+              const perimeter = sides.reduce((a,b)=>a+b,0);
 
-                // لو كنا على نسخة مكبرة 2x نرجع القياس للحجم الأصلي
-                if (img === up) correctedSide = sidePx / 2;
+              if (!avgSide || !isFinite(avgSide)) continue;
 
-                bestPerimeter = perimeter;
-                bestScale = correctedSide / ARUCO_MARKER_CM;
+              const sideConsistency = minSide / maxSide;
+              const perspectivePenalty = 1 - sideConsistency;
+              const pxPerCm = avgSide / ARUCO_MARKER_CM;
+
+              const candidate = {
+                pxPerCm,
+                avgSide,
+                minSide,
+                maxSide,
+                perimeter,
+                sideConsistency,
+                perspectivePenalty,
+                qualityScore: (perimeter * 0.6) + (sideConsistency * 1000)
+              };
+
+              if (!best || candidate.qualityScore > best.qualityScore) {
+                best = candidate;
               }
             }
           }
@@ -744,20 +800,17 @@ function detectArucoPxPerCm(imgData){
           params.delete?.();
           refine?.delete?.();
         }
-
-        if (bestScale) break;
       }
-      if (bestScale) break;
     }
   } finally {
     src.delete();
     gray.delete();
-    if (eq !== gray) eq.delete?.();
+    eq.delete?.();
     thr.delete?.();
     up.delete?.();
   }
 
-  return bestScale;
+  return best;
 }
 window.detectArucoPxPerCm = detectArucoPxPerCm;
    
