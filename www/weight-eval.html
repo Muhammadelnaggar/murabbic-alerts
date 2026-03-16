@@ -411,7 +411,15 @@ outWeight.textContent = W + ' كجم';
 });
 
    currentConfidence = confidence;
-lastMetrics = { sharpness, brightness, chestCm, weightKg: W, confidence };
+lastMetrics = {
+  sharpness,
+  brightness,
+  chestCm,
+  weightKg: W,
+  confidence,
+  markerConsistency: scaleResult.sideConsistency,
+  perspectivePenalty: scaleResult.perspectivePenalty
+};
 
 outSharp.textContent = String(sharpness || '—');
 outLight.textContent = String(brightness || '—');
@@ -420,10 +428,9 @@ outConf.textContent = confidence + '%';
 const scaleInfo = getScaleFeedback(pxPerCm);
 let scaleQuality = scaleInfo?.quality || 'bad';
 let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
-
-if (scaleResult.sideConsistency < 0.80) {
+if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20) {
   scaleQuality = 'weak';
-  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان.';
+  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
 }
 
 if (scaleQuality === 'bad') {
@@ -493,9 +500,11 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   chest_cm: Number(outChestW.textContent)||null,
   estimatedWeightKg: weightKg,
   confidence: currentConfidence,
-  quality: {
+   quality: {
     sharpness: lastMetrics?.sharpness || null,
-    brightness: lastMetrics?.brightness || null
+    brightness: lastMetrics?.brightness || null,
+    markerConsistency: lastMetrics?.markerConsistency ?? null,
+    perspectivePenalty: lastMetrics?.perspectivePenalty ?? null
   },
   animalNumber, eventDate,
   source: location.pathname
@@ -575,24 +584,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
-    let score = 0;
-
-    if (hasMarker) score += 30;
-
-    if (sharpness >= 1200) score += 25;
-    else if (sharpness >= 700) score += 18;
-    else if (sharpness >= 350) score += 10;
-
-    if (brightness >= 90 && brightness <= 190) score += 15;
-    else if (brightness >= 70 && brightness <= 210) score += 10;
-    else score += 4;
-
-    if (pxPerCm >= 4 && pxPerCm <= 40) score += 10;
-if (chestCm >= 35 && chestCm <= 110) score += 10;
-if (weightKg >= 80 && weightKg <= 1200) score += 10;
-
-    return Math.max(0, Math.min(100, Math.round(score)));
-  }
+  
 
   async function dataURLToImageData(dataURL){
     const img = await window.vision.dataURLToImage(dataURL);
