@@ -312,9 +312,11 @@ if (!window.cvReady || !window.cv) {
 }
 
   try{
-    let imgData = null;
-    let sharpness = 0;
-    let brightness = 0;
+   let imgData = null;
+let sharpness = 0;
+let brightness = 0;
+let resizeRatio = 1;
+let scaleResult = null;
 
     if(currentSource === 'camera'){
       if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
@@ -332,7 +334,8 @@ if (!window.cvReady || !window.cv) {
       brightness = Math.round(best.brightness || 0);
 
   const originalImgData = await dataURLToImageData(best.dataURL);
-const scaleResult = detectArucoPxPerCm(originalImgData);
+
+scaleResult = detectArucoPxPerCm(originalImgData);
 if(!scaleResult || !scaleResult.pxPerCm){
   outScale.textContent='—';
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -343,7 +346,7 @@ if(!scaleResult || !scaleResult.pxPerCm){
 }
 
 imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-const resizeRatio = originalImgData.width / imgData.width;
+resizeRatio = originalImgData.width / imgData.width;
 lastShot = imgData;
 pxPerCm = scaleResult.pxPerCm;
 outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
@@ -354,9 +357,9 @@ outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
       can.width = imgPrev.naturalWidth;
       can.height = imgPrev.naturalHeight;
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
-   const originalImgData = ctx.getImageData(0,0,can.width,can.height);
+  const originalImgData = ctx.getImageData(0,0,can.width,can.height);
 
-const scaleResult = detectArucoPxPerCm(originalImgData);
+scaleResult = detectArucoPxPerCm(originalImgData);
 if(!scaleResult || !scaleResult.pxPerCm){
   outScale.textContent='—';
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -367,7 +370,7 @@ if(!scaleResult || !scaleResult.pxPerCm){
 }
 
 imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-const resizeRatio = originalImgData.width / imgData.width;
+resizeRatio = originalImgData.width / imgData.width;
 lastShot = imgData;
 pxPerCm = scaleResult.pxPerCm;
 outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
@@ -437,6 +440,7 @@ if(!bodyLenPxSmall){
 }
 
 const bodyLenPx = bodyLenPxSmall * resizeRatio;
+const bodyLenCm = bodyLenPx / pxPerCm;
 
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
 const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
@@ -765,7 +769,7 @@ try {
     candidates.push({ mat: up, scaleFix: 0.5 });
   }
 } catch(e) {}
- dictList
+ 
   let best = null;
 
   try {
