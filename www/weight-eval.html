@@ -959,20 +959,62 @@ function measureChestDepthAtFront(mask){
   if(!box) return null;
 
   const bodyLen = box.maxX - box.minX;
+  if(bodyLen < 40) return null;
 
-  const x1 = Math.round(box.minX + bodyLen * 0.28);
-  const x2 = Math.round(box.minX + bodyLen * 0.34);
-  const x3 = Math.round(box.minX + bodyLen * 0.40);
+  // نأخذ عينات من الطرف الأيسر والطرف الأيمن
+  const leftXs = [
+    Math.round(box.minX + bodyLen * 0.08),
+    Math.round(box.minX + bodyLen * 0.12),
+    Math.round(box.minX + bodyLen * 0.16)
+  ];
 
-  const d1 = measureVerticalSpanAtX(mask, x1, box.minY, box.maxY);
-  const d2 = measureVerticalSpanAtX(mask, x2, box.minY, box.maxY);
-  const d3 = measureVerticalSpanAtX(mask, x3, box.minY, box.maxY);
+  const rightXs = [
+    Math.round(box.minX + bodyLen * 0.84),
+    Math.round(box.minX + bodyLen * 0.88),
+    Math.round(box.minX + bodyLen * 0.92)
+  ];
 
-  const vals = [d1, d2, d3].filter(v => v && isFinite(v));
+  const leftVals = leftXs
+    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
+    .filter(v => v && isFinite(v));
+
+  const rightVals = rightXs
+    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
+    .filter(v => v && isFinite(v));
+
+  if(!leftVals.length || !rightVals.length) return null;
+
+  const leftAvg = leftVals.reduce((a,b)=>a+b,0) / leftVals.length;
+  const rightAvg = rightVals.reduce((a,b)=>a+b,0) / rightVals.length;
+
+  // الطرف الأضيق غالبًا هو جهة الرأس/الرقبة = المقدمة
+  const frontIsLeft = leftAvg < rightAvg;
+
+  let xs;
+  if(frontIsLeft){
+    // نقيس خلف الكتف من جهة اليسار (المقدمة يسار)
+    xs = [
+      Math.round(box.minX + bodyLen * 0.30),
+      Math.round(box.minX + bodyLen * 0.36),
+      Math.round(box.minX + bodyLen * 0.42)
+    ];
+  } else {
+    // نقيس خلف الكتف من جهة اليمين (المقدمة يمين)
+    xs = [
+      Math.round(box.minX + bodyLen * 0.70),
+      Math.round(box.minX + bodyLen * 0.64),
+      Math.round(box.minX + bodyLen * 0.58)
+    ];
+  }
+
+  const vals = xs
+    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
+    .filter(v => v && isFinite(v));
+
   if(!vals.length) return null;
 
   vals.sort((a,b)=>a-b);
-  return vals[Math.floor(vals.length/2)];
+  return vals[Math.floor(vals.length / 2)];
 }
     
  function measureBodyLengthPx(mask){
@@ -1132,11 +1174,44 @@ function measureChestDepthAtFront(mask){
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
     // خط قياس الصدر
-    const bodyLen = b.maxX - b.minX;
-    const x1 = Math.round(b.minX + bodyLen * 0.28);
-    const x2 = Math.round(b.minX + bodyLen * 0.34);
-    const x3 = Math.round(b.minX + bodyLen * 0.40);
-    const xs = [x1, x2, x3];
+   const bodyLen = b.maxX - b.minX;
+
+const leftXs = [
+  Math.round(b.minX + bodyLen * 0.08),
+  Math.round(b.minX + bodyLen * 0.12),
+  Math.round(b.minX + bodyLen * 0.16)
+];
+
+const rightXs = [
+  Math.round(b.minX + bodyLen * 0.84),
+  Math.round(b.minX + bodyLen * 0.88),
+  Math.round(b.minX + bodyLen * 0.92)
+];
+
+const leftVals = leftXs
+  .map(x => measureVerticalSpanAtX(lastMask, x, b.minY, b.maxY))
+  .filter(v => v && isFinite(v));
+
+const rightVals = rightXs
+  .map(x => measureVerticalSpanAtX(lastMask, x, b.minY, b.maxY))
+  .filter(v => v && isFinite(v));
+
+const leftAvg = leftVals.length ? (leftVals.reduce((a,b)=>a+b,0) / leftVals.length) : 0;
+const rightAvg = rightVals.length ? (rightVals.reduce((a,b)=>a+b,0) / rightVals.length) : 0;
+
+const frontIsLeft = leftAvg < rightAvg;
+
+const xs = frontIsLeft
+  ? [
+      Math.round(b.minX + bodyLen * 0.30),
+      Math.round(b.minX + bodyLen * 0.36),
+      Math.round(b.minX + bodyLen * 0.42)
+    ]
+  : [
+      Math.round(b.minX + bodyLen * 0.70),
+      Math.round(b.minX + bodyLen * 0.64),
+      Math.round(b.minX + bodyLen * 0.58)
+    ];
 
     ctx.strokeStyle = 'rgba(245,158,11,0.95)';
     ctx.lineWidth = 2;
