@@ -163,6 +163,9 @@ function markCvReady() {
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
+    <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
+  وجّه الكاميرا ليظهر الحيوان كاملًا من الجانب، وضع علامة القياس 10 سم بجوار الكتف.
+</div>
   </section>
 
   <div id="toast" class="toast"></div>
@@ -225,7 +228,38 @@ const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.65;
     toast.style.display='block'; clearTimeout(showToast._t);
     showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
   }
+  function setGuide(msg, level='normal'){
+  const el = $('visionGuide');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.classList.remove('err');
+  if(level === 'warn') el.classList.add('err');
+}
 
+function getScaleFeedback(pxPerCm){
+  if(!pxPerCm || !isFinite(pxPerCm)){
+    return {
+      quality:'bad',
+      msg:'لم نقرأ علامة القياس بوضوح بعد — قرّب العلامة واجعلها بجوار الكتف.'
+    };
+  }
+  if(pxPerCm < 4){
+    return {
+      quality:'weak',
+      msg:'العلامة صغيرة في اللقطة — قرّبها قليلًا أو اجعلها أوضح.'
+    };
+  }
+  if(pxPerCm > 20){
+    return {
+      quality:'weak',
+      msg:'العلامة قريبة جدًا أو أكبر من اللازم مقارنة بالحيوان.'
+    };
+  }
+  return {
+    quality:'good',
+    msg:'قراءة علامة القياس جيدة.'
+  };
+}
   // ========= تهيئة الحقول =========
   initContextFields();
   function initContextFields(){
@@ -319,17 +353,21 @@ if (!window.cvReady || !window.cv) {
       return showToast('لم تُكتشف علامة ArUco', true);
     }
 
-    pxPerCm = scale;
-    if (!pxPerCm || pxPerCm < 4 || pxPerCm > 20) {
-  outScale.textContent = '—';
-  outChestW.textContent = '—';
-  outWeight.textContent = '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('علامة القياس ArUco غير صالحة في هذه اللقطة — كبّر العلامة وضعها بجوار الكتف وعلى نفس مستوى الجسم', true);
-}
-    outScale.textContent = pxPerCm.toFixed(2)+' px/cm';
+  pxPerCm = scale;
+let scaleHint = '';
 
+if (!pxPerCm || !isFinite(pxPerCm)) {
+  scaleHint = 'تعذّر قراءة علامة القياس بوضوح';
+  outScale.textContent = '—';
+} else {
+  outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+
+  if (pxPerCm < 4) {
+    scaleHint = 'علامة القياس صغيرة في اللقطة — قرّبها قليلًا وضعها بجوار الكتف';
+  } else if (pxPerCm > 20) {
+    scaleHint = 'علامة القياس قريبة جدًا أو أكبر من اللازم مقارنة بالحيوان';
+  }
+}
     const mask = animalMask(imgData);
     if(!mask){
       outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -339,7 +377,7 @@ if (!window.cvReady || !window.cv) {
       return showToast('تعذّر تحديد الحيوان', true);
     }
 
-    const chestPx = measureChestDepth(mask, 0.35);
+   const chestPx = measureChestDepthAtFront(mask);
     if(!chestPx){
       outSharp.textContent = sharpness ? String(sharpness) : '—';
       outLight.textContent = brightness ? String(brightness) : '—';
@@ -349,12 +387,24 @@ if (!window.cvReady || !window.cv) {
       return showToast('فشل قياس عمق الصدر', true);
     }
 
-   const chestCmRaw = chestPx / pxPerCm;
-const chestCm = chestCmRaw * 0.88;   // تصحيح بسيط لتقليل تضخيم القياس من الصورة الجانبية
+  const chestCmRaw = chestPx / pxPerCm;
+const chestCm = chestCmRaw * 0.95;
 outChestW.textContent = chestCm.toFixed(1);
 
-const HG = chestCm * GIRTH_FACTOR;
-const W = Math.round((HG * HG * HG) / 10880);
+const bodyLenPx = measureBodyLengthPx(mask);
+if(!bodyLenPx){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('فشل قياس طول الجسم', true);
+}
+
+const bodyLenCm = bodyLenPx / pxPerCm;
+
+// معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
+const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
 outWeight.textContent = W + ' كجم';
     const confidence = scoreConfidence({
       sharpness,
@@ -372,12 +422,14 @@ outWeight.textContent = W + ' كجم';
     outLight.textContent = String(brightness || '—');
     outConf.textContent = confidence + '%';
 
-if (!pxPerCm || pxPerCm < 4 || pxPerCm > 20) {
-  showToast('علامة القياس ArUco غير صالحة في هذه اللقطة — كبّر العلامة وضعها بجوار الكتف وعلى نفس مستوى الجسم', true);
+if (scaleQuality === 'bad') {
+  showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
+} else if (scaleQuality === 'weak') {
+  showToast('تم التقدير مبدئيًا — ' + scaleTip);
 } else if (confidence < 55) {
-  showToast('اللقطة مقبولة بصعوبة — أعد التصوير لرفع الدقة', true);
+  showToast('تم التقدير مبدئيًا — يفضّل إعادة لقطة أوضح لرفع الدقة');
 } else if (confidence < 75) {
-  showToast('تم التقدير — يفضّل إعادة لقطة أوضح لرفع الدقة');
+  showToast('تم التقدير — النتيجة جيدة ويمكن تحسينها بلقطة أوضح');
 } else {
   showToast('✅ تم التقدير بجودة جيدة');
 }
@@ -733,20 +785,13 @@ function measureChestDepthAtFront(mask){
   vals.sort((a,b)=>a-b);
   return vals[Math.floor(vals.length/2)];
 }
-  function measureChestDepth(mask, pos){
-  const x = Math.floor(mask.cols * pos);
-  let top=-1, bottom=-1;
-
-  for(let y=0;y<mask.rows;y++){
-    if(mask.ucharPtr(y,x)[0]){
-      if(top==-1) top=y;
-      bottom=y;
-    }
-  }
-
-  if(top==-1) return 0;
-  return bottom-top;
-}  
+    
+ function measureBodyLengthPx(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+  return box.maxX - box.minX;
+}   
+ 
   </script>
 </body>
 </html>
