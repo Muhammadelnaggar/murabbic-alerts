@@ -331,32 +331,8 @@ if (!window.cvReady || !window.cv) {
       sharpness = Math.round(best.sharpness || 0);
       brightness = Math.round(best.brightness || 0);
 
-   imgData = await dataURLToImageData(best.dataURL);
-imgData = undistortImageData(imgData);
-imgData = downscaleImageDataIfNeeded(imgData, 1600);
-lastShot = imgData;
-      
-    } else {
-      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
-
-      can.width = imgPrev.naturalWidth;
-      can.height = imgPrev.naturalHeight;
-      ctx.drawImage(imgPrev,0,0,can.width,can.height);
-    imgData = ctx.getImageData(0,0,can.width,can.height);
-imgData = undistortImageData(imgData);
-imgData = downscaleImageDataIfNeeded(imgData, 1600);
-lastShot = imgData;
-
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = can.width;
-      tempCanvas.height = can.height;
-      tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
-
-      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
-      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
-    }
-
-  const scaleResult = detectArucoPxPerCm(imgData);
+  const originalImgData = await dataURLToImageData(best.dataURL);
+const scaleResult = detectArucoPxPerCm(originalImgData);
 if(!scaleResult || !scaleResult.pxPerCm){
   outScale.textContent='—';
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -366,10 +342,46 @@ if(!scaleResult || !scaleResult.pxPerCm){
   return showToast('لم تُكتشف علامة ArUco', true);
 }
 
+imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+const resizeRatio = originalImgData.width / imgData.width;
+lastShot = imgData;
 pxPerCm = scaleResult.pxPerCm;
-outScale.textContent = (pxPerCm && isFinite(pxPerCm))
-  ? (pxPerCm.toFixed(2) + ' px/cm')
-  : '—';
+outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+      
+    } else {
+      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
+
+      can.width = imgPrev.naturalWidth;
+      can.height = imgPrev.naturalHeight;
+      ctx.drawImage(imgPrev,0,0,can.width,can.height);
+   const originalImgData = ctx.getImageData(0,0,can.width,can.height);
+
+const scaleResult = detectArucoPxPerCm(originalImgData);
+if(!scaleResult || !scaleResult.pxPerCm){
+  outScale.textContent='—';
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('لم تُكتشف علامة ArUco', true);
+}
+
+imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+const resizeRatio = originalImgData.width / imgData.width;
+lastShot = imgData;
+pxPerCm = scaleResult.pxPerCm;
+outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+
+const tempCanvas = document.createElement('canvas');
+tempCanvas.width = imgData.width;
+tempCanvas.height = imgData.height;
+tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
+
+      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
+      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
+    }
+
+
     const mask = animalMask(imgData);
 if(!mask){
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -399,22 +411,23 @@ if(!poseResult){
   mask.delete?.();
   return showToast('تعذّر تحليل وضعية الحيوان', true);
 }
-   const chestPx = measureChestDepthAtFront(mask);
-    if(!chestPx){
-      outSharp.textContent = sharpness ? String(sharpness) : '—';
-      outLight.textContent = brightness ? String(brightness) : '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      mask.delete?.();
-      return showToast('فشل قياس عمق الصدر', true);
-    }
+  const chestPxSmall = measureChestDepthAtFront(mask);
+if(!chestPxSmall){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('فشل قياس عمق الصدر', true);
+}
 
-  const chestCmRaw = chestPx / pxPerCm;
-const chestCm = chestCmRaw * 0.95;
+const chestPx = chestPxSmall * resizeRatio;
+const chestCm = chestPx / pxPerCm;
+outChestW.textContent = chestCm.toFixed(1);
 outChestW.textContent = chestCm.toFixed(1);
 
-const bodyLenPx = measureBodyLengthPx(mask);
-if(!bodyLenPx){
+const bodyLenPxSmall = measureBodyLengthPx(mask);
+if(!bodyLenPxSmall){
   outSharp.textContent = sharpness ? String(sharpness) : '—';
   outLight.textContent = brightness ? String(brightness) : '—';
   outConf.textContent = '0%';
@@ -423,7 +436,7 @@ if(!bodyLenPx){
   return showToast('فشل قياس طول الجسم', true);
 }
 
-const bodyLenCm = bodyLenPx / pxPerCm;
+const bodyLenPx = bodyLenPxSmall * resizeRatio;
 
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
 const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
@@ -670,53 +683,9 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
-  function undistortImageData(imgData){
-  const cv = window.cv;
-  if(!cv || !cameraCalibration) return imgData;
-
-  const src = cv.matFromImageData(imgData);
-  const dst = new cv.Mat();
-
-  const cameraMatrix = cv.matFromArray(
-    3, 3, cv.CV_64F,
-    [
-      cameraCalibration.cameraMatrix[0][0], cameraCalibration.cameraMatrix[0][1], cameraCalibration.cameraMatrix[0][2],
-      cameraCalibration.cameraMatrix[1][0], cameraCalibration.cameraMatrix[1][1], cameraCalibration.cameraMatrix[1][2],
-      cameraCalibration.cameraMatrix[2][0], cameraCalibration.cameraMatrix[2][1], cameraCalibration.cameraMatrix[2][2]
-    ]
-  );
-
-  const distCoeffs = cv.matFromArray(
-    1, 5, cv.CV_64F,
-    [
-      cameraCalibration.distCoeffs[0],
-      cameraCalibration.distCoeffs[1],
-      cameraCalibration.distCoeffs[2],
-      cameraCalibration.distCoeffs[3],
-      cameraCalibration.distCoeffs[4]
-    ]
-  );
-
-  try{
-    cv.undistort(src, dst, cameraMatrix, distCoeffs);
-
-    const out = new ImageData(
-      new Uint8ClampedArray(dst.data),
-      dst.cols,
-      dst.rows
-    );
-
-    return out;
-  } catch(err){
-    console.warn('Undistort failed', err);
-    return imgData;
-  } finally {
-    src.delete();
-    dst.delete();
-    cameraMatrix.delete();
-    distCoeffs.delete();
-  }
-}  
+function undistortImageData(imgData){
+  return imgData;
+} 
  function downscaleImageDataIfNeeded(imgData, maxSide = 1600){
   const w = imgData.width;
   const h = imgData.height;
@@ -961,7 +930,6 @@ function measureChestDepthAtFront(mask){
   const bodyLen = box.maxX - box.minX;
   if(bodyLen < 40) return null;
 
-  // نأخذ عينات من الطرف الأيسر والطرف الأيمن
   const leftXs = [
     Math.round(box.minX + bodyLen * 0.08),
     Math.round(box.minX + bodyLen * 0.12),
@@ -986,37 +954,47 @@ function measureChestDepthAtFront(mask){
 
   const leftAvg = leftVals.reduce((a,b)=>a+b,0) / leftVals.length;
   const rightAvg = rightVals.reduce((a,b)=>a+b,0) / rightVals.length;
-
-  // الطرف الأضيق غالبًا هو جهة الرأس/الرقبة = المقدمة
   const frontIsLeft = leftAvg < rightAvg;
 
-  let xs;
-  if(frontIsLeft){
-    // نقيس خلف الكتف من جهة اليسار (المقدمة يسار)
-    xs = [
-      Math.round(box.minX + bodyLen * 0.30),
-      Math.round(box.minX + bodyLen * 0.36),
-      Math.round(box.minX + bodyLen * 0.42)
-    ];
-  } else {
-    // نقيس خلف الكتف من جهة اليمين (المقدمة يمين)
-    xs = [
-      Math.round(box.minX + bodyLen * 0.70),
-      Math.round(box.minX + bodyLen * 0.64),
-      Math.round(box.minX + bodyLen * 0.58)
-    ];
+  const scanStart = frontIsLeft
+    ? Math.round(box.minX + bodyLen * 0.22)
+    : Math.round(box.minX + bodyLen * 0.78);
+
+  const scanEnd = frontIsLeft
+    ? Math.round(box.minX + bodyLen * 0.58)
+    : Math.round(box.minX + bodyLen * 0.42);
+
+  const step = frontIsLeft ? 1 : -1;
+  const samples = [];
+
+  for(let x = scanStart; frontIsLeft ? x <= scanEnd : x >= scanEnd; x += step){
+    const span = measureVerticalSpanAtX(mask, x, box.minY, box.maxY);
+    if(span && isFinite(span)){
+      samples.push({ x, span });
+    }
   }
 
-  const vals = xs
-    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
-    .filter(v => v && isFinite(v));
+  if(samples.length < 7) return null;
 
-  if(!vals.length) return null;
+  const smoothed = [];
+  for(let i = 2; i < samples.length - 2; i++){
+    const windowVals = [
+      samples[i-2].span,
+      samples[i-1].span,
+      samples[i].span,
+      samples[i+1].span,
+      samples[i+2].span
+    ].sort((a,b)=>a-b);
 
-  vals.sort((a,b)=>a-b);
-  return vals[Math.floor(vals.length / 2)];
-}
-    
+    const median = windowVals[2];
+    smoothed.push({ x: samples[i].x, span: median });
+  }
+
+  if(!smoothed.length) return null;
+
+  smoothed.sort((a,b)=>b.span-a.span);
+  return smoothed[0].span;
+} 
  function measureBodyLengthPx(mask){
   const box = getBodyBox(mask);
   if(!box) return null;
