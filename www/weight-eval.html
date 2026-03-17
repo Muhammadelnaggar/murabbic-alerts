@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>قياسات الجسم - مُرَبِّيك</title>
+<style>
+body {font-family: Arial; background:#0b7f47; color:#fff; text-align:center; padding:20px;}
+.card {background:#fff; color:#000; padding:15px; border-radius:12px; margin-top:20px;}
+.val {font-size:28px; font-weight:bold;}
+.label {font-size:14px; color:#555;}
+</style>
+</head>
+<body>
+
+<h2>قياس جسم الحيوان</h2>
+
+<div class="card">
+  <div class="label">طول الجسم</div>
+  <div id="bodyLen" class="val">—</div>
+</div>
+
+<div class="card">
+  <div class="label">محيط الصدر (تقديري)</div>
+  <div id="chest" class="val">—</div>
+</div>
+
+<div class="card">
+  <div class="label">جودة القياس</div>
+  <div id="conf" class="val">0%</div>
+</div>
+
+<script>
+// بيانات تجريبية بدل الكاميرا
+function simulateMeasurement(){
+  let bodyLen = 150 + Math.random()*30; // سم
+  let chest = 180 + Math.random()*40;   // سم
+  let conf = 70 + Math.random()*20;
+
+  // فلتر أمان
+  if(bodyLen < 90 || bodyLen > 260 || chest < 120 || chest > 260){
+    document.getElementById('bodyLen').innerText = '—';
+    document.getElementById('chest').innerText = '—';
+    document.getElementById('conf').innerText = '0%';
+    return;
+  }
+
+  document.getElementById('bodyLen').innerText = bodyLen.toFixed(1) + ' سم';
+  document.getElementById('chest').innerText = chest.toFixed(1) + ' سم';
+  document.getElementById('conf').innerText = conf.toFixed(0) + '%';
+}
+
+// تشغيل تلقائي
+simulateMeasurement();
+</script>
+
+</body>
+</html>
