@@ -155,7 +155,7 @@ function markCvReady() {
 
    <div class="kpi3">
   <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
-  <div class="kpi"><div class="lbl">عرض الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+<div class="kpi"><div class="lbl">محيط الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
   <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
 </div>
 
@@ -445,11 +445,11 @@ const bodyLenCm = bodyLenPx / pxPerCm;
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
 const W = Math.round((heartGirthCm * heartGirthCm * bodyLenCm) / 10838);;
 outWeight.textContent = W + ' كجم';
-  const confidence = scoreConfidence({
+ const confidence = scoreConfidence({
   sharpness,
   brightness,
   pxPerCm,
-  chestCm,
+  chestCm: heartGirthCm,
   weightKg: W,
   hasMarker: true,
   markerConsistency: scaleResult.sideConsistency,
@@ -462,7 +462,8 @@ outWeight.textContent = W + ' كجم';
 lastMetrics = {
   sharpness,
   brightness,
-  chestCm,
+  chestCm: heartGirthCm,
+  chestDepthCm,
   weightKg: W,
   confidence,
   markerConsistency: scaleResult.sideConsistency,
@@ -476,9 +477,9 @@ lastMetrics = {
   maskAreaRatio: maskEval.areaRatioToImage
 };
 
-outSharp.textContent = String(sharpness || '—');
-outLight.textContent = String(brightness || '—');
-outConf.textContent = confidence + '%';
+outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
+outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
+outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
 
 const scaleInfo = getScaleFeedback(pxPerCm);
 let scaleQuality = scaleInfo?.quality || 'bad';
@@ -583,7 +584,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
   marker_cm: ARUCO_MARKER_CM,
   px_per_cm: pxPerCm || null,
-  chest_cm: Number(outChestW.textContent)||null,
+ heart_girth_cm: Number(outChestW.textContent) || null,
   estimatedWeightKg: weightKg,
   confidence: currentConfidence,
   quality: {
