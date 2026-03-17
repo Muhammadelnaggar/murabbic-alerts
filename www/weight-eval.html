@@ -730,15 +730,38 @@ function getChestWindowFromMarker(mask, scaleResult){
   if(bodyLen < 40) return null;
 
  // نحرك من الرأس إلى خلف الكتف (حوالي 18% من طول الجسم)
-const offsetInward = Math.round(bodyLen * 0.18);
-  const spread = Math.max(10, Math.round(bodyLen * 0.08));
-  let centerX = frontIsLeft ? Math.round(marker.x + offsetInward) : Math.round(marker.x - offsetInward);
-  centerX = clamp(centerX, box.minX + 6, box.maxX - 6);
+// عرض الماركر بالبكسل من الزوايا
+const markerWidthPx = scaleResult?.avgSide || 0;
 
-  const sampleXs = frontIsLeft
-    ? [centerX, centerX + Math.round(spread * 0.35), centerX + Math.round(spread * 0.70)]
-    : [centerX, centerX - Math.round(spread * 0.35), centerX - Math.round(spread * 0.70)];
+// نحرك الجيرث من موضع الماركر إلى خلف الكتف فعلاً
+// نأخذ أكبر قيمة بين نسبة من طول الجسم ونسبة من عرض الماركر
+const offsetInward = Math.round(
+  Math.max(bodyLen * 0.26, markerWidthPx * 3.2)
+);
 
+// نجعل نافذة القياس ضيقة ومركزة حول الجيرث
+const spread = Math.round(bodyLen * 0.05);
+
+let centerX = frontIsLeft
+  ? Math.round(marker.x + offsetInward)
+  : Math.round(marker.x - offsetInward);
+
+// لا نسمح للجيرث أن يبقى قريبًا جدًا من الرأس
+const minChestX = Math.round(box.minX + bodyLen * 0.22);
+const maxChestX = Math.round(box.maxX - bodyLen * 0.22);
+
+centerX = clamp(centerX, minChestX, maxChestX);
+ const sampleXs = frontIsLeft
+  ? [
+      centerX - spread,
+      centerX,
+      centerX + spread
+    ]
+  : [
+      centerX + spread,
+      centerX,
+      centerX - spread
+    ];
   const samples = sampleXs
     .map(x => {
       x = clamp(x, box.minX + 2, box.maxX - 2);
