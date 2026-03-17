@@ -729,8 +729,9 @@ function getChestWindowFromMarker(mask, scaleResult){
   const bodyLen = box.maxX - box.minX;
   if(bodyLen < 40) return null;
 
-  const offsetInward = Math.round(bodyLen * 0.06);
-  const spread = Math.max(10, Math.round(bodyLen * 0.10));
+ // نحرك من الرأس إلى خلف الكتف (حوالي 18% من طول الجسم)
+const offsetInward = Math.round(bodyLen * 0.18);
+  const spread = Math.max(10, Math.round(bodyLen * 0.08));
   let centerX = frontIsLeft ? Math.round(marker.x + offsetInward) : Math.round(marker.x - offsetInward);
   centerX = clamp(centerX, box.minX + 6, box.maxX - 6);
 
