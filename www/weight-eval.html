@@ -523,15 +523,17 @@ drawVisionOverlay({
   bodySideScore: poseResult.sideProfileScore,
   maskScore: maskEval.score
 });
-    fireTrack('weight_estimated', {
-      source: currentSource,
-      px_per_cm: pxPerCm,
-      chest_cm: chestCm,
-      weight_kg: W,
-      sharpness,
-      brightness,
-      confidence
-    });
+  fireTrack('weight_estimated', {
+  source: currentSource,
+  px_per_cm: pxPerCm,
+  heart_girth_cm: heartGirthCm,
+  chest_depth_cm: chestDepthCm,
+  body_length_cm: bodyLenCm,
+  weight_kg: W,
+  sharpness,
+  brightness,
+  confidence
+});
 try{
   if(lastMask && lastMask !== mask) lastMask.delete?.();
   lastMask = mask;
