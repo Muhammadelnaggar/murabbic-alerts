@@ -442,8 +442,22 @@ if(!bodyLenPxSmall){
 const bodyLenPx = bodyLenPxSmall * resizeRatio;
 const bodyLenCm = bodyLenPx / pxPerCm;
 
-// معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
-const W = Math.round((heartGirthCm * heartGirthCm * bodyLenCm) / 10838);;
+if (
+  !isFinite(heartGirthCm) ||
+  !isFinite(bodyLenCm) ||
+  heartGirthCm < 120 || heartGirthCm > 260 ||
+  bodyLenCm < 90 || bodyLenCm > 240
+){
+  outChestW.textContent = '—';
+  outWeight.textContent = '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('القياس التشريحي غير منطقي — أعد التصوير بوضع جانبي كامل والماركر بجوار الكتف.', true);
+}
+
+// معادلة الوزن
+const W = Math.round((heartGirthCm * heartGirthCm * bodyLenCm) / 10838);
 outWeight.textContent = W + ' كجم';
  const confidence = scoreConfidence({
   sharpness,
@@ -482,6 +496,10 @@ outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
 outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
 
 const scaleInfo = getScaleFeedback(pxPerCm);
+    if ((scaleResult.pxSpreadRatio ?? 0) > 0.12) {
+  scaleQuality = 'weak';
+  scaleTip = 'قراءة الماركر غير مستقرة داخل نفس الصورة — غالبًا بسبب الميل أو الخلفية أو ضعف الحدود. اجعل العلامة أوضح ومستقيمة.';
+}
 let scaleQuality = scaleInfo?.quality || 'bad';
 let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
 
@@ -730,28 +748,25 @@ function detectArucoPxPerCm(imgData){
 
   const src = cv.matFromImageData(imgData);
   const gray = new cv.Mat();
-  const dictList = [
-  cv.DICT_4X4_1000,
-  cv.DICT_4X4_250,
-  cv.DICT_5X5_1000
-].filter(v => typeof v === 'number');
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-  const candidates = [];
+  const variants = [];
+  variants.push({ name:'gray', mat: gray, scaleFix: 1 });
 
-  // 1) الصورة الأصلية
-  candidates.push({ mat: gray, scaleFix: 1 });
-
-  // 2) CLAHE لتحسين التباين
   const eq = new cv.Mat();
   try {
     const clahe = new cv.CLAHE(2.0, new cv.Size(8,8));
     clahe.apply(gray, eq);
     clahe.delete();
-    candidates.push({ mat: eq, scaleFix: 1 });
-  } catch(e) {}
+    variants.push({ name:'clahe', mat: eq, scaleFix: 1 });
+  } catch(e){}
 
-  // 3) Threshold
+  const blur = new cv.Mat();
+  try {
+    cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0, 0, cv.BORDER_DEFAULT);
+    variants.push({ name:'blur', mat: blur, scaleFix: 1 });
+  } catch(e){}
+
   const thr = new cv.Mat();
   try {
     cv.adaptiveThreshold(
@@ -760,23 +775,35 @@ function detectArucoPxPerCm(imgData){
       cv.THRESH_BINARY,
       31, 7
     );
-    candidates.push({ mat: thr, scaleFix: 1 });
-  } catch(e) {}
+    variants.push({ name:'thr', mat: thr, scaleFix: 1 });
+  } catch(e){}
 
-  // 4) تكبير 2x
-const up = new cv.Mat();
-try {
-  const longest = Math.max(gray.cols, gray.rows);
-  if (longest <= 1200) {
-    cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
-    candidates.push({ mat: up, scaleFix: 0.5 });
+  const up = new cv.Mat();
+  try {
+    const longest = Math.max(gray.cols, gray.rows);
+    if (longest <= 1400) {
+      cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
+      variants.push({ name:'up2x', mat: up, scaleFix: 0.5 });
+    }
+  } catch(e){}
+
+  const dictList = [
+    cv.DICT_4X4_1000,
+    cv.DICT_4X4_250,
+    cv.DICT_5X5_1000
+  ].filter(v => typeof v === 'number');
+
+  const all = [];
+
+  function median(arr){
+    if(!arr?.length) return null;
+    const s = [...arr].sort((a,b)=>a-b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
   }
-} catch(e) {}
- 
-  let best = null;
 
   try {
-    for (const item of candidates) {
+    for (const item of variants) {
       for (const dictId of dictList) {
         const dict = cv.getPredefinedDictionary(dictId);
         const params = new cv.aruco_DetectorParameters();
@@ -787,7 +814,7 @@ try {
           params.adaptiveThreshWinSizeStep = 4;
           params.minMarkerPerimeterRate = 0.01;
           params.maxMarkerPerimeterRate = 4.0;
-          params.polygonalApproxAccuracyRate = 0.08;
+          params.polygonalApproxAccuracyRate = 0.06;
           params.minCornerDistanceRate = 0.01;
           params.minDistanceToBorder = 1;
           params.cornerRefinementMethod = 1;
@@ -825,34 +852,60 @@ try {
               const maxSide = Math.max(...sides);
               const avgSide = sides.reduce((a,b)=>a+b,0) / sides.length;
               const perimeter = sides.reduce((a,b)=>a+b,0);
-
               if (!avgSide || !isFinite(avgSide)) continue;
 
               const sideConsistency = minSide / maxSide;
               const perspectivePenalty = 1 - sideConsistency;
               const pxPerCm = avgSide / ARUCO_MARKER_CM;
-              const scaledCorners = [];
-for(let k = 0; k < 8; k += 2){
-  scaledCorners.push({
-    x: c[k] * item.scaleFix,
-    y: c[k + 1] * item.scaleFix
-  });
-}
-             const candidate = {
-  pxPerCm,
-  avgSide,
-  minSide,
-  maxSide,
-  perimeter,
-  sideConsistency,
-  perspectivePenalty,
-  corners: scaledCorners,
-  qualityScore: (perimeter * 0.6) + (sideConsistency * 1000)
-};
 
-              if (!best || candidate.qualityScore > best.qualityScore) {
-                best = candidate;
+              const scaledCorners = [];
+              for(let k = 0; k < 8; k += 2){
+                scaledCorners.push({
+                  x: c[k] * item.scaleFix,
+                  y: c[k + 1] * item.scaleFix
+                });
               }
+
+              const cx = scaledCorners.reduce((s,p)=>s+p.x,0) / 4;
+              const cy = scaledCorners.reduce((s,p)=>s+p.y,0) / 4;
+              const imgW = src.cols;
+              const imgH = src.rows;
+              const longest = Math.max(imgW, imgH);
+
+              const borderGap = Math.min(
+                ...scaledCorners.map(p => Math.min(p.x, p.y, imgW - p.x, imgH - p.y))
+              );
+              const borderGapRatio = borderGap / longest;
+
+              const centerDx = Math.abs(cx - imgW/2) / imgW;
+              const centerDy = Math.abs(cy - imgH/2) / imgH;
+              const centerPenalty = Math.min(1, Math.hypot(centerDx, centerDy));
+
+              if (avgSide < 18) continue;
+              if (sideConsistency < 0.68) continue;
+
+              const qualityScore =
+                (perimeter * 0.7) +
+                (sideConsistency * 1200) +
+                (borderGapRatio * 500) -
+                (centerPenalty * 120) -
+                (perspectivePenalty * 280);
+
+              all.push({
+                pxPerCm,
+                avgSide,
+                minSide,
+                maxSide,
+                perimeter,
+                sideConsistency,
+                perspectivePenalty,
+                corners: scaledCorners,
+                borderGapRatio,
+                centerPenalty,
+                qualityScore,
+                variant: item.name,
+                dictId
+              });
             }
           }
         } catch (err) {
@@ -871,34 +924,141 @@ for(let k = 0; k < 8; k += 2){
     src.delete();
     gray.delete();
     eq.delete?.();
+    blur.delete?.();
     thr.delete?.();
     up.delete?.();
   }
-if (best) {
-  return best;
-}
-return null;
+
+  if (!all.length) return null;
+
+  all.sort((a,b)=>b.qualityScore-a.qualityScore);
+
+  const strong = all.filter(r =>
+    r.sideConsistency >= 0.78 &&
+    r.perspectivePenalty <= 0.22 &&
+    r.borderGapRatio >= 0.003
+  );
+
+  const pool = strong.length ? strong.slice(0, 5) : all.slice(0, 3);
+  const medianPx = median(pool.map(r => r.pxPerCm));
+  const pxMin = Math.min(...pool.map(r => r.pxPerCm));
+  const pxMax = Math.max(...pool.map(r => r.pxPerCm));
+  const pxSpreadRatio = medianPx ? ((pxMax - pxMin) / medianPx) : 0;
+
+  const best = pool[0];
+  return {
+    ...best,
+    pxPerCm: medianPx || best.pxPerCm,
+    pxSpreadRatio,
+    candidatesCount: pool.length
+  };
 }
 window.detectArucoPxPerCm = detectArucoPxPerCm;
    
-  function animalMask(imgData){
-    const cv = window.cv; if(!cv) return null;
-    const src=cv.matFromImageData(imgData);
-    const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);
-    cv.medianBlur(gray,gray,3);
-    const bin=new cv.Mat(); cv.threshold(gray,bin,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU);
-    const kernel=cv.Mat.ones(5,5,cv.CV_8U); cv.morphologyEx(bin,bin,cv.MORPH_OPEN,kernel);
-    const contours=new cv.MatVector(), hierarchy=new cv.Mat();
-    cv.findContours(bin,contours,hierarchy,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
-    let maxA=0,best=-1;
-    for(let i=0;i<contours.size();i++){const a=cv.contourArea(contours.get(i)); if(a>maxA){maxA=a;best=i;}}
-    if(best<0){src.delete();gray.delete();bin.delete();kernel.delete();contours.delete();hierarchy.delete();return null;}
-    const mask=cv.Mat.zeros(bin.rows,bin.cols,cv.CV_8U);
-    cv.drawContours(mask,contours,best,new cv.Scalar(255,255,255,255),-1);
-    src.delete();gray.delete();bin.delete();contours.delete();hierarchy.delete();
-    kernel.delete();
+function animalMask(imgData){
+  const cv = window.cv;
+  if(!cv) return null;
+
+  const src = cv.matFromImageData(imgData);
+  const gray = new cv.Mat();
+  const blur = new cv.Mat();
+  const bin1 = new cv.Mat();
+  const bin2 = new cv.Mat();
+  const merged = new cv.Mat();
+  const kernel5 = cv.Mat.ones(5,5,cv.CV_8U);
+  const kernel9 = cv.Mat.ones(9,9,cv.CV_8U);
+
+  try{
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+    cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0, 0, cv.BORDER_DEFAULT);
+
+    cv.threshold(blur, bin1, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+    cv.adaptiveThreshold(
+      blur, bin2, 255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      41, 9
+    );
+
+    cv.bitwise_or(bin1, bin2, merged);
+    cv.morphologyEx(merged, merged, cv.MORPH_CLOSE, kernel9);
+    cv.morphologyEx(merged, merged, cv.MORPH_OPEN, kernel5);
+
+    const contours = new cv.MatVector();
+    const hierarchy = new cv.Mat();
+    cv.findContours(merged, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    let best = -1;
+    let bestScore = -1;
+    const imgArea = merged.rows * merged.cols;
+    const cxImg = merged.cols / 2;
+    const cyImg = merged.rows / 2;
+
+    for(let i=0; i<contours.size(); i++){
+      const cnt = contours.get(i);
+      const area = cv.contourArea(cnt);
+      if(area < imgArea * 0.03) continue;
+
+      const rect = cv.boundingRect(cnt);
+      if(!rect || rect.width < 40 || rect.height < 40) continue;
+
+      const areaRatio = area / imgArea;
+      const aspect = rect.width / Math.max(1, rect.height);
+      const fill = area / Math.max(1, rect.width * rect.height);
+
+      const ccx = rect.x + rect.width / 2;
+      const ccy = rect.y + rect.height / 2;
+      const centerDist =
+        Math.hypot(ccx - cxImg, ccy - cyImg) /
+        Math.max(merged.cols, merged.rows);
+
+      let score = 0;
+      score += area * 0.0015;
+
+      if(aspect >= 1.45 && aspect <= 4.8) score += 70;
+      else if(aspect >= 1.20 && aspect <= 5.20) score += 35;
+
+      if(fill >= 0.28 && fill <= 0.82) score += 55;
+      else if(fill >= 0.18 && fill <= 0.90) score += 25;
+
+      if(areaRatio >= 0.08 && areaRatio <= 0.75) score += 40;
+      else if(areaRatio >= 0.05 && areaRatio <= 0.85) score += 20;
+
+      score -= centerDist * 80;
+
+      if(score > bestScore){
+        bestScore = score;
+        best = i;
+      }
+    }
+
+    if(best < 0){
+      contours.delete();
+      hierarchy.delete();
+      return null;
+    }
+
+    const mask = cv.Mat.zeros(merged.rows, merged.cols, cv.CV_8U);
+    cv.drawContours(mask, contours, best, new cv.Scalar(255,255,255,255), -1);
+
+    cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel9);
+    cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel5);
+
+    contours.delete();
+    hierarchy.delete();
     return mask;
+  } finally {
+    src.delete();
+    gray.delete();
+    blur.delete();
+    bin1.delete();
+    bin2.delete();
+    merged.delete();
+    kernel5.delete();
+    kernel9.delete();
   }
+}
+
 function getBodyBox(mask){
   let minX = mask.cols, maxX = -1, minY = mask.rows, maxY = -1;
 
@@ -916,33 +1076,34 @@ function getBodyBox(mask){
   return (maxX > minX && maxY > minY) ? { minX, maxX, minY, maxY } : null;
 }
 
-function measureVerticalSpanAtX(mask, x, minY, maxY){
-  let y0 = -1, y1 = -1;
+function getVerticalBoundsAtX(mask, x, minY, maxY){
+  let yTop = -1, yBottom = -1;
 
   for(let y=minY; y<=maxY; y++){
-    if(mask.ucharPtr(y,x)[0] > 0){ y0 = y; break; }
+    if(mask.ucharPtr(y,x)[0] > 0){ yTop = y; break; }
   }
-
   for(let y=maxY; y>=minY; y--){
-    if(mask.ucharPtr(y,x)[0] > 0){ y1 = y; break; }
+    if(mask.ucharPtr(y,x)[0] > 0){ yBottom = y; break; }
   }
 
-  return (y0 >= 0 && y1 > y0) ? (y1 - y0) : null;
+  if(yTop >= 0 && yBottom > yTop){
+    return { yTop, yBottom, span: yBottom - yTop };
+  }
+  return null;
 }
 
-function measureChestDepthAtFront(mask){
-  const box = getBodyBox(mask);
-  if(!box) return null;
+function measureVerticalSpanAtX(mask, x, minY, maxY){
+  const b = getVerticalBoundsAtX(mask, x, minY, maxY);
+  return b ? b.span : null;
+}
 
+function estimateFrontSide(mask, box){
   const bodyLen = box.maxX - box.minX;
-  if(bodyLen < 40) return null;
-
   const leftXs = [
     Math.round(box.minX + bodyLen * 0.08),
     Math.round(box.minX + bodyLen * 0.12),
     Math.round(box.minX + bodyLen * 0.16)
   ];
-
   const rightXs = [
     Math.round(box.minX + bodyLen * 0.84),
     Math.round(box.minX + bodyLen * 0.88),
@@ -961,129 +1122,107 @@ function measureChestDepthAtFront(mask){
 
   const leftAvg = leftVals.reduce((a,b)=>a+b,0) / leftVals.length;
   const rightAvg = rightVals.reduce((a,b)=>a+b,0) / rightVals.length;
-  const frontIsLeft = leftAvg < rightAvg;
-
-  const scanStart = frontIsLeft
-    ? Math.round(box.minX + bodyLen * 0.22)
-    : Math.round(box.minX + bodyLen * 0.78);
-
-  const scanEnd = frontIsLeft
-    ? Math.round(box.minX + bodyLen * 0.58)
-    : Math.round(box.minX + bodyLen * 0.42);
-
-  const step = frontIsLeft ? 1 : -1;
-  const samples = [];
-
-  for(let x = scanStart; frontIsLeft ? x <= scanEnd : x >= scanEnd; x += step){
-    const span = measureVerticalSpanAtX(mask, x, box.minY, box.maxY);
-    if(span && isFinite(span)){
-      samples.push({ x, span });
-    }
-  }
-
-  if(samples.length < 7) return null;
-
-  const smoothed = [];
-  for(let i = 2; i < samples.length - 2; i++){
-    const windowVals = [
-      samples[i-2].span,
-      samples[i-1].span,
-      samples[i].span,
-      samples[i+1].span,
-      samples[i+2].span
-    ].sort((a,b)=>a-b);
-
-    const median = windowVals[2];
-    smoothed.push({ x: samples[i].x, span: median });
-  }
-
-  if(!smoothed.length) return null;
-
-  smoothed.sort((a,b)=>b.span-a.span);
-  return smoothed[0].span;
-} 
- function measureBodyLengthPx(mask){
-  const box = getBodyBox(mask);
-  if(!box) return null;
-  return box.maxX - box.minX;
-}   
- function analyzeBodyPose(mask){
-  const box = getBodyBox(mask);
-  if(!box) return null;
-
-  const width = box.maxX - box.minX;
-  const height = box.maxY - box.minY;
-  if(width < 40 || height < 40) return null;
-
-  const areaBox = width * height;
-
-  let areaMask = 0;
-  for(let y = box.minY; y <= box.maxY; y++){
-    for(let x = box.minX; x <= box.maxX; x++){
-      if(mask.ucharPtr(y, x)[0] > 0) areaMask++;
-    }
-  }
-
-  const fillRatio = areaBox > 0 ? (areaMask / areaBox) : 0;
-  const aspectRatio = height > 0 ? (width / height) : 0;
-
-  const xA = Math.round(box.minX + width * 0.20);
-  const xB = Math.round(box.minX + width * 0.35);
-  const xC = Math.round(box.minX + width * 0.50);
-  const xD = Math.round(box.minX + width * 0.65);
-  const xE = Math.round(box.minX + width * 0.80);
-
-  const spans = [xA, xB, xC, xD, xE]
-    .map(x => measureVerticalSpanAtX(mask, x, box.minY, box.maxY))
-    .filter(v => v && isFinite(v));
-
-  if(spans.length < 3){
-    return {
-      box,
-      width,
-      height,
-      fillRatio,
-      aspectRatio,
-      sideProfileScore: 0,
-      posePenalty: 1,
-      poseQuality: 'bad'
-    };
-  }
-
-  const minSpan = Math.min(...spans);
-  const maxSpan = Math.max(...spans);
-  const avgSpan = spans.reduce((a,b)=>a+b,0) / spans.length;
-  const spanConsistency = maxSpan > 0 ? (minSpan / maxSpan) : 0;
-
-  let sideProfileScore = 0;
-
-  if(aspectRatio >= 1.6 && aspectRatio <= 3.8) sideProfileScore += 0.40;
-  else if(aspectRatio >= 1.35 && aspectRatio <= 4.2) sideProfileScore += 0.25;
-
-  if(fillRatio >= 0.38 && fillRatio <= 0.78) sideProfileScore += 0.30;
-  else if(fillRatio >= 0.28 && fillRatio <= 0.85) sideProfileScore += 0.18;
-
-  if(spanConsistency >= 0.45) sideProfileScore += 0.30;
-  else if(spanConsistency >= 0.30) sideProfileScore += 0.18;
-
-  sideProfileScore = Math.max(0, Math.min(1, sideProfileScore));
-
-  let poseQuality = 'good';
-  if(sideProfileScore < 0.45) poseQuality = 'bad';
-  else if(sideProfileScore < 0.68) poseQuality = 'weak';
 
   return {
-    box,
-    width,
-    height,
-    fillRatio,
-    aspectRatio,
-    spans,
-    spanConsistency,
-    sideProfileScore,
-    posePenalty: 1 - sideProfileScore,
-    poseQuality
+    frontIsLeft: leftAvg < rightAvg,
+    leftAvg,
+    rightAvg
   };
+}
+
+function getChestWindowSamples(mask, box){
+  const bodyLen = box.maxX - box.minX;
+  if(bodyLen < 40) return null;
+
+  const frontInfo = estimateFrontSide(mask, box);
+  if(!frontInfo) return null;
+
+  const frontIsLeft = frontInfo.frontIsLeft;
+
+  const ratios = frontIsLeft
+    ? [0.18, 0.20, 0.22, 0.24, 0.26, 0.28]
+    : [0.82, 0.80, 0.78, 0.76, 0.74, 0.72];
+
+  const samples = ratios.map(r=>{
+    const x = Math.round(box.minX + bodyLen * r);
+    const b = getVerticalBoundsAtX(mask, x, box.minY, box.maxY);
+    return b ? { x, ...b } : null;
+  }).filter(Boolean);
+
+  if(samples.length < 3) return null;
+
+  const spans = samples.map(s => s.span).sort((a,b)=>a-b);
+  const medianSpan = spans[Math.floor(spans.length / 2)];
+
+  const filtered = samples.filter(s =>
+    s.span >= medianSpan * 0.78 &&
+    s.span <= medianSpan * 1.22
+  );
+
+  if(filtered.length < 2) return null;
+
+  filtered.sort((a,b)=>a.x-b.x);
+
+  return {
+    frontIsLeft,
+    samples: filtered,
+    bestSpan: filtered.reduce((a,b)=>a+b.span,0) / filtered.length
+  };
+}
+
+function measureChestDepthAtFront(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const bodyLen = box.maxX - box.minX;
+  if(bodyLen < 40) return null;
+
+  const chest = getChestWindowSamples(mask, box);
+  if(!chest || !chest.bestSpan || !isFinite(chest.bestSpan)) return null;
+
+  return chest.bestSpan;
+}
+
+function measureBodyLengthPx(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const height = box.maxY - box.minY;
+  const rows = [
+    Math.round(box.minY + height * 0.35),
+    Math.round(box.minY + height * 0.45),
+    Math.round(box.minY + height * 0.55),
+    Math.round(box.minY + height * 0.65)
+  ];
+
+  const lefts = [];
+  const rights = [];
+
+  rows.forEach(y=>{
+    let x0 = -1, x1 = -1;
+
+    for(let x=box.minX; x<=box.maxX; x++){
+      if(mask.ucharPtr(y,x)[0] > 0){ x0 = x; break; }
+    }
+    for(let x=box.maxX; x>=box.minX; x--){
+      if(mask.ucharPtr(y,x)[0] > 0){ x1 = x; break; }
+    }
+
+    if(x0 >= 0 && x1 > x0){
+      lefts.push(x0);
+      rights.push(x1);
+    }
+  });
+
+  if(lefts.length < 2 || rights.length < 2) return null;
+
+  lefts.sort((a,b)=>a-b);
+  rights.sort((a,b)=>a-b);
+
+  const left = lefts[Math.floor(lefts.length / 2)];
+  const right = rights[Math.floor(rights.length / 2)];
+
+  return right - left;
 }
  function evaluateAnimalMask(mask){
   const box = getBodyBox(mask);
@@ -1158,68 +1297,20 @@ function measureChestDepthAtFront(mask){
     ctx.strokeStyle = 'rgba(14,160,90,0.95)';
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
-    // خط قياس الصدر
-   const bodyLen = b.maxX - b.minX;
+// خط قياس الصدر
+const chest = getChestWindowSamples(lastMask, b);
 
-const leftXs = [
-  Math.round(b.minX + bodyLen * 0.08),
-  Math.round(b.minX + bodyLen * 0.12),
-  Math.round(b.minX + bodyLen * 0.16)
-];
+ctx.strokeStyle = 'rgba(245,158,11,0.95)';
+ctx.lineWidth = 2;
 
-const rightXs = [
-  Math.round(b.minX + bodyLen * 0.84),
-  Math.round(b.minX + bodyLen * 0.88),
-  Math.round(b.minX + bodyLen * 0.92)
-];
-
-const leftVals = leftXs
-  .map(x => measureVerticalSpanAtX(lastMask, x, b.minY, b.maxY))
-  .filter(v => v && isFinite(v));
-
-const rightVals = rightXs
-  .map(x => measureVerticalSpanAtX(lastMask, x, b.minY, b.maxY))
-  .filter(v => v && isFinite(v));
-
-const leftAvg = leftVals.length ? (leftVals.reduce((a,b)=>a+b,0) / leftVals.length) : 0;
-const rightAvg = rightVals.length ? (rightVals.reduce((a,b)=>a+b,0) / rightVals.length) : 0;
-
-const frontIsLeft = leftAvg < rightAvg;
-
-const xs = frontIsLeft
-  ? [
-      Math.round(b.minX + bodyLen * 0.30),
-      Math.round(b.minX + bodyLen * 0.36),
-      Math.round(b.minX + bodyLen * 0.42)
-    ]
-  : [
-      Math.round(b.minX + bodyLen * 0.70),
-      Math.round(b.minX + bodyLen * 0.64),
-      Math.round(b.minX + bodyLen * 0.58)
-    ];
-
-    ctx.strokeStyle = 'rgba(245,158,11,0.95)';
-    ctx.lineWidth = 2;
-
-    xs.forEach(x=>{
-      let yTop = -1, yBottom = -1;
-      for(let y=b.minY; y<=b.maxY; y++){
-        const px = lastMask?.ucharPtr?.(y, x)?.[0];
-        if(px > 0){ yTop = y; break; }
-      }
-      for(let y=b.maxY; y>=b.minY; y--){
-        const px = lastMask?.ucharPtr?.(y, x)?.[0];
-        if(px > 0){ yBottom = y; break; }
-      }
-      if(yTop >= 0 && yBottom > yTop){
-        ctx.beginPath();
-        ctx.moveTo(x, yTop);
-        ctx.lineTo(x, yBottom);
-        ctx.stroke();
-      }
-    });
-  }
-
+if (chest?.samples?.length) {
+  chest.samples.forEach(s => {
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.yTop);
+    ctx.lineTo(s.x, s.yBottom);
+    ctx.stroke();
+  });
+}
   // إطار الماركر
   if(scaleResult?.corners && scaleResult.corners.length === 4){
     ctx.strokeStyle = 'rgba(37,99,235,0.95)';
