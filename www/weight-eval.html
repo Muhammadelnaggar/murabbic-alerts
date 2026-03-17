@@ -712,72 +712,103 @@ function getVerticalBoundsAtX(mask, x, minY, maxY){
   return null;
 }
 
-function getFrontSideFromMarker(mask, scaleResult){
-  const box = getBodyBox(mask);
-  if(!box) return null;
-  const marker = getMarkerCenter(scaleResult);
-  if(!marker) return null;
-  const distLeft = Math.abs(marker.x - box.minX);
-  const distRight = Math.abs(marker.x - box.maxX);
-  return { box, marker, frontIsLeft: distLeft <= distRight };
+function medianOf(arr){
+  if(!arr?.length) return null;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
 }
 
-function getChestWindowFromMarker(mask, scaleResult){
-  const side = getFrontSideFromMarker(mask, scaleResult);
-  if(!side) return null;
-  const { box, marker, frontIsLeft } = side;
+function getMaskColumns(mask, box){
+  const cols = [];
+  for(let x = box.minX; x <= box.maxX; x++){
+    const b = getVerticalBoundsAtX(mask, x, box.minY, box.maxY);
+    if(b) cols.push({ x, ...b });
+  }
+  return cols;
+}
+
+function estimateAnatomicalLandmarks(mask){
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
   const bodyLen = box.maxX - box.minX;
-  if(bodyLen < 40) return null;
+  const bodyHt = box.maxY - box.minY;
+  if(bodyLen < 40 || bodyHt < 40) return null;
 
- // نحرك من الرأس إلى خلف الكتف (حوالي 18% من طول الجسم)
-// عرض الماركر بالبكسل من الزوايا
-const markerWidthPx = scaleResult?.avgSide || 0;
+  const cols = getMaskColumns(mask, box);
+  if(cols.length < 20) return null;
 
-// نحرك الجيرث من موضع الماركر إلى خلف الكتف فعلاً
-// نأخذ أكبر قيمة بين نسبة من طول الجسم ونسبة من عرض الماركر
-const offsetInward = Math.round(
-  Math.max(bodyLen * 0.26, markerWidthPx * 3.2)
-);
+  const leftEdge = cols.filter(c => c.x <= box.minX + bodyLen * 0.12).map(c => c.span);
+  const rightEdge = cols.filter(c => c.x >= box.maxX - bodyLen * 0.12).map(c => c.span);
+  if(!leftEdge.length || !rightEdge.length) return null;
 
-// نجعل نافذة القياس ضيقة ومركزة حول الجيرث
-const spread = Math.round(bodyLen * 0.05);
+  const leftMed = medianOf(leftEdge);
+  const rightMed = medianOf(rightEdge);
+  const frontIsLeft = leftMed < rightMed;
+  const frontX = frontIsLeft ? box.minX : box.maxX;
+  const sign = frontIsLeft ? 1 : -1;
 
-let centerX = frontIsLeft
-  ? Math.round(marker.x + offsetInward)
-  : Math.round(marker.x - offsetInward);
+  const trunkStart = frontX + sign * Math.round(bodyLen * 0.12);
+  const trunkEnd   = frontX + sign * Math.round(bodyLen * 0.42);
+  const trunkCols = cols.filter(c => frontIsLeft
+    ? (c.x >= Math.min(trunkStart, trunkEnd) && c.x <= Math.max(trunkStart, trunkEnd))
+    : (c.x <= Math.max(trunkStart, trunkEnd) && c.x >= Math.min(trunkStart, trunkEnd))
+  );
+  if(trunkCols.length < 8) return null;
 
-// لا نسمح للجيرث أن يبقى قريبًا جدًا من الرأس
-const minChestX = Math.round(box.minX + bodyLen * 0.22);
-const maxChestX = Math.round(box.maxX - bodyLen * 0.22);
+  const withers = trunkCols.reduce((best, c) => !best || c.yTop < best.yTop ? c : best, null);
+  if(!withers) return null;
 
-centerX = clamp(centerX, minChestX, maxChestX);
- const sampleXs = frontIsLeft
-  ? [
-      centerX - spread,
-      centerX,
-      centerX + spread
-    ]
-  : [
-      centerX + spread,
-      centerX,
-      centerX - spread
-    ];
-  const samples = sampleXs
-    .map(x => {
-      x = clamp(x, box.minX + 2, box.maxX - 2);
-      const b = getVerticalBoundsAtX(mask, x, box.minY, box.maxY);
-      return b ? { x, ...b } : null;
-    })
-    .filter(Boolean);
+  let girthCenterX = withers.x + sign * Math.round(bodyLen * 0.10);
+  const minFrontRatio = 0.20;
+  const maxFrontRatio = 0.46;
+  const minChestX = frontIsLeft
+    ? Math.round(box.minX + bodyLen * minFrontRatio)
+    : Math.round(box.maxX - bodyLen * maxFrontRatio);
+  const maxChestX = frontIsLeft
+    ? Math.round(box.minX + bodyLen * maxFrontRatio)
+    : Math.round(box.maxX - bodyLen * minFrontRatio);
+  girthCenterX = clamp(girthCenterX, Math.min(minChestX, maxChestX), Math.max(minChestX, maxChestX));
+
+  const brisketWindow = cols.filter(c => Math.abs(c.x - girthCenterX) <= bodyLen * 0.06);
+  const brisket = brisketWindow.reduce((best, c) => !best || c.yBottom > best.yBottom ? c : best, null) || withers;
+
+  return {
+    box,
+    cols,
+    frontIsLeft,
+    frontX,
+    sign,
+    bodyLen,
+    bodyHt,
+    withers,
+    brisket,
+    girthCenterX
+  };
+}
+
+function getChestWindowFromLandmarks(mask){
+  const lm = estimateAnatomicalLandmarks(mask);
+  if(!lm) return null;
+
+  const { box, bodyLen, girthCenterX } = lm;
+  const spread = Math.max(8, Math.round(bodyLen * 0.028));
+  const sampleXs = [girthCenterX - spread, girthCenterX, girthCenterX + spread]
+    .map(x => clamp(Math.round(x), box.minX + 2, box.maxX - 2));
+
+  const samples = [...new Set(sampleXs)].map(x => {
+    const b = getVerticalBoundsAtX(mask, x, box.minY, box.maxY);
+    return b ? { x, ...b } : null;
+  }).filter(Boolean);
 
   if(samples.length < 2) return null;
-  const spans = samples.map(s => s.span).sort((a,b)=>a-b);
-  const medianSpan = spans[Math.floor(spans.length / 2)];
-  const filtered = samples.filter(s => s.span >= medianSpan * 0.82 && s.span <= medianSpan * 1.18);
+  const med = medianOf(samples.map(s => s.span));
+  const filtered = samples.filter(s => s.span >= med * 0.88 && s.span <= med * 1.12);
   if(filtered.length < 2) return null;
 
   const chestPx = filtered.reduce((a,b)=>a+b.span,0) / filtered.length;
-  return { marker, frontIsLeft, centerX, samples: filtered, chestPx };
+  return { ...lm, samples: filtered, chestPx };
 }
 
   async function postJSON(url, body){
@@ -1168,7 +1199,7 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
 }
 
 function measureChestDepthAtFront(mask, scaleResult){
-  const chest = getChestWindowFromMarker(mask, scaleResult);
+  const chest = getChestWindowFromLandmarks(mask);
   if(!chest) return null;
   return chest.chestPx;
 }
@@ -1329,7 +1360,7 @@ function measureChestDepthAtFront(mask, scaleResult){
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
     // خط قياس الصدر
-    const chest = getChestWindowFromMarker(lastMask, scaleResult);
+    const chest = getChestWindowFromLandmarks(lastMask);
 
     ctx.strokeStyle = 'rgba(245,158,11,0.95)';
     ctx.lineWidth = 2;
