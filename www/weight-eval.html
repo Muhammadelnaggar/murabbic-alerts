@@ -165,9 +165,24 @@ function markCvReady() {
   <div class="kpi"><div class="lbl">الثقة</div><div class="val" id="awConf">—</div></div>
 </div>
 
+<div class="row" style="margin-top:12px">
+  <div>
+    <label for="actualWeightKg">الوزن الفعلي إذا كان متاحًا (اختياري)</label>
+    <input id="actualWeightKg" type="text" inputmode="decimal" placeholder="مثال: 700" />
+  </div>
+  <div>
+    <label for="weightFeedbackNote">ملاحظة قصيرة (اختياري)</label>
+    <input id="weightFeedbackNote" type="text" placeholder="مثال: وزن ميزان اليوم" />
+  </div>
+</div>
+<div class="chips" style="margin-top:6px">
+  <button id="awSaveFeedback" class="chip" type="button">حفظ الوزن الفعلي لتحسين الدقة</button>
+</div>
+
     <div class="hint">
       ضع علامة ArUco مربّع 10 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة. 
       الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
+      وإذا كان الوزن الفعلي متاحًا من الميزان، أدخله بعد التقدير ليُحفَظ كعينة تحسين لدقة مُرَبِّيك لاحقًا.
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
@@ -187,8 +202,10 @@ function markCvReady() {
  const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
-  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
+  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave'), btnSaveFeedback=$('awSaveFeedback');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
+  const actualWeightInp = $('actualWeightKg');
+  const feedbackNoteInp = $('weightFeedbackNote');
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
@@ -286,6 +303,56 @@ function getScaleFeedback(pxPerCm){
   function pushContext(){
     if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
+  }
+
+  function parseKgInput(v){
+    if(v == null) return null;
+    const n = Number(String(v).replace(/,/g,'.').replace(/[^0-9.\-]/g,''));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  function getEstimatedWeightKg(){
+    const txt = (outWeight.textContent || '').replace(/[^0-9.\-]/g, '');
+    const n = Number(txt);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  }
+
+  function buildVisionLearningSample(){
+    const estimatedWeightKg = getEstimatedWeightKg();
+    const actualWeightKg = parseKgInput(actualWeightInp?.value || '');
+    if(!estimatedWeightKg || !actualWeightKg) return null;
+
+    return {
+      eventType: 'تغذية راجعة وزن فعلي',
+      feature: 'weight_estimation_feedback',
+      sourceMode: currentSource,
+      animalNumber: (inpNum.value || '').trim(),
+      eventDate: inpDate.value || new Date().toISOString().slice(0,10),
+      estimatedWeightKg,
+      actualWeightKg,
+      weightDeltaKg: Math.round(actualWeightKg - estimatedWeightKg),
+      absWeightErrorKg: Math.abs(Math.round(actualWeightKg - estimatedWeightKg)),
+      confidence: currentConfidence,
+      note: (feedbackNoteInp?.value || '').trim() || null,
+      marker_cm: ARUCO_MARKER_CM,
+      px_per_cm: pxPerCm || null,
+      heart_girth_cm: parseKgInput(outChestW.textContent || ''),
+      quality: {
+        sharpness: lastMetrics?.sharpness || null,
+        brightness: lastMetrics?.brightness || null,
+        markerConsistency: lastMetrics?.markerConsistency ?? null,
+        perspectivePenalty: lastMetrics?.perspectivePenalty ?? null,
+        bodySideScore: lastMetrics?.bodySideScore ?? null,
+        bodyPosePenalty: lastMetrics?.bodyPosePenalty ?? null,
+        fillRatio: lastMetrics?.fillRatio ?? null,
+        aspectRatio: lastMetrics?.aspectRatio ?? null,
+        maskScore: lastMetrics?.maskScore ?? null,
+        chestDepthCm: lastMetrics?.chestDepthCm ?? null
+      },
+      modelVersion: 'murabbik_vision_v1',
+      feedbackForLearning: true,
+      source: location.pathname
+    };
   }
 
  btnStart.onclick=async()=>{
@@ -850,6 +917,8 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
 }
 
+   const actualWeightKg = parseKgInput(actualWeightInp?.value || '');
+
    const payload={
   eventType:'تقدير وزن',
   feature:'weight_estimation',
@@ -857,8 +926,11 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
   marker_cm: ARUCO_MARKER_CM,
   px_per_cm: pxPerCm || null,
- heart_girth_cm: Number(outChestW.textContent) || null,
+ heart_girth_cm: parseKgInput(outChestW.textContent) || null,
   estimatedWeightKg: weightKg,
+  actualWeightKg: actualWeightKg || null,
+  weightDeltaKg: actualWeightKg ? Math.round(actualWeightKg - weightKg) : null,
+  absWeightErrorKg: actualWeightKg ? Math.abs(Math.round(actualWeightKg - weightKg)) : null,
   confidence: currentConfidence,
   quality: {
   sharpness: lastMetrics?.sharpness || null,
@@ -903,6 +975,48 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
       }
     }
   };
+
+  btnSaveFeedback.onclick = async()=>{
+    const animalNumber = (inpNum.value || '').trim();
+    const sample = buildVisionLearningSample();
+
+    if(!animalNumber) return showToast('أدخل رقم الحيوان أولًا', true);
+    if(!getEstimatedWeightKg()) return showToast('نفّذ التقدير أولًا قبل حفظ الوزن الفعلي', true);
+    if(!sample?.actualWeightKg) return showToast('أدخل الوزن الفعلي أولًا', true);
+
+    pushContext();
+    fireTrack('weight_feedback_save_click', {
+      animalNumber: sample.animalNumber,
+      estimatedWeightKg: sample.estimatedWeightKg,
+      actualWeightKg: sample.actualWeightKg
+    });
+
+    try {
+      const res = await postJSON('/api/events', sample);
+      if(!res || res?.ok===false) throw new Error('API failed');
+      showToast('✅ تم حفظ الوزن الفعلي كعينة تحسين للدقة');
+      fireTrack('weight_feedback_saved_api', {ok:true, absWeightErrorKg: sample.absWeightErrorKg});
+    } catch (e) {
+      try{
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js');
+        const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js');
+        const cfg = (await import('/js/firebase-config.js')).default;
+        const app = initializeApp(cfg);
+        const db  = getFirestore(app, 'murabbikdata');
+        await addDoc(collection(db,'events'), {
+          ...sample,
+          createdAt: serverTimestamp()
+        });
+        showToast('✅ تم حفظ عينة التعلم في Firestore');
+        fireTrack('weight_feedback_saved_firestore', {ok:true, absWeightErrorKg: sample.absWeightErrorKg});
+      }catch(err){
+        console.error(err);
+        showToast('تعذّر حفظ الوزن الفعلي', true);
+        fireTrack('weight_feedback_saved_failed', {ok:false});
+      }
+    }
+  };
+
  function scoreConfidence({
    sharpness=0,
   brightness=0,
