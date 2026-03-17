@@ -425,9 +425,9 @@ if(!chestPxSmall){
 }
 
 const chestPx = chestPxSmall * resizeRatio;
-const chestCm = chestPx / pxPerCm;
-outChestW.textContent = chestCm.toFixed(1);
-
+const chestDepthCm = chestPx / pxPerCm;
+const heartGirthCm = chestDepthCm * GIRTH_FACTOR;
+outChestW.textContent = heartGirthCm.toFixed(1);
 
 const bodyLenPxSmall = measureBodyLengthPx(mask);
 if(!bodyLenPxSmall){
@@ -443,7 +443,7 @@ const bodyLenPx = bodyLenPxSmall * resizeRatio;
 const bodyLenCm = bodyLenPx / pxPerCm;
 
 // معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
-const W = Math.round((chestCm * chestCm * bodyLenCm) / 10838);
+const W = Math.round((heartGirthCm * heartGirthCm * bodyLenCm) / 10838);;
 outWeight.textContent = W + ' كجم';
   const confidence = scoreConfidence({
   sharpness,
