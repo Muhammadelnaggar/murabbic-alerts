@@ -180,7 +180,6 @@ function markCvReady() {
   
 
   <script type="module">
-    import { cameraCalibration } from '/js/camera-calibration.js';
     import { FilesetResolver, ImageSegmenter } from '/ai/mediapipe/vision_bundle.mjs';
   // ========= DOM =========
   const $=id=>document.getElementById(id);
@@ -193,7 +192,10 @@ function markCvReady() {
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
-const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.65;
+const ARUCO_MARKER_CM = 10;
+const MAX_ANALYSIS_SIDE = 1280;
+const CAMERA_BURST_COUNT = 3;
+const CAMERA_BURST_DELAY_MS = 80;
  let stream=null, cvReady=false, pxPerCm=null, lastShot=null, lastMask=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
@@ -327,8 +329,8 @@ let scaleResult = null;
 
       const frames = await window.vision.captureBurst({
         preview: v,
-        count: 5,
-        delayMs: 120
+        count: CAMERA_BURST_COUNT,
+        delayMs: CAMERA_BURST_DELAY_MS
       });
 
       const best = window.vision.pickBestFrame(frames);
@@ -349,7 +351,7 @@ if(!scaleResult || !scaleResult.pxPerCm){
   return showToast('لم تُكتشف علامة ArUco', true);
 }
 
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+imgData = downscaleImageDataIfNeeded(originalImgData, MAX_ANALYSIS_SIDE);
 resizeRatio = originalImgData.width / imgData.width;
 lastShot = imgData;
 pxPerCm = scaleResult.pxPerCm;
@@ -373,7 +375,7 @@ if(!scaleResult || !scaleResult.pxPerCm){
   return showToast('لم تُكتشف علامة ArUco', true);
 }
 
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+imgData = downscaleImageDataIfNeeded(originalImgData, MAX_ANALYSIS_SIDE);
 resizeRatio = originalImgData.width / imgData.width;
 lastShot = imgData;
 pxPerCm = scaleResult.pxPerCm;
@@ -430,7 +432,8 @@ if(!chestPxSmall){
 
 const chestPx = chestPxSmall * resizeRatio;
 const chestDepthCm = chestPx / pxPerCm;
-const heartGirthCm = chestDepthCm * GIRTH_FACTOR;
+const chestWidthCm = chestDepthCm;
+const heartGirthCm = chestWidthCm * 1.78;
 outChestW.textContent = heartGirthCm.toFixed(1);
 
 const bodyLenPxSmall = measureBodyLengthPx(mask);
@@ -999,9 +1002,7 @@ function detectArucoPxPerCm(imgData){
   const src = cv.matFromImageData(imgData);
   const gray = new cv.Mat();
   const dictList = [
-  cv.DICT_4X4_1000,
-  cv.DICT_4X4_250,
-  cv.DICT_5X5_1000
+  cv.DICT_4X4_1000
 ].filter(v => typeof v === 'number');
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
@@ -1030,16 +1031,6 @@ function detectArucoPxPerCm(imgData){
     );
     candidates.push({ mat: thr, scaleFix: 1 });
   } catch(e) {}
-
-  // 4) تكبير 2x
-const up = new cv.Mat();
-try {
-  const longest = Math.max(gray.cols, gray.rows);
-  if (longest <= 1200) {
-    cv.resize(gray, up, new cv.Size(gray.cols * 2, gray.rows * 2), 0, 0, cv.INTER_CUBIC);
-    candidates.push({ mat: up, scaleFix: 0.5 });
-  }
-} catch(e) {}
  
   let best = null;
 
@@ -1140,7 +1131,6 @@ for(let k = 0; k < 8; k += 2){
     gray.delete();
     eq.delete?.();
     thr.delete?.();
-    up.delete?.();
   }
 if (best) {
   return best;
@@ -1359,20 +1349,6 @@ function measureChestDepthAtFront(mask, scaleResult){
     ctx.strokeStyle = 'rgba(14,160,90,0.95)';
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
-    // خط قياس الصدر
-    const chest = getChestWindowFromLandmarks(lastMask);
-
-    ctx.strokeStyle = 'rgba(245,158,11,0.95)';
-    ctx.lineWidth = 2;
-
-    if (chest?.samples?.length) {
-      chest.samples.forEach(s => {
-        ctx.beginPath();
-        ctx.moveTo(s.x, s.yTop);
-        ctx.lineTo(s.x, s.yBottom);
-        ctx.stroke();
-      });
-    }
   }
 
   // إطار الماركر
