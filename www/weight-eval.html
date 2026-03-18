@@ -1210,7 +1210,7 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
   return (y0 >= 0 && y1 > y0) ? (y1 - y0) : null;
 }
 
-ffunction measureChestDepthAtFront(mask, scaleResult){
+function measureChestDepthAtFront(mask, scaleResult){
   const chest = getChestWindowFromLandmarks(mask);
   if(!chest) return null;
   return chest.chestPx;
