@@ -412,70 +412,7 @@ function enableGuideDragging(){
   window.addEventListener('mouseup', endDrag);
   window.addEventListener('touchend', endDrag);
 }
-  function startDrag(e, target){
-    if(currentSource !== 'image') return;
-    dragTarget = target;
 
-    const p = e.touches ? e.touches[0] : e;
-    dragStartX = p.clientX;
-    dragStartY = p.clientY;
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function onMove(e){
-    if(!dragTarget || currentSource !== 'image') return;
-
-    const p = e.touches ? e.touches[0] : e;
-    const wrapRect = viewWrap.getBoundingClientRect();
-    const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
-    const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
-
-    if(dragTarget === guideChest){
-      const newLeft = clampPct(chestGuideLeftPct + dxPct, 5, 85);
-      chestGuideLeftPct = newLeft;
-      guideChest.style.left = chestGuideLeftPct + '%';
-      dragStartX = p.clientX;
-    }
-
-    if(dragTarget === guideLengthStart){
-      lengthStartXPct = clampPct(lengthStartXPct + dxPct, 0, 100);
-      lengthStartYPct = clampPct(lengthStartYPct + dyPct, 0, 100);
-      updateLengthGuide();
-      dragStartX = p.clientX;
-      dragStartY = p.clientY;
-    }
-
-    if(dragTarget === guideLengthEnd){
-      lengthEndXPct = clampPct(lengthEndXPct + dxPct, 0, 100);
-      lengthEndYPct = clampPct(lengthEndYPct + dyPct, 0, 100);
-      updateLengthGuide();
-      dragStartX = p.clientX;
-      dragStartY = p.clientY;
-    }
-
-    e.preventDefault();
-  }
-
-  function endDrag(){
-    dragTarget = null;
-  }
-
-  guideChest.addEventListener('mousedown', e => startDrag(e, guideChest));
-  guideChest.addEventListener('touchstart', e => startDrag(e, guideChest), { passive:false });
-
-  guideLengthStart.addEventListener('mousedown', e => startDrag(e, guideLengthStart));
-  guideLengthEnd.addEventListener('mousedown', e => startDrag(e, guideLengthEnd));
-
-  guideLengthStart.addEventListener('touchstart', e => startDrag(e, guideLengthStart), { passive:false });
-  guideLengthEnd.addEventListener('touchstart', e => startDrag(e, guideLengthEnd), { passive:false });
-
-  window.addEventListener('mousemove', onMove, { passive:false });
-  window.addEventListener('touchmove', onMove, { passive:false });
-  window.addEventListener('mouseup', endDrag);
-  window.addEventListener('touchend', endDrag);
-}
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
