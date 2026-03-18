@@ -455,10 +455,9 @@ const fullness = boxAreaPx > 0 ? (bodyAreaPx / boxAreaPx) : 0;
 const speciesFactor = poseResult.aspectRatio > 2.2 ? 0.000095 : 0.000105;
 
 const W = Math.round(
-  speciesFactor *
+  0.002 *
   bodyAreaCm2 *
-  chestDepthCm *
-  (0.6 + 0.4 * fullness)
+  chestDepthCm
 );
 
 outWeight.textContent = W + ' كجم';
