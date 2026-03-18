@@ -151,7 +151,35 @@ function markCvReady() {
       <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
     </div>
 
-    <canvas id="awCan"></canvas>
+   <div id="awWrap" style="position:relative">
+  <canvas id="awCan"></canvas>
+
+  <div id="guideChest" style="
+    position:absolute;
+    top:10px;
+    bottom:10px;
+    left:32%;
+    width:10%;
+    border:2px dashed #f59e0b;
+    background:rgba(245,158,11,.10);
+    border-radius:10px;
+    pointer-events:none;
+    z-index:5;
+  "></div>
+
+  <div id="guideLength" style="
+    position:absolute;
+    left:12%;
+    right:12%;
+    top:48%;
+    height:10%;
+    border:2px dashed #2563eb;
+    background:rgba(37,99,235,.10);
+    border-radius:10px;
+    pointer-events:none;
+    z-index:5;
+  "></div>
+</div>
 
    <div class="kpi3">
   <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
@@ -185,7 +213,8 @@ function markCvReady() {
   // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
- const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
+const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
+const wrap=$('awWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
@@ -271,6 +300,19 @@ function getScaleFeedback(pxPerCm){
     quality:'good',
     msg:'قراءة علامة القياس جيدة.'
   };
+}
+    function syncGuides(){
+  if(!can || !guideChest || !guideLength) return;
+
+  const isWide = can.width > can.height;
+
+  guideChest.style.left = isWide ? '30%' : '28%';
+  guideChest.style.width = isWide ? '9%' : '11%';
+
+  guideLength.style.left = '12%';
+  guideLength.style.right = '12%';
+  guideLength.style.top = isWide ? '48%' : '50%';
+  guideLength.style.height = '10%';
 }
   // ========= تهيئة الحقول =========
   initContextFields();
@@ -360,6 +402,7 @@ outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
       can.width = imgPrev.naturalWidth;
       can.height = imgPrev.naturalHeight;
+     syncGuides();
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
   const originalImgData = ctx.getImageData(0,0,can.width,can.height);
 
@@ -966,6 +1009,7 @@ chest_depth_cm: Number(outChestW.textContent) || null,
     const img = await window.vision.dataURLToImage(dataURL);
     can.width = img.naturalWidth;
     can.height = img.naturalHeight;
+    syncGuides();
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
@@ -988,7 +1032,7 @@ function undistortImageData(imgData){
   srcCan.height = h;
   const sctx = srcCan.getContext('2d', { willReadFrequently:true });
   sctx.putImageData(imgData, 0, 0);
-
+  syncGuides();
   const dstCan = document.createElement('canvas');
   dstCan.width = tw;
   dstCan.height = th;
@@ -1210,36 +1254,82 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
 }
 
 function measureChestDepthAtFront(mask, scaleResult){
-  const chest = getChestWindowFromLandmarks(mask);
-  if(!chest) return null;
-  return chest.chestPx;
-}
+  if(!guideChest || !can) return null;
 
-function measureBodyLengthPx(mask){
   const box = getBodyBox(mask);
   if(!box) return null;
 
-  const midY = Math.round((box.minY + box.maxY) / 2);
+  const canvasRect = can.getBoundingClientRect();
+  const chestRect = guideChest.getBoundingClientRect();
 
-  let left = null;
-  let right = null;
+  const x0 = Math.max(
+    0,
+    Math.round(((chestRect.left - canvasRect.left) / canvasRect.width) * mask.cols)
+  );
+  const x1 = Math.min(
+    mask.cols - 1,
+    Math.round(((chestRect.right - canvasRect.left) / canvasRect.width) * mask.cols)
+  );
 
-  for(let x = box.minX; x <= box.maxX; x++){
-    if(mask.ucharPtr(midY, x)[0] > 0){
-      left = x;
-      break;
+  if(x1 <= x0) return null;
+
+  const spans = [];
+  for(let x = x0; x <= x1; x++){
+    const span = measureVerticalSpanAtX(mask, x, box.minY, box.maxY);
+    if(span && isFinite(span)) spans.push(span);
+  }
+
+  if(spans.length < 3) return null;
+  return spans.reduce((a,b)=>a+b,0) / spans.length;
+}
+
+function measureBodyLengthPx(mask){
+  if(!guideLength || !can) return null;
+
+  const box = getBodyBox(mask);
+  if(!box) return null;
+
+  const canvasRect = can.getBoundingClientRect();
+  const lengthRect = guideLength.getBoundingClientRect();
+
+  const y0 = Math.max(
+    0,
+    Math.round(((lengthRect.top - canvasRect.top) / canvasRect.height) * mask.rows)
+  );
+  const y1 = Math.min(
+    mask.rows - 1,
+    Math.round(((lengthRect.bottom - canvasRect.top) / canvasRect.height) * mask.rows)
+  );
+
+  if(y1 <= y0) return null;
+
+  const lengths = [];
+
+  for(let y = y0; y <= y1; y++){
+    let left = null;
+    let right = null;
+
+    for(let x = box.minX; x <= box.maxX; x++){
+      if(mask.ucharPtr(y, x)[0] > 0){
+        left = x;
+        break;
+      }
+    }
+
+    for(let x = box.maxX; x >= box.minX; x--){
+      if(mask.ucharPtr(y, x)[0] > 0){
+        right = x;
+        break;
+      }
+    }
+
+    if(left !== null && right !== null && right > left){
+      lengths.push(right - left);
     }
   }
 
-  for(let x = box.maxX; x >= box.minX; x--){
-    if(mask.ucharPtr(midY, x)[0] > 0){
-      right = x;
-      break;
-    }
-  }
-
-  if(left === null || right === null || right <= left) return null;
-  return right - left;
+  if(lengths.length < 3) return null;
+  return lengths.reduce((a,b)=>a+b,0) / lengths.length;
 }
  function measureBodyAreaPx(mask){
   let area = 0;
@@ -1401,20 +1491,6 @@ function measureBodyLengthPx(mask){
     ctx.strokeStyle = 'rgba(14,160,90,0.95)';
     ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
-    // خط قياس الصدر
-    const chest = getChestWindowFromLandmarks(lastMask);
-
-    ctx.strokeStyle = 'rgba(245,158,11,0.95)';
-    ctx.lineWidth = 2;
-
-    if (chest?.samples?.length) {
-      chest.samples.forEach(s => {
-        ctx.beginPath();
-        ctx.moveTo(s.x, s.yTop);
-        ctx.lineTo(s.x, s.yBottom);
-        ctx.stroke();
-      });
-    }
   }
 
   // إطار الماركر
