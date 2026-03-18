@@ -136,24 +136,14 @@ function markCvReady() {
     <!-- ✅ بادج وضع المصدر -->
     <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-    <!-- مصدر 1: كاميرا -->
-    <video id="awCam" class="source" playsinline autoplay muted></video>
-    <!-- مصدر 2: صورة بديلة -->
-    <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
+  <div id="viewWrap" style="position:relative">
+  <!-- مصدر 1: كاميرا -->
+  <video id="awCam" class="source" playsinline autoplay muted></video>
 
-    <!-- اختيار صورة -->
-    <div class="sep">أو اختر صورة</div>
-    <div class="chips">
-      <input id="awFile" type="file" accept="image/*" capture="environment" class="hidden">
-      <label for="awFile" class="chip">📸 اختيار صورة</label>
-      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
-      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
-    </div>
+  <!-- مصدر 2: صورة بديلة -->
+  <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
 
-   <div id="awWrap" style="position:relative">
-  <canvas id="awCan"></canvas>
-
+  <!-- Overlay guides فوق الكاميرا/الصورة -->
   <div id="guideChest" style="
     position:absolute;
     top:10px;
@@ -164,7 +154,7 @@ function markCvReady() {
     background:rgba(245,158,11,.10);
     border-radius:10px;
     pointer-events:none;
-    z-index:5;
+    z-index:8;
   "></div>
 
   <div id="guideLength" style="
@@ -177,8 +167,22 @@ function markCvReady() {
     background:rgba(37,99,235,.10);
     border-radius:10px;
     pointer-events:none;
-    z-index:5;
+    z-index:8;
   "></div>
+</div>
+
+    <!-- اختيار صورة -->
+    <div class="sep">أو اختر صورة</div>
+    <div class="chips">
+      <input id="awFile" type="file" accept="image/*" capture="environment" class="hidden">
+      <label for="awFile" class="chip">📸 اختيار صورة</label>
+      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
+      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
+    </div>
+
+<div id="awWrap" style="position:relative">
+  <canvas id="awCan"></canvas>
 </div>
 
    <div class="kpi3">
@@ -214,7 +218,7 @@ function markCvReady() {
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
-const wrap=$('awWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
+const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
@@ -257,6 +261,8 @@ const ARUCO_MARKER_CM=10;
       modeBadge.classList.toggle('err', !isDemo);
       setSaveEnabled(isDemo);
     }
+    syncGuideVisibility();
+   
   }
   function fireTrack(event, meta={}){
     try {
@@ -301,10 +307,20 @@ function getScaleFeedback(pxPerCm){
     msg:'قراءة علامة القياس جيدة.'
   };
 }
-    function syncGuides(){
-  if(!can || !guideChest || !guideLength) return;
+   function syncGuides(){
+  if(!guideChest || !guideLength) return;
 
-  const isWide = can.width > can.height;
+  const baseW =
+    (!v.classList.contains('hidden') && v.videoWidth) ? v.videoWidth :
+    (!imgPrev.classList.contains('hidden') && imgPrev.naturalWidth) ? imgPrev.naturalWidth :
+    can.width;
+
+  const baseH =
+    (!v.classList.contains('hidden') && v.videoHeight) ? v.videoHeight :
+    (!imgPrev.classList.contains('hidden') && imgPrev.naturalHeight) ? imgPrev.naturalHeight :
+    can.height;
+
+  const isWide = baseW > baseH;
 
   guideChest.style.left = isWide ? '30%' : '28%';
   guideChest.style.width = isWide ? '9%' : '11%';
@@ -314,8 +330,16 @@ function getScaleFeedback(pxPerCm){
   guideLength.style.top = isWide ? '48%' : '50%';
   guideLength.style.height = '10%';
 }
+    
+ function syncGuideVisibility(){
+  const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
+  if(viewWrap){
+    viewWrap.style.display = showLiveOverlay ? 'block' : 'none';
+  }
+}   
   // ========= تهيئة الحقول =========
   initContextFields();
+   syncGuideVisibility(); 
   function initContextFields(){
     const q=new URLSearchParams(location.search);
     const num = q.get('number') || q.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
@@ -335,6 +359,8 @@ function getScaleFeedback(pxPerCm){
       preview: v
     });
     setSource('camera');
+    syncGuides();
+syncGuideVisibility();
     fireTrack('camera_start');
   }catch(e){
     console.error(e);
