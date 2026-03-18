@@ -155,7 +155,7 @@ function markCvReady() {
 
    <div class="kpi3">
   <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
-<div class="kpi"><div class="lbl">محيط الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+<div class="kpi"><div class="lbl">عمق الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
   <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
 </div>
 
@@ -193,7 +193,7 @@ function markCvReady() {
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
-const ARUCO_MARKER_CM=10, GIRTH_FACTOR=2.65;
+const ARUCO_MARKER_CM=10;
  let stream=null, cvReady=false, pxPerCm=null, lastShot=null, lastMask=null, currentSource='camera';
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
@@ -430,8 +430,7 @@ if(!chestPxSmall){
 
 const chestPx = chestPxSmall * resizeRatio;
 const chestDepthCm = chestPx / pxPerCm;
-const heartGirthCm = chestDepthCm * GIRTH_FACTOR;
-outChestW.textContent = heartGirthCm.toFixed(1);
+outChestW.textContent = chestDepthCm.toFixed(1);
 
 const bodyLenPxSmall = measureBodyLengthPx(mask);
 if(!bodyLenPxSmall){
@@ -446,14 +445,28 @@ if(!bodyLenPxSmall){
 const bodyLenPx = bodyLenPxSmall * resizeRatio;
 const bodyLenCm = bodyLenPx / pxPerCm;
 
-// معادلة هجينة أبسط وأكثر ثباتًا من الاعتماد على الصدر وحده
-const W = Math.round((heartGirthCm * heartGirthCm * bodyLenCm) / 10838);;
+const bodyAreaPx = measureBodyAreaPx(mask);
+const bodyAreaCm2 = bodyAreaPx / (pxPerCm * pxPerCm);
+
+const box = getBodyBox(mask);
+const boxAreaPx = box ? ((box.maxX - box.minX) * (box.maxY - box.minY)) : 0;
+const fullness = boxAreaPx > 0 ? (bodyAreaPx / boxAreaPx) : 0;
+
+const speciesFactor = poseResult.aspectRatio > 2.2 ? 0.0000095 : 0.0000105;
+
+const W = Math.round(
+  speciesFactor *
+  bodyAreaCm2 *
+  chestDepthCm *
+  (0.6 + 0.4 * fullness)
+);
+
 outWeight.textContent = W + ' كجم';
- const confidence = scoreConfidence({
+const confidence = scoreConfidence({
   sharpness,
   brightness,
   pxPerCm,
-  chestCm: heartGirthCm,
+  chestCm: chestDepthCm,
   weightKg: W,
   hasMarker: true,
   markerConsistency: scaleResult.sideConsistency,
@@ -466,7 +479,7 @@ outWeight.textContent = W + ' كجم';
 lastMetrics = {
   sharpness,
   brightness,
-  chestCm: heartGirthCm,
+  chestCm: chestDepthCm,
   chestDepthCm,
   weightKg: W,
   confidence,
@@ -527,10 +540,9 @@ drawVisionOverlay({
   bodySideScore: poseResult.sideProfileScore,
   maskScore: maskEval.score
 });
-  fireTrack('weight_estimated', {
+ fireTrack('weight_estimated', {
   source: currentSource,
   px_per_cm: pxPerCm,
-  heart_girth_cm: heartGirthCm,
   chest_depth_cm: chestDepthCm,
   body_length_cm: bodyLenCm,
   weight_kg: W,
@@ -854,7 +866,7 @@ if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 
   method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
   marker_cm: ARUCO_MARKER_CM,
   px_per_cm: pxPerCm || null,
- heart_girth_cm: Number(outChestW.textContent) || null,
+chest_depth_cm: Number(outChestW.textContent) || null,
   estimatedWeightKg: weightKg,
   confidence: currentConfidence,
   quality: {
@@ -1202,11 +1214,41 @@ function measureChestDepthAtFront(mask, scaleResult){
   const chest = getChestWindowFromLandmarks(mask);
   if(!chest) return null;
   return chest.chestPx;
-}
- function measureBodyLengthPx(mask){
+function measureBodyLengthPx(mask){
   const box = getBodyBox(mask);
   if(!box) return null;
-  return box.maxX - box.minX;
+
+  const midY = Math.round((box.minY + box.maxY) / 2);
+
+  let left = null;
+  let right = null;
+
+  for(let x = box.minX; x <= box.maxX; x++){
+    if(mask.ucharPtr(midY, x)[0] > 0){
+      left = x;
+      break;
+    }
+  }
+
+  for(let x = box.maxX; x >= box.minX; x--){
+    if(mask.ucharPtr(midY, x)[0] > 0){
+      right = x;
+      break;
+    }
+  }
+
+  if(left === null || right === null || right <= left) return null;
+  return right - left;
+}
+}  
+ function measureBodyAreaPx(mask){
+  let area = 0;
+  for(let y = 0; y < mask.rows; y++){
+    for(let x = 0; x < mask.cols; x++){
+      if(mask.ucharPtr(y, x)[0] > 0) area++;
+    }
+  }
+  return area;
 }   
  function analyzeBodyPose(mask){
   const box = getBodyBox(mask);
