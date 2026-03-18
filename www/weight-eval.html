@@ -325,7 +325,7 @@ function enableGuideDragging(){
   if(!viewWrap || !guideChest || !guideLength || !guideLengthStart || !guideLengthEnd) return;
 
   let dragMode = null;
-}
+
   function startDrag(e, target, mode){
     if(currentSource !== 'image') return;
 
@@ -348,14 +348,12 @@ function enableGuideDragging(){
     const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
     const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
 
-    // الصدر: تحريك أفقي
     if(dragTarget === guideChest && dragMode === 'move'){
       chestGuideLeftPct = clampPct(chestGuideLeftPct + dxPct, 5, 85);
       guideChest.style.left = chestGuideLeftPct + '%';
       dragStartX = p.clientX;
     }
 
-    // الصدر: تصغير/تكبير من الأعلى
     if(dragTarget === guideChestTop && dragMode === 'top'){
       const newTop = clampPct(chestGuideTopPct + dyPct, 0, chestGuideTopPct + chestGuideHeightPct - 8);
       const delta = newTop - chestGuideTopPct;
@@ -366,14 +364,12 @@ function enableGuideDragging(){
       dragStartY = p.clientY;
     }
 
-    // الصدر: تصغير/تكبير من الأسفل
     if(dragTarget === guideChestBottom && dragMode === 'bottom'){
       chestGuideHeightPct = clampPct(chestGuideHeightPct + dyPct, 8, 95 - chestGuideTopPct);
       guideChest.style.height = chestGuideHeightPct + '%';
       dragStartY = p.clientY;
     }
 
-    // خط الطول الحر
     if(dragTarget === guideLengthStart){
       lengthStartXPct = clampPct(lengthStartXPct + dxPct, 0, 100);
       lengthStartYPct = clampPct(lengthStartYPct + dyPct, 0, 100);
@@ -416,7 +412,6 @@ function enableGuideDragging(){
   window.addEventListener('mouseup', endDrag);
   window.addEventListener('touchend', endDrag);
 }
-
   function startDrag(e, target){
     if(currentSource !== 'image') return;
     dragTarget = target;
