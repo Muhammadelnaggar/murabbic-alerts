@@ -136,7 +136,7 @@ function markCvReady() {
     <!-- ✅ بادج وضع المصدر -->
     <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-  <div id="viewWrap" style="position:relative">
+<div id="viewWrap" style="position:relative;overflow:hidden;border-radius:12px">
   <!-- مصدر 1: كاميرا -->
   <video id="awCam" class="source" playsinline autoplay muted></video>
 
@@ -144,63 +144,98 @@ function markCvReady() {
   <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
 
   <!-- Overlay guides فوق الكاميرا/الصورة -->
-  <div id="guideChest" style="
+ <div id="guideChest" style="
     position:absolute;
-    top:10px;
-    bottom:10px;
     left:32%;
+    top:18%;
     width:10%;
+    height:42%;
     border:2px dashed #f59e0b;
     background:rgba(245,158,11,.10);
     border-radius:10px;
-   pointer-events:auto;
-touch-action:none;
-cursor:ew-resize;
+    pointer-events:auto;
+    touch-action:none;
+    cursor:move;
     z-index:8;
-  "></div>
-<div id="guideLength" style="
-  position:absolute;
-  left:18%;
-  top:44%;
-  width:52%;
-  height:0;
-  border-top:3px dashed #2563eb;
-  transform-origin:0 0;
-  pointer-events:none;
-  z-index:8;
-">
-  <div id="guideLengthStart" style="
+  ">
+  <div id="guideChestTop" style="
     position:absolute;
-    left:-11px;
     top:-11px;
+    left:50%;
+    transform:translateX(-50%);
     width:22px;
     height:22px;
     border-radius:50%;
-    background:#2563eb;
+    background:#f59e0b;
     border:2px solid #fff;
     box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:move;
+    cursor:ns-resize;
     pointer-events:auto;
     touch-action:none;
   "></div>
 
-  <div id="guideLengthEnd" style="
+  <div id="guideChestBottom" style="
     position:absolute;
-    right:-11px;
-    top:-11px;
+    bottom:-11px;
+    left:50%;
+    transform:translateX(-50%);
     width:22px;
     height:22px;
     border-radius:50%;
-    background:#2563eb;
+    background:#f59e0b;
     border:2px solid #fff;
     box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:move;
+    cursor:ns-resize;
     pointer-events:auto;
     touch-action:none;
   "></div>
 </div>
-    <!-- اختيار صورة -->
-    <div class="sep">أو اختر صورة</div>
+
+  <div id="guideLength" style="
+    position:absolute;
+    left:18%;
+    top:44%;
+    width:52%;
+    height:0;
+    border-top:3px dashed #2563eb;
+    transform-origin:0 0;
+    pointer-events:none;
+    z-index:8;
+  ">
+    <div id="guideLengthStart" style="
+      position:absolute;
+      left:-11px;
+      top:-11px;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#2563eb;
+      border:2px solid #fff;
+      box-shadow:0 1px 6px rgba(0,0,0,.25);
+      cursor:move;
+      pointer-events:auto;
+      touch-action:none;
+    "></div>
+
+    <div id="guideLengthEnd" style="
+      position:absolute;
+      right:-11px;
+      top:-11px;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#2563eb;
+      border:2px solid #fff;
+      box-shadow:0 1px 6px rgba(0,0,0,.25);
+      cursor:move;
+      pointer-events:auto;
+      touch-action:none;
+    "></div>
+  </div>
+</div>
+
+<!-- اختيار صورة -->
+<div class="sep">أو اختر صورة</div>
     <div class="chips">
      <input id="awFile" type="file" accept="image/*" class="hidden">
       <label for="awFile" class="chip">📸 اختيار صورة</label>
@@ -247,6 +282,7 @@ cursor:ew-resize;
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
 const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
+const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
 const guideLengthStart=$('guideLengthStart'), guideLengthEnd=$('guideLengthEnd');
    let dragTarget = null;
 let dragStartX = 0;
@@ -255,7 +291,9 @@ let dragStartLeft = 0;
 let dragStartTop = 0;
 
 let chestGuideLeftPct = 32;
+let chestGuideTopPct = 18;
 let chestGuideWidthPct = 10;
+let chestGuideHeightPct = 42;
 
 let lengthStartXPct = 18;
 let lengthStartYPct = 44;
@@ -285,6 +323,99 @@ function updateLengthGuide(){
 }
 function enableGuideDragging(){
   if(!viewWrap || !guideChest || !guideLength || !guideLengthStart || !guideLengthEnd) return;
+
+  let dragMode = null;
+}
+  function startDrag(e, target, mode){
+    if(currentSource !== 'image') return;
+
+    dragTarget = target;
+    dragMode = mode;
+
+    const p = e.touches ? e.touches[0] : e;
+    dragStartX = p.clientX;
+    dragStartY = p.clientY;
+
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMove(e){
+    if(!dragTarget || currentSource !== 'image') return;
+
+    const p = e.touches ? e.touches[0] : e;
+    const wrapRect = viewWrap.getBoundingClientRect();
+    const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
+    const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
+
+    // الصدر: تحريك أفقي
+    if(dragTarget === guideChest && dragMode === 'move'){
+      chestGuideLeftPct = clampPct(chestGuideLeftPct + dxPct, 5, 85);
+      guideChest.style.left = chestGuideLeftPct + '%';
+      dragStartX = p.clientX;
+    }
+
+    // الصدر: تصغير/تكبير من الأعلى
+    if(dragTarget === guideChestTop && dragMode === 'top'){
+      const newTop = clampPct(chestGuideTopPct + dyPct, 0, chestGuideTopPct + chestGuideHeightPct - 8);
+      const delta = newTop - chestGuideTopPct;
+      chestGuideTopPct = newTop;
+      chestGuideHeightPct = clampPct(chestGuideHeightPct - delta, 8, 95 - chestGuideTopPct);
+      guideChest.style.top = chestGuideTopPct + '%';
+      guideChest.style.height = chestGuideHeightPct + '%';
+      dragStartY = p.clientY;
+    }
+
+    // الصدر: تصغير/تكبير من الأسفل
+    if(dragTarget === guideChestBottom && dragMode === 'bottom'){
+      chestGuideHeightPct = clampPct(chestGuideHeightPct + dyPct, 8, 95 - chestGuideTopPct);
+      guideChest.style.height = chestGuideHeightPct + '%';
+      dragStartY = p.clientY;
+    }
+
+    // خط الطول الحر
+    if(dragTarget === guideLengthStart){
+      lengthStartXPct = clampPct(lengthStartXPct + dxPct, 0, 100);
+      lengthStartYPct = clampPct(lengthStartYPct + dyPct, 0, 100);
+      updateLengthGuide();
+      dragStartX = p.clientX;
+      dragStartY = p.clientY;
+    }
+
+    if(dragTarget === guideLengthEnd){
+      lengthEndXPct = clampPct(lengthEndXPct + dxPct, 0, 100);
+      lengthEndYPct = clampPct(lengthEndYPct + dyPct, 0, 100);
+      updateLengthGuide();
+      dragStartX = p.clientX;
+      dragStartY = p.clientY;
+    }
+
+    e.preventDefault();
+  }
+
+  function endDrag(){
+    dragTarget = null;
+    dragMode = null;
+  }
+
+  guideChest.addEventListener('mousedown', e => startDrag(e, guideChest, 'move'));
+  guideChest.addEventListener('touchstart', e => startDrag(e, guideChest, 'move'), { passive:false });
+
+  guideChestTop?.addEventListener('mousedown', e => startDrag(e, guideChestTop, 'top'));
+  guideChestBottom?.addEventListener('mousedown', e => startDrag(e, guideChestBottom, 'bottom'));
+  guideChestTop?.addEventListener('touchstart', e => startDrag(e, guideChestTop, 'top'), { passive:false });
+  guideChestBottom?.addEventListener('touchstart', e => startDrag(e, guideChestBottom, 'bottom'), { passive:false });
+
+  guideLengthStart.addEventListener('mousedown', e => startDrag(e, guideLengthStart, 'point'));
+  guideLengthEnd.addEventListener('mousedown', e => startDrag(e, guideLengthEnd, 'point'));
+  guideLengthStart.addEventListener('touchstart', e => startDrag(e, guideLengthStart, 'point'), { passive:false });
+  guideLengthEnd.addEventListener('touchstart', e => startDrag(e, guideLengthEnd, 'point'), { passive:false });
+
+  window.addEventListener('mousemove', onMove, { passive:false });
+  window.addEventListener('touchmove', onMove, { passive:false });
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchend', endDrag);
+}
 
   function startDrag(e, target){
     if(currentSource !== 'image') return;
@@ -457,9 +588,11 @@ function syncGuides(reset=false){
 
   const isWide = baseW > baseH;
 
- if(reset){
+if(reset){
   chestGuideLeftPct = isWide ? 30 : 28;
+  chestGuideTopPct = isWide ? 18 : 20;
   chestGuideWidthPct = isWide ? 9 : 11;
+  chestGuideHeightPct = isWide ? 42 : 46;
 
   lengthStartXPct = isWide ? 18 : 16;
   lengthStartYPct = isWide ? 44 : 46;
@@ -468,7 +601,10 @@ function syncGuides(reset=false){
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
+guideChest.style.top = chestGuideTopPct + '%';
 guideChest.style.width = chestGuideWidthPct + '%';
+guideChest.style.height = chestGuideHeightPct + '%';
+guideChest.style.bottom = 'auto';
 
 updateLengthGuide();
 }
