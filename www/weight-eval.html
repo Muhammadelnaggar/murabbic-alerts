@@ -178,7 +178,7 @@ cursor:ns-resize;
     <!-- اختيار صورة -->
     <div class="sep">أو اختر صورة</div>
     <div class="chips">
-      <input id="awFile" type="file" accept="image/*" capture="environment" class="hidden">
+     <input id="awFile" type="file" accept="image/*" class="hidden">
       <label for="awFile" class="chip">📸 اختيار صورة</label>
       <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
       <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
@@ -223,11 +223,16 @@ cursor:ns-resize;
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
 const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
-    let dragTarget = null;
+   let dragTarget = null;
 let dragStartX = 0;
 let dragStartY = 0;
 let dragStartLeft = 0;
 let dragStartTop = 0;
+
+let chestGuideLeftPct = 32;
+let chestGuideWidthPct = 10;
+let lengthGuideTopPct = 48;
+let lengthGuideHeightPct = 10;
 
 function clampPct(v, min, max){
   return Math.max(min, Math.min(max, v));
@@ -260,15 +265,17 @@ function enableGuideDragging(){
     const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
     const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
 
-    if(dragTarget === guideChest){
-      const newLeft = clampPct(dragStartLeft + dxPct, 5, 85);
-      guideChest.style.left = newLeft + '%';
-    }
+   if(dragTarget === guideChest){
+  const newLeft = clampPct(dragStartLeft + dxPct, 5, 85);
+  chestGuideLeftPct = newLeft;
+  guideChest.style.left = chestGuideLeftPct + '%';
+}
 
-    if(dragTarget === guideLength){
-      const newTop = clampPct(dragStartTop + dyPct, 5, 85);
-      guideLength.style.top = newTop + '%';
-    }
+if(dragTarget === guideLength){
+  const newTop = clampPct(dragStartTop + dyPct, 5, 85);
+  lengthGuideTopPct = newTop;
+  guideLength.style.top = lengthGuideTopPct + '%';
+}
 
     e.preventDefault();
   }
@@ -381,7 +388,7 @@ function getScaleFeedback(pxPerCm){
     msg:'قراءة علامة القياس جيدة.'
   };
 }
-   function syncGuides(){
+function syncGuides(reset=false){
   if(!guideChest || !guideLength) return;
 
   const baseW =
@@ -396,15 +403,21 @@ function getScaleFeedback(pxPerCm){
 
   const isWide = baseW > baseH;
 
-  guideChest.style.left = isWide ? '30%' : '28%';
-  guideChest.style.width = isWide ? '9%' : '11%';
+  if(reset){
+    chestGuideLeftPct = isWide ? 30 : 28;
+    chestGuideWidthPct = isWide ? 9 : 11;
+    lengthGuideTopPct = isWide ? 48 : 50;
+    lengthGuideHeightPct = 10;
+  }
+
+  guideChest.style.left = chestGuideLeftPct + '%';
+  guideChest.style.width = chestGuideWidthPct + '%';
 
   guideLength.style.left = '12%';
   guideLength.style.right = '12%';
-  guideLength.style.top = isWide ? '48%' : '50%';
-  guideLength.style.height = '10%';
-}
-    
+  guideLength.style.top = lengthGuideTopPct + '%';
+  guideLength.style.height = lengthGuideHeightPct + '%';
+} 
  function syncGuideVisibility(){
   const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
   if(viewWrap){
@@ -433,8 +446,8 @@ function getScaleFeedback(pxPerCm){
       state: visionState,
       preview: v
     });
-    setSource('camera');
-    syncGuides();
+   setSource('camera');
+syncGuides(true);
 syncGuideVisibility();
     fireTrack('camera_start');
   }catch(e){
@@ -448,8 +461,10 @@ syncGuideVisibility();
     const f=file.files?.[0]; if(!f) return;
     const url=URL.createObjectURL(f);
     imgPrev.onload=()=>URL.revokeObjectURL(url);
-    imgPrev.src=url;
-    setSource('image'); fireTrack('image_selected', {size:f.size, type:f.type});
+  imgPrev.src=url;
+setSource('image');
+syncGuides(true);
+fireTrack('image_selected', {size:f.size, type:f.type});
   };
 
   // ========= التقاط/تقدير =========
@@ -503,7 +518,7 @@ outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
       can.width = imgPrev.naturalWidth;
       can.height = imgPrev.naturalHeight;
-     syncGuides();
+    
       ctx.drawImage(imgPrev,0,0,can.width,can.height);
   const originalImgData = ctx.getImageData(0,0,can.width,can.height);
 
@@ -1110,7 +1125,7 @@ chest_depth_cm: Number(outChestW.textContent) || null,
     const img = await window.vision.dataURLToImage(dataURL);
     can.width = img.naturalWidth;
     can.height = img.naturalHeight;
-    syncGuides();
+    
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
@@ -1133,7 +1148,7 @@ function undistortImageData(imgData){
   srcCan.height = h;
   const sctx = srcCan.getContext('2d', { willReadFrequently:true });
   sctx.putImageData(imgData, 0, 0);
-  syncGuides();
+ 
   const dstCan = document.createElement('canvas');
   dstCan.width = tw;
   dstCan.height = th;
