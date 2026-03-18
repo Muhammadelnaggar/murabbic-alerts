@@ -1210,10 +1210,12 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
   return (y0 >= 0 && y1 > y0) ? (y1 - y0) : null;
 }
 
-function measureChestDepthAtFront(mask, scaleResult){
+ffunction measureChestDepthAtFront(mask, scaleResult){
   const chest = getChestWindowFromLandmarks(mask);
   if(!chest) return null;
   return chest.chestPx;
+}
+
 function measureBodyLengthPx(mask){
   const box = getBodyBox(mask);
   if(!box) return null;
@@ -1240,7 +1242,6 @@ function measureBodyLengthPx(mask){
   if(left === null || right === null || right <= left) return null;
   return right - left;
 }
-}  
  function measureBodyAreaPx(mask){
   let area = 0;
   for(let y = 0; y < mask.rows; y++){
