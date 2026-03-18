@@ -153,7 +153,9 @@ function markCvReady() {
     border:2px dashed #f59e0b;
     background:rgba(245,158,11,.10);
     border-radius:10px;
-    pointer-events:none;
+   pointer-events:auto;
+touch-action:none;
+cursor:ew-resize;
     z-index:8;
   "></div>
 
@@ -166,7 +168,9 @@ function markCvReady() {
     border:2px dashed #2563eb;
     background:rgba(37,99,235,.10);
     border-radius:10px;
-    pointer-events:none;
+   pointer-events:auto;
+touch-action:none;
+cursor:ns-resize;
     z-index:8;
   "></div>
 </div>
@@ -219,6 +223,72 @@ function markCvReady() {
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
 const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
+    let dragTarget = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartLeft = 0;
+let dragStartTop = 0;
+
+function clampPct(v, min, max){
+  return Math.max(min, Math.min(max, v));
+}
+
+function enableGuideDragging(){
+  if(!viewWrap || !guideChest || !guideLength) return;
+
+  function startDrag(e, target){
+    if(currentSource !== 'image') return; // السحب للصورة فقط
+    dragTarget = target;
+
+    const p = e.touches ? e.touches[0] : e;
+    const wrapRect = viewWrap.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
+
+    dragStartX = p.clientX;
+    dragStartY = p.clientY;
+    dragStartLeft = ((rect.left - wrapRect.left) / wrapRect.width) * 100;
+    dragStartTop  = ((rect.top  - wrapRect.top ) / wrapRect.height) * 100;
+
+    e.preventDefault();
+  }
+
+  function onMove(e){
+    if(!dragTarget) return;
+
+    const p = e.touches ? e.touches[0] : e;
+    const wrapRect = viewWrap.getBoundingClientRect();
+    const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
+    const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
+
+    if(dragTarget === guideChest){
+      const newLeft = clampPct(dragStartLeft + dxPct, 5, 85);
+      guideChest.style.left = newLeft + '%';
+    }
+
+    if(dragTarget === guideLength){
+      const newTop = clampPct(dragStartTop + dyPct, 5, 85);
+      guideLength.style.top = newTop + '%';
+    }
+
+    e.preventDefault();
+  }
+
+  function endDrag(){
+    dragTarget = null;
+  }
+
+  guideChest.addEventListener('mousedown', e => startDrag(e, guideChest));
+  guideLength.addEventListener('mousedown', e => startDrag(e, guideLength));
+
+  guideChest.addEventListener('touchstart', e => startDrag(e, guideChest), { passive:false });
+  guideLength.addEventListener('touchstart', e => startDrag(e, guideLength), { passive:false });
+
+  window.addEventListener('mousemove', onMove, { passive:false });
+  window.addEventListener('touchmove', onMove, { passive:false });
+
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchend', endDrag);
+}
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
   const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
@@ -252,6 +322,8 @@ const ARUCO_MARKER_CM=10;
       imgPrev.classList.add('hidden');
       modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
       modeBadge.classList.remove('err');
+      guideChest.style.cursor = 'default';
+guideLength.style.cursor = 'default';
       setSaveEnabled(true);
     } else {
       imgPrev.classList.remove('hidden');
@@ -259,6 +331,8 @@ const ARUCO_MARKER_CM=10;
       if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
       modeBadge.textContent = isDemo ? 'الوضع: صورة (عرض Demo — الحفظ مسموح)' : 'الوضع: صورة (عرض فقط — الحفظ غير مسموح)';
       modeBadge.classList.toggle('err', !isDemo);
+      guideChest.style.cursor = 'ew-resize';
+      guideLength.style.cursor = 'ns-resize';
       setSaveEnabled(isDemo);
     }
     syncGuideVisibility();
@@ -340,6 +414,7 @@ function getScaleFeedback(pxPerCm){
   // ========= تهيئة الحقول =========
   initContextFields();
    syncGuideVisibility(); 
+    enableGuideDragging();
   function initContextFields(){
     const q=new URLSearchParams(location.search);
     const num = q.get('number') || q.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
