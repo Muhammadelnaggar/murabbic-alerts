@@ -159,19 +159,44 @@ cursor:ew-resize;
     z-index:8;
   "></div>
 
-  <div id="guideLength" style="
+<div id="guideLength" style="
+  position:absolute;
+  left:18%;
+  top:38%;
+  width:52%;
+  height:0;
+  border-top:3px dashed #2563eb;
+  pointer-events:none;
+  z-index:8;
+">
+  <div id="guideLengthStart" style="
     position:absolute;
-    left:12%;
-    right:12%;
-    top:48%;
-    height:10%;
-    border:2px dashed #2563eb;
-    background:rgba(37,99,235,.10);
-    border-radius:10px;
-   pointer-events:auto;
-touch-action:none;
-cursor:ns-resize;
-    z-index:8;
+    left:-11px;
+    top:-11px;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:#2563eb;
+    border:2px solid #fff;
+    box-shadow:0 1px 6px rgba(0,0,0,.25);
+    cursor:move;
+    pointer-events:auto;
+    touch-action:none;
+  "></div>
+
+  <div id="guideLengthEnd" style="
+    position:absolute;
+    right:-11px;
+    top:-11px;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:#2563eb;
+    border:2px solid #fff;
+    box-shadow:0 1px 6px rgba(0,0,0,.25);
+    cursor:move;
+    pointer-events:auto;
+    touch-action:none;
   "></div>
 </div>
 
@@ -231,8 +256,11 @@ let dragStartTop = 0;
 
 let chestGuideLeftPct = 32;
 let chestGuideWidthPct = 10;
-let lengthGuideTopPct = 48;
-let lengthGuideHeightPct = 10;
+
+let lengthGuideLeftPct = 18;
+let lengthGuideTopPct = 38;
+let lengthGuideWidthPct = 52;
+let lengthGuideHeightPct = 12;
 
 function clampPct(v, min, max){
   return Math.max(min, Math.min(max, v));
@@ -272,8 +300,13 @@ function enableGuideDragging(){
 }
 
 if(dragTarget === guideLength){
-  const newTop = clampPct(dragStartTop + dyPct, 5, 85);
+  const newLeft = clampPct(dragStartLeft + dxPct, 0, 90);
+  const newTop  = clampPct(dragStartTop + dyPct, 0, 90);
+
+  lengthGuideLeftPct = newLeft;
   lengthGuideTopPct = newTop;
+
+  guideLength.style.left = lengthGuideLeftPct + '%';
   guideLength.style.top = lengthGuideTopPct + '%';
 }
 
@@ -406,18 +439,22 @@ function syncGuides(reset=false){
   if(reset){
     chestGuideLeftPct = isWide ? 30 : 28;
     chestGuideWidthPct = isWide ? 9 : 11;
-    lengthGuideTopPct = isWide ? 48 : 50;
-    lengthGuideHeightPct = 10;
+
+    lengthGuideLeftPct = isWide ? 18 : 16;
+    lengthGuideTopPct = isWide ? 38 : 40;
+    lengthGuideWidthPct = isWide ? 52 : 56;
+    lengthGuideHeightPct = isWide ? 12 : 14;
   }
 
   guideChest.style.left = chestGuideLeftPct + '%';
   guideChest.style.width = chestGuideWidthPct + '%';
 
-  guideLength.style.left = '12%';
-  guideLength.style.right = '12%';
+  guideLength.style.left = lengthGuideLeftPct + '%';
   guideLength.style.top = lengthGuideTopPct + '%';
+  guideLength.style.width = lengthGuideWidthPct + '%';
   guideLength.style.height = lengthGuideHeightPct + '%';
-} 
+  guideLength.style.right = 'auto';
+}
  function syncGuideVisibility(){
   const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
   if(viewWrap){
@@ -1402,12 +1439,17 @@ function measureChestDepthAtFront(mask, scaleResult){
 function measureBodyLengthPx(mask){
   if(!guideLength || !can) return null;
 
-  const box = getBodyBox(mask);
-  if(!box) return null;
-
   const canvasRect = can.getBoundingClientRect();
   const lengthRect = guideLength.getBoundingClientRect();
 
+  const x0 = Math.max(
+    0,
+    Math.round(((lengthRect.left - canvasRect.left) / canvasRect.width) * mask.cols)
+  );
+  const x1 = Math.min(
+    mask.cols - 1,
+    Math.round(((lengthRect.right - canvasRect.left) / canvasRect.width) * mask.cols)
+  );
   const y0 = Math.max(
     0,
     Math.round(((lengthRect.top - canvasRect.top) / canvasRect.height) * mask.rows)
@@ -1417,22 +1459,22 @@ function measureBodyLengthPx(mask){
     Math.round(((lengthRect.bottom - canvasRect.top) / canvasRect.height) * mask.rows)
   );
 
-  if(y1 <= y0) return null;
+  if(x1 <= x0 || y1 <= y0) return null;
 
-  const lengths = [];
+  let bestLen = 0;
 
   for(let y = y0; y <= y1; y++){
     let left = null;
     let right = null;
 
-    for(let x = box.minX; x <= box.maxX; x++){
+    for(let x = x0; x <= x1; x++){
       if(mask.ucharPtr(y, x)[0] > 0){
         left = x;
         break;
       }
     }
 
-    for(let x = box.maxX; x >= box.minX; x--){
+    for(let x = x1; x >= x0; x--){
       if(mask.ucharPtr(y, x)[0] > 0){
         right = x;
         break;
@@ -1440,12 +1482,12 @@ function measureBodyLengthPx(mask){
     }
 
     if(left !== null && right !== null && right > left){
-      lengths.push(right - left);
+      const len = right - left;
+      if(len > bestLen) bestLen = len;
     }
   }
 
-  if(lengths.length < 3) return null;
-  return lengths.reduce((a,b)=>a+b,0) / lengths.length;
+  return bestLen > 0 ? bestLen : null;
 }
  function measureBodyAreaPx(mask){
   let area = 0;
