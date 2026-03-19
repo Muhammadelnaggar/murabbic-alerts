@@ -241,6 +241,31 @@ function markCvReady() {
       touch-action:none;
     "></div>
   </div>
+  <div id="liveLenTag" style="
+  position:absolute;
+  right:10px;
+  top:10px;
+  z-index:12;
+  background:rgba(15,23,42,.82);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  font:700 13px Cairo, sans-serif;
+  pointer-events:none;
+">الطول: — px</div>
+
+<div id="liveChestTag" style="
+  position:absolute;
+  right:10px;
+  top:48px;
+  z-index:12;
+  background:rgba(15,23,42,.82);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  font:700 13px Cairo, sans-serif;
+  pointer-events:none;
+">الصدر: — px</div>
 </div>
 
 <!-- اختيار صورة -->
@@ -293,6 +318,7 @@ const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
 const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
 const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
 const guideLengthStart=$('guideLengthStart'), guideLengthEnd=$('guideLengthEnd');
+const liveLenTag=$('liveLenTag'), liveChestTag=$('liveChestTag');
    let dragTarget = null;
 let dragStartX = 0;
 let dragStartY = 0;
@@ -360,6 +386,7 @@ function enableGuideDragging(){
     if(dragTarget === guideChest && dragMode === 'move'){
       chestGuideLeftPct = clampPct(chestGuideLeftPct + dxPct, 5, 85);
       guideChest.style.left = chestGuideLeftPct + '%';
+      updateLiveOverlayMeasurements();
       dragStartX = p.clientX;
     }
 
@@ -370,12 +397,14 @@ function enableGuideDragging(){
       chestGuideHeightPct = clampPct(chestGuideHeightPct - delta, 8, 95 - chestGuideTopPct);
       guideChest.style.top = chestGuideTopPct + '%';
       guideChest.style.height = chestGuideHeightPct + '%';
+      updateLiveOverlayMeasurements();
       dragStartY = p.clientY;
     }
 
     if(dragTarget === guideChestBottom && dragMode === 'bottom'){
       chestGuideHeightPct = clampPct(chestGuideHeightPct + dyPct, 8, 95 - chestGuideTopPct);
       guideChest.style.height = chestGuideHeightPct + '%';
+      updateLiveOverlayMeasurements();
       dragStartY = p.clientY;
     }
 
@@ -383,6 +412,7 @@ function enableGuideDragging(){
       lengthStartXPct = clampPct(lengthStartXPct + dxPct, 0, 100);
       lengthStartYPct = clampPct(lengthStartYPct + dyPct, 0, 100);
       updateLengthGuide();
+      updateLiveOverlayMeasurements();
       dragStartX = p.clientX;
       dragStartY = p.clientY;
     }
@@ -391,6 +421,7 @@ function enableGuideDragging(){
       lengthEndXPct = clampPct(lengthEndXPct + dxPct, 0, 100);
       lengthEndYPct = clampPct(lengthEndYPct + dyPct, 0, 100);
       updateLengthGuide();
+      updateLiveOverlayMeasurements();
       dragStartX = p.clientX;
       dragStartY = p.clientY;
     }
@@ -539,12 +570,16 @@ lengthEndYPct = isWide ? 40 : 42;
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
+  updateLiveOverlayMeasurements();
 guideChest.style.top = chestGuideTopPct + '%';
+ updateLiveOverlayMeasurements();
 guideChest.style.width = chestGuideWidthPct + '%';
 guideChest.style.height = chestGuideHeightPct + '%';
+  updateLiveOverlayMeasurements();
 guideChest.style.bottom = 'auto';
 
 updateLengthGuide();
+  updateLiveOverlayMeasurements();
 }
  function syncGuideVisibility(){
   const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
@@ -622,6 +657,28 @@ function measureBodyLengthPxFromOverlay(imgData){
 
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
+ function updateLiveOverlayMeasurements(){
+  if(!lastShot){
+    if(liveLenTag) liveLenTag.textContent = 'الطول: — px';
+    if(liveChestTag) liveChestTag.textContent = 'الصدر: — px';
+    return;
+  }
+
+  const chestPx = measureChestDepthPxFromOverlay(lastShot);
+  const bodyLenPx = measureBodyLengthPxFromOverlay(lastShot);
+
+  if(liveChestTag){
+    liveChestTag.textContent = `الصدر: ${
+      chestPx && isFinite(chestPx) ? Math.round(chestPx) : '—'
+    } px`;
+  }
+
+  if(liveLenTag){
+    liveLenTag.textContent = `الطول: ${
+      bodyLenPx && isFinite(bodyLenPx) ? Math.round(bodyLenPx) : '—'
+    } px`;
+  }
+}   
  btnStart.onclick=async()=>{
   try{
     stream = await window.vision.startCameraHD({
@@ -759,6 +816,7 @@ const W = Math.round(
   (heartGirthCm * heartGirthCm * bodyLenCm) / 10800
 );
 outWeight.textContent = W + ' كجم';
+    updateLiveOverlayMeasurements();
 const confidence = scoreConfidence({
   sharpness,
   brightness,
