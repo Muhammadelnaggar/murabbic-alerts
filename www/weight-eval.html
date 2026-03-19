@@ -561,7 +561,54 @@ updateLengthGuide();
     if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
+function getActiveSourceEl(){
+  return currentSource === 'image' ? imgPrev : v;
+}
 
+function getSourceScaleToImage(imgData){
+  const srcEl = getActiveSourceEl();
+  if(!srcEl || !imgData) return null;
+
+  const srcRect = srcEl.getBoundingClientRect();
+  if(!srcRect.width || !srcRect.height) return null;
+
+  return {
+    sx: imgData.width / srcRect.width,
+    sy: imgData.height / srcRect.height
+  };
+}
+
+function getCenter(el){
+  const r = el.getBoundingClientRect();
+  return {
+    x: r.left + (r.width / 2),
+    y: r.top + (r.height / 2)
+  };
+}
+
+function measureChestDepthPxFromOverlay(imgData){
+  const scale = getSourceScaleToImage(imgData);
+  if(!scale || !guideChestTop || !guideChestBottom) return null;
+
+  const a = getCenter(guideChestTop);
+  const b = getCenter(guideChestBottom);
+
+  const dyScreen = Math.abs(b.y - a.y);
+  return dyScreen * scale.sy;
+}
+
+function measureBodyLengthPxFromOverlay(imgData){
+  const scale = getSourceScaleToImage(imgData);
+  if(!scale || !guideLengthStart || !guideLengthEnd) return null;
+
+  const a = getCenter(guideLengthStart);
+  const b = getCenter(guideLengthEnd);
+
+  const dxImg = (b.x - a.x) * scale.sx;
+  const dyImg = (b.y - a.y) * scale.sy;
+
+  return Math.hypot(dxImg, dyImg);
+}
  btnStart.onclick=async()=>{
   try{
     stream = await window.vision.startCameraHD({
@@ -699,19 +746,30 @@ if(!poseResult){
   mask.delete?.();
   return showToast('تعذّر تحليل وضعية الحيوان', true);
 }
- const chestPx = (chestGuideHeightPct / 100) * imgData.height;
+const chestPx = measureChestDepthPxFromOverlay(imgData);
+if(!chestPx || !isFinite(chestPx)){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('فشل قياس عمق الصدر من الأوفرلاي', true);
+}
+
 const chestDepthCm = chestPx / pxPerCm;
 outChestW.textContent = chestDepthCm.toFixed(1);
 
-const sx = (lengthStartXPct / 100) * imgData.width;
-const sy = (lengthStartYPct / 100) * imgData.height;
+const bodyLenPx = measureBodyLengthPxFromOverlay(imgData);
+if(!bodyLenPx || !isFinite(bodyLenPx)){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  mask.delete?.();
+  return showToast('فشل قياس طول الجسم من الأوفرلاي', true);
+}
 
-const ex = (lengthEndXPct / 100) * imgData.width;
-const ey = (lengthEndYPct / 100) * imgData.height;
-
-const bodyLenPx = Math.hypot(ex - sx, ey - sy);
 const bodyLenCm = bodyLenPx / pxPerCm;
-
 // تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
 const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
 
@@ -745,8 +803,12 @@ lastMetrics = {
   markerConsistency: scaleResult.sideConsistency,
   perspectivePenalty: scaleResult.perspectivePenalty,
   bodySideScore: poseResult.sideProfileScore,
-  bodyPose: poseResult.posePenalty,
-  maskScore: maskEval.score
+  bodyPosePenalty: poseResult.posePenalty,
+  fillRatio: poseResult.fillRatio,
+  aspectRatio: poseResult.aspectRatio,
+  maskScore: maskEval.score,
+  maskQuality: maskEval.quality,
+  maskAreaRatio: maskEval.areaRatioToImage
 };
 outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
 outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
