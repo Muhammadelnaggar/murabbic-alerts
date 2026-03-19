@@ -527,15 +527,15 @@ function syncGuides(reset=false){
   const isWide = baseW > baseH;
 
 if(reset){
-chestGuideLeftPct = isWide ? 49 : 48;
-chestGuideTopPct = isWide ? 15 : 16;
-chestGuideWidthPct = isWide ? 9 : 10;
-chestGuideHeightPct = isWide ? 40 : 42;
+chestGuideLeftPct = isWide ? 58 : 57;
+chestGuideTopPct = isWide ? 6 : 8;
+chestGuideWidthPct = isWide ? 8 : 9;
+chestGuideHeightPct = isWide ? 58 : 60;
 
-lengthStartXPct = isWide ? 23 : 22;
-lengthStartYPct = isWide ? 26 : 27;
-lengthEndXPct = isWide ? 71 : 72;
-lengthEndYPct = isWide ? 47 : 48;
+lengthStartXPct = isWide ? 22 : 22;
+lengthStartYPct = isWide ? 18 : 20;
+lengthEndXPct = isWide ? 73 : 74;
+lengthEndYPct = isWide ? 40 : 42;
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
@@ -567,53 +567,60 @@ updateLengthGuide();
     if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
-function getActiveSourceEl(){
-  return currentSource === 'image' ? imgPrev : v;
-}
+function getImageDisplayRect(imgData){
+  const wrapRect = viewWrap.getBoundingClientRect();
 
-function getSourceScaleToImage(imgData){
-  const srcEl = getActiveSourceEl();
-  if(!srcEl || !imgData) return null;
+  const imgAspect = imgData.width / imgData.height;
+  const wrapAspect = wrapRect.width / wrapRect.height;
 
-  const srcRect = srcEl.getBoundingClientRect();
-  if(!srcRect.width || !srcRect.height) return null;
+  let drawWidth, drawHeight, offsetX, offsetY;
+
+  if(imgAspect > wrapAspect){
+    drawWidth = wrapRect.width;
+    drawHeight = drawWidth / imgAspect;
+    offsetX = 0;
+    offsetY = (wrapRect.height - drawHeight) / 2;
+  } else {
+    drawHeight = wrapRect.height;
+    drawWidth = drawHeight * imgAspect;
+    offsetY = 0;
+    offsetX = (wrapRect.width - drawWidth) / 2;
+  }
 
   return {
-    sx: imgData.width / srcRect.width,
-    sy: imgData.height / srcRect.height
+    left: wrapRect.left + offsetX,
+    top: wrapRect.top + offsetY,
+    width: drawWidth,
+    height: drawHeight
   };
 }
 
-function getCenter(el){
-  const r = el.getBoundingClientRect();
+function getPointInImage(el, imgData){
+  const er = el.getBoundingClientRect();
+  const ir = getImageDisplayRect(imgData);
+
   return {
-    x: r.left + (r.width / 2),
-    y: r.top + (r.height / 2)
+    x: (er.left + er.width / 2 - ir.left) * (imgData.width / ir.width),
+    y: (er.top + er.height / 2 - ir.top) * (imgData.height / ir.height)
   };
 }
 
 function measureChestDepthPxFromOverlay(imgData){
-  const scale = getSourceScaleToImage(imgData);
-  if(!scale || !guideChestTop || !guideChestBottom) return null;
+  if(!guideChestTop || !guideChestBottom) return null;
 
-  const a = getCenter(guideChestTop);
-  const b = getCenter(guideChestBottom);
+  const a = getPointInImage(guideChestTop, imgData);
+  const b = getPointInImage(guideChestBottom, imgData);
 
-  const dyScreen = Math.abs(b.y - a.y);
-  return dyScreen * scale.sy;
+  return Math.abs(b.y - a.y);
 }
 
 function measureBodyLengthPxFromOverlay(imgData){
-  const scale = getSourceScaleToImage(imgData);
-  if(!scale || !guideLengthStart || !guideLengthEnd) return null;
+  if(!guideLengthStart || !guideLengthEnd) return null;
 
-  const a = getCenter(guideLengthStart);
-  const b = getCenter(guideLengthEnd);
+  const a = getPointInImage(guideLengthStart, imgData);
+  const b = getPointInImage(guideLengthEnd, imgData);
 
-  const dxImg = (b.x - a.x) * scale.sx;
-  const dyImg = (b.y - a.y) * scale.sy;
-
-  return Math.hypot(dxImg, dyImg);
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
  btnStart.onclick=async()=>{
   try{
@@ -728,7 +735,6 @@ if(!chestPx || !isFinite(chestPx)){
   outLight.textContent = brightness ? String(brightness) : '—';
   outConf.textContent = '0%';
   currentConfidence = 0;
-
   return showToast('فشل قياس عمق الصدر من الأوفرلاي', true);
 }
 
