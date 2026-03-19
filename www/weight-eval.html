@@ -521,15 +521,15 @@ function syncGuides(reset=false){
   const isWide = baseW > baseH;
 
 if(reset){
-  chestGuideLeftPct = isWide ? 30 : 28;
-  chestGuideTopPct = isWide ? 18 : 20;
-  chestGuideWidthPct = isWide ? 9 : 11;
-  chestGuideHeightPct = isWide ? 42 : 46;
+ chestGuideLeftPct = isWide ? 50 : 49;
+chestGuideTopPct = isWide ? 14 : 15;
+chestGuideWidthPct = isWide ? 8 : 9;
+chestGuideHeightPct = isWide ? 40 : 42;
 
-  lengthStartXPct = isWide ? 18 : 16;
-  lengthStartYPct = isWide ? 44 : 46;
-  lengthEndXPct = isWide ? 70 : 72;
-  lengthEndYPct = isWide ? 44 : 46;
+lengthStartXPct = isWide ? 23 : 22;
+lengthStartYPct = isWide ? 24 : 25;
+lengthEndXPct = isWide ? 70 : 71;
+lengthEndYPct = isWide ? 46 : 47;
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
@@ -1497,15 +1497,14 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
 }
 
 function measureChestDepthAtFront(mask, scaleResult){
-  if(!guideChest || !can) return null;
+  if(!guideChest) return null;
 
-  const canvasRect = can.getBoundingClientRect();
-  const chestRect = guideChest.getBoundingClientRect();
+  // نعتمد على نسب الأوفرلاي نفسها، وليس getBoundingClientRect
+  const x0 = Math.max(0, Math.round((chestGuideLeftPct / 100) * mask.cols));
+  const x1 = Math.min(mask.cols - 1, Math.round(((chestGuideLeftPct + chestGuideWidthPct) / 100) * mask.cols));
 
-  const x0 = Math.max(0, Math.round(((chestRect.left - canvasRect.left) / canvasRect.width) * mask.cols));
-  const x1 = Math.min(mask.cols - 1, Math.round(((chestRect.right - canvasRect.left) / canvasRect.width) * mask.cols));
-  const y0 = Math.max(0, Math.round(((chestRect.top - canvasRect.top) / canvasRect.height) * mask.rows));
-  const y1 = Math.min(mask.rows - 1, Math.round(((chestRect.bottom - canvasRect.top) / canvasRect.height) * mask.rows));
+  const y0 = Math.max(0, Math.round((chestGuideTopPct / 100) * mask.rows));
+  const y1 = Math.min(mask.rows - 1, Math.round(((chestGuideTopPct + chestGuideHeightPct) / 100) * mask.rows));
 
   if(x1 <= x0 || y1 <= y0) return null;
 
@@ -1535,7 +1534,13 @@ function measureChestDepthAtFront(mask, scaleResult){
   }
 
   if(spans.length < 3) return null;
-  return spans.reduce((a,b)=>a+b,0) / spans.length;
+
+  // نأخذ median بدل average ليكون أكثر ثباتًا
+  spans.sort((a,b)=>a-b);
+  const mid = Math.floor(spans.length / 2);
+  return spans.length % 2
+    ? spans[mid]
+    : (spans[mid - 1] + spans[mid]) / 2;
 }
 function measureBodyLengthPx(mask){
   if(!guideLength || !can) return null;
