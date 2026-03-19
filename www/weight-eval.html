@@ -268,16 +268,11 @@ function markCvReady() {
 ">الصدر: — px</div>
 </div>
 
-<!-- اختيار صورة -->
-<div class="sep">أو اختر صورة</div>
-    <div class="chips">
-     <input id="awFile" type="file" accept="image/*" class="hidden">
-      <label for="awFile" class="chip">📸 اختيار صورة</label>
-      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
-      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
-    </div>
-
+<div class="chips">
+  <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+  <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
+  <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
+</div>
 <div id="awWrap" style="position:relative">
   <canvas id="awCan"></canvas>
 </div>
@@ -313,7 +308,7 @@ function markCvReady() {
    
   // ========= DOM =========
   const $=id=>document.getElementById(id);
-  const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
+const v=$('awCam');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
 const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
 const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
@@ -362,7 +357,7 @@ function enableGuideDragging(){
   let dragMode = null;
 
   function startDrag(e, target, mode){
-    if(currentSource !== 'image') return;
+   
 
     dragTarget = target;
     dragMode = mode;
@@ -376,7 +371,7 @@ function enableGuideDragging(){
   }
 
   function onMove(e){
-    if(!dragTarget || currentSource !== 'image') return;
+   if(!dragTarget) return;
 
     const p = e.touches ? e.touches[0] : e;
     const wrapRect = viewWrap.getBoundingClientRect();
@@ -476,21 +471,12 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
-    function setSource(s){
+   function setSource(){
   currentSource = 'camera';
-
   v.classList.remove('hidden');
-
-  if(imgPrev){
-    imgPrev.classList.add('hidden');
-    imgPrev.src = '';
-  }
 
   modeBadge.textContent = 'الوضع: كاميرا مباشرة';
   modeBadge.classList.remove('err');
-
-  guideChest.style.cursor = 'default';
-  guideLength.style.cursor = 'default';
 
   setSaveEnabled(true);
   syncGuideVisibility();
@@ -541,15 +527,8 @@ function getScaleFeedback(pxPerCm){
 function syncGuides(reset=false){
   if(!guideChest || !guideLength) return;
 
-  const baseW =
-    (!v.classList.contains('hidden') && v.videoWidth) ? v.videoWidth :
-    (!imgPrev.classList.contains('hidden') && imgPrev.naturalWidth) ? imgPrev.naturalWidth :
-    can.width;
-
-  const baseH =
-    (!v.classList.contains('hidden') && v.videoHeight) ? v.videoHeight :
-    (!imgPrev.classList.contains('hidden') && imgPrev.naturalHeight) ? imgPrev.naturalHeight :
-    can.height;
+  const baseW = v.videoWidth || can.width || 1000;
+  const baseH = v.videoHeight || can.height || 700;
 
   const isWide = baseW > baseH;
 
@@ -676,10 +655,11 @@ function measureBodyLengthPxFromOverlay(imgData){
 }   
  btnStart.onclick=async()=>{
   try{
-    stream = await window.vision.startCameraHD({
-      state: visionState,
-      preview: v
-    });
+   stream = await window.vision.startCameraHD({
+  state: visionState,
+  preview: v,
+  facingMode: 'environment'
+});
    setSource('camera');
 syncGuides(true);
 syncGuideVisibility();
@@ -856,10 +836,8 @@ btnShot.onclick = async()=>{
 if ((lastMetrics?.bodySideScore ?? 1) < 0.45) {
   return showToast('وضعية الحيوان غير مناسبة للحفظ — نحتاج لقطة جانبية أوضح.', true);
 }
-    // اشتراطات التشغيل المتفق عليها:
-if (currentSource === 'image' && !isDemo) {
-  return showToast('الحفظ للصورة غير مسموح — استخدم الكاميرا أو فعّل وضع Demo.', true);
-}
+    
+
 if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0)) {
   return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
 }
