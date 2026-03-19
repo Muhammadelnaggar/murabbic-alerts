@@ -521,15 +521,15 @@ function syncGuides(reset=false){
   const isWide = baseW > baseH;
 
 if(reset){
- chestGuideLeftPct = isWide ? 50 : 49;
-chestGuideTopPct = isWide ? 14 : 15;
-chestGuideWidthPct = isWide ? 8 : 9;
+chestGuideLeftPct = isWide ? 49 : 48;
+chestGuideTopPct = isWide ? 15 : 16;
+chestGuideWidthPct = isWide ? 9 : 10;
 chestGuideHeightPct = isWide ? 40 : 42;
 
 lengthStartXPct = isWide ? 23 : 22;
-lengthStartYPct = isWide ? 24 : 25;
-lengthEndXPct = isWide ? 70 : 71;
-lengthEndYPct = isWide ? 46 : 47;
+lengthStartYPct = isWide ? 26 : 27;
+lengthEndXPct = isWide ? 71 : 72;
+lengthEndYPct = isWide ? 47 : 48;
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
@@ -726,25 +726,15 @@ if(!bodyLenPxSmall){
 const bodyLenPx = bodyLenPxSmall * resizeRatio;
 const bodyLenCm = bodyLenPx / pxPerCm;
 
-const bodyAreaPx = measureBodyAreaPx(mask);
-const bodyAreaCm2 = bodyAreaPx / (pxPerCm * pxPerCm);
+// نحول عمق الصدر الظاهري إلى محيط صدر تقديري
+// معامل أولي عملي للأبقار من اللقطة الجانبية — سنعايره لاحقًا على بيانات حقيقية
+const heartGirthCmEst = chestDepthCm * 2.10;
 
-const box = getBodyBox(mask);
-const boxAreaPx = box ? ((box.maxX - box.minX) * (box.maxY - box.minY)) : 0;
-const fullness = boxAreaPx > 0 ? (bodyAreaPx / boxAreaPx) : 0;
-
-// معادلة نهائية: طول × عمق × مساحة^0.5 مع ضبط الامتلاء
-const areaLinearCm = Math.sqrt(bodyAreaCm2);
-const fullnessAdj = 0.85 + (0.30 * Math.max(0, Math.min(1, fullness)));
-
+// معادلة الوزن التقليدية الأقرب للواقع:
+// الوزن (كجم) = (محيط الصدر² × طول الجسم) ÷ 10800
 const W = Math.round(
-  0.155 *
-  bodyLenCm *
-  chestDepthCm *
-  areaLinearCm *
-  fullnessAdj / 100
+  (heartGirthCmEst * heartGirthCmEst * bodyLenCm) / 10800
 );
-
 outWeight.textContent = W + ' كجم';
 const confidence = scoreConfidence({
   sharpness,
@@ -765,6 +755,7 @@ lastMetrics = {
   brightness,
   chestCm: chestDepthCm,
   chestDepthCm,
+  heartGirthCmEst,
   bodyLenCm,
   weightKg: W,
   confidence,
@@ -1499,7 +1490,6 @@ function measureVerticalSpanAtX(mask, x, minY, maxY){
 function measureChestDepthAtFront(mask, scaleResult){
   if(!guideChest) return null;
 
-  // نعتمد على نسب الأوفرلاي نفسها، وليس getBoundingClientRect
   const x0 = Math.max(0, Math.round((chestGuideLeftPct / 100) * mask.cols));
   const x1 = Math.min(mask.cols - 1, Math.round(((chestGuideLeftPct + chestGuideWidthPct) / 100) * mask.cols));
 
@@ -1535,9 +1525,9 @@ function measureChestDepthAtFront(mask, scaleResult){
 
   if(spans.length < 3) return null;
 
-  // نأخذ median بدل average ليكون أكثر ثباتًا
   spans.sort((a,b)=>a-b);
   const mid = Math.floor(spans.length / 2);
+
   return spans.length % 2
     ? spans[mid]
     : (spans[mid - 1] + spans[mid]) / 2;
