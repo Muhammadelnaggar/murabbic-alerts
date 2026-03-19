@@ -738,22 +738,16 @@ lastMetrics = {
   sharpness,
   brightness,
   chestCm: chestDepthCm,
-  chestDepthCm,
- heartGirthCm
+  heartGirthCm,
   bodyLenCm,
   weightKg: W,
   confidence,
   markerConsistency: scaleResult.sideConsistency,
   perspectivePenalty: scaleResult.perspectivePenalty,
   bodySideScore: poseResult.sideProfileScore,
-  bodyPosePenalty: poseResult.posePenalty,
-  fillRatio: poseResult.fillRatio,
-  aspectRatio: poseResult.aspectRatio,
-  maskScore: maskEval.score,
-  maskQuality: maskEval.quality,
-  maskAreaRatio: maskEval.areaRatioToImage
+  bodyPose: poseResult.posePenalty,
+  maskScore: maskEval.score
 };
-
 outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
 outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
 outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
