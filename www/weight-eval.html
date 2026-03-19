@@ -476,29 +476,25 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
-  function setSource(s){
-    currentSource = s;
-    if(s === 'camera'){
-      v.classList.remove('hidden');
-      imgPrev.classList.add('hidden');
-      modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
-      modeBadge.classList.remove('err');
-      guideChest.style.cursor = 'default';
-guideLength.style.cursor = 'default';
-      setSaveEnabled(true);
-    } else {
-      imgPrev.classList.remove('hidden');
-      v.classList.add('hidden');
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
-      modeBadge.textContent = isDemo ? 'الوضع: صورة (عرض Demo — الحفظ مسموح)' : 'الوضع: صورة (عرض فقط — الحفظ غير مسموح)';
-      modeBadge.classList.toggle('err', !isDemo);
-      guideChest.style.cursor = 'ew-resize';
-      guideLength.style.cursor = 'ns-resize';
-      setSaveEnabled(isDemo);
-    }
-    syncGuideVisibility();
-   
+    function setSource(s){
+  currentSource = 'camera';
+
+  v.classList.remove('hidden');
+
+  if(imgPrev){
+    imgPrev.classList.add('hidden');
+    imgPrev.src = '';
   }
+
+  modeBadge.textContent = 'الوضع: كاميرا مباشرة';
+  modeBadge.classList.remove('err');
+
+  guideChest.style.cursor = 'default';
+  guideLength.style.cursor = 'default';
+
+  setSaveEnabled(true);
+  syncGuideVisibility();
+}
   function fireTrack(event, meta={}){
     try {
       window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
@@ -581,12 +577,11 @@ guideChest.style.bottom = 'auto';
 updateLengthGuide();
   updateLiveOverlayMeasurements();
 }
- function syncGuideVisibility(){
-  const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
+function syncGuideVisibility(){
   if(viewWrap){
-    viewWrap.style.display = showLiveOverlay ? 'block' : 'none';
+    viewWrap.style.display = 'block';
   }
-}   
+}
   // ========= تهيئة الحقول =========
   initContextFields();
    syncGuideVisibility(); 
@@ -695,206 +690,143 @@ syncGuideVisibility();
   }
 };
 
-  // ========= اختيار صورة =========
-  file.onchange = ()=>{
-    const f=file.files?.[0]; if(!f) return;
-    const url=URL.createObjectURL(f);
-    imgPrev.onload=()=>URL.revokeObjectURL(url);
-  imgPrev.src=url;
-setSource('image');
-syncGuides(true);
-fireTrack('image_selected', {size:f.size, type:f.type});
-  };
+
 
   // ========= التقاط/تقدير =========
- btnShot.onclick = async()=>{
-if (!window.cvReady || !window.cv) {
-  return showToast('OpenCV لم يكتمل تحميله بعد', true);
-}
+btnShot.onclick = async()=>{
+  if (!window.cvReady || !window.cv) {
+    return showToast('OpenCV لم يكتمل تحميله بعد', true);
+  }
 
   try{
-   let imgData = null;
-let sharpness = 0;
-let brightness = 0;
-let resizeRatio = 1;
-let scaleResult = null;
+    if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
 
-    if(currentSource === 'camera'){
-      if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+    let imgData = null;
+    let sharpness = 0;
+    let brightness = 0;
+    let resizeRatio = 1;
+    let scaleResult = null;
 
-      const frames = await window.vision.captureBurst({
-        preview: v,
-        count: 5,
-        delayMs: 120
-      });
+    const frames = await window.vision.captureBurst({
+      preview: v,
+      count: 5,
+      delayMs: 120
+    });
 
-      const best = window.vision.pickBestFrame(frames);
-      if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
+    const best = window.vision.pickBestFrame(frames);
+    if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
 
-      sharpness = Math.round(best.sharpness || 0);
-      brightness = Math.round(best.brightness || 0);
+    sharpness = Math.round(best.sharpness || 0);
+    brightness = Math.round(best.brightness || 0);
 
-  const originalImgData = await dataURLToImageData(best.dataURL);
+    const originalImgData = await dataURLToImageData(best.dataURL);
 
-scaleResult = detectArucoPxPerCm(originalImgData);
-if(!scaleResult || !scaleResult.pxPerCm){
-  outScale.textContent='—';
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('لم تُكتشف علامة ArUco', true);
-}
-
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-resizeRatio = originalImgData.width / imgData.width;
-lastShot = imgData;
-pxPerCm = scaleResult.pxPerCm;
-outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-      
-    } else {
-      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
-
-      can.width = imgPrev.naturalWidth;
-      can.height = imgPrev.naturalHeight;
-    
-      ctx.drawImage(imgPrev,0,0,can.width,can.height);
-  const originalImgData = ctx.getImageData(0,0,can.width,can.height);
-
-scaleResult = detectArucoPxPerCm(originalImgData);
-if(!scaleResult || !scaleResult.pxPerCm){
-  outScale.textContent='—';
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('لم تُكتشف علامة ArUco', true);
-}
-
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-resizeRatio = originalImgData.width / imgData.width;
-lastShot = imgData;
-pxPerCm = scaleResult.pxPerCm;
-outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-
-const tempCanvas = document.createElement('canvas');
-tempCanvas.width = imgData.width;
-tempCanvas.height = imgData.height;
-tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
-
-      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
-      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
+    scaleResult = detectArucoPxPerCm(originalImgData);
+    if(!scaleResult || !scaleResult.pxPerCm){
+      outScale.textContent='—';
+      outSharp.textContent = sharpness ? String(sharpness) : '—';
+      outLight.textContent = brightness ? String(brightness) : '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      return showToast('لم تُكتشف علامة ArUco', true);
     }
 
-const chestPx = measureChestDepthPxFromOverlay(imgData);
-if(!chestPx || !isFinite(chestPx)){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('فشل قياس عمق الصدر من الأوفرلاي', true);
-}
+    imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+    resizeRatio = originalImgData.width / imgData.width;
+    lastShot = imgData;
+    pxPerCm = scaleResult.pxPerCm;
+    outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
-const chestDepthCm = chestPx / pxPerCm;
-outChestW.textContent = chestDepthCm.toFixed(1);
+    const chestRect = getChestGuideRectOnImage(imgData);
+    const lengthLine = getLengthGuideLineOnImage(imgData);
 
-const bodyLenPx = measureBodyLengthPxFromOverlay(imgData);
-if(!bodyLenPx || !isFinite(bodyLenPx)){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('فشل قياس طول الجسم من الأوفرلاي', true);
-}
+    const chestPx = chestRect?.height || 0;
+    const bodyLenPx = lengthLine
+      ? Math.hypot(lengthLine.x2 - lengthLine.x1, lengthLine.y2 - lengthLine.y1)
+      : 0;
 
-const bodyLenCm = bodyLenPx / pxPerCm;
-// تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
-const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
+    if(!pxPerCm || !chestPx || !bodyLenPx){
+      outChestW.textContent = '—';
+      outWeight.textContent = '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      return showToast('تعذر حساب القياسات من الكاميرا', true);
+    }
 
-// معادلة الوزن القياسية
-const W = Math.round(
-  (heartGirthCm * heartGirthCm * bodyLenCm) / 10800
-);
-outWeight.textContent = W + ' كجم';
-    updateLiveOverlayMeasurements();
-const confidence = scoreConfidence({
-  sharpness,
-  brightness,
-  pxPerCm,
-  chestCm: chestDepthCm,
-  weightKg: W,
-  hasMarker: true,
-  markerConsistency: scaleResult.sideConsistency,
-  markerPenalty: scaleResult.perspectivePenalty,
-  bodySideScore: 1,
-  bodyPosePenalty: 0,
-  maskScore: 1
-});
-   currentConfidence = confidence;
-lastMetrics = {
-  sharpness,
-  brightness,
-  chestCm: chestDepthCm,
-  heartGirthCm,
-  bodyLenCm,
-  weightKg: W,
-  confidence,
-  markerConsistency: scaleResult.sideConsistency,
-  perspectivePenalty: scaleResult.perspectivePenalty
-};
-outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
-outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
-outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
+    const chestDepthCm = chestPx / pxPerCm;
+    const bodyLenCm = bodyLenPx / pxPerCm;
+    const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
+    const weightKg = (heartGirthCm * heartGirthCm * bodyLenCm) / 10800;
 
-const scaleInfo = getScaleFeedback(pxPerCm);
-let scaleQuality = scaleInfo?.quality || 'bad';
-let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+    outChestW.textContent = chestDepthCm.toFixed(1) + ' سم';
+    outWeight.textContent = weightKg.toFixed(0) + ' كجم';
+    outSharp.textContent = sharpness ? String(sharpness) : '—';
+    outLight.textContent = brightness ? String(brightness) : '—';
 
-if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20) {
-  scaleQuality = 'weak';
-  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
-}
+    const markerConsistency = scaleResult?.sideConsistency ?? 0;
+    const perspectivePenalty = scaleResult?.perspectivePenalty ?? 1;
 
+    const sharpScore = Math.max(0, Math.min(1, sharpness / 180));
+    const lightScore = Math.max(0, 1 - (Math.abs((brightness || 128) - 128) / 128));
 
-if (scaleQuality === 'bad') {
-  showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
-} else if (scaleQuality === 'weak') {
-  showToast('تم التقدير مبدئيًا — ' + scaleTip);
-} else if (confidence < 55) {
-  showToast('تم التقدير مبدئيًا — يفضّل إعادة لقطة أوضح لرفع الدقة');
-} else if (confidence < 75) {
-  showToast('تم التقدير — النتيجة جيدة ويمكن تحسينها بلقطة أوضح');
-} else {
-  showToast('✅ تم التقدير بجودة جيدة');
-}
-drawVisionOverlay({
-  imgData,
-  scaleResult,
-  poseResult: null,
-  chestPx,
-  confidence,
-  scaleTip,
-  markerConsistency: scaleResult.sideConsistency,
-  bodySideScore: 1,
-  maskScore: 1
-});
- fireTrack('weight_estimated', {
-  source: currentSource,
-  px_per_cm: pxPerCm,
-  chest_depth_cm: chestDepthCm,
-  body_length_cm: bodyLenCm,
-  weight_kg: W,
-  sharpness,
-  brightness,
-  confidence
-});
+    const bodySideScore = 0.6;
+    const maskScore = 0.5;
+    const bodyPosePenalty = 0.2;
 
-  }catch(err){
-    console.error(err);
+    const confidence = Math.round(
+      100 * Math.max(0, Math.min(1,
+        (markerConsistency * 0.35) +
+        (sharpScore * 0.20) +
+        (lightScore * 0.10) +
+        (bodySideScore * 0.15) +
+        (maskScore * 0.10) +
+        ((1 - perspectivePenalty) * 0.10) -
+        (bodyPosePenalty * 0.10)
+      ))
+    );
+
+    currentConfidence = confidence;
+    outConf.textContent = confidence + '%';
+
+    lastMetrics = {
+      pxPerCm,
+      chestPx,
+      chestDepthCm,
+      heartGirthCm,
+      bodyLenPx,
+      bodyLenCm,
+      weightKg,
+      confidence,
+      sharpness,
+      brightness,
+      markerConsistency,
+      perspectivePenalty
+    };
+
+    drawVisionOverlay({
+      imgData,
+      scaleResult,
+      poseResult: null,
+      chestPx,
+      confidence,
+      scaleTip: markerConsistency < 0.75 ? 'ميل واضح في الماركر' : 'الماركر جيد',
+      markerConsistency,
+      bodySideScore,
+      maskScore
+    });
+
+    showToast('تم الالتقاط من الكاميرا');
+    fireTrack('weight_estimated', {
+      source: 'camera',
+      confidence,
+      pxPerCm: Number(pxPerCm?.toFixed?.(2) || 0)
+    });
+
+  }catch(e){
+    console.error(e);
     showToast('حدث خطأ أثناء التقدير', true);
   }
 };
-
 
   async function postJSON(url, body){
     const res = await fetch(url, {
