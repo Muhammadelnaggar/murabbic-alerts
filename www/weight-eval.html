@@ -285,7 +285,7 @@ function markCvReady() {
 
   <script type="module">
     import { cameraCalibration } from '/js/camera-calibration.js';
-    import { FilesetResolver, ImageSegmenter } from '/ai/mediapipe/vision_bundle.mjs';
+   
   // ========= DOM =========
   const $=id=>document.getElementById(id);
   const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
@@ -435,10 +435,7 @@ const ARUCO_MARKER_CM=10;
   let currentConfidence = null, lastMetrics = null;
   const visionState = {};
   const isDemo = new URLSearchParams(location.search).get('demo') === '1';
-  let mpImageSegmenter = null;
-  let mpSegReady = false;
-  let mpSegInitPromise = null;
-
+ 
   // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
 
@@ -725,36 +722,6 @@ tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0
       brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
     }
 
-
-    const mask = await animalMaskSegmented(imgData);
-if(!mask){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('تعذّر تحديد الحيوان', true);
-}
-
-const maskEval = evaluateAnimalMask(mask);
-if(!maskEval || maskEval.quality === 'bad'){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  mask.delete?.();
-  return showToast('تم تحديد شكل غير مناسب كجسم الحيوان — حاول لقطة أوضح بخلفية أبسط.', true);
-}
-
-lastMask = mask;
-const poseResult = analyzeBodyPose(mask);
-if(!poseResult){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  mask.delete?.();
-  return showToast('تعذّر تحليل وضعية الحيوان', true);
-}
 const chestPx = measureChestDepthPxFromOverlay(imgData);
 if(!chestPx || !isFinite(chestPx)){
   outSharp.textContent = sharpness ? String(sharpness) : '—';
@@ -796,9 +763,9 @@ const confidence = scoreConfidence({
   hasMarker: true,
   markerConsistency: scaleResult.sideConsistency,
   markerPenalty: scaleResult.perspectivePenalty,
-  bodySideScore: poseResult.sideProfileScore,
-  bodyPosePenalty: poseResult.posePenalty,
-  maskScore: maskEval.score
+  bodySideScore: 1,
+  bodyPosePenalty: 0,
+  maskScore: 1
 });
    currentConfidence = confidence;
 lastMetrics = {
@@ -810,14 +777,7 @@ lastMetrics = {
   weightKg: W,
   confidence,
   markerConsistency: scaleResult.sideConsistency,
-  perspectivePenalty: scaleResult.perspectivePenalty,
-  bodySideScore: poseResult.sideProfileScore,
-  bodyPosePenalty: poseResult.posePenalty,
-  fillRatio: poseResult.fillRatio,
-  aspectRatio: poseResult.aspectRatio,
-  maskScore: maskEval.score,
-  maskQuality: maskEval.quality,
-  maskAreaRatio: maskEval.areaRatioToImage
+  perspectivePenalty: scaleResult.perspectivePenalty
 };
 outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
 outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
@@ -832,17 +792,7 @@ if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20)
   scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
 }
 
-if (poseResult.poseQuality === 'bad') {
-  scaleQuality = 'weak';
-  scaleTip = 'وضعية الحيوان غير مناسبة للقياس — نحتاج لقطة جانبية أوضح مع ظهور الجسم كاملًا بدون ميل واضح.';
-} else if (poseResult.poseQuality === 'weak' && scaleQuality !== 'bad') {
-  scaleQuality = 'weak';
-  scaleTip = 'القياس ممكن، لكن وضعية الحيوان ليست جانبية بالكامل — لقطة جانبية أوضح سترفع الدقة.';
-}
-if (maskEval.quality === 'weak' && scaleQuality !== 'bad') {
-  scaleQuality = 'weak';
-  scaleTip = 'الخلفية أو حدود الجسم ليست واضحة بما يكفي — حاول جعل الحيوان أوضح وخلفيته أبسط.';
-}
+
 if (scaleQuality === 'bad') {
   showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
 } else if (scaleQuality === 'weak') {
@@ -857,13 +807,13 @@ if (scaleQuality === 'bad') {
 drawVisionOverlay({
   imgData,
   scaleResult,
-  poseResult,
+  poseResult: null,
   chestPx,
   confidence,
   scaleTip,
   markerConsistency: scaleResult.sideConsistency,
-  bodySideScore: poseResult.sideProfileScore,
-  maskScore: maskEval.score
+  bodySideScore: 1,
+  maskScore: 1
 });
  fireTrack('weight_estimated', {
   source: currentSource,
