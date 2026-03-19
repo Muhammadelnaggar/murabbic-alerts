@@ -726,14 +726,12 @@ if(!bodyLenPxSmall){
 const bodyLenPx = bodyLenPxSmall * resizeRatio;
 const bodyLenCm = bodyLenPx / pxPerCm;
 
-// نحول عمق الصدر الظاهري إلى محيط صدر تقديري
-// معامل أولي عملي للأبقار من اللقطة الجانبية — سنعايره لاحقًا على بيانات حقيقية
-const heartGirthCmEst = chestDepthCm * 2.10;
+// تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
+const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
 
-// معادلة الوزن التقليدية الأقرب للواقع:
-// الوزن (كجم) = (محيط الصدر² × طول الجسم) ÷ 10800
+// معادلة الوزن القياسية
 const W = Math.round(
-  (heartGirthCmEst * heartGirthCmEst * bodyLenCm) / 10800
+  (heartGirthCm * heartGirthCm * bodyLenCm) / 10800
 );
 outWeight.textContent = W + ' كجم';
 const confidence = scoreConfidence({
