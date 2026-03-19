@@ -699,31 +699,21 @@ if(!poseResult){
   mask.delete?.();
   return showToast('تعذّر تحليل وضعية الحيوان', true);
 }
-  const chestPxSmall = measureChestDepthAtFront(mask, scaleResult);
-if(!chestPxSmall){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  mask.delete?.();
-  return showToast('فشل قياس عمق الصدر', true);
-}
+ const chestPx = (chestGuideHeightPct / 100) * imgData.height;
+const chestDepthCm = chestPx / pxPerCm;
+outChestW.textContent = chestDepthCm.toFixed(1);
 
 const chestPx = chestPxSmall * resizeRatio;
 const chestDepthCm = chestPx / pxPerCm;
 outChestW.textContent = chestDepthCm.toFixed(1);
 
-const bodyLenPxSmall = measureBodyLengthPx(mask);
-if(!bodyLenPxSmall){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  mask.delete?.();
-  return showToast('فشل قياس طول الجسم', true);
-}
+const sx = (lengthStartXPct / 100) * imgData.width;
+const sy = (lengthStartYPct / 100) * imgData.height;
 
-const bodyLenPx = bodyLenPxSmall * resizeRatio;
+const ex = (lengthEndXPct / 100) * imgData.width;
+const ey = (lengthEndYPct / 100) * imgData.height;
+
+const bodyLenPx = Math.hypot(ex - sx, ey - sy);
 const bodyLenCm = bodyLenPx / pxPerCm;
 
 // تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
@@ -753,7 +743,7 @@ lastMetrics = {
   brightness,
   chestCm: chestDepthCm,
   chestDepthCm,
-  heartGirthCmEst,
+ heartGirthCm
   bodyLenCm,
   weightKg: W,
   confidence,
