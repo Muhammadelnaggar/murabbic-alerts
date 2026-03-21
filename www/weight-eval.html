@@ -506,22 +506,20 @@ btnShot.onclick = async()=>{
     pxPerCm = scaleResult.pxPerCm;
     outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
-    // ❌ إلغاء القياس القديم
-const chestRect = null;
-const lengthLine = null;
+   // ❌ إلغاء القياس القديم مؤقتًا
+const chestPx = 0;
+const bodyLenPx = 0;
 
-   const chestPx = 0;
-   const bodyLenPx = 0;
-      ? Math.hypot(lengthLine.x2 - lengthLine.x1, lengthLine.y2 - lengthLine.y1)
-      : 0;
+ outChestW.textContent = '—';
+outWeight.textContent = '—';
+outConf.textContent = '—';
+currentConfidence = null;
 
-   if(!pxPerCm){
-      outChestW.textContent = '—';
-      outWeight.textContent = '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      return showToast('تم قراءة الماركر بنجاح — جاري تطوير القياس التلقائي', false);
-    }
+if(!pxPerCm){
+  return showToast('لم تُكتشف علامة ArUco', true);
+}
+
+return showToast('تم قراءة الماركر بنجاح — القياس التلقائي قيد التوصيل الآن');
 
     const chestDepthCm = chestPx / pxPerCm;
     const bodyLenCm = bodyLenPx / pxPerCm;
