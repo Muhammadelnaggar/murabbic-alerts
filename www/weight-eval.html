@@ -75,10 +75,10 @@ canvas{
 
 #animalFrame{
   position:absolute !important;
-  left:8% !important;
-  top:18% !important;
-  width:84% !important;
-  height:56% !important;
+  left:6% !important;
+  top:28% !important;
+  width:88% !important;
+  height:34% !important;
   border:3px dashed rgba(14,160,90,.95) !important;
   border-radius:24px !important;
   box-sizing:border-box !important;
@@ -87,15 +87,16 @@ canvas{
 
 #markerGuide{
   position:absolute !important;
-  left:12% !important;
-  top:40% !important;
-  width:18% !important;
+  left:8% !important;
+  top:45% !important;
+  width:12% !important;
   aspect-ratio:1/1 !important;
   border:3px solid #f59e0b !important;
   border-radius:14px !important;
   background:rgba(245,158,11,.12) !important;
   box-shadow:0 0 18px rgba(245,158,11,.35) !important;
   box-sizing:border-box !important;
+  transform:translateY(-50%) !important;
 }
 
 #markerGuideLabel,
@@ -112,10 +113,9 @@ canvas{
 
 #markerGuideLabel{
   position:absolute !important;
-  left:12% !important;
-  top:34% !important;
+  left:8% !important;
+  top:36% !important;
 }
-
 #animalGuideLabel{
   position:absolute !important;
   right:8% !important;
@@ -262,7 +262,7 @@ function markCvReady() {
     <div id="animalFrame"></div>
     <div id="markerGuide"></div>
     <div id="markerGuideLabel">ضع الماركر هنا</div>
-    <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار</div>
+    <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار الأفقي</div>
     <div id="cameraStatus">وجّه الحيوان داخل الإطار</div>
   </div>
 </div>
@@ -422,11 +422,12 @@ function syncGuideVisibility(show = false){
 btnStart.onclick = async () => {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
+    video: {
+  facingMode: { ideal: 'environment' },
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  aspectRatio: { ideal: 16 / 9 }
+},
       audio: false
     });
 
