@@ -489,21 +489,41 @@ function measureBodyLengthPxFromOverlay(imgData){
 }   
  btnStart.onclick=async()=>{
   try{
-  stream = await navigator.mediaDevices.getUserMedia({
+ stream = await navigator.mediaDevices.getUserMedia({
   video: {
-    facingMode: 'environment'
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 1280 },
+    height: { ideal: 720 }
   },
   audio: false
 });
 
 v.srcObject = stream;
+v.muted = true;
+v.playsInline = true;
+v.setAttribute('autoplay', '');
+v.setAttribute('playsinline', '');
+
+await new Promise((resolve) => {
+  v.onloadedmetadata = () => resolve();
+});
 
 await v.play();
+
+console.log('camera started', {
+  readyState: v.readyState,
+  videoWidth: v.videoWidth,
+  videoHeight: v.videoHeight
+});
 setSource();
 
 if (viewWrap) viewWrap.style.display = 'block';
 document.body.classList.add('camera-mode');
 syncGuideVisibility();
+
+v.style.display = 'block';
+v.style.visibility = 'visible';
+v.style.opacity = '1';
 
 if (cameraGuide) cameraGuide.style.display = 'block';
 if (cameraStatus) cameraStatus.style.display = 'block';
