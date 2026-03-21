@@ -43,16 +43,17 @@ canvas{
   border:0 !important;
 }
 
-#awCam{
+#cameraGuide{
   position:absolute !important;
   inset:0 !important;
-  width:100% !important;
-  height:100% !important;
-  object-fit:cover !important;
-  display:block !important;
-  background:#000 !important;
-}
 
+  display:flex !important;
+  flex-direction:row !important;
+
+  gap:10px;
+  padding:10px;
+  box-sizing:border-box;
+}
 #awCan{
   position:absolute !important;
   inset:0 !important;
@@ -72,18 +73,24 @@ canvas{
   pointer-events:none !important;
   display:none;
 }
-
-#animalFrame{
-  position:absolute !important;
-  left:3% !important;
-  top:32% !important;
-  width:72% !important;
-  height:22% !important;
-  border:3px solid #16a34a !important;
+#guidePanel{
+  position:relative !important;
+  flex:0 0 28% !important;
+  height:100% !important;
+  border:3px solid #f59e0b !important;
   border-radius:18px !important;
   box-sizing:border-box !important;
-  box-shadow:none !important;
-  background:transparent !important;
+  background:rgba(255,255,255,.10) !important;
+}
+#animalFrame{
+  flex: 0 0 68% !important;
+  height:100% !important;
+
+  border:3px solid #16a34a !important;
+  border-radius:18px !important;
+
+  position:relative !important;
+  box-sizing:border-box !important;
 }
 
 #markerGuide{
@@ -129,24 +136,37 @@ canvas{
 
 #animalGuideLabel{
   position:absolute !important;
- right:4% !important;
-  top:12% !important;
- transform:none !important;
-  font:800 15px Cairo, sans-serif !important;
+  top:18% !important;
+  right:10% !important;
+  left:10% !important;
+  transform:none !important;
+  text-align:center !important;
+  font:800 18px Cairo, sans-serif !important;
+  background:none !important;
+  border:0 !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  color:#111 !important;
 }
 
 #cameraStatus{
   position:absolute !important;
- right:4% !important;
-  bottom:18px !important;
- transform:none !important;
-  display:none;
-  min-width:78%;
-  max-width:90%;
-  text-align:center;
+  bottom:18% !important;
+  right:10% !important;
+  left:10% !important;
+  transform:none !important;
+  display:block !important;
+  text-align:center !important;
   white-space:normal !important;
-  line-height:1.7;
-  font:800 14px Cairo, sans-serif !important;
+  line-height:1.7 !important;
+  font:800 15px Cairo, sans-serif !important;
+  background:none !important;
+  border:0 !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  color:#111 !important;
 }
 
 #cameraGuide.ok #markerGuideLabel,
@@ -320,14 +340,16 @@ function markCvReady() {
   <canvas id="awCan"></canvas>
 
 <div id="cameraGuide">
-  <div id="animalFrame"></div>
-  <div id="markerGuide"></div>
-  <div id="markerGuideLabel">ضع الماركر بجوار الكتف وعلى مستوى الجسم</div>
-  <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
-  <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
-</div>
-</div>
+  <div id="animalFrame">
+    <div id="markerGuide"></div>
+    <div id="markerGuideLabel">ضع الماركر بجوار الكتف وعلى مستوى الجسم</div>
+  </div>
 
+  <div id="guidePanel">
+    <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
+    <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
+  </div>
+</div>
 <div class="chips">
   <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
   <button id="awSave" class="chip" type="button">حفظ كحدث</button>
