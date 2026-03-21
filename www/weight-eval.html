@@ -575,20 +575,21 @@ btnShot.onclick = async()=>{
     pxPerCm = scaleResult.pxPerCm;
     outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
-    const chestRect = getChestGuideRectOnImage(imgData);
-    const lengthLine = getLengthGuideLineOnImage(imgData);
+    // ❌ إلغاء القياس القديم
+const chestRect = null;
+const lengthLine = null;
 
-    const chestPx = chestRect?.height || 0;
-    const bodyLenPx = lengthLine
+   const chestPx = 0;
+   const bodyLenPx = 0;
       ? Math.hypot(lengthLine.x2 - lengthLine.x1, lengthLine.y2 - lengthLine.y1)
       : 0;
 
-    if(!pxPerCm || !chestPx || !bodyLenPx){
+   if(!pxPerCm){
       outChestW.textContent = '—';
       outWeight.textContent = '—';
       outConf.textContent = '0%';
       currentConfidence = 0;
-      return showToast('تعذر حساب القياسات من الكاميرا', true);
+      return showToast('تم قراءة الماركر بنجاح — جاري تطوير القياس التلقائي', false);
     }
 
     const chestDepthCm = chestPx / pxPerCm;
