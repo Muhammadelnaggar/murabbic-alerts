@@ -76,31 +76,32 @@ canvas{
 #animalFrame{
   position:absolute !important;
   left:0 !important;
-  top:16% !important;
+  top:25% !important;
   width:100% !important;
-  height:68% !important;
-  border:3px dashed rgba(16,185,129,.96) !important;
+  height:50% !important;
+  border:3px dashed rgba(16,185,129,.95) !important;
   border-radius:0 !important;
   box-sizing:border-box !important;
   box-shadow:
-    0 0 0 9999px rgba(0,0,0,.16) inset,
-    0 0 28px rgba(16,185,129,.18) !important;
-}
-#markerGuide{
-  position:absolute !important;
-  left:6% !important;
-  top:42% !important;
-  width:88px !important;
-  height:88px !important;
-  border:3px solid #f59e0b !important;
-  border-radius:14px !important;
-  background:rgba(245,158,11,.14) !important;
-  box-shadow:
-    0 0 20px rgba(245,158,11,.28),
-    inset 0 0 0 1px rgba(255,255,255,.18) !important;
-  box-sizing:border-box !important;
+    0 0 0 9999px rgba(0,0,0,.18) inset,
+    0 0 28px rgba(16,185,129,.20) !important;
 }
 
+#markerGuide{
+  position:absolute !important;
+  left:4% !important;
+  top:42% !important;
+  width:80px !important;
+  height:80px !important;
+  border:3px solid #f59e0b !important;
+  border-radius:14px !important;
+  background:rgba(245,158,11,.16) !important;
+  box-shadow:
+    0 0 20px rgba(245,158,11,.34),
+    inset 0 0 0 1px rgba(255,255,255,.20) !important;
+  box-sizing:border-box !important;
+  transform:translateY(-50%) !important;
+}
 #markerGuideLabel,
 #animalGuideLabel,
 #cameraStatus{
@@ -118,13 +119,14 @@ canvas{
 }
 #markerGuideLabel{
   position:absolute !important;
-  left:6% !important;
-  top:34% !important;
+  left:4% !important;
+  top:35% !important;
 }
+
 #animalGuideLabel{
   position:absolute !important;
   left:50% !important;
-  top:7% !important;
+  top:12% !important;
   transform:translateX(-50%) !important;
   font:800 15px Cairo, sans-serif !important;
 }
@@ -151,14 +153,18 @@ canvas{
 
 @media (max-width: 640px){
   #animalFrame{
-    top:14% !important;
-    height:72% !important;
+    left:0 !important;
+    top:24% !important;
+    width:100% !important;
+    height:52% !important;
+    border-radius:0 !important;
   }
+
   #markerGuide{
-    left:5% !important;
-    top:40% !important;
-    width:78px !important;
-    height:78px !important;
+    left:4% !important;
+    top:45% !important;
+    width:72px !important;
+    height:72px !important;
   }
   #markerGuideLabel,
   #animalGuideLabel,
@@ -166,17 +172,19 @@ canvas{
     border-radius:18px !important;
     padding:10px 14px !important;
   }
-  #animalGuideLabel{
-    top:6% !important;
-    max-width:88vw;
-    white-space:normal !important;
-    text-align:center;
-  }
-  #markerGuideLabel{
-    top:31% !important;
-    max-width:42vw;
-    white-space:normal !important;
-    text-align:center;
+ #animalGuideLabel{
+  top:10% !important;
+  max-width:88vw;
+  white-space:normal !important;
+  text-align:center;
+}
+
+#markerGuideLabel{
+  left:4% !important;
+  top:33% !important;
+  max-width:46vw;
+  white-space:normal !important;
+  text-align:center;
   }
 }
 
@@ -309,13 +317,13 @@ function markCvReady() {
   <video id="awCam" class="source" playsinline autoplay muted></video>
   <canvas id="awCan"></canvas>
 
-  <div id="cameraGuide">
-    <div id="animalFrame"></div>
-    <div id="markerGuide"></div>
-    <div id="markerGuideLabel">ضع الماركر هنا بجوار الكتف</div>
-   <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
-   <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
-  </div>
+<div id="cameraGuide">
+  <div id="animalFrame"></div>
+  <div id="markerGuide"></div>
+  <div id="markerGuideLabel">ضع الماركر بجوار الكتف وعلى مستوى الجسم</div>
+  <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
+  <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
+</div>
 </div>
 
 <div class="chips">
@@ -394,16 +402,13 @@ function updateOrientationUI(){
     return;
   }
 
-  if (!landscape) {
-    if (cameraGuide) cameraGuide.classList.remove('ok');
-    setGuide('لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي', 'warn');
-  } else if (autoEstimated) {
-    if (cameraGuide) cameraGuide.classList.add('ok');
-    setGuide('تم الالتقاط والتقدير تلقائيًا — راجع النتيجة ثم احفظ الحدث');
-  } else {
-    if (cameraGuide) cameraGuide.classList.add('ok');
-    setGuide('');
-  }
+if (!landscape) {
+  if (cameraGuide) cameraGuide.classList.remove('ok');
+  setGuide('لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي', 'warn');
+} else {
+  if (cameraGuide) cameraGuide.classList.add('ok');
+  setGuide('');
+}
 }
 
 window.addEventListener('resize', updateOrientationUI);
