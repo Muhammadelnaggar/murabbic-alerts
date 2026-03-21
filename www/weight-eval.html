@@ -75,58 +75,58 @@ canvas{
 
 #animalFrame{
   position:absolute !important;
-  left:4% !important;
-  top:38% !important;
-  width:92% !important;
-  height:20% !important;
-  border:3px dashed rgba(16,185,129,.95) !important;
-  border-radius:30px !important;
+  left:2% !important;
+  top:31% !important;
+  width:96% !important;
+  height:34% !important;
+  border:3px dashed rgba(16,185,129,.96) !important;
+  border-radius:28px !important;
   box-sizing:border-box !important;
   box-shadow:
-    0 0 0 9999px rgba(0,0,0,.24) inset,
-    0 0 28px rgba(16,185,129,.20) !important;
+    0 0 0 9999px rgba(0,0,0,.18) inset,
+    0 0 26px rgba(16,185,129,.18) !important;
 }
 #markerGuide{
   position:absolute !important;
-  left:7% !important;
-  top:48% !important;
-  width:18% !important;
-  height:11% !important;
+  left:6% !important;
+  top:58% !important;
+  width:24% !important;
+  height:7.5% !important;
   border:3px solid #f59e0b !important;
-  border-radius:18px !important;
-  background:rgba(245,158,11,.16) !important;
+  border-radius:16px !important;
+  background:rgba(245,158,11,.10) !important;
   box-shadow:
-    0 0 20px rgba(245,158,11,.34),
-    inset 0 0 0 1px rgba(255,255,255,.20) !important;
+    0 0 18px rgba(245,158,11,.28),
+    inset 0 0 0 1px rgba(255,255,255,.18) !important;
   box-sizing:border-box !important;
-  transform:translateY(-50%) !important;
 }
 
 #markerGuideLabel,
 #animalGuideLabel,
 #cameraStatus{
-  background:rgba(15,23,42,.64) !important;
+  background:rgba(15,23,42,.56) !important;
   color:#fff !important;
-  padding:10px 14px !important;
-  border-radius:18px !important;
-  font:800 13px Cairo, sans-serif !important;
-  white-space:nowrap !important;
+  padding:8px 12px !important;
+  border-radius:16px !important;
+  font:800 12px Cairo, sans-serif !important;
   border:1px solid rgba(255,255,255,.10) !important;
-  box-shadow:0 14px 30px rgba(0,0,0,.24) !important;
-  backdrop-filter:blur(10px) !important;
-  -webkit-backdrop-filter:blur(10px) !important;
+  box-shadow:0 10px 22px rgba(0,0,0,.20) !important;
+  backdrop-filter:blur(8px) !important;
+  -webkit-backdrop-filter:blur(8px) !important;
 }
 #markerGuideLabel{
   position:absolute !important;
-  left:7% !important;
-  top:39% !important;
+  left:6% !important;
+  top:51% !important;
+  white-space:nowrap !important;
 }
 #animalGuideLabel{
   position:absolute !important;
   left:50% !important;
-  top:16% !important;
+  top:12% !important;
   transform:translateX(-50%) !important;
-  font:800 15px Cairo, sans-serif !important;
+  font:800 14px Cairo, sans-serif !important;
+  white-space:nowrap !important;
 }
 
 #cameraStatus{
@@ -135,42 +135,42 @@ canvas{
   bottom:18px !important;
   transform:translateX(-50%) !important;
   display:none;
-  min-width:84%;
-  max-width:92%;
+  min-width:78%;
+  max-width:90%;
   text-align:center;
   white-space:normal !important;
-  line-height:1.7;
-  font:800 14px Cairo, sans-serif !important;
+  line-height:1.6;
+  font:800 13px Cairo, sans-serif !important;
 }
 
 @media (max-width: 640px){
   #animalFrame{
-    left:4% !important;
-    top:37% !important;
-    width:92% !important;
-    height:18% !important;
-    border-radius:26px !important;
+    left:2% !important;
+    top:30% !important;
+    width:96% !important;
+    height:36% !important;
+    border-radius:24px !important;
   }
   #markerGuide{
-    left:7% !important;
-    top:48% !important;
-    width:22% !important;
-    height:10% !important;
+    left:6% !important;
+    top:58% !important;
+    width:26% !important;
+    height:7% !important;
   }
   #markerGuideLabel,
   #animalGuideLabel,
   #cameraStatus{
-    border-radius:20px !important;
-    padding:12px 16px !important;
+    border-radius:18px !important;
+    padding:10px 14px !important;
   }
   #animalGuideLabel{
-    top:14% !important;
-    max-width:88vw;
+    top:11% !important;
+    max-width:84vw;
     white-space:normal !important;
     text-align:center;
   }
   #markerGuideLabel{
-    top:40% !important;
+    top:50% !important;
     max-width:44vw;
     white-space:normal !important;
     text-align:center;
@@ -309,9 +309,9 @@ function markCvReady() {
   <div id="cameraGuide">
     <div id="animalFrame"></div>
     <div id="markerGuide"></div>
-    <div id="markerGuideLabel">ضع الماركر أفقيًا هنا</div>
-   <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار الأفقي</div>
-   <div id="cameraStatus">الكاميرا تعمل الآن — لف الموبايل بالعرض فقط لتحسين الالتقاط، وسيبدأ مُرَبِّيك التقدير تلقائيًا عند جاهزية اللقطة</div>
+    <div id="markerGuideLabel">ضع الماركر أفقيًا</div>
+   <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار</div>
+   <div id="cameraStatus">يمكن فتح الكاميرا رأسيًا، لكن وجّه الموبايل بالعرض ليبدأ الالتقاط والتقييم تلقائيًا</div>
   </div>
 </div>
 
@@ -338,7 +338,7 @@ function markCvReady() {
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
- افتح الكاميرا، ثم لف الموبايل بالعرض. ضع الحيوان جانبيًا داخل الإطار الأفقي، وضع الماركر أفقيًا داخل المستطيل البرتقالي. الالتقاط والتقدير يتمان تلقائيًا دون أي زر إضافي.
+افتح الكاميرا ثم وجّه الموبايل بالعرض. ضع الحيوان جانبيًا داخل الإطار، وضع الماركر أفقيًا. الالتقاط والتقييم يتمان تلقائيًا.
 </div>
   </section>
 
@@ -391,11 +391,11 @@ function updateOrientationUI(){
   }
 
   if (!landscape) {
-    setGuide('الكاميرا تعمل في الوضع الرأسي، لكن لف الموبايل بالعرض ليبدأ الالتقاط التلقائي', 'warn');
+    setGuide('يمكن فتح الكاميرا رأسيًا، لكن لف الموبايل بالعرض ليبدأ الالتقاط والتقييم تلقائيًا', 'warn');
   } else if (autoEstimated) {
-    setGuide('تم التقدير التلقائي بنجاح — راجع النتيجة ثم احفظ الحدث');
+    setGuide('تم التقييم تلقائيًا — راجع النتيجة ثم احفظ الحدث');
   } else {
-    setGuide('ثبّت الموبايل بالعرض، واجعل الحيوان داخل الإطار والماركر داخل المستطيل البرتقالي');
+    setGuide('وجّه الحيوان داخل الإطار، وضع الماركر أفقيًا، وثبّت الموبايل لحظة');
   }
 }
 
