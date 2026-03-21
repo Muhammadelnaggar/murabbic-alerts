@@ -75,26 +75,29 @@ canvas{
 
 #animalFrame{
   position:absolute !important;
-  left:6% !important;
-  top:28% !important;
-  width:88% !important;
-  height:34% !important;
-  border:3px dashed rgba(14,160,90,.95) !important;
-  border-radius:24px !important;
+  left:5% !important;
+  top:32% !important;
+  width:90% !important;
+  height:26% !important;
+  border:3px dashed rgba(16,185,129,.95) !important;
+  border-radius:28px !important;
   box-sizing:border-box !important;
-  box-shadow:0 0 0 9999px rgba(0,0,0,.22) inset !important;
+  box-shadow:
+    0 0 0 9999px rgba(0,0,0,.24) inset,
+    0 0 24px rgba(16,185,129,.18) !important;
 }
-
 #markerGuide{
   position:absolute !important;
   left:8% !important;
   top:45% !important;
-  width:12% !important;
+  width:11% !important;
   aspect-ratio:1/1 !important;
   border:3px solid #f59e0b !important;
-  border-radius:14px !important;
-  background:rgba(245,158,11,.12) !important;
-  box-shadow:0 0 18px rgba(245,158,11,.35) !important;
+  border-radius:16px !important;
+  background:rgba(245,158,11,.14) !important;
+  box-shadow:
+    0 0 18px rgba(245,158,11,.32),
+    inset 0 0 0 1px rgba(255,255,255,.18) !important;
   box-sizing:border-box !important;
   transform:translateY(-50%) !important;
 }
@@ -114,20 +117,49 @@ canvas{
 #markerGuideLabel{
   position:absolute !important;
   left:8% !important;
-  top:36% !important;
+  top:37% !important;
+  background:rgba(15,23,42,.72) !important;
+  color:#fff !important;
+  padding:8px 12px !important;
+  border-radius:16px !important;
+  font:700 13px Cairo, sans-serif !important;
+  white-space:nowrap !important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 #animalGuideLabel{
   position:absolute !important;
-  right:8% !important;
-  top:11% !important;
+  right:50% !important;
+  top:22% !important;
+  transform:translateX(50%) !important;
+  background:rgba(15,23,42,.72) !important;
+  color:#fff !important;
+  padding:10px 16px !important;
+  border-radius:18px !important;
+  font:800 15px Cairo, sans-serif !important;
+  white-space:nowrap !important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 
 #cameraStatus{
   position:absolute !important;
   left:50% !important;
-  bottom:24px !important;
+  bottom:22px !important;
   transform:translateX(-50%) !important;
   display:none;
+  min-width:78%;
+  text-align:center;
+  background:rgba(2,6,23,.78) !important;
+  color:#fff !important;
+  padding:12px 16px !important;
+  border-radius:20px !important;
+  font:800 14px Cairo, sans-serif !important;
+  white-space:normal !important;
+  line-height:1.5;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 12px 30px rgba(0,0,0,.25) !important;
 }
 
 body.camera-mode header,
@@ -166,6 +198,20 @@ body.camera-mode .card{
   </style>
 </head>
 <body>
+  <div id="rotateHint" style="
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#fff;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
+  font-size:18px;
+  font-weight:700;
+">
+  لف الموبايل بالعرض لبدء التصوير
+</div>
   <!-- تتبّع ذكي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
@@ -263,7 +309,7 @@ function markCvReady() {
     <div id="markerGuide"></div>
     <div id="markerGuideLabel">ضع الماركر هنا</div>
     <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار الأفقي</div>
-    <div id="cameraStatus">وجّه الحيوان داخل الإطار</div>
+    <div id="cameraStatus">وجّه الحيوان داخل الإطار الأفقي وضع الماركر داخل المربع البرتقالي</div>
   </div>
 </div>
 
@@ -330,7 +376,23 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
  
   // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
+function isLandscape(){
+  return window.innerWidth > window.innerHeight;
+}
+    function checkOrientation(){
+  const hint = document.getElementById('rotateHint');
+  if(!hint) return;
 
+  if(window.innerWidth < window.innerHeight){
+    hint.style.display = 'flex';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
   // ========= مساعدات =========
   function setSaveEnabled(yes){
     btnSave.disabled = !yes;
@@ -420,6 +482,10 @@ function syncGuideVisibility(show = false){
   }
  
 btnStart.onclick = async () => {
+ if(!isLandscape()){
+  showToast('من فضلك لف الموبايل بالعرض لبدء التصوير', true);
+  return;
+} 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
     video: {
