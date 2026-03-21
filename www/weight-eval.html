@@ -141,131 +141,64 @@ function markCvReady() {
   <video id="awCam" class="source" playsinline autoplay muted></video>
 
   <!-- مصدر 2: صورة بديلة -->
-  <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
-
-  <!-- Overlay guides فوق الكاميرا/الصورة -->
-<div id="guideChest" style="
+ <!-- اختيار صورة -->
+<div class="sep">أو اختر صورة</div>
+<!-- Overlay guide الجديد: إرشادي فقط -->
+<div id="cameraGuide" style="
+  position:absolute;
+  inset:0;
+  z-index:8;
+  pointer-events:none;
+">
+  <!-- إطار الحيوان -->
+  <div id="animalFrame" style="
     position:absolute;
-    left:32%;
+    left:12%;
     top:18%;
-    width:10%;
-    height:42%;
-    border:none;
-    background:transparent;
+    width:76%;
+    height:58%;
+    border:3px dashed rgba(14,160,90,.95);
+    border-radius:18px;
+    box-shadow:0 0 0 9999px rgba(255,255,255,.08) inset;
+  "></div>
+
+  <!-- منطقة الماركر -->
+  <div id="markerGuide" style="
+    position:absolute;
+    left:16%;
+    top:34%;
+    width:16%;
+    aspect-ratio:1/1;
+    border:3px solid #f59e0b;
+    border-radius:12px;
+    background:rgba(245,158,11,.10);
+  "></div>
+
+  <!-- وصف الماركر -->
+  <div id="markerGuideLabel" style="
+    position:absolute;
+    left:16%;
+    top:30%;
+    background:rgba(15,23,42,.85);
+    color:#fff;
+    padding:6px 10px;
     border-radius:10px;
-    pointer-events:auto;
-    touch-action:none;
-    cursor:move;
-    z-index:8;
-  ">
-  <div style="
-    position:absolute;
-    top:0;
-    bottom:0;
-    left:50%;
-    transform:translateX(-50%);
-    border-left:3px dashed #f59e0b;
-    pointer-events:none;
-  "></div>
-  <div id="guideChestTop" style="
-    position:absolute;
-    top:-11px;
-    left:50%;
-    transform:translateX(-50%);
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    background:#f59e0b;
-    border:2px solid #fff;
-    box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:ns-resize;
-    pointer-events:auto;
-    touch-action:none;
-  "></div>
+    font:700 12px Cairo, sans-serif;
+    white-space:nowrap;
+  ">ضع الماركر هنا</div>
 
-  <div id="guideChestBottom" style="
+  <!-- وصف الحيوان -->
+  <div id="animalGuideLabel" style="
     position:absolute;
-    bottom:-11px;
-    left:50%;
-    transform:translateX(-50%);
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    background:#f59e0b;
-    border:2px solid #fff;
-    box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:ns-resize;
-    pointer-events:auto;
-    touch-action:none;
-  "></div>
-</div>
-
-  <div id="guideLength" style="
-    position:absolute;
-    left:18%;
-    top:44%;
-    width:52%;
-    height:0;
-    border-top:3px dashed #2563eb;
-    transform-origin:0 0;
-    pointer-events:none;
-    z-index:8;
-  ">
-    <div id="guideLengthStart" style="
-      position:absolute;
-      left:-11px;
-      top:-11px;
-      width:22px;
-      height:22px;
-      border-radius:50%;
-      background:#2563eb;
-      border:2px solid #fff;
-      box-shadow:0 1px 6px rgba(0,0,0,.25);
-      cursor:move;
-      pointer-events:auto;
-      touch-action:none;
-    "></div>
-
-    <div id="guideLengthEnd" style="
-      position:absolute;
-      right:-11px;
-      top:-11px;
-      width:22px;
-      height:22px;
-      border-radius:50%;
-      background:#2563eb;
-      border:2px solid #fff;
-      box-shadow:0 1px 6px rgba(0,0,0,.25);
-      cursor:move;
-      pointer-events:auto;
-      touch-action:none;
-    "></div>
-  </div>
-  <div id="liveLenTag" style="
-  position:absolute;
-  right:10px;
-  top:10px;
-  z-index:12;
-  background:rgba(15,23,42,.82);
-  color:#fff;
-  padding:6px 10px;
-  border-radius:10px;
-  font:700 13px Cairo, sans-serif;
-  pointer-events:none;
-">الطول: — px</div>
-
-<div id="liveChestTag" style="
-  position:absolute;
-  right:10px;
-  top:48px;
-  z-index:12;
-  background:rgba(15,23,42,.82);
-  color:#fff;
-  padding:6px 10px;
-  border-radius:10px;
-  font:700 13px Cairo, sans-serif;
-  pointer-events:none;
-">الصدر: — px</div>
+    right:12%;
+    top:12%;
+    background:rgba(15,23,42,.85);
+    color:#fff;
+    padding:6px 10px;
+    border-radius:10px;
+    font:700 12px Cairo, sans-serif;
+    white-space:nowrap;
+  ">ضع الحيوان جانبيًا داخل الإطار</div>
 </div>
 
 <div class="chips">
@@ -295,7 +228,7 @@ function markCvReady() {
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
-  وجّه الكاميرا ليظهر الحيوان كاملًا من الجانب، وضع علامة القياس 10 سم بجوار الكتف.
+ وجّه الكاميرا حتى يظهر الحيوان كاملًا داخل الإطار، وضع الماركر داخل المربع البرتقالي. سيتم الالتقاط تلقائيًا عند جاهزية اللقطة.
 </div>
   </section>
 
@@ -310,26 +243,11 @@ function markCvReady() {
   const $=id=>document.getElementById(id);
 const v=$('awCam');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
-const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
-const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
-const guideLengthStart=$('guideLengthStart'), guideLengthEnd=$('guideLengthEnd');
-const liveLenTag=$('liveLenTag'), liveChestTag=$('liveChestTag');
-   let dragTarget = null;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartLeft = 0;
-let dragStartTop = 0;
-
-let chestGuideLeftPct = 32;
-let chestGuideTopPct = 18;
-let chestGuideWidthPct = 10;
-let chestGuideHeightPct = 42;
-
-let lengthStartXPct = 18;
-let lengthStartYPct = 44;
-let lengthEndXPct = 70;
-let lengthEndYPct = 44;
-
+const wrap=$('awWrap'), viewWrap=$('viewWrap');
+const cameraGuide=$('cameraGuide');
+const animalFrame=$('animalFrame');
+const markerGuide=$('markerGuide');
+  
 function clampPct(v, min, max){
   return Math.max(min, Math.min(max, v));
 }
@@ -351,25 +269,6 @@ function updateLengthGuide(){
   guideLength.style.height = '0';
   guideLength.style.transform = `rotate(${angle}deg)`;
 }
-function enableGuideDragging(){
-  if(!viewWrap || !guideChest || !guideLength || !guideLengthStart || !guideLengthEnd) return;
-
-  let dragMode = null;
-
-  function startDrag(e, target, mode){
-   
-
-    dragTarget = target;
-    dragMode = mode;
-
-    const p = e.touches ? e.touches[0] : e;
-    dragStartX = p.clientX;
-    dragStartY = p.clientY;
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
   function onMove(e){
    if(!dragTarget) return;
 
@@ -471,15 +370,13 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
-   function setSource(){
+  function setSource(){
   currentSource = 'camera';
   v.classList.remove('hidden');
-
   modeBadge.textContent = 'الوضع: كاميرا مباشرة';
   modeBadge.classList.remove('err');
-
   setSaveEnabled(true);
-  syncGuideVisibility();
+  if(viewWrap) viewWrap.style.display = 'block';
 }
   function fireTrack(event, meta={}){
     try {
@@ -524,38 +421,8 @@ function getScaleFeedback(pxPerCm){
     msg:'قراءة علامة القياس جيدة.'
   };
 }
-function syncGuides(reset=false){
-  if(!guideChest || !guideLength) return;
 
-  const baseW = v.videoWidth || can.width || 1000;
-  const baseH = v.videoHeight || can.height || 700;
 
-  const isWide = baseW > baseH;
-
-if(reset){
-chestGuideLeftPct = isWide ? 58 : 57;
-chestGuideTopPct = isWide ? 6 : 8;
-chestGuideWidthPct = isWide ? 8 : 9;
-chestGuideHeightPct = isWide ? 58 : 60;
-
-lengthStartXPct = isWide ? 22 : 22;
-lengthStartYPct = isWide ? 18 : 20;
-lengthEndXPct = isWide ? 73 : 74;
-lengthEndYPct = isWide ? 40 : 42;
-}
-
-guideChest.style.left = chestGuideLeftPct + '%';
-  updateLiveOverlayMeasurements();
-guideChest.style.top = chestGuideTopPct + '%';
- updateLiveOverlayMeasurements();
-guideChest.style.width = chestGuideWidthPct + '%';
-guideChest.style.height = chestGuideHeightPct + '%';
-  updateLiveOverlayMeasurements();
-guideChest.style.bottom = 'auto';
-
-updateLengthGuide();
-  updateLiveOverlayMeasurements();
-}
 function syncGuideVisibility(){
   if(viewWrap){
     viewWrap.style.display = 'block';
@@ -564,7 +431,7 @@ function syncGuideVisibility(){
   // ========= تهيئة الحقول =========
   initContextFields();
    syncGuideVisibility(); 
-    enableGuideDragging();
+   
   function initContextFields(){
     const q=new URLSearchParams(location.search);
     const num = q.get('number') || q.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
@@ -604,15 +471,6 @@ function getImageDisplayRect(imgData){
   };
 }
 
-function getPointInImage(el, imgData){
-  const er = el.getBoundingClientRect();
-  const ir = getImageDisplayRect(imgData);
-
-  return {
-    x: (er.left + er.width / 2 - ir.left) * (imgData.width / ir.width),
-    y: (er.top + er.height / 2 - ir.top) * (imgData.height / ir.height)
-  };
-}
 
 function measureChestDepthPxFromOverlay(imgData){
   if(!guideChestTop || !guideChestBottom) return null;
@@ -661,7 +519,7 @@ function measureBodyLengthPxFromOverlay(imgData){
   facingMode: 'environment'
 });
    setSource('camera');
-syncGuides(true);
+
 syncGuideVisibility();
     fireTrack('camera_start');
   }catch(e){
