@@ -41,6 +41,7 @@ canvas{
   border-radius:0 !important;
   background:#000 !important;
   border:0 !important;
+  display:none !important;
 }
 
 #awCam{
@@ -495,6 +496,7 @@ function measureBodyLengthPxFromOverlay(imgData){
 });
 setSource();
 
+if (viewWrap) viewWrap.style.display = 'block';
 document.body.classList.add('camera-mode');
 syncGuideVisibility();
 
@@ -504,9 +506,13 @@ setGuide('وجّه الحيوان داخل الإطار وضع الماركر د
 
 fireTrack('camera_start');
   }catch(e){
-    console.error(e);
-    showToast('تعذّر فتح الكاميرا', true);
-  }
+  console.error(e);
+  if (viewWrap) viewWrap.style.display = 'none';
+  document.body.classList.remove('camera-mode');
+  if (cameraGuide) cameraGuide.style.display = 'none';
+  if (cameraStatus) cameraStatus.style.display = 'none';
+  showToast('تعذّر فتح الكاميرا', true);
+}
 };
 
 
