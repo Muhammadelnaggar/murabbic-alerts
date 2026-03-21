@@ -489,11 +489,16 @@ function measureBodyLengthPxFromOverlay(imgData){
 }   
  btnStart.onclick=async()=>{
   try{
-   stream = await window.vision.startCameraHD({
-  state: visionState,
-  preview: v,
-  facingMode: 'environment'
+  stream = await navigator.mediaDevices.getUserMedia({
+  video: {
+    facingMode: 'environment'
+  },
+  audio: false
 });
+
+v.srcObject = stream;
+
+await v.play();
 setSource();
 
 if (viewWrap) viewWrap.style.display = 'block';
