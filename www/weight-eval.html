@@ -75,23 +75,23 @@ canvas{
 
 #animalFrame{
   position:absolute !important;
-  left:3% !important;
-  top:34% !important;
-  width:94% !important;
-  height:22% !important;
+  left:4% !important;
+  top:38% !important;
+  width:92% !important;
+  height:20% !important;
   border:3px dashed rgba(16,185,129,.95) !important;
   border-radius:30px !important;
   box-sizing:border-box !important;
   box-shadow:
-    0 0 0 9999px rgba(0,0,0,.26) inset,
+    0 0 0 9999px rgba(0,0,0,.24) inset,
     0 0 28px rgba(16,185,129,.20) !important;
 }
 #markerGuide{
   position:absolute !important;
-  left:6% !important;
-  top:45% !important;
-  width:10% !important;
-  aspect-ratio:1/1 !important;
+  left:7% !important;
+  top:48% !important;
+  width:18% !important;
+  height:11% !important;
   border:3px solid #f59e0b !important;
   border-radius:18px !important;
   background:rgba(245,158,11,.16) !important;
@@ -118,13 +118,13 @@ canvas{
 }
 #markerGuideLabel{
   position:absolute !important;
-  left:6% !important;
-  top:36% !important;
+  left:7% !important;
+  top:39% !important;
 }
 #animalGuideLabel{
   position:absolute !important;
   left:50% !important;
-  top:24% !important;
+  top:16% !important;
   transform:translateX(-50%) !important;
   font:800 15px Cairo, sans-serif !important;
 }
@@ -132,15 +132,49 @@ canvas{
 #cameraStatus{
   position:absolute !important;
   left:50% !important;
-  bottom:20px !important;
+  bottom:18px !important;
   transform:translateX(-50%) !important;
   display:none;
   min-width:84%;
   max-width:92%;
   text-align:center;
   white-space:normal !important;
-  line-height:1.6;
+  line-height:1.7;
   font:800 14px Cairo, sans-serif !important;
+}
+
+@media (max-width: 640px){
+  #animalFrame{
+    left:4% !important;
+    top:37% !important;
+    width:92% !important;
+    height:18% !important;
+    border-radius:26px !important;
+  }
+  #markerGuide{
+    left:7% !important;
+    top:48% !important;
+    width:22% !important;
+    height:10% !important;
+  }
+  #markerGuideLabel,
+  #animalGuideLabel,
+  #cameraStatus{
+    border-radius:20px !important;
+    padding:12px 16px !important;
+  }
+  #animalGuideLabel{
+    top:14% !important;
+    max-width:88vw;
+    white-space:normal !important;
+    text-align:center;
+  }
+  #markerGuideLabel{
+    top:40% !important;
+    max-width:44vw;
+    white-space:normal !important;
+    text-align:center;
+  }
 }
 
 body.camera-mode header,
@@ -275,15 +309,14 @@ function markCvReady() {
   <div id="cameraGuide">
     <div id="animalFrame"></div>
     <div id="markerGuide"></div>
-    <div id="markerGuideLabel">ضع الماركر هنا</div>
-   <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار بعرض الشاشة</div>
-   <div id="cameraStatus">الكاميرا تعمل الآن — للالتقاط فقط لف الموبايل بالعرض ثم ضع الحيوان داخل الإطار والماركر داخل المربع</div>
+    <div id="markerGuideLabel">ضع الماركر أفقيًا هنا</div>
+   <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار الأفقي</div>
+   <div id="cameraStatus">الكاميرا تعمل الآن — لف الموبايل بالعرض فقط لتحسين الالتقاط، وسيبدأ مُرَبِّيك التقدير تلقائيًا عند جاهزية اللقطة</div>
   </div>
 </div>
 
 <div class="chips">
   <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-  <button id="awShot" class="chip" type="button">التقاط & تقدير</button>
   <button id="awSave" class="chip" type="button">حفظ كحدث</button>
 </div>
 
@@ -305,7 +338,7 @@ function markCvReady() {
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
- وجّه الكاميرا حتى يظهر الحيوان كاملًا داخل الإطار، وضع الماركر داخل المربع البرتقالي. سيتم الالتقاط تلقائيًا عند جاهزية اللقطة.
+ افتح الكاميرا، ثم لف الموبايل بالعرض. ضع الحيوان جانبيًا داخل الإطار الأفقي، وضع الماركر أفقيًا داخل المستطيل البرتقالي. الالتقاط والتقدير يتمان تلقائيًا دون أي زر إضافي.
 </div>
   </section>
 
@@ -330,13 +363,14 @@ if (cameraGuide) cameraGuide.style.display = 'none';
 if (cameraStatus) cameraStatus.style.display = 'none';
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
-  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
+  const btnStart=$('awStart'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
 let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
+  let autoCaptureTimer=null, autoBusy=false, autoEstimated=false;
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
   const visionState = {};
@@ -351,21 +385,17 @@ function isLandscape(){
 function updateOrientationUI(){
   const landscape = isLandscape();
 
-  if (btnShot) {
-    btnShot.disabled = !landscape;
-    btnShot.style.opacity = landscape ? '1' : '0.55';
-    btnShot.style.pointerEvents = landscape ? 'auto' : 'none';
-  }
-
   if (!stream) {
     setGuide('شغّل الكاميرا أولًا');
     return;
   }
 
   if (!landscape) {
-    setGuide('لف الموبايل بالعرض ثم ابدأ الالتقاط', 'warn');
+    setGuide('الكاميرا تعمل في الوضع الرأسي، لكن لف الموبايل بالعرض ليبدأ الالتقاط التلقائي', 'warn');
+  } else if (autoEstimated) {
+    setGuide('تم التقدير التلقائي بنجاح — راجع النتيجة ثم احفظ الحدث');
   } else {
-    setGuide('وجّه الحيوان داخل الإطار الأفقي وضع الماركر داخل المربع البرتقالي');
+    setGuide('ثبّت الموبايل بالعرض، واجعل الحيوان داخل الإطار والماركر داخل المستطيل البرتقالي');
   }
 }
 
@@ -443,6 +473,21 @@ function syncGuideVisibility(show = false){
   viewWrap.style.display = show ? 'block' : 'none';
 }
 
+function stopAutoCapture(){
+  if(autoCaptureTimer){
+    clearInterval(autoCaptureTimer);
+    autoCaptureTimer = null;
+  }
+}
+
+function startAutoCapture(){
+  stopAutoCapture();
+  autoCaptureTimer = setInterval(async ()=>{
+    if(autoBusy || autoEstimated || !stream || !window.cvReady || !window.cv || !isLandscape()) return;
+    await runAutoEstimate();
+  }, 1800);
+}
+
  // ========= تهيئة الحقول =========
   initContextFields();
   if (viewWrap) viewWrap.style.display = 'none';
@@ -460,6 +505,8 @@ function syncGuideVisibility(show = false){
   }
  
 btnStart.onclick = async () => {
+  autoEstimated = false;
+  stopAutoCapture();
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -496,6 +543,7 @@ btnStart.onclick = async () => {
 if (cameraStatus) cameraStatus.style.display = 'block';
 
 updateOrientationUI();
+startAutoCapture();
 fireTrack('camera_start');
 
     console.log('camera started', {
@@ -506,6 +554,7 @@ fireTrack('camera_start');
 
   } catch (e) {
     console.error('CAMERA_START_ERROR', e);
+    stopAutoCapture();
     syncGuideVisibility(false);
     document.body.classList.remove('camera-mode');
     if (cameraGuide) cameraGuide.style.display = 'none';
@@ -516,18 +565,17 @@ fireTrack('camera_start');
 
 
   // ========= التقاط/تقدير =========
-btnShot.onclick = async () => {
-  if (!window.cvReady || !window.cv) {
-    return showToast('OpenCV لم يكتمل تحميله بعد', true);
-  }
-
-  if (!isLandscape()) {
-    setGuide('لف الموبايل بالعرض ثم اضغط التقاط & تقدير', 'warn');
-    return showToast('التقاط الصورة متاح فقط عند إمساك الموبايل بالعرض', true);
-  }
+async function runAutoEstimate(){
+  if (!window.cvReady || !window.cv || autoBusy) return;
+  autoBusy = true;
 
   try {
-    if (!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+    if (!v.videoWidth) {
+      autoBusy = false;
+      return;
+    }
+
+    setGuide('جاري فحص اللقطة تلقائيًا…');
 
     const frames = await window.vision.captureBurst({
       preview: v,
@@ -536,7 +584,11 @@ btnShot.onclick = async () => {
     });
 
     const best = window.vision.pickBestFrame(frames);
-    if (!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
+    if (!best?.dataURL) {
+      setGuide('تعذّر التقاط لقطة واضحة — ثبّت الموبايل وحاول مرة أخرى', 'warn');
+      autoBusy = false;
+      return;
+    }
 
     const sharpness = Math.round(best.sharpness || 0);
     const brightness = Math.round(best.brightness || 0);
@@ -554,7 +606,9 @@ btnShot.onclick = async () => {
       outConf.textContent = '0%';
       currentConfidence = 0;
       lastMetrics = null;
-      return showToast('لم تُكتشف علامة ArUco', true);
+      setGuide('الماركر غير واضح بعد — قرّبه وضعه أفقيًا داخل المستطيل البرتقالي', 'warn');
+      autoBusy = false;
+      return;
     }
 
     const imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
@@ -605,18 +659,26 @@ btnShot.onclick = async () => {
       maskScore: 0
     });
 
-    showToast('تم قراءة الماركر بنجاح — القياس التلقائي هو الخطوة التالية');
+    autoEstimated = true;
+    stopAutoCapture();
+    setGuide('تم الالتقاط والتقدير تلقائيًا — راجع النتيجة ثم احفظ الحدث');
+    showToast('تم الالتقاط والتقدير تلقائيًا');
     fireTrack('weight_estimated', {
       source: 'camera',
+      mode: 'auto',
       confidence,
       pxPerCm: Number(pxPerCm.toFixed(2))
     });
 
   } catch (e) {
     console.error(e);
+    setGuide('حدث خطأ أثناء التقدير التلقائي', 'warn');
     showToast('حدث خطأ أثناء التقدير', true);
+  } finally {
+    autoBusy = false;
   }
-};
+}
+
   async function postJSON(url, body){
     const res = await fetch(url, {
       method: 'POST',
