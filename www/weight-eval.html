@@ -41,7 +41,6 @@ canvas{
   border-radius:0 !important;
   background:#000 !important;
   border:0 !important;
-  display:none !important;
 }
 
 #awCam{
@@ -399,14 +398,14 @@ function getScaleFeedback(pxPerCm){
 }
 
 
-function syncGuideVisibility(){
-  if(viewWrap){
-    viewWrap.style.display = 'block';
-  }
+function syncGuideVisibility(show = false){
+  if(!viewWrap) return;
+  viewWrap.style.display = show ? 'block' : 'none';
 }
-  // ========= تهيئة الحقول =========
+}
+ // ========= تهيئة الحقول =========
   initContextFields();
-   syncGuideVisibility(); 
+  if (viewWrap) viewWrap.style.display = 'none';
    
   function initContextFields(){
     const q=new URLSearchParams(location.search);
@@ -517,9 +516,8 @@ console.log('camera started', {
 });
 setSource();
 
-if (viewWrap) viewWrap.style.display = 'block';
+syncGuideVisibility(true);
 document.body.classList.add('camera-mode');
-syncGuideVisibility();
 
 v.style.display = 'block';
 v.style.visibility = 'visible';
@@ -532,7 +530,7 @@ setGuide('وجّه الحيوان داخل الإطار وضع الماركر د
 fireTrack('camera_start');
   }catch(e){
   console.error(e);
-  if (viewWrap) viewWrap.style.display = 'none';
+  syncGuideVisibility(false);
   document.body.classList.remove('camera-mode');
   if (cameraGuide) cameraGuide.style.display = 'none';
   if (cameraStatus) cameraStatus.style.display = 'none';
