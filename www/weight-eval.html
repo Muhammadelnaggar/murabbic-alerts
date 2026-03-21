@@ -43,16 +43,14 @@ canvas{
   border:0 !important;
 }
 
-#cameraGuide{
+#awCam{
   position:absolute !important;
   inset:0 !important;
-
-  display:flex !important;
-  flex-direction:row !important;
-
-  gap:10px;
-  padding:10px;
-  box-sizing:border-box;
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover !important;
+  display:block !important;
+  background:#000 !important;
 }
 #awCan{
   position:absolute !important;
@@ -72,6 +70,11 @@ canvas{
   z-index:8 !important;
   pointer-events:none !important;
   display:none;
+
+  flex-direction:row !important;
+  gap:10px;
+  padding:10px;
+  box-sizing:border-box;
 }
 #guidePanel{
   position:relative !important;
