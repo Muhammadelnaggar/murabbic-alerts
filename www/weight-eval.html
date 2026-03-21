@@ -136,78 +136,107 @@ function markCvReady() {
     <!-- ✅ بادج وضع المصدر -->
     <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-<div id="viewWrap" style="position:relative;overflow:hidden;border-radius:12px">
-  <!-- مصدر 1: كاميرا -->
-  <video id="awCam" class="source" playsinline autoplay muted></video>
-
-  <!-- مصدر 2: صورة بديلة -->
- <!-- اختيار صورة -->
-<div class="sep">أو اختر صورة</div>
-<!-- Overlay guide الجديد: إرشادي فقط -->
-<div id="cameraGuide" style="
-  position:absolute;
-  inset:0;
-  z-index:8;
-  pointer-events:none;
+<div id="viewWrap" style="
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+  aspect-ratio:4/3;
+  background:#eef6ee;
+  border:1px solid var(--border);
 ">
-  <!-- إطار الحيوان -->
-  <div id="animalFrame" style="
-    position:absolute;
-    left:12%;
-    top:18%;
-    width:76%;
-    height:58%;
-    border:3px dashed rgba(14,160,90,.95);
-    border-radius:18px;
-    box-shadow:0 0 0 9999px rgba(255,255,255,.08) inset;
-  "></div>
+  <video
+    id="awCam"
+    class="source"
+    playsinline
+    autoplay
+    muted
+    style="
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      border:0;
+      background:#eef6ee;
+    "
+  ></video>
 
-  <!-- منطقة الماركر -->
-  <div id="markerGuide" style="
-    position:absolute;
-    left:16%;
-    top:34%;
-    width:16%;
-    aspect-ratio:1/1;
-    border:3px solid #f59e0b;
-    border-radius:12px;
-    background:rgba(245,158,11,.10);
-  "></div>
+  <canvas
+    id="awCan"
+    style="
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      border:0;
+      background:transparent;
+      margin:0;
+      pointer-events:none;
+    "
+  ></canvas>
 
-  <!-- وصف الماركر -->
-  <div id="markerGuideLabel" style="
+  <div id="cameraGuide" style="
     position:absolute;
-    left:16%;
-    top:30%;
-    background:rgba(15,23,42,.85);
-    color:#fff;
-    padding:6px 10px;
-    border-radius:10px;
-    font:700 12px Cairo, sans-serif;
-    white-space:nowrap;
-  ">ضع الماركر هنا</div>
+    inset:0;
+    z-index:8;
+    pointer-events:none;
+    display:none;
+  ">
+    <div id="animalFrame" style="
+      position:absolute;
+      left:14%;
+      top:16%;
+      width:72%;
+      height:62%;
+      border:3px dashed rgba(14,160,90,.95);
+      border-radius:18px;
+      box-sizing:border-box;
+    "></div>
 
-  <!-- وصف الحيوان -->
-  <div id="animalGuideLabel" style="
-    position:absolute;
-    right:12%;
-    top:12%;
-    background:rgba(15,23,42,.85);
-    color:#fff;
-    padding:6px 10px;
-    border-radius:10px;
-    font:700 12px Cairo, sans-serif;
-    white-space:nowrap;
-  ">ضع الحيوان جانبيًا داخل الإطار</div>
+    <div id="markerGuide" style="
+      position:absolute;
+      left:18%;
+      top:38%;
+      width:14%;
+      aspect-ratio:1/1;
+      border:3px solid #f59e0b;
+      border-radius:12px;
+      background:rgba(245,158,11,.10);
+      box-sizing:border-box;
+    "></div>
+
+    <div id="markerGuideLabel" style="
+      position:absolute;
+      left:18%;
+      top:31%;
+      background:rgba(15,23,42,.88);
+      color:#fff;
+      padding:6px 10px;
+      border-radius:10px;
+      font:700 12px Cairo, sans-serif;
+      white-space:nowrap;
+    ">ضع الماركر هنا</div>
+
+    <div id="animalGuideLabel" style="
+      position:absolute;
+      right:14%;
+      top:9%;
+      background:rgba(15,23,42,.88);
+      color:#fff;
+      padding:6px 10px;
+      border-radius:10px;
+      font:700 12px Cairo, sans-serif;
+      white-space:nowrap;
+    ">ضع الحيوان جانبيًا داخل الإطار</div>
+  </div>
 </div>
 
 <div class="chips">
   <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-  <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
-  <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
-</div>
-<div id="awWrap" style="position:relative">
-  <canvas id="awCan"></canvas>
+  <button id="awShot" class="chip" type="button">التقاط & تقدير</button>
+  <button id="awSave" class="chip" type="button">حفظ كحدث</button>
 </div>
 
    <div class="kpi3">
@@ -243,8 +272,9 @@ function markCvReady() {
   const $=id=>document.getElementById(id);
 const v=$('awCam');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
-const wrap=$('awWrap'), viewWrap=$('viewWrap');
+const viewWrap=$('viewWrap');
 const cameraGuide=$('cameraGuide');
+    if (cameraGuide) cameraGuide.style.display = 'none';
 const animalFrame=$('animalFrame');
 const markerGuide=$('markerGuide');
   
@@ -518,10 +548,11 @@ function measureBodyLengthPxFromOverlay(imgData){
   preview: v,
   facingMode: 'environment'
 });
-   setSource('camera');
+ setSource();
 
 syncGuideVisibility();
-    fireTrack('camera_start');
+if (cameraGuide) cameraGuide.style.display = 'block';
+fireTrack('camera_start');
   }catch(e){
     console.error(e);
     showToast('تعذّر فتح الكاميرا', true);
