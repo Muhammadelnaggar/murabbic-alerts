@@ -198,20 +198,7 @@ body.camera-mode .card{
   </style>
 </head>
 <body>
-  <div id="rotateHint" style="
-  position:fixed;
-  inset:0;
-  background:#000;
-  color:#fff;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:2000;
-  font-size:18px;
-  font-weight:700;
-">
-  لف الموبايل بالعرض لبدء التصوير
-</div>
+ 
   <!-- تتبّع ذكي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
@@ -376,23 +363,7 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
  
   // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
-function isLandscape(){
-  return window.innerWidth > window.innerHeight;
-}
-    function checkOrientation(){
-  const hint = document.getElementById('rotateHint');
-  if(!hint) return;
 
-  if(window.innerWidth < window.innerHeight){
-    hint.style.display = 'flex';
-  } else {
-    hint.style.display = 'none';
-  }
-}
-
-window.addEventListener('resize', checkOrientation);
-window.addEventListener('orientationchange', checkOrientation);
-checkOrientation();
   // ========= مساعدات =========
   function setSaveEnabled(yes){
     btnSave.disabled = !yes;
@@ -482,10 +453,7 @@ function syncGuideVisibility(show = false){
   }
  
 btnStart.onclick = async () => {
- if(!isLandscape()){
-  showToast('من فضلك لف الموبايل بالعرض لبدء التصوير', true);
-  return;
-} 
+ 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
     video: {
