@@ -75,28 +75,28 @@ canvas{
 
 #animalFrame{
   position:absolute !important;
-  left:2% !important;
-  top:31% !important;
-  width:96% !important;
-  height:34% !important;
+  left:0 !important;
+  top:16% !important;
+  width:100% !important;
+  height:68% !important;
   border:3px dashed rgba(16,185,129,.96) !important;
-  border-radius:28px !important;
+  border-radius:0 !important;
   box-sizing:border-box !important;
   box-shadow:
-    0 0 0 9999px rgba(0,0,0,.18) inset,
-    0 0 26px rgba(16,185,129,.18) !important;
+    0 0 0 9999px rgba(0,0,0,.16) inset,
+    0 0 28px rgba(16,185,129,.18) !important;
 }
 #markerGuide{
   position:absolute !important;
   left:6% !important;
-  top:58% !important;
-  width:24% !important;
-  height:7.5% !important;
+  top:42% !important;
+  width:88px !important;
+  height:88px !important;
   border:3px solid #f59e0b !important;
-  border-radius:16px !important;
-  background:rgba(245,158,11,.10) !important;
+  border-radius:14px !important;
+  background:rgba(245,158,11,.14) !important;
   box-shadow:
-    0 0 18px rgba(245,158,11,.28),
+    0 0 20px rgba(245,158,11,.28),
     inset 0 0 0 1px rgba(255,255,255,.18) !important;
   box-sizing:border-box !important;
 }
@@ -104,29 +104,29 @@ canvas{
 #markerGuideLabel,
 #animalGuideLabel,
 #cameraStatus{
-  background:rgba(15,23,42,.56) !important;
+  background:rgba(15,23,42,.26) !important;
   color:#fff !important;
-  padding:8px 12px !important;
-  border-radius:16px !important;
-  font:800 12px Cairo, sans-serif !important;
+  padding:10px 14px !important;
+  border-radius:18px !important;
+  font:800 13px Cairo, sans-serif !important;
+  white-space:nowrap !important;
   border:1px solid rgba(255,255,255,.10) !important;
-  box-shadow:0 10px 22px rgba(0,0,0,.20) !important;
+  box-shadow:0 10px 24px rgba(0,0,0,.14) !important;
   backdrop-filter:blur(8px) !important;
   -webkit-backdrop-filter:blur(8px) !important;
+  transition:opacity .18s ease !important;
 }
 #markerGuideLabel{
   position:absolute !important;
   left:6% !important;
-  top:51% !important;
-  white-space:nowrap !important;
+  top:34% !important;
 }
 #animalGuideLabel{
   position:absolute !important;
   left:50% !important;
-  top:12% !important;
+  top:7% !important;
   transform:translateX(-50%) !important;
-  font:800 14px Cairo, sans-serif !important;
-  white-space:nowrap !important;
+  font:800 15px Cairo, sans-serif !important;
 }
 
 #cameraStatus{
@@ -139,23 +139,26 @@ canvas{
   max-width:90%;
   text-align:center;
   white-space:normal !important;
-  line-height:1.6;
-  font:800 13px Cairo, sans-serif !important;
+  line-height:1.7;
+  font:800 14px Cairo, sans-serif !important;
+}
+
+#cameraGuide.ok #markerGuideLabel,
+#cameraGuide.ok #animalGuideLabel,
+#cameraGuide.ok #cameraStatus{
+  opacity:0 !important;
 }
 
 @media (max-width: 640px){
   #animalFrame{
-    left:2% !important;
-    top:30% !important;
-    width:96% !important;
-    height:36% !important;
-    border-radius:24px !important;
+    top:14% !important;
+    height:72% !important;
   }
   #markerGuide{
-    left:6% !important;
-    top:58% !important;
-    width:26% !important;
-    height:7% !important;
+    left:5% !important;
+    top:40% !important;
+    width:78px !important;
+    height:78px !important;
   }
   #markerGuideLabel,
   #animalGuideLabel,
@@ -164,14 +167,14 @@ canvas{
     padding:10px 14px !important;
   }
   #animalGuideLabel{
-    top:11% !important;
-    max-width:84vw;
+    top:6% !important;
+    max-width:88vw;
     white-space:normal !important;
     text-align:center;
   }
   #markerGuideLabel{
-    top:50% !important;
-    max-width:44vw;
+    top:31% !important;
+    max-width:42vw;
     white-space:normal !important;
     text-align:center;
   }
@@ -309,9 +312,9 @@ function markCvReady() {
   <div id="cameraGuide">
     <div id="animalFrame"></div>
     <div id="markerGuide"></div>
-    <div id="markerGuideLabel">ضع الماركر أفقيًا</div>
-   <div id="animalGuideLabel">ضع الحيوان جانبيًا داخل الإطار</div>
-   <div id="cameraStatus">يمكن فتح الكاميرا رأسيًا، لكن وجّه الموبايل بالعرض ليبدأ الالتقاط والتقييم تلقائيًا</div>
+    <div id="markerGuideLabel">ضع الماركر هنا بجوار الكتف</div>
+   <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
+   <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
   </div>
 </div>
 
@@ -338,7 +341,7 @@ function markCvReady() {
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
-افتح الكاميرا ثم وجّه الموبايل بالعرض. ضع الحيوان جانبيًا داخل الإطار، وضع الماركر أفقيًا. الالتقاط والتقييم يتمان تلقائيًا.
+ افتح الكاميرا. الإطار ظاهر تلقائيًا. لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي.
 </div>
   </section>
 
@@ -386,16 +389,20 @@ function updateOrientationUI(){
   const landscape = isLandscape();
 
   if (!stream) {
+    if (cameraGuide) cameraGuide.classList.remove('ok');
     setGuide('شغّل الكاميرا أولًا');
     return;
   }
 
   if (!landscape) {
-    setGuide('يمكن فتح الكاميرا رأسيًا، لكن لف الموبايل بالعرض ليبدأ الالتقاط والتقييم تلقائيًا', 'warn');
+    if (cameraGuide) cameraGuide.classList.remove('ok');
+    setGuide('لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي', 'warn');
   } else if (autoEstimated) {
-    setGuide('تم التقييم تلقائيًا — راجع النتيجة ثم احفظ الحدث');
+    if (cameraGuide) cameraGuide.classList.add('ok');
+    setGuide('تم الالتقاط والتقدير تلقائيًا — راجع النتيجة ثم احفظ الحدث');
   } else {
-    setGuide('وجّه الحيوان داخل الإطار، وضع الماركر أفقيًا، وثبّت الموبايل لحظة');
+    if (cameraGuide) cameraGuide.classList.add('ok');
+    setGuide('');
   }
 }
 
@@ -438,7 +445,7 @@ function setGuide(msg, level='normal'){
     cameraStatus.textContent = msg || '';
     cameraStatus.style.display = msg ? 'block' : 'none';
     cameraStatus.style.background =
-      level === 'warn' ? 'rgba(127,29,29,.86)' : 'rgba(15,23,42,.82)';
+      level === 'warn' ? 'rgba(127,29,29,.30)' : 'rgba(15,23,42,.24)';
   }
 }
 
