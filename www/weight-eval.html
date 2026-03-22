@@ -10,11 +10,27 @@
   <style>
     :root{ --green:#0ea05a; --border:#c5e1a5; --card:#ffffff; --bg:#f7faf7; --text:#0f172a; }
     *{box-sizing:border-box;}
-    body{margin:0;font-family:'Cairo','Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--text);}
+ body{
+  margin:0;
+  font-family:'Cairo','Segoe UI',Tahoma,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  overflow:hidden;
+}
     header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);
       padding:12px 16px;display:flex;align-items:center;gap:12px;}
     h1{margin:0;font-size:18px;color:var(--green);font-weight:800;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px;}
+   .card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:0;
+  padding:8px;
+  margin:0;
+  height:calc(100vh - 60px);
+  display:flex;
+  flex-direction:column;
+}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;}
     label{font-weight:700;color:#14532d;font-size:13px;margin-bottom:4px;display:block}
     input[type="text"],input[type="date"]{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:#fcfff8}
@@ -30,33 +46,28 @@
   background:#fff;
   margin-top:10px;
 }
-   video{
-  display:block;
+ video{
   width:100%;
   height:100%;
-  aspect-ratio:auto;
   object-fit:cover;
-  border:2px solid #63b32e;
-  border-radius:22px;
-  background:#fff;
 }
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
     .kpi .lbl{font-size:12px;color:#2b593a;}
     .kpi .val{font-weight:800;color:#14532d;font-size:16px;}
     .hint{font-size:12px;color:#555;margin-top:10px;}
-    .capture-shell{
+   .capture-shell{
   display:grid;
-  grid-template-columns:1.6fr 1fr;
-  gap:14px;
-  margin-top:10px;
+  grid-template-columns:2fr 1fr;
+  gap:10px;
+  height:100%;
 }
 
 .camera-pane{
   position:relative;
-  border-radius:24px;
+  border-radius:0;
   overflow:hidden;
-  min-height:340px;
+  height:100%;
 }
 
 .guide-pane{
@@ -82,11 +93,7 @@
   text-align:center;
 }
 
-@media (max-width: 800px){
-  .capture-shell{
-    grid-template-columns:1fr;
-  }
-}
+
     .toast{position:fixed;bottom:12px;left:12px;right:12px;margin:auto;max-width:520px;background:#e8f5e9;
       color:#064e3b;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-weight:700;display:none}
     .err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
@@ -97,6 +104,28 @@
     .badge{display:inline-block;padding:4px 8px;border:1px solid var(--border);
       border-radius:999px;background:#fff;font-size:12px;color:#14532d;margin:6px 0}
     .badge.err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
+    .orientation-tip{
+  margin:8px 0 0;
+  padding:10px 12px;
+  border:1px solid #fde68a;
+  background:#fffbeb;
+  color:#92400e;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:700;
+  text-align:center;
+}
+ body.clean-capture #guideChest,
+body.clean-capture #guideLength,
+body.clean-capture #liveLenTag,
+body.clean-capture #liveChestTag{
+  opacity:0;
+  pointer-events:none;
+}
+
+body.clean-capture .guide-pane{
+  justify-content:flex-start;
+}   
   </style>
 </head>
 <body>
@@ -322,15 +351,18 @@ function markCvReady() {
     </div>
   </div>
 
-  <div class="guide-pane">
-    <div class="guide-title">تعليمات الاستخدام</div>
-    <div class="guide-text">
-      وجّه الحيوان جانبيًا داخل الإطار<br>
-      ضع علامة القياس بجوار الكتف<br>
-      حافظ على إضاءة واضحة<br>
-      سيتم التقدير تلقائيًا
-    </div>
+<div class="guide-pane">
+  <div class="guide-title">تعليمات الاستخدام</div>
+ <div class="guide-text">
+  وجّه الحيوان جانبيًا داخل الإطار<br>
+  ضع علامة القياس بجوار الكتف وعلى نفس مستوى الجسم<br>
+  حافظ على إضاءة واضحة وثبّت الهاتف قدر الإمكان<br>
+  سيتم الالتقاط والتقدير تلقائيًا عند اكتمال الشروط
+</div>
+  <div id="orientationTip" class="orientation-tip">
+    للحصول على أفضل دقة، اجعل الموبايل بالعرض أثناء التقدير
   </div>
+</div>
 
 </div>
 <div class="chips">
@@ -507,10 +539,10 @@ function enableGuideDragging(){
 
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
- const btnStart=$('awStart'), btnSave=$('awSave');
+  const btnStart=$('awStart'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
-
+  const orientationTip = $('orientationTip');
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
 let stream=null, pxPerCm=null, lastShot=null;
@@ -655,6 +687,24 @@ function syncGuideVisibility(){
 }
   // ========= تهيئة الحقول =========
   initContextFields();
+  document.body.classList.add('clean-capture');
+    function updateOrientationTip(){
+  if(!orientationTip) return;
+  if(window.innerWidth > window.innerHeight){
+    orientationTip.textContent = 'وضع العرض ممتاز للتقدير التلقائي';
+    orientationTip.style.background = '#ecfdf5';
+    orientationTip.style.borderColor = '#bbf7d0';
+    orientationTip.style.color = '#166534';
+  }else{
+    orientationTip.textContent = 'لأفضل دقة، لف الموبايل بالعرض أثناء التقدير';
+    orientationTip.style.background = '#fffbeb';
+    orientationTip.style.borderColor = '#fde68a';
+    orientationTip.style.color = '#92400e';
+  }
+}
+
+updateOrientationTip();
+window.addEventListener('resize', updateOrientationTip);
    syncGuideVisibility(); 
     enableGuideDragging();
   function initContextFields(){
@@ -753,7 +803,7 @@ function measureBodyLengthPxFromOverlay(imgData){
     });
      setSource();
 syncGuides(true);
-  showToast('حرّك الخطوط على جسم الحيوان قبل التقاط الصورة');  
+ showToast('وجّه الحيوان جانبيًا وضع علامة القياس بجوار الكتف'); 
 syncGuideVisibility();
     fireTrack('camera_start');
     if(!autoRunning){
