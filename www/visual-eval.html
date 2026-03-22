@@ -217,18 +217,7 @@
     <input id="evalDate" type="date" />
   </div>
 </section>
-  <div id="sysbar" class="mbk-infobar info">
-  <div class="mbk-meta">
-    <div class="meta-item">
-      <span class="meta-label">رقم الحيوان</span>
-      <span id="animalNumberView" class="meta-value">—</span>
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">تاريخ التقييم</span>
-      <span id="evalDateView" class="meta-value">—</span>
-    </div>
-  </div>
-</div>
+ 
 
   <div class="container row">
     <section class="card" id="cameraCard">
@@ -264,28 +253,6 @@
 <aside class="card">
   <form id="metaForm" style="padding:12px">
     <input type="hidden" id="animalId" name="animalId" />
-
-    <label style="display:block;margin:6px 0;font-weight:800;color:#0f172a">رقم الحيوان
-      <input
-        type="text"
-        id="animalNumber"
-        name="animalNumber"
-        class="input"
-        readonly
-        style="width:100%;margin-top:8px"
-      />
-    </label>
-
-    <label style="display:block;margin:14px 0 6px;font-weight:800;color:#0f172a">تاريخ التقييم
-      <input
-        type="date"
-        id="eventDate"
-        name="eventDate"
-        class="input"
-        required
-        style="width:100%;margin-top:8px"
-      />
-    </label>
   </form>
       <div class="metrics" id="metrics">
         <h3>التقييم الإجمالي</h3>
@@ -359,14 +326,25 @@
     const captureToggleBtn=$('#captureToggleBtn'), nextAngleBtn=$('#nextAngleBtn');
     const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
     const thumbs=$('#thumbs'), helperText=$('#helperText');
-    const animalIdInput=$('#animalId'), eventDateInput=$('#eventDate'), saveBtn=$('#saveBtn'), backBtn=$('#backBtn');
-   const animalNumberInput=$('#animalNumber'); const saveMsg=$('#saveMsg');
+    const animalIdInput = $('#animalId'),
+      saveBtn = $('#saveBtn'),
+      backBtn = $('#backBtn');
 
-const ctx=getAnimalFromContext();
-if(animalIdInput) animalIdInput.value = ctx.id || '';
-if(eventDateInput) eventDateInput.value = (ctx.date && /^\d{4}-\d{2}-\d{2}$/.test(ctx.date)) ? ctx.date : todayCairo();
-if(numberSpan) numberSpan.textContent = ctx.number || '—';
+const animalNumberInput = $('#animalNumber');
+const evalDateInput = $('#evalDate');
+const saveMsg = $('#saveMsg');
 
+const ctx = getAnimalFromContext();
+
+if (animalIdInput) animalIdInput.value = ctx.id || '';
+
+if (animalNumberInput) {
+  animalNumberInput.value = ctx.number || '';
+}
+
+if (evalDateInput) {
+  evalDateInput.value = ctx.date || todayCairo();
+}
     function showMsg(text, ok=true){ if(!saveMsg) return; saveMsg.textContent=text; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>{ saveMsg.className='msg'; }, 4000); }
 
     // ===== الكاميرا =====
@@ -480,14 +458,14 @@ if(numberSpan) numberSpan.textContent = ctx.number || '—';
     nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
     toggleFlash.addEventListener('click', toggleTorch);
     restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-    backBtn.addEventListener('click', ()=>{ const params=new URLSearchParams(); if(ctx.id) params.set('animalId',ctx.id); if(ctx.number) params.set('number',ctx.number); if(ctx.date) params.set('date',ctx.date); location.href = `add-event.html?${params.toString()}`; });
+   
 
     (async function init(){
       try{
         if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
         await startCamera(); await listCameras();
         renderThumbs(); setAngle('side');
-        if(!eventDateInput.value) eventDateInput.value=todayCairo();
+       if (!evalDateInput.value) evalDateInput.value = todayCairo();
       }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
     })();
   </script>
@@ -498,8 +476,8 @@ if(numberSpan) numberSpan.textContent = ctx.number || '—';
   (function(){
     const saveBtn=document.getElementById('saveBtn');
     const animalIdInput=document.getElementById('animalId');
-    const eventDateInput=document.getElementById('eventDate');
-    const animalNumberInput=document.getElementById('animalNumber');
+   const evalDateInput = document.getElementById('evalDate');
+const animalNumberInput = document.getElementById('animalNumber');
     const saveMsg=document.getElementById('saveMsg');
 
     function todayCairo(){
@@ -549,7 +527,8 @@ if(numberSpan) numberSpan.textContent = ctx.number || '—';
           type: 'تقييم Milking Traits',
           eventType: 'milking_traits_eval',
           animalId: (animalIdInput?.value||'') || null,
-        animalNumber: (animalNumberInput?.value || localStorage.getItem('currentAnimalNumber') || '').trim(),
+       animalNumber: (animalNumberInput?.value || localStorage.getItem('currentAnimalNumber') || '').trim(),
+eventDate: evalDateInput?.value || todayCairo(),
           eventDate: eventDateInput?.value || todayCairo(),
           overallScore: overall,
           groups: { udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
