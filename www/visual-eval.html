@@ -181,10 +181,6 @@
     .msg.err{display:block;background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d}
 
     .save-bar .btn{flex:1 1 48%;min-height:56px;font-size:16px;padding:14px 16px;border-radius:14px;touch-action:manipulation;pointer-events:auto}
-    @media (max-width:540px){
-      .save-bar{flex-direction:column}
-      .save-bar .btn{flex:1 1 auto;width:100%;min-height:60px;font-size:17px}
-    }
       /* منع أي طبقة تحرير من حجب الأزرار */
     editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
     /* تأكيد أولوية شريط الحفظ */
@@ -217,7 +213,7 @@
     <input id="evalDate" type="date" />
   </div>
 </section>
- 
+</div>
 
   <div class="container row">
     <section class="card" id="cameraCard">
@@ -260,9 +256,8 @@
       </div>
 
       <div class="save-bar">
-        <div id="saveMsg" class="msg" style="width:100%"></div>
-        <button id="saveBtn" type="button" class="btn btn-primary" onclick="window.__handleSave && window.__handleSave(event)">حفظ نتيجة التقييم</button>
-        <button id="backBtn" type="button" class="btn btn-light">رجوع لصفحة الأحداث</button>
+                <button id="saveBtn" type="button" class="btn btn-primary" onclick="window.__handleSave && window.__handleSave(event)">حفظ نتيجة التقييم</button>
+        <button id="backBtn" type="button" class="btn btn-light">لوحة التحكم</button>
       </div>
     </aside>
   </div>
@@ -326,25 +321,16 @@
     const captureToggleBtn=$('#captureToggleBtn'), nextAngleBtn=$('#nextAngleBtn');
     const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
     const thumbs=$('#thumbs'), helperText=$('#helperText');
-    const animalIdInput = $('#animalId'),
-      saveBtn = $('#saveBtn'),
-      backBtn = $('#backBtn');
-
-const animalNumberInput = $('#animalNumber');
-const evalDateInput = $('#evalDate');
-const saveMsg = $('#saveMsg');
+    const animalIdInput = $('#animalId'), saveBtn = $('#saveBtn'), backBtn = $('#backBtn');
+    const animalNumberInput = $('#animalNumber');
+    const evalDateInput = $('#evalDate');
+    const saveMsg = $('#saveMsg');
 
 const ctx = getAnimalFromContext();
-
 if (animalIdInput) animalIdInput.value = ctx.id || '';
+if (animalNumberInput) animalNumberInput.value = ctx.number || '';
+if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
 
-if (animalNumberInput) {
-  animalNumberInput.value = ctx.number || '';
-}
-
-if (evalDateInput) {
-  evalDateInput.value = ctx.date || todayCairo();
-}
     function showMsg(text, ok=true){ if(!saveMsg) return; saveMsg.textContent=text; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>{ saveMsg.className='msg'; }, 4000); }
 
     // ===== الكاميرا =====
@@ -458,14 +444,14 @@ if (evalDateInput) {
     nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
     toggleFlash.addEventListener('click', toggleTorch);
     restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-   
+    backBtn.addEventListener('click', ()=>{ const params=new URLSearchParams(); if(animalIdInput?.value) params.set('animalId', animalIdInput.value); if(animalNumberInput?.value) params.set('number', animalNumberInput.value); if(evalDateInput?.value) params.set('date', evalDateInput.value); location.href = `dashboard.html?${params.toString()}`; });
 
     (async function init(){
       try{
         if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
         await startCamera(); await listCameras();
         renderThumbs(); setAngle('side');
-       if (!evalDateInput.value) evalDateInput.value = todayCairo();
+        if(!evalDateInput.value) evalDateInput.value=todayCairo();
       }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
     })();
   </script>
@@ -476,15 +462,15 @@ if (evalDateInput) {
   (function(){
     const saveBtn=document.getElementById('saveBtn');
     const animalIdInput=document.getElementById('animalId');
-   const evalDateInput = document.getElementById('evalDate');
-const animalNumberInput = document.getElementById('animalNumber');
+    const evalDateInput=document.getElementById('evalDate');
+    const animalNumberInput=document.getElementById('animalNumber');
     const saveMsg=document.getElementById('saveMsg');
 
     function todayCairo(){
       const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
       return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     }
-    function setMsg(t,ok=true){ if(!saveMsg){ alert(t); return; } saveMsg.textContent=t; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>saveMsg.className='msg',4000); }
+    function setMsg(t,ok=true){ if(!saveMsg) return; saveMsg.textContent=t; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>saveMsg.className='msg',4000); }
 
     async function __handleSave(e){
       try{ e && e.preventDefault && e.preventDefault(); }catch{}
@@ -527,9 +513,8 @@ const animalNumberInput = document.getElementById('animalNumber');
           type: 'تقييم Milking Traits',
           eventType: 'milking_traits_eval',
           animalId: (animalIdInput?.value||'') || null,
-       animalNumber: (animalNumberInput?.value || localStorage.getItem('currentAnimalNumber') || '').trim(),
-eventDate: evalDateInput?.value || todayCairo(),
-          eventDate: eventDateInput?.value || todayCairo(),
+        animalNumber: (animalNumberInput?.value || localStorage.getItem('currentAnimalNumber') || '').trim(),
+          eventDate: evalDateInput?.value || todayCairo(),
           overallScore: overall,
           groups: { udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
           kpi: window.state?.k || {},
