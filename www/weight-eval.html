@@ -199,29 +199,41 @@
   border-radius:0;
   text-align:center;
 }
-    .capture-guide-title{
-      font-size:28px;
-      font-weight:800;
-      line-height:1.6;
-      margin-bottom:20px;
-      color:#111827;
-    }
-    .capture-guide-text{
-      font-size:22px;
-      line-height:2;
-      color:#111827;
-    }
-    .capture-guide-note{
-      margin-top:18px;
-      border:1px solid #f8d87a;
-      background:#fff8e8;
-      color:#8a4c12;
-      border-radius:18px;
-      padding:14px 12px;
-      font-size:18px;
-      font-weight:700;
-      line-height:1.8;
-    }
+   .capture-guide-title{
+  font-size:15px;
+  font-weight:800;
+  line-height:1.4;
+  margin:0;
+  color:#ffffff;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+   .capture-guide-text{
+  margin-top:8px;
+  font-size:13px;
+  line-height:1.5;
+  color:rgba(255,255,255,.92);
+  text-align:center;
+}
+  .capture-guide-note{
+  position:absolute;
+  left:50%;
+  bottom:20%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,0.65);
+  color:#fff;
+  border-radius:999px;
+  padding:10px 18px;
+  font-size:14px;
+  font-weight:700;
+  text-align:center;
+  z-index:30;
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,0.15);
+}
 
     #guideChest,
     #guideLength,
@@ -394,16 +406,11 @@
         </div>
       </div>
 
-      <aside class="capture-guide">
-        <div class="capture-guide-title">تعليمات الاستخدام والتوجيهات</div>
-        <div class="capture-guide-text">
-          وجّه الحيوان من الجانب داخل كادر الكاميرا<br>
-          ضع علامة القياس بجوار الكتف وعلى نفس مستوى الجسم<br>
-          اجعل الهاتف بالعرض لتحصل على أفضل دقة<br>
-          سيتم الالتقاط والتقدير تلقائيًا عند اكتمال الشروط
-        </div>
-        <div class="capture-guide-note">لأفضل دقة، لف الموبايل بالعرض أثناء التقدير</div>
-      </aside>
+    <aside class="capture-guide">
+  <div class="capture-guide-title">وجّه الحيوان جانبيًا</div>
+  <div class="capture-guide-text">ضع الماركر بجوار الكتف وعلى نفس المستوى</div>
+  <div class="capture-guide-note">التصوير أفقي فقط</div>
+</aside>
     </div>
   </section>
 
