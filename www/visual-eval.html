@@ -206,6 +206,17 @@
     <a class="mbk-back" id="backTopBtn" href="add-event.html">رجوع</a>
   </div>
 </header>
+  <section class="card meta-card">
+  <div class="field">
+    <label for="animalNumber">رقم الحيوان</label>
+    <input id="animalNumber" type="text" readonly />
+  </div>
+
+  <div class="field">
+    <label for="evalDate">تاريخ التقييم</label>
+    <input id="evalDate" type="date" />
+  </div>
+</section>
   <div id="sysbar" class="mbk-infobar info">
   <div class="mbk-meta">
     <div class="meta-item">
@@ -250,14 +261,32 @@
       </div>
     </section>
 
-    <aside class="card">
-      <form id="metaForm" style="padding:12px">
-        <input type="hidden" id="animalId" name="animalId" />
-        <label style="display:block;margin:6px 0">تاريخ التقييم
-          <input type="date" id="eventDate" name="eventDate" class="input" required />
-        </label>
-      </form>
+<aside class="card">
+  <form id="metaForm" style="padding:12px">
+    <input type="hidden" id="animalId" name="animalId" />
 
+    <label style="display:block;margin:6px 0;font-weight:800;color:#0f172a">رقم الحيوان
+      <input
+        type="text"
+        id="animalNumber"
+        name="animalNumber"
+        class="input"
+        readonly
+        style="width:100%;margin-top:8px"
+      />
+    </label>
+
+    <label style="display:block;margin:14px 0 6px;font-weight:800;color:#0f172a">تاريخ التقييم
+      <input
+        type="date"
+        id="eventDate"
+        name="eventDate"
+        class="input"
+        required
+        style="width:100%;margin-top:8px"
+      />
+    </label>
+  </form>
       <div class="metrics" id="metrics">
         <h3>التقييم الإجمالي</h3>
         <div class="helper">التقط/ارفع الصور ثم يظهر الإجمالي هنا (لا تُحفَظ الصور؛ تُحفَظ النتائج فقط).</div>
@@ -312,12 +341,12 @@
     const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
     const thumbs=$('#thumbs'), helperText=$('#helperText');
     const animalIdInput=$('#animalId'), eventDateInput=$('#eventDate'), saveBtn=$('#saveBtn'), backBtn=$('#backBtn');
-    const numberSpan=document.querySelector('.animal-number'); const saveMsg=$('#saveMsg');
+   const animalNumberInput=$('#animalNumber'); const saveMsg=$('#saveMsg');
 
-    const ctx=getAnimalFromContext();
-    if(animalIdInput) animalIdInput.value=ctx.id||'';
-    if(eventDateInput) eventDateInput.value=ctx.date||todayCairo();
-    if(numberSpan) numberSpan.textContent=ctx.number||(ctx.id?`#${String(ctx.id).slice(-5)}`:'—');
+  const ctx=getAnimalFromContext();
+if(animalIdInput) animalIdInput.value=ctx.id||'';
+if(eventDateInput) eventDateInput.value=ctx.date||todayCairo();
+if(animalNumberInput) animalNumberInput.value=ctx.number || '';
 
     function showMsg(text, ok=true){ if(!saveMsg) return; saveMsg.textContent=text; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>{ saveMsg.className='msg'; }, 4000); }
 
@@ -451,6 +480,7 @@
     const saveBtn=document.getElementById('saveBtn');
     const animalIdInput=document.getElementById('animalId');
     const eventDateInput=document.getElementById('eventDate');
+    const animalNumberInput=document.getElementById('animalNumber');
     const saveMsg=document.getElementById('saveMsg');
 
     function todayCairo(){
@@ -500,7 +530,7 @@
           type: 'تقييم Milking Traits',
           eventType: 'milking_traits_eval',
           animalId: (animalIdInput?.value||'') || null,
-          animalNumber: localStorage.getItem('currentAnimalNumber') || '',
+        animalNumber: (animalNumberInput?.value || localStorage.getItem('currentAnimalNumber') || '').trim(),
           eventDate: eventDateInput?.value || todayCairo(),
           overallScore: overall,
           groups: { udder:U, backRumpBody:B, frontLegs:F, femininity:FE },
