@@ -140,8 +140,6 @@ function markCvReady() {
   <!-- مصدر 1: كاميرا -->
   <video id="awCam" class="source" playsinline autoplay muted></video>
 
-  <!-- مصدر 2: صورة بديلة -->
-  <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
 
   <!-- Overlay guides فوق الكاميرا/الصورة -->
 <div id="guideChest" style="
@@ -267,17 +265,11 @@ function markCvReady() {
   pointer-events:none;
 ">الصدر: — px</div>
 </div>
-
-<!-- اختيار صورة -->
-<div class="sep">أو اختر صورة</div>
-    <div class="chips">
-     <input id="awFile" type="file" accept="image/*" class="hidden">
-      <label for="awFile" class="chip">📸 اختيار صورة</label>
-      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
-      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
-    </div>
-
+<div class="chips">
+  <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+  <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
+  <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
+</div>
 <div id="awWrap" style="position:relative">
   <canvas id="awCan"></canvas>
 </div>
@@ -309,27 +301,23 @@ function markCvReady() {
   
 
   <script type="module">
-    import { cameraCalibration } from '/js/camera-calibration.js';
+  
    
   // ========= DOM =========
   const $=id=>document.getElementById(id);
-  const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
+ const v=$('awCam');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
-const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
+const viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
 const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
 const guideLengthStart=$('guideLengthStart'), guideLengthEnd=$('guideLengthEnd');
 const liveLenTag=$('liveLenTag'), liveChestTag=$('liveChestTag');
    let dragTarget = null;
 let dragStartX = 0;
 let dragStartY = 0;
-let dragStartLeft = 0;
-let dragStartTop = 0;
-
 let chestGuideLeftPct = 32;
 let chestGuideTopPct = 18;
 let chestGuideWidthPct = 10;
 let chestGuideHeightPct = 42;
-
 let lengthStartXPct = 18;
 let lengthStartYPct = 44;
 let lengthEndXPct = 70;
@@ -362,7 +350,7 @@ function enableGuideDragging(){
   let dragMode = null;
 
   function startDrag(e, target, mode){
-    if(currentSource !== 'image') return;
+    if(!lastShot) return;
 
     dragTarget = target;
     dragMode = mode;
@@ -376,7 +364,7 @@ function enableGuideDragging(){
   }
 
   function onMove(e){
-    if(!dragTarget || currentSource !== 'image') return;
+   if(!dragTarget || !lastShot) return;
 
     const p = e.touches ? e.touches[0] : e;
     const wrapRect = viewWrap.getBoundingClientRect();
@@ -461,11 +449,10 @@ function enableGuideDragging(){
 
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
-let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
-  window.getLastShot = () => lastShot;  
-  let currentConfidence = null, lastMetrics = null;
-  const visionState = {};
-  const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+let stream=null, cvReady=false, pxPerCm=null, lastShot=null;
+window.getLastShot = () => lastShot;
+let currentConfidence = null, lastMetrics = null;
+const visionState = {};
  
   // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
@@ -476,29 +463,15 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
-  function setSource(s){
-    currentSource = s;
-    if(s === 'camera'){
-      v.classList.remove('hidden');
-      imgPrev.classList.add('hidden');
-      modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
-      modeBadge.classList.remove('err');
-      guideChest.style.cursor = 'default';
-guideLength.style.cursor = 'default';
-      setSaveEnabled(true);
-    } else {
-      imgPrev.classList.remove('hidden');
-      v.classList.add('hidden');
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
-      modeBadge.textContent = isDemo ? 'الوضع: صورة (عرض Demo — الحفظ مسموح)' : 'الوضع: صورة (عرض فقط — الحفظ غير مسموح)';
-      modeBadge.classList.toggle('err', !isDemo);
-      guideChest.style.cursor = 'ew-resize';
-      guideLength.style.cursor = 'ns-resize';
-      setSaveEnabled(isDemo);
-    }
-    syncGuideVisibility();
-   
-  }
+function setSource(){
+  v.classList.remove('hidden');
+  modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
+  modeBadge.classList.remove('err');
+  guideChest.style.cursor = 'default';
+  guideLength.style.cursor = 'default';
+  setSaveEnabled(true);
+  syncGuideVisibility();
+}
   function fireTrack(event, meta={}){
     try {
       window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
@@ -545,15 +518,8 @@ function getScaleFeedback(pxPerCm){
 function syncGuides(reset=false){
   if(!guideChest || !guideLength) return;
 
-  const baseW =
-    (!v.classList.contains('hidden') && v.videoWidth) ? v.videoWidth :
-    (!imgPrev.classList.contains('hidden') && imgPrev.naturalWidth) ? imgPrev.naturalWidth :
-    can.width;
-
-  const baseH =
-    (!v.classList.contains('hidden') && v.videoHeight) ? v.videoHeight :
-    (!imgPrev.classList.contains('hidden') && imgPrev.naturalHeight) ? imgPrev.naturalHeight :
-    can.height;
+  const baseW = v.videoWidth || can.width;
+  const baseH = v.videoHeight || can.height;
 
   const isWide = baseW > baseH;
 
@@ -581,12 +547,11 @@ guideChest.style.bottom = 'auto';
 updateLengthGuide();
   updateLiveOverlayMeasurements();
 }
- function syncGuideVisibility(){
-  const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
+function syncGuideVisibility(){
   if(viewWrap){
-    viewWrap.style.display = showLiveOverlay ? 'block' : 'none';
+    viewWrap.style.display = 'block';
   }
-}   
+}
   // ========= تهيئة الحقول =========
   initContextFields();
    syncGuideVisibility(); 
@@ -685,7 +650,7 @@ function measureBodyLengthPxFromOverlay(imgData){
       state: visionState,
       preview: v
     });
-   setSource('camera');
+     setSource();
 syncGuides(true);
 syncGuideVisibility();
     fireTrack('camera_start');
@@ -694,18 +659,6 @@ syncGuideVisibility();
     showToast('تعذّر فتح الكاميرا', true);
   }
 };
-
-  // ========= اختيار صورة =========
-  file.onchange = ()=>{
-    const f=file.files?.[0]; if(!f) return;
-    const url=URL.createObjectURL(f);
-    imgPrev.onload=()=>URL.revokeObjectURL(url);
-  imgPrev.src=url;
-setSource('image');
-syncGuides(true);
-fireTrack('image_selected', {size:f.size, type:f.type});
-  };
-
   // ========= التقاط/تقدير =========
  btnShot.onclick = async()=>{
 if (!window.cvReady || !window.cv) {
@@ -716,75 +669,38 @@ if (!window.cvReady || !window.cv) {
    let imgData = null;
 let sharpness = 0;
 let brightness = 0;
-let resizeRatio = 1;
 let scaleResult = null;
 
-    if(currentSource === 'camera'){
-      if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+    if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
 
-      const frames = await window.vision.captureBurst({
-        preview: v,
-        count: 5,
-        delayMs: 120
-      });
+    const frames = await window.vision.captureBurst({
+      preview: v,
+      count: 5,
+      delayMs: 120
+    });
 
-      const best = window.vision.pickBestFrame(frames);
-      if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
+    const best = window.vision.pickBestFrame(frames);
+    if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
 
-      sharpness = Math.round(best.sharpness || 0);
-      brightness = Math.round(best.brightness || 0);
+    sharpness = Math.round(best.sharpness || 0);
+    brightness = Math.round(best.brightness || 0);
 
-  const originalImgData = await dataURLToImageData(best.dataURL);
+    const originalImgData = await dataURLToImageData(best.dataURL);
 
-scaleResult = detectArucoPxPerCm(originalImgData);
-if(!scaleResult || !scaleResult.pxPerCm){
-  outScale.textContent='—';
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('لم تُكتشف علامة ArUco', true);
-}
-
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-resizeRatio = originalImgData.width / imgData.width;
-lastShot = imgData;
-pxPerCm = scaleResult.pxPerCm;
-outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-      
-    } else {
-      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
-
-      can.width = imgPrev.naturalWidth;
-      can.height = imgPrev.naturalHeight;
-    
-      ctx.drawImage(imgPrev,0,0,can.width,can.height);
-  const originalImgData = ctx.getImageData(0,0,can.width,can.height);
-
-scaleResult = detectArucoPxPerCm(originalImgData);
-if(!scaleResult || !scaleResult.pxPerCm){
-  outScale.textContent='—';
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('لم تُكتشف علامة ArUco', true);
-}
-
-imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-resizeRatio = originalImgData.width / imgData.width;
-lastShot = imgData;
-pxPerCm = scaleResult.pxPerCm;
-outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-
-const tempCanvas = document.createElement('canvas');
-tempCanvas.width = imgData.width;
-tempCanvas.height = imgData.height;
-tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
-
-      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
-      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
+    scaleResult = detectArucoPxPerCm(originalImgData);
+    if(!scaleResult || !scaleResult.pxPerCm){
+      outScale.textContent='—';
+      outSharp.textContent = sharpness ? String(sharpness) : '—';
+      outLight.textContent = brightness ? String(brightness) : '—';
+      outConf.textContent = '0%';
+      currentConfidence = 0;
+      return showToast('لم تُكتشف علامة ArUco', true);
     }
+
+    imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+    lastShot = imgData;
+    pxPerCm = scaleResult.pxPerCm;
+    outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
 
 const chestPx = measureChestDepthPxFromOverlay(imgData);
 if(!chestPx || !isFinite(chestPx)){
@@ -879,7 +795,7 @@ drawVisionOverlay({
   maskScore: 1
 });
  fireTrack('weight_estimated', {
-  source: currentSource,
+  source: 'camera',
   px_per_cm: pxPerCm,
   chest_depth_cm: chestDepthCm,
   body_length_cm: bodyLenCm,
@@ -924,18 +840,15 @@ drawVisionOverlay({
 if ((lastMetrics?.bodySideScore ?? 1) < 0.45) {
   return showToast('وضعية الحيوان غير مناسبة للحفظ — نحتاج لقطة جانبية أوضح.', true);
 }
-    // اشتراطات التشغيل المتفق عليها:
-if (currentSource === 'image' && !isDemo) {
-  return showToast('الحفظ للصورة غير مسموح — استخدم الكاميرا أو فعّل وضع Demo.', true);
-}
-if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0)) {
+    
+if (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0) {
   return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
 }
 
    const payload={
   eventType:'تقدير وزن',
   feature:'weight_estimation',
-  sourceMode: currentSource,
+  sourceMode: 'camera',
   method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
   marker_cm: ARUCO_MARKER_CM,
   px_per_cm: pxPerCm || null,
@@ -957,7 +870,7 @@ chest_depth_cm: Number(outChestW.textContent) || null,
 };
 
     pushContext();
-    fireTrack('weight_save_click', {animalNumber, eventDate, weightKg, source: currentSource});
+       fireTrack('weight_save_click', {animalNumber, eventDate, weightKg, source: 'camera'});
 
     try {
     const res = await postJSON('/api/events', payload);
@@ -971,10 +884,19 @@ chest_depth_cm: Number(outChestW.textContent) || null,
         const cfg = (await import('/js/firebase-config.js')).default;
         const app = initializeApp(cfg);
         const db  = getFirestore(app, 'murabbikdata');
-     await addDoc(collection(db,'events'), {
+    await addDoc(collection(db,'events'), {
+  eventType: 'تقدير وزن',
+  feature: 'weight_estimation',
+  sourceMode: 'camera',
+  marker_cm: ARUCO_MARKER_CM,
+  px_per_cm: payload.px_per_cm ?? null,
+  chest_depth_cm: payload.chest_depth_cm ?? null,
+  estimatedWeightKg: payload.estimatedWeightKg,
+  confidence: payload.confidence ?? null,
   animalNumber: payload.animalNumber,
   eventDate: payload.eventDate,
-  estimatedWeightKg: payload.estimatedWeightKg
+  source: location.pathname,
+  createdAt: serverTimestamp()
 });
         showToast('✅ تم حفظ حدث الوزن في Firestore (بديل)');
         fireTrack('weight_saved_firestore', {ok:true});
@@ -1044,9 +966,7 @@ chest_depth_cm: Number(outChestW.textContent) || null,
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
-function undistortImageData(imgData){
-  return imgData;
-} 
+
  function downscaleImageDataIfNeeded(imgData, maxSide = 1600){
   const w = imgData.width;
   const h = imgData.height;
