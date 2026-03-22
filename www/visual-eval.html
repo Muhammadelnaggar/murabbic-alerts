@@ -313,15 +313,34 @@
     t.event('page_view', { page: location.pathname, feature:'milking_traits_eval' });
 
     function todayCairo(){ const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'})); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
-    function getAnimalFromContext(){
-      const id=qs.get('animalId')||localStorage.getItem('currentAnimalId')||'';
-      const number=qs.get('number')||localStorage.getItem('currentAnimalNumber')||'';
-      const date=qs.get('date')||sessionStorage.getItem('currentEventDate')||localStorage.getItem('currentEventDate')||todayCairo();
-      if(id) localStorage.setItem('currentAnimalId',id);
-      if(number) localStorage.setItem('currentAnimalNumber',number);
-      if(date){ localStorage.setItem('currentEventDate',date); sessionStorage.setItem('currentEventDate',date); }
-      return {id,number,date};
-    }
+   function getAnimalFromContext(){
+  const id =
+    qs.get('animalId') ||
+    localStorage.getItem('currentAnimalId') ||
+    '';
+
+  const number =
+    qs.get('number') ||
+    qs.get('animalNumber') ||
+    localStorage.getItem('currentAnimalNumber') ||
+    '';
+
+  const date =
+    qs.get('eventDate') ||
+    qs.get('date') ||
+    sessionStorage.getItem('currentEventDate') ||
+    localStorage.getItem('currentEventDate') ||
+    todayCairo();
+
+  if(id) localStorage.setItem('currentAnimalId', id);
+  if(number) localStorage.setItem('currentAnimalNumber', number);
+  if(date){
+    localStorage.setItem('currentEventDate', date);
+    sessionStorage.setItem('currentEventDate', date);
+  }
+
+  return { id, number, date };
+}
 
     const anglesOrder=['udder-rear','side','front-body','teat-close'];
     const angleLabels={ 'udder-rear':'خلفية','side':'جانبية','front-body':'أمامية','teat-close':'قريبة ضرع' };
@@ -343,10 +362,10 @@
     const animalIdInput=$('#animalId'), eventDateInput=$('#eventDate'), saveBtn=$('#saveBtn'), backBtn=$('#backBtn');
    const animalNumberInput=$('#animalNumber'); const saveMsg=$('#saveMsg');
 
-  const ctx=getAnimalFromContext();
-if(animalIdInput) animalIdInput.value=ctx.id||'';
-if(eventDateInput) eventDateInput.value=ctx.date||todayCairo();
-if(animalNumberInput) animalNumberInput.value=ctx.number || '';
+const ctx=getAnimalFromContext();
+if(animalIdInput) animalIdInput.value = ctx.id || '';
+if(eventDateInput) eventDateInput.value = (ctx.date && /^\d{4}-\d{2}-\d{2}$/.test(ctx.date)) ? ctx.date : todayCairo();
+if(numberSpan) numberSpan.textContent = ctx.number || '—';
 
     function showMsg(text, ok=true){ if(!saveMsg) return; saveMsg.textContent=text; saveMsg.className='msg '+(ok?'ok':'err'); setTimeout(()=>{ saveMsg.className='msg'; }, 4000); }
 
