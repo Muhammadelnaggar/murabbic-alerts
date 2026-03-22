@@ -271,7 +271,6 @@ function markCvReady() {
 </div>
 <div class="chips">
   <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-  <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
   <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
 </div>
 <canvas id="awCan"></canvas>
@@ -444,7 +443,7 @@ function enableGuideDragging(){
 
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
-  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
+ const btnStart=$('awStart'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
 
@@ -693,181 +692,13 @@ syncGuides(true);
   showToast('حرّك الخطوط على جسم الحيوان قبل التقاط الصورة');  
 syncGuideVisibility();
     fireTrack('camera_start');
+    if(!autoRunning){
+  autoRunning = true;
+  setInterval(autoCaptureLoop, 800);
+}
   }catch(e){
     console.error(e);
     showToast('تعذّر فتح الكاميرا', true);
-  }
-};
-  // ========= التقاط/تقدير =========
- btnShot.onclick = async()=>{
-if (!window.cvReady || !window.cv) {
-  return showToast('OpenCV لم يكتمل تحميله بعد', true);
-}
-
-  try{
-   let imgData = null;
-let sharpness = 0;
-let brightness = 0;
-let scaleResult = null;
-
-    if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
-
-    const frames = await window.vision.captureBurst({
-      preview: v,
-      count: 5,
-      delayMs: 120
-    });
-
-    const best = window.vision.pickBestFrame(frames);
-    if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
-
-    sharpness = Math.round(best.sharpness || 0);
-    brightness = Math.round(best.brightness || 0);
-
-    const originalImgData = await dataURLToImageData(best.dataURL);
-
-    scaleResult = detectArucoPxPerCm(originalImgData);
-    if(!scaleResult || !scaleResult.pxPerCm){
-      outScale.textContent='—';
-      outSharp.textContent = sharpness ? String(sharpness) : '—';
-      outLight.textContent = brightness ? String(brightness) : '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      return showToast('لم تُكتشف علامة ArUco', true);
-    }
-
-    imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-    lastShot = imgData;
-    pxPerCm = scaleResult.pxPerCm;
-    outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-
-const chestPx = measureChestDepthPxFromOverlay(imgData);
-if(!chestPx || !isFinite(chestPx)){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('فشل قياس عمق الصدر من الأوفرلاي', true);
-}
-
-const chestDepthCm = chestPx / pxPerCm;
-outChestW.textContent = chestDepthCm.toFixed(1);
-
-const bodyLenPx = measureBodyLengthPxFromOverlay(imgData);
-if(!bodyLenPx || !isFinite(bodyLenPx)){
-  outSharp.textContent = sharpness ? String(sharpness) : '—';
-  outLight.textContent = brightness ? String(brightness) : '—';
-  outConf.textContent = '0%';
-  currentConfidence = 0;
-  return showToast('فشل قياس طول الجسم من الأوفرلاي', true);
-}
-
-const rawBodyLenCm = bodyLenPx / pxPerCm;
-
-if(chestDepthCm < 20 || chestDepthCm > 150){
-  return showToast('قياس الصدر غير منطقي — عدّل موضع الخط البرتقالي', true);
-}
-
-if(rawBodyLenCm < 40 || rawBodyLenCm > 260){
-  return showToast('قياس طول الجسم غير منطقي — عدّل موضع الخط الأزرق', true);
-}
-
-const species = getAnimalTypeHint();
-const girthFactor = getChestToGirthFactor(species);
-const bodyFactor = getBodyConditionFactor(chestDepthCm, rawBodyLenCm);
-const lengthFactor = getPerspectiveLengthFactor(scaleResult?.perspectivePenalty || 0);
-
-const heartGirthCm = chestDepthCm * girthFactor;
-const bodyLenCm = rawBodyLenCm * lengthFactor;
-
-const W = Math.round(
-  ((heartGirthCm * heartGirthCm * bodyLenCm) / 10800) * bodyFactor
-);
-outWeight.textContent = W + ' كجم';
-    updateLiveOverlayMeasurements();
-const confidence = scoreConfidence({
-  sharpness,
-  brightness,
-  pxPerCm,
-  chestCm: chestDepthCm,
-  weightKg: W,
-  hasMarker: true,
-  markerConsistency: scaleResult.sideConsistency,
-  markerPenalty: scaleResult.perspectivePenalty,
- bodySideScore: 0.7,
-  bodyPosePenalty: 0,
- maskScore: 0.7
-});
-   currentConfidence = confidence;
-lastMetrics = {
-  sharpness,
-  brightness,
-  chestCm: chestDepthCm,
-  heartGirthCm,
-  bodyLenCm,
-  rawBodyLenCm,
-  weightKg: W,
-  confidence,
-  markerConsistency: scaleResult.sideConsistency,
-  perspectivePenalty: scaleResult.perspectivePenalty,
-  species,
-  girthFactor,
-  bodyFactor,
-  lengthFactor,
-  bodySideScore: 0.7,
-  bodyPosePenalty: 0,
-  fillRatio: chestDepthCm && bodyLenCm ? (chestDepthCm / bodyLenCm) : null
-};
-outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
-outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
-outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
-
-const scaleInfo = getScaleFeedback(pxPerCm);
-let scaleQuality = scaleInfo?.quality || 'bad';
-let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
-
-if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20) {
-  scaleQuality = 'weak';
-  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
-}
-
-
-if (scaleQuality === 'bad') {
-  showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
-} else if (scaleQuality === 'weak') {
-  showToast('تم التقدير مبدئيًا — ' + scaleTip);
-} else if (confidence < 55) {
-  showToast('تم التقدير مبدئيًا — يفضّل إعادة لقطة أوضح لرفع الدقة');
-} else if (confidence < 75) {
-  showToast('تم التقدير — النتيجة جيدة ويمكن تحسينها بلقطة أوضح');
-} else {
-  showToast('✅ تم التقدير بجودة جيدة');
-}
-drawVisionOverlay({
-  imgData,
-  scaleResult,
-  poseResult: null,
-  chestPx,
-  confidence,
-  scaleTip,
-  markerConsistency: scaleResult.sideConsistency,
-  bodySideScore: 0.7,
-  maskScore: 0.7
-});
- fireTrack('weight_estimated', {
-  source: 'camera',
-  px_per_cm: pxPerCm,
-  chest_depth_cm: chestDepthCm,
-  body_length_cm: bodyLenCm,
-  weight_kg: W,
-  sharpness,
-  brightness,
-  confidence
-});
-
-  }catch(err){
-    console.error(err);
-    showToast('حدث خطأ أثناء التقدير', true);
   }
 };
 
@@ -976,6 +807,142 @@ if (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0) {
       }
     }
   };
+  let autoRunning = false;
+let lastAutoRun = 0;
+
+function isFrameGood({
+  sharpness,
+  brightness,
+  pxPerCm,
+  chestCm,
+  bodyLenCm,
+  scaleResult
+}){
+
+  if(!pxPerCm || pxPerCm < 4 || pxPerCm > 25) return false;
+
+  if(sharpness < 400) return false;
+
+  if(brightness < 60 || brightness > 220) return false;
+
+  if(!chestCm || chestCm < 20 || chestCm > 150) return false;
+
+  if(!bodyLenCm || bodyLenCm < 40 || bodyLenCm > 260) return false;
+
+  if((scaleResult?.sideConsistency ?? 0) < 0.75) return false;
+
+  if((scaleResult?.perspectivePenalty ?? 1) > 0.25) return false;
+
+  return true;
+}
+
+async function autoCaptureLoop(){
+
+  if(!v.videoWidth) return;
+
+  if(Date.now() - lastAutoRun < 1200) return;
+
+  lastAutoRun = Date.now();
+
+  try{
+
+    const frames = await window.vision.captureBurst({
+      preview: v,
+      count: 3,
+      delayMs: 80
+    });
+
+    const best = window.vision.pickBestFrame(frames);
+    if(!best?.dataURL) return;
+
+    const sharpness = Math.round(best.sharpness || 0);
+    const brightness = Math.round(best.brightness || 0);
+
+    const originalImgData = await dataURLToImageData(best.dataURL);
+
+    const scaleResult = detectArucoPxPerCm(originalImgData);
+    if(!scaleResult?.pxPerCm) return;
+
+    const pxPerCmLocal = scaleResult.pxPerCm;
+
+    const imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+
+    const chestPx = measureChestDepthPxFromOverlay(imgData);
+    const bodyLenPx = measureBodyLengthPxFromOverlay(imgData);
+
+    if(!chestPx || !bodyLenPx) return;
+
+    const chestCm = chestPx / pxPerCmLocal;
+    const bodyLenCm = bodyLenPx / pxPerCmLocal;
+
+    if(!isFrameGood({
+      sharpness,
+      brightness,
+      pxPerCm: pxPerCmLocal,
+      chestCm,
+      bodyLenCm,
+      scaleResult
+    })) return;
+
+    // ===== هنا اللقطة ممتازة =====
+    lastShot = imgData;
+    pxPerCm = pxPerCmLocal;
+
+    outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+
+    const species = getAnimalTypeHint();
+    const girthFactor = getChestToGirthFactor(species);
+    const bodyFactor = getBodyConditionFactor(chestCm, bodyLenCm);
+    const lengthFactor = getPerspectiveLengthFactor(scaleResult.perspectivePenalty || 0);
+
+    const heartGirthCm = chestCm * girthFactor;
+    const bodyLenAdj = bodyLenCm * lengthFactor;
+
+    const W = Math.round(
+      ((heartGirthCm * heartGirthCm * bodyLenAdj) / 10800) * bodyFactor
+    );
+
+    outChestW.textContent = chestCm.toFixed(1);
+    outWeight.textContent = W + ' كجم';
+
+    const confidence = scoreConfidence({
+      sharpness,
+      brightness,
+      pxPerCm: pxPerCmLocal,
+      chestCm,
+      weightKg: W,
+      hasMarker: true,
+      markerConsistency: scaleResult.sideConsistency,
+      markerPenalty: scaleResult.perspectivePenalty,
+      bodySideScore: 0.7,
+      bodyPosePenalty: 0,
+      maskScore: 0.7
+    });
+
+    currentConfidence = confidence;
+
+    outSharp.textContent = sharpness;
+    outLight.textContent = brightness;
+    outConf.textContent = confidence + '%';
+
+    showToast('📸 تم الالتقاط تلقائيًا');
+
+    drawVisionOverlay({
+      imgData,
+      scaleResult,
+      poseResult: null,
+      chestPx,
+      confidence,
+      scaleTip: '',
+      markerConsistency: scaleResult.sideConsistency,
+      bodySideScore: 0.7,
+      maskScore: 0.7
+    });
+
+  }catch(e){
+    console.warn(e);
+  }
+}  
  function scoreConfidence({
    sharpness=0,
   brightness=0,
