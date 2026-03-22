@@ -30,6 +30,10 @@
   background:#fff;
   margin-top:10px;
 }
+    video{
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
     .kpi .lbl{font-size:12px;color:#2b593a;}
@@ -270,10 +274,7 @@ function markCvReady() {
   <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
   <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
 </div>
-<div id="awWrap" style="position:relative">
-  <canvas id="awCan"></canvas>
-</div>
-
+<canvas id="awCan"></canvas>
    <div class="kpi3">
   <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
 <div class="kpi"><div class="lbl">عمق الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
@@ -449,7 +450,7 @@ function enableGuideDragging(){
 
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
-let stream=null, cvReady=false, pxPerCm=null, lastShot=null;
+let stream=null, pxPerCm=null, lastShot=null;
 window.getLastShot = () => lastShot;
 let currentConfidence = null, lastMetrics = null;
 const visionState = {};
@@ -467,8 +468,8 @@ function setSource(){
   v.classList.remove('hidden');
   modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
   modeBadge.classList.remove('err');
-  guideChest.style.cursor = 'default';
-  guideLength.style.cursor = 'default';
+guideChest.style.cursor = 'move';
+guideLength.style.cursor = 'default';
   setSaveEnabled(true);
   syncGuideVisibility();
 }
@@ -536,12 +537,11 @@ lengthEndYPct = isWide ? 40 : 42;
 }
 
 guideChest.style.left = chestGuideLeftPct + '%';
-  updateLiveOverlayMeasurements();
 guideChest.style.top = chestGuideTopPct + '%';
- updateLiveOverlayMeasurements();
 guideChest.style.width = chestGuideWidthPct + '%';
 guideChest.style.height = chestGuideHeightPct + '%';
-  updateLiveOverlayMeasurements();
+
+updateLiveOverlayMeasurements();
 guideChest.style.bottom = 'auto';
 
 updateLengthGuide();
@@ -652,6 +652,7 @@ function measureBodyLengthPxFromOverlay(imgData){
     });
      setSource();
 syncGuides(true);
+  showToast('حرّك الخطوط على جسم الحيوان قبل التقاط الصورة');  
 syncGuideVisibility();
     fireTrack('camera_start');
   }catch(e){
@@ -725,6 +726,10 @@ if(!bodyLenPx || !isFinite(bodyLenPx)){
 
 const bodyLenCm = bodyLenPx / pxPerCm;
 // تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
+ if(chestDepthCm < 20 || chestDepthCm > 150){
+  return showToast('قياس الصدر غير منطقي — عدّل موضع الخط البرتقالي', true);
+} 
+
 const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
 
 // معادلة الوزن القياسية
@@ -742,9 +747,9 @@ const confidence = scoreConfidence({
   hasMarker: true,
   markerConsistency: scaleResult.sideConsistency,
   markerPenalty: scaleResult.perspectivePenalty,
-  bodySideScore: 1,
+ bodySideScore: 0.7,
   bodyPosePenalty: 0,
-  maskScore: 1
+ maskScore: 0.7
 });
    currentConfidence = confidence;
 lastMetrics = {
@@ -962,7 +967,7 @@ chest_depth_cm: Number(outChestW.textContent) || null,
     const img = await window.vision.dataURLToImage(dataURL);
     can.width = img.naturalWidth;
     can.height = img.naturalHeight;
-    
+    ctx.clearRect(0,0,can.width,can.height);
     ctx.drawImage(img, 0, 0, can.width, can.height);
     return ctx.getImageData(0,0,can.width,can.height);
   }
