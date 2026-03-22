@@ -30,15 +30,63 @@
   background:#fff;
   margin-top:10px;
 }
-    video{
-  aspect-ratio: 16/9;
-  object-fit: cover;
+   video{
+  display:block;
+  width:100%;
+  height:100%;
+  aspect-ratio:auto;
+  object-fit:cover;
+  border:2px solid #63b32e;
+  border-radius:22px;
+  background:#fff;
 }
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
     .kpi .lbl{font-size:12px;color:#2b593a;}
     .kpi .val{font-weight:800;color:#14532d;font-size:16px;}
     .hint{font-size:12px;color:#555;margin-top:10px;}
+    .capture-shell{
+  display:grid;
+  grid-template-columns:1.6fr 1fr;
+  gap:14px;
+  margin-top:10px;
+}
+
+.camera-pane{
+  position:relative;
+  border-radius:24px;
+  overflow:hidden;
+  min-height:340px;
+}
+
+.guide-pane{
+  border:2px solid #f58220;
+  border-radius:24px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  background:#fff;
+}
+
+.guide-title{
+  font-size:22px;
+  font-weight:800;
+  text-align:center;
+  margin-bottom:12px;
+}
+
+.guide-text{
+  font-size:15px;
+  line-height:1.8;
+  text-align:center;
+}
+
+@media (max-width: 800px){
+  .capture-shell{
+    grid-template-columns:1fr;
+  }
+}
     .toast{position:fixed;bottom:12px;left:12px;right:12px;margin:auto;max-width:520px;background:#e8f5e9;
       color:#064e3b;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-weight:700;display:none}
     .err{background:#fff1f2;color:#7f1d1d;border-color:#fecdd3}
@@ -140,7 +188,10 @@ function markCvReady() {
     <!-- ✅ بادج وضع المصدر -->
     <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-<div id="viewWrap" style="position:relative;overflow:hidden;border-radius:12px">
+<div class="capture-shell">
+
+  <div class="camera-pane">
+    <div id="viewWrap" style="position:relative;overflow:hidden;height:100%">
   <!-- مصدر 1: كاميرا -->
   <video id="awCam" class="source" playsinline autoplay muted></video>
 
@@ -268,6 +319,19 @@ function markCvReady() {
   font:700 13px Cairo, sans-serif;
   pointer-events:none;
 ">الصدر: — px</div>
+    </div>
+  </div>
+
+  <div class="guide-pane">
+    <div class="guide-title">تعليمات الاستخدام</div>
+    <div class="guide-text">
+      وجّه الحيوان جانبيًا داخل الإطار<br>
+      ضع علامة القياس بجوار الكتف<br>
+      حافظ على إضاءة واضحة<br>
+      سيتم التقدير تلقائيًا
+    </div>
+  </div>
+
 </div>
 <div class="chips">
   <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
