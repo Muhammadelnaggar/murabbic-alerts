@@ -491,7 +491,45 @@ guideLength.style.cursor = 'default';
   el.classList.remove('err');
   if(level === 'warn') el.classList.add('err');
 }
+function getAnimalTypeHint(){
+  const q = new URLSearchParams(location.search);
+  const raw =
+    q.get('kind') ||
+    q.get('animalType') ||
+    q.get('type') ||
+    q.get('species') ||
+    '';
 
+  const s = String(raw).trim().toLowerCase();
+
+  if (s.includes('buff') || s.includes('جام') || s.includes('buffalo')) return 'buffalo';
+  if (s.includes('cow') || s.includes('بق') || s.includes('cattle')) return 'cow';
+  return 'unknown';
+}
+
+function getChestToGirthFactor(species='unknown'){
+  if (species === 'buffalo') return 2.72;
+  if (species === 'cow') return 2.60;
+  return 2.66;
+}
+
+function getBodyConditionFactor(chestDepthCm, bodyLenCm){
+  if (!chestDepthCm || !bodyLenCm) return 1;
+  const ratio = chestDepthCm / bodyLenCm;
+
+  if (ratio >= 0.42) return 1.04;
+  if (ratio >= 0.37) return 1.02;
+  if (ratio >= 0.31) return 1.00;
+  if (ratio >= 0.27) return 0.97;
+  return 0.94;
+}
+
+function getPerspectiveLengthFactor(perspectivePenalty=0){
+  if (perspectivePenalty <= 0.06) return 1.00;
+  if (perspectivePenalty <= 0.12) return 1.015;
+  if (perspectivePenalty <= 0.18) return 1.03;
+  return 1.05;
+}
 function getScaleFeedback(pxPerCm){
   if(!pxPerCm || !isFinite(pxPerCm)){
     return {
@@ -724,17 +762,26 @@ if(!bodyLenPx || !isFinite(bodyLenPx)){
   return showToast('فشل قياس طول الجسم من الأوفرلاي', true);
 }
 
-const bodyLenCm = bodyLenPx / pxPerCm;
-// تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
- if(chestDepthCm < 20 || chestDepthCm > 150){
+const rawBodyLenCm = bodyLenPx / pxPerCm;
+
+if(chestDepthCm < 20 || chestDepthCm > 150){
   return showToast('قياس الصدر غير منطقي — عدّل موضع الخط البرتقالي', true);
-} 
+}
 
-const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
+if(rawBodyLenCm < 40 || rawBodyLenCm > 260){
+  return showToast('قياس طول الجسم غير منطقي — عدّل موضع الخط الأزرق', true);
+}
 
-// معادلة الوزن القياسية
+const species = getAnimalTypeHint();
+const girthFactor = getChestToGirthFactor(species);
+const bodyFactor = getBodyConditionFactor(chestDepthCm, rawBodyLenCm);
+const lengthFactor = getPerspectiveLengthFactor(scaleResult?.perspectivePenalty || 0);
+
+const heartGirthCm = chestDepthCm * girthFactor;
+const bodyLenCm = rawBodyLenCm * lengthFactor;
+
 const W = Math.round(
-  (heartGirthCm * heartGirthCm * bodyLenCm) / 10800
+  ((heartGirthCm * heartGirthCm * bodyLenCm) / 10800) * bodyFactor
 );
 outWeight.textContent = W + ' كجم';
     updateLiveOverlayMeasurements();
@@ -758,10 +805,18 @@ lastMetrics = {
   chestCm: chestDepthCm,
   heartGirthCm,
   bodyLenCm,
+  rawBodyLenCm,
   weightKg: W,
   confidence,
   markerConsistency: scaleResult.sideConsistency,
-  perspectivePenalty: scaleResult.perspectivePenalty
+  perspectivePenalty: scaleResult.perspectivePenalty,
+  species,
+  girthFactor,
+  bodyFactor,
+  lengthFactor,
+  bodySideScore: 0.7,
+  bodyPosePenalty: 0,
+  fillRatio: chestDepthCm && bodyLenCm ? (chestDepthCm / bodyLenCm) : null
 };
 outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
 outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
@@ -796,8 +851,8 @@ drawVisionOverlay({
   confidence,
   scaleTip,
   markerConsistency: scaleResult.sideConsistency,
-  bodySideScore: 1,
-  maskScore: 1
+  bodySideScore: 0.7,
+  maskScore: 0.7
 });
  fireTrack('weight_estimated', {
   source: 'camera',
@@ -856,11 +911,17 @@ if (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0) {
   sourceMode: 'camera',
   method: 'murabbik_vision_v1(aruco+burst+bestframe+mask)',
   marker_cm: ARUCO_MARKER_CM,
-  px_per_cm: pxPerCm || null,
-chest_depth_cm: Number(outChestW.textContent) || null,
+   px_per_cm: pxPerCm || null,
+  chest_depth_cm: lastMetrics?.chestCm ?? null,
+  heart_girth_cm: lastMetrics?.heartGirthCm ?? null,
+  body_length_cm: lastMetrics?.bodyLenCm ?? null,
   estimatedWeightKg: weightKg,
   confidence: currentConfidence,
   quality: {
+    species: lastMetrics?.species ?? null,
+  girthFactor: lastMetrics?.girthFactor ?? null,
+  bodyFactor: lastMetrics?.bodyFactor ?? null,
+  lengthFactor: lastMetrics?.lengthFactor ?? null,  
   sharpness: lastMetrics?.sharpness || null,
   brightness: lastMetrics?.brightness || null,
   markerConsistency: lastMetrics?.markerConsistency ?? null,
@@ -889,15 +950,18 @@ chest_depth_cm: Number(outChestW.textContent) || null,
         const cfg = (await import('/js/firebase-config.js')).default;
         const app = initializeApp(cfg);
         const db  = getFirestore(app, 'murabbikdata');
-    await addDoc(collection(db,'events'), {
+   await addDoc(collection(db,'events'), {
   eventType: 'تقدير وزن',
   feature: 'weight_estimation',
   sourceMode: 'camera',
   marker_cm: ARUCO_MARKER_CM,
   px_per_cm: payload.px_per_cm ?? null,
   chest_depth_cm: payload.chest_depth_cm ?? null,
+  heart_girth_cm: payload.heart_girth_cm ?? null,
+  body_length_cm: payload.body_length_cm ?? null,
   estimatedWeightKg: payload.estimatedWeightKg,
   confidence: payload.confidence ?? null,
+  quality: payload.quality ?? null,
   animalNumber: payload.animalNumber,
   eventDate: payload.eventDate,
   source: location.pathname,
