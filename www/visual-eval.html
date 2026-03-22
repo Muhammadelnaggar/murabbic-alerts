@@ -459,7 +459,132 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
     }
     async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); }}
     function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
+    async function loadImageFromDataUrl(dataUrl){
+  return await new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
 
+function imageStatsFromDataUrl(dataUrl){
+  return new Promise(async (resolve, reject)=>{
+    try{
+      const img = await loadImageFromDataUrl(dataUrl);
+      const c = document.createElement('canvas');
+      const maxSide = 320;
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+      c.width = w; c.height = h;
+
+      const ctx = c.getContext('2d', { willReadFrequently:true });
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const { data } = ctx.getImageData(0, 0, w, h);
+
+      let sumL = 0, sumL2 = 0;
+      let edgeSum = 0;
+      let subjectCount = 0;
+
+      const lum = new Float32Array(w * h);
+
+      for(let y=0; y<h; y++){
+        for(let x=0; x<w; x++){
+          const i = (y*w + x) * 4;
+          const r = data[i], g = data[i+1], b = data[i+2];
+          const L = 0.2126*r + 0.7152*g + 0.0722*b;
+          lum[y*w + x] = L;
+          sumL += L;
+          sumL2 += L * L;
+        }
+      }
+
+      const mean = sumL / (w*h);
+      const variance = Math.max(0, (sumL2 / (w*h)) - (mean * mean));
+      const contrast = Math.sqrt(variance);
+
+      // تقدير الحدة: متوسط فرق الجيران
+      let sharpness = 0, sharpN = 0;
+      for(let y=1; y<h-1; y++){
+        for(let x=1; x<w-1; x++){
+          const p = lum[y*w + x];
+          const dx = Math.abs(p - lum[y*w + (x+1)]);
+          const dy = Math.abs(p - lum[(y+1)*w + x]);
+          sharpness += dx + dy;
+          sharpN += 2;
+        }
+      }
+      sharpness = sharpN ? (sharpness / sharpN) : 0;
+
+      // تقدير بسيط لمساحة الجسم: أي بكسل أغمق من الخلفية العامة قليلًا
+      const threshold = mean - 12;
+      for(let i=0; i<lum.length; i++){
+        if(lum[i] < threshold) subjectCount++;
+      }
+      const subjectFill = subjectCount / lum.length;
+
+      resolve({
+        width: w,
+        height: h,
+        brightness: mean,   // 0..255
+        contrast,           // كلما زاد أفضل
+        sharpness,          // كلما زاد أفضل
+        subjectFill         // نسبة ملء الجسم التقريبية
+      });
+    }catch(err){
+      reject(err);
+    }
+  });
+}
+
+function qualityThresholds(angle){
+  const base = {
+    minBrightness: 55,
+    maxBrightness: 210,
+    minContrast: 18,
+    minSharpness: 9,
+    minFill: 0.08,
+    maxFill: 0.72
+  };
+
+  if(angle === 'teat-close'){
+    return { ...base, minSharpness: 11, minFill: 0.12, maxFill: 0.85 };
+  }
+  if(angle === 'side'){
+    return { ...base, minFill: 0.12, maxFill: 0.65 };
+  }
+  if(angle === 'udder-rear'){
+    return { ...base, minFill: 0.10, maxFill: 0.60 };
+  }
+  return base;
+}
+
+async function qualityCheck(dataUrl, angle){
+  const s = await imageStatsFromDataUrl(dataUrl);
+  const th = qualityThresholds(angle);
+  const reasons = [];
+
+  if(s.brightness < th.minBrightness) reasons.push('الإضاءة منخفضة');
+  if(s.brightness > th.maxBrightness) reasons.push('الإضاءة عالية زيادة');
+  if(s.contrast < th.minContrast) reasons.push('الصورة باهتة');
+  if(s.sharpness < th.minSharpness) reasons.push('الصورة غير واضحة');
+  if(s.subjectFill < th.minFill) reasons.push('اقترب أكثر من الحيوان');
+  if(s.subjectFill > th.maxFill) reasons.push('ابتعد قليلًا عن الحيوان');
+
+  const ok = reasons.length === 0;
+
+  return {
+    ok,
+    stats: s,
+    reasons,
+    summary: ok
+      ? '✅ اللقطة مقبولة للتقييم'
+      : `⚠️ اللقطة غير مناسبة: ${reasons.join('، ')}`
+  };
+}
     function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
 
     // ===== الحسابات (جاهزة للذكاء الاصطناعي) =====
@@ -468,15 +593,39 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
     async function computeKPIs(dataUrl, angle){
       const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
       const k={};
-      if(angle==='udder-rear'){
-        k.udderCleft=seededValue(seed+10,60,95);
-        k.udderBalanceFrontRear=seededValue(seed+11,60,95); // توازن النصف الأمامي والخلفي
-        k.teatDistribution=seededValue(seed+12,60,95);
-        k.teatSize=seededValue(seed+13,60,95);
-      } else if(angle==='side'){
-        k.backStraight=seededValue(seed+21,60,95);
-        k.rumpAngle=seededValue(seed+22,60,95);
-        k.bodyDepth=seededValue(seed+23,60,95);
+     if(angle==='udder-rear'){
+  const rear = await analyzeUdderRearImage(dataUrl);
+
+  if(!state.analysis) state.analysis = {};
+  state.analysis.rear = rear;
+
+  if(!rear.ok){
+    k.udderCleft = 55;
+    k.udderBalanceFrontRear = 55;
+    k.teatDistribution = 55;
+    k.teatSize = 55;
+  }else{
+    k.udderCleft = rear.udderCleft;
+    k.udderBalanceFrontRear = rear.udderBalanceFrontRear;
+    k.teatDistribution = rear.teatDistribution;
+    k.teatSize = rear.teatSize;
+  }
+}
+  const side = await analyzeSideImage(dataUrl);
+
+  if(!state.analysis) state.analysis = {};
+  state.analysis.side = side;
+
+  if(!side.ok){
+    k.backStraight = 55;
+    k.rumpAngle = 55;
+    k.bodyDepth = 55;
+  }else{
+    k.backStraight = side.backStraight;
+    k.rumpAngle = side.rumpAngle;
+    k.bodyDepth = side.bodyDepth;
+  }
+}
       } else if(angle==='front-body'){
         k.chestWidth=seededValue(seed+31,60,95);
         k.frontLegsParallel=seededValue(seed+32,60,95);
@@ -489,6 +638,145 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
     }
 
     // الأوزان: 40% ضرع، 30% ظهر/رامب/عمق، 20% صدر/أرجل أمامية، 10% أنوثة
+    async function analyzeSideImage(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+
+  const c = document.createElement('canvas');
+  const maxW = 420;
+  const scale = Math.min(1, maxW / img.width);
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  c.width = w;
+  c.height = h;
+
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  const lum = new Float32Array(w * h);
+  let sum = 0;
+
+  for(let y=0; y<h; y++){
+    for(let x=0; x<w; x++){
+      const i = (y * w + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const L = 0.2126*r + 0.7152*g + 0.0722*b;
+      lum[y*w + x] = L;
+      sum += L;
+    }
+  }
+
+  const mean = sum / (w*h);
+  const thr = mean - 10;
+
+  // mask بسيط للجسم
+  const mask = new Uint8Array(w * h);
+  let count = 0;
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+
+  for(let y=0; y<h; y++){
+    for(let x=0; x<w; x++){
+      const idx = y*w + x;
+      if(lum[idx] < thr){
+        mask[idx] = 1;
+        count++;
+        if(x < minX) minX = x;
+        if(y < minY) minY = y;
+        if(x > maxX) maxX = x;
+        if(y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if(count < (w*h*0.05)){
+    return {
+      ok:false,
+      backStraight:0,
+      rumpAngle:0,
+      bodyDepth:0,
+      subjectFill: count/(w*h)
+    };
+  }
+
+  const bw = Math.max(1, maxX - minX + 1);
+  const bh = Math.max(1, maxY - minY + 1);
+  const subjectFill = count / (w*h);
+
+  // upper contour
+  const topLine = [];
+  for(let x=minX; x<=maxX; x++){
+    let found = -1;
+    for(let y=minY; y<=maxY; y++){
+      if(mask[y*w + x]){
+        found = y;
+        break;
+      }
+    }
+    topLine.push(found);
+  }
+
+  // smoothing
+  const smooth = topLine.map((_, i)=>{
+    let s=0, n=0;
+    for(let j=i-2; j<=i+2; j++){
+      if(j>=0 && j<topLine.length && topLine[j]>=0){
+        s += topLine[j];
+        n++;
+      }
+    }
+    return n ? s/n : -1;
+  });
+
+  // topline straightness from front 25% to rear 75%
+  const a = Math.floor(smooth.length * 0.25);
+  const b = Math.floor(smooth.length * 0.75);
+  const seg = smooth.slice(a, b).filter(v => v >= 0);
+
+  let meanTop = 0;
+  for(const v of seg) meanTop += v;
+  meanTop = seg.length ? meanTop / seg.length : 0;
+
+  let varTop = 0;
+  for(const v of seg) varTop += (v - meanTop) * (v - meanTop);
+  varTop = seg.length ? varTop / seg.length : 999;
+
+  // كلما قل التذبذب زادت الاستقامة
+  let backStraight = Math.round(95 - Math.min(35, Math.sqrt(varTop) * 4));
+  backStraight = Math.max(50, Math.min(95, backStraight));
+
+  // rump angle: فرق آخر الظهر عن أوله
+  const first = smooth[Math.floor(smooth.length * 0.20)];
+  const last  = smooth[Math.floor(smooth.length * 0.80)];
+  let slope = (last >= 0 && first >= 0) ? (last - first) / Math.max(1, (smooth.length * 0.60)) : 0;
+  let rumpAngle = Math.round(88 - Math.min(28, Math.abs(slope) * 220));
+  rumpAngle = Math.max(55, Math.min(95, rumpAngle));
+
+  // body depth: عمق الجسم عند منتصف الطول
+  const midX = Math.floor((minX + maxX) / 2);
+  let topY = -1, botY = -1;
+  for(let y=minY; y<=maxY; y++){
+    if(mask[y*w + midX]){
+      if(topY < 0) topY = y;
+      botY = y;
+    }
+  }
+  const depthPx = (topY >= 0 && botY >= 0) ? (botY - topY + 1) : 0;
+  const depthRatio = depthPx / Math.max(1, bh);
+
+  let bodyDepth = Math.round(55 + Math.min(40, depthRatio * 55));
+  bodyDepth = Math.max(50, Math.min(95, bodyDepth));
+
+  return {
+    ok:true,
+    backStraight,
+    rumpAngle,
+    bodyDepth,
+    subjectFill,
+    bbox:{ minX, minY, maxX, maxY, bw, bh }
+  };
+}
+    
     function computeOverallFromState(){
       const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
       const SUB={
@@ -506,7 +794,205 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
       const overall=Math.round((U*WEIGHTS.UDDER + B*WEIGHTS.BACK_RUMP + F*WEIGHTS.FRONT_LEGS + FE*WEIGHTS.FEMININITY)/total);
       return {overall,U,B,F,FE};
     }
+   async function analyzeUdderRearImage(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
 
+  const c = document.createElement('canvas');
+  const maxW = 420;
+  const scale = Math.min(1, maxW / img.width);
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  c.width = w;
+  c.height = h;
+
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  const lum = new Float32Array(w * h);
+  let sum = 0;
+
+  for(let y=0; y<h; y++){
+    for(let x=0; x<w; x++){
+      const i = (y*w + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const L = 0.2126*r + 0.7152*g + 0.0722*b;
+      lum[y*w + x] = L;
+      sum += L;
+    }
+  }
+
+  const mean = sum / (w*h);
+  const thr = mean - 8;
+
+  const mask = new Uint8Array(w*h);
+  let count = 0;
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+
+  for(let y=0; y<h; y++){
+    for(let x=0; x<w; x++){
+      const idx = y*w + x;
+      if(lum[idx] < thr){
+        mask[idx] = 1;
+        count++;
+        if(x < minX) minX = x;
+        if(y < minY) minY = y;
+        if(x > maxX) maxX = x;
+        if(y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if(count < (w*h*0.04)){
+    return {
+      ok:false,
+      udderCleft:0,
+      udderBalanceFrontRear:0,
+      teatDistribution:0,
+      teatSize:0
+    };
+  }
+
+  const bw = Math.max(1, maxX - minX + 1);
+  const bh = Math.max(1, maxY - minY + 1);
+  const cx = Math.floor((minX + maxX) / 2);
+
+  // نركز على الجزء السفلي الأوسط حيث الضرع غالبًا
+  const y1 = Math.floor(minY + bh * 0.35);
+  const y2 = Math.floor(minY + bh * 0.95);
+  const x1 = Math.floor(minX + bw * 0.15);
+  const x2 = Math.floor(minX + bw * 0.85);
+
+  // balance يمين/يسار
+  let leftCount = 0, rightCount = 0;
+  for(let y=y1; y<=y2; y++){
+    for(let x=x1; x<=x2; x++){
+      if(mask[y*w + x]){
+        if(x < cx) leftCount++;
+        else rightCount++;
+      }
+    }
+  }
+  const balanceRatio = Math.min(leftCount, rightCount) / Math.max(1, Math.max(leftCount, rightCount));
+  let udderBalance = Math.round(55 + balanceRatio * 40);
+  udderBalance = Math.max(50, Math.min(95, udderBalance));
+
+  // udder cleft: نبحث عن وادٍ فاتح/فاصل قرب المنتصف
+  let centerDark = 0, sideDark = 0, n = 0;
+  const cleftBand = Math.max(2, Math.round(bw * 0.05));
+  for(let y=y1; y<=y2; y++){
+    const c0 = Math.max(x1, cx - cleftBand);
+    const c1 = Math.min(x2, cx + cleftBand);
+
+    let rowCenter = 0, rowCenterN = 0;
+    for(let x=c0; x<=c1; x++){
+      rowCenter += lum[y*w + x];
+      rowCenterN++;
+    }
+
+    let rowSides = 0, rowSidesN = 0;
+    for(let x=x1; x<x1 + Math.round((x2-x1)*0.2); x++){
+      rowSides += lum[y*w + x];
+      rowSidesN++;
+    }
+    for(let x=x2 - Math.round((x2-x1)*0.2); x<=x2; x++){
+      rowSides += lum[y*w + x];
+      rowSidesN++;
+    }
+
+    if(rowCenterN && rowSidesN){
+      centerDark += rowCenter / rowCenterN;
+      sideDark += rowSides / rowSidesN;
+      n++;
+    }
+  }
+
+  const cleftContrast = n ? ((centerDark/n) - (sideDark/n)) : 0;
+  let udderCleft = Math.round(72 + Math.max(-12, Math.min(20, cleftContrast * 1.2)));
+  udderCleft = Math.max(50, Math.min(95, udderCleft));
+
+  // teat distribution: نبحث عن نقاط سفلية داكنة منفصلة تقريبًا
+  const teatCandidates = [];
+  const teatY1 = Math.floor(minY + bh * 0.60);
+  const teatY2 = Math.floor(minY + bh * 0.98);
+
+  for(let x=x1; x<=x2; x++){
+    let bottomMost = -1;
+    for(let y=teatY2; y>=teatY1; y--){
+      if(mask[y*w + x]){
+        bottomMost = y;
+        break;
+      }
+    }
+    teatCandidates.push(bottomMost);
+  }
+
+  const peaks = [];
+  for(let i=2; i<teatCandidates.length-2; i++){
+    const v = teatCandidates[i];
+    if(v < 0) continue;
+    if(
+      v > teatCandidates[i-1] &&
+      v >= teatCandidates[i+1] &&
+      v > teatCandidates[i-2] &&
+      v >= teatCandidates[i+2]
+    ){
+      peaks.push({ x: x1 + i, y: v });
+    }
+  }
+
+  // دمج القمم المتقاربة
+  const merged = [];
+  for(const p of peaks){
+    const last = merged[merged.length - 1];
+    if(last && Math.abs(last.x - p.x) < Math.round(bw * 0.08)){
+      last.x = Math.round((last.x + p.x) / 2);
+      last.y = Math.max(last.y, p.y);
+    }else{
+      merged.push({ ...p });
+    }
+  }
+
+  let teatDistribution = 60;
+  if(merged.length >= 2){
+    const xs = merged.map(p => p.x).sort((a,b)=>a-b);
+    const gaps = [];
+    for(let i=1; i<xs.length; i++) gaps.push(xs[i] - xs[i-1]);
+
+    let gapMean = gaps.reduce((a,b)=>a+b,0) / Math.max(1, gaps.length);
+    let gapVar = 0;
+    for(const g of gaps) gapVar += (g - gapMean) * (g - gapMean);
+    gapVar = gaps.length ? gapVar / gaps.length : 999;
+
+    teatDistribution = Math.round(88 - Math.min(28, Math.sqrt(gapVar) * 0.9));
+    teatDistribution = Math.max(55, Math.min(95, teatDistribution));
+  }
+
+  // teat size: عمق البروز لأسفل
+  let teatSize = 60;
+  if(merged.length){
+    const protrusions = merged.map(p => p.y - teatY1);
+    const avgP = protrusions.reduce((a,b)=>a+b,0) / protrusions.length;
+    teatSize = Math.round(55 + Math.min(35, avgP / Math.max(1, bh) * 120));
+    teatSize = Math.max(50, Math.min(95, teatSize));
+  }
+
+  return {
+    ok:true,
+    udderCleft,
+    udderBalanceFrontRear: udderBalance,
+    teatDistribution,
+    teatSize,
+    details:{
+      leftCount,
+      rightCount,
+      balanceRatio,
+      cleftContrast,
+      teatPeaks: merged.length
+    }
+  };
+}
     function verbal(m){ if(m>=85) return 'ممتاز'; if(m>=75) return 'جيد جدًا'; if(m>=60) return 'متوسط'; return 'ضعيف'; }
     function groupWidget(title,pct){ return `<div class="rowg"><div>${title}</div><div class="pct">${pct}%</div><div class="bar" style="grid-column:1 / span 2"><div class="fill" style="width:${pct}%;background:#86efac"></div></div></div>`; }
 
@@ -537,13 +1023,79 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
     $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
 
     uploadBtn.addEventListener('click', ()=> uploadInput.click());
-    uploadInput.addEventListener('change', e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const dataUrl=r.result; state.captures[state.currentAngle]=dataUrl; state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_upload',{angle:state.currentAngle}); }; r.readAsDataURL(f); uploadInput.value=''; });
+   uploadInput.addEventListener('change', e=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
 
-    captureToggleBtn.addEventListener('click', async ()=>{
-      const has=!!state.captures[state.currentAngle];
-      if(has){ state.captures[state.currentAngle]=null; state.k[state.currentAngle]=null; renderThumbs(); updateButtons(); renderScore(); t.event('capture_clear',{angle:state.currentAngle}); }
-      else{ const url=dataURLFromVideo(); state.captures[state.currentAngle]=url; state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_take',{angle:state.currentAngle}); }
-    });
+  const r = new FileReader();
+  r.onload = async ()=>{
+    const dataUrl = r.result;
+
+    const qc = await qualityCheck(dataUrl, state.currentAngle);
+    if(!qc.ok){
+      helperText.textContent = qc.summary;
+      t.event('capture_rejected', { angle: state.currentAngle, reason: qc.reasons.join(' | ') });
+      uploadInput.value = '';
+      return;
+    }
+
+    helperText.textContent = qc.summary;
+    state.captures[state.currentAngle] = dataUrl;
+    state.k[state.currentAngle] = await computeKPIs(dataUrl, state.currentAngle);
+    if(state.currentAngle === 'udder-rear' && state.analysis?.rear?.ok){
+  helperText.textContent =
+    `✅ الخلفية مقبولة — تماثل الضرع: ${state.analysis.rear.udderBalanceFrontRear}%، توزيع الحلمات: ${state.analysis.rear.teatDistribution}%، الشق الوسطي: ${state.analysis.rear.udderCleft}%`;
+}
+    if(state.currentAngle === 'udder-rear' && state.analysis?.rear?.ok){
+  helperText.textContent =
+    `✅ الخلفية مقبولة — تماثل الضرع: ${state.analysis.rear.udderBalanceFrontRear}%، توزيع الحلمات: ${state.analysis.rear.teatDistribution}%، الشق الوسطي: ${state.analysis.rear.udderCleft}%`;
+}
+    if(state.currentAngle === 'side' && state.analysis?.side?.ok){
+  helperText.textContent = `✅ الجانبية مقبولة — استقامة الظهر: ${state.analysis.side.backStraight}%، زاوية الرامب: ${state.analysis.side.rumpAngle}%، عمق الجسم: ${state.analysis.side.bodyDepth}%`;
+}
+    renderThumbs();
+    updateButtons();
+    renderScore();
+    t.event('capture_upload', { angle: state.currentAngle });
+  };
+  r.readAsDataURL(f);
+  uploadInput.value = '';
+});
+
+   captureToggleBtn.addEventListener('click', async ()=>{
+  const has = !!state.captures[state.currentAngle];
+
+  if(has){
+    state.captures[state.currentAngle] = null;
+    state.k[state.currentAngle] = null;
+    renderThumbs();
+    updateButtons();
+    renderScore();
+    helperText.textContent = helperByAngle[state.currentAngle];
+    t.event('capture_clear', { angle: state.currentAngle });
+    return;
+  }
+
+  const url = dataURLFromVideo();
+  const qc = await qualityCheck(url, state.currentAngle);
+
+  if(!qc.ok){
+    helperText.textContent = qc.summary;
+    t.event('capture_rejected', { angle: state.currentAngle, reason: qc.reasons.join(' | ') });
+    return;
+  }
+
+  helperText.textContent = qc.summary;
+  state.captures[state.currentAngle] = url;
+  state.k[state.currentAngle] = await computeKPIs(url, state.currentAngle);
+     if(state.currentAngle === 'side' && state.analysis?.side?.ok){
+  helperText.textContent = `✅ الجانبية مقبولة — استقامة الظهر: ${state.analysis.side.backStraight}%، زاوية الرامب: ${state.analysis.side.rumpAngle}%، عمق الجسم: ${state.analysis.side.bodyDepth}%`;
+}
+  renderThumbs();
+  updateButtons();
+  renderScore();
+  t.event('capture_take', { angle: state.currentAngle });
+});
 
     nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
     toggleFlash.addEventListener('click', toggleTorch);
@@ -588,13 +1140,22 @@ if (evalDateInput) evalDateInput.value = ctx.date || todayCairo();
       if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='جارٍ الحفظ…'; }
 
       try{
-        const res = window.computeOverallFromState();
-        const overall = res?.overall || 0;
-        const U = res?.U || 0, B = res?.B || 0, F = res?.F || 0, FE = res?.FE || 0;
-        if(!overall){
-          setMsg('⚠️ التقط صورة واحدة على الأقل لحساب النتيجة', false);
-          return;
-        }
+       const mustHave = ['side', 'udder-rear'];
+const missing = mustHave.filter(a => !window.state?.captures?.[a]);
+
+if(missing.length){
+  setMsg('⚠️ يلزم على الأقل لقطة جانبية ولقطة خلفية قبل الحفظ', false);
+  return;
+}
+
+const res = window.computeOverallFromState();
+const overall = res?.overall || 0;
+const U = res?.U || 0, B = res?.B || 0, F = res?.F || 0, FE = res?.FE || 0;
+
+if(!overall){
+  setMsg('⚠️ لا يمكن حساب النتيجة الآن', false);
+  return;
+}
 
         // 1) إعداد فايربيز: نأخذ db و auth من firebase-config.js
         const mod = await import('./js/firebase-config.js');          // يوفّر db, auth, ensureAuth
