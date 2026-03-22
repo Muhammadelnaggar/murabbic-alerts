@@ -166,6 +166,13 @@ body.clean-capture .guide-pane{
     padding:8px 10px;
   }
 }
+  /* إخفاء أي بقايا أوفرلاي خارج شاشة الكاميرا */
+#mainCard #guideChest,
+#mainCard #guideLength,
+#mainCard #liveLenTag,
+#mainCard #liveChestTag{
+  display:none !important;
+}
   </style>
 </head>
 <body>
@@ -241,7 +248,7 @@ function markCvReady() {
   </div>
 </header>
 
-  <section class="card">
+ <section id="mainCard" class="card">
     <!-- رقم الحيوان + التاريخ -->
     <div class="row">
       <div>
@@ -261,161 +268,7 @@ function markCvReady() {
 
   <div class="camera-pane">
     <div id="viewWrap" style="position:relative;overflow:hidden;height:100%">
-  <!-- مصدر 1: كاميرا -->
-  <video id="awCam" class="source" playsinline autoplay muted></video>
-
-
-  <!-- Overlay guides فوق الكاميرا/الصورة -->
-<div id="guideChest" style="
-    position:absolute;
-    left:32%;
-    top:18%;
-    width:10%;
-    height:42%;
-    border:none;
-    background:transparent;
-    border-radius:10px;
-    pointer-events:auto;
-    touch-action:none;
-    cursor:move;
-    z-index:8;
-  ">
-  <div style="
-    position:absolute;
-    top:0;
-    bottom:0;
-    left:50%;
-    transform:translateX(-50%);
-    border-left:3px dashed #f59e0b;
-    pointer-events:none;
-  "></div>
-  <div id="guideChestTop" style="
-    position:absolute;
-    top:-11px;
-    left:50%;
-    transform:translateX(-50%);
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    background:#f59e0b;
-    border:2px solid #fff;
-    box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:ns-resize;
-    pointer-events:auto;
-    touch-action:none;
-  "></div>
-
-  <div id="guideChestBottom" style="
-    position:absolute;
-    bottom:-11px;
-    left:50%;
-    transform:translateX(-50%);
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    background:#f59e0b;
-    border:2px solid #fff;
-    box-shadow:0 1px 6px rgba(0,0,0,.25);
-    cursor:ns-resize;
-    pointer-events:auto;
-    touch-action:none;
-  "></div>
-</div>
-
-  <div id="guideLength" style="
-    position:absolute;
-    left:18%;
-    top:44%;
-    width:52%;
-    height:0;
-    border-top:3px dashed #2563eb;
-    transform-origin:0 0;
-    pointer-events:none;
-    z-index:8;
-  ">
-    <div id="guideLengthStart" style="
-      position:absolute;
-      left:-11px;
-      top:-11px;
-      width:22px;
-      height:22px;
-      border-radius:50%;
-      background:#2563eb;
-      border:2px solid #fff;
-      box-shadow:0 1px 6px rgba(0,0,0,.25);
-      cursor:move;
-      pointer-events:auto;
-      touch-action:none;
-    "></div>
-
-    <div id="guideLengthEnd" style="
-      position:absolute;
-      right:-11px;
-      top:-11px;
-      width:22px;
-      height:22px;
-      border-radius:50%;
-      background:#2563eb;
-      border:2px solid #fff;
-      box-shadow:0 1px 6px rgba(0,0,0,.25);
-      cursor:move;
-      pointer-events:auto;
-      touch-action:none;
-    "></div>
-  </div>
-  <div id="liveLenTag" style="
-  position:absolute;
-  right:10px;
-  top:10px;
-  z-index:12;
-  background:rgba(15,23,42,.82);
-  color:#fff;
-  padding:6px 10px;
-  border-radius:10px;
-  font:700 13px Cairo, sans-serif;
-  pointer-events:none;
-">الطول: — px</div>
-
-<div id="liveChestTag" style="
-  position:absolute;
-  right:10px;
-  top:48px;
-  z-index:12;
-  background:rgba(15,23,42,.82);
-  color:#fff;
-  padding:6px 10px;
-  border-radius:10px;
-  font:700 13px Cairo, sans-serif;
-  pointer-events:none;
-">الصدر: — px</div>
-    </div>
-  </div>
-
-<div class="guide-pane">
-  <div class="guide-title">تعليمات الاستخدام</div>
- <div class="guide-text">
-  • وجّه الحيوان من الجانب داخل كادر الكاميرا<br>
-  • ضع علامة القياس بجوار الكتف وعلى نفس مستوى الجسم<br>
-  • اجعل الهاتف بالعرض لتحصل على أفضل دقة<br>
-  • سيتم الالتقاط والتقدير تلقائيًا عند اكتمال الشروط
-</div>
-  <div id="orientationTip" class="orientation-tip">
-    للحصول على أفضل دقة، اجعل الموبايل بالعرض أثناء التقدير
-  </div>
-</div>
-
-</div>
-<div class="chips">
-  <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-  <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
-</div>
-<canvas id="awCan"></canvas>
-   <div class="kpi3">
-  <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
-<div class="kpi"><div class="lbl">عمق الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
-  <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
-</div>
-
+ 
 <div class="kpi3">
   <div class="kpi"><div class="lbl">حدة الصورة</div><div class="val" id="awSharp">—</div></div>
   <div class="kpi"><div class="lbl">الإضاءة</div><div class="val" id="awLight">—</div></div>
@@ -431,7 +284,195 @@ function markCvReady() {
   وجّه الكاميرا ليظهر الحيوان كاملًا من الجانب، وضع علامة القياس 10 سم بجوار الكتف.
 </div>
   </section>
+<section id="captureScreen" class="hidden" style="
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:#e5e5e5;
+  padding:16px;
+">
+  <div style="
+    width:100%;
+    height:100%;
+    display:grid;
+    grid-template-columns:1.8fr 1fr;
+    gap:16px;
+    align-items:stretch;
+  ">
 
+    <div style="
+      border:4px solid #63b32e;
+      border-radius:28px;
+      overflow:hidden;
+      background:#fff;
+      position:relative;
+      min-height:320px;
+    ">
+      <div id="viewWrap" style="position:absolute;inset:0;">
+        <video id="awCam" class="source" playsinline autoplay muted></video>
+
+        <div id="guideChest" style="
+          position:absolute;
+          left:32%;
+          top:18%;
+          width:10%;
+          height:42%;
+          border:none;
+          background:transparent;
+          border-radius:10px;
+          pointer-events:auto;
+          touch-action:none;
+          cursor:move;
+          z-index:8;
+        ">
+          <div style="
+            position:absolute;
+            top:0;
+            bottom:0;
+            left:50%;
+            transform:translateX(-50%);
+            border-left:3px dashed #f59e0b;
+            pointer-events:none;
+          "></div>
+
+          <div id="guideChestTop" style="
+            position:absolute;
+            top:-11px;
+            left:50%;
+            transform:translateX(-50%);
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            background:#f59e0b;
+            border:2px solid #fff;
+            box-shadow:0 1px 6px rgba(0,0,0,.25);
+            cursor:ns-resize;
+            pointer-events:auto;
+            touch-action:none;
+          "></div>
+
+          <div id="guideChestBottom" style="
+            position:absolute;
+            bottom:-11px;
+            left:50%;
+            transform:translateX(-50%);
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            background:#f59e0b;
+            border:2px solid #fff;
+            box-shadow:0 1px 6px rgba(0,0,0,.25);
+            cursor:ns-resize;
+            pointer-events:auto;
+            touch-action:none;
+          "></div>
+        </div>
+
+        <div id="guideLength" style="
+          position:absolute;
+          left:18%;
+          top:44%;
+          width:52%;
+          height:0;
+          border-top:3px dashed #2563eb;
+          transform-origin:0 0;
+          pointer-events:none;
+          z-index:8;
+        ">
+          <div id="guideLengthStart" style="
+            position:absolute;
+            left:-11px;
+            top:-11px;
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            background:#2563eb;
+            border:2px solid #fff;
+            box-shadow:0 1px 6px rgba(0,0,0,.25);
+            cursor:move;
+            pointer-events:auto;
+            touch-action:none;
+          "></div>
+
+          <div id="guideLengthEnd" style="
+            position:absolute;
+            right:-11px;
+            top:-11px;
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            background:#2563eb;
+            border:2px solid #fff;
+            box-shadow:0 1px 6px rgba(0,0,0,.25);
+            cursor:move;
+            pointer-events:auto;
+            touch-action:none;
+          "></div>
+        </div>
+
+        <div id="liveLenTag" style="
+          position:absolute;
+          right:10px;
+          top:10px;
+          z-index:12;
+          background:rgba(15,23,42,.82);
+          color:#fff;
+          padding:6px 10px;
+          border-radius:10px;
+          font:700 13px Cairo, sans-serif;
+          pointer-events:none;
+        ">الطول: — px</div>
+
+        <div id="liveChestTag" style="
+          position:absolute;
+          right:10px;
+          top:48px;
+          z-index:12;
+          background:rgba(15,23,42,.82);
+          color:#fff;
+          padding:6px 10px;
+          border-radius:10px;
+          font:700 13px Cairo, sans-serif;
+          pointer-events:none;
+        ">الصدر: — px</div>
+      </div>
+    </div>
+
+    <div style="
+      border:4px solid #f58220;
+      border-radius:28px;
+      background:#fff;
+      padding:24px 18px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      text-align:center;
+      direction:rtl;
+    ">
+      <div style="
+        font-size:28px;
+        font-weight:800;
+        line-height:1.6;
+        margin-bottom:20px;
+        color:#111827;
+      ">تعليمات الاستخدام والتوجيهات</div>
+
+      <div style="
+        font-size:22px;
+        line-height:2;
+        color:#111827;
+      ">
+        وجّه الحيوان من الجانب داخل كادر الكاميرا<br>
+        ضع علامة القياس بجوار الكتف وعلى نفس مستوى الجسم<br>
+        اجعل الهاتف بالعرض لتحصل على أفضل دقة<br>
+        سيتم الالتقاط والتقدير تلقائيًا عند اكتمال الشروط
+      </div>
+    </div>
+
+  </div>
+
+ 
+</section>
   <div id="toast" class="toast"></div>
 
   
@@ -582,6 +623,8 @@ function enableGuideDragging(){
   const btnStart=$('awStart'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
+    const mainCard = $('mainCard');
+const captureScreen = $('captureScreen');
   const orientationTip = $('orientationTip');
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
@@ -599,6 +642,15 @@ const visionState = {};
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
+  function openCaptureScreen(){
+  if(mainCard) mainCard.classList.add('hidden');
+  if(captureScreen) captureScreen.classList.remove('hidden');
+}
+
+function closeCaptureScreen(){
+  if(captureScreen) captureScreen.classList.add('hidden');
+  if(mainCard) mainCard.classList.remove('hidden');
+}  
 function setSource(){
   v.classList.remove('hidden');
   modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
@@ -835,8 +887,10 @@ function measureBodyLengthPxFromOverlay(imgData){
     } px`;
   }
 }   
- btnStart.onclick=async()=>{
+btnStart.onclick=async()=>{
   try{
+    openCaptureScreen();
+
     stream = await window.vision.startCameraHD({
       state: visionState,
       preview: v
@@ -1079,7 +1133,8 @@ async function autoCaptureLoop(){
     outLight.textContent = brightness;
     outConf.textContent = confidence + '%';
 
-    showToast('📸 تم الالتقاط تلقائيًا');
+   closeCaptureScreen();
+showToast('✅ تم التقدير تلقائيًا');
 
     drawVisionOverlay({
       imgData,
