@@ -21,238 +21,14 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
     .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#e8f5e9;
       font-weight:700;font-size:14px;color:#064e3b;cursor:pointer;}
-    video,img.preview{width:100%;border:0;border-radius:0;background:#000}
-canvas{
+    video,img.preview{width:100%;border:1px solid var(--border);border-radius:12px;background:#fff}
+    canvas{
   display:block;
   width:100%;
-  border:0;
-  border-radius:0;
-  background:transparent;
-  margin:0;
-}
-
-#viewWrap{
-  position:fixed !important;
-  inset:0 !important;
-  width:100vw !important;
-  height:100vh !important;
-  z-index:1200 !important;
-  overflow:hidden !important;
-  border-radius:0 !important;
-  background:#000 !important;
-  border:0 !important;
-}
-
-#awCam{
-  position:absolute !important;
-  inset:0 !important;
-  width:100% !important;
-  height:45% !important;
-align-self:center !important;
-  object-fit:cover !important;
-  display:block !important;
-  background:#000 !important;
-}
-#awCan{
-  position:absolute !important;
-  inset:0 !important;
-  width:100% !important;
-  height:100% !important;
-  display:block !important;
-  background:transparent !important;
-  border:0 !important;
-  margin:0 !important;
-  pointer-events:none !important;
-}
-
-#cameraGuide{
-  position:absolute !important;
-  inset:0 !important;
-  z-index:8 !important;
-  pointer-events:none !important;
-  display:none;
-
-  flex-direction:row !important;
-  gap:10px;
-  padding:10px;
-  box-sizing:border-box;
-  direction:ltr !important;
-}
-   @media (orientation: portrait){
-  #cameraGuide{
-    display:block !important;
-  }
-
-  #guidePanel{
-    position:absolute !important;
-    right:4% !important;
-    top:10% !important;
-    width:32% !important;
-    height:80% !important;
-  }
-
-  #animalFrame{
-    position:absolute !important;
-    left:4% !important;
-    top:34% !important;
-    width:62% !important;
-    height:24% !important;
-  }
-}
-#guidePanel{
-  position:relative !important;
-  flex:0 0 28% !important;
-  height:100% !important;
-  border:3px solid #f59e0b !important;
-  border-radius:18px !important;
-  box-sizing:border-box !important;
-  background:rgba(255,255,255,.10) !important;
-}
-#animalFrame{
-  flex: 0 0 68% !important;
-  height:100% !important;
-
-  border:3px solid #16a34a !important;
-  border-radius:18px !important;
-
-  position:relative !important;
-  box-sizing:border-box !important;
-}
-
-#markerGuide{
-  position:absolute !important;
-
-  /* يمين الكادر */
-  right:4% !important;
-
-  /* ✳️ هنا التعديل الصح */
- top:50% !important;
-
-  /* الحجم */
-  width:80px !important;
-  height:80px !important;
-
-  border:3px solid #f59e0b !important;
-  border-radius:14px !important;
-  background:rgba(245,158,11,.16) !important;
-
-  transform:translateY(-50%) !important;
-  z-index:3;
-}
-#markerGuideLabel,
-#animalGuideLabel,
-#cameraStatus{
-  background:rgba(15,23,42,.26) !important;
-  color:#fff !important;
-  padding:10px 14px !important;
-  border-radius:18px !important;
-  font:800 13px Cairo, sans-serif !important;
-  white-space:nowrap !important;
-  border:1px solid rgba(255,255,255,.10) !important;
-  box-shadow:0 10px 24px rgba(0,0,0,.14) !important;
-  backdrop-filter:blur(8px) !important;
-  -webkit-backdrop-filter:blur(8px) !important;
-  transition:opacity .18s ease !important;
-}
-#markerGuideLabel{
-  position:absolute !important;
-  right:4% !important;
- top:46% !important;
-}
-
-#animalGuideLabel{
-  position:absolute !important;
-  top:18% !important;
-  right:10% !important;
-  left:10% !important;
-  transform:none !important;
-  text-align:center !important;
-  font:800 18px Cairo, sans-serif !important;
-  background:none !important;
-  border:0 !important;
-  box-shadow:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  color:#111 !important;
-}
-
-#cameraStatus{
-  position:absolute !important;
-  bottom:18% !important;
-  right:10% !important;
-  left:10% !important;
-  transform:none !important;
-  display:block !important;
-  text-align:center !important;
-  white-space:normal !important;
-  line-height:1.7 !important;
-  font:800 15px Cairo, sans-serif !important;
-  background:none !important;
-  border:0 !important;
-  box-shadow:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  color:#111 !important;
-}
-
-#cameraGuide.ok #markerGuideLabel,
-#cameraGuide.ok #animalGuideLabel,
-#cameraGuide.ok #cameraStatus{
-  opacity:0 !important;
-}
-
-@media (max-width: 640px){
- #animalFrame{
-  left:3% !important;
-  top:34% !important;
-  width:72% !important;
-  height:20% !important;
-  border-radius:18px !important;
-}
-
-#markerGuide{
-  right:4% !important;
- top:56% !important;
-  width:72px !important;
-  height:72px !important;
-}
-  #markerGuideLabel,
-  #animalGuideLabel,
-  #cameraStatus{
-    border-radius:18px !important;
-    padding:10px 14px !important;
-  }
- #animalGuideLabel{
-  top:10% !important;
-  max-width:88vw;
-  white-space:normal !important;
-  text-align:center;
-}
-
-#markerGuideLabel{
-  position:absolute !important;
-  right:4% !important;
-  top:44% !important;
-}
-}
-
-body.camera-mode header,
-body.camera-mode .card > .row,
-body.camera-mode .card > .badge,
-body.camera-mode .card > .chips,
-body.camera-mode .card > .kpi3,
-body.camera-mode .card > .hint,
-body.camera-mode .card > #opencvStatus,
-body.camera-mode .card > #visionGuide{
-  opacity:0 !important;
-  pointer-events:none !important;
-}
-
-body.camera-mode .card{
-  margin:0 !important;
-  padding:0 !important;
-  border:0 !important;
-  background:transparent !important;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  margin-top:10px;
 }
     .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
     .kpi{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:10px;text-align:center;}
@@ -272,7 +48,6 @@ body.camera-mode .card{
   </style>
 </head>
 <body>
- 
   <!-- تتبّع ذكي -->
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
@@ -361,25 +136,150 @@ function markCvReady() {
     <!-- ✅ بادج وضع المصدر -->
     <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-<div id="viewWrap">
+<div id="viewWrap" style="position:relative;overflow:hidden;border-radius:12px">
+  <!-- مصدر 1: كاميرا -->
   <video id="awCam" class="source" playsinline autoplay muted></video>
+
+  <!-- مصدر 2: صورة بديلة -->
+  <img id="awPreview" class="source preview hidden" alt="معاينة الصورة المختارة" />
+
+  <!-- Overlay guides فوق الكاميرا/الصورة -->
+<div id="guideChest" style="
+    position:absolute;
+    left:32%;
+    top:18%;
+    width:10%;
+    height:42%;
+    border:none;
+    background:transparent;
+    border-radius:10px;
+    pointer-events:auto;
+    touch-action:none;
+    cursor:move;
+    z-index:8;
+  ">
+  <div style="
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:50%;
+    transform:translateX(-50%);
+    border-left:3px dashed #f59e0b;
+    pointer-events:none;
+  "></div>
+  <div id="guideChestTop" style="
+    position:absolute;
+    top:-11px;
+    left:50%;
+    transform:translateX(-50%);
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:#f59e0b;
+    border:2px solid #fff;
+    box-shadow:0 1px 6px rgba(0,0,0,.25);
+    cursor:ns-resize;
+    pointer-events:auto;
+    touch-action:none;
+  "></div>
+
+  <div id="guideChestBottom" style="
+    position:absolute;
+    bottom:-11px;
+    left:50%;
+    transform:translateX(-50%);
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:#f59e0b;
+    border:2px solid #fff;
+    box-shadow:0 1px 6px rgba(0,0,0,.25);
+    cursor:ns-resize;
+    pointer-events:auto;
+    touch-action:none;
+  "></div>
+</div>
+
+  <div id="guideLength" style="
+    position:absolute;
+    left:18%;
+    top:44%;
+    width:52%;
+    height:0;
+    border-top:3px dashed #2563eb;
+    transform-origin:0 0;
+    pointer-events:none;
+    z-index:8;
+  ">
+    <div id="guideLengthStart" style="
+      position:absolute;
+      left:-11px;
+      top:-11px;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#2563eb;
+      border:2px solid #fff;
+      box-shadow:0 1px 6px rgba(0,0,0,.25);
+      cursor:move;
+      pointer-events:auto;
+      touch-action:none;
+    "></div>
+
+    <div id="guideLengthEnd" style="
+      position:absolute;
+      right:-11px;
+      top:-11px;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#2563eb;
+      border:2px solid #fff;
+      box-shadow:0 1px 6px rgba(0,0,0,.25);
+      cursor:move;
+      pointer-events:auto;
+      touch-action:none;
+    "></div>
+  </div>
+  <div id="liveLenTag" style="
+  position:absolute;
+  right:10px;
+  top:10px;
+  z-index:12;
+  background:rgba(15,23,42,.82);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  font:700 13px Cairo, sans-serif;
+  pointer-events:none;
+">الطول: — px</div>
+
+<div id="liveChestTag" style="
+  position:absolute;
+  right:10px;
+  top:48px;
+  z-index:12;
+  background:rgba(15,23,42,.82);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  font:700 13px Cairo, sans-serif;
+  pointer-events:none;
+">الصدر: — px</div>
+</div>
+
+<!-- اختيار صورة -->
+<div class="sep">أو اختر صورة</div>
+    <div class="chips">
+     <input id="awFile" type="file" accept="image/*" class="hidden">
+      <label for="awFile" class="chip">📸 اختيار صورة</label>
+      <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+      <button id="awShot"  class="chip" type="button">التقاط & تقدير</button>
+      <button id="awSave"  class="chip" type="button">حفظ كحدث</button>
+    </div>
+
+<div id="awWrap" style="position:relative">
   <canvas id="awCan"></canvas>
-
-<div id="cameraGuide">
-  <div id="animalFrame">
-    <div id="markerGuide"></div>
-    <div id="markerGuideLabel">ضع الماركر بجوار الكتف وعلى مستوى الجسم</div>
-  </div>
-
-  <div id="guidePanel">
-    <div id="animalGuideLabel">وجّه الحيوان جانبيًا داخل الإطار</div>
-    <div id="cameraStatus">لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي</div>
-  </div>
-</div>
-</div>
-<div class="chips">
-  <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
-  <button id="awSave" class="chip" type="button">حفظ كحدث</button>
 </div>
 
    <div class="kpi3">
@@ -400,7 +300,7 @@ function markCvReady() {
     </div>
     <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
     <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
- افتح الكاميرا. الإطار ظاهر تلقائيًا. لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي.
+  وجّه الكاميرا ليظهر الحيوان كاملًا من الجانب، وضع علامة القياس 10 سم بجوار الكتف.
 </div>
   </section>
 
@@ -413,26 +313,155 @@ function markCvReady() {
    
   // ========= DOM =========
   const $=id=>document.getElementById(id);
-const v=$('awCam');
+  const v=$('awCam'), imgPrev=$('awPreview'), file=$('awFile');
 const can=$('awCan'), ctx=can.getContext('2d', { willReadFrequently:true });
-const viewWrap=$('viewWrap');
-const cameraGuide=$('cameraGuide');
-const animalFrame=$('animalFrame');
-const markerGuide=$('markerGuide');
-const cameraStatus=$('cameraStatus');
+const wrap=$('awWrap'), viewWrap=$('viewWrap'), guideChest=$('guideChest'), guideLength=$('guideLength');
+const guideChestTop=$('guideChestTop'), guideChestBottom=$('guideChestBottom');
+const guideLengthStart=$('guideLengthStart'), guideLengthEnd=$('guideLengthEnd');
+const liveLenTag=$('liveLenTag'), liveChestTag=$('liveChestTag');
+   let dragTarget = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartLeft = 0;
+let dragStartTop = 0;
 
-if (cameraGuide) cameraGuide.style.display = 'none';
-if (cameraStatus) cameraStatus.style.display = 'none';
+let chestGuideLeftPct = 32;
+let chestGuideTopPct = 18;
+let chestGuideWidthPct = 10;
+let chestGuideHeightPct = 42;
+
+let lengthStartXPct = 18;
+let lengthStartYPct = 44;
+let lengthEndXPct = 70;
+let lengthEndYPct = 44;
+
+function clampPct(v, min, max){
+  return Math.max(min, Math.min(max, v));
+}
+function updateLengthGuide(){
+  if(!guideLength) return;
+
+  const left = Math.min(lengthStartXPct, lengthEndXPct);
+  const top  = Math.min(lengthStartYPct, lengthEndYPct);
+
+  const dx = lengthEndXPct - lengthStartXPct;
+  const dy = lengthEndYPct - lengthStartYPct;
+
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  guideLength.style.left = left + '%';
+  guideLength.style.top = top + '%';
+  guideLength.style.width = len + '%';
+  guideLength.style.height = '0';
+  guideLength.style.transform = `rotate(${angle}deg)`;
+}
+function enableGuideDragging(){
+  if(!viewWrap || !guideChest || !guideLength || !guideLengthStart || !guideLengthEnd) return;
+
+  let dragMode = null;
+
+  function startDrag(e, target, mode){
+    if(currentSource !== 'image') return;
+
+    dragTarget = target;
+    dragMode = mode;
+
+    const p = e.touches ? e.touches[0] : e;
+    dragStartX = p.clientX;
+    dragStartY = p.clientY;
+
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMove(e){
+    if(!dragTarget || currentSource !== 'image') return;
+
+    const p = e.touches ? e.touches[0] : e;
+    const wrapRect = viewWrap.getBoundingClientRect();
+    const dxPct = ((p.clientX - dragStartX) / wrapRect.width) * 100;
+    const dyPct = ((p.clientY - dragStartY) / wrapRect.height) * 100;
+
+    if(dragTarget === guideChest && dragMode === 'move'){
+      chestGuideLeftPct = clampPct(chestGuideLeftPct + dxPct, 5, 85);
+      guideChest.style.left = chestGuideLeftPct + '%';
+      updateLiveOverlayMeasurements();
+      dragStartX = p.clientX;
+    }
+
+    if(dragTarget === guideChestTop && dragMode === 'top'){
+      const newTop = clampPct(chestGuideTopPct + dyPct, 0, chestGuideTopPct + chestGuideHeightPct - 8);
+      const delta = newTop - chestGuideTopPct;
+      chestGuideTopPct = newTop;
+      chestGuideHeightPct = clampPct(chestGuideHeightPct - delta, 8, 95 - chestGuideTopPct);
+      guideChest.style.top = chestGuideTopPct + '%';
+      guideChest.style.height = chestGuideHeightPct + '%';
+      updateLiveOverlayMeasurements();
+      dragStartY = p.clientY;
+    }
+
+    if(dragTarget === guideChestBottom && dragMode === 'bottom'){
+      chestGuideHeightPct = clampPct(chestGuideHeightPct + dyPct, 8, 95 - chestGuideTopPct);
+      guideChest.style.height = chestGuideHeightPct + '%';
+      updateLiveOverlayMeasurements();
+      dragStartY = p.clientY;
+    }
+
+    if(dragTarget === guideLengthStart){
+      lengthStartXPct = clampPct(lengthStartXPct + dxPct, 0, 100);
+      lengthStartYPct = clampPct(lengthStartYPct + dyPct, 0, 100);
+      updateLengthGuide();
+      updateLiveOverlayMeasurements();
+      dragStartX = p.clientX;
+      dragStartY = p.clientY;
+    }
+
+    if(dragTarget === guideLengthEnd){
+      lengthEndXPct = clampPct(lengthEndXPct + dxPct, 0, 100);
+      lengthEndYPct = clampPct(lengthEndYPct + dyPct, 0, 100);
+      updateLengthGuide();
+      updateLiveOverlayMeasurements();
+      dragStartX = p.clientX;
+      dragStartY = p.clientY;
+    }
+
+    e.preventDefault();
+  }
+
+  function endDrag(){
+    dragTarget = null;
+    dragMode = null;
+  }
+
+  guideChest.addEventListener('mousedown', e => startDrag(e, guideChest, 'move'));
+  guideChest.addEventListener('touchstart', e => startDrag(e, guideChest, 'move'), { passive:false });
+
+  guideChestTop?.addEventListener('mousedown', e => startDrag(e, guideChestTop, 'top'));
+  guideChestBottom?.addEventListener('mousedown', e => startDrag(e, guideChestBottom, 'bottom'));
+  guideChestTop?.addEventListener('touchstart', e => startDrag(e, guideChestTop, 'top'), { passive:false });
+  guideChestBottom?.addEventListener('touchstart', e => startDrag(e, guideChestBottom, 'bottom'), { passive:false });
+
+  guideLengthStart.addEventListener('mousedown', e => startDrag(e, guideLengthStart, 'point'));
+  guideLengthEnd.addEventListener('mousedown', e => startDrag(e, guideLengthEnd, 'point'));
+  guideLengthStart.addEventListener('touchstart', e => startDrag(e, guideLengthStart, 'point'), { passive:false });
+  guideLengthEnd.addEventListener('touchstart', e => startDrag(e, guideLengthEnd, 'point'), { passive:false });
+
+  window.addEventListener('mousemove', onMove, { passive:false });
+  window.addEventListener('touchmove', onMove, { passive:false });
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchend', endDrag);
+}
+
   const outScale=$('awScale'), outChestW=$('awChestW'), outWeight=$('awWeight');
   const outSharp=$('awSharp'), outLight=$('awLight'), outConf=$('awConf');
-  const btnStart=$('awStart'), btnSave=$('awSave');
+  const btnStart=$('awStart'), btnShot=$('awShot'), btnSave=$('awSave');
   const inpNum=$('animalNumber'), inpDate=$('eventDate'); const toast=$('toast');
   const modeBadge = $('modeBadge');
 
   // ========= ثوابت/حالة =========
 const ARUCO_MARKER_CM=10;
 let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='camera';
-  let autoCaptureTimer=null, autoBusy=false, autoEstimated=false;
   window.getLastShot = () => lastShot;  
   let currentConfidence = null, lastMetrics = null;
   const visionState = {};
@@ -440,44 +469,36 @@ let stream=null, cvReady=false, pxPerCm=null, lastShot=null, currentSource='came
  
   // ========= تتبّع =========
   try { window.t?.event && window.t.event('page_view', {page: location.pathname, feature:'weight_estimation'});} catch(e){}
-function isLandscape(){
-  return window.innerWidth > window.innerHeight;
-}
 
-function updateOrientationUI(){
-  const landscape = isLandscape();
-
-  if (!stream) {
-    if (cameraGuide) cameraGuide.classList.remove('ok');
-    setGuide('شغّل الكاميرا أولًا');
-    return;
-  }
-
-if (!landscape) {
-  if (cameraGuide) cameraGuide.classList.remove('ok');
-  setGuide('لف الموبايل بالعرض ليبدأ الالتقاط والتقييم التلقائي', 'warn');
-} else {
-  if (cameraGuide) cameraGuide.classList.add('ok');
-  setGuide('');
-}
-}
-
-window.addEventListener('resize', updateOrientationUI);
-window.addEventListener('orientationchange', updateOrientationUI);
   // ========= مساعدات =========
   function setSaveEnabled(yes){
     btnSave.disabled = !yes;
     btnSave.style.opacity = yes ? '1' : '0.5';
     btnSave.style.pointerEvents = yes ? 'auto' : 'none';
   }
-  function setSource(){
-  currentSource = 'camera';
-  v.classList.remove('hidden');
-  modeBadge.textContent = 'الوضع: كاميرا مباشرة';
-  modeBadge.classList.remove('err');
-  setSaveEnabled(true);
-  if(viewWrap) viewWrap.style.display = 'block';
-}
+  function setSource(s){
+    currentSource = s;
+    if(s === 'camera'){
+      v.classList.remove('hidden');
+      imgPrev.classList.add('hidden');
+      modeBadge.textContent = 'الوضع: كاميرا (حفظ مسموح)';
+      modeBadge.classList.remove('err');
+      guideChest.style.cursor = 'default';
+guideLength.style.cursor = 'default';
+      setSaveEnabled(true);
+    } else {
+      imgPrev.classList.remove('hidden');
+      v.classList.add('hidden');
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      modeBadge.textContent = isDemo ? 'الوضع: صورة (عرض Demo — الحفظ مسموح)' : 'الوضع: صورة (عرض فقط — الحفظ غير مسموح)';
+      modeBadge.classList.toggle('err', !isDemo);
+      guideChest.style.cursor = 'ew-resize';
+      guideLength.style.cursor = 'ns-resize';
+      setSaveEnabled(isDemo);
+    }
+    syncGuideVisibility();
+   
+  }
   function fireTrack(event, meta={}){
     try {
       window.dataLayer.push({event, page: location.pathname, feature:'weight_estimation', ...meta});
@@ -489,20 +510,12 @@ window.addEventListener('orientationchange', updateOrientationUI);
     toast.style.display='block'; clearTimeout(showToast._t);
     showToast._t = setTimeout(()=>{ toast.style.display='none'; }, 2600);
   }
-function setGuide(msg, level='normal'){
+  function setGuide(msg, level='normal'){
   const el = $('visionGuide');
-  if(el){
-    el.textContent = msg || '';
-    el.classList.remove('err');
-    if(level === 'warn') el.classList.add('err');
-  }
-
-  if(cameraStatus){
-    cameraStatus.textContent = msg || '';
-    cameraStatus.style.display = msg ? 'block' : 'none';
-    cameraStatus.style.background =
-      level === 'warn' ? 'rgba(127,29,29,.30)' : 'rgba(15,23,42,.24)';
-  }
+  if(!el) return;
+  el.textContent = msg || '';
+  el.classList.remove('err');
+  if(level === 'warn') el.classList.add('err');
 }
 
 function getScaleFeedback(pxPerCm){
@@ -529,32 +542,55 @@ function getScaleFeedback(pxPerCm){
     msg:'قراءة علامة القياس جيدة.'
   };
 }
+function syncGuides(reset=false){
+  if(!guideChest || !guideLength) return;
 
+  const baseW =
+    (!v.classList.contains('hidden') && v.videoWidth) ? v.videoWidth :
+    (!imgPrev.classList.contains('hidden') && imgPrev.naturalWidth) ? imgPrev.naturalWidth :
+    can.width;
 
-function syncGuideVisibility(show = false){
-  if(!viewWrap) return;
-  viewWrap.style.display = show ? 'block' : 'none';
+  const baseH =
+    (!v.classList.contains('hidden') && v.videoHeight) ? v.videoHeight :
+    (!imgPrev.classList.contains('hidden') && imgPrev.naturalHeight) ? imgPrev.naturalHeight :
+    can.height;
+
+  const isWide = baseW > baseH;
+
+if(reset){
+chestGuideLeftPct = isWide ? 58 : 57;
+chestGuideTopPct = isWide ? 6 : 8;
+chestGuideWidthPct = isWide ? 8 : 9;
+chestGuideHeightPct = isWide ? 58 : 60;
+
+lengthStartXPct = isWide ? 22 : 22;
+lengthStartYPct = isWide ? 18 : 20;
+lengthEndXPct = isWide ? 73 : 74;
+lengthEndYPct = isWide ? 40 : 42;
 }
 
-function stopAutoCapture(){
-  if(autoCaptureTimer){
-    clearInterval(autoCaptureTimer);
-    autoCaptureTimer = null;
+guideChest.style.left = chestGuideLeftPct + '%';
+  updateLiveOverlayMeasurements();
+guideChest.style.top = chestGuideTopPct + '%';
+ updateLiveOverlayMeasurements();
+guideChest.style.width = chestGuideWidthPct + '%';
+guideChest.style.height = chestGuideHeightPct + '%';
+  updateLiveOverlayMeasurements();
+guideChest.style.bottom = 'auto';
+
+updateLengthGuide();
+  updateLiveOverlayMeasurements();
+}
+ function syncGuideVisibility(){
+  const showLiveOverlay = (currentSource === 'camera' || currentSource === 'image');
+  if(viewWrap){
+    viewWrap.style.display = showLiveOverlay ? 'block' : 'none';
   }
-}
-
-function startAutoCapture(){
-  stopAutoCapture();
-  autoCaptureTimer = setInterval(async ()=>{
-    if(autoBusy || autoEstimated || !stream || !window.cvReady || !window.cv || !isLandscape()) return;
-    await runAutoEstimate();
-  }, 1800);
-}
-
- // ========= تهيئة الحقول =========
+}   
+  // ========= تهيئة الحقول =========
   initContextFields();
-  if (viewWrap) viewWrap.style.display = 'none';
-   document.body.classList.remove('camera-mode');
+   syncGuideVisibility(); 
+    enableGuideDragging();
   function initContextFields(){
     const q=new URLSearchParams(location.search);
     const num = q.get('number') || q.get('animalNumber') || localStorage.getItem('currentAnimalNumber') || '';
@@ -566,181 +602,299 @@ function startAutoCapture(){
     if(inpNum.value) localStorage.setItem('currentAnimalNumber', inpNum.value.trim());
     if(inpDate.value) localStorage.setItem('lastEventDate', inpDate.value);
   }
- 
-btnStart.onclick = async () => {
-  autoEstimated = false;
-  stopAutoCapture();
+function getImageDisplayRect(imgData){
+  const wrapRect = viewWrap.getBoundingClientRect();
 
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-  facingMode: { ideal: 'environment' },
-  width: { ideal: 1280 },
-  height: { ideal: 720 },
-  aspectRatio: { ideal: 16 / 9 }
-},
-      audio: false
+  const imgAspect = imgData.width / imgData.height;
+  const wrapAspect = wrapRect.width / wrapRect.height;
+
+  let drawWidth, drawHeight, offsetX, offsetY;
+
+  if(imgAspect > wrapAspect){
+    drawWidth = wrapRect.width;
+    drawHeight = drawWidth / imgAspect;
+    offsetX = 0;
+    offsetY = (wrapRect.height - drawHeight) / 2;
+  } else {
+    drawHeight = wrapRect.height;
+    drawWidth = drawHeight * imgAspect;
+    offsetY = 0;
+    offsetX = (wrapRect.width - drawWidth) / 2;
+  }
+
+  return {
+    left: wrapRect.left + offsetX,
+    top: wrapRect.top + offsetY,
+    width: drawWidth,
+    height: drawHeight
+  };
+}
+
+function getPointInImage(el, imgData){
+  const er = el.getBoundingClientRect();
+  const ir = getImageDisplayRect(imgData);
+
+  return {
+    x: (er.left + er.width / 2 - ir.left) * (imgData.width / ir.width),
+    y: (er.top + er.height / 2 - ir.top) * (imgData.height / ir.height)
+  };
+}
+
+function measureChestDepthPxFromOverlay(imgData){
+  if(!guideChestTop || !guideChestBottom) return null;
+
+  const a = getPointInImage(guideChestTop, imgData);
+  const b = getPointInImage(guideChestBottom, imgData);
+
+  return Math.abs(b.y - a.y);
+}
+
+function measureBodyLengthPxFromOverlay(imgData){
+  if(!guideLengthStart || !guideLengthEnd) return null;
+
+  const a = getPointInImage(guideLengthStart, imgData);
+  const b = getPointInImage(guideLengthEnd, imgData);
+
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+ function updateLiveOverlayMeasurements(){
+  if(!lastShot){
+    if(liveLenTag) liveLenTag.textContent = 'الطول: — px';
+    if(liveChestTag) liveChestTag.textContent = 'الصدر: — px';
+    return;
+  }
+
+  const chestPx = measureChestDepthPxFromOverlay(lastShot);
+  const bodyLenPx = measureBodyLengthPxFromOverlay(lastShot);
+
+  if(liveChestTag){
+    liveChestTag.textContent = `الصدر: ${
+      chestPx && isFinite(chestPx) ? Math.round(chestPx) : '—'
+    } px`;
+  }
+
+  if(liveLenTag){
+    liveLenTag.textContent = `الطول: ${
+      bodyLenPx && isFinite(bodyLenPx) ? Math.round(bodyLenPx) : '—'
+    } px`;
+  }
+}   
+ btnStart.onclick=async()=>{
+  try{
+    stream = await window.vision.startCameraHD({
+      state: visionState,
+      preview: v
     });
-
-    v.srcObject = stream;
-    v.muted = true;
-    v.playsInline = true;
-    v.autoplay = true;
-
-    await new Promise((resolve) => {
-      v.onloadedmetadata = () => resolve();
-    });
-
-    await v.play();
-
-    setSource();
-    syncGuideVisibility(true);
-    document.body.classList.add('camera-mode');
-
-    v.style.display = 'block';
-    v.style.visibility = 'visible';
-    v.style.opacity = '1';
-    v.style.background = '#000';
-
-  if (cameraGuide) cameraGuide.style.display = 'flex';
-if (cameraStatus) cameraStatus.style.display = 'block';
-
-updateOrientationUI();
-startAutoCapture();
-fireTrack('camera_start');
-
-    console.log('camera started', {
-      readyState: v.readyState,
-      videoWidth: v.videoWidth,
-      videoHeight: v.videoHeight
-    });
-
-  } catch (e) {
-    console.error('CAMERA_START_ERROR', e);
-    stopAutoCapture();
-    syncGuideVisibility(false);
-    document.body.classList.remove('camera-mode');
-    if (cameraGuide) cameraGuide.style.display = 'none';
-    if (cameraStatus) cameraStatus.style.display = 'none';
+   setSource('camera');
+syncGuides(true);
+syncGuideVisibility();
+    fireTrack('camera_start');
+  }catch(e){
+    console.error(e);
     showToast('تعذّر فتح الكاميرا', true);
   }
 };
 
+  // ========= اختيار صورة =========
+  file.onchange = ()=>{
+    const f=file.files?.[0]; if(!f) return;
+    const url=URL.createObjectURL(f);
+    imgPrev.onload=()=>URL.revokeObjectURL(url);
+  imgPrev.src=url;
+setSource('image');
+syncGuides(true);
+fireTrack('image_selected', {size:f.size, type:f.type});
+  };
 
   // ========= التقاط/تقدير =========
-async function runAutoEstimate(){
-  if (!window.cvReady || !window.cv || autoBusy) return;
-  autoBusy = true;
-
-  try {
-    if (!v.videoWidth) {
-      autoBusy = false;
-      return;
-    }
-
-    setGuide('جاري فحص اللقطة تلقائيًا…');
-
-    const frames = await window.vision.captureBurst({
-      preview: v,
-      count: 5,
-      delayMs: 120
-    });
-
-    const best = window.vision.pickBestFrame(frames);
-    if (!best?.dataURL) {
-      setGuide('تعذّر التقاط لقطة واضحة — ثبّت الموبايل وحاول مرة أخرى', 'warn');
-      autoBusy = false;
-      return;
-    }
-
-    const sharpness = Math.round(best.sharpness || 0);
-    const brightness = Math.round(best.brightness || 0);
-
-    const originalImgData = await dataURLToImageData(best.dataURL);
-    const scaleResult = detectArucoPxPerCm(originalImgData);
-
-    outSharp.textContent = sharpness ? String(sharpness) : '—';
-    outLight.textContent = brightness ? String(brightness) : '—';
-
-    if (!scaleResult || !scaleResult.pxPerCm) {
-      outScale.textContent = '—';
-      outChestW.textContent = '—';
-      outWeight.textContent = '—';
-      outConf.textContent = '0%';
-      currentConfidence = 0;
-      lastMetrics = null;
-      setGuide('الماركر غير واضح بعد — قرّبه وضعه أفقيًا داخل المستطيل البرتقالي', 'warn');
-      autoBusy = false;
-      return;
-    }
-
-    const imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
-    lastShot = imgData;
-    pxPerCm = scaleResult.pxPerCm;
-
-    outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
-    outChestW.textContent = '—';
-    outWeight.textContent = '—';
-
-    const markerConsistency = scaleResult?.sideConsistency ?? 0;
-    const perspectivePenalty = scaleResult?.perspectivePenalty ?? 1;
-    const sharpScore = Math.max(0, Math.min(1, sharpness / 180));
-    const lightScore = Math.max(0, 1 - (Math.abs((brightness || 128) - 128) / 128));
-    const confidence = Math.round(
-      100 * Math.max(0, Math.min(1,
-        (markerConsistency * 0.45) +
-        (sharpScore * 0.30) +
-        (lightScore * 0.15) +
-        ((1 - perspectivePenalty) * 0.10)
-      ))
-    );
-
-    currentConfidence = confidence;
-    outConf.textContent = confidence + '%';
-
-    lastMetrics = {
-      pxPerCm,
-      sharpness,
-      brightness,
-      markerConsistency,
-      perspectivePenalty,
-      bodySideScore: null,
-      bodyPosePenalty: null,
-      fillRatio: null,
-      aspectRatio: null
-    };
-
-    drawVisionOverlay({
-      imgData,
-      scaleResult,
-      poseResult: null,
-      chestPx: 0,
-      confidence,
-      scaleTip: markerConsistency < 0.75 ? 'ميل واضح في الماركر' : 'الماركر جيد',
-      markerConsistency,
-      bodySideScore: 0,
-      maskScore: 0
-    });
-
-    autoEstimated = true;
-    stopAutoCapture();
-    setGuide('تم الالتقاط والتقدير تلقائيًا — راجع النتيجة ثم احفظ الحدث');
-    showToast('تم الالتقاط والتقدير تلقائيًا');
-    fireTrack('weight_estimated', {
-      source: 'camera',
-      mode: 'auto',
-      confidence,
-      pxPerCm: Number(pxPerCm.toFixed(2))
-    });
-
-  } catch (e) {
-    console.error(e);
-    setGuide('حدث خطأ أثناء التقدير التلقائي', 'warn');
-    showToast('حدث خطأ أثناء التقدير', true);
-  } finally {
-    autoBusy = false;
-  }
+ btnShot.onclick = async()=>{
+if (!window.cvReady || !window.cv) {
+  return showToast('OpenCV لم يكتمل تحميله بعد', true);
 }
+
+  try{
+   let imgData = null;
+let sharpness = 0;
+let brightness = 0;
+let resizeRatio = 1;
+let scaleResult = null;
+
+    if(currentSource === 'camera'){
+      if(!v.videoWidth) return showToast('الكاميرا غير جاهزة', true);
+
+      const frames = await window.vision.captureBurst({
+        preview: v,
+        count: 5,
+        delayMs: 120
+      });
+
+      const best = window.vision.pickBestFrame(frames);
+      if(!best?.dataURL) return showToast('تعذّر التقاط صورة واضحة', true);
+
+      sharpness = Math.round(best.sharpness || 0);
+      brightness = Math.round(best.brightness || 0);
+
+  const originalImgData = await dataURLToImageData(best.dataURL);
+
+scaleResult = detectArucoPxPerCm(originalImgData);
+if(!scaleResult || !scaleResult.pxPerCm){
+  outScale.textContent='—';
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('لم تُكتشف علامة ArUco', true);
+}
+
+imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+resizeRatio = originalImgData.width / imgData.width;
+lastShot = imgData;
+pxPerCm = scaleResult.pxPerCm;
+outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+      
+    } else {
+      if(!imgPrev.naturalWidth) return showToast('اختر صورة أولًا', true);
+
+      can.width = imgPrev.naturalWidth;
+      can.height = imgPrev.naturalHeight;
+    
+      ctx.drawImage(imgPrev,0,0,can.width,can.height);
+  const originalImgData = ctx.getImageData(0,0,can.width,can.height);
+
+scaleResult = detectArucoPxPerCm(originalImgData);
+if(!scaleResult || !scaleResult.pxPerCm){
+  outScale.textContent='—';
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('لم تُكتشف علامة ArUco', true);
+}
+
+imgData = downscaleImageDataIfNeeded(originalImgData, 1600);
+resizeRatio = originalImgData.width / imgData.width;
+lastShot = imgData;
+pxPerCm = scaleResult.pxPerCm;
+outScale.textContent = pxPerCm.toFixed(2) + ' px/cm';
+
+const tempCanvas = document.createElement('canvas');
+tempCanvas.width = imgData.width;
+tempCanvas.height = imgData.height;
+tempCanvas.getContext('2d', { willReadFrequently:true }).putImageData(imgData, 0, 0);
+
+      sharpness = Math.round(window.vision.computeSharpnessFromCanvas(tempCanvas) || 0);
+      brightness = Math.round(window.vision.computeBrightnessFromCanvas(tempCanvas) || 0);
+    }
+
+const chestPx = measureChestDepthPxFromOverlay(imgData);
+if(!chestPx || !isFinite(chestPx)){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('فشل قياس عمق الصدر من الأوفرلاي', true);
+}
+
+const chestDepthCm = chestPx / pxPerCm;
+outChestW.textContent = chestDepthCm.toFixed(1);
+
+const bodyLenPx = measureBodyLengthPxFromOverlay(imgData);
+if(!bodyLenPx || !isFinite(bodyLenPx)){
+  outSharp.textContent = sharpness ? String(sharpness) : '—';
+  outLight.textContent = brightness ? String(brightness) : '—';
+  outConf.textContent = '0%';
+  currentConfidence = 0;
+  return showToast('فشل قياس طول الجسم من الأوفرلاي', true);
+}
+
+const bodyLenCm = bodyLenPx / pxPerCm;
+// تحويل عمق الصدر إلى محيط صدر (Ellipse Model)
+const heartGirthCm = Math.PI * 0.825 * chestDepthCm;
+
+// معادلة الوزن القياسية
+const W = Math.round(
+  (heartGirthCm * heartGirthCm * bodyLenCm) / 10800
+);
+outWeight.textContent = W + ' كجم';
+    updateLiveOverlayMeasurements();
+const confidence = scoreConfidence({
+  sharpness,
+  brightness,
+  pxPerCm,
+  chestCm: chestDepthCm,
+  weightKg: W,
+  hasMarker: true,
+  markerConsistency: scaleResult.sideConsistency,
+  markerPenalty: scaleResult.perspectivePenalty,
+  bodySideScore: 1,
+  bodyPosePenalty: 0,
+  maskScore: 1
+});
+   currentConfidence = confidence;
+lastMetrics = {
+  sharpness,
+  brightness,
+  chestCm: chestDepthCm,
+  heartGirthCm,
+  bodyLenCm,
+  weightKg: W,
+  confidence,
+  markerConsistency: scaleResult.sideConsistency,
+  perspectivePenalty: scaleResult.perspectivePenalty
+};
+outSharp.textContent = Number.isFinite(sharpness) ? String(sharpness) : '—';
+outLight.textContent = Number.isFinite(brightness) ? String(brightness) : '—';
+outConf.textContent = Number.isFinite(confidence) ? (confidence + '%') : '—';
+
+const scaleInfo = getScaleFeedback(pxPerCm);
+let scaleQuality = scaleInfo?.quality || 'bad';
+let scaleTip = scaleInfo?.msg || 'حاول تقريب العلامة وإظهارها بوضوح بجوار الحيوان';
+
+if (scaleResult.sideConsistency < 0.80 || scaleResult.perspectivePenalty > 0.20) {
+  scaleQuality = 'weak';
+  scaleTip = 'العلامة ظاهرة لكنها مائلة أو بمنظور قوي — اجعلها مستقيمة وموازية لجانب الحيوان وعلى نفس مستوى الجسم.';
+}
+
+
+if (scaleQuality === 'bad') {
+  showToast('تعذّر قراءة علامة القياس — حاول مرة أخرى مع ظهور العلامة بوضوح');
+} else if (scaleQuality === 'weak') {
+  showToast('تم التقدير مبدئيًا — ' + scaleTip);
+} else if (confidence < 55) {
+  showToast('تم التقدير مبدئيًا — يفضّل إعادة لقطة أوضح لرفع الدقة');
+} else if (confidence < 75) {
+  showToast('تم التقدير — النتيجة جيدة ويمكن تحسينها بلقطة أوضح');
+} else {
+  showToast('✅ تم التقدير بجودة جيدة');
+}
+drawVisionOverlay({
+  imgData,
+  scaleResult,
+  poseResult: null,
+  chestPx,
+  confidence,
+  scaleTip,
+  markerConsistency: scaleResult.sideConsistency,
+  bodySideScore: 1,
+  maskScore: 1
+});
+ fireTrack('weight_estimated', {
+  source: currentSource,
+  px_per_cm: pxPerCm,
+  chest_depth_cm: chestDepthCm,
+  body_length_cm: bodyLenCm,
+  weight_kg: W,
+  sharpness,
+  brightness,
+  confidence
+});
+
+  }catch(err){
+    console.error(err);
+    showToast('حدث خطأ أثناء التقدير', true);
+  }
+};
+
 
   async function postJSON(url, body){
     const res = await fetch(url, {
@@ -770,8 +924,10 @@ async function runAutoEstimate(){
 if ((lastMetrics?.bodySideScore ?? 1) < 0.45) {
   return showToast('وضعية الحيوان غير مناسبة للحفظ — نحتاج لقطة جانبية أوضح.', true);
 }
-    
-
+    // اشتراطات التشغيل المتفق عليها:
+if (currentSource === 'image' && !isDemo) {
+  return showToast('الحفظ للصورة غير مسموح — استخدم الكاميرا أو فعّل وضع Demo.', true);
+}
 if (currentSource === 'camera' && (!pxPerCm || !isFinite(pxPerCm) || pxPerCm <= 0)) {
   return showToast('لا بد من اكتشاف علامة القياس ArUco قبل الحفظ.', true);
 }
