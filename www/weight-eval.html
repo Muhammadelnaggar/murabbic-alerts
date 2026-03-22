@@ -206,6 +206,26 @@ body.clean-capture .guide-pane{
   display:block;
   background:#000;
 }
+  #captureScreen{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+#captureScreen > div{
+  width:100%;
+  max-width:1000px;
+  aspect-ratio:16/9;
+  display:grid;
+  grid-template-columns:1.8fr 1fr;
+  gap:12px;
+}
+
+#captureScreen video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}  
   </style>
 </head>
 <body>
