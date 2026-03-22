@@ -262,28 +262,45 @@ function markCvReady() {
     </div>
 
     <!-- ✅ بادج وضع المصدر -->
-    <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
+   <div id="modeBadge" class="badge">الوضع: كاميرا (حفظ مسموح)</div>
 
-<div class="capture-shell">
+<div class="chips">
+  <button id="awStart" class="chip" type="button">تشغيل الكاميرا</button>
+  <button id="awSave" class="chip" type="button">حفظ كحدث</button>
+</div>
 
-  <div class="camera-pane">
-    <div id="viewWrap" style="position:relative;overflow:hidden;height:100%">
- 
+<div class="kpi3">
+  <div class="kpi"><div class="lbl">المقياس</div><div class="val" id="awScale">—</div></div>
+  <div class="kpi"><div class="lbl">عمق الصدر (سم)</div><div class="val" id="awChestW">—</div></div>
+  <div class="kpi"><div class="lbl">الوزن التقديري</div><div class="val" id="awWeight">—</div></div>
+</div>
+
 <div class="kpi3">
   <div class="kpi"><div class="lbl">حدة الصورة</div><div class="val" id="awSharp">—</div></div>
   <div class="kpi"><div class="lbl">الإضاءة</div><div class="val" id="awLight">—</div></div>
   <div class="kpi"><div class="lbl">الثقة</div><div class="val" id="awConf">—</div></div>
 </div>
 
-    <div class="hint">
-      ضع علامة ArUco مربّع 10 سم بجوار الحيوان وعلى نفس مسافة الكاميرا/الصورة. 
-      الخوارزمية تلتقط الحيوان + العلامة تلقائيًا وتقدّر الوزن.
-    </div>
-    <div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
-    <div id="visionGuide" class="badge" style="display:block;margin-top:8px">
+<div class="hint">
+  ضع علامة ArUco مربّع 10 سم بجوار الحيوان وعلى نفس مستوى الجسم.
+  سيتم الالتقاط والتقدير تلقائيًا عند اكتمال الشروط.
+</div>
+
+<div id="opencvStatus" class="infobar error">انتظر تحميل OpenCV.js</div>
+
+<div id="visionGuide" class="badge" style="display:block;margin-top:8px">
   وجّه الكاميرا ليظهر الحيوان كاملًا من الجانب، وضع علامة القياس 10 سم بجوار الكتف.
 </div>
-  </section>
+
+</section>
+
+<section id="captureScreen" class="hidden" style="
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:#e5e5e5;
+  padding:16px;
+">
 <section id="captureScreen" class="hidden" style="
   position:fixed;
   inset:0;
