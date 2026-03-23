@@ -362,7 +362,13 @@
   '/images/milk_traits/udder_cleft/4.jpg',
   '/images/milk_traits/udder_cleft/5.jpg'
 ];
-
+const UDDER_DEPTH_REF_PATHS = [
+  '/images/milk_traits/udder_depth/1.jpg',
+  '/images/milk_traits/udder_depth/2.jpg',
+  '/images/milk_traits/udder_depth/3.jpg',
+  '/images/milk_traits/udder_depth/4.jpg',
+  '/images/milk_traits/udder_depth/5.jpg'
+];
 const __refImgCache = new Map();
 
 async function loadImageFromDataUrl(dataUrl){
@@ -395,8 +401,16 @@ async function makeUdderCleftVectorFromPath(path){
   const img = await loadImageAny(path);
   return makeUdderCleftVectorFromImage(img);
 }
+async function makeUdderDepthVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeUdderDepthVectorFromImage(img);
+}
 
-function makeUdderCleftVectorFromImage(img){
+async function makeUdderDepthVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeUdderDepthVectorFromImage(img);
+}
+function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
   const size = 96;
   c.width = size;
@@ -407,10 +421,10 @@ function makeUdderCleftVectorFromImage(img){
   const sw = img.width;
   const sh = img.height;
 
-  const sx = Math.round(sw * 0.22);
-  const sy = Math.round(sh * 0.20);
-  const cw = Math.round(sw * 0.56);
-  const ch = Math.round(sh * 0.68);
+  const sx = Math.max(0, Math.round(sw * crop.x));
+  const sy = Math.max(0, Math.round(sh * crop.y));
+  const cw = Math.max(1, Math.round(sw * crop.w));
+  const ch = Math.max(1, Math.round(sh * crop.h));
 
   ctx.drawImage(img, sx, sy, cw, ch, 0, 0, size, size);
 
@@ -441,6 +455,26 @@ function makeUdderCleftVectorFromImage(img){
   }
 
   return gray;
+}
+
+function makeUdderCleftVectorFromImage(img){
+  // ROI ضيق حول الشق الوسطي فقط
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.34,
+    y: 0.36,
+    w: 0.32,
+    h: 0.24
+  });
+}
+
+function makeUdderDepthVectorFromImage(img){
+  // ROI أوسع يركز على قاع الضرع + الرجلين الخلفيتين
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.18,
+    y: 0.28,
+    w: 0.64,
+    h: 0.58
+  });
 }
 
 function cosineSimilarityVec(a, b){
@@ -479,18 +513,40 @@ async function compareUdderCleftReference(dataUrl){
     gap: best.sim - second.sim,
     ranking: sims
   };
-}async function computeKPIs(dataUrl, angle){
+}
+async function compareUdderDepthReference(dataUrl){
+  const sampleVec = await makeUdderDepthVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<UDDER_DEPTH_REF_PATHS.length; i++){
+    const refVec = await makeUdderDepthVectorFromPath(UDDER_DEPTH_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return {
+    grade: best.grade,
+    pct,
+    similarity: best.sim
+  };
+} 
+    async function computeKPIs(dataUrl, angle){
   const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
   const k={};
 
   if(angle==='udder-rear'){
-    const cleftRef = await compareUdderCleftReference(dataUrl);
+    const depthRef = await compareUdderDepthReference(dataUrl);
 
     if(!state.analysis) state.analysis = {};
     state.analysis.rearRef = cleftRef;
-
+    state.analysis.depthRef = depthRef;
     k.udderCleft = cleftRef.pct;
-    k.udderBalanceFrontRear = seededValue(seed+11,60,95);
+    k.uddek.udderBalanceFrontRear = depthRef.pct;rBalanceFrontRear = seededValue(seed+11,60,95);
     k.teatDistribution = seededValue(seed+12,60,95);
     k.teatSize = seededValue(seed+13,60,95);
 
@@ -572,7 +628,8 @@ async function compareUdderCleftReference(dataUrl){
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
 
     if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-      helperText.textContent = `✅ الخلفية مقبولة — الشق الوسطي المرجعي: درجة ${state.analysis.rearRef.grade}/5`;
+      helperText.textContent =
+  `✅ الخلفية مقبولة — الشق الوسطي: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5`;
     }
 
     renderThumbs();
