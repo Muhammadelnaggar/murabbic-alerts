@@ -382,7 +382,8 @@ const UDDER_DEPTH_REF_PATHS = [
   '/images/milk_traits/rear_teat_placement/3.jpg',
   '/images/milk_traits/rear_teat_placement/4.jpg',
   '/images/milk_traits/rear_teat_placement/5.jpg'
-];   
+]; 
+
 const __refImgCache = new Map();
 
 async function loadImageFromDataUrl(dataUrl){
@@ -441,7 +442,13 @@ async function makeRearUdderWidthVectorFromPath(path){
 async function makeRearTeatPlacementVectorFromPath(path){
   const img = await loadImageAny(path);
   return makeRearTeatPlacementVectorFromImage(img);
-}   
+}
+    
+
+async function makeTeatLengthVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeTeatLengthVectorFromImage(img);
+}
 function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
   const size = 96;
@@ -524,7 +531,16 @@ function makeRearTeatPlacementVectorFromImage(img){
     w: 0.40,
     h: 0.30
   });
-}    
+} 
+    function makeTeatLengthVectorFromImage(img){
+  // تركيز على الحلمات من قاعدة الاتصال حتى الطرف
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.36,
+    y: 0.42,
+    w: 0.28,
+    h: 0.42
+  });
+}
 function cosineSimilarityVec(a, b){
   let dot = 0, na = 0, nb = 0;
   const n = Math.min(a.length, b.length);
@@ -624,32 +640,32 @@ async function compareUdderDepthReference(dataUrl){
     pct,
     similarity: best.sim
   };
-}   
+} 
+   
     async function computeKPIs(dataUrl, angle){
   const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
   const k={};
 
- if(angle==='udder-rear'){
+if(angle==='udder-rear'){
   const cleftRef = await compareUdderCleftReference(dataUrl);
   const depthRef = await compareUdderDepthReference(dataUrl);
   const widthRef = await compareRearUdderWidthReference(dataUrl);
   const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
-  const teatLengthRef = await compareTeatLengthReference(dataUrl);
+ 
 
   if(!state.analysis) state.analysis = {};
   state.analysis.cleftRef = cleftRef;
   state.analysis.depthRef = depthRef;
   state.analysis.widthRef = widthRef;
   state.analysis.teatPlacementRef = teatPlacementRef;
-  state.analysis.teatLengthRef = teatLengthRef;
+ 
 
   k.udderCleft = cleftRef.pct;
   k.udderDepth = depthRef.pct;
   k.rearUdderWidth = widthRef.pct;
   k.rearTeatPlacement = teatPlacementRef.pct;
-  k.teatLength = teatLengthRef.pct;
+ 
 }
-
 
   return k;
 }
@@ -658,7 +674,7 @@ async function compareUdderDepthReference(dataUrl){
     function computeOverallFromState(){
       const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
       const SUB={
-       UDDER:{ udderCleft:20, udderDepth:20, rearUdderWidth:20, rearTeatPlacement:20, teatLength:20 }
+      UDDER:{ udderCleft:25, udderDepth:25, rearUdderWidth:25, rearTeatPlacement:25 }
         BACK_RUMP:{ backStraight:45, rumpAngle:35, bodyDepth:20 },
         FRONT_LEGS:{ chestWidth:50, frontLegsParallel:50 },
         FEMININITY:{ femininity:100 }
@@ -713,10 +729,10 @@ async function compareUdderDepthReference(dataUrl){
     state.captures[state.currentAngle]=dataUrl;
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
 
-    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-    helperText.textContent =
-  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef.grade}/5 | توزيع الحلمات: ${state.analysis.teatPlacementRef.grade}/5`;
-    }
+   if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
+  helperText.textContent =
+`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5`
+}
 
     renderThumbs();
     updateButtons();
@@ -748,10 +764,10 @@ async function compareUdderDepthReference(dataUrl){
     state.captures[state.currentAngle]=url;
     state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle);
 
-    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-     helperText.textContent =
-  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5`;
-    }
+   if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
+  helperText.textContent =
+`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
+}
 
     renderThumbs();
     updateButtons();
