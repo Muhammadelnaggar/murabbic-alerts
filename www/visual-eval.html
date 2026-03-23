@@ -375,6 +375,13 @@ const UDDER_DEPTH_REF_PATHS = [
   '/images/milk_traits/rear_udder_width/3.jpg',
   '/images/milk_traits/rear_udder_width/4.jpg',
   '/images/milk_traits/rear_udder_width/5.jpg'
+];  
+ const REAR_TEAT_PLACEMENT_REF_PATHS = [
+  '/images/milk_traits/rear_teat_placement/1.jpg',
+  '/images/milk_traits/rear_teat_placement/2.jpg',
+  '/images/milk_traits/rear_teat_placement/3.jpg',
+  '/images/milk_traits/rear_teat_placement/4.jpg',
+  '/images/milk_traits/rear_teat_placement/5.jpg'
 ];   
 const __refImgCache = new Map();
 
@@ -425,7 +432,16 @@ async function makeRearUdderWidthVectorFromDataUrl(dataUrl){
 async function makeRearUdderWidthVectorFromPath(path){
   const img = await loadImageAny(path);
   return makeRearUdderWidthVectorFromImage(img);
-}    
+}  
+ async function makeRearTeatPlacementVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeRearTeatPlacementVectorFromImage(img);
+}
+
+async function makeRearTeatPlacementVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeRearTeatPlacementVectorFromImage(img);
+}   
 function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
   const size = 96;
@@ -500,6 +516,15 @@ function makeRearUdderWidthVectorFromImage(img){
     h: 0.25
   });
 }
+function makeRearTeatPlacementVectorFromImage(img){
+  // منطقة الحلمات الخلفية فقط
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.30,
+    y: 0.45,
+    w: 0.40,
+    h: 0.30
+  });
+}    
 function cosineSimilarityVec(a, b){
   let dot = 0, na = 0, nb = 0;
   const n = Math.min(a.length, b.length);
@@ -578,7 +603,28 @@ async function compareUdderDepthReference(dataUrl){
     pct,
     similarity: best.sim
   };
-}  
+}
+ async function compareRearTeatPlacementReference(dataUrl){
+  const sampleVec = await makeRearTeatPlacementVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<REAR_TEAT_PLACEMENT_REF_PATHS.length; i++){
+    const refVec = await makeRearTeatPlacementVectorFromPath(REAR_TEAT_PLACEMENT_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return {
+    grade: best.grade,
+    pct,
+    similarity: best.sim
+  };
+}   
     async function computeKPIs(dataUrl, angle){
   const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
   const k={};
@@ -587,15 +633,16 @@ async function compareUdderDepthReference(dataUrl){
     const cleftRef = await compareUdderCleftReference(dataUrl);
     const depthRef = await compareUdderDepthReference(dataUrl);
     const widthRef = await compareRearUdderWidthReference(dataUrl);
-
+    const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
     if(!state.analysis) state.analysis = {};
     state.analysis.rearRef = cleftRef;
     state.analysis.depthRef = depthRef;
     state.analysis.widthRef = widthRef;
+    state.analysis.teatPlacementRef = teatPlacementRef;
     k.udderCleft = cleftRef.pct;
     k.udderBalanceFrontRear = depthRef.pct;
    k.teatDistribution = widthRef.pct;
-    k.teatSize = seededValue(seed+13,60,95);
+   k.teatSize = teatPlacementRef.pct;
   } 
   else if(angle==='side'){
     k.backStraight=seededValue(seed+21,60,95);
@@ -675,8 +722,8 @@ async function compareUdderDepthReference(dataUrl){
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
 
     if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-     helperText.textContent =
-  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef?.grade}/5`;
+    helperText.textContent =
+  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef.grade}/5 | توزيع الحلمات: ${state.analysis.teatPlacementRef.grade}/5`;
     }
 
     renderThumbs();
