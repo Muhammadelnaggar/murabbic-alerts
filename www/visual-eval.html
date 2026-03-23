@@ -355,28 +355,162 @@
     // ===== الحسابات (جاهزة للذكاء الاصطناعي) =====
     function hashString(s){let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return Math.abs(h); }
     function seededValue(seed,min,max){ const x=Math.sin(seed)*10000; const f=x-Math.floor(x); return Math.round(min+f*(max-min)); }
-    async function computeKPIs(dataUrl, angle){
-      const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
-      const k={};
-      if(angle==='udder-rear'){
-        k.udderCleft=seededValue(seed+10,60,95);
-        k.udderBalanceFrontRear=seededValue(seed+11,60,95); // توازن النصف الأمامي والخلفي
-        k.teatDistribution=seededValue(seed+12,60,95);
-        k.teatSize=seededValue(seed+13,60,95);
-      } else if(angle==='side'){
-        k.backStraight=seededValue(seed+21,60,95);
-        k.rumpAngle=seededValue(seed+22,60,95);
-        k.bodyDepth=seededValue(seed+23,60,95);
-      } else if(angle==='front-body'){
-        k.chestWidth=seededValue(seed+31,60,95);
-        k.frontLegsParallel=seededValue(seed+32,60,95);
-      } else if(angle==='teat-close'){
-        k.teatSize=seededValue(seed+41,60,95);
-        k.teatDistribution=seededValue(seed+42,60,95);
-        k.teatSymmetry=seededValue(seed+43,60,95);
-      }
-      return k;
-    }
+    const UDDER_CLEFT_REF_PATHS = [
+  '/images/milk_traits/udder_cleft/1.jpg',
+  '/images/milk_traits/udder_cleft/2.jpg',
+  '/images/milk_traits/udder_cleft/3.jpg',
+  '/images/milk_traits/udder_cleft/4.jpg',
+  '/images/milk_traits/udder_cleft/5.jpg'
+];
+
+const __refImgCache = new Map();
+
+async function loadImageFromDataUrl(dataUrl){
+  return await new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+async function loadImageAny(src){
+  if(__refImgCache.has(src)) return __refImgCache.get(src);
+  const p = new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = ()=> reject(new Error('تعذر تحميل الصورة: ' + src));
+    img.src = src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now();
+  });
+  __refImgCache.set(src, p);
+  return p;
+}
+
+async function makeUdderCleftVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeUdderCleftVectorFromImage(img);
+}
+
+async function makeUdderCleftVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeUdderCleftVectorFromImage(img);
+}
+
+function makeUdderCleftVectorFromImage(img){
+  const c = document.createElement('canvas');
+  const size = 96;
+  c.width = size;
+  c.height = size;
+
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+
+  const sw = img.width;
+  const sh = img.height;
+
+  const sx = Math.round(sw * 0.22);
+  const sy = Math.round(sh * 0.20);
+  const cw = Math.round(sw * 0.56);
+  const ch = Math.round(sh * 0.68);
+
+  ctx.drawImage(img, sx, sy, cw, ch, 0, 0, size, size);
+
+  const imgData = ctx.getImageData(0, 0, size, size);
+  const d = imgData.data;
+
+  const gray = new Float32Array(size * size);
+
+  for(let i=0, p=0; i<d.length; i+=4, p++){
+    const r = d[i], g = d[i+1], b = d[i+2];
+    gray[p] = 0.2126*r + 0.7152*g + 0.0722*b;
+  }
+
+  let mean = 0;
+  for(let i=0; i<gray.length; i++) mean += gray[i];
+  mean /= gray.length;
+
+  let variance = 0;
+  for(let i=0; i<gray.length; i++){
+    const v = gray[i] - mean;
+    variance += v * v;
+  }
+  variance /= gray.length;
+  const std = Math.sqrt(variance) || 1;
+
+  for(let i=0; i<gray.length; i++){
+    gray[i] = (gray[i] - mean) / std;
+  }
+
+  return gray;
+}
+
+function cosineSimilarityVec(a, b){
+  let dot = 0, na = 0, nb = 0;
+  const n = Math.min(a.length, b.length);
+  for(let i=0; i<n; i++){
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if(!na || !nb) return -1;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+async function compareUdderCleftReference(dataUrl){
+  const sampleVec = await makeUdderCleftVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<UDDER_CLEFT_REF_PATHS.length; i++){
+    const refVec = await makeUdderCleftVectorFromPath(UDDER_CLEFT_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const second = sims[1] || { sim: best.sim };
+
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return {
+    grade: best.grade,
+    pct,
+    similarity: best.sim,
+    gap: best.sim - second.sim,
+    ranking: sims
+  };
+}async function computeKPIs(dataUrl, angle){
+  const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
+  const k={};
+
+  if(angle==='udder-rear'){
+    const cleftRef = await compareUdderCleftReference(dataUrl);
+
+    if(!state.analysis) state.analysis = {};
+    state.analysis.rearRef = cleftRef;
+
+    k.udderCleft = cleftRef.pct;
+    k.udderBalanceFrontRear = seededValue(seed+11,60,95);
+    k.teatDistribution = seededValue(seed+12,60,95);
+    k.teatSize = seededValue(seed+13,60,95);
+
+  } else if(angle==='side'){
+    k.backStraight=seededValue(seed+21,60,95);
+    k.rumpAngle=seededValue(seed+22,60,95);
+    k.bodyDepth=seededValue(seed+23,60,95);
+
+  } else if(angle==='front-body'){
+    k.chestWidth=seededValue(seed+31,60,95);
+    k.frontLegsParallel=seededValue(seed+32,60,95);
+
+  } else if(angle==='teat-close'){
+    k.teatSize=seededValue(seed+41,60,95);
+    k.teatDistribution=seededValue(seed+42,60,95);
+    k.teatSymmetry=seededValue(seed+43,60,95);
+  }
+
+  return k;
+}
 
     // الأوزان: 40% ضرع، 30% ظهر/رامب/عمق، 20% صدر/أرجل أمامية، 10% أنوثة
     function computeOverallFromState(){
@@ -427,13 +561,60 @@
     $$('.angle-tab').forEach(btn=> btn.addEventListener('click', ()=> setAngle(btn.dataset.angle)));
 
     uploadBtn.addEventListener('click', ()=> uploadInput.click());
-    uploadInput.addEventListener('change', e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ const dataUrl=r.result; state.captures[state.currentAngle]=dataUrl; state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_upload',{angle:state.currentAngle}); }; r.readAsDataURL(f); uploadInput.value=''; });
+  uploadInput.addEventListener('change', e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
 
-    captureToggleBtn.addEventListener('click', async ()=>{
-      const has=!!state.captures[state.currentAngle];
-      if(has){ state.captures[state.currentAngle]=null; state.k[state.currentAngle]=null; renderThumbs(); updateButtons(); renderScore(); t.event('capture_clear',{angle:state.currentAngle}); }
-      else{ const url=dataURLFromVideo(); state.captures[state.currentAngle]=url; state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle); renderThumbs(); updateButtons(); renderScore(); t.event('capture_take',{angle:state.currentAngle}); }
-    });
+  const r=new FileReader();
+  r.onload=async ()=>{
+    const dataUrl=r.result;
+    state.captures[state.currentAngle]=dataUrl;
+    state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
+
+    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
+      helperText.textContent = `✅ الخلفية مقبولة — الشق الوسطي المرجعي: درجة ${state.analysis.rearRef.grade}/5`;
+    }
+
+    renderThumbs();
+    updateButtons();
+    renderScore();
+    t.event('capture_upload',{angle:state.currentAngle});
+  };
+
+  r.readAsDataURL(f);
+  uploadInput.value='';
+});
+
+  captureToggleBtn.addEventListener('click', async ()=>{
+  const has=!!state.captures[state.currentAngle];
+
+  if(has){
+    state.captures[state.currentAngle]=null;
+    state.k[state.currentAngle]=null;
+
+    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
+      delete state.analysis.rearRef;
+    }
+
+    renderThumbs();
+    updateButtons();
+    renderScore();
+    t.event('capture_clear',{angle:state.currentAngle});
+  } else {
+    const url=dataURLFromVideo();
+    state.captures[state.currentAngle]=url;
+    state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle);
+
+    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
+      helperText.textContent = `✅ الخلفية مقبولة — الشق الوسطي المرجعي: درجة ${state.analysis.rearRef.grade}/5`;
+    }
+
+    renderThumbs();
+    updateButtons();
+    renderScore();
+    t.event('capture_take',{angle:state.currentAngle});
+  }
+});
 
     nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
     toggleFlash.addEventListener('click', toggleTorch);
