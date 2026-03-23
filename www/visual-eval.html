@@ -474,12 +474,11 @@ function makeGrayVectorFromImageCrop(img, crop){
 }
 
 function makeUdderCleftVectorFromImage(img){
-  // ROI ضيق حول الشق الوسطي فقط
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.34,
-    y: 0.36,
-    w: 0.32,
-    h: 0.24
+    x: 0.42,
+    y: 0.32,
+    w: 0.16,
+    h: 0.18
   });
 }
 
@@ -676,8 +675,8 @@ async function compareUdderDepthReference(dataUrl){
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
 
     if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-      helperText.textContent =
-  `✅ الخلفية مقبولة — الشق الوسطي: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5`;
+     helperText.textContent =
+  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef?.grade || '-'} /5`;
     }
 
     renderThumbs();
