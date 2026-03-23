@@ -231,7 +231,7 @@
         <button class="angle-tab active" data-angle="udder-rear">لقطة خلفية</button>
         <button class="angle-tab" data-angle="side">لقطة جانبية</button>
         <button class="angle-tab" data-angle="front-body">لقطة أمامية</button>
-        <button class="angle-tab" data-angle="teat-close">قريبة للضرع</button>
+       
       </div>
 
       <div class="controls">
@@ -300,7 +300,7 @@
       return {id,number,date};
     }
 
-    const anglesOrder=['udder-rear','side','front-body','teat-close'];
+   const anglesOrder=['udder-rear'];
     const angleLabels={ 'udder-rear':'خلفية','side':'جانبية','front-body':'أمامية','teat-close':'قريبة ضرع' };
     const helperByAngle={
       'udder-rear':'قيّم تماثل أرباع الضرع وتوزيع الحلمات واتساع الأرجل الخلفية والـ udder cleft.',
@@ -629,35 +629,27 @@ async function compareUdderDepthReference(dataUrl){
   const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
   const k={};
 
-  if(angle==='udder-rear'){
-    const cleftRef = await compareUdderCleftReference(dataUrl);
-    const depthRef = await compareUdderDepthReference(dataUrl);
-    const widthRef = await compareRearUdderWidthReference(dataUrl);
-    const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
-    if(!state.analysis) state.analysis = {};
-    state.analysis.rearRef = cleftRef;
-    state.analysis.depthRef = depthRef;
-    state.analysis.widthRef = widthRef;
-    state.analysis.teatPlacementRef = teatPlacementRef;
-    k.udderCleft = cleftRef.pct;
-    k.udderBalanceFrontRear = depthRef.pct;
-   k.teatDistribution = widthRef.pct;
-   k.teatSize = teatPlacementRef.pct;
-  } 
-  else if(angle==='side'){
-    k.backStraight=seededValue(seed+21,60,95);
-    k.rumpAngle=seededValue(seed+22,60,95);
-    k.bodyDepth=seededValue(seed+23,60,95);
+ if(angle==='udder-rear'){
+  const cleftRef = await compareUdderCleftReference(dataUrl);
+  const depthRef = await compareUdderDepthReference(dataUrl);
+  const widthRef = await compareRearUdderWidthReference(dataUrl);
+  const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
+  const teatLengthRef = await compareTeatLengthReference(dataUrl);
 
-  } else if(angle==='front-body'){
-    k.chestWidth=seededValue(seed+31,60,95);
-    k.frontLegsParallel=seededValue(seed+32,60,95);
+  if(!state.analysis) state.analysis = {};
+  state.analysis.cleftRef = cleftRef;
+  state.analysis.depthRef = depthRef;
+  state.analysis.widthRef = widthRef;
+  state.analysis.teatPlacementRef = teatPlacementRef;
+  state.analysis.teatLengthRef = teatLengthRef;
 
-  } else if(angle==='teat-close'){
-    k.teatSize=seededValue(seed+41,60,95);
-    k.teatDistribution=seededValue(seed+42,60,95);
-    k.teatSymmetry=seededValue(seed+43,60,95);
-  }
+  k.udderCleft = cleftRef.pct;
+  k.udderDepth = depthRef.pct;
+  k.rearUdderWidth = widthRef.pct;
+  k.rearTeatPlacement = teatPlacementRef.pct;
+  k.teatLength = teatLengthRef.pct;
+}
+
 
   return k;
 }
@@ -666,14 +658,14 @@ async function compareUdderDepthReference(dataUrl){
     function computeOverallFromState(){
       const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
       const SUB={
-        UDDER:{ udderCleft:25, udderBalanceFrontRear:20, teatDistribution:20, teatSize:15, teatSymmetry:20 },
+       UDDER:{ udderCleft:20, udderDepth:20, rearUdderWidth:20, rearTeatPlacement:20, teatLength:20 }
         BACK_RUMP:{ backStraight:45, rumpAngle:35, bodyDepth:20 },
         FRONT_LEGS:{ chestWidth:50, frontLegsParallel:50 },
         FEMININITY:{ femininity:100 }
       };
-      const all=Object.assign({},state.k['udder-rear'],state.k['side'],state.k['front-body'],state.k['teat-close']);
+      const all=Object.assign({},state.k['udder-rear'],state.k['udder-rear'],state.k['front-body'],state.k['udder-rear']);
       // علامة الأنوثة (قد تُستمد من الجانب)
-      if(state.k['side'] && state.k['side'].femininity==null){ all.femininity = seededValue( hashString('fem'+(all.backStraight||70)), 60, 95 ); }
+      if(state.k['udder-rear'] && state.k['udder-rear'].femininity==null){ all.femininity = seededValue( hashString('fem'+(all.backStraight||70)), 60, 95 ); }
       const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
       const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), F=w(SUB.FRONT_LEGS), FE=w(SUB.FEMININITY);
       const total=WEIGHTS.UDDER+WEIGHTS.BACK_RUMP+WEIGHTS.FRONT_LEGS+WEIGHTS.FEMININITY;
@@ -768,7 +760,7 @@ async function compareUdderDepthReference(dataUrl){
   }
 });
 
-    nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
+    //nextAngleBtn.addEventListener('click', ()=>{ const i=anglesOrder.indexOf(state.currentAngle); setAngle(anglesOrder[(i+1)%anglesOrder.length]); t.event('angle_next',{angle:state.currentAngle}); });
     toggleFlash.addEventListener('click', toggleTorch);
     restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
     const backTopBtn = document.getElementById('backTopBtn');
@@ -779,7 +771,7 @@ async function compareUdderDepthReference(dataUrl){
       try{
         if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
         await startCamera(); await listCameras();
-        renderThumbs(); setAngle('side');
+        renderThumbs();setAngle('udder-rear');
         if(!eventDateInput.value) eventDateInput.value=todayCairo();
       }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
     })();
