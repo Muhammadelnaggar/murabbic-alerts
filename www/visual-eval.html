@@ -676,7 +676,7 @@ async function compareUdderDepthReference(dataUrl){
 
     if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
      helperText.textContent =
-  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef?.grade || '-'} /5`;
+  `✅ الخلفية مقبولة — الشق: ${state.analysis.rearRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض: ${state.analysis.widthRef?.grade}/5`;
     }
 
     renderThumbs();
