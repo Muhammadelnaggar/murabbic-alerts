@@ -590,53 +590,56 @@ async function qualityCheck(dataUrl, angle){
     // ===== الحسابات (جاهزة للذكاء الاصطناعي) =====
     function hashString(s){let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return Math.abs(h); }
     function seededValue(seed,min,max){ const x=Math.sin(seed)*10000; const f=x-Math.floor(x); return Math.round(min+f*(max-min)); }
-    async function computeKPIs(dataUrl, angle){
-      const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
-      const k={};
-     if(angle==='udder-rear'){
-  const rear = await analyzeUdderRearImage(dataUrl);
+async function computeKPIs(dataUrl, angle){
+  const seed = hashString(angle + (dataUrl ? dataUrl.slice(0,64) : String(Math.random())));
+  const k = {};
 
-  if(!state.analysis) state.analysis = {};
-  state.analysis.rear = rear;
+  if(angle === 'udder-rear'){
+    const rear = await analyzeUdderRearImage(dataUrl);
 
-  if(!rear.ok){
-    k.udderCleft = 55;
-    k.udderBalanceFrontRear = 55;
-    k.teatDistribution = 55;
-    k.teatSize = 55;
-  }else{
-    k.udderCleft = rear.udderCleft;
-    k.udderBalanceFrontRear = rear.udderBalanceFrontRear;
-    k.teatDistribution = rear.teatDistribution;
-    k.teatSize = rear.teatSize;
-  }
-}
-  const side = await analyzeSideImage(dataUrl);
+    if(!state.analysis) state.analysis = {};
+    state.analysis.rear = rear;
 
-  if(!state.analysis) state.analysis = {};
-  state.analysis.side = side;
-
-  if(!side.ok){
-    k.backStraight = 55;
-    k.rumpAngle = 55;
-    k.bodyDepth = 55;
-  }else{
-    k.backStraight = side.backStraight;
-    k.rumpAngle = side.rumpAngle;
-    k.bodyDepth = side.bodyDepth;
-  }
-}
-      } else if(angle==='front-body'){
-        k.chestWidth=seededValue(seed+31,60,95);
-        k.frontLegsParallel=seededValue(seed+32,60,95);
-      } else if(angle==='teat-close'){
-        k.teatSize=seededValue(seed+41,60,95);
-        k.teatDistribution=seededValue(seed+42,60,95);
-        k.teatSymmetry=seededValue(seed+43,60,95);
-      }
-      return k;
+    if(!rear.ok){
+      k.udderCleft = 55;
+      k.udderBalanceFrontRear = 55;
+      k.teatDistribution = 55;
+      k.teatSize = 55;
+    }else{
+      k.udderCleft = rear.udderCleft;
+      k.udderBalanceFrontRear = rear.udderBalanceFrontRear;
+      k.teatDistribution = rear.teatDistribution;
+      k.teatSize = rear.teatSize;
     }
 
+  } else if(angle === 'side'){
+    const side = await analyzeSideImage(dataUrl);
+
+    if(!state.analysis) state.analysis = {};
+    state.analysis.side = side;
+
+    if(!side.ok){
+      k.backStraight = 55;
+      k.rumpAngle = 55;
+      k.bodyDepth = 55;
+    }else{
+      k.backStraight = side.backStraight;
+      k.rumpAngle = side.rumpAngle;
+      k.bodyDepth = side.bodyDepth;
+    }
+
+  } else if(angle === 'front-body'){
+    k.chestWidth = seededValue(seed+31,60,95);
+    k.frontLegsParallel = seededValue(seed+32,60,95);
+
+  } else if(angle === 'teat-close'){
+    k.teatSize = seededValue(seed+41,60,95);
+    k.teatDistribution = seededValue(seed+42,60,95);
+    k.teatSymmetry = seededValue(seed+43,60,95);
+  }
+
+  return k;
+}
     // الأوزان: 40% ضرع، 30% ظهر/رامب/عمق، 20% صدر/أرجل أمامية، 10% أنوثة
     async function analyzeSideImage(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
@@ -1046,10 +1049,7 @@ async function qualityCheck(dataUrl, angle){
   helperText.textContent =
     `✅ الخلفية مقبولة — تماثل الضرع: ${state.analysis.rear.udderBalanceFrontRear}%، توزيع الحلمات: ${state.analysis.rear.teatDistribution}%، الشق الوسطي: ${state.analysis.rear.udderCleft}%`;
 }
-    if(state.currentAngle === 'udder-rear' && state.analysis?.rear?.ok){
-  helperText.textContent =
-    `✅ الخلفية مقبولة — تماثل الضرع: ${state.analysis.rear.udderBalanceFrontRear}%، توزيع الحلمات: ${state.analysis.rear.teatDistribution}%، الشق الوسطي: ${state.analysis.rear.udderCleft}%`;
-}
+   
     if(state.currentAngle === 'side' && state.analysis?.side?.ok){
   helperText.textContent = `✅ الجانبية مقبولة — استقامة الظهر: ${state.analysis.side.backStraight}%، زاوية الرامب: ${state.analysis.side.rumpAngle}%، عمق الجسم: ${state.analysis.side.bodyDepth}%`;
 }
@@ -1102,14 +1102,22 @@ async function qualityCheck(dataUrl, angle){
     restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
     backBtn.addEventListener('click', ()=>{ const params=new URLSearchParams(); if(animalIdInput?.value) params.set('animalId', animalIdInput.value); if(animalNumberInput?.value) params.set('number', animalNumberInput.value); if(evalDateInput?.value) params.set('date', evalDateInput.value); location.href = `dashboard.html?${params.toString()}`; });
 
-    (async function init(){
-      try{
-        if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showMsg('⚠️ المتصفح لا يدعم الكاميرا', false); return; }
-        await startCamera(); await listCameras();
-        renderThumbs(); setAngle('side');
-        if(!evalDateInput.value) evalDateInput.value=todayCairo();
-      }catch(err){ console.warn(err); showMsg('❌ تعذّر الوصول للكاميرا', false); }
-    })();
+   (async function init(){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      helperText.textContent = '⚠️ المتصفح لا يدعم الكاميرا';
+      return;
+    }
+    await startCamera();
+    await listCameras();
+    renderThumbs();
+    setAngle('side');
+    if(!evalDateInput.value) evalDateInput.value = todayCairo();
+  }catch(err){
+    console.warn(err);
+    helperText.textContent = '❌ تعذّر الوصول للكاميرا';
+  }
+})();
   </script>
 
   <!-- حفظ النتيجة فقط (بدون صور) إلى فايربيز -->
