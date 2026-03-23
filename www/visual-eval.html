@@ -540,6 +540,7 @@ async function compareUdderDepthReference(dataUrl){
   const k={};
 
   if(angle==='udder-rear'){
+    const cleftRef = await compareUdderCleftReference(dataUrl);
     const depthRef = await compareUdderDepthReference(dataUrl);
 
     if(!state.analysis) state.analysis = {};
