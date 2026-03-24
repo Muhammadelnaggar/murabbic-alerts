@@ -570,10 +570,10 @@ function makeGrayVectorFromImageCrop(img, crop){
 
 function makeUdderCleftVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.42,
-    y: 0.32,
-    w: 0.16,
-    h: 0.18
+   x: 0.35,
+    y: 0.40,
+    w: 0.30,
+    h: 0.35
   });
 }
 
@@ -636,10 +636,10 @@ function makeFrontTeatLengthVectorFromImage(img){
     function makeTeatLengthVectorFromImage(img){
   // تركيز على الحلمات من قاعدة الاتصال حتى الطرف
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.36,
-    y: 0.42,
-    w: 0.28,
-    h: 0.42
+    x: 0.42,
+    y: 0.50,
+    w: 0.16,
+    h: 0.30
   });
 }
 function cosineSimilarityVec(a, b){
@@ -669,7 +669,7 @@ async function compareUdderCleftReference(dataUrl){
   const best = sims[0];
   const second = sims[1] || { sim: best.sim };
 
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+  const pct = Math.round((best.grade / 5) * 100);
 
   return {
     grade: best.grade,
