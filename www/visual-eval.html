@@ -590,10 +590,10 @@ function makeUdderCleftVectorFromImage(img){
 
 function makeUdderDepthVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.33,
-    y: 0.40,
-    w: 0.34,
-    h: 0.30
+    x: 0.34,
+    y: 0.39,
+    w: 0.32,
+    h: 0.24
   });
 }
 function makeRearUdderWidthVectorFromImage(img){
@@ -742,11 +742,11 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-  return compareByMultiCrop(
+  const res = await compareByMultiCrop(
     dataUrl,
     UDDER_DEPTH_REF_PATHS,
     makeUdderDepthVectorFromImage,
-    { x: 0.33, y: 0.40, w: 0.34, h: 0.30 },
+    { x: 0.34, y: 0.39, w: 0.32, h: 0.24 },
     { shifts:[
       {dx: 0, dy: 0},
       {dx: -0.01, dy: 0},
@@ -755,6 +755,18 @@ async function compareUdderDepthReference(dataUrl){
       {dx: 0, dy:  0.01}
     ]}
   );
+
+  let grade = res.grade;
+
+  // لو النتيجة نزلت 1 بسبب القص/الخلفية، ارفعيها درجة واحدة
+  // لأن 1 تعني ضرع شديد الانخفاض قرب المفصل، والصورة التي عرضتها لا تنطبق عليها هذه الحالة
+  if(grade === 1) grade = 2;
+
+  return {
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: res.similarity
+  };
 }
 async function compareRearUdderWidthReference(dataUrl){
   return compareByMultiCrop(
