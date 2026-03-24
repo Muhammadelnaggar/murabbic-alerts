@@ -499,17 +499,27 @@ async function makeTeatLengthVectorFromPath(path){
 }
 
 async function compareTeatLengthReference(dataUrl){
-  return compareByMultiCrop(
+  const res = await compareByMultiCrop(
     dataUrl,
     TEAT_LENGTH_REF_PATHS,
     makeTeatLengthVectorFromImage,
-    { x: 0.42, y: 0.52, w: 0.16, h: 0.30 },
+    { x: 0.40, y: 0.50, w: 0.20, h: 0.34 },
     { shifts:[
       {dx: 0, dy: 0},
       {dx: -0.01, dy: 0},
       {dx:  0.01, dy: 0}
     ]}
   );
+
+  const ideal = 3;
+  const diff = Math.abs(res.grade - ideal);
+  const pct = Math.max(0, 100 - diff * 25);
+
+  return {
+    grade: res.grade,
+    pct,
+    similarity: res.similarity
+  };
 }
 function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
@@ -625,10 +635,10 @@ function makeFrontTeatLengthVectorFromImage(img){
     function makeTeatLengthVectorFromImage(img){
   // تركيز على الحلمات من قاعدة الاتصال حتى الطرف
   return makeGrayVectorFromImageCrop(img, {
-   x: 0.42,
-    y: 0.52,
-    w: 0.16,
-    h: 0.30
+   x: 0.40,
+    y: 0.50,
+    w: 0.20,
+    h: 0.34
   });
 }
 function cosineSimilarityVec(a, b){
@@ -759,7 +769,7 @@ async function compareRearTeatPlacementReference(dataUrl){
     dataUrl,
     REAR_TEAT_PLACEMENT_REF_PATHS,
     makeRearTeatPlacementVectorFromImage,
-    { x: 0.38, y: 0.50, w: 0.24, h: 0.25 },
+    { x: 0.34, y: 0.48, w: 0.32, h: 0.28 },
     { shifts:[
       {dx: 0, dy: 0},
       {dx: -0.015, dy: 0},
