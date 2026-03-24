@@ -731,17 +731,41 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-  return compareByMultiCrop(
-    dataUrl,
-    UDDER_DEPTH_REF_PATHS,
-    makeUdderDepthVectorFromImage,
-    { x: 0.35, y: 0.42, w: 0.30, h: 0.35 },
-    { shifts:[
-      {dx: 0, dy: 0},
-      {dx: -0.02, dy: 0},
-      {dx:  0.02, dy: 0}
-    ]}
-  );
+  const img = await loadImageFromDataUrl(dataUrl);
+
+  // نأخذ منطقة تشمل قاع الضرع + بداية الرجلين
+  const vec = makeGrayVectorFromImageCrop(img, {
+    x: 0.30,
+    y: 0.48,
+    w: 0.40,
+    h: 0.28
+  });
+
+  const sims = [];
+
+  for(let i=0;i<UDDER_DEPTH_REF_PATHS.length;i++){
+    const refImg = await loadImageAny(UDDER_DEPTH_REF_PATHS[i]);
+    const refVec = makeUdderDepthVectorFromImage(refImg);
+    const sim = cosineSimilarityVec(vec, refVec);
+    sims.push({grade:i+1, sim});
+  }
+
+  sims.sort((a,b)=>b.sim-a.sim);
+
+  let grade = sims[0].grade;
+
+  // 🔥 تعديل مهم: رفع الدرجات العليا لو الفرق بسيط
+  if(sims[0].sim - sims[1].sim < 0.04){
+    grade = Math.max(sims[0].grade, sims[1].grade);
+  }
+
+  const pct = Math.round((grade/5)*100);
+
+  return {
+    grade,
+    pct,
+    similarity: sims[0].sim
+  };
 }
   async function compareRearUdderWidthReference(dataUrl){
   const sampleVec = await makeRearUdderWidthVectorFromDataUrl(dataUrl);
