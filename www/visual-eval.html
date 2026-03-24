@@ -577,12 +577,11 @@ function makeUdderDepthVectorFromImage(img){
   });
 }
 function makeRearUdderWidthVectorFromImage(img){
-  // ROI أعلى الضرع الخلفي (منطقة الاتصال)
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.20,
-    y: 0.10,
-    w: 0.60,
-    h: 0.25
+    x: 0.26,
+    y: 0.14,
+    w: 0.48,
+    h: 0.18
   });
 }
 function makeRearTeatPlacementVectorFromImage(img){
