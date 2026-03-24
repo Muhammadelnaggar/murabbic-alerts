@@ -319,15 +319,7 @@ const helperByAngle = {
   torchOn:false,
   captures:{ 'udder-rear':null,'side':null,'front-body':null,'teat-close':null },
   k:{},
-  landmarks:{
-    rearTeats:{
-      leftBase:null,
-      leftTip:null,
-      rightBase:null,
-      rightTip:null
-    }
-  },
-  dragKey:null
+ landmarks:{},
 };
    
     window.state = state; // لأغراض الذكاء والتتبع
@@ -366,183 +358,12 @@ const helperByAngle = {
       else if(a==='teat-close'){ rx=w*.25; ry=h*.25; rw=w*.5; rh=h*.5; }
       else if(a==='front-body'){ rx=w*.12; ry=h*.12; rw=w*.76; rh=h*.76; }
       if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); }
-      drawRearTeatLandmarks(g,w,h);                   
+                       
     }
     
     async function toggleTorch(){ try{ if(!state.track) return; state.torchOn=!state.torchOn; await state.track.applyConstraints({advanced:[{torch:state.torchOn}]}); toggleFlash.setAttribute('aria-pressed',String(state.torchOn)); toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش'; }catch(e){ console.warn('Torch not supported',e); }}
     function dataURLFromVideo(){ const c=document.createElement('canvas'); const w=preview.videoWidth,h=preview.videoHeight; c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h); return c.toDataURL('image/jpeg',0.92); }
-    function getRearTeatKeys(){
-  return ['leftBase','leftTip','rightBase','rightTip'];
-}
 
-function getRearTeatPoint(key){
-  return state.landmarks.rearTeats[key];
-}
-
-function setRearTeatPoint(key, x, y){
-  state.landmarks.rearTeats[key] = { x, y };
-}
-
-function allRearTeatsReady(){
-  return getRearTeatKeys().every(k => !!getRearTeatPoint(k));
-}
-
-function dist(a,b){
-  if(!a || !b) return 0;
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function getRearTeatMetrics(){
-  const p = state.landmarks.rearTeats;
-  if(!allRearTeatsReady()) return null;
-
-  const leftLen  = dist(p.leftBase,  p.leftTip);
-  const rightLen = dist(p.rightBase, p.rightTip);
-  const teatLen = (leftLen + rightLen) / 2;
-
-  const baseSpacing = dist(p.leftBase, p.rightBase);
-
-  return { teatLen, baseSpacing };
-}
-
-function rearTeatLengthGradeFromPx(px){
-  if(px < 18) return 1;
-  if(px < 28) return 2;
-  if(px < 40) return 3;
-  if(px < 52) return 4;
-  return 5;
-}
-
-function rearTeatPlacementGradeFromPx(px){
-  if(px < 28) return 1;
-  if(px < 42) return 2;
-  if(px < 58) return 3;
-  if(px < 74) return 4;
-  return 5;
-}
-
-function drawRearTeatLandmarks(g,w,h){
-  if(state.currentAngle !== 'udder-rear') return;
-
-  const labels = {
-    leftBase:'L قاعدة',
-    leftTip:'L نهاية',
-    rightBase:'R قاعدة',
-    rightTip:'R نهاية'
-  };
-
-  const colors = {
-    leftBase:'#22c55e',
-    leftTip:'#22c55e',
-    rightBase:'#38bdf8',
-    rightTip:'#38bdf8'
-  };
-
-  for(const key of getRearTeatKeys()){
-    const p = getRearTeatPoint(key);
-    if(!p) continue;
-
-    g.beginPath();
-    g.fillStyle = colors[key];
-    g.arc(p.x, p.y, 7 * devicePixelRatio, 0, Math.PI * 2);
-    g.fill();
-
-    g.fillStyle = '#ffffff';
-    g.font = `${12 * devicePixelRatio}px sans-serif`;
-    g.fillText(labels[key], p.x + 10 * devicePixelRatio, p.y - 10 * devicePixelRatio);
-  }
-
-  const p = state.landmarks.rearTeats;
-  if(p.leftBase && p.leftTip){
-    g.strokeStyle = '#22c55e';
-    g.lineWidth = 3 * devicePixelRatio;
-    g.beginPath();
-    g.moveTo(p.leftBase.x, p.leftBase.y);
-    g.lineTo(p.leftTip.x, p.leftTip.y);
-    g.stroke();
-  }
-
-  if(p.rightBase && p.rightTip){
-    g.strokeStyle = '#38bdf8';
-    g.lineWidth = 3 * devicePixelRatio;
-    g.beginPath();
-    g.moveTo(p.rightBase.x, p.rightBase.y);
-    g.lineTo(p.rightTip.x, p.rightTip.y);
-    g.stroke();
-  }
-
-  if(p.leftBase && p.rightBase){
-    g.strokeStyle = 'rgba(251,191,36,.95)';
-    g.lineWidth = 2 * devicePixelRatio;
-    g.beginPath();
-    g.moveTo(p.leftBase.x, p.leftBase.y);
-    g.lineTo(p.rightBase.x, p.rightBase.y);
-    g.stroke();
-  }
-}
-
-function findNearestRearTeatPoint(x,y){
-  let best = null;
-  let bestD = Infinity;
-  for(const key of getRearTeatKeys()){
-    const p = getRearTeatPoint(key);
-    if(!p) continue;
-    const d = Math.hypot(p.x - x, p.y - y);
-    if(d < bestD){
-      bestD = d;
-      best = key;
-    }
-  }
-  return bestD <= 24 * devicePixelRatio ? best : null;
-}
-
-function overlayPointFromEvent(e){
-  const r = overlay.getBoundingClientRect();
-  const x = (e.clientX - r.left) * devicePixelRatio;
-  const y = (e.clientY - r.top) * devicePixelRatio;
-  return { x, y };
-}
-
-overlay.addEventListener('pointerdown', (e)=>{
-  if(state.currentAngle !== 'udder-rear') return;
-
-  const p = overlayPointFromEvent(e);
-  const near = findNearestRearTeatPoint(p.x, p.y);
-
-  if(near){
-    state.dragKey = near;
-    overlay.setPointerCapture(e.pointerId);
-    return;
-  }
-
-  const firstEmpty = getRearTeatKeys().find(k => !getRearTeatPoint(k));
-  if(firstEmpty){
-    setRearTeatPoint(firstEmpty, p.x, p.y);
-    drawGuide();
-  }
-});
-
-overlay.addEventListener('pointermove', (e)=>{
-  if(state.currentAngle !== 'udder-rear' || !state.dragKey) return;
-  const p = overlayPointFromEvent(e);
-  setRearTeatPoint(state.dragKey, p.x, p.y);
-  drawGuide();
-});
-
-overlay.addEventListener('pointerup', ()=>{
-  state.dragKey = null;
-});
-
-overlay.addEventListener('dblclick', ()=>{
-  if(state.currentAngle !== 'udder-rear') return;
-  state.landmarks.rearTeats = {
-    leftBase:null,
-    leftTip:null,
-    rightBase:null,
-    rightTip:null
-  };
-  drawGuide();
-});
     function renderThumbs(){ if(!thumbs) return; thumbs.innerHTML=''; for(const a of anglesOrder){ const w=document.createElement('div'); w.className='thumb'; const img=document.createElement('img'); if(state.captures[a]) img.src=state.captures[a]; w.appendChild(img); const lb=document.createElement('div'); lb.className='label'; lb.textContent=angleLabels[a]; w.appendChild(lb); w.title=angleLabels[a]; w.addEventListener('click',()=>setAngle(a)); thumbs.appendChild(w); }}
 
     // ===== الحسابات (جاهزة للذكاء الاصطناعي) =====
@@ -1050,16 +871,7 @@ if(angle==='udder-rear'){
   const widthRef = await compareRearUdderWidthReference(dataUrl);
   const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
   const teatLengthRef = await compareTeatLengthReference(dataUrl);
-  const lm = getRearTeatMetrics();
-if(lm){
-  teatPlacementRef.grade = rearTeatPlacementGradeFromPx(lm.baseSpacing);
-  teatPlacementRef.pct = Math.round((teatPlacementRef.grade / 5) * 100);
-
-  teatLengthRef.grade = rearTeatLengthGradeFromPx(lm.teatLen);
-  const ideal = 3;
-  const diff = Math.abs(teatLengthRef.grade - ideal);
-  teatLengthRef.pct = Math.max(0, 100 - diff * 25);
-}
+ 
   if(!state.analysis) state.analysis = {};
   state.analysis.cleftRef = cleftRef;
   state.analysis.depthRef = depthRef;
