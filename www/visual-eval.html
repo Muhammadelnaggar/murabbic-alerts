@@ -300,11 +300,11 @@
       return {id,number,date};
     }
 
-   const anglesOrder=['udder-rear'];
+  const anglesOrder=['udder-rear','side'];
     const angleLabels={ 'udder-rear':'خلفية','side':'جانبية','front-body':'أمامية','teat-close':'قريبة ضرع' };
     const helperByAngle={
       'udder-rear':'قيّم تماثل أرباع الضرع وتوزيع الحلمات واتساع الأرجل الخلفية والـ udder cleft.',
-      'side':'قيّم استقامة الظهر وزاوية الرامب وعمق الجسم.',
+      'side':'قيّم تعليق الضرع الأمامي وتموضع الحلمات الأمامية وطولها من اللقطة الجانبية.',
       'front-body':'قيّم اتساع الصدر واستقامة/توازي الأرجل الأمامية.',
       'teat-close':'قيّم توزيع/حجم الحلمات وتماثلها.'
     };
@@ -383,7 +383,20 @@ const UDDER_DEPTH_REF_PATHS = [
   '/images/milk_traits/rear_teat_placement/4.jpg',
   '/images/milk_traits/rear_teat_placement/5.jpg'
 ]; 
-
+const SIDE_UDDER_REF_PATHS = [
+  '/images/milk_traits/side_udder/1.jpg',
+  '/images/milk_traits/side_udder/2.jpg',
+  '/images/milk_traits/side_udder/3.jpg',
+  '/images/milk_traits/side_udder/4.jpg',
+  '/images/milk_traits/side_udder/5.jpg'
+];
+    const TEAT_LENGTH_REF_PATHS = [
+  '/images/milk_traits/teat_length/1.jpg',
+  '/images/milk_traits/teat_length/2.jpg',
+  '/images/milk_traits/teat_length/3.jpg',
+  '/images/milk_traits/teat_length/4.jpg',
+  '/images/milk_traits/teat_length/5.jpg'
+];
 const __refImgCache = new Map();
 
 async function loadImageFromDataUrl(dataUrl){
@@ -443,12 +456,68 @@ async function makeRearTeatPlacementVectorFromPath(path){
   const img = await loadImageAny(path);
   return makeRearTeatPlacementVectorFromImage(img);
 }
-    
+ async function makeForeUdderAttachmentVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeForeUdderAttachmentVectorFromImage(img);
+}
+
+async function makeForeUdderAttachmentVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeForeUdderAttachmentVectorFromImage(img);
+}
+
+async function makeFrontTeatPlacementVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeFrontTeatPlacementVectorFromImage(img);
+}
+
+async function makeFrontTeatPlacementVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeFrontTeatPlacementVectorFromImage(img);
+}
+
+async function makeFrontTeatLengthVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeFrontTeatLengthVectorFromImage(img);
+}
+
+async function makeFrontTeatLengthVectorFromPath(path){
+  const img = await loadImageAny(path);
+  return makeFrontTeatLengthVectorFromImage(img);
+}   
 
 async function makeTeatLengthVectorFromPath(path){
   const img = await loadImageAny(path);
   return makeTeatLengthVectorFromImage(img);
 }
+ async function makeTeatLengthVectorFromDataUrl(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  return makeTeatLengthVectorFromImage(img);
+}
+
+async function compareTeatLengthReference(dataUrl){
+  const sampleVec = await makeTeatLengthVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<TEAT_LENGTH_REF_PATHS.length; i++){
+    const refVec = await makeTeatLengthVectorFromPath(TEAT_LENGTH_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const ideal = 3;
+  const diff = Math.abs(best.grade - ideal);
+  const pct = 100 - diff * 25;
+
+  return {
+    grade: best.grade,
+    pct,
+    similarity: best.sim
+  };
+}   
 function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
   const size = 96;
@@ -532,6 +601,35 @@ function makeRearTeatPlacementVectorFromImage(img){
     h: 0.30
   });
 } 
+    function makeForeUdderAttachmentVectorFromImage(img){
+  // منطقة الاتصال الأمامي للضرع بجدار البطن
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.34,
+    y: 0.12,
+    w: 0.42,
+    h: 0.34
+  });
+}
+
+function makeFrontTeatPlacementVectorFromImage(img){
+  // منطقة خروج الحلمة الأمامية واتجاهها
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.48,
+    y: 0.42,
+    w: 0.22,
+    h: 0.24
+  });
+}
+
+function makeFrontTeatLengthVectorFromImage(img){
+  // الحلمة الأمامية نفسها من القاعدة للطرف
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.42,
+    y: 0.44,
+    w: 0.18,
+    h: 0.36
+  });
+}
     function makeTeatLengthVectorFromImage(img){
   // تركيز على الحلمات من قاعدة الاتصال حتى الطرف
   return makeGrayVectorFromImageCrop(img, {
@@ -641,7 +739,59 @@ async function compareUdderDepthReference(dataUrl){
     similarity: best.sim
   };
 } 
-   
+  async function compareForeUdderAttachmentReference(dataUrl){
+  const sampleVec = await makeForeUdderAttachmentVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<SIDE_UDDER_REF_PATHS.length; i++){
+    const refVec = await makeForeUdderAttachmentVectorFromPath(SIDE_UDDER_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return { grade: best.grade, pct, similarity: best.sim };
+}
+
+async function compareFrontTeatPlacementReference(dataUrl){
+  const sampleVec = await makeFrontTeatPlacementVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<SIDE_UDDER_REF_PATHS.length; i++){
+    const refVec = await makeFrontTeatPlacementVectorFromPath(SIDE_UDDER_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return { grade: best.grade, pct, similarity: best.sim };
+}
+
+async function compareFrontTeatLengthReference(dataUrl){
+  const sampleVec = await makeFrontTeatLengthVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<SIDE_UDDER_REF_PATHS.length; i++){
+    const refVec = await makeFrontTeatLengthVectorFromPath(SIDE_UDDER_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+
+  return { grade: best.grade, pct, similarity: best.sim };
+} 
     async function computeKPIs(dataUrl, angle){
   const seed=hashString(angle+(dataUrl?dataUrl.slice(0,64):String(Math.random())));
   const k={};
@@ -651,22 +801,36 @@ if(angle==='udder-rear'){
   const depthRef = await compareUdderDepthReference(dataUrl);
   const widthRef = await compareRearUdderWidthReference(dataUrl);
   const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
- 
+  const teatLengthRef = await compareTeatLengthReference(dataUrl);
 
   if(!state.analysis) state.analysis = {};
   state.analysis.cleftRef = cleftRef;
   state.analysis.depthRef = depthRef;
   state.analysis.widthRef = widthRef;
   state.analysis.teatPlacementRef = teatPlacementRef;
- 
+  state.analysis.teatLengthRef = teatLengthRef;
 
   k.udderCleft = cleftRef.pct;
   k.udderDepth = depthRef.pct;
   k.rearUdderWidth = widthRef.pct;
   k.rearTeatPlacement = teatPlacementRef.pct;
- 
+  k.teatLength = teatLengthRef.pct;
 }
 
+else if(angle==='side'){
+  const foreRef = await compareForeUdderAttachmentReference(dataUrl);
+  const frontPlacementRef = await compareFrontTeatPlacementReference(dataUrl);
+  const frontLengthRef = await compareFrontTeatLengthReference(dataUrl);
+
+  if(!state.analysis) state.analysis = {};
+  state.analysis.foreUdderAttachmentRef = foreRef;
+  state.analysis.frontTeatPlacementRef = frontPlacementRef;
+  state.analysis.frontTeatLengthRef = frontLengthRef;
+
+  k.foreUdderAttachment = foreRef.pct;
+  k.frontTeatPlacement = frontPlacementRef.pct;
+  k.frontTeatLength = frontLengthRef.pct;
+} 
   return k;
 }
 
@@ -674,14 +838,30 @@ if(angle==='udder-rear'){
     function computeOverallFromState(){
       const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
       const SUB={
-      UDDER:{ udderCleft:25, udderDepth:25, rearUdderWidth:25, rearTeatPlacement:25 }
+     UDDER:{
+  udderCleft:25,
+  udderDepth:25,
+  rearUdderWidth:20,
+  teatLength:10,
+  teatPlacement:10,
+  foreUdderAttachment:10
+},
         BACK_RUMP:{ backStraight:45, rumpAngle:35, bodyDepth:20 },
         FRONT_LEGS:{ chestWidth:50, frontLegsParallel:50 },
         FEMININITY:{ femininity:100 }
       };
-      const all=Object.assign({},state.k['udder-rear'],state.k['udder-rear'],state.k['front-body'],state.k['udder-rear']);
+     const all = Object.assign({}, state.k['udder-rear'], state.k['side']);
       // علامة الأنوثة (قد تُستمد من الجانب)
       if(state.k['udder-rear'] && state.k['udder-rear'].femininity==null){ all.femininity = seededValue( hashString('fem'+(all.backStraight||70)), 60, 95 ); }
+      all.teatPlacement = Math.round((
+  (all.rearTeatPlacement || 0) +
+  (all.frontTeatPlacement || 0)
+) / ((typeof all.rearTeatPlacement === 'number' && typeof all.frontTeatPlacement === 'number') ? 2 : 1));
+
+all.teatLength = Math.round((
+  (all.teatLength || 0) +
+  (all.frontTeatLength || 0)
+) / ((typeof all.teatLength === 'number' && typeof all.frontTeatLength === 'number') ? 2 : 1));
       const w=(map)=>{let s=0,sw=0; for(const key in map){ const v=all[key], ww=map[key]; if(typeof v==='number'){ s+=v*ww; sw+=ww; }} return sw?Math.round(s/sw):0; };
       const U=w(SUB.UDDER), B=w(SUB.BACK_RUMP), F=w(SUB.FRONT_LEGS), FE=w(SUB.FEMININITY);
       const total=WEIGHTS.UDDER+WEIGHTS.BACK_RUMP+WEIGHTS.FRONT_LEGS+WEIGHTS.FEMININITY;
@@ -731,7 +911,8 @@ if(angle==='udder-rear'){
 
    if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
   helperText.textContent =
-`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5`
+helperText.textContent =
+`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
 }
 
     renderThumbs();
@@ -751,9 +932,13 @@ if(angle==='udder-rear'){
     state.captures[state.currentAngle]=null;
     state.k[state.currentAngle]=null;
 
-    if(state.currentAngle==='udder-rear' && state.analysis?.rearRef){
-      delete state.analysis.rearRef;
-    }
+   if(state.currentAngle==='udder-rear' && state.analysis){
+  delete state.analysis.cleftRef;
+  delete state.analysis.depthRef;
+  delete state.analysis.widthRef;
+  delete state.analysis.teatPlacementRef;
+  delete state.analysis.teatLengthRef;
+}
 
     renderThumbs();
     updateButtons();
@@ -764,7 +949,7 @@ if(angle==='udder-rear'){
     state.captures[state.currentAngle]=url;
     state.k[state.currentAngle]=await computeKPIs(url,state.currentAngle);
 
-   if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
+  if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
   helperText.textContent =
 `✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
 }
