@@ -652,6 +652,30 @@ function cosineSimilarityVec(a, b){
   if(!na || !nb) return -1;
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
+ function drawDebug(sampleVec, w, h, refList){
+  const cropCanvas = document.getElementById('dbgCrop');
+  const grayCanvas = document.getElementById('dbgGray');
+  const refsDiv = document.getElementById('dbgRefs');
+
+  if(!cropCanvas || !grayCanvas) return;
+
+  const ctx = grayCanvas.getContext('2d');
+  const imgData = ctx.createImageData(w, h);
+
+  for(let i=0;i<sampleVec.length;i++){
+    const v = sampleVec[i];
+    imgData.data[i*4+0] = v;
+    imgData.data[i*4+1] = v;
+    imgData.data[i*4+2] = v;
+    imgData.data[i*4+3] = 255;
+  }
+
+  ctx.putImageData(imgData,0,0);
+
+  refsDiv.innerHTML = refList.map(r =>
+    `Grade ${r.grade} | sim=${r.sim.toFixed(3)}`
+  ).join('<br>');
+}   
 function shiftedCrop(base, dx=0, dy=0){
   return {
     x: Math.max(0, Math.min(1 - base.w, base.x + dx)),
@@ -751,7 +775,7 @@ async function compareUdderDepthReference(dataUrl){
   }
 
   sims.sort((a,b)=>b.sim-a.sim);
-
+drawDebug(vec, 64, 64, sims.slice(0,3));
   let grade = sims[0].grade;
 
   // 🔥 تعديل مهم: رفع الدرجات العليا لو الفرق بسيط
@@ -1145,5 +1169,23 @@ else if(state.currentAngle==='side' && state.analysis?.foreUdderAttachmentRef){
     nuke();
   })();
 </script>
+ <div id="debugBox" style="padding:10px;background:#111;color:#0f0;font-size:12px">
+  <h3>Debug View</h3>
+
+  <div>
+    <div>Crop</div>
+    <canvas id="dbgCrop" width="120" height="120"></canvas>
+  </div>
+
+  <div>
+    <div>Grayscale</div>
+    <canvas id="dbgGray" width="120" height="120"></canvas>
+  </div>
+
+  <div>
+    <div>Top Matches</div>
+    <div id="dbgRefs"></div>
+  </div>
+</div> 
 </body>
 </html>
