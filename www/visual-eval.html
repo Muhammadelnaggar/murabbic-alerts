@@ -642,17 +642,17 @@ function rearUdderWidthGrade(box){
 function udderDepthGrade(box){
   const udderBottom = box.maxY / box.imgH;
 
-  // مرجع العرقوب التقديري داخل نفس اللقطة الخلفية
-  // لأن الصورة الميدانية ثابتة نسبيًا والعرقوب يظهر عادة أسفل الضرع
+  // سطر العرقوب التقديري
   const hockLine = 0.78;
 
+  // الفرق بين قاع الضرع ومستوى العرقوب
   const gap = hockLine - udderBottom;
 
-  // كلما كان قاع الضرع أعلى من العرقوب زادت الدرجة
-  if(gap >= 0.14) return 5;
-  if(gap >= 0.10) return 4;
-  if(gap >= 0.06) return 3;
-  if(gap >= 0.02) return 2;
+  // حدود أضيق حتى يتغير التقييم فعلاً مع تغير الصورة
+  if(gap >= 0.16) return 5;
+  if(gap >= 0.12) return 4;
+  if(gap >= 0.08) return 3;
+  if(gap >= 0.04) return 2;
   return 1;
 }
 function makeUdderCleftVectorFromImage(img){
@@ -819,6 +819,7 @@ async function compareUdderCleftReference(dataUrl){
 }
 async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
+  const vec = makeUdderDepthVectorFromImage(img);
   const box = detectRearUdderMaskBox(img);
 
   if(!box){
