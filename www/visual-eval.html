@@ -300,15 +300,17 @@
       return {id,number,date};
     }
 
-  const anglesOrder=['udder-rear','side'];
-   const angleLabels={ 'udder-rear':'خلفية للضرع','side':'جانبية للضرع' };;
-    };
-    const helperByAngle={
-     const helperByAngle={
-  'udder-rear':'وجّه الكاميرا خلف الحيوان بحيث يظهر الضرع كاملًا والحلمات بوضوح.',
-  'side':'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي والحلمات الأمامية بوضوح.'
+  const anglesOrder = ['udder-rear','side'];
+
+const angleLabels = {
+  'udder-rear': 'خلفية للضرع',
+  'side': 'جانبية للضرع'
 };
-    };
+
+const helperByAngle = {
+  'udder-rear': 'وجّه الكاميرا خلف الحيوان بحيث يظهر الضرع كاملًا والحلمات بوضوح.',
+  'side': 'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي والحلمات الأمامية بوضوح.'
+};
 
     const state = { currentAngle:'side', stream:null, track:null, capabilities:null, torchOn:false, captures: { 'udder-rear':null,'side':null,'front-body':null,'teat-close':null }, k:{} };
     window.state = state; // لأغراض الذكاء والتتبع
@@ -912,9 +914,15 @@ all.teatLength = Math.round(
     const dataUrl=r.result;
     state.captures[state.currentAngle]=dataUrl;
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
-
-  if(state.currentAngle===
-
+if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
+  helperText.textContent =
+`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
+}
+else if(state.currentAngle==='side' && state.analysis?.foreUdderAttachmentRef){
+  helperText.textContent =
+`✅ تم تقييم الضرع الجانبي — التعليق الأمامي: ${state.analysis.foreUdderAttachmentRef.grade}/5 | تموضع الحلمات الأمامية: ${state.analysis.frontTeatPlacementRef.grade}/5 | طول الحلمات الأمامية: ${state.analysis.frontTeatLengthRef.grade}/5`;
+}
+ 
     renderThumbs();
     updateButtons();
     renderScore();
