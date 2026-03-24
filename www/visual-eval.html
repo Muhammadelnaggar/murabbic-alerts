@@ -578,7 +578,83 @@ function makeGrayVectorFromImageCrop(img, crop){
 
   return gray;
 }
+function detectRearUdderMaskBox(img){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
 
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+  // نشتغل فقط داخل نطاق خلفي مركزي للضرع
+  const x1 = Math.round(width  * 0.22);
+  const x2 = Math.round(width  * 0.78);
+  const y1 = Math.round(height * 0.22);
+  const y2 = Math.round(height * 0.82);
+
+  let minX = width, maxX = -1, minY = height, maxY = -1;
+
+  for(let y = y1; y < y2; y++){
+    for(let x = x1; x < x2; x++){
+      const i = (y * width + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+
+      // قناع بسيط لجلد الضرع/الحلمات: أحمر أعلى من الأزرق، وسطوع متوسط
+      const bright = (r + g + b) / 3;
+      const udderLike =
+        r > 70 &&
+        r > b + 10 &&
+        bright > 55 &&
+        bright < 210;
+
+      if(udderLike){
+        if(x < minX) minX = x;
+        if(x > maxX) maxX = x;
+        if(y < minY) minY = y;
+        if(y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if(maxX <= minX || maxY <= minY){
+    return null;
+  }
+
+  return {
+    minX, maxX, minY, maxY,
+    widthPx: maxX - minX,
+    depthPx: maxY - minY,
+    imgW: width,
+    imgH: height
+  };
+}
+
+function rearUdderWidthGrade(box){
+  const ratio = box.widthPx / box.imgW;
+  if(ratio >= 0.34) return 5;
+  if(ratio >= 0.30) return 4;
+  if(ratio >= 0.26) return 3;
+  if(ratio >= 0.22) return 2;
+  return 1;
+}
+
+function udderDepthGrade(box){
+  const udderBottom = box.maxY / box.imgH;
+
+  // مرجع العرقوب التقديري داخل نفس اللقطة الخلفية
+  // لأن الصورة الميدانية ثابتة نسبيًا والعرقوب يظهر عادة أسفل الضرع
+  const hockLine = 0.78;
+
+  const gap = hockLine - udderBottom;
+
+  // كلما كان قاع الضرع أعلى من العرقوب زادت الدرجة
+  if(gap >= 0.14) return 5;
+  if(gap >= 0.10) return 4;
+  if(gap >= 0.06) return 3;
+  if(gap >= 0.02) return 2;
+  return 1;
+}
 function makeUdderCleftVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
    x: 0.35,
@@ -742,37 +818,35 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-  return compareByMultiCrop(
-    dataUrl,
-    UDDER_DEPTH_REF_PATHS,
-    makeUdderDepthVectorFromImage,
-    { x: 0.35, y: 0.48, w: 0.30, h: 0.24 },
-    { shifts:[
-      {dx: 0, dy: 0},
-      {dx: 0, dy: -0.015},
-      {dx: 0, dy:  0.015}
-    ]}
-  );
-}
-async function compareRearUdderWidthReference(dataUrl){
-  const sampleVec = await makeRearUdderWidthVectorFromDataUrl(dataUrl);
+  const img = await loadImageFromDataUrl(dataUrl);
+  const box = detectRearUdderMaskBox(img);
 
-  const sims = [];
-  for(let i=0; i<REAR_UDDER_WIDTH_REF_PATHS.length; i++){
-    const refVec = await makeRearUdderWidthVectorFromPath(REAR_UDDER_WIDTH_REF_PATHS[i]);
-    const sim = cosineSimilarityVec(sampleVec, refVec);
-    sims.push({ grade: i + 1, sim });
+  if(!box){
+    return { grade: 3, pct: 60, similarity: 0 };
   }
 
-  sims.sort((a,b)=> b.sim - a.sim);
-
-  const best = sims[0];
-  const pct = Math.round((best.grade / 5) * 100);
+  const grade = udderDepthGrade(box);
 
   return {
-    grade: best.grade,
-    pct,
-    similarity: best.sim
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: 1
+  };
+}
+async function compareRearUdderWidthReference(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  const box = detectRearUdderMaskBox(img);
+
+  if(!box){
+    return { grade: 3, pct: 60, similarity: 0 };
+  }
+
+  const grade = rearUdderWidthGrade(box);
+
+  return {
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: 1
   };
 }
 async function compareRearTeatPlacementReference(dataUrl){
