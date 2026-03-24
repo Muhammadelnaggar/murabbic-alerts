@@ -580,10 +580,10 @@ function makeUdderCleftVectorFromImage(img){
 function makeUdderDepthVectorFromImage(img){
   // ROI أوسع يركز على قاع الضرع + الرجلين الخلفيتين
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.18,
-    y: 0.28,
-    w: 0.64,
-    h: 0.58
+    x: 0.35,
+    y: 0.42,
+    w: 0.30,
+    h: 0.35
   });
 }
 function makeRearUdderWidthVectorFromImage(img){
@@ -598,10 +598,10 @@ function makeRearUdderWidthVectorFromImage(img){
 function makeRearTeatPlacementVectorFromImage(img){
   // منطقة الحلمات الخلفية فقط
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.30,
-    y: 0.45,
-    w: 0.40,
-    h: 0.30
+    x: 0.38,
+    y: 0.50,
+    w: 0.24,
+    h: 0.25
   });
 } 
     function makeForeUdderAttachmentVectorFromImage(img){
@@ -636,8 +636,8 @@ function makeFrontTeatLengthVectorFromImage(img){
     function makeTeatLengthVectorFromImage(img){
   // تركيز على الحلمات من قاعدة الاتصال حتى الطرف
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.42,
-    y: 0.50,
+   x: 0.42,
+    y: 0.52,
     w: 0.16,
     h: 0.30
   });
