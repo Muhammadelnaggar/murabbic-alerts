@@ -590,17 +590,17 @@ function makeUdderCleftVectorFromImage(img){
 
 function makeUdderDepthVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.34,
-    y: 0.39,
-    w: 0.32,
+     x: 0.35,
+    y: 0.48,
+    w: 0.30,
     h: 0.24
   });
 }
 function makeRearUdderWidthVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
-    x: 0.24,
-    y: 0.28,
-    w: 0.52,
+   x: 0.26,
+    y: 0.14,
+    w: 0.48,
     h: 0.18
   });
 }
@@ -742,44 +742,38 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-  const res = await compareByMultiCrop(
+  return compareByMultiCrop(
     dataUrl,
     UDDER_DEPTH_REF_PATHS,
     makeUdderDepthVectorFromImage,
-    { x: 0.34, y: 0.39, w: 0.32, h: 0.24 },
+    { x: 0.35, y: 0.48, w: 0.30, h: 0.24 },
     { shifts:[
       {dx: 0, dy: 0},
-      {dx: -0.01, dy: 0},
-      {dx:  0.01, dy: 0},
-      {dx: 0, dy: -0.01},
-      {dx: 0, dy:  0.01}
+      {dx: 0, dy: -0.015},
+      {dx: 0, dy:  0.015}
     ]}
   );
-
-  let grade = res.grade;
-
-  // لو النتيجة نزلت 1 بسبب القص/الخلفية، ارفعيها درجة واحدة
-  // لأن 1 تعني ضرع شديد الانخفاض قرب المفصل، والصورة التي عرضتها لا تنطبق عليها هذه الحالة
-  if(grade === 1) grade = 2;
-
-  return {
-    grade,
-    pct: Math.round((grade / 5) * 100),
-    similarity: res.similarity
-  };
 }
 async function compareRearUdderWidthReference(dataUrl){
-  return compareByMultiCrop(
-    dataUrl,
-    REAR_UDDER_WIDTH_REF_PATHS,
-    makeRearUdderWidthVectorFromImage,
-    { x: 0.24, y: 0.28, w: 0.52, h: 0.18 },
-    { shifts:[
-      {dx: 0, dy: 0},
-      {dx: -0.015, dy: 0},
-      {dx:  0.015, dy: 0}
-    ]}
-  );
+  const sampleVec = await makeRearUdderWidthVectorFromDataUrl(dataUrl);
+
+  const sims = [];
+  for(let i=0; i<REAR_UDDER_WIDTH_REF_PATHS.length; i++){
+    const refVec = await makeRearUdderWidthVectorFromPath(REAR_UDDER_WIDTH_REF_PATHS[i]);
+    const sim = cosineSimilarityVec(sampleVec, refVec);
+    sims.push({ grade: i + 1, sim });
+  }
+
+  sims.sort((a,b)=> b.sim - a.sim);
+
+  const best = sims[0];
+  const pct = Math.round((best.grade / 5) * 100);
+
+  return {
+    grade: best.grade,
+    pct,
+    similarity: best.sim
+  };
 }
 async function compareRearTeatPlacementReference(dataUrl){
   return compareByMultiCrop(
