@@ -228,9 +228,9 @@
   <div class="container row">
     <section class="card" id="cameraCard">
       <div class="angles">
-        <button class="angle-tab active" data-angle="udder-rear">لقطة خلفية</button>
-        <button class="angle-tab" data-angle="side">لقطة جانبية</button>
-        <button class="angle-tab" data-angle="front-body">لقطة أمامية</button>
+       <button class="angle-tab active" data-angle="udder-rear">خلفية للضرع</button>
+       <button class="angle-tab" data-angle="side">جانبية للضرع</button>
+        
        
       </div>
 
@@ -301,12 +301,12 @@
     }
 
   const anglesOrder=['udder-rear','side'];
-    const angleLabels={ 'udder-rear':'خلفية','side':'جانبية','front-body':'أمامية','teat-close':'قريبة ضرع' };
+   const angleLabels={ 'udder-rear':'خلفية للضرع','side':'جانبية للضرع' };;
     const helperByAngle={
-      'udder-rear':'قيّم تماثل أرباع الضرع وتوزيع الحلمات واتساع الأرجل الخلفية والـ udder cleft.',
-      'side':'قيّم تعليق الضرع الأمامي وتموضع الحلمات الأمامية وطولها من اللقطة الجانبية.',
-      'front-body':'قيّم اتساع الصدر واستقامة/توازي الأرجل الأمامية.',
-      'teat-close':'قيّم توزيع/حجم الحلمات وتماثلها.'
+     const helperByAngle={
+  'udder-rear':'وجّه الكاميرا خلف الحيوان بحيث يظهر الضرع كاملًا والحلمات بوضوح.',
+  'side':'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي والحلمات الأمامية بوضوح.'
+};
     };
 
     const state = { currentAngle:'side', stream:null, track:null, capabilities:null, torchOn:false, captures: { 'udder-rear':null,'side':null,'front-body':null,'teat-close':null }, k:{} };
