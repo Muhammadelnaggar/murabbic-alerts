@@ -775,7 +775,7 @@ async function compareUdderDepthReference(dataUrl){
   }
 
   sims.sort((a,b)=>b.sim-a.sim);
-drawDebug(vec, 64, 64, sims.slice(0,3));
+drawDebug(vec, 32, 32, sims.slice(0,3));
   let grade = sims[0].grade;
 
   // 🔥 تعديل مهم: رفع الدرجات العليا لو الفرق بسيط
@@ -1169,17 +1169,17 @@ else if(state.currentAngle==='side' && state.analysis?.foreUdderAttachmentRef){
     nuke();
   })();
 </script>
- <div id="debugBox" style="padding:10px;background:#111;color:#0f0;font-size:12px">
+ <div id="debugBox" style="padding:10px;background:#fff;color:#111;font-size:12px;border:1px solid #ccc">
   <h3>Debug View</h3>
 
   <div>
     <div>Crop</div>
-    <canvas id="dbgCrop" width="120" height="120"></canvas>
+   <canvas id="dbgCrop" width="120" height="120" style="border:1px solid #999;background:#fff"></canvas>
   </div>
 
   <div>
     <div>Grayscale</div>
-    <canvas id="dbgGray" width="120" height="120"></canvas>
+    <canvas id="dbgGray" width="120" height="120" style="border:1px solid #999;background:#fff"></canvas>
   </div>
 
   <div>
