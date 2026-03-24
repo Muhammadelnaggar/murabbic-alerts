@@ -499,28 +499,18 @@ async function makeTeatLengthVectorFromPath(path){
 }
 
 async function compareTeatLengthReference(dataUrl){
-  const sampleVec = await makeTeatLengthVectorFromDataUrl(dataUrl);
-
-  const sims = [];
-  for(let i=0; i<TEAT_LENGTH_REF_PATHS.length; i++){
-    const refVec = await makeTeatLengthVectorFromPath(TEAT_LENGTH_REF_PATHS[i]);
-    const sim = cosineSimilarityVec(sampleVec, refVec);
-    sims.push({ grade: i + 1, sim });
-  }
-
-  sims.sort((a,b)=> b.sim - a.sim);
-
-  const best = sims[0];
-  const ideal = 3;
-  const diff = Math.abs(best.grade - ideal);
-  const pct = 100 - diff * 25;
-
-  return {
-    grade: best.grade,
-    pct,
-    similarity: best.sim
-  };
-}   
+  return compareByMultiCrop(
+    dataUrl,
+    TEAT_LENGTH_REF_PATHS,
+    makeTeatLengthVectorFromImage,
+    { x: 0.42, y: 0.52, w: 0.16, h: 0.30 },
+    { shifts:[
+      {dx: 0, dy: 0},
+      {dx: -0.01, dy: 0},
+      {dx:  0.01, dy: 0}
+    ]}
+  );
+}
 function makeGrayVectorFromImageCrop(img, crop){
   const c = document.createElement('canvas');
   const size = 96;
@@ -653,7 +643,59 @@ function cosineSimilarityVec(a, b){
   if(!na || !nb) return -1;
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
+function shiftedCrop(base, dx=0, dy=0){
+  return {
+    x: Math.max(0, Math.min(1 - base.w, base.x + dx)),
+    y: Math.max(0, Math.min(1 - base.h, base.y + dy)),
+    w: base.w,
+    h: base.h
+  };
+}
 
+async function compareByMultiCrop(dataUrl, refPaths, makeVectorFromImage, baseCrop, opts={}){
+  const img = await loadImageFromDataUrl(dataUrl);
+  const shifts = opts.shifts || [
+    {dx: 0, dy: 0},
+    {dx: -0.02, dy: 0},
+    {dx:  0.02, dy: 0}
+  ];
+
+  const grades = [];
+  const tops = [];
+
+  for(const s of shifts){
+    const crop = shiftedCrop(baseCrop, s.dx, s.dy);
+    const sampleVec = makeGrayVectorFromImageCrop(img, crop);
+
+    const sims = [];
+    for(let i=0; i<refPaths.length; i++){
+      const refImg = await loadImageAny(refPaths[i]);
+      const refVec = makeVectorFromImage(refImg);
+      const sim = cosineSimilarityVec(sampleVec, refVec);
+      sims.push({ grade: i + 1, sim });
+    }
+
+    sims.sort((a,b)=> b.sim - a.sim);
+    grades.push(sims[0].grade);
+    tops.push(sims[0]);
+  }
+
+  grades.sort((a,b)=> a-b);
+  const grade = grades[Math.floor(grades.length / 2)];
+
+  let bestTop = tops[0];
+  for(const t of tops){
+    if(t.sim > bestTop.sim) bestTop = t;
+  }
+
+  const pct = Math.round((grade / 5) * 100);
+
+  return {
+    grade,
+    pct,
+    similarity: bestTop.sim
+  };
+}
 async function compareUdderCleftReference(dataUrl){
   const sampleVec = await makeUdderCleftVectorFromDataUrl(dataUrl);
 
@@ -680,26 +722,18 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-  const sampleVec = await makeUdderDepthVectorFromDataUrl(dataUrl);
-
-  const sims = [];
-  for(let i=0; i<UDDER_DEPTH_REF_PATHS.length; i++){
-    const refVec = await makeUdderDepthVectorFromPath(UDDER_DEPTH_REF_PATHS[i]);
-    const sim = cosineSimilarityVec(sampleVec, refVec);
-    sims.push({ grade: i + 1, sim });
-  }
-
-  sims.sort((a,b)=> b.sim - a.sim);
-
-  const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
-
-  return {
-    grade: best.grade,
-    pct,
-    similarity: best.sim
-  };
-} 
+  return compareByMultiCrop(
+    dataUrl,
+    UDDER_DEPTH_REF_PATHS,
+    makeUdderDepthVectorFromImage,
+    { x: 0.35, y: 0.42, w: 0.30, h: 0.35 },
+    { shifts:[
+      {dx: 0, dy: 0},
+      {dx: -0.02, dy: 0},
+      {dx:  0.02, dy: 0}
+    ]}
+  );
+}
   async function compareRearUdderWidthReference(dataUrl){
   const sampleVec = await makeRearUdderWidthVectorFromDataUrl(dataUrl);
 
@@ -713,7 +747,7 @@ async function compareUdderDepthReference(dataUrl){
   sims.sort((a,b)=> b.sim - a.sim);
 
   const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+  const pct = Math.round((best.grade / 5) * 100);
 
   return {
     grade: best.grade,
@@ -721,27 +755,19 @@ async function compareUdderDepthReference(dataUrl){
     similarity: best.sim
   };
 }
- async function compareRearTeatPlacementReference(dataUrl){
-  const sampleVec = await makeRearTeatPlacementVectorFromDataUrl(dataUrl);
-
-  const sims = [];
-  for(let i=0; i<REAR_TEAT_PLACEMENT_REF_PATHS.length; i++){
-    const refVec = await makeRearTeatPlacementVectorFromPath(REAR_TEAT_PLACEMENT_REF_PATHS[i]);
-    const sim = cosineSimilarityVec(sampleVec, refVec);
-    sims.push({ grade: i + 1, sim });
-  }
-
-  sims.sort((a,b)=> b.sim - a.sim);
-
-  const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
-
-  return {
-    grade: best.grade,
-    pct,
-    similarity: best.sim
-  };
-} 
+async function compareRearTeatPlacementReference(dataUrl){
+  return compareByMultiCrop(
+    dataUrl,
+    REAR_TEAT_PLACEMENT_REF_PATHS,
+    makeRearTeatPlacementVectorFromImage,
+    { x: 0.38, y: 0.50, w: 0.24, h: 0.25 },
+    { shifts:[
+      {dx: 0, dy: 0},
+      {dx: -0.015, dy: 0},
+      {dx:  0.015, dy: 0}
+    ]}
+  );
+}
   async function compareForeUdderAttachmentReference(dataUrl){
   const sampleVec = await makeForeUdderAttachmentVectorFromDataUrl(dataUrl);
 
@@ -755,7 +781,7 @@ async function compareUdderDepthReference(dataUrl){
   sims.sort((a,b)=> b.sim - a.sim);
 
   const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+  const pct = Math.round((best.grade / 5) * 100);
 
   return { grade: best.grade, pct, similarity: best.sim };
 }
@@ -773,7 +799,7 @@ async function compareFrontTeatPlacementReference(dataUrl){
   sims.sort((a,b)=> b.sim - a.sim);
 
   const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+  const pct = Math.round((best.grade / 5) * 100);
 
   return { grade: best.grade, pct, similarity: best.sim };
 }
@@ -791,7 +817,7 @@ async function compareFrontTeatLengthReference(dataUrl){
   sims.sort((a,b)=> b.sim - a.sim);
 
   const best = sims[0];
-  const pct = Math.round(55 + ((best.grade - 1) / 4) * 40);
+  const pct = Math.round((best.grade / 5) * 100);
 
   return { grade: best.grade, pct, similarity: best.sim };
 } 
