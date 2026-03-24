@@ -311,7 +311,7 @@ const helperByAngle = {
   'side': 'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي والحلمات الأمامية بوضوح.'
 };
 
-    const state = const state = {
+    const state = {
   currentAngle:'side',
   stream:null,
   track:null,
@@ -329,7 +329,7 @@ const helperByAngle = {
   },
   dragKey:null
 };
-    { currentAngle:'side', stream:null, track:null, capabilities:null, torchOn:false, captures: { 'udder-rear':null,'side':null,'front-body':null,'teat-close':null }, k:{} };
+   
     window.state = state; // لأغراض الذكاء والتتبع
 
     const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
