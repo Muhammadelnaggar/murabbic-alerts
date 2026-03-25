@@ -848,6 +848,22 @@ function makeRearUdderWidthVectorFromImage(img){
     h: 0.18
   });
 }
+    async function compareRearUdderWidthReference(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  const box = detectRearUdderMaskBox(img);
+
+  if(!box){
+    return { grade: 3, pct: 60, similarity: 0 };
+  }
+
+  const grade = rearUdderWidthGrade(box);
+
+  return {
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: 1
+  };
+}
 function makeRearTeatPlacementVectorFromImage(img){
   // منطقة الحلمات الخلفية فقط
   return makeGrayVectorFromImageCrop(img, {
@@ -1054,32 +1070,7 @@ async function compareUdderCleftReference(dataUrl){
     confidence: res.confidence
   };
 }
-async function compareUdderDepthReference(dataUrl){
 
-  const img = await loadImageFromDataUrl(dataUrl);
-
-  const udderBottomY = detectRearUdderBottomY(img);
-  const hockY = detectRearHockLineY(img);
-
-  // لو الاكتشاف فشل أو المرجعان قريبان جدًا بشكل غير منطقي، نرجع للحياد
-  if(udderBottomY < 0 || hockY < 0){
-    return { grade: 3, pct: 60, similarity: 0 };
-  }
-
-  const gap = (hockY - udderBottomY) / img.height;
-  const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
-
-  const confidence =
-    (udderBottomY > 0 ? 0.5 : 0) +
-    (hockY > 0 ? 0.3 : 0) +
-    (gap > -0.05 && gap < 0.18 ? 0.2 : 0);
-
-  return {
-    grade,
-    pct: Math.round((grade / 5) * 100),
-    similarity: confidence
-  };
-}
 async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
 
