@@ -702,21 +702,21 @@ function detectRearHockLineY(img){
   ];
 
   const y1 = Math.round(height * 0.58);
-  const y2 = Math.round(height * 0.88);
+  const y2 = Math.round(height * 0.90);
 
   const sideYs = [];
 
   for(const band of bands){
-    let bestY = -1;
-    let bestDelta = -1;
+    let chosenY = -1;
 
-    for(let y = y1 + 2; y < y2 - 2; y++){
+    // نمشي من أسفل لأعلى، لأن العرقوب الحقيقي أقرب لأسفل الرجل من الثنيات العليا
+    for(let y = y2 - 3; y >= y1 + 3; y--){
       let above = 0, mid = 0, below = 0, count = 0;
 
       for(let x = band.x1; x < band.x2; x++){
-        const iA = ((y - 2) * width + x) * 4;
+        const iA = ((y - 3) * width + x) * 4;
         const iM = (y * width + x) * 4;
-        const iB = ((y + 2) * width + x) * 4;
+        const iB = ((y + 3) * width + x) * 4;
 
         const a = (data[iA] + data[iA+1] + data[iA+2]) / 3;
         const m = (data[iM] + data[iM+1] + data[iM+2]) / 3;
@@ -732,16 +732,16 @@ function detectRearHockLineY(img){
       mid   /= count;
       below /= count;
 
-      // نبحث عن صف يكون أغمق من أعلى وأسفل منه = انثناء المفصل
-      const delta = ((above - mid) + (below - mid));
+      const delta = (above - mid) + (below - mid);
 
-      if(delta > bestDelta){
-        bestDelta = delta;
-        bestY = y;
+      // أول انثناء واضح من أسفل = الأقرب أن يكون العرقوب
+      if(delta > 16){
+        chosenY = y;
+        break;
       }
     }
 
-    if(bestY >= 0) sideYs.push(bestY);
+    if(chosenY >= 0) sideYs.push(chosenY);
   }
 
   if(!sideYs.length) return -1;
