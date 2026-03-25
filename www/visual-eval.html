@@ -646,36 +646,40 @@ function detectRearUdderBottomY(img){
 
   const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
 
-  // نطاق أضيق ومركزي أسفل الضرع فقط
-  const x1 = Math.round(width  * 0.36);
-  const x2 = Math.round(width  * 0.64);
-  const y1 = Math.round(height * 0.38);
-  const y2 = Math.round(height * 0.78);
+  const x1 = Math.round(width  * 0.34);
+  const x2 = Math.round(width  * 0.66);
+  const y1 = Math.round(height * 0.36);
+  const y2 = Math.round(height * 0.76);
 
-  let maxY = -1;
+  let bestY = -1;
+  let bestScore = -1;
 
   for(let y = y1; y < y2; y++){
+    let rowScore = 0;
+
     for(let x = x1; x < x2; x++){
       const i = (y * width + x) * 4;
       const r = data[i], g = data[i+1], b = data[i+2];
       const bright = (r + g + b) / 3;
 
-      // جلد الضرع/الحلمات فقط بشكل أضيق
       const udderLike =
         r > 85 &&
-        r > b + 12 &&
-        bright > 70 &&
-        bright < 205;
+        r > b + 10 &&
+        bright > 65 &&
+        bright < 210;
 
-      if(udderLike){
-        if(y > maxY) maxY = y;
-      }
+      if(udderLike) rowScore++;
+    }
+
+    // نختار آخر صف قوي فعلًا، وليس أي نقطة داكنة متفرقة
+    if(rowScore > bestScore || (rowScore === bestScore && y > bestY)){
+      bestScore = rowScore;
+      bestY = y;
     }
   }
 
-  return maxY;
+  return bestScore > 8 ? bestY : -1;
 }
-
 function detectRearHockLineY(img){
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -685,41 +689,56 @@ function detectRearHockLineY(img){
 
   const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
 
-  // نبحث عن العرقوبين في الجانبين لا في الوسط
   const bands = [
     { x1: Math.round(width * 0.22), x2: Math.round(width * 0.34) },
     { x1: Math.round(width * 0.66), x2: Math.round(width * 0.78) }
   ];
 
-  const y1 = Math.round(height * 0.62);
-  const y2 = Math.round(height * 0.92);
+  const y1 = Math.round(height * 0.58);
+  const y2 = Math.round(height * 0.88);
 
-  let bestY = -1;
-  let bestScore = -1;
+  const sideYs = [];
 
-  for(let y = y1; y < y2; y++){
-    let rowScore = 0;
+  for(const band of bands){
+    let bestY = -1;
+    let bestDelta = -1;
 
-    for(const band of bands){
+    for(let y = y1 + 2; y < y2 - 2; y++){
+      let above = 0, mid = 0, below = 0, count = 0;
+
       for(let x = band.x1; x < band.x2; x++){
-        const i = (y * width + x) * 4;
-        const r = data[i], g = data[i+1], b = data[i+2];
-        const bright = (r + g + b) / 3;
+        const iA = ((y - 2) * width + x) * 4;
+        const iM = (y * width + x) * 4;
+        const iB = ((y + 2) * width + x) * 4;
 
-        // رجل/مفصل أغمق من جلد الضرع عادة
-        if(bright < 135){
-          rowScore++;
-        }
+        const a = (data[iA] + data[iA+1] + data[iA+2]) / 3;
+        const m = (data[iM] + data[iM+1] + data[iM+2]) / 3;
+        const b = (data[iB] + data[iB+1] + data[iB+2]) / 3;
+
+        above += a;
+        mid += m;
+        below += b;
+        count++;
+      }
+
+      above /= count;
+      mid   /= count;
+      below /= count;
+
+      // نبحث عن صف يكون أغمق من أعلى وأسفل منه = انثناء المفصل
+      const delta = ((above - mid) + (below - mid));
+
+      if(delta > bestDelta){
+        bestDelta = delta;
+        bestY = y;
       }
     }
 
-    if(rowScore > bestScore){
-      bestScore = rowScore;
-      bestY = y;
-    }
+    if(bestY >= 0) sideYs.push(bestY);
   }
 
-  return bestY;
+  if(!sideYs.length) return -1;
+  return Math.round(sideYs.reduce((a,b)=>a+b,0) / sideYs.length);
 }
 function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
   if(udderBottomY < 0 || hockY < 0) return 3;
@@ -959,14 +978,16 @@ async function compareUdderDepthReference(dataUrl){
   const udderBottomY = detectRearUdderBottomY(img);
   const hockY = detectRearHockLineY(img);
 
+  if(udderBottomY < 0 || hockY < 0){
+    return {
+      grade: 3,
+      pct: 60,
+      similarity: 0
+    };
+  }
+
   const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
-  console.log('DEPTH DEBUG', {
-  udderBottomY,
-  hockY,
-  imgH: img.height,
-  gap: (hockY - udderBottomY) / img.height,
-  grade
-});
+
   return {
     grade,
     pct: Math.round((grade / 5) * 100),
@@ -1224,7 +1245,7 @@ if(state.currentAngle==='udder-rear' && state.analysis){
 
   if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
   helperText.textContent =
-`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
+`✅ تم تقييم الضرع — الارتفاع الخلفي: ${state.analysis.heightRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | الشق: ${state.analysis.cleftRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
 }
 
     renderThumbs();
