@@ -958,66 +958,7 @@ async function compareByMultiCrop(dataUrl, refPaths, makeVectorFromImage, baseCr
     similarity: bestTop.sim
   };
 }
-    function detectUdderCleftGrade(img){
-  const c = document.createElement('canvas');
-  c.width = img.width;
-  c.height = img.height;
-  const ctx = c.getContext('2d', { willReadFrequently:true });
-  ctx.drawImage(img, 0, 0);
 
-  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
-
-  const y1 = Math.round(height * 0.30);
-  const y2 = Math.round(height * 0.74);
-
-  const lc1 = Math.round(width * 0.44);
-  const lc2 = Math.round(width * 0.48);
-
-  const cc1 = Math.round(width * 0.48);
-  const cc2 = Math.round(width * 0.52);
-
-  const rc1 = Math.round(width * 0.52);
-  const rc2 = Math.round(width * 0.56);
-
-  let goodRows = 0;
-  let contrastSum = 0;
-  let rows = 0;
-
-  function avgBright(y, x1, x2){
-    let s = 0, n = 0;
-    for(let x=x1; x<x2; x++){
-      const i = (y * width + x) * 4;
-      s += (data[i] + data[i+1] + data[i+2]) / 3;
-      n++;
-    }
-    return n ? s / n : 0;
-  }
-
-  for(let y = y1; y < y2; y++){
-    const leftB   = avgBright(y, lc1, lc2);
-    const centerB = avgBright(y, cc1, cc2);
-    const rightB  = avgBright(y, rc1, rc2);
-
-    const sideAvg = (leftB + rightB) / 2;
-    const delta = sideAvg - centerB; // كلما كان المركز أغمق كان الشق أوضح
-
-    if(delta > 5) goodRows++;
-    if(delta > 0) contrastSum += delta;
-    rows++;
-  }
-
-  const continuity = rows ? goodRows / rows : 0;
-  const contrast = rows ? contrastSum / rows : 0;
-
-  let grade = 1;
-  if(continuity >= 0.70 && contrast >= 14) grade = 5;
-  else if(continuity >= 0.55 && contrast >= 10) grade = 4;
-  else if(continuity >= 0.40 && contrast >= 7) grade = 3;
-  else if(continuity >= 0.25 && contrast >= 4) grade = 2;
-  else grade = 1;
-
-  return { grade, continuity, contrast };
-}
 function detectUdderCleftGrade(img){
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -1115,7 +1056,7 @@ async function compareUdderCleftReference(dataUrl){
   };
 }
 async function compareUdderDepthReference(dataUrl){
-async function compareUdderDepthReference(dataUrl){
+
   const img = await loadImageFromDataUrl(dataUrl);
 
   const udderBottomY = detectRearUdderBottomY(img);
