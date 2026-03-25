@@ -750,12 +750,16 @@ function detectRearHockLineY(img){
 function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
   if(udderBottomY < 0 || hockY < 0) return 3;
 
-  const gap = (hockY - udderBottomY) / imgH;
+  // المكتشف الحالي للعرقوب يميل أن يكون أعلى من مركز المفصل الحقيقي
+  // لذلك ننزله قليلًا ليقترب من مركز العرقوب الفعلي
+  const correctedHockY = hockY + Math.round(imgH * 0.03);
 
-  if(gap >= 0.14) return 5;
-  if(gap >= 0.10) return 4;
-  if(gap >= 0.06) return 3;
-  if(gap >= 0.02) return 2;
+  const gap = (correctedHockY - udderBottomY) / imgH;
+
+  if(gap >= 0.10) return 5;
+  if(gap >= 0.06) return 4;
+  if(gap >= 0.03) return 3;
+  if(gap >= 0.00) return 2;
   return 1;
 }
 function detectRearVulvaBottomY(img){
@@ -954,29 +958,76 @@ async function compareByMultiCrop(dataUrl, refPaths, makeVectorFromImage, baseCr
     similarity: bestTop.sim
   };
 }
-async function compareUdderCleftReference(dataUrl){
-  const sampleVec = await makeUdderCleftVectorFromDataUrl(dataUrl);
+    function detectUdderCleftGrade(img){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
 
-  const sims = [];
-  for(let i=0; i<UDDER_CLEFT_REF_PATHS.length; i++){
-    const refVec = await makeUdderCleftVectorFromPath(UDDER_CLEFT_REF_PATHS[i]);
-    const sim = cosineSimilarityVec(sampleVec, refVec);
-    sims.push({ grade: i + 1, sim });
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+  const y1 = Math.round(height * 0.30);
+  const y2 = Math.round(height * 0.74);
+
+  const lc1 = Math.round(width * 0.44);
+  const lc2 = Math.round(width * 0.48);
+
+  const cc1 = Math.round(width * 0.48);
+  const cc2 = Math.round(width * 0.52);
+
+  const rc1 = Math.round(width * 0.52);
+  const rc2 = Math.round(width * 0.56);
+
+  let goodRows = 0;
+  let contrastSum = 0;
+  let rows = 0;
+
+  function avgBright(y, x1, x2){
+    let s = 0, n = 0;
+    for(let x=x1; x<x2; x++){
+      const i = (y * width + x) * 4;
+      s += (data[i] + data[i+1] + data[i+2]) / 3;
+      n++;
+    }
+    return n ? s / n : 0;
   }
 
-  sims.sort((a,b)=> b.sim - a.sim);
+  for(let y = y1; y < y2; y++){
+    const leftB   = avgBright(y, lc1, lc2);
+    const centerB = avgBright(y, cc1, cc2);
+    const rightB  = avgBright(y, rc1, rc2);
 
-  const best = sims[0];
-  const second = sims[1] || { sim: best.sim };
+    const sideAvg = (leftB + rightB) / 2;
+    const delta = sideAvg - centerB; // كلما كان المركز أغمق كان الشق أوضح
 
-  const pct = Math.round((best.grade / 5) * 100);
+    if(delta > 5) goodRows++;
+    if(delta > 0) contrastSum += delta;
+    rows++;
+  }
+
+  const continuity = rows ? goodRows / rows : 0;
+  const contrast = rows ? contrastSum / rows : 0;
+
+  let grade = 1;
+  if(continuity >= 0.70 && contrast >= 14) grade = 5;
+  else if(continuity >= 0.55 && contrast >= 10) grade = 4;
+  else if(continuity >= 0.40 && contrast >= 7) grade = 3;
+  else if(continuity >= 0.25 && contrast >= 4) grade = 2;
+  else grade = 1;
+
+  return { grade, continuity, contrast };
+}
+async function compareUdderCleftReference(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+  const res = detectUdderCleftGrade(img);
 
   return {
-    grade: best.grade,
-    pct,
-    similarity: best.sim,
-    gap: best.sim - second.sim,
-    ranking: sims
+    grade: res.grade,
+    pct: Math.round((res.grade / 5) * 100),
+    similarity: 1,
+    continuity: res.continuity,
+    contrast: res.contrast
   };
 }
 async function compareUdderDepthReference(dataUrl){
