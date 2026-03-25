@@ -692,7 +692,15 @@ function detectRearUdderBottomY(img){
 
   return chosenY;
 }
- function detectSingleHockY(data, width, height, band){
+function detectSingleHockPoint(img, band){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
+
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
   const y1 = Math.round(height * 0.60);
   const y2 = Math.round(height * 0.90);
 
@@ -708,7 +716,6 @@ function detectRearUdderBottomY(img){
 
   let chosenY = -1;
 
-  // نبحث من أسفل لأعلى عن أول وادٍ واضح = الأقرب للعرقوب الحقيقي
   for(let y = y2 - 4; y >= y1 + 4; y--){
     const a1 = rowBrightness(y - 4);
     const a2 = rowBrightness(y - 2);
@@ -718,48 +725,88 @@ function detectRearUdderBottomY(img){
 
     const valleyScore = ((a1 + a2 + b1 + b2) / 4) - m;
 
-    // أول valley واضح من أسفل نعتبره العرقوب
     if(valleyScore >= 10){
       chosenY = y;
       break;
     }
   }
 
-  return chosenY;
+  if(chosenY < 0) return null;
+
+  let bestX = -1;
+  let bestDark = 999;
+
+  for(let x = band.x1; x < band.x2; x++){
+    const i = (chosenY * width + x) * 4;
+    const bright = (data[i] + data[i+1] + data[i+2]) / 3;
+    if(bright < bestDark){
+      bestDark = bright;
+      bestX = x;
+    }
+  }
+
+  if(bestX < 0) return null;
+
+  return { x: bestX, y: chosenY };
 }
+
 function detectRearHockLineY(img){
-  const c = document.createElement('canvas');
-  c.width = img.width;
-  c.height = img.height;
-  const ctx = c.getContext('2d', { willReadFrequently:true });
-  ctx.drawImage(img, 0, 0);
+  const left = detectSingleHockPoint(img, {
+    x1: Math.round(img.width * 0.22),
+    x2: Math.round(img.width * 0.34)
+  });
 
-  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+  const right = detectSingleHockPoint(img, {
+    x1: Math.round(img.width * 0.66),
+    x2: Math.round(img.width * 0.78)
+  });
 
-  const leftBand  = { x1: Math.round(width * 0.22), x2: Math.round(width * 0.34) };
-  const rightBand = { x1: Math.round(width * 0.66), x2: Math.round(width * 0.78) };
+  if(!left && !right) return null;
+  if(!left) return { left:null, right, y:right.y };
+  if(!right) return { left, right:null, y:left.y };
 
-  const leftY = detectSingleHockY(data, width, height, leftBand);
-  const rightY = detectSingleHockY(data, width, height, rightBand);
-
-  if(leftY < 0 && rightY < 0) return -1;
-  if(leftY < 0) return rightY;
-  if(rightY < 0) return leftY;
-
-  return Math.round((leftY + rightY) / 2);
+  return {
+    left,
+    right,
+    y: Math.round((left.y + right.y) / 2)
+  };
 }
-function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
-  if(udderBottomY < 0 || hockY < 0) return 3;
 
-  // بدون إنزال إضافي للعرقوب
-  const gap = (hockY - udderBottomY) / imgH;
+function udderDepthGradeFromLandmarks(floorY, hockY, imgH){
+  if(floorY == null || hockY == null) return 3;
 
-  // إذا أرضية الضرع عند العرقوب أو أسفله => 1
+  const gap = (hockY - floorY) / imgH;
+
   if(gap <= 0.00) return 1;
   if(gap <= 0.020) return 2;
   if(gap <= 0.050) return 3;
   if(gap <= 0.085) return 4;
   return 5;
+}
+
+async function compareUdderDepthReference(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+
+  const floor = detectRearUdderBottomY(img);
+  const hocks = detectRearHockLineY(img);
+
+  if(floor == null || !hocks || hocks.y == null){
+    return { grade: 3, pct: 60, similarity: 0 };
+  }
+
+  const grade = udderDepthGradeFromLandmarks(floor, hocks.y, img.height);
+
+  let confidence = 0.6;
+  if(hocks.left && hocks.right){
+    const symmetry = Math.abs(hocks.left.y - hocks.right.y) / Math.max(1, img.height);
+    confidence = 1 - Math.min(symmetry / 0.08, 0.4);
+  }
+
+  return {
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: confidence
+  };
 }
 function detectRearVulvaBottomY(img){
   const c = document.createElement('canvas');
@@ -1065,25 +1112,6 @@ async function compareUdderCleftReference(dataUrl){
     continuity: res.continuity,
     contrast: res.contrast,
     confidence: res.confidence
-  };
-}
-
-async function compareUdderDepthReference(dataUrl){
-  const img = await loadImageFromDataUrl(dataUrl);
-
-  const udderBottomY = detectRearUdderBottomY(img);
-  const hockY = detectRearHockLineY(img);
-
-  if(udderBottomY < 0 || hockY < 0){
-    return { grade: 3, pct: 60, similarity: 0 };
-  }
-
-  const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
-
-  return {
-    grade,
-    pct: Math.round((grade / 5) * 100),
-    similarity: 1
   };
 }
 async function compareRearTeatPlacementReference(dataUrl){
