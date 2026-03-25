@@ -969,15 +969,17 @@ function detectUdderCleftGrade(img){
   const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
 
   const box = detectRearUdderMaskBox(img);
-  if(!box) return { grade: 3, continuity: 0, contrast: 0, confidence: 0, narrowness: 0 };
+  if(!box){
+    return { grade: 3, depthScore: 0, confidence: 0 };
+  }
 
-  // نعمل داخل جسم الضرع فقط
+  // نشتغل داخل جسم الضرع فقط
   const x1 = Math.max(0, box.minX + Math.round(box.widthPx * 0.18));
   const x2 = Math.min(width, box.maxX - Math.round(box.widthPx * 0.18));
   const y1 = Math.max(0, box.minY + Math.round(box.depthPx * 0.10));
-  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.58)); // نستبعد أسفل الحلمات
+  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.58)); // بعيد عن الحلمات
 
-  const udderMid = (box.minX + box.maxX) / 2;
+  const udderMid = Math.round((box.minX + box.maxX) / 2);
 
   function avgBright(y, a, b){
     let s = 0, n = 0;
@@ -989,93 +991,53 @@ function detectUdderCleftGrade(img){
     return n ? s / n : 0;
   }
 
-  let goodRows = 0;
-  let contrastSum = 0;
+  let depthSum = 0;
   let rows = 0;
-  let stabilitySum = 0;
-  let narrowSum = 0;
-  let lastBestCx = null;
+  let validRows = 0;
 
   for(let y = y1; y < y2; y++){
-    let bestCx = -1;
+    // نبحث حول منتصف الضرع فقط
     let bestDelta = -999;
-    let bestWidthPx = 0;
 
-    for(let cx = x1 + 12; cx <= x2 - 12; cx++){
+    for(let cx = udderMid - Math.round(box.widthPx * 0.08);
+            cx <= udderMid + Math.round(box.widthPx * 0.08);
+            cx++){
+
+      if(cx - 12 < x1 || cx + 12 > x2) continue;
+
       const leftB   = avgBright(y, cx - 12, cx - 4);
       const centerB = avgBright(y, cx - 3,  cx + 3);
       const rightB  = avgBright(y, cx + 4,  cx + 12);
 
       const sideAvg = (leftB + rightB) / 2;
+
+      // عمق الشق = الجانبان أفتح من المركز
       const delta = sideAvg - centerB;
 
       if(delta > bestDelta){
         bestDelta = delta;
-        bestCx = cx;
-
-        // تقدير عرض الـ valley: كلما كان أضيق كان أقرب لرباط وسطي قوي
-        let l = cx, r = cx;
-        while(l > x1){
-          const b1 = avgBright(y, l - 1, l);
-          if((sideAvg - b1) < bestDelta * 0.45) break;
-          l--;
-        }
-        while(r < x2 - 1){
-          const b1 = avgBright(y, r, r + 1);
-          if((sideAvg - b1) < bestDelta * 0.45) break;
-          r++;
-        }
-        bestWidthPx = Math.max(1, r - l + 1);
       }
     }
 
     rows++;
 
-    const centerOffset = Math.abs(bestCx - udderMid) / Math.max(1, box.widthPx);
-    const centeredScore = 1 - Math.min(centerOffset / 0.12, 1);
-
-    let stabilityScore = 0.5;
-    if(lastBestCx != null){
-      const drift = Math.abs(bestCx - lastBestCx) / Math.max(1, box.widthPx);
-      stabilityScore = 1 - Math.min(drift / 0.10, 1);
+    if(bestDelta > 1.5){
+      depthSum += bestDelta;
+      validRows++;
     }
-    lastBestCx = bestCx;
-
-    const widthRatio = bestWidthPx / Math.max(1, box.widthPx);
-    const narrowScore = 1 - Math.min(widthRatio / 0.16, 1); // العريض يُعاقب
-
-    if(bestDelta > 3.2 && centeredScore > 0.45){
-      goodRows++;
-    }
-
-    if(bestDelta > 0){
-      contrastSum += bestDelta;
-    }
-
-    stabilitySum += stabilityScore * centeredScore;
-    narrowSum += narrowScore;
   }
 
-  const continuity = rows ? goodRows / rows : 0;
-  const contrast = rows ? contrastSum / rows : 0;
-  const stability = rows ? stabilitySum / rows : 0;
-  const narrowness = rows ? narrowSum / rows : 0;
-
-  // النجاح لا يعتمد على التباين فقط، بل على المركزية + الاستمرارية + الضيق
-  const confidence =
-    (continuity * 0.35) +
-    (Math.min(contrast / 10, 1) * 0.20) +
-    (stability * 0.25) +
-    (narrowness * 0.20);
+  const depthScore = validRows ? depthSum / validRows : 0;
+  const confidence = rows ? (validRows / rows) : 0;
 
   let grade = 1;
-  if(confidence >= 0.78 && continuity >= 0.68 && narrowness >= 0.58) grade = 5;
-  else if(confidence >= 0.62 && continuity >= 0.52 && narrowness >= 0.45) grade = 4;
-  else if(confidence >= 0.46 && continuity >= 0.38 && narrowness >= 0.32) grade = 3;
-  else if(confidence >= 0.28 && continuity >= 0.22) grade = 2;
+  if(depthScore >= 11 && confidence >= 0.45) grade = 5;
+  else if(depthScore >= 8  && confidence >= 0.35) grade = 4;
+  else if(depthScore >= 5.5 && confidence >= 0.25) grade = 3;
+  else if(depthScore >= 3.5 && confidence >= 0.15) grade = 2;
   else grade = 1;
 
-  return { grade, continuity, contrast, confidence, narrowness, stability };
+  return { grade, depthScore, confidence };
 }
 async function compareUdderCleftReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
