@@ -432,7 +432,14 @@ async function loadImageAny(src){
   __refImgCache.set(src, p);
   return p;
 }
-
+function makeUdderCleftVectorFromImage(img){
+  return makeGrayVectorFromImageCrop(img, {
+    x: 0.42,
+    y: 0.28,
+    w: 0.16,
+    h: 0.44
+  });
+}
 async function makeUdderCleftVectorFromDataUrl(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
   return makeUdderCleftVectorFromImage(img);
