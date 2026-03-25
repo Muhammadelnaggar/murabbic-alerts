@@ -656,16 +656,17 @@ function detectRearUdderBottomY(img){
   const box = detectRearUdderMaskBox(img);
   if(!box) return -1;
 
-  const x1 = Math.max(0, box.minX + Math.round(box.widthPx * 0.12));
-  const x2 = Math.min(width, box.maxX - Math.round(box.widthPx * 0.12));
+  // نشتغل في الجزء الأوسط من الضرع فقط ونبتعد أكثر عن الحلمات
+  const x1 = Math.max(0, box.minX + Math.round(box.widthPx * 0.18));
+  const x2 = Math.min(width, box.maxX - Math.round(box.widthPx * 0.18));
   const y1 = Math.max(0, box.minY + Math.round(box.depthPx * 0.18));
-  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.78));
+  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.72));
 
   function isUdderLikeAt(x, y){
     const i = (y * width + x) * 4;
     const r = data[i], g = data[i+1], b = data[i+2];
     const bright = (r + g + b) / 3;
-    return r > 80 && r > b + 8 && bright > 60 && bright < 215;
+    return r > 88 && r > b + 10 && bright > 68 && bright < 210;
   }
 
   let chosenY = -1;
@@ -683,8 +684,8 @@ function detectRearUdderBottomY(img){
       }
     }
 
-    const runRatio = bestRun / Math.max(1, box.widthPx);
-    if(runRatio >= 0.24){
+    const runRatio = bestRun / Math.max(1, (x2 - x1));
+    if(runRatio >= 0.32){
       chosenY = y;
       break;
     }
@@ -773,24 +774,25 @@ function detectRearHockLineY(img){
 }
 
 function udderDepthGradeFromLandmarks(floorY, hockY, imgH){
-  if(floorY == null || hockY == null) return 3;
+  if(floorY == null || hockY == null || floorY < 0 || hockY < 0) return 3;
 
   const gap = (hockY - floorY) / imgH;
 
-  if(gap <= 0.00) return 1;
+  // الملامسة أو النزول عند العرقوب = 1
+  if(gap <= 0.005) return 1;
   if(gap <= 0.020) return 2;
-  if(gap <= 0.050) return 3;
-  if(gap <= 0.085) return 4;
+  if(gap <= 0.045) return 3;
+  if(gap <= 0.080) return 4;
   return 5;
 }
-
 async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
 
   const floor = detectRearUdderBottomY(img);
   const hocks = detectRearHockLineY(img);
 
-  if(floor == null || !hocks || hocks.y == null){
+  // مهم: detectRearUdderBottomY ترجع -1 عند الفشل
+  if(floor < 0 || !hocks || hocks.y == null || hocks.y < 0){
     return { grade: 3, pct: 60, similarity: 0 };
   }
 
