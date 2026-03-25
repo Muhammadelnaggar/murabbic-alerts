@@ -960,7 +960,13 @@ async function compareUdderDepthReference(dataUrl){
   const hockY = detectRearHockLineY(img);
 
   const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
-
+  console.log('DEPTH DEBUG', {
+  udderBottomY,
+  hockY,
+  imgH: img.height,
+  gap: (hockY - udderBottomY) / img.height,
+  grade
+});
   return {
     grade,
     pct: Math.round((grade / 5) * 100),
@@ -1198,10 +1204,11 @@ else if(state.currentAngle==='side' && state.analysis?.foreUdderAttachmentRef){
     state.captures[state.currentAngle]=null;
     state.k[state.currentAngle]=null;
 
-   if(state.currentAngle==='udder-rear' && state.analysis){
+if(state.currentAngle==='udder-rear' && state.analysis){
   delete state.analysis.cleftRef;
   delete state.analysis.depthRef;
   delete state.analysis.widthRef;
+  delete state.analysis.heightRef;
   delete state.analysis.teatPlacementRef;
   delete state.analysis.teatLengthRef;
 }
