@@ -172,15 +172,43 @@
       overlay.width=r.width*devicePixelRatio; overlay.height=r.height*devicePixelRatio;
       overlay.style.width=r.width+'px'; overlay.style.height=r.height+'px';
     }
+    function getGuideBoxPx(w=overlay.width,h=overlay.height){
+      return {
+        x: Math.round(w*0.18),
+        y: Math.round(h*0.18),
+        w: Math.round(w*0.64),
+        h: Math.round(h*0.64)
+      };
+    }
     function drawGuide(){
       const g=overlay.getContext('2d'); if(!g) return;
       const w=overlay.width,h=overlay.height; g.clearRect(0,0,w,h);
-      g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=1*devicePixelRatio;
-      for(let i=1;i<3;i++){ g.beginPath(); g.moveTo((w/3)*i,0); g.lineTo((w/3)*i,h); g.stroke();
-        g.beginPath(); g.moveTo(0,(h/3)*i); g.lineTo(w,(h/3)*i); g.stroke(); }
-      g.strokeStyle='rgba(14,160,90,.9)'; g.lineWidth=4*devicePixelRatio;
-      const rx=w*.18, ry=h*.18, rw=w*.64, rh=h*.64;
-      if(g.roundRect){ g.beginPath(); g.roundRect(rx,ry,rw,rh,20*devicePixelRatio); g.stroke(); } else { g.strokeRect(rx,ry,rw,rh); }
+      const box=getGuideBoxPx(w,h);
+      g.fillStyle='rgba(0,0,0,.28)';
+      g.fillRect(0,0,w,h);
+      g.save();
+      g.globalCompositeOperation='destination-out';
+      g.beginPath();
+      if(g.roundRect){ g.roundRect(box.x,box.y,box.w,box.h,20*devicePixelRatio); }
+      else { g.rect(box.x,box.y,box.w,box.h); }
+      g.fill();
+      g.restore();
+      g.strokeStyle='rgba(255,255,255,.22)'; g.lineWidth=1*devicePixelRatio;
+      for(let i=1;i<3;i++){
+        const x = box.x + (box.w/3)*i;
+        const y = box.y + (box.h/3)*i;
+        g.beginPath(); g.moveTo(x, box.y); g.lineTo(x, box.y + box.h); g.stroke();
+        g.beginPath(); g.moveTo(box.x, y); g.lineTo(box.x + box.w, y); g.stroke();
+      }
+      g.strokeStyle='rgba(14,160,90,.95)'; g.lineWidth=4*devicePixelRatio;
+      g.beginPath();
+      if(g.roundRect){ g.roundRect(box.x,box.y,box.w,box.h,20*devicePixelRatio); }
+      else { g.rect(box.x,box.y,box.w,box.h); }
+      g.stroke();
+      g.fillStyle='rgba(14,160,90,.95)';
+      g.font=`${16*devicePixelRatio}px Cairo, sans-serif`;
+      g.textAlign='center';
+      g.fillText('ضع الروث داخل الإطار بالكامل', w/2, Math.max(24*devicePixelRatio, box.y - 12*devicePixelRatio));
     }
 
     async function listCameras(){
@@ -206,11 +234,126 @@
       toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش';
     }catch(e){ console.warn('Torch not supported',e); } }
 
-    function dataURLFromVideo(){
+    function captureFrameCanvas(){
       const c=document.createElement('canvas');
       const w=preview.videoWidth,h=preview.videoHeight;
-      c.width=w; c.height=h; c.getContext('2d').drawImage(preview,0,0,w,h);
-      return c.toDataURL('image/jpeg',0.92);
+      c.width=w; c.height=h;
+      c.getContext('2d',{willReadFrequently:true}).drawImage(preview,0,0,w,h);
+      return c;
+    }
+    function dataURLFromVideo(){
+      return captureFrameCanvas().toDataURL('image/jpeg',0.92);
+    }
+    function canvasFromDataURL(dataUrl){
+      return new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const c=document.createElement('canvas');
+          c.width=img.width; c.height=img.height;
+          c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0);
+          resolve(c);
+        };
+        img.onerror=reject;
+        img.src=dataUrl;
+      });
+    }
+    function getGuideRectOnSource(sw,sh){
+      const box=getGuideBoxPx(overlay.width, overlay.height);
+      const scaleX = sw / overlay.width;
+      const scaleY = sh / overlay.height;
+      return {
+        x: Math.max(0, Math.floor(box.x * scaleX)),
+        y: Math.max(0, Math.floor(box.y * scaleY)),
+        w: Math.max(20, Math.floor(box.w * scaleX)),
+        h: Math.max(20, Math.floor(box.h * scaleY))
+      };
+    }
+    function analyzeCaptureQuality(canvas){
+      const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      const {width:w,height:h}=canvas;
+      const r=getGuideRectOnSource(w,h);
+      const data=ctx.getImageData(r.x,r.y,r.w,r.h).data;
+      let sum=0, sum2=0, edge=0, dark=0, bright=0;
+      const lum = new Float32Array(r.w*r.h);
+      let k=0;
+      for(let i=0;i<data.length;i+=4){
+        const y=0.2126*data[i]+0.7152*data[i+1]+0.0722*data[i+2];
+        lum[k++]=y; sum+=y; sum2+=y*y;
+        if(y<45) dark++; if(y>230) bright++;
+      }
+      const n=lum.length||1, mean=sum/n, std=Math.sqrt(Math.max(0,(sum2/n)-(mean*mean)));
+      for(let y=1;y<r.h-1;y++){
+        for(let x=1;x<r.w-1;x++){
+          const i=y*r.w+x;
+          const gx=lum[i+1]-lum[i-1], gy=lum[i+r.w]-lum[i-r.w];
+          edge += Math.hypot(gx,gy);
+        }
+      }
+      const edgeMean=edge/Math.max(1,(r.w-2)*(r.h-2));
+      const darkPct=dark/n, brightPct=bright/n;
+      let ok=true, msg='';
+      if(mean < 55){ ok=false; msg='الإضاءة ضعيفة جدًا'; }
+      else if(edgeMean < 8){ ok=false; msg='الصورة مهزوزة أو غير واضحة'; }
+      else if(darkPct > 0.55){ ok=false; msg='الروث أو الخلفية معتمة جدًا'; }
+      else if(brightPct > 0.22){ ok=false; msg='يوجد لمعان/تعريض زائد'; }
+      return {ok,msg,mean:Math.round(mean),clarity:Math.round(edgeMean),darkPct,brightPct};
+    }
+    function segmentMainBlob(sourceCanvas){
+      const sctx=sourceCanvas.getContext('2d',{willReadFrequently:true});
+      const sw=sourceCanvas.width, sh=sourceCanvas.height;
+      const guide=getGuideRectOnSource(sw,sh);
+      const img=sctx.getImageData(guide.x,guide.y,guide.w,guide.h);
+      const d=img.data, w=guide.w, h=guide.h;
+      const mask=new Uint8Array(w*h);
+      let count=0;
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const p=(y*w+x)*4;
+          const r=d[p], g=d[p+1], b=d[p+2];
+          const lum=0.2126*r+0.7152*g+0.0722*b;
+          const max=Math.max(r,g,b), min=Math.min(r,g,b);
+          const sat=max===0?0:(max-min)/max;
+          const isBlob=(lum<170 && sat<0.42) || (lum<140) || (r>g*0.92 && g>b*0.92 && lum<165);
+          if(isBlob){ mask[y*w+x]=1; count++; }
+        }
+      }
+      if(count < (w*h*0.03)) return null;
+      const visited=new Uint8Array(w*h);
+      const qx=new Int32Array(w*h), qy=new Int32Array(w*h);
+      let best=null;
+      const cx=w/2, cy=h/2;
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+        const idx=y*w+x;
+        if(!mask[idx] || visited[idx]) continue;
+        let head=0,tail=0; qx[tail]=x; qy[tail]=y; tail++; visited[idx]=1;
+        let minx=x,maxx=x,miny=y,maxy=y,area=0,sumx=0,sumy=0;
+        while(head<tail){
+          const xx=qx[head], yy=qy[head]; head++; area++; sumx+=xx; sumy+=yy;
+          if(xx<minx) minx=xx; if(xx>maxx) maxx=xx; if(yy<miny) miny=yy; if(yy>maxy) maxy=yy;
+          const ns=[[1,0],[-1,0],[0,1],[0,-1]];
+          for(const [dx,dy] of ns){
+            const nx=xx+dx, ny=yy+dy;
+            if(nx<0||ny<0||nx>=w||ny>=h) continue;
+            const ni=ny*w+nx;
+            if(mask[ni] && !visited[ni]){ visited[ni]=1; qx[tail]=nx; qy[tail]=ny; tail++; }
+          }
+        }
+        const bw=maxx-minx+1, bh=maxy-miny+1;
+        if(area < (w*h*0.01) || bw < w*0.12 || bh < h*0.12) continue;
+        const mx=sumx/area, my=sumy/area;
+        const dist=Math.hypot(mx-cx, my-cy);
+        const compact = area / Math.max(1,bw*bh);
+        const score = area + compact*5000 - dist*8;
+        if(!best || score > best.score) best={minx,maxx,miny,maxy,area,score};
+      }
+      if(!best) return null;
+      const padX=Math.round((best.maxx-best.minx+1)*0.12);
+      const padY=Math.round((best.maxy-best.miny+1)*0.12);
+      const sx=Math.max(0, guide.x + best.minx - padX);
+      const sy=Math.max(0, guide.y + best.miny - padY);
+      const ex=Math.min(sw, guide.x + best.maxx + 1 + padX);
+      const ey=Math.min(sh, guide.y + best.maxy + 1 + padY);
+      return {x:sx,y:sy,w:Math.max(10, ex-sx),h:Math.max(10, ey-sy),fillRatio: best.area/(w*h)};
     }
 
     // ====== (المطلوب 1) مسار الصور المرجعية مضبوط إلى www/images بدقة ======
@@ -236,11 +379,21 @@
     // مزج خصائص متعددة: ROI مركزي + تعتيم خفيف + تسوية تباين + متجه رمادي مُطبَّع + لونية HSV (المتوسط/الانحراف)
     // + نسيج LBP-lite + HOG-lite، ثم مقارنة مع المراجع بأوزان مدروسة.
     function cropROI(img,w=224,h=224){
-      const cw=img.width, ch=img.height;
-      const rw = Math.floor(cw*0.6), rh = Math.floor(ch*0.6);
-      const rx = Math.floor((cw - rw)/2), ry = Math.floor((ch - rh)/2);
+      const src=document.createElement('canvas');
+      src.width=img.width; src.height=img.height;
+      const sg=src.getContext('2d',{willReadFrequently:true});
+      sg.imageSmoothingEnabled = true;
+      sg.drawImage(img,0,0);
+      const blob = segmentMainBlob(src);
+      let rx,ry,rw,rh;
+      if(blob){
+        rx=blob.x; ry=blob.y; rw=blob.w; rh=blob.h;
+      }else{
+        const guide=getGuideRectOnSource(img.width,img.height);
+        rx=guide.x; ry=guide.y; rw=guide.w; rh=guide.h;
+      }
       const c=document.createElement('canvas'); c.width=w; c.height=h;
-      const g=c.getContext('2d');
+      const g=c.getContext('2d',{willReadFrequently:true});
       g.imageSmoothingEnabled = true;
       g.drawImage(img, rx, ry, rw, rh, 0, 0, w, h);
       return c;
@@ -398,21 +551,35 @@
     function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToFeatureVec(img)); img.src=dataUrl; }); }
 
     async function scoreFeces(dataUrl){
-      const refs=await refVectorsPromise; if(!refs.length) return 3.5;
+      const refs=await refVectorsPromise; if(!refs.length) return {score:3.5, confidence:0, sim:0};
       const vec=await vectorForDataURL(dataUrl);
-      // تشابه مرجّح (متجه كامل بالفعل مُوحّد) → كوساين
-      let best=null;
-      for(const r of refs){ const sim=cosine(vec,r.vec); if(!best || sim>best.sim) best={score:r.score, sim}; }
-      return best?best.score:3.5;
+      const byScore = new Map();
+      for(const r of refs){
+        const sim=cosine(vec,r.vec);
+        if(!byScore.has(r.score)) byScore.set(r.score, []);
+        byScore.get(r.score).push(sim);
+      }
+      let bestScore=3.5, bestAvg=-999, secondAvg=-999;
+      for(const [score, sims] of byScore.entries()){
+        sims.sort((a,b)=>b-a);
+        const top = sims.slice(0, Math.min(3, sims.length));
+        const avg = top.reduce((a,b)=>a+b,0)/top.length;
+        if(avg > bestAvg){ secondAvg = bestAvg; bestAvg = avg; bestScore = Number(score); }
+        else if(avg > secondAvg){ secondAvg = avg; }
+      }
+      const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg))*3.5 ));
+      return {score:bestScore, confidence, sim:bestAvg};
     }
 
-    function renderFecesScore(s){
+    function renderFecesScore(result){
       if(window.__REFS_COUNT__===0){
         scoreBadge.textContent='غير محسوب — مراجع مفقودة';
         scoreFill.style.width='0%'; scoreFill.style.background='#facc15';
         scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/';
         state.lastScore=null; window.fecesScore=null; return;
       }
+      const s = typeof result === 'number' ? result : Number(result?.score || 0);
+      const conf = typeof result === 'object' ? Number(result?.confidence || 0) : 0;
       let label='';
       if(s<=1.5) label='إسهال';
       else if(s<=2.5) label='لين';
@@ -424,7 +591,7 @@
       const pct=Math.min(100, Math.max(0, (s/5)*100));
       scoreFill.style.width=pct+'%';
       scoreFill.style.background = s===3.5 ? '#86efac' : '#7dd3fc';
-      scoreNote.textContent='';
+      scoreNote.textContent = conf >= 0.7 ? 'ثقة عالية' : conf >= 0.45 ? 'ثقة متوسطة' : 'ثقة منخفضة — أعد الالتقاط لو أمكن';
       state.lastScore = s; window.fecesScore = s;
     }
 
@@ -441,19 +608,50 @@
     }
 
     captureBtn.addEventListener('click', async ()=>{
-      const url=dataURLFromVideo(); state.lastCapture=url; showUploadPreview(url);
-      const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false;
+      const frame = captureFrameCanvas();
+      const quality = analyzeCaptureQuality(frame);
+      if(!quality.ok){
+        renderFecesScore({score:0, confidence:0});
+        scoreBadge.textContent='لقطة غير مناسبة';
+        scoreFill.style.width='0%';
+        scoreFill.style.background='#fb7185';
+        scoreNote.textContent=quality.msg;
+        window.fecesScore=null; state.lastScore=null;
+        return;
+      }
+      const url=frame.toDataURL('image/jpeg',0.92); state.lastCapture=url; showUploadPreview(url);
+      const result=await scoreFeces(url); renderFecesScore(result); retakeBtn.disabled=false;
     });
     retakeBtn.addEventListener('click', ()=>{
-      state.lastCapture=null; renderFecesScore(3.5); retakeBtn.disabled=true;
+      state.lastCapture=null; renderFecesScore({score:3.5, confidence:0}); retakeBtn.disabled=true;
       if(uploadPreviewBox) uploadPreviewBox.style.display='none';
+      scoreNote.textContent='التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي ~ 3.5).';
+      scoreBadge.textContent='—';
+      scoreFill.style.width='0%';
+      window.fecesScore=null; state.lastScore=null;
     });
     if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
     if(uploadInput) uploadInput.addEventListener('change', async (e)=>{
       const f=e.target.files && e.target.files[0]; if(!f) return;
       const r=new FileReader();
-      r.onload=async ()=>{ const url=r.result; state.lastCapture=url; showUploadPreview(url);
-        const s=await scoreFeces(url); renderFecesScore(s); retakeBtn.disabled=false; };
+      r.onload=async ()=>{
+        const url=r.result;
+        try{
+          const canvas = await canvasFromDataURL(url);
+          const quality = analyzeCaptureQuality(canvas);
+          if(!quality.ok){
+            scoreBadge.textContent='صورة غير مناسبة';
+            scoreFill.style.width='0%';
+            scoreFill.style.background='#fb7185';
+            scoreNote.textContent=quality.msg;
+            window.fecesScore=null; state.lastScore=null;
+            uploadInput.value='';
+            return;
+          }
+        }catch{}
+        state.lastCapture=url; showUploadPreview(url);
+        const result=await scoreFeces(url); renderFecesScore(result); retakeBtn.disabled=false;
+      };
       r.readAsDataURL(f); uploadInput.value='';
     });
 
@@ -473,7 +671,7 @@
         const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
           c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); showUploadPreview(url); };
         img.src=demoRef;
-      }catch{ renderFecesScore(3.5); }
+      }catch{ renderFecesScore({score:3.5, confidence:0}); }
     }
 
     (async function init(){
@@ -489,7 +687,7 @@
         await startCamera(); await listCameras();
         if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
         if(isDemo) runDemo();
-        renderFecesScore(3.5); // قيمة أولية
+        renderFecesScore({score:3.5, confidence:0}); // قيمة أولية
       }catch(e){ console.warn(e); }
     })();
   </script>
