@@ -656,25 +656,21 @@ function detectRearUdderBottomY(img){
   const box = detectRearUdderMaskBox(img);
   if(!box) return -1;
 
-  const udderMid = Math.round((box.minX + box.maxX) / 2);
-
-  // نشتغل داخل جسم الضرع ونستبعد أسفل الحلمات
-  const x1 = Math.max(0, box.minX + Math.round(box.widthPx * 0.14));
-  const x2 = Math.min(width, box.maxX - Math.round(box.widthPx * 0.14));
+  const x1 = Math.max(0, box.minX + Math.round(box.widthPx * 0.12));
+  const x2 = Math.min(width, box.maxX - Math.round(box.widthPx * 0.12));
   const y1 = Math.max(0, box.minY + Math.round(box.depthPx * 0.18));
-  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.72));
+  const y2 = Math.min(height, box.minY + Math.round(box.depthPx * 0.78));
 
   function isUdderLikeAt(x, y){
     const i = (y * width + x) * 4;
     const r = data[i], g = data[i+1], b = data[i+2];
     const bright = (r + g + b) / 3;
-    return r > 85 && r > b + 10 && bright > 65 && bright < 210;
+    return r > 80 && r > b + 8 && bright > 60 && bright < 215;
   }
 
   let chosenY = -1;
 
   for(let y = y2; y >= y1; y--){
-    // نبحث عن شريط متصل حول منتصف الضرع، لا مجرد نقاط متفرقة
     let run = 0;
     let bestRun = 0;
 
@@ -688,9 +684,7 @@ function detectRearUdderBottomY(img){
     }
 
     const runRatio = bestRun / Math.max(1, box.widthPx);
-
-    // أرضية الضرع يجب أن تكون صفًا متصلًا معتبرًا، لا حلمة منفردة
-    if(runRatio >= 0.22){
+    if(runRatio >= 0.24){
       chosenY = y;
       break;
     }
@@ -698,6 +692,45 @@ function detectRearUdderBottomY(img){
 
   return chosenY;
 }
+ function detectSingleHockY(data, width, height, band){
+  const y1 = Math.round(height * 0.60);
+  const y2 = Math.round(height * 0.90);
+
+  function rowBrightness(y){
+    let s = 0, n = 0;
+    for(let x = band.x1; x < band.x2; x++){
+      const i = (y * width + x) * 4;
+      s += (data[i] + data[i+1] + data[i+2]) / 3;
+      n++;
+    }
+    return n ? s / n : 0;
+  }
+
+  let bestY = -1;
+  let bestScore = -999;
+
+  for(let y = y1 + 4; y < y2 - 4; y++){
+    const a1 = rowBrightness(y - 4);
+    const a2 = rowBrightness(y - 2);
+    const m  = rowBrightness(y);
+    const b1 = rowBrightness(y + 2);
+    const b2 = rowBrightness(y + 4);
+
+    // Valley مستقر عند المفصل
+    const valleyScore = ((a1 + a2 + b1 + b2) / 4) - m;
+
+    // نفضّل المواضع السفلية نسبيًا لكن ليس أسفل الرجل تمامًا
+    const yBias = (y - y1) / Math.max(1, (y2 - y1));
+    const finalScore = valleyScore + (yBias * 2.0);
+
+    if(finalScore > bestScore){
+      bestScore = finalScore;
+      bestY = y;
+    }
+  }
+
+  return bestY;
+}   
 function detectRearHockLineY(img){
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -707,66 +740,22 @@ function detectRearHockLineY(img){
 
   const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
 
-  const bands = [
-    { x1: Math.round(width * 0.22), x2: Math.round(width * 0.34) },
-    { x1: Math.round(width * 0.66), x2: Math.round(width * 0.78) }
-  ];
+  const leftBand  = { x1: Math.round(width * 0.22), x2: Math.round(width * 0.34) };
+  const rightBand = { x1: Math.round(width * 0.66), x2: Math.round(width * 0.78) };
 
-  const y1 = Math.round(height * 0.60);
-  const y2 = Math.round(height * 0.90);
+  const leftY = detectSingleHockY(data, width, height, leftBand);
+  const rightY = detectSingleHockY(data, width, height, rightBand);
 
-  function rowBrightness(y, x1, x2){
-    let s = 0, n = 0;
-    for(let x = x1; x < x2; x++){
-      const i = (y * width + x) * 4;
-      s += (data[i] + data[i+1] + data[i+2]) / 3;
-      n++;
-    }
-    return n ? s / n : 0;
-  }
+  if(leftY < 0 && rightY < 0) return -1;
+  if(leftY < 0) return rightY;
+  if(rightY < 0) return leftY;
 
-  const sideYs = [];
-
-  for(const band of bands){
-    let bestY = -1;
-    let bestScore = -999;
-
-    for(let y = y1 + 4; y < y2 - 4; y++){
-      const a1 = rowBrightness(y - 4, band.x1, band.x2);
-      const a2 = rowBrightness(y - 2, band.x1, band.x2);
-      const m  = rowBrightness(y,     band.x1, band.x2);
-      const b1 = rowBrightness(y + 2, band.x1, band.x2);
-      const b2 = rowBrightness(y + 4, band.x1, band.x2);
-
-      // نبحث عن "وادي" واضح ومستقر، لا صف داكن عابر
-      const score = ((a1 + a2 + b1 + b2) / 4) - m;
-
-      // نفضل المواضع الأقرب لأسفل الرجل لكن ليس القاع
-      const yBias = (y - y1) / Math.max(1, (y2 - y1));
-      const finalScore = score + (yBias * 2.5);
-
-      if(finalScore > bestScore){
-        bestScore = finalScore;
-        bestY = y;
-      }
-    }
-
-    if(bestY >= 0) sideYs.push(bestY);
-  }
-
-  if(!sideYs.length) return -1;
-
-  // ناخذ المتوسط بعد ترتيب القيم لتقليل أثر الجانب الشاذ
-  sideYs.sort((a,b)=>a-b);
-  if(sideYs.length === 1) return sideYs[0];
-  return Math.round((sideYs[0] + sideYs[sideYs.length - 1]) / 2);
+  return Math.round((leftY + rightY) / 2);
 }
 function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
   if(udderBottomY < 0 || hockY < 0) return 3;
 
-  // نصحح العرقوب قليلًا لأسفل لأن الكاشف يميل لالتقاط أعلى الانثناء
-  const correctedHockY = hockY + Math.round(imgH * 0.024);
-
+  const correctedHockY = hockY + Math.round(imgH * 0.022);
   const gap = (correctedHockY - udderBottomY) / imgH;
 
   if(gap >= 0.090) return 5;
@@ -1091,15 +1080,17 @@ async function compareUdderDepthReference(dataUrl){
     similarity: confidence
   };
 }
-async function compareRearUdderWidthReference(dataUrl){
+async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
-  const box = detectRearUdderMaskBox(img);
 
-  if(!box){
+  const udderBottomY = detectRearUdderBottomY(img);
+  const hockY = detectRearHockLineY(img);
+
+  if(udderBottomY < 0 || hockY < 0){
     return { grade: 3, pct: 60, similarity: 0 };
   }
 
-  const grade = rearUdderWidthGrade(box);
+  const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
 
   return {
     grade,
