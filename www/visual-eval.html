@@ -706,31 +706,27 @@ function detectRearUdderBottomY(img){
     return n ? s / n : 0;
   }
 
-  let bestY = -1;
-  let bestScore = -999;
+  let chosenY = -1;
 
-  for(let y = y1 + 4; y < y2 - 4; y++){
+  // نبحث من أسفل لأعلى عن أول وادٍ واضح = الأقرب للعرقوب الحقيقي
+  for(let y = y2 - 4; y >= y1 + 4; y--){
     const a1 = rowBrightness(y - 4);
     const a2 = rowBrightness(y - 2);
     const m  = rowBrightness(y);
     const b1 = rowBrightness(y + 2);
     const b2 = rowBrightness(y + 4);
 
-    // Valley مستقر عند المفصل
     const valleyScore = ((a1 + a2 + b1 + b2) / 4) - m;
 
-    // نفضّل المواضع السفلية نسبيًا لكن ليس أسفل الرجل تمامًا
-    const yBias = (y - y1) / Math.max(1, (y2 - y1));
-    const finalScore = valleyScore + (yBias * 2.0);
-
-    if(finalScore > bestScore){
-      bestScore = finalScore;
-      bestY = y;
+    // أول valley واضح من أسفل نعتبره العرقوب
+    if(valleyScore >= 10){
+      chosenY = y;
+      break;
     }
   }
 
-  return bestY;
-}   
+  return chosenY;
+}
 function detectRearHockLineY(img){
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -755,14 +751,15 @@ function detectRearHockLineY(img){
 function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
   if(udderBottomY < 0 || hockY < 0) return 3;
 
-  const correctedHockY = hockY + Math.round(imgH * 0.022);
-  const gap = (correctedHockY - udderBottomY) / imgH;
+  // بدون إنزال إضافي للعرقوب
+  const gap = (hockY - udderBottomY) / imgH;
 
-  if(gap >= 0.090) return 5;
-  if(gap >= 0.055) return 4;
-  if(gap >= 0.022) return 3;
-  if(gap >= -0.010) return 2;
-  return 1;
+  // إذا أرضية الضرع عند العرقوب أو أسفله => 1
+  if(gap <= 0.00) return 1;
+  if(gap <= 0.020) return 2;
+  if(gap <= 0.050) return 3;
+  if(gap <= 0.085) return 4;
+  return 5;
 }
 function detectRearVulvaBottomY(img){
   const c = document.createElement('canvas');
