@@ -778,20 +778,20 @@ function udderDepthGradeFromLandmarks(floorY, hockY, imgH){
 
   const gap = (hockY - floorY) / imgH;
 
-  // الملامسة أو النزول عند العرقوب = 1
+  // أشد قليلاً حتى لا تتكدس العينات عند 3
   if(gap <= 0.005) return 1;
-  if(gap <= 0.020) return 2;
-  if(gap <= 0.045) return 3;
-  if(gap <= 0.080) return 4;
+  if(gap <= 0.018) return 2;
+  if(gap <= 0.038) return 3;
+  if(gap <= 0.070) return 4;
   return 5;
 }
-async function compareUdderDepthReference(dataUrl){
+async function compareUdderDepthReference(dataUrl){async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
 
   const floor = detectRearUdderBottomY(img);
   const hocks = detectRearHockLineY(img);
 
-  // مهم: detectRearUdderBottomY ترجع -1 عند الفشل
+  // detectRearUdderBottomY ترجع -1 عند الفشل
   if(floor < 0 || !hocks || hocks.y == null || hocks.y < 0){
     return { grade: 3, pct: 60, similarity: 0 };
   }
@@ -809,6 +809,7 @@ async function compareUdderDepthReference(dataUrl){
     pct: Math.round((grade / 5) * 100),
     similarity: confidence
   };
+}
 }
 function detectRearVulvaBottomY(img){
   const c = document.createElement('canvas');
