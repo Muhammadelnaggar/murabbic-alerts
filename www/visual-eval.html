@@ -785,7 +785,7 @@ function udderDepthGradeFromLandmarks(floorY, hockY, imgH){
   if(gap <= 0.070) return 4;
   return 5;
 }
-async function compareUdderDepthReference(dataUrl){async function compareUdderDepthReference(dataUrl){
+async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
 
   const floor = detectRearUdderBottomY(img);
