@@ -638,30 +638,100 @@ function rearUdderWidthGrade(box){
   if(ratio >= 0.22) return 2;
   return 1;
 }
+function detectRearUdderBottomY(img){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
 
-function udderDepthGrade(box){
-  const udderBottom = box.maxY / box.imgH;
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
 
-  // سطر العرقوب التقديري
-  const hockLine = 0.78;
+  // نطاق أضيق ومركزي أسفل الضرع فقط
+  const x1 = Math.round(width  * 0.36);
+  const x2 = Math.round(width  * 0.64);
+  const y1 = Math.round(height * 0.38);
+  const y2 = Math.round(height * 0.78);
 
-  // الفرق بين قاع الضرع ومستوى العرقوب
-  const gap = hockLine - udderBottom;
+  let maxY = -1;
 
-  // حدود أضيق حتى يتغير التقييم فعلاً مع تغير الصورة
-  if(gap >= 0.16) return 5;
-  if(gap >= 0.12) return 4;
-  if(gap >= 0.08) return 3;
-  if(gap >= 0.04) return 2;
-  return 1;
+  for(let y = y1; y < y2; y++){
+    for(let x = x1; x < x2; x++){
+      const i = (y * width + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const bright = (r + g + b) / 3;
+
+      // جلد الضرع/الحلمات فقط بشكل أضيق
+      const udderLike =
+        r > 85 &&
+        r > b + 12 &&
+        bright > 70 &&
+        bright < 205;
+
+      if(udderLike){
+        if(y > maxY) maxY = y;
+      }
+    }
+  }
+
+  return maxY;
 }
-function makeUdderCleftVectorFromImage(img){
-  return makeGrayVectorFromImageCrop(img, {
-   x: 0.35,
-    y: 0.40,
-    w: 0.30,
-    h: 0.35
-  });
+
+function detectRearHockLineY(img){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
+
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+  // نبحث عن العرقوبين في الجانبين لا في الوسط
+  const bands = [
+    { x1: Math.round(width * 0.22), x2: Math.round(width * 0.34) },
+    { x1: Math.round(width * 0.66), x2: Math.round(width * 0.78) }
+  ];
+
+  const y1 = Math.round(height * 0.62);
+  const y2 = Math.round(height * 0.92);
+
+  let bestY = -1;
+  let bestScore = -1;
+
+  for(let y = y1; y < y2; y++){
+    let rowScore = 0;
+
+    for(const band of bands){
+      for(let x = band.x1; x < band.x2; x++){
+        const i = (y * width + x) * 4;
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const bright = (r + g + b) / 3;
+
+        // رجل/مفصل أغمق من جلد الضرع عادة
+        if(bright < 135){
+          rowScore++;
+        }
+      }
+    }
+
+    if(rowScore > bestScore){
+      bestScore = rowScore;
+      bestY = y;
+    }
+  }
+
+  return bestY;
+}
+function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
+  if(udderBottomY < 0 || hockY < 0) return 3;
+
+  const gap = (hockY - udderBottomY) / imgH;
+
+  if(gap >= 0.14) return 5;
+  if(gap >= 0.10) return 4;
+  if(gap >= 0.06) return 3;
+  if(gap >= 0.02) return 2;
+  return 1;
 }
 
 function makeUdderDepthVectorFromImage(img){
@@ -819,14 +889,11 @@ async function compareUdderCleftReference(dataUrl){
 }
 async function compareUdderDepthReference(dataUrl){
   const img = await loadImageFromDataUrl(dataUrl);
-  const vec = makeUdderDepthVectorFromImage(img);
-  const box = detectRearUdderMaskBox(img);
 
-  if(!box){
-    return { grade: 3, pct: 60, similarity: 0 };
-  }
+  const udderBottomY = detectRearUdderBottomY(img);
+  const hockY = detectRearHockLineY(img);
 
-  const grade = udderDepthGrade(box);
+  const grade = udderDepthGradeFromYs(udderBottomY, hockY, img.height);
 
   return {
     grade,
