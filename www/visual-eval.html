@@ -251,8 +251,7 @@
 
       <div class="capture-bar">
         <div class="status" id="thumbs"></div>
-        <div class="helper" id="helperText">وجّه الكاميرا حسب الزاوية المختارة. التقط الأربع لقطات: خلفية/جانبية/أمامية/قريبة للضرع.</div>
-      </div>
+        <div class="helper" id="helperText">وجّه الكاميرا حسب الزاوية المختارة. نحتاج لقطتين فقط: خلفية للضرع، وجانبية للضرع.</div>
     </section>
 
     <aside class="card">
@@ -307,8 +306,8 @@ const angleLabels = {
 };
 
 const helperByAngle = {
-  'udder-rear': 'وجّه الكاميرا خلف الحيوان بحيث يظهر الضرع كاملًا والحلمات بوضوح.',
-  'side': 'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي والحلمات الأمامية بوضوح.'
+  'udder-rear': 'وجّه الكاميرا خلف الحيوان بحيث يظهر الفرج، الارتكاز الخلفي للضرع، أرضية الضرع، العرقوب، والحلمات بوضوح.',
+  'side': 'وجّه الكاميرا جانبيًا بحيث يظهر اتصال الضرع الأمامي، أرضية الضرع، والحلمات الأمامية بوضوح.'
 };
 
     const state = {
@@ -733,7 +732,74 @@ function udderDepthGradeFromYs(udderBottomY, hockY, imgH){
   if(gap >= 0.02) return 2;
   return 1;
 }
+function detectRearVulvaBottomY(img){
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.drawImage(img, 0, 0);
 
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+  const x1 = Math.round(width  * 0.42);
+  const x2 = Math.round(width  * 0.58);
+  const y1 = Math.round(height * 0.08);
+  const y2 = Math.round(height * 0.34);
+
+  let bestY = -1;
+  let bestScore = -1;
+
+  for(let y = y1; y < y2; y++){
+    let rowScore = 0;
+    for(let x = x1; x < x2; x++){
+      const i = (y * width + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const bright = (r + g + b) / 3;
+
+      if(r > 70 && r > b + 8 && bright > 55 && bright < 190){
+        rowScore++;
+      }
+    }
+    if(rowScore > bestScore){
+      bestScore = rowScore;
+      bestY = y;
+    }
+  }
+
+  return bestY;
+}
+
+function detectRearUdderTopY(img){
+  const box = detectRearUdderMaskBox(img);
+  return box ? box.minY : -1;
+}
+
+function rearUdderHeightGradeFromYs(vulvaBottomY, udderTopY, imgH){
+  if(vulvaBottomY < 0 || udderTopY < 0) return 3;
+
+  const dist = (udderTopY - vulvaBottomY) / imgH;
+
+  if(dist <= 0.06) return 5;
+  if(dist <= 0.10) return 4;
+  if(dist <= 0.14) return 3;
+  if(dist <= 0.18) return 2;
+  return 1;
+}
+
+async function compareRearUdderHeightReference(dataUrl){
+  const img = await loadImageFromDataUrl(dataUrl);
+
+  const vulvaBottomY = detectRearVulvaBottomY(img);
+  const udderTopY = detectRearUdderTopY(img);
+
+  const grade = rearUdderHeightGradeFromYs(vulvaBottomY, udderTopY, img.height);
+
+  return {
+    grade,
+    pct: Math.round((grade / 5) * 100),
+    similarity: 1
+  };
+}
 function makeUdderDepthVectorFromImage(img){
   return makeGrayVectorFromImageCrop(img, {
      x: 0.35,
@@ -988,24 +1054,27 @@ async function compareFrontTeatLengthReference(dataUrl){
   const k={};
 
 if(angle==='udder-rear'){
-  const cleftRef = await compareUdderCleftReference(dataUrl);
-  const depthRef = await compareUdderDepthReference(dataUrl);
-  const widthRef = await compareRearUdderWidthReference(dataUrl);
-  const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
-  const teatLengthRef = await compareTeatLengthReference(dataUrl);
+ const cleftRef = await compareUdderCleftReference(dataUrl);
+const depthRef = await compareUdderDepthReference(dataUrl);
+const widthRef = await compareRearUdderWidthReference(dataUrl);
+const heightRef = await compareRearUdderHeightReference(dataUrl);
+const teatPlacementRef = await compareRearTeatPlacementReference(dataUrl);
+const teatLengthRef = await compareTeatLengthReference(dataUrl);
  
   if(!state.analysis) state.analysis = {};
-  state.analysis.cleftRef = cleftRef;
-  state.analysis.depthRef = depthRef;
-  state.analysis.widthRef = widthRef;
-  state.analysis.teatPlacementRef = teatPlacementRef;
-  state.analysis.teatLengthRef = teatLengthRef;
+ state.analysis.cleftRef = cleftRef;
+state.analysis.depthRef = depthRef;
+state.analysis.widthRef = widthRef;
+state.analysis.heightRef = heightRef;
+state.analysis.teatPlacementRef = teatPlacementRef;
+state.analysis.teatLengthRef = teatLengthRef;
 
-  k.udderCleft = cleftRef.pct;
-  k.udderDepth = depthRef.pct;
-  k.rearUdderWidth = widthRef.pct;
-  k.rearTeatPlacement = teatPlacementRef.pct;
-  k.teatLength = teatLengthRef.pct;
+ k.udderCleft = cleftRef.pct;
+k.udderDepth = depthRef.pct;
+k.rearUdderWidth = widthRef.pct;
+k.rearUdderHeight = heightRef.pct;
+k.rearTeatPlacement = teatPlacementRef.pct;
+k.teatLength = teatLengthRef.pct;
 }
 
 else if(angle==='side'){
@@ -1029,13 +1098,14 @@ else if(angle==='side'){
     function computeOverallFromState(){
       const WEIGHTS={ UDDER:40, BACK_RUMP:30, FRONT_LEGS:20, FEMININITY:10 };
       const SUB={
-     UDDER:{
-  udderCleft:25,
-  udderDepth:25,
-  rearUdderWidth:20,
-  teatLength:10,
-  teatPlacement:10,
-  foreUdderAttachment:10
+  UDDER:{
+  udderDepth:30,
+  teatPlacement:20,
+  foreUdderAttachment:18,
+  rearUdderWidth:12,
+  rearUdderHeight:10,
+  udderCleft:5,
+  teatLength:5
 },
         BACK_RUMP:{ backStraight:45, rumpAngle:35, bodyDepth:20 },
         FRONT_LEGS:{ chestWidth:50, frontLegsParallel:50 },
@@ -1104,7 +1174,7 @@ all.teatLength = Math.round(
     state.k[state.currentAngle]=await computeKPIs(dataUrl,state.currentAngle);
 if(state.currentAngle==='udder-rear' && state.analysis?.cleftRef){
   helperText.textContent =
-`✅ تم تقييم الضرع — الشق: ${state.analysis.cleftRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
+`✅ تم تقييم الضرع — الارتفاع الخلفي: ${state.analysis.heightRef.grade}/5 | العرض الخلفي: ${state.analysis.widthRef.grade}/5 | العمق: ${state.analysis.depthRef.grade}/5 | الشق: ${state.analysis.cleftRef.grade}/5 | تموضع الحلمات: ${state.analysis.teatPlacementRef.grade}/5 | طول الحلمات: ${state.analysis.teatLengthRef.grade}/5`;
 }
 else if(state.currentAngle==='side' && state.analysis?.foreUdderAttachmentRef){
   helperText.textContent =
