@@ -105,7 +105,7 @@
         <div id="scoreWidget" class="score">
           <div class="score-badge" id="scoreBadge">—</div>
           <div class="score-bar"><div class="fill" id="scoreFill" style="width:0%"></div></div>
-          <div class="score-note" id="scoreNote">التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي ~ 3.5).</div>
+          <div class="score-note" id="scoreNote">التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي = 3).</div>
         </div>
       </div>
 
@@ -356,23 +356,24 @@
       return {x:sx,y:sy,w:Math.max(10, ex-sx),h:Math.max(10, ey-sy),fillRatio: best.area/(w*h)};
     }
 
-    // ====== (المطلوب 1) مسار الصور المرجعية مضبوط إلى www/images بدقة ======
-    // الأسماء: 1.jpg, 2.jpg, 3.jpg, 3_5.jpg, 4.jpg, 5.jpg
-    const REF_BASES = ['/www/images/','/images/']; // الأولوية لـ /www/images/
+    // ====== الصور المرجعية: فولدر مستقل feces + 5 صور لكل درجة من 1 إلى 5 ======
+    // المسار الأساسي: www/images/feces/
+    // الأسماء المعتمدة: 1_1.jpg ... 1_5.jpg / 2_1.jpg ... / 3_1.jpg ... / 4_1.jpg ... / 5_1.jpg ...
+    // الدرجة المثالية المعتمدة في مُرَبِّيك: 3
+    const REF_BASES = ['/www/images/feces/','/images/feces/'];
     const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
-    const REF_NAMES = [
-      {score:1,   names:['1']},
-      {score:2,   names:['2']},
-      {score:3,   names:['3']},
-      {score:3.5, names:['3_5','3.5']},
-      {score:4,   names:['4']},
-      {score:5,   names:['5']}
-    ];
-    const REF_LIST = REF_NAMES.flatMap(({score,names}) =>
-      names.map(name => ({
-        score,
-        urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`))
-      }))
+    const REF_SCORES = [1,2,3,4,5];
+    const REF_PER_SCORE = 5;
+    const REF_LIST = REF_SCORES.flatMap(score =>
+      Array.from({length:REF_PER_SCORE}, (_,i) => {
+        const idx = i + 1;
+        const name = `${score}_${idx}`;
+        return {
+          score,
+          name,
+          urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`))
+        };
+      })
     );
 
     // ====== تقنية التقييم عالية الدقة (المطلوب 3) ======
@@ -542,7 +543,7 @@
       const refs = arr.filter(Boolean);
       __REFS_COUNT__ = refs.length; window.__REFS_COUNT__ = __REFS_COUNT__;
       if(!refs.length && scoreNote){
-        scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات في www/images/ بالأسماء الصحيحة.';
+        scoreNote.textContent = 'تنبيه: لم يتم تحميل الصور المرجعية — تأكد من وجود الملفات داخل www/images/feces/ بالأسماء الصحيحة.';
       }
       return refs;
     });
@@ -551,7 +552,7 @@
     function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToFeatureVec(img)); img.src=dataUrl; }); }
 
     async function scoreFeces(dataUrl){
-      const refs=await refVectorsPromise; if(!refs.length) return {score:3.5, confidence:0, sim:0};
+      const refs=await refVectorsPromise; if(!refs.length) return {score:3, confidence:0, sim:0};
       const vec=await vectorForDataURL(dataUrl);
       const byScore = new Map();
       for(const r of refs){
@@ -559,7 +560,7 @@
         if(!byScore.has(r.score)) byScore.set(r.score, []);
         byScore.get(r.score).push(sim);
       }
-      let bestScore=3.5, bestAvg=-999, secondAvg=-999;
+      let bestScore=3, bestAvg=-999, secondAvg=-999;
       for(const [score, sims] of byScore.entries()){
         sims.sort((a,b)=>b-a);
         const top = sims.slice(0, Math.min(3, sims.length));
@@ -575,7 +576,7 @@
       if(window.__REFS_COUNT__===0){
         scoreBadge.textContent='غير محسوب — مراجع مفقودة';
         scoreFill.style.width='0%'; scoreFill.style.background='#facc15';
-        scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/';
+        scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/feces/';
         state.lastScore=null; window.fecesScore=null; return;
       }
       const s = typeof result === 'number' ? result : Number(result?.score || 0);
@@ -583,14 +584,14 @@
       let label='';
       if(s<=1.5) label='إسهال';
       else if(s<=2.5) label='لين';
-      else if(s<3.5) label='قريب للمثالي';
-      else if(s===3.5) label='مثالي';
+      else if(s<3) label='قريب من المثالي';
+      else if(s===3) label='مثالي';
       else if(s<=4.5) label='صلب';
       else label='إمساك';
       scoreBadge.textContent=`${label} — ${s} / 5`;
       const pct=Math.min(100, Math.max(0, (s/5)*100));
       scoreFill.style.width=pct+'%';
-      scoreFill.style.background = s===3.5 ? '#86efac' : '#7dd3fc';
+      scoreFill.style.background = s===3 ? '#86efac' : '#7dd3fc';
       scoreNote.textContent = conf >= 0.7 ? 'ثقة عالية' : conf >= 0.45 ? 'ثقة متوسطة' : 'ثقة منخفضة — أعد الالتقاط لو أمكن';
       state.lastScore = s; window.fecesScore = s;
     }
@@ -623,9 +624,9 @@
       const result=await scoreFeces(url); renderFecesScore(result); retakeBtn.disabled=false;
     });
     retakeBtn.addEventListener('click', ()=>{
-      state.lastCapture=null; renderFecesScore({score:3.5, confidence:0}); retakeBtn.disabled=true;
+      state.lastCapture=null; renderFecesScore({score:3, confidence:0}); retakeBtn.disabled=true;
       if(uploadPreviewBox) uploadPreviewBox.style.display='none';
-      scoreNote.textContent='التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي ~ 3.5).';
+      scoreNote.textContent='التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي = 3).';
       scoreBadge.textContent='—';
       scoreFill.style.width='0%';
       window.fecesScore=null; state.lastScore=null;
@@ -667,11 +668,11 @@
 
     // تهيئة الصفحة + ربط السياق (المطلوب 6 + 7)
     async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
-      const demoRef='/www/images/3_5.jpg'; try{
+      const demoRef='/www/images/feces/3_1.jpg'; try{
         const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
           c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); showUploadPreview(url); };
         img.src=demoRef;
-      }catch{ renderFecesScore({score:3.5, confidence:0}); }
+      }catch{ renderFecesScore({score:3, confidence:0}); }
     }
 
     (async function init(){
@@ -687,7 +688,7 @@
         await startCamera(); await listCameras();
         if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
         if(isDemo) runDemo();
-        renderFecesScore({score:3.5, confidence:0}); // قيمة أولية
+        renderFecesScore({score:3, confidence:0}); // قيمة أولية
       }catch(e){ console.warn(e); }
     })();
   </script>
@@ -714,8 +715,8 @@
   function fecesDesc(score){
     if (score <= 1.5) return "إسهال";
     if (score <= 2.5) return "لين";
-    if (score <  3.5) return "قريب للمثالي";
-    if (score === 3.5) return "مثالي";
+    if (score <  3) return "قريب من المثالي";
+    if (score === 3) return "مثالي";
     if (score <= 4.5) return "صلب";
     return "إمساك";
   }
