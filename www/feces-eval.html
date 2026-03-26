@@ -609,29 +609,16 @@
       g.fillText('ضع الروث داخل الإطار بالكامل', w/2, Math.max(24*devicePixelRatio, box.y - 12*devicePixelRatio));
     }
 
-    async function listCameras(){
-      const devs=await navigator.mediaDevices.enumerateDevices();
-      const cams=devs.filter(d=>d.kind==='videoinput');
-      cameraSelect.innerHTML='';
-      cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); });
-      return cams;
-    }
+  
     async function startCamera(deviceId){
       if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
       const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}};
       const stream=await navigator.mediaDevices.getUserMedia(cs);
       state.stream=stream; preview.srcObject=stream;
       const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null;
-      await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport();
+      await preview.play(); fitOverlay(); drawGuide();
     }
-    function populateTorchSupport(){ const cap=state.capabilities; toggleFlash.disabled=!(cap&&'torch' in cap); }
-    async function toggleTorch(){ try{
-      if(!state.track) return; state.torchOn=!state.torchOn;
-      await state.track.applyConstraints({advanced:[{torch:state.torchOn}]});
-      toggleFlash.setAttribute('aria-pressed',String(state.torchOn));
-      toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش';
-    }catch(e){ console.warn('Torch not supported',e); } }
-
+   
     function captureFrameCanvas(){
       const c=document.createElement('canvas');
       const w=preview.videoWidth,h=preview.videoHeight;
