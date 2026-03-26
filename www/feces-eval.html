@@ -1079,6 +1079,7 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
   }
 
   return bestOverall || {score:3, confidence:0, sim:0};
+   }  
 function renderFecesScore(result){
   if(window.__REFS_COUNT__===0){
     scoreBadge.textContent='غير متاح الآن';
