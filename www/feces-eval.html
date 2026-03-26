@@ -153,10 +153,13 @@
     font-weight:800;
     white-space:nowrap;
   }
+.container{
+  max-width:520px;
+  margin:14px auto 210px;
+  padding:0 12px;
+}
 
- .container{
-
-  .card{
+.card{
     background:var(--card);
     border:1px solid #e2e8f0;
     border-radius:18px;
@@ -1232,7 +1235,7 @@ scoreNote.textContent = 'التقط صورة جديدة واضحة للتقيي�
           c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); showUploadPreview(url); };
         img.src=demoRef;
       }catch{ renderFecesScore({score:3, confidence:0}); }
-    }
+    
 
     (async function init(){
       try{
