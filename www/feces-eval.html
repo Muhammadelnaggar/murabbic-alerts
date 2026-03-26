@@ -380,54 +380,26 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
     // ====== تقنية التقييم عالية الدقة (المطلوب 3) ======
     // مزج خصائص متعددة: ROI مركزي + تعتيم خفيف + تسوية تباين + متجه رمادي مُطبَّع + لونية HSV (المتوسط/الانحراف)
     // + نسيج LBP-lite + HOG-lite، ثم مقارنة مع المراجع بأوزان مدروسة.
-function cropROI(img,w=224,h=224){
-  const src=document.createElement('canvas');
-  src.width=img.width; src.height=img.height;
-  const sg=src.getContext('2d',{willReadFrequently:true});
-  sg.imageSmoothingEnabled = true;
-  sg.drawImage(img,0,0);
-
-  const blob = segmentMainBlob(src);
-  let rx,ry,rw,rh;
-
-  if(blob){
-    const pad = 0.22; // هامش أكبر حول الروث لالتقاط القوام حتى لو اللقطة بعيدة
-    let bx = blob.x - blob.w * pad;
-    let by = blob.y - blob.h * pad;
-    let bw = blob.w * (1 + pad*2);
-    let bh = blob.h * (1 + pad*2);
-
-    // نجعل القص مربعًا قدر الإمكان لتثبيت الشكل بعد التصغير
-    const side = Math.max(bw, bh) * 1.06;
-    const cx = bx + bw/2;
-    const cy = by + bh/2;
-
-    rx = Math.round(cx - side/2);
-    ry = Math.round(cy - side/2);
-    rw = Math.round(side);
-    rh = Math.round(side);
-
-    if(rx < 0){ rw += rx; rx = 0; }
-    if(ry < 0){ rh += ry; ry = 0; }
-    if(rx + rw > img.width)  rw = img.width  - rx;
-    if(ry + rh > img.height) rh = img.height - ry;
-
-    rw = Math.max(20, rw);
-    rh = Math.max(20, rh);
-  }else{
-    const guide=getGuideRectOnSource(img.width,img.height);
-    rx=guide.x; ry=guide.y; rw=guide.w; rh=guide.h;
-  }
-
-  const c=document.createElement('canvas');
-  c.width=w; c.height=h;
-  const g=c.getContext('2d',{willReadFrequently:true});
-  g.imageSmoothingEnabled = true;
-  g.fillStyle = '#d9d9d9';
-  g.fillRect(0,0,w,h);
-  g.drawImage(img, rx, ry, rw, rh, 0, 0, w, h);
-  return c;
-}
+    function cropROI(img,w=224,h=224){
+      const src=document.createElement('canvas');
+      src.width=img.width; src.height=img.height;
+      const sg=src.getContext('2d',{willReadFrequently:true});
+      sg.imageSmoothingEnabled = true;
+      sg.drawImage(img,0,0);
+      const blob = segmentMainBlob(src);
+      let rx,ry,rw,rh;
+      if(blob){
+        rx=blob.x; ry=blob.y; rw=blob.w; rh=blob.h;
+      }else{
+        const guide=getGuideRectOnSource(img.width,img.height);
+        rx=guide.x; ry=guide.y; rw=guide.w; rh=guide.h;
+      }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const g=c.getContext('2d',{willReadFrequently:true});
+      g.imageSmoothingEnabled = true;
+      g.drawImage(img, rx, ry, rw, rh, 0, 0, w, h);
+      return c;
+    }
     function gaussianBlur(c){
       // بلور بسيط 3x3
       const g=c.getContext('2d'), {width:w,height:h}=c; const img=g.getImageData(0,0,w,h);
@@ -541,18 +513,16 @@ function cropROI(img,w=224,h=224){
       return out;
     }
 
-  function imgToFeatureVec(img){
-  // نفس المنطق الحالي لكن بدقة أعلى قليلًا وثبات أفضل
-  let c = cropROI(img, 224, 224);
-  c = gaussianBlur(c);
-
-  const gray  = toGrayVec(c, 80);
-  const color = hsvMoments(c);
-  const lbp   = lbpHist(c, 80);
-  const hog   = hogLite(c, 10);
-
-  return concatFeatures(gray, color, lbp, hog);
-}
+    function imgToFeatureVec(img){
+      // ROI مركزي + Gaussian + مجموعات الخصائص
+      let c = cropROI(img, 192, 192);
+      c = gaussianBlur(c);
+      const gray = toGrayVec(c, 64);
+      const color = hsvMoments(c);
+      const lbp = lbpHist(c, 64);
+      const hog = hogLite(c, 8);
+      return concatFeatures(gray, color, lbp, hog);
+    }
 
     async function loadRefVector(item){
       const candidates = item.urls || []; let i = 0;
@@ -678,10 +648,8 @@ function cropROI(img,w=224,h=224){
 
     for(const [score, sims] of byScore.entries()){
       sims.sort((a,b)=>b-a);
-     const top = sims.slice(0, Math.min(3, sims.length));
-const weights = top.length === 1 ? [1] : top.length === 2 ? [0.70, 0.30] : [0.55, 0.30, 0.15];
-let avg = 0;
-for(let i=0;i<top.length;i++) avg += top[i] * weights[i];
+      const top = sims.slice(0, Math.min(3, sims.length));
+      const avg = top.reduce((a,b)=>a+b,0) / top.length;
 
       if(avg > bestAvg){
         secondAvg = bestAvg;
@@ -692,7 +660,7 @@ for(let i=0;i<top.length;i++) avg += top[i] * weights[i];
       }
     }
 
-  const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg)) * 4.2));;
+    const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg)) * 3.5));
 
     const candidateResult = {
       score: bestScore,
