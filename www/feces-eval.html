@@ -625,13 +625,15 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
       const result=await scoreFeces(url); renderFecesScore(result); retakeBtn.disabled=false;
     });
     retakeBtn.addEventListener('click', ()=>{
-      state.lastCapture=null; renderFecesScore({score:3, confidence:0}); retakeBtn.disabled=true;
-      if(uploadPreviewBox) uploadPreviewBox.style.display='none';
-      scoreNote.textContent='التقط/ارفع صورة لعرض درجة الروث (1=إسهال … 5=إمساك، المثالي = 3).';
-      scoreBadge.textContent='—';
-      scoreFill.style.width='0%';
-      window.fecesScore=null; state.lastScore=null;
-    });
+     state.lastCapture=null;
+retakeBtn.disabled=true;
+if(uploadPreviewBox) uploadPreviewBox.style.display='none';
+scoreBadge.textContent='—';
+scoreFill.style.width='0%';
+scoreFill.style.background='#e5e7eb';
+scoreNote.textContent='التقط أو ارفع صورة أولًا.';
+window.fecesScore=null;
+state.lastScore=null;
     if(uploadBtn) uploadBtn.addEventListener('click', ()=> uploadInput && uploadInput.click());
     if(uploadInput) uploadInput.addEventListener('change', async (e)=>{
       const f=e.target.files && e.target.files[0]; if(!f) return;
@@ -690,7 +692,12 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
         await startCamera(); await listCameras();
         if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
         if(isDemo) runDemo();
-        renderFecesScore({score:3, confidence:0}); // قيمة أولية
+      scoreBadge.textContent='—';
+scoreFill.style.width='0%';
+scoreFill.style.background='#e5e7eb';
+scoreNote.textContent='التقط أو ارفع صورة أولًا.';
+window.fecesScore=null;
+state.lastScore=null;
       }catch(e){ console.warn(e); }
     })();
   </script>
