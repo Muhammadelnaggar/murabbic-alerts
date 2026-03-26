@@ -743,26 +743,22 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
     // ====== تقنية التقييم عالية الدقة (المطلوب 3) ======
     // مزج خصائص متعددة: ROI مركزي + تعتيم خفيف + تسوية تباين + متجه رمادي مُطبَّع + لونية HSV (المتوسط/الانحراف)
     // + نسيج LBP-lite + HOG-lite، ثم مقارنة مع المراجع بأوزان مدروسة.
-    function cropROI(img,w=224,h=224){
-      const src=document.createElement('canvas');
-      src.width=img.width; src.height=img.height;
-      const sg=src.getContext('2d',{willReadFrequently:true});
-      sg.imageSmoothingEnabled = true;
-      sg.drawImage(img,0,0);
-      const blob = segmentMainBlob(src);
-      let rx,ry,rw,rh;
-      if(blob){
-        rx=blob.x; ry=blob.y; rw=blob.w; rh=blob.h;
-      }else{
-        const guide=getGuideRectOnSource(img.width,img.height);
-        rx=guide.x; ry=guide.y; rw=guide.w; rh=guide.h;
-      }
-      const c=document.createElement('canvas'); c.width=w; c.height=h;
-      const g=c.getContext('2d',{willReadFrequently:true});
-      g.imageSmoothingEnabled = true;
-      g.drawImage(img, rx, ry, rw, rh, 0, 0, w, h);
-      return c;
-    }
+ function cropROI(img,w=224,h=224){
+  const guide = getGuideRectOnSource(img.width, img.height);
+  const rx = guide.x;
+  const ry = guide.y;
+  const rw = guide.w;
+  const rh = guide.h;
+
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+
+  const g = c.getContext('2d',{willReadFrequently:true});
+  g.imageSmoothingEnabled = true;
+  g.drawImage(img, rx, ry, rw, rh, 0, 0, w, h);
+  return c;
+}
     function gaussianBlur(c){
       // بلور بسيط 3x3
       const g=c.getContext('2d'), {width:w,height:h}=c; const img=g.getImageData(0,0,w,h);
