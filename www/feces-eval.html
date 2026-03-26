@@ -358,23 +358,24 @@
 
     // ====== الصور المرجعية: فولدر مستقل feces + 5 صور لكل درجة من 1 إلى 5 ======
     // المسار الأساسي: www/images/feces/
-    // الأسماء المعتمدة: 1_1.jpg ... 1_5.jpg / 2_1.jpg ... / 3_1.jpg ... / 4_1.jpg ... / 5_1.jpg ...
-    // الدرجة المثالية المعتمدة في مُرَبِّيك: 3
-    const REF_BASES = ['/www/images/feces/','/images/feces/'];
-    const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
-    const REF_SCORES = [1,2,3,4,5];
-    const REF_PER_SCORE = 5;
-    const REF_LIST = REF_SCORES.flatMap(score =>
-      Array.from({length:REF_PER_SCORE}, (_,i) => {
-        const idx = i + 1;
-        const name = `${score}_${idx}`;
-        return {
-          score,
-          name,
-          urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`))
-        };
-      })
-    );
+  const REF_BASES = ['/www/images/feces/','/images/feces/'];
+const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
+
+const REF_MAP = {
+  1: ['1-1', '1-2'],
+  2: ['2-1', '2-2', '2-3', '2-4', '2-5'],
+  3: ['3-1', '3-2', '3-3', '3-4', '3-5'],
+  4: ['4-1', '4-2', '4-3', '4-4', '4-5'],
+  5: ['5-1', '5-2']
+};
+
+const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
+  names.map(name => ({
+    score: Number(score),
+    name,
+    urls: REF_BASES.flatMap(base => REF_EXTS.map(ext => `${base}${name}.${ext}`))
+  }))
+);
 
     // ====== تقنية التقييم عالية الدقة (المطلوب 3) ======
     // مزج خصائص متعددة: ROI مركزي + تعتيم خفيف + تسوية تباين + متجه رمادي مُطبَّع + لونية HSV (المتوسط/الانحراف)
