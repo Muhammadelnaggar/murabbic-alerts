@@ -550,29 +550,135 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
     });
 
     function cosine(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
-    function vectorForDataURL(dataUrl){ return new Promise(res=>{ const img=new Image(); img.onload=()=>res(imgToFeatureVec(img)); img.src=dataUrl; }); }
+    function makeCandidateCanvasesFromDataURL(dataUrl){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const src = document.createElement('canvas');
+      src.width = img.width;
+      src.height = img.height;
+      const sg = src.getContext('2d', {willReadFrequently:true});
+      sg.drawImage(img, 0, 0);
 
-    async function scoreFeces(dataUrl){
-      const refs=await refVectorsPromise; if(!refs.length) return {score:3, confidence:0, sim:0};
-      const vec=await vectorForDataURL(dataUrl);
-      const byScore = new Map();
-      for(const r of refs){
-        const sim=cosine(vec,r.vec);
-        if(!byScore.has(r.score)) byScore.set(r.score, []);
-        byScore.get(r.score).push(sim);
+      const blob = segmentMainBlob(src);
+      const out = [];
+
+      function pushCrop(x,y,w,h,size=192){
+        const c = document.createElement('canvas');
+        c.width = size; c.height = size;
+        const g = c.getContext('2d', {willReadFrequently:true});
+        g.imageSmoothingEnabled = true;
+        g.drawImage(src, x, y, w, h, 0, 0, size, size);
+        out.push(c);
       }
-      let bestScore=3, bestAvg=-999, secondAvg=-999;
-      for(const [score, sims] of byScore.entries()){
-        sims.sort((a,b)=>b-a);
-        const top = sims.slice(0, Math.min(3, sims.length));
-        const avg = top.reduce((a,b)=>a+b,0)/top.length;
-        if(avg > bestAvg){ secondAvg = bestAvg; bestAvg = avg; bestScore = Number(score); }
-        else if(avg > secondAvg){ secondAvg = avg; }
+
+      if(blob){
+        const cx = blob.x + blob.w/2;
+        const cy = blob.y + blob.h/2;
+
+        const scales = [1.00, 1.18, 1.38, 1.62];
+        const shifts = [
+          [0,0],
+          [-0.08,0], [0.08,0],
+          [0,-0.08], [0,0.08]
+        ];
+
+        for(const s of scales){
+          const bw = Math.min(src.width,  blob.w * s);
+          const bh = Math.min(src.height, blob.h * s);
+
+          for(const [sx,sy] of shifts){
+            let x = Math.round(cx - bw/2 + bw*sx);
+            let y = Math.round(cy - bh/2 + bh*sy);
+
+            x = Math.max(0, Math.min(src.width  - bw, x));
+            y = Math.max(0, Math.min(src.height - bh, y));
+
+            pushCrop(x, y, Math.round(bw), Math.round(bh), 192);
+          }
+        }
+      }else{
+        const guide = getGuideRectOnSource(src.width, src.height);
+        const cx = guide.x + guide.w/2;
+        const cy = guide.y + guide.h/2;
+        const scales = [1.00, 1.20, 1.40];
+
+        for(const s of scales){
+          const bw = Math.min(src.width,  guide.w * s);
+          const bh = Math.min(src.height, guide.h * s);
+          let x = Math.round(cx - bw/2);
+          let y = Math.round(cy - bh/2);
+          x = Math.max(0, Math.min(src.width  - bw, x));
+          y = Math.max(0, Math.min(src.height - bh, y));
+          pushCrop(x, y, Math.round(bw), Math.round(bh), 192);
+        }
       }
-      const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg))*3.5 ));
-      return {score:bestScore, confidence, sim:bestAvg};
+
+      resolve(out);
+    };
+    img.src = dataUrl;
+  });
+}
+
+   async function scoreFeces(dataUrl){
+  const refs = await refVectorsPromise;
+  if(!refs.length) return {score:3, confidence:0, sim:0};
+
+  const candidates = await makeCandidateCanvasesFromDataURL(dataUrl);
+  if(!candidates.length) return {score:3, confidence:0, sim:0};
+
+  let bestOverall = null;
+
+  for(const canvas of candidates){
+    const vec = concatFeatures(
+      toGrayVec(gaussianBlur(canvas), 64),
+      hsvMoments(canvas),
+      lbpHist(canvas, 64),
+      hogLite(canvas, 8)
+    );
+
+    const byScore = new Map();
+    for(const r of refs){
+      const sim = cosine(vec, r.vec);
+      if(!byScore.has(r.score)) byScore.set(r.score, []);
+      byScore.get(r.score).push(sim);
     }
 
+    let bestScore = 3, bestAvg = -999, secondAvg = -999;
+
+    for(const [score, sims] of byScore.entries()){
+      sims.sort((a,b)=>b-a);
+      const top = sims.slice(0, Math.min(3, sims.length));
+      const avg = top.reduce((a,b)=>a+b,0) / top.length;
+
+      if(avg > bestAvg){
+        secondAvg = bestAvg;
+        bestAvg = avg;
+        bestScore = Number(score);
+      }else if(avg > secondAvg){
+        secondAvg = avg;
+      }
+    }
+
+    const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg)) * 3.5));
+
+    const candidateResult = {
+      score: bestScore,
+      confidence,
+      sim: bestAvg
+    };
+
+    if(
+      !bestOverall ||
+      candidateResult.confidence > bestOverall.confidence ||
+      (candidateResult.confidence === bestOverall.confidence && candidateResult.sim > bestOverall.sim)
+    ){
+      bestOverall = candidateResult;
+    }
+  }
+
+  return bestOverall || {score:3, confidence:0, sim:0};
+}
     function renderFecesScore(result){
       if(window.__REFS_COUNT__===0){
         scoreBadge.textContent='غير محسوب — مراجع مفقودة';
