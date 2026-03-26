@@ -872,13 +872,9 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
       return out;
     }
 
-   function imgToFeatureVec(img){
+function imgToFeatureVec(img){
   const c = cropROI(img, 192, 192);
-  const gray = toGrayVec(c, 64);
-  const color = hsvMoments(c);
-  const lbp = lbpHist(c, 64);
-  const hog = hogLite(c, 8);
-  return concatFeatures(gray, color, lbp, hog);
+  return toGrayVec(c, 64);
 }
 
     async function loadRefVector(item){
@@ -918,13 +914,7 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
 });
 
 const canvas = cropROI(img, 192, 192);
-
-const vec = concatFeatures(
- toGrayVec(canvas, 64),
-  hsvMoments(canvas),
-  lbpHist(canvas, 64),
-  hogLite(canvas, 8)
-);
+const vec = toGrayVec(canvas, 64);
 
 const byScore = new Map();
 for (const r of refs) {
