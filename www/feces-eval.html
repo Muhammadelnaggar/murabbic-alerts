@@ -417,17 +417,9 @@
     grid-template-columns:1fr 1fr;
   }
 
-  .controls .select{
-    grid-column:1 / -1;
-    width:100%;
-  }
-
   #captureBtn,
   #retakeBtn,
   #uploadBtn,
-  #restartBtn,
-  #toggleFlash,
-  #demoBtn{
     width:100%;
   }
 
@@ -454,7 +446,7 @@
     </div>
 
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-    <span class="demo-badge" id="demoBadge">وضع العرض</span>
+   
   </div>
 </header>
 <div class="mbk-animal-wrap">
@@ -466,10 +458,7 @@
   <div class="container">
     <section class="card" id="cameraCard">
       <div class="controls">
-        <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
-        <button id="demoBtn" class="btn btn-light" title="تشغيل وضع العرض">وضع العرض</button>
-        <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
-        <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
+       
         <div style="margin-inline-start:auto"></div>
         <button id="captureBtn" class="btn btn-primary">التقاط</button>
         <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
@@ -556,8 +545,7 @@
     }
 
     // عناصر الصفحة
-    const preview=$('#preview'), overlay=$('#overlay'), cameraSelect=$('#cameraSelect');
-    const toggleFlash=$('#toggleFlash'), restartBtn=$('#restartBtn');
+   
     const captureBtn=$('#captureBtn'), retakeBtn=$('#retakeBtn');
     const uploadBtn=$('#uploadBtn'), uploadInput=$('#uploadInput');
     const scoreBadge=$('#scoreBadge'), scoreFill=$('#scoreFill'), scoreNote=$('#scoreNote');
@@ -612,28 +600,14 @@
       g.fillText('ضع الروث داخل الإطار بالكامل', w/2, Math.max(24*devicePixelRatio, box.y - 12*devicePixelRatio));
     }
 
-    async function listCameras(){
-      const devs=await navigator.mediaDevices.enumerateDevices();
-      const cams=devs.filter(d=>d.kind==='videoinput');
-      cameraSelect.innerHTML='';
-      cams.forEach((c,i)=>{ const o=document.createElement('option'); o.value=c.deviceId; o.textContent=c.label||`كاميرا ${i+1}`; cameraSelect.appendChild(o); });
-      return cams;
-    }
     async function startCamera(deviceId){
       if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
       const cs=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:{ideal:'environment'}}};
       const stream=await navigator.mediaDevices.getUserMedia(cs);
       state.stream=stream; preview.srcObject=stream;
       const [track]=stream.getVideoTracks(); state.track=track; state.capabilities=track.getCapabilities?.()||null;
-      await preview.play(); fitOverlay(); drawGuide(); populateTorchSupport();
+      await preview.play(); fitOverlay(); drawGuide();
     }
-    function populateTorchSupport(){ const cap=state.capabilities; toggleFlash.disabled=!(cap&&'torch' in cap); }
-    async function toggleTorch(){ try{
-      if(!state.track) return; state.torchOn=!state.torchOn;
-      await state.track.applyConstraints({advanced:[{torch:state.torchOn}]});
-      toggleFlash.setAttribute('aria-pressed',String(state.torchOn));
-      toggleFlash.textContent=state.torchOn?'الفلاش: يعمل':'الفلاش';
-    }catch(e){ console.warn('Torch not supported',e); } }
 
     function captureFrameCanvas(){
       const c=document.createElement('canvas');
@@ -1162,10 +1136,8 @@ function renderFecesScore(result){
 }
     // UI bindings
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
-    toggleFlash.addEventListener('click', async ()=>{ await (async()=>{ /* كفاية تعليق */ })(); await (async()=>{})(); toggleTorch(); });
-    restartBtn.addEventListener('click', async ()=>{ await startCamera(cameraSelect.value); });
-    cameraSelect.addEventListener('change', async ()=>{ await startCamera(cameraSelect.value); });
-
+   
+   
     function showUploadPreview(url){
       if(!uploadPreviewBox || !uploadPreviewImg) return;
       uploadPreviewImg.src = url;
@@ -1232,13 +1204,7 @@ scoreNote.textContent = 'التقط صورة جديدة واضحة للتقيي�
 
     // تهيئة الصفحة + ربط السياق (المطلوب 6 + 7)
     async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
-     const demoRef='/images/feces/3-1.jpg';
-      try{
-        const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
-          c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); showUploadPreview(url); };
-        img.src=demoRef;
-      }catch{ renderFecesScore({score:3, confidence:0}); }
-    }
+    
 
     (async function init(){
       try{
@@ -1250,8 +1216,7 @@ scoreNote.textContent = 'التقط صورة جديدة واضحة للتقيي�
         if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ alert('المتصفح لا يدعم تشغيل الكاميرا عبر الويب.'); }
         if(location.protocol!=='https:' && location.hostname!=='localhost'){ console.warn('يُنصح باستخدام https لتشغيل الكاميرا.'); }
 
-        await startCamera(); await listCameras();
-        if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
+        await startCamera(); 
         if(isDemo) runDemo();
 scoreBadge.textContent='بانتظار الصورة';
 scoreBadge.style.background='#f8fafc';
