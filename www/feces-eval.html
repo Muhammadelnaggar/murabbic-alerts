@@ -7,68 +7,385 @@
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
   <title>تقييم الروث بالكاميرا — مُرَبِّك</title>
-  <style>
-    :root{
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --text:#0f172a; --muted:#64748b; --card:#ffffff; --danger:#c2410c;
+ <style>
+  :root{
+    --green:#0ea05a;
+    --green-600:#0b7f47;
+    --green-700:#0a6a3c;
+    --bg:#f7faf7;
+    --text:#0f172a;
+    --muted:#64748b;
+    --card:#ffffff;
+    --danger:#c2410c;
+    --border:#c5e1a5;
+    --cream:#fffdf7;
+    --soft:#eefaf3;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  .mbk-shell{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh;
+    background:transparent;
+  }
+
+  header{
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid #e5efe7;
+    padding:10px 12px;
+  }
+
+  .mbk-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    max-width:520px;
+    margin:0 auto;
+  }
+
+  .mbk-logo{
+    width:42px;
+    height:42px;
+    object-fit:contain;
+    opacity:.6;
+    flex:0 0 auto;
+  }
+
+  .mbk-center{
+    min-width:0;
+    flex:1 1 auto;
+    display:grid;
+    gap:2px;
+  }
+
+  .mbk-page-title{
+    margin:0;
+    font-size:18px;
+    font-weight:800;
+    line-height:1.2;
+    color:#0f172a;
+  }
+
+  .mbk-app-name{
+    font-size:13px;
+    font-weight:800;
+    color:var(--green);
+    line-height:1;
+  }
+
+  .mbk-subline{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .demo-badge{
+    display:none;
+    background:#fff7d6;
+    color:#92400e;
+    border:1px solid #facc15;
+    padding:5px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    white-space:nowrap;
+  }
+
+  .container{
+    max-width:520px;
+    margin:14px auto 110px;
+    padding:0 12px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid #e2e8f0;
+    border-radius:18px;
+    box-shadow:0 2px 10px rgba(0,0,0,.04);
+    overflow:hidden;
+  }
+
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    padding:12px;
+    background:#fff;
+  }
+
+  .controls .select,
+  .controls .input,
+  .save-bar .input{
+    padding:12px 14px;
+    border:1px solid #cbd5e1;
+    border-radius:14px;
+    background:#fff;
+    font-size:16px;
+    min-height:48px;
+  }
+
+  .controls .select{
+    min-width:150px;
+    flex:1 1 160px;
+  }
+
+  .btn{
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    font-weight:800;
+    min-height:50px;
+    padding:13px 16px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+    transition:.18s ease;
+  }
+
+  .btn:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+  }
+
+  .btn-primary{
+    background:var(--green);
+    color:#fff;
+  }
+
+  .btn-primary:hover{ background:var(--green-700); }
+
+  .btn-light{
+    background:#f8fafc;
+    color:#0f172a;
+    border:1px solid #dbe5ee;
+  }
+
+  .btn-danger{
+    background:#fff1f2;
+    color:#b42318;
+    border:1px solid #fecdd3;
+  }
+
+  .preview-wrap{
+    position:relative;
+    border-top:1px solid #eef2f7;
+    border-bottom:1px solid #eef2f7;
+    overflow:hidden;
+    background:#000;
+  }
+
+  video#preview{
+    width:100%;
+    height:auto;
+    display:block;
+    background:#000;
+  }
+
+  canvas#overlay{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+  }
+
+  .results{
+    padding:12px;
+    display:grid;
+    gap:12px;
+    background:#fff;
+  }
+
+  .section-title{
+    margin:0;
+    color:var(--green-600);
+    font-size:16px;
+    font-weight:800;
+  }
+
+  .upload-preview{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    padding:10px;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+  }
+
+  .upload-preview img{
+    width:96px;
+    height:96px;
+    object-fit:cover;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+  }
+
+  .score{
+    display:grid;
+    gap:10px;
+    padding:12px;
+    border:1px solid #dfe8e2;
+    border-radius:16px;
+    background:linear-gradient(180deg,#ffffff 0%, #fbfefc 100%);
+  }
+
+  .score-badge{
+    display:inline-block;
+    padding:8px 12px;
+    border:1px solid transparent;
+    border-radius:999px;
+    font-weight:800;
+    width:max-content;
+    background:#f8fafc;
+    color:#0f172a;
+  }
+
+  .score-bar{
+    height:12px;
+    background:#f1f5f9;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    overflow:hidden;
+  }
+
+  .score-bar .fill{
+    height:100%;
+    transition:width .22s ease;
+  }
+
+  .score-note{
+    color:var(--muted);
+    font-weight:700;
+    line-height:1.7;
+    font-size:14px;
+  }
+
+  .save-bar{
+    position:fixed;
+    right:0;
+    left:0;
+    bottom:0;
+    z-index:25;
+    background:rgba(255,255,255,.98);
+    backdrop-filter:blur(8px);
+    border-top:1px solid #e2e8f0;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .save-bar-inner{
+    max-width:520px;
+    margin:0 auto;
+    display:grid;
+    gap:10px;
+  }
+
+  .save-top{
+    display:grid;
+    gap:8px;
+  }
+
+  .date-wrap{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    color:#0f172a;
+    font-weight:800;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:10px 12px;
+  }
+
+  .date-wrap input{
+    flex:1 1 auto;
+    border:none;
+    background:transparent;
+    font:inherit;
+    color:inherit;
+    min-height:32px;
+  }
+
+  .save-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .save-actions .btn{
+    width:100%;
+    min-height:54px;
+    font-size:17px;
+    border-radius:15px;
+  }
+
+  #saveMsg{
+    display:none;
+    width:100%;
+    padding:12px;
+    border-radius:14px;
+    font-weight:800;
+    text-align:center;
+    line-height:1.6;
+  }
+
+  editor-card,.editor-card{
+    pointer-events:none !important;
+    opacity:0 !important;
+    visibility:hidden !important;
+    position:static !important;
+    z-index:-1 !important;
+  }
+
+  @media (max-width:520px){
+    .controls{
+      display:grid;
+      grid-template-columns:1fr 1fr;
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid #e2e8f0;padding:12px 16px;display:flex;align-items:center;gap:12px}
-    .title{font-weight:800;color:var(--green);margin:0}
-    .badge{background:#e6f8ef;color:var(--green-600);padding:4px 8px;border-radius:999px;font-size:12px}
-    .container{max-width:800px;margin:16px auto;padding:0 16px}
-    .card{background:var(--card);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
 
-    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px}
-    .controls .select,.controls .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
-    .controls .btn{padding:12px 14px;border:none;border-radius:12px;cursor:pointer;font-weight:700;min-height:44px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .btn-primary{background:var(--green);color:#fff}
-    .btn-light{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
-    .btn-danger{background:var(--danger);color:#fff}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-
-    .preview-wrap{position:relative;border-radius:16px;overflow:hidden;background:#000}
-    video#preview{width:100%;height:auto;display:block;background:#000}
-    canvas#overlay{position:absolute;inset:0;pointer-events:none}
-
-    .results{padding:12px;border-top:1px solid #e2e8f0;display:grid;gap:12px}
-    .score{display:grid;gap:10px;padding:8px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
-    .score-badge{display:inline-block;padding:6px 10px;border:1px solid transparent;border-radius:999px;font-weight:800;width:max-content}
-    .score-bar{height:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden}
-    .score-bar .fill{height:100%}
-    .score-note{color:var(--muted);font-weight:700}
-
-    /* خانة عرض الصورة المُرفوعة (المطلوب 2) */
-    .upload-preview{
-      display:flex; gap:12px; align-items:center; padding:8px; background:#fff; border:1px solid #e2e8f0; border-radius:12px;
+    .controls .select{
+      grid-column:1 / -1;
+      width:100%;
     }
-    .upload-preview img{width:96px;height:96px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb}
 
-    editor-card,.editor-card{pointer-events:none !important;opacity:0 !important;visibility:hidden !important;position:static !important;z-index:-1 !important}
-    header,.container,#cameraCard{position:relative;z-index:1}
-    .save-bar{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap}
-    .save-bar .input{padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px}
-    /* تكبير أزرار شريط الحفظ ليتناسق مع باقي الصفحات */
-.save-bar .btn{
-  padding:16px 18px;
-  min-height:54px;
-  font-size:17px;
-  border-radius:14px;
-}
-/* على الموبايل نخليهم صف فوق بعض وبعرض كامل */
-@media (max-width:520px){
-  .save-bar{ flex-direction:column; align-items:stretch }
-  .save-bar .btn{ width:100% }
-}
+    #captureBtn,
+    #retakeBtn,
+    #uploadBtn,
+    #restartBtn,
+    #toggleFlash,
+    #demoBtn{
+      width:100%;
+    }
 
-  </style>
+    .save-actions{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
 </head>
 <body>
+ <div class="mbk-shell">
   <header>
-    <h1 class="title">تقييم الروث بالكاميرا</h1>
-    <span class="badge">مُرَبِّك</span>
-    <span class="badge" id="demoBadge" style="display:none;background:#fff3cd;color:#92400e;border:1px solid #facc15">وضع العرض</span>
-    <div style="margin-inline-start:auto;color:var(--muted);font-weight:700">رقم الحيوان: <span class="animal-number">—</span></div>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">تقييم الروث بالكاميرا</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+        <div class="mbk-subline">رقم الحيوان: <span class="animal-number">—</span></div>
+      </div>
+      <span class="demo-badge" id="demoBadge">وضع العرض</span>
+    </div>
   </header>
 
   <div class="container">
@@ -91,14 +408,14 @@
       </div>
 
       <div class="results" id="resultsBox">
-        <h3 style="margin:8px 0;color:var(--green-600)">النتيجة</h3>
+       <h3 class="section-title">تقييم الحالة</h3>
 
         <!-- خانة عرض الصورة المرفوعة/المُلتقطة (المطلوب 2) -->
         <div class="upload-preview" id="uploadPreviewBox" style="display:none">
           <img id="uploadPreviewImg" alt="المعاينة" />
           <div style="display:grid;gap:6px">
-            <div style="font-weight:700;color:#0f172a">معاينة الصورة</div>
-            <div style="color:var(--muted);font-size:14px">تُستخدم هذه الصورة لحساب الدرجة فقط — لا يتم حفظها.</div>
+            <div style="font-weight:800;color:#0f172a">الصورة المستخدمة في التقييم</div>
+            <div style="color:var(--muted);font-size:14px;line-height:1.6">يتم تحليل هذه الصورة فقط لاستخراج النتيجة، ولا يتم حفظها ضمن بيانات الحيوان.</div>
           </div>
         </div>
 
@@ -109,19 +426,25 @@
         </div>
       </div>
 
-      <div class="save-bar">
-        <input type="hidden" id="animalId" />
-        <label style="display:flex;gap:8px;align-items:center">تاريخ التقييم
-          <input type="date" id="eventDate" class="input" />
-        </label>
+     <div class="save-bar">
+  <div class="save-bar-inner">
+    <input type="hidden" id="animalId" />
 
-        <div style="margin-inline-start:auto;display:flex;gap:8px">
-           <div id="saveMsg" style="display:none;width:100%;padding:10px;border-radius:12px;font-weight:700;text-align:center"></div>
-          <!-- زر الرجوع إلى add-event (المطلوب 5) -->
-          <button id="backBtn" class="btn btn-light" type="button">رجوع لصفحة الحدث</button>
-          <button id="saveBtn" class="btn btn-primary" type="button">حفظ التقييم</button>
-        </div>
-      </div>
+    <div class="save-top">
+      <div id="saveMsg"></div>
+
+      <label class="date-wrap">
+        <span>تاريخ التقييم</span>
+        <input type="date" id="eventDate" class="input" />
+      </label>
+    </div>
+
+    <div class="save-actions">
+      <button id="backBtn" class="btn btn-light" type="button">العودة لصفحة الحدث</button>
+      <button id="saveBtn" class="btn btn-primary" type="button">حفظ التقييم</button>
+    </div>
+  </div>
+</div>
     </section>
   </div>
 
@@ -678,31 +1001,92 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
   }
 
   return bestOverall || {score:3, confidence:0, sim:0};
-}
-    function renderFecesScore(result){
-      if(window.__REFS_COUNT__===0){
-        scoreBadge.textContent='غير محسوب — مراجع مفقودة';
-        scoreFill.style.width='0%'; scoreFill.style.background='#facc15';
-        scoreNote.textContent='لم يتم تحميل الصور المرجعية. تأكد من وجودها في www/images/feces/';
-        state.lastScore=null; window.fecesScore=null; return;
-      }
-      const s = typeof result === 'number' ? result : Number(result?.score || 0);
-      const conf = typeof result === 'object' ? Number(result?.confidence || 0) : 0;
-      let label='';
-      if(s<=1.5) label='إسهال';
-      else if(s<=2.5) label='لين';
-      else if(s<3) label='قريب من المثالي';
-      else if(s===3) label='مثالي';
-      else if(s<=4.5) label='صلب';
-      else label='إمساك';
-      scoreBadge.textContent=`${label} — ${s} / 5`;
-      const pct=Math.min(100, Math.max(0, (s/5)*100));
-      scoreFill.style.width=pct+'%';
-      scoreFill.style.background = s===3 ? '#86efac' : '#7dd3fc';
-      scoreNote.textContent = conf >= 0.7 ? 'ثقة عالية' : conf >= 0.45 ? 'ثقة متوسطة' : 'ثقة منخفضة — أعد الالتقاط لو أمكن';
-      state.lastScore = s; window.fecesScore = s;
-    }
+}function renderFecesScore(result){
+  if(window.__REFS_COUNT__===0){
+    scoreBadge.textContent='غير متاح الآن';
+    scoreFill.style.width='0%';
+    scoreFill.style.background='#facc15';
+    scoreBadge.style.background='#fff7d6';
+    scoreBadge.style.color='#92400e';
+    scoreBadge.style.borderColor='#facc15';
+    scoreNote.textContent='الصور المرجعية غير متاحة الآن، لذلك لا يمكن إظهار تقييم موثوق.';
+    state.lastScore=null;
+    window.fecesScore=null;
+    return;
+  }
 
+  const s = typeof result === 'number' ? result : Number(result?.score || 0);
+  const conf = typeof result === 'object' ? Number(result?.confidence || 0) : 0;
+
+  let badgeText = '';
+  let noteText = '';
+  let barColor = '#7dd3fc';
+  let badgeBg = '#eff6ff';
+  let badgeColor = '#1d4ed8';
+  let badgeBorder = '#bfdbfe';
+
+  if(s<=1.5){
+    badgeText = 'سيولة مرتفعة';
+    noteText = 'القوام أقرب إلى الإسهال ويحتاج متابعة سريعة مع بقية الحالة العامة.';
+    barColor = '#fb7185';
+    badgeBg = '#fff1f2';
+    badgeColor = '#be123c';
+    badgeBorder = '#fecdd3';
+  }else if(s<=2.5){
+    badgeText = 'ألين من المطلوب';
+    noteText = 'الروث ألين من المستوى المفضل، وقد يستفيد من مراجعة التغذية والألياف.';
+    barColor = '#f59e0b';
+    badgeBg = '#fff7ed';
+    badgeColor = '#b45309';
+    badgeBorder = '#fed7aa';
+  }else if(s<3){
+    badgeText = 'قريب من المستوى المفضل';
+    noteText = 'النتيجة قريبة من الحالة المرغوبة، مع ميل بسيط للسيولة.';
+    barColor = '#84cc16';
+    badgeBg = '#f7fee7';
+    badgeColor = '#3f6212';
+    badgeBorder = '#d9f99d';
+  }else if(s===3){
+    badgeText = 'ضمن المستوى المفضل';
+    noteText = 'القوام ضمن النطاق المرغوب عادةً، وهذه نتيجة مطمئنة.';
+    barColor = '#22c55e';
+    badgeBg = '#ecfdf5';
+    badgeColor = '#166534';
+    badgeBorder = '#86efac';
+  }else if(s<=4.5){
+    badgeText = 'أكثر تماسكًا من المطلوب';
+    noteText = 'الروث أكثر تماسكًا من المستوى المفضل، وقد يفيد النظر في شرب الماء والخشونة.';
+    barColor = '#38bdf8';
+    badgeBg = '#eff6ff';
+    badgeColor = '#1d4ed8';
+    badgeBorder = '#bfdbfe';
+  }else{
+    badgeText = 'جفاف مرتفع';
+    noteText = 'القوام يميل إلى الجفاف والإمساك، ويحتاج تقييمًا مع الحالة التغذوية والماء.';
+    barColor = '#8b5cf6';
+    badgeBg = '#f5f3ff';
+    badgeColor = '#6d28d9';
+    badgeBorder = '#ddd6fe';
+  }
+
+  scoreBadge.textContent = badgeText;
+  scoreBadge.style.background = badgeBg;
+  scoreBadge.style.color = badgeColor;
+  scoreBadge.style.borderColor = badgeBorder;
+
+  const pct = Math.min(100, Math.max(0, (s/5)*100));
+  scoreFill.style.width = pct + '%';
+  scoreFill.style.background = barColor;
+
+  let confText = '';
+  if(conf >= 0.7) confText = 'درجة الثقة في القراءة جيدة.';
+  else if(conf >= 0.45) confText = 'درجة الثقة متوسطة؛ إعادة الصورة قد تعطي قراءة أوضح.';
+  else confText = 'الثقة منخفضة؛ الأفضل إعادة التصوير بصورة أوضح وأقرب.';
+
+  scoreNote.textContent = `${noteText} ${confText}`;
+  state.lastScore = s;
+  window.fecesScore = s;
+}
     // UI bindings
     window.addEventListener('resize', ()=>{ fitOverlay(); drawGuide(); });
     toggleFlash.addEventListener('click', async ()=>{ await (async()=>{ /* كفاية تعليق */ })(); await (async()=>{})(); toggleTorch(); });
@@ -734,10 +1118,13 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
   state.lastCapture = null;
   retakeBtn.disabled = true;
   if(uploadPreviewBox) uploadPreviewBox.style.display = 'none';
-  scoreBadge.textContent = '—';
-  scoreFill.style.width = '0%';
-  scoreFill.style.background = '#e5e7eb';
-  scoreNote.textContent = 'التقط أو ارفع صورة أولًا.';
+ scoreBadge.textContent = 'بانتظار صورة جديدة';
+scoreBadge.style.background = '#f8fafc';
+scoreBadge.style.color = '#334155';
+scoreBadge.style.borderColor = '#e2e8f0';
+scoreFill.style.width = '0%';
+scoreFill.style.background = '#e5e7eb';
+scoreNote.textContent = 'تم مسح القراءة السابقة. التقط صورة جديدة واضحة أو ارفع صورة أخرى للتقييم.';
   window.fecesScore = null;
   state.lastScore = null;
 });
@@ -799,10 +1186,13 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
         await startCamera(); await listCameras();
         if(!cameraSelect.value && cameraSelect.options.length){ cameraSelect.value=cameraSelect.options[0].value; }
         if(isDemo) runDemo();
-      scoreBadge.textContent='—';
+scoreBadge.textContent='بانتظار الصورة';
+scoreBadge.style.background='#f8fafc';
+scoreBadge.style.color='#334155';
+scoreBadge.style.borderColor='#e2e8f0';
 scoreFill.style.width='0%';
 scoreFill.style.background='#e5e7eb';
-scoreNote.textContent='التقط أو ارفع صورة أولًا.';
+scoreNote.textContent='وجّه الروث داخل الإطار ثم التقط صورة أو ارفع صورة واضحة ليعرض مُرَبِّيك التقييم.';
 window.fecesScore=null;
 state.lastScore=null;
       }catch(e){ console.warn(e); }
@@ -863,7 +1253,7 @@ state.lastScore=null;
 
   const score = Number(window.fecesScore ?? 0);
   if (!score) {
-    showMsg("⚠️ التقط/ارفع صورة أولًا لاحتساب الدرجة.", false);
+    showMsg("لا يمكن الحفظ قبل تصوير الروث أو رفع صورة واضحة للتقييم.", false);
     return;
   }
 
@@ -910,7 +1300,7 @@ state.lastScore=null;
       createdAt: serverTimestamp()
     });
 
-    showMsg("✅ تم حفظ تقييم الروث بنجاح", true);
+   showMsg("تم حفظ تقييم الروث بنجاح داخل سجل الحيوان.", true);
 
     // إعادة التوجيه
     setTimeout(() => {
@@ -923,7 +1313,7 @@ state.lastScore=null;
 
   } catch (err) {
     console.error("Firestore save error:", err);
-    showMsg("❌ حدث خطأ أثناء الحفظ", false);
+   showMsg("تعذر حفظ التقييم الآن. حاول مرة أخرى بعد لحظات.", false);
 
   } finally {
     btn.disabled = false;
@@ -933,3 +1323,6 @@ state.lastScore=null;
 }); // ← إغلاق event listener للزر
 }); // ← إغلاق DOMContentLoaded
 </script>
+</div>
+</body>
+</html>
