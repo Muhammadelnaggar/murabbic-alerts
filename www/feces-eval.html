@@ -92,7 +92,56 @@
     font-weight:700;
     white-space:nowrap;
   }
+  .mbk-animal-wrap{
+  max-width:520px;
+  margin:10px auto 0;
+  padding:0 12px;
+}
 
+.mbk-field-label{
+  display:block;
+  margin:0 0 6px;
+  font-size:13px;
+  font-weight:800;
+  color:var(--muted);
+}
+
+.mbk-readonly-field{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:12px 14px;
+  border:1px solid #cbd5e1;
+  border-radius:14px;
+  background:#fff;
+  color:#0f172a;
+  font-size:18px;
+  font-weight:900;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+} 
+.mbk-back{
+  flex:0 0 auto;
+  min-height:40px;
+  padding:8px 12px;
+  border:1px solid #dbe5ee;
+  border-radius:12px;
+  background:#fff;
+  color:#0f172a;
+  text-decoration:none;
+  font-weight:800;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.mbk-animal-line{
+  max-width:520px;
+  margin:8px auto 0;
+  padding-top:8px;
+  border-top:1px solid var(--border);
+  text-align:center;
+}
   .demo-badge{
     display:none;
     background:#fff7d6;
@@ -376,18 +425,25 @@
 </head>
 <body>
  <div class="mbk-shell">
-  <header>
-    <div class="mbk-head">
-      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-      <div class="mbk-center">
-        <div class="mbk-page-title">تقييم الروث بالكاميرا</div>
-        <div class="mbk-app-name">مُرَبِّيك</div>
-        <div class="mbk-subline">رقم الحيوان: <span class="animal-number">—</span></div>
-      </div>
-      <span class="demo-badge" id="demoBadge">وضع العرض</span>
-    </div>
-  </header>
+<header>
+  <div class="mbk-head">
+    <a class="mbk-back" href="add-event.html" id="headBackBtn">رجوع</a>
 
+    <div class="mbk-center">
+      <div class="mbk-page-title">تقييم الروث بالكاميرا</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <span class="demo-badge" id="demoBadge">وضع العرض</span>
+  </div>
+</header>
+<div class="mbk-animal-wrap">
+  <label class="mbk-field-label">رقم الحيوان</label>
+  <div class="mbk-readonly-field">
+    <span class="animal-number">—</span>
+  </div>
+</div>
   <div class="container">
     <section class="card" id="cameraCard">
       <div class="controls">
