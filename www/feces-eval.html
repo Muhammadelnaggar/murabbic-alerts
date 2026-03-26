@@ -876,16 +876,14 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
       return out;
     }
 
-    function imgToFeatureVec(img){
-      // ROI مركزي + Gaussian + مجموعات الخصائص
-      let c = cropROI(img, 192, 192);
-      c = gaussianBlur(c);
-      const gray = toGrayVec(c, 64);
-      const color = hsvMoments(c);
-      const lbp = lbpHist(c, 64);
-      const hog = hogLite(c, 8);
-      return concatFeatures(gray, color, lbp, hog);
-    }
+   function imgToFeatureVec(img){
+  const c = cropROI(img, 192, 192);
+  const gray = toGrayVec(c, 64);
+  const color = hsvMoments(c);
+  const lbp = lbpHist(c, 64);
+  const hog = hogLite(c, 8);
+  return concatFeatures(gray, color, lbp, hog);
+}
 
     async function loadRefVector(item){
       const candidates = item.urls || []; let i = 0;
@@ -926,7 +924,7 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
 const canvas = cropROI(img, 192, 192);
 
 const vec = concatFeatures(
-  toGrayVec(gaussianBlur(canvas), 64),
+ toGrayVec(canvas, 64),
   hsvMoments(canvas),
   lbpHist(canvas, 64),
   hogLite(canvas, 8)
