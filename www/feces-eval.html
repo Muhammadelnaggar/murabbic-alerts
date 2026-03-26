@@ -358,7 +358,7 @@
 
     // ====== الصور المرجعية: فولدر مستقل feces + 5 صور لكل درجة من 1 إلى 5 ======
     // المسار الأساسي: www/images/feces/
-  const REF_BASES = ['/www/images/feces/','/images/feces/'];
+  const REF_BASES = ['/images/feces/'];
 const REF_EXTS = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
 
 const REF_MAP = {
@@ -669,7 +669,8 @@ const REF_LIST = Object.entries(REF_MAP).flatMap(([score, names]) =>
 
     // تهيئة الصفحة + ربط السياق (المطلوب 6 + 7)
     async function runDemo(){ const badge=$('#demoBadge'); if(badge) badge.style.display='inline-block';
-      const demoRef='/www/images/feces/3_1.jpg'; try{
+     const demoRef='/images/feces/3-1.jpg';
+      try{
         const img=new Image(); img.onload=async ()=>{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
           c.getContext('2d').drawImage(img,0,0); const url=c.toDataURL('image/jpeg',0.9); state.lastCapture=url; renderFecesScore(await scoreFeces(url)); showUploadPreview(url); };
         img.src=demoRef;
