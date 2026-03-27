@@ -386,7 +386,8 @@ header{
 
      
 
-  <main class="page-wrap">
+ <main class="page-wrap">
+  <form id="deathForm" data-event="نفوق">
     <div id="info" class="infobar"></div>
 
     <section class="mbk-card">
@@ -429,7 +430,7 @@ header{
       </div>
     </section>
 
-    
+      </form>
   </main>
 
   <script type="module">
@@ -492,44 +493,42 @@ header{
 
         const eventDate = ($("eventDate").value || dt).slice(0,10);
         const reason = getReason();
+const snap = await getDocs(query(
+  collection(db, "animals"),
+  where("userId", "==", uid),
+  where("number", "==", String(num)),
+  limit(1)
+));
 
-        const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
-          type: "نفوق",
-          eventType: "نفوق",
-          eventDate,
-          reason,
-          notes: ($("notes").value || "").trim(),
-          userId: uid,
-          source: "/death.html",
-          createdAt: serverTimestamp()
-        };
+if (snap.empty) {
+  msg("❌ الحيوان غير موجود في الحيوانات.", false);
+  return;
+}
 
-        await addDoc(collection(db, "events"), payload);
+const animalRef = snap.docs[0].ref;
 
-        const snap = await getDocs(query(
-          collection(db, "animals"),
-          where("userId", "==", uid),
-          where("number", "==", String(num)),
-          limit(1)
-        ));
+const payload = {
+  animalNumber: String(num),
+  animalId: String(num),
+  type: "نفوق",
+  eventType: "نفوق",
+  eventDate,
+  reason,
+  notes: ($("notes").value || "").trim(),
+  userId: uid,
+  source: "/death.html",
+  createdAt: serverTimestamp()
+};
 
-        if (snap.empty) {
-          msg("❌ الحيوان غير موجود في الحيوانات.", false);
-          return;
-        }
+await addDoc(collection(db, "events"), payload);
 
-        const animalRef = snap.docs[0].ref;
-
-        await updateDoc(animalRef, {
-          archived: true,
-          status: "نافق",
-          deathDate: eventDate,
-          deathReason: reason || null,
-          updatedAt: serverTimestamp()
-        });
-
+await updateDoc(animalRef, {
+  archived: true,
+  status: "نافق",
+  deathDate: eventDate,
+  deathReason: reason || null,
+  updatedAt: serverTimestamp()
+});
         msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
 
         localStorage.setItem("lastAnimalNumber", String(num));
