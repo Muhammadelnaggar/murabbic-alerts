@@ -520,36 +520,36 @@ header{
 
       const animalRef = snap.docs[0].ref;
 
-      await addDoc(collection(db, "events"), {
-        animalNumber,
-        animalId: animalNumber,
-        type: "نفوق",
-        eventType: "نفوق",
-        eventDate,
-        reason,
-        notes,
-        userId: uid,
-        source: "/death.html",
-        createdAt: serverTimestamp()
-      });
+await addDoc(collection(db, "events"), {
+  animalNumber,
+  animalId: animalNumber,
+  type: "نفوق",
+  eventType: "نفوق",
+  eventDate,
+  reason,
+  notes,
+  userId: uid,
+  source: "/death.html",
+  createdAt: serverTimestamp()
+});
 
-      await updateDoc(animalRef, {
-        archived: true,
-        status: "نافق",
-        deathDate: eventDate,
-        deathReason: reason || null,
-        updatedAt: serverTimestamp()
-      });
+await updateDoc(animalRef, {
+  archived: true,
+  status: "inactive",
+  eventType: "نفوق",
+  deathDate: eventDate,
+  deathReason: reason || null,
+  updatedAt: serverTimestamp()
+});
 
-      localStorage.setItem("lastAnimalNumber", animalNumber);
-      localStorage.setItem("lastEventDate", eventDate);
+localStorage.setItem("lastAnimalNumber", animalNumber);
+localStorage.setItem("lastEventDate", eventDate);
 
-      msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
+msg("✅ تم تسجيل النفوق بنجاح وتحديث حالة الحيوان إلى inactive", true);
 
-      setTimeout(() => {
-        location.href = "dashboard.html";
-      }, 900);
-
+setTimeout(() => {
+  location.href = "dashboard.html";
+}, 1800);
     } catch (e) {
       console.error(e);
       msg("❌ فشل في الحفظ.", false);
