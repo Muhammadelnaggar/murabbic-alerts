@@ -433,118 +433,140 @@ header{
       </form>
   </main>
 
-  <script type="module">
-    import { db, auth, ensureAuth } from "/js/firebase-config.js";
-    import {
-      collection, addDoc, serverTimestamp,
-      updateDoc, getDocs, query, where, limit
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script type="module">
+  import { db, auth, ensureAuth } from "/js/firebase-config.js";
+  import {
+    collection, addDoc, serverTimestamp,
+    updateDoc, getDocs, query, where, limit
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const $ = (id) => document.getElementById(id);
-    const info = $("info");
-    const btn  = $("saveBtn");
+  const $ = (id) => document.getElementById(id);
 
-    function msg(t, ok=false){
-      info.className = "infobar " + (ok ? "ok" : "err");
-      info.textContent = t;
-    }
+  const form = $("deathForm");
+  const info = $("info");
+  const reasonSelect = $("reasonSelect");
+  const otherWrap = $("otherWrap");
 
-    const p = new URLSearchParams(location.search);
-    const num = (
-      p.get("number") ||
-      p.get("animalNumber") ||
-      p.get("animalId") ||
-      p.get("id") ||
-      localStorage.getItem("lastAnimalNumber") ||
-      localStorage.getItem("lastAnimalId") ||
-      localStorage.getItem("currentAnimalNumber") ||
-      ""
-    ).toString().trim();
+  function msg(text, ok = false){
+    if (!info) return;
+    info.className = ok ? "infobar ok" : "infobar err";
+    info.textContent = text;
+  }
 
-    const dt = (
-      p.get("date") ||
-      p.get("eventDate") ||
-      localStorage.getItem("lastEventDate") ||
-      new Date().toISOString().slice(0,10)
-    ).toString().slice(0,10);
+  const p = new URLSearchParams(location.search);
 
-    $("animalNumber").value = num;
-    $("eventDate").value = dt;
+  const num = (
+    p.get("number") ||
+    p.get("animalNumber") ||
+    p.get("animalId") ||
+    p.get("id") ||
+    localStorage.getItem("lastAnimalNumber") ||
+    localStorage.getItem("lastAnimalId") ||
+    localStorage.getItem("currentAnimalNumber") ||
+    ""
+  ).toString().trim();
 
-    const reasonSelect = $("reasonSelect");
-    const otherWrap = $("otherWrap");
+  const dt = (
+    p.get("date") ||
+    p.get("eventDate") ||
+    localStorage.getItem("lastEventDate") ||
+    new Date().toISOString().slice(0,10)
+  ).toString().slice(0,10);
 
-    reasonSelect.addEventListener("change", () => {
-      otherWrap.style.display = (reasonSelect.value === "أخرى") ? "block" : "none";
-    });
+  $("animalNumber").value = num;
+  $("eventDate").value = dt;
 
-    function getReason(){
-      const v = (reasonSelect.value || "").trim();
-      if (v === "أخرى") return ($("reasonOther").value || "").trim();
-      return v;
-    }
+  // تشغيل Gate أول فتح الصفحة بعد الـ prefill
+  setTimeout(() => {
+    $("animalNumber")?.dispatchEvent(new Event("input", { bubbles:true }));
+    $("animalNumber")?.dispatchEvent(new Event("change", { bubbles:true }));
+    $("eventDate")?.dispatchEvent(new Event("input", { bubbles:true }));
+    $("eventDate")?.dispatchEvent(new Event("change", { bubbles:true }));
+  }, 0);
 
-    btn.onclick = async () => {
-      try {
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) throw new Error("NO_AUTH");
-        if (!num) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+  reasonSelect?.addEventListener("change", () => {
+    otherWrap.style.display = reasonSelect.value === "أخرى" ? "block" : "none";
+  });
 
-        const eventDate = ($("eventDate").value || dt).slice(0,10);
-        const reason = getReason();
-const snap = await getDocs(query(
-  collection(db, "animals"),
-  where("userId", "==", uid),
-  where("number", "==", String(num)),
-  limit(1)
-));
+  function getReason(){
+    const v = (reasonSelect?.value || "").trim();
+    if (v === "أخرى") return ($("reasonOther")?.value || "").trim();
+    return v;
+  }
 
-if (snap.empty) {
-  msg("❌ الحيوان غير موجود في الحيوانات.", false);
-  return;
-}
+  form?.addEventListener("mbk:valid", async () => {
+    try {
+      await ensureAuth();
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error("NO_AUTH");
 
-const animalRef = snap.docs[0].ref;
+      const animalNumber = ($("animalNumber")?.value || "").toString().trim();
+      const eventDate = ($("eventDate")?.value || "").slice(0,10);
+      const reason = getReason();
+      const notes = ($("notes")?.value || "").trim();
 
-const payload = {
-  animalNumber: String(num),
-  animalId: String(num),
-  type: "نفوق",
-  eventType: "نفوق",
-  eventDate,
-  reason,
-  notes: ($("notes").value || "").trim(),
-  userId: uid,
-  source: "/death.html",
-  createdAt: serverTimestamp()
-};
+      let snap = await getDocs(query(
+        collection(db, "animals"),
+        where("userId", "==", uid),
+        where("number", "==", animalNumber),
+        limit(1)
+      ));
 
-await addDoc(collection(db, "events"), payload);
-
-await updateDoc(animalRef, {
-  archived: true,
-  status: "نافق",
-  deathDate: eventDate,
-  deathReason: reason || null,
-  updatedAt: serverTimestamp()
-});
-        msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
-
-        localStorage.setItem("lastAnimalNumber", String(num));
-        localStorage.setItem("lastEventDate", eventDate);
-
-        setTimeout(() => location.href = "dashboard.html", 900);
-
-      } catch (e) {
-        console.error(e);
-        msg("❌ فشل في الحفظ.", false);
+      if (snap.empty) {
+        snap = await getDocs(query(
+          collection(db, "animals"),
+          where("userId", "==", uid),
+          where("animalNumber", "==", animalNumber),
+          limit(1)
+        ));
       }
-    };
-  </script>
+
+      if (snap.empty) {
+        msg("❌ رقم الحيوان غير موجود.", false);
+        return;
+      }
+
+      const animalRef = snap.docs[0].ref;
+
+      await addDoc(collection(db, "events"), {
+        animalNumber,
+        animalId: animalNumber,
+        type: "نفوق",
+        eventType: "نفوق",
+        eventDate,
+        reason,
+        notes,
+        userId: uid,
+        source: "/death.html",
+        createdAt: serverTimestamp()
+      });
+
+      await updateDoc(animalRef, {
+        archived: true,
+        status: "نافق",
+        deathDate: eventDate,
+        deathReason: reason || null,
+        updatedAt: serverTimestamp()
+      });
+
+      localStorage.setItem("lastAnimalNumber", animalNumber);
+      localStorage.setItem("lastEventDate", eventDate);
+
+      msg("تم تسجيل النفوق وأرشفة الحيوان ✅", true);
+
+      setTimeout(() => {
+        location.href = "dashboard.html";
+      }, 900);
+
+    } catch (e) {
+      console.error(e);
+      msg("❌ فشل في الحفظ.", false);
+    }
+  });
+</script>
   <div class="bottom-bar">
   <a class="bottom-btn secondary" href="dashboard.html">لوحة التحكم</a>
-  <button class="bottom-btn primary" id="saveBtn" type="submit">حفظ النفوق</button>
+  <button class="bottom-btn primary" id="saveBtn" type="submit" form="deathForm">حفظ النفوق</button>
 </div>
 </body>
 </html>
