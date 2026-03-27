@@ -476,14 +476,6 @@ header{
   $("animalNumber").value = num;
   $("eventDate").value = dt;
 
-  // تشغيل Gate أول فتح الصفحة بعد الـ prefill
-  setTimeout(() => {
-    $("animalNumber")?.dispatchEvent(new Event("input", { bubbles:true }));
-    $("animalNumber")?.dispatchEvent(new Event("change", { bubbles:true }));
-    $("eventDate")?.dispatchEvent(new Event("input", { bubbles:true }));
-    $("eventDate")?.dispatchEvent(new Event("change", { bubbles:true }));
-  }, 0);
-
   reasonSelect?.addEventListener("change", () => {
     otherWrap.style.display = reasonSelect.value === "أخرى" ? "block" : "none";
   });
