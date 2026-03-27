@@ -361,6 +361,17 @@ export const eventSchemas = {
   },
   guards: []
 },
+ "نفوق": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ النفوق غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
+
+    reason: { required: false },
+    notes: { required: false }
+  },
+  guards: []
+}, 
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
