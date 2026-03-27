@@ -1433,7 +1433,12 @@ if (eventName === "تغذية") {
   showMsg(bar, "✅ تم التحقق — أكمل إدخال العليقة ثم اضغط حفظ.", "success");
   lockForm(false);
   return true;
-}   
+}  
+if (eventName === "نفوق") {
+  showMsg(bar, "✅ تم التحقق — أكمل البيانات ثم اضغط حفظ النفوق.", "success");
+  lockForm(false);
+  return true;
+}    
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
