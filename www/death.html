@@ -393,17 +393,17 @@ header{
     <section class="mbk-card">
       <div class="field">
         <label for="animalNumber">رقم الحيوان</label>
-        <input id="animalNumber" readonly />
+       <input id="animalNumber" data-field="animalNumber" readonly />
       </div>
 
       <div class="field">
         <label for="eventDate">تاريخ النفوق</label>
-        <input id="eventDate" type="date" />
+       <input id="eventDate" data-field="eventDate" type="date" />
       </div>
 
       <div class="field">
         <label for="reasonSelect">سبب محتمل</label>
-        <select id="reasonSelect">
+       <select id="reasonSelect" data-field="reason">
           <option value="">— اختر سببًا —</option>
           <option value="مرض تنفسي">مرض تنفسي</option>
           <option value="مرض هضمي/إسهال شديد">مرض هضمي/إسهال شديد</option>
@@ -426,7 +426,7 @@ header{
 
       <div class="field">
         <label for="notes">ملاحظات</label>
-        <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+       <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
       </div>
     </section>
 
