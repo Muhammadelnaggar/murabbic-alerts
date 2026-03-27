@@ -870,21 +870,24 @@ async function scoreFeces(dataUrl){
     hogLite(canvas, 8)
   );
 
-  const byScore = new Map();
-  for (const r of refs) {
-    const sim = cosine(vec, r.vec);
-    if (!byScore.has(r.score)) byScore.set(r.score, []);
-    byScore.get(r.score).push(sim);
+let bestRef = null;
+let bestSim = -999;
+let secondSim = -999;
+
+for (const r of refs) {
+  const sim = cosine(vec, r.vec);
+  if (sim > bestSim) {
+    secondSim = bestSim;
+    bestSim = sim;
+    bestRef = r;
+  } else if (sim > secondSim) {
+    secondSim = sim;
   }
+}
 
-  let bestScore = 3, bestAvg = -999, secondAvg = -999;
-
-  for (const [score, sims] of byScore.entries()) {
-    sims.sort((a,b)=>b-a);
-    const top = sims.slice(0, Math.min(3, sims.length));
-    const avg = top.reduce((a,b)=>a+b,0) / top.length;
-
-    if (avg > bestAvg) {
+const bestScore = Number(bestRef?.score || 3);
+const confidence = Math.max(0, Math.min(1, (bestSim - Math.max(-1, secondSim)) * 3.5));
+return { score: bestScore, confidence, sim: bestSim };
       secondAvg = bestAvg;
       bestAvg = avg;
       bestScore = Number(score);
