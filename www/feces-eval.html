@@ -913,50 +913,50 @@ function renderFecesScore(result){
   let badgeColor = '#1d4ed8';
   let badgeBorder = '#bfdbfe';
 
-  if(s<=1.5){
-    badgeText = 'إسهال';
-    noteText = 'الروث إسهال راجع العليقة للحموضة والسموم الفطرية.';
-    barColor = '#fb7185';
-    badgeBg = '#fff1f2';
-    badgeColor = '#be123c';
-    badgeBorder = '#fecdd3';
-  }else if(s<=2.5){
-    badgeText = 'به ليونة';
-    noteText = 'الروث جيد ولكن به ليونة راجع الخشن وأطوال التقطيع من 3 - 5 سم.';
-    barColor = '#f59e0b';
-    badgeBg = '#fff7ed';
-    badgeColor = '#b45309';
-    badgeBorder = '#fed7aa';
-  }else if(s<3){
-    badgeText = 'قريب من المثالي';
-    noteText = 'الروث جيد ولكن به ليونة راجع الخشن وأطوال التقطيع من 3 - 5 سم.';
-    barColor = '#84cc16';
-    badgeBg = '#f7fee7';
-    badgeColor = '#3f6212';
-    badgeBorder = '#d9f99d';
-  }else if(s===3){
-    badgeText = 'مثالي';
-    noteText = 'الروث مثالي دليل على توازن العليقة وجودة الهضم.';
-    barColor = '#22c55e';
-    badgeBg = '#ecfdf5';
-    badgeColor = '#166534';
-    badgeBorder = '#86efac';
-  }else if(s<=4.5){
-    badgeText = 'يميل إلى الجفاف';
-    noteText = 'الروث جيد ويميل إلى الجفاف راجع كمية الخشن وجودته.';
-    barColor = '#38bdf8';
-    badgeBg = '#eff6ff';
-    badgeColor = '#1d4ed8';
-    badgeBorder = '#bfdbfe';
-  }else{
-    badgeText = 'جاف جدًا';
-    noteText = 'الروث جاف جدًا إمساك راجع كمية الخشن الزائدة واوزن العليقة.';
-    barColor = '#8b5cf6';
-    badgeBg = '#f5f3ff';
-    badgeColor = '#6d28d9';
-    badgeBorder = '#ddd6fe';
-  }
-
+if (s === 1) {
+  badgeText = 'إسهال';
+  noteText = 'الروث إسهال راجع العليقة للحموضة والسموم الفطرية.';
+  barColor = '#fb7185';
+  badgeBg = '#fff1f2';
+  badgeColor = '#be123c';
+  badgeBorder = '#fecdd3';
+} else if (s === 2) {
+  badgeText = 'به ليونة';
+  noteText = 'الروث جيد ولكن به ليونة راجع الخشن وأطوال التقطيع من 3 - 5 سم.';
+  barColor = '#f59e0b';
+  badgeBg = '#fff7ed';
+  badgeColor = '#b45309';
+  badgeBorder = '#fed7aa';
+} else if (s === 3) {
+  badgeText = 'مثالي';
+  noteText = 'الروث مثالي دليل على توازن العليقة وجودة الهضم.';
+  barColor = '#22c55e';
+  badgeBg = '#ecfdf5';
+  badgeColor = '#166534';
+  badgeBorder = '#86efac';
+} else if (s === 4) {
+  badgeText = 'يميل إلى الجفاف';
+  noteText = 'الروث جيد ويميل إلى الجفاف راجع كمية الخشن وجودته.';
+  barColor = '#38bdf8';
+  badgeBg = '#eff6ff';
+  badgeColor = '#1d4ed8';
+  badgeBorder = '#bfdbfe';
+} else if (s === 5) {
+  badgeText = 'جاف جدًا';
+  noteText = 'الروث جاف جدًا إمساك راجع كمية الخشن الزائدة واوزن العليقة.';
+  barColor = '#8b5cf6';
+  badgeBg = '#f5f3ff';
+  badgeColor = '#6d28d9';
+  badgeBorder = '#ddd6fe';
+} else {
+  badgeText = 'غير محدد';
+  noteText = 'تعذر تحديد الدرجة بدقة.';
+  barColor = '#94a3b8';
+  badgeBg = '#f8fafc';
+  badgeColor = '#334155';
+  badgeBorder = '#cbd5e1';
+}
+    
   scoreBadge.textContent = badgeText;
   scoreBadge.style.background = badgeBg;
   scoreBadge.style.color = badgeColor;
