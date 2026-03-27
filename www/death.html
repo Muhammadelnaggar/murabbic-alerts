@@ -401,23 +401,17 @@ header{
        <input id="eventDate" data-field="eventDate" type="date" />
       </div>
 
-      <div class="field">
-        <label for="reasonSelect">سبب محتمل</label>
-       <select id="reasonSelect" data-field="reason">
-          <option value="">— اختر سببًا —</option>
-          <option value="مرض تنفسي">مرض تنفسي</option>
-          <option value="مرض هضمي/إسهال شديد">مرض هضمي/إسهال شديد</option>
-          <option value="التهاب ضرع/تسمم دموي">التهاب ضرع/تسمم دموي</option>
-          <option value="حمى اللبن/نقص كالسيوم">حمى اللبن/نقص كالسيوم</option>
-          <option value="كيتوزيس/اضطراب أيضي">كيتوزيس/اضطراب أيضي</option>
-          <option value="نفوق أثناء/بعد الولادة">نفوق أثناء/بعد الولادة</option>
-          <option value="حادث/إصابة/كسر">حادث/إصابة/كسر</option>
-          <option value="تسمم/تغذية">تسمم/تغذية</option>
-          <option value="طفيليات/حمى">طفيليات/حمى</option>
-          <option value="مجهول">مجهول</option>
-          <option value="أخرى">أخرى (اكتب)</option>
-        </select>
-      </div>
+     <div class="field">
+  <label for="reasonInput">سبب محتمل</label>
+  <input
+    id="reasonInput"
+    data-field="reason"
+    list="deathReasonsList"
+    placeholder="اكتب السبب المحتمل"
+    autocomplete="off"
+  />
+  <datalist id="deathReasonsList"></datalist>
+</div>
 
       <div id="otherWrap" class="field" style="display:none">
         <label for="reasonOther">اكتب السبب</label>
@@ -435,17 +429,18 @@ header{
 
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-    collection, addDoc, serverTimestamp,
-    updateDoc, getDocs, query, where, limit
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ import {
+  collection, addDoc, serverTimestamp,
+  updateDoc, getDocs, query, where, limit,
+  doc, setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const $ = (id) => document.getElementById(id);
 
   const form = $("deathForm");
   const info = $("info");
-  const reasonSelect = $("reasonSelect");
-  const otherWrap = $("otherWrap");
+ const reasonInput = $("reasonInput");
+const reasonsList = $("deathReasonsList");
 
 function msg(text, ok = false){
   if (!info) return;
@@ -477,17 +472,64 @@ function msg(text, ok = false){
 
   $("animalNumber").value = num;
   $("eventDate").value = dt;
+(async () => {
+  try {
+    await ensureAuth();
+    const uid = auth.currentUser?.uid;
+    if (uid) await loadUserDeathReasons(uid);
+  } catch (e) {
+    console.error("loadUserDeathReasons failed", e);
+  }
+})();
+ function getReason(){
+  return (reasonInput?.value || "").trim();
+}
 
-  reasonSelect?.addEventListener("change", () => {
-    otherWrap.style.display = reasonSelect.value === "أخرى" ? "block" : "none";
+function normalizeReasonKey(text){
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+async function loadUserDeathReasons(uid){
+  if (!uid || !reasonsList) return;
+
+  reasonsList.innerHTML = "";
+
+  const snap = await getDocs(query(
+    collection(db, "death_reasons"),
+    where("userId", "==", uid)
+  ));
+
+  const items = [];
+  snap.forEach((d) => {
+    const data = d.data() || {};
+    const label = String(data.label || "").trim();
+    if (label) items.push(label);
   });
 
-  function getReason(){
-    const v = (reasonSelect?.value || "").trim();
-    if (v === "أخرى") return ($("reasonOther")?.value || "").trim();
-    return v;
-  }
+  items
+    .sort((a, b) => a.localeCompare(b, "ar"))
+    .forEach((label) => {
+      const opt = document.createElement("option");
+      opt.value = label;
+      reasonsList.appendChild(opt);
+    });
+}
 
+async function saveUserDeathReason(uid, label){
+  const clean = String(label || "").trim();
+  if (!uid || !clean) return;
+
+  const key = `${uid}__${normalizeReasonKey(clean)}`;
+
+  await setDoc(doc(db, "death_reasons", key), {
+    userId: uid,
+    label: clean,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
   form?.addEventListener("mbk:valid", async () => {
     try {
       await ensureAuth();
@@ -534,7 +576,9 @@ await addDoc(collection(db, "events"), {
   source: "/death.html",
   createdAt: serverTimestamp()
 });
-
+if (reason) {
+  await saveUserDeathReason(uid, reason);
+}
 await updateDoc(animalRef, {
   archived: true,
   status: "inactive",
@@ -547,7 +591,7 @@ await updateDoc(animalRef, {
 localStorage.setItem("lastAnimalNumber", animalNumber);
 localStorage.setItem("lastEventDate", eventDate);
 
-msg("✅ تم تسجيل النفوق بنجاح وتحديث حالة الحيوان إلى inactive", true);
+msg("✅ تم تسجيل النفوق بنجاح", true);
 const saveBtn = document.getElementById("saveBtn");
 saveBtn?.setAttribute("disabled", "disabled");
 if (saveBtn) saveBtn.style.opacity = ".7";
