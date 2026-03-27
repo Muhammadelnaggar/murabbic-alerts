@@ -888,16 +888,6 @@ for (const r of refs) {
 const bestScore = Number(bestRef?.score || 3);
 const confidence = Math.max(0, Math.min(1, (bestSim - Math.max(-1, secondSim)) * 3.5));
 return { score: bestScore, confidence, sim: bestSim };
-      secondAvg = bestAvg;
-      bestAvg = avg;
-      bestScore = Number(score);
-    } else if (avg > secondAvg) {
-      secondAvg = avg;
-    }
-  }
-
-  const confidence = Math.max(0, Math.min(1, (bestAvg - Math.max(-1, secondAvg)) * 3.5));
-  return { score: bestScore, confidence, sim: bestAvg };
 }
  
 function renderFecesScore(result){
