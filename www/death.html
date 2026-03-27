@@ -257,11 +257,113 @@
     .btn-dash:hover{
       background:#f6fff8;
     }
+header{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:#fff;
+  border-bottom:1px solid #e5e7eb;
+}
 
+.mbk-head{
+  max-width:520px;
+  margin:0 auto;
+  min-height:72px;
+  padding:12px 16px;
+  display:grid;
+  grid-template-columns:56px 1fr 56px;
+  align-items:center;
+  gap:10px;
+}
+
+.mbk-logo{
+  width:38px;
+  height:38px;
+  object-fit:contain;
+  opacity:.6;
+}
+
+.mbk-center{
+  text-align:center;
+  min-width:0;
+}
+
+.mbk-page-title{
+  font-size:24px;
+  font-weight:900;
+  line-height:1.1;
+  color:#111827;
+}
+
+.mbk-app-name{
+  margin-top:2px;
+  font-size:13px;
+  font-weight:800;
+  color:#6b7280;
+}
+
+.mbk-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:56px;
+  height:42px;
+  border-radius:12px;
+  text-decoration:none;
+  color:var(--green-dark);
+  border:1px solid #d7e7d7;
+  background:#fff;
+  font-size:15px;
+  font-weight:800;
+  padding:0 12px;
+}
+
+.bottom-bar{
+  position:fixed;
+  right:0;
+  left:0;
+  bottom:0;
+  z-index:40;
+  background:#fff;
+  border-top:1px solid #e5e7eb;
+  box-shadow:0 -6px 18px rgba(15,23,42,.06);
+  padding:14px 12px calc(14px + env(safe-area-inset-bottom));
+}
+
+.bottom-bar{
+  max-width:520px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.bottom-btn{
+  min-height:54px;
+  border:none;
+  border-radius:16px;
+  font-family:inherit;
+  font-size:18px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  cursor:pointer;
+}
+
+.bottom-btn.primary{
+  background:var(--green);
+  color:#fff;
+}
+
+.bottom-btn.secondary{
+  background:#f3f4f6;
+  color:#111827;
+}
     @media (max-width:420px){
-      .mbk-brand-text h1{font-size:22px}
-      .actions{grid-template-columns:1fr 1fr}
-      .btn{font-size:18px; min-height:58px}
+      .mbk-page-title{font-size:22px}
+      .bottom-btn{font-size:17px; min-height:52px}
       .field label{font-size:16px}
       .field input,
       .field select,
@@ -271,23 +373,18 @@
 </head>
 
 <body>
-  <header class="mbk-head">
-    <div class="mbk-head-inner">
-      <div class="mbk-head-side">
-        <a class="mbk-back" href="add-event.html">رجوع</a>
-      </div>
-
-      <div class="mbk-brand">
-        <div class="mbk-brand-text">
-          <h1>النفوق</h1>
-          <div class="sub">مُرَبِّيك</div>
-        </div>
-        <img src="images/logo.png" alt="شعار مُرَبِّيك">
-      </div>
-
-      <div class="mbk-head-side end"></div>
+ <header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل نفوق</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-  </header>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
+
+     
 
   <main class="page-wrap">
     <div id="info" class="infobar"></div>
@@ -332,10 +429,7 @@
       </div>
     </section>
 
-    <div class="actions">
-      <button id="saveBtn" class="btn btn-save" data-validate="true" type="button">✅ حفظ النفوق</button>
-      <a class="btn btn-dash" href="dashboard.html">لوحة التحكم</a>
-    </div>
+    
   </main>
 
   <script type="module">
@@ -449,5 +543,9 @@
       }
     };
   </script>
+  <div class="bottom-bar">
+  <a class="bottom-btn secondary" href="dashboard.html">لوحة التحكم</a>
+  <button class="bottom-btn primary" id="saveBtn" type="submit">حفظ النفوق</button>
+</div>
 </body>
 </html>
