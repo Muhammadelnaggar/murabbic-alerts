@@ -1454,6 +1454,12 @@ if (eventName === "استبعاد") {
   bar.style.display = "none";
   lockForm(false);
   return true;
+} 
+ // ✅ Weaning: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "فطام") {
+  bar.style.display = "none";
+  lockForm(false);
+  return true;
 }   
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
