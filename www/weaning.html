@@ -226,11 +226,20 @@ async function fetchAnimal(uid, number){
     if (!uid || !n || !dt) return;
 
     const r = await calcWeaningAge(uid, n, dt);
-   if (r.ok) {
+  if (r.ok) {
   $("weaningAgeDays").value = String(r.age);
+
+  // ✅ فك القفل المركزي محليًا لصفحة الفطام
+  form.dataset.locked = "0";
+  form.dataset.animalOk = "1";
+
   msg("✅ تم التحقق — أكمل البيانات ثم اضغط تسجيل الحدث.", true);
 } else {
   $("weaningAgeDays").value = "";
+
+  // ✅ أعِد القفل إذا فشل التحقق المحلي
+  form.dataset.locked = "1";
+  form.dataset.animalOk = "0";
 }
   }
 
@@ -244,9 +253,10 @@ async function fetchAnimal(uid, number){
   $("eventDate").addEventListener("change", refreshSingleAge);
   $("eventDate").addEventListener("input", refreshSingleAge);
 
-  hydrateUI();
-  refreshSingleAge();
-
+hydrateUI();
+form.dataset.locked = "1";
+form.dataset.animalOk = "0";
+refreshSingleAge();
   form.addEventListener("mbk:valid", async (ev) => {
     try {
       const uid = await getUid();
