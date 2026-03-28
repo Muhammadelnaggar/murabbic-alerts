@@ -371,6 +371,17 @@ export const eventSchemas = {
   },
   guards: []
 },
+"استبعاد": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ الاستبعاد غير صالح." },
+    documentData: { required: true, msg: "تعذّر العثور على الحيوان — تحقق من الرقم." },
+    cullMain: { required: true, msg: "سبب الاستبعاد (رئيسي) مطلوب." },
+    cullDetail: { required: true, msg: "تفصيل السبب مطلوب." },
+    notes: { required: false }
+  },
+  guards: []
+},  
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
