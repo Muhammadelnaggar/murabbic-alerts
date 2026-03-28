@@ -381,7 +381,17 @@ export const eventSchemas = {
     notes: { required: false }
   },
   guards: []
-},  
+}, 
+ "فطام": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ الفطام غير صالح." },
+    documentData: { required: false, msg: "تعذّر العثور على الحيوان." },
+    weaningAgeDays: { required: false, type: "number", msg: "عمر الفطام غير صالح." },
+    notes: { required: false }
+  },
+  guards: []
+}, 
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
