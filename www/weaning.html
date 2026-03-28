@@ -94,7 +94,18 @@ getDocs, query, where, limit, doc, getDoc
   function hideMsg(){
     info.style.display = "none";
   }
+  function setWeaningUIEnabled(enabled){
+  const saveBtn = $("saveBtn");
+  const cardBtn = $("cardBtn");
+  const notesEl = $("notes");
 
+  if (saveBtn) saveBtn.disabled = !enabled;
+  if (notesEl) notesEl.disabled = !enabled;
+
+  if (!isGroup) {
+    if (cardBtn) cardBtn.disabled = !enabled;
+  }
+}
   function daysBetween(a, b){
     const d1 = new Date(String(a || "").slice(0,10));
     const d2 = new Date(String(b || "").slice(0,10));
@@ -226,12 +237,13 @@ async function fetchAnimal(uid, number){
     if (!uid || !n || !dt) return;
 
     const r = await calcWeaningAge(uid, n, dt);
-  if (r.ok) {
+if (r.ok) {
   $("weaningAgeDays").value = String(r.age);
 
   // ✅ فك القفل المركزي محليًا لصفحة الفطام
   form.dataset.locked = "0";
   form.dataset.animalOk = "1";
+  setWeaningUIEnabled(true);
 
   msg("✅ تم التحقق — أكمل البيانات ثم اضغط تسجيل الحدث.", true);
 } else {
@@ -240,6 +252,7 @@ async function fetchAnimal(uid, number){
   // ✅ أعِد القفل إذا فشل التحقق المحلي
   form.dataset.locked = "1";
   form.dataset.animalOk = "0";
+  setWeaningUIEnabled(false);
 }
   }
 
@@ -256,6 +269,7 @@ async function fetchAnimal(uid, number){
 hydrateUI();
 form.dataset.locked = "1";
 form.dataset.animalOk = "0";
+setWeaningUIEnabled(false);
 refreshSingleAge();
   form.addEventListener("mbk:valid", async (ev) => {
     try {
