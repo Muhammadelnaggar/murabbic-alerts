@@ -59,8 +59,8 @@
 <script type="module">
   import { db, auth, ensureAuth } from "/js/firebase-config.js";
   import {
-    collection, addDoc, serverTimestamp,
-    getDocs, query, where, limit
+collection, addDoc, serverTimestamp,
+getDocs, query, where, limit, doc, getDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const $ = (id) => document.getElementById(id);
@@ -109,39 +109,79 @@
     return auth.currentUser?.uid || localStorage.getItem("userId") || "";
   }
 
-  async function fetchAnimal(uid, number){
-    const nStr = String(number || "").trim();
-    const nNum = Number(nStr);
+async function fetchAnimal(uid, number){
+  const nStr = String(number || "").trim();
+  const nNum = Number(nStr);
 
-    const tries = [
-      ["userId", "animalNumber", nStr],
-      ["userId", "animalNumber", nNum],
-      ["ownerUid", "animalNumber", nStr],
-      ["ownerUid", "animalNumber", nNum],
-      ["userId", "number", nStr],
-      ["ownerUid", "number", nStr]
-    ];
+  // 1) ابحث أولًا في animals
+  const animalTries = [
+    ["userId", "animalNumber", nStr],
+    ["userId", "animalNumber", nNum],
+    ["ownerUid", "animalNumber", nStr],
+    ["ownerUid", "animalNumber", nNum],
+    ["userId", "number", nStr],
+    ["ownerUid", "number", nStr]
+  ];
 
-    for (const [ownerField, numField, value] of tries) {
-      if (typeof value === "number" && Number.isNaN(value)) continue;
-      try {
-        const qy = query(
-          collection(db, "animals"),
-          where(ownerField, "==", uid),
-          where(numField, "==", value),
-          limit(1)
-        );
-        const snap = await getDocs(qy);
-        if (!snap.empty) {
-          const d = snap.docs[0];
-          return { id: d.id, data: d.data() || {} };
-        }
-      } catch (_) {}
-    }
-
-    return null;
+  for (const [ownerField, numField, value] of animalTries) {
+    if (typeof value === "number" && Number.isNaN(value)) continue;
+    try {
+      const qy = query(
+        collection(db, "animals"),
+        where(ownerField, "==", uid),
+        where(numField, "==", value),
+        limit(1)
+      );
+      const snap = await getDocs(qy);
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        return { id: d.id, data: d.data() || {}, source: "animals" };
+      }
+    } catch (_) {}
   }
 
+  // 2) لو لم يوجد، ابحث في calves
+  const calfTries = [
+    ["userId", "calfNumber", nStr],
+    ["userId", "calfNumber", nNum],
+    ["ownerUid", "calfNumber", nStr],
+    ["ownerUid", "calfNumber", nNum],
+    ["userId", "animalNumber", nStr],
+    ["ownerUid", "animalNumber", nStr]
+  ];
+
+  for (const [ownerField, numField, value] of calfTries) {
+    if (typeof value === "number" && Number.isNaN(value)) continue;
+    try {
+      const qy = query(
+        collection(db, "calves"),
+        where(ownerField, "==", uid),
+        where(numField, "==", value),
+        limit(1)
+      );
+      const snap = await getDocs(qy);
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        return { id: d.id, data: d.data() || {}, source: "calves" };
+      }
+    } catch (_) {}
+  }
+
+  // 3) محاولة مباشرة بالرقم كـ doc id داخل calves
+  try {
+    const calfRef = doc(db, "calves", nStr);
+    const calfSnap = await getDoc(calfRef);
+    if (calfSnap.exists()) {
+      const data = calfSnap.data() || {};
+      const owner = String(data.userId || data.ownerUid || "").trim();
+      if (owner === uid) {
+        return { id: calfSnap.id, data, source: "calves" };
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
   async function calcWeaningAge(uid, number, dateISO){
     const animal = await fetchAnimal(uid, number);
     if (!animal) return { ok:false, age:null, reason:"الحيوان غير موجود." };
