@@ -1448,7 +1448,13 @@ if (eventName === "نفوق") {
   showMsg(bar, "✅ تم التحقق — أكمل البيانات ثم اضغط حفظ النفوق.", "success");
   lockForm(false);
   return true;
-}    
+}  
+ // ✅ Cull: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "استبعاد") {
+  bar.style.display = "none";
+  lockForm(false);
+  return true;
+}   
     // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
     const v = validateEvent(eventName, formData);
 
