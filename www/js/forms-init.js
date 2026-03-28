@@ -91,7 +91,17 @@ bar.className = "infobar mbk-infobar show " + cls;
   `;
 
   bar.innerHTML = html;
+const okBtn = bar.querySelector(".okbtn");
+okBtn?.addEventListener("click", () => {
+  bar.style.display = "none";
 
+  const form = bar.closest("form") || document.querySelector("form");
+  const animalEl =
+    form?.querySelector('[data-field="animalNumber"]') ||
+    form?.querySelector("#animalNumber");
+
+  animalEl?.focus?.();
+});
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
   // actions (اختياري)
