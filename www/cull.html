@@ -6,49 +6,24 @@
   <title>تسجيل استبعاد — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
-  <style>
-  /* ===== Header tweak (page black, app green, bigger logo) ===== */
-  .mbk-title{ flex-direction: column; align-items: flex-start; gap: 4px; }
-  .mbk-page{ color:#000 !important; font-weight:900; font-size:22px; line-height:1.1; }
-  .mbk-app{ color:#0ea05a !important; font-weight:800; font-size:18px; line-height:1.1; }
-  .mbk-logo{ height:60px; width:auto; }
-
-  /* ===== Bottom actions pinned to end of form ===== */
-  .bottom-actions{ margin-top: 22px; display:flex; gap:12px; }
-  .bottom-actions button{
-    flex:1; padding:12px; font-size:16px; border-radius:10px;
-    border:0; cursor:pointer;
-  }
-
-  /* Primary: Save (green) */
-  #saveBtn{ background:#0ea05a; color:#fff; }
-  #saveBtn:hover{ background:#0b7f47; }
-
-  /* Secondary: Open card (NOT green) */
-  #openCardBtn{
-    background:#ffffff;
-    color:#111;
-    border:2px solid #d9d9d9;
-  }
-  #openCardBtn:hover{ background:#f6f6f6; }
-</style>
 
 </head>
 <body>
- <header class="mbk-top">
+<header>
   <div class="mbk-head">
-    <div class="mbk-title">
-      <div class="mbk-page">تسجيل الإستبعاد</div>
-      <div class="mbk-app">مُرَبِّيك</div>
-    </div>
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل الاستبعاد</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
   </div>
 </header>
 
 
   <main class="mbk-form">
     <div id="info" class="infobar"></div>
-
+<section class="mbk-card">
     <label>رقم الحيوان</label>
     <input id="animalNumber" readonly />
 
@@ -70,15 +45,10 @@
 
     <label>ملاحظات</label>
     <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
-
-   <div class="bottom-actions">
-  <button id="saveBtn" data-validate="true">
-    حفظ الاستبعاد ✅
-  </button>
-
-  <button type="button" id="openCardBtn">
-    فتح بطاقة الحيوان 📄
-  </button>
+    </section>
+  <div class="btn-row">
+  <button class="save-btn" id="saveBtn" data-validate="true" type="button">تسجيل الحدث</button>
+  <button class="open-card" type="button" id="openCardBtn">بطاقة الحيوان</button>
 </div>
 
   </main>
