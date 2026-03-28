@@ -257,3 +257,82 @@ html[dir="rtl"] input[type="date"]{
   color:var(--brand-600, #0b7f47);
   cursor:pointer;
 }
+/* ===== توحيد شكل الحقول في كل صفحات مُرَبِّيك ===== */
+.mbk-card input,
+.mbk-card select,
+.mbk-card textarea,
+.mbk-form input,
+.mbk-form select,
+.mbk-form textarea{
+  min-height:48px;
+  padding:12px 14px;
+  border:1px solid #d7e2ea;
+  border-radius:14px;
+  background:#fff;
+  color:var(--ink);
+  font:inherit;
+  box-shadow:none;
+  outline:none;
+}
+
+.mbk-card input:focus,
+.mbk-card select:focus,
+.mbk-card textarea:focus,
+.mbk-form input:focus,
+.mbk-form select:focus,
+.mbk-form textarea:focus{
+  border-color:#b7d9c2;
+  box-shadow:0 0 0 3px rgba(14,160,90,.08);
+}
+
+/* ===== توحيد الشريط السفلي للأزرار ===== */
+.btn-row{
+  position:sticky;
+  bottom:0;
+  z-index:20;
+  display:flex;
+  flex-direction:row;
+  gap:10px;
+  align-items:center;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  margin-top:14px;
+  background:rgba(247,250,247,.96);
+  backdrop-filter:blur(6px);
+  border-top:1px solid #e5e7eb;
+}
+
+.btn-row .save-btn{
+  flex:1;
+  width:auto !important;
+  min-height:50px;
+  margin:0 !important;
+  border:0;
+  border-radius:14px;
+  background:var(--brand);
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.btn-row .open-card{
+  flex:1;
+  width:auto !important;
+  min-height:50px;
+  margin:0 !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  border:1px solid #cbd5e1;
+  background:#f8fafc;
+  color:#0f172a;
+  font-size:15px;
+  font-weight:800;
+  text-decoration:none;
+}
+
+/* في العربي: أول زر يكون يمين */
+html[dir="rtl"] .btn-row{
+  flex-direction:row;
+}
