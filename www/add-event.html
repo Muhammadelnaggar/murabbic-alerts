@@ -436,13 +436,7 @@ const isWeaning = /weaning\.html/i.test(String(targetPage||''));
 const isExtraTeats = /extra-teats\.html/i.test(String(targetPage||''));
 const isColostrum = /colostrum-feeding\.html/i.test(String(targetPage||''));
 
-const isGroupAllowed =
-  isOvsynch ||
-  isHeat ||
-  isNutrition ||
-  isWeaning ||
-  isExtraTeats ||
-  isColostrum;
+const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
