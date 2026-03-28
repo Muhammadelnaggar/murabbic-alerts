@@ -24,12 +24,10 @@
     <div id="info" class="infobar"></div>
 
     <section class="mbk-card">
-      <div class="field">
-        <label for="animalNumbersView">رقم الحيوان</label>
-        <textarea id="animalNumbersView" readonly style="min-height:80px; resize:vertical;"></textarea>
-        <input id="animalNumber" data-field="animalNumber" type="hidden" />
-      </div>
-
+     <div class="field">
+  <label for="animalNumber">رقم الحيوان</label>
+  <textarea id="animalNumber" data-field="animalNumber" style="min-height:80px; resize:vertical;"></textarea>
+</div>
       <div class="field">
         <label for="eventDate">تاريخ الفطام</label>
         <input id="eventDate" data-field="eventDate" type="date" />
@@ -159,27 +157,26 @@
     return { ok:true, age, animal };
   }
 
-  function hydrateUI(){
-    $("eventDate").value = eventDate;
+ function hydrateUI(){
+  $("eventDate").value = eventDate;
 
-    if (isGroup) {
-      $("animalNumbersView").value = bulkList.join("\n");
-      $("animalNumbersView").rows = Math.max(3, bulkList.length);
-      $("animalNumber").value = bulkList[0] || "";
-      $("singleAgeWrap").style.display = "none";
-      $("bulkAgeHint").style.display = "";
-      cardBtn.disabled = true;
-      cardBtn.style.opacity = ".6";
-      cardBtn.style.pointerEvents = "none";
-    } else {
-      const n = bulkList[0] || "";
-      $("animalNumbersView").value = n;
-      $("animalNumber").value = n;
-      $("singleAgeWrap").style.display = "";
-      $("bulkAgeHint").style.display = "none";
-      cardBtn.disabled = !n;
-    }
+  if (isGroup) {
+    $("animalNumber").value = bulkList.join("\n");
+    $("animalNumber").rows = Math.max(3, bulkList.length);
+    $("singleAgeWrap").style.display = "none";
+    $("bulkAgeHint").style.display = "";
+    cardBtn.disabled = true;
+    cardBtn.style.opacity = ".6";
+    cardBtn.style.pointerEvents = "none";
+  } else {
+    const n = bulkList[0] || "";
+    $("animalNumber").value = n;
+    $("animalNumber").rows = 1;
+    $("singleAgeWrap").style.display = "";
+    $("bulkAgeHint").style.display = "none";
+    cardBtn.disabled = !n;
   }
+}
 
   async function refreshSingleAge(){
     if (isGroup) return;
@@ -197,11 +194,12 @@
     }
   }
 
-  cardBtn.onclick = () => {
-    const n = String($("animalNumber").value || "").trim();
-    if (!n) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-  };
+ cardBtn.onclick = () => {
+  const raw = String($("animalNumber").value || "").trim();
+  const n = (raw.match(/\d+/) || [""])[0];
+  if (!n) return;
+  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+};
 
   $("eventDate").addEventListener("change", refreshSingleAge);
   $("eventDate").addEventListener("input", refreshSingleAge);
