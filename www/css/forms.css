@@ -194,9 +194,44 @@ html[dir="rtl"] input[type="date"]{
 
 .mbk-form button:active{ transform:translateY(1px); }
 .mbk-form button:disabled{ opacity:.6; cursor:not-allowed; }
-.btn-row{display:flex;gap:10px;margin-top:12px}
-.btn-row .save-btn{flex:1;width:auto;margin:0}
-.btn-row .open-card{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1}
+.btn-row{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+  margin-bottom:0;
+  align-items:center;
+}
+
+.btn-row .save-btn{
+  flex:1;
+  width:auto;
+  margin:0;
+  min-height:50px;
+  border:0;
+  border-radius:14px;
+  background:var(--brand);
+  color:#fff;
+  font-weight:800;
+  font-size:16px;
+  cursor:pointer;
+}
+
+.btn-row .open-card{
+  flex:1;
+  width:auto;
+  min-height:50px;
+  margin:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  border:1px solid #cbd5e1;
+  background:#f8fafc;
+  color:#0f172a;
+  text-decoration:none;
+  font-weight:800;
+  font-size:15px;
+}
 /* ===============================
    Murabbik Infobar — Types (Unified)
    =============================== */
