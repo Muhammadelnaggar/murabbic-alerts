@@ -32,7 +32,7 @@
    <input id="eventDate" data-field="eventDate" type="date" />
 
     <label>سبب الاستبعاد (رئيسي)</label>
-    <select id="cullMain" data-field="cullMain" required>
+    <select id="cullMain" data-field="cullMain">
       <option value="">— اختر —</option>
       <option value="انتاجي">إنتاجي</option>
       <option value="تناسلي">تناسلي</option>
@@ -40,7 +40,8 @@
     </select>
 
     <label>تفصيل السبب</label>
-<select id="cullDetail" data-field="cullDetail" required>      <option value="">— اختر السبب الرئيسي أولاً —</option>
+<select id="cullDetail" data-field="cullDetail" disabled>    
+  <option value="">— اختر السبب الرئيسي أولاً —</option>
     </select>
 
     <label>ملاحظات</label>
@@ -111,13 +112,22 @@ openBtn.onclick = () => {
     const mainEl = $("cullMain");
     const detailEl = $("cullDetail");
 
-    function fillDetails(){
-      const m = (mainEl.value || "").trim();
-      const arr = DETAILS[m] || [];
-      detailEl.innerHTML =
-        `<option value="">— اختر —</option>` +
-        arr.map(x => `<option value="${x}">${x}</option>`).join("");
-    }
+   function fillDetails(){
+  const m = (mainEl.value || "").trim();
+
+  if (!m) {
+    detailEl.innerHTML = `<option value="">— اختر السبب الرئيسي أولاً —</option>`;
+    detailEl.value = "";
+    detailEl.disabled = true;
+    return;
+  }
+
+  const arr = DETAILS[m] || [];
+  detailEl.disabled = false;
+  detailEl.innerHTML =
+    `<option value="">— اختر —</option>` +
+    arr.map(x => `<option value="${x}">${x}</option>`).join("");
+}
 
     mainEl.addEventListener("change", fillDetails);
     fillDetails();
