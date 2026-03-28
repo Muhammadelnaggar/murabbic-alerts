@@ -93,14 +93,27 @@ bar.className = "infobar mbk-infobar show " + cls;
   bar.innerHTML = html;
 const okBtn = bar.querySelector(".okbtn");
 okBtn?.addEventListener("click", () => {
+  bar.className = "infobar mbk-infobar";
   bar.style.display = "none";
+  bar.innerHTML = "";
 
   const form = bar.closest("form") || document.querySelector("form");
   const animalEl =
     form?.querySelector('[data-field="animalNumber"]') ||
     form?.querySelector("#animalNumber");
 
-  animalEl?.focus?.();
+  const dateEl =
+    form?.querySelector('[data-field="eventDate"]') ||
+    form?.querySelector("#eventDate");
+
+  if (animalEl) {
+    animalEl.removeAttribute("readonly");
+    animalEl.disabled = false;
+    animalEl.focus();
+    animalEl.select?.();
+  }
+
+  if (dateEl) dateEl.disabled = false;
 });
   try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
 
