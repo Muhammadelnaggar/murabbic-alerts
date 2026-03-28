@@ -71,10 +71,11 @@ openBtn.onclick = () => {
   location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
 };
 
-    function msg(t, ok=false){
-      info.className = "infobar " + (ok ? "ok" : "err");
-      info.textContent = t;
-    }
+   function msg(t, ok=false){
+  info.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
+  info.style.display = "block";
+  info.textContent = t;
+}
 
     const p = new URLSearchParams(location.search);
     const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
