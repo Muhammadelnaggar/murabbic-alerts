@@ -226,12 +226,12 @@ async function fetchAnimal(uid, number){
     if (!uid || !n || !dt) return;
 
     const r = await calcWeaningAge(uid, n, dt);
-    if (r.ok) {
-      $("weaningAgeDays").value = String(r.age);
-      hideMsg();
-    } else {
-      $("weaningAgeDays").value = "";
-    }
+   if (r.ok) {
+  $("weaningAgeDays").value = String(r.age);
+  msg("✅ تم التحقق — أكمل البيانات ثم اضغط تسجيل الحدث.", true);
+} else {
+  $("weaningAgeDays").value = "";
+}
   }
 
  cardBtn.onclick = () => {
