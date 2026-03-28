@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="weaning">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل الفطام — مُرَبِّيك</title>
+  <link rel="stylesheet" href="css/forms.css" />
+  <script type="module" src="js/forms-init.js"></script>
+</head>
+<body>
+<header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل الفطام</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
+
+<main class="mbk-form">
+  <form id="weaningForm" data-event="فطام" novalidate>
+    <div id="info" class="infobar"></div>
+
+    <section class="mbk-card">
+      <div class="field">
+        <label for="animalNumbersView">رقم الحيوان</label>
+        <textarea id="animalNumbersView" readonly style="min-height:80px; resize:vertical;"></textarea>
+        <input id="animalNumber" data-field="animalNumber" type="hidden" />
+      </div>
+
+      <div class="field">
+        <label for="eventDate">تاريخ الفطام</label>
+        <input id="eventDate" data-field="eventDate" type="date" />
+      </div>
+
+      <div class="field" id="singleAgeWrap" style="display:none;">
+        <label for="weaningAgeDays">عمر الفطام (يوم)</label>
+        <input id="weaningAgeDays" data-field="weaningAgeDays" type="number" readonly />
+      </div>
+
+      <div class="field" id="bulkAgeHint" style="display:none;">
+        <label>عمر الفطام</label>
+        <div class="hint">سيتم حساب عمر الفطام تلقائيًا لكل حيوان من تاريخ الميلاد المسجل.</div>
+      </div>
+
+      <div class="field">
+        <label for="notes">ملاحظات</label>
+        <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
+      </div>
+    </section>
+
+    <div class="btn-row">
+      <button class="save-btn" id="saveBtn" type="submit">تسجيل الحدث</button>
+      <button class="open-card" id="cardBtn" type="button">بطاقة الحيوان</button>
+    </div>
+  </form>
+</main>
+
+<script type="module">
+  import { db, auth, ensureAuth } from "/js/firebase-config.js";
+  import {
+    collection, addDoc, serverTimestamp,
+    getDocs, query, where, limit
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const $ = (id) => document.getElementById(id);
+
+  const form = $("weaningForm");
+  const info = $("info");
+  const cardBtn = $("cardBtn");
+
+  const qs = new URLSearchParams(location.search);
+  const isGroup = String(qs.get("mbkMode") || "").trim() === "group";
+  const bulkRaw = String(qs.get("bulk") || "").trim();
+  const singleNumber = String(qs.get("number") || qs.get("animalNumber") || "").trim();
+  const eventDate = String(qs.get("date") || qs.get("eventDate") || new Date().toISOString().slice(0,10)).slice(0,10);
+
+  const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  const toLatin = (s) => String(s || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+  const onlyDigits = (s) => toLatin(s).replace(/[^\d]/g, "");
+  const parseNumbers = (raw) => {
+    const arr = (toLatin(raw).match(/\d+/g) || []).map(x => x.replace(/\D/g,"")).filter(Boolean);
+    return [...new Set(arr)];
+  };
+
+  const bulkList = isGroup ? parseNumbers(bulkRaw) : (singleNumber ? [onlyDigits(singleNumber)] : []);
+
+  function msg(text, ok = false){
+    info.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
+    info.style.display = "block";
+    info.textContent = text;
+  }
+
+  function hideMsg(){
+    info.style.display = "none";
+  }
+
+  function daysBetween(a, b){
+    const d1 = new Date(String(a || "").slice(0,10));
+    const d2 = new Date(String(b || "").slice(0,10));
+    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
+    d1.setHours(0,0,0,0);
+    d2.setHours(0,0,0,0);
+    return Math.round((d2 - d1) / 86400000);
+  }
+
+  async function getUid(){
+    await ensureAuth();
+    return auth.currentUser?.uid || localStorage.getItem("userId") || "";
+  }
+
+  async function fetchAnimal(uid, number){
+    const nStr = String(number || "").trim();
+    const nNum = Number(nStr);
+
+    const tries = [
+      ["userId", "animalNumber", nStr],
+      ["userId", "animalNumber", nNum],
+      ["ownerUid", "animalNumber", nStr],
+      ["ownerUid", "animalNumber", nNum],
+      ["userId", "number", nStr],
+      ["ownerUid", "number", nStr]
+    ];
+
+    for (const [ownerField, numField, value] of tries) {
+      if (typeof value === "number" && Number.isNaN(value)) continue;
+      try {
+        const qy = query(
+          collection(db, "animals"),
+          where(ownerField, "==", uid),
+          where(numField, "==", value),
+          limit(1)
+        );
+        const snap = await getDocs(qy);
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          return { id: d.id, data: d.data() || {} };
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  async function calcWeaningAge(uid, number, dateISO){
+    const animal = await fetchAnimal(uid, number);
+    if (!animal) return { ok:false, age:null, reason:"الحيوان غير موجود." };
+
+    const birthDate =
+      String(animal.data.birthDate || animal.data.dateOfBirth || animal.data.dob || "").slice(0,10);
+
+    if (!birthDate) return { ok:false, age:null, reason:"تاريخ الميلاد غير مسجل." };
+
+    const age = daysBetween(birthDate, dateISO);
+    if (!Number.isFinite(age) || age < 0) return { ok:false, age:null, reason:"تعذّر حساب عمر الفطام." };
+
+    return { ok:true, age, animal };
+  }
+
+  function hydrateUI(){
+    $("eventDate").value = eventDate;
+
+    if (isGroup) {
+      $("animalNumbersView").value = bulkList.join("\n");
+      $("animalNumbersView").rows = Math.max(3, bulkList.length);
+      $("animalNumber").value = bulkList[0] || "";
+      $("singleAgeWrap").style.display = "none";
+      $("bulkAgeHint").style.display = "";
+      cardBtn.disabled = true;
+      cardBtn.style.opacity = ".6";
+      cardBtn.style.pointerEvents = "none";
+    } else {
+      const n = bulkList[0] || "";
+      $("animalNumbersView").value = n;
+      $("animalNumber").value = n;
+      $("singleAgeWrap").style.display = "";
+      $("bulkAgeHint").style.display = "none";
+      cardBtn.disabled = !n;
+    }
+  }
+
+  async function refreshSingleAge(){
+    if (isGroup) return;
+    const uid = await getUid();
+    const n = String($("animalNumber").value || "").trim();
+    const dt = String($("eventDate").value || "").slice(0,10);
+    if (!uid || !n || !dt) return;
+
+    const r = await calcWeaningAge(uid, n, dt);
+    if (r.ok) {
+      $("weaningAgeDays").value = String(r.age);
+      hideMsg();
+    } else {
+      $("weaningAgeDays").value = "";
+    }
+  }
+
+  cardBtn.onclick = () => {
+    const n = String($("animalNumber").value || "").trim();
+    if (!n) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+  };
+
+  $("eventDate").addEventListener("change", refreshSingleAge);
+  $("eventDate").addEventListener("input", refreshSingleAge);
+
+  hydrateUI();
+  refreshSingleAge();
+
+  form.addEventListener("mbk:valid", async (ev) => {
+    try {
+      const uid = await getUid();
+      if (!uid) throw new Error("NO_AUTH");
+
+      const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
+      const dt = String(formData.eventDate || $("eventDate").value || "").slice(0,10);
+      const notes = String(formData.notes || "").trim();
+
+      if (isGroup) {
+        if (!bulkList.length) {
+          msg("❌ لا توجد أرقام لحفظ الفطام.", false);
+          return;
+        }
+
+        let saved = 0;
+        const failed = [];
+
+        for (const num of bulkList) {
+          const ageRes = await calcWeaningAge(uid, num, dt);
+          if (!ageRes.ok) {
+            failed.push(num);
+            continue;
+          }
+
+          const payload = {
+            animalNumber: String(num),
+            animalId: String(num),
+            type: "فطام",
+            eventType: "فطام",
+            eventDate: dt,
+            weaningAgeDays: ageRes.age,
+            notes,
+            userId: uid,
+            source: "/weaning.html",
+            createdAt: serverTimestamp()
+          };
+
+          await addDoc(collection(db, "events"), payload);
+          saved++;
+        }
+
+        if (!saved) {
+          msg("❌ تعذّر تسجيل الفطام لأي رقم. راجع تواريخ الميلاد أو الأرقام.", false);
+          return;
+        }
+
+        if (failed.length) {
+          msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان. تعذّر الحساب/الحفظ لعدد ${failed.length}.`, true);
+        } else {
+          msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان بنجاح.`, true);
+        }
+
+        return;
+      }
+
+      const n = String(formData.animalNumber || $("animalNumber").value || "").trim();
+      const ageRes = await calcWeaningAge(uid, n, dt);
+      if (!ageRes.ok) {
+        msg(`❌ ${ageRes.reason}`, false);
+        return;
+      }
+
+      $("weaningAgeDays").value = String(ageRes.age);
+
+      const payload = {
+        animalNumber: n,
+        animalId: n,
+        type: "فطام",
+        eventType: "فطام",
+        eventDate: dt,
+        weaningAgeDays: ageRes.age,
+        notes,
+        userId: uid,
+        source: "/weaning.html",
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, "events"), payload);
+
+      msg("✅ تم تسجيل الفطام بنجاح.", true);
+      localStorage.setItem("lastAnimalNumber", n);
+      localStorage.setItem("lastEventDate", dt);
+
+      setTimeout(() => {
+        location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+      }, 900);
+
+    } catch (e) {
+      console.error(e);
+      msg("❌ فشل في الحفظ.", false);
+    }
+  });
+</script>
+</body>
+</html>
