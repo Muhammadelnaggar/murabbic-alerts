@@ -22,16 +22,17 @@
 
 
   <main class="mbk-form">
-    <div id="info" class="infobar"></div>
-<section class="mbk-card">
+    <form id="cullForm" data-event="استبعاد" novalidate>
+  <div id="info" class="infobar"></div>
+  <section class="mbk-card">
     <label>رقم الحيوان</label>
-    <input id="animalNumber" readonly />
+   <input id="animalNumber" data-field="animalNumber" readonly />
 
     <label>تاريخ الاستبعاد</label>
-    <input id="eventDate" type="date" />
+   <input id="eventDate" data-field="eventDate" type="date" />
 
     <label>سبب الاستبعاد (رئيسي)</label>
-    <select id="cullMain" required>
+    <select id="cullMain" data-field="cullMain" required>
       <option value="">— اختر —</option>
       <option value="انتاجي">إنتاجي</option>
       <option value="تناسلي">تناسلي</option>
@@ -39,18 +40,17 @@
     </select>
 
     <label>تفصيل السبب</label>
-    <select id="cullDetail" required>
-      <option value="">— اختر السبب الرئيسي أولاً —</option>
+<select id="cullDetail" data-field="cullDetail" required>      <option value="">— اختر السبب الرئيسي أولاً —</option>
     </select>
 
     <label>ملاحظات</label>
-    <textarea id="notes" rows="3" placeholder="اختياري"></textarea>
+   <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
     </section>
   <div class="btn-row">
   <button class="save-btn" id="saveBtn" data-validate="true" type="button">تسجيل الحدث</button>
   <button class="open-card" type="button" id="openCardBtn">بطاقة الحيوان</button>
 </div>
-
+</form>
   </main>
 
   <script type="module">
@@ -122,19 +122,20 @@ openBtn.onclick = () => {
     mainEl.addEventListener("change", fillDetails);
     fillDetails();
 
-    btn.onclick = async () => {
+   window.addEventListener("mbk:valid", async (ev) => {
       try {
         await ensureAuth();
         const uid = auth.currentUser?.uid;
         if (!uid) throw new Error("NO_AUTH");
+        const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
 
         const n = String(num || "").trim();
         if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
 
-        const eventDate = ($("eventDate").value || dt).slice(0,10);
+const eventDate = String(formData.eventDate || dt || "").slice(0,10);
 
-        const cullMain = (mainEl.value || "").trim();
-        const cullDetail = (detailEl.value || "").trim();
+const cullMain = String(formData.cullMain || "").trim();
+const cullDetail = String(formData.cullDetail || "").trim();
         if (!cullMain) { msg("⚠️ اختر سبب الاستبعاد (رئيسي).", false); return; }
         if (!cullDetail) { msg("⚠️ اختر تفصيل السبب.", false); return; }
 
@@ -150,7 +151,7 @@ openBtn.onclick = () => {
           cullDetail,
           reason: `${cullMain} — ${cullDetail}`,
 
-          notes: ($("notes").value || "").trim(),
+          notes: String(formData.notes || "").trim(),
           userId: uid,
           source: "/cull.html",
           createdAt: serverTimestamp()
