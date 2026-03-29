@@ -207,7 +207,7 @@
   <script type="module">
 import { db } from './js/firebase-config.js';
 import {
-  collection, query, where, orderBy, getDocs, limit
+  collection, doc, getDoc, query, where, orderBy, getDocs, limit
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     const $ = (id) => document.getElementById(id);
   const els = {
@@ -380,19 +380,15 @@ els.animalNumberInput?.addEventListener('keydown', (e) => {
 async function getOwnerFieldQueries(number, userId) {
   const nNum = Number(number);
   const canUseNumber = !Number.isNaN(nNum);
-  const ownerFields = ['userId', 'ownerUid'];
+  const ownerFields = ['userId','ownerUid'];
   const numberFields = canUseNumber ? [String(number), nNum] : [String(number)];
   const queries = [];
 
   for (const ownerField of ownerFields) {
     for (const num of numberFields) {
-      queries.push(
-        query(collection(db, 'calves'),
-          where(ownerField, '==', userId),
-          where('calfNumber', '==', num),
-          limit(1)
-        )
-      );
+      queries.push(query(collection(db, 'calves'), where(ownerField, '==', userId), where('calfNumber', '==', num), limit(1)));
+      queries.push(query(collection(db, 'calves'), where(ownerField, '==', userId), where('animalNumber', '==', num), limit(1)));
+      queries.push(query(collection(db, 'calves'), where(ownerField, '==', userId), where('number', '==', num), limit(1)));
     }
   }
   return queries;
@@ -405,7 +401,110 @@ async function getOwnerFieldQueries(number, userId) {
       }
       return null;
     }
+    async function loadDamDoc(calf, userId) {
+  const damId = pick(calf, ['damId','motherId'], '');
+  const damNumber = pick(calf, ['damNumber','motherNumber'], '');
 
+  if (damId) {
+    try {
+      const snap = await getDoc(doc(db, 'animals', String(damId)));
+      if (snap.exists()) {
+        const data = snap.data() || {};
+        const owner = pick(data, ['userId','ownerUid'], '');
+        if (!owner || owner === userId) return { id: snap.id, ...data };
+      }
+    } catch (e) {
+      console.warn('loadDamDoc by id failed', e);
+    }
+  }
+
+  if (!damNumber) return null;
+
+  const ownerFields = ['userId','ownerUid'];
+  const numVals = [String(damNumber)];
+  const nNum = Number(damNumber);
+  if (!Number.isNaN(nNum)) numVals.push(nNum);
+
+  for (const ownerField of ownerFields) {
+    for (const num of numVals) {
+      try {
+        const qx = query(collection(db, 'animals'), where(ownerField, '==', userId), where('animalNumber', '==', num), limit(1));
+        const snap = await getDocs(qx);
+        if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+      } catch (e) {
+        console.warn('loadDamDoc by number failed', e);
+      }
+    }
+  }
+
+  return null;
+}
+   async function loadBirthEventForDam(calf, userId) {
+  const damId = pick(calf, ['damId','motherId'], '');
+  const damNumber = pick(calf, ['damNumber','motherNumber'], '');
+  const birthDate = normalizeDate(pick(calf, ['birthDate','dob','dateOfBirth'], ''));
+
+  const ownerFields = ['userId','ownerUid'];
+  const damNumberVals = [];
+  const dn = Number(damNumber);
+  if (damNumber !== '') damNumberVals.push(String(damNumber));
+  if (!Number.isNaN(dn)) damNumberVals.push(dn);
+
+  const matchesBirthEvent = (row) => {
+    const evType = String(pick(row, ['eventType','type'], '')).trim();
+    if (evType !== 'ولادة') return false;
+
+    const evDate = normalizeDate(pick(row, ['eventDate','date'], ''));
+    if (birthDate && evDate && evDate !== birthDate) return false;
+
+    const rowAnimalId = String(pick(row, ['animalId'], '')).trim();
+    const rowAnimalNumber = String(pick(row, ['animalNumber','number'], '')).trim();
+
+    const idOk = damId && rowAnimalId === String(damId).trim();
+    const numOk = damNumber && rowAnimalNumber === String(damNumber).trim();
+
+    return idOk || numOk || (!damId && !damNumber ? false : true);
+  };
+
+  for (const ownerField of ownerFields) {
+    if (damId) {
+      try {
+        const qx = query(collection(db, 'events'), where(ownerField, '==', userId), where('animalId', '==', String(damId)));
+        const snap = await getDocs(qx);
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const hit = rows.find(matchesBirthEvent);
+        if (hit) return hit;
+      } catch (e) {
+        console.warn('birth event by damId failed', e);
+      }
+    }
+
+    for (const num of damNumberVals) {
+      try {
+        const qx = query(collection(db, 'events'), where(ownerField, '==', userId), where('animalNumber', '==', num));
+        const snap = await getDocs(qx);
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const hit = rows.find(matchesBirthEvent);
+        if (hit) return hit;
+      } catch (e) {
+        console.warn('birth event by damNumber failed', e);
+      }
+    }
+  }
+
+  return null;
+} 
+ function buildLitterCompositionFromBirthEvent(birthEvent) {
+  if (!birthEvent) return '';
+
+  const parts = [
+    pick(birthEvent, ['calf1Sex'], ''),
+    pick(birthEvent, ['calf2Sex'], ''),
+    pick(birthEvent, ['calf3Sex'], '')
+  ].map(v => String(v || '').trim()).filter(Boolean);
+
+  return parts.join(' + ');
+}   
     async function loadEvents(number, userId) {
       const ownerFields = ['userId','ownerUid'];
       const numberValues = [];
@@ -454,40 +553,61 @@ async function getOwnerFieldQueries(number, userId) {
       return all;
     }
 
-    function fillCalf(calf, events) {
-     const number = pick(calf, ['calfNumber','animalNumber','number'], '—');
-      const sex = normalizeSex(pick(calf, ['sex','gender','type'], '—')) || '—';
-      const breed = pick(calf, ['breed','breedName','speciesBreed'], '—');
-      const birthDate = normalizeDate(pick(calf, ['birthDate','dob','dateOfBirth'], ''));
-      const birthType = pick(calf, ['birthType','deliveryType'], '—');
-      const litterSize = pick(calf, ['litterSize','birthCount'], '—');
-      const litterOrder = pick(calf, ['litterOrder','birthOrder'], '—');
-      const litterComposition = pick(calf, ['litterComposition','birthComposition'], '—');
-      const status = normalizeStatusFromEvents(events);
+function fillCalf(calf, events, damDoc = null, birthEvent = null) {
+  const number = pick(calf, ['calfNumber','animalNumber','number'], '—');
+  const sex = normalizeSex(pick(calf, ['sex','gender','type'], '—')) || '—';
+  const breed = pick(calf, ['species','breed','breedName','speciesBreed'], '') ||
+                pick(damDoc || {}, ['species','breed','breedName','speciesBreed'], '—');
 
-      els.animalNo.textContent = `رقم العجل: ${number}`;
-      els.currentStatus.textContent = status;
-      els.sex.textContent = sex;
-      els.breed.textContent = breed;
-      els.birthDate.textContent = birthDate || '—';
-      els.birthDate2.textContent = birthDate || '—';
-      els.age.textContent = calcAgeText(birthDate);
-    els.damNumber.textContent = pick(calf, ['damNumber','damId','motherNumber','motherId'], '—');
-      els.sireNumber.textContent = pick(calf, ['sireNumber','fatherNumber','fatherId'], '—');
-      els.sireName.textContent = pick(calf, ['sireName','fatherName'], '—');
-      els.birthType.textContent = birthType || '—';
-      els.litterSize.textContent = litterSize || '—';
-      els.litterOrder.textContent = litterOrder || '—';
-      els.litterComposition.textContent = litterComposition || '—';
+  const birthDate = normalizeDate(pick(calf, ['birthDate','dob','dateOfBirth'], ''));
+  const birthType = pick(calf, ['birthType','deliveryType'], '') ||
+                    pick(birthEvent || {}, ['calvingKind','birthType','deliveryType'], '—');
 
-      if (shouldShowTwinWarning(calf)) {
-        els.twinWarning.hidden = false;
-        els.twinWarning.textContent = 'ملاحظة مهمة: العِجلة مولودة توأم مع عجل ذكر — يوجد احتمال خُنثى';
-      } else {
-        els.twinWarning.hidden = true;
-      }
-    }
+  const litterSize = pick(calf, ['litterSize','birthCount'], '') ||
+                     pick(birthEvent || {}, ['calfCount','litterSize'], '—');
 
+  const litterOrder = pick(calf, ['litterOrder','birthOrder'], '—');
+
+  const litterComposition = pick(calf, ['litterComposition','birthComposition'], '') ||
+                            buildLitterCompositionFromBirthEvent(birthEvent) ||
+                            '—';
+
+  const status = normalizeStatusFromEvents(events);
+
+  els.animalNo.textContent = `رقم العجل: ${number}`;
+  els.currentStatus.textContent = status;
+  els.sex.textContent = sex;
+  els.breed.textContent = breed || '—';
+  els.birthDate.textContent = birthDate || '—';
+  els.birthDate2.textContent = birthDate || '—';
+  els.age.textContent = calcAgeText(birthDate);
+
+  els.damNumber.textContent = pick(calf, ['damNumber','damId','motherNumber','motherId'], '—');
+
+  els.sireNumber.textContent =
+    pick(calf, ['sireNumber','fatherNumber','fatherId','sireId'], '') ||
+    pick(damDoc || {}, ['lastSireNumber','sireNumber','fatherNumber','fatherId','sireId'], '—');
+
+  els.sireName.textContent =
+    pick(calf, ['sireName','fatherName'], '') ||
+    pick(damDoc || {}, ['lastSireName','sireName','fatherName'], '—');
+
+  els.birthType.textContent = birthType || '—';
+  els.litterSize.textContent = litterSize || '—';
+  els.litterOrder.textContent = litterOrder || '—';
+  els.litterComposition.textContent = litterComposition || '—';
+
+  if (shouldShowTwinWarning({
+    ...calf,
+    birthType: birthType,
+    litterComposition: litterComposition
+  })) {
+    els.twinWarning.hidden = false;
+    els.twinWarning.textContent = 'ملاحظة مهمة: العِجلة مولودة توأم مع عجل ذكر — يوجد احتمال خُنثى';
+  } else {
+    els.twinWarning.hidden = true;
+  }
+}
     function renderTimeline(events) {
       els.timeline.innerHTML = '';
       if (!events.length) {
@@ -565,19 +685,24 @@ if (!number) {
         showCardOnly();
         setBar('جارِ تحميل بطاقة العجل...');
 
-        const [calf, events] = await Promise.all([
-          loadCalf(number, userId),
-          loadEvents(number, userId)
-        ]);
+const [calf, events] = await Promise.all([
+  loadCalf(number, userId),
+  loadEvents(number, userId)
+]);
 
-        if (!calf) {
-          setBar('لم يتم العثور على بيانات العجل.', 'error-box');
-          return;
-        }
+if (!calf) {
+  setBar('لم يتم العثور على بيانات العجل.', 'error-box');
+  return;
+}
 
-        fillCalf(calf, events);
-        renderTimeline(events);
-        renderSummary(events);
+const [damDoc, birthEvent] = await Promise.all([
+  loadDamDoc(calf, userId),
+  loadBirthEventForDam(calf, userId)
+]);
+
+fillCalf(calf, events, damDoc, birthEvent);
+renderTimeline(events);
+renderSummary(events);
         hideBar();
 
         try {
