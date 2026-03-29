@@ -67,6 +67,61 @@
     .empty{padding:16px;text-align:center;color:var(--muted);background:var(--soft);border:1px dashed var(--line);border-radius:14px;font-weight:700}
     .sysbar{display:none;margin-bottom:12px}
     .sysbar.show{display:block}
+  .lookup-bar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-bottom:12px;
+  padding:12px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,.04);
+}
+.lookup-input{
+  flex:1;
+  min-width:0;
+  height:44px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:0 12px;
+  font:inherit;
+  background:#fff;
+  color:var(--text);
+}
+.lookup-input:focus{
+  outline:none;
+  border-color:var(--green);
+  box-shadow:0 0 0 3px rgba(14,160,90,.10);
+}
+.lookup-btn{
+  height:44px;
+  border:none;
+  border-radius:12px;
+  padding:0 16px;
+  background:var(--green);
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.lookup-btn:hover{
+  background:var(--green-dark);
+}
+.hidden{
+  display:none !important;
+}
+@media (max-width:560px){
+  .lookup-bar{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .lookup-btn,
+  .lookup-input{
+    width:100%;
+  }
+}
     @media (max-width:560px){
       .page{padding:12px 10px 24px}
       .card{padding:12px;border-radius:18px}
@@ -87,10 +142,14 @@
         <div class="mbk-sub">مُرَبِّيك</div>
       </div>
     </header>
+<div id="statusBar" class="sysbar info-box"></div>
 
-    <div id="statusBar" class="sysbar info-box"></div>
+<div id="lookupBar" class="lookup-bar hidden">
+  <input id="animalNumberInput" class="lookup-input" type="text" inputmode="numeric" placeholder="اكتب رقم العجل" />
+  <button id="openAnimalBtn" class="lookup-btn" type="button">فتح البطاقة</button>
+</div>
 
-    <main class="card">
+<main id="cardMain" class="card hidden">
       <section class="section">
         <h2 class="section-title">البيانات الأساسية</h2>
         <div class="hero">
@@ -151,31 +210,34 @@ import {
   collection, query, where, orderBy, getDocs, limit
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     const $ = (id) => document.getElementById(id);
-    const els = {
-      statusBar: $('statusBar'),
-      animalNo: $('animalNo'),
-      currentStatus: $('currentStatus'),
-      sex: $('sex'),
-      breed: $('breed'),
-      birthDate: $('birthDate'),
-      age: $('age'),
-      damNumber: $('damNumber'),
-      sireNumber: $('sireNumber'),
-      sireName: $('sireName'),
-      birthDate2: $('birthDate2'),
-      birthType: $('birthType'),
-      litterSize: $('litterSize'),
-      litterOrder: $('litterOrder'),
-      litterComposition: $('litterComposition'),
-      twinWarning: $('twinWarning'),
-      timelineEmpty: $('timelineEmpty'),
-      timelineWrap: $('timelineWrap'),
-      timeline: $('timeline'),
-      summaryEmpty: $('summaryEmpty'),
-      summaryTable: $('summaryTable'),
-      summaryBody: $('summaryBody')
-    };
-
+  const els = {
+  statusBar: $('statusBar'),
+  lookupBar: $('lookupBar'),
+  animalNumberInput: $('animalNumberInput'),
+  openAnimalBtn: $('openAnimalBtn'),
+  cardMain: $('cardMain'),
+  animalNo: $('animalNo'),
+  currentStatus: $('currentStatus'),
+  sex: $('sex'),
+  breed: $('breed'),
+  birthDate: $('birthDate'),
+  age: $('age'),
+  damNumber: $('damNumber'),
+  sireNumber: $('sireNumber'),
+  sireName: $('sireName'),
+  birthDate2: $('birthDate2'),
+  birthType: $('birthType'),
+  litterSize: $('litterSize'),
+  litterOrder: $('litterOrder'),
+  litterComposition: $('litterComposition'),
+  twinWarning: $('twinWarning'),
+  timelineEmpty: $('timelineEmpty'),
+  timelineWrap: $('timelineWrap'),
+  timeline: $('timeline'),
+  summaryEmpty: $('summaryEmpty'),
+  summaryTable: $('summaryTable'),
+  summaryBody: $('summaryBody')
+};
     function setBar(message, cls = 'info-box') {
       els.statusBar.className = `sysbar show ${cls}`;
       els.statusBar.textContent = message;
@@ -185,11 +247,34 @@ import {
       els.statusBar.className = 'sysbar';
       els.statusBar.textContent = '';
     }
+    function showLookupOnly(message = '') {
+  els.lookupBar.classList.remove('hidden');
+  els.cardMain.classList.add('hidden');
+  if (message) setBar(message, 'info-box');
+  else hideBar();
+}
 
+function showCardOnly() {
+  els.lookupBar.classList.add('hidden');
+  els.cardMain.classList.remove('hidden');
+}
+
+function openCardByInput() {
+  const num = String(els.animalNumberInput?.value || '').trim();
+  if (!num) {
+    setBar('اكتب رقم العجل أولاً.', 'error-box');
+    els.animalNumberInput?.focus();
+    return;
+  }
+  location.href = `calf-card.html?number=${encodeURIComponent(num)}`;
+}
     function qp(name) {
       return new URL(location.href).searchParams.get(name);
     }
-
+   els.openAnimalBtn?.addEventListener('click', openCardByInput);
+els.animalNumberInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') openCardByInput();
+});
     function escapeHtml(v) {
       return String(v ?? '').replace(/[&<>\"']/g, (m) => ({
         '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -461,18 +546,18 @@ import {
 
     async function main() {
       try {
-        const number = qp('number') || qp('animalNumber') || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
+       const number = qp('number') || qp('animalNumber') || '';
         const userId = window.__tenant?.userId || localStorage.getItem('userId') || localStorage.getItem('ownerUid') || '';
 
-        if (!number) {
-          setBar('لم يتم تحديد رقم العجل.', 'error-box');
-          return;
-        }
+if (!number) {
+  showLookupOnly('اكتب رقم العجل لفتح البطاقة.');
+  return;
+}
         if (!userId) {
           setBar('تعذر تحديد المستخدم الحالي.', 'error-box');
           return;
         }
-
+        showCardOnly();
         setBar('جارِ تحميل بطاقة العجل...');
 
         const [calf, events] = await Promise.all([
