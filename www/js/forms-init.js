@@ -1562,7 +1562,6 @@ if (eventName === "إزالة الحلمات الزائدة") {
 
     okNums.push(one);
 
-    // في الفردي فقط خزّن الوثيقة في الفورم
     if (!looksBulkEvent) {
       applyAnimalToForm(form, animal);
     }
