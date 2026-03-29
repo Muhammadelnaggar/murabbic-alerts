@@ -4,7 +4,15 @@
 // ✅ يجمع [data-field] ويُظهر رسائل في infobar أعلى النموذج
 // ✅ عند النجاح يطلق "mbk:valid" ويحمل البيانات في detail.formData
 
-import { validateEvent, uniqueAnimalNumber, thresholds, uniqueCalfNumbers, guards, recentHeatCheck } from "./form-rules.js";
+import {
+  validateEvent,
+  uniqueAnimalNumber,
+  thresholds,
+  uniqueCalfNumbers,
+  guards,
+  recentHeatCheck,
+  previewSupernumeraryTeatRemovalList
+} from "./form-rules.js";
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
@@ -1455,7 +1463,70 @@ if (eventName === "استبعاد") {
   lockForm(false);
   return true;
 } 
- // ✅ Weaning: Gate فقط — لا تعمل validateEvent قبل الحفظ
+if (eventName === "إزالة الحلمات الزائدة") {
+  const uid = await getUid();
+  if (!uid) {
+    showMsg(bar, "سجّل الدخول أولًا.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  const parsedNums = [...new Set(
+    (_latin(rawN).match(/\d+/g) || [])
+      .map(x => x.replace(/\D/g, ""))
+      .filter(Boolean)
+  )];
+
+  const looksBulkEvent = (parsedNums.length > 1) || /[,\s;\n،]/.test(rawN);
+
+  showMsg(bar, "جارِ التحقق من الأرقام…", "info");
+  lockForm(true);
+
+  const result = await previewSupernumeraryTeatRemovalList(uid, parsedNums);
+  const okNums = result.valid || [];
+  const bad = result.rejected || [];
+
+  const numEl = getFieldEl(form, "animalNumber");
+  if (numEl && looksBulkEvent) {
+    numEl.value = okNums.join(",");
+  }
+
+  if (!okNums.length) {
+    const preview = bad
+      .slice(0, 5)
+      .map(x => `${x.number}: ${x.reason}`)
+      .join(" — ");
+
+    showMsg(
+      bar,
+      `❌ لا يوجد أي رقم مؤهل لتسجيل إزالة الحلمات الزائدة. ${preview}${bad.length > 5 ? " …" : ""}`,
+      "error"
+    );
+    lockForm(true);
+    return false;
+  }
+
+  try {
+    form.dataset.mbkSupernumeraryExcluded = JSON.stringify(bad);
+  } catch(_) {}
+
+  if (looksBulkEvent) {
+    const badMsg = bad.length
+      ? ` تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x => `${x.number} (${String(x.reason).replace(/^❌\s*/, "")})`).join("، ")}${bad.length > 3 ? "…" : ""}`
+      : "";
+
+    showMsg(
+      bar,
+      `✅ تم التحقق — جاهز لتسجيل إزالة الحلمات الزائدة لعدد ${okNums.length}.${badMsg}`,
+      "success"
+    );
+  } else {
+    showMsg(bar, "✅ تم التحقق — الحيوان مؤهل لتسجيل إزالة الحلمات الزائدة.", "success");
+  }
+
+  lockForm(false);
+  return true;
+}
 if (eventName === "فطام") {
   bar.style.display = "none";
   lockForm(false);
@@ -1502,7 +1573,21 @@ if (eventName === "فطام") {
       );
       return true;
     }
+    if (eventName === "إزالة الحلمات الزائدة" && nums2.length > 1) {
+  const formData2 = collectFormData(form);
+  const bulkEvents = nums2.map(nn => Object.assign({}, formData2, { animalNumber: nn }));
+  const excludedRaw = form?.dataset?.mbkSupernumeraryExcluded
+    ? (()=>{ try{return JSON.parse(form.dataset.mbkSupernumeraryExcluded)}catch{return []} })()
+    : [];
 
+  form.dispatchEvent(
+    new CustomEvent("mbk:valid", {
+      bubbles: true,
+      detail: { formData: formData2, eventName, form, bulk: true, bulkEvents, excluded: excludedRaw }
+    })
+  );
+  return true;
+}
     form.dispatchEvent(
       new CustomEvent("mbk:valid", {
         bubbles: true,
