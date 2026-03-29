@@ -377,21 +377,26 @@ els.animalNumberInput?.addEventListener('keydown', (e) => {
       return sex === 'أنثى' && birthType === 'توأم' && /أنثى\s*\+\s*ذكر|ذكر\s*\+\s*أنثى/.test(composition);
     }
 
-    async function getOwnerFieldQueries(number, userId) {
-      const nNum = Number(number);
-      const canUseNumber = !Number.isNaN(nNum);
-      const ownerFields = ['userId','ownerUid'];
-      const numberFields = canUseNumber ? [nNum, String(number)] : [String(number)];
-      const queries = [];
-      for (const ownerField of ownerFields) {
-        for (const num of numberFields) {
-       queries.push(query(collection(db, 'calves'), where(ownerField, '==', userId), where('animalNumber', '==', num), limit(1)));
-       queries.push(query(collection(db, 'calves'), where(ownerField, '==', userId), where('number', '==', num), limit(1)));
-        }
-      }
-      return queries;
-    }
+async function getOwnerFieldQueries(number, userId) {
+  const nNum = Number(number);
+  const canUseNumber = !Number.isNaN(nNum);
+  const ownerFields = ['userId', 'ownerUid'];
+  const numberFields = canUseNumber ? [String(number), nNum] : [String(number)];
+  const queries = [];
 
+  for (const ownerField of ownerFields) {
+    for (const num of numberFields) {
+      queries.push(
+        query(collection(db, 'calves'),
+          where(ownerField, '==', userId),
+          where('calfNumber', '==', num),
+          limit(1)
+        )
+      );
+    }
+  }
+  return queries;
+}
     async function loadCalf(number, userId) {
       const qs = await getOwnerFieldQueries(number, userId);
       for (const qx of qs) {
@@ -450,7 +455,7 @@ els.animalNumberInput?.addEventListener('keydown', (e) => {
     }
 
     function fillCalf(calf, events) {
-      const number = pick(calf, ['animalNumber','number','calfNumber'], '—');
+     const number = pick(calf, ['calfNumber','animalNumber','number'], '—');
       const sex = normalizeSex(pick(calf, ['sex','gender','type'], '—')) || '—';
       const breed = pick(calf, ['breed','breedName','speciesBreed'], '—');
       const birthDate = normalizeDate(pick(calf, ['birthDate','dob','dateOfBirth'], ''));
@@ -467,7 +472,7 @@ els.animalNumberInput?.addEventListener('keydown', (e) => {
       els.birthDate.textContent = birthDate || '—';
       els.birthDate2.textContent = birthDate || '—';
       els.age.textContent = calcAgeText(birthDate);
-     els.damNumber.textContent = pick(calf, ['damNumber','motherNumber','motherId','damId'], '—');
+    els.damNumber.textContent = pick(calf, ['damNumber','damId','motherNumber','motherId'], '—');
       els.sireNumber.textContent = pick(calf, ['sireNumber','fatherNumber','fatherId'], '—');
       els.sireName.textContent = pick(calf, ['sireName','fatherName'], '—');
       els.birthType.textContent = birthType || '—';
