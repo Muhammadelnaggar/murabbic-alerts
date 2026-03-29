@@ -1493,25 +1493,23 @@ if (eventName === "إزالة الحلمات الزائدة") {
   showMsg(bar, "جارِ التحقق من الأرقام…", "info");
   lockForm(true);
 
-  // ===== فردي =====
-  if (!looksBulkEvent && parsedNums.length === 1) {
-    const one = parsedNums[0];
+  const okNums = [];
+  const bad = [];
+
+  for (const one of parsedNums) {
     const animal = await fetchAnimalByNumberForUser(uid, one);
 
     if (!animal) {
-      showMsg(bar, "❌ الرقم غير موجود في الحيوانات أو العجول داخل حسابك.", "error");
-      lockForm(true);
-      return false;
+      bad.push({ number: one, reason: "❌ الرقم غير موجود في الحيوانات أو العجول داخل حسابك." });
+      continue;
     }
 
     const doc = animal.data || {};
-    applyAnimalToForm(form, animal);
 
     const st = String(doc.status ?? "").trim().toLowerCase();
     if (st === "inactive") {
-      showMsg(bar, "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له.", "error");
-      lockForm(true);
-      return false;
+      bad.push({ number: one, reason: "❌ الحيوان خارج القطيع (بيع/نفوق/استبعاد)." });
+      continue;
     }
 
     const sexVals = [
@@ -1519,7 +1517,9 @@ if (eventName === "إزالة الحلمات الزائدة") {
       doc.gender,
       doc.animalSex,
       doc.typeSex,
-      doc.sextype
+      doc.sextype,
+      doc.sexAr,
+      doc.genderAr
     ].map(v => String(v || "").trim().toLowerCase());
 
     const isFemale = sexVals.some(v =>
@@ -1530,9 +1530,8 @@ if (eventName === "إزالة الحلمات الزائدة") {
     );
 
     if (!isFemale) {
-      showMsg(bar, "❌ لا يمكن تسجيل إزالة الحلمات الزائدة لأن الحيوان ليس أنثى.", "error");
-      lockForm(true);
-      return false;
+      bad.push({ number: one, reason: "❌ الحيوان ليس أنثى." });
+      continue;
     }
 
     let duplicated = false;
@@ -1552,26 +1551,22 @@ if (eventName === "إزالة الحلمات الزائدة") {
         }
       });
     } catch (_) {
-      showMsg(bar, "⚠️ تعذّر التحقق من تكرار الحدث الآن. أعد المحاولة.", "error");
-      lockForm(true);
-      return false;
+      bad.push({ number: one, reason: "⚠️ تعذّر التحقق من تكرار الحدث الآن." });
+      continue;
     }
 
     if (duplicated) {
-      showMsg(bar, "❌ تم تسجيل إزالة الحلمات الزائدة مسبقًا لهذا الرقم.", "error");
-      lockForm(true);
-      return false;
+      bad.push({ number: one, reason: "❌ تم تسجيل إزالة الحلمات الزائدة مسبقًا لهذا الرقم." });
+      continue;
     }
 
-    showMsg(bar, "✅ تم التحقق — الحيوان مؤهل لتسجيل إزالة الحلمات الزائدة.", "success");
-    lockForm(false);
-    return true;
-  }
+    okNums.push(one);
 
-  // ===== جماعي =====
-  const result = await previewSupernumeraryTeatRemovalList(uid, parsedNums);
-  const okNums = result.valid || [];
-  const bad = result.rejected || [];
+    // في الفردي فقط خزّن الوثيقة في الفورم
+    if (!looksBulkEvent) {
+      applyAnimalToForm(form, animal);
+    }
+  }
 
   const numEl = getFieldEl(form, "animalNumber");
   if (numEl && looksBulkEvent) {
@@ -1579,16 +1574,21 @@ if (eventName === "إزالة الحلمات الزائدة") {
   }
 
   if (!okNums.length) {
-    const preview = bad
-      .slice(0, 5)
-      .map(x => `${x.number}: ${x.reason}`)
-      .join(" — ");
+    if (!looksBulkEvent && bad.length === 1) {
+      showMsg(bar, bad[0].reason, "error");
+    } else {
+      const preview = bad
+        .slice(0, 5)
+        .map(x => `${x.number}: ${x.reason}`)
+        .join(" — ");
 
-    showMsg(
-      bar,
-      `❌ لا يوجد أي رقم مؤهل لتسجيل إزالة الحلمات الزائدة. ${preview}${bad.length > 5 ? " …" : ""}`,
-      "error"
-    );
+      showMsg(
+        bar,
+        `❌ لا يوجد أي رقم مؤهل لتسجيل إزالة الحلمات الزائدة. ${preview}${bad.length > 5 ? " …" : ""}`,
+        "error"
+      );
+    }
+
     lockForm(true);
     return false;
   }
@@ -1597,15 +1597,19 @@ if (eventName === "إزالة الحلمات الزائدة") {
     form.dataset.mbkSupernumeraryExcluded = JSON.stringify(bad);
   } catch(_) {}
 
-  const badMsg = bad.length
-    ? ` تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x => `${x.number} (${String(x.reason).replace(/^❌\s*/, "")})`).join("، ")}${bad.length > 3 ? "…" : ""}`
-    : "";
+  if (looksBulkEvent) {
+    const badMsg = bad.length
+      ? ` تم استبعاد ${bad.length}: ${bad.slice(0,3).map(x => `${x.number} (${String(x.reason).replace(/^❌\s*/, "")})`).join("، ")}${bad.length > 3 ? "…" : ""}`
+      : "";
 
-  showMsg(
-    bar,
-    `✅ تم التحقق — جاهز لتسجيل إزالة الحلمات الزائدة لعدد ${okNums.length}.${badMsg}`,
-    "success"
-  );
+    showMsg(
+      bar,
+      `✅ تم التحقق — جاهز لتسجيل إزالة الحلمات الزائدة لعدد ${okNums.length}.${badMsg}`,
+      "success"
+    );
+  } else {
+    showMsg(bar, "✅ تم التحقق — الحيوان مؤهل لتسجيل إزالة الحلمات الزائدة.", "success");
+  }
 
   lockForm(false);
   return true;
