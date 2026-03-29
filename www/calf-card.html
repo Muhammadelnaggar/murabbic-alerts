@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>بطاقة العجل — مُرَبِّيك</title>
+  <link rel="stylesheet" href="css/forms.css" />
+  <script>window.dataLayer = window.dataLayer || [];</script>
+  <script src="js/app-core.js"></script>
+  <script type="module" src="js/timeline.js"></script>
+  <script type="module" src="js/smart-checks.js"></script>
+  <script src="js/tenant-bootstrap.js"></script>
+  <script src="js/api.js"></script>
+  <style>
+    :root{
+      --green:#0ea05a;
+      --green-dark:#0b7f47;
+      --bg:#f6fbf7;
+      --card:#ffffff;
+      --text:#102217;
+      --muted:#6b7280;
+      --line:#dbe7df;
+      --soft:#eef7f0;
+      --warn-bg:#fff8e6;
+      --warn-bd:#f2d58a;
+      --warn-tx:#7a5200;
+      --danger-bg:#fff1f2;
+      --danger-bd:#fecdd3;
+      --danger-tx:#9f1239;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Cairo","Tahoma","Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    .page{width:min(100%,780px);margin:0 auto;padding:14px 12px 28px}
+    .mbk-head{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+    .mbk-logo{width:42px;height:42px;object-fit:contain;opacity:.85}
+    .mbk-head-text{flex:1;min-width:0}
+    .mbk-title{margin:0;font-size:20px;font-weight:800;color:var(--green-dark)}
+    .mbk-sub{margin-top:2px;font-size:13px;color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,.05)}
+    .section{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff}
+    .section + .section{margin-top:12px}
+    .section-title{margin:0 0 12px;font-size:16px;font-weight:800;color:var(--green-dark)}
+    .hero{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+    .animal-no{font-size:28px;font-weight:900;color:var(--green-dark);line-height:1.1}
+    .status-badge{display:inline-flex;align-items:center;justify-content:center;min-width:88px;padding:9px 14px;border-radius:999px;background:var(--green);color:#fff;font-size:14px;font-weight:800;white-space:nowrap}
+    .info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .info-item{background:var(--soft);border:1px solid #e2eee6;border-radius:14px;padding:10px 12px;min-height:62px}
+    .info-label{font-size:12px;color:var(--muted);margin-bottom:5px}
+    .info-value{font-size:15px;font-weight:800;color:var(--text);line-height:1.4;word-break:break-word}
+    .warning-box,.info-box,.error-box{margin-top:12px;border-radius:14px;padding:12px 14px;font-size:14px;font-weight:800;line-height:1.7}
+    .warning-box{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn-tx)}
+    .info-box{background:var(--soft);border:1px solid var(--line);color:var(--green-dark)}
+    .error-box{background:var(--danger-bg);border:1px solid var(--danger-bd);color:var(--danger-tx)}
+    .timeline-wrap{overflow-x:auto;padding-bottom:4px}
+    .timeline{position:relative;display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;min-width:620px;padding:16px 6px 4px}
+    .timeline::before{content:"";position:absolute;top:27px;right:12px;left:12px;height:3px;background:#d7e7dc;border-radius:999px}
+    .timeline-item{position:relative;z-index:1;flex:0 0 100px;min-width:100px;text-align:center}
+    .timeline-dot{width:18px;height:18px;border-radius:50%;background:var(--green);border:4px solid #dff3e6;margin:0 auto 10px;cursor:pointer;position:relative;appearance:none;-webkit-appearance:none}
+    .timeline-date{font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:700}
+    .timeline-name{font-size:13px;font-weight:800;line-height:1.4}
+    .tooltip{position:absolute;bottom:130%;right:50%;transform:translateX(50%);min-width:170px;max-width:220px;background:#112117;color:#fff;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.7;text-align:right;box-shadow:0 10px 24px rgba(0,0,0,.18);opacity:0;visibility:hidden;pointer-events:none;transition:.18s ease}
+    .tooltip::after{content:"";position:absolute;top:100%;right:50%;transform:translateX(50%);border:7px solid transparent;border-top-color:#112117}
+    .timeline-dot:hover .tooltip,.timeline-dot:focus .tooltip,.timeline-dot.active .tooltip{opacity:1;visibility:visible}
+    .summary-table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:16px;border:1px solid var(--line)}
+    .summary-table th,.summary-table td{padding:11px 10px;text-align:right;border-bottom:1px solid #edf2ee;vertical-align:top;font-size:14px}
+    .summary-table thead th{background:var(--soft);color:var(--green-dark);font-weight:800;white-space:nowrap}
+    .summary-table tbody tr:last-child td{border-bottom:none}
+    .empty{padding:16px;text-align:center;color:var(--muted);background:var(--soft);border:1px dashed var(--line);border-radius:14px;font-weight:700}
+    .sysbar{display:none;margin-bottom:12px}
+    .sysbar.show{display:block}
+    @media (max-width:560px){
+      .page{padding:12px 10px 24px}
+      .card{padding:12px;border-radius:18px}
+      .section{padding:12px;border-radius:16px}
+      .hero{grid-template-columns:1fr}
+      .info-grid{grid-template-columns:1fr 1fr;gap:8px}
+      .animal-no{font-size:25px}
+      .summary-table th,.summary-table td{font-size:13px;padding:10px 8px}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="mbk-head">
+      <img class="mbk-logo" src="images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-head-text">
+        <h1 class="mbk-title">بطاقة العجل</h1>
+        <div class="mbk-sub">مُرَبِّيك</div>
+      </div>
+    </header>
+
+    <div id="statusBar" class="sysbar info-box"></div>
+
+    <main class="card">
+      <section class="section">
+        <h2 class="section-title">البيانات الأساسية</h2>
+        <div class="hero">
+          <div id="animalNo" class="animal-no">رقم العجل: —</div>
+          <div id="currentStatus" class="status-badge">—</div>
+        </div>
+        <div class="info-grid" style="margin-top:12px;">
+          <div class="info-item"><div class="info-label">النوع</div><div id="sex" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">السلالة</div><div id="breed" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">تاريخ الميلاد</div><div id="birthDate" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">العمر</div><div id="age" class="info-value">—</div></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">التنسيب والولادة</h2>
+        <div class="info-grid">
+          <div class="info-item"><div class="info-label">رقم الأم</div><div id="damNumber" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">رقم الأب</div><div id="sireNumber" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">اسم الأب</div><div id="sireName" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">تاريخ الميلاد</div><div id="birthDate2" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">حالة الولادة</div><div id="birthType" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">عدد المواليد</div><div id="litterSize" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">ترتيب العجل</div><div id="litterOrder" class="info-value">—</div></div>
+          <div class="info-item"><div class="info-label">تركيب الولادة</div><div id="litterComposition" class="info-value">—</div></div>
+        </div>
+        <div id="twinWarning" class="warning-box" hidden></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">الخط الزمني</h2>
+        <div id="timelineEmpty" class="empty">لا توجد أحداث مسجلة بعد</div>
+        <div id="timelineWrap" class="timeline-wrap" hidden>
+          <div id="timeline" class="timeline"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">ملخص الأحداث</h2>
+        <div id="summaryEmpty" class="empty">لا توجد أحداث متاحة</div>
+        <table id="summaryTable" class="summary-table" hidden>
+          <thead>
+            <tr>
+              <th>الحدث</th>
+              <th>التاريخ</th>
+              <th>ملاحظات</th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import firebaseConfig from './js/firebase-config.js';
+    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getFirestore, collection, query, where, orderBy, getDocs, limit
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db = getFirestore(app, 'murabbikdata');
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      statusBar: $('statusBar'),
+      animalNo: $('animalNo'),
+      currentStatus: $('currentStatus'),
+      sex: $('sex'),
+      breed: $('breed'),
+      birthDate: $('birthDate'),
+      age: $('age'),
+      damNumber: $('damNumber'),
+      sireNumber: $('sireNumber'),
+      sireName: $('sireName'),
+      birthDate2: $('birthDate2'),
+      birthType: $('birthType'),
+      litterSize: $('litterSize'),
+      litterOrder: $('litterOrder'),
+      litterComposition: $('litterComposition'),
+      twinWarning: $('twinWarning'),
+      timelineEmpty: $('timelineEmpty'),
+      timelineWrap: $('timelineWrap'),
+      timeline: $('timeline'),
+      summaryEmpty: $('summaryEmpty'),
+      summaryTable: $('summaryTable'),
+      summaryBody: $('summaryBody')
+    };
+
+    function setBar(message, cls = 'info-box') {
+      els.statusBar.className = `sysbar show ${cls}`;
+      els.statusBar.textContent = message;
+    }
+
+    function hideBar() {
+      els.statusBar.className = 'sysbar';
+      els.statusBar.textContent = '';
+    }
+
+    function qp(name) {
+      return new URL(location.href).searchParams.get(name);
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? '').replace(/[&<>\"']/g, (m) => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      }[m]));
+    }
+
+    function pick(obj, keys, fallback = '') {
+      for (const k of keys) {
+        const v = obj?.[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+      return fallback;
+    }
+
+    function normalizeDate(value) {
+      if (!value) return '';
+      if (typeof value === 'string') {
+        const s = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const d = new Date(s);
+        if (!isNaN(d)) return d.toISOString().slice(0,10);
+        return s;
+      }
+      if (value?.toDate) return value.toDate().toISOString().slice(0,10);
+      if (value instanceof Date && !isNaN(value)) return value.toISOString().slice(0,10);
+      return '';
+    }
+
+    function daysBetween(a, b) {
+      const ms = 24 * 60 * 60 * 1000;
+      const da = new Date(a + 'T00:00:00');
+      const db = new Date(b + 'T00:00:00');
+      return Math.max(0, Math.floor((db - da) / ms));
+    }
+
+    function calcAgeText(birthDate) {
+      if (!birthDate) return '—';
+      const today = new Date().toISOString().slice(0,10);
+      const days = daysBetween(birthDate, today);
+      if (days < 30) return `${days} يوم`;
+      const months = Math.floor(days / 30);
+      const rem = days % 30;
+      if (months < 12) return rem >= 15 ? `${months}.5 شهر` : `${months} شهر`;
+      const years = Math.floor(months / 12);
+      const remMonths = months % 12;
+      return remMonths ? `${years} سنة و${remMonths} شهر` : `${years} سنة`;
+    }
+
+    function normalizeSex(v) {
+      const s = String(v || '').trim();
+      if (!s) return '';
+      if (['انثى','أنثى','female','f'].includes(s.toLowerCase())) return 'أنثى';
+      if (['ذكر','male','m'].includes(s.toLowerCase())) return 'ذكر';
+      return s;
+    }
+
+    function normalizeStatusFromEvents(events) {
+      const names = events.map(ev => eventDisplayName(ev).trim());
+      if (names.some(n => n === 'نامي')) return 'نامي';
+      if (names.some(n => n === 'فطام')) return 'فطام';
+      return 'رضيع';
+    }
+
+    function eventDisplayName(ev) {
+      const raw = pick(ev, ['eventType','type','name','title'], '');
+      const s = String(raw).trim().toLowerCase();
+      const mapping = {
+        'رضاعة':'رضاعة',
+        'feeding':'رضاعة',
+        'milk feeding':'رضاعة',
+        'colostrum':'رضاعة',
+        'فطام':'فطام',
+        'weaning':'فطام',
+        'إزالة حلمات زائدة':'إزالة حلمات زائدة',
+        'ازالة حلمات زائدة':'إزالة حلمات زائدة',
+        'extra teats':'إزالة حلمات زائدة',
+        'supernumerary teats':'إزالة حلمات زائدة',
+        'تحصين':'تحصين',
+        'vaccination':'تحصين',
+        'حالة صحية':'حالة صحية',
+        'مرض':'حالة صحية',
+        'disease':'حالة صحية',
+        'health':'حالة صحية',
+        'نامي':'نامي',
+        'growing':'نامي'
+      };
+      if (mapping[raw]) return mapping[raw];
+      if (mapping[s]) return mapping[s];
+      return String(raw || 'حدث').trim();
+    }
+
+    function eventNote(ev) {
+      return pick(ev, ['notes','note','details','description','summary','comment'], '—');
+    }
+
+    function shouldShowTwinWarning(calf) {
+      const sex = normalizeSex(pick(calf, ['sex','gender','type'], ''));
+      const birthType = String(pick(calf, ['birthType','deliveryType'], '')).trim();
+      const composition = String(pick(calf, ['litterComposition','birthComposition'], '')).trim();
+      return sex === 'أنثى' && birthType === 'توأم' && /أنثى\s*\+\s*ذكر|ذكر\s*\+\s*أنثى/.test(composition);
+    }
+
+    async function getOwnerFieldQueries(number, userId) {
+      const nNum = Number(number);
+      const canUseNumber = !Number.isNaN(nNum);
+      const ownerFields = ['userId','ownerUid'];
+      const numberFields = canUseNumber ? [nNum, String(number)] : [String(number)];
+      const queries = [];
+      for (const ownerField of ownerFields) {
+        for (const num of numberFields) {
+          queries.push(query(collection(db, 'animals'), where(ownerField, '==', userId), where('animalNumber', '==', num), limit(1)));
+          queries.push(query(collection(db, 'animals'), where(ownerField, '==', userId), where('number', '==', num), limit(1)));
+        }
+      }
+      return queries;
+    }
+
+    async function loadCalf(number, userId) {
+      const qs = await getOwnerFieldQueries(number, userId);
+      for (const qx of qs) {
+        const snap = await getDocs(qx);
+        if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+      }
+      return null;
+    }
+
+    async function loadEvents(number, userId) {
+      const ownerFields = ['userId','ownerUid'];
+      const numberValues = [];
+      const nNum = Number(number);
+      if (!Number.isNaN(nNum)) numberValues.push(nNum);
+      numberValues.push(String(number));
+      const all = [];
+      const seen = new Set();
+
+      for (const ownerField of ownerFields) {
+        for (const nVal of numberValues) {
+          for (const field of ['animalNumber','number']) {
+            try {
+              const qx = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal), orderBy('eventDate', 'asc'));
+              const snap = await getDocs(qx);
+              snap.forEach(doc => {
+                if (seen.has(doc.id)) return;
+                const row = { id: doc.id, ...doc.data() };
+                const disp = eventDisplayName(row);
+                if (!['رضاعة','فطام','إزالة حلمات زائدة','تحصين','حالة صحية','نامي'].includes(disp)) return;
+                seen.add(doc.id);
+                all.push(row);
+              });
+            } catch (_) {
+              // ignore index/order issues; will sort in-memory later if needed
+              try {
+                const qy = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal));
+                const snap2 = await getDocs(qy);
+                snap2.forEach(doc => {
+                  if (seen.has(doc.id)) return;
+                  const row = { id: doc.id, ...doc.data() };
+                  const disp = eventDisplayName(row);
+                  if (!['رضاعة','فطام','إزالة حلمات زائدة','تحصين','حالة صحية','نامي'].includes(disp)) return;
+                  seen.add(doc.id);
+                  all.push(row);
+                });
+              } catch (e2) {
+                console.warn('events query failed', e2);
+              }
+            }
+          }
+        }
+      }
+
+      all.sort((a,b) => normalizeDate(pick(a,['eventDate','date','createdAt'])) < normalizeDate(pick(b,['eventDate','date','createdAt'])) ? -1 : 1);
+      return all;
+    }
+
+    function fillCalf(calf, events) {
+      const number = pick(calf, ['animalNumber','number'], '—');
+      const sex = normalizeSex(pick(calf, ['sex','gender','type'], '—')) || '—';
+      const breed = pick(calf, ['breed','breedName','speciesBreed'], '—');
+      const birthDate = normalizeDate(pick(calf, ['birthDate','dob','dateOfBirth'], ''));
+      const birthType = pick(calf, ['birthType','deliveryType'], '—');
+      const litterSize = pick(calf, ['litterSize','birthCount'], '—');
+      const litterOrder = pick(calf, ['litterOrder','birthOrder'], '—');
+      const litterComposition = pick(calf, ['litterComposition','birthComposition'], '—');
+      const status = normalizeStatusFromEvents(events);
+
+      els.animalNo.textContent = `رقم العجل: ${number}`;
+      els.currentStatus.textContent = status;
+      els.sex.textContent = sex;
+      els.breed.textContent = breed;
+      els.birthDate.textContent = birthDate || '—';
+      els.birthDate2.textContent = birthDate || '—';
+      els.age.textContent = calcAgeText(birthDate);
+      els.damNumber.textContent = pick(calf, ['damNumber','motherNumber','motherId'], '—');
+      els.sireNumber.textContent = pick(calf, ['sireNumber','fatherNumber','fatherId'], '—');
+      els.sireName.textContent = pick(calf, ['sireName','fatherName'], '—');
+      els.birthType.textContent = birthType || '—';
+      els.litterSize.textContent = litterSize || '—';
+      els.litterOrder.textContent = litterOrder || '—';
+      els.litterComposition.textContent = litterComposition || '—';
+
+      if (shouldShowTwinWarning(calf)) {
+        els.twinWarning.hidden = false;
+        els.twinWarning.textContent = 'ملاحظة مهمة: العِجلة مولودة توأم مع عجل ذكر — يوجد احتمال خُنثى';
+      } else {
+        els.twinWarning.hidden = true;
+      }
+    }
+
+    function renderTimeline(events) {
+      els.timeline.innerHTML = '';
+      if (!events.length) {
+        els.timelineWrap.hidden = true;
+        els.timelineEmpty.hidden = false;
+        return;
+      }
+      els.timelineWrap.hidden = false;
+      els.timelineEmpty.hidden = true;
+
+      events.forEach(ev => {
+        const name = eventDisplayName(ev);
+        const date = normalizeDate(pick(ev, ['eventDate','date','createdAt'], '')) || '—';
+        const note = eventNote(ev);
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+        item.innerHTML = `
+          <button type="button" class="timeline-dot">
+            <span class="tooltip">
+              <strong>الحدث:</strong> ${escapeHtml(name)}<br>
+              <strong>التاريخ:</strong> ${escapeHtml(date)}<br>
+              <strong>ملاحظات:</strong> ${escapeHtml(note)}
+            </span>
+          </button>
+          <div class="timeline-date">${escapeHtml(date)}</div>
+          <div class="timeline-name">${escapeHtml(name)}</div>
+        `;
+        els.timeline.appendChild(item);
+      });
+
+      els.timeline.querySelectorAll('.timeline-dot').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const active = btn.classList.contains('active');
+          els.timeline.querySelectorAll('.timeline-dot.active').forEach(x => x.classList.remove('active'));
+          if (!active) btn.classList.add('active');
+          e.stopPropagation();
+        });
+      });
+    }
+
+    function renderSummary(events) {
+      els.summaryBody.innerHTML = '';
+      if (!events.length) {
+        els.summaryTable.hidden = true;
+        els.summaryEmpty.hidden = false;
+        return;
+      }
+      els.summaryTable.hidden = false;
+      els.summaryEmpty.hidden = true;
+
+      events.slice().reverse().forEach(ev => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(eventDisplayName(ev))}</td>
+          <td>${escapeHtml(normalizeDate(pick(ev, ['eventDate','date','createdAt'], '')) || '—')}</td>
+          <td>${escapeHtml(eventNote(ev))}</td>
+        `;
+        els.summaryBody.appendChild(tr);
+      });
+    }
+
+    async function main() {
+      try {
+        const number = qp('number') || qp('animalNumber') || localStorage.getItem('currentAnimalNumber') || localStorage.getItem('lastAnimalNumber') || '';
+        const userId = window.__tenant?.userId || localStorage.getItem('userId') || localStorage.getItem('ownerUid') || '';
+
+        if (!number) {
+          setBar('لم يتم تحديد رقم العجل.', 'error-box');
+          return;
+        }
+        if (!userId) {
+          setBar('تعذر تحديد المستخدم الحالي.', 'error-box');
+          return;
+        }
+
+        setBar('جارِ تحميل بطاقة العجل...');
+
+        const [calf, events] = await Promise.all([
+          loadCalf(number, userId),
+          loadEvents(number, userId)
+        ]);
+
+        if (!calf) {
+          setBar('لم يتم العثور على بيانات العجل.', 'error-box');
+          return;
+        }
+
+        fillCalf(calf, events);
+        renderTimeline(events);
+        renderSummary(events);
+        hideBar();
+
+        try {
+          window.dataLayer.push({ event:'page_view', page:'calf-card', animalNumber:String(number) });
+        } catch (_) {}
+      } catch (err) {
+        console.error(err);
+        setBar('حدث خطأ أثناء تحميل بطاقة العجل.', 'error-box');
+      }
+    }
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.timeline-dot.active').forEach(x => x.classList.remove('active'));
+    });
+
+    main();
+  </script>
+</body>
+</html>
