@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="supernumerary-teat-removal">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>إزالة الحلمات الزائدة — مُرَبِّيك</title>
+
+  <link rel="stylesheet" href="css/forms.css" />
+  <script type="module" src="js/forms-init.js"></script>
+</head>
+<body>
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-title">إزالة الحلمات الزائدة</div>
+        <div class="mbk-subtitle">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
+    </div>
+  </header>
+
+  <div id="sysbar" class="infobar mbk-infobar" style="display:none"></div>
+
+  <main class="mbk-main">
+    <form id="stForm"
+          class="mbk-form"
+          data-event="supernumerary_teat_removal"
+          novalidate>
+
+      <section class="card">
+        <div class="field">
+          <label for="animalNumber">رقم الحيوان</label>
+          <input
+            id="animalNumber"
+            name="animalNumber"
+            data-field="animalNumber"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="مثال: 203 أو 203،204،205"
+          />
+          <small class="hint">يمكن إدخال رقم واحد أو عدة أرقام مفصولة بفاصلة</small>
+        </div>
+
+        <div class="field">
+          <label for="eventDate">تاريخ إزالة الحلمات</label>
+          <input
+            id="eventDate"
+            name="eventDate"
+            data-field="eventDate"
+            type="date"
+          />
+        </div>
+
+        <div class="field">
+          <label for="notes">ملاحظات</label>
+          <textarea
+            id="notes"
+            name="notes"
+            data-field="notes"
+            rows="3"
+            placeholder="ملاحظات اختيارية"
+          ></textarea>
+        </div>
+      </section>
+
+      <div class="bottom-actions">
+        <button id="saveBtn" type="submit" class="btn btn-primary">تسجيل الحدث</button>
+        <a href="dashboard.html" class="btn btn-secondary">لوحة التحكم</a>
+      </div>
+    </form>
+  </main>
+
+  <script type="module">
+    import firebaseConfig from '/js/firebase-config.js';
+    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getFirestore, collection, addDoc, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db = getFirestore(app, 'murabbikdata');
+
+    const form = document.getElementById('stForm');
+    const sysbar = document.getElementById('sysbar');
+    const saveBtn = document.getElementById('saveBtn');
+
+    function showMsg(msg, cls='ok'){
+      sysbar.className = `infobar mbk-infobar show ${cls}`;
+      sysbar.textContent = msg || '';
+      sysbar.style.display = msg ? 'block' : 'none';
+    }
+
+    function q(name){
+      return new URL(location.href).searchParams.get(name) || '';
+    }
+
+    function prefill(){
+      const n = q('number') || q('animalNumber') || localStorage.getItem('lastAnimalId') || '';
+      const d = q('date') || q('eventDate') || localStorage.getItem('lastEventDate') || '';
+
+      if (n && !form.animalNumber.value) form.animalNumber.value = n;
+      if (d && !form.eventDate.value) form.eventDate.value = d;
+    }
+
+    prefill();
+
+    form.addEventListener('mbk:valid', async (ev) => {
+      try{
+        saveBtn.disabled = true;
+        showMsg('جارٍ تسجيل الحدث...', 'ok');
+
+        const detail = ev.detail || {};
+        const userId =
+          window.__MBK_USER_ID__ ||
+          window.userId ||
+          localStorage.getItem('userId') ||
+          localStorage.getItem('uid') ||
+          '';
+
+        const accepted = Array.isArray(detail.acceptedNumbers) && detail.acceptedNumbers.length
+          ? detail.acceptedNumbers
+          : [String(form.animalNumber.value || '').trim()].filter(Boolean);
+
+        const eventDate = String(form.eventDate.value || '').trim();
+        const notes = String(form.notes.value || '').trim();
+
+        for (const n of accepted){
+          await addDoc(collection(db, 'events'), {
+            type: 'supernumerary_teat_removal',
+            eventType: 'إزالة الحلمات الزائدة',
+            animalNumber: String(n),
+            eventDate,
+            notes,
+            userId,
+            source: 'supernumerary-teat-removal.html',
+            createdAt: serverTimestamp()
+          });
+        }
+
+        localStorage.setItem('lastAnimalId', accepted[0] || '');
+        localStorage.setItem('lastEventDate', eventDate);
+
+        if (accepted.length === 1) {
+          showMsg('تم تسجيل إزالة الحلمات الزائدة بنجاح', 'ok');
+        } else {
+          showMsg(`تم تسجيل إزالة الحلمات الزائدة لعدد ${accepted.length} حيوان`, 'ok');
+        }
+
+        setTimeout(() => {
+          location.href = 'dashboard.html';
+        }, 700);
+
+      }catch(err){
+        console.error(err);
+        showMsg('تعذر تسجيل الحدث. حاول مرة أخرى.', 'err');
+      }finally{
+        saveBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
