@@ -194,7 +194,7 @@
     <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
     <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
     <button class="btn" data-page="weaning.html">🐮 فطام</button>
-    <button class="btn" data-page="extra-teats.html">✂️ إزالة الحلمات الزائدة</button>
+   <button class="btn" data-page="supernumerary-teat-removal.html">✂️ إزالة الحلمات الزائدة</button>
     <button class="btn" data-page="colostrum-feeding.html">🍼 تغذية السرسوب</button>
     <!-- ✅ نفس ملفك -->
     <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
@@ -433,10 +433,10 @@ const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(St
 const isHeat = /heat\.html/i.test(String(targetPage||''));
 const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
 const isWeaning = /weaning\.html/i.test(String(targetPage||''));
-const isExtraTeats = /extra-teats\.html/i.test(String(targetPage||''));
+const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
 const isColostrum = /colostrum-feeding\.html/i.test(String(targetPage||''));
 
-const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning;
+const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
@@ -466,7 +466,7 @@ const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page)
 const isHeat = /heat\.html/i.test(String(page));
 const isNutrition = /nutrition\.html/i.test(String(page));
 const isWeaning = /weaning\.html/i.test(String(page));
-const isExtraTeats = /extra-teats\.html/i.test(String(page));
+const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(page));
 const isColostrum = /colostrum-feeding\.html/i.test(String(page));
 
 if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
