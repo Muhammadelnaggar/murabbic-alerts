@@ -85,22 +85,38 @@
   }
 
   (function prefill(){
-    const qs = new URLSearchParams(location.search);
-    const num  = qs.get("number") || qs.get("animalNumber") || "";
-    const date = qs.get("date") || qs.get("dt") || qs.get("eventDate") || "";
+ (function prefill(){
+  const qs = new URLSearchParams(location.search);
 
-    if (num && $("animalNumber")) {
-      $("animalNumber").value = normDigits(num);
-      $("animalNumber").dispatchEvent(new Event("input", { bubbles:true }));
-      $("animalNumber").dispatchEvent(new Event("change", { bubbles:true }));
-    }
+  const mode = String(qs.get("mbkMode") || "").trim();
+  const bulk = String(qs.get("bulk") || "").trim();
+  const num  = String(qs.get("number") || qs.get("animalNumber") || "").trim();
+  const date = qs.get("date") || qs.get("dt") || qs.get("eventDate") || "";
 
-    if (date && $("eventDate")) {
-      $("eventDate").value = toISO(date);
-      $("eventDate").dispatchEvent(new Event("input", { bubbles:true }));
-      $("eventDate").dispatchEvent(new Event("change", { bubbles:true }));
-    }
-  })();
+  let prefillNumbers = "";
+
+  if (mode === "group" && bulk) {
+    prefillNumbers = bulk
+      .split(",")
+      .map(x => normDigits(x))
+      .filter(Boolean)
+      .join("\n");
+  } else if (num) {
+    prefillNumbers = normDigits(num);
+  }
+
+  if (prefillNumbers && $("animalNumber")) {
+    $("animalNumber").value = prefillNumbers;
+    $("animalNumber").dispatchEvent(new Event("input", { bubbles:true }));
+    $("animalNumber").dispatchEvent(new Event("change", { bubbles:true }));
+  }
+
+  if (date && $("eventDate")) {
+    $("eventDate").value = toISO(date);
+    $("eventDate").dispatchEvent(new Event("input", { bubbles:true }));
+    $("eventDate").dispatchEvent(new Event("change", { bubbles:true }));
+  }
+})();
 
   cardBtn?.addEventListener("click", () => {
     const raw = String($("animalNumber")?.value || "");
