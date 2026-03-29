@@ -3,162 +3,179 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>إزالة الحلمات الزائدة — مُرَبِّيك</title>
-
+  <title>تسجيل إزالة الحلمات الزائدة — مُرَبِّيك</title>
   <link rel="stylesheet" href="css/forms.css" />
   <script type="module" src="js/forms-init.js"></script>
 </head>
 <body>
-  <header>
-    <div class="mbk-head">
-      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-      <div class="mbk-center">
-        <div class="mbk-title">إزالة الحلمات الزائدة</div>
-        <div class="mbk-subtitle">مُرَبِّيك</div>
-      </div>
-      <a class="mbk-back" href="add-event.html">رجوع</a>
+<header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل إزالة الحلمات الزائدة</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-  </header>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
 
-  <div id="sysbar" class="infobar mbk-infobar" style="display:none"></div>
+<main class="mbk-form">
+  <div id="info" class="infobar"></div>
 
-  <main class="mbk-main">
-    <form id="stForm"
-          class="mbk-form"
-          data-event="supernumerary_teat_removal"
-          novalidate>
-
-      <section class="card">
-        <div class="field">
-          <label for="animalNumber">رقم الحيوان</label>
-          <input
-            id="animalNumber"
-            name="animalNumber"
-            data-field="animalNumber"
-            type="text"
-            inputmode="numeric"
-            autocomplete="off"
-            placeholder="مثال: 203 أو 203،204،205"
-          />
-          <small class="hint">يمكن إدخال رقم واحد أو عدة أرقام مفصولة بفاصلة</small>
-        </div>
-
-        <div class="field">
-          <label for="eventDate">تاريخ إزالة الحلمات</label>
-          <input
-            id="eventDate"
-            name="eventDate"
-            data-field="eventDate"
-            type="date"
-          />
-        </div>
-
-        <div class="field">
-          <label for="notes">ملاحظات</label>
-          <textarea
-            id="notes"
-            name="notes"
-            data-field="notes"
-            rows="3"
-            placeholder="ملاحظات اختيارية"
-          ></textarea>
-        </div>
-      </section>
-
-      <div class="bottom-actions">
-        <button id="saveBtn" type="submit" class="btn btn-primary">تسجيل الحدث</button>
-        <a href="dashboard.html" class="btn btn-secondary">لوحة التحكم</a>
+  <form id="extraTeatForm" data-event="إزالة الحلمات الزائدة" novalidate>
+    <section class="mbk-card">
+      <div class="field">
+        <label for="animalNumber">رقم الحيوان</label>
+        <textarea id="animalNumber" data-field="animalNumber" style="min-height:80px; resize:vertical;" placeholder="رقم واحد أو عدة أرقام"></textarea>
       </div>
-    </form>
-  </main>
 
-  <script type="module">
-    import firebaseConfig from '/js/firebase-config.js';
-    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import {
-      getFirestore, collection, addDoc, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+      <div class="field">
+        <label for="eventDate">تاريخ إزالة الحلمات الزائدة</label>
+        <input id="eventDate" data-field="eventDate" type="date" />
+      </div>
 
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    const db = getFirestore(app, 'murabbikdata');
+      <div class="field">
+        <label for="notes">ملاحظات</label>
+        <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
+      </div>
+    </section>
 
-    const form = document.getElementById('stForm');
-    const sysbar = document.getElementById('sysbar');
-    const saveBtn = document.getElementById('saveBtn');
+    <div class="btn-row">
+      <button class="save-btn" id="saveBtn" type="submit">تسجيل الحدث</button>
+      <button class="open-card" id="cardBtn" type="button">بطاقة الحيوان</button>
+    </div>
+  </form>
+</main>
 
-    function showMsg(msg, cls='ok'){
-      sysbar.className = `infobar mbk-infobar show ${cls}`;
-      sysbar.textContent = msg || '';
-      sysbar.style.display = msg ? 'block' : 'none';
+<script type="module">
+  import { db, auth, ensureAuth } from "/js/firebase-config.js";
+  import {
+    collection, addDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const $ = (id) => document.getElementById(id);
+
+  const form = $("extraTeatForm");
+  const info = $("info");
+  const saveBtn = $("saveBtn");
+  const cardBtn = $("cardBtn");
+
+  function normDigits(s){
+    const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+    return String(s || '')
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .replace(/[^\d,\n،\s;]/g, '')
+      .trim();
+  }
+
+  function toISO(s){
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (isNaN(d)) return '';
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+  }
+
+  function getUid(){
+    return auth?.currentUser?.uid
+      || localStorage.getItem("userId")
+      || localStorage.getItem("uid")
+      || localStorage.getItem("tenantId")
+      || "";
+  }
+
+  (function prefill(){
+    const qs = new URLSearchParams(location.search);
+    const num  = qs.get("number") || qs.get("animalNumber") || "";
+    const date = qs.get("date") || qs.get("dt") || qs.get("eventDate") || "";
+
+    if (num && $("animalNumber")) {
+      $("animalNumber").value = normDigits(num);
+      $("animalNumber").dispatchEvent(new Event("input", { bubbles:true }));
+      $("animalNumber").dispatchEvent(new Event("change", { bubbles:true }));
     }
 
-    function q(name){
-      return new URL(location.href).searchParams.get(name) || '';
+    if (date && $("eventDate")) {
+      $("eventDate").value = toISO(date);
+      $("eventDate").dispatchEvent(new Event("input", { bubbles:true }));
+      $("eventDate").dispatchEvent(new Event("change", { bubbles:true }));
     }
+  })();
 
-    function prefill(){
-      const n = q('number') || q('animalNumber') || localStorage.getItem('lastAnimalId') || '';
-      const d = q('date') || q('eventDate') || localStorage.getItem('lastEventDate') || '';
+  cardBtn?.addEventListener("click", () => {
+    const raw = String($("animalNumber")?.value || "");
+    const nums = [...new Set((raw.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
+    if (!nums.length) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+  });
 
-      if (n && !form.animalNumber.value) form.animalNumber.value = n;
-      if (d && !form.eventDate.value) form.eventDate.value = d;
-    }
+  form.addEventListener("mbk:valid", async (ev) => {
+    try {
+      saveBtn.disabled = true;
 
-    prefill();
+      await ensureAuth?.();
 
-    form.addEventListener('mbk:valid', async (ev) => {
-      try{
-        saveBtn.disabled = true;
-        showMsg('جارٍ تسجيل الحدث...', 'ok');
+      const uid = getUid();
+      if (!uid) throw new Error("NO_UID");
 
-        const detail = ev.detail || {};
-        const userId =
-          window.__MBK_USER_ID__ ||
-          window.userId ||
-          localStorage.getItem('userId') ||
-          localStorage.getItem('uid') ||
-          '';
+      const detail = ev.detail || {};
+      const excluded = Array.isArray(detail.excluded) ? detail.excluded : [];
+      const payloads = detail.bulk && Array.isArray(detail.bulkEvents) && detail.bulkEvents.length
+        ? detail.bulkEvents
+        : [detail.formData || {}];
 
-        const accepted = Array.isArray(detail.acceptedNumbers) && detail.acceptedNumbers.length
-          ? detail.acceptedNumbers
-          : [String(form.animalNumber.value || '').trim()].filter(Boolean);
+      let saved = 0;
 
-        const eventDate = String(form.eventDate.value || '').trim();
-        const notes = String(form.notes.value || '').trim();
+      for (const p of payloads) {
+        const animalNumber = String(p.animalNumber || "").trim();
+        const eventDate = String(p.eventDate || "").slice(0,10);
+        const notes = String(p.notes || "").trim();
 
-        for (const n of accepted){
-          await addDoc(collection(db, 'events'), {
-            type: 'supernumerary_teat_removal',
-            eventType: 'إزالة الحلمات الزائدة',
-            animalNumber: String(n),
-            eventDate,
-            notes,
-            userId,
-            source: 'supernumerary-teat-removal.html',
-            createdAt: serverTimestamp()
-          });
-        }
+        if (!animalNumber || !eventDate) continue;
 
-        localStorage.setItem('lastAnimalId', accepted[0] || '');
-        localStorage.setItem('lastEventDate', eventDate);
+        await addDoc(collection(db, "events"), {
+          userId: uid,
+          animalNumber,
+          eventDate,
+          eventType: "إزالة الحلمات الزائدة",
+          type: "supernumerary_teat_removal",
+          notes,
+          source: "supernumerary-teat-removal.html",
+          createdAt: serverTimestamp()
+        });
 
-        if (accepted.length === 1) {
-          showMsg('تم تسجيل إزالة الحلمات الزائدة بنجاح', 'ok');
-        } else {
-          showMsg(`تم تسجيل إزالة الحلمات الزائدة لعدد ${accepted.length} حيوان`, 'ok');
-        }
-
-        setTimeout(() => {
-          location.href = 'dashboard.html';
-        }, 700);
-
-      }catch(err){
-        console.error(err);
-        showMsg('تعذر تسجيل الحدث. حاول مرة أخرى.', 'err');
-      }finally{
-        saveBtn.disabled = false;
+        saved++;
       }
-    });
-  </script>
+
+      if (!saved) {
+        info.className = "infobar mbk-infobar show error";
+        info.style.display = "block";
+        info.textContent = "❌ لم يتم حفظ أي سجل.";
+        return;
+      }
+
+      const msg = excluded.length
+        ? `✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${saved}. وتم استبعاد ${excluded.length}.`
+        : (saved === 1
+            ? "✅ تم تسجيل إزالة الحلمات الزائدة بنجاح."
+            : `✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${saved}.`);
+
+      info.className = "infobar mbk-infobar show success";
+      info.style.display = "block";
+      info.textContent = msg;
+
+      localStorage.setItem("lastAnimalId", String(payloads[0]?.animalNumber || ""));
+      localStorage.setItem("lastEventDate", String(payloads[0]?.eventDate || ""));
+
+    } catch (err) {
+      console.error(err);
+      info.className = "infobar mbk-infobar show error";
+      info.style.display = "block";
+      info.textContent = "❌ تعذر حفظ الحدث. حاول مرة أخرى.";
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>
