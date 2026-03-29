@@ -392,6 +392,15 @@ export const eventSchemas = {
   },
   guards: []
 }, 
+"إزالة الحلمات الزائدة": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    eventDate: { required: true, type: "date", msg: "تاريخ إزالة الحلمات الزائدة غير صالح." },
+    documentData: { required: false, msg: "تعذّر العثور على الحيوان." },
+    notes: { required: false }
+  },
+  guards: []
+},  
 };
 // ===================================================================
 //                 Vaccination Protocols (Egypt v1) + Helpers
@@ -451,6 +460,141 @@ function buildVaccinationTasks({ vaccineKey, doseType, eventDate }){
 // ===================================================================
 //                          الحُرّاس (GUARDS للأحداث)
 // ===================================================================
+async function findAnimalForUserByNumber(userId, animalNumber){
+  const raw = String(animalNumber || "").trim();
+  const num = Number(raw);
+
+  const tries = [];
+
+  if (userId) {
+    tries.push(
+      query(collection(db, "animals"),
+        where("userId", "==", userId),
+        where("animalNumber", "==", raw),
+        limit(1))
+    );
+    tries.push(
+      query(collection(db, "animals"),
+        where("ownerUid", "==", userId),
+        where("animalNumber", "==", raw),
+        limit(1))
+    );
+
+    if (!Number.isNaN(num)) {
+      tries.push(
+        query(collection(db, "animals"),
+          where("userId", "==", userId),
+          where("animalNumber", "==", num),
+          limit(1))
+      );
+      tries.push(
+        query(collection(db, "animals"),
+          where("ownerUid", "==", userId),
+          where("animalNumber", "==", num),
+          limit(1))
+      );
+    }
+  }
+
+  for (const qx of tries) {
+    try {
+      const snap = await getDocs(qx);
+      if (!snap.empty) return snap.docs[0].data() || null;
+    } catch(_) {}
+  }
+
+  return null;
+}
+
+function isFemaleAnimal(doc = {}){
+  const vals = [
+    doc.sex,
+    doc.gender,
+    doc.animalSex,
+    doc.typeSex,
+    doc.sextype
+  ].map(v => String(v || "").trim().toLowerCase());
+
+  return vals.some(v =>
+    v === "أنثى" ||
+    v === "انثى" ||
+    v === "female" ||
+    v === "f"
+  );
+}
+
+async function hasSupernumeraryTeatRemovalBefore(userId, animalNumber){
+  const n = String(animalNumber || "").trim();
+  if (!userId || !n) return false;
+
+  try {
+    const qx = query(
+      collection(db, "events"),
+      where("userId", "==", userId),
+      where("animalNumber", "==", n),
+      limit(80)
+    );
+
+    const snap = await getDocs(qx);
+    if (snap.empty) return false;
+
+    for (const ds of snap.docs) {
+      const ev = ds.data() || {};
+      const t = String(ev.eventType || ev.type || "").trim();
+      if (
+        t === "إزالة الحلمات الزائدة" ||
+        t === "supernumerary_teat_removal"
+      ) {
+        return true;
+      }
+    }
+  } catch(_) {
+    return true; // Strict: لو تعذّر التحقق نمنع التكرار
+  }
+
+  return false;
+}
+
+export async function previewSupernumeraryTeatRemovalList(userId, numbers = []){
+  const clean = [...new Set(
+    (Array.isArray(numbers) ? numbers : [])
+      .map(n => String(n || "").trim())
+      .filter(Boolean)
+  )];
+
+  const valid = [];
+  const rejected = [];
+
+  for (const n of clean) {
+    const animal = await findAnimalForUserByNumber(userId, n);
+
+    if (!animal) {
+      rejected.push({ number: n, reason: "❌ الرقم غير موجود." });
+      continue;
+    }
+
+    const st = String(animal.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      rejected.push({ number: n, reason: "❌ الحيوان خارج القطيع." });
+      continue;
+    }
+
+    if (!isFemaleAnimal(animal)) {
+      rejected.push({ number: n, reason: "❌ هذا الحيوان ليس أنثى." });
+      continue;
+    }
+
+    const duplicated = await hasSupernumeraryTeatRemovalBefore(userId, n);
+    if (duplicated) {
+      rejected.push({ number: n, reason: "❌ تم تسجيل إزالة الحلمات الزائدة مسبقًا." });
+      continue;
+    }
+
+    valid.push(n);
+  }
+
+  return { valid, rejected };
+}
 export const guards = {
   
 vaccinationDecision(fd) {
