@@ -369,47 +369,58 @@ async function fetchAnimalByNumberForUser(uid, number) {
   const num = normalizeDigits(number);
   if (!uid || !num) return null;
 
-  try {
-    const key = `${uid}#${num}`;
-    const q1 = query(
-      collection(db, "animals"),
-      where("userId_number", "==", key),
-      limit(1)
-    );
-    const s1 = await getDocs(q1);
-    if (!s1.empty) {
-      const d = s1.docs[0];
-      return { id: d.id, data: d.data() || {} };
-    }
-  } catch (_) {}
-
-  const tries = [
-    ["number", num],
-    ["animalNumber", num],
-    ["animalNumber", Number(num)]
-  ].filter((t) => !(typeof t[1] === "number" && Number.isNaN(t[1])));
-
-for (const [field, val] of tries) {
-  for (const ownerField of ["userId", "ownerUid"]) {
+  async function findInCollection(colName) {
     try {
-      const q2 = query(
-        collection(db, "animals"),
-        where(ownerField, "==", uid),
-        where(field, "==", val),
+      const key = `${uid}#${num}`;
+      const q1 = query(
+        collection(db, colName),
+        where("userId_number", "==", key),
         limit(1)
       );
-      const s2 = await getDocs(q2);
-      if (!s2.empty) {
-        const d = s2.docs[0];
-        return { id: d.id, data: d.data() || {} };
+      const s1 = await getDocs(q1);
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        return { id: d.id, data: d.data() || {}, _collection: colName };
       }
     } catch (_) {}
+
+    const tries = [
+      ["number", num],
+      ["animalNumber", num],
+      ["animalNumber", Number(num)],
+      ["calfNumber", num],
+      ["calfNumber", Number(num)]
+    ].filter((t) => !(typeof t[1] === "number" && Number.isNaN(t[1])));
+
+    for (const [field, val] of tries) {
+      for (const ownerField of ["userId", "ownerUid"]) {
+        try {
+          const q2 = query(
+            collection(db, colName),
+            where(ownerField, "==", uid),
+            where(field, "==", val),
+            limit(1)
+          );
+          const s2 = await getDocs(q2);
+          if (!s2.empty) {
+            const d = s2.docs[0];
+            return { id: d.id, data: d.data() || {}, _collection: colName };
+          }
+        } catch (_) {}
+      }
+    }
+
+    return null;
   }
-}
+
+  const animalDoc = await findInCollection("animals");
+  if (animalDoc) return animalDoc;
+
+  const calfDoc = await findInCollection("calves");
+  if (calfDoc) return calfDoc;
 
   return null;
 }
-
 async function fetchCalvingSignalsFromEvents(uid, number) {
   const num = String(normalizeDigits(number || "")).trim();
 
