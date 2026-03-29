@@ -810,7 +810,7 @@ if (!hasAnyNumber || !d) {
 
 // ✅ فحص وجود الحيوان الفردي فقط لو الإدخال "فردي فعلاً"
 // لو الإدخال فيه فواصل/مسافات => Bulk حتى لو bulkList اتفسّر غلط
-if (bulkList.length <= 1 && !looksBulk) {
+if (bulkList.length <= 1 && !looksBulk && eventName !== "إزالة الحلمات الزائدة") {
   const okAnimal = await ensureAnimalExistsGate(form, bar);
   if (!okAnimal) {
     lockForm(true);
