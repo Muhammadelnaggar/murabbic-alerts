@@ -133,12 +133,29 @@
 
       const uid = getUid();
       if (!uid) throw new Error("NO_UID");
+const detail = ev.detail || {};
+const excluded = Array.isArray(detail.excluded) ? detail.excluded : [];
 
-      const detail = ev.detail || {};
-      const excluded = Array.isArray(detail.excluded) ? detail.excluded : [];
-      const payloads = detail.bulk && Array.isArray(detail.bulkEvents) && detail.bulkEvents.length
-        ? detail.bulkEvents
-        : [detail.formData || {}];
+let payloads = [];
+
+if (detail.bulk && Array.isArray(detail.bulkEvents) && detail.bulkEvents.length) {
+  payloads = detail.bulkEvents;
+} else {
+  const base = detail.formData || {};
+  const rawNums = String(base.animalNumber || $("animalNumber")?.value || "");
+  const nums = [...new Set(
+    rawNums
+      .split(/[\n,،;\s]+/g)
+      .map(x => normDigits(x))
+      .filter(Boolean)
+  )];
+
+  if (nums.length > 1) {
+    payloads = nums.map(n => ({ ...base, animalNumber: n }));
+  } else {
+    payloads = [base];
+  }
+}
 
       let saved = 0;
 
