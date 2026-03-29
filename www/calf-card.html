@@ -7,8 +7,7 @@
   <link rel="stylesheet" href="css/forms.css" />
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="js/app-core.js"></script>
-  <script type="module" src="js/timeline.js"></script>
-  <script type="module" src="js/smart-checks.js"></script>
+
   <script src="js/tenant-bootstrap.js"></script>
  <script type="module" src="js/api.js"></script>
   <style>
@@ -147,15 +146,10 @@
   </div>
 
   <script type="module">
-    import firebaseConfig from './js/firebase-config.js';
-    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import {
-      getFirestore, collection, query, where, orderBy, getDocs, limit
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    const db = getFirestore(app, 'murabbikdata');
-
+import { db } from './js/firebase-config.js';
+import {
+  collection, query, where, orderBy, getDocs, limit
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
     const $ = (id) => document.getElementById(id);
     const els = {
       statusBar: $('statusBar'),
@@ -511,5 +505,7 @@
 
     main();
   </script>
+    <script type="module" src="js/timeline.js"></script>
+  <script type="module" src="js/smart-checks.js"></script>
 </body>
 </html>
