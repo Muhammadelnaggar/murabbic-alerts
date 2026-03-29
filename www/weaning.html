@@ -114,7 +114,50 @@ getDocs, query, where, limit, doc, getDoc
     d2.setHours(0,0,0,0);
     return Math.round((d2 - d1) / 86400000);
   }
+async function hasWeaningEvent(uid, number){
+  const nStr = String(number || "").trim();
+  const nNum = Number(nStr);
 
+  const tries = [
+    ["animalNumber", nStr],
+    ["animalNumber", nNum]
+  ];
+
+  for (const [numField, value] of tries) {
+    if (typeof value === "number" && Number.isNaN(value)) continue;
+
+    try {
+      const qy = query(
+        collection(db, "events"),
+        where("userId", "==", uid),
+        where(numField, "==", value),
+        where("eventType", "==", "فطام"),
+        limit(1)
+      );
+      const snap = await getDocs(qy);
+      if (!snap.empty) return true;
+    } catch (_) {}
+  }
+
+  // fallback لو بعض الأحداث القديمة محفوظة في type فقط
+  for (const [numField, value] of tries) {
+    if (typeof value === "number" && Number.isNaN(value)) continue;
+
+    try {
+      const qy = query(
+        collection(db, "events"),
+        where("userId", "==", uid),
+        where(numField, "==", value),
+        where("type", "==", "فطام"),
+        limit(1)
+      );
+      const snap = await getDocs(qy);
+      if (!snap.empty) return true;
+    } catch (_) {}
+  }
+
+  return false;
+}
   async function getUid(){
     await ensureAuth();
     return auth.currentUser?.uid || localStorage.getItem("userId") || "";
@@ -289,50 +332,74 @@ refreshSingleAge();
         let saved = 0;
         const failed = [];
 
-        for (const num of bulkList) {
-          const ageRes = await calcWeaningAge(uid, num, dt);
-          if (!ageRes.ok) {
-            failed.push(num);
-            continue;
-          }
+       const duplicated = [];
 
-          const payload = {
-            animalNumber: String(num),
-            animalId: String(num),
-            type: "فطام",
-            eventType: "فطام",
-            eventDate: dt,
-            weaningAgeDays: ageRes.age,
-            notes,
-            userId: uid,
-            source: "/weaning.html",
-            createdAt: serverTimestamp()
-          };
+for (const num of bulkList) {
+  // ✅ منع التكرار
+  const alreadyWeaned = await hasWeaningEvent(uid, num);
+  if (alreadyWeaned) {
+    duplicated.push(num);
+    continue;
+  }
 
-          await addDoc(collection(db, "events"), payload);
-          saved++;
+  const ageRes = await calcWeaningAge(uid, num, dt);
+  if (!ageRes.ok) {
+    failed.push(num);
+    continue;
+  }
+
+  const payload = {
+    animalNumber: String(num),
+    animalId: String(num),
+    type: "فطام",
+    eventType: "فطام",
+    eventDate: dt,
+    weaningAgeDays: ageRes.age,
+    notes,
+    userId: uid,
+    source: "/weaning.html",
+    createdAt: serverTimestamp()
+  };
+
+  await addDoc(collection(db, "events"), payload);
+  saved++;
+}
         }
 
-        if (!saved) {
-          msg("❌ تعذّر تسجيل الفطام لأي رقم. راجع تواريخ الميلاد أو الأرقام.", false);
-          return;
-        }
+      if (!saved) {
+  if (duplicated.length) {
+    msg(`❌ جميع الأرقام المختارة مسجل لها فطام سابقًا (${duplicated.length}).`, false);
+  } else {
+    msg("❌ تعذّر تسجيل الفطام لأي رقم. راجع تواريخ الميلاد أو الأرقام.", false);
+  }
+  return;
+}
 
-        if (failed.length) {
-          msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان. تعذّر الحساب/الحفظ لعدد ${failed.length}.`, true);
-        } else {
-          msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان بنجاح.`, true);
-        }
+if (failed.length || duplicated.length) {
+  msg(
+    `✅ تم تسجيل الفطام لعدد ${saved} حيوان.` +
+    `${duplicated.length ? ` تم استبعاد ${duplicated.length} لأن الفطام مسجل سابقًا.` : ""}` +
+    `${failed.length ? ` وتعذّر الحساب/الحفظ لعدد ${failed.length}.` : ""}`,
+    true
+  );
+} else {
+  msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان بنجاح.`, true);
+}
 
-        return;
-      }
+     const n = String(formData.animalNumber || $("animalNumber").value || "").trim();
 
-      const n = String(formData.animalNumber || $("animalNumber").value || "").trim();
-      const ageRes = await calcWeaningAge(uid, n, dt);
-      if (!ageRes.ok) {
-        msg(`❌ ${ageRes.reason}`, false);
-        return;
-      }
+// ✅ منع تكرار الفطام
+const alreadyWeaned = await hasWeaningEvent(uid, n);
+if (alreadyWeaned) {
+  msg("❌ تم تسجيل الفطام لهذا الحيوان من قبل — لا يمكن تكراره.", false);
+  return;
+}
+
+const ageRes = await calcWeaningAge(uid, n, dt);
+if (!ageRes.ok) {
+  msg(`❌ ${ageRes.reason}`, false);
+  return;
+}
 
       $("weaningAgeDays").value = String(ageRes.age);
 
