@@ -121,12 +121,13 @@
     </select>
 
     <!-- جديد -->
-    <label for="servicesCount">عدد مرات التلقيح (الموسم الحالي):</label>
-    <input type="number" id="servicesCount" min="0" placeholder="0" />
+  <label for="servicesCount">عدد مرات التلقيح (الموسم الحالي):</label>
+<input type="number" id="servicesCount" min="0" placeholder="0" />
 
-    <!-- جديد -->
+<label for="lactationNumber">رقم موسم الحليب الحالي:</label>
+<input type="number" id="lactationNumber" min="0" placeholder="مثال: 3" />
 
-    <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
+<label for="lastCalvingDate">تاريخ آخر ولادة:</label>
     <input type="date" id="lastCalvingDate" />
 
     <!-- DIM -->
@@ -580,7 +581,7 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
   const dailyMilkVal         = $("dailyMilk").value.trim();
   const reproductiveStatus   = $("reproductiveStatus").value;
   const servicesCount        = Number($("servicesCount").value || 0);
-  const lactationNumber      = Number($("lactationNumber").value || 0);
+  const lactationNumber      = Number($("lactationNumber")?.value || 0);
   const birthDate            = $("birthDate").value || null;
   const lastCalvingDate      = $("lastCalvingDate").value;
   const lastInseminationInp  = $("lastInseminationDate").value || null;
