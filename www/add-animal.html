@@ -634,63 +634,79 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
     }
 
     // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
-   const payload = (entryTypeVal === "mothers")
+const payload = (entryTypeVal === "mothers")
   ? {
       ownerUid: CURRENT_UID,
       userId: CURRENT_UID,
       userId_number: key,
       entryType: "mothers",
 
-number: numberStr,
-animalNumber: Number(numberStr),
-animaltype: normAnimaltype(animalTypeAr),
-animalTypeAr,
-breed,
-sex: followerSexVal,
+      number: numberStr,
+      animalNumber: Number(numberStr),
+      animaltype: normAnimaltype(animalTypeAr),
+      animalTypeAr,
+      breed,
 
-status: followerStatusVal,
-followerStatus: followerStatusVal,
+      productionStatus,
+      dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
+      reproductiveStatus,
+      servicesCount,
+      lactationNumber,
+      birthDate,
+      lastCalvingDate: lactationNumber > 0 ? (lastCalvingDate || null) : null,
 
-birthDate,
-damNumber: damNumberVal,
+      lastInseminationDate:
+        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار" || productionStatus === "جاف" || reproductiveStatus === "مفتوحة")
+          ? (lastInseminationInp || null) : null,
 
-weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
+      sireNumber:
+        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار")
+          ? (sireNumberInp || null) : null,
 
-number: numberStr,
-animalNumber: Number(numberStr),
-animaltype: normAnimaltype(animalTypeAr),
-animalTypeAr,
-breed,
-sex: followerSexVal,
-
-status: followerStatusVal,
-followerStatus: followerStatusVal,
-
-birthDate,
-damNumber: damNumberVal,
-
-weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
-
-lastInseminationDate:
-  (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-    ? (followerLastInseminationVal || null) : null,
-
-servicesCount:
-  (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-    ? followerServicesCountVal : 0,
-
-sireNumber:
-  (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-    ? (followerSireNumberVal || null) : null,
-
-pregnancyDays:
-  (followerStatusVal === "عشار")
-    ? (followerPregnancyDaysVal || null) : null,
-
-createdAt: serverTimestamp(),
-demo: true
+      daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
+      createdAt: serverTimestamp(),
+      demo: true
     }
   : {
+      ownerUid: CURRENT_UID,
+      userId: CURRENT_UID,
+      userId_number: key,
+      entryType: "followers",
+
+      number: numberStr,
+      animalNumber: Number(numberStr),
+      animaltype: normAnimaltype(animalTypeAr),
+      animalTypeAr,
+      breed,
+
+      sex: followerSexVal,
+      status: followerStatusVal,
+      followerStatus: followerStatusVal,
+
+      birthDate,
+      damNumber: damNumberVal,
+      weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
+
+      lastInseminationDate:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? (followerLastInseminationVal || null) : null,
+
+      servicesCount:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? followerServicesCountVal : 0,
+
+      sireNumber:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? (followerSireNumberVal || null) : null,
+
+      pregnancyDays:
+        (followerStatusVal === "عشار")
+          ? (followerPregnancyDaysVal || null) : null,
+
+      createdAt: serverTimestamp(),
+      demo: true
+    };
+   {
       ownerUid: CURRENT_UID,
       userId: CURRENT_UID,
       userId_number: key,
