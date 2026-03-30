@@ -524,6 +524,15 @@ function showPopup(msg, ok=true){
   }
 
   const numberStr            = $("animalNumber").value.trim();
+   const entryTypeVal                 = $("entryType").value;
+const followerSexVal               = $("followerSex")?.value || "";
+const followerStatusVal            = $("followerStatus")?.value || "";
+const damNumberVal                 = $("damNumber")?.value.trim() || null;
+const weaningDateVal               = $("weaningDate")?.value || null;
+const followerLastInseminationVal  = $("followerLastInseminationDate")?.value || null;
+const followerServicesCountVal     = Number($("followerServicesCount")?.value || 0);
+const followerSireNumberVal        = $("followerSireNumber")?.value.trim() || null;
+const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value || 0);
   const animalTypeAr         = $("animalType").value;
   const breed                = $("breed").value;
   const productionStatus     = $("productionStatus").value;
@@ -541,6 +550,22 @@ function showPopup(msg, ok=true){
     setMsg("أكمل الحقول المطلوبة.", false);
     return;
   }
+   if (entryTypeVal === "followers") {
+  if (!numberStr || !animalTypeAr || !breed || !birthDate || !followerSexVal || !followerStatusVal || !damNumberVal) {
+    setMsg("أكمل بيانات التابع المطلوبة.", false);
+    return;
+  }
+
+  if (followerStatusVal === "فطام" && !weaningDateVal) {
+    setMsg("أدخل تاريخ الفطام.", false);
+    return;
+  }
+
+  if ((followerStatusVal === "ملقح" || followerStatusVal === "عشار") && !followerLastInseminationVal) {
+    setMsg("أدخل تاريخ آخر تلقيح.", false);
+    return;
+  }
+}
   if (lactationNumber > 0 && !lastCalvingDate){
     setMsg("أدخل تاريخ آخر ولادة.", false);
     return;
@@ -567,11 +592,12 @@ function showPopup(msg, ok=true){
     }
 
     // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
-    const ref = await addDoc(collection(db,"animals"), {
+   const payload = (entryTypeVal === "mothers")
+  ? {
       ownerUid: CURRENT_UID,
-
       userId: CURRENT_UID,
       userId_number: key,
+      entryType: "mothers",
 
       number: numberStr,
       animalNumber: Number(numberStr),
@@ -585,26 +611,62 @@ function showPopup(msg, ok=true){
       lactationNumber,
       birthDate,
       lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
-lastInseminationDate:
-  (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
-    ? (lastInseminationInp || null) : null,
-sireNumber:
-  (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار")
-    ? (sireNumberInp || null) : null,
-daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
+      lastInseminationDate:
+        (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
+          ? (lastInseminationInp || null) : null,
+      sireNumber:
+        (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار")
+          ? (sireNumberInp || null) : null,
+      daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
       createdAt: serverTimestamp(),
       demo: true
-    });
+    }
+  : {
+      ownerUid: CURRENT_UID,
+      userId: CURRENT_UID,
+      userId_number: key,
+      entryType: "followers",
 
+      number: numberStr,
+      animalNumber: Number(numberStr),
+      animaltype: normAnimaltype(animalTypeAr),
+      animalTypeAr,
+      breed,
+      sex: followerSexVal,
+      followerStatus: followerStatusVal,
+      birthDate,
+      damNumber: damNumberVal,
+      weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
+      lastInseminationDate:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? (followerLastInseminationVal || null) : null,
+      servicesCount:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? followerServicesCountVal : 0,
+      sireNumber:
+        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
+          ? (followerSireNumberVal || null) : null,
+      pregnancyDays:
+        (followerStatusVal === "عشار")
+          ? (followerPregnancyDaysVal || null) : null,
+      createdAt: serverTimestamp(),
+      demo: true
+    };
+
+const ref = await addDoc(collection(db,"animals"), payload);
   showPopup("تم تسجيل الحيوان بنجاح ✅", true);
 
-    localStorage.setItem("currentAnimalId", ref.id);
-    localStorage.setItem("currentAnimalNumber", numberStr);
-    const d = todayLocal();
-    setTimeout(()=>{
-      location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-    }, 1200);
+  localStorage.setItem("currentAnimalId", ref.id);
+localStorage.setItem("currentAnimalNumber", numberStr);
+const d = todayLocal();
 
+setTimeout(()=>{
+  if (entryTypeVal === "followers") {
+    location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
+  } else {
+    location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
+  }
+}, 1200);
   }catch(err){
     console.error(err);
     setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
