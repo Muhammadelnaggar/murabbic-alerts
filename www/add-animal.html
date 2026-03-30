@@ -620,12 +620,13 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
   try{
     // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
     const key = `${CURRENT_UID}#${numberStr}`;
-  const dupQ = query(
-  collection(db, "animals"),
+const dupCollection = (entryTypeVal === "followers") ? "calves" : "animals";
+const dupQ = query(
+  collection(db, dupCollection),
   where("userId_number", "==", key),
   limit(1)
 );
-    const dupSnap = await getDocs(dupQ);
+const dupSnap = await getDocs(dupQ);
 
     if (!dupSnap.empty){
      showPopup("⚠️ هذا الحيوان موجود بالفعل — لا يمكن التسجيل.", false);
@@ -667,14 +668,17 @@ const payload = (entryTypeVal === "mothers")
       createdAt: serverTimestamp(),
       
     }
-  : {
+: {
       ownerUid: CURRENT_UID,
       userId: CURRENT_UID,
       userId_number: key,
       entryType: "followers",
 
+      calfNumber: numberStr,
       number: numberStr,
       animalNumber: Number(numberStr),
+
+      species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
       animaltype: normAnimaltype(animalTypeAr),
       animalTypeAr,
       breed,
@@ -703,8 +707,7 @@ const payload = (entryTypeVal === "mothers")
         (followerStatusVal === "عشار")
           ? (followerPregnancyDaysVal || null) : null,
 
-      createdAt: serverTimestamp(),
-     
+      createdAt: serverTimestamp()
     };
   
 
