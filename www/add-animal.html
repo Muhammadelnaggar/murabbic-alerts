@@ -413,6 +413,10 @@ function setEntryMode(mode){
   if (followerLastInseminationDate) {
     followerLastInseminationDate.required = (!mothers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
   }
+
+  toggleCalvingForLactation();
+  toggleMilkFieldLocal();
+  toggleInseminationFieldLocal();
 }
       ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
       ['change','input'].forEach(e=>productionEl.addEventListener(e,()=>{toggleMilkFieldLocal();toggleInseminationFieldLocal();}));
