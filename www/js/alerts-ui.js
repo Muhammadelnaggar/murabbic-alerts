@@ -289,39 +289,40 @@
   kill(true);
 });
     
+el.querySelector('[data-act="now"]')?.addEventListener('click', ()=>{
   try{
-    const nums = Array.isArray(payload?.vaxNumbers) ? payload.vaxNumbers : [];
-    const items = Array.isArray(payload?.vaxItems) ? payload.vaxItems : [];
-    const first = items[0] || {};
-    const date = String(first.dueDate || '').trim();
+    const rid = String(payload?.ruleId || '');
 
-    // نحط نفس المفاتيح بأكثر من اسم عشان أي صفحة تلتقطها
-    if (nums.length <= 1){
-      const n = nums[0] || '';
-      if (n) {
-        localStorage.setItem('lastAnimalId', n);
-        localStorage.setItem('lastAnimalNumber', n);
-        localStorage.setItem('currentAnimalId', n);
+    if (rid === 'vaccination_due_7days') {
+      const nums = Array.isArray(payload?.vaxNumbers) ? payload.vaxNumbers : [];
+      const items = Array.isArray(payload?.vaxItems) ? payload.vaxItems : [];
+      const first = items[0] || {};
+      const date = String(first.dueDate || '').trim();
+
+      if (nums.length <= 1) {
+        const n = nums[0] || '';
+        if (n) {
+          localStorage.setItem('lastAnimalId', n);
+          localStorage.setItem('lastAnimalNumber', n);
+          localStorage.setItem('currentAnimalId', n);
+        }
+      } else {
+        localStorage.setItem('bulkList', JSON.stringify(nums));
+        localStorage.setItem('bulkNumbers', JSON.stringify(nums));
+        localStorage.setItem('mbk_bulk_numbers', JSON.stringify(nums));
       }
-    } else {
-      localStorage.setItem('bulkList', JSON.stringify(nums));
-      localStorage.setItem('bulkNumbers', JSON.stringify(nums));
-      localStorage.setItem('mbk_bulk_numbers', JSON.stringify(nums));
-    }
-    if (date) localStorage.setItem('lastEventDate', date);
 
-    // افتح صفحة التحصين
-    location.href = '/vaccination.html';
+      if (date) localStorage.setItem('lastEventDate', date);
+      location.href = '/vaccination.html';
+    } else {
+      const url =
+        (payload?.actionUrl && String(payload.actionUrl).trim()) ||
+        '/add-event.html';
+      location.href = url;
+    }
   }catch{}
   kill(true);
 });
-
-    el.querySelector('[data-act="open"]')?.addEventListener('click', ()=>{
-      try{
-        if (payload.actionUrl) location.href = payload.actionUrl;
-      }catch{}
-      kill(true);
-    });
 
     stack.prepend(el);
     setTimeout(()=> el.classList.add('show'), 20);
