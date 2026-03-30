@@ -143,7 +143,10 @@
       <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
       <input type="date" id="lastInseminationDate" />
     </div>
-
+    <div id="sireField" style="display:none;">
+  <label for="sireNumber">رقم الطلوقة:</label>
+  <input type="text" id="sireNumber" placeholder="اكتب رقم الطلوقة" />
+</div>
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
     <div id="popupBox" class="mbk-popup">
@@ -163,6 +166,8 @@
       const reproductiveEl = document.getElementById('reproductiveStatus');
       const inseminationField = document.getElementById('inseminationField');
       const lastInseminationDate = document.getElementById('lastInseminationDate');
+      const sireField = document.getElementById('sireField');
+      const sireNumber = document.getElementById('sireNumber');
       const lastCalvingDate = document.getElementById('lastCalvingDate');
       const daysInMilk = document.getElementById('daysInMilk');
       const lactationNumber = document.getElementById('lactationNumber');
@@ -185,15 +190,21 @@
         toggleMilkVsPregnancy();
       }
 
-      function toggleInseminationFieldLocal(){
-        const val = reproductiveEl.value;
-        const showByRep = (val === "ملقحة" || val === "عشار" || val === "مفتوحة");
-        const showByProd = (productionEl.value === "جاف");
-        const show = showByRep || showByProd;
-        inseminationField.style.display = show ? "block" : "none";
-        lastInseminationDate.required = (val === "ملقحة" || val === "عشار" || productionEl.value === "جاف");
-        if(!show){ lastInseminationDate.value = ""; }
-      }
+ function toggleInseminationFieldLocal(){
+  const val = reproductiveEl.value;
+  const showByRep = (val === "ملقحة" || val === "عشار" || val === "مفتوحة");
+  const showByProd = (productionEl.value === "جاف");
+  const show = showByRep || showByProd;
+
+  inseminationField.style.display = show ? "block" : "none";
+  lastInseminationDate.required = (val === "ملقحة" || val === "عشار" || productionEl.value === "جاف");
+  if(!show){ lastInseminationDate.value = ""; }
+
+  const showSire = (val === "ملقحة" || val === "عشار");
+  sireField.style.display = showSire ? "block" : "none";
+  sireNumber.required = showSire;
+  if(!showSire){ sireNumber.value = ""; }
+}
 
       function toggleCalvingForLactation(){
         const ln = Number(lactationNumber.value || 0);
@@ -394,6 +405,7 @@ function showPopup(msg, ok=true){
   const birthDate            = $("birthDate").value || null;
   const lastCalvingDate      = $("lastCalvingDate").value;
   const lastInseminationInp  = $("lastInseminationDate").value || null;
+   const sireNumberInp        = $("sireNumber").value.trim() || null;
   const daysInMilkVal        = Number($("daysInMilk").value || 0);
 
   if (!numberStr || !animalTypeAr){
@@ -444,10 +456,13 @@ function showPopup(msg, ok=true){
       lactationNumber,
       birthDate,
       lastCalvingDate: lactationNumber>0 ? lastCalvingDate : null,
-      lastInseminationDate:
-        (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
-          ? (lastInseminationInp || null) : null,
-      daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
+lastInseminationDate:
+  (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار" || productionStatus==="جاف" || reproductiveStatus==="مفتوحة")
+    ? (lastInseminationInp || null) : null,
+sireNumber:
+  (reproductiveStatus==="ملقحة" || reproductiveStatus==="عشار")
+    ? (sireNumberInp || null) : null,
+daysInMilk: productionStatus==="جاف" ? null : (daysInMilkVal || null),
       createdAt: serverTimestamp(),
       demo: true
     });
