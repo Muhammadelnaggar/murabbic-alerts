@@ -125,10 +125,6 @@
     <input type="number" id="servicesCount" min="0" placeholder="0" />
 
     <!-- جديد -->
-    
-
-    <label for="birthDate">تاريخ الميلاد (اختياري):</label>
-    <input type="date" id="birthDate" />
 
     <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
     <input type="date" id="lastCalvingDate" />
@@ -213,7 +209,6 @@
       const sireNumber = document.getElementById('sireNumber');
       const lastCalvingDate = document.getElementById('lastCalvingDate');
       const daysInMilk = document.getElementById('daysInMilk');
-      const lactationNumber = document.getElementById('lactationNumber');
       const pregnancyBox = document.getElementById('pregnancyBox');
       const pregnancyDays = document.getElementById('pregnancyDays');
       const entryType = document.getElementById('entryType');
@@ -265,19 +260,26 @@ const followerPregnancyDays = document.getElementById('followerPregnancyDays');
 }
 
       function toggleCalvingForLactation(){
-        const ln = Number(lactationNumber.value || 0);
-        if (ln === 0){
-          lastCalvingDate.value = "";
-          lastCalvingDate.disabled = true;
-          lastCalvingDate.required = false;
-          daysInMilk.value = "";
-          daysInMilk.disabled = true;
-        }else{
-          lastCalvingDate.disabled = false;
-          lastCalvingDate.required = true;
-          if (productionEl.value !== "جاف") daysInMilk.disabled = false;
-        }
-      }
+  const mothersMode = (entryType.value === "mothers");
+  if (!mothersMode){
+    lastCalvingDate.value = "";
+    lastCalvingDate.disabled = true;
+    lastCalvingDate.required = false;
+    daysInMilk.value = "";
+    daysInMilk.disabled = true;
+    return;
+  }
+
+  lastCalvingDate.disabled = false;
+  lastCalvingDate.required = true;
+
+  if (productionEl.value === "جاف"){
+    daysInMilk.value = "";
+    daysInMilk.disabled = true;
+  } else {
+    daysInMilk.disabled = false;
+  }
+}
 
       function computeDIM(){
         if (productionEl.value === "جاف") { daysInMilk.value=""; return; }
@@ -311,7 +313,6 @@ const followerPregnancyDays = document.getElementById('followerPregnancyDays');
           pregnancyBox.style.display = "none";
           pregnancyDays.value = "";
           pregnancyDays.disabled = true;
-          if (Number(lactationNumber.value||0) > 0){
             daysInMilk.disabled = false;
             computeDIM();
           }
@@ -419,7 +420,7 @@ function setEntryMode(mode){
       ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
       ['change','input'].forEach(e=>lastCalvingDate.addEventListener(e,computeDIM));
       ['change','input'].forEach(e=>lastInseminationDate.addEventListener(e,computePregnancy));
-      ['change','input'].forEach(e=>lactationNumber.addEventListener(e,()=>{toggleCalvingForLactation();computeDIM();}));
+     
      btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
      btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
       followerSex.addEventListener('change', ()=>{
