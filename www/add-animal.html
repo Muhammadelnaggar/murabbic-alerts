@@ -717,9 +717,7 @@ localStorage.setItem("currentAnimalNumber", numberStr);
 const d = todayLocal();
 
 setTimeout(()=>{
-  if (entryTypeVal === "followers") {
-    location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-  
+  location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
 }, 1200);
   }catch(err){
     console.error(err);
