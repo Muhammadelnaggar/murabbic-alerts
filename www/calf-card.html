@@ -112,6 +112,28 @@
 .hidden{
   display:none !important;
 }
+ .back-btn{
+  width:42px;
+  height:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--soft);
+  color:var(--green-dark);
+  text-decoration:none;
+  font-size:22px;
+  font-weight:900;
+  flex:0 0 42px;
+  box-shadow:0 4px 12px rgba(0,0,0,.04);
+}
+.back-btn:hover{
+  background:#e7f3ea;
+}
+.back-btn:active{
+  transform:translateY(1px);
+}   
 @media (max-width:560px){
   .lookup-bar{
     flex-direction:column;
@@ -525,7 +547,6 @@ async function getOwnerFieldQueries(number, userId) {
                 if (seen.has(doc.id)) return;
                 const row = { id: doc.id, ...doc.data() };
                 const disp = eventDisplayName(row);
-                if (!['رضاعة','فطام','إزالة حلمات زائدة','تحصين','حالة صحية','نامي'].includes(disp)) return;
                 seen.add(doc.id);
                 all.push(row);
               });
