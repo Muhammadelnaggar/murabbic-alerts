@@ -553,7 +553,14 @@ async function getOwnerFieldQueries(number, userId) {
             } catch (_) {
               // ignore index/order issues; will sort in-memory later if needed
               try {
-                const qy = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal));
+const qy = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal));
+const snap2 = await getDocs(qy);
+snap2.forEach(doc => {
+  if (seen.has(doc.id)) return;
+  const row = { id: doc.id, ...doc.data() };
+  seen.add(doc.id);
+  all.push(row);
+});
                 const snap2 = await getDocs(qy);
                 snap2.forEach(doc => {
                   if (seen.has(doc.id)) return;
