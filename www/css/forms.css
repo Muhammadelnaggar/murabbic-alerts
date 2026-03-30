@@ -399,3 +399,16 @@ html[dir="rtl"] input[type="date"]{
 html[dir="rtl"] .btn-row{
   flex-direction:row;
 }
+.mbk-title{
+  font-size:20px;
+  font-weight:900;
+  color:#0f172a;
+  line-height:1.2;
+}
+
+.mbk-sub{
+  font-size:13px;
+  font-weight:800;
+  color:#0b7f47;
+  opacity:1;
+}
