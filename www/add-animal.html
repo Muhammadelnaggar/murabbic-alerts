@@ -620,11 +620,11 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
   try{
     // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
     const key = `${CURRENT_UID}#${numberStr}`;
-    const dupQ = query(
-      collection(db, "animals"),
-      where("userId_number", "==", key),
-      limit(1)
-    );
+  const dupQ = query(
+  collection(db, "animals"),
+  where("userId_number", "==", key),
+  limit(1)
+);
     const dupSnap = await getDocs(dupQ);
 
     if (!dupSnap.empty){
@@ -695,7 +695,8 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
       demo: true
     };
 
-const ref = await addDoc(collection(db,"animals"), payload);
+const targetCollection = (entryTypeVal === "followers") ? "calves" : "animals";
+const ref = await addDoc(collection(db, targetCollection), payload);
   showPopup("تم تسجيل الحيوان بنجاح ✅", true);
 
   localStorage.setItem("currentAnimalId", ref.id);
