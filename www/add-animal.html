@@ -80,23 +80,25 @@
 </div>
 
 <input type="hidden" id="entryType" value="mothers" />
-    <div id="mothersFields">
-    <label for="animalNumber">رقم الحيوان:</label>
-    <input type="text" id="animalNumber" required />
 
-    <label for="animalType">نوع الحيوان:</label>
-    <select id="animalType" required>
-      <option value="">اختر النوع</option>
-      <option value="بقرة">بقرة</option>
-      <option value="جاموسة">جاموسة</option>
-    </select>
+<label for="animalNumber">رقم الحيوان:</label>
+<input type="text" id="animalNumber" required />
 
-    <label for="breed">السلالة:</label>
-    <select id="breed" required>
-      <option value="">اختر السلالة</option>
-    </select>
+<label for="animalType">نوع الحيوان:</label>
+<select id="animalType" required>
+  <option value="">اختر النوع</option>
+  <option value="بقرة">بقرة</option>
+  <option value="جاموسة">جاموسة</option>
+</select>
 
-    <label for="productionStatus">الحالة الإنتاجية:</label>
+<label for="breed">السلالة:</label>
+<select id="breed" required>
+  <option value="">اختر السلالة</option>
+</select>
+<label for="birthDate">تاريخ الميلاد (اختياري):</label>
+<input type="date" id="birthDate" />
+<div id="mothersFields">
+<label for="productionStatus">الحالة الإنتاجية:</label>
     <select id="productionStatus" required>
       <option value="">اختر الحالة</option>
       <option value="حلاب">حلاب</option>
@@ -123,8 +125,7 @@
     <input type="number" id="servicesCount" min="0" placeholder="0" />
 
     <!-- جديد -->
-    <label for="lactationNumber">رقم موسم الحليب الحالي:</label>
-    <input type="number" id="lactationNumber" min="0" placeholder="مثال: 3" />
+    
 
     <label for="birthDate">تاريخ الميلاد (اختياري):</label>
     <input type="date" id="birthDate" />
@@ -347,13 +348,20 @@ function computeFollowerPregnancy(){
 function toggleFollowerFields(){
   const st = followerStatus.value;
 
-  weaningField.classList.toggle('hidden-block', st !== "فطام");
+  const showWeaning = (st === "فطام");
+  weaningField.classList.toggle('hidden-block', !showWeaning);
+  weaningDate.required = (entryType.value === "followers" && showWeaning);
 
   const showInsemination = (st === "ملقح" || st === "عشار");
   followerInseminationField.classList.toggle('hidden-block', !showInsemination);
+  followerLastInseminationDate.required = (entryType.value === "followers" && showInsemination);
 
   const showPregnancy = (st === "عشار");
   followerPregnancyBox.classList.toggle('hidden-block', !showPregnancy);
+
+  if (!showWeaning){
+    weaningDate.value = "";
+  }
 
   if (!showInsemination){
     followerLastInseminationDate.value = "";
@@ -366,8 +374,8 @@ function toggleFollowerFields(){
   } else {
     computeFollowerPregnancy();
   }
-} 
-     function setEntryMode(mode){
+}
+function setEntryMode(mode){
   entryType.value = mode;
 
   const mothers = (mode === "mothers");
@@ -376,6 +384,35 @@ function toggleFollowerFields(){
 
   btnMothers.classList.toggle('active', mothers);
   btnFollowers.classList.toggle('active', !mothers);
+
+  const motherRequiredIds = [
+    'productionStatus',
+    'reproductiveStatus'
+  ];
+
+  const followerRequiredIds = [
+    'followerSex',
+    'followerStatus',
+    'damNumber'
+  ];
+
+  motherRequiredIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.required = mothers;
+  });
+
+  followerRequiredIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.required = !mothers;
+  });
+
+  if (weaningDate) {
+    weaningDate.required = (!mothers && followerStatus.value === "فطام");
+  }
+
+  if (followerLastInseminationDate) {
+    followerLastInseminationDate.required = (!mothers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
+  }
 }
       ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
       ['change','input'].forEach(e=>productionEl.addEventListener(e,()=>{toggleMilkFieldLocal();toggleInseminationFieldLocal();}));
