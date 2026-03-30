@@ -620,19 +620,8 @@ const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value ||
   try{
     // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
     const key = `${CURRENT_UID}#${numberStr}`;
-const dupCollection = (entryTypeVal === "followers") ? "calves" : "animals";
-const dupQ = query(
-  collection(db, dupCollection),
-  where("userId_number", "==", key),
-  limit(1)
-);
-const dupSnap = await getDocs(dupQ);
 
-    if (!dupSnap.empty){
-     showPopup("⚠️ هذا الحيوان موجود بالفعل — لا يمكن التسجيل.", false);
 
-      return;
-    }
 
     // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
 const payload = (entryTypeVal === "mothers")
