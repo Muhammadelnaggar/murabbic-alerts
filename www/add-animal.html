@@ -152,8 +152,40 @@
 </div>
       </div>
     <div id="followersFields" class="hidden-block">
-  <div style="padding:12px;border:1px dashed #cddc39;border-radius:10px;background:#f9fff3;color:#2e7d32;font-weight:700">
-    تبويب التوابع — سنضيف حقوله في المرحلة التالية
+  <label for="followerSex">الجنس:</label>
+  <select id="followerSex">
+    <option value="">اختر الجنس</option>
+    <option value="أنثى">أنثى</option>
+    <option value="ذكر">ذكر</option>
+  </select>
+
+  <label for="followerStatus">الحالة الحالية:</label>
+  <select id="followerStatus">
+    <option value="">اختر الحالة</option>
+  </select>
+
+  <label for="damNumber">رقم الأم:</label>
+  <input type="text" id="damNumber" placeholder="اكتب رقم الأم" />
+
+  <div id="weaningField" class="hidden-block">
+    <label for="weaningDate">تاريخ الفطام:</label>
+    <input type="date" id="weaningDate" />
+  </div>
+
+  <div id="followerInseminationField" class="hidden-block">
+    <label for="followerLastInseminationDate">تاريخ آخر تلقيح:</label>
+    <input type="date" id="followerLastInseminationDate" />
+
+    <label for="followerServicesCount">عدد مرات التلقيح:</label>
+    <input type="number" id="followerServicesCount" min="0" placeholder="0" />
+
+    <label for="followerSireNumber">رقم الطلوقة:</label>
+    <input type="text" id="followerSireNumber" placeholder="اكتب رقم الطلوقة" />
+  </div>
+
+  <div id="followerPregnancyBox" class="hidden-block">
+    <label for="followerPregnancyDays">عدد أيام الحمل:</label>
+    <input type="number" id="followerPregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" />
   </div>
 </div>
     <button type="submit">📥 تسجيل الحيوان</button>
@@ -188,6 +220,17 @@ const btnMothers = document.getElementById('btnMothers');
 const btnFollowers = document.getElementById('btnFollowers');
 const mothersFields = document.getElementById('mothersFields');
 const followersFields = document.getElementById('followersFields');
+const followerSex = document.getElementById('followerSex');
+const followerStatus = document.getElementById('followerStatus');
+const damNumber = document.getElementById('damNumber');
+const weaningField = document.getElementById('weaningField');
+const weaningDate = document.getElementById('weaningDate');
+const followerInseminationField = document.getElementById('followerInseminationField');
+const followerLastInseminationDate = document.getElementById('followerLastInseminationDate');
+const followerServicesCount = document.getElementById('followerServicesCount');
+const followerSireNumber = document.getElementById('followerSireNumber');
+const followerPregnancyBox = document.getElementById('followerPregnancyBox');
+const followerPregnancyDays = document.getElementById('followerPregnancyDays');      
       const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
       const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
 
@@ -273,6 +316,57 @@ const followersFields = document.getElementById('followersFields');
           }
         }
       }
+     function updateFollowerStatusOptions(){
+  const sex = followerSex.value;
+  const femaleOptions = ["رضيع","فطام","نامي","تحت التلقيح","ملقح","عشار"];
+  const maleOptions = ["رضيع","فطام","نامي"];
+  const list = sex === "ذكر" ? maleOptions : sex === "أنثى" ? femaleOptions : [];
+
+  followerStatus.innerHTML =
+    '<option value="">اختر الحالة</option>' +
+    list.map(v => `<option value="${v}">${v}</option>`).join('');
+}
+
+function computeFollowerPregnancy(){
+  if (followerStatus.value !== "عشار"){
+    followerPregnancyDays.value = "";
+    return;
+  }
+  const ins = followerLastInseminationDate.value;
+  if (!ins){
+    followerPregnancyDays.value = "";
+    return;
+  }
+  const d0 = new Date(ins), d1 = new Date();
+  d0.setHours(0,0,0,0);
+  d1.setHours(0,0,0,0);
+  const diff = Math.max(0, Math.round((d1 - d0) / 86400000));
+  followerPregnancyDays.value = String(diff);
+}
+
+function toggleFollowerFields(){
+  const st = followerStatus.value;
+
+  weaningField.classList.toggle('hidden-block', st !== "فطام");
+
+  const showInsemination = (st === "ملقح" || st === "عشار");
+  followerInseminationField.classList.toggle('hidden-block', !showInsemination);
+
+  const showPregnancy = (st === "عشار");
+  followerPregnancyBox.classList.toggle('hidden-block', !showPregnancy);
+
+  if (!showInsemination){
+    followerLastInseminationDate.value = "";
+    followerServicesCount.value = "";
+    followerSireNumber.value = "";
+  }
+
+  if (!showPregnancy){
+    followerPregnancyDays.value = "";
+  } else {
+    computeFollowerPregnancy();
+  }
+} 
      function setEntryMode(mode){
   entryType.value = mode;
 
@@ -291,6 +385,14 @@ const followersFields = document.getElementById('followersFields');
       ['change','input'].forEach(e=>lactationNumber.addEventListener(e,()=>{toggleCalvingForLactation();computeDIM();}));
      btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
      btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
+      followerSex.addEventListener('change', ()=>{
+  updateFollowerStatusOptions();
+  toggleFollowerFields();
+});
+
+followerStatus.addEventListener('change', toggleFollowerFields);
+followerLastInseminationDate.addEventListener('change', computeFollowerPregnancy);
+followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy);
  document.addEventListener('DOMContentLoaded', ()=>{
   updateBreedOptionsLocal();
   toggleCalvingForLactation();
@@ -300,6 +402,8 @@ const followersFields = document.getElementById('followersFields');
   computeDIM();
   computePregnancy();
   setEntryMode('mothers');
+  updateFollowerStatusOptions();
+  toggleFollowerFields(); 
 });
 
       window.__mbkUI = { updateBreedOptions: updateBreedOptionsLocal, toggleMilkField: toggleMilkFieldLocal, toggleInseminationField: toggleInseminationFieldLocal, computeDIM, computePregnancy, toggleCalvingForLactation };
