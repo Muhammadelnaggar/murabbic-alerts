@@ -511,7 +511,7 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
   const $ = (id)=>document.getElementById(id);
   const DASHBOARD_URL = "dashboard.html";
   const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-  const setMsg=(t,ok=false)=>{ msgDiv.textContent=t; msgDiv.className=ok?"success":"error"; msgDiv.style.display="block"; };
+  const setMsg = (t, ok=false) => { showPopup(t, ok); };
 
   // رجوع ذكي
   let __hasAnimals = null;
@@ -665,7 +665,7 @@ const payload = (entryTypeVal === "mothers")
 
       daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
       createdAt: serverTimestamp(),
-      demo: true
+      
     }
   : {
       ownerUid: CURRENT_UID,
@@ -704,39 +704,9 @@ const payload = (entryTypeVal === "mothers")
           ? (followerPregnancyDaysVal || null) : null,
 
       createdAt: serverTimestamp(),
-      demo: true
+     
     };
-   {
-      ownerUid: CURRENT_UID,
-      userId: CURRENT_UID,
-      userId_number: key,
-      entryType: "followers",
-
-      number: numberStr,
-      animalNumber: Number(numberStr),
-      animaltype: normAnimaltype(animalTypeAr),
-      animalTypeAr,
-      breed,
-      sex: followerSexVal,
-      followerStatus: followerStatusVal,
-      birthDate,
-      damNumber: damNumberVal,
-      weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
-      lastInseminationDate:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerLastInseminationVal || null) : null,
-      servicesCount:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? followerServicesCountVal : 0,
-      sireNumber:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerSireNumberVal || null) : null,
-      pregnancyDays:
-        (followerStatusVal === "عشار")
-          ? (followerPregnancyDaysVal || null) : null,
-      createdAt: serverTimestamp(),
-      demo: true
-    };
+  
 
 const targetCollection = (entryTypeVal === "followers") ? "calves" : "animals";
 const ref = await addDoc(collection(db, targetCollection), payload);
@@ -749,9 +719,7 @@ const d = todayLocal();
 setTimeout(()=>{
   if (entryTypeVal === "followers") {
     location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-  } else {
-    location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-  }
+  
 }, 1200);
   }catch(err){
     console.error(err);
