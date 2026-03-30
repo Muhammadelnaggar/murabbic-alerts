@@ -528,59 +528,68 @@ async function getOwnerFieldQueries(number, userId) {
 
   return parts.join(' + ');
 }   
-    async function loadEvents(number, userId) {
-      const ownerFields = ['userId','ownerUid'];
-      const numberValues = [];
-      const nNum = Number(number);
-      if (!Number.isNaN(nNum)) numberValues.push(nNum);
-      numberValues.push(String(number));
-      const all = [];
-      const seen = new Set();
+async function loadEvents(number, userId) {
+  const ownerFields = ['userId', 'ownerUid'];
+  const numberValues = [];
+  const nNum = Number(number);
 
-      for (const ownerField of ownerFields) {
-        for (const nVal of numberValues) {
-          for (const field of ['animalNumber','number']) {
-            try {
-              const qx = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal), orderBy('eventDate', 'asc'));
-              const snap = await getDocs(qx);
-              snap.forEach(doc => {
-                if (seen.has(doc.id)) return;
-                const row = { id: doc.id, ...doc.data() };
-                const disp = eventDisplayName(row);
-                seen.add(doc.id);
-                all.push(row);
-              });
-            } catch (_) {
-              // ignore index/order issues; will sort in-memory later if needed
-              try {
-const qy = query(collection(db, 'events'), where(ownerField, '==', userId), where(field, '==', nVal));
-const snap2 = await getDocs(qy);
-snap2.forEach(doc => {
-  if (seen.has(doc.id)) return;
-  const row = { id: doc.id, ...doc.data() };
-  seen.add(doc.id);
-  all.push(row);
-});
-                const snap2 = await getDocs(qy);
-                snap2.forEach(doc => {
-                  if (seen.has(doc.id)) return;
-                  const row = { id: doc.id, ...doc.data() };
-                  const disp = eventDisplayName(row);
-                  if (!['رضاعة','فطام','إزالة حلمات زائدة','تحصين','حالة صحية','نامي'].includes(disp)) return;
-                  seen.add(doc.id);
-                  all.push(row);
-                });
-              } catch (e2) {
-                console.warn('events query failed', e2);
-              }
-            }
+  if (!Number.isNaN(nNum)) numberValues.push(nNum);
+  numberValues.push(String(number));
+
+  const all = [];
+  const seen = new Set();
+
+  for (const ownerField of ownerFields) {
+    for (const nVal of numberValues) {
+      for (const field of ['animalNumber', 'number']) {
+        try {
+          const qx = query(
+            collection(db, 'events'),
+            where(ownerField, '==', userId),
+            where(field, '==', nVal),
+            orderBy('eventDate', 'asc')
+          );
+
+          const snap = await getDocs(qx);
+          snap.forEach(docSnap => {
+            if (seen.has(docSnap.id)) return;
+            const row = { id: docSnap.id, ...docSnap.data() };
+            seen.add(docSnap.id);
+            all.push(row);
+          });
+
+        } catch (_) {
+          try {
+            const qy = query(
+              collection(db, 'events'),
+              where(ownerField, '==', userId),
+              where(field, '==', nVal)
+            );
+
+            const fallbackSnap = await getDocs(qy);
+            fallbackSnap.forEach(docSnap => {
+              if (seen.has(docSnap.id)) return;
+              const row = { id: docSnap.id, ...docSnap.data() };
+              seen.add(docSnap.id);
+              all.push(row);
+            });
+
+          } catch (e2) {
+            console.warn('events query failed', e2);
           }
         }
       }
-
-      all.sort((a,b) => normalizeDate(pick(a,['eventDate','date','createdAt'])) < normalizeDate(pick(b,['eventDate','date','createdAt'])) ? -1 : 1);
-      return all;
     }
+  }
+
+  all.sort((a, b) => {
+    const ad = normalizeDate(pick(a, ['eventDate', 'date', 'createdAt']));
+    const bd = normalizeDate(pick(b, ['eventDate', 'date', 'createdAt']));
+    return ad < bd ? -1 : ad > bd ? 1 : 0;
+  });
+
+  return all;
+}
 
 function fillCalf(calf, events, damDoc = null, birthEvent = null) {
   const number = pick(calf, ['calfNumber','animalNumber','number'], '—');
