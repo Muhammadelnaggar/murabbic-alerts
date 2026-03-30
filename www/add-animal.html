@@ -96,8 +96,15 @@
   protectPage();
   lockBackButton();
 </script>
-  <h1>➕ إضافة حيوان جديد</h1>
-  <form id="animalForm">
+ <header class="mbk-head">
+  <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  <div class="mbk-center">
+    <div class="mbk-title">إضافة حيوان جديد</div>
+    <div class="mbk-sub">مُرَبِّيك</div>
+  </div>
+</header>
+ <main class="mbk-main">
+  <form id="animalForm" class="mbk-form">
     <div id="msg"></div>
    <div id="entryTypeBox" class="entry-type-box">
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
@@ -187,7 +194,8 @@
   <div class="mbk-popup-content" id="popupContent"></div>
 </div>
 
-  </form>
+   </form>
+</main>
 
   <!-- واجهة النموذج (سلالات/حسابات تلقائية) -->
   <script>
