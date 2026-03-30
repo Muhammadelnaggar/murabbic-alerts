@@ -656,6 +656,21 @@ damNumber: damNumberVal,
 
 weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
 
+number: numberStr,
+animalNumber: Number(numberStr),
+animaltype: normAnimaltype(animalTypeAr),
+animalTypeAr,
+breed,
+sex: followerSexVal,
+
+status: followerStatusVal,
+followerStatus: followerStatusVal,
+
+birthDate,
+damNumber: damNumberVal,
+
+weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
+
 lastInseminationDate:
   (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
     ? (followerLastInseminationVal || null) : null,
