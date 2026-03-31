@@ -155,6 +155,37 @@ if (t !== "شياع" && t !== "heat") return;
 }
 
 export const eventSchemas = {
+  "إضافة حيوان": {
+  fields: {
+    animalNumber: { required: true, msg: "رقم الحيوان مطلوب." },
+    animalType: { required: true, msg: "نوع الحيوان مطلوب." },
+    breed: { required: true, msg: "السلالة مطلوبة." },
+    entryType: { required: true, msg: "نوع الإدخال غير محدد." },
+
+    birthDate: { required: false, type: "date", msg: "تاريخ الميلاد غير صالح." },
+
+    productionStatus: { required: false, msg: "الحالة الإنتاجية مطلوبة." },
+    dailyMilk: { required: false, type: "number", msg: "إنتاج اللبن غير صالح." },
+    reproductiveStatus: { required: false, msg: "الحالة التناسلية مطلوبة." },
+    servicesCount: { required: false, type: "number" },
+    lactationNumber: { required: false, type: "number" },
+    lastCalvingDate: { required: false, type: "date", msg: "تاريخ آخر ولادة غير صالح." },
+    daysInMilk: { required: false, type: "number" },
+    pregnancyDays: { required: false, type: "number" },
+    lastInseminationDate: { required: false, type: "date", msg: "تاريخ آخر تلقيح غير صالح." },
+    sireNumber: { required: false },
+
+    followerSex: { required: false, msg: "الجنس مطلوب." },
+    followerStatus: { required: false, msg: "الحالة الحالية مطلوبة." },
+    damNumber: { required: false, msg: "رقم الأم مطلوب." },
+    weaningDate: { required: false, type: "date", msg: "تاريخ الفطام غير صالح." },
+    followerLastInseminationDate: { required: false, type: "date", msg: "تاريخ آخر تلقيح غير صالح." },
+    followerServicesCount: { required: false, type: "number" },
+    followerSireNumber: { required: false },
+    followerPregnancyDays: { required: false, type: "number" }
+  },
+  guards: ["addAnimalDecision"]
+},
 "ولادة": {
   fields: {
     // أساسيات
@@ -611,7 +642,49 @@ vaccinationDecision(fd) {
   // ✅ المستبعد تناسليًا يُحصَّن عادي
   return null;
 },
+addAnimalDecision(fd) {
+  const mode = String(fd.entryType || "").trim();
 
+  if (mode === "mothers") {
+    if (!String(fd.productionStatus || "").trim()) return "❌ الحالة الإنتاجية مطلوبة.";
+    if (!String(fd.reproductiveStatus || "").trim()) return "❌ الحالة التناسلية مطلوبة.";
+
+    if (String(fd.productionStatus || "").trim() === "حلاب") {
+      const milk = String(fd.dailyMilk || "").trim();
+      if (!milk) return "❌ إنتاج اللبن اليومي مطلوب للحيوان الحلاب.";
+    }
+
+    if (Number(fd.lactationNumber || 0) > 0 && !String(fd.lastCalvingDate || "").trim()) {
+      return "❌ تاريخ آخر ولادة مطلوب عند وجود رقم موسم.";
+    }
+
+    if (String(fd.productionStatus || "").trim() === "جاف" && !String(fd.lastInseminationDate || "").trim()) {
+      return "❌ تاريخ آخر تلقيح مطلوب للحيوان الجاف.";
+    }
+
+    return null;
+  }
+
+  if (mode === "followers") {
+    if (!String(fd.birthDate || "").trim()) return "❌ تاريخ الميلاد مطلوب للتابع.";
+    if (!String(fd.followerSex || "").trim()) return "❌ جنس التابع مطلوب.";
+    if (!String(fd.followerStatus || "").trim()) return "❌ الحالة الحالية للتابع مطلوبة.";
+    if (!String(fd.damNumber || "").trim()) return "❌ رقم الأم مطلوب.";
+
+    if (String(fd.followerStatus || "").trim() === "فطام" && !String(fd.weaningDate || "").trim()) {
+      return "❌ تاريخ الفطام مطلوب.";
+    }
+
+    const st = String(fd.followerStatus || "").trim();
+    if ((st === "ملقح" || st === "عشار") && !String(fd.followerLastInseminationDate || "").trim()) {
+      return "❌ تاريخ آخر تلقيح مطلوب.";
+    }
+
+    return null;
+  }
+
+  return "❌ نوع الإدخال غير معروف.";
+},
 calvingDecision(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر العثور على الحيوان — تحقق من الرقم.";
