@@ -420,7 +420,12 @@ padding: 6px 0;
     <div class="strip-item"><span class="lbl">جاف مبكّر</span><span class="val" id="ctxEarlyDry_txt">—</span></div>
     <div class="strip-item"><span class="lbl">تحضير ولادة</span><span class="val" id="ctxCloseUp_txt">—</span></div>
   </div>
-
+  <div class="strip-row">
+  <div class="strip-item"><span class="lbl">دهن اللبن %</span><span class="val" id="ctxMilkFat_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">بروتين اللبن %</span><span class="val" id="ctxMilkProtein_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">سعر اللبن/كجم</span><span class="val" id="ctxMilkPrice_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">السلالة</span><span class="val" id="ctxBreed_txt">—</span></div>
+</div>
   <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
@@ -430,6 +435,10 @@ padding: 6px 0;
     <input id="ctxEarlyDry" type="checkbox" style="display:none">
     <input id="ctxCloseUp" type="checkbox" style="display:none">
     <select id="ctxPreg" style="display:none"><option value="">—</option><option value="عشار">عشار</option><option value="فارغة">فارغة</option></select>
+    <input id="ctxMilkFat" type="number" inputmode="decimal" step="0.01" min="0" style="display:none">
+<input id="ctxMilkProtein" type="number" inputmode="decimal" step="0.01" min="0" style="display:none">
+<input id="ctxMilkPrice" type="number" inputmode="decimal" step="0.01" min="0" style="display:none">
+<input id="ctxBreed" type="text" style="display:none">
   </div>
 
   <div class="warning" id="warn"></div>
@@ -537,12 +546,17 @@ padding: 6px 0;
     <span id="totCost">—</span>
     <span id="totAsFed">—</span>
     <span id="mixPriceAsFed">—</span>
-    <span id="cpPctTotal">—</span>
+    <span id="mpSupplyG">—</span>
+    <span id="mpDensityGkgDM">—</span>
+    <span id="mpTargetG">—</span>
+    <span id="mpBalanceG">—</span>
+    <span id="targetAsFedKg">—</span>
+    <span id="ecmKg">—</span>
+    <span id="fpcmKg">—</span>
     <span id="fcRatio">—</span>
-
-  <span id="nelActual">—</span>
-<span id="ndfPctActual">—</span>
-<span id="fatPctActual">—</span>
+    <span id="nelActual">—</span>
+    <span id="ndfPctActual">—</span>
+    <span id="fatPctActual">—</span>
 
 <span id="dmiTarget">—</span>
 <span id="nelTarget">—</span>
