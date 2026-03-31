@@ -490,11 +490,14 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
 
   const form   = document.getElementById("animalForm");
   const msgDiv = document.getElementById("msg");
+  const bar = window.ensureInfoBar ? window.ensureInfoBar(form) : null;
+const showCentral = (msg, type="success") => window.showMsg ? window.showMsg(bar, msg, type) : showPopup(msg, type !== "error");
   const $ = (id)=>document.getElementById(id);
   const DASHBOARD_URL = "dashboard.html";
   const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-  const setMsg = (t, ok=false) => { showPopup(t, ok); };
-
+const setMsg = (t, ok=false) => {
+  showCentral(t, ok ? "success" : "error");
+};
   // رجوع ذكي
   let __hasAnimals = null;
   window.addEventListener("DOMContentLoaded", async () => {
@@ -654,8 +657,7 @@ const payload = (entryTypeVal === "mothers")
 
 const targetCollection = (entryTypeVal === "followers") ? "calves" : "animals";
 const ref = await addDoc(collection(db, targetCollection), payload);
-  showPopup("تم تسجيل الحيوان بنجاح ✅", true);
-
+showCentral("✅ تم تسجيل الحيوان بنجاح", "success");
   localStorage.setItem("currentAnimalId", ref.id);
 localStorage.setItem("currentAnimalNumber", numberStr);
 const d = todayLocal();
