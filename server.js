@@ -988,11 +988,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
    title: 'العليقة الحالية — البروتين الممثل',
     value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
   },
-  {
-    key: 'mpBalanceG',
-  title: 'توازن البروتين الممثل',
-    value: txt(nutrition.mpBalanceG, 'جم/يوم', 0)
-  },
+ 
 
   {
     key: 'ndfTarget',
