@@ -79,28 +79,22 @@
   <button type="button" id="btnFollowers" class="entry-tab">توابع</button>
 </div>
 
-<input type="hidden" id="entryType" value="mothers" />
-
+<input type="hidden" id="entryType" value="mothers" data-field="entryType" />
 <label for="animalNumber">رقم الحيوان:</label>
-<input type="text" id="animalNumber" required />
-
+<input type="text" id="animalNumber" required data-field="animalNumber" />
 <label for="animalType">نوع الحيوان:</label>
-<select id="animalType" required>
-  <option value="">اختر النوع</option>
+<select id="animalType" required data-field="animalType">  <option value="">اختر النوع</option>
   <option value="بقرة">بقرة</option>
   <option value="جاموسة">جاموسة</option>
 </select>
 
 <label for="breed">السلالة:</label>
-<select id="breed" required>
-  <option value="">اختر السلالة</option>
+<select id="breed" required data-field="breed">  <option value="">اختر السلالة</option>
 </select>
 <label for="birthDate">تاريخ الميلاد (اختياري):</label>
-<input type="date" id="birthDate" />
-<div id="mothersFields">
+<input type="date" id="birthDate" data-field="birthDate" /><div id="mothersFields">
 <label for="productionStatus">الحالة الإنتاجية:</label>
-    <select id="productionStatus" required>
-      <option value="">اختر الحالة</option>
+<select id="productionStatus" required data-field="productionStatus">      <option value="">اختر الحالة</option>
       <option value="حلاب">حلاب</option>
       <option value="جاف">جاف</option>
     </select>
@@ -111,8 +105,8 @@
     </div>
 
     <label for="reproductiveStatus">الحالة التناسلية:</label>
-    <select id="reproductiveStatus" required>
-      <option value="">اختر الحالة</option>
+  <select id="reproductiveStatus" required data-field="reproductiveStatus">
+     <option value="">اختر الحالة</option>
       <option value="حديث الولادة">حديث الولادة</option>
       <option value="ملقحة">ملقحة</option>
       <option value="عشار">عشار</option>
@@ -122,69 +116,57 @@
 
     <!-- جديد -->
   <label for="servicesCount">عدد مرات التلقيح (الموسم الحالي):</label>
-<input type="number" id="servicesCount" min="0" placeholder="0" />
-
+<input type="number" id="servicesCount" min="0" placeholder="0" data-field="servicesCount" />
 <label for="lactationNumber">رقم موسم الحليب الحالي:</label>
-<input type="number" id="lactationNumber" min="0" placeholder="مثال: 3" />
-
+<input type="number" id="lactationNumber" min="0" placeholder="مثال: 3" data-field="lactationNumber" />
 <label for="lastCalvingDate">تاريخ آخر ولادة:</label>
-    <input type="date" id="lastCalvingDate" />
-
+<input type="date" id="lastCalvingDate" data-field="lastCalvingDate" />
     <!-- DIM -->
     <label for="daysInMilk">عدد أيام الحليب (DIM):</label>
-    <input type="number" id="daysInMilk" readonly disabled placeholder="يُحسب تلقائيًا" />
-
+<input type="number" id="daysInMilk" readonly disabled placeholder="يُحسب تلقائيًا" data-field="daysInMilk" />
     <!-- أيام الحمل (للجاف) -->
     <div id="pregnancyBox" style="display:none;">
       <label for="pregnancyDays">عدد أيام الحمل:</label>
-      <input type="number" id="pregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" />
-    </div>
+<input type="number" id="pregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" data-field="pregnancyDays" />    </div>
 
     <div id="inseminationField" style="display:none;">
       <label for="lastInseminationDate">تاريخ آخر تلقيح:</label>
-      <input type="date" id="lastInseminationDate" />
-    </div>
+<input type="date" id="lastInseminationDate" data-field="lastInseminationDate" />    </div>
     <div id="sireField" style="display:none;">
   <label for="sireNumber">رقم الطلوقة:</label>
-  <input type="text" id="sireNumber" placeholder="اكتب رقم الطلوقة" />
-</div>
+<input type="text" id="sireNumber" placeholder="اكتب رقم الطلوقة" data-field="sireNumber" />
+    </div>
       </div>
     <div id="followersFields" class="hidden-block">
   <label for="followerSex">الجنس:</label>
-  <select id="followerSex">
-    <option value="">اختر الجنس</option>
+<select id="followerSex" data-field="followerSex">
+  <option value="">اختر الجنس</option>
     <option value="أنثى">أنثى</option>
     <option value="ذكر">ذكر</option>
   </select>
 
   <label for="followerStatus">الحالة الحالية:</label>
-  <select id="followerStatus">
-    <option value="">اختر الحالة</option>
+<select id="followerStatus" data-field="followerStatus">
+  <option value="">اختر الحالة</option>
   </select>
 
   <label for="damNumber">رقم الأم:</label>
-  <input type="text" id="damNumber" placeholder="اكتب رقم الأم" />
-
+<input type="text" id="damNumber" placeholder="اكتب رقم الأم" data-field="damNumber" />
   <div id="weaningField" class="hidden-block">
     <label for="weaningDate">تاريخ الفطام:</label>
-    <input type="date" id="weaningDate" />
-  </div>
+<input type="date" id="weaningDate" data-field="weaningDate" />  </div>
 
   <div id="followerInseminationField" class="hidden-block">
     <label for="followerLastInseminationDate">تاريخ آخر تلقيح:</label>
-    <input type="date" id="followerLastInseminationDate" />
-
+<input type="date" id="followerLastInseminationDate" data-field="followerLastInseminationDate" />
     <label for="followerServicesCount">عدد مرات التلقيح:</label>
-    <input type="number" id="followerServicesCount" min="0" placeholder="0" />
-
+<input type="number" id="followerServicesCount" min="0" placeholder="0" data-field="followerServicesCount" />
     <label for="followerSireNumber">رقم الطلوقة:</label>
-    <input type="text" id="followerSireNumber" placeholder="اكتب رقم الطلوقة" />
-  </div>
+<input type="text" id="followerSireNumber" placeholder="اكتب رقم الطلوقة" data-field="followerSireNumber" />  </div>
 
   <div id="followerPregnancyBox" class="hidden-block">
     <label for="followerPregnancyDays">عدد أيام الحمل:</label>
-    <input type="number" id="followerPregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" />
-  </div>
+<input type="number" id="followerPregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" data-field="followerPregnancyDays" />  </div>
 </div>
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
@@ -556,73 +538,43 @@ function showPopup(msg, ok=true){
   setTimeout(() => { box.style.display = "none"; }, 1800);
 }
 
- form.addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  msgDiv.style.display = "none";
+form.addEventListener("mbk:valid", async (e)=>{
+ const formData = e.detail?.formData || {};
+msgDiv.style.display = "none";
 
   if (!CURRENT_UID){
     setMsg("فضلاً سجّل الدخول أولاً.", false);
     return;
   }
 
-  const numberStr            = $("animalNumber").value.trim();
-   const entryTypeVal                 = $("entryType").value;
-const followerSexVal               = $("followerSex")?.value || "";
-const followerStatusVal            = $("followerStatus")?.value || "";
-const damNumberVal                 = $("damNumber")?.value.trim() || null;
-const weaningDateVal               = $("weaningDate")?.value || null;
-const followerLastInseminationVal  = $("followerLastInseminationDate")?.value || null;
-const followerServicesCountVal     = Number($("followerServicesCount")?.value || 0);
-const followerSireNumberVal        = $("followerSireNumber")?.value.trim() || null;
-const followerPregnancyDaysVal     = Number($("followerPregnancyDays")?.value || 0);
-  const animalTypeAr         = $("animalType").value;
-  const breed                = $("breed").value;
-  const productionStatus     = $("productionStatus").value;
-  const dailyMilkVal         = $("dailyMilk").value.trim();
-  const reproductiveStatus   = $("reproductiveStatus").value;
-  const servicesCount        = Number($("servicesCount").value || 0);
-  const lactationNumber      = Number($("lactationNumber")?.value || 0);
-  const birthDate            = $("birthDate").value || null;
-  const lastCalvingDate      = $("lastCalvingDate").value;
-  const lastInseminationInp  = $("lastInseminationDate").value || null;
-   const sireNumberInp        = $("sireNumber").value.trim() || null;
-  const daysInMilkVal        = Number($("daysInMilk").value || 0);
+  const numberStr = String(formData.animalNumber || "").trim();
+const entryTypeVal = String(formData.entryType || "mothers").trim();
 
-  if (!numberStr || !animalTypeAr){
-    setMsg("أكمل الحقول المطلوبة.", false);
-    return;
-  }
-   if (entryTypeVal === "followers") {
-  if (!numberStr || !animalTypeAr || !breed || !birthDate || !followerSexVal || !followerStatusVal || !damNumberVal) {
-    setMsg("أكمل بيانات التابع المطلوبة.", false);
-    return;
-  }
+const followerSexVal = String(formData.followerSex || "").trim();
+const followerStatusVal = String(formData.followerStatus || "").trim();
+const damNumberVal = String(formData.damNumber || "").trim() || null;
+const weaningDateVal = String(formData.weaningDate || "").trim() || null;
+const followerLastInseminationVal = String(formData.followerLastInseminationDate || "").trim() || null;
+const followerServicesCountVal = Number(formData.followerServicesCount || 0);
+const followerSireNumberVal = String(formData.followerSireNumber || "").trim() || null;
+const followerPregnancyDaysVal = Number(formData.followerPregnancyDays || 0);
 
-  if (followerStatusVal === "فطام" && !weaningDateVal) {
-    setMsg("أدخل تاريخ الفطام.", false);
-    return;
-  }
-
-  if ((followerStatusVal === "ملقح" || followerStatusVal === "عشار") && !followerLastInseminationVal) {
-    setMsg("أدخل تاريخ آخر تلقيح.", false);
-    return;
-  }
-}
-  if (lactationNumber > 0 && !lastCalvingDate){
-    setMsg("أدخل تاريخ آخر ولادة.", false);
-    return;
-  }
-  if (productionStatus === "جاف" && !lastInseminationInp){
-    setMsg("أدخل تاريخ آخر تلقيح.", false);
-    return;
-  }
+const animalTypeAr = String(formData.animalType || "").trim();
+const breed = String(formData.breed || "").trim();
+const productionStatus = String(formData.productionStatus || "").trim();
+const dailyMilkVal = String(formData.dailyMilk || "").trim();
+const reproductiveStatus = String(formData.reproductiveStatus || "").trim();
+const servicesCount = Number(formData.servicesCount || 0);
+const lactationNumber = Number(formData.lactationNumber || 0);
+const birthDate = String(formData.birthDate || "").trim() || null;
+const lastCalvingDate = String(formData.lastCalvingDate || "").trim();
+const lastInseminationInp = String(formData.lastInseminationDate || "").trim() || null;
+const sireNumberInp = String(formData.sireNumber || "").trim() || null;
+const daysInMilkVal = Number(formData.daysInMilk || 0);
 
   try{
     // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
     const key = `${CURRENT_UID}#${numberStr}`;
-
-
-
     // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
 const payload = (entryTypeVal === "mothers")
   ? {
