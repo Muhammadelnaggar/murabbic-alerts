@@ -254,7 +254,8 @@ if (mpCard?.balance != null) {
     setNum('nelTarget', t?.nel ?? a?.targets?.nelTarget, '', 2);
   }
 }
-  setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
+ setNum('mpTargetG', t?.mpTargetG ?? a?.targets?.mpTargetG, '', 0);
+setNum('mpBalanceG', a?.nutrition?.mpBalanceG ?? a?.targets?.mpBalanceG, '', 0);
   setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
   setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
 
@@ -1997,27 +1998,26 @@ window.renderNutritionPanels = function renderNutritionPanels(){
     return {sym:"▲", color:"#f57c00"};
   };
 
-  const n = $("nutritionKPIs");
-  if(n){
-    const items = [
-      ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
-      ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
-      ["البروتين الخام", fmt($("cpPctTotal")?.textContent, "")],
-      ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
-    ];
-    n.innerHTML = items.map(([k,v])=>{
-      let st = {sym:"—", color:"#64748b"};
-      if(k==="المادة الجافة"){
-        st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
-      }else if(k==="البروتين الخام"){
-        st = kpiState(toNum($("cpPctTotal")?.textContent), toNum($("cpTarget")?.textContent), 1.0);
-      }else if(k==="صحة الكرش"){
-        st = {sym:"●", color:"#0b7f47"};
-      }
-      return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
-    }).join("");
-  }
-
+ const n = $("nutritionKPIs");
+if(n){
+  const items = [
+    ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+    ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
+    ["البروتين الممثل MP", fmt($("mpSupplyG")?.textContent, " جم/يوم")],
+    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
+  ];
+  n.innerHTML = items.map(([k,v])=>{
+    let st = {sym:"—", color:"#64748b"};
+    if(k==="المادة الجافة"){
+      st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
+    }else if(k==="البروتين الممثل MP"){
+      st = kpiState(toNum($("mpSupplyG")?.textContent), toNum($("mpTargetG")?.textContent), 50);
+    }else if(k==="صحة الكرش"){
+      st = {sym:"●", color:"#0b7f47"};
+    }
+    return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
+  }).join("");
+}
   const e = $("economicKPIs");
   if(e){
     const items = [
