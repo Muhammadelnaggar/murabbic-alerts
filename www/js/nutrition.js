@@ -137,8 +137,8 @@ async function refreshRationAnalysis(rows) {
   rows: list,
   mode: document.getElementById('mode')?.value || 'tmr_asfed',
   concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-  milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null),
-  context: readContext()
+milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
+   context: readContext()
 });
 
   if (key === rationAnalysisCacheKey && rationAnalysisCache) {
