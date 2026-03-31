@@ -1797,6 +1797,49 @@ function attachUniqueAnimalNumberWatcher() {
     }, 400);
   });
 }
+function attachAddAnimalForm() {
+  const form = document.getElementById("animalForm");
+  if (!form) return;
+  if (form.dataset.mbkAddAnimalAttached === "1") return;
+  form.dataset.mbkAddAnimalAttached = "1";
+
+  const bar = ensureInfoBar(form);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    clearFieldErrors(form);
+
+    const formData = collectFormData(form);
+    const v = validateEvent("إضافة حيوان", formData);
+
+    if (!v || v.ok === false) {
+      if (v?.fieldErrors && typeof v.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(v.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const topMsgs =
+        (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
+        (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
+        ["❌ البيانات غير صحيحة — راجع الحقول."];
+
+      showMsg(bar, topMsgs, "error");
+      return;
+    }
+
+    showMsg(bar, "✅ تم التحقق — جارِ الحفظ...", "success");
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:valid", {
+        bubbles: true,
+        detail: { formData, eventName: "إضافة حيوان", form }
+      })
+    );
+  });
+}
 /* ===================== Special: Ovsynch Protocol (NO GATE / NO LOCK / NO VALIDATION) ===================== */
 function attachOvsynchProtocol(form){
   const bar = ensureInfoBar(form);
@@ -2129,6 +2172,7 @@ document
 
 
   attachUniqueAnimalNumberWatcher();
+attachAddAnimalForm();
 }
 
 if (document.readyState === "loading") {
