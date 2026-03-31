@@ -980,17 +980,17 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 
   {
     key: 'mpTargetG',
-    title: 'احتياجات MP',
+   title: 'احتياجات البروتين الممثل',
     value: txt(targets.mpTargetG, 'جم/يوم', 0)
   },
   {
     key: 'mpSupplyG',
-    title: 'العليقة الحالية — MP',
+   title: 'العليقة الحالية — البروتين الممثل',
     value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
   },
   {
     key: 'mpBalanceG',
-    title: 'توازن MP',
+  title: 'توازن البروتين الممثل',
     value: txt(nutrition.mpBalanceG, 'جم/يوم', 0)
   },
 
