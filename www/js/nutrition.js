@@ -1998,23 +1998,35 @@ window.renderNutritionPanels = function renderNutritionPanels(){
     return {sym:"▲", color:"#f57c00"};
   };
 
- const n = $("nutritionKPIs");
+const n = $("nutritionKPIs");
 if(n){
   const items = [
     ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
+    ["البروتين الخام CP", fmt($("cpPctTotal")?.textContent, "%")],
     ["البروتين الممثل MP", fmt($("mpSupplyG")?.textContent, " جم/يوم")],
     ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
   ];
   n.innerHTML = items.map(([k,v])=>{
     let st = {sym:"—", color:"#64748b"};
+
     if(k==="المادة الجافة"){
       st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
+
+    }else if(k==="البروتين الخام CP"){
+      const cpTargetEl = document.getElementById("cpTarget");
+      const cpTarget = cpTargetEl ? toNum(cpTargetEl.textContent) : NaN;
+      st = Number.isFinite(cpTarget)
+        ? kpiState(toNum($("cpPctTotal")?.textContent), cpTarget, 1.0)
+        : {sym:"—", color:"#64748b"};
+
     }else if(k==="البروتين الممثل MP"){
       st = kpiState(toNum($("mpSupplyG")?.textContent), toNum($("mpTargetG")?.textContent), 50);
+
     }else if(k==="صحة الكرش"){
       st = {sym:"●", color:"#0b7f47"};
     }
+
     return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
   }).join("");
 }
