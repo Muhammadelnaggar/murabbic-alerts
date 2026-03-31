@@ -334,11 +334,14 @@ function normalizeNutritionAnalysis(a = {}) {
   mixPriceDM: toNumOrNull(a?.totals?.mixPriceDM),
   mixPriceAsFed: toNumOrNull(a?.totals?.mixPriceAsFed)
 },
-   nutrition: {
+  nutrition: {
   cpPctTotal: toNumOrNull(a?.nutrition?.cpPctTotal),
+  mpSupplyG: toNumOrNull(a?.nutrition?.mpSupplyG),
+  mpDensityGkgDM: toNumOrNull(a?.nutrition?.mpDensityGkgDM),
+  mpBalanceG: toNumOrNull(a?.nutrition?.mpBalanceG),
   fcRatio: toNumOrNull(a?.nutrition?.fcRatio),
-  nelActual: toNumOrNull(a?.nutrition?.nelActual),      // فعلي /يوم
-  nelDensity: toNumOrNull(a?.nutrition?.nelDensity),    // فعلي /كجم DM
+  nelActual: toNumOrNull(a?.nutrition?.nelActual),
+  nelDensity: toNumOrNull(a?.nutrition?.nelDensity),
   ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
   fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
   roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
@@ -347,13 +350,14 @@ function normalizeNutritionAnalysis(a = {}) {
   rumenNote: a?.nutrition?.rumenNote || null
 },
     targets: {
-      dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
-      nelTarget: toNumOrNull(a?.targets?.nelTarget),
-      cpTarget: toNumOrNull(a?.targets?.cpTarget),
-      ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
-      fatTarget: toNumOrNull(a?.targets?.fatTarget),
-      starchMax: toNumOrNull(a?.targets?.starchMax)
-    },
+  dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
+  nelTarget: toNumOrNull(a?.targets?.nelTarget),
+  cpTarget: toNumOrNull(a?.targets?.cpTarget),
+  mpTargetG: toNumOrNull(a?.targets?.mpTargetG),
+  ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
+  fatTarget: toNumOrNull(a?.targets?.fatTarget),
+  starchMax: toNumOrNull(a?.targets?.starchMax)
+},
        economics: {
       costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
       dmPerKgMilk: toNumOrNull(a?.economics?.dmPerKgMilk),
@@ -553,17 +557,18 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
   const cleanRows = Array.isArray(rows) ? rows : [];
   const modeNorm = String(mode || 'tmr_asfed').trim();
 
-  const rationCore = analyzeRation(
-    cleanRows.map(r => ({
-      kg: r.asFedKg,
-      dm: r.dmPct,
-      cp: r.cpPct,
-      nel: r.nelMcalPerKgDM,
-      ndf: r.ndfPct,
-      fat: r.fatPct,
-      cat: r.cat
-    }))
-  );
+ const rationCore = analyzeRation(
+  cleanRows.map(r => ({
+    kg: r.asFedKg,
+    dm: r.dmPct,
+    cp: r.cpPct,
+    mp: r.mpGPerKgDM,
+    nel: r.nelMcalPerKgDM,
+    ndf: r.ndfPct,
+    fat: r.fatPct,
+    cat: r.cat
+  }))
+);
 
   const runtimeCtx = deriveNutritionRuntimeContext(context);
 
@@ -802,11 +807,19 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
       mixPriceDM,
       mixPriceAsFed
     },
-   nutrition: {
+  nutrition: {
   cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
+  mpSupplyG: rationCore?.nutrition?.mpSupplyG ?? null,
+  mpDensityGkgDM: rationCore?.nutrition?.mpDensityGkgDM ?? null,
+  mpBalanceG: (
+    Number.isFinite(Number(rationCore?.nutrition?.mpSupplyG)) &&
+    Number.isFinite(Number(targetsCore?.mpTargetG))
+  )
+    ? round2(Number(rationCore.nutrition.mpSupplyG) - Number(targetsCore.mpTargetG))
+    : null,
   fcRatio: concDm > 0 ? round2(forageDm / concDm) : null,
-  nelActual: nelActualDay,             // /يوم
-  nelDensity: nelDensity,              // /كجم DM للعرض المتقدم فقط
+  nelActual: nelActualDay,
+  nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
   fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
   roughPctDM,
@@ -815,14 +828,15 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   rumenNote,
   rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
 },
-    targets: {
-      dmiTarget: targetsCore?.dmi ?? null,
-      nelTarget: targetsCore?.nel ?? null,
-      cpTarget: targetsCore?.cpTarget ?? null,
-      ndfTarget: targetsCore?.ndfTarget ?? null,
-      fatTarget: null,
-      starchMax: targetsCore?.starchMax ?? null
-    },
+   targets: {
+  dmiTarget: targetsCore?.dmi ?? null,
+  nelTarget: targetsCore?.nel ?? null,
+  cpTarget: targetsCore?.cpTarget ?? null,
+  mpTargetG: targetsCore?.mpTargetG ?? null,
+  ndfTarget: targetsCore?.ndfTarget ?? null,
+  fatTarget: null,
+  starchMax: targetsCore?.starchMax ?? null
+},
        economics: {
       costPerKgMilk,
       dmPerKgMilk,
@@ -962,6 +976,21 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       title: 'العليقة الحالية — بروتين خام',
       value: txt(nutrition.cpPctTotal, '', 1)
     },
+    {
+  key: 'mpTargetG',
+  title: 'احتياجات MP',
+  value: txt(targets.mpTargetG, 'جم/يوم', 0)
+},
+{
+  key: 'mpSupplyG',
+  title: 'العليقة الحالية — MP',
+  value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
+},
+{
+  key: 'mpBalanceG',
+  title: 'توازن MP',
+  value: txt(nutrition.mpBalanceG, 'جم/يوم', 0)
+},
     {
       key: 'ndfTarget',
       title: 'احتياجات الألياف NDF',
