@@ -836,6 +836,13 @@ async function initNutritionUI(){
   const ctxCloseUp = document.getElementById('ctxCloseUp');
   const ctxPreg = document.getElementById('ctxPreg');
   const presetSel = document.getElementById('preset');
+  const milkFatInput = document.getElementById('milkFatInput');
+const milkProteinInput = document.getElementById('milkProteinInput');
+const milkPriceInput = document.getElementById('milkPriceInput');
+
+const ctxMilkFat = document.getElementById('ctxMilkFat');
+const ctxMilkProtein = document.getElementById('ctxMilkProtein');
+const ctxMilkPrice = document.getElementById('ctxMilkPrice');
   const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
   const advancedBtn = document.getElementById('toggleAdvancedBtn');
@@ -853,13 +860,39 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
   }
 
   initNutritionPanels();
+  bindMilkInputs();
   bindAdvancedToggle();
-
+  if (milkFatInput && ctxMilkFat) milkFatInput.value = ctxMilkFat.value || '';
+if (milkProteinInput && ctxMilkProtein) milkProteinInput.value = ctxMilkProtein.value || '';
+if (milkPriceInput && ctxMilkPrice) milkPriceInput.value = ctxMilkPrice.value || '';
   // ✅ Helpers (لا تعتمد على jQuery)
   const $ = (id) => document.getElementById(id);
   const qs = (sel, root=document) => root.querySelector(sel);
   const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+function bindMilkInputs(){
+  const syncAndRefresh = async () => {
+    if (ctxMilkFat && milkFatInput) ctxMilkFat.value = milkFatInput.value || '';
+    if (ctxMilkProtein && milkProteinInput) ctxMilkProtein.value = milkProteinInput.value || '';
+    if (ctxMilkPrice && milkPriceInput) ctxMilkPrice.value = milkPriceInput.value || '';
 
+    updateCtxView();
+
+    try { await refreshTargets(); } catch(_) {}
+    try { recalc(); } catch(_) {}
+
+    try {
+      const rows = (window.rationItems || []).map(it => ({ ...it }));
+      if (rows.length) await refreshRationAnalysis(rows);
+    } catch(_) {}
+  };
+
+  [milkFatInput, milkProteinInput, milkPriceInput].forEach(el => {
+    if (!el || el.dataset.bound === '1') return;
+    el.dataset.bound = '1';
+    el.addEventListener('input', syncAndRefresh);
+    el.addEventListener('change', syncAndRefresh);
+  });
+}
   // ✅ تحويل السعر: لو المستخدم كتب "سعر/كجم" (مثلاً 13.5) نحوله تلقائياً إلى "سعر/طن" (×1000)
   function normalizeKgPrice(v){
     const n = Number(v);
