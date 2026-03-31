@@ -955,85 +955,89 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     }
   ];
 
-  const advancedCards = [
-    {
-      key: 'dmiTarget',
-      title: 'احتياجات المادة الجافة',
-      value: txt(targets.dmiTarget, 'كجم', 2)
-    },
-    {
-      key: 'totDM',
-      title: 'العليقة الحالية — مادة جافة',
-      value: txt(totals.dmKg, 'كجم', 2)
-    },
-    {
-      key: 'cpTarget',
-      title: 'احتياجات البروتين الخام',
-      value: txt(targets.cpTarget, '%', 1)
-    },
-    {
-      key: 'cpPctTotal',
-      title: 'العليقة الحالية — بروتين خام',
-      value: txt(nutrition.cpPctTotal, '', 1)
-    },
-    {
-  key: 'mpTargetG',
-  title: 'احتياجات MP',
-  value: txt(targets.mpTargetG, 'جم/يوم', 0)
-},
-{
-  key: 'mpSupplyG',
-  title: 'العليقة الحالية — MP',
-  value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
-},
-{
-  key: 'mpBalanceG',
-  title: 'توازن MP',
-  value: txt(nutrition.mpBalanceG, 'جم/يوم', 0)
-},
-    {
-      key: 'ndfTarget',
-      title: 'احتياجات الألياف NDF',
-      value: txt(targets.ndfTarget, '%', 0)
-    },
-    {
-      key: 'ndfPctActual',
-      title: 'العليقة الحالية — ألياف NDF',
-      value: txt(nutrition.ndfPctActual, '', 1)
-    },
-        {
-      key: 'starchMax',
-      title: 'الحد الأقصى للنشا',
-      value: txt(targets.starchMax, '%', 0)
-    },
-    {
-      key: 'roughageMin',
-      title: 'الحد الأدنى للخشن',
-      value: txt(targets.roughageMin, '%', 0)
-    },
-   {
-  key: 'fatLimit',
-  title: 'الحد المسموح به لدهن العليقة',
-  value: '6–7 % من المادة الجافة'
-},
-       {
-      key: 'fatPctActual',
-      title: 'العليقة الحالية — دهن',
-      value: txt(nutrition.fatPctActual, '', 1)
-    },
-   
-    {
-      key: 'nelTarget',
-      title: 'احتياجات الطاقة',
-      value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
-    },
-    {
-      key: 'nelActual',
-      title: 'العليقة الحالية — طاقة',
-      value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
-    }
-  ];
+ const advancedCards = [
+  {
+    key: 'dmiTarget',
+    title: 'احتياجات المادة الجافة',
+    value: txt(targets.dmiTarget, 'كجم', 2)
+  },
+  {
+    key: 'totDM',
+    title: 'العليقة الحالية — مادة جافة',
+    value: txt(totals.dmKg, 'كجم', 2)
+  },
 
+  {
+    key: 'cpTarget',
+    title: 'احتياجات البروتين الخام',
+    value: txt(targets.cpTarget, '%', 1)
+  },
+  {
+    key: 'cpPctTotal',
+    title: 'العليقة الحالية — بروتين خام',
+    value: txt(nutrition.cpPctTotal, '%', 1)
+  },
+
+  {
+    key: 'mpTargetG',
+    title: 'احتياجات MP',
+    value: txt(targets.mpTargetG, 'جم/يوم', 0)
+  },
+  {
+    key: 'mpSupplyG',
+    title: 'العليقة الحالية — MP',
+    value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
+  },
+  {
+    key: 'mpBalanceG',
+    title: 'توازن MP',
+    value: txt(nutrition.mpBalanceG, 'جم/يوم', 0)
+  },
+
+  {
+    key: 'ndfTarget',
+    title: 'احتياجات الألياف NDF',
+    value: txt(targets.ndfTarget, '%', 0)
+  },
+  {
+    key: 'ndfPctActual',
+    title: 'العليقة الحالية — ألياف NDF',
+    value: txt(nutrition.ndfPctActual, '%', 1)
+  },
+
+  {
+    key: 'starchMax',
+    title: 'الحد الأقصى للنشا',
+    value: txt(targets.starchMax, '%', 0)
+  },
+  {
+    key: 'roughageMin',
+    title: 'الحد الأدنى للخشن',
+    value: txt(targets.roughageMin, '%', 0)
+  },
+
+  {
+    key: 'fatLimit',
+    title: 'الحد المسموح به لدهن العليقة',
+    value: '6–7 % من المادة الجافة'
+  },
+  {
+    key: 'fatPctActual',
+    title: 'العليقة الحالية — دهن',
+    value: txt(nutrition.fatPctActual, '%', 1)
+  },
+
+  {
+    key: 'nelTarget',
+    title: 'احتياجات الطاقة',
+    value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
+  },
+  {
+    key: 'nelActual',
+    title: 'العليقة الحالية — طاقة',
+    value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
+  }
+];
   return {
     analysisCards,
     economicsCards,
