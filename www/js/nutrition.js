@@ -338,7 +338,13 @@ if (fcEl) {
    const fcEl2 = document.getElementById('fcRatio');
 const rumenHintEl = document.getElementById('rumenHint');
 if (rumenHintEl) {
-  rumenHintEl.textContent = fcEl2?.dataset?.rumenNote || '';
+  const note = String(fcEl2?.dataset?.rumenNote || '').trim();
+  const fixedAdvice = 'لصحة الكرش والاجترار وإفراز اللعاب: يجب ألا يقل طول تقطيع الخشن عن 3–5 سم.';
+
+  rumenHintEl.innerHTML = `
+    ${note ? `<div>${note}</div>` : ''}
+    <div style="margin-top:6px;color:#475569;">${fixedAdvice}</div>
+  `;
 }
 
 window.mbkNutrition = window.mbkNutrition || {};
