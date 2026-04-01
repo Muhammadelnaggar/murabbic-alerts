@@ -639,6 +639,66 @@ function buildNutritionCentralTargets(context = {}) {
     buffaloDmiFactor: isBuffaloSpecies(context.species) ? buffaloDmiFactor : 1
   };
 }
+function deriveFiberStarchTargets({
+  species,
+  roughPctDM,
+  baseNdfTarget,
+  baseStarchMax,
+  baseRoughageMin
+}) {
+  const isBuffalo = isBuffaloSpecies(species);
+
+  const rough = Number(roughPctDM || 0);
+  let ndfTarget = Number(baseNdfTarget || (isBuffalo ? 34 : 30));
+  let starchMax = Number(baseStarchMax || (isBuffalo ? 22 : 28));
+  let roughageMin = Number(baseRoughageMin || (isBuffalo ? 50 : 40));
+
+  // جاموس
+  if (isBuffalo) {
+    if (rough < 45) {
+      ndfTarget = 36;
+      starchMax = 20;
+      roughageMin = 50;
+    } else if (rough < 50) {
+      ndfTarget = 35;
+      starchMax = 21;
+      roughageMin = 50;
+    } else if (rough <= 65) {
+      ndfTarget = 34;
+      starchMax = 22;
+      roughageMin = 50;
+    } else {
+      ndfTarget = 33;
+      starchMax = 20;
+      roughageMin = 55;
+    }
+  } else {
+    // أبقار
+    if (rough < 35) {
+      ndfTarget = 32;
+      starchMax = 24;
+      roughageMin = 40;
+    } else if (rough < 40) {
+      ndfTarget = 31;
+      starchMax = 26;
+      roughageMin = 40;
+    } else if (rough <= 60) {
+      ndfTarget = 30;
+      starchMax = 28;
+      roughageMin = 40;
+    } else {
+      ndfTarget = 31;
+      starchMax = 24;
+      roughageMin = 50;
+    }
+  }
+
+  return {
+    ndfTarget,
+    starchMax,
+    roughageMin
+  };
+}
 function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
   const cleanRows = Array.isArray(rows) ? rows : [];
 const modeNorm = String(mode || 'tmr_asfed').trim();
@@ -801,7 +861,17 @@ const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100
 
 let rumenStatus = null;
 let rumenNote = null;
+const dynamicFiberTargets = deriveFiberStarchTargets({
+  species: context?.species,
+  roughPctDM,
+  baseNdfTarget: targetsCore?.ndfTarget,
+  baseStarchMax: targetsCore?.starchMax,
+  baseRoughageMin: targetsCore?.roughageMin
+});
 
+targetsCore.ndfTarget = dynamicFiberTargets.ndfTarget;
+targetsCore.starchMax = dynamicFiberTargets.starchMax;
+targetsCore.roughageMin = dynamicFiberTargets.roughageMin;
 if (totalDmForRumen <= 0) {
   rumenStatus = 'warn';
   rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
@@ -813,18 +883,31 @@ if (totalDmForRumen <= 0) {
   const low  = isBuffalo ? 50 : 40;
   const high = isBuffalo ? 70 : 60;
 
+if (totalDmForRumen <= 0) {
+  rumenStatus = 'warn';
+  rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
+} else {
+  const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
+  const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
+
   if (roughPctDM === 0 || concPctDM === 100) {
     rumenStatus = 'danger';
     rumenNote = 'العليقة 100% مركزات وخطر الحموضة وقلة دسم الحليب مرتفع';
-  } else if (roughPctDM < low) {
+  } else if (roughPctDM < Number(targetsCore?.roughageMin || 0)) {
     rumenStatus = 'danger';
-    rumenNote = 'الخشن منخفض وخطر الحموضة وقلة دسم الحليب مرتفع';
-  } else if (roughPctDM > high) {
+    rumenNote = 'الخشن أقل من الحد الأدنى المناسب لهذه العليقة';
+  } else if (starchActual > Number(targetsCore?.starchMax || 0)) {
+    rumenStatus = 'danger';
+    rumenNote = 'النشا أعلى من الحد الآمن مقارنة بنسبة الخشن الحالية';
+  } else if (ndfActual < Number(targetsCore?.ndfTarget || 0)) {
     rumenStatus = 'warn';
-    rumenNote = 'الخشن مرتفع وقد يقل المأكول';
+    rumenNote = 'الألياف أقل من المطلوب بالنسبة لتكوين العليقة الحالي';
+  } else if (roughPctDM > (Number(targetsCore?.roughageMin || 0) + 20)) {
+    rumenStatus = 'warn';
+    rumenNote = 'الخشن مرتفع وقد يحد من المأكول والطاقة';
   } else {
     rumenStatus = 'good';
-    rumenNote = 'النسبة ممتازة لصحة الكرش';
+    rumenNote = 'توازن الخشن والنشا والألياف مناسب لصحة الكرش';
   }
 }
 const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
@@ -862,14 +945,15 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   rumenNote,
   rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
 },
-   targets: {
+  targets: {
   dmiTarget: targetsCore?.dmi ?? null,
   nelTarget: targetsCore?.nel ?? null,
   cpTarget: targetsCore?.cpTarget ?? null,
   mpTargetG: targetsCore?.mpTargetG ?? null,
   ndfTarget: targetsCore?.ndfTarget ?? null,
   fatTarget: null,
-  starchMax: targetsCore?.starchMax ?? null
+  starchMax: targetsCore?.starchMax ?? null,
+  roughageMin: targetsCore?.roughageMin ?? null
 },
        economics: {
       costPerKgMilk,
