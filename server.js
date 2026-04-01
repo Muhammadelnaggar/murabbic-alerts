@@ -343,6 +343,7 @@ function normalizeNutritionAnalysis(a = {}) {
   nelActual: toNumOrNull(a?.nutrition?.nelActual),
   nelDensity: toNumOrNull(a?.nutrition?.nelDensity),
   ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
+    peNDFPctActual: toNumOrNull(a?.nutrition?.peNDFPctActual),
   fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
   starchPctActual: toNumOrNull(a?.nutrition?.starchPctActual ?? a?.nutrition?.starchPct),
   roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
@@ -358,7 +359,8 @@ function normalizeNutritionAnalysis(a = {}) {
   ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
   fatTarget: toNumOrNull(a?.targets?.fatTarget),
   starchMax: toNumOrNull(a?.targets?.starchMax),
-  roughageMin: toNumOrNull(a?.targets?.roughageMin)
+  roughageMin: toNumOrNull(a?.targets?.roughageMin),
+      peNDFMin: toNumOrNull(a?.targets?.peNDFMin)
 },
        economics: {
       costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
@@ -644,7 +646,8 @@ function deriveFiberStarchTargets({
   roughPctDM,
   baseNdfTarget,
   baseStarchMax,
-  baseRoughageMin
+  baseRoughageMin,
+   basePeNDFMin
 }) {
   const isBuffalo = isBuffaloSpecies(species);
 
@@ -652,21 +655,24 @@ function deriveFiberStarchTargets({
   let ndfTarget = Number(baseNdfTarget || (isBuffalo ? 34 : 30));
   let starchMax = Number(baseStarchMax || (isBuffalo ? 22 : 28));
   let roughageMin = Number(baseRoughageMin || (isBuffalo ? 50 : 40));
-
+  let peNDFMin = Number(basePeNDFMin || (isBuffalo ? 21 : 18));
   // جاموس
   if (isBuffalo) {
     if (rough < 45) {
       ndfTarget = 36;
       starchMax = 20;
       roughageMin = 50;
+      peNDFMin = 23;
     } else if (rough < 50) {
       ndfTarget = 35;
       starchMax = 21;
       roughageMin = 50;
+      peNDFMin = 22;
     } else if (rough <= 65) {
       ndfTarget = 34;
       starchMax = 22;
       roughageMin = 50;
+      peNDFMin = 21;
     } else {
       ndfTarget = 33;
       starchMax = 20;
@@ -678,25 +684,30 @@ function deriveFiberStarchTargets({
       ndfTarget = 32;
       starchMax = 24;
       roughageMin = 40;
+      peNDFMin = 20;
     } else if (rough < 40) {
       ndfTarget = 31;
       starchMax = 26;
       roughageMin = 40;
+      peNDFMin = 19;
     } else if (rough <= 60) {
       ndfTarget = 30;
       starchMax = 28;
       roughageMin = 40;
+      peNDFMin = 18;
     } else {
       ndfTarget = 31;
       starchMax = 24;
       roughageMin = 50;
+      peNDFMin = 19;
     }
   }
 
   return {
     ndfTarget,
     starchMax,
-    roughageMin
+    roughageMin,
+     peNDFMin
   };
 }
 function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
@@ -866,31 +877,42 @@ const dynamicFiberTargets = deriveFiberStarchTargets({
   roughPctDM,
   baseNdfTarget: targetsCore?.ndfTarget,
   baseStarchMax: targetsCore?.starchMax,
-  baseRoughageMin: targetsCore?.roughageMin
+  baseRoughageMin: targetsCore?.roughageMin,
+   basePeNDFMin: targetsCore?.peNDFMin
 });
 
 targetsCore.ndfTarget = dynamicFiberTargets.ndfTarget;
 targetsCore.starchMax = dynamicFiberTargets.starchMax;
 targetsCore.roughageMin = dynamicFiberTargets.roughageMin;
+targetsCore.peNDFMin = dynamicFiberTargets.peNDFMin; 
 if (totalDmForRumen <= 0) {
   rumenStatus = 'warn';
   rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
 } else {
   const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
   const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
-
+   const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
   if (roughPctDM === 0 || concPctDM === 100) {
     rumenStatus = 'danger';
     rumenNote = 'العليقة 100% مركزات وخطر الحموضة وقلة دسم الحليب مرتفع';
   } else if (roughPctDM < Number(targetsCore?.roughageMin || 0)) {
     rumenStatus = 'danger';
     rumenNote = 'الخشن أقل من الحد الأدنى المناسب لهذه العليقة';
-  } else if (starchActual > Number(targetsCore?.starchMax || 0)) {
-    rumenStatus = 'danger';
-    rumenNote = 'النشا أعلى من الحد الآمن مقارنة بنسبة الخشن الحالية';
-  } else if (ndfActual < Number(targetsCore?.ndfTarget || 0)) {
-    rumenStatus = 'warn';
-    rumenNote = 'الألياف أقل من المطلوب بالنسبة لتكوين العليقة الحالي';
+} else if (
+  starchActual > Number(targetsCore?.starchMax || 0) &&
+  peNDFActual < Number(targetsCore?.peNDFMin || 0)
+) {
+  rumenStatus = 'danger';
+  rumenNote = 'النشا مرتفع والألياف المؤثرة ميكانيكيًا غير كافية لصحة الكرش';
+} else if (starchActual > Number(targetsCore?.starchMax || 0)) {
+  rumenStatus = 'danger';
+  rumenNote = 'النشا أعلى من الحد الآمن مقارنة بنسبة الخشن الحالية';
+} else if (peNDFActual < Number(targetsCore?.peNDFMin || 0)) {
+  rumenStatus = 'warn';
+  rumenNote = 'الألياف المؤثرة ميكانيكيًا أقل من المطلوب لصحة الكرش';
+} else if (ndfActual < Number(targetsCore?.ndfTarget || 0)) {
+  rumenStatus = 'warn';
+  rumenNote = 'الألياف أقل من المطلوب بالنسبة لتكوين العليقة الحالي';
   } else if (roughPctDM > (Number(targetsCore?.roughageMin || 0) + 20)) {
     rumenStatus = 'warn';
     rumenNote = 'الخشن مرتفع وقد يحد من المأكول والطاقة';
@@ -926,6 +948,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   nelActual: nelActualDay,
   nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+    ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
   fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
@@ -942,7 +965,8 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   ndfTarget: targetsCore?.ndfTarget ?? null,
   fatTarget: null,
   starchMax: targetsCore?.starchMax ?? null,
-  roughageMin: targetsCore?.roughageMin ?? null
+roughageMin: targetsCore?.roughageMin ?? null,
+peNDFMin: targetsCore?.peNDFMin ?? null
 },
        economics: {
       costPerKgMilk,
@@ -1108,7 +1132,16 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     title: 'العليقة الحالية — ألياف NDF',
     value: txt(nutrition.ndfPctActual, '%', 1)
   },
-
+{
+  key: 'peNDFMin',
+  title: 'الحد الأدنى للألياف المؤثرة',
+  value: txt(targets.peNDFMin, '%', 0)
+},
+{
+  key: 'peNDFPctActual',
+  title: 'العليقة الحالية — ألياف مؤثرة',
+  value: txt(nutrition.peNDFPctActual, '%', 1)
+},
  {
   key: 'starchMax',
   title: 'الحد الأقصى للنشا',
