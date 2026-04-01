@@ -2168,20 +2168,35 @@ if (adv && adv.style.display === "block") {
 
     const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
     const fcRatioEl = document.getElementById("fcRatio");
-    if(fcCard){
-      const serverNote = String(fcRatioEl?.dataset?.rumenNote || "").trim();
-      const txt = String(fcRatioEl?.textContent || "").trim();
-      const m = txt.match(/خشن\s+(\d+(?:\.\d+)?)%\s*\/\s*مركز\s+(\d+(?:\.\d+)?)%/);
-      const roughPct = m ? Number(m[1]) : NaN;
-      const concPct  = m ? Number(m[2]) : NaN;
-      const detail = (Number.isFinite(roughPct) && Number.isFinite(concPct))
-        ? `خشن ${Math.round(roughPct)}% / مركز ${Math.round(concPct)}%`
-        : txt;
-      if (serverNote.includes('خطر الحموضة') || serverNote.includes('100% مركزات')) setStatus(fcCard, 'bad', 'خطر', serverNote || detail, 25);
-      else if (serverNote.includes('الخشن منخفض')) setStatus(fcCard, 'warn', 'تحذير', serverNote || detail, 45);
-      else if (serverNote.includes('الخشن مرتفع')) setStatus(fcCard, 'warn', 'معلومة', serverNote || detail, 70);
-      else setStatus(fcCard, 'ok', 'ممتاز', serverNote || detail || 'توازن مناسب للكرش', 85);
-    }
+   const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
+const fcRatioEl = document.getElementById("fcRatio");
+if(fcCard){
+  const rumenCard =
+    (Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.analysisCards)
+      ? window.mbkNutrition.serverViewModel.panels.analysisCards.find(x => x?.key === 'rumen')
+      : null) || null;
+
+  const serverNote = String(fcRatioEl?.dataset?.rumenNote || "").trim();
+  const txt = String(fcRatioEl?.textContent || "").trim();
+  const m = txt.match(/خشن\s+(\d+(?:\.\d+)?)%\s*\/\s*مركز\s+(\d+(?:\.\d+)?)%/);
+  const roughPct = m ? Number(m[1]) : NaN;
+  const concPct  = m ? Number(m[2]) : NaN;
+  const detail = (Number.isFinite(roughPct) && Number.isFinite(concPct))
+    ? `خشن ${Math.round(roughPct)}% / مركز ${Math.round(concPct)}%`
+    : txt;
+
+  const status = String(rumenCard?.status || '').trim();
+
+  if (status === 'danger') {
+    setStatus(fcCard, 'bad', 'خطر', serverNote || detail, 25);
+  } else if (status === 'warn') {
+    setStatus(fcCard, 'warn', 'تحذير', serverNote || detail, 45);
+  } else if (status === 'good') {
+    setStatus(fcCard, 'ok', 'مناسب', serverNote || detail, 85);
+  } else {
+    setStatus(fcCard, '', 'معلومة', serverNote || detail, 0);
+  }
+}
 
  const pairConfigs = [
   [['العليقة الحالية','مادة جافة'], ['احتياجات','المادة الجافة'], 'كجم', 0.92, 1.05],
