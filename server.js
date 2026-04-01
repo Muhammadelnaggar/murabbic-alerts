@@ -357,7 +357,8 @@ function normalizeNutritionAnalysis(a = {}) {
   mpTargetG: toNumOrNull(a?.targets?.mpTargetG),
   ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
   fatTarget: toNumOrNull(a?.targets?.fatTarget),
-  starchMax: toNumOrNull(a?.targets?.starchMax)
+  starchMax: toNumOrNull(a?.targets?.starchMax),
+  roughageMin: toNumOrNull(a?.targets?.roughageMin)
 },
        economics: {
       costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
@@ -555,24 +556,7 @@ function deriveNutritionRuntimeContext(context = {}) {
     bcsUsed
   };
 }
-function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
-  const cleanRows = Array.isArray(rows) ? rows : [];
-  const modeNorm = String(mode || 'tmr_asfed').trim();
-
-const rationCore = analyzeRation(
-  cleanRows.map(r => ({
-    kg: r.asFedKg,
-    dm: r.dmPct,
-    cp: r.cpPct,
-    mp: r.mpGPerKgDM,
-    nel: r.nelMcalPerKgDM,
-    ndf: r.ndfPct,
-    fat: r.fatPct,
-    starch: r.starchPct,
-    cat: r.cat
-  }))
-);
-
+function buildNutritionCentralTargets(context = {}) {
   const runtimeCtx = deriveNutritionRuntimeContext(context);
 
   let targetsCore = computeTargets({
@@ -647,6 +631,52 @@ const rationCore = analyzeRation(
         : cpAfterProtein * growthFactor
     );
   }
+
+  return {
+    targetsCore,
+    runtimeCtx,
+    buffaloMilkEnergyFactor: isBuffaloSpecies(context.species) ? buffaloMilkEnergyFactor : 1,
+    buffaloDmiFactor: isBuffaloSpecies(context.species) ? buffaloDmiFactor : 1
+  };
+}
+function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
+  const cleanRows = Array.isArray(rows) ? rows : [];
+const modeNorm = String(mode || 'tmr_asfed').trim();
+
+const builtTargets = buildNutritionCentralTargets(context);
+const runtimeCtx = builtTargets.runtimeCtx;
+const targetsCore = builtTargets.targetsCore;
+const buffaloMilkEnergyFactor = builtTargets.buffaloMilkEnergyFactor;
+const buffaloDmiFactor = builtTargets.buffaloDmiFactor;
+
+const rationCore = analyzeRation(
+  cleanRows.map(r => ({
+    kg: r.asFedKg,
+    dm: r.dmPct,
+    cp: r.cpPct,
+    mp: r.mpGPerKgDM,
+    nel: r.nelMcalPerKgDM,
+    ndf: r.ndfPct,
+    fat: r.fatPct,
+    starch: r.starchPct,
+    cat: r.cat,
+    pricePerTonAsFed: r.pricePerTon
+  })),
+  {
+    dmi: targetsCore?.dmi,
+    nel: targetsCore?.nel,
+    mpTargetG: targetsCore?.mpTargetG,
+    ndfTarget: targetsCore?.ndfTarget,
+    starchMax: targetsCore?.starchMax,
+    roughageMin: targetsCore?.roughageMin
+  },
+  {
+    avgMilkKg: context?.avgMilkKg,
+    milkFatPct: runtimeCtx?.milkFatPctUsed,
+    milkProteinPct: runtimeCtx?.milkProteinPctUsed,
+    milkPrice: milkPrice
+  }
+);
   let totCost = null;
   let mixPriceDM = null;
   let mixPriceAsFed = null;
@@ -1083,13 +1113,25 @@ async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
 app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
-    const ctx = body.context || {};
+    const ctx = normalizeNutritionContext(body.context || {});
 
-    const targets = computeTargets(ctx);
+    const built = buildNutritionCentralTargets(ctx);
 
     return res.json({
       ok: true,
-      targets
+      targets: cleanObj({
+        ...built.targetsCore,
+        inputs: {
+          bodyWeightKgUsed: built.runtimeCtx.bodyWeightKgUsed,
+          milkFatPctUsed: built.runtimeCtx.milkFatPctUsed,
+          milkProteinPctUsed: built.runtimeCtx.milkProteinPctUsed,
+          lactationNumberUsed: built.runtimeCtx.lactationNumberUsed,
+          thiUsed: built.runtimeCtx.thiUsed,
+          bcsUsed: built.runtimeCtx.bcsUsed,
+          buffaloMilkEnergyFactor: built.buffaloMilkEnergyFactor,
+          buffaloDmiFactor: built.buffaloDmiFactor
+        }
+      })
     });
   } catch (e) {
     console.error('nutrition.targets error:', e);
