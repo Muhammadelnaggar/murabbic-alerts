@@ -948,7 +948,6 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   nelActual: nelActualDay,
   nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
-    ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
   fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
