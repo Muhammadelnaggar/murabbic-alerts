@@ -2168,8 +2168,7 @@ if (adv && adv.style.display === "block") {
 
     const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
     const fcRatioEl = document.getElementById("fcRatio");
-   const fcCard = findCardByLabelIncludes(root, ['صحة الكرش']);
-const fcRatioEl = document.getElementById("fcRatio");
+  
 if(fcCard){
   const rumenCard =
     (Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.analysisCards)
