@@ -2079,53 +2079,56 @@ function arcPath(cx, cy, r, startDeg, endDeg){
 function buildGaugeSvg(kind, current, target, state){
   const max = gaugeScaleMax(kind, current, target);
   const currentPos = gaugePos(current, max);
-  const targetPos = gaugePos(target, max);
+  const targetPos  = gaugePos(target, max);
 
-  const cx = 80, cy = 82, r = 52;
+  const cx = 80, cy = 82, r = 50;
 
   let safeFrom = 0.45, safeTo = 0.65;
   if (kind === 'ceiling' && Number.isFinite(target) && target > 0) {
     safeFrom = 0.00;
-    safeTo = gaugePos(target * 0.90, max);
+    safeTo   = gaugePos(target * 0.90, max);
   } else if (Number.isFinite(target) && target > 0) {
     safeFrom = gaugePos(target * 0.92, max);
-    safeTo = gaugePos(target * 1.08, max);
+    safeTo   = gaugePos(target * 1.08, max);
   }
 
-  const a0 = 180;
-  const a1 = 180 - (180 * Math.max(0, safeFrom));
-  const a2 = 180 - (180 * Math.min(1, safeTo));
-  const a3 = 0;
+  safeFrom = Math.max(0, Math.min(1, safeFrom));
+  safeTo   = Math.max(0, Math.min(1, safeTo));
 
-  const bg1 = arcPath(cx, cy, r, a0, a1);
-  const bg2 = arcPath(cx, cy, r, a1, a2);
-  const bg3 = arcPath(cx, cy, r, a2, a3);
+  const aStart = 180;
+  const aSafeStart = 180 - (180 * safeFrom);
+  const aSafeEnd   = 180 - (180 * safeTo);
+  const aEnd = 0;
 
-  const targetAngle = 180 - (180 * targetPos);
+  const redLeft  = arcPath(cx, cy, r, aStart, aSafeStart);
+  const greenMid = arcPath(cx, cy, r, aSafeStart, aSafeEnd);
+  const redRight = arcPath(cx, cy, r, aSafeEnd, aEnd);
+
+  const targetAngle  = 180 - (180 * targetPos);
   const currentAngle = 180 - (180 * currentPos);
 
   const targetOuter = polar(cx, cy, r + 2, targetAngle);
   const targetInner = polar(cx, cy, r - 10, targetAngle);
 
   const needleTip = polar(cx, cy, r - 12, currentAngle);
-  const leftBase  = polar(cx, cy, 10, currentAngle - 90);
-  const rightBase = polar(cx, cy, 10, currentAngle + 90);
 
   return `
     <svg viewBox="0 0 160 100" width="160" height="100" aria-hidden="true">
-      <path d="${bg1}" fill="none" stroke="#fecaca" stroke-width="14" stroke-linecap="round"></path>
-      <path d="${bg2}" fill="none" stroke="#bbf7d0" stroke-width="14" stroke-linecap="round"></path>
-      <path d="${bg3}" fill="none" stroke="#fecaca" stroke-width="14" stroke-linecap="round"></path>
+      <path d="${redLeft}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${greenMid}" fill="none" stroke="#b7efc5" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${redRight}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
 
-      <line x1="${targetOuter.x}" y1="${targetOuter.y}" x2="${targetInner.x}" y2="${targetInner.y}" stroke="#111827" stroke-width="3.5" stroke-linecap="round"></line>
+      <line x1="${targetOuter.x}" y1="${targetOuter.y}" x2="${targetInner.x}" y2="${targetInner.y}"
+            stroke="#111827" stroke-width="3.5" stroke-linecap="round"></line>
 
-      <path d="M ${leftBase.x} ${leftBase.y} L ${needleTip.x} ${needleTip.y} L ${rightBase.x} ${rightBase.y} Z" fill="${state.color}" opacity="0.95"></path>
-      <circle cx="${cx}" cy="${cy}" r="6" fill="${state.color}"></circle>
-      <circle cx="${cx}" cy="${cy}" r="2.5" fill="#ffffff"></circle>
+      <line x1="${cx}" y1="${cy}" x2="${needleTip.x}" y2="${needleTip.y}"
+            stroke="${state.color}" stroke-width="4" stroke-linecap="round"></line>
+
+      <circle cx="${cx}" cy="${cy}" r="5.5" fill="${state.color}"></circle>
+      <circle cx="${cx}" cy="${cy}" r="2.3" fill="#ffffff"></circle>
     </svg>
   `;
 }
-
 function renderGaugeRows(cards){
   const defs = [
     { key:'dm',     label:'المادة الجافة',           current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'target'  },
