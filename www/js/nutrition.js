@@ -853,8 +853,8 @@ const feedSummaryBox = document.getElementById('feedSummaryBox');
     if (!advancedBtn || !advancedBox || advancedBtn.dataset.bound === '1') return;
     advancedBtn.dataset.bound = '1';
     advancedBtn.addEventListener('click', ()=>{
-      const open = (advancedBox.style.display === 'grid');
-      advancedBox.style.display = open ? 'none' : 'grid';
+    const open = (advancedBox.style.display === 'block');
+      advancedBox.style.display = open ? 'none' : 'block';
       advancedBtn.textContent = open ? 'عرض متقدم' : 'إخفاء العرض المتقدم';
       try { if (typeof render === 'function') render(); } catch(_){ }
     });
@@ -1973,6 +1973,202 @@ function initNutritionPanels(){
     const v = parseFloat(t);
     return Number.isFinite(v) ? v : NaN;
   };
+  function parseMetricNumber(v){
+  const s = String(v ?? '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const m = s.match(/-?\d+(\.\d+)?/);
+  return m ? Number(m[0]) : NaN;
+}
+
+function titleHas(card, text){
+  return String(card?.title || '').includes(text);
+}
+
+function findCard(cards, text){
+  return (Array.isArray(cards) ? cards.find(c => titleHas(c, text)) : null) || null;
+}
+
+function gaugeStatus(kind, current, target, low = 0.92, high = 1.08){
+  if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
+    return { key:'na', label:'غير متاح', color:'#94a3b8', note:'لا توجد بيانات كافية' };
+  }
+
+  if (kind === 'ceiling') {
+    if (current <= target * 0.90) return { key:'good', label:'آمن', color:'#16a34a', note:'ضمن الحد الآمن' };
+    if (current <= target)        return { key:'warn', label:'قريب', color:'#d97706', note:'قريب من الحد — يحتاج متابعة' };
+    return { key:'danger', label:'خطر', color:'#dc2626', note:'أعلى من الحد — يحتاج تدخل' };
+  }
+
+  const ratio = current / target;
+  if (ratio < low)  return { key:'danger', label:'ناقص', color:'#dc2626', note:'أقل من المطلوب بوضوح' };
+  if (ratio <= high) return { key:'good', label:'مناسب', color:'#16a34a', note:'داخل النطاق المناسب' };
+  if (ratio <= high * 1.12) return { key:'warn', label:'زيادة', color:'#d97706', note:'أعلى من المطلوب قليلًا' };
+  return { key:'danger', label:'زيادة', color:'#dc2626', note:'أعلى من المطلوب بوضوح' };
+}
+
+function metricComment(key, state){
+  const k = String(key || '');
+  const s = String(state?.key || '');
+
+  const map = {
+    dm: {
+      danger: 'المأكول لا يغطي الاحتياج وقد يضغط على الأداء',
+      good:   'المأكول مناسب ويغطي الاحتياج',
+      warn:   'المأكول أعلى قليلًا من المطلوب'
+    },
+    nel: {
+      danger: 'الطاقة أقل من المطلوب وقد تحد من اللبن',
+      good:   'الطاقة مناسبة للإنتاج',
+      warn:   'الطاقة أعلى قليلًا من الحاجة'
+    },
+    cp: {
+      danger: 'البروتين الخام منخفض',
+      good:   'البروتين الخام مناسب',
+      warn:   'البروتين الخام مرتفع ويحتاج مراجعة'
+    },
+    mp: {
+      danger: 'البروتين الممثل أقل من المطلوب — هذا قيد مهم',
+      good:   'البروتين الممثل مناسب',
+      warn:   'البروتين الممثل أعلى من المطلوب'
+    },
+    ndf: {
+      danger: 'الألياف غير كافية وخطر الحموضة يرتفع',
+      good:   'الألياف متزنة وتدعم الكرش',
+      warn:   'الألياف أعلى من المطلوب وقد تقلل الطاقة'
+    },
+    starch: {
+      danger: 'النشا أعلى من الحد — راقب الحموضة ودهن اللبن',
+      good:   'النشا ضمن الحد الآمن',
+      warn:   'النشا قريب من الحد — يحتاج حذر'
+    },
+    fat: {
+      danger: 'دهن العليقة أعلى من الحد المسموح',
+      good:   'دهن العليقة ضمن الحد الآمن',
+      warn:   'الدهن قريب من الحد — راقب الإضافات الدهنية'
+    }
+  };
+
+  return (map[k] && map[k][s]) || state?.note || '';
+}
+
+function gaugeScaleMax(kind, current, target){
+  const c = Number.isFinite(current) ? current : 0;
+  const t = Number.isFinite(target) ? target : 0;
+  if (kind === 'ceiling') return Math.max(t * 1.25, c * 1.10, 1);
+  return Math.max(t * 1.35, c * 1.10, 1);
+}
+
+function gaugePos(value, max){
+  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 0;
+  return Math.max(0, Math.min(1, value / max));
+}
+
+function polar(cx, cy, r, angleDeg){
+  const a = (angleDeg - 180) * Math.PI / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+
+function arcPath(cx, cy, r, startDeg, endDeg){
+  const s = polar(cx, cy, r, startDeg);
+  const e = polar(cx, cy, r, endDeg);
+  const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+}
+
+function needleSvg(pos, color){
+  const angle = 180 - (180 * pos);
+  const p1 = polar(80, 78, 44, angle);
+  return `
+    <line x1="80" y1="78" x2="${p1.x}" y2="${p1.y}" stroke="${color}" stroke-width="3.5" stroke-linecap="round"></line>
+    <circle cx="80" cy="78" r="5" fill="${color}"></circle>
+  `;
+}
+
+function markerSvg(pos){
+  const angle = 180 - (180 * pos);
+  const outer = polar(80, 78, 56, angle);
+  const inner = polar(80, 78, 46, angle);
+  return `<line x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" stroke="#0f172a" stroke-width="3" stroke-linecap="round"></line>`;
+}
+
+function buildGaugeSvg(kind, current, target, state){
+  const max = gaugeScaleMax(kind, current, target);
+  const currentPos = gaugePos(current, max);
+  const targetPos = gaugePos(target, max);
+
+  let greenFrom = 0.45, greenTo = 0.65;
+  if (kind === 'ceiling' && Number.isFinite(target) && target > 0) {
+    greenFrom = 0.00;
+    greenTo = gaugePos(target * 0.90, max);
+  } else if (Number.isFinite(target) && target > 0) {
+    greenFrom = gaugePos(target * 0.92, max);
+    greenTo = gaugePos(target * 1.08, max);
+  }
+
+  const red1 = arcPath(80, 78, 56, 180, 180 - (180 * Math.max(0, greenFrom)));
+  const green = arcPath(80, 78, 56, 180 - (180 * Math.max(0, greenFrom)), 180 - (180 * Math.min(1, greenTo)));
+  const red2 = arcPath(80, 78, 56, 180 - (180 * Math.min(1, greenTo)), 0);
+
+  return `
+    <svg viewBox="0 0 160 92" width="160" height="92" aria-hidden="true">
+      <path d="${red1}" fill="none" stroke="#fecaca" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${green}" fill="none" stroke="#bbf7d0" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${red2}" fill="none" stroke="#fecaca" stroke-width="12" stroke-linecap="round"></path>
+      ${markerSvg(targetPos)}
+      ${needleSvg(currentPos, state.color)}
+    </svg>
+  `;
+}
+
+function renderGaugeRows(cards){
+  const defs = [
+    { key:'dm',     label:'المادة الجافة',           current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'target'  },
+    { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
+    { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
+    { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
+    { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'احتياجات الألياف NDF',            unit:'%',       kind:'target'  },
+    { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
+    { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' }
+  ];
+
+  const rows = defs.map(def => {
+    const currentCard = findCard(cards, def.current);
+    const targetCard = findCard(cards, def.target);
+
+    if (!currentCard || !targetCard) return '';
+
+    const current = parseMetricNumber(currentCard.value);
+    const target = parseMetricNumber(targetCard.value);
+    const state = gaugeStatus(def.kind, current, target);
+    const comment = metricComment(def.key, state);
+
+    return `
+      <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+          <div style="font-weight:800;font-size:15px;color:#0f172a">${def.label}</div>
+          <span style="font-size:12px;font-weight:800;color:${state.color};background:#f8fafc;border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px">${state.label}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:8px">
+          <div style="text-align:right">
+            <div style="font-size:11px;color:#64748b">العليقة الحالية</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${currentCard.value || '—'}</div>
+          </div>
+
+          <div style="display:flex;justify-content:center">${buildGaugeSvg(def.kind, current, target, state)}</div>
+
+          <div style="text-align:left">
+            <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : 'الاحتياج'}</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${targetCard.value || '—'}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:6px;font-size:12px;line-height:1.45;color:#475569">${comment}</div>
+      </div>
+    `;
+  }).filter(Boolean);
+
+  return rows.join('');
+}
 window.renderNutritionPanels = function renderNutritionPanels(){
     const vm = window.mbkNutrition?.serverViewModel || {};
   const P  = vm.panels || {};
@@ -2042,19 +2238,14 @@ if(n){
     e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
   }
 
-   const adv = $("advancedKPIs");
-  if (adv && adv.style.display === "grid") {
-    const cards = Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.advancedCards)
-      ? window.mbkNutrition.serverViewModel.panels.advancedCards
-      : [];
+  const adv = $("advancedKPIs");
+if (adv && adv.style.display === "block") {
+  const cards = Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.advancedCards)
+    ? window.mbkNutrition.serverViewModel.panels.advancedCards
+    : [];
 
-    adv.innerHTML = cards.map(card => (
-      '<div class="kpi">' +
-        '<div class="k">' + (card?.title || '') + '</div>' +
-        '<div class="v">' + (card?.value || '—') + '</div>' +
-      '</div>'
-    )).join("");
-  }
+  adv.innerHTML = renderGaugeRows(cards);
+}
 
   try { window.enhanceNutritionPanels?.(); } catch(_) {}
 };
