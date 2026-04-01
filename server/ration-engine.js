@@ -250,8 +250,8 @@ function analyzeRation(rows, targets = {}, context = {}){
       mpTargetG: round(mpTargetG, 0),
       ndfTarget: round(ndfTarget),
       starchMax: round(starchMax),
-      roughageMin: round(roughageMin)
-      peNDFMin: round(peNDFMin),
+      roughageMin: round(roughageMin),
+      peNDFMin: round(peNDFMin)
     }
   };
 }
