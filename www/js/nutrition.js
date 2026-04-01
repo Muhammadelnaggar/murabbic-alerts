@@ -2087,12 +2087,24 @@ function buildGaugeSvg(kind, current, target, state){
   const stroke = 22;
 
   // تقسيم واضح جدًا مثل عداد الساعة
-  const redTo = 0.33;
-  const yellowTo = 0.66;
+ const redTo = 0.33;
+const yellowTo = 0.66;
 
-  const redArc = arcPath(cx, cy, r, 0, redTo);
-  const yellowArc = arcPath(cx, cy, r, redTo, yellowTo);
-  const greenArc = arcPath(cx, cy, r, yellowTo, 1);
+let arc1 = '';
+let arc2 = '';
+let arc3 = '';
+
+if (kind === 'ceiling') {
+  // في مؤشرات الحد الأقصى: الآمن يسار، ثم تحذير، ثم خطر يمين
+  arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+} else {
+  // في مؤشرات الاحتياج: منخفض = خطر، وسط = تحذير، يمين = جيد
+  arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+}
 
   const tip = gaugePoint(cx, cy, r - 8, pos);
 
@@ -2102,9 +2114,9 @@ function buildGaugeSvg(kind, current, target, state){
 
   return `
     <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
-      <path d="${redArc}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>
-      <path d="${yellowArc}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>
-      <path d="${greenArc}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>
+     ${arc1}
+${arc2}
+${arc3}
 
       <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
 
