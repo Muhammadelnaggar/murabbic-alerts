@@ -2081,47 +2081,38 @@ function arcPath(cx, cy, r, fromPos, toPos){
 
 function buildGaugeSvg(kind, current, target, state){
   const max = gaugeScaleMax(kind, current, target);
-  const currentPos = gaugePos(current, max);
-  const targetPos  = gaugePos(target, max);
+  const pos = gaugePos(current, max);
 
-  const cx = 80, cy = 82, r = 50;
+  const cx = 80, cy = 84, r = 58;
+  const stroke = 22;
 
-  let safeFrom = 0.45, safeTo = 0.65;
+  // تقسيم واضح جدًا مثل عداد الساعة
+  const redTo = 0.33;
+  const yellowTo = 0.66;
 
-  if (kind === 'ceiling' && Number.isFinite(target) && target > 0) {
-    safeFrom = 0.00;
-    safeTo   = gaugePos(target * 0.90, max);
-  } else if (Number.isFinite(target) && target > 0) {
-    safeFrom = gaugePos(target * 0.92, max);
-    safeTo   = gaugePos(target * 1.08, max);
-  }
+  const redArc = arcPath(cx, cy, r, 0, redTo);
+  const yellowArc = arcPath(cx, cy, r, redTo, yellowTo);
+  const greenArc = arcPath(cx, cy, r, yellowTo, 1);
 
-  safeFrom = Math.max(0, Math.min(1, safeFrom));
-  safeTo   = Math.max(0, Math.min(1, safeTo));
+  const tip = gaugePoint(cx, cy, r - 8, pos);
 
-  const leftRed   = arcPath(cx, cy, r, 0, safeFrom);
-  const greenArc  = arcPath(cx, cy, r, safeFrom, safeTo);
-  const rightRed  = arcPath(cx, cy, r, safeTo, 1);
-
-  const targetOuter = gaugePoint(cx, cy, r + 2, targetPos);
-  const targetInner = gaugePoint(cx, cy, r - 10, targetPos);
-
-  const needleTip = gaugePoint(cx, cy, r - 12, currentPos);
+  // قاعدة الإبرة أسمك وتعطي شكل عداد محترم
+  const baseLeft = { x: cx - 5, y: cy + 1 };
+  const baseRight = { x: cx + 5, y: cy + 1 };
 
   return `
-    <svg viewBox="0 0 160 100" width="160" height="100" aria-hidden="true">
-      <path d="${leftRed}"  fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${greenArc}" fill="none" stroke="#b7efc5" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${rightRed}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
+    <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
+      <path d="${redArc}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>
+      <path d="${yellowArc}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>
+      <path d="${greenArc}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>
 
-      <line x1="${targetOuter.x}" y1="${targetOuter.y}" x2="${targetInner.x}" y2="${targetInner.y}"
-            stroke="#111827" stroke-width="3.5" stroke-linecap="round"></line>
+      <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
 
-      <line x1="${cx}" y1="${cy}" x2="${needleTip.x}" y2="${needleTip.y}"
-            stroke="${state.color}" stroke-width="4" stroke-linecap="round"></line>
+      <path d="M ${baseLeft.x} ${baseLeft.y} L ${tip.x} ${tip.y} L ${baseRight.x} ${baseRight.y} Z"
+            fill="#111111"></path>
 
-      <circle cx="${cx}" cy="${cy}" r="5.5" fill="${state.color}"></circle>
-      <circle cx="${cx}" cy="${cy}" r="2.3" fill="#ffffff"></circle>
+      <circle cx="${cx}" cy="${cy}" r="6.5" fill="#111111"></circle>
+      <circle cx="${cx}" cy="${cy}" r="2.6" fill="#ffffff"></circle>
     </svg>
   `;
 }
