@@ -878,13 +878,7 @@ function bindMilkInputs(){
 
     updateCtxView();
 
-    try { await refreshTargets(); } catch(_) {}
-    try { recalc(); } catch(_) {}
-
-    try {
-      const rows = (window.rationItems || []).map(it => ({ ...it }));
-      if (rows.length) await refreshRationAnalysis(rows);
-    } catch(_) {}
+  try { recalc(); } catch(_) {}
   };
 
   [milkFatInput, milkProteinInput, milkPriceInput].forEach(el => {
@@ -1419,227 +1413,74 @@ if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
   focusEditable(tr);
 }
 
-  function recalc(){
-    const ctx = (window.mbkNutrition?.readContext ? window.mbkNutrition.readContext() : (typeof readContext==="function" ? readContext() : {}));
-    const mode = modeSel.value;
-    let totalDM=0, totalCost=0, mix=0, sumPct=0, mixAsFed=0, dmFrac=0;
-    let totalAsFed=0;
-    let cpKg=0;
-    let roughDM=0, roughCost=0;
-    let roughDM_forFC=0, concDM_forFC=0; // DM for F:C (DM basis)
-    let nelSupplied=0; // Mcal/day when possible
-    let ndfKg=0;       // kg NDF/day when possible
-    let fatKg=0;       // kg fat/day on DM basis
-    let concMixAsFed=0, concDmFrac=0, concSumPct=0;
-    const concKg = parseFloat(concKgInput.value)||0;
-    if(mode==="split"){ totalAsFed += concKg; }
-    // ✅ تحديث سطر الإدخال الحالي دائمًا (حتى لو الحساب الكلي يعتمد على rationItems)
-Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
-  const dm   = parseFloat(tr.querySelector('.dm')?.value)||0;
-  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
-  const pKg  = normalizeKgPrice(pRaw);
-  const pTon = pKg * 1000;
-  const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
+function recalc(){
+  const mode = modeSel.value;
+  const concKg = parseFloat(concKgInput?.value) || 0;
 
-  const pDM  = (dm>0) ? (pTon/(dm/100)) : 0;
-  const kgDM = kg*(dm/100);
-  const cost = kg*pKg;
+  // 1) تحديث حسابات الصفوف فقط (UI row-level only)
+  Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
+    const dm   = parseFloat(tr.querySelector('.dm')?.value) || 0;
+    const pRaw = parseFloat(tr.querySelector('.pTon')?.value) || 0;
+    const pKg  = normalizeKgPrice(pRaw);
+    const pTon = pKg * 1000;
+    const kg   = parseFloat(tr.querySelector('.kg')?.value) || 0;
 
-  const pTonDMEl = tr.querySelector('.pTonDM');
-  const kgDMEl   = tr.querySelector('.kgDM');
-  const costEl   = tr.querySelector('.cost');
+    const pDM  = (dm > 0) ? (pTon / (dm / 100)) : 0;
+    const kgDM = kg * (dm / 100);
+    const cost = kg * pKg;
 
-  if(pTonDMEl) pTonDMEl.textContent = pDM ? nf(pDM) : '—';
-  if(kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
-  if(costEl)   costEl.textContent   = cost ? nf(cost) : '—';
-});
-    // ✅ الحساب يعتمد على القائمة المعتمدة rationItems (بعد الضغط "إضافة")
-// وإذا لم توجد عناصر بعد، يعتمد على صفوف الجدول الحالية.
-    const entries = (Array.isArray(rationItems) && rationItems.length)
-      ? rationItems.map(it=>({it}))
-      : Array.from(tbody.querySelectorAll('tr')).map(tr=>({tr}));
+    const pTonDMEl = tr.querySelector('.pTonDM');
+    const kgDMEl   = tr.querySelector('.kgDM');
+    const costEl   = tr.querySelector('.cost');
 
-    entries.forEach(({tr,it})=>{
-      const dm = it ? (Number(it.dm)||0) : (parseFloat(tr.querySelector('.dm')?.value)||0);
-      const cpIn = it ? (Number(it.cp)||0) : (parseFloat(tr.querySelector('.cp')?.value)||0);
-      const pRaw = it ? (Number(it.pTonRaw)||0) : (parseFloat(tr.querySelector('.pTon')?.value)||0);
-      const pKg = normalizeKgPrice(pRaw);
-      const pTon = pKg * 1000;
-      const kg = it ? (Number(it.kg)||0) : (parseFloat(tr.querySelector('.kg')?.value)||0);
-      const pc = it ? (Number(it.pct)||0) : (parseFloat(tr.querySelector('.pct')?.value)||0);
-      const cat= it ? (String(it.cat||'conc')) : ((tr.querySelector('.cat')?.value)||'conc');
-      const nm = it ? String(it.name||'').trim() : (tr.querySelector('.name')?.value||'').trim();
+    if (pTonDMEl) pTonDMEl.textContent = pDM ? nf(pDM) : '—';
+    if (kgDMEl)   kgDMEl.textContent   = kgDM ? nf(kgDM) : '—';
+    if (costEl)   costEl.textContent   = cost ? nf(cost) : '—';
 
-      const pDM = dm>0? (pTon/(dm/100)) : 0;
-      if(tr && tr.querySelector('.pTonDM')) tr.querySelector('.pTonDM').textContent = pDM? nf(pDM):'—';
+    setRowState(tr);
+  });
 
-      if (mode==='tmr_asfed'){
-        const kgDM = kg*(dm/100);
-        totalAsFed += kg;
-        if(cat==='rough') roughDM_forFC += kgDM; else concDM_forFC += kgDM;
+  // 2) تحذيرات الإدخال فقط
+  let w = '';
 
-        const f = FEEDS_BY_NAME.get(normName(nm));
-        if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
-        if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-        if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
-        const cost = kg * pKg;
-        const cpPct = cpIn;
-        const cpAdd = kgDM*(cpPct/100);
-
-        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
-
-        totalDM+=kgDM; totalCost+=cost; cpKg += cpAdd;
-
-      } else if (mode==='tmr_percent'){
-        if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
-        if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
-
-        if (pc>0){
-          mixAsFed+=(pc/100)*pTon;
-          const dmPart = (pc/100)*(dm/100);
-          dmFrac+=dmPart;
-          sumPct+=pc;
-          cpKg += dmPart*(cpIn/100);
-          if(cat==='rough') roughDM_forFC += dmPart; else concDM_forFC += dmPart;
-
-          const f = FEEDS_BY_NAME.get(normName(nm));
-          if(f && Number.isFinite(f.nel)) nelSupplied += dmPart * Number(f.nel);
-          if(f && Number.isFinite(f.ndf)) ndfKg += dmPart * (Number(f.ndf)/100);
-          if(f && Number.isFinite(f.fat)) fatKg += dmPart * (Number(f.fat)/100);
-        }
-
-      } else { // split
-        if (cat==='rough'){
-          const kgDM = kg*(dm/100);
-          totalAsFed += kg;
-          roughDM_forFC += kgDM;
-
-          const f = FEEDS_BY_NAME.get(normName(nm));
-          if(f && Number.isFinite(f.nel)) nelSupplied += kgDM * Number(f.nel);
-if(f && Number.isFinite(f.ndf)) ndfKg += kgDM * (Number(f.ndf)/100);
-if(f && Number.isFinite(f.fat)) fatKg += kgDM * (Number(f.fat)/100);
-
-          const cost = kg * pKg;
-          cpKg += kgDM*(cpIn/100);
-
-          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = kgDM? nf(kgDM):'—';
-          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = cost? nf(cost):'—';
-
-          totalDM+=kgDM; totalCost+=cost;
-          roughDM+=kgDM; roughCost+=cost;
-
-        } else {
-          // مكونات المركزات كنسبة as-fed من "إجمالي المركزات"
-          if(tr && tr.querySelector('.kgDM')) tr.querySelector('.kgDM').textContent = '—';
-          if(tr && tr.querySelector('.cost')) tr.querySelector('.cost').textContent = '—';
-          if (pc>0){
-            concMixAsFed += (pc/100)*pTon;
-            const dmPart = (pc/100)*(dm/100);
-            concDmFrac += dmPart;
-            concSumPct += pc;
-          }
-        }
-      }
-    });
-
-
-    // split: add concentrate DM for F:C (DM basis)
-    if(mode==='split'){
-      concDM_forFC += concKg * concDmFrac;
-      // NEL/NDF for concentrate part (approx using dm fraction per 1 kg as-fed)
-      // nelSupplied / ndfKg already accumulated for rough; for conc we can approximate from library if names exist (handled in percent loops).
+  if (mode === 'tmr_percent') {
+    const sumPct = (window.rationItems || []).reduce((s, it) => s + (Number(it?.pct) || 0), 0);
+    if (sumPct > 0 && (sumPct < 99 || sumPct > 101)) {
+      w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
     }
-
-    const pillMix = document.getElementById('pillMix');
-    const pillSumPct = document.getElementById('pillSumPct');
-
-    if (mode==='tmr_asfed'){
-      if (totalDM>0){
-        let mixDM=0;
-    document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
-  const dm = parseFloat(tr.querySelector('.dm')?.value)||0;
-  const pRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
-  const pKg = normalizeKgPrice(pRaw);
-  const pTon = pKg*1000;
-  const kg = parseFloat(tr.querySelector('.kg')?.value)||0;
-
-  const pDM = dm>0 ? (pTon/(dm/100)) : 0;
-  const share = totalDM>0 ? ((kg*(dm/100))/totalDM) : 0;
-  mixDM += share * pDM;
-});
-        mix = mixDM;
-      }
-      pillMix.style.display=''; pillSumPct.style.display='none';
-     if($("totDM")) $("totDM").textContent = nf(totalDM);
-      if($("totCost")) $("totCost").textContent = nf(totalCost);
-    } else if (mode==='tmr_percent'){
-      mix = dmFrac>0? (mixAsFed/dmFrac) : 0;
-      document.getElementById('sumPct').textContent = nf(sumPct)+'%';
-      pillMix.style.display=''; pillSumPct.style.display='inline-flex';
-      if($("totDM")) $("totDM").textContent = '—';
-      if($("totCost")) $("totCost").textContent = '—';
-    } else {
-      const concPriceDM = concDmFrac>0? (concMixAsFed/concDmFrac) : 0;
-      const concKgDM    = concKg * concDmFrac;
-      const concCost    = (concKgDM/1000) * concPriceDM;
-      const totalDMAll  = roughDM + concKgDM;
-      const totalCostAll= roughCost + concCost;
-
-      document.getElementById('roughDM').textContent = nf(roughDM);
-      document.getElementById('roughCost').textContent = nf(roughCost);
-      document.getElementById('sumPctConc').textContent = nf(concSumPct)+'%';
-      document.getElementById('concDMpct').textContent = nf(concDmFrac*100)+'%';
-      document.getElementById('concPriceDM').textContent = concPriceDM? nf(concPriceDM):'—';
-      document.getElementById('concKgShow').textContent  = concKg? nf(concKg):'—';
-      document.getElementById('concKgDM').textContent    = concKgDM? nf(concKgDM):'—';
-      document.getElementById('concCost').textContent    = concCost? nf(concCost):'—';
-      document.getElementById('totalCostAll').textContent= (totalCostAll||totalCostAll===0)? nf(totalCostAll):'—';
-
-      if($("totDM")) $("totDM").textContent = totalDMAll? nf(totalDMAll):'—';
-      if($("totCost")) $("totCost").textContent = totalCostAll? nf(totalCostAll):'—';
-
-      pillMix.style.display='none'; pillSumPct.style.display='none';
-    }
-
-    document.getElementById('mixPriceDM').textContent = mix? nf(mix):'—';
-    const mixAsFedTon = (totalAsFed>0 && totalCost>0) ? ((totalCost / totalAsFed) * 1000) : null;
-const mixAsFedEl = document.getElementById("mixPriceAsFed");
-if(mixAsFedEl) mixAsFedEl.textContent = (mixAsFedTon!=null && isFinite(mixAsFedTon)) ? nf(mixAsFedTon) : "—";
-   let w = '';
-
-if (mode==='tmr_percent' && (sumPct<99 || sumPct>101)) {
-  w = `⚠️ مجموع نسب as-fed = ${nf(sumPct)}% (المثالي 100%)`;
-}
-
-if (mode==='split' && concSumPct && (concSumPct<99 || concSumPct>101)) {
-  w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
-}
-
-const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
-  const dm = parseFloat(tr.querySelector('.dm').value);
-  const hasVal =
-    (parseFloat(tr.querySelector('.kg').value)||0) > 0 ||
-    (parseFloat(tr.querySelector('.pct').value)||0) > 0;
-  return !dm && hasVal;
-});
-
-if (!w && dmMissing) {
-  w = '⚠️ أدخل %DM لكل خامة لحساب التكلفة بدقة.';
-}
-   
-
-    Promise.resolve()
-      .then(() => window.mbkNutrition?.refreshTargets?.())
-      .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
-      .catch(() => {})
-      .finally(() => {
-        warn.textContent = w;
-        try{ render(); }catch(e){}
-        try{ renderRationSummary(); }catch(e){}
-      });
   }
 
+  if (mode === 'split') {
+    const concItems = (window.rationItems || []).filter(it => String(it?.cat || '') === 'conc');
+    const concSumPct = concItems.reduce((s, it) => s + (Number(it?.pct) || 0), 0);
+    if (concSumPct > 0 && (concSumPct < 99 || concSumPct > 101)) {
+      w = `⚠️ نسب المركز = ${nf(concSumPct)}% (المثالي 100%)`;
+    }
+  }
+
+  const dmMissing = Array.from(tbody.querySelectorAll('tr')).some(tr=>{
+    const dm = parseFloat(tr.querySelector('.dm')?.value);
+    const hasVal =
+      (parseFloat(tr.querySelector('.kg')?.value) || 0) > 0 ||
+      (parseFloat(tr.querySelector('.pct')?.value) || 0) > 0;
+    return !dm && hasVal;
+  });
+
+  if (!w && dmMissing) {
+    w = '⚠️ أدخل %DM لكل خامة لحساب التحليل بدقة.';
+  }
+
+  // 3) لا نكتب أي totals/analysis محليًا — السيرفر فقط
+  Promise.resolve()
+    .then(() => window.mbkNutrition?.refreshTargets?.())
+    .then(() => window.mbkNutrition?.refreshRationAnalysis?.(window.rationItems || []))
+    .catch(() => {})
+    .finally(() => {
+      warn.textContent = w;
+      try { render(); } catch(e) {}
+      try { renderRationSummary(); } catch(e) {}
+    });
+}
 function hookRow(tr){
   const nameEl = tr.querySelector('.name');
   const dmEl   = tr.querySelector('.dm');
