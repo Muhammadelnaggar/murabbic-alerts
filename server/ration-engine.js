@@ -19,28 +19,60 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+function inferPef(row = {}){
+  const explicit = Number(row.pef);
+  if (Number.isFinite(explicit) && explicit >= 0) return explicit;
 
-function estimateRumenState({ starchPct, ndfPctActual, roughPctDM, starchMax, ndfTarget, roughageMin }){
+  const cat = String(row.cat || '').trim().toLowerCase();
+  const name = String(row.name || row.feedName || '').trim().toLowerCase();
+
+  if (cat === 'conc' || cat === 'add') return 0;
+
+  if (/تبن|قش|straw|hay|دريس/.test(name)) return 1.0;
+  if (/سيلاج|silage/.test(name)) return 0.75;
+  if (/برسيم|green|fresh/.test(name)) return 0.70;
+  if (/pulp|لب بنجر|بنجر/.test(name)) return 0.45;
+
+  if (cat === 'rough') return 0.70;
+  return 0;
+}
+function estimateRumenState({
+  starchPct,
+  ndfPctActual,
+  roughPctDM,
+  peNDFPctActual,
+  starchMax,
+  ndfTarget,
+  roughageMin,
+  peNDFMin
+}){
   const starch = num(starchPct);
   const ndf = num(ndfPctActual);
   const rough = num(roughPctDM);
+  const peNDF = num(peNDFPctActual);
+
   const starchCeiling = num(starchMax) || 28;
   const ndfFloor = num(ndfTarget) || 30;
   const roughFloor = num(roughageMin) || 40;
+  const peNDFFloor = num(peNDFMin) || 18;
 
   let status = 'good';
   let note = 'توازن الكرش جيد';
 
-  if (starch > starchCeiling || ndf < ndfFloor - 1 || rough < roughFloor - 3){
+  if (
+    rough < roughFloor - 3 ||
+    starch > starchCeiling ||
+    peNDF < peNDFFloor - 2
+  ){
     status = 'danger';
-    note = 'خطر على توازن الكرش: النشا مرتفع أو الألياف/الخشن غير كافيين';
+    note = 'خطر على توازن الكرش: الخشن أو الألياف المؤثرة غير كافيين أو النشا مرتفع';
   } else if (
-    starch > (starchCeiling - 2) ||
+    rough < roughFloor ||
     ndf < ndfFloor ||
-    rough < roughFloor
+    peNDF < peNDFFloor
   ){
     status = 'warn';
-    note = 'توازن الكرش قريب من الحد ويحتاج مراجعة';
+    note = 'توازن الكرش قريب من الحد ويحتاج مراجعة الخشن والألياف المؤثرة';
   }
 
   return {
@@ -48,7 +80,6 @@ function estimateRumenState({ starchPct, ndfPctActual, roughPctDM, starchMax, nd
     note
   };
 }
-
 function calcFpcmKg(milkKg, milkFatPct){
   const milk = num(milkKg);
   const fat = num(milkFatPct);
@@ -73,6 +104,7 @@ function analyzeRation(rows, targets = {}, context = {}){
   let mpSupplyG = 0;
   let nelMcal = 0;
   let ndfKg = 0;
+  let peNdfKg = 0;
   let fatKg = 0;
   let starchKg = 0;
 
@@ -91,6 +123,7 @@ function analyzeRation(rows, targets = {}, context = {}){
     const fat = num(r.fat ?? r.fatPct);
     const starch = num(r.starchPct ?? r.starch);
     const cat = String(r.cat || '').trim();
+    const pef = inferPef(r);
 
     const priceKg =
       num(r.priceKg) ||
@@ -108,6 +141,7 @@ function analyzeRation(rows, targets = {}, context = {}){
     mpSupplyG += dmItemKg * mp;
     nelMcal += dmItemKg * nel;
     ndfKg += dmItemKg * (ndf / 100);
+    peNdfKg += dmItemKg * (ndf / 100) * pef;
     fatKg += dmItemKg * (fat / 100);
     starchKg += dmItemKg * (starch / 100);
     totalCost += kg * priceKg;
@@ -120,6 +154,7 @@ function analyzeRation(rows, targets = {}, context = {}){
   const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
   const nelActual = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
+  const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
   const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
   const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
 
@@ -133,7 +168,7 @@ function analyzeRation(rows, targets = {}, context = {}){
   const ndfTarget = num(targets?.ndfTarget);
   const starchMax = num(targets?.starchMax);
   const roughageMin = num(targets?.roughageMin);
-
+  const peNDFMin = num(targets?.peNDFMin);
   const dmBalanceKg = dmiTarget ? (dmKg - dmiTarget) : 0;
   const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
 
@@ -159,7 +194,8 @@ function analyzeRation(rows, targets = {}, context = {}){
     roughPctDM,
     starchMax,
     ndfTarget,
-    roughageMin
+    roughageMin,
+    peNDFMin
   });
 
   return {
@@ -170,6 +206,7 @@ function analyzeRation(rows, targets = {}, context = {}){
       mpSupplyG: round(mpSupplyG, 0),
       nelMcal: round(nelMcal),
       ndfKg: round(ndfKg),
+      peNdfKg: round(peNdfKg),
       fatKg: round(fatKg),
       starchKg: round(starchKg),
       forageDmKg: round(forageDmKg),
@@ -186,6 +223,7 @@ function analyzeRation(rows, targets = {}, context = {}){
       nelActual: round(nelActual),
       nelBalanceMcal: round(nelMcal - nelTarget),
       ndfPctActual: round(ndfPctActual),
+      peNDFPctActual: round(peNDFPctActual),
       fatPctActual: round(fatPctActual),
       starchPct: round(starchPct),
       roughPctDM: round(roughPctDM),
@@ -213,6 +251,7 @@ function analyzeRation(rows, targets = {}, context = {}){
       ndfTarget: round(ndfTarget),
       starchMax: round(starchMax),
       roughageMin: round(roughageMin)
+      peNDFMin: round(peNDFMin),
     }
   };
 }
