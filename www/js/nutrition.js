@@ -2064,16 +2064,19 @@ function gaugePos(value, max){
   return Math.max(0, Math.min(1, value / max));
 }
 
-function polar(cx, cy, r, angleDeg){
-  const a = (angleDeg - 180) * Math.PI / 180;
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+function gaugePoint(cx, cy, r, pos){
+  const p = Math.max(0, Math.min(1, Number(pos) || 0));
+  const a = Math.PI * (1 - p); // 0 = يسار ، 1 = يمين على نصف الدائرة العلوي
+  return {
+    x: cx + r * Math.cos(a),
+    y: cy - r * Math.sin(a)
+  };
 }
 
-function arcPath(cx, cy, r, startDeg, endDeg){
-  const s = polar(cx, cy, r, startDeg);
-  const e = polar(cx, cy, r, endDeg);
-  const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+function arcPath(cx, cy, r, fromPos, toPos){
+  const s = gaugePoint(cx, cy, r, fromPos);
+  const e = gaugePoint(cx, cy, r, toPos);
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`;
 }
 
 function buildGaugeSvg(kind, current, target, state){
@@ -2084,6 +2087,7 @@ function buildGaugeSvg(kind, current, target, state){
   const cx = 80, cy = 82, r = 50;
 
   let safeFrom = 0.45, safeTo = 0.65;
+
   if (kind === 'ceiling' && Number.isFinite(target) && target > 0) {
     safeFrom = 0.00;
     safeTo   = gaugePos(target * 0.90, max);
@@ -2095,28 +2099,20 @@ function buildGaugeSvg(kind, current, target, state){
   safeFrom = Math.max(0, Math.min(1, safeFrom));
   safeTo   = Math.max(0, Math.min(1, safeTo));
 
-  const aStart = 180;
-  const aSafeStart = 180 - (180 * safeFrom);
-  const aSafeEnd   = 180 - (180 * safeTo);
-  const aEnd = 0;
+  const leftRed   = arcPath(cx, cy, r, 0, safeFrom);
+  const greenArc  = arcPath(cx, cy, r, safeFrom, safeTo);
+  const rightRed  = arcPath(cx, cy, r, safeTo, 1);
 
-  const redLeft  = arcPath(cx, cy, r, aStart, aSafeStart);
-  const greenMid = arcPath(cx, cy, r, aSafeStart, aSafeEnd);
-  const redRight = arcPath(cx, cy, r, aSafeEnd, aEnd);
+  const targetOuter = gaugePoint(cx, cy, r + 2, targetPos);
+  const targetInner = gaugePoint(cx, cy, r - 10, targetPos);
 
-  const targetAngle  = 180 - (180 * targetPos);
-  const currentAngle = 180 - (180 * currentPos);
-
-  const targetOuter = polar(cx, cy, r + 2, targetAngle);
-  const targetInner = polar(cx, cy, r - 10, targetAngle);
-
-  const needleTip = polar(cx, cy, r - 12, currentAngle);
+  const needleTip = gaugePoint(cx, cy, r - 12, currentPos);
 
   return `
     <svg viewBox="0 0 160 100" width="160" height="100" aria-hidden="true">
-      <path d="${redLeft}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${greenMid}" fill="none" stroke="#b7efc5" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${redRight}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${leftRed}"  fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${greenArc}" fill="none" stroke="#b7efc5" stroke-width="12" stroke-linecap="round"></path>
+      <path d="${rightRed}" fill="none" stroke="#fbcaca" stroke-width="12" stroke-linecap="round"></path>
 
       <line x1="${targetOuter.x}" y1="${targetOuter.y}" x2="${targetInner.x}" y2="${targetInner.y}"
             stroke="#111827" stroke-width="3.5" stroke-linecap="round"></line>
