@@ -174,15 +174,16 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
  cpTarget = clamp(cpTarget + f.cpBonusPct, 13, 20);;
 
   return {
-    species: 'cow',
-    bodyWeight,
-    dim: Number.isFinite(dim) ? Math.round(dim) : null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    ndfTarget: f.ndfTarget,
-starchMax: f.starchMax
-  };
+  species: 'cow',
+  bodyWeight,
+  dim: Number.isFinite(dim) ? Math.round(dim) : null,
+  dmi: round(dmi),
+  nel: round(nelTotal),
+  cpTarget: round(cpTarget),
+  mpTargetG: round((milkKg * 85) + (bodyWeight * 1.2), 0),
+  ndfTarget: f.ndfTarget,
+  starchMax: f.starchMax
+};
 }
 function resolveHeiferTargetGain(bodyWeight){
   const bw = Number(bodyWeight || 0);
@@ -237,17 +238,18 @@ function computeCowHeiferNASEM({ bodyWeight, pregDays, closeUp, breed }){
   let cpTarget = 15.0 + f.cpBonusPct;
   cpTarget = clamp(cpTarget, 14.5, 17.5);
 
-  return {
-    species: 'cow',
-    category: 'heifer',
-    bodyWeight,
-    dim: null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    ndfTarget: f.ndfTarget,
-    starchMax: f.starchMax
-  };
+return {
+  species: 'cow',
+  category: 'heifer',
+  bodyWeight,
+  dim: null,
+  dmi: round(dmi),
+  nel: round(nelTotal),
+  cpTarget: round(cpTarget),
+  mpTargetG: round(bodyWeight * 1.3, 0),
+  ndfTarget: f.ndfTarget,
+  starchMax: f.starchMax
+};
 }
 
 /* ============================= */
@@ -321,23 +323,25 @@ const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'جاموس');
   let cpTarget = 14.0;
   cpTarget = clamp(cpTarget, 13.5, 15.5);
 
-  return {
-    species: 'buffalo',
-    category: 'heifer',
-    bodyWeight,
-    dim: null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    ndfTarget: 34,
-    starchMax: 26,
-    roughageMin: 50
-  };
+ return {
+  species: 'buffalo',
+  category: 'heifer',
+  bodyWeight,
+  dim: null,
+  dmi: round(dmi),
+  nel: round(nelTotal),
+  cpTarget: round(cpTarget),
+  mpTargetG: round(bodyWeight * 1.35, 0),
+  ndfTarget: 34,
+  starchMax: 26,
+  roughageMin: 50
+};
 }
 /* ============================= */
 
-function round(n){
-  return Math.round(n * 100) / 100;
+function round(n, d = 2){
+  const p = 10 ** d;
+  return Math.round((Number(n) || 0) * p) / p;
 }
 
 function clamp(x, a, b){
