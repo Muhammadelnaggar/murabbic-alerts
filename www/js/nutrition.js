@@ -1835,11 +1835,17 @@ function gaugeStatus(kind, current, target, low = 0.92, high = 1.08){
     return { key:'na', label:'غير متاح', color:'#94a3b8', note:'لا توجد بيانات كافية' };
   }
 
-  if (kind === 'ceiling') {
-    if (current <= target * 0.90) return { key:'good', label:'آمن', color:'#16a34a', note:'ضمن الحد الآمن' };
-    if (current <= target)        return { key:'warn', label:'قريب', color:'#d97706', note:'قريب من الحد — يحتاج متابعة' };
-    return { key:'danger', label:'خطر', color:'#dc2626', note:'أعلى من الحد — يحتاج تدخل' };
+ if (kind === 'ceiling') {
+  if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
+    return { label:'معلومة', color:'#64748b', tone:'info' };
   }
+
+  if (current < target) {
+    return { label:'آمن', color:'#16a34a', tone:'good' };
+  }
+
+  return { label:'خطر', color:'#dc2626', tone:'danger' };
+}
 
   const ratio = current / target;
   if (ratio < low)  return { key:'danger', label:'ناقص', color:'#dc2626', note:'أقل من المطلوب بوضوح' };
@@ -1936,17 +1942,17 @@ let arc2 = '';
 let arc3 = '';
 
 if (kind === 'ceiling') {
-  // في مؤشرات الحد الأقصى: الآمن يسار، ثم تحذير، ثم خطر يمين
-  arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  const limitPos = gaugePos(target, max);
+
+  arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc2 = `<path d="${arcPath(cx, cy, r, limitPos, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  arc3 = '';
 } else {
   // في مؤشرات الاحتياج: منخفض = خطر، وسط = تحذير، يمين = جيد
   arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
   arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
   arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
 }
-
   const tip = gaugePoint(cx, cy, r - 8, pos);
 
   // قاعدة الإبرة أسمك وتعطي شكل عداد محترم
