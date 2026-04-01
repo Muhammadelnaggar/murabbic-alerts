@@ -1185,12 +1185,12 @@ if (d.enabled === false) return;
   cat: String(d.cat || d.category || d.type || '').trim() || null,
 
   dm: pickNum(d, ['dmPct','dm','DM','dm_percent','dryMatterPct','dryMatter','dmP']),
-  cp: pickNum(d, ['cpPct','cp','CP','proteinPct','protein','crudeProteinPct','cp_percent','cpP']),
-
-  nel: pickNum(d, ['nelMcalPerKgDM','nel','NEL']),
-  ndf: pickNum(d, ['ndfPct','ndf','NDF']),
-  fat: pickNum(d, ['fatPct','fat','Fat','EE','etherExtractPct','fat_percent']),
-  mp:  pickNum(d, ['mpGPerKgDM','mp','MP']),
+cp: pickNum(d, ['cpPct','cp','CP','proteinPct','protein','crudeProteinPct','cp_percent','cpP']),
+nel: pickNum(d, ['nelMcalPerKgDM','nel','NEL']),
+ndf: pickNum(d, ['ndfPct','ndf','NDF']),
+fat: pickNum(d, ['fatPct','fat','Fat','EE','etherExtractPct','fat_percent']),
+starch: pickNum(d, ['starchPct','starch','Starch']),
+mp:  pickNum(d, ['mpGPerKgDM','mp','MP']),
 });
     });
 // ===== دمج تعديلات المستخدم (Overrides) فوق قيم NRC =====
@@ -1214,6 +1214,7 @@ if (o.cpPct != null) f.cp = Number(o.cpPct);
 if (o.nelMcalPerKgDM != null) f.nel = Number(o.nelMcalPerKgDM);
 if (o.ndfPct != null) f.ndf = Number(o.ndfPct);
 if (o.fatPct != null) f.fat = Number(o.fatPct);
+if (o.starchPct != null) f.starch = Number(o.starchPct);
 if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
     } catch (e) {
       console.warn('override read failed for', f.id, e);
@@ -2074,47 +2075,52 @@ function arcPath(cx, cy, r, startDeg, endDeg){
   return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
 }
 
-function needleSvg(pos, color){
-  const angle = 180 - (180 * pos);
-  const p1 = polar(80, 78, 44, angle);
-  return `
-    <line x1="80" y1="78" x2="${p1.x}" y2="${p1.y}" stroke="${color}" stroke-width="3.5" stroke-linecap="round"></line>
-    <circle cx="80" cy="78" r="5" fill="${color}"></circle>
-  `;
-}
-
-function markerSvg(pos){
-  const angle = 180 - (180 * pos);
-  const outer = polar(80, 78, 56, angle);
-  const inner = polar(80, 78, 46, angle);
-  return `<line x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" stroke="#0f172a" stroke-width="3" stroke-linecap="round"></line>`;
-}
-
 function buildGaugeSvg(kind, current, target, state){
   const max = gaugeScaleMax(kind, current, target);
   const currentPos = gaugePos(current, max);
   const targetPos = gaugePos(target, max);
 
-  let greenFrom = 0.45, greenTo = 0.65;
+  const cx = 80, cy = 82, r = 52;
+
+  let safeFrom = 0.45, safeTo = 0.65;
   if (kind === 'ceiling' && Number.isFinite(target) && target > 0) {
-    greenFrom = 0.00;
-    greenTo = gaugePos(target * 0.90, max);
+    safeFrom = 0.00;
+    safeTo = gaugePos(target * 0.90, max);
   } else if (Number.isFinite(target) && target > 0) {
-    greenFrom = gaugePos(target * 0.92, max);
-    greenTo = gaugePos(target * 1.08, max);
+    safeFrom = gaugePos(target * 0.92, max);
+    safeTo = gaugePos(target * 1.08, max);
   }
 
-  const red1 = arcPath(80, 78, 56, 180, 180 - (180 * Math.max(0, greenFrom)));
-  const green = arcPath(80, 78, 56, 180 - (180 * Math.max(0, greenFrom)), 180 - (180 * Math.min(1, greenTo)));
-  const red2 = arcPath(80, 78, 56, 180 - (180 * Math.min(1, greenTo)), 0);
+  const a0 = 180;
+  const a1 = 180 - (180 * Math.max(0, safeFrom));
+  const a2 = 180 - (180 * Math.min(1, safeTo));
+  const a3 = 0;
+
+  const bg1 = arcPath(cx, cy, r, a0, a1);
+  const bg2 = arcPath(cx, cy, r, a1, a2);
+  const bg3 = arcPath(cx, cy, r, a2, a3);
+
+  const targetAngle = 180 - (180 * targetPos);
+  const currentAngle = 180 - (180 * currentPos);
+
+  const targetOuter = polar(cx, cy, r + 2, targetAngle);
+  const targetInner = polar(cx, cy, r - 10, targetAngle);
+
+  const needleTip = polar(cx, cy, r - 12, currentAngle);
+  const leftBase  = polar(cx, cy, 10, currentAngle - 90);
+  const rightBase = polar(cx, cy, 10, currentAngle + 90);
 
   return `
-    <svg viewBox="0 0 160 92" width="160" height="92" aria-hidden="true">
-      <path d="${red1}" fill="none" stroke="#fecaca" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${green}" fill="none" stroke="#bbf7d0" stroke-width="12" stroke-linecap="round"></path>
-      <path d="${red2}" fill="none" stroke="#fecaca" stroke-width="12" stroke-linecap="round"></path>
-      ${markerSvg(targetPos)}
-      ${needleSvg(currentPos, state.color)}
+    <svg viewBox="0 0 160 100" width="160" height="100" aria-hidden="true">
+      <path d="${bg1}" fill="none" stroke="#fecaca" stroke-width="14" stroke-linecap="round"></path>
+      <path d="${bg2}" fill="none" stroke="#bbf7d0" stroke-width="14" stroke-linecap="round"></path>
+      <path d="${bg3}" fill="none" stroke="#fecaca" stroke-width="14" stroke-linecap="round"></path>
+
+      <line x1="${targetOuter.x}" y1="${targetOuter.y}" x2="${targetInner.x}" y2="${targetInner.y}" stroke="#111827" stroke-width="3.5" stroke-linecap="round"></line>
+
+      <path d="M ${leftBase.x} ${leftBase.y} L ${needleTip.x} ${needleTip.y} L ${rightBase.x} ${rightBase.y} Z" fill="${state.color}" opacity="0.95"></path>
+      <circle cx="${cx}" cy="${cy}" r="6" fill="${state.color}"></circle>
+      <circle cx="${cx}" cy="${cy}" r="2.5" fill="#ffffff"></circle>
     </svg>
   `;
 }
