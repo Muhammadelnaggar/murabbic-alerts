@@ -1774,10 +1774,11 @@ const item = {
   pct,
   pTonRaw,
 
-  nel: (feedMeta && Number.isFinite(Number(feedMeta.nel))) ? Number(feedMeta.nel) : null,
-  ndf: (feedMeta && Number.isFinite(Number(feedMeta.ndf))) ? Number(feedMeta.ndf) : null,
-  fat: (feedMeta && Number.isFinite(Number(feedMeta.fat))) ? Number(feedMeta.fat) : null,
-  mp:  (feedMeta && Number.isFinite(Number(feedMeta.mp)))  ? Number(feedMeta.mp)  : null
+  nel:    (feedMeta && Number.isFinite(Number(feedMeta.nel)))    ? Number(feedMeta.nel)    : null,
+  ndf:    (feedMeta && Number.isFinite(Number(feedMeta.ndf)))    ? Number(feedMeta.ndf)    : null,
+  fat:    (feedMeta && Number.isFinite(Number(feedMeta.fat)))    ? Number(feedMeta.fat)    : null,
+  starch: (feedMeta && Number.isFinite(Number(feedMeta.starch))) ? Number(feedMeta.starch) : null,
+  mp:     (feedMeta && Number.isFinite(Number(feedMeta.mp)))     ? Number(feedMeta.mp)     : null
 };
 
 if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
