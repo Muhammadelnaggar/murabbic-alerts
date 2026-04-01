@@ -1035,7 +1035,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       target: num(targets.cpTarget, 1),
       targetText: txt(targets.cpTarget, '%', 1)
     },
-   {
+{
   key: 'rumen',
   title: 'صحة الكرش',
   value:
