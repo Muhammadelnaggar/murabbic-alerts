@@ -344,6 +344,7 @@ function normalizeNutritionAnalysis(a = {}) {
   nelDensity: toNumOrNull(a?.nutrition?.nelDensity),
   ndfPctActual: toNumOrNull(a?.nutrition?.ndfPctActual),
   fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
+  starchPctActual: toNumOrNull(a?.nutrition?.starchPctActual ?? a?.nutrition?.starchPct),
   roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
   concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
   rumenStatus: a?.nutrition?.rumenStatus || null,
@@ -389,10 +390,11 @@ function normalizeNutritionRows(rows = []) {
     cpPct: toNumOrNull(r?.cpPct ?? r?.cp),
    pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon ?? r?.price ?? r?.pTonRaw),
     pricePerTonDM: toNumOrNull(r?.pricePerTonDM ?? r?.pTonDM),
-    nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
-    ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
-    fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
-    mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
+   nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
+ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
+fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
+starchPct: toNumOrNull(r?.starchPct ?? r?.starch),
+mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
   }));
 }
 function round2(v){
@@ -557,7 +559,7 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
   const cleanRows = Array.isArray(rows) ? rows : [];
   const modeNorm = String(mode || 'tmr_asfed').trim();
 
- const rationCore = analyzeRation(
+const rationCore = analyzeRation(
   cleanRows.map(r => ({
     kg: r.asFedKg,
     dm: r.dmPct,
@@ -566,6 +568,7 @@ function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_as
     nel: r.nelMcalPerKgDM,
     ndf: r.ndfPct,
     fat: r.fatPct,
+    starch: r.starchPct,
     cat: r.cat
   }))
 );
@@ -822,6 +825,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
   fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
+  starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
   concPctDM,
   rumenStatus,
@@ -1001,16 +1005,21 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     value: txt(nutrition.ndfPctActual, '%', 1)
   },
 
-  {
-    key: 'starchMax',
-    title: 'الحد الأقصى للنشا',
-    value: txt(targets.starchMax, '%', 0)
-  },
-  {
-    key: 'roughageMin',
-    title: 'الحد الأدنى للخشن',
-    value: txt(targets.roughageMin, '%', 0)
-  },
+ {
+  key: 'starchMax',
+  title: 'الحد الأقصى للنشا',
+  value: txt(targets.starchMax, '%', 0)
+},
+{
+  key: 'starchPctActual',
+  title: 'العليقة الحالية — نشا',
+  value: txt(nutrition.starchPctActual, '%', 1)
+},
+{
+  key: 'roughageMin',
+  title: 'الحد الأدنى للخشن',
+  value: txt(targets.roughageMin, '%', 0)
+},
 
   {
     key: 'fatLimit',
