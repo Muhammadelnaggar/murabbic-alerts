@@ -876,17 +876,6 @@ if (totalDmForRumen <= 0) {
   rumenStatus = 'warn';
   rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
 } else {
-  const isBuffalo = isBuffaloSpecies(context?.species);
-
-  // أبقار: ممتاز 40–60
-  // جاموس: حد أدنى 50% خشن مع نطاق عملي أعلى
-  const low  = isBuffalo ? 50 : 40;
-  const high = isBuffalo ? 70 : 60;
-
-if (totalDmForRumen <= 0) {
-  rumenStatus = 'warn';
-  rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
-} else {
   const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
   const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
 
