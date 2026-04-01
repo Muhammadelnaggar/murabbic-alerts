@@ -733,14 +733,15 @@ const rationCore = analyzeRation(
     cat: r.cat,
     pricePerTonAsFed: r.pricePerTon
   })),
-  {
-    dmi: targetsCore?.dmi,
-    nel: targetsCore?.nel,
-    mpTargetG: targetsCore?.mpTargetG,
-    ndfTarget: targetsCore?.ndfTarget,
-    starchMax: targetsCore?.starchMax,
-    roughageMin: targetsCore?.roughageMin
-  },
+ {
+  dmi: targetsCore?.dmi,
+  nel: targetsCore?.nel,
+  mpTargetG: targetsCore?.mpTargetG,
+  ndfTarget: targetsCore?.ndfTarget,
+  starchMax: targetsCore?.starchMax,
+  roughageMin: targetsCore?.roughageMin,
+  peNDFMin: targetsCore?.peNDFMin
+},
   {
     avgMilkKg: context?.avgMilkKg,
     milkFatPct: runtimeCtx?.milkFatPctUsed,
@@ -934,7 +935,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
       mixPriceDM,
       mixPriceAsFed
     },
-  nutrition: {
+ nutrition: {
   cpPctTotal: rationCore?.nutrition?.cpPctTotal ?? null,
   mpSupplyG: rationCore?.nutrition?.mpSupplyG ?? null,
   mpDensityGkgDM: rationCore?.nutrition?.mpDensityGkgDM ?? null,
@@ -948,6 +949,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   nelActual: nelActualDay,
   nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
+  peNDFPctActual: rationCore?.nutrition?.peNDFPctActual ?? null,
   fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
@@ -955,6 +957,17 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   rumenStatus,
   rumenNote,
   rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
+},
+targets: {
+  dmiTarget: targetsCore?.dmi ?? null,
+  nelTarget: targetsCore?.nel ?? null,
+  cpTarget: targetsCore?.cpTarget ?? null,
+  mpTargetG: targetsCore?.mpTargetG ?? null,
+  ndfTarget: targetsCore?.ndfTarget ?? null,
+  fatTarget: null,
+  starchMax: targetsCore?.starchMax ?? null,
+  roughageMin: targetsCore?.roughageMin ?? null,
+  peNDFMin: targetsCore?.peNDFMin ?? null
 },
   targets: {
   dmiTarget: targetsCore?.dmi ?? null,
