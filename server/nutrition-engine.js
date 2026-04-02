@@ -1,323 +1,15 @@
 // مُرَبِّيك — Nutrition Engine
-// يعتمد على وزن قياسي حسب النوع والسلالة
-// مبني على تحليلات واحتياجات غذائية علمية دقيقة
-// Cow core + breed adjustment
-function resolveFeedingCategory(ctx){
+// نسخة أقوى للاقتراب من NASEM 2021 داخل حدود هذا الملف
+// ملاحظات:
+// 1) الأبقار: تحسين DMI / NEL / الحمل / MP بصورة واضحة.
+// 2) الجاموس: ما زال Murabbik operational adaptation لأن NASEM 2021 ليس نموذجًا مباشرًا للجاموس.
+// 3) البروتين العلمي الأساسي هنا هو mpTargetG
+// 4) cpReferencePct مرجع تشغيلي للعرض فقط، وليس requirement علمي نهائي.
 
-  const milkKg   = Number(ctx?.avgMilkKg || 0);
-  const pregDays = Number(ctx?.pregnancyDays || 0);
-  const closeUp  = !!ctx?.closeUp;
-
-  if (milkKg > 0) return 'lactating';
-
-  if (closeUp) return 'close_up';
-
-  if (pregDays > 0) return 'dry_pregnant';
-
-  return 'heifer';
+function num(v, d = 0){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
 }
-function computeTargets(ctx){
-
-  const species  = String(ctx?.species || '').trim();
-  const breed    = String(ctx?.breed || '').trim();
-  const milkKg   = Number(ctx?.avgMilkKg || 0);
-  const pregDays = Number(ctx?.pregnancyDays || 0);
-  const closeUp  = !!ctx?.closeUp;
-  const category = resolveFeedingCategory(ctx);
-  const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
-
-  const bodyWeight = getStandardWeight(species, breed);
-
-  if (category === 'heifer') {
-    return computeCowHeifer({
-      bodyWeight,
-      pregDays,
-      closeUp,
-      breed
-    });
-  }
-
-  return computeCow({
-    bodyWeight,
-    milkKg,
-    pregDays,
-    closeUp,
-    dim,
-    breed
-  });
-}
-
-/* ============================= */
-/*      STANDARD WEIGHT TABLE    */
-/* ============================= */
-
-function getStandardWeight(species, breed){
-
-  const b = String(breed || '').trim();
-
-if(
-  species === 'جاموس' ||
-  species === 'جاموسة' ||
-  species === 'buffalo'
-){
-  if (b.includes('مصري')) return 600;
-  if (b.includes('هجين') && (b.includes('ايطالي') || b.includes('إيطالي'))) return 700;
-  if (b.includes('هجين') && b.includes('مورا')) return 750;
-  if (b.includes('ايطالي') || b.includes('إيطالي')) return 720;
-  if (b.includes('مورا')) return 800;
-  if (b.includes('خليط')) return 650;
-  return 650;
-}
-
-  // أبقار
-  if(b.includes('هولشتاين')) return 650;
-  if(b.includes('مونبليار') || b.includes('مونبيليار')) return 700; // ✅ ثنائي الغرض أثقل
-  if(b.includes('فريزيان')) return 620;
-  if(b.includes('سيمينتال')) return 720;
-  if(b.includes('براون') || b.includes('سويس')) return 680;
-  if(b.includes('جيرسي')) return 450;
-  if(b.includes('خليط')) return 600;
-
-  return 630;
-}
-
-
-/* ============================= */
-/*          COW ENGINE           */
-/* ============================= */
-
-
-function isDualPurposeBreed(breed){
-  const b = String(breed || '').trim().toLowerCase()
-    .replace(/[أإآ]/g,'ا')
-    .replace(/ة/g,'ه');
-  return (
-    b.includes('مونبليار') || b.includes('مونبيليار') || b.includes('montb') || b.includes('montbeli') ||
-    b.includes('سيمينتال') || b.includes('simmental')
-  );
-}
-
-function cowBreedFactors(breed){
-  if(isDualPurposeBreed(breed)){
-    return {
-      cpBonusPct: 2.0,
-      dmiFactor: 0.96,
-      nelMilkFactor: 1.03
-    };
-  }
-
-  return {
-    cpBonusPct: 0.0,
-    dmiFactor: 1.0,
-    nelMilkFactor: 1.0
-  };
-}
-function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
-  const f = cowBreedFactors(breed);
-
-  const bw = Number(bodyWeight || 0);
-  const milk = Number(milkKg || 0);
-  const days = Number(dim || 0);
-  const bw075 = Math.pow(bw, 0.75);
-
-  const baseDmi = (0.022 * bw) + (0.12 * milk);
-  const wol = days > 0 ? (days / 7) : 0;
-  const lactFactor = wol > 0 ? (1 - Math.exp(-0.22 * (wol + 2.5))) : 1;
-
-  let dmi = baseDmi * lactFactor;
-
-  const minDmi = Math.max(10, bw * 0.018);
-  const maxDmi = (milk > 0) ? Math.max(bw * 0.040, 26) : (bw * 0.028);
-
-  dmi = clamp(dmi * f.dmiFactor, minDmi, maxDmi);
-
-  const nelMaintenance = 0.10 * bw075;
-  const nelMilk = (0.74 * milk) * f.nelMilkFactor;
-
-  let nelPreg = 0;
-  if (pregDays > 190) {
-    nelPreg = 0.0038 * pregDays;
-  }
-  if (closeUp) {
-    nelPreg += 2.3;
-  }
-
-  const nelTotal = nelMaintenance + nelMilk + nelPreg;
-
-  let cpTarget = 14.0 + (0.07 * milk);
-  cpTarget = clamp(cpTarget + f.cpBonusPct, 14.0, 18.5);
-
-  let mpTargetG = (3.8 * bw075) + (43 * milk);
-  if (pregDays > 190) mpTargetG += 80;
-  if (closeUp) mpTargetG += 60;
-
-  return {
-    species: 'cow',
-    bodyWeight: bw,
-    dim: Number.isFinite(days) ? Math.round(days) : null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    mpTargetG: round(mpTargetG, 0)
-  };
-}
-function resolveHeiferTargetGain(bodyWeight){
-  const bw = Number(bodyWeight || 0);
-
-  if (bw <= 250) return 0.80;
-  if (bw <= 350) return 0.90;
-  if (bw <= 450) return 0.85;
-  return 0.75;
-}
-
-function estimateHeiferGrowthNEL(bodyWeight, species){
-  const bw = Number(bodyWeight || 0);
-  const adg = resolveHeiferTargetGain(bw);
-
-  // معادلة تشغيلية متدرجة بدل رقم ثابت
-  // أساس Cow heifer ثم نخفض قليلًا للجاموس
-  let nelGrowth = 2.2 + (adg * 1.4) + (bw / 500);
-
-  if (String(species || '').includes('جاموس')) {
-    nelGrowth = nelGrowth * 0.95;
-  }
-
-  return round(nelGrowth);
-}
-function computeCowHeifer({ bodyWeight, pregDays, closeUp, breed }){
-  const f = cowBreedFactors(breed);
-  const bw075 = Math.pow(bodyWeight, 0.75);
-
-  const nelMaintenance = 0.08 * bw075;
-  const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'cow');
-
-  let nelPreg = 0;
-  if (pregDays > 190) {
-    nelPreg = 0.00318 * pregDays;
-  }
-  if (closeUp) {
-    nelPreg += 2.0;
-  }
-
-  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
-
-  let dmi = bodyWeight * (bodyWeight < 300 ? 0.024 : 0.022);
-  dmi = dmi * f.dmiFactor;
-
-  let cpTarget = 15.0 + f.cpBonusPct;
-  cpTarget = clamp(cpTarget, 14.5, 17.0);
-
-  const mpTargetG = (3.6 * bw075) + 120;
-
-  return {
-    species: 'cow',
-    category: 'heifer',
-    bodyWeight,
-    dim: null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    mpTargetG: round(mpTargetG, 0)
-  };
-}
-/* ============================= */
-/*        BUFFALO ENGINE         */
-/* ============================= */
-
-function computeBuffalo({ bodyWeight, milkKg, pregDays, closeUp, dim }){
-  const bw = Number(bodyWeight || 0);
-  const milk = Number(milkKg || 0);
-  const days = Number(dim || 0);
-  const bw075 = Math.pow(bw, 0.75);
-
-  // 1) DMI — أقل من الأبقار قليلًا لكن ليس بشكل مبالغ
-  const baseDmi = (0.0215 * bw) + (0.115 * milk);
-  const wol = days > 0 ? (days / 7) : 0;
-  const lactFactor = wol > 0 ? (1 - Math.exp(-0.20 * (wol + 2.5))) : 1;
-
-  let dmi = baseDmi * lactFactor;
-  dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
-
-  // 2) NEL
-  const nelMaintenance = 0.095 * bw075;
-  const nelMilk = 0.90 * milk;
-
-  let nelPreg = 0;
-  if (pregDays > 200) {
-    nelPreg = 0.0038 * pregDays;
-  }
-  if (closeUp) {
-    nelPreg += 2.5;
-  }
-
-  const nelTotal = nelMaintenance + nelMilk + nelPreg;
-
-  // 3) CP reference only
-  let cpTarget = 12.5 + (0.16 * milk);
-  cpTarget = clamp(cpTarget, 12.5, 15.5);
-
-  // 4) MP target — مرجع عملي
-  let mpTargetG = (3.6 * bw075) + (40 * milk);
-  if (pregDays > 200) mpTargetG += 80;
-  if (closeUp) mpTargetG += 60;
-
-  return {
-    species: 'buffalo',
-    bodyWeight: bw,
-    dim: Number.isFinite(days) ? Math.round(days) : null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    cpTarget: round(cpTarget),
-    mpTargetG: round(mpTargetG, 0),
-    ndfTarget: 34,
-    starchMax: 22,
-    roughageMin: 50
-  };
-}
-function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
-
-  const bw075 = Math.pow(bodyWeight, 0.75);
-
-  // صيانة
-  const nelMaintenance = 0.075 * bw075;
-
-  // نمو مبدئي لعجلات الجاموس
-const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'جاموس');
-
-  // حمل
-  let nelPreg = 0;
-  if (pregDays > 200) {
-    nelPreg = 0.0035 * pregDays;
-  }
-  if (closeUp) {
-    nelPreg += 2.5;
-  }
-
-  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
-
-  // DMI أقل قليلًا من الأبقار
- const dmi = bodyWeight * (bodyWeight < 300 ? 0.023 : 0.021);
-
-let cpTarget = 14.0;
-cpTarget = clamp(cpTarget, 13.5, 15.0);
-
-const mpTargetG = (3.5 * bw075) + 120;
-
-return {
-  species: 'buffalo',
-  category: 'heifer',
-  bodyWeight,
-  dim: null,
-  dmi: round(dmi),
-  nel: round(nelTotal),
-  cpTarget: round(cpTarget),
-  mpTargetG: round(mpTargetG, 0),
-  ndfTarget: 34,
-  starchMax: 22,
-  roughageMin: 50
-};
-}
-/* ============================= */
 
 function round(n, d = 2){
   const p = 10 ** d;
@@ -326,9 +18,526 @@ function round(n, d = 2){
 
 function clamp(x, a, b){
   x = Number(x);
-  if(!Number.isFinite(x)) return a;
+  if (!Number.isFinite(x)) return a;
   return Math.max(a, Math.min(b, x));
 }
+
+function normArabic(s){
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه');
+}
+
+/* ============================= */
+/*        FEEDING CATEGORY       */
+/* ============================= */
+
+function resolveFeedingCategory(ctx){
+  const milkKg   = num(ctx?.avgMilkKg ?? ctx?.milkKg ?? 0);
+  const pregDays = num(ctx?.pregnancyDays || 0);
+  const closeUp  = !!ctx?.closeUp;
+
+  if (milkKg > 0) return 'lactating';
+  if (closeUp) return 'close_up';
+  if (pregDays > 0) return 'dry_pregnant';
+  return 'heifer';
+}
+
+/* ============================= */
+/*      STANDARD WEIGHT TABLE    */
+/* ============================= */
+
+function getStandardWeight(species, breed){
+  const sp = normArabic(species);
+  const b  = normArabic(breed);
+
+  if (sp === 'جاموس' || sp === 'جاموسه' || sp === 'buffalo'){
+    if (b.includes('مصري')) return 600;
+    if (b.includes('هجين') && (b.includes('ايطالي') || b.includes('ايطالى') || b.includes('ايتالي') || b.includes('ايتالى'))) return 700;
+    if (b.includes('هجين') && b.includes('مورا')) return 750;
+    if (b.includes('ايطالي') || b.includes('ايطالى')) return 720;
+    if (b.includes('مورا')) return 800;
+    if (b.includes('خليط')) return 650;
+    return 650;
+  }
+
+  if (b.includes('هولشتاين')) return 650;
+  if (b.includes('مونبليار') || b.includes('مونبيليار') || b.includes('montb')) return 700;
+  if (b.includes('فريزيان')) return 620;
+  if (b.includes('سيمينتال') || b.includes('simmental')) return 720;
+  if (b.includes('براون') || b.includes('سويس') || b.includes('brown swiss')) return 680;
+  if (b.includes('جيرسي') || b.includes('jersey')) return 450;
+  if (b.includes('خليط')) return 600;
+
+  return 630;
+}
+
+/* ============================= */
+/*       BREED ADJUSTMENTS       */
+/* ============================= */
+
+function isDualPurposeBreed(breed){
+  const b = normArabic(breed);
+  return (
+    b.includes('مونبليار') ||
+    b.includes('مونبيليار') ||
+    b.includes('montb') ||
+    b.includes('سيمينتال') ||
+    b.includes('simmental')
+  );
+}
+
+function cowBreedFactors(breed){
+  if (isDualPurposeBreed(breed)){
+    return {
+      cpBonusPct: 2.0,   // business rule محفوظ لمُرَبِّيك
+      dmiFactor: 0.97,
+      nelMilkFactor: 1.02
+    };
+  }
+  return {
+    cpBonusPct: 0.0,
+    dmiFactor: 1.0,
+    nelMilkFactor: 1.0
+  };
+}
+
+/* ============================= */
+/*       NASEM CORE HELPERS      */
+/* ============================= */
+
+// ECM approximation for operational use
+function milkEnergyCorrectedKg(milkKg, fatPct, proteinPct){
+  const milk = num(milkKg);
+  const fat  = num(fatPct, 3.7);
+  const prot = num(proteinPct, 3.2);
+
+  const fatKg  = milk * (fat / 100);
+  const protKg = milk * (prot / 100);
+
+  return (0.327 * milk) + (12.95 * fatKg) + (7.20 * protKg);
+}
+
+// Operationalized NASEM-style lactating DMI
+// Chapter 2 emphasizes Equation 2-1 as primary animal-factor DMI predictor.
+// The official model needs specific fitted inputs; هنا نحافظ على نفس البنية العلمية بدل المعادلة المبسطة القديمة.
+function predictCowLactatingDMI({ bodyWeight, milkKg, fatPct, proteinPct, dim, bcs, parity }){
+  const bw    = num(bodyWeight);
+  const milkE = milkEnergyCorrectedKg(milkKg, fatPct, proteinPct);
+  const DIM   = Math.max(1, num(dim, 1));
+  const BCS   = clamp(num(bcs, 3.0), 2.0, 4.5);
+  const PAR   = (num(parity, 2) <= 1) ? 1 : 2;
+
+  const bw075 = Math.pow(bw, 0.75);
+
+  let base = 3.7 + (0.305 * milkE) + (0.0104 * bw075);
+  base += (BCS - 3.0) * 0.5;
+  if (PAR === 1) base -= 0.7;
+
+  const wol = DIM / 7;
+  const lagFactor = 1 - Math.exp(-0.192 * (wol + 3.67));
+
+  let dmi = base * lagFactor;
+
+  const minDmi = Math.max(8.5, bw * 0.0175);
+  const maxDmi = Math.max(26, bw * 0.042);
+
+  return clamp(dmi, minDmi, maxDmi);
+}
+
+// Heifer DMI
+function predictHeiferDMI({ bodyWeight, dietNDFPct }){
+  const bw = num(bodyWeight);
+  const ndf = Number(dietNDFPct);
+
+  if (Number.isFinite(ndf) && ndf > 0){
+    const dmi = (0.0185 * bw) + (1.6 - 0.018 * ndf);
+    return clamp(dmi, bw * 0.018, bw * 0.030);
+  }
+
+  return clamp(0.022 * bw, bw * 0.018, bw * 0.030);
+}
+
+function nelMaintenanceMcal(bodyWeight){
+  return 0.10 * Math.pow(num(bodyWeight), 0.75);
+}
+
+// Milk energy from components, instead of fixed factor per kg milk
+function nelLactationMilkMcal(milkKg, fatPct, proteinPct, f){
+  const milk = num(milkKg);
+  const fat  = num(fatPct, 3.7) / 100;
+  const prot = num(proteinPct, 3.2) / 100;
+
+  const mcalPerKgMilk =
+      (0.0929 * (fat * 100)) +
+      (0.0563 * (prot * 100)) +
+      0.192;
+
+  return milk * mcalPerKgMilk * num(f?.nelMilkFactor, 1);
+}
+
+// Pregnancy NEL based on conceptus growth style
+function gestationConceptusNE(bodyWeight, pregDays){
+  const bw = num(bodyWeight);
+  const dp = num(pregDays);
+
+  if (dp < 190) return 0;
+
+  const gravid = Math.exp((0.03233 * dp) - (0.0000275 * dp * dp) - 8.595);
+  return (0.14 * gravid * 4.16) / 0.13 * Math.pow(bw / 650, 0.75);
+}
+
+function closeUpExtraNEL(closeUp){
+  return closeUp ? 0.8 : 0;
+}
+
+function heiferTargetADG(bodyWeight){
+  const bw = num(bodyWeight);
+  if (bw <= 250) return 0.80;
+  if (bw <= 350) return 0.90;
+  if (bw <= 450) return 0.85;
+  return 0.75;
+}
+
+function heiferGrowthNEL(bodyWeight, species){
+  const bw = num(bodyWeight);
+  const adg = heiferTargetADG(bw);
+
+  let nelGrowth = 2.2 + (adg * 1.4) + (bw / 500);
+  if (normArabic(species).includes('جاموس')) {
+    nelGrowth *= 0.95;
+  }
+  return nelGrowth;
+}
+
+// MP operational approximation
+// NASEM 2021 evaluates protein on MP / absorbed AA basis, not crude protein alone.
+function computeOperationalMPTarget({
+  bodyWeight,
+  milkKg,
+  proteinPct,
+  pregDays,
+  closeUp,
+  growth
+}){
+  const bw075 = Math.pow(num(bodyWeight), 0.75);
+  const milk  = num(milkKg);
+  const milkProtPct = num(proteinPct, 3.2) / 100;
+
+  const mpMaintenance = 3.8 * bw075;
+  const mpLactation   = milk * milkProtPct * 1000 / 0.67;
+  const mpPreg        = (pregDays >= 190) ? (70 + Math.max(0, (pregDays - 190) * 1.2)) : 0;
+  const mpGrowth      = growth ? 120 : 0;
+  const mpCloseUp     = closeUp ? 40 : 0;
+
+  return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
+}
+
+// Operational CP reference only
+function computeCPReferencePct({ species, milkKg, breed, stage }){
+  const sp = normArabic(species);
+  const milk = num(milkKg);
+  const dual = isDualPurposeBreed(breed);
+
+  let cp = 0;
+
+  if (sp === 'جاموس' || sp === 'جاموسه' || sp === 'buffalo'){
+    if (stage === 'heifer') cp = 14.0;
+    else cp = 12.5 + (0.13 * milk);
+    return clamp(cp, 12.5, 15.5);
+  }
+
+  if (stage === 'heifer') cp = 15.0;
+  else cp = 14.0 + (0.055 * milk);
+
+  if (dual) cp += 2.0;
+
+  return clamp(cp, 14.0, stage === 'heifer' ? 17.0 : 18.5);
+}
+
+/* ============================= */
+/*          COW ENGINE           */
+/* ============================= */
+
+function computeCow({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  closeUp,
+  dim,
+  breed,
+  milkFatPct,
+  milkProteinPct,
+  bcs,
+  parity
+}){
+  const f = cowBreedFactors(breed);
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const days = num(dim);
+  const fatPct = num(milkFatPct, 3.7);
+  const proteinPct = num(milkProteinPct, 3.2);
+
+  let dmi = predictCowLactatingDMI({
+    bodyWeight: bw,
+    milkKg: milk,
+    fatPct,
+    proteinPct,
+    dim: days,
+    bcs: num(bcs, 3.0),
+    parity: num(parity, 2)
+  });
+
+  dmi = clamp(dmi * f.dmiFactor, Math.max(8.5, bw * 0.0175), Math.max(26, bw * 0.042));
+
+  const nelMaintenance = nelMaintenanceMcal(bw);
+  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct, f);
+  const nelPreg = gestationConceptusNE(bw, pregDays) + closeUpExtraNEL(closeUp);
+  const nelTotal = nelMaintenance + nelMilk + nelPreg;
+
+  const mpTargetG = computeOperationalMPTarget({
+    bodyWeight: bw,
+    milkKg: milk,
+    proteinPct,
+    pregDays,
+    closeUp,
+    growth: false
+  });
+
+  const cpReferencePct = computeCPReferencePct({
+    species: 'cow',
+    milkKg: milk,
+    breed,
+    stage: 'lactating'
+  });
+
+  return {
+    species: 'cow',
+    category: 'lactating',
+    bodyWeight: bw,
+    dim: Number.isFinite(days) ? Math.round(days) : null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    mpTargetG: round(mpTargetG, 0),
+    cpReferencePct: round(cpReferencePct),
+    proteinSystem: 'MP',
+    ndfTarget: 30,
+    starchMax: 28,
+    roughageMin: 40
+  };
+}
+
+function computeCowHeifer({
+  bodyWeight,
+  pregDays,
+  closeUp,
+  breed,
+  dietNDFPct
+}){
+  const f = cowBreedFactors(breed);
+  const bw = num(bodyWeight);
+  const bw075 = Math.pow(bw, 0.75);
+
+  let dmi = predictHeiferDMI({
+    bodyWeight: bw,
+    dietNDFPct
+  });
+  dmi *= f.dmiFactor;
+
+  const nelMaintenance = 0.08 * bw075;
+  const nelGrowth = heiferGrowthNEL(bw, 'cow');
+  const nelPreg = gestationConceptusNE(bw, pregDays) + (closeUp ? 0.6 : 0);
+  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+
+  const mpTargetG = computeOperationalMPTarget({
+    bodyWeight: bw,
+    milkKg: 0,
+    proteinPct: 0,
+    pregDays,
+    closeUp,
+    growth: true
+  });
+
+  const cpReferencePct = computeCPReferencePct({
+    species: 'cow',
+    milkKg: 0,
+    breed,
+    stage: 'heifer'
+  });
+
+  return {
+    species: 'cow',
+    category: 'heifer',
+    bodyWeight: bw,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    mpTargetG: round(mpTargetG, 0),
+    cpReferencePct: round(cpReferencePct),
+    proteinSystem: 'MP',
+    ndfTarget: 32,
+    starchMax: 24,
+    roughageMin: 45
+  };
+}
+
+/* ============================= */
+/*        BUFFALO ENGINE         */
+/* ============================= */
+
+function computeBuffalo({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  closeUp,
+  dim,
+  milkFatPct,
+  milkProteinPct
+}){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const days = num(dim);
+  const fatPct = num(milkFatPct, 6.5);
+  const proteinPct = num(milkProteinPct, 4.2);
+
+  const baseDmi = (0.0205 * bw) + (0.120 * milk);
+  const wol = days > 0 ? (days / 7) : 0;
+  const lactFactor = wol > 0 ? (1 - Math.exp(-0.20 * (wol + 2.8))) : 1;
+
+  let dmi = baseDmi * lactFactor;
+  dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
+
+  const nelMaintenance = 0.095 * Math.pow(bw, 0.75);
+  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct, { nelMilkFactor: 1.05 });
+  const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) : 0) + (closeUp ? 1.0 : 0);
+  const nelTotal = nelMaintenance + nelMilk + nelPreg;
+
+  const mpTargetG = computeOperationalMPTarget({
+    bodyWeight: bw,
+    milkKg: milk,
+    proteinPct,
+    pregDays,
+    closeUp,
+    growth: false
+  });
+
+  const cpReferencePct = computeCPReferencePct({
+    species: 'buffalo',
+    milkKg: milk,
+    breed: '',
+    stage: 'lactating'
+  });
+
+  return {
+    species: 'buffalo',
+    category: 'lactating',
+    bodyWeight: bw,
+    dim: Number.isFinite(days) ? Math.round(days) : null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    mpTargetG: round(mpTargetG, 0),
+    cpReferencePct: round(cpReferencePct),
+    proteinSystem: 'MP',
+    ndfTarget: 34,
+    starchMax: 22,
+    roughageMin: 50
+  };
+}
+
+function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
+  const bw = num(bodyWeight);
+  const bw075 = Math.pow(bw, 0.75);
+
+  const nelMaintenance = 0.075 * bw075;
+  const nelGrowth = heiferGrowthNEL(bw, 'جاموس');
+  const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) * 0.95 : 0) + (closeUp ? 0.8 : 0);
+  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+
+  const dmi = clamp(
+    bw * (bw < 300 ? 0.023 : 0.021),
+    bw * 0.018,
+    bw * 0.028
+  );
+
+  const mpTargetG = computeOperationalMPTarget({
+    bodyWeight: bw,
+    milkKg: 0,
+    proteinPct: 0,
+    pregDays,
+    closeUp,
+    growth: true
+  });
+
+  const cpReferencePct = computeCPReferencePct({
+    species: 'buffalo',
+    milkKg: 0,
+    breed: '',
+    stage: 'heifer'
+  });
+
+  return {
+    species: 'buffalo',
+    category: 'heifer',
+    bodyWeight: bw,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    mpTargetG: round(mpTargetG, 0),
+    cpReferencePct: round(cpReferencePct),
+    proteinSystem: 'MP',
+    ndfTarget: 34,
+    starchMax: 22,
+    roughageMin: 50
+  };
+}
+
+/* ============================= */
+/*         MAIN DISPATCH         */
+/* ============================= */
+
+function computeTargets(ctx){
+  const species    = String(ctx?.species || '').trim();
+  const breed      = String(ctx?.breed || '').trim();
+  const milkKg     = num(ctx?.avgMilkKg ?? ctx?.milkKg ?? 0);
+  const pregDays   = num(ctx?.pregnancyDays || 0);
+  const closeUp    = !!ctx?.closeUp;
+  const category   = resolveFeedingCategory(ctx);
+  const dim        = num(ctx?.daysInMilk ?? ctx?.dim ?? 0);
+  const bodyWeight = num(ctx?.bodyWeight || 0) || getStandardWeight(species, breed);
+
+  const common = {
+    bodyWeight,
+    milkKg,
+    pregDays,
+    closeUp,
+    dim,
+    breed,
+    milkFatPct: ctx?.milkFatPct,
+    milkProteinPct: ctx?.milkProteinPct,
+    bcs: num(ctx?.bcs, 3.0),
+    parity: num(ctx?.parity, 2),
+    dietNDFPct: ctx?.dietNDFPct
+  };
+
+  const sp = normArabic(species);
+  const isBuffalo = (sp === 'جاموس' || sp === 'جاموسه' || sp === 'buffalo');
+
+  if (isBuffalo){
+    if (category === 'heifer' || category === 'dry_pregnant' || category === 'close_up'){
+      return computeBuffaloHeifer(common);
+    }
+    return computeBuffalo(common);
+  }
+
+  if (category === 'heifer' || category === 'dry_pregnant' || category === 'close_up'){
+    return computeCowHeifer(common);
+  }
+
+  return computeCow(common);
+}
+
 module.exports = {
   computeTargets
 };
