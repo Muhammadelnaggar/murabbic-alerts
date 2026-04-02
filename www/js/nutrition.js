@@ -12,10 +12,14 @@ let targetsCacheKey = '';
 async function fetchTargets(ctx) {
   const _ctx = ctx || readContext();
 
- const payload = {
+const payload = {
   context: {
     species: _ctx?.species,
     breed: _ctx?.breed || window.currentAnimal?.breed || null,
+    bodyWeight: _ctx?.bodyWeight,
+    bcs: _ctx?.bcs,
+    parity: _ctx?.parity,
+    dietNDFPct: _ctx?.dietNDFPct,
     daysInMilk: _ctx?.daysInMilk,
     avgMilkKg: _ctx?.avgMilkKg,
     pregnancyDays: _ctx?.pregnancyDays,
@@ -59,9 +63,13 @@ if (!res.ok || data?.ok === false) {
 
 async function refreshTargets() {
   const ctx = readContext();
- const key = JSON.stringify({
+const key = JSON.stringify({
   species: ctx?.species || '',
   breed: ctx?.breed || window.currentAnimal?.breed || '',
+  bodyWeight: ctx?.bodyWeight ?? '',
+  bcs: ctx?.bcs ?? '',
+  parity: ctx?.parity ?? '',
+  dietNDFPct: ctx?.dietNDFPct ?? '',
   daysInMilk: ctx?.daysInMilk ?? '',
   avgMilkKg: ctx?.avgMilkKg ?? '',
   pregnancyDays: ctx?.pregnancyDays ?? '',
@@ -376,17 +384,25 @@ function disableSave(disabled){
 
 function setHiddenCtxFromQuery(){
   const p = qp();
-  const setVal = (id, v) => { const el=document.getElementById(id); if(el && v!==null && v!==undefined && v!=='') el.value = v; };
-  const setChk = (id, v) => { const el=document.getElementById(id); if(el) el.checked = (v==='1' || v==='true' || v==='yes'); };
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== null && v !== undefined && v !== '') el.value = v; };
+  const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = (v === '1' || v === 'true' || v === 'yes'); };
+
   setVal('ctxDIM', p.get('dim') || p.get('DIM'));
   setVal('ctxSpecies', p.get('species'));
   setVal('ctxAvgMilk', p.get('avgMilk'));
   setVal('ctxDCC', p.get('dcc'));
   setVal('ctxPreg', p.get('preg'));
+
   setVal('ctxMilkFat', p.get('milkFat'));
-setVal('ctxMilkProtein', p.get('milkProtein'));
-setVal('ctxMilkPrice', p.get('milkPrice'));
-setVal('ctxBreed', p.get('breed'));
+  setVal('ctxMilkProtein', p.get('milkProtein'));
+  setVal('ctxMilkPrice', p.get('milkPrice'));
+  setVal('ctxBreed', p.get('breed'));
+
+  setVal('ctxBodyWeight', p.get('bodyWeight'));
+  setVal('ctxBCS', p.get('bcs'));
+  setVal('ctxParity', p.get('parity'));
+  setVal('ctxDietNDFPct', p.get('dietNDFPct'));
+
   setChk('ctxEarlyDry', p.get('earlyDry'));
   setChk('ctxCloseUp', p.get('closeUp'));
 }
@@ -407,17 +423,23 @@ function displaySpeciesLabel(v){
   return v || '—';
 }
 function updateCtxView(){
-  const species = document.getElementById('ctxSpecies')?.value || '';
-  const dim = document.getElementById('ctxDIM')?.value || '';
-  const avgMilk = document.getElementById('ctxAvgMilk')?.value || '';
-  const dcc = document.getElementById('ctxDCC')?.value || '';
-  const preg = document.getElementById('ctxPreg')?.value || '';
-  const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
-  const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
-  const milkFat = document.getElementById('ctxMilkFat')?.value || '';
-  const milkProtein = document.getElementById('ctxMilkProtein')?.value || '';
-  const milkPrice = document.getElementById('ctxMilkPrice')?.value || '';
-  const breed = document.getElementById('ctxBreed')?.value || '';
+ const species = document.getElementById('ctxSpecies')?.value || '';
+const dim = document.getElementById('ctxDIM')?.value || '';
+const avgMilk = document.getElementById('ctxAvgMilk')?.value || '';
+const dcc = document.getElementById('ctxDCC')?.value || '';
+const preg = document.getElementById('ctxPreg')?.value || '';
+const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
+const closeUp = !!document.getElementById('ctxCloseUp')?.checked;
+
+const milkFat = document.getElementById('ctxMilkFat')?.value || '';
+const milkProtein = document.getElementById('ctxMilkProtein')?.value || '';
+const milkPrice = document.getElementById('ctxMilkPrice')?.value || '';
+const breed = document.getElementById('ctxBreed')?.value || '';
+
+const bodyWeight = document.getElementById('ctxBodyWeight')?.value || '';
+const bcs = document.getElementById('ctxBCS')?.value || '';
+const parity = document.getElementById('ctxParity')?.value || '';
+const dietNDFPct = document.getElementById('ctxDietNDFPct')?.value || '';
   setElText('ctxSpecies_txt', displaySpeciesLabel(species));
   setElText('ctxDIM_txt', dim || '—');
   setElText('ctxAvgMilk_txt', avgMilk ? Number(avgMilk).toFixed(1) : '—');
@@ -428,7 +450,13 @@ function updateCtxView(){
 setElText('ctxMilkProtein_txt', milkProtein ? Number(milkProtein).toFixed(2) : '—');
 setElText('ctxMilkPrice_txt', milkPrice ? Number(milkPrice).toFixed(2) : '—');
 setElText('ctxBreed_txt', breed || '—');
-  setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
+
+setElText('ctxBodyWeight_txt', bodyWeight ? Number(bodyWeight).toFixed(0) : '—');
+setElText('ctxBCS_txt', bcs ? Number(bcs).toFixed(2) : '—');
+setElText('ctxParity_txt', parity || '—');
+setElText('ctxDietNDFPct_txt', dietNDFPct ? Number(dietNDFPct).toFixed(1) : '—');
+
+setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
 
   // متبقي للولادة
   const dccNum = dcc!=='' ? Number(dcc) : NaN;
@@ -626,11 +654,34 @@ const species = normalizeSpecies(speciesRaw);
   const preg = (animal?.reproductiveStatus || animal?.lastDiagnosis || animal?.pregStatus || '') || '';
 
   // breed (لرفع دقة الاحتياجات حسب السلالة)
-  try{
-    const br = String(animal?.breed || '').trim();
-    const el = document.getElementById('ctxBreed');
-    if(el && br) el.value = br;
-  }catch(_){ }
+ // breed + bodyWeight + bcs + parity
+try{
+  const br = String(animal?.breed || '').trim();
+  const breedEl = document.getElementById('ctxBreed');
+  if (breedEl && br) breedEl.value = br;
+
+  const bw =
+    animal?.bodyWeight ??
+    animal?.weight ??
+    null;
+
+  const bcs =
+    animal?.bcs ??
+    null;
+
+  const parity =
+    animal?.parity ??
+    animal?.lactationNumber ??
+    null;
+
+  const bwEl = document.getElementById('ctxBodyWeight');
+  const bcsEl = document.getElementById('ctxBCS');
+  const parityEl = document.getElementById('ctxParity');
+
+  if (bwEl && bw != null) bwEl.value = bw;
+  if (bcsEl && bcs != null) bcsEl.value = bcs;
+  if (parityEl && parity != null) parityEl.value = parity;
+}catch(_){ }
 
 
   // DCC من lastInseminationDate (فقط لو عشار)
@@ -738,10 +789,46 @@ const avgMilk = milks.length
   }
   const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
 
-  if(species) document.getElementById('ctxSpecies').value = species;
-  if(avgDIM!=null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
-  document.getElementById('ctxAvgMilk').value = (avgMilk!=null ? avgMilk.toFixed(1) : '');
-  if(avgDCC!=null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
+ if (species) document.getElementById('ctxSpecies').value = species;
+if (avgDIM != null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
+document.getElementById('ctxAvgMilk').value = (avgMilk != null ? avgMilk.toFixed(1) : '');
+if (avgDCC != null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
+
+// breed ممثلة للمجموعة: أول سلالة متاحة
+const groupBreed =
+  String(docs.find(d => String(d?.breed || '').trim())?.breed || '').trim();
+const breedEl = document.getElementById('ctxBreed');
+if (breedEl && groupBreed) breedEl.value = groupBreed;
+
+// parity ممثلة للمجموعة: متوسط lactationNumber/parity إن وُجد
+const parityVals = docs
+  .map(d => Number(d?.parity ?? d?.lactationNumber))
+  .filter(v => Number.isFinite(v));
+const avgParity = parityVals.length
+  ? (parityVals.reduce((a,b)=>a+b,0) / parityVals.length)
+  : null;
+const parityEl = document.getElementById('ctxParity');
+if (parityEl && avgParity != null) parityEl.value = Math.round(avgParity);
+
+// bodyWeight ممثل للمجموعة: متوسط bodyWeight/weight إن وُجد
+const bwVals = docs
+  .map(d => Number(d?.bodyWeight ?? d?.weight))
+  .filter(v => Number.isFinite(v) && v > 0);
+const avgBW = bwVals.length
+  ? (bwVals.reduce((a,b)=>a+b,0) / bwVals.length)
+  : null;
+const bwEl = document.getElementById('ctxBodyWeight');
+if (bwEl && avgBW != null) bwEl.value = Math.round(avgBW);
+
+// BCS ممثل للمجموعة: متوسط bcs إن وُجد
+const bcsVals = docs
+  .map(d => Number(d?.bcs))
+  .filter(v => Number.isFinite(v) && v > 0);
+const avgBCS = bcsVals.length
+  ? (bcsVals.reduce((a,b)=>a+b,0) / bcsVals.length)
+  : null;
+const bcsEl = document.getElementById('ctxBCS');
+if (bcsEl && avgBCS != null) bcsEl.value = avgBCS.toFixed(2);
 
   const animalInfo = document.getElementById('animalInfo');
   const groupLabel =
@@ -2290,36 +2377,60 @@ function cleanDeep(obj){
 
 
 function readContext(){
-  const getNum = id => { const v = document.getElementById(id)?.value; return v? Number(v) : null; };
+  const getNum = id => { const v = document.getElementById(id)?.value; return v ? Number(v) : null; };
   const getSel = id => document.getElementById(id)?.value || null;
 
   const species = getSel('ctxSpecies');
   const dcc = getNum('ctxDCC');
-  const gest = (species==='جاموس') ? 310 : 280;
+  const gest = (species === 'جاموس') ? 310 : 280;
   const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
 
   return {
-   group: (
-  qp().get('group') ||
-  qp().get('groupName') ||
-  document.getElementById('animalInfo')?.textContent?.trim() ||
-  null
-),
+    group: (
+      qp().get('group') ||
+      qp().get('groupName') ||
+      document.getElementById('animalInfo')?.textContent?.trim() ||
+      null
+    ),
     species,
     breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || window.currentAnimal?.breed || null),
+
+    bodyWeight: parseUiNumber(
+      document.getElementById('ctxBodyWeight')?.value ||
+      window.currentAnimal?.bodyWeight ||
+      window.currentAnimal?.weight ||
+      null
+    ),
+
+    bcs: parseUiNumber(
+      document.getElementById('ctxBCS')?.value ||
+      window.currentAnimal?.bcs ||
+      null
+    ),
+
+    parity: parseUiNumber(
+      document.getElementById('ctxParity')?.value ||
+      window.currentAnimal?.parity ||
+      window.currentAnimal?.lactationNumber ||
+      null
+    ),
+
+    dietNDFPct: parseUiNumber(
+      document.getElementById('ctxDietNDFPct')?.value || null
+    ),
+
     daysInMilk: getNum('ctxDIM'),
     avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
-milkFatPct: parseUiNumber(document.getElementById('ctxMilkFat')?.value || null),
-milkProteinPct: parseUiNumber(document.getElementById('ctxMilkProtein')?.value || null),
-milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
-earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
+    milkFatPct: parseUiNumber(document.getElementById('ctxMilkFat')?.value || null),
+    milkProteinPct: parseUiNumber(document.getElementById('ctxMilkProtein')?.value || null),
+    milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
+    earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
     closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
     pregnancyStatus: getSel('ctxPreg'),
     pregnancyDays: dcc,
     daysToCalving
   };
 }
-
 async function saveToServer(payload){
   const { auth } = await import('/js/firebase-config.js');
 
