@@ -297,26 +297,38 @@ function normalizeNutritionContext(ctx = {}) {
   if (/cow|بقر|بقرة|أبقار/i.test(speciesRaw)) species = 'بقر';
   if (/buffalo|جاموس/i.test(speciesRaw)) species = 'جاموس';
 
-   return cleanObj({
+  return cleanObj({
     group: ctx.group || null,
     species,
     breed: ctx.breed || null,
+
     daysInMilk: toNumOrNull(ctx.daysInMilk),
     avgMilkKg: toNumOrNull(ctx.avgMilkKg),
+
     earlyDry: !!ctx.earlyDry,
     closeUp: !!ctx.closeUp,
     pregnancyStatus: ctx.pregnancyStatus || null,
     pregnancyDays: toNumOrNull(ctx.pregnancyDays),
     daysToCalving: toNumOrNull(ctx.daysToCalving),
 
-    bodyWeightKg: toNumOrNull(ctx.bodyWeightKg),
-    cameraWeightKg: toNumOrNull(ctx.cameraWeightKg ?? ctx.estimatedWeightKg ?? ctx.weightEstimateKg),
-    groupBodyWeightKg: toNumOrNull(ctx.groupBodyWeightKg ?? ctx.representativeBodyWeightKg),
+    bodyWeight: toNumOrNull(ctx.bodyWeight ?? ctx.bodyWeightKg),
+    bodyWeightKg: toNumOrNull(ctx.bodyWeight ?? ctx.bodyWeightKg),
+
+    cameraWeightKg: toNumOrNull(
+      ctx.cameraWeightKg ?? ctx.estimatedWeightKg ?? ctx.weightEstimateKg
+    ),
+
+    groupBodyWeightKg: toNumOrNull(
+      ctx.groupBodyWeightKg ?? ctx.representativeBodyWeightKg
+    ),
 
     milkFatPct: toNumOrNull(ctx.milkFatPct),
     milkProteinPct: toNumOrNull(ctx.milkProteinPct),
 
-    lactationNumber: toNumOrNull(ctx.lactationNumber),
+    parity: toNumOrNull(ctx.parity ?? ctx.lactationNumber),
+    lactationNumber: toNumOrNull(ctx.parity ?? ctx.lactationNumber),
+
+    dietNDFPct: toNumOrNull(ctx.dietNDFPct),
 
     thi: toNumOrNull(ctx.thi),
 
@@ -561,21 +573,22 @@ function deriveNutritionRuntimeContext(context = {}) {
 function buildNutritionCentralTargets(context = {}) {
   const runtimeCtx = deriveNutritionRuntimeContext(context);
 
-  let targetsCore = computeTargets({
-    species: context.species,
-    breed: context.breed,
-    daysInMilk: context.daysInMilk,
-    avgMilkKg: context.avgMilkKg,
-    pregnancyDays: context.pregnancyDays,
-    closeUp: context.closeUp,
+ let targetsCore = computeTargets({
+  species: context.species,
+  breed: context.breed,
+  daysInMilk: context.daysInMilk,
+  avgMilkKg: context.avgMilkKg,
+  pregnancyDays: context.pregnancyDays,
+  closeUp: context.closeUp,
 
-    bodyWeightKg: runtimeCtx.bodyWeightKgUsed,
-    milkFatPct: runtimeCtx.milkFatPctUsed,
-    milkProteinPct: runtimeCtx.milkProteinPctUsed,
-    lactationNumber: runtimeCtx.lactationNumberUsed,
-    thi: runtimeCtx.thiUsed,
-    bcs: runtimeCtx.bcsUsed
-  });
+  bodyWeight: runtimeCtx.bodyWeightKgUsed,
+  milkFatPct: runtimeCtx.milkFatPctUsed,
+  milkProteinPct: runtimeCtx.milkProteinPctUsed,
+  parity: runtimeCtx.lactationNumberUsed,
+  dietNDFPct: context.dietNDFPct,
+  thi: runtimeCtx.thiUsed,
+  bcs: runtimeCtx.bcsUsed
+});
 
   targetsCore = applyBuffaloNutritionRules(targetsCore, context);
 
@@ -633,7 +646,12 @@ function buildNutritionCentralTargets(context = {}) {
         : cpAfterProtein * growthFactor
     );
   }
-
+if (!Number.isFinite(Number(targetsCore?.cpTarget))) {
+  const cpRef = Number(targetsCore?.cpReferencePct);
+  if (Number.isFinite(cpRef)) {
+    targetsCore.cpTarget = round2(cpRef);
+  }
+}
   return {
     targetsCore,
     runtimeCtx,
@@ -958,17 +976,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   rumenNote,
   rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
 },
-targets: {
-  dmiTarget: targetsCore?.dmi ?? null,
-  nelTarget: targetsCore?.nel ?? null,
-  cpTarget: targetsCore?.cpTarget ?? null,
-  mpTargetG: targetsCore?.mpTargetG ?? null,
-  ndfTarget: targetsCore?.ndfTarget ?? null,
-  fatTarget: null,
-  starchMax: targetsCore?.starchMax ?? null,
-  roughageMin: targetsCore?.roughageMin ?? null,
-  peNDFMin: targetsCore?.peNDFMin ?? null
-},
+
   targets: {
   dmiTarget: targetsCore?.dmi ?? null,
   nelTarget: targetsCore?.nel ?? null,
