@@ -18,24 +18,33 @@ function resolveFeedingCategory(ctx){
 }
 function computeTargets(ctx){
 
-  const species  = String(ctx?.species || '').trim();
-  const breed    = String(ctx?.breed || '').trim();
-  const milkKg   = Number(ctx?.avgMilkKg || 0);
-  const pregDays = Number(ctx?.pregnancyDays || 0);
-  const closeUp  = !!ctx?.closeUp;
-  const category = resolveFeedingCategory(ctx);
-  // DIM (أيام الحليب) — مهم جدًا لتأثير مرحلة الإدرار على الاستهلاك
-  const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
+const species  = String(ctx?.species || '').trim();
+const breed    = String(ctx?.breed || '').trim();
+const milkKg   = Number(ctx?.avgMilkKg || 0);
+const pregDays = Number(ctx?.pregnancyDays || 0);
+const closeUp  = !!ctx?.closeUp;
+const category = resolveFeedingCategory(ctx);
+const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
 
-  const bodyWeight = getStandardWeight(species, breed);
+const bodyWeight = getStandardWeight(species, breed);
+
 if (category === 'heifer') {
-  if (species === 'جاموس') {
-    return computeBuffaloHeifer({
-      bodyWeight,
-      pregDays,
-      closeUp,
-      breed
-    });
+  return computeCowHeifer({
+    bodyWeight,
+    pregDays,
+    closeUp,
+    breed
+  });
+}
+
+return computeCow({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  closeUp,
+  dim,
+  breed
+});
   }
 
  return computeCowHeiferNASEM({
@@ -117,6 +126,7 @@ function isDualPurposeBreed(breed){
   );
 }
 
+function cowBreedFactors(breed){
 function cowBreedFactors(breed){
   if(isDualPurposeBreed(breed)){
     return {
@@ -240,7 +250,6 @@ function computeCowHeifer({ bodyWeight, pregDays, closeUp, breed }){
     mpTargetG: round(mpTargetG, 0)
   };
 }
-
 /* ============================= */
 /*        BUFFALO ENGINE         */
 /* ============================= */
