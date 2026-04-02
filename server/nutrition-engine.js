@@ -1,7 +1,7 @@
-// مُرَبِّيك — Nutrition Engine (Unified)
+// مُرَبِّيك — Nutrition Engine
 // يعتمد على وزن قياسي حسب النوع والسلالة
-// Cow = NASEM-lite (DMI/DIM curve + NEL)
-// Buffalo = Cow base + Adjustment Layer
+// مبني على تحليلات واحتياجات غذائية علمية دقيقة
+// Cow core + breed adjustment
 function resolveFeedingCategory(ctx){
 
   const milkKg   = Number(ctx?.avgMilkKg || 0);
@@ -118,27 +118,20 @@ function isDualPurposeBreed(breed){
 }
 
 function cowBreedFactors(breed){
-  // افتراضات مُرَبِّيك الميدانية للسلالات ثنائية الغرض
   if(isDualPurposeBreed(breed)){
     return {
       cpBonusPct: 2.0,
       dmiFactor: 0.96,
-      nelMilkFactor: 1.03,
-      ndfTarget: 33,
-      starchMax: 25
+      nelMilkFactor: 1.03
     };
   }
 
-  // السلالات العادية
   return {
     cpBonusPct: 0.0,
     dmiFactor: 1.0,
-    nelMilkFactor: 1.0,
-    ndfTarget: 30,
-    starchMax: 28
+    nelMilkFactor: 1.0
   };
 }
-
 function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
   const f = cowBreedFactors(breed);
 
@@ -147,28 +140,20 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
   const days = Number(dim || 0);
   const bw075 = Math.pow(bw, 0.75);
 
-  // 1) DMI — عملي ومحترم مرحليًا
-  // أساس استهلاك + أثر DIM + ضبط بسيط للسلالة
   const baseDmi = (0.022 * bw) + (0.12 * milk);
   const wol = days > 0 ? (days / 7) : 0;
   const lactFactor = wol > 0 ? (1 - Math.exp(-0.22 * (wol + 2.5))) : 1;
 
   let dmi = baseDmi * lactFactor;
 
-  // early lactation cap / mid-lactation ceiling
   const minDmi = Math.max(10, bw * 0.018);
   const maxDmi = (milk > 0) ? Math.max(bw * 0.040, 26) : (bw * 0.028);
 
   dmi = clamp(dmi * f.dmiFactor, minDmi, maxDmi);
 
-  // 2) NEL requirement (still practical, but more defensible)
-  // maintenance
   const nelMaintenance = 0.10 * bw075;
-
-  // milk energy
   const nelMilk = (0.74 * milk) * f.nelMilkFactor;
 
-  // pregnancy
   let nelPreg = 0;
   if (pregDays > 190) {
     nelPreg = 0.0038 * pregDays;
@@ -179,13 +164,9 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
 
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
-  // 3) CP target — كمرجع فقط وليس أساس الحكم النهائي
-  // نستخدمه كواجهة عامة initial reference
   let cpTarget = 14.0 + (0.07 * milk);
   cpTarget = clamp(cpTarget + f.cpBonusPct, 14.0, 18.5);
 
-  // 4) MP target — نجعله أكثر تحفظًا ومنطقيًا من المعادلة القديمة
-  // maintenance + milk + pregnancy adjustment
   let mpTargetG = (3.8 * bw075) + (43 * milk);
   if (pregDays > 190) mpTargetG += 80;
   if (closeUp) mpTargetG += 60;
@@ -197,9 +178,7 @@ function computeCow({ bodyWeight, milkKg, pregDays, closeUp, dim, breed }){
     dmi: round(dmi),
     nel: round(nelTotal),
     cpTarget: round(cpTarget),
-    mpTargetG: round(mpTargetG, 0),
-    ndfTarget: milk >= 32 ? 30 : milk >= 22 ? 31 : 32,
-    starchMax: milk >= 32 ? 28 : 26
+    mpTargetG: round(mpTargetG, 0)
   };
 }
 function resolveHeiferTargetGain(bodyWeight){
@@ -225,18 +204,13 @@ function estimateHeiferGrowthNEL(bodyWeight, species){
 
   return round(nelGrowth);
 }
-function computeCowHeiferNASEM({ bodyWeight, pregDays, closeUp, breed }){
-
+function computeCowHeifer({ bodyWeight, pregDays, closeUp, breed }){
   const f = cowBreedFactors(breed);
   const bw075 = Math.pow(bodyWeight, 0.75);
 
-  // صيانة
   const nelMaintenance = 0.08 * bw075;
-
-  // نمو مبدئي عملي لعجلات الأبقار
   const nelGrowth = estimateHeiferGrowthNEL(bodyWeight, 'cow');
 
-  // حمل
   let nelPreg = 0;
   if (pregDays > 190) {
     nelPreg = 0.00318 * pregDays;
@@ -247,28 +221,24 @@ function computeCowHeiferNASEM({ bodyWeight, pregDays, closeUp, breed }){
 
   const nelTotal = nelMaintenance + nelGrowth + nelPreg;
 
-  // DMI تشغيلي لعجلات الأبقار
- let dmi = bodyWeight * (bodyWeight < 300 ? 0.024 : 0.022);
+  let dmi = bodyWeight * (bodyWeight < 300 ? 0.024 : 0.022);
   dmi = dmi * f.dmiFactor;
 
-  // CP دعم نمو
- let cpTarget = 15.0 + f.cpBonusPct;
-cpTarget = clamp(cpTarget, 14.5, 17.0);
+  let cpTarget = 15.0 + f.cpBonusPct;
+  cpTarget = clamp(cpTarget, 14.5, 17.0);
 
-const mpTargetG = (3.6 * bw075) + 120;
+  const mpTargetG = (3.6 * bw075) + 120;
 
-return {
-  species: 'cow',
-  category: 'heifer',
-  bodyWeight,
-  dim: null,
-  dmi: round(dmi),
-  nel: round(nelTotal),
-  cpTarget: round(cpTarget),
-  mpTargetG: round(mpTargetG, 0),
-  ndfTarget: 32,
-  starchMax: 24
-};
+  return {
+    species: 'cow',
+    category: 'heifer',
+    bodyWeight,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    cpTarget: round(cpTarget),
+    mpTargetG: round(mpTargetG, 0)
+  };
 }
 
 /* ============================= */
