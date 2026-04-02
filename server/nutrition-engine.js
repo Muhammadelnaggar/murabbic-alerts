@@ -18,63 +18,34 @@ function resolveFeedingCategory(ctx){
 }
 function computeTargets(ctx){
 
-const species  = String(ctx?.species || '').trim();
-const breed    = String(ctx?.breed || '').trim();
-const milkKg   = Number(ctx?.avgMilkKg || 0);
-const pregDays = Number(ctx?.pregnancyDays || 0);
-const closeUp  = !!ctx?.closeUp;
-const category = resolveFeedingCategory(ctx);
-const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
+  const species  = String(ctx?.species || '').trim();
+  const breed    = String(ctx?.breed || '').trim();
+  const milkKg   = Number(ctx?.avgMilkKg || 0);
+  const pregDays = Number(ctx?.pregnancyDays || 0);
+  const closeUp  = !!ctx?.closeUp;
+  const category = resolveFeedingCategory(ctx);
+  const dim = Number(ctx?.daysInMilk ?? ctx?.dim ?? 0);
 
-const bodyWeight = getStandardWeight(species, breed);
+  const bodyWeight = getStandardWeight(species, breed);
 
-if (category === 'heifer') {
-  return computeCowHeifer({
-    bodyWeight,
-    pregDays,
-    closeUp,
-    breed
-  });
-}
-
-return computeCow({
-  bodyWeight,
-  milkKg,
-  pregDays,
-  closeUp,
-  dim,
-  breed
-});
+  if (category === 'heifer') {
+    return computeCowHeifer({
+      bodyWeight,
+      pregDays,
+      closeUp,
+      breed
+    });
   }
 
- return computeCowHeiferNASEM({
-    bodyWeight,
-    pregDays,
-    closeUp,
-    breed
-  });
-}
-
-if(species === 'جاموس'){
-  return computeBuffalo({
+  return computeCow({
     bodyWeight,
     milkKg,
     pregDays,
     closeUp,
-    dim
+    dim,
+    breed
   });
 }
-
-return computeCow({
-  bodyWeight,
-  milkKg,
-  pregDays,
-  closeUp,
-  dim,
-  breed
-});
-}
-
 
 /* ============================= */
 /*      STANDARD WEIGHT TABLE    */
@@ -126,7 +97,6 @@ function isDualPurposeBreed(breed){
   );
 }
 
-function cowBreedFactors(breed){
 function cowBreedFactors(breed){
   if(isDualPurposeBreed(breed)){
     return {
