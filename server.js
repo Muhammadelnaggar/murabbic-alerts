@@ -974,7 +974,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   concPctDM,
   rumenStatus,
   rumenNote,
-  rumenAdvice: "يجب ألا يقل طول تقطيع الخشن عن 3–5 سم لضمان الاجترار وتقليل خطر الحموضة"
+ rumenAdvice: "تم احتساب الألياف المؤثرة وصحة الكرش على افتراض أن طول تقطيع الخشن 3–5 سم. إذا كان التقطيع أقصر أو أطول من ذلك قد تختلف دقة التقييم."
 },
 
   targets: {
