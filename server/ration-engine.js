@@ -26,14 +26,21 @@ function inferPef(row = {}){
   const cat = String(row.cat || '').trim().toLowerCase();
   const name = String(row.name || row.feedName || '').trim().toLowerCase();
 
+  // المركزات والإضافات: لا تُحسب كألياف مؤثرة
   if (cat === 'conc' || cat === 'add') return 0;
 
-  if (/تبن|قش|straw|hay|دريس/.test(name)) return 1.0;
-  if (/سيلاج|silage/.test(name)) return 0.75;
-  if (/برسيم|green|fresh/.test(name)) return 0.70;
+  // افتراض مُرَبِّيك القياسي:
+  // إذا لم يُدخل المستخدم طول التقطيع، نعتبر الخشن مقطع 3–5 سم
+  // وبالتالي نستخدم قيم pef تشغيلية مناسبة لهذا الطول
+  if (/تبن|قش|straw/.test(name)) return 1.00;
+  if (/hay|دريس/.test(name)) return 0.95;
+  if (/سيلاج|silage/.test(name)) return 0.85;
+  if (/برسيم|green|fresh/.test(name)) return 0.80;
   if (/pulp|لب بنجر|بنجر/.test(name)) return 0.45;
 
-  if (cat === 'rough') return 0.70;
+  // أي خشن غير معروف النوع → اعتبره خشن 3–5 سم بشكل افتراضي
+  if (cat === 'rough') return 0.85;
+
   return 0;
 }
 function estimateRumenState({
@@ -112,7 +119,10 @@ function analyzeRation(rows, targets = {}, context = {}){
   let concDmKg = 0;
 
   let totalCost = 0;
-
+  let missingMpRows = 0;
+  let missingNelRows = 0;
+  let missingNdfRows = 0;
+  let missingStarchRows = 0;
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -124,7 +134,10 @@ function analyzeRation(rows, targets = {}, context = {}){
     const starch = num(r.starchPct ?? r.starch);
     const cat = String(r.cat || '').trim();
     const pef = inferPef(r);
-
+   
+    if (!Number.isFinite(Number(r.nel ?? r.nelMcalPerKgDM))) missingNelRows++;
+    if (!Number.isFinite(Number(r.ndf ?? r.ndfPct))) missingNdfRows++;
+    if (!Number.isFinite(Number(r.starchPct ?? r.starch))) missingStarchRows++;
     const priceKg =
       num(r.priceKg) ||
       (
@@ -138,7 +151,11 @@ function analyzeRation(rows, targets = {}, context = {}){
     asFedKg += kg;
     dmKg += dmItemKg;
     cpKg += dmItemKg * (cp / 100);
-    mpSupplyG += dmItemKg * mp;
+    if (mp > 0) {
+  mpSupplyG += dmItemKg * mp;
+} else {
+  missingMpRows++;
+}
     nelMcal += dmItemKg * nel;
     ndfKg += dmItemKg * (ndf / 100);
     peNdfKg += dmItemKg * (ndf / 100) * pef;
@@ -152,7 +169,8 @@ function analyzeRation(rows, targets = {}, context = {}){
 
   const cpPctTotal = dmKg > 0 ? (cpKg / dmKg) * 100 : 0;
   const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
-  const nelActual = dmKg > 0 ? (nelMcal / dmKg) : 0;
+  const nelTotalMcalDay = nelMcal;
+  const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
   const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
   const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
@@ -171,7 +189,17 @@ function analyzeRation(rows, targets = {}, context = {}){
   const peNDFMin = num(targets?.peNDFMin);
   const dmBalanceKg = dmiTarget ? (dmKg - dmiTarget) : 0;
   const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
+  let mpNote = 'تقييم البروتين الممثل جيد';
 
+if (missingMpRows > 0) {
+  mpNote = 'تقييم البروتين الممثل يحتوي خامات بدون قيم MP كاملة';
+}
+
+if (mpTargetG && mpSupplyG < mpTargetG) {
+  mpNote = missingMpRows > 0
+    ? 'يوجد عجز MP مع نقص في بعض بيانات الخامات'
+    : 'يوجد عجز في البروتين الممثل عن الاحتياج';
+}
   const mixPriceAsFed = asFedKg > 0 ? (totalCost / asFedKg) : 0;
   const mixPriceDM = dmKg > 0 ? (totalCost / dmKg) : 0;
 
@@ -188,15 +216,16 @@ function analyzeRation(rows, targets = {}, context = {}){
   const fpcmKg = calcFpcmKg(avgMilkKg, milkFatPct);
   const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
 
-  const rumenState = estimateRumenState({
-    starchPct,
-    ndfPctActual,
-    roughPctDM,
-    starchMax,
-    ndfTarget,
-    roughageMin,
-    peNDFMin
-  });
+const rumenState = estimateRumenState({
+  starchPct,
+  ndfPctActual,
+  roughPctDM,
+  peNDFPctActual,
+  starchMax,
+  ndfTarget,
+  roughageMin,
+  peNDFMin
+});
 
   return {
     totals: {
@@ -220,7 +249,15 @@ function analyzeRation(rows, targets = {}, context = {}){
       mpSupplyG: round(mpSupplyG, 0),
       mpDensityGkgDM: round(mpDensityGkgDM, 0),
       mpBalanceG: round(mpBalanceG, 0),
-      nelActual: round(nelActual),
+      mpNote,
+      inputQuality: {
+        missingMpRows,
+        missingNelRows,
+        missingNdfRows,
+        missingStarchRows
+},
+     nelActual: round(nelTotalMcalDay),
+      nelDensity: round(nelDensityMcalKgDM),
       nelBalanceMcal: round(nelMcal - nelTarget),
       ndfPctActual: round(ndfPctActual),
       peNDFPctActual: round(peNDFPctActual),
