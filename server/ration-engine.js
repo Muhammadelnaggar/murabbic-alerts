@@ -26,19 +26,18 @@ function inferPef(row = {}){
   const cat = String(row.cat || '').trim().toLowerCase();
   const name = String(row.name || row.feedName || '').trim().toLowerCase();
 
-  // المركزات والإضافات: لا تُحسب كألياف مؤثرة
+  // المركزات والإضافات لا تُحسب كألياف مؤثرة
   if (cat === 'conc' || cat === 'add') return 0;
 
   // افتراض مُرَبِّيك القياسي:
-  // إذا لم يُدخل المستخدم طول التقطيع، نعتبر الخشن مقطع 3–5 سم
-  // وبالتالي نستخدم قيم pef تشغيلية مناسبة لهذا الطول
+  // تم احتساب peNDF على أساس أن طول تقطيع الخشن 3–5 سم
   if (/تبن|قش|straw/.test(name)) return 1.00;
   if (/hay|دريس/.test(name)) return 0.95;
   if (/سيلاج|silage/.test(name)) return 0.85;
   if (/برسيم|green|fresh/.test(name)) return 0.80;
   if (/pulp|لب بنجر|بنجر/.test(name)) return 0.45;
 
-  // أي خشن غير معروف النوع → اعتبره خشن 3–5 سم بشكل افتراضي
+  // أي خشن غير محدد النوع → افتراض خشن مقطع 3–5 سم
   if (cat === 'rough') return 0.85;
 
   return 0;
