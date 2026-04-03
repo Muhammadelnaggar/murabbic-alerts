@@ -47,9 +47,33 @@
 .info .pill{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;line-height:1.1}
 .info .pill b{font-size:15px}
 .info .pill .k{font-size:12px;opacity:.75}
-#ctxList{grid-template-columns:repeat(2,minmax(0,1fr))}
+#ctxList{
+  display:block;
+  padding:10px;
+}
+
+#ctxList .strip-row{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:8px;
+}
+
+#ctxList .strip-row:first-child{
+  margin-top:0;
+}
+
+#ctxList .strip-item{
+  background:#f8fafc;
+  border:1px solid #eef2f7;
+  border-radius:12px;
+  padding:10px 8px;
+}
+
 @media (min-width:720px){
-  #ctxList{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #ctxList .strip-row{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
 }
 /* Hide template + search buttons (keep DOM for safety) */
 #tpl, #applyTpl, #addBySearch{display:none !important}
@@ -386,7 +410,45 @@ padding: 6px 0;
   opacity:.9;
   line-height:1.2;
 }
+.milk-inline-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  align-items:start;
+}
 
+.milk-inline-row .grow{min-width:0}
+
+.milk-inline-row label{
+  display:block;
+  margin-bottom:6px;
+  font-size:12px;
+  font-weight:800;
+  color:#334155;
+  line-height:1.2;
+  min-height:30px;
+}
+
+.milk-inline-row input{
+  width:100%;
+  min-height:42px;
+  padding:8px 10px;
+  border-radius:12px;
+}
+
+@media (max-width:420px){
+  .milk-inline-row{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:6px;
+  }
+  .milk-inline-row label{
+    font-size:11px;
+    min-height:28px;
+  }
+  .milk-inline-row input{
+    padding:8px 8px;
+  }
+}
 </style>
 </head>
 <body>
@@ -443,7 +505,7 @@ padding: 6px 0;
 
   <div class="warning" id="warn"></div>
   <div class="mbk-card" id="milkInputsCard">
-  <div class="row stack" style="gap:8px">
+ <div class="milk-inline-row">
     <div class="grow">
       <label class="muted">دهن اللبن %</label>
       <input id="milkFatInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="مثال: 3.8" style="width:100%">
