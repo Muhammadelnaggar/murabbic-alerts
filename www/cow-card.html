@@ -65,64 +65,65 @@
     /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
 .ev-list{
   display:grid;
-  gap:10px;
+  gap:8px;
 }
 
-.ev-card{
-  border:1px solid var(--border);
-  border-radius:14px;
-  background:#fff;
-  padding:12px;
-}
-
-.ev-card + .ev-card{
-  margin-top:0;
-}
-
-.ev-row{
+.ev-item{
   display:grid;
-  grid-template-columns:96px 1fr;
-  gap:10px;
-  align-items:start;
+  grid-template-columns:110px 1fr 1fr;
+  gap:8px;
+  align-items:center;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  padding:10px 12px;
 }
 
-.ev-row + .ev-row{
-  margin-top:8px;
-  padding-top:8px;
-  border-top:1px solid #edf5e8;
+.ev-item > div{
+  min-width:0;
 }
 
-.ev-label{
-  color:#2b593a;
+.ev-date{
+  color:#0f5132;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.ev-type{
+  color:#14532d;
+  font-size:14px;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.ev-note{
+  color:#355;
   font-size:13px;
   font-weight:700;
-}
-
-.ev-value{
-  color:#0f5132;
-  font-size:14px;
-  line-height:1.7;
-  font-weight:800;
-  white-space:normal;
-  word-break:break-word;
-  overflow-wrap:anywhere;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 @media (max-width:560px){
-  .ev-row{
-    grid-template-columns:88px 1fr;
-    gap:8px;
+  .ev-item{
+    grid-template-columns:96px 1fr 1fr;
+    gap:6px;
+    padding:9px 10px;
   }
 
-  .ev-label{
+  .ev-date{
     font-size:12px;
   }
 
-  .ev-value{
-    font-size:13px;
+  .ev-type,
+  .ev-note{
+    font-size:12px;
   }
 }
-
 /* === Timeline (أحداث الحيوان) === */
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
@@ -1168,15 +1169,14 @@ function renderEventsList(events){
   list.className = 'ev-list';
 
   if (!Array.isArray(events) || !events.length){
-    const card = document.createElement('div');
-    card.className = 'ev-card';
-    card.innerHTML = `
-      <div class="ev-row">
-        <div class="ev-label">الحالة</div>
-        <div class="ev-value">لا توجد أحداث</div>
-      </div>
+    const item = document.createElement('div');
+    item.className = 'ev-item';
+    item.innerHTML = `
+      <div class="ev-date">—</div>
+      <div class="ev-type">لا توجد أحداث</div>
+      <div class="ev-note">—</div>
     `;
-    list.appendChild(card);
+    list.appendChild(item);
     box.appendChild(list);
     return;
   }
@@ -1186,26 +1186,17 @@ function renderEventsList(events){
     .sort((a,b) => (b.d || '').localeCompare(a.d || ''));
 
   for (const { e, d } of rows){
-    const card = document.createElement('div');
-    card.className = 'ev-card';
-    if (e.id) card.id = `evrow-${e.id}`;
+    const item = document.createElement('div');
+    item.className = 'ev-item';
+    if (e.id) item.id = `evrow-${e.id}`;
 
-    card.innerHTML = `
-      <div class="ev-row">
-        <div class="ev-label">التاريخ</div>
-        <div class="ev-value">${d ? new Date(d).toLocaleDateString('ar-EG') : '—'}</div>
-      </div>
-      <div class="ev-row">
-        <div class="ev-label">اسم الحدث</div>
-        <div class="ev-value">${eventNameRaw(e)}</div>
-      </div>
-      <div class="ev-row">
-        <div class="ev-label">التفاصيل</div>
-        <div class="ev-value">${compactEventDetails(e)}</div>
-      </div>
+    item.innerHTML = `
+      <div class="ev-date">${d ? new Date(d).toLocaleDateString('ar-EG') : '—'}</div>
+      <div class="ev-type">${eventNameRaw(e)}</div>
+      <div class="ev-note">${compactEventDetails(e)}</div>
     `;
 
-    list.appendChild(card);
+    list.appendChild(item);
   }
 
   box.appendChild(list);
