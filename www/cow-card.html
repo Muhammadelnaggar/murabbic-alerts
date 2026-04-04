@@ -13,15 +13,6 @@
 .legend .leg:nth-child(3) .dot{background:#fff176}
 .legend .leg:nth-child(4) .dot{background:#66bb6a}
 
-/* جدول الأحداث القابل للتمرير */
-.ev-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-.ev-table{width:100%;border-collapse:separate;border-spacing:0}
-.ev-table th,.ev-table td{padding:10px;border-bottom:1px solid var(--border);font:13px system-ui;vertical-align:top}
-.ev-table thead th{position:sticky;top:0;background:#f8fff5;z-index:1;text-align:right}
-.ev-table tr:hover td{background:#f7fff2}
-.ev-date{white-space:nowrap;color:#0f5132;font-weight:700}
-.ev-type{color:#14532d;font-weight:800}
-.ev-note{color:#355}
 
    
     .openbar{display:flex;gap:8px;align-items:center;justify-content:center;margin:0 0 12px;flex-wrap:wrap}
@@ -72,45 +63,63 @@
 
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
     /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
+.ev-list{
+  display:grid;
+  gap:10px;
+}
+
+.ev-card{
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  padding:12px;
+}
+
+.ev-card + .ev-card{
+  margin-top:0;
+}
+
+.ev-row{
+  display:grid;
+  grid-template-columns:96px 1fr;
+  gap:10px;
+  align-items:start;
+}
+
+.ev-row + .ev-row{
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px solid #edf5e8;
+}
+
+.ev-label{
+  color:#2b593a;
+  font-size:13px;
+  font-weight:700;
+}
+
+.ev-value{
+  color:#0f5132;
+  font-size:14px;
+  line-height:1.7;
+  font-weight:800;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
 @media (max-width:560px){
-  .ev-scroll{
-    overflow:auto;
-    max-height:none;
+  .ev-row{
+    grid-template-columns:88px 1fr;
+    gap:8px;
   }
 
-  .ev-table{
-    table-layout:auto;
-    min-width:640px;
+  .ev-label{
+    font-size:12px;
   }
 
-  .ev-table thead th{
-    position:sticky;
-    top:0;
-    z-index:1;
-  }
-
-  .ev-table th,
-  .ev-table td{
-    padding:10px 8px;
+  .ev-value{
     font-size:13px;
-    line-height:1.55;
-    white-space:normal;
-    word-break:break-word;
-    overflow-wrap:anywhere;
-  }
-
-  .ev-date{
-    white-space:nowrap;
-  }
-
-  .ev-type,
-  .ev-note{
-    white-space:normal;
-    overflow:visible;
-    text-overflow:unset;
-    display:block;
-    -webkit-line-clamp:unset;
-    -webkit-box-orient:unset;
   }
 }
 
@@ -1155,87 +1164,69 @@ function renderEventsList(events){
   if (!box) return;
   box.innerHTML = '';
 
-  const wrap  = document.createElement('div'); wrap.className = 'ev-scroll';
-  const table = document.createElement('table'); table.className = 'ev-table';
- table.innerHTML = `
-  <thead>
-    <tr>
-      <th style="width:160px">التاريخ</th>
-      <th style="width:200px">اسم الحدث</th>
-      <th>التفاصيل / النتيجة</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-`;
+  const list = document.createElement('div');
+  list.className = 'ev-list';
 
-  const tbody = table.querySelector('tbody');
-
-  // لا توجد أحداث
   if (!Array.isArray(events) || !events.length){
-   const tr = document.createElement('tr');
-tr.innerHTML = `<td class="ev-date">—</td><td class="ev-type">لا توجد أحداث</td><td class="ev-note">—</td>`;
-
-    tbody.appendChild(tr);
-    wrap.appendChild(table); box.appendChild(wrap);
-    requestAnimationFrame(scheduleFit);
+    const card = document.createElement('div');
+    card.className = 'ev-card';
+    card.innerHTML = `
+      <div class="ev-row">
+        <div class="ev-label">الحالة</div>
+        <div class="ev-value">لا توجد أحداث</div>
+      </div>
+    `;
+    list.appendChild(card);
+    box.appendChild(list);
     return;
   }
 
-  // فرز تنازلي بالتاريخ؛ لو مفيش تاريخ نسيبه في الآخر
-  const rows = [...events].map(e => ({ e, d: evDate(e) || '' }))
-    .sort((a,b) => (b.d||'').localeCompare(a.d||''));
+  const rows = [...events]
+    .map(e => ({ e, d: evDate(e) || '' }))
+    .sort((a,b) => (b.d || '').localeCompare(a.d || ''));
 
- for (const {e, d} of rows){
-  const tr = document.createElement('tr');
-  tr.id = e.id ? `evrow-${e.id}` : '';
-  tr.setAttribute('aria-selected','false');
+  for (const { e, d } of rows){
+    const card = document.createElement('div');
+    card.className = 'ev-card';
+    if (e.id) card.id = `evrow-${e.id}`;
 
-  const dateTd = document.createElement('td');
-  dateTd.className = 'ev-date';
-  dateTd.textContent = d ? new Date(d).toLocaleDateString('ar-EG') : '—';
+    card.innerHTML = `
+      <div class="ev-row">
+        <div class="ev-label">التاريخ</div>
+        <div class="ev-value">${d ? new Date(d).toLocaleDateString('ar-EG') : '—'}</div>
+      </div>
+      <div class="ev-row">
+        <div class="ev-label">اسم الحدث</div>
+        <div class="ev-value">${eventNameRaw(e)}</div>
+      </div>
+      <div class="ev-row">
+        <div class="ev-label">التفاصيل</div>
+        <div class="ev-value">${compactEventDetails(e)}</div>
+      </div>
+    `;
 
-  const nameTd = document.createElement('td');
-  nameTd.className = 'ev-type';
-  nameTd.textContent = eventNameRaw(e);   // 👈 الآن يرجّع العربي أولاً
+    list.appendChild(card);
+  }
 
-  const detTd = document.createElement('td');
-  detTd.className = 'ev-note';
-  detTd.textContent = compactEventDetails(e);
-
-  tr.appendChild(dateTd);
-  tr.appendChild(nameTd);
-  tr.appendChild(detTd);
-  tbody.appendChild(tr);
-}
-
-
-
-  wrap.appendChild(table);
-  box.appendChild(wrap);
-  requestAnimationFrame(scheduleFit);
+  box.appendChild(list);
 }
 function focusEventRow(evId){
   if (!evId) return;
   const row = document.getElementById(`evrow-${evId}`);
   if (!row) return;
 
-  // حدّد الوعاء القابل للتمرير
-  const scroller = document.querySelector('#evList .ev-scroll') || row.closest('.ev-scroll') || document;
-  // شيل الهايلايت القديم
-  const old = scroller.querySelector('.ev-row--focus');
+  const old = document.querySelector('.ev-row--focus');
   if (old) old.classList.remove('ev-row--focus');
 
-  // هايلايت + تمرير ناعم
   row.classList.add('ev-row--focus');
   row.setAttribute('aria-selected','true');
-  const top = row.offsetTop - (scroller.clientHeight/2 - row.clientHeight/2);
-  scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  row.scrollIntoView({ behavior:'smooth', block:'center' });
 
-  // إزالة الهايلايت بعد شوية (اختياري)
   clearTimeout(row._hlTO);
-  row._hlTO = setTimeout(()=>{ row.classList.remove('ev-row--focus'); }, 2500);
+  row._hlTO = setTimeout(() => {
+    row.classList.remove('ev-row--focus');
+  }, 2500);
 }
-
 
 /* ======================= ربط الأقسام ======================= */
 function renderCard(state, kind){
