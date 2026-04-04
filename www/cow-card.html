@@ -23,17 +23,12 @@
 .ev-type{color:#14532d;font-weight:800}
 .ev-note{color:#355}
 
-    :root{--bg:#fffdf5;--card:#ffffff;--border:#d9efd0;--ink:#134e35;--muted:#f7fff2;--acc:#2e7d32}
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.45;color:var(--ink);padding:18px}
-    .wrap{max-width:980px;margin:0 auto}
+   
     .openbar{display:flex;gap:8px;align-items:center;justify-content:center;margin:0 0 12px;flex-wrap:wrap}
     .openbar small{opacity:.8}
     .openbar input{width:160px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#fcfff8}
     .openbar button{padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:#e8f5e9;color:#1b5e20;font-weight:700;cursor:pointer}
     .kind-badge{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fcfff8;font-weight:700}
-    .title{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
-    .title h1{margin:0;font-size:clamp(18px,4.6vw,28px);color:#14532d}
     .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .chip{background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-weight:700;font-size:13px;color:#0f5132}
     .chip[data-variant="ok"]{background:#e8f5e9;border-color:#c8e6c9;color:#1b5e20}
@@ -78,28 +73,44 @@
     .notice{margin:10px 0;padding:10px;border:1px dashed var(--border);background:#fcfff8;border-radius:12px;color:#14532d;font:13px system-ui}
     /* صف واحد ظاهر + رأس مثبت على الشاشات الصغيرة */
 @media (max-width:560px){
-  .ev-scroll{ overflow:auto; }
-  .ev-table{ table-layout: fixed; }
-  .ev-table thead th{ position: sticky; top: 0; z-index:1; }
-
-  .ev-table th, .ev-table td{
-    padding:10px 8px;       /* أكبر */
-    font-size:13px;         /* أوضح */
-    line-height:1.45;
+  .ev-scroll{
+    overflow:auto;
+    max-height:none;
   }
 
-  /* التاريخ والاسم: سطر واحد مع ellipsis */
-  .ev-date, .ev-type{
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  .ev-table{
+    table-layout:auto;
+    min-width:640px;
   }
 
-  /* التفاصيل/النتيجة: سطرين لقراءة مريحة */
+  .ev-table thead th{
+    position:sticky;
+    top:0;
+    z-index:1;
+  }
+
+  .ev-table th,
+  .ev-table td{
+    padding:10px 8px;
+    font-size:13px;
+    line-height:1.55;
+    white-space:normal;
+    word-break:break-word;
+    overflow-wrap:anywhere;
+  }
+
+  .ev-date{
+    white-space:nowrap;
+  }
+
+  .ev-type,
   .ev-note{
     white-space:normal;
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
+    overflow:visible;
+    text-overflow:unset;
+    display:block;
+    -webkit-line-clamp:unset;
+    -webkit-box-orient:unset;
   }
 }
 
@@ -143,21 +154,29 @@
   lockBackButton();
 </script>
   <div class="wrap">
-    <div class="openbar" id="openbar">
-      <small>افتح بالرقم:</small>
-      <input id="openNumber" inputmode="numeric" placeholder="مثال: 108" />
-      <span class="kind-badge">النوع: <span id="kindVal">—</span></span>
-      <button id="openBtn">فتح</button>
+   <header>
+  <div class="mbk-head">
+    <a href="dashboard.html" aria-label="الرجوع إلى لوحة التحكم">←</a>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title" id="cardTitle">بطاقة الحيوان رقم —</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
+  </div>
+</header>
 
-    <div class="title" aria-label="عنوان بطاقة الحيوان">
-      <h1 id="cardTitle">بطاقة الحيوان رقم —</h1>
-      <div class="chips" role="group" aria-label="حالات الحيوان">
-        <div class="chip chip-repro"  id="chipRepro"  data-variant="ok">—</div>
-        <div class="chip chip-prod"   id="chipProd"   data-variant="ok">—</div>
-        <div class="chip chip-health" id="chipHealth" data-variant="ok">—</div>
-      </div>
-    </div>
+<div class="chips" role="group" aria-label="حالات الحيوان" style="margin:10px 0 12px">
+  <div class="chip chip-repro"  id="chipRepro"  data-variant="ok">—</div>
+  <div class="chip chip-prod"   id="chipProd"   data-variant="ok">—</div>
+  <div class="chip chip-health" id="chipHealth" data-variant="ok">—</div>
+</div>
+
+<div class="openbar" id="openbar">
+  <small>افتح بالرقم:</small>
+  <input id="openNumber" inputmode="numeric" placeholder="مثال: 108" />
+  <span class="kind-badge">النوع: <span id="kindVal">—</span></span>
+  <button id="openBtn">فتح</button>
+</div>
 
    <section class="card" aria-label="المعلومات الأساسية">
   <h3>المعلومات الأساسية</h3>
