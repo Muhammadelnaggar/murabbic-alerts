@@ -113,8 +113,8 @@
 <div id="bulkBox" class="hide">
   <div id="bulkInfo" class="muted" style="margin:0 0 12px 0;font-weight:800"></div>
 
-  <div style="overflow:auto;-webkit-overflow-scrolling:touch">
-    <table id="bulkTable" style="width:100%;border-collapse:separate;border-spacing:0 8px;min-width:760px">
+ <div style="width:100%">
+  <table id="bulkTable" style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0 6px">
       <thead>
         <tr>
           <th style="text-align:right;padding:8px 10px">رقم الحيوان</th>
@@ -274,6 +274,16 @@ limit = mod.limit;
     // ===== منطق الإرسال =====
     const form = $('milkForm');
     const confirmBox = $('confirmBox');
+    const totalLine = $('totalLine');
+const goAddEventBtn = $('goAddEvent');
+const backDashBtn = $('backDash');
+const openCowCardBtn = $('openCowCardBtn');
+
+openCowCardBtn?.addEventListener('click', () => {
+  const n = inputAnimal.value.trim();
+  if (!n) return;
+  location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+});
     const sysbar = document.getElementById("sysbar");
 function showSaveOK(text){
   if (!sysbar) return;
@@ -298,28 +308,28 @@ const cancelBulkBtn = $('cancelBulkBtn');
 function bulkRowHtml(n){
   return `
     <tr class="bulk-row" data-number="${n}" data-kind="cow">
-      <td style="padding:10px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap">
+      <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap;font-size:15px">
         ${n}
       </td>
 
-      <td class="bulk-kind-cell" style="padding:10px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0b7f47">
+     <td class="bulk-kind-cell" style="padding:8px 6px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0b7f47;font-size:14px">
         ...
       </td>
 
-      <td style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-        <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+      <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+       <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
       </td>
 
-      <td style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-        <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+     <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+       <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
       </td>
 
       <td class="bulk-s3-cell" style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-        <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+      <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
       </td>
 
-      <td style="padding:10px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center">
-        <div class="bulk-total" style="font-weight:900;color:#0b7f47;min-width:78px">0.0 كجم</div>
+      <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
+       <div class="bulk-total" style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">0.0</div>
       </td>
     </tr>
   `;
