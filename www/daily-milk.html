@@ -176,10 +176,10 @@
     </table>
   </div>
 
-  <div class="btn-row">
-    <button type="button" id="saveBulkBtn" class="save-btn">حفظ اللبن الجماعي</button>
-    <button type="button" id="cancelBulkBtn" class="save-btn open-card">إلغاء</button>
-  </div>
+<div class="btn-row">
+  <button type="button" id="saveBulkBtn" class="save-btn">حفظ اللبن</button>
+  <button type="button" id="cancelBulkBtn" class="save-btn open-card">لوحة التحكم</button>
+</div>
 </div>
       <div class="row">
         <div class="col">
@@ -211,7 +211,7 @@
         </div>
       </div>
 
-  <div class="btn-row">
+<div class="btn-row">
   <button type="submit" class="save-btn">حفظ اللبن اليومي</button>
 
   <button type="button" id="openCowCardBtn" class="save-btn open-card">
@@ -413,7 +413,7 @@ function setupBulkMode(){
 
   inputAnimal.closest('.row')?.classList.add('hide');
   document.getElementById('sessions')?.classList.add('hide');
- document.querySelector('.btn-row')?.classList.add('hide');
+ form.querySelectorAll('.btn-row')[1]?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
 }
     async function fetchAnimalMeta(animalNumber){
@@ -630,7 +630,7 @@ const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
 });
 
 cancelBulkBtn?.addEventListener('click', () => {
-  location.href = buildUrl('/add-event.html', { date: inputDate.value.trim() });
+  location.href = '/dashboard.html';
 });
     // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
