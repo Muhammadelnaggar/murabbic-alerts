@@ -110,7 +110,15 @@
 
     <form id="milkForm" data-validate="true" data-event="لبن يومي" autocomplete="off" novalidate>
   <div id="sysbar" class="infobar"></div>
+<div id="bulkBox" class="hide">
+  <div id="bulkInfo" class="muted" style="margin:0 0 12px 0;font-weight:800"></div>
+  <div id="bulkRows" style="display:grid;gap:12px"></div>
 
+  <div class="btn-row">
+    <button type="button" id="saveBulkBtn" class="save-btn">حفظ اللبن الجماعي</button>
+    <button type="button" id="cancelBulkBtn" class="save-btn open-card">إلغاء</button>
+  </div>
+</div>
       <div class="row">
         <div class="col">
           <label for="animalNumber">رقم الحيوان</label>
@@ -197,16 +205,31 @@
     }
 
     // ===== تهيئة السياق =====
-   const inputAnimal = $('animalNumber');
-    const inputDate   = $('eventDate');
-   
-    const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
-                                   localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
-    const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
-                                   localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
-    const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
-    if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
-    if (!inputDate.value   && qsDate)   inputDate.value   = qsDate;
+  const qsMode = firstNonEmpty(getQS('mode'));
+const qsNumbersRaw = firstNonEmpty(getQS('numbers'));
+
+const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
+                               localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
+const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
+                               localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
+const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
+
+function parseBulkNumbers(raw){
+  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  return [...new Set(
+    String(raw || '')
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .split(/[,\n،;\s]+/)
+      .map(x => x.trim())
+      .filter(Boolean)
+  )];
+}
+
+const bulkNumbers = parseBulkNumbers(qsNumbersRaw);
+const isBulkMode = (qsMode === 'bulk' && bulkNumbers.length > 1);
+
+if (!isBulkMode && !inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
+if (!inputDate.value && qsDate) inputDate.value = qsDate;
    
 
     // ===== ربط فايرستور (من غير أي رسائل تقنية للمستخدم) =====
@@ -252,7 +275,73 @@ openCowCardBtn?.addEventListener('click', () => {
   if (!n) return;
   location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
 });
+const bulkBox = $('bulkBox');
+const bulkInfo = $('bulkInfo');
+const bulkRows = $('bulkRows');
+const saveBulkBtn = $('saveBulkBtn');
+const cancelBulkBtn = $('cancelBulkBtn');
 
+function bulkRowHtml(n){
+  return `
+    <div class="bulk-row" data-number="${n}" style="border:1px solid #e2e8f0;border-radius:14px;padding:12px;background:#fff">
+      <div style="font-weight:800;margin-bottom:10px">رقم الحيوان: ${n}</div>
+
+      <div class="row">
+        <div class="col">
+          <label>حلبة 1 (كجم)</label>
+          <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+        </div>
+        <div class="col">
+          <label>حلبة 2 (كجم)</label>
+          <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+        </div>
+        <div class="col">
+          <label>حلبة 3 (كجم)</label>
+          <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="muted" style="font-weight:700">الإجمالي</div>
+        <div class="bulk-total" style="padding:10px 12px;border-radius:12px;background:#eaf7f0;border:1px solid #b7e4c7;font-weight:900;color:#0b7f47;min-width:88px;text-align:center">0.0 كجم</div>
+      </div>
+    </div>
+  `;
+}
+
+function updateBulkRowTotal(row){
+  if (!row) return;
+  const s1 = toNum(row.querySelector('.bulk-s1')?.value);
+  const s2 = toNum(row.querySelector('.bulk-s2')?.value);
+  const s3 = toNum(row.querySelector('.bulk-s3')?.value);
+  const total = s1 + s2 + s3;
+
+  const totalBox = row.querySelector('.bulk-total');
+  if (totalBox) totalBox.textContent = `${total.toFixed(1)} كجم`;
+}
+
+function bindBulkTotals(){
+  document.querySelectorAll('.bulk-row').forEach((row) => {
+    ['.bulk-s1','.bulk-s2','.bulk-s3'].forEach((sel) => {
+      row.querySelector(sel)?.addEventListener('input', () => updateBulkRowTotal(row));
+    });
+    updateBulkRowTotal(row);
+  });
+}
+
+function setupBulkMode(){
+  if (!isBulkMode) return;
+
+  bulkBox.classList.remove('hide');
+  bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
+  bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
+  bindBulkTotals();
+
+  inputAnimal.closest('.row')?.classList.add('hide');
+  document.getElementById('sessions')?.classList.add('hide');
+  openCowCardBtn?.classList.add('hide');
+}
+    setupBulkMode();
 form.addEventListener("mbk:valid", async (ev) => {
   hideMsg();
 
@@ -323,7 +412,78 @@ if (confirmBox) confirmBox.style.display = "none";
   }
 });
 
+saveBulkBtn?.addEventListener('click', async () => {
+  hideMsg();
 
+  const eventDate = String(inputDate.value || '').trim();
+  if (!eventDate) {
+    showMsg('اختر تاريخ اليوم أولًا.');
+    return;
+  }
+
+  if (!db) {
+    showMsg('تعذّر الحفظ الآن. أعد المحاولة لاحقًا.');
+    return;
+  }
+
+  const rows = Array.from(document.querySelectorAll('.bulk-row'));
+  if (!rows.length) {
+    showMsg('لا توجد بيانات جماعية جاهزة.');
+    return;
+  }
+
+  let saved = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    const animalNumber = String(row.dataset.number || '').trim();
+    const s1 = toNum(row.querySelector('.bulk-s1')?.value);
+    const s2 = toNum(row.querySelector('.bulk-s2')?.value);
+    const s3 = toNum(row.querySelector('.bulk-s3')?.value);
+    const total = s1 + s2 + s3;
+
+    if (total <= 0) continue;
+
+    const payload = {
+      userId: (window.__tenant?.userId || localStorage.getItem("userId") || "").trim(),
+      animalId: animalNumber,
+      animalNumber,
+      eventType: "لبن يومي",
+      type: "daily_milk",
+      eventDate,
+      kind: "cow",
+      milkSessions: [
+        { n: 1, kg: s1 },
+        { n: 2, kg: s2 },
+        { n: 3, kg: s3 }
+      ],
+      milkKg: Number(total.toFixed(1)),
+      source: location.pathname + '?bulk=1',
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await addDoc(collection(db, "events"), payload);
+      try { await window.updateAnimalByEvent(payload); } catch (e) { console.error("Frontend animal update failed:", e); }
+      saved++;
+    } catch (err) {
+      console.error(err);
+      failed++;
+    }
+  }
+
+  if (saved > 0) {
+    showSaveOK(`✅ تم تسجيل ${saved} سجل لبن جماعي بنجاح${failed ? ` — وتعذر حفظ ${failed}` : ''}`);
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
+    return;
+  }
+
+  showMsg('لم يتم حفظ أي سجل. أدخل كميات الحلبات أولًا.');
+});
+
+cancelBulkBtn?.addEventListener('click', () => {
+  location.href = buildUrl('/add-event.html', { date: inputDate.value.trim() });
+});
     // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
       const url = buildUrl('/add-event.html', {
