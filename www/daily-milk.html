@@ -158,6 +158,7 @@
     <form id="milkForm" data-validate="true" data-event="لبن يومي" autocomplete="off" novalidate>
   <div id="sysbar" class="infobar"></div>
 <div id="bulkBox" class="hide">
+  <div id="bulkDateBar" style="display:none;margin:0 0 12px 0"></div>
   <div id="bulkInfo" class="muted" style="margin:0 0 12px 0;font-weight:800"></div>
 
  <div style="width:100%">
@@ -346,7 +347,8 @@ function showSaveOK(text){
   try { sysbar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
 }
 
-  const bulkBox = $('bulkBox');
+const bulkBox = $('bulkBox');
+const bulkDateBar = $('bulkDateBar');
 const bulkInfo = $('bulkInfo');
 const bulkRows = $('bulkRows');
 const saveBulkBtn = $('saveBulkBtn');
@@ -406,14 +408,21 @@ function setupBulkMode(){
   if (!isBulkMode) return;
 
   bulkBox.classList.remove('hide');
- bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان — ${inputDate.value || ''}`;
+
+  if (bulkDateBar && inputDate && !bulkDateBar.contains(inputDate)) {
+    bulkDateBar.style.display = 'block';
+    bulkDateBar.innerHTML = '<label for="eventDate" style="display:block;margin:0 0 6px;font-weight:800">تاريخ اليوم</label>';
+    bulkDateBar.appendChild(inputDate);
+  }
+
+  bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان`;
   bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
   bindBulkTotals();
   detectBulkKinds();
 
- inputAnimal.closest('.col')?.classList.add('hide');
+  inputAnimal.closest('.col')?.classList.add('hide');
   document.getElementById('sessions')?.classList.add('hide');
- form.querySelectorAll('.btn-row')[1]?.classList.add('hide');
+  form.querySelectorAll('.btn-row')[1]?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
 }
     async function fetchAnimalMeta(animalNumber){
@@ -626,7 +635,7 @@ const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
     return;
   }
 
-  showMsg('لم يتم حفظ أي سجل. أدخل كميات الحلبات أولًا.');
+  showMsg('لم يتم حفظ أي سجل. تأكد من وجود تاريخ وإدخال كميات اللبن في صف واحد على الأقل.');
 });
 
 cancelBulkBtn?.addEventListener('click', () => {
