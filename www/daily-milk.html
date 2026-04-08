@@ -358,65 +358,55 @@ const s2Input = $('s2');
 const s3Input = $('s3');
 
 let bulkSubmitState = null;
+function applyCentralDailyMilkPreviewToRows(preview) {
+  const validMap = new Map(
+    (preview?.valid || []).map(x => [String(x.number || "").trim(), x])
+  );
 
-function markBulkRowRejected(row, reason){
-  row.dataset.eligible = '0';
-  row.style.opacity = '0.55';
-  row.style.filter = 'grayscale(.15)';
+  const rejectedMap = new Map(
+    (preview?.rejected || []).map(x => [String(x.number || "").trim(), x.reason || "مرفوض"])
+  );
 
-  const kindCell = row.querySelector('.bulk-kind-cell');
-  if (kindCell) {
-    kindCell.textContent = reason || 'مرفوض';
-    kindCell.style.color = '#b91c1c';
-    kindCell.style.fontWeight = '800';
-  }
-
-  row.querySelectorAll('input').forEach(inp => {
-    inp.disabled = true;
-    inp.value = '';
-  });
-
-  updateBulkRowTotal(row);
-}
-
-function markBulkRowAccepted(row, species){
-  row.dataset.eligible = '1';
-  row.style.opacity = '1';
-  row.style.filter = 'none';
-
-  const kind = (species === 'جاموس') ? 'buffalo' : 'cow';
-  applyBulkRowKind(row, kind);
-
-  const kindCell = row.querySelector('.bulk-kind-cell');
-  if (kindCell) {
-    kindCell.style.color = '#0b7f47';
-    kindCell.style.fontWeight = '800';
-  }
-
-  row.querySelectorAll('input').forEach(inp => {
-    inp.disabled = false;
-  });
-}
-
-async function validateBulkRowsOnLoad(){
   const rows = Array.from(document.querySelectorAll('.bulk-row'));
   let ok = 0;
   let bad = 0;
-  const rejected = [];
 
   for (const row of rows) {
-    const animalNumber = String(row.dataset.number || '').trim();
-    const meta = await fetchAnimalMeta(animalNumber);
+    const n = String(row.dataset.number || '').trim();
 
-    if (!meta?.doc) {
-      markBulkRowRejected(row, 'غير موجود');
-      rejected.push(animalNumber);
-      bad++;
+    if (validMap.has(n)) {
+      const item = validMap.get(n) || {};
+      row.dataset.eligible = '1';
+      row.style.opacity = '1';
+      row.style.filter = 'none';
+
+      const sp = String(item.species || '').trim();
+      const kind = (sp === 'جاموس') ? 'buffalo' : 'cow';
+      applyBulkRowKind(row, kind);
+
+      row.querySelectorAll('input').forEach(inp => { inp.disabled = false; });
+      ok++;
       continue;
     }
 
-    markBulkRowAccepted(row, meta.species || 'أبقار');
-    ok++;
+    row.dataset.eligible = '0';
+    row.style.opacity = '0.55';
+    row.style.filter = 'grayscale(.15)';
+
+    const kindCell = row.querySelector('.bulk-kind-cell');
+    if (kindCell) {
+      kindCell.textContent = rejectedMap.get(n) || 'مرفوض';
+      kindCell.style.color = '#b91c1c';
+      kindCell.style.fontWeight = '800';
+    }
+
+    row.querySelectorAll('input').forEach(inp => {
+      inp.disabled = true;
+      inp.value = '';
+    });
+
+    updateBulkRowTotal(row);
+    bad++;
   }
 
   if (ok && !bad) {
@@ -426,12 +416,10 @@ async function validateBulkRowsOnLoad(){
 
   if (ok && bad) {
     bulkInfo.textContent = `إدخال جماعي: ${ok} جاهز — ${bad} مرفوض`;
-    showMsg(`تم استبعاد الأرقام غير المؤهلة: ${rejected.join(' - ')}`);
     return;
   }
 
   bulkInfo.textContent = `إدخال جماعي: لا توجد أرقام مؤهلة`;
-  showMsg(`لا توجد أرقام صالحة للحفظ: ${rejected.join(' - ')}`);
 }
 
 function fillSingleFormFromBulkRow(row, eventDate){
@@ -561,43 +549,15 @@ function setupBulkMode(){
   document.getElementById('sessions')?.classList.add('hide');
   singleBtns?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
-  validateBulkRowsOnLoad();
+  const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
+if (previewRaw) {
+  try {
+    const preview = JSON.parse(previewRaw);
+    applyCentralDailyMilkPreviewToRows(preview);
+  } catch(_) {}
 }
-    async function fetchAnimalMeta(animalNumber){
-  const uid = String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
-  const nStr = String(animalNumber || "").trim();
-  const nNum = Number(nStr);
-
-  if (!db || !uid || !nStr) return null;
-
-  const tries = [
-    ["userId", "animalNumber", nStr],
-    ["userId", "animalNumber", nNum],
-    ["ownerUid", "animalNumber", nStr],
-    ["ownerUid", "animalNumber", nNum]
-  ].filter(([, , v]) => !(typeof v === "number" && Number.isNaN(v)));
-
-  for (const [ownerField, numField, numVal] of tries) {
-    try {
-      const qx = query(
-        collection(db, "animals"),
-        where(ownerField, "==", uid),
-        where(numField, "==", numVal),
-        limit(1)
-      );
-      const snap = await getDocs(qx);
-      if (!snap.empty) {
-        const d = snap.docs[0].data() || {};
-        let sp = String(d.species || d.animalTypeAr || d.animalType || "").trim();
-        if (/cow|بقر/i.test(sp)) sp = "أبقار";
-        if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-        return { species: sp || "أبقار", doc: d };
-      }
-    } catch (_) {}
-  }
-
-  return null;
 }
+
 
 function applyBulkRowKind(row, kind){
   const s3Cell = row.querySelector('.bulk-s3-cell');
@@ -619,15 +579,6 @@ function applyBulkRowKind(row, kind){
 
   row.dataset.kind = kind;
   updateBulkRowTotal(row);
-}
-async function detectBulkKinds(){
-  const rows = Array.from(document.querySelectorAll('.bulk-row'));
-  for (const row of rows) {
-    const animalNumber = String(row.dataset.number || '').trim();
-    const meta = await fetchAnimalMeta(animalNumber);
-    const kind = (meta?.species === 'جاموس') ? 'buffalo' : 'cow';
-    applyBulkRowKind(row, kind);
-  }
 }
 
 async function saveMilkPayload(payload){
@@ -780,6 +731,24 @@ cancelBulkBtn?.addEventListener('click', () => {
   location.href = '/dashboard.html';
 });
     setupBulkMode();
+    if (isBulkMode) {
+  const raw = bulkNumbers.join(",");
+  if (inputAnimal) inputAnimal.value = raw;
+
+  try {
+    await form.requestSubmit();
+  } catch (_) {
+    form.requestSubmit();
+  }
+
+  const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
+  if (previewRaw) {
+    try {
+      const preview = JSON.parse(previewRaw);
+      applyCentralDailyMilkPreviewToRows(preview);
+    } catch(_) {}
+  }
+}
     // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
       const url = buildUrl('/add-event.html', {
