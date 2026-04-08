@@ -353,7 +353,126 @@ const bulkInfo = $('bulkInfo');
 const bulkRows = $('bulkRows');
 const saveBulkBtn = $('saveBulkBtn');
 const cancelBulkBtn = $('cancelBulkBtn');
+const s1Input = $('s1');
+const s2Input = $('s2');
+const s3Input = $('s3');
 
+let bulkSubmitState = null;
+
+function markBulkRowRejected(row, reason){
+  row.dataset.eligible = '0';
+  row.style.opacity = '0.55';
+  row.style.filter = 'grayscale(.15)';
+
+  const kindCell = row.querySelector('.bulk-kind-cell');
+  if (kindCell) {
+    kindCell.textContent = reason || 'مرفوض';
+    kindCell.style.color = '#b91c1c';
+    kindCell.style.fontWeight = '800';
+  }
+
+  row.querySelectorAll('input').forEach(inp => {
+    inp.disabled = true;
+    inp.value = '';
+  });
+
+  updateBulkRowTotal(row);
+}
+
+function markBulkRowAccepted(row, species){
+  row.dataset.eligible = '1';
+  row.style.opacity = '1';
+  row.style.filter = 'none';
+
+  const kind = (species === 'جاموس') ? 'buffalo' : 'cow';
+  applyBulkRowKind(row, kind);
+
+  const kindCell = row.querySelector('.bulk-kind-cell');
+  if (kindCell) {
+    kindCell.style.color = '#0b7f47';
+    kindCell.style.fontWeight = '800';
+  }
+
+  row.querySelectorAll('input').forEach(inp => {
+    inp.disabled = false;
+  });
+}
+
+async function validateBulkRowsOnLoad(){
+  const rows = Array.from(document.querySelectorAll('.bulk-row'));
+  let ok = 0;
+  let bad = 0;
+  const rejected = [];
+
+  for (const row of rows) {
+    const animalNumber = String(row.dataset.number || '').trim();
+    const meta = await fetchAnimalMeta(animalNumber);
+
+    if (!meta?.doc) {
+      markBulkRowRejected(row, 'غير موجود');
+      rejected.push(animalNumber);
+      bad++;
+      continue;
+    }
+
+    markBulkRowAccepted(row, meta.species || 'أبقار');
+    ok++;
+  }
+
+  if (ok && !bad) {
+    bulkInfo.textContent = `إدخال جماعي: ${ok} حيوان جاهز`;
+    return;
+  }
+
+  if (ok && bad) {
+    bulkInfo.textContent = `إدخال جماعي: ${ok} جاهز — ${bad} مرفوض`;
+    showMsg(`تم استبعاد الأرقام غير المؤهلة: ${rejected.join(' - ')}`);
+    return;
+  }
+
+  bulkInfo.textContent = `إدخال جماعي: لا توجد أرقام مؤهلة`;
+  showMsg(`لا توجد أرقام صالحة للحفظ: ${rejected.join(' - ')}`);
+}
+
+function fillSingleFormFromBulkRow(row, eventDate){
+  const animalNumber = String(row.dataset.number || '').trim();
+  const kind = String(row.dataset.kind || 'cow').trim();
+  const s1 = toNum(row.querySelector('.bulk-s1')?.value);
+  const s2 = toNum(row.querySelector('.bulk-s2')?.value);
+  const s3 = toNum(row.querySelector('.bulk-s3')?.value);
+
+  inputAnimal.value = animalNumber;
+  inputDate.value = eventDate;
+  applyKindUI(kind);
+
+  s1Input.value = s1 > 0 ? String(s1) : '';
+  s2Input.value = s2 > 0 ? String(s2) : '';
+  s3Input.value = (kind === 'buffalo') ? '' : (s3 > 0 ? String(s3) : '');
+
+  return { animalNumber, kind, s1, s2, s3 };
+}
+
+function settleBulkSubmit(result){
+  if (!bulkSubmitState) return false;
+  clearTimeout(bulkSubmitState.timer);
+  const resolve = bulkSubmitState.resolve;
+  bulkSubmitState = null;
+  resolve(result);
+  return true;
+}
+
+function submitOneBulkRowThroughCentral(){
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (!bulkSubmitState) return;
+      bulkSubmitState = null;
+      resolve({ ok:false, reason:'timeout' });
+    }, 3000);
+
+    bulkSubmitState = { resolve, timer };
+    form.requestSubmit();
+  });
+}
 function bulkRowHtml(n){
   return `
     <tr class="bulk-row" data-number="${n}" data-kind="cow">
@@ -437,11 +556,12 @@ function setupBulkMode(){
   bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان`;
   bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
   bindBulkTotals();
-  detectBulkKinds();
+ 
 
   document.getElementById('sessions')?.classList.add('hide');
   singleBtns?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
+  validateBulkRowsOnLoad();
 }
     async function fetchAnimalMeta(animalNumber){
   const uid = String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
@@ -510,7 +630,21 @@ async function detectBulkKinds(){
   }
 }
 
+async function saveMilkPayload(payload){
+  await addDoc(collection(db, "events"), payload);
 
+  try {
+    await window.updateAnimalByEvent(payload);
+  } catch (e) {
+    console.error("Frontend animal update failed:", e);
+  }
+
+  localStorage.setItem("lastAnimalId", payload.animalNumber || "");
+  localStorage.setItem("currentAnimalId", payload.animalNumber || "");
+  localStorage.setItem("eventDate", payload.eventDate || "");
+  localStorage.setItem("lastEventDate", payload.eventDate || "");
+  localStorage.setItem("lastKind", payload.kind || "");
+}
 form.addEventListener("mbk:valid", async (ev) => {
   hideMsg();
 
@@ -558,27 +692,27 @@ form.addEventListener("mbk:valid", async (ev) => {
   };
 
   try {
-    await addDoc(collection(db, "events"), payload);
+   
+await saveMilkPayload(payload);
 
-    try { await window.updateAnimalByEvent(payload); } catch (e) { console.error("Frontend animal update failed:", e); }
+if (settleBulkSubmit({ ok:true, animalNumber, milkKg: payload.milkKg })) {
+  return;
+}
 
-    localStorage.setItem("lastAnimalId", animalNumber);
-    localStorage.setItem("currentAnimalId", animalNumber);
-    localStorage.setItem("eventDate", eventDate);
-    localStorage.setItem("lastEventDate", eventDate);
-    localStorage.setItem("lastKind", kind);
-
-   showSaveOK(`✅ تم تسجيل اللبن اليومي بنجاح — الإجمالي: ${payload.milkKg.toFixed(1)} كجم`);
+showSaveOK(`✅ تم تسجيل اللبن اليومي بنجاح — الإجمالي: ${payload.milkKg.toFixed(1)} كجم`);
 if (confirmBox) confirmBox.style.display = "none";
 
+try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
+ } catch (err) {
+  dev("Firestore save error: " + (err?.message || err));
 
-    // ✅ (اختياري) سكرول لفوق بعد النجاح عشان الرسالة تتشاف بسرعة
-    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
-  } catch (err) {
-    dev("Firestore save error: " + (err?.message || err));
-    showMsg("تعذّر حفظ اللبن اليومي. أعد المحاولة لاحقًا.");
-    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
+  if (settleBulkSubmit({ ok:false, animalNumber, reason:'save_error' })) {
+    return;
   }
+
+  showMsg("تعذّر حفظ اللبن اليومي. أعد المحاولة لاحقًا.");
+  try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
+}
 });
 
 saveBulkBtn?.addEventListener('click', async () => {
@@ -590,72 +724,58 @@ saveBulkBtn?.addEventListener('click', async () => {
     return;
   }
 
-  if (!db) {
-    showMsg('تعذّر الحفظ الآن. أعد المحاولة لاحقًا.');
+  const rows = Array.from(document.querySelectorAll('.bulk-row'));
+  const eligibleRows = rows.filter(row => row.dataset.eligible === '1');
+
+  if (!eligibleRows.length) {
+    showMsg('لا توجد أرقام مؤهلة للحفظ.');
     return;
   }
 
-  const rows = Array.from(document.querySelectorAll('.bulk-row'));
-  if (!rows.length) {
-    showMsg('لا توجد بيانات جماعية جاهزة.');
-    return;
-  }
+  saveBulkBtn.disabled = true;
+  cancelBulkBtn.disabled = true;
 
   let saved = 0;
   let failed = 0;
+  const rejected = [];
 
-  for (const row of rows) {
-   const animalNumber = String(row.dataset.number || '').trim();
-const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-const kind = String(row.dataset.kind || 'cow').trim();
-const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
+  for (const row of eligibleRows) {
+    const preview = fillSingleFormFromBulkRow(row, eventDate);
+    const total = (preview.kind === 'buffalo')
+      ? (preview.s1 + preview.s2)
+      : (preview.s1 + preview.s2 + preview.s3);
 
     if (total <= 0) continue;
 
-    const payload = {
-      userId: (window.__tenant?.userId || localStorage.getItem("userId") || "").trim(),
-      animalId: animalNumber,
-      animalNumber,
-      eventType: "لبن يومي",
-      type: "daily_milk",
-      eventDate,
-     kind,
-     milkSessions: (kind === 'buffalo')
-  ? [
-      { n: 1, kg: s1 },
-      { n: 2, kg: s2 }
-    ]
-  : [
-      { n: 1, kg: s1 },
-      { n: 2, kg: s2 },
-      { n: 3, kg: s3 }
-    ],
-      milkKg: Number(total.toFixed(1)),
-      source: location.pathname + '?bulk=1',
-      createdAt: serverTimestamp()
-    };
+    const result = await submitOneBulkRowThroughCentral();
 
-    try {
-      await addDoc(collection(db, "events"), payload);
-      try { await window.updateAnimalByEvent(payload); } catch (e) { console.error("Frontend animal update failed:", e); }
+    if (result?.ok) {
       saved++;
-    } catch (err) {
-      console.error(err);
+    } else {
       failed++;
+      rejected.push(preview.animalNumber);
     }
   }
 
+  saveBulkBtn.disabled = false;
+  cancelBulkBtn.disabled = false;
+
   if (saved > 0) {
-    showSaveOK(`✅ تم تسجيل ${saved} سجل لبن جماعي بنجاح${failed ? ` — وتعذر حفظ ${failed}` : ''}`);
+    let text = `✅ تم تسجيل ${saved} سجل لبن جماعي بنجاح`;
+    if (failed) text += ` — وتعذر حفظ ${failed}`;
+    if (rejected.length) text += ` — أرقام مرفوضة: ${rejected.join(' - ')}`;
+    showSaveOK(text);
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
     return;
   }
 
-  showMsg('لم يتم حفظ أي سجل. تأكد من وجود تاريخ وإدخال كميات اللبن في صف واحد على الأقل.');
-});
+  if (rejected.length) {
+    showMsg(`تعذّر حفظ الأرقام التالية: ${rejected.join(' - ')}`);
+    return;
+  }
 
+  showMsg('لم يتم حفظ أي سجل. أدخل كميات اللبن في صف واحد على الأقل.');
+});
 cancelBulkBtn?.addEventListener('click', () => {
   location.href = '/dashboard.html';
 });
