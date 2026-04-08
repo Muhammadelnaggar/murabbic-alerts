@@ -87,7 +87,54 @@
 .open-card:active{
   transform:scale(.98);
 }
-
+#bulkBox{margin-top:12px}
+#bulkTable{
+  width:100%;
+  table-layout:fixed;
+  border-collapse:separate;
+  border-spacing:0 6px;
+}
+#bulkTable th{
+  font-size:13px;
+  font-weight:800;
+  color:#0f172a;
+  padding:6px 4px !important;
+  line-height:1.2;
+}
+#bulkTable td{
+  vertical-align:middle;
+}
+#bulkTable input[type="number"]{
+  width:100% !important;
+  min-width:0 !important;
+  padding:8px 4px !important;
+  font-size:15px !important;
+  text-align:center;
+}
+#bulkTable .bulk-total{
+  font-size:13px !important;
+  line-height:1.2;
+}
+#bulkTable .bulk-kind-cell{
+  font-size:13px !important;
+}
+@media (max-width: 480px){
+  #bulkInfo{
+    font-size:13px !important;
+    line-height:1.5;
+  }
+  #bulkTable th{
+    font-size:12px;
+    padding:4px 2px !important;
+  }
+  #bulkTable input[type="number"]{
+    font-size:14px !important;
+    padding:7px 2px !important;
+  }
+  #bulkTable .bulk-total{
+    font-size:12px !important;
+  }
+}
   </style>
 </head>
 <body>
@@ -359,14 +406,14 @@ function setupBulkMode(){
   if (!isBulkMode) return;
 
   bulkBox.classList.remove('hide');
-  bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
+ bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان — ${inputDate.value || ''}`;
   bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
   bindBulkTotals();
   detectBulkKinds();
 
   inputAnimal.closest('.row')?.classList.add('hide');
   document.getElementById('sessions')?.classList.add('hide');
-  document.querySelector('.btn-row')?.classList.add('hide');
+ document.querySelector('.btn-row')?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
 }
     async function fetchAnimalMeta(animalNumber){
