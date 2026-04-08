@@ -205,7 +205,9 @@
     }
 
     // ===== تهيئة السياق =====
-  const qsMode = firstNonEmpty(getQS('mode'));
+const inputAnimal = $('animalNumber');
+const inputDate   = $('eventDate');
+const qsMode = firstNonEmpty(getQS('mode'));
 const qsNumbersRaw = firstNonEmpty(getQS('numbers'));
 
 const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
@@ -233,14 +235,20 @@ if (!inputDate.value && qsDate) inputDate.value = qsDate;
    
 
     // ===== ربط فايرستور (من غير أي رسائل تقنية للمستخدم) =====
-    let db, addDoc, collection, serverTimestamp;
+   let db, addDoc, collection, serverTimestamp, query, where, getDocs, limit;
     async function ensureDb(){
       try{
         const appMod = await import('/js/firebase-config.js');
         const app = appMod.app || appMod.default || appMod;
         const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
         db = appMod.db || mod.getFirestore(app.app || app);
-        addDoc = mod.addDoc; collection = mod.collection; serverTimestamp = mod.serverTimestamp;
+       addDoc = mod.addDoc;
+collection = mod.collection;
+serverTimestamp = mod.serverTimestamp;
+query = mod.query;
+where = mod.where;
+getDocs = mod.getDocs;
+limit = mod.limit;
       } catch (e){
         // لا نعرض أي تحذير للمستخدم — فقط سجل للمطور
         dev('Firebase init failed: ' + (e?.message || e));
@@ -302,15 +310,15 @@ function bulkRowHtml(n){
 
 function updateBulkRowTotal(row){
   if (!row) return;
-  const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-  const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-  const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-  const total = s1 + s2 + s3;
+ const s1 = toNum(row.querySelector('.bulk-s1')?.value);
+const s2 = toNum(row.querySelector('.bulk-s2')?.value);
+const s3 = toNum(row.querySelector('.bulk-s3')?.value);
+const kind = String(row.dataset.kind || 'cow').trim();
+const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
 
   const totalBox = row.querySelector('.bulk-total');
   if (totalBox) totalBox.textContent = `${total.toFixed(1)} كجم`;
 }
-
 function bindBulkTotals(){
   document.querySelectorAll('.bulk-row').forEach((row) => {
     ['.bulk-s1','.bulk-s2','.bulk-s3'].forEach((sel) => {
@@ -323,83 +331,88 @@ function bindBulkTotals(){
 function setupBulkMode(){
   if (!isBulkMode) return;
 
-  bulkBox.classList.remove('hide');
-  bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
-  bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
-  bindBulkTotals();
+bulkBox.classList.remove('hide');
+bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
+bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
+bindBulkTotals();
+detectBulkKinds();
 
-  inputAnimal.closest('.row')?.classList.add('hide');
-  document.getElementById('sessions')?.classList.add('hide');
-  openCowCardBtn?.classList.add('hide');
+inputAnimal.closest('.row')?.classList.add('hide');
+document.getElementById('sessions')?.classList.add('hide');
+openCowCardBtn?.classList.add('hide');
+}
+    async function fetchAnimalMeta(animalNumber){
+  const uid = String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
+  const nStr = String(animalNumber || "").trim();
+  const nNum = Number(nStr);
+
+  if (!db || !uid || !nStr) return null;
+
+  const tries = [
+    ["userId", "animalNumber", nStr],
+    ["userId", "animalNumber", nNum],
+    ["ownerUid", "animalNumber", nStr],
+    ["ownerUid", "animalNumber", nNum]
+  ].filter(([, , v]) => !(typeof v === "number" && Number.isNaN(v)));
+
+  for (const [ownerField, numField, numVal] of tries) {
+    try {
+      const qx = query(
+        collection(db, "animals"),
+        where(ownerField, "==", uid),
+        where(numField, "==", numVal),
+        limit(1)
+      );
+      const snap = await getDocs(qx);
+      if (!snap.empty) {
+        const d = snap.docs[0].data() || {};
+        let sp = String(d.species || d.animalTypeAr || d.animalType || "").trim();
+        if (/cow|بقر/i.test(sp)) sp = "أبقار";
+        if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+        return { species: sp || "أبقار", doc: d };
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+function applyBulkRowKind(row, kind){
+  const s3Wrap = row.querySelector('.bulk-s3')?.closest('.col');
+  const s3Input = row.querySelector('.bulk-s3');
+  const labels = row.querySelectorAll('label');
+
+  if (kind === 'buffalo') {
+    if (labels[0]) labels[0].textContent = 'حلبة صباح (كجم)';
+    if (labels[1]) labels[1].textContent = 'حلبة مساء (كجم)';
+    if (s3Wrap) s3Wrap.classList.add('hide');
+    if (s3Input) {
+      s3Input.value = '';
+      s3Input.disabled = true;
+    }
+  } else {
+    if (labels[0]) labels[0].textContent = 'حلبة 1 (كجم)';
+    if (labels[1]) labels[1].textContent = 'حلبة 2 (كجم)';
+    if (labels[2]) labels[2].textContent = 'حلبة 3 (كجم)';
+    if (s3Wrap) s3Wrap.classList.remove('hide');
+    if (s3Input) s3Input.disabled = false;
+  }
+
+  row.dataset.kind = kind;
+  updateBulkRowTotal(row);
+}
+
+async function detectBulkKinds(){
+  const rows = Array.from(document.querySelectorAll('.bulk-row'));
+  for (const row of rows) {
+    const animalNumber = String(row.dataset.number || '').trim();
+    const meta = await fetchAnimalMeta(animalNumber);
+    const kind = (meta?.species === 'جاموس') ? 'buffalo' : 'cow';
+    applyBulkRowKind(row, kind);
+  }
 }
 setupBulkMode();
-const bulkBox = $('bulkBox');
-const bulkInfo = $('bulkInfo');
-const bulkRows = $('bulkRows');
-const saveBulkBtn = $('saveBulkBtn');
-const cancelBulkBtn = $('cancelBulkBtn');
 
-function bulkRowHtml(n){
-  return `
-    <div class="bulk-row" data-number="${n}" style="border:1px solid #e2e8f0;border-radius:14px;padding:12px;background:#fff">
-      <div style="font-weight:800;margin-bottom:10px">رقم الحيوان: ${n}</div>
-
-      <div class="row">
-        <div class="col">
-          <label>حلبة 1 (كجم)</label>
-          <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-        <div class="col">
-          <label>حلبة 2 (كجم)</label>
-          <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-        <div class="col">
-          <label>حلبة 3 (كجم)</label>
-          <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-      </div>
-
-      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <div class="muted" style="font-weight:700">الإجمالي</div>
-        <div class="bulk-total" style="padding:10px 12px;border-radius:12px;background:#eaf7f0;border:1px solid #b7e4c7;font-weight:900;color:#0b7f47;min-width:88px;text-align:center">0.0 كجم</div>
-      </div>
-    </div>
-  `;
-}
-
-function updateBulkRowTotal(row){
-  if (!row) return;
-  const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-  const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-  const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-  const total = s1 + s2 + s3;
-
-  const totalBox = row.querySelector('.bulk-total');
-  if (totalBox) totalBox.textContent = `${total.toFixed(1)} كجم`;
-}
-
-function bindBulkTotals(){
-  document.querySelectorAll('.bulk-row').forEach((row) => {
-    ['.bulk-s1','.bulk-s2','.bulk-s3'].forEach((sel) => {
-      row.querySelector(sel)?.addEventListener('input', () => updateBulkRowTotal(row));
-    });
-    updateBulkRowTotal(row);
-  });
-}
-
-function setupBulkMode(){
-  if (!isBulkMode) return;
-
-  bulkBox.classList.remove('hide');
-  bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
-  bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
-  bindBulkTotals();
-
-  inputAnimal.closest('.row')?.classList.add('hide');
-  document.getElementById('sessions')?.classList.add('hide');
-  openCowCardBtn?.classList.add('hide');
-}
-    setupBulkMode();
 form.addEventListener("mbk:valid", async (ev) => {
   hideMsg();
 
@@ -509,12 +522,17 @@ saveBulkBtn?.addEventListener('click', async () => {
       eventType: "لبن يومي",
       type: "daily_milk",
       eventDate,
-      kind: "cow",
-      milkSessions: [
-        { n: 1, kg: s1 },
-        { n: 2, kg: s2 },
-        { n: 3, kg: s3 }
-      ],
+     kind,
+     milkSessions: (kind === 'buffalo')
+  ? [
+      { n: 1, kg: s1 },
+      { n: 2, kg: s2 }
+    ]
+  : [
+      { n: 1, kg: s1 },
+      { n: 2, kg: s2 },
+      { n: 3, kg: s3 }
+    ],
       milkKg: Number(total.toFixed(1)),
       source: location.pathname + '?bulk=1',
       createdAt: serverTimestamp()
