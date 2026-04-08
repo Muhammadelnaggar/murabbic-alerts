@@ -509,7 +509,7 @@ async function detectBulkKinds(){
     applyBulkRowKind(row, kind);
   }
 }
-setupBulkMode();
+
 
 form.addEventListener("mbk:valid", async (ev) => {
   hideMsg();
@@ -659,6 +659,7 @@ const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
 cancelBulkBtn?.addEventListener('click', () => {
   location.href = '/dashboard.html';
 });
+    setupBulkMode();
     // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
       const url = buildUrl('/add-event.html', {
