@@ -374,20 +374,26 @@ function applyCentralDailyMilkPreviewToRows(preview) {
   for (const row of rows) {
     const n = String(row.dataset.number || '').trim();
 
-    if (validMap.has(n)) {
-      const item = validMap.get(n) || {};
-      row.dataset.eligible = '1';
-      row.style.opacity = '1';
-      row.style.filter = 'none';
+   if (validMap.has(n)) {
+  const item = validMap.get(n) || {};
+  row.dataset.eligible = '1';
+  row.style.opacity = '1';
+  row.style.filter = 'none';
 
-      const sp = String(item.species || '').trim();
-      const kind = (sp === 'جاموس') ? 'buffalo' : 'cow';
-      applyBulkRowKind(row, kind);
+  const sp = String(item.species || '').trim();
+  const kind = (sp === 'جاموس') ? 'buffalo' : 'cow';
 
-      row.querySelectorAll('input').forEach(inp => { inp.disabled = false; });
-      ok++;
-      continue;
-    }
+  // ✅ خزّن بيانات الحيوان نفسها على الصف لاستخدامها وقت الحفظ
+  row.__animalDoc = item.documentData || null;
+  row.dataset.animalId = String(item.animalId || "");
+  row.dataset.species = sp || "أبقار";
+
+  applyBulkRowKind(row, kind);
+
+  row.querySelectorAll('input').forEach(inp => { inp.disabled = false; });
+  ok++;
+  continue;
+}
 
     row.dataset.eligible = '0';
     row.style.opacity = '0.55';
@@ -437,7 +443,19 @@ function fillSingleFormFromBulkRow(row, eventDate){
   s2Input.value = s2 > 0 ? String(s2) : '';
   s3Input.value = (kind === 'buffalo') ? '' : (s3 > 0 ? String(s3) : '');
 
-  return { animalNumber, kind, s1, s2, s3 };
+  // ✅ أهم نقطة: مرّر وثيقة الحيوان نفسها للمركزي قبل submit
+  form.__mbkDoc = row.__animalDoc || null;
+  form.__mbkAnimalId = String(row.dataset.animalId || "");
+
+  return {
+    animalNumber,
+    kind,
+    s1,
+    s2,
+    s3,
+    animalId: form.__mbkAnimalId,
+    documentData: form.__mbkDoc
+  };
 }
 
 function settleBulkSubmit(result){
@@ -692,6 +710,11 @@ saveBulkBtn?.addEventListener('click', async () => {
 
   for (const row of eligibleRows) {
     const preview = fillSingleFormFromBulkRow(row, eventDate);
+    if (!preview.documentData) {
+  failed++;
+  rejected.push(preview.animalNumber);
+  continue;
+}
     const total = (preview.kind === 'buffalo')
       ? (preview.s1 + preview.s2)
       : (preview.s1 + preview.s2 + preview.s3);
