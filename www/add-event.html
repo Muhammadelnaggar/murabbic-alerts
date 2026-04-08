@@ -468,6 +468,7 @@ const isNutrition = /nutrition\.html/i.test(String(page));
 const isWeaning = /weaning\.html/i.test(String(page));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(page));
 const isColostrum = /colostrum-feeding\.html/i.test(String(page));
+const isDailyMilk = /daily-milk\.html/i.test(String(page));
 
 if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
   u.searchParams.set('mbkMode', 'group');
