@@ -680,7 +680,57 @@ return { ok:true, valid, rejected, message };
 // ✅ اجعلها متاحة للصفحات بدون استيراد
 window.mbk = window.mbk || {};
 window.mbk.previewOvsynchList = previewOvsynchList;
+async function previewDailyMilkList(numbers = [], eventDate = "") {
+  const uid = await getUid();
+  const dt = String(eventDate || "").trim().slice(0,10);
 
+  if (!uid) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ لم يتم تأكيد الدخول." }] };
+  }
+  if (!dt) {
+    return { ok:false, valid: [], rejected: [{ number:"", reason:"⚠️ اختر تاريخ اليوم أولًا." }] };
+  }
+
+  const clean = Array.isArray(numbers)
+    ? numbers.map(normalizeDigits).filter(Boolean)
+    : [];
+  const uniq = [...new Set(clean)];
+
+  const valid = [];
+  const rejected = [];
+
+  for (const num of uniq) {
+    const animal = await fetchAnimalByNumberForUser(uid, num);
+
+    if (!animal) {
+      rejected.push({ number:num, reason:"❌ غير موجود في حسابك." });
+      continue;
+    }
+
+    const doc = animal.data || {};
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      rejected.push({ number:num, reason:"❌ خارج القطيع." });
+      continue;
+    }
+
+    let sp = String(doc.species || doc.animalTypeAr || doc.animalType || "").trim();
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+    valid.push({
+      number: num,
+      species: sp || "أبقار",
+      animalId: animal.id || "",
+      documentData: doc
+    });
+  }
+
+  return { ok:true, valid, rejected };
+}
+
+window.mbk = window.mbk || {};
+window.mbk.previewDailyMilkList = previewDailyMilkList;
 function applyAnimalToForm(form, animal) {
   form.__mbkDoc = animal?.data || null;
   form.__mbkAnimalId = animal?.id || "";
@@ -817,7 +867,46 @@ if (bulkList.length <= 1 && !looksBulk && eventName !== "إزالة الحلما
     return false;
   }
 }
+// ===============================
+// ✅ Gate مركزي خاص بصفحة اللبن الجماعي
+// - يتحقق من القائمة كلها مركزيًا
+// - يستبعد غير الموجود / inactive
+// - يكتب الأرقام المؤهلة فقط في animalNumber
+// ===============================
+if (eventName === "لبن يومي" && (bulkList.length > 1 || looksBulk)) {
+  const res = await previewDailyMilkList(bulkList, d);
 
+  if (!res?.ok) {
+    showMsg(bar, "⚠️ تعذّر التحقق من قائمة اللبن الآن.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  const validNums = (res.valid || []).map(x => String(x.number || "").trim()).filter(Boolean);
+  const rejected = res.rejected || [];
+
+  const numEl = getFieldEl(form, "animalNumber");
+  if (numEl) numEl.value = validNums.join(",");
+
+  if (!validNums.length) {
+    const preview = rejected.slice(0,5).map(x => `${x.number}: ${x.reason}`).join(" — ");
+    showMsg(bar, `❌ لا توجد أرقام مؤهلة لتسجيل اللبن. ${preview}${rejected.length > 5 ? " …" : ""}`, "error");
+    lockForm(true);
+    return false;
+  }
+
+  try {
+    form.dataset.mbkDailyMilkPreview = JSON.stringify(res);
+  } catch(_) {}
+
+  const badMsg = rejected.length
+    ? ` (تم استبعاد ${rejected.length}: ${rejected.slice(0,3).map(x => `${x.number} (${x.reason})`).join("، ")}${rejected.length > 3 ? "…" : ""})`
+    : "";
+
+  showMsg(bar, `✅ تم التحقق من القائمة — المؤهل لتسجيل اللبن: ${validNums.length}.${badMsg}`, "success");
+  lockForm(false);
+  return true;
+}
 // ===============================
     // ✅ Gate خاص بصفحة الشياع (حسب طلبك)
     // - يمنع: عِشار + مستبعدة تناسليًا + غير موجودة (مغطاة بالـGate)
