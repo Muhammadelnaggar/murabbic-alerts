@@ -473,6 +473,9 @@ if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColost
   u.searchParams.set('mbkMode', 'group');
   u.searchParams.set('bulk', ctx.bulk);
   if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
+} else if (/daily-milk\.html/i.test(String(page)) && ctx.mode === 'group') {
+  u.searchParams.set('mode', 'bulk');
+  u.searchParams.set('numbers', ctx.bulk);
 } else {
   u.searchParams.set('number', ctx.number);
 }
