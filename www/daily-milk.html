@@ -731,23 +731,49 @@ cancelBulkBtn?.addEventListener('click', () => {
   location.href = '/dashboard.html';
 });
     setupBulkMode();
-    if (isBulkMode) {
+   if (isBulkMode) {
   const raw = bulkNumbers.join(",");
   if (inputAnimal) inputAnimal.value = raw;
 
-  try {
-    await form.requestSubmit();
-  } catch (_) {
-    form.requestSubmit();
-  }
+  saveBulkBtn.disabled = true;
+  bulkInfo.textContent = `جارِ التحقق من ${bulkNumbers.length} رقم...`;
 
-  const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
-  if (previewRaw) {
+  form.requestSubmit();
+
+  const waitPreview = setInterval(() => {
+    const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
+    if (!previewRaw) return;
+
+    clearInterval(waitPreview);
+
     try {
       const preview = JSON.parse(previewRaw);
+
+      // 1) طبّق نتيجة الفحص المركزي
       applyCentralDailyMilkPreviewToRows(preview);
-    } catch(_) {}
-  }
+
+      // 2) احذف الصفوف المرفوضة من الجدول نهائيًا
+      const validNums = (preview.valid || []).map(x => String(x.number || "").trim());
+
+      document.querySelectorAll('.bulk-row').forEach((row) => {
+        const n = String(row.dataset.number || '').trim();
+        if (!validNums.includes(n)) row.remove();
+      });
+
+      // 3) حدّث العنوان وزر الحفظ
+      bulkInfo.textContent = `إدخال جماعي: ${validNums.length} حيوان`;
+      saveBulkBtn.disabled = validNums.length === 0;
+
+      // 4) لو بقي صف واحد فقط وكان جاموس، سيظل بحلبتين لأن applyCentralDailyMilkPreviewToRows
+      //    استدعت applyBulkRowKind(row, 'buffalo') بالفعل
+    } catch (_) {
+      saveBulkBtn.disabled = true;
+    }
+  }, 120);
+
+  setTimeout(() => {
+    clearInterval(waitPreview);
+  }, 4000);
 }
     // ===== ما بعد النجاح =====
     goAddEventBtn.addEventListener('click', ()=>{
