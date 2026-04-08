@@ -409,10 +409,29 @@ function setupBulkMode(){
 
   bulkBox.classList.remove('hide');
 
-  if (bulkDateBar && inputDate && !bulkDateBar.contains(inputDate)) {
+  const animalCol = inputAnimal.closest('.col');
+  const dateCol = inputDate.closest('.col');
+  const firstRow = inputAnimal.closest('.row');
+  const singleBtns = form.querySelectorAll('.btn-row')[1];
+
+  // أخفِ عمود رقم الحيوان الفردي فقط
+  if (animalCol) animalCol.classList.add('hide');
+
+  // انقل عمود التاريخ كاملًا (اللابيل + الحقل) تحت الهيدر داخل الـ bulkBox
+  if (bulkDateBar && dateCol && !bulkDateBar.contains(dateCol)) {
     bulkDateBar.style.display = 'block';
-    bulkDateBar.innerHTML = '<label for="eventDate" style="display:block;margin:0 0 6px;font-weight:800">تاريخ اليوم</label>';
-    bulkDateBar.appendChild(inputDate);
+    dateCol.style.flex = '1 1 100%';
+    dateCol.style.minWidth = '100%';
+    dateCol.style.margin = '0';
+    bulkDateBar.innerHTML = '';
+    bulkDateBar.appendChild(dateCol);
+  }
+
+  // لو الصف الأول لم يبق فيه شيء ظاهر غير التاريخ المنقول، أخفه
+  if (firstRow) {
+    const visibleCols = Array.from(firstRow.querySelectorAll('.col'))
+      .filter(el => !el.classList.contains('hide') && !bulkDateBar.contains(el));
+    if (!visibleCols.length) firstRow.classList.add('hide');
   }
 
   bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان`;
@@ -420,9 +439,8 @@ function setupBulkMode(){
   bindBulkTotals();
   detectBulkKinds();
 
-  inputAnimal.closest('.col')?.classList.add('hide');
   document.getElementById('sessions')?.classList.add('hide');
-  form.querySelectorAll('.btn-row')[1]?.classList.add('hide');
+  singleBtns?.classList.add('hide');
   openCowCardBtn?.classList.add('hide');
 }
     async function fetchAnimalMeta(animalNumber){
