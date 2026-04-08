@@ -112,7 +112,22 @@
   <div id="sysbar" class="infobar"></div>
 <div id="bulkBox" class="hide">
   <div id="bulkInfo" class="muted" style="margin:0 0 12px 0;font-weight:800"></div>
-  <div id="bulkRows" style="display:grid;gap:12px"></div>
+
+  <div style="overflow:auto;-webkit-overflow-scrolling:touch">
+    <table id="bulkTable" style="width:100%;border-collapse:separate;border-spacing:0 8px;min-width:760px">
+      <thead>
+        <tr>
+          <th style="text-align:right;padding:8px 10px">رقم الحيوان</th>
+          <th style="text-align:center;padding:8px 10px">النوع</th>
+          <th style="text-align:center;padding:8px 10px">حلبة 1</th>
+          <th style="text-align:center;padding:8px 10px">حلبة 2</th>
+          <th style="text-align:center;padding:8px 10px" id="bulkHeadS3">حلبة 3</th>
+          <th style="text-align:center;padding:8px 10px">الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody id="bulkRows"></tbody>
+    </table>
+  </div>
 
   <div class="btn-row">
     <button type="button" id="saveBulkBtn" class="save-btn">حفظ اللبن الجماعي</button>
@@ -282,29 +297,31 @@ const cancelBulkBtn = $('cancelBulkBtn');
 
 function bulkRowHtml(n){
   return `
-    <div class="bulk-row" data-number="${n}" style="border:1px solid #e2e8f0;border-radius:14px;padding:12px;background:#fff">
-      <div style="font-weight:800;margin-bottom:10px">رقم الحيوان: ${n}</div>
+    <tr class="bulk-row" data-number="${n}" data-kind="cow">
+      <td style="padding:10px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap">
+        ${n}
+      </td>
 
-      <div class="row">
-        <div class="col">
-          <label>حلبة 1 (كجم)</label>
-          <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-        <div class="col">
-          <label>حلبة 2 (كجم)</label>
-          <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-        <div class="col">
-          <label>حلبة 3 (كجم)</label>
-          <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
-        </div>
-      </div>
+      <td class="bulk-kind-cell" style="padding:10px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0b7f47">
+        ...
+      </td>
 
-      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <div class="muted" style="font-weight:700">الإجمالي</div>
-        <div class="bulk-total" style="padding:10px 12px;border-radius:12px;background:#eaf7f0;border:1px solid #b7e4c7;font-weight:900;color:#0b7f47;min-width:88px;text-align:center">0.0 كجم</div>
-      </div>
-    </div>
+      <td style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+      </td>
+
+      <td style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+      </td>
+
+      <td class="bulk-s3-cell" style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:90px;text-align:center" />
+      </td>
+
+      <td style="padding:10px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center">
+        <div class="bulk-total" style="font-weight:900;color:#0b7f47;min-width:78px">0.0 كجم</div>
+      </td>
+    </tr>
   `;
 }
 
@@ -331,15 +348,16 @@ function bindBulkTotals(){
 function setupBulkMode(){
   if (!isBulkMode) return;
 
-bulkBox.classList.remove('hide');
-bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
-bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
-bindBulkTotals();
-detectBulkKinds();
+  bulkBox.classList.remove('hide');
+  bulkInfo.textContent = `إدخال جماعي لعدد ${bulkNumbers.length} حيوان — التاريخ: ${inputDate.value || ''}`;
+  bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
+  bindBulkTotals();
+  detectBulkKinds();
 
-inputAnimal.closest('.row')?.classList.add('hide');
-document.getElementById('sessions')?.classList.add('hide');
-openCowCardBtn?.classList.add('hide');
+  inputAnimal.closest('.row')?.classList.add('hide');
+  document.getElementById('sessions')?.classList.add('hide');
+  document.querySelector('.btn-row')?.classList.add('hide');
+  openCowCardBtn?.classList.add('hide');
 }
     async function fetchAnimalMeta(animalNumber){
   const uid = String(window.__tenant?.userId || localStorage.getItem("userId") || "").trim();
@@ -378,30 +396,26 @@ openCowCardBtn?.classList.add('hide');
 }
 
 function applyBulkRowKind(row, kind){
-  const s3Wrap = row.querySelector('.bulk-s3')?.closest('.col');
+  const s3Cell = row.querySelector('.bulk-s3-cell');
   const s3Input = row.querySelector('.bulk-s3');
-  const labels = row.querySelectorAll('label');
+  const kindCell = row.querySelector('.bulk-kind-cell');
 
   if (kind === 'buffalo') {
-    if (labels[0]) labels[0].textContent = 'حلبة صباح (كجم)';
-    if (labels[1]) labels[1].textContent = 'حلبة مساء (كجم)';
-    if (s3Wrap) s3Wrap.classList.add('hide');
+    if (kindCell) kindCell.textContent = 'جاموس';
+    if (s3Cell) s3Cell.style.display = 'none';
     if (s3Input) {
       s3Input.value = '';
       s3Input.disabled = true;
     }
   } else {
-    if (labels[0]) labels[0].textContent = 'حلبة 1 (كجم)';
-    if (labels[1]) labels[1].textContent = 'حلبة 2 (كجم)';
-    if (labels[2]) labels[2].textContent = 'حلبة 3 (كجم)';
-    if (s3Wrap) s3Wrap.classList.remove('hide');
+    if (kindCell) kindCell.textContent = 'أبقار';
+    if (s3Cell) s3Cell.style.display = '';
     if (s3Input) s3Input.disabled = false;
   }
 
   row.dataset.kind = kind;
   updateBulkRowTotal(row);
 }
-
 async function detectBulkKinds(){
   const rows = Array.from(document.querySelectorAll('.bulk-row'));
   for (const row of rows) {
@@ -507,11 +521,12 @@ saveBulkBtn?.addEventListener('click', async () => {
   let failed = 0;
 
   for (const row of rows) {
-    const animalNumber = String(row.dataset.number || '').trim();
-    const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-    const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-    const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-    const total = s1 + s2 + s3;
+   const animalNumber = String(row.dataset.number || '').trim();
+const s1 = toNum(row.querySelector('.bulk-s1')?.value);
+const s2 = toNum(row.querySelector('.bulk-s2')?.value);
+const s3 = toNum(row.querySelector('.bulk-s3')?.value);
+const kind = String(row.dataset.kind || 'cow').trim();
+const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
 
     if (total <= 0) continue;
 
