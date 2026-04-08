@@ -434,9 +434,8 @@ const isHeat = /heat\.html/i.test(String(targetPage||''));
 const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
 const isWeaning = /weaning\.html/i.test(String(targetPage||''));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
-const isColostrum = /colostrum-feeding\.html/i.test(String(targetPage||''));
-
-const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats;
+const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
+const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isDailyMilk;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
@@ -474,13 +473,13 @@ if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColost
   u.searchParams.set('mbkMode', 'group');
   u.searchParams.set('bulk', ctx.bulk);
   if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-} else if (/daily-milk\.html/i.test(String(page)) && ctx.mode === 'group') {
+} else if (isDailyMilk && ctx.mode === 'group') {
   u.searchParams.set('mode', 'bulk');
   u.searchParams.set('numbers', ctx.bulk);
+  if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
 } else {
   u.searchParams.set('number', ctx.number);
 }
-
         u.searchParams.set('date', ctx.date);
         u.searchParams.set('eventDate', ctx.date);
         return u.toString();
