@@ -188,6 +188,10 @@ header{
   background:#fff;
 }
 
+.settings[hidden]{
+  display:none !important;
+}
+
 .settings h4{
   margin:0 0 12px;
   color:var(--mbk-green-dark);
@@ -419,13 +423,14 @@ header{
   <div class="list" id="list-all"></div>
 </section>
 
-    <section class="toolbar">
-      <div class="search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
-      <button class="btn" id="refreshBtn">تحديث</button>
-     <span class="hint">اختر المجموعة من القائمة بالأعلى، ويمكنك البحث ثم مسح البحث للعودة للوضع الطبيعي.</span>
-    </section>
+   <section class="toolbar">
+  <div class="search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
+  <button class="btn" id="refreshBtn">تحديث</button>
+  <button class="btn" id="settingsBtn" type="button">الإعدادات</button>
+  <span class="hint">اختر المجموعة من القائمة بالأعلى، ويمكنك البحث ثم مسح البحث للعودة للوضع الطبيعي.</span>
+</section>
 
-    <section class="settings" id="settings">
+   <section class="settings" id="settings" hidden>
      <div class="hint" style="margin-bottom:8px">
   هذه العتبات يحددها المستخدم بالكامل، ومُرَبِّيك يوزّع الحيوانات على المجموعات حسب الرينجات المدخلة فقط.
 </div>
@@ -1525,12 +1530,17 @@ $('#saveSettings').addEventListener('click', async ()=>{
   readSettingsFromUI();
   saveThresholdsLocal();
   try{ await saveThresholdsToFirestore(); }catch{}
-  updateCounters();
+  refreshCurrentView();
   await syncAllGroupsData();
-  if (state.currentGroup) renderSelected(state.currentGroup);
+  document.getElementById('settings')?.setAttribute('hidden', '');
   window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
 });
-
+$('#settingsBtn')?.addEventListener('click', ()=>{
+  const box = document.getElementById('settings');
+  if (!box) return;
+  if (box.hasAttribute('hidden')) box.removeAttribute('hidden');
+  else box.setAttribute('hidden', '');
+});
 function refreshCurrentView(){
   state.groupsCache = null;
   updateCounters();
