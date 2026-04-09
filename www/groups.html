@@ -557,23 +557,7 @@ const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
 
-const GROUP_DEFS = [
-  { id:'cow_males',          species:'cow',     baseKey:'males',         label:'ذكور أبقار',                  feedingEligible:true  },
-  { id:'cow_all',            species:'cow',     baseKey:'all',           label:'كل الأبقار',                  feedingEligible:false },
-  { id:'cow_fresh',          species:'cow',     baseKey:'fresh',         label:'أبقار حديث الولادة',          feedingEligible:true  },
-  { id:'cow_high',           species:'cow',     baseKey:'high',          label:'أبقار عالية الإدرار',         feedingEligible:true  },
-  { id:'cow_med',            species:'cow',     baseKey:'med',           label:'أبقار متوسطة الإدرار',        feedingEligible:true  },
-  { id:'cow_low',            species:'cow',     baseKey:'low',           label:'أبقار منخفضة الإدرار',        feedingEligible:true  },
-  { id:'cow_dry',            species:'cow',     baseKey:'dry',           label:'أبقار جافة',                  feedingEligible:true  },
-  { id:'cow_closeup',        species:'cow',     baseKey:'closeup',       label:'أبقار انتظار ولادة',          feedingEligible:true  },
-  { id:'cow_suckling',       species:'cow',     baseKey:'suckling',      label:'رضيع أبقار',                  feedingEligible:true  },
-  { id:'cow_weaned',         species:'cow',     baseKey:'weaned',        label:'فطام أبقار',                  feedingEligible:true  },
-  { id:'cow_growing',        species:'cow',     baseKey:'growing',       label:'نامي أبقار',                  feedingEligible:true  },
-  { id:'cow_heiferOpen',     species:'cow',     baseKey:'heiferOpen',    label:'عجلات جاهزة أبقار',           feedingEligible:true  },
-  { id:'cow_breeding',       species:'cow',     baseKey:'breeding',      label:'عجلات تحت التلقيح أبقار',     feedingEligible:true  },
-  { id:'cow_pregHeifers',    species:'cow',     baseKey:'pregHeifers',   label:'عجلات عشار أبقار',            feedingEligible:true  },
-  { id:'cow_heiferCloseup',  species:'cow',     baseKey:'heiferCloseup', label:'عجلات انتظار ولادة أبقار',    feedingEligible:true  },
-  { id:'cow_hospital',       species:'cow',     baseKey:'hospital',      label:'مستشفى أبقار',                feedingEligible:false },
+
 const GROUP_DEFS = [
   { id:'cow_males',        species:'cow',     baseKey:'males',       label:'ذكور أبقار',               feedingEligible:true  },
   { id:'cow_all',          species:'cow',     baseKey:'all',         label:'كل الأبقار',               feedingEligible:false },
@@ -1010,19 +994,15 @@ function milkBand(an, milk){
 function ageCfg(sp){
   if (sp === 'buffalo') {
     return {
-      sucklingMax: Number(state.thresholds.bufSucklingMax || 3),
-      weanedMax:   Number(state.thresholds.bufWeanedMax || 6),
-      growingMax:  Number(state.thresholds.bufGrowingMax || 15),
-      heiferMin:   Number(state.thresholds.bufHeiferMin || 16),
-      heiferMax:   Number(state.thresholds.bufHeiferMax || 20)
+      sucklingMax: Number(state.thresholds.bufSucklingMax || 2),
+      weanedMax:   Number(state.thresholds.bufWeanedMax || 5),
+      growingMax:  Number(state.thresholds.bufGrowingMax || 12)
     };
   }
   return {
     sucklingMax: Number(state.thresholds.cowSucklingMax || 2),
     weanedMax:   Number(state.thresholds.cowWeanedMax || 5),
-    growingMax:  Number(state.thresholds.cowGrowingMax || 12),
-    heiferMin:   Number(state.thresholds.cowHeiferMin || 13),
-    heiferMax:   Number(state.thresholds.cowHeiferMax || 15)
+    growingMax:  Number(state.thresholds.cowGrowingMax || 12)
   };
 }
 function isLactatingAdult(an){
@@ -1041,11 +1021,11 @@ function isGrowingGroup(an, sp){
 }
 function isHeiferAge(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m >= c.heiferMin && m <= c.heiferMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m > c.growingMax;
 }
 function isMatureOpenNonLactating(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && !isPregnant(an) && !isBreedingStatus(an) && m > c.heiferMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && !isBreedingStatus(an) && m > c.growingMax;
 }
 
 /* ============= تنسيق بيانات الحيوان ============= */
@@ -1178,8 +1158,8 @@ if($('#bufMedMax'))  $('#bufMedMax').value  = state.thresholds.bufMedMax;
 if($('#bufHighMin')) $('#bufHighMin').value = state.thresholds.bufHighMin;
 
   const ids = [
-  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
-  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
+  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowCloseUpDays',
+  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufCloseUpDays'
 ];
 ids.forEach(id => {
   const el = $('#'+id);
@@ -1203,12 +1183,12 @@ state.thresholds.bufMedMin  = Number($('#bufMedMin')?.value  || 8);
 state.thresholds.bufMedMax  = Number($('#bufMedMax')?.value  || 11.9);
 state.thresholds.bufHighMin = Number($('#bufHighMin')?.value || 12);
 
-  [
-    'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
-    'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
-  ].forEach(id => {
-    state.thresholds[id] = Number($('#'+id)?.value || state.thresholds[id] || 0);
-  });
+ [
+  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowCloseUpDays',
+  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufCloseUpDays'
+].forEach(id => {
+  state.thresholds[id] = Number($('#'+id)?.value || state.thresholds[id] || 0);
+});
 }
 
 /* ============= المجموعات الديناميكية ============= */
