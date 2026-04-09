@@ -2271,7 +2271,141 @@ app.post('/api/admin/events/normalize', ensureAdmin, async (req, res) => {
   }
 });
 
+// ============================================================
+//                       API: GROUPS SETTINGS
+// ============================================================
+app.get('/api/groups/settings', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
 
+    const tenant = req.userId;
+    const ds = await db.collection('users').doc(tenant).collection('settings').doc('groups').get();
+
+    return res.json({
+      ok: true,
+      thresholds: ds.exists ? (ds.data()?.thresholds || ds.data()) : null
+    });
+  } catch (e) {
+    console.error('groups.settings.get', e);
+    return res.status(500).json({ ok:false, error:'groups_settings_get_failed' });
+  }
+});
+
+app.post('/api/groups/settings', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const tenant = req.userId;
+    const thresholds = req.body?.thresholds || {};
+
+    await db.collection('users').doc(tenant).collection('settings').doc('groups').set({
+      userId: tenant,
+      thresholds,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    return res.json({ ok:true, saved:true });
+  } catch (e) {
+    console.error('groups.settings.save', e);
+    return res.status(500).json({ ok:false, error:'groups_settings_save_failed' });
+  }
+});
+
+// ============================================================
+//                       API: GROUPS SYNC
+// ============================================================
+app.post('/api/groups/sync', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const tenant = req.userId;
+    const groups = Array.isArray(req.body?.groups) ? req.body.groups : [];
+    const members = Array.isArray(req.body?.members) ? req.body.members : [];
+
+    let batch = db.batch();
+    let ops = 0;
+
+    for (const g of groups) {
+      const groupId = String(g?.groupId || '').trim();
+      if (!groupId) continue;
+
+      const ref = db.collection('groups').doc(`${tenant}_${groupId}`);
+      batch.set(ref, {
+        ...g,
+        userId: tenant,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+
+      ops++;
+      if (ops >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    const desiredIds = new Set();
+
+    for (const m of members) {
+      const groupId = String(m?.groupId || '').trim();
+      const animalNumber = String(m?.animalNumber || '').trim();
+      if (!groupId || !animalNumber) continue;
+
+      const memberId = `${tenant}_${groupId}_${animalNumber}`;
+      desiredIds.add(memberId);
+
+      const ref = db.collection('groups_members').doc(memberId);
+      batch.set(ref, {
+        ...m,
+        userId: tenant,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+
+      ops++;
+      if (ops >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+    }
+
+    const oldSnap = await db.collection('groups_members').where('userId', '==', tenant).get();
+
+    if (!oldSnap.empty) {
+      let delBatch = db.batch();
+      let delOps = 0;
+
+      for (const ds of oldSnap.docs) {
+        if (!desiredIds.has(ds.id)) {
+          delBatch.delete(ds.ref);
+          delOps++;
+          if (delOps >= 400) {
+            await delBatch.commit();
+            delBatch = db.batch();
+            delOps = 0;
+          }
+        }
+      }
+
+      if (delOps > 0) {
+        await delBatch.commit();
+      }
+    }
+
+    return res.json({
+      ok: true,
+      savedGroups: groups.length,
+      savedMembers: members.length
+    });
+  } catch (e) {
+    console.error('groups.sync', e);
+    return res.status(500).json({ ok:false, error:'groups_sync_failed' });
+  }
+});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
