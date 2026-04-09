@@ -95,28 +95,34 @@ header{
   padding:14px 12px 100px;
 }
 
-/* chips */
-.chips{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:center;
-  flex-wrap:wrap;
+.group-picker{
   margin:10px 0 14px;
 }
-.chip{
-  padding:9px 12px;
-  border:1px solid var(--mbk-border);
-  border-radius:999px;
-  background:#fff;
-  cursor:pointer;
+
+.group-picker-label{
+  display:block;
+  margin-bottom:6px;
   font-size:13px;
-  color:var(--mbk-text);
+  font-weight:800;
+  color:var(--mbk-green-dark);
 }
-.chip.active{
-  background:var(--mbk-green);
-  color:#fff;
+
+.group-select{
+  width:100%;
+  height:48px;
+  padding:0 14px;
+  border:1px solid var(--mbk-border);
+  border-radius:16px;
+  background:#fff;
+  color:var(--mbk-text);
+  font-size:16px;
+  font-weight:800;
+  outline:none;
+}
+
+.group-select:focus{
   border-color:var(--mbk-green);
+  box-shadow:0 0 0 3px rgba(14,160,90,.10);
 }
     .species-tabs{
   display:flex;
@@ -401,7 +407,10 @@ header{
   <button type="button" class="species-tab" data-species="buffalo">جاموس</button>
 </div>
 
-<div class="chips" id="quickChips"></div>
+<div class="group-picker" id="groupPickerWrap">
+  <label for="groupSelect" class="group-picker-label">اختر المجموعة</label>
+  <select id="groupSelect" class="group-select"></select>
+</div>
     <section class="group-sec" id="sec-all">
   <div class="group-head" data-id="all">
     <span class="name">كل الحيوانات</span>
@@ -413,7 +422,7 @@ header{
     <section class="toolbar">
       <div class="search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
       <button class="btn" id="refreshBtn">تحديث</button>
-      <span class="hint">لن تُعرض المجموعات والأسماء إلا بعد الضغط على زر المجموعة بالأعلى.</span>
+     <span class="hint">اختر المجموعة من القائمة بالأعلى، ويمكنك البحث ثم مسح البحث للعودة للوضع الطبيعي.</span>
     </section>
 
     <section class="settings" id="settings">
@@ -1113,6 +1122,8 @@ function ensureDynamicGroupsUI(){
       <div class="list" id="list-${def.id}"></div>
     </section>
   `).join('');
+  
+  $$('.group-head', host).forEach(h => h.style.display = 'none');
 }
 
 function filterByQuery(list){
@@ -1219,10 +1230,15 @@ function renderSelected(id){
   }
 
   $$('.group-sec').forEach(s=>s.classList.remove('show'));
-  const sec = document.getElementById('sec-'+id);
-  if(sec) sec.classList.add('show');
-  $$('.list').forEach(l=>l.classList.remove('show'));
-  list.classList.add('show');
+$$('.list').forEach(l=>l.classList.remove('show'));
+
+const sec = document.getElementById('sec-'+id);
+if(sec) sec.classList.add('show');
+
+list.classList.add('show');
+
+const head = sec?.querySelector('.group-head');
+if (head) head.style.display = 'none';
 }
  function buildSpeciesTabs(){
   const host = $('#speciesTabs');
@@ -1237,53 +1253,48 @@ function renderSelected(id){
         x.classList.toggle('active', x === btn);
       });
 
-      buildChips();
+     buildGroupSelect();
 
-      const first = $('#quickChips .chip');
-      if (first) {
-        state.currentGroup = first.dataset.id;
-        first.classList.add('active');
-        renderSelected(first.dataset.id);
-      }
+const sel = $('#groupSelect');
+if (sel && sel.value) {
+  state.currentGroup = sel.value;
+  renderSelected(sel.value);
+}
     };
   });
 } 
-function buildChips(){
-  const host = $('#quickChips');
-  if (!host) return;
-
-  host.innerHTML = '';
+function buildGroupSelect(){
+  const sel = $('#groupSelect');
+  if (!sel) return;
 
   const defs = GROUP_DEFS.filter(def => def.species === state.viewSpecies);
 
-  defs.forEach(def=>{
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip';
-    b.textContent = def.label
+  sel.innerHTML = defs.map(def => {
+    const label = def.label
       .replace(/^أبقار\s*/, '')
       .replace(/^جاموس\s*/, '')
       .replace(/\s+أبقار$/, '')
       .replace(/\s+جاموس$/, '');
+    return `<option value="${def.id}">${label}</option>`;
+  }).join('');
 
-    b.dataset.id = def.id;
+  if (state.currentGroup && defs.some(d => d.id === state.currentGroup)) {
+    sel.value = state.currentGroup;
+  } else if (defs[0]) {
+    state.currentGroup = defs[0].id;
+    sel.value = defs[0].id;
+  }
 
-    if (state.currentGroup === def.id) b.classList.add('active');
-
-    b.onclick = () => {
-      state.currentGroup = def.id;
-      $$('#quickChips .chip').forEach(x=>x.classList.toggle('active', x === b));
-      renderSelected(def.id);
-      const counts = splitGroups();
-      window.dataLayer.push({
-        event:'group_select',
-        group:def.id,
-        count:(counts[def.id]||[]).length
-      });
-    };
-
-    host.appendChild(b);
-  });
+  sel.onchange = () => {
+    state.currentGroup = sel.value;
+    renderSelected(sel.value);
+    const counts = splitGroups();
+    window.dataLayer.push({
+      event:'group_select',
+      group:sel.value,
+      count:(counts[sel.value]||[]).length
+    });
+  };
 }
 function bindGroupHeaders(){
   $$('.group-head').forEach(h=>{
@@ -1520,17 +1531,42 @@ $('#saveSettings').addEventListener('click', async ()=>{
   window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
 });
 
-$('#q').addEventListener('input', ()=>{
+function refreshCurrentView(){
+  state.groupsCache = null;
   updateCounters();
   if (state.currentGroup) renderSelected(state.currentGroup);
-});
-$('#refreshBtn').addEventListener('click', async ()=>{
-  await loadAnimals();
-  updateCounters();
-  if(state.currentGroup) renderSelected(state.currentGroup);
-  await syncAllGroupsData();
+}
+
+function clearSearchAndRestore(){
+  const q = $('#q');
+  if (!q) return;
+  q.value = '';
+  refreshCurrentView();
+}
+
+$('#q').addEventListener('input', ()=>{
+  refreshCurrentView();
 });
 
+$('#q').addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    clearSearchAndRestore();
+    $('#q').blur();
+  }
+});
+
+$('#q').addEventListener('search', ()=>{
+  if (!$('#q').value.trim()) {
+    refreshCurrentView();
+  }
+});
+$('#refreshBtn').addEventListener('click', async ()=>{
+  $('#q').value = '';
+  await loadAnimals();
+  refreshCurrentView();
+  await syncAllGroupsData();
+});
 /* ============= تشخيص للأخطاء العامة ============= */
 window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
 window.addEventListener('unhandledrejection', e => console.error('Promise Rejection:', e.reason));
@@ -1573,16 +1609,15 @@ try { await loadThresholdsFromFirestore(); } catch (e) { console.warn('thresh ge
 syncSettingsUIFromState();
 
  buildSpeciesTabs();
-buildChips();
+buildGroupSelect();
 bindGroupHeaders();
 
 await loadAnimals();
+updateCounters();
 
 state.currentGroup = 'cow_all';
-renderSelected('cow_all');
-
-const firstChip = $('#quickChips .chip');
-if (firstChip) firstChip.classList.add('active');
+buildGroupSelect();
+renderSelected(state.currentGroup);
 })();</script>
 
 </body>
