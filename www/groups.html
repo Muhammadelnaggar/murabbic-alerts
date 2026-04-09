@@ -1439,17 +1439,7 @@ async function syncAllGroupsData(){
 }
 
 /* ============= تحميل الحيوانات ============= */
-async function loadAnimalsFromFirestore(){
-  try{
-    if(!state.userId || !db) return [];
-    const qy = query(collection(db,'animals'), where('userId','==', state.userId));
-    const snap = await getDocs(qy);
-    return snap.docs.map(d=> ({ id:d.id, ...d.data() }));
-  }catch(e){
-    console.warn('fb animals err', e);
-    return [];
-  }
-}
+
   function shouldAppearInGroups(a){
   const txt = [
     a?.status,
@@ -1484,30 +1474,30 @@ async function loadAnimalsFromFirestore(){
   return true;
 }
 async function loadAnimals(){
+  try {
+    const [animalsRes, calvesRes] = await Promise.all([
+      apiGet('/api/animals'),
+      apiGet('/api/calves')
+    ]);
 
-  const animalsSnap = await getDocs(
-    query(collection(db,'animals'), where('userId','==',state.userId))
-  );
+    const animals = (Array.isArray(animalsRes?.animals) ? animalsRes.animals : [])
+      .filter(shouldAppearInGroups);
 
-  const calvesSnap = await getDocs(
-    query(collection(db,'calves'), where('userId','==',state.userId))
-  );
+    const calves = (Array.isArray(calvesRes?.calves) ? calvesRes.calves : [])
+      .map(d => ({
+        ...d,
+        animalNumber: d.calfNumber || d.animalNumber || d.id,
+        isCalf: true
+      }))
+      .filter(shouldAppearInGroups);
 
-const animals = animalsSnap.docs
-  .map(d => ({ id:d.id, ...d.data() }))
-  .filter(shouldAppearInGroups);
-
-const calves = calvesSnap.docs
-  .map(d => ({
-    id:d.id,
-    ...d.data(),
-    animalNumber: d.data().calfNumber || d.id,
-    isCalf: true
-  }))
-  .filter(shouldAppearInGroups);
-
-  state.animals = [...animals, ...calves];
-  state.groupsCache = null;
+    state.animals = [...animals, ...calves];
+    state.groupsCache = null;
+  } catch (e) {
+    console.warn('groups load err', e);
+    state.animals = [];
+    state.groupsCache = null;
+  }
 }
 /* ============= ربط الواجهة ============= */
 $$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
