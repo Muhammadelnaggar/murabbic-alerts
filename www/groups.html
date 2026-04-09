@@ -431,8 +431,8 @@ header{
 </section>
 
    <section class="settings" id="settings" hidden>
-     <div class="hint" style="margin-bottom:8px">
-  هذه العتبات يحددها المستخدم بالكامل، ومُرَبِّيك يوزّع الحيوانات على المجموعات حسب الرينجات المدخلة فقط.
+    <div class="hint" style="margin-bottom:8px">
+  المستخدم يحدد عتبات الجروبات بنفسه. يجب أن تكون الرينجات متصلة بلا فجوات: بداية الفطام ثم نهاية الفطام/بداية نامي ثم نهاية نامي/بداية تحت التلقيح، حتى لا يسقط أي حيوان خارج أي مجموعة.
 </div>
       <div class="radio-row">
         <label><input type="radio" name="species" value="cow" checked> أبقار</label>
@@ -454,7 +454,7 @@ header{
       <div class="row" style="margin-top:8px">
         <button class="btn primary" id="saveSettings">حفظ الإعدادات</button>
       </div>
-      <div class="hint" style="margin-top:6px">حديث الولادة (للحلاب) محسوب داخليًا من 1 إلى 45 يوم (DIM) ولا يحتاج إدخال يدوي.</div>
+      <div class="hint" style="margin-top:6px">الرضيع يدخل تلقائيًا إلى مجموعة الرضيع، ولا يخرج منها إلا بعد تسجيل حدث فطام بواسطة المستخدم.</div>
     </section>
 
     <!-- المجموعات: القوائم مخفية افتراضيًا -->
@@ -558,6 +558,7 @@ const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
 const normTxt = v => String(v ?? '').trim().toLowerCase();
 
 const GROUP_DEFS = [
+  { id:'cow_males',          species:'cow',     baseKey:'males',         label:'ذكور أبقار',                  feedingEligible:true  },
   { id:'cow_all',            species:'cow',     baseKey:'all',           label:'كل الأبقار',                  feedingEligible:false },
   { id:'cow_fresh',          species:'cow',     baseKey:'fresh',         label:'أبقار حديث الولادة',          feedingEligible:true  },
   { id:'cow_high',           species:'cow',     baseKey:'high',          label:'أبقار عالية الإدرار',         feedingEligible:true  },
@@ -573,24 +574,35 @@ const GROUP_DEFS = [
   { id:'cow_pregHeifers',    species:'cow',     baseKey:'pregHeifers',   label:'عجلات عشار أبقار',            feedingEligible:true  },
   { id:'cow_heiferCloseup',  species:'cow',     baseKey:'heiferCloseup', label:'عجلات انتظار ولادة أبقار',    feedingEligible:true  },
   { id:'cow_hospital',       species:'cow',     baseKey:'hospital',      label:'مستشفى أبقار',                feedingEligible:false },
+const GROUP_DEFS = [
+  { id:'cow_males',        species:'cow',     baseKey:'males',       label:'ذكور أبقار',               feedingEligible:true  },
+  { id:'cow_all',          species:'cow',     baseKey:'all',         label:'كل الأبقار',               feedingEligible:false },
+  { id:'cow_high',         species:'cow',     baseKey:'high',        label:'عالي الإدرار أبقار',       feedingEligible:true  },
+  { id:'cow_med',          species:'cow',     baseKey:'med',         label:'متوسط الإدرار أبقار',      feedingEligible:true  },
+  { id:'cow_low',          species:'cow',     baseKey:'low',         label:'منخفض الإدرار أبقار',      feedingEligible:true  },
+  { id:'cow_dry',          species:'cow',     baseKey:'dry',         label:'جاف أبقار',                feedingEligible:true  },
+  { id:'cow_closeup',      species:'cow',     baseKey:'closeup',     label:'انتظار ولادة أبقار',       feedingEligible:true  },
+  { id:'cow_suckling',     species:'cow',     baseKey:'suckling',    label:'رضيع أبقار',               feedingEligible:true  },
+  { id:'cow_weaned',       species:'cow',     baseKey:'weaned',      label:'فطام أبقار',               feedingEligible:true  },
+  { id:'cow_growing',      species:'cow',     baseKey:'growing',     label:'نامي أبقار',               feedingEligible:true  },
+  { id:'cow_heiferOpen',   species:'cow',     baseKey:'heiferOpen',  label:'تحت التلقيح أبقار',        feedingEligible:true  },
+  { id:'cow_breeding',     species:'cow',     baseKey:'breeding',    label:'عجلات ملقحة أبقار',        feedingEligible:true  },
+  { id:'cow_pregHeifers',  species:'cow',     baseKey:'pregHeifers', label:'عجلات عشار أبقار',         feedingEligible:true  },
 
-  { id:'buffalo_all',        species:'buffalo', baseKey:'all',           label:'كل الجاموس',                  feedingEligible:false },
-  { id:'buffalo_fresh',      species:'buffalo', baseKey:'fresh',         label:'جاموس حديث الولادة',          feedingEligible:true  },
-  { id:'buffalo_high',       species:'buffalo', baseKey:'high',          label:'جاموس عالي الإدرار',          feedingEligible:true  },
-  { id:'buffalo_med',        species:'buffalo', baseKey:'med',           label:'جاموس متوسط الإدرار',         feedingEligible:true  },
-  { id:'buffalo_low',        species:'buffalo', baseKey:'low',           label:'جاموس منخفض الإدرار',         feedingEligible:true  },
-  { id:'buffalo_dry',        species:'buffalo', baseKey:'dry',           label:'جاموس جاف',                   feedingEligible:true  },
-  { id:'buffalo_closeup',    species:'buffalo', baseKey:'closeup',       label:'جاموس انتظار ولادة',          feedingEligible:true  },
-  { id:'buffalo_suckling',   species:'buffalo', baseKey:'suckling',      label:'رضيع جاموس',                  feedingEligible:true  },
-  { id:'buffalo_weaned',     species:'buffalo', baseKey:'weaned',        label:'فطام جاموس',                  feedingEligible:true  },
-  { id:'buffalo_growing',    species:'buffalo', baseKey:'growing',       label:'نامي جاموس',                  feedingEligible:true  },
-  { id:'buffalo_heiferOpen', species:'buffalo', baseKey:'heiferOpen',    label:'عجلات جاهزة جاموس',           feedingEligible:true  },
-  { id:'buffalo_breeding',   species:'buffalo', baseKey:'breeding',      label:'عجلات تحت التلقيح جاموس',     feedingEligible:true  },
-  { id:'buffalo_pregHeifers',species:'buffalo', baseKey:'pregHeifers',   label:'عجلات عشار جاموس',            feedingEligible:true  },
-  { id:'buffalo_heiferCloseup', species:'buffalo', baseKey:'heiferCloseup', label:'عجلات انتظار ولادة جاموس', feedingEligible:true  },
-  { id:'buffalo_hospital',   species:'buffalo', baseKey:'hospital',      label:'مستشفى جاموس',                feedingEligible:false }
+  { id:'buffalo_males',       species:'buffalo', baseKey:'males',       label:'ذكور جاموس',              feedingEligible:true  },
+  { id:'buffalo_all',         species:'buffalo', baseKey:'all',         label:'كل الجاموس',              feedingEligible:false },
+  { id:'buffalo_high',        species:'buffalo', baseKey:'high',        label:'عالي الإدرار جاموس',      feedingEligible:true  },
+  { id:'buffalo_med',         species:'buffalo', baseKey:'med',         label:'متوسط الإدرار جاموس',     feedingEligible:true  },
+  { id:'buffalo_low',         species:'buffalo', baseKey:'low',         label:'منخفض الإدرار جاموس',     feedingEligible:true  },
+  { id:'buffalo_dry',         species:'buffalo', baseKey:'dry',         label:'جاف جاموس',               feedingEligible:true  },
+  { id:'buffalo_closeup',     species:'buffalo', baseKey:'closeup',     label:'انتظار ولادة جاموس',      feedingEligible:true  },
+  { id:'buffalo_suckling',    species:'buffalo', baseKey:'suckling',    label:'رضيع جاموس',              feedingEligible:true  },
+  { id:'buffalo_weaned',      species:'buffalo', baseKey:'weaned',      label:'فطام جاموس',              feedingEligible:true  },
+  { id:'buffalo_growing',     species:'buffalo', baseKey:'growing',     label:'نامي جاموس',              feedingEligible:true  },
+  { id:'buffalo_heiferOpen',  species:'buffalo', baseKey:'heiferOpen',  label:'تحت التلقيح جاموس',       feedingEligible:true  },
+  { id:'buffalo_breeding',    species:'buffalo', baseKey:'breeding',    label:'عجلات ملقحة جاموس',       feedingEligible:true  },
+  { id:'buffalo_pregHeifers', species:'buffalo', baseKey:'pregHeifers', label:'عجلات عشار جاموس',        feedingEligible:true  }
 ];
-
 const GROUP_DEF_BY_ID = Object.fromEntries(GROUP_DEFS.map(x => [x.id, x]));
 const LEGACY_SECTION_IDS = [
   'sec-all','sec-fresh','sec-high','sec-med','sec-low','sec-dry',
@@ -720,9 +732,18 @@ function getSexText(an){
 
   return 'غير محدد';
 }
-
+function isMale(an){
+  return getSexText(an) === 'ذكر';
+}
 function isYoungStock(an){
   return !hasCalvedBefore(an);
+}
+  function hasWeaningEvent(an){
+  return an?._hasWeaningEvent === true;
+}
+
+function isInfantGroup(an){
+  return !hasCalvedBefore(an) && !hasWeaningEvent(an);
 }
 function getMilkKg(an){
   return num(
@@ -756,7 +777,93 @@ function isTypeOneOf(e, names=[]){
 }
 const milkEventNames = ['daily_milk','لبن يومي','milk','milk report'];
 
+
+function eventText(e){
+  return [
+    e?.type,
+    e?.eventType,
+    e?.name,
+    e?.kind
+  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+}
+
+function isWeaningEvent(e){
+  const txt = eventText(e);
+  return (
+    txt.includes('فطام') ||
+    txt.includes('weaning') ||
+    txt.includes('weaned')
+  );
+}
+
+async function enrichLifecycleFromEvents(list){
+  if(!db || !state.userId || !Array.isArray(list) || !list.length) return;
+
+  try{
+    let evQuery;
+    try{
+      evQuery = query(
+        collection(db,'events'),
+        where('userId','==', state.userId),
+        orderBy('eventDate','desc'),
+        limit(1500)
+      );
+    }catch(_){
+      evQuery = query(
+        collection(db,'events'),
+        where('userId','==', state.userId),
+        limit(1500)
+      );
+    }
+
+    const evSnap = await getDocs(evQuery);
+    const weaningMap = new Map();
+
+    evSnap.forEach(docu => {
+      const e = docu.data();
+      if (!isWeaningEvent(e)) return;
+
+      const key = String(
+        e?.animalNumber ??
+        e?.number ??
+        e?.calfNumber ??
+        e?.animalId ??
+        e?.animalID ??
+        ''
+      ).trim();
+
+      if (!key) return;
+
+      const d = getEventDate(e) || new Date(0);
+      const prev = weaningMap.get(key);
+
+      if (!prev || d < prev) {
+        weaningMap.set(key, d);
+      }
+    });
+
+    list.forEach(an => {
+      const key = String(
+        an?.animalNumber ??
+        an?.number ??
+        an?.calfNumber ??
+        an?.id ??
+        ''
+      ).trim();
+
+      an._hasWeaningEvent = weaningMap.has(key);
+      an._firstWeaningDate = weaningMap.has(key)
+        ? weaningMap.get(key).toISOString()
+        : null;
+    });
+
+  }catch(e){
+    console.warn('lifecycle events read err', e);
+  }
+}
+
 async function enrichMilkFromEvents(list){
+
   if(!db || !state.userId || !Array.isArray(list) || !list.length) return;
   const stillZero = list.filter(an => getMilkKg(an) === 0);
   if(!stillZero.length) return;
@@ -922,20 +1029,19 @@ function isLactatingAdult(an){
   return !isDry(an) && (getMilkKg(an) > 0 || getDIM(an) > 0 || hasCalvedBefore(an));
 }
 function isSucklingGroup(an, sp){
-  const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && m >= 0 && m <= c.sucklingMax;
+  return isInfantGroup(an);
 }
 function isWeanedGroup(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && m > c.sucklingMax && m <= c.weanedMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m >= c.sucklingMax && m <= c.weanedMax;
 }
 function isGrowingGroup(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && m > c.weanedMax && m <= c.growingMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m > c.weanedMax && m <= c.growingMax;
 }
 function isHeiferAge(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && m >= c.heiferMin && m <= c.heiferMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m >= c.heiferMin && m <= c.heiferMax;
 }
 function isMatureOpenNonLactating(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
@@ -1017,13 +1123,11 @@ function ensureSettingsUI(){
   cowRow.id = 'cowExtraThresholds';
   cowRow.style.marginTop = '8px';
   cowRow.innerHTML = `
-    <label>رضيع أبقار حتى <input type="number" id="cowSucklingMax" min="0" step="1"> شهر</label>
-    <label>فطام أبقار حتى <input type="number" id="cowWeanedMax" min="0" step="1"> شهر</label>
-    <label>نامي أبقار حتى <input type="number" id="cowGrowingMax" min="0" step="1"> شهر</label>
-    <label>بداية العجلات أبقار <input type="number" id="cowHeiferMin" min="0" step="1"> شهر</label>
-    <label>نهاية العجلات أبقار <input type="number" id="cowHeiferMax" min="0" step="1"> شهر</label>
-    <label>انتظار الولادة أبقار <input type="number" id="cowCloseUpDays" min="0" step="1"> يوم</label>
-  `;
+  <label>بداية الفطام أبقار <input type="number" id="cowSucklingMax" min="0" step="1"> شهر</label>
+  <label>نهاية الفطام / بداية نامي أبقار <input type="number" id="cowWeanedMax" min="0" step="1"> شهر</label>
+  <label>نهاية نامي / بداية تحت التلقيح أبقار <input type="number" id="cowGrowingMax" min="0" step="1"> شهر</label>
+  <label>انتظار الولادة أبقار <input type="number" id="cowCloseUpDays" min="0" step="1"> يوم</label>
+`;
 
   const bufRow = document.createElement('div');
   bufRow.className = 'row';
@@ -1031,13 +1135,11 @@ function ensureSettingsUI(){
   bufRow.style.display = 'none';
   bufRow.style.marginTop = '8px';
   bufRow.innerHTML = `
-    <label>رضيع جاموس حتى <input type="number" id="bufSucklingMax" min="0" step="1"> شهر</label>
-    <label>فطام جاموس حتى <input type="number" id="bufWeanedMax" min="0" step="1"> شهر</label>
-    <label>نامي جاموس حتى <input type="number" id="bufGrowingMax" min="0" step="1"> شهر</label>
-    <label>بداية العجلات جاموس <input type="number" id="bufHeiferMin" min="0" step="1"> شهر</label>
-    <label>نهاية العجلات جاموس <input type="number" id="bufHeiferMax" min="0" step="1"> شهر</label>
-    <label>انتظار الولادة جاموس <input type="number" id="bufCloseUpDays" min="0" step="1"> يوم</label>
-  `;
+  <label>بداية الفطام جاموس <input type="number" id="bufSucklingMax" min="0" step="1"> شهر</label>
+  <label>نهاية الفطام / بداية نامي جاموس <input type="number" id="bufWeanedMax" min="0" step="1"> شهر</label>
+  <label>نهاية نامي / بداية تحت التلقيح جاموس <input type="number" id="bufGrowingMax" min="0" step="1"> شهر</label>
+  <label>انتظار الولادة جاموس <input type="number" id="bufCloseUpDays" min="0" step="1"> يوم</label>
+`;
 
   const saveRow = $('#saveSettings')?.closest('.row');
   if (saveRow) {
@@ -1051,7 +1153,7 @@ function ensureSettingsUI(){
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.style.marginTop = '6px';
-  hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. الحلاب بالإنتاج، الصغار بالعمر، والعجلات بالعمر + الحالة التناسلية.';
+ hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. الذكور في مجموعة مستقلة، والرضيع يظل رضيعًا حتى تسجيل حدث فطام، ثم تُطبّق الرينجات العمرية والحالة التناسلية.';
   $('#settings')?.appendChild(hint);
 }
 
@@ -1148,14 +1250,15 @@ function splitGroups(applyQuery = true){
     const milk = getMilkKg(an);
     const c = ageCfg(sp);
 
-    g[pref+'all'].push(an);
-    if(hasDisease(an)) g[pref+'hospital'].push(an);
+  g[pref+'all'].push(an);
 
- if (isLactatingAdult(an) && hasCalvedBefore(an)) {
-  if (isFresh(an)) g[pref+'fresh'].push(an);
+if (isMale(an)) {
+  g[pref+'males'].push(an);
+  continue;
+}
 
+if (isLactatingAdult(an) && hasCalvedBefore(an)) {
   const band = milkBand(an, milk);
-
   if (band === 'high') {
     g[pref+'high'].push(an);
     continue;
@@ -1174,35 +1277,38 @@ function splitGroups(applyQuery = true){
   continue;
 }
 
-    if (isPregnant(an)) {
-      if (hasCalvedBefore(an)) {
-        if (isCloseUp(an, sp)) g[pref+'closeup'].push(an);
-        else g[pref+'dry'].push(an);
-      } else {
-        if (isCloseUp(an, sp)) g[pref+'heiferCloseup'].push(an);
-        else g[pref+'pregHeifers'].push(an);
-      }
-      continue;
-    }
+   if (isInfantGroup(an)) {
+  g[pref+'suckling'].push(an);
+  continue;
+}
 
-    if (isSucklingGroup(an, sp)) { g[pref+'suckling'].push(an); continue; }
-    if (isWeanedGroup(an, sp))   { g[pref+'weaned'].push(an); continue; }
-    if (isGrowingGroup(an, sp))  { g[pref+'growing'].push(an); continue; }
+if (isPregnant(an)) {
+  if (isCloseUp(an, sp)) {
+    g[pref+'closeup'].push(an);
+  } else if (hasCalvedBefore(an)) {
+    g[pref+'dry'].push(an);
+  } else {
+    g[pref+'pregHeifers'].push(an);
+  }
+  continue;
+}
 
-    if (isHeiferAge(an, sp)) {
-      if (isBreedingStatus(an)) g[pref+'breeding'].push(an);
-      else g[pref+'heiferOpen'].push(an);
-      continue;
-    }
+if (isWeanedGroup(an, sp))  { g[pref+'weaned'].push(an); continue; }
+if (isGrowingGroup(an, sp)) { g[pref+'growing'].push(an); continue; }
 
-    if (isMatureOpenNonLactating(an, sp)) {
-      g[pref+'heiferOpen'].push(an);
-      continue;
-    }
+if (!hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && isBreedingStatus(an)) {
+  g[pref+'breeding'].push(an);
+  continue;
+}
 
-    if (isDry(an) && hasCalvedBefore(an)) {
-      g[pref+'dry'].push(an);
-    }
+if (!hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && m > c.growingMax) {
+  g[pref+'heiferOpen'].push(an);
+  continue;
+}
+
+if (isDry(an) && hasCalvedBefore(an)) {
+  g[pref+'dry'].push(an);
+}
   }
 
   return g;
@@ -1508,7 +1614,8 @@ async function loadAnimals(){
       .filter(shouldAppearInGroups);
 
     state.animals = [...animals, ...calves];
-    state.groupsCache = null;
+await enrichLifecycleFromEvents(state.animals);
+state.groupsCache = null;
   } catch (e) {
     console.warn('groups load err', e);
     state.animals = [];
