@@ -113,6 +113,60 @@ function requireUserId(req, res, next){
   req.userId = t;
   next();
 }
+function eventTextSrv(e = {}) {
+  return [
+    e?.type,
+    e?.eventType,
+    e?.name,
+    e?.kind,
+    e?.eventTypeNorm
+  ].map(v => String(v || '').trim().toLowerCase()).join(' ');
+}
+
+function isWeaningEventSrv(e = {}) {
+  const txt = eventTextSrv(e);
+  return txt.includes('فطام') || txt.includes('weaning') || txt.includes('weaned');
+}
+
+function isCloseUpEventSrv(e = {}) {
+  const txt = eventTextSrv(e);
+  return txt.includes('انتظار الولادة') || txt.includes('close up') || txt.includes('closeup');
+}
+
+function isMilkEventSrv(e = {}) {
+  const txt = eventTextSrv(e);
+  return (
+    txt.includes('daily_milk') ||
+    txt.includes('لبن يومي') ||
+    txt.includes('milk') ||
+    txt.includes('milk report')
+  );
+}
+
+function numSrv(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function getEventMsSrv(e = {}) {
+  const d =
+    toDate(e?.eventDate) ||
+    toDate(e?.date) ||
+    toDate(e?.createdAt) ||
+    toDate(e?.timestamp);
+  return d ? d.getTime() : 0;
+}
+
+function eventAnimalKeySrv(e = {}) {
+  return String(
+    e?.animalNumber ??
+    e?.number ??
+    e?.calfNumber ??
+    e?.animalId ??
+    e?.animalID ??
+    ''
+  ).trim();
+}
 // ============================================================
 //                  DIM: Daily updater (server-side)
 // ============================================================
@@ -2270,7 +2324,97 @@ app.post('/api/admin/events/normalize', ensureAdmin, async (req, res) => {
     });
   }
 });
+// ============================================================
+//                 API: GROUPS EVENTS ENRICH
+// ============================================================
+app.post('/api/groups/events-enrich', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
 
+    const tenant = req.userId;
+    const animalNumbers = Array.isArray(req.body?.animalNumbers)
+      ? req.body.animalNumbers.map(x => String(x).trim()).filter(Boolean)
+      : [];
+
+    if (!animalNumbers.length) {
+      return res.json({ ok:true, enrichments:{} });
+    }
+
+    const wanted = new Set(animalNumbers);
+    const enrichments = {};
+
+    let snap;
+    try {
+      snap = await db.collection('events')
+        .where('userId', '==', tenant)
+        .orderBy('eventDate', 'desc')
+        .limit(3000)
+        .get();
+    } catch (_) {
+      snap = await db.collection('events')
+        .where('userId', '==', tenant)
+        .limit(3000)
+        .get();
+    }
+
+    snap.forEach(ds => {
+      const e = ds.data() || {};
+      const key = eventAnimalKeySrv(e);
+      if (!key || !wanted.has(key)) return;
+
+      if (!enrichments[key]) {
+        enrichments[key] = {
+          hasWeaningEvent: false,
+          firstWeaningDate: null,
+          hasCloseUpEvent: false,
+          lastCloseUpDate: null,
+          lastMilkKg: null,
+          latestMilkDate: null
+        };
+      }
+
+      const row = enrichments[key];
+      const ms = getEventMsSrv(e);
+
+      if (isWeaningEventSrv(e)) {
+        const curr = row.firstWeaningDate ? new Date(row.firstWeaningDate).getTime() : null;
+        if (!curr || (ms && ms < curr)) {
+          row.hasWeaningEvent = true;
+          row.firstWeaningDate = ms ? new Date(ms).toISOString() : row.firstWeaningDate;
+        }
+      }
+
+      if (isCloseUpEventSrv(e)) {
+        const curr = row.lastCloseUpDate ? new Date(row.lastCloseUpDate).getTime() : null;
+        if (!curr || (ms && ms > curr)) {
+          row.hasCloseUpEvent = true;
+          row.lastCloseUpDate = ms ? new Date(ms).toISOString() : row.lastCloseUpDate;
+        }
+      }
+
+      if (isMilkEventSrv(e)) {
+        const milkKg = numSrv(
+          e?.milkKg ??
+          e?.dailyMilk ??
+          e?.milk ??
+          e?.yield ??
+          e?.kg
+        );
+
+        const curr = row.latestMilkDate ? new Date(row.latestMilkDate).getTime() : null;
+        if (!curr || (ms && ms > curr)) {
+          row.lastMilkKg = milkKg;
+          row.latestMilkDate = ms ? new Date(ms).toISOString() : row.latestMilkDate;
+        }
+      }
+    });
+
+    return res.json({ ok:true, enrichments });
+  } catch (e) {
+    console.error('groups.events-enrich', e);
+    return res.status(500).json({ ok:false, error:'groups_events_enrich_failed' });
+  }
+});
 // ============================================================
 //                       API: GROUPS SETTINGS
 // ============================================================
