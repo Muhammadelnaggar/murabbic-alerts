@@ -1425,6 +1425,39 @@ async function loadAnimalsFromFirestore(){
     return [];
   }
 }
+  function shouldAppearInGroups(a){
+  const txt = [
+    a?.status,
+    a?.animalStatus,
+    a?.statusAr,
+    a?.saleStatus,
+    a?.lifeStatus,
+    a?.fate,
+    a?.exitReason
+  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+
+  // flags صريحة
+  if (a?.active === false) return false;
+  if (a?.isActive === false) return false;
+  if (a?.inactive === true) return false;
+
+  // حالات تمنع الظهور
+  if (txt.includes('inactive')) return false;
+  if (txt.includes('dead')) return false;
+  if (txt.includes('sold')) return false;
+
+  if (txt.includes('نافق')) return false;
+  if (txt.includes('نفوق')) return false;
+  if (txt.includes('مباع')) return false;
+  if (txt.includes('بيع')) return false;
+  if (txt.includes('غير نشط')) return false;
+  if (txt.includes('خارج القطيع')) return false;
+
+  // ✅ لا نستبعد "مستبعد" أو breedingBlocked
+  // لأنه قد يظل يحلب ويستمر في المجموعات حتى البيع أو النفوق
+
+  return true;
+}
 async function loadAnimals(){
 
   const animalsSnap = await getDocs(
@@ -1435,20 +1468,18 @@ async function loadAnimals(){
     query(collection(db,'calves'), where('userId','==',state.userId))
   );
 
- const animals = animalsSnap.docs
+const animals = animalsSnap.docs
   .map(d => ({ id:d.id, ...d.data() }))
-  .filter(a => (a.status || 'active') === 'active');
+  .filter(shouldAppearInGroups);
 
-const calves  = calvesSnap.docs
+const calves = calvesSnap.docs
   .map(d => ({
     id:d.id,
     ...d.data(),
     animalNumber: d.data().calfNumber || d.id,
-    isCalf:true
+    isCalf: true
   }))
-  .filter(a => (a.status || 'active') === 'active');
-
-state.animals = [...animals, ...calves];
+  .filter(shouldAppearInGroups);
 
   state.animals = [...animals, ...calves];
   state.groupsCache = null;
