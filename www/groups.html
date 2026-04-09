@@ -735,7 +735,14 @@ function isWeaningEvent(e){
     txt.includes('weaned')
   );
 }
-
+function isCloseUpEvent(e){
+  const txt = eventText(e);
+  return (
+    txt.includes('انتظار الولادة') ||
+    txt.includes('close up') ||
+    txt.includes('closeup')
+  );
+}
 async function enrichLifecycleFromEvents(list){
   if(!db || !state.userId || !Array.isArray(list) || !list.length) return;
 
@@ -758,29 +765,37 @@ async function enrichLifecycleFromEvents(list){
 
     const evSnap = await getDocs(evQuery);
     const weaningMap = new Map();
+    const closeUpMap = new Map();
+   evSnap.forEach(docu => {
+  const e = docu.data();
 
-    evSnap.forEach(docu => {
-      const e = docu.data();
-      if (!isWeaningEvent(e)) return;
+  const key = String(
+    e?.animalNumber ??
+    e?.number ??
+    e?.calfNumber ??
+    e?.animalId ??
+    e?.animalID ??
+    ''
+  ).trim();
 
-      const key = String(
-        e?.animalNumber ??
-        e?.number ??
-        e?.calfNumber ??
-        e?.animalId ??
-        e?.animalID ??
-        ''
-      ).trim();
+  if (!key) return;
 
-      if (!key) return;
+  const d = getEventDate(e) || new Date(0);
 
-      const d = getEventDate(e) || new Date(0);
-      const prev = weaningMap.get(key);
+  if (isWeaningEvent(e)) {
+    const prevWean = weaningMap.get(key);
+    if (!prevWean || d < prevWean) {
+      weaningMap.set(key, d);
+    }
+  }
 
-      if (!prev || d < prev) {
-        weaningMap.set(key, d);
-      }
-    });
+  if (isCloseUpEvent(e)) {
+    const prevClose = closeUpMap.get(key);
+    if (!prevClose || d > prevClose) {
+      closeUpMap.set(key, d);
+    }
+  }
+});
 
     list.forEach(an => {
       const key = String(
@@ -791,10 +806,15 @@ async function enrichLifecycleFromEvents(list){
         ''
       ).trim();
 
-      an._hasWeaningEvent = weaningMap.has(key);
-      an._firstWeaningDate = weaningMap.has(key)
-        ? weaningMap.get(key).toISOString()
-        : null;
+     an._hasWeaningEvent = weaningMap.has(key);
+an._firstWeaningDate = weaningMap.has(key)
+  ? weaningMap.get(key).toISOString()
+  : null;
+
+an._hasCloseUpEvent = closeUpMap.has(key);
+an._lastCloseUpDate = closeUpMap.has(key)
+  ? closeUpMap.get(key).toISOString()
+  : null;
     });
 
   }catch(e){
@@ -890,7 +910,7 @@ const hasDisease = an =>
   an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
 
 function getGestationLengthDays(sp){ return sp === 'buffalo' ? 300 : 270; }
-function getCloseUpDays(sp){ return Number(sp === 'buffalo' ? state.thresholds.bufCloseUpDays : state.thresholds.cowCloseUpDays) || (sp === 'buffalo' ? 30 : 21); }
+
 function getECD(an, sp){
   return toDate(an?.expectedCalvingDate) ||
          toDate(an?.expectedDateOfCalving) ||
@@ -904,11 +924,7 @@ function getECD(an, sp){
          })();
 }
 function isCloseUp(an, sp){
-  if(!isPregnant(an)) return false;
-  const ecd = getECD(an, sp);
-  if(!ecd) return false;
-  const diff = Math.ceil((ecd - new Date()) / 86400000);
-  return diff >= 0 && diff <= getCloseUpDays(sp);
+  return !!an?._hasCloseUpEvent;
 }
 
 const FRESH_FROM = 1, FRESH_TO = 45;
@@ -950,15 +966,13 @@ function milkBand(an, milk){
 function ageCfg(sp){
   if (sp === 'buffalo') {
     return {
-      sucklingMax: Number(state.thresholds.bufSucklingMax || 2),
-      weanedMax:   Number(state.thresholds.bufWeanedMax || 5),
-      growingMax:  Number(state.thresholds.bufGrowingMax || 12)
+      weanedMax:  Number(state.thresholds.bufWeanedMax || 5),
+      growingMax: Number(state.thresholds.bufGrowingMax || 12)
     };
   }
   return {
-    sucklingMax: Number(state.thresholds.cowSucklingMax || 2),
-    weanedMax:   Number(state.thresholds.cowWeanedMax || 5),
-    growingMax:  Number(state.thresholds.cowGrowingMax || 12)
+    weanedMax:  Number(state.thresholds.cowWeanedMax || 5),
+    growingMax: Number(state.thresholds.cowGrowingMax || 12)
   };
 }
 function isLactatingAdult(an){
@@ -969,7 +983,7 @@ function isSucklingGroup(an, sp){
 }
 function isWeanedGroup(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m >= c.sucklingMax && m <= c.weanedMax;
+  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m <= c.weanedMax;
 }
 function isGrowingGroup(an, sp){
   const m = getAgeMonths(an), c = ageCfg(sp);
@@ -1058,11 +1072,9 @@ function ensureSettingsUI(){
   cowRow.className = 'row';
   cowRow.id = 'cowExtraThresholds';
   cowRow.style.marginTop = '8px';
-  cowRow.innerHTML = `
-  <label>بداية الفطام أبقار <input type="number" id="cowSucklingMax" min="0" step="1"> شهر</label>
+ cowRow.innerHTML = `
   <label>نهاية الفطام / بداية نامي أبقار <input type="number" id="cowWeanedMax" min="0" step="1"> شهر</label>
   <label>نهاية نامي / بداية تحت التلقيح أبقار <input type="number" id="cowGrowingMax" min="0" step="1"> شهر</label>
-  <label>انتظار الولادة أبقار <input type="number" id="cowCloseUpDays" min="0" step="1"> يوم</label>
 `;
 
   const bufRow = document.createElement('div');
@@ -1070,11 +1082,9 @@ function ensureSettingsUI(){
   bufRow.id = 'buffExtraThresholds';
   bufRow.style.display = 'none';
   bufRow.style.marginTop = '8px';
-  bufRow.innerHTML = `
-  <label>بداية الفطام جاموس <input type="number" id="bufSucklingMax" min="0" step="1"> شهر</label>
+bufRow.innerHTML = `
   <label>نهاية الفطام / بداية نامي جاموس <input type="number" id="bufWeanedMax" min="0" step="1"> شهر</label>
   <label>نهاية نامي / بداية تحت التلقيح جاموس <input type="number" id="bufGrowingMax" min="0" step="1"> شهر</label>
-  <label>انتظار الولادة جاموس <input type="number" id="bufCloseUpDays" min="0" step="1"> يوم</label>
 `;
 
   const saveRow = $('#saveSettings')?.closest('.row');
@@ -1113,9 +1123,9 @@ if($('#bufMedMin'))  $('#bufMedMin').value  = state.thresholds.bufMedMin;
 if($('#bufMedMax'))  $('#bufMedMax').value  = state.thresholds.bufMedMax;
 if($('#bufHighMin')) $('#bufHighMin').value = state.thresholds.bufHighMin;
 
-  const ids = [
-  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowCloseUpDays',
-  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufCloseUpDays'
+ const ids = [
+  'cowWeanedMax','cowGrowingMax',
+  'bufWeanedMax','bufGrowingMax'
 ];
 ids.forEach(id => {
   const el = $('#'+id);
@@ -1139,9 +1149,9 @@ state.thresholds.bufMedMin  = Number($('#bufMedMin')?.value  || 8);
 state.thresholds.bufMedMax  = Number($('#bufMedMax')?.value  || 11.9);
 state.thresholds.bufHighMin = Number($('#bufHighMin')?.value || 12);
 
- [
-  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowCloseUpDays',
-  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufCloseUpDays'
+[
+  'cowWeanedMax','cowGrowingMax',
+  'bufWeanedMax','bufGrowingMax'
 ].forEach(id => {
   state.thresholds[id] = Number($('#'+id)?.value || state.thresholds[id] || 0);
 });
