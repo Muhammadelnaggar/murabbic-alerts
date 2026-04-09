@@ -515,7 +515,7 @@ import {
   getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc,
   orderBy, limit, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import { apiGet, apiPost } from "/js/api.js";
 /* ============= firebase-config (ديناميكي مع fallback) ============= */
 let cfg = null;
 try {
@@ -623,22 +623,23 @@ function saveThresholdsLocal(){
 }
 async function loadThresholdsFromFirestore(){
   try{
-    if(!state.userId || !db) return;
-    const ref = doc(db, 'users', state.userId, 'settings', 'groups');
-    const ds  = await getDoc(ref);
-    if(ds.exists()){
-      const cloud = ds.data()?.thresholds || ds.data();
-      state.thresholds = { ...state.thresholds, ...cloud };
+    const res = await apiGet('/api/groups/settings');
+    if (res?.ok && res.thresholds) {
+      state.thresholds = { ...state.thresholds, ...res.thresholds };
       saveThresholdsLocal();
     }
-  }catch(e){ console.warn('thresh get err', e); }
+  }catch(e){
+    console.warn('thresh get err', e);
+  }
 }
 async function saveThresholdsToFirestore(){
   try{
-    if(!state.userId || !db) return;
-    const ref = doc(db, 'users', state.userId, 'settings', 'groups');
-    await setDoc(ref, { thresholds: state.thresholds, updatedAt: new Date().toISOString() }, { merge:true });
-  }catch(e){ console.warn('thresh save err', e); }
+    await apiPost('/api/groups/settings', {
+      thresholds: state.thresholds
+    });
+  }catch(e){
+    console.warn('thresh save err', e);
+  }
 }
 
 /* ============= تواريخ/مقاييس ============= */
@@ -1419,8 +1420,22 @@ async function syncGroupMembersToFirestore(){
   }
 }
 async function syncAllGroupsData(){
-  await syncGroupsToFirestore();
-  await syncGroupMembersToFirestore();
+  try{
+    const groupsMap = splitGroups(false);
+
+    const groups = GROUP_DEFS.map(def => buildGroupDoc(def.id, groupsMap[def.id] || []));
+
+    const members = [];
+    GROUP_DEFS.forEach(def => {
+      (groupsMap[def.id] || []).forEach(an => {
+        members.push(buildGroupMemberDoc(def.id, an));
+      });
+    });
+
+    await apiPost('/api/groups/sync', { groups, members });
+  }catch(e){
+    console.error('syncAllGroupsData error:', e);
+  }
 }
 
 /* ============= تحميل الحيوانات ============= */
