@@ -2406,6 +2406,30 @@ app.post('/api/groups/sync', requireUserId, async (req, res) => {
     return res.status(500).json({ ok:false, error:'groups_sync_failed' });
   }
 });
+app.get('/api/calves', requireUserId, async (req, res) => {
+  try {
+    const tenant = req.userId;
+
+    if (db) {
+      const snap = await db.collection('calves')
+        .where('userId', '==', tenant)
+        .limit(2000)
+        .get();
+
+      const calves = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+
+      return res.json({ ok: true, calves });
+    }
+
+    return res.json({ ok: true, calves: [] });
+  } catch (e) {
+    console.error('calves api error:', e);
+    return res.status(500).json({ ok:false, error:'calves_failed' });
+  }
+});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
