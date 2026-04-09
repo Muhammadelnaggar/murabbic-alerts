@@ -510,6 +510,7 @@ header{
 <script type="module">
 /* ============= Firebase SDK ============= */
 import { getApps, initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";  
 import {
   getFirestore, collection, getDocs, query, where, setDoc, doc, getDoc,
   orderBy, limit, writeBatch, serverTimestamp
@@ -527,12 +528,16 @@ try {
 
 const app = getApps().length ? getApp() : (cfg ? initializeApp(cfg) : null);
 let db = null;
-try {
-  if (app) db = getFirestore(app, "murabbikdata");
-} catch (e) {
-  console.warn("getFirestore failed; REST will be used as fallback.", e);
-}
+let auth = null;
 
+try {
+  if (app) {
+    db = getFirestore(app, "murabbikdata");
+    auth = getAuth(app);
+  }
+} catch (e) {
+  console.warn("Firebase init failed; REST will be used as fallback.", e);
+}
 /* ============= أدوات سريعة ============= */
 const $  = (s,p=document)=>p.querySelector(s);
 const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
@@ -1056,10 +1061,15 @@ if($('#bufMedMax'))  $('#bufMedMax').value  = state.thresholds.bufMedMax;
 if($('#bufHighMin')) $('#bufHighMin').value = state.thresholds.bufHighMin;
 
   const ids = [
-    'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
-    'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
-  ];
-  ids.forEach(id => { if($('#'+id)) $('#'+id).value = state.thresholds[id]; });
+  'cowSucklingMax','cowWeanedMax','cowGrowingMax','cowHeiferMin','cowHeiferMax','cowCloseUpDays',
+  'bufSucklingMax','bufWeanedMax','bufGrowingMax','bufHeiferMin','bufHeiferMax','bufCloseUpDays'
+];
+ids.forEach(id => {
+  const el = $('#'+id);
+  if (!el) return;
+  const v = state.thresholds[id];
+  el.value = (v === undefined || v === null) ? '' : v;
+});
 }
 
 function readSettingsFromUI(){
@@ -1527,10 +1537,35 @@ window.dataLayer.push({event:'page_view', page:'/groups.html'});
 (async function start(){
   ensureSettingsUI();
   ensureDynamicGroupsUI();
+async function waitForFirebaseAuth(timeoutMs = 6000){
+  if (!auth) return null;
+  if (auth.currentUser?.uid) return auth.currentUser.uid;
 
-  await waitForUserId();
-  try{ await loadThresholdsFromFirestore(); }catch{}
-  syncSettingsUIFromState();
+  return await new Promise((resolve) => {
+    let done = false;
+
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      try { unsub && unsub(); } catch(_) {}
+      resolve(null);
+    }, timeoutMs);
+
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (done) return;
+      if (!u?.uid) return;
+      done = true;
+      clearTimeout(timer);
+      try { unsub && unsub(); } catch(_) {}
+      resolve(u.uid);
+    });
+  });
+}
+ await waitForUserId();
+await waitForFirebaseAuth();
+
+try { await loadThresholdsFromFirestore(); } catch (e) { console.warn('thresh get err', e); }
+syncSettingsUIFromState();
 
  buildSpeciesTabs();
 buildChips();
