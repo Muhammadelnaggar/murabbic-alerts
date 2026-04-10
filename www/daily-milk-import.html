@@ -356,7 +356,7 @@
 102, 10, 9, 8
 103, 6, 5"></textarea>
      <div class="hint">
-  يمكنك رفع CSV أو TXT أو Excel مباشرة. الصيغ المقبولة: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. كما يمكن للصفحة قراءة ملفات فيها أعمدة إضافية وهيدر مثل رقم الحيوان / الإجمالي / الحلبات.
+  يمكنك رفع CSV أو TXT أو Excel مباشرة. عند رفع Excel سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ثم يقرأ الأعمدة ويجهز المعاينة للحفظ.
 </div>
       </div>
 
@@ -494,6 +494,7 @@ let previewData = [];
 let fileTextCache = '';
 let parsedLinesCache = [];
 let detectedHeaderParts = null;
+let selectedSheetName = '';
 
     function getUserId(){
       return (
@@ -741,32 +742,114 @@ function sheetRowsToText(rows){
     .join('\n');
 }
 
-async function readExcelFileAsText(file){
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type:'array' });
+function scoreSheetRows(rows){
+  if (!Array.isArray(rows) || !rows.length) return 0;
 
-  const firstSheetName = workbook.SheetNames?.[0];
-  if (!firstSheetName){
-    throw new Error('EMPTY_WORKBOOK');
+  let score = 0;
+  let headerParts = null;
+  let headerMap = null;
+  let dataLikeRows = 0;
+  let validAnimalRows = 0;
+  let milkLikeRows = 0;
+
+  const sampleRows = rows.slice(0, 60);
+
+  for (const row of sampleRows){
+    const parts = (Array.isArray(row) ? row : []).map(v => String(v ?? '').trim());
+    const joined = parts.join(' , ').trim();
+    if (!joined) continue;
+
+    if (!headerParts && looksLikeHeader(joined)){
+      headerParts = parts.slice();
+      headerMap = detectColumnMap(headerParts);
+
+      score += 10;
+
+      if (headerMap.animalIdx >= 0) score += 20;
+      if (headerMap.totalIdx >= 0) score += 18;
+      if (headerMap.s1Idx >= 0) score += 10;
+      if (headerMap.s2Idx >= 0) score += 10;
+      if (headerMap.s3Idx >= 0) score += 10;
+
+      continue;
+    }
+
+    if (headerMap && headerMap.animalIdx >= 0){
+      const animalNo = normAnimalNo(parts[headerMap.animalIdx] || '');
+      const totalVal = headerMap.totalIdx >= 0 ? numFromCell(parts[headerMap.totalIdx]) : null;
+      const v1 = headerMap.s1Idx >= 0 ? numFromCell(parts[headerMap.s1Idx]) : null;
+      const v2 = headerMap.s2Idx >= 0 ? numFromCell(parts[headerMap.s2Idx]) : null;
+      const v3 = headerMap.s3Idx >= 0 ? numFromCell(parts[headerMap.s3Idx]) : null;
+      const sessionVals = [v1, v2, v3].filter(v => v !== null && v >= 0);
+
+      if (animalNo) validAnimalRows++;
+      if ((totalVal !== null && totalVal > 0) || sessionVals.length >= 1) milkLikeRows++;
+      if (animalNo && ((totalVal !== null && totalVal > 0) || sessionVals.length >= 1)) dataLikeRows++;
+    } else {
+      const animalNo = normAnimalNo(parts[0] || '');
+      const nums = extractMilkNumbers(parts);
+
+      if (animalNo) validAnimalRows++;
+      if (nums.length) milkLikeRows++;
+      if (animalNo && nums.length) dataLikeRows++;
+    }
   }
 
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet){
-    throw new Error('EMPTY_SHEET');
-  }
+  score += Math.min(validAnimalRows, 20) * 2;
+  score += Math.min(milkLikeRows, 20) * 2;
+  score += Math.min(dataLikeRows, 20) * 4;
 
-  const rows = XLSX.utils.sheet_to_json(sheet, {
+  return score;
+}
+
+function workbookSheetToRows(workbook, sheetName){
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) return [];
+  return XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
     blankrows: false,
     raw: false
   });
+}
 
-  if (!rows || !rows.length){
-    throw new Error('NO_ROWS');
+function pickBestSheet(workbook){
+  const names = workbook.SheetNames || [];
+  if (!names.length) return { sheetName:'', rows:[] };
+
+  let best = {
+    sheetName: names[0],
+    rows: workbookSheetToRows(workbook, names[0]),
+    score: -1
+  };
+
+  for (const name of names){
+    const rows = workbookSheetToRows(workbook, name);
+    const score = scoreSheetRows(rows);
+
+    if (score > best.score){
+      best = { sheetName:name, rows, score };
+    }
   }
 
-  return sheetRowsToText(rows);
+  return { sheetName: best.sheetName, rows: best.rows };
+}
+
+async function readExcelFileAsText(file){
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type:'array' });
+
+  if (!workbook.SheetNames?.length){
+    throw new Error('EMPTY_WORKBOOK');
+  }
+
+  const picked = pickBestSheet(workbook);
+  if (!picked.sheetName || !picked.rows?.length){
+    throw new Error('NO_VALID_SHEET');
+  }
+
+  selectedSheetName = picked.sheetName;
+  return sheetRowsToText(picked.rows);
 }
 function parseRawText(text){
   const lines = String(text || '')
@@ -1194,7 +1277,7 @@ if (looksLikeHeader(line)){
       showBar('err', 'تعذر حفظ السجلات الآن.');
     }
 
-   function clearAll(){
+  function clearAll(){
   hideBar();
   batchInput.value = '';
   fileInput.value = '';
@@ -1202,6 +1285,7 @@ if (looksLikeHeader(line)){
   previewData = [];
   parsedLinesCache = [];
   detectedHeaderParts = null;
+  selectedSheetName = '';
   hideColumnMap();
   renderPreview([]);
 }
@@ -1226,9 +1310,14 @@ if (looksLikeHeader(line)){
       text = await f.text();
     }
 
-    fileTextCache = text;
-    batchInput.value = text;
-    showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
+fileTextCache = text;
+batchInput.value = text;
+
+if (isExcelFile(f) && selectedSheetName){
+  showBar('ok', `تم تحميل ملف المحلب وقراءة ورقة البيانات تلقائيًا: ${selectedSheetName}`);
+} else {
+  showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
+}
   }catch(err){
     console.error(err);
     fileTextCache = '';
