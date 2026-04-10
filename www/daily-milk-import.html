@@ -341,59 +341,26 @@
       <div id="sysbar" class="infobar"></div>
 
       <h1 class="title">استيراد اللبن اليومي</h1>
-      <div class="muted">استيراد مباشر إلى سجلات اللبن اليومية داخل مُرَبِّيك</div>
+            <div class="muted">استيراد اللبن من المحلب — يمكنك لصق بيانات المحلب أو تحميل ملفه</div>
 
-      <div class="row" style="margin-top:12px">
-        <div class="col">
+          <div class="row" style="margin-top:12px">
+        <div class="col" style="min-width:100%">
           <label for="eventDate">تاريخ اليوم</label>
           <input id="eventDate" type="date" />
         </div>
-
-        <div class="col">
-          <label for="importSource">مصدر الإدخال</label>
-          <select id="importSource">
-            <option value="batch">إدخال باتش</option>
-            <option value="file">رفع ملف</option>
-            <option value="parlor">المحلب</option>
-          </select>
-        </div>
       </div>
 
-      <div class="tabs">
-        <button type="button" class="tab-btn active" data-tab="batchPane">إدخال باتش</button>
-        <button type="button" class="tab-btn" data-tab="filePane">رفع ملف</button>
-        <button type="button" class="tab-btn" data-tab="parlorPane">المحلب</button>
-      </div>
-
-      <div id="batchPane" class="tab-pane active">
-        <label for="batchInput">ألصق البيانات هنا</label>
-        <textarea id="batchInput" placeholder="مثال:
-101, 8, 7, 6
+      <div id="batchPane" class="tab-pane active" style="display:block">
+        <label for="batchInput">ألصق بيانات المحلب هنا</label>
+        <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
         <div class="hint">
-          الصيغة المدعومة الآن: رقم الحيوان ثم 2 أو 3 حلبات<br>
-          مثال: <b>101, 8, 7, 6</b> أو <b>205, 5, 4</b>
+          يمكنك لصق بيانات المحلب كما هي أو تحميل ملف المحلب، وسيتم التعامل معهما بنفس الطريقة
         </div>
       </div>
 
-      <div id="filePane" class="tab-pane">
-        <label for="fileInput">ارفع ملف CSV أو TXT</label>
-        <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" />
-        <div class="hint">
-          أول عمود = رقم الحيوان، ثم 2 أو 3 حلبات في نفس السطر.
-        </div>
-      </div>
-
-      <div id="parlorPane" class="tab-pane">
-        <div class="card" style="margin:0;padding:14px;background:#f8fafc">
-          <div style="font-weight:900;color:#0b7f47;margin-bottom:6px">ربط المحلب</div>
-          <div class="muted">
-            هذا القسم جاهز شكليًا الآن داخل صفحة الاستيراد، وسنربطه لاحقًا بملف أو API المحلب حسب النظام المتاح في المزرعة.
-          </div>
-        </div>
-      </div>
-
+      <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" />
       <div class="btn-row">
         <button type="button" id="previewBtn" class="btn btn-primary">معاينة البيانات</button>
         <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
@@ -436,7 +403,7 @@
       </div>
 
       <div class="btn-row">
-        <button type="button" id="saveBtn" class="btn btn-primary btn-block">حفظ الاستيراد مباشرة</button>
+        <button type="button" id="saveBtn" class="btn btn-primary btn-block">حفظ بيانات المحلب</button>
       </div>
     </div>
   </div>
@@ -457,7 +424,7 @@
     const $ = (id) => document.getElementById(id);
 
     const eventDate = $('eventDate');
-    const importSource = $('importSource');
+   
     const batchInput = $('batchInput');
     const fileInput = $('fileInput');
     const previewBtn = $('previewBtn');
@@ -471,10 +438,6 @@
     const kpiValid = $('kpiValid');
     const kpiInvalid = $('kpiInvalid');
     const kpiMilk = $('kpiMilk');
-
-    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
-    const panes = Array.from(document.querySelectorAll('.tab-pane'));
-
     const firebaseConfig =
       firebaseCfg.default ||
       firebaseCfg.firebaseConfig ||
@@ -714,18 +677,12 @@
         return;
       }
 
-    const raw = String(batchInput.value || '').trim();
+      const raw = String(batchInput.value || '').trim();
 
-if (!raw){
-  showBar('warn', 'ألصق بيانات الباتش أو ارفع ملفًا أولًا.');
-  return;
-}
-
-if (importSource.value === 'parlor'){
-  showBar('warn', 'ربط المحلب سيُفعّل لاحقًا. استخدم الباتش أو الملف الآن.');
-  return;
-}
-
+      if (!raw){
+        showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
+        return;
+      }
       let rows = parseRawText(raw);
 
       if (!rows.length){
@@ -844,44 +801,29 @@ if (importSource.value === 'parlor'){
       renderPreview([]);
     }
 
-    function switchTab(tabId){
-      tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
-      panes.forEach(p => p.classList.toggle('active', p.id === tabId));
 
-      if (tabId === 'batchPane') importSource.value = 'batch';
-      if (tabId === 'filePane') importSource.value = 'file';
-      if (tabId === 'parlorPane') importSource.value = 'parlor';
-    }
-
-    tabs.forEach(btn => {
-      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      loadFileBtn.addEventListener('click', () => {
+      fileInput.click();
     });
 
-    importSource.addEventListener('change', () => {
-      if (importSource.value === 'batch') switchTab('batchPane');
-      if (importSource.value === 'file') switchTab('filePane');
-      if (importSource.value === 'parlor') switchTab('parlorPane');
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      if (!f){
+        fileTextCache = '';
+        return;
+      }
+
+      try{
+        const text = await f.text();
+        fileTextCache = text;
+        batchInput.value = text;
+        showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
+      }catch(err){
+        console.error(err);
+        fileTextCache = '';
+        showBar('err', 'تعذر قراءة ملف المحلب.');
+      }
     });
-
-   fileInput.addEventListener('change', async (e) => {
-  const f = e.target.files?.[0];
-  if (!f){
-    fileTextCache = '';
-    return;
-  }
-
-  try{
-    const text = await f.text();
-    fileTextCache = text;
-    batchInput.value = text;
-    showBar('ok', `تم تحميل الملف ووضعه داخل الباتش: ${f.name}`);
-  }catch(err){
-    console.error(err);
-    fileTextCache = '';
-    showBar('err', 'تعذر قراءة الملف.');
-  }
-});
-
     previewBtn.addEventListener('click', makePreview);
     clearBtn.addEventListener('click', clearAll);
     saveBtn.addEventListener('click', saveAll);
