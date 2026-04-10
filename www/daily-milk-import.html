@@ -355,8 +355,8 @@
         <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
-     <div class="hint">
-  يمكنك رفع CSV أو TXT أو Excel مباشرة. عند رفع Excel سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ثم يقرأ الأعمدة ويجهز المعاينة للحفظ.
+    <div class="hint">
+  يمكنك رفع CSV أو TXT أو Excel مباشرة. سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ثم يقرأ الأعمدة ويجهز المعاينة للحفظ، ولن يظهر التعيين اليدوي إلا عند الحاجة فقط.
 </div>
       </div>
 
@@ -726,6 +726,60 @@ function buildManualMap(){
     s2Idx: Number(mapS2.value),
     s3Idx: Number(mapS3.value)
   };
+}
+    function isGoodAutoMap(colMap){
+  if (!colMap) return false;
+  if (colMap.animalIdx < 0) return false;
+  if (colMap.totalIdx >= 0) return true;
+
+  const sessionsCount =
+    (colMap.s1Idx >= 0 ? 1 : 0) +
+    (colMap.s2Idx >= 0 ? 1 : 0) +
+    (colMap.s3Idx >= 0 ? 1 : 0);
+
+  return sessionsCount >= 2;
+}
+
+function applyPreviewRows(rows, options = {}){
+  const {
+    autoLoaded = false,
+    sourceLabel = ''
+  } = options;
+
+  if (!rows.length){
+    previewData = [];
+    renderPreview([]);
+    hideColumnMap();
+    showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
+    return;
+  }
+
+  previewData = rows;
+  renderPreview(rows);
+
+  const autoMap = detectedHeaderParts?.length
+    ? detectColumnMap(detectedHeaderParts)
+    : null;
+
+  if (detectedHeaderParts?.length && !isGoodAutoMap(autoMap)){
+    showColumnMap(detectedHeaderParts, autoMap);
+  } else {
+    hideColumnMap();
+  }
+
+  const validCount = rows.filter(x => x.valid).length;
+
+  if (!validCount){
+    showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
+    return;
+  }
+
+  if (autoLoaded && sourceLabel){
+    showBar('ok', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز للحفظ.`);
+    return;
+  }
+
+  showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
 }
     function isExcelFile(file){
   const name = String(file?.name || '').toLowerCase();
@@ -1146,43 +1200,22 @@ if (looksLikeHeader(line)){
     }
 
     async function makePreview(){
-      hideBar();
+  hideBar();
 
-      const date = String(eventDate.value || '').trim();
-      if (!date){
-        showBar('warn', 'اختر تاريخ اليوم أولًا.');
-        return;
-      }
-
-      const raw = String(batchInput.value || '').trim();
-
-      if (!raw){
-        showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
-        return;
-      }
-      let rows = parseRawText(raw);
-
-      if (!rows.length){
-        showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
-        renderPreview([]);
-        previewData = [];
-        return;
-      }
-      previewData = rows;
-      renderPreview(rows);
-
-      if (detectedHeaderParts && detectedHeaderParts.length){
-  showColumnMap(detectedHeaderParts, detectColumnMap(detectedHeaderParts));
-} else {
-  hideColumnMap();
+const date = String(eventDate.value || '').trim();
+if (!date){
+  showBar('warn', 'اختر تاريخ اليوم أولًا.');
+  return;
 }
 
-      const validCount = rows.filter(x => x.valid).length;
-      if (validCount){
-        showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
-      } else {
-        showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
-      }
+const raw = String(batchInput.value || '').trim();
+if (!raw){
+  showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
+  return;
+}
+
+const rows = parseRawText(raw);
+applyPreviewRows(rows);
     }
 
     async function saveAll(){
@@ -1313,10 +1346,24 @@ if (looksLikeHeader(line)){
 fileTextCache = text;
 batchInput.value = text;
 
+const date = String(eventDate.value || '').trim();
+if (!date){
+  showBar('warn', 'تم تحميل الملف. اختر تاريخ اليوم ثم ستتم المعاينة.');
+  return;
+}
+
+const rows = parseRawText(text);
+
 if (isExcelFile(f) && selectedSheetName){
-  showBar('ok', `تم تحميل ملف المحلب وقراءة ورقة البيانات تلقائيًا: ${selectedSheetName}`);
+  applyPreviewRows(rows, {
+    autoLoaded: true,
+    sourceLabel: `ملف Excel — ${selectedSheetName}`
+  });
 } else {
-  showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
+  applyPreviewRows(rows, {
+    autoLoaded: true,
+    sourceLabel: f.name
+  });
 }
   }catch(err){
     console.error(err);
@@ -1340,6 +1387,7 @@ applyMapBtn.addEventListener('click', () => {
 
   previewData = rows;
   renderPreview(rows);
+  hideColumnMap();
 
   const validCount = rows.filter(x => x.valid).length;
   if (validCount){
@@ -1348,7 +1396,6 @@ applyMapBtn.addEventListener('click', () => {
     showBar('warn', 'بعد تعيين الأعمدة لا توجد صفوف صحيحة جاهزة للحفظ.');
   }
 });
-
 saveBtn.addEventListener('click', saveAll);
     const qs = new URLSearchParams(location.search);
     const rawDate = String(qs.get('eventDate') || qs.get('date') || '').trim();
