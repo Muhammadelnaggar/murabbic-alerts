@@ -418,8 +418,7 @@
     import * as firebaseCfg from '/js/firebase-config.js';
     import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import {
-      getFirestore, collection, addDoc, serverTimestamp,
-      query, where, getDocs, limit
+            getFirestore, collection, addDoc, serverTimestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const $ = (id) => document.getElementById(id);
@@ -552,93 +551,21 @@
         const s3 = nums[2] || 0;
         const total = s1 + s2 + s3;
 
-        out.push({
+               out.push({
           raw: line,
           animalNumber,
           s1, s2, s3,
           total,
           valid: true,
           reason: '',
-          kind: '',
-          species: '',
-          animalDoc: null
+          kind: (nums.length === 2 ? 'buffalo' : 'cow'),
+          species: (nums.length === 2 ? 'جاموس' : 'أبقار')
         });
       }
 
       return out;
     }
 
-    async function loadAnimalsIndex(numbers){
-      const uid = getUserId();
-      if (!uid) throw new Error('no_user');
-
-      const uniq = [...new Set(numbers.map(normAnimalNo).filter(Boolean))];
-      const index = new Map();
-
-      const q1 = query(
-        collection(db, 'animals'),
-        where('userId', '==', uid),
-        limit(5000)
-      );
-
-      const snap = await getDocs(q1);
-      snap.forEach(doc => {
-        const d = doc.data() || {};
-        const n = normAnimalNo(d.animalNumber);
-        if (n) index.set(n, { id: doc.id, data: d });
-      });
-
-      return uniq.reduce((acc, n) => {
-        acc.set(n, index.get(n) || null);
-        return acc;
-      }, new Map());
-    }
-
-    function normalizeSpecies(sp){
-      const s = String(sp || '').trim();
-      if (/buffalo|جاموس/i.test(s)) return 'جاموس';
-      if (/cow|بقر|أبقار/i.test(s)) return 'أبقار';
-      return '';
-    }
-
-    function applyAnimalMatch(rows, matchMap){
-      return rows.map(row => {
-        if (!row.valid) return row;
-
-        const hit = matchMap.get(row.animalNumber);
-        if (!hit){
-          row.valid = false;
-          row.reason = 'الحيوان غير موجود';
-          return row;
-        }
-
-        const d = hit.data || {};
-        const sp = normalizeSpecies(d.species || d.animalTypeAr || d.animalType || '');
-        row.species = sp || 'أبقار';
-        row.kind = (row.species === 'جاموس') ? 'buffalo' : 'cow';
-        row.animalDoc = { ...d, animalId: hit.id };
-
-        if (row.kind === 'buffalo'){
-          if (row.s3 > 0){
-            row.valid = false;
-            row.reason = 'الجاموس يجب أن يكون بحلبتين فقط';
-            return row;
-          }
-        } else {
-          if (row.s1 <= 0 || row.s2 <= 0){
-            row.valid = false;
-            row.reason = 'بيانات اللبن غير مكتملة';
-            return row;
-          }
-        }
-
-        row.total = row.kind === 'buffalo'
-          ? (row.s1 + row.s2)
-          : (row.s1 + row.s2 + row.s3);
-
-        return row;
-      });
-    }
 
     function renderPreview(rows){
       previewRows.innerHTML = rows.map(row => {
@@ -693,22 +620,14 @@
         previewData = [];
         return;
       }
+      previewData = rows;
+      renderPreview(rows);
 
-      try{
-        const matchMap = await loadAnimalsIndex(rows.map(x => x.animalNumber));
-        rows = applyAnimalMatch(rows, matchMap);
-        previewData = rows;
-        renderPreview(rows);
-
-        const validCount = rows.filter(x => x.valid).length;
-        if (validCount){
-          showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
-        } else {
-          showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
-        }
-      }catch(err){
-        console.error(err);
-        showBar('err', 'تعذر تجهيز المعاينة الآن.');
+      const validCount = rows.filter(x => x.valid).length;
+      if (validCount){
+        showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
+      } else {
+        showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
       }
     }
 
