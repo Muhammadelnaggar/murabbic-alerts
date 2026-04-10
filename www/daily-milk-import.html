@@ -361,10 +361,11 @@
       </div>
 
       <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" />
-      <div class="btn-row">
-        <button type="button" id="previewBtn" class="btn btn-primary">معاينة البيانات</button>
-        <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
-      </div>
+     <div class="btn-row">
+  <button type="button" id="loadFileBtn" class="btn btn-ghost">تحميل ملف المحلب</button>
+  <button type="button" id="previewBtn" class="btn btn-primary">معاينة</button>
+  <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
+</div>
 
       <div class="kpi" id="kpiBar">
         <div class="box">
@@ -423,10 +424,11 @@
 
     const $ = (id) => document.getElementById(id);
 
-    const eventDate = $('eventDate');
-   
+   const eventDate = $('eventDate');
+
     const batchInput = $('batchInput');
     const fileInput = $('fileInput');
+    const loadFileBtn = $('loadFileBtn');
     const previewBtn = $('previewBtn');
     const clearBtn = $('clearBtn');
     const saveBtn = $('saveBtn');
