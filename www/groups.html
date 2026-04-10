@@ -1167,10 +1167,11 @@ function bindAnimalPanelClose(root){
   root?.querySelector('[data-close-animal]')?.addEventListener('click', () => {
     state.selectedAnimalId = null;
     hideAnimalPop();
-    const panel = $('#animalPanel');
+    const panel = root;
     if (panel) {
       panel.hidden = true;
       panel.innerHTML = '';
+      panel.closest('.barn-wrap')?.querySelectorAll('.animal-dot.is-selected').forEach(x => x.classList.remove('is-selected'));
     }
   });
 }
@@ -1178,22 +1179,23 @@ function bindAnimalPanelClose(root){
 function scrollToAnimalPanel(panel){
   if (!panel) return;
   requestAnimationFrame(() => {
+    const y = panel.getBoundingClientRect().top + window.scrollY - 88;
     try {
-      panel.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'nearest' });
+      window.scrollTo({ top: Math.max(0, y), behavior:'smooth' });
     } catch (_) {
-      panel.scrollIntoView();
+      window.scrollTo(0, Math.max(0, y));
     }
   });
 }
 
-function showAnimalPanel(an){
+function showAnimalPanel(an, panelEl = null, opts = {}){
   state.selectedAnimalId = String(an?.animalNumber || an?.number || an?.id || '');
-  const panel = $('#animalPanel');
+  const panel = panelEl || $('#animalPanel');
   if (!panel) return;
   panel.innerHTML = animalSummaryHTML(an);
   panel.hidden = false;
   bindAnimalPanelClose(panel);
-  scrollToAnimalPanel(panel);
+  if (opts.scroll !== false) scrollToAnimalPanel(panel);
 }
 
 function hideAnimalPop(){
@@ -1223,7 +1225,7 @@ function showAnimalPop(an, el){
   }
 }
 
-function createAnimalDot(an){
+function createAnimalDot(an, panel){
   const core = getAnimalCore(an);
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -1234,13 +1236,12 @@ function createAnimalDot(an){
   btn.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
-    showAnimalPanel(an);
+    panel.hidden = false;
+    showAnimalPanel(an, panel, { scroll:true });
     hideAnimalPop();
+    panel.closest('.barn-wrap')?.querySelectorAll('.animal-dot.is-selected').forEach(x => x.classList.remove('is-selected'));
+    btn.classList.add('is-selected');
   });
-  btn.addEventListener('touchstart', () => {
-    showAnimalPanel(an);
-    hideAnimalPop();
-  }, { passive:true });
   btn.addEventListener('mouseenter', () => {
     if (window.innerWidth >= 860) showAnimalPop(an, btn);
   });
@@ -1263,15 +1264,20 @@ function renderBarn(list, groupId){
     <div class="animal-panel" id="animalPanel" hidden></div>
   `;
   const grid = wrap.querySelector('#barnGrid');
+  const panel = wrap.querySelector('#animalPanel');
   if (!list.length) {
     grid.outerHTML = `<div class="barn-empty">لا عناصر في هذه المجموعة الآن</div>`;
     return wrap;
   }
-  list.forEach(an => grid.appendChild(createAnimalDot(an)));
+  list.forEach(an => grid.appendChild(createAnimalDot(an, panel)));
 
   if (state.selectedAnimalId) {
     const selected = list.find(an => String(an?.animalNumber || an?.number || an?.id || '') === state.selectedAnimalId);
-    if (selected) showAnimalPanel(selected);
+    if (selected) {
+      showAnimalPanel(selected, panel, { scroll:false });
+      const selectedBtn = wrap.querySelector(`.animal-dot[data-animal-id="${CSS.escape(state.selectedAnimalId)}"]`);
+      if (selectedBtn) selectedBtn.classList.add('is-selected');
+    }
   }
   return wrap;
 }
