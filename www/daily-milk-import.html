@@ -355,8 +355,8 @@
         <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
-    <div class="hint">
-  يمكنك رفع CSV أو TXT أو Excel مباشرة. سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ثم يقرأ الأعمدة ويجهز المعاينة للحفظ، ولن يظهر التعيين اليدوي إلا عند الحاجة فقط.
+   <div class="hint">
+  يمكنك رفع CSV أو TXT أو Excel مباشرة. سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ويحاول فهم الأعمدة حتى لو كانت عناوينها مختلفة، ثم يجهز المعاينة للحفظ. ولن يظهر التعيين اليدوي إلا عند الحاجة فقط.
 </div>
       </div>
 
@@ -549,6 +549,7 @@ function makeDailyMilkDocId(uid, animalNumber, eventDate){
 function looksLikeHeader(line){
   const s = latinDigits(String(line || '').trim().toLowerCase());
   if (!s) return false;
+
   return (
     s.includes('animal') ||
     s.includes('cow') ||
@@ -556,11 +557,21 @@ function looksLikeHeader(line){
     s.includes('number') ||
     s.includes('no') ||
     s.includes('tag') ||
+    s.includes('ear tag') ||
+    s.includes('id') ||
     s.includes('milk') ||
     s.includes('yield') ||
+    s.includes('qty') ||
+    s.includes('quantity') ||
     s.includes('session') ||
+    s.includes('milking') ||
+    s.includes('morning') ||
+    s.includes('evening') ||
+    s.includes('night') ||
     s.includes('parlor') ||
     s.includes('total') ||
+    s.includes('kg') ||
+    s.includes('production') ||
     s.includes('رقم') ||
     s.includes('الحيوان') ||
     s.includes('لبن') ||
@@ -591,10 +602,12 @@ function extractMilkNumbers(parts){
   }
   return nums;
 }
-    function normalizeHeaderCell(v){
+function normalizeHeaderCell(v){
   return latinDigits(String(v || '').trim().toLowerCase())
-    .replace(/\s+/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\//g, ' ')
     .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -609,77 +622,58 @@ function detectColumnMap(headerParts){
 
   const cells = headerParts.map(normalizeHeaderCell);
 
+  const animalHints = [
+    'رقم الحيوان','رقم','الحيوان','animal no','animal number','animal id',
+    'cow no','cow id','buffalo id','tag','tag no','tag number','ear tag',
+    'id','animal'
+  ];
+
+  const totalHints = [
+    'اجمالي','إجمالي','total','milk total','yield total','yield',
+    'qty','quantity','kg','milk kg','total milk','daily milk','production'
+  ];
+
+  const s1Hints = [
+    'حلبة 1','الحلبة 1','session 1','milking 1','morning','am',
+    'morning milk','1st milking','milk 1','shift 1'
+  ];
+
+  const s2Hints = [
+    'حلبة 2','الحلبة 2','session 2','milking 2','evening','pm',
+    'evening milk','2nd milking','milk 2','shift 2'
+  ];
+
+  const s3Hints = [
+    'حلبة 3','الحلبة 3','session 3','milking 3','night',
+    'night milk','3rd milking','milk 3','shift 3'
+  ];
+
+  function matchAny(cell, hints){
+    return hints.some(h => cell === h || cell.includes(h));
+  }
+
   cells.forEach((c, i) => {
-    if (
-      map.animalIdx < 0 &&
-      (
-        c.includes('رقم الحيوان') ||
-        c === 'رقم' ||
-        c.includes('animal no') ||
-        c.includes('animal number') ||
-        c.includes('cow no') ||
-        c.includes('tag') ||
-        c === 'no'
-      )
-    ){
+    if (map.animalIdx < 0 && matchAny(c, animalHints)){
       map.animalIdx = i;
       return;
     }
 
-    if (
-      map.totalIdx < 0 &&
-      (
-        c.includes('اجمالي') ||
-        c.includes('إجمالي') ||
-        c.includes('total') ||
-        c.includes('milk total') ||
-        c.includes('yield total')
-      )
-    ){
+    if (map.totalIdx < 0 && matchAny(c, totalHints)){
       map.totalIdx = i;
       return;
     }
 
-    if (
-      map.s1Idx < 0 &&
-      (
-        c.includes('حلبة 1') ||
-        c.includes('الحلبة 1') ||
-        c.includes('session 1') ||
-        c.includes('milking 1') ||
-        c.includes('morning') ||
-        c.includes('am')
-      )
-    ){
+    if (map.s1Idx < 0 && matchAny(c, s1Hints)){
       map.s1Idx = i;
       return;
     }
 
-    if (
-      map.s2Idx < 0 &&
-      (
-        c.includes('حلبة 2') ||
-        c.includes('الحلبة 2') ||
-        c.includes('session 2') ||
-        c.includes('milking 2') ||
-        c.includes('evening') ||
-        c.includes('pm')
-      )
-    ){
+    if (map.s2Idx < 0 && matchAny(c, s2Hints)){
       map.s2Idx = i;
       return;
     }
 
-    if (
-      map.s3Idx < 0 &&
-      (
-        c.includes('حلبة 3') ||
-        c.includes('الحلبة 3') ||
-        c.includes('session 3') ||
-        c.includes('milking 3') ||
-        c.includes('night')
-      )
-    ){
+    if (map.s3Idx < 0 && matchAny(c, s3Hints)){
       map.s3Idx = i;
       return;
     }
@@ -687,7 +681,6 @@ function detectColumnMap(headerParts){
 
   return map;
 }
-
 function numFromCell(v){
   const n = parseFloat(String(v || '').trim().replace(',', '.'));
   return Number.isFinite(n) ? n : null;
