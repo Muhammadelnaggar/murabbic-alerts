@@ -124,6 +124,39 @@ header{
   border-color:var(--mbk-green);
   box-shadow:0 0 0 3px rgba(14,160,90,.10);
 }
+
+.group-summary{
+  margin-top:10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  background:#fff;
+  border:1px solid var(--mbk-border);
+  border-radius:16px;
+}
+
+.group-summary-name{
+  font-size:14px;
+  font-weight:900;
+  color:var(--mbk-green-dark);
+}
+
+.group-summary-count{
+  min-width:42px;
+  height:32px;
+  padding:0 12px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--mbk-soft);
+  border:1px solid var(--mbk-border);
+  color:var(--mbk-green-dark);
+  font-weight:900;
+  font-size:14px;
+}
     .species-tabs{
   display:flex;
   gap:8px;
@@ -259,47 +292,188 @@ header{
     .list.show{display:block}
     .list .empty{padding:20px;background:#fff;border:1px dashed var(--border);border-radius:12px;color:#777;text-align:center}
 
-    /* بطاقات */
-    .grid{display:grid;grid-template-columns:1fr;gap:10px}
-    @media(min-width:680px){ .grid{grid-template-columns:1fr 1fr} }
-    @media(min-width:980px){ .grid{grid-template-columns:1fr 1fr 1fr} }
-   .card{
-  background:var(--mbk-card);
+    /* مخطط الحظيرة + بطاقة الحيوان المختصرة */
+.barn-wrap{
+  position:relative;
+  background:#fff;
   border:1px solid var(--mbk-border);
-  border-radius:20px;
-  padding:14px;
+  border-radius:22px;
+  padding:12px;
   box-shadow:0 2px 10px rgba(0,0,0,.04);
 }
 
-.card h3{
-  margin:0 0 10px;
-  font-size:17px;
+.barn-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.barn-title{
+  font-size:14px;
+  font-weight:900;
   color:var(--mbk-green-dark);
+}
+
+.barn-note{
+  font-size:12px;
+  color:#728277;
+}
+
+.barn-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(58px,1fr));
+  gap:8px;
+}
+
+.animal-dot{
+  min-height:58px;
+  border-radius:18px;
+  border:1px solid var(--mbk-border);
+  background:var(--mbk-soft);
+  color:var(--mbk-text);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:13px;
+  font-weight:900;
+  padding:6px 4px;
+  line-height:1.1;
+  cursor:pointer;
+  position:relative;
+}
+
+.animal-dot small{
+  display:block;
+  font-size:10px;
+  font-weight:700;
+  color:#6f7d73;
+  margin-top:2px;
+}
+
+.animal-dot.is-high{ background:#eef8f0; border-color:#bfe0c8; }
+.animal-dot.is-med{ background:#f7f8ed; border-color:#dde0bf; }
+.animal-dot.is-low{ background:#fbf4e9; border-color:#ead7b8; }
+.animal-dot.is-dry{ background:#f4f4f4; border-color:#d8d8d8; }
+.animal-dot.is-preg{ box-shadow: inset 0 0 0 2px rgba(14,160,90,.14); }
+.animal-dot.is-selected{
+  border-color:var(--mbk-green);
+  box-shadow:0 0 0 3px rgba(14,160,90,.12);
+}
+
+.barn-empty{
+  padding:18px;
+  text-align:center;
+  color:#6f7d73;
+  border:1px dashed var(--mbk-border);
+  border-radius:18px;
+  background:#fff;
+}
+
+.animal-panel{
+  margin-top:12px;
+  background:#fff;
+  border:1px solid var(--mbk-border);
+  border-radius:20px;
+  padding:12px;
+}
+
+.animal-panel[hidden], .animal-pop[hidden]{ display:none !important; }
+
+.animal-panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.animal-panel-title{
+  font-size:16px;
+  font-weight:900;
+  color:var(--mbk-green-dark);
+}
+
+.animal-panel-badges{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+
+.mini-badge{
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid var(--mbk-border);
+  background:var(--mbk-soft);
+  font-size:12px;
+  font-weight:800;
+}
+
+.animal-mini-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.animal-mini-item{
+  background:#fff;
+  border:1px solid var(--mbk-border);
+  border-radius:14px;
+  padding:8px 10px;
+}
+
+.animal-mini-label{
+  display:block;
+  font-size:11px;
+  color:#728277;
+  font-weight:700;
+  margin-bottom:2px;
+}
+
+.animal-mini-value{
+  display:block;
+  font-size:14px;
+  color:var(--mbk-text);
   font-weight:900;
 }
 
-.meta{
-  display:flex;
-  flex-wrap:wrap;
+.animal-panel-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
   gap:8px;
-  font-size:13px;
 }
 
-.tag{
-  background:var(--mbk-soft);
-  border:1px solid var(--mbk-border);
-  border-radius:999px;
-  padding:5px 9px;
+.animal-panel-actions .btn{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
 }
 
-.pill{
-  display:inline-block;
-  font-size:11px;
-  padding:3px 8px;
-  border-radius:999px;
-  border:1px solid var(--mbk-border);
+.animal-pop{
+  position:fixed;
+  inset:auto 12px 86px 12px;
+  z-index:60;
   background:#fff;
-  color:#333;
+  border:1px solid var(--mbk-border);
+  border-radius:20px;
+  box-shadow:0 10px 28px rgba(0,0,0,.12);
+  padding:12px;
+}
+
+@media(min-width:860px){
+  .animal-pop{
+    position:absolute;
+    inset:auto;
+    min-width:260px;
+    max-width:300px;
+    pointer-events:none;
+  }
 }
 
     /* زر عودة للموبايل */
@@ -414,6 +588,10 @@ header{
 <div class="group-picker" id="groupPickerWrap">
   <label for="groupSelect" class="group-picker-label">اختر المجموعة</label>
   <select id="groupSelect" class="group-select"></select>
+  <div class="group-summary" id="groupSummary" aria-live="polite">
+    <span class="group-summary-name" id="groupSummaryName">كل الأبقار</span>
+    <span class="group-summary-count" id="groupSummaryCount">0</span>
+  </div>
 </div>
     <section class="group-sec" id="sec-all">
   <div class="group-head" data-id="all">
@@ -460,6 +638,8 @@ header{
  
 
   </main>
+
+  <div class="animal-pop" id="animalPop" hidden></div>
 
   <!-- زر عودة عريض للموبايل -->
   <div class="mobile-footer">
@@ -516,6 +696,13 @@ const GROUP_DEFS = [
   { id:'buffalo_pregHeifers', species:'buffalo', baseKey:'pregHeifers', label:'عجلات عشار جاموس',        feedingEligible:true  }
 ];
 const GROUP_DEF_BY_ID = Object.fromEntries(GROUP_DEFS.map(x => [x.id, x]));
+function shortGroupLabel(def){
+  return String(def?.label || '')
+    .replace(/^أبقار\s*/, '')
+    .replace(/^جاموس\s*/, '')
+    .replace(/\s+أبقار$/, '')
+    .replace(/\s+جاموس$/, '');
+}
 const LEGACY_SECTION_IDS = [
   'sec-all','sec-fresh','sec-high','sec-med','sec-low','sec-dry',
   'sec-suckling','sec-weaned','sec-growing','sec-breeding','sec-pregHeifers','sec-hospital'
@@ -527,7 +714,8 @@ const state = {
   userId: null,
   thresholds: loadThresholds(),
   currentGroup: null,
-  viewSpecies: 'cow'
+  viewSpecies: 'cow',
+  selectedAnimalId: null
 };
 
 /* ============= انتظار userId ============= */
@@ -908,55 +1096,164 @@ function normalize(an){
   return n;
 }
 
-/* ============= بطاقات ============= */
-function card(an){
+/* ============= عرض الحظيرة + بطاقة مختصرة ============= */
+function getAnimalCore(an){
   const milk = getMilkKg(an);
   const dim = getDIM(an);
   const ageM = getAgeMonths(an);
-  const band = milkBand(an, milk);
-  const birthDateText = getBirthDateText(an);
   const sexText = getSexText(an);
   const young = isYoungStock(an);
+  const id = String(an?.animalNumber || an?.number || an?.id || '');
+  const sp = isBuffalo(an) ? 'جاموس' : 'أبقار';
+  const status = isPregnant(an) ? 'عشار' : (isDry(an) ? 'جاف' : (young ? sexText : 'حلاب'));
+  const band = milkBand(an, milk);
+  return { milk, dim, ageM, sexText, young, id, sp, status, band };
+}
 
-  const tags = [];
-  tags.push(isBuffalo(an) ? 'جاموس' : 'أبقار');
+function dotClass(an){
+  const core = getAnimalCore(an);
+  const cls = ['animal-dot'];
+  if (core.band === 'high') cls.push('is-high');
+  else if (core.band === 'med') cls.push('is-med');
+  else if (core.band === 'low') cls.push('is-low');
+  if (isDry(an)) cls.push('is-dry');
+  if (isPregnant(an)) cls.push('is-preg');
+  if (state.selectedAnimalId && state.selectedAnimalId === core.id) cls.push('is-selected');
+  return cls.join(' ');
+}
 
-  if (young) {
-    tags.push(`الجنس: ${sexText}`);
-    tags.push(`الميلاد: ${birthDateText}`);
-    tags.push(`العمر: ${ageM} شهر`);
-  } else {
-    tags.push(`لبن: ${milk.toFixed(1)} كجم/يوم`);
-    tags.push(`DIM: ${dim}`);
-    if (ageM > 0) tags.push(`العمر: ${ageM} شهر`);
-  }
+function animalSummaryHTML(an){
+  const core = getAnimalCore(an);
+  const title = core.young
+    ? (core.sexText === 'ذكر' ? `عجل رقم ${core.id}` : `عجلة رقم ${core.id}`)
+    : `حيوان رقم ${core.id}`;
 
-  if (isPregnant(an)) tags.push('عشار');
-  if (isDry(an)) tags.push('جاف');
-  if (an?.bcs) tags.push('BCS ' + an.bcs);
-  if (an?.breed) tags.push(an.breed);
+  const badges = [core.sp, core.status];
+  if (an?.breed) badges.push(String(an.breed));
+  if (core.band) badges.push(core.band === 'high' ? 'عالي' : core.band === 'med' ? 'متوسط' : 'منخفض');
 
-  const id = (an?.animalNumber || an?.number || an?.id || '').toString();
+  const rows = core.young
+    ? [
+        ['الجنس', core.sexText],
+        ['العمر', `${core.ageM} شهر`],
+        ['الميلاد', getBirthDateText(an)],
+        ['النوع', core.sp]
+      ]
+    : [
+        ['اللبن', `${core.milk.toFixed(1)} كجم/يوم`],
+        ['DIM', String(core.dim)],
+        ['الحالة', core.status],
+        ['النوع', core.sp]
+      ];
 
-  let titleText = `حيوان رقم ${id}`;
-  if (young) {
-    if (sexText === 'ذكر') titleText = `عجل رقم ${id}`;
-    else if (sexText === 'أنثى') titleText = `عجلة رقم ${id}`;
-  }
-
-  const el = document.createElement('div');
-  el.className = 'card';
-  el.innerHTML = `
-    <h3>${titleText} <span class="pill">${young ? 'young' : band}</span></h3>
-    <div class="meta">
-      ${tags.map(t => `<span class="tag">${t}</span>`).join('')}
+  const date = new Date().toISOString().slice(0,10);
+  return `
+    <div class="animal-panel-head">
+      <div class="animal-panel-title">${title}</div>
+      <button type="button" class="btn" data-close-animal style="min-height:36px;padding:6px 10px">إغلاق</button>
     </div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <a class="btn" href="/cow-card.html?number=${encodeURIComponent(id)}&date=${new Date().toISOString().slice(0,10)}">البطاقة</a>
-      <a class="btn" href="/add-event.html?number=${encodeURIComponent(id)}&date=${new Date().toISOString().slice(0,10)}">حدث جديد</a>
+    <div class="animal-panel-badges">${badges.map(x => `<span class="mini-badge">${x}</span>`).join('')}</div>
+    <div class="animal-mini-grid">
+      ${rows.map(([k,v]) => `<div class="animal-mini-item"><span class="animal-mini-label">${k}</span><span class="animal-mini-value">${v}</span></div>`).join('')}
+    </div>
+    <div class="animal-panel-actions">
+      <a class="btn" href="/cow-card.html?number=${encodeURIComponent(core.id)}&date=${date}">البطاقة</a>
+      <a class="btn" href="/add-event.html?number=${encodeURIComponent(core.id)}&date=${date}">حدث جديد</a>
     </div>
   `;
-  return el;
+}
+
+function bindAnimalPanelClose(root){
+  root?.querySelector('[data-close-animal]')?.addEventListener('click', () => {
+    state.selectedAnimalId = null;
+    hideAnimalPop();
+    const panel = $('#animalPanel');
+    if (panel) panel.hidden = true;
+    refreshCurrentView();
+  });
+}
+
+function showAnimalPanel(an){
+  state.selectedAnimalId = String(an?.animalNumber || an?.number || an?.id || '');
+  const panel = $('#animalPanel');
+  if (!panel) return;
+  panel.innerHTML = animalSummaryHTML(an);
+  panel.hidden = false;
+  bindAnimalPanelClose(panel);
+}
+
+function hideAnimalPop(){
+  const pop = $('#animalPop');
+  if (!pop) return;
+  pop.hidden = true;
+  pop.innerHTML = '';
+  pop.style.left = '';
+  pop.style.top = '';
+}
+
+function showAnimalPop(an, el){
+  const pop = $('#animalPop');
+  if (!pop) return;
+  pop.innerHTML = animalSummaryHTML(an);
+  pop.hidden = false;
+  bindAnimalPanelClose(pop);
+
+  if (window.innerWidth >= 860 && el) {
+    const wrap = el.closest('.barn-wrap');
+    const er = el.getBoundingClientRect();
+    const wr = wrap?.getBoundingClientRect();
+    if (wr) {
+      pop.style.left = `${Math.max(8, er.left - wr.left - 8)}px`;
+      pop.style.top = `${Math.max(8, er.bottom - wr.top + 8)}px`;
+    }
+  }
+}
+
+function createAnimalDot(an){
+  const core = getAnimalCore(an);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = dotClass(an);
+  btn.setAttribute('data-animal-id', core.id);
+  btn.innerHTML = `<span>${core.id}</span>${core.young ? `<small>${core.sexText}</small>` : `<small>${core.milk > 0 ? core.milk.toFixed(0)+'ك' : core.status}</small>`}`;
+
+  btn.addEventListener('click', () => {
+    showAnimalPanel(an);
+    refreshCurrentView();
+  });
+  btn.addEventListener('mouseenter', () => {
+    if (window.innerWidth >= 860) showAnimalPop(an, btn);
+  });
+  btn.addEventListener('mouseleave', () => {
+    if (window.innerWidth >= 860) hideAnimalPop();
+  });
+  return btn;
+}
+
+function renderBarn(list, groupId){
+  const def = GROUP_DEF_BY_ID[groupId];
+  const wrap = document.createElement('div');
+  wrap.className = 'barn-wrap';
+  wrap.innerHTML = `
+    <div class="barn-head">
+      <div class="barn-title">${shortGroupLabel(def)} — ${list.length} رأس</div>
+      <div class="barn-note">كل نقطة = حيوان</div>
+    </div>
+    <div class="barn-grid" id="barnGrid"></div>
+    <div class="animal-panel" id="animalPanel" hidden></div>
+  `;
+  const grid = wrap.querySelector('#barnGrid');
+  if (!list.length) {
+    grid.outerHTML = `<div class="barn-empty">لا عناصر في هذه المجموعة الآن</div>`;
+    return wrap;
+  }
+  list.forEach(an => grid.appendChild(createAnimalDot(an)));
+
+  if (state.selectedAnimalId) {
+    const selected = list.find(an => String(an?.animalNumber || an?.number || an?.id || '') === state.selectedAnimalId);
+    if (selected) showAnimalPanel(selected);
+  }
+  return wrap;
 }
 /* ============= واجهة الإعدادات الديناميكية ============= */
 function ensureSettingsUI(){
@@ -1155,6 +1452,15 @@ if (isDry(an) && hasCalvedBefore(an)) {
 }
 
 /* ============= عدادات + عرض ============= */
+function updateSelectedGroupSummary(id){
+  const def = GROUP_DEF_BY_ID[id];
+  const counts = state.groupsCache || splitGroups();
+  const count = (counts[id] || []).length;
+  const nameEl = $('#groupSummaryName');
+  const countEl = $('#groupSummaryCount');
+  if (nameEl) nameEl.textContent = shortGroupLabel(def) || 'المجموعة';
+  if (countEl) countEl.textContent = String(count);
+}
 function updateCounters(){
   const g = state.groupsCache || splitGroups();
   state.groupsCache = g;
@@ -1162,6 +1468,13 @@ function updateCounters(){
     const el = $('#c-'+def.id);
     if (el) el.textContent = (g[def.id] || []).length;
   });
+  const sel = $('#groupSelect');
+  if (sel) {
+    const current = state.currentGroup;
+    buildGroupSelect();
+    if (current) sel.value = current;
+  }
+  if (state.currentGroup) updateSelectedGroupSummary(state.currentGroup);
 }
 function renderSelected(id){
   const g = state.groupsCache || splitGroups();
@@ -1170,26 +1483,18 @@ function renderSelected(id){
   const list = $('#list-'+id);
   if (!list) return;
   list.innerHTML='';
-
-  if(!map.length){
-    list.innerHTML = `<div class="empty">لا عناصر في هذه المجموعة الآن</div>`;
-  } else {
-    const grid=document.createElement('div');
-    grid.className='grid';
-    map.forEach(an=>grid.appendChild(card(an)));
-    list.appendChild(grid);
-  }
+  list.appendChild(renderBarn(map, id));
 
   $$('.group-sec').forEach(s=>s.classList.remove('show'));
-$$('.list').forEach(l=>l.classList.remove('show'));
+  $$('.list').forEach(l=>l.classList.remove('show'));
 
-const sec = document.getElementById('sec-'+id);
-if(sec) sec.classList.add('show');
+  const sec = document.getElementById('sec-'+id);
+  if(sec) sec.classList.add('show');
 
-list.classList.add('show');
+  list.classList.add('show');
 
-const head = sec?.querySelector('.group-head');
-if (head) head.style.display = 'none';
+  const head = sec?.querySelector('.group-head');
+  if (head) head.style.display = 'none';
 }
  function buildSpeciesTabs(){
   const host = $('#speciesTabs');
@@ -1220,13 +1525,11 @@ function buildGroupSelect(){
 
   const defs = GROUP_DEFS.filter(def => def.species === state.viewSpecies);
 
+  const counts = state.groupsCache || splitGroups(false);
   sel.innerHTML = defs.map(def => {
-    const label = def.label
-      .replace(/^أبقار\s*/, '')
-      .replace(/^جاموس\s*/, '')
-      .replace(/\s+أبقار$/, '')
-      .replace(/\s+جاموس$/, '');
-    return `<option value="${def.id}">${label}</option>`;
+    const label = shortGroupLabel(def);
+    const count = (counts[def.id] || []).length;
+    return `<option value="${def.id}">${label} (${count})</option>`;
   }).join('');
 
   if (state.currentGroup && defs.some(d => d.id === state.currentGroup)) {
@@ -1235,6 +1538,8 @@ function buildGroupSelect(){
     state.currentGroup = defs[0].id;
     sel.value = defs[0].id;
   }
+
+  updateSelectedGroupSummary(state.currentGroup);
 
   sel.onchange = () => {
     state.currentGroup = sel.value;
