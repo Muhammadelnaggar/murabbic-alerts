@@ -355,8 +355,8 @@
         <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
-   <div class="hint">
-  يمكنك رفع CSV أو TXT أو Excel مباشرة. سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ويحاول فهم الأعمدة حتى لو كانت عناوينها مختلفة، ثم يجهز المعاينة للحفظ. ولن يظهر التعيين اليدوي إلا عند الحاجة فقط.
+  <div class="hint">
+  يمكنك رفع CSV أو TXT أو Excel مباشرة. سيبحث مُرَبِّيك تلقائيًا عن ورقة بيانات اللبن الأنسب، ويحاول فهم الأعمدة حتى لو كانت عناوينها مختلفة، ثم يراجع أرقام الحيوانات مع قاعدة مربيك ويجهز المعاينة للحفظ. ولن يظهر التعيين اليدوي إلا عند الحاجة فقط.
 </div>
       </div>
 
@@ -449,12 +449,16 @@
   <script type="module">
     import * as firebaseCfg from '/js/firebase-config.js';
     import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import {
+   import {
   getFirestore,
   collection,
   doc,
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+  limit
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const $ = (id) => document.getElementById(id);
@@ -495,6 +499,7 @@ let fileTextCache = '';
 let parsedLinesCache = [];
 let detectedHeaderParts = null;
 let selectedSheetName = '';
+let existingAnimalSet = new Set();
 
     function getUserId(){
       return (
@@ -732,23 +737,99 @@ function buildManualMap(){
 
   return sessionsCount >= 2;
 }
+async function loadUserAnimalNumbers(uid){
+  const out = new Set();
 
-function applyPreviewRows(rows, options = {}){
+  const q1 = query(
+    collection(db, 'animals'),
+    where('userId', '==', uid),
+    limit(5000)
+  );
+
+  const snap1 = await getDocs(q1);
+  snap1.forEach(docSnap => {
+    const d = docSnap.data() || {};
+    const n = normAnimalNo(d.animalNumber ?? d.number ?? d.tagNumber ?? '');
+    if (n) out.add(n);
+  });
+
+  if (!out.size){
+    try{
+      const q2 = query(
+        collection(db, 'animals'),
+        where('ownerUid', '==', uid),
+        limit(5000)
+      );
+
+      const snap2 = await getDocs(q2);
+      snap2.forEach(docSnap => {
+        const d = docSnap.data() || {};
+        const n = normAnimalNo(d.animalNumber ?? d.number ?? d.tagNumber ?? '');
+        if (n) out.add(n);
+      });
+    }catch(_){}
+  }
+
+  existingAnimalSet = out;
+  return out;
+}
+
+function validateRowsAgainstAnimals(rows){
+  const animalSet = existingAnimalSet || new Set();
+
+  return rows.map(row => {
+    if (!row.valid) return row;
+
+    const n = normAnimalNo(row.animalNumber || '');
+    if (!n || !animalSet.has(n)){
+      return {
+        ...row,
+        valid: false,
+        reason: 'رقم الحيوان غير موجود في مربيك'
+      };
+    }
+
+    return row;
+  });
+}
+async function applyPreviewRows(rows, options = {}){
   const {
     autoLoaded = false,
     sourceLabel = ''
   } = options;
 
-  if (!rows.length){
-    previewData = [];
-    renderPreview([]);
-    hideColumnMap();
-    showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
-    return;
-  }
+ if (!rows.length){
+  previewData = [];
+  renderPreview([]);
+  hideColumnMap();
+  showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
+  return;
+}
 
-  previewData = rows;
-  renderPreview(rows);
+const uid = getUserId();
+if (!uid){
+  previewData = [];
+  renderPreview([]);
+  hideColumnMap();
+  showBar('err', 'تعذر تحديد المستخدم الحالي.');
+  return;
+}
+
+try{
+  await loadUserAnimalNumbers(uid);
+}catch(err){
+  console.error(err);
+  previewData = [];
+  renderPreview([]);
+  hideColumnMap();
+  showBar('err', 'تعذر تحميل قائمة الحيوانات من مربيك.');
+  return;
+}
+
+const checkedRows = validateRowsAgainstAnimals(rows);
+
+previewData = checkedRows;
+renderPreview(checkedRows);
 
   const autoMap = detectedHeaderParts?.length
     ? detectColumnMap(detectedHeaderParts)
@@ -760,19 +841,28 @@ function applyPreviewRows(rows, options = {}){
     hideColumnMap();
   }
 
-  const validCount = rows.filter(x => x.valid).length;
+  const validCount = checkedRows.filter(x => x.valid).length;
+const invalidCount = checkedRows.length - validCount;
 
   if (!validCount){
     showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
     return;
   }
 
-  if (autoLoaded && sourceLabel){
+if (autoLoaded && sourceLabel){
+  if (invalidCount > 0){
+    showBar('warn', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز و${invalidCount} صف مرفوض.`);
+  } else {
     showBar('ok', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز للحفظ.`);
-    return;
   }
+  return;
+}
 
+if (invalidCount > 0){
+  showBar('warn', `تمت المعاينة — ${validCount} صف جاهز و${invalidCount} صف مرفوض.`);
+} else {
   showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
+}
 }
     function isExcelFile(file){
   const name = String(file?.name || '').toLowerCase();
@@ -1208,7 +1298,7 @@ if (!raw){
 }
 
 const rows = parseRawText(raw);
-applyPreviewRows(rows);
+await applyPreviewRows(rows);
     }
 
     async function saveAll(){
@@ -1348,12 +1438,12 @@ if (!date){
 const rows = parseRawText(text);
 
 if (isExcelFile(f) && selectedSheetName){
-  applyPreviewRows(rows, {
+  await applyPreviewRows(rows, {
     autoLoaded: true,
     sourceLabel: `ملف Excel — ${selectedSheetName}`
   });
 } else {
-  applyPreviewRows(rows, {
+  await applyPreviewRows(rows, {
     autoLoaded: true,
     sourceLabel: f.name
   });
@@ -1368,7 +1458,7 @@ if (isExcelFile(f) && selectedSheetName){
 previewBtn.addEventListener('click', makePreview);
 clearBtn.addEventListener('click', clearAll);
 
-applyMapBtn.addEventListener('click', () => {
+applyMapBtn.addEventListener('click', async () => {
   const raw = String(batchInput.value || '').trim();
   if (!raw){
     showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
@@ -1378,16 +1468,8 @@ applyMapBtn.addEventListener('click', () => {
   const manualMap = buildManualMap();
   const rows = parseWithManualMap(raw, manualMap);
 
-  previewData = rows;
-  renderPreview(rows);
   hideColumnMap();
-
-  const validCount = rows.filter(x => x.valid).length;
-  if (validCount){
-    showBar('ok', `تم تطبيق تعيين الأعمدة — ${validCount} صف جاهز للحفظ.`);
-  } else {
-    showBar('warn', 'بعد تعيين الأعمدة لا توجد صفوف صحيحة جاهزة للحفظ.');
-  }
+  await applyPreviewRows(rows);
 });
 saveBtn.addEventListener('click', saveAll);
     const qs = new URLSearchParams(location.search);
