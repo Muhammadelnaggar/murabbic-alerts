@@ -355,9 +355,9 @@
         <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
-        <div class="hint">
-          يمكنك لصق بيانات المحلب كما هي أو تحميل ملف المحلب، وسيتم التعامل معهما بنفس الطريقة
-        </div>
+      <div class="hint">
+  الصيغ المقبولة حاليًا: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. ويمكن أن يكون الملف CSV أو TXT أو مفصولًا بفاصلة أو فاصلة منقوطة أو Tab.
+</div>
       </div>
 
       <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" />
@@ -494,92 +494,178 @@
       return Number.isFinite(n) ? n : 0;
     }
 
-    function normAnimalNo(v){
-      return latinDigits(String(v || '')).replace(/[^\d]/g,'').trim();
-    }
-    function makeDailyMilkDocId(uid, animalNumber, eventDate){
+  function normAnimalNo(v){
+  return latinDigits(String(v || '')).replace(/[^\d]/g,'').trim();
+}
+
+function makeDailyMilkDocId(uid, animalNumber, eventDate){
   const u = String(uid || '').trim();
   const n = normAnimalNo(animalNumber);
   const d = String(eventDate || '').trim();
   return `daily_milk__${u}__${n}__${d}`;
 }
-    function parseRawText(text){
-      const lines = String(text || '')
-        .replace(/\r/g,'')
-        .split('\n')
-        .map(x => x.trim())
-        .filter(Boolean);
 
-      const out = [];
+function looksLikeHeader(line){
+  const s = latinDigits(String(line || '').trim().toLowerCase());
+  if (!s) return false;
+  return (
+    s.includes('animal') ||
+    s.includes('cow') ||
+    s.includes('buffalo') ||
+    s.includes('number') ||
+    s.includes('no') ||
+    s.includes('tag') ||
+    s.includes('milk') ||
+    s.includes('yield') ||
+    s.includes('session') ||
+    s.includes('parlor') ||
+    s.includes('total') ||
+    s.includes('رقم') ||
+    s.includes('الحيوان') ||
+    s.includes('لبن') ||
+    s.includes('حلب') ||
+    s.includes('اجمالي') ||
+    s.includes('إجمالي') ||
+    s.includes('المحلب')
+  );
+}
 
-      for (const line of lines){
-        const normalized = latinDigits(line).replace(/[;\t،]+/g, ',');
-        const parts = normalized.split(',').map(x => x.trim()).filter(Boolean);
+function splitSmartLine(line){
+  const raw = latinDigits(String(line || '').trim());
+  if (!raw) return [];
+  if (raw.includes('\t')) return raw.split('\t').map(x => x.trim()).filter(Boolean);
+  if (raw.includes(';')) return raw.split(';').map(x => x.trim()).filter(Boolean);
+  return raw.replace(/[،]+/g, ',').split(',').map(x => x.trim()).filter(Boolean);
+}
 
-        if (parts.length < 3){
-          out.push({
-            raw: line,
-            animalNumber: '',
-            s1: 0, s2: 0, s3: 0,
-            total: 0,
-            valid: false,
-            reason: 'السطر لا يحتوي على رقم + حلبتين على الأقل'
-          });
-          continue;
-        }
+function extractMilkNumbers(parts){
+  const nums = [];
+  for (let i = 1; i < parts.length; i++){
+    const v = String(parts[i] || '').trim();
+    if (!v) continue;
+    const n = parseFloat(v.replace(',', '.'));
+    if (Number.isFinite(n) && n >= 0){
+      nums.push(n);
+    }
+  }
+  return nums;
+}
+function parseRawText(text){
+  const lines = String(text || '')
+    .replace(/\r/g,'')
+    .split('\n')
+    .map(x => x.trim())
+    .filter(Boolean);
 
-        const animalNumber = normAnimalNo(parts[0]);
-        const nums = parts.slice(1).map(toNum).filter(x => x > 0);
+  const out = [];
 
-        if (!animalNumber){
-          out.push({
-            raw: line,
-            animalNumber: '',
-            s1: 0, s2: 0, s3: 0,
-            total: 0,
-            valid: false,
-            reason: 'رقم الحيوان غير صالح'
-          });
-          continue;
-        }
+  for (const line of lines){
+    if (looksLikeHeader(line)) continue;
 
-        if (nums.length < 2 || nums.length > 3){
-          out.push({
-            raw: line,
-            animalNumber,
-            s1: 0, s2: 0, s3: 0,
-            total: 0,
-            valid: false,
-            reason: 'عدد الحلبات يجب أن يكون 2 أو 3'
-          });
-          continue;
-        }
+    const parts = splitSmartLine(line);
 
-        const s1 = nums[0] || 0;
-        const s2 = nums[1] || 0;
-        const s3 = nums[2] || 0;
-        const total = s1 + s2 + s3;
-
-               out.push({
-          raw: line,
-          animalNumber,
-          s1, s2, s3,
-          total,
-          valid: true,
-          reason: '',
-          kind: (nums.length === 2 ? 'buffalo' : 'cow'),
-          species: (nums.length === 2 ? 'جاموس' : 'أبقار')
-        });
-      }
-
-      return out;
+    if (parts.length < 2){
+      out.push({
+        raw: line,
+        animalNumber: '',
+        s1: 0, s2: 0, s3: 0,
+        total: 0,
+        valid: false,
+        reason: 'السطر لا يحتوي على رقم الحيوان وبيانات اللبن'
+      });
+      continue;
     }
 
+    const animalNumber = normAnimalNo(parts[0]);
+    const nums = extractMilkNumbers(parts);
+
+    if (!animalNumber){
+      out.push({
+        raw: line,
+        animalNumber: '',
+        s1: 0, s2: 0, s3: 0,
+        total: 0,
+        valid: false,
+        reason: 'رقم الحيوان غير صالح'
+      });
+      continue;
+    }
+
+    if (!nums.length){
+      out.push({
+        raw: line,
+        animalNumber,
+        s1: 0, s2: 0, s3: 0,
+        total: 0,
+        valid: false,
+        reason: 'لم يتم العثور على قيم لبن صالحة'
+      });
+      continue;
+    }
+
+    let s1 = 0, s2 = 0, s3 = 0, total = 0, kind = 'cow', species = 'أبقار', importMode = '';
+
+    if (nums.length === 1){
+      total = nums[0];
+      s1 = total;
+      kind = 'cow';
+      species = 'أبقار';
+      importMode = 'total_only';
+    } else if (nums.length === 2){
+      s1 = nums[0];
+      s2 = nums[1];
+      total = s1 + s2;
+      kind = 'buffalo';
+      species = 'جاموس';
+      importMode = 'sessions_2';
+    } else {
+      s1 = nums[0] || 0;
+      s2 = nums[1] || 0;
+      s3 = nums[2] || 0;
+      total = s1 + s2 + s3;
+      kind = 'cow';
+      species = 'أبقار';
+      importMode = 'sessions_3';
+    }
+
+    if (total <= 0){
+      out.push({
+        raw: line,
+        animalNumber,
+        s1: 0, s2: 0, s3: 0,
+        total: 0,
+        valid: false,
+        reason: 'إجمالي اللبن غير صالح'
+      });
+      continue;
+    }
+
+    out.push({
+      raw: line,
+      animalNumber,
+      s1, s2, s3,
+      total,
+      valid: true,
+      reason: '',
+      kind,
+      species,
+      importMode
+    });
+  }
+
+  return out;
+}
 
     function renderPreview(rows){
       previewRows.innerHTML = rows.map(row => {
         const statusClass = row.valid ? 'status-ok' : 'status-bad';
-        const statusText = row.valid ? 'جاهز' : (row.reason || 'مرفوض');
+       const statusText = row.valid
+  ? (
+      row.importMode === 'total_only' ? 'جاهز (إجمالي فقط)' :
+      row.importMode === 'sessions_2' ? 'جاهز (حلبتان)' :
+      'جاهز (3 حلبات)'
+    )
+  : (row.reason || 'مرفوض');
         return `
           <tr>
             <td class="num">${row.animalNumber || '—'}</td>
@@ -670,21 +756,25 @@
       const rejected = [];
 
       for (const row of validRows){
-        const payload = {
-          userId: uid,
-          animalId: row.animalNumber,
-          animalNumber: row.animalNumber,
-          eventType: 'لبن يومي',
-          type: 'daily_milk',
-          eventDate: date,
-          kind: row.kind === 'buffalo' ? 'buffalo' : 'cow',
-          milkSessions: row.kind === 'buffalo'
-            ? [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }]
-            : [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }, { n:3, kg:row.s3 }],
-          milkKg: Number(row.total.toFixed(1)),
-          source: '/daily-milk-import.html',
-          createdAt: serverTimestamp()
-        };
+       const payload = {
+  userId: uid,
+  animalId: row.animalNumber,
+  animalNumber: row.animalNumber,
+  eventType: 'لبن يومي',
+  type: 'daily_milk',
+  eventDate: date,
+  kind: row.kind === 'buffalo' ? 'buffalo' : 'cow',
+  importMode: row.importMode || 'sessions_3',
+  milkSessions:
+    row.importMode === 'total_only'
+      ? [{ n:1, kg:row.total }]
+      : row.kind === 'buffalo'
+        ? [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }]
+        : [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }, { n:3, kg:row.s3 }],
+  milkKg: Number(row.total.toFixed(1)),
+  source: '/daily-milk-import.html',
+  createdAt: serverTimestamp()
+};
 
        try{
   const eventId = makeDailyMilkDocId(uid, row.animalNumber, date);
