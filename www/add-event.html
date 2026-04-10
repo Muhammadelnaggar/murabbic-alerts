@@ -108,7 +108,65 @@
 
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--text);text-align:center}
+    .import-box{
+  margin:12px;
+  padding:14px;
+  background:linear-gradient(135deg,#eefaf2 0%, #f8fffb 100%);
+  border:2px dashed #86cfa0;
+  border-radius:16px;
+  box-shadow:0 4px 10px rgba(14,160,90,.08);
+}
 
+.import-title{
+  font-size:15px;
+  font-weight:900;
+  color:var(--brand-600);
+  margin:0 0 6px;
+  text-align:center;
+}
+
+.import-sub{
+  font-size:13px;
+  color:var(--muted);
+  text-align:center;
+  line-height:1.7;
+  margin:0 0 12px;
+}
+
+.btn-import-milk{
+  width:100%;
+  padding:15px 16px;
+  border:none;
+  border-radius:14px;
+  background:linear-gradient(135deg,#0ea05a 0%, #13b767 100%);
+  color:#fff;
+  font-size:17px;
+  font-weight:900;
+  font-family:inherit;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(14,160,90,.20);
+  transition:.2s ease;
+}
+
+.btn-import-milk:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 24px rgba(14,160,90,.24);
+}
+
+.btn-import-milk small{
+  display:block;
+  font-size:12px;
+  font-weight:700;
+  opacity:.95;
+  margin-top:4px;
+}
+
+@media (max-width:480px){
+  .btn-import-milk{
+    font-size:16px;
+    padding:14px;
+  }
+}
     .mbk-bottom-nav{
       position:fixed;
       bottom:0; left:0; right:0;
@@ -179,7 +237,16 @@
   </div>
 
   <div id="inlineMsg"><div class="text"></div></div>
-
+  <div class="import-box" id="milkImportBox">
+  <div class="import-title">استيراد اللبن اليومي</div>
+  <div class="import-sub">
+    من المحالب أو برفع ملف أو إدخال باتش — هذا المسار غير مرتبط بأرقام الحيوانات من هذه الصفحة
+  </div>
+  <button type="button" class="btn-import-milk" id="btnMilkImport">
+    📥 استيراد اللبن / باتش
+    <small>رفع ملف • ربط محلب • إدخال جماعي • مع تأجيل التزامن</small>
+  </button>
+</div>
   <div class="grid" id="eventButtons">
     <button class="btn" data-page="calving.html">👶 ولادة</button>
     <button class="btn" data-page="insemination.html">📅 تلقيح</button>
@@ -187,7 +254,6 @@
     <button class="btn" data-page="dry-off.html">🚫 تجفيف</button>
     <button class="btn" data-page="close-up.html">🍼 تحضير للولادة</button>
     <button class="btn" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-    <button class="btn" data-page="daily-milk-import.html">📥 استيراد اللبن / باتش</button>
     <button class="btn" data-page="nutrition.html">🌿 تغذية</button>
     <button class="btn" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
     <button class="btn" data-page="disease.html">🔬 التشخيص</button>
@@ -483,7 +549,6 @@ const isDailyMilkImport = /daily-milk-import\.html/i.test(String(page));
   u.searchParams.set('source', 'batch');
 }
 else if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
-if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
   u.searchParams.set('mbkMode', 'group');
   u.searchParams.set('bulk', ctx.bulk);
   if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
@@ -498,7 +563,18 @@ if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColost
         u.searchParams.set('eventDate', ctx.date);
         return u.toString();
       }
+      function openMilkImport(){
+  let date = norm($('#eventDate').value) || todayISO();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
+  $('#warn').textContent = '';
+  const u = new URL('daily-milk-import.html', location.href);
+  u.searchParams.set('mode', 'import');
+  u.searchParams.set('source', 'batch');
+  u.searchParams.set('date', date);
+  u.searchParams.set('eventDate', date);
+  location.href = u.toString();
+}
       function wireButtons(){
         $$('#eventButtons .btn[data-page]').forEach(btn=>{
           btn.addEventListener('click', (e)=>{
@@ -558,12 +634,18 @@ if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColost
           saveTrimmingInline();
         }, {passive:false});
       }
-
-      hydrate();
-      wireLive();
-      wireButtons();
-      wireTrimming();
-      wireGroupsPicker();
+     function wireMilkImport(){
+  document.getElementById('btnMilkImport')?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    openMilkImport();
+  }, {passive:false});
+}
+hydrate();
+wireLive();
+wireButtons();
+wireTrimming();
+wireMilkImport();
+wireGroupsPicker();
     })();
   </script>
 
