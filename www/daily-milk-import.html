@@ -418,8 +418,12 @@
     import * as firebaseCfg from '/js/firebase-config.js';
     import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import {
-            getFirestore, collection, addDoc, serverTimestamp
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     const $ = (id) => document.getElementById(id);
 
@@ -493,7 +497,12 @@
     function normAnimalNo(v){
       return latinDigits(String(v || '')).replace(/[^\d]/g,'').trim();
     }
-
+    function makeDailyMilkDocId(uid, animalNumber, eventDate){
+  const u = String(uid || '').trim();
+  const n = normAnimalNo(animalNumber);
+  const d = String(eventDate || '').trim();
+  return `daily_milk__${u}__${n}__${d}`;
+}
     function parseRawText(text){
       const lines = String(text || '')
         .replace(/\r/g,'')
@@ -677,21 +686,27 @@
           createdAt: serverTimestamp()
         };
 
-        try{
-          await addDoc(collection(db, 'events'), payload);
+       try{
+  const eventId = makeDailyMilkDocId(uid, row.animalNumber, date);
 
-          try{
-            await window.updateAnimalByEvent(payload);
-          }catch(e){
-            console.error('Animal update failed:', e);
-          }
+  await setDoc(
+    doc(collection(db, 'events'), eventId),
+    payload,
+    { merge: true }
+  );
 
-          saved++;
-        }catch(err){
-          console.error(err);
-          failed++;
-          rejected.push(row.animalNumber);
-        }
+  try{
+    await window.updateAnimalByEvent(payload);
+  }catch(e){
+    console.error('Animal update failed:', e);
+  }
+
+  saved++;
+}catch(err){
+  console.error(err);
+  failed++;
+  rejected.push(row.animalNumber);
+}
       }
 
       saveBtn.disabled = false;
