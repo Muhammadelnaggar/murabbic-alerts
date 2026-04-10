@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>استيراد اللبن اليومي — مُرَبِّيك</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+
+  <script type="module">
+    import { updateAnimalByEvent } from "/js/animal-update.js";
+    window.updateAnimalByEvent = updateAnimalByEvent;
+  </script>
+
+  <link rel="stylesheet" href="css/forms.css">
+  <script type="module" src="js/forms-init.js"></script>
+
+  <style>
+    :root{
+      --green:#0ea05a;
+      --green-600:#0b7f47;
+      --bg:#f7faf7;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e2e8f0;
+      --danger:#c2410c;
+      --warn:#92400e;
+      --warn-bg:#fffbeb;
+      --ok-bg:#ecfdf5;
+      --ok-bd:#86efac;
+      --ok-tx:#065f46;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ max-width:100%; overflow-x:hidden; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;
+      padding-bottom:86px;
+    }
+
+    header{
+      position:sticky;
+      top:0;
+      z-index:20;
+      background:var(--card);
+      border-bottom:1px solid var(--border);
+    }
+
+    .wrap{
+      max-width:860px;
+      margin:16px auto;
+      padding:0 12px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:16px;
+      box-shadow:0 1px 2px rgba(0,0,0,.04);
+      margin-bottom:12px;
+    }
+
+    .title{
+      margin:0 0 6px;
+      color:var(--green-600);
+      font-size:20px;
+      font-weight:900;
+    }
+
+    .muted{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.7;
+    }
+
+    .row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .col{
+      flex:1 1 220px;
+      min-width:220px;
+    }
+
+    label{
+      display:block;
+      margin:12px 0 6px;
+      font-weight:800;
+    }
+
+    input[type="date"],
+    input[type="file"],
+    textarea,
+    select{
+      width:100%;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:#fff;
+      font-size:16px;
+      outline:none;
+      font-family:inherit;
+    }
+
+    textarea{
+      min-height:170px;
+      resize:vertical;
+      line-height:1.7;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus{
+      border-color:var(--green-600);
+    }
+
+    .tabs{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      margin:12px 0 0;
+    }
+
+    .tab-btn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+      border-radius:12px;
+      padding:12px 10px;
+      font-weight:900;
+      font-size:15px;
+      cursor:pointer;
+    }
+
+    .tab-btn.active{
+      background:var(--green);
+      border-color:var(--green);
+      color:#fff;
+    }
+
+    .tab-pane{ display:none; margin-top:14px; }
+    .tab-pane.active{ display:block; }
+
+    .infobar{
+      display:none;
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      font-weight:800;
+      line-height:1.7;
+    }
+    .infobar.ok{
+      display:block;
+      background:var(--ok-bg);
+      border:1px solid var(--ok-bd);
+      color:var(--ok-tx);
+    }
+    .infobar.warn{
+      display:block;
+      background:var(--warn-bg);
+      border:1px solid #fde68a;
+      color:var(--warn);
+    }
+    .infobar.err{
+      display:block;
+      background:#fef2f2;
+      border:1px solid #fecaca;
+      color:#991b1b;
+    }
+
+    .hint{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.7;
+      margin-top:8px;
+    }
+
+    .kpi{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      margin-top:12px;
+    }
+    .kpi .box{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;
+      text-align:center;
+    }
+    .kpi .n{
+      font-size:20px;
+      font-weight:900;
+      color:var(--green-600);
+    }
+    .kpi .l{
+      font-size:12px;
+      color:var(--muted);
+      margin-top:4px;
+      font-weight:800;
+    }
+
+    .btn-row{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      appearance:none;
+      border:none;
+      border-radius:12px;
+      padding:12px 14px;
+      cursor:pointer;
+      font-weight:900;
+      font-size:16px;
+      font-family:inherit;
+      min-height:48px;
+    }
+
+    .btn-primary{
+      background:var(--green);
+      color:#fff;
+      box-shadow:0 2px 4px rgba(0,0,0,.08);
+    }
+    .btn-primary:active{ transform:scale(.98); }
+
+    .btn-ghost{
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--border);
+    }
+
+    .btn-block{
+      width:100%;
+    }
+
+    .preview-wrap{
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:#fff;
+      margin-top:12px;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:720px;
+    }
+
+    th,td{
+      padding:10px 8px;
+      border-bottom:1px solid var(--border);
+      text-align:center;
+      font-size:14px;
+      white-space:nowrap;
+    }
+
+    th{
+      background:#f8fafc;
+      font-weight:900;
+      color:#0f172a;
+    }
+
+    td.num{
+      font-weight:900;
+      text-align:right;
+    }
+
+    .status-ok{
+      color:#0b7f47;
+      font-weight:900;
+    }
+
+    .status-bad{
+      color:#b91c1c;
+      font-weight:900;
+    }
+
+    .hide{ display:none !important; }
+
+    .mbk-bottom-nav{
+      position:fixed;
+      bottom:0; left:0; right:0;
+      height:58px;
+      background:#ffffff;
+      border-top:1px solid var(--border);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:9999;
+    }
+    .mbk-bottom-nav .mbk-nav-link{
+      text-decoration:none;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#ffffff;
+      color:var(--text);
+      font-size:.9rem;
+      white-space:nowrap;
+    }
+
+    @media (max-width:640px){
+      .kpi{ grid-template-columns:repeat(2,1fr); }
+      .tabs{ grid-template-columns:1fr; }
+      .col{ min-width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import { protectPage, lockBackButton } from "/js/nav-guard.js";
+    protectPage();
+    lockBackButton();
+  </script>
+
+  <header>
+    <div class="mbk-head">
+      <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+      <div class="mbk-center">
+        <div class="mbk-page-title">استيراد اللبن اليومي</div>
+        <div class="mbk-app-name">مُرَبِّيك</div>
+      </div>
+      <a class="mbk-back" href="add-event.html">رجوع</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div id="sysbar" class="infobar"></div>
+
+      <h1 class="title">استيراد اللبن اليومي</h1>
+      <div class="muted">استيراد مباشر إلى سجلات اللبن اليومية داخل مُرَبِّيك</div>
+
+      <div class="row" style="margin-top:12px">
+        <div class="col">
+          <label for="eventDate">تاريخ اليوم</label>
+          <input id="eventDate" type="date" />
+        </div>
+
+        <div class="col">
+          <label for="importSource">مصدر الإدخال</label>
+          <select id="importSource">
+            <option value="batch">إدخال باتش</option>
+            <option value="file">رفع ملف</option>
+            <option value="parlor">المحلب</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="batchPane">إدخال باتش</button>
+        <button type="button" class="tab-btn" data-tab="filePane">رفع ملف</button>
+        <button type="button" class="tab-btn" data-tab="parlorPane">المحلب</button>
+      </div>
+
+      <div id="batchPane" class="tab-pane active">
+        <label for="batchInput">ألصق البيانات هنا</label>
+        <textarea id="batchInput" placeholder="مثال:
+101, 8, 7, 6
+102, 10, 9, 8
+103, 6, 5"></textarea>
+        <div class="hint">
+          الصيغة المدعومة الآن: رقم الحيوان ثم 2 أو 3 حلبات<br>
+          مثال: <b>101, 8, 7, 6</b> أو <b>205, 5, 4</b>
+        </div>
+      </div>
+
+      <div id="filePane" class="tab-pane">
+        <label for="fileInput">ارفع ملف CSV أو TXT</label>
+        <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" />
+        <div class="hint">
+          أول عمود = رقم الحيوان، ثم 2 أو 3 حلبات في نفس السطر.
+        </div>
+      </div>
+
+      <div id="parlorPane" class="tab-pane">
+        <div class="card" style="margin:0;padding:14px;background:#f8fafc">
+          <div style="font-weight:900;color:#0b7f47;margin-bottom:6px">ربط المحلب</div>
+          <div class="muted">
+            هذا القسم جاهز شكليًا الآن داخل صفحة الاستيراد، وسنربطه لاحقًا بملف أو API المحلب حسب النظام المتاح في المزرعة.
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="previewBtn" class="btn btn-primary">معاينة البيانات</button>
+        <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
+      </div>
+
+      <div class="kpi" id="kpiBar">
+        <div class="box">
+          <div class="n" id="kpiRows">0</div>
+          <div class="l">صفوف مقروءة</div>
+        </div>
+        <div class="box">
+          <div class="n" id="kpiValid">0</div>
+          <div class="l">صحيحة</div>
+        </div>
+        <div class="box">
+          <div class="n" id="kpiInvalid">0</div>
+          <div class="l">مرفوضة</div>
+        </div>
+        <div class="box">
+          <div class="n" id="kpiMilk">0.0</div>
+          <div class="l">إجمالي اللبن</div>
+        </div>
+      </div>
+
+      <div class="preview-wrap hide" id="previewWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم الحيوان</th>
+              <th>النوع</th>
+              <th>حلبة 1</th>
+              <th>حلبة 2</th>
+              <th>حلبة 3</th>
+              <th>الإجمالي</th>
+              <th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody id="previewRows"></tbody>
+        </table>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="saveBtn" class="btn btn-primary btn-block">حفظ الاستيراد مباشرة</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="mbk-bottom-nav">
+    <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
+    <a href="add-event.html" class="mbk-nav-link">↩️ الأحداث</a>
+  </nav>
+
+  <script type="module">
+    import * as firebaseCfg from '/js/firebase-config.js';
+    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getFirestore, collection, addDoc, serverTimestamp,
+      query, where, getDocs, limit
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const $ = (id) => document.getElementById(id);
+
+    const eventDate = $('eventDate');
+    const importSource = $('importSource');
+    const batchInput = $('batchInput');
+    const fileInput = $('fileInput');
+    const previewBtn = $('previewBtn');
+    const clearBtn = $('clearBtn');
+    const saveBtn = $('saveBtn');
+    const previewWrap = $('previewWrap');
+    const previewRows = $('previewRows');
+    const sysbar = $('sysbar');
+
+    const kpiRows = $('kpiRows');
+    const kpiValid = $('kpiValid');
+    const kpiInvalid = $('kpiInvalid');
+    const kpiMilk = $('kpiMilk');
+
+    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+    const panes = Array.from(document.querySelectorAll('.tab-pane'));
+
+    const firebaseConfig =
+      firebaseCfg.default ||
+      firebaseCfg.firebaseConfig ||
+      firebaseCfg.config ||
+      firebaseCfg;
+
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db = getFirestore(app, "murabbikdata");
+
+    let previewData = [];
+    let fileTextCache = '';
+
+    function getUserId(){
+      return (
+        window.userId ||
+        (window.__TENANT__ && window.__TENANT__.userId) ||
+        localStorage.getItem("userId") ||
+        sessionStorage.getItem("userId") ||
+        null
+      );
+    }
+
+    function todayISO(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,10);
+    }
+
+    function showBar(kind, text){
+      sysbar.className = 'infobar ' + kind;
+      sysbar.textContent = text;
+      sysbar.style.display = 'block';
+      try{ sysbar.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
+    }
+
+    function hideBar(){
+      sysbar.className = 'infobar';
+      sysbar.textContent = '';
+      sysbar.style.display = 'none';
+    }
+
+    function latinDigits(s){
+      const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+      return String(s || '').replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+    }
+
+    function toNum(v){
+      const n = parseFloat(String(v).replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function normAnimalNo(v){
+      return latinDigits(String(v || '')).replace(/[^\d]/g,'').trim();
+    }
+
+    function parseRawText(text){
+      const lines = String(text || '')
+        .replace(/\r/g,'')
+        .split('\n')
+        .map(x => x.trim())
+        .filter(Boolean);
+
+      const out = [];
+
+      for (const line of lines){
+        const normalized = latinDigits(line).replace(/[;\t،]+/g, ',');
+        const parts = normalized.split(',').map(x => x.trim()).filter(Boolean);
+
+        if (parts.length < 3){
+          out.push({
+            raw: line,
+            animalNumber: '',
+            s1: 0, s2: 0, s3: 0,
+            total: 0,
+            valid: false,
+            reason: 'السطر لا يحتوي على رقم + حلبتين على الأقل'
+          });
+          continue;
+        }
+
+        const animalNumber = normAnimalNo(parts[0]);
+        const nums = parts.slice(1).map(toNum).filter(x => x > 0);
+
+        if (!animalNumber){
+          out.push({
+            raw: line,
+            animalNumber: '',
+            s1: 0, s2: 0, s3: 0,
+            total: 0,
+            valid: false,
+            reason: 'رقم الحيوان غير صالح'
+          });
+          continue;
+        }
+
+        if (nums.length < 2 || nums.length > 3){
+          out.push({
+            raw: line,
+            animalNumber,
+            s1: 0, s2: 0, s3: 0,
+            total: 0,
+            valid: false,
+            reason: 'عدد الحلبات يجب أن يكون 2 أو 3'
+          });
+          continue;
+        }
+
+        const s1 = nums[0] || 0;
+        const s2 = nums[1] || 0;
+        const s3 = nums[2] || 0;
+        const total = s1 + s2 + s3;
+
+        out.push({
+          raw: line,
+          animalNumber,
+          s1, s2, s3,
+          total,
+          valid: true,
+          reason: '',
+          kind: '',
+          species: '',
+          animalDoc: null
+        });
+      }
+
+      return out;
+    }
+
+    async function loadAnimalsIndex(numbers){
+      const uid = getUserId();
+      if (!uid) throw new Error('no_user');
+
+      const uniq = [...new Set(numbers.map(normAnimalNo).filter(Boolean))];
+      const index = new Map();
+
+      const q1 = query(
+        collection(db, 'animals'),
+        where('userId', '==', uid),
+        limit(5000)
+      );
+
+      const snap = await getDocs(q1);
+      snap.forEach(doc => {
+        const d = doc.data() || {};
+        const n = normAnimalNo(d.animalNumber);
+        if (n) index.set(n, { id: doc.id, data: d });
+      });
+
+      return uniq.reduce((acc, n) => {
+        acc.set(n, index.get(n) || null);
+        return acc;
+      }, new Map());
+    }
+
+    function normalizeSpecies(sp){
+      const s = String(sp || '').trim();
+      if (/buffalo|جاموس/i.test(s)) return 'جاموس';
+      if (/cow|بقر|أبقار/i.test(s)) return 'أبقار';
+      return '';
+    }
+
+    function applyAnimalMatch(rows, matchMap){
+      return rows.map(row => {
+        if (!row.valid) return row;
+
+        const hit = matchMap.get(row.animalNumber);
+        if (!hit){
+          row.valid = false;
+          row.reason = 'الحيوان غير موجود';
+          return row;
+        }
+
+        const d = hit.data || {};
+        const sp = normalizeSpecies(d.species || d.animalTypeAr || d.animalType || '');
+        row.species = sp || 'أبقار';
+        row.kind = (row.species === 'جاموس') ? 'buffalo' : 'cow';
+        row.animalDoc = { ...d, animalId: hit.id };
+
+        if (row.kind === 'buffalo'){
+          if (row.s3 > 0){
+            row.valid = false;
+            row.reason = 'الجاموس يجب أن يكون بحلبتين فقط';
+            return row;
+          }
+        } else {
+          if (row.s1 <= 0 || row.s2 <= 0){
+            row.valid = false;
+            row.reason = 'بيانات اللبن غير مكتملة';
+            return row;
+          }
+        }
+
+        row.total = row.kind === 'buffalo'
+          ? (row.s1 + row.s2)
+          : (row.s1 + row.s2 + row.s3);
+
+        return row;
+      });
+    }
+
+    function renderPreview(rows){
+      previewRows.innerHTML = rows.map(row => {
+        const statusClass = row.valid ? 'status-ok' : 'status-bad';
+        const statusText = row.valid ? 'جاهز' : (row.reason || 'مرفوض');
+        return `
+          <tr>
+            <td class="num">${row.animalNumber || '—'}</td>
+            <td>${row.species || '—'}</td>
+            <td>${row.s1 ? row.s1.toFixed(1) : '—'}</td>
+            <td>${row.s2 ? row.s2.toFixed(1) : '—'}</td>
+            <td>${row.s3 ? row.s3.toFixed(1) : '—'}</td>
+            <td>${row.total ? row.total.toFixed(1) : '0.0'}</td>
+            <td class="${statusClass}">${statusText}</td>
+          </tr>
+        `;
+      }).join('');
+
+      previewWrap.classList.toggle('hide', !rows.length);
+
+      const totalRows = rows.length;
+      const validRows = rows.filter(x => x.valid).length;
+      const invalidRows = totalRows - validRows;
+      const milkTotal = rows.filter(x => x.valid).reduce((s, x) => s + (x.total || 0), 0);
+
+      kpiRows.textContent = String(totalRows);
+      kpiValid.textContent = String(validRows);
+      kpiInvalid.textContent = String(invalidRows);
+      kpiMilk.textContent = milkTotal.toFixed(1);
+    }
+
+    async function makePreview(){
+      hideBar();
+
+      const date = String(eventDate.value || '').trim();
+      if (!date){
+        showBar('warn', 'اختر تاريخ اليوم أولًا.');
+        return;
+      }
+
+      let raw = '';
+      const mode = importSource.value;
+
+      if (mode === 'batch'){
+        raw = String(batchInput.value || '').trim();
+        if (!raw){
+          showBar('warn', 'ألصق بيانات الباتش أولًا.');
+          return;
+        }
+      } else if (mode === 'file'){
+        raw = String(fileTextCache || '').trim();
+        if (!raw){
+          showBar('warn', 'ارفع ملفًا أولًا.');
+          return;
+        }
+      } else {
+        showBar('warn', 'ربط المحلب سيُفعّل لاحقًا. استخدم الباتش أو الملف الآن.');
+        return;
+      }
+
+      let rows = parseRawText(raw);
+
+      if (!rows.length){
+        showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
+        renderPreview([]);
+        previewData = [];
+        return;
+      }
+
+      try{
+        const matchMap = await loadAnimalsIndex(rows.map(x => x.animalNumber));
+        rows = applyAnimalMatch(rows, matchMap);
+        previewData = rows;
+        renderPreview(rows);
+
+        const validCount = rows.filter(x => x.valid).length;
+        if (validCount){
+          showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
+        } else {
+          showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
+        }
+      }catch(err){
+        console.error(err);
+        showBar('err', 'تعذر تجهيز المعاينة الآن.');
+      }
+    }
+
+    async function saveAll(){
+      hideBar();
+
+      const uid = getUserId();
+      if (!uid){
+        showBar('err', 'تعذر تحديد المستخدم الحالي.');
+        return;
+      }
+
+      const date = String(eventDate.value || '').trim();
+      if (!date){
+        showBar('warn', 'اختر تاريخ اليوم أولًا.');
+        return;
+      }
+
+      const validRows = previewData.filter(x => x.valid);
+      if (!validRows.length){
+        showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      previewBtn.disabled = true;
+      clearBtn.disabled = true;
+
+      let saved = 0;
+      let failed = 0;
+      const rejected = [];
+
+      for (const row of validRows){
+        const payload = {
+          userId: uid,
+          animalId: row.animalNumber,
+          animalNumber: row.animalNumber,
+          eventType: 'لبن يومي',
+          type: 'daily_milk',
+          eventDate: date,
+          kind: row.kind === 'buffalo' ? 'buffalo' : 'cow',
+          milkSessions: row.kind === 'buffalo'
+            ? [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }]
+            : [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }, { n:3, kg:row.s3 }],
+          milkKg: Number(row.total.toFixed(1)),
+          source: '/daily-milk-import.html',
+          createdAt: serverTimestamp()
+        };
+
+        try{
+          await addDoc(collection(db, 'events'), payload);
+
+          try{
+            await window.updateAnimalByEvent(payload);
+          }catch(e){
+            console.error('Animal update failed:', e);
+          }
+
+          saved++;
+        }catch(err){
+          console.error(err);
+          failed++;
+          rejected.push(row.animalNumber);
+        }
+      }
+
+      saveBtn.disabled = false;
+      previewBtn.disabled = false;
+      clearBtn.disabled = false;
+
+      if (saved && !failed){
+        showBar('ok', `✅ تم حفظ ${saved} سجل لبن بنجاح.`);
+        try{ window.scrollTo({ top:0, behavior:'smooth' }); }catch(_){}
+        return;
+      }
+
+      if (saved && failed){
+        showBar('warn', `تم حفظ ${saved} سجل — وتعذر حفظ ${failed} (${rejected.join(' - ')})`);
+        try{ window.scrollTo({ top:0, behavior:'smooth' }); }catch(_){}
+        return;
+      }
+
+      showBar('err', 'تعذر حفظ السجلات الآن.');
+    }
+
+    function clearAll(){
+      hideBar();
+      batchInput.value = '';
+      fileInput.value = '';
+      fileTextCache = '';
+      previewData = [];
+      renderPreview([]);
+    }
+
+    function switchTab(tabId){
+      tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+      panes.forEach(p => p.classList.toggle('active', p.id === tabId));
+
+      if (tabId === 'batchPane') importSource.value = 'batch';
+      if (tabId === 'filePane') importSource.value = 'file';
+      if (tabId === 'parlorPane') importSource.value = 'parlor';
+    }
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    importSource.addEventListener('change', () => {
+      if (importSource.value === 'batch') switchTab('batchPane');
+      if (importSource.value === 'file') switchTab('filePane');
+      if (importSource.value === 'parlor') switchTab('parlorPane');
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      if (!f){
+        fileTextCache = '';
+        return;
+      }
+
+      try{
+        fileTextCache = await f.text();
+        showBar('ok', `تم تحميل الملف: ${f.name}`);
+      }catch(err){
+        console.error(err);
+        fileTextCache = '';
+        showBar('err', 'تعذر قراءة الملف.');
+      }
+    });
+
+    previewBtn.addEventListener('click', makePreview);
+    clearBtn.addEventListener('click', clearAll);
+    saveBtn.addEventListener('click', saveAll);
+
+    const qs = new URLSearchParams(location.search);
+    const rawDate = String(qs.get('eventDate') || qs.get('date') || '').trim();
+    eventDate.value = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
+
+    renderPreview([]);
+  </script>
+</body>
+</html>
