@@ -714,25 +714,17 @@
         return;
       }
 
-      let raw = '';
-      const mode = importSource.value;
+    const raw = String(batchInput.value || '').trim();
 
-      if (mode === 'batch'){
-        raw = String(batchInput.value || '').trim();
-        if (!raw){
-          showBar('warn', 'ألصق بيانات الباتش أولًا.');
-          return;
-        }
-      } else if (mode === 'file'){
-        raw = String(fileTextCache || '').trim();
-        if (!raw){
-          showBar('warn', 'ارفع ملفًا أولًا.');
-          return;
-        }
-      } else {
-        showBar('warn', 'ربط المحلب سيُفعّل لاحقًا. استخدم الباتش أو الملف الآن.');
-        return;
-      }
+if (!raw){
+  showBar('warn', 'ألصق بيانات الباتش أو ارفع ملفًا أولًا.');
+  return;
+}
+
+if (importSource.value === 'parlor'){
+  showBar('warn', 'ربط المحلب سيُفعّل لاحقًا. استخدم الباتش أو الملف الآن.');
+  return;
+}
 
       let rows = parseRawText(raw);
 
@@ -871,22 +863,24 @@
       if (importSource.value === 'parlor') switchTab('parlorPane');
     });
 
-    fileInput.addEventListener('change', async (e) => {
-      const f = e.target.files?.[0];
-      if (!f){
-        fileTextCache = '';
-        return;
-      }
+   fileInput.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0];
+  if (!f){
+    fileTextCache = '';
+    return;
+  }
 
-      try{
-        fileTextCache = await f.text();
-        showBar('ok', `تم تحميل الملف: ${f.name}`);
-      }catch(err){
-        console.error(err);
-        fileTextCache = '';
-        showBar('err', 'تعذر قراءة الملف.');
-      }
-    });
+  try{
+    const text = await f.text();
+    fileTextCache = text;
+    batchInput.value = text;
+    showBar('ok', `تم تحميل الملف ووضعه داخل الباتش: ${f.name}`);
+  }catch(err){
+    console.error(err);
+    fileTextCache = '';
+    showBar('err', 'تعذر قراءة الملف.');
+  }
+});
 
     previewBtn.addEventListener('click', makePreview);
     clearBtn.addEventListener('click', clearAll);
