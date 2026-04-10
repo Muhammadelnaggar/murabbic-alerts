@@ -355,8 +355,8 @@
         <textarea id="batchInput" placeholder="101, 8, 7, 6
 102, 10, 9, 8
 103, 6, 5"></textarea>
-      <div class="hint">
-  الصيغ المقبولة حاليًا: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. ويمكن أن يكون الملف CSV أو TXT أو مفصولًا بفاصلة أو فاصلة منقوطة أو Tab.
+     <div class="hint">
+  الصيغ المقبولة حاليًا: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. كما يمكن للصفحة قراءة ملفات فيها أعمدة إضافية وهيدر مثل رقم الحيوان / الإجمالي / الحلبات، سواء كانت CSV أو TXT أو مفصولة بفاصلة أو فاصلة منقوطة أو Tab.
 </div>
       </div>
 
@@ -550,6 +550,107 @@ function extractMilkNumbers(parts){
   }
   return nums;
 }
+    function normalizeHeaderCell(v){
+  return latinDigits(String(v || '').trim().toLowerCase())
+    .replace(/\s+/g, ' ')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+}
+
+function detectColumnMap(headerParts){
+  const map = {
+    animalIdx: -1,
+    totalIdx: -1,
+    s1Idx: -1,
+    s2Idx: -1,
+    s3Idx: -1
+  };
+
+  const cells = headerParts.map(normalizeHeaderCell);
+
+  cells.forEach((c, i) => {
+    if (
+      map.animalIdx < 0 &&
+      (
+        c.includes('رقم الحيوان') ||
+        c === 'رقم' ||
+        c.includes('animal no') ||
+        c.includes('animal number') ||
+        c.includes('cow no') ||
+        c.includes('tag') ||
+        c === 'no'
+      )
+    ){
+      map.animalIdx = i;
+      return;
+    }
+
+    if (
+      map.totalIdx < 0 &&
+      (
+        c.includes('اجمالي') ||
+        c.includes('إجمالي') ||
+        c.includes('total') ||
+        c.includes('milk total') ||
+        c.includes('yield total')
+      )
+    ){
+      map.totalIdx = i;
+      return;
+    }
+
+    if (
+      map.s1Idx < 0 &&
+      (
+        c.includes('حلبة 1') ||
+        c.includes('الحلبة 1') ||
+        c.includes('session 1') ||
+        c.includes('milking 1') ||
+        c.includes('morning') ||
+        c.includes('am')
+      )
+    ){
+      map.s1Idx = i;
+      return;
+    }
+
+    if (
+      map.s2Idx < 0 &&
+      (
+        c.includes('حلبة 2') ||
+        c.includes('الحلبة 2') ||
+        c.includes('session 2') ||
+        c.includes('milking 2') ||
+        c.includes('evening') ||
+        c.includes('pm')
+      )
+    ){
+      map.s2Idx = i;
+      return;
+    }
+
+    if (
+      map.s3Idx < 0 &&
+      (
+        c.includes('حلبة 3') ||
+        c.includes('الحلبة 3') ||
+        c.includes('session 3') ||
+        c.includes('milking 3') ||
+        c.includes('night')
+      )
+    ){
+      map.s3Idx = i;
+      return;
+    }
+  });
+
+  return map;
+}
+
+function numFromCell(v){
+  const n = parseFloat(String(v || '').trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
 function parseRawText(text){
   const lines = String(text || '')
     .replace(/\r/g,'')
@@ -558,26 +659,108 @@ function parseRawText(text){
     .filter(Boolean);
 
   const out = [];
+  let colMap = null;
 
   for (const line of lines){
-    if (looksLikeHeader(line)) continue;
-
     const parts = splitSmartLine(line);
+    if (!parts.length) continue;
 
-    if (parts.length < 2){
-      out.push({
-        raw: line,
-        animalNumber: '',
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'السطر لا يحتوي على رقم الحيوان وبيانات اللبن'
-      });
+    if (looksLikeHeader(line)){
+      colMap = detectColumnMap(parts);
       continue;
     }
 
-    const animalNumber = normAnimalNo(parts[0]);
-    const nums = extractMilkNumbers(parts);
+    let animalNumber = '';
+    let s1 = 0, s2 = 0, s3 = 0, total = 0;
+    let kind = 'cow', species = 'أبقار', importMode = '';
+
+    if (colMap && colMap.animalIdx >= 0){
+      animalNumber = normAnimalNo(parts[colMap.animalIdx] || '');
+
+      const totalVal = colMap.totalIdx >= 0 ? numFromCell(parts[colMap.totalIdx]) : null;
+      const v1 = colMap.s1Idx >= 0 ? numFromCell(parts[colMap.s1Idx]) : null;
+      const v2 = colMap.s2Idx >= 0 ? numFromCell(parts[colMap.s2Idx]) : null;
+      const v3 = colMap.s3Idx >= 0 ? numFromCell(parts[colMap.s3Idx]) : null;
+
+      const sessionVals = [v1, v2, v3].filter(v => v !== null && v >= 0);
+
+      if (totalVal !== null && totalVal > 0){
+        total = totalVal;
+
+        if (sessionVals.length >= 3){
+          s1 = v1 || 0;
+          s2 = v2 || 0;
+          s3 = v3 || 0;
+          importMode = 'sessions_3';
+          kind = 'cow';
+          species = 'أبقار';
+        } else if (sessionVals.length === 2){
+          s1 = v1 || 0;
+          s2 = v2 || 0;
+          importMode = 'sessions_2';
+          kind = 'buffalo';
+          species = 'جاموس';
+        } else {
+          s1 = totalVal;
+          importMode = 'total_only';
+          kind = 'cow';
+          species = 'أبقار';
+        }
+      } else if (sessionVals.length >= 3){
+        s1 = v1 || 0;
+        s2 = v2 || 0;
+        s3 = v3 || 0;
+        total = s1 + s2 + s3;
+        importMode = 'sessions_3';
+        kind = 'cow';
+        species = 'أبقار';
+      } else if (sessionVals.length === 2){
+        s1 = v1 || 0;
+        s2 = v2 || 0;
+        total = s1 + s2;
+        importMode = 'sessions_2';
+        kind = 'buffalo';
+        species = 'جاموس';
+      }
+    } else {
+      if (parts.length < 2){
+        out.push({
+          raw: line,
+          animalNumber: '',
+          s1: 0, s2: 0, s3: 0,
+          total: 0,
+          valid: false,
+          reason: 'السطر لا يحتوي على رقم الحيوان وبيانات اللبن'
+        });
+        continue;
+      }
+
+      animalNumber = normAnimalNo(parts[0]);
+      const nums = extractMilkNumbers(parts);
+
+      if (nums.length === 1){
+        total = nums[0];
+        s1 = total;
+        kind = 'cow';
+        species = 'أبقار';
+        importMode = 'total_only';
+      } else if (nums.length === 2){
+        s1 = nums[0];
+        s2 = nums[1];
+        total = s1 + s2;
+        kind = 'buffalo';
+        species = 'جاموس';
+        importMode = 'sessions_2';
+      } else if (nums.length >= 3){
+        s1 = nums[0] || 0;
+        s2 = nums[1] || 0;
+        s3 = nums[2] || 0;
+        total = s1 + s2 + s3;
+        kind = 'cow';
+        species = 'أبقار';
+        importMode = 'sessions_3';
+      }
+    }
 
     if (!animalNumber){
       out.push({
@@ -591,7 +774,7 @@ function parseRawText(text){
       continue;
     }
 
-    if (!nums.length){
+    if (!(total > 0)){
       out.push({
         raw: line,
         animalNumber,
@@ -599,43 +782,6 @@ function parseRawText(text){
         total: 0,
         valid: false,
         reason: 'لم يتم العثور على قيم لبن صالحة'
-      });
-      continue;
-    }
-
-    let s1 = 0, s2 = 0, s3 = 0, total = 0, kind = 'cow', species = 'أبقار', importMode = '';
-
-    if (nums.length === 1){
-      total = nums[0];
-      s1 = total;
-      kind = 'cow';
-      species = 'أبقار';
-      importMode = 'total_only';
-    } else if (nums.length === 2){
-      s1 = nums[0];
-      s2 = nums[1];
-      total = s1 + s2;
-      kind = 'buffalo';
-      species = 'جاموس';
-      importMode = 'sessions_2';
-    } else {
-      s1 = nums[0] || 0;
-      s2 = nums[1] || 0;
-      s3 = nums[2] || 0;
-      total = s1 + s2 + s3;
-      kind = 'cow';
-      species = 'أبقار';
-      importMode = 'sessions_3';
-    }
-
-    if (total <= 0){
-      out.push({
-        raw: line,
-        animalNumber,
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'إجمالي اللبن غير صالح'
       });
       continue;
     }
@@ -655,7 +801,6 @@ function parseRawText(text){
 
   return out;
 }
-
     function renderPreview(rows){
       previewRows.innerHTML = rows.map(row => {
         const statusClass = row.valid ? 'status-ok' : 'status-bad';
