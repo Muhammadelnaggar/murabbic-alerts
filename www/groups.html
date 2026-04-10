@@ -323,44 +323,91 @@ header{
 
 .barn-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(58px,1fr));
-  gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(70px,1fr));
+  gap:10px;
 }
 
 .animal-dot{
-  min-height:58px;
-  border-radius:18px;
-  border:1px solid var(--mbk-border);
-  background:var(--mbk-soft);
+  min-height:76px;
+  border:0;
+  background:transparent;
   color:var(--mbk-text);
   display:flex;
-  align-items:center;
+  align-items:flex-end;
   justify-content:center;
   text-align:center;
   font-size:13px;
   font-weight:900;
-  padding:6px 4px;
-  line-height:1.1;
+  padding:0;
+  line-height:1.05;
   cursor:pointer;
   position:relative;
+  isolation:isolate;
 }
 
-.animal-dot small{
+.animal-dot::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-repeat:no-repeat;
+  background-position:center top;
+  background-size:100% 100%;
+  z-index:0;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.06));
+}
+
+.animal-dot .dot-label{
+  position:relative;
+  z-index:1;
+  width:78%;
+  margin-bottom:10px;
+  background:rgba(255,255,255,.88);
+  border:1px solid rgba(255,255,255,.65);
+  border-radius:999px;
+  padding:4px 4px 3px;
+  backdrop-filter:blur(2px);
+}
+
+.animal-dot .dot-id{
   display:block;
-  font-size:10px;
-  font-weight:700;
-  color:#6f7d73;
-  margin-top:2px;
+  font-size:12px;
+  font-weight:900;
+  color:#173126;
 }
 
-.animal-dot.is-high{ background:#eef8f0; border-color:#bfe0c8; }
-.animal-dot.is-med{ background:#f7f8ed; border-color:#dde0bf; }
-.animal-dot.is-low{ background:#fbf4e9; border-color:#ead7b8; }
-.animal-dot.is-dry{ background:#f4f4f4; border-color:#d8d8d8; }
-.animal-dot.is-preg{ box-shadow: inset 0 0 0 2px rgba(14,160,90,.14); }
-.animal-dot.is-selected{
-  border-color:var(--mbk-green);
-  box-shadow:0 0 0 3px rgba(14,160,90,.12);
+.animal-dot .dot-sub{
+  display:block;
+  font-size:9px;
+  font-weight:800;
+  color:#5f7065;
+  margin-top:1px;
+}
+
+.animal-dot.shape-cow::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23e9f5ec' stroke='%23bfdcc6' stroke-width='3' d='M20 49c0-10 8-18 18-18h28c10 0 19 2 27 8l8 6c6 4 8 12 5 18l-2 5c-2 4-6 7-11 7H31c-8 0-14-7-14-15 0-5 1-8 3-11z'/><path fill='%23e9f5ec' stroke='%23bfdcc6' stroke-width='3' d='M25 40V25c0-6 4-10 10-10h4c8 0 14 6 14 14v10'/><path fill='%23e9f5ec' stroke='%23bfdcc6' stroke-width='3' d='M53 21l-9-8-6 10M74 21l9-8 6 10'/><path stroke='%23bfdcc6' stroke-width='4' stroke-linecap='round' d='M33 74v13M51 74v13M75 74v13M93 74v13M101 44l12-6'/><circle cx='46' cy='34' r='2.5' fill='%2380a28a'/><circle cx='62' cy='34' r='2.5' fill='%2380a28a'/></svg>");
+}
+
+.animal-dot.shape-buffalo::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23eef1f5' stroke='%23c8d0db' stroke-width='3' d='M18 50c0-11 9-20 20-20h28c11 0 20 3 29 10l7 5c6 4 8 13 4 19l-2 4c-2 4-6 7-11 7H31c-8 0-15-7-15-15 0-4 1-8 2-10z'/><path fill='%23eef1f5' stroke='%23c8d0db' stroke-width='3' d='M27 39V24c0-6 5-11 11-11h5c8 0 14 6 14 14v12'/><path fill='none' stroke='%23c8d0db' stroke-width='5' stroke-linecap='round' d='M44 20C34 10 22 11 13 17M72 20c10-10 22-9 31-3'/><path stroke='%23c8d0db' stroke-width='4' stroke-linecap='round' d='M34 74v13M52 74v13M76 74v13M94 74v13M102 45l11-4'/><circle cx='47' cy='34' r='2.5' fill='%23828c99'/><circle cx='63' cy='34' r='2.5' fill='%23828c99'/></svg>");
+}
+
+.animal-dot.shape-calf::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23f7efe7' stroke='%23e3cdb6' stroke-width='3' d='M25 52c0-9 7-16 16-16h24c9 0 17 2 24 7l7 5c5 4 6 10 4 16l-1 4c-2 4-6 6-10 6H37c-7 0-12-6-12-13z'/><path fill='%23f7efe7' stroke='%23e3cdb6' stroke-width='3' d='M30 43V31c0-6 4-10 10-10h4c8 0 13 6 13 13v9'/><path stroke='%23e3cdb6' stroke-width='4' stroke-linecap='round' d='M39 74v11M54 74v11M74 74v11M89 74v11M99 47l10-5'/><circle cx='48' cy='38' r='2.3' fill='%23b5987a'/><circle cx='62' cy='38' r='2.3' fill='%23b5987a'/></svg>");
+}
+
+.animal-dot.is-high::before{ filter:drop-shadow(0 2px 4px rgba(14,160,90,.18)); }
+.animal-dot.is-med::before{ filter:drop-shadow(0 2px 4px rgba(140,140,40,.16)); }
+.animal-dot.is-low::before{ filter:drop-shadow(0 2px 4px rgba(180,120,30,.16)); }
+.animal-dot.is-dry::before{ opacity:.82; }
+.animal-dot.is-preg .dot-label{ box-shadow:0 0 0 2px rgba(14,160,90,.12); }
+.animal-dot.is-selected::after{
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border-radius:20px;
+  border:2px solid var(--mbk-green);
+  box-shadow:0 0 0 3px rgba(14,160,90,.10);
+  z-index:0;
 }
 
 .barn-empty{
@@ -1229,9 +1276,10 @@ function createAnimalDot(an, panel){
   const core = getAnimalCore(an);
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = dotClass(an);
+  const shapeClass = core.young ? 'shape-calf' : (core.sp === 'جاموس' ? 'shape-buffalo' : 'shape-cow');
+  btn.className = `${dotClass(an)} ${shapeClass}`;
   btn.setAttribute('data-animal-id', core.id);
-  btn.innerHTML = `<span>${core.id}</span>${core.young ? `<small>${core.sexText}</small>` : `<small>${core.milk > 0 ? core.milk.toFixed(0)+'ك' : core.status}</small>`}`;
+  btn.innerHTML = `<span class="dot-label"><span class="dot-id">${core.id}</span><span class="dot-sub">${core.young ? core.sexText : (core.milk > 0 ? core.milk.toFixed(0)+'ك' : core.status)}</span></span>`;
 
   btn.addEventListener('click', (ev) => {
     ev.preventDefault();
