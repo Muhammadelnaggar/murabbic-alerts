@@ -1175,6 +1175,17 @@ function bindAnimalPanelClose(root){
   });
 }
 
+function scrollToAnimalPanel(panel){
+  if (!panel) return;
+  requestAnimationFrame(() => {
+    try {
+      panel.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'nearest' });
+    } catch (_) {
+      panel.scrollIntoView();
+    }
+  });
+}
+
 function showAnimalPanel(an){
   state.selectedAnimalId = String(an?.animalNumber || an?.number || an?.id || '');
   const panel = $('#animalPanel');
@@ -1182,6 +1193,7 @@ function showAnimalPanel(an){
   panel.innerHTML = animalSummaryHTML(an);
   panel.hidden = false;
   bindAnimalPanelClose(panel);
+  scrollToAnimalPanel(panel);
 }
 
 function hideAnimalPop(){
