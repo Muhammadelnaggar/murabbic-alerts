@@ -1168,8 +1168,10 @@ function bindAnimalPanelClose(root){
     state.selectedAnimalId = null;
     hideAnimalPop();
     const panel = $('#animalPanel');
-    if (panel) panel.hidden = true;
-    refreshCurrentView();
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = '';
+    }
   });
 }
 
@@ -1217,10 +1219,16 @@ function createAnimalDot(an){
   btn.setAttribute('data-animal-id', core.id);
   btn.innerHTML = `<span>${core.id}</span>${core.young ? `<small>${core.sexText}</small>` : `<small>${core.milk > 0 ? core.milk.toFixed(0)+'ك' : core.status}</small>`}`;
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
     showAnimalPanel(an);
-    refreshCurrentView();
+    hideAnimalPop();
   });
+  btn.addEventListener('touchstart', () => {
+    showAnimalPanel(an);
+    hideAnimalPop();
+  }, { passive:true });
   btn.addEventListener('mouseenter', () => {
     if (window.innerWidth >= 860) showAnimalPop(an, btn);
   });
@@ -1772,6 +1780,15 @@ $('#refreshBtn').addEventListener('click', async ()=>{
 /* ============= تشخيص للأخطاء العامة ============= */
 window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
 window.addEventListener('unhandledrejection', e => console.error('Promise Rejection:', e.reason));
+
+
+document.addEventListener('click', (e) => {
+  if (window.innerWidth >= 860) {
+    const insideDot = e.target.closest('.animal-dot');
+    const insidePop = e.target.closest('#animalPop');
+    if (!insideDot && !insidePop) hideAnimalPop();
+  }
+});
 
 /* ============= تشغيل ============= */
 window.dataLayer = window.dataLayer || [];
