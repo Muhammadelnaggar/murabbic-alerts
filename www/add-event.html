@@ -134,7 +134,9 @@
 }
 
 .btn-import-milk{
-  width:100%;
+  display:block;
+  width:calc(100% - 24px);
+  margin:12px 12px 84px;
   padding:15px 16px;
   border:none;
   border-radius:14px;
@@ -237,16 +239,7 @@
   </div>
 
   <div id="inlineMsg"><div class="text"></div></div>
-  <div class="import-box" id="milkImportBox">
-  <div class="import-title">استيراد اللبن اليومي</div>
-  <div class="import-sub">
-    من المحالب أو برفع ملف أو إدخال باتش — هذا المسار غير مرتبط بأرقام الحيوانات من هذه الصفحة
-  </div>
-  <button type="button" class="btn-import-milk" id="btnMilkImport">
-    📥 استيراد اللبن / باتش
-    <small>رفع ملف • ربط محلب • إدخال جماعي • مع تأجيل التزامن</small>
-  </button>
-</div>
+
   <div class="grid" id="eventButtons">
     <button class="btn" data-page="calving.html">👶 ولادة</button>
     <button class="btn" data-page="insemination.html">📅 تلقيح</button>
@@ -273,7 +266,7 @@
     <button class="btn" data-page="sale.html">💰 بيع</button>
     <button class="btn" data-page="smart-camera.html">🤖 الكاميرا الذكية</button>
   </div>
-
+ <button type="button" class="btn-import-milk" id="btnMilkImport">📥 استيراد اللبن / باتش</button>
   <script>window.dataLayer = window.dataLayer || [];</script>
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
