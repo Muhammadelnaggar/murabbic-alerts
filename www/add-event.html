@@ -187,6 +187,7 @@
     <button class="btn" data-page="dry-off.html">🚫 تجفيف</button>
     <button class="btn" data-page="close-up.html">🍼 تحضير للولادة</button>
     <button class="btn" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
+    <button class="btn" data-page="daily-milk-import.html">📥 استيراد اللبن / باتش</button>
     <button class="btn" data-page="nutrition.html">🌿 تغذية</button>
     <button class="btn" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
     <button class="btn" data-page="disease.html">🔬 التشخيص</button>
@@ -423,7 +424,15 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
         let date = norm($('#eventDate').value) || todayISO();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+const isDailyMilkImport = /daily-milk-import\.html/i.test(String(targetPage || ''));
 
+// ✅ صفحة استيراد اللبن لا تحتاج رقم حيوان، فقط التاريخ
+if (isDailyMilkImport){
+  $('#warn').textContent = '';
+  $('#animalInfo').textContent = '🥛 استيراد اللبن اليومي / باتش';
+  updateCowCardNav('', true);
+  return { mode:'import', date };
+}
         if (!list.length){
           $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
           updateCowCardNav('', false);
@@ -468,7 +477,12 @@ const isWeaning = /weaning\.html/i.test(String(page));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(page));
 const isColostrum = /colostrum-feeding\.html/i.test(String(page));
 const isDailyMilk = /daily-milk\.html/i.test(String(page));
-
+const isDailyMilkImport = /daily-milk-import\.html/i.test(String(page));
+        if (isDailyMilkImport) {
+  u.searchParams.set('mode', 'import');
+  u.searchParams.set('source', 'batch');
+}
+else if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
 if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
   u.searchParams.set('mbkMode', 'group');
   u.searchParams.set('bulk', ctx.bulk);
