@@ -12,7 +12,7 @@
 
   <link rel="stylesheet" href="css/forms.css">
   <script type="module" src="js/forms-init.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     :root{
       --green:#0ea05a;
@@ -356,11 +356,11 @@
 102, 10, 9, 8
 103, 6, 5"></textarea>
      <div class="hint">
-  الصيغ المقبولة حاليًا: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. كما يمكن للصفحة قراءة ملفات فيها أعمدة إضافية وهيدر مثل رقم الحيوان / الإجمالي / الحلبات، سواء كانت CSV أو TXT أو مفصولة بفاصلة أو فاصلة منقوطة أو Tab.
+  يمكنك رفع CSV أو TXT أو Excel مباشرة. الصيغ المقبولة: رقم + إجمالي، أو رقم + حلبتين، أو رقم + 3 حلبات. كما يمكن للصفحة قراءة ملفات فيها أعمدة إضافية وهيدر مثل رقم الحيوان / الإجمالي / الحلبات.
 </div>
       </div>
 
-      <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hide" />
+     <input id="fileInput" type="file" accept=".csv,.txt,.xlsx,.xls,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hide" />
      <div class="btn-row">
   <button type="button" id="loadFileBtn" class="btn btn-ghost">تحميل ملف المحلب</button>
   <button type="button" id="previewBtn" class="btn btn-primary">معاينة</button>
@@ -725,6 +725,48 @@ function buildManualMap(){
     s2Idx: Number(mapS2.value),
     s3Idx: Number(mapS3.value)
   };
+}
+    function isExcelFile(file){
+  const name = String(file?.name || '').toLowerCase();
+  return name.endsWith('.xlsx') || name.endsWith('.xls');
+}
+
+function sheetRowsToText(rows){
+  return rows
+    .map(row => (Array.isArray(row) ? row : []))
+    .map(row => row.map(cell => {
+      if (cell == null) return '';
+      return String(cell).trim();
+    }).join(','))
+    .join('\n');
+}
+
+async function readExcelFileAsText(file){
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type:'array' });
+
+  const firstSheetName = workbook.SheetNames?.[0];
+  if (!firstSheetName){
+    throw new Error('EMPTY_WORKBOOK');
+  }
+
+  const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet){
+    throw new Error('EMPTY_SHEET');
+  }
+
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: '',
+    blankrows: false,
+    raw: false
+  });
+
+  if (!rows || !rows.length){
+    throw new Error('NO_ROWS');
+  }
+
+  return sheetRowsToText(rows);
 }
 function parseRawText(text){
   const lines = String(text || '')
@@ -1152,39 +1194,48 @@ if (looksLikeHeader(line)){
       showBar('err', 'تعذر حفظ السجلات الآن.');
     }
 
-    function clearAll(){
-      hideBar();
-      batchInput.value = '';
-      fileInput.value = '';
-      fileTextCache = '';
-      previewData = [];
-      hideColumnMap();
-      renderPreview([]);
-    }
-
+   function clearAll(){
+  hideBar();
+  batchInput.value = '';
+  fileInput.value = '';
+  fileTextCache = '';
+  previewData = [];
+  parsedLinesCache = [];
+  detectedHeaderParts = null;
+  hideColumnMap();
+  renderPreview([]);
+}
 
       loadFileBtn.addEventListener('click', () => {
       fileInput.click();
     });
 
-    fileInput.addEventListener('change', async (e) => {
-      const f = e.target.files?.[0];
-      if (!f){
-        fileTextCache = '';
-        return;
-      }
+   fileInput.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0];
+  if (!f){
+    fileTextCache = '';
+    return;
+  }
 
-      try{
-        const text = await f.text();
-        fileTextCache = text;
-        batchInput.value = text;
-        showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
-      }catch(err){
-        console.error(err);
-        fileTextCache = '';
-        showBar('err', 'تعذر قراءة ملف المحلب.');
-      }
-    });
+  try{
+    let text = '';
+
+    if (isExcelFile(f)){
+      text = await readExcelFileAsText(f);
+    } else {
+      text = await f.text();
+    }
+
+    fileTextCache = text;
+    batchInput.value = text;
+    showBar('ok', `تم تحميل ملف المحلب وإدراجه داخل البيانات: ${f.name}`);
+  }catch(err){
+    console.error(err);
+    fileTextCache = '';
+    batchInput.value = '';
+    showBar('err', 'تعذر قراءة ملف المحلب. تأكد أن الملف Excel أو CSV أو TXT صالح.');
+  }
+});
 previewBtn.addEventListener('click', makePreview);
 clearBtn.addEventListener('click', clearAll);
 
