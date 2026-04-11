@@ -74,9 +74,10 @@
  <main class="mbk-main">
   <form id="animalForm" class="mbk-form">
     <div id="msg"></div>
-   <div id="entryTypeBox" class="entry-type-box">
+<div id="entryTypeBox" class="entry-type-box">
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
   <button type="button" id="btnFollowers" class="entry-tab">توابع</button>
+  <button type="button" id="btnImport" class="entry-tab">استيراد</button>
 </div>
 
 <input type="hidden" id="entryType" value="mothers" data-field="entryType" />
@@ -167,6 +168,42 @@
     <label for="followerPregnancyDays">عدد أيام الحمل:</label>
 <input type="number" id="followerPregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" data-field="followerPregnancyDays" />  </div>
 </div>
+    <div id="importFields" class="hidden-block">
+  <label for="importKind">نوع الاستيراد:</label>
+  <select id="importKind">
+    <option value="mothers">أمهات</option>
+    <option value="followers">توابع</option>
+  </select>
+
+  <label for="importFile">ملف الاستيراد:</label>
+  <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" />
+
+  <div class="hint">
+    ارفع ملف القطيع كما هو، ثم راجع المعاينة قبل الحفظ.
+  </div>
+
+  <div class="btn-row">
+    <button type="button" id="previewImportBtn">معاينة الملف</button>
+    <button type="button" id="saveImportBtn">حفظ الاستيراد</button>
+  </div>
+
+  <div id="importMsg" class="toast"></div>
+
+  <div class="preview-wrap hidden-block" id="importPreviewWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>رقم الحيوان</th>
+          <th>النوع</th>
+          <th>السلالة</th>
+          <th>الحالة</th>
+          <th>الحالة</th>
+        </tr>
+      </thead>
+      <tbody id="importPreviewRows"></tbody>
+    </table>
+  </div>
+</div>
     <button type="submit">📥 تسجيل الحيوان</button>
     <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
     <div id="popupBox" class="mbk-popup">
@@ -193,11 +230,13 @@
       const daysInMilk = document.getElementById('daysInMilk');
       const pregnancyBox = document.getElementById('pregnancyBox');
       const pregnancyDays = document.getElementById('pregnancyDays');
-      const entryType = document.getElementById('entryType');
+const entryType = document.getElementById('entryType');
 const btnMothers = document.getElementById('btnMothers');
 const btnFollowers = document.getElementById('btnFollowers');
+const btnImport = document.getElementById('btnImport');
 const mothersFields = document.getElementById('mothersFields');
 const followersFields = document.getElementById('followersFields');
+const importFields = document.getElementById('importFields');
 const followerSex = document.getElementById('followerSex');
 const followerStatus = document.getElementById('followerStatus');
 const damNumber = document.getElementById('damNumber');
@@ -372,6 +411,26 @@ function setEntryMode(mode){
     'reproductiveStatus'
   ];
 
+ function setEntryMode(mode){
+  entryType.value = mode;
+
+  const mothers = (mode === "mothers");
+  const followers = (mode === "followers");
+  const importing = (mode === "import");
+
+  mothersFields.classList.toggle('hidden-block', !mothers);
+  followersFields.classList.toggle('hidden-block', !followers);
+  importFields.classList.toggle('hidden-block', !importing);
+
+  btnMothers.classList.toggle('active', mothers);
+  btnFollowers.classList.toggle('active', followers);
+  btnImport.classList.toggle('active', importing);
+
+  const motherRequiredIds = [
+    'productionStatus',
+    'reproductiveStatus'
+  ];
+
   const followerRequiredIds = [
     'followerSex',
     'followerStatus',
@@ -385,16 +444,30 @@ function setEntryMode(mode){
 
   followerRequiredIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.required = !mothers;
+    if (el) el.required = followers;
   });
 
   if (weaningDate) {
-    weaningDate.required = (!mothers && followerStatus.value === "فطام");
+    weaningDate.required = (followers && followerStatus.value === "فطام");
   }
 
   if (followerLastInseminationDate) {
-    followerLastInseminationDate.required = (!mothers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
+    followerLastInseminationDate.required = (followers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
   }
+
+  const disableManualCore = importing;
+  [
+    'animalNumber','animalType','breed','birthDate',
+    'productionStatus','dailyMilk','reproductiveStatus',
+    'servicesCount','lactationNumber','lastCalvingDate',
+    'daysInMilk','pregnancyDays','lastInseminationDate','sireNumber',
+    'followerSex','followerStatus','damNumber','weaningDate',
+    'followerLastInseminationDate','followerServicesCount',
+    'followerSireNumber','followerPregnancyDays'
+  ].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.disabled = disableManualCore;
+  });
 
   toggleCalvingForLactation();
   toggleMilkFieldLocal();
@@ -406,8 +479,9 @@ function setEntryMode(mode){
       ['change','input'].forEach(e=>lastCalvingDate.addEventListener(e,computeDIM));
       ['change','input'].forEach(e=>lastInseminationDate.addEventListener(e,computePregnancy));
      
-     btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
-     btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
+btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
+btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
+btnImport.addEventListener('click', ()=> setEntryMode('import'));
       followerSex.addEventListener('change', ()=>{
   updateFollowerStatusOptions();
   toggleFollowerFields();
@@ -541,6 +615,9 @@ function showPopup(msg, ok=true){
 }
 
 form.addEventListener("mbk:valid", async (e)=>{
+  if (document.getElementById("entryType")?.value === "import"){
+  return;
+}
  const formData = e.detail?.formData || {};
 msgDiv.style.display = "none";
 
