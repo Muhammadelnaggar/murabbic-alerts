@@ -55,61 +55,81 @@
   color: #c62828;
 }
 .entry-type-box{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin:10px 0 16px;
+  display:flex;
+  align-items:flex-end;
+  gap:18px;
+  margin:8px 0 18px;
+  padding:0 2px;
+  border-bottom:1px solid #e5e7eb;
 }
 
 .entry-tab{
   appearance:none;
-  border:1px solid #d9e6db;
-  background:linear-gradient(180deg,#ffffff 0%, #f7faf7 100%);
-  color:#1f2937;
-  border-radius:16px;
-  padding:14px 10px;
-  min-height:52px;
+  border:none;
+  background:transparent;
+  color:#6b7280;
   font-family:'Cairo',system-ui,sans-serif;
-  font-size:16px;
+  font-size:15px;
   font-weight:800;
+  padding:10px 2px 14px;
+  margin:0;
+  min-height:auto;
+  border-radius:0;
   cursor:pointer;
-  box-shadow:0 4px 14px rgba(15,23,42,.05);
-  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+  box-shadow:none;
+  position:relative;
+  transition:color .18s ease, opacity .18s ease;
 }
 
 .entry-tab:hover{
-  transform:translateY(-1px);
-  box-shadow:0 8px 22px rgba(15,23,42,.08);
-  border-color:#b9d8bf;
+  background:transparent;
+  color:#111827;
+  transform:none;
+  box-shadow:none;
 }
 
 .entry-tab:active{
-  transform:scale(.98);
+  transform:none;
 }
 
 .entry-tab.active{
-  background:linear-gradient(180deg,#18b663 0%, #0e9f57 100%);
-  color:#fff;
-  border-color:#0e9f57;
-  box-shadow:0 10px 24px rgba(14,159,87,.22);
+  background:transparent;
+  color:#0e9f57;
+  border:none;
+  box-shadow:none;
+}
+
+.entry-tab.active::after{
+  content:"";
+  position:absolute;
+  inset-inline:0;
+  bottom:-1px;
+  height:3px;
+  border-radius:999px 999px 0 0;
+  background:#0e9f57;
 }
 
 .entry-tab:focus-visible{
   outline:none;
-  box-shadow:0 0 0 3px rgba(14,159,87,.16);
+  color:#111827;
+  box-shadow:none;
 }
 
 @media (max-width:640px){
   .entry-type-box{
-    grid-template-columns:1fr 1fr 1fr;
-    gap:8px;
+    gap:14px;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+
+  .entry-type-box::-webkit-scrollbar{
+    display:none;
   }
 
   .entry-tab{
-    font-size:15px;
-    padding:12px 8px;
-    min-height:48px;
-    border-radius:14px;
+    flex:0 0 auto;
+    font-size:14px;
+    padding:10px 0 12px;
   }
 }
   </style>
