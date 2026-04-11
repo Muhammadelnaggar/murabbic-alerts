@@ -160,24 +160,11 @@
 }
 
 .mbk-page-bottom-bar{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:9998;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  background:#ffffff;
-  border-top:1px solid #e5e7eb;
-  box-shadow:0 -6px 20px rgba(15,23,42,.06);
-}
 
 .mbk-bottom-btn{
   appearance:none;
-  min-height:50px;
-  border-radius:14px;
+  min-height:48px;
+  border-radius:12px;
   text-decoration:none;
   display:flex;
   align-items:center;
@@ -186,7 +173,7 @@
   font-size:15px;
   font-weight:800;
   cursor:pointer;
-  transition:transform .12s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+  transition:transform .12s ease, background .18s ease, color .18s ease, border-color .18s ease;
 }
 
 .mbk-bottom-btn:active{
@@ -194,18 +181,8 @@
 }
 
 .mbk-bottom-btn-primary{
-  border:none;
-  background:#16a34a;
-  color:#fff;
-  box-shadow:0 8px 18px rgba(22,163,74,.18);
-}
 
 .mbk-bottom-btn-ghost{
-  border:1px solid #dbe4dc;
-  background:#fff;
-  color:#0f172a;
-  box-shadow:0 4px 12px rgba(15,23,42,.05);
-}
 
 @media (max-width:640px){
   .mbk-page-bottom-bar{
@@ -651,7 +628,6 @@ btnImport.addEventListener('click', ()=> setEntryMode('import'));
       primaryActionBtn.addEventListener('click', (e) => {
   if (entryType.value === 'import'){
     e.preventDefault();
-    document.getElementById('saveImportBtn')?.click();
   }
 });
       followerSex.addEventListener('change', ()=>{
@@ -761,11 +737,7 @@ const setMsg = (t, ok=false) => {
         location.href = DASHBOARD_URL;
       }
     });
-    document.getElementById("cancelLink")?.addEventListener("click",(e)=>{
-      e.preventDefault();
-      if (__hasAnimals === false){ alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع."); return; }
-      location.href = DASHBOARD_URL;
-    });
+   
   });
 
   const normAnimaltype = (ar)=>{
