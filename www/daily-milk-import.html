@@ -776,16 +776,44 @@ async function loadUserAnimalNumbers(uid){
 
 function validateRowsAgainstAnimals(rows){
   const animalSet = existingAnimalSet || new Set();
+  const seen = new Set();
 
   return rows.map(row => {
     if (!row.valid) return row;
 
     const n = normAnimalNo(row.animalNumber || '');
-    if (!n || !animalSet.has(n)){
+
+    if (!n){
+      return {
+        ...row,
+        valid: false,
+        reason: 'رقم الحيوان غير صالح'
+      };
+    }
+
+    if (seen.has(n)){
+      return {
+        ...row,
+        valid: false,
+        reason: 'رقم مكرر داخل نفس الملف'
+      };
+    }
+
+    seen.add(n);
+
+    if (!animalSet.has(n)){
       return {
         ...row,
         valid: false,
         reason: 'رقم الحيوان غير موجود في مربيك'
+      };
+    }
+
+    if (!(Number(row.total || 0) > 0)){
+      return {
+        ...row,
+        valid: false,
+        reason: 'إجمالي اللبن غير صالح'
       };
     }
 
@@ -843,7 +871,17 @@ renderPreview(checkedRows);
 
   const validCount = checkedRows.filter(x => x.valid).length;
 const invalidCount = checkedRows.length - validCount;
+const reasonCounts = {};
+checkedRows
+  .filter(x => !x.valid)
+  .forEach(x => {
+    const key = x.reason || 'مرفوض';
+    reasonCounts[key] = (reasonCounts[key] || 0) + 1;
+  });
 
+const reasonsText = Object.entries(reasonCounts)
+  .map(([k, v]) => `${k}: ${v}`)
+  .join(' — ');
   if (!validCount){
     showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
     return;
@@ -851,7 +889,7 @@ const invalidCount = checkedRows.length - validCount;
 
 if (autoLoaded && sourceLabel){
   if (invalidCount > 0){
-    showBar('warn', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز و${invalidCount} صف مرفوض.`);
+    showBar('warn', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز و${invalidCount} صف مرفوض. ${reasonsText}`);
   } else {
     showBar('ok', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز للحفظ.`);
   }
@@ -859,7 +897,7 @@ if (autoLoaded && sourceLabel){
 }
 
 if (invalidCount > 0){
-  showBar('warn', `تمت المعاينة — ${validCount} صف جاهز و${invalidCount} صف مرفوض.`);
+  showBar('warn', `تمت المعاينة — ${validCount} صف جاهز و${invalidCount} صف مرفوض. ${reasonsText}`);
 } else {
   showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
 }
@@ -1264,7 +1302,7 @@ if (looksLikeHeader(line)){
             <td>${row.s2 ? row.s2.toFixed(1) : '—'}</td>
             <td>${row.s3 ? row.s3.toFixed(1) : '—'}</td>
             <td>${row.total ? row.total.toFixed(1) : '0.0'}</td>
-            <td class="${statusClass}">${statusText}</td>
+          <td class="${statusClass}" title="${row.reason || ''}">${statusText}</td>
           </tr>
         `;
       }).join('');
