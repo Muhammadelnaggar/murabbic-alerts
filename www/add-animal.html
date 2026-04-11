@@ -139,18 +139,11 @@
     padding:10px 12px 12px;
   }
 }
-    .import-actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:14px;
-}
-
-.btn-import-primary,
-.btn-import-secondary,
-.import-dashboard-link{
+   .btn-import-secondary{
   appearance:none;
-  border:none;
+  border:1px solid #dbe4dc;
+  background:#fff;
+  color:#0f172a;
   text-decoration:none;
   display:flex;
   align-items:center;
@@ -161,40 +154,63 @@
   font-size:15px;
   font-weight:800;
   cursor:pointer;
+  box-shadow:0 4px 12px rgba(15,23,42,.05);
+}
+
+.mbk-page-bottom-bar{
+  position:sticky;
+  bottom:0;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:18px;
+  padding-top:10px;
+  background:#fff;
+}
+
+.mbk-bottom-btn{
+  appearance:none;
+  min-height:50px;
+  border-radius:14px;
+  text-decoration:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Cairo',system-ui,sans-serif;
+  font-size:15px;
+  font-weight:800;
+  cursor:pointer;
   transition:transform .12s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
 }
 
-.btn-import-primary{
+.mbk-bottom-btn:active{
+  transform:scale(.985);
+}
+
+.mbk-bottom-btn-primary{
+  border:none;
   background:#16a34a;
   color:#fff;
   box-shadow:0 8px 18px rgba(22,163,74,.18);
 }
 
-.btn-import-secondary,
-.import-dashboard-link{
+.mbk-bottom-btn-ghost{
+  border:1px solid #dbe4dc;
   background:#fff;
   color:#0f172a;
-  border:1px solid #dbe4dc;
   box-shadow:0 4px 12px rgba(15,23,42,.05);
 }
 
-.btn-import-primary:active,
-.btn-import-secondary:active,
-.import-dashboard-link:active{
-  transform:scale(.985);
-}
-
-.import-dashboard-link{
-  grid-column:1 / -1;
-}
-
 @media (max-width:640px){
-  .import-actions{
-    grid-template-columns:1fr;
+  .mbk-page-bottom-bar{
+    grid-template-columns:1fr 1fr;
+    gap:8px;
   }
 
-  .import-dashboard-link{
-    grid-column:auto;
+  .mbk-bottom-btn,
+  .btn-import-secondary{
+    min-height:48px;
+    font-size:14px;
   }
 }
   </style>
@@ -333,10 +349,8 @@
     ارفع ملف القطيع كما هو، ثم راجع المعاينة قبل الحفظ.
   </div>
 
- <div class="btn-row import-actions">
+<div class="btn-row">
   <button type="button" id="previewImportBtn" class="btn-import-secondary">معاينة الملف</button>
-  <button type="button" id="saveImportBtn" class="btn-import-primary">حفظ الاستيراد</button>
-  <a href="dashboard.html" id="importDashboardBtn" class="btn-import-secondary import-dashboard-link">لوحة التحكم</a>
 </div>
 
   <div id="importMsg" class="toast"></div>
@@ -356,9 +370,9 @@
     </table>
   </div>
 </div>
-   <div id="manualActions">
-  <button type="submit">📥 تسجيل الحيوان</button>
-  <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
+  <div id="pageBottomBar" class="mbk-page-bottom-bar">
+  <button type="submit" id="primaryActionBtn" class="mbk-bottom-btn mbk-bottom-btn-primary">📥 تسجيل الحيوان</button>
+  <a href="dashboard.html" id="dashboardBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">لوحة التحكم</a>
 </div>
     <div id="popupBox" class="mbk-popup">
   <div class="mbk-popup-content" id="popupContent"></div>
@@ -392,7 +406,8 @@ const sharedAnimalFields = document.getElementById('sharedAnimalFields');
 const mothersFields = document.getElementById('mothersFields');
 const followersFields = document.getElementById('followersFields');
 const importFields = document.getElementById('importFields');
-const manualActions = document.getElementById('manualActions');
+const primaryActionBtn = document.getElementById('primaryActionBtn');
+const dashboardBtn = document.getElementById('dashboardBtn');
 const followerSex = document.getElementById('followerSex');
 const followerStatus = document.getElementById('followerStatus');
 const damNumber = document.getElementById('damNumber');
@@ -565,7 +580,7 @@ sharedAnimalFields.classList.toggle('hidden-block', importing);
 mothersFields.classList.toggle('hidden-block', !mothers);
 followersFields.classList.toggle('hidden-block', !followers);
 importFields.classList.toggle('hidden-block', !importing);
-manualActions.classList.toggle('hidden-block', importing);
+primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 تسجيل الحيوان';
 
   btnMothers.classList.toggle('active', mothers);
   btnFollowers.classList.toggle('active', followers);
@@ -627,6 +642,12 @@ manualActions.classList.toggle('hidden-block', importing);
 btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
 btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
 btnImport.addEventListener('click', ()=> setEntryMode('import'));
+      primaryActionBtn.addEventListener('click', (e) => {
+  if (entryType.value === 'import'){
+    e.preventDefault();
+    document.getElementById('saveImportBtn')?.click();
+  }
+});
       followerSex.addEventListener('change', ()=>{
   updateFollowerStatusOptions();
   toggleFollowerFields();
