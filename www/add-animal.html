@@ -396,20 +396,7 @@ function toggleFollowerFields(){
     computeFollowerPregnancy();
   }
 }
-function setEntryMode(mode){
-  entryType.value = mode;
 
-  const mothers = (mode === "mothers");
-  mothersFields.classList.toggle('hidden-block', !mothers);
-  followersFields.classList.toggle('hidden-block', mothers);
-
-  btnMothers.classList.toggle('active', mothers);
-  btnFollowers.classList.toggle('active', !mothers);
-
-  const motherRequiredIds = [
-    'productionStatus',
-    'reproductiveStatus'
-  ];
 
  function setEntryMode(mode){
   entryType.value = mode;
