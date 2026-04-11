@@ -356,7 +356,7 @@
 102, 10, 9, 8
 103, 6, 5"></textarea>
  <div class="hint">
-  يمكنك رفع ملف المحلب مباشرة أو لصق البيانات، ثم مراجعة المعاينة قبل الحفظ.
+  ارفع ملف المحلب كما هو، ثم راجع المعاينة قبل الحفظ.
 </div>
       </div>
 
@@ -366,11 +366,7 @@
   <button type="button" id="previewBtn" class="btn btn-primary">معاينة</button>
   <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
 </div>
-      <div id="columnMapBox" class="card hide" style="padding:12px; margin-top:12px">
-  <div class="title" style="font-size:16px; margin-bottom:8px">تعيين أعمدة ملف المحلب</div>
- <div class="muted" style="margin-bottom:10px">
-  عند الحاجة، حدّد الأعمدة المطلوبة ثم اضغط "تطبيق".
-</div>
+     
 
   <div class="row">
     <div class="col">
@@ -474,13 +470,6 @@
     const previewWrap = $('previewWrap');
     const previewRows = $('previewRows');
     const sysbar = $('sysbar');
-    const columnMapBox = $('columnMapBox');
-    const mapAnimal = $('mapAnimal');
-    const mapTotal = $('mapTotal');
-    const mapS1 = $('mapS1');
-    const mapS2 = $('mapS2');
-    const mapS3 = $('mapS3');
-    const applyMapBtn = $('applyMapBtn');
     const kpiRows = $('kpiRows');
     const kpiValid = $('kpiValid');
     const kpiInvalid = $('kpiInvalid');
@@ -552,41 +541,45 @@ function makeDailyMilkDocId(uid, animalNumber, eventDate){
 }
 
 function looksLikeHeader(line){
-  const s = latinDigits(String(line || '').trim().toLowerCase());
+  const s = normalizeHeaderCell(line);
   if (!s) return false;
 
-  return (
-    s.includes('animal') ||
-    s.includes('cow') ||
-    s.includes('buffalo') ||
-    s.includes('number') ||
-    s.includes('no') ||
-    s.includes('tag') ||
-    s.includes('ear tag') ||
-    s.includes('id') ||
-    s.includes('milk') ||
-    s.includes('yield') ||
-    s.includes('qty') ||
-    s.includes('quantity') ||
-    s.includes('session') ||
-    s.includes('milking') ||
-    s.includes('morning') ||
-    s.includes('evening') ||
-    s.includes('night') ||
-    s.includes('parlor') ||
-    s.includes('total') ||
-    s.includes('kg') ||
-    s.includes('production') ||
-    s.includes('رقم') ||
-    s.includes('الحيوان') ||
-    s.includes('لبن') ||
-    s.includes('حلب') ||
-    s.includes('اجمالي') ||
-    s.includes('إجمالي') ||
-    s.includes('المحلب')
-  );
-}
+  const headerHints = [
+    'animal number',
+    'animal no',
+    'animal id',
+    'cow id',
+    'buffalo id',
+    'ear tag',
+    'tag number',
+    'tag no',
+    'milk total',
+    'total milk',
+    'total',
+    'yield total',
+    'morning milk',
+    'evening milk',
+    'night milk',
+    'milking date',
+    'session 1',
+    'session 2',
+    'session 3',
+    'milking 1',
+    'milking 2',
+    'milking 3',
+    'رقم الحيوان',
+    'الحيوان',
+    'اجمالي اللبن',
+    'إجمالي اللبن',
+    'تاريخ الحلب',
+    'حلبة 1',
+    'حلبة 2',
+    'حلبة 3',
+    'المحلب'
+  ];
 
+  return headerHints.some(h => s.includes(h));
+}
 function splitSmartLine(line){
   const raw = latinDigits(String(line || '').trim());
   if (!raw) return [];
@@ -690,41 +683,8 @@ function numFromCell(v){
   const n = parseFloat(String(v || '').trim().replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
-    function fillMapSelect(selectEl, headerParts, selectedIdx){
-  const options = ['<option value="-1">— لا يوجد —</option>']
-    .concat(
-      headerParts.map((h, i) => {
-        const label = String(h || `عمود ${i + 1}`).trim() || `عمود ${i + 1}`;
-        const sel = i === selectedIdx ? 'selected' : '';
-        return `<option value="${i}" ${sel}>${label}</option>`;
-      })
-    );
 
-  selectEl.innerHTML = options.join('');
-}
 
-function showColumnMap(headerParts, colMap){
-  fillMapSelect(mapAnimal, headerParts, colMap?.animalIdx ?? -1);
-  fillMapSelect(mapTotal,  headerParts, colMap?.totalIdx ?? -1);
-  fillMapSelect(mapS1,     headerParts, colMap?.s1Idx ?? -1);
-  fillMapSelect(mapS2,     headerParts, colMap?.s2Idx ?? -1);
-  fillMapSelect(mapS3,     headerParts, colMap?.s3Idx ?? -1);
-  columnMapBox.classList.remove('hide');
-}
-
-function hideColumnMap(){
-  columnMapBox.classList.add('hide');
-}
-
-function buildManualMap(){
-  return {
-    animalIdx: Number(mapAnimal.value),
-    totalIdx: Number(mapTotal.value),
-    s1Idx: Number(mapS1.value),
-    s2Idx: Number(mapS2.value),
-    s3Idx: Number(mapS3.value)
-  };
-}
     function isGoodAutoMap(colMap){
   if (!colMap) return false;
   if (colMap.animalIdx < 0) return false;
@@ -863,15 +823,18 @@ const checkedRows = validateRowsAgainstAnimals(rows);
 previewData = checkedRows;
 renderPreview(checkedRows);
 
-  const autoMap = detectedHeaderParts?.length
-    ? detectColumnMap(detectedHeaderParts)
-    : null;
+const autoMap = detectedHeaderParts?.length
+  ? detectColumnMap(detectedHeaderParts)
+  : null;
 
-  if (detectedHeaderParts?.length && !isGoodAutoMap(autoMap)){
-    showColumnMap(detectedHeaderParts, autoMap);
-  } else {
-    hideColumnMap();
-  }
+hideColumnMap();
+
+if (detectedHeaderParts?.length && !isGoodAutoMap(autoMap)){
+  previewData = [];
+  renderPreview([]);
+  showBar('err', 'تعذر قراءة ملف المحلب بهذا التنسيق. ارفع ملف تصدير المحلب كما هو.');
+  return;
+}
 
   const validCount = checkedRows.filter(x => x.valid).length;
 const invalidCount = checkedRows.length - validCount;
@@ -1184,110 +1147,7 @@ if (looksLikeHeader(line)){
 
   return out;
 }
-    function parseWithManualMap(text, manualMap){
-  const lines = String(text || '')
-    .replace(/\r/g,'')
-    .split('\n')
-    .map(x => x.trim())
-    .filter(Boolean);
 
-  const out = [];
-
-  for (const line of lines){
-    if (looksLikeHeader(line)) continue;
-
-    const parts = splitSmartLine(line);
-    if (!parts.length) continue;
-
-    const animalNumber = manualMap.animalIdx >= 0 ? normAnimalNo(parts[manualMap.animalIdx] || '') : '';
-    const totalVal = manualMap.totalIdx >= 0 ? numFromCell(parts[manualMap.totalIdx]) : null;
-    const v1 = manualMap.s1Idx >= 0 ? numFromCell(parts[manualMap.s1Idx]) : null;
-    const v2 = manualMap.s2Idx >= 0 ? numFromCell(parts[manualMap.s2Idx]) : null;
-    const v3 = manualMap.s3Idx >= 0 ? numFromCell(parts[manualMap.s3Idx]) : null;
-
-    let s1 = 0, s2 = 0, s3 = 0, total = 0;
-    let kind = 'cow', species = 'أبقار', importMode = '';
-
-    const sessionVals = [v1, v2, v3].filter(v => v !== null && v >= 0);
-
-    if (totalVal !== null && totalVal > 0){
-      total = totalVal;
-
-      if (sessionVals.length >= 3){
-        s1 = v1 || 0;
-        s2 = v2 || 0;
-        s3 = v3 || 0;
-        importMode = 'sessions_3';
-        kind = 'cow';
-        species = 'أبقار';
-      } else if (sessionVals.length === 2){
-        s1 = v1 || 0;
-        s2 = v2 || 0;
-        importMode = 'sessions_2';
-        kind = 'buffalo';
-        species = 'جاموس';
-      } else {
-        s1 = totalVal;
-        importMode = 'total_only';
-        kind = 'cow';
-        species = 'أبقار';
-      }
-    } else if (sessionVals.length >= 3){
-      s1 = v1 || 0;
-      s2 = v2 || 0;
-      s3 = v3 || 0;
-      total = s1 + s2 + s3;
-      importMode = 'sessions_3';
-      kind = 'cow';
-      species = 'أبقار';
-    } else if (sessionVals.length === 2){
-      s1 = v1 || 0;
-      s2 = v2 || 0;
-      total = s1 + s2;
-      importMode = 'sessions_2';
-      kind = 'buffalo';
-      species = 'جاموس';
-    }
-
-    if (!animalNumber){
-      out.push({
-        raw: line,
-        animalNumber: '',
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'رقم الحيوان غير صالح'
-      });
-      continue;
-    }
-
-    if (!(total > 0)){
-      out.push({
-        raw: line,
-        animalNumber,
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'لم يتم العثور على قيم لبن صالحة'
-      });
-      continue;
-    }
-
-    out.push({
-      raw: line,
-      animalNumber,
-      s1, s2, s3,
-      total,
-      valid: true,
-      reason: '',
-      kind,
-      species,
-      importMode
-    });
-  }
-
-  return out;
-}
     function renderPreview(rows){
       previewRows.innerHTML = rows.map(row => {
         const statusClass = row.valid ? 'status-ok' : 'status-bad';
@@ -1500,19 +1360,7 @@ if (isExcelFile(f) && selectedSheetName){
 previewBtn.addEventListener('click', makePreview);
 clearBtn.addEventListener('click', clearAll);
 
-applyMapBtn.addEventListener('click', async () => {
-  const raw = String(batchInput.value || '').trim();
-  if (!raw){
-    showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
-    return;
-  }
 
-  const manualMap = buildManualMap();
-  const rows = parseWithManualMap(raw, manualMap);
-
-  hideColumnMap();
-  await applyPreviewRows(rows);
-});
 saveBtn.addEventListener('click', saveAll);
     const qs = new URLSearchParams(location.search);
     const rawDate = String(qs.get('eventDate') || qs.get('date') || '').trim();
