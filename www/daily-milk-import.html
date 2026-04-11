@@ -366,35 +366,7 @@
   <button type="button" id="previewBtn" class="btn btn-primary">معاينة</button>
   <button type="button" id="clearBtn" class="btn btn-ghost">مسح</button>
 </div>
-     
-
-  <div class="row">
-    <div class="col">
-      <label for="mapAnimal">رقم الحيوان</label>
-      <select id="mapAnimal"></select>
-    </div>
-    <div class="col">
-      <label for="mapTotal">إجمالي اللبن</label>
-      <select id="mapTotal"></select>
-    </div>
-    <div class="col">
-      <label for="mapS1">حلبة 1</label>
-      <select id="mapS1"></select>
-    </div>
-    <div class="col">
-      <label for="mapS2">حلبة 2</label>
-      <select id="mapS2"></select>
-    </div>
-    <div class="col">
-      <label for="mapS3">حلبة 3</label>
-      <select id="mapS3"></select>
-    </div>
-  </div>
-
-  <div class="btn-row">
-    <button type="button" id="applyMapBtn" class="btn btn-primary">تطبيق</button>
-  </div>
-</div>
+    
       <div class="kpi" id="kpiBar">
         <div class="box">
           <div class="n" id="kpiRows">0</div>
@@ -793,7 +765,7 @@ async function applyPreviewRows(rows, options = {}){
  if (!rows.length){
   previewData = [];
   renderPreview([]);
-  hideColumnMap();
+  
   showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
   return;
 }
@@ -802,7 +774,7 @@ const uid = getUserId();
 if (!uid){
   previewData = [];
   renderPreview([]);
-  hideColumnMap();
+  
   showBar('err', 'تعذر تحديد المستخدم الحالي.');
   return;
 }
@@ -813,7 +785,7 @@ try{
   console.error(err);
   previewData = [];
   renderPreview([]);
-  hideColumnMap();
+  
   showBar('err', 'تعذر تحميل قائمة الحيوانات من مربيك.');
   return;
 }
@@ -827,7 +799,7 @@ const autoMap = detectedHeaderParts?.length
   ? detectColumnMap(detectedHeaderParts)
   : null;
 
-hideColumnMap();
+
 
 if (detectedHeaderParts?.length && !isGoodAutoMap(autoMap)){
   previewData = [];
@@ -1304,7 +1276,7 @@ await applyPreviewRows(rows);
   parsedLinesCache = [];
   detectedHeaderParts = null;
   selectedSheetName = '';
-  hideColumnMap();
+  
   renderPreview([]);
 }
 
