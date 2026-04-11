@@ -57,9 +57,10 @@
 .entry-type-box{
   display:flex;
   align-items:flex-end;
-  gap:18px;
+  justify-content:flex-start;
+  gap:0;
   margin:8px 0 18px;
-  padding:0 2px;
+  padding:0;
   border-bottom:1px solid #e5e7eb;
 }
 
@@ -71,14 +72,21 @@
   font-family:'Cairo',system-ui,sans-serif;
   font-size:15px;
   font-weight:800;
-  padding:10px 2px 14px;
+  padding:10px 14px 14px;
   margin:0;
   min-height:auto;
   border-radius:0;
   cursor:pointer;
   box-shadow:none;
   position:relative;
-  transition:color .18s ease, opacity .18s ease;
+
+  width:auto !important;
+  min-width:unset !important;
+  max-width:none !important;
+  flex:0 0 auto !important;
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
 }
 
 .entry-tab:hover{
@@ -102,7 +110,8 @@
 .entry-tab.active::after{
   content:"";
   position:absolute;
-  inset-inline:0;
+  right:0;
+  left:0;
   bottom:-1px;
   height:3px;
   border-radius:999px 999px 0 0;
@@ -117,7 +126,6 @@
 
 @media (max-width:640px){
   .entry-type-box{
-    gap:14px;
     overflow-x:auto;
     scrollbar-width:none;
   }
@@ -127,9 +135,8 @@
   }
 
   .entry-tab{
-    flex:0 0 auto;
     font-size:14px;
-    padding:10px 0 12px;
+    padding:10px 12px 12px;
   }
 }
   </style>
