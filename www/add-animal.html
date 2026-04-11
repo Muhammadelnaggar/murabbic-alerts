@@ -8,7 +8,9 @@
   <script type="module" src="js/forms-init.js"></script>
   <style>
     
-
+    body{
+  padding-bottom:96px;
+}
     .toast{display:none;position:relative;padding:12px 14px 12px 48px;border-radius:14px;background:#ecfdf5;border:1px solid #10b98133;color:#065f46;font-weight:700;box-shadow:0 8px 24px rgba(16,185,129,.15);margin-bottom:10px}
     .toast.show{display:block;animation:toast-pop .25s ease-out}
     .toast .icon{position:absolute;inset-inline-start:12px;top:50%;transform:translateY(-50%);width:22px;height:22px}
@@ -158,14 +160,18 @@
 }
 
 .mbk-page-bottom-bar{
-  position:sticky;
+  position:fixed;
+  left:0;
+  right:0;
   bottom:0;
+  z-index:9998;
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-top:18px;
-  padding-top:10px;
-  background:#fff;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:#ffffff;
+  border-top:1px solid #e5e7eb;
+  box-shadow:0 -6px 20px rgba(15,23,42,.06);
 }
 
 .mbk-bottom-btn{
@@ -370,9 +376,9 @@
     </table>
   </div>
 </div>
-  <div id="pageBottomBar" class="mbk-page-bottom-bar">
+ <div id="pageBottomBar" class="mbk-page-bottom-bar">
   <button type="submit" id="primaryActionBtn" class="mbk-bottom-btn mbk-bottom-btn-primary">📥 تسجيل الحيوان</button>
-  <a href="dashboard.html" id="dashboardBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">لوحة التحكم</a>
+  <button type="button" id="dashboardBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">لوحة التحكم</button>
 </div>
     <div id="popupBox" class="mbk-popup">
   <div class="mbk-popup-content" id="popupContent"></div>
