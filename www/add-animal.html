@@ -297,8 +297,10 @@
     </table>
   </div>
 </div>
-    <button type="submit">📥 تسجيل الحيوان</button>
-    <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
+   <div id="manualActions">
+  <button type="submit">📥 تسجيل الحيوان</button>
+  <a href="#" id="cancelLink">⬅️ إلغاء والعودة</a>
+</div>
     <div id="popupBox" class="mbk-popup">
   <div class="mbk-popup-content" id="popupContent"></div>
 </div>
@@ -331,6 +333,7 @@ const sharedAnimalFields = document.getElementById('sharedAnimalFields');
 const mothersFields = document.getElementById('mothersFields');
 const followersFields = document.getElementById('followersFields');
 const importFields = document.getElementById('importFields');
+const manualActions = document.getElementById('manualActions');
 const followerSex = document.getElementById('followerSex');
 const followerStatus = document.getElementById('followerStatus');
 const damNumber = document.getElementById('damNumber');
@@ -503,6 +506,7 @@ sharedAnimalFields.classList.toggle('hidden-block', importing);
 mothersFields.classList.toggle('hidden-block', !mothers);
 followersFields.classList.toggle('hidden-block', !followers);
 importFields.classList.toggle('hidden-block', !importing);
+manualActions.classList.toggle('hidden-block', importing);
 
   btnMothers.classList.toggle('active', mothers);
   btnFollowers.classList.toggle('active', followers);
