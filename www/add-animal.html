@@ -141,23 +141,7 @@
     padding:10px 12px 12px;
   }
 }
-   .btn-import-secondary{
-  appearance:none;
-  border:1px solid #dbe4dc;
-  background:#fff;
-  color:#0f172a;
-  text-decoration:none;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:48px;
-  border-radius:14px;
-  font-family:'Cairo',system-ui,sans-serif;
-  font-size:15px;
-  font-weight:800;
-  cursor:pointer;
-  box-shadow:0 4px 12px rgba(15,23,42,.05);
-}
+  
 
 .mbk-page-bottom-bar{
   position:fixed;
@@ -213,11 +197,12 @@
     gap:8px;
   }
 
-  .mbk-bottom-btn,
-  .btn-import-secondary{
-    min-height:48px;
-    font-size:14px;
-  }
+ .mbk-bottom-btn{
+  min-height:48px;
+  font-size:14px;
+}
+.btn-row{
+  margin-top:14px;
 }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700&display=swap" rel="stylesheet">
@@ -356,7 +341,7 @@
   </div>
 
 <div class="btn-row">
-  <button type="button" id="previewImportBtn" class="btn-import-secondary">معاينة الملف</button>
+ <button type="button" id="previewImportBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">معاينة الملف</button>
 </div>
 
   <div id="importMsg" class="toast"></div>
