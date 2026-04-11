@@ -81,19 +81,28 @@
 </div>
 
 <input type="hidden" id="entryType" value="mothers" data-field="entryType" />
-<label for="animalNumber">رقم الحيوان:</label>
-<input type="text" id="animalNumber" required data-field="animalNumber" />
-<label for="animalType">نوع الحيوان:</label>
-<select id="animalType" required data-field="animalType">  <option value="">اختر النوع</option>
-  <option value="بقرة">بقرة</option>
-  <option value="جاموسة">جاموسة</option>
-</select>
 
-<label for="breed">السلالة:</label>
-<select id="breed" required data-field="breed">  <option value="">اختر السلالة</option>
-</select>
-<label for="birthDate">تاريخ الميلاد (اختياري):</label>
-<input type="date" id="birthDate" data-field="birthDate" /><div id="mothersFields">
+<div id="sharedAnimalFields">
+  <label for="animalNumber">رقم الحيوان:</label>
+  <input type="text" id="animalNumber" required data-field="animalNumber" />
+
+  <label for="animalType">نوع الحيوان:</label>
+  <select id="animalType" required data-field="animalType">
+    <option value="">اختر النوع</option>
+    <option value="بقرة">بقرة</option>
+    <option value="جاموسة">جاموسة</option>
+  </select>
+
+  <label for="breed">السلالة:</label>
+  <select id="breed" required data-field="breed">
+    <option value="">اختر السلالة</option>
+  </select>
+
+  <label for="birthDate">تاريخ الميلاد (اختياري):</label>
+  <input type="date" id="birthDate" data-field="birthDate" />
+</div>
+
+<div id="mothersFields">
 <label for="productionStatus">الحالة الإنتاجية:</label>
 <select id="productionStatus" required data-field="productionStatus">      <option value="">اختر الحالة</option>
       <option value="حلاب">حلاب</option>
@@ -234,6 +243,7 @@ const entryType = document.getElementById('entryType');
 const btnMothers = document.getElementById('btnMothers');
 const btnFollowers = document.getElementById('btnFollowers');
 const btnImport = document.getElementById('btnImport');
+const sharedAnimalFields = document.getElementById('sharedAnimalFields');
 const mothersFields = document.getElementById('mothersFields');
 const followersFields = document.getElementById('followersFields');
 const importFields = document.getElementById('importFields');
@@ -401,13 +411,14 @@ function toggleFollowerFields(){
  function setEntryMode(mode){
   entryType.value = mode;
 
-  const mothers = (mode === "mothers");
-  const followers = (mode === "followers");
-  const importing = (mode === "import");
+ const mothers = (mode === "mothers");
+const followers = (mode === "followers");
+const importing = (mode === "import");
 
-  mothersFields.classList.toggle('hidden-block', !mothers);
-  followersFields.classList.toggle('hidden-block', !followers);
-  importFields.classList.toggle('hidden-block', !importing);
+sharedAnimalFields.classList.toggle('hidden-block', importing);
+mothersFields.classList.toggle('hidden-block', !mothers);
+followersFields.classList.toggle('hidden-block', !followers);
+importFields.classList.toggle('hidden-block', !importing);
 
   btnMothers.classList.toggle('active', mothers);
   btnFollowers.classList.toggle('active', followers);
