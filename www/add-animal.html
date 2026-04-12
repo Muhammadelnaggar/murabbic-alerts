@@ -142,7 +142,40 @@
   }
 }
   
+.preview-wrap{
+  display:block;
+  width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  background:#fff;
+  margin-top:12px;
+}
 
+.preview-wrap table{
+  width:max-content;
+  min-width:1200px;
+  border-collapse:collapse;
+  font-size:14px;
+}
+
+.preview-wrap th,
+.preview-wrap td{
+  white-space:nowrap;
+  padding:10px 12px;
+  border-bottom:1px solid #eef2f7;
+  text-align:right;
+}
+
+.preview-wrap thead th{
+  position:sticky;
+  top:0;
+  background:#f8fafc;
+  z-index:1;
+  font-weight:800;
+}
 .mbk-page-bottom-bar{
   position:fixed;
   left:0;
@@ -349,15 +382,23 @@
 
   <div class="preview-wrap hidden-block" id="importPreviewWrap">
     <table>
-      <thead>
-        <tr>
-          <th>رقم الحيوان</th>
-          <th>النوع</th>
-          <th>السلالة</th>
-          <th>الحالة</th>
-          <th>الحالة</th>
-        </tr>
-      </thead>
+     <thead>
+  <tr>
+    <th>رقم الحيوان</th>
+    <th>النوع</th>
+    <th>السلالة</th>
+    <th>تاريخ الميلاد</th>
+    <th>الحالة الإنتاجية</th>
+    <th>اللبن</th>
+    <th>الحالة التناسلية</th>
+    <th>مرات التلقيح</th>
+    <th>الموسم</th>
+    <th>رقم الطلوقة</th>
+    <th>آخر ولادة</th>
+    <th>آخر تلقيح</th>
+    <th>DIM</th>
+  </tr>
+</thead>
       <tbody id="importPreviewRows"></tbody>
     </table>
   </div>
@@ -1054,25 +1095,32 @@ setTimeout(()=>{
     if (previewWrap) previewWrap.classList.add("hidden-block");
   }
 
-  function renderPreview(rows) {
-    if (!previewRows || !previewWrap) return;
+function renderPreview(rows) {
+  if (!previewRows || !previewWrap) return;
 
-    previewRows.innerHTML = rows.map(r => {
-      const x = r.normalized || {};
-      return `
-        <tr>
-          <td>${x.animalNumber || ""}</td>
-          <td>${x.animalType || ""}</td>
-          <td>${x.breed || ""}</td>
-          <td>${x.productionStatus || ""}</td>
-          <td>${x.reproductiveStatus || ""}</td>
-        </tr>
-      `;
-    }).join("");
+  previewRows.innerHTML = rows.map(r => {
+    const x = r.normalized || {};
+    return `
+      <tr>
+        <td>${x.animalNumber || ""}</td>
+        <td>${x.animalType || ""}</td>
+        <td>${x.breed || ""}</td>
+        <td>${x.birthDate || ""}</td>
+        <td>${x.productionStatus || ""}</td>
+        <td>${x.dailyMilk || ""}</td>
+        <td>${x.reproductiveStatus || ""}</td>
+        <td>${x.servicesCount || ""}</td>
+        <td>${x.lactationNumber || ""}</td>
+        <td>${x.sireNumber || ""}</td>
+        <td>${x.lastCalvingDate || ""}</td>
+        <td>${x.lastInseminationDate || ""}</td>
+        <td>${x.daysInMilk || ""}</td>
+      </tr>
+    `;
+  }).join("");
 
-    previewWrap.classList.remove("hidden-block");
-  }
-
+  previewWrap.classList.remove("hidden-block");
+}
   function splitCsvLine(line) {
     const out = [];
     let cur = "";
