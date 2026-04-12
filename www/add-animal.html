@@ -772,8 +772,137 @@ function showPopup(msg, ok=true){
 }
 
 form.addEventListener("mbk:valid", async (e)=>{
-  if (document.getElementById("entryType")?.value === "import"){
-  return;
+ if (document.getElementById("entryType")?.value === "import"){
+  const preview = window.__IMPORT_PREVIEW__ || [];
+  const profile = window.__IMPORT_PROFILE__ || null;
+  const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
+
+  if (!CURRENT_UID){
+    setMsg("فضلاً سجّل الدخول أولاً.", false);
+    return;
+  }
+
+  if (!profile || !preview.length){
+    setMsg("اعمل معاينة للملف أولاً قبل الحفظ.", false);
+    return;
+  }
+
+  try{
+    const targetCollection = (importKind === "followers") ? "calves" : "animals";
+    let saved = 0;
+
+    for (const item of preview){
+      const x = item?.normalized || {};
+      const numberStr = String(x.animalNumber || "").trim();
+      if (!numberStr) continue;
+
+      const key = `${CURRENT_UID}#${numberStr}`;
+
+      const animalTypeAr = String(x.animalType || "").trim();
+      const breed = String(x.breed || "").trim();
+      const birthDate = String(x.birthDate || "").trim() || null;
+      const productionStatus = String(x.productionStatus || "").trim();
+      const dailyMilkVal = Number(x.dailyMilk || 0);
+      const reproductiveStatus = String(x.reproductiveStatus || "").trim();
+      const servicesCount = Number(x.servicesCount || 0);
+      const lactationNumber = Number(x.lactationNumber || 0);
+      const sireNumberInp = String(x.sireNumber || "").trim() || null;
+      const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
+      const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
+      const daysInMilkVal = Number(x.daysInMilk || 0);
+
+      const followerStatusVal = String(x.followerStatus || "").trim();
+      const followerSexVal = String(x.followerSex || "").trim();
+      const damNumberVal = String(x.damNumber || "").trim() || null;
+      const weaningDateVal = String(x.weaningDate || "").trim() || null;
+      const followerPregnancyDaysVal = Number(x.followerPregnancyDays || 0);
+
+      const payload = (importKind === "mothers")
+        ? {
+            ownerUid: CURRENT_UID,
+            userId: CURRENT_UID,
+            userId_number: key,
+            entryType: "mothers",
+
+            number: numberStr,
+            animalNumber: Number(numberStr),
+            animaltype: normAnimaltype(animalTypeAr),
+            animalTypeAr,
+            breed,
+
+            productionStatus,
+            dailyMilk: productionStatus === "حلاب" ? dailyMilkVal : null,
+            reproductiveStatus,
+            servicesCount,
+            lactationNumber,
+            birthDate,
+            lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
+            lastInseminationDate: lastInseminationInp || null,
+            sireNumber: sireNumberInp || null,
+            daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
+
+            importSource: profile.key,
+            importedAt: serverTimestamp(),
+            createdAt: serverTimestamp()
+          }
+        : {
+            ownerUid: CURRENT_UID,
+            userId: CURRENT_UID,
+            userId_number: key,
+            entryType: "followers",
+
+            calfNumber: numberStr,
+            number: numberStr,
+            animalNumber: Number(numberStr),
+
+            species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
+            animaltype: normAnimaltype(animalTypeAr),
+            animalTypeAr,
+            breed,
+
+            sex: followerSexVal,
+            status: followerStatusVal,
+            followerStatus: followerStatusVal,
+
+            birthDate,
+            damNumber: damNumberVal,
+            weaningDate: weaningDateVal,
+            lastInseminationDate: lastInseminationInp || null,
+            servicesCount,
+            sireNumber: sireNumberInp || null,
+            pregnancyDays: followerPregnancyDaysVal || null,
+
+            importSource: profile.key,
+            importedAt: serverTimestamp(),
+            createdAt: serverTimestamp()
+          };
+
+      const dupQ = query(
+  collection(db, targetCollection),
+  where("userId", "==", CURRENT_UID),
+  where("animalNumber", "==", Number(numberStr)),
+  limit(1)
+);
+
+const dupSnap = await getDocs(dupQ);
+if (!dupSnap.empty) {
+  continue;
+}
+
+await addDoc(collection(db, targetCollection), payload);
+saved++;
+    }
+
+    setMsg(`تم استيراد ${saved} سجل بنجاح`, true);
+    setTimeout(()=>{
+      location.href = "dashboard.html";
+    }, 1200);
+    return;
+  }catch(err){
+    console.error(err);
+    setMsg("حدث خطأ أثناء حفظ ملف الاستيراد.", false);
+    return;
+  }
 }
  const formData = e.detail?.formData || {};
 msgDiv.style.display = "none";
@@ -905,7 +1034,346 @@ setTimeout(()=>{
 });
 
 </script>
+<script type="module">
+  <script type="module">
+  import { detectBestProfile, buildPreviewRows } from "/js/import-engine.js";
+  import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
+  const importFileEl = document.getElementById("importFile");
+  const previewBtn = document.getElementById("previewImportBtn");
+  const importMsg = document.getElementById("importMsg");
+  const previewWrap = document.getElementById("importPreviewWrap");
+  const previewRows = document.getElementById("importPreviewRows");
 
+  function showImportMsg(text, ok = true) {
+    if (!importMsg) return;
+    importMsg.className = ok ? "toast show" : "toast show";
+    importMsg.style.display = "block";
+    importMsg.innerHTML = `<div>${text}</div>`;
+  }
+
+  function clearPreview() {
+    if (previewRows) previewRows.innerHTML = "";
+    if (previewWrap) previewWrap.classList.add("hidden-block");
+  }
+
+  function renderPreview(rows) {
+    if (!previewRows || !previewWrap) return;
+
+    previewRows.innerHTML = rows.map(r => {
+      const x = r.normalized || {};
+      return `
+        <tr>
+          <td>${x.animalNumber || ""}</td>
+          <td>${x.animalType || ""}</td>
+          <td>${x.breed || ""}</td>
+          <td>${x.productionStatus || ""}</td>
+          <td>${x.reproductiveStatus || ""}</td>
+        </tr>
+      `;
+    }).join("");
+
+    previewWrap.classList.remove("hidden-block");
+  }
+
+ function parseCsvText(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return [];
+
+  const headers = splitCsvLine(lines[0]);
+
+  return lines.slice(1).map(line => {
+    const vals = splitCsvLine(line);
+    const row = {};
+    headers.forEach((h, i) => row[h] = vals[i] ?? "");
+    return row;
+  });
+}
+
+function splitCsvLine(line) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+
+  out.push(cur.trim());
+  return out;
+}
+
+function normalizeRowsFromSheet(rows) {
+  if (!Array.isArray(rows) || !rows.length) return [];
+
+  return rows
+    .map(r => {
+      const clean = {};
+      Object.keys(r || {}).forEach(k => {
+        const key = String(k || "").trim();
+        if (!key) return;
+        clean[key] = r[k] == null ? "" : String(r[k]).trim();
+      });
+      return clean;
+    })
+    .filter(r => Object.keys(r).length > 0);
+}
+
+async function parseImportFile(file) {
+  const name = String(file?.name || "").toLowerCase();
+
+  if (name.endsWith(".csv") || name.endsWith(".txt")) {
+    const text = await file.text();
+    return parseCsvText(text);
+  }
+
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+
+    const firstSheetName = wb.SheetNames?.[0];
+    if (!firstSheetName) return [];
+
+    const sheet = wb.Sheets[firstSheetName];
+    if (!sheet) return [];
+
+    const jsonRows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false
+    });
+
+    return normalizeRowsFromSheet(jsonRows);
+  }
+
+  return [];
+}
+
+  previewBtn?.addEventListener("click", async () => {
+    try {
+      clearPreview();
+
+      const file = importFileEl?.files?.[0];
+      if (!file) {
+        showImportMsg("اختر ملف الاستيراد أولاً", false);
+        return;
+      }
+
+      const rows = await parseImportFile(file);
+
+      if (!rows.length) {
+        showImportMsg("الملف فارغ أو غير مقروء", false);
+        return;
+      }
+
+      const headers = Object.keys(rows[0] || {});
+      const profile = detectBestProfile(headers);
+
+      if (!profile) {
+        showImportMsg("لم يتعرف مُرَبِّيك على نوع ملف التصدير", false);
+        return;
+      }
+
+      const preview = buildPreviewRows(rows, profile);
+      renderPreview(preview);
+
+      showImportMsg(`تم التعرف على الملف كنمط ${profile.label} ومعاينة ${preview.length} سجل`, true);
+
+      window.__IMPORT_PREVIEW__ = preview;
+      window.__IMPORT_PROFILE__ = profile;
+    } catch (err) {
+      console.error(err);
+      showImportMsg("حدث خطأ أثناء قراءة ملف الاستيراد", false);
+    }
+  });
+</script>
+  <script type="module">
+  import { detectBestProfile, buildPreviewRows } from "/js/import-engine.js";
+  import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
+
+  const importFileEl = document.getElementById("importFile");
+  const previewBtn = document.getElementById("previewImportBtn");
+  const importMsg = document.getElementById("importMsg");
+  const previewWrap = document.getElementById("importPreviewWrap");
+  const previewRows = document.getElementById("importPreviewRows");
+
+  function showImportMsg(text, ok = true) {
+    if (!importMsg) return;
+    importMsg.className = "toast show";
+    importMsg.style.display = "block";
+    importMsg.innerHTML = `<div>${text}</div>`;
+  }
+
+  function clearPreview() {
+    if (previewRows) previewRows.innerHTML = "";
+    if (previewWrap) previewWrap.classList.add("hidden-block");
+  }
+
+  function renderPreview(rows) {
+    if (!previewRows || !previewWrap) return;
+
+    previewRows.innerHTML = rows.map(r => {
+      const x = r.normalized || {};
+      return `
+        <tr>
+          <td>${x.animalNumber || ""}</td>
+          <td>${x.animalType || ""}</td>
+          <td>${x.breed || ""}</td>
+          <td>${x.productionStatus || ""}</td>
+          <td>${x.reproductiveStatus || ""}</td>
+        </tr>
+      `;
+    }).join("");
+
+    previewWrap.classList.remove("hidden-block");
+  }
+
+  function splitCsvLine(line) {
+    const out = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      const next = line[i + 1];
+
+      if (ch === '"') {
+        if (inQuotes && next === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === "," && !inQuotes) {
+        out.push(cur.trim());
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+
+    out.push(cur.trim());
+    return out;
+  }
+
+  function parseCsvText(text) {
+    const lines = String(text || "")
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (!lines.length) return [];
+
+    const headers = splitCsvLine(lines[0]);
+
+    return lines.slice(1).map(line => {
+      const vals = splitCsvLine(line);
+      const row = {};
+      headers.forEach((h, i) => row[h] = vals[i] ?? "");
+      return row;
+    });
+  }
+
+  function normalizeRowsFromSheet(rows) {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    return rows
+      .map(r => {
+        const clean = {};
+        Object.keys(r || {}).forEach(k => {
+          const key = String(k || "").trim();
+          if (!key) return;
+          clean[key] = r[k] == null ? "" : String(r[k]).trim();
+        });
+        return clean;
+      })
+      .filter(r => Object.keys(r).length > 0);
+  }
+
+  async function parseImportFile(file) {
+    const name = String(file?.name || "").toLowerCase();
+
+    if (name.endsWith(".csv") || name.endsWith(".txt")) {
+      const text = await file.text();
+      return parseCsvText(text);
+    }
+
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+
+      const firstSheetName = wb.SheetNames?.[0];
+      if (!firstSheetName) return [];
+
+      const sheet = wb.Sheets[firstSheetName];
+      if (!sheet) return [];
+
+      const jsonRows = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        raw: false
+      });
+
+      return normalizeRowsFromSheet(jsonRows);
+    }
+
+    return [];
+  }
+
+  previewBtn?.addEventListener("click", async () => {
+    try {
+      clearPreview();
+
+      const file = importFileEl?.files?.[0];
+      if (!file) {
+        showImportMsg("اختر ملف الاستيراد أولاً", false);
+        return;
+      }
+
+      const rows = await parseImportFile(file);
+
+      if (!rows.length) {
+        showImportMsg("الملف فارغ أو غير مقروء", false);
+        return;
+      }
+
+      const headers = Object.keys(rows[0] || {});
+      const profile = detectBestProfile(headers);
+
+      if (!profile) {
+        showImportMsg("لم يتعرف مُرَبِّيك على نوع ملف التصدير", false);
+        return;
+      }
+
+      const preview = buildPreviewRows(rows, profile);
+      renderPreview(preview);
+
+      showImportMsg(`تم التعرف على الملف كنمط ${profile.label} ومعاينة ${preview.length} سجل`, true);
+
+      window.__IMPORT_PREVIEW__ = preview;
+      window.__IMPORT_PROFILE__ = profile;
+    } catch (err) {
+      console.error(err);
+      showImportMsg("حدث خطأ أثناء قراءة ملف الاستيراد", false);
+    }
+  });
+</script>
   <script type="module" src="/js/timeline.js"></script>
   <script type="module" src="/js/smart-checks.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
