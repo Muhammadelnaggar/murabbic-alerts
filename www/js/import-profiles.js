@@ -28,7 +28,7 @@ export const DairyCompProfile = {
     servicesCount: ["tbrd", "times bred", "services", "service count", "breedings"],
     lactationNumber: ["lact", "lactation", "lactation no"],
     sireNumber: ["sid", "sire", "sire id", "bull id", "sire bull id", "bull number"],
-    lastCalvingDate: ["lcalv", "last calving", "last calving date", "calving date", "fresh date"],
+   lastCalvingDate: ["fdat", "lcalv", "last calving", "last calving date", "calving date", "fresh date"],
     lastInseminationDate: ["lserv", "last service", "service date", "last breeding date", "last insemination date"],
     daysInMilk: ["dim", "days in milk"]
   },
