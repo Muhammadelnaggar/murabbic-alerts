@@ -32,21 +32,50 @@ function toDateYMD(v) {
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-  const dmy1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (dmy1) {
-    const [, dd, mm, yyyy] = dmy1;
+  // d/m/yyyy أو dd/mm/yyyy
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    let [, dd, mm, yyyy] = m;
+    dd = String(dd).padStart(2, "0");
+    mm = String(mm).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  const dmy2 = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (dmy2) {
-    const [, dd, mm, yyyy] = dmy2;
+  // d-m-yyyy أو dd-mm-yyyy
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) {
+    let [, dd, mm, yyyy] = m;
+    dd = String(dd).padStart(2, "0");
+    mm = String(mm).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  const ymd2 = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (ymd2) {
-    const [, yyyy, mm, dd] = ymd2;
+  // d/m/yy أو dd/mm/yy
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) {
+    let [, dd, mm, yy] = m;
+    dd = String(dd).padStart(2, "0");
+    mm = String(mm).padStart(2, "0");
+    const yyyy = Number(yy) >= 50 ? `19${yy}` : `20${yy}`;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // d-m-yy أو dd-mm-yy
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+  if (m) {
+    let [, dd, mm, yy] = m;
+    dd = String(dd).padStart(2, "0");
+    mm = String(mm).padStart(2, "0");
+    const yyyy = Number(yy) >= 50 ? `19${yy}` : `20${yy}`;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // yyyy/m/d
+  m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (m) {
+    let [, yyyy, mm, dd] = m;
+    dd = String(dd).padStart(2, "0");
+    mm = String(mm).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
 
