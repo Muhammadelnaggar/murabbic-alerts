@@ -80,15 +80,48 @@ export const DairyCompProfile = {
   },
 
   inferRules: {
-    animalType(row) {
-      if (row.animalType) return row.animalType;
+   animalType(row) {
+  if (row.animalType) return row.animalType;
 
-      const breed = String(row.breed || "").trim();
-      if (["بلدي", "هجين إيطالي", "هجين هندي"].includes(breed)) return "جاموسة";
-      if (["هولشتاين", "جيرسي", "مونبليار", "سيمينتال", "خليط"].includes(breed)) return "بقرة";
+  const breed = String(row.breed || "").trim().toLowerCase();
 
-      return "";
-    },
+  const buffaloBreeds = [
+    "بلدي",
+    "baladi",
+    "مصري",
+    "egyptian buffalo",
+    "هجين إيطالي",
+    "italian cross",
+    "italian hybrid",
+    "هجين هندي",
+    "murrah cross",
+    "indian cross",
+    "indian hybrid",
+    "buffalo",
+    "water buffalo"
+  ];
+
+  const cowBreeds = [
+    "هولشتاين",
+    "holstein",
+    "hf",
+    "جيرسي",
+    "jersey",
+    "مونبليار",
+    "montbeliarde",
+    "سيمينتال",
+    "simmental",
+    "خليط",
+    "crossbred",
+    "cow",
+    "cattle"
+  ];
+
+  if (buffaloBreeds.includes(breed)) return "جاموسة";
+  if (cowBreeds.includes(breed)) return "بقرة";
+
+  return "";
+},
 
     productionStatus(row) {
       if (row.productionStatus) return row.productionStatus;
