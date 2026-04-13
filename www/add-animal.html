@@ -451,7 +451,50 @@ const followerLastInseminationDate = document.getElementById('followerLastInsemi
 const followerServicesCount = document.getElementById('followerServicesCount');
 const followerSireNumber = document.getElementById('followerSireNumber');
 const followerPregnancyBox = document.getElementById('followerPregnancyBox');
-const followerPregnancyDays = document.getElementById('followerPregnancyDays');      
+const followerPregnancyDays = document.getElementById('followerPregnancyDays');  
+      const importBypassIds = [
+  'animalNumber',
+  'animalType',
+  'breed',
+  'birthDate',
+  'productionStatus',
+  'dailyMilk',
+  'reproductiveStatus',
+  'servicesCount',
+  'lactationNumber',
+  'lastCalvingDate',
+  'daysInMilk',
+  'pregnancyDays',
+  'lastInseminationDate',
+  'sireNumber',
+  'followerSex',
+  'followerStatus',
+  'damNumber',
+  'weaningDate',
+  'followerLastInseminationDate',
+  'followerServicesCount',
+  'followerSireNumber',
+  'followerPregnancyDays'
+];
+
+function setImportValidationBypass(on) {
+  importBypassIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (on) {
+      if (el.hasAttribute('data-field')) {
+        el.setAttribute('data-orig-field', el.getAttribute('data-field'));
+        el.removeAttribute('data-field');
+      }
+    } else {
+      if (!el.hasAttribute('data-field') && el.hasAttribute('data-orig-field')) {
+        el.setAttribute('data-field', el.getAttribute('data-orig-field'));
+        el.removeAttribute('data-orig-field');
+      }
+    }
+  });
+}
       const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
       const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
 
@@ -608,7 +651,7 @@ function toggleFollowerFields(){
  const mothers = (mode === "mothers");
 const followers = (mode === "followers");
 const importing = (mode === "import");
-
+setImportValidationBypass(importing);
 sharedAnimalFields.classList.toggle('hidden-block', importing);
 mothersFields.classList.toggle('hidden-block', !mothers);
 followersFields.classList.toggle('hidden-block', !followers);
@@ -650,10 +693,7 @@ followerRequiredIds.forEach(id => {
   const el = document.getElementById(id);
   if (el) el.required = followers;
 });
-  followerRequiredIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.required = followers;
-  });
+ 
 
   if (weaningDate) {
     weaningDate.required = (followers && followerStatus.value === "فطام");
