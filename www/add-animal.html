@@ -619,22 +619,37 @@ primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 �
   btnFollowers.classList.toggle('active', followers);
   btnImport.classList.toggle('active', importing);
 
-  const motherRequiredIds = [
-    'productionStatus',
-    'reproductiveStatus'
-  ];
+const sharedRequiredIds = [
+  'animalNumber',
+  'animalType',
+  'breed'
+];
 
-  const followerRequiredIds = [
-    'followerSex',
-    'followerStatus',
-    'damNumber'
-  ];
+const motherRequiredIds = [
+  'productionStatus',
+  'reproductiveStatus'
+];
 
-  motherRequiredIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.required = mothers;
-  });
+const followerRequiredIds = [
+  'followerSex',
+  'followerStatus',
+  'damNumber'
+];
 
+sharedRequiredIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.required = !importing;
+});
+
+motherRequiredIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.required = mothers;
+});
+
+followerRequiredIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.required = followers;
+});
   followerRequiredIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.required = followers;
@@ -648,19 +663,32 @@ primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 �
     followerLastInseminationDate.required = (followers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
   }
 
-  const disableManualCore = importing;
-  [
-    'animalNumber','animalType','breed','birthDate',
-    'productionStatus','dailyMilk','reproductiveStatus',
-    'servicesCount','lactationNumber','lastCalvingDate',
-    'daysInMilk','pregnancyDays','lastInseminationDate','sireNumber',
-    'followerSex','followerStatus','damNumber','weaningDate',
-    'followerLastInseminationDate','followerServicesCount',
-    'followerSireNumber','followerPregnancyDays'
-  ].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.disabled = disableManualCore;
-  });
+ const sharedDisabledIds = ['animalNumber','animalType','breed','birthDate'];
+const mothersDisabledIds = [
+  'productionStatus','dailyMilk','reproductiveStatus',
+  'servicesCount','lactationNumber','lastCalvingDate',
+  'daysInMilk','pregnancyDays','lastInseminationDate','sireNumber'
+];
+const followersDisabledIds = [
+  'followerSex','followerStatus','damNumber','weaningDate',
+  'followerLastInseminationDate','followerServicesCount',
+  'followerSireNumber','followerPregnancyDays'
+];
+
+sharedDisabledIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = importing;
+});
+
+mothersDisabledIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = importing || !mothers;
+});
+
+followersDisabledIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = importing || !followers;
+});
 
   toggleCalvingForLactation();
   toggleMilkFieldLocal();
