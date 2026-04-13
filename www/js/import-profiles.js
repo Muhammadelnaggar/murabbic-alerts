@@ -22,7 +22,7 @@ export const DairyCompProfile = {
     animalType: ["type", "species", "animal type", "kind"],
     breed: ["breed"],
     birthDate: ["bdat", "birth date", "birthdate", "dob", "date of birth"],
-    productionStatus: ["status", "prod", "production status", "lactation status"],
+    productionStatus: ["stat", "status", "prod", "production status", "lactation status"],
     dailyMilk: ["milk", "milk yield", "daily milk", "yield"],
     reproductiveStatus: ["rpro", "repro", "repro status", "reproductive status"],
     servicesCount: ["tbrd", "times bred", "services", "service count", "breedings"],
