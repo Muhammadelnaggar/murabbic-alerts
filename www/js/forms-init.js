@@ -1894,30 +1894,55 @@ function attachAddAnimalForm() {
 
   const bar = ensureInfoBar(form);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    clearFieldErrors(form);
+  clearFieldErrors(form);
 
-    const formData = collectFormData(form);
-    const v = validateEvent("إضافة حيوان", formData);
+  const formData = collectFormData(form);
+  const entryType = String(formData.entryType || form.querySelector("#entryType")?.value || "mothers").trim();
 
-    if (!v || v.ok === false) {
-      if (v?.fieldErrors && typeof v.fieldErrors === "object") {
-        for (const [fname, msg] of Object.entries(v.fieldErrors)) {
-          placeFieldError(form, fname, msg);
-        }
-        scrollToFirstFieldError(form);
+  // ✅ المسار المركزي الصحيح للاستيراد:
+  // لا نمرره على validateEvent("إضافة حيوان")
+  // لأن الاستيراد لا يعتمد على الحقول اليدوية بل على window.__IMPORT_PREVIEW__
+  if (entryType === "import") {
+    form.dispatchEvent(
+      new CustomEvent("mbk:valid", {
+        bubbles: true,
+        detail: { formData, eventName: "إضافة حيوان", form }
+      })
+    );
+    return;
+  }
+
+  const v = validateEvent("إضافة حيوان", formData);
+
+  if (!v || v.ok === false) {
+    if (v?.fieldErrors && typeof v.fieldErrors === "object") {
+      for (const [fname, msg] of Object.entries(v.fieldErrors)) {
+        placeFieldError(form, fname, msg);
       }
-
-      const topMsgs =
-        (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
-        (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
-        ["❌ البيانات غير صحيحة — راجع الحقول."];
-
-      showMsg(bar, topMsgs, "error");
-      return;
+      scrollToFirstFieldError(form);
     }
+
+    const topMsgs =
+      (Array.isArray(v?.guardErrors) && v.guardErrors.length) ? v.guardErrors :
+      (Array.isArray(v?.errors) && v.errors.length) ? v.errors :
+      ["❌ البيانات غير صحيحة — راجع الحقول."];
+
+    showMsg(bar, topMsgs, "error");
+    return;
+  }
+
+  showMsg(bar, "✅ تم التحقق — جارِ الحفظ...", "success");
+
+  form.dispatchEvent(
+    new CustomEvent("mbk:valid", {
+      bubbles: true,
+      detail: { formData, eventName: "إضافة حيوان", form }
+    })
+  );
+});
 
     showMsg(bar, "✅ تم التحقق — جارِ الحفظ...", "success");
 
