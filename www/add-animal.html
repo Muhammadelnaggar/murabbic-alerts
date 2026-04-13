@@ -690,9 +690,23 @@ followersDisabledIds.forEach(id => {
   if (el) el.disabled = importing || !followers;
 });
 
-  toggleCalvingForLactation();
+    toggleCalvingForLactation();
   toggleMilkFieldLocal();
   toggleInseminationFieldLocal();
+
+  const msgBox = document.getElementById('msg');
+  if (msgBox) {
+    msgBox.className = '';
+    msgBox.style.display = 'none';
+    msgBox.innerHTML = '';
+  }
+
+  const sysBar = document.querySelector('.mbk-infobar, .sysbar, #sysbar, #statusBar');
+  if (sysBar) {
+    sysBar.className = 'infobar mbk-infobar';
+    sysBar.style.display = 'none';
+    sysBar.innerHTML = '';
+  }
 }
       ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
       ['change','input'].forEach(e=>productionEl.addEventListener(e,()=>{toggleMilkFieldLocal();toggleInseminationFieldLocal();}));
@@ -1242,6 +1256,12 @@ function renderPreview(rows) {
 
   previewBtn?.addEventListener("click", async () => {
     try {
+      const msgBox = document.getElementById('msg');
+if (msgBox) {
+  msgBox.className = '';
+  msgBox.style.display = 'none';
+  msgBox.innerHTML = '';
+}
       clearPreview();
 
       const file = importFileEl?.files?.[0];
