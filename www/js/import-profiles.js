@@ -28,9 +28,10 @@ export const DairyCompProfile = {
   servicesCount: ["tbrd", "times bred", "services", "service count", "breedings"],
   lactationNumber: ["lact", "lactation", "lactation no"],
   sireNumber: ["sid", "sire", "sire id", "bull id", "sire bull id", "bull number"],
-  lastCalvingDate: ["fdat", "lcalv", "last calving", "last calving date", "calving date", "fresh date"],
-  lastInseminationDate: ["lserv", "last service", "service date", "last breeding date", "last insemination date"],
-  lastHeatDate: ["lheat", "last heat", "last heat date", "heat date", "estrus date", "last estrus date"]
+ lastCalvingDate: ["fdat", "lcalv", "last calving", "last calving date", "calving date", "fresh date"],
+lastInseminationDate: ["lserv", "last service", "service date", "last breeding date", "last insemination date"],
+previousInseminationDate: ["pserv", "prev service", "previous service", "previous breeding date", "previous insemination date", "prior service date"],
+lastHeatDate: ["lheat", "last heat", "last heat date", "heat date", "estrus date", "last estrus date"]
 },
 
   valueMap: {
@@ -169,6 +170,7 @@ export const DairyCompProfile = {
   sireNumber: "string",
   lastCalvingDate: "date",
   lastInseminationDate: "date",
+  previousInseminationDate: "date",
   lastHeatDate: "date"
 },
 
@@ -212,8 +214,9 @@ export const DelProProfile = {
     servicesCount: ["times bred", "tbrd", "service count", "number of services", "breedings"],
     lactationNumber: ["lactation", "lactation no"],
     sireNumber: ["sire bull id", "sire id", "bull id", "orn"],
-    lastCalvingDate: ["last calving date", "calving date"],
+   lastCalvingDate: ["last calving date", "calving date"],
 lastInseminationDate: ["last insemination date", "service date"],
+previousInseminationDate: ["previous insemination date", "previous service date", "prev service", "prior service date"],
 lastHeatDate: ["last heat date", "last heat", "heat date", "estrus date", "last estrus date"],
 damNumber: ["dam number", "dam id"]
   },
@@ -277,7 +280,7 @@ damNumber: ["dam number", "dam id"]
   "lastCalvingDate",
   "lastInseminationDate"
 ],
-  normalize: {
+ normalize: {
   animalNumber: "string",
   animalType: "string",
   breed: "string",
@@ -290,6 +293,7 @@ damNumber: ["dam number", "dam id"]
   sireNumber: "string",
   lastCalvingDate: "date",
   lastInseminationDate: "date",
+  previousInseminationDate: "date",
   lastHeatDate: "date"
 },
 
@@ -332,6 +336,7 @@ export const MurabbikNativeProfile = {
     sireNumber: ["sirenumber"],
    lastCalvingDate: ["lastcalvingdate"],
 lastInseminationDate: ["lastinseminationdate"],
+previousInseminationDate: ["previousinseminationdate"],
 lastHeatDate: ["lastheatdate"]
   },
 
@@ -365,6 +370,7 @@ requiredInternalFields: [
   sireNumber: "string",
   lastCalvingDate: "date",
   lastInseminationDate: "date",
+  previousInseminationDate: "date",
   lastHeatDate: "date"
 },
 
