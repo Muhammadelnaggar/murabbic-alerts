@@ -17,21 +17,21 @@ export const DairyCompProfile = {
     forbiddenHeaders: []
   },
 
-  columnMap: {
-    animalNumber: ["id", "animal id", "animal number", "number"],
-    animalType: ["type", "species", "animal type", "kind"],
-    breed: ["breed"],
-    birthDate: ["bdat", "birth date", "birthdate", "dob", "date of birth"],
-    productionStatus: ["stat", "status", "prod", "production status", "lactation status"],
-    dailyMilk: ["milk", "milk yield", "daily milk", "yield"],
-    reproductiveStatus: ["rpro", "repro", "repro status", "reproductive status"],
-    servicesCount: ["tbrd", "times bred", "services", "service count", "breedings"],
-    lactationNumber: ["lact", "lactation", "lactation no"],
-    sireNumber: ["sid", "sire", "sire id", "bull id", "sire bull id", "bull number"],
-   lastCalvingDate: ["fdat", "lcalv", "last calving", "last calving date", "calving date", "fresh date"],
-    lastInseminationDate: ["lserv", "last service", "service date", "last breeding date", "last insemination date"],
-    daysInMilk: ["dim", "days in milk"]
-  },
+ columnMap: {
+  animalNumber: ["id", "animal id", "animal number", "number"],
+  animalType: ["type", "species", "animal type", "kind"],
+  breed: ["breed"],
+  birthDate: ["bdat", "birth date", "birthdate", "dob", "date of birth"],
+  productionStatus: ["stat", "status", "prod", "production status", "lactation status"],
+  dailyMilk: ["milk", "milk yield", "daily milk", "yield"],
+  reproductiveStatus: ["rpro", "repro", "repro status", "reproductive status"],
+  servicesCount: ["tbrd", "times bred", "services", "service count", "breedings"],
+  lactationNumber: ["lact", "lactation", "lactation no"],
+  sireNumber: ["sid", "sire", "sire id", "bull id", "sire bull id", "bull number"],
+  lastCalvingDate: ["fdat", "lcalv", "last calving", "last calving date", "calving date", "fresh date"],
+  lastInseminationDate: ["lserv", "last service", "service date", "last breeding date", "last insemination date"],
+  lastHeatDate: ["lheat", "last heat", "last heat date", "heat date", "estrus date", "last estrus date"]
+},
 
   valueMap: {
     animalType: {
@@ -143,37 +143,36 @@ export const DairyCompProfile = {
     }
   },
 
-  requiredInternalFields: [
-    "animalNumber",
-    "animalType",
-    "breed",
-    "birthDate",
-    "productionStatus",
-    "dailyMilk",
-    "reproductiveStatus",
-    "servicesCount",
-    "lactationNumber",
-    "sireNumber",
-    "lastCalvingDate",
-    "lastInseminationDate",
-    "daysInMilk"
-  ],
+ requiredInternalFields: [
+  "animalNumber",
+  "animalType",
+  "breed",
+  "birthDate",
+  "productionStatus",
+  "dailyMilk",
+  "reproductiveStatus",
+  "servicesCount",
+  "lactationNumber",
+  "sireNumber",
+  "lastCalvingDate",
+  "lastInseminationDate"
+],
 
-  normalize: {
-    animalNumber: "string",
-    animalType: "string",
-    breed: "string",
-    birthDate: "date",
-    productionStatus: "string",
-    dailyMilk: "number",
-    reproductiveStatus: "string",
-    servicesCount: "integer",
-    lactationNumber: "integer",
-    sireNumber: "string",
-    lastCalvingDate: "date",
-    lastInseminationDate: "date",
-    daysInMilk: "integer"
-  },
+ normalize: {
+  animalNumber: "string",
+  animalType: "string",
+  breed: "string",
+  birthDate: "date",
+  productionStatus: "string",
+  dailyMilk: "number",
+  reproductiveStatus: "string",
+  servicesCount: "integer",
+  lactationNumber: "integer",
+  sireNumber: "string",
+  lastCalvingDate: "date",
+  lastInseminationDate: "date",
+  lastHeatDate: "date"
+},
 
   confidenceRules: {
     profileMatch(headers) {
@@ -216,9 +215,9 @@ export const DelProProfile = {
     lactationNumber: ["lactation", "lactation no"],
     sireNumber: ["sire bull id", "sire id", "bull id", "orn"],
     lastCalvingDate: ["last calving date", "calving date"],
-    lastInseminationDate: ["last insemination date", "service date"],
-    daysInMilk: ["days in milk", "dim"],
-    damNumber: ["dam number", "dam id"]
+lastInseminationDate: ["last insemination date", "service date"],
+lastHeatDate: ["last heat date", "last heat", "heat date", "estrus date", "last estrus date"],
+damNumber: ["dam number", "dam id"]
   },
 
   valueMap: {
@@ -267,37 +266,36 @@ export const DelProProfile = {
     }
   },
 
-  requiredInternalFields: [
-    "animalNumber",
-    "animalType",
-    "breed",
-    "birthDate",
-    "productionStatus",
-    "dailyMilk",
-    "reproductiveStatus",
-    "servicesCount",
-    "lactationNumber",
-    "sireNumber",
-    "lastCalvingDate",
-    "lastInseminationDate",
-    "daysInMilk"
-  ],
+ requiredInternalFields: [
+  "animalNumber",
+  "animalType",
+  "breed",
+  "birthDate",
+  "productionStatus",
+  "dailyMilk",
+  "reproductiveStatus",
+  "servicesCount",
+  "lactationNumber",
+  "sireNumber",
+  "lastCalvingDate",
+  "lastInseminationDate"
+],
 
   normalize: {
-    animalNumber: "string",
-    animalType: "string",
-    breed: "string",
-    birthDate: "date",
-    productionStatus: "string",
-    dailyMilk: "number",
-    reproductiveStatus: "string",
-    servicesCount: "integer",
-    lactationNumber: "integer",
-    sireNumber: "string",
-    lastCalvingDate: "date",
-    lastInseminationDate: "date",
-    daysInMilk: "integer"
-  },
+  animalNumber: "string",
+  animalType: "string",
+  breed: "string",
+  birthDate: "date",
+  productionStatus: "string",
+  dailyMilk: "number",
+  reproductiveStatus: "string",
+  servicesCount: "integer",
+  lactationNumber: "integer",
+  sireNumber: "string",
+  lastCalvingDate: "date",
+  lastInseminationDate: "date",
+  lastHeatDate: "date"
+},
 
   confidenceRules: {
     profileMatch(headers) {
@@ -336,45 +334,44 @@ export const MurabbikNativeProfile = {
     servicesCount: ["servicescount"],
     lactationNumber: ["lactationnumber"],
     sireNumber: ["sirenumber"],
-    lastCalvingDate: ["lastcalvingdate"],
-    lastInseminationDate: ["lastinseminationdate"],
-    daysInMilk: ["daysinmilk"]
+   lastCalvingDate: ["lastcalvingdate"],
+lastInseminationDate: ["lastinseminationdate"],
+lastHeatDate: ["lastheatdate"]
   },
 
   valueMap: {},
   inferRules: {},
 
-  requiredInternalFields: [
-    "animalNumber",
-    "animalType",
-    "breed",
-    "birthDate",
-    "productionStatus",
-    "dailyMilk",
-    "reproductiveStatus",
-    "servicesCount",
-    "lactationNumber",
-    "sireNumber",
-    "lastCalvingDate",
-    "lastInseminationDate",
-    "daysInMilk"
-  ],
+ requiredInternalFields: [
+  "animalNumber",
+  "animalType",
+  "breed",
+  "birthDate",
+  "productionStatus",
+  "dailyMilk",
+  "reproductiveStatus",
+  "servicesCount",
+  "lactationNumber",
+  "sireNumber",
+  "lastCalvingDate",
+  "lastInseminationDate"
+],
 
-  normalize: {
-    animalNumber: "string",
-    animalType: "string",
-    breed: "string",
-    birthDate: "date",
-    productionStatus: "string",
-    dailyMilk: "number",
-    reproductiveStatus: "string",
-    servicesCount: "integer",
-    lactationNumber: "integer",
-    sireNumber: "string",
-    lastCalvingDate: "date",
-    lastInseminationDate: "date",
-    daysInMilk: "integer"
-  },
+ normalize: {
+  animalNumber: "string",
+  animalType: "string",
+  breed: "string",
+  birthDate: "date",
+  productionStatus: "string",
+  dailyMilk: "number",
+  reproductiveStatus: "string",
+  servicesCount: "integer",
+  lactationNumber: "integer",
+  sireNumber: "string",
+  lastCalvingDate: "date",
+  lastInseminationDate: "date",
+  lastHeatDate: "date"
+},
 
   confidenceRules: {
     profileMatch(headers) {
