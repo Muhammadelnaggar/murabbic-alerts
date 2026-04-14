@@ -384,7 +384,7 @@
     <table>
      <thead>
   <tr>
-   <th>رقم الحيوان</th>
+<th>رقم الحيوان</th>
 <th>النوع</th>
 <th>السلالة</th>
 <th>تاريخ الميلاد</th>
@@ -396,6 +396,7 @@
 <th>رقم الطلوقة</th>
 <th>آخر ولادة</th>
 <th>آخر تلقيح</th>
+<th>التلقيح السابق</th>
 <th>آخر شياع</th>
   </tr>
 </thead>
@@ -926,8 +927,9 @@ form.addEventListener("mbk:valid", async (e)=>{
       const servicesCount = Number(x.servicesCount || 0);
       const lactationNumber = Number(x.lactationNumber || 0);
       const sireNumberInp = String(x.sireNumber || "").trim() || null;
-     const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
+    const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
 const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
+const previousInseminationInp = String(x.previousInseminationDate || "").trim() || null;
 const lastHeatDateInp = String(x.lastHeatDate || "").trim() || null;
 
       const followerStatusVal = String(x.followerStatus || "").trim();
@@ -957,6 +959,7 @@ lactationNumber,
 birthDate,
 lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
 lastInseminationDate: lastInseminationInp || null,
+previousInseminationDate: previousInseminationInp || null,
 lastHeatDate: lastHeatDateInp || null,
 sireNumber: sireNumberInp || null,
 
@@ -1196,6 +1199,7 @@ function renderPreview(rows) {
         <td>${x.sireNumber || ""}</td>
         <td>${x.lastCalvingDate || ""}</td>
         <td>${x.lastInseminationDate || ""}</td>
+        <td>${x.previousInseminationDate || ""}</td>
         <td>${x.lastHeatDate || ""}</td>
       </tr>
     `;
