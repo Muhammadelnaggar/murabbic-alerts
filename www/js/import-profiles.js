@@ -149,7 +149,6 @@ export const DairyCompProfile = {
   "breed",
   "birthDate",
   "productionStatus",
-  "dailyMilk",
   "reproductiveStatus",
   "servicesCount",
   "lactationNumber",
@@ -157,7 +156,6 @@ export const DairyCompProfile = {
   "lastCalvingDate",
   "lastInseminationDate"
 ],
-
  normalize: {
   animalNumber: "string",
   animalType: "string",
@@ -272,7 +270,6 @@ damNumber: ["dam number", "dam id"]
   "breed",
   "birthDate",
   "productionStatus",
-  "dailyMilk",
   "reproductiveStatus",
   "servicesCount",
   "lactationNumber",
@@ -280,7 +277,6 @@ damNumber: ["dam number", "dam id"]
   "lastCalvingDate",
   "lastInseminationDate"
 ],
-
   normalize: {
   animalNumber: "string",
   animalType: "string",
@@ -342,13 +338,12 @@ lastHeatDate: ["lastheatdate"]
   valueMap: {},
   inferRules: {},
 
- requiredInternalFields: [
+requiredInternalFields: [
   "animalNumber",
   "animalType",
   "breed",
   "birthDate",
   "productionStatus",
-  "dailyMilk",
   "reproductiveStatus",
   "servicesCount",
   "lactationNumber",
