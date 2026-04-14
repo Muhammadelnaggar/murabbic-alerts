@@ -384,19 +384,19 @@
     <table>
      <thead>
   <tr>
-    <th>رقم الحيوان</th>
-    <th>النوع</th>
-    <th>السلالة</th>
-    <th>تاريخ الميلاد</th>
-    <th>الحالة الإنتاجية</th>
-    <th>اللبن</th>
-    <th>الحالة التناسلية</th>
-    <th>مرات التلقيح</th>
-    <th>الموسم</th>
-    <th>رقم الطلوقة</th>
-    <th>آخر ولادة</th>
-    <th>آخر تلقيح</th>
-    <th>DIM</th>
+   <th>رقم الحيوان</th>
+<th>النوع</th>
+<th>السلالة</th>
+<th>تاريخ الميلاد</th>
+<th>الحالة الإنتاجية</th>
+<th>اللبن</th>
+<th>الحالة التناسلية</th>
+<th>مرات التلقيح</th>
+<th>الموسم</th>
+<th>رقم الطلوقة</th>
+<th>آخر ولادة</th>
+<th>آخر تلقيح</th>
+<th>آخر شياع</th>
   </tr>
 </thead>
       <tbody id="importPreviewRows"></tbody>
@@ -926,9 +926,9 @@ form.addEventListener("mbk:valid", async (e)=>{
       const servicesCount = Number(x.servicesCount || 0);
       const lactationNumber = Number(x.lactationNumber || 0);
       const sireNumberInp = String(x.sireNumber || "").trim() || null;
-      const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
-      const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
-      const daysInMilkVal = Number(x.daysInMilk || 0);
+     const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
+const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
+const lastHeatDateInp = String(x.lastHeatDate || "").trim() || null;
 
       const followerStatusVal = String(x.followerStatus || "").trim();
       const followerSexVal = String(x.followerSex || "").trim();
@@ -949,18 +949,18 @@ form.addEventListener("mbk:valid", async (e)=>{
             animalTypeAr,
             breed,
 
-            productionStatus,
-            dailyMilk: productionStatus === "حلاب" ? dailyMilkVal : null,
-            reproductiveStatus,
-            servicesCount,
-            lactationNumber,
-            birthDate,
-            lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
-            lastInseminationDate: lastInseminationInp || null,
-            sireNumber: sireNumberInp || null,
-            daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
+           productionStatus,
+dailyMilk: productionStatus === "حلاب" ? dailyMilkVal : null,
+reproductiveStatus,
+servicesCount,
+lactationNumber,
+birthDate,
+lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
+lastInseminationDate: lastInseminationInp || null,
+lastHeatDate: lastHeatDateInp || null,
+sireNumber: sireNumberInp || null,
 
-            importSource: profile.key,
+importSource: profile.key,
             importedAt: serverTimestamp(),
             createdAt: serverTimestamp()
           }
@@ -1196,7 +1196,7 @@ function renderPreview(rows) {
         <td>${x.sireNumber || ""}</td>
         <td>${x.lastCalvingDate || ""}</td>
         <td>${x.lastInseminationDate || ""}</td>
-        <td>${x.daysInMilk || ""}</td>
+        <td>${x.lastHeatDate || ""}</td>
       </tr>
     `;
   }).join("");
