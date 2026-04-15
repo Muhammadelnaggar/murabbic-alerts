@@ -45,7 +45,7 @@
     0 8px 24px rgba(15,23,42,.04),
     0 2px 8px rgba(15,23,42,.03);
 }
-    }
+    
     #thiBar{
       display:flex;
       flex-direction:column;
@@ -298,10 +298,36 @@
 
 <!-- مؤشرات القطيع -->
 <div class="card">
-  <div class="section-title">📊 مؤشرات القطيع (تناسلي + إنتاجي)</div>
-  <div id="kpiGrid" class="kpi-grid"></div>
-  <div id="statusBar">جارٍ تحميل بيانات القطيع...</div>
+  <div class="section-title">📌 تعداد القطيع</div>
+  <div id="herdGrid" class="kpi-grid"></div>
 </div>
+
+<div class="card">
+  <div class="section-title">🥛 المؤشرات الإنتاجية</div>
+  <div id="prodGrid" class="kpi-grid"></div>
+</div>
+
+<div class="card">
+  <div class="section-title">🌿 مؤشرات الخصوبة</div>
+  <div id="reproGrid" class="kpi-grid"></div>
+</div>
+
+<div class="card">
+  <div class="section-title">📉 مؤشرات الاستبعاد بالقطيع</div>
+  <div id="cullGrid" class="kpi-grid"></div>
+</div>
+
+<div class="card">
+  <div class="section-title">🌾 مؤشرات كفاءة التغذية</div>
+  <div id="feedGrid" class="kpi-grid"></div>
+</div>
+
+<div class="card">
+  <div class="section-title">🩺 مؤشرات الصحة</div>
+  <div id="healthGrid" class="kpi-grid"></div>
+</div>
+
+<div id="statusBar" class="card">جارٍ تحميل بيانات القطيع...</div>
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
@@ -453,8 +479,13 @@ function box(label, value, sub='', gaugeId=null, cls=''){
 
 // ============ تحميل مؤشرات القطيع ============
 async function loadHerdKPIs(){
-  const statusBar = document.getElementById('statusBar');
-  const grid = document.getElementById('kpiGrid');
+  const statusBar  = document.getElementById('statusBar');
+  const herdGrid   = document.getElementById('herdGrid');
+  const prodGrid   = document.getElementById('prodGrid');
+  const reproGrid  = document.getElementById('reproGrid');
+  const cullGrid   = document.getElementById('cullGrid');
+  const feedGrid   = document.getElementById('feedGrid');
+  const healthGrid = document.getElementById('healthGrid');
 
   try{
     const [statsResp, animalsResp] = await Promise.all([
@@ -588,52 +619,77 @@ async function loadHerdKPIs(){
     const fecesScore    = stats.fecesScore ?? 0;
     const bcsCamera     = stats.bcsCamera ?? 0;
 
-   grid.innerHTML =
-  box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active', 'herd') +
-  box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk', 'herd') +
-  box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg', 'repro') +
-  box('معدل الإخصاب %', conceptionRatePct + '%', 'محسوب من S/C', 'g_fert', 'repro') +
-  box('متوسط الأيام المفتوحة', openDaysAvg, 'من الولادة للحمل', 'g_openDays', 'repro') +
-  box('معدل الحمل (21 يوم)', pregRate21d, '', 'g_pregRate', 'repro') +
-  box('خدمات لكل حمل (S/C)', servicesPerConception, '', 'g_sc', 'repro') +
-  box('نسبة الإجهاض', abortionRatePct + '%', '', 'g_abort', 'repro') +
-  box('نسبة الولادات النافقة', (stats.deadCalvingRatePct ?? 0) + '%', '', 'g_deadCalving', 'health') +
-  box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc', 'repro') +
-  box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk', 'prod') +
-  box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk', 'prod') +
-  box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim', 'repro') +
-  box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct', 'herd') +
-  box('استبعاد إنتاجي', cullProdPct + '%', '', 'g_cullProd', 'cull') +
-  box('استبعاد تناسلي', cullReproPct + '%', '', 'g_cullRepro', 'cull') +
-  box('استبعاد صحي', cullHealthPct + '%', '', 'g_cullHealth', 'cull') +
-  box('كفاءة تحويل العلف', feedEfficiency, '', 'g_fe', 'feed') +
-  box('المادة الجافة المأكولة', dmiAvg, '', 'g_dmi', 'feed') +
-  box('صافي دخل اللبن IOFC', iofc, 'جنيه/بقرة/يوم', 'g_iofc', 'feed') +
-  box('تقييم الروث', fecesScore, '', 'g_feces', 'health') +
-  box('BCS بالكاميرا', bcsCamera, '', 'g_bcs', 'health');
+herdGrid.innerHTML =
+  box('عدد الأبقار أو الجاموس في القطيع', totalActive, '', 'g_active', 'herd') +
+  box('عدد الأبقار أو الجاموس الحلاب', inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
+  box('عدد الأبقار أو الجاموس الجافة', Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
+
+prodGrid.innerHTML =
+  box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
+  box('متوسط اللبن الأسبوعي / رأس', stats.avgWeeklyMilkPerHead ?? 0, 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
+  box('إجمالي إنتاج اللبن اليومي', milkTotal ?? 0, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
+  box('إجمالي إنتاج اللبن الشهري', stats.monthlyMilkTotal ?? 0, 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
+  box('إنتاج اللبن المتوقع 305 يوم', stats.expected305Milk ?? 0, '', 'g_305', 'prod');
+
+reproGrid.innerHTML =
+  box('عدد الأبقار / الجاموس العشار في القطيع', pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
+  box('عدد الأبقار / الجاموس المفتوحة في القطيع', stats.openCount ?? 0, `نسبتهم من القطيع ${stats.openPct ?? 0}%`, 'g_openCount', 'repro') +
+  box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
+  box('متوسط عدد أيام الحليب للقطيع', avgDIM ?? 0, '', 'g_dim', 'repro') +
+  box('عدد الأبقار / الجاموس الملقحة في القطيع', stats.bredCount ?? 0, `نسبتهم من القطيع ${stats.bredPct ?? 0}%`, 'g_bred', 'repro') +
+  box('متوسط عدد الأيام بين تلقيحين', stats.avgBreedingInterval ?? 0, '', 'g_breedInterval', 'repro') +
+  box('نسبة مشاهدة الشياع في القطيع', stats.heatDetectionRate ?? 0, '', 'g_heatRate', 'repro');
+
+cullGrid.innerHTML =
+  box('إجمالي عدد الاستبعاد', stats.cullTotal ?? 0, `نسبته في القطيع ${stats.cullTotalPct ?? 0}%`, 'g_cullTotal', 'cull') +
+  box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
+  box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
+  box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
+
+feedGrid.innerHTML =
+  box('تكلفة لتر لبن / يوم من التغذية', stats.feedCostPerLiter ?? 0, '', 'g_feedCostLiter', 'feed') +
+  box('كفاءة التحويل مادة جافة / لبن', feedEfficiency, '', 'g_fe', 'feed') +
+  box('تكلفة رأس / يوم من التغذية', stats.feedCostPerHeadPerDay ?? 0, '', 'g_feedHeadDay', 'feed') +
+  box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
+
+healthGrid.innerHTML =
+  box('عدد التهاب الضرع في القطيع', stats.mastitisCount ?? 0, `نسبتهم من الحلاب ${stats.mastitisPctOfMilking ?? 0}%`, 'g_mastitis', 'health') +
+  box('عدد حالات العرج في القطيع', stats.lamenessCount ?? 0, `نسبتهم ${stats.lamenessPct ?? 0}%`, 'g_lameness', 'health') +
+  box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
+  box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
     // الجوجز
-    renderMiniGauge("g_active", totalActive ? 100 : 0);
-    renderMiniGauge("g_inmilk", inMilkPct);
-    renderMiniGauge("g_preg", pregPct);
-    renderMiniGauge("g_fert", conceptionRatePct);
-    renderMiniGauge("g_openDays", openDaysAvg);
-    renderMiniGauge("g_pregRate", pregRate21d);
-    renderMiniGauge("g_sc", servicesPerConception * 25); // تقريبي عشان النسبة (1–4 خدمات)
-    renderMiniGauge("g_abort", abortionRatePct);
-    renderMiniGauge("g_deadCalving", stats.deadCalvingRatePct ?? 0);
-    renderMiniGauge("g_afc", stats.ageAtFirstCalvingMonths ?? 0);
-    renderMiniGauge("g_avgMilk", avgMilk ?? 0);
-    renderMiniGauge("g_totalMilk", milkTotal ?? 0);
-    renderMiniGauge("g_dim", avgDIM ?? 0);
-    renderMiniGauge("g_inmilkPct", inMilkPct ?? 0);
-    renderMiniGauge("g_cullProd", cullProdPct);
-    renderMiniGauge("g_cullRepro", cullReproPct);
-    renderMiniGauge("g_cullHealth", cullHealthPct);
-    renderMiniGauge("g_fe", feedEfficiency);
-    renderMiniGauge("g_dmi", dmiAvg);
-    renderMiniGauge("g_iofc", iofc);
-    renderMiniGauge("g_feces", fecesScore);
-    renderMiniGauge("g_bcs", bcsCamera);
+   renderMiniGauge("g_active", totalActive ? 100 : 0);
+renderMiniGauge("g_inmilk", inMilkPct);
+renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0);
+
+renderMiniGauge("g_avgMilk", avgMilk ?? 0);
+renderMiniGauge("g_weekMilk", stats.avgWeeklyMilkPerHead ?? 0);
+renderMiniGauge("g_totalMilk", milkTotal ?? 0);
+renderMiniGauge("g_monthMilk", stats.monthlyMilkTotal ?? 0);
+renderMiniGauge("g_305", stats.expected305Milk ?? 0);
+
+renderMiniGauge("g_preg", pregPct);
+renderMiniGauge("g_openCount", stats.openPct ?? 0);
+renderMiniGauge("g_openDays", openDaysAvg);
+renderMiniGauge("g_dim", avgDIM ?? 0);
+renderMiniGauge("g_bred", stats.bredPct ?? 0);
+renderMiniGauge("g_breedInterval", stats.avgBreedingInterval ?? 0);
+renderMiniGauge("g_heatRate", stats.heatDetectionRate ?? 0);
+
+renderMiniGauge("g_cullTotal", stats.cullTotalPct ?? 0);
+renderMiniGauge("g_cullProd", cullProdPct);
+renderMiniGauge("g_cullRepro", cullReproPct);
+renderMiniGauge("g_cullHealth", cullHealthPct);
+
+renderMiniGauge("g_feedCostLiter", stats.feedCostPerLiter ?? 0);
+renderMiniGauge("g_fe", feedEfficiency);
+renderMiniGauge("g_feedHeadDay", stats.feedCostPerHeadPerDay ?? 0);
+renderMiniGauge("g_iofc", iofc);
+
+renderMiniGauge("g_mastitis", stats.mastitisPctOfMilking ?? 0);
+renderMiniGauge("g_lameness", stats.lamenessPct ?? 0);
+renderMiniGauge("g_feces", fecesScore);
+renderMiniGauge("g_bcs", bcsCamera);
 
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }
