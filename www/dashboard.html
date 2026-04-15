@@ -97,9 +97,9 @@
   padding:4px 2px 8px;
   border-bottom:1px solid #edf3ee;
 }
-   .kpi-grid{
+  .kpi-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:12px;
   margin-top:10px;
 }
@@ -476,7 +476,28 @@ function box(label, value, sub='', gaugeId=null, cls=''){
     </div>
   `;
 }
+function getTypeLabel(stats, animals){
+  const serverType =
+    String(
+      stats?.selectedType ||
+      stats?.species ||
+      stats?.herdType ||
+      stats?.type ||
+      ''
+    ).trim();
 
+  if (serverType.includes('جاموس')) return 'جاموس';
+  if (serverType.includes('بقار') || serverType.includes('أبقار')) return 'أبقار';
+
+  let cows = 0, buffalo = 0;
+  for (const an of (animals || [])){
+    const sp = String(an.species || an.type || an.kind || '').trim();
+    if (sp.includes('جاموس')) buffalo++;
+    else if (sp.includes('بقار') || sp.includes('أبقار')) cows++;
+  }
+
+  return buffalo > cows ? 'جاموس' : 'أبقار';
+}
 // ============ تحميل مؤشرات القطيع ============
 async function loadHerdKPIs(){
   const statusBar  = document.getElementById('statusBar');
@@ -618,7 +639,7 @@ async function loadHerdKPIs(){
     const iofc          = stats.iofc ?? 0;
     const fecesScore    = stats.fecesScore ?? 0;
     const bcsCamera     = stats.bcsCamera ?? 0;
-
+   const typeLabel = getTypeLabel(stats, animals);
 herdGrid.innerHTML =
   box('عدد الأبقار أو الجاموس في القطيع', totalActive, '', 'g_active', 'herd') +
   box('عدد الأبقار أو الجاموس الحلاب', inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
