@@ -35,13 +35,16 @@
       font-size:24px;
       font-weight:800;
     }
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:8px;
-      margin-bottom:8px;
-      box-shadow:0 1px 4px rgba(0,0,0,.04);
+   .card{
+  background:linear-gradient(180deg,#ffffff 0%,#fbfdfb 100%);
+  border:1px solid #e7efe9;
+  border-radius:22px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:
+    0 8px 24px rgba(15,23,42,.04),
+    0 2px 8px rgba(15,23,42,.03);
+}
     }
     #thiBar{
       display:flex;
@@ -83,53 +86,104 @@
       font-size:10px;
       cursor:pointer;
     }
-    .section-title{
-      font-weight:800;
-      font-size:13px;
-      margin:4px 2px 4px;
-      color:#1b5e20;
-      display:flex;
-      align-items:center;
-      gap:6px;
-    }
-    .kpi-grid{
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:6px;
-    }
-    .kpi{
-      background:#ffffff;
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:6px;
-      font-size:9px;
-      display:flex;
-      flex-direction:column;
-      gap:1px;
-      min-height:40px;
-    }
-    .kpi-label{font-weight:700;color:#1b5e20;}
-    .kpi-value{font-size:15px;font-weight:800;color:#066b3b;}
-    .kpi-sub{font-size:8px;color:#607d8b;}
+   .section-title{
+  font-weight:900;
+  font-size:16px;
+  margin:2px 2px 10px;
+  color:#134e2f;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:4px 2px 8px;
+  border-bottom:1px solid #edf3ee;
+}
+   .kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
+  gap:12px;
+  margin-top:10px;
+}
+   .kpi{
+  position:relative;
+  background:linear-gradient(180deg,#ffffff 0%,#f9fcfa 100%);
+  border:1px solid #e6efe8;
+  border-radius:20px;
+  padding:14px 14px 12px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:8px;
+  min-height:118px;
+  box-shadow:
+    0 10px 24px rgba(15,23,42,.05),
+    0 2px 8px rgba(14,160,90,.06);
+  overflow:hidden;
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.kpi::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto 0;
+  height:4px;
+  background:linear-gradient(90deg,var(--brand),#7ad7a7);
+}
+.kpi.herd::before{ background:linear-gradient(90deg,#0ea05a,#7ad7a7); }
+.kpi.prod::before{ background:linear-gradient(90deg,#0284c7,#67c3f3); }
+.kpi.repro::before{ background:linear-gradient(90deg,#7c3aed,#b79cff); }
+.kpi.cull::before{ background:linear-gradient(90deg,#ea580c,#fdba74); }
+.kpi.feed::before{ background:linear-gradient(90deg,#ca8a04,#f5d76e); }
+.kpi.health::before{ background:linear-gradient(90deg,#dc2626,#f7a6a6); }
+.kpi:hover{
+  transform:translateY(-2px);
+  box-shadow:
+    0 14px 28px rgba(15,23,42,.08),
+    0 4px 10px rgba(14,160,90,.10);
+  border-color:#cfe7d7;
+}
+
+.kpi-label{
+  font-size:12px;
+  font-weight:800;
+  line-height:1.5;
+  color:#1f5136;
+  margin-top:2px;
+}
+
+.kpi-value{
+  font-size:28px;
+  line-height:1;
+  font-weight:900;
+  color:#0b7f47;
+  letter-spacing:-.5px;
+}
+
+.kpi-sub{
+  font-size:11px;
+  line-height:1.5;
+  color:#6b7d75;
+}
     #statusBar{
       margin-top:4px;
       font-size:9px;
       text-align:center;
       color:#388e3c;
     }
-    .mini-gauge {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      margin: 4px auto;
-      background: conic-gradient(#2e7d32 0deg, #e0e0e0 0deg);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:11px;
-      font-weight:bold;
-      color:#2e7d32;
-    }
+   .mini-gauge{
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  margin:2px 0 0 auto;
+  background:conic-gradient(#2e7d32 0deg,#e7ece9 0deg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  font-weight:900;
+  color:#1f5136;
+  box-shadow:inset 0 0 0 6px #fff;
+  border:1px solid #edf3ee;
+}
     body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Cairo',Tahoma,Arial,sans-serif; }
 
 .mbk-top{
@@ -383,12 +437,12 @@ function getDIM(an){
   return Math.max(0, daysBetween(new Date(), calv));
 }
 
-function box(label, value, sub='', gaugeId=null){
+function box(label, value, sub='', gaugeId=null, cls=''){
   const gaugeHTML = gaugeId
     ? `<div id="${gaugeId}" class="mini-gauge"></div>`
     : '';
   return `
-    <div class="kpi">
+    <div class="kpi ${cls}">
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${value ?? '--'}</div>
       ${gaugeHTML}
@@ -534,30 +588,29 @@ async function loadHerdKPIs(){
     const fecesScore    = stats.fecesScore ?? 0;
     const bcsCamera     = stats.bcsCamera ?? 0;
 
-    grid.innerHTML =
-      box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active') +
-      box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk') +
-      box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg') +
-      box('معدل الإخصاب %', conceptionRatePct + '%', 'محسوب من S/C', 'g_fert') +
-      box('متوسط الأيام المفتوحة', openDaysAvg, 'من الولادة للحمل', 'g_openDays') +
-      box('معدل الحمل (21 يوم)', pregRate21d, '', 'g_pregRate') +
-      box('خدمات لكل حمل (S/C)', servicesPerConception, '', 'g_sc') +
-      box('نسبة الإجهاض', abortionRatePct + '%', '', 'g_abort') +
-      box('نسبة الولادات النافقة', stats.deadCalvingRatePct ?? 0 + '%', '', 'g_deadCalving') +
-      box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc') +
-      box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk') +
-      box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk') +
-      box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim') +
-      box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct') +
-      box('استبعاد إنتاجي', cullProdPct + '%', '', 'g_cullProd') +
-      box('استبعاد تناسلي', cullReproPct + '%', '', 'g_cullRepro') +
-      box('استبعاد صحي', cullHealthPct + '%', '', 'g_cullHealth') +
-      box('كفاءة تحويل العلف', feedEfficiency, '', 'g_fe') +
-      box('المادة الجافة المأكولة', dmiAvg, '', 'g_dmi') +
-      box('صافي دخل اللبن IOFC', iofc, 'جنيه/بقرة/يوم', 'g_iofc') +
-      box('تقييم الروث', fecesScore, '', 'g_feces') +
-      box('BCS بالكاميرا', bcsCamera, '', 'g_bcs');
-
+   grid.innerHTML =
+  box('إجمالي الحيوانات النشطة', totalActive, 'مستبعد منها المباعة/النافقة/المؤرشفة', 'g_active', 'herd') +
+  box('عدد الأبقار في الحليب', `${inMilk} (${inMilkPct}%)`, 'نسبتهم من القطيع', 'g_inmilk', 'herd') +
+  box('نسبة العشار', pregPct + '%', 'من إجمالي النشط', 'g_preg', 'repro') +
+  box('معدل الإخصاب %', conceptionRatePct + '%', 'محسوب من S/C', 'g_fert', 'repro') +
+  box('متوسط الأيام المفتوحة', openDaysAvg, 'من الولادة للحمل', 'g_openDays', 'repro') +
+  box('معدل الحمل (21 يوم)', pregRate21d, '', 'g_pregRate', 'repro') +
+  box('خدمات لكل حمل (S/C)', servicesPerConception, '', 'g_sc', 'repro') +
+  box('نسبة الإجهاض', abortionRatePct + '%', '', 'g_abort', 'repro') +
+  box('نسبة الولادات النافقة', (stats.deadCalvingRatePct ?? 0) + '%', '', 'g_deadCalving', 'health') +
+  box('العمر عند أول ولادة', stats.ageAtFirstCalvingMonths ?? 0, 'بالشهر', 'g_afc', 'repro') +
+  box('متوسط إنتاج اللبن', avgMilk ?? 0, 'كجم/بقرة', 'g_avgMilk', 'prod') +
+  box('إجمالي اللبن اليومي', milkTotal ?? 0, 'كجم', 'g_totalMilk', 'prod') +
+  box('متوسط DIM', avgDIM ?? 0, 'أيام في الحليب', 'g_dim', 'repro') +
+  box('نسبة الأبقار في الحليب', inMilkPct + '%', '', 'g_inmilkPct', 'herd') +
+  box('استبعاد إنتاجي', cullProdPct + '%', '', 'g_cullProd', 'cull') +
+  box('استبعاد تناسلي', cullReproPct + '%', '', 'g_cullRepro', 'cull') +
+  box('استبعاد صحي', cullHealthPct + '%', '', 'g_cullHealth', 'cull') +
+  box('كفاءة تحويل العلف', feedEfficiency, '', 'g_fe', 'feed') +
+  box('المادة الجافة المأكولة', dmiAvg, '', 'g_dmi', 'feed') +
+  box('صافي دخل اللبن IOFC', iofc, 'جنيه/بقرة/يوم', 'g_iofc', 'feed') +
+  box('تقييم الروث', fecesScore, '', 'g_feces', 'health') +
+  box('BCS بالكاميرا', bcsCamera, '', 'g_bcs', 'health');
     // الجوجز
     renderMiniGauge("g_active", totalActive ? 100 : 0);
     renderMiniGauge("g_inmilk", inMilkPct);
