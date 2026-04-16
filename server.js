@@ -1791,14 +1791,35 @@ app.get("/api/herd-stats", async (req, res) => {
     // --------------------------------------
     // 🔥 3) نفوق + استبعاد
     // --------------------------------------
-    const cullProd   = animals.filter(a => a.cullReason === "productivity").length;
-    const cullRepro  = animals.filter(a => a.cullReason === "reproduction").length;
-    const cullHealth = animals.filter(a => a.cullReason === "health").length;
+let cullProd = 0, cullRepro = 0, cullHealth = 0;
 
-    const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
-    const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
-    const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
+try {
+  const evSnap = await db.collection("events")
+    .where("userId", "==", uid)
+    .limit(5000)
+    .get();
 
+  const ev = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const cullEvents = ev.filter(e => {
+    const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
+    return txt.includes("استبعاد") || txt.includes("cull");
+  });
+
+  for (const e of cullEvents) {
+    const main = String(e.cullMain || e.reason || "").toLowerCase();
+
+    if (main.includes("انتاج")) cullProd++;
+    else if (main.includes("تناسل")) cullRepro++;
+    else if (main.includes("صح")) cullHealth++;
+  }
+} catch (e) {
+  console.error("cull events error:", e.message || e);
+}
+
+const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
+const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
+const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
     // --------------------------------------
     // 🔥 4) كاميرا
     // --------------------------------------
