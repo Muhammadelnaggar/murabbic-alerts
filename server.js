@@ -1717,6 +1717,7 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get("/api/herd-stats", async (req, res) => {
   try {
     const uid = req.headers["x-user-id"];
+    const herdType = String(req.query.type || '').trim().toLowerCase();
     if (!uid) return res.json({ ok:false, error:"NO_USER" });
 
     // --------------------------------------
@@ -1727,11 +1728,25 @@ app.get("/api/herd-stats", async (req, res) => {
       .where("userId", "==", uid)
       .get();
 
-    const animals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const active = animals.filter(a => {
-      const st = String(a.status || a.lifeStatus || "").toLowerCase();
-      return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
-    });
+   const animalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+const animals = animalsAll.filter(a => {
+  const st = String(a.status || a.lifeStatus || "").toLowerCase();
+  if (["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st)) return false;
+
+  const at = String(a.animaltype || '').trim().toLowerCase();
+  const ar = String(a.animalTypeAr || '').trim();
+
+  if (herdType === 'cows') {
+    return at === 'cow' || ar.includes('بقار') || ar.includes('ابقار');
+  }
+  if (herdType === 'buffalo') {
+    return at === 'buffalo' || ar.includes('جاموس');
+  }
+  return true;
+});
+
+const active = animals;
 
     const total = active.length;
 
@@ -1806,13 +1821,21 @@ try {
     return txt.includes("استبعاد") || txt.includes("cull");
   });
 
-  for (const e of cullEvents) {
-    const main = String(e.cullMain || e.reason || "").toLowerCase();
+ for (const e of cullEvents) {
+  const evAnimalNo = String(e.animalNumber || e.animalId || '').trim();
 
-    if (main.includes("انتاج")) cullProd++;
-    else if (main.includes("تناسل")) cullRepro++;
-    else if (main.includes("صح")) cullHealth++;
-  }
+  const matchedAnimal = animals.find(a =>
+    String(a.animalNumber || a.number || a.id || '').trim() === evAnimalNo
+  );
+
+  if (!matchedAnimal) continue;
+
+  const main = String(e.cullMain || e.reason || "").toLowerCase();
+
+  if (main.includes("انتاج")) cullProd++;
+  else if (main.includes("تناسل")) cullRepro++;
+  else if (main.includes("صح")) cullHealth++;
+}
 } catch (e) {
   console.error("cull events error:", e.message || e);
 }
