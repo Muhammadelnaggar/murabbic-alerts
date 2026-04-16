@@ -747,7 +747,11 @@ const typeLabel = getTypeLabelByKey(currentType);
     const iofc          = stats.iofc ?? 0;
     const fecesScore    = stats.fecesScore ?? 0;
     const bcsCamera     = stats.bcsCamera ?? 0;
-  
+    const cullTotalCount = (stats.cullTotal ?? ((stats.cullProdCount ?? 0) + (stats.cullReproCount ?? 0) + (stats.cullHealthCount ?? 0)));
+    const cullTotalPct   = stats.cullTotalPct ?? 0;
+
+    const feedCostPerLiter = stats.feedCostPerLiter ?? 0;
+    const feedCostPerHeadPerDay = stats.feedCostPerHeadPerDay ?? 0;
  herdGrid.innerHTML =
   box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
@@ -784,16 +788,16 @@ reproGrid.innerHTML =
   box('نسبة مشاهدة الشياع في القطيع', '--', '', 'g_heatRate', 'repro');
 
 cullGrid.innerHTML =
-  box('إجمالي عدد الاستبعاد', '--', 'نسبته في القطيع --%', 'g_cullTotal', 'cull') +
-  box('عدد الاستبعاد الإنتاجي', '--', 'نسبته من الاستبعاد --%', 'g_cullProd', 'cull') +
-  box('عدد الاستبعاد التناسلي', '--', 'نسبته من الاستبعاد --%', 'g_cullRepro', 'cull') +
-  box('عدد الاستبعاد الصحي', '--', 'نسبته من الاستبعاد --%', 'g_cullHealth', 'cull');
+  box('إجمالي عدد الاستبعاد', cullTotalCount, `نسبته في القطيع ${cullTotalPct}%`, 'g_cullTotal', 'cull') +
+  box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
+  box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
+  box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 
 feedGrid.innerHTML =
-  box('تكلفة لتر لبن / يوم من التغذية', '--', '', 'g_feedCostLiter', 'feed') +
-  box('كفاءة التحويل مادة جافة / لبن', '--', '', 'g_fe', 'feed') +
-  box('تكلفة رأس / يوم من التغذية', '--', '', 'g_feedHeadDay', 'feed') +
-  box('هامش لبن / علف', '--', '', 'g_iofc', 'feed');
+  box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed') +
+  box('كفاءة التحويل مادة جافة / لبن', feedEfficiency, '', 'g_fe', 'feed') +
+  box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
+  box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
     
 const mastitisCount = animals.filter(an => norm(an.healthStatus || an.lastDisease || an.disease || '').includes('ضرع') || norm(an.healthStatus || an.lastDisease || an.disease || '').includes('mastitis')).length;
 const lamenessCount = animals.filter(an => norm(an.healthStatus || an.lastDisease || an.disease || '').includes('عرج') || norm(an.healthStatus || an.lastDisease || an.disease || '').includes('lameness')).length;
@@ -820,15 +824,15 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_breedInterval", NaN);
 renderMiniGauge("g_heatRate", NaN);
 
-renderMiniGauge("g_cullTotal", NaN);
-renderMiniGauge("g_cullProd", NaN);
-renderMiniGauge("g_cullRepro", NaN);
-renderMiniGauge("g_cullHealth", NaN);
+renderMiniGauge("g_cullTotal", cullTotalPct);
+renderMiniGauge("g_cullProd", cullProdPct);
+renderMiniGauge("g_cullRepro", cullReproPct);
+renderMiniGauge("g_cullHealth", cullHealthPct);
 
-renderMiniGauge("g_feedCostLiter", NaN);
-renderMiniGauge("g_fe", NaN);
-renderMiniGauge("g_feedHeadDay", NaN);
-renderMiniGauge("g_iofc", NaN);
+renderMiniGauge("g_feedCostLiter", feedCostPerLiter);
+renderMiniGauge("g_fe", feedEfficiency);
+renderMiniGauge("g_feedHeadDay", feedCostPerHeadPerDay);
+renderMiniGauge("g_iofc", iofc);
 
 renderMiniGauge("g_mastitis", mastitisPct);
 renderMiniGauge("g_lameness", lamenessPct);
