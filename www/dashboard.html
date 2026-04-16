@@ -615,7 +615,7 @@ async function loadHerdKPIs(){
 
   try{
     const [statsResp, animalsResp] = await Promise.all([
-      fetchJSON(`/api/herd-stats`),
+      fetchJSON(`/api/herd-stats?type=${currentType}`)
       fetchJSON(`/api/animals`)
     ]);
 
