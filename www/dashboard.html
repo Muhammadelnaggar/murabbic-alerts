@@ -544,7 +544,10 @@ function detectAnimalType(an){
     an.animalType,
     an.category,
     an.classification,
-    an.groupType
+    an.groupType,
+    an.breed,
+    an.subType,
+    an.family
   ].filter(Boolean).join(' | ');
 
   const sp = norm(raw);
@@ -559,7 +562,10 @@ function detectAnimalType(an){
     sp.includes('بقار') ||
     sp.includes('ابقار') ||
     sp.includes('cow') ||
-    sp.includes('cattle')
+    sp.includes('cattle') ||
+    sp.includes('holstein') ||
+    sp.includes('friesian') ||
+    sp.includes('jersey')
   ) return 'cows';
 
   return '';
@@ -644,21 +650,11 @@ async function loadHerdKPIs(){
       Array.isArray(animalsResp?.data) ? animalsResp.data :
       Array.isArray(animalsResp?.animals) ? animalsResp.animals : [];
 
-   const activeAnimals = animalsArr.filter(isActive);
+const activeAnimals = animalsArr.filter(isActive);
 
 setupTypeSwitch(activeAnimals);
 
-let animals = filterAnimalsByType(activeAnimals, currentType);
-
-// لو فشل التعرّف على النوع، لا تصفّر الصفحة
-if (!animals.length) {
-  if (currentType === 'cows') {
-    animals = activeAnimals.filter(an => !detectAnimalType(an) || detectAnimalType(an) === 'cows');
-  } else {
-    animals = activeAnimals.filter(an => !detectAnimalType(an) || detectAnimalType(an) === 'buffalo');
-  }
-}
-
+const animals = filterAnimalsByType(activeAnimals, currentType);
 const total = animals.length;
 const typeLabel = getTypeLabelByKey(currentType);
    
