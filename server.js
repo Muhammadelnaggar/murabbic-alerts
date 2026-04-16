@@ -1875,34 +1875,54 @@ app.get("/api/herd-stats", async (req, res) => {
     // --------------------------------------
     // 🔥 6) RETURN — النتيجة النهائية للداشبورد
     // --------------------------------------
-    return res.json({
-      ok: true,
-      totals: {
-        totalActive: total,
-        pregnant: { count: preg, pct: pregPct },
-      },
+return res.json({
+  ok: true,
 
-      fertility: {
-        servicesPerConception,
-        conceptionRatePct: conceptionPct,
-        scPlus: extraFertility.scPlus,
-        hdr21:  extraFertility.hdr21,
-        cr21:   extraFertility.cr21,
-        pr21:   extraFertility.pr21
-      },
+  totals: {
+    totalActive: total,
+    pregnant: { count: preg, pct: pregPct },
+  },
 
-      openDaysAvg,
-      abortionRatePct: abortPct,
+  fertility: {
+    servicesPerConception,
+    conceptionRatePct: conceptionPct,
+    scPlus: extraFertility.scPlus,
+    hdr21: extraFertility.hdr21,
+    cr21: extraFertility.cr21,
+    pr21: extraFertility.pr21
+  },
 
-      culling: {
-        productivity: cullProdPct,
-        reproduction: cullReproPct,
-        health: cullHealthPct
-      },
+  openDaysAvg,
+  abortionRatePct: abortPct,
 
-      bcsCamera,
-      fecesScore
-    });
+  // ===== الاستبعاد بالشكل الذي ينتظره الداشبورد =====
+  cullTotal: cullProd + cullRepro + cullHealth,
+  cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
+
+  cullProdCount: cullProd,
+  cullReproCount: cullRepro,
+  cullHealthCount: cullHealth,
+
+  cullProdPct,
+  cullReproPct,
+  cullHealthPct,
+
+  // ===== إبقاء الكائن القديم لو احتجناه لاحقًا =====
+  culling: {
+    productivity: cullProdPct,
+    reproduction: cullReproPct,
+    health: cullHealthPct
+  },
+
+  // ===== التغذية: مؤقتًا صفر صريح بدل undefined =====
+  feedCostPerLiter: 0,
+  feedEfficiency: 0,
+  feedCostPerHeadPerDay: 0,
+  iofc: 0,
+
+  bcsCamera,
+  fecesScore
+});
 
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
