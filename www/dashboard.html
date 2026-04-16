@@ -614,10 +614,10 @@ async function loadHerdKPIs(){
   const healthGrid = document.getElementById('healthGrid');
 
   try{
-    const [statsResp, animalsResp] = await Promise.all([
-      fetchJSON(`/api/herd-stats?type=${currentType}`)
-      fetchJSON(`/api/animals`)
-    ]);
+   const [statsResp, animalsResp] = await Promise.all([
+  fetchJSON(`/api/herd-stats?type=${currentType}`),
+  fetchJSON(`/api/animals`)
+]);
 
     const animalsArr =
       Array.isArray(animalsResp) ? animalsResp :
