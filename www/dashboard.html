@@ -697,6 +697,7 @@ const typeLabel = getTypeLabelByKey(currentType);
     const inMilkPct = total ? Math.round(inMilk * 100 / total) : 0;
     const avgDIM    = inMilk ? Math.round(dimSum / inMilk) : 0;
     const avgMilk   = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
+    const milkTotalDisplay = +milkTotal.toFixed(1);
     if (!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk * inMilk);
 
     // خصوبة من الوثيقة
@@ -755,7 +756,7 @@ const typeLabel = getTypeLabelByKey(currentType);
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
   box('متوسط اللبن الأسبوعي / رأس', '--', 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
-  box('إجمالي إنتاج اللبن اليومي', milkTotal ?? 0, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
+ box('إجمالي إنتاج اللبن اليومي', milkTotalDisplay, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
   box('إجمالي إنتاج اللبن الشهري', '--', 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
   box('إنتاج اللبن المتوقع 305 يوم', '--', '', 'g_305', 'prod');
 
