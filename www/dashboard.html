@@ -536,9 +536,9 @@ function box(label, value, sub='', gaugeId=null, cls=''){
   `;
 }
 
-  function detectAnimalType(an){
-  const sp = String(an.species || an.type || an.kind || '').trim();
-  if (sp.includes('جاموس')) return 'buffalo';
+ function detectAnimalType(an){
+  const sp = String(an.species || an.type || an.kind || '').trim().toLowerCase();
+  if (sp.includes('جاموس') || sp.includes('buffalo')) return 'buffalo';
   if (sp.includes('بقار') || sp.includes('أبقار') || sp.includes('cow')) return 'cows';
   return '';
 }
