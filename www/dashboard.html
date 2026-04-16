@@ -759,12 +759,26 @@ prodGrid.innerHTML =
   box('إجمالي إنتاج اللبن الشهري', '--', 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
   box('إنتاج اللبن المتوقع 305 يوم', '--', '', 'g_305', 'prod');
 
+const openCount = animals.filter(an => {
+  const rep = norm(an.reproductiveStatus || an.reproStatus || '');
+  return rep.includes('مفتوح') || rep.includes('open');
+}).length;
+
+const openPct = total ? Math.round((openCount * 100) / total) : 0;
+
+const bredCount = animals.filter(an => {
+  const rep = norm(an.reproductiveStatus || an.reproStatus || '');
+  return rep.includes('ملقح') || rep.includes('bred') || rep.includes('inseminated');
+}).length;
+
+const bredPct = total ? Math.round((bredCount * 100) / total) : 0;
+
 reproGrid.innerHTML =
   box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
-  box(`عدد ${typeLabel} المفتوحة في القطيع`, '--', 'نسبتهم من القطيع --%', 'g_openCount', 'repro') +
+  box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
   box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
   box('متوسط عدد أيام الحليب للقطيع', avgDIM ?? 0, '', 'g_dim', 'repro') +
-  box(`عدد ${typeLabel} الملقحة في القطيع`, '--', 'نسبتهم من القطيع --%', 'g_bred', 'repro') +
+  box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
   box('متوسط عدد الأيام بين تلقيحين', '--', '', 'g_breedInterval', 'repro') +
   box('نسبة مشاهدة الشياع في القطيع', '--', '', 'g_heatRate', 'repro');
 
@@ -780,9 +794,14 @@ feedGrid.innerHTML =
   box('تكلفة رأس / يوم من التغذية', '--', '', 'g_feedHeadDay', 'feed') +
   box('هامش لبن / علف', '--', '', 'g_iofc', 'feed');
     
+const mastitisCount = animals.filter(an => norm(an.healthStatus || an.lastDisease || an.disease || '').includes('ضرع') || norm(an.healthStatus || an.lastDisease || an.disease || '').includes('mastitis')).length;
+const lamenessCount = animals.filter(an => norm(an.healthStatus || an.lastDisease || an.disease || '').includes('عرج') || norm(an.healthStatus || an.lastDisease || an.disease || '').includes('lameness')).length;
+const mastitisPct = inMilk ? Math.round((mastitisCount * 100) / inMilk) : 0;
+const lamenessPct = total ? Math.round((lamenessCount * 100) / total) : 0;
+
 healthGrid.innerHTML =
-  box('عدد التهاب الضرع في القطيع', stats.mastitisCount ?? 0, `نسبتهم من الحلاب ${stats.mastitisPctOfMilking ?? 0}%`, 'g_mastitis', 'health') +
-  box('عدد حالات العرج في القطيع', stats.lamenessCount ?? 0, `نسبتهم ${stats.lamenessPct ?? 0}%`, 'g_lameness', 'health') +
+  box('عدد التهاب الضرع في القطيع', mastitisCount, `نسبتهم من الحلاب ${mastitisPct}%`, 'g_mastitis', 'health') +
+  box('عدد حالات العرج في القطيع', lamenessCount, `نسبتهم ${lamenessPct}%`, 'g_lameness', 'health') +
   box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
   box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
     // الجوجز
@@ -795,8 +814,8 @@ renderMiniGauge("g_weekMilk", NaN);
 renderMiniGauge("g_monthMilk", NaN);
 renderMiniGauge("g_305", NaN);
 
-renderMiniGauge("g_openCount", NaN);
-renderMiniGauge("g_bred", NaN);
+renderMiniGauge("g_openCount", openPct);
+renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_breedInterval", NaN);
 renderMiniGauge("g_heatRate", NaN);
 
@@ -810,8 +829,8 @@ renderMiniGauge("g_fe", NaN);
 renderMiniGauge("g_feedHeadDay", NaN);
 renderMiniGauge("g_iofc", NaN);
 
-renderMiniGauge("g_mastitis", NaN);
-renderMiniGauge("g_lameness", NaN);
+renderMiniGauge("g_mastitis", mastitisPct);
+renderMiniGauge("g_lameness", lamenessPct);
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
