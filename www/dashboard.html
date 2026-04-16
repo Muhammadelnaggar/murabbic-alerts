@@ -200,17 +200,42 @@
   justify-content:space-between;
   gap:12px;
 }
-.type-switch{
-  display:flex;
-  gap:8px;
+.switch-wrap{
   margin:10px 0 12px;
-  padding:4px;
+}
+
+.type-switch{
+  position:relative;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
   background:#eef7f0;
   border:1px solid #dbe9df;
   border-radius:16px;
+  padding:4px;
+  overflow:hidden;
 }
+
+.type-switch::before{
+  content:"";
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:calc(50% - 4px);
+  height:calc(100% - 8px);
+  border-radius:12px;
+  background:linear-gradient(180deg,#0ea05a 0%,#0b7f47 100%);
+  box-shadow:0 6px 14px rgba(14,160,90,.18);
+  transition:transform .22s ease;
+}
+
+.type-switch.buffalo::before{
+  transform:translateX(calc(-100% + 8px));
+}
+
 .type-btn{
-  flex:1;
+  position:relative;
+  z-index:1;
   border:none;
   background:transparent;
   color:#1f5136;
@@ -219,16 +244,16 @@
   padding:12px 10px;
   border-radius:12px;
   cursor:pointer;
-  transition:.18s ease;
 }
+
 .type-btn.active{
-  background:linear-gradient(180deg,#0ea05a 0%,#0b7f47 100%);
   color:#fff;
-  box-shadow:0 6px 14px rgba(14,160,90,.18);
+  box-shadow:none;
 }
+
 .type-btn.hidden{
   display:none;
-}    
+}
 .mbk-title{ line-height:1.1; }
 .mbk-page{ font-size:18px; font-weight:900; color:var(--text); }
 .mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
@@ -324,9 +349,11 @@
   <div class="tile" onclick="location.href='calf-card.html'">🐄 بطاقة العجل</div>
   <div class="tile" onclick="location.href='nutrition-eval.html'">🥗 تقييم التغذية</div>
 </div>
-<div id="typeSwitch" class="type-switch">
-  <button id="btnCows" class="type-btn active" type="button">أبقار</button>
-  <button id="btnBuffalo" class="type-btn" type="button">جاموس</button>
+<div class="switch-wrap">
+  <div id="typeSwitch" class="type-switch">
+    <button id="btnCows" class="type-btn active" type="button">أبقار</button>
+    <button id="btnBuffalo" class="type-btn" type="button">جاموس</button>
+  </div>
 </div>
 <!-- مؤشرات القطيع -->
 <div class="card">
@@ -508,28 +535,7 @@ function box(label, value, sub='', gaugeId=null, cls=''){
     </div>
   `;
 }
-function getTypeLabel(stats, animals){
-  const serverType =
-    String(
-      stats?.selectedType ||
-      stats?.species ||
-      stats?.herdType ||
-      stats?.type ||
-      ''
-    ).trim();
 
-  if (serverType.includes('جاموس')) return 'جاموس';
-  if (serverType.includes('بقار') || serverType.includes('أبقار')) return 'أبقار';
-
-  let cows = 0, buffalo = 0;
-  for (const an of (animals || [])){
-    const sp = String(an.species || an.type || an.kind || '').trim();
-    if (sp.includes('جاموس')) buffalo++;
-    else if (sp.includes('بقار') || sp.includes('أبقار')) cows++;
-  }
-
-  return buffalo > cows ? 'جاموس' : 'أبقار';
-}
   function detectAnimalType(an){
   const sp = String(an.species || an.type || an.kind || '').trim();
   if (sp.includes('جاموس')) return 'buffalo';
@@ -546,6 +552,7 @@ function filterAnimalsByType(animals, typeKey){
 }
 
 function setupTypeSwitch(animals){
+  const wrap = document.getElementById('typeSwitch');
   const btnCows = document.getElementById('btnCows');
   const btnBuffalo = document.getElementById('btnBuffalo');
 
@@ -553,25 +560,25 @@ function setupTypeSwitch(animals){
   const buffaloCount = filterAnimalsByType(animals, 'buffalo').length;
 
   if (!cowsCount) btnCows.classList.add('hidden');
+  else btnCows.classList.remove('hidden');
+
   if (!buffaloCount) btnBuffalo.classList.add('hidden');
+  else btnBuffalo.classList.remove('hidden');
 
   if (buffaloCount && !cowsCount) currentType = 'buffalo';
   else currentType = 'cows';
 
+  wrap.classList.toggle('buffalo', currentType === 'buffalo');
   btnCows.classList.toggle('active', currentType === 'cows');
   btnBuffalo.classList.toggle('active', currentType === 'buffalo');
 
   btnCows.onclick = () => {
     currentType = 'cows';
-    btnCows.classList.add('active');
-    btnBuffalo.classList.remove('active');
     loadHerdKPIs();
   };
 
   btnBuffalo.onclick = () => {
     currentType = 'buffalo';
-    btnBuffalo.classList.add('active');
-    btnCows.classList.remove('active');
     loadHerdKPIs();
   };
 }
@@ -729,32 +736,32 @@ const typeLabel = getTypeLabelByKey(currentType);
 
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
-  box('متوسط اللبن الأسبوعي / رأس', stats.avgWeeklyMilkPerHead ?? 0, 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
+  box('متوسط اللبن الأسبوعي / رأس', '--', 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
   box('إجمالي إنتاج اللبن اليومي', milkTotal ?? 0, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
-  box('إجمالي إنتاج اللبن الشهري', stats.monthlyMilkTotal ?? 0, 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
-  box('إنتاج اللبن المتوقع 305 يوم', stats.expected305Milk ?? 0, '', 'g_305', 'prod');
+  box('إجمالي إنتاج اللبن الشهري', '--', 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
+  box('إنتاج اللبن المتوقع 305 يوم', '--', '', 'g_305', 'prod');
 
 reproGrid.innerHTML =
   box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
-  box(`عدد ${typeLabel} المفتوحة في القطيع`, stats.openCount ?? 0, `نسبتهم من القطيع ${stats.openPct ?? 0}%`, 'g_openCount', 'repro') +
+  box(`عدد ${typeLabel} المفتوحة في القطيع`, '--', 'نسبتهم من القطيع --%', 'g_openCount', 'repro') +
   box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
   box('متوسط عدد أيام الحليب للقطيع', avgDIM ?? 0, '', 'g_dim', 'repro') +
-  box(`عدد ${typeLabel} الملقحة في القطيع`, stats.bredCount ?? 0, `نسبتهم من القطيع ${stats.bredPct ?? 0}%`, 'g_bred', 'repro') +
-  box('متوسط عدد الأيام بين تلقيحين', stats.avgBreedingInterval ?? 0, '', 'g_breedInterval', 'repro') +
-  box('نسبة مشاهدة الشياع في القطيع', stats.heatDetectionRate ?? 0, '', 'g_heatRate', 'repro');
+  box(`عدد ${typeLabel} الملقحة في القطيع`, '--', 'نسبتهم من القطيع --%', 'g_bred', 'repro') +
+  box('متوسط عدد الأيام بين تلقيحين', '--', '', 'g_breedInterval', 'repro') +
+  box('نسبة مشاهدة الشياع في القطيع', '--', '', 'g_heatRate', 'repro');
 
 cullGrid.innerHTML =
-  box('إجمالي عدد الاستبعاد', stats.cullTotal ?? 0, `نسبته في القطيع ${stats.cullTotalPct ?? 0}%`, 'g_cullTotal', 'cull') +
-  box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
-  box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
-  box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
+  box('إجمالي عدد الاستبعاد', '--', 'نسبته في القطيع --%', 'g_cullTotal', 'cull') +
+  box('عدد الاستبعاد الإنتاجي', '--', 'نسبته من الاستبعاد --%', 'g_cullProd', 'cull') +
+  box('عدد الاستبعاد التناسلي', '--', 'نسبته من الاستبعاد --%', 'g_cullRepro', 'cull') +
+  box('عدد الاستبعاد الصحي', '--', 'نسبته من الاستبعاد --%', 'g_cullHealth', 'cull');
 
 feedGrid.innerHTML =
-  box('تكلفة لتر لبن / يوم من التغذية', stats.feedCostPerLiter ?? 0, '', 'g_feedCostLiter', 'feed') +
-  box('كفاءة التحويل مادة جافة / لبن', feedEfficiency, '', 'g_fe', 'feed') +
-  box('تكلفة رأس / يوم من التغذية', stats.feedCostPerHeadPerDay ?? 0, '', 'g_feedHeadDay', 'feed') +
-  box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
-
+  box('تكلفة لتر لبن / يوم من التغذية', '--', '', 'g_feedCostLiter', 'feed') +
+  box('كفاءة التحويل مادة جافة / لبن', '--', '', 'g_fe', 'feed') +
+  box('تكلفة رأس / يوم من التغذية', '--', '', 'g_feedHeadDay', 'feed') +
+  box('هامش لبن / علف', '--', '', 'g_iofc', 'feed');
+    
 healthGrid.innerHTML =
   box('عدد التهاب الضرع في القطيع', stats.mastitisCount ?? 0, `نسبتهم من الحلاب ${stats.mastitisPctOfMilking ?? 0}%`, 'g_mastitis', 'health') +
   box('عدد حالات العرج في القطيع', stats.lamenessCount ?? 0, `نسبتهم ${stats.lamenessPct ?? 0}%`, 'g_lameness', 'health') +
@@ -766,34 +773,27 @@ renderMiniGauge("g_inmilk", inMilkPct);
 renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0);
 
 renderMiniGauge("g_avgMilk", avgMilk ?? 0);
-renderMiniGauge("g_weekMilk", stats.avgWeeklyMilkPerHead ?? 0);
-renderMiniGauge("g_totalMilk", milkTotal ?? 0);
-renderMiniGauge("g_monthMilk", stats.monthlyMilkTotal ?? 0);
-renderMiniGauge("g_305", stats.expected305Milk ?? 0);
+renderMiniGauge("g_weekMilk", NaN);
+renderMiniGauge("g_monthMilk", NaN);
+renderMiniGauge("g_305", NaN);
 
-renderMiniGauge("g_preg", pregPct);
-renderMiniGauge("g_openCount", stats.openPct ?? 0);
-renderMiniGauge("g_openDays", openDaysAvg);
-renderMiniGauge("g_dim", avgDIM ?? 0);
-renderMiniGauge("g_bred", stats.bredPct ?? 0);
-renderMiniGauge("g_breedInterval", stats.avgBreedingInterval ?? 0);
-renderMiniGauge("g_heatRate", stats.heatDetectionRate ?? 0);
+renderMiniGauge("g_openCount", NaN);
+renderMiniGauge("g_bred", NaN);
+renderMiniGauge("g_breedInterval", NaN);
+renderMiniGauge("g_heatRate", NaN);
 
-renderMiniGauge("g_cullTotal", stats.cullTotalPct ?? 0);
-renderMiniGauge("g_cullProd", cullProdPct);
-renderMiniGauge("g_cullRepro", cullReproPct);
-renderMiniGauge("g_cullHealth", cullHealthPct);
+renderMiniGauge("g_cullTotal", NaN);
+renderMiniGauge("g_cullProd", NaN);
+renderMiniGauge("g_cullRepro", NaN);
+renderMiniGauge("g_cullHealth", NaN);
 
-renderMiniGauge("g_feedCostLiter", stats.feedCostPerLiter ?? 0);
-renderMiniGauge("g_fe", feedEfficiency);
-renderMiniGauge("g_feedHeadDay", stats.feedCostPerHeadPerDay ?? 0);
-renderMiniGauge("g_iofc", iofc);
+renderMiniGauge("g_feedCostLiter", NaN);
+renderMiniGauge("g_fe", NaN);
+renderMiniGauge("g_feedHeadDay", NaN);
+renderMiniGauge("g_iofc", NaN);
 
-renderMiniGauge("g_mastitis", stats.mastitisPctOfMilking ?? 0);
-renderMiniGauge("g_lameness", stats.lamenessPct ?? 0);
-renderMiniGauge("g_feces", fecesScore);
-renderMiniGauge("g_bcs", bcsCamera);
-
+renderMiniGauge("g_mastitis", NaN);
+renderMiniGauge("g_lameness", NaN);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }
   catch(e){
@@ -808,7 +808,15 @@ function renderMiniGauge(id, percent){
   const el = document.getElementById(id);
   if(!el) return;
 
-  const val = Math.max(0, Math.min(100, percent));
+  const n = Number(percent);
+  if (!Number.isFinite(n)){
+    el.style.background = 'conic-gradient(#dfe7e2 360deg, #dfe7e2 360deg)';
+    el.style.color = '#8aa091';
+    el.textContent = '--';
+    return;
+  }
+
+  const val = Math.max(0, Math.min(100, n));
   el.style.background =
     `conic-gradient(#2e7d32 ${val*3.6}deg, #e0e0e0 ${val*3.6}deg)`;
   el.style.color = '#2e7d32';
