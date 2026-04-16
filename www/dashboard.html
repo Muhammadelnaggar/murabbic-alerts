@@ -399,7 +399,7 @@
 <script>
 // ============ API BASE ============
 const API_BASE = "https://murabbic-alerts.onrender.com";
-let currentType = 'cows';
+let currentType = '';
 // ============ هوية المستخدم ============
 function getTenantId() {
   try {
@@ -565,19 +565,27 @@ function setupTypeSwitch(animals){
   if (!buffaloCount) btnBuffalo.classList.add('hidden');
   else btnBuffalo.classList.remove('hidden');
 
-  if (buffaloCount && !cowsCount) currentType = 'buffalo';
-  else currentType = 'cows';
+  // لا تعيدي currentType كل مرة إلا إذا كان النوع الحالي غير متاح
+  if (currentType === 'buffalo' && !buffaloCount) currentType = 'cows';
+  if (currentType === 'cows' && !cowsCount) currentType = 'buffalo';
+
+  // لو أول تحميل فقط
+  if (!currentType) {
+    currentType = buffaloCount && !cowsCount ? 'buffalo' : 'cows';
+  }
 
   wrap.classList.toggle('buffalo', currentType === 'buffalo');
   btnCows.classList.toggle('active', currentType === 'cows');
   btnBuffalo.classList.toggle('active', currentType === 'buffalo');
 
   btnCows.onclick = () => {
+    if (currentType === 'cows') return;
     currentType = 'cows';
     loadHerdKPIs();
   };
 
   btnBuffalo.onclick = () => {
+    if (currentType === 'buffalo') return;
     currentType = 'buffalo';
     loadHerdKPIs();
   };
@@ -695,12 +703,9 @@ const typeLabel = getTypeLabelByKey(currentType);
     const t     = stats.totals    || {};
     const fert  = stats.fertility || {};
 
-    const totalActive =
-      t.totalActive != null ? t.totalActive : total;
+ const totalActive = total;
 
-    const pregPct =
-      t?.pregnant?.pct != null ? t.pregnant.pct :
-      (t.pregnantPct != null ? t.pregnantPct : pregPctDoc);
+  const pregPct = pregPctDoc;
 
     const conceptionRatePct =
       fert.conceptionRatePct != null ? fert.conceptionRatePct : conceptionRatePctDoc;
@@ -794,6 +799,8 @@ renderMiniGauge("g_iofc", NaN);
 
 renderMiniGauge("g_mastitis", NaN);
 renderMiniGauge("g_lameness", NaN);
+renderMiniGauge("g_feces", fecesScore);
+renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }
   catch(e){
