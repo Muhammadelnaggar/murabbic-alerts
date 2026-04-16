@@ -200,6 +200,35 @@
   justify-content:space-between;
   gap:12px;
 }
+.type-switch{
+  display:flex;
+  gap:8px;
+  margin:10px 0 12px;
+  padding:4px;
+  background:#eef7f0;
+  border:1px solid #dbe9df;
+  border-radius:16px;
+}
+.type-btn{
+  flex:1;
+  border:none;
+  background:transparent;
+  color:#1f5136;
+  font-weight:900;
+  font-size:14px;
+  padding:12px 10px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.type-btn.active{
+  background:linear-gradient(180deg,#0ea05a 0%,#0b7f47 100%);
+  color:#fff;
+  box-shadow:0 6px 14px rgba(14,160,90,.18);
+}
+.type-btn.hidden{
+  display:none;
+}    
 .mbk-title{ line-height:1.1; }
 .mbk-page{ font-size:18px; font-weight:900; color:var(--text); }
 .mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
@@ -295,7 +324,10 @@
   <div class="tile" onclick="location.href='calf-card.html'">🐄 بطاقة العجل</div>
   <div class="tile" onclick="location.href='nutrition-eval.html'">🥗 تقييم التغذية</div>
 </div>
-
+<div id="typeSwitch" class="type-switch">
+  <button id="btnCows" class="type-btn active" type="button">أبقار</button>
+  <button id="btnBuffalo" class="type-btn" type="button">جاموس</button>
+</div>
 <!-- مؤشرات القطيع -->
 <div class="card">
   <div class="section-title">📌 تعداد القطيع</div>
@@ -340,7 +372,7 @@
 <script>
 // ============ API BASE ============
 const API_BASE = "https://murabbic-alerts.onrender.com";
-
+let currentType = 'cows';
 // ============ هوية المستخدم ============
 function getTenantId() {
   try {
@@ -498,6 +530,51 @@ function getTypeLabel(stats, animals){
 
   return buffalo > cows ? 'جاموس' : 'أبقار';
 }
+  function detectAnimalType(an){
+  const sp = String(an.species || an.type || an.kind || '').trim();
+  if (sp.includes('جاموس')) return 'buffalo';
+  if (sp.includes('بقار') || sp.includes('أبقار') || sp.includes('cow')) return 'cows';
+  return '';
+}
+
+function getTypeLabelByKey(typeKey){
+  return typeKey === 'buffalo' ? 'جاموس' : 'أبقار';
+}
+
+function filterAnimalsByType(animals, typeKey){
+  return (animals || []).filter(an => detectAnimalType(an) === typeKey);
+}
+
+function setupTypeSwitch(animals){
+  const btnCows = document.getElementById('btnCows');
+  const btnBuffalo = document.getElementById('btnBuffalo');
+
+  const cowsCount = filterAnimalsByType(animals, 'cows').length;
+  const buffaloCount = filterAnimalsByType(animals, 'buffalo').length;
+
+  if (!cowsCount) btnCows.classList.add('hidden');
+  if (!buffaloCount) btnBuffalo.classList.add('hidden');
+
+  if (buffaloCount && !cowsCount) currentType = 'buffalo';
+  else currentType = 'cows';
+
+  btnCows.classList.toggle('active', currentType === 'cows');
+  btnBuffalo.classList.toggle('active', currentType === 'buffalo');
+
+  btnCows.onclick = () => {
+    currentType = 'cows';
+    btnCows.classList.add('active');
+    btnBuffalo.classList.remove('active');
+    loadHerdKPIs();
+  };
+
+  btnBuffalo.onclick = () => {
+    currentType = 'buffalo';
+    btnBuffalo.classList.add('active');
+    btnCows.classList.remove('active');
+    loadHerdKPIs();
+  };
+}
 // ============ تحميل مؤشرات القطيع ============
 async function loadHerdKPIs(){
   const statusBar  = document.getElementById('statusBar');
@@ -520,9 +597,14 @@ async function loadHerdKPIs(){
       Array.isArray(animalsResp?.data) ? animalsResp.data :
       Array.isArray(animalsResp?.animals) ? animalsResp.animals : [];
 
-    const animals = animalsArr.filter(isActive);
-    const total = animals.length;
+   const activeAnimals = animalsArr.filter(isActive);
 
+setupTypeSwitch(activeAnimals);
+
+const animals = filterAnimalsByType(activeAnimals, currentType);
+const total = animals.length;
+const typeLabel = getTypeLabelByKey(currentType);
+   
     let inMilk = 0,
         dimSum = 0,
         milkTotal = 0,
@@ -639,11 +721,11 @@ async function loadHerdKPIs(){
     const iofc          = stats.iofc ?? 0;
     const fecesScore    = stats.fecesScore ?? 0;
     const bcsCamera     = stats.bcsCamera ?? 0;
-   const typeLabel = getTypeLabel(stats, animals);
-herdGrid.innerHTML =
-  box('عدد الأبقار أو الجاموس في القطيع', totalActive, '', 'g_active', 'herd') +
-  box('عدد الأبقار أو الجاموس الحلاب', inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
-  box('عدد الأبقار أو الجاموس الجافة', Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
+  
+ herdGrid.innerHTML =
+  box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
+  box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
+  box(`عدد ${typeLabel} الجافة`, Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
 
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
@@ -653,11 +735,11 @@ prodGrid.innerHTML =
   box('إنتاج اللبن المتوقع 305 يوم', stats.expected305Milk ?? 0, '', 'g_305', 'prod');
 
 reproGrid.innerHTML =
-  box('عدد الأبقار / الجاموس العشار في القطيع', pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
-  box('عدد الأبقار / الجاموس المفتوحة في القطيع', stats.openCount ?? 0, `نسبتهم من القطيع ${stats.openPct ?? 0}%`, 'g_openCount', 'repro') +
+  box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
+  box(`عدد ${typeLabel} المفتوحة في القطيع`, stats.openCount ?? 0, `نسبتهم من القطيع ${stats.openPct ?? 0}%`, 'g_openCount', 'repro') +
   box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
   box('متوسط عدد أيام الحليب للقطيع', avgDIM ?? 0, '', 'g_dim', 'repro') +
-  box('عدد الأبقار / الجاموس الملقحة في القطيع', stats.bredCount ?? 0, `نسبتهم من القطيع ${stats.bredPct ?? 0}%`, 'g_bred', 'repro') +
+  box(`عدد ${typeLabel} الملقحة في القطيع`, stats.bredCount ?? 0, `نسبتهم من القطيع ${stats.bredPct ?? 0}%`, 'g_bred', 'repro') +
   box('متوسط عدد الأيام بين تلقيحين', stats.avgBreedingInterval ?? 0, '', 'g_breedInterval', 'repro') +
   box('نسبة مشاهدة الشياع في القطيع', stats.heatDetectionRate ?? 0, '', 'g_heatRate', 'repro');
 
