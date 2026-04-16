@@ -536,10 +536,32 @@ function box(label, value, sub='', gaugeId=null, cls=''){
   `;
 }
 
- function detectAnimalType(an){
-  const sp = String(an.species || an.type || an.kind || '').trim().toLowerCase();
-  if (sp.includes('جاموس') || sp.includes('buffalo')) return 'buffalo';
-  if (sp.includes('بقار') || sp.includes('أبقار') || sp.includes('cow')) return 'cows';
+function detectAnimalType(an){
+  const raw = [
+    an.species,
+    an.type,
+    an.kind,
+    an.animalType,
+    an.category,
+    an.classification,
+    an.groupType
+  ].filter(Boolean).join(' | ');
+
+  const sp = norm(raw);
+
+  if (
+    sp.includes('جاموس') ||
+    sp.includes('buffalo') ||
+    sp.includes('buf')
+  ) return 'buffalo';
+
+  if (
+    sp.includes('بقار') ||
+    sp.includes('ابقار') ||
+    sp.includes('cow') ||
+    sp.includes('cattle')
+  ) return 'cows';
+
   return '';
 }
 
@@ -553,26 +575,36 @@ function filterAnimalsByType(animals, typeKey){
 
 function setupTypeSwitch(animals){
   const wrap = document.getElementById('typeSwitch');
+  const wrapOuter = document.querySelector('.switch-wrap');
   const btnCows = document.getElementById('btnCows');
   const btnBuffalo = document.getElementById('btnBuffalo');
 
   const cowsCount = filterAnimalsByType(animals, 'cows').length;
   const buffaloCount = filterAnimalsByType(animals, 'buffalo').length;
 
-  if (!cowsCount) btnCows.classList.add('hidden');
-  else btnCows.classList.remove('hidden');
+  // لا تخفي السويتش كله إلا لو القطيع فعلاً ليس فيه إلا نوع واحد معروف
+  btnCows.classList.remove('hidden');
+  btnBuffalo.classList.remove('hidden');
 
-  if (!buffaloCount) btnBuffalo.classList.add('hidden');
-  else btnBuffalo.classList.remove('hidden');
-
-  // لا تعيدي currentType كل مرة إلا إذا كان النوع الحالي غير متاح
-  if (currentType === 'buffalo' && !buffaloCount) currentType = 'cows';
-  if (currentType === 'cows' && !cowsCount) currentType = 'buffalo';
-
-  // لو أول تحميل فقط
-  if (!currentType) {
-    currentType = buffaloCount && !cowsCount ? 'buffalo' : 'cows';
+  if (cowsCount > 0 && buffaloCount > 0){
+    wrapOuter.style.display = '';
+  } else if (cowsCount > 0 && buffaloCount === 0){
+    wrapOuter.style.display = '';
+    btnBuffalo.classList.add('hidden');
+    currentType = 'cows';
+  } else if (buffaloCount > 0 && cowsCount === 0){
+    wrapOuter.style.display = '';
+    btnCows.classList.add('hidden');
+    currentType = 'buffalo';
+  } else {
+    // لو فشل التمييز، لا تخفي السويتش
+    wrapOuter.style.display = '';
+    if (!currentType) currentType = 'cows';
   }
+
+  if (currentType === 'buffalo' && buffaloCount === 0 && cowsCount > 0) currentType = 'cows';
+  if (currentType === 'cows' && cowsCount === 0 && buffaloCount > 0) currentType = 'buffalo';
+  if (!currentType) currentType = cowsCount >= buffaloCount ? 'cows' : 'buffalo';
 
   wrap.classList.toggle('buffalo', currentType === 'buffalo');
   btnCows.classList.toggle('active', currentType === 'cows');
@@ -616,7 +648,17 @@ async function loadHerdKPIs(){
 
 setupTypeSwitch(activeAnimals);
 
-const animals = filterAnimalsByType(activeAnimals, currentType);
+let animals = filterAnimalsByType(activeAnimals, currentType);
+
+// لو فشل التعرّف على النوع، لا تصفّر الصفحة
+if (!animals.length) {
+  if (currentType === 'cows') {
+    animals = activeAnimals.filter(an => !detectAnimalType(an) || detectAnimalType(an) === 'cows');
+  } else {
+    animals = activeAnimals.filter(an => !detectAnimalType(an) || detectAnimalType(an) === 'buffalo');
+  }
+}
+
 const total = animals.length;
 const typeLabel = getTypeLabelByKey(currentType);
    
