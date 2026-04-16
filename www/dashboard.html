@@ -537,36 +537,11 @@ function box(label, value, sub='', gaugeId=null, cls=''){
 }
 
 function detectAnimalType(an){
-  const raw = [
-    an.species,
-    an.type,
-    an.kind,
-    an.animalType,
-    an.category,
-    an.classification,
-    an.groupType,
-    an.breed,
-    an.subType,
-    an.family
-  ].filter(Boolean).join(' | ');
+  const ar = norm(an.animalTypeAr || '');
+  const en = String(an.animaltype || '').trim().toLowerCase();
 
-  const sp = norm(raw);
-
-  if (
-    sp.includes('جاموس') ||
-    sp.includes('buffalo') ||
-    sp.includes('buf')
-  ) return 'buffalo';
-
-  if (
-    sp.includes('بقار') ||
-    sp.includes('ابقار') ||
-    sp.includes('cow') ||
-    sp.includes('cattle') ||
-    sp.includes('holstein') ||
-    sp.includes('friesian') ||
-    sp.includes('jersey')
-  ) return 'cows';
+  if (ar.includes('جاموس') || en === 'buffalo') return 'buffalo';
+  if (ar.includes('بقار') || ar.includes('ابقار') || en === 'cow' || en === 'cattle') return 'cows';
 
   return '';
 }
