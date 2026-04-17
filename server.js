@@ -1728,12 +1728,9 @@ app.get("/api/herd-stats", async (req, res) => {
       .where("userId", "==", uid)
       .get();
 
-   const animalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+const animalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-const animals = animalsAll.filter(a => {
-  const st = String(a.status || a.lifeStatus || "").toLowerCase();
-  if (["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st)) return false;
-
+const animalsByType = animalsAll.filter(a => {
   const at = String(a.animaltype || '').trim().toLowerCase();
   const ar = String(a.animalTypeAr || '').trim();
 
@@ -1746,9 +1743,12 @@ const animals = animalsAll.filter(a => {
   return true;
 });
 
-const active = animals;
+const active = animalsByType.filter(a => {
+  const st = String(a.status || a.lifeStatus || "").toLowerCase();
+  return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
+});
 
-    const total = active.length;
+const total = active.length;
 
     // --------------------------------------
     // 🔥 2) خصوبة من الوثيقة
@@ -1824,7 +1824,7 @@ try {
  for (const e of cullEvents) {
   const evAnimalNo = String(e.animalNumber || e.animalId || '').trim();
 
-  const matchedAnimal = animals.find(a =>
+ const matchedAnimal = animalsByType.find(a =>
     String(a.animalNumber || a.number || a.id || '').trim() === evAnimalNo
   );
 
