@@ -1852,7 +1852,7 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 
     const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
     const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
-   // --------------------------------------
+ // --------------------------------------
 // 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
 // --------------------------------------
 let dailyMilkTotal = 0;
@@ -1866,24 +1866,24 @@ try {
     .limit(5000)
     .get();
 
- const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...d.data() }));
+  const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
   const animalNosSet = new Set(
     animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
   );
 
-const milkEvents = evMilkAll.filter(e => {
-  const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase().trim();
-  const no = String(e.animalNumber || e.number || e.animalId || "").trim();
+  const milkEvents = evMilkAll.filter(e => {
+    const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase().trim();
+    const no = String(e.animalNumber || e.number || e.animalId || '').trim();
 
-  return (
-    animalNosSet.has(no) &&
-    (
-      txt === "daily_milk" ||
-      txt === "لبن يومي"
-    )
-  );
-});
+    return (
+      animalNosSet.has(no) &&
+      (
+        txt === "daily_milk" ||
+        txt === "لبن يومي"
+      )
+    );
+  });
 
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -1893,7 +1893,8 @@ const milkEvents = evMilkAll.filter(e => {
 
   const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  const dayMap = new Map();
+  // آخر تسجيل فقط لكل حيوان/يوم
+  const latestPerAnimalDay = new Map();
 
   for (const e of milkEvents) {
     const d = toDate(e.eventDate || e.date || e.createdAt || e.timestamp);
@@ -1911,26 +1912,56 @@ const milkEvents = evMilkAll.filter(e => {
       0
     );
 
-   if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
+    if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
 
-// إجمالي اليوم الحالي
-if (dayOnly.getTime() === today.getTime()) {
-  dailyMilkTotal += milkVal;
-}
+    const animalNo = String(e.animalNumber || e.number || e.animalId || '').trim();
+    if (!animalNo) continue;
 
-// إجمالي الشهر الحالي
-if (dayOnly >= startMonth && dayOnly <= today) {
-  monthlyMilkTotal += milkVal;
-}
+    const dayKey = dayOnly.toISOString().slice(0,10);
+    const key = `${animalNo}__${dayKey}`;
+
+    const eventMs =
+      toDate(e.createdAt)?.getTime() ||
+      toDate(e.timestamp)?.getTime() ||
+      toDate(e.eventDate)?.getTime() ||
+      toDate(e.date)?.getTime() ||
+      0;
+
+    const prev = latestPerAnimalDay.get(key);
+    if (!prev || eventMs >= prev.eventMs) {
+      latestPerAnimalDay.set(key, {
+        animalNo,
+        dayKey,
+        dayOnly,
+        milkVal,
+        eventMs
+      });
+    }
+  }
+
+  const dayMap = new Map();
+
+  for (const recEntry of latestPerAnimalDay.values()) {
+    const { animalNo, dayKey, dayOnly, milkVal } = recEntry;
+
+    // إجمالي اليوم الحالي
+    if (dayOnly.getTime() === today.getTime()) {
+      dailyMilkTotal += milkVal;
+    }
+
+    // إجمالي الشهر الحالي
+    if (dayOnly >= startMonth && dayOnly <= today) {
+      monthlyMilkTotal += milkVal;
+    }
+
     // آخر 7 أيام
     if (dayOnly >= start7 && dayOnly <= today) {
-      const key = dayOnly.toISOString().slice(0,10);
-      if (!dayMap.has(key)) {
-        dayMap.set(key, { totalMilk: 0, heads: new Set() });
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, { totalMilk: 0, heads: new Set() });
       }
-      const rec = dayMap.get(key);
+      const rec = dayMap.get(dayKey);
       rec.totalMilk += milkVal;
-      rec.heads.add(String(e.animalNumber || e.number || e.animalId || '').trim());
+      rec.heads.add(animalNo);
     }
   }
 
@@ -1947,10 +1978,11 @@ if (dayOnly >= startMonth && dayOnly <= today) {
     sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
   }
 
- dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
-monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-expected305Milk = +(avgHead7Days * 305).toFixed(1);
+  dailyMilkTotal = +dailyMilkTotal.toFixed(1);
+  avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
+  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+  expected305Milk = +(avgHead7Days * 305).toFixed(1);
+
 } catch (e) {
   console.error("milk stats error:", e.message || e);
 }
