@@ -1872,18 +1872,18 @@ try {
     animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
   );
 
-  const milkEvents = evMilkAll.filter(e => {
-    const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase();
-    const no = String(e.animalNumber || e.number || e.animalId || "").trim();
-    return (
-      animalNosSet.has(no) &&
-      (
-        txt.includes("daily_milk") ||
-        txt.includes("لبن يومي") ||
-        txt.includes("milk")
-      )
-    );
-  });
+const milkEvents = evMilkAll.filter(e => {
+  const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase().trim();
+  const no = String(e.animalNumber || e.number || e.animalId || "").trim();
+
+  return (
+    animalNosSet.has(no) &&
+    (
+      txt === "daily_milk" ||
+      txt === "لبن يومي"
+    )
+  );
+});
 
   const today = new Date();
   today.setHours(0,0,0,0);
