@@ -757,12 +757,16 @@ const typeLabel = getTypeLabelByKey(currentType);
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
   box(`عدد ${typeLabel} الجافة`, Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
 
+const avgWeeklyMilk = avgMilk ? +(avgMilk * 7).toFixed(1) : 0;
+const monthlyMilkTotal = milkTotalDisplay ? +(milkTotalDisplay * 30).toFixed(1) : 0;
+const milk305 = avgMilk ? +(avgMilk * 305).toFixed(1) : 0;
+
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
-  box('متوسط اللبن الأسبوعي / رأس', '--', 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
- box('إجمالي إنتاج اللبن اليومي', milkTotalDisplay, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
-  box('إجمالي إنتاج اللبن الشهري', '--', 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
-  box('إنتاج اللبن المتوقع 305 يوم', '--', '', 'g_305', 'prod');
+  box('متوسط اللبن الأسبوعي / رأس', avgWeeklyMilk, 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
+  box('إجمالي إنتاج اللبن اليومي', milkTotalDisplay, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
+  box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
+  box('إنتاج اللبن المتوقع 305 يوم', milk305, '', 'g_305', 'prod');
 
 const openCount = animals.filter(an => {
   const rep = norm(an.reproductiveStatus || an.reproStatus || '');
@@ -815,9 +819,9 @@ renderMiniGauge("g_inmilk", inMilkPct);
 renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0);
 
 renderMiniGauge("g_avgMilk", avgMilk ?? 0);
-renderMiniGauge("g_weekMilk", NaN);
-renderMiniGauge("g_monthMilk", NaN);
-renderMiniGauge("g_305", NaN);
+renderMiniGauge("g_weekMilk", avgWeeklyMilk);
+renderMiniGauge("g_monthMilk", monthlyMilkTotal);
+renderMiniGauge("g_305", milk305);
 
 renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
