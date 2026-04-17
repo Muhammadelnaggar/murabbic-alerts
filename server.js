@@ -1856,10 +1856,11 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 // 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
 // --------------------------------------
 let dailyMilkTotal = 0;
+let avgHeadToday = 0;
 let avgHead7Days = 0;
 let monthlyMilkTotal = 0;
 let expected305Milk = 0;
-
+    
 try {
   const evSnapMilk = await db.collection("events")
     .where("userId", "==", uid)
@@ -1952,12 +1953,16 @@ for (let i = 0; i < 7; i++) {
   daysWithMilk++;
 }
 
-  dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-  avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
-  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-  expected305Milk = +(avgHead7Days * 305).toFixed(1);
-  const latestRec = latestMilkDay ? dayMap.get(latestMilkDay.toISOString().slice(0,10)) : null;
-const avgHeadToday = (latestRec && latestRec.heads.size)
+ dailyMilkTotal = +dailyMilkTotal.toFixed(1);
+avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
+monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+expected305Milk = +(avgHead7Days * 305).toFixed(1);
+
+const latestRec = latestMilkDay
+  ? dayMap.get(latestMilkDay.toISOString().slice(0,10))
+  : null;
+
+avgHeadToday = (latestRec && latestRec.heads.size)
   ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
   : 0;
 }
