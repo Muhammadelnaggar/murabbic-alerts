@@ -2071,7 +2071,7 @@ monthlyMilkTotal,
 expected305Milk,
 bcsCamera,
 fecesScore
-
+});
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
     return res.json({ ok:false, error:e.message });
