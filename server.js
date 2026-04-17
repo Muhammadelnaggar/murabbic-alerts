@@ -1926,6 +1926,7 @@ if (latestMilkDay) {
   const startMonth = new Date(latestMilkDay.getFullYear(), latestMilkDay.getMonth(), 1);
 
   let sumDailyHeadAvg = 0;
+let daysWithMilk = 0;
 
   for (const [key, rec] of dayMap.entries()) {
     const d = new Date(key + 'T00:00:00');
@@ -1939,21 +1940,26 @@ if (latestMilkDay) {
     }
   }
 
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start7);
-    d.setDate(start7.getDate() + i);
-    const key = d.toISOString().slice(0,10);
+for (let i = 0; i < 7; i++) {
+  const d = new Date(start7);
+  d.setDate(start7.getDate() + i);
+  const key = d.toISOString().slice(0,10);
 
-    const rec = dayMap.get(key);
-    if (!rec || !rec.heads.size) continue;
+  const rec = dayMap.get(key);
+  if (!rec || !rec.heads.size) continue;
 
-    sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
-  }
+  sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
+  daysWithMilk++;
+}
 
   dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-  avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
+  avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
   monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
   expected305Milk = +(avgHead7Days * 305).toFixed(1);
+  const latestRec = latestMilkDay ? dayMap.get(latestMilkDay.toISOString().slice(0,10)) : null;
+const avgHeadToday = (latestRec && latestRec.heads.size)
+  ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
+  : 0;
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
@@ -2070,6 +2076,7 @@ feedEfficiency: 0,
 feedCostPerHeadPerDay: 0,
 iofc: 0,
 dailyMilkTotal,
+  avgHeadToday,
 avgHead7Days,
 monthlyMilkTotal,
 expected305Milk,
