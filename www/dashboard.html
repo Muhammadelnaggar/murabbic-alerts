@@ -757,9 +757,10 @@ const typeLabel = getTypeLabelByKey(currentType);
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
   box(`عدد ${typeLabel} الجافة`, Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
 
-const avgHead7Days = stats.avgHead7Days ?? '--';
+const avgHead7Days = stats.avgHead7Days ?? 0;
+const totalDailyMilk = +(avgMilk * inMilk).toFixed(1);
 const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
-const milk305 = stats.expected305Milk ?? 0;
+const milk305 = +(avgMilk * 305).toFixed(1);
 
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
@@ -820,9 +821,10 @@ renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inM
 
 renderMiniGauge("g_avgMilk", avgMilk ?? 0);
 renderMiniGauge("g_weekMilk", avgHead7Days);
+renderMiniGauge("g_totalMilk", totalDailyMilk);
 renderMiniGauge("g_monthMilk", monthlyMilkTotal);
 renderMiniGauge("g_305", milk305);
-
+    
 renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_breedInterval", NaN);
