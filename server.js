@@ -1814,7 +1814,7 @@ try {
     .limit(5000)
     .get();
 
-  const ev = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+ const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
   const cullEvents = ev.filter(e => {
     const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
@@ -1855,6 +1855,7 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
    // --------------------------------------
 // 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
 // --------------------------------------
+let dailyMilkTotal = 0;
 let avgHead7Days = 0;
 let monthlyMilkTotal = 0;
 let expected305Milk = 0;
@@ -1910,13 +1911,17 @@ try {
       0
     );
 
-    if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
+   if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
 
-    // إجمالي الشهر الحالي
-    if (dayOnly >= startMonth && dayOnly <= today) {
-      monthlyMilkTotal += milkVal;
-    }
+// إجمالي اليوم الحالي
+if (dayOnly.getTime() === today.getTime()) {
+  dailyMilkTotal += milkVal;
+}
 
+// إجمالي الشهر الحالي
+if (dayOnly >= startMonth && dayOnly <= today) {
+  monthlyMilkTotal += milkVal;
+}
     // آخر 7 أيام
     if (dayOnly >= start7 && dayOnly <= today) {
       const key = dayOnly.toISOString().slice(0,10);
@@ -1942,10 +1947,10 @@ try {
     sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
   }
 
-  avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
-  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-  expected305Milk = +(avgHead7Days * 305).toFixed(1);
-
+ dailyMilkTotal = +dailyMilkTotal.toFixed(1);
+avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
+monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+expected305Milk = +(avgHead7Days * 305).toFixed(1);
 } catch (e) {
   console.error("milk stats error:", e.message || e);
 }
@@ -1960,7 +1965,7 @@ try {
         .limit(5000)
         .get();
 
-      const ev = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+     const ev = evSnap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
       const heats = ev.filter(e => e.eventTypeNorm === "heat" && e.eventDate);
       const ins   = ev.filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
@@ -2057,15 +2062,15 @@ return res.json({
 
   // ===== التغذية: مؤقتًا صفر صريح بدل undefined =====
   feedCostPerLiter: 0,
-  feedEfficiency: 0,
-  feedCostPerHeadPerDay: 0,
-  iofc: 0,
+feedEfficiency: 0,
+feedCostPerHeadPerDay: 0,
+iofc: 0,
+dailyMilkTotal,
 avgHead7Days,
 monthlyMilkTotal,
 expected305Milk,
-  bcsCamera,
-  fecesScore
-});
+bcsCamera,
+fecesScore
 
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
