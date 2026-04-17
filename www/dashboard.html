@@ -762,9 +762,14 @@ const totalDailyMilk = stats.dailyMilkTotal ?? 0;
 const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
 const milk305 = stats.expected305Milk ?? 0;
 
+const avgHeadToday =
+  stats.avgHeadToday != null
+    ? stats.avgHeadToday
+    : ((inMilk > 0 && totalDailyMilk > 0) ? +(totalDailyMilk / inMilk).toFixed(1) : 0);
+
 prodGrid.innerHTML =
-  box('متوسط اللبن اليومي / رأس / يوم', avgHead7Days, '', null, 'prod') +
-  box('متوسط الرأس يوم / 7 أيام', avgHead7Days, '', null, 'prod') +
+  box('متوسط اللبن اليومي / رأس / يوم', avgHeadToday, '', null, 'prod') +
+  box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
   box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
   box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod') +
   box('إنتاج اللبن المتوقع 305 يوم', milk305, '', null, 'prod');
