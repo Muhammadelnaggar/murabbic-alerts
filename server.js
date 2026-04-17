@@ -1814,7 +1814,7 @@ try {
     .limit(5000)
     .get();
 
- const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+const ev = evSnap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
   const cullEvents = ev.filter(e => {
     const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
