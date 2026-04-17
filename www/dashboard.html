@@ -765,7 +765,7 @@ const milk305 = +(avgMilk * 305).toFixed(1);
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgMilk ?? 0, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
   box('متوسط الرأس يوم / 7 أيام', avgHead7Days, 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
-  box('إجمالي إنتاج اللبن اليومي', milkTotalDisplay, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
+  box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
   box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
   box('إنتاج اللبن المتوقع 305 يوم', milk305, '', 'g_305', 'prod');
 
