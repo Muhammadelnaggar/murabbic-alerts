@@ -1851,7 +1851,103 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 
     const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
     const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
+   // --------------------------------------
+// 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
+// --------------------------------------
+let avgHead7Days = 0;
+let monthlyMilkTotal = 0;
+let expected305Milk = 0;
 
+try {
+  const evSnapMilk = await db.collection("events")
+    .where("userId", "==", uid)
+    .limit(5000)
+    .get();
+
+  const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const animalNosSet = new Set(
+    animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
+  );
+
+  const milkEvents = evMilkAll.filter(e => {
+    const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase();
+    const no = String(e.animalNumber || e.number || e.animalId || "").trim();
+    return (
+      animalNosSet.has(no) &&
+      (
+        txt.includes("daily_milk") ||
+        txt.includes("لبن يومي") ||
+        txt.includes("milk")
+      )
+    );
+  });
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const start7 = new Date(today);
+  start7.setDate(start7.getDate() - 6);
+
+  const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const dayMap = new Map();
+
+  for (const e of milkEvents) {
+    const d = toDate(e.eventDate || e.date || e.createdAt || e.timestamp);
+    if (!d || isNaN(d.getTime())) continue;
+
+    const dayOnly = new Date(d);
+    dayOnly.setHours(0,0,0,0);
+
+    const milkVal = Number(
+      e.totalMilk ??
+      e.dailyMilk ??
+      e.milkKg ??
+      e.milk ??
+      e.value ??
+      0
+    );
+
+    if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
+
+    // إجمالي الشهر الحالي
+    if (dayOnly >= startMonth && dayOnly <= today) {
+      monthlyMilkTotal += milkVal;
+    }
+
+    // آخر 7 أيام
+    if (dayOnly >= start7 && dayOnly <= today) {
+      const key = dayOnly.toISOString().slice(0,10);
+      if (!dayMap.has(key)) {
+        dayMap.set(key, { totalMilk: 0, heads: new Set() });
+      }
+      const rec = dayMap.get(key);
+      rec.totalMilk += milkVal;
+      rec.heads.add(String(e.animalNumber || e.number || e.animalId || '').trim());
+    }
+  }
+
+  let sumDailyHeadAvg = 0;
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start7);
+    d.setDate(start7.getDate() + i);
+    const key = d.toISOString().slice(0,10);
+
+    const rec = dayMap.get(key);
+    if (!rec || !rec.heads.size) continue;
+
+    sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
+  }
+
+  avgHead7Days = +(sumDailyHeadAvg / 7).toFixed(1);
+  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+  expected305Milk = +(avgHead7Days * 305).toFixed(1);
+
+} catch (e) {
+  console.error("milk stats error:", e.message || e);
+}
     // --------------------------------------
     // 🔥 5) خصوبة 21 يوم من الأحداث (FERTILITY EVENTS)
     // --------------------------------------
@@ -1963,7 +2059,9 @@ return res.json({
   feedEfficiency: 0,
   feedCostPerHeadPerDay: 0,
   iofc: 0,
-
+avgHead7Days,
+monthlyMilkTotal,
+expected305Milk,
   bcsCamera,
   fecesScore
 });
