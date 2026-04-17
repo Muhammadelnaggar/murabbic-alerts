@@ -763,11 +763,11 @@ const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
 const milk305 = stats.expected305Milk ?? 0;
 
 prodGrid.innerHTML =
-  box('متوسط اللبن اليومي / رأس / يوم', avgHead7Days, 'مؤشر صعود وهبوط', 'g_avgMilk', 'prod') +
-  box('متوسط الرأس يوم / 7 أيام', avgHead7Days, 'مؤشر صعود وهبوط', 'g_weekMilk', 'prod') +
-  box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, 'مؤشر صعود وهبوط', 'g_totalMilk', 'prod') +
-  box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, 'مؤشر صعود وهبوط', 'g_monthMilk', 'prod') +
-  box('إنتاج اللبن المتوقع 305 يوم', milk305, '', 'g_305', 'prod');
+  box('متوسط اللبن اليومي / رأس / يوم', avgHead7Days, '', null, 'prod') +
+  box('متوسط الرأس يوم / 7 أيام', avgHead7Days, '', null, 'prod') +
+  box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
+  box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod') +
+  box('إنتاج اللبن المتوقع 305 يوم', milk305, '', null, 'prod');
 
 const openCount = animals.filter(an => {
   const rep = norm(an.reproductiveStatus || an.reproStatus || '');
@@ -819,11 +819,7 @@ healthGrid.innerHTML =
 renderMiniGauge("g_inmilk", inMilkPct);
 renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0);
 
-renderMiniGauge("g_avgMilk", avgMilk ?? 0);
-renderMiniGauge("g_weekMilk", avgHead7Days);
-renderMiniGauge("g_totalMilk", totalDailyMilk);
-renderMiniGauge("g_monthMilk", monthlyMilkTotal);
-renderMiniGauge("g_305", milk305);
+// تم حذف جوجز اللبن
     
 renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
