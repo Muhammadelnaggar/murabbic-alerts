@@ -807,10 +807,12 @@ const dailyTrend = stats.dailyTrend || 'flat';
 const monthlyDeltaPct = stats.monthlyDeltaPct;
 const monthlyTrend = stats.monthlyTrend || 'flat';
 
+const dailyMilkTotal = stats.dailyMilkTotal ?? 0;
+
 const avgHeadToday =
   stats.avgHeadToday != null
     ? stats.avgHeadToday
-    : ((inMilk > 0 && totalDailyMilk > 0) ? +(totalDailyMilk / inMilk).toFixed(1) : 0);
+    : ((inMilk > 0 && dailyMilkTotal > 0) ? +(dailyMilkTotal / inMilk).toFixed(1) : 0);
 
 const avgHeadDeltaPct = stats.avgHeadDeltaPct;
 const avgHeadTrend = stats.avgHeadTrend || 'flat';
@@ -826,7 +828,7 @@ prodGrid.innerHTML =
   box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
   box(
     'إجمالي إنتاج اللبن اليومي',
-    totalDailyMilk,
+   dailyMilkTotal,
     trendHtml(dailyTrend, dailyDeltaPct, 'مقارنة بأمس'),
     null,
     'prod'
