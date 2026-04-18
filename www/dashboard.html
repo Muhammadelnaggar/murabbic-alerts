@@ -561,7 +561,9 @@ function trendHtml(trend, pct, note=''){
   if (pct == null || !Number.isFinite(Number(pct))) return '';
 
   const t = String(trend || 'flat');
-  const arrow = t === 'up' ? '↗' : (t === 'down' ? '↘' : '→');
+  if (t === 'flat' || Math.abs(Number(pct)) < 0.05) return '';
+
+  const arrow = t === 'up' ? '↗' : '↘';
   const pctTxt = `${Math.abs(Number(pct)).toFixed(1)}%`;
 
   return `
