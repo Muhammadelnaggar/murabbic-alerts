@@ -163,28 +163,6 @@
   line-height:1.5;
   color:#6b7d75;
 }
-    .trend-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  margin-top:4px;
-  font-size:12px;
-  font-weight:900;
-}
-
-.trend-chip.up{ color:#15803d; }
-.trend-chip.down{ color:#dc2626; }
-.trend-chip.flat{ color:#64748b; }
-
-.trend-arrow{
-  font-size:15px;
-  font-weight:900;
-}
-
-.trend-pct{
-  direction:ltr;
-  unicode-bidi:isolate;
-}
     #statusBar{
       margin-top:4px;
       font-size:9px;
@@ -557,23 +535,7 @@ function box(label, value, sub='', gaugeId=null, cls=''){
     </div>
   `;
 }
-function trendHtml(trend, pct, note=''){
-  if (pct == null || !Number.isFinite(Number(pct))) return '';
 
-  const t = String(trend || 'flat');
-  if (t === 'flat' || Math.abs(Number(pct)) < 0.05) return '';
-
-  const arrow = t === 'up' ? '↗' : '↘';
-  const pctTxt = `${Math.abs(Number(pct)).toFixed(1)}%`;
-
-  return `
-    <span class="trend-chip ${t}">
-      <span class="trend-arrow">${arrow}</span>
-      <span class="trend-pct">${pctTxt}</span>
-      ${note ? `<span>${note}</span>` : ''}
-    </span>
-  `;
-}
 function detectAnimalType(an){
   const ar = norm(an.animalTypeAr || '');
   const en = String(an.animaltype || '').trim().toLowerCase();
@@ -652,13 +614,10 @@ async function loadHerdKPIs(){
   const healthGrid = document.getElementById('healthGrid');
 
   try{
-  const statsResp = await fetchJSON(`/api/herd-stats?type=${currentType}`);
-
-if (!statsResp || statsResp.ok === false) {
-  throw new Error((statsResp && statsResp.error) || 'herd_stats_failed');
-}
-
-const animalsResp = await fetchJSON(`/api/animals`);
+   const [statsResp, animalsResp] = await Promise.all([
+  fetchJSON(`/api/herd-stats?type=${currentType}`),
+  fetchJSON(`/api/animals`)
+]);
 
     const animalsArr =
       Array.isArray(animalsResp) ? animalsResp :
@@ -754,10 +713,7 @@ const typeLabel = getTypeLabelByKey(currentType);
         ? Math.round(abortCount * 100 / (pregCount + abortCount))
         : 0;
 
-   const stats = (statsResp && statsResp.ok) ? statsResp : null;
-if (!stats) {
-  throw new Error((statsResp && statsResp.error) || 'herd_stats_failed');
-}
+    const stats = statsResp || {};
     const t     = stats.totals    || {};
     const fert  = stats.fertility || {};
 
@@ -801,51 +757,23 @@ if (!stats) {
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
   box(`عدد ${typeLabel} الجافة`, Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
 
-const avgHead7Days =
-  stats.avgHead7Days != null
-    ? stats.avgHead7Days
-    : 0;
+const avgHead7Days = stats.avgHead7Days ?? 0;
+const totalDailyMilk = stats.dailyMilkTotal ?? 0;
 const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
-
-const dailyDeltaPct = stats.dailyDeltaPct;
-const dailyTrend = stats.dailyTrend || 'flat';
-
-const monthlyDeltaPct = stats.monthlyDeltaPct;
-const monthlyTrend = stats.monthlyTrend || 'flat';
-
-const dailyMilkTotal = stats.dailyMilkTotal ?? 0;
+const milk305 = stats.expected305Milk ?? 0;
 
 const avgHeadToday =
   stats.avgHeadToday != null
     ? stats.avgHeadToday
-    : ((inMilk > 0 && dailyMilkTotal > 0) ? +(dailyMilkTotal / inMilk).toFixed(1) : 0);
-
-const avgHeadDeltaPct = stats.avgHeadDeltaPct;
-const avgHeadTrend = stats.avgHeadTrend || 'flat';
+    : ((inMilk > 0 && totalDailyMilk > 0) ? +(totalDailyMilk / inMilk).toFixed(1) : 0);
 
 prodGrid.innerHTML =
-  box(
-    'متوسط اللبن اليومي / رأس / يوم',
-    avgHeadToday,
-    trendHtml(avgHeadTrend, avgHeadDeltaPct, 'مقارنة بأمس'),
-    null,
-    'prod'
-  ) +
+  box('متوسط اللبن اليومي / رأس / يوم', avgHeadToday, '', null, 'prod') +
   box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
-  box(
-    'إجمالي إنتاج اللبن اليومي',
-   dailyMilkTotal,
-    trendHtml(dailyTrend, dailyDeltaPct, 'مقارنة بأمس'),
-    null,
-    'prod'
-  ) +
-  box(
-    'إجمالي إنتاج اللبن الشهري',
-    monthlyMilkTotal,
-    trendHtml(monthlyTrend, monthlyDeltaPct, 'مقارنة بالشهر السابق'),
-    null,
-    'prod'
-  );
+  box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
+  box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod') +
+  box('إنتاج اللبن المتوقع 305 يوم', milk305, '', null, 'prod');
+
 const openCount = animals.filter(an => {
   const rep = norm(an.reproductiveStatus || an.reproStatus || '');
   return rep.includes('مفتوح') || rep.includes('open');
@@ -921,8 +849,8 @@ renderMiniGauge("g_bcs", bcsCamera);
   }
   catch(e){
     console.error('herd stats error', e);
-   document.getElementById('statusBar').textContent =
-  'فشل تحميل بيانات القطيع: ' + (e?.message || 'خطأ غير معروف');
+    document.getElementById('statusBar').textContent =
+      'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
   }
 }
 
