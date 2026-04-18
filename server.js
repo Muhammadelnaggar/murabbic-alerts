@@ -1856,22 +1856,10 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 // 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
 // --------------------------------------
 let dailyMilkTotal = 0;
+let avgHeadToday = 0;
 let avgHead7Days = 0;
 let monthlyMilkTotal = 0;
-let avgHeadToday = 0;
-
-let prevDayMilkTotal = 0;
-let prevAvgHeadToday = 0;
-
-let dailyDeltaPct = null;
-let dailyTrend = "flat";
-
-let avgHeadDeltaPct = null;
-let avgHeadTrend = "flat";
-
-let prevMonthMilkTotal = 0;
-let monthlyDeltaPct = null;
-let monthlyTrend = "flat";
+let expected305Milk = 0;
     
 try {
   const evSnapMilk = await db.collection("events")
@@ -1936,38 +1924,10 @@ if (latestMilkDay) {
   const start7 = new Date(latestMilkDay);
   start7.setDate(start7.getDate() - 6);
 
-  const startMonth = new Date(
-    latestMilkDay.getFullYear(),
-    latestMilkDay.getMonth(),
-    1
-  );
-
-  const prevDay = new Date(latestMilkDay);
-  prevDay.setDate(prevDay.getDate() - 1);
-  const prevDayKey = prevDay.toISOString().slice(0,10);
-
-  const prevMonthStart = new Date(
-    latestMilkDay.getFullYear(),
-    latestMilkDay.getMonth() - 1,
-    1
-  );
-
-  const prevMonthLastDay = new Date(
-    latestMilkDay.getFullYear(),
-    latestMilkDay.getMonth(),
-    0
-  ).getDate();
-
-  const compareDay = Math.min(latestMilkDay.getDate(), prevMonthLastDay);
-
-  const prevMonthEnd = new Date(
-    latestMilkDay.getFullYear(),
-    latestMilkDay.getMonth() - 1,
-    compareDay
-  );
+  const startMonth = new Date(latestMilkDay.getFullYear(), latestMilkDay.getMonth(), 1);
 
   let sumDailyHeadAvg = 0;
-  let daysWithMilk = 0;
+let daysWithMilk = 0;
 
   for (const [key, rec] of dayMap.entries()) {
     const d = new Date(key + 'T00:00:00');
@@ -1976,61 +1936,35 @@ if (latestMilkDay) {
       dailyMilkTotal += rec.totalMilk;
     }
 
-    if (key === prevDayKey) {
-      prevDayMilkTotal += rec.totalMilk;
-    }
-
     if (d >= startMonth && d <= latestMilkDay) {
       monthlyMilkTotal += rec.totalMilk;
     }
-
-    if (d >= prevMonthStart && d <= prevMonthEnd) {
-      prevMonthMilkTotal += rec.totalMilk;
-    }
   }
 
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start7);
-    d.setDate(start7.getDate() + i);
-    const key = d.toISOString().slice(0,10);
+for (let i = 0; i < 7; i++) {
+  const d = new Date(start7);
+  d.setDate(start7.getDate() + i);
+  const key = d.toISOString().slice(0,10);
 
-    const rec = dayMap.get(key);
-    if (!rec || !rec.heads.size) continue;
+  const rec = dayMap.get(key);
+  if (!rec || !rec.heads.size) continue;
 
-    sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
-    daysWithMilk++;
-  }
+  sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
+  daysWithMilk++;
+}
 
-  dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-  prevDayMilkTotal = +prevDayMilkTotal.toFixed(1);
-  avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
-  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-  prevMonthMilkTotal = +prevMonthMilkTotal.toFixed(1);
+ dailyMilkTotal = +dailyMilkTotal.toFixed(1);
+avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
+monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+expected305Milk = +(avgHead7Days * 305).toFixed(1);
 
- const latestRec = dayMap.get(latestMilkDay.toISOString().slice(0,10));
+const latestRec = latestMilkDay
+  ? dayMap.get(latestMilkDay.toISOString().slice(0,10))
+  : null;
+
 avgHeadToday = (latestRec && latestRec.heads.size)
   ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
   : 0;
-
-const prevDayRec = dayMap.get(prevDayKey);
-prevAvgHeadToday = (prevDayRec && prevDayRec.heads.size)
-  ? +(prevDayRec.totalMilk / prevDayRec.heads.size).toFixed(1)
-  : 0;
-
-if (prevDayMilkTotal > 0) {
-  dailyDeltaPct = +(((dailyMilkTotal - prevDayMilkTotal) / prevDayMilkTotal) * 100).toFixed(1);
-  dailyTrend = dailyDeltaPct > 0 ? "up" : (dailyDeltaPct < 0 ? "down" : "flat");
-}
-
-if (prevAvgHeadToday > 0) {
-  avgHeadDeltaPct = +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1);
-  avgHeadTrend = avgHeadDeltaPct > 0 ? "up" : (avgHeadDeltaPct < 0 ? "down" : "flat");
-}
-
-  if (prevMonthMilkTotal > 0) {
-    monthlyDeltaPct = +(((monthlyMilkTotal - prevMonthMilkTotal) / prevMonthMilkTotal) * 100).toFixed(1);
-    monthlyTrend = monthlyDeltaPct > 0 ? "up" : (monthlyDeltaPct < 0 ? "down" : "flat");
-  }
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
@@ -2147,21 +2081,10 @@ feedEfficiency: 0,
 feedCostPerHeadPerDay: 0,
 iofc: 0,
 dailyMilkTotal,
-prevDayMilkTotal,
-dailyDeltaPct,
-dailyTrend,
-
-avgHeadToday,
-prevAvgHeadToday,
-avgHeadDeltaPct,
-avgHeadTrend,
+  avgHeadToday,
 avgHead7Days,
-
 monthlyMilkTotal,
-prevMonthMilkTotal,
-monthlyDeltaPct,
-monthlyTrend,
-
+expected305Milk,
 bcsCamera,
 fecesScore
 });
