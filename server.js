@@ -1857,48 +1857,6 @@ const openDaysAvg =
 const abortPct =
   (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
 
-    for (const a of active) {
-      const rep  = String(a.reproductiveStatus || "").toLowerCase();
-      const diag = String(a.lastDiagnosisResult || "").toLowerCase();
-
-      const isPreg =
-        rep.includes("عشار") ||
-        rep.includes("preg") ||
-        diag.includes("عشار");
-
-      if (isPreg) {
-        preg++;
-
-        const sc = Number(a.servicesCount || 0);
-        if (sc > 0) {
-          servicesSum += sc;
-          servicesN++;
-        }
-
-        const calv = a.lastCalvingDate ? new Date(a.lastCalvingDate) : null;
-        const ins  = a.lastInseminationDate ? new Date(a.lastInseminationDate) : null;
-
-        if (calv && ins) {
-          const d = Math.floor((ins - calv) / 86400000);
-          if (d >= 0 && d < 400) {
-            openDaysSum += d;
-            openDaysN++;
-          }
-        }
-      }
-
-      if (a.lastAbortionDate) aborts++;
-    }
-
-    const pregPct = total ? Math.round((preg * 100) / total) : 0;
-    const servicesPerConception =
-      servicesN ? +(servicesSum / servicesN).toFixed(2) : 0;
-    const conceptionPct =
-      servicesPerConception ? Math.round(100 / servicesPerConception) : 0;
-    const openDaysAvg =
-      openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
-    const abortPct =
-      (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
 
     // --------------------------------------
     // 🔥 3) نفوق + استبعاد
