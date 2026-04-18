@@ -1750,15 +1750,112 @@ const active = animalsByType.filter(a => {
 
 const total = active.length;
 
-    // --------------------------------------
-    // 🔥 2) خصوبة من الوثيقة
-    // --------------------------------------
-    let preg = 0,
-        aborts = 0,
-        servicesSum = 0,
-        servicesN = 0,
-        openDaysSum = 0,
-        openDaysN = 0;
+   // --------------------------------------
+// 🔥 2) خصوبة + تعداد + صحة من الوثيقة
+// --------------------------------------
+let preg = 0,
+    aborts = 0,
+    servicesSum = 0,
+    servicesN = 0,
+    openDaysSum = 0,
+    openDaysN = 0,
+    inMilkCount = 0,
+    dimSum = 0,
+    dimN = 0,
+    openCount = 0,
+    bredCount = 0,
+    mastitisCount = 0,
+    lamenessCount = 0;
+
+for (const a of active) {
+  const rep  = String(a.reproductiveStatus || a.reproStatus || "").toLowerCase();
+  const diag = String(a.lastDiagnosisResult || "").toLowerCase();
+  const prod = String(a.productionStatus || a.lactationStatus || "").toLowerCase();
+  const health = String(a.healthStatus || a.lastDisease || a.disease || "").toLowerCase();
+
+  const isPreg =
+    rep.includes("عشار") ||
+    rep.includes("preg") ||
+    diag.includes("عشار");
+
+  const isOpen =
+    rep.includes("مفتوح") ||
+    rep.includes("open");
+
+  const isBred =
+    rep.includes("ملقح") ||
+    rep.includes("bred") ||
+    rep.includes("inseminated");
+
+  const isInMilkDoc =
+    a.inMilk === true ||
+    (
+      a.inMilk !== false &&
+      !prod.includes("dry") &&
+      !prod.includes("جاف") &&
+      (
+        prod.includes("milk") ||
+        prod.includes("lact") ||
+        prod.includes("حلاب") ||
+        prod.includes("محلب") ||
+        prod.includes("منتج")
+      )
+    );
+
+  if (isInMilkDoc) inMilkCount++;
+
+  const dim = Number(a.daysInMilk || 0);
+  if (Number.isFinite(dim) && dim >= 0) {
+    dimSum += dim;
+    dimN++;
+  }
+
+  if (isOpen) openCount++;
+  if (isBred) bredCount++;
+
+  if (health.includes("ضرع") || health.includes("mastitis")) mastitisCount++;
+  if (health.includes("عرج") || health.includes("lameness")) lamenessCount++;
+
+  if (isPreg) {
+    preg++;
+
+    const sc = Number(a.servicesCount || 0);
+    if (sc > 0) {
+      servicesSum += sc;
+      servicesN++;
+    }
+
+    const calv = a.lastCalvingDate ? new Date(a.lastCalvingDate) : null;
+    const ins  = a.lastInseminationDate ? new Date(a.lastInseminationDate) : null;
+
+    if (calv && ins) {
+      const d = Math.floor((ins - calv) / 86400000);
+      if (d >= 0 && d < 400) {
+        openDaysSum += d;
+        openDaysN++;
+      }
+    }
+  }
+
+  if (a.lastAbortionDate) aborts++;
+}
+
+const pregPct = total ? Math.round((preg * 100) / total) : 0;
+const inMilkPct = total ? Math.round((inMilkCount * 100) / total) : 0;
+const openPct = total ? Math.round((openCount * 100) / total) : 0;
+const bredPct = total ? Math.round((bredCount * 100) / total) : 0;
+const mastitisPct = inMilkCount ? Math.round((mastitisCount * 100) / inMilkCount) : 0;
+const lamenessPct = total ? Math.round((lamenessCount * 100) / total) : 0;
+const avgDIM = dimN ? Math.round(dimSum / dimN) : 0;
+
+const servicesPerConception =
+  servicesN ? +(servicesSum / servicesN).toFixed(2) : 0;
+const conceptionPct =
+  servicesPerConception ? Math.round(100 / servicesPerConception) : 0;
+const openDaysAvg =
+  openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
+const abortPct =
+  (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
 
     for (const a of active) {
       const rep  = String(a.reproductiveStatus || "").toLowerCase();
@@ -2053,10 +2150,22 @@ return res.json({
     pr21: extraFertility.pr21
   },
 
+  // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
+  inMilkCount,
+  inMilkPct,
+  openCount,
+  openPct,
+  bredCount,
+  bredPct,
+  mastitisCount,
+  mastitisPct,
+  lamenessCount,
+  lamenessPct,
+  avgDIM,
+
   openDaysAvg,
   abortionRatePct: abortPct,
 
-  // ===== الاستبعاد بالشكل الذي ينتظره الداشبورد =====
   cullTotal: cullProd + cullRepro + cullHealth,
   cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
 
@@ -2068,25 +2177,25 @@ return res.json({
   cullReproPct,
   cullHealthPct,
 
-  // ===== إبقاء الكائن القديم لو احتجناه لاحقًا =====
   culling: {
     productivity: cullProdPct,
     reproduction: cullReproPct,
     health: cullHealthPct
   },
 
-  // ===== التغذية: مؤقتًا صفر صريح بدل undefined =====
+  // ===== التغذية: مؤقتًا صفر صريح =====
   feedCostPerLiter: 0,
-feedEfficiency: 0,
-feedCostPerHeadPerDay: 0,
-iofc: 0,
-dailyMilkTotal,
+  feedEfficiency: 0,
+  feedCostPerHeadPerDay: 0,
+  iofc: 0,
+
+  dailyMilkTotal,
   avgHeadToday,
-avgHead7Days,
-monthlyMilkTotal,
-expected305Milk,
-bcsCamera,
-fecesScore
+  avgHead7Days,
+  monthlyMilkTotal,
+  expected305Milk,
+  bcsCamera,
+  fecesScore
 });
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
