@@ -1938,6 +1938,8 @@ if (latestMilkDay) {
   );
 
   const prevDay = new Date(latestMilkDay);
+  prevDay.setDate(prevDay.getDate() - 1);
+  const prevDayKey = prevDay.toISOString().slice(0,10);
 
   const prevMonthStart = new Date(
     latestMilkDay.getFullYear(),
@@ -1969,9 +1971,9 @@ if (latestMilkDay) {
       dailyMilkTotal += rec.totalMilk;
     }
 
- if (prevAvailableDayKey && key === prevAvailableDayKey) {
-  prevDayMilkTotal += rec.totalMilk;
-}
+    if (key === prevDayKey) {
+      prevDayMilkTotal += rec.totalMilk;
+    }
 
     if (d >= startMonth && d <= latestMilkDay) {
       monthlyMilkTotal += rec.totalMilk;
