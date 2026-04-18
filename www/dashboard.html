@@ -554,38 +554,12 @@ function filterAnimalsByType(animals, typeKey){
   return (animals || []).filter(an => detectAnimalType(an) === typeKey);
 }
 
-function setupTypeSwitch(animals){
+function setupTypeSwitch(){
   const wrap = document.getElementById('typeSwitch');
-  const wrapOuter = document.querySelector('.switch-wrap');
   const btnCows = document.getElementById('btnCows');
   const btnBuffalo = document.getElementById('btnBuffalo');
 
-  const cowsCount = filterAnimalsByType(animals, 'cows').length;
-  const buffaloCount = filterAnimalsByType(animals, 'buffalo').length;
-
-  // لا تخفي السويتش كله إلا لو القطيع فعلاً ليس فيه إلا نوع واحد معروف
-  btnCows.classList.remove('hidden');
-  btnBuffalo.classList.remove('hidden');
-
-  if (cowsCount > 0 && buffaloCount > 0){
-    wrapOuter.style.display = '';
-  } else if (cowsCount > 0 && buffaloCount === 0){
-    wrapOuter.style.display = '';
-    btnBuffalo.classList.add('hidden');
-    currentType = 'cows';
-  } else if (buffaloCount > 0 && cowsCount === 0){
-    wrapOuter.style.display = '';
-    btnCows.classList.add('hidden');
-    currentType = 'buffalo';
-  } else {
-    // لو فشل التمييز، لا تخفي السويتش
-    wrapOuter.style.display = '';
-    if (!currentType) currentType = 'cows';
-  }
-
-  if (currentType === 'buffalo' && buffaloCount === 0 && cowsCount > 0) currentType = 'cows';
-  if (currentType === 'cows' && cowsCount === 0 && buffaloCount > 0) currentType = 'buffalo';
-  if (!currentType) currentType = cowsCount >= buffaloCount ? 'cows' : 'buffalo';
+  if (!currentType) currentType = 'cows';
 
   wrap.classList.toggle('buffalo', currentType === 'buffalo');
   btnCows.classList.toggle('active', currentType === 'cows');
@@ -594,12 +568,14 @@ function setupTypeSwitch(animals){
   btnCows.onclick = () => {
     if (currentType === 'cows') return;
     currentType = 'cows';
+    setupTypeSwitch();
     loadHerdKPIs();
   };
 
   btnBuffalo.onclick = () => {
     if (currentType === 'buffalo') return;
     currentType = 'buffalo';
+    setupTypeSwitch();
     loadHerdKPIs();
   };
 }
@@ -614,144 +590,69 @@ async function loadHerdKPIs(){
   const healthGrid = document.getElementById('healthGrid');
 
   try{
-   const [statsResp, animalsResp] = await Promise.all([
-  fetchJSON(`/api/herd-stats?type=${currentType}`),
-  fetchJSON(`/api/animals`)
-]);
+     setupTypeSwitch();
 
-    const animalsArr =
-      Array.isArray(animalsResp) ? animalsResp :
-      Array.isArray(animalsResp?.items) ? animalsResp.items :
-      Array.isArray(animalsResp?.data) ? animalsResp.data :
-      Array.isArray(animalsResp?.animals) ? animalsResp.animals : [];
-
-const activeAnimals = animalsArr.filter(isActive);
-
-setupTypeSwitch(activeAnimals);
-
-const animals = filterAnimalsByType(activeAnimals, currentType);
-const total = animals.length;
-const typeLabel = getTypeLabelByKey(currentType);
-   
-    let inMilk = 0,
-        dimSum = 0,
-        milkTotal = 0,
-        milkCount = 0;
-
-    // مؤشرات الخصوبة من وثيقة الحيوان
-    let pregCount = 0;                // عدد العشار
-    let abortCount = 0;               // عدد من لديهم إجهاض مسجّل
-    let servicesSum = 0;              // مجموع الخدمات (للحاملين فقط)
-    let servicesNForSPC = 0;          // عدد الحيوانات المستخدمة في SPC
-    let openDaysSum = 0;              // مجموع الأيام المفتوحة
-    let openDaysN = 0;                // عدد الأبقار التي حسبنا لها الأيام المفتوحة
-
-    for (const an of animals){
-      // في الحليب + DIM + اللبن
-      if (isInMilk(an)){
-        inMilk++;
-        dimSum += getDIM(an);
-      }
-      const m = Number(an.dailyMilk || an.lastMilkKg || 0);
-      if (m > 0){
-        milkTotal += m;
-        milkCount++;
-      }
-
-      // حالة تناسلية
-      const rep   = norm(an.reproductiveStatus || an.reproStatus || '');
-      const diagR = norm(an.lastDiagnosisResult || '');
-      const isPreg =
-        rep.includes('عشار') ||
-        diagR === 'عشار' ||
-        rep.includes('pregnant');
-
-      if (isPreg){
-        pregCount++;
-
-        // خدمات لكل حمل (من servicesCount في الوثيقة)
-        const services = Number(an.servicesCount || an.serviceCount || 0);
-        if (services > 0){
-          servicesSum += services;
-          servicesNForSPC++;
-        }
-
-        // الأيام المفتوحة = من الولادة حتى التلقيح المخصب
-        const calv = toDate(an.lastCalvingDate || an.calvingDate);
-        const ins  = toDate(an.lastInseminationDate || an.serviceDate);
-        if (calv && ins){
-          const d = daysBetween(ins, calv);
-          if (d >= 0 && d < 400){ // فلتر أرقام شاذة
-            openDaysSum += d;
-            openDaysN++;
-          }
-        }
-      }
-
-      // إجهاض
-      if (an.lastAbortionDate || an.abortionDate){
-        abortCount++;
-      }
-    }
-
-    const inMilkPct = total ? Math.round(inMilk * 100 / total) : 0;
-    const avgDIM    = inMilk ? Math.round(dimSum / inMilk) : 0;
-    const avgMilk   = milkCount ? +(milkTotal / milkCount).toFixed(1) : 0;
-    const milkTotalDisplay = +milkTotal.toFixed(1);
-    if (!milkTotal && avgMilk && inMilk) milkTotal = Math.round(avgMilk * inMilk);
-
-    // خصوبة من الوثيقة
-    const pregPctDoc = total ? Math.round(pregCount * 100 / total) : 0;
-    const servicesPerConceptionDoc =
-      servicesNForSPC ? +(servicesSum / servicesNForSPC).toFixed(2) : 0;
-    const conceptionRatePctDoc =
-      servicesPerConceptionDoc ? Math.round(100 / servicesPerConceptionDoc) : 0;
-    const openDaysAvgDoc =
-      openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
-    const abortionRatePctDoc =
-      (pregCount + abortCount)
-        ? Math.round(abortCount * 100 / (pregCount + abortCount))
-        : 0;
-
-    const stats = statsResp || {};
-    const t     = stats.totals    || {};
+    const stats = await fetchJSON(`/api/herd-stats?type=${currentType}`);
+    const t     = stats.totals || {};
     const fert  = stats.fertility || {};
 
- const totalActive = total;
+    const typeLabel = getTypeLabelByKey(currentType);
 
-  const pregPct = pregPctDoc;
+    const totalActive = Number(t.totalActive ?? 0);
+    const pregPct = Number(t?.pregnant?.pct ?? 0);
+
+    // الداشبورد عرض فقط: لا نحسب من animals محليًا
+    const inMilk = Number(stats.inMilkCount ?? 0);
+    const inMilkPct = Number(stats.inMilkPct ?? 0);
 
     const conceptionRatePct =
-      fert.conceptionRatePct != null ? fert.conceptionRatePct : conceptionRatePctDoc;
+      fert.conceptionRatePct != null ? Number(fert.conceptionRatePct) : 0;
 
     const openDaysAvg =
-      stats.openDaysAvg != null ? stats.openDaysAvg : openDaysAvgDoc;
+      stats.openDaysAvg != null ? Number(stats.openDaysAvg) : 0;
 
     const pregRate21d =
-      stats.pregRate21d != null ? stats.pregRate21d : 0; // هنكمّله لاحقًا من أحداث الشياع
+      fert.pr21 != null ? Number(fert.pr21) :
+      (stats.pregRate21d != null ? Number(stats.pregRate21d) : 0);
 
     const servicesPerConception =
-      stats.servicesPerConception != null
-        ? stats.servicesPerConception
-        : servicesPerConceptionDoc;
+      fert.servicesPerConception != null ? Number(fert.servicesPerConception) : 0;
 
     const abortionRatePct =
-      stats.abortionRatePct != null ? stats.abortionRatePct : abortionRatePctDoc;
+      stats.abortionRatePct != null ? Number(stats.abortionRatePct) : 0;
 
-    // تغذية / استبعاد / … تبقى كما هي من السيرفر (0 الآن لو مش محسوبة)
-    const cullProdPct   = stats.cullProdPct   ?? 0;
-    const cullReproPct  = stats.cullReproPct  ?? 0;
-    const cullHealthPct = stats.cullHealthPct ?? 0;
-    const feedEfficiency= stats.feedEfficiency ?? 0;
-    const dmiAvg        = stats.dmiAvg ?? 0;
-    const iofc          = stats.iofc ?? 0;
-    const fecesScore    = stats.fecesScore ?? 0;
-    const bcsCamera     = stats.bcsCamera ?? 0;
-    const cullTotalCount = (stats.cullTotal ?? ((stats.cullProdCount ?? 0) + (stats.cullReproCount ?? 0) + (stats.cullHealthCount ?? 0)));
-    const cullTotalPct   = stats.cullTotalPct ?? 0;
+    const cullProdPct   = Number(stats.cullProdPct ?? 0);
+    const cullReproPct  = Number(stats.cullReproPct ?? 0);
+    const cullHealthPct = Number(stats.cullHealthPct ?? 0);
+    const feedEfficiency= Number(stats.feedEfficiency ?? 0);
+    const dmiAvg        = Number(stats.dmiAvg ?? 0);
+    const iofc          = Number(stats.iofc ?? 0);
+    const fecesScore    = Number(stats.fecesScore ?? 0);
+    const bcsCamera     = Number(stats.bcsCamera ?? 0);
+    const cullTotalCount = Number(stats.cullTotal ?? 0);
+    const cullTotalPct   = Number(stats.cullTotalPct ?? 0);
 
-    const feedCostPerLiter = stats.feedCostPerLiter ?? 0;
-    const feedCostPerHeadPerDay = stats.feedCostPerHeadPerDay ?? 0;
+    const feedCostPerLiter = Number(stats.feedCostPerLiter ?? 0);
+    const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? 0);
+
+    const avgHead7Days = Number(stats.avgHead7Days ?? 0);
+    const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
+    const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
+    const milk305 = Number(stats.expected305Milk ?? 0);
+    const avgHeadToday = Number(stats.avgHeadToday ?? 0);
+
+    // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
+    const openCount = Number(stats.openCount ?? 0);
+    const openPct   = Number(stats.openPct ?? 0);
+
+    const bredCount = Number(stats.bredCount ?? 0);
+    const bredPct   = Number(stats.bredPct ?? 0);
+
+    const mastitisCount = Number(stats.mastitisCount ?? 0);
+    const mastitisPct   = Number(stats.mastitisPct ?? 0);
+
+    const lamenessCount = Number(stats.lamenessCount ?? 0);
+    const lamenessPct   = Number(stats.lamenessPct ?? 0);
  herdGrid.innerHTML =
   box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
