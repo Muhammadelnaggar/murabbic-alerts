@@ -638,7 +638,7 @@ async function loadHerdKPIs(){
     const avgHead7Days = Number(stats.avgHead7Days ?? 0);
     const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
     const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
-    const milk305 = Number(stats.expected305Milk ?? 0);
+   
     const avgHeadToday = Number(stats.avgHeadToday ?? 0);
 
     // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
@@ -669,7 +669,7 @@ async function loadHerdKPIs(){
       box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
       box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
       box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod') +
-      box('إنتاج اللبن المتوقع 305 يوم', milk305, '', null, 'prod');
+     
 
     reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
