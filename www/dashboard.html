@@ -652,10 +652,13 @@ async function loadHerdKPIs(){
   const healthGrid = document.getElementById('healthGrid');
 
   try{
-   const [statsResp, animalsResp] = await Promise.all([
-  fetchJSON(`/api/herd-stats?type=${currentType}`),
-  fetchJSON(`/api/animals`)
-]);
+  const statsResp = await fetchJSON(`/api/herd-stats?type=${currentType}`);
+
+if (!statsResp || statsResp.ok === false) {
+  throw new Error((statsResp && statsResp.error) || 'herd_stats_failed');
+}
+
+const animalsResp = await fetchJSON(`/api/animals`);
 
     const animalsArr =
       Array.isArray(animalsResp) ? animalsResp :
@@ -751,7 +754,10 @@ const typeLabel = getTypeLabelByKey(currentType);
         ? Math.round(abortCount * 100 / (pregCount + abortCount))
         : 0;
 
-    const stats = statsResp || {};
+   const stats = (statsResp && statsResp.ok) ? statsResp : null;
+if (!stats) {
+  throw new Error((statsResp && statsResp.error) || 'herd_stats_failed');
+}
     const t     = stats.totals    || {};
     const fert  = stats.fertility || {};
 
@@ -915,8 +921,8 @@ renderMiniGauge("g_bcs", bcsCamera);
   }
   catch(e){
     console.error('herd stats error', e);
-    document.getElementById('statusBar').textContent =
-      'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
+   document.getElementById('statusBar').textContent =
+  'فشل تحميل بيانات القطيع: ' + (e?.message || 'خطأ غير معروف');
   }
 }
 
