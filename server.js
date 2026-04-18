@@ -1861,13 +1861,8 @@ let monthlyMilkTotal = 0;
 let avgHeadToday = 0;
 
 let prevDayMilkTotal = 0;
-let prevAvgHeadToday = 0;
-
 let dailyDeltaPct = null;
 let dailyTrend = "flat";
-
-let avgHeadDeltaPct = null;
-let avgHeadTrend = "flat";
 
 let prevMonthMilkTotal = 0;
 let monthlyDeltaPct = null;
@@ -2007,25 +2002,15 @@ if (latestMilkDay) {
   monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
   prevMonthMilkTotal = +prevMonthMilkTotal.toFixed(1);
 
- const latestRec = dayMap.get(latestMilkDay.toISOString().slice(0,10));
-avgHeadToday = (latestRec && latestRec.heads.size)
-  ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
-  : 0;
+  const latestRec = dayMap.get(latestMilkDay.toISOString().slice(0,10));
+  avgHeadToday = (latestRec && latestRec.heads.size)
+    ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
+    : 0;
 
-const prevDayRec = dayMap.get(prevDayKey);
-prevAvgHeadToday = (prevDayRec && prevDayRec.heads.size)
-  ? +(prevDayRec.totalMilk / prevDayRec.heads.size).toFixed(1)
-  : 0;
-
-if (prevDayMilkTotal > 0) {
-  dailyDeltaPct = +(((dailyMilkTotal - prevDayMilkTotal) / prevDayMilkTotal) * 100).toFixed(1);
-  dailyTrend = dailyDeltaPct > 0 ? "up" : (dailyDeltaPct < 0 ? "down" : "flat");
-}
-
-if (prevAvgHeadToday > 0) {
-  avgHeadDeltaPct = +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1);
-  avgHeadTrend = avgHeadDeltaPct > 0 ? "up" : (avgHeadDeltaPct < 0 ? "down" : "flat");
-}
+  if (prevDayMilkTotal > 0) {
+    dailyDeltaPct = +(((dailyMilkTotal - prevDayMilkTotal) / prevDayMilkTotal) * 100).toFixed(1);
+    dailyTrend = dailyDeltaPct > 0 ? "up" : (dailyDeltaPct < 0 ? "down" : "flat");
+  }
 
   if (prevMonthMilkTotal > 0) {
     monthlyDeltaPct = +(((monthlyMilkTotal - prevMonthMilkTotal) / prevMonthMilkTotal) * 100).toFixed(1);
@@ -2152,9 +2137,6 @@ dailyDeltaPct,
 dailyTrend,
 
 avgHeadToday,
-prevAvgHeadToday,
-avgHeadDeltaPct,
-avgHeadTrend,
 avgHead7Days,
 
 monthlyMilkTotal,
