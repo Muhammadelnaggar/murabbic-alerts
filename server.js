@@ -2151,7 +2151,7 @@ return res.json({
   avgHeadToday,
   avgHead7Days,
   monthlyMilkTotal,
-  expected305Milk,
+ 
   bcsCamera,
   fecesScore
 });
