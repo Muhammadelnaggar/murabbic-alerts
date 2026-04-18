@@ -795,8 +795,10 @@ const typeLabel = getTypeLabelByKey(currentType);
   box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
   box(`عدد ${typeLabel} الجافة`, Math.max(0, totalActive - inMilk), `نسبتهم من القطيع ${totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0}%`, 'g_dry', 'herd');
 
-const avgHead7Days = stats.avgHead7Days ?? 0;
-const totalDailyMilk = stats.dailyMilkTotal ?? 0;
+const avgHead7Days =
+  stats.avgHead7Days != null
+    ? stats.avgHead7Days
+    : 0;
 const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
 
 const dailyDeltaPct = stats.dailyDeltaPct;
@@ -810,8 +812,17 @@ const avgHeadToday =
     ? stats.avgHeadToday
     : ((inMilk > 0 && totalDailyMilk > 0) ? +(totalDailyMilk / inMilk).toFixed(1) : 0);
 
+const avgHeadDeltaPct = stats.avgHeadDeltaPct;
+const avgHeadTrend = stats.avgHeadTrend || 'flat';
+
 prodGrid.innerHTML =
-  box('متوسط اللبن اليومي / رأس / يوم', avgHeadToday, '', null, 'prod') +
+  box(
+    'متوسط اللبن اليومي / رأس / يوم',
+    avgHeadToday,
+    trendHtml(avgHeadTrend, avgHeadDeltaPct, 'مقارنة بأمس'),
+    null,
+    'prod'
+  ) +
   box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
   box(
     'إجمالي إنتاج اللبن اليومي',
@@ -827,7 +838,6 @@ prodGrid.innerHTML =
     null,
     'prod'
   );
-    
 const openCount = animals.filter(an => {
   const rep = norm(an.reproductiveStatus || an.reproStatus || '');
   return rep.includes('مفتوح') || rep.includes('open');
