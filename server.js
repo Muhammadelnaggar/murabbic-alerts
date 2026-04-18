@@ -1856,10 +1856,9 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
 // 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
 // --------------------------------------
 let dailyMilkTotal = 0;
-let avgHeadToday = 0;
 let avgHead7Days = 0;
 let monthlyMilkTotal = 0;
-let expected305Milk = 0;
+let avgHeadToday = 0;
     
 try {
   const evSnapMilk = await db.collection("events")
@@ -1962,13 +1961,13 @@ if (latestMilkDay) {
   }
 
   dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-  avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
-  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-  expected305Milk = +(avgHead7Days * 305).toFixed(1);
+avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
+monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
 
-  avgHeadToday = (latestRec && latestRec.heads.size)
-    ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
-    : 0;
+const latestRec = latestMilkDay ? dayMap.get(latestMilkDay.toISOString().slice(0,10)) : null;
+avgHeadToday = (latestRec && latestRec.heads.size)
+  ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
+  : 0;
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
@@ -2085,10 +2084,9 @@ feedEfficiency: 0,
 feedCostPerHeadPerDay: 0,
 iofc: 0,
 dailyMilkTotal,
-  avgHeadToday,
+avgHeadToday,
 avgHead7Days,
 monthlyMilkTotal,
-expected305Milk,
 bcsCamera,
 fecesScore
 });
