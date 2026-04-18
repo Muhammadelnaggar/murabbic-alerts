@@ -1921,50 +1921,54 @@ for (const e of milkEvents) {
 }
 
 if (latestMilkDay) {
-  const start7 = new Date(latestMilkDay);
-  start7.setDate(start7.getDate() - 6);
+  const latestKey = latestMilkDay.toISOString().slice(0,10);
 
-  const startMonth = new Date(latestMilkDay.getFullYear(), latestMilkDay.getMonth(), 1);
+  // 1) تحديد بداية آخر سلسلة أيام متصلة تنتهي عند latestMilkDay
+  const batchDays = [];
+  let cursor = new Date(latestMilkDay);
 
-  let sumDailyHeadAvg = 0;
-let daysWithMilk = 0;
+  while (true) {
+    const key = cursor.toISOString().slice(0,10);
+    const rec = dayMap.get(key);
+    if (!rec || !rec.heads.size) break;
 
-  for (const [key, rec] of dayMap.entries()) {
-    const d = new Date(key + 'T00:00:00');
+    batchDays.unshift(key);
 
-    if (d.getTime() === latestMilkDay.getTime()) {
-      dailyMilkTotal += rec.totalMilk;
-    }
-
-    if (d >= startMonth && d <= latestMilkDay) {
-      monthlyMilkTotal += rec.totalMilk;
-    }
+    cursor.setDate(cursor.getDate() - 1);
   }
 
-for (let i = 0; i < 7; i++) {
-  const d = new Date(start7);
-  d.setDate(start7.getDate() + i);
-  const key = d.toISOString().slice(0,10);
+  // 2) إجمالي آخر يوم مسجل فقط
+  const latestRec = dayMap.get(latestKey);
+  dailyMilkTotal = latestRec ? latestRec.totalMilk : 0;
 
-  const rec = dayMap.get(key);
-  if (!rec || !rec.heads.size) continue;
+  // 3) إجمالي "الشهر" المعروض = إجمالي آخر باتش متصل فقط
+  monthlyMilkTotal = batchDays.reduce((sum, key) => {
+    const rec = dayMap.get(key);
+    return sum + (rec ? rec.totalMilk : 0);
+  }, 0);
 
-  sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
-  daysWithMilk++;
-}
+  // 4) متوسط 7 أيام = آخر 7 أيام من نفس الباتش فقط
+  const last7BatchDays = batchDays.slice(-7);
 
- dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
-monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
-expected305Milk = +(avgHead7Days * 305).toFixed(1);
+  let sumDailyHeadAvg = 0;
+  let daysWithMilk = 0;
 
-const latestRec = latestMilkDay
-  ? dayMap.get(latestMilkDay.toISOString().slice(0,10))
-  : null;
+  for (const key of last7BatchDays) {
+    const rec = dayMap.get(key);
+    if (!rec || !rec.heads.size) continue;
 
-avgHeadToday = (latestRec && latestRec.heads.size)
-  ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
-  : 0;
+    sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
+    daysWithMilk++;
+  }
+
+  dailyMilkTotal = +dailyMilkTotal.toFixed(1);
+  avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
+  monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+  expected305Milk = +(avgHead7Days * 305).toFixed(1);
+
+  avgHeadToday = (latestRec && latestRec.heads.size)
+    ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
+    : 0;
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
