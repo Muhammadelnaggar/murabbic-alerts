@@ -163,6 +163,28 @@
   line-height:1.5;
   color:#6b7d75;
 }
+    .trend-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:4px;
+  font-size:12px;
+  font-weight:900;
+}
+
+.trend-chip.up{ color:#15803d; }
+.trend-chip.down{ color:#dc2626; }
+.trend-chip.flat{ color:#64748b; }
+
+.trend-arrow{
+  font-size:15px;
+  font-weight:900;
+}
+
+.trend-pct{
+  direction:ltr;
+  unicode-bidi:isolate;
+}
     #statusBar{
       margin-top:4px;
       font-size:9px;
@@ -535,7 +557,21 @@ function box(label, value, sub='', gaugeId=null, cls=''){
     </div>
   `;
 }
+function trendHtml(trend, pct, note=''){
+  if (pct == null || !Number.isFinite(Number(pct))) return '';
 
+  const t = String(trend || 'flat');
+  const arrow = t === 'up' ? '↗' : (t === 'down' ? '↘' : '→');
+  const pctTxt = `${Math.abs(Number(pct)).toFixed(1)}%`;
+
+  return `
+    <span class="trend-chip ${t}">
+      <span class="trend-arrow">${arrow}</span>
+      <span class="trend-pct">${pctTxt}</span>
+      ${note ? `<span>${note}</span>` : ''}
+    </span>
+  `;
+}
 function detectAnimalType(an){
   const ar = norm(an.animalTypeAr || '');
   const en = String(an.animaltype || '').trim().toLowerCase();
@@ -761,6 +797,11 @@ const avgHead7Days = stats.avgHead7Days ?? 0;
 const totalDailyMilk = stats.dailyMilkTotal ?? 0;
 const monthlyMilkTotal = stats.monthlyMilkTotal ?? 0;
 
+const dailyDeltaPct = stats.dailyDeltaPct;
+const dailyTrend = stats.dailyTrend || 'flat';
+
+const monthlyDeltaPct = stats.monthlyDeltaPct;
+const monthlyTrend = stats.monthlyTrend || 'flat';
 
 const avgHeadToday =
   stats.avgHeadToday != null
@@ -770,8 +811,20 @@ const avgHeadToday =
 prodGrid.innerHTML =
   box('متوسط اللبن اليومي / رأس / يوم', avgHeadToday, '', null, 'prod') +
   box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
-  box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
-  box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod');
+  box(
+    'إجمالي إنتاج اللبن اليومي',
+    totalDailyMilk,
+    trendHtml(dailyTrend, dailyDeltaPct, 'مقارنة بأمس'),
+    null,
+    'prod'
+  ) +
+  box(
+    'إجمالي إنتاج اللبن الشهري',
+    monthlyMilkTotal,
+    trendHtml(monthlyTrend, monthlyDeltaPct, 'مقارنة بالشهر السابق'),
+    null,
+    'prod'
+  );
     
 const openCount = animals.filter(an => {
   const rep = norm(an.reproductiveStatus || an.reproStatus || '');
