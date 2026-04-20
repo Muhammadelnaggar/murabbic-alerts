@@ -427,7 +427,7 @@ let currentType = '';
 
 function prodState(deltaPct){
   const a = Math.abs(Number(deltaPct || 0));
-  if (a < 5) return 'ok';
+  if (a < 3) return 'ok';
   if (a < 7) return 'warn';
   return 'danger';
 }
@@ -729,7 +729,7 @@ const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
 
 const avgHeadState = prodState(avgHeadDeltaPct);
 const dailyMilkState = prodState(dailyMilkDeltaPct);
-const showCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 5;
+const showCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
 
 const causesState = prodState(dailyMilkDeltaPct);
 const causesText = buildMilkCauses({
