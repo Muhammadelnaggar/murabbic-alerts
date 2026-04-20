@@ -299,6 +299,29 @@
   background:#ffa726;
   border-color:#ffa726;
 }
+.kpi.prod-ok{
+  border-color:#cfe7d7;
+  background:linear-gradient(180deg,#ffffff 0%,#f7fcf8 100%);
+}
+.kpi.prod-ok::before{
+  background:linear-gradient(90deg,#0ea05a,#7ad7a7);
+}
+
+.kpi.prod-warn{
+  border-color:#f6d5b6;
+  background:linear-gradient(180deg,#fffaf5 0%,#fff4ea 100%);
+}
+.kpi.prod-warn::before{
+  background:linear-gradient(90deg,#fb8c00,#ffcc80);
+}
+
+.kpi.prod-danger{
+  border-color:#f2c4c4;
+  background:linear-gradient(180deg,#fff8f8 0%,#fff0f0 100%);
+}
+.kpi.prod-danger::before{
+  background:linear-gradient(90deg,#e53935,#ef9a9a);
+}    
   </style>
 </head>
 <body>
@@ -400,6 +423,44 @@
 // ============ API BASE ============
 const API_BASE = "https://murabbic-alerts.onrender.com";
 let currentType = '';
+ let currentTHI = null;
+
+function prodState(deltaPct){
+  const a = Math.abs(Number(deltaPct || 0));
+  if (a < 5) return 'ok';
+  if (a < 7) return 'warn';
+  return 'danger';
+}
+
+function prodDeltaText(deltaPct){
+  const n = Number(deltaPct || 0);
+  if (!Number.isFinite(n) || n === 0) return '—';
+  return `${n > 0 ? '↑' : '↓'} ${Math.abs(n).toFixed(1)}%`;
+}
+
+function prodCard(label, value, sub='', state='ok', href=''){
+  const cls =
+    state === 'danger' ? 'prod-danger' :
+    state === 'warn'   ? 'prod-warn'   :
+                         'prod-ok';
+
+  const go = href ? `onclick="location.href='${href}'"` : '';
+
+  return `
+    <div class="kpi prod ${cls}" ${go}>
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${value ?? '--'}</div>
+      ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+    </div>
+  `;
+}
+
+function buildMilkCauses({ thi, mastitisPct, lamenessPct }){
+  const causes = [];
+  if (Number(thi) >= 72) causes.push('حرارة');
+  if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
+  return causes.length ? causes.join(' + ') : 'غير واضح';
+} 
 // ============ هوية المستخدم ============
 function getTenantId() {
   try {
@@ -458,7 +519,7 @@ async function loadWeatherTHI(){
     const t = Math.round(j.current.temperature_2m);
     const h = Math.round(j.current.relative_humidity_2m);
     const thi = Math.round(((t*9/5+32) - (0.55-0.0055*h)*((t*9/5+32)-58)));
-
+    currentTHI = thi;
     tEl.textContent = t;
     hEl.textContent = h;
     thiEl.textContent = thi;
@@ -634,12 +695,14 @@ async function loadHerdKPIs(){
 
     const feedCostPerLiter = Number(stats.feedCostPerLiter ?? 0);
     const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? 0);
+    
+ const avgHead7Days = Number(stats.avgHead7Days ?? 0);
+const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
+const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
+const avgHeadToday = Number(stats.avgHeadToday ?? 0);
 
-    const avgHead7Days = Number(stats.avgHead7Days ?? 0);
-    const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
-    const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
-   
-    const avgHeadToday = Number(stats.avgHeadToday ?? 0);
+const avgHeadDeltaPct = Number(stats.avgHeadDeltaPct ?? 0);
+const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
 
     // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
     const openCount = Number(stats.openCount ?? 0);
@@ -664,11 +727,51 @@ async function loadHerdKPIs(){
       box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
       box(`عدد ${typeLabel} الجافة`, dryCount, `نسبتهم من القطيع ${dryPct}%`, 'g_dry', 'herd');
 
-    prodGrid.innerHTML =
-      box('متوسط اللبن اليومي / رأس / يوم', avgHeadToday, '', null, 'prod') +
-      box('متوسط الرأس / 7 أيام', avgHead7Days, '', null, 'prod') +
-      box('إجمالي إنتاج اللبن اليومي', totalDailyMilk, '', null, 'prod') +
-      box('إجمالي إنتاج اللبن الشهري', monthlyMilkTotal, '', null, 'prod');
+   const avgHeadState = prodState(avgHeadDeltaPct);
+const dailyMilkState = prodState(dailyMilkDeltaPct);
+const causesState = prodState(dailyMilkDeltaPct);
+const causesText = buildMilkCauses({
+  thi: currentTHI,
+  mastitisPct,
+  lamenessPct
+});
+
+prodGrid.innerHTML =
+  prodCard(
+    'متوسط اللبن اليومي / رأس / يوم',
+    avgHeadToday,
+    prodDeltaText(avgHeadDeltaPct),
+    avgHeadState,
+    'milk-reports.html?view=daily_avg'
+  ) +
+  prodCard(
+    'متوسط الرأس / 7 أيام',
+    avgHead7Days,
+    '',
+    'ok',
+    'milk-reports.html?view=7days'
+  ) +
+  prodCard(
+    'إجمالي إنتاج اللبن اليومي',
+    totalDailyMilk,
+    prodDeltaText(dailyMilkDeltaPct),
+    dailyMilkState,
+    'milk-reports.html?view=daily_total'
+  ) +
+  prodCard(
+    'أسباب تغير إنتاج اللبن',
+    causesText,
+    '',
+    causesState,
+    'milk-reports.html?view=causes'
+  ) +
+  prodCard(
+    'إجمالي إنتاج اللبن الشهري',
+    monthlyMilkTotal,
+    '',
+    'ok',
+    'milk-reports.html?view=monthly'
+  ););
      
 
     reproGrid.innerHTML =
