@@ -727,8 +727,10 @@ const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
       box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
       box(`عدد ${typeLabel} الجافة`, dryCount, `نسبتهم من القطيع ${dryPct}%`, 'g_dry', 'herd');
 
-   const avgHeadState = prodState(avgHeadDeltaPct);
+const avgHeadState = prodState(avgHeadDeltaPct);
 const dailyMilkState = prodState(dailyMilkDeltaPct);
+const showCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 5;
+
 const causesState = prodState(dailyMilkDeltaPct);
 const causesText = buildMilkCauses({
   thi: currentTHI,
@@ -758,12 +760,16 @@ prodGrid.innerHTML =
     dailyMilkState,
     'milk-reports.html?view=daily_total'
   ) +
-  prodCard(
-    'أسباب تغير إنتاج اللبن',
-    causesText,
-    '',
-    causesState,
-    'milk-reports.html?view=causes'
+  (
+    showCausesCard
+      ? prodCard(
+          'أسباب تغير إنتاج اللبن',
+          causesText,
+          '',
+          causesState,
+          'milk-reports.html?view=causes'
+        )
+      : ''
   ) +
   prodCard(
     'إجمالي إنتاج اللبن الشهري',
@@ -772,7 +778,6 @@ prodGrid.innerHTML =
     'ok',
     'milk-reports.html?view=monthly'
   );
-     
 
     reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
