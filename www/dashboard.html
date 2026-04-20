@@ -330,6 +330,39 @@
 .kpi.prod-danger::before{
   background:linear-gradient(90deg,#e53935,#ef9a9a);
 }
+    .prod-cause-wrap{
+  margin-top:14px;
+}
+
+.prod-cause-wrap:empty{
+  display:none;
+}
+
+.prod-cause-card{
+  width:calc(100% - 0px);
+  max-width:calc(50% - 6px);
+  min-height:110px;
+  border-radius:22px;
+  border:2px dashed #d9e7dd;
+  box-shadow:
+    0 10px 24px rgba(15,23,42,.04),
+    0 2px 8px rgba(15,23,42,.03);
+}
+
+.prod-cause-card .kpi-label{
+  font-size:14px;
+}
+
+.prod-cause-card .kpi-value{
+  font-size:30px;
+  line-height:1.15;
+}
+
+@media (max-width:480px){
+  .prod-cause-card{
+    max-width:100%;
+  }
+}
   .prod-trend-badge{
   display:inline-flex;
   align-items:center;
@@ -434,6 +467,7 @@
 <div class="card">
   <div class="section-title">🥛 المؤشرات الإنتاجية</div>
   <div id="prodGrid" class="kpi-grid"></div>
+  <div id="prodCauseWrap" class="prod-cause-wrap"></div>
 </div>
 
 <div class="card">
@@ -695,13 +729,14 @@ function setupTypeSwitch(){
 }
 // ============ تحميل مؤشرات القطيع ============
 async function loadHerdKPIs(){
-  const statusBar  = document.getElementById('statusBar');
-  const herdGrid   = document.getElementById('herdGrid');
-  const prodGrid   = document.getElementById('prodGrid');
-  const reproGrid  = document.getElementById('reproGrid');
-  const cullGrid   = document.getElementById('cullGrid');
-  const feedGrid   = document.getElementById('feedGrid');
-  const healthGrid = document.getElementById('healthGrid');
+const statusBar  = document.getElementById('statusBar');
+const herdGrid   = document.getElementById('herdGrid');
+const prodGrid   = document.getElementById('prodGrid');
+const prodCauseWrap = document.getElementById('prodCauseWrap');
+const reproGrid  = document.getElementById('reproGrid');
+const cullGrid   = document.getElementById('cullGrid');
+const feedGrid   = document.getElementById('feedGrid');
+const healthGrid = document.getElementById('healthGrid');
 
   try{
      setupTypeSwitch();
@@ -813,16 +848,7 @@ prodGrid.innerHTML =
     dailyMilkState,
     'milk-reports.html?view=daily_total'
   ) +
-  (
-    showCausesCard
-         ? `
-        <div class="kpi prod ${causesState === 'danger' ? 'prod-danger' : causesState === 'warn' ? 'prod-warn' : 'prod-ok'}" onclick="location.href='milk-reports.html?view=causes'">
-          <div class="kpi-label">أسباب تغير إنتاج اللبن</div>
-          <div class="kpi-value" style="font-size:26px; line-height:1.15;">${causesText}</div>
-        </div>
-      `
-      : ''
-  ) +
+ 
   prodCard(
     'إجمالي إنتاج اللبن الشهري',
     monthlyMilkTotal,
@@ -830,7 +856,15 @@ prodGrid.innerHTML =
     'ok',
     'milk-reports.html?view=monthly'
   );
-
+prodCauseWrap.innerHTML = showCausesCard
+  ? `
+    <div class="kpi prod prod-cause-card ${causesState === 'danger' ? 'prod-danger' : causesState === 'warn' ? 'prod-warn' : 'prod-ok'}"
+         onclick="location.href='milk-reports.html?view=causes'">
+      <div class="kpi-label">أسباب تغير إنتاج اللبن</div>
+      <div class="kpi-value">${causesText}</div>
+    </div>
+  `
+  : '';
     reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
       box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
