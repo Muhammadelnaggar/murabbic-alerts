@@ -157,7 +157,15 @@
   color:#0b7f47;
   letter-spacing:-.5px;
 }
+.kpi.prod .kpi-label{
+  font-size:14px;
+  line-height:1.45;
+}
 
+.kpi.prod .kpi-value{
+  font-size:34px;
+  line-height:1.05;
+}
 .kpi-sub{
   font-size:11px;
   line-height:1.5;
@@ -321,7 +329,46 @@
 }
 .kpi.prod-danger::before{
   background:linear-gradient(90deg,#e53935,#ef9a9a);
-}    
+}
+  .prod-trend-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  align-self:flex-start;
+  margin-top:2px;
+  padding:8px 14px;
+  border-radius:999px;
+  font-size:19px;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:-.2px;
+  min-height:42px;
+  box-shadow:0 4px 10px rgba(0,0,0,.06);
+}
+
+.kpi.prod-ok .prod-trend-badge{
+  background:#e7f7ee;
+  color:#0b7f47;
+  border:1px solid #bfe3cb;
+}
+
+.kpi.prod-warn .prod-trend-badge{
+  background:#fff1e3;
+  color:#c46a00;
+  border:1px solid #f3c38f;
+}
+
+.kpi.prod-danger .prod-trend-badge{
+  background:#ffe8e8;
+  color:#d32f2f;
+  border:1px solid #efb4b4;
+}
+
+.prod-subtle{
+  font-size:15px;
+  font-weight:800;
+  color:#315f49;
+}  
   </style>
 </head>
 <body>
@@ -445,16 +492,22 @@ function prodCard(label, value, sub='', state='ok', href=''){
                          'prod-ok';
 
   const go = href ? `onclick="location.href='${href}'"` : '';
+  const hasTrend = sub && sub !== '—';
 
   return `
     <div class="kpi prod ${cls}" ${go}>
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${value ?? '--'}</div>
-      ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+      ${
+        sub
+          ? hasTrend
+            ? `<div class="prod-trend-badge">${sub}</div>`
+            : `<div class="kpi-sub prod-subtle">${sub}</div>`
+          : ''
+      }
     </div>
   `;
 }
-
 function buildMilkCauses({ thi, mastitisPct, lamenessPct }){
   const causes = [];
   if (Number(thi) >= 72) causes.push('حرارة');
@@ -762,13 +815,12 @@ prodGrid.innerHTML =
   ) +
   (
     showCausesCard
-      ? prodCard(
-          'أسباب تغير إنتاج اللبن',
-          causesText,
-          '',
-          causesState,
-          'milk-reports.html?view=causes'
-        )
+         ? `
+        <div class="kpi prod ${causesState === 'danger' ? 'prod-danger' : causesState === 'warn' ? 'prod-warn' : 'prod-ok'}" onclick="location.href='milk-reports.html?view=causes'">
+          <div class="kpi-label">أسباب تغير إنتاج اللبن</div>
+          <div class="kpi-value" style="font-size:26px; line-height:1.15;">${causesText}</div>
+        </div>
+      `
       : ''
   ) +
   prodCard(
