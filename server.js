@@ -2017,35 +2017,30 @@ dailyMilkTotal = +dailyMilkTotal.toFixed(1);
 avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
 monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
 
-const latestKey = latestMilkDay
-  ? latestMilkDay.toISOString().slice(0,10)
-  : null;
+const sortedKeys = [...dayMap.keys()].sort();
+
+const latestKey = sortedKeys.length ? sortedKeys[sortedKeys.length - 1] : null;
+const prevKey   = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : null;
 
 const latestRec = latestKey ? dayMap.get(latestKey) : null;
+const prevRec   = prevKey ? dayMap.get(prevKey) : null;
 
 avgHeadToday = (latestRec && latestRec.heads.size)
   ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
   : 0;
 
-if (latestMilkDay) {
-  const prevDay = new Date(latestMilkDay);
-  prevDay.setDate(prevDay.getDate() - 1);
-  const prevKey = prevDay.toISOString().slice(0,10);
-  const prevRec = dayMap.get(prevKey);
+prevDailyMilkTotal = prevRec ? +Number(prevRec.totalMilk || 0).toFixed(1) : 0;
+prevAvgHeadToday = (prevRec && prevRec.heads.size)
+  ? +(prevRec.totalMilk / prevRec.heads.size).toFixed(1)
+  : 0;
 
-  prevDailyMilkTotal = prevRec ? +Number(prevRec.totalMilk || 0).toFixed(1) : 0;
-  prevAvgHeadToday = (prevRec && prevRec.heads.size)
-    ? +(prevRec.totalMilk / prevRec.heads.size).toFixed(1)
-    : 0;
+dailyMilkDeltaPct = prevDailyMilkTotal > 0
+  ? +(((dailyMilkTotal - prevDailyMilkTotal) / prevDailyMilkTotal) * 100).toFixed(1)
+  : 0;
 
-  dailyMilkDeltaPct = prevDailyMilkTotal > 0
-    ? +(((dailyMilkTotal - prevDailyMilkTotal) / prevDailyMilkTotal) * 100).toFixed(1)
-    : 0;
-
-  avgHeadDeltaPct = prevAvgHeadToday > 0
-    ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
-    : 0;
-}
+avgHeadDeltaPct = prevAvgHeadToday > 0
+  ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
+  : 0;
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
