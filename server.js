@@ -2018,7 +2018,9 @@ avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
 monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
 
 const sortedKeys = [...dayMap.keys()].sort();
-
+console.log("MILK sortedKeys =", sortedKeys);
+console.log("MILK latestKey =", sortedKeys[sortedKeys.length - 1] || null);
+console.log("MILK prevKey =", sortedKeys[sortedKeys.length - 2] || null);
 const latestKey = sortedKeys.length ? sortedKeys[sortedKeys.length - 1] : null;
 const prevKey   = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : null;
 
