@@ -2026,7 +2026,8 @@ const prevKey   = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : nu
 
 const latestRec = latestKey ? dayMap.get(latestKey) : null;
 const prevRec   = prevKey ? dayMap.get(prevKey) : null;
-
+console.log("MILK latestRec =", latestRec);
+console.log("MILK prevRec =", prevRec);
 avgHeadToday = (latestRec && latestRec.heads.size)
   ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
   : 0;
@@ -2043,6 +2044,12 @@ dailyMilkDeltaPct = prevDailyMilkTotal > 0
 avgHeadDeltaPct = prevAvgHeadToday > 0
   ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
   : 0;
+  console.log("MILK dailyMilkTotal =", dailyMilkTotal);
+console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
+console.log("MILK avgHeadToday =", avgHeadToday);
+console.log("MILK prevAvgHeadToday =", prevAvgHeadToday);
+console.log("MILK dailyMilkDeltaPct =", dailyMilkDeltaPct);
+console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
