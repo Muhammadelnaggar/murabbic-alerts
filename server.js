@@ -1849,26 +1849,39 @@ try {
 
   const evBreed = evSnapBreed.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
-  const inseminationEvents = evBreed
-    .filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
+const inseminationEvents = evBreed
+  .map(e => {
+    const normType = normalizeEventType(
+      e.eventTypeNorm || e.eventType || e.type || ""
+    );
 
-  const byAnimal = new Map();
+    const eventDate = computeEventDateFromDoc(e);
 
-  for (const e of inseminationEvents) {
-    const animalKey = String(
-      e.animalNumber ??
-      e.number ??
-      e.animalId ??
-      ""
-    ).trim();
+    return {
+      ...e,
+      _normType: normType,
+      _eventDate: eventDate
+    };
+  })
+  .filter(e => e._normType === "insemination" && e._eventDate);
 
-    const ms = new Date(e.eventDate).getTime();
+const byAnimal = new Map();
 
-    if (!animalKey || !Number.isFinite(ms)) continue;
+for (const e of inseminationEvents) {
+  const animalKey = String(
+    e.animalNumber ??
+    e.number ??
+    e.animalId ??
+    ""
+  ).trim();
 
-    if (!byAnimal.has(animalKey)) byAnimal.set(animalKey, []);
-    byAnimal.get(animalKey).push(ms);
-  }
+  const ms = new Date(e._eventDate).getTime();
+
+  if (!animalKey || !Number.isFinite(ms)) continue;
+
+  if (!byAnimal.has(animalKey)) byAnimal.set(animalKey, []);
+  byAnimal.get(animalKey).push(ms);
+}
 
   for (const arr of byAnimal.values()) {
     arr.sort((a, b) => a - b);
