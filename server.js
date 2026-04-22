@@ -1765,8 +1765,10 @@ let preg = 0,
     openCount = 0,
     bredCount = 0,
     mastitisCount = 0,
-    lamenessCount = 0;
-
+    lamenessCount = 0,
+    breedIntervalSum = 0,
+    breedIntervalN = 0;
+    
 for (const a of active) {
   const rep  = String(a.reproductiveStatus || a.reproStatus || "").toLowerCase();
   const diag = String(a.lastDiagnosisResult || "").toLowerCase();
@@ -1839,7 +1841,49 @@ for (const a of active) {
 
   if (a.lastAbortionDate) aborts++;
 }
+try {
+  const evSnapBreed = await db.collection("events")
+    .where("userId", "==", uid)
+    .limit(5000)
+    .get();
 
+  const evBreed = evSnapBreed.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+  const inseminationEvents = evBreed
+    .filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
+
+  const byAnimal = new Map();
+
+  for (const e of inseminationEvents) {
+    const animalKey = String(
+      e.animalNumber ??
+      e.number ??
+      e.animalId ??
+      ""
+    ).trim();
+
+    const ms = new Date(e.eventDate).getTime();
+
+    if (!animalKey || !Number.isFinite(ms)) continue;
+
+    if (!byAnimal.has(animalKey)) byAnimal.set(animalKey, []);
+    byAnimal.get(animalKey).push(ms);
+  }
+
+  for (const arr of byAnimal.values()) {
+    arr.sort((a, b) => a - b);
+
+    for (let i = 1; i < arr.length; i++) {
+      const diffDays = Math.round((arr[i] - arr[i - 1]) / 86400000);
+      if (diffDays >= 1 && diffDays <= 365) {
+        breedIntervalSum += diffDays;
+        breedIntervalN++;
+      }
+    }
+  }
+} catch (e) {
+  console.error("BREED INTERVAL ERROR", e);
+}
 const pregPct = total ? Math.round((preg * 100) / total) : 0;
 const inMilkPct = total ? Math.round((inMilkCount * 100) / total) : 0;
 const openPct = total ? Math.round((openCount * 100) / total) : 0;
@@ -1856,6 +1900,9 @@ const openDaysAvg =
   openDaysN ? Math.round(openDaysSum / openDaysN) : 0;
 const abortPct =
   (preg + aborts) ? Math.round((aborts * 100) / (preg + aborts)) : 0;
+
+const avgBreedIntervalDays =
+  breedIntervalN ? Math.round(breedIntervalSum / breedIntervalN) : 0;
 
 
     // --------------------------------------
@@ -2151,8 +2198,11 @@ return res.json({
   lamenessPct,
   avgDIM,
 
-  openDaysAvg,
-  abortionRatePct: abortPct,
+ openDaysAvg,
+abortionCount: aborts,
+abortionRatePct: abortPct,
+avgBreedIntervalDays,
+heatDetectionRatePct: extraFertility.hdr21,
 
   cullTotal: cullProd + cullRepro + cullHealth,
   cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
