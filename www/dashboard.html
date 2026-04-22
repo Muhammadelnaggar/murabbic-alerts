@@ -877,13 +877,13 @@ prodCauseWrap.innerHTML = showCausesCard
 reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
       box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
-      box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
-      box('متوسط عدد أيام الحليب للقطيع', avgDIM, '', 'g_dim', 'repro') +
+      box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', null, 'repro') +
+      box('متوسط عدد أيام الحليب للقطيع', avgDIM, '', null, 'repro') +
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
       box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro') +
       box('متوسط عدد الأيام بين تلقيحين', avgBreedIntervalDays || '--', '', 'g_breedInterval', 'repro') +
       box('نسبة مشاهدة الشياع في القطيع', `${heatDetectionRatePct || 0}%`, '', 'g_heatRate', 'repro');
-
+    
     cullGrid.innerHTML =
       box('إجمالي عدد الاستبعاد', cullTotalCount, `نسبته في القطيع ${cullTotalPct}%`, 'g_cullTotal', 'cull') +
       box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
@@ -908,6 +908,7 @@ renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inM
 
 // تم حذف جوجز اللبن
     
+renderMiniGauge("g_preg", pregPct);
 renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_abortRate", abortionRatePct);
