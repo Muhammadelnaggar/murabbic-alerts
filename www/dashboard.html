@@ -506,18 +506,6 @@ const API_BASE = "https://murabbic-alerts.onrender.com";
 let currentType = '';
  let currentTHI = null;
 
-function prodState(deltaPct){
-  const a = Math.abs(Number(deltaPct || 0));
-  if (a < 3) return 'ok';
-  if (a < 7) return 'warn';
-  return 'danger';
-}
-
-function prodDeltaText(deltaPct){
-  const n = Number(deltaPct || 0);
-  if (!Number.isFinite(n) || n === 0) return '—';
-  return `${n > 0 ? '↑' : '↓'} ${Math.abs(n).toFixed(1)}%`;
-}
 
 function prodCard(label, value, sub='', state='ok', href=''){
   const cls =
@@ -542,12 +530,7 @@ function prodCard(label, value, sub='', state='ok', href=''){
     </div>
   `;
 }
-function buildMilkCauses({ thi, mastitisPct, lamenessPct }){
-  const causes = [];
-  if (Number(thi) >= 72) causes.push('حرارة');
-  if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
-  return causes.length ? causes.join(' + ') : 'غير واضح';
-} 
+
 // ============ هوية المستخدم ============
 function getTenantId() {
   try {
@@ -794,7 +777,20 @@ const avgHeadToday = Number(stats.avgHeadToday ?? 0);
 
 const avgHeadDeltaPct = Number(stats.avgHeadDeltaPct ?? 0);
 const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
+const productionEval = stats.productionEval || {};
 
+const avgHeadState = productionEval.avgHead?.state || 'ok';
+const dailyMilkState = productionEval.dailyMilk?.state || 'ok';
+
+const avgHeadDeltaText =
+  productionEval.avgHead?.deltaText != null
+    ? String(productionEval.avgHead.deltaText)
+    : '—';
+
+const dailyMilkDeltaText =
+  productionEval.dailyMilk?.deltaText != null
+    ? String(productionEval.dailyMilk.deltaText)
+    : '—';
     // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
     const openCount = Number(stats.openCount ?? 0);
     const openPct   = Number(stats.openPct ?? 0);
@@ -838,22 +834,13 @@ const conceptionGaugePct =
       box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
       box(`عدد ${typeLabel} الجافة`, dryCount, `نسبتهم من القطيع ${dryPct}%`, 'g_dry', 'herd');
 
-const avgHeadState = prodState(avgHeadDeltaPct);
-const dailyMilkState = prodState(dailyMilkDeltaPct);
-const showCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
 
-const causesState = prodState(dailyMilkDeltaPct);
-const causesText = buildMilkCauses({
-  thi: currentTHI,
-  mastitisPct,
-  lamenessPct
-});
 
 prodGrid.innerHTML =
   prodCard(
     'متوسط اللبن اليومي / رأس / يوم',
     avgHeadToday,
-    prodDeltaText(avgHeadDeltaPct),
+   avgHeadDeltaText
     avgHeadState,
     'milk-reports.html?view=daily_avg'
   ) +
@@ -867,7 +854,7 @@ prodGrid.innerHTML =
   prodCard(
     'إجمالي إنتاج اللبن اليومي',
     totalDailyMilk,
-    prodDeltaText(dailyMilkDeltaPct),
+   dailyMilkDeltaText
     dailyMilkState,
     'milk-reports.html?view=daily_total'
   ) +
