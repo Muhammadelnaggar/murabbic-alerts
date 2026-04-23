@@ -724,9 +724,12 @@ const healthGrid = document.getElementById('healthGrid');
   try{
      setupTypeSwitch();
 
-   const thiParam = Number.isFinite(Number(currentTHI)) ? `&thi=${encodeURIComponent(currentTHI)}` : '';
+ const thiParam = Number.isFinite(Number(currentTHI)) ? `&thi=${encodeURIComponent(currentTHI)}` : '';
 const stats = await fetchJSON(`/api/herd-stats?type=${currentType}${thiParam}`);
-    const t     = stats.totals || {};
+if (!stats?.ok) {
+  throw new Error(stats?.error || 'herd_stats_failed');
+}
+const t     = stats.totals || {};
     const fert  = stats.fertility || {};
 
     const typeLabel = getTypeLabelByKey(currentType);
