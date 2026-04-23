@@ -1710,7 +1710,33 @@ app.get('/api/animal-timeline', async (req, res) => {
     res.status(500).json({ ok:false, error:'timeline_failed' });
   }
 });
+function computeEventDateFromDoc(doc = {}) {
+  const direct =
+    doc?.eventDate ||
+    doc?.date ||
+    null;
 
+  if (direct) {
+    const s = String(direct).trim();
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+  }
+
+  const created =
+    doc?.createdAt?._seconds
+      ? new Date(doc.createdAt._seconds * 1000)
+      : doc?.createdAt instanceof Date
+      ? doc.createdAt
+      : doc?.timestamp
+      ? new Date(doc.timestamp)
+      : null;
+
+  if (created && !isNaN(created.getTime())) {
+    return created.toISOString().slice(0, 10);
+  }
+
+  return '';
+}
 // =============================================
 //   /api/herd-stats  —  Murabbik Full Edition
 // =============================================
