@@ -2133,6 +2133,27 @@ dailyMilkDeltaPct = prevDailyMilkTotal > 0
 avgHeadDeltaPct = prevAvgHeadToday > 0
   ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
   : 0;
+  // --------------------------------------
+// 🔥 5.5) Murabbik touch للإنتاج — سيرفر فقط
+// --------------------------------------
+function prodStateSrv(deltaPct){
+  const a = Math.abs(Number(deltaPct || 0));
+  if (a < 3) return 'ok';
+  if (a < 7) return 'warn';
+  return 'danger';
+}
+
+function prodDeltaTextSrv(deltaPct){
+  const n = Number(deltaPct || 0);
+  if (!Number.isFinite(n) || n === 0) return '—';
+  return `${n > 0 ? '↑' : '↓'} ${Math.abs(n).toFixed(1)}%`;
+}
+
+const avgHeadState = prodStateSrv(avgHeadDeltaPct);
+const dailyMilkState = prodStateSrv(dailyMilkDeltaPct);
+
+const avgHeadDeltaText = prodDeltaTextSrv(avgHeadDeltaPct);
+const dailyMilkDeltaText = prodDeltaTextSrv(dailyMilkDeltaPct);
   console.log("MILK dailyMilkTotal =", dailyMilkTotal);
 console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
 console.log("MILK avgHeadToday =", avgHeadToday);
@@ -2295,14 +2316,32 @@ heatDetectionRatePct: extraFertility.hdr21,
   feedCostPerHeadPerDay: 0,
   iofc: 0,
 
-  dailyMilkTotal,
-  avgHeadToday,
-  avgHead7Days,
-  monthlyMilkTotal,
-  dailyMilkDeltaPct,
-  avgHeadDeltaPct,
-  bcsCamera,
-  fecesScore
+ dailyMilkTotal,
+avgHeadToday,
+avgHead7Days,
+monthlyMilkTotal,
+dailyMilkDeltaPct,
+avgHeadDeltaPct,
+avgHeadDeltaText,
+dailyMilkDeltaText,
+
+productionEval: {
+  avgHead: {
+    value: avgHeadToday,
+    deltaPct: avgHeadDeltaPct,
+    deltaText: avgHeadDeltaText,
+    state: avgHeadState
+  },
+  dailyMilk: {
+    value: dailyMilkTotal,
+    deltaPct: dailyMilkDeltaPct,
+    deltaText: dailyMilkDeltaText,
+    state: dailyMilkState
+  }
+},
+
+bcsCamera,
+fecesScore
 });
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
