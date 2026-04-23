@@ -1916,6 +1916,36 @@ const abortPct =
 const avgBreedIntervalDays =
   breedIntervalN ? Math.round(breedIntervalSum / breedIntervalN) : 0;
 
+// ===== Murabbik touch — تقييم الخصوبة (سيرفر فقط) =====
+const spcGaugePct =
+  servicesPerConception > 0
+    ? Math.max(0, Math.min(100, Math.round((2 / servicesPerConception) * 100)))
+    : null;
+
+const conceptionGaugePct =
+  conceptionPct > 0
+    ? Math.max(0, Math.min(100, Math.round((conceptionPct / 40) * 100)))
+    : null;
+
+const openDaysGaugePct =
+  openDaysAvg > 0
+    ? Math.max(0, Math.min(100, Math.round((90 / openDaysAvg) * 100)))
+    : null;
+
+const spcStatus =
+  servicesPerConception <= 0 ? "na" :
+  servicesPerConception <= 2 ? "good" :
+  servicesPerConception <= 2.5 ? "warn" : "bad";
+
+const conceptionStatus =
+  conceptionPct <= 0 ? "na" :
+  conceptionPct >= 40 ? "good" :
+  conceptionPct >= 30 ? "warn" : "bad";
+
+const openDaysStatus =
+  openDaysAvg <= 0 ? "na" :
+  openDaysAvg <= 90 ? "good" :
+  openDaysAvg <= 120 ? "warn" : "bad";
 
     // --------------------------------------
     // 🔥 3) نفوق + استبعاد
@@ -2191,10 +2221,34 @@ return res.json({
 fertility: {
   servicesPerConception,
   conceptionRatePct: conceptionPct,
+  openDaysAvg,
   scPlus: extraFertility.scPlus,
   hdr21: extraFertility.hdr21,
   cr21: extraFertility.cr21,
-  pr21: extraFertility.pr21
+  pr21: extraFertility.pr21,
+
+  murabbikEval: {
+    ideal: {
+      servicesPerConceptionMax: 2,
+      conceptionRateMin: 40,
+      openDaysMax: 90
+    },
+    spc: {
+      value: servicesPerConception,
+      gaugePct: spcGaugePct,
+      status: spcStatus
+    },
+    conception: {
+      value: conceptionPct,
+      gaugePct: conceptionGaugePct,
+      status: conceptionStatus
+    },
+    openDays: {
+      value: openDaysAvg,
+      gaugePct: openDaysGaugePct,
+      status: openDaysStatus
+    }
+  }
 },
 
 // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
