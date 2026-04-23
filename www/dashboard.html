@@ -754,18 +754,12 @@ const healthGrid = document.getElementById('healthGrid');
     const inMilk = Number(stats.inMilkCount ?? 0);
     const inMilkPct = Number(stats.inMilkPct ?? 0);
 
-    const conceptionRatePct =
-      fert.conceptionRatePct != null ? Number(fert.conceptionRatePct) : 0;
+   const openDaysAvg =
+  stats.openDaysAvg != null ? Number(stats.openDaysAvg) : 0;
 
-    const openDaysAvg =
-      stats.openDaysAvg != null ? Number(stats.openDaysAvg) : 0;
-
-    const pregRate21d =
-      fert.pr21 != null ? Number(fert.pr21) :
-      (stats.pregRate21d != null ? Number(stats.pregRate21d) : 0);
-
-    const servicesPerConception =
-      fert.servicesPerConception != null ? Number(fert.servicesPerConception) : 0;
+const pregRate21d =
+  fert.pr21 != null ? Number(fert.pr21) :
+  (stats.pregRate21d != null ? Number(stats.pregRate21d) : 0);
 
 const abortionCount =
   stats.abortionCount != null ? Number(stats.abortionCount) : 0;
@@ -895,7 +889,9 @@ reproGrid.innerHTML =
       box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
       box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', null, 'repro') +
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
-      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro') );
+      box('عدد الخدمات للحمل', servicesPerConception, '', 'g_spc', 'repro') +
+      box('معدل الإخصاب', `${conceptionRatePct}%`, '', 'g_conception', 'repro') +
+      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro');
      
     
     cullGrid.innerHTML =
