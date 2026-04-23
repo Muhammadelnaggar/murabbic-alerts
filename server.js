@@ -1710,42 +1710,15 @@ app.get('/api/animal-timeline', async (req, res) => {
     res.status(500).json({ ok:false, error:'timeline_failed' });
   }
 });
-function computeEventDateFromDoc(doc = {}) {
-  const direct =
-    doc?.eventDate ||
-    doc?.date ||
-    null;
 
-  if (direct) {
-    const s = String(direct).trim();
-    const m = s.match(/\d{4}-\d{2}-\d{2}/);
-    if (m) return m[0];
-  }
-
-  const created =
-    doc?.createdAt?._seconds
-      ? new Date(doc.createdAt._seconds * 1000)
-      : doc?.createdAt instanceof Date
-      ? doc.createdAt
-      : doc?.timestamp
-      ? new Date(doc.timestamp)
-      : null;
-
-  if (created && !isNaN(created.getTime())) {
-    return created.toISOString().slice(0, 10);
-  }
-
-  return '';
-}
 // =============================================
 //   /api/herd-stats  —  Murabbik Full Edition
 // =============================================
 app.get("/api/herd-stats", async (req, res) => {
   try {
-   const uid = req.headers["x-user-id"];
-const herdType = String(req.query.type || '').trim().toLowerCase();
-const thiNow = Number(req.query.thi ?? 0);
-if (!uid) return res.json({ ok:false, error:"NO_USER" });
+    const uid = req.headers["x-user-id"];
+    const herdType = String(req.query.type || '').trim().toLowerCase();
+    if (!uid) return res.json({ ok:false, error:"NO_USER" });
 
     // --------------------------------------
     // 🔥 1) جلب الحيوانات
@@ -1943,36 +1916,6 @@ const abortPct =
 const avgBreedIntervalDays =
   breedIntervalN ? Math.round(breedIntervalSum / breedIntervalN) : 0;
 
-// ===== Murabbik touch — تقييم الخصوبة (سيرفر فقط) =====
-const spcGaugePct =
-  servicesPerConception > 0
-    ? Math.max(0, Math.min(100, Math.round((2 / servicesPerConception) * 100)))
-    : null;
-
-const conceptionGaugePct =
-  conceptionPct > 0
-    ? Math.max(0, Math.min(100, Math.round((conceptionPct / 40) * 100)))
-    : null;
-
-const openDaysGaugePct =
-  openDaysAvg > 0
-    ? Math.max(0, Math.min(100, Math.round((90 / openDaysAvg) * 100)))
-    : null;
-
-const spcStatus =
-  servicesPerConception <= 0 ? "na" :
-  servicesPerConception <= 2 ? "good" :
-  servicesPerConception <= 2.5 ? "warn" : "bad";
-
-const conceptionStatus =
-  conceptionPct <= 0 ? "na" :
-  conceptionPct >= 40 ? "good" :
-  conceptionPct >= 30 ? "warn" : "bad";
-
-const openDaysStatus =
-  openDaysAvg <= 0 ? "na" :
-  openDaysAvg <= 90 ? "good" :
-  openDaysAvg <= 120 ? "warn" : "bad";
 
     // --------------------------------------
     // 🔥 3) نفوق + استبعاد
@@ -2095,16 +2038,7 @@ for (const e of milkEvents) {
   rec.totalMilk += milkVal;
   rec.heads.add(String(e.animalNumber || e.number || e.animalId || '').trim());
 }
-let avgHeadState = 'ok';
-let dailyMilkState = 'ok';
 
-let avgHeadDeltaText = '—';
-let dailyMilkDeltaText = '—';
-
-let showMilkCausesCard = false;
-let milkCausesState = 'ok';
-let milkCausesText = 'غير واضح';
-  
 if (latestMilkDay) {
   const start7 = new Date(latestMilkDay);
   start7.setDate(start7.getDate() - 6);
@@ -2169,35 +2103,6 @@ dailyMilkDeltaPct = prevDailyMilkTotal > 0
 avgHeadDeltaPct = prevAvgHeadToday > 0
   ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
   : 0;
-  // --------------------------------------
-// 🔥 5.5) Murabbik touch للإنتاج — سيرفر فقط
-// --------------------------------------
-function prodStateSrv(deltaPct){
-  const a = Math.abs(Number(deltaPct || 0));
-  if (a < 3) return 'ok';
-  if (a < 7) return 'warn';
-  return 'danger';
-}
-
-function prodDeltaTextSrv(deltaPct){
-  const n = Number(deltaPct || 0);
-  if (!Number.isFinite(n) || n === 0) return '—';
-  return `${n > 0 ? '↑' : '↓'} ${Math.abs(n).toFixed(1)}%`;
-}
-
-avgHeadState = prodStateSrv(avgHeadDeltaPct);
-dailyMilkState = prodStateSrv(dailyMilkDeltaPct);
-
-avgHeadDeltaText = prodDeltaTextSrv(avgHeadDeltaPct);
-dailyMilkDeltaText = prodDeltaTextSrv(dailyMilkDeltaPct);
-
-showMilkCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
-milkCausesState = prodStateSrv(dailyMilkDeltaPct);
-milkCausesText = buildMilkCausesSrv({
-  thi: thiNow,
-  mastitisPct,
-  lamenessPct
-});
   console.log("MILK dailyMilkTotal =", dailyMilkTotal);
 console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
 console.log("MILK avgHeadToday =", avgHeadToday);
@@ -2286,34 +2191,10 @@ return res.json({
 fertility: {
   servicesPerConception,
   conceptionRatePct: conceptionPct,
-  openDaysAvg,
   scPlus: extraFertility.scPlus,
   hdr21: extraFertility.hdr21,
   cr21: extraFertility.cr21,
-  pr21: extraFertility.pr21,
-
-  murabbikEval: {
-    ideal: {
-      servicesPerConceptionMax: 2,
-      conceptionRateMin: 40,
-      openDaysMax: 90
-    },
-    spc: {
-      value: servicesPerConception,
-      gaugePct: spcGaugePct,
-      status: spcStatus
-    },
-    conception: {
-      value: conceptionPct,
-      gaugePct: conceptionGaugePct,
-      status: conceptionStatus
-    },
-    openDays: {
-      value: openDaysAvg,
-      gaugePct: openDaysGaugePct,
-      status: openDaysStatus
-    }
-  }
+  pr21: extraFertility.pr21
 },
 
 // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
@@ -2360,37 +2241,14 @@ heatDetectionRatePct: extraFertility.hdr21,
   feedCostPerHeadPerDay: 0,
   iofc: 0,
 
- dailyMilkTotal,
-avgHeadToday,
-avgHead7Days,
-monthlyMilkTotal,
-dailyMilkDeltaPct,
-avgHeadDeltaPct,
-avgHeadDeltaText,
-dailyMilkDeltaText,
-
-productionEval: {
-  avgHead: {
-    value: avgHeadToday,
-    deltaPct: avgHeadDeltaPct,
-    deltaText: avgHeadDeltaText,
-    state: avgHeadState
-  },
-  dailyMilk: {
-    value: dailyMilkTotal,
-    deltaPct: dailyMilkDeltaPct,
-    deltaText: dailyMilkDeltaText,
-    state: dailyMilkState
-  },
-  causes: {
-    show: showMilkCausesCard,
-    text: milkCausesText,
-    state: milkCausesState
-  }
-},
-
-bcsCamera,
-fecesScore
+  dailyMilkTotal,
+  avgHeadToday,
+  avgHead7Days,
+  monthlyMilkTotal,
+  dailyMilkDeltaPct,
+  avgHeadDeltaPct,
+  bcsCamera,
+  fecesScore
 });
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
