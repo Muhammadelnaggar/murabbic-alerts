@@ -1855,12 +1855,12 @@ const inseminationEvents = evBreed
       e.eventTypeNorm || e.eventType || e.type || ""
     );
 
-    const eventDate = computeEventDateFromDoc(e);
+    const evDate = computeEventDateFromDoc(e);
 
     return {
       ...e,
       _normType: normType,
-      _eventDate: eventDate
+      _eventDate: evDate
     };
   })
   .filter(e => e._normType === "insemination" && e._eventDate);
@@ -1882,7 +1882,6 @@ for (const e of inseminationEvents) {
   if (!byAnimal.has(animalKey)) byAnimal.set(animalKey, []);
   byAnimal.get(animalKey).push(ms);
 }
-
   for (const arr of byAnimal.values()) {
     arr.sort((a, b) => a - b);
 
