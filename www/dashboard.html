@@ -816,8 +816,18 @@ const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
     const dryCount = Math.max(0, totalActive - inMilk);
     const dryPct = totalActive ? Math.round((dryCount * 100) / totalActive) : 0;
 
-    const pregCount = Number(t?.pregnant?.count ?? 0);
-    const avgDIM = Number(stats.avgDIM ?? 0);
+const pregCount = Number(t?.pregnant?.count ?? 0);
+const avgDIM = Number(stats.avgDIM ?? 0);
+
+const servicesPerConception =
+  stats.servicesPerConception != null
+    ? Number(stats.servicesPerConception)
+    : Number(fert.servicesPerConception ?? 0);
+
+const conceptionRatePct =
+  stats.conceptionRatePct != null
+    ? Number(stats.conceptionRatePct)
+    : Number(fert.conceptionRatePct ?? 0);
 
     herdGrid.innerHTML =
       box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
@@ -857,7 +867,13 @@ prodGrid.innerHTML =
     dailyMilkState,
     'milk-reports.html?view=daily_total'
   ) +
- 
+   prodCard(
+    'متوسط عدد أيام الحليب للقطيع',
+    avgDIM,
+    '',
+    'ok',
+    'milk-reports.html'
+  ) +
   prodCard(
     'إجمالي إنتاج اللبن الشهري',
     monthlyMilkTotal,
@@ -878,11 +894,9 @@ reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
       box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
       box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', null, 'repro') +
-      box('متوسط عدد أيام الحليب للقطيع', avgDIM, '', null, 'repro') +
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
-      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro') +
-      box('متوسط عدد الأيام بين تلقيحين', avgBreedIntervalDays, '', 'g_breedInterval', 'repro')+
-      box('نسبة مشاهدة الشياع في القطيع', `${heatDetectionRatePct || 0}%`, '', 'g_heatRate', 'repro');
+      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro') );
+     
     
     cullGrid.innerHTML =
       box('إجمالي عدد الاستبعاد', cullTotalCount, `نسبته في القطيع ${cullTotalPct}%`, 'g_cullTotal', 'cull') +
@@ -911,9 +925,9 @@ renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inM
 renderMiniGauge("g_preg", pregPct);
 renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
+renderMiniGauge("g_spc", servicesPerConception > 0 ? Math.min(100, Math.round((1 / servicesPerConception) * 100)) : NaN);
+renderMiniGauge("g_conception", conceptionRatePct);
 renderMiniGauge("g_abortRate", abortionRatePct);
-renderMiniGauge("g_breedInterval", avgBreedIntervalDays > 0 ? Math.min(100, Math.round((avgBreedIntervalDays / 60) * 100)) : NaN);
-renderMiniGauge("g_heatRate", heatDetectionRatePct);
 
 renderMiniGauge("g_cullTotal", cullTotalPct);
 renderMiniGauge("g_cullProd", cullProdPct);
