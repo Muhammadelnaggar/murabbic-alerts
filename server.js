@@ -2095,7 +2095,16 @@ for (const e of milkEvents) {
   rec.totalMilk += milkVal;
   rec.heads.add(String(e.animalNumber || e.number || e.animalId || '').trim());
 }
+let avgHeadState = 'ok';
+let dailyMilkState = 'ok';
 
+let avgHeadDeltaText = '—';
+let dailyMilkDeltaText = '—';
+
+let showMilkCausesCard = false;
+let milkCausesState = 'ok';
+let milkCausesText = 'غير واضح';
+  
 if (latestMilkDay) {
   const start7 = new Date(latestMilkDay);
   start7.setDate(start7.getDate() - 6);
@@ -2176,25 +2185,19 @@ function prodDeltaTextSrv(deltaPct){
   return `${n > 0 ? '↑' : '↓'} ${Math.abs(n).toFixed(1)}%`;
 }
 
-const avgHeadState = prodStateSrv(avgHeadDeltaPct);
-const dailyMilkState = prodStateSrv(dailyMilkDeltaPct);
+avgHeadState = prodStateSrv(avgHeadDeltaPct);
+dailyMilkState = prodStateSrv(dailyMilkDeltaPct);
 
-const avgHeadDeltaText = prodDeltaTextSrv(avgHeadDeltaPct);
-const dailyMilkDeltaText = prodDeltaTextSrv(dailyMilkDeltaPct);
- function buildMilkCausesSrv({ thi, mastitisPct, lamenessPct }){
-  const causes = [];
-  if (Number(thi) >= 72) causes.push('حرارة');
-  if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
-  return causes.length ? causes.join(' + ') : 'غير واضح';
-}
+avgHeadDeltaText = prodDeltaTextSrv(avgHeadDeltaPct);
+dailyMilkDeltaText = prodDeltaTextSrv(dailyMilkDeltaPct);
 
-const showMilkCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
-const milkCausesState = prodStateSrv(dailyMilkDeltaPct);
-const milkCausesText = buildMilkCausesSrv({
+showMilkCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
+milkCausesState = prodStateSrv(dailyMilkDeltaPct);
+milkCausesText = buildMilkCausesSrv({
   thi: thiNow,
   mastitisPct,
   lamenessPct
-}); 
+});
   console.log("MILK dailyMilkTotal =", dailyMilkTotal);
 console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
 console.log("MILK avgHeadToday =", avgHeadToday);
