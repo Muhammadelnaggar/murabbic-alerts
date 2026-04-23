@@ -784,7 +784,21 @@ const productionEval = stats.productionEval || {};
 const showCausesCard = !!productionEval.causes?.show;
 const causesState = productionEval.causes?.state || 'ok';
 const causesText = productionEval.causes?.text || 'غير واضح';
+const avgHeadDeltaText =
+  productionEval?.avgHead?.deltaText != null
+    ? String(productionEval.avgHead.deltaText)
+    : (stats?.avgHeadDeltaText != null ? String(stats.avgHeadDeltaText) : '—');
 
+const dailyMilkDeltaText =
+  productionEval?.dailyMilk?.deltaText != null
+    ? String(productionEval.dailyMilk.deltaText)
+    : (stats?.dailyMilkDeltaText != null ? String(stats.dailyMilkDeltaText) : '—');
+
+const avgHeadState =
+  productionEval?.avgHead?.state || 'ok';
+
+const dailyMilkState =
+  productionEval?.dailyMilk?.state || 'ok';
     // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
     const openCount = Number(stats.openCount ?? 0);
     const openPct   = Number(stats.openPct ?? 0);
@@ -834,8 +848,8 @@ prodGrid.innerHTML =
   prodCard(
     'متوسط اللبن اليومي / رأس / يوم',
     avgHeadToday,
-    productionEval.avgHead?.deltaText != null ? String(productionEval.avgHead.deltaText) : '—',
-    productionEval.avgHead?.state || 'ok',
+   avgHeadDeltaText,
+avgHeadState,
     'milk-reports.html?view=daily_avg'
   ) +
   prodCard(
@@ -848,8 +862,8 @@ prodGrid.innerHTML =
   prodCard(
     'إجمالي إنتاج اللبن اليومي',
     totalDailyMilk,
-    productionEval.dailyMilk?.deltaText != null ? String(productionEval.dailyMilk.deltaText) : '—',
-    productionEval.dailyMilk?.state || 'ok',
+   dailyMilkDeltaText,
+dailyMilkState,
     'milk-reports.html?view=daily_total'
   ) +
    prodCard(
