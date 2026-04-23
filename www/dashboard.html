@@ -724,7 +724,8 @@ const healthGrid = document.getElementById('healthGrid');
   try{
      setupTypeSwitch();
 
-    const stats = await fetchJSON(`/api/herd-stats?type=${currentType}`);
+   const thiParam = Number.isFinite(Number(currentTHI)) ? `&thi=${encodeURIComponent(currentTHI)}` : '';
+const stats = await fetchJSON(`/api/herd-stats?type=${currentType}${thiParam}`);
     const t     = stats.totals || {};
     const fert  = stats.fertility || {};
 
@@ -778,7 +779,9 @@ const avgHeadToday = Number(stats.avgHeadToday ?? 0);
 const avgHeadDeltaPct = Number(stats.avgHeadDeltaPct ?? 0);
 const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
 const productionEval = stats.productionEval || {};
-
+const showCausesCard = !!productionEval.causes?.show;
+const causesState = productionEval.causes?.state || 'ok';
+const causesText = productionEval.causes?.text || 'غير واضح';
 const avgHeadState = productionEval.avgHead?.state || 'ok';
 const dailyMilkState = productionEval.dailyMilk?.state || 'ok';
 
