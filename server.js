@@ -1716,9 +1716,10 @@ app.get('/api/animal-timeline', async (req, res) => {
 // =============================================
 app.get("/api/herd-stats", async (req, res) => {
   try {
-    const uid = req.headers["x-user-id"];
-    const herdType = String(req.query.type || '').trim().toLowerCase();
-    if (!uid) return res.json({ ok:false, error:"NO_USER" });
+   const uid = req.headers["x-user-id"];
+const herdType = String(req.query.type || '').trim().toLowerCase();
+const thiNow = Number(req.query.thi ?? 0);
+if (!uid) return res.json({ ok:false, error:"NO_USER" });
 
     // --------------------------------------
     // 🔥 1) جلب الحيوانات
@@ -2154,6 +2155,20 @@ const dailyMilkState = prodStateSrv(dailyMilkDeltaPct);
 
 const avgHeadDeltaText = prodDeltaTextSrv(avgHeadDeltaPct);
 const dailyMilkDeltaText = prodDeltaTextSrv(dailyMilkDeltaPct);
+ function buildMilkCausesSrv({ thi, mastitisPct, lamenessPct }){
+  const causes = [];
+  if (Number(thi) >= 72) causes.push('حرارة');
+  if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
+  return causes.length ? causes.join(' + ') : 'غير واضح';
+}
+
+const showMilkCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
+const milkCausesState = prodStateSrv(dailyMilkDeltaPct);
+const milkCausesText = buildMilkCausesSrv({
+  thi: thiNow,
+  mastitisPct,
+  lamenessPct
+}); 
   console.log("MILK dailyMilkTotal =", dailyMilkTotal);
 console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
 console.log("MILK avgHeadToday =", avgHeadToday);
@@ -2337,6 +2352,11 @@ productionEval: {
     deltaPct: dailyMilkDeltaPct,
     deltaText: dailyMilkDeltaText,
     state: dailyMilkState
+  },
+  causes: {
+    show: showMilkCausesCard,
+    text: milkCausesText,
+    state: milkCausesState
   }
 },
 
