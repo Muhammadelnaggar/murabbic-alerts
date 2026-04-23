@@ -2188,17 +2188,19 @@ return res.json({
     pregnant: { count: preg, pct: pregPct },
   },
 
-  fertility: {
-    servicesPerConception,
-    conceptionRatePct: conceptionPct,
-    scPlus: extraFertility.scPlus,
-    hdr21: extraFertility.hdr21,
-    cr21: extraFertility.cr21,
-    pr21: extraFertility.pr21
-  },
+fertility: {
+  servicesPerConception,
+  conceptionRatePct: conceptionPct,
+  scPlus: extraFertility.scPlus,
+  hdr21: extraFertility.hdr21,
+  cr21: extraFertility.cr21,
+  pr21: extraFertility.pr21
+},
 
-  // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
-  inMilkCount,
+// ===== الحقول التي ينتظرها الداشبورد مباشرة =====
+servicesPerConception,
+conceptionRatePct: conceptionPct,
+inMilkCount,
   inMilkPct,
   openCount,
   openPct,
