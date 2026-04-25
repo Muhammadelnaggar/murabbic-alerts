@@ -857,7 +857,31 @@ function feBox(value){
     'feed'
   );
 }
+function feedBandCard(title, band = {}) {
+  const headCount = Number(band?.headCount || 0);
+  const avgMilkKg = Number(band?.avgMilkKg || 0);
+  const feedEfficiency = Number(band?.feedEfficiency || 0);
+  const feedCostPerLiter = Number(band?.feedCostPerLiter || 0);
+  const feedCostPerHeadPerDay = Number(band?.feedCostPerHeadPerDay || 0);
+  const iofc = Number(band?.iofc || 0);
 
+  const lines = [
+    `عدد الحيوانات: ${headCount || 0}`,
+    `متوسط اللبن: ${Number.isFinite(avgMilkKg) ? avgMilkKg.toFixed(1) : '0.0'} كجم`,
+    `كفاءة التحويل: ${Number.isFinite(feedEfficiency) ? feedEfficiency.toFixed(2) : '0.00'}`,
+    `تكلفة اللتر: ${Number.isFinite(feedCostPerLiter) ? feedCostPerLiter.toFixed(2) : '0.00'} ج`,
+    `تكلفة الرأس/يوم: ${Number.isFinite(feedCostPerHeadPerDay) ? feedCostPerHeadPerDay.toFixed(2) : '0.00'} ج`,
+    `هامش لبن/علف: ${Number.isFinite(iofc) ? iofc.toFixed(2) : '0.00'} ج`
+  ];
+
+  return `
+    <div class="kpi feed">
+      <div class="kpi-label">${title}</div>
+      <div class="kpi-value">${Number.isFinite(feedEfficiency) ? feedEfficiency.toFixed(2) : '0.00'}</div>
+      <div class="kpi-sub">${lines.join('<br>')}</div>
+    </div>
+  `;
+}
 function mastitisBox(count, pct){
   const v = Number(pct);
   return scaleMetricBox(
@@ -989,7 +1013,18 @@ const heatDetectionRatePct =
 
     const feedCostPerLiter = Number(stats.feedCostPerLiter ?? 0);
     const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? 0);
-    
+    const feedBands = stats.feedBands || {};
+const feedOverall = feedBands.overall || {
+  headCount: 0,
+  avgMilkKg: 0,
+  feedCostPerLiter: feedCostPerLiter,
+  feedEfficiency: Number(stats.feedEfficiency ?? 0),
+  feedCostPerHeadPerDay: feedCostPerHeadPerDay,
+  iofc: Number(stats.iofc ?? 0)
+};
+const feedHigh = feedBands.high || {};
+const feedMedium = feedBands.medium || {};
+const feedLow = feedBands.low || {};
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
 const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
 const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
@@ -1107,10 +1142,10 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-      box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed') +
-      feBox(feedEfficiency) +
-      box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
-      box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
+      feedBandCard('إجمالي القطيع', feedOverall) +
+      feedBandCard('عالي الإنتاج', feedHigh) +
+      feedBandCard('متوسط الإنتاج', feedMedium) +
+      feedBandCard('منخفض الإنتاج', feedLow);
 
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
@@ -1132,13 +1167,6 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_cullProd", cullProdPct);
 renderMiniGauge("g_cullRepro", cullReproPct);
 renderMiniGauge("g_cullHealth", cullHealthPct);
-
-renderMiniGauge("g_feedCostLiter", feedCostPerLiter);
-
-renderMiniGauge("g_feedHeadDay", feedCostPerHeadPerDay);
-renderMiniGauge("g_iofc", iofc);
-
-
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
