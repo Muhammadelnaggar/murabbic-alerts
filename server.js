@@ -2116,7 +2116,7 @@ console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
     // --------------------------------------
     // 🔥 5) خصوبة 21 يوم من الأحداث (FERTILITY EVENTS)
     // --------------------------------------
-    let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0 };
+    let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0, firstServicePct:0 };
 
     try {
       const evSnap = await db.collection("events")
@@ -2136,7 +2136,25 @@ console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
       heats.forEach(e => e.ms = new Date(e.eventDate).getTime());
       ins.forEach(e => e.ms = new Date(e.eventDate).getTime());
       pregP.forEach(e => e.ms = new Date(e.eventDate).getTime());
+      const pregByAnimal = new Map();
 
+for (const e of pregP) {
+  const animalKey = String(
+    e.animalNumber ??
+    e.number ??
+    e.animalId ??
+    ""
+  ).trim();
+
+  if (!animalKey || !Number.isFinite(e.ms)) continue;
+
+  if (!pregByAnimal.has(animalKey)) pregByAnimal.set(animalKey, []);
+  pregByAnimal.get(animalKey).push(e.ms);
+}
+
+for (const arr of pregByAnimal.values()) {
+  arr.sort((a, b) => a - b);
+}
       // --- S/C+ ---
       let sc_total=0, sc_conc=0;
       for (const p of pregP) {
@@ -2169,9 +2187,29 @@ console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
 
       const hdr21 = eligible ? Math.round((heats21.length*100)/eligible) : 0;
       const cr21  = ins21.length ? Math.round((preg21.length*100)/ins21.length) : 0;
-      const pr21  = Math.round((hdr21/100) * cr21);
+     const pr21  = Math.round((hdr21/100) * cr21);
 
-      extraFertility = { scPlus, hdr21, cr21, pr21 };
+// --- First service conception ---
+let firstServiceEligible = 0;
+let firstServiceSuccess = 0;
+
+for (const [animalKey, insArr] of byAnimal.entries()) {
+  if (!insArr.length) continue;
+
+  const firstInsMs = insArr[0];
+  firstServiceEligible++;
+
+  const pregArr = pregByAnimal.get(animalKey) || [];
+  const hit = pregArr.some(ms => ms >= firstInsMs && ms <= (firstInsMs + 90*86400000));
+
+  if (hit) firstServiceSuccess++;
+}
+
+const firstServicePct = firstServiceEligible
+  ? Math.round((firstServiceSuccess * 100) / firstServiceEligible)
+  : 0;
+
+extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
 
     } catch(e){
       console.error("FERTILITY EVENT ERROR", e);
@@ -2194,9 +2232,9 @@ fertility: {
   scPlus: extraFertility.scPlus,
   hdr21: extraFertility.hdr21,
   cr21: extraFertility.cr21,
-  pr21: extraFertility.pr21
+  pr21: extraFertility.pr21,
+  firstServicePct: extraFertility.firstServicePct
 },
-
 // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
 servicesPerConception,
 conceptionRatePct: conceptionPct,
@@ -2212,11 +2250,13 @@ inMilkCount,
   lamenessPct,
   avgDIM,
 
- openDaysAvg,
+openDaysAvg,
 abortionCount: aborts,
 abortionRatePct: abortPct,
 avgBreedIntervalDays,
 heatDetectionRatePct: extraFertility.hdr21,
+pregRate21d: extraFertility.pr21,
+firstServiceConceptionPct: extraFertility.firstServicePct,
 
   cullTotal: cullProd + cullRepro + cullHealth,
   cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
