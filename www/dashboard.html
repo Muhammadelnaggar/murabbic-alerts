@@ -822,7 +822,11 @@ const conceptionRatePct =
   stats.conceptionRatePct != null
     ? Number(stats.conceptionRatePct)
     : Number(fert.conceptionRatePct ?? 0);
-
+const firstServiceConceptionPct =
+  stats.firstServiceConceptionPct != null
+    ? Number(stats.firstServiceConceptionPct)
+    : Number(fert.firstServicePct ?? 0);
+    
     herdGrid.innerHTML =
       box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
       box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
@@ -886,12 +890,13 @@ prodCauseWrap.innerHTML = showCausesCard
   : '';
 reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
-      box(`عدد ${typeLabel} المفتوحة في القطيع`, openCount, `نسبتهم من القطيع ${openPct}%`, 'g_openCount', 'repro') +
-      box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', null, 'repro') +
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
-      box('عدد الخدمات للحمل', servicesPerConception, '', 'g_spc', 'repro') +
+      box('معدل الحمل 21 يوم', `${pregRate21d}%`, '', 'g_pr21', 'repro') +
       box('معدل الإخصاب', `${conceptionRatePct}%`, '', 'g_conception', 'repro') +
-      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'repro');
+      box('معدل رصد الشياع', `${heatDetectionRatePct}%`, '', 'g_hdr21', 'repro') +
+      box('عدد الخدمات للحمل', servicesPerConception, '', 'g_spc', 'repro') +
+      box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
+      box('نسبة نجاح أول تلقيح', `${firstServiceConceptionPct}%`, '', 'g_firstService', 'repro');
      
     
     cullGrid.innerHTML =
@@ -906,9 +911,10 @@ reproGrid.innerHTML =
       box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
       box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
 
-    healthGrid.innerHTML =
+   healthGrid.innerHTML =
       box('عدد التهاب الضرع في القطيع', mastitisCount, `نسبتهم من الحلاب ${mastitisPct}%`, 'g_mastitis', 'health') +
       box('عدد حالات العرج في القطيع', lamenessCount, `نسبتهم ${lamenessPct}%`, 'g_lameness', 'health') +
+      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'health') +
       box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
       box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
     // الجوجز
@@ -919,11 +925,13 @@ renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inM
 // تم حذف جوجز اللبن
     
 renderMiniGauge("g_preg", pregPct);
-renderMiniGauge("g_openCount", openPct);
 renderMiniGauge("g_bred", bredPct);
-renderMiniGauge("g_spc", servicesPerConception > 0 ? Math.min(100, Math.round((1 / servicesPerConception) * 100)) : NaN);
+renderMiniGauge("g_pr21", pregRate21d);
 renderMiniGauge("g_conception", conceptionRatePct);
-renderMiniGauge("g_abortRate", abortionRatePct);
+renderMiniGauge("g_hdr21", heatDetectionRatePct);
+renderMiniGauge("g_spc", servicesPerConception > 0 ? Math.min(100, Math.round((1 / servicesPerConception) * 100)) : NaN);
+renderMiniGauge("g_openDays", openDaysAvg > 0 ? Math.min(100, Math.round((90 / openDaysAvg) * 100)) : NaN);
+renderMiniGauge("g_firstService", firstServiceConceptionPct);
 
 renderMiniGauge("g_cullTotal", cullTotalPct);
 renderMiniGauge("g_cullProd", cullProdPct);
