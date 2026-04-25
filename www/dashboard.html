@@ -938,8 +938,8 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_pr21", pregRate21d);
 renderMiniGauge("g_conception", conceptionRatePct);
 renderMiniGauge("g_hdr21", heatDetectionRatePct);
-renderMiniGauge("g_spc", servicesPerConception > 0 ? Math.min(100, Math.round((1 / servicesPerConception) * 100)) : NaN);
-renderMiniGauge("g_openDays", openDaysAvg > 0 ? Math.min(100, Math.round((90 / openDaysAvg) * 100)) : NaN);
+renderMiniGauge("g_spc", servicesPerConception);
+renderMiniGauge("g_openDays", openDaysAvg);
 renderMiniGauge("g_firstService", firstServiceConceptionPct);
 
 renderMiniGauge("g_cullTotal", cullTotalPct);
@@ -1070,18 +1070,21 @@ function gaugeDisplayValue(id, rawValue){
   const v = Number(rawValue);
   if (!Number.isFinite(v)) return '--';
 
-  switch (id) {
-    case 'g_spc':
-      return v.toFixed(2);
+ switch (id) {
+  case 'g_spc':
+    return v.toFixed(2);
 
-    case 'g_fe':
-    case 'g_bcs':
-    case 'g_feces':
-      return v.toFixed(1);
+  case 'g_openDays':
+    return String(Math.round(v));
 
-    default:
-      return `${Math.round(v)}%`;
-  }
+  case 'g_fe':
+  case 'g_bcs':
+  case 'g_feces':
+    return v.toFixed(1);
+
+  default:
+    return `${Math.round(v)}%`;
+}
 }
 
 function gaugeArcPercent(id, rawValue){
