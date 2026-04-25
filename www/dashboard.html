@@ -97,26 +97,26 @@
   padding:4px 2px 8px;
   border-bottom:1px solid #edf3ee;
 }
-  .kpi-grid{
+ .kpi-grid{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  margin-top:10px;
+  gap:9px;
+  margin-top:8px;
 }
-   .kpi{
+.kpi{
   position:relative;
   background:linear-gradient(180deg,#ffffff 0%,#f9fcfa 100%);
   border:1px solid #e6efe8;
-  border-radius:20px;
-  padding:14px 14px 12px;
+  border-radius:18px;
+  padding:11px 11px 10px;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
-  gap:8px;
-  min-height:118px;
+  gap:6px;
+  min-height:96px;
   box-shadow:
-    0 10px 24px rgba(15,23,42,.05),
-    0 2px 8px rgba(14,160,90,.06);
+    0 8px 18px rgba(15,23,42,.045),
+    0 2px 6px rgba(14,160,90,.05);
   overflow:hidden;
   transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
@@ -143,32 +143,32 @@
 }
 
 .kpi-label{
-  font-size:12px;
+  font-size:11px;
   font-weight:800;
-  line-height:1.5;
+  line-height:1.35;
   color:#1f5136;
-  margin-top:2px;
+  margin-top:1px;
 }
 
 .kpi-value{
-  font-size:28px;
+  font-size:24px;
   line-height:1;
   font-weight:900;
   color:#0b7f47;
-  letter-spacing:-.5px;
+  letter-spacing:-.4px;
 }
 .kpi.prod .kpi-label{
-  font-size:14px;
-  line-height:1.45;
+  font-size:12px;
+  line-height:1.35;
 }
 
 .kpi.prod .kpi-value{
-  font-size:34px;
-  line-height:1.05;
+  font-size:28px;
+  line-height:1.02;
 }
 .kpi-sub{
-  font-size:11px;
-  line-height:1.5;
+  font-size:10px;
+  line-height:1.35;
   color:#6b7d75;
 }
     #statusBar{
@@ -177,20 +177,28 @@
       text-align:center;
       color:#388e3c;
     }
-   .mini-gauge{
-  width:52px;
-  height:52px;
+.mini-gauge{
+  --p: 0deg;
+  --gauge-color: #0ea05a;
+  width:44px;
+  height:44px;
   border-radius:50%;
   margin:2px 0 0 auto;
-  background:conic-gradient(#2e7d32 0deg,#e7ece9 0deg);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:11px;
+  font-size:9px;
   font-weight:900;
-  color:#1f5136;
-  box-shadow:inset 0 0 0 6px #fff;
-  border:1px solid #edf3ee;
+  color:#163b29;
+  background:
+    radial-gradient(closest-side, #ffffff 62%, transparent 63% 100%),
+    conic-gradient(var(--gauge-color) var(--p), #e7ece9 0deg);
+  border:1px solid #e3ece6;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.9),
+    0 2px 6px rgba(15,23,42,.06);
+  line-height:1;
+  letter-spacing:-.2px;
 }
     body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Cairo',Tahoma,Arial,sans-serif; }
 
@@ -962,18 +970,25 @@ function renderMiniGauge(id, percent){
   if(!el) return;
 
   const n = Number(percent);
+
   if (!Number.isFinite(n)){
-    el.style.background = 'conic-gradient(#dfe7e2 360deg, #dfe7e2 360deg)';
+    el.style.setProperty('--p', '0deg');
+    el.style.setProperty('--gauge-color', '#cfd8d3');
     el.style.color = '#8aa091';
     el.textContent = '--';
     return;
   }
 
   const val = Math.max(0, Math.min(100, n));
-  el.style.background =
-    `conic-gradient(#2e7d32 ${val*3.6}deg, #e0e0e0 ${val*3.6}deg)`;
-  el.style.color = '#2e7d32';
-  el.textContent = val + '%';
+
+  let gaugeColor = '#0ea05a';
+  if (val < 40) gaugeColor = '#dc2626';
+  else if (val < 70) gaugeColor = '#f59e0b';
+
+  el.style.setProperty('--p', `${val * 3.6}deg`);
+  el.style.setProperty('--gauge-color', gaugeColor);
+  el.style.color = gaugeColor;
+  el.textContent = `${Math.round(val)}%`;
 }
   // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
