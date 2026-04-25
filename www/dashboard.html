@@ -171,26 +171,52 @@
   line-height:1.35;
   color:#6b7d75;
 }
-  .spc-indicator{
+.metric-line{
+  position:relative;
   width:100%;
-  height:8px;
-  border-radius:999px;
-  background:#e7ece9;
-  overflow:hidden;
-  margin-top:2px;
-  box-shadow:inset 0 1px 2px rgba(15,23,42,.06);
+  height:24px;
+  margin-top:4px;
 }
 
-.spc-indicator-fill{
-  height:100%;
-  width:100%;
+.metric-line-track{
+  position:absolute;
+  top:10px;
+  right:0;
+  left:0;
+  height:4px;
   border-radius:999px;
+  background:linear-gradient(90deg,#dc2626 0%, #f59e0b 40%, #0ea05a 72%, #06b6d4 100%);
+  box-shadow:inset 0 1px 2px rgba(15,23,42,.08);
 }
 
-.spc-indicator-fill.danger{ background:#dc2626; }
-.spc-indicator-fill.warn{ background:#f59e0b; }
-.spc-indicator-fill.ok{ background:#0ea05a; }
-.spc-indicator-fill.elite{ background:#06b6d4; }  
+.metric-line-dot{
+  position:absolute;
+  top:4px;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:#fff;
+  border:3px solid #0f172a;
+  box-shadow:0 2px 6px rgba(15,23,42,.18);
+  transform:translateX(50%);
+}
+
+.metric-line-label{
+  position:absolute;
+  top:0;
+  font-size:9px;
+  font-weight:800;
+  color:#64748b;
+  line-height:1;
+}
+
+.metric-line-label.best{
+  right:0;
+}
+
+.metric-line-label.worst{
+  left:0;
+}
     #statusBar{
       margin-top:4px;
       font-size:9px;
@@ -711,23 +737,61 @@ function box(label, value, sub='', gaugeId=null, cls=''){
     </div>
   `;
 }
-function spcBox(value){
-  const v = Number(value);
-  const state =
-    v <= 1.4 ? 'elite' :
-    v <= 1.5 ? 'ok' :
-    v <= 2.0 ? 'warn' :
-    'danger';
+function clamp(v, min, max){
+  return Math.max(min, Math.min(max, v));
+}
+
+function metricLinePositionSPC(v){
+  if (!Number.isFinite(v)) return 0;
+  const best = 1.4;
+  const worst = 3.0;
+  const pct = ((worst - v) / (worst - best)) * 100;
+  return clamp(pct, 0, 100);
+}
+
+function metricLinePositionOpenDays(v){
+  if (!Number.isFinite(v)) return 0;
+  const best = 105;
+  const worst = 180;
+  const pct = ((worst - v) / (worst - best)) * 100;
+  return clamp(pct, 0, 100);
+}
+
+function lineMetricBox(label, value, displayValue, positionPct){
+  const pos = Number.isFinite(positionPct) ? positionPct : 0;
 
   return `
     <div class="kpi repro">
-      <div class="kpi-label">عدد الخدمات للحمل</div>
-      <div class="kpi-value">${Number.isFinite(v) ? v.toFixed(2) : '--'}</div>
-      <div class="spc-indicator">
-        <div class="spc-indicator-fill ${state}"></div>
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${displayValue}</div>
+      <div class="metric-line">
+        <div class="metric-line-label best">أفضل</div>
+        <div class="metric-line-label worst">أسوأ</div>
+        <div class="metric-line-track"></div>
+        <div class="metric-line-dot" style="right:calc(${pos}% - 8px)"></div>
       </div>
     </div>
   `;
+}
+
+function spcBox(value){
+  const v = Number(value);
+  return lineMetricBox(
+    'عدد الخدمات للحمل',
+    v,
+    Number.isFinite(v) ? v.toFixed(2) : '--',
+    metricLinePositionSPC(v)
+  );
+}
+
+function openDaysBox(value){
+  const v = Number(value);
+  return lineMetricBox(
+    'متوسط عدد الأيام المفتوحة للقطيع',
+    v,
+    Number.isFinite(v) ? String(Math.round(v)) : '--',
+    metricLinePositionOpenDays(v)
+  );
 }
 function detectAnimalType(an){
   const ar = norm(an.animalTypeAr || '');
@@ -938,11 +1002,10 @@ reproGrid.innerHTML =
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
       box('معدل الحمل 21 يوم', `${pregRate21d}%`, '', 'g_pr21', 'repro') +
       box('معدل الإخصاب', `${conceptionRatePct}%`, '', 'g_conception', 'repro') +
-      box('معدل رصد الشياع', `${heatDetectionRatePct}%`, '', 'g_hdr21', 'repro') +
-      spcBox(servicesPerConception) +
-      box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
-      box('نسبة نجاح أول تلقيح', `${firstServiceConceptionPct}%`, '', 'g_firstService', 'repro');
-     
+     box('معدل رصد الشياع', `${heatDetectionRatePct}%`, '', 'g_hdr21', 'repro') +
+spcBox(servicesPerConception) +
+openDaysBox(openDaysAvg) +
+box('نسبة نجاح أول تلقيح', `${firstServiceConceptionPct}%`, '', 'g_firstService', 'repro');
     
     cullGrid.innerHTML =
       box('إجمالي عدد الاستبعاد', cullTotalCount, `نسبته في القطيع ${cullTotalPct}%`, 'g_cullTotal', 'cull') +
@@ -976,7 +1039,7 @@ renderMiniGauge("g_pr21", pregRate21d);
 renderMiniGauge("g_conception", conceptionRatePct);
 renderMiniGauge("g_hdr21", heatDetectionRatePct);
 
-renderMiniGauge("g_openDays", openDaysAvg);
+
 renderMiniGauge("g_firstService", firstServiceConceptionPct);
 
 renderMiniGauge("g_cullTotal", cullTotalPct);
