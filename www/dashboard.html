@@ -925,6 +925,7 @@ reproGrid.innerHTML =
       box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'health') +
       box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
       box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
+    
     // الجوجز
    renderMiniGauge("g_active", totalActive ? 100 : 0);
 renderMiniGauge("g_inmilk", inMilkPct);
@@ -963,32 +964,196 @@ renderMiniGauge("g_bcs", bcsCamera);
       'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
   }
 }
+const GAUGE_COLORS = {
+  danger:  '#dc2626',
+  warn:    '#f59e0b',
+  ok:      '#0ea05a',
+  elite:   '#06b6d4',
+  neutral: '#94a3b8'
+};
 
+function gaugeState(id, rawValue){
+  const v = Number(rawValue);
+  if (!Number.isFinite(v)) return 'neutral';
+
+  switch (id) {
+    // ===== الخصوبة الملونة =====
+    case 'g_pr21':
+      if (v >= 30) return 'elite';
+      if (v >= 25) return 'ok';
+      if (v >= 20) return 'warn';
+      return 'danger';
+
+    case 'g_conception':
+      if (v > 55) return 'elite';
+      if (v >= 50) return 'ok';
+      if (v >= 40) return 'warn';
+      return 'danger';
+
+    case 'g_hdr21':
+      if (v >= 80) return 'elite';
+      if (v >= 70) return 'ok';
+      if (v >= 60) return 'warn';
+      return 'danger';
+
+    case 'g_spc': // عكسي
+      if (v <= 1.4) return 'elite';
+      if (v <= 1.5) return 'ok';
+      if (v <= 2.0) return 'warn';
+      return 'danger';
+
+    case 'g_openDays': // عكسي
+      if (v <= 105) return 'elite';
+      if (v <= 115) return 'ok';
+      if (v <= 140) return 'warn';
+      return 'danger';
+
+    case 'g_firstService':
+      if (v > 55) return 'elite';
+      if (v >= 50) return 'ok';
+      if (v >= 45) return 'warn';
+      return 'danger';
+
+    // ===== الصحة الملونة =====
+    case 'g_mastitis': // عكسي
+      if (v < 1) return 'elite';
+      if (v < 3) return 'ok';
+      if (v <= 5) return 'warn';
+      return 'danger';
+
+    case 'g_lameness': // عكسي
+      if (v <= 1) return 'elite';
+      if (v <= 1.5) return 'ok';
+      if (v <= 3) return 'warn';
+      return 'danger';
+
+    case 'g_abortRate': // عكسي
+      if (v <= 2) return 'elite';
+      if (v <= 3) return 'ok';
+      if (v <= 5) return 'warn';
+      return 'danger';
+
+    // ===== التغذية الملونة =====
+    case 'g_fe':
+      if (v > 1.70) return 'elite';
+      if (v >= 1.45) return 'ok';
+      if (v >= 1.30) return 'warn';
+      return 'danger';
+
+    // ===== الاستبعاد: الكلي فقط ملون =====
+    case 'g_cullTotal': // عكسي
+      if (v < 22) return 'elite';
+      if (v < 28) return 'ok';
+      if (v <= 35) return 'warn';
+      return 'danger';
+
+    // ===== معلوماتية فقط =====
+    case 'g_preg':
+    case 'g_bred':
+    case 'g_active':
+    case 'g_inmilk':
+    case 'g_dry':
+    case 'g_cullProd':
+    case 'g_cullRepro':
+    case 'g_cullHealth':
+    case 'g_feedCostLiter':
+    case 'g_feedHeadDay':
+    case 'g_iofc':
+    case 'g_feces':
+    case 'g_bcs':
+    default:
+      return 'neutral';
+  }
+}
+
+function gaugeDisplayValue(id, rawValue){
+  const v = Number(rawValue);
+  if (!Number.isFinite(v)) return '--';
+
+  switch (id) {
+    case 'g_spc':
+      return v.toFixed(2);
+
+    case 'g_fe':
+    case 'g_bcs':
+    case 'g_feces':
+      return v.toFixed(1);
+
+    default:
+      return `${Math.round(v)}%`;
+  }
+}
+
+function gaugeArcPercent(id, rawValue){
+  const v = Number(rawValue);
+  if (!Number.isFinite(v)) return NaN;
+
+  switch (id) {
+    case 'g_spc': { // الأقل أفضل
+      if (v <= 1.4) return 100;
+      if (v >= 3) return 0;
+      return Math.max(0, Math.min(100, ((3 - v) / (3 - 1.4)) * 100));
+    }
+
+    case 'g_openDays': { // الأقل أفضل
+      if (v <= 105) return 100;
+      if (v >= 180) return 0;
+      return Math.max(0, Math.min(100, ((180 - v) / (180 - 105)) * 100));
+    }
+
+    case 'g_mastitis': { // الأقل أفضل
+      if (v <= 1) return 100;
+      if (v >= 8) return 0;
+      return Math.max(0, Math.min(100, ((8 - v) / (8 - 1)) * 100));
+    }
+
+    case 'g_lameness': { // الأقل أفضل
+      if (v <= 1) return 100;
+      if (v >= 6) return 0;
+      return Math.max(0, Math.min(100, ((6 - v) / (6 - 1)) * 100));
+    }
+
+    case 'g_abortRate': { // الأقل أفضل
+      if (v <= 2) return 100;
+      if (v >= 8) return 0;
+      return Math.max(0, Math.min(100, ((8 - v) / (8 - 2)) * 100));
+    }
+
+    case 'g_fe': {
+      if (v <= 1.0) return 0;
+      if (v >= 1.9) return 100;
+      return Math.max(0, Math.min(100, ((v - 1.0) / (1.9 - 1.0)) * 100));
+    }
+
+    // المؤشرات المئوية المباشرة
+    default:
+      return Math.max(0, Math.min(100, v));
+  }
+}
 // ============ mini-gauge ============
 function renderMiniGauge(id, percent){
   const el = document.getElementById(id);
-  if(!el) return;
+  if (!el) return;
 
   const n = Number(percent);
 
-  if (!Number.isFinite(n)){
+  if (!Number.isFinite(n)) {
     el.style.setProperty('--p', '0deg');
-    el.style.setProperty('--gauge-color', '#cfd8d3');
+    el.style.setProperty('--gauge-color', GAUGE_COLORS.neutral);
     el.style.color = '#8aa091';
     el.textContent = '--';
     return;
   }
 
-  const val = Math.max(0, Math.min(100, n));
+  const state = gaugeState(id, n);
+  const gaugeColor = GAUGE_COLORS[state] || GAUGE_COLORS.neutral;
+  const arcPercent = gaugeArcPercent(id, n);
+  const safeArc = Number.isFinite(arcPercent) ? Math.max(0, Math.min(100, arcPercent)) : 0;
 
-  let gaugeColor = '#0ea05a';
-  if (val < 40) gaugeColor = '#dc2626';
-  else if (val < 70) gaugeColor = '#f59e0b';
-
-  el.style.setProperty('--p', `${val * 3.6}deg`);
+  el.style.setProperty('--p', `${safeArc * 3.6}deg`);
   el.style.setProperty('--gauge-color', gaugeColor);
   el.style.color = gaugeColor;
-  el.textContent = `${Math.round(val)}%`;
+  el.textContent = gaugeDisplayValue(id, n);
 }
   // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
