@@ -446,7 +446,71 @@ function normalizeNutritionAnalysis(a = {}) {
     }
   });
 }
+function emptyFeedBand() {
+  return {
+    headCount: 0,
+    avgMilkKg: 0,
+    feedCostPerLiter: 0,
+    feedEfficiency: 0,
+    feedCostPerHeadPerDay: 0,
+    iofc: 0,
+    eventDate: null
+  };
+}
 
+function feedBandKey(raw = '') {
+  const s = String(raw || '').trim().toLowerCase();
+
+  if (/high|عالي/.test(s)) return 'high';
+  if (/medium|med|متوسط/.test(s)) return 'medium';
+  if (/low|منخفض/.test(s)) return 'low';
+
+  return 'overall';
+}
+
+function buildFeedBandFromEvent(e = {}) {
+  const a = e?.nutrition?.analysis || {};
+  const ctx = e?.nutrition?.context || {};
+  const economics = a?.economics || {};
+  const totals = a?.totals || {};
+
+  const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
+  const feedEfficiency =
+    dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0;
+
+  return {
+    headCount: Number(e?.groupSize || 1) || 1,
+    avgMilkKg: Number(ctx?.avgMilkKg || 0) || 0,
+    feedCostPerLiter: Number(economics?.costPerKgMilk || 0) || 0,
+    feedEfficiency,
+    feedCostPerHeadPerDay: Number(totals?.totCost || 0) || 0,
+    iofc: Number(economics?.milkMargin || 0) || 0,
+    eventDate: e?.eventDate || e?.date || null
+  };
+}
+
+function weightedFeedBands(cards = []) {
+  const valid = cards.filter(x => x && Number(x.headCount) > 0);
+  if (!valid.length) return emptyFeedBand();
+
+  const totalHeads = valid.reduce((s, x) => s + Number(x.headCount || 0), 0) || 0;
+  if (!totalHeads) return emptyFeedBand();
+
+  const wavg = (key) => {
+    const sum = valid.reduce((s, x) => s + (Number(x[key] || 0) * Number(x.headCount || 0)), 0);
+    return +(sum / totalHeads).toFixed(2);
+  };
+
+  return {
+    headCount: totalHeads,
+    avgMilkKg: wavg('avgMilkKg'),
+    feedCostPerLiter: wavg('feedCostPerLiter'),
+    feedEfficiency: wavg('feedEfficiency'),
+    feedCostPerHeadPerDay: wavg('feedCostPerHeadPerDay'),
+    iofc: wavg('iofc'),
+    eventDate: null
+  };
+}
 function normalizeNutritionRows(rows = []) {
   if (!Array.isArray(rows)) return [];
   return rows.map((r) => cleanObj({
@@ -2214,7 +2278,82 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
     } catch(e){
       console.error("FERTILITY EVENT ERROR", e);
     }
+    // --------------------------------------
+    // 🔥 5.5) التغذية — إجمالي + عالي/متوسط/منخفض
+    // --------------------------------------
+    let feedBands = {
+      overall: emptyFeedBand(),
+      high: emptyFeedBand(),
+      medium: emptyFeedBand(),
+      low: emptyFeedBand()
+    };
 
+    try {
+      const evSnapNut = await db.collection("events")
+        .where("userId", "==", uid)
+        .limit(5000)
+        .get();
+
+      const evNutAll = evSnapNut.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+      const nutritionEvents = evNutAll
+        .map(e => {
+          const txt = String(e.eventTypeNorm || e.eventType || e.type || '').toLowerCase().trim();
+          const ms = getEventMsSrv(e);
+          return { ...e, _txt: txt, _ms: ms };
+        })
+        .filter(e =>
+          (
+            e._txt === 'nutrition' ||
+            e._txt === 'nutrition_group' ||
+            e._txt.includes('nutrition') ||
+            e._txt.includes('تغذية')
+          ) &&
+          e?.nutrition?.analysis
+        );
+
+      const latestByBand = new Map();
+
+      for (const e of nutritionEvents) {
+        const rawGroup =
+          e?.nutrition?.context?.group ||
+          e?.group ||
+          e?.groupName ||
+          '';
+
+        const band =
+          String(e.type || '').toLowerCase() === 'nutrition_group'
+            ? feedBandKey(rawGroup)
+            : (rawGroup ? feedBandKey(rawGroup) : 'overall');
+
+        const prev = latestByBand.get(band);
+        if (!prev || Number(e._ms || 0) > Number(prev._ms || 0)) {
+          latestByBand.set(band, e);
+        }
+      }
+
+      if (latestByBand.has('high')) {
+        feedBands.high = buildFeedBandFromEvent(latestByBand.get('high'));
+      }
+      if (latestByBand.has('medium')) {
+        feedBands.medium = buildFeedBandFromEvent(latestByBand.get('medium'));
+      }
+      if (latestByBand.has('low')) {
+        feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'));
+      }
+
+      if (latestByBand.has('overall')) {
+        feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
+      } else {
+        feedBands.overall = weightedFeedBands([
+          feedBands.high,
+          feedBands.medium,
+          feedBands.low
+        ]);
+      }
+    } catch (e) {
+      console.error("FEED BANDS ERROR:", e.message || e);
+    }
     // --------------------------------------
     // 🔥 6) RETURN — النتيجة النهائية للداشبورد
     // --------------------------------------
@@ -2275,11 +2414,13 @@ firstServiceConceptionPct: extraFertility.firstServicePct,
     health: cullHealthPct
   },
 
-  // ===== التغذية: مؤقتًا صفر صريح =====
-  feedCostPerLiter: 0,
-  feedEfficiency: 0,
-  feedCostPerHeadPerDay: 0,
-  iofc: 0,
+  // ===== التغذية: إجمالي + شرائح الإنتاج =====
+  feedCostPerLiter: feedBands.overall.feedCostPerLiter,
+  feedEfficiency: feedBands.overall.feedEfficiency,
+  feedCostPerHeadPerDay: feedBands.overall.feedCostPerHeadPerDay,
+  iofc: feedBands.overall.iofc,
+
+  feedBands,
 
   dailyMilkTotal,
   avgHeadToday,
