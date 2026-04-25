@@ -2342,15 +2342,11 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
         feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'));
       }
 
-      if (latestByBand.has('overall')) {
-        feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
-      } else {
-        feedBands.overall = weightedFeedBands([
-          feedBands.high,
-          feedBands.medium,
-          feedBands.low
-        ]);
-      }
+         feedBands.overall = weightedFeedBands([
+        feedBands.high,
+        feedBands.medium,
+        feedBands.low
+      ]);
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
