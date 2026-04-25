@@ -741,27 +741,23 @@ function clamp(v, min, max){
   return Math.max(min, Math.min(max, v));
 }
 
-function metricScalePositionSPC(v){
+function metricScalePositionDirect(v, worst, best){
   if (!Number.isFinite(v)) return 0;
-  const best = 1.4;
-  const worst = 4.0;
+  const pct = ((v - worst) / (best - worst)) * 100;
+  return clamp(pct, 0, 100);
+}
+
+function metricScalePositionInverse(v, best, worst){
+  if (!Number.isFinite(v)) return 0;
   const pct = ((worst - v) / (worst - best)) * 100;
   return clamp(pct, 0, 100);
 }
 
-function metricScalePositionOpenDays(v){
-  if (!Number.isFinite(v)) return 0;
-  const best = 105;
-  const worst = 220;
-  const pct = ((worst - v) / (worst - best)) * 100;
-  return clamp(pct, 0, 100);
-}
-
-function scaleMetricBox(label, displayValue, positionPct){
+function scaleMetricBox(label, displayValue, positionPct, cls='repro'){
   const pos = Number.isFinite(positionPct) ? positionPct : 0;
 
   return `
-    <div class="kpi repro">
+    <div class="kpi ${cls}">
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${displayValue}</div>
 
@@ -780,12 +776,43 @@ function scaleMetricBox(label, displayValue, positionPct){
   `;
 }
 
+function pr21Box(value){
+  const v = Number(value);
+  return scaleMetricBox(
+    'معدل الحمل 21 يوم',
+    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
+    metricScalePositionDirect(v, 15, 30),
+    'repro'
+  );
+}
+
+function conceptionBox(value){
+  const v = Number(value);
+  return scaleMetricBox(
+    'معدل الإخصاب',
+    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
+    metricScalePositionDirect(v, 35, 60),
+    'repro'
+  );
+}
+
+function hdrBox(value){
+  const v = Number(value);
+  return scaleMetricBox(
+    'معدل رصد الشياع',
+    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
+    metricScalePositionDirect(v, 50, 85),
+    'repro'
+  );
+}
+
 function spcBox(value){
   const v = Number(value);
   return scaleMetricBox(
     'عدد الخدمات للحمل',
     Number.isFinite(v) ? v.toFixed(2) : '--',
-    metricScalePositionSPC(v)
+    metricScalePositionInverse(v, 1.4, 4.0),
+    'repro'
   );
 }
 
@@ -794,7 +821,68 @@ function openDaysBox(value){
   return scaleMetricBox(
     'متوسط عدد الأيام المفتوحة للقطيع',
     Number.isFinite(v) ? String(Math.round(v)) : '--',
-    metricScalePositionOpenDays(v)
+    metricScalePositionInverse(v, 105, 220),
+    'repro'
+  );
+}
+
+function firstServiceBox(value){
+  const v = Number(value);
+  return scaleMetricBox(
+    'نسبة نجاح أول تلقيح',
+    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
+    metricScalePositionDirect(v, 40, 60),
+    'repro'
+  );
+}
+
+function cullTotalBox(count, pct){
+  const v = Number(pct);
+  return scaleMetricBox(
+    'إجمالي عدد الاستبعاد',
+    Number.isFinite(count) ? String(count) : '--',
+    metricScalePositionInverse(v, 22, 40),
+    'cull'
+  );
+}
+
+function feBox(value){
+  const v = Number(value);
+  return scaleMetricBox(
+    'كفاءة التحويل مادة جافة / لبن',
+    Number.isFinite(v) ? v.toFixed(1) : '--',
+    metricScalePositionDirect(v, 1.20, 1.85),
+    'feed'
+  );
+}
+
+function mastitisBox(count, pct){
+  const v = Number(pct);
+  return scaleMetricBox(
+    'عدد التهاب الضرع في القطيع',
+    Number.isFinite(count) ? String(count) : '--',
+    metricScalePositionInverse(v, 1, 6),
+    'health'
+  );
+}
+
+function lamenessBox(count, pct){
+  const v = Number(pct);
+  return scaleMetricBox(
+    'عدد حالات العرج في القطيع',
+    Number.isFinite(count) ? String(count) : '--',
+    metricScalePositionInverse(v, 1, 4),
+    'health'
+  );
+}
+
+function abortionBox(count, pct){
+  const v = Number(pct);
+  return scaleMetricBox(
+    'عدد الإجهاض في القطيع',
+    Number.isFinite(count) ? String(count) : '--',
+    metricScalePositionInverse(v, 2, 6),
+    'health'
   );
 }
 function detectAnimalType(an){
@@ -1004,29 +1092,28 @@ prodCauseWrap.innerHTML = showCausesCard
 reproGrid.innerHTML =
       box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
       box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
-      box('معدل الحمل 21 يوم', `${pregRate21d}%`, '', 'g_pr21', 'repro') +
-      box('معدل الإخصاب', `${conceptionRatePct}%`, '', 'g_conception', 'repro') +
-     box('معدل رصد الشياع', `${heatDetectionRatePct}%`, '', 'g_hdr21', 'repro') +
-spcBox(servicesPerConception) +
-openDaysBox(openDaysAvg) +
-box('نسبة نجاح أول تلقيح', `${firstServiceConceptionPct}%`, '', 'g_firstService', 'repro');
+      pr21Box(pregRate21d) +
+      conceptionBox(conceptionRatePct) +
+      hdrBox(heatDetectionRatePct) +
+      spcBox(servicesPerConception) +
+      openDaysBox(openDaysAvg) +
+      firstServiceBox(firstServiceConceptionPct);
     
-    cullGrid.innerHTML =
-      box('إجمالي عدد الاستبعاد', cullTotalCount, `نسبته في القطيع ${cullTotalPct}%`, 'g_cullTotal', 'cull') +
+cullGrid.innerHTML =
+      cullTotalBox(cullTotalCount, cullTotalPct) +
       box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
-
-    feedGrid.innerHTML =
+feedGrid.innerHTML =
       box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed') +
-      box('كفاءة التحويل مادة جافة / لبن', feedEfficiency, '', 'g_fe', 'feed') +
+      feBox(feedEfficiency) +
       box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
       box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
 
-   healthGrid.innerHTML =
-      box('عدد التهاب الضرع في القطيع', mastitisCount, `نسبتهم من الحلاب ${mastitisPct}%`, 'g_mastitis', 'health') +
-      box('عدد حالات العرج في القطيع', lamenessCount, `نسبتهم ${lamenessPct}%`, 'g_lameness', 'health') +
-      box('عدد الإجهاض في القطيع', abortionCount, `نسبتهم ${abortionRatePct}%`, 'g_abortRate', 'health') +
+healthGrid.innerHTML =
+      mastitisBox(mastitisCount, mastitisPct) +
+      lamenessBox(lamenessCount, lamenessPct) +
+      abortionBox(abortionCount, abortionRatePct) +
       box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
       box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
     
@@ -1039,25 +1126,17 @@ renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inM
     
 renderMiniGauge("g_preg", pregPct);
 renderMiniGauge("g_bred", bredPct);
-renderMiniGauge("g_pr21", pregRate21d);
-renderMiniGauge("g_conception", conceptionRatePct);
-renderMiniGauge("g_hdr21", heatDetectionRatePct);
 
-
-renderMiniGauge("g_firstService", firstServiceConceptionPct);
-
-renderMiniGauge("g_cullTotal", cullTotalPct);
 renderMiniGauge("g_cullProd", cullProdPct);
 renderMiniGauge("g_cullRepro", cullReproPct);
 renderMiniGauge("g_cullHealth", cullHealthPct);
 
 renderMiniGauge("g_feedCostLiter", feedCostPerLiter);
-renderMiniGauge("g_fe", feedEfficiency);
+
 renderMiniGauge("g_feedHeadDay", feedCostPerHeadPerDay);
 renderMiniGauge("g_iofc", iofc);
 
-renderMiniGauge("g_mastitis", mastitisPct);
-renderMiniGauge("g_lameness", lamenessPct);
+
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
