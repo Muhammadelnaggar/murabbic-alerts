@@ -834,7 +834,11 @@ const firstServiceConceptionPct =
   stats.firstServiceConceptionPct != null
     ? Number(stats.firstServiceConceptionPct)
     : Number(fert.firstServicePct ?? 0);
-    
+    const spcStateText =
+  servicesPerConception <= 1.4 ? 'امتياز' :
+  servicesPerConception <= 1.5 ? 'جيد' :
+  servicesPerConception <= 2.0 ? 'يحتاج تحسين' :
+  'خطر';
     herdGrid.innerHTML =
       box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
       box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
@@ -902,7 +906,7 @@ reproGrid.innerHTML =
       box('معدل الحمل 21 يوم', `${pregRate21d}%`, '', 'g_pr21', 'repro') +
       box('معدل الإخصاب', `${conceptionRatePct}%`, '', 'g_conception', 'repro') +
       box('معدل رصد الشياع', `${heatDetectionRatePct}%`, '', 'g_hdr21', 'repro') +
-      box('عدد الخدمات للحمل', servicesPerConception, '', 'g_spc', 'repro') +
+     box('عدد الخدمات للحمل', servicesPerConception.toFixed(2), spcStateText, null, 'repro') +
       box('متوسط عدد الأيام المفتوحة للقطيع', openDaysAvg, '', 'g_openDays', 'repro') +
       box('نسبة نجاح أول تلقيح', `${firstServiceConceptionPct}%`, '', 'g_firstService', 'repro');
      
@@ -938,7 +942,7 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_pr21", pregRate21d);
 renderMiniGauge("g_conception", conceptionRatePct);
 renderMiniGauge("g_hdr21", heatDetectionRatePct);
-renderMiniGauge("g_spc", servicesPerConception);
+
 renderMiniGauge("g_openDays", openDaysAvg);
 renderMiniGauge("g_firstService", firstServiceConceptionPct);
 
@@ -1070,7 +1074,7 @@ function gaugeDisplayValue(id, rawValue){
   const v = Number(rawValue);
   if (!Number.isFinite(v)) return '--';
 
- switch (id) {
+switch (id) {
   case 'g_spc':
     return v.toFixed(2);
 
