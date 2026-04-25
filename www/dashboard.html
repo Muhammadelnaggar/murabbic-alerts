@@ -1013,17 +1013,7 @@ const heatDetectionRatePct =
 
     const feedCostPerLiter = Number(stats.feedCostPerLiter ?? 0);
     const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? 0);
-    const feedBands = stats.feedBands || {};
-const feedOverall = feedBands.overall || {
-  headCount: 0,
-  avgMilkKg: 0,
-  feedCostPerLiter: feedCostPerLiter,
-  feedEfficiency: Number(stats.feedEfficiency ?? 0),
-  feedCostPerHeadPerDay: feedCostPerHeadPerDay,
-  iofc: Number(stats.iofc ?? 0)
-};
-const feedHigh = feedBands.high || {};
-const feedMedium = feedBands.medium || {};
+
 const feedLow = feedBands.low || {};
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
 const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
@@ -1142,10 +1132,10 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-      feedBandCard('إجمالي القطيع', feedOverall) +
-      feedBandCard('عالي الإنتاج', feedHigh) +
-      feedBandCard('متوسط الإنتاج', feedMedium) +
-      feedBandCard('منخفض الإنتاج', feedLow);
+      box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed') +
+      feBox(feedEfficiency) +
+      box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
+      box('هامش لبن / علف', iofc, '', 'g_iofc', 'feed');
 
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
@@ -1167,6 +1157,9 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_cullProd", cullProdPct);
 renderMiniGauge("g_cullRepro", cullReproPct);
 renderMiniGauge("g_cullHealth", cullHealthPct);
+renderMiniGauge("g_feedCostLiter", feedCostPerLiter);
+renderMiniGauge("g_feedHeadDay", feedCostPerHeadPerDay);
+renderMiniGauge("g_iofc", iofc);
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
