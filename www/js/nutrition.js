@@ -607,33 +607,38 @@ async function fetchGroupAvgMilkKg(fs, db, uid, numbers, endDateStr, days = 7){
     nums.map(x => Number(x)).filter(n => Number.isFinite(n)).map(String)
   );
 
-  const candidates = [];
+const candidates = [];
+const startIso = start.toISOString().slice(0,10);
+const endIso   = end.toISOString().slice(0,10);
 
-  async function pull(ownerField){
+async function pull(ownerField){
+  try{
+    const q = query(
+      collection(db, 'events'),
+      where(ownerField, '==', uid),
+      where('eventDate', '>=', startIso),
+      where('eventDate', '<=', endIso),
+      limit(2500)
+    );
+    const snap = await getDocs(q);
+    snap.forEach(d => candidates.push(d.data()));
+  }catch(_){
     try{
       const q = query(
         collection(db, 'events'),
         where(ownerField, '==', uid),
-        orderBy('createdAt', 'desc'),
+        where('date', '>=', startIso),
+        where('date', '<=', endIso),
         limit(2500)
       );
       const snap = await getDocs(q);
       snap.forEach(d => candidates.push(d.data()));
-    }catch(_){
-      try{
-        const q = query(
-          collection(db, 'events'),
-          where(ownerField, '==', uid),
-          limit(2500)
-        );
-        const snap = await getDocs(q);
-        snap.forEach(d => candidates.push(d.data()));
-      }catch(__){}
-    }
+    }catch(__){}
   }
+}
 
-  await pull('userId');
-  await pull('ownerUid');
+await pull('userId');
+await pull('ownerUid');
 
   const byAnimalDay = new Map();
 
@@ -835,11 +840,10 @@ async function loadCtxFromGroup(numbers, eventDate){
   const uid = auth?.currentUser?.uid;
   if(!uid) return { ok:false, reason:'no_uid' };
 
-  const docs = [];
-  for(const n of numbers){
-    const doc = await findAnimalDocByNumber(db, fs, uid, n);
-    if(doc) docs.push(doc);
-  }
+ const foundDocs = await Promise.all(
+  numbers.map(n => findAnimalDocByNumber(db, fs, uid, n))
+);
+const docs = foundDocs.filter(Boolean);
   if(!docs.length) return { ok:false, reason:'not_found' };
 
   const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
