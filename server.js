@@ -1493,7 +1493,10 @@ if (!rows.length) {
 
 const mode = nutrition.mode || 'tmr_asfed';
 const concKg = toNumOrNull(nutrition.concKg);
-const milkPrice = toNumOrNull(nutrition.milkPrice);
+const milkPrice = toNumOrNull(
+  nutrition.milkPrice ??
+  nutrition.context?.milkPrice
+);
 
 const centralAnalysis = buildNutritionCentralAnalysis({
   rows,
