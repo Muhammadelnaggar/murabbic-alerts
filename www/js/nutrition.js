@@ -775,24 +775,55 @@ const avgMilk = milks.length
   ? (milks.reduce((a, b) => a + b, 0) / milks.length)
   : null;
 
-  const dccs = [];
-  for(const d of docs){
-    const repro = d.reproductiveStatus || '';
-    if(repro!=='عشار') continue;
-    const lastIns = d.lastInseminationDate;
-    if(!lastIns) continue;
-    const a = new Date(lastIns);
-    const b = new Date(eventDate);
-    if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
-    const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-    if(diff>=0) dccs.push(diff);
-  }
-  const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
+const pregStates = docs.map(d => String(
+  d.reproductiveStatus ||
+  d.lastDiagnosis ||
+  d.pregStatus ||
+  ''
+).trim()).filter(Boolean);
 
- if (species) document.getElementById('ctxSpecies').value = species;
+const pregNorm = pregStates.map(s => {
+  if (s === 'عشار') return 'عشار';
+  if (s === 'فارغة') return 'فارغة';
+  if (s === 'ملقح') return 'ملقح';
+  return '';
+}).filter(Boolean);
+
+let groupPreg = '';
+if (pregNorm.length) {
+  const uniq = [...new Set(pregNorm)];
+  groupPreg = (uniq.length === 1) ? uniq[0] : 'مختلط';
+}
+
+const dccs = [];
+for(const d of docs){
+  const repro = String(
+    d.reproductiveStatus ||
+    d.lastDiagnosis ||
+    d.pregStatus ||
+    ''
+  ).trim();
+
+  if(repro !== 'عشار') continue;
+
+  const lastIns = d.lastInseminationDate;
+  if(!lastIns) continue;
+
+  const a = new Date(lastIns);
+  const b = new Date(eventDate);
+
+  if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
+
+  const diff = Math.floor((b.getTime()-a.getTime())/86400000);
+  if(diff >= 0) dccs.push(diff);
+}
+const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
+
+if (species) document.getElementById('ctxSpecies').value = species;
 if (avgDIM != null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
 document.getElementById('ctxAvgMilk').value = (avgMilk != null ? avgMilk.toFixed(1) : '');
-if (avgDCC != null) document.getElementById('ctxDCC').value = Math.round(avgDCC);
+document.getElementById('ctxDCC').value = (avgDCC != null ? Math.round(avgDCC) : '');
+document.getElementById('ctxPreg').value = groupPreg || '';
 
 // breed ممثلة للمجموعة: أول سلالة متاحة
 const groupBreed =
