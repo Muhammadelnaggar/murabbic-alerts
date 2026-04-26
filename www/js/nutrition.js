@@ -532,35 +532,24 @@ async function findAnimalDocByNumber(db, fs, uid, nStr){
 async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   const { collection, query, where, limit, getDocs, orderBy } = fs;
 
-  const end = new Date(endDateStr || todayLocal());
-  if(isNaN(end.getTime())) return { avg:null, days:0 };
- const start = new Date(end); start.setDate(start.getDate() - days);
+const wanted = new Set(nums.map(String));
+const wantedNum = new Set(
+  nums.map(x => Number(x)).filter(n => Number.isFinite(n)).map(String)
+);
 
-  const candidates = [];
-  async function pull(ownerField){
-    try{
-      const q = query(
-        collection(db,'events'),
-        where(ownerField,'==', uid),
-        where('animalNumber','==', animalVal),
-        orderBy('createdAt','desc'),
-        limit(160)
-      );
-      const snap = await getDocs(q);
-      snap.forEach(d=>candidates.push(d.data()));
-    }catch(_){
-      try{
-        const q = query(
-          collection(db,'events'),
-          where(ownerField,'==', uid),
-          where('animalNumber','==', animalVal),
-          limit(160)
-        );
-        const snap = await getDocs(q);
-        snap.forEach(d=>candidates.push(d.data()));
-      }catch(__){}
-    }
-  }
+const candidates = [];
+
+async function pull(ownerField){
+  try{
+    const q = query(
+      collection(db, 'events'),
+      where(ownerField, '==', uid),
+      limit(4000)
+    );
+    const snap = await getDocs(q);
+    snap.forEach(d => candidates.push(d.data()));
+  }catch(_){}
+}
 
   await pull('userId');
   await pull('ownerUid');
@@ -640,62 +629,65 @@ async function pull(ownerField){
 await pull('userId');
 await pull('ownerUid');
 
-  const byAnimalDay = new Map();
+const byAnimalDay = new Map();
 
-  for(const ev of candidates){
-    if(!isMilkEvent(ev)) continue;
+for(const ev of candidates){
+  if(!isMilkEvent(ev)) continue;
 
-    const rawNo = String(ev?.animalNumber ?? ev?.number ?? ev?.animalId ?? '').trim();
-    if(!rawNo) continue;
+  const rawNo = String(ev?.animalNumber ?? ev?.number ?? ev?.animalId ?? '').trim();
+  if(!rawNo) continue;
 
-    const rawNoNum = Number(rawNo);
-    const keyNo = String(rawNo);
-    const keyNoNum = Number.isFinite(rawNoNum) ? String(rawNoNum) : '';
+  const rawNoNum = Number(rawNo);
+  const keyNo = String(rawNo);
+  const keyNoNum = Number.isFinite(rawNoNum) ? String(rawNoNum) : '';
 
-    if(!wanted.has(keyNo) && !wantedNum.has(keyNo) && !wanted.has(keyNoNum) && !wantedNum.has(keyNoNum)) {
-      continue;
-    }
-
-    const day = getEventDay(ev);
-    if(!day) continue;
-
-    const d = new Date(day);
-    if(isNaN(d.getTime())) continue;
-    if(d < start || d > end) continue;
-
-    const kg = getMilkKg(ev);
-    if(!Number.isFinite(kg) || kg <= 0) continue;
-
-    const k = `${keyNoNum || keyNo}__${day}`;
-    const prev = byAnimalDay.get(k);
-    const t = evTime(ev);
-
-    if(!prev || t > prev.t){
-      byAnimalDay.set(k, { kg, t, animal: keyNoNum || keyNo });
-    }
+  if(!wanted.has(keyNo) && !wantedNum.has(keyNo) && !wanted.has(keyNoNum) && !wantedNum.has(keyNoNum)) {
+    continue;
   }
 
-  const perAnimal = new Map();
+  const day = getEventDay(ev);
+  if(!day) continue;
 
-  for(const rec of byAnimalDay.values()){
-    if(!perAnimal.has(rec.animal)){
-      perAnimal.set(rec.animal, []);
-    }
-    perAnimal.get(rec.animal).push(rec.kg);
+  const kg = getMilkKg(ev);
+  if(!Number.isFinite(kg) || kg <= 0) continue;
+
+  const animalKey = keyNoNum || keyNo;
+  const k = `${animalKey}__${day}`;
+  const prev = byAnimalDay.get(k);
+  const t = evTime(ev);
+
+  if(!prev || t > prev.t){
+    byAnimalDay.set(k, { kg, t, animal: animalKey, day });
   }
-
-  const animalAverages = [];
-  for(const arr of perAnimal.values()){
-    if(arr.length){
-      animalAverages.push(arr.reduce((a,b)=>a+b,0) / arr.length);
-    }
-  }
-
-  if(!animalAverages.length) return { avg:null, days:0 };
-
-  const avg = animalAverages.reduce((a,b)=>a+b,0) / animalAverages.length;
-  return { avg, days: animalAverages.length };
 }
+
+const perAnimal = new Map();
+
+for(const rec of byAnimalDay.values()){
+  if(!perAnimal.has(rec.animal)){
+    perAnimal.set(rec.animal, []);
+  }
+  perAnimal.get(rec.animal).push(rec);
+}
+
+const animalAverages = [];
+let usedDays = 0;
+
+for(const arr of perAnimal.values()){
+  arr.sort((a,b) => String(b.day).localeCompare(String(a.day)));
+  const last7Recorded = arr.slice(0, 7);
+  if(last7Recorded.length){
+    usedDays = Math.max(usedDays, last7Recorded.length);
+    animalAverages.push(
+      last7Recorded.reduce((s, x) => s + x.kg, 0) / last7Recorded.length
+    );
+  }
+}
+
+if(!animalAverages.length) return { avg:null, days:0 };
+
+const avg = animalAverages.reduce((a,b)=>a+b,0) / animalAverages.length;
+return { avg, days: usedDays };
 function parseNumbersList(){
   const p = qp();
   const raw = (
