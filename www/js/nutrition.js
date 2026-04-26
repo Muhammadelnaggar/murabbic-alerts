@@ -587,7 +587,110 @@ async function fetchAvgMilkKgFor(fs, db, uid, animalVal, endDateStr, days=7){
   const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
   return { avg, days: vals.length };
 }
+async function fetchGroupAvgMilkKg(fs, db, uid, numbers, endDateStr, days = 7){
+  const { collection, query, where, limit, getDocs, orderBy } = fs;
 
+  const nums = (Array.isArray(numbers) ? numbers : [])
+    .map(x => String(x).trim())
+    .filter(Boolean);
+
+  if (!nums.length) return { avg:null, days:0 };
+
+  const end = new Date(endDateStr || todayLocal());
+  if (isNaN(end.getTime())) return { avg:null, days:0 };
+
+  const start = new Date(end);
+  start.setDate(start.getDate() - 6);
+
+  const wanted = new Set(nums.map(String));
+  const wantedNum = new Set(
+    nums.map(x => Number(x)).filter(n => Number.isFinite(n)).map(String)
+  );
+
+  const candidates = [];
+
+  async function pull(ownerField){
+    try{
+      const q = query(
+        collection(db, 'events'),
+        where(ownerField, '==', uid),
+        orderBy('createdAt', 'desc'),
+        limit(2500)
+      );
+      const snap = await getDocs(q);
+      snap.forEach(d => candidates.push(d.data()));
+    }catch(_){
+      try{
+        const q = query(
+          collection(db, 'events'),
+          where(ownerField, '==', uid),
+          limit(2500)
+        );
+        const snap = await getDocs(q);
+        snap.forEach(d => candidates.push(d.data()));
+      }catch(__){}
+    }
+  }
+
+  await pull('userId');
+  await pull('ownerUid');
+
+  const byAnimalDay = new Map();
+
+  for(const ev of candidates){
+    if(!isMilkEvent(ev)) continue;
+
+    const rawNo = String(ev?.animalNumber ?? ev?.number ?? ev?.animalId ?? '').trim();
+    if(!rawNo) continue;
+
+    const rawNoNum = Number(rawNo);
+    const keyNo = String(rawNo);
+    const keyNoNum = Number.isFinite(rawNoNum) ? String(rawNoNum) : '';
+
+    if(!wanted.has(keyNo) && !wantedNum.has(keyNo) && !wanted.has(keyNoNum) && !wantedNum.has(keyNoNum)) {
+      continue;
+    }
+
+    const day = getEventDay(ev);
+    if(!day) continue;
+
+    const d = new Date(day);
+    if(isNaN(d.getTime())) continue;
+    if(d < start || d > end) continue;
+
+    const kg = getMilkKg(ev);
+    if(!Number.isFinite(kg) || kg <= 0) continue;
+
+    const k = `${keyNoNum || keyNo}__${day}`;
+    const prev = byAnimalDay.get(k);
+    const t = evTime(ev);
+
+    if(!prev || t > prev.t){
+      byAnimalDay.set(k, { kg, t, animal: keyNoNum || keyNo });
+    }
+  }
+
+  const perAnimal = new Map();
+
+  for(const rec of byAnimalDay.values()){
+    if(!perAnimal.has(rec.animal)){
+      perAnimal.set(rec.animal, []);
+    }
+    perAnimal.get(rec.animal).push(rec.kg);
+  }
+
+  const animalAverages = [];
+  for(const arr of perAnimal.values()){
+    if(arr.length){
+      animalAverages.push(arr.reduce((a,b)=>a+b,0) / arr.length);
+    }
+  }
+
+  if(!animalAverages.length) return { avg:null, days:0 };
+
+  const avg = animalAverages.reduce((a,b)=>a+b,0) / animalAverages.length;
+  return { avg, days: animalAverages.length };
+}
 function parseNumbersList(){
   const p = qp();
   const raw = (
@@ -749,32 +852,8 @@ const species = normalizeSpecies(
   ''
 );
 
- const milks = [];
-for (const d of docs) {
-  const raw = String(d.animalNumber || '').trim();
-  const num = Number(raw);
-
-  const tries = [];
-  if (raw) tries.push(raw);
-  if (Number.isFinite(num)) tries.push(num);
-
-  let picked = null;
-
-  for (const key of tries) {
-    const r = await fetchAvgMilkKgFor(fs, db, uid, key, eventDate, 7);
-    if (r && r.avg != null) {
-      picked = Number(r.avg);
-      break;
-    }
-  }
-
-  if (picked != null) milks.push(picked);
-}
-
-const avgMilk = milks.length
-  ? (milks.reduce((a, b) => a + b, 0) / milks.length)
-  : null;
-
+const avgMilkRes = await fetchGroupAvgMilkKg(fs, db, uid, numbers, eventDate, 7);
+const avgMilk = (avgMilkRes?.avg != null) ? Number(avgMilkRes.avg) : null;
 const pregStates = docs.map(d => String(
   d.reproductiveStatus ||
   d.lastDiagnosis ||
