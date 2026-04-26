@@ -1718,7 +1718,21 @@ async function syncAllGroupsData(){
     console.error('syncAllGroupsData error:', e);
   }
 }
+let __groupsSyncTimer = null;
+let __groupsSyncBusy = false;
 
+function requestGroupsSync(delay = 700){
+  clearTimeout(__groupsSyncTimer);
+  __groupsSyncTimer = setTimeout(async ()=>{
+    if (__groupsSyncBusy) return;
+    __groupsSyncBusy = true;
+    try{
+      await syncAllGroupsData();
+    }finally{
+      __groupsSyncBusy = false;
+    }
+  }, delay);
+}
 /* ============= تحميل الحيوانات ============= */
 
   function shouldAppearInGroups(a){
@@ -1787,8 +1801,8 @@ $$('input[name="species"]').forEach(r => r.addEventListener('change', async () =
   syncSettingsUIFromState();
   saveThresholdsLocal();
   saveThresholdsToFirestore().catch(()=>{});
-  updateCounters();
-  await syncAllGroupsData();
+  refreshCurrentView();
+  requestGroupsSync();
   window.dataLayer.push({ event:'species_switch', species:r.value });
 }));
 
@@ -1797,7 +1811,7 @@ $('#saveSettings').addEventListener('click', async ()=>{
   saveThresholdsLocal();
   try{ await saveThresholdsToFirestore(); }catch{}
   refreshCurrentView();
-  await syncAllGroupsData();
+  requestGroupsSync();
   document.getElementById('settings')?.setAttribute('hidden', '');
   window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
 });
@@ -1841,7 +1855,7 @@ $('#refreshBtn').addEventListener('click', async ()=>{
   $('#q').value = '';
   await loadAnimals();
   refreshCurrentView();
-  await syncAllGroupsData();
+  requestGroupsSync(100);
 });
 /* ============= تشخيص للأخطاء العامة ============= */
 window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
@@ -1878,6 +1892,8 @@ updateCounters();
 state.currentGroup = 'cow_all';
 buildGroupSelect();
 renderSelected(state.currentGroup);
+
+requestGroupsSync(100);
 })();</script>
 
 </body>
