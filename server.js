@@ -484,7 +484,14 @@ function buildFeedBandFromEvent(e = {}) {
     feedCostPerLiter: Number(economics?.costPerKgMilk || 0) || 0,
     feedEfficiency,
     feedCostPerHeadPerDay: Number(totals?.totCost || 0) || 0,
-    iofc: Number(economics?.milkMargin || 0) || 0,
+   iofc: Number.isFinite(Number(economics?.milkMargin))
+  ? Number(economics.milkMargin)
+  : (
+      Number.isFinite(Number(economics?.milkRevenue)) &&
+      Number.isFinite(Number(totals?.totCost))
+        ? +(Number(economics.milkRevenue) - Number(totals.totCost)).toFixed(2)
+        : 0
+    ),
     eventDate: e?.eventDate || e?.date || null
   };
 }
