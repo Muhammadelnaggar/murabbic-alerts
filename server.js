@@ -2443,10 +2443,79 @@ firstServiceConceptionPct: extraFertility.firstServicePct,
   }
 });
 
+// ============================================================
+//                 API: HEAT CONTEXT (server-only)
+// ============================================================
+app.get('/api/heat/context', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
 
+    const uid = req.userId;
+    const animalNumber = normalizeDigitsSrv(req.query.animalNumber || '');
+    const eventDate = String(req.query.eventDate || '').slice(0,10);
+
+    if (!animalNumber) {
+      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+      return res.status(400).json({ ok:false, error:'eventDate_required' });
+    }
+
+    const animal = await findAnimalDocByNumberSrv(uid, animalNumber);
+    if (!animal) {
+      return res.status(404).json({ ok:false, error:'animal_not_found' });
+    }
+
+    const reproductiveStatus =
+      String(
+        animal.reproductiveStatus ||
+        animal.reproStatus ||
+        animal.lastDiagnosis ||
+        ''
+      ).trim();
+
+    let dimAtEvent = null;
+    const lastCalvingDate = String(animal.lastCalvingDate || '').slice(0,10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(lastCalvingDate)) {
+      dimAtEvent = daysBetweenIsoSrv(lastCalvingDate, eventDate);
+      if (dimAtEvent != null && dimAtEvent < 0) dimAtEvent = 0;
+    }
+
+    const lastEvent = await getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate);
+
+    let lastEventType = null;
+    let lastEventDate = null;
+    let daysSinceLastHeatOrAI = null;
+
+    if (lastEvent?._eventDate) {
+      lastEventDate = lastEvent._eventDate;
+      lastEventType = lastEvent._typeNorm;
+      daysSinceLastHeatOrAI = daysBetweenIsoSrv(lastEventDate, eventDate);
+      if (daysSinceLastHeatOrAI != null && daysSinceLastHeatOrAI < 0) {
+        daysSinceLastHeatOrAI = null;
+      }
+    }
+
+    return res.json({
+      ok: true,
+      animalId: String(animal.id || animal.animalId || animalNumber),
+      animalNumber: String(animal.animalNumber || animal.number || animalNumber),
+      species: normalizeSpeciesSrv(animal.species || animal.animalTypeAr || animal.animalType || animal.animaltype),
+      reproductiveStatus,
+      dimAtEvent,
+      lastEventType,
+      lastEventDate,
+      daysSinceLastHeatOrAI
+    });
+  } catch (e) {
+    console.error('heat-context', e);
+    return res.status(500).json({ ok:false, error:'heat_context_failed' });
+  }
+});
 // ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
+
 app.get('/api/animals', async (req, res) => {
   const tenant = resolveTenant(req);
 
@@ -2529,7 +2598,107 @@ function computeEventDateFromDoc(data = {}) {
   // مفيش تاريخ واضح
   return null;
 }
+function normalizeDigitsSrv(s){
+  const map = {
+    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+  };
+  return String(s || '')
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g, '')
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+}
 
+function daysBetweenIsoSrv(fromIso, toIso){
+  const a = String(fromIso || '').slice(0,10);
+  const b = String(toIso || '').slice(0,10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return null;
+  const d1 = new Date(a + 'T00:00:00');
+  const d2 = new Date(b + 'T00:00:00');
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return null;
+  return Math.floor((d2 - d1) / 86400000);
+}
+
+function normalizeSpeciesSrv(v){
+  const s = String(v || '').trim();
+  if (/cow|بقر|أبقار/i.test(s)) return 'أبقار';
+  if (/buffalo|جاموس/i.test(s)) return 'جاموس';
+  return s || '';
+}
+
+function findAnimalNumberMatches(val){
+  const raw = String(val || '').trim();
+  const num = Number(raw);
+  const out = [raw];
+  if (!Number.isNaN(num)) out.push(num);
+  return out;
+}
+
+async function findAnimalDocByNumberSrv(uid, animalNumber){
+  const cand = findAnimalNumberMatches(animalNumber);
+
+  for (const ownerField of ['userId', 'ownerUid']) {
+    for (const field of ['animalNumber', 'number']) {
+      for (const v of cand) {
+        try {
+          const snap = await db.collection('animals')
+            .where(ownerField, '==', uid)
+            .where(field, '==', v)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            const d = snap.docs[0];
+            return { id: d.id, ...(d.data() || {}) };
+          }
+        } catch(_) {}
+      }
+    }
+  }
+
+  return null;
+}
+
+async function getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate){
+  const raw = String(animalNumber || '').trim();
+  const evDate = String(eventDate || '').slice(0,10);
+  if (!uid || !raw || !evDate) return null;
+
+  const candidates = [];
+  const vals = findAnimalNumberMatches(raw);
+
+  for (const field of ['animalNumber', 'number']) {
+    for (const v of vals) {
+      try {
+        const snap = await db.collection('events')
+          .where('userId', '==', uid)
+          .where(field, '==', v)
+          .limit(80)
+          .get();
+
+        snap.docs.forEach(doc => candidates.push(doc.data() || {}));
+      } catch(_) {}
+    }
+  }
+
+  const rows = candidates
+    .map(ev => {
+      const txt = eventTextSrv(ev);
+      const typeNorm =
+        (txt.includes('insemination') || txt.includes('تلقيح')) ? 'insemination' :
+        (txt.includes('شياع') || txt.includes('heat')) ? 'heat' :
+        '';
+      return {
+        ...ev,
+        _typeNorm: typeNorm,
+        _eventDate: computeEventDateFromDoc(ev)
+      };
+    })
+    .filter(ev => ev._typeNorm && ev._eventDate && ev._eventDate < evDate)
+    .sort((a,b) => String(b._eventDate).localeCompare(String(a._eventDate)));
+
+  return rows[0] || null;
+}
 // ============================================================
 //                 ADMIN: transfer owner (safe)
 // ============================================================
