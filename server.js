@@ -1359,6 +1359,80 @@ async function findAnimalDocRefByNumberForTenant(tenant, rawNumber) {
 
   return null;
 }
+async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
+  if (!db || !tenant) return;
+
+  const desired = new Map();
+
+  for (const g of (Array.isArray(groups) ? groups : [])) {
+    const groupId = String(g?.groupId || '').trim();
+    const groupKey = String(g?.groupKey || '').trim();
+    const groupName = String(g?.groupName || g?.name || groupId || '').trim();
+    const species = String(g?.species || '').trim() || null;
+    const feedingEligible = !!g?.feedingEligible;
+    const avgMilkKg = Number.isFinite(Number(g?.avgMilkKg)) ? Number(g.avgMilkKg) : null;
+    const avgDim = Number.isFinite(Number(g?.avgDim)) ? Number(g.avgDim) : null;
+
+    const nums = Array.isArray(g?.animalNumbers)
+      ? g.animalNumbers.map(x => String(x).trim()).filter(Boolean)
+      : [];
+
+    for (const n of nums) {
+      desired.set(String(n), {
+        group: groupName || null,
+        groupId: groupId || null,
+        groupKey: groupKey || null,
+        feedingEligible,
+        groupSpecies: species,
+        groupAvgMilkKg: avgMilkKg,
+        groupAvgDim: avgDim,
+        groupUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }
+
+  const animalsSnap = await db.collection('animals')
+    .where('userId', '==', tenant)
+    .limit(5000)
+    .get();
+
+  if (animalsSnap.empty) return;
+
+  let batch = db.batch();
+  let ops = 0;
+
+  for (const d of animalsSnap.docs) {
+    const a = d.data() || {};
+    const animalNum = String(a.animalNumber ?? a.number ?? '').trim();
+    const patch = desired.get(animalNum);
+
+    if (patch) {
+      batch.set(d.ref, patch, { merge: true });
+    } else {
+      batch.set(d.ref, {
+        group: admin.firestore.FieldValue.delete(),
+        groupId: admin.firestore.FieldValue.delete(),
+        groupKey: admin.firestore.FieldValue.delete(),
+        feedingEligible: admin.firestore.FieldValue.delete(),
+        groupSpecies: admin.firestore.FieldValue.delete(),
+        groupAvgMilkKg: admin.firestore.FieldValue.delete(),
+        groupAvgDim: admin.firestore.FieldValue.delete(),
+        groupUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    ops++;
+    if (ops >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+
+  if (ops > 0) {
+    await batch.commit();
+  }
+}
 // ============================================================
 //                API: NUTRITION TARGETS (CENTRAL)
 // ============================================================
@@ -2918,6 +2992,63 @@ async function fetchAnimalEventsSrv(uid, animal = {}) {
     String(computeEventDateFromDoc(a) || '').localeCompare(String(computeEventDateFromDoc(b) || ''))
   );
 }
+async function findAnimalGroupNameSrv(uid, animal = {}) {
+  if (!db || !uid || !animal) return null;
+
+  const animalVals = findAnimalNumberMatches(
+    animal.animalNumber ?? animal.number ?? ''
+  ).map(v => String(v).trim()).filter(Boolean);
+
+  if (!animalVals.length) return null;
+
+  try {
+    const memSnap = await db.collection('groups_members')
+      .where('userId', '==', uid)
+      .limit(2000)
+      .get();
+
+    if (memSnap.empty) return null;
+
+    let member = null;
+
+    for (const d of memSnap.docs) {
+      const m = d.data() || {};
+      const mAnimal = String(m.animalNumber ?? '').trim();
+      if (animalVals.includes(mAnimal)) {
+        member = m;
+        break;
+      }
+    }
+
+    if (!member) return null;
+
+    const directName =
+      String(
+        member.groupName ||
+        member.name ||
+        member.group ||
+        ''
+      ).trim();
+
+    if (directName) return directName;
+
+    const groupId = String(member.groupId || '').trim();
+    if (!groupId) return null;
+
+    const groupDocId = `${uid}_${groupId}`;
+    const gdoc = await db.collection('groups').doc(groupDocId).get();
+
+    if (gdoc.exists) {
+      const g = gdoc.data() || {};
+      return String(g.groupName || g.name || groupId).trim() || null;
+    }
+
+    return groupId || null;
+  } catch (e) {
+    console.error('findAnimalGroupNameSrv', e);
+    return null;
+  }
+}
 // ============================================================
 //                 ADMIN: transfer owner (safe)
 // ============================================================
@@ -3461,11 +3592,14 @@ app.post('/api/groups/sync', requireUserId, async (req, res) => {
       }
     }
 
-    return res.json({
-      ok: true,
-      savedGroups: groups.length,
-      savedMembers: members.length
-    });
+  await syncAnimalGroupFieldsSrv(tenant, groups);
+
+return res.json({
+  ok: true,
+  savedGroups: groups.length,
+  savedMembers: members.length,
+  animalsSynced: true
+});
   } catch (e) {
     console.error('groups.sync', e);
     return res.status(500).json({ ok:false, error:'groups_sync_failed' });
@@ -3491,7 +3625,7 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
     }
 
     const events = await fetchAnimalEventsSrv(uid, animal);
-
+    const groupNameFromMembership = await findAnimalGroupNameSrv(uid, animal);
     const state = {
       number: animal.animalNumber ?? animal.number ?? number,
 
