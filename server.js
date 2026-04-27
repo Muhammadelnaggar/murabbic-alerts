@@ -2513,6 +2513,99 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: HEAT SAVE (server-only)
+// ============================================================
+app.post('/api/heat/save', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = normalizeDigitsSrv(body.animalNumber || '');
+    const eventDate = String(body.eventDate || '').slice(0,10);
+    const heatTime = String(body.heatTime || '').trim() || null;
+    const notes = String(body.notes || '').trim() || null;
+
+    if (!animalNumber) {
+      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+      return res.status(400).json({ ok:false, error:'eventDate_required' });
+    }
+
+    const animal = await findAnimalDocByNumberSrv(uid, animalNumber);
+    if (!animal) {
+      return res.status(404).json({ ok:false, error:'animal_not_found' });
+    }
+
+    const ctx = await (async () => {
+      const reproductiveStatus =
+        String(
+          animal.reproductiveStatus ||
+          animal.reproStatus ||
+          animal.lastDiagnosis ||
+          ''
+        ).trim();
+
+      let dimAtEvent = null;
+      const lastCalvingDate = String(animal.lastCalvingDate || '').slice(0,10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(lastCalvingDate)) {
+        dimAtEvent = daysBetweenIsoSrv(lastCalvingDate, eventDate);
+        if (dimAtEvent != null && dimAtEvent < 0) dimAtEvent = 0;
+      }
+
+      const lastEvent = await getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate);
+
+      let daysSinceLastHeatOrAI = null;
+      if (lastEvent?._eventDate) {
+        daysSinceLastHeatOrAI = daysBetweenIsoSrv(lastEvent._eventDate, eventDate);
+        if (daysSinceLastHeatOrAI != null && daysSinceLastHeatOrAI < 0) {
+          daysSinceLastHeatOrAI = null;
+        }
+      }
+
+      return { reproductiveStatus, dimAtEvent, daysSinceLastHeatOrAI };
+    })();
+
+    const payload = {
+      animalNumber: String(animal.animalNumber || animal.number || animalNumber),
+      animalId: String(animal.id || animal.animalId || animalNumber),
+      type: "شياع",
+      eventType: "شياع",
+      eventDate,
+      heatTime,
+      notes,
+      reproductiveStatusSnapshot: ctx.reproductiveStatus || null,
+      dimAtEvent: ctx.dimAtEvent ?? null,
+      daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI ?? null,
+      userId: uid,
+      source: "/heat.html",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const evRef = await db.collection('events').add(payload);
+
+    const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
+    if (animalRef) {
+      await animalRef.ref.set({
+        lastHeatDate: eventDate
+      }, { merge:true });
+    }
+
+    return res.json({
+      ok: true,
+      id: evRef.id,
+      animalNumber: payload.animalNumber,
+      animalId: payload.animalId,
+      saved: payload
+    });
+  } catch (e) {
+    console.error('heat-save', e);
+    return res.status(500).json({ ok:false, error:'heat_save_failed' });
+  }
+});
+// ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
 
