@@ -184,6 +184,7 @@
 
   <script type="module">
     import { db, auth } from "/js/firebase-config.js";
+    import { apiGet } from "/js/api.js";
     import { updateAnimalByEvent } from "/js/animal-update.js";
     import {
   collection, addDoc, serverTimestamp,
@@ -234,79 +235,66 @@ $("eventDate").value = dt;
       const d = new Date(String(s || "").slice(0,10));
       return isNaN(d.getTime()) ? null : d;
     }
-async function calcDaysSinceLastHeatOrAI(){
-  const doc = form.__mbkDoc;
-  if (!doc) return;
-
-  const uid = auth?.currentUser?.uid || localStorage.getItem("userId");
-  if (!uid) return;
-
-  const animalNumber = $("animalNumber").value.trim();
+async function loadHeatContextFromServer(){
+  const raw = $("animalNumber").value.trim();
   const eventDate = $("eventDate").value;
 
-  if (!animalNumber || !eventDate) return;
+  if (!raw || !eventDate) {
+    $("reproStatus").value = "";
+    $("dim").value = "";
+    $("daysSinceLastHeatOrAI").value = "";
+    return;
+  }
+
+  // جماعي: ما نحملش context مفرد
+  if (/[\s,\n،;]/.test(raw)) {
+    $("reproStatus").value = "";
+    $("dim").value = "";
+    $("daysSinceLastHeatOrAI").value = "";
+    return;
+  }
 
   try{
-    const eventsRef = collection(db, "events");
+    const q =
+      `/api/heat/context?animalNumber=${encodeURIComponent(raw)}&eventDate=${encodeURIComponent(eventDate)}`;
 
-    const snap = await getDocs(query(
-      eventsRef,
-      where("userId", "==", uid),
-      where("animalNumber", "==", animalNumber),
-      where("type", "in", ["شياع","insemination"]),
-      orderBy("eventDate", "desc"),
-      limit(1)
-    ));
+    const res = await apiGet(q);
 
-    if (snap.empty){
+    if (!res?.ok) {
+      $("reproStatus").value = "";
+      $("dim").value = "";
       $("daysSinceLastHeatOrAI").value = "";
       return;
     }
 
-    const last = snap.docs[0].data();
-    const lastDate = new Date(last.eventDate);
-    const currentDate = new Date(eventDate);
+    if ($("animalId")) $("animalId").value = String(res.animalId || "");
+    $("reproStatus").value = String(res.reproductiveStatus || "").trim();
+    $("dim").value = (res.dimAtEvent ?? "") === "" ? "" : String(res.dimAtEvent);
+    $("daysSinceLastHeatOrAI").value =
+      (res.daysSinceLastHeatOrAI ?? "") === "" ? "" : String(res.daysSinceLastHeatOrAI);
 
-    const diff = Math.floor((currentDate - lastDate) / 86400000);
-
-    $("daysSinceLastHeatOrAI").value = diff >= 0 ? diff : "";
-
-  }catch(e){
-    console.error(e);
+  }catch(err){
+    console.error("heat context load failed", err);
+    $("reproStatus").value = "";
+    $("dim").value = "";
+    $("daysSinceLastHeatOrAI").value = "";
   }
 }
+   function calcDIMFromDoc(){}
 
-    function calcDIMFromDoc(){
-      const doc = form.__mbkDoc || null;
-      if (!doc) { $("dim").value = ""; return; }
-
-      const calv = toDate(doc.lastCalvingDate);
-      const evd  = toDate($("eventDate").value || dt);
-      if (!calv || !evd) { $("dim").value = ""; return; }
-
-      const days = Math.floor((evd - calv) / 86400000);
-      $("dim").value = String(Math.max(0, days));
-    }
-
-    function fillFromDocIfReady(){
-      if (form?.dataset?.animalOk !== "1") return;
-      const doc = form.__mbkDoc || null;
-      if (!doc) return;
-
-      $("reproStatus").value = String(doc.reproductiveStatus || "").trim();
-      calcDIMFromDoc();
-    }
+   async function fillFromDocIfReady(){
+  if (form?.dataset?.animalOk !== "1") return;
+  await loadHeatContextFromServer();
+}
 
     // بعد نجاح الـGate، forms-init سيملأ form.__mbkDoc و dataset.animalOk
-   const docWatcher = setInterval(async () => {
-  fillFromDocIfReady();
-  await calcDaysSinceLastHeatOrAI();
+const docWatcher = setInterval(async () => {
+  await fillFromDocIfReady();
 
-      if (form?.dataset?.animalOk === "1" && form.__mbkDoc) {
-        clearInterval(docWatcher);
-      }
-    }, 120);
-
+  if (form?.dataset?.animalOk === "1" && form.__mbkDoc) {
+    clearInterval(docWatcher);
+  }
+}, 120);
    $("eventDate").addEventListener("change", async () => {
   calcDIMFromDoc();
   await calcDaysSinceLastHeatOrAI();
@@ -392,9 +380,19 @@ form.addEventListener("mbk:valid", async (e) => {
       createdAt: serverTimestamp()
     };
 
-    await addDoc(collection(db, "events"), payload);
-    msg("✅ تم تسجيل الشياع بنجاح.", true);
+await addDoc(collection(db, "events"), payload);
 
+await updateAnimalByEvent({
+  db,
+  animalNumber,
+  eventType: "heat",
+  eventDate,
+  patch: {
+    lastHeatDate: eventDate
+  }
+});
+
+msg("✅ تم تسجيل الشياع بنجاح.", true);
   }catch(err){
     console.error(err);
     msg("❌ حدث خطأ أثناء الحفظ.", false);
