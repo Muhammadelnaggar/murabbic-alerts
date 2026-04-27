@@ -277,17 +277,8 @@
 </div> 
 
   <script type="module">
-/* ======================= Firebase ======================= */
-const fb = await import('/js/firebase-config.js');
-if (fb.ensureAuth) await fb.ensureAuth();
-const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-const DB = fb.db || fs.getFirestore(); // يفترض أن fb.db = getFirestore(app,'murabbikdata')
-const { collection, doc, getDoc, getDocs, query, where, limit } = fs;
-const userNow = fb?.auth?.currentUser || null;
-const UID = userNow?.uid ?? null;
-// ثوابت أسماء الحقول
-const ANIM_OWNER_FIELD = 'ownerUid'; // في animals
-const EVENT_USER_FIELD = 'userId';   // في events
+/* ======================= API only ======================= */
+const { apiGet } = await import('/js/api.js');
 
 // مساعد لاستخراج تاريخ الحدث
 const evDate = (e={}) =>
@@ -535,234 +526,136 @@ function evMilkKg(e = {}) {
 }
 
 
-/* ======================= Firestore ======================= */
-async function fetchAnimalByNumber(n){
-  if (n == null || String(n).trim() === '') return null;
-  const nStr = String(n).trim();
-  const nNum = Number(nStr);
-  const A = collection(DB, 'animals');
+/* ======================= API-backed card ======================= */
+async function fetchAnimalCardFromServer({ number, animalId } = {}){
+  const qs = new URLSearchParams();
+  if (number != null && String(number).trim() !== '') qs.set('number', String(number).trim());
+  if (animalId != null && String(animalId).trim() !== '') qs.set('animalId', String(animalId).trim());
 
-  // doc(id = الرقم كنص)
-  try {
-    const d = await getDoc(doc(DB, 'animals', nStr));
-    if (d.exists()) {
-      const data = d.data();
-      if (!UID || data?.[ANIM_OWNER_FIELD] === UID) {
-        return normalizeAnimalDoc({ id: d.id, ...data });
-      }
-    }
-  } catch {}
+  const path = `/api/animal-card?${qs.toString()}`;
+  const res = await apiGet(path);
 
-  // animalNumber = Number
-  if (Number.isFinite(nNum)) {
-    try {
-      const q1 = UID
-        ? query(A, where(ANIM_OWNER_FIELD,'==',UID), where('animalNumber','==',nNum), limit(1))
-        : query(A, where('animalNumber','==',nNum), limit(1));
-      const s1 = await getDocs(q1);
-      if (!s1.empty) { const d = s1.docs[0]; return normalizeAnimalDoc({ id:d.id, ...d.data() }); }
-    } catch {}
+  if (!res?.ok) {
+    throw new Error(res?.error || 'تعذّر تحميل بطاقة الحيوان');
   }
 
-  // animalNumber = String
-  try {
-    const q2 = UID
-      ? query(A, where(ANIM_OWNER_FIELD,'==',UID), where('animalNumber','==',nStr), limit(1))
-      : query(A, where('animalNumber','==',nStr), limit(1));
-    const s2 = await getDocs(q2);
-    if (!s2.empty) { const d = s2.docs[0]; return normalizeAnimalDoc({ id:d.id, ...d.data() }); }
-  } catch {}
-
-  return null;
+  return res;
 }
 
+function normalizeAnimalFromServer(an = {}){
+  return {
+    id: an.id || '',
+    number: an.animalNumber ?? an.number ?? null,
+    kind: normKind(an.kind || an.animalType || an.type || an.animalTypeAr || ''),
+    birthDate: an.birthDate || null,
+    lastCalvingDate: an.lastCalvingDate || null,
+    lactationNumber: an.lactationNumber ?? null,
+    breed: an.breed || '—',
+    group: an.group || '—',
+
+    pregnancyDate: an.pregnancyDate || null,
+    reproductiveStatus: an.reproductiveStatus || '—',
+    lastInseminationDate: an.lastInseminationDate || null,
+    servicesCount: an.servicesCount ?? null,
+    serviceIntervalDays: an.serviceIntervalDays ?? null,
+    heatIntervalDays: an.heatIntervalDays ?? null,
+
+    productionStatus: an.productionStatus || '—',
+    milkTodayKg: an.milkTodayKg ?? null,
+    seasonTotalKg: an.seasonTotalKg ?? null,
+    m305Kg: an.m305Kg ?? null,
+
+    healthStatus: an.healthStatus || 'سليم',
+    lastCheckDate: an.lastCheckDate || null,
+
+    milkTraitsScore: toPercent(an.milkTraitsScore ?? 0),
+    ovsynch: an.ovsynch || null,
+    daysInMilk: an.daysInMilk ?? null,
+    gestationDays: an.gestationDays ?? null
+  };
+}
 
 async function fetchAnimal({ number, animalId } = {}) {
-  if (animalId) {
-    const d = await getDoc(doc(DB,'animals', String(animalId)));
-    if (d.exists()) {
-      const data = d.data();
-      if (!UID || data?.[ANIM_OWNER_FIELD] === UID) {
-        return normalizeAnimalDoc({ id:d.id, ...data });
-      }
-    }
-  }
-  const a = await fetchAnimalByNumber(number);
-  if (a) return a;
-  throw new Error('لا يوجد حيوان مطابق');
-}
-async function fetchEvents(animal){
-  const E = collection(DB, 'events');
-  const rows = [];
+  const res = await fetchAnimalCardFromServer({ number, animalId });
+  const animal = normalizeAnimalFromServer(res.animal || {});
 
-  try {
-    // حسب معرف وثيقة الحيوان
-    if (animal.id) {
-      const qById = UID
-        ? query(E, where('animalId','==', String(animal.id)), where(EVENT_USER_FIELD,'==',UID))
-        : query(E, where('animalId','==', String(animal.id)));
-      const sById = await getDocs(qById);
-      sById.forEach(d => rows.push({ id:d.id, ...d.data() }));
-    }
-
-    // حسب رقم الحيوان (سلسلة ورقم)
-    if (animal.number != null) {
-      const nStr = String(animal.number);
-      const nNum = Number(nStr);
-
-      const baseQs = [
-        query(E, where('animalNumber','==', nStr)),
-        query(E, where('number','==', nStr)),
-        ...(Number.isFinite(nNum) ? [
-          query(E, where('animalNumber','==', nNum)),
-          query(E, where('number','==', nNum)),
-        ] : []),
-      ];
-
-      for (const q0 of baseQs) {
-        const qf = UID ? query(q0, where(EVENT_USER_FIELD,'==',UID)) : q0;
-        const s  = await getDocs(qf);
-        s.forEach(d => rows.push({ id:d.id, ...d.data() }));
-      }
-    }
-  } catch (e) {
-    console.error('[fetchEvents] error:', e);
-  }
-
-  // إزالة التكرار ثم الترتيب حسب التاريخ تصاعديًا
-  const uniq = new Map(rows.map(r => [r.id, r]));
-  return [...uniq.values()].sort((a,b) => (evDate(a)||'').localeCompare(evDate(b)||''));
-}
-
-/* ======================= Build state ======================= */
-function buildState(animal, events){
-  const st={
+  animal.__serverPayload = res;
+  animal.__serverEvents = Array.isArray(res.events) ? res.events : [];
+  animal.__serverState = {
     number: animal.number ?? animal.id?.slice(-6),
     reproductiveStatus: animal.reproductiveStatus || '—',
-    productionStatus:   animal.productionStatus   || '—',
-    healthStatus:       animal.healthStatus       || 'سليم',
-    birthDate:       animal.birthDate       || null,
+    productionStatus: animal.productionStatus || '—',
+    healthStatus: animal.healthStatus || 'سليم',
+
+    birthDate: animal.birthDate || null,
     lastCalvingDate: animal.lastCalvingDate || null,
     lactationNumber: animal.lactationNumber ?? null,
-    daysInMilk: null, gestationDays: 
-      null, pregnancyDate: animal.pregnancyDate || null,
-    breed: animal.breed || '—', group: animal.group || '—',
+    daysInMilk: animal.daysInMilk ?? null,
+    gestationDays: animal.gestationDays ?? null,
+    pregnancyDate: animal.pregnancyDate || null,
+
+    breed: animal.breed || '—',
+    group: animal.group || '—',
     milkTraitsScore: animal.milkTraitsScore ?? 0,
-    inseminations: [], estrusDates: Array.isArray(animal.estrusDates)?[...animal.estrusDates]:[],
-    lastInseminationDate: animal.lastInseminationDate ?? null, servicesCount: animal.servicesCount ?? null,
-    serviceIntervalDays: animal.serviceIntervalDays ?? null, heatIntervalDays: animal.heatIntervalDays ?? null,
-    milkTodayKg: animal.milkTodayKg ?? null, seasonTotalKg: animal.seasonTotalKg ?? null, m305Kg: animal.m305Kg ?? null,
+
+    inseminations: [],
+    estrusDates: [],
+    lastInseminationDate: animal.lastInseminationDate ?? null,
+    servicesCount: animal.servicesCount ?? null,
+    serviceIntervalDays: animal.serviceIntervalDays ?? null,
+    heatIntervalDays: animal.heatIntervalDays ?? null,
+
+    milkTodayKg: animal.milkTodayKg ?? null,
+    seasonTotalKg: animal.seasonTotalKg ?? null,
+    m305Kg: animal.m305Kg ?? null,
+    milkSeries: Array.isArray(res.milkSeries) ? res.milkSeries : [],
+
+    lastCheckDate: animal.lastCheckDate || null,
+    healthHistory: Array.isArray(res.healthHistory) ? res.healthHistory : [],
+    ovsynch: animal.ovsynch || null,
+    isDry: /جاف|dry/i.test(String(animal.productionStatus || '')),
+
+    __animalRaw: animal
+  };
+
+  return animal;
+}
+
+async function fetchEvents(animal){
+  return Array.isArray(animal?.__serverEvents) ? animal.__serverEvents : [];
+}
+
+function buildState(animal, events){
+  return animal?.__serverState || {
+    number: animal?.number ?? '—',
+    reproductiveStatus: '—',
+    productionStatus: '—',
+    healthStatus: 'سليم',
+    birthDate: null,
+    lastCalvingDate: null,
+    lactationNumber: null,
+    daysInMilk: null,
+    gestationDays: null,
+    pregnancyDate: null,
+    breed: '—',
+    group: '—',
+    milkTraitsScore: 0,
+    inseminations: [],
+    estrusDates: [],
+    lastInseminationDate: null,
+    servicesCount: null,
+    serviceIntervalDays: null,
+    heatIntervalDays: null,
+    milkTodayKg: null,
+    seasonTotalKg: null,
+    m305Kg: null,
     milkSeries: [],
-    lastCheckDate: animal.lastCheckDate || null, healthHistory: [],
-    ovsynch: animal.ovsynch || null, isDry: false,
-    __animalRaw: animal, // للاستخدام في “كل البيانات”
+    lastCheckDate: null,
+    healthHistory: [],
+    ovsynch: null,
+    isDry: false,
+    __animalRaw: animal || {}
   };
-
-  const milkTmp=[]; let season=0;
-  for (const e of events){
-    const t=evType(e), d=evDate(e);
-    if (t==='dry') st.isDry=true, st.productionStatus='جاف';
-    if (t==='pregnancy') st.reproductiveStatus='عِشار';
-    if (t==='calving' && d) st.lastCalvingDate=d;
-    if (t==='insemination' && d) st.inseminations.push(d);
-    if (t==='heat' && d) st.estrusDates.push(d);
-    if (t==='pregnancy'){ st.pregnancyDate = st.pregnancyDate || d || e.pregnancyDate || null; st.reproductiveStatus='عِشار'; }
-    if (t==='disease'){
-     const rawDx = e.diseaseName || e.diagnosis || e.disease || e.condition || e.eventType || e.type || e.name || '';
-const dx    = translateToken(rawDx) || (hasArabic(rawDx) ? String(rawDx).trim() : String(rawDx||'—'));
-st.healthHistory.push({ date: d||'', diagnosis: dx, note: e.note||'' });
-if (st.healthHistory.length && st.healthStatus === 'حالات صحية مسجلة') {
-  const lastDx = st.healthHistory.at(-1)?.diagnosis;
-  if (lastDx) st.healthStatus = lastDx;    // يعرض آخر تشخيص كحالة حالية
-}
-
-    }
-    if (t==='milk'){
-      const kg=evMilkKg(e);
-      if (kg>0){ season+=kg; milkTmp.push({ d, kg }); if (d===todayStr) st.milkTodayKg=kg; }
-    }
-  }
-
-  if (st.lastCalvingDate){
-    const ms=Date.now()-new Date(st.lastCalvingDate).getTime();
-    st.daysInMilk=Math.max(0,Math.floor(ms/86400000));
-  }
-
-  st.inseminations.sort();
-  if (!st.lastInseminationDate) st.lastInseminationDate=st.inseminations.at(-1) || null;
-  if (st.servicesCount==null) st.servicesCount=st.inseminations.length || null;
-  st.estrusDates.sort();
-
-  if (st.seasonTotalKg==null) st.seasonTotalKg=season || null;
-
-  if (milkTmp.length){
-    const base=st.lastCalvingDate?new Date(st.lastCalvingDate).getTime():null;
-    st.milkSeries=milkTmp.filter(p=>p.d).map(p=>{
-      const di=base?Math.max(0,Math.floor((new Date(p.d).getTime()-base)/86400000)):0;
-      return { d:di, v:p.kg };
-    }).sort((a,b)=>a.d-b.d);
-  }
-
-  if (st.m305Kg==null && st.daysInMilk>0 && (st.seasonTotalKg||0)>0){
-    st.m305Kg=Math.round((st.seasonTotalKg/st.daysInMilk)*305);
-  }
-
-  if (st.isDry) st.productionStatus='جاف';
-  else if (!animal.productionStatus && st.daysInMilk!=null){
-    st.productionStatus = st.daysInMilk<60?'حليب مبكر' : st.daysInMilk<200?'حليب متوسط' : 'حليب متأخر';
-  }
-  // لو مفيش milkTraitsScore في وثيقة الحيوان، خد آخر قيمة من الأحداث
-// تحديث سكور "سمات اللبن" من الأحداث لو مش موجود في وثيقة الحيوان
-if ((st.milkTraitsScore == null || Number(st.milkTraitsScore) === 0) && Array.isArray(events) && events.length) {
-  // محول محلي آمن للنسبة المئوية (يتعامل مع "78" أو "78%" أو 0.78)
-  const _toPercent = (v)=>{
-    if (v == null) return 0;
-    let n = (typeof v === 'string') ? parseFloat(v.replace(/[^\d.-]+/g,'')) : Number(v);
-    if (!Number.isFinite(n)) return 0;
-    // لو السلسلة فيها % اعتبرها جاهزة، ولو رقم بين 0 و 1 اعتبره كسري وحوّله لم %
-    if (typeof v === 'string' && v.includes('%')) {
-      // n كما هو
-    } else if (n >= 0 && n <= 1) {
-      n = n * 100;
-    }
-    return Math.max(0, Math.min(100, Math.round(n)));
-  };
-
- // مفاتيح محتملة للسكور النهائي (تشمل overallScore)
-const CAND_KEYS = [
-  'overallScore','overall_score','overall',          // الجديد
-  'milkTraitsScore','traitsScore','milk_score',
-  'score','milkTraits','traits','quality'
-];
-
-// البحث العميق داخل الحدث وأي كائنات فرعية
-const pullScore = (root)=>{
-  const stack = [root];
-  while (stack.length){
-    const obj = stack.pop();
-    if (!obj || typeof obj !== 'object') continue;
-
-    for (const [k,v] of Object.entries(obj)){
-      if (CAND_KEYS.includes(String(k))) {
-        if (v != null && (typeof v === 'number' || typeof v === 'string')) return v;
-      }
-      if (v && typeof v === 'object') stack.push(v);
-    }
-  }
-  return null;
-};
-
-
-  // خُد آخر قيمة متاحة (من الأحدث للأقدم)
-  for (let i = events.length - 1; i >= 0; i--) {
-    const raw = pullScore(events[i]);
-    if (raw != null) {
-      st.milkTraitsScore = _toPercent(raw);
-      break;
-    }
-  }
-}
-return st;
 }
 
 /* ======================= UI (قياس/رسم) ======================= */
