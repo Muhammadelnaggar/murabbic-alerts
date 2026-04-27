@@ -685,7 +685,7 @@ function renderMilkChart(series){
   const svg=$('milkChart'), sc=$('milkScroll');
   if(!svg||!sc||!Array.isArray(series)||!series.length){ svg.innerHTML=''; return; }
   const base=Math.max(sc.clientWidth,320), pxPer=Math.max(6,Math.min(11,Math.round(base/28))), pad=10;
-  const data=series.map((p,i)=>({x:i,y:Number(p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
+const data=series.map((p,i)=>({x:i,y:Number(p.kg ?? p.v)||0})), N=data.length, W=pad*2+(N-1)*pxPer+20;
   svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.style.width=W+'px';
   const maxY=Math.max(...data.map(d=>d.y),1), minY=Math.min(...data.map(d=>d.y),0), yR=Math.max(1,maxY-minY);
   const sx=(i)=>pad+(i*pxPer), sy=(v)=>60-6-((v-minY)*(60-12)/yR);
@@ -1118,14 +1118,16 @@ function renderCard(state, kind){
   $('cardTitle').textContent = `${kindTitleAr(kind)} رقم ${state.number ?? '—'}`;
   setChip($('chipRepro'),state.reproductiveStatus); setChip($('chipProd'),state.productionStatus); setChip($('chipHealth'),state.healthStatus);
 
-  put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
-  put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
+put('fiBirth',fmtD(state.birthDate)); put('fiLastCalving',fmtD(state.lastCalvingDate));
+put('fiLactNo',state.lactationNumber!=null?NF.format(state.lactationNumber):'—');
 
-  const hideDIM = state.isDry || state.productionStatus === 'جاف';
-  put('fiDIM', (!hideDIM && state.daysInMilk!=null) ? NF.format(state.daysInMilk) : '—');
+const hideDIM = state.isDry || state.productionStatus === 'جاف';
+put('fiDIM', (!hideDIM && state.daysInMilk!=null) ? NF.format(state.daysInMilk) : '—');
 
- const g = state.gestationDays;
+const g = state.gestationDays;
 put('fiGestAge', g != null ? NF.format(g) : '—');
+put('fiBreed', state.breed || '—');
+put('fiGroup', state.group || '—');
 
   renderGauge(state.milkTraitsScore);
   put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
