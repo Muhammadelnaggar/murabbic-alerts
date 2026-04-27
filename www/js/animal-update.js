@@ -233,15 +233,14 @@ upd.protocolExitDate = date;
     // ============================================================
     // 🟩 INSEMINATION — تلقيح
     // ============================================================
-    if (type === "insemination") {
-      upd.lastInseminationDate = date;
-      upd.reproductiveStatus   = "ملقح";
-      if (ev.servicesCount != null) upd.servicesCount = ev.servicesCount;
-      upd.status = "active";
-      // ✅ لو كانت داخل بروتوكول: تخرج تلقائيًا عند التلقيح
-upd.currentProtocol = null;
-upd.protocolStatus = "exited_inseminated";
-upd.protocolExitDate = date;
+if (type === "insemination") {
+  upd.lastInseminationDate = date;
+  upd.reproductiveStatus   = "ملقحة";
+  upd.status = "active";
+  upd.currentProtocol = null;
+  upd.protocolStatus = "exited_inseminated";
+  upd.protocolExitDate = date;
+}
 
     }
 
@@ -388,7 +387,10 @@ if (type === "close_up") {
     for (const d of snap.docs) {
       const cur = d.data() || {};
       const updFinal = { ...upd };
-
+      if (type === "insemination") {
+  const curSvc = Number(cur.servicesCount || 0);
+  updFinal.servicesCount = (Number.isFinite(curSvc) ? curSvc : 0) + 1;
+}
       // ✅ زيادة lactationNumber تلقائيًا عند الولادة (لو مش مُرسل)
       if (type === "calving" && wantIncLactation) {
         const curL = Number(cur.lactationNumber || 0);
