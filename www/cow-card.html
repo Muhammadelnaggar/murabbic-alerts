@@ -1124,9 +1124,8 @@ function renderCard(state, kind){
   const hideDIM = state.isDry || state.productionStatus === 'جاف';
   put('fiDIM', (!hideDIM && state.daysInMilk!=null) ? NF.format(state.daysInMilk) : '—');
 
-  let g=state.gestationDays, ref=state.pregnancyDate||state.lastInseminationDate;
-  if(g==null&&ref){const ms=Date.now()-new Date(ref).getTime(); g=Math.max(0,Math.floor(ms/86400000));}
-  put('fiGestAge',g!=null?NF.format(g):'—'); put('fiBreed',state.breed||'—'); put('fiGroup',state.group||'—');
+ const g = state.gestationDays;
+put('fiGestAge', g != null ? NF.format(g) : '—');
 
   renderGauge(state.milkTraitsScore);
   put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
