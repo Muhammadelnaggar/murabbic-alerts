@@ -2792,6 +2792,132 @@ async function getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate){
 
   return rows[0] || null;
 }
+function eventTypeForCardSrv(e = {}) {
+  const txt = eventTextSrv(e);
+
+  if (/daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج/.test(txt)) return 'milk';
+  if (/calving|birth|ولادة/.test(txt)) return 'calving';
+  if (/insemination|تلقيح|خدم|خدمة/.test(txt)) return 'insemination';
+  if (/pregnancy|pregnan|تشخيص حمل|سونار|جس/.test(txt)) return 'pregnancy';
+  if (/heat|estrus|شياع|شبق/.test(txt)) return 'heat';
+  if (/dry\s*-?\s*off|^dry$|جاف|تجفيف/.test(txt)) return 'dry';
+  if (/mastitis|lameness|disease|ill|مرض|التهاب|عرج/.test(txt)) return 'disease';
+
+  return 'other';
+}
+
+function milkKgFromEventSrv(e = {}) {
+  const directKeys = ['dailyMilk','daily_milk','milkKg','total','kg','milk','amount'];
+  for (const k of directKeys) {
+    const n = Number(e?.[k]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  const milkPartKey =
+    /(^(am|pm|morning|noon|evening|morn|mid|eve)$)|(^milk\d$)|(^milk_(am|pm|morning|noon|evening)$)|(^صباح$|^ظهر$|^مساء$|^حلبة\d$|^حلبه\d$)/i;
+
+  let sum = 0;
+  for (const [k, v] of Object.entries(e || {})) {
+    if (milkPartKey.test(k)) {
+      const n = Number(v);
+      if (Number.isFinite(n)) sum += n;
+    }
+  }
+  return sum > 0 ? sum : 0;
+}
+
+function avgIntervalDaysSrv(arr = []) {
+  const xs = [...new Set((Array.isArray(arr) ? arr : []).filter(Boolean))].sort();
+  if (xs.length < 2) return null;
+
+  let sum = 0;
+  let n = 0;
+  for (let i = 1; i < xs.length; i++) {
+    const d = daysBetweenIsoSrv(xs[i - 1], xs[i]);
+    if (Number.isFinite(d) && d >= 0) {
+      sum += d;
+      n++;
+    }
+  }
+  return n ? Math.round(sum / n) : null;
+}
+
+function lastOfSrv(arr = []) {
+  const xs = [...new Set((Array.isArray(arr) ? arr : []).filter(Boolean))].sort();
+  return xs.length ? xs[xs.length - 1] : null;
+}
+
+function positivePregnancyEventSrv(e = {}) {
+  const txt = [
+    e?.result,
+    e?.status,
+    e?.diagnosis,
+    e?.pregnancyResult,
+    e?.eventType,
+    e?.type
+  ].map(v => String(v || '').toLowerCase()).join(' ');
+
+  return /(عشار|pregnant|positive|موجب|ايجابي)/i.test(txt);
+}
+
+function negativePregnancyEventSrv(e = {}) {
+  const txt = [
+    e?.result,
+    e?.status,
+    e?.diagnosis,
+    e?.pregnancyResult,
+    e?.eventType,
+    e?.type
+  ].map(v => String(v || '').toLowerCase()).join(' ');
+
+  return /(فارغ|فارغة|open|empty|negative|سالب)/i.test(txt);
+}
+
+async function fetchAnimalEventsSrv(uid, animal = {}) {
+  if (!db || !uid || !animal) return [];
+
+  const rows = [];
+  const seen = new Set();
+
+  const pushDocs = (docs = []) => {
+    for (const d of docs) {
+      if (!d || !d.id || seen.has(d.id)) continue;
+      seen.add(d.id);
+      rows.push({ id: d.id, ...(d.data() || {}) });
+    }
+  };
+
+  // 1) حسب animalId
+  if (animal.id) {
+    try {
+      const s = await db.collection('events')
+        .where('userId', '==', uid)
+        .where('animalId', '==', String(animal.id))
+        .limit(300)
+        .get();
+      pushDocs(s.docs);
+    } catch (_) {}
+  }
+
+  // 2) حسب الرقم
+  const vals = findAnimalNumberMatches(animal.animalNumber ?? animal.number ?? '');
+  for (const field of ['animalNumber', 'number']) {
+    for (const v of vals) {
+      try {
+        const s = await db.collection('events')
+          .where('userId', '==', uid)
+          .where(field, '==', v)
+          .limit(300)
+          .get();
+        pushDocs(s.docs);
+      } catch (_) {}
+    }
+  }
+
+  return rows.sort((a, b) =>
+    String(computeEventDateFromDoc(a) || '').localeCompare(String(computeEventDateFromDoc(b) || ''))
+  );
+}
 // ============================================================
 //                 ADMIN: transfer owner (safe)
 // ============================================================
@@ -3343,6 +3469,200 @@ app.post('/api/groups/sync', requireUserId, async (req, res) => {
   } catch (e) {
     console.error('groups.sync', e);
     return res.status(500).json({ ok:false, error:'groups_sync_failed' });
+  }
+});
+// ============================================================
+//                 API: ANIMAL CARD (server-only)
+// ============================================================
+app.get('/api/animal-card', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const uid = req.userId;
+    const number = normalizeDigitsSrv(req.query.number || req.query.animalNumber || '');
+
+    if (!number) {
+      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    }
+
+    const animal = await findAnimalDocByNumberSrv(uid, number);
+    if (!animal) {
+      return res.status(404).json({ ok:false, error:'animal_not_found' });
+    }
+
+    const events = await fetchAnimalEventsSrv(uid, animal);
+
+    const state = {
+      number: animal.animalNumber ?? animal.number ?? number,
+
+      kind: animal.animalType || animal.kind || animal.type || animal.animalTypeAr || null,
+      breed: animal.breed || animal.breedName || null,
+      group: animal.group || null,
+
+      birthDate: animal.birthDate || animal.birth_date || animal.dob || null,
+      lastCalvingDate: animal.lastCalvingDate || animal.lastCalving || animal.calvingDate || null,
+      lactationNumber: animal.lactationNumber ?? animal.lactNo ?? null,
+      daysInMilk: Number.isFinite(Number(animal.daysInMilk)) ? Number(animal.daysInMilk) : null,
+
+      reproductiveStatus: String(animal.reproductiveStatus || animal.reproStatus || '').trim() || null,
+      productionStatus: String(animal.productionStatus || animal.prodStatus || '').trim() || null,
+      healthStatus: String(animal.healthStatus || animal.lastDisease || animal.disease || 'سليم').trim(),
+
+      pregnancyDate: animal.pregnancyDate || animal.pregnantFrom || null,
+      lastInseminationDate: animal.lastInseminationDate || null,
+      servicesCount: Number.isFinite(Number(animal.servicesCount)) ? Number(animal.servicesCount) : null,
+      serviceIntervalDays: Number.isFinite(Number(animal.serviceIntervalDays)) ? Number(animal.serviceIntervalDays) : null,
+      heatIntervalDays: Number.isFinite(Number(animal.heatIntervalDays)) ? Number(animal.heatIntervalDays) : null,
+
+      milkTraitsScore: Number(animal.milkTraitsScore || animal.milk_score || 0) || 0,
+      ovsynch: animal.ovsynch || null,
+
+      milkTodayKg: Number.isFinite(Number(animal.milkTodayKg)) ? Number(animal.milkTodayKg) : null,
+      seasonTotalKg: Number.isFinite(Number(animal.seasonTotalKg)) ? Number(animal.seasonTotalKg) : null,
+      m305Kg: Number.isFinite(Number(animal.m305Kg)) ? Number(animal.m305Kg) : null,
+
+      lastCheckDate: animal.lastCheckDate || animal.healthCheckDate || null,
+
+      inseminations: [],
+      estrusDates: Array.isArray(animal.estrusDates) ? [...animal.estrusDates] : [],
+      healthHistory: [],
+      milkSeries: []
+    };
+
+    let seasonMilk = 0;
+
+    for (const e of events) {
+      const t = eventTypeForCardSrv(e);
+      const d = computeEventDateFromDoc(e);
+
+      if (t === 'calving' && d) {
+        state.lastCalvingDate = d;
+      }
+
+      if (t === 'dry') {
+        state.productionStatus = 'جاف';
+      }
+
+      if (t === 'insemination' && d) {
+        state.inseminations.push(d);
+      }
+
+      if (t === 'heat' && d) {
+        state.estrusDates.push(d);
+      }
+
+      if (t === 'pregnancy') {
+        if (positivePregnancyEventSrv(e)) {
+          if (d) state.pregnancyDate = state.pregnancyDate || d;
+          state.reproductiveStatus = 'عِشار';
+        } else if (negativePregnancyEventSrv(e)) {
+          if (!state.pregnancyDate) state.reproductiveStatus = 'مفتوحة';
+        }
+      }
+
+      if (t === 'disease') {
+        state.healthHistory.push({
+          date: d || null,
+          name: e.diseaseName || e.eventType || e.type || 'حالة صحية',
+          note: e.notes || e.note || ''
+        });
+        if (d && !state.lastCheckDate) state.lastCheckDate = d;
+      }
+
+      if (t === 'milk' && d) {
+        const kg = milkKgFromEventSrv(e);
+        if (kg > 0) {
+          state.milkSeries.push({ date: d, kg });
+          seasonMilk += kg;
+        }
+      }
+    }
+
+    state.inseminations = [...new Set(state.inseminations.filter(Boolean))].sort();
+    state.estrusDates = [...new Set(state.estrusDates.filter(Boolean))].sort();
+    state.milkSeries = state.milkSeries.sort((a,b)=> String(a.date).localeCompare(String(b.date)));
+
+    state.lastInseminationDate = state.lastInseminationDate || lastOfSrv(state.inseminations);
+    state.servicesCount = Number.isFinite(Number(state.servicesCount))
+      ? Number(state.servicesCount)
+      : (state.inseminations.length || null);
+
+    state.serviceIntervalDays = Number.isFinite(Number(state.serviceIntervalDays))
+      ? Number(state.serviceIntervalDays)
+      : avgIntervalDaysSrv(state.inseminations);
+
+    const lastHeatDate = lastOfSrv(state.estrusDates);
+    state.lastHeatDate = lastHeatDate || null;
+
+    state.heatIntervalDays = Number.isFinite(Number(state.heatIntervalDays))
+      ? Number(state.heatIntervalDays)
+      : avgIntervalDaysSrv(state.estrusDates);
+
+    // ✅ عمر الحمل: لا يُحسب من آخر تلقيح إطلاقًا
+    let gestationDays = null;
+    if (state.reproductiveStatus && /عشار|preg/i.test(String(state.reproductiveStatus))) {
+      if (state.pregnancyDate) {
+        gestationDays = daysBetweenIsoSrv(String(state.pregnancyDate).slice(0,10), cairoTodayISO());
+        if (Number.isFinite(gestationDays) && gestationDays < 0) gestationDays = null;
+      }
+    }
+    state.gestationDays = gestationDays;
+
+    if (!Number.isFinite(Number(state.daysInMilk)) && state.lastCalvingDate) {
+      const dim = daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0,10), cairoTodayISO());
+      state.daysInMilk = Number.isFinite(dim) && dim >= 0 ? dim : null;
+    }
+
+    if (state.milkSeries.length) {
+      const lastMilk = state.milkSeries[state.milkSeries.length - 1];
+      state.milkTodayKg = Number.isFinite(Number(state.milkTodayKg))
+        ? Number(state.milkTodayKg)
+        : Number(lastMilk.kg || 0);
+
+      state.seasonTotalKg = Number.isFinite(Number(state.seasonTotalKg))
+        ? Number(state.seasonTotalKg)
+        : Math.round(seasonMilk * 100) / 100;
+    }
+
+    return res.json({
+      ok: true,
+      animal: {
+        id: animal.id,
+        animalNumber: state.number,
+        kind: state.kind,
+        breed: state.breed,
+        group: state.group,
+        birthDate: state.birthDate,
+        lastCalvingDate: state.lastCalvingDate,
+        lactationNumber: state.lactationNumber,
+        daysInMilk: state.daysInMilk,
+
+        reproductiveStatus: state.reproductiveStatus,
+        pregnancyDate: state.pregnancyDate,
+        gestationDays: state.gestationDays,
+        lastInseminationDate: state.lastInseminationDate,
+        servicesCount: state.servicesCount,
+        serviceIntervalDays: state.serviceIntervalDays,
+        lastHeatDate: state.lastHeatDate,
+        heatIntervalDays: state.heatIntervalDays,
+
+        productionStatus: state.productionStatus,
+        milkTodayKg: state.milkTodayKg,
+        seasonTotalKg: state.seasonTotalKg,
+        m305Kg: state.m305Kg,
+        milkTraitsScore: state.milkTraitsScore,
+
+        healthStatus: state.healthStatus,
+        lastCheckDate: state.lastCheckDate,
+        ovsynch: state.ovsynch
+      },
+      milkSeries: state.milkSeries,
+      healthHistory: state.healthHistory.slice(-20).reverse(),
+      events: events.slice(-80)
+    });
+  } catch (e) {
+    console.error('animal-card', e);
+    return res.status(500).json({ ok:false, error:'animal_card_failed' });
   }
 });
 app.get('/api/calves', requireUserId, async (req, res) => {
