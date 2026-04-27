@@ -69,6 +69,83 @@
     margin-top: 8px !important;
   }
 }
+    /* ✅ Murabbik compact radio buttons */
+.radio-group{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin:6px 0 10px;
+}
+
+.radio-group label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  min-height:44px;
+  border:1px solid #dfe9d7;
+  border-radius:14px;
+  background:#fff;
+  color:#173126;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  line-height:1;
+}
+
+.radio-group input[type="radio"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:18px;
+  height:18px;
+  margin:0;
+  border:1.8px solid #bfd3c2;
+  border-radius:50%;
+  background:#fff;
+  display:inline-grid;
+  place-items:center;
+  position:relative;
+  transition:.15s ease;
+}
+
+.radio-group input[type="radio"]::before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  transform:scale(0);
+  transition:.15s ease;
+  background:#0ea05a;
+}
+
+.radio-group input[type="radio"]:checked{
+  border-color:#0ea05a;
+}
+
+.radio-group input[type="radio"]:checked::before{
+  transform:scale(1);
+}
+
+.radio-group label:has(input[type="radio"]:checked){
+  border-color:#0ea05a;
+  background:#f6fbf7;
+  color:#0b7f47;
+  box-shadow:0 0 0 2px rgba(14,160,90,.08);
+}
+
+@media (max-width: 520px){
+  .radio-group{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .radio-group label{
+    justify-content:center;
+    padding:10px 12px;
+    font-size:13px;
+  }
+}
 </style>
 
   <title>تسجيل التلقيح — مُرَبِّيك</title>
@@ -198,12 +275,25 @@ function showBar(msg, type = "success") {
     };
 
     try {
-      await addDoc(collection(db, "events"), payload);
-           showBar("✅ تم حفظ التلقيح بنجاح", "success");
-      setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
-    } catch (err) {
-            showBar("❌ فشل الحفظ", "error");
+  const ref = await addDoc(collection(db, "events"), payload);
+
+  await updateAnimalByEvent({
+    db,
+    animalNumber: d.animalNumber,
+    eventType: "insemination",
+    eventDate: d.eventDate,
+    patch: {
+      lastInseminationDate: d.eventDate,
+      reproductiveStatus: "ملقحة"
     }
+  });
+
+  showBar("✅ تم حفظ التلقيح بنجاح", "success");
+  setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
+} catch (err) {
+  console.error(err);
+  showBar("❌ فشل الحفظ", "error");
+}
   });
   </script>
 <script>
