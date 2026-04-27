@@ -295,11 +295,12 @@ const docWatcher = setInterval(async () => {
     clearInterval(docWatcher);
   }
 }, 120);
-   $("eventDate").addEventListener("change", async () => {
-  calcDIMFromDoc();
-  await calcDaysSinceLastHeatOrAI();
+$("eventDate").addEventListener("change", async () => {
+  await loadHeatContextFromServer();
 });
-
+$("animalNumber").addEventListener("blur", async () => {
+  await loadHeatContextFromServer();
+});
    $("openCowCard").addEventListener("click", ()=> {
   const n = String($("animalNumber").value || "").trim();
   if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
