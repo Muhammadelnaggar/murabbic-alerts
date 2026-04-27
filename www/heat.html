@@ -253,7 +253,7 @@ async function calcDaysSinceLastHeatOrAI(){
       eventsRef,
       where("userId", "==", uid),
       where("animalNumber", "==", animalNumber),
-      where("type", "in", ["شياع","insemination"])
+      where("type", "in", ["شياع","insemination"]),
       orderBy("eventDate", "desc"),
       limit(1)
     ));
