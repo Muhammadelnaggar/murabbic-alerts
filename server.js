@@ -3646,6 +3646,7 @@ group:
   animal.pen ||
   animal.lot ||
   animal.section ||
+  groupNameFromMembership ||
   null,
       birthDate: animal.birthDate || animal.birth_date || animal.dob || null,
       lastCalvingDate: animal.lastCalvingDate || animal.lastCalving || animal.calvingDate || null,
