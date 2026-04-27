@@ -3495,10 +3495,24 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
     const state = {
       number: animal.animalNumber ?? animal.number ?? number,
 
-      kind: animal.animalType || animal.kind || animal.type || animal.animalTypeAr || null,
-      breed: animal.breed || animal.breedName || null,
-      group: animal.group || null,
-
+kind: animal.animalType || animal.kind || animal.type || animal.animalTypeAr || null,
+breed:
+  animal.breed ||
+  animal.breedName ||
+  animal.breedAr ||
+  animal.animalBreed ||
+  animal.animalBreedAr ||
+  animal.strain ||
+  animal.line ||
+  null,
+group:
+  animal.group ||
+  animal.groupName ||
+  animal.currentGroup ||
+  animal.pen ||
+  animal.lot ||
+  animal.section ||
+  null,
       birthDate: animal.birthDate || animal.birth_date || animal.dob || null,
       lastCalvingDate: animal.lastCalvingDate || animal.lastCalving || animal.calvingDate || null,
       lactationNumber: animal.lactationNumber ?? animal.lactNo ?? null,
@@ -3583,20 +3597,22 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
     state.milkSeries = state.milkSeries.sort((a,b)=> String(a.date).localeCompare(String(b.date)));
 
     state.lastInseminationDate = state.lastInseminationDate || lastOfSrv(state.inseminations);
-    state.servicesCount = Number.isFinite(Number(state.servicesCount))
-      ? Number(state.servicesCount)
-      : (state.inseminations.length || null);
+state.servicesCount =
+  Number.isFinite(Number(state.servicesCount)) && Number(state.servicesCount) > 0
+    ? Number(state.servicesCount)
+    : (state.inseminations.length || null);
 
-    state.serviceIntervalDays = Number.isFinite(Number(state.serviceIntervalDays))
-      ? Number(state.serviceIntervalDays)
-      : avgIntervalDaysSrv(state.inseminations);
+state.serviceIntervalDays =
+  Number.isFinite(Number(state.serviceIntervalDays)) && Number(state.serviceIntervalDays) > 0
+    ? Number(state.serviceIntervalDays)
+    : avgIntervalDaysSrv(state.inseminations);
+const lastHeatDate = lastOfSrv(state.estrusDates);
+state.lastHeatDate = state.lastHeatDate || lastHeatDate || null;
 
-    const lastHeatDate = lastOfSrv(state.estrusDates);
-    state.lastHeatDate = lastHeatDate || null;
-
-    state.heatIntervalDays = Number.isFinite(Number(state.heatIntervalDays))
-      ? Number(state.heatIntervalDays)
-      : avgIntervalDaysSrv(state.estrusDates);
+state.heatIntervalDays =
+  Number.isFinite(Number(state.heatIntervalDays)) && Number(state.heatIntervalDays) > 0
+    ? Number(state.heatIntervalDays)
+    : avgIntervalDaysSrv(state.estrusDates);
 
     // ✅ عمر الحمل: لا يُحسب من آخر تلقيح إطلاقًا
     let gestationDays = null;
@@ -3613,17 +3629,19 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       state.daysInMilk = Number.isFinite(dim) && dim >= 0 ? dim : null;
     }
 
-    if (state.milkSeries.length) {
-      const lastMilk = state.milkSeries[state.milkSeries.length - 1];
-      state.milkTodayKg = Number.isFinite(Number(state.milkTodayKg))
-        ? Number(state.milkTodayKg)
-        : Number(lastMilk.kg || 0);
+if (state.milkSeries.length) {
+  const lastMilk = state.milkSeries[state.milkSeries.length - 1];
 
-      state.seasonTotalKg = Number.isFinite(Number(state.seasonTotalKg))
-        ? Number(state.seasonTotalKg)
-        : Math.round(seasonMilk * 100) / 100;
-    }
+  state.milkTodayKg =
+    Number.isFinite(Number(state.milkTodayKg)) && Number(state.milkTodayKg) > 0
+      ? Number(state.milkTodayKg)
+      : Number(lastMilk.kg || 0);
 
+  state.seasonTotalKg =
+    Number.isFinite(Number(state.seasonTotalKg)) && Number(state.seasonTotalKg) > 0
+      ? Number(state.seasonTotalKg)
+      : Math.round(seasonMilk * 100) / 100;
+}
     return res.json({
       ok: true,
       animal: {
