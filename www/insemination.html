@@ -293,16 +293,13 @@ function showBar(msg, type = "success") {
     try {
   const ref = await addDoc(collection(db, "events"), payload);
 
-  await updateAnimalByEvent({
-    db,
-    animalNumber: d.animalNumber,
-    eventType: "insemination",
-    eventDate: d.eventDate,
-    patch: {
-      lastInseminationDate: d.eventDate,
-      reproductiveStatus: "ملقحة"
-    }
-  });
+ await updateAnimalByEvent({
+  userId: localStorage.getItem("userId"),
+  animalNumber: d.animalNumber,
+  eventType: "insemination",
+  eventDate: d.eventDate,
+  servicesCount: Number(e.detail?.animalDoc?.servicesCount || 0) + 1
+});
 
   showBar("✅ تم حفظ التلقيح بنجاح", "success");
   setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
