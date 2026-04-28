@@ -3605,6 +3605,159 @@ return res.json({
     return res.status(500).json({ ok:false, error:'groups_sync_failed' });
   }
 });
+function dimFromDatesSrv(calvingISO, eventISO){
+  const a = String(calvingISO || '').slice(0,10);
+  const b = String(eventISO || '').slice(0,10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return null;
+  const d = diffDaysISO(a, b);
+  return Number.isFinite(d) && d >= 1 ? d : null;
+}
+
+function solveLinear3x3Srv(A, b){
+  const m = A.map((row,i)=>[...row, b[i]]);
+  const n = 3;
+
+  for(let col=0; col<n; col++){
+    let pivot = col;
+    for(let r=col+1; r<n; r++){
+      if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    }
+    if (Math.abs(m[pivot][col]) < 1e-12) return null;
+    if (pivot !== col) [m[col], m[pivot]] = [m[pivot], m[col]];
+
+    const div = m[col][col];
+    for(let c=col; c<=n; c++) m[col][c] /= div;
+
+    for(let r=0; r<n; r++){
+      if (r === col) continue;
+      const f = m[r][col];
+      for(let c=col; c<=n; c++) m[r][c] -= f * m[col][c];
+    }
+  }
+  return [m[0][3], m[1][3], m[2][3]];
+}
+
+function aliSchaefferBasisSrv(dim){
+  const t = Number(dim);
+  if (!Number.isFinite(t) || t < 1) return null;
+  const x = t / 305;
+  if (x <= 0) return null;
+  return [1, x, x*x, Math.log(1/x), Math.log(1/x)*Math.log(1/x)];
+}
+
+function breedClassSrv(species, breed = ''){
+  const s = String(species || '').toLowerCase();
+  const b = String(breed || '').toLowerCase();
+
+  if (/buffalo|جاموس/.test(s)) return 'buffalo';
+  if (/holstein|هولشتاين|هولستين/.test(b)) return 'holstein';
+  if (/montbeliarde|مونتبليارد/.test(b)) return 'montbeliarde';
+  if (/simmental|سيمنتال/.test(b)) return 'simmental';
+  return 'cow';
+}
+
+function prior305Srv({ species, breed, parity } = {}){
+  const cls = breedClassSrv(species, breed);
+  const p = Number(parity || 0);
+
+  const table = {
+    buffalo:      { p1: 1800, p2: 2200, p3: 2400 },
+    holstein:     { p1: 7500, p2: 9200, p3: 9800 },
+    montbeliarde: { p1: 6200, p2: 7600, p3: 8200 },
+    simmental:    { p1: 5600, p2: 7000, p3: 7600 },
+    cow:          { p1: 6000, p2: 7600, p3: 8200 }
+  };
+
+  const row = table[cls] || table.cow;
+  if (p <= 1) return row.p1;
+  if (p === 2) return row.p2;
+  return row.p3;
+}
+
+function projectLactation305AliSchaefferSrv({
+  milkSeries = [],
+  lastCalvingDate,
+  species,
+  breed,
+  parity
+} = {}){
+  const pts = (Array.isArray(milkSeries) ? milkSeries : [])
+    .map(p => {
+      const dim = p.dim ?? dimFromDatesSrv(lastCalvingDate, p.date);
+      const y = Number(p.kg);
+      return { dim: Number(dim), y };
+    })
+    .filter(p => Number.isFinite(p.dim) && p.dim >= 5 && p.dim <= 305 && Number.isFinite(p.y) && p.y > 0)
+    .sort((a,b) => a.dim - b.dim);
+
+  // شروط صلاحية قوية: 5 نقاط على الأقل + تغطية زمنية معقولة
+  const uniqDims = [...new Set(pts.map(p => p.dim))];
+  if (uniqDims.length < 5) return null;
+  if ((Math.max(...uniqDims) - Math.min(...uniqDims)) < 45) return null;
+
+  // y = β0 + β1*x + β2*x² + β3*ln(1/x) + β4*ln²(1/x)
+  // نثبّت β3, β4 على priors بسيطة حسب النوع/الموسم، ونحل 3x3 للباقي
+  const prior305 = prior305Srv({ species, breed, parity });
+  const peakScale =
+    /buffalo|جاموس/i.test(String(species || '')) ? 0.55 :
+    Number(parity || 0) <= 1 ? 0.82 : 1.0;
+
+  const beta3 = 7.5 * peakScale;
+  const beta4 = -1.25 * peakScale;
+
+  let s00=0,s01=0,s02=0,s11=0,s12=0,s22=0;
+  let t0=0,t1=0,t2=0;
+
+  for (const p of pts){
+    const basis = aliSchaefferBasisSrv(p.dim);
+    if (!basis) continue;
+    const [b0,b1,b2,b3v,b4v] = basis;
+    const yy = p.y - (beta3 * b3v + beta4 * b4v);
+
+    s00 += b0*b0; s01 += b0*b1; s02 += b0*b2;
+    s11 += b1*b1; s12 += b1*b2; s22 += b2*b2;
+
+    t0 += b0*yy; t1 += b1*yy; t2 += b2*yy;
+  }
+
+  // regularization خفيفة باتجاه prior معقول
+  const ridge = 0.25;
+  const A = [
+    [s00 + ridge, s01,         s02],
+    [s01,         s11 + ridge, s12],
+    [s02,         s12,         s22 + ridge]
+  ];
+
+  const avgDailyPrior = prior305 / 305;
+  const b = [
+    t0 + ridge * avgDailyPrior,
+    t1 + ridge * 0,
+    t2 + ridge * 0
+  ];
+
+  const sol = solveLinear3x3Srv(A, b);
+  if (!sol) return null;
+  const [beta0, beta1, beta2] = sol;
+
+  let total305 = 0;
+  for(let d=1; d<=305; d++){
+    const basis = aliSchaefferBasisSrv(d);
+    if (!basis) continue;
+    const [b0,b1,b2,b3v,b4v] = basis;
+    const yhat = beta0*b0 + beta1*b1 + beta2*b2 + beta3*b3v + beta4*b4v;
+    total305 += Math.max(0, yhat);
+  }
+
+  if (!Number.isFinite(total305) || total305 <= 0) return null;
+
+  return {
+    m305Kg: Math.round(total305),
+    model: 'ali_schaeffer',
+    pointsUsed: uniqDims.length,
+    dimMin: Math.min(...uniqDims),
+    dimMax: Math.max(...uniqDims)
+  };
+}
 // ============================================================
 //                 API: ANIMAL CARD (server-only)
 // ============================================================
@@ -3776,6 +3929,16 @@ if (state.milkSeries.length) {
     Number.isFinite(Number(state.seasonTotalKg)) && Number(state.seasonTotalKg) > 0
       ? Number(state.seasonTotalKg)
       : Math.round(seasonMilk * 100) / 100;
+
+  const proj = projectLactation305AliSchaefferSrv({
+    milkSeries: state.milkSeries,
+    lastCalvingDate: state.lastCalvingDate,
+    species: state.kind,
+    breed: state.breed,
+    parity: state.lactationNumber
+  });
+
+  state.m305Kg = proj?.m305Kg ?? null;
 }
     return res.json({
       ok: true,
