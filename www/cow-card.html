@@ -38,33 +38,32 @@
     .kpi .lbl{font-size:12px;color:#2b593a}
     .kpi .val{font-weight:800;color:#14532d;font-size:clamp(16px,4.6vw,20px)}
 
-  .chart-scroll{
+.chart-scroll{
   overflow-x:auto;
   overflow-y:hidden;
-  border:1px solid #dfe9d7;
-  border-radius:16px;
-  background:linear-gradient(180deg,#fcfff8 0%, #ffffff 100%);
-  padding:8px 6px 2px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  border:1px solid #d9e7d3;
+  border-radius:18px;
+  background:#fff;
+  padding:10px 8px 6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.04);
 }
 
 .prod-chart{
   display:block;
-  height:260px;
+  height:280px;
 }
 
 @media (max-width:560px){
-  .prod-chart{height:220px}
+  .prod-chart{height:240px}
 }
 
 .hint{
-  font-size:12px;
-  color:#456;
+  font-size:11px;
+  color:#5b6b63;
   margin-top:8px;
   text-align:center;
   line-height:1.5;
 }
-
     .hl{display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:center}
     .hl.head{font-weight:700;color:#0f5132}
     .hl>div{border:1px solid var(--border);background:#fcfff8;border-radius:12px;padding:8px}
@@ -231,7 +230,7 @@
       <div class="chart-scroll" id="milkScroll">
         <svg id="milkChart" class="prod-chart" viewBox="0 0 100 60" preserveAspectRatio="none" aria-label="مخطط إنتاج اللبن"></svg>
       </div>
-      <div class="hint">يعرض كامل فترة الحليب — اسحب/تمرير أفقيًا لمشاهدة كل الأيام (كجم/يوم)</div>
+      <div class="hint">المحور الأفقي: أيام الحليب (DIM) — المحور الرأسي: الإنتاج كجم/يوم</div>
     </section>
 
     <section class="card" aria-label="الحالة التناسلية">
@@ -650,118 +649,199 @@ function buildState(animal, events){
 }
 
 
-function renderMilkChart(series){
-  const svg = $('milkChart'), sc = $('milkScroll');
-  if(!svg || !sc || !Array.isArray(series) || !series.length){
+function renderMilkChart(series, state){
+  const svg = $('milkChart');
+  const sc  = $('milkScroll');
+  if (!svg || !sc || !Array.isArray(series) || !series.length){
     if (svg) svg.innerHTML = '';
     return;
   }
 
-  const rows = series
-    .map((p, i) => ({
-      i,
-      date: String(p.date || ''),
-      kg: Number(p.kg ?? p.v ?? 0)
-    }))
-    .filter(x => Number.isFinite(x.kg) && x.kg > 0);
+  const calving = String(state?.lastCalvingDate || '').slice(0,10);
 
-  if(!rows.length){
+  function isoOk(v){
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '').slice(0,10));
+  }
+
+  function dimFromPoint(p){
+    const direct =
+      Number(p?.dim ?? p?.daysInMilk ?? p?.daysInMilkAtEvent ?? NaN);
+    if (Number.isFinite(direct) && direct >= 0) return direct;
+
+    const d = String(p?.date || '').slice(0,10);
+    if (!isoOk(calving) || !isoOk(d)) return null;
+
+    const ms = new Date(d + 'T00:00:00').getTime() - new Date(calving + 'T00:00:00').getTime();
+    const dim = Math.floor(ms / 86400000);
+    return Number.isFinite(dim) && dim >= 0 ? dim : null;
+  }
+
+  const rows = series
+    .map((p) => ({
+      date: String(p?.date || ''),
+      dim: dimFromPoint(p),
+      kg: Number(p?.kg ?? p?.v ?? 0)
+    }))
+    .filter(r => Number.isFinite(r.dim) && r.dim >= 0 && Number.isFinite(r.kg) && r.kg > 0)
+    .sort((a,b) => a.dim - b.dim);
+
+  if (!rows.length){
     svg.innerHTML = '';
     return;
   }
 
-  const base = Math.max(sc.clientWidth, 320);
-  const pxPer = Math.max(12, Math.min(22, Math.round(base / 14)));
-  const padL = 18, padR = 18, padT = 12, padB = 24;
-  const H = 80;
-  const W = padL + padR + Math.max(1, rows.length - 1) * pxPer + 20;
+  const padL = 48, padR = 18, padT = 18, padB = 34;
+  const H = 96;
+  const plotH = H - padT - padB;
+
+  const xMaxRaw = Math.max(...rows.map(r => r.dim), Number(state?.daysInMilk || 0), 1);
+  const xMax = Math.max(10, Math.ceil(xMaxRaw / 10) * 10);
+
+  const yMaxRaw = Math.max(...rows.map(r => r.kg), 5);
+  const yMax = Math.max(10, Math.ceil(yMaxRaw / 5) * 5);
+
+  const plotW = Math.max(320, rows.length * 18);
+  const W = padL + plotW + padR;
 
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.style.width = W + 'px';
   svg.innerHTML = '';
 
-  const maxY = Math.max(...rows.map(r => r.kg), 1);
-  const minY = 0;
-  const yRange = Math.max(1, maxY - minY);
-
-  const sx = (i) => padL + i * pxPer;
-  const sy = (v) => H - padB - ((v - minY) * (H - padT - padB) / yRange);
-
   const NS = 'http://www.w3.org/2000/svg';
 
-  // grid
-  for(let j = 0; j < 4; j++){
-    const y = padT + j * ((H - padT - padB) / 3);
+  const xAt = (dim) => padL + (dim / xMax) * plotW;
+  const yAt = (kg)  => padT + plotH - (kg / yMax) * plotH;
+
+  // الخلفية
+  const bg = document.createElementNS(NS, 'rect');
+  bg.setAttribute('x', padL);
+  bg.setAttribute('y', padT);
+  bg.setAttribute('width', plotW);
+  bg.setAttribute('height', plotH);
+  bg.setAttribute('rx', '10');
+  bg.setAttribute('fill', '#fbfdf9');
+  bg.setAttribute('stroke', '#edf3e8');
+  svg.appendChild(bg);
+
+  // خطوط أفقية + أرقام المحور الرأسي
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++){
+    const val = (yMax / yTicks) * i;
+    const y = yAt(val);
+
     const ln = document.createElementNS(NS, 'line');
     ln.setAttribute('x1', padL);
-    ln.setAttribute('x2', W - padR);
+    ln.setAttribute('x2', padL + plotW);
     ln.setAttribute('y1', y);
     ln.setAttribute('y2', y);
-    ln.setAttribute('stroke', j === 3 ? '#dfe9d7' : '#edf5e8');
-    ln.setAttribute('stroke-width', j === 3 ? '1' : '0.8');
+    ln.setAttribute('stroke', i === 0 ? '#d8e6d2' : '#edf3e8');
+    ln.setAttribute('stroke-width', i === 0 ? '1.2' : '1');
     svg.appendChild(ln);
+
+    const tx = document.createElementNS(NS, 'text');
+    tx.setAttribute('x', padL - 8);
+    tx.setAttribute('y', y + 4);
+    tx.setAttribute('text-anchor', 'end');
+    tx.setAttribute('font-size', '9');
+    tx.setAttribute('fill', '#5f6f66');
+    tx.textContent = `${Math.round(val)}`;
+    svg.appendChild(tx);
   }
 
-  // area
+  // خطوط رأسية + أرقام المحور الأفقي
+  const xTicks = 6;
+  for (let i = 0; i <= xTicks; i++){
+    const val = Math.round((xMax / xTicks) * i);
+    const x = xAt(val);
+
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', x);
+    ln.setAttribute('x2', x);
+    ln.setAttribute('y1', padT);
+    ln.setAttribute('y2', padT + plotH);
+    ln.setAttribute('stroke', '#f2f6ef');
+    ln.setAttribute('stroke-width', '1');
+    svg.appendChild(ln);
+
+    const tx = document.createElementNS(NS, 'text');
+    tx.setAttribute('x', x);
+    tx.setAttribute('y', H - 10);
+    tx.setAttribute('text-anchor', 'middle');
+    tx.setAttribute('font-size', '9');
+    tx.setAttribute('fill', '#5f6f66');
+    tx.textContent = `${val}`;
+    svg.appendChild(tx);
+  }
+
+  // عنوان المحور الرأسي
+  const yTitle = document.createElementNS(NS, 'text');
+  yTitle.setAttribute('x', 14);
+  yTitle.setAttribute('y', 14);
+  yTitle.setAttribute('font-size', '9');
+  yTitle.setAttribute('fill', '#395448');
+  yTitle.textContent = 'كجم/يوم';
+  svg.appendChild(yTitle);
+
+  // عنوان المحور الأفقي
+  const xTitle = document.createElementNS(NS, 'text');
+  xTitle.setAttribute('x', padL + (plotW / 2));
+  xTitle.setAttribute('y', H - 2);
+  xTitle.setAttribute('text-anchor', 'middle');
+  xTitle.setAttribute('font-size', '9');
+  xTitle.setAttribute('fill', '#395448');
+  xTitle.textContent = 'أيام الحليب (DIM)';
+  svg.appendChild(xTitle);
+
+  // المساحة تحت المنحنى
   let lineD = '';
   rows.forEach((p, idx) => {
-    lineD += (idx ? ' L ' : 'M ') + sx(idx).toFixed(2) + ' ' + sy(p.kg).toFixed(2);
+    lineD += (idx ? ' L ' : 'M ') + xAt(p.dim).toFixed(2) + ' ' + yAt(p.kg).toFixed(2);
   });
+
   const areaD =
     lineD +
-    ` L ${sx(rows.length - 1).toFixed(2)} ${(H - padB).toFixed(2)}` +
-    ` L ${sx(0).toFixed(2)} ${(H - padB).toFixed(2)} Z`;
+    ` L ${xAt(rows[rows.length - 1].dim).toFixed(2)} ${(padT + plotH).toFixed(2)}` +
+    ` L ${xAt(rows[0].dim).toFixed(2)} ${(padT + plotH).toFixed(2)} Z`;
 
   const area = document.createElementNS(NS, 'path');
   area.setAttribute('d', areaD);
-  area.setAttribute('fill', '#dff3df');
+  area.setAttribute('fill', '#dff1df');
   area.setAttribute('opacity', '0.9');
   svg.appendChild(area);
 
-  // line
+  // المنحنى
   const line = document.createElementNS(NS, 'path');
   line.setAttribute('d', lineD);
   line.setAttribute('fill', 'none');
-  line.setAttribute('stroke', '#2e7d32');
-  line.setAttribute('stroke-width', '2.2');
+  line.setAttribute('stroke', '#1f7a3f');
+  line.setAttribute('stroke-width', '2.6');
   line.setAttribute('stroke-linejoin', 'round');
   line.setAttribute('stroke-linecap', 'round');
   svg.appendChild(line);
 
-  // points
+  // النقاط
   rows.forEach((p, idx) => {
     const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('cx', sx(idx));
-    c.setAttribute('cy', sy(p.kg));
-    c.setAttribute('r', idx === rows.length - 1 ? '2.8' : '2.1');
-    c.setAttribute('fill', idx === rows.length - 1 ? '#14532d' : '#2e7d32');
+    c.setAttribute('cx', xAt(p.dim));
+    c.setAttribute('cy', yAt(p.kg));
+    c.setAttribute('r', idx === rows.length - 1 ? '3.2' : '2.2');
+    c.setAttribute('fill', idx === rows.length - 1 ? '#0f5132' : '#2f8f4e');
+    c.setAttribute('stroke', '#ffffff');
+    c.setAttribute('stroke-width', '1');
     svg.appendChild(c);
   });
 
-  // labels: first, middle, last
-  const labelIdx = [...new Set([0, Math.floor((rows.length - 1) / 2), rows.length - 1])];
-  labelIdx.forEach(idx => {
-    const tx = document.createElementNS(NS, 'text');
-    tx.setAttribute('x', sx(idx));
-    tx.setAttribute('y', H - 6);
-    tx.setAttribute('text-anchor', 'middle');
-    tx.setAttribute('font-size', '10');
-    tx.setAttribute('fill', '#456');
-    tx.textContent = rows[idx].date ? new Date(rows[idx].date).toLocaleDateString('ar-EG') : '';
-    svg.appendChild(tx);
-  });
-
-  // latest value badge
+  // تمييز آخر قراءة بشكل هادئ
   const last = rows[rows.length - 1];
-  const badge = document.createElementNS(NS, 'text');
-  badge.setAttribute('x', sx(rows.length - 1));
-  badge.setAttribute('y', Math.max(14, sy(last.kg) - 8));
-  badge.setAttribute('text-anchor', 'end');
-  badge.setAttribute('font-size', '10');
-  badge.setAttribute('font-weight', '700');
-  badge.setAttribute('fill', '#14532d');
-  badge.textContent = `${last.kg.toFixed(1)} كجم`;
-  svg.appendChild(badge);
+  const tag = document.createElementNS(NS, 'text');
+  tag.setAttribute('x', xAt(last.dim) - 4);
+  tag.setAttribute('y', Math.max(12, yAt(last.kg) - 8));
+  tag.setAttribute('text-anchor', 'end');
+  tag.setAttribute('font-size', '8.5');
+  tag.setAttribute('font-weight', '700');
+  tag.setAttribute('fill', '#0f5132');
+  tag.textContent = `${last.kg.toFixed(1)} كجم`;
+  svg.appendChild(tag);
 
   setTimeout(() => { sc.scrollLeft = svg.scrollWidth; }, 0);
 }
@@ -1189,7 +1269,7 @@ put('fiGroup', state.group || '—');
   put('kpiMilkToday',state.milkTodayKg!=null?`${Number(state.milkTodayKg).toFixed(1)} كجم`:'—');
   put('kpiSeason',state.seasonTotalKg!=null?`${NF.format(Math.round(state.seasonTotalKg))} كجم`:'—');
   put('kpi305',state.m305Kg!=null?`${NF.format(Math.round(state.m305Kg))} كجم`:'—');
-  renderMilkChart(state.milkSeries);
+ renderMilkChart(state.milkSeries, state);
 
   put('fiLastIns',fmtD(state.lastInseminationDate));
   const spc = state.servicesCount;
