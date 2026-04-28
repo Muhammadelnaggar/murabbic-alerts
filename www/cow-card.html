@@ -8,10 +8,6 @@
   <title>Murabbik – بطاقة الحيوان</title>
   <style>
     /* ألوان نقاط الليجند للجوج */
-.legend .leg:nth-child(1) .dot{background:#ef5350}
-.legend .leg:nth-child(2) .dot{background:#ffb74d}
-.legend .leg:nth-child(3) .dot{background:#fff176}
-.legend .leg:nth-child(4) .dot{background:#66bb6a}
 
 
    
@@ -563,7 +559,7 @@ function normalizeAnimalFromServer(an = {}){
     healthStatus: an.healthStatus || 'سليم',
     lastCheckDate: an.lastCheckDate || null,
 
-    milkTraitsScore: toPercent(an.milkTraitsScore ?? 0),
+   
     ovsynch: an.ovsynch || null,
     daysInMilk: an.daysInMilk ?? null,
     gestationDays: an.gestationDays ?? null
@@ -591,7 +587,7 @@ async function fetchAnimal({ number, animalId } = {}) {
     lastHeatDate: animal.lastHeatDate ?? null,
     breed: animal.breed || '—',
     group: animal.group || '—',
-    milkTraitsScore: animal.milkTraitsScore ?? 0,
+   
 
     inseminations: [],
     estrusDates: [],
@@ -634,7 +630,7 @@ function buildState(animal, events){
     pregnancyDate: null,
     breed: '—',
     group: '—',
-    milkTraitsScore: 0,
+  
     inseminations: [],
     estrusDates: [],
     lastInseminationDate: null,
@@ -653,28 +649,7 @@ function buildState(animal, events){
   };
 }
 
-/* ======================= UI (قياس/رسم) ======================= */
-function arcPath(cx,cy,r,a0,a1){
-  const A=(x)=>x*Math.PI/180, P=(ang)=>[cx+r*Math.cos(A(ang)), cy+r*Math.sin(A(ang))];
-  const [x0,y0]=P(a0),[x1,y1]=P(a1);
-  return`M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 0 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
-}
-function renderGauge(score){
-  score=Math.max(0,Math.min(100,Number(score)||0));
-  const g=$('gSlices'); if(!g) return; g.innerHTML='';
-  const colors=['#ef5350','#ffb74d','#fff176','#66bb6a'], steps=[0,25,50,75,100];
-  for(let i=0;i<4;i++){
-    const s=steps[i],e=steps[i+1],a0=180-(s/100)*180,a1=180-(e/100)*180;
-    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('d',arcPath(50,50,40,a0,a1));
-    p.setAttribute('fill','none'); p.setAttribute('stroke',colors[i]);
-    p.setAttribute('stroke-width','12'); p.setAttribute('stroke-linecap','round');
-    g.appendChild(p);
-  }
-  const ang=180-(score/100)*180; const needle=$('needle'); if(needle) needle.setAttribute('transform',`rotate(${ang} 50 50)`);
-  const label=score>=75?'ممتاز':score>=50?'جيد':score>=25?'متوسط':'ضعيف';
-  put('milkGaugeVal',`${label} — ${score}%`);
-}
+
 function renderMilkChart(series){
   const svg = $('milkChart'), sc = $('milkScroll');
   if(!svg || !sc || !Array.isArray(series) || !series.length){
