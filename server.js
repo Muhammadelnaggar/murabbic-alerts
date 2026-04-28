@@ -3690,11 +3690,17 @@ function projectLactation305AliSchaefferSrv({
     .filter(p => Number.isFinite(p.dim) && p.dim >= 5 && p.dim <= 305 && Number.isFinite(p.y) && p.y > 0)
     .sort((a,b) => a.dim - b.dim);
 
-  // شروط صلاحية قوية: 5 نقاط على الأقل + تغطية زمنية معقولة
-  const uniqDims = [...new Set(pts.map(p => p.dim))];
-  if (uniqDims.length < 5) return null;
-  if ((Math.max(...uniqDims) - Math.min(...uniqDims)) < 45) return null;
+// شروط صلاحية مرنة لمُرَبِّيك:
+// 1) لازم على الأقل 5 نقاط فعلية
+// 2) لازم يكون فيها تنوع حقيقي في DIM
+const uniqDims = [...new Set(pts.map(p => p.dim))];
+if (uniqDims.length < 5) return null;
 
+const dimSpan = Math.max(...uniqDims) - Math.min(...uniqDims);
+const fitQuality =
+  dimSpan >= 60 ? 'high' :
+  dimSpan >= 25 ? 'medium' :
+  'low';
   // y = β0 + β1*x + β2*x² + β3*ln(1/x) + β4*ln²(1/x)
   // نثبّت β3, β4 على priors بسيطة حسب النوع/الموسم، ونحل 3x3 للباقي
   const prior305 = prior305Srv({ species, breed, parity });
@@ -3750,13 +3756,14 @@ function projectLactation305AliSchaefferSrv({
 
   if (!Number.isFinite(total305) || total305 <= 0) return null;
 
-  return {
-    m305Kg: Math.round(total305),
-    model: 'ali_schaeffer',
-    pointsUsed: uniqDims.length,
-    dimMin: Math.min(...uniqDims),
-    dimMax: Math.max(...uniqDims)
-  };
+return {
+  m305Kg: Math.round(total305),
+  model: 'ali_schaeffer',
+  pointsUsed: uniqDims.length,
+  dimMin: Math.min(...uniqDims),
+  dimMax: Math.max(...uniqDims),
+  fitQuality
+};
 }
 // ============================================================
 //                 API: ANIMAL CARD (server-only)
