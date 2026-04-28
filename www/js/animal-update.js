@@ -242,7 +242,7 @@ if (type === "insemination") {
   upd.protocolExitDate = date;
 }
 
-    }
+   
 
     // ============================================================
     // 🟩 PREGNANCY DIAGNOSIS — تشخيص حمل
