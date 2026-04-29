@@ -415,7 +415,68 @@ function computeCowHeifer({
 /* ============================= */
 /*        BUFFALO ENGINE         */
 /* ============================= */
+function buffaloFCM6(milkKg, fatPct){
+  const milk = num(milkKg);
+  const fat = num(fatPct, 6.5);
 
+  // 6% FCM للجاموس:
+  // FCM = 0.308 * milk + 11.54 * fatKg
+  // حيث fatKg = milk * fat%
+  const fatKg = milk * (fat / 100);
+  return (0.308 * milk) + (11.54 * fatKg);
+}
+function buffaloECM(milkKg, fatPct, proteinPct){
+  const milk = num(milkKg);
+  const fat = num(fatPct, 6.5);
+  const protein = num(proteinPct, 4.2);
+
+  if (!milk) return 0;
+
+  // ECM operational form
+  return milk * ((0.383 * fat) + (0.242 * protein) + 0.7832) / 3.1138;
+}
+
+function buffaloNelMilkMcal(milkKg, fatPct, proteinPct){
+  const ecm = buffaloECM(milkKg, fatPct, proteinPct);
+
+  // Buffalo-specific lactation NE:
+  // 3.56 MJ NE / kg ECM  → 0.85086 Mcal NE / kg ECM
+  const mcalPerKgECM = 3.56 / 4.184;
+
+  return ecm * mcalPerKgECM;
+}
+function buffaloCpPctLactating({ bodyWeight, milkKg, fatPct, dmi }){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const fat = num(fatPct, 6.5);
+  const dmiKg = Math.max(0.1, num(dmi));
+
+  const fcm6 = buffaloFCM6(milk, fat);
+
+  // Paul et al.:
+  // CP maintenance = 5.43 g / kg BW^0.75 / day
+  // CP milk        = 90.3 g / kg 6% FCM
+  const cpMaintG = 5.43 * Math.pow(bw, 0.75);
+  const cpMilkG = 90.3 * fcm6;
+
+  const cpPct = (cpMaintG + cpMilkG) / (dmiKg * 10);
+  return round(cpPct, 2);
+}
+
+function buffaloCpPctHeifer({ bodyWeight, pregDays, closeUp }){
+  const bw = num(bodyWeight);
+  const dp = num(pregDays);
+
+  // الحمل المتأخر
+  if (dp >= 270 || closeUp) return 14.0;
+  if (dp >= 240) return 12.0;
+
+  // عجلات الجاموس
+  if (bw < 400) return 15.5;
+  if (bw <= 500) return 13.0;
+
+  return 13.0;
+}
 function computeBuffalo({
   bodyWeight,
   milkKg,
@@ -433,19 +494,24 @@ function computeBuffalo({
   const days = num(dim);
   const fatPct = num(milkFatPct, 6.5);
   const proteinPct = num(milkProteinPct, 4.2);
-  const BCS = clamp(num(bcs, 3.0), 2.0, 4.5);
-  const PAR = num(parity, 2);
-  void BCS;
-  void PAR;
-  const baseDmi = (0.0205 * bw) + (0.120 * milk);
-  const wol = days > 0 ? (days / 7) : 0;
-  const lactFactor = wol > 0 ? (1 - Math.exp(-0.20 * (wol + 2.8))) : 1;
+ const BCS = clamp(num(bcs, 3.0), 2.0, 4.5);
+const PAR = num(parity, 2);
+void BCS;
+void PAR;
 
-  let dmi = baseDmi * lactFactor;
-  dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
+// Buffalo DMI based on metabolic BW + 6% FCM
+const fcm6 = buffaloFCM6(milk, fatPct);
+
+// DMI (kg/d) = 0.0599 * BW^0.75 + 0.688 * FCM6
+let dmi =
+  (0.0599 * Math.pow(bw, 0.75)) +
+  (0.688 * fcm6);
+
+// حدود تشغيلية آمنة للجاموس الحلاب
+dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
 
   const nelMaintenance = 0.095 * Math.pow(bw, 0.75);
-  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct, { nelMilkFactor: 1.05 });
+ const nelMilk = buffaloNelMilkMcal(milk, fatPct, proteinPct);
   const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) : 0) + (closeUp ? 1.0 : 0);
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
@@ -458,11 +524,11 @@ function computeBuffalo({
     growth: false
   });
 
-const cpReferencePct = computeCPReferencePct({
-  species: 'buffalo',
+const cpReferencePct = buffaloCpPctLactating({
+  bodyWeight: bw,
   milkKg: milk,
-  breed,
-  stage: 'lactating'
+  fatPct,
+  dmi
 });
 
   return {
@@ -507,11 +573,10 @@ const dmi = predictHeiferDMI({
     growth: true
   });
 
-const cpReferencePct = computeCPReferencePct({
-  species: 'buffalo',
-  milkKg: 0,
-  breed,
-  stage: 'heifer'
+const cpReferencePct = buffaloCpPctHeifer({
+  bodyWeight: bw,
+  pregDays,
+  closeUp
 });
 
   return {
