@@ -929,28 +929,43 @@ function filterAnimalsByType(animals, typeKey){
   return (animals || []).filter(an => detectAnimalType(an) === typeKey);
 }
 
-function setupTypeSwitch(){
+function setupTypeSwitch(meta = {}){
   const wrap = document.getElementById('typeSwitch');
   const btnCows = document.getElementById('btnCows');
   const btnBuffalo = document.getElementById('btnBuffalo');
 
-  if (!currentType) currentType = 'cows';
+  const hasCows = meta.hasCows !== false;
+  const hasBuffalo = meta.hasBuffalo !== false;
+  const singleHerdType = meta.singleHerdType || null;
+
+  if (singleHerdType === 'cows' || singleHerdType === 'buffalo') {
+    currentType = singleHerdType;
+    wrap.style.display = 'none';
+  } else {
+    wrap.style.display = '';
+    if (!currentType) {
+      currentType = hasCows ? 'cows' : (hasBuffalo ? 'buffalo' : 'cows');
+    }
+  }
+
+  btnCows.classList.toggle('hidden', !hasCows);
+  btnBuffalo.classList.toggle('hidden', !hasBuffalo);
 
   wrap.classList.toggle('buffalo', currentType === 'buffalo');
   btnCows.classList.toggle('active', currentType === 'cows');
   btnBuffalo.classList.toggle('active', currentType === 'buffalo');
 
   btnCows.onclick = () => {
-    if (currentType === 'cows') return;
+    if (!hasCows || currentType === 'cows') return;
     currentType = 'cows';
-    setupTypeSwitch();
+    setupTypeSwitch({ hasCows, hasBuffalo, singleHerdType });
     loadHerdKPIs();
   };
 
   btnBuffalo.onclick = () => {
-    if (currentType === 'buffalo') return;
+    if (!hasBuffalo || currentType === 'buffalo') return;
     currentType = 'buffalo';
-    setupTypeSwitch();
+    setupTypeSwitch({ hasCows, hasBuffalo, singleHerdType });
     loadHerdKPIs();
   };
 }
@@ -966,9 +981,13 @@ const feedGrid   = document.getElementById('feedGrid');
 const healthGrid = document.getElementById('healthGrid');
 
   try{
-     setupTypeSwitch();
+const stats = await fetchJSON(`/api/herd-stats?type=${currentType || 'cows'}`);
 
-    const stats = await fetchJSON(`/api/herd-stats?type=${currentType}`);
+setupTypeSwitch({
+  hasCows: !!stats.hasCows,
+  hasBuffalo: !!stats.hasBuffalo,
+  singleHerdType: stats.singleHerdType || null
+});
     const t     = stats.totals || {};
     const fert  = stats.fertility || {};
 
