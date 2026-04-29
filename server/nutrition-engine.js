@@ -422,15 +422,21 @@ function computeBuffalo({
   pregDays,
   closeUp,
   dim,
+  breed,
   milkFatPct,
-  milkProteinPct
+  milkProteinPct,
+  bcs,
+  parity
 }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
   const days = num(dim);
   const fatPct = num(milkFatPct, 6.5);
   const proteinPct = num(milkProteinPct, 4.2);
-
+  const BCS = clamp(num(bcs, 3.0), 2.0, 4.5);
+  const PAR = num(parity, 2);
+  void BCS;
+  void PAR;
   const baseDmi = (0.0205 * bw) + (0.120 * milk);
   const wol = days > 0 ? (days / 7) : 0;
   const lactFactor = wol > 0 ? (1 - Math.exp(-0.20 * (wol + 2.8))) : 1;
@@ -452,12 +458,12 @@ function computeBuffalo({
     growth: false
   });
 
-  const cpReferencePct = computeCPReferencePct({
-    species: 'buffalo',
-    milkKg: milk,
-    breed: '',
-    stage: 'lactating'
-  });
+const cpReferencePct = computeCPReferencePct({
+  species: 'buffalo',
+  milkKg: milk,
+  breed,
+  stage: 'lactating'
+});
 
   return {
     species: 'buffalo',
@@ -475,7 +481,7 @@ function computeBuffalo({
   };
 }
 
-function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
+function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
   const bw = num(bodyWeight);
   const bw075 = Math.pow(bw, 0.75);
 
@@ -484,10 +490,12 @@ function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
   const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) * 0.95 : 0) + (closeUp ? 0.8 : 0);
   const nelTotal = nelMaintenance + nelGrowth + nelPreg;
 
- const dmi = predictHeiferDMI({
+const matureBw = getStandardWeight('جاموس', breed);
+
+const dmi = predictHeiferDMI({
   bodyWeight: bw,
-  matureBodyWeight: Math.max(750, bw * 1.35),
-  dietNDFPct: null
+  matureBodyWeight: matureBw,
+  dietNDFPct
 });
 
   const mpTargetG = computeOperationalMPTarget({
@@ -499,12 +507,12 @@ function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp }){
     growth: true
   });
 
-  const cpReferencePct = computeCPReferencePct({
-    species: 'buffalo',
-    milkKg: 0,
-    breed: '',
-    stage: 'heifer'
-  });
+const cpReferencePct = computeCPReferencePct({
+  species: 'buffalo',
+  milkKg: 0,
+  breed,
+  stage: 'heifer'
+});
 
   return {
     species: 'buffalo',
