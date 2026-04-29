@@ -1878,6 +1878,28 @@ app.get("/api/herd-stats", async (req, res) => {
 
 const animalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+const hasCows = animalsAll.some(a => {
+  const at = String(a.animaltype || '').trim().toLowerCase();
+  const ar = String(a.animalTypeAr || '').trim();
+  return at === 'cow' || ar.includes('بقار') || ar.includes('ابقار');
+});
+
+const hasBuffalo = animalsAll.some(a => {
+  const at = String(a.animaltype || '').trim().toLowerCase();
+  const ar = String(a.animalTypeAr || '').trim();
+  return at === 'buffalo' || ar.includes('جاموس');
+});
+
+const availableTypes = [
+  ...(hasCows ? ['cows'] : []),
+  ...(hasBuffalo ? ['buffalo'] : [])
+];
+
+const singleHerdType =
+  hasCows && !hasBuffalo ? 'cows' :
+  hasBuffalo && !hasCows ? 'buffalo' :
+  null;
+
 const animalsByType = animalsAll.filter(a => {
   const at = String(a.animaltype || '').trim().toLowerCase();
   const ar = String(a.animalTypeAr || '').trim();
@@ -2521,16 +2543,21 @@ firstServiceConceptionPct: extraFertility.firstServicePct,
   feedCostPerHeadPerDay: feedBands.overall.feedCostPerHeadPerDay,
   iofc: feedBands.overall.iofc,
 
-  feedBands,
+ feedBands,
 
-  dailyMilkTotal,
-  avgHeadToday,
-  avgHead7Days,
-  monthlyMilkTotal,
-  dailyMilkDeltaPct,
-  avgHeadDeltaPct,
-  bcsCamera,
-  fecesScore
+dailyMilkTotal,
+avgHeadToday,
+avgHead7Days,
+monthlyMilkTotal,
+dailyMilkDeltaPct,
+avgHeadDeltaPct,
+bcsCamera,
+fecesScore,
+
+hasCows,
+hasBuffalo,
+availableTypes,
+singleHerdType
 });
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
