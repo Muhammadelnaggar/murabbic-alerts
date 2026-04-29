@@ -1039,13 +1039,14 @@ if (looksLikeHeader(line)){
           importMode = 'sessions_3';
           kind = 'cow';
           species = 'أبقار';
-        } else if (sessionVals.length === 2){
-          s1 = v1 || 0;
-          s2 = v2 || 0;
-          importMode = 'sessions_2';
-          kind = 'buffalo';
-          species = 'جاموس';
-        } else {
+      } else if (sessionVals.length === 2){
+  s1 = sessionVals[0] || 0;
+  s2 = sessionVals[1] || 0;
+  importMode = 'sessions_2';
+  kind = 'buffalo';
+  species = 'جاموس';
+}
+        else {
           s1 = totalVal;
           importMode = 'total_only';
           kind = 'cow';
@@ -1059,14 +1060,14 @@ if (looksLikeHeader(line)){
         importMode = 'sessions_3';
         kind = 'cow';
         species = 'أبقار';
-      } else if (sessionVals.length === 2){
-        s1 = v1 || 0;
-        s2 = v2 || 0;
-        total = s1 + s2;
-        importMode = 'sessions_2';
-        kind = 'buffalo';
-        species = 'جاموس';
-      }
+     } else if (sessionVals.length === 2){
+  s1 = sessionVals[0] || 0;
+  s2 = sessionVals[1] || 0;
+  total = s1 + s2;
+  importMode = 'sessions_2';
+  kind = 'buffalo';
+  species = 'جاموس';
+}
     } else {
       if (parts.length < 2){
         out.push({
