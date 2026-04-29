@@ -715,7 +715,6 @@ function buildNutritionCentralTargets(context = {}) {
   bcs: runtimeCtx.bcsUsed
 });
 
-  targetsCore = applyBuffaloNutritionRules(targetsCore, context);
 
   const refBw = Number(runtimeCtx.breedDefaults?.bodyWeightKg || runtimeCtx.bodyWeightKgUsed || 0);
   const actualBw = Number(runtimeCtx.bodyWeightKgUsed || refBw || 0);
@@ -734,34 +733,32 @@ function buildNutritionCentralTargets(context = {}) {
     (0.0547 * Number(runtimeCtx.milkProteinPctUsed || 3.2)) +
     (0.0395 * 4.8);
 
-  const milkEnergyFactorBase = milkEnergyRef > 0 ? (milkEnergyActual / milkEnergyRef) : 1;
-  const buffaloMilkEnergyFactor = getBuffaloMilkEnergyFactor(context.species, context.breed);
-  const buffaloDmiFactor = getBuffaloDmiFactor(context.species, context.breed);
+const milkEnergyFactorBase = milkEnergyRef > 0 ? (milkEnergyActual / milkEnergyRef) : 1;
+const buffaloMilkEnergyFactor = 1;
+const buffaloDmiFactor = 1;
 
   const thiDmiFactor = getThiDmiFactor(runtimeCtx.thiUsed);
   const growthFactor = getGrowthFactor(runtimeCtx.lactationNumberUsed);
   const bcsNelFactor = getBcsNelFactor(runtimeCtx.bcsUsed);
   const proteinFactor = Number(runtimeCtx.milkProteinPctUsed || 3.2) / 3.2;
 
-  if (Number.isFinite(Number(targetsCore?.dmi))) {
-    targetsCore.dmi = round2(
-      Number(targetsCore.dmi) *
-      bwFactor *
-      thiDmiFactor *
-      buffaloDmiFactor
-    );
-  }
+if (Number.isFinite(Number(targetsCore?.dmi))) {
+  targetsCore.dmi = round2(
+    Number(targetsCore.dmi) *
+    bwFactor *
+    thiDmiFactor
+  );
+}
 
-  if (Number.isFinite(Number(targetsCore?.nel))) {
-    targetsCore.nel = round2(
-      Number(targetsCore.nel) *
-      bwFactor *
-      milkEnergyFactorBase *
-      buffaloMilkEnergyFactor *
-      growthFactor *
-      bcsNelFactor
-    );
-  }
+if (Number.isFinite(Number(targetsCore?.nel))) {
+  targetsCore.nel = round2(
+    Number(targetsCore.nel) *
+    bwFactor *
+    milkEnergyFactorBase *
+    growthFactor *
+    bcsNelFactor
+  );
+}
 
   if (Number.isFinite(Number(targetsCore?.cpTarget))) {
     const cpAfterProtein = Number(targetsCore.cpTarget) * proteinFactor;
