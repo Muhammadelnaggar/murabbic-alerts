@@ -2380,21 +2380,38 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
 
       const evNutAll = evSnapNut.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
 
-      const nutritionEvents = evNutAll
-        .map(e => {
-          const txt = String(e.eventTypeNorm || e.eventType || e.type || '').toLowerCase().trim();
-          const ms = getEventMsSrv(e);
-          return { ...e, _txt: txt, _ms: ms };
-        })
-        .filter(e =>
-          (
-            e._txt === 'nutrition' ||
-            e._txt === 'nutrition_group' ||
-            e._txt.includes('nutrition') ||
-            e._txt.includes('تغذية')
-          ) &&
-          e?.nutrition?.analysis
-        );
+const nutritionEvents = evNutAll
+  .map(e => {
+    const txt = String(e.eventTypeNorm || e.eventType || e.type || '').toLowerCase().trim();
+    const ms = getEventMsSrv(e);
+
+    const ctxSpecies = String(
+      e?.nutrition?.context?.species ||
+      e?.species ||
+      e?.animalTypeAr ||
+      e?.animaltype ||
+      ''
+    ).trim().toLowerCase();
+
+    const matchesType =
+      herdType === 'cows'
+        ? (ctxSpecies.includes('بقر') || ctxSpecies.includes('cow'))
+        : herdType === 'buffalo'
+          ? (ctxSpecies.includes('جاموس') || ctxSpecies.includes('buffalo'))
+          : true;
+
+    return { ...e, _txt: txt, _ms: ms, _matchesType: matchesType };
+  })
+  .filter(e =>
+    (
+      e._txt === 'nutrition' ||
+      e._txt === 'nutrition_group' ||
+      e._txt.includes('nutrition') ||
+      e._txt.includes('تغذية')
+    ) &&
+    e?.nutrition?.analysis &&
+    e._matchesType
+  );
 
       const latestByBand = new Map();
 
@@ -2426,11 +2443,15 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
         feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'));
       }
 
-         feedBands.overall = weightedFeedBands([
-        feedBands.high,
-        feedBands.medium,
-        feedBands.low
-      ]);
+if (latestByBand.has('overall')) {
+  feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
+} else {
+  feedBands.overall = weightedFeedBands([
+    feedBands.high,
+    feedBands.medium,
+    feedBands.low
+  ]);
+}
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
