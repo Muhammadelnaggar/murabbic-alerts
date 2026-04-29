@@ -926,7 +926,32 @@ function workbookSheetToRows(workbook, sheetName){
     raw: false
   });
 }
+function pickPreferredMilkSheet(workbook){
+  const names = workbook.SheetNames || [];
+  if (!names.length) return null;
 
+  for (const name of names){
+    const rows = workbookSheetToRows(workbook, name);
+    if (!rows.length) continue;
+
+    const header = (rows[0] || []).map(v => normalizeHeaderCell(v));
+    const hasAnimal =
+      header.some(h => h.includes('animal number') || h.includes('animal id') || h.includes('رقم الحيوان'));
+    const hasMorning =
+      header.some(h => h.includes('morning milk') || h.includes('morning') || h.includes('حلبة 1'));
+    const hasNight =
+      header.some(h => h.includes('night milk') || h.includes('evening milk') || h.includes('evening') || h.includes('حلبة 2'));
+    const hasTotal =
+      header.some(h => h.includes('total milk') || h === 'total' || h.includes('yield'));
+
+    // الأفضل لملفات الجاموس ذات الحلبتين
+    if (hasAnimal && hasMorning && hasNight && hasTotal){
+      return { sheetName: name, rows };
+    }
+  }
+
+  return null;
+}
 function pickBestSheet(workbook){
   const names = workbook.SheetNames || [];
   if (!names.length) return { sheetName:'', rows:[] };
@@ -957,13 +982,15 @@ async function readExcelFileAsText(file){
     throw new Error('EMPTY_WORKBOOK');
   }
 
-  const picked = pickBestSheet(workbook);
-  if (!picked.sheetName || !picked.rows?.length){
-    throw new Error('NO_VALID_SHEET');
-  }
+const preferred = pickPreferredMilkSheet(workbook);
+const picked = preferred || pickBestSheet(workbook);
 
-  selectedSheetName = picked.sheetName;
-  return sheetRowsToText(picked.rows);
+if (!picked.sheetName || !picked.rows?.length){
+  throw new Error('NO_VALID_SHEET');
+}
+
+selectedSheetName = picked.sheetName;
+return sheetRowsToText(picked.rows);
 }
 function parseRawText(text){
   const lines = String(text || '')
