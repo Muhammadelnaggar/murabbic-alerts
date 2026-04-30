@@ -702,67 +702,7 @@ function buildNutritionCentralTargets(context = {}) {
 };
 }
 
-  const isBuffalo = isBuffaloSpecies(species);
 
-  const rough = Number(roughPctDM || 0);
-  let ndfTarget = Number(baseNdfTarget || (isBuffalo ? 34 : 30));
-  let starchMax = Number(baseStarchMax || (isBuffalo ? 22 : 28));
-  let roughageMin = Number(baseRoughageMin || (isBuffalo ? 50 : 40));
-  let peNDFMin = Number(basePeNDFMin || (isBuffalo ? 21 : 18));
-  // جاموس
-  if (isBuffalo) {
-    if (rough < 45) {
-      ndfTarget = 36;
-      starchMax = 20;
-      roughageMin = 50;
-      peNDFMin = 23;
-    } else if (rough < 50) {
-      ndfTarget = 35;
-      starchMax = 21;
-      roughageMin = 50;
-      peNDFMin = 22;
-    } else if (rough <= 65) {
-      ndfTarget = 34;
-      starchMax = 22;
-      roughageMin = 50;
-      peNDFMin = 21;
-    } else {
-      ndfTarget = 33;
-      starchMax = 20;
-      roughageMin = 55;
-    }
-  } else {
-    // أبقار
-    if (rough < 35) {
-      ndfTarget = 32;
-      starchMax = 24;
-      roughageMin = 40;
-      peNDFMin = 20;
-    } else if (rough < 40) {
-      ndfTarget = 31;
-      starchMax = 26;
-      roughageMin = 40;
-      peNDFMin = 19;
-    } else if (rough <= 60) {
-      ndfTarget = 30;
-      starchMax = 28;
-      roughageMin = 40;
-      peNDFMin = 18;
-    } else {
-      ndfTarget = 31;
-      starchMax = 24;
-      roughageMin = 50;
-      peNDFMin = 19;
-    }
-  }
-
-  return {
-    ndfTarget,
-    starchMax,
-    roughageMin,
-     peNDFMin
-  };
-}
 function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
   const cleanRows = Array.isArray(rows) ? rows : [];
 const modeNorm = String(mode || 'tmr_asfed').trim();
@@ -1022,8 +962,7 @@ peNDFMin: targetsCore?.peNDFMin ?? null
       lactationNumberUsed: runtimeCtx.lactationNumberUsed,
       thiUsed: runtimeCtx.thiUsed,
       bcsUsed: runtimeCtx.bcsUsed,
-      buffaloMilkEnergyFactor: isBuffaloSpecies(context.species) ? buffaloMilkEnergyFactor : 1,
-      buffaloDmiFactor: isBuffaloSpecies(context.species) ? buffaloDmiFactor : 1
+      
     }
   });
 }
@@ -1350,8 +1289,7 @@ app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
           lactationNumberUsed: built.runtimeCtx.lactationNumberUsed,
           thiUsed: built.runtimeCtx.thiUsed,
           bcsUsed: built.runtimeCtx.bcsUsed,
-          buffaloMilkEnergyFactor: built.buffaloMilkEnergyFactor,
-          buffaloDmiFactor: built.buffaloDmiFactor
+          
         }
       })
     });
