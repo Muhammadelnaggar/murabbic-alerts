@@ -584,22 +584,7 @@ function getBreedNutritionDefaults(species, breed) {
   return BREED_NUTRITION_DEFAULTS[key] || BREED_NUTRITION_DEFAULTS.default_cow;
 }
 
-function getThiDmiFactor(thi) {
-  const n = Number(thi);
-  if (!Number.isFinite(n)) return 1;
-  if (n >= 79) return 0.90;
-  if (n >= 73) return 0.94;
-  if (n >= 68) return 0.97;
-  return 1;
-}
 
-function getGrowthFactor(lactationNumber) {
-  const n = Number(lactationNumber);
-  if (!Number.isFinite(n)) return 1;
-  if (n === 1) return 1.10;
-  if (n === 2) return 1.05;
-  return 1;
-}
 function isBuffaloSpecies(species = '') {
   return /جاموس|buffalo/i.test(String(species || '').trim());
 }
@@ -643,13 +628,7 @@ function applyBuffaloNutritionRules(targetsCore = {}, context = {}) {
 
   return targetsCore;
 }
-function getBcsNelFactor(bcs) {
-  const n = Number(bcs);
-  if (!Number.isFinite(n)) return 1;
-  if (n < 2.75) return 1.03;
-  if (n > 3.75) return 0.98;
-  return 1;
-}
+
 
 function deriveNutritionRuntimeContext(context = {}) {
   const breedDefaults = getBreedNutritionDefaults(context.species, context.breed);
@@ -716,79 +695,13 @@ function buildNutritionCentralTargets(context = {}) {
 });
 
 
-  const refBw = Number(runtimeCtx.breedDefaults?.bodyWeightKg || runtimeCtx.bodyWeightKgUsed || 0);
-  const actualBw = Number(runtimeCtx.bodyWeightKgUsed || refBw || 0);
 
-  const bwFactor = (refBw > 0 && actualBw > 0)
-    ? Math.pow(actualBw / refBw, 0.75)
-    : 1;
-
-  const milkEnergyRef =
-    (0.0929 * 3.7) +
-    (0.0547 * 3.2) +
-    (0.0395 * 4.8);
-
-  const milkEnergyActual =
-    (0.0929 * Number(runtimeCtx.milkFatPctUsed || 3.7)) +
-    (0.0547 * Number(runtimeCtx.milkProteinPctUsed || 3.2)) +
-    (0.0395 * 4.8);
-
-const milkEnergyFactorBase = milkEnergyRef > 0 ? (milkEnergyActual / milkEnergyRef) : 1;
-const buffaloMilkEnergyFactor = 1;
-const buffaloDmiFactor = 1;
-
-  const thiDmiFactor = getThiDmiFactor(runtimeCtx.thiUsed);
-  const growthFactor = getGrowthFactor(runtimeCtx.lactationNumberUsed);
-  const bcsNelFactor = getBcsNelFactor(runtimeCtx.bcsUsed);
-  const proteinFactor = Number(runtimeCtx.milkProteinPctUsed || 3.2) / 3.2;
-
-if (Number.isFinite(Number(targetsCore?.dmi))) {
-  targetsCore.dmi = round2(
-    Number(targetsCore.dmi) *
-    bwFactor *
-    thiDmiFactor
-  );
+ return {
+  targetsCore,
+  runtimeCtx
+};
 }
 
-if (Number.isFinite(Number(targetsCore?.nel))) {
-  targetsCore.nel = round2(
-    Number(targetsCore.nel) *
-    bwFactor *
-    milkEnergyFactorBase *
-    growthFactor *
-    bcsNelFactor
-  );
-}
-
-  if (Number.isFinite(Number(targetsCore?.cpTarget))) {
-    const cpAfterProtein = Number(targetsCore.cpTarget) * proteinFactor;
-    targetsCore.cpTarget = round2(
-      isBuffaloSpecies(context.species)
-        ? cpAfterProtein
-        : cpAfterProtein * growthFactor
-    );
-  }
-if (!Number.isFinite(Number(targetsCore?.cpTarget))) {
-  const cpRef = Number(targetsCore?.cpReferencePct);
-  if (Number.isFinite(cpRef)) {
-    targetsCore.cpTarget = round2(cpRef);
-  }
-}
-  return {
-    targetsCore,
-    runtimeCtx,
-    buffaloMilkEnergyFactor: isBuffaloSpecies(context.species) ? buffaloMilkEnergyFactor : 1,
-    buffaloDmiFactor: isBuffaloSpecies(context.species) ? buffaloDmiFactor : 1
-  };
-}
-function deriveFiberStarchTargets({
-  species,
-  roughPctDM,
-  baseNdfTarget,
-  baseStarchMax,
-  baseRoughageMin,
-   basePeNDFMin
-}) {
   const isBuffalo = isBuffaloSpecies(species);
 
   const rough = Number(roughPctDM || 0);
@@ -857,8 +770,6 @@ const modeNorm = String(mode || 'tmr_asfed').trim();
 const builtTargets = buildNutritionCentralTargets(context);
 const runtimeCtx = builtTargets.runtimeCtx;
 const targetsCore = builtTargets.targetsCore;
-const buffaloMilkEnergyFactor = builtTargets.buffaloMilkEnergyFactor;
-const buffaloDmiFactor = builtTargets.buffaloDmiFactor;
 
 const rationCore = analyzeRation(
   cleanRows.map(r => ({
@@ -1013,19 +924,7 @@ const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100
 
 let rumenStatus = null;
 let rumenNote = null;
-const dynamicFiberTargets = deriveFiberStarchTargets({
-  species: context?.species,
-  roughPctDM,
-  baseNdfTarget: targetsCore?.ndfTarget,
-  baseStarchMax: targetsCore?.starchMax,
-  baseRoughageMin: targetsCore?.roughageMin,
-   basePeNDFMin: targetsCore?.peNDFMin
-});
 
-targetsCore.ndfTarget = dynamicFiberTargets.ndfTarget;
-targetsCore.starchMax = dynamicFiberTargets.starchMax;
-targetsCore.roughageMin = dynamicFiberTargets.roughageMin;
-targetsCore.peNDFMin = dynamicFiberTargets.peNDFMin; 
 if (totalDmForRumen <= 0) {
   rumenStatus = 'warn';
   rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
