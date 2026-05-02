@@ -19,6 +19,39 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+// SOURCE: NASEM_2021_EQ_2_2
+// Diet/ration effect DMI equation for lactating cows.
+// Applies only when ration forage-NDF, ADF/NDF, fNDFD, and milk yield are available.
+function predictCowLactatingDMIRationEffect({ fNDFPct, adfPct, ndfPct, fNDFDPct, milkKg }){
+  const fNDF = num(fNDFPct);
+  const ADF_NDF = safeDiv(num(adfPct), num(ndfPct));
+  const rawFNDFD = Number(fNDFDPct);
+  const fNDFD = Number.isFinite(rawFNDFD) && rawFNDFD > 0 ? rawFNDFD : 52.0;
+  const MY = num(milkKg);
+
+  if (!fNDF || !ADF_NDF || !MY) return null;
+
+  const dmi =
+    12.0
+    - (0.107 * fNDF)
+    + (8.17 * ADF_NDF)
+    + (0.0253 * fNDFD)
+    - (0.328 * (ADF_NDF - 0.602) * (fNDFD - 48.3))
+    + (0.225 * MY)
+    + (0.00390 * (fNDFD - 48.3) * (MY - 33.1));
+
+  return {
+    model: 'NASEM_2021_EQ_2_2',
+    dmi: round(dmi),
+    inputs: {
+      fNDFPct: round(fNDF),
+      adfNdfRatio: round(ADF_NDF, 3),
+      fNDFDPct: round(fNDFD),
+      milkKg: round(MY)
+    },
+    usedFNDFDFallback: !(Number.isFinite(rawFNDFD) && rawFNDFD > 0)
+  };
+}
 function inferPef(row = {}){
   const explicit = Number(row.pef);
   if (Number.isFinite(explicit) && explicit >= 0) return explicit;
@@ -109,10 +142,15 @@ function analyzeRation(rows, targets = {}, context = {}){
   let cpKg = 0;
   let mpSupplyG = 0;
   let nelMcal = 0;
-  let ndfKg = 0;
-  let peNdfKg = 0;
-  let fatKg = 0;
-  let starchKg = 0;
+ let ndfKg = 0;
+let adfKg = 0;
+let peNdfKg = 0;
+let fatKg = 0;
+let starchKg = 0;
+
+let forageNdfKg = 0;
+let forageNdfdWeightedSum = 0;
+let forageNdfdWeightKg = 0;
 
   let forageDmKg = 0;
   let concDmKg = 0;
@@ -128,9 +166,11 @@ function analyzeRation(rows, targets = {}, context = {}){
     const cp = num(r.cp ?? r.cpPct);
     const mp = num(r.mp ?? r.mpGPerKgDM);
     const nel = num(r.nel ?? r.nelMcalPerKgDM);
-    const ndf = num(r.ndf ?? r.ndfPct);
-    const fat = num(r.fat ?? r.fatPct);
-    const starch = num(r.starchPct ?? r.starch);
+const ndf = num(r.ndf ?? r.ndfPct);
+const adf = num(r.adf ?? r.adfPct);
+const fat = num(r.fat ?? r.fatPct);
+const starch = num(r.starchPct ?? r.starch);
+const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDigestibilityPct);
     const cat = String(r.cat || '').trim();
     const pef = inferPef(r);
    
@@ -157,13 +197,25 @@ function analyzeRation(rows, targets = {}, context = {}){
 }
     nelMcal += dmItemKg * nel;
     ndfKg += dmItemKg * (ndf / 100);
-    peNdfKg += dmItemKg * (ndf / 100) * pef;
-    fatKg += dmItemKg * (fat / 100);
+adfKg += dmItemKg * (adf / 100);
+peNdfKg += dmItemKg * (ndf / 100) * pef;
+fatKg += dmItemKg * (fat / 100);
     starchKg += dmItemKg * (starch / 100);
     totalCost += kg * priceKg;
 
-    if (cat === 'rough') forageDmKg += dmItemKg;
-    if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
+    if (cat === 'rough') {
+  forageDmKg += dmItemKg;
+
+  const forageNdfItemKg = dmItemKg * (ndf / 100);
+  forageNdfKg += forageNdfItemKg;
+
+  if (Number.isFinite(fNDFD) && fNDFD > 0 && forageNdfItemKg > 0) {
+    forageNdfdWeightedSum += forageNdfItemKg * fNDFD;
+    forageNdfdWeightKg += forageNdfItemKg;
+  }
+}
+
+if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
   }
 
   const cpPctTotal = dmKg > 0 ? (cpKg / dmKg) * 100 : 0;
@@ -171,9 +223,14 @@ function analyzeRation(rows, targets = {}, context = {}){
   const nelTotalMcalDay = nelMcal;
   const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
-  const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
-  const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
-  const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
+const adfPctActual = dmKg > 0 ? (adfKg / dmKg) * 100 : 0;
+const forageNdfPctDiet = dmKg > 0 ? (forageNdfKg / dmKg) * 100 : 0;
+const weightedForageNdfDigestibilityPct =
+  forageNdfdWeightKg > 0 ? (forageNdfdWeightedSum / forageNdfdWeightKg) : null;
+
+const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
+const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
+const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
 
   const roughPctDM = dmKg > 0 ? (forageDmKg / dmKg) * 100 : 0;
   const concPctDM = dmKg > 0 ? (concDmKg / dmKg) * 100 : 0;
@@ -212,8 +269,62 @@ if (mpTargetG && mpSupplyG < mpTargetG) {
   const dmPerKgMilk = avgMilkKg > 0 ? (dmKg / avgMilkKg) : 0;
   const milkMargin = milkRevenue - totalCost;
 
-  const fpcmKg = calcFpcmKg(avgMilkKg, milkFatPct);
-  const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
+ const fpcmKg = calcFpcmKg(avgMilkKg, milkFatPct);
+const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
+
+const speciesText = String(context?.species || '').trim().toLowerCase();
+const isBuffalo = /جاموس|buffalo/.test(speciesText);
+const dim = num(context?.daysInMilk ?? context?.dim);
+const canApplyNasemRationDmi =
+  !isBuffalo &&
+  avgMilkKg > 0 &&
+  dim > 60 &&
+  forageNdfPctDiet > 0 &&
+  adfPctActual > 0 &&
+  ndfPctActual > 0;
+
+const rationDmiCalc = canApplyNasemRationDmi
+  ? predictCowLactatingDMIRationEffect({
+      fNDFPct: forageNdfPctDiet,
+      adfPct: adfPctActual,
+      ndfPct: ndfPctActual,
+      fNDFDPct: weightedForageNdfDigestibilityPct,
+      milkKg: avgMilkKg
+    })
+  : null;
+
+const dmiRationEffect = rationDmiCalc
+  ? {
+      model: 'NASEM_2021_EQ_2_2',
+      applied: true,
+      rationDmiKg: rationDmiCalc.dmi,
+      animalDmiTargetKg: round(dmiTarget),
+      constraintKg: round(rationDmiCalc.dmi - dmiTarget),
+      status: dmiTarget && rationDmiCalc.dmi < dmiTarget - 1 ? 'limited_by_ration' : 'not_limited',
+      usedFNDFDFallback: rationDmiCalc.usedFNDFDFallback,
+      inputs: rationDmiCalc.inputs,
+      note: dmiTarget && rationDmiCalc.dmi < dmiTarget - 1
+        ? 'العليقة قد تحدّ استهلاك المادة الجافة بسبب تأثير الألياف أو هضم الخشن'
+        : 'العليقة لا تبدو محددة لاستهلاك المادة الجافة حسب نموذج NASEM 2021 Eq. 2-2'
+    }
+  : {
+      model: 'NASEM_2021_EQ_2_2',
+      applied: false,
+      rationDmiKg: null,
+      animalDmiTargetKg: round(dmiTarget),
+      constraintKg: null,
+      status: 'not_applied',
+      usedFNDFDFallback: false,
+      inputs: {
+        fNDFPct: round(forageNdfPctDiet),
+        adfPct: round(adfPctActual),
+        ndfPct: round(ndfPctActual),
+        fNDFDPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
+        milkKg: round(avgMilkKg),
+        dim: round(dim, 0)
+      },
+      note: 'لم يتم تطبيق Eq. 2-2 لأن شروط التطبيق أو بيانات العليقة غير مكتملة'
+    };
 
 const rumenState = estimateRumenState({
   starchPct,
@@ -259,8 +370,11 @@ const rumenState = estimateRumenState({
       nelDensity: round(nelDensityMcalKgDM),
       nelBalanceMcal: round(nelMcal - nelTarget),
       ndfPctActual: round(ndfPctActual),
-      peNDFPctActual: round(peNDFPctActual),
-      fatPctActual: round(fatPctActual),
+adfPctActual: round(adfPctActual),
+forageNdfPctDiet: round(forageNdfPctDiet),
+forageNdfDigestibilityPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
+peNDFPctActual: round(peNDFPctActual),
+fatPctActual: round(fatPctActual),
       starchPct: round(starchPct),
       roughPctDM: round(roughPctDM),
       concPctDM: round(concPctDM),
@@ -270,7 +384,8 @@ const rumenState = estimateRumenState({
         status: rumenState.status,
         note: rumenState.note
       },
-      dmBalanceKg: round(dmBalanceKg)
+     dmBalanceKg: round(dmBalanceKg),
+dmiRationEffect
     },
     economics: {
       costPerKgMilk: round(costPerKgMilk),
