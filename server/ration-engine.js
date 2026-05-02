@@ -67,10 +67,22 @@ const NASEM_MICROBIAL = {
   rdpCapPctDM: 12
 };
 
+// SOURCE: NASEM_2021_TABLE_6_2
+// Microbial AA composition, g AA_corr / 100 g TP.
+// Adapted in NASEM from Sok et al. (2017) with correction factors from Lapierre et al. (2019).
 function defaultMicrobialAaProfilePctTP(){
-  // SOURCE REQUIRED FROM NASEM_2021_TABLE_6_2 BEFORE FINAL LOCK.
-  // Empty now by design: no invented AA composition.
-  return null;
+  return {
+    Arg: 5.47,
+    His: 2.21,
+    Ile: 6.99,
+    Leu: 9.23,
+    Lys: 9.44,
+    Met: 2.63,
+    Phe: 6.30,
+    Thr: 6.23,
+    Trp: 1.37,
+    Val: 6.88
+  };
 }
 
 function predictMicrobialProteinNasem({
