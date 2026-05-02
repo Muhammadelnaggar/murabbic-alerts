@@ -19,6 +19,70 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+// SOURCE: NASEM_2021_TABLE_4_1
+// Total-tract digestibility coefficients of fatty acids by source class.
+function resolveFaDigestibilityCoeff(row = {}){
+  const explicit = Number(row.faDigestibilityCoeff ?? row.faDigestibility ?? row.faDigCoeff);
+  if (Number.isFinite(explicit) && explicit > 0 && explicit <= 1) {
+    return {
+      coeff: explicit,
+      sourceClass: 'explicit_feed_value',
+      source: 'FEED_LIBRARY'
+    };
+  }
+
+  const rawClass = String(row.fatClass ?? row.faSourceClass ?? row.fatSourceClass ?? '').trim().toLowerCase();
+  const name = String(row.name || row.feedName || '').trim().toLowerCase();
+  const cat = String(row.cat || '').trim().toLowerCase();
+
+  const text = `${rawClass} ${name}`;
+
+  if (/palmitic.*stearic.*90|stearic.*90|c18:0.*90/.test(text)) {
+    return { coeff: 0.31, sourceClass: 'palmitic_or_stearic_gt_90', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/extensively.*saturated|hydrogenated|مشبع.*جدا/.test(text)) {
+    return { coeff: 0.44, sourceClass: 'extensively_saturated_triglycerides', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/saturated.*triglyceride|مشبع/.test(text)) {
+    return { coeff: 0.61, sourceClass: 'saturated_fa_enriched_triglycerides', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/calcium.*salt|palm.*calcium|ca.*salt|املاح.*كالسيوم|كالسيوم.*دهن/.test(text)) {
+    return { coeff: 0.76, sourceClass: 'calcium_salts_palm_fatty_acid', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/palmitic.*85|c16:0.*85/.test(text)) {
+    return { coeff: 0.73, sourceClass: 'palmitic_acid_85', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/nonesterified|free fatty acid|ffa/.test(text)) {
+    return { coeff: 0.69, sourceClass: 'saturated_fa_enriched_nonesterified_fa', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/tallow|شحم/.test(text)) {
+    return { coeff: 0.68, sourceClass: 'tallow_triglyceride', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/blend|blended|خليط دهون|دهن مخلوط/.test(text)) {
+    return { coeff: 0.63, sourceClass: 'blended_triglyceride', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/oil|زيت/.test(text)) {
+    return { coeff: 0.70, sourceClass: 'oil', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  if (/seed|بذره|بذور|cottonseed|soybean|sunflower|canola|flax/.test(text)) {
+    return { coeff: 0.73, sourceClass: 'oil_seeds', source: 'NASEM_2021_TABLE_4_1' };
+  }
+
+  return {
+    coeff: 0.73,
+    sourceClass: cat === 'add' ? 'common_feeds_default_for_additive_review' : 'common_feeds',
+    source: 'NASEM_2021_TABLE_4_1'
+  };
+}
 // SOURCE: NASEM_2021_EQ_2_2
 // Diet/ration effect DMI equation for lactating cows.
 // Applies only when ration forage-NDF, ADF/NDF, fNDFD, and milk yield are available.
@@ -146,6 +210,12 @@ function analyzeRation(rows, targets = {}, context = {}){
 let adfKg = 0;
 let peNdfKg = 0;
 let fatKg = 0;
+let faKg = 0;
+let digestibleFaKg = 0;
+let faCoeffWeightedSum = 0;
+let faCoeffWeightKg = 0;
+let missingFaRows = 0;
+let fatSupplementFaKg = 0;
 let starchKg = 0;
 
 let forageNdfKg = 0;
@@ -169,6 +239,10 @@ let forageNdfdWeightKg = 0;
 const ndf = num(r.ndf ?? r.ndfPct);
 const adf = num(r.adf ?? r.adfPct);
 const fat = num(r.fat ?? r.fatPct);
+const rawFA = Number(r.faPct ?? r.fattyAcidsPct ?? r.totalFaPct ?? r.totalFAPct);
+const fa = Number.isFinite(rawFA) && rawFA > 0 ? rawFA : fat;
+const faUsesFatFallback = !(Number.isFinite(rawFA) && rawFA > 0);
+const faDig = resolveFaDigestibilityCoeff(r);
 const starch = num(r.starchPct ?? r.starch);
 const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDigestibilityPct);
     const cat = String(r.cat || '').trim();
@@ -200,7 +274,25 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
 adfKg += dmItemKg * (adf / 100);
 peNdfKg += dmItemKg * (ndf / 100) * pef;
 fatKg += dmItemKg * (fat / 100);
-    starchKg += dmItemKg * (starch / 100);
+
+const faItemKg = dmItemKg * (fa / 100);
+faKg += faItemKg;
+digestibleFaKg += faItemKg * faDig.coeff;
+
+if (faItemKg > 0) {
+  faCoeffWeightedSum += faItemKg * faDig.coeff;
+  faCoeffWeightKg += faItemKg;
+}
+
+if (faUsesFatFallback && fat > 0) {
+  missingFaRows++;
+}
+
+if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
+  fatSupplementFaKg += faItemKg;
+}
+
+starchKg += dmItemKg * (starch / 100);
     totalCost += kg * priceKg;
 
     if (cat === 'rough') {
@@ -230,6 +322,11 @@ const weightedForageNdfDigestibilityPct =
 
 const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
 const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
+const faPctActual = dmKg > 0 ? (faKg / dmKg) * 100 : 0;
+const digestibleFaPctActual = dmKg > 0 ? (digestibleFaKg / dmKg) * 100 : 0;
+const faDigestibilityCoeffWeighted =
+  faCoeffWeightKg > 0 ? (faCoeffWeightedSum / faCoeffWeightKg) : 0;
+const fatSupplementFAPctDM = dmKg > 0 ? (fatSupplementFaKg / dmKg) * 100 : 0;
 const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
 
   const roughPctDM = dmKg > 0 ? (forageDmKg / dmKg) * 100 : 0;
@@ -325,7 +422,27 @@ const dmiRationEffect = rationDmiCalc
       },
       note: 'لم يتم تطبيق Eq. 2-2 لأن شروط التطبيق أو بيانات العليقة غير مكتملة'
     };
-
+const fatModel = {
+  model: 'NASEM_2021_TABLE_4_1_FA_DIGESTIBILITY',
+  totalFatKg: round(fatKg),
+  totalFatPctDM: round(fatPctActual),
+  totalFAKg: round(faKg),
+  totalFAPctDM: round(faPctActual),
+  digestibleFAKg: round(digestibleFaKg),
+  digestibleFAPctDM: round(digestibleFaPctActual),
+  faDigestibilityCoeffWeighted: round(faDigestibilityCoeffWeighted, 3),
+  fatSupplementFAPctDM: round(fatSupplementFAPctDM),
+  missingFaRows,
+  faValueSource: missingFaRows > 0 ? 'fatPct_fallback_used_for_some_feeds' : 'explicit_fa_values',
+  warning:
+    fatSupplementFAPctDM >= 3
+      ? 'إضافات الدهون مرتفعة؛ نموذج NASEM 2021 قد يبالغ في تقدير هضم FA وطاقة العليقة عند مستويات الإضافة العالية'
+      : (
+          missingFaRows > 0
+            ? 'بعض الخامات لا تحتوي FA صريح؛ تم استخدام fatPct كبديل داخلي وليس كقيمة NASEM موثقة'
+            : ''
+        )
+};
 const rumenState = estimateRumenState({
   starchPct,
   ndfPctActual,
@@ -347,6 +464,8 @@ const rumenState = estimateRumenState({
       ndfKg: round(ndfKg),
       peNdfKg: round(peNdfKg),
       fatKg: round(fatKg),
+      faKg: round(faKg),
+      digestibleFaKg: round(digestibleFaKg),
       starchKg: round(starchKg),
       forageDmKg: round(forageDmKg),
       concDmKg: round(concDmKg),
@@ -375,7 +494,10 @@ forageNdfPctDiet: round(forageNdfPctDiet),
 forageNdfDigestibilityPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
 peNDFPctActual: round(peNDFPctActual),
 fatPctActual: round(fatPctActual),
-      starchPct: round(starchPct),
+faPctActual: round(faPctActual),
+digestibleFaPctActual: round(digestibleFaPctActual),
+fatModel,
+starchPct: round(starchPct),
       roughPctDM: round(roughPctDM),
       concPctDM: round(concPctDM),
       fcRatio: fcRatio == null ? null : round(fcRatio),
