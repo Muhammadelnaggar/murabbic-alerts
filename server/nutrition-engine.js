@@ -107,8 +107,9 @@ function cowBreedFactors(breed){
 /*       NASEM CORE HELPERS      */
 /* ============================= */
 
-// ECM approximation for operational use
-function milkEnergyCorrectedKg(milkKg, fatPct, proteinPct){
+// SOURCE: NASEM_2021_EQ_2_1_INPUT
+// MilkE = milk energy output, Mcal/day
+function milkEnergyMcalDay(milkKg, fatPct, proteinPct){
   const milk = num(milkKg);
   const fat  = num(fatPct, 3.7);
   const prot = num(proteinPct, 3.2);
@@ -119,12 +120,18 @@ function milkEnergyCorrectedKg(milkKg, fatPct, proteinPct){
   return (0.327 * milk) + (12.95 * fatKg) + (7.20 * protKg);
 }
 
+// Backward-compatible alias.
+// الاسم القديم كان مضللًا لأنه لا يرجع kg بل Mcal/day.
+function milkEnergyCorrectedKg(milkKg, fatPct, proteinPct){
+  return milkEnergyMcalDay(milkKg, fatPct, proteinPct);
+}
+
 // Operationalized NASEM-style lactating DMI
 // Chapter 2 emphasizes Equation 2-1 as primary animal-factor DMI predictor.
 // The official model needs specific fitted inputs; هنا نحافظ على نفس البنية العلمية بدل المعادلة المبسطة القديمة.
 function predictCowLactatingDMI({ bodyWeight, milkKg, fatPct, proteinPct, dim, bcs, parity }){
   const bw    = num(bodyWeight);
-  const milkE = milkEnergyCorrectedKg(milkKg, fatPct, proteinPct); // Mcal/d proxy
+ const milkE = milkEnergyMcalDay(milkKg, fatPct, proteinPct); // Mcal/day
   const DIM   = Math.max(1, num(dim, 1));
   const BCS   = clamp(num(bcs, 3.0), 2.0, 4.5);
 
@@ -344,6 +351,11 @@ function computeCow({
   return {
     species: 'cow',
     category: 'lactating',
+    dmiModel: {
+  animalSide: 'NASEM_2021_EQ_2_1',
+  status: 'verified',
+  milkEUnit: 'Mcal/day'
+},
     bodyWeight: bw,
     dim: Number.isFinite(days) ? Math.round(days) : null,
     dmi: round(dmi),
