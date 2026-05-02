@@ -19,6 +19,68 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+// SOURCE: NASEM_2021_TABLE_5_1
+// Carbohydrate safety guide for lactating cow TMR diets.
+// Uses forage NDF, total NDF, and starch.
+// No extrapolation below fNDF 15% DM.
+function evaluateCarbohydrateSafety({ forageNdfPctDiet, ndfPctActual, starchPct }){
+  const fNDF = num(forageNdfPctDiet);
+  const totalNDF = num(ndfPctActual);
+  const starch = num(starchPct);
+
+  if (!fNDF || !totalNDF) {
+    return {
+      model: 'NASEM_2021_TABLE_5_1',
+      applied: false,
+      status: 'not_applied',
+      reason: 'missing_forage_ndf_or_total_ndf',
+      note: 'لا يمكن تقييم أمان الكربوهيدرات بدون fNDF و total NDF'
+    };
+  }
+
+  if (fNDF < 15) {
+    return {
+      model: 'NASEM_2021_TABLE_5_1',
+      applied: true,
+      status: 'danger',
+      fNDFPctDM: round(fNDF),
+      totalNDFPctDM: round(totalNDF),
+      starchPctDM: round(starch),
+      minTotalNDFPctDM: 33,
+      maxStarchPctDM: 22,
+      note: 'fNDF أقل من نطاق جدول NASEM 2021؛ العليقة عالية الخطورة ولا يتم عمل extrapolation'
+    };
+  }
+
+  const fNDFForTable = Math.min(fNDF, 19);
+  const deficitFrom19 = 19 - fNDFForTable;
+
+  const minTotalNDF = 25 + (2 * deficitFrom19);
+  const maxStarch = 30 - (2 * deficitFrom19);
+
+  let status = 'good';
+  let note = 'توازن الكربوهيدرات مناسب حسب NASEM 2021 Table 5-1';
+
+  if (totalNDF < minTotalNDF || starch > maxStarch) {
+    status = 'danger';
+    note = 'خطر كربوهيدرات: total NDF أقل من المطلوب أو starch أعلى من الحد حسب NASEM 2021 Table 5-1';
+  } else if (totalNDF < minTotalNDF + 1 || starch > maxStarch - 1) {
+    status = 'warn';
+    note = 'الكربوهيدرات قريبة من حدود الأمان حسب NASEM 2021 Table 5-1';
+  }
+
+  return {
+    model: 'NASEM_2021_TABLE_5_1',
+    applied: true,
+    status,
+    fNDFPctDM: round(fNDF),
+    totalNDFPctDM: round(totalNDF),
+    starchPctDM: round(starch),
+    minTotalNDFPctDM: round(minTotalNDF),
+    maxStarchPctDM: round(maxStarch),
+    note
+  };
+}
 // SOURCE: NASEM_2021_TABLE_4_1
 // Total-tract digestibility coefficients of fatty acids by source class.
 function resolveFaDigestibilityCoeff(row = {}){
@@ -217,6 +279,12 @@ let faCoeffWeightKg = 0;
 let missingFaRows = 0;
 let fatSupplementFaKg = 0;
 let starchKg = 0;
+let wscKg = 0;
+let ndsfKg = 0;
+let ndscKg = 0;
+let nonForageNdfKg = 0;
+let missingWscRows = 0;
+let missingNdsfRows = 0;
 
 let forageNdfKg = 0;
 let forageNdfdWeightedSum = 0;
@@ -245,6 +313,15 @@ const fa = hasExplicitFA ? rawFA : 0;
 const faMissing = !hasExplicitFA && fat > 0;
 const faDig = resolveFaDigestibilityCoeff(r);
 const starch = num(r.starchPct ?? r.starch);
+
+const rawWSC = Number(r.wscPct ?? r.waterSolubleCarbsPct ?? r.waterSolubleCarbohydratesPct);
+const hasWSC = Number.isFinite(rawWSC) && rawWSC >= 0;
+const wsc = hasWSC ? rawWSC : 0;
+
+const rawNDSF = Number(r.ndsfPct ?? r.neutralDetergentSolubleFiberPct);
+const hasNDSF = Number.isFinite(rawNDSF) && rawNDSF >= 0;
+const ndsf = hasNDSF ? rawNDSF : 0;
+
 const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDigestibilityPct);
     const cat = String(r.cat || '').trim();
     const pef = inferPef(r);
@@ -294,9 +371,16 @@ if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
 }
 
 starchKg += dmItemKg * (starch / 100);
-    totalCost += kg * priceKg;
+wscKg += dmItemKg * (wsc / 100);
+ndsfKg += dmItemKg * (ndsf / 100);
+ndscKg += dmItemKg * ((starch + wsc + ndsf) / 100);
 
-    if (cat === 'rough') {
+if (!hasWSC) missingWscRows++;
+if (!hasNDSF) missingNdsfRows++;
+
+totalCost += kg * priceKg;
+
+if (cat === 'rough') {
   forageDmKg += dmItemKg;
 
   const forageNdfItemKg = dmItemKg * (ndf / 100);
@@ -306,6 +390,8 @@ starchKg += dmItemKg * (starch / 100);
     forageNdfdWeightedSum += forageNdfItemKg * fNDFD;
     forageNdfdWeightKg += forageNdfItemKg;
   }
+} else {
+  nonForageNdfKg += dmItemKg * (ndf / 100);
 }
 
 if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
@@ -329,6 +415,10 @@ const faDigestibilityCoeffWeighted =
   faCoeffWeightKg > 0 ? (faCoeffWeightedSum / faCoeffWeightKg) : 0;
 const fatSupplementFAPctDM = dmKg > 0 ? (fatSupplementFaKg / dmKg) * 100 : 0;
 const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
+const wscPctActual = dmKg > 0 ? (wscKg / dmKg) * 100 : 0;
+const ndsfPctActual = dmKg > 0 ? (ndsfKg / dmKg) * 100 : 0;
+const ndscPctActual = dmKg > 0 ? (ndscKg / dmKg) * 100 : 0;
+const nonForageNdfPctDiet = dmKg > 0 ? (nonForageNdfKg / dmKg) * 100 : 0;
 
   const roughPctDM = dmKg > 0 ? (forageDmKg / dmKg) * 100 : 0;
   const concPctDM = dmKg > 0 ? (concDmKg / dmKg) * 100 : 0;
@@ -444,6 +534,33 @@ warning:
           : ''
       )
 };
+ const carbohydrateSafetyModel = evaluateCarbohydrateSafety({
+  forageNdfPctDiet,
+  ndfPctActual,
+  starchPct
+});
+
+const carbohydrateModel = {
+  model: 'NASEM_2021_CH5_CARBOHYDRATE_FRACTIONS',
+  nfcUsedForFormulation: false,
+
+  ndfPctDM: round(ndfPctActual),
+  forageNdfPctDM: round(forageNdfPctDiet),
+  nonForageNdfPctDM: round(nonForageNdfPctDiet),
+
+  starchPctDM: round(starchPct),
+  wscPctDM: round(wscPctActual),
+  ndsfPctDM: round(ndsfPctActual),
+  ndscPctDM: round(ndscPctActual),
+
+  missingWscRows,
+  missingNdsfRows,
+
+  note:
+    (missingWscRows > 0 || missingNdsfRows > 0)
+      ? 'بعض الخامات لا تحتوي WSC أو NDSF؛ لن يتم حساب NDSC الكامل لها حتى تُستكمل مكتبة الخامات'
+      : 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
+}; 
 const rumenState = estimateRumenState({
   starchPct,
   ndfPctActual,
@@ -468,6 +585,10 @@ const rumenState = estimateRumenState({
       faKg: round(faKg),
       digestibleFaKg: round(digestibleFaKg),
       starchKg: round(starchKg),
+      wscKg: round(wscKg),
+      ndsfKg: round(ndsfKg),
+      ndscKg: round(ndscKg),
+      nonForageNdfKg: round(nonForageNdfKg),
       forageDmKg: round(forageDmKg),
       concDmKg: round(concDmKg),
       totCost: round(totalCost),
@@ -480,11 +601,13 @@ const rumenState = estimateRumenState({
       mpDensityGkgDM: round(mpDensityGkgDM, 0),
       mpBalanceG: round(mpBalanceG, 0),
       mpNote,
-      inputQuality: {
-        missingMpRows,
-        missingNelRows,
-        missingNdfRows,
-        missingStarchRows
+inputQuality: {
+  missingMpRows,
+  missingNelRows,
+  missingNdfRows,
+  missingStarchRows,
+  missingWscRows,
+  missingNdsfRows
 },
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
@@ -499,7 +622,13 @@ faPctActual: round(faPctActual),
 digestibleFaPctActual: round(digestibleFaPctActual),
 fatModel,
 starchPct: round(starchPct),
-      roughPctDM: round(roughPctDM),
+wscPctActual: round(wscPctActual),
+ndsfPctActual: round(ndsfPctActual),
+ndscPctActual: round(ndscPctActual),
+nonForageNdfPctDiet: round(nonForageNdfPctDiet),
+carbohydrateModel,
+carbohydrateSafetyModel,
+roughPctDM: round(roughPctDM),
       concPctDM: round(concPctDM),
       fcRatio: fcRatio == null ? null : round(fcRatio),
       rumenNote: rumenState.note,
