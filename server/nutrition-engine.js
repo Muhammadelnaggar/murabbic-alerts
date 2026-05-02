@@ -378,7 +378,153 @@ function computeNasemMPRequirement({
     note: 'MP target computed from NASEM 2021 factorial NP components; EAA targets are handled separately by Eq. 6-14b/6-14d.'
   };
 }
+// SOURCE: NASEM_2021_TABLE_6_2_AND_TABLE_6_4
+// EAA requirement keys: Table 6-4 target efficiencies.
+// Arg is not included because Table 6-4 does not provide a target efficiency for Arg.
+const NASEM_EAA_KEYS = ['His', 'Ile', 'Leu', 'Lys', 'Met', 'Phe', 'Thr', 'Trp', 'Val'];
 
+const NASEM_EAA_TARGET_EFF = {
+  His: 0.75,
+  Ile: 0.71,
+  Leu: 0.73,
+  Lys: 0.72,
+  Met: 0.73,
+  Phe: 0.60,
+  Thr: 0.64,
+  Trp: 0.86,
+  Val: 0.74
+};
+
+// SOURCE: NASEM_2021_TABLE_6_2
+// g AA / 100 g TP
+const NASEM_AA_PROFILE = {
+  scurf: {
+    His: 1.75,
+    Ile: 2.96,
+    Leu: 6.93,
+    Lys: 5.64,
+    Met: 1.40,
+    Phe: 3.61,
+    Thr: 4.01,
+    Trp: 0.73,
+    Val: 4.66
+  },
+  wholeEmptyBody: {
+    His: 3.04,
+    Ile: 3.69,
+    Leu: 8.27,
+    Lys: 7.90,
+    Met: 2.37,
+    Phe: 4.41,
+    Thr: 4.84,
+    Trp: 1.05,
+    Val: 5.15
+  },
+  metabolicFecal: {
+    His: 3.54,
+    Ile: 5.39,
+    Leu: 9.19,
+    Lys: 7.61,
+    Met: 1.73,
+    Phe: 5.28,
+    Thr: 7.36,
+    Trp: 1.79,
+    Val: 7.01
+  },
+  milk: {
+    His: 2.92,
+    Ile: 6.18,
+    Leu: 10.56,
+    Lys: 8.82,
+    Met: 3.03,
+    Phe: 5.26,
+    Thr: 4.62,
+    Trp: 1.65,
+    Val: 6.90
+  }
+};
+
+function aaFromProteinG(proteinG, profile){
+  const out = {};
+  for (const aa of NASEM_EAA_KEYS){
+    out[aa] = num(proteinG) * (num(profile?.[aa]) / 100);
+  }
+  return out;
+}
+
+function endogenousUrinaryEaaG(bodyWeight){
+  const bw = num(bodyWeight);
+  const out = {};
+
+  for (const aa of NASEM_EAA_KEYS){
+    // Eq. 6-8b: for all EAA except His
+    out[aa] = (0.010 * 6.25 * bw) * (NASEM_AA_PROFILE.wholeEmptyBody[aa] / 100);
+  }
+
+  // Eq. 6-8c: add urinary 3-methyl His
+  out.His += (7.82 + (0.55 * bw)) / 1000;
+
+  return out;
+}
+
+// SOURCE: NASEM_2021_EQ_6_7B_TO_6_14B_AND_6_14D
+// Target-side digestible EAA flow requirement.
+function computeNasemEAARequirements({
+  bodyWeight,
+  milkKg,
+  mpReq
+}){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const c = mpReq?.components || {};
+
+  const netScurf = aaFromProteinG(c.npScurfG, NASEM_AA_PROFILE.scurf);
+  const netMfp = aaFromProteinG(c.npMfpG, NASEM_AA_PROFILE.metabolicFecal);
+  const netMilk = aaFromProteinG(c.npMilkG, NASEM_AA_PROFILE.milk);
+  const netGrowth = aaFromProteinG(c.npGrowthG, NASEM_AA_PROFILE.wholeEmptyBody);
+  const netGestation = aaFromProteinG(c.npGestationG, NASEM_AA_PROFILE.wholeEmptyBody);
+  const endoUrinary = endogenousUrinaryEaaG(bw);
+
+  const requiredEaaG = {};
+
+  for (const aa of NASEM_EAA_KEYS){
+    const eff = NASEM_EAA_TARGET_EFF[aa];
+
+    if (milk > 0){
+      // Eq. 6-14b
+      requiredEaaG[aa] =
+        ((netScurf[aa] + netMfp[aa] + netMilk[aa] + netGrowth[aa]) / eff) +
+        (netGestation[aa] / 0.33) +
+        endoUrinary[aa];
+    } else {
+      // Eq. 6-14d
+      requiredEaaG[aa] =
+        ((netScurf[aa] + netMfp[aa]) / eff) +
+        (netGestation[aa] / 0.33) +
+        (netGrowth[aa] / 0.40) +
+        endoUrinary[aa];
+    }
+  }
+
+  return {
+    model: milk > 0 ? 'NASEM_2021_EQ_6_14B' : 'NASEM_2021_EQ_6_14D',
+    status: 'verified_eaa_target',
+    targetType: 'digestible_EAA_flow',
+    requiredEaaG: Object.fromEntries(
+      NASEM_EAA_KEYS.map(k => [k, round(requiredEaaG[k], 2)])
+    ),
+    targetEfficiencies: NASEM_EAA_TARGET_EFF,
+    components: {
+      netScurfG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(netScurf[k], 3)])),
+      netMfpG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(netMfp[k], 3)])),
+      netMilkG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(netMilk[k], 3)])),
+      netGrowthG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(netGrowth[k], 3)])),
+      netGestationG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(netGestation[k], 3)])),
+      endogenousUrinaryG: Object.fromEntries(NASEM_EAA_KEYS.map(k => [k, round(endoUrinary[k], 3)]))
+    },
+    note: 'EAA target computed from NASEM 2021 factorial NetAA components and Table 6-4 target efficiencies.'
+  };
+}
 // Backward-compatible wrapper.
 // لا نستخدمه كـ operational approximation بعد الآن.
 function computeOperationalMPTarget(args){
@@ -494,6 +640,12 @@ const mpReq = computeNasemMPRequirement({
 
 const mpTargetG = mpReq.mpTargetG;
 
+const eaaReq = computeNasemEAARequirements({
+  bodyWeight: bw,
+  milkKg: milk,
+  mpReq
+});
+
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: milk,
@@ -523,8 +675,9 @@ const mpTargetG = mpReq.mpTargetG;
   components: Object.fromEntries(
     Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
   ),
-  note: mpReq.note
-}, 
+  note: mpReq.note,
+  eaaRequirementModel: eaaReq
+},  
     bodyWeight: bw,
     dim: Number.isFinite(days) ? Math.round(days) : null,
     dmi: round(dmi),
@@ -577,6 +730,12 @@ const mpReq = computeNasemMPRequirement({
 
 const mpTargetG = mpReq.mpTargetG;
 
+const eaaReq = computeNasemEAARequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  mpReq
+});
+
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: 0,
@@ -595,7 +754,8 @@ const mpTargetG = mpReq.mpTargetG;
   components: Object.fromEntries(
     Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
   ),
-  note: mpReq.note
+   note: mpReq.note,
+  eaaRequirementModel: eaaReq
 },
     bodyWeight: bw,
     dim: null,
