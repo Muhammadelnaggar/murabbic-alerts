@@ -525,6 +525,52 @@ function computeNasemEAARequirements({
     note: 'EAA target computed from NASEM 2021 factorial NetAA components and Table 6-4 target efficiencies.'
   };
 }
+// SOURCE: NASEM_2021_CH7_MINERALS_FRAMEWORK
+// Macro-mineral requirement model skeleton.
+// Values are intentionally null until each official equation is implemented.
+// Cows only; buffalo remains MURABBIK_OPERATIONAL_RULE.
+const MACRO_MINERAL_REQUIREMENT_KEYS = ['Ca', 'P', 'Mg', 'Na', 'K', 'Cl', 'S'];
+
+function makeEmptyMacroMineralRequirement(){
+  const out = {};
+  for (const mineral of MACRO_MINERAL_REQUIREMENT_KEYS){
+    out[mineral] = {
+      requiredAbsorbedG: null,
+      dietaryRequiredG: null,
+      absorptionCoeff: null,
+      status: 'not_implemented',
+      source: null,
+      note: 'لم يتم تطبيق معادلة هذا المعدن بعد'
+    };
+  }
+  return out;
+}
+
+function computeNasemMacroMineralRequirements({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  dmi,
+  growth,
+  category
+}){
+  return {
+    model: 'NASEM_2021_CH7_MACRO_MINERAL_REQUIREMENT_FRAMEWORK',
+    status: 'framework_only',
+    species: 'cow',
+    targetType: 'absorbed_and_dietary_macro_minerals',
+    inputs: {
+      bodyWeight: round(bodyWeight, 2),
+      milkKg: round(milkKg, 2),
+      pregDays: round(pregDays, 0),
+      dmi: round(dmi, 2),
+      growth: !!growth,
+      category: category || null
+    },
+    requiredMinerals: makeEmptyMacroMineralRequirement(),
+    note: 'تم تجهيز إطار احتياجات المعادن الكبرى فقط؛ سيتم ملء Ca/P/Mg/Na/K/Cl/S بمعادلات NASEM الرسمية خطوة خطوة'
+  };
+}
 // Backward-compatible wrapper.
 // لا نستخدمه كـ operational approximation بعد الآن.
 function computeOperationalMPTarget(args){
@@ -642,8 +688,26 @@ const mpTargetG = mpReq.mpTargetG;
 
 const eaaReq = computeNasemEAARequirements({
   bodyWeight: bw,
-  milkKg: milk,
+  milkKg: 0,
   mpReq
+});
+
+const mineralReq = computeNasemMacroMineralRequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  pregDays,
+  dmi,
+  growth: true,
+  category: 'heifer_or_dry'
+});
+
+  const cpReferencePct = computeCPReferencePct({
+  bodyWeight: bw,
+  milkKg: milk,
+  pregDays,
+  dmi,
+  growth: false,
+  category: 'lactating'
 });
 
   const cpReferencePct = computeCPReferencePct({
@@ -755,8 +819,9 @@ const eaaReq = computeNasemEAARequirements({
     Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
   ),
    note: mpReq.note,
-  eaaRequirementModel: eaaReq
+    eaaRequirementModel: eaaReq
 },
+mineralRequirementModel: mineralReq,
     bodyWeight: bw,
     dim: null,
     dmi: round(dmi),
