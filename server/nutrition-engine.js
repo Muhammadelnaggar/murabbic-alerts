@@ -415,9 +415,20 @@ function computeBuffaloOperationalMPTarget({
 
   return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
 }
+// MURABBIK_OPERATIONAL_RULE
+// Buffalo MP target is NOT labeled as NASEM 2021.
+// Kept separate to avoid applying dairy-cattle NASEM equations to buffalo.
+function computeBuffaloOperationalMPTarget({
+  bodyWeight,
+  milkKg,
+  proteinPct,
+  pregDays,
+  closeUp,
+  growth
+}){
   const bw075 = Math.pow(num(bodyWeight), 0.75);
   const milk  = num(milkKg);
-  const milkProtPct = num(proteinPct, 3.2) / 100;
+  const milkProtPct = num(proteinPct, 4.2) / 100;
 
   const mpMaintenance = 3.8 * bw075;
 
