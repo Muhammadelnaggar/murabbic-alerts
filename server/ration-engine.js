@@ -19,6 +19,40 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+// SOURCE: NASEM_2021_CH6_EAA_FRAMEWORK
+// Essential amino acids handled as absorbed supplies, g/day.
+// No AA is calculated unless feed AA profile exists.
+const EAA_KEYS = ['Arg', 'His', 'Ile', 'Leu', 'Lys', 'Met', 'Phe', 'Thr', 'Trp', 'Val'];
+
+function makeEaaZeroMap(){
+  const out = {};
+  for (const k of EAA_KEYS) out[k] = 0;
+  return out;
+}
+
+function normalizeAaProfile(profile){
+  if (!profile || typeof profile !== 'object') return null;
+
+  const out = {};
+  let hasAny = false;
+
+  for (const k of EAA_KEYS){
+    const v = Number(
+      profile[k] ??
+      profile[k.toLowerCase()] ??
+      profile[k.toUpperCase()]
+    );
+
+    if (Number.isFinite(v) && v >= 0){
+      out[k] = v;
+      hasAny = true;
+    } else {
+      out[k] = null;
+    }
+  }
+
+  return hasAny ? out : null;
+}
 // SOURCE: NASEM_2021_TABLE_5_1
 // Carbohydrate safety guide for lactating cow TMR diets.
 // Uses forage NDF, total NDF, and starch.
@@ -275,6 +309,9 @@ let missingRdpRows = 0;
 let missingRupRows = 0;
 let missingRupDigestibilityRows = 0;
 let missingAaProfileRows = 0;
+  let rupEaaG = makeEaaZeroMap();
+let digestibleRupEaaG = makeEaaZeroMap();
+let missingAaDetailRows = 0;
   let nelMcal = 0;
  let ndfKg = 0;
 let adfKg = 0;
@@ -323,8 +360,9 @@ const rawRupDig = Number(r.rupDigestibilityPct ?? r.digestibleRupPct ?? r.dRUPPc
 const hasRupDig = Number.isFinite(rawRupDig) && rawRupDig >= 0;
 const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
 
-const aaProfile = r.aaProfilePctTP || r.aaProfile || null;
-const hasAaProfile = !!aaProfile && typeof aaProfile === 'object';
+const aaProfileRaw = r.aaProfilePctTP || r.aaProfile || null;
+const aaProfile = normalizeAaProfile(aaProfileRaw);
+const hasAaProfile = !!aaProfile;
 
 const mp = num(r.mp ?? r.mpGPerKgDM);
     const nel = num(r.nel ?? r.nelMcalPerKgDM);
@@ -378,10 +416,35 @@ if (hasRup) {
   const rupItemKg = cpItemKg * (rupPctCP / 100);
   rupKg += rupItemKg;
 
+  const digestibleRupItemKg = hasRupDig
+    ? rupItemKg * (rupDigestibilityPct / 100)
+    : 0;
+
   if (hasRupDig) {
-    digestibleRupKg += rupItemKg * (rupDigestibilityPct / 100);
+    digestibleRupKg += digestibleRupItemKg;
   } else {
     missingRupDigestibilityRows++;
+  }
+
+  if (hasAaProfile) {
+    for (const aa of EAA_KEYS){
+      const aaPctTP = aaProfile[aa];
+
+      if (aaPctTP == null) {
+        missingAaDetailRows++;
+        continue;
+      }
+
+      // aaProfilePctTP = g AA / 100 g true protein.
+      // Here RUP is treated as kg protein equivalent from feed library fields.
+      const aaInRupG = rupItemKg * 1000 * (aaPctTP / 100);
+      const aaDigestibleG = hasRupDig
+        ? digestibleRupItemKg * 1000 * (aaPctTP / 100)
+        : 0;
+
+      rupEaaG[aa] += aaInRupG;
+      digestibleRupEaaG[aa] += aaDigestibleG;
+    }
   }
 } else if (cp > 0) {
   missingRupRows++;
@@ -453,6 +516,11 @@ const digestibleRupPctDM = dmKg > 0 ? (digestibleRupKg / dmKg) * 100 : 0;
 const rdpPctCPActual = cpKg > 0 ? (rdpKg / cpKg) * 100 : 0;
 const rupPctCPActual = cpKg > 0 ? (rupKg / cpKg) * 100 : 0;
 const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
+  const digestibleRupEaaDensityGkgDM = {};
+for (const aa of EAA_KEYS){
+  digestibleRupEaaDensityGkgDM[aa] =
+    dmKg > 0 ? (digestibleRupEaaG[aa] / dmKg) : 0;
+}
   const nelTotalMcalDay = nelMcal;
   const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
@@ -629,8 +697,20 @@ const carbohydrateModel = {
   missingRdpRows,
   missingRupRows,
   missingRupDigestibilityRows,
-  missingAaProfileRows,
-  note:
+ missingAaProfileRows,
+missingAaDetailRows
+missingAaDetailRows,
+eaaModel: {
+  model: 'NASEM_2021_CH6_EAA_SUPPLY_FRAMEWORK',
+  supplyMode: 'digestible_RUP_EAA_from_feed_library_only',
+  includesMicrobialEAA: false,
+  includesEndogenousEAA: false,
+  rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
+  digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
+  digestibleRupEaaDensityGkgDM: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaDensityGkgDM[k], 2)])),
+  note: 'هذه مرحلة إمداد EAA من dRUP فقط؛ لا تشمل microbial EAA أو endogenous EAA بعد'
+},
+note:
     (missingRdpRows || missingRupRows || missingRupDigestibilityRows || missingAaProfileRows)
       ? 'بعض خامات البروتين لا تحتوي RDP/RUP/dRUP أو AA profile؛ لن يتم اعتبار تقييم البروتين مكتملًا حتى تُستكمل مكتبة الخامات'
       : 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
@@ -654,6 +734,8 @@ const rumenState = estimateRumenState({
 rdpKg: round(rdpKg),
 rupKg: round(rupKg),
 digestibleRupKg: round(digestibleRupKg),
+      rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
+digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
 mpSupplyG: round(mpSupplyG, 0),
       nelMcal: round(nelMcal),
       ndfKg: round(ndfKg),
