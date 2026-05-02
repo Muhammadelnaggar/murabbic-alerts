@@ -240,8 +240,9 @@ const ndf = num(r.ndf ?? r.ndfPct);
 const adf = num(r.adf ?? r.adfPct);
 const fat = num(r.fat ?? r.fatPct);
 const rawFA = Number(r.faPct ?? r.fattyAcidsPct ?? r.totalFaPct ?? r.totalFAPct);
-const fa = Number.isFinite(rawFA) && rawFA > 0 ? rawFA : fat;
-const faUsesFatFallback = !(Number.isFinite(rawFA) && rawFA > 0);
+const hasExplicitFA = Number.isFinite(rawFA) && rawFA > 0;
+const fa = hasExplicitFA ? rawFA : 0;
+const faMissing = !hasExplicitFA && fat > 0;
 const faDig = resolveFaDigestibilityCoeff(r);
 const starch = num(r.starchPct ?? r.starch);
 const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDigestibilityPct);
@@ -284,7 +285,7 @@ if (faItemKg > 0) {
   faCoeffWeightKg += faItemKg;
 }
 
-if (faUsesFatFallback && fat > 0) {
+if (faMissing) {
   missingFaRows++;
 }
 
@@ -433,15 +434,15 @@ const fatModel = {
   faDigestibilityCoeffWeighted: round(faDigestibilityCoeffWeighted, 3),
   fatSupplementFAPctDM: round(fatSupplementFAPctDM),
   missingFaRows,
-  faValueSource: missingFaRows > 0 ? 'fatPct_fallback_used_for_some_feeds' : 'explicit_fa_values',
-  warning:
-    fatSupplementFAPctDM >= 3
-      ? 'إضافات الدهون مرتفعة؛ نموذج NASEM 2021 قد يبالغ في تقدير هضم FA وطاقة العليقة عند مستويات الإضافة العالية'
-      : (
-          missingFaRows > 0
-            ? 'بعض الخامات لا تحتوي FA صريح؛ تم استخدام fatPct كبديل داخلي وليس كقيمة NASEM موثقة'
-            : ''
-        )
+ faValueSource: missingFaRows > 0 ? 'missing_explicit_fa_values' : 'explicit_fa_values',
+warning:
+  fatSupplementFAPctDM >= 3
+    ? 'إضافات الدهون مرتفعة؛ نموذج NASEM 2021 قد يبالغ في تقدير هضم FA وطاقة العليقة عند مستويات الإضافة العالية'
+    : (
+        missingFaRows > 0
+          ? 'بعض الخامات لا تحتوي FA صريح؛ لن يتم حساب FA لها حتى تُستكمل مكتبة الخامات'
+          : ''
+      )
 };
 const rumenState = estimateRumenState({
   starchPct,
