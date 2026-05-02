@@ -141,6 +141,53 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
           : 'إمداد الأحماض الأمينية يغطي الاحتياج المحسوب')
   };
 }
+// MURABBIK_MINERAL_SUPPLY
+// Macro-mineral supply from feed library.
+// Units:
+// - Feed mineral fields are expected as % of DM.
+// - Output totalMineralG = g/day.
+// - absorbedMineralG is calculated only when an explicit absorption coefficient exists.
+const MACRO_MINERAL_KEYS = ['Ca', 'P', 'Mg', 'Na', 'K', 'Cl', 'S'];
+
+const MINERAL_FIELD_MAP = {
+  Ca: ['caPct', 'calciumPct', 'CaPct'],
+  P:  ['pPct', 'phosphorusPct', 'PPct'],
+  Mg: ['mgPct', 'magnesiumPct', 'MgPct'],
+  Na: ['naPct', 'sodiumPct', 'NaPct'],
+  K:  ['kPct', 'potassiumPct', 'KPct'],
+  Cl: ['clPct', 'chloridePct', 'ClPct'],
+  S:  ['sPct', 'sulfurPct', 'sulphurPct', 'SPct']
+};
+
+const MINERAL_ABS_FIELD_MAP = {
+  Ca: ['caAbsCoeff', 'calciumAbsCoeff', 'CaAbsCoeff'],
+  P:  ['pAbsCoeff', 'phosphorusAbsCoeff', 'PAbsCoeff'],
+  Mg: ['mgAbsCoeff', 'magnesiumAbsCoeff', 'MgAbsCoeff'],
+  Na: ['naAbsCoeff', 'sodiumAbsCoeff', 'NaAbsCoeff'],
+  K:  ['kAbsCoeff', 'potassiumAbsCoeff', 'KAbsCoeff'],
+  Cl: ['clAbsCoeff', 'chlorideAbsCoeff', 'ClAbsCoeff'],
+  S:  ['sAbsCoeff', 'sulfurAbsCoeff', 'sulphurAbsCoeff', 'SAbsCoeff']
+};
+
+function firstFiniteField(row, names){
+  for (const name of names){
+    const v = Number(row?.[name]);
+    if (Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function makeMineralZeroMap(){
+  const out = {};
+  for (const k of MACRO_MINERAL_KEYS) out[k] = 0;
+  return out;
+}
+
+function makeMineralMissingMap(){
+  const out = {};
+  for (const k of MACRO_MINERAL_KEYS) out[k] = 0;
+  return out;
+}
 // SOURCE: NASEM_2021_EQ_20_74_TO_20_79
 // Ruminal microbial protein model.
 // Requires rumen-digested NDF and rumen-digested starch inputs.
@@ -557,6 +604,14 @@ let forageNdfdWeightKg = 0;
 let rumDigStarchKg = 0;
 let missingRumDigNdfRows = 0;
 let missingRumDigStarchRows = 0;
+
+let mineralG = makeMineralZeroMap();
+let absorbedMineralG = makeMineralZeroMap();
+let mineralAbsCoeffWeightedSum = makeMineralZeroMap();
+let mineralAbsCoeffWeightG = makeMineralZeroMap();
+let missingMineralRows = makeMineralMissingMap();
+let missingMineralAbsCoeffRows = makeMineralMissingMap();
+
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -628,7 +683,25 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
       );
 
     const dmItemKg = kg * (dm / 100);
+for (const mineral of MACRO_MINERAL_KEYS) {
+  const pct = firstFiniteField(r, MINERAL_FIELD_MAP[mineral]);
+  const absCoeff = firstFiniteField(r, MINERAL_ABS_FIELD_MAP[mineral]);
 
+  if (pct != null && pct >= 0) {
+    const mineralItemG = dmItemKg * 1000 * (pct / 100);
+    mineralG[mineral] += mineralItemG;
+
+    if (absCoeff != null && absCoeff >= 0 && absCoeff <= 1) {
+      absorbedMineralG[mineral] += mineralItemG * absCoeff;
+      mineralAbsCoeffWeightedSum[mineral] += mineralItemG * absCoeff;
+      mineralAbsCoeffWeightG[mineral] += mineralItemG;
+    } else if (mineralItemG > 0) {
+      missingMineralAbsCoeffRows[mineral]++;
+    }
+  } else if (dmItemKg > 0) {
+    missingMineralRows[mineral]++;
+  }
+}
     asFedKg += kg;
     dmKg += dmItemKg;
 const cpItemKg = dmItemKg * (cp / 100);
@@ -951,6 +1024,33 @@ for (const aa of EAA_KEYS) {
   context,
   supplyEaaG: totalModeledEaaG
 });
+
+const mineralSupplyModel = {
+  model: 'MURABBIK_MACRO_MINERAL_SUPPLY',
+  source: 'FEED_LIBRARY_VALUES',
+  unit: 'g_day',
+  totalMineralG: Object.fromEntries(
+    MACRO_MINERAL_KEYS.map(k => [k, round(mineralG[k], 2)])
+  ),
+  absorbedMineralG: Object.fromEntries(
+    MACRO_MINERAL_KEYS.map(k => [k, round(absorbedMineralG[k], 2)])
+  ),
+  absorptionCoeffWeighted: Object.fromEntries(
+    MACRO_MINERAL_KEYS.map(k => [
+      k,
+      mineralAbsCoeffWeightG[k] > 0
+        ? round(mineralAbsCoeffWeightedSum[k] / mineralAbsCoeffWeightG[k], 3)
+        : null
+    ])
+  ),
+  missingMineralRows,
+  missingMineralAbsCoeffRows,
+  note:
+    Object.values(missingMineralRows).some(v => v > 0)
+      ? 'بعض الخامات لا تحتوي قيم معادن كاملة؛ يتم حساب إمداد المعادن فقط من القيم الموجودة في مكتبة الخامات'
+      : 'تم حساب إمداد المعادن الكبرى من مكتبة الخامات'
+};
+
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
   mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
@@ -1022,8 +1122,14 @@ digestibleRupKg: round(digestibleRupKg),
       peNdfKg: round(peNdfKg),
       fatKg: round(fatKg),
       faKg: round(faKg),
-      digestibleFaKg: round(digestibleFaKg),
-      starchKg: round(starchKg),
+     digestibleFaKg: round(digestibleFaKg),
+mineralsG: Object.fromEntries(
+  MACRO_MINERAL_KEYS.map(k => [k, round(mineralG[k], 2)])
+),
+absorbedMineralsG: Object.fromEntries(
+  MACRO_MINERAL_KEYS.map(k => [k, round(absorbedMineralG[k], 2)])
+),
+starchKg: round(starchKg),
       wscKg: round(wscKg),
       ndsfKg: round(ndsfKg),
       ndscKg: round(ndscKg),
@@ -1042,6 +1148,7 @@ digestibleRupPctDM: round(digestibleRupPctDM),
 rdpPctCP: round(rdpPctCPActual),
 rupPctCP: round(rupPctCPActual),
 proteinModel,
+mineralSupplyModel,
       mpSupplyG: round(mpSupplyG, 0),
       mpDensityGkgDM: round(mpDensityGkgDM, 0),
       mpBalanceG: round(mpBalanceG, 0),
@@ -1059,7 +1166,9 @@ missingRupDigestibilityRows,
 missingAaProfileRows,
 missingAaDetailRows,
 missingRumDigNdfRows,
-missingRumDigStarchRows
+missingRumDigStarchRows,
+missingMineralRows,
+missingMineralAbsCoeffRows
 },
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
