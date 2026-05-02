@@ -384,30 +384,7 @@ function computeNasemMPRequirement({
 function computeOperationalMPTarget(args){
   return computeNasemMPRequirement(args).mpTargetG;
 }
-// MURABBIK_OPERATIONAL_RULE
-// Buffalo MP target is NOT labeled as NASEM 2021.
-// Kept separate to avoid applying dairy-cattle NASEM equations to buffalo.
 
-  const bw075 = Math.pow(num(bodyWeight), 0.75);
-  const milk  = num(milkKg);
-  const milkProtPct = num(proteinPct, 4.2) / 100;
-
-  const mpMaintenance = 3.8 * bw075;
-
-  const milkTrueProteinG = milk * milkProtPct * 1000;
-  const mpLactation = milkTrueProteinG / 0.67;
-
-  let mpPreg = 0;
-  if (pregDays >= 190){
-    const late = pregDays - 190;
-    mpPreg = 70 + (1.8 * late) + (0.01 * late * late);
-  }
-
-  const mpGrowth = growth ? 140 : 0;
-  const mpCloseUp = closeUp ? 45 : 0;
-
-  return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
-}
 // MURABBIK_OPERATIONAL_RULE
 // Buffalo MP target is NOT labeled as NASEM 2021.
 // Kept separate to avoid applying dairy-cattle NASEM equations to buffalo.
