@@ -161,33 +161,7 @@ function predictMicrobialProteinNasem({
       : 'تم حساب microbial protein فقط؛ microbial EAA ينتظر Table 6-2 في مكتبة/ثوابت المحرك'
   };
 }
-// SOURCE: NASEM_2021_MODEL_DESCRIPTION_MICROBIAL_FLOW
-// Converts microbial N flow to microbial CP and TP.
-// Stoichiometric constants only; microbial N prediction equation is not invented here.
-function microbialProteinFromN({ microbialNG }){
-  const nG = num(microbialNG);
 
-  if (nG <= 0) {
-    return {
-      applied: false,
-      microbialNG: 0,
-      microbialCPG: 0,
-      microbialTPG: 0,
-      note: 'لم يتم حساب microbial protein لعدم توفر microbial N'
-    };
-  }
-
-  const microbialCPG = nG * 6.25;
-  const microbialTPG = microbialCPG * 0.824;
-
-  return {
-    applied: true,
-    microbialNG: round(nG, 0),
-    microbialCPG: round(microbialCPG, 0),
-    microbialTPG: round(microbialTPG, 0),
-    note: 'تم تحويل microbial N إلى microbial CP وTP بمعاملات NASEM model description'
-  };
-}
 // SOURCE: NASEM_2021_TABLE_5_1
 // Carbohydrate safety guide for lactating cow TMR diets.
 // Uses forage NDF, total NDF, and starch.
@@ -447,11 +421,7 @@ let missingAaProfileRows = 0;
   let rupEaaG = makeEaaZeroMap();
 let digestibleRupEaaG = makeEaaZeroMap();
 let missingAaDetailRows = 0;
- let microbialNG = 0;
-let microbialCPG = 0;
-let microbialTPG = 0;
-let microbialInputRows = 0;
-let microbialEaaG = makeEaaZeroMap();
+
   let nelMcal = 0;
  let ndfKg = 0;
 let adfKg = 0;
@@ -507,13 +477,7 @@ const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
 const aaProfileRaw = r.aaProfilePctTP || r.aaProfile || null;
 const aaProfile = normalizeAaProfile(aaProfileRaw);
 const hasAaProfile = !!aaProfile;
-const microbialNInput = Number(r.microbialNG ?? r.microbialNFlowG);
-const microbialCPInput = Number(r.microbialCPG ?? r.microbialCrudeProteinG);
-const microbialTPInput = Number(r.microbialTPG ?? r.microbialTrueProteinG);
 
-const microbialAaProfileRaw = r.microbialAaProfilePctTP || r.microbialAaProfile || null;
-const microbialAaProfile = normalizeAaProfile(microbialAaProfileRaw);
-const hasMicrobialAaProfile = !!microbialAaProfile;
 const mp = num(r.mp ?? r.mpGPerKgDM);
     const nel = num(r.nel ?? r.nelMcalPerKgDM);
 const ndf = num(r.ndf ?? r.ndfPct);
@@ -564,28 +528,7 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
       );
 
     const dmItemKg = kg * (dm / 100);
-const microbialFromN = microbialProteinFromN({ microbialNG: microbialNInput });
 
-if (microbialFromN.applied) {
-  microbialNG += microbialFromN.microbialNG;
-  microbialCPG += microbialFromN.microbialCPG;
-  microbialTPG += microbialFromN.microbialTPG;
-  microbialInputRows++;
-} else if (Number.isFinite(microbialCPInput) && microbialCPInput > 0) {
-  microbialCPG += microbialCPInput;
-  microbialTPG += Number.isFinite(microbialTPInput) && microbialTPInput > 0
-    ? microbialTPInput
-    : microbialCPInput * 0.824;
-  microbialInputRows++;
-}
-
-if (hasMicrobialAaProfile && microbialTPInput > 0) {
-  for (const aa of EAA_KEYS) {
-    const aaPctTP = microbialAaProfile[aa];
-    if (aaPctTP == null) continue;
-    microbialEaaG[aa] += microbialTPInput * (aaPctTP / 100);
-  }
-}
     asFedKg += kg;
     dmKg += dmItemKg;
 const cpItemKg = dmItemKg * (cp / 100);
