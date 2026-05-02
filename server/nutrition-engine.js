@@ -192,29 +192,46 @@ function nelMaintenanceMcal(bodyWeight){
   return 0.10 * Math.pow(num(bodyWeight), 0.75);
 }
 
-// Milk energy from components, instead of fixed factor per kg milk
-function nelLactationMilkMcal(milkKg, fatPct, proteinPct, f){
+// SOURCE: NASEM_2021_EQ_3_14A
+// Milk NEL when milk crude protein is known.
+// lactosePct default = 4.85% when not measured.
+function nelLactationMilkMcal(milkKg, fatPct, proteinPct, f, lactosePct = 4.85){
   const milk = num(milkKg);
-  const fat  = num(fatPct, 3.7) / 100;
-  const prot = num(proteinPct, 3.2) / 100;
+  const fatKgPerKgMilk = num(fatPct, 3.7) / 100;
+  const cpKgPerKgMilk = num(proteinPct, 3.2) / 100;
+  const lactoseKgPerKgMilk = num(lactosePct, 4.85) / 100;
 
   const mcalPerKgMilk =
-      (0.0929 * (fat * 100)) +
-      (0.0563 * (prot * 100)) +
-      0.192;
+    (9.29 * fatKgPerKgMilk) +
+    (5.5 * cpKgPerKgMilk) +
+    (3.95 * lactoseKgPerKgMilk);
 
   return milk * mcalPerKgMilk * num(f?.nelMilkFactor, 1);
 }
+// SOURCE: NASEM_2021_EQ_3_15_TO_3_18
+// Gestation NEL for adult dairy cattle.
+// calfBirthWeightKg: if not provided, estimate from mature body weight.
+function gestationConceptusNE(bodyWeight, pregDays, calfBirthWeightKg = null, matureBodyWeight = null, isHeifer = false){
+  const dayGest = clamp(num(pregDays), 0, 280);
+  if (dayGest < 12) return 0;
 
-// Pregnancy NEL based on conceptus growth style
-function gestationConceptusNE(bodyWeight, pregDays){
-  const bw = num(bodyWeight);
-  const dp = num(pregDays);
+  const matBW = num(matureBodyWeight) || num(bodyWeight);
+  const calfBW =
+    num(calfBirthWeightKg) ||
+    (matBW * (isHeifer ? 0.058 : 0.063));
 
-  if (dp < 190) return 0;
+  const grUterAtParturition = calfBW * 1.825;
 
-  const gravid = Math.exp((0.03233 * dp) - (0.0000275 * dp * dp) - 8.595);
-  return (0.14 * gravid * 4.16) / 0.13 * Math.pow(bw / 650, 0.75);
+  const grUterWt =
+    grUterAtParturition *
+    Math.exp(-1 * (0.0243 - (0.0000245 * dayGest)) * (280 - dayGest));
+
+  const grUterWtGain =
+    (0.0243 - (0.0000245 * dayGest)) * grUterWt;
+
+  const gestNEL = grUterWtGain * 4.16;
+
+  return Math.max(0, gestNEL);
 }
 
 function closeUpExtraNEL(closeUp){
@@ -355,6 +372,12 @@ function computeCow({
   animalSide: 'NASEM_2021_EQ_2_1',
   status: 'verified',
   milkEUnit: 'Mcal/day'
+},
+    energyModel: {
+  maintenance: 'NASEM_2021_EQ_3_13',
+  lactation: 'NASEM_2021_EQ_3_14A',
+  gestation: 'NASEM_2021_EQ_3_15_TO_3_18',
+  unit: 'NEL_Mcal_day'
 },
     bodyWeight: bw,
     dim: Number.isFinite(days) ? Math.round(days) : null,
