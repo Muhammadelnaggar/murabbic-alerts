@@ -1,4 +1,4 @@
-function num(v){
+ function num(v){
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
