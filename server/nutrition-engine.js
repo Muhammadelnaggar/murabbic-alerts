@@ -688,20 +688,11 @@ const mpTargetG = mpReq.mpTargetG;
 
 const eaaReq = computeNasemEAARequirements({
   bodyWeight: bw,
-  milkKg: 0,
+  milkKg: milk,
   mpReq
 });
 
 const mineralReq = computeNasemMacroMineralRequirements({
-  bodyWeight: bw,
-  milkKg: 0,
-  pregDays,
-  dmi,
-  growth: true,
-  category: 'heifer_or_dry'
-});
-
-  const cpReferencePct = computeCPReferencePct({
   bodyWeight: bw,
   milkKg: milk,
   pregDays,
@@ -742,7 +733,10 @@ const mineralReq = computeNasemMacroMineralRequirements({
   note: mpReq.note,
   eaaRequirementModel: eaaReq
 },  
-    bodyWeight: bw,
+mineralRequirementModel: mineralReq,
+bodyWeight: bw,
+  
+   
     dim: Number.isFinite(days) ? Math.round(days) : null,
     dmi: round(dmi),
     nel: round(nelTotal),
@@ -799,7 +793,14 @@ const eaaReq = computeNasemEAARequirements({
   milkKg: 0,
   mpReq
 });
-
+const mineralReq = computeNasemMacroMineralRequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  pregDays,
+  dmi,
+  growth: true,
+  category: 'heifer_or_dry'
+});
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: 0,
