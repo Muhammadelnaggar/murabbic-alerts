@@ -53,6 +53,94 @@ function normalizeAaProfile(profile){
 
   return hasAny ? out : null;
 }
+// MURABBIK_EAA_BALANCE
+// Compares ration modeled EAA supply against NASEM target-side EAA requirements.
+// Requirement source is expected from nutrition-engine:
+// targets.proteinRequirementModel.eaaRequirementModel.requiredEaaG
+function resolveRequiredEaaG(targets = {}, context = {}){
+  const req =
+    targets?.proteinRequirementModel?.eaaRequirementModel?.requiredEaaG ||
+    targets?.eaaRequirementModel?.requiredEaaG ||
+    targets?.requiredEaaG ||
+    context?.proteinRequirementModel?.eaaRequirementModel?.requiredEaaG ||
+    context?.eaaRequirementModel?.requiredEaaG ||
+    context?.requiredEaaG ||
+    null;
+
+  return req && typeof req === 'object' ? req : null;
+}
+
+function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
+  const requiredEaaG = resolveRequiredEaaG(targets, context);
+
+  if (!requiredEaaG) {
+    return {
+      model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+      applied: false,
+      status: 'not_applied',
+      reason: 'missing_required_eaa_targets',
+      note: 'لم يتم حساب ميزان EAA لأن requiredEaaG غير موجود من nutrition-engine'
+    };
+  }
+
+  const keys = Object.keys(requiredEaaG)
+    .filter(k => Number.isFinite(Number(requiredEaaG[k])) && Number(requiredEaaG[k]) > 0);
+
+  if (!keys.length) {
+    return {
+      model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+      applied: false,
+      status: 'not_applied',
+      reason: 'empty_required_eaa_targets',
+      note: 'قائمة احتياجات EAA موجودة لكنها لا تحتوي قيمًا صالحة'
+    };
+  }
+
+  const balance = {};
+  let limitingAA = null;
+  let minRatio = Infinity;
+
+  for (const aa of keys) {
+    const required = Number(requiredEaaG[aa]);
+    const supplied = Number(supplyEaaG?.[aa] || 0);
+    const diff = supplied - required;
+    const ratio = required > 0 ? supplied / required : 0;
+
+    if (ratio < minRatio) {
+      minRatio = ratio;
+      limitingAA = aa;
+    }
+
+    let status = 'ok';
+    if (ratio < 0.95) status = 'deficit';
+    else if (ratio < 1.00) status = 'watch';
+
+    balance[aa] = {
+      requiredG: round(required, 2),
+      suppliedG: round(supplied, 2),
+      balanceG: round(diff, 2),
+      supplyPctOfRequirement: round(ratio * 100, 1),
+      status
+    };
+  }
+
+  const hasDeficit = Object.values(balance).some(x => x.status === 'deficit');
+  const hasWatch = Object.values(balance).some(x => x.status === 'watch');
+
+  return {
+    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+    applied: true,
+    status: hasDeficit ? 'deficit' : (hasWatch ? 'watch' : 'ok'),
+    limitingAA,
+    limitingSupplyPct: Number.isFinite(minRatio) ? round(minRatio * 100, 1) : null,
+    balance,
+    note: hasDeficit
+      ? 'يوجد عجز في حمض أميني أساسي واحد أو أكثر مقارنة باحتياجات NASEM target-side'
+      : (hasWatch
+          ? 'بعض الأحماض الأمينية قريبة من حد الاحتياج وتحتاج متابعة'
+          : 'إمداد الأحماض الأمينية يغطي الاحتياج المحسوب')
+  };
+}
 // SOURCE: NASEM_2021_EQ_20_74_TO_20_79
 // Ruminal microbial protein model.
 // Requires rumen-digested NDF and rumen-digested starch inputs.
@@ -858,6 +946,11 @@ for (const aa of EAA_KEYS) {
     digestibleRupEaaG[aa] +
     (microbialProteinModel.microbialEaaG?.[aa] || 0);
 }
+ const eaaBalanceModel = buildEaaBalanceModel({
+  targets,
+  context,
+  supplyEaaG: totalModeledEaaG
+});
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
   mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
@@ -885,6 +978,7 @@ includesEndogenousEAA: false,
  microbialProteinModel,
 microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
 totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
+eaaBalanceModel,
 note: microbialProteinModel.hasMicrobialAaProfile
   ? 'تم حساب EAA من dRUP و microbial true protein؛ لا تشمل endogenous EAA بعد'
   : 'تم حساب EAA من dRUP فقط؛ microbial protein محسوب عند توفر مدخلات rumen digestion لكن microbial EAA ينتظر Table 6-2'
