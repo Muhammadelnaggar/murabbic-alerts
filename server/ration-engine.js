@@ -53,6 +53,141 @@ function normalizeAaProfile(profile){
 
   return hasAny ? out : null;
 }
+// SOURCE: NASEM_2021_EQ_20_74_TO_20_79
+// Ruminal microbial protein model.
+// Requires rumen-digested NDF and rumen-digested starch inputs.
+// No fallback is used for ruminal digestibility.
+const NASEM_MICROBIAL = {
+  MiN_Vm_int: 100.8,
+  MiN_Vm_RDPslp: 81.56,
+  MiN_Km_rdNDF: 0.0939,
+  MiN_Km_rdSt: 0.0274,
+  microbialCpPerNG: 6.25,
+  microbialTpPerCp: 0.824,
+  rdpCapPctDM: 12
+};
+
+function defaultMicrobialAaProfilePctTP(){
+  // SOURCE REQUIRED FROM NASEM_2021_TABLE_6_2 BEFORE FINAL LOCK.
+  // Empty now by design: no invented AA composition.
+  return null;
+}
+
+function predictMicrobialProteinNasem({
+  rdpKg,
+  dmKg,
+  rumDigNdfKg,
+  rumDigStarchKg,
+  microbialAaProfilePctTP
+}){
+  const An_RDPIn = num(rdpKg);              // kg/d
+  const Dt_DMIn = num(dmKg);                // kg/d
+  const Rum_DigNDFIn = num(rumDigNdfKg);    // kg/d
+  const Rum_DigStIn = num(rumDigStarchKg);  // kg/d
+
+  if (!An_RDPIn || !Dt_DMIn || !Rum_DigNDFIn || !Rum_DigStIn) {
+    return {
+      model: 'NASEM_2021_EQ_20_74_TO_20_79',
+      applied: false,
+      status: 'not_applied',
+      reason: 'missing_rumen_digested_ndf_or_starch_or_rdp',
+      microbialNG: 0,
+      microbialCPKg: 0,
+      microbialTPKg: 0,
+      rdpBalanceKg: null,
+      microbialEaaG: makeEaaZeroMap(),
+      note: 'لم يتم تطبيق microbial protein لأن Rum_DigNDFIn أو Rum_DigStIn أو RDP غير مكتمل'
+    };
+  }
+
+  // NASEM text: RDP effect capped above 12% dietary RDP.
+  const rdpCapKg = Dt_DMIn * (NASEM_MICROBIAL.rdpCapPctDM / 100);
+  const cappedRDPKg = Math.min(An_RDPIn, rdpCapKg);
+
+  const MiN_Vm =
+    NASEM_MICROBIAL.MiN_Vm_int +
+    (NASEM_MICROBIAL.MiN_Vm_RDPslp * cappedRDPKg);
+
+  const microbialNG =
+    MiN_Vm /
+    (
+      1 +
+      (NASEM_MICROBIAL.MiN_Km_rdNDF / Rum_DigNDFIn) +
+      (NASEM_MICROBIAL.MiN_Km_rdSt / Rum_DigStIn)
+    );
+
+  let microbialCPKg =
+    (microbialNG * NASEM_MICROBIAL.microbialCpPerNG) / 1000;
+
+  // NASEM text: maximum microbial CP set at RDP intake.
+  microbialCPKg = Math.min(microbialCPKg, An_RDPIn);
+
+  const microbialTPKg =
+    microbialCPKg * NASEM_MICROBIAL.microbialTpPerCp;
+
+  const rdpBalanceKg = An_RDPIn - microbialCPKg;
+
+  const profile = normalizeAaProfile(microbialAaProfilePctTP);
+  const microbialEaaG = makeEaaZeroMap();
+
+  if (profile) {
+    for (const aa of EAA_KEYS) {
+      const aaPctTP = profile[aa];
+      if (aaPctTP == null) continue;
+      microbialEaaG[aa] = microbialTPKg * 1000 * (aaPctTP / 100);
+    }
+  }
+
+  return {
+    model: 'NASEM_2021_EQ_20_74_TO_20_79',
+    applied: true,
+    status: 'calculated',
+    microbialNG: round(microbialNG, 0),
+    microbialCPKg: round(microbialCPKg, 3),
+    microbialTPKg: round(microbialTPKg, 3),
+    rdpBalanceKg: round(rdpBalanceKg, 3),
+    cappedRDPKg: round(cappedRDPKg, 3),
+    rdpCapPctDM: NASEM_MICROBIAL.rdpCapPctDM,
+    inputs: {
+      rdpKg: round(An_RDPIn, 3),
+      dmKg: round(Dt_DMIn, 3),
+      rumDigNdfKg: round(Rum_DigNDFIn, 3),
+      rumDigStarchKg: round(Rum_DigStIn, 3)
+    },
+    microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
+    hasMicrobialAaProfile: !!profile,
+    note: profile
+      ? 'تم حساب microbial protein و microbial EAA حسب NASEM 2021'
+      : 'تم حساب microbial protein فقط؛ microbial EAA ينتظر Table 6-2 في مكتبة/ثوابت المحرك'
+  };
+}
+// SOURCE: NASEM_2021_MODEL_DESCRIPTION_MICROBIAL_FLOW
+// Converts microbial N flow to microbial CP and TP.
+// Stoichiometric constants only; microbial N prediction equation is not invented here.
+function microbialProteinFromN({ microbialNG }){
+  const nG = num(microbialNG);
+
+  if (nG <= 0) {
+    return {
+      applied: false,
+      microbialNG: 0,
+      microbialCPG: 0,
+      microbialTPG: 0,
+      note: 'لم يتم حساب microbial protein لعدم توفر microbial N'
+    };
+  }
+
+  const microbialCPG = nG * 6.25;
+  const microbialTPG = microbialCPG * 0.824;
+
+  return {
+    applied: true,
+    microbialNG: round(nG, 0),
+    microbialCPG: round(microbialCPG, 0),
+    microbialTPG: round(microbialTPG, 0),
+    note: 'تم تحويل microbial N إلى microbial CP وTP بمعاملات NASEM model description'
+  };
+}
 // SOURCE: NASEM_2021_TABLE_5_1
 // Carbohydrate safety guide for lactating cow TMR diets.
 // Uses forage NDF, total NDF, and starch.
@@ -312,6 +447,11 @@ let missingAaProfileRows = 0;
   let rupEaaG = makeEaaZeroMap();
 let digestibleRupEaaG = makeEaaZeroMap();
 let missingAaDetailRows = 0;
+ let microbialNG = 0;
+let microbialCPG = 0;
+let microbialTPG = 0;
+let microbialInputRows = 0;
+let microbialEaaG = makeEaaZeroMap();
   let nelMcal = 0;
  let ndfKg = 0;
 let adfKg = 0;
@@ -343,6 +483,10 @@ let forageNdfdWeightKg = 0;
   let missingNelRows = 0;
   let missingNdfRows = 0;
   let missingStarchRows = 0;
+ let rumDigNdfKg = 0;
+let rumDigStarchKg = 0;
+let missingRumDigNdfRows = 0;
+let missingRumDigStarchRows = 0;
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -363,7 +507,13 @@ const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
 const aaProfileRaw = r.aaProfilePctTP || r.aaProfile || null;
 const aaProfile = normalizeAaProfile(aaProfileRaw);
 const hasAaProfile = !!aaProfile;
+const microbialNInput = Number(r.microbialNG ?? r.microbialNFlowG);
+const microbialCPInput = Number(r.microbialCPG ?? r.microbialCrudeProteinG);
+const microbialTPInput = Number(r.microbialTPG ?? r.microbialTrueProteinG);
 
+const microbialAaProfileRaw = r.microbialAaProfilePctTP || r.microbialAaProfile || null;
+const microbialAaProfile = normalizeAaProfile(microbialAaProfileRaw);
+const hasMicrobialAaProfile = !!microbialAaProfile;
 const mp = num(r.mp ?? r.mpGPerKgDM);
     const nel = num(r.nel ?? r.nelMcalPerKgDM);
 const ndf = num(r.ndf ?? r.ndfPct);
@@ -379,7 +529,21 @@ const starch = num(r.starchPct ?? r.starch);
 const rawWSC = Number(r.wscPct ?? r.waterSolubleCarbsPct ?? r.waterSolubleCarbohydratesPct);
 const hasWSC = Number.isFinite(rawWSC) && rawWSC >= 0;
 const wsc = hasWSC ? rawWSC : 0;
+const rawRumNdfDig = Number(
+  r.rumDigNdfPctOfNdf ??
+  r.rumenDigestedNdfPctOfNdf ??
+  r.ruminalNdfDigestibilityPct ??
+  r.rumenNdfDigestibilityPct
+);
+const hasRumNdfDig = Number.isFinite(rawRumNdfDig) && rawRumNdfDig >= 0;
 
+const rawRumStarchDig = Number(
+  r.rumDigStarchPctOfStarch ??
+  r.rumenDigestedStarchPctOfStarch ??
+  r.ruminalStarchDigestibilityPct ??
+  r.rumenStarchDigestibilityPct
+);
+const hasRumStarchDig = Number.isFinite(rawRumStarchDig) && rawRumStarchDig >= 0;
 const rawNDSF = Number(r.ndsfPct ?? r.neutralDetergentSolubleFiberPct);
 const hasNDSF = Number.isFinite(rawNDSF) && rawNDSF >= 0;
 const ndsf = hasNDSF ? rawNDSF : 0;
@@ -400,7 +564,28 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
       );
 
     const dmItemKg = kg * (dm / 100);
+const microbialFromN = microbialProteinFromN({ microbialNG: microbialNInput });
 
+if (microbialFromN.applied) {
+  microbialNG += microbialFromN.microbialNG;
+  microbialCPG += microbialFromN.microbialCPG;
+  microbialTPG += microbialFromN.microbialTPG;
+  microbialInputRows++;
+} else if (Number.isFinite(microbialCPInput) && microbialCPInput > 0) {
+  microbialCPG += microbialCPInput;
+  microbialTPG += Number.isFinite(microbialTPInput) && microbialTPInput > 0
+    ? microbialTPInput
+    : microbialCPInput * 0.824;
+  microbialInputRows++;
+}
+
+if (hasMicrobialAaProfile && microbialTPInput > 0) {
+  for (const aa of EAA_KEYS) {
+    const aaPctTP = microbialAaProfile[aa];
+    if (aaPctTP == null) continue;
+    microbialEaaG[aa] += microbialTPInput * (aaPctTP / 100);
+  }
+}
     asFedKg += kg;
     dmKg += dmItemKg;
 const cpItemKg = dmItemKg * (cp / 100);
@@ -482,7 +667,22 @@ if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
   fatSupplementFaKg += faItemKg;
 }
 
-starchKg += dmItemKg * (starch / 100);
+const starchItemKg = dmItemKg * (starch / 100);
+const ndfItemKg = dmItemKg * (ndf / 100);
+
+starchKg += starchItemKg;
+
+if (hasRumNdfDig) {
+  rumDigNdfKg += ndfItemKg * (rawRumNdfDig / 100);
+} else if (ndfItemKg > 0) {
+  missingRumDigNdfRows++;
+}
+
+if (hasRumStarchDig) {
+  rumDigStarchKg += starchItemKg * (rawRumStarchDig / 100);
+} else if (starchItemKg > 0) {
+  missingRumDigStarchRows++;
+}
 wscKg += dmItemKg * (wsc / 100);
 ndsfKg += dmItemKg * (ndsf / 100);
 ndscKg += dmItemKg * ((starch + wsc + ndsf) / 100);
@@ -520,6 +720,11 @@ const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
 for (const aa of EAA_KEYS){
   digestibleRupEaaDensityGkgDM[aa] =
     dmKg > 0 ? (digestibleRupEaaG[aa] / dmKg) : 0;
+}
+ const totalModeledEaaG = {};
+for (const aa of EAA_KEYS){
+  totalModeledEaaG[aa] =
+    digestibleRupEaaG[aa] + microbialEaaG[aa];
 }
   const nelTotalMcalDay = nelMcal;
   const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
@@ -683,6 +888,25 @@ const carbohydrateModel = {
       ? 'بعض الخامات لا تحتوي WSC أو NDSF؛ لن يتم حساب NDSC الكامل لها حتى تُستكمل مكتبة الخامات'
       : 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
 }; 
+ const microbialAaProfilePctTP =
+  context?.microbialAaProfilePctTP ||
+  context?.microbialAaProfile ||
+  defaultMicrobialAaProfilePctTP();
+
+const microbialProteinModel = predictMicrobialProteinNasem({
+  rdpKg,
+  dmKg,
+  rumDigNdfKg,
+  rumDigStarchKg,
+  microbialAaProfilePctTP
+});
+
+const totalModeledEaaG = {};
+for (const aa of EAA_KEYS) {
+  totalModeledEaaG[aa] =
+    digestibleRupEaaG[aa] +
+    (microbialProteinModel.microbialEaaG?.[aa] || 0);
+}
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
   mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
@@ -702,12 +926,30 @@ missingAaDetailRows,
 eaaModel: {
   model: 'NASEM_2021_CH6_EAA_SUPPLY_FRAMEWORK',
   supplyMode: 'digestible_RUP_EAA_from_feed_library_only',
-  includesMicrobialEAA: false,
-  includesEndogenousEAA: false,
+ includesMicrobialEAA: !!microbialProteinModel.hasMicrobialAaProfile,
+includesEndogenousEAA: false,
   rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
   digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
   digestibleRupEaaDensityGkgDM: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaDensityGkgDM[k], 2)])),
-  note: 'هذه مرحلة إمداد EAA من dRUP فقط؛ لا تشمل microbial EAA أو endogenous EAA بعد'
+ microbialProteinModel,
+microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
+totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
+ microbialProteinModel: {
+  model: 'NASEM_2021_MICROBIAL_N_TO_CP_TP_STOICHIOMETRY',
+  predictionMode: microbialInputRows > 0 ? 'explicit_microbial_input' : 'not_predicted',
+  microbialNG: round(microbialNG, 0),
+  microbialCPG: round(microbialCPG, 0),
+  microbialTPG: round(microbialTPG, 0),
+  microbialInputRows,
+  note: microbialProteinModel.hasMicrobialAaProfile
+  ? 'تم حساب EAA من dRUP و microbial true protein؛ لا تشمل endogenous EAA بعد'
+  : 'تم حساب EAA من dRUP فقط؛ microbial protein محسوب عند توفر مدخلات rumen digestion لكن microbial EAA ينتظر Table 6-2'
+},
+microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
+totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
+  note: microbialInputRows > 0
+  ? 'هذه مرحلة EAA من dRUP ومع مدخل microbial صريح؛ لا تشمل endogenous EAA بعد ولا تتضمن معادلة توقع microbial protein'
+  : 'هذه مرحلة EAA من dRUP فقط؛ لا تشمل microbial EAA أو endogenous EAA بعد'
 },
 note:
     (missingRdpRows || missingRupRows || missingRupDigestibilityRows || missingAaProfileRows)
@@ -733,8 +975,19 @@ const rumenState = estimateRumenState({
 rdpKg: round(rdpKg),
 rupKg: round(rupKg),
 digestibleRupKg: round(digestibleRupKg),
+     microbialNG: round(microbialProteinModel.microbialNG || 0, 0),
+microbialCPKg: round(microbialProteinModel.microbialCPKg || 0, 3),
+microbialTPKg: round(microbialProteinModel.microbialTPKg || 0, 3),
+rdpBalanceKg: microbialProteinModel.rdpBalanceKg == null ? null : round(microbialProteinModel.rdpBalanceKg, 3),
       rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
 digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
+     microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
+totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
+     microbialNG: round(microbialNG, 0),
+microbialCPG: round(microbialCPG, 0),
+microbialTPG: round(microbialTPG, 0),
+microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
+totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
 mpSupplyG: round(mpSupplyG, 0),
       nelMcal: round(nelMcal),
       ndfKg: round(ndfKg),
@@ -766,17 +1019,19 @@ proteinModel,
       mpBalanceG: round(mpBalanceG, 0),
       mpNote,
 inputQuality: {
-  missingMpRows,
-  missingNelRows,
-  missingNdfRows,
-  missingStarchRows,
- missingWscRows,
+missingMpRows,
+missingNelRows,
+missingNdfRows,
+missingStarchRows,
+missingWscRows,
 missingNdsfRows,
 missingRdpRows,
 missingRupRows,
 missingRupDigestibilityRows,
 missingAaProfileRows,
-missingAaDetailRows
+missingAaDetailRows,
+missingRumDigNdfRows,
+missingRumDigStarchRows
 },
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
