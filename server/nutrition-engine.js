@@ -233,7 +233,28 @@ function gestationConceptusNE(bodyWeight, pregDays, calfBirthWeightKg = null, ma
 
   return Math.max(0, gestNEL);
 }
+// SOURCE: NASEM_2021_EQ_3_15_TO_3_18_HELPER
+// Daily gravid uterus gain, kg/day, used by protein Eq. 6-11a.
+function gravidUterusGainKgDay(bodyWeight, pregDays, calfBirthWeightKg = null, matureBodyWeight = null, isHeifer = false){
+  const dayGest = clamp(num(pregDays), 0, 280);
+  if (dayGest < 12) return 0;
 
+  const matBW = num(matureBodyWeight) || num(bodyWeight);
+  const calfBW =
+    num(calfBirthWeightKg) ||
+    (matBW * (isHeifer ? 0.058 : 0.063));
+
+  const grUterAtParturition = calfBW * 1.825;
+
+  const grUterWt =
+    grUterAtParturition *
+    Math.exp(-1 * (0.0243 - (0.0000245 * dayGest)) * (280 - dayGest));
+
+  const grUterWtGain =
+    (0.0243 - (0.0000245 * dayGest)) * grUterWt;
+
+  return Math.max(0, grUterWtGain);
+}
 function closeUpExtraNEL(closeUp){
   return closeUp ? 0.8 : 0;
 }
@@ -259,14 +280,110 @@ function heiferGrowthNEL(bodyWeight, species){
 
 // MP operational approximation
 // NASEM 2021 evaluates protein on MP / absorbed AA basis, not crude protein alone.
-function computeOperationalMPTarget({
+// SOURCE: NASEM_2021_EQ_6_7A_TO_6_14A
+// MP recommendation, target-side only.
+// Eq. 6-14a for lactating cows.
+// Eq. 6-14c for late-gestation / heifers when milk = 0.
+function computeNasemMPRequirement({
   bodyWeight,
   milkKg,
   proteinPct,
   pregDays,
   closeUp,
-  growth
+  growth,
+  dmi,
+  ndfPct,
+  parity,
+  species,
+  matureBodyWeight
 }){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const protPct = num(proteinPct, 3.2) / 100;
+  const DMI = Math.max(0, num(dmi));
+  const ndf = num(ndfPct, 30);
+  const preg = num(pregDays);
+  const par = num(parity, 2);
+
+  const targetEffMP = 0.69;
+
+  // Eq. 6-7a: NP-scurf = 0.17 × BW^0.60
+  const npScurfG = 0.17 * Math.pow(bw, 0.60);
+
+  // Eq. 6-8a: NP-endogenous urinary = 53 × 6.25 × BW × 0.001
+  const npEndogenousUrinaryG = 53 * 6.25 * bw * 0.001;
+
+  // Eq. 6-9a,b: CP-MFP = (11.62 + 0.134 × NDF%DM) × DMI; NP-MFP = CP-MFP × 0.73
+  const cpMfpG = (11.62 + (0.134 * ndf)) * DMI;
+  const npMfpG = cpMfpG * 0.73;
+
+  // Milk TP. If TP/CP is not known, NASEM uses 0.951.
+  const npMilkG = milk * protPct * 1000 * 0.951;
+
+  // Eq. 6-11a: NP-Gestation = Gain_GrUter × 125
+  const isHeifer = !!growth || milk <= 0;
+  const grUterGainKg = gravidUterusGainKgDay(
+    bw,
+    preg,
+    null,
+    matureBodyWeight || bw,
+    isHeifer
+  );
+  const npGestationG = grUterGainKg * 125;
+
+  // Eq. 6-12a: NP-growth = Frame weight gain(g/d) × 0.11 × 0.86
+  let frameGainKgDay = 0;
+  if (growth) {
+    frameGainKgDay = heiferTargetADG(bw);
+  } else if (milk > 0 && par === 1) {
+    frameGainKgDay = 0.19;
+  } else if (milk > 0 && par === 2) {
+    frameGainKgDay = 0.15;
+  }
+
+  const npGrowthG = (frameGainKgDay * 1000) * 0.11 * 0.86;
+
+  let recommendedMPG;
+
+  if (milk > 0) {
+    // Eq. 6-14a
+    recommendedMPG =
+      ((npScurfG + npMfpG + npMilkG + npGrowthG) / targetEffMP) +
+      (npGestationG / 0.33) +
+      npEndogenousUrinaryG;
+  } else {
+    // Eq. 6-14c for late-gestation cows/heifers
+    recommendedMPG =
+      ((npScurfG + npMfpG) / targetEffMP) +
+      (npGestationG / 0.33) +
+      (npGrowthG / 0.40) +
+      npEndogenousUrinaryG;
+  }
+
+  return {
+    mpTargetG: recommendedMPG,
+    model: milk > 0 ? 'NASEM_2021_EQ_6_14A' : 'NASEM_2021_EQ_6_14C',
+    targetEffMP,
+    components: {
+      npScurfG,
+      npMfpG,
+      npMilkG,
+      npGrowthG,
+      npGestationG,
+      npEndogenousUrinaryG,
+      cpMfpG,
+      grUterGainKgDay: grUterGainKg,
+      frameGainKgDay
+    },
+    note: 'MP target computed from NASEM 2021 factorial NP components; EAA targets are handled separately by Eq. 6-14b/6-14d.'
+  };
+}
+
+// Backward-compatible wrapper.
+// لا نستخدمه كـ operational approximation بعد الآن.
+function computeOperationalMPTarget(args){
+  return computeNasemMPRequirement(args).mpTargetG;
+}
   const bw075 = Math.pow(num(bodyWeight), 0.75);
   const milk  = num(milkKg);
   const milkProtPct = num(proteinPct, 3.2) / 100;
@@ -349,14 +466,21 @@ function computeCow({
   const nelPreg = gestationConceptusNE(bw, pregDays) + closeUpExtraNEL(closeUp);
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
-  const mpTargetG = computeOperationalMPTarget({
-    bodyWeight: bw,
-    milkKg: milk,
-    proteinPct,
-    pregDays,
-    closeUp,
-    growth: false
-  });
+const mpReq = computeNasemMPRequirement({
+  bodyWeight: bw,
+  milkKg: milk,
+  proteinPct,
+  pregDays,
+  closeUp,
+  growth: false,
+  dmi,
+  ndfPct: 30,
+  parity: num(parity, 2),
+  species: 'cow',
+  matureBodyWeight: getStandardWeight('cow', breed)
+});
+
+const mpTargetG = mpReq.mpTargetG;
 
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
@@ -379,6 +503,16 @@ function computeCow({
   gestation: 'NASEM_2021_EQ_3_15_TO_3_18',
   unit: 'NEL_Mcal_day'
 },
+   proteinRequirementModel: {
+  model: mpReq.model,
+  status: 'verified_mp_target',
+  targetType: 'MP',
+  targetEffMP: mpReq.targetEffMP,
+  components: Object.fromEntries(
+    Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
+  ),
+  note: mpReq.note
+}, 
     bodyWeight: bw,
     dim: Number.isFinite(days) ? Math.round(days) : null,
     dmi: round(dmi),
@@ -415,14 +549,21 @@ function computeCowHeifer({
   const nelPreg = gestationConceptusNE(bw, pregDays) + (closeUp ? 0.6 : 0);
   const nelTotal = nelMaintenance + nelGrowth + nelPreg;
 
-  const mpTargetG = computeOperationalMPTarget({
-    bodyWeight: bw,
-    milkKg: 0,
-    proteinPct: 0,
-    pregDays,
-    closeUp,
-    growth: true
-  });
+const mpReq = computeNasemMPRequirement({
+  bodyWeight: bw,
+  milkKg: 0,
+  proteinPct: 0,
+  pregDays,
+  closeUp,
+  growth: true,
+  dmi,
+  ndfPct: 32,
+  parity: 0,
+  species: 'cow',
+  matureBodyWeight: Math.max(700, bw * 1.35)
+});
+
+const mpTargetG = mpReq.mpTargetG;
 
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
@@ -434,6 +575,16 @@ function computeCowHeifer({
   return {
     species: 'cow',
     category: 'heifer',
+    proteinRequirementModel: {
+  model: mpReq.model,
+  status: 'verified_mp_target',
+  targetType: 'MP',
+  targetEffMP: mpReq.targetEffMP,
+  components: Object.fromEntries(
+    Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
+  ),
+  note: mpReq.note
+},
     bodyWeight: bw,
     dim: null,
     dmi: round(dmi),
