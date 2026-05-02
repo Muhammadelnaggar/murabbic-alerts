@@ -265,8 +265,16 @@ function analyzeRation(rows, targets = {}, context = {}){
 
   let asFedKg = 0;
   let dmKg = 0;
-  let cpKg = 0;
-  let mpSupplyG = 0;
+ let cpKg = 0;
+let rdpKg = 0;
+let rupKg = 0;
+let digestibleRupKg = 0;
+let mpSupplyG = 0;
+
+let missingRdpRows = 0;
+let missingRupRows = 0;
+let missingRupDigestibilityRows = 0;
+let missingAaProfileRows = 0;
   let nelMcal = 0;
  let ndfKg = 0;
 let adfKg = 0;
@@ -301,8 +309,24 @@ let forageNdfdWeightKg = 0;
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
-    const cp = num(r.cp ?? r.cpPct);
-    const mp = num(r.mp ?? r.mpGPerKgDM);
+  const cp = num(r.cp ?? r.cpPct);
+
+const rawRdpPctCP = Number(r.rdpPctCP ?? r.rdpPctOfCP ?? r.rdp);
+const hasRdp = Number.isFinite(rawRdpPctCP) && rawRdpPctCP >= 0;
+const rdpPctCP = hasRdp ? rawRdpPctCP : 0;
+
+const rawRupPctCP = Number(r.rupPctCP ?? r.rupPctOfCP ?? r.rup);
+const hasRup = Number.isFinite(rawRupPctCP) && rawRupPctCP >= 0;
+const rupPctCP = hasRup ? rawRupPctCP : 0;
+
+const rawRupDig = Number(r.rupDigestibilityPct ?? r.digestibleRupPct ?? r.dRUPPct);
+const hasRupDig = Number.isFinite(rawRupDig) && rawRupDig >= 0;
+const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
+
+const aaProfile = r.aaProfilePctTP || r.aaProfile || null;
+const hasAaProfile = !!aaProfile && typeof aaProfile === 'object';
+
+const mp = num(r.mp ?? r.mpGPerKgDM);
     const nel = num(r.nel ?? r.nelMcalPerKgDM);
 const ndf = num(r.ndf ?? r.ndfPct);
 const adf = num(r.adf ?? r.adfPct);
@@ -341,8 +365,33 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
 
     asFedKg += kg;
     dmKg += dmItemKg;
-    cpKg += dmItemKg * (cp / 100);
-    if (mp > 0) {
+const cpItemKg = dmItemKg * (cp / 100);
+cpKg += cpItemKg;
+
+if (hasRdp) {
+  rdpKg += cpItemKg * (rdpPctCP / 100);
+} else if (cp > 0) {
+  missingRdpRows++;
+}
+
+if (hasRup) {
+  const rupItemKg = cpItemKg * (rupPctCP / 100);
+  rupKg += rupItemKg;
+
+  if (hasRupDig) {
+    digestibleRupKg += rupItemKg * (rupDigestibilityPct / 100);
+  } else {
+    missingRupDigestibilityRows++;
+  }
+} else if (cp > 0) {
+  missingRupRows++;
+}
+
+if (!hasAaProfile && cp > 0) {
+  missingAaProfileRows++;
+}
+
+if (mp > 0) {
   mpSupplyG += dmItemKg * mp;
 } else {
   missingMpRows++;
@@ -398,7 +447,12 @@ if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
   }
 
   const cpPctTotal = dmKg > 0 ? (cpKg / dmKg) * 100 : 0;
-  const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
+const rdpPctDM = dmKg > 0 ? (rdpKg / dmKg) * 100 : 0;
+const rupPctDM = dmKg > 0 ? (rupKg / dmKg) * 100 : 0;
+const digestibleRupPctDM = dmKg > 0 ? (digestibleRupKg / dmKg) * 100 : 0;
+const rdpPctCPActual = cpKg > 0 ? (rdpKg / cpKg) * 100 : 0;
+const rupPctCPActual = cpKg > 0 ? (rupKg / cpKg) * 100 : 0;
+const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
   const nelTotalMcalDay = nelMcal;
   const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
@@ -561,6 +615,26 @@ const carbohydrateModel = {
       ? 'بعض الخامات لا تحتوي WSC أو NDSF؛ لن يتم حساب NDSC الكامل لها حتى تُستكمل مكتبة الخامات'
       : 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
 }; 
+ const proteinModel = {
+  model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
+  mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
+  cpPctDM: round(cpPctTotal),
+  rdpPctDM: round(rdpPctDM),
+  rupPctDM: round(rupPctDM),
+  digestibleRupPctDM: round(digestibleRupPctDM),
+  rdpPctCP: round(rdpPctCPActual),
+  rupPctCP: round(rupPctCPActual),
+  mpSupplyG: round(mpSupplyG, 0),
+  mpDensityGkgDM: round(mpDensityGkgDM, 0),
+  missingRdpRows,
+  missingRupRows,
+  missingRupDigestibilityRows,
+  missingAaProfileRows,
+  note:
+    (missingRdpRows || missingRupRows || missingRupDigestibilityRows || missingAaProfileRows)
+      ? 'بعض خامات البروتين لا تحتوي RDP/RUP/dRUP أو AA profile؛ لن يتم اعتبار تقييم البروتين مكتملًا حتى تُستكمل مكتبة الخامات'
+      : 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
+}; 
 const rumenState = estimateRumenState({
   starchPct,
   ndfPctActual,
@@ -577,7 +651,10 @@ const rumenState = estimateRumenState({
       asFedKg: round(asFedKg),
       dmKg: round(dmKg),
       cpKg: round(cpKg),
-      mpSupplyG: round(mpSupplyG, 0),
+rdpKg: round(rdpKg),
+rupKg: round(rupKg),
+digestibleRupKg: round(digestibleRupKg),
+mpSupplyG: round(mpSupplyG, 0),
       nelMcal: round(nelMcal),
       ndfKg: round(ndfKg),
       peNdfKg: round(peNdfKg),
@@ -597,6 +674,12 @@ const rumenState = estimateRumenState({
     },
     nutrition: {
       cpPctTotal: round(cpPctTotal),
+      rdpPctDM: round(rdpPctDM),
+rupPctDM: round(rupPctDM),
+digestibleRupPctDM: round(digestibleRupPctDM),
+rdpPctCP: round(rdpPctCPActual),
+rupPctCP: round(rupPctCPActual),
+proteinModel,
       mpSupplyG: round(mpSupplyG, 0),
       mpDensityGkgDM: round(mpDensityGkgDM, 0),
       mpBalanceG: round(mpBalanceG, 0),
@@ -606,8 +689,12 @@ inputQuality: {
   missingNelRows,
   missingNdfRows,
   missingStarchRows,
-  missingWscRows,
-  missingNdsfRows
+ missingWscRows,
+missingNdsfRows,
+missingRdpRows,
+missingRupRows,
+missingRupDigestibilityRows,
+missingAaProfileRows
 },
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
