@@ -696,9 +696,8 @@ const carbohydrateModel = {
   mpDensityGkgDM: round(mpDensityGkgDM, 0),
   missingRdpRows,
   missingRupRows,
-  missingRupDigestibilityRows,
- missingAaProfileRows,
-missingAaDetailRows
+ missingRupDigestibilityRows,
+missingAaProfileRows,
 missingAaDetailRows,
 eaaModel: {
   model: 'NASEM_2021_CH6_EAA_SUPPLY_FRAMEWORK',
@@ -776,7 +775,8 @@ missingNdsfRows,
 missingRdpRows,
 missingRupRows,
 missingRupDigestibilityRows,
-missingAaProfileRows
+missingAaProfileRows,
+missingAaDetailRows
 },
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
