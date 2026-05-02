@@ -384,6 +384,37 @@ function computeNasemMPRequirement({
 function computeOperationalMPTarget(args){
   return computeNasemMPRequirement(args).mpTargetG;
 }
+// MURABBIK_OPERATIONAL_RULE
+// Buffalo MP target is NOT labeled as NASEM 2021.
+// Kept separate to avoid applying dairy-cattle NASEM equations to buffalo.
+function computeBuffaloOperationalMPTarget({
+  bodyWeight,
+  milkKg,
+  proteinPct,
+  pregDays,
+  closeUp,
+  growth
+}){
+  const bw075 = Math.pow(num(bodyWeight), 0.75);
+  const milk  = num(milkKg);
+  const milkProtPct = num(proteinPct, 4.2) / 100;
+
+  const mpMaintenance = 3.8 * bw075;
+
+  const milkTrueProteinG = milk * milkProtPct * 1000;
+  const mpLactation = milkTrueProteinG / 0.67;
+
+  let mpPreg = 0;
+  if (pregDays >= 190){
+    const late = pregDays - 190;
+    mpPreg = 70 + (1.8 * late) + (0.01 * late * late);
+  }
+
+  const mpGrowth = growth ? 140 : 0;
+  const mpCloseUp = closeUp ? 45 : 0;
+
+  return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
+}
   const bw075 = Math.pow(num(bodyWeight), 0.75);
   const milk  = num(milkKg);
   const milkProtPct = num(proteinPct, 3.2) / 100;
@@ -701,15 +732,14 @@ dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
   const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) : 0) + (closeUp ? 1.0 : 0);
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
-  const mpTargetG = computeOperationalMPTarget({
-    bodyWeight: bw,
-    milkKg: milk,
-    proteinPct,
-    pregDays,
-    closeUp,
-    growth: false
-  });
-
+const mpTargetG = computeBuffaloOperationalMPTarget({
+  bodyWeight: bw,
+  milkKg: milk,
+  proteinPct,
+  pregDays,
+  closeUp,
+  growth: false
+});
 const cpReferencePct = buffaloCpPctLactating({
   bodyWeight: bw,
   milkKg: milk,
@@ -750,14 +780,14 @@ const dmi = predictHeiferDMI({
   dietNDFPct
 });
 
-  const mpTargetG = computeOperationalMPTarget({
-    bodyWeight: bw,
-    milkKg: 0,
-    proteinPct: 0,
-    pregDays,
-    closeUp,
-    growth: true
-  });
+ const mpTargetG = computeBuffaloOperationalMPTarget({
+  bodyWeight: bw,
+  milkKg: 0,
+  proteinPct: 0,
+  pregDays,
+  closeUp,
+  growth: true
+});
 
 const cpReferencePct = buffaloCpPctHeifer({
   bodyWeight: bw,
