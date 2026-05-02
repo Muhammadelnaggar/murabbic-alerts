@@ -721,11 +721,7 @@ for (const aa of EAA_KEYS){
   digestibleRupEaaDensityGkgDM[aa] =
     dmKg > 0 ? (digestibleRupEaaG[aa] / dmKg) : 0;
 }
- const totalModeledEaaG = {};
-for (const aa of EAA_KEYS){
-  totalModeledEaaG[aa] =
-    digestibleRupEaaG[aa] + microbialEaaG[aa];
-}
+
   const nelTotalMcalDay = nelMcal;
   const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
   const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
@@ -934,22 +930,9 @@ includesEndogenousEAA: false,
  microbialProteinModel,
 microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
 totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
- microbialProteinModel: {
-  model: 'NASEM_2021_MICROBIAL_N_TO_CP_TP_STOICHIOMETRY',
-  predictionMode: microbialInputRows > 0 ? 'explicit_microbial_input' : 'not_predicted',
-  microbialNG: round(microbialNG, 0),
-  microbialCPG: round(microbialCPG, 0),
-  microbialTPG: round(microbialTPG, 0),
-  microbialInputRows,
-  note: microbialProteinModel.hasMicrobialAaProfile
+note: microbialProteinModel.hasMicrobialAaProfile
   ? 'تم حساب EAA من dRUP و microbial true protein؛ لا تشمل endogenous EAA بعد'
   : 'تم حساب EAA من dRUP فقط؛ microbial protein محسوب عند توفر مدخلات rumen digestion لكن microbial EAA ينتظر Table 6-2'
-},
-microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
-totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
-  note: microbialInputRows > 0
-  ? 'هذه مرحلة EAA من dRUP ومع مدخل microbial صريح؛ لا تشمل endogenous EAA بعد ولا تتضمن معادلة توقع microbial protein'
-  : 'هذه مرحلة EAA من dRUP فقط؛ لا تشمل microbial EAA أو endogenous EAA بعد'
 },
 note:
     (missingRdpRows || missingRupRows || missingRupDigestibilityRows || missingAaProfileRows)
@@ -976,19 +959,15 @@ rdpKg: round(rdpKg),
 rupKg: round(rupKg),
 digestibleRupKg: round(digestibleRupKg),
      microbialNG: round(microbialProteinModel.microbialNG || 0, 0),
-microbialCPKg: round(microbialProteinModel.microbialCPKg || 0, 3),
-microbialTPKg: round(microbialProteinModel.microbialTPKg || 0, 3),
-rdpBalanceKg: microbialProteinModel.rdpBalanceKg == null ? null : round(microbialProteinModel.rdpBalanceKg, 3),
-      rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
-digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
+     microbialCPKg: round(microbialProteinModel.microbialCPKg || 0, 3),
+     microbialTPKg: round(microbialProteinModel.microbialTPKg || 0, 3),
+     rdpBalanceKg: microbialProteinModel.rdpBalanceKg == null ? null : round(microbialProteinModel.rdpBalanceKg, 3),
+     rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
+     digestibleRupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(digestibleRupEaaG[k], 0)])),
      microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
-totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
-     microbialNG: round(microbialNG, 0),
-microbialCPG: round(microbialCPG, 0),
-microbialTPG: round(microbialTPG, 0),
-microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
-totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
-mpSupplyG: round(mpSupplyG, 0),
+     totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
+   
+      mpSupplyG: round(mpSupplyG, 0),
       nelMcal: round(nelMcal),
       ndfKg: round(ndfKg),
       peNdfKg: round(peNdfKg),
