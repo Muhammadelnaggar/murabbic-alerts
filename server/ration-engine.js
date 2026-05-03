@@ -537,11 +537,12 @@ function resolveFaDigestibilityCoeff(row = {}){
 function predictCowLactatingDMIRationEffect({ fNDFPct, adfPct, ndfPct, fNDFDPct, milkKg }){
   const fNDF = num(fNDFPct);
   const ADF_NDF = safeDiv(num(adfPct), num(ndfPct));
-  const rawFNDFD = Number(fNDFDPct);
-  const fNDFD = Number.isFinite(rawFNDFD) && rawFNDFD > 0 ? rawFNDFD : 52.0;
-  const MY = num(milkKg);
+const fNDFD = Number(fNDFDPct);
+const MY = num(milkKg);
 
-  if (!fNDF || !ADF_NDF || !MY) return null;
+if (!fNDF || !ADF_NDF || !(Number.isFinite(fNDFD) && fNDFD > 0) || !MY) {
+  throw new Error('NASEM_EQ_2_2_REQUIRES_FNDF_ADF_NDF_FNDFD_AND_MILK');
+}
 
   const dmi =
     12.0
@@ -560,8 +561,7 @@ function predictCowLactatingDMIRationEffect({ fNDFPct, adfPct, ndfPct, fNDFDPct,
       adfNdfRatio: round(ADF_NDF, 3),
       fNDFDPct: round(fNDFD),
       milkKg: round(MY)
-    },
-    usedFNDFDFallback: !(Number.isFinite(rawFNDFD) && rawFNDFD > 0)
+    }
   };
 }
 function inferPef(row = {}){
@@ -1004,7 +1004,9 @@ const canApplyNasemRationDmi =
   dim > 60 &&
   forageNdfPctDiet > 0 &&
   adfPctActual > 0 &&
-  ndfPctActual > 0;
+  ndfPctActual > 0 &&
+  weightedForageNdfDigestibilityPct != null &&
+  weightedForageNdfDigestibilityPct > 0;
 
 const rationDmiCalc = canApplyNasemRationDmi
   ? predictCowLactatingDMIRationEffect({
@@ -1024,30 +1026,12 @@ const dmiRationEffect = rationDmiCalc
       animalDmiTargetKg: round(dmiTarget),
       constraintKg: round(rationDmiCalc.dmi - dmiTarget),
       status: dmiTarget && rationDmiCalc.dmi < dmiTarget - 1 ? 'limited_by_ration' : 'not_limited',
-      usedFNDFDFallback: rationDmiCalc.usedFNDFDFallback,
       inputs: rationDmiCalc.inputs,
       note: dmiTarget && rationDmiCalc.dmi < dmiTarget - 1
         ? 'العليقة قد تحدّ استهلاك المادة الجافة بسبب تأثير الألياف أو هضم الخشن'
         : 'العليقة لا تبدو محددة لاستهلاك المادة الجافة حسب نموذج NASEM 2021 Eq. 2-2'
     }
-  : {
-      model: 'NASEM_2021_EQ_2_2',
-      applied: false,
-      rationDmiKg: null,
-      animalDmiTargetKg: round(dmiTarget),
-      constraintKg: null,
-      status: 'not_applied',
-      usedFNDFDFallback: false,
-      inputs: {
-        fNDFPct: round(forageNdfPctDiet),
-        adfPct: round(adfPctActual),
-        ndfPct: round(ndfPctActual),
-        fNDFDPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
-        milkKg: round(avgMilkKg),
-        dim: round(dim, 0)
-      },
-      note: 'لم يتم تطبيق Eq. 2-2 لأن شروط التطبيق أو بيانات العليقة غير مكتملة'
-    };
+  : null;
 const fatModel = {
   model: 'NASEM_2021_TABLE_4_1_FA_DIGESTIBILITY',
   totalFatKg: round(fatKg),
