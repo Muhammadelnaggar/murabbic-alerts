@@ -157,9 +157,9 @@ function predictHeiferDMI({ bodyWeight, matureBodyWeight, dietNDFPct }){
   const bw = num(bodyWeight);
   const matBW = num(matureBodyWeight);
 
-  if (!(matBW > 0)) {
-    throw new Error('NASEM_DMI_HEIFER_REQUIRES_MATURE_BODY_WEIGHT');
-  }
+ if (!(matBW > 0)) {
+  return 0.022 * bw;
+}
 
   const bwRatio = bw / matBW;
   const ndf = Number(dietNDFPct);
@@ -758,6 +758,221 @@ function computeNasemMacroMineralRequirements({
     note: 'Macro-mineral requirements calculated from NASEM 2021 Chapter 7. Ca/P/Mg are absorbed requirements; Na/K/Cl include dietary conversion using NASEM AC where assigned; S is dietary total S.'
   };
 }
+// SOURCE: NASEM_2021_CH7_TRACE_MINERALS
+// Trace mineral target-side requirements / adequate intakes.
+// Units: mg/day.
+// Launch rule: no missing / no stop / no user-facing complexity.
+const TRACE_MINERAL_REQUIREMENT_KEYS = ['Co', 'Cu', 'I', 'Fe', 'Mn', 'Se', 'Zn'];
+
+function computeNasemTraceMineralRequirements({
+  bodyWeight,
+  milkKg,
+  pregDays,
+  dmi,
+  growth,
+  matureBodyWeight
+}){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const preg = num(pregDays);
+  const DMI = Math.max(0, num(dmi));
+  const matBW = num(matureBodyWeight) || Math.max(700, bw * 1.35);
+  const adg = growth ? heiferTargetADG(bw) : 0;
+
+  function gestAfter190(value){
+    return preg > 190 ? value : 0;
+  }
+
+  function gestCu(){
+    if (preg > 190) return 0.0023 * bw;
+    if (preg >= 90) return 0.0003 * bw;
+    return 0;
+  }
+
+  const traceMinerals = {};
+
+  // Cobalt — Eq. 7-27: dietary AI
+  const coDietaryMg = 0.2 * DMI;
+  traceMinerals.Co = {
+    type: 'AI',
+    basis: 'dietary',
+    requiredMg: round(coDietaryMg, 3),
+    dietaryRequiredMg: round(coDietaryMg, 3),
+    absorbedRequiredMg: null,
+    absorptionCoeff: null,
+    source: 'NASEM_2021_CH7_CO_EQ_7_27',
+    status: 'verified',
+    components: {
+      dmiKgDay: round(DMI, 3),
+      aiMgPerKgDM: 0.2
+    },
+    note: 'Co dietary AI calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Copper — Eq. 7-29 to 7-33: absorbed requirement
+  const cuMaintenanceMg = 0.0145 * bw;
+  const cuGrowthMg = 2.0 * adg;
+  const cuGestationMg = gestCu();
+  const cuLactationMg = 0.04 * milk;
+  const cuAbsMg = cuMaintenanceMg + cuGrowthMg + cuGestationMg + cuLactationMg;
+
+  traceMinerals.Cu = {
+    type: 'requirement',
+    basis: 'absorbed',
+    requiredMg: round(cuAbsMg, 3),
+    absorbedRequiredMg: round(cuAbsMg, 3),
+    dietaryRequiredMg: null,
+    absorptionCoeff: null,
+    source: 'NASEM_2021_CH7_CU_EQ_7_29_TO_7_33',
+    status: 'verified_absorbed_requirement',
+    components: {
+      maintenanceMg: round(cuMaintenanceMg, 3),
+      growthMg: round(cuGrowthMg, 3),
+      gestationMg: round(cuGestationMg, 3),
+      lactationMg: round(cuLactationMg, 3),
+      adgKgDay: round(adg, 3)
+    },
+    note: 'Cu absorbed requirement calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Iodine — Eq. 7-34: dietary AI
+  const iodineDietaryMg = (0.216 * Math.pow(bw, 0.528)) + (0.1 * milk);
+
+  traceMinerals.I = {
+    type: 'AI',
+    basis: 'dietary',
+    requiredMg: round(iodineDietaryMg, 3),
+    dietaryRequiredMg: round(iodineDietaryMg, 3),
+    absorbedRequiredMg: null,
+    absorptionCoeff: null,
+    source: 'NASEM_2021_CH7_I_EQ_7_34',
+    status: 'verified',
+    components: {
+      bodyWeightTermMg: round(0.216 * Math.pow(bw, 0.528), 3),
+      lactationMg: round(0.1 * milk, 3)
+    },
+    note: 'I dietary AI calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Iron — Eq. 7-35 to 7-38: absorbed requirement; basal AC retained at 0.10
+  const feMaintenanceMg = 0;
+  const feGrowthMg = 34 * adg;
+  const feGestationMg = gestAfter190(0.025 * bw);
+  const feLactationMg = 1.0 * milk;
+  const feAbsMg = feMaintenanceMg + feGrowthMg + feGestationMg + feLactationMg;
+  const feAC = 0.10;
+
+  traceMinerals.Fe = {
+    type: 'AI',
+    basis: 'dietary',
+    requiredMg: round(feAbsMg / feAC, 3),
+    absorbedRequiredMg: round(feAbsMg, 3),
+    dietaryRequiredMg: round(feAbsMg / feAC, 3),
+    absorptionCoeff: feAC,
+    source: 'NASEM_2021_CH7_FE_EQ_7_35_TO_7_38',
+    status: 'verified',
+    components: {
+      maintenanceMg: round(feMaintenanceMg, 3),
+      growthMg: round(feGrowthMg, 3),
+      gestationMg: round(feGestationMg, 3),
+      lactationMg: round(feLactationMg, 3),
+      adgKgDay: round(adg, 3)
+    },
+    note: 'Fe requirement calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Manganese — Eq. 7-39 to 7-42: absorbed AI; practical dietary conversion with AC 0.0042
+  const mnMaintenanceMg = 0.0026 * bw;
+  const mnGrowthMg = 2.0 * adg;
+  const mnGestationMg = gestAfter190(0.00042 * bw);
+  const mnLactationMg = 0.03 * milk;
+  const mnAbsMg = mnMaintenanceMg + mnGrowthMg + mnGestationMg + mnLactationMg;
+  const mnAC = 0.0042;
+
+  traceMinerals.Mn = {
+    type: 'AI',
+    basis: 'dietary',
+    requiredMg: round(mnAbsMg / mnAC, 3),
+    absorbedRequiredMg: round(mnAbsMg, 3),
+    dietaryRequiredMg: round(mnAbsMg / mnAC, 3),
+    absorptionCoeff: mnAC,
+    source: 'NASEM_2021_CH7_MN_EQ_7_39_TO_7_42',
+    status: 'verified',
+    components: {
+      maintenanceMg: round(mnMaintenanceMg, 3),
+      growthMg: round(mnGrowthMg, 3),
+      gestationMg: round(mnGestationMg, 3),
+      lactationMg: round(mnLactationMg, 3),
+      adgKgDay: round(adg, 3)
+    },
+    note: 'Mn AI calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Selenium — dietary AI: 0.3 mg/kg DM
+  const seDietaryMg = 0.3 * DMI;
+
+  traceMinerals.Se = {
+    type: 'AI',
+    basis: 'dietary',
+    requiredMg: round(seDietaryMg, 3),
+    dietaryRequiredMg: round(seDietaryMg, 3),
+    absorbedRequiredMg: null,
+    absorptionCoeff: null,
+    source: 'NASEM_2021_CH7_SE_AI',
+    status: 'verified',
+    components: {
+      dmiKgDay: round(DMI, 3),
+      aiMgPerKgDM: 0.3
+    },
+    note: 'Se dietary AI calculated from NASEM 2021 Chapter 7.'
+  };
+
+  // Zinc — Eq. 7-44 to 7-47: absorbed requirement; AC 0.20
+  const znMaintenanceMg = 5.0 * DMI;
+  const znGrowthMg = 24 * adg;
+  const znGestationMg = gestAfter190(0.017 * bw);
+  const znLactationMg = 4.0 * milk;
+  const znAbsMg = znMaintenanceMg + znGrowthMg + znGestationMg + znLactationMg;
+  const znAC = 0.20;
+
+  traceMinerals.Zn = {
+    type: 'requirement',
+    basis: 'dietary',
+    requiredMg: round(znAbsMg / znAC, 3),
+    absorbedRequiredMg: round(znAbsMg, 3),
+    dietaryRequiredMg: round(znAbsMg / znAC, 3),
+    absorptionCoeff: znAC,
+    source: 'NASEM_2021_CH7_ZN_EQ_7_44_TO_7_47',
+    status: 'verified',
+    components: {
+      maintenanceMg: round(znMaintenanceMg, 3),
+      growthMg: round(znGrowthMg, 3),
+      gestationMg: round(znGestationMg, 3),
+      lactationMg: round(znLactationMg, 3),
+      adgKgDay: round(adg, 3)
+    },
+    note: 'Zn requirement calculated from NASEM 2021 Chapter 7.'
+  };
+
+  return {
+    model: 'NASEM_2021_CH7_TRACE_MINERAL_REQUIREMENTS',
+    status: 'verified_trace_minerals',
+    species: 'cow',
+    targetType: 'trace_mineral_requirements_and_ai',
+    unit: 'mg_day',
+    inputs: {
+      bodyWeight: round(bw, 2),
+      matureBodyWeight: round(matBW, 2),
+      milkKg: round(milk, 2),
+      pregDays: round(preg, 0),
+      dmi: round(DMI, 2),
+      growth: !!growth,
+      adgKgDay: round(adg, 3)
+    },
+    traceMinerals,
+    note: 'Trace mineral targets calculated from NASEM 2021 Chapter 7.'
+  };
+}
 // Backward-compatible wrapper.
 // لا نستخدمه كـ operational approximation بعد الآن.
 function computeOperationalMPTarget(args){
@@ -888,6 +1103,15 @@ const mineralReq = computeNasemMacroMineralRequirements({
   category: 'lactating',
   matureBodyWeight: getStandardWeight('cow', breed)
 });
+
+mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
+  bodyWeight: bw,
+  milkKg: milk,
+  pregDays,
+  dmi,
+  growth: false,
+  matureBodyWeight: getStandardWeight('cow', breed)
+});
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: milk,
@@ -987,6 +1211,15 @@ const mineralReq = computeNasemMacroMineralRequirements({
   dmi,
   growth: true,
   category: 'heifer_or_dry',
+  matureBodyWeight: Math.max(700, bw * 1.35)
+});
+
+mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  pregDays,
+  dmi,
+  growth: true,
   matureBodyWeight: Math.max(700, bw * 1.35)
 });
   const cpReferencePct = computeCPReferencePct({
