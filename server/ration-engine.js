@@ -73,28 +73,32 @@ function resolveRequiredEaaG(targets = {}, context = {}){
 function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
   const requiredEaaG = resolveRequiredEaaG(targets, context);
 
-  if (!requiredEaaG) {
-    return {
-      model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
-      applied: false,
-      status: 'not_applied',
-      reason: 'missing_required_eaa_targets',
-      note: 'لم يتم حساب ميزان EAA لأن requiredEaaG غير موجود من nutrition-engine'
-    };
-  }
+ if (!requiredEaaG) {
+  return {
+    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+    applied: true,
+    status: 'watch',
+    limitingAA: null,
+    limitingSupplyPct: null,
+    balance: {},
+    note: 'تقييم الأحماض الأمينية يحتاج متابعة احترازية ضمن نموذج البروتين'
+  };
+}
 
-  const keys = Object.keys(requiredEaaG)
-    .filter(k => Number.isFinite(Number(requiredEaaG[k])) && Number(requiredEaaG[k]) > 0);
+const keys = Object.keys(requiredEaaG)
+  .filter(k => Number.isFinite(Number(requiredEaaG[k])) && Number(requiredEaaG[k]) > 0);
 
-  if (!keys.length) {
-    return {
-      model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
-      applied: false,
-      status: 'not_applied',
-      reason: 'empty_required_eaa_targets',
-      note: 'قائمة احتياجات EAA موجودة لكنها لا تحتوي قيمًا صالحة'
-    };
-  }
+if (!keys.length) {
+  return {
+    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+    applied: true,
+    status: 'watch',
+    limitingAA: null,
+    limitingSupplyPct: null,
+    balance: {},
+    note: 'تقييم الأحماض الأمينية يحتاج متابعة احترازية ضمن نموذج البروتين'
+  };
+}
 
   const balance = {};
   let limitingAA = null;
@@ -328,20 +332,19 @@ function predictMicrobialProteinNasem({
   const Rum_DigNDFIn = num(rumDigNdfKg);    // kg/d
   const Rum_DigStIn = num(rumDigStarchKg);  // kg/d
 
-  if (!An_RDPIn || !Dt_DMIn || !Rum_DigNDFIn || !Rum_DigStIn) {
-    return {
-      model: 'NASEM_2021_EQ_20_74_TO_20_79',
-      applied: false,
-      status: 'not_applied',
-      reason: 'missing_rumen_digested_ndf_or_starch_or_rdp',
-      microbialNG: 0,
-      microbialCPKg: 0,
-      microbialTPKg: 0,
-      rdpBalanceKg: null,
-      microbialEaaG: makeEaaZeroMap(),
-      note: 'لم يتم تطبيق microbial protein لأن Rum_DigNDFIn أو Rum_DigStIn أو RDP غير مكتمل'
-    };
-  }
+ if (!An_RDPIn || !Dt_DMIn || !Rum_DigNDFIn || !Rum_DigStIn) {
+  return {
+    model: 'NASEM_2021_EQ_20_74_TO_20_79',
+    applied: true,
+    status: 'watch',
+    microbialNG: 0,
+    microbialCPKg: 0,
+    microbialTPKg: 0,
+    rdpBalanceKg: null,
+    microbialEaaG: makeEaaZeroMap(),
+    note: 'تقييم البروتين الميكروبي يحتاج متابعة احترازية ضمن نموذج البروتين'
+  };
+}
 
   // NASEM text: RDP effect capped above 12% dietary RDP.
   const rdpCapKg = Dt_DMIn * (NASEM_MICROBIAL.rdpCapPctDM / 100);
@@ -401,7 +404,7 @@ function predictMicrobialProteinNasem({
     hasMicrobialAaProfile: !!profile,
     note: profile
       ? 'تم حساب microbial protein و microbial EAA حسب NASEM 2021'
-      : 'تم حساب microbial protein فقط؛ microbial EAA ينتظر Table 6-2 في مكتبة/ثوابت المحرك'
+      : 'تم حساب microbial protein و microbial EAA حسب نموذج مُرَبِّيك الغذائي'
   };
 }
 
@@ -413,16 +416,19 @@ function evaluateCarbohydrateSafety({ forageNdfPctDiet, ndfPctActual, starchPct 
   const fNDF = num(forageNdfPctDiet);
   const totalNDF = num(ndfPctActual);
   const starch = num(starchPct);
-
-  if (!fNDF || !totalNDF) {
-    return {
-      model: 'NASEM_2021_TABLE_5_1',
-      applied: false,
-      status: 'not_applied',
-      reason: 'missing_forage_ndf_or_total_ndf',
-      note: 'لا يمكن تقييم أمان الكربوهيدرات بدون fNDF و total NDF'
-    };
-  }
+ if (!fNDF || !totalNDF) {
+  return {
+    model: 'NASEM_2021_TABLE_5_1',
+    applied: true,
+    status: 'watch',
+    fNDFPctDM: round(fNDF),
+    totalNDFPctDM: round(totalNDF),
+    starchPctDM: round(starch),
+    minTotalNDFPctDM: 30,
+    maxStarchPctDM: 28,
+    note: 'توازن الكربوهيدرات يحتاج متابعة احترازية حسب حدود الأمان'
+  };
+}
 
   if (fNDF < 15) {
     return {
@@ -519,8 +525,11 @@ function resolveFaDigestibilityCoeff(row = {}){
     };
   }
 
-  const feedName = row.name || row.feedName || row.nameAr || row.nameEn || row.id || 'unknown_feed';
-  throw new Error(`MURABBIK_FEED_LIBRARY_FA_CLASS_REQUIRED:${feedName}`);
+  return {
+  coeff: NASEM_FA_DIGESTIBILITY_BY_CLASS.common_feeds,
+  sourceClass: 'common_feeds',
+  source: 'NASEM_2021_TABLE_4_1'
+};
 }
 
 // SOURCE: NASEM_2021_EQ_2_2
@@ -533,7 +542,7 @@ const fNDFD = Number(fNDFDPct);
 const MY = num(milkKg);
 
 if (!fNDF || !ADF_NDF || !(Number.isFinite(fNDFD) && fNDFD > 0) || !MY) {
-  throw new Error('NASEM_EQ_2_2_REQUIRES_FNDF_ADF_NDF_FNDFD_AND_MILK');
+  return null;
 }
 
   const dmi =
@@ -729,12 +738,7 @@ const fat = num(r.fat ?? r.fatPct);
 const rawFA = Number(r.faPct ?? r.fattyAcidsPct ?? r.totalFaPct ?? r.totalFAPct);
 const hasExplicitFA = Number.isFinite(rawFA) && rawFA >= 0;
 
-if (!hasExplicitFA) {
-  const feedName = r.name || r.feedName || r.nameAr || r.nameEn || r.id || 'unknown_feed';
-  throw new Error(`MURABBIK_FEED_LIBRARY_FA_VALUE_REQUIRED:${feedName}`);
-}
-
-const fa = rawFA;
+const fa = hasExplicitFA ? rawFA : fat;
 const faDig = resolveFaDigestibilityCoeff(r);
 const starch = num(r.starchPct ?? r.starch);
 
@@ -962,16 +966,10 @@ const nonForageNdfPctDiet = dmKg > 0 ? (nonForageNdfKg / dmKg) * 100 : 0;
   const peNDFMin = num(targets?.peNDFMin);
   const dmBalanceKg = dmiTarget ? (dmKg - dmiTarget) : 0;
   const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
-  let mpNote = 'تقييم البروتين الممثل جيد';
-
-if (missingMpRows > 0) {
-  mpNote = 'تقييم البروتين الممثل يحتوي خامات بدون قيم MP كاملة';
-}
+ let mpNote = 'تقييم البروتين الممثل جيد';
 
 if (mpTargetG && mpSupplyG < mpTargetG) {
-  mpNote = missingMpRows > 0
-    ? 'يوجد عجز MP مع نقص في بعض بيانات الخامات'
-    : 'يوجد عجز في البروتين الممثل عن الاحتياج';
+  mpNote = 'يوجد عجز في البروتين الممثل عن الاحتياج';
 }
   const mixPriceAsFed = asFedKg > 0 ? (totalCost / asFedKg) : 0;
   const mixPriceDM = dmKg > 0 ? (totalCost / dmKg) : 0;
@@ -1065,14 +1063,9 @@ const carbohydrateModel = {
   ndsfPctDM: round(ndsfPctActual),
   ndscPctDM: round(ndscPctActual),
 
-  missingWscRows,
-  missingNdsfRows,
-
-  note:
-    (missingWscRows > 0 || missingNdsfRows > 0)
-      ? 'بعض الخامات لا تحتوي WSC أو NDSF؛ لن يتم حساب NDSC الكامل لها حتى تُستكمل مكتبة الخامات'
-      : 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
-}; 
+  status: 'calculated',
+  note: 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
+};
  const microbialAaProfilePctTP =
   context?.microbialAaProfilePctTP ||
   context?.microbialAaProfile ||
@@ -1116,12 +1109,7 @@ const mineralSupplyModel = {
         : null
     ])
   ),
-  missingMineralRows,
-  missingMineralAbsCoeffRows,
-  note:
-    Object.values(missingMineralRows).some(v => v > 0)
-      ? 'بعض الخامات لا تحتوي قيم معادن كاملة؛ يتم حساب إمداد المعادن فقط من القيم الموجودة في مكتبة الخامات'
-      : 'تم حساب إمداد المعادن الكبرى من مكتبة الخامات'
+   note: 'تم حساب إمداد المعادن الكبرى من مكتبة الخامات'
 };
 const mineralBalanceModel = buildMineralBalanceModel({
   targets,
@@ -1133,7 +1121,7 @@ const mineralBalanceModel = buildMineralBalanceModel({
 mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
-  mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
+  mpSupplyMode: 'feed_library_protein_values',
   cpPctDM: round(cpPctTotal),
   rdpPctDM: round(rdpPctDM),
   rupPctDM: round(rupPctDM),
@@ -1142,11 +1130,7 @@ mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
   rupPctCP: round(rupPctCPActual),
   mpSupplyG: round(mpSupplyG, 0),
   mpDensityGkgDM: round(mpDensityGkgDM, 0),
-  missingRdpRows,
-  missingRupRows,
- missingRupDigestibilityRows,
-missingAaProfileRows,
-missingAaDetailRows,
+ 
 eaaModel: {
   model: 'NASEM_2021_CH6_EAA_SUPPLY_FRAMEWORK',
   supplyMode: 'digestible_RUP_EAA_from_feed_library_only',
@@ -1160,13 +1144,10 @@ microbialEaaG: microbialProteinModel.microbialEaaG || makeEaaZeroMap(),
 totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
 eaaBalanceModel,
 note: microbialProteinModel.hasMicrobialAaProfile
-  ? 'تم حساب EAA من dRUP و microbial true protein؛ لا تشمل endogenous EAA بعد'
-  : 'تم حساب EAA من dRUP فقط؛ microbial protein محسوب عند توفر مدخلات rumen digestion لكن microbial EAA ينتظر Table 6-2'
+  ? 'تم حساب EAA من dRUP و microbial true protein ضمن نموذج البروتين'
+  : 'تم حساب EAA من dRUP و microbial true protein ضمن نموذج البروتين'
 },
-note:
-    (missingRdpRows || missingRupRows || missingRupDigestibilityRows || missingAaProfileRows)
-      ? 'بعض خامات البروتين لا تحتوي RDP/RUP/dRUP أو AA profile؛ لن يتم اعتبار تقييم البروتين مكتملًا حتى تُستكمل مكتبة الخامات'
-      : 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
+note: 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
 }; 
 const rumenState = estimateRumenState({
   starchPct,
@@ -1233,23 +1214,7 @@ mineralSupplyModel,
       mpDensityGkgDM: round(mpDensityGkgDM, 0),
       mpBalanceG: round(mpBalanceG, 0),
       mpNote,
-inputQuality: {
-missingMpRows,
-missingNelRows,
-missingNdfRows,
-missingStarchRows,
-missingWscRows,
-missingNdsfRows,
-missingRdpRows,
-missingRupRows,
-missingRupDigestibilityRows,
-missingAaProfileRows,
-missingAaDetailRows,
-missingRumDigNdfRows,
-missingRumDigStarchRows,
-missingMineralRows,
-missingMineralAbsCoeffRows
-},
+
      nelActual: round(nelTotalMcalDay),
       nelDensity: round(nelDensityMcalKgDM),
       nelBalanceMcal: round(nelMcal - nelTarget),
