@@ -383,7 +383,9 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
           select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
             const nums = g.members.map(x => String(x).trim()).filter(Boolean).join(',');
            const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.animalsCount || g.members.length || 0})`;
-           return `<option value="${nums}" data-group-name="${String(g.name || '').replace(/"/g, '&quot;')}">${label}</option>`;
+          return `<option value="${nums}"
+  data-group-name="${String(g.name || '').replace(/"/g, '&quot;')}"
+  data-animal-type="${String(g.animalType || '').replace(/"/g, '&quot;')}">${label}</option>`;
           }).join('');
         }catch(err){
           console.error('groups load failed', err);
@@ -446,7 +448,92 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
         // unique مع الحفاظ على ترتيب الإدخال
         return [...new Set(list)];
       }
+     const NUTRITION_LAUNCH_CORE_MSG =
+  'مُرَبِّيك يبدأ من مركز الربح: علائق الحلاب والجاف وانتظار الولادة. علائق التوابع في التحديثات.';
 
+function normalizeGroupText(s){
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه');
+}
+
+function isNutritionLaunchCoreText(text){
+  const s = normalizeGroupText(text);
+
+  return (
+    s.includes('حلاب') ||
+    s.includes('حليب') ||
+    s.includes('لبن') ||
+    s.includes('جاف') ||
+    s.includes('تجفيف') ||
+    s.includes('انتظار الولاده') ||
+    s.includes('انتظار ولاده') ||
+    s.includes('قبل الولاده') ||
+    s.includes('تحضير للولاده') ||
+    s.includes('close') ||
+    s.includes('dry') ||
+    s.includes('lact')
+  );
+}
+
+function isNutritionBlockedText(text){
+  const s = normalizeGroupText(text);
+
+  return (
+    s.includes('تابع') ||
+    s.includes('توابع') ||
+    s.includes('عجل') ||
+    s.includes('عجله') ||
+    s.includes('عجلات') ||
+    s.includes('رضيع') ||
+    s.includes('فطام') ||
+    s.includes('نامي') ||
+    s.includes('تحت التلقيح') ||
+    s.includes('ذكر') ||
+    s.includes('ذكور') ||
+    s.includes('heifer') ||
+    s.includes('calf') ||
+    s.includes('young') ||
+    s.includes('wean')
+  );
+}
+
+function getCurrentSelectedGroupMeta(){
+  const sel = $('#groupSelect');
+  const opt = sel?.options?.[sel.selectedIndex];
+
+  return {
+    name: norm(opt?.dataset?.groupName || ''),
+    animalType: norm(opt?.dataset?.animalType || ''),
+    hasGroup: !!norm(opt?.dataset?.groupName || '')
+  };
+}
+
+function blockNutritionIfOutOfLaunchCore(list){
+  const meta = getCurrentSelectedGroupMeta();
+
+  if (list.length > 1) {
+    const label = `${meta.name} ${meta.animalType}`;
+
+    if (isNutritionLaunchCoreText(label)) return false;
+
+    $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
+    return true;
+  }
+
+  if (meta.hasGroup) {
+    const label = `${meta.name} ${meta.animalType}`;
+
+    if (isNutritionBlockedText(label) && !isNutritionLaunchCoreText(label)) {
+      $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
+      return true;
+    }
+  }
+
+  return false;
+}
       function hydrate(){
         const qs = new URLSearchParams(location.search);
 
@@ -500,6 +587,12 @@ if (isDailyMilkImport){
 const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
 const isHeat = /heat\.html/i.test(String(targetPage||''));
 const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
+
+if (isNutrition && blockNutritionIfOutOfLaunchCore(list)) {
+  updateCowCardNav(list.length === 1 ? list[0] : '', list.length > 1);
+  return null;
+}
+
 const isWeaning = /weaning\.html/i.test(String(targetPage||''));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
 const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
