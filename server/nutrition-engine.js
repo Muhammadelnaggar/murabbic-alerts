@@ -549,26 +549,235 @@ function makeEmptyMacroMineralRequirement(){
 function computeNasemMacroMineralRequirements({
   bodyWeight,
   milkKg,
+  milkProteinPct,
   pregDays,
   dmi,
   growth,
-  category
+  category,
+  matureBodyWeight
 }){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const DMI = Math.max(0, num(dmi));
+  const preg = num(pregDays);
+  const proteinPct = num(milkProteinPct, 3.2);
+  const isLactating = milk > 0 || category === 'lactating';
+  const isGrowing = !!growth;
+  const matBW = num(matureBodyWeight) || Math.max(700, bw * 1.35);
+  const adg = isGrowing ? heiferTargetADG(bw) : 0;
+
+  const requiredMinerals = makeEmptyMacroMineralRequirement();
+
+  function gestAfter190(value){
+    return preg > 190 ? value : 0;
+  }
+
+  function makeMineral({
+    key,
+    source,
+    requiredAbsorbedG,
+    absorptionCoeff,
+    components,
+    status = 'verified',
+    note = ''
+  }){
+    requiredMinerals[key] = {
+      requiredAbsorbedG: round(requiredAbsorbedG, 2),
+      dietaryRequiredG:
+        absorptionCoeff && absorptionCoeff > 0
+          ? round(requiredAbsorbedG / absorptionCoeff, 2)
+          : null,
+      absorptionCoeff: absorptionCoeff ?? null,
+      status,
+      source,
+      components: Object.fromEntries(
+        Object.entries(components || {}).map(([k, v]) => [k, round(v, 3)])
+      ),
+      note
+    };
+  }
+
+  // Calcium — NASEM 2021 Chapter 7
+  const caMaintenanceG = 0.90 * DMI;
+  const caGrowthG = isGrowing
+    ? ((9.83 * Math.pow(matBW, 0.22)) * Math.pow(bw, -0.22)) * adg
+    : 0;
+  const caGestationG = gestAfter190(
+    (
+      (0.02456 * Math.exp((0.05581 - (0.00007 * preg)) * preg)) -
+      (0.02456 * Math.exp((0.05581 - (0.00007 * (preg - 1))) * (preg - 1)))
+    ) * (bw / 715)
+  );
+  const caMilkGPerKg = 0.295 + (0.239 * proteinPct);
+  const caLactationG = milk * caMilkGPerKg;
+
+  makeMineral({
+    key: 'Ca',
+    source: 'NASEM_2021_CH7_CA_EQ_7_1_TO_7_4',
+    requiredAbsorbedG: caMaintenanceG + caGrowthG + caGestationG + caLactationG,
+    absorptionCoeff: null,
+    status: 'verified_absorbed_requirement',
+    components: {
+      maintenanceG: caMaintenanceG,
+      growthG: caGrowthG,
+      gestationG: caGestationG,
+      lactationG: caLactationG,
+      milkCaGPerKg: caMilkGPerKg,
+      adgKgDay: adg
+    },
+    note: 'Ca absorbed requirement calculated from NASEM 2021; dietary Ca requires feed/source-specific Ca absorption coefficients.'
+  });
+
+  // Phosphorus — NASEM 2021 Chapter 7
+  const pMaintenanceG = (isGrowing ? 0.8 : 1.0) * DMI + (0.0006 * bw);
+  const pGrowthG = isGrowing
+    ? (1.2 + ((4.635 * Math.pow(matBW, 0.22)) * Math.pow(bw, -0.22))) * adg
+    : 0;
+  const pGestationG = gestAfter190(
+    (
+      (0.02743 * Math.exp((0.05527 - (0.000075 * preg)) * preg)) -
+      (0.02743 * Math.exp((0.05527 - (0.000075 * (preg - 1))) * (preg - 1)))
+    ) * (bw / 715)
+  );
+  const pLactationG = 0.90 * milk;
+
+  makeMineral({
+    key: 'P',
+    source: 'NASEM_2021_CH7_P_EQ_7_5_TO_7_7',
+    requiredAbsorbedG: pMaintenanceG + pGrowthG + pGestationG + pLactationG,
+    absorptionCoeff: null,
+    status: 'verified_absorbed_requirement',
+    components: {
+      maintenanceG: pMaintenanceG,
+      growthG: pGrowthG,
+      gestationG: pGestationG,
+      lactationG: pLactationG,
+      adgKgDay: adg
+    },
+    note: 'P absorbed requirement calculated from NASEM 2021; dietary conversion should use feed/source-specific P absorption from ration-engine.'
+  });
+
+  // Magnesium — NASEM 2021 Chapter 7
+  const mgMaintenanceG = (0.3 * DMI) + (0.0007 * bw);
+  const mgGrowthG = isGrowing ? 0.45 * adg : 0;
+  const mgGestationG = gestAfter190(0.3 * (bw / 715));
+  const mgLactationG = 0.11 * milk;
+
+  makeMineral({
+    key: 'Mg',
+    source: 'NASEM_2021_CH7_MG_EQ_7_9_TO_7_12',
+    requiredAbsorbedG: mgMaintenanceG + mgGrowthG + mgGestationG + mgLactationG,
+    absorptionCoeff: null,
+    status: 'verified_absorbed_requirement',
+    components: {
+      maintenanceG: mgMaintenanceG,
+      growthG: mgGrowthG,
+      gestationG: mgGestationG,
+      lactationG: mgLactationG,
+      adgKgDay: adg
+    },
+    note: 'Mg absorbed requirement calculated from NASEM 2021; absorption is affected by diet K and should be handled in ration-engine.'
+  });
+
+  // Sodium — NASEM 2021 Chapter 7
+  const naMaintenanceG = 1.45 * DMI;
+  const naGrowthG = isGrowing ? 1.4 * adg : 0;
+  const naGestationG = gestAfter190(1.4 * (bw / 715));
+  const naLactationG = 0.4 * milk;
+
+  makeMineral({
+    key: 'Na',
+    source: 'NASEM_2021_CH7_NA_EQ_7_14_TO_7_17',
+    requiredAbsorbedG: naMaintenanceG + naGrowthG + naGestationG + naLactationG,
+    absorptionCoeff: 1.0,
+    status: 'verified',
+    components: {
+      maintenanceG: naMaintenanceG,
+      growthG: naGrowthG,
+      gestationG: naGestationG,
+      lactationG: naLactationG,
+      adgKgDay: adg
+    },
+    note: 'Na requirement and dietary requirement calculated with AC = 1.00 as assigned by NASEM 2021.'
+  });
+
+  // Potassium — NASEM 2021 Chapter 7
+  const kMaintenanceG = (2.5 * DMI) + ((isLactating ? 0.2 : 0.07) * bw);
+  const kGrowthG = isGrowing ? 2.5 * adg : 0;
+  const kGestationG = gestAfter190(1.03 * (bw / 715));
+  const kLactationG = 1.5 * milk;
+
+  makeMineral({
+    key: 'K',
+    source: 'NASEM_2021_CH7_K_EQ_7_22_TO_7_25',
+    requiredAbsorbedG: kMaintenanceG + kGrowthG + kGestationG + kLactationG,
+    absorptionCoeff: 1.0,
+    status: 'verified',
+    components: {
+      maintenanceG: kMaintenanceG,
+      growthG: kGrowthG,
+      gestationG: kGestationG,
+      lactationG: kLactationG,
+      adgKgDay: adg
+    },
+    note: 'K requirement and dietary requirement calculated with AC = 1.00 as assigned by NASEM 2021.'
+  });
+
+  // Chloride — NASEM 2021 Chapter 7
+  const clMaintenanceG = 1.11 * DMI;
+  const clGrowthG = isGrowing ? 1.0 * adg : 0;
+  const clGestationG = gestAfter190(1.0 * (bw / 715));
+  const clLactationG = 1.0 * milk;
+
+  makeMineral({
+    key: 'Cl',
+    source: 'NASEM_2021_CH7_CL_EQ_7_18_TO_7_21',
+    requiredAbsorbedG: clMaintenanceG + clGrowthG + clGestationG + clLactationG,
+    absorptionCoeff: 0.92,
+    status: 'verified',
+    components: {
+      maintenanceG: clMaintenanceG,
+      growthG: clGrowthG,
+      gestationG: clGestationG,
+      lactationG: clLactationG,
+      adgKgDay: adg
+    },
+    note: 'Cl requirement and dietary requirement calculated with AC = 0.92 as assigned by NASEM 2021.'
+  });
+
+  // Sulfur — NASEM 2021 Chapter 7
+  const sDietaryG = DMI * 2.0;
+
+  requiredMinerals.S = {
+    requiredAbsorbedG: null,
+    dietaryRequiredG: round(sDietaryG, 2),
+    absorptionCoeff: null,
+    status: 'verified_dietary_requirement',
+    source: 'NASEM_2021_CH7_S_EQ_7_26',
+    components: {
+      dietaryG: round(sDietaryG, 3)
+    },
+    note: 'S requirement is dietary total S, not absorbed: Total S g/d = DMI × 2.0.'
+  };
+
   return {
     model: 'NASEM_2021_CH7_MACRO_MINERAL_REQUIREMENT_FRAMEWORK',
-    status: 'framework_only',
+    status: 'verified_macro_minerals',
     species: 'cow',
     targetType: 'absorbed_and_dietary_macro_minerals',
     inputs: {
-      bodyWeight: round(bodyWeight, 2),
-      milkKg: round(milkKg, 2),
-      pregDays: round(pregDays, 0),
-      dmi: round(dmi, 2),
-      growth: !!growth,
-      category: category || null
+      bodyWeight: round(bw, 2),
+      milkKg: round(milk, 2),
+      milkProteinPct: round(proteinPct, 2),
+      pregDays: round(preg, 0),
+      dmi: round(DMI, 2),
+      growth: isGrowing,
+      category: category || null,
+      matureBodyWeight: round(matBW, 2),
+      adgKgDay: round(adg, 3)
     },
-    requiredMinerals: makeEmptyMacroMineralRequirement(),
-    note: 'تم تجهيز إطار احتياجات المعادن الكبرى فقط؛ سيتم ملء Ca/P/Mg/Na/K/Cl/S بمعادلات NASEM الرسمية خطوة خطوة'
+    requiredMinerals,
+    note: 'Macro-mineral requirements calculated from NASEM 2021 Chapter 7. Ca/P/Mg are absorbed requirements; Na/K/Cl include dietary conversion using NASEM AC where assigned; S is dietary total S.'
   };
 }
 // Backward-compatible wrapper.
@@ -695,12 +904,13 @@ const eaaReq = computeNasemEAARequirements({
 const mineralReq = computeNasemMacroMineralRequirements({
   bodyWeight: bw,
   milkKg: milk,
+  milkProteinPct: proteinPct,
   pregDays,
   dmi,
   growth: false,
-  category: 'lactating'
+  category: 'lactating',
+  matureBodyWeight: getStandardWeight('cow', breed)
 });
-
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: milk,
@@ -796,10 +1006,12 @@ const eaaReq = computeNasemEAARequirements({
 const mineralReq = computeNasemMacroMineralRequirements({
   bodyWeight: bw,
   milkKg: 0,
+  milkProteinPct: 0,
   pregDays,
   dmi,
   growth: true,
-  category: 'heifer_or_dry'
+  category: 'heifer_or_dry',
+  matureBodyWeight: Math.max(700, bw * 1.35)
 });
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
