@@ -186,7 +186,7 @@ function nelMaintenanceMcal(bodyWeight){
 // SOURCE: NASEM_2021_EQ_3_14A
 // Milk NEL when milk crude protein is known.
 // lactosePct default = 4.85% when not measured.
-function nelLactationMilkMcal(milkKg, fatPct, proteinPct, f, lactosePct = 4.85){
+function nelLactationMilkMcal(milkKg, fatPct, proteinPct, lactosePct = 4.85){
   const milk = num(milkKg);
   const fatKgPerKgMilk = num(fatPct, 3.7) / 100;
   const cpKgPerKgMilk = num(proteinPct, 3.2) / 100;
@@ -197,7 +197,7 @@ function nelLactationMilkMcal(milkKg, fatPct, proteinPct, f, lactosePct = 4.85){
     (5.5 * cpKgPerKgMilk) +
     (3.95 * lactoseKgPerKgMilk);
 
-  return milk * mcalPerKgMilk * num(f?.nelMilkFactor, 1);
+  return milk * mcalPerKgMilk;
 }
 // SOURCE: NASEM_2021_EQ_3_15_TO_3_18
 // Gestation NEL for adult dairy cattle.
@@ -246,9 +246,7 @@ function gravidUterusGainKgDay(bodyWeight, pregDays, calfBirthWeightKg = null, m
 
   return Math.max(0, grUterWtGain);
 }
-function closeUpExtraNEL(closeUp){
-  return closeUp ? 0.8 : 0;
-}
+
 
 function heiferTargetADG(bodyWeight){
   const bw = num(bodyWeight);
@@ -256,17 +254,6 @@ function heiferTargetADG(bodyWeight){
   if (bw <= 350) return 0.90;
   if (bw <= 450) return 0.85;
   return 0.75;
-}
-
-function heiferGrowthNEL(bodyWeight, species){
-  const bw = num(bodyWeight);
-  const adg = heiferTargetADG(bw);
-
-  let nelGrowth = 2.2 + (adg * 1.4) + (bw / 500);
-  if (normArabic(species).includes('جاموس')) {
-    nelGrowth *= 0.95;
-  }
-  return nelGrowth;
 }
 
 // MP operational approximation
@@ -846,7 +833,6 @@ function computeCow({
   bcs,
   parity
 }){
-  const f = cowBreedFactors(breed);
   const bw = num(bodyWeight);
   const milk = num(milkKg);
   const days = num(dim);
@@ -866,8 +852,8 @@ function computeCow({
   dmi = Math.max(0, dmi);
 
   const nelMaintenance = nelMaintenanceMcal(bw);
-  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct, f);
-  const nelPreg = gestationConceptusNE(bw, pregDays) + closeUpExtraNEL(closeUp);
+  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
+const nelPreg = gestationConceptusNE(bw, pregDays);
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
 
 const mpReq = computeNasemMPRequirement({
@@ -957,9 +943,9 @@ function computeCowHeifer({
   breed,
   dietNDFPct
 }){
-  const f = cowBreedFactors(breed);
+
   const bw = num(bodyWeight);
-  const bw075 = Math.pow(bw, 0.75);
+ 
 
 let dmi = predictHeiferDMI({
   bodyWeight: bw,
@@ -967,10 +953,10 @@ let dmi = predictHeiferDMI({
   dietNDFPct
 });
 
-  const nelMaintenance = 0.08 * bw075;
-  const nelGrowth = heiferGrowthNEL(bw, 'cow');
-  const nelPreg = gestationConceptusNE(bw, pregDays) + (closeUp ? 0.6 : 0);
-  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+ const nelMaintenance = nelMaintenanceMcal(bw);
+const nelGrowth = 0;
+const nelPreg = gestationConceptusNE(bw, pregDays);
+const nelTotal = nelMaintenance + nelPreg;
 
 const mpReq = computeNasemMPRequirement({
   bodyWeight: bw,
@@ -1174,12 +1160,12 @@ const cpReferencePct = buffaloCpPctLactating({
 
 function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
   const bw = num(bodyWeight);
-  const bw075 = Math.pow(bw, 0.75);
+const bw075 = Math.pow(bw, 0.75);
 
-  const nelMaintenance = 0.075 * bw075;
-  const nelGrowth = heiferGrowthNEL(bw, 'جاموس');
-  const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) * 0.95 : 0) + (closeUp ? 0.8 : 0);
-  const nelTotal = nelMaintenance + nelGrowth + nelPreg;
+const nelMaintenance = 0.075 * bw075;
+const nelGrowth = 0;
+const nelPreg = (pregDays > 200 ? gestationConceptusNE(bw, pregDays) * 0.95 : 0) + (closeUp ? 0.8 : 0);
+const nelTotal = nelMaintenance + nelPreg;
 
 const matureBw = getStandardWeight('جاموس', breed);
 
