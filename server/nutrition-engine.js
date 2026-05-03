@@ -126,66 +126,57 @@ function milkEnergyCorrectedKg(milkKg, fatPct, proteinPct){
   return milkEnergyMcalDay(milkKg, fatPct, proteinPct);
 }
 
-// Operationalized NASEM-style lactating DMI
-// Chapter 2 emphasizes Equation 2-1 as primary animal-factor DMI predictor.
-// The official model needs specific fitted inputs; هنا نحافظ على نفس البنية العلمية بدل المعادلة المبسطة القديمة.
+// SOURCE: NASEM_2021_EQ_2_1
+// Lactating cow DMI, kg/day.
+// Applies to lactating dairy cows using animal factors only.
 function predictCowLactatingDMI({ bodyWeight, milkKg, fatPct, proteinPct, dim, bcs, parity }){
-  const bw    = num(bodyWeight);
- const milkE = milkEnergyMcalDay(milkKg, fatPct, proteinPct); // Mcal/day
-  const DIM   = Math.max(1, num(dim, 1));
-  const BCS   = clamp(num(bcs, 3.0), 2.0, 4.5);
+  const bw = num(bodyWeight);
+  const milkE = milkEnergyMcalDay(milkKg, fatPct, proteinPct); // Mcal/day
+  const DIM = Math.max(1, num(dim, 1));
+  const BCS = clamp(num(bcs, 3.0), 1.0, 5.0);
 
-  // NASEM Eq 2-1 parity term:
-  // primiparous = 0, multiparous = 1
+  // NASEM Eq 2-1 parity adjustment:
+  // 0 = primiparous, 1 = multiparous
   const PAR = (num(parity, 2) > 1) ? 1 : 0;
 
-  // DMI (kg/d) =
-  // [3.7 + 5.7*Parity + 0.305*MilkE + 0.022*BW + (-0.689 - 1.87*Parity)*BCS]
-  // × [1 - (0.212 + 0.136*Parity) * e^(-0.053*DIM)]
-  let dmi =
-    (
-      3.7 +
-      (5.7 * PAR) +
-      (0.305 * milkE) +
-      (0.022 * bw) +
-      ((-0.689 - (1.87 * PAR)) * BCS)
-    ) *
-    (
-      1 - ((0.212 + (0.136 * PAR)) * Math.exp(-0.053 * DIM))
-    );
-
-  const minDmi = Math.max(8.5, bw * 0.0175);
-  const maxDmi = Math.max(26, bw * 0.042);
-
-  return clamp(dmi, minDmi, maxDmi);
+  return (
+    3.7 +
+    (5.7 * PAR) +
+    (0.305 * milkE) +
+    (0.022 * bw) +
+    ((-0.689 - (1.87 * PAR)) * BCS)
+  ) *
+  (
+    1 - ((0.212 + (0.136 * PAR)) * Math.exp(-0.053 * DIM))
+  );
 }
-// Heifer DMI
+// SOURCE: NASEM_2021_EQ_2_3_AND_2_4
+// Heifer DMI, kg/day.
+// Eq 2-4 is used when diet NDF is known; Eq 2-3 is used when diet NDF is not known.
 function predictHeiferDMI({ bodyWeight, matureBodyWeight, dietNDFPct }){
   const bw = num(bodyWeight);
+  const matBW = num(matureBodyWeight);
 
-  // NASEM Eq 2-3 / 2-4 requires MatBW
-  // fallback operational mature BW if not provided
-  const matBW = num(matureBodyWeight || 0) || Math.max(700, bw * 1.35);
+  if (!(matBW > 0)) {
+    throw new Error('NASEM_DMI_HEIFER_REQUIRES_MATURE_BODY_WEIGHT');
+  }
+
   const bwRatio = bw / matBW;
   const ndf = Number(dietNDFPct);
 
-  // Equation 2-4 when NDF is known
   if (Number.isFinite(ndf) && ndf > 0){
     const expectedNDF =
       23.1 + (56 * bwRatio) - (30.6 * Math.pow(bwRatio, 2));
 
-    const dmi =
-      (0.0226 * matBW * (1 - Math.exp(-1.47 * bwRatio))) -
-      (0.082 * (ndf - expectedNDF));
-
-    return clamp(dmi, bw * 0.018, bw * 0.030);
+    return (
+      0.0226 * matBW * (1 - Math.exp(-1.47 * bwRatio))
+    ) -
+    (
+      0.082 * (ndf - expectedNDF)
+    );
   }
 
-  // Equation 2-3 when NDF is not known
-  const dmi =
-    0.022 * matBW * (1 - Math.exp(-1.54 * bwRatio));
-
-  return clamp(dmi, bw * 0.018, bw * 0.030);
+  return 0.022 * matBW * (1 - Math.exp(-1.54 * bwRatio));
 }
 
 function nelMaintenanceMcal(bodyWeight){
@@ -872,7 +863,7 @@ function computeCow({
     parity: num(parity, 2)
   });
 
-  dmi = clamp(dmi * f.dmiFactor, Math.max(8.5, bw * 0.0175), Math.max(26, bw * 0.042));
+  dmi = Math.max(0, dmi);
 
   const nelMaintenance = nelMaintenanceMcal(bw);
   const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct, f);
@@ -970,12 +961,11 @@ function computeCowHeifer({
   const bw = num(bodyWeight);
   const bw075 = Math.pow(bw, 0.75);
 
- let dmi = predictHeiferDMI({
+let dmi = predictHeiferDMI({
   bodyWeight: bw,
-  matureBodyWeight: Math.max(700, bw * 1.35),
+  matureBodyWeight: getStandardWeight('cow', breed),
   dietNDFPct
 });
-  dmi *= f.dmiFactor;
 
   const nelMaintenance = 0.08 * bw075;
   const nelGrowth = heiferGrowthNEL(bw, 'cow');
