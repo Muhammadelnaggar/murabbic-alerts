@@ -468,9 +468,35 @@ function evaluateCarbohydrateSafety({ forageNdfPctDiet, ndfPctActual, starchPct 
   };
 }
 // SOURCE: NASEM_2021_TABLE_4_1
-// Total-tract digestibility coefficients of fatty acids by source class.
+// Total-tract digestibility coefficients of fatty acids by explicit feed-library class.
+// No name-based guessing. Feed library must provide either:
+// - faDigestibilityCoeff
+// - or faSourceClass / fatSourceClass / fatClass
+const NASEM_FA_DIGESTIBILITY_BY_CLASS = {
+  common_feeds: 0.73,
+  oil_seeds: 0.73,
+  oil: 0.70,
+  blended_triglyceride: 0.63,
+  tallow_triglyceride: 0.68,
+  saturated_fa_enriched_triglycerides: 0.61,
+  extensively_saturated_triglycerides: 0.44,
+  calcium_salts_palm_fatty_acid: 0.76,
+  saturated_fa_enriched_nonesterified_fa: 0.69,
+  palmitic_acid_85: 0.73,
+  palmitic_or_stearic_gt_90: 0.31
+};
+
+function normalizeFaSourceClass(v){
+  return String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/-/g, '_');
+}
+
 function resolveFaDigestibilityCoeff(row = {}){
   const explicit = Number(row.faDigestibilityCoeff ?? row.faDigestibility ?? row.faDigCoeff);
+
   if (Number.isFinite(explicit) && explicit > 0 && explicit <= 1) {
     return {
       coeff: explicit,
@@ -479,58 +505,24 @@ function resolveFaDigestibilityCoeff(row = {}){
     };
   }
 
-  const rawClass = String(row.fatClass ?? row.faSourceClass ?? row.fatSourceClass ?? '').trim().toLowerCase();
-  const name = String(row.name || row.feedName || '').trim().toLowerCase();
-  const cat = String(row.cat || '').trim().toLowerCase();
+  const sourceClass = normalizeFaSourceClass(
+    row.faSourceClass ??
+    row.fatSourceClass ??
+    row.fatClass
+  );
 
-  const text = `${rawClass} ${name}`;
-
-  if (/palmitic.*stearic.*90|stearic.*90|c18:0.*90/.test(text)) {
-    return { coeff: 0.31, sourceClass: 'palmitic_or_stearic_gt_90', source: 'NASEM_2021_TABLE_4_1' };
+  if (sourceClass && Object.prototype.hasOwnProperty.call(NASEM_FA_DIGESTIBILITY_BY_CLASS, sourceClass)) {
+    return {
+      coeff: NASEM_FA_DIGESTIBILITY_BY_CLASS[sourceClass],
+      sourceClass,
+      source: 'NASEM_2021_TABLE_4_1'
+    };
   }
 
-  if (/extensively.*saturated|hydrogenated|مشبع.*جدا/.test(text)) {
-    return { coeff: 0.44, sourceClass: 'extensively_saturated_triglycerides', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/saturated.*triglyceride|مشبع/.test(text)) {
-    return { coeff: 0.61, sourceClass: 'saturated_fa_enriched_triglycerides', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/calcium.*salt|palm.*calcium|ca.*salt|املاح.*كالسيوم|كالسيوم.*دهن/.test(text)) {
-    return { coeff: 0.76, sourceClass: 'calcium_salts_palm_fatty_acid', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/palmitic.*85|c16:0.*85/.test(text)) {
-    return { coeff: 0.73, sourceClass: 'palmitic_acid_85', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/nonesterified|free fatty acid|ffa/.test(text)) {
-    return { coeff: 0.69, sourceClass: 'saturated_fa_enriched_nonesterified_fa', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/tallow|شحم/.test(text)) {
-    return { coeff: 0.68, sourceClass: 'tallow_triglyceride', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/blend|blended|خليط دهون|دهن مخلوط/.test(text)) {
-    return { coeff: 0.63, sourceClass: 'blended_triglyceride', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/oil|زيت/.test(text)) {
-    return { coeff: 0.70, sourceClass: 'oil', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  if (/seed|بذره|بذور|cottonseed|soybean|sunflower|canola|flax/.test(text)) {
-    return { coeff: 0.73, sourceClass: 'oil_seeds', source: 'NASEM_2021_TABLE_4_1' };
-  }
-
-  return {
-    coeff: 0.73,
-    sourceClass: cat === 'add' ? 'common_feeds_default_for_additive_review' : 'common_feeds',
-    source: 'NASEM_2021_TABLE_4_1'
-  };
+  const feedName = row.name || row.feedName || row.nameAr || row.nameEn || row.id || 'unknown_feed';
+  throw new Error(`MURABBIK_FEED_LIBRARY_FA_CLASS_REQUIRED:${feedName}`);
 }
+
 // SOURCE: NASEM_2021_EQ_2_2
 // Diet/ration effect DMI equation for lactating cows.
 // Applies only when ration forage-NDF, ADF/NDF, fNDFD, and milk yield are available.
@@ -674,7 +666,7 @@ let faKg = 0;
 let digestibleFaKg = 0;
 let faCoeffWeightedSum = 0;
 let faCoeffWeightKg = 0;
-let missingFaRows = 0;
+
 let fatSupplementFaKg = 0;
 let starchKg = 0;
 let wscKg = 0;
@@ -735,9 +727,14 @@ const ndf = num(r.ndf ?? r.ndfPct);
 const adf = num(r.adf ?? r.adfPct);
 const fat = num(r.fat ?? r.fatPct);
 const rawFA = Number(r.faPct ?? r.fattyAcidsPct ?? r.totalFaPct ?? r.totalFAPct);
-const hasExplicitFA = Number.isFinite(rawFA) && rawFA > 0;
-const fa = hasExplicitFA ? rawFA : 0;
-const faMissing = !hasExplicitFA && fat > 0;
+const hasExplicitFA = Number.isFinite(rawFA) && rawFA >= 0;
+
+if (!hasExplicitFA) {
+  const feedName = r.name || r.feedName || r.nameAr || r.nameEn || r.id || 'unknown_feed';
+  throw new Error(`MURABBIK_FEED_LIBRARY_FA_VALUE_REQUIRED:${feedName}`);
+}
+
+const fa = rawFA;
 const faDig = resolveFaDigestibilityCoeff(r);
 const starch = num(r.starchPct ?? r.starch);
 
@@ -871,9 +868,6 @@ if (faItemKg > 0) {
   faCoeffWeightKg += faItemKg;
 }
 
-if (faMissing) {
-  missingFaRows++;
-}
 
 if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
   fatSupplementFaKg += faItemKg;
@@ -1042,16 +1036,15 @@ const fatModel = {
   digestibleFAPctDM: round(digestibleFaPctActual),
   faDigestibilityCoeffWeighted: round(faDigestibilityCoeffWeighted, 3),
   fatSupplementFAPctDM: round(fatSupplementFAPctDM),
-  missingFaRows,
- faValueSource: missingFaRows > 0 ? 'missing_explicit_fa_values' : 'explicit_fa_values',
-warning:
-  fatSupplementFAPctDM >= 3
-    ? 'إضافات الدهون مرتفعة؛ نموذج NASEM 2021 قد يبالغ في تقدير هضم FA وطاقة العليقة عند مستويات الإضافة العالية'
-    : (
-        missingFaRows > 0
-          ? 'بعض الخامات لا تحتوي FA صريح؛ لن يتم حساب FA لها حتى تُستكمل مكتبة الخامات'
-          : ''
-      )
+  faValueSource: 'feed_library_fa_values',
+  status:
+    fatSupplementFAPctDM >= 3
+      ? 'watch'
+      : 'ok',
+  note:
+    fatSupplementFAPctDM >= 3
+      ? 'إضافات الدهون مرتفعة؛ راجع مستوى الإضافة لأن NASEM 2021 يحذر من احتمال المبالغة في تقدير هضم FA وطاقة العليقة عند مستويات الإضافة العالية'
+      : 'تم حساب FA digestibility من مكتبة الخامات حسب NASEM 2021 Table 4-1'
 };
  const carbohydrateSafetyModel = evaluateCarbohydrateSafety({
   forageNdfPctDiet,
