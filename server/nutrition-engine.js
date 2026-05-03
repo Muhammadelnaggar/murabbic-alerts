@@ -973,6 +973,125 @@ function computeNasemTraceMineralRequirements({
     note: 'Trace mineral targets calculated from NASEM 2021 Chapter 7.'
   };
 }
+// SOURCE: NASEM_2021_CH8_VITAMINS
+// Supplemental vitamin AI targets for dairy cattle.
+// Units: IU/day.
+// Launch rule: no missing / no stop / no user-facing complexity.
+// Applies to cows only; buffalo remains MURABBIK_OPERATIONAL_RULE.
+const VITAMIN_REQUIREMENT_KEYS = ['A', 'D', 'E'];
+
+function computeNasemVitaminRequirements({
+  bodyWeight,
+  milkKg,
+  category,
+  closeUp,
+  freshPastureDMKg = 0
+}){
+  const bw = num(bodyWeight);
+  const milk = num(milkKg);
+  const pastureDM = Math.max(0, num(freshPastureDMKg));
+  const cat = String(category || '').trim();
+
+  const isLactating = milk > 0 || cat === 'lactating';
+  const isPrepartum = !!closeUp || cat === 'close_up';
+  const isDry = !isLactating && !isPrepartum;
+
+  // Vitamin A — NASEM 2021 Eq. 8-1a,b
+  const vitaminAIU =
+    milk > 35
+      ? (110 * bw) + (1000 * (milk - 35))
+      : (110 * bw);
+
+  // Vitamin D — NASEM 2021 Eq. 8-2a,b
+  const vitaminDIU =
+    isLactating
+      ? (40 * bw)
+      : (30 * bw);
+
+  // Vitamin E — NASEM 2021 Eq. 8-3a,b,c
+  let vitaminEIU;
+  let vitaminEEquation;
+
+  if (isPrepartum) {
+    vitaminEIU = 3.0 * bw;
+    vitaminEEquation = 'NASEM_2021_CH8_EQ_8_3B';
+  } else if (isDry) {
+    vitaminEIU = 1.6 * bw;
+    vitaminEEquation = 'NASEM_2021_CH8_EQ_8_3A';
+  } else {
+    vitaminEIU = 0.8 * bw;
+    vitaminEEquation = 'NASEM_2021_CH8_EQ_8_3C';
+  }
+
+  // NASEM: reduce supplemental vitamin E by 50 IU/d for each kg fresh pasture DM.
+  const vitaminEPastureCreditIU = 50 * pastureDM;
+  const vitaminEFinalIU = Math.max(0, vitaminEIU - vitaminEPastureCreditIU);
+
+  const vitamins = {
+    A: {
+      type: 'AI',
+      basis: 'supplemental',
+      unit: 'IU_day',
+      requiredIU: round(vitaminAIU, 0),
+      source: milk > 35 ? 'NASEM_2021_CH8_EQ_8_1B' : 'NASEM_2021_CH8_EQ_8_1A',
+      status: 'verified',
+      components: {
+        bodyWeightKg: round(bw, 2),
+        milkKg: round(milk, 2),
+        baseIUPerKgBW: 110,
+        extraMilkIU: round(milk > 35 ? 1000 * (milk - 35) : 0, 0)
+      },
+      note: 'Vitamin A supplemental AI calculated from NASEM 2021 Chapter 8.'
+    },
+
+    D: {
+      type: 'AI',
+      basis: 'supplemental_D3',
+      unit: 'IU_day',
+      requiredIU: round(vitaminDIU, 0),
+      source: isLactating ? 'NASEM_2021_CH8_EQ_8_2B' : 'NASEM_2021_CH8_EQ_8_2A',
+      status: 'verified',
+      components: {
+        bodyWeightKg: round(bw, 2),
+        iuPerKgBW: isLactating ? 40 : 30
+      },
+      note: 'Vitamin D supplemental AI calculated from NASEM 2021 Chapter 8.'
+    },
+
+    E: {
+      type: 'AI',
+      basis: 'supplemental',
+      unit: 'IU_day',
+      requiredIU: round(vitaminEFinalIU, 0),
+      source: vitaminEEquation,
+      status: 'verified',
+      components: {
+        bodyWeightKg: round(bw, 2),
+        baseRequiredIU: round(vitaminEIU, 0),
+        freshPastureDMKg: round(pastureDM, 2),
+        pastureCreditIU: round(vitaminEPastureCreditIU, 0)
+      },
+      note: 'Vitamin E supplemental AI calculated from NASEM 2021 Chapter 8.'
+    }
+  };
+
+  return {
+    model: 'NASEM_2021_CH8_VITAMIN_AI',
+    status: 'verified_vitamin_ai',
+    species: 'cow',
+    targetType: 'supplemental_vitamin_AI',
+    unit: 'IU_day',
+    inputs: {
+      bodyWeight: round(bw, 2),
+      milkKg: round(milk, 2),
+      category: cat || null,
+      closeUp: !!closeUp,
+      freshPastureDMKg: round(pastureDM, 2)
+    },
+    vitamins,
+    note: 'Vitamin A, D, and E supplemental AI targets calculated from NASEM 2021 Chapter 8.'
+  };
+}
 // Backward-compatible wrapper.
 // لا نستخدمه كـ operational approximation بعد الآن.
 function computeOperationalMPTarget(args){
@@ -1112,6 +1231,13 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   growth: false,
   matureBodyWeight: getStandardWeight('cow', breed)
 });
+  const vitaminReq = computeNasemVitaminRequirements({
+  bodyWeight: bw,
+  milkKg: milk,
+  category: 'lactating',
+  closeUp,
+  freshPastureDMKg: 0
+});
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: milk,
@@ -1145,6 +1271,7 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   eaaRequirementModel: eaaReq
 },  
 mineralRequirementModel: mineralReq,
+vitaminRequirementModel: vitaminReq,
 bodyWeight: bw,
   
    
@@ -1222,6 +1349,13 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   growth: true,
   matureBodyWeight: Math.max(700, bw * 1.35)
 });
+  const vitaminReq = computeNasemVitaminRequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  category: closeUp ? 'close_up' : (pregDays > 0 ? 'dry_pregnant' : 'heifer'),
+  closeUp,
+  freshPastureDMKg: 0
+});
   const cpReferencePct = computeCPReferencePct({
     species: 'cow',
     milkKg: 0,
@@ -1243,7 +1377,8 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
    note: mpReq.note,
     eaaRequirementModel: eaaReq
 },
-mineralRequirementModel: mineralReq,
+    mineralRequirementModel: mineralReq,
+    vitaminRequirementModel: vitaminReq,
     bodyWeight: bw,
     dim: null,
     dmi: round(dmi),
