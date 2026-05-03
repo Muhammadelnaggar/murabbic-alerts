@@ -188,6 +188,102 @@ function makeMineralMissingMap(){
   for (const k of MACRO_MINERAL_KEYS) out[k] = 0;
   return out;
 }
+// MURABBIK_MINERAL_BALANCE
+// Final macro-mineral balance.
+// Feed library is treated as complete.
+// Output statuses only: ok | watch | deficit.
+function resolveRequiredMinerals(targets = {}, context = {}){
+  const req =
+    targets?.mineralRequirementModel?.requiredMinerals ||
+    targets?.requiredMinerals ||
+    context?.mineralRequirementModel?.requiredMinerals ||
+    context?.requiredMinerals ||
+    null;
+
+  return req && typeof req === 'object' ? req : {};
+}
+
+function buildMineralBalanceModel({
+  targets = {},
+  context = {},
+  totalMineralG = {},
+  absorbedMineralG = {}
+}){
+  const requiredMinerals = resolveRequiredMinerals(targets, context);
+
+  const balance = {};
+  let overallStatus = 'ok';
+  let limitingMineral = null;
+  let minPct = Infinity;
+
+  for (const mineral of MACRO_MINERAL_KEYS){
+    const req = requiredMinerals[mineral] || {};
+
+    const requiredAbsorbed = Number(req.requiredAbsorbedG);
+    const requiredDietary = Number(req.dietaryRequiredG);
+
+    const suppliedTotal = Number(totalMineralG?.[mineral] || 0);
+    const suppliedAbsorbed = Number(absorbedMineralG?.[mineral] || 0);
+
+    let requirementBasis = 'absorbed';
+    let requiredG = requiredAbsorbed;
+    let suppliedG = suppliedAbsorbed;
+
+    // Sulfur in NASEM is dietary total S.
+    if (mineral === 'S'){
+      requirementBasis = 'dietary';
+      requiredG = requiredDietary;
+      suppliedG = suppliedTotal;
+    }
+
+    // If nutrition-engine gives dietary requirement instead of absorbed, use dietary.
+    if (!(Number.isFinite(requiredG) && requiredG > 0) && Number.isFinite(requiredDietary) && requiredDietary > 0){
+      requirementBasis = 'dietary';
+      requiredG = requiredDietary;
+      suppliedG = suppliedTotal;
+    }
+
+    const pct = requiredG > 0 ? (suppliedG / requiredG) * 100 : 100;
+    const diff = suppliedG - requiredG;
+
+    let status = 'ok';
+    if (pct < 95) status = 'deficit';
+    else if (pct < 100) status = 'watch';
+
+    if (status === 'deficit') overallStatus = 'deficit';
+    else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
+
+    if (pct < minPct){
+      minPct = pct;
+      limitingMineral = mineral;
+    }
+
+    balance[mineral] = {
+      status,
+      requirementBasis,
+      requiredG: round(requiredG, 2),
+      suppliedG: round(suppliedG, 2),
+      balanceG: round(diff, 2),
+      supplyPctOfRequirement: round(pct, 1),
+      source: req.source || null
+    };
+  }
+
+  return {
+    model: 'MURABBIK_MINERAL_BALANCE_NASEM_2021',
+    applied: true,
+    status: overallStatus,
+    limitingMineral,
+    limitingSupplyPct: Number.isFinite(minPct) ? round(minPct, 1) : null,
+    balance,
+    note:
+      overallStatus === 'deficit'
+        ? 'يوجد عجز في معدن واحد أو أكثر'
+        : overallStatus === 'watch'
+          ? 'بعض المعادن قريبة من حد الاحتياج'
+          : 'إمداد المعادن يغطي الاحتياج'
+  };
+}
 // SOURCE: NASEM_2021_EQ_20_74_TO_20_79
 // Ruminal microbial protein model.
 // Requires rumen-digested NDF and rumen-digested starch inputs.
@@ -1050,7 +1146,14 @@ const mineralSupplyModel = {
       ? 'بعض الخامات لا تحتوي قيم معادن كاملة؛ يتم حساب إمداد المعادن فقط من القيم الموجودة في مكتبة الخامات'
       : 'تم حساب إمداد المعادن الكبرى من مكتبة الخامات'
 };
+const mineralBalanceModel = buildMineralBalanceModel({
+  targets,
+  context,
+  totalMineralG: mineralG,
+  absorbedMineralG
+});
 
+mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
   mpSupplyMode: mpSupplyG > 0 ? 'explicit_mp_from_feed_library' : 'not_calculated',
