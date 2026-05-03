@@ -288,6 +288,92 @@ function buildMineralBalanceModel({
           : 'إمداد المعادن يغطي الاحتياج'
   };
 }
+// MURABBIK_VITAMIN_SUPPLY
+// Vitamins A/D/E supply from feed library.
+// Units: IU/day.
+// Launch rule: no missing / no stop / no user-facing complexity.
+const VITAMIN_KEYS = ['A', 'D', 'E'];
+
+const VITAMIN_FIELD_MAP = {
+  A: ['vitAIUPerKgDM', 'vitaminAIUPerKgDM', 'vitA_IU_kgDM', 'vitA'],
+  D: ['vitDIUPerKgDM', 'vitaminDIUPerKgDM', 'vitD_IU_kgDM', 'vitD'],
+  E: ['vitEIUPerKgDM', 'vitaminEIUPerKgDM', 'vitE_IU_kgDM', 'vitE']
+};
+
+function makeVitaminZeroMap(){
+  const out = {};
+  for (const k of VITAMIN_KEYS) out[k] = 0;
+  return out;
+}
+
+function resolveRequiredVitamins(targets = {}, context = {}){
+  const vitamins =
+    targets?.vitaminRequirementModel?.vitamins ||
+    targets?.vitamins ||
+    context?.vitaminRequirementModel?.vitamins ||
+    context?.vitamins ||
+    null;
+
+  return vitamins && typeof vitamins === 'object' ? vitamins : {};
+}
+
+function buildVitaminBalanceModel({
+  targets = {},
+  context = {},
+  vitaminIU = {}
+}){
+  const requiredVitamins = resolveRequiredVitamins(targets, context);
+
+  const balance = {};
+  let overallStatus = 'ok';
+  let limitingVitamin = null;
+  let minPct = Infinity;
+
+  for (const key of VITAMIN_KEYS){
+    const req = requiredVitamins[key] || {};
+    const requiredIU = Number(req.requiredIU);
+    const suppliedIU = Number(vitaminIU?.[key] || 0);
+
+    const pct = requiredIU > 0 ? (suppliedIU / requiredIU) * 100 : 100;
+    const diff = suppliedIU - (requiredIU > 0 ? requiredIU : 0);
+
+    let status = 'ok';
+    if (pct < 95) status = 'deficit';
+    else if (pct < 100) status = 'watch';
+
+    if (status === 'deficit') overallStatus = 'deficit';
+    else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
+
+    if (pct < minPct){
+      minPct = pct;
+      limitingVitamin = key;
+    }
+
+    balance[key] = {
+      status,
+      requiredIU: round(requiredIU > 0 ? requiredIU : 0, 0),
+      suppliedIU: round(suppliedIU, 0),
+      balanceIU: round(diff, 0),
+      supplyPctOfRequirement: round(pct, 1),
+      source: req.source || null
+    };
+  }
+
+  return {
+    model: 'MURABBIK_VITAMIN_BALANCE_A_D_E',
+    applied: true,
+    status: overallStatus,
+    limitingVitamin,
+    limitingSupplyPct: Number.isFinite(minPct) ? round(minPct, 1) : null,
+    balance,
+    note:
+      overallStatus === 'deficit'
+        ? 'يوجد عجز في فيتامين واحد أو أكثر'
+        : overallStatus === 'watch'
+          ? 'بعض الفيتامينات قريبة من حد الاحتياج'
+          : 'إمداد الفيتامينات يغطي الاحتياج'
+  };
+}
 // SOURCE: NASEM_2021_EQ_20_74_TO_20_79
 // Ruminal microbial protein model.
 // Requires rumen-digested NDF and rumen-digested starch inputs.
@@ -708,7 +794,7 @@ let mineralAbsCoeffWeightedSum = makeMineralZeroMap();
 let mineralAbsCoeffWeightG = makeMineralZeroMap();
 let missingMineralRows = makeMineralMissingMap();
 let missingMineralAbsCoeffRows = makeMineralMissingMap();
-
+let vitaminIU = makeVitaminZeroMap();
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -779,7 +865,15 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
           : 0
       );
 
-    const dmItemKg = kg * (dm / 100);
+   const dmItemKg = kg * (dm / 100);
+
+for (const vitamin of VITAMIN_KEYS) {
+  const iuPerKgDM = firstFiniteField(r, VITAMIN_FIELD_MAP[vitamin]);
+  if (iuPerKgDM != null && iuPerKgDM >= 0) {
+    vitaminIU[vitamin] += dmItemKg * iuPerKgDM;
+  }
+}
+
 for (const mineral of MACRO_MINERAL_KEYS) {
   const pct = firstFiniteField(r, MINERAL_FIELD_MAP[mineral]);
   const absCoeff = firstFiniteField(r, MINERAL_ABS_FIELD_MAP[mineral]);
@@ -1119,6 +1213,23 @@ const mineralBalanceModel = buildMineralBalanceModel({
 });
 
 mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
+
+const vitaminSupplyModel = {
+  model: 'MURABBIK_VITAMIN_SUPPLY_A_D_E',
+  source: 'FEED_LIBRARY_VALUES',
+  unit: 'IU_day',
+  vitaminIU: Object.fromEntries(
+    VITAMIN_KEYS.map(k => [k, round(vitaminIU[k], 0)])
+  ),
+  note: 'تم حساب إمداد الفيتامينات A و D و E من مكتبة الخامات'
+};
+
+vitaminSupplyModel.vitaminBalanceModel = buildVitaminBalanceModel({
+  targets,
+  context,
+  vitaminIU
+});
+
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
   mpSupplyMode: 'feed_library_protein_values',
@@ -1190,6 +1301,9 @@ mineralsG: Object.fromEntries(
 absorbedMineralsG: Object.fromEntries(
   MACRO_MINERAL_KEYS.map(k => [k, round(absorbedMineralG[k], 2)])
 ),
+vitaminsIU: Object.fromEntries(
+  VITAMIN_KEYS.map(k => [k, round(vitaminIU[k], 0)])
+),
 starchKg: round(starchKg),
       wscKg: round(wscKg),
       ndsfKg: round(ndsfKg),
@@ -1210,9 +1324,8 @@ rdpPctCP: round(rdpPctCPActual),
 rupPctCP: round(rupPctCPActual),
 proteinModel,
 mineralSupplyModel,
+vitaminSupplyModel,
       mpSupplyG: round(mpSupplyG, 0),
-      mpDensityGkgDM: round(mpDensityGkgDM, 0),
-      mpBalanceG: round(mpBalanceG, 0),
       mpNote,
 
      nelActual: round(nelTotalMcalDay),
