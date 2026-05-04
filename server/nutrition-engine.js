@@ -178,7 +178,65 @@ function predictHeiferDMI({ bodyWeight, matureBodyWeight, dietNDFPct }){
 
   return 0.022 * matBW * (1 - Math.exp(-1.54 * bwRatio));
 }
+// SOURCE: NASEM_2021_CH12_EQ_12_1
+// Dry and transition mature cow DMI.
+// Daily DMI, kg/100 kg BW = 1.47 − [(0.365 − 0.0028 × NDF) × Week] − 0.035 × Week²
+// NDF is limited to 30–55% DM.
+// Week is weeks before calving as a negative value; if >3 wk prepartum, Week = -3.
+// If BCS > 4, estimated DMI is reduced by 8%.
+function predictCowDryTransitionDMI({ bodyWeight, pregDays, dietNDFPct, bcs, gestationLength = 280 }){
+const bw = num(bodyWeight);
+const preg = clamp(num(pregDays), 0, gestationLength);
+const rawNdf = Number(dietNDFPct);
 
+if (!(Number.isFinite(rawNdf) && rawNdf > 0)) {
+  return {
+    dmi: null,
+    model: 'NASEM_2021_CH12_EQ_12_1',
+    applied: false,
+    status: 'requires_diet_ndf_from_ration',
+    inputs: {
+      bodyWeight: round(bw, 2),
+      pregDays: round(preg, 0),
+      bcs: round(num(bcs, 3), 2),
+      gestationLength
+    }
+  };
+}
+
+const ndf = clamp(rawNdf, 30, 55);
+ 
+  const daysPrepartum = Math.max(0, gestationLength - preg);
+
+  let week = -Math.min(3, daysPrepartum / 7);
+
+  const dmiKgPer100KgBW =
+    1.47 -
+    ((0.365 - (0.0028 * ndf)) * week) -
+    (0.035 * week * week);
+
+  let dmi = bw * (dmiKgPer100KgBW / 100);
+
+  if (num(bcs, 3) > 4) {
+    dmi *= 0.92;
+  }
+
+return {
+  dmi: Math.max(0, dmi),
+  model: 'NASEM_2021_CH12_EQ_12_1',
+  applied: true,
+  status: 'verified',
+  inputs: {
+      bodyWeight: round(bw, 2),
+      pregDays: round(preg, 0),
+      daysPrepartum: round(daysPrepartum, 0),
+      weekPrepartum: round(week, 3),
+      dietNDFPct: round(ndf, 2),
+      bcs: round(num(bcs, 3), 2),
+      gestationLength
+    }
+  };
+}
 function nelMaintenanceMcal(bodyWeight){
   return 0.10 * Math.pow(num(bodyWeight), 0.75);
 }
@@ -1286,7 +1344,151 @@ bodyWeight: bw,
     roughageMin: 40
   };
 }
+function computeCowDryMother({
+  bodyWeight,
+  pregDays,
+  closeUp,
+  breed,
+  dietNDFPct,
+  bcs,
+  parity
+}){
+  const bw = num(bodyWeight);
+  const preg = num(pregDays);
+  const matBW = getStandardWeight('cow', breed);
+  const isCloseUp = !!closeUp;
 
+  const dmiCalc = predictCowDryTransitionDMI({
+    bodyWeight: bw,
+    pregDays: preg,
+    dietNDFPct,
+    bcs,
+    gestationLength: 280
+  });
+
+  if (!dmiCalc || dmiCalc.applied === false) {
+  return {
+    species: 'cow',
+    category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
+    dmiModel: dmiCalc,
+    bodyWeight: bw,
+    dim: null,
+    dmi: null,
+    nel: null,
+    mpTargetG: null,
+    cpReferencePct: null,
+    proteinSystem: 'MP',
+    ndfTarget: null,
+    starchMax: null,
+    roughageMin: null,
+    internalStatus: 'WAITING_FOR_RATION_NDF_TO_APPLY_NASEM_CH12'
+  };
+}
+
+const dmi = Math.max(0, dmiCalc.dmi);
+
+  const nelMaintenance = nelMaintenanceMcal(bw);
+  const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
+  const nelTotal = nelMaintenance + nelPreg;
+
+  const mpReq = computeNasemMPRequirement({
+    bodyWeight: bw,
+    milkKg: 0,
+    proteinPct: 0,
+    pregDays: preg,
+    closeUp: isCloseUp,
+    growth: false,
+    dmi,
+   ndfPct: dmiCalc.inputs.dietNDFPct,
+    parity: num(parity, 2),
+    species: 'cow',
+    matureBodyWeight: matBW
+  });
+
+  const mpTargetG = mpReq.mpTargetG;
+
+  const eaaReq = computeNasemEAARequirements({
+    bodyWeight: bw,
+    milkKg: 0,
+    mpReq
+  });
+
+  const mineralReq = computeNasemMacroMineralRequirements({
+    bodyWeight: bw,
+    milkKg: 0,
+    milkProteinPct: 0,
+    pregDays: preg,
+    dmi,
+    growth: false,
+    category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
+    matureBodyWeight: matBW
+  });
+
+  mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
+    bodyWeight: bw,
+    milkKg: 0,
+    pregDays: preg,
+    dmi,
+    growth: false,
+    matureBodyWeight: matBW
+  });
+
+  const vitaminReq = computeNasemVitaminRequirements({
+    bodyWeight: bw,
+    milkKg: 0,
+    category: isCloseUp ? 'close_up' : 'dry_pregnant',
+    closeUp: isCloseUp,
+    freshPastureDMKg: 0
+  });
+
+  const cpReferencePct = isCloseUp ? 12.5 : 12.0;
+
+  return {
+    species: 'cow',
+    category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
+
+    dmiModel: {
+      animalSide: dmiCalc.model,
+      status: 'verified',
+      inputs: dmiCalc.inputs,
+      note: 'Dry and transition mature cow DMI calculated from NASEM 2021 Chapter 12 Eq. 12-1.'
+    },
+
+    energyModel: {
+      maintenance: 'NASEM_2021_EQ_3_13',
+      gestation: 'NASEM_2021_EQ_3_15_TO_3_18',
+      growth: 'not_used_for_mature_dry_cow',
+      unit: 'NEL_Mcal_day'
+    },
+
+    proteinRequirementModel: {
+      model: mpReq.model,
+      status: 'verified_mp_target',
+      targetType: 'MP',
+      targetEffMP: mpReq.targetEffMP,
+      components: Object.fromEntries(
+        Object.entries(mpReq.components).map(([k, v]) => [k, round(v, 3)])
+      ),
+      note: mpReq.note,
+      eaaRequirementModel: eaaReq
+    },
+
+    mineralRequirementModel: mineralReq,
+    vitaminRequirementModel: vitaminReq,
+
+    bodyWeight: bw,
+    dim: null,
+    dmi: round(dmi),
+    nel: round(nelTotal),
+    mpTargetG: round(mpTargetG, 0),
+    cpReferencePct: round(cpReferencePct),
+    proteinSystem: 'MP',
+
+    ndfTarget: isCloseUp ? 34 : 36,
+    starchMax: isCloseUp ? 18 : 16,
+    roughageMin: isCloseUp ? 55 : 60
+  };
+}
 function computeCowHeifer({
   bodyWeight,
   pregDays,
@@ -1612,11 +1814,15 @@ function computeTargets(ctx){
     return computeBuffalo(common);
   }
 
-  if (category === 'heifer' || category === 'dry_pregnant' || category === 'close_up'){
-    return computeCowHeifer(common);
-  }
+if (category === 'dry_pregnant' || category === 'close_up'){
+  return computeCowDryMother(common);
+}
 
-  return computeCow(common);
+if (category === 'heifer'){
+  return computeCowHeifer(common);
+}
+
+return computeCow(common);
 }
 
 module.exports = {
