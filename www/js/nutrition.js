@@ -795,7 +795,34 @@ try{
       if(diff >= 0) dcc = diff;
     }
   }
+  const prodTxt = String(animal?.productionStatus || '').trim().toLowerCase();
+  const groupTxt = String(animal?.group || '').trim().toLowerCase();
+  const groupKeyTxt = String(animal?.groupKey || '').trim().toLowerCase();
 
+  const isDryFromAnimal =
+    prodTxt.includes('جاف') ||
+    prodTxt.includes('dry') ||
+    groupTxt.includes('جاف') ||
+    groupKeyTxt === 'dry';
+
+  const gestLen = (species === 'جاموس') ? 310 : 280;
+  const daysToCalvingCalc =
+    Number.isFinite(Number(dcc)) ? (gestLen - Number(dcc)) : null;
+
+  const isCloseUpFromAnimal =
+    prodTxt.includes('تحضير') ||
+    prodTxt.includes('انتظار الولادة') ||
+    prodTxt.includes('close') ||
+    groupTxt.includes('تحضير') ||
+    groupTxt.includes('انتظار الولادة') ||
+    groupKeyTxt.includes('close') ||
+    (Number.isFinite(daysToCalvingCalc) && daysToCalvingCalc <= 21);
+
+  const earlyDryEl = document.getElementById('ctxEarlyDry');
+  const closeUpEl = document.getElementById('ctxCloseUp');
+
+  if (earlyDryEl) earlyDryEl.checked = !!(isDryFromAnimal && !isCloseUpFromAnimal);
+  if (closeUpEl) closeUpEl.checked = !!isCloseUpFromAnimal;
 // متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
   let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
   if((avgRes?.avg==null) && String(numberStr).trim()!==''){
