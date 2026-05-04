@@ -370,8 +370,11 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     : Array.isArray(d.members)
       ? d.members
       : [],
-  animalType: String(d.animalType || d.species || ''),
-  animalsCount: Number(d.animalsCount || 0)
+ animalType: String(d.animalType || d.species || ''),
+animalsCount: Number(d.animalsCount || 0),
+groupId: String(d.groupId || doc.id || ''),
+groupKey: String(d.groupKey || ''),
+feedingEligible: d.feedingEligible === true
 });
           });
 
@@ -383,9 +386,12 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
           select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
             const nums = g.members.map(x => String(x).trim()).filter(Boolean).join(',');
            const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.animalsCount || g.members.length || 0})`;
-          return `<option value="${nums}"
+return `<option value="${nums}"
   data-group-name="${String(g.name || '').replace(/"/g, '&quot;')}"
-  data-animal-type="${String(g.animalType || '').replace(/"/g, '&quot;')}">${label}</option>`;
+  data-animal-type="${String(g.animalType || '').replace(/"/g, '&quot;')}"
+  data-group-id="${String(g.groupId || '').replace(/"/g, '&quot;')}"
+  data-group-key="${String(g.groupKey || '').replace(/"/g, '&quot;')}"
+  data-feeding-eligible="${g.feedingEligible ? '1' : '0'}">${label}</option>`;
           }).join('');
         }catch(err){
           console.error('groups load failed', err);
@@ -448,8 +454,30 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
         // unique مع الحفاظ على ترتيب الإدخال
         return [...new Set(list)];
       }
-     const NUTRITION_LAUNCH_CORE_MSG =
+const NUTRITION_LAUNCH_CORE_MSG =
   'مُرَبِّيك يبدأ من مركز الربح: علائق الحلاب والجاف وانتظار الولادة. علائق التوابع في التحديثات.';
+
+const NUTRITION_ALLOWED_GROUP_KEYS = new Set([
+  'fresh',
+  'closeup',
+  'dry',
+  'high',
+  'med',
+  'low'
+]);
+
+const NUTRITION_BLOCKED_GROUP_KEYS = new Set([
+  'suckling',
+  'weaned',
+  'growing',
+  'breeding',
+  'heiferOpen',
+  'pregHeifers',
+  'heiferCloseup',
+  'males',
+  'hospital',
+  'all'
+]);
 
 function normalizeGroupText(s){
   return String(s || '')
@@ -459,45 +487,8 @@ function normalizeGroupText(s){
     .replace(/ة/g, 'ه');
 }
 
-function isNutritionLaunchCoreText(text){
-  const s = normalizeGroupText(text);
-
-  return (
-    s.includes('حلاب') ||
-    s.includes('حليب') ||
-    s.includes('لبن') ||
-    s.includes('جاف') ||
-    s.includes('تجفيف') ||
-    s.includes('انتظار الولاده') ||
-    s.includes('انتظار ولاده') ||
-    s.includes('قبل الولاده') ||
-    s.includes('تحضير للولاده') ||
-    s.includes('close') ||
-    s.includes('dry') ||
-    s.includes('lact')
-  );
-}
-
-function isNutritionBlockedText(text){
-  const s = normalizeGroupText(text);
-
-  return (
-    s.includes('تابع') ||
-    s.includes('توابع') ||
-    s.includes('عجل') ||
-    s.includes('عجله') ||
-    s.includes('عجلات') ||
-    s.includes('رضيع') ||
-    s.includes('فطام') ||
-    s.includes('نامي') ||
-    s.includes('تحت التلقيح') ||
-    s.includes('ذكر') ||
-    s.includes('ذكور') ||
-    s.includes('heifer') ||
-    s.includes('calf') ||
-    s.includes('young') ||
-    s.includes('wean')
-  );
+function normalizeGroupKey(s){
+  return String(s || '').trim();
 }
 
 function getCurrentSelectedGroupMeta(){
@@ -507,32 +498,92 @@ function getCurrentSelectedGroupMeta(){
   return {
     name: norm(opt?.dataset?.groupName || ''),
     animalType: norm(opt?.dataset?.animalType || ''),
+    groupId: norm(opt?.dataset?.groupId || ''),
+    groupKey: norm(opt?.dataset?.groupKey || ''),
+    feedingEligible: opt?.dataset?.feedingEligible === '1',
     hasGroup: !!norm(opt?.dataset?.groupName || '')
   };
+}
+
+function inferNutritionAllowedFromText(text){
+  const s = normalizeGroupText(text);
+
+  return (
+    s.includes('حديث الولاده') ||
+    s.includes('حديثه الولاده') ||
+    s.includes('عالي الادرار') ||
+    s.includes('متوسط الادرار') ||
+    s.includes('منخفض الادرار') ||
+    s.includes('حلاب') ||
+    s.includes('حليب') ||
+    s.includes('لبن') ||
+    s.includes('جاف') ||
+    s.includes('انتظار ولاده') ||
+    s.includes('انتظار الولاده') ||
+    s.includes('قبل الولاده') ||
+    s.includes('تحضير للولاده') ||
+    s.includes('fresh') ||
+    s.includes('closeup') ||
+    s.includes('dry') ||
+    s.includes('high') ||
+    s.includes('med') ||
+    s.includes('low')
+  );
+}
+
+function inferNutritionBlockedFromText(text){
+  const s = normalizeGroupText(text);
+
+  return (
+    s.includes('رضيع') ||
+    s.includes('فطام') ||
+    s.includes('نامي') ||
+    s.includes('تحت التلقيح') ||
+    s.includes('عجلات') ||
+    s.includes('عجله') ||
+    s.includes('عجل') ||
+    s.includes('ذكور') ||
+    s.includes('ذكر') ||
+    s.includes('كل الابقار') ||
+    s.includes('كل الجاموس') ||
+    s.includes('كل الحيوانات') ||
+    s.includes('مستشفى') ||
+    s.includes('مستشفي') ||
+    s.includes('suckling') ||
+    s.includes('weaned') ||
+    s.includes('growing') ||
+    s.includes('breeding') ||
+    s.includes('heifer') ||
+    s.includes('males') ||
+    s.includes('hospital') ||
+    s.includes('all')
+  );
+}
+
+function isNutritionLaunchCoreGroup(meta){
+  const key = normalizeGroupKey(meta.groupKey || meta.groupId).replace(/^cow_|^buffalo_/, '');
+  const label = `${meta.name} ${meta.groupId} ${meta.groupKey}`;
+
+  if (NUTRITION_ALLOWED_GROUP_KEYS.has(key)) return true;
+  if (meta.feedingEligible && inferNutritionAllowedFromText(label)) return true;
+
+  return inferNutritionAllowedFromText(label) && !inferNutritionBlockedFromText(label);
 }
 
 function blockNutritionIfOutOfLaunchCore(list){
   const meta = getCurrentSelectedGroupMeta();
 
-  if (list.length > 1) {
-    const label = `${meta.name} ${meta.animalType}`;
+  if (!meta.hasGroup) return false;
 
-    if (isNutritionLaunchCoreText(label)) return false;
-
-    $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
+  if (!list.length) {
+    $('#warn').textContent = '⚠️ هذه المجموعة لا تحتوي أرقام حيوانات صالحة.';
     return true;
   }
 
-  if (meta.hasGroup) {
-    const label = `${meta.name} ${meta.animalType}`;
+  if (isNutritionLaunchCoreGroup(meta)) return false;
 
-    if (isNutritionBlockedText(label) && !isNutritionLaunchCoreText(label)) {
-      $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
-      return true;
-    }
-  }
-
-  return false;
+  $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
+  return true;
 }
       function hydrate(){
         const qs = new URLSearchParams(location.search);
@@ -587,12 +638,10 @@ if (isDailyMilkImport){
 const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
 const isHeat = /heat\.html/i.test(String(targetPage||''));
 const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
-
 if (isNutrition && blockNutritionIfOutOfLaunchCore(list)) {
   updateCowCardNav(list.length === 1 ? list[0] : '', list.length > 1);
   return null;
 }
-
 const isWeaning = /weaning\.html/i.test(String(targetPage||''));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
 const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
