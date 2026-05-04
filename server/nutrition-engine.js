@@ -149,6 +149,82 @@ function buildChapter12EnergyModel({
       : 'Fresh postpartum/lactating cow energy includes milk energy when milk production exists.'
   };
 }
+// SOURCE: NASEM_2021_CH12_PROTEIN_CONTEXT
+// Chapter 12 classifies dry/transition stage.
+// Protein requirements for mature dry/close-up cows are evaluated using Chapter 6 MP/EAA components,
+// with no lactation protein and no growth protein for mature dry cows.
+function buildChapter12ProteinModel({
+  chapter12StageModel,
+  mpReq,
+  eaaReq
+}){
+  const stage = chapter12StageModel?.stage || 'not_chapter12_target';
+
+  const c = mpReq?.components || {};
+
+  const isDryOrPrepartum =
+    stage === 'far_off_dry' ||
+    stage === 'close_up_prepartum';
+
+  return {
+    model: 'NASEM_2021_CH12_PROTEIN_CONTEXT',
+    stage,
+    source: 'NASEM_2021_CH12_PLUS_CH6_PROTEIN',
+    status: 'verified_context',
+    targetType: 'MP_and_digestible_EAA_flow',
+    mpModel: mpReq?.model || null,
+    eaaModel: eaaReq?.model || null,
+    rule: isDryOrPrepartum
+      ? 'mature_dry_or_close_up_cow_uses_no_lactation_protein_no_growth_protein'
+      : 'fresh_or_lactating_cow_uses_lactation_protein_when_milk_exists',
+    components: {
+      npScurfG: round(c.npScurfG, 3),
+      npMfpG: round(c.npMfpG, 3),
+      npMilkG: round(c.npMilkG, 3),
+      npGrowthG: round(c.npGrowthG, 3),
+      npGestationG: round(c.npGestationG, 3),
+      npEndogenousUrinaryG: round(c.npEndogenousUrinaryG, 3),
+      cpMfpG: round(c.cpMfpG, 3),
+      grUterGainKgDay: round(c.grUterGainKgDay, 4),
+      frameGainKgDay: round(c.frameGainKgDay, 4)
+    },
+    note: isDryOrPrepartum
+      ? 'Dry/close-up mature cow protein is calculated from maintenance/metabolic fecal/endogenous and gestation components; milk and growth components are zero.'
+      : 'Fresh/lactating cow protein includes milk protein when milk production exists.'
+  };
+}
+// SOURCE: NASEM_2021_CH12_MINERAL_REQUIREMENTS
+// Chapter 12 defines dry/transition stage.
+// Mineral requirements are calculated from NASEM Chapter 7 according to the animal state.
+// For mature dry/close-up cows: no lactation minerals and no growth minerals.
+function buildChapter12MineralModel({
+  chapter12StageModel,
+  mineralReq
+}){
+  const stage = chapter12StageModel?.stage || 'not_chapter12_target';
+
+  const isDryOrPrepartum =
+    stage === 'far_off_dry' ||
+    stage === 'close_up_prepartum';
+
+  return {
+    model: 'NASEM_2021_DRY_TRANSITION_MINERAL_REQUIREMENTS',
+    stage,
+    source: 'NASEM_2021_CH12_STAGE_PLUS_CH7_MINERALS',
+    status: 'verified',
+    targetType: 'macro_and_trace_mineral_requirements',
+    rule: isDryOrPrepartum
+      ? 'mature_dry_or_close_up_cow_uses_no_lactation_minerals_no_growth_minerals'
+      : 'fresh_or_lactating_cow_uses_lactation_minerals_when_milk_exists',
+    macroMineralModel: mineralReq?.model || null,
+    traceMineralModel: mineralReq?.traceMineralRequirementModel?.model || null,
+    macroMinerals: mineralReq?.requiredMinerals || null,
+    traceMinerals: mineralReq?.traceMineralRequirementModel?.traceMinerals || null,
+    note: isDryOrPrepartum
+      ? 'Dry/close-up mature cow mineral requirements are calculated from maintenance and gestation components; milk and growth mineral components are zero.'
+      : 'Fresh/lactating cow mineral requirements include milk mineral components when milk production exists.'
+  };
+}
 /* ============================= */
 /*      STANDARD WEIGHT TABLE    */
 /* ============================= */
@@ -1405,6 +1481,7 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   growth: false,
   matureBodyWeight: getStandardWeight('cow', breed)
 });
+
   const vitaminReq = computeNasemVitaminRequirements({
   bodyWeight: bw,
   milkKg: milk,
@@ -1543,7 +1620,11 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     milkKg: 0,
     mpReq
   });
-
+  const chapter12ProteinModel = buildChapter12ProteinModel({
+  chapter12StageModel,
+  mpReq,
+  eaaReq
+});
   const mineralReq = computeNasemMacroMineralRequirements({
     bodyWeight: bw,
     milkKg: 0,
@@ -1563,7 +1644,10 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     growth: false,
     matureBodyWeight: matBW
   });
-
+const chapter12MineralModel = buildChapter12MineralModel({
+  chapter12StageModel,
+  mineralReq
+});
   const vitaminReq = computeNasemVitaminRequirements({
     bodyWeight: bw,
     milkKg: 0,
@@ -1592,8 +1676,10 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
       growth: 'not_used_for_mature_dry_cow',
       unit: 'NEL_Mcal_day'
     },
-   chapter12EnergyModel,
-    proteinRequirementModel: {
+      chapter12EnergyModel,
+      chapter12ProteinModel,
+      chapter12MineralModel,
+      proteinRequirementModel: {
       model: mpReq.model,
       status: 'verified_mp_target',
       targetType: 'MP',
