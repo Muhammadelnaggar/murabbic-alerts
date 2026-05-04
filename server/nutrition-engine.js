@@ -43,7 +43,112 @@ function resolveFeedingCategory(ctx){
   if (pregDays > 0) return 'dry_pregnant';
   return 'heifer';
 }
+// SOURCE: NASEM_2021_CH12_STAGE_DEFINITION
+// Chapter 12 defines transition as the last 3 weeks of gestation
+// and the first 3 weeks of lactation.
+// This model classifies stage only; it does not invent nutrient requirements.
+function resolveChapter12Stage(ctx = {}){
+  const milkKg = num(ctx?.avgMilkKg ?? ctx?.milkKg ?? 0);
+  const pregDays = num(ctx?.pregnancyDays || 0);
+  const dim = num(ctx?.daysInMilk ?? ctx?.dim ?? 0);
+  const closeUp = !!ctx?.closeUp;
 
+  const gestationLength = 280;
+  const daysPrepartum =
+    pregDays > 0
+      ? Math.max(0, gestationLength - Math.min(pregDays, gestationLength))
+      : null;
+
+  if (milkKg > 0 && dim > 0 && dim <= 21) {
+    return {
+      model: 'NASEM_2021_CH12_STAGE_DEFINITION',
+      stage: 'fresh_postpartum',
+      transitionPhase: 'postpartum',
+      isTransition: true,
+      daysInMilk: Math.round(dim),
+      daysPrepartum: null,
+      note: 'Fresh cow within first 3 weeks of lactation according to NASEM 2021 Chapter 12.'
+    };
+  }
+
+  if (closeUp || (daysPrepartum != null && daysPrepartum <= 21)) {
+    return {
+      model: 'NASEM_2021_CH12_STAGE_DEFINITION',
+      stage: 'close_up_prepartum',
+      transitionPhase: 'prepartum',
+      isTransition: true,
+      daysInMilk: null,
+      daysPrepartum: daysPrepartum == null ? null : Math.round(daysPrepartum),
+      note: 'Close-up cow within last 3 weeks of gestation according to NASEM 2021 Chapter 12.'
+    };
+  }
+
+  if (daysPrepartum != null && daysPrepartum > 21) {
+    return {
+      model: 'NASEM_2021_CH12_STAGE_DEFINITION',
+      stage: 'far_off_dry',
+      transitionPhase: 'dry_far_off',
+      isTransition: false,
+      daysInMilk: null,
+      daysPrepartum: Math.round(daysPrepartum),
+      note: 'Far-off dry cow before the last 3 weeks prepartum; DMI is set from week 3 value per NASEM 2021 Chapter 12.'
+    };
+  }
+
+  return {
+    model: 'NASEM_2021_CH12_STAGE_DEFINITION',
+    stage: 'not_chapter12_target',
+    transitionPhase: null,
+    isTransition: false,
+    daysInMilk: dim > 0 ? Math.round(dim) : null,
+    daysPrepartum,
+    note: 'Animal is not currently classified as dry or transition cow by Chapter 12 stage rules.'
+  };
+}
+// SOURCE: NASEM_2021_CH12_ENERGY_CONTEXT
+// Chapter 12 classifies dry/transition stage.
+// Adult cow energy requirements remain expressed as NEL components:
+// maintenance, pregnancy, lactation when milk exists, and no growth for mature dry cows.
+function buildChapter12EnergyModel({
+  chapter12StageModel,
+  nelMaintenance,
+  nelPreg,
+  nelMilk = 0,
+  nelGrowth = 0
+}){
+  const stage = chapter12StageModel?.stage || 'not_chapter12_target';
+  const isDryOrPrepartum =
+    stage === 'far_off_dry' ||
+    stage === 'close_up_prepartum';
+
+  const components = {
+    maintenanceMcal: round(nelMaintenance),
+    pregnancyMcal: round(nelPreg),
+    lactationMcal: round(nelMilk),
+    growthMcal: round(nelGrowth)
+  };
+
+  return {
+    model: 'NASEM_2021_CH12_ENERGY_CONTEXT',
+    stage,
+    source: 'NASEM_2021_CH12_PLUS_CH3_ENERGY',
+    unit: 'NEL_Mcal_day',
+    status: 'verified',
+    components,
+    totalNELMcal: round(
+      num(nelMaintenance) +
+      num(nelPreg) +
+      num(nelMilk) +
+      num(nelGrowth)
+    ),
+    rule: isDryOrPrepartum
+      ? 'mature_dry_or_close_up_cow_uses_maintenance_plus_pregnancy_no_lactation_no_growth'
+      : 'fresh_or_lactating_cow_uses_lactation_energy_when_milk_exists',
+    note: isDryOrPrepartum
+      ? 'Dry/close-up mature cow energy is calculated from maintenance plus pregnancy only; lactation and growth are not used.'
+      : 'Fresh postpartum/lactating cow energy includes milk energy when milk production exists.'
+  };
+}
 /* ============================= */
 /*      STANDARD WEIGHT TABLE    */
 /* ============================= */
@@ -1230,7 +1335,12 @@ function computeCow({
   const days = num(dim);
   const fatPct = num(milkFatPct, 3.7);
   const proteinPct = num(milkProteinPct, 3.2);
-
+  const chapter12StageModel = resolveChapter12Stage({
+  avgMilkKg: milk,
+  pregnancyDays: pregDays,
+  closeUp,
+  daysInMilk: days
+});
   let dmi = predictCowLactatingDMI({
     bodyWeight: bw,
     milkKg: milk,
@@ -1247,7 +1357,13 @@ function computeCow({
   const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
 const nelPreg = gestationConceptusNE(bw, pregDays);
   const nelTotal = nelMaintenance + nelMilk + nelPreg;
-
+const chapter12EnergyModel = buildChapter12EnergyModel({
+  chapter12StageModel,
+  nelMaintenance,
+  nelPreg,
+  nelMilk,
+  nelGrowth: 0
+});
 const mpReq = computeNasemMPRequirement({
   bodyWeight: bw,
   milkKg: milk,
@@ -1304,8 +1420,9 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   });
 
   return {
-    species: 'cow',
-    category: 'lactating',
+   species: 'cow',
+category: 'lactating',
+chapter12StageModel,
     dmiModel: {
   animalSide: 'NASEM_2021_EQ_2_1',
   status: 'verified',
@@ -1317,6 +1434,7 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   gestation: 'NASEM_2021_EQ_3_15_TO_3_18',
   unit: 'NEL_Mcal_day'
 },
+    chapter12EnergyModel,
    proteinRequirementModel: {
   model: mpReq.model,
   status: 'verified_mp_target',
@@ -1357,7 +1475,12 @@ function computeCowDryMother({
   const preg = num(pregDays);
   const matBW = getStandardWeight('cow', breed);
   const isCloseUp = !!closeUp;
-
+  const chapter12StageModel = resolveChapter12Stage({
+  avgMilkKg: 0,
+  pregnancyDays: preg,
+  closeUp: isCloseUp,
+  daysInMilk: 0
+});
   const dmiCalc = predictCowDryTransitionDMI({
     bodyWeight: bw,
     pregDays: preg,
@@ -1370,6 +1493,7 @@ function computeCowDryMother({
   return {
     species: 'cow',
     category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
+    chapter12StageModel,
     dmiModel: dmiCalc,
     bodyWeight: bw,
     dim: null,
@@ -1390,7 +1514,13 @@ const dmi = Math.max(0, dmiCalc.dmi);
   const nelMaintenance = nelMaintenanceMcal(bw);
   const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
   const nelTotal = nelMaintenance + nelPreg;
-
+const chapter12EnergyModel = buildChapter12EnergyModel({
+  chapter12StageModel,
+  nelMaintenance,
+  nelPreg,
+  nelMilk: 0,
+  nelGrowth: 0
+});
   const mpReq = computeNasemMPRequirement({
     bodyWeight: bw,
     milkKg: 0,
@@ -1446,6 +1576,7 @@ const dmi = Math.max(0, dmiCalc.dmi);
   return {
     species: 'cow',
     category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
+    chapter12StageModel,
 
     dmiModel: {
       animalSide: dmiCalc.model,
@@ -1460,7 +1591,7 @@ const dmi = Math.max(0, dmiCalc.dmi);
       growth: 'not_used_for_mature_dry_cow',
       unit: 'NEL_Mcal_day'
     },
-
+   chapter12EnergyModel,
     proteinRequirementModel: {
       model: mpReq.model,
       status: 'verified_mp_target',
