@@ -702,12 +702,92 @@ function buildNutritionCentralTargets(context = {}) {
 };
 }
 
+function deriveDietNDFPctFromRows(rows = [], mode = 'tmr_asfed', concKg = null) {
+  const cleanRows = Array.isArray(rows) ? rows : [];
+  const modeNorm = String(mode || 'tmr_asfed').trim();
 
+  let dmKg = 0;
+  let ndfKg = 0;
+
+  if (modeNorm === 'tmr_asfed') {
+    for (const r of cleanRows) {
+      const asFedKg = Number(r.asFedKg || 0);
+      const dmPct = Number(r.dmPct || 0);
+      const ndfPct = Number(r.ndfPct || 0);
+
+      const rowDmKg = asFedKg * (dmPct / 100);
+      dmKg += rowDmKg;
+      ndfKg += rowDmKg * (ndfPct / 100);
+    }
+  }
+
+  if (modeNorm === 'tmr_percent') {
+    for (const r of cleanRows) {
+      const pct = Number(r.pct || 0) / 100;
+      const dmPct = Number(r.dmPct || 0);
+      const ndfPct = Number(r.ndfPct || 0);
+
+      const rowDmPart = pct * (dmPct / 100);
+      dmKg += rowDmPart;
+      ndfKg += rowDmPart * (ndfPct / 100);
+    }
+  }
+
+  if (modeNorm === 'split') {
+    const concKgNum = Number(concKg || 0);
+
+    let concDmFrac = 0;
+    let concNdfFrac = 0;
+
+    for (const r of cleanRows) {
+      const cat = String(r.cat || '').trim();
+      const dmPct = Number(r.dmPct || 0);
+      const ndfPct = Number(r.ndfPct || 0);
+
+      if (cat === 'rough') {
+        const asFedKg = Number(r.asFedKg || 0);
+        const rowDmKg = asFedKg * (dmPct / 100);
+        dmKg += rowDmKg;
+        ndfKg += rowDmKg * (ndfPct / 100);
+      }
+
+      if (cat === 'conc') {
+        const pct = Number(r.pct || 0) / 100;
+        concDmFrac += pct * (dmPct / 100);
+        concNdfFrac += pct * (dmPct / 100) * (ndfPct / 100);
+      }
+    }
+
+    const concDmKg = concKgNum * concDmFrac;
+    const concNdfKg = concKgNum * concNdfFrac;
+
+    dmKg += concDmKg;
+    ndfKg += concNdfKg;
+  }
+
+  if (!(dmKg > 0)) return null;
+
+  const out = (ndfKg / dmKg) * 100;
+  return Number.isFinite(out) ? round2(out) : null;
+}
 function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
   const cleanRows = Array.isArray(rows) ? rows : [];
 const modeNorm = String(mode || 'tmr_asfed').trim();
 
-const builtTargets = buildNutritionCentralTargets(context);
+const dietNDFPctFromRation = deriveDietNDFPctFromRows(
+  cleanRows,
+  modeNorm,
+  concKg
+);
+
+const contextForTargets = {
+  ...context,
+  dietNDFPct: Number.isFinite(Number(context?.dietNDFPct))
+    ? context.dietNDFPct
+    : dietNDFPctFromRation
+};
+
+const builtTargets = buildNutritionCentralTargets(contextForTargets);
 const runtimeCtx = builtTargets.runtimeCtx;
 const targetsCore = builtTargets.targetsCore;
 
