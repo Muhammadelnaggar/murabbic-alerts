@@ -1026,9 +1026,10 @@ for (const aa of EAA_KEYS){
     dmKg > 0 ? (digestibleRupEaaG[aa] / dmKg) : 0;
 }
 
-  const nelTotalMcalDay = nelMcal;
-  const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
-  const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
+const nelTotalMcalDay = nelMcal;
+const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
+const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
+const dietNDFPct = ndfPctActual;
 const adfPctActual = dmKg > 0 ? (adfKg / dmKg) * 100 : 0;
 const forageNdfPctDiet = dmKg > 0 ? (forageNdfKg / dmKg) * 100 : 0;
 const weightedForageNdfDigestibilityPct =
@@ -1328,10 +1329,11 @@ vitaminSupplyModel,
       mpSupplyG: round(mpSupplyG, 0),
       mpNote,
 
-     nelActual: round(nelTotalMcalDay),
-      nelDensity: round(nelDensityMcalKgDM),
-      nelBalanceMcal: round(nelMcal - nelTarget),
-      ndfPctActual: round(ndfPctActual),
+nelActual: round(nelTotalMcalDay),
+nelDensity: round(nelDensityMcalKgDM),
+nelBalanceMcal: round(nelMcal - nelTarget),
+ndfPctActual: round(ndfPctActual),
+dietNDFPct: round(dietNDFPct),
 adfPctActual: round(adfPctActual),
 forageNdfPctDiet: round(forageNdfPctDiet),
 forageNdfDigestibilityPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
@@ -1368,6 +1370,7 @@ dmiRationEffect
     },
     targets: {
       dmiTarget: round(dmiTarget),
+      dietNDFPct: round(dietNDFPct),
       nelTarget: round(nelTarget),
       mpTargetG: round(mpTargetG, 0),
       ndfTarget: round(ndfTarget),
