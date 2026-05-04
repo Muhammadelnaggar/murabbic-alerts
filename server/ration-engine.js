@@ -288,6 +288,50 @@ function buildMineralBalanceModel({
           : 'إمداد المعادن يغطي الاحتياج'
   };
 }
+// MURABBIK_DCAD_SUPPLY
+// DCAD from actual ration mineral supply.
+// Formula: mEq/kg DM = [(Na/23) + (K/39.1) - (Cl/35.45) - (S/16.03)] * 1000 / DM kg
+// Mineral inputs are total grams/day from feed library.
+function buildDcadModel({ totalMineralG = {}, dmKg = 0, context = {} }){
+  const dm = Number(dmKg);
+
+  const naG = Number(totalMineralG.Na || 0);
+  const kG  = Number(totalMineralG.K  || 0);
+  const clG = Number(totalMineralG.Cl || 0);
+  const sG  = Number(totalMineralG.S  || 0);
+
+  const dcadMeqDay =
+    ((naG / 23.0) + (kG / 39.1) - (clG / 35.45) - (sG / 16.03)) * 1000;
+
+  const dcadMeqKgDM =
+    dm > 0 ? (dcadMeqDay / dm) : 0;
+
+  const isCloseUp =
+    !!context?.closeUp ||
+    String(context?.category || '').includes('close_up') ||
+    String(context?.stage || '').includes('close_up');
+
+  return {
+    model: 'MURABBIK_DCAD_ACTUAL_SUPPLY',
+    source: 'FEED_LIBRARY_NA_K_CL_S',
+    applied: true,
+    unit: 'mEq_kg_DM',
+    status: 'calculated',
+    dcadMeqKgDM: round(dcadMeqKgDM, 0),
+    dcadMeqDay: round(dcadMeqDay, 0),
+    closeUpContext: isCloseUp,
+    inputs: {
+      dmKg: round(dm, 2),
+      sodiumG: round(naG, 2),
+      potassiumG: round(kG, 2),
+      chlorideG: round(clG, 2),
+      sulfurG: round(sG, 2)
+    },
+    note: isCloseUp
+      ? 'تم حساب DCAD الفعلي لعليقة انتظار الولادة من Na/K/Cl/S'
+      : 'تم حساب DCAD الفعلي للعليقة من Na/K/Cl/S'
+  };
+}
 // MURABBIK_VITAMIN_SUPPLY
 // Vitamins A/D/E supply from feed library.
 // Units: IU/day.
@@ -1213,7 +1257,14 @@ const mineralBalanceModel = buildMineralBalanceModel({
   absorbedMineralG
 });
 
+const dcadModel = buildDcadModel({
+  totalMineralG: mineralG,
+  dmKg,
+  context
+});
+
 mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
+mineralSupplyModel.dcadModel = dcadModel;
 
 const vitaminSupplyModel = {
   model: 'MURABBIK_VITAMIN_SUPPLY_A_D_E',
@@ -1325,6 +1376,7 @@ rdpPctCP: round(rdpPctCPActual),
 rupPctCP: round(rupPctCPActual),
 proteinModel,
 mineralSupplyModel,
+dcadModel,
 vitaminSupplyModel,
       mpSupplyG: round(mpSupplyG, 0),
       mpNote,
