@@ -780,11 +780,19 @@ const dietNDFPctFromRation = deriveDietNDFPctFromRows(
   concKg
 );
 
+const contextDietNDF = Number(context?.dietNDFPct);
+const derivedDietNDF = Number(dietNDFPctFromRation);
+
 const contextForTargets = {
   ...context,
-  dietNDFPct: Number.isFinite(Number(context?.dietNDFPct))
-    ? context.dietNDFPct
-    : dietNDFPctFromRation
+  dietNDFPct:
+    Number.isFinite(contextDietNDF) && contextDietNDF > 0
+      ? contextDietNDF
+      : (
+          Number.isFinite(derivedDietNDF) && derivedDietNDF > 0
+            ? derivedDietNDF
+            : null
+        )
 };
 
 const builtTargets = buildNutritionCentralTargets(contextForTargets);
