@@ -225,6 +225,35 @@ function buildChapter12MineralModel({
       : 'Fresh/lactating cow mineral requirements include milk mineral components when milk production exists.'
   };
 }
+// SOURCE: NASEM_2021_CH12_VITAMIN_REQUIREMENTS
+// Chapter 12 defines dry/transition stage.
+// Vitamin requirements are calculated from NASEM Chapter 8 according to the animal state.
+function buildChapter12VitaminModel({
+  chapter12StageModel,
+  vitaminReq
+}){
+  const stage = chapter12StageModel?.stage || 'not_chapter12_target';
+
+  const isDryOrPrepartum =
+    stage === 'far_off_dry' ||
+    stage === 'close_up_prepartum';
+
+  return {
+    model: 'NASEM_2021_DRY_TRANSITION_VITAMIN_REQUIREMENTS',
+    stage,
+    source: 'NASEM_2021_CH12_STAGE_PLUS_CH8_VITAMINS',
+    status: 'verified',
+    targetType: 'supplemental_vitamin_AI',
+    rule: isDryOrPrepartum
+      ? 'mature_dry_or_close_up_cow_uses_dry_or_prepartum_vitamin_ai'
+      : 'fresh_or_lactating_cow_uses_lactating_vitamin_ai',
+    vitaminModel: vitaminReq?.model || null,
+    vitamins: vitaminReq?.vitamins || null,
+    note: isDryOrPrepartum
+      ? 'Dry/close-up mature cow vitamin AI is calculated from NASEM Chapter 8 according to dry or prepartum state.'
+      : 'Fresh/lactating cow vitamin AI is calculated according to lactating state.'
+  };
+}
 /* ============================= */
 /*      STANDARD WEIGHT TABLE    */
 /* ============================= */
@@ -1655,7 +1684,10 @@ const chapter12MineralModel = buildChapter12MineralModel({
     closeUp: isCloseUp,
     freshPastureDMKg: 0
   });
-
+const chapter12VitaminModel = buildChapter12VitaminModel({
+  chapter12StageModel,
+  vitaminReq
+});
   const cpReferencePct = isCloseUp ? 12.5 : 12.0;
 
   return {
@@ -1679,6 +1711,7 @@ const chapter12MineralModel = buildChapter12MineralModel({
       chapter12EnergyModel,
       chapter12ProteinModel,
       chapter12MineralModel,
+      chapter12VitaminModel,
       proteinRequirementModel: {
       model: mpReq.model,
       status: 'verified_mp_target',
