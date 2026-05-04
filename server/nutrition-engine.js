@@ -1939,10 +1939,15 @@ function computeTargets(ctx){
   const isBuffalo = (sp === 'جاموس' || sp === 'جاموسه' || sp === 'buffalo');
 
   if (isBuffalo){
-    if (category === 'heifer' || category === 'dry_pregnant' || category === 'close_up'){
-      return computeBuffaloHeifer(common);
-    }
-    return computeBuffalo(common);
+   if (category === 'dry_pregnant' || category === 'close_up'){
+  return computeCowDryMother(common);
+}
+
+if (category === 'heifer'){
+  return computeCowHeifer(common);
+}
+
+return computeCow(common);
   }
 
 if (category === 'dry_pregnant' || category === 'close_up'){
