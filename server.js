@@ -415,7 +415,17 @@ function normalizeNutritionAnalysis(a = {}) {
   roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
   concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
   rumenStatus: a?.nutrition?.rumenStatus || null,
-  rumenNote: a?.nutrition?.rumenNote || null
+  rumenNote: a?.nutrition?.rumenNote || null,
+
+mineralSupplyModel: a?.nutrition?.mineralSupplyModel || null,
+vitaminSupplyModel: a?.nutrition?.vitaminSupplyModel || null,
+dcadModel: a?.nutrition?.dcadModel || null,
+proteinModel: a?.nutrition?.proteinModel || null,
+fatModel: a?.nutrition?.fatModel || null,
+carbohydrateModel: a?.nutrition?.carbohydrateModel || null,
+carbohydrateSafetyModel: a?.nutrition?.carbohydrateSafetyModel || null,
+dmiRationEffect: a?.nutrition?.dmiRationEffect || null
+    
 },
     targets: {
   dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
@@ -534,7 +544,19 @@ function normalizeNutritionRows(rows = []) {
 ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
 fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
 starchPct: toNumOrNull(r?.starchPct ?? r?.starch),
-mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp)
+mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp),
+
+caPct: toNumOrNull(r?.caPct ?? r?.calciumPct),
+pPct: toNumOrNull(r?.pPct ?? r?.phosphorusPct),
+mgPct: toNumOrNull(r?.mgPct ?? r?.magnesiumPct),
+naPct: toNumOrNull(r?.naPct ?? r?.sodiumPct),
+kPct: toNumOrNull(r?.kPct ?? r?.potassiumPct),
+clPct: toNumOrNull(r?.clPct ?? r?.chloridePct),
+sPct: toNumOrNull(r?.sPct ?? r?.sulfurPct ?? r?.sulphurPct),
+
+vitAIUPerKgDM: toNumOrNull(r?.vitAIUPerKgDM ?? r?.vitaminAIUPerKgDM),
+vitDIUPerKgDM: toNumOrNull(r?.vitDIUPerKgDM ?? r?.vitaminDIUPerKgDM),
+vitEIUPerKgDM: toNumOrNull(r?.vitEIUPerKgDM ?? r?.vitaminEIUPerKgDM)
   }));
 }
 function round2(v){
@@ -801,6 +823,8 @@ const targetsCore = builtTargets.targetsCore;
 
 const rationCore = analyzeRation(
   cleanRows.map(r => ({
+    ...r,
+
     kg: r.asFedKg,
     dm: r.dmPct,
     cp: r.cpPct,
@@ -1023,7 +1047,16 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   concPctDM,
   rumenStatus,
   rumenNote,
- rumenAdvice: "تم احتساب الألياف المؤثرة وصحة الكرش على افتراض أن طول تقطيع الخشن 3–5 سم. إذا كان التقطيع أقصر أو أطول من ذلك قد تختلف دقة التقييم."
+ rumenAdvice: "تم احتساب الألياف المؤثرة وصحة الكرش على افتراض أن طول تقطيع الخشن 3–5 سم. إذا كان التقطيع أقصر أو أطول من ذلك قد تختلف دقة التقييم.",
+
+mineralSupplyModel: rationCore?.nutrition?.mineralSupplyModel || null,
+vitaminSupplyModel: rationCore?.nutrition?.vitaminSupplyModel || null,
+dcadModel: rationCore?.nutrition?.dcadModel || null,
+proteinModel: rationCore?.nutrition?.proteinModel || null,
+fatModel: rationCore?.nutrition?.fatModel || null,
+carbohydrateModel: rationCore?.nutrition?.carbohydrateModel || null,
+carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null,
+dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
 },
 
   targets: {
