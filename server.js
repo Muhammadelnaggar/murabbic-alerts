@@ -556,7 +556,34 @@ sPct: toNumOrNull(r?.sPct ?? r?.sulfurPct ?? r?.sulphurPct),
 
 vitAIUPerKgDM: toNumOrNull(r?.vitAIUPerKgDM ?? r?.vitaminAIUPerKgDM),
 vitDIUPerKgDM: toNumOrNull(r?.vitDIUPerKgDM ?? r?.vitaminDIUPerKgDM),
-vitEIUPerKgDM: toNumOrNull(r?.vitEIUPerKgDM ?? r?.vitaminEIUPerKgDM)
+vitEIUPerKgDM: toNumOrNull(r?.vitEIUPerKgDM ?? r?.vitaminEIUPerKgDM),
+
+adfPct: toNumOrNull(r?.adfPct ?? r?.adf),
+ashPct: toNumOrNull(r?.ashPct ?? r?.ash),
+
+rdpPctCP: toNumOrNull(r?.rdpPctCP ?? r?.rdpPctOfCP ?? r?.rdp),
+rupPctCP: toNumOrNull(r?.rupPctCP ?? r?.rupPctOfCP ?? r?.rup),
+rupDigestibilityPct: toNumOrNull(r?.rupDigestibilityPct ?? r?.digestibleRupPct ?? r?.dRUPPct),
+
+wscPct: toNumOrNull(r?.wscPct ?? r?.waterSolubleCarbsPct ?? r?.waterSolubleCarbohydratesPct),
+
+faPct: toNumOrNull(r?.faPct ?? r?.fattyAcidsPct ?? r?.totalFaPct ?? r?.totalFAPct),
+faSourceClass: r?.faSourceClass || r?.fatSourceClass || r?.fatClass || null,
+faProfilePctTFA: r?.faProfilePctTFA || null,
+
+forageNdfDigestibilityPct: toNumOrNull(r?.forageNdfDigestibilityPct),
+fNDFD: toNumOrNull(r?.fNDFD ?? r?.forageNdfDigestibilityPct ?? r?.ndfd ?? r?.ndfDigestibilityPct),
+
+rumDigNdfPctOfNdf: toNumOrNull(r?.rumDigNdfPctOfNdf ?? r?.rumenDigestedNdfPctOfNdf ?? r?.ruminalNdfDigestibilityPct ?? r?.rumenNdfDigestibilityPct),
+rumDigStarchPctOfStarch: toNumOrNull(r?.rumDigStarchPctOfStarch ?? r?.rumenDigestedStarchPctOfStarch ?? r?.ruminalStarchDigestibilityPct ?? r?.rumenStarchDigestibilityPct),
+
+aaProfilePctTP: r?.aaProfilePctTP || r?.aaProfile || null,
+
+cuMgKgDM: toNumOrNull(r?.cuMgKgDM),
+feMgKgDM: toNumOrNull(r?.feMgKgDM),
+mnMgKgDM: toNumOrNull(r?.mnMgKgDM),
+znMgKgDM: toNumOrNull(r?.znMgKgDM),
+moMgKgDM: toNumOrNull(r?.moMgKgDM)
   }));
 }
 function round2(v){
