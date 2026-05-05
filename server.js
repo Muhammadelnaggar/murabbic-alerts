@@ -586,6 +586,103 @@ znMgKgDM: toNumOrNull(r?.znMgKgDM),
 moMgKgDM: toNumOrNull(r?.moMgKgDM)
   }));
 }
+function feedKeySrv(v){
+  return String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/\s+/g, ' ');
+}
+
+function pickFeedIdFromRowSrv(r = {}){
+  return String(
+    r.feedId ||
+    r.itemId ||
+    r.feedItemId ||
+    r.id ||
+    ''
+  ).trim();
+}
+
+async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
+  if (!db || !Array.isArray(rawRows) || !rawRows.length) return rawRows;
+
+  try {
+    const snap = await db.collection('feed_items').get();
+
+    const byId = new Map();
+    const byName = new Map();
+
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      if (d.enabled === false) return;
+
+      const feed = {
+        id: doc.id,
+        feedId: doc.id,
+        ...d
+      };
+
+      byId.set(doc.id, feed);
+
+      [
+        d.nameAr,
+        d.name,
+        d.sourceFeedName,
+        doc.id
+      ].forEach(x => {
+        const k = feedKeySrv(x);
+        if (k && !byName.has(k)) byName.set(k, feed);
+      });
+    });
+
+    return rawRows.map(r => {
+      const row = r || {};
+      const explicitId = pickFeedIdFromRowSrv(row);
+
+      const feed =
+        (explicitId && byId.get(explicitId)) ||
+        byName.get(feedKeySrv(row.name || row.feedName || row.nameAr)) ||
+        null;
+
+      if (!feed) return row;
+
+      const amountPatch = {
+        asFedKg: row.asFedKg ?? row.kg ?? row.amount,
+        kg: row.kg ?? row.asFedKg ?? row.amount,
+        amount: row.amount,
+        pct: row.pct,
+        pricePerTon: row.pricePerTon ?? row.pTon ?? row.price ?? row.pTonRaw,
+        pTon: row.pTon,
+        price: row.price,
+        pTonRaw: row.pTonRaw,
+        pricePerTonDM: row.pricePerTonDM ?? row.pTonDM,
+        pTonDM: row.pTonDM
+      };
+
+      return cleanObj({
+        ...row,
+        ...feed,
+
+        id: feed.id || explicitId || row.id || null,
+        feedId: feed.id || explicitId || row.feedId || null,
+        name: row.name || feed.nameAr || feed.name || null,
+        nameAr: feed.nameAr || row.nameAr || row.name || null,
+        cat: row.cat || feed.cat || feed.category || null,
+
+        ...amountPatch,
+
+        _feedLibraryMerged: true,
+        _feedLibrarySource: feed.source || null
+      });
+    });
+  } catch (e) {
+    console.error('nutrition feed_items merge failed:', e.message || e);
+    return rawRows;
+  }
+}
 function round2(v){
   return Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : null;
 }
@@ -1467,8 +1564,15 @@ const mode = body.mode || 'tmr_asfed';
 const concKg = toNumOrNull(body.concKg);
 const milkPrice = toNumOrNull(body.milkPrice);
 
+const enrichedRows = await enrichNutritionRowsFromFeedItems(req.userId, rows);
+const normalizedRows = normalizeNutritionRows(enrichedRows);
+
+console.log('NUTRITION ANALYZE rawRows[0] =', rows[0] || null);
+console.log('NUTRITION ANALYZE enrichedRows[0] =', enrichedRows[0] || null);
+console.log('NUTRITION ANALYZE normalizedRows[0] =', normalizedRows[0] || null);
+
 const analysis = buildNutritionCentralAnalysis({
-  rows: normalizeNutritionRows(rows),
+  rows: normalizedRows,
   context,
   mode,
   concKg,
@@ -1525,7 +1629,8 @@ if (isGroup && !groupNumbers.length) {
 
 const nutrition = body.nutrition || {};
 const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
-const rows = normalizeNutritionRows(rawRows);
+const enrichedRows = await enrichNutritionRowsFromFeedItems(tenant, rawRows);
+const rows = normalizeNutritionRows(enrichedRows);
 const context = normalizeNutritionContext(nutrition.context || {});
 
 console.log('NUTRITION SAVE rawRows.length =', rawRows.length);
@@ -1533,6 +1638,7 @@ console.log('NUTRITION SAVE rawRows[0] =', rawRows[0] || null);
 console.log('NUTRITION SAVE normalizedRows.length =', rows.length);
 console.log('NUTRITION SAVE normalizedRows[0] =', rows[0] || null);
 console.log('NUTRITION SAVE normalizedContext =', context);
+console.log('NUTRITION SAVE enrichedRows[0] =', enrichedRows[0] || null);
 
 if (!rows.length) {
   return res.status(400).json({
