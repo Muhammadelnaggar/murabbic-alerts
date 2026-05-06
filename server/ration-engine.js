@@ -19,6 +19,112 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+
+// SOURCE: NASEM_2021_CH3_EQ_3_8_TO_3_12
+// Diet-level energy model. Feed library supplies composition; the engine calculates DE, ME, and NEL.
+function pctFrac(v){
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n > 1 ? n / 100 : n;
+}
+
+function calculateNasemEnergy2021({
+  dmKg,
+  ndfPctDM,
+  dNdfPctOfNdf,
+  starchPctDM,
+  dStarchPctOfStarch,
+  faPctDM,
+  dFaPctOfFa,
+  rdpPctDM,
+  sNPNCPEPctDM,
+  digestibleRupPctDM,
+  romPctDM,
+  mfcpGPerKgDM,
+  fmcpGPerKgDM,
+  efRomPctDM,
+  cpPctDM,
+  adCpPctOfCp,
+  milkCPKg = 0,
+  bodyGainCPKg = 0
+}){
+  const DMI = num(dmKg);
+
+  const NDF_DM = num(ndfPctDM);
+  const dNDF_NDF = pctFrac(dNdfPctOfNdf);
+  const Starch_DM = num(starchPctDM);
+  const dStarch_Starch = pctFrac(dStarchPctOfStarch);
+  const FA_DM = num(faPctDM);
+  const dFA_FA = pctFrac(dFaPctOfFa);
+
+  const RDP_DM = num(rdpPctDM);
+  const sNPNCPE_DM = num(sNPNCPEPctDM);
+  const dRUP_DM = num(digestibleRupPctDM);
+
+  const ROM_DM = num(romPctDM);
+  const MFCP = num(mfcpGPerKgDM);
+  const fMCP = num(fmcpGPerKgDM);
+  const efROM_DM = num(efRomPctDM);
+
+  const CP_DM = num(cpPctDM);
+  const adCP_CP = pctFrac(adCpPctOfCp || 70);
+
+  const DE_DM =
+    (0.042 * NDF_DM * dNDF_NDF) +
+    (0.0423 * Starch_DM * dStarch_Starch) +
+    (0.0940 * FA_DM * dFA_FA) +
+    (0.0565 * (RDP_DM - sNPNCPE_DM + dRUP_DM)) +
+    (0.0089 * sNPNCPE_DM) +
+    (0.040 * ROM_DM * 0.96) -
+    (0.00565 * MFCP) -
+    (0.00565 * fMCP) -
+    (0.0040 * efROM_DM);
+
+  const dNDF_DM = NDF_DM * dNDF_NDF;
+
+  const GasE_DM = DMI > 0
+    ? ((0.294 * DMI - 0.347 * FA_DM + 0.0409 * dNDF_DM) / DMI)
+    : 0;
+
+  const UN = DMI > 0
+    ? (((DMI * CP_DM * adCP_CP) - num(milkCPKg) - num(bodyGainCPKg)) * 1000 / 6.25)
+    : 0;
+
+  const UE_DM = DMI > 0 ? ((0.0146 * UN) / DMI) : 0;
+  const ME_DM = DE_DM - GasE_DM - UE_DM;
+  const NEL_DM = 0.66 * ME_DM;
+
+  return {
+    model: 'NASEM_2021_CH3_EQ_3_8_TO_3_12',
+    applied: true,
+    status: 'calculated',
+    deMcalPerKgDM: round(DE_DM, 3),
+    gasEMcalPerKgDM: round(GasE_DM, 3),
+    urinaryEMcalPerKgDM: round(UE_DM, 3),
+    meMcalPerKgDM: round(ME_DM, 3),
+    nelMcalPerKgDM: round(NEL_DM, 3),
+    inputs: {
+      dmKg: round(DMI, 3),
+      ndfPctDM: round(NDF_DM, 3),
+      dNdfPctOfNdf: round(dNDF_NDF * 100, 3),
+      starchPctDM: round(Starch_DM, 3),
+      dStarchPctOfStarch: round(dStarch_Starch * 100, 3),
+      faPctDM: round(FA_DM, 3),
+      dFaPctOfFa: round(dFA_FA * 100, 3),
+      rdpPctDM: round(RDP_DM, 3),
+      sNPNCPEPctDM: round(sNPNCPE_DM, 3),
+      digestibleRupPctDM: round(dRUP_DM, 3),
+      romPctDM: round(ROM_DM, 3),
+      mfcpGPerKgDM: round(MFCP, 3),
+      fmcpGPerKgDM: round(fMCP, 3),
+      efRomPctDM: round(efROM_DM, 3),
+      cpPctDM: round(CP_DM, 3),
+      adCpPctOfCp: round(adCP_CP * 100, 3),
+      urinaryNGramDay: round(UN, 3)
+    }
+  };
+}
+
 // SOURCE: NASEM_2021_CH6_EAA_FRAMEWORK
 // Essential amino acids handled as absorbed supplies, g/day.
 // No AA is calculated unless feed AA profile exists.
@@ -786,7 +892,7 @@ function analyzeRation(rows, targets = {}, context = {}){
 let rdpKg = 0;
 let rupKg = 0;
 let digestibleRupKg = 0;
-let mpSupplyG = 0;
+let feedLibraryMpSupplyG = 0;
 
 let missingRdpRows = 0;
 let missingRupRows = 0;
@@ -796,7 +902,7 @@ let missingAaProfileRows = 0;
 let digestibleRupEaaG = makeEaaZeroMap();
 let missingAaDetailRows = 0;
 
-  let nelMcal = 0;
+  let feedLibraryNelMcal = 0;
  let ndfKg = 0;
 let adfKg = 0;
 let peNdfKg = 0;
@@ -818,6 +924,8 @@ let missingNdsfRows = 0;
 let forageNdfKg = 0;
 let forageNdfdWeightedSum = 0;
 let forageNdfdWeightKg = 0;
+let starchDigestibilityWeightedSum = 0;
+let starchDigestibilityWeightKg = 0;
 
   let forageDmKg = 0;
   let concDmKg = 0;
@@ -991,11 +1099,11 @@ if (!hasAaProfile && cp > 0) {
 }
 
 if (mp > 0) {
-  mpSupplyG += dmItemKg * mp;
+  feedLibraryMpSupplyG += dmItemKg * mp;
 } else {
   missingMpRows++;
 }
-    nelMcal += dmItemKg * nel;
+    feedLibraryNelMcal += dmItemKg * nel;
     ndfKg += dmItemKg * (ndf / 100);
 adfKg += dmItemKg * (adf / 100);
 peNdfKg += dmItemKg * (ndf / 100) * pef;
@@ -1028,6 +1136,10 @@ if (hasRumNdfDig) {
 
 if (hasRumStarchDig) {
   rumDigStarchKg += starchItemKg * (rawRumStarchDig / 100);
+  if (starchItemKg > 0) {
+    starchDigestibilityWeightedSum += starchItemKg * rawRumStarchDig;
+    starchDigestibilityWeightKg += starchItemKg;
+  }
 } else if (starchItemKg > 0) {
   missingRumDigStarchRows++;
 }
@@ -1063,15 +1175,13 @@ const rupPctDM = dmKg > 0 ? (rupKg / dmKg) * 100 : 0;
 const digestibleRupPctDM = dmKg > 0 ? (digestibleRupKg / dmKg) * 100 : 0;
 const rdpPctCPActual = cpKg > 0 ? (rdpKg / cpKg) * 100 : 0;
 const rupPctCPActual = cpKg > 0 ? (rupKg / cpKg) * 100 : 0;
-const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
   const digestibleRupEaaDensityGkgDM = {};
 for (const aa of EAA_KEYS){
   digestibleRupEaaDensityGkgDM[aa] =
     dmKg > 0 ? (digestibleRupEaaG[aa] / dmKg) : 0;
 }
 
-const nelTotalMcalDay = nelMcal;
-const nelDensityMcalKgDM = dmKg > 0 ? (nelMcal / dmKg) : 0;
+const feedLibraryNelDensityMcalKgDM = dmKg > 0 ? (feedLibraryNelMcal / dmKg) : 0;
 const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
 const dietNDFPct = ndfPctActual;
 const adfPctActual = dmKg > 0 ? (adfKg / dmKg) * 100 : 0;
@@ -1087,6 +1197,8 @@ const faDigestibilityCoeffWeighted =
   faCoeffWeightKg > 0 ? (faCoeffWeightedSum / faCoeffWeightKg) : 0;
 const fatSupplementFAPctDM = dmKg > 0 ? (fatSupplementFaKg / dmKg) * 100 : 0;
 const starchPct = dmKg > 0 ? (starchKg / dmKg) * 100 : 0;
+const weightedStarchDigestibilityPct =
+  starchDigestibilityWeightKg > 0 ? (starchDigestibilityWeightedSum / starchDigestibilityWeightKg) : 0;
 const wscPctActual = dmKg > 0 ? (wscKg / dmKg) * 100 : 0;
 const ndsfPctActual = dmKg > 0 ? (ndsfKg / dmKg) * 100 : 0;
 const ndscPctActual = dmKg > 0 ? (ndscKg / dmKg) * 100 : 0;
@@ -1104,8 +1216,29 @@ const nonForageNdfPctDiet = dmKg > 0 ? (nonForageNdfKg / dmKg) * 100 : 0;
   const roughageMin = num(targets?.roughageMin);
   const peNDFMin = num(targets?.peNDFMin);
   const dmBalanceKg = dmiTarget ? (dmKg - dmiTarget) : 0;
-  const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
- let mpNote = 'تقييم البروتين الممثل جيد';
+
+ const microbialAaProfilePctTP =
+  context?.microbialAaProfilePctTP ||
+  context?.microbialAaProfile ||
+  defaultMicrobialAaProfilePctTP();
+
+const microbialProteinModel = predictMicrobialProteinNasem({
+  rdpKg,
+  dmKg,
+  rumDigNdfKg,
+  rumDigStarchKg,
+  microbialAaProfilePctTP
+});
+
+const modeledMpSupplyG =
+  (digestibleRupKg * 1000) +
+  ((Number(microbialProteinModel.microbialTPKg) || 0) * 1000);
+
+const mpSupplyG = modeledMpSupplyG;
+const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
+const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
+
+let mpNote = 'تقييم البروتين الممثل جيد';
 
 if (mpTargetG && mpSupplyG < mpTargetG) {
   mpNote = 'يوجد عجز في البروتين الممثل عن الاحتياج';
@@ -1125,6 +1258,34 @@ if (mpTargetG && mpSupplyG < mpTargetG) {
 
  const fpcmKg = calcFpcmKg(avgMilkKg, milkFatPct);
 const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
+
+const milkCPKg = avgMilkKg > 0 && milkProteinPct > 0
+  ? avgMilkKg * (milkProteinPct / 100)
+  : 0;
+
+const nasemEnergyModel = calculateNasemEnergy2021({
+  dmKg,
+  ndfPctDM: ndfPctActual,
+  dNdfPctOfNdf: weightedForageNdfDigestibilityPct || weightedStarchDigestibilityPct || 50,
+  starchPctDM: starchPct,
+  dStarchPctOfStarch: weightedStarchDigestibilityPct || 90,
+  faPctDM: faPctActual,
+  dFaPctOfFa: faDigestibilityCoeffWeighted > 0 ? (faDigestibilityCoeffWeighted * 100) : 73,
+  rdpPctDM,
+  sNPNCPEPctDM: 0,
+  digestibleRupPctDM,
+  romPctDM: Math.max(0, 100 - cpPctTotal - ndfPctActual - starchPct - faPctActual - wscPctActual - (dmKg > 0 ? 0 : 0)),
+  mfcpGPerKgDM: microbialProteinModel.microbialCPKg && dmKg > 0 ? (microbialProteinModel.microbialCPKg * 1000 / dmKg) : 0,
+  fmcpGPerKgDM: 0,
+  efRomPctDM: 0,
+  cpPctDM: cpPctTotal,
+  adCpPctOfCp: 70,
+  milkCPKg,
+  bodyGainCPKg: Number(context?.bodyGainCPKg || 0)
+});
+
+const nelTotalMcalDay = nasemEnergyModel.nelMcalPerKgDM * dmKg;
+const nelDensityMcalKgDM = nasemEnergyModel.nelMcalPerKgDM;
 
 const speciesText = String(context?.species || '').trim().toLowerCase();
 const isBuffalo = /جاموس|buffalo/.test(speciesText);
@@ -1205,20 +1366,7 @@ const carbohydrateModel = {
   status: 'calculated',
   note: 'تم حساب تقسيم الكربوهيدرات حسب NASEM 2021: NDF و NDSC fractions'
 };
- const microbialAaProfilePctTP =
-  context?.microbialAaProfilePctTP ||
-  context?.microbialAaProfile ||
-  defaultMicrobialAaProfilePctTP();
-
-const microbialProteinModel = predictMicrobialProteinNasem({
-  rdpKg,
-  dmKg,
-  rumDigNdfKg,
-  rumDigStarchKg,
-  microbialAaProfilePctTP
-});
-
-const totalModeledEaaG = {};
+ const totalModeledEaaG = {};
 for (const aa of EAA_KEYS) {
   totalModeledEaaG[aa] =
     digestibleRupEaaG[aa] +
@@ -1284,7 +1432,7 @@ vitaminSupplyModel.vitaminBalanceModel = buildVitaminBalanceModel({
 
  const proteinModel = {
   model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
-  mpSupplyMode: 'feed_library_protein_values',
+  mpSupplyMode: 'modeled_digestible_RUP_plus_microbial_true_protein',
   cpPctDM: round(cpPctTotal),
   rdpPctDM: round(rdpPctDM),
   rupPctDM: round(rupPctDM),
@@ -1293,10 +1441,12 @@ vitaminSupplyModel.vitaminBalanceModel = buildVitaminBalanceModel({
   rupPctCP: round(rupPctCPActual),
   mpSupplyG: round(mpSupplyG, 0),
   mpDensityGkgDM: round(mpDensityGkgDM, 0),
+  feedLibraryMpSupplyG: round(feedLibraryMpSupplyG, 0),
+  modeledMpSupplyG: round(modeledMpSupplyG, 0),
  
 eaaModel: {
   model: 'NASEM_2021_CH6_EAA_SUPPLY_FRAMEWORK',
-  supplyMode: 'digestible_RUP_EAA_from_feed_library_only',
+  supplyMode: 'digestible_RUP_EAA_plus_microbial_EAA',
  includesMicrobialEAA: !!microbialProteinModel.hasMicrobialAaProfile,
 includesEndogenousEAA: false,
   rupEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(rupEaaG[k], 0)])),
@@ -1341,7 +1491,12 @@ digestibleRupKg: round(digestibleRupKg),
      totalModeledEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(totalModeledEaaG[k], 0)])),
    
       mpSupplyG: round(mpSupplyG, 0),
-      nelMcal: round(nelMcal),
+      feedLibraryMpSupplyG: round(feedLibraryMpSupplyG, 0),
+      modeledMpSupplyG: round(modeledMpSupplyG, 0),
+      nelMcal: round(nelTotalMcalDay),
+      feedLibraryNelMcal: round(feedLibraryNelMcal),
+      deMcal: round(nasemEnergyModel.deMcalPerKgDM * dmKg),
+      meMcal: round(nasemEnergyModel.meMcalPerKgDM * dmKg),
       ndfKg: round(ndfKg),
       peNdfKg: round(peNdfKg),
       fatKg: round(fatKg),
@@ -1383,7 +1538,8 @@ vitaminSupplyModel,
 
 nelActual: round(nelTotalMcalDay),
 nelDensity: round(nelDensityMcalKgDM),
-nelBalanceMcal: round(nelMcal - nelTarget),
+energySupplyModel: nasemEnergyModel,
+nelBalanceMcal: round(nelTotalMcalDay - nelTarget),
 ndfPctActual: round(ndfPctActual),
 dietNDFPct: round(dietNDFPct),
 adfPctActual: round(adfPctActual),
