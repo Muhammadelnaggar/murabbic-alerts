@@ -540,11 +540,66 @@ function normalizeNutritionRows(rows = []) {
     cpPct: toNumOrNull(r?.cpPct ?? r?.cp),
    pricePerTon: toNumOrNull(r?.pricePerTon ?? r?.pTon ?? r?.price ?? r?.pTonRaw),
     pricePerTonDM: toNumOrNull(r?.pricePerTonDM ?? r?.pTonDM),
-   nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
-ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
-fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
-starchPct: toNumOrNull(r?.starchPct ?? r?.starch),
+nelMcalPerKgDM: toNumOrNull(r?.nelMcalPerKgDM ?? r?.nel),
 mpGPerKgDM: toNumOrNull(r?.mpGPerKgDM ?? r?.mp),
+
+// NASEM 2021 feed energy inputs
+baseDEMcalPerKgDM: toNumOrNull(
+  r?.baseDEMcalPerKgDM ??
+  r?.baseDE ??
+  r?.de ??
+  r?.deMcalPerKgDM
+),
+
+// Carbohydrate / fiber / fat
+ndfPct: toNumOrNull(r?.ndfPct ?? r?.ndf),
+adfPct: toNumOrNull(r?.adfPct ?? r?.adf),
+fatPct: toNumOrNull(r?.fatPct ?? r?.fat),
+crudeFatPct: toNumOrNull(r?.crudeFatPct ?? r?.fatPct ?? r?.fat),
+faPct: toNumOrNull(r?.faPct ?? r?.fattyAcidsPct ?? r?.totalFaPct),
+starchPct: toNumOrNull(r?.starchPct ?? r?.starch),
+wscPct: toNumOrNull(r?.wscPct ?? r?.waterSolubleCarbsPct),
+ndsfPct: toNumOrNull(r?.ndsfPct ?? r?.neutralDetergentSolubleFiberPct),
+ligninPct: toNumOrNull(r?.ligninPct),
+
+// Digestibility fields for NASEM energy / microbial protein
+forageNdfDigestibilityPct: toNumOrNull(
+  r?.forageNdfDigestibilityPct ??
+  r?.fNDFD ??
+  r?.ndfDigestibilityPct ??
+  r?.ndfd
+),
+
+fNDFD: toNumOrNull(
+  r?.fNDFD ??
+  r?.forageNdfDigestibilityPct ??
+  r?.ndfDigestibilityPct ??
+  r?.ndfd
+),
+
+rumDigNdfPctOfNdf: toNumOrNull(
+  r?.rumDigNdfPctOfNdf ??
+  r?.rumenDigestedNdfPctOfNdf ??
+  r?.ruminalNdfDigestibilityPct ??
+  r?.rumenNdfDigestibilityPct
+),
+
+rumDigStarchPctOfStarch: toNumOrNull(
+  r?.rumDigStarchPctOfStarch ??
+  r?.rumenDigestedStarchPctOfStarch ??
+  r?.ruminalStarchDigestibilityPct ??
+  r?.rumenStarchDigestibilityPct ??
+  r?.starchDigestibilityPct
+),
+
+starchDigestibilityPct: toNumOrNull(
+  r?.starchDigestibilityPct ??
+  r?.rumDigStarchPctOfStarch ??
+  r?.rumenDigestedStarchPctOfStarch
+),
+
+faDigestibilityCoeff: toNumOrNull(r?.faDigestibilityCoeff ?? r?.faDigestibility ?? r?.faDigCoeff),
+faSourceClass: r?.faSourceClass ?? r?.fatSourceClass ?? r?.fatClass ?? null,
 
 caPct: toNumOrNull(r?.caPct ?? r?.calciumPct),
 pPct: toNumOrNull(r?.pPct ?? r?.phosphorusPct),
@@ -947,18 +1002,45 @@ const targetsCore = builtTargets.targetsCore;
 
 const rationCore = analyzeRation(
   cleanRows.map(r => ({
-    ...r,
+...r,
 
-    kg: r.asFedKg,
-    dm: r.dmPct,
-    cp: r.cpPct,
-    mp: r.mpGPerKgDM,
-    nel: r.nelMcalPerKgDM,
-    ndf: r.ndfPct,
-    fat: r.fatPct,
-    starch: r.starchPct,
-    cat: r.cat,
-    pricePerTonAsFed: r.pricePerTon
+kg: r.asFedKg,
+dm: r.dmPct,
+cp: r.cpPct,
+
+// Legacy values remain available, but NASEM engine does not depend on them as feed truth
+mp: r.mpGPerKgDM,
+nel: r.nelMcalPerKgDM,
+
+// NASEM 2021 feed composition
+baseDE: r.baseDEMcalPerKgDM,
+baseDEMcalPerKgDM: r.baseDEMcalPerKgDM,
+
+ndf: r.ndfPct,
+ndfPct: r.ndfPct,
+adf: r.adfPct,
+adfPct: r.adfPct,
+fat: r.fatPct,
+fatPct: r.fatPct,
+crudeFatPct: r.crudeFatPct,
+faPct: r.faPct,
+starch: r.starchPct,
+starchPct: r.starchPct,
+wscPct: r.wscPct,
+ndsfPct: r.ndsfPct,
+ligninPct: r.ligninPct,
+
+forageNdfDigestibilityPct: r.forageNdfDigestibilityPct,
+fNDFD: r.fNDFD,
+rumDigNdfPctOfNdf: r.rumDigNdfPctOfNdf,
+rumDigStarchPctOfStarch: r.rumDigStarchPctOfStarch,
+starchDigestibilityPct: r.starchDigestibilityPct,
+
+faDigestibilityCoeff: r.faDigestibilityCoeff,
+faSourceClass: r.faSourceClass,
+
+cat: r.cat,
+pricePerTonAsFed: r.pricePerTon
   })),
  {
   dmi: targetsCore?.dmi,
