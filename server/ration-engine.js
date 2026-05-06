@@ -30,6 +30,7 @@ function pctFrac(v){
 
 function calculateNasemEnergy2021({
   dmKg,
+  baseDEMcalPerKgDM,
   ndfPctDM,
   dNdfPctOfNdf,
   starchPctDM,
@@ -69,16 +70,22 @@ function calculateNasemEnergy2021({
   const CP_DM = num(cpPctDM);
   const adCP_CP = pctFrac(adCpPctOfCp || 70);
 
-  const DE_DM =
-    (0.042 * NDF_DM * dNDF_NDF) +
-    (0.0423 * Starch_DM * dStarch_Starch) +
-    (0.0940 * FA_DM * dFA_FA) +
-    (0.0565 * (RDP_DM - sNPNCPE_DM + dRUP_DM)) +
-    (0.0089 * sNPNCPE_DM) +
-    (0.040 * ROM_DM * 0.96) -
-    (0.00565 * MFCP) -
-    (0.00565 * fMCP) -
-    (0.0040 * efROM_DM);
+ const componentDE_DM =
+  (0.042 * NDF_DM * dNDF_NDF) +
+  (0.0423 * Starch_DM * dStarch_Starch) +
+  (0.0940 * FA_DM * dFA_FA) +
+  (0.0565 * (RDP_DM - sNPNCPE_DM + dRUP_DM)) +
+  (0.0089 * sNPNCPE_DM) +
+  (0.040 * ROM_DM * 0.96) -
+  (0.00565 * MFCP) -
+  (0.00565 * fMCP) -
+  (0.0040 * efROM_DM);
+
+const BASE_DE_DM = num(baseDEMcalPerKgDM);
+
+// في مُرَبِّيك: DE الأساسي يأتي من NASEM feed library كـ weighted diet baseDE.
+// إعادة تركيب DE من المكونات تبقى diagnostic فقط.
+const DE_DM = BASE_DE_DM > 0 ? BASE_DE_DM : componentDE_DM;
 
   const dNDF_DM = NDF_DM * dNDF_NDF;
 
@@ -109,12 +116,15 @@ const NEL_DM = 0.66 * ME_DM;
     applied: true,
     status: 'calculated',
     deMcalPerKgDM: round(DE_DM, 3),
+    componentDeMcalPerKgDM: round(componentDE_DM, 3),
+    baseDeMcalPerKgDM: round(BASE_DE_DM, 3),
     gasEMcalPerKgDM: round(GasE_DM, 3),
     urinaryEMcalPerKgDM: round(UE_DM, 3),
     meMcalPerKgDM: round(ME_DM, 3),
     nelMcalPerKgDM: round(NEL_DM, 3),
     inputs: {
       dmKg: round(DMI, 3),
+      baseDEMcalPerKgDM: round(BASE_DE_DM, 3),
       ndfPctDM: round(NDF_DM, 3),
       dNdfPctOfNdf: round(dNDF_NDF * 100, 3),
       starchPctDM: round(Starch_DM, 3),
@@ -912,7 +922,9 @@ let missingAaProfileRows = 0;
 let digestibleRupEaaG = makeEaaZeroMap();
 let missingAaDetailRows = 0;
 
-  let feedLibraryNelMcal = 0;
+ let feedLibraryNelMcal = 0;
+ let feedLibraryBaseDEMcal = 0;
+ let feedLibraryBaseDEWeightKg = 0;
  let ndfKg = 0;
 let adfKg = 0;
 let peNdfKg = 0;
@@ -1028,7 +1040,17 @@ const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDi
       );
 
    const dmItemKg = kg * (dm / 100);
+   const rawBaseDE = Number(
+  r.baseDE ??
+  r.baseDEMcalPerKgDM ??
+  r.de ??
+  r.deMcalPerKgDM
+);
 
+if (Number.isFinite(rawBaseDE) && rawBaseDE > 0 && dmItemKg > 0) {
+  feedLibraryBaseDEMcal += dmItemKg * rawBaseDE;
+  feedLibraryBaseDEWeightKg += dmItemKg;
+}
 for (const vitamin of VITAMIN_KEYS) {
   const iuPerKgDM = firstFiniteField(r, VITAMIN_FIELD_MAP[vitamin]);
   if (iuPerKgDM != null && iuPerKgDM >= 0) {
@@ -1192,6 +1214,10 @@ for (const aa of EAA_KEYS){
 }
 
 const feedLibraryNelDensityMcalKgDM = dmKg > 0 ? (feedLibraryNelMcal / dmKg) : 0;
+ const feedLibraryBaseDEDensityMcalKgDM =
+  feedLibraryBaseDEWeightKg > 0
+    ? (feedLibraryBaseDEMcal / feedLibraryBaseDEWeightKg)
+    : 0;
 const ndfPctActual = dmKg > 0 ? (ndfKg / dmKg) * 100 : 0;
 const dietNDFPct = ndfPctActual;
 const adfPctActual = dmKg > 0 ? (adfKg / dmKg) * 100 : 0;
@@ -1275,6 +1301,7 @@ const milkCPKg = avgMilkKg > 0 && milkProteinPct > 0
 
 const nasemEnergyModel = calculateNasemEnergy2021({
   dmKg,
+  baseDEMcalPerKgDM: feedLibraryBaseDEDensityMcalKgDM,
   ndfPctDM: ndfPctActual,
   dNdfPctOfNdf: weightedForageNdfDigestibilityPct || weightedStarchDigestibilityPct || 50,
   starchPctDM: starchPct,
@@ -1505,6 +1532,8 @@ digestibleRupKg: round(digestibleRupKg),
       modeledMpSupplyG: round(modeledMpSupplyG, 0),
       nelMcal: round(nelTotalMcalDay),
       feedLibraryNelMcal: round(feedLibraryNelMcal),
+      feedLibraryBaseDEMcal: round(feedLibraryBaseDEMcal),
+      feedLibraryBaseDEDensityMcalKgDM: round(feedLibraryBaseDEDensityMcalKgDM, 3),
       deMcal: round(nasemEnergyModel.deMcalPerKgDM * dmKg),
       meMcal: round(nasemEnergyModel.meMcalPerKgDM * dmKg),
       ndfKg: round(ndfKg),
