@@ -86,13 +86,23 @@ function calculateNasemEnergy2021({
     ? ((0.294 * DMI - 0.347 * FA_DM + 0.0409 * dNDF_DM) / DMI)
     : 0;
 
-  const UN = DMI > 0
-    ? (((DMI * CP_DM * adCP_CP) - num(milkCPKg) - num(bodyGainCPKg)) * 1000 / 6.25)
+const CP_FRAC = CP_DM > 1 ? (CP_DM / 100) : CP_DM;
+
+const retainedProteinKg =
+  Math.max(0, num(milkCPKg)) +
+  Math.max(0, num(bodyGainCPKg));
+
+const absorbedProteinKg =
+  DMI > 0 ? (DMI * CP_FRAC * adCP_CP) : 0;
+
+const UN =
+  DMI > 0
+    ? Math.max(0, (absorbedProteinKg - retainedProteinKg) * 1000 / 6.25)
     : 0;
 
-  const UE_DM = DMI > 0 ? ((0.0146 * UN) / DMI) : 0;
-  const ME_DM = DE_DM - GasE_DM - UE_DM;
-  const NEL_DM = 0.66 * ME_DM;
+const UE_DM = DMI > 0 ? ((0.0146 * UN) / DMI) : 0;
+const ME_DM = DE_DM - GasE_DM - UE_DM;
+const NEL_DM = 0.66 * ME_DM;
 
   return {
     model: 'NASEM_2021_CH3_EQ_3_8_TO_3_12',
