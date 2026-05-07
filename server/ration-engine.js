@@ -325,6 +325,108 @@ function firstFiniteField(row, names){
   return null;
 }
 
+function normalizeMineralSourceText(row = {}) {
+  return String(
+    row.mineralSourceClass ||
+    row.sourceClass ||
+    row.feedClass ||
+    row.cat ||
+    row.category ||
+    row.sourceFeedName ||
+    row.nameAr ||
+    row.name ||
+    row.feedName ||
+    row.id ||
+    ''
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/\s+/g, '_')
+    .replace(/-/g, '_');
+}
+
+function resolveCalciumAbsCoeff(row = {}) {
+  const txt = normalizeMineralSourceText(row);
+
+  if (/dical|dicalcium|ثنائي|فوسفات_كالسيوم/.test(txt)) {
+    return { coeff: 0.60, source: 'NASEM_2021_CA_DICALCIUM_PHOSPHATE_CLASS' };
+  }
+
+  if (/calcium_chloride|cacl|كلوريد_كالسيوم/.test(txt)) {
+    return { coeff: 0.60, source: 'NASEM_2021_CA_CALCIUM_CHLORIDE_CLASS' };
+  }
+
+  if (/limestone|calcium_carbonate|كربونات|حجر_جيري|جير/.test(txt)) {
+    return { coeff: 0.45, source: 'NASEM_2021_CA_LIMESTONE_CLASS' };
+  }
+
+  if (/alfalfa|حجازي|برسيم_حجازي|corn_silage|silage|سيلاج|forage|rough|خشن/.test(txt)) {
+    return { coeff: 0.40, source: 'NASEM_2021_CA_FORAGE_CLASS' };
+  }
+
+  if (/conc|concentrate|grain|corn|soybean|مركز|ذره|ذرة|صويا/.test(txt)) {
+    return { coeff: 0.60, source: 'NASEM_2021_CA_CONCENTRATE_CLASS' };
+  }
+
+  return { coeff: 0.60, source: 'NASEM_2021_CA_DEFAULT_FEED_CLASS' };
+}
+
+function resolvePhosphorusAbsCoeff(row = {}) {
+  const txt = normalizeMineralSourceText(row);
+
+  if (/mono|di_calcium|dical|phosphate|فوسفات|معدني|mineral|inorganic/.test(txt)) {
+    return { coeff: 0.84, source: 'NASEM_2021_P_INORGANIC_FRACTION_AC' };
+  }
+
+  if (/organic|phytate|فيتات/.test(txt)) {
+    return { coeff: 0.68, source: 'NASEM_2021_P_ORGANIC_FRACTION_AC' };
+  }
+
+  return { coeff: 0.72, source: 'NASEM_2021_P_NO_FRACTION_DATA_AC' };
+}
+
+function resolveMagnesiumAbsCoeffFromDietK(dietKPctDM) {
+  const kPct = Number(dietKPctDM);
+  const k = Number.isFinite(kPct) ? kPct : 1;
+
+  const coeff = 0.30 - (0.075 * Math.max(0, k - 1));
+
+  return {
+    coeff: clamp(coeff, 0.10, 0.30),
+    source: 'NASEM_2021_MG_AC_ADJUSTED_BY_DIET_K'
+  };
+}
+
+function resolveMineralAbsCoeff(mineral, row = {}, targetRequiredMinerals = {}) {
+  const explicitAbsCoeff = firstFiniteField(row, MINERAL_ABS_FIELD_MAP[mineral]);
+
+  if (explicitAbsCoeff != null && explicitAbsCoeff >= 0 && explicitAbsCoeff <= 1) {
+    return {
+      coeff: explicitAbsCoeff,
+      source: 'feed_item_explicit_abs_coeff'
+    };
+  }
+
+  const targetAbsCoeff = Number(targetRequiredMinerals?.[mineral]?.absorptionCoeff);
+
+  if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff >= 0 && targetAbsCoeff <= 1) {
+    return {
+      coeff: targetAbsCoeff,
+      source: 'target_requirement_abs_coeff'
+    };
+  }
+
+  if (mineral === 'Ca') return resolveCalciumAbsCoeff(row);
+  if (mineral === 'P') return resolvePhosphorusAbsCoeff(row);
+
+  return {
+    coeff: null,
+    source: null
+  };
+}
 function makeMineralZeroMap(){
   const out = {};
   for (const k of MACRO_MINERAL_KEYS) out[k] = 0;
@@ -1140,25 +1242,15 @@ for (const vitamin of VITAMIN_KEYS) {
 }
 
 for (const mineral of MACRO_MINERAL_KEYS) {
-for (const mineral of MACRO_MINERAL_KEYS) {
   const pct = firstFiniteField(r, MINERAL_FIELD_MAP[mineral]);
-
-  const explicitAbsCoeff = firstFiniteField(r, MINERAL_ABS_FIELD_MAP[mineral]);
-  const targetAbsCoeff = Number(targetRequiredMinerals?.[mineral]?.absorptionCoeff);
-
-  let absCoeff = null;
-
-  if (explicitAbsCoeff != null && explicitAbsCoeff >= 0 && explicitAbsCoeff <= 1) {
-    absCoeff = explicitAbsCoeff;
-  } else if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff >= 0 && targetAbsCoeff <= 1) {
-    absCoeff = targetAbsCoeff;
-  }
+  const resolvedAbs = resolveMineralAbsCoeff(mineral, r, targetRequiredMinerals);
+  const absCoeff = resolvedAbs.coeff;
 
   if (pct != null && pct >= 0) {
     const mineralItemG = dmItemKg * 1000 * (pct / 100);
     mineralG[mineral] += mineralItemG;
 
-    if (absCoeff != null) {
+    if (absCoeff != null && absCoeff >= 0 && absCoeff <= 1) {
       absorbedMineralG[mineral] += mineralItemG * absCoeff;
       mineralAbsCoeffWeightedSum[mineral] += mineralItemG * absCoeff;
       mineralAbsCoeffWeightG[mineral] += mineralItemG;
@@ -1168,7 +1260,8 @@ for (const mineral of MACRO_MINERAL_KEYS) {
   } else if (dmItemKg > 0) {
     missingMineralRows[mineral]++;
   }
-}  asFedKg += kg;
+}
+  asFedKg += kg;
     dmKg += dmItemKg;
 const cpItemKg = dmItemKg * (cp / 100);
 cpKg += cpItemKg;
@@ -1333,7 +1426,16 @@ if (cat === 'rough') {
 
 if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
   }
+const dietKPctDMForMg =
+  dmKg > 0 ? (mineralG.K / (dmKg * 1000)) * 100 : 0;
 
+if (mineralG.Mg > 0 && mineralAbsCoeffWeightG.Mg <= 0) {
+  const mgAbs = resolveMagnesiumAbsCoeffFromDietK(dietKPctDMForMg);
+
+  absorbedMineralG.Mg = mineralG.Mg * mgAbs.coeff;
+  mineralAbsCoeffWeightedSum.Mg = mineralG.Mg * mgAbs.coeff;
+  mineralAbsCoeffWeightG.Mg = mineralG.Mg;
+}
   const cpPctTotal = dmKg > 0 ? (cpKg / dmKg) * 100 : 0;
 const rdpPctDM = dmKg > 0 ? (rdpKg / dmKg) * 100 : 0;
 const rupPctDM = dmKg > 0 ? (rupKg / dmKg) * 100 : 0;
