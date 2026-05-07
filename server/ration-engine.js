@@ -986,7 +986,11 @@ const rawRupDig = Number(r.rupDigestibilityPct ?? r.digestibleRupPct ?? r.dRUPPc
 const hasRupDig = Number.isFinite(rawRupDig) && rawRupDig >= 0;
 const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
 
-const aaProfileRaw = r.aaProfilePctTP || r.aaProfile || null;
+const aaProfileRaw =
+  r.aaProfilePctCP ||
+  r.aaProfilePctTP ||
+  r.aaProfile ||
+  null;
 const aaProfile = normalizeAaProfile(aaProfileRaw);
 const hasAaProfile = !!aaProfile;
 
