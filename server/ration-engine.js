@@ -21,9 +21,10 @@ function safeDiv(a, b){
 }
 const NASEM_PROTEIN_A_ESCAPE_FRAC = 0.064;
 const NASEM_PROTEIN_A_DEGRADED_FRAC = 1 - NASEM_PROTEIN_A_ESCAPE_FRAC;
-
 const NASEM_KP_B_FORAGE_PCT_PER_H = 4.87;
 const NASEM_KP_B_CONCENTRATE_PCT_PER_H = 5.28;
+const NASEM_DEFAULT_RUM_DIG_NDF_PCT_OF_NDF = 37.6;
+const NASEM_DEFAULT_RUM_DIG_STARCH_PCT_OF_STARCH = 65.6;
 
 function resolveNasemProteinKpPctPerHour(row = {}) {
   const explicit = Number(row.proteinBKpPctPerHour ?? row.kpPctPerHour);
@@ -1084,7 +1085,9 @@ const rawRumNdfDig = Number(
   r.rumenNdfDigestibilityPct
 );
 const hasRumNdfDig = Number.isFinite(rawRumNdfDig) && rawRumNdfDig >= 0;
-
+const effectiveRumNdfDigPct = hasRumNdfDig
+  ? clamp(rawRumNdfDig, 0, 100)
+  : NASEM_DEFAULT_RUM_DIG_NDF_PCT_OF_NDF;
 const rawRumStarchDig = Number(
   r.rumDigStarchPctOfStarch ??
   r.rumenDigestedStarchPctOfStarch ??
@@ -1092,6 +1095,9 @@ const rawRumStarchDig = Number(
   r.rumenStarchDigestibilityPct
 );
 const hasRumStarchDig = Number.isFinite(rawRumStarchDig) && rawRumStarchDig >= 0;
+const effectiveRumStarchDigPct = hasRumStarchDig
+  ? clamp(rawRumStarchDig, 0, 100)
+  : NASEM_DEFAULT_RUM_DIG_STARCH_PCT_OF_STARCH;
 const rawNDSF = Number(r.ndsfPct ?? r.neutralDetergentSolubleFiberPct);
 const hasNDSF = Number.isFinite(rawNDSF) && rawNDSF >= 0;
 const ndsf = hasNDSF ? rawNDSF : 0;
@@ -1271,20 +1277,23 @@ const ndfItemKg = dmItemKg * (ndf / 100);
 
 starchKg += starchItemKg;
 
-if (hasRumNdfDig) {
-  rumDigNdfKg += ndfItemKg * (rawRumNdfDig / 100);
-} else if (ndfItemKg > 0) {
-  missingRumDigNdfRows++;
+if (ndfItemKg > 0) {
+  rumDigNdfKg += ndfItemKg * (effectiveRumNdfDigPct / 100);
+
+  if (!hasRumNdfDig) {
+    missingRumDigNdfRows++;
+  }
 }
 
-if (hasRumStarchDig) {
-  rumDigStarchKg += starchItemKg * (rawRumStarchDig / 100);
-  if (starchItemKg > 0) {
-    starchDigestibilityWeightedSum += starchItemKg * rawRumStarchDig;
-    starchDigestibilityWeightKg += starchItemKg;
+if (starchItemKg > 0) {
+  rumDigStarchKg += starchItemKg * (effectiveRumStarchDigPct / 100);
+
+  starchDigestibilityWeightedSum += starchItemKg * effectiveRumStarchDigPct;
+  starchDigestibilityWeightKg += starchItemKg;
+
+  if (!hasRumStarchDig) {
+    missingRumDigStarchRows++;
   }
-} else if (starchItemKg > 0) {
-  missingRumDigStarchRows++;
 }
 wscKg += dmItemKg * (wsc / 100);
 ndsfKg += dmItemKg * (ndsf / 100);
