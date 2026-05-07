@@ -403,7 +403,7 @@ function resolveMagnesiumAbsCoeffFromDietK(dietKPctDM) {
 function resolveMineralAbsCoeff(mineral, row = {}, targetRequiredMinerals = {}) {
   const explicitAbsCoeff = firstFiniteField(row, MINERAL_ABS_FIELD_MAP[mineral]);
 
-  if (explicitAbsCoeff != null && explicitAbsCoeff >= 0 && explicitAbsCoeff <= 1) {
+ if (explicitAbsCoeff != null && explicitAbsCoeff > 0 && explicitAbsCoeff <= 1) {
     return {
       coeff: explicitAbsCoeff,
       source: 'feed_item_explicit_abs_coeff'
@@ -412,7 +412,7 @@ function resolveMineralAbsCoeff(mineral, row = {}, targetRequiredMinerals = {}) 
 
   const targetAbsCoeff = Number(targetRequiredMinerals?.[mineral]?.absorptionCoeff);
 
-  if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff >= 0 && targetAbsCoeff <= 1) {
+  if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff > 0 && targetAbsCoeff <= 1) {
     return {
       coeff: targetAbsCoeff,
       source: 'target_requirement_abs_coeff'
