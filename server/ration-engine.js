@@ -1002,6 +1002,9 @@ let mineralAbsCoeffWeightG = makeMineralZeroMap();
 let missingMineralRows = makeMineralMissingMap();
 let missingMineralAbsCoeffRows = makeMineralMissingMap();
 let vitaminIU = makeVitaminZeroMap();
+
+const targetRequiredMinerals = resolveRequiredMinerals(targets, context);
+
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -1137,14 +1140,25 @@ for (const vitamin of VITAMIN_KEYS) {
 }
 
 for (const mineral of MACRO_MINERAL_KEYS) {
+for (const mineral of MACRO_MINERAL_KEYS) {
   const pct = firstFiniteField(r, MINERAL_FIELD_MAP[mineral]);
-  const absCoeff = firstFiniteField(r, MINERAL_ABS_FIELD_MAP[mineral]);
+
+  const explicitAbsCoeff = firstFiniteField(r, MINERAL_ABS_FIELD_MAP[mineral]);
+  const targetAbsCoeff = Number(targetRequiredMinerals?.[mineral]?.absorptionCoeff);
+
+  let absCoeff = null;
+
+  if (explicitAbsCoeff != null && explicitAbsCoeff >= 0 && explicitAbsCoeff <= 1) {
+    absCoeff = explicitAbsCoeff;
+  } else if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff >= 0 && targetAbsCoeff <= 1) {
+    absCoeff = targetAbsCoeff;
+  }
 
   if (pct != null && pct >= 0) {
     const mineralItemG = dmItemKg * 1000 * (pct / 100);
     mineralG[mineral] += mineralItemG;
 
-    if (absCoeff != null && absCoeff >= 0 && absCoeff <= 1) {
+    if (absCoeff != null) {
       absorbedMineralG[mineral] += mineralItemG * absCoeff;
       mineralAbsCoeffWeightedSum[mineral] += mineralItemG * absCoeff;
       mineralAbsCoeffWeightG[mineral] += mineralItemG;
@@ -1154,8 +1168,7 @@ for (const mineral of MACRO_MINERAL_KEYS) {
   } else if (dmItemKg > 0) {
     missingMineralRows[mineral]++;
   }
-}
-    asFedKg += kg;
+}  asFedKg += kg;
     dmKg += dmItemKg;
 const cpItemKg = dmItemKg * (cp / 100);
 cpKg += cpItemKg;
