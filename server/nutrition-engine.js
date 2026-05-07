@@ -1,10 +1,9 @@
 // مُرَبِّيك — Nutrition Engine
-// نسخة أقوى للاقتراب من NASEM 2021 داخل حدود هذا الملف
-// ملاحظات:
-// نسخة محسّنة أقرب إلى NASEM 2021 داخل حدود target-side فقط
-// DMI: قريب جدًا من المعادلات الموصى بها
-// MP: target-side improved approximation
-// المضاهاة الكاملة للبروتين/AA تتطلب supply-side في analyze-ration
+// Target-side nutrition requirements engine.
+// Cows: DMI, Energy, MP/EAA, Macro minerals, Trace minerals, and Vitamins
+// are calculated using implemented NASEM 2021 equation pathways.
+// Buffalo remains separated under MURABBIK_OPERATIONAL_RULE unless explicitly documented.
+// Supply-side ration analysis is handled in server/ration-engine.js.
 function num(v, d = 0){
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
