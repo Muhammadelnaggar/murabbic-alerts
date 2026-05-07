@@ -428,7 +428,7 @@ carbohydrateSafetyModel: a?.nutrition?.carbohydrateSafetyModel || null,
 dmiRationEffect: a?.nutrition?.dmiRationEffect || null
     
 },
-    targets: {
+targets: {
   dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
   nelTarget: toNumOrNull(a?.targets?.nelTarget),
   cpTarget: toNumOrNull(a?.targets?.cpTarget),
@@ -437,7 +437,13 @@ dmiRationEffect: a?.nutrition?.dmiRationEffect || null
   fatTarget: toNumOrNull(a?.targets?.fatTarget),
   starchMax: toNumOrNull(a?.targets?.starchMax),
   roughageMin: toNumOrNull(a?.targets?.roughageMin),
-      peNDFMin: toNumOrNull(a?.targets?.peNDFMin)
+  peNDFMin: toNumOrNull(a?.targets?.peNDFMin),
+
+  proteinRequirementModel: a?.targets?.proteinRequirementModel || null,
+  mineralRequirementModel: a?.targets?.mineralRequirementModel || null,
+  vitaminRequirementModel: a?.targets?.vitaminRequirementModel || null,
+  chapter12MineralModel: a?.targets?.chapter12MineralModel || null,
+  chapter12VitaminModel: a?.targets?.chapter12VitaminModel || null
 },
        economics: {
       costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
@@ -1091,19 +1097,38 @@ cat: r.cat,
 pricePerTonAsFed: r.pricePerTon
   })),
  {
+  ...targetsCore,
+
   dmi: targetsCore?.dmi,
+  dmiTarget: targetsCore?.dmi,
   nel: targetsCore?.nel,
+  nelTarget: targetsCore?.nel,
   mpTargetG: targetsCore?.mpTargetG,
   ndfTarget: targetsCore?.ndfTarget,
   starchMax: targetsCore?.starchMax,
   roughageMin: targetsCore?.roughageMin,
-  peNDFMin: targetsCore?.peNDFMin
+  peNDFMin: targetsCore?.peNDFMin,
+
+  proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
+  mineralRequirementModel: targetsCore?.mineralRequirementModel || null,
+  vitaminRequirementModel: targetsCore?.vitaminRequirementModel || null,
+  chapter12MineralModel: targetsCore?.chapter12MineralModel || null,
+  chapter12VitaminModel: targetsCore?.chapter12VitaminModel || null
 },
   {
+    ...contextForTargets,
+    ...targetsCore,
+
     avgMilkKg: context?.avgMilkKg,
     milkFatPct: runtimeCtx?.milkFatPctUsed,
     milkProteinPct: runtimeCtx?.milkProteinPctUsed,
-    milkPrice: milkPrice
+    milkPrice: milkPrice,
+
+    proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
+    mineralRequirementModel: targetsCore?.mineralRequirementModel || null,
+    vitaminRequirementModel: targetsCore?.vitaminRequirementModel || null,
+    chapter12MineralModel: targetsCore?.chapter12MineralModel || null,
+    chapter12VitaminModel: targetsCore?.chapter12VitaminModel || null
   }
 );
   let totCost = null;
@@ -1322,8 +1347,14 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   ndfTarget: targetsCore?.ndfTarget ?? null,
   fatTarget: null,
   starchMax: targetsCore?.starchMax ?? null,
-roughageMin: targetsCore?.roughageMin ?? null,
-peNDFMin: targetsCore?.peNDFMin ?? null
+  roughageMin: targetsCore?.roughageMin ?? null,
+  peNDFMin: targetsCore?.peNDFMin ?? null,
+
+  proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
+  mineralRequirementModel: targetsCore?.mineralRequirementModel || null,
+  vitaminRequirementModel: targetsCore?.vitaminRequirementModel || null,
+  chapter12MineralModel: targetsCore?.chapter12MineralModel || null,
+  chapter12VitaminModel: targetsCore?.chapter12VitaminModel || null
 },
        economics: {
       costPerKgMilk,
