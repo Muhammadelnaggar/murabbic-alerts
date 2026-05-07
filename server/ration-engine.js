@@ -19,7 +19,24 @@ function safeDiv(a, b){
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
   return a / b;
 }
+const NASEM_PROTEIN_A_ESCAPE_FRAC = 0.064;
+const NASEM_PROTEIN_A_DEGRADED_FRAC = 1 - NASEM_PROTEIN_A_ESCAPE_FRAC;
 
+const NASEM_KP_B_FORAGE_PCT_PER_H = 4.87;
+const NASEM_KP_B_CONCENTRATE_PCT_PER_H = 5.28;
+
+function resolveNasemProteinKpPctPerHour(row = {}) {
+  const explicit = Number(row.proteinBKpPctPerHour ?? row.kpPctPerHour);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const cat = String(row.cat || row.category || '').trim().toLowerCase();
+
+  if (cat === 'rough' || cat === 'forage') {
+    return NASEM_KP_B_FORAGE_PCT_PER_H;
+  }
+
+  return NASEM_KP_B_CONCENTRATE_PCT_PER_H;
+}
 // SOURCE: NASEM_2021_CH3_EQ_3_8_TO_3_12
 // Diet-level energy model. Feed library supplies composition; the engine calculates DE, ME, and NEL.
 function pctFrac(v){
@@ -906,26 +923,41 @@ function calcEcmKg(milkKg, milkFatPct, milkProteinPct){
 function analyzeRation(rows, targets = {}, context = {}){
   const list = Array.isArray(rows) ? rows : [];
 
-  let asFedKg = 0;
-  let dmKg = 0;
- let cpKg = 0;
+let asFedKg = 0;
+let dmKg = 0;
+let cpKg = 0;
 let rdpKg = 0;
 let rupKg = 0;
 let digestibleRupKg = 0;
 let feedLibraryMpSupplyG = 0;
 
+let solubleProteinKg = 0;
+let proteinAKg = 0;
+let proteinBKg = 0;
+let proteinCKg = 0;
+
+let proteinADegradedKg = 0;
+let proteinAEscapedKg = 0;
+let proteinBDegradedKg = 0;
+let proteinBEscapedKg = 0;
+
+let proteinFractionRows = 0;
+let weightedProteinBKdSum = 0;
+let weightedProteinBKpSum = 0;
+let weightedProteinBKg = 0;
+
 let missingRdpRows = 0;
 let missingRupRows = 0;
 let missingRupDigestibilityRows = 0;
 let missingAaProfileRows = 0;
-  let rupEaaG = makeEaaZeroMap();
+let rupEaaG = makeEaaZeroMap();
 let digestibleRupEaaG = makeEaaZeroMap();
 let missingAaDetailRows = 0;
 
- let feedLibraryNelMcal = 0;
- let feedLibraryBaseDEMcal = 0;
- let feedLibraryBaseDEWeightKg = 0;
- let ndfKg = 0;
+let feedLibraryNelMcal = 0;
+let feedLibraryBaseDEMcal = 0;
+let feedLibraryBaseDEWeightKg = 0;
+let ndfKg = 0;
 let adfKg = 0;
 let peNdfKg = 0;
 let fatKg = 0;
@@ -985,6 +1017,42 @@ const rupPctCP = hasRup ? rawRupPctCP : 0;
 const rawRupDig = Number(r.rupDigestibilityPct ?? r.digestibleRupPct ?? r.dRUPPct);
 const hasRupDig = Number.isFinite(rawRupDig) && rawRupDig >= 0;
 const rupDigestibilityPct = hasRupDig ? rawRupDig : 0;
+const solubleProteinPctCP = num(
+  r.solubleProteinPctCP ??
+  r.solubleProtein ??
+  r.solubleCP
+);
+
+const proteinAFractionPctCP = num(
+  r.proteinAFractionPctCP ??
+  r.proteinA ??
+  r.aFractionPctCP
+);
+
+const proteinBFractionPctCP = num(
+  r.proteinBFractionPctCP ??
+  r.proteinB ??
+  r.bFractionPctCP
+);
+
+const proteinBKdPctPerHour = num(
+  r.proteinBKdPctPerHour ??
+  r.proteinBKd ??
+  r.kdProteinB
+);
+
+const proteinCFractionPctCP = num(
+  r.proteinCFractionPctCP ??
+  r.proteinC ??
+  r.cFractionPctCP
+);
+
+const proteinBKpPctPerHour = resolveNasemProteinKpPctPerHour(r);
+
+const hasNasemProteinFractions =
+  (proteinAFractionPctCP > 0 || proteinBFractionPctCP > 0 || proteinCFractionPctCP > 0) &&
+  proteinBKdPctPerHour > 0 &&
+  proteinBKpPctPerHour > 0;
 
 const aaProfileRaw =
   r.aaProfilePctCP ||
@@ -1086,51 +1154,90 @@ for (const mineral of MACRO_MINERAL_KEYS) {
 const cpItemKg = dmItemKg * (cp / 100);
 cpKg += cpItemKg;
 
-if (hasRdp) {
-  rdpKg += cpItemKg * (rdpPctCP / 100);
-} else if (cp > 0) {
-  missingRdpRows++;
-}
+const solubleItemKg = cpItemKg * (solubleProteinPctCP / 100);
+const proteinAItemKg = cpItemKg * (proteinAFractionPctCP / 100);
+const proteinBItemKg = cpItemKg * (proteinBFractionPctCP / 100);
+const proteinCItemKg = cpItemKg * (proteinCFractionPctCP / 100);
 
-if (hasRup) {
-  const rupItemKg = cpItemKg * (rupPctCP / 100);
-  rupKg += rupItemKg;
+solubleProteinKg += solubleItemKg;
+proteinAKg += proteinAItemKg;
+proteinBKg += proteinBItemKg;
+proteinCKg += proteinCItemKg;
 
-  const digestibleRupItemKg = hasRupDig
-    ? rupItemKg * (rupDigestibilityPct / 100)
-    : 0;
+let rdpItemKg = 0;
+let rupItemKg = 0;
 
-  if (hasRupDig) {
-    digestibleRupKg += digestibleRupItemKg;
-  } else {
-    missingRupDigestibilityRows++;
+if (hasNasemProteinFractions) {
+  proteinFractionRows++;
+
+  const aDegradedItemKg = proteinAItemKg * NASEM_PROTEIN_A_DEGRADED_FRAC;
+  const aEscapedItemKg = proteinAItemKg * NASEM_PROTEIN_A_ESCAPE_FRAC;
+
+  const bDegradedFrac =
+    proteinBKdPctPerHour / (proteinBKdPctPerHour + proteinBKpPctPerHour);
+
+  const bEscapedFrac =
+    proteinBKpPctPerHour / (proteinBKdPctPerHour + proteinBKpPctPerHour);
+
+  const bDegradedItemKg = proteinBItemKg * bDegradedFrac;
+  const bEscapedItemKg = proteinBItemKg * bEscapedFrac;
+
+  rdpItemKg = aDegradedItemKg + bDegradedItemKg;
+  rupItemKg = aEscapedItemKg + bEscapedItemKg + proteinCItemKg;
+
+  proteinADegradedKg += aDegradedItemKg;
+  proteinAEscapedKg += aEscapedItemKg;
+  proteinBDegradedKg += bDegradedItemKg;
+  proteinBEscapedKg += bEscapedItemKg;
+
+  if (proteinBItemKg > 0) {
+    weightedProteinBKdSum += proteinBItemKg * proteinBKdPctPerHour;
+    weightedProteinBKpSum += proteinBItemKg * proteinBKpPctPerHour;
+    weightedProteinBKg += proteinBItemKg;
+  }
+} else {
+  if (hasRdp) {
+    rdpItemKg = cpItemKg * (rdpPctCP / 100);
+  } else if (cp > 0) {
+    missingRdpRows++;
   }
 
-  if (hasAaProfile) {
-    for (const aa of EAA_KEYS){
-      const aaPctTP = aaProfile[aa];
+  if (hasRup) {
+    rupItemKg = cpItemKg * (rupPctCP / 100);
+  } else if (cp > 0) {
+    missingRupRows++;
+  }
+}
 
-      if (aaPctTP == null) {
-        missingAaDetailRows++;
-        continue;
-      }
+rdpKg += rdpItemKg;
+rupKg += rupItemKg;
 
-      // aaProfilePctTP = g AA / 100 g true protein.
-      // Here RUP is treated as kg protein equivalent from feed library fields.
-      const aaInRupG = rupItemKg * 1000 * (aaPctTP / 100);
-      const aaDigestibleG = hasRupDig
-        ? digestibleRupItemKg * 1000 * (aaPctTP / 100)
-        : 0;
+const digestibleRupItemKg = hasRupDig
+  ? rupItemKg * (rupDigestibilityPct / 100)
+  : 0;
 
-      rupEaaG[aa] += aaInRupG;
-      digestibleRupEaaG[aa] += aaDigestibleG;
+if (hasRupDig) {
+  digestibleRupKg += digestibleRupItemKg;
+} else if (rupItemKg > 0) {
+  missingRupDigestibilityRows++;
+}
+
+if (hasAaProfile) {
+  for (const aa of EAA_KEYS) {
+    const aaPctCP = aaProfile[aa];
+
+    if (aaPctCP == null) {
+      missingAaDetailRows++;
+      continue;
     }
+
+    const aaInRupG = rupItemKg * 1000 * (aaPctCP / 100);
+    const aaDigestibleG = digestibleRupItemKg * 1000 * (aaPctCP / 100);
+
+    rupEaaG[aa] += aaInRupG;
+    digestibleRupEaaG[aa] += aaDigestibleG;
   }
 } else if (cp > 0) {
-  missingRupRows++;
-}
-
-if (!hasAaProfile && cp > 0) {
   missingAaProfileRows++;
 }
 
@@ -1480,6 +1587,47 @@ vitaminSupplyModel.vitaminBalanceModel = buildVitaminBalanceModel({
   digestibleRupPctDM: round(digestibleRupPctDM),
   rdpPctCP: round(rdpPctCPActual),
   rupPctCP: round(rupPctCPActual),
+  proteinFractionModel: {
+  model: 'NASEM_2021_RDP_RUP_FROM_A_B_C_KD_KP',
+  applied: proteinFractionRows > 0,
+  status: proteinFractionRows > 0 ? 'calculated' : 'fallback_to_table_rdp_rup',
+
+  solubleProteinKg: round(solubleProteinKg, 3),
+
+  proteinAKg: round(proteinAKg, 3),
+  proteinBKg: round(proteinBKg, 3),
+  proteinCKg: round(proteinCKg, 3),
+
+  proteinADegradedKg: round(proteinADegradedKg, 3),
+  proteinAEscapedKg: round(proteinAEscapedKg, 3),
+  proteinBDegradedKg: round(proteinBDegradedKg, 3),
+  proteinBEscapedKg: round(proteinBEscapedKg, 3),
+
+  rdpFromFractionsKg: round(rdpKg, 3),
+  rupFromFractionsKg: round(rupKg, 3),
+
+  solubleProteinPctCP: cpKg > 0 ? round((solubleProteinKg / cpKg) * 100, 2) : 0,
+  proteinAPctCP: cpKg > 0 ? round((proteinAKg / cpKg) * 100, 2) : 0,
+  proteinBPctCP: cpKg > 0 ? round((proteinBKg / cpKg) * 100, 2) : 0,
+  proteinCPctCP: cpKg > 0 ? round((proteinCKg / cpKg) * 100, 2) : 0,
+
+  proteinADegradedFrac: NASEM_PROTEIN_A_DEGRADED_FRAC,
+  proteinAEscapedFrac: NASEM_PROTEIN_A_ESCAPE_FRAC,
+
+  weightedProteinBKdPctPerHour:
+    weightedProteinBKg > 0 ? round(weightedProteinBKdSum / weightedProteinBKg, 3) : null,
+
+  weightedProteinBKpPctPerHour:
+    weightedProteinBKg > 0 ? round(weightedProteinBKpSum / weightedProteinBKg, 3) : null,
+
+  kpRule:
+    'NASEM 2021 static kp: forage B = 4.87%/h, concentrate B = 5.28%/h',
+
+  note:
+    proteinFractionRows > 0
+      ? 'تم حساب RDP/RUP من فراكشنات A/B/C مع kd و kp حسب NASEM 2021.'
+      : 'لم تتوفر فراكشنات البروتين الكاملة؛ تم استخدام RDP/RUP من جدول الخامة.'
+},
   mpSupplyG: round(mpSupplyG, 0),
   mpDensityGkgDM: round(mpDensityGkgDM, 0),
   feedLibraryMpSupplyG: round(feedLibraryMpSupplyG, 0),
@@ -1519,9 +1667,17 @@ const rumenState = estimateRumenState({
       asFedKg: round(asFedKg),
       dmKg: round(dmKg),
       cpKg: round(cpKg),
-rdpKg: round(rdpKg),
-rupKg: round(rupKg),
-digestibleRupKg: round(digestibleRupKg),
+      rdpKg: round(rdpKg),
+      rupKg: round(rupKg),
+      digestibleRupKg: round(digestibleRupKg),
+      solubleProteinKg: round(solubleProteinKg, 3),
+      proteinAKg: round(proteinAKg, 3),
+      proteinBKg: round(proteinBKg, 3),
+      proteinCKg: round(proteinCKg, 3),
+      proteinADegradedKg: round(proteinADegradedKg, 3),
+      proteinAEscapedKg: round(proteinAEscapedKg, 3),
+      proteinBDegradedKg: round(proteinBDegradedKg, 3),
+     proteinBEscapedKg: round(proteinBEscapedKg, 3),
      microbialNG: round(microbialProteinModel.microbialNG || 0, 0),
      microbialCPKg: round(microbialProteinModel.microbialCPKg || 0, 3),
      microbialTPKg: round(microbialProteinModel.microbialTPKg || 0, 3),
