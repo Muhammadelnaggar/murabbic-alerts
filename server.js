@@ -617,6 +617,36 @@ vitEIUPerKgDM: toNumOrNull(r?.vitEIUPerKgDM ?? r?.vitaminEIUPerKgDM),
 adfPct: toNumOrNull(r?.adfPct ?? r?.adf),
 ashPct: toNumOrNull(r?.ashPct ?? r?.ash),
 
+solubleProteinPctCP: toNumOrNull(
+  r?.solubleProteinPctCP ??
+  r?.solubleProtein ??
+  r?.solubleCP
+),
+
+proteinAFractionPctCP: toNumOrNull(
+  r?.proteinAFractionPctCP ??
+  r?.proteinA ??
+  r?.aFractionPctCP
+),
+
+proteinBFractionPctCP: toNumOrNull(
+  r?.proteinBFractionPctCP ??
+  r?.proteinB ??
+  r?.bFractionPctCP
+),
+
+proteinBKdPctPerHour: toNumOrNull(
+  r?.proteinBKdPctPerHour ??
+  r?.proteinBKd ??
+  r?.kdProteinB
+),
+
+proteinCFractionPctCP: toNumOrNull(
+  r?.proteinCFractionPctCP ??
+  r?.proteinC ??
+  r?.cFractionPctCP
+),
+
 rdpPctCP: toNumOrNull(r?.rdpPctCP ?? r?.rdpPctOfCP ?? r?.rdp),
 rupPctCP: toNumOrNull(r?.rupPctCP ?? r?.rupPctOfCP ?? r?.rup),
 rupDigestibilityPct: toNumOrNull(r?.rupDigestibilityPct ?? r?.digestibleRupPct ?? r?.dRUPPct),
@@ -633,7 +663,9 @@ fNDFD: toNumOrNull(r?.fNDFD ?? r?.forageNdfDigestibilityPct ?? r?.ndfd ?? r?.ndf
 rumDigNdfPctOfNdf: toNumOrNull(r?.rumDigNdfPctOfNdf ?? r?.rumenDigestedNdfPctOfNdf ?? r?.ruminalNdfDigestibilityPct ?? r?.rumenNdfDigestibilityPct),
 rumDigStarchPctOfStarch: toNumOrNull(r?.rumDigStarchPctOfStarch ?? r?.rumenDigestedStarchPctOfStarch ?? r?.ruminalStarchDigestibilityPct ?? r?.rumenStarchDigestibilityPct),
 
-aaProfilePctTP: r?.aaProfilePctTP || r?.aaProfile || null,
+aaProfilePctCP: r?.aaProfilePctCP || null,
+aaProfilePctTP: r?.aaProfilePctTP || null,
+aaProfile: r?.aaProfile || null,
 
 cuMgKgDM: toNumOrNull(r?.cuMgKgDM),
 feMgKgDM: toNumOrNull(r?.feMgKgDM),
@@ -1039,6 +1071,21 @@ starchDigestibilityPct: r.starchDigestibilityPct,
 
 faDigestibilityCoeff: r.faDigestibilityCoeff,
 faSourceClass: r.faSourceClass,
+
+// NASEM 2021 protein fractions
+solubleProteinPctCP: r.solubleProteinPctCP,
+proteinAFractionPctCP: r.proteinAFractionPctCP,
+proteinBFractionPctCP: r.proteinBFractionPctCP,
+proteinBKdPctPerHour: r.proteinBKdPctPerHour,
+proteinCFractionPctCP: r.proteinCFractionPctCP,
+
+rdpPctCP: r.rdpPctCP,
+rupPctCP: r.rupPctCP,
+rupDigestibilityPct: r.rupDigestibilityPct,
+
+aaProfilePctCP: r.aaProfilePctCP,
+aaProfilePctTP: r.aaProfilePctTP,
+aaProfile: r.aaProfile,
 
 cat: r.cat,
 pricePerTonAsFed: r.pricePerTon
