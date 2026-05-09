@@ -22,11 +22,12 @@ const payload = {
     dietNDFPct: _ctx?.dietNDFPct,
     daysInMilk: _ctx?.daysInMilk,
     avgMilkKg: _ctx?.avgMilkKg,
-    pregnancyDays: _ctx?.pregnancyDays,
-    closeUp: _ctx?.closeUp,
-    milkFatPct: _ctx?.milkFatPct,
-    milkProteinPct: _ctx?.milkProteinPct,
-    milkPrice: _ctx?.milkPrice
+   pregnancyDays: _ctx?.pregnancyDays,
+pregnancyStatus: _ctx?.pregnancyStatus,
+daysToCalving: _ctx?.daysToCalving,
+earlyDry: _ctx?.earlyDry,
+closeUp: _ctx?.closeUp,
+milkFatPct: _ctx?.milkFatPct,
   }
 };
 
@@ -2755,7 +2756,7 @@ async function saveEvent(e){
       rows,
       context: readContext(),
       concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-      milkPrice: parseUiNumber(new URLSearchParams(location.search).get('milkPrice') || null)
+     milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null)
     }
   });
 
