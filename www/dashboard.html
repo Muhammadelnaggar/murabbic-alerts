@@ -653,7 +653,28 @@ async function loadWeatherTHI(){
   const circle = document.getElementById('thiCircle');
 
   try{
-    const j = await fetchJSON('/api/weather/thi');
+   let weatherPath = '/api/weather/thi';
+
+try {
+  if (navigator.geolocation) {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 10 * 60 * 1000
+      });
+    });
+
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    weatherPath = `/api/weather/thi?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+  }
+} catch (_) {
+  // لو المستخدم رفض الموقع أو فشل تحديده، نستخدم الافتراضي من السيرفر
+}
+
+const j = await fetchJSON(weatherPath);
 
     if (!j || j.ok === false) {
       throw new Error(j?.error || 'weather_thi_failed');
