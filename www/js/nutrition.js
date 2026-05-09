@@ -444,20 +444,18 @@ const dietNDFPct = document.getElementById('ctxDietNDFPct')?.value || '';
   setElText('ctxSpecies_txt', displaySpeciesLabel(species));
   setElText('ctxDIM_txt', dim || '—');
   setElText('ctxAvgMilk_txt', avgMilk ? Number(avgMilk).toFixed(1) : '—');
-  setElText('ctxDCC_txt', dcc || '—');
-  setElText('ctxPreg_txt', preg || '—');
+  setElText('ctxDCC_txt', dcc || '0');
+  setElText('ctxPreg_txt', preg || 'فارغة');
   setElText('ctxEarlyDry_txt', earlyDry ? 'نعم' : 'لا');
   setElText('ctxMilkFat_txt', milkFat ? Number(milkFat).toFixed(2) : '—');
-setElText('ctxMilkProtein_txt', milkProtein ? Number(milkProtein).toFixed(2) : '—');
-setElText('ctxMilkPrice_txt', milkPrice ? Number(milkPrice).toFixed(2) : '—');
-setElText('ctxBreed_txt', breed || '—');
-
-setElText('ctxBodyWeight_txt', bodyWeight ? Number(bodyWeight).toFixed(0) : '—');
-setElText('ctxBCS_txt', bcs ? Number(bcs).toFixed(2) : '—');
-setElText('ctxParity_txt', parity || '—');
-setElText('ctxDietNDFPct_txt', dietNDFPct ? Number(dietNDFPct).toFixed(1) : '—');
-
-setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
+  setElText('ctxMilkProtein_txt', milkProtein ? Number(milkProtein).toFixed(2) : '—');
+  setElText('ctxMilkPrice_txt', milkPrice ? Number(milkPrice).toFixed(2) : '—');
+  setElText('ctxBreed_txt', breed || '—');
+  setElText('ctxBodyWeight_txt', bodyWeight ? Number(bodyWeight).toFixed(0) : '—');
+  setElText('ctxBCS_txt', bcs ? Number(bcs).toFixed(2) : '—');
+  setElText('ctxParity_txt', parity || '—');
+  setElText('ctxDietNDFPct_txt', dietNDFPct ? Number(dietNDFPct).toFixed(1) : '—');
+  setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
 
   // متبقي للولادة
   const dccNum = dcc!=='' ? Number(dcc) : NaN;
