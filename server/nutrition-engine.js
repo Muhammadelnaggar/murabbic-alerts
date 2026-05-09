@@ -1421,7 +1421,25 @@ function computeCPReferencePct({ species, milkKg, breed, stage }){
 /* ============================= */
 /*          COW ENGINE           */
 /* ============================= */
+function lactatingFrameGainKgDay({ milkKg, parity }){
+  const milk = num(milkKg);
+  const par = num(parity, 2);
 
+  if (milk <= 0) return 0;
+
+  if (par === 1) return 0.19;
+  if (par === 2) return 0.15;
+
+  return 0;
+}
+
+function nelFrameGainMcal(frameGainKgDay){
+  const gain = num(frameGainKgDay);
+  if (gain <= 0) return 0;
+
+  // عمليًا قريب من تقرير الموديول: 0.19 kg frame gain ≈ 0.65 Mcal NEL
+  return gain * 3.42;
+}
 function computeCow({
   bodyWeight,
   milkKg,
@@ -1457,16 +1475,25 @@ function computeCow({
 
   dmi = Math.max(0, dmi);
 
-  const nelMaintenance = nelMaintenanceMcal(bw);
-  const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
+const nelMaintenance = nelMaintenanceMcal(bw);
+const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
 const nelPreg = gestationConceptusNE(bw, pregDays);
-  const nelTotal = nelMaintenance + nelMilk + nelPreg;
+
+const frameGainKgDay = lactatingFrameGainKgDay({
+  milkKg: milk,
+  parity: num(parity, 2)
+});
+
+const nelGrowth = nelFrameGainMcal(frameGainKgDay);
+
+const nelTotal = nelMaintenance + nelMilk + nelPreg + nelGrowth;
+
 const chapter12EnergyModel = buildChapter12EnergyModel({
   chapter12StageModel,
   nelMaintenance,
   nelPreg,
   nelMilk,
-  nelGrowth: 0
+  nelGrowth
 });
 const mpReq = computeNasemMPRequirement({
   bodyWeight: bw,
