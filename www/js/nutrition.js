@@ -28,6 +28,8 @@ daysToCalving: _ctx?.daysToCalving,
 earlyDry: _ctx?.earlyDry,
 closeUp: _ctx?.closeUp,
 milkFatPct: _ctx?.milkFatPct,
+milkProteinPct: _ctx?.milkProteinPct,
+milkPrice: _ctx?.milkPrice
   }
 };
 
@@ -74,6 +76,9 @@ const key = JSON.stringify({
   daysInMilk: ctx?.daysInMilk ?? '',
   avgMilkKg: ctx?.avgMilkKg ?? '',
   pregnancyDays: ctx?.pregnancyDays ?? '',
+  pregnancyStatus: ctx?.pregnancyStatus || '',
+  daysToCalving: ctx?.daysToCalving ?? '',
+  earlyDry: !!ctx?.earlyDry,
   closeUp: !!ctx?.closeUp,
   milkFatPct: ctx?.milkFatPct ?? '',
   milkProteinPct: ctx?.milkProteinPct ?? '',
