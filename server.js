@@ -100,7 +100,69 @@ function resolveTenant(req) {
   return uid ? tenantKey(uid) : null;
 }
 
+// ============================================================
+//                  WEATHER / THI CENTRAL SOURCE
+// ============================================================
+const WEATHER_DEFAULT_LAT = Number(process.env.WEATHER_LAT || 30.0444);
+const WEATHER_DEFAULT_LON = Number(process.env.WEATHER_LON || 31.2357);
+const WEATHER_CACHE_MS = 5 * 60 * 1000;
 
+let weatherThiCache = {
+  at: 0,
+  data: null
+};
+
+function calcTHI(tempC, humidityPct) {
+  const t = Number(tempC);
+  const h = Number(humidityPct);
+
+  if (!Number.isFinite(t) || !Number.isFinite(h)) return null;
+
+  const tf = (t * 9 / 5) + 32;
+  return Math.round(tf - ((0.55 - (0.0055 * h)) * (tf - 58)));
+}
+
+function classifyTHI(thi) {
+  const n = Number(thi);
+
+  if (!Number.isFinite(n)) {
+    return {
+      level: 'unknown',
+      label: 'غير متاح',
+      severity: 0
+    };
+  }
+
+  if (n < 68) {
+    return {
+      level: 'comfort',
+      label: 'راحة',
+      severity: 0
+    };
+  }
+
+  if (n < 72) {
+    return {
+      level: 'mild',
+      label: 'إجهاد خفيف',
+      severity: 1
+    };
+  }
+
+  if (n < 78) {
+    return {
+      level: 'moderate',
+      label: 'إجهاد متوسط',
+      severity: 2
+    };
+  }
+
+  return {
+    level: 'high',
+    label: 'إجهاد عالي',
+    severity: 3
+  };
+}
 
 function belongs(rec, tenant){
   const t = rec && rec.userId ? rec.userId : '';
@@ -296,7 +358,72 @@ async function ensureAdmin(req, res, next) {
     return res.status(404).send('Not Found');
   }
 }
+// ============================================================
+//                  API: WEATHER / THI
+// ============================================================
+app.get('/api/weather/thi', async (req, res) => {
+  try {
+    const now = Date.now();
 
+    if (weatherThiCache.data && (now - weatherThiCache.at) < WEATHER_CACHE_MS) {
+      return res.json({
+        ok: true,
+        cached: true,
+        ...weatherThiCache.data
+      });
+    }
+
+    const lat = Number(req.query.lat || WEATHER_DEFAULT_LAT);
+    const lon = Number(req.query.lon || WEATHER_DEFAULT_LON);
+
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m&timezone=auto`;
+
+    const r = await fetch(url, { cache: 'no-store' });
+
+    if (!r.ok) {
+      throw new Error(`open_meteo_${r.status}`);
+    }
+
+    const j = await r.json();
+
+    const tempC = Number(j?.current?.temperature_2m);
+    const humidity = Number(j?.current?.relative_humidity_2m);
+    const thi = calcTHI(tempC, humidity);
+    const status = classifyTHI(thi);
+
+    const data = {
+      tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
+      humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
+      thi,
+      status,
+      source: 'open-meteo',
+      lat,
+      lon,
+      updatedAt: new Date().toISOString()
+    };
+
+    weatherThiCache = {
+      at: now,
+      data
+    };
+
+    return res.json({
+      ok: true,
+      cached: false,
+      ...data
+    });
+  } catch (e) {
+    console.error('weather.thi error:', e.message || e);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'weather_thi_failed',
+      message: e.message || String(e)
+    });
+  }
+});
 // ============================================================
 //                       API: EVENTS
 // ============================================================
