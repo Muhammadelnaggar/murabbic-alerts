@@ -8,7 +8,80 @@ const NUTRITION_BUILD_ID = 'nutrition-2026-03-05-B';
 
 let targetsCache = null;
 let targetsCacheKey = '';
+let currentWeatherTHI = null;
+let currentWeatherTempC = null;
+let currentWeatherHumidity = null;
+let weatherThiLoadedAt = 0;
 
+async function getDeviceWeatherPath(){
+  let path = '/api/weather/thi';
+
+  try {
+    if (navigator.geolocation) {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 6000,
+          maximumAge: 10 * 60 * 1000
+        });
+      });
+
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      path = `/api/weather/thi?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+    }
+  } catch (_) {}
+
+  return path;
+}
+
+async function loadNutritionWeatherTHI(){
+  const now = Date.now();
+
+  if (currentWeatherTHI != null && (now - weatherThiLoadedAt) < 5 * 60 * 1000) {
+    return currentWeatherTHI;
+  }
+
+  try {
+    const API_BASE = window.API_BASE || '';
+    const path = await getDeviceWeatherPath();
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: 'no-store'
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+
+    const thi = Number(data.thi);
+    const tempC = Number(data.tempC);
+    const humidity = Number(data.humidity);
+
+    currentWeatherTHI = Number.isFinite(thi) ? thi : null;
+    currentWeatherTempC = Number.isFinite(tempC) ? tempC : null;
+    currentWeatherHumidity = Number.isFinite(humidity) ? humidity : null;
+    weatherThiLoadedAt = now;
+
+    window.mbkNutrition = window.mbkNutrition || {};
+    window.mbkNutrition.weather = {
+      thi: currentWeatherTHI,
+      tempC: currentWeatherTempC,
+      humidity: currentWeatherHumidity,
+      status: data.status || null,
+      source: data.source || 'api-weather-thi',
+      updatedAt: data.updatedAt || null
+    };
+
+    return currentWeatherTHI;
+  } catch (e) {
+    console.warn('nutrition weather THI failed:', e.message || e);
+    return currentWeatherTHI;
+  }
+}
 async function fetchTargets(ctx) {
   const _ctx = ctx || readContext();
 
@@ -29,7 +102,8 @@ earlyDry: _ctx?.earlyDry,
 closeUp: _ctx?.closeUp,
 milkFatPct: _ctx?.milkFatPct,
 milkProteinPct: _ctx?.milkProteinPct,
-milkPrice: _ctx?.milkPrice
+milkPrice: _ctx?.milkPrice,
+thi: _ctx?.thi
   }
 };
 
@@ -65,8 +139,9 @@ if (!res.ok || data?.ok === false) {
 }
 
 async function refreshTargets() {
+  await loadNutritionWeatherTHI();
   const ctx = readContext();
-const key = JSON.stringify({
+  const key = JSON.stringify({
   species: ctx?.species || '',
   breed: ctx?.breed || window.currentAnimal?.breed || '',
   bodyWeight: ctx?.bodyWeight ?? '',
@@ -82,7 +157,8 @@ const key = JSON.stringify({
   closeUp: !!ctx?.closeUp,
   milkFatPct: ctx?.milkFatPct ?? '',
   milkProteinPct: ctx?.milkProteinPct ?? '',
-  milkPrice: ctx?.milkPrice ?? ''
+  milkPrice: ctx?.milkPrice ?? '',
+  thi: ctx?.thi ?? ''
 });
 
   if (key === targetsCacheKey && targetsCache) {
@@ -100,6 +176,7 @@ let rationAnalysisCache = null;
 let rationAnalysisCacheKey = '';
 
 async function fetchRationAnalysis(rows) {
+  await loadNutritionWeatherTHI();
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) {
     rationAnalysisCache = null;
@@ -2648,7 +2725,10 @@ function readContext(){
     closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
     pregnancyStatus: getSel('ctxPreg'),
     pregnancyDays: dcc,
-    daysToCalving
+    daysToCalving,
+    thi: currentWeatherTHI,
+    tempC: currentWeatherTempC,
+    humidity: currentWeatherHumidity
   };
 
   const bodyWeight =
