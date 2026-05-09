@@ -1071,10 +1071,12 @@ const milkPriceInput = document.getElementById('milkPriceInput');
 const ctxMilkFat = document.getElementById('ctxMilkFat');
 const ctxMilkProtein = document.getElementById('ctxMilkProtein');
 const ctxMilkPrice = document.getElementById('ctxMilkPrice');
-  const feedInputBox = document.getElementById('feedInputBox');
+const ctxBodyWeight = document.getElementById('ctxBodyWeight');
+const ctxBCS = document.getElementById('ctxBCS');
+const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
-  const advancedBtn = document.getElementById('toggleAdvancedBtn');
-  const advancedBox = document.getElementById('advancedKPIs');
+const advancedBtn = document.getElementById('toggleAdvancedBtn');
+const advancedBox = document.getElementById('advancedKPIs');
 
   function bindAdvancedToggle(){
     if (!advancedBtn || !advancedBox || advancedBtn.dataset.bound === '1') return;
@@ -1108,7 +1110,7 @@ function bindMilkInputs(){
   try { recalc(); } catch(_) {}
   };
 
-  [milkFatInput, milkProteinInput, milkPriceInput].forEach(el => {
+ [milkFatInput, milkProteinInput, milkPriceInput, ctxBodyWeight, ctxBCS].forEach(el => {
     if (!el || el.dataset.bound === '1') return;
     el.dataset.bound = '1';
     el.addEventListener('input', syncAndRefresh);
@@ -2522,38 +2524,104 @@ function cleanDeep(obj){
   return obj;
 }
 
+function estimateBodyWeightFromContext(ctx = {}){
+  const species = String(ctx.species || '').trim();
+  const breed = String(ctx.breed || '').toLowerCase();
+  const dim = Number(ctx.daysInMilk);
+  const milk = Number(ctx.avgMilkKg);
+  const closeUp = !!ctx.closeUp;
+  const earlyDry = !!ctx.earlyDry;
 
+  const isBuffalo =
+    species.includes('جاموس') ||
+    breed.includes('buffalo') ||
+    breed.includes('murrah') ||
+    breed.includes('مورا');
+
+  if (isBuffalo) {
+    let bw = 580;
+
+    if (
+      breed.includes('murrah') ||
+      breed.includes('مورا') ||
+      breed.includes('ايطالي') ||
+      breed.includes('إيطالي') ||
+      breed.includes('italian')
+    ) {
+      bw = 650;
+    }
+
+    if (earlyDry || closeUp) bw += 25;
+    if (Number.isFinite(milk) && milk >= 14) bw += 20;
+
+    return Math.round(bw);
+  }
+
+  let bw = 600;
+
+  if (
+    breed.includes('holstein') ||
+    breed.includes('هولشتاين') ||
+    breed.includes('فريزيان') ||
+    breed.includes('friesian')
+  ) {
+    bw = 620;
+  } else if (
+    breed.includes('بلدي') ||
+    breed.includes('local') ||
+    breed.includes('native')
+  ) {
+    bw = 450;
+  } else if (
+    breed.includes('خليط') ||
+    breed.includes('cross')
+  ) {
+    bw = 550;
+  }
+
+  if (earlyDry || closeUp) bw += 20;
+  if (Number.isFinite(dim) && dim > 0 && dim <= 45) bw -= 20;
+  if (Number.isFinite(milk) && milk >= 35) bw += 20;
+
+  return Math.round(bw);
+}
+
+function estimateBCSFromContext(ctx = {}){
+  const dim = Number(ctx.daysInMilk);
+  const closeUp = !!ctx.closeUp;
+  const earlyDry = !!ctx.earlyDry;
+
+  if (closeUp) return 3.50;
+  if (earlyDry) return 3.25;
+  if (Number.isFinite(dim) && dim > 0 && dim <= 45) return 2.75;
+
+  return 3.00;
+}
 function readContext(){
-  const getNum = id => { const v = document.getElementById(id)?.value; return v ? Number(v) : null; };
-  const getSel = id => document.getElementById(id)?.value || null;
+  const getNum = (id) => {
+    const v = document.getElementById(id)?.value;
+    const n = parseUiNumber(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const getSel = (id) => String(document.getElementById(id)?.value || '').trim();
 
   const species = getSel('ctxSpecies');
+  const breed = getSel('ctxBreed') || String(window.currentAnimal?.breed || '').trim();
+
   const dcc = getNum('ctxDCC');
   const gest = (species === 'جاموس') ? 310 : 280;
   const daysToCalving = Number.isFinite(dcc) ? (gest - dcc) : null;
 
-  return {
-    group: (
-      qp().get('group') ||
-      qp().get('groupName') ||
-      document.getElementById('animalInfo')?.textContent?.trim() ||
-      null
-    ),
+  const manualBodyWeight = parseUiNumber(document.getElementById('ctxBodyWeight')?.value || null);
+  const animalBodyWeight = parseUiNumber(window.currentAnimal?.bodyWeight ?? window.currentAnimal?.weight ?? null);
+
+  const manualBCS = parseUiNumber(document.getElementById('ctxBCS')?.value || null);
+  const animalBCS = parseUiNumber(window.currentAnimal?.bcs ?? null);
+
+  const baseCtx = {
     species,
-    breed: (document.getElementById('ctxBreed')?.value || qp().get('breed') || window.currentAnimal?.breed || null),
-
-    bodyWeight: parseUiNumber(
-      document.getElementById('ctxBodyWeight')?.value ||
-      window.currentAnimal?.bodyWeight ||
-      window.currentAnimal?.weight ||
-      null
-    ),
-
-    bcs: parseUiNumber(
-      document.getElementById('ctxBCS')?.value ||
-      window.currentAnimal?.bcs ||
-      null
-    ),
+    breed,
 
     parity: parseUiNumber(
       document.getElementById('ctxParity')?.value ||
@@ -2567,15 +2635,46 @@ function readContext(){
     ),
 
     daysInMilk: getNum('ctxDIM'),
-    avgMilkKg: (document.getElementById('ctxAvgMilk')?.value ? parseFloat(document.getElementById('ctxAvgMilk').value) : null),
+    avgMilkKg: getNum('ctxAvgMilk'),
     milkFatPct: parseUiNumber(document.getElementById('ctxMilkFat')?.value || null),
     milkProteinPct: parseUiNumber(document.getElementById('ctxMilkProtein')?.value || null),
     milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
+
     earlyDry: !!(document.getElementById('ctxEarlyDry')?.checked),
     closeUp: !!(document.getElementById('ctxCloseUp')?.checked),
     pregnancyStatus: getSel('ctxPreg'),
     pregnancyDays: dcc,
     daysToCalving
+  };
+
+  const bodyWeight =
+    Number.isFinite(manualBodyWeight) ? manualBodyWeight :
+    Number.isFinite(animalBodyWeight) ? animalBodyWeight :
+    estimateBodyWeightFromContext(baseCtx);
+
+  const bcs =
+    Number.isFinite(manualBCS) ? manualBCS :
+    Number.isFinite(animalBCS) ? animalBCS :
+    estimateBCSFromContext(baseCtx);
+
+  return {
+    ...baseCtx,
+
+    bodyWeight,
+    bcs,
+
+    bodyWeightSource:
+      Number.isFinite(manualBodyWeight) ? 'manual' :
+      Number.isFinite(animalBodyWeight) ? 'animal_doc' :
+      'estimated',
+
+    bcsSource:
+      Number.isFinite(manualBCS) ? 'manual' :
+      Number.isFinite(animalBCS) ? 'animal_doc' :
+      'estimated',
+
+    bodyWeightEstimated: !Number.isFinite(manualBodyWeight) && !Number.isFinite(animalBodyWeight),
+    bcsEstimated: !Number.isFinite(manualBCS) && !Number.isFinite(animalBCS)
   };
 }
 async function saveToServer(payload){
