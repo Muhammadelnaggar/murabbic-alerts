@@ -675,6 +675,7 @@ const NASEM_MICROBIAL = {
   MiN_Km_rdSt: 0.0274,
   microbialCpPerNG: 6.25,
   microbialTpPerCp: 0.824,
+  microbialTpDigestibility: 0.80,
   rdpCapPctDM: 12
 };
 
@@ -744,8 +745,11 @@ function predictMicrobialProteinNasem({
   // NASEM text: maximum microbial CP set at RDP intake.
   microbialCPKg = Math.min(microbialCPKg, An_RDPIn);
 
-  const microbialTPKg =
-    microbialCPKg * NASEM_MICROBIAL.microbialTpPerCp;
+const microbialTPKg =
+  microbialCPKg * NASEM_MICROBIAL.microbialTpPerCp;
+
+const microbialMPKg =
+  microbialTPKg * NASEM_MICROBIAL.microbialTpDigestibility;
 
   const rdpBalanceKg = An_RDPIn - microbialCPKg;
 
@@ -756,7 +760,7 @@ function predictMicrobialProteinNasem({
     for (const aa of EAA_KEYS) {
       const aaPctTP = profile[aa];
       if (aaPctTP == null) continue;
-      microbialEaaG[aa] = microbialTPKg * 1000 * (aaPctTP / 100);
+      microbialEaaG[aa] = microbialMPKg * 1000 * (aaPctTP / 100);
     }
   }
 
@@ -767,6 +771,8 @@ function predictMicrobialProteinNasem({
     microbialNG: round(microbialNG, 0),
     microbialCPKg: round(microbialCPKg, 3),
     microbialTPKg: round(microbialTPKg, 3),
+    microbialMPKg: round(microbialMPKg, 3),
+    microbialTpDigestibility: NASEM_MICROBIAL.microbialTpDigestibility,
     rdpBalanceKg: round(rdpBalanceKg, 3),
     cappedRDPKg: round(cappedRDPKg, 3),
     rdpCapPctDM: NASEM_MICROBIAL.rdpCapPctDM,
@@ -1501,10 +1507,16 @@ const microbialProteinModel = predictMicrobialProteinNasem({
   microbialAaProfilePctTP
 });
 
+const microbialMPKg =
+  Number(
+    microbialProteinModel.microbialMPKg ??
+    microbialProteinModel.digestibleMicrobialTPKg ??
+    0
+  );
+
 const modeledMpSupplyG =
   (digestibleRupKg * 1000) +
-  ((Number(microbialProteinModel.microbialTPKg) || 0) * 1000);
-
+  (microbialMPKg * 1000);
 const mpSupplyG = modeledMpSupplyG;
 const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
 const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
