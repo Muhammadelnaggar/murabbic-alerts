@@ -272,6 +272,85 @@ function showCentralMsg(text, type = 'info'){
 
   msgWarn(text);
 }
+function renderNutritionHeatStressAlert(){
+  const card = document.getElementById('nutritionAnalysisCard');
+  const grid = document.getElementById('nutritionKPIs');
+  if (!card || !grid) return;
+
+  let box = document.getElementById('nutritionHeatStressAlert');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'nutritionHeatStressAlert';
+    grid.parentNode.insertBefore(box, grid);
+  }
+
+  const w = window.mbkNutrition?.weather || {};
+  const thi = Number(w.thi);
+  const tempC = Number(w.tempC);
+  const humidity = Number(w.humidity);
+
+  if (!Number.isFinite(thi)) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+
+  let label = 'راحة';
+  let icon = '✅';
+  let bg = '#ecfdf3';
+  let border = '#bbf7d0';
+  let color = '#166534';
+  let note = 'لا يوجد إجهاد حراري مؤثر حاليًا على تقييم العليقة.';
+
+  if (thi >= 78) {
+    label = 'إجهاد حراري عالي';
+    icon = '⛔';
+    bg = '#fff1f2';
+    border = '#fecdd3';
+    color = '#b91c1c';
+    note = 'قد ينخفض المأكول الفعلي بوضوح؛ قيّم كفاية العليقة مع التبريد والمياه وتوقيت تقديم العلف.';
+  } else if (thi >= 72) {
+    label = 'إجهاد حراري متوسط';
+    icon = '🌡️';
+    bg = '#fff7ed';
+    border = '#fed7aa';
+    color = '#c2410c';
+    note = 'قد يقل استهلاك المادة الجافة؛ راقب المأكول والمياه قبل الحكم النهائي على كفاية العليقة.';
+  } else if (thi >= 68) {
+    label = 'بداية إجهاد حراري';
+    icon = '⚠️';
+    bg = '#fefce8';
+    border = '#fde68a';
+    color = '#854d0e';
+    note = 'راقب القطيع خلال اليوم، خصوصًا الأبقار عالية الإنتاج.';
+  }
+
+  box.style.display = 'block';
+  box.style.margin = '0 0 10px';
+  box.style.padding = '10px 12px';
+  box.style.borderRadius = '16px';
+  box.style.background = bg;
+  box.style.border = `1px solid ${border}`;
+  box.style.color = color;
+  box.style.boxShadow = '0 4px 12px rgba(15,23,42,.04)';
+
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div style="font-weight:900;font-size:14px">
+        ${icon} ${label}
+      </div>
+      <div style="font-weight:900;font-size:13px">
+        THI ${Math.round(thi)}
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:800;line-height:1.5;margin-top:5px">
+      ${note}
+    </div>
+    <div style="font-size:11px;font-weight:700;opacity:.8;margin-top:4px">
+      الحرارة ${Number.isFinite(tempC) ? Math.round(tempC) : '—'}°C — الرطوبة ${Number.isFinite(humidity) ? Math.round(humidity) : '—'}%
+    </div>
+  `;
+}
 function applyServerAnalysisToDom(analysis, targets){
   const a = analysis || {};
   const t = targets || {};
@@ -444,7 +523,7 @@ window.mbkNutrition.serverViewModel = {
   targets: t,
   panels: P
 };
-
+renderNutritionHeatStressAlert();
 try { window.renderNutritionPanels?.(); } catch(_) {}
 }
 function msgWarn(text){
