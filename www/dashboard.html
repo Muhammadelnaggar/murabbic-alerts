@@ -653,38 +653,53 @@ async function loadWeatherTHI(){
   const circle = document.getElementById('thiCircle');
 
   try{
-    const lat = 30.0444, lon = 31.2357; // القاهرة
-    const r = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`,
-      { cache:'no-store' }
-    );
-    const j = await r.json();
-    const t = Math.round(j.current.temperature_2m);
-    const h = Math.round(j.current.relative_humidity_2m);
-    const thi = Math.round(((t*9/5+32) - (0.55-0.0055*h)*((t*9/5+32)-58)));
-    currentTHI = thi;
-    tEl.textContent = t;
-    hEl.textContent = h;
-    thiEl.textContent = thi;
-    circle.textContent = thi;
+    const j = await fetchJSON('/api/weather/thi');
 
-    let txt, bg, color;
-    if (thi < 68){ txt='راحة'; bg='#c8e6c9'; color='#2e7d32'; }
-    else if (thi < 72){ txt='إجهاد خفيف'; bg='#fff9c4'; color='#f9a825'; }
-    else if (thi < 78){ txt='إجهاد متوسط'; bg='#ffe0b2'; color='#fb8c00'; }
-    else { txt='إجهاد عالي'; bg='#ffcdd2'; color='#e53935'; }
+    if (!j || j.ok === false) {
+      throw new Error(j?.error || 'weather_thi_failed');
+    }
 
-    statusEl.textContent = txt;
+    const t = Number(j.tempC);
+    const h = Number(j.humidity);
+    const thi = Number(j.thi);
+
+    currentTHI = Number.isFinite(thi) ? thi : null;
+
+    tEl.textContent = Number.isFinite(t) ? Math.round(t) : '--';
+    hEl.textContent = Number.isFinite(h) ? Math.round(h) : '--';
+    thiEl.textContent = Number.isFinite(thi) ? Math.round(thi) : '--';
+    circle.textContent = Number.isFinite(thi) ? Math.round(thi) : '--';
+
+    const level = String(j?.status?.level || '');
+    const label = String(j?.status?.label || 'غير متاح');
+
+    let bg = '#c8e6c9';
+    let color = '#2e7d32';
+
+    if (level === 'mild') {
+      bg = '#fff9c4';
+      color = '#f9a825';
+    } else if (level === 'moderate') {
+      bg = '#ffe0b2';
+      color = '#fb8c00';
+    } else if (level === 'high') {
+      bg = '#ffcdd2';
+      color = '#e53935';
+    }
+
+    statusEl.textContent = label;
     statusEl.style.color = color;
     circle.style.background = bg;
     circle.style.borderColor = color;
     circle.style.color = color;
+
   }catch(e){
+    currentTHI = null;
     statusEl.textContent = 'غير متاح حالياً';
     statusEl.style.color = '#e53935';
+    circle.textContent = '--';
   }
 }
-
 // ============ مساعدات ============
 function norm(s){
   return String(s||'').toLowerCase()
