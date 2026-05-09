@@ -513,6 +513,12 @@ padding: 6px 0;
   <div class="strip-item"><span class="lbl">سعر اللبن/كجم</span><span class="val" id="ctxMilkPrice_txt">—</span></div>
   <div class="strip-item"><span class="lbl">السلالة</span><span class="val" id="ctxBreed_txt">—</span></div>
 </div>
+  <div class="strip-row">
+  <div class="strip-item"><span class="lbl">وزن الحيوان</span><span class="val" id="ctxBodyWeight_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
+  <div class="strip-item"><span class="lbl">NDF العليقة %</span><span class="val" id="ctxDietNDFPct_txt">—</span></div>
+</div>
   <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
@@ -542,6 +548,24 @@ padding: 6px 0;
     <div class="grow">
       <label class="muted">سعر اللبن/كجم</label>
       <input id="milkPriceInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="مثال: 18" style="width:100%">
+    </div>
+  </div>
+</div>
+  <div class="mbk-card" id="animalInputsCard">
+  <div class="milk-inline-row">
+    <div class="grow">
+      <label class="muted">وزن الحيوان كجم</label>
+      <input id="ctxBodyWeight" type="number" inputmode="decimal" step="1" min="0" placeholder="اختياري" style="width:100%">
+    </div>
+
+    <div class="grow">
+      <label class="muted">الحالة الجسمانية BCS</label>
+      <input id="ctxBCS" type="number" inputmode="decimal" step="0.25" min="1" max="5" placeholder="اختياري" style="width:100%">
+    </div>
+
+    <div class="grow">
+      <label class="muted">ملاحظة</label>
+      <input type="text" value="لو تُركت فارغة يحسب مُرَبِّيك تقديريًا" disabled style="width:100%">
     </div>
   </div>
 </div>
@@ -696,8 +720,6 @@ padding: 6px 0;
  <input type="hidden" id="animalNumber" data-field="animalNumber">
 <input type="hidden" id="eventDate" data-field="eventDate">
 <input type="hidden" id="animalId" data-field="animalId">
-<input type="hidden" id="ctxBodyWeight">
-<input type="hidden" id="ctxBCS">
 <input type="hidden" id="ctxParity">
 <input type="hidden" id="ctxDietNDFPct">
   <button id="saveEvent" class="btn-primary" style="width:100%">💾 حفظ التركيبة كحدث تغذية</button>
