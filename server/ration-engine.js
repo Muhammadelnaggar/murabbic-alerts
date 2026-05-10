@@ -243,37 +243,53 @@ function resolveEaaComponents(targets = {}, context = {}){
   return comps && typeof comps === 'object' ? comps : {};
 }
 
-function sumNetEaaUseG(aa, components = {}, requiredG = null, targetEff = null){
-  const keys = [
-    'netScurfG',
-    'netMfpG',
-    'netMilkG',
-    'netGrowthG',
-    'netGestationG',
-    'endogenousUrinaryG'
-  ];
+function getEaaComponentG(components = {}, key, aa){
+  const v = Number(components?.[key]?.[aa]);
+  return Number.isFinite(v) ? v : 0;
+}
 
-  let sum = 0;
-  let hasAny = false;
+function buildEaaUseParts(aa, components = {}, requiredG = null, targetEff = null){
+  const secretionAccretionG =
+    getEaaComponentG(components, 'netScurfG', aa) +
+    getEaaComponentG(components, 'netMfpG', aa) +
+    getEaaComponentG(components, 'netMilkG', aa) +
+    getEaaComponentG(components, 'netGrowthG', aa);
 
-  for (const k of keys){
-    const v = Number(components?.[k]?.[aa]);
-    if (Number.isFinite(v)) {
-      sum += v;
-      hasAny = true;
-    }
+  const gestationNetG =
+    getEaaComponentG(components, 'netGestationG', aa);
+
+  const endogenousUrinaryG =
+    getEaaComponentG(components, 'endogenousUrinaryG', aa);
+
+  const hasParts =
+    secretionAccretionG > 0 ||
+    gestationNetG > 0 ||
+    endogenousUrinaryG > 0;
+
+  if (hasParts) {
+    return {
+      secretionAccretionG,
+      gestationNetG,
+      endogenousUrinaryG
+    };
   }
-
-  if (hasAny) return sum;
 
   const req = Number(requiredG);
   const eff = Number(targetEff);
 
   if (Number.isFinite(req) && req > 0 && Number.isFinite(eff) && eff > 0) {
-    return req * eff;
+    return {
+      secretionAccretionG: req * eff,
+      gestationNetG: 0,
+      endogenousUrinaryG: 0
+    };
   }
 
-  return null;
+  return {
+    secretionAccretionG: null,
+    gestationNetG: null,
+    endogenousUrinaryG: null
+  };
 }
 
 function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
@@ -324,20 +340,34 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
     const supplied = Number(supplyEaaG?.[aa] || 0);
     const targetEff = Number(targetEfficiencies?.[aa] || 0);
 
-    const netUse = sumNetEaaUseG(
-      aa,
-      components,
-      required > 0 ? required : null,
-      targetEff > 0 ? targetEff : null
-    );
+ const useParts = buildEaaUseParts(
+  aa,
+  components,
+  required > 0 ? required : null,
+  targetEff > 0 ? targetEff : null
+);
 
-    const diff = supplied - required;
-    const supplyRatio = required > 0 ? supplied / required : null;
+const secretionAccretionG = Number(useParts.secretionAccretionG);
+const gestationNetG = Number(useParts.gestationNetG);
+const endogenousUrinaryG = Number(useParts.endogenousUrinaryG);
 
-    const predictedEff =
-      supplied > 0 && Number.isFinite(netUse) && netUse > 0
-        ? netUse / supplied
-        : null;
+const gestationMetabolicCostG =
+  Number.isFinite(gestationNetG) && gestationNetG > 0
+    ? gestationNetG / 0.33
+    : 0;
+
+const availableEaaForEfficiency =
+  supplied - endogenousUrinaryG - gestationMetabolicCostG;
+
+const diff = supplied - required;
+const supplyRatio = required > 0 ? supplied / required : null;
+
+const predictedEff =
+  availableEaaForEfficiency > 0 &&
+  Number.isFinite(secretionAccretionG) &&
+  secretionAccretionG > 0
+    ? secretionAccretionG / availableEaaForEfficiency
+    : null;
 
     const efficiencyRatio =
       predictedEff != null && targetEff > 0
@@ -394,10 +424,13 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
       balanceG: round(diff, 2),
       supplyPctOfRequirement: supplyRatio != null ? round(supplyRatio * 100, 1) : null,
 
-      netUseG: Number.isFinite(netUse) ? round(netUse, 2) : null,
-      targetEfficiency: targetEff > 0 ? round(targetEff, 3) : null,
-      predictedEfficiency: predictedEff != null ? round(predictedEff, 3) : null,
-      efficiencyRatio: efficiencyRatio != null ? round(efficiencyRatio, 3) : null,
+     secretionAccretionG: Number.isFinite(secretionAccretionG) ? round(secretionAccretionG, 2) : null,
+     endogenousUrinaryG: Number.isFinite(endogenousUrinaryG) ? round(endogenousUrinaryG, 2) : null,
+     gestationMetabolicCostG: round(gestationMetabolicCostG, 2),
+     availableEaaForEfficiencyG: round(availableEaaForEfficiency, 2),
+     targetEfficiency: targetEff > 0 ? round(targetEff, 3) : null,
+     predictedEfficiency: predictedEff != null ? round(predictedEff, 3) : null,
+     efficiencyRatio: efficiencyRatio != null ? round(efficiencyRatio, 3) : null,
 
       status,
       interpretation
