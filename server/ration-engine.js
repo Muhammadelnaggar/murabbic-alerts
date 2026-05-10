@@ -353,7 +353,141 @@ const MINERAL_ABS_FIELD_MAP = {
   Cl: ['clAbsCoeff', 'chlorideAbsCoeff', 'ClAbsCoeff'],
   S:  ['sAbsCoeff', 'sulfurAbsCoeff', 'sulphurAbsCoeff', 'SAbsCoeff']
 };
+// NASEM_2021_CH7_TRACE_MINERAL_SUPPLY
+// Trace minerals are supplied by feed library as mg/kg DM.
+// Balance basis follows nutrition-engine traceMineralRequirementModel:
+// dietary / absorbed / AI according to each mineral.
+const TRACE_MINERAL_KEYS = ['Co', 'Cu', 'Fe', 'I', 'Mn', 'Se', 'Zn'];
 
+const TRACE_MINERAL_FIELD_MAP = {
+  Co: ['coMgKgDM', 'cobaltMgKgDM', 'CoMgKgDM'],
+  Cu: ['cuMgKgDM', 'copperMgKgDM', 'CuMgKgDM'],
+  Fe: ['feMgKgDM', 'ironMgKgDM', 'FeMgKgDM'],
+  I:  ['iMgKgDM', 'iodineMgKgDM', 'IMgKgDM'],
+  Mn: ['mnMgKgDM', 'manganeseMgKgDM', 'MnMgKgDM'],
+  Se: ['seMgKgDM', 'seleniumMgKgDM', 'SeMgKgDM'],
+  Zn: ['znMgKgDM', 'zincMgKgDM', 'ZnMgKgDM']
+};
+
+const TRACE_MINERAL_ABS_FIELD_MAP = {
+  Co: ['coAbsCoeff', 'cobaltAbsCoeff', 'CoAbsCoeff'],
+  Cu: ['cuAbsCoeff', 'copperAbsCoeff', 'CuAbsCoeff'],
+  Fe: ['feAbsCoeff', 'ironAbsCoeff', 'FeAbsCoeff'],
+  I:  ['iAbsCoeff', 'iodineAbsCoeff', 'IAbsCoeff'],
+  Mn: ['mnAbsCoeff', 'manganeseAbsCoeff', 'MnAbsCoeff'],
+  Se: ['seAbsCoeff', 'seleniumAbsCoeff', 'SeAbsCoeff'],
+  Zn: ['znAbsCoeff', 'zincAbsCoeff', 'ZnAbsCoeff']
+};
+
+function makeTraceMineralZeroMap(){
+  const out = {};
+  for (const k of TRACE_MINERAL_KEYS) out[k] = 0;
+  return out;
+}
+
+function resolveRequiredTraceMinerals(targets = {}, context = {}){
+  const req =
+    targets?.mineralRequirementModel?.traceMineralRequirementModel?.traceMinerals ||
+    targets?.traceMineralRequirementModel?.traceMinerals ||
+    targets?.traceMinerals ||
+    context?.mineralRequirementModel?.traceMineralRequirementModel?.traceMinerals ||
+    context?.traceMineralRequirementModel?.traceMinerals ||
+    context?.traceMinerals ||
+    null;
+
+  return req && typeof req === 'object' ? req : {};
+}
+
+function buildTraceMineralBalanceModel({
+  targets = {},
+  context = {},
+  totalTraceMineralMg = {},
+  absorbedTraceMineralMg = {}
+}){
+  const requiredTraceMinerals = resolveRequiredTraceMinerals(targets, context);
+
+  const balance = {};
+  let overallStatus = 'ok';
+  let limitingTraceMineral = null;
+  let minPct = Infinity;
+
+  for (const mineral of TRACE_MINERAL_KEYS){
+    const req = requiredTraceMinerals[mineral] || {};
+
+    const basis = String(req.basis || '').toLowerCase();
+
+    const absorbedRequired = Number(
+      req.absorbedRequiredMg ??
+      (basis === 'absorbed' ? req.requiredMg : null)
+    );
+
+    const dietaryRequired = Number(
+      req.dietaryRequiredMg ??
+      (basis === 'dietary' ? req.requiredMg : null)
+    );
+
+    const suppliedTotal = Number(totalTraceMineralMg?.[mineral] || 0);
+    const suppliedAbsorbed = Number(absorbedTraceMineralMg?.[mineral] || 0);
+
+    let requirementBasis = 'dietary';
+    let requiredMg = dietaryRequired;
+    let suppliedMg = suppliedTotal;
+
+    if (Number.isFinite(absorbedRequired) && absorbedRequired > 0) {
+      requirementBasis = 'absorbed';
+      requiredMg = absorbedRequired;
+      suppliedMg = suppliedAbsorbed;
+    } else if (Number.isFinite(dietaryRequired) && dietaryRequired > 0) {
+      requirementBasis = 'dietary';
+      requiredMg = dietaryRequired;
+      suppliedMg = suppliedTotal;
+    } else {
+      requiredMg = 0;
+      suppliedMg = suppliedTotal;
+    }
+
+    const pct = requiredMg > 0 ? (suppliedMg / requiredMg) * 100 : 100;
+    const diff = suppliedMg - requiredMg;
+
+    let status = 'ok';
+    if (pct < 95) status = 'deficit';
+    else if (pct < 100) status = 'watch';
+
+    if (status === 'deficit') overallStatus = 'deficit';
+    else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
+
+    if (pct < minPct) {
+      minPct = pct;
+      limitingTraceMineral = mineral;
+    }
+
+    balance[mineral] = {
+      status,
+      requirementBasis,
+      requiredMg: round(requiredMg, 3),
+      suppliedMg: round(suppliedMg, 3),
+      balanceMg: round(diff, 3),
+      supplyPctOfRequirement: round(pct, 1),
+      source: req.source || null,
+      requirementType: req.type || null
+    };
+  }
+
+  return {
+    model: 'NASEM_2021_TRACE_MINERAL_BALANCE',
+    applied: true,
+    status: overallStatus,
+    limitingTraceMineral,
+    limitingSupplyPct: Number.isFinite(minPct) ? round(minPct, 1) : null,
+    balance,
+    note:
+      overallStatus === 'deficit'
+        ? 'يوجد عجز في عنصر صغير واحد أو أكثر حسب NASEM 2021'
+        : overallStatus === 'watch'
+          ? 'بعض العناصر الصغرى قريبة من حد الاحتياج حسب NASEM 2021'
+          : 'إمداد العناصر الصغرى يغطي الاحتياج حسب NASEM 2021'
+  };
+}
 function firstFiniteField(row, names){
   for (const name of names){
     const v = Number(row?.[name]);
@@ -1146,6 +1280,14 @@ let mineralAbsCoeffWeightedSum = makeMineralZeroMap();
 let mineralAbsCoeffWeightG = makeMineralZeroMap();
 let missingMineralRows = makeMineralMissingMap();
 let missingMineralAbsCoeffRows = makeMineralMissingMap();
+
+let traceMineralMg = makeTraceMineralZeroMap();
+let absorbedTraceMineralMg = makeTraceMineralZeroMap();
+let traceMineralAbsCoeffWeightedSum = makeTraceMineralZeroMap();
+let traceMineralAbsCoeffWeightMg = makeTraceMineralZeroMap();
+let missingTraceMineralRows = makeTraceMineralZeroMap();
+let missingTraceMineralAbsCoeffRows = makeTraceMineralZeroMap();
+
 let vitaminIU = makeVitaminZeroMap();
 
 const targetRequiredMinerals = resolveRequiredMinerals(targets, context);
@@ -1300,7 +1442,27 @@ for (const mineral of MACRO_MINERAL_KEYS) {
     } else if (mineralItemG > 0) {
       missingMineralAbsCoeffRows[mineral]++;
     }
+  }
+   for (const mineral of TRACE_MINERAL_KEYS) {
+  const mgPerKgDM = firstFiniteField(r, TRACE_MINERAL_FIELD_MAP[mineral]);
+  const absCoeff = firstFiniteField(r, TRACE_MINERAL_ABS_FIELD_MAP[mineral]);
+
+  if (mgPerKgDM != null && mgPerKgDM >= 0) {
+    const traceItemMg = dmItemKg * mgPerKgDM;
+    traceMineralMg[mineral] += traceItemMg;
+
+    if (absCoeff != null && absCoeff >= 0 && absCoeff <= 1) {
+      absorbedTraceMineralMg[mineral] += traceItemMg * absCoeff;
+      traceMineralAbsCoeffWeightedSum[mineral] += traceItemMg * absCoeff;
+      traceMineralAbsCoeffWeightMg[mineral] += traceItemMg;
+    } else if (traceItemMg > 0) {
+      missingTraceMineralAbsCoeffRows[mineral]++;
+    }
   } else if (dmItemKg > 0) {
+    missingTraceMineralRows[mineral]++;
+  }
+}
+  else if (dmItemKg > 0) {
     missingMineralRows[mineral]++;
   }
 }
@@ -1726,6 +1888,40 @@ const mineralBalanceModel = buildMineralBalanceModel({
   absorbedMineralG
 });
 
+const traceMineralSupplyModel = {
+  model: 'NASEM_2021_TRACE_MINERAL_SUPPLY',
+  source: 'FEED_LIBRARY_VALUES',
+  unit: 'mg_day',
+  totalTraceMineralMg: Object.fromEntries(
+    TRACE_MINERAL_KEYS.map(k => [k, round(traceMineralMg[k], 3)])
+  ),
+  absorbedTraceMineralMg: Object.fromEntries(
+    TRACE_MINERAL_KEYS.map(k => [k, round(absorbedTraceMineralMg[k], 3)])
+  ),
+  absorptionCoeffWeighted: Object.fromEntries(
+    TRACE_MINERAL_KEYS.map(k => [
+      k,
+      traceMineralAbsCoeffWeightMg[k] > 0
+        ? round(traceMineralAbsCoeffWeightedSum[k] / traceMineralAbsCoeffWeightMg[k], 4)
+        : null
+    ])
+  ),
+  missingRows: Object.fromEntries(
+    TRACE_MINERAL_KEYS.map(k => [k, missingTraceMineralRows[k]])
+  ),
+  missingAbsCoeffRows: Object.fromEntries(
+    TRACE_MINERAL_KEYS.map(k => [k, missingTraceMineralAbsCoeffRows[k]])
+  ),
+  note: 'تم حساب إمداد العناصر الصغرى من مكتبة الخامات حسب mg/kg DM'
+};
+
+traceMineralSupplyModel.traceMineralBalanceModel = buildTraceMineralBalanceModel({
+  targets,
+  context,
+  totalTraceMineralMg: traceMineralMg,
+  absorbedTraceMineralMg
+});
+
 const dcadModel = buildDcadModel({
   totalMineralG: mineralG,
   dmKg,
@@ -1733,6 +1929,7 @@ const dcadModel = buildDcadModel({
 });
 
 mineralSupplyModel.mineralBalanceModel = mineralBalanceModel;
+mineralSupplyModel.traceMineralSupplyModel = traceMineralSupplyModel;
 mineralSupplyModel.dcadModel = dcadModel;
 
 const vitaminSupplyModel = {
