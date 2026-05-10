@@ -197,10 +197,10 @@ function normalizeAaProfile(profile){
 
   return hasAny ? out : null;
 }
-// MURABBIK_EAA_BALANCE
-// Compares modeled metabolizable EAA supply against NASEM target-side EAA supply.
-// This matches the practical report view: Target Supply vs Predicted Supply.
-// Predicted efficiency is kept out of the judgment until its exact NASEM/model equation is fully matched.
+// NASEM_2021_EAA_TARGET_SUPPLY_BALANCE
+// Target-side EAA requirements are calculated in nutrition-engine.js using NASEM 2021 Eq. 6-14b / 6-14d.
+// Supply-side EAA is calculated here as digestible RUP EAA + microbial EAA.
+// Arg is not evaluated in balance because NASEM 2021 Table 6-4 does not provide target efficiency for Arg.
 function resolveEaaRequirementModel(targets = {}, context = {}){
   const m =
     targets?.proteinRequirementModel?.eaaRequirementModel ||
@@ -238,7 +238,7 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
 
   if (!requiredEaaG || typeof requiredEaaG !== 'object') {
     return {
-      model: 'MURABBIK_EAA_BALANCE_TARGET_VS_SUPPLY',
+      model: 'NASEM_2021_EAA_TARGET_SUPPLY_BALANCE',
       applied: true,
       status: 'watch',
       limitingAA: null,
@@ -248,21 +248,20 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
     };
   }
 
-  const keys = EAA_KEYS.filter(k => {
-    const req = Number(requiredEaaG?.[k]);
-    const supplied = Number(supplyEaaG?.[k]);
-    return (Number.isFinite(req) && req > 0) || (Number.isFinite(supplied) && supplied > 0);
-  });
+  // NASEM balance only evaluates EAA with positive target requirement.
+  // This excludes Arg because NASEM Table 6-4 has no target efficiency for Arg.
+  const keys = Object.keys(requiredEaaG)
+    .filter(k => Number.isFinite(Number(requiredEaaG[k])) && Number(requiredEaaG[k]) > 0);
 
   if (!keys.length) {
     return {
-      model: 'MURABBIK_EAA_BALANCE_TARGET_VS_SUPPLY',
+      model: 'NASEM_2021_EAA_TARGET_SUPPLY_BALANCE',
       applied: true,
       status: 'watch',
       limitingAA: null,
       limitingSupplyPct: null,
       balance: {},
-      note: 'لا توجد بيانات كافية لتقييم الأحماض الأمينية الأساسية'
+      note: 'لا توجد بيانات كافية لتقييم الأحماض الأمينية الأساسية حسب NASEM 2021'
     };
   }
 
@@ -272,36 +271,31 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
   let minSupplyRatio = Infinity;
 
   for (const aa of keys) {
-    const required = Number(requiredEaaG?.[aa] || 0);
+    const required = Number(requiredEaaG[aa]);
     const supplied = Number(supplyEaaG?.[aa] || 0);
     const targetEff = Number(targetEfficiencies?.[aa] || 0);
 
     const diff = supplied - required;
-    const supplyRatio = required > 0 ? supplied / required : null;
+    const supplyRatio = required > 0 ? supplied / required : 0;
 
     let status = 'ok';
-    let interpretation = 'الإمداد يغطي الاحتياج المستهدف';
+    let interpretation = 'الإمداد يغطي الاحتياج المستهدف حسب NASEM 2021';
 
     if (supplied <= 0 && required > 0) {
       status = 'deficit';
       interpretation = 'لا يوجد إمداد محسوب لهذا الحمض الأميني';
-    } else if (supplyRatio != null) {
-      if (supplyRatio < 0.95) {
-        status = 'deficit';
-        interpretation = 'الإمداد أقل من الاحتياج المستهدف';
-      } else if (supplyRatio < 1.00) {
-        status = 'watch';
-        interpretation = 'الإمداد قريب من الاحتياج ويحتاج متابعة';
-      }
-    } else {
+    } else if (supplyRatio < 0.95) {
+      status = 'deficit';
+      interpretation = 'الإمداد أقل من الاحتياج المستهدف حسب NASEM 2021';
+    } else if (supplyRatio < 1.00) {
       status = 'watch';
-      interpretation = 'بيانات التقييم غير مكتملة';
+      interpretation = 'الإمداد قريب من الاحتياج المستهدف حسب NASEM 2021';
     }
 
     if (status === 'deficit') overallStatus = 'deficit';
     else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
 
-    if (supplyRatio != null && supplyRatio < minSupplyRatio) {
+    if (supplyRatio < minSupplyRatio) {
       minSupplyRatio = supplyRatio;
       limitingAA = aa;
     }
@@ -310,7 +304,7 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
       requiredG: round(required, 2),
       suppliedG: round(supplied, 2),
       balanceG: round(diff, 2),
-      supplyPctOfRequirement: supplyRatio != null ? round(supplyRatio * 100, 1) : null,
+      supplyPctOfRequirement: round(supplyRatio * 100, 1),
       targetEfficiency: targetEff > 0 ? round(targetEff, 3) : null,
       status,
       interpretation
@@ -318,7 +312,7 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
   }
 
   return {
-    model: 'MURABBIK_EAA_BALANCE_TARGET_VS_SUPPLY',
+    model: 'NASEM_2021_EAA_TARGET_SUPPLY_BALANCE',
     applied: true,
     status: overallStatus,
     limitingAA,
@@ -326,12 +320,13 @@ function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
     balance,
     note:
       overallStatus === 'deficit'
-        ? 'يوجد حمض أميني واحد أو أكثر أقل من الاحتياج المستهدف'
+        ? 'يوجد حمض أميني أساسي واحد أو أكثر أقل من الاحتياج المستهدف حسب NASEM 2021'
         : overallStatus === 'watch'
-          ? 'بعض الأحماض الأمينية قريبة من الاحتياج المستهدف'
-          : 'إمداد الأحماض الأمينية يغطي الاحتياج المستهدف'
+          ? 'بعض الأحماض الأمينية الأساسية قريبة من الاحتياج المستهدف حسب NASEM 2021'
+          : 'إمداد الأحماض الأمينية الأساسية يغطي الاحتياج المستهدف حسب NASEM 2021'
   };
-}// MURABBIK_MINERAL_SUPPLY
+}
+// MURABBIK_MINERAL_SUPPLY
 // Macro-mineral supply from feed library.
 // Units:
 // - Feed mineral fields are expected as % of DM.
