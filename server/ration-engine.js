@@ -198,95 +198,226 @@ function normalizeAaProfile(profile){
   return hasAny ? out : null;
 }
 // MURABBIK_EAA_BALANCE
-// Compares ration modeled EAA supply against NASEM target-side EAA requirements.
-// Requirement source is expected from nutrition-engine:
-// targets.proteinRequirementModel.eaaRequirementModel.requiredEaaG
+// Compares modeled metabolizable EAA supply against NASEM target-side EAA requirements.
+// Adds NASEM-style efficiency assessment:
+// predictedEfficiency = netAAUse / metabolizableEaaSupply
+// If predictedEfficiency > targetEfficiency, the AA is limiting or near limiting.
+function resolveEaaRequirementModel(targets = {}, context = {}){
+  const m =
+    targets?.proteinRequirementModel?.eaaRequirementModel ||
+    targets?.eaaRequirementModel ||
+    context?.proteinRequirementModel?.eaaRequirementModel ||
+    context?.eaaRequirementModel ||
+    null;
+
+  return m && typeof m === 'object' ? m : {};
+}
+
 function resolveRequiredEaaG(targets = {}, context = {}){
   const req =
-    targets?.proteinRequirementModel?.eaaRequirementModel?.requiredEaaG ||
-    targets?.eaaRequirementModel?.requiredEaaG ||
+    resolveEaaRequirementModel(targets, context)?.requiredEaaG ||
     targets?.requiredEaaG ||
-    context?.proteinRequirementModel?.eaaRequirementModel?.requiredEaaG ||
-    context?.eaaRequirementModel?.requiredEaaG ||
     context?.requiredEaaG ||
     null;
 
   return req && typeof req === 'object' ? req : null;
 }
 
+function resolveTargetEaaEfficiencies(targets = {}, context = {}){
+  const eff =
+    resolveEaaRequirementModel(targets, context)?.targetEfficiencies ||
+    targets?.targetEfficiencies ||
+    context?.targetEfficiencies ||
+    null;
+
+  return eff && typeof eff === 'object' ? eff : {};
+}
+
+function resolveEaaComponents(targets = {}, context = {}){
+  const comps =
+    resolveEaaRequirementModel(targets, context)?.components ||
+    targets?.eaaComponents ||
+    context?.eaaComponents ||
+    null;
+
+  return comps && typeof comps === 'object' ? comps : {};
+}
+
+function sumNetEaaUseG(aa, components = {}, requiredG = null, targetEff = null){
+  const keys = [
+    'netScurfG',
+    'netMfpG',
+    'netMilkG',
+    'netGrowthG',
+    'netGestationG',
+    'endogenousUrinaryG'
+  ];
+
+  let sum = 0;
+  let hasAny = false;
+
+  for (const k of keys){
+    const v = Number(components?.[k]?.[aa]);
+    if (Number.isFinite(v)) {
+      sum += v;
+      hasAny = true;
+    }
+  }
+
+  if (hasAny) return sum;
+
+  const req = Number(requiredG);
+  const eff = Number(targetEff);
+
+  if (Number.isFinite(req) && req > 0 && Number.isFinite(eff) && eff > 0) {
+    return req * eff;
+  }
+
+  return null;
+}
+
 function buildEaaBalanceModel({ targets = {}, context = {}, supplyEaaG = {} }){
   const requiredEaaG = resolveRequiredEaaG(targets, context);
+  const targetEfficiencies = resolveTargetEaaEfficiencies(targets, context);
+  const components = resolveEaaComponents(targets, context);
 
- if (!requiredEaaG) {
-  return {
-    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
-    applied: true,
-    status: 'watch',
-    limitingAA: null,
-    limitingSupplyPct: null,
-    balance: {},
-    note: 'تقييم الأحماض الأمينية يحتاج متابعة احترازية ضمن نموذج البروتين'
-  };
-}
+  if (!requiredEaaG || typeof requiredEaaG !== 'object') {
+    return {
+      model: 'MURABBIK_EAA_BALANCE_NASEM_2021_EFFICIENCY_BASED',
+      applied: true,
+      status: 'watch',
+      limitingAA: null,
+      limitingSupplyPct: null,
+      limitingEfficiencyRatio: null,
+      balance: {},
+      note: 'تقييم الأحماض الأمينية يحتاج احتياجات EAA من محرك الاحتياجات'
+    };
+  }
 
-const keys = Object.keys(requiredEaaG)
-  .filter(k => Number.isFinite(Number(requiredEaaG[k])) && Number(requiredEaaG[k]) > 0);
+  const keys = EAA_KEYS.filter(k => {
+    const req = Number(requiredEaaG?.[k]);
+    const supplied = Number(supplyEaaG?.[k]);
+    return (Number.isFinite(req) && req > 0) || (Number.isFinite(supplied) && supplied > 0);
+  });
 
-if (!keys.length) {
-  return {
-    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
-    applied: true,
-    status: 'watch',
-    limitingAA: null,
-    limitingSupplyPct: null,
-    balance: {},
-    note: 'تقييم الأحماض الأمينية يحتاج متابعة احترازية ضمن نموذج البروتين'
-  };
-}
+  if (!keys.length) {
+    return {
+      model: 'MURABBIK_EAA_BALANCE_NASEM_2021_EFFICIENCY_BASED',
+      applied: true,
+      status: 'watch',
+      limitingAA: null,
+      limitingSupplyPct: null,
+      limitingEfficiencyRatio: null,
+      balance: {},
+      note: 'لا توجد بيانات كافية لتقييم الأحماض الأمينية الأساسية'
+    };
+  }
 
   const balance = {};
+  let overallStatus = 'ok';
   let limitingAA = null;
-  let minRatio = Infinity;
+  let minSupplyRatio = Infinity;
+  let maxEfficiencyRatio = -Infinity;
 
   for (const aa of keys) {
-    const required = Number(requiredEaaG[aa]);
+    const required = Number(requiredEaaG?.[aa] || 0);
     const supplied = Number(supplyEaaG?.[aa] || 0);
-    const diff = supplied - required;
-    const ratio = required > 0 ? supplied / required : 0;
+    const targetEff = Number(targetEfficiencies?.[aa] || 0);
 
-    if (ratio < minRatio) {
-      minRatio = ratio;
-      limitingAA = aa;
-    }
+    const netUse = sumNetEaaUseG(
+      aa,
+      components,
+      required > 0 ? required : null,
+      targetEff > 0 ? targetEff : null
+    );
+
+    const diff = supplied - required;
+    const supplyRatio = required > 0 ? supplied / required : null;
+
+    const predictedEff =
+      supplied > 0 && Number.isFinite(netUse) && netUse > 0
+        ? netUse / supplied
+        : null;
+
+    const efficiencyRatio =
+      predictedEff != null && targetEff > 0
+        ? predictedEff / targetEff
+        : null;
 
     let status = 'ok';
-    if (ratio < 0.95) status = 'deficit';
-    else if (ratio < 1.00) status = 'watch';
+    let interpretation = 'الإمداد مناسب حسب كفاءة الاستخدام المستهدفة';
+
+    if (supplied <= 0 && required > 0) {
+      status = 'deficit';
+      interpretation = 'لا يوجد إمداد محسوب لهذا الحمض الأميني';
+    } else if (efficiencyRatio != null) {
+      if (efficiencyRatio > 1.05) {
+        status = 'deficit';
+        interpretation = 'الكفاءة المطلوبة أعلى من المستهدف؛ هذا الحمض قد يكون محددًا للإنتاج';
+      } else if (efficiencyRatio > 1.00) {
+        status = 'watch';
+        interpretation = 'قريب من حد الكفاءة المستهدفة ويحتاج متابعة';
+      } else {
+        status = 'ok';
+        interpretation = 'الكفاءة المتوقعة ضمن أو أقل من المستهدف';
+      }
+    } else if (supplyRatio != null) {
+      if (supplyRatio < 0.95) {
+        status = 'deficit';
+        interpretation = 'الإمداد أقل من الاحتياج المحسوب';
+      } else if (supplyRatio < 1.00) {
+        status = 'watch';
+        interpretation = 'الإمداد قريب من الاحتياج';
+      }
+    } else {
+      status = 'watch';
+      interpretation = 'بيانات الكفاءة غير مكتملة';
+    }
+
+    if (status === 'deficit') overallStatus = 'deficit';
+    else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
+
+    if (supplyRatio != null && supplyRatio < minSupplyRatio) {
+      minSupplyRatio = supplyRatio;
+    }
+
+    if (efficiencyRatio != null && efficiencyRatio > maxEfficiencyRatio) {
+      maxEfficiencyRatio = efficiencyRatio;
+      limitingAA = aa;
+    } else if (limitingAA == null && supplyRatio != null && supplyRatio === minSupplyRatio) {
+      limitingAA = aa;
+    }
 
     balance[aa] = {
       requiredG: round(required, 2),
       suppliedG: round(supplied, 2),
       balanceG: round(diff, 2),
-      supplyPctOfRequirement: round(ratio * 100, 1),
-      status
+      supplyPctOfRequirement: supplyRatio != null ? round(supplyRatio * 100, 1) : null,
+
+      netUseG: Number.isFinite(netUse) ? round(netUse, 2) : null,
+      targetEfficiency: targetEff > 0 ? round(targetEff, 3) : null,
+      predictedEfficiency: predictedEff != null ? round(predictedEff, 3) : null,
+      efficiencyRatio: efficiencyRatio != null ? round(efficiencyRatio, 3) : null,
+
+      status,
+      interpretation
     };
   }
 
-  const hasDeficit = Object.values(balance).some(x => x.status === 'deficit');
-  const hasWatch = Object.values(balance).some(x => x.status === 'watch');
-
   return {
-    model: 'MURABBIK_EAA_BALANCE_USING_NASEM_TARGETS',
+    model: 'MURABBIK_EAA_BALANCE_NASEM_2021_EFFICIENCY_BASED',
     applied: true,
-    status: hasDeficit ? 'deficit' : (hasWatch ? 'watch' : 'ok'),
+    status: overallStatus,
     limitingAA,
-    limitingSupplyPct: Number.isFinite(minRatio) ? round(minRatio * 100, 1) : null,
+    limitingSupplyPct: Number.isFinite(minSupplyRatio) ? round(minSupplyRatio * 100, 1) : null,
+    limitingEfficiencyRatio: Number.isFinite(maxEfficiencyRatio) ? round(maxEfficiencyRatio, 3) : null,
     balance,
-    note: hasDeficit
-      ? 'يوجد عجز في حمض أميني أساسي واحد أو أكثر مقارنة باحتياجات NASEM target-side'
-      : (hasWatch
-          ? 'بعض الأحماض الأمينية قريبة من حد الاحتياج وتحتاج متابعة'
-          : 'إمداد الأحماض الأمينية يغطي الاحتياج المحسوب')
+    note:
+      overallStatus === 'deficit'
+        ? 'يوجد حمض أميني واحد أو أكثر قد يحدّ الإنتاج حسب كفاءة استخدام NASEM'
+        : overallStatus === 'watch'
+          ? 'بعض الأحماض الأمينية قريبة من حد الكفاءة المستهدفة'
+          : 'إمداد الأحماض الأمينية مناسب حسب كفاءة الاستخدام المستهدفة'
   };
 }
 // MURABBIK_MINERAL_SUPPLY
