@@ -800,11 +800,22 @@ aaProfilePctCP: r?.aaProfilePctCP || null,
 aaProfilePctTP: r?.aaProfilePctTP || null,
 aaProfile: r?.aaProfile || null,
 
+coMgKgDM: toNumOrNull(r?.coMgKgDM),
 cuMgKgDM: toNumOrNull(r?.cuMgKgDM),
 feMgKgDM: toNumOrNull(r?.feMgKgDM),
+iMgKgDM: toNumOrNull(r?.iMgKgDM),
 mnMgKgDM: toNumOrNull(r?.mnMgKgDM),
+seMgKgDM: toNumOrNull(r?.seMgKgDM),
 znMgKgDM: toNumOrNull(r?.znMgKgDM),
-moMgKgDM: toNumOrNull(r?.moMgKgDM)
+moMgKgDM: toNumOrNull(r?.moMgKgDM),
+
+coAbsCoeff: toNumOrNull(r?.coAbsCoeff),
+cuAbsCoeff: toNumOrNull(r?.cuAbsCoeff),
+feAbsCoeff: toNumOrNull(r?.feAbsCoeff),
+iAbsCoeff: toNumOrNull(r?.iAbsCoeff),
+mnAbsCoeff: toNumOrNull(r?.mnAbsCoeff),
+seAbsCoeff: toNumOrNull(r?.seAbsCoeff),
+znAbsCoeff: toNumOrNull(r?.znAbsCoeff)
   }));
 }
 function feedKeySrv(v){
@@ -1219,6 +1230,23 @@ rupDigestibilityPct: r.rupDigestibilityPct,
 aaProfilePctCP: r.aaProfilePctCP,
 aaProfilePctTP: r.aaProfilePctTP,
 aaProfile: r.aaProfile,
+
+// Trace minerals — NASEM 2021
+coMgKgDM: r.coMgKgDM,
+cuMgKgDM: r.cuMgKgDM,
+feMgKgDM: r.feMgKgDM,
+iMgKgDM: r.iMgKgDM,
+mnMgKgDM: r.mnMgKgDM,
+seMgKgDM: r.seMgKgDM,
+znMgKgDM: r.znMgKgDM,
+
+coAbsCoeff: r.coAbsCoeff,
+cuAbsCoeff: r.cuAbsCoeff,
+feAbsCoeff: r.feAbsCoeff,
+iAbsCoeff: r.iAbsCoeff,
+mnAbsCoeff: r.mnAbsCoeff,
+seAbsCoeff: r.seAbsCoeff,
+znAbsCoeff: r.znAbsCoeff,
 
 cat: r.cat,
 pricePerTonAsFed: r.pricePerTon
