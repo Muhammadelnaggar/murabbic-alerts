@@ -1173,9 +1173,9 @@ const contextForTargets = {
         )
 };
 
-const builtTargets = buildNutritionCentralTargets(contextForTargets);
-const runtimeCtx = builtTargets.runtimeCtx;
-const targetsCore = builtTargets.targetsCore;
+let builtTargets = buildNutritionCentralTargets(contextForTargets);
+let runtimeCtx = builtTargets.runtimeCtx;
+let targetsCore = builtTargets.targetsCore;
 
 const rationCore = analyzeRation(
   cleanRows.map(r => ({
@@ -1286,6 +1286,7 @@ pricePerTonAsFed: r.pricePerTon
     chapter12VitaminModel: targetsCore?.chapter12VitaminModel || null
   }
 );
+
   let totCost = null;
   let mixPriceDM = null;
   let mixPriceAsFed = null;
