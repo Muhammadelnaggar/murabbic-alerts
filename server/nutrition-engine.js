@@ -803,7 +803,7 @@ function computeNasemMacroMineralRequirements({
 }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
-  const DMI = Math.max(0, num(dmi));
+  const DMI = Math.max(0, num(mineralDmiUsed));
   const preg = num(pregDays);
   const proteinPct = num(milkProteinPct, 3.2);
   const isLactating = milk > 0 || category === 'lactating';
@@ -1042,7 +1042,7 @@ function computeNasemTraceMineralRequirements({
   const bw = num(bodyWeight);
   const milk = num(milkKg);
   const preg = num(pregDays);
-  const DMI = Math.max(0, num(dmi));
+  const DMI = Math.max(0, num(mineralDmiUsed));
   const matBW = num(matureBodyWeight) || Math.max(700, bw * 1.35);
   const adg = growth ? heiferTargetADG(bw) : 0;
 
@@ -1506,7 +1506,7 @@ const mpReq = computeNasemMPRequirement({
   pregDays,
   closeUp,
   growth: false,
-  dmi: mineralDmiUsed,
+  dmi,
   ndfPct: 30,
   parity: num(parity, 2),
   species: 'cow',
@@ -1526,7 +1526,7 @@ const mineralReq = computeNasemMacroMineralRequirements({
   milkKg: milk,
   milkProteinPct: proteinPct,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth: false,
   category: 'lactating',
   matureBodyWeight: getStandardWeight('cow', breed)
@@ -1536,7 +1536,7 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   bodyWeight: bw,
   milkKg: milk,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth: false,
   matureBodyWeight: getStandardWeight('cow', breed)
 });
@@ -1693,7 +1693,7 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     milkKg: 0,
     milkProteinPct: 0,
     pregDays: preg,
-    dmi,
+    dmi: mineralDmiUsed,
     growth: false,
     category: isCloseUp ? 'close_up_mature_cow' : 'dry_mature_cow',
     matureBodyWeight: matBW
@@ -1703,7 +1703,7 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     bodyWeight: bw,
     milkKg: 0,
     pregDays: preg,
-    dmi,
+    dmi: mineralDmiUsed,
     growth: false,
     matureBodyWeight: matBW
   });
@@ -1837,7 +1837,7 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
   bodyWeight: bw,
   milkKg: 0,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth: true,
   matureBodyWeight: Math.max(700, bw * 1.35)
 });
