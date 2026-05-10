@@ -397,7 +397,30 @@ function resolveRequiredTraceMinerals(targets = {}, context = {}){
 
   return req && typeof req === 'object' ? req : {};
 }
+function resolveTraceMineralAbsCoeff(mineral, row = {}, requiredTraceMinerals = {}){
+  const explicitAbsCoeff = firstFiniteField(row, TRACE_MINERAL_ABS_FIELD_MAP[mineral]);
 
+  if (explicitAbsCoeff != null && explicitAbsCoeff > 0 && explicitAbsCoeff <= 1) {
+    return {
+      coeff: explicitAbsCoeff,
+      source: 'feed_item_explicit_abs_coeff'
+    };
+  }
+
+  const targetAbsCoeff = Number(requiredTraceMinerals?.[mineral]?.absorptionCoeff);
+
+  if (Number.isFinite(targetAbsCoeff) && targetAbsCoeff > 0 && targetAbsCoeff <= 1) {
+    return {
+      coeff: targetAbsCoeff,
+      source: 'target_requirement_abs_coeff'
+    };
+  }
+
+  return {
+    coeff: null,
+    source: null
+  };
+}
 function buildTraceMineralBalanceModel({
   targets = {},
   context = {},
@@ -433,10 +456,20 @@ function buildTraceMineralBalanceModel({
     let requiredMg = dietaryRequired;
     let suppliedMg = suppliedTotal;
 
+    let missingAbsorptionCoeff = false;
+
     if (Number.isFinite(absorbedRequired) && absorbedRequired > 0) {
       requirementBasis = 'absorbed';
       requiredMg = absorbedRequired;
-      suppliedMg = suppliedAbsorbed;
+
+      if (suppliedAbsorbed > 0) {
+        suppliedMg = suppliedAbsorbed;
+      } else if (suppliedTotal > 0) {
+        suppliedMg = 0;
+        missingAbsorptionCoeff = true;
+      } else {
+        suppliedMg = 0;
+      }
     } else if (Number.isFinite(dietaryRequired) && dietaryRequired > 0) {
       requirementBasis = 'dietary';
       requiredMg = dietaryRequired;
@@ -450,8 +483,14 @@ function buildTraceMineralBalanceModel({
     const diff = suppliedMg - requiredMg;
 
     let status = 'ok';
-    if (pct < 95) status = 'deficit';
-    else if (pct < 100) status = 'watch';
+
+    if (missingAbsorptionCoeff) {
+      status = 'watch';
+    } else if (pct < 95) {
+      status = 'deficit';
+    } else if (pct < 100) {
+      status = 'watch';
+    }
 
     if (status === 'deficit') overallStatus = 'deficit';
     else if (status === 'watch' && overallStatus === 'ok') overallStatus = 'watch';
@@ -469,7 +508,9 @@ function buildTraceMineralBalanceModel({
       balanceMg: round(diff, 3),
       supplyPctOfRequirement: round(pct, 1),
       source: req.source || null,
-      requirementType: req.type || null
+      requirementType: req.type || null,
+      missingAbsorptionCoeff,
+      suppliedTotalMg: round(suppliedTotal, 3)
     };
   }
 
@@ -1291,6 +1332,7 @@ let missingTraceMineralAbsCoeffRows = makeTraceMineralZeroMap();
 let vitaminIU = makeVitaminZeroMap();
 
 const targetRequiredMinerals = resolveRequiredMinerals(targets, context);
+const targetRequiredTraceMinerals = resolveRequiredTraceMinerals(targets, context);
 
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
@@ -1449,7 +1491,8 @@ for (const mineral of MACRO_MINERAL_KEYS) {
 
 for (const traceMineral of TRACE_MINERAL_KEYS) {
   const mgPerKgDM = firstFiniteField(r, TRACE_MINERAL_FIELD_MAP[traceMineral]);
-  const absCoeff = firstFiniteField(r, TRACE_MINERAL_ABS_FIELD_MAP[traceMineral]);
+  const resolvedAbs = resolveTraceMineralAbsCoeff(traceMineral, r, targetRequiredTraceMinerals);
+  const absCoeff = resolvedAbs.coeff;
 
   if (mgPerKgDM != null && mgPerKgDM >= 0) {
     const traceItemMg = dmItemKg * mgPerKgDM;
