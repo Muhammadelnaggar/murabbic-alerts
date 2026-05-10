@@ -1068,6 +1068,7 @@ function buildNutritionCentralTargets(context = {}) {
   milkProteinPct: runtimeCtx.milkProteinPctUsed,
   parity: runtimeCtx.lactationNumberUsed,
   dietNDFPct: context.dietNDFPct,
+  mineralDmi: context.mineralDmi,
   thi: runtimeCtx.thiUsed,
   bcs: runtimeCtx.bcsUsed
 });
@@ -1148,6 +1149,46 @@ function deriveDietNDFPctFromRows(rows = [], mode = 'tmr_asfed', concKg = null) 
   const out = (ndfKg / dmKg) * 100;
   return Number.isFinite(out) ? round2(out) : null;
 }
+function deriveRationDmKgFromRows(rows = [], mode = 'tmr_asfed', concKg = null) {
+  const cleanRows = Array.isArray(rows) ? rows : [];
+  const modeNorm = String(mode || 'tmr_asfed').trim();
+
+  let dmKg = 0;
+
+  if (modeNorm === 'tmr_asfed') {
+    for (const r of cleanRows) {
+      const asFedKg = Number(r.asFedKg || 0);
+      const dmPct = Number(r.dmPct || 0);
+      dmKg += asFedKg * (dmPct / 100);
+    }
+  }
+
+  if (modeNorm === 'split') {
+    const concKgNum = Number(concKg || 0);
+    let concDmFrac = 0;
+
+    for (const r of cleanRows) {
+      const cat = String(r.cat || '').trim();
+      const dmPct = Number(r.dmPct || 0);
+
+      if (cat === 'rough') {
+        const asFedKg = Number(r.asFedKg || 0);
+        dmKg += asFedKg * (dmPct / 100);
+      }
+
+      if (cat === 'conc') {
+        const pct = Number(r.pct || 0) / 100;
+        concDmFrac += pct * (dmPct / 100);
+      }
+    }
+
+    dmKg += concKgNum * concDmFrac;
+  }
+
+  if (!(dmKg > 0)) return null;
+
+  return round2(dmKg);
+}
 function buildNutritionCentralAnalysis({ rows = [], context = {}, mode = 'tmr_asfed', concKg = null, milkPrice = null }) {
   const cleanRows = Array.isArray(rows) ? rows : [];
 const modeNorm = String(mode || 'tmr_asfed').trim();
@@ -1161,6 +1202,12 @@ const dietNDFPctFromRation = deriveDietNDFPctFromRows(
 const contextDietNDF = Number(context?.dietNDFPct);
 const derivedDietNDF = Number(dietNDFPctFromRation);
 
+const actualRationDmKg = deriveRationDmKgFromRows(
+  cleanRows,
+  modeNorm,
+  concKg
+);
+
 const contextForTargets = {
   ...context,
   dietNDFPct:
@@ -1170,7 +1217,11 @@ const contextForTargets = {
           Number.isFinite(derivedDietNDF) && derivedDietNDF > 0
             ? derivedDietNDF
             : null
-        )
+        ),
+  mineralDmi:
+    Number.isFinite(Number(actualRationDmKg)) && Number(actualRationDmKg) > 0
+      ? Number(actualRationDmKg)
+      : null
 };
 
 let builtTargets = buildNutritionCentralTargets(contextForTargets);
