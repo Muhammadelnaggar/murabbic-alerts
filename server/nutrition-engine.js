@@ -796,7 +796,7 @@ function computeNasemMacroMineralRequirements({
   milkKg,
   milkProteinPct,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth,
   category,
   matureBodyWeight
@@ -1035,7 +1035,7 @@ function computeNasemTraceMineralRequirements({
   bodyWeight,
   milkKg,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth,
   matureBodyWeight
 }){
@@ -1450,7 +1450,8 @@ function computeCow({
   milkFatPct,
   milkProteinPct,
   bcs,
-  parity
+  parity,
+  mineralDmi
 }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
@@ -1474,7 +1475,10 @@ function computeCow({
   });
 
   dmi = Math.max(0, dmi);
-
+const mineralDmiUsed =
+  Number.isFinite(Number(mineralDmi)) && Number(mineralDmi) > 0
+    ? Number(mineralDmi)
+    : dmi;
 const nelMaintenance = nelMaintenanceMcal(bw);
 const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
 const nelPreg = gestationConceptusNE(bw, pregDays);
@@ -1502,7 +1506,7 @@ const mpReq = computeNasemMPRequirement({
   pregDays,
   closeUp,
   growth: false,
-  dmi,
+  dmi: mineralDmiUsed,
   ndfPct: 30,
   parity: num(parity, 2),
   species: 'cow',
@@ -1602,7 +1606,8 @@ function computeCowDryMother({
   breed,
   dietNDFPct,
   bcs,
-  parity
+  parity,
+  mineralDmi
 }){
   const bw = num(bodyWeight);
   const preg = num(pregDays);
@@ -1643,7 +1648,10 @@ function computeCowDryMother({
 }
 
 const dmi = Math.max(0, dmiCalc.dmi);
-
+const mineralDmiUsed =
+  Number.isFinite(Number(mineralDmi)) && Number(mineralDmi) > 0
+    ? Number(mineralDmi)
+    : dmi;
   const nelMaintenance = nelMaintenanceMcal(bw);
   const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
   const nelTotal = nelMaintenance + nelPreg;
@@ -1772,7 +1780,8 @@ function computeCowHeifer({
   pregDays,
   closeUp,
   breed,
-  dietNDFPct
+  dietNDFPct,
+  mineralDmi
 }){
 
   const bw = num(bodyWeight);
@@ -1783,7 +1792,10 @@ let dmi = predictHeiferDMI({
   matureBodyWeight: getStandardWeight('cow', breed),
   dietNDFPct
 });
-
+const mineralDmiUsed =
+  Number.isFinite(Number(mineralDmi)) && Number(mineralDmi) > 0
+    ? Number(mineralDmi)
+    : dmi;
  const nelMaintenance = nelMaintenanceMcal(bw);
 const nelGrowth = 0;
 const nelPreg = gestationConceptusNE(bw, pregDays);
@@ -1815,7 +1827,7 @@ const mineralReq = computeNasemMacroMineralRequirements({
   milkKg: 0,
   milkProteinPct: 0,
   pregDays,
-  dmi,
+  dmi: mineralDmiUsed,
   growth: true,
   category: 'heifer_or_dry',
   matureBodyWeight: Math.max(700, bw * 1.35)
@@ -2080,7 +2092,8 @@ function computeTargets(ctx){
     milkProteinPct: ctx?.milkProteinPct,
     bcs: num(ctx?.bcs, 3.0),
     parity: num(ctx?.parity, 2),
-    dietNDFPct: ctx?.dietNDFPct
+    dietNDFPct: ctx?.dietNDFPct,
+    mineralDmi: ctx?.mineralDmi ?? ctx?.rationDmiKg ?? ctx?.actualDmiKg ?? ctx?.dmKg
   };
 
   const sp = normArabic(species);
