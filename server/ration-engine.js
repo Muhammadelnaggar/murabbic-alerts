@@ -1442,28 +1442,28 @@ for (const mineral of MACRO_MINERAL_KEYS) {
     } else if (mineralItemG > 0) {
       missingMineralAbsCoeffRows[mineral]++;
     }
+  } else if (dmItemKg > 0) {
+    missingMineralRows[mineral]++;
   }
-   for (const mineral of TRACE_MINERAL_KEYS) {
-  const mgPerKgDM = firstFiniteField(r, TRACE_MINERAL_FIELD_MAP[mineral]);
-  const absCoeff = firstFiniteField(r, TRACE_MINERAL_ABS_FIELD_MAP[mineral]);
+}
+
+for (const traceMineral of TRACE_MINERAL_KEYS) {
+  const mgPerKgDM = firstFiniteField(r, TRACE_MINERAL_FIELD_MAP[traceMineral]);
+  const absCoeff = firstFiniteField(r, TRACE_MINERAL_ABS_FIELD_MAP[traceMineral]);
 
   if (mgPerKgDM != null && mgPerKgDM >= 0) {
     const traceItemMg = dmItemKg * mgPerKgDM;
-    traceMineralMg[mineral] += traceItemMg;
+    traceMineralMg[traceMineral] += traceItemMg;
 
     if (absCoeff != null && absCoeff >= 0 && absCoeff <= 1) {
-      absorbedTraceMineralMg[mineral] += traceItemMg * absCoeff;
-      traceMineralAbsCoeffWeightedSum[mineral] += traceItemMg * absCoeff;
-      traceMineralAbsCoeffWeightMg[mineral] += traceItemMg;
+      absorbedTraceMineralMg[traceMineral] += traceItemMg * absCoeff;
+      traceMineralAbsCoeffWeightedSum[traceMineral] += traceItemMg * absCoeff;
+      traceMineralAbsCoeffWeightMg[traceMineral] += traceItemMg;
     } else if (traceItemMg > 0) {
-      missingTraceMineralAbsCoeffRows[mineral]++;
+      missingTraceMineralAbsCoeffRows[traceMineral]++;
     }
   } else if (dmItemKg > 0) {
-    missingTraceMineralRows[mineral]++;
-  }
-}
-  else if (dmItemKg > 0) {
-    missingMineralRows[mineral]++;
+    missingTraceMineralRows[traceMineral]++;
   }
 }
   asFedKg += kg;
