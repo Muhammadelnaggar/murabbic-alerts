@@ -1063,7 +1063,16 @@ try{
       if(diff >= 0) dcc = diff;
     }
   }
- const prodTxt = String(animal?.productionStatus || '').trim().toLowerCase();
+const prodTxt = String(
+  animal?.productionStatus ||
+  animal?.productionState ||
+  animal?.milkStatus ||
+  animal?.lactationStatus ||
+  animal?.status ||
+  animal?.group ||
+  animal?.groupName ||
+  ''
+).trim().toLowerCase();
 
 const isDryFromAnimal =
   prodTxt.includes('جاف') ||
@@ -1078,13 +1087,21 @@ const isCloseUpFromAnimal =
   Number.isFinite(daysToCalvingCalc) &&
   daysToCalvingCalc < 30;
 
-  
+const earlyDryEl = document.getElementById('ctxEarlyDry');
+const closeUpEl = document.getElementById('ctxCloseUp');
 
-  const earlyDryEl = document.getElementById('ctxEarlyDry');
-  const closeUpEl = document.getElementById('ctxCloseUp');
+if (earlyDryEl) {
+  earlyDryEl.checked = !!(isDryFromAnimal && !isCloseUpFromAnimal);
+  earlyDryEl.value = earlyDryEl.checked ? '1' : '';
+}
 
-  if (earlyDryEl) earlyDryEl.checked = !!(isDryFromAnimal && !isCloseUpFromAnimal);
-  if (closeUpEl) closeUpEl.checked = !!isCloseUpFromAnimal;
+if (closeUpEl) {
+  closeUpEl.checked = !!isCloseUpFromAnimal;
+  closeUpEl.value = closeUpEl.checked ? '1' : '';
+}
+
+setElText('ctxEarlyDry_txt', earlyDryEl?.checked ? 'نعم' : 'لا');
+setElText('ctxCloseUp_txt', closeUpEl?.checked ? 'نعم' : 'لا');
 // متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
   let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
   if((avgRes?.avg==null) && String(numberStr).trim()!==''){
