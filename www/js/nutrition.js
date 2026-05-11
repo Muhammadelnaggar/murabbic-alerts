@@ -1063,26 +1063,18 @@ try{
       if(diff >= 0) dcc = diff;
     }
   }
-const prodTxt = [
-  animal?.productionStatus,
-  animal?.productionState,
-  animal?.milkStatus,
-  animal?.lactationStatus,
-  animal?.status,
-  animal?.group,
-  animal?.groupName,
-  animal?.groupKey
-]
-  .map(v => String(v || '').trim())
-  .filter(Boolean)
-  .join(' ')
+const productionStatusRaw = String(animal?.productionStatus || '')
+  .trim()
   .toLowerCase();
 
 const isDryFromAnimal =
-  prodTxt.includes('جاف') ||
-  prodTxt.includes('dry');
+  productionStatusRaw === 'dry' ||
+  productionStatusRaw === 'جاف' ||
+  productionStatusRaw.includes('dry') ||
+  productionStatusRaw.includes('جاف');
 
 const gestLen = (species === 'جاموس') ? 310 : 280;
+
 const daysToCalvingCalc =
   Number.isFinite(Number(dcc)) ? (gestLen - Number(dcc)) : null;
 
@@ -1091,21 +1083,24 @@ const isCloseUpFromAnimal =
   Number.isFinite(daysToCalvingCalc) &&
   daysToCalvingCalc < 30;
 
+const isEarlyDryFromAnimal =
+  isDryFromAnimal && !isCloseUpFromAnimal;
+
 const earlyDryEl = document.getElementById('ctxEarlyDry');
 const closeUpEl = document.getElementById('ctxCloseUp');
 
 if (earlyDryEl) {
-  earlyDryEl.checked = !!(isDryFromAnimal && !isCloseUpFromAnimal);
-  earlyDryEl.value = earlyDryEl.checked ? '1' : '';
+  earlyDryEl.checked = isEarlyDryFromAnimal;
+  earlyDryEl.value = isEarlyDryFromAnimal ? '1' : '';
 }
 
 if (closeUpEl) {
-  closeUpEl.checked = !!isCloseUpFromAnimal;
-  closeUpEl.value = closeUpEl.checked ? '1' : '';
+  closeUpEl.checked = isCloseUpFromAnimal;
+  closeUpEl.value = isCloseUpFromAnimal ? '1' : '';
 }
 
-setElText('ctxEarlyDry_txt', earlyDryEl?.checked ? 'نعم' : 'لا');
-setElText('ctxCloseUp_txt', closeUpEl?.checked ? 'نعم' : 'لا');
+setElText('ctxEarlyDry_txt', isEarlyDryFromAnimal ? 'نعم' : 'لا');
+setElText('ctxCloseUp_txt', isCloseUpFromAnimal ? 'نعم' : 'لا');
 // متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
   let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
   if((avgRes?.avg==null) && String(numberStr).trim()!==''){
