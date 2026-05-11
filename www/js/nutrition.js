@@ -1063,16 +1063,20 @@ try{
       if(diff >= 0) dcc = diff;
     }
   }
-const prodTxt = String(
-  animal?.productionStatus ||
-  animal?.productionState ||
-  animal?.milkStatus ||
-  animal?.lactationStatus ||
-  animal?.status ||
-  animal?.group ||
-  animal?.groupName ||
-  ''
-).trim().toLowerCase();
+const prodTxt = [
+  animal?.productionStatus,
+  animal?.productionState,
+  animal?.milkStatus,
+  animal?.lactationStatus,
+  animal?.status,
+  animal?.group,
+  animal?.groupName,
+  animal?.groupKey
+]
+  .map(v => String(v || '').trim())
+  .filter(Boolean)
+  .join(' ')
+  .toLowerCase();
 
 const isDryFromAnimal =
   prodTxt.includes('جاف') ||
