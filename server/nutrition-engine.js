@@ -540,7 +540,8 @@ function computeNasemMPRequirement({
   ndfPct,
   parity,
   species,
-  matureBodyWeight
+  matureBodyWeight,
+  frameGainKgDay
 }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
@@ -576,18 +577,21 @@ function computeNasemMPRequirement({
   );
   const npGestationG = grUterGainKg * 125;
 
-  // Eq. 6-12a: NP-growth = Frame weight gain(g/d) × 0.11 × 0.86
-  let frameGainKgDay = 0;
-  if (growth) {
-    frameGainKgDay = heiferTargetADG(bw);
-  } else if (milk > 0 && par === 1) {
-    frameGainKgDay = 0.19;
-  } else if (milk > 0 && par === 2) {
-    frameGainKgDay = 0.15;
-  }
+ // Eq. 6-12a: NP-growth = Frame weight gain(g/d) × 0.11 × 0.86
+// NASEM: Frame gain is an independent model input.
+let frameGainForProteinKgDay = 0;
 
-  const npGrowthG = (frameGainKgDay * 1000) * 0.11 * 0.86;
+if (Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0) {
+  frameGainForProteinKgDay = Number(frameGainKgDay);
+} else if (growth) {
+  frameGainForProteinKgDay = heiferTargetADG(bw);
+} else if (milk > 0 && par === 1) {
+  frameGainForProteinKgDay = 0.19;
+} else if (milk > 0 && par === 2) {
+  frameGainForProteinKgDay = 0.15;
+}
 
+const npGrowthG = (frameGainForProteinKgDay * 1000) * 0.11 * 0.86;
   let recommendedMPG;
 
   if (milk > 0) {
@@ -609,17 +613,17 @@ function computeNasemMPRequirement({
     mpTargetG: recommendedMPG,
     model: milk > 0 ? 'NASEM_2021_EQ_6_14A' : 'NASEM_2021_EQ_6_14C',
     targetEffMP,
-    components: {
-      npScurfG,
-      npMfpG,
-      npMilkG,
-      npGrowthG,
-      npGestationG,
-      npEndogenousUrinaryG,
-      cpMfpG,
-      grUterGainKgDay: grUterGainKg,
-      frameGainKgDay
-    },
+components: {
+  npScurfG,
+  npMfpG,
+  npMilkG,
+  npGrowthG,
+  npGestationG,
+  npEndogenousUrinaryG,
+  cpMfpG,
+  grUterGainKgDay: grUterGainKg,
+  frameGainKgDay: frameGainForProteinKgDay
+},
     note: 'MP target computed from NASEM 2021 factorial NP components; EAA targets are handled separately by Eq. 6-14b/6-14d.'
   };
 }
@@ -1607,7 +1611,8 @@ function computeCowDryMother({
   dietNDFPct,
   bcs,
   parity,
-  mineralDmi
+  mineralDmi,
+  frameGainKgDay
 }){
   const bw = num(bodyWeight);
   const preg = num(pregDays);
@@ -1652,15 +1657,24 @@ const mineralDmiUsed =
   Number.isFinite(Number(mineralDmi)) && Number(mineralDmi) > 0
     ? Number(mineralDmi)
     : dmi;
-  const nelMaintenance = nelMaintenanceMcal(bw);
-  const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
-  const nelTotal = nelMaintenance + nelPreg;
+const nelMaintenance = nelMaintenanceMcal(bw);
+const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
+
+const frameGainForEnergyKgDay =
+  Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0
+    ? Number(frameGainKgDay)
+    : 0;
+
+const nelGrowth = nelFrameGainMcal(frameGainForEnergyKgDay);
+
+const nelTotal = nelMaintenance + nelPreg + nelGrowth;
+
 const chapter12EnergyModel = buildChapter12EnergyModel({
   chapter12StageModel,
   nelMaintenance,
   nelPreg,
   nelMilk: 0,
-  nelGrowth: 0
+  nelGrowth
 });
   const mpReq = computeNasemMPRequirement({
     bodyWeight: bw,
@@ -1670,11 +1684,13 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     closeUp: isCloseUp,
     growth: false,
     dmi: mineralDmiUsed,
-   ndfPct: dmiCalc.inputs.dietNDFPct,
+    ndfPct: dmiCalc.inputs.dietNDFPct,
     parity: num(parity, 2),
     species: 'cow',
-    matureBodyWeight: matBW
-  });
+    matureBodyWeight: matBW,
+    frameGainKgDay: frameGainForEnergyKgDay
+});
+  
 
   const mpTargetG = mpReq.mpTargetG;
 
@@ -2093,7 +2109,8 @@ function computeTargets(ctx){
     bcs: num(ctx?.bcs, 3.0),
     parity: num(ctx?.parity, 2),
     dietNDFPct: ctx?.dietNDFPct,
-    mineralDmi: ctx?.mineralDmi ?? ctx?.rationDmiKg ?? ctx?.actualDmiKg ?? ctx?.dmKg
+    mineralDmi: ctx?.mineralDmi ?? ctx?.rationDmiKg ?? ctx?.actualDmiKg ?? ctx?.dmKg,
+    frameGainKgDay: ctx?.frameGainKgDay ?? ctx?.frameGain ?? ctx?.targetFrameGainKgDay ?? ctx?.frmGainTarget
   };
 
   const sp = normArabic(species);
