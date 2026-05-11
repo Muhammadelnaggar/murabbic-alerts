@@ -110,52 +110,64 @@ function isDryNutritionContext(ctx = null){
 }
 
 function applyDryMilkVisibility(){
-  const ctx = readContext ? readContext() : {};
-  const isDry = isDryNutritionContext(ctx);
+  const earlyDry = !!document.getElementById('ctxEarlyDry')?.checked;
+  const closeUp  = !!document.getElementById('ctxCloseUp')?.checked;
 
-  const ids = [
+  const pregText = String(document.getElementById('ctxPreg')?.value || '')
+    .trim()
+    .toLowerCase();
+
+  const isDry =
+    earlyDry ||
+    closeUp ||
+    pregText.includes('جاف') ||
+    pregText.includes('dry') ||
+    pregText.includes('تحضير') ||
+    pregText.includes('انتظار الولادة') ||
+    pregText.includes('close');
+
+  [
     'ctxAvgMilk_txt',
     'ctxMilkFat_txt',
     'ctxMilkProtein_txt',
     'ctxMilkPrice_txt'
-  ];
-
-  ids.forEach(id => {
+  ].forEach(id => {
     const el = document.getElementById(id);
     const item = el?.closest?.('.strip-item');
     if (item) item.style.display = isDry ? 'none' : '';
   });
 
-const milkBox =
-  document.getElementById('milkInputsCard') ||
-  document.getElementById('milkInputsBox') ||
-  document.getElementById('milkInputBox') ||
-  document.getElementById('milkContextBox') ||
-  document.querySelector('.milk-inline-row')?.closest?.('.mbk-card') ||
-  document.querySelector('.milk-inline-row')?.closest?.('.card') ||
-  document.querySelector('.milk-inline-row');
+  const milkInputsCard =
+    document.getElementById('milkInputsCard') ||
+    document.querySelector('.milk-inline-row')?.closest?.('.mbk-card') ||
+    document.querySelector('.milk-inline-row')?.closest?.('.card') ||
+    document.querySelector('.milk-inline-row');
 
-  if (milkBox) milkBox.style.display = isDry ? 'none' : '';
+  if (milkInputsCard) {
+    milkInputsCard.style.display = isDry ? 'none' : '';
+  }
 
-  ['milkFatInput', 'milkProteinInput', 'milkPriceInput'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.required = !isDry;
-    el.disabled = !!isDry;
-    if (isDry) el.value = '';
-  });
+  const avg = document.getElementById('ctxAvgMilk');
+  const fat = document.getElementById('ctxMilkFat');
+  const protein = document.getElementById('ctxMilkProtein');
+  const price = document.getElementById('ctxMilkPrice');
 
   if (isDry) {
-    const avg = document.getElementById('ctxAvgMilk');
-    const fat = document.getElementById('ctxMilkFat');
-    const protein = document.getElementById('ctxMilkProtein');
-    const price = document.getElementById('ctxMilkPrice');
-
     if (avg) avg.value = '0';
     if (fat) fat.value = '';
     if (protein) protein.value = '';
     if (price) price.value = '';
   }
+
+  ['milkFatInput', 'milkProteinInput', 'milkPriceInput'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.required = !isDry;
+    el.disabled = isDry;
+
+    if (isDry) el.value = '';
+  });
 }
 async function fetchTargets(ctx) {
 const _ctxRaw = ctx || readContext();
@@ -1200,25 +1212,13 @@ const avgParity = parityVals.length
 const parityEl = document.getElementById('ctxParity');
 if (parityEl && avgParity != null) parityEl.value = Math.round(avgParity);
 
-// bodyWeight ممثل للمجموعة: متوسط bodyWeight/weight إن وُجد
-const bwVals = docs
-  .map(d => Number(d?.bodyWeight ?? d?.weight))
-  .filter(v => Number.isFinite(v) && v > 0);
-const avgBW = bwVals.length
-  ? (bwVals.reduce((a,b)=>a+b,0) / bwVals.length)
-  : null;
+// في تغذية المجموعة لا نملأ وزن الجسم ولا BCS من متوسطات الحيوانات.
+// لو المستخدم أدخلهم نستخدمهم، ولو تركهم فارغين readContext سيحسبهم تلقائيًا.
 const bwEl = document.getElementById('ctxBodyWeight');
-if (bwEl && avgBW != null) bwEl.value = Math.round(avgBW);
-
-// BCS ممثل للمجموعة: متوسط bcs إن وُجد
-const bcsVals = docs
-  .map(d => Number(d?.bcs))
-  .filter(v => Number.isFinite(v) && v > 0);
-const avgBCS = bcsVals.length
-  ? (bcsVals.reduce((a,b)=>a+b,0) / bcsVals.length)
-  : null;
 const bcsEl = document.getElementById('ctxBCS');
-if (bcsEl && avgBCS != null) bcsEl.value = avgBCS.toFixed(2);
+
+if (bwEl && !bwEl.dataset.userEdited) bwEl.value = '';
+if (bcsEl && !bcsEl.dataset.userEdited) bcsEl.value = '';
 
   const animalInfo = document.getElementById('animalInfo');
   const groupLabel =
@@ -1329,6 +1329,18 @@ const ctxMilkProtein = document.getElementById('ctxMilkProtein');
 const ctxMilkPrice = document.getElementById('ctxMilkPrice');
 const ctxBodyWeight = document.getElementById('ctxBodyWeight');
 const ctxBCS = document.getElementById('ctxBCS');
+  [ctxBodyWeight, ctxBCS].forEach(el => {
+  if (!el || el.dataset.userEditBound === '1') return;
+  el.dataset.userEditBound = '1';
+
+  el.addEventListener('input', () => {
+    el.dataset.userEdited = '1';
+  });
+
+  el.addEventListener('change', () => {
+    el.dataset.userEdited = '1';
+  });
+});
 const feedInputBox = document.getElementById('feedInputBox');
 const feedSummaryBox = document.getElementById('feedSummaryBox');
 const advancedBtn = document.getElementById('toggleAdvancedBtn');
@@ -2961,6 +2973,7 @@ async function saveToServer(payload){
 
   return data;
 }
+window.readContext = readContext;
 function redirectSmart(delay = 250){
   const to = (document.querySelector('form[data-redirect]')?.dataset?.redirect) || '/dashboard.html';
   setTimeout(()=>{ location.href = to; }, delay);
