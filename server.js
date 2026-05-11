@@ -506,8 +506,15 @@ function normalizeNutritionContext(ctx = {}) {
     milkFatPct: toNumOrNull(ctx.milkFatPct),
     milkProteinPct: toNumOrNull(ctx.milkProteinPct),
 
-    parity: toNumOrNull(ctx.parity ?? ctx.lactationNumber),
+     parity: toNumOrNull(ctx.parity ?? ctx.lactationNumber),
     lactationNumber: toNumOrNull(ctx.parity ?? ctx.lactationNumber),
+
+    frameGainKgDay: toNumOrNull(
+      ctx.frameGainKgDay ??
+      ctx.frameGain ??
+      ctx.targetFrameGainKgDay ??
+      ctx.frmGainTarget
+    ),
 
     dietNDFPct: toNumOrNull(ctx.dietNDFPct),
 
@@ -566,9 +573,11 @@ targets: {
   roughageMin: toNumOrNull(a?.targets?.roughageMin),
   peNDFMin: toNumOrNull(a?.targets?.peNDFMin),
 
-  proteinRequirementModel: a?.targets?.proteinRequirementModel || null,
+    proteinRequirementModel: a?.targets?.proteinRequirementModel || null,
   mineralRequirementModel: a?.targets?.mineralRequirementModel || null,
   vitaminRequirementModel: a?.targets?.vitaminRequirementModel || null,
+  chapter12EnergyModel: a?.targets?.chapter12EnergyModel || null,
+  chapter12ProteinModel: a?.targets?.chapter12ProteinModel || null,
   chapter12MineralModel: a?.targets?.chapter12MineralModel || null,
   chapter12VitaminModel: a?.targets?.chapter12VitaminModel || null
 },
@@ -1075,6 +1084,7 @@ function buildNutritionCentralTargets(context = {}) {
   parity: runtimeCtx.lactationNumberUsed,
   dietNDFPct: context.dietNDFPct,
   mineralDmi: context.mineralDmi,
+  frameGainKgDay: context.frameGainKgDay,
   thi: runtimeCtx.thiUsed,
   bcs: runtimeCtx.bcsUsed
 });
@@ -1216,6 +1226,10 @@ const actualRationDmKg = deriveRationDmKgFromRows(
 
 const contextForTargets = {
   ...context,
+  frameGainKgDay:
+    Number.isFinite(Number(context?.frameGainKgDay)) && Number(context.frameGainKgDay) > 0
+      ? Number(context.frameGainKgDay)
+      : null,
   dietNDFPct:
     Number.isFinite(contextDietNDF) && contextDietNDF > 0
       ? contextDietNDF
@@ -1566,6 +1580,8 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
   mineralRequirementModel: targetsCore?.mineralRequirementModel || null,
   vitaminRequirementModel: targetsCore?.vitaminRequirementModel || null,
+  chapter12EnergyModel: targetsCore?.chapter12EnergyModel || null,
+  chapter12ProteinModel: targetsCore?.chapter12ProteinModel || null,
   chapter12MineralModel: targetsCore?.chapter12MineralModel || null,
   chapter12VitaminModel: targetsCore?.chapter12VitaminModel || null
 },
