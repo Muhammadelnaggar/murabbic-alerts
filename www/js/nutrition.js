@@ -1063,28 +1063,22 @@ try{
       if(diff >= 0) dcc = diff;
     }
   }
-  const prodTxt = String(animal?.productionStatus || '').trim().toLowerCase();
-  const groupTxt = String(animal?.group || '').trim().toLowerCase();
-  const groupKeyTxt = String(animal?.groupKey || '').trim().toLowerCase();
+ const prodTxt = String(animal?.productionStatus || '').trim().toLowerCase();
 
-  const isDryFromAnimal =
-    prodTxt.includes('جاف') ||
-    prodTxt.includes('dry') ||
-    groupTxt.includes('جاف') ||
-    groupKeyTxt === 'dry';
+const isDryFromAnimal =
+  prodTxt.includes('جاف') ||
+  prodTxt.includes('dry');
 
-  const gestLen = (species === 'جاموس') ? 310 : 280;
-  const daysToCalvingCalc =
-    Number.isFinite(Number(dcc)) ? (gestLen - Number(dcc)) : null;
+const gestLen = (species === 'جاموس') ? 310 : 280;
+const daysToCalvingCalc =
+  Number.isFinite(Number(dcc)) ? (gestLen - Number(dcc)) : null;
 
-  const isCloseUpFromAnimal =
-    prodTxt.includes('تحضير') ||
-    prodTxt.includes('انتظار الولادة') ||
-    prodTxt.includes('close') ||
-    groupTxt.includes('تحضير') ||
-    groupTxt.includes('انتظار الولادة') ||
-    groupKeyTxt.includes('close') ||
-    (Number.isFinite(daysToCalvingCalc) && daysToCalvingCalc <= 21);
+const isCloseUpFromAnimal =
+  isDryFromAnimal &&
+  Number.isFinite(daysToCalvingCalc) &&
+  daysToCalvingCalc < 30;
+
+  
 
   const earlyDryEl = document.getElementById('ctxEarlyDry');
   const closeUpEl = document.getElementById('ctxCloseUp');
