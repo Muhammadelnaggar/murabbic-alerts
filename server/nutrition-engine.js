@@ -1669,7 +1669,7 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     pregDays: preg,
     closeUp: isCloseUp,
     growth: false,
-    dmi,
+    dmi: mineralDmiUsed,
    ndfPct: dmiCalc.inputs.dietNDFPct,
     parity: num(parity, 2),
     species: 'cow',
