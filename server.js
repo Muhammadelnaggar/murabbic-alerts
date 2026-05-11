@@ -742,7 +742,13 @@ naPct: toNumOrNull(r?.naPct ?? r?.sodiumPct),
 kPct: toNumOrNull(r?.kPct ?? r?.potassiumPct),
 clPct: toNumOrNull(r?.clPct ?? r?.chloridePct),
 sPct: toNumOrNull(r?.sPct ?? r?.sulfurPct ?? r?.sulphurPct),
-
+caAbsCoeff: toNumOrNull(r?.caAbsCoeff ?? r?.caAbsorptionCoeff),
+pAbsCoeff: toNumOrNull(r?.pAbsCoeff ?? r?.pAbsorptionCoeff),
+mgAbsCoeff: toNumOrNull(r?.mgAbsCoeff ?? r?.mgAbsorptionCoeff),
+naAbsCoeff: toNumOrNull(r?.naAbsCoeff ?? r?.naAbsorptionCoeff),
+kAbsCoeff: toNumOrNull(r?.kAbsCoeff ?? r?.kAbsorptionCoeff),
+clAbsCoeff: toNumOrNull(r?.clAbsCoeff ?? r?.clAbsorptionCoeff),
+sAbsCoeff: toNumOrNull(r?.sAbsCoeff ?? r?.sAbsorptionCoeff),
 vitAIUPerKgDM: toNumOrNull(r?.vitAIUPerKgDM ?? r?.vitaminAIUPerKgDM),
 vitDIUPerKgDM: toNumOrNull(r?.vitDIUPerKgDM ?? r?.vitaminDIUPerKgDM),
 vitEIUPerKgDM: toNumOrNull(r?.vitEIUPerKgDM ?? r?.vitaminEIUPerKgDM),
@@ -809,13 +815,13 @@ seMgKgDM: toNumOrNull(r?.seMgKgDM),
 znMgKgDM: toNumOrNull(r?.znMgKgDM),
 moMgKgDM: toNumOrNull(r?.moMgKgDM),
 
-coAbsCoeff: toNumOrNull(r?.coAbsCoeff),
-cuAbsCoeff: toNumOrNull(r?.cuAbsCoeff),
-feAbsCoeff: toNumOrNull(r?.feAbsCoeff),
-iAbsCoeff: toNumOrNull(r?.iAbsCoeff),
-mnAbsCoeff: toNumOrNull(r?.mnAbsCoeff),
-seAbsCoeff: toNumOrNull(r?.seAbsCoeff),
-znAbsCoeff: toNumOrNull(r?.znAbsCoeff)
+coAbsCoeff: toNumOrNull(r?.coAbsCoeff ?? r?.coAbsorptionCoeff),
+cuAbsCoeff: toNumOrNull(r?.cuAbsCoeff ?? r?.cuAbsorptionCoeff),
+feAbsCoeff: toNumOrNull(r?.feAbsCoeff ?? r?.feAbsorptionCoeff),
+iAbsCoeff: toNumOrNull(r?.iAbsCoeff ?? r?.iAbsorptionCoeff),
+mnAbsCoeff: toNumOrNull(r?.mnAbsCoeff ?? r?.mnAbsorptionCoeff),
+seAbsCoeff: toNumOrNull(r?.seAbsCoeff ?? r?.seAbsorptionCoeff),
+znAbsCoeff: toNumOrNull(r?.znAbsCoeff ?? r?.znAbsorptionCoeff)
   }));
 }
 function feedKeySrv(v){
