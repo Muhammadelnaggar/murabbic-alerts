@@ -169,8 +169,42 @@ function applyDryMilkVisibility(){
     if (isDry) el.value = '';
   });
 }
+function getFrameGainKgDayInput(){
+  const fromWindow =
+    window.mbkNutrition?.testFrameGainKgDay ??
+    window.mbkNutrition?.frameGainKgDay ??
+    null;
+
+  const fromDom =
+    document.getElementById('ctxFrameGainKgDay')?.value ??
+    document.getElementById('ctxFrameGain')?.value ??
+    null;
+
+  const p = qp();
+  const fromUrl =
+    p.get('frameGainKgDay') ||
+    p.get('frameGain') ||
+    p.get('targetFrameGainKgDay') ||
+    p.get('frmGainTarget');
+
+  const n = Number(fromWindow ?? fromDom ?? fromUrl);
+
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function buildNutritionContextForRequest(){
+  const ctx = readContext();
+
+  return {
+    ...ctx,
+    frameGainKgDay:
+      Number.isFinite(Number(ctx?.frameGainKgDay)) && Number(ctx.frameGainKgDay) > 0
+        ? Number(ctx.frameGainKgDay)
+        : getFrameGainKgDayInput()
+  };
+}
 async function fetchTargets(ctx) {
-const _ctxRaw = ctx || readContext();
+const _ctxRaw = ctx || buildNutritionContextForRequest();
 const _isDry = isDryNutritionContext(_ctxRaw);
 const _ctx = _isDry
   ? {
@@ -188,11 +222,12 @@ const payload = {
     breed: _ctx?.breed || window.currentAnimal?.breed || null,
     bodyWeight: _ctx?.bodyWeight,
     bcs: _ctx?.bcs,
-    parity: _ctx?.parity,
-    dietNDFPct: _ctx?.dietNDFPct,
-    daysInMilk: _ctx?.daysInMilk,
-    avgMilkKg: _ctx?.avgMilkKg,
-   pregnancyDays: _ctx?.pregnancyDays,
+parity: _ctx?.parity,
+frameGainKgDay: _ctx?.frameGainKgDay,
+dietNDFPct: _ctx?.dietNDFPct,
+daysInMilk: _ctx?.daysInMilk,
+avgMilkKg: _ctx?.avgMilkKg,
+pregnancyDays: _ctx?.pregnancyDays,
 pregnancyStatus: _ctx?.pregnancyStatus,
 daysToCalving: _ctx?.daysToCalving,
 earlyDry: _ctx?.earlyDry,
@@ -237,13 +272,14 @@ if (!res.ok || data?.ok === false) {
 
 async function refreshTargets() {
   await loadNutritionWeatherTHI();
-  const ctx = readContext();
+  const ctx = buildNutritionContextForRequest();
   const key = JSON.stringify({
   species: ctx?.species || '',
   breed: ctx?.breed || window.currentAnimal?.breed || '',
   bodyWeight: ctx?.bodyWeight ?? '',
   bcs: ctx?.bcs ?? '',
   parity: ctx?.parity ?? '',
+  frameGainKgDay: ctx?.frameGainKgDay ?? '',
   dietNDFPct: ctx?.dietNDFPct ?? '',
   daysInMilk: ctx?.daysInMilk ?? '',
   avgMilkKg: ctx?.avgMilkKg ?? '',
@@ -275,6 +311,7 @@ let rationAnalysisCacheKey = '';
 async function fetchRationAnalysis(rows) {
   await loadNutritionWeatherTHI();
   const list = Array.isArray(rows) ? rows : [];
+  const ctx = buildNutritionContextForRequest();
   if (!list.length) {
     rationAnalysisCache = null;
     return null;
@@ -295,10 +332,10 @@ async function fetchRationAnalysis(rows) {
   mode: document.getElementById('mode')?.value || 'tmr_asfed',
   rows: list,
   concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-milkPrice: isDryNutritionContext(readContext())
+milkPrice: isDryNutritionContext(ctx)
   ? null
   : parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
-context: readContext()
+context: ctx
 })
   });
 
@@ -317,6 +354,7 @@ return rationAnalysisCache;
 
 async function refreshRationAnalysis(rows) {
   const list = Array.isArray(rows) ? rows : [];
+  const ctx = buildNutritionContextForRequest();
   if (!list.length) {
     rationAnalysisCache = null;
     rationAnalysisCacheKey = '';
@@ -327,10 +365,10 @@ async function refreshRationAnalysis(rows) {
   rows: list,
   mode: document.getElementById('mode')?.value || 'tmr_asfed',
   concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-milkPrice: isDryNutritionContext(readContext())
+milkPrice: isDryNutritionContext(ctx)
   ? null
   : parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
-context: readContext()
+context: ctx
 });
 
   if (key === rationAnalysisCacheKey && rationAnalysisCache) {
