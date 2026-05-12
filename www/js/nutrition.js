@@ -2984,7 +2984,6 @@ frameGainKgDay: (() => {
 dietNDFPct: parseUiNumber(
   document.getElementById('ctxDietNDFPct')?.value || null
 ),
-    ),
 
     daysInMilk: getNum('ctxDIM'),
     avgMilkKg: isDry ? 0 : getNum('ctxAvgMilk'),
