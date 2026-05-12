@@ -587,8 +587,9 @@ function computeNasemMPRequirement({
   // Milk TP. If TP/CP is not known, NASEM uses 0.951.
   const npMilkG = milk * protPct * 1000 * 0.951;
 
- // NASEM 2021: NP-Gestation = Gain_GrUter × 123 g CP/kg × 0.86 TP/CP
- const isHeifer = !!growth && par < 1;
+  // SOURCE: NASEM_2021_EQ_6_11A
+  // NP-Gestation (g/d) = Gain_GrUter (kg/d) × 125
+  const isHeifer = !!growth && par < 1;
   const grUterGainKg = gravidUterusGainKgDay(
     bw,
     preg,
@@ -596,7 +597,8 @@ function computeNasemMPRequirement({
     matureBodyWeight || bw,
     isHeifer
   );
-  const npGestationG = grUterGainKg * 123 * 0.86;
+  const npGestationG = grUterGainKg * 125;
+  
 
  // Eq. 6-12a: NP-growth = Frame weight gain(g/d) × 0.11 × 0.86
 // NASEM: Frame gain is an independent model input.
@@ -614,10 +616,7 @@ if (Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0) {
 
 const frameGainGDay = frameGainForProteinKgDay * 1000;
 
-const npGrowthG =
-  milk > 0
-    ? frameGainGDay * 0.11 * 0.86
-    : frameGainGDay * 0.06;
+const npGrowthG = frameGainGDay * 0.11 * 0.86;
   let recommendedMPG;
 
   if (milk > 0) {
@@ -1717,14 +1716,9 @@ const mineralDmiUsed =
 const nelMaintenance = nelMaintenanceMcal(bw);
 const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
 
-const frameGainForEnergyKgDay = nasemFrameGainKgDay({
-  bodyWeight: bw,
-  matureBodyWeight: matBW,
-  parity: num(parity, 2),
-  explicitFrameGainKgDay: frameGainKgDay
-});
+const frameGainForEnergyKgDay = 0;
 
-const nelGrowth = nelFrameGainMcal(frameGainForEnergyKgDay);
+const nelGrowth = 0;
 
 const nelTotal = nelMaintenance + nelPreg + nelGrowth;
 
@@ -1747,7 +1741,7 @@ const chapter12EnergyModel = buildChapter12EnergyModel({
     parity: num(parity, 2),
     species: 'cow',
     matureBodyWeight: matBW,
-    frameGainKgDay: frameGainForEnergyKgDay
+    frameGainKgDay: 0
 });
   
 
