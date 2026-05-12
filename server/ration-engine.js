@@ -128,7 +128,6 @@ const UN =
 const UE_DM = DMI > 0 ? ((0.0146 * UN) / DMI) : 0;
 const ME_DM = DE_DM - GasE_DM - UE_DM;
 const NEL_DM = 0.66 * ME_DM;
-
   return {
     model: 'NASEM_2021_CH3_EQ_3_8_TO_3_12',
     applied: true,
