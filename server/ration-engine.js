@@ -111,21 +111,9 @@ const DE_DM = BASE_DE_DM > 0 ? BASE_DE_DM : componentDE_DM;
     ? ((0.294 * DMI - 0.347 * FA_DM + 0.0409 * dNDF_DM) / DMI)
     : 0;
 
-const CP_FRAC = CP_DM > 1 ? (CP_DM / 100) : CP_DM;
+const urinaryNGramDay = 0;
 
-const retainedProteinKg =
-  Math.max(0, num(milkCPKg)) +
-  Math.max(0, num(bodyGainCPKg));
-
-const absorbedProteinKg =
-  DMI > 0 ? (DMI * CP_FRAC * adCP_CP) : 0;
-
-const UN =
-  DMI > 0
-    ? Math.max(0, (absorbedProteinKg - retainedProteinKg) * 1000 / 6.25)
-    : 0;
-
-const UE_DM = DMI > 0 ? ((0.0146 * UN) / DMI) : 0;
+const UE_DM = DMI > 0 ? ((0.0146 * urinaryNGramDay) / DMI) : 0;
 const ME_DM = DE_DM - GasE_DM - UE_DM;
 const NEL_DM = 0.66 * ME_DM;
   return {
@@ -157,7 +145,7 @@ const NEL_DM = 0.66 * ME_DM;
       efRomPctDM: round(efROM_DM, 3),
       cpPctDM: round(CP_DM, 3),
       adCpPctOfCp: round(adCP_CP * 100, 3),
-      urinaryNGramDay: round(UN, 3)
+      urinaryNGramDay: round(urinaryNGramDay, 3)
     }
   };
 }
