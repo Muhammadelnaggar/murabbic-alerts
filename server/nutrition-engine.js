@@ -587,8 +587,8 @@ function computeNasemMPRequirement({
   // Milk TP. If TP/CP is not known, NASEM uses 0.951.
   const npMilkG = milk * protPct * 1000 * 0.951;
 
-  // Eq. 6-11a: NP-Gestation = Gain_GrUter × 125
-  const isHeifer = !!growth || milk <= 0;
+ // NASEM 2021: NP-Gestation = Gain_GrUter × 123 g CP/kg × 0.86 TP/CP
+ const isHeifer = !!growth && par < 1;
   const grUterGainKg = gravidUterusGainKgDay(
     bw,
     preg,
@@ -596,7 +596,7 @@ function computeNasemMPRequirement({
     matureBodyWeight || bw,
     isHeifer
   );
-  const npGestationG = grUterGainKg * 125;
+  const npGestationG = grUterGainKg * 123 * 0.86;
 
  // Eq. 6-12a: NP-growth = Frame weight gain(g/d) × 0.11 × 0.86
 // NASEM: Frame gain is an independent model input.
