@@ -612,7 +612,12 @@ if (Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0) {
   frameGainForProteinKgDay = 0.15;
 }
 
-const npGrowthG = (frameGainForProteinKgDay * 1000) * 0.11 * 0.86;
+const frameGainGDay = frameGainForProteinKgDay * 1000;
+
+const npGrowthG =
+  milk > 0
+    ? frameGainGDay * 0.11 * 0.86
+    : frameGainGDay * 0.06;
   let recommendedMPG;
 
   if (milk > 0) {
