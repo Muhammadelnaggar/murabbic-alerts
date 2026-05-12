@@ -2952,15 +2952,38 @@ function readContext(){
     species,
     breed,
 
-    parity: parseUiNumber(
-      document.getElementById('ctxParity')?.value ||
-      window.currentAnimal?.parity ||
-      window.currentAnimal?.lactationNumber ||
-      null
-    ),
+parity: parseUiNumber(
+  document.getElementById('ctxParity')?.value ||
+  window.currentAnimal?.parity ||
+  window.currentAnimal?.lactationNumber ||
+  null
+),
 
-    dietNDFPct: parseUiNumber(
-      document.getElementById('ctxDietNDFPct')?.value || null
+frameGainKgDay: (() => {
+  const fromWindow =
+    window.mbkNutrition?.testFrameGainKgDay ??
+    window.mbkNutrition?.frameGainKgDay ??
+    null;
+
+  const fromDom =
+    document.getElementById('ctxFrameGainKgDay')?.value ??
+    document.getElementById('ctxFrameGain')?.value ??
+    null;
+
+  const p = qp();
+  const fromUrl =
+    p.get('frameGainKgDay') ||
+    p.get('frameGain') ||
+    p.get('targetFrameGainKgDay') ||
+    p.get('frmGainTarget');
+
+  const n = parseUiNumber(fromWindow ?? fromDom ?? fromUrl);
+  return Number.isFinite(n) && n > 0 ? n : null;
+})(),
+
+dietNDFPct: parseUiNumber(
+  document.getElementById('ctxDietNDFPct')?.value || null
+),
     ),
 
     daysInMilk: getNum('ctxDIM'),
