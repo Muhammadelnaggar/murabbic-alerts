@@ -1446,16 +1446,38 @@ function computeCPReferencePct({ species, milkKg, breed, stage }){
 /* ============================= */
 /*          COW ENGINE           */
 /* ============================= */
-function lactatingFrameGainKgDay({ milkKg, parity }){
-  const milk = num(milkKg);
+function nasemFrameGainKgDay({
+  bodyWeight,
+  matureBodyWeight,
+  parity,
+  explicitFrameGainKgDay = null
+}){
+  // لو جاءت قيمة صريحة من السياق/الموديول/المستخدم، تُستخدم كما هي.
+  if (Number.isFinite(Number(explicitFrameGainKgDay)) && Number(explicitFrameGainKgDay) > 0) {
+    return Number(explicitFrameGainKgDay);
+  }
+
+  const bw = num(bodyWeight);
+  const matBW = num(matureBodyWeight);
   const par = num(parity, 2);
 
-  if (milk <= 0) return 0;
+  if (!(bw > 0 && matBW > 0)) return 0;
+  if (bw >= matBW) return 0;
+  if (par >= 3) return 0;
 
-  if (par === 1) return 0.19;
-  if (par === 2) return 0.15;
+  const targetGain =
+    par === 1 ? 0.19 :
+    par === 2 ? 0.15 :
+    0;
 
-  return 0;
+  if (targetGain <= 0) return 0;
+
+  const remainingKg = matBW - bw;
+  return Math.max(0, Math.min(targetGain, remainingKg));
+}
+
+function lactatingFrameGainKgDay(args){
+  return nasemFrameGainKgDay(args);
 }
 
 function nelFrameGainMcal(frameGainKgDay){
@@ -1476,7 +1498,8 @@ function computeCow({
   milkProteinPct,
   bcs,
   parity,
-  mineralDmi
+  mineralDmi,
+  frameGainKgDay
 }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
@@ -1508,12 +1531,16 @@ const nelMaintenance = nelMaintenanceMcal(bw);
 const nelMilk = nelLactationMilkMcal(milk, fatPct, proteinPct);
 const nelPreg = gestationConceptusNE(bw, pregDays);
 
-const frameGainKgDay = lactatingFrameGainKgDay({
-  milkKg: milk,
-  parity: num(parity, 2)
+const matureBodyWeight = getStandardWeight('cow', breed);
+
+const frameGainForEnergyKgDay = lactatingFrameGainKgDay({
+  bodyWeight: bw,
+  matureBodyWeight,
+  parity: num(parity, 2),
+  explicitFrameGainKgDay: frameGainKgDay
 });
 
-const nelGrowth = nelFrameGainMcal(frameGainKgDay);
+const nelGrowth = nelFrameGainMcal(frameGainForEnergyKgDay);
 
 const nelTotal = nelMaintenance + nelMilk + nelPreg + nelGrowth;
 
@@ -1535,7 +1562,8 @@ const mpReq = computeNasemMPRequirement({
   ndfPct: 30,
   parity: num(parity, 2),
   species: 'cow',
-  matureBodyWeight: getStandardWeight('cow', breed)
+ matureBodyWeight,
+frameGainKgDay: frameGainForEnergyKgDay
 });
 
 const mpTargetG = mpReq.mpTargetG;
@@ -1554,7 +1582,7 @@ const mineralReq = computeNasemMacroMineralRequirements({
   dmi: mineralDmiUsed,
   growth: false,
   category: 'lactating',
-  matureBodyWeight: getStandardWeight('cow', breed)
+  matureBodyWeight
 });
 
 mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
@@ -1681,10 +1709,12 @@ const mineralDmiUsed =
 const nelMaintenance = nelMaintenanceMcal(bw);
 const nelPreg = gestationConceptusNE(bw, preg, null, matBW, false);
 
-const frameGainForEnergyKgDay =
-  Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0
-    ? Number(frameGainKgDay)
-    : 0;
+const frameGainForEnergyKgDay = nasemFrameGainKgDay({
+  bodyWeight: bw,
+  matureBodyWeight: matBW,
+  parity: num(parity, 2),
+  explicitFrameGainKgDay: frameGainKgDay
+});
 
 const nelGrowth = nelFrameGainMcal(frameGainForEnergyKgDay);
 
