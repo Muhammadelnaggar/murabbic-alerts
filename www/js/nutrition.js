@@ -332,10 +332,21 @@ async function fetchRationAnalysis(rows) {
   mode: document.getElementById('mode')?.value || 'tmr_asfed',
   rows: list,
   concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
-milkPrice: isDryNutritionContext(ctx)
-  ? null
-  : parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
-context: ctx
+  milkPrice: isDryNutritionContext(ctx)
+    ? null
+    : parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null),
+  context: {
+    ...ctx,
+    frameGainKgDay:
+      Number.isFinite(Number(ctx?.frameGainKgDay)) && Number(ctx.frameGainKgDay) > 0
+        ? Number(ctx.frameGainKgDay)
+        : (
+            Number.isFinite(Number(window.mbkNutrition?.testFrameGainKgDay)) &&
+            Number(window.mbkNutrition?.testFrameGainKgDay) > 0
+              ? Number(window.mbkNutrition.testFrameGainKgDay)
+              : null
+          )
+  }
 })
   });
 
