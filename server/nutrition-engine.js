@@ -1484,8 +1484,11 @@ function nelFrameGainMcal(frameGainKgDay){
   const gain = num(frameGainKgDay);
   if (gain <= 0) return 0;
 
-  // عمليًا قريب من تقرير الموديول: 0.19 kg frame gain ≈ 0.65 Mcal NEL
-  return gain * 3.42;
+  // NASEM module check:
+  // 0.10 kg/d frame gain -> 0.61 Mcal/d NEL
+  // 0.15 kg/d frame gain -> 0.92 Mcal/d NEL
+  // ≈ 6.1 Mcal NEL per kg frame gain.
+  return gain * 6.1;
 }
 function computeCow({
   bodyWeight,
