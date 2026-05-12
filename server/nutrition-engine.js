@@ -127,6 +127,8 @@ function buildChapter12EnergyModel({
     growthMcal: round(nelGrowth)
   };
 
+  const hasGrowth = num(nelGrowth) > 0;
+
   return {
     model: 'NASEM_2021_CH12_ENERGY_CONTEXT',
     stage,
@@ -141,10 +143,18 @@ function buildChapter12EnergyModel({
       num(nelGrowth)
     ),
     rule: isDryOrPrepartum
-      ? 'mature_dry_or_close_up_cow_uses_maintenance_plus_pregnancy_no_lactation_no_growth'
+      ? (
+          hasGrowth
+            ? 'mature_dry_or_close_up_cow_uses_maintenance_plus_pregnancy_plus_frame_growth_no_lactation'
+            : 'mature_dry_or_close_up_cow_uses_maintenance_plus_pregnancy_no_lactation_no_growth'
+        )
       : 'fresh_or_lactating_cow_uses_lactation_energy_when_milk_exists',
     note: isDryOrPrepartum
-      ? 'Dry/close-up mature cow energy is calculated from maintenance plus pregnancy only; lactation and growth are not used.'
+      ? (
+          hasGrowth
+            ? 'Dry/close-up mature cow energy is calculated from maintenance plus pregnancy plus target frame gain; lactation is not used.'
+            : 'Dry/close-up mature cow energy is calculated from maintenance plus pregnancy only; lactation and growth are not used.'
+        )
       : 'Fresh postpartum/lactating cow energy includes milk energy when milk production exists.'
   };
 }
@@ -165,6 +175,9 @@ function buildChapter12ProteinModel({
     stage === 'far_off_dry' ||
     stage === 'close_up_prepartum';
 
+  const hasGrowthProtein =
+    num(c.npGrowthG) > 0 || num(c.frameGainKgDay) > 0;
+
   return {
     model: 'NASEM_2021_CH12_PROTEIN_CONTEXT',
     stage,
@@ -174,7 +187,11 @@ function buildChapter12ProteinModel({
     mpModel: mpReq?.model || null,
     eaaModel: eaaReq?.model || null,
     rule: isDryOrPrepartum
-      ? 'mature_dry_or_close_up_cow_uses_no_lactation_protein_no_growth_protein'
+      ? (
+          hasGrowthProtein
+            ? 'mature_dry_or_close_up_cow_uses_no_lactation_protein_plus_frame_growth_protein'
+            : 'mature_dry_or_close_up_cow_uses_no_lactation_protein_no_growth_protein'
+        )
       : 'fresh_or_lactating_cow_uses_lactation_protein_when_milk_exists',
     components: {
       npScurfG: round(c.npScurfG, 3),
@@ -187,8 +204,12 @@ function buildChapter12ProteinModel({
       grUterGainKgDay: round(c.grUterGainKgDay, 4),
       frameGainKgDay: round(c.frameGainKgDay, 4)
     },
-    note: isDryOrPrepartum
-      ? 'Dry/close-up mature cow protein is calculated from maintenance/metabolic fecal/endogenous and gestation components; milk and growth components are zero.'
+     note: isDryOrPrepartum
+      ? (
+          hasGrowthProtein
+            ? 'Dry/close-up mature cow protein is calculated from maintenance/metabolic fecal/endogenous, gestation, and target frame gain components; milk protein is not used.'
+            : 'Dry/close-up mature cow protein is calculated from maintenance/metabolic fecal/endogenous and gestation components; milk and growth components are zero.'
+        )
       : 'Fresh/lactating cow protein includes milk protein when milk production exists.'
   };
 }
