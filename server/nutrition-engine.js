@@ -588,7 +588,7 @@ function computeNasemMPRequirement({
   const npMilkG = milk * protPct * 1000 * 0.951;
 
   // Eq. 6-11a: NP-Gestation = Gain_GrUter × 125
- const isHeifer = !!growth && par <= 0;
+  const isHeifer = !!growth || milk <= 0;
   const grUterGainKg = gravidUterusGainKgDay(
     bw,
     preg,
