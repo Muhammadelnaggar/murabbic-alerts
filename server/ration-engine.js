@@ -135,9 +135,16 @@ const retainedProteinKg =
           : Math.max(0, num(bodyGainCPKg))
       );
 
+const cpIntakeKg = DMI * CP_FRAC;
+const apparentlyDigestedCPKg = cpIntakeKg * adCP_CP;
+const urinaryNBeforeClampG =
+  DMI > 0
+    ? ((apparentlyDigestedCPKg - retainedProteinKg) * 1000 / 6.25)
+    : 0;
+
 const urinaryNGramDay =
   DMI > 0
-    ? Math.max(0, (DMI * CP_FRAC * adCP_CP - retainedProteinKg) * 1000 / 6.25)
+    ? Math.max(0, urinaryNBeforeClampG)
     : 0;
 
 const UE_DM = DMI > 0 ? ((0.0146 * urinaryNGramDay) / DMI) : 0;
@@ -191,7 +198,13 @@ const NEL_DM = 0.66 * ME_DM;
       efRomPctDM: round(efROM_DM, 3),
       cpPctDM: round(CP_DM, 3),
       adCpPctOfCp: round(adCP_CP * 100, 3),
-      urinaryNGramDay: round(urinaryNGramDay, 3)
+
+      cpIntakeKg: round(cpIntakeKg, 3),
+      apparentlyDigestedCPKg: round(apparentlyDigestedCPKg, 3),
+      retainedProteinKg: round(retainedProteinKg, 3),
+      urinaryNBeforeClampG: round(urinaryNBeforeClampG, 3),
+      urinaryNGramDay: round(urinaryNGramDay, 3),
+      urinaryEDiagnosticOnly: true
     }
   };
 }
