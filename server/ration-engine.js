@@ -91,16 +91,25 @@ function calculateNasemEnergy2021({
   const CP_DM = num(cpPctDM);
   const adCP_CP = pctFrac(adCpPctOfCp || 70);
 
- const componentDE_DM =
-  (0.042 * NDF_DM * dNDF_NDF) +
-  (0.0423 * Starch_DM * dStarch_Starch) +
-  (0.0940 * FA_DM * dFA_FA) +
+const ndfDE_DM = (0.042 * NDF_DM * dNDF_NDF);
+const starchDE_DM = (0.0423 * Starch_DM * dStarch_Starch);
+const faDE_DM = (0.0940 * FA_DM * dFA_FA);
+const proteinDE_DM =
   (0.0565 * (RDP_DM - sNPNCPE_DM + dRUP_DM)) +
-  (0.0089 * sNPNCPE_DM) +
-  (0.040 * ROM_DM * 0.96) -
+  (0.0089 * sNPNCPE_DM) -
   (0.00565 * MFCP) -
-  (0.00565 * fMCP) -
+  (0.00565 * fMCP);
+
+const romDE_DM =
+  (0.040 * ROM_DM * 0.96) -
   (0.0040 * efROM_DM);
+
+const componentDE_DM =
+  ndfDE_DM +
+  starchDE_DM +
+  faDE_DM +
+  proteinDE_DM +
+  romDE_DM;
 
 const BASE_DE_DM = num(baseDEMcalPerKgDM);
 
@@ -145,6 +154,25 @@ const NEL_DM = 0.66 * ME_DM;
     urinaryEMcalPerKgDM: round(UE_DM, 3),
     meMcalPerKgDM: round(ME_DM, 3),
     nelMcalPerKgDM: round(NEL_DM, 3),
+       deComponentModel: {
+      unit: 'Mcal_day_and_Mcal_kg_DM',
+      ndfDEMcalPerKgDM: round(ndfDE_DM, 3),
+      starchDEMcalPerKgDM: round(starchDE_DM, 3),
+      faDEMcalPerKgDM: round(faDE_DM, 3),
+      proteinDEMcalPerKgDM: round(proteinDE_DM, 3),
+      romDEMcalPerKgDM: round(romDE_DM, 3),
+      totalDEMcalPerKgDM: round(componentDE_DM, 3),
+
+      ndfDEMcalDay: round(ndfDE_DM * DMI, 2),
+      starchDEMcalDay: round(starchDE_DM * DMI, 2),
+      faDEMcalDay: round(faDE_DM * DMI, 2),
+      proteinDEMcalDay: round(proteinDE_DM * DMI, 2),
+      romDEMcalDay: round(romDE_DM * DMI, 2),
+      totalDEMcalDay: round(componentDE_DM * DMI, 2),
+
+      diagnosticOnly: true,
+      note: 'Diagnostic breakdown of DE components to compare with NASEM Report 4.3; does not change final calculation.'
+    },
     inputs: {
       dmKg: round(DMI, 3),
       baseDEMcalPerKgDM: round(BASE_DE_DM, 3),
