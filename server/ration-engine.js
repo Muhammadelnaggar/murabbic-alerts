@@ -64,8 +64,11 @@ function calculateNasemEnergy2021({
   efRomPctDM,
   cpPctDM,
   adCpPctOfCp,
-  milkCPKg = 0,
-  bodyGainCPKg = 0
+    milkCPKg = 0,
+  bodyGainCPKg = 0,
+  matureBodyWeight = 0,
+  isLactating = false,
+  isWithin60DaysOfParturition = false
 }){
   const DMI = num(dmKg);
 
@@ -111,7 +114,21 @@ const DE_DM = BASE_DE_DM > 0 ? BASE_DE_DM : componentDE_DM;
     ? ((0.294 * DMI - 0.347 * FA_DM + 0.0409 * dNDF_DM) / DMI)
     : 0;
 
-const urinaryNGramDay = 0;
+const CP_FRAC = CP_DM > 1 ? (CP_DM / 100) : CP_DM;
+
+const retainedProteinKg =
+  isLactating
+    ? (Math.max(0, num(milkCPKg)) + Math.max(0, num(bodyGainCPKg)))
+    : (
+        isWithin60DaysOfParturition && num(matureBodyWeight) > 0
+          ? (0.00014 * num(matureBodyWeight))
+          : Math.max(0, num(bodyGainCPKg))
+      );
+
+const urinaryNGramDay =
+  DMI > 0
+    ? Math.max(0, (DMI * CP_FRAC * adCP_CP - retainedProteinKg) * 1000 / 6.25)
+    : 0;
 
 const UE_DM = DMI > 0 ? ((0.0146 * urinaryNGramDay) / DMI) : 0;
 const ME_DM = DE_DM - GasE_DM - UE_DM;
@@ -1794,7 +1811,21 @@ const nasemEnergyModel = calculateNasemEnergy2021({
   cpPctDM: cpPctTotal,
   adCpPctOfCp: 70,
   milkCPKg,
-  bodyGainCPKg: Number(context?.bodyGainCPKg || 0)
+    bodyGainCPKg: Number(context?.bodyGainCPKg || 0),
+  matureBodyWeight: Number(context?.matureBodyWeight || context?.matureBodyWeightKg || 0),
+  isLactating: avgMilkKg > 0,
+  isWithin60DaysOfParturition:
+    !(avgMilkKg > 0) &&
+    (
+      context?.closeUp === true ||
+      String(context?.category || '').includes('close_up') ||
+      String(context?.stage || '').includes('close_up') ||
+      (
+        Number(context?.pregnancyDays || context?.pregDays || 0) > 0 &&
+        Number(context?.gestationLength || 280) - Number(context?.pregnancyDays || context?.pregDays || 0) <= 60
+      )
+    )
+ 
 });
 
 const nelTotalMcalDay = nasemEnergyModel.nelMcalPerKgDM * dmKg;
