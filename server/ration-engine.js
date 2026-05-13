@@ -1365,6 +1365,10 @@ let missingNdsfRows = 0;
 let forageNdfKg = 0;
 let forageNdfdWeightedSum = 0;
 let forageNdfdWeightKg = 0;
+
+let dietNdfdWeightedSum = 0;
+let dietNdfdWeightKg = 0;
+
 let starchDigestibilityWeightedSum = 0;
 let starchDigestibilityWeightKg = 0;
 
@@ -1695,6 +1699,11 @@ if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
 const starchItemKg = dmItemKg * (starch / 100);
 const ndfItemKg = dmItemKg * (ndf / 100);
 
+if (Number.isFinite(fNDFD) && fNDFD > 0 && ndfItemKg > 0) {
+  dietNdfdWeightedSum += ndfItemKg * fNDFD;
+  dietNdfdWeightKg += ndfItemKg;
+}
+
 starchKg += starchItemKg;
 
 if (ndfItemKg > 0) {
@@ -1740,6 +1749,10 @@ if (cat === 'rough') {
 
 if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
   }
+ const weightedDietNdfDigestibilityPct =
+  dietNdfdWeightKg > 0
+    ? (dietNdfdWeightedSum / dietNdfdWeightKg)
+    : null;
 const dietKPctDMForMg =
   dmKg > 0 ? (mineralG.K / (dmKg * 1000)) * 100 : 0;
 
@@ -1865,14 +1878,13 @@ const bodyWeightKgForEnergy = Number(
 );
 
 const ndfBaseDigestibilityPctForEnergy =
-  Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
-    ? Number(weightedForageNdfDigestibilityPct)
+  Number.isFinite(Number(weightedDietNdfDigestibilityPct)) && Number(weightedDietNdfDigestibilityPct) > 0
+    ? Number(weightedDietNdfDigestibilityPct)
     : (
-        Number.isFinite(Number(weightedStarchDigestibilityPct)) && Number(weightedStarchDigestibilityPct) > 0
-          ? Number(weightedStarchDigestibilityPct)
+        Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
+          ? Number(weightedForageNdfDigestibilityPct)
           : 50
       );
-
 const dmiBwForEnergy =
   bodyWeightKgForEnergy > 0
     ? (dmKg / bodyWeightKgForEnergy)
