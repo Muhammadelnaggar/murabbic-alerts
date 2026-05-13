@@ -1286,7 +1286,27 @@ function calcEcmKg(milkKg, milkFatPct, milkProteinPct){
   if (!milk) return 0;
   return milk * ((0.383 * fat) + (0.242 * protein) + 0.7832) / 3.1138;
 }
+function resolveEnergyStage(context = {}, avgMilkKg = 0){
+  if (avgMilkKg > 0) return 'lactating';
 
+  const txt = String(
+    context?.stage ||
+    context?.category ||
+    context?.physiologicalStage ||
+    ''
+  ).toLowerCase();
+
+  const closeUp =
+    context?.closeUp === true ||
+    txt.includes('close_up') ||
+    txt.includes('closeup') ||
+    txt.includes('انتظار') ||
+    txt.includes('ولادة');
+
+  if (closeUp) return 'close_up';
+
+  return 'far_dry';
+}
 function analyzeRation(rows, targets = {}, context = {}){
   const list = Array.isArray(rows) ? rows : [];
 
@@ -1833,6 +1853,41 @@ const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
 const milkCPKg = avgMilkKg > 0 && milkProteinPct > 0
   ? avgMilkKg * (milkProteinPct / 100)
   : 0;
+
+const energyStage = resolveEnergyStage(context, avgMilkKg);
+
+const bodyWeightKgForEnergy = Number(
+  context?.bodyWeightKg ??
+  context?.bodyWeight ??
+  context?.bwKg ??
+  context?.bw ??
+  0
+);
+
+const ndfBaseDigestibilityPctForEnergy =
+  Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
+    ? Number(weightedForageNdfDigestibilityPct)
+    : (
+        Number.isFinite(Number(weightedStarchDigestibilityPct)) && Number(weightedStarchDigestibilityPct) > 0
+          ? Number(weightedStarchDigestibilityPct)
+          : 50
+      );
+
+const dmiBwForEnergy =
+  bodyWeightKgForEnergy > 0
+    ? (dmKg / bodyWeightKgForEnergy)
+    : 0.035;
+
+// NASEM 2021 energy supply uses diet-adjusted NDF digestibility.
+// Same supply equation for lactating, far-dry, and close-up; stage affects context/requirements.
+const ndfAdjustedDigestibilityPctForEnergy = clamp(
+  ndfBaseDigestibilityPctForEnergy
+    - (0.0059 * (starchPct - 26) * 100)
+    - (1.1 * (dmiBwForEnergy - 0.035) * 100),
+  0,
+  100
+);
+
 // NASEM 2021 Eq. 3-6a:
 // MFCP, g/kg DMI = 11.62 + 0.134 × dietary NDF%DM
 const mfcpGPerKgDMForEnergy =
@@ -1862,7 +1917,7 @@ const nasemEnergyModel = calculateNasemEnergy2021({
   dmKg,
   baseDEMcalPerKgDM: feedLibraryBaseDEDensityMcalKgDM,
   ndfPctDM: ndfPctActual,
-  dNdfPctOfNdf: weightedForageNdfDigestibilityPct || weightedStarchDigestibilityPct || 50,
+ dNdfPctOfNdf: ndfAdjustedDigestibilityPctForEnergy,
   starchPctDM: starchPct,
   dStarchPctOfStarch: weightedStarchDigestibilityPct || 90,
   faPctDM: faPctActual,
@@ -1893,9 +1948,20 @@ adCpPctOfCp: adCpPctOfCpForEnergy,
     )
  
 });
-
-const nelTotalMcalDay = nasemEnergyModel.nelMcalPerKgDM * dmKg;
-const nelDensityMcalKgDM = nasemEnergyModel.nelMcalPerKgDM;
+const energySupplyModel = {
+  ...nasemEnergyModel,
+  stage: energyStage,
+  ndfDigestibilityMode: 'NASEM_2021_ADJUSTED_DIET_NDF_DIGESTIBILITY',
+  ndfDigestibilityContext: {
+    basePct: round(ndfBaseDigestibilityPctForEnergy, 3),
+    adjustedPct: round(ndfAdjustedDigestibilityPctForEnergy, 3),
+    starchPctDM: round(starchPct, 3),
+    dmiBw: round(dmiBwForEnergy, 4),
+    bodyWeightKg: round(bodyWeightKgForEnergy, 1)
+  }
+};
+const nelTotalMcalDay = energySupplyModel.nelMcalPerKgDM * dmKg;
+const nelDensityMcalKgDM = energySupplyModel.nelMcalPerKgDM;
 
 const speciesText = String(context?.species || '').trim().toLowerCase();
 const isBuffalo = /جاموس|buffalo/.test(speciesText);
@@ -2234,7 +2300,7 @@ vitaminSupplyModel,
 
 nelActual: round(nelTotalMcalDay),
 nelDensity: round(nelDensityMcalKgDM),
-energySupplyModel: nasemEnergyModel,
+energySupplyModel,
 nelBalanceMcal: round(nelTotalMcalDay - nelTarget),
 ndfPctActual: round(ndfPctActual),
 dietNDFPct: round(dietNDFPct),
