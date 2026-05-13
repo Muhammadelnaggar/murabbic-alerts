@@ -104,9 +104,10 @@ function calculateNasemEnergy2021({
 
 const BASE_DE_DM = num(baseDEMcalPerKgDM);
 
-// في مُرَبِّيك: DE الأساسي يأتي من NASEM feed library كـ weighted diet baseDE.
-// إعادة تركيب DE من المكونات تبقى diagnostic فقط.
-const DE_DM = BASE_DE_DM > 0 ? BASE_DE_DM : componentDE_DM;
+// NASEM 2021 Eq. 3-8:
+// Final diet DE must be calculated from digestible diet fractions.
+// Feed-table Base DE is diagnostic/input context only, not the final DE.
+const DE_DM = componentDE_DM;
 
   const dNDF_DM = NDF_DM * dNDF_NDF;
 
