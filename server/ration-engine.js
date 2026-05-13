@@ -1368,7 +1368,8 @@ let forageNdfdWeightKg = 0;
 
 let dietNdfdWeightedSum = 0;
 let dietNdfdWeightKg = 0;
-
+let ligninNdfdWeightedSum = 0;
+let ligninNdfdWeightKg = 0;
 let starchDigestibilityWeightedSum = 0;
 let starchDigestibilityWeightKg = 0;
 
@@ -1699,6 +1700,26 @@ if (String(r.cat || '').trim().toLowerCase() === 'add' && faItemKg > 0) {
 const starchItemKg = dmItemKg * (starch / 100);
 const ndfItemKg = dmItemKg * (ndf / 100);
 
+const ligninPct = Number(r.ligninPct ?? r.adlPct ?? r.acidDetergentLigninPct);
+
+if (
+  Number.isFinite(ligninPct) &&
+  ligninPct >= 0 &&
+  ndf > 0 &&
+  ndfItemKg > 0
+) {
+  const ligninNdfRatio = clamp(ligninPct / ndf, 0, 0.99);
+
+  const ligninBasedNdfDigestibilityPct =
+    0.75 *
+    (1 - ligninNdfRatio) *
+    (1 - Math.pow(ligninNdfRatio, 2 / 3)) *
+    100;
+
+  ligninNdfdWeightedSum += ndfItemKg * ligninBasedNdfDigestibilityPct;
+  ligninNdfdWeightKg += ndfItemKg;
+}
+
 if (Number.isFinite(fNDFD) && fNDFD > 0 && ndfItemKg > 0) {
   dietNdfdWeightedSum += ndfItemKg * fNDFD;
   dietNdfdWeightKg += ndfItemKg;
@@ -1752,6 +1773,10 @@ if (cat === 'conc' || cat === 'add') concDmKg += dmItemKg;
  const weightedDietNdfDigestibilityPct =
   dietNdfdWeightKg > 0
     ? (dietNdfdWeightedSum / dietNdfdWeightKg)
+    : null;
+ const ligninBasedDietNdfDigestibilityPct =
+  ligninNdfdWeightKg > 0
+    ? (ligninNdfdWeightedSum / ligninNdfdWeightKg)
     : null;
 const dietKPctDMForMg =
   dmKg > 0 ? (mineralG.K / (dmKg * 1000)) * 100 : 0;
@@ -1878,12 +1903,16 @@ const bodyWeightKgForEnergy = Number(
 );
 
 const ndfBaseDigestibilityPctForEnergy =
-  Number.isFinite(Number(weightedDietNdfDigestibilityPct)) && Number(weightedDietNdfDigestibilityPct) > 0
-    ? Number(weightedDietNdfDigestibilityPct)
+  Number.isFinite(Number(ligninBasedDietNdfDigestibilityPct)) && Number(ligninBasedDietNdfDigestibilityPct) > 0
+    ? Number(ligninBasedDietNdfDigestibilityPct)
     : (
-        Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
-          ? Number(weightedForageNdfDigestibilityPct)
-          : 50
+        Number.isFinite(Number(weightedDietNdfDigestibilityPct)) && Number(weightedDietNdfDigestibilityPct) > 0
+          ? Number(weightedDietNdfDigestibilityPct)
+          : (
+              Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
+                ? Number(weightedForageNdfDigestibilityPct)
+                : 50
+            )
       );
 const dmiBwForEnergy =
   bodyWeightKgForEnergy > 0
@@ -1964,9 +1993,18 @@ const energySupplyModel = {
   ...nasemEnergyModel,
   stage: energyStage,
   ndfDigestibilityMode: 'NASEM_2021_ADJUSTED_DIET_NDF_DIGESTIBILITY',
-  ndfDigestibilityContext: {
-    basePct: round(ndfBaseDigestibilityPctForEnergy, 3),
-    adjustedPct: round(ndfAdjustedDigestibilityPctForEnergy, 3),
+ndfDigestibilityContext: {
+  basePct: round(ndfBaseDigestibilityPctForEnergy, 3),
+  baseSource: Number.isFinite(Number(ligninBasedDietNdfDigestibilityPct)) && Number(ligninBasedDietNdfDigestibilityPct) > 0
+    ? 'NASEM_2021_EQ_3_3A_LIGNIN_BASED'
+    : 'FALLBACK_FEED_NDFD',
+  ligninBasedBasePct: Number.isFinite(Number(ligninBasedDietNdfDigestibilityPct))
+    ? round(ligninBasedDietNdfDigestibilityPct, 3)
+    : null,
+  feedNdfdBasePct: Number.isFinite(Number(weightedDietNdfDigestibilityPct))
+    ? round(weightedDietNdfDigestibilityPct, 3)
+    : null,
+  adjustedPct: round(ndfAdjustedDigestibilityPctForEnergy, 3),
     starchPctDM: round(starchPct, 3),
     dmiBw: round(dmiBwForEnergy, 4),
     bodyWeightKg: round(bodyWeightKgForEnergy, 1)
