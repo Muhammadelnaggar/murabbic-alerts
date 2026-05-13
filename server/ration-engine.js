@@ -1974,19 +1974,31 @@ cpPctDM: cpPctTotal,
 adCpPctOfCp: adCpPctOfCpForEnergy,
   milkCPKg,
     bodyGainCPKg: Number(context?.bodyGainCPKg || 0),
-  matureBodyWeight: Number(context?.matureBodyWeight || context?.matureBodyWeightKg || 0),
+  matureBodyWeight: Number(
+  context?.matureBodyWeight ||
+  context?.matureBodyWeightKg ||
+  context?.matureWeight ||
+  context?.matureWeightKg ||
+  targets?.matureBodyWeight ||
+  targets?.matureBodyWeightKg ||
+  targets?.matureWeight ||
+  targets?.matureWeightKg ||
+  bodyWeightKgForEnergy ||
+  0
+),
   isLactating: avgMilkKg > 0,
-  isWithin60DaysOfParturition:
-    !(avgMilkKg > 0) &&
+isWithin60DaysOfParturition:
+  !(avgMilkKg > 0) &&
+  (
+    context?.closeUp === true ||
+    String(context?.category || '').includes('close_up') ||
+    String(context?.stage || '').includes('close_up') ||
     (
-      context?.closeUp === true ||
-      String(context?.category || '').includes('close_up') ||
-      String(context?.stage || '').includes('close_up') ||
-      (
-        Number(context?.pregnancyDays || context?.pregDays || 0) > 0 &&
-        Number(context?.gestationLength || 280) - Number(context?.pregnancyDays || context?.pregDays || 0) <= 60
-      )
+      Number(context?.pregnancyDays || context?.pregDays || context?.daysPregnant || 0) > 0 &&
+      Number(context?.gestationLength || context?.gestationLengthDays || targets?.gestationLength || targets?.gestationLengthDays || 280)
+        - Number(context?.pregnancyDays || context?.pregDays || context?.daysPregnant || 0) <= 60
     )
+  )
  
 });
 const energySupplyModel = {
