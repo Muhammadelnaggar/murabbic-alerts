@@ -120,9 +120,14 @@ const DE_DM = componentDE_DM;
 
   const dNDF_DM = NDF_DM * dNDF_NDF;
 
-  const GasE_DM = DMI > 0
-    ? ((0.294 * DMI - 0.347 * FA_DM + 0.0409 * dNDF_DM) / DMI)
-    : 0;
+ const gasENumerator =
+  0.294 * DMI -
+  0.347 * FA_DM +
+  0.0409 * dNDF_DM;
+
+const GasE_DM = DMI > 0
+  ? (gasENumerator / DMI)
+  : 0;
 
 const CP_FRAC = CP_DM > 1 ? (CP_DM / 100) : CP_DM;
 
@@ -204,7 +209,15 @@ const NEL_DM = 0.66 * ME_DM;
       retainedProteinKg: round(retainedProteinKg, 3),
       urinaryNBeforeClampG: round(urinaryNBeforeClampG, 3),
       urinaryNGramDay: round(urinaryNGramDay, 3),
-      urinaryEDiagnosticOnly: true
+     urinaryEDiagnosticOnly: true,
+gasEEquationInputs: {
+  dmKg: round(DMI, 3),
+  faPctDM: round(FA_DM, 3),
+  dNdfPctDM: round(dNDF_DM, 3),
+  numerator: round(gasENumerator, 3),
+  gasEMcalPerKgDM: round(GasE_DM, 3),
+  gasEMcalDay: round(GasE_DM * DMI, 3)
+}
     }
   };
 }
