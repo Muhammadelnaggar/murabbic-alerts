@@ -49,9 +49,10 @@ function pctFrac(v){
 function calculateNasemEnergy2021({
   dmKg,
   baseDEMcalPerKgDM,
-  ndfPctDM,
-  dNdfPctOfNdf,
-  starchPctDM,
+ndfPctDM,
+dNdfPctOfNdf,
+gasDNdfPctDM = null,
+starchPctDM,
   dStarchPctOfStarch,
   faPctDM,
   dFaPctOfFa,
@@ -118,12 +119,19 @@ const BASE_DE_DM = num(baseDEMcalPerKgDM);
 // Feed-table Base DE is diagnostic/input context only, not the final DE.
 const DE_DM = componentDE_DM;
 
-  const dNDF_DM = NDF_DM * dNDF_NDF;
+const dNDF_DM = NDF_DM * dNDF_NDF;
 
- const gasENumerator =
+const rawGasDNdfPctDM = Number(gasDNdfPctDM);
+
+const dNDF_DM_ForGas =
+  Number.isFinite(rawGasDNdfPctDM) && rawGasDNdfPctDM > 0
+    ? rawGasDNdfPctDM
+    : dNDF_DM;
+
+const gasENumerator =
   0.294 * DMI -
   0.347 * FA_DM +
-  0.0409 * dNDF_DM;
+  0.0409 * dNDF_DM_ForGas;
 
 const GasE_DM = DMI > 0
   ? (gasENumerator / DMI)
@@ -213,7 +221,12 @@ const NEL_DM = 0.66 * ME_DM;
 gasEEquationInputs: {
   dmKg: round(DMI, 3),
   faPctDM: round(FA_DM, 3),
-  dNdfPctDM: round(dNDF_DM, 3),
+ dNdfPctDMForDE: round(dNDF_DM, 3),
+dNdfPctDMForGas: round(dNDF_DM_ForGas, 3),
+gasDNdfSource:
+  Number.isFinite(rawGasDNdfPctDM) && rawGasDNdfPctDM > 0
+    ? 'RUMEN_DIGESTED_NDF'
+    : 'TOTAL_TRACT_DNDF_FALLBACK',
   numerator: round(gasENumerator, 3),
   gasEMcalPerKgDM: round(GasE_DM, 3),
   gasEMcalDay: round(GasE_DM * DMI, 3)
@@ -1970,9 +1983,10 @@ const adCpPctOfCpForEnergy =
 const nasemEnergyModel = calculateNasemEnergy2021({
   dmKg,
   baseDEMcalPerKgDM: feedLibraryBaseDEDensityMcalKgDM,
-  ndfPctDM: ndfPctActual,
- dNdfPctOfNdf: ndfAdjustedDigestibilityPctForEnergy,
-  starchPctDM: starchPct,
+ndfPctDM: ndfPctActual,
+dNdfPctOfNdf: ndfAdjustedDigestibilityPctForEnergy,
+gasDNdfPctDM: dmKg > 0 ? ((rumDigNdfKg / dmKg) * 100) : null,
+starchPctDM: starchPct,
   dStarchPctOfStarch: weightedStarchDigestibilityPct || 90,
   faPctDM: faPctActual,
   dFaPctOfFa: faDigestibilityCoeffWeighted > 0 ? (faDigestibilityCoeffWeighted * 100) : 73,
