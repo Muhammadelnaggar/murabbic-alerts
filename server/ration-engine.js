@@ -1833,6 +1833,39 @@ const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
 const milkCPKg = avgMilkKg > 0 && milkProteinPct > 0
   ? avgMilkKg * (milkProteinPct / 100)
   : 0;
+ // NASEM 2021 Eq. 3-5a:
+// Adjusted NDF digestibility from base NDF digestibility.
+// dNDF_adj = dNDF_base − 0.0059 × (Starch%DM − 26) − 1.1 × (DMI/BW − 0.035)
+// Values are handled as percentage points here.
+const bodyWeightKgForEnergy = Number(
+  context?.bodyWeightKg ??
+  context?.bodyWeight ??
+  context?.bwKg ??
+  context?.bw ??
+  0
+);
+
+const ndfBaseDigestibilityPctForEnergy =
+  Number.isFinite(Number(weightedForageNdfDigestibilityPct)) && Number(weightedForageNdfDigestibilityPct) > 0
+    ? Number(weightedForageNdfDigestibilityPct)
+    : (
+        Number.isFinite(Number(weightedStarchDigestibilityPct)) && Number(weightedStarchDigestibilityPct) > 0
+          ? Number(weightedStarchDigestibilityPct)
+          : 50
+      );
+
+const dmiBwForEnergy =
+  bodyWeightKgForEnergy > 0
+    ? (dmKg / bodyWeightKgForEnergy)
+    : 0.035;
+
+const ndfAdjustedDigestibilityPctForEnergy = clamp(
+  ndfBaseDigestibilityPctForEnergy
+    - (0.0059 * (starchPct - 26) * 100)
+    - (1.1 * (dmiBwForEnergy - 0.035) * 100),
+  0,
+  100
+);
 // NASEM 2021 Eq. 3-6a:
 // MFCP, g/kg DMI = 11.62 + 0.134 × dietary NDF%DM
 const mfcpGPerKgDMForEnergy =
@@ -1862,7 +1895,7 @@ const nasemEnergyModel = calculateNasemEnergy2021({
   dmKg,
   baseDEMcalPerKgDM: feedLibraryBaseDEDensityMcalKgDM,
   ndfPctDM: ndfPctActual,
-  dNdfPctOfNdf: weightedForageNdfDigestibilityPct || weightedStarchDigestibilityPct || 50,
+ dNdfPctOfNdf: ndfAdjustedDigestibilityPctForEnergy,
   starchPctDM: starchPct,
   dStarchPctOfStarch: weightedStarchDigestibilityPct || 90,
   faPctDM: faPctActual,
