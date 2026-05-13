@@ -1834,9 +1834,18 @@ const nasemEnergyModel = calculateNasemEnergy2021({
   sNPNCPEPctDM: 0,
   digestibleRupPctDM,
   romPctDM: Math.max(0, 100 - cpPctTotal - ndfPctActual - starchPct - faPctActual - wscPctActual - (dmKg > 0 ? 0 : 0)),
-  mfcpGPerKgDM: microbialProteinModel.microbialCPKg && dmKg > 0 ? (microbialProteinModel.microbialCPKg * 1000 / dmKg) : 0,
-  fmcpGPerKgDM: 0,
-  efRomPctDM: 0,
+// NASEM 2021 Eq. 3-6a:
+// MFCP, g/kg DMI = 11.62 + 0.134 × dietary NDF%DM
+mfcpGPerKgDM: 11.62 + (0.134 * ndfPctActual),
+
+// NASEM 2021 Eq. 3-6b:
+// fecal microbial CP = 20% of microbial CP flow, expressed g/kg DMI
+fmcpGPerKgDM: microbialProteinModel.microbialCPKg && dmKg > 0
+  ? ((microbialProteinModel.microbialCPKg * 1000 * 0.20) / dmKg)
+  : 0,
+
+// NASEM 2021: endogenous fecal ROM = 34.3 g/kg DMI
+efRomPctDM: 34.3,
   cpPctDM: cpPctTotal,
   adCpPctOfCp: 70,
   milkCPKg,
