@@ -1833,7 +1833,31 @@ const ecmKg = calcEcmKg(avgMilkKg, milkFatPct, milkProteinPct);
 const milkCPKg = avgMilkKg > 0 && milkProteinPct > 0
   ? avgMilkKg * (milkProteinPct / 100)
   : 0;
+// NASEM 2021 Eq. 3-6a:
+// MFCP, g/kg DMI = 11.62 + 0.134 × dietary NDF%DM
+const mfcpGPerKgDMForEnergy =
+  11.62 + (0.134 * ndfPctActual);
 
+// NASEM 2021 Eq. 3-6b:
+// fMCP, g/kg DMI = microbial CP × 20% / DMI
+const fmcpGPerKgDMForEnergy =
+  microbialProteinModel.microbialCPKg && dmKg > 0
+    ? ((microbialProteinModel.microbialCPKg * 1000 * 0.20) / dmKg)
+    : 0;
+
+// NASEM 2021 Eq. 3-7b:
+// adCP_CP = [(RDP + dRUP) − (fMCP + MFCP)] / CP
+const adCpPctOfCpForEnergy =
+  cpPctTotal > 0
+    ? (
+        (
+          rdpPctDM +
+          digestibleRupPctDM -
+          (mfcpGPerKgDMForEnergy / 10) -
+          (fmcpGPerKgDMForEnergy / 10)
+        ) / cpPctTotal
+      ) * 100
+    : 70;
 const nasemEnergyModel = calculateNasemEnergy2021({
   dmKg,
   baseDEMcalPerKgDM: feedLibraryBaseDEDensityMcalKgDM,
@@ -1847,20 +1871,11 @@ const nasemEnergyModel = calculateNasemEnergy2021({
   sNPNCPEPctDM: 0,
   digestibleRupPctDM,
   romPctDM: Math.max(0, 100 - cpPctTotal - ndfPctActual - starchPct - faPctActual - wscPctActual - (dmKg > 0 ? 0 : 0)),
-// NASEM 2021 Eq. 3-6a:
-// MFCP, g/kg DMI = 11.62 + 0.134 × dietary NDF%DM
-mfcpGPerKgDM: 11.62 + (0.134 * ndfPctActual),
-
-// NASEM 2021 Eq. 3-6b:
-// fecal microbial CP = 20% of microbial CP flow, expressed g/kg DMI
-fmcpGPerKgDM: microbialProteinModel.microbialCPKg && dmKg > 0
-  ? ((microbialProteinModel.microbialCPKg * 1000 * 0.20) / dmKg)
-  : 0,
-
-// NASEM 2021: endogenous fecal ROM = 34.3 g/kg DMI
+mfcpGPerKgDM: mfcpGPerKgDMForEnergy,
+fmcpGPerKgDM: fmcpGPerKgDMForEnergy,
 efRomPctDM: 34.3,
-  cpPctDM: cpPctTotal,
-  adCpPctOfCp: 70,
+cpPctDM: cpPctTotal,
+adCpPctOfCp: adCpPctOfCpForEnergy,
   milkCPKg,
     bodyGainCPKg: Number(context?.bodyGainCPKg || 0),
   matureBodyWeight: Number(context?.matureBodyWeight || context?.matureBodyWeightKg || 0),
