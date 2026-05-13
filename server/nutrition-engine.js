@@ -608,10 +608,6 @@ if (Number.isFinite(Number(frameGainKgDay)) && Number(frameGainKgDay) > 0) {
   frameGainForProteinKgDay = Number(frameGainKgDay);
 } else if (growth) {
   frameGainForProteinKgDay = heiferTargetADG(bw);
-} else if (milk > 0 && par === 1) {
-  frameGainForProteinKgDay = 0.19;
-} else if (milk > 0 && par === 2) {
-  frameGainForProteinKgDay = 0.15;
 }
 
 const frameGainGDay = frameGainForProteinKgDay * 1000;
@@ -1570,7 +1566,7 @@ const mpReq = computeNasemMPRequirement({
   parity: num(parity, 2),
   species: 'cow',
  matureBodyWeight,
-frameGainKgDay: frameGainForEnergyKgDay
+frameGainKgDay: frameGainKgDay
 });
 
 const mpTargetG = mpReq.mpTargetG;
