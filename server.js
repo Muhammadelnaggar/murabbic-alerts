@@ -559,6 +559,7 @@ energySupplyModel: a?.nutrition?.energySupplyModel || null,
 fatModel: a?.nutrition?.fatModel || null,
 carbohydrateModel: a?.nutrition?.carbohydrateModel || null,
 carbohydrateSafetyModel: a?.nutrition?.carbohydrateSafetyModel || null,
+rumenHealthModel: a?.nutrition?.rumenHealthModel || null,
 dmiRationEffect: a?.nutrition?.dmiRationEffect || null
     
 },
@@ -1458,7 +1459,7 @@ const nelDensity = (rationCore?.totals?.dmKg > 0)
   ? round2((rationCore?.totals?.nelMcal || 0) / rationCore.totals.dmKg)
   : null;
 
-// ===== صحة الكرش: نسبة خشن/مركز على أساس DM =====
+// ===== صحة الكرش: تقييم خطر اضطراب الكرش من تركيب العليقة =====
 let forageDm = 0;
 let concDm = 0;
 
@@ -1480,45 +1481,34 @@ const totalDmForRumen = forageDm + concDm;
 const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : 0;
 const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : 0;
 
-let rumenStatus = null;
-let rumenNote = null;
+const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
+const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
+const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
 
-if (totalDmForRumen <= 0) {
-  rumenStatus = 'warn';
-  rumenNote = 'لا توجد بيانات كافية لتقييم صحة الكرش';
-} else {
-  const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
-  const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
-   const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
-  if (roughPctDM === 0 || concPctDM === 100) {
-    rumenStatus = 'danger';
-    rumenNote = 'العليقة 100% مركزات وخطر الحموضة وقلة دسم الحليب مرتفع';
-  } else if (roughPctDM < Number(targetsCore?.roughageMin || 0)) {
-    rumenStatus = 'danger';
-    rumenNote = 'الخشن أقل من الحد الأدنى المناسب لهذه العليقة';
-} else if (
-  starchActual > Number(targetsCore?.starchMax || 0) &&
-  peNDFActual < Number(targetsCore?.peNDFMin || 0)
-) {
-  rumenStatus = 'danger';
-  rumenNote = 'النشا مرتفع والألياف المؤثرة ميكانيكيًا غير كافية لصحة الكرش';
-} else if (starchActual > Number(targetsCore?.starchMax || 0)) {
-  rumenStatus = 'danger';
-  rumenNote = 'النشا أعلى من الحد الآمن مقارنة بنسبة الخشن الحالية';
-} else if (peNDFActual < Number(targetsCore?.peNDFMin || 0)) {
-  rumenStatus = 'warn';
-  rumenNote = 'الألياف المؤثرة ميكانيكيًا أقل من المطلوب لصحة الكرش';
-} else if (ndfActual < Number(targetsCore?.ndfTarget || 0)) {
-  rumenStatus = 'warn';
-  rumenNote = 'الألياف أقل من المطلوب بالنسبة لتكوين العليقة الحالي';
-  } else if (roughPctDM > (Number(targetsCore?.roughageMin || 0) + 20)) {
-    rumenStatus = 'warn';
-    rumenNote = 'الخشن مرتفع وقد يحد من المأكول والطاقة';
-  } else {
-    rumenStatus = 'good';
-    rumenNote = 'توازن الخشن والنشا والألياف مناسب لصحة الكرش';
-  }
-}
+const rumenHealthModel = buildRumenHealthModel({
+  roughPctDM,
+  concPctDM,
+  starchActual,
+  starchMax: targetsCore?.starchMax,
+  ndfActual,
+  ndfTarget: targetsCore?.ndfTarget,
+  peNDFActual,
+  peNDFMin: targetsCore?.peNDFMin,
+  carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null,
+  nelActual: nelActualDay,
+  nelTarget: targetsCore?.nel,
+  dmiActual: rationCore?.totals?.dmKg,
+  dmiTarget: targetsCore?.dmi
+});
+
+const rumenStatus =
+  rumenHealthModel.status === 'danger'
+    ? 'danger'
+    : rumenHealthModel.status === 'watch'
+      ? 'warn'
+      : 'good';
+
+const rumenNote = `${rumenHealthModel.title}: ${rumenHealthModel.reason}`;
 const costPerKgMilk = (milkKg > 0 && totCost != null) ? round2(totCost / milkKg) : null;
 const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(rationCore.totals.dmKg / milkKg) : null;
 const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
@@ -1551,9 +1541,10 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
   concPctDM,
-  rumenStatus,
-  rumenNote,
- rumenAdvice: "تم احتساب الألياف المؤثرة وصحة الكرش على افتراض أن طول تقطيع الخشن 3–5 سم. إذا كان التقطيع أقصر أو أطول من ذلك قد تختلف دقة التقييم.",
+rumenStatus,
+rumenNote,
+rumenHealthModel,
+rumenAdvice: rumenHealthModel.adviceText,
 
 mineralSupplyModel: rationCore?.nutrition?.mineralSupplyModel || null,
 vitaminSupplyModel: rationCore?.nutrition?.vitaminSupplyModel || null,
@@ -1605,7 +1596,209 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
 function pctOrNull(v){
   return Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
 }
+function findMissingNutritionPrices(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
 
+  return list.filter(r => {
+    const name = String(r?.name || r?.nameAr || r?.feedName || r?.id || '').trim();
+
+    const hasAmount =
+      Number(r?.asFedKg || 0) > 0 ||
+      Number(r?.kg || 0) > 0 ||
+      Number(r?.amount || 0) > 0 ||
+      Number(r?.pct || 0) > 0;
+
+    const price = Number(
+      r?.pricePerTon ??
+      r?.pTon ??
+      r?.price ??
+      r?.pTonRaw
+    );
+
+    return name && hasAmount && !(Number.isFinite(price) && price > 0);
+  });
+}
+
+function buildRumenHealthModel({
+  roughPctDM,
+  concPctDM,
+  starchActual,
+  starchMax,
+  ndfActual,
+  ndfTarget,
+  peNDFActual,
+  peNDFMin,
+  carbohydrateSafetyModel = null,
+  nelActual = null,
+  nelTarget = null,
+  dmiActual = null,
+  dmiTarget = null
+}) {
+  const rough = Number(roughPctDM);
+  const conc = Number(concPctDM);
+  const starch = Number(starchActual);
+  const starchLimit = Number(starchMax);
+  const ndf = Number(ndfActual);
+  const ndfLimit = Number(ndfTarget);
+  const pendf = Number(peNDFActual);
+  const pendfMin = Number(peNDFMin);
+
+  const safePct = (v) =>
+    Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
+
+  const indicators = {
+    roughage: {
+      label: 'الخشن',
+      actual: safePct(rough),
+      target: null,
+      status: Number.isFinite(rough) && rough > 0 ? 'ok' : 'unknown'
+    },
+    starch: {
+      label: 'النشا',
+      actual: safePct(starch),
+      target: safePct(starchLimit),
+      status:
+        Number.isFinite(starch) && Number.isFinite(starchLimit)
+          ? (starch > starchLimit ? 'danger' : 'ok')
+          : 'unknown'
+    },
+    ndf: {
+      label: 'NDF',
+      actual: safePct(ndf),
+      target: safePct(ndfLimit),
+      status:
+        Number.isFinite(ndf) && Number.isFinite(ndfLimit)
+          ? (ndf < ndfLimit ? 'watch' : 'ok')
+          : 'unknown'
+    },
+    peNDF: {
+      label: 'peNDF',
+      actual: safePct(pendf),
+      target: safePct(pendfMin),
+      status:
+        Number.isFinite(pendf) && Number.isFinite(pendfMin)
+          ? (pendf < pendfMin ? 'watch' : 'ok')
+          : 'unknown',
+      rule: 'minimum_only'
+    }
+  };
+
+  let status = 'good';
+  let score = 92;
+  let title = 'صحة الكرش آمنة';
+  let reason = 'توازن الخشن والنشا والألياف مناسب.';
+  let instruction = 'حافظ على طول تقطيع الخشن 3–5 سم، وراقب الاجترار والروث ودسم اللبن.';
+
+  const carbStatus = String(carbohydrateSafetyModel?.status || '').toLowerCase();
+
+  if (!Number.isFinite(rough) || !Number.isFinite(conc) || (rough + conc) <= 0) {
+    status = 'watch';
+    score = 55;
+    title = 'تقييم صحة الكرش غير مكتمل';
+    reason = 'لا توجد بيانات كافية عن الخشن والمركزات داخل العليقة.';
+    instruction = 'أدخل الخامات وتصنيفها وسعرها ونسبتها بدقة قبل اعتماد الحكم.';
+  } else if (rough <= 0 || conc >= 100) {
+    status = 'danger';
+    score = 20;
+    title = 'خطر حموضة مرتفع';
+    reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ.';
+    instruction = 'أدخل مصدر خشن فعّال فورًا قبل اعتماد التركيبة.';
+  } else if (
+    Number.isFinite(starch) &&
+    Number.isFinite(starchLimit) &&
+    starch > starchLimit &&
+    Number.isFinite(pendf) &&
+    Number.isFinite(pendfMin) &&
+    pendf < pendfMin
+  ) {
+    status = 'danger';
+    score = 30;
+    title = 'خطر حموضة واضح';
+    reason = 'النشا مرتفع مع انخفاض الألياف المؤثرة.';
+    instruction = 'قلل النشا السريع أو المركزات، وارفع الخشن الفعّال بطول تقطيع 3–5 سم.';
+  } else if (
+    carbStatus === 'danger' ||
+    (
+      Number.isFinite(starch) &&
+      Number.isFinite(starchLimit) &&
+      starch > starchLimit
+    )
+  ) {
+    status = 'danger';
+    score = 42;
+    title = 'النشا أعلى من الآمن';
+    reason = 'النشا أعلى من الحد المناسب مقارنة بألياف العليقة.';
+    instruction = 'راجع مصادر الحبوب أو كمية المركزات قبل اعتماد التركيبة.';
+  } else if (
+    Number.isFinite(pendf) &&
+    Number.isFinite(pendfMin) &&
+    pendf < pendfMin
+  ) {
+    status = 'watch';
+    score = 68;
+    title = 'الألياف المؤثرة أقل من المطلوب';
+    reason = 'peNDF أقل من الحد الأدنى اللازم لدعم الاجترار وإفراز اللعاب.';
+    instruction = 'حسّن طول تقطيع الخشن إلى 3–5 سم أو ارفع مصدر الألياف الفعّالة.';
+  } else if (
+    Number.isFinite(ndf) &&
+    Number.isFinite(ndfLimit) &&
+    ndf < ndfLimit
+  ) {
+    status = 'watch';
+    score = 72;
+    title = 'الألياف الكلية قريبة من الحد';
+    reason = 'NDF أقل من المستوى المناسب لهذه المرحلة.';
+    instruction = 'راجع نسبة وجودة الخشن قبل زيادة مصادر الطاقة.';
+  } else if (carbStatus === 'watch') {
+    status = 'watch';
+    score = 76;
+    title = 'توازن الكربوهيدرات يحتاج مراقبة';
+    reason = carbohydrateSafetyModel?.note || 'العليقة قريبة من حدود الأمان.';
+    instruction = 'راجع النشا وألياف الخشن، وراقب الروث والاجترار ودسم اللبن.';
+  }
+
+  const nelLow =
+    Number.isFinite(Number(nelActual)) &&
+    Number.isFinite(Number(nelTarget)) &&
+    Number(nelActual) < Number(nelTarget);
+
+  const dmiLow =
+    Number.isFinite(Number(dmiActual)) &&
+    Number.isFinite(Number(dmiTarget)) &&
+    Number(dmiActual) < Number(dmiTarget);
+
+  if (
+    status === 'good' &&
+    Number.isFinite(pendf) &&
+    Number.isFinite(pendfMin) &&
+    pendf > pendfMin + 8 &&
+    (nelLow || dmiLow)
+  ) {
+    status = 'watch';
+    score = 78;
+    title = 'ألياف مرتفعة مع احتمال نقص طاقة';
+    reason = 'peNDF أعلى من الحد الأدنى، وهذا ليس خطر كرش، لكنه قد يقلل كثافة الطاقة إذا ظهر نقص في الطاقة أو المأكول.';
+    instruction = 'راجع كارت الطاقة والمادة الجافة قبل تقليل الخشن؛ لا تعتبر ارتفاع peNDF وحده مشكلة.';
+  }
+
+  return {
+    model: 'MURABBIK_RUMEN_HEALTH_NASEM_2021_ALIGNED',
+    status,
+    score,
+    title,
+    reason,
+    instruction,
+    indicators,
+    displayText: title,
+    noteText: reason,
+    adviceText: instruction,
+    sourceBasis: [
+      'NASEM_2021_CARBOHYDRATE_SAFETY',
+      'FORAGE_NDF_STARCH_NDF_INTERACTION',
+      'PENDF_AS_MINIMUM_ONLY'
+    ]
+  };
+}
 function buildNutritionPanels(analysis = {}, context = {}) {
   const totals = analysis?.totals || {};
   const nutrition = analysis?.nutrition || {};
@@ -1654,14 +1847,21 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 {
   key: 'rumen',
   title: 'صحة الكرش',
-  value:
+  value: nutrition.rumenHealthModel?.displayText || (
     Number.isFinite(rough) && Number.isFinite(conc)
       ? `خشن ${rough}% / مركز ${conc}%`
-      : '—',
-  actual: null,
-  target: null,
-  targetText: nutrition.rumenNote || '—',
-  status: nutrition.rumenStatus || null
+      : '—'
+  ),
+  actual: nutrition.rumenHealthModel?.score ?? null,
+  target: 80,
+  targetText: [
+    nutrition.rumenHealthModel?.noteText || nutrition.rumenNote || '',
+    nutrition.rumenHealthModel?.adviceText
+      ? `تعليمات مُرَبِّيك: ${nutrition.rumenHealthModel.adviceText}`
+      : ''
+  ].filter(Boolean).join(' — '),
+  status: nutrition.rumenStatus || null,
+  model: nutrition.rumenHealthModel || null
 }
   ];
 
@@ -1957,6 +2157,15 @@ const milkPrice = toNumOrNull(body.milkPrice);
 
 const enrichedRows = await enrichNutritionRowsFromFeedItems(req.userId, rows);
 const normalizedRows = normalizeNutritionRows(enrichedRows);
+const missingPriceRows = findMissingNutritionPrices(normalizedRows);
+if (missingPriceRows.length) {
+  return res.status(400).json({
+    ok: false,
+    error: 'feed_price_required',
+    message: 'سعر كل خامة داخل التركيبة إجباري لحساب التحليل الاقتصادي بدقة',
+    missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
+  });
+}
 const missingPriceRows = normalizedRows.filter(r => {
   const name = String(r?.name || '').trim();
   const price = Number(r?.pricePerTon);
@@ -2039,6 +2248,15 @@ const nutrition = body.nutrition || {};
 const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
 const enrichedRows = await enrichNutritionRowsFromFeedItems(tenant, rawRows);
 const rows = normalizeNutritionRows(enrichedRows);
+const missingPriceRows = findMissingNutritionPrices(rows);
+if (missingPriceRows.length) {
+  return res.status(400).json({
+    ok:false,
+    error:'feed_price_required',
+    message:'سعر كل خامة داخل التركيبة إجباري قبل حفظ حدث التغذية',
+    missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
+  });
+}
 const missingPriceRows = normalizedRows.filter(r => {
   const name = String(r?.name || '').trim();
   const price = Number(r?.pricePerTon);
