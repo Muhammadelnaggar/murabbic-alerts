@@ -1716,19 +1716,44 @@ function buildRumenHealthModel({
     title = 'خطر حموضة واضح';
     reason = 'النشا مرتفع مع انخفاض الألياف المؤثرة.';
     instruction = 'قلل النشا السريع أو المركزات، وارفع الخشن الفعّال بطول تقطيع 3–5 سم.';
-  } else if (
-    carbStatus === 'danger' ||
-    (
-      Number.isFinite(starch) &&
-      Number.isFinite(starchLimit) &&
-      starch > starchLimit
-    )
+ } else if (
+    Number.isFinite(starch) &&
+    Number.isFinite(starchLimit) &&
+    starch > starchLimit
   ) {
-    status = 'danger';
-    score = 42;
-    title = 'النشا أعلى من الآمن';
-    reason = 'النشا أعلى من الحد المناسب مقارنة بألياف العليقة.';
-    instruction = 'راجع مصادر الحبوب أو كمية المركزات قبل اعتماد التركيبة.';
+    const starchOver = starch - starchLimit;
+
+    const fiberLooksProtective =
+      (
+        Number.isFinite(rough) &&
+        rough >= 55
+      ) ||
+      (
+        Number.isFinite(ndf) &&
+        Number.isFinite(ndfLimit) &&
+        ndf >= ndfLimit
+      ) ||
+      (
+        Number.isFinite(pendf) &&
+        (
+          !Number.isFinite(pendfMin) ||
+          pendf >= pendfMin
+        )
+      );
+
+    if (fiberLooksProtective && starchOver <= 8) {
+      status = 'watch';
+      score = 74;
+      title = 'النشا مرتفع مع ألياف كافية';
+      reason = 'النشا أعلى من الحد المستهدف، لكن الخشن وNDF/peNDF يوفّرون حماية كافية للكرش.';
+      instruction = 'لا تعتبرها حموضة مباشرة؛ راقب الروث والاجترار ودسم اللبن، وراجع كارت الطاقة قبل تعديل العليقة.';
+    } else {
+      status = 'danger';
+      score = 42;
+      title = 'النشا أعلى من الآمن';
+      reason = 'النشا أعلى من الحد المناسب مقارنة بألياف العليقة.';
+      instruction = 'راجع مصادر الحبوب أو كمية المركزات قبل اعتماد التركيبة.';
+    }
   } else if (
     Number.isFinite(pendf) &&
     Number.isFinite(pendfMin) &&
