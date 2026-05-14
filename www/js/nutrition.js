@@ -2144,6 +2144,7 @@ if(name){
   const cp   = parseFloat(tr.querySelector('.cp')?.value)||0;
   const kg   = parseFloat(tr.querySelector('.kg')?.value)||0;
   const pct  = parseFloat(tr.querySelector('.pct')?.value)||0;
+  const pRaw = parseFloat(tr.querySelector('.pTon')?.value) || 0;
 
   if(!name){
     alert('اختر خامة أولاً');
@@ -2155,7 +2156,11 @@ if(name){
   const needPct = (mode==='tmr_percent' || (mode==='split' && cat!=='rough'));
   if(needPct && !pct){ alert('ادخل نسبة as-fed'); return; }
   if(!needPct && !kg){ alert('ادخل كجم as-fed'); return; }
-
+  if(!pRaw || pRaw <= 0){
+  alert('سعر الخامة إجباري لحساب التحليل الاقتصادي بدقة');
+  tr.querySelector('.pTon')?.focus();
+  return;
+}
   // أضف/حدّث الخامة في القائمة
 const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
 const pTonRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
