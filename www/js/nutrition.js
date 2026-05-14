@@ -374,11 +374,24 @@ return rationAnalysisCache;
 async function refreshRationAnalysis(rows) {
   const list = Array.isArray(rows) ? rows : [];
   const ctx = buildNutritionContextForRequest();
-  if (!list.length) {
-    rationAnalysisCache = null;
-    rationAnalysisCacheKey = '';
-    return null;
-  }
+ if (!list.length) {
+  rationAnalysisCache = null;
+  rationAnalysisCacheKey = '';
+
+  window.mbkNutrition = window.mbkNutrition || {};
+  window.mbkNutrition.rationAnalysis = null;
+  window.mbkNutrition.panels = {
+    analysisCards: [],
+    advancedCards: [],
+    economicsCards: []
+  };
+
+  applyServerAnalysisToDom({}, window.mbkNutrition.targets || null);
+
+  try { window.renderNutritionPanels?.(); } catch(_) {}
+
+  return null;
+}
 
  const key = JSON.stringify({
   rows: list,
@@ -1535,30 +1548,41 @@ btnRationRemove?.addEventListener('click', ()=>{
 // تعديل المختار (خامة واحدة فقط)
 btnRationEdit?.addEventListener('click', ()=>{
   if(selectedRation.size !== 1) return;
+
   const i = Array.from(selectedRation)[0];
   const it = rationItems[i];
   if(!it) return;
 
- fillCurrentRowWithFeed(it, it.cat);
+  fillCurrentRowWithFeed(it, it.cat);
 
   const tr = tbody.querySelector('tr:last-child');
   if(tr){
     const dmEl = tr.querySelector('.dm');
+    const cpEl = tr.querySelector('.cp');
     const kgEl = tr.querySelector('.kg');
     const pctEl = tr.querySelector('.pct');
+    const pTonEl = tr.querySelector('.pTon');
+
     if(dmEl && it.dm!=null && it.dm!==0) dmEl.value = it.dm;
+    if(cpEl && it.cp!=null && it.cp!==0) cpEl.value = it.cp;
     if(kgEl) kgEl.value = it.kg ? it.kg : '';
     if(pctEl) pctEl.value = it.pct ? it.pct : '';
+    if(pTonEl) pTonEl.value = it.pTonRaw ? it.pTonRaw : '';
+
     setRowState(tr);
     focusEditable(tr);
+  }
+
+  // احذف النسخة القديمة من الخامة المختارة
+  // وبعد تعديل الكمية/السعر/النسبة والضغط على "إضافة خامة" سيتم حفظ النسخة الجديدة
+  if(i >= 0 && i < rationItems.length){
+    rationItems.splice(i, 1);
   }
 
   selectedRation.clear();
   renderRationSummary();
   recalc();
-  recalc();
 });
-
 
 const miniActions = document.getElementById('miniActions');
 
