@@ -2155,18 +2155,30 @@ if(name){
   const pct  = parseFloat(tr.querySelector('.pct')?.value)||0;
   const pRaw = parseFloat(tr.querySelector('.pTon')?.value) || 0;
 
-  if(!name){
-    alert('اختر خامة أولاً');
-    return;
-  }
+if(!name){
+  showCentralMsg('⚠️ اختر خامة أولاً', 'error');
+  tr.querySelector('.name')?.focus();
+  return;
+}
 
-  // لو Split أو Percent لازم نسبة، لو TMR Kg لازم كجم
-  const mode = modeSel.value;
-  const needPct = (mode==='tmr_percent' || (mode==='split' && cat!=='rough'));
-  if(needPct && !pct){ alert('ادخل نسبة as-fed'); return; }
-  if(!needPct && !kg){ alert('ادخل كجم as-fed'); return; }
-  if(!pRaw || pRaw <= 0){
-  alert('سعر الخامة إجباري لحساب التحليل الاقتصادي بدقة');
+// لو Split أو Percent لازم نسبة، لو TMR Kg لازم كجم
+const mode = modeSel.value;
+const needPct = (mode==='tmr_percent' || (mode==='split' && cat!=='rough'));
+
+if(needPct && !pct){
+  showCentralMsg('⚠️ ادخل نسبة as-fed', 'error');
+  tr.querySelector('.pct')?.focus();
+  return;
+}
+
+if(!needPct && !kg){
+  showCentralMsg('⚠️ ادخل كجم as-fed', 'error');
+  tr.querySelector('.kg')?.focus();
+  return;
+}
+
+if(!pRaw || pRaw <= 0){
+  showCentralMsg('⚠️ سعر الخامة إجباري لحساب التحليل الاقتصادي بدقة', 'error');
   tr.querySelector('.pTon')?.focus();
   return;
 }
@@ -2300,11 +2312,11 @@ feedTypeFilter.addEventListener('change', filterFeeds);
 // ✅ عند اختيار خامة: افتح نموذج الإدخال فورًا
 presetSel.addEventListener('change', ()=>{
   const selectedType = (feedTypeFilter.value || '').trim();
-  if(!selectedType || selectedType === 'all'){
-    alert("اختر نوع الخامه أولاً (مركزات/خشن/إضافات)");
-    presetSel.value = '';
-    return;
-  }
+if(!selectedType || selectedType === 'all'){
+  showCentralMsg('⚠️ اختر نوع الخامة أولاً: مركزات / خشن / إضافات', 'error');
+  presetSel.value = '';
+  return;
+}
 
   const id = (presetSel.value || '').trim();
   if(!id) return;
