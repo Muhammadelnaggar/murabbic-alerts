@@ -53,9 +53,9 @@ async function loadNutritionWeatherTHI(){
 
     const data = await res.json().catch(() => ({}));
 
-    if (!res.ok || data?.ok === false) {
-      throw new Error(data?.error || `HTTP ${res.status}`);
-    }
+if (!res.ok || data?.ok === false) {
+  throw new Error(data?.error || `HTTP ${res.status}`);
+}
 
     const thi = Number(data.thi);
     const tempC = Number(data.tempC);
@@ -352,7 +352,15 @@ async function fetchRationAnalysis(rows) {
 
 const data = await res.json().catch(() => ({}));
 if (!res.ok || data?.ok === false) {
-  throw new Error(data?.error || `HTTP ${res.status}`);
+  if (data?.error === 'feed_price_required') {
+    const names = Array.isArray(data.missingRows) && data.missingRows.length
+      ? `: ${data.missingRows.join('، ')}`
+      : '';
+
+    throw new Error((data.message || 'سعر كل خامة إجباري') + names);
+  }
+
+  throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
 }
 
 rationAnalysisCache = data.analysis || null;
@@ -2654,7 +2662,8 @@ if(n){
       st = {sym:"●", color:"#0b7f47"};
     }
 
-    return '<div class="kpi"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
+    const cls = (k === "صحة الكرش") ? "kpi rumen-feature" : "kpi";
+return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
   }).join("");
 }
   const e = $("economicKPIs");
@@ -2751,6 +2760,38 @@ if (adv && adv.style.display === "block") {
     const fcRatioEl = document.getElementById("fcRatio");
   
 if(fcCard){
+    fcCard.classList.add('rumen-feature');
+
+  const rhm =
+    window.mbkNutrition?.serverViewModel?.analysis?.nutrition?.rumenHealthModel ||
+    window.mbkNutrition?.rationAnalysis?.nutrition?.rumenHealthModel ||
+    null;
+
+  if (rhm) {
+    const badgeText =
+      rhm.status === 'danger'
+        ? 'خطر'
+        : rhm.status === 'watch'
+          ? 'مراقبة'
+          : 'آمنة';
+
+    const uiStatus =
+      rhm.status === 'danger'
+        ? 'bad'
+        : rhm.status === 'watch'
+          ? 'warn'
+          : 'ok';
+
+    setStatus(
+      fcCard,
+      uiStatus,
+      badgeText,
+      `${rhm.reason || ''}${rhm.instruction ? ' — تعليمات مُرَبِّيك: ' + rhm.instruction : ''}`,
+      Number(rhm.score || 0)
+    );
+
+    return;
+  }
   const rumenCard =
     (Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.analysisCards)
       ? window.mbkNutrition.serverViewModel.panels.analysisCards.find(x => x?.key === 'rumen')
