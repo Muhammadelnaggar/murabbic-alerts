@@ -531,7 +531,8 @@ const panelByKey = (arr, key) =>
   setNum('mixPriceAsFed', a?.totals?.mixPriceAsFed, '', 2);
   setNum('mpSupplyG', a?.nutrition?.mpSupplyG, '', 0);
   setNum('mpDensityGkgDM', a?.nutrition?.mpDensityGkgDM, '', 0);
-
+  setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '', 1);
+  setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
 const dmCard = panelByKey(P.analysisCards, 'dm');
 if (dmCard?.actual != null) {
   setNum('totDM', dmCard.actual, '', 2);
