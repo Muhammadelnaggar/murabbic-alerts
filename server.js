@@ -546,8 +546,10 @@ function normalizeNutritionAnalysis(a = {}) {
     peNDFPctActual: toNumOrNull(a?.nutrition?.peNDFPctActual),
   fatPctActual: toNumOrNull(a?.nutrition?.fatPctActual),
   starchPctActual: toNumOrNull(a?.nutrition?.starchPctActual ?? a?.nutrition?.starchPct),
-  roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
-  concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
+ roughPctDM: toNumOrNull(a?.nutrition?.roughPctDM),
+concPctDM: toNumOrNull(a?.nutrition?.concPctDM),
+forageNDFPctDM: toNumOrNull(a?.nutrition?.forageNDFPctDM),
+forageNDFShareOfTotalNDF: toNumOrNull(a?.nutrition?.forageNDFShareOfTotalNDF),
   rumenStatus: a?.nutrition?.rumenStatus || null,
   rumenNote: a?.nutrition?.rumenNote || null,
 
@@ -573,6 +575,7 @@ targets: {
   starchMax: toNumOrNull(a?.targets?.starchMax),
   roughageMin: toNumOrNull(a?.targets?.roughageMin),
   peNDFMin: toNumOrNull(a?.targets?.peNDFMin),
+  forageNDFMin: toNumOrNull(a?.targets?.forageNDFMin),
 
     proteinRequirementModel: a?.targets?.proteinRequirementModel || null,
   mineralRequirementModel: a?.targets?.mineralRequirementModel || null,
@@ -1462,25 +1465,61 @@ const nelDensity = (rationCore?.totals?.dmKg > 0)
 // ===== صحة الكرش: تقييم خطر اضطراب الكرش من تركيب العليقة =====
 let forageDm = 0;
 let concDm = 0;
+let forageNdfKg = 0;
+let totalNdfKgForRumen = 0;
 
 for (const r of cleanRows) {
   const kg = Number(r.asFedKg || 0);
   const dmPct = Number(r.dmPct || 0);
+  const ndfPct = Number(r.ndfPct || 0);
   const dmKg = kg * (dmPct / 100);
+  const ndfKg = dmKg * (ndfPct / 100);
   const cat = String(r.cat || '').trim();
 
-  if (cat === 'rough') forageDm += dmKg;
-  if (cat === 'conc') concDm += dmKg;
+  if (cat === 'rough') {
+    forageDm += dmKg;
+    forageNdfKg += ndfKg;
+  }
+
+  if (cat === 'conc') {
+    concDm += dmKg;
+  }
+
+  totalNdfKgForRumen += ndfKg;
 }
 
 forageDm = round2(forageDm) || 0;
 concDm = round2(concDm) || 0;
+forageNdfKg = round2(forageNdfKg) || 0;
+totalNdfKgForRumen = round2(totalNdfKgForRumen) || 0;
 
 const totalDmForRumen = forageDm + concDm;
 
-const roughPctDM = totalDmForRumen > 0 ? round2((forageDm / totalDmForRumen) * 100) : 0;
-const concPctDM  = totalDmForRumen > 0 ? round2((concDm / totalDmForRumen) * 100) : 0;
+const roughPctDM = totalDmForRumen > 0
+  ? round2((forageDm / totalDmForRumen) * 100)
+  : 0;
 
+const concPctDM = totalDmForRumen > 0
+  ? round2((concDm / totalDmForRumen) * 100)
+  : 0;
+
+const forageNDFPctDM = totalDmForRumen > 0
+  ? round2((forageNdfKg / totalDmForRumen) * 100)
+  : 0;
+
+const forageNDFShareOfTotalNDF = totalNdfKgForRumen > 0
+  ? round2((forageNdfKg / totalNdfKgForRumen) * 100)
+  : 0;
+
+const isDryOrCloseUpForRumen =
+  !!contextForTargets?.earlyDry ||
+  !!contextForTargets?.closeUp ||
+  /جاف|dry|انتظار|تحضير|close/i.test(String(contextForTargets?.pregnancyStatus || ''));
+
+const forageNDFMinForRumen =
+  Number.isFinite(Number(targetsCore?.forageNDFMin))
+    ? Number(targetsCore.forageNDFMin)
+    : (isDryOrCloseUpForRumen ? 21 : 19);
 const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
 const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
 const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
@@ -1488,6 +1527,8 @@ const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
 const rumenHealthModel = buildRumenHealthModel({
   roughPctDM,
   concPctDM,
+  forageNDFPctDM,
+  forageNDFShareOfTotalNDF,
   starchActual,
   starchMax: targetsCore?.starchMax,
   ndfActual,
@@ -1495,6 +1536,7 @@ const rumenHealthModel = buildRumenHealthModel({
   peNDFActual,
   peNDFMin: targetsCore?.peNDFMin,
   roughageMin: targetsCore?.roughageMin,
+  forageNDFMin: forageNDFMinForRumen,
   carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null
 });
 
@@ -1538,10 +1580,11 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
   concPctDM,
-rumenStatus,
-rumenNote,
-rumenHealthModel,
-rumenAdvice: rumenHealthModel.adviceText,
+  forageNDFPctDM,
+  forageNDFShareOfTotalNDF,
+  rumenStatus,
+  rumenNote,
+  rumenHealthModel,
 
 mineralSupplyModel: rationCore?.nutrition?.mineralSupplyModel || null,
 vitaminSupplyModel: rationCore?.nutrition?.vitaminSupplyModel || null,
@@ -1564,6 +1607,7 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   starchMax: targetsCore?.starchMax ?? null,
   roughageMin: targetsCore?.roughageMin ?? null,
   peNDFMin: targetsCore?.peNDFMin ?? null,
+  forageNDFMin: forageNDFMinForRumen,
 
   proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
   mineralRequirementModel: targetsCore?.mineralRequirementModel || null,
@@ -1619,6 +1663,8 @@ function findMissingNutritionPrices(rows = []) {
 function buildRumenHealthModel({
   roughPctDM,
   concPctDM,
+  forageNDFPctDM,
+  forageNDFShareOfTotalNDF,
   starchActual,
   starchMax,
   ndfActual,
@@ -1626,37 +1672,77 @@ function buildRumenHealthModel({
   peNDFActual,
   peNDFMin,
   roughageMin,
+  forageNDFMin,
   carbohydrateSafetyModel = null
 }) {
   const rough = Number(roughPctDM);
   const conc = Number(concPctDM);
+  const forageNDF = Number(forageNDFPctDM);
+  const forageNDFShare = Number(forageNDFShareOfTotalNDF);
   const starch = Number(starchActual);
   const starchLimit = Number(starchMax);
   const ndf = Number(ndfActual);
   const ndfLimit = Number(ndfTarget);
+
   const pendf = Number(peNDFActual);
   const pendfFloor = Number.isFinite(Number(peNDFMin)) ? Number(peNDFMin) : 18;
   const roughFloor = Number.isFinite(Number(roughageMin)) ? Number(roughageMin) : 40;
+  const forageNDFFloor = Number.isFinite(Number(forageNDFMin)) ? Number(forageNDFMin) : 19;
 
   const safePct = (v) =>
     Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
+
+  const gap = (target, actual) =>
+    Number.isFinite(Number(target)) && Number.isFinite(Number(actual))
+      ? Number(target) - Number(actual)
+      : 0;
 
   const starchHigh =
     Number.isFinite(starch) &&
     Number.isFinite(starchLimit) &&
     starch > starchLimit;
 
-  const starchOver = starchHigh ? (starch - starchLimit) : 0;
+  const starchVeryHigh =
+    Number.isFinite(starch) &&
+    Number.isFinite(starchLimit) &&
+    starch >= starchLimit + 8;
 
-  const peNDFLow =
-    Number.isFinite(pendf) &&
-    Number.isFinite(pendfFloor) &&
-    pendf < pendfFloor;
+  const ndfGap = gap(ndfLimit, ndf);
+  const pendfGap = gap(pendfFloor, pendf);
+  const forageNDFGap = gap(forageNDFFloor, forageNDF);
 
-  const ndfLow =
-    Number.isFinite(ndf) &&
-    Number.isFinite(ndfLimit) &&
-    ndf < ndfLimit;
+  const ndfOK = Number.isFinite(ndf) && Number.isFinite(ndfLimit) && ndf >= ndfLimit;
+  const ndfMarginal = Number.isFinite(ndfGap) && ndfGap > 0 && ndfGap <= 2;
+  const ndfLow = Number.isFinite(ndfGap) && ndfGap > 2;
+  const ndfSevereLow = Number.isFinite(ndfGap) && ndfGap > 4;
+
+  const peNDFOK = Number.isFinite(pendf) && Number.isFinite(pendfFloor) && pendf >= pendfFloor;
+  const peNDFMarginal = Number.isFinite(pendfGap) && pendfGap > 0 && pendfGap <= 2;
+  const peNDFLow = Number.isFinite(pendfGap) && pendfGap > 2;
+  const peNDFSevereLow = Number.isFinite(pendfGap) && pendfGap > 4;
+
+  const forageNDFOK =
+    Number.isFinite(forageNDF) &&
+    Number.isFinite(forageNDFFloor) &&
+    forageNDF >= forageNDFFloor;
+
+  const forageNDFMarginal =
+    Number.isFinite(forageNDFGap) &&
+    forageNDFGap > 0 &&
+    forageNDFGap <= 2;
+
+  const forageNDFLow =
+    Number.isFinite(forageNDFGap) &&
+    forageNDFGap > 2;
+
+  const forageNDFSevereLow =
+    Number.isFinite(forageNDFGap) &&
+    forageNDFGap > 4;
+
+  const roughOK =
+    Number.isFinite(rough) &&
+    Number.isFinite(roughFloor) &&
+    rough >= roughFloor;
 
   const roughLow =
     Number.isFinite(rough) &&
@@ -1667,124 +1753,176 @@ function buildRumenHealthModel({
     Number.isFinite(conc) &&
     conc >= 60;
 
+  const concVeryHigh =
+    Number.isFinite(conc) &&
+    conc >= 70;
+
   const noEffectiveRoughage =
     Number.isFinite(rough) &&
     Number.isFinite(conc) &&
     (rough <= 0 || conc >= 100);
 
   const indicators = {
-    roughage: {
-      label: 'الخشن',
-      actual: safePct(rough),
-      target: safePct(roughFloor),
-      status:
-        Number.isFinite(rough) && Number.isFinite(roughFloor)
-          ? (rough < roughFloor ? 'watch' : 'ok')
-          : 'unknown'
-    },
     starch: {
       label: 'النشا',
       actual: safePct(starch),
       target: safePct(starchLimit),
-      status:
-        Number.isFinite(starch) && Number.isFinite(starchLimit)
-          ? (starch > starchLimit ? 'watch' : 'ok')
-          : 'unknown'
+      status: starchHigh ? 'watch' : 'ok'
     },
     ndf: {
-      label: 'NDF',
+      label: 'NDF الكلي',
       actual: safePct(ndf),
       target: safePct(ndfLimit),
-      status:
-        Number.isFinite(ndf) && Number.isFinite(ndfLimit)
-          ? (ndf < ndfLimit ? 'watch' : 'ok')
-          : 'unknown'
+      status: ndfLow ? 'watch' : 'ok'
     },
     peNDF: {
       label: 'peNDF',
       actual: safePct(pendf),
       target: safePct(pendfFloor),
-      status:
-        Number.isFinite(pendf) && Number.isFinite(pendfFloor)
-          ? (pendf < pendfFloor ? 'watch' : 'ok')
-          : 'unknown',
+      status: peNDFLow ? 'watch' : 'ok',
       rule: 'minimum_only'
+    },
+    forageNDF: {
+      label: 'Forage NDF',
+      actual: safePct(forageNDF),
+      target: safePct(forageNDFFloor),
+      shareOfTotalNDF: safePct(forageNDFShare),
+      status: forageNDFLow ? 'watch' : 'ok'
+    },
+    roughage: {
+      label: 'الخشن',
+      actual: safePct(rough),
+      target: safePct(roughFloor),
+      status: roughLow ? 'watch' : 'ok'
+    },
+    concentrate: {
+      label: 'المركزات',
+      actual: safePct(conc),
+      target: 60,
+      status: concHigh ? 'watch' : 'ok'
     }
   };
 
   let score = 100;
 
-  if (starchHigh) {
-    if (starchOver <= 4) score -= 8;
-    else if (starchOver <= 8) score -= 14;
-    else score -= 22;
-  }
-
-  if (peNDFLow) score -= 30;
-  if (ndfLow) score -= 25;
-  if (roughLow) score -= 25;
-  if (concHigh) score -= 18;
+  if (starchHigh) score -= starchVeryHigh ? 18 : 10;
+  if (ndfMarginal) score -= 5;
+  if (ndfLow) score -= ndfSevereLow ? 20 : 12;
+  if (peNDFMarginal) score -= 6;
+  if (peNDFLow) score -= peNDFSevereLow ? 28 : 18;
+  if (forageNDFMarginal) score -= 6;
+  if (forageNDFLow) score -= forageNDFSevereLow ? 28 : 18;
+  if (roughLow) score -= 16;
+  if (concHigh) score -= concVeryHigh ? 25 : 14;
   if (noEffectiveRoughage) score = 20;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   let status = 'good';
   let title = 'صحة الكرش آمنة';
-  let reason = 'توازن النشا والخشن وNDF وpeNDF مناسب لصحة الكرش.';
-  let instruction = 'حافظ على طول تقطيع الخشن 3–5 سم، وراقب الاجترار والروث ودسم اللبن.';
+  let reason = 'النشا والألياف الكلية وNDF الخشن والألياف المؤثرة في توازن مناسب.';
+  let instruction = 'استمر على نفس جودة الخلط، وحافظ على طول تقطيع الخشن 3–5 سم، مع متابعة الروث والاجترار ودسم اللبن.';
 
-  if (
-    !Number.isFinite(rough) ||
-    !Number.isFinite(conc) ||
-    (rough + conc) <= 0
-  ) {
-    status = 'watch';
-    score = 55;
-    title = 'تقييم صحة الكرش غير مكتمل';
-    reason = 'لا توجد بيانات كافية عن الخشن والمركزات داخل العليقة.';
-    instruction = 'أدخل الخامات وتصنيفها ونسبتها بدقة قبل اعتماد الحكم.';
-  } else if (noEffectiveRoughage) {
+  const strongFiberProtection =
+    (ndfOK || ndfMarginal) &&
+    (peNDFOK || peNDFMarginal) &&
+    (forageNDFOK || forageNDFMarginal) &&
+    roughOK &&
+    !concHigh;
+
+  if (noEffectiveRoughage) {
     status = 'danger';
-    score = 20;
+    score = Math.min(score, 20);
     title = 'خطر اضطراب كرش مرتفع';
-    reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ.';
-    instruction = 'أدخل مصدر خشن فعّال قبل اعتماد التركيبة.';
+    reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ، وهذا يضعف الاجترار واللعاب ويرفع خطر انخفاض pH الكرش.';
+    instruction = 'أدخل مصدر خشن فعّال قبل اعتماد التركيبة، وتأكد أن الخشن مقطع 3–5 سم وأن الخلطة لا تُفرز.';
   } else if (
     starchHigh &&
-    (peNDFLow || ndfLow || roughLow || concHigh)
+    (
+      peNDFLow ||
+      forageNDFLow ||
+      ndfLow ||
+      roughLow ||
+      concHigh
+    )
   ) {
     status = 'danger';
-    title = 'خطر حموضة واضح';
-    reason = 'النشا مرتفع مع نقص في حماية الكرش من الألياف أو الخشن.';
-    instruction = 'قلل النشا السريع أو المركزات، وارفع الخشن الفعّال بطول تقطيع 3–5 سم.';
+    score = Math.min(score, 55);
+    title = forageNDFLow
+      ? 'خطر نقص حماية الخشن'
+      : 'خطر حموضة واضح';
+
+    reason = forageNDFLow
+      ? 'النشا مرتفع وNDF القادم من الخشن أقل من المطلوب، لذلك حماية الكرش لا تكفي حتى لو NDF الكلي قريبًا من الهدف.'
+      : 'النشا مرتفع ومعه حماية الكرش من الخشن أو الألياف الفعّالة غير كافية، وهذا يرفع خطر انخفاض pH وضعف الاجترار.';
+
+    instruction = forageNDFLow
+      ? 'زِد سيلاج/دريس/تبن فعّال بدل الاعتماد على NDF من المركزات أو النواتج، وراجع جودة الخشن والخلط.'
+      : 'قلّل الحبوب/النشا السريع أو وزّعها على وجبات، وارفع Forage NDF من سيلاج/دريس/تبن فعّال بطول 3–5 سم.';
   } else if (
+    concVeryHigh ||
+    (peNDFLow && forageNDFLow) ||
     (peNDFLow && ndfLow) ||
-    (peNDFLow && roughLow) ||
-    (ndfLow && roughLow)
+    (forageNDFLow && roughLow)
   ) {
     status = 'danger';
-    title = 'حماية الكرش ضعيفة';
-    reason = 'أكثر من مؤشر ألياف منخفض، وهذا يقلل دعم الاجترار وإفراز اللعاب.';
-    instruction = 'راجع نسبة الخشن وجودته وطول التقطيع قبل اعتماد العليقة.';
+    score = Math.min(score, 58);
+    title = concVeryHigh ? 'المركزات مرتفعة على الكرش' : 'حماية الكرش ضعيفة';
+    reason = concVeryHigh
+      ? 'نسبة المركزات عالية جدًا، وهذا يزيد سرعة التخمر ويضعف استقرار بيئة الكرش إذا لم تقابلها ألياف فعّالة كافية.'
+      : 'الألياف الفعّالة أو NDF القادم من الخشن غير كافيين لدعم الاجترار وإفراز اللعاب.';
+    instruction = concVeryHigh
+      ? 'قلّل المركزات تدريجيًا أو ارفع الخشن الفعّال، وتجنب أي تغيير مفاجئ في الحبوب.'
+      : 'ارفع مصدر خشن فعّال، وراجع نسبة السيلاج/الدريس/التبن، وتأكد من طول التقطيع وعدم فرز الخلطة.';
+  } else if (starchHigh && strongFiberProtection) {
+    status = 'watch';
+    score = Math.max(score, 68);
+    title = 'النشا مرتفع مع حماية ألياف كافية';
+    reason = 'النشا أعلى من الهدف، لكن الخشن وForage NDF وpeNDF كافية حاليًا لحماية الكرش.';
+    instruction = 'لا تعدّل بقسوة. راقب الروث والاجترار ودسم اللبن. لو ظهرت علامات حموضة، خفّض النشا أو ارفع الخشن الفعّال.';
   } else if (starchHigh) {
     status = 'watch';
-    title = 'النشا مرتفع مع ألياف كافية';
-    reason = 'النشا أعلى من الحد المستهدف، لكن NDF وpeNDF والخشن كافية لحماية الكرش.';
-    instruction = 'لا تعتبرها حموضة مباشرة؛ راقب الروث والاجترار ودسم اللبن.';
+    score = Math.max(score, 62);
+    title = 'النشا مرتفع ويحتاج متابعة';
+    reason = 'النشا أعلى من الهدف، لكن مؤشرات الألياف لا تشير إلى خطر حموضة واضح.';
+    instruction = 'راجع مصدر النشا، وراقب الروث والاجترار ودسم اللبن، وتأكد من طول تقطيع الخشن ومنع فرز الخلطة.';
+  } else if (ndfMarginal) {
+    status = 'watch';
+    score = Math.max(score, 72);
+    title = 'الألياف الكلية قريبة من الحد';
+    reason = 'NDF قريب من الحد الأدنى، لكن باقي مؤشرات حماية الكرش لا تشير لخطر واضح.';
+    instruction = 'حافظ على الخشن ولا ترفع الحبوب الآن. راقب الروث والاجترار، وارفع الخشن قليلًا لو ظهرت علامات اضطراب.';
+  } else if (forageNDFMarginal) {
+    status = 'watch';
+    score = Math.max(score, 72);
+    title = 'NDF الخشن قريب من الحد';
+    reason = 'جزء الألياف القادم من الخشن قريب من الحد، وقد لا يكفي إذا زاد النشا أو ساء التقطيع.';
+    instruction = 'راجع نسبة السيلاج/الدريس/التبن، وتأكد أن الخشن فعّال وغير ناعم جدًا.';
+  } else if (peNDFMarginal) {
+    status = 'watch';
+    score = Math.max(score, 72);
+    title = 'الألياف المؤثرة قريبة من الحد';
+    reason = 'peNDF قريب من الحد الأدنى اللازم للمضغ والاجترار، لكنه ليس خطرًا واضحًا حاليًا.';
+    instruction = 'حافظ على طول تقطيع الخشن 3–5 سم، وراقب الروث والاجترار خاصة بعد أي زيادة في الحبوب.';
   } else if (peNDFLow) {
     status = 'watch';
     title = 'الألياف المؤثرة أقل من المطلوب';
-    reason = 'peNDF أقل من الحد الأدنى اللازم لدعم الاجترار وإفراز اللعاب.';
+    reason = 'peNDF أقل من الحد الأدنى اللازم لدعم المضغ واللعاب وثبات pH الكرش.';
     instruction = 'حسّن طول تقطيع الخشن إلى 3–5 سم أو ارفع مصدر الألياف الفعّالة.';
+  } else if (forageNDFLow) {
+    status = 'watch';
+    title = 'NDF الخشن أقل من المطلوب';
+    reason = 'NDF القادم من الخشن أقل من الحد الداعم لصحة الكرش حتى لو بعض NDF يأتي من المركزات.';
+    instruction = 'ارفع سيلاج/دريس/تبن فعّال، ولا تعتمد على NDF المركزات كبديل كامل لحماية الكرش.';
   } else if (ndfLow) {
     status = 'watch';
     title = 'الألياف الكلية منخفضة';
-    reason = 'NDF أقل من المستوى المناسب لهذه المرحلة.';
-    instruction = 'راجع نسبة وجودة الخشن قبل زيادة مصادر الطاقة.';
+    reason = 'NDF الكلي أقل من المستوى المناسب لهذه المرحلة، وهذا يقلل هامش أمان الكرش.';
+    instruction = 'راجع نسبة وجودة الخشن قبل زيادة مصادر الطاقة أو الحبوب.';
   } else if (roughLow) {
     status = 'watch';
     title = 'الخشن أقل من المطلوب';
-    reason = 'نسبة الخشن أقل من الحد الأدنى الداعم لصحة الكرش.';
+    reason = 'نسبة الخشن أقل من الحد الأدنى الداعم للمضغ والاجترار.';
     instruction = 'ارفع مصدر الخشن أو حسّن فعالية الألياف قبل اعتماد العليقة.';
   } else if (concHigh) {
     status = 'watch';
@@ -1794,7 +1932,7 @@ function buildRumenHealthModel({
   }
 
   return {
-    model: 'MURABBIK_RUMEN_HEALTH_ONLY_V2',
+    model: 'MURABBIK_RUMEN_HEALTH_FORAGE_NDF_V1',
     status,
     score,
     title,
@@ -1807,7 +1945,8 @@ function buildRumenHealthModel({
     sourceBasis: [
       'RUMEN_HEALTH_ONLY',
       'STARCH_PLUS_FIBER_PROTECTION',
-      'NDF_AND_PENDF_MINIMUM_ONLY',
+      'FORAGE_NDF_AS_CORE_PROTECTION',
+      'PENDF_AS_PHYSICAL_EFFECTIVENESS',
       'NO_DMI_OR_ENERGY_JUDGMENT_INSIDE_RUMEN_CARD'
     ]
   };
