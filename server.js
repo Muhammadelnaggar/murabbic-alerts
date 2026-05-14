@@ -1956,6 +1956,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const nutrition = analysis?.nutrition || {};
   const targets = analysis?.targets || {};
   const economics = analysis?.economics || {};
+
   const num = (v, d = 2) => {
     const n = Number(v);
     return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
@@ -1968,53 +1969,275 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     return unit ? `${out} ${unit}` : out;
   };
 
+  const pctTxt = (v, d = 1) => txt(v, '%', d);
+
+  const stateFromBalance = (actual, target, tolerancePct = 5) => {
+    const a = Number(actual);
+    const t = Number(target);
+    if (!Number.isFinite(a) || !Number.isFinite(t) || t <= 0) return 'warn';
+
+    const diffPct = ((a - t) / t) * 100;
+    if (Math.abs(diffPct) <= tolerancePct) return 'good';
+    if (diffPct < 0) return 'warn';
+    return 'watch';
+  };
+
+  const uiStatus = (state) => {
+    if (state === 'danger') return 'danger';
+    if (state === 'watch' || state === 'warn') return 'warn';
+    return 'good';
+  };
+
+  const dmActual = num(totals.dmKg, 2);
+  const dmTarget = num(targets.dmiTarget, 2);
+
+  const nelActual = num(nutrition.nelActual, 2);
+  const nelTarget = num(targets.nelTarget, 2);
+
+  const mpActual = num(nutrition.mpSupplyG, 0);
+  const mpTarget = num(targets.mpTargetG, 0);
+
+  const cpActual = num(nutrition.cpPctTotal, 1);
+  const cpTarget = num(targets.cpTarget, 1);
+
+  const starchActual = num(nutrition.starchPctActual, 1);
+  const starchMax = num(targets.starchMax, 1);
+
+  const fatActual = num(nutrition.fatPctActual, 1);
+  const fatMax = 7;
+
   const rough = num(nutrition.roughPctDM, 0);
   const conc = num(nutrition.concPctDM, 0);
 
+  const rumenModel = nutrition.rumenHealthModel || null;
+  const rumenState =
+    rumenModel?.status === 'danger'
+      ? 'danger'
+      : rumenModel?.status === 'watch'
+        ? 'warn'
+        : 'good';
+
+  const dmState = stateFromBalance(dmActual, dmTarget, 5);
+  const nelState = stateFromBalance(nelActual, nelTarget, 5);
+  const mpState = stateFromBalance(mpActual, mpTarget, 5);
+
+  const starchHigh =
+    Number.isFinite(Number(starchActual)) &&
+    Number.isFinite(Number(starchMax)) &&
+    Number(starchActual) > Number(starchMax);
+
+  const fatHigh =
+    Number.isFinite(Number(fatActual)) &&
+    Number(fatActual) > fatMax;
+
+  const dmHint =
+    dmState === 'good'
+      ? 'المأكول قريب من الاحتياج. حافظ على انتظام التوزيع.'
+      : Number(dmActual) < Number(dmTarget)
+        ? 'المادة الجافة ناقصة. ارفع الكمية تدريجيًا وراجع المتبقي.'
+        : 'المادة الجافة مرتفعة. تأكد أنها مأكولة وليست هدرًا.';
+
+  const nelHint =
+    nelState === 'good'
+      ? 'الطاقة تغطي الاحتياج الحالي. راقب الإنتاج وBCS.'
+      : Number(nelActual) < Number(nelTarget)
+        ? 'الطاقة ناقصة. راجع المادة الجافة أولًا ثم كثافة الطاقة.'
+        : 'الطاقة مرتفعة. راجع مصدر الطاقة قبل زيادة الحبوب.';
+
+  const mpHint =
+    mpState === 'good'
+      ? 'MP يغطي الاحتياج. حافظ على جودة مصدر البروتين.'
+      : Number(mpActual) < Number(mpTarget)
+        ? 'MP ناقص. حسّن مصدر البروتين قبل رفع CP عشوائيًا.'
+        : 'MP أعلى من الاحتياج. راجع التكلفة والهدر البروتيني.';
+
+  const starchHint =
+    starchHigh
+      ? 'النشا مرتفع عن الحد الآمن. راجع كارت صحة الكرش قبل تعديل الحبوب.'
+      : 'النشا داخل الحد. حافظ على توازن الحبوب والخشن.';
+
+  const fatHint =
+    fatHigh
+      ? 'الدهون مرتفعة عن الحد. قلّل الدهون الحرة أو استخدم دهونًا محمية عند الحاجة.'
+      : 'الدهون داخل الحد الآمن. لا ترفعها إلا لهدف واضح.';
+
+  const economyHint =
+    Number.isFinite(Number(economics.milkMargin))
+      ? (
+          Number(economics.milkMargin) >= 0
+            ? 'الهامش موجب. راجع أغلى خامتين قبل أي تعديل.'
+            : 'الهامش ضعيف. راجع السعر والإنتاج وأغلى الخامات.'
+        )
+      : (
+          Number.isFinite(Number(economics.costPerKgMilk))
+            ? 'راجع تكلفة كجم اللبن مع الإنتاج وسعر اللبن.'
+            : 'أدخل سعر اللبن والخامات لقرار اقتصادي أدق.'
+        );
+
+  const priorityText = (() => {
+    if (rumenModel?.status === 'danger') {
+      return 'الأولوية: أصلح صحة الكرش قبل رفع الطاقة أو الحبوب.';
+    }
+
+    if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
+      return 'الأولوية: ارفع المادة الجافة تدريجيًا قبل تغيير التركيبة.';
+    }
+
+    if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
+      return 'الأولوية: حسّن MP قبل رفع البروتين الخام عشوائيًا.';
+    }
+
+    if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
+      return 'الأولوية: حسّن الطاقة بدون كسر أمان الكرش.';
+    }
+
+    if (fatHigh) {
+      return 'الأولوية: راجع الدهون الحرة قبل اعتماد العليقة.';
+    }
+
+    if (starchHigh) {
+      return 'الأولوية: راجع صحة الكرش قبل تعديل الحبوب.';
+    }
+
+    return 'الأولوية: العليقة مقبولة؛ تابع الإنتاج والروث والمتبقي.';
+  })();
+
+  const decisionText = (() => {
+    if (rumenModel?.status === 'danger') {
+      return 'العليقة تحتاج ضبط صحة الكرش أولًا.';
+    }
+
+    if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
+      return 'العليقة آمنة للكرش لكنها لا تغطي المادة الجافة.';
+    }
+
+    if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
+      return 'العليقة تحتاج تحسين البروتين الممثل MP.';
+    }
+
+    if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
+      return 'العليقة تحتاج دعم طاقة محسوب.';
+    }
+
+    if (fatHigh || starchHigh) {
+      return 'العليقة تحتاج مراقبة النشا/الدهون مع صحة الكرش.';
+    }
+
+    return 'العليقة متوازنة تشغيليًا حسب المدخلات الحالية.';
+  })();
+
   const analysisCards = [
+    {
+      key: 'decision',
+      title: 'قرار مُرَبِّيك',
+      value: decisionText,
+      actual: null,
+      target: null,
+      targetText: priorityText,
+      status:
+        rumenModel?.status === 'danger'
+          ? 'danger'
+          : (
+              dmState !== 'good' ||
+              nelState !== 'good' ||
+              mpState !== 'good' ||
+              starchHigh ||
+              fatHigh
+            )
+              ? 'warn'
+              : 'good'
+    },
+
     {
       key: 'dm',
       title: 'المادة الجافة',
-      value: txt(totals.dmKg, 'كجم', 2),
-      actual: num(totals.dmKg, 2),
-      target: num(targets.dmiTarget, 2),
-      targetText: txt(targets.dmiTarget, 'كجم', 2)
+      value: txt(dmActual, 'كجم', 2),
+      actual: dmActual,
+      target: dmTarget,
+      targetText: `${txt(dmActual, 'كجم', 2)} / ${txt(dmTarget, 'كجم', 2)} — ${dmHint}`,
+      status: uiStatus(dmState)
     },
+
     {
-      key: 'asFed',
-      title: 'المأكول الكلي',
-      value: txt(totals.asFedKg, 'كجم', 2),
-      actual: num(totals.asFedKg, 2),
+      key: 'nel',
+      title: 'الطاقة',
+      value: txt(nelActual, 'Mcal', 2),
+      actual: nelActual,
+      target: nelTarget,
+      targetText: `${txt(nelActual, 'Mcal', 2)} / ${txt(nelTarget, 'Mcal', 2)} — ${nelHint}`,
+      status: uiStatus(nelState)
+    },
+
+    {
+      key: 'mp',
+      title: 'MP / CP',
+      value: `${txt(mpActual, 'جم', 0)} / CP ${pctTxt(cpActual, 1)}`,
+      actual: mpActual,
+      target: mpTarget,
+      targetText: `${txt(mpActual, 'جم', 0)} / ${txt(mpTarget, 'جم', 0)} — ${mpHint}`,
+      status: uiStatus(mpState)
+    },
+
+    {
+      key: 'starch',
+      title: 'النشا',
+      value: pctTxt(starchActual, 1),
+      actual: starchActual,
+      target: starchMax,
+      targetText: `${pctTxt(starchActual, 1)} / ${pctTxt(starchMax, 1)} — ${starchHint}`,
+      status: starchHigh ? 'warn' : 'good'
+    },
+
+    {
+      key: 'fat',
+      title: 'الدهون',
+      value: pctTxt(fatActual, 1),
+      actual: fatActual,
+      target: fatMax,
+      targetText: `${pctTxt(fatActual, 1)} / ${pctTxt(fatMax, 1)} — ${fatHint}`,
+      status: fatHigh ? 'warn' : 'good'
+    },
+
+    {
+      key: 'rumen',
+      title: 'صحة الكرش',
+      value: rumenModel?.displayText || (
+        Number.isFinite(rough) && Number.isFinite(conc)
+          ? `خشن ${rough}% / مركز ${conc}%`
+          : '—'
+      ),
+      actual: rumenModel?.score ?? null,
+      target: 80,
+      targetText: [
+        rumenModel?.noteText || nutrition.rumenNote || '',
+        rumenModel?.adviceText
+          ? `تعليمات مُرَبِّيك: ${rumenModel.adviceText}`
+          : ''
+      ].filter(Boolean).join(' — '),
+      status: nutrition.rumenStatus || null,
+      model: rumenModel || null
+    },
+
+    {
+      key: 'priority',
+      title: 'أولوية التعديل',
+      value: priorityText,
+      actual: null,
       target: null,
-      targetText: '—'
-    },
-    {
-      key: 'cp',
-      title: 'البروتين الخام',
-      value: txt(nutrition.cpPctTotal, '%', 1),
-      actual: num(nutrition.cpPctTotal, 1),
-      target: num(targets.cpTarget, 1),
-      targetText: txt(targets.cpTarget, '%', 1)
-    },
-{
-  key: 'rumen',
-  title: 'صحة الكرش',
-  value: nutrition.rumenHealthModel?.displayText || (
-    Number.isFinite(rough) && Number.isFinite(conc)
-      ? `خشن ${rough}% / مركز ${conc}%`
-      : '—'
-  ),
-  actual: nutrition.rumenHealthModel?.score ?? null,
-  target: 80,
-  targetText: [
-    nutrition.rumenHealthModel?.noteText || nutrition.rumenNote || '',
-    nutrition.rumenHealthModel?.adviceText
-      ? `تعليمات مُرَبِّيك: ${nutrition.rumenHealthModel.adviceText}`
-      : ''
-  ].filter(Boolean).join(' — '),
-  status: nutrition.rumenStatus || null,
-  model: nutrition.rumenHealthModel || null
-}
+      targetText: 'خطوة واحدة الآن — التفاصيل في تقرير التغذية.',
+      status:
+        rumenModel?.status === 'danger'
+          ? 'danger'
+          : (
+              dmState !== 'good' ||
+              nelState !== 'good' ||
+              mpState !== 'good' ||
+              starchHigh ||
+              fatHigh
+            )
+              ? 'warn'
+              : 'good'
+    }
   ];
 
   const economicsCards = [
@@ -2023,131 +2246,136 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       title: 'التكلفة/رأس',
       value: Number.isFinite(Number(totals.totCost))
         ? `${num(totals.totCost, 2)} ج`
-        : '—'
+        : '—',
+      targetText: economyHint
     },
     {
       key: 'costPerKgMilk',
       title: 'تكلفة كجم لبن',
       value: Number.isFinite(Number(economics.costPerKgMilk))
         ? `${num(economics.costPerKgMilk, 2)} ج/كجم`
-        : '—'
+        : '—',
+      targetText: economyHint
     },
     {
-  key: 'dmPerKgMilk',
-  title: 'كفاءة تحويل العلف',
-  value: Number.isFinite(Number(economics.dmPerKgMilk)) && Number(economics.dmPerKgMilk) > 0
-    ? `1 كجم مادة جافة → ${num(1 / Number(economics.dmPerKgMilk), 2)} كجم لبن`
-    : '—'
-},
+      key: 'dmPerKgMilk',
+      title: 'كفاءة تحويل العلف',
+      value: Number.isFinite(Number(economics.dmPerKgMilk)) && Number(economics.dmPerKgMilk) > 0
+        ? `1 كجم مادة جافة → ${num(1 / Number(economics.dmPerKgMilk), 2)} كجم لبن`
+        : '—',
+      targetText: 'راقب الكفاءة مع اللبن والمادة الجافة.'
+    },
     {
       key: 'mixPriceAsFed',
       title: 'سعر طن العليقة',
       value: Number.isFinite(Number(totals.mixPriceAsFed))
         ? `${num(totals.mixPriceAsFed, 2)} ج/طن as-fed`
-        : '—'
+        : '—',
+      targetText: 'راجع أغلى خامتين قبل تغيير التركيبة.'
     },
     {
       key: 'milkMargin',
       title: 'هامش لبن-علف',
       value: Number.isFinite(Number(economics.milkMargin))
         ? `${num(economics.milkMargin, 2)} ج`
-        : '—'
+        : '—',
+      targetText: economyHint
     }
   ];
 
- const advancedCards = [
-  {
-    key: 'dmiTarget',
-    title: 'احتياجات المادة الجافة',
-    value: txt(targets.dmiTarget, 'كجم', 2)
-  },
-  {
-    key: 'totDM',
-    title: 'العليقة الحالية — مادة جافة',
-    value: txt(totals.dmKg, 'كجم', 2)
-  },
+  const advancedCards = [
+    {
+      key: 'dmiTarget',
+      title: 'احتياجات المادة الجافة',
+      value: txt(targets.dmiTarget, 'كجم', 2)
+    },
+    {
+      key: 'totDM',
+      title: 'العليقة الحالية — مادة جافة',
+      value: txt(totals.dmKg, 'كجم', 2)
+    },
 
-  {
-    key: 'cpTarget',
-    title: 'احتياجات البروتين الخام',
-    value: txt(targets.cpTarget, '%', 1)
-  },
-  {
-    key: 'cpPctTotal',
-    title: 'العليقة الحالية — بروتين خام',
-    value: txt(nutrition.cpPctTotal, '%', 1)
-  },
+    {
+      key: 'cpTarget',
+      title: 'احتياجات البروتين الخام',
+      value: txt(targets.cpTarget, '%', 1)
+    },
+    {
+      key: 'cpPctTotal',
+      title: 'العليقة الحالية — بروتين خام',
+      value: txt(nutrition.cpPctTotal, '%', 1)
+    },
 
-  {
-    key: 'mpTargetG',
-   title: 'احتياجات البروتين الممثل',
-    value: txt(targets.mpTargetG, 'جم/يوم', 0)
-  },
-  {
-    key: 'mpSupplyG',
-   title: 'العليقة الحالية — البروتين الممثل',
-    value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
-  },
- 
+    {
+      key: 'mpTargetG',
+      title: 'احتياجات البروتين الممثل',
+      value: txt(targets.mpTargetG, 'جم/يوم', 0)
+    },
+    {
+      key: 'mpSupplyG',
+      title: 'العليقة الحالية — البروتين الممثل',
+      value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
+    },
 
-  {
-    key: 'ndfTarget',
-    title: 'احتياجات الألياف NDF',
-    value: txt(targets.ndfTarget, '%', 0)
-  },
-  {
-    key: 'ndfPctActual',
-    title: 'العليقة الحالية — ألياف NDF',
-    value: txt(nutrition.ndfPctActual, '%', 1)
-  },
-{
-  key: 'peNDFMin',
-  title: 'الحد الأدنى للألياف المؤثرة',
-  value: txt(targets.peNDFMin, '%', 0)
-},
-{
-  key: 'peNDFPctActual',
-  title: 'العليقة الحالية — ألياف مؤثرة',
-  value: txt(nutrition.peNDFPctActual, '%', 1)
-},
- {
-  key: 'starchMax',
-  title: 'الحد الأقصى للنشا',
-  value: txt(targets.starchMax, '%', 0)
-},
-{
-  key: 'starchPctActual',
-  title: 'العليقة الحالية — نشا',
-  value: txt(nutrition.starchPctActual, '%', 1)
-},
-{
-  key: 'roughageMin',
-  title: 'الحد الأدنى للخشن',
-  value: txt(targets.roughageMin, '%', 0)
-},
+    {
+      key: 'ndfTarget',
+      title: 'احتياجات الألياف NDF',
+      value: txt(targets.ndfTarget, '%', 0)
+    },
+    {
+      key: 'ndfPctActual',
+      title: 'العليقة الحالية — ألياف NDF',
+      value: txt(nutrition.ndfPctActual, '%', 1)
+    },
+    {
+      key: 'peNDFMin',
+      title: 'الحد الأدنى للألياف المؤثرة',
+      value: txt(targets.peNDFMin, '%', 0)
+    },
+    {
+      key: 'peNDFPctActual',
+      title: 'العليقة الحالية — ألياف مؤثرة',
+      value: txt(nutrition.peNDFPctActual, '%', 1)
+    },
+    {
+      key: 'starchMax',
+      title: 'الحد الأقصى للنشا',
+      value: txt(targets.starchMax, '%', 0)
+    },
+    {
+      key: 'starchPctActual',
+      title: 'العليقة الحالية — نشا',
+      value: txt(nutrition.starchPctActual, '%', 1)
+    },
+    {
+      key: 'roughageMin',
+      title: 'الحد الأدنى للخشن',
+      value: txt(targets.roughageMin, '%', 0)
+    },
 
-  {
-    key: 'fatLimit',
-    title: 'الحد المسموح به لدهن العليقة',
-    value: '6–7 % من المادة الجافة'
-  },
-  {
-    key: 'fatPctActual',
-    title: 'العليقة الحالية — دهن',
-    value: txt(nutrition.fatPctActual, '%', 1)
-  },
+    {
+      key: 'fatLimit',
+      title: 'الحد المسموح به لدهن العليقة',
+      value: '6–7 % من المادة الجافة'
+    },
+    {
+      key: 'fatPctActual',
+      title: 'العليقة الحالية — دهن',
+      value: txt(nutrition.fatPctActual, '%', 1)
+    },
 
-  {
-    key: 'nelTarget',
-    title: 'احتياجات الطاقة',
-    value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
-  },
-  {
-    key: 'nelActual',
-    title: 'العليقة الحالية — طاقة',
-    value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
-  }
-];
+    {
+      key: 'nelTarget',
+      title: 'احتياجات الطاقة',
+      value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
+    },
+    {
+      key: 'nelActual',
+      title: 'العليقة الحالية — طاقة',
+      value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
+    }
+  ];
+
   return {
     analysisCards,
     economicsCards,
