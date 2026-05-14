@@ -2624,7 +2624,22 @@ function renderGaugeRows(cards){
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
     { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' }
   ];
+  const quickCards =
+  Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.analysisCards)
+    ? window.mbkNutrition.serverViewModel.panels.analysisCards
+    : [];
 
+const quickCardByKey = (key) =>
+  quickCards.find(x => x?.key === key) || null;
+
+const smartHint = (key, fallback = '') => {
+  const txt = String(quickCardByKey(key)?.targetText || '').trim();
+  if (!txt) return fallback || '';
+
+  // لو السيرفر بعت "القيمة / الهدف — التوجيه"، نعرض التوجيه فقط
+  const parts = txt.split('—').map(s => s.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : txt;
+};
   const rows = defs.map(def => {
     const currentCard = findCard(cards, def.current);
     const targetCard = findCard(cards, def.target);
@@ -2634,7 +2649,7 @@ function renderGaugeRows(cards){
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
     const state = gaugeStatus(def.kind, current, target);
-    const comment = metricComment(def.key, state);
+    const comment = smartHint(def.key, metricComment(def.key, state));
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
