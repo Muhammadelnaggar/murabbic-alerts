@@ -2205,12 +2205,23 @@ const item = {
 };
 
 if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
-  // نظّف سطر الإدخال لخامة جديدة
-  tr.querySelector('.name').value='';
-  tr.querySelector('.kg').value='';
-  tr.querySelector('.pct').value='';
-  tr.querySelector('.dm').value='';
-  tr.querySelector('.cp').value='';
+ // نظّف سطر الإدخال لخامة جديدة
+tr.querySelector('.name').value='';
+tr.querySelector('.kg').value='';
+tr.querySelector('.pct').value='';
+tr.querySelector('.dm').value='';
+tr.querySelector('.cp').value='';
+tr.querySelector('.pTon').value='';
+
+const pTonDMEl = tr.querySelector('.pTonDM');
+const kgDMEl = tr.querySelector('.kgDM');
+const costEl = tr.querySelector('.cost');
+
+if (pTonDMEl) pTonDMEl.textContent = '—';
+if (kgDMEl) kgDMEl.textContent = '—';
+if (costEl) costEl.textContent = '—';
+
+setRowState(tr);
   renderRationSummary();
   recalc();
 
