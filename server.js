@@ -1494,11 +1494,8 @@ const rumenHealthModel = buildRumenHealthModel({
   ndfTarget: targetsCore?.ndfTarget,
   peNDFActual,
   peNDFMin: targetsCore?.peNDFMin,
-  carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null,
-  nelActual: nelActualDay,
-  nelTarget: targetsCore?.nel,
-  dmiActual: rationCore?.totals?.dmKg,
-  dmiTarget: targetsCore?.dmi
+  roughageMin: targetsCore?.roughageMin,
+  carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null
 });
 
 const rumenStatus =
@@ -1628,11 +1625,8 @@ function buildRumenHealthModel({
   ndfTarget,
   peNDFActual,
   peNDFMin,
-  carbohydrateSafetyModel = null,
-  nelActual = null,
-  nelTarget = null,
-  dmiActual = null,
-  dmiTarget = null
+  roughageMin,
+  carbohydrateSafetyModel = null
 }) {
   const rough = Number(roughPctDM);
   const conc = Number(concPctDM);
@@ -1641,17 +1635,52 @@ function buildRumenHealthModel({
   const ndf = Number(ndfActual);
   const ndfLimit = Number(ndfTarget);
   const pendf = Number(peNDFActual);
-  const pendfMin = Number(peNDFMin);
+  const pendfFloor = Number.isFinite(Number(peNDFMin)) ? Number(peNDFMin) : 18;
+  const roughFloor = Number.isFinite(Number(roughageMin)) ? Number(roughageMin) : 40;
 
   const safePct = (v) =>
     Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
+
+  const starchHigh =
+    Number.isFinite(starch) &&
+    Number.isFinite(starchLimit) &&
+    starch > starchLimit;
+
+  const starchOver = starchHigh ? (starch - starchLimit) : 0;
+
+  const peNDFLow =
+    Number.isFinite(pendf) &&
+    Number.isFinite(pendfFloor) &&
+    pendf < pendfFloor;
+
+  const ndfLow =
+    Number.isFinite(ndf) &&
+    Number.isFinite(ndfLimit) &&
+    ndf < ndfLimit;
+
+  const roughLow =
+    Number.isFinite(rough) &&
+    Number.isFinite(roughFloor) &&
+    rough < roughFloor;
+
+  const concHigh =
+    Number.isFinite(conc) &&
+    conc >= 60;
+
+  const noEffectiveRoughage =
+    Number.isFinite(rough) &&
+    Number.isFinite(conc) &&
+    (rough <= 0 || conc >= 100);
 
   const indicators = {
     roughage: {
       label: 'الخشن',
       actual: safePct(rough),
-      target: null,
-      status: Number.isFinite(rough) && rough > 0 ? 'ok' : 'unknown'
+      target: safePct(roughFloor),
+      status:
+        Number.isFinite(rough) && Number.isFinite(roughFloor)
+          ? (rough < roughFloor ? 'watch' : 'ok')
+          : 'unknown'
     },
     starch: {
       label: 'النشا',
@@ -1659,7 +1688,7 @@ function buildRumenHealthModel({
       target: safePct(starchLimit),
       status:
         Number.isFinite(starch) && Number.isFinite(starchLimit)
-          ? (starch > starchLimit ? 'danger' : 'ok')
+          ? (starch > starchLimit ? 'watch' : 'ok')
           : 'unknown'
     },
     ndf: {
@@ -1674,140 +1703,98 @@ function buildRumenHealthModel({
     peNDF: {
       label: 'peNDF',
       actual: safePct(pendf),
-      target: safePct(pendfMin),
+      target: safePct(pendfFloor),
       status:
-        Number.isFinite(pendf) && Number.isFinite(pendfMin)
-          ? (pendf < pendfMin ? 'watch' : 'ok')
+        Number.isFinite(pendf) && Number.isFinite(pendfFloor)
+          ? (pendf < pendfFloor ? 'watch' : 'ok')
           : 'unknown',
       rule: 'minimum_only'
     }
   };
 
+  let score = 100;
+
+  if (starchHigh) {
+    if (starchOver <= 4) score -= 8;
+    else if (starchOver <= 8) score -= 14;
+    else score -= 22;
+  }
+
+  if (peNDFLow) score -= 30;
+  if (ndfLow) score -= 25;
+  if (roughLow) score -= 25;
+  if (concHigh) score -= 18;
+  if (noEffectiveRoughage) score = 20;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
   let status = 'good';
-  let score = 92;
   let title = 'صحة الكرش آمنة';
-  let reason = 'توازن الخشن والنشا والألياف مناسب.';
+  let reason = 'توازن النشا والخشن وNDF وpeNDF مناسب لصحة الكرش.';
   let instruction = 'حافظ على طول تقطيع الخشن 3–5 سم، وراقب الاجترار والروث ودسم اللبن.';
 
-  const carbStatus = String(carbohydrateSafetyModel?.status || '').toLowerCase();
-
-  if (!Number.isFinite(rough) || !Number.isFinite(conc) || (rough + conc) <= 0) {
+  if (
+    !Number.isFinite(rough) ||
+    !Number.isFinite(conc) ||
+    (rough + conc) <= 0
+  ) {
     status = 'watch';
     score = 55;
     title = 'تقييم صحة الكرش غير مكتمل';
     reason = 'لا توجد بيانات كافية عن الخشن والمركزات داخل العليقة.';
-    instruction = 'أدخل الخامات وتصنيفها وسعرها ونسبتها بدقة قبل اعتماد الحكم.';
-  } else if (rough <= 0 || conc >= 100) {
+    instruction = 'أدخل الخامات وتصنيفها ونسبتها بدقة قبل اعتماد الحكم.';
+  } else if (noEffectiveRoughage) {
     status = 'danger';
     score = 20;
-    title = 'خطر حموضة مرتفع';
+    title = 'خطر اضطراب كرش مرتفع';
     reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ.';
-    instruction = 'أدخل مصدر خشن فعّال فورًا قبل اعتماد التركيبة.';
+    instruction = 'أدخل مصدر خشن فعّال قبل اعتماد التركيبة.';
   } else if (
-    Number.isFinite(starch) &&
-    Number.isFinite(starchLimit) &&
-    starch > starchLimit &&
-    Number.isFinite(pendf) &&
-    Number.isFinite(pendfMin) &&
-    pendf < pendfMin
+    starchHigh &&
+    (peNDFLow || ndfLow || roughLow || concHigh)
   ) {
     status = 'danger';
-    score = 30;
     title = 'خطر حموضة واضح';
-    reason = 'النشا مرتفع مع انخفاض الألياف المؤثرة.';
+    reason = 'النشا مرتفع مع نقص في حماية الكرش من الألياف أو الخشن.';
     instruction = 'قلل النشا السريع أو المركزات، وارفع الخشن الفعّال بطول تقطيع 3–5 سم.';
- } else if (
-    Number.isFinite(starch) &&
-    Number.isFinite(starchLimit) &&
-    starch > starchLimit
-  ) {
-    const starchOver = starch - starchLimit;
-
-    const fiberLooksProtective =
-      (
-        Number.isFinite(rough) &&
-        rough >= 55
-      ) ||
-      (
-        Number.isFinite(ndf) &&
-        Number.isFinite(ndfLimit) &&
-        ndf >= ndfLimit
-      ) ||
-      (
-        Number.isFinite(pendf) &&
-        (
-          !Number.isFinite(pendfMin) ||
-          pendf >= pendfMin
-        )
-      );
-
-    if (fiberLooksProtective && starchOver <= 8) {
-      status = 'watch';
-      score = 74;
-      title = 'النشا مرتفع مع ألياف كافية';
-      reason = 'النشا أعلى من الحد المستهدف، لكن الخشن وNDF/peNDF يوفّرون حماية كافية للكرش.';
-      instruction = 'لا تعتبرها حموضة مباشرة؛ راقب الروث والاجترار ودسم اللبن، وراجع كارت الطاقة قبل تعديل العليقة.';
-    } else {
-      status = 'danger';
-      score = 42;
-      title = 'النشا أعلى من الآمن';
-      reason = 'النشا أعلى من الحد المناسب مقارنة بألياف العليقة.';
-      instruction = 'راجع مصادر الحبوب أو كمية المركزات قبل اعتماد التركيبة.';
-    }
   } else if (
-    Number.isFinite(pendf) &&
-    Number.isFinite(pendfMin) &&
-    pendf < pendfMin
+    (peNDFLow && ndfLow) ||
+    (peNDFLow && roughLow) ||
+    (ndfLow && roughLow)
   ) {
+    status = 'danger';
+    title = 'حماية الكرش ضعيفة';
+    reason = 'أكثر من مؤشر ألياف منخفض، وهذا يقلل دعم الاجترار وإفراز اللعاب.';
+    instruction = 'راجع نسبة الخشن وجودته وطول التقطيع قبل اعتماد العليقة.';
+  } else if (starchHigh) {
     status = 'watch';
-    score = 68;
+    title = 'النشا مرتفع مع ألياف كافية';
+    reason = 'النشا أعلى من الحد المستهدف، لكن NDF وpeNDF والخشن كافية لحماية الكرش.';
+    instruction = 'لا تعتبرها حموضة مباشرة؛ راقب الروث والاجترار ودسم اللبن.';
+  } else if (peNDFLow) {
+    status = 'watch';
     title = 'الألياف المؤثرة أقل من المطلوب';
     reason = 'peNDF أقل من الحد الأدنى اللازم لدعم الاجترار وإفراز اللعاب.';
     instruction = 'حسّن طول تقطيع الخشن إلى 3–5 سم أو ارفع مصدر الألياف الفعّالة.';
-  } else if (
-    Number.isFinite(ndf) &&
-    Number.isFinite(ndfLimit) &&
-    ndf < ndfLimit
-  ) {
+  } else if (ndfLow) {
     status = 'watch';
-    score = 72;
-    title = 'الألياف الكلية قريبة من الحد';
+    title = 'الألياف الكلية منخفضة';
     reason = 'NDF أقل من المستوى المناسب لهذه المرحلة.';
     instruction = 'راجع نسبة وجودة الخشن قبل زيادة مصادر الطاقة.';
-  } else if (carbStatus === 'watch') {
+  } else if (roughLow) {
     status = 'watch';
-    score = 76;
-    title = 'توازن الكربوهيدرات يحتاج مراقبة';
-    reason = carbohydrateSafetyModel?.note || 'العليقة قريبة من حدود الأمان.';
-    instruction = 'راجع النشا وألياف الخشن، وراقب الروث والاجترار ودسم اللبن.';
-  }
-
-  const nelLow =
-    Number.isFinite(Number(nelActual)) &&
-    Number.isFinite(Number(nelTarget)) &&
-    Number(nelActual) < Number(nelTarget);
-
-  const dmiLow =
-    Number.isFinite(Number(dmiActual)) &&
-    Number.isFinite(Number(dmiTarget)) &&
-    Number(dmiActual) < Number(dmiTarget);
-
-  if (
-    status === 'good' &&
-    Number.isFinite(pendf) &&
-    Number.isFinite(pendfMin) &&
-    pendf > pendfMin + 8 &&
-    (nelLow || dmiLow)
-  ) {
+    title = 'الخشن أقل من المطلوب';
+    reason = 'نسبة الخشن أقل من الحد الأدنى الداعم لصحة الكرش.';
+    instruction = 'ارفع مصدر الخشن أو حسّن فعالية الألياف قبل اعتماد العليقة.';
+  } else if (concHigh) {
     status = 'watch';
-    score = 78;
-    title = 'ألياف مرتفعة مع احتمال نقص طاقة';
-    reason = 'peNDF أعلى من الحد الأدنى، وهذا ليس خطر كرش، لكنه قد يقلل كثافة الطاقة إذا ظهر نقص في الطاقة أو المأكول.';
-    instruction = 'راجع كارت الطاقة والمادة الجافة قبل تقليل الخشن؛ لا تعتبر ارتفاع peNDF وحده مشكلة.';
+    title = 'المركزات مرتفعة';
+    reason = 'نسبة المركزات عالية وتحتاج متابعة حتى مع كفاية الألياف.';
+    instruction = 'راقب الروث والاجترار ودسم اللبن، وتجنب التغيير المفاجئ في المركزات.';
   }
 
   return {
-    model: 'MURABBIK_RUMEN_HEALTH_NASEM_2021_ALIGNED',
+    model: 'MURABBIK_RUMEN_HEALTH_ONLY_V2',
     status,
     score,
     title,
@@ -1818,9 +1805,10 @@ function buildRumenHealthModel({
     noteText: reason,
     adviceText: instruction,
     sourceBasis: [
-      'NASEM_2021_CARBOHYDRATE_SAFETY',
-      'FORAGE_NDF_STARCH_NDF_INTERACTION',
-      'PENDF_AS_MINIMUM_ONLY'
+      'RUMEN_HEALTH_ONLY',
+      'STARCH_PLUS_FIBER_PROTECTION',
+      'NDF_AND_PENDF_MINIMUM_ONLY',
+      'NO_DMI_OR_ENERGY_JUDGMENT_INSIDE_RUMEN_CARD'
     ]
   };
 }
