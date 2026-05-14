@@ -2166,15 +2166,6 @@ if (missingPriceRows.length) {
     missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
   });
 }
-const missingPriceRows = normalizedRows.filter(r => {
-  const name = String(r?.name || '').trim();
-  const price = Number(r?.pricePerTon);
-  const hasAmount =
-    Number(r?.asFedKg || 0) > 0 ||
-    Number(r?.pct || 0) > 0;
-
-  return name && hasAmount && !(Number.isFinite(price) && price > 0);
-});
 
 if (missingPriceRows.length) {
   return res.status(400).json({
@@ -2257,15 +2248,7 @@ if (missingPriceRows.length) {
     missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
   });
 }
-const missingPriceRows = normalizedRows.filter(r => {
-  const name = String(r?.name || '').trim();
-  const price = Number(r?.pricePerTon);
-  const hasAmount =
-    Number(r?.asFedKg || 0) > 0 ||
-    Number(r?.pct || 0) > 0;
 
-  return name && hasAmount && !(Number.isFinite(price) && price > 0);
-});
 
 if (missingPriceRows.length) {
   return res.status(400).json({
