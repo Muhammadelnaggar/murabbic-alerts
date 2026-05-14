@@ -1957,7 +1957,24 @@ const milkPrice = toNumOrNull(body.milkPrice);
 
 const enrichedRows = await enrichNutritionRowsFromFeedItems(req.userId, rows);
 const normalizedRows = normalizeNutritionRows(enrichedRows);
+const missingPriceRows = normalizedRows.filter(r => {
+  const name = String(r?.name || '').trim();
+  const price = Number(r?.pricePerTon);
+  const hasAmount =
+    Number(r?.asFedKg || 0) > 0 ||
+    Number(r?.pct || 0) > 0;
 
+  return name && hasAmount && !(Number.isFinite(price) && price > 0);
+});
+
+if (missingPriceRows.length) {
+  return res.status(400).json({
+    ok: false,
+    error: 'feed_price_required',
+    message: 'سعر كل خامة داخل التركيبة إجباري لحساب التحليل الاقتصادي بدقة',
+    missingRows: missingPriceRows.map(r => r.name).slice(0, 10)
+  });
+}
 console.log('NUTRITION ANALYZE rawRows[0] =', rows[0] || null);
 console.log('NUTRITION ANALYZE enrichedRows[0] =', enrichedRows[0] || null);
 console.log('NUTRITION ANALYZE normalizedRows[0] =', normalizedRows[0] || null);
@@ -2022,6 +2039,24 @@ const nutrition = body.nutrition || {};
 const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
 const enrichedRows = await enrichNutritionRowsFromFeedItems(tenant, rawRows);
 const rows = normalizeNutritionRows(enrichedRows);
+const missingPriceRows = normalizedRows.filter(r => {
+  const name = String(r?.name || '').trim();
+  const price = Number(r?.pricePerTon);
+  const hasAmount =
+    Number(r?.asFedKg || 0) > 0 ||
+    Number(r?.pct || 0) > 0;
+
+  return name && hasAmount && !(Number.isFinite(price) && price > 0);
+});
+
+if (missingPriceRows.length) {
+  return res.status(400).json({
+    ok: false,
+    error: 'feed_price_required',
+    message: 'سعر كل خامة داخل التركيبة إجباري لحساب التحليل الاقتصادي بدقة',
+    missingRows: missingPriceRows.map(r => r.name).slice(0, 10)
+  });
+}    
 const context = normalizeNutritionContext(nutrition.context || {});
 
 console.log('NUTRITION SAVE rawRows.length =', rawRows.length);
