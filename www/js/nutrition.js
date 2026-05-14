@@ -1954,12 +1954,21 @@ if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
  if(dmEl) dmEl.value = (feed && feed.dm != null) ? feed.dm : '';
 if(cpEl) cpEl.value = (feed && feed.cp != null) ? feed.cp : '';
 
-  // فضّي الكمية/النسبة عشان المستخدم يدخل
-  const kgEl = tr.querySelector('.kg');
-  const pctEl = tr.querySelector('.pct');
-  if(kgEl) kgEl.value = '';
-  if(pctEl) pctEl.value = '';
+ // فضّي الكمية/النسبة/السعر عشان المستخدم يدخل خامة جديدة بدون بقايا
+const kgEl = tr.querySelector('.kg');
+const pctEl = tr.querySelector('.pct');
+const pTonEl = tr.querySelector('.pTon');
+const pTonDMEl = tr.querySelector('.pTonDM');
+const kgDMEl = tr.querySelector('.kgDM');
+const costEl = tr.querySelector('.cost');
 
+if(kgEl) kgEl.value = '';
+if(pctEl) pctEl.value = '';
+if(pTonEl) pTonEl.value = '';
+
+if(pTonDMEl) pTonDMEl.textContent = '—';
+if(kgDMEl) kgDMEl.textContent = '—';
+if(costEl) costEl.textContent = '—';
   // خلّي السطر جاهز للإدخال
   setRowState(tr);
   focusEditable(tr);
