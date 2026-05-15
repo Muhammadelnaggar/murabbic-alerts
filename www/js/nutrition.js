@@ -2538,21 +2538,70 @@ function metricComment(key, state){
   return (map[k] && map[k][s]) || state?.note || '';
 }
 
-function gaugeScaleMax(kind, current, target){
-  const c = Number.isFinite(current) ? current : 0;
-  const t = Number.isFinite(target) ? target : 0;
+function clamp01(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
 
-  // مؤشرات الحد الأقصى: الأحمر يبدأ بعد الحد مباشرة،
-  // لكن بصريًا نخلي الحد في آخر الأخضر تقريبًا، وليس في منتصف العداد.
-  if (kind === 'ceiling') {
-    return Math.max(t * 1.08, c * 1.02, 1);
+function gaugeRatio(current, target){
+  const c = Number(current);
+  const t = Number(target);
+  if (!Number.isFinite(c) || !Number.isFinite(t) || t <= 0) return null;
+  return c / t;
+}
+
+function gaugeStatus(kind, current, target){
+  const ratio = gaugeRatio(current, target);
+
+  if (ratio == null) {
+    return { key:'na', label:'غير متاح', color:'#94a3b8', tone:'info', note:'لا توجد بيانات كافية' };
   }
 
-  return Math.max(t * 1.35, c * 1.10, 1);
+  if (kind === 'ceiling') {
+    if (ratio <= 1) {
+      return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'داخل الحد.' };
+    }
+    if (ratio <= 1.08) {
+      return { key:'warn', label:'تنبيه', color:'#d97706', tone:'warn', note:'تجاوز بسيط للحد.' };
+    }
+    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'تجاوز واضح للحد.' };
+  }
+
+  // target: الاحتياج له نطاق مناسب حول الهدف
+  if (ratio < 0.90) {
+    return { key:'danger', label:'ناقص', color:'#dc2626', tone:'danger', note:'أقل من المطلوب بوضوح' };
+  }
+  if (ratio < 0.97) {
+    return { key:'warn', label:'قريب من النقص', color:'#d97706', tone:'warn', note:'أقل قليلًا من المطلوب' };
+  }
+  if (ratio <= 1.08) {
+    return { key:'good', label:'مناسب', color:'#16a34a', tone:'good', note:'داخل النطاق المناسب' };
+  }
+  if (ratio <= 1.18) {
+    return { key:'warn', label:'مرتفع', color:'#d97706', tone:'warn', note:'أعلى من المطلوب' };
+  }
+  return { key:'danger', label:'مرتفع جدًا', color:'#dc2626', tone:'danger', note:'أعلى من المطلوب بوضوح' };
 }
-function gaugePos(value, max){
-  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 0;
-  return Math.max(0, Math.min(1, value / max));
+
+function gaugeNeedlePos(kind, current, target){
+  const ratio = gaugeRatio(current, target);
+  if (ratio == null) return 0;
+
+  if (kind === 'ceiling') {
+    // 0 إلى 100% من الحد = داخل الأخضر بالكامل
+    // الحد نفسه عند آخر الأخضر، وبعده يبدأ الأحمر
+    if (ratio <= 1) return clamp01(ratio * 0.82);
+    return clamp01(0.82 + Math.min((ratio - 1) / 0.20, 1) * 0.18);
+  }
+
+  // target:
+  // 100% من الاحتياج في منتصف الأخضر تقريبًا
+  if (ratio <= 0.90) return clamp01((ratio / 0.90) * 0.30);
+  if (ratio <= 0.97) return 0.30 + ((ratio - 0.90) / 0.07) * 0.18;
+  if (ratio <= 1.08) return 0.48 + ((ratio - 0.97) / 0.11) * 0.22;
+  if (ratio <= 1.18) return 0.70 + ((ratio - 1.08) / 0.10) * 0.15;
+  return clamp01(0.85 + Math.min((ratio - 1.18) / 0.22, 1) * 0.15);
 }
 
 function gaugePoint(cx, cy, r, pos){
@@ -2571,8 +2620,7 @@ function arcPath(cx, cy, r, fromPos, toPos){
 }
 
 function buildGaugeSvg(kind, current, target, state){
-  const max = gaugeScaleMax(kind, current, target);
-  const pos = gaugePos(current, max);
+  const pos = gaugeNeedlePos(kind, current, target);
 
   const cx = 80, cy = 84, r = 58;
   const stroke = 22;
@@ -2586,7 +2634,8 @@ let arc2 = '';
 let arc3 = '';
 
 if (kind === 'ceiling') {
-  const limitPos = gaugePos(target, max);
+  // الحد الأقصى: كل ما قبل الحد أخضر، وبعده خطر
+  const limitPos = 0.82;
 
   arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
   arc2 = `<path d="${arcPath(cx, cy, r, limitPos, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
