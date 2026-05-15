@@ -675,6 +675,158 @@ function weightedFeedBands(cards = []) {
     eventDate: null
   };
 }
+function normalizeFatTypeSrv(v = '') {
+  const s = String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/\s+/g, ' ');
+
+  if (!s) return null;
+
+  if (
+    /protected|bypass|calcium\s*salt|prilled|rumen\s*protected|محم|محمي|محميه|محمية|دهون محميه|دهون محمية/.test(s)
+  ) {
+    return 'protected';
+  }
+
+  if (
+    /free|unprotected|oil|زيت|زيوت|دهن حر|دهون حره|دهون حرة|شحم/.test(s)
+  ) {
+    return 'free';
+  }
+
+  return null;
+}
+
+function classifyFatTypeFromRowSrv(r = {}) {
+  const explicit = normalizeFatTypeSrv(
+    r?.fatType ??
+    r?.fatKind ??
+    r?.lipidType ??
+    r?.fatProtection ??
+    r?.protectedFatType ??
+    r?.fatSourceClass ??
+    r?.faSourceClass
+  );
+
+  if (explicit === 'protected') return 'protected';
+
+  const byName = normalizeFatTypeSrv(
+    r?.name ||
+    r?.nameAr ||
+    r?.feedName ||
+    r?.sourceFeedName ||
+    r?.id ||
+    ''
+  );
+
+  if (byName === 'protected') return 'protected';
+
+  // القاعدة المعتمدة في مُرَبِّيك:
+  // أي دهن غير محمي صراحةً يُعامل كدهون حرة.
+  return 'free';
+}
+
+function buildFatPartitionModel(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+
+  let totalDmKg = 0;
+  let totalFatKg = 0;
+  let freeFatKg = 0;
+  let protectedFatKg = 0;
+
+  for (const r of list) {
+    const asFedKg = Number(r?.asFedKg || 0);
+    const dmPct = Number(r?.dmPct || 0);
+    const fatPct = Number(
+      r?.fatPct ??
+      r?.crudeFatPct ??
+      r?.faPct ??
+      0
+    );
+
+    if (!(asFedKg > 0) || !(dmPct > 0) || !(fatPct > 0)) continue;
+
+    const dmKg = asFedKg * (dmPct / 100);
+    const fatKg = dmKg * (fatPct / 100);
+    const fatType = classifyFatTypeFromRowSrv(r);
+
+    totalDmKg += dmKg;
+    totalFatKg += fatKg;
+
+    if (fatType === 'protected') {
+      protectedFatKg += fatKg;
+    } else {
+      freeFatKg += fatKg;
+    }
+  }
+
+  if (!(totalDmKg > 0)) return null;
+
+  const pct = (kg) => round2((kg / totalDmKg) * 100) || 0;
+
+  const totalFatPct = pct(totalFatKg);
+  const freeFatPct = pct(freeFatKg);
+  const protectedFatPct = pct(protectedFatKg);
+
+  const totalFatCeilingPctDM = 7;
+  const freeFatCeilingPctDM = 5;
+
+  const totalHigh =
+    Number.isFinite(Number(totalFatPct)) &&
+    totalFatPct > totalFatCeilingPctDM;
+
+  const freeHigh =
+    Number.isFinite(Number(freeFatPct)) &&
+    freeFatPct > freeFatCeilingPctDM;
+
+  let status = 'good';
+  let title = 'الدهون داخل الحد';
+  let reason = 'مستوى الدهون لا يظهر ضغطًا واضحًا على العليقة.';
+  let instruction = 'لا ترفعها إلا لهدف طاقة واضح.';
+
+  if (freeHigh) {
+    status = 'watch';
+    title = 'الدهون الحرة مرتفعة';
+    reason = 'الدهون غير المحمية قد تضغط على هضم الألياف في الكرش.';
+    instruction = 'قلّل الدهون غير المحمية لحماية هضم الألياف.';
+  } else if (totalHigh && protectedFatPct > freeFatPct) {
+    status = 'watch';
+    title = 'الدهن مرتفع من مصدر محمي';
+    reason = 'الدهون المحمية لا تُعامل كخطر مباشر على هضم الألياف مثل الدهون الحرة.';
+    instruction = 'راقب الطاقة والتكلفة.';
+  } else if (totalHigh) {
+    status = 'watch';
+    title = 'الدهن الكلي مرتفع';
+    reason = 'إجمالي دهن العليقة أعلى من الحد، ومعظمه غير محمي.';
+    instruction = 'راجع مصدر الدهون قبل اعتماد العليقة.';
+  }
+
+  return {
+    model: 'MURABBIK_FAT_FREE_PROTECTED_V1',
+    status,
+    title,
+    reason,
+    instruction,
+    uiText: `${title}. ${instruction}`,
+
+    totalFatPct,
+    freeFatPct,
+    protectedFatPct,
+
+    totalFatCeilingPctDM,
+    freeFatCeilingPctDM,
+
+    fatKg: {
+      total: round2(totalFatKg),
+      free: round2(freeFatKg),
+      protected: round2(protectedFatKg)
+    }
+  };
+}
 function normalizeNutritionRows(rows = []) {
   if (!Array.isArray(rows)) return [];
   return rows.map((r) => cleanObj({
@@ -747,7 +899,7 @@ starchDigestibilityPct: toNumOrNull(
 
 faDigestibilityCoeff: toNumOrNull(r?.faDigestibilityCoeff ?? r?.faDigestibility ?? r?.faDigCoeff),
 faSourceClass: r?.faSourceClass ?? r?.fatSourceClass ?? r?.fatClass ?? null,
-
+fatType: classifyFatTypeFromRowSrv(r),
 caPct: toNumOrNull(r?.caPct ?? r?.calciumPct),
 pPct: toNumOrNull(r?.pPct ?? r?.phosphorusPct),
 mgPct: toNumOrNull(r?.mgPct ?? r?.magnesiumPct),
@@ -807,6 +959,7 @@ wscPct: toNumOrNull(r?.wscPct ?? r?.waterSolubleCarbsPct ?? r?.waterSolubleCarbo
 
 faPct: toNumOrNull(r?.faPct ?? r?.fattyAcidsPct ?? r?.totalFaPct ?? r?.totalFAPct),
 faSourceClass: r?.faSourceClass || r?.fatSourceClass || r?.fatClass || null,
+fatType: classifyFatTypeFromRowSrv(r),    
 faProfilePctTFA: r?.faProfilePctTFA || null,
 
 forageNdfDigestibilityPct: toNumOrNull(r?.forageNdfDigestibilityPct),
@@ -1461,7 +1614,7 @@ const nelActualDay = round2(rationCore?.totals?.nelMcal ?? null);
 const nelDensity = (rationCore?.totals?.dmKg > 0)
   ? round2((rationCore?.totals?.nelMcal || 0) / rationCore.totals.dmKg)
   : null;
-
+const fatPartitionModel = buildFatPartitionModel(cleanRows);
 // ===== صحة الكرش: تقييم خطر اضطراب الكرش من تركيب العليقة =====
 let forageDm = 0;
 let concDm = 0;
@@ -1576,7 +1729,7 @@ const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue
   nelDensity: nelDensity,
   ndfPctActual: rationCore?.nutrition?.ndfPctActual ?? null,
   peNDFPctActual: rationCore?.nutrition?.peNDFPctActual ?? null,
-  fatPctActual: rationCore?.nutrition?.fatPctActual ?? null,
+  fatPctActual: fatPartitionModel?.totalFatPct ?? rationCore?.nutrition?.fatPctActual ?? null,
   starchPctActual: rationCore?.nutrition?.starchPct ?? null,
   roughPctDM,
   concPctDM,
@@ -1591,7 +1744,7 @@ vitaminSupplyModel: rationCore?.nutrition?.vitaminSupplyModel || null,
 dcadModel: rationCore?.nutrition?.dcadModel || null,
 proteinModel: rationCore?.nutrition?.proteinModel || null,
 energySupplyModel: rationCore?.nutrition?.energySupplyModel || null,
-fatModel: rationCore?.nutrition?.fatModel || null,
+fatModel: fatPartitionModel || rationCore?.nutrition?.fatModel || null,
 carbohydrateModel: rationCore?.nutrition?.carbohydrateModel || null,
 carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null,
 dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
@@ -2003,8 +2156,9 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const starchActual = num(nutrition.starchPctActual, 1);
   const starchMax = num(targets.starchMax, 1);
 
-  const fatActual = num(nutrition.fatPctActual, 1);
-  const fatMax = 7;
+  const fatActual = num(nutrition.fatModel?.totalFatPct ?? nutrition.fatPctActual, 1);
+  const fatMax = num(nutrition.fatModel?.totalFatCeilingPctDM ?? 7, 1);
+  const fatModel = nutrition.fatModel || null;
 
   const rough = num(nutrition.roughPctDM, 0);
   const conc = num(nutrition.concPctDM, 0);
@@ -2026,9 +2180,14 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     Number.isFinite(Number(starchMax)) &&
     Number(starchActual) > Number(starchMax);
 
-  const fatHigh =
-    Number.isFinite(Number(fatActual)) &&
-    Number(fatActual) > fatMax;
+const fatHigh =
+  Number.isFinite(Number(fatActual)) &&
+  Number.isFinite(Number(fatMax)) &&
+  Number(fatActual) > Number(fatMax);
+
+const fatNeedsAttention =
+  (fatModel?.status && fatModel.status !== 'good') ||
+  fatHigh;
 
   const dmHint =
     dmState === 'good'
@@ -2057,9 +2216,12 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       : 'النشا داخل الحد. حافظ على توازن الحبوب والخشن.';
 
   const fatHint =
+  fatModel?.uiText ||
+  (
     fatHigh
-      ? 'الدهون مرتفعة عن الحد. قلّل الدهون الحرة أو استخدم دهونًا محمية عند الحاجة.'
-      : 'الدهون داخل الحد الآمن. لا ترفعها إلا لهدف واضح.';
+      ? 'الدهن الكلي مرتفع. راجع نوع مصدر الدهون قبل اعتماد العليقة.'
+      : 'الدهون داخل الحد. لا ترفعها إلا لهدف طاقة واضح.'
+  );
 
   const economyHint =
     Number.isFinite(Number(economics.milkMargin))
@@ -2091,9 +2253,9 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       return 'الأولوية: حسّن الطاقة بدون كسر أمان الكرش.';
     }
 
-    if (fatHigh) {
-      return 'الأولوية: راجع الدهون الحرة قبل اعتماد العليقة.';
-    }
+if (fatNeedsAttention) {
+  return 'الأولوية: راجع الدهون الحرة/المحمية قبل اعتماد العليقة.';
+}
 
     if (starchHigh) {
       return 'الأولوية: راجع صحة الكرش قبل تعديل الحبوب.';
@@ -2119,9 +2281,9 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       return 'العليقة تحتاج دعم طاقة محسوب.';
     }
 
-    if (fatHigh || starchHigh) {
-      return 'العليقة تحتاج مراقبة النشا/الدهون مع صحة الكرش.';
-    }
+if (fatNeedsAttention || starchHigh) {
+  return 'العليقة تحتاج مراقبة النشا/الدهون مع صحة الكرش.';
+}
 
     return 'العليقة متوازنة تشغيليًا حسب المدخلات الحالية.';
   })();
@@ -2142,7 +2304,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
               nelState !== 'good' ||
               mpState !== 'good' ||
               starchHigh ||
-              fatHigh
+              fatNeedsAttention
             )
               ? 'warn'
               : 'good'
@@ -2195,7 +2357,10 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       actual: fatActual,
       target: fatMax,
       targetText: `${pctTxt(fatActual, 1)} / ${pctTxt(fatMax, 1)} — ${fatHint}`,
-      status: fatHigh ? 'warn' : 'good'
+      status:
+  fatModel?.status === 'danger'
+    ? 'danger'
+    : (fatNeedsAttention ? 'warn' : 'good')
     },
 
     {
@@ -2233,7 +2398,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
               nelState !== 'good' ||
               mpState !== 'good' ||
               starchHigh ||
-              fatHigh
+              fatNeedsAttention
             )
               ? 'warn'
               : 'good'
