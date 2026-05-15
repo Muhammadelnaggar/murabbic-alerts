@@ -2551,62 +2551,67 @@ function gaugeRatio(current, target){
   return c / t;
 }
 
-function gaugeStatus(kind, current, target){
+function gaugeProfile(key, kind){
+  if (kind === 'ceiling') {
+    return {
+      type: 'ceiling',
+      minR: 0,
+      maxR: 1.20,
+      goodMax: 1.00,
+      warnMax: 1.08
+    };
+  }
+
+  const profiles = {
+    dm:  { minR:0.80, lowDanger:0.90, lowWarn:0.97, goodMax:1.05, highWarn:1.12, maxR:1.20 },
+    nel: { minR:0.80, lowDanger:0.92, lowWarn:0.98, goodMax:1.05, highWarn:1.12, maxR:1.20 },
+    cp:  { minR:0.80, lowDanger:0.90, lowWarn:0.97, goodMax:1.08, highWarn:1.15, maxR:1.25 },
+    mp:  { minR:0.75, lowDanger:0.90, lowWarn:0.97, goodMax:1.08, highWarn:1.18, maxR:1.30 },
+    ndf: { minR:0.75, lowDanger:0.90, lowWarn:0.97, goodMax:1.10, highWarn:1.20, maxR:1.30 }
+  };
+
+  return {
+    type: 'target',
+    ...(profiles[key] || { minR:0.75, lowDanger:0.90, lowWarn:0.97, goodMax:1.08, highWarn:1.18, maxR:1.25 })
+  };
+}
+
+function gaugeStatus(kind, current, target, key = ''){
   const ratio = gaugeRatio(current, target);
+  const p = gaugeProfile(key, kind);
 
   if (ratio == null) {
     return { key:'na', label:'غير متاح', color:'#94a3b8', tone:'info', note:'لا توجد بيانات كافية' };
   }
 
-  if (kind === 'ceiling') {
-    if (ratio <= 1) {
-      return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'داخل الحد.' };
+  if (p.type === 'ceiling') {
+    if (ratio <= p.goodMax) {
+      return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'داخل الحد' };
     }
-    if (ratio <= 1.08) {
-      return { key:'warn', label:'تنبيه', color:'#d97706', tone:'warn', note:'تجاوز بسيط للحد.' };
+    if (ratio <= p.warnMax) {
+      return { key:'warn', label:'تجاوز بسيط', color:'#d97706', tone:'warn', note:'تجاوز بسيط للحد' };
     }
-    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'تجاوز واضح للحد.' };
+    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'تجاوز واضح للحد' };
   }
 
-  // target: الاحتياج له نطاق مناسب حول الهدف
-  if (ratio < 0.90) {
+  if (ratio < p.lowDanger) {
     return { key:'danger', label:'ناقص', color:'#dc2626', tone:'danger', note:'أقل من المطلوب بوضوح' };
   }
-  if (ratio < 0.97) {
+  if (ratio < p.lowWarn) {
     return { key:'warn', label:'قريب من النقص', color:'#d97706', tone:'warn', note:'أقل قليلًا من المطلوب' };
   }
-  if (ratio <= 1.08) {
+  if (ratio <= p.goodMax) {
     return { key:'good', label:'مناسب', color:'#16a34a', tone:'good', note:'داخل النطاق المناسب' };
   }
-  if (ratio <= 1.18) {
+  if (ratio <= p.highWarn) {
     return { key:'warn', label:'مرتفع', color:'#d97706', tone:'warn', note:'أعلى من المطلوب' };
   }
   return { key:'danger', label:'مرتفع جدًا', color:'#dc2626', tone:'danger', note:'أعلى من المطلوب بوضوح' };
 }
 
-function gaugeNeedlePos(kind, current, target){
-  const ratio = gaugeRatio(current, target);
-  if (ratio == null) return 0;
-
-  if (kind === 'ceiling') {
-    // 0 إلى 100% من الحد = داخل الأخضر بالكامل
-    // الحد نفسه عند آخر الأخضر، وبعده يبدأ الأحمر
-    if (ratio <= 1) return clamp01(ratio * 0.82);
-    return clamp01(0.82 + Math.min((ratio - 1) / 0.20, 1) * 0.18);
-  }
-
-  // target:
-  // 100% من الاحتياج في منتصف الأخضر تقريبًا
-  if (ratio <= 0.90) return clamp01((ratio / 0.90) * 0.30);
-  if (ratio <= 0.97) return 0.30 + ((ratio - 0.90) / 0.07) * 0.18;
-  if (ratio <= 1.08) return 0.48 + ((ratio - 0.97) / 0.11) * 0.22;
-  if (ratio <= 1.18) return 0.70 + ((ratio - 1.08) / 0.10) * 0.15;
-  return clamp01(0.85 + Math.min((ratio - 1.18) / 0.22, 1) * 0.15);
-}
-
 function gaugePoint(cx, cy, r, pos){
-  const p = Math.max(0, Math.min(1, Number(pos) || 0));
-  const a = Math.PI * (1 - p); // 0 = يسار ، 1 = يمين على نصف الدائرة العلوي
+  const p = clamp01(pos);
+  const a = Math.PI * (1 - p);
   return {
     x: cx + r * Math.cos(a),
     y: cy - r * Math.sin(a)
@@ -2620,51 +2625,102 @@ function arcPath(cx, cy, r, fromPos, toPos){
 }
 
 function buildGaugeSvg(kind, current, target, state){
-  const pos = gaugeNeedlePos(kind, current, target);
+  const ratio = gaugeRatio(current, target);
 
-  const cx = 80, cy = 84, r = 58;
-  const stroke = 22;
+  const cx = 80;
+  const cy = 86;
+  const r = 58;
+  const stroke = 20;
 
-  // تقسيم واضح جدًا مثل عداد الساعة
- const redTo = 0.33;
-const yellowTo = 0.66;
+  const red = '#ff1a12';
+  const yellow = '#f3c754';
+  const green = '#84d983';
+  const gray = '#e5e7eb';
+  const ink = '#111827';
 
-let arc1 = '';
-let arc2 = '';
-let arc3 = '';
+  let pos = 0.5;
+  let arcs = '';
+  let ticks = '';
 
-if (kind === 'ceiling') {
-  // الحد الأقصى: كل ما قبل الحد أخضر، وبعده خطر
-  const limitPos = 0.82;
+  if (ratio == null) {
+    arcs = `<path d="${arcPath(cx, cy, r, 0, 1)}" fill="none" stroke="${gray}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  }
 
-  arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc2 = `<path d="${arcPath(cx, cy, r, limitPos, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc3 = '';
-} else {
-  // في مؤشرات الاحتياج: منخفض = خطر، وسط = تحذير، يمين = جيد
-  arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-}
-  const tip = gaugePoint(cx, cy, r - 8, pos);
+  else if (kind === 'ceiling') {
+    const maxRatio = 1.20;
+    const limitPos = 1 / maxRatio;
 
-  // قاعدة الإبرة أسمك وتعطي شكل عداد محترم
-  const baseLeft = { x: cx - 5, y: cy + 1 };
-  const baseRight = { x: cx + 5, y: cy + 1 };
+    pos = clamp01(ratio / maxRatio);
+
+    arcs = `
+      <path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+      <path d="${arcPath(cx, cy, r, limitPos, 1)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+    `;
+
+    const a = gaugePoint(cx, cy, r - 16, limitPos);
+    const b = gaugePoint(cx, cy, r + 7, limitPos);
+    const label = gaugePoint(cx, cy, r + 21, limitPos);
+
+    ticks = `
+      <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
+        stroke="${ink}" stroke-width="3" stroke-linecap="round" opacity=".65"></line>
+      <text x="${label.x}" y="${label.y + 4}" text-anchor="middle"
+        font-size="9" font-weight="900" fill="#475569">الحد</text>
+    `;
+  }
+
+  else {
+const prof = gaugeProfile(state?.metricKey || '', kind);
+const minR = prof.minR;
+const maxR = prof.maxR;
+const map = (x) => clamp01((x - minR) / (maxR - minR));
+
+    pos = map(ratio);
+
+   arcs = `
+  <path d="${arcPath(cx, cy, r, 0, map(prof.lowDanger))}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+  <path d="${arcPath(cx, cy, r, map(prof.lowDanger), map(prof.lowWarn))}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+  <path d="${arcPath(cx, cy, r, map(prof.lowWarn), map(prof.goodMax))}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+  <path d="${arcPath(cx, cy, r, map(prof.goodMax), map(prof.highWarn))}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+  <path d="${arcPath(cx, cy, r, map(prof.highWarn), 1)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>
+`;
+
+    const targetPos = map(1);
+    const a = gaugePoint(cx, cy, r - 16, targetPos);
+    const b = gaugePoint(cx, cy, r + 7, targetPos);
+    const label = gaugePoint(cx, cy, r + 21, targetPos);
+
+    ticks = `
+      <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
+        stroke="${ink}" stroke-width="3" stroke-linecap="round" opacity=".65"></line>
+      <text x="${label.x}" y="${label.y + 4}" text-anchor="middle"
+        font-size="9" font-weight="900" fill="#475569">الهدف</text>
+    `;
+  }
+
+  const tip = gaugePoint(cx, cy, r - 7, pos);
+  const dot = gaugePoint(cx, cy, r, pos);
 
   return `
-    <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
-     ${arc1}
-${arc2}
-${arc3}
+    <svg viewBox="0 0 160 118" width="160" height="118" aria-hidden="true">
+      ${arcs}
+      ${ticks}
 
-      <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
+      <circle cx="${cx}" cy="${cy}" r="32" fill="#ffffff"></circle>
 
-      <path d="M ${baseLeft.x} ${baseLeft.y} L ${tip.x} ${tip.y} L ${baseRight.x} ${baseRight.y} Z"
-            fill="#111111"></path>
+      <line
+        x1="${cx}"
+        y1="${cy}"
+        x2="${tip.x}"
+        y2="${tip.y}"
+        stroke="${ink}"
+        stroke-width="5"
+        stroke-linecap="round"
+      ></line>
 
-      <circle cx="${cx}" cy="${cy}" r="6.5" fill="#111111"></circle>
-      <circle cx="${cx}" cy="${cy}" r="2.6" fill="#ffffff"></circle>
+      <circle cx="${dot.x}" cy="${dot.y}" r="4.5" fill="${ink}" stroke="#ffffff" stroke-width="2"></circle>
+      <circle cx="${cx}" cy="${cy}" r="8" fill="${ink}"></circle>
+      <circle cx="${cx}" cy="${cy}" r="4" fill="#ffffff"></circle>
     </svg>
   `;
 }
@@ -2702,7 +2758,7 @@ const smartHint = (key, fallback = '') => {
 
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
-    let state = gaugeStatus(def.kind, current, target);
+   let state = gaugeStatus(def.kind, current, target, def.key);
 
 const serverCard = quickCardByKey(def.key);
 if (serverCard?.status) {
@@ -2716,7 +2772,11 @@ if (serverCard?.status) {
     state = { key:'danger', label:'خطر', color:'#dc2626', tone:'danger' };
   }
 }
-    const comment = smartHint(def.key, metricComment(def.key, state));
+
+// مهم جدًا: حتى لو السيرفر غيّر حالة الكارت، الجوج لازم يعرف نوع المؤشر
+state.metricKey = def.key;
+
+const comment = smartHint(def.key, metricComment(def.key, state));
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
