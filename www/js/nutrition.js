@@ -2581,58 +2581,84 @@ function buildGaugeSvg(kind, current, target, state){
 
   const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
 
+  const ratio = valid ? (c / t) : null;
+  const key = String(state?.metricKey || '').trim();
+
   let pos = 0.5;
-  let arc1 = '';
-  let arc2 = '';
-  let arc3 = '';
-  let tick = '';
+  let zones = [];
+  let tickPos = null;
+  let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
 
   if (!valid) {
-    arc1 = `<path d="${arcPath(cx, cy, r, 0, 1)}" fill="none" stroke="${gray}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    zones = [{ from: 0, to: 1, color: gray }];
   }
 
   else if (kind === 'ceiling') {
-    /*
-      جوج النشا والدهن فقط:
-      مقياس ثابت من 0 إلى 120% من الحد.
-      أخضر حتى الحد.
-      أصفر من 100 إلى 108% من الحد.
-      أحمر بعد 108%.
-      لا علاقة له بالتعليقات أو الاتزان.
-    */
-    const scaleMax = t * 1.20;
+    // النشا والدهن: ثابت 0 → 120% من الحد
+    // أخضر حتى الحد، أصفر 100–108%، أحمر بعد ذلك
+    const maxRatio = 1.20;
 
-    const limitPos  = clamp01(t / scaleMax);        // 83.33%
-    const yellowPos = clamp01((t * 1.08) / scaleMax); // 90%
-    pos = clamp01(c / scaleMax);
+    pos = clamp01(ratio / maxRatio);
 
-    arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-    arc2 = `<path d="${arcPath(cx, cy, r, limitPos, yellowPos)}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-    arc3 = `<path d="${arcPath(cx, cy, r, yellowPos, 1)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    const limitPos = clamp01(1 / maxRatio);
+    const warnPos  = clamp01(1.08 / maxRatio);
 
-    const a = gaugePoint(cx, cy, r - 15, limitPos);
-    const b = gaugePoint(cx, cy, r + 6, limitPos);
+    zones = [
+      { from: 0,        to: limitPos, color: green },
+      { from: limitPos, to: warnPos,  color: yellow },
+      { from: warnPos,  to: 1,        color: red }
+    ];
+
+    tickPos = limitPos;
+  }
+
+  else {
+    // باقي الجوجز: مقياس ثابت حسب نوع المؤشر
+    const profiles = {
+      dm:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
+      nel: { min: 0.80, lowDanger: 0.92, lowWarn: 0.98, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
+      cp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.30 },
+      mp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.08, highWarn: 1.18, max: 1.30 },
+      ndf: { min: 0.75, lowDanger: 0.92, lowWarn: 0.97, goodMax: 1.15, highWarn: 1.30, max: 1.45 }
+    };
+
+    const p = profiles[key] || profiles.dm;
+
+    const map = (x) => {
+      if (!Number.isFinite(Number(x)) || p.max <= p.min) return 0;
+      return clamp01((Number(x) - p.min) / (p.max - p.min));
+    };
+
+    pos = map(ratio);
+
+    zones = [
+      { from: 0,                 to: map(p.lowDanger), color: red },
+      { from: map(p.lowDanger),  to: map(p.lowWarn),   color: yellow },
+      { from: map(p.lowWarn),    to: map(p.goodMax),   color: green },
+      { from: map(p.goodMax),    to: map(p.highWarn),  color: yellow },
+      { from: map(p.highWarn),   to: 1,                color: red }
+    ];
+
+    tickPos = map(1);
+  }
+
+  const arcs = zones.map(z => {
+    if (z.to <= z.from) return '';
+    return `<path d="${arcPath(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  }).join('');
+
+  let tick = '';
+  if (tickPos != null) {
+    const a = gaugePoint(cx, cy, r - 15, tickPos);
+    const b = gaugePoint(cx, cy, r + 6, tickPos);
+    const lab = gaugePoint(cx, cy, r + 20, tickPos);
 
     tick = `
       <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
         stroke="${ink}" stroke-width="3" stroke-linecap="round" opacity=".65"></line>
+      <text x="${lab.x}" y="${lab.y + 4}" text-anchor="middle"
+        font-size="9" font-weight="900" fill="#475569">${tickLabel}</text>
     `;
-  }
-
-  else {
-    /*
-      باقي الجوجز كما هي بصريًا تقريبًا.
-      لا تعديل في الحكم أو التعليقات أو الاتزان.
-    */
-    const max = gaugeScaleMax(kind, current, target);
-    pos = gaugePos(current, max);
-
-    const redTo = 0.33;
-    const yellowTo = 0.66;
-
-    arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-    arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-    arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
   }
 
   const tip = gaugePoint(cx, cy, r - 8, pos);
@@ -2642,9 +2668,7 @@ function buildGaugeSvg(kind, current, target, state){
 
   return `
     <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
-      ${arc1}
-      ${arc2}
-      ${arc3}
+      ${arcs}
       ${tick}
 
       <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
@@ -2692,6 +2716,7 @@ const smartHint = (key, fallback = '') => {
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
     const state = gaugeStatus(def.kind, current, target);
+    const gaugeState = { ...(state || {}), metricKey: def.key };
     const comment = smartHint(def.key, '');
 
     return `
@@ -2707,7 +2732,7 @@ const smartHint = (key, fallback = '') => {
             <div style="font-size:15px;font-weight:800;color:#0f172a">${currentCard.value || '—'}</div>
           </div>
 
-          <div style="display:flex;justify-content:center">${buildGaugeSvg(def.kind, current, target, state)}</div>
+          <div style="display:flex;justify-content:center">${buildGaugeSvg(def.kind, current, target, gaugeState)}</div>
 
           <div style="text-align:left">
             <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : 'الاحتياج'}</div>
