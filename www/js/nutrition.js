@@ -1945,18 +1945,31 @@ if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
     const pct  = tr.querySelector('.pct')?.value;
     return (!name && !kg && !pct);
   }
-  function focusEditable(tr){
-    const mode = modeSel.value;
-    const cat  = (tr.querySelector('.cat')?.value)||'conc';
-    const kgEl = tr.querySelector('.kg');
-    const pctEl= tr.querySelector('.pct');
-    setRowState(tr);
-    setTimeout(()=>{
-      if (mode==='tmr_asfed'){ kgEl?.focus(); kgEl?.select?.(); }
-      else if (mode==='tmr_percent'){ pctEl?.focus(); pctEl?.select?.(); }
-      else { if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); } else { pctEl?.focus(); pctEl?.select?.(); } }
-    }, 0);
-  }
+function focusEditable(tr){
+  const mode = modeSel.value;
+  const cat  = (tr.querySelector('.cat')?.value)||'conc';
+  const kgEl = tr.querySelector('.kg');
+  const pctEl= tr.querySelector('.pct');
+  const pTonEl = tr.querySelector('.pTon');
+
+  setRowState(tr);
+
+  setTimeout(()=>{
+    // مربيك: السعر أولًا لأنه إجباري ومؤثر في الاقتصاد
+    if (pTonEl && !pTonEl.disabled) {
+      pTonEl.focus();
+      pTonEl.select?.();
+      return;
+    }
+
+    if (mode==='tmr_asfed'){ kgEl?.focus(); kgEl?.select?.(); }
+    else if (mode==='tmr_percent'){ pctEl?.focus(); pctEl?.select?.(); }
+    else {
+      if (cat==='rough'){ kgEl?.focus(); kgEl?.select?.(); }
+      else { pctEl?.focus(); pctEl?.select?.(); }
+    }
+  }, 0);
+}
  function fillCurrentRowWithFeed(feed, cat){
   let tr = tbody.querySelector('tr:last-child');         // السطر الوحيد
   if(!tr){
