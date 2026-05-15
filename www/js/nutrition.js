@@ -2541,10 +2541,15 @@ function metricComment(key, state){
 function gaugeScaleMax(kind, current, target){
   const c = Number.isFinite(current) ? current : 0;
   const t = Number.isFinite(target) ? target : 0;
-  if (kind === 'ceiling') return Math.max(t * 1.25, c * 1.10, 1);
+
+  // مؤشرات الحد الأقصى: الأحمر يبدأ بعد الحد مباشرة،
+  // لكن بصريًا نخلي الحد في آخر الأخضر تقريبًا، وليس في منتصف العداد.
+  if (kind === 'ceiling') {
+    return Math.max(t * 1.08, c * 1.02, 1);
+  }
+
   return Math.max(t * 1.35, c * 1.10, 1);
 }
-
 function gaugePos(value, max){
   if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 0;
   return Math.max(0, Math.min(1, value / max));
@@ -2648,7 +2653,20 @@ const smartHint = (key, fallback = '') => {
 
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
-    const state = gaugeStatus(def.kind, current, target);
+    let state = gaugeStatus(def.kind, current, target);
+
+const serverCard = quickCardByKey(def.key);
+if (serverCard?.status) {
+  const s = String(serverCard.status || '').trim();
+
+  if (s === 'good') {
+    state = { key:'good', label:'آمن', color:'#16a34a', tone:'good' };
+  } else if (s === 'warn' || s === 'watch') {
+    state = { key:'warn', label:'تنبيه', color:'#d97706', tone:'warn' };
+  } else if (s === 'danger') {
+    state = { key:'danger', label:'خطر', color:'#dc2626', tone:'danger' };
+  }
+}
     const comment = smartHint(def.key, metricComment(def.key, state));
 
     return `
