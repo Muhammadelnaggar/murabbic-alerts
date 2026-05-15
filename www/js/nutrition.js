@@ -2566,50 +2566,93 @@ function arcPath(cx, cy, r, fromPos, toPos){
 }
 
 function buildGaugeSvg(kind, current, target, state){
-  const max = gaugeScaleMax(kind, current, target);
-  const pos = gaugePos(current, max);
-
   const cx = 80, cy = 84, r = 58;
   const stroke = 22;
 
-  // تقسيم واضح جدًا مثل عداد الساعة
- const redTo = 0.33;
-const yellowTo = 0.66;
+  const green  = '#84d983';
+  const yellow = '#f3c754';
+  const red    = '#ff1a12';
+  const ink    = '#111111';
+  const gray   = '#e5e7eb';
 
-let arc1 = '';
-let arc2 = '';
-let arc3 = '';
+  const c = Number(current);
+  const t = Number(target);
+  const valid = Number.isFinite(c) && Number.isFinite(t) && t > 0;
 
-if (kind === 'ceiling') {
-  const limitPos = gaugePos(target, max);
+  const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
 
-  arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc2 = `<path d="${arcPath(cx, cy, r, limitPos, 1)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc3 = '';
-} else {
-  // في مؤشرات الاحتياج: منخفض = خطر، وسط = تحذير، يمين = جيد
-  arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="#ff1a12" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="#f3c754" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="#84d983" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-}
+  let pos = 0.5;
+  let arc1 = '';
+  let arc2 = '';
+  let arc3 = '';
+  let tick = '';
+
+  if (!valid) {
+    arc1 = `<path d="${arcPath(cx, cy, r, 0, 1)}" fill="none" stroke="${gray}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  }
+
+  else if (kind === 'ceiling') {
+    /*
+      جوج النشا والدهن فقط:
+      مقياس ثابت من 0 إلى 120% من الحد.
+      أخضر حتى الحد.
+      أصفر من 100 إلى 108% من الحد.
+      أحمر بعد 108%.
+      لا علاقة له بالتعليقات أو الاتزان.
+    */
+    const scaleMax = t * 1.20;
+
+    const limitPos  = clamp01(t / scaleMax);        // 83.33%
+    const yellowPos = clamp01((t * 1.08) / scaleMax); // 90%
+    pos = clamp01(c / scaleMax);
+
+    arc1 = `<path d="${arcPath(cx, cy, r, 0, limitPos)}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    arc2 = `<path d="${arcPath(cx, cy, r, limitPos, yellowPos)}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    arc3 = `<path d="${arcPath(cx, cy, r, yellowPos, 1)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+
+    const a = gaugePoint(cx, cy, r - 15, limitPos);
+    const b = gaugePoint(cx, cy, r + 6, limitPos);
+
+    tick = `
+      <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
+        stroke="${ink}" stroke-width="3" stroke-linecap="round" opacity=".65"></line>
+    `;
+  }
+
+  else {
+    /*
+      باقي الجوجز كما هي بصريًا تقريبًا.
+      لا تعديل في الحكم أو التعليقات أو الاتزان.
+    */
+    const max = gaugeScaleMax(kind, current, target);
+    pos = gaugePos(current, max);
+
+    const redTo = 0.33;
+    const yellowTo = 0.66;
+
+    arc1 = `<path d="${arcPath(cx, cy, r, 0, redTo)}" fill="none" stroke="${red}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    arc2 = `<path d="${arcPath(cx, cy, r, redTo, yellowTo)}" fill="none" stroke="${yellow}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+    arc3 = `<path d="${arcPath(cx, cy, r, yellowTo, 1)}" fill="none" stroke="${green}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  }
+
   const tip = gaugePoint(cx, cy, r - 8, pos);
 
-  // قاعدة الإبرة أسمك وتعطي شكل عداد محترم
   const baseLeft = { x: cx - 5, y: cy + 1 };
   const baseRight = { x: cx + 5, y: cy + 1 };
 
   return `
     <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
-     ${arc1}
-${arc2}
-${arc3}
+      ${arc1}
+      ${arc2}
+      ${arc3}
+      ${tick}
 
       <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
 
       <path d="M ${baseLeft.x} ${baseLeft.y} L ${tip.x} ${tip.y} L ${baseRight.x} ${baseRight.y} Z"
-            fill="#111111"></path>
+            fill="${ink}"></path>
 
-      <circle cx="${cx}" cy="${cy}" r="6.5" fill="#111111"></circle>
+      <circle cx="${cx}" cy="${cy}" r="6.5" fill="${ink}"></circle>
       <circle cx="${cx}" cy="${cy}" r="2.6" fill="#ffffff"></circle>
     </svg>
   `;
@@ -2649,7 +2692,7 @@ const smartHint = (key, fallback = '') => {
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
     const state = gaugeStatus(def.kind, current, target);
-    const comment = smartHint(def.key, metricComment(def.key, state));
+    const comment = smartHint(def.key, '');
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
@@ -2672,7 +2715,7 @@ const smartHint = (key, fallback = '') => {
           </div>
         </div>
 
-        <div style="margin-top:6px;font-size:12px;line-height:1.45;color:#475569">${comment}</div>
+       ${comment ? `<div style="margin-top:6px;font-size:12px;line-height:1.45;color:#475569">${comment}</div>` : ''}
       </div>
     `;
   }).filter(Boolean);
