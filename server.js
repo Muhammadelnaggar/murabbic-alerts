@@ -780,8 +780,9 @@ function buildFatPartitionModel(rows = []) {
     totalFatPct > totalFatCeilingPctDM;
 
   const freeHigh =
-    Number.isFinite(Number(freeFatPct)) &&
-    freeFatPct > freeFatCeilingPctDM;
+  totalHigh &&
+  Number.isFinite(Number(freeFatPct)) &&
+  freeFatPct > freeFatCeilingPctDM;
 
   let status = 'good';
   let title = 'الدهون داخل الحد';
