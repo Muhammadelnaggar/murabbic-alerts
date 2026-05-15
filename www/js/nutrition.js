@@ -2694,6 +2694,44 @@ function buildGaugeSvg(kind, current, target, state){
     </svg>
   `;
 }
+function formatMurabbikComment(txt = '') {
+  const s = String(txt || '').trim();
+  if (!s) return '';
+
+  const clean = s.replace(/^مربيك:\s*/, '');
+
+  return `
+    <div style="
+      display:flex;
+      align-items:center;
+      gap:6px;
+      margin-bottom:4px;
+      color:#0b7a43;
+      font-weight:950;
+      font-size:15px;
+      line-height:1.2;
+    ">
+      <span style="
+        width:7px;
+        height:7px;
+        border-radius:50%;
+        background:#0b7a43;
+        display:inline-block;
+        box-shadow:0 0 0 4px rgba(11,122,67,.12);
+      "></span>
+      <span>مربيك</span>
+    </div>
+
+    <div style="
+      color:#334155;
+      font-weight:850;
+      font-size:13.5px;
+      line-height:1.75;
+    ">
+      ${clean}
+    </div>
+  `;
+} 
 function renderGaugeRows(cards){
   const defs = [
     { key:'dm',     label:'المادة الجافة',           current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'target'  },
@@ -2753,7 +2791,7 @@ const smartHint = (key, fallback = '') => {
           </div>
         </div>
 
-       ${comment ? `<div style="margin-top:6px;font-size:12px;line-height:1.45;color:#475569">${comment}</div>` : ''}
+      ${comment ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(15,23,42,.08)">${formatMurabbikComment(comment)}</div>` : ''}
       </div>
     `;
   }).filter(Boolean);
