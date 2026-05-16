@@ -1537,6 +1537,7 @@ const rumenHealthModel = buildRumenHealthModel({
   peNDFMin: targetsCore?.peNDFMin,
   roughageMin: targetsCore?.roughageMin,
   forageNDFMin: forageNDFMinForRumen,
+  isBuffaloRumen: /جاموس|buffalo/i.test(String(contextForTargets?.species || '')),
   carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null
 });
 
@@ -1673,6 +1674,7 @@ function buildRumenHealthModel({
   peNDFMin,
   roughageMin,
   forageNDFMin,
+  isBuffaloRumen = false,
   carbohydrateSafetyModel = null
 }) {
   const rough = Number(roughPctDM);
@@ -1761,7 +1763,12 @@ function buildRumenHealthModel({
     Number.isFinite(rough) &&
     Number.isFinite(conc) &&
     (rough <= 0 || conc >= 100);
-
+const buffaloForageOnlyRumenSafe =
+  !!isBuffaloRumen &&
+  Number.isFinite(rough) &&
+  Number.isFinite(conc) &&
+  rough > 95 &&
+  conc < 5;
   const indicators = {
     starch: {
       label: 'النشا',
@@ -1830,14 +1837,20 @@ function buildRumenHealthModel({
     roughOK &&
     !concHigh;
 
-  if (noEffectiveRoughage) {
-    status = 'danger';
-    score = Math.min(score, 20);
-    title = 'خطر اضطراب كرش مرتفع';
-    reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ، وهذا يضعف الاجترار واللعاب ويرفع خطر انخفاض pH الكرش.';
-    instruction = 'أدخل مصدر خشن فعّال قبل اعتماد التركيبة، وتأكد أن الخشن مقطع 3–5 سم وأن الخلطة لا تُفرز.';
-  } else if (
-    starchHigh &&
+ if (noEffectiveRoughage) {
+  status = 'danger';
+  score = Math.min(score, 20);
+  title = 'خطر اضطراب كرش مرتفع';
+  reason = 'العليقة تعتمد على المركزات بدون خشن فعّال كافٍ، وهذا يضعف الاجترار واللعاب ويرفع خطر انخفاض pH الكرش.';
+  instruction = 'أدخل مصدر خشن فعّال قبل اعتماد التركيبة، وتأكد أن الخشن مقطع 3–5 سم وأن الخلطة لا تُفرز.';
+} else if (buffaloForageOnlyRumenSafe) {
+  status = 'good';
+  score = Math.max(score, 90);
+  title = 'صحة الكرش مثالية';
+  reason = 'العليقة خشن فقط؛ لا يوجد ضغط حبوب أو مركزات يرفع خطر الحموضة.';
+  instruction = 'حافظ على جودة الخشن وطول التقطيع 3–5 سم، واستكمل احتياجات الطاقة والبروتين من كروتها المخصصة.';
+} else if (
+  starchHigh &&
     (
       peNDFLow ||
       forageNDFLow ||
