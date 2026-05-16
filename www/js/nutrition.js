@@ -195,8 +195,16 @@ function getFrameGainKgDayInput(){
 function buildNutritionContextForRequest(){
   const ctx = readContext();
 
+  const groupCtx =
+    window.mbkNutrition?.groupContext &&
+    typeof window.mbkNutrition.groupContext === 'object'
+      ? window.mbkNutrition.groupContext
+      : {};
+
   return {
     ...ctx,
+    ...groupCtx,
+
     frameGainKgDay:
       Number.isFinite(Number(ctx?.frameGainKgDay)) && Number(ctx.frameGainKgDay) > 0
         ? Number(ctx.frameGainKgDay)
@@ -235,7 +243,17 @@ closeUp: _ctx?.closeUp,
 milkFatPct: _ctx?.milkFatPct,
 milkProteinPct: _ctx?.milkProteinPct,
 milkPrice: _ctx?.milkPrice,
-thi: _ctx?.thi
+thi: _ctx?.thi,
+
+groupMode: _ctx?.groupMode || null,
+groupType: _ctx?.groupType || null,
+headCount: _ctx?.headCount ?? null,
+avgAgeMonths: _ctx?.avgAgeMonths ?? null,
+firstParityPct: _ctx?.firstParityPct ?? null,
+avgParity: _ctx?.avgParity ?? null,
+daysInMilkSpread: _ctx?.daysInMilkSpread ?? null,
+breedSource: _ctx?.breedSource || null,
+groupContextSource: _ctx?.groupContextSource || null
   }
 };
 
@@ -291,7 +309,16 @@ async function refreshTargets() {
   milkFatPct: ctx?.milkFatPct ?? '',
   milkProteinPct: ctx?.milkProteinPct ?? '',
   milkPrice: ctx?.milkPrice ?? '',
-  thi: ctx?.thi ?? ''
+  thi: ctx?.thi ?? '',
+groupMode: ctx?.groupMode || '',
+groupType: ctx?.groupType || '',
+headCount: ctx?.headCount ?? '',
+avgAgeMonths: ctx?.avgAgeMonths ?? '',
+firstParityPct: ctx?.firstParityPct ?? '',
+avgParity: ctx?.avgParity ?? '',
+daysInMilkSpread: ctx?.daysInMilkSpread ?? '',
+breedSource: ctx?.breedSource || '',
+groupContextSource: ctx?.groupContextSource || ''
 });
 
   if (key === targetsCacheKey && targetsCache) {
@@ -1198,10 +1225,11 @@ setElText('ctxCloseUp_txt', isCloseUpFromAnimal ? 'نعم' : 'لا');
 }
 
 async function loadCtxFromGroup(numbers, eventDate){
-    const nums = (Array.isArray(numbers) ? numbers : [])
-    .map(x => Number(String(x).trim()))
-    .filter(n => Number.isFinite(n));
-  if(!numbers?.length) return { ok:false, reason:'no_number' };
+  const nums = (Array.isArray(numbers) ? numbers : [])
+    .map(x => String(x).trim())
+    .filter(Boolean);
+
+  if(!nums.length) return { ok:false, reason:'no_number' };
 
   const { db, auth } = await import('/js/firebase-config.js');
   const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
@@ -1209,109 +1237,307 @@ async function loadCtxFromGroup(numbers, eventDate){
   const uid = auth?.currentUser?.uid;
   if(!uid) return { ok:false, reason:'no_uid' };
 
- const foundDocs = await Promise.all(
-  numbers.map(n => findAnimalDocByNumber(db, fs, uid, n))
-);
-const docs = foundDocs.filter(Boolean);
+  const foundDocs = await Promise.all(
+    nums.map(n => findAnimalDocByNumber(db, fs, uid, n))
+  );
+
+  const docs = foundDocs.filter(Boolean);
   if(!docs.length) return { ok:false, reason:'not_found' };
 
-  const dims = docs.map(d=>Number(d.daysInMilk)).filter(x=>Number.isFinite(x));
-  const avgDIM = dims.length ? (dims.reduce((a,b)=>a+b,0)/dims.length) : null;
+  const eventDay = eventDate || todayLocal();
 
-const first = docs[0] || {};
-const species = normalizeSpecies(
-  first?.animalTypeAr ||
-  (first?.animaltype === 'buffalo' ? 'جاموس' : (first?.animaltype === 'cow' ? 'بقر' : '')) ||
-  ''
-);
+  const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
-const avgMilkRes = await fetchGroupAvgMilkKg(fs, db, uid, numbers, eventDate, 7);
-const avgMilk = (avgMilkRes?.avg != null) ? Number(avgMilkRes.avg) : null;
-const pregStates = docs.map(d => String(
-  d.reproductiveStatus ||
-  d.lastDiagnosis ||
-  d.pregStatus ||
-  ''
-).trim()).filter(Boolean);
+  const avg = (arr) => {
+    const vals = arr.map(toNum).filter(v => v !== null);
+    return vals.length ? vals.reduce((a,b)=>a+b,0) / vals.length : null;
+  };
 
-const pregNorm = pregStates.map(s => {
-  if (s === 'عشار') return 'عشار';
-  if (s === 'فارغة') return 'فارغة';
-  if (s === 'ملقح') return 'ملقح';
-  return '';
-}).filter(Boolean);
+  const pct = (part, total) => {
+    const p = Number(part);
+    const t = Number(total);
+    return t > 0 ? Math.round((p / t) * 1000) / 10 : null;
+  };
 
-let groupPreg = '';
-if (pregNorm.length) {
-  const uniq = [...new Set(pregNorm)];
-  groupPreg = (uniq.length === 1) ? uniq[0] : 'مختلط';
-}
+  const pickMajorityText = (arr) => {
+    const map = new Map();
 
-const dccs = [];
-for(const d of docs){
-  const repro = String(
-    d.reproductiveStatus ||
-    d.lastDiagnosis ||
-    d.pregStatus ||
+    arr.map(x => String(x || '').trim())
+      .filter(Boolean)
+      .forEach(x => {
+        map.set(x, (map.get(x) || 0) + 1);
+      });
+
+    let best = '';
+    let count = 0;
+
+    for (const [k, v] of map.entries()) {
+      if (v > count) {
+        best = k;
+        count = v;
+      }
+    }
+
+    return best;
+  };
+
+  const ageMonthsFromBirth = (animal) => {
+    const raw =
+      animal?.birthDate ||
+      animal?.birthdate ||
+      animal?.dateOfBirth ||
+      animal?.dob ||
+      animal?.birth ||
+      '';
+
+    if (!raw) return null;
+
+    const a = new Date(String(raw).slice(0,10));
+    const b = new Date(eventDay);
+
+    if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+
+    const months =
+      (b.getFullYear() - a.getFullYear()) * 12 +
+      (b.getMonth() - a.getMonth()) +
+      ((b.getDate() >= a.getDate()) ? 0 : -1);
+
+    return Number.isFinite(months) && months >= 0 ? months : null;
+  };
+
+  const getSpecies = (animal) => normalizeSpecies(
+    animal?.animalTypeAr ||
+    (animal?.animaltype === 'buffalo' ? 'جاموس' : (animal?.animaltype === 'cow' ? 'بقر' : '')) ||
+    animal?.species ||
+    ''
+  );
+
+  const getPreg = (animal) => String(
+    animal?.reproductiveStatus ||
+    animal?.lastDiagnosis ||
+    animal?.pregStatus ||
     ''
   ).trim();
 
-  if(repro !== 'عشار') continue;
+  const getParity = (animal) => toNum(
+    animal?.parity ??
+    animal?.lactationNumber ??
+    animal?.season ??
+    animal?.milkSeason
+  );
 
-  const lastIns = d.lastInseminationDate;
-  if(!lastIns) continue;
+  const calcDcc = (animal) => {
+    const repro = getPreg(animal);
+    if (repro !== 'عشار') return null;
 
-  const a = new Date(lastIns);
-  const b = new Date(eventDate);
+    const lastIns = animal?.lastInseminationDate;
+    if (!lastIns) return null;
 
-  if(isNaN(a.getTime()) || isNaN(b.getTime())) continue;
+    const a = new Date(String(lastIns).slice(0,10));
+    const b = new Date(eventDay);
 
-  const diff = Math.floor((b.getTime()-a.getTime())/86400000);
-  if(diff >= 0) dccs.push(diff);
-}
-const avgDCC = dccs.length ? (dccs.reduce((a,b)=>a+b,0)/dccs.length) : null;
+    if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
 
-if (species) document.getElementById('ctxSpecies').value = species;
-if (avgDIM != null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
-document.getElementById('ctxAvgMilk').value = (avgMilk != null ? avgMilk.toFixed(1) : '');
-document.getElementById('ctxDCC').value = (avgDCC != null ? Math.round(avgDCC) : '');
-document.getElementById('ctxPreg').value = groupPreg || '';
+    const diff = Math.floor((b.getTime() - a.getTime()) / 86400000);
+    return diff >= 0 ? diff : null;
+  };
 
-// breed ممثلة للمجموعة: أول سلالة متاحة
-const groupBreed =
-  String(docs.find(d => String(d?.breed || '').trim())?.breed || '').trim();
-const breedEl = document.getElementById('ctxBreed');
-if (breedEl && groupBreed) breedEl.value = groupBreed;
+  const classifyGroupType = () => {
+    const p = qp();
 
-// parity ممثلة للمجموعة: متوسط lactationNumber/parity إن وُجد
-const parityVals = docs
-  .map(d => Number(d?.parity ?? d?.lactationNumber))
-  .filter(v => Number.isFinite(v));
-const avgParity = parityVals.length
-  ? (parityVals.reduce((a,b)=>a+b,0) / parityVals.length)
-  : null;
-const parityEl = document.getElementById('ctxParity');
-if (parityEl && avgParity != null) parityEl.value = Math.round(avgParity);
+    const urlType = String(
+      p.get('groupType') ||
+      p.get('nutritionGroupType') ||
+      p.get('stage') ||
+      ''
+    ).trim().toLowerCase();
 
-// في تغذية المجموعة لا نملأ وزن الجسم ولا BCS من متوسطات الحيوانات.
-// لو المستخدم أدخلهم نستخدمهم، ولو تركهم فارغين readContext سيحسبهم تلقائيًا.
-const bwEl = document.getElementById('ctxBodyWeight');
-const bcsEl = document.getElementById('ctxBCS');
+    if (urlType.includes('close')) return 'close_up';
+    if (urlType.includes('far') || urlType.includes('dry')) return 'far_dry';
+    if (urlType.includes('حلاب') || urlType.includes('milk') || urlType.includes('lact')) return 'lactating';
 
-if (bwEl && !bwEl.dataset.userEdited) bwEl.value = '';
-if (bcsEl && !bcsEl.dataset.userEdited) bcsEl.value = '';
+    if (document.getElementById('ctxCloseUp')?.checked) return 'close_up';
+    if (document.getElementById('ctxEarlyDry')?.checked) return 'far_dry';
+
+    const stages = docs.map(d => {
+      const s = String(d?.productionStatus || d?.status || '').trim().toLowerCase();
+
+      if (
+        s === 'dry' ||
+        s === 'جاف' ||
+        s.includes('dry') ||
+        s.includes('جاف')
+      ) {
+        const speciesForGest = getSpecies(d);
+        const dcc = calcDcc(d);
+        const gestLen = (speciesForGest === 'جاموس') ? 310 : 280;
+        const daysToCalving =
+          Number.isFinite(Number(dcc)) ? (gestLen - Number(dcc)) : null;
+
+        return Number.isFinite(Number(daysToCalving)) && Number(daysToCalving) < 30
+          ? 'close_up'
+          : 'far_dry';
+      }
+
+      return 'lactating';
+    });
+
+    return pickMajorityText(stages) || 'lactating';
+  };
+
+  const species = pickMajorityText(docs.map(getSpecies));
+
+  const groupType = classifyGroupType();
+
+  const dims = docs
+    .map(d => toNum(d.daysInMilk))
+    .filter(v => v !== null);
+
+  const avgDIM = dims.length ? avg(dims) : null;
+
+  const daysInMilkSpread =
+    dims.length >= 2
+      ? Math.max(...dims) - Math.min(...dims)
+      : 0;
+
+  const breed = pickMajorityText(
+    docs.map(d => d?.breed)
+  );
+
+  const parityVals = docs
+    .map(getParity)
+    .filter(v => v !== null);
+
+  const avgParity = parityVals.length ? avg(parityVals) : null;
+  const firstParityCount = parityVals.filter(v => Math.round(v) === 1).length;
+  const firstParityPct = parityVals.length ? pct(firstParityCount, parityVals.length) : null;
+
+  const ageVals = docs
+    .map(ageMonthsFromBirth)
+    .filter(v => v !== null);
+
+  const avgAgeMonths = ageVals.length ? avg(ageVals) : null;
+
+  const pregStates = docs
+    .map(getPreg)
+    .filter(Boolean);
+
+  const pregNorm = pregStates.map(s => {
+    if (s === 'عشار') return 'عشار';
+    if (s === 'فارغة') return 'فارغة';
+    if (s === 'ملقح') return 'ملقح';
+    return '';
+  }).filter(Boolean);
+
+  let groupPreg = '';
+  if (pregNorm.length) {
+    const uniq = [...new Set(pregNorm)];
+    groupPreg = (uniq.length === 1) ? uniq[0] : 'مختلط';
+  }
+
+  const dccs = docs
+    .map(calcDcc)
+    .filter(v => v !== null);
+
+  const avgDCC = dccs.length ? avg(dccs) : null;
+
+  const avgMilkRes =
+    groupType === 'lactating'
+      ? await fetchGroupAvgMilkKg(fs, db, uid, nums, eventDay, 7)
+      : { avg: 0, days: 0 };
+
+  const avgMilk = (avgMilkRes?.avg != null) ? Number(avgMilkRes.avg) : null;
+
+  if (species) document.getElementById('ctxSpecies').value = species;
+  if (avgDIM != null) document.getElementById('ctxDIM').value = Math.round(avgDIM);
+
+  document.getElementById('ctxAvgMilk').value =
+    groupType === 'lactating'
+      ? (avgMilk != null ? avgMilk.toFixed(1) : '')
+      : '0';
+
+  document.getElementById('ctxDCC').value =
+    avgDCC != null ? Math.round(avgDCC) : '';
+
+  document.getElementById('ctxPreg').value = groupPreg || '';
+
+  const breedEl = document.getElementById('ctxBreed');
+  if (breedEl) breedEl.value = breed || '';
+
+  const parityEl = document.getElementById('ctxParity');
+  if (parityEl && avgParity != null) parityEl.value = Math.round(avgParity);
+
+  const earlyDryEl = document.getElementById('ctxEarlyDry');
+  const closeUpEl = document.getElementById('ctxCloseUp');
+
+  if (earlyDryEl) {
+    earlyDryEl.checked = groupType === 'far_dry';
+    earlyDryEl.value = groupType === 'far_dry' ? '1' : '';
+  }
+
+  if (closeUpEl) {
+    closeUpEl.checked = groupType === 'close_up';
+    closeUpEl.value = groupType === 'close_up' ? '1' : '';
+  }
+
+  const bwEl = document.getElementById('ctxBodyWeight');
+  const bcsEl = document.getElementById('ctxBCS');
+
+  if (bwEl && !bwEl.dataset.userEdited) bwEl.value = '';
+  if (bcsEl && !bcsEl.dataset.userEdited) bcsEl.value = '';
+
+  window.mbkNutrition = window.mbkNutrition || {};
+  window.mbkNutrition.groupContext = {
+    groupMode: 'group',
+    groupType,
+    headCount: docs.length,
+
+    species,
+    breed: breed || null,
+    breedSource: breed ? 'majority_in_group' : null,
+
+    daysInMilk: avgDIM != null ? Math.round(avgDIM) : null,
+    daysInMilkSpread,
+
+    avgMilkKg: groupType === 'lactating'
+      ? (avgMilk != null ? Number(avgMilk.toFixed(1)) : null)
+      : 0,
+
+    parity: avgParity != null ? Math.round(avgParity) : null,
+    avgParity: avgParity != null ? Math.round(avgParity * 10) / 10 : null,
+    firstParityPct,
+
+    avgAgeMonths: avgAgeMonths != null ? Math.round(avgAgeMonths * 10) / 10 : null,
+
+    pregnancyStatus: groupPreg || null,
+    pregnancyDays: avgDCC != null ? Math.round(avgDCC) : null,
+
+    earlyDry: groupType === 'far_dry',
+    closeUp: groupType === 'close_up',
+
+    groupContextSource: 'nutrition_group_representative_context'
+  };
 
   const animalInfo = document.getElementById('animalInfo');
   const groupLabel =
-  String(qp().get('group') || qp().get('groupName') || '').trim();
+    String(qp().get('group') || qp().get('groupName') || '').trim();
 
-if (animalInfo) {
-  animalInfo.textContent =
-    groupLabel || `مجموعة (${docs.length} رأس)`;
-}
+  if (animalInfo) {
+    animalInfo.textContent =
+      groupLabel || `مجموعة (${docs.length} رأس)`;
+  }
 
   updateCtxView();
-  return { ok:true, count: docs.length };
+
+  return {
+    ok:true,
+    count: docs.length,
+    groupType,
+    groupContext: window.mbkNutrition.groupContext
+  };
 }
 
 async function loadCtxAuto(){
