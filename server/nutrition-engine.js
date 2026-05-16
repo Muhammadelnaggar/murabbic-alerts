@@ -2015,6 +2015,33 @@ function buffaloCpPctHeifer({ bodyWeight, pregDays, closeUp }){
 
   return 13.0;
 }
+// SOURCE: BUFFALO_NUTRIENT_REQUIREMENTS_BULBUL_2010_TABLE_4
+// Lactating buffalo NDF% and NSC% targets by milk yield.
+// These are buffalo targets, not cow fallbacks.
+function buffaloNdfTargetByMilk(milkKg){
+  const m = num(milkKg);
+
+  if (m < 6) return 52;
+  if (m < 7) return 47;
+  if (m < 8) return 46;
+  if (m < 9) return 44;
+  if (m < 10) return 43;
+  if (m < 11) return 42;
+  if (m < 12) return 40;
+  return 39;
+}
+
+function buffaloNscReferenceByMilk(milkKg){
+  const m = num(milkKg);
+
+  if (m < 6) return 25;
+  if (m < 7) return 27;
+  if (m < 8) return 28;
+  if (m < 9) return 29;
+  if (m < 11) return 30;
+  if (m < 12) return 31;
+  return 32;
+}
 function computeBuffalo({
   bodyWeight,
   milkKg,
@@ -2067,23 +2094,66 @@ const cpReferencePct = buffaloCpPctLactating({
   fatPct,
   dmi
 });
+const bw075 = Math.pow(bw, 0.75);
 
-  return {
-    species: 'buffalo',
-    category: 'lactating',
-    bodyWeight: bw,
-    dim: Number.isFinite(days) ? Math.round(days) : null,
-    dmi: round(dmi),
-    nel: round(nelTotal),
-    mpTargetG: round(mpTargetG, 0),
-    cpReferencePct: round(cpReferencePct),
-    proteinSystem: 'MP',
-    ndfTarget: 34,
-    starchMax: 22,
-    roughageMin: 50
-  };
+// SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
+// TDN kg/day = (35.3 × BW^0.75 + 406 × FCM6) / 1000
+const tdnTargetKg =
+  ((35.3 * bw075) + (406 * fcm6)) / 1000;
+
+// SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
+// CP g/day = 5.43 × BW^0.75 + 90.3 × FCM6
+const cpTargetG =
+  (5.43 * bw075) + (90.3 * fcm6);
+
+// SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
+// DCP g/day = 3.14 × BW^0.75 + 55.2 × FCM6
+const dcpTargetG =
+  (3.14 * bw075) + (55.2 * fcm6);
+
+const ndfTarget = buffaloNdfTargetByMilk(milk);
+const nscReferencePct = buffaloNscReferenceByMilk(milk);
+return {
+  species: 'buffalo',
+  category: 'lactating',
+
+  buffaloRequirementModel: {
+    model: 'MURABBIK_BUFFALO_LACTATING_REQUIREMENTS_V1',
+    status: 'documented_buffalo_targets',
+    dmiSource: 'Paul_Mandal_Pathak_2002_BW075_FCM6',
+    tdnCpDcpSource: 'Paul_Mandal_Pathak_2002_BW075_FCM6',
+    ndfNscSource: 'Bulbul_2010_Lactating_Buffalo_Table',
+    note: 'Targets are produced by the existing Murabbik buffalo engine and returned in the same shape consumed by ration analysis.'
+  },
+
+  bodyWeight: bw,
+  dim: Number.isFinite(days) ? Math.round(days) : null,
+
+  dmi: round(dmi),
+  dmiTarget: round(dmi),
+
+  nel: round(nelTotal),
+  nelTarget: round(nelTotal),
+
+  tdnTargetKg: round(tdnTargetKg, 2),
+
+  mpTargetG: round(mpTargetG, 0),
+
+  cpReferencePct: round(cpReferencePct),
+  cpTarget: round(cpReferencePct),
+  cpTargetG: round(cpTargetG, 0),
+  dcpTargetG: round(dcpTargetG, 0),
+
+  proteinSystem: 'MP',
+
+  ndfTarget,
+  nscReferencePct,
+
+  starchMax: null,
+  fatTarget: null,
+  roughageMin: null
+};
 }
-
 function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
   const bw = num(bodyWeight);
 const bw075 = Math.pow(bw, 0.75);
@@ -2165,17 +2235,21 @@ function computeTargets(ctx){
   const sp = normArabic(species);
   const isBuffalo = (sp === 'جاموس' || sp === 'جاموسه' || sp === 'buffalo');
 
-  if (isBuffalo){
-   if (category === 'dry_pregnant' || category === 'close_up'){
-  return computeCowDryMother(common);
-}
-
-if (category === 'heifer'){
-  return computeCowHeifer(common);
-}
-
-return computeCow(common);
+if (isBuffalo){
+  if (category === 'lactating'){
+    return computeBuffalo(common);
   }
+
+  if (category === 'heifer'){
+    return computeBuffaloHeifer(common);
+  }
+
+  if (category === 'dry_pregnant' || category === 'close_up'){
+    return computeBuffaloHeifer(common);
+  }
+
+  return computeBuffalo(common);
+}
 
 if (category === 'dry_pregnant' || category === 'close_up'){
   return computeCowDryMother(common);
