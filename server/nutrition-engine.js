@@ -2113,19 +2113,31 @@ const dcpTargetG =
 
 const ndfTarget = buffaloNdfTargetByMilk(milk);
 const nscReferencePct = buffaloNscReferenceByMilk(milk);
+
+const pathakDmiKg =
+  (0.02 * bw) + (milk / 3);
+
+const concentrateKgDM =
+  1.25 + (0.5 * milk);
+
+const roughageKgDM =
+  Math.max(0, pathakDmiKg - concentrateKgDM);
+
+const roughageMin =
+  pathakDmiKg > 0
+    ? clamp((roughageKgDM / pathakDmiKg) * 100, 40, 75)
+    : null;
+
 return {
   species: 'buffalo',
   category: 'lactating',
 
-  buffaloRequirementModel: {
-    model: 'MURABBIK_BUFFALO_LACTATING_REQUIREMENTS_V1',
-    status: 'documented_buffalo_targets',
-    dmiSource: 'Paul_Mandal_Pathak_2002_BW075_FCM6',
-    tdnCpDcpSource: 'Paul_Mandal_Pathak_2002_BW075_FCM6',
-    ndfNscSource: 'Bulbul_2010_Lactating_Buffalo_Table',
-    note: 'Targets are produced by the existing Murabbik buffalo engine and returned in the same shape consumed by ration analysis.'
-  },
-
+buffaloRequirementModel: {
+  model: 'MURABBIK_BUFFALO_ENGINE_V1',
+  status: 'active',
+  targetType: 'buffalo_lactating_requirements',
+  note: 'Murabbik buffalo engine outputs final buffalo targets for ration evaluation.'
+},
   bodyWeight: bw,
   dim: Number.isFinite(days) ? Math.round(days) : null,
 
@@ -2149,9 +2161,13 @@ return {
   ndfTarget,
   nscReferencePct,
 
-  starchMax: null,
-  fatTarget: null,
-  roughageMin: null
+starchMax: 24,
+
+fatMax: 7,
+fatLimit: 7,
+fatTarget: null,
+
+roughageMin: round(roughageMin)
 };
 }
 function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
