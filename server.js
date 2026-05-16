@@ -1956,6 +1956,8 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const nutrition = analysis?.nutrition || {};
   const targets = analysis?.targets || {};
   const economics = analysis?.economics || {};
+    const isBuffalo =
+    /جاموس|buffalo/i.test(String(context?.species || context?.animalType || context?.kind || ''));
 
   const num = (v, d = 2) => {
     const n = Number(v);
@@ -2033,50 +2035,96 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const cpState = stateFromBalance(cpActual, cpTarget, 5);
   const ndfState = stateFromBalance(nutrition.ndfPctActual, targets.ndfTarget, 5);
 
-  const dmHint =
+  let dmHint =
     dmState === 'good'
       ? 'مربيك: المادة الجافة مناسبة. حافظ على انتظام التوزيع.'
       : Number(dmActual) < Number(dmTarget)
         ? 'مربيك: المادة الجافة غير كافية. ارفع الكمية تدريجيًا وراجع المتبقي.'
         : 'مربيك: المادة الجافة زيادة. تأكد أنها مأكولة وليست هدرًا.';
 
-  const nelHint =
+  let nelHint =
     nelState === 'good'
       ? 'مربيك: الطاقة تغطي الاحتياج الحالي. راقب الإنتاج وحالة الجسم.'
       : Number(nelActual) < Number(nelTarget)
         ? 'مربيك: الطاقة غير كافية. راجع المادة الجافة أولًا ثم كثافة الطاقة.'
         : 'مربيك: الطاقة أعلى من الاحتياج. راجع كثافة العليقة والتكلفة قبل اعتماد التركيبة.';
 
-  const mpHint =
+  let mpHint =
     mpState === 'good'
       ? 'مربيك: البروتين الممثل يغطي الاحتياج الحالي.'
       : Number(mpActual) < Number(mpTarget)
         ? 'مربيك: البروتين الممثل غير كافٍ؛ راجع جودة مصدر البروتين.'
         : 'مربيك: البروتين الممثل زيادة؛ راجع التكلفة والهدر البروتيني.';
 
-  const cpHint =
+  let cpHint =
     cpState === 'good'
       ? 'مربيك: البروتين الخام مقبول كمؤشر عام؛ القرار النهائي من البروتين الممثل.'
       : Number(cpActual) < Number(cpTarget)
         ? 'مربيك: البروتين الخام منخفض كمؤشر عام؛ راجع البروتين الممثل قبل زيادته.'
         : 'مربيك: البروتين الخام زيادة؛ راجع الهدر والتكلفة، ولا تعدّله إلا حسب البروتين الممثل.';
 
-  const ndfHint =
+  let ndfHint =
     ndfState === 'good'
       ? 'مربيك: الألياف مناسبة؛ حافظ على طول تقطيع الخشن ٣–٥ سم.'
       : Number(nutrition.ndfPctActual) < Number(targets.ndfTarget)
         ? 'مربيك: الألياف غير كافية؛ زِد الخشن الفعّال وراجع صحة الكرش.'
         : 'مربيك: الألياف زيادة؛ قد تقلل المأكول والطاقة.';
 
-  const starchHint =
+  let starchHint =
     starchHigh
       ? 'مربيك: النشا أعلى من الحد الآمن. راجع كارت صحة الكرش قبل تعديل الحبوب.'
       : 'مربيك: النشا داخل الحد. حافظ على توازن الحبوب والخشن.';
 
-  const fatHint =
+  let fatHint =
     fatHigh
       ? 'مربيك: دهن العليقة أعلى من الحد؛ قد يقلل هضم الألياف ويضغط على دهن اللبن.'
       : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
+    if (isBuffalo) {
+    dmHint =
+      dmState === 'good'
+        ? 'مربيك: المادة الجافة مناسبة للجاموس. حافظ على ثبات الخلطة والمتبقي.'
+        : Number(dmActual) < Number(dmTarget)
+          ? 'مربيك: المادة الجافة أقل من احتياج الجاموس. حسّن جودة الخشن والاستساغة قبل زيادة المركزات.'
+          : 'مربيك: المادة الجافة أعلى من الاحتياج. تأكد أن الزيادة مأكولة وليست فرزًا أو هدرًا.';
+
+    nelHint =
+      nelState === 'good'
+        ? 'مربيك: الطاقة مناسبة لاحتياج الجاموس الحالي.'
+        : Number(nelActual) < Number(nelTarget)
+          ? 'مربيك: الطاقة أقل من احتياج الجاموس. ادعم الطاقة بدون تجاوز حد النشا أو خفض الألياف.'
+          : 'مربيك: الطاقة أعلى من احتياج الجاموس. راجع التكلفة وكثافة العليقة قبل زيادة الحبوب.';
+
+    mpHint =
+      mpState === 'good'
+        ? 'مربيك: البروتين الممثل مناسب لاحتياج الجاموس.'
+        : Number(mpActual) < Number(mpTarget)
+          ? 'مربيك: البروتين الممثل أقل من احتياج الجاموس. حسّن جودة البروتين مع ضبط الطاقة.'
+          : 'مربيك: البروتين الممثل أعلى من احتياج الجاموس. راجع التكلفة والهدر البروتيني.';
+
+    cpHint =
+      cpState === 'good'
+        ? 'مربيك: البروتين الخام مناسب كمؤشر للجاموس؛ القرار الأهم من البروتين الممثل والطاقة.'
+        : Number(cpActual) < Number(cpTarget)
+          ? 'مربيك: البروتين الخام منخفض كمؤشر للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
+          : 'مربيك: البروتين الخام أعلى من احتياج الجاموس. قلّل الهدر وراجع التكلفة.';
+
+    ndfHint =
+      ndfState === 'good'
+        ? 'مربيك: الألياف مناسبة للجاموس. حافظ على خشن فعّال وثبات الخلطة.'
+        : Number(nutrition.ndfPctActual) < Number(targets.ndfTarget)
+          ? 'مربيك: الألياف أقل من هدف الجاموس. ارفع الخشن الفعّال قبل أي زيادة في الحبوب.'
+          : 'مربيك: الألياف أعلى من احتياج الجاموس الحالي. راجع الطاقة والمأكول قبل زيادة الخشن.';
+
+    starchHint =
+      starchHigh
+        ? 'مربيك: النشا أعلى من حد أمان الجاموس. خفّض الحبوب السريعة أو ارفع الخشن الفعّال قبل اعتماد العليقة.'
+        : 'مربيك: النشا داخل حد أمان الجاموس. لا ترفعه إلا مع ألياف كافية واحتياج طاقة واضح.';
+
+    fatHint =
+      fatHigh
+        ? 'مربيك: دهن العليقة أعلى من حد الأمان. خفّض الدهون لحماية هضم الألياف واستقرار الكرش.'
+        : 'مربيك: دهن العليقة داخل حد الأمان. الدهون هنا Limit وليست هدفًا للرفع.';
+  }
   const economyHint =
     Number.isFinite(Number(economics.milkMargin))
       ? (
@@ -2090,7 +2138,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
             : 'أدخل سعر اللبن والخامات لقرار اقتصادي أدق.'
         );
 
-  const priorityText = (() => {
+   let priorityText = (() => {
     if (rumenModel?.status === 'danger') {
       return 'مربيك: أصلح صحة الكرش قبل رفع الطاقة أو الحبوب.';
     }
@@ -2117,8 +2165,24 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 
     return 'مربيك: العليقة مقبولة؛ تابع الإنتاج والروث والمتبقي.';
   })();
-
-  const decisionText = (() => {
+    if (isBuffalo) {
+    if (rumenModel?.status === 'danger') {
+      priorityText = 'مربيك: اضبط أمان كرش الجاموس أولًا؛ لا ترفع الحبوب أو الدهون الآن.';
+    } else if (starchHigh) {
+      priorityText = 'مربيك: خفّض النشا أولًا أو ارفع الخشن الفعّال؛ الجاموس حساس لضغط النشا.';
+    } else if (fatHigh) {
+      priorityText = 'مربيك: خفّض دهن العليقة أولًا لأنه Limit وليس هدفًا.';
+    } else if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
+      priorityText = 'مربيك: حسّن مأكول الجاموس بالخشن الجيد والاستساغة قبل تعديل المركزات.';
+    } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
+      priorityText = 'مربيك: حسّن البروتين الممثل للجاموس مع ضبط الطاقة، ولا ترفع CP عشوائيًا.';
+    } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
+      priorityText = 'مربيك: ادعم طاقة الجاموس بدون تجاوز حد النشا أو خفض الألياف.';
+    } else {
+      priorityText = 'مربيك: عليقة الجاموس مقبولة؛ تابع الروث والاجترار ودهن اللبن والمتبقي.';
+    }
+  }
+   let decisionText = (() => {
     if (rumenModel?.status === 'danger') {
       return 'مربيك: العليقة تحتاج ضبط صحة الكرش أولًا.';
     }
@@ -2141,7 +2205,23 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 
     return 'مربيك: العليقة متوازنة تشغيليًا حسب المدخلات الحالية.';
   })();
-
+    if (isBuffalo) {
+    if (rumenModel?.status === 'danger') {
+      decisionText = 'مربيك: عليقة الجاموس تحتاج ضبط أمان الكرش أولًا.';
+    } else if (starchHigh) {
+      decisionText = 'مربيك: عليقة الجاموس تتجاوز حد النشا الآمن.';
+    } else if (fatHigh) {
+      decisionText = 'مربيك: عليقة الجاموس تتجاوز حد الدهون الآمن.';
+    } else if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
+      decisionText = 'مربيك: العليقة آمنة نسبيًا للكرش لكنها لا تغطي مأكول الجاموس.';
+    } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
+      decisionText = 'مربيك: العليقة تحتاج تحسين بروتين ممثل مناسب للجاموس.';
+    } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
+      decisionText = 'مربيك: العليقة تحتاج دعم طاقة آمن للجاموس.';
+    } else {
+      decisionText = 'مربيك: عليقة الجاموس متوازنة تشغيليًا حسب المدخلات الحالية.';
+    }
+  }
   const analysisCards = [
     {
       key: 'decision',
