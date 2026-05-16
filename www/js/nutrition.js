@@ -2853,9 +2853,19 @@ function buildGaugeSvg(kind, current, target, state){
 
   else {
     // باقي الجوجز: مقياس ثابت حسب نوع المؤشر
+    const isBuffaloSupplyGauge =
+      state?.buffaloGauge === true &&
+      (key === 'dm' || key === 'nel');
+
     const profiles = {
-      dm:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
-      nel: { min: 0.80, lowDanger: 0.92, lowWarn: 0.98, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
+      dm: isBuffaloSupplyGauge
+        ? { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.05, highWarn: 1.12, max: 1.20 }
+        : { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
+
+      nel: isBuffaloSupplyGauge
+        ? { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.05, highWarn: 1.12, max: 1.20 }
+        : { min: 0.80, lowDanger: 0.92, lowWarn: 0.98, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
+
       cp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.30 },
       mp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.08, highWarn: 1.18, max: 1.30 },
       ndf: { min: 0.75, lowDanger: 0.92, lowWarn: 0.97, goodMax: 1.15, highWarn: 1.30, max: 1.45 }
@@ -2968,6 +2978,14 @@ function renderGaugeRows(cards){
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
     { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' }
   ];
+    const currentSpeciesForGauge =
+    document.getElementById('ctxSpecies')?.value ||
+    window.mbkNutrition?.serverViewModel?.analysis?.context?.species ||
+    window.mbkNutrition?.serverViewModel?.targets?.species ||
+    '';
+
+  const isBuffaloGauge =
+    /جاموس|buffalo/i.test(String(currentSpeciesForGauge || ''));
   const quickCards =
   Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.analysisCards)
     ? window.mbkNutrition.serverViewModel.panels.analysisCards
@@ -2993,7 +3011,11 @@ const smartHint = (key, fallback = '') => {
     const current = parseMetricNumber(currentCard.value);
     const target = parseMetricNumber(targetCard.value);
     const state = gaugeStatus(def.kind, current, target);
-    const gaugeState = { ...(state || {}), metricKey: def.key };
+        const gaugeState = {
+      ...(state || {}),
+      metricKey: def.key,
+      buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel')
+    };
     const comment = smartHint(def.key, '');
 
     return `
