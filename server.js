@@ -1520,6 +1520,12 @@ const forageNDFMinForRumen =
   Number.isFinite(Number(targetsCore?.forageNDFMin))
     ? Number(targetsCore.forageNDFMin)
     : (isDryOrCloseUpForRumen ? 21 : 19);
+
+const peNDFMinForRumen =
+  Number.isFinite(Number(targetsCore?.peNDFMin))
+    ? Number(targetsCore.peNDFMin)
+    : 18;
+
 const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
 const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
 const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
@@ -1534,7 +1540,7 @@ const rumenHealthModel = buildRumenHealthModel({
   ndfActual,
   ndfTarget: targetsCore?.ndfTarget,
   peNDFActual,
-  peNDFMin: targetsCore?.peNDFMin,
+  peNDFMin: peNDFMinForRumen,
   roughageMin: targetsCore?.roughageMin,
   forageNDFMin: forageNDFMinForRumen,
   isBuffaloRumen: /جاموس|buffalo/i.test(String(contextForTargets?.species || '')),
@@ -1607,7 +1613,7 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   fatTarget: null,
   starchMax: targetsCore?.starchMax ?? null,
   roughageMin: targetsCore?.roughageMin ?? null,
-  peNDFMin: targetsCore?.peNDFMin ?? null,
+  peNDFMin: peNDFMinForRumen,
   forageNDFMin: forageNDFMinForRumen,
 
   proteinRequirementModel: targetsCore?.proteinRequirementModel || null,
@@ -1777,11 +1783,17 @@ const buffaloForageOnlyRumenSafe =
       status: starchHigh ? 'watch' : 'ok'
     },
     ndf: {
-      label: 'NDF الكلي',
-      actual: safePct(ndf),
-      target: safePct(ndfLimit),
-      status: ndfLow ? 'watch' : 'ok'
-    },
+  label: 'NDF الكلي',
+  actual: safePct(ndf),
+  target: safePct(ndfLimit),
+  status:
+    isBuffaloRumen && Number.isFinite(ndf) && Number.isFinite(ndfLimit) && ndf > ndfLimit
+      ? 'high'
+      : (ndfLow ? 'watch' : 'ok'),
+  rule: isBuffaloRumen
+    ? 'comfort_ceiling_not_rumen_danger'
+    : 'minimum_or_target'
+},
     peNDF: {
       label: 'peNDF',
       actual: safePct(pendf),
@@ -2121,13 +2133,12 @@ function buildNutritionPanels(analysis = {}, context = {}) {
           ? 'مربيك: البروتين الخام منخفض كمؤشر للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
           : 'مربيك: البروتين الخام أعلى من احتياج الجاموس. قلّل الهدر وراجع التكلفة.';
 
-    ndfHint =
-      ndfState === 'good'
-        ? 'مربيك: الألياف مناسبة للجاموس. حافظ على خشن فعّال وثبات الخلطة.'
-        : Number(nutrition.ndfPctActual) < Number(targets.ndfTarget)
-          ? 'مربيك: الألياف أقل من هدف الجاموس. ارفع الخشن الفعّال قبل أي زيادة في الحبوب.'
-          : 'مربيك: الألياف أعلى من احتياج الجاموس الحالي. راجع الطاقة والمأكول قبل زيادة الخشن.';
-
+   ndfHint =
+  Number(nutrition.ndfPctActual) > Number(targets.ndfTarget)
+    ? 'مربيك: الألياف الكلية مرتفعة وقد تضغط الطاقة، لكن صحة الكرش آمنة إذا كان النشا وNDF الخشن والألياف المؤثرة مناسبين.'
+    : Number(nutrition.ndfPctActual) < Number(targets.ndfTarget)
+      ? 'مربيك: الألياف الكلية أقل من مدى الراحة. راجع الخشن الفعّال قبل زيادة الحبوب.'
+      : 'مربيك: الألياف الكلية ضمن مدى الراحة للجاموس.';
     starchHint =
       starchHigh
         ? 'مربيك: النشا أعلى من حد أمان الجاموس. خفّض الحبوب السريعة أو ارفع الخشن الفعّال قبل اعتماد العليقة.'
