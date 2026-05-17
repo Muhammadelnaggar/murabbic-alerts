@@ -1407,8 +1407,16 @@ function computeBuffaloOperationalMPTarget({
 
   const mpMaintenance = 3.8 * bw075;
 
+   // SOURCE: BOVERA_2002_LACTATING_BUFFALO_MP_EFFICIENCY
+  // Italian Mediterranean buffalo: efficiency of converting MP into milk protein = 50%
+  // compared with 70% commonly used for dairy cows in CNCPS.
+  const buffaloMilkProteinMPEfficiency = milk > 0 ? 0.50 : 0.67;
+
   const milkTrueProteinG = milk * milkProtPct * 1000;
-  const mpLactation = milkTrueProteinG / 0.67;
+  const mpLactation =
+    milk > 0
+      ? (milkTrueProteinG / buffaloMilkProteinMPEfficiency)
+      : 0;
 
   let mpPreg = 0;
   if (pregDays >= 190){
@@ -1419,7 +1427,7 @@ function computeBuffaloOperationalMPTarget({
   const mpGrowth = growth ? 140 : 0;
   const mpCloseUp = closeUp ? 45 : 0;
 
-  return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
+    return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
 }
 // Operational CP reference only
 function computeCPReferencePct({ species, milkKg, breed, stage }){
