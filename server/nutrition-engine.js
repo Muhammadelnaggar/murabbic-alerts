@@ -1384,6 +1384,249 @@ function computeNasemVitaminRequirements({
     note: 'Vitamin A, D, and E supplemental AI targets calculated from NASEM 2021 Chapter 8.'
   };
 }
+// MURABBIK_BUFFALO_MINERAL_VITAMIN_LAYER_V1
+// Direct buffalo layer where documented values exist.
+// Ca/P are calculated from buffalo body weight + milk component.
+// Other minerals/vitamins use cattle-base equations only as a tagged buffalo layer,
+// not as NASEM buffalo.
+function computeBuffaloMineralVitaminRequirements({
+  bodyWeight,
+  milkKg = 0,
+  milkFatPct = 6.5,
+  pregDays = 0,
+  dmi = 0,
+  category = '',
+  closeUp = false,
+  growth = false,
+  matureBodyWeight = null
+} = {}){
+  const bw = num(bodyWeight);
+  const milk = Math.max(0, num(milkKg));
+  const fatPct = num(milkFatPct, 6.5);
+  const DMI = Math.max(0, num(dmi));
+  const preg = num(pregDays);
+  const cat = String(category || '').trim();
+
+  const isLactating = milk > 0 || cat === 'lactating';
+  const isCloseUp = !!closeUp || cat === 'close_up_buffalo';
+  const isDry = !isLactating;
+
+  const matBW = num(matureBodyWeight) || bw || 650;
+
+  // 4% FCM = 0.4M + 15F, where F = milk fat kg/day.
+  const fatKg = milk * (fatPct / 100);
+  const fcm4 = (0.4 * milk) + (15 * fatKg);
+
+  // Direct buffalo Ca/P layer:
+  // maintenance scaled from mature buffalo reference;
+  // lactation adds Ca/P per kg 4% FCM.
+  const caMaintenanceG = 0.04 * bw;
+  const pMaintenanceG  = 0.0283 * bw;
+
+  const caLactationG = isLactating ? (2.73 * fcm4) : 0;
+  const pLactationG  = isLactating ? (1.68 * fcm4) : 0;
+
+  // Late pregnancy / close-up support for buffalo.
+  const caPregnancyG =
+    isDry && (isCloseUp || preg >= 240)
+      ? 8
+      : 0;
+
+  const pPregnancyG =
+    isDry && (isCloseUp || preg >= 240)
+      ? 6
+      : 0;
+
+  const caTotalG = caMaintenanceG + caLactationG + caPregnancyG;
+  const pTotalG  = pMaintenanceG + pLactationG + pPregnancyG;
+
+  const cattleMacroBase = computeNasemMacroMineralRequirements({
+    bodyWeight: bw,
+    milkKg: milk,
+    milkProteinPct: 4.2,
+    pregDays: preg,
+    dmi: DMI,
+    growth: !!growth,
+    category: isLactating ? 'lactating' : (isCloseUp ? 'close_up' : 'dry'),
+    matureBodyWeight: matBW
+  });
+
+  const cattleTraceBase = computeNasemTraceMineralRequirements({
+    bodyWeight: bw,
+    milkKg: milk,
+    pregDays: preg,
+    dmi: DMI,
+    growth: !!growth,
+    matureBodyWeight: matBW
+  });
+
+  const cattleVitaminBase = computeNasemVitaminRequirements({
+    bodyWeight: bw,
+    milkKg: milk,
+    category: isLactating ? 'lactating' : (isCloseUp ? 'close_up' : 'dry'),
+    closeUp: isCloseUp,
+    freshPastureDMKg: 0
+  });
+
+  const requiredMinerals = {
+    ...(cattleMacroBase?.requiredMinerals || {})
+  };
+
+  requiredMinerals.Ca = {
+    type: 'requirement',
+    basis: 'dietary',
+    requiredAbsorbedG: null,
+    dietaryRequiredG: round(caTotalG, 2),
+    absorptionCoeff: null,
+    status: 'verified_buffalo_direct_layer',
+    source: 'BUFFALO_CA_REQUIREMENT_BODY_WEIGHT_PLUS_4PCT_FCM',
+    components: {
+      maintenanceG: round(caMaintenanceG, 3),
+      lactationG: round(caLactationG, 3),
+      pregnancyG: round(caPregnancyG, 3),
+      fcm4KgDay: round(fcm4, 3)
+    },
+    note: 'Buffalo calcium requirement calculated from body weight plus 4% FCM milk component.'
+  };
+
+  requiredMinerals.P = {
+    type: 'requirement',
+    basis: 'dietary',
+    requiredAbsorbedG: null,
+    dietaryRequiredG: round(pTotalG, 2),
+    absorptionCoeff: null,
+    status: 'verified_buffalo_direct_layer',
+    source: 'BUFFALO_P_REQUIREMENT_BODY_WEIGHT_PLUS_4PCT_FCM',
+    components: {
+      maintenanceG: round(pMaintenanceG, 3),
+      lactationG: round(pLactationG, 3),
+      pregnancyG: round(pPregnancyG, 3),
+      fcm4KgDay: round(fcm4, 3)
+    },
+    note: 'Buffalo phosphorus requirement calculated from body weight plus 4% FCM milk component.'
+  };
+
+  for (const k of Object.keys(requiredMinerals)){
+    if (k !== 'Ca' && k !== 'P' && requiredMinerals[k]) {
+      requiredMinerals[k] = {
+        ...requiredMinerals[k],
+        species: 'buffalo',
+        sourceBase: requiredMinerals[k].source || null,
+        source: 'CATTLE_BASE_TAGGED_FOR_BUFFALO_LAYER',
+        status: 'cattle_base_due_to_no_direct_buffalo_equation',
+        note: 'Used as cattle-base requirement inside Murabbik buffalo layer; not labeled as NASEM buffalo.'
+      };
+    }
+  }
+
+  const traceMinerals = {
+    ...(cattleTraceBase?.traceMinerals || {})
+  };
+
+  for (const k of Object.keys(traceMinerals)){
+    traceMinerals[k] = {
+      ...traceMinerals[k],
+      species: 'buffalo',
+      sourceBase: traceMinerals[k].source || null,
+      source: 'CATTLE_BASE_TAGGED_FOR_BUFFALO_LAYER',
+      status: 'cattle_base_due_to_no_direct_buffalo_equation',
+      note: 'Used as cattle-base trace mineral target inside Murabbik buffalo layer; not labeled as NASEM buffalo.'
+    };
+  }
+
+  const vitaminAFromWeightIU = 60 * bw;
+
+  const vitamins = {
+    ...(cattleVitaminBase?.vitamins || {})
+  };
+
+  vitamins.A = {
+    type: 'AI',
+    basis: 'supplemental',
+    unit: 'IU_day',
+    requiredIU: round(
+      Math.max(
+        vitaminAFromWeightIU,
+        num(cattleVitaminBase?.vitamins?.A?.requiredIU)
+      ),
+      0
+    ),
+    status: 'verified_buffalo_layer',
+    source: 'BUFFALO_VITAMIN_A_WEIGHT_BASE_LAYER',
+    components: {
+      bodyWeightKg: round(bw, 2),
+      iuPerKgBW: 60,
+      cattleBaseIU: round(num(cattleVitaminBase?.vitamins?.A?.requiredIU), 0)
+    },
+    note: 'Buffalo vitamin A target uses weight-based buffalo layer; cattle-base value is retained only if higher.'
+  };
+
+  for (const k of Object.keys(vitamins)){
+    if (k !== 'A' && vitamins[k]) {
+      vitamins[k] = {
+        ...vitamins[k],
+        species: 'buffalo',
+        sourceBase: vitamins[k].source || null,
+        source: 'CATTLE_BASE_TAGGED_FOR_BUFFALO_LAYER',
+        status: 'cattle_base_due_to_no_direct_buffalo_equation',
+        note: 'Used as cattle-base vitamin target inside Murabbik buffalo layer; not labeled as NASEM buffalo.'
+      };
+    }
+  }
+
+  const mineralRequirementModel = {
+    model: 'MURABBIK_BUFFALO_MINERAL_LAYER_V1',
+    status: 'active',
+    species: 'buffalo',
+    targetType: 'macro_and_trace_mineral_requirements',
+    unit: 'g_day_and_mg_day',
+    inputs: {
+      bodyWeight: round(bw, 2),
+      milkKg: round(milk, 2),
+      milkFatPct: round(fatPct, 2),
+      fcm4KgDay: round(fcm4, 3),
+      pregnancyDays: round(preg, 0),
+      dmi: round(DMI, 2),
+      category: cat || null,
+      closeUp: isCloseUp
+    },
+    requiredMinerals,
+    traceMineralRequirementModel: {
+      model: 'MURABBIK_BUFFALO_TRACE_MINERAL_LAYER_V1',
+      status: 'active',
+      species: 'buffalo',
+      targetType: 'trace_mineral_requirements_and_ai',
+      unit: 'mg_day',
+      traceMinerals,
+      note: 'Trace minerals use cattle-base equations tagged for buffalo where direct buffalo equations are not implemented.'
+    },
+    note: 'Ca/P are direct buffalo layer; other minerals are cattle-base tagged for buffalo, not NASEM buffalo.'
+  };
+
+  const vitaminRequirementModel = {
+    model: 'MURABBIK_BUFFALO_VITAMIN_LAYER_V1',
+    status: 'active',
+    species: 'buffalo',
+    targetType: 'supplemental_vitamin_AI',
+    unit: 'IU_day',
+    inputs: {
+      bodyWeight: round(bw, 2),
+      milkKg: round(milk, 2),
+      category: cat || null,
+      closeUp: isCloseUp
+    },
+    vitamins,
+    note: 'Vitamin A uses buffalo layer; D/E are cattle-base tagged where direct buffalo equations are not implemented.'
+  };
+
+  return {
+    mineralRequirementModel,
+    vitaminRequirementModel,
+    chapter12MineralModel: null,
+    chapter12VitaminModel: null
+  };
+}
+
 // Backward-compatible wrapper.
 // لا نستخدمه كـ operational approximation بعد الآن.
 function computeOperationalMPTarget(args){
@@ -2099,6 +2342,17 @@ const cpReferencePct = buffaloCpPctLactating({
   fatPct,
   dmi
 });
+ const buffaloMinVitReq = computeBuffaloMineralVitaminRequirements({
+  bodyWeight: bw,
+  milkKg: milk,
+  milkFatPct: fatPct,
+  pregDays,
+  dmi,
+  category: 'lactating',
+  closeUp,
+  growth: false,
+  matureBodyWeight: getStandardWeight('جاموس', breed)
+}); 
 const bw075 = Math.pow(bw, 0.75);
 
 // SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
@@ -2145,7 +2399,10 @@ const roughageMin =
 return {
   species: 'buffalo',
   category: 'lactating',
-
+mineralRequirementModel: buffaloMinVitReq.mineralRequirementModel,
+vitaminRequirementModel: buffaloMinVitReq.vitaminRequirementModel,
+chapter12MineralModel: buffaloMinVitReq.chapter12MineralModel,
+chapter12VitaminModel: buffaloMinVitReq.chapter12VitaminModel,
 buffaloRequirementModel: {
   model: 'MURABBIK_BUFFALO_LACTATING_LAYER_V2',
   status: 'active',
@@ -2291,7 +2548,17 @@ function computeBuffaloDryFromCowBase(args = {}){
     cowEquivalentPregnancyDays: round(cowEquivalentPregDays, 0),
     rule: 'Buffalo stage is classified using 308 days gestation; close-up starts within the last 30 days before calving.'
   };
-
+const buffaloMinVitReq = computeBuffaloMineralVitaminRequirements({
+  bodyWeight: bw,
+  milkKg: 0,
+  milkFatPct: 0,
+  pregDays: preg,
+  dmi: buffaloDmi,
+  category: stageLabel,
+  closeUp: isCloseUp,
+  growth: false,
+  matureBodyWeight: buffaloMatureBW
+});
   return {
     ...base,
 
@@ -2301,12 +2568,12 @@ function computeBuffaloDryFromCowBase(args = {}){
 
     // Buffalo dry/close-up does not expose cow NASEM mineral/vitamin/chapter12 requirement models.
     // These remain null until a documented buffalo layer is added.
-    chapter12EnergyModel: null,
-    chapter12ProteinModel: null,
-    chapter12MineralModel: null,
-    chapter12VitaminModel: null,
-    mineralRequirementModel: null,
-    vitaminRequirementModel: null,
+chapter12EnergyModel: null,
+chapter12ProteinModel: null,
+chapter12MineralModel: buffaloMinVitReq.chapter12MineralModel,
+chapter12VitaminModel: buffaloMinVitReq.chapter12VitaminModel,
+mineralRequirementModel: buffaloMinVitReq.mineralRequirementModel,
+vitaminRequirementModel: buffaloMinVitReq.vitaminRequirementModel,
 
     buffaloRequirementModel: {
       model: 'MURABBIK_BUFFALO_DRY_CLOSEUP_LAYER_V2',
