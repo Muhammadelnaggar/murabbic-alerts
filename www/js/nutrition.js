@@ -3008,13 +3008,28 @@ const smartHint = (key, fallback = '') => {
 
     if (!currentCard || !targetCard) return '';
 
-    const current = parseMetricNumber(currentCard.value);
-    const target = parseMetricNumber(targetCard.value);
-    const state = gaugeStatus(def.kind, current, target);
+let current = parseMetricNumber(currentCard.value);
+let target = parseMetricNumber(targetCard.value);
+
+// إصلاح خاص فقط بمؤشر البروتين الممثل للجاموس
+// الأرقام الصحيحة تأتي من analysisCards: actual / target
+if (isBuffaloGauge && def.key === 'mp') {
+  const mpQuick = quickCardByKey('mp');
+
+  if (Number.isFinite(Number(mpQuick?.actual))) {
+    current = Number(mpQuick.actual);
+  }
+
+  if (Number.isFinite(Number(mpQuick?.target))) {
+    target = Number(mpQuick.target);
+  }
+}
+
+const state = gaugeStatus(def.kind, current, target);
         const gaugeState = {
       ...(state || {}),
       metricKey: def.key,
-      buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel')
+      buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
     const comment = smartHint(def.key, '');
 
