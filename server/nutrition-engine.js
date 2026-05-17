@@ -2122,6 +2122,16 @@ const dcpTargetG =
 const ndfTarget = buffaloNdfTargetByMilk(milk);
 const nscReferencePct = buffaloNscReferenceByMilk(milk);
 
+// Lactating buffalo forage-NDF safety range
+// 33–40% DM = comfort/safety range for rumen protection in Murabbik buffalo layer.
+const forageNDFMin = 33;
+const forageNDFComfort = 36.5;
+const forageNDFMaxComfort = 40;
+
+// Saturated fat support level observed in lactating buffalo study.
+// This is not a fat target; fatLimit remains the safety ceiling.
+const saturatedFatSupportPct = 2;
+
 const pathakDmiKg =
   (0.02 * bw) + (milk / 3);
 
@@ -2166,14 +2176,19 @@ buffaloRequirementModel: {
 
   proteinSystem: 'MP',
 
-  ndfTarget,
-  nscReferencePct,
+ndfTarget,
+nscReferencePct,
+
+forageNDFMin,
+forageNDFComfort,
+forageNDFMaxComfort,
 
 starchMax: 24,
 
 fatMax: 7,
 fatLimit: 7,
 fatTarget: null,
+saturatedFatSupportPct,
 
 roughageMin: round(roughageMin)
 };
