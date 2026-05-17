@@ -2029,14 +2029,11 @@ function buffaloCpPctHeifer({ bodyWeight, pregDays, closeUp }){
 function buffaloNdfTargetByMilk(milkKg){
   const m = num(milkKg);
 
-  if (m < 6) return 52;
-  if (m < 7) return 47;
-  if (m < 8) return 46;
-  if (m < 9) return 44;
-  if (m < 10) return 43;
-  if (m < 11) return 42;
-  if (m < 12) return 40;
-  return 39;
+  // Total NDF in lactating buffalo is a comfort ceiling, not a target to push upward.
+  // Forage NDF protects the rumen; excessive total NDF can depress DMI and energy intake.
+  if (m < 8) return 40;
+  if (m < 12) return 39;
+  return 38;
 }
 
 function buffaloNscReferenceByMilk(milkKg){
@@ -2120,7 +2117,6 @@ const dcpTargetG =
   (3.14 * bw075) + (55.2 * fcm6);
 
 const ndfTarget = buffaloNdfTargetByMilk(milk);
-const nscReferencePct = buffaloNscReferenceByMilk(milk);
 
 // Lactating buffalo forage-NDF safety range
 // 33–40% DM = comfort/safety range for rumen protection in Murabbik buffalo layer.
@@ -2151,46 +2147,46 @@ return {
   category: 'lactating',
 
 buffaloRequirementModel: {
-  model: 'MURABBIK_BUFFALO_ENGINE_V1',
+  model: 'MURABBIK_BUFFALO_LACTATING_LAYER_V2',
   status: 'active',
-  targetType: 'buffalo_lactating_requirements',
-  note: 'Murabbik buffalo engine outputs final buffalo targets for ration evaluation.'
+  targetType: 'buffalo_lactating_final_targets',
+  outputFields: [
+    'dmiTarget',
+    'nelTarget',
+    'mpTargetG',
+    'cpTarget',
+    'cpTargetG',
+    'ndfTarget',
+    'forageNDFMin',
+    'forageNDFComfort',
+    'forageNDFMaxComfort',
+    'starchMax',
+    'fatLimit',
+    'roughageMin'
+  ],
+  rule: 'Buffalo layer returns Murabbik final targets only; TDN, NSC, and DCP are not exposed as user-facing targets.'
 },
   bodyWeight: bw,
   dim: Number.isFinite(days) ? Math.round(days) : null,
-
   dmi: round(dmi),
   dmiTarget: round(dmi),
-
   nel: round(nelTotal),
   nelTarget: round(nelTotal),
-
-  tdnTargetKg: round(tdnTargetKg, 2),
-
   mpTargetG: round(mpTargetG, 0),
-
   cpReferencePct: round(cpReferencePct),
   cpTarget: round(cpReferencePct),
   cpTargetG: round(cpTargetG, 0),
-  dcpTargetG: round(dcpTargetG, 0),
-
   proteinSystem: 'MP',
-
-ndfTarget,
-nscReferencePct,
-
-forageNDFMin,
-forageNDFComfort,
-forageNDFMaxComfort,
-
-starchMax: 24,
-
-fatMax: 7,
-fatLimit: 7,
-fatTarget: null,
-saturatedFatSupportPct,
-
-roughageMin: round(roughageMin)
+  ndfTarget,
+  forageNDFMin,
+  forageNDFComfort,
+  forageNDFMaxComfort,
+  starchMax: 24,
+  fatMax: 7,
+  fatLimit: 7,
+  fatTarget: null,
+  saturatedFatSupportPct,
+  roughageMin: round(roughageMin)
 };
 }
 function computeBuffaloDryFromCowBase(args = {}){
