@@ -2170,6 +2170,203 @@ fatTarget: null,
 roughageMin: round(roughageMin)
 };
 }
+function computeBuffaloDryFromCowBase(args = {}){
+  const buffaloGestationLength = 308;
+  const cowGestationLength = 280;
+
+  const bw = num(args.bodyWeight);
+  const bw075 = Math.pow(bw, 0.75);
+  const breed = args.breed || '';
+
+  const preg = clamp(num(args.pregDays), 0, buffaloGestationLength);
+
+  const buffaloDaysPrepartum =
+    preg > 0
+      ? Math.max(0, buffaloGestationLength - preg)
+      : null;
+
+  const isCloseUp =
+    !!args.closeUp ||
+    (
+      buffaloDaysPrepartum !== null &&
+      buffaloDaysPrepartum < 30
+    );
+
+  const cowEquivalentPregDays =
+    buffaloDaysPrepartum !== null
+      ? clamp(cowGestationLength - buffaloDaysPrepartum, 0, cowGestationLength)
+      : 0;
+
+  const base = computeCowDryMother({
+    ...args,
+    pregDays: cowEquivalentPregDays,
+    closeUp: isCloseUp,
+    breed
+  });
+
+  const buffaloDmi =
+    isCloseUp
+      ? bw * 0.018
+      : 0.068 * bw075;
+
+  const buffaloMaintenanceNEL = nelMaintenanceMcal(bw);
+
+  const buffaloMatureBW = getStandardWeight('جاموس', breed);
+
+  const buffaloPregNEL =
+    cowEquivalentPregDays > 0
+      ? gestationConceptusNE(
+          bw,
+          cowEquivalentPregDays,
+          null,
+          buffaloMatureBW,
+          false
+        )
+      : 0;
+
+  const buffaloNEL =
+    buffaloMaintenanceNEL + buffaloPregNEL;
+
+  const mpTargetG = computeBuffaloOperationalMPTarget({
+    bodyWeight: bw,
+    milkKg: 0,
+    proteinPct: 0,
+    pregDays: preg,
+    closeUp: isCloseUp,
+    growth: false
+  });
+
+  const cpTarget = isCloseUp ? 14.0 : 10.5;
+  const cpTargetG = buffaloDmi * (cpTarget / 100) * 1000;
+
+  const ndfTarget = isCloseUp ? 52 : 60;
+  const roughageMin = isCloseUp ? 55 : 60;
+  const starchMax = isCloseUp ? 10 : 9;
+
+  const stageLabel =
+    isCloseUp
+      ? 'close_up_buffalo'
+      : 'dry_pregnant_buffalo';
+
+  const buffaloStageModel = {
+    model: 'MURABBIK_BUFFALO_STAGE_MODEL_V1',
+    species: 'buffalo',
+    category: stageLabel,
+    status: 'active',
+    gestationLengthDays: buffaloGestationLength,
+    pregnancyDays: round(preg, 0),
+    daysPrepartum:
+      buffaloDaysPrepartum === null ? null : round(buffaloDaysPrepartum, 0),
+    cowEquivalentPregnancyDays: round(cowEquivalentPregDays, 0),
+    rule: 'Buffalo dry and close-up stage is determined using buffalo gestation length, then mapped to Murabbik dry/transition base structure.'
+  };
+
+  return {
+    ...base,
+
+    species: 'buffalo',
+    category: stageLabel,
+    chapter12StageModel: buffaloStageModel,
+
+    buffaloRequirementModel: {
+      model: 'MURABBIK_BUFFALO_DRY_CLOSEUP_LAYER_V1',
+      status: 'active_documented_layer',
+      baseEngine: base?.chapter12EnergyModel?.source || 'MURABBIK_COW_DRY_CLOSEUP_BASE',
+      adjustmentStage: stageLabel,
+      buffaloGestationLength,
+      cowGestationLength,
+      originalBuffaloPregnancyDays: round(preg, 0),
+      buffaloDaysPrepartum:
+        buffaloDaysPrepartum === null ? null : round(buffaloDaysPrepartum, 0),
+      cowEquivalentPregnancyDays: round(cowEquivalentPregDays, 0),
+      rule: 'Cow dry/transition engine remains the structured base; documented buffalo differences are applied to final Murabbik target fields only.',
+      outputFields: [
+        'dmi',
+        'nel',
+        'mpTargetG',
+        'cpTarget',
+        'cpTargetG',
+        'ndfTarget',
+        'roughageMin',
+        'starchMax',
+        'fatLimit'
+      ],
+      sources: [
+        'BULBUL_2010_BUFFALO_DRY_PREGNANT_REQUIREMENTS',
+        'FRANZOLIN_1994_BUFFALO_FORAGE_UTILIZATION'
+      ]
+    },
+
+    baseCowCategory: base?.category || null,
+
+    dmiModel: {
+      model: 'MURABBIK_BUFFALO_DMI_DRY_CLOSEUP_LAYER_V1',
+      status: 'active_documented_layer',
+      species: 'buffalo',
+      stage: stageLabel,
+      basis: isCloseUp
+        ? 'late_pregnancy_buffalo_DMI_from_BW_pct'
+        : 'dry_buffalo_DMI_from_BW075',
+      valueKgDay: round(buffaloDmi),
+      note: 'Final DMI target is adjusted by buffalo dry/late-pregnancy layer and returned in Murabbik standard field dmi.'
+    },
+
+    energyModel: {
+      model: 'MURABBIK_BUFFALO_ENERGY_DRY_CLOSEUP_LAYER_V1',
+      status: 'active_layer_on_murabbik_energy_field',
+      species: 'buffalo',
+      stage: stageLabel,
+      unit: 'NEL_Mcal_day',
+      components: {
+        maintenanceMcal: round(buffaloMaintenanceNEL),
+        pregnancyMcal: round(buffaloPregNEL),
+        lactationMcal: 0,
+        growthMcal: 0
+      },
+      totalNELMcal: round(buffaloNEL),
+      note: 'Final energy target remains in Murabbik standard field nel; no parallel ME/TDN output is exposed.'
+    },
+
+    proteinRequirementModel: {
+      model: 'MURABBIK_BUFFALO_PROTEIN_DRY_CLOSEUP_LAYER_V1',
+      status: 'active_documented_layer',
+      species: 'buffalo',
+      stage: stageLabel,
+      targetType: 'MP_and_CP_reference',
+      mpTargetG: round(mpTargetG, 0),
+      cpTargetPct: round(cpTarget, 1),
+      cpTargetG: round(cpTargetG, 0),
+      note: 'Final protein targets are returned through Murabbik standard fields mpTargetG, cpTarget, and cpTargetG.'
+    },
+
+    dim: null,
+
+    dmi: round(buffaloDmi),
+    dmiTarget: round(buffaloDmi),
+
+    nel: round(buffaloNEL),
+    nelTarget: round(buffaloNEL),
+
+    mpTargetG: round(mpTargetG, 0),
+
+    cpReferencePct: round(cpTarget, 1),
+    cpTarget: round(cpTarget, 1),
+    cpTargetG: round(cpTargetG, 0),
+
+    proteinSystem: 'MP_CP',
+
+    ndfTarget,
+    roughageMin,
+
+    starchMax,
+
+    fatTarget: null,
+    fatLimit: 7,
+    fatMax: 7,
+
+    internalStatus: 'BUFFALO_DRY_CLOSEUP_LAYER_APPLIED'
+  };
+}
 function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
   const bw = num(bodyWeight);
 const bw075 = Math.pow(bw, 0.75);
@@ -2256,11 +2453,11 @@ if (isBuffalo){
     return computeBuffalo(common);
   }
 
-  if (category === 'heifer'){
-    return computeBuffaloHeifer(common);
+  if (category === 'dry_pregnant' || category === 'close_up'){
+    return computeBuffaloDryFromCowBase(common);
   }
 
-  if (category === 'dry_pregnant' || category === 'close_up'){
+  if (category === 'heifer'){
     return computeBuffaloHeifer(common);
   }
 
