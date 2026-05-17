@@ -2194,7 +2194,6 @@ function computeBuffaloDryFromCowBase(args = {}){
   const cowGestationLength = 280;
 
   const bw = num(args.bodyWeight);
-  const bw075 = Math.pow(bw, 0.75);
   const breed = args.breed || '';
 
   const preg = clamp(num(args.pregDays), 0, buffaloGestationLength);
@@ -2223,10 +2222,17 @@ function computeBuffaloDryFromCowBase(args = {}){
     breed
   });
 
+  /*
+    Buffalo dry / close-up layer
+    This layer keeps Murabbik final fields only.
+    No TDN / NSC / DCP output.
+    NDF is a comfort ceiling, not a target to push upward.
+  */
+
   const buffaloDmi =
     isCloseUp
-      ? bw * 0.018
-      : 0.068 * bw075;
+      ? bw * 0.0175
+      : bw * 0.0185;
 
   const buffaloMaintenanceNEL = nelMaintenanceMcal(bw);
 
@@ -2255,12 +2261,18 @@ function computeBuffaloDryFromCowBase(args = {}){
     growth: false
   });
 
-  const cpTarget = isCloseUp ? 14.0 : 10.5;
+  const cpTarget = isCloseUp ? 13.0 : 11.5;
   const cpTargetG = buffaloDmi * (cpTarget / 100) * 1000;
 
-  const ndfTarget = isCloseUp ? 52 : 60;
+  const ndfTarget = isCloseUp ? 40 : 45;
+
+  const forageNDFMin = isCloseUp ? 33 : 35;
+  const forageNDFComfort = isCloseUp ? 36.5 : 40;
+  const forageNDFMaxComfort = isCloseUp ? 40 : 45;
+
   const roughageMin = isCloseUp ? 55 : 60;
-  const starchMax = isCloseUp ? 10 : 9;
+
+  const starchMax = isCloseUp ? 12 : 10;
 
   const stageLabel =
     isCloseUp
@@ -2268,7 +2280,7 @@ function computeBuffaloDryFromCowBase(args = {}){
       : 'dry_pregnant_buffalo';
 
   const buffaloStageModel = {
-    model: 'MURABBIK_BUFFALO_STAGE_MODEL_V1',
+    model: 'MURABBIK_BUFFALO_STAGE_MODEL_V2',
     species: 'buffalo',
     category: stageLabel,
     status: 'active',
@@ -2277,7 +2289,7 @@ function computeBuffaloDryFromCowBase(args = {}){
     daysPrepartum:
       buffaloDaysPrepartum === null ? null : round(buffaloDaysPrepartum, 0),
     cowEquivalentPregnancyDays: round(cowEquivalentPregDays, 0),
-    rule: 'Buffalo dry and close-up stage is determined using buffalo gestation length, then mapped to Murabbik dry/transition base structure.'
+    rule: 'Buffalo stage is classified using 308 days gestation; close-up starts within the last 30 days before calving.'
   };
 
   return {
@@ -2287,9 +2299,19 @@ function computeBuffaloDryFromCowBase(args = {}){
     category: stageLabel,
     chapter12StageModel: buffaloStageModel,
 
+    // Buffalo dry/close-up does not expose cow NASEM mineral/vitamin/chapter12 requirement models.
+    // These remain null until a documented buffalo layer is added.
+    chapter12EnergyModel: null,
+    chapter12ProteinModel: null,
+    chapter12MineralModel: null,
+    chapter12VitaminModel: null,
+    mineralRequirementModel: null,
+    vitaminRequirementModel: null,
+
     buffaloRequirementModel: {
-      model: 'MURABBIK_BUFFALO_DRY_CLOSEUP_LAYER_V1',
-      status: 'active_documented_layer',
+      model: 'MURABBIK_BUFFALO_DRY_CLOSEUP_LAYER_V2',
+      status: 'active',
+      targetType: 'buffalo_dry_closeup_final_targets',
       baseEngine: base?.chapter12EnergyModel?.source || 'MURABBIK_COW_DRY_CLOSEUP_BASE',
       adjustmentStage: stageLabel,
       buffaloGestationLength,
@@ -2298,41 +2320,39 @@ function computeBuffaloDryFromCowBase(args = {}){
       buffaloDaysPrepartum:
         buffaloDaysPrepartum === null ? null : round(buffaloDaysPrepartum, 0),
       cowEquivalentPregnancyDays: round(cowEquivalentPregDays, 0),
-      rule: 'Cow dry/transition engine remains the structured base; documented buffalo differences are applied to final Murabbik target fields only.',
       outputFields: [
-        'dmi',
-        'nel',
+        'dmiTarget',
+        'nelTarget',
         'mpTargetG',
         'cpTarget',
         'cpTargetG',
         'ndfTarget',
-        'roughageMin',
+        'forageNDFMin',
+        'forageNDFComfort',
+        'forageNDFMaxComfort',
         'starchMax',
-        'fatLimit'
+        'fatLimit',
+        'roughageMin'
       ],
-      sources: [
-        'BULBUL_2010_BUFFALO_DRY_PREGNANT_REQUIREMENTS',
-        'FRANZOLIN_1994_BUFFALO_FORAGE_UTILIZATION'
-      ]
+      rule: 'Buffalo dry/close-up layer returns Murabbik final targets only; NDF is a comfort ceiling, not a target to increase.'
     },
 
     baseCowCategory: base?.category || null,
 
     dmiModel: {
-      model: 'MURABBIK_BUFFALO_DMI_DRY_CLOSEUP_LAYER_V1',
-      status: 'active_documented_layer',
+      model: 'MURABBIK_BUFFALO_DMI_DRY_CLOSEUP_LAYER_V2',
+      status: 'active',
       species: 'buffalo',
       stage: stageLabel,
-      basis: isCloseUp
-        ? 'late_pregnancy_buffalo_DMI_from_BW_pct'
-        : 'dry_buffalo_DMI_from_BW075',
       valueKgDay: round(buffaloDmi),
-      note: 'Final DMI target is adjusted by buffalo dry/late-pregnancy layer and returned in Murabbik standard field dmi.'
+      rule: isCloseUp
+        ? 'Close-up buffalo DMI is slightly reduced near calving.'
+        : 'Dry pregnant buffalo DMI is set from body weight with forage-based intake.'
     },
 
     energyModel: {
-      model: 'MURABBIK_BUFFALO_ENERGY_DRY_CLOSEUP_LAYER_V1',
-      status: 'active_layer_on_murabbik_energy_field',
+      model: 'MURABBIK_BUFFALO_ENERGY_DRY_CLOSEUP_LAYER_V2',
+      status: 'active',
       species: 'buffalo',
       stage: stageLabel,
       unit: 'NEL_Mcal_day',
@@ -2343,19 +2363,19 @@ function computeBuffaloDryFromCowBase(args = {}){
         growthMcal: 0
       },
       totalNELMcal: round(buffaloNEL),
-      note: 'Final energy target remains in Murabbik standard field nel; no parallel ME/TDN output is exposed.'
+      rule: 'Energy target remains Murabbik NEL/day; no parallel TDN or ME target is exposed.'
     },
 
     proteinRequirementModel: {
-      model: 'MURABBIK_BUFFALO_PROTEIN_DRY_CLOSEUP_LAYER_V1',
-      status: 'active_documented_layer',
+      model: 'MURABBIK_BUFFALO_PROTEIN_DRY_CLOSEUP_LAYER_V2',
+      status: 'active',
       species: 'buffalo',
       stage: stageLabel,
       targetType: 'MP_and_CP_reference',
       mpTargetG: round(mpTargetG, 0),
       cpTargetPct: round(cpTarget, 1),
       cpTargetG: round(cpTargetG, 0),
-      note: 'Final protein targets are returned through Murabbik standard fields mpTargetG, cpTarget, and cpTargetG.'
+      rule: 'Protein target is returned as Murabbik MP plus CP reference; no DCP target is exposed.'
     },
 
     dim: null,
@@ -2372,18 +2392,23 @@ function computeBuffaloDryFromCowBase(args = {}){
     cpTarget: round(cpTarget, 1),
     cpTargetG: round(cpTargetG, 0),
 
-    proteinSystem: 'MP_CP',
+    proteinSystem: 'MP',
 
     ndfTarget,
-    roughageMin,
+
+    forageNDFMin,
+    forageNDFComfort,
+    forageNDFMaxComfort,
 
     starchMax,
 
     fatTarget: null,
-    fatLimit: 7,
-    fatMax: 7,
+    fatLimit: 6,
+    fatMax: 6,
 
-    internalStatus: 'BUFFALO_DRY_CLOSEUP_LAYER_APPLIED'
+    roughageMin,
+
+    internalStatus: 'BUFFALO_DRY_CLOSEUP_LAYER_V2_APPLIED'
   };
 }
 function computeBuffaloHeifer({ bodyWeight, pregDays, closeUp, breed, dietNDFPct }){
