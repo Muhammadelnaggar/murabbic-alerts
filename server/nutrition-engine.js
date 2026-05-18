@@ -1639,27 +1639,33 @@ function computeOperationalMPTarget(args){
 function computeBuffaloOperationalMPTarget({
   bodyWeight,
   milkKg,
+  fatPct,
   proteinPct,
   pregDays,
   closeUp,
   growth
 }){
-  const bw075 = Math.pow(num(bodyWeight), 0.75);
-  const milk  = num(milkKg);
-  const milkProtPct = num(proteinPct, 4.2) / 100;
+  const bw = num(bodyWeight);
+  const bw075 = Math.pow(bw, 0.75);
+  const milk = num(milkKg);
+  const fat = num(fatPct, 6.5);
 
+  // SOURCE: LACTATING_BUFFALO_MP_REQUIREMENT_STUDY
+  // Lactating buffalo MP requirement:
+  // maintenance MP = 2.56 g/kg BW^0.75
+  // milk MP        = 66.78 g/kg 6% FCM
+  // Applies to lactating buffalo only.
+  if (milk > 0) {
+    const fcm6 = buffaloFCM6(milk, fat);
+
+    const mpMaintenance = 2.56 * bw075;
+    const mpLactation = 66.78 * fcm6;
+
+    return mpMaintenance + mpLactation;
+  }
+
+  // Non-lactating buffalo path kept unchanged in this edit.
   const mpMaintenance = 3.8 * bw075;
-
-   // SOURCE: BOVERA_2002_LACTATING_BUFFALO_MP_EFFICIENCY
-  // Italian Mediterranean buffalo: efficiency of converting MP into milk protein = 50%
-  // compared with 70% commonly used for dairy cows in CNCPS.
-  const buffaloMilkProteinMPEfficiency = milk > 0 ? 0.50 : 0.67;
-
-  const milkTrueProteinG = milk * milkProtPct * 1000;
-  const mpLactation =
-    milk > 0
-      ? (milkTrueProteinG / buffaloMilkProteinMPEfficiency)
-      : 0;
 
   let mpPreg = 0;
   if (pregDays >= 190){
@@ -1670,7 +1676,7 @@ function computeBuffaloOperationalMPTarget({
   const mpGrowth = growth ? 140 : 0;
   const mpCloseUp = closeUp ? 45 : 0;
 
-    return mpMaintenance + mpLactation + mpPreg + mpGrowth + mpCloseUp;
+  return mpMaintenance + mpPreg + mpGrowth + mpCloseUp;
 }
 // Operational CP reference only
 function computeCPReferencePct({ species, milkKg, breed, stage }){
@@ -2331,6 +2337,7 @@ dmi = clamp(dmi, Math.max(9, bw * 0.0175), Math.max(24, bw * 0.036));
 const mpTargetG = computeBuffaloOperationalMPTarget({
   bodyWeight: bw,
   milkKg: milk,
+  fatPct,
   proteinPct,
   pregDays,
   closeUp,
