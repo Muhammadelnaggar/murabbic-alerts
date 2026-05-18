@@ -1943,8 +1943,7 @@ async function loadSpeciesFromAnimals(){
     console.warn(e);
   }
 }
-  if ((qp.get('earlyDry')||'') === '1') ctxEarlyDry.checked = true;
-  if ((qp.get('closeUp') ||'') === '1') ctxCloseUp.checked  = true;
+ 
 
   // ===== مكتبة خامات مصر من Firestore (لا علاقة ببقر/جاموس) =====
  const { db, auth } = await import('/js/firebase-config.js');
@@ -2586,18 +2585,36 @@ try{
   concKgInput.addEventListener('input', recalc);
 
   function getGestLen(){ return (ctxSpecies?.value==='جاموس' ? 310 : 280); }
-  function applyDCCRules(){
-    const dcc = parseInt(ctxDCC?.value);
-    const GL = getGestLen();
-    if (!isNaN(dcc)){
-      const dtc = GL - dcc;
-      if (dtcVal) dtcVal.textContent = isFinite(dtc)? String(dtc) : '—';
-      ctxEarlyDry.checked = (dcc >= (GL - 60));
-      ctxCloseUp.checked  = (dcc >= (GL - 21));
-    } else {
-      if (dtcVal) dtcVal.textContent = '—';
+function applyDCCRules(){
+  const dcc = parseInt(ctxDCC?.value);
+  const GL = getGestLen();
+
+  if (!isNaN(dcc)){
+    const dtc = GL - dcc;
+    if (dtcVal) dtcVal.textContent = isFinite(dtc) ? String(dtc) : '—';
+  } else {
+    if (dtcVal) dtcVal.textContent = '—';
+  }
+
+  const p = qp();
+  const mode = String(p.get('mbkMode') || '').trim().toLowerCase();
+  const nums = parseNumbersList();
+  const isRealGroup = mode === 'group' || nums.length > 1;
+
+  const loaded = window.mbkNutrition?.loadedAnimalContext;
+
+  if (!isRealGroup && loaded && loaded.source === 'firestore_animal_context') {
+    if (ctxEarlyDry) {
+      ctxEarlyDry.checked = !!loaded.earlyDry;
+      ctxEarlyDry.value = loaded.earlyDry ? '1' : '';
+    }
+
+    if (ctxCloseUp) {
+      ctxCloseUp.checked = !!loaded.closeUp;
+      ctxCloseUp.value = loaded.closeUp ? '1' : '';
     }
   }
+}
   ctxDCC?.addEventListener('input', applyDCCRules);
   ctxSpecies?.addEventListener('change', applyDCCRules);
   applyDCCRules();
