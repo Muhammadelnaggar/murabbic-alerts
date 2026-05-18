@@ -2888,7 +2888,55 @@ function buildGaugeSvg(kind, current, target, state){
   let zones = [];
   let tickPos = null;
   let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
+    if (kind === 'dcad') {
+    const layer =
+      state?.speciesLayer ||
+      state?.dcadLayer ||
+      state?.model?.interpretation?.speciesLayer ||
+      '';
 
+    const isBuffaloDcad = /buffalo|جاموس/i.test(String(layer || ''));
+
+    const minOk = isBuffaloDcad ? -100 : -50;
+    const maxOk = isBuffaloDcad ? -50 : -10;
+
+    const scaleMin = isBuffaloDcad ? -150 : -80;
+    const scaleMax = 200;
+
+    const toPos = (v) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return 0;
+      return Math.max(0, Math.min(1, (n - scaleMin) / (scaleMax - scaleMin)));
+    };
+
+    const currentPos = toPos(c);
+    const minOkPos = toPos(minOk);
+    const maxOkPos = toPos(maxOk);
+
+    zones = [
+      { from: 0, to: minOkPos, color: yellow },
+      { from: minOkPos, to: maxOkPos, color: green },
+      { from: maxOkPos, to: 1, color: red }
+    ];
+
+    pos = currentPos;
+    tickPos = maxOkPos;
+    tickLabel = 'الحد';
+
+    return `
+      <svg width="160" height="112" viewBox="0 0 160 112" aria-hidden="true">
+        ${zones.map(z => `<path d="${arcPath(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="${stroke}" stroke-linecap="butt"/>`).join('')}
+
+        <path d="${arcPath(cx, cy, r, tickPos, tickPos + 0.001)}" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+
+        <line x1="${cx}" y1="${cy}" x2="${gaugePoint(cx, cy, r - 9, pos).x}" y2="${gaugePoint(cx, cy, r - 9, pos).y}" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="${cx}" cy="${cy}" r="7" fill="${ink}"/>
+        <circle cx="${cx}" cy="${cy}" r="3" fill="#fff"/>
+
+        <text x="${gaugePoint(cx, cy, r, tickPos).x}" y="${gaugePoint(cx, cy, r, tickPos).y - 7}" text-anchor="middle" font-size="10" font-weight="800" fill="#334155">${tickLabel}</text>
+      </svg>
+    `;
+  }
   if (!valid) {
     zones = [{ from: 0, to: 1, color: gray }];
   }
@@ -3037,8 +3085,8 @@ function renderGaugeRows(cards){
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
     { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'احتياجات الألياف NDF',            unit:'%',       kind:'target'  },
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
- { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' },
-{ key:'dcad',   label:'DCAD انتظار الولادة',    cardKey:'dcad',                              unit:'mEq/kg DM',                          kind:'dcad'    }
+    { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' },
+    { key:'dcad',   label:'DCAD انتظار الولادة',    cardKey:'dcad',                              unit:'mEq/kg DM',                          kind:'dcad'    }
 ];
 
 const currentSpeciesForGauge =
@@ -3107,7 +3155,12 @@ const rows = defs.map(def => {
             <div style="font-size:15px;font-weight:800;color:#0f172a">${dcadCard.value || '—'}</div>
           </div>
 
-          <div style="display:flex;justify-content:center">${buildGaugeSvg('ceiling', current, target, gaugeState)}</div>
+         <div style="display:flex;justify-content:center">${
+  buildGaugeSvg('dcad', current, target, {
+    ...gaugeState,
+    speciesLayer: dcadCard?.model?.interpretation?.speciesLayer
+  })
+}</div>
 
           <div style="text-align:left">
             <div style="font-size:11px;color:#64748b">الحد</div>
@@ -3163,7 +3216,17 @@ const state = gaugeStatus(def.kind, current, target);
             <div style="font-size:15px;font-weight:800;color:#0f172a">${currentCard.value || '—'}</div>
           </div>
 
-          <div style="display:flex;justify-content:center">${buildGaugeSvg(def.kind, current, target, gaugeState)}</div>
+         <div style="display:flex;justify-content:center">${
+  buildGaugeSvg(
+    def.key === 'dcad' ? 'dcad' : def.kind,
+    current,
+    target,
+    {
+      ...gaugeState,
+      speciesLayer: quickCardByKey('dcad')?.model?.interpretation?.speciesLayer
+    }
+  )
+}</div>
 
           <div style="text-align:left">
             <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : 'الاحتياج'}</div>
