@@ -3259,7 +3259,7 @@ if (adv && adv.style.display === "block") {
   const cards = Array.isArray(P.advancedCards) ? P.advancedCards : [];
   adv.innerHTML = renderGaugeRows(cards);
 }
-}
+
   try { window.enhanceNutritionPanels?.(); } catch(_) {}
 };
   window.render = window.renderNutritionPanels;
