@@ -195,21 +195,51 @@ function getFrameGainKgDayInput(){
 function buildNutritionContextForRequest(){
   const ctx = readContext();
 
+  const p = qp();
+  const mode = String(p.get('mbkMode') || '').trim().toLowerCase();
+  const nums = parseNumbersList();
+
+  const isRealGroup =
+    mode === 'group' ||
+    nums.length > 1;
+
   const groupCtx =
+    isRealGroup &&
     window.mbkNutrition?.groupContext &&
     typeof window.mbkNutrition.groupContext === 'object'
       ? window.mbkNutrition.groupContext
       : {};
 
-  return {
+  const loadedAnimalCtx =
+    !isRealGroup &&
+    window.mbkNutrition?.loadedAnimalContext &&
+    typeof window.mbkNutrition.loadedAnimalContext === 'object'
+      ? window.mbkNutrition.loadedAnimalContext
+      : {};
+
+  const out = {
     ...ctx,
     ...groupCtx,
+    ...loadedAnimalCtx,
 
     frameGainKgDay:
       Number.isFinite(Number(ctx?.frameGainKgDay)) && Number(ctx.frameGainKgDay) > 0
         ? Number(ctx.frameGainKgDay)
         : getFrameGainKgDayInput()
   };
+
+  if (!isRealGroup) {
+    delete out.groupMode;
+    delete out.groupType;
+    delete out.groupContextSource;
+    delete out.headCount;
+    delete out.avgAgeMonths;
+    delete out.firstParityPct;
+    delete out.avgParity;
+    delete out.daysInMilkSpread;
+  }
+
+  return out;
 }
 async function fetchTargets(ctx) {
 const _ctxRaw = ctx || buildNutritionContextForRequest();
@@ -770,8 +800,6 @@ function setHiddenCtxFromQuery(){
   setVal('ctxParity', p.get('parity'));
   setVal('ctxDietNDFPct', p.get('dietNDFPct'));
 
-  setChk('ctxEarlyDry', p.get('earlyDry'));
-  setChk('ctxCloseUp', p.get('closeUp'));
 }
 function normalizeSpecies(raw){
   const s = String(raw || '').trim();
@@ -1199,6 +1227,22 @@ if (closeUpEl) {
 
 setElText('ctxEarlyDry_txt', isEarlyDryFromAnimal ? 'نعم' : 'لا');
 setElText('ctxCloseUp_txt', isCloseUpFromAnimal ? 'نعم' : 'لا');
+  window.mbkNutrition = window.mbkNutrition || {};
+window.mbkNutrition.loadedAnimalContext = {
+  mode: 'animal',
+  animalNumber: String(numberStr || '').trim(),
+  species,
+  breed: String(animal?.breed || '').trim() || null,
+  daysInMilk: dim != null ? Math.round(dim) : null,
+  pregnancyStatus: preg || null,
+  pregnancyDays: dcc != null ? Math.round(dcc) : null,
+  daysToCalving: daysToCalvingCalc != null ? Math.round(daysToCalvingCalc) : null,
+  earlyDry: isEarlyDryFromAnimal,
+  closeUp: isCloseUpFromAnimal,
+  productionStatus: animal?.productionStatus || null,
+  reproductiveStatus: animal?.reproductiveStatus || null,
+  source: 'firestore_animal_context'
+};
 // متوسط اللبن (آخر 7 أيام) — جرّب string ثم number (لأن animalNumber قد يُخزن كنص أو رقم)
   let avgRes = await fetchAvgMilkKgFor(fs, db, uid, String(numberStr), eventDate, 7);
   if((avgRes?.avg==null) && String(numberStr).trim()!==''){
@@ -3088,12 +3132,15 @@ window.renderNutritionPanels = function renderNutritionPanels(){
 
 const n = $("nutritionKPIs");
 if(n){
+  const dcadCard = panelByKey(P.analysisCards, 'dcad');
+
   const items = [
     ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
     ["البروتين الخام CP", fmt($("cpPctTotal")?.textContent, "%")],
     ["البروتين الممثل MP", fmt($("mpSupplyG")?.textContent, " جم/يوم")],
-    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
+    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")],
+    ...(dcadCard ? [[dcadCard.title || "DCAD انتظار الولادة", dcadCard.value || "—"]] : [])
   ];
   n.innerHTML = items.map(([k,v])=>{
     let st = {sym:"—", color:"#64748b"};
