@@ -2371,7 +2371,10 @@ const tdnTargetKg =
 // CP g/day = 5.43 × BW^0.75 + 90.3 × FCM6
 const cpTargetG =
   (5.43 * bw075) + (90.3 * fcm6);
-
+const cpTargetPctOnTargetDmi =
+  dmi > 0
+    ? (cpTargetG / (dmi * 10))
+    : null;
 // SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
 // DCP g/day = 3.14 × BW^0.75 + 55.2 × FCM6
 const dcpTargetG =
@@ -2437,9 +2440,11 @@ buffaloRequirementModel: {
   nel: round(nelTotal),
   nelTarget: round(nelTotal),
   mpTargetG: round(mpTargetG, 0),
-  cpReferencePct: round(cpReferencePct),
-  cpTarget: round(cpReferencePct),
-  cpTargetG: round(cpTargetG, 0),
+cpReferencePct: round(cpReferencePct),
+cpTarget: round(cpTargetPctOnTargetDmi),
+cpTargetG: round(cpTargetG, 0),
+cpTargetPctOnTargetDmi: round(cpTargetPctOnTargetDmi),
+proteinTargetInterpretation: 'CP target is calculated as g/day from buffalo equation, then expressed as % of target DMI. UI judgement should compare CP supply primarily against cpTargetG when available.',
   proteinSystem: 'MP',
   ndfTarget,
   forageNDFMin,
