@@ -1996,34 +1996,61 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 
   const dcadValue = Number(dcad?.dcadMeqKgDM);
 
+  const isBuffaloForDcad =
+    /جاموس|buffalo/i.test(String(
+      context?.species ||
+      context?.animalType ||
+      context?.kind ||
+      dcad?.species ||
+      ''
+    ));
+
   let dcadCard = null;
 
   if (isCloseUpContext && Number.isFinite(dcadValue)) {
+    const lowLimit  = isBuffaloForDcad ? -100 : -50;
+    const highLimit = isBuffaloForDcad ? -50  : -10;
+
     let dcadStatus = 'good';
     let dcadText = 'مناسب';
 
-    if (dcadValue > 200) {
+    if (dcadValue > highLimit) {
       dcadStatus = 'warn';
-      dcadText = 'موجب مرتفع';
-    } else if (dcadValue < -100) {
+      dcadText = 'أعلى من المطلوب';
+    } else if (dcadValue < lowLimit) {
       dcadStatus = 'warn';
-      dcadText = 'منخفض جدًا';
+      dcadText = 'أقل من المطلوب';
     }
+
+    const layerName = isBuffaloForDcad ? 'جاموس' : 'أبقار';
+    const rangeText = `${lowLimit} إلى ${highLimit} mEq/kg DM`;
 
     dcadCard = {
       key: 'dcad',
-      title: 'DCAD انتظار الولادة',
+      title: `DCAD انتظار الولادة — ${layerName}`,
       value: `${dcadValue} mEq/kg DM`,
       actual: dcadValue,
-      target: 200,
+      target: highLimit,
       targetText:
-        dcadValue > 200
-          ? 'مربيك: DCAD موجب مرتفع لانتظار الولادة. راجع البوتاسيوم والخشن عالي K، واضبط الأملاح الأنيونية تحت إشراف فني.'
-          : dcadValue < -100
-            ? 'مربيك: DCAD منخفض جدًا. راجع الاستساغة والأملاح الأنيونية ولا تخفضه أكثر بدون متابعة فنية.'
-            : 'مربيك: DCAD داخل نطاق مقبول مبدئيًا لانتظار الولادة.',
+        dcadStatus === 'good'
+          ? `مربيك: DCAD مناسب لمرحلة انتظار الولادة (${rangeText}).`
+          : dcadValue > highLimit
+            ? `مربيك: DCAD أعلى من نطاق انتظار الولادة المطلوب (${rangeText}). راجع البوتاسيوم والصوديوم والخشن عالي K، واضبط الأملاح الأنيونية تحت إشراف فني.`
+            : `مربيك: DCAD أقل من نطاق انتظار الولادة المطلوب (${rangeText}). راجع الاستساغة ومأكول المادة الجافة ولا تخفضه أكثر بدون متابعة فنية.`,
       status: dcadStatus,
-      model: dcad
+      model: {
+        ...dcad,
+        interpretation: {
+          speciesLayer: isBuffaloForDcad ? 'buffalo' : 'cattle',
+          rangeMin: lowLimit,
+          rangeMax: highLimit,
+          status: dcadStatus,
+          label: dcadText,
+          sourceBasis: isBuffaloForDcad
+            ? 'MURABBIK_BUFFALO_CLOSEUP_DCAD_RANGE_USER_APPROVED'
+            : 'MURABBIK_CATTLE_CLOSEUP_DCAD_RANGE_USER_APPROVED'
+        }
+      }
     };
   }
     const isBuffalo =
