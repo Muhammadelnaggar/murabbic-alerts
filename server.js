@@ -5,7 +5,7 @@ const fs      = require('fs');
 const express = require('express');
 const cors    = require('cors');
 const admin   = require('firebase-admin');
-const { computeTargets } = require('./server/nutrition-engine.js');
+const { computeTargets, getStandardWeight } = require('./server/nutrition-engine.js');
 const { analyzeRation } = require('./server/ration-engine.js');
 const EVENT_SYNONYMS = {
   insemination: ['insemination', 'تلقيح'],
@@ -479,10 +479,14 @@ function normalizeNutritionContext(ctx = {}) {
   if (/buffalo|جاموس/i.test(speciesRaw)) species = 'جاموس';
 
   return cleanObj({
-    group: ctx.group || null,
+     group: ctx.group || null,
+    groupMode: ctx.groupMode || null,
+    groupType: ctx.groupType || null,
+    groupContextSource: ctx.groupContextSource || null,
+    headCount: toNumOrNull(ctx.headCount),
+
     species,
     breed: ctx.breed || null,
-
     daysInMilk: toNumOrNull(ctx.daysInMilk),
     avgMilkKg: toNumOrNull(ctx.avgMilkKg),
 
@@ -591,8 +595,11 @@ targets: {
       milkRevenue: toNumOrNull(a?.economics?.milkRevenue),
       milkMargin: toNumOrNull(a?.economics?.milkMargin)
     },
-       inputs: {
+             inputs: {
       bodyWeightKgUsed: toNumOrNull(a?.inputs?.bodyWeightKgUsed),
+      bodyWeightSource: a?.inputs?.bodyWeightSource || null,
+      bcsSource: a?.inputs?.bcsSource || null,
+      representativeWarning: a?.inputs?.representativeWarning || null,
       milkFatPctUsed: toNumOrNull(a?.inputs?.milkFatPctUsed),
       milkProteinPctUsed: toNumOrNull(a?.inputs?.milkProteinPctUsed),
       lactationNumberUsed: toNumOrNull(a?.inputs?.lactationNumberUsed),
@@ -1030,12 +1037,35 @@ function applyBuffaloNutritionRules(targetsCore = {}, context = {}) {
 function deriveNutritionRuntimeContext(context = {}) {
   const breedDefaults = getBreedNutritionDefaults(context.species, context.breed);
 
+  const isGroupContext =
+    String(context.groupMode || '').toLowerCase() === 'group' ||
+    Number(context.headCount || 0) > 1 ||
+    String(context.groupContextSource || '').trim() !== '';
+
+  const standardBodyWeightKg = getStandardWeight(context.species, context.breed);
+
+  const hasUserBodyWeight =
+    Number.isFinite(Number(context.bodyWeightKg)) ||
+    Number.isFinite(Number(context.bodyWeight));
+
+  const hasGroupBodyWeight =
+    Number.isFinite(Number(context.groupBodyWeightKg));
+
   const bodyWeightKgUsed = pickFirstFinite(
     context.bodyWeightKg,
+    context.bodyWeight,
     context.cameraWeightKg,
     context.groupBodyWeightKg,
+    standardBodyWeightKg,
     breedDefaults.bodyWeightKg
   );
+
+  const bodyWeightSource =
+    hasUserBodyWeight ? 'user_body_weight' :
+    Number.isFinite(Number(context.cameraWeightKg)) ? 'camera_weight' :
+    hasGroupBodyWeight ? 'group_representative_body_weight_input' :
+    Number.isFinite(Number(standardBodyWeightKg)) ? 'standard_weight_fallback' :
+    'breed_default_fallback';
 
   const milkFatPctUsed = pickFirstFinite(
     context.milkFatPct,
@@ -1056,14 +1086,33 @@ function deriveNutritionRuntimeContext(context = {}) {
     context.thi
   );
 
+  const hasBcsInput =
+    Number.isFinite(Number(context.bcs)) ||
+    Number.isFinite(Number(context.groupBcs));
+
   const bcsUsed = pickFirstFinite(
     context.bcs,
-    context.groupBcs
+    context.groupBcs,
+    isGroupContext ? 3.0 : null
   );
+
+  const bcsSource =
+    Number.isFinite(Number(context.bcs)) ? 'user_bcs' :
+    Number.isFinite(Number(context.groupBcs)) ? 'group_representative_bcs_input' :
+    isGroupContext ? 'standard_bcs_fallback' :
+    'not_available';
+
+  const representativeWarning =
+    isGroupContext && (!hasUserBodyWeight && !hasGroupBodyWeight || !hasBcsInput)
+      ? 'تم استخدام وزن/BCS قياسي للمجموعة. إدخال وزن وBCS ممثلين يعطي تحليلًا أدق.'
+      : null;
 
   return {
     breedDefaults,
     bodyWeightKgUsed,
+    bodyWeightSource,
+    bcsSource,
+    representativeWarning,
     milkFatPctUsed,
     milkProteinPctUsed,
     lactationNumberUsed,
@@ -1630,14 +1679,16 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
       milkRevenue,
       milkMargin
     },
-       inputs: {
+             inputs: {
       bodyWeightKgUsed: runtimeCtx.bodyWeightKgUsed,
+      bodyWeightSource: runtimeCtx.bodyWeightSource,
+      bcsSource: runtimeCtx.bcsSource,
+      representativeWarning: runtimeCtx.representativeWarning,
       milkFatPctUsed: runtimeCtx.milkFatPctUsed,
       milkProteinPctUsed: runtimeCtx.milkProteinPctUsed,
       lactationNumberUsed: runtimeCtx.lactationNumberUsed,
       thiUsed: runtimeCtx.thiUsed,
-      bcsUsed: runtimeCtx.bcsUsed,
-      
+      bcsUsed: runtimeCtx.bcsUsed
     }
   });
 }
