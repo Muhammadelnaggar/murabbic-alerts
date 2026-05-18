@@ -2787,5 +2787,6 @@ return computeCow(common);
 }
 
 module.exports = {
-  computeTargets
+  computeTargets,
+  getStandardWeight
 };
