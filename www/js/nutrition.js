@@ -3037,9 +3037,11 @@ function renderGaugeRows(cards){
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
     { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'احتياجات الألياف NDF',            unit:'%',       kind:'target'  },
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
-    { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' }
-  ];
-    const currentSpeciesForGauge =
+ { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' },
+{ key:'dcad',   label:'DCAD انتظار الولادة',    cardKey:'dcad',                              unit:'mEq/kg DM',                          kind:'dcad'    }
+];
+
+const currentSpeciesForGauge =
     document.getElementById('ctxSpecies')?.value ||
     window.mbkNutrition?.serverViewModel?.analysis?.context?.species ||
     window.mbkNutrition?.serverViewModel?.targets?.species ||
@@ -3063,11 +3065,65 @@ const smartHint = (key, fallback = '') => {
   const parts = txt.split('—').map(s => s.trim()).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : txt;
 };
-  const rows = defs.map(def => {
-    const currentCard = findCard(cards, def.current);
-    const targetCard = findCard(cards, def.target);
+const rows = defs.map(def => {
+  if (def.key === 'dcad') {
+    const dcadCard = quickCardByKey('dcad');
+    if (!dcadCard) return '';
 
-    if (!currentCard || !targetCard) return '';
+    const current = Number.isFinite(Number(dcadCard.actual))
+      ? Number(dcadCard.actual)
+      : parseMetricNumber(dcadCard.value);
+
+    const target = Number.isFinite(Number(dcadCard.target))
+      ? Number(dcadCard.target)
+      : 200;
+
+    const isWarn =
+      dcadCard.status === 'warn' ||
+      dcadCard.status === 'danger';
+
+    const state = {
+      label: isWarn ? 'تنبيه' : 'مقبول',
+      color: isWarn ? '#b91c1c' : '#0b7f47'
+    };
+
+    const gaugeState = {
+      ...state,
+      metricKey: 'dcad'
+    };
+
+    const comment = String(dcadCard.targetText || '').trim();
+
+    return `
+      <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+          <div style="font-weight:800;font-size:15px;color:#0f172a">${def.label}</div>
+          <span style="font-size:12px;font-weight:800;color:${state.color};background:#f8fafc;border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px">${state.label}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:8px">
+          <div style="text-align:right">
+            <div style="font-size:11px;color:#64748b">العليقة الحالية</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${dcadCard.value || '—'}</div>
+          </div>
+
+          <div style="display:flex;justify-content:center">${buildGaugeSvg('ceiling', current, target, gaugeState)}</div>
+
+          <div style="text-align:left">
+            <div style="font-size:11px;color:#64748b">الحد</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${target} mEq/kg DM</div>
+          </div>
+        </div>
+
+        ${comment ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(15,23,42,.08)">${formatMurabbikComment(comment)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  const currentCard = findCard(cards, def.current);
+  const targetCard = findCard(cards, def.target);
+
+  if (!currentCard || !targetCard) return '';
 
 let current = parseMetricNumber(currentCard.value);
 let target = parseMetricNumber(targetCard.value);
@@ -3200,20 +3256,9 @@ return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div cl
 
 const adv = $("advancedKPIs");
 if (adv && adv.style.display === "block") {
-  const dcadCard = panelByKey(P.analysisCards, 'dcad');
-  const advCards = Array.isArray(P.advancedCards) ? [...P.advancedCards] : [];
-
-  if (dcadCard && !advCards.some(x => x?.key === 'dcad')) {
-    advCards.push({
-      key: 'dcad',
-      title: dcadCard.title || 'DCAD انتظار الولادة',
-      value: dcadCard.value || '—',
-      targetText: dcadCard.targetText || '',
-      status: dcadCard.status || 'good'
-    });
-  }
-
-  adv.innerHTML = renderGaugeRows(advCards);
+  const cards = Array.isArray(P.advancedCards) ? P.advancedCards : [];
+  adv.innerHTML = renderGaugeRows(cards);
+}
 }
   try { window.enhanceNutritionPanels?.(); } catch(_) {}
 };
