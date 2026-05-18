@@ -1981,6 +1981,51 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const nutrition = analysis?.nutrition || {};
   const targets = analysis?.targets || {};
   const economics = analysis?.economics || {};
+    const dcad = nutrition?.dcadModel || null;
+  const isCloseUpContext =
+    dcad?.closeUpContext === true ||
+    context?.closeUp === true ||
+    analysis?.targets?.category === 'close_up_mature_cow' ||
+    analysis?.targets?.category === 'close_up_buffalo' ||
+    /close|close_up|تحضير|انتظار/i.test(String(
+      context?.pregnancyStatus ||
+      context?.category ||
+      analysis?.targets?.category ||
+      ''
+    ));
+
+  const dcadValue = Number(dcad?.dcadMeqKgDM);
+
+  let dcadCard = null;
+
+  if (isCloseUpContext && Number.isFinite(dcadValue)) {
+    let dcadStatus = 'good';
+    let dcadText = 'مناسب';
+
+    if (dcadValue > 200) {
+      dcadStatus = 'warn';
+      dcadText = 'موجب مرتفع';
+    } else if (dcadValue < -100) {
+      dcadStatus = 'warn';
+      dcadText = 'منخفض جدًا';
+    }
+
+    dcadCard = {
+      key: 'dcad',
+      title: 'DCAD انتظار الولادة',
+      value: `${dcadValue} mEq/kg DM`,
+      actual: dcadValue,
+      target: 200,
+      targetText:
+        dcadValue > 200
+          ? 'مربيك: DCAD موجب مرتفع لانتظار الولادة. راجع البوتاسيوم والخشن عالي K، واضبط الأملاح الأنيونية تحت إشراف فني.'
+          : dcadValue < -100
+            ? 'مربيك: DCAD منخفض جدًا. راجع الاستساغة والأملاح الأنيونية ولا تخفضه أكثر بدون متابعة فنية.'
+            : 'مربيك: DCAD داخل نطاق مقبول مبدئيًا لانتظار الولادة.',
+      status: dcadStatus,
+      model: dcad
+    };
+  }
     const isBuffalo =
     /جاموس|buffalo/i.test(String(context?.species || context?.animalType || context?.kind || ''));
 
@@ -2355,7 +2400,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       status: nutrition.rumenStatus || null,
       model: rumenModel || null
     },
-
+        ...(dcadCard ? [dcadCard] : []),
     {
       key: 'priority',
       title: 'أولوية التعديل',
