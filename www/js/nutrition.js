@@ -1878,24 +1878,24 @@ let rationItems = window.rationItems;
   const concKgInput = document.getElementById('concKgInput');
 
   function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-  const qp = new URLSearchParams(location.search);
- const animalId =
-  qp.get('animalNumber') ||
-  qp.get('number') ||
-  qp.get('animalId') ||
+const urlParams = new URLSearchParams(location.search);
+const animalId =
+  urlParams.get('animalNumber') ||
+  urlParams.get('number') ||
+  urlParams.get('animalId') ||
   '';
-  const groupName = qp.get('group') || '';
-  const eventDate= qp.get('date') || todayLocal();
+const groupName = urlParams.get('group') || '';
+const eventDate = urlParams.get('date') || todayLocal();
 
   document.getElementById('animalInfo').textContent = (groupName || animalId || 'غير محدد');
   try{ document.getElementById('dateInfo').textContent = new Date(eventDate).toLocaleDateString('ar-EG'); }catch{ document.getElementById('dateInfo').textContent = eventDate; }
 
   // تعبئة سياق من الرابط كـ fallback فقط (لا تمسح سياق المجموعة بعد تحميله)
-  if (ctxDIM && !ctxDIM.value) ctxDIM.value = qp.get('dim') || '';
-  if (ctxSpecies && !ctxSpecies.value) ctxSpecies.value = qp.get('species') || '';
-  if (ctxAvgMilk && !ctxAvgMilk.value) ctxAvgMilk.value = qp.get('avgMilk') || '';
-  if (ctxDCC && !ctxDCC.value) ctxDCC.value = qp.get('dcc') || '';
-  if (ctxPreg && !ctxPreg.value) ctxPreg.value = qp.get('preg') || qp.get('pregnancy') || '';
+if (ctxDIM && !ctxDIM.value) ctxDIM.value = urlParams.get('dim') || '';
+if (ctxSpecies && !ctxSpecies.value) ctxSpecies.value = urlParams.get('species') || '';
+if (ctxAvgMilk && !ctxAvgMilk.value) ctxAvgMilk.value = urlParams.get('avgMilk') || '';
+if (ctxDCC && !ctxDCC.value) ctxDCC.value = urlParams.get('dcc') || '';
+if (ctxPreg && !ctxPreg.value) ctxPreg.value = urlParams.get('preg') || urlParams.get('pregnancy') || '';
   // ===== تحميل نوع الحيوان تلقائياً من animals =====
 async function loadSpeciesFromAnimals(){
   try{
@@ -2596,7 +2596,7 @@ function applyDCCRules(){
     if (dtcVal) dtcVal.textContent = '—';
   }
 
-  const p = qp();
+  const p = new URLSearchParams(window.location.search);
   const mode = String(p.get('mbkMode') || '').trim().toLowerCase();
   const nums = parseNumbersList();
   const isRealGroup = mode === 'group' || nums.length > 1;
