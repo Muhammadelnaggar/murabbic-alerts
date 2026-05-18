@@ -2888,7 +2888,7 @@ function buildGaugeSvg(kind, current, target, state){
   let zones = [];
   let tickPos = null;
   let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
-    if (kind === 'dcad') {
+  if (kind === 'dcad') {
     const layer =
       state?.speciesLayer ||
       state?.dcadLayer ||
@@ -2898,46 +2898,33 @@ function buildGaugeSvg(kind, current, target, state){
     const isBuffaloDcad = /buffalo|جاموس/i.test(String(layer || ''));
 
     const minOk = isBuffaloDcad ? -100 : -50;
-    const maxOk = isBuffaloDcad ? -50 : -10;
+    const maxOk = isBuffaloDcad ? -50  : -10;
 
-    const scaleMin = isBuffaloDcad ? -150 : -80;
-    const scaleMax = 200;
+    const scaleMin = isBuffaloDcad ? -130 : -70;
+    const scaleMax = isBuffaloDcad ? 40   : 80;
 
-    const toPos = (v) => {
+    const mapDcad = (v) => {
       const n = Number(v);
-      if (!Number.isFinite(n)) return 0;
-      return Math.max(0, Math.min(1, (n - scaleMin) / (scaleMax - scaleMin)));
+      if (!Number.isFinite(n) || scaleMax <= scaleMin) return 0.5;
+      return clamp01((n - scaleMin) / (scaleMax - scaleMin));
     };
 
-    const currentPos = toPos(c);
-    const minOkPos = toPos(minOk);
-    const maxOkPos = toPos(maxOk);
+    const minOkPos = mapDcad(minOk);
+    const maxOkPos = mapDcad(maxOk);
+
+    pos = mapDcad(c);
 
     zones = [
-      { from: 0, to: minOkPos, color: yellow },
+      { from: 0,        to: minOkPos, color: yellow },
       { from: minOkPos, to: maxOkPos, color: green },
-      { from: maxOkPos, to: 1, color: red }
+      { from: maxOkPos, to: 1,        color: red }
     ];
 
-    pos = currentPos;
     tickPos = maxOkPos;
     tickLabel = 'الحد';
-
-    return `
-      <svg width="160" height="112" viewBox="0 0 160 112" aria-hidden="true">
-        ${zones.map(z => `<path d="${arcPath(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="${stroke}" stroke-linecap="butt"/>`).join('')}
-
-        <path d="${arcPath(cx, cy, r, tickPos, tickPos + 0.001)}" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
-
-        <line x1="${cx}" y1="${cy}" x2="${gaugePoint(cx, cy, r - 9, pos).x}" y2="${gaugePoint(cx, cy, r - 9, pos).y}" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
-        <circle cx="${cx}" cy="${cy}" r="7" fill="${ink}"/>
-        <circle cx="${cx}" cy="${cy}" r="3" fill="#fff"/>
-
-        <text x="${gaugePoint(cx, cy, r, tickPos).x}" y="${gaugePoint(cx, cy, r, tickPos).y - 7}" text-anchor="middle" font-size="10" font-weight="800" fill="#334155">${tickLabel}</text>
-      </svg>
-    `;
   }
-  if (!valid) {
+
+  else if (!valid) {
     zones = [{ from: 0, to: 1, color: gray }];
   }
 
