@@ -636,7 +636,7 @@ if (mpCard?.balance != null) {
 }
 
  {
-  const advNelActual = panelByKey(P.advancedCards, 'nelActual');
+ const advNelActual = panelByKey(P.advancedCards, 'nelActual');
   if (advNelActual?.value) {
     const n = parseFloat(String(advNelActual.value).replace(/[^\d.\-]/g, ''));
     if (Number.isFinite(n)) setNum('nelActual', n, '', 2);
@@ -3147,70 +3147,13 @@ window.renderNutritionPanels = function renderNutritionPanels(){
     return {sym:"▲", color:"#f57c00"};
   };
 
+
 const n = $("nutritionKPIs");
 if(n){
-  const dcadCard = panelByKey(P.analysisCards, 'dcad');
+  const oldDcadBox = document.getElementById('nutritionDcadCard');
+  if (oldDcadBox) oldDcadBox.remove();
 
-  let dcadBox = document.getElementById('nutritionDcadCard');
-
-  if (!dcadBox) {
-    dcadBox = document.createElement('div');
-    dcadBox.id = 'nutritionDcadCard';
-    n.parentNode.insertBefore(dcadBox, n);
-  }
-
-  if (dcadCard) {
-    const isWarn = dcadCard.status === 'warn' || dcadCard.status === 'danger';
-
-    dcadBox.style.display = 'block';
-    dcadBox.style.margin = '0 0 12px';
-    dcadBox.style.padding = '14px 16px';
-    dcadBox.style.borderRadius = '18px';
-    dcadBox.style.border = isWarn ? '1px solid #fecaca' : '1px solid #bbf7d0';
-    dcadBox.style.background = isWarn ? '#fff1f2' : '#ecfdf3';
-    dcadBox.style.boxShadow = '0 8px 18px rgba(15,23,42,.06)';
-
-    dcadBox.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:13px;font-weight:900;color:#0f172a">
-            ${dcadCard.title || 'DCAD انتظار الولادة'}
-          </div>
-          <div style="font-size:11px;font-weight:800;color:#64748b;margin-top:2px">
-            يظهر تلقائيًا في حالات انتظار الولادة فقط
-          </div>
-        </div>
-
-        <div style="
-          font-size:18px;
-          font-weight:1000;
-          color:${isWarn ? '#b91c1c' : '#047857'};
-          background:#fff;
-          border-radius:14px;
-          padding:8px 12px;
-          border:1px solid rgba(15,23,42,.08)
-        ">
-          ${dcadCard.value || '—'}
-        </div>
-      </div>
-
-      <div style="
-        margin-top:10px;
-        padding-top:10px;
-        border-top:1px solid rgba(15,23,42,.08);
-        font-size:12px;
-        font-weight:800;
-        line-height:1.7;
-        color:#334155
-      ">
-        ${dcadCard.targetText || ''}
-      </div>
-    `;
-  } else {
-    dcadBox.style.display = 'none';
-    dcadBox.innerHTML = '';
-  }
-
+  
   const items = [
     ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
@@ -3255,15 +3198,23 @@ return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div cl
     e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
   }
 
-  const adv = $("advancedKPIs");
+const adv = $("advancedKPIs");
 if (adv && adv.style.display === "block") {
-  const cards = Array.isArray(window.mbkNutrition?.serverViewModel?.panels?.advancedCards)
-    ? window.mbkNutrition.serverViewModel.panels.advancedCards
-    : [];
+  const dcadCard = panelByKey(P.analysisCards, 'dcad');
+  const advCards = Array.isArray(P.advancedCards) ? [...P.advancedCards] : [];
 
-  adv.innerHTML = renderGaugeRows(cards);
+  if (dcadCard && !advCards.some(x => x?.key === 'dcad')) {
+    advCards.push({
+      key: 'dcad',
+      title: dcadCard.title || 'DCAD انتظار الولادة',
+      value: dcadCard.value || '—',
+      targetText: dcadCard.targetText || '',
+      status: dcadCard.status || 'good'
+    });
+  }
+
+  adv.innerHTML = renderGaugeRows(advCards);
 }
-
   try { window.enhanceNutritionPanels?.(); } catch(_) {}
 };
   window.render = window.renderNutritionPanels;
