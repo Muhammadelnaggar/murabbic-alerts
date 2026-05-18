@@ -2147,10 +2147,33 @@ function buildNutritionPanels(analysis = {}, context = {}) {
   const mpActual = num(nutrition.mpSupplyG, 0);
   const mpTarget = num(targets.mpTargetG, 0);
 
-  const cpActual = num(nutrition.cpPctTotal, 1);
-  const cpTarget = num(targets.cpTarget, 1);
+const cpActual = num(nutrition.cpPctTotal, 1);
+const cpTarget = num(targets.cpTarget, 1);
 
-  const starchActual = num(nutrition.starchPctActual, 1);
+const cpIntakeG =
+  Number.isFinite(Number(totals?.dmKg)) &&
+  Number.isFinite(Number(nutrition?.cpPctTotal))
+    ? Number(totals.dmKg) * (Number(nutrition.cpPctTotal) / 100) * 1000
+    : null;
+
+const cpTargetG =
+  Number.isFinite(Number(targets?.proteinRequirementModel?.cpTargetG))
+    ? Number(targets.proteinRequirementModel.cpTargetG)
+    : (
+        Number.isFinite(Number(targets?.cpTargetG))
+          ? Number(targets.cpTargetG)
+          : null
+      );
+
+const buffaloCpState =
+  isBuffalo &&
+  Number.isFinite(Number(cpIntakeG)) &&
+  Number.isFinite(Number(cpTargetG)) &&
+  Number(cpTargetG) > 0
+    ? stateFromBalance(cpIntakeG, cpTargetG, 5)
+    : null;
+
+const starchActual = num(nutrition.starchPctActual, 1);
   const starchMax = num(targets.starchMax, 1);
 
   const fatActual = num(nutrition.fatPctActual, 1);
@@ -2180,7 +2203,7 @@ function buildNutritionPanels(analysis = {}, context = {}) {
     Number.isFinite(Number(fatActual)) &&
     Number(fatActual) > fatMax;
 
-  const cpState = stateFromBalance(cpActual, cpTarget, 5);
+  const cpState = buffaloCpState || stateFromBalance(cpActual, cpTarget, 5);
   const ndfState = stateFromBalance(nutrition.ndfPctActual, targets.ndfTarget, 5);
 
   let dmHint =
@@ -2249,12 +2272,24 @@ function buildNutritionPanels(analysis = {}, context = {}) {
           ? 'مربيك: البروتين الممثل أقل من احتياج الجاموس. حسّن جودة البروتين مع ضبط الطاقة.'
           : 'مربيك: البروتين الممثل أعلى من احتياج الجاموس. راجع التكلفة والهدر البروتيني.';
 
-    cpHint =
-      cpState === 'good'
-        ? 'مربيك: البروتين الخام مناسب كمؤشر للجاموس؛ القرار الأهم من البروتين الممثل والطاقة.'
-        : Number(cpActual) < Number(cpTarget)
-          ? 'مربيك: البروتين الخام منخفض كمؤشر للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
-          : 'مربيك: البروتين الخام أعلى من احتياج الجاموس. قلّل الهدر وراجع التكلفة.';
+cpHint =
+  buffaloCpState === 'good'
+    ? 'مربيك: البروتين الخام قريب من المطلوب للجاموس؛ القرار الأهم الآن من البروتين الممثل والطاقة.'
+    : (
+        buffaloCpState === 'warn'
+          ? 'مربيك: البروتين الخام أقل من المطلوب للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
+          : (
+              buffaloCpState === 'watch'
+                ? 'مربيك: البروتين الخام أعلى من المطلوب للجاموس، لكن لا تخفضه إذا كان البروتين الممثل أو الطاقة ناقصين.'
+                : (
+                    cpState === 'good'
+                      ? 'مربيك: البروتين الخام مناسب كمؤشر للجاموس؛ القرار الأهم من البروتين الممثل والطاقة.'
+                      : Number(cpActual) < Number(cpTarget)
+                        ? 'مربيك: البروتين الخام منخفض كمؤشر للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
+                        : 'مربيك: البروتين الخام أعلى من احتياج الجاموس، لكن لا تخفضه إذا كان البروتين الممثل أو الطاقة ناقصين.'
+                  )
+            )
+      );
 
    ndfHint =
   Number(nutrition.ndfPctActual) > Number(targets.ndfTarget)
@@ -2420,15 +2455,20 @@ function buildNutritionPanels(analysis = {}, context = {}) {
       targetText: `${txt(mpActual, 'جم/يوم', 0)} / ${txt(mpTarget, 'جم/يوم', 0)} — ${mpHint}`,
       status: uiStatus(mpState)
     },
-          {
-      key: 'cp',
-      title: 'البروتين الخام',
-      value: pctTxt(cpActual, 1),
-      actual: cpActual,
-      target: cpTarget,
-      targetText: `${pctTxt(cpActual, 1)} / ${pctTxt(cpTarget, 1)} — ${cpHint}`,
-      status: uiStatus(cpState)
-    },
+        {
+  key: 'cp',
+  title: 'البروتين الخام',
+  value: pctTxt(cpActual, 1),
+  actual: cpActual,
+  target: cpTarget,
+  targetText:
+    isBuffalo &&
+    Number.isFinite(Number(cpIntakeG)) &&
+    Number.isFinite(Number(cpTargetG))
+      ? `${pctTxt(cpActual, 1)} — ${txt(cpIntakeG, 'جم/يوم', 0)} / ${txt(cpTargetG, 'جم/يوم', 0)} — ${cpHint}`
+      : `${pctTxt(cpActual, 1)} / ${pctTxt(cpTarget, 1)} — ${cpHint}`,
+  status: uiStatus(cpState)
+},
 
     {
       key: 'ndf',
