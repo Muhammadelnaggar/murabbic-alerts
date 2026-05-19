@@ -478,8 +478,22 @@ function normalizeNutritionContext(ctx = {}) {
   if (/cow|بقر|بقرة|أبقار/i.test(speciesRaw)) species = 'بقر';
   if (/buffalo|جاموس/i.test(speciesRaw)) species = 'جاموس';
 
+  const groupName = String(
+    ctx.groupName ||
+    ctx.group ||
+    ctx.groupLabel ||
+    ''
+  ).trim() || null;
+
+  const groupNumbers = Array.isArray(ctx.groupNumbers)
+    ? ctx.groupNumbers.map(x => String(x || '').trim()).filter(Boolean)
+    : null;
+
   return cleanObj({
-     group: ctx.group || null,
+    groupName,
+    group: groupName,
+    groupLabel: String(ctx.groupLabel || groupName || '').trim() || null,
+    groupNumbers,
     groupMode: ctx.groupMode || null,
     groupType: ctx.groupType || null,
     groupContextSource: ctx.groupContextSource || null,
@@ -3040,6 +3054,221 @@ if (!isGroup && db) {
     return res.status(500).json({ ok:false, error:'nutrition_save_failed', message: e.message || String(e) });
   }
 });
+
+// ============================================================
+//                  API: NUTRITION REPORTS
+// ============================================================
+function eventCreatedMs(e = {}) {
+  const c = e.createdAt;
+  try {
+    if (c && typeof c.toMillis === 'function') return c.toMillis();
+    if (c && typeof c.toDate === 'function') return c.toDate().getTime();
+  } catch (_) {}
+  if (c && Number.isFinite(Number(c._seconds))) return Number(c._seconds) * 1000;
+  if (c && Number.isFinite(Number(c.seconds))) return Number(c.seconds) * 1000;
+  if (Number.isFinite(Number(e.ts))) return Number(e.ts);
+  const d = toDate(e.eventDate || e.date);
+  return d ? d.getTime() : 0;
+}
+
+function normReportText(v = '') {
+  return String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/\s+/g, ' ');
+}
+
+function nutritionGroupNameFromEvent(e = {}) {
+  const ctx = e?.nutrition?.context || {};
+  return String(
+    ctx.groupName ||
+    ctx.group ||
+    ctx.groupLabel ||
+    e.groupName ||
+    ''
+  ).trim();
+}
+
+function nutritionStageFromEvent(e = {}) {
+  const ctx = e?.nutrition?.context || {};
+  const targets = e?.nutrition?.analysis?.targets || {};
+  const groupType = String(ctx.groupType || '').trim().toLowerCase();
+  const avgMilk = Number(ctx.avgMilkKg || e?.nutrition?.analysis?.inputs?.avgMilkKg || 0);
+
+  if (ctx.closeUp || groupType.includes('close')) return 'close_up';
+  if (ctx.earlyDry || groupType.includes('far') || groupType.includes('dry')) return 'far_dry';
+  if (avgMilk > 0 || groupType.includes('lact')) return 'lactating';
+
+  const chapterStage = String(targets?.chapter12EnergyModel?.stage || '').toLowerCase();
+  if (chapterStage.includes('close')) return 'close_up';
+  if (chapterStage.includes('far') || chapterStage.includes('dry')) return 'far_dry';
+
+  return 'unknown';
+}
+
+function nutritionSpeciesKeyFromEvent(e = {}) {
+  const s = String(e?.nutrition?.context?.species || '').trim().toLowerCase();
+  if (s.includes('جاموس') || s.includes('buffalo')) return 'buffalo';
+  if (s.includes('بقر') || s.includes('cow')) return 'cows';
+  return '';
+}
+
+function isNutritionSavedEvent(e = {}) {
+  const t = String(e.type || e.eventTypeNorm || '').trim().toLowerCase();
+  return t === 'nutrition' || t === 'nutrition_group';
+}
+
+async function fetchNutritionReportEvents(tenant, limit = 900) {
+  if (!db) return readJson(eventsPath, []).filter(e => belongs(e, tenant) || tenantKey(e.ownerUid) === tenantKey(tenant));
+
+  const byId = new Map();
+  async function pull(field) {
+    try {
+      const snap = await db.collection('events')
+        .where(field, '==', tenant)
+        .limit(limit)
+        .get();
+      snap.forEach(d => byId.set(d.id, { id: d.id, ...(d.data() || {}) }));
+    } catch (e) {
+      console.error('nutrition report pull failed:', field, e.message || e);
+    }
+  }
+
+  await pull('ownerUid');
+  await pull('userId');
+
+  return [...byId.values()];
+}
+
+function filterNutritionReportEvents(events, { type, stage, groupName } = {}) {
+  const typeKey = String(type || '').trim().toLowerCase();
+  const wantedSpecies = typeKey === 'buffalo' ? 'buffalo' : (typeKey === 'cows' ? 'cows' : '');
+  const wantedStage = String(stage || '').trim().toLowerCase();
+  const wantedGroup = normReportText(groupName || '');
+
+  return (events || [])
+    .filter(isNutritionSavedEvent)
+    .filter(e => e?.nutrition?.analysis && e?.nutrition?.context)
+    .filter(e => !wantedSpecies || nutritionSpeciesKeyFromEvent(e) === wantedSpecies)
+    .filter(e => !wantedStage || nutritionStageFromEvent(e) === wantedStage)
+    .filter(e => !wantedGroup || normReportText(nutritionGroupNameFromEvent(e)) === wantedGroup)
+    .sort((a, b) => eventCreatedMs(b) - eventCreatedMs(a));
+}
+
+function buildLactatingNutritionSummary(events = []) {
+  const latestByGroup = new Map();
+
+  for (const e of events) {
+    if (nutritionStageFromEvent(e) !== 'lactating') continue;
+    const name = nutritionGroupNameFromEvent(e) || `مجموعة ${e.groupSize || e?.nutrition?.context?.headCount || ''}`.trim();
+    const key = normReportText(name) || e.id || String(eventCreatedMs(e));
+    if (!latestByGroup.has(key)) latestByGroup.set(key, e);
+  }
+
+  const groups = [...latestByGroup.values()].map(e => {
+    const a = e.nutrition.analysis || {};
+    const ctx = e.nutrition.context || {};
+    const heads = Number(e.groupSize || ctx.headCount || 1) || 1;
+    const avgMilk = Number(ctx.avgMilkKg || 0) || 0;
+    const totalMilk = +(heads * avgMilk).toFixed(2);
+    const feedCostHead = Number(a?.totals?.totCost || 0) || 0;
+    const milkRevenueHead = Number(a?.economics?.milkRevenue || 0) || 0;
+    const marginHead = Number.isFinite(Number(a?.economics?.milkMargin))
+      ? Number(a.economics.milkMargin)
+      : (milkRevenueHead - feedCostHead);
+
+    return {
+      id: e.id || null,
+      groupName: nutritionGroupNameFromEvent(e) || null,
+      eventDate: e.eventDate || e.date || null,
+      headCount: heads,
+      avgMilkKg: avgMilk,
+      totalMilkKg: totalMilk,
+      feedCostPerHead: +feedCostHead.toFixed(2),
+      milkRevenuePerHead: +milkRevenueHead.toFixed(2),
+      marginPerHead: +marginHead.toFixed(2),
+      totalFeedCost: +(feedCostHead * heads).toFixed(2),
+      totalMilkRevenue: +(milkRevenueHead * heads).toFixed(2),
+      totalMargin: +(marginHead * heads).toFixed(2),
+      costPerKgMilk: Number(a?.economics?.costPerKgMilk || 0) || 0,
+      dmPerKgMilk: Number(a?.economics?.dmPerKgMilk || 0) || 0,
+      cpPctTotal: Number(a?.nutrition?.cpPctTotal || 0) || 0,
+      mpBalanceG: Number(a?.nutrition?.mpBalanceG || 0) || 0,
+      nelActual: Number(a?.nutrition?.nelActual || 0) || 0,
+      ndfPctActual: Number(a?.nutrition?.ndfPctActual || 0) || 0,
+      starchPctActual: Number(a?.nutrition?.starchPctActual || 0) || 0,
+      fatPctActual: Number(a?.nutrition?.fatPctActual || 0) || 0,
+      rumenStatus: a?.nutrition?.rumenStatus || null
+    };
+  });
+
+  const totals = groups.reduce((acc, g) => {
+    acc.headCount += Number(g.headCount || 0);
+    acc.totalMilkKg += Number(g.totalMilkKg || 0);
+    acc.totalFeedCost += Number(g.totalFeedCost || 0);
+    acc.totalMilkRevenue += Number(g.totalMilkRevenue || 0);
+    acc.totalMargin += Number(g.totalMargin || 0);
+    return acc;
+  }, { headCount: 0, totalMilkKg: 0, totalFeedCost: 0, totalMilkRevenue: 0, totalMargin: 0 });
+
+  totals.avgMilkKg = totals.headCount ? +(totals.totalMilkKg / totals.headCount).toFixed(2) : 0;
+  totals.costPerKgMilk = totals.totalMilkKg ? +(totals.totalFeedCost / totals.totalMilkKg).toFixed(2) : 0;
+  totals.marginPerHead = totals.headCount ? +(totals.totalMargin / totals.headCount).toFixed(2) : 0;
+
+  for (const k of Object.keys(totals)) totals[k] = +Number(totals[k] || 0).toFixed(2);
+
+  const weakest = [...groups].sort((a, b) => Number(a.marginPerHead || 0) - Number(b.marginPerHead || 0))[0] || null;
+  const best = [...groups].sort((a, b) => Number(b.marginPerHead || 0) - Number(a.marginPerHead || 0))[0] || null;
+
+  return { groups, totals, best, weakest };
+}
+
+app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
+  try {
+    const tenant = req.userId;
+    const scope = String(req.query.scope || 'group').trim();
+    const type = String(req.query.type || '').trim();
+    const stage = String(req.query.stage || '').trim();
+    const groupName = String(req.query.groupName || req.query.group || '').trim();
+
+    const events = await fetchNutritionReportEvents(tenant);
+    const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
+
+    if (scope === 'lactating_summary') {
+      const summary = buildLactatingNutritionSummary(filtered);
+      return res.json({ ok: true, scope, type: type || null, count: summary.groups.length, summary });
+    }
+
+    const event = filtered[0] || null;
+    if (!event) {
+      return res.status(404).json({
+        ok: false,
+        error: 'nutrition_report_not_found',
+        message: 'لا يوجد تحليل تغذية محفوظ مطابق للتقرير المطلوب'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      scope,
+      type: type || null,
+      stage: nutritionStageFromEvent(event),
+      groupName: nutritionGroupNameFromEvent(event) || null,
+      event
+    });
+  } catch (e) {
+    console.error('nutrition.report.latest error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_report_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
     const event = req.body || {};
