@@ -26,9 +26,18 @@ const NASEM_KP_B_CONCENTRATE_PCT_PER_H = 5.28;
 const NASEM_DEFAULT_RUM_DIG_NDF_PCT_OF_NDF = 37.6;
 const NASEM_DEFAULT_RUM_DIG_STARCH_PCT_OF_STARCH = 65.6;
 
-function resolveNasemProteinKpPctPerHour(row = {}) {
+function resolveNasemProteinKpPctPerHour(row = {}, opts = {}) {
   const explicit = Number(row.proteinBKpPctPerHour ?? row.kpPctPerHour);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  // SOURCE: ICAR_2013_RUMEN_OUTFLOW_RATE
+  // Buffalo-only override when feed library does not provide explicit kp.
+  // ICAR: maintenance r = 0.02/h, higher but <2x maintenance r = 0.05/h.
+  // Keep cow/NASEM path unchanged.
+  if (opts?.isBuffalo) {
+    const milk = num(opts?.avgMilkKg);
+    return milk > 0 ? 5.0 : 2.0;
+  }
 
   const cat = String(row.cat || row.category || '').trim().toLowerCase();
 
@@ -1073,7 +1082,93 @@ const microbialMPKg =
       : 'تم حساب microbial protein و microbial EAA حسب نموذج مُرَبِّيك الغذائي'
   };
 }
+// SOURCE: ICAR_2013_BUFFALO_MP_SUPPLY
+// Buffalo MP supply = digestible microbial true protein + digestible undegraded protein.
+// MCP is limited by fermentable energy and ERDP.
+// DMTP = 0.75 × 0.85 × MCP = 0.6375 MCP.
+// Applies only when analyzeRation context species is buffalo.
+function predictBuffaloMPSupplyIcar2013({
+  rdpKg,
+  digestibleRupKg,
+  dmKg,
+  meMcalPerKgDM,
+  faPctDM,
+  avgMilkKg,
+  microbialAaProfilePctTP
+} = {}) {
+  const DMI = Math.max(0, num(dmKg));
+  const erdpG = Math.max(0, num(rdpKg) * 1000);
+  const digestibleRupG = Math.max(0, num(digestibleRupKg) * 1000);
 
+  const me = Math.max(0, num(meMcalPerKgDM));
+  const faPct = Math.max(0, num(faPctDM));
+
+  // ICAR FME concept: FME = ME minus energy from oils/fats and fermentation acids.
+  // No fermentation acid field exists in current feed library, so only fat ME is deducted.
+  const fatMEMcalPerKgDM = (faPct / 100) * 8.33;
+  const fmeMcalPerKgDM = Math.max(0, me - fatMEMcalPerKgDM);
+  const fmeMcalDay = fmeMcalPerKgDM * DMI;
+
+  const milk = Math.max(0, num(avgMilkKg));
+
+  // ICAR level:
+  // L=1 maintenance -> 37.7 g MCP/Mcal FME.
+  // L=2 growing or buffalo milk up to 15 L -> 41.8 g MCP/Mcal FME.
+  // No cow L=3 extrapolation is applied to buffalo.
+  const levelOfFeeding = milk > 0 ? 2 : 1;
+  const mcpYieldGPerMcalFME = levelOfFeeding === 2 ? 41.8 : 37.7;
+
+  const mcpFromEnergyG = fmeMcalDay * mcpYieldGPerMcalFME;
+  const microbialCPG = Math.min(mcpFromEnergyG, erdpG);
+
+  const microbialTPG = microbialCPG * 0.75;
+  const microbialMPG = microbialTPG * 0.85;
+
+  const mpSupplyG = digestibleRupG + microbialMPG;
+  const rdpBalanceG = erdpG - microbialCPG;
+
+  const profile = normalizeAaProfile(microbialAaProfilePctTP);
+  const microbialEaaG = makeEaaZeroMap();
+
+  if (profile) {
+    for (const aa of EAA_KEYS) {
+      const aaPctTP = profile[aa];
+      if (aaPctTP == null) continue;
+      microbialEaaG[aa] = microbialMPG * (aaPctTP / 100);
+    }
+  }
+
+  return {
+    model: 'ICAR_2013_BUFFALO_MP_SUPPLY',
+    applied: true,
+    status: 'calculated',
+    species: 'buffalo',
+    supplyMode: 'digestible_RUP_plus_ICAR_digestible_microbial_true_protein',
+    levelOfFeeding,
+    mcpYieldGPerMcalFME,
+    fmeMcalPerKgDM: round(fmeMcalPerKgDM, 3),
+    fmeMcalDay: round(fmeMcalDay, 3),
+    fatMEMcalPerKgDM: round(fatMEMcalPerKgDM, 3),
+    microbialCPKg: round(microbialCPG / 1000, 3),
+    microbialTPKg: round(microbialTPG / 1000, 3),
+    microbialMPKg: round(microbialMPG / 1000, 3),
+    microbialTpDigestibility: 0.85,
+    digestibleRupKg: round(digestibleRupG / 1000, 3),
+    mpSupplyG: round(mpSupplyG, 0),
+    rdpBalanceKg: round(rdpBalanceG / 1000, 3),
+    inputs: {
+      rdpKg: round(num(rdpKg), 3),
+      digestibleRupKg: round(num(digestibleRupKg), 3),
+      dmKg: round(DMI, 3),
+      meMcalPerKgDM: round(me, 3),
+      faPctDM: round(faPct, 3),
+      avgMilkKg: round(milk, 3)
+    },
+    microbialEaaG: Object.fromEntries(EAA_KEYS.map(k => [k, round(microbialEaaG[k], 0)])),
+    hasMicrobialAaProfile: !!profile,
+    note: 'تم حساب إمداد MP للجاموس حسب ICAR 2013: digestible RUP + 0.6375 × MCP، مع تحديد MCP بالأقل بين FME وERDP.'
+  };
+}
 // SOURCE: NASEM_2021_TABLE_5_1
 // Carbohydrate safety guide for lactating cow TMR diets.
 // Uses forage NDF, total NDF, and starch.
@@ -1431,6 +1526,15 @@ let vitaminIU = makeVitaminZeroMap();
 const targetRequiredMinerals = resolveRequiredMinerals(targets, context);
 const targetRequiredTraceMinerals = resolveRequiredTraceMinerals(targets, context);
 
+const speciesTextForProtein =
+  String(context?.species || '').trim().toLowerCase();
+
+const isBuffaloProteinContext =
+  /جاموس|buffalo/.test(speciesTextForProtein);
+
+const avgMilkKgForProtein =
+  num(context?.avgMilkKg ?? context?.milkKg);
+
   for (const r of list){
     const kg = num(r.kg ?? r.asFedKg);
     const dm = num(r.dm ?? r.dmPct);
@@ -1477,7 +1581,10 @@ const proteinCFractionPctCP = num(
   r.cFractionPctCP
 );
 
-const proteinBKpPctPerHour = resolveNasemProteinKpPctPerHour(r);
+const proteinBKpPctPerHour = resolveNasemProteinKpPctPerHour(r, {
+  isBuffalo: isBuffaloProteinContext,
+  avgMilkKg: avgMilkKgForProtein
+});
 
 const hasNasemProteinFractions =
   (proteinAFractionPctCP > 0 || proteinBFractionPctCP > 0 || proteinCFractionPctCP > 0) &&
@@ -1871,7 +1978,7 @@ const nonForageNdfPctDiet = dmKg > 0 ? (nonForageNdfKg / dmKg) * 100 : 0;
   context?.microbialAaProfile ||
   defaultMicrobialAaProfilePctTP();
 
-const microbialProteinModel = predictMicrobialProteinNasem({
+let microbialProteinModel = predictMicrobialProteinNasem({
   rdpKg,
   dmKg,
   rumDigNdfKg,
@@ -1879,20 +1986,20 @@ const microbialProteinModel = predictMicrobialProteinNasem({
   microbialAaProfilePctTP
 });
 
-const microbialMPKg =
+let microbialMPKg =
   Number(
     microbialProteinModel.microbialMPKg ??
     microbialProteinModel.digestibleMicrobialTPKg ??
     0
   );
 
-const modeledMpSupplyG =
+let modeledMpSupplyG =
   (digestibleRupKg * 1000) +
   (microbialMPKg * 1000);
-const mpSupplyG = modeledMpSupplyG;
-const mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
-const mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
 
+let mpSupplyG = modeledMpSupplyG;
+let mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
+let mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
 let mpNote = 'تقييم البروتين الممثل جيد';
 
 if (mpTargetG && mpSupplyG < mpTargetG) {
@@ -2054,6 +2161,40 @@ const nelDensityMcalKgDM = energySupplyModel.nelMcalPerKgDM;
 
 const speciesText = String(context?.species || '').trim().toLowerCase();
 const isBuffalo = /جاموس|buffalo/.test(speciesText);
+
+if (isBuffalo) {
+  microbialProteinModel = predictBuffaloMPSupplyIcar2013({
+    rdpKg,
+    digestibleRupKg,
+    dmKg,
+    meMcalPerKgDM: energySupplyModel.meMcalPerKgDM,
+    faPctDM: faPctActual,
+    avgMilkKg,
+    microbialAaProfilePctTP
+  });
+
+  microbialMPKg =
+    Number(
+      microbialProteinModel.microbialMPKg ??
+      microbialProteinModel.digestibleMicrobialTPKg ??
+      0
+    );
+
+  modeledMpSupplyG =
+    Number.isFinite(Number(microbialProteinModel.mpSupplyG))
+      ? Number(microbialProteinModel.mpSupplyG)
+      : ((digestibleRupKg * 1000) + (microbialMPKg * 1000));
+
+  mpSupplyG = modeledMpSupplyG;
+  mpDensityGkgDM = dmKg > 0 ? (mpSupplyG / dmKg) : 0;
+  mpBalanceG = mpTargetG ? (mpSupplyG - mpTargetG) : 0;
+
+  mpNote =
+    mpTargetG && mpSupplyG < mpTargetG
+      ? 'يوجد عجز في البروتين الممثل للجاموس حسب ICAR 2013'
+      : 'إمداد البروتين الممثل للجاموس يغطي الاحتياج حسب ICAR 2013';
+}
+
 const dim = num(context?.daysInMilk ?? context?.dim);
 const canApplyNasemRationDmi =
   !isBuffalo &&
@@ -2231,8 +2372,12 @@ vitaminSupplyModel.vitaminBalanceModel = buildVitaminBalanceModel({
 });
 
  const proteinModel = {
-  model: 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
-  mpSupplyMode: 'modeled_digestible_RUP_plus_microbial_true_protein',
+  model: isBuffalo
+    ? 'ICAR_2013_BUFFALO_PROTEIN_SUPPLY_LAYER'
+    : 'NASEM_2021_CH6_PROTEIN_AA_FRAMEWORK',
+  mpSupplyMode: isBuffalo
+    ? 'ICAR_2013_digestible_RUP_plus_digestible_microbial_true_protein'
+    : 'modeled_digestible_RUP_plus_microbial_true_protein',
   cpPctDM: round(cpPctTotal),
   rdpPctDM: round(rdpPctDM),
   rupPctDM: round(rupPctDM),
@@ -2301,7 +2446,9 @@ note: microbialProteinModel.hasMicrobialAaProfile
   ? 'تم حساب EAA من dRUP و microbial true protein ضمن نموذج البروتين'
   : 'تم حساب EAA من dRUP و microbial true protein ضمن نموذج البروتين'
 },
-note: 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
+note: isBuffalo
+  ? 'تم تجهيز نموذج البروتين للجاموس حسب ICAR 2013 في MP supply، مع حساب CP وRDP/RUP من بيانات الخامات.'
+  : 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
 }; 
 const rumenState = estimateRumenState({
   starchPct,
