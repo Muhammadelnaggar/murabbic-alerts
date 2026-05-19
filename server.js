@@ -1129,6 +1129,8 @@ function buildNutritionCentralTargets(context = {}) {
   daysInMilk: context.daysInMilk,
   avgMilkKg: context.avgMilkKg,
   pregnancyDays: context.pregnancyDays,
+  daysToCalving: context.daysToCalving,
+  earlyDry: context.earlyDry,
   closeUp: context.closeUp,
 
   bodyWeight: runtimeCtx.bodyWeightKgUsed,
