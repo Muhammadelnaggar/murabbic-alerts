@@ -2162,7 +2162,14 @@ const cpTargetG =
     : (
         Number.isFinite(Number(targets?.cpTargetG))
           ? Number(targets.cpTargetG)
-          : null
+          : (
+              isBuffalo &&
+              Number.isFinite(Number(targets?.cpTarget)) &&
+              Number.isFinite(Number(targets?.dmiTarget)) &&
+              Number(targets.dmiTarget) > 0
+                ? Number(targets.dmiTarget) * (Number(targets.cpTarget) / 100) * 1000
+                : null
+            )
       );
 
 const buffaloCpState =
