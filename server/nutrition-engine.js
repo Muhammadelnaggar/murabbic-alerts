@@ -57,19 +57,30 @@ function resolveChapter12Stage(ctx = {}){
     pregDays > 0
       ? Math.max(0, gestationLength - Math.min(pregDays, gestationLength))
       : null;
+   if (milkKg > 0) {
+    if (dim > 0 && dim <= 21) {
+      return {
+        model: 'NASEM_2021_CH12_STAGE_DEFINITION',
+        stage: 'fresh_postpartum',
+        transitionPhase: 'postpartum',
+        isTransition: true,
+        daysInMilk: Math.round(dim),
+        daysPrepartum: null,
+        note: 'Fresh cow within first 3 weeks of lactation according to NASEM 2021 Chapter 12.'
+      };
+    }
 
-  if (milkKg > 0 && dim > 0 && dim <= 21) {
     return {
       model: 'NASEM_2021_CH12_STAGE_DEFINITION',
-      stage: 'fresh_postpartum',
-      transitionPhase: 'postpartum',
-      isTransition: true,
-      daysInMilk: Math.round(dim),
+      stage: 'lactating_not_chapter12_target',
+      transitionPhase: null,
+      isTransition: false,
+      daysInMilk: dim > 0 ? Math.round(dim) : null,
       daysPrepartum: null,
-      note: 'Fresh cow within first 3 weeks of lactation according to NASEM 2021 Chapter 12.'
+      note: 'Lactating cow beyond fresh period; Chapter 12 dry/transition stage is not applied.'
     };
   }
-
+ 
   if (closeUp || (daysPrepartum != null && daysPrepartum <= 21)) {
     return {
       model: 'NASEM_2021_CH12_STAGE_DEFINITION',
