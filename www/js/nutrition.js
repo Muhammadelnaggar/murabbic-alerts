@@ -1532,8 +1532,12 @@ async function loadCtxFromGroup(numbers, eventDate){
 
   if (bwEl && !bwEl.dataset.userEdited) bwEl.value = '';
   if (bcsEl && !bcsEl.dataset.userEdited) bcsEl.value = '';
-  const groupLabel =
-  String(qp().get('group') || qp().get('groupName') || '').trim();
+const groupLabel = String(
+  qp().get('group') ||
+  qp().get('groupName') ||
+  document.getElementById('animalInfo')?.textContent ||
+  ''
+).trim();
   
   window.mbkNutrition = window.mbkNutrition || {};
   window.mbkNutrition.groupContext = {
