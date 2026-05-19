@@ -2856,15 +2856,6 @@ if (missingPriceRows.length) {
     missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
   });
 }
-
-if (missingPriceRows.length) {
-  return res.status(400).json({
-    ok: false,
-    error: 'feed_price_required',
-    message: 'سعر كل خامة داخل التركيبة إجباري لحساب التحليل الاقتصادي بدقة',
-    missingRows: missingPriceRows.map(r => r.name).slice(0, 10)
-  });
-}
 console.log('NUTRITION ANALYZE rawRows[0] =', rows[0] || null);
 console.log('NUTRITION ANALYZE enrichedRows[0] =', enrichedRows[0] || null);
 console.log('NUTRITION ANALYZE normalizedRows[0] =', normalizedRows[0] || null);
@@ -2930,15 +2921,6 @@ const rawRows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
 const enrichedRows = await enrichNutritionRowsFromFeedItems(tenant, rawRows);
 const rows = normalizeNutritionRows(enrichedRows);
 const missingPriceRows = findMissingNutritionPrices(rows);
-if (missingPriceRows.length) {
-  return res.status(400).json({
-    ok:false,
-    error:'feed_price_required',
-    message:'سعر كل خامة داخل التركيبة إجباري قبل حفظ حدث التغذية',
-    missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
-  });
-}
-
 
 if (missingPriceRows.length) {
   return res.status(400).json({
@@ -2984,6 +2966,7 @@ const centralAnalysis = buildNutritionCentralAnalysis({
   concKg,
   milkPrice
 });
+    const centralPanels = buildNutritionPanels(centralAnalysis, context);
    let animalDoc = null;
 let animalDocId = '';
 
@@ -3019,11 +3002,12 @@ if (!isGroup && db) {
   source: '/nutrition.html',
 
   nutrition: {
-    mode: nutrition.mode || 'tmr_asfed',
-    rows,
-    context,
-    analysis: centralAnalysis
-  }
+  mode: nutrition.mode || 'tmr_asfed',
+  rows,
+  context,
+  analysis: centralAnalysis,
+  panels: centralPanels
+}
 });
 
     const localEvents = readJson(eventsPath, []);
