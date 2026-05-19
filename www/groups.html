@@ -1700,6 +1700,14 @@ function buildGroupMemberDoc(groupId, an){
     updatedAt: new Date().toISOString()
   };
 }
+function chunkArray(arr, size = 100){
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
 async function syncAllGroupsData(){
   try{
     const groupsMap = splitGroups(false);
@@ -1713,7 +1721,38 @@ async function syncAllGroupsData(){
       });
     });
 
-    await apiPost('/api/groups/sync', { groups, members });
+    const desiredMemberIds = members
+      .map(m => {
+        const groupId = String(m?.groupId || '').trim();
+        const animalNumber = String(m?.animalNumber || '').trim();
+        if (!groupId || !animalNumber || !state.userId) return '';
+        return `${state.userId}_${groupId}_${animalNumber}`;
+      })
+      .filter(Boolean);
+
+    const chunks = chunkArray(members, 100);
+
+    await apiPost('/api/groups/sync', {
+      groups,
+      members: [],
+      partial: true
+    });
+
+    for (const part of chunks) {
+      await apiPost('/api/groups/sync', {
+        groups: [],
+        members: part,
+        partial: true
+      });
+    }
+
+    await apiPost('/api/groups/sync', {
+      groups: [],
+      members: [],
+      finalize: true,
+      desiredMemberIds
+    });
+
   }catch(e){
     console.error('syncAllGroupsData error:', e);
   }
