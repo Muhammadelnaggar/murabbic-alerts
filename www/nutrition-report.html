@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقرير التغذية - مُرَبِّيك</title>
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <link rel="stylesheet" href="/css/forms.css">
+  <style>
+    :root{--green:#0b7f47;--brand:#0ea05a;--bg:#f7faf7;--card:#fff;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--warn:#c2410c;--danger:#b91c1c;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:'Cairo',Tahoma,Arial,sans-serif;direction:rtl}
+    .mbk-top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--border)}
+    .mbk-head{max-width:980px;margin:0 auto;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .mbk-page{font-size:18px;font-weight:900;color:var(--text)}
+    .mbk-app{font-size:13px;font-weight:900;color:var(--green);opacity:.9}.mbk-logo{height:46px;object-fit:contain}
+    .page{max-width:980px;margin:12px auto 80px;padding:0 10px}.card{background:#fff;border:1px solid #e7efe9;border-radius:22px;padding:14px;margin-bottom:12px;box-shadow:0 8px 24px rgba(15,23,42,.04)}
+    .hero{background:linear-gradient(180deg,#fff,#f7fcf8)}.title{font-size:22px;font-weight:900;color:#134e2f;margin:0 0 6px}.sub{font-size:13px;font-weight:800;color:var(--muted);line-height:1.7}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.kpi{border:1px solid #e6efe8;border-radius:18px;padding:12px;background:#fff}.kpi b{display:block;font-size:22px;color:var(--green);line-height:1.1}.kpi span{display:block;font-size:11px;font-weight:900;color:#315f49;margin-top:6px;line-height:1.35}.section-title{font-weight:900;color:#134e2f;margin:0 0 10px;font-size:16px;border-bottom:1px solid #edf3ee;padding-bottom:8px}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mini{border:1px solid #e6efe8;border-radius:18px;padding:12px;background:#fbfdfb}.mini .name{font-size:13px;font-weight:900;color:#1f5136;margin-bottom:5px}.mini .value{font-size:20px;font-weight:900;color:#0b7f47}.mini .note{font-size:12px;font-weight:800;color:#64748b;line-height:1.55;margin-top:5px}.badge{display:inline-flex;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0}.badge.warn{background:#fff7ed;color:#c2410c;border-color:#fed7aa}.badge.danger{background:#fff1f2;color:#b91c1c;border-color:#fecdd3}.table-wrap{overflow:auto}table{width:100%;border-collapse:separate;border-spacing:0 8px;min-width:760px}th{font-size:12px;color:#475569;text-align:right;padding:8px}td{background:#fff;border-top:1px solid #e6efe8;border-bottom:1px solid #e6efe8;padding:10px;font-size:13px;font-weight:800}td:first-child{border-right:1px solid #e6efe8;border-radius:0 14px 14px 0}td:last-child{border-left:1px solid #e6efe8;border-radius:14px 0 0 14px}.click{cursor:pointer}.click:hover td{background:#f7fcf8}.actions{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:min(92%,440px);display:flex;gap:8px;background:rgba(255,255,255,.82);backdrop-filter:blur(8px);border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:7px;z-index:30}.actions button,.actions a{flex:1;text-align:center;text-decoration:none;border:none;border-radius:12px;padding:12px;font-weight:900;cursor:pointer}.primary{background:#0ea05a;color:white}.ghost{background:#eef7f0;color:#134e2f}.empty{font-size:14px;font-weight:900;color:#64748b;line-height:1.7}.print-only{display:none}
+    @media(max-width:680px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cards{grid-template-columns:1fr}.title{font-size:19px}.kpi b{font-size:19px}}
+    @media print{body{background:#fff}.mbk-top,.actions{display:none}.page{max-width:none;margin:0;padding:0}.card{box-shadow:none;break-inside:avoid}.print-only{display:block}.no-print{display:none}}
+  </style>
+</head>
+<body>
+<header class="mbk-top"><div class="mbk-head"><div><div class="mbk-page">تقرير التغذية</div><div class="mbk-app">مُرَبِّيك</div></div><img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك"></div></header>
+<main class="page">
+  <section class="card hero"><h1 id="reportTitle" class="title">جاري تحميل تقرير التغذية...</h1><div id="reportSub" class="sub">يتم قراءة آخر تحليل تغذية محفوظ بدون إعادة حساب.</div></section>
+  <section id="statusBox" class="card empty">جاري التحميل...</section>
+  <section id="content"></section>
+</main>
+<div class="actions"><a class="ghost" href="dashboard.html">لوحة التحكم</a><button class="primary" onclick="window.print()">طباعة / PDF</button></div>
+<script>window.API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';</script>
+<script type="module" src="/js/nutrition-report.js"></script>
+</body>
+</html>
