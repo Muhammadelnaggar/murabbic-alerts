@@ -1187,10 +1187,18 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-      box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed') +
-      feBox(feedEfficiency) +
-      box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed') +
-      box('صافي عائد اللبن بعد العلف / رأس / يوم', iofc, '', 'g_iofc', 'feed');
+  `<div onclick="location.href='nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}'">
+    ${box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed')}
+  </div>` +
+  `<div onclick="location.href='nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}'">
+    ${feBox(feedEfficiency)}
+  </div>` +
+  `<div onclick="location.href='nutrition-report.html?view=head_cost&type=${currentType || 'cows'}'">
+    ${box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed')}
+  </div>` +
+  `<div onclick="location.href='nutrition-report.html?view=iofc&type=${currentType || 'cows'}'">
+    ${box('صافي عائد اللبن بعد العلف / رأس / يوم', iofc, '', 'g_iofc', 'feed')}
+  </div>`;
 
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
