@@ -2458,6 +2458,97 @@ proteinTargetInterpretation: 'CP target is calculated as g/day from buffalo equa
   roughageMin: round(roughageMin)
 };
 }
+// SOURCE: ICAR_2013_CATTLE_BUFFALO_TABLE_9_AND_PREGNANCY_TABLE
+// Buffalo dry / close-up protein target.
+// Maintenance: Table 9 / MPm = 2.65 g/kg BW^0.75.
+// Pregnancy: ICAR pregnancy protein additions for buffaloes/day.
+// Applies only to non-lactating buffalo dry / close-up path.
+const ICAR2013_BUFFALO_MAINT_PROTEIN = [
+  { bw: 200, mpG: 141, cpG: 259 },
+  { bw: 250, mpG: 167, cpG: 306 },
+  { bw: 300, mpG: 191, cpG: 351 },
+  { bw: 350, mpG: 214, cpG: 394 },
+  { bw: 400, mpG: 237, cpG: 436 },
+  { bw: 450, mpG: 259, cpG: 476 },
+  { bw: 500, mpG: 280, cpG: 515 },
+  { bw: 550, mpG: 301, cpG: 553 },
+  { bw: 600, mpG: 321, cpG: 591 },
+  { bw: 650, mpG: 341, cpG: 627 },
+  { bw: 700, mpG: 361, cpG: 663 },
+  { bw: 750, mpG: 380, cpG: 698 },
+  { bw: 800, mpG: 399, cpG: 733 }
+];
+
+function interpolateIcarProteinTable(bodyWeight){
+  const bw = num(bodyWeight);
+
+  if (bw <= ICAR2013_BUFFALO_MAINT_PROTEIN[0].bw) {
+    return ICAR2013_BUFFALO_MAINT_PROTEIN[0];
+  }
+
+  const last = ICAR2013_BUFFALO_MAINT_PROTEIN[ICAR2013_BUFFALO_MAINT_PROTEIN.length - 1];
+  if (bw >= last.bw) return last;
+
+  for (let i = 1; i < ICAR2013_BUFFALO_MAINT_PROTEIN.length; i++){
+    const lo = ICAR2013_BUFFALO_MAINT_PROTEIN[i - 1];
+    const hi = ICAR2013_BUFFALO_MAINT_PROTEIN[i];
+
+    if (bw >= lo.bw && bw <= hi.bw){
+      const f = (bw - lo.bw) / (hi.bw - lo.bw);
+
+      return {
+        bw,
+        mpG: lo.mpG + ((hi.mpG - lo.mpG) * f),
+        cpG: lo.cpG + ((hi.cpG - lo.cpG) * f)
+      };
+    }
+  }
+
+  return last;
+}
+
+function icar2013BuffaloPregnancyProtein(pregDays){
+  const d = num(pregDays);
+
+  // ICAR pregnancy additions start after 6 months.
+  if (d < 180) {
+    return {
+      stage: 'before_6_months',
+      mpG: 0,
+      cpG: 0
+    };
+  }
+
+  if (d < 210) {
+    return {
+      stage: 'pregnancy_month_6_to_7',
+      mpG: 131,
+      cpG: 203
+    };
+  }
+
+  if (d < 240) {
+    return {
+      stage: 'pregnancy_month_7_to_8',
+      mpG: 172,
+      cpG: 259
+    };
+  }
+
+  if (d < 270) {
+    return {
+      stage: 'pregnancy_month_8_to_9',
+      mpG: 214,
+      cpG: 316
+    };
+  }
+
+  return {
+    stage: 'pregnancy_month_9_to_10',
+    mpG: 255,
+    cpG: 373
+  };
+}
 function computeBuffaloDryFromCowBase(args = {}){
   const buffaloGestationLength = 308;
   const cowGestationLength = 280;
@@ -2521,17 +2612,21 @@ function computeBuffaloDryFromCowBase(args = {}){
   const buffaloNEL =
     buffaloMaintenanceNEL + buffaloPregNEL;
 
-  const mpTargetG = computeBuffaloOperationalMPTarget({
-    bodyWeight: bw,
-    milkKg: 0,
-    proteinPct: 0,
-    pregDays: preg,
-    closeUp: isCloseUp,
-    growth: false
-  });
+  const buffaloMaintProtein = interpolateIcarProteinTable(bw);
+  const buffaloPregProtein = icar2013BuffaloPregnancyProtein(preg);
 
-  const cpTarget = isCloseUp ? 13.0 : 11.5;
-  const cpTargetG = buffaloDmi * (cpTarget / 100) * 1000;
+  const mpTargetG =
+    num(buffaloMaintProtein.mpG) +
+    num(buffaloPregProtein.mpG);
+
+  const cpTargetG =
+    num(buffaloMaintProtein.cpG) +
+    num(buffaloPregProtein.cpG);
+
+  const cpTarget =
+    buffaloDmi > 0
+      ? cpTargetG / (buffaloDmi * 10)
+      : null;
 
   const ndfTarget = isCloseUp ? 40 : 45;
 
@@ -2613,7 +2708,30 @@ vitaminRequirementModel: buffaloMinVitReq.vitaminRequirementModel,
         'fatLimit',
         'roughageMin'
       ],
-      rule: 'Buffalo dry/close-up layer returns Murabbik final targets only; NDF is a comfort ceiling, not a target to increase.'
+           rule: 'Buffalo layer returns Murabbik final targets only; TDN, NSC, and DCP are not exposed as user-facing targets.',
+      proteinRequirementModel: {
+        model: 'ICAR_2013_BUFFALO_DRY_CLOSEUP_PROTEIN',
+        status: 'active',
+        source: 'ICAR_2013_TABLE_9_PLUS_BUFFALO_PREGNANCY_PROTEIN',
+        targetType: 'MP_and_CP_g_day',
+        maintenance: {
+          bodyWeightKg: round(bw, 2),
+          mpG: round(buffaloMaintProtein.mpG, 0),
+          cpG: round(buffaloMaintProtein.cpG, 0)
+        },
+        pregnancy: {
+          pregnancyDays: round(preg, 0),
+          stage: buffaloPregProtein.stage,
+          mpG: round(buffaloPregProtein.mpG, 0),
+          cpG: round(buffaloPregProtein.cpG, 0)
+        },
+        total: {
+          mpTargetG: round(mpTargetG, 0),
+          cpTargetG: round(cpTargetG, 0),
+          cpTargetPctOnTargetDmi: round(cpTarget, 2)
+        },
+        rule: 'Dry and close-up buffalo protein = ICAR maintenance protein + ICAR pregnancy protein addition. Lactating buffalo equations are not used here.'
+      }
     },
 
     baseCowCategory: base?.category || null,
