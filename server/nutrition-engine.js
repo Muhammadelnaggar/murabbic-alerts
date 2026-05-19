@@ -2243,16 +2243,15 @@ function buffaloNelMilkMcal(milkKg, fatPct, proteinPct){
 function buffaloCpPctLactating({ bodyWeight, milkKg, fatPct, dmi }){
   const bw = num(bodyWeight);
   const milk = num(milkKg);
-  const fat = num(fatPct, 6.5);
   const dmiKg = Math.max(0.1, num(dmi));
 
-  const fcm6 = buffaloFCM6(milk, fat);
-
-  // Paul et al.:
-  // CP maintenance = 5.43 g / kg BW^0.75 / day
-  // CP milk        = 90.3 g / kg 6% FCM
-  const cpMaintG = 5.43 * Math.pow(bw, 0.75);
-  const cpMilkG = 90.3 * fcm6;
+  // SOURCE: ICAR_2013_TABLE_9_AND_TABLE_11_BUFFALO
+  // Lactating buffalo CP target:
+  // maintenance CP from ICAR Table 9 by BW
+  // milk production CP = 124 g CP / kg milk
+  const maint = interpolateIcarProteinTable(bw);
+  const cpMaintG = num(maint.cpG);
+  const cpMilkG = 124 * milk;
 
   const cpPct = (cpMaintG + cpMilkG) / (dmiKg * 10);
   return round(cpPct, 2);
@@ -2367,10 +2366,17 @@ const bw075 = Math.pow(bw, 0.75);
 const tdnTargetKg =
   ((35.3 * bw075) + (406 * fcm6)) / 1000;
 
-// SOURCE: PAUL_MANDAL_PATHAK_2002_LACTATING_RIVERINE_BUFFALO
-// CP g/day = 5.43 × BW^0.75 + 90.3 × FCM6
+// SOURCE: ICAR_2013_TABLE_9_AND_TABLE_11_BUFFALO
+// Lactating buffalo CP target:
+// maintenance CP from ICAR Table 9 by BW
+// milk production CP = 124 g CP / kg milk
+const buffaloCpMaintenance = interpolateIcarProteinTable(bw);
+const cpMaintenanceG = num(buffaloCpMaintenance.cpG);
+const cpMilkProductionG = 124 * milk;
+
 const cpTargetG =
-  (5.43 * bw075) + (90.3 * fcm6);
+  cpMaintenanceG + cpMilkProductionG;
+
 const cpTargetPctOnTargetDmi =
   dmi > 0
     ? (cpTargetG / (dmi * 10))
@@ -2431,8 +2437,29 @@ buffaloRequirementModel: {
     'fatLimit',
     'roughageMin'
   ],
-  rule: 'Buffalo layer returns Murabbik final targets only; TDN, NSC, and DCP are not exposed as user-facing targets.'
+   rule: 'Buffalo layer returns Murabbik final targets only; TDN, NSC, and DCP are not exposed as user-facing targets.',
+  proteinRequirementModel: {
+    model: 'ICAR_2013_BUFFALO_LACTATING_CP_LAYER',
+    status: 'active',
+    source: 'ICAR_2013_TABLE_9_PLUS_TABLE_11_BUFFALO_MILK_CP',
+    targetType: 'CP_g_day',
+    maintenance: {
+      bodyWeightKg: round(bw, 2),
+      cpG: round(cpMaintenanceG, 0)
+    },
+    milkProduction: {
+      milkKg: round(milk, 2),
+      cpGPerKgMilk: 124,
+      cpG: round(cpMilkProductionG, 0)
+    },
+    total: {
+      cpTargetG: round(cpTargetG, 0),
+      cpTargetPctOnTargetDmi: round(cpTargetPctOnTargetDmi, 2)
+    },
+    rule: 'Lactating buffalo CP = ICAR maintenance CP by body weight + 124 g CP per kg milk. MP remains handled by the lactating buffalo MP equation.'
+  }
 },
+
   bodyWeight: bw,
   dim: Number.isFinite(days) ? Math.round(days) : null,
   dmi: round(dmi),
