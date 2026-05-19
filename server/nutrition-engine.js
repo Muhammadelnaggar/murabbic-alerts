@@ -2583,16 +2583,23 @@ function computeBuffaloDryFromCowBase(args = {}){
   const bw = num(args.bodyWeight);
   const breed = args.breed || '';
 
-  const preg = clamp(num(args.pregDays), 0, buffaloGestationLength);
+   const preg = clamp(num(args.pregDays), 0, buffaloGestationLength);
+
+  const explicitDaysToCalving = Number(args.daysToCalving);
 
   const buffaloDaysPrepartum =
-    preg > 0
-      ? Math.max(0, buffaloGestationLength - preg)
-      : null;
+    Number.isFinite(explicitDaysToCalving) && explicitDaysToCalving >= 0
+      ? explicitDaysToCalving
+      : (
+          preg > 0
+            ? Math.max(0, buffaloGestationLength - preg)
+            : null
+        );
 
   const isCloseUp =
-    !!args.closeUp ||
+    args.closeUp === true ||
     (
+      args.earlyDry !== true &&
       buffaloDaysPrepartum !== null &&
       buffaloDaysPrepartum < 30
     );
