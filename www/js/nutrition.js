@@ -1532,13 +1532,18 @@ async function loadCtxFromGroup(numbers, eventDate){
 
   if (bwEl && !bwEl.dataset.userEdited) bwEl.value = '';
   if (bcsEl && !bcsEl.dataset.userEdited) bcsEl.value = '';
-
+  const groupLabel =
+  String(qp().get('group') || qp().get('groupName') || '').trim();
+  
   window.mbkNutrition = window.mbkNutrition || {};
   window.mbkNutrition.groupContext = {
     groupMode: 'group',
     groupType,
     headCount: docs.length,
-
+    groupName: groupLabel || null,
+    group: groupLabel || null,
+    groupLabel: groupLabel || null,
+    groupNumbers: nums,
     species,
     breed: breed || null,
     breedSource: breed ? 'majority_in_group' : null,
@@ -1566,8 +1571,7 @@ async function loadCtxFromGroup(numbers, eventDate){
   };
 
   const animalInfo = document.getElementById('animalInfo');
-  const groupLabel =
-    String(qp().get('group') || qp().get('groupName') || '').trim();
+  
 
   if (animalInfo) {
     animalInfo.textContent =
@@ -3764,7 +3768,9 @@ async function saveEvent(e){
    showCentralMsg('⚠️ لا يمكن الحفظ بدون خامات في العليقة.', 'error');
     return;
   }
-
+  const saveContext = isGroupMode
+  ? buildNutritionContextForRequest()
+  : readContext();
   const payload = cleanDeep({
     animalNumber: isGroupMode ? null : animalId,
     eventDate,
@@ -3778,7 +3784,7 @@ async function saveEvent(e){
     nutrition: {
       mode: (document.getElementById('mode')?.value || 'tmr_asfed'),
       rows,
-      context: readContext(),
+      context: saveContext,
       concKg: parseUiNumber(document.getElementById('concKgInput')?.value || null),
      milkPrice: parseUiNumber(document.getElementById('ctxMilkPrice')?.value || null)
     }
@@ -3791,8 +3797,8 @@ async function saveEvent(e){
     
    await saveToServer(payload);
 
-const ctx = readContext();
-const groupName = String(ctx?.group || '').trim();
+const ctx = saveContext;
+const groupName = String(ctx?.groupName || ctx?.group || ctx?.groupLabel || '').trim();
 
 const successMsg = isGroupMode
   ? `✅ تم حفظ تغذية مجموعة "${groupName || 'بدون اسم'}"`
