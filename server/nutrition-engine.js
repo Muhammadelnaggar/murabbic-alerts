@@ -2904,10 +2904,12 @@ function computeTargets(ctx){
   const dim        = num(ctx?.daysInMilk ?? ctx?.dim ?? 0);
   const bodyWeight = num(ctx?.bodyWeight || 0) || getStandardWeight(species, breed);
 
-  const common = {
+const common = {
     bodyWeight,
     milkKg,
     pregDays,
+    daysToCalving: ctx?.daysToCalving,
+    earlyDry: ctx?.earlyDry === true,
     closeUp,
     dim,
     breed,
