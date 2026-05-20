@@ -258,14 +258,14 @@ const payload = {
   context: {
     species: _ctx?.species,
     breed: _ctx?.breed || window.currentAnimal?.breed || null,
-    bodyWeight: _ctx?.bodyWeight,
-    bcs: _ctx?.bcs,
-parity: _ctx?.parity,
+    bodyWeight: _ctx?.bodyWeight ?? _ctx?.formulationTarget?.bodyWeightKg ?? _ctx?.groupBodyWeightKg,
+    bcs: _ctx?.bcs ?? _ctx?.formulationTarget?.bcs ?? _ctx?.groupBcs,
+parity: _ctx?.parity ?? _ctx?.formulationTarget?.parity,
 frameGainKgDay: _ctx?.frameGainKgDay,
 dietNDFPct: _ctx?.dietNDFPct,
-daysInMilk: _ctx?.daysInMilk,
-avgMilkKg: _ctx?.avgMilkKg,
-pregnancyDays: _ctx?.pregnancyDays,
+daysInMilk: _ctx?.daysInMilk ?? _ctx?.formulationTarget?.daysInMilk,
+avgMilkKg: _ctx?.avgMilkKg ?? _ctx?.formulationTarget?.milkKg,
+pregnancyDays: _ctx?.pregnancyDays ?? _ctx?.formulationTarget?.pregnancyDays,
 pregnancyStatus: _ctx?.pregnancyStatus,
 daysToCalving: _ctx?.daysToCalving,
 earlyDry: _ctx?.earlyDry,
@@ -283,7 +283,11 @@ firstParityPct: _ctx?.firstParityPct ?? null,
 avgParity: _ctx?.avgParity ?? null,
 daysInMilkSpread: _ctx?.daysInMilkSpread ?? null,
 breedSource: _ctx?.breedSource || null,
-groupContextSource: _ctx?.groupContextSource || null
+groupContextSource: _ctx?.groupContextSource || null,
+observedAvgMilkKg: _ctx?.observedAvgMilkKg ?? null,
+groupNutritionProfile: _ctx?.groupNutritionProfile || null,
+homogeneity: _ctx?.homogeneity || null,
+formulationTarget: _ctx?.formulationTarget || null
   }
 };
 
@@ -348,7 +352,11 @@ firstParityPct: ctx?.firstParityPct ?? '',
 avgParity: ctx?.avgParity ?? '',
 daysInMilkSpread: ctx?.daysInMilkSpread ?? '',
 breedSource: ctx?.breedSource || '',
-groupContextSource: ctx?.groupContextSource || ''
+groupContextSource: ctx?.groupContextSource || '',
+observedAvgMilkKg: ctx?.observedAvgMilkKg ?? '',
+groupNutritionProfile: ctx?.groupNutritionProfile || null,
+homogeneity: ctx?.homogeneity || null,
+formulationTarget: ctx?.formulationTarget || null
 });
 
   if (key === targetsCacheKey && targetsCache) {
@@ -1078,10 +1086,129 @@ async function fetchGroupAvgMilkKg(fs, db, uid, numbers, endDateStr, days = 7){
     }
   }
 
-  if (!animalAverages.length) return { avg:null, days:0 };
+  if (!animalAverages.length) return { avg:null, days:0, animalAverages: [], animalCount: 0 };
 
   const avg = animalAverages.reduce((a,b)=>a+b,0) / animalAverages.length;
-  return { avg, days: usedDays };
+  return {
+    avg,
+    days: usedDays,
+    animalAverages: animalAverages.map(v => Math.round(Number(v) * 10) / 10),
+    animalCount: animalAverages.length
+  };
+}
+
+function statSummary(values = [], digits = 2){
+  const vals = (Array.isArray(values) ? values : [])
+    .map(v => Number(v))
+    .filter(v => Number.isFinite(v));
+
+  if (!vals.length) {
+    return {
+      count: 0,
+      avg: null,
+      min: null,
+      max: null,
+      sd: null,
+      cvPct: null,
+      p60: null,
+      p75: null,
+      p83: null,
+      spread: null
+    };
+  }
+
+  const sorted = [...vals].sort((a,b) => a - b);
+  const avgVal = vals.reduce((a,b) => a + b, 0) / vals.length;
+  const variance = vals.reduce((s, v) => s + Math.pow(v - avgVal, 2), 0) / vals.length;
+  const sdVal = Math.sqrt(variance);
+
+  const round = (x) =>
+    Number.isFinite(Number(x))
+      ? Math.round(Number(x) * Math.pow(10, digits)) / Math.pow(10, digits)
+      : null;
+
+  const percentile = (p) => {
+    if (!sorted.length) return null;
+    const pos = (sorted.length - 1) * p;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    const next = sorted[base + 1];
+    return round(next === undefined ? sorted[base] : sorted[base] + rest * (next - sorted[base]));
+  };
+
+  return {
+    count: vals.length,
+    avg: round(avgVal),
+    min: round(sorted[0]),
+    max: round(sorted[sorted.length - 1]),
+    sd: round(sdVal),
+    cvPct: avgVal > 0 ? round((sdVal / avgVal) * 100) : null,
+    p60: percentile(0.60),
+    p75: percentile(0.75),
+    p83: percentile(0.83),
+    spread: round(sorted[sorted.length - 1] - sorted[0])
+  };
+}
+
+function buildGroupNutritionDecision({ groupType, milkStats, dimStats, bcsStats } = {}){
+  const reasons = [];
+
+  const milkCv = Number(milkStats?.cvPct);
+  const milkSpread = Number(milkStats?.spread);
+  const dimSpread = Number(dimStats?.spread);
+  const bcsSpread = Number(bcsStats?.spread);
+
+  let score = 100;
+
+  if (groupType === 'lactating') {
+    if (Number.isFinite(milkCv)) {
+      if (milkCv > 22) { score -= 30; reasons.push('تشتت إنتاج اللبن مرتفع'); }
+      else if (milkCv > 14) { score -= 15; reasons.push('تشتت إنتاج اللبن متوسط'); }
+    }
+
+    if (Number.isFinite(milkSpread)) {
+      if (milkSpread > 12) { score -= 25; reasons.push('مدى اللبن واسع داخل المجموعة'); }
+      else if (milkSpread > 7) { score -= 12; reasons.push('مدى اللبن متوسط داخل المجموعة'); }
+    }
+
+    if (Number.isFinite(dimSpread)) {
+      if (dimSpread > 140) { score -= 20; reasons.push('مدى أيام الحليب واسع'); }
+      else if (dimSpread > 80) { score -= 10; reasons.push('مدى أيام الحليب متوسط'); }
+    }
+  } else {
+    if (Number.isFinite(dimSpread) && dimSpread > 120) {
+      score -= 15;
+      reasons.push('مدى أيام الحليب/الحالة واسع');
+    }
+  }
+
+  if (Number.isFinite(bcsSpread)) {
+    if (bcsSpread >= 1) { score -= 15; reasons.push('تفاوت حالة الجسم واضح'); }
+    else if (bcsSpread >= 0.5) { score -= 8; reasons.push('تفاوت حالة الجسم متوسط'); }
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let status = 'good';
+  let method = 'average';
+  let label = 'متجانسة';
+  let recommendation = 'المجموعة مناسبة لحيوان ممثل واحد بدرجة جيدة.';
+
+  if (score < 60) {
+    status = 'weak';
+    method = 'lead_p83';
+    label = 'ضعيفة التجانس';
+    recommendation = 'المجموعة واسعة غذائيًا. الأفضل تقسيمها، أو استخدام هدف قيادة أعلى قبل اعتماد العليقة.';
+  } else if (score < 80) {
+    status = 'medium';
+    method = 'lead_p75';
+    label = 'متوسطة التجانس';
+    recommendation = 'المجموعة مقبولة تشغيليًا لكن تحتاج هامش قيادة للأعلى احتياجًا داخل المجموعة.';
+  }
+
+  if (!reasons.length) reasons.push('التشتت الغذائي داخل الحدود المقبولة');
+
+  return { score, status, label, method, reasons, recommendation };
 }
 function parseNumbersList(){
   const p = qp();
@@ -1538,7 +1665,91 @@ const groupLabel = String(
   document.getElementById('animalInfo')?.textContent ||
   ''
 ).trim();
-  
+
+  const getBCS = (animal) => toNum(
+    animal?.bcs ??
+    animal?.BCS ??
+    animal?.bodyConditionScore ??
+    animal?.lastBcs
+  );
+
+  const getBodyWeight = (animal) => toNum(
+    animal?.bodyWeight ??
+    animal?.bodyWeightKg ??
+    animal?.weight ??
+    animal?.weightKg
+  );
+
+  const bcsVals = docs.map(getBCS).filter(v => v !== null);
+  const bodyWeightVals = docs.map(getBodyWeight).filter(v => v !== null);
+  const milkVals = groupType === 'lactating'
+    ? (Array.isArray(avgMilkRes?.animalAverages) ? avgMilkRes.animalAverages : [])
+    : [];
+
+  const milkStats = statSummary(milkVals, 2);
+  const dimStats = statSummary(dims, 0);
+  const bcsStats = statSummary(bcsVals, 2);
+  const bodyWeightStats = statSummary(bodyWeightVals, 0);
+  const parityStats = statSummary(parityVals, 2);
+  const pregnancyStats = statSummary(dccs, 0);
+
+  const homogeneity = buildGroupNutritionDecision({
+    groupType,
+    milkStats,
+    dimStats,
+    bcsStats
+  });
+
+  const targetMilk =
+    groupType !== 'lactating'
+      ? 0
+      : (
+          homogeneity.method === 'lead_p83'
+            ? (milkStats.p83 ?? milkStats.p75 ?? milkStats.avg ?? avgMilk)
+            : homogeneity.method === 'lead_p75'
+              ? (milkStats.p75 ?? milkStats.avg ?? avgMilk)
+              : (milkStats.avg ?? avgMilk)
+        );
+
+  const targetBW =
+    (bwEl && bwEl.dataset.userEdited && Number.isFinite(Number(bwEl.value)))
+      ? Number(bwEl.value)
+      : (bodyWeightStats.avg ?? null);
+
+  const targetBCS =
+    (bcsEl && bcsEl.dataset.userEdited && Number.isFinite(Number(bcsEl.value)))
+      ? Number(bcsEl.value)
+      : (bcsStats.avg ?? null);
+
+  const formulationTarget = {
+    method: homogeneity.method,
+    milkKg: targetMilk != null ? Math.round(Number(targetMilk) * 10) / 10 : null,
+    daysInMilk: dimStats.avg != null ? Math.round(Number(dimStats.avg)) : null,
+    bodyWeightKg: targetBW != null ? Math.round(Number(targetBW)) : null,
+    bcs: targetBCS != null ? Math.round(Number(targetBCS) * 100) / 100 : null,
+    parity: parityStats.avg != null ? Math.round(Number(parityStats.avg)) : null,
+    pregnancyDays: pregnancyStats.avg != null ? Math.round(Number(pregnancyStats.avg)) : null,
+    source: 'group_nutrition_fingerprint'
+  };
+
+  const groupNutritionProfile = {
+    source: 'group_nutrition_fingerprint_v1',
+    groupName: groupLabel || null,
+    groupType,
+    headCount: docs.length,
+    milk: milkStats,
+    dim: dimStats,
+    bcs: bcsStats,
+    bodyWeight: bodyWeightStats,
+    parity: {
+      ...parityStats,
+      firstParityPct
+    },
+    pregnancy: pregnancyStats,
+    homogeneity,
+    formulationTarget
+  };
+
   window.mbkNutrition = window.mbkNutrition || {};
   window.mbkNutrition.groupContext = {
     groupMode: 'group',
@@ -1552,14 +1763,23 @@ const groupLabel = String(
     breed: breed || null,
     breedSource: breed ? 'majority_in_group' : null,
 
-    daysInMilk: avgDIM != null ? Math.round(avgDIM) : null,
+    daysInMilk: formulationTarget.daysInMilk ?? (avgDIM != null ? Math.round(avgDIM) : null),
     daysInMilkSpread,
 
     avgMilkKg: groupType === 'lactating'
+      ? (formulationTarget.milkKg ?? (avgMilk != null ? Number(avgMilk.toFixed(1)) : null))
+      : 0,
+
+    observedAvgMilkKg: groupType === 'lactating'
       ? (avgMilk != null ? Number(avgMilk.toFixed(1)) : null)
       : 0,
 
-    parity: avgParity != null ? Math.round(avgParity) : null,
+    milkMin: milkStats.min,
+    milkMax: milkStats.max,
+    milkSd: milkStats.sd,
+    milkCvPct: milkStats.cvPct,
+
+    parity: formulationTarget.parity ?? (avgParity != null ? Math.round(avgParity) : null),
     avgParity: avgParity != null ? Math.round(avgParity * 10) / 10 : null,
     firstParityPct,
 
@@ -1571,7 +1791,14 @@ const groupLabel = String(
     earlyDry: groupType === 'far_dry',
     closeUp: groupType === 'close_up',
 
-    groupContextSource: 'nutrition_group_representative_context'
+    groupBodyWeightKg: formulationTarget.bodyWeightKg,
+    groupBcs: formulationTarget.bcs,
+
+    groupNutritionProfile,
+    homogeneity,
+    formulationTarget,
+
+    groupContextSource: 'group_nutrition_fingerprint_v1'
   };
 
   const animalInfo = document.getElementById('animalInfo');
