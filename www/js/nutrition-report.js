@@ -295,40 +295,64 @@ function renderRumen(a = {}){
   </div>`);
 }
 
-function shortModelName(x){
-  const s = String(x || '');
-  if(!s) return '—';
-  return s.replace(/^NASEM_2021_/,'NASEM ').replace(/^MURABBIK_/,'MURABBIK ');
+function balanceStatusText(model){
+  const s = String(model?.status || '').toLowerCase();
+  if (!model) return 'غير محسوب';
+  if (s.includes('deficit')) return 'يوجد عجز يحتاج مراجعة';
+  if (s.includes('excess')) return 'زيادة تحتاج مراجعة';
+  if (s.includes('ok') || s.includes('verified') || s.includes('calculated')) return 'مقبول';
+  return 'تم الحساب';
 }
+
+function firstLimitingMineral(model){
+  return (
+    model?.mineralBalanceModel?.limitingMineral ||
+    model?.traceMineralBalanceModel?.limitingTraceMineral ||
+    model?.limitingMineral ||
+    model?.limitingTraceMineral ||
+    ''
+  );
+}
+
 function renderMineralsVitamins(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
   const t = a.targets || {};
-  const macro = t.mineralRequirementModel || {};
-  const vitReq = t.vitaminRequirementModel || {};
   const supply = n.mineralSupplyModel || {};
   const vitSupply = n.vitaminSupplyModel || {};
   const dcad = n.dcadModel || {};
   const close = isCloseUp(stage, ctx);
 
+  const mineralLimit = firstLimitingMineral(supply);
+  const vitLimit = vitSupply?.vitaminBalanceModel?.limitingVitamin || vitSupply?.limitingVitamin || '';
+
   const cards = [
-    mini('نموذج المعادن المطلوبة', shortModelName(macro.model), macro.note || ''),
-    mini('إمداد المعادن', shortModelName(supply.model), supply.note || ''),
-    mini('نموذج الفيتامينات المطلوبة', shortModelName(vitReq.model), vitReq.note || ''),
-    mini('إمداد الفيتامينات', shortModelName(vitSupply.model), vitSupply.note || '')
+    mini(
+      'المعادن الكبرى والصغرى',
+      balanceStatusText(supply?.mineralBalanceModel || supply?.traceMineralBalanceModel || supply),
+      mineralLimit ? `أقرب عنصر للمراجعة: ${mineralLimit}` : 'راجع تفاصيل الإضافات المعدنية عند الحاجة.',
+      clsByState((supply?.mineralBalanceModel || supply?.traceMineralBalanceModel || supply)?.status)
+    ),
+    mini(
+      'الفيتامينات',
+      balanceStatusText(vitSupply?.vitaminBalanceModel || vitSupply),
+      vitLimit ? `أقرب فيتامين للمراجعة: ${vitLimit}` : 'راجع مصدر الفيتامينات في الخلطة.',
+      clsByState((vitSupply?.vitaminBalanceModel || vitSupply)?.status)
+    )
   ];
 
   if(close || dcad?.dcadMeqKgDM != null){
-    cards.push(mini('DCAD انتظار الولادة', `${nf(dcad.dcadMeqKgDM,0)} mEq/kg DM`, dcad.note || 'راجع أملاح الأنيون والكالسيوم والماغنسيوم.', num(dcad.dcadMeqKgDM) > -50 ? 'warn' : ''));
+    const dcadVal = num(dcad?.dcadMeqKgDM);
+    cards.push(mini(
+      close ? 'DCAD انتظار الولادة' : 'ميزان الأملاح DCAD',
+      Number.isFinite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—',
+      close
+        ? 'مهم جدًا في انتظار الولادة ويُراجع مع أملاح الأنيون.'
+        : 'مؤشر أملاح، لا يُستخدم وحده لتقييم عليقة الحلاب.',
+      close && Number.isFinite(dcadVal) && dcadVal > -50 ? 'warn' : ''
+    ));
   }
 
-  const ch12 = [
-    t.chapter12EnergyModel,
-    t.chapter12ProteinModel,
-    t.chapter12MineralModel,
-    t.chapter12VitaminModel
-  ].filter(Boolean).map(m => mini(shortModelName(m.model), m.stage || m.status || '—', m.note || m.rule || '')).join('');
-
-  return section('المعادن والفيتامينات ومرحلة الجاف/الانتقال', `<div class="cards">${cards.join('')}${ch12}</div>`);
+  return section('المعادن والفيتامينات', `<div class="cards">${cards.join('')}</div>`);
 }
 
 function renderRows(rows = []){
