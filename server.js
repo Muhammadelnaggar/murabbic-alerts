@@ -539,7 +539,17 @@ function normalizeNutritionContext(ctx = {}) {
     thi: toNumOrNull(ctx.thi),
 
     bcs: toNumOrNull(ctx.bcs),
-    groupBcs: toNumOrNull(ctx.groupBcs ?? ctx.representativeBcs)
+    groupBcs: toNumOrNull(ctx.groupBcs ?? ctx.representativeBcs),
+
+    observedAvgMilkKg: toNumOrNull(ctx.observedAvgMilkKg),
+    milkMin: toNumOrNull(ctx.milkMin),
+    milkMax: toNumOrNull(ctx.milkMax),
+    milkSd: toNumOrNull(ctx.milkSd),
+    milkCvPct: toNumOrNull(ctx.milkCvPct),
+
+    groupNutritionProfile: ctx.groupNutritionProfile || null,
+    homogeneity: ctx.homogeneity || null,
+    formulationTarget: ctx.formulationTarget || null
   });
 }
 
