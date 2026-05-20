@@ -3235,7 +3235,176 @@ function buildLactatingNutritionSummary(events = []) {
 
   return { groups, totals, best, weakest };
 }
+function nutritionReportKeyFromEvent(e = {}) {
+  const species = nutritionSpeciesKeyFromEvent(e) || 'unknown_species';
+  const stage = nutritionStageFromEvent(e) || 'unknown_stage';
+  const groupName = nutritionGroupNameFromEvent(e) || 'مجموعة بدون اسم';
 
+  return [
+    species,
+    stage,
+    normReportText(groupName)
+  ].join('__');
+}
+
+function stageSortWeight(stage = '') {
+  const s = String(stage || '').toLowerCase();
+  if (s === 'lactating') return 1;
+  if (s === 'far_dry') return 2;
+  if (s === 'close_up') return 3;
+  return 9;
+}
+
+function stageLabelSrv(stage = '') {
+  const s = String(stage || '').toLowerCase();
+  if (s === 'lactating') return 'حلاب';
+  if (s === 'far_dry') return 'جاف بعيد';
+  if (s === 'close_up') return 'انتظار الولادة';
+  return 'غير محدد';
+}
+
+function speciesLabelSrv(species = '') {
+  const s = String(species || '').toLowerCase();
+  if (s === 'buffalo') return 'جاموس';
+  if (s === 'cows') return 'أبقار';
+  return 'غير محدد';
+}
+
+function pickDecisionCardSrv(e = {}) {
+  const cards = e?.nutrition?.panels?.analysisCards || [];
+  return cards.find(c => String(c?.key || '').toLowerCase() === 'decision') || null;
+}
+
+function pickPriorityCardSrv(e = {}) {
+  const cards = e?.nutrition?.panels?.analysisCards || [];
+  return cards.find(c => String(c?.key || '').toLowerCase() === 'priority') || null;
+}
+
+function reportStatusFromEventSrv(e = {}) {
+  const decision = pickDecisionCardSrv(e);
+  const priority = pickPriorityCardSrv(e);
+
+  const status = String(
+    decision?.status ||
+    priority?.status ||
+    e?.nutrition?.analysis?.nutrition?.rumenStatus ||
+    ''
+  ).toLowerCase();
+
+  if (status.includes('danger')) return 'danger';
+  if (status.includes('warn') || status.includes('watch')) return 'warn';
+  if (status.includes('good') || status.includes('ok')) return 'good';
+
+  return 'unknown';
+}
+
+function buildNutritionReportIndexItem(e = {}) {
+  const ctx = e?.nutrition?.context || {};
+  const a = e?.nutrition?.analysis || {};
+  const stage = nutritionStageFromEvent(e);
+  const species = nutritionSpeciesKeyFromEvent(e);
+  const decision = pickDecisionCardSrv(e);
+  const priority = pickPriorityCardSrv(e);
+
+  const headCount =
+    Number(e.groupSize || ctx.headCount || 0) || null;
+
+  const milkTarget =
+    Number(ctx?.formulationTarget?.milkKg || ctx.avgMilkKg || 0) || null;
+
+  return cleanObj({
+    id: e.id || null,
+    groupName: nutritionGroupNameFromEvent(e) || 'مجموعة بدون اسم',
+    stage,
+    stageLabel: stageLabelSrv(stage),
+    species,
+    speciesLabel: speciesLabelSrv(species),
+    eventDate: e.eventDate || e.date || null,
+    createdMs: eventCreatedMs(e),
+    headCount,
+    milkTargetKg: milkTarget,
+    dmiTarget: a?.targets?.dmiTarget ?? null,
+    dmActual: a?.totals?.dmKg ?? null,
+    nelTarget: a?.targets?.nelTarget ?? null,
+    nelActual: a?.nutrition?.nelActual ?? null,
+    mpTargetG: a?.targets?.mpTargetG ?? null,
+    mpSupplyG: a?.nutrition?.mpSupplyG ?? null,
+    mpBalanceG: a?.nutrition?.mpBalanceG ?? null,
+    ndfPctActual: a?.nutrition?.ndfPctActual ?? null,
+    starchPctActual: a?.nutrition?.starchPctActual ?? null,
+    fatPctActual: a?.nutrition?.fatPctActual ?? null,
+    costPerKgMilk: a?.economics?.costPerKgMilk ?? null,
+    milkMargin: a?.economics?.milkMargin ?? null,
+    rumenStatus: a?.nutrition?.rumenStatus || null,
+    reportStatus: reportStatusFromEventSrv(e),
+    decisionText: decision?.value || null,
+    priorityText: priority?.value || priority?.targetText || null
+  });
+}
+
+function buildAllNutritionReport(events = []) {
+  const latestByKey = new Map();
+
+  for (const e of events || []) {
+    const key = nutritionReportKeyFromEvent(e);
+    const prev = latestByKey.get(key);
+
+    if (!prev || eventCreatedMs(e) > eventCreatedMs(prev)) {
+      latestByKey.set(key, e);
+    }
+  }
+
+  const latestEvents = [...latestByKey.values()].sort((a, b) => {
+    const sw = stageSortWeight(nutritionStageFromEvent(a)) - stageSortWeight(nutritionStageFromEvent(b));
+    if (sw !== 0) return sw;
+
+    const an = normReportText(nutritionGroupNameFromEvent(a));
+    const bn = normReportText(nutritionGroupNameFromEvent(b));
+    if (an !== bn) return an.localeCompare(bn);
+
+    return eventCreatedMs(b) - eventCreatedMs(a);
+  });
+
+  const index = latestEvents.map(buildNutritionReportIndexItem);
+
+  const danger = index.filter(x => x.reportStatus === 'danger');
+  const warn = index.filter(x => x.reportStatus === 'warn');
+
+  const lactatingEvents = latestEvents.filter(e => nutritionStageFromEvent(e) === 'lactating');
+  const lactatingSummary = buildLactatingNutritionSummary(lactatingEvents);
+
+  const highestCost = [...index]
+    .filter(x => Number.isFinite(Number(x.costPerKgMilk)))
+    .sort((a, b) => Number(b.costPerKgMilk || 0) - Number(a.costPerKgMilk || 0))[0] || null;
+
+  const weakestMargin = [...index]
+    .filter(x => Number.isFinite(Number(x.milkMargin)))
+    .sort((a, b) => Number(a.milkMargin || 0) - Number(b.milkMargin || 0))[0] || null;
+
+  const firstPriority =
+    danger[0] ||
+    warn[0] ||
+    weakestMargin ||
+    highestCost ||
+    index[0] ||
+    null;
+
+  return cleanObj({
+    count: latestEvents.length,
+    index,
+    executive: {
+      totalRations: latestEvents.length,
+      dangerCount: danger.length,
+      warningCount: warn.length,
+      okCount: index.filter(x => x.reportStatus === 'good').length,
+      firstPriority,
+      highestCost,
+      weakestMargin
+    },
+    lactatingSummary,
+    events: latestEvents
+  });
+}
 app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
   try {
     const tenant = req.userId;
@@ -3247,12 +3416,39 @@ app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
     const events = await fetchNutritionReportEvents(tenant);
     const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
 
+    if (scope === 'all') {
+      const report = buildAllNutritionReport(filtered);
+
+      if (!report.count) {
+        return res.status(404).json({
+          ok: false,
+          error: 'nutrition_report_not_found',
+          message: 'لا توجد علائق تغذية محفوظة مطابقة للتقرير الشامل'
+        });
+      }
+
+      return res.json({
+        ok: true,
+        scope,
+        type: type || null,
+        count: report.count,
+        report
+      });
+    }
+
     if (scope === 'lactating_summary') {
       const summary = buildLactatingNutritionSummary(filtered);
-      return res.json({ ok: true, scope, type: type || null, count: summary.groups.length, summary });
+      return res.json({
+        ok: true,
+        scope,
+        type: type || null,
+        count: summary.groups.length,
+        summary
+      });
     }
 
     const event = filtered[0] || null;
+
     if (!event) {
       return res.status(404).json({
         ok: false,
@@ -3278,7 +3474,6 @@ app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
     });
   }
 });
-
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
     const event = req.body || {};
