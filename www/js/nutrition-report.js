@@ -436,7 +436,7 @@ function renderMineralsVitamins(a = {}, stage = '', ctx = {}){
   const vitRows = vitaminTableRows(vitBalance);
 
   const dcadVal = num(dcad?.dcadMeqKgDM);
-  const dcadHtml = (close || Number.isFinite(dcadVal))
+  const dcadHtml = close
     ? `<div class="cards" style="margin-top:12px">
         ${mini(
           close ? 'DCAD انتظار الولادة' : 'ميزان الأملاح DCAD',
