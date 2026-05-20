@@ -295,64 +295,189 @@ function renderRumen(a = {}){
   </div>`);
 }
 
-function balanceStatusText(model){
-  const s = String(model?.status || '').toLowerCase();
-  if (!model) return 'غير محسوب';
-  if (s.includes('deficit')) return 'يوجد عجز يحتاج مراجعة';
-  if (s.includes('excess')) return 'زيادة تحتاج مراجعة';
-  if (s.includes('ok') || s.includes('verified') || s.includes('calculated')) return 'مقبول';
-  return 'تم الحساب';
+function statusAr(status){
+  const s = String(status || '').toLowerCase();
+  if (s.includes('deficit')) return 'نقص';
+  if (s.includes('excess')) return 'زيادة';
+  if (s.includes('ok')) return 'مقبول';
+  if (s.includes('warn') || s.includes('watch')) return 'مراجعة';
+  return 'محسوب';
 }
 
-function firstLimitingMineral(model){
-  return (
-    model?.mineralBalanceModel?.limitingMineral ||
-    model?.traceMineralBalanceModel?.limitingTraceMineral ||
-    model?.limitingMineral ||
-    model?.limitingTraceMineral ||
-    ''
-  );
+function mineralVal(item, keyG, keyMg){
+  const v = item?.[keyG] ?? item?.[keyMg];
+  return Number.isFinite(Number(v)) ? Number(v) : null;
+}
+
+function mineralTableRows(balance = {}, unit = 'g'){
+  const orderMacro = ['Ca','P','Mg','Na','K','Cl','S'];
+  const orderTrace = ['Co','Cu','Fe','I','Mn','Se','Zn'];
+  const order = unit === 'mg' ? orderTrace : orderMacro;
+
+  return order
+    .filter(k => balance && balance[k])
+    .map(k => {
+      const item = balance[k] || {};
+
+      const required = unit === 'mg'
+        ? mineralVal(item, 'requiredG', 'requiredMg')
+        : mineralVal(item, 'requiredG', 'requiredMg');
+
+      const supplied = unit === 'mg'
+        ? mineralVal(item, 'suppliedG', 'suppliedMg')
+        : mineralVal(item, 'suppliedG', 'suppliedMg');
+
+      const bal = unit === 'mg'
+        ? mineralVal(item, 'balanceG', 'balanceMg')
+        : mineralVal(item, 'balanceG', 'balanceMg');
+
+      const cover = num(item.supplyPctOfRequirement);
+      const st = item.status || '';
+
+      return `<tr>
+        <td>${esc(k)} ${badge(statusAr(st), st)}</td>
+        <td>${required == null ? '—' : nf(required, 2)} ${unit}</td>
+        <td>${supplied == null ? '—' : nf(supplied, 2)} ${unit}</td>
+        <td>${bal == null ? '—' : nf(bal, 2)} ${unit}</td>
+        <td>${Number.isFinite(cover) ? nf(cover, 1) + '%' : '—'}</td>
+      </tr>`;
+    });
+}
+
+function vitaminTableRows(balance = {}){
+  return ['A','D','E']
+    .filter(k => balance && balance[k])
+    .map(k => {
+      const item = balance[k] || {};
+      const required = num(item.requiredIU);
+      const supplied = num(item.suppliedIU);
+      const bal = num(item.balanceIU);
+      const cover = num(item.supplyPctOfRequirement);
+      const st = item.status || '';
+
+      return `<tr>
+        <td>${esc(k)} ${badge(statusAr(st), st)}</td>
+        <td>${Number.isFinite(required) ? nf(required, 0) : '—'} IU</td>
+        <td>${Number.isFinite(supplied) ? nf(supplied, 0) : '—'} IU</td>
+        <td>${Number.isFinite(bal) ? nf(bal, 0) : '—'} IU</td>
+        <td>${Number.isFinite(cover) ? nf(cover, 1) + '%' : '—'}</td>
+      </tr>`;
+    });
+}
+
+function collectDeficits(balance = {}){
+  return Object.entries(balance || {})
+    .filter(([_, v]) => String(v?.status || '').toLowerCase().includes('deficit'))
+    .map(([k, v]) => ({
+      key: k,
+      cover: num(v.supplyPctOfRequirement)
+    }))
+    .sort((a,b) => (Number(a.cover) || 0) - (Number(b.cover) || 0));
+}
+
+function mineralAdvice(macroBalance = {}, traceBalance = {}, vitBalance = {}, close = false){
+  const macroDef = collectDeficits(macroBalance);
+  const traceDef = collectDeficits(traceBalance);
+  const vitDef = collectDeficits(vitBalance);
+
+  const notes = [];
+
+  if (macroDef.length){
+    const keys = macroDef.map(x => x.key).join('، ');
+    notes.push(`المعادن الكبرى الناقصة: ${keys}. ابدأ بتصحيح الأقل تغطية ولا ترفع كل الأملاح عشوائيًا.`);
+
+    if (macroDef.some(x => x.key === 'Na')) {
+      notes.push('نقص الصوديوم غالبًا يحتاج مراجعة ملح الطعام/مصدر NaCl في الخلطة.');
+    }
+    if (macroDef.some(x => x.key === 'Ca' || x.key === 'P')) {
+      notes.push('نقص الكالسيوم أو الفوسفور يحتاج مراجعة الحجر الجيري/ثنائي فوسفات الكالسيوم أو مصدر Ca/P المستخدم.');
+    }
+    if (macroDef.some(x => x.key === 'Mg')) {
+      notes.push('نقص الماغنسيوم يحتاج مراجعة مصدر Mg مناسب، خصوصًا مع علائق عالية البوتاسيوم.');
+    }
+  }
+
+  if (traceDef.length){
+    const keys = traceDef.map(x => x.key).join('، ');
+    notes.push(`العناصر الصغرى الناقصة: ${keys}. راجع premix المعادن الصغرى ومعدل الإضافة الفعلي لكل رأس.`);
+  }
+
+  if (vitDef.length){
+    const keys = vitDef.map(x => x.key).join('، ');
+    notes.push(`الفيتامينات الناقصة: ${keys}. راجع premix الفيتامينات أو مصدر A/D/E في الخلطة.`);
+  }
+
+  if (close) {
+    notes.push('في انتظار الولادة راجع DCAD والكالسيوم والماغنسيوم مع أملاح الأنيون تحت إشراف فني، ولا تعتمد على رقم واحد فقط.');
+  }
+
+  if (!notes.length){
+    notes.push('المعادن والفيتامينات المحفوظة لا تظهر عجزًا واضحًا. استمر في المراجعة مع تغيّر الخامات والأسعار.');
+  }
+
+  return `<ul class="sub" style="margin:0;padding-inline-start:22px;font-weight:900;color:#334155;line-height:1.9">
+    ${notes.map(x => `<li>${esc(x)}</li>`).join('')}
+  </ul>`;
 }
 
 function renderMineralsVitamins(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
-  const t = a.targets || {};
   const supply = n.mineralSupplyModel || {};
   const vitSupply = n.vitaminSupplyModel || {};
   const dcad = n.dcadModel || {};
   const close = isCloseUp(stage, ctx);
 
-  const mineralLimit = firstLimitingMineral(supply);
-  const vitLimit = vitSupply?.vitaminBalanceModel?.limitingVitamin || vitSupply?.limitingVitamin || '';
+  const macroBalance = supply?.mineralBalanceModel?.balance || {};
+  const traceBalance = supply?.traceMineralBalanceModel?.balance || {};
+  const vitBalance = vitSupply?.vitaminBalanceModel?.balance || {};
 
-  const cards = [
-    mini(
-      'المعادن الكبرى والصغرى',
-      balanceStatusText(supply?.mineralBalanceModel || supply?.traceMineralBalanceModel || supply),
-      mineralLimit ? `أقرب عنصر للمراجعة: ${mineralLimit}` : 'راجع تفاصيل الإضافات المعدنية عند الحاجة.',
-      clsByState((supply?.mineralBalanceModel || supply?.traceMineralBalanceModel || supply)?.status)
-    ),
-    mini(
-      'الفيتامينات',
-      balanceStatusText(vitSupply?.vitaminBalanceModel || vitSupply),
-      vitLimit ? `أقرب فيتامين للمراجعة: ${vitLimit}` : 'راجع مصدر الفيتامينات في الخلطة.',
-      clsByState((vitSupply?.vitaminBalanceModel || vitSupply)?.status)
-    )
-  ];
+  const macroRows = mineralTableRows(macroBalance, 'g');
+  const traceRows = mineralTableRows(traceBalance, 'mg');
+  const vitRows = vitaminTableRows(vitBalance);
 
-  if(close || dcad?.dcadMeqKgDM != null){
-    const dcadVal = num(dcad?.dcadMeqKgDM);
-    cards.push(mini(
-      close ? 'DCAD انتظار الولادة' : 'ميزان الأملاح DCAD',
-      Number.isFinite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—',
-      close
-        ? 'مهم جدًا في انتظار الولادة ويُراجع مع أملاح الأنيون.'
-        : 'مؤشر أملاح، لا يُستخدم وحده لتقييم عليقة الحلاب.',
-      close && Number.isFinite(dcadVal) && dcadVal > -50 ? 'warn' : ''
-    ));
-  }
+  const dcadVal = num(dcad?.dcadMeqKgDM);
+  const dcadHtml = (close || Number.isFinite(dcadVal))
+    ? `<div class="cards" style="margin-top:12px">
+        ${mini(
+          close ? 'DCAD انتظار الولادة' : 'ميزان الأملاح DCAD',
+          Number.isFinite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—',
+          close
+            ? 'مؤشر مهم قبل الولادة ويُراجع مع أملاح الأنيون والكالسيوم والماغنسيوم.'
+            : 'مؤشر أملاح للمتابعة، وليس وحده قرار تعديل لعليقة الحلاب.',
+          close && Number.isFinite(dcadVal) && dcadVal > -50 ? 'warn' : ''
+        )}
+      </div>`
+    : '';
 
-  return section('المعادن والفيتامينات', `<div class="cards">${cards.join('')}</div>`);
+  return section('المعادن والفيتامينات', `
+    <div class="sub" style="font-weight:900;color:#334155;margin-bottom:10px">
+      يعرض التقرير الاحتياج، الإمداد، الميزان، ونسبة التغطية لكل عنصر محفوظ في التحليل.
+    </div>
+
+    ${table(
+      ['المعدن الكبير', 'الاحتياج', 'الإمداد', 'الميزان', 'التغطية'],
+      macroRows,
+      'لا توجد بيانات معادن كبرى محفوظة.'
+    )}
+
+    ${table(
+      ['العنصر الصغير', 'الاحتياج', 'الإمداد', 'الميزان', 'التغطية'],
+      traceRows,
+      'لا توجد بيانات عناصر صغرى محفوظة.'
+    )}
+
+    ${table(
+      ['الفيتامين', 'الاحتياج', 'الإمداد', 'الميزان', 'التغطية'],
+      vitRows,
+      'لا توجد بيانات فيتامينات محفوظة.'
+    )}
+
+    ${dcadHtml}
+
+    <div style="margin-top:12px">
+      ${mineralAdvice(macroBalance, traceBalance, vitBalance, close)}
+    </div>
+  `);
 }
 
 function renderRows(rows = []){
