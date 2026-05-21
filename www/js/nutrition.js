@@ -3459,16 +3459,40 @@ const state = def.key === 'dm'
             <div style="font-size:15px;font-weight:800;color:#0f172a">${currentText || '—'}</div>
           </div>
 
-         <div style="display:flex;justify-content:center">${
-  buildGaugeSvg(
-    def.key === 'dcad' ? 'dcad' : def.kind,
-    current,
-    target,
-    {
-      ...gaugeState,
-      speciesLayer: quickCardByKey('dcad')?.model?.interpretation?.speciesLayer
-    }
-  )
+<div style="display:flex;justify-content:center">${
+  def.key === 'dm'
+    ? `
+      <div style="
+        width:160px;
+        min-height:108px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        border-radius:18px;
+        background:#f8fafc;
+        border:1px solid #e5e7eb;
+      ">
+        <div style="font-size:13px;font-weight:950;color:#334155">مأكول / متوقع</div>
+        <div style="font-size:22px;font-weight:950;color:#0f172a">
+          ${
+            Number.isFinite(current) && Number.isFinite(target) && target > 0
+              ? Math.round((current / target) * 100)
+              : '—'
+          }%
+        </div>
+      </div>
+    `
+    : buildGaugeSvg(
+        def.key === 'dcad' ? 'dcad' : def.kind,
+        current,
+        target,
+        {
+          ...gaugeState,
+          speciesLayer: quickCardByKey('dcad')?.model?.interpretation?.speciesLayer
+        }
+      )
 }</div>
 
           <div style="text-align:left">
