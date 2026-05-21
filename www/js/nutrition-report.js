@@ -87,14 +87,13 @@ function stateClass(state){
 
 function statusText(state){
   const s = String(state || '').toLowerCase();
-  if(s.includes('danger')) return 'خطر';
-  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
-  if(s.includes('good') || s.includes('ok')) return 'مقبول';
   if(s.includes('deficit')) return 'نقص';
   if(s.includes('excess')) return 'زيادة';
-  return 'متابعة';
+  if(s.includes('danger')) return 'تنبيه';
+  if(s.includes('warn') || s.includes('watch')) return 'يحتاج ضبط';
+  if(s.includes('good') || s.includes('ok')) return 'متزن';
+  return 'معلومة';
 }
-
 function badge(text, state = ''){
   if(!text) return '';
   return `<span class="status-chip ${stateClass(state || text)}">${esc(text)}</span>`;
@@ -735,11 +734,11 @@ function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
 
   return `<div class="decision-box">
     <div class="decision-head">
-      <div class="decision-title">الحكم التنفيذي</div>
+      <div class="decision-title">قراءة مُرَبِّيك</div>
       ${badge(statusText(state), state)}
     </div>
     <div class="decision-text">${esc(displayDecision.title)}</div>
-    <div class="decision-note"><b>الإجراء الأول:</b> ${esc(displayDecision.action)}</div>
+    <div class="decision-note"><b>توصية مُرَبِّيك:</b> ${esc(displayDecision.action)}</div>
   </div>`;
 }
 function renderContextBlock(ctx = {}, event = {}, stage = ''){
@@ -848,12 +847,12 @@ function vitaminRows(balance = {}){
       const supplied = num(item.suppliedIU);
       const bal = num(item.balanceIU);
       const cover = num(item.supplyPctOfRequirement);
-
+      const label = k === 'A' ? 'فيتامين أ' : (k === 'D' ? 'فيتامين د' : 'فيتامين هـ');
       return metricRow(
-        `Vitamin ${k}`,
-        Number.isFinite(required) ? `${nf(required, 0)} IU` : '—',
-        Number.isFinite(supplied) ? `${nf(supplied, 0)} IU` : '—',
-        Number.isFinite(bal) ? `${nf(bal, 0)} IU` : '—',
+        label,
+        Number.isFinite(required) ? `${nf(required, 0)} وحدة دولية` : '—',
+        Number.isFinite(supplied) ? `${nf(supplied, 0)} وحدة دولية` : '—',
+        Number.isFinite(bal) ? `${nf(bal, 0)} وحدة دولية` : '—',
         mineralStatus(item),
         Number.isFinite(cover) ? `تغطية ${nf(cover,1)}%` : '—'
       );
@@ -882,28 +881,28 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const dcadVal = n.dcadModel?.dcadMeqKgDM;
 
   const rows = [
-    metricRow('المادة الجافة المأكولة', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
-    metricRow('الطاقة NEL', `${nf(t.nelTarget,2)} Mcal/يوم`, `${nf(n.nelActual,2)} Mcal/يوم`, finite(nelBal) ? `${nf(nelBal,2)} Mcal` : '—', balanceState(nelBal, 0.5), 'الاحتياج والإمداد يومي.'),
-    metricRow('البروتين الممثل MP', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), 'الأولوية قبل تعديل CP.'),
-    metricRow('البروتين الخام CP', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام.'),
-    metricRow('NDF الكلي', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'يُقرأ مع صحة الكرش.'),
-    metricRow('peNDF', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), 'ألياف فعالة للمضغ والاجترار.'),
-    metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), 'حد أمان وليس هدفًا للرفع.'),
-    metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'الزيادة قد تضغط هضم الألياف.'),
-    metricRow('صحة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', rumenState, rh.reason || n.rumenNote || '—'),
-    metricRow('الخشن من DM', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), 'الخشن ليس رقمًا فقط؛ الفعالية مهمة.'),
-    metricRow('Forage NDF', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'حماية الكرش من مصدر خشن.')
+metricRow('المادة الجافة المأكولة (DMI)', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
+metricRow('الطاقة الصافية للحليب (NEL)', `${nf(t.nelTarget,2)} ميجا كالوري/يوم`, `${nf(n.nelActual,2)} ميجا كالوري/يوم`, finite(nelBal) ? `${nf(nelBal,2)} ميجا كالوري` : '—', balanceState(nelBal, 0.5), 'راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.'),
+metricRow('البروتين الممثل القابل للاستفادة (MP)', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), 'راجع مصدر البروتين الحقيقي قبل زيادة البروتين الخام.'),
+metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام يُقرأ مع البروتين الممثل.'),
+metricRow('الألياف المتعادلة (NDF)', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'يُقرأ مع صحة الكرش والألياف الفعالة.'),
+metricRow('الألياف الفعالة للكرش (peNDF)', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), 'راجع طول تقطيع الخشن ومنع فرز الخلطة.'),
+metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), 'راجع الحبوب والألياف الفعالة عند الاقتراب من الحد.'),
+metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'الزيادة قد تضغط هضم الألياف.'),
+metricRow('صحة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', rumenState, rh.reason || n.rumenNote || '—'),
+metricRow('نسبة الخشن من المادة الجافة', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), 'الخشن ليس رقمًا فقط؛ الفعالية وطول التقطيع مهمان.'),
+metricRow('الألياف المتعادلة من الخشن (Forage NDF)', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'جزء الألياف المتعادلة القادم من الخامات الخشنة.')
   ];
 
   if(isLactating(stage, ctx)){
     rows.push(metricRow('تكلفة كجم اللبن', 'أقل أفضل', money(e.costPerKgMilk), '—', 'muted', 'مؤشر اقتصادي للحلاب.'));
     rows.push(metricRow('هامش لبن-علف/رأس', 'موجب', money(e.milkMargin), '—', finite(e.milkMargin) && Number(e.milkMargin) < 0 ? 'danger' : 'good', 'أهم مؤشر ربحية يومي.'));
     rows.push(metricRow('إيراد اللبن/رأس', 'حسب السعر', money(e.milkRevenue), '—', 'muted', 'مرتبط بسعر اللبن المدخل.'));
-    rows.push(metricRow('DM / كجم لبن', 'أقل أفضل مع ثبات الصحة', kg(e.dmPerKgMilk,2), '—', 'muted', 'كفاءة تحويل العلف.'));
+    rows.push(metricRow('مادة جافة / كجم لبن', 'أقل أفضل مع ثبات الصحة', kg(e.dmPerKgMilk,2), '—', 'muted', 'مؤشر لكفاءة تحويل العلف.'));
   }
 
   if(isCloseUp(stage, ctx)){
-    rows.push(metricRow('DCAD انتظار الولادة', 'نطاق انتظار الولادة', finite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—', '—', finite(dcadVal) && Number(dcadVal) > -50 ? 'warn' : 'good', dcad?.note || 'يُراجع مع Ca/Mg وأملاح الأنيون.'));
+   rows.push(metricRow('ميزان الكاتيونات والأنيونات الغذائي (DCAD)', 'نطاق انتظار الولادة', finite(dcadVal) ? `${nf(dcadVal,0)} ملي مكافئ/كجم مادة جافة` : '—', '—', finite(dcadVal) && Number(dcadVal) > -50 ? 'warn' : 'good', dcad?.note || 'راجع الكالسيوم والماغنسيوم وأملاح الأنيون تحت إشراف فني.'));
   }
 
   const macro = mineralRows(macroBalance, 'g');
@@ -911,7 +910,7 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const vit = vitaminRows(vitBalance);
 
   const mineralHeader = (macro.length || trace.length || vit.length)
-    ? `<div class="analysis-subtitle">المعادن والفيتامينات داخل نفس تحليل العليقة</div>`
+   ? `<div class="analysis-subtitle">العناصر المعدنية والفيتامينات</div>`
     : '';
 
   return section('تحليل العليقة الكامل', `
@@ -924,11 +923,11 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
       <div class="decision-note">${esc(rh.instruction)}</div>
     </div>` : ''}
 
-   ${table(['البند','المتوقع / الاحتياج / الحد','الإمداد / الفعلي','الفرق','الحكم','ملاحظة'], rows)}
+  ${table(['البند','المتوقع / الاحتياج / الحد','الإمداد / الفعلي','الفرق','قراءة مُرَبِّيك','توصية مُرَبِّيك'], rows)}
 
     ${mineralHeader}
     ${(macro.length || trace.length || vit.length) ? table(
-      ['العنصر','الاحتياج','الإمداد','الميزان','الحكم','ملاحظة'],
+      ['العنصر','الاحتياج','الإمداد','الميزان','قراءة مُرَبِّيك','توصية مُرَبِّيك'],
       [...macro, ...trace, ...vit],
       'لا توجد عناصر محفوظة داخل التحليل.'
     ) : ''}
@@ -965,7 +964,7 @@ function renderRows(rows = []){
   });
 
   return section('تركيبة العليقة ومساهمة الخامات', table(
-    ['الخامة','الفئة','as-fed','DM kg','CP kg','NDF kg','نشا kg','دهن %','تكلفة/رأس'],
+   ['الخامة','الفئة','كجم طازج (as-fed)','كجم مادة جافة','كجم بروتين خام','كجم ألياف متعادلة','كجم نشا','دهن %','تكلفة/رأس'],
     body,
     'لا توجد خامات محفوظة.'
   ));
@@ -1036,7 +1035,7 @@ function renderOneRation(event = {}, opts = {}){
     ${renderContextBlock(ctx, event, stage)}
     ${renderCompleteRationAnalysis(a, stage, ctx)}
     ${renderRows(rows)}
-    ${renderActions(a, stage, ctx)}
+   
   </div>`;
 }
 
@@ -1075,24 +1074,24 @@ function renderExecutiveAll(report = {}, type = ''){
       <div class="hero-main">
         <h2 class="hero-title">تقرير التغذية الشامل — ${esc(typeLabel)}</h2>
         <div class="hero-desc">
-          تقرير مفهرس: ملخص تنفيذي، فهرس العلائق، مقارنة مختصرة، ثم كل عليقة بتفاصيلها كاملة.
-          كل المعادن والفيتامينات تظهر داخل تحليل العليقة نفسها، وليس ككيان منفصل.
+تقرير عملي يلخص العلائق المحفوظة، ثم يعرض مقارنة مختصرة وتفاصيل كل عليقة.
+اقرأ جدول الاتزان أولًا، ثم راجع تركيبة العليقة والخامات.
         </div>
         <div style="margin-top:12px">
-          ${first.groupName ? badge(`الأولوية: ${first.groupName}`, first.reportStatus) : badge('متابعة عامة','muted')}
+          ${first.groupName ? badge(`تحتاج مراجعة: ${first.groupName}`, first.reportStatus) : badge('معلومة عامة','muted')}
         </div>
       </div>
 
       <div class="hero-side">
         ${kpi('عدد العلائق', nf(ex.totalRations,0))}
-        ${kpi('علائق خطر', nf(ex.dangerCount,0), '', ex.dangerCount ? 'danger' : 'good')}
-        ${kpi('علائق مراجعة', nf(ex.warningCount,0), '', ex.warningCount ? 'warn' : 'good')}
-        ${kpi('علائق مقبولة', nf(ex.okCount,0), '', 'good')}
+${kpi('علائق بها تنبيه', nf(ex.dangerCount,0), '', ex.dangerCount ? 'danger' : 'good')}
+${kpi('علائق تحتاج ضبط', nf(ex.warningCount,0), '', ex.warningCount ? 'warn' : 'good')}
+${kpi('علائق متزنة', nf(ex.okCount,0), '', 'good')}
       </div>
     </div>
 
     <div class="cards" style="margin-top:12px">
-      ${mini('أول تدخل', first.groupName || '—', first.priorityText || first.decisionText || '—', first.reportStatus)}
+     ${mini('أهم قراءة الآن', first.groupName || '—', first.priorityText || first.decisionText || '—', first.reportStatus)}
       ${mini('أعلى تكلفة كجم لبن', highCost.groupName || '—', finite(highCost.costPerKgMilk) ? money(highCost.costPerKgMilk) : '—', finite(highCost.costPerKgMilk) ? 'warn' : 'muted')}
       ${mini('أضعف هامش لبن-علف', weak.groupName || '—', finite(weak.milkMargin) ? money(weak.milkMargin) : '—', finite(weak.milkMargin) && Number(weak.milkMargin) < 0 ? 'danger' : 'warn')}
       ${mini('شكل التقرير', 'مفهرس ومبوب', 'اختَر العليقة من الشريط أو الفهرس.')}
@@ -1141,7 +1140,7 @@ function renderAllComparison(report = {}){
   </tr>`);
 
   return section('مقارنة مختصرة بين العلائق', table(
-   ['العليقة','المرحلة','مأكول/متوقع','طاقة فعلي/احتياج','MP فعلي/احتياج','ميزان MP','NDF','نشا','تكلفة كجم اللبن','الحكم'],
+  ['العليقة','المرحلة','مأكول/متوقع','الطاقة الصافية للحليب (NEL)','البروتين الممثل (MP)','ميزان البروتين الممثل','الألياف المتعادلة (NDF)','نشا','تكلفة كجم اللبن','قراءة مُرَبِّيك'],
     rows,
     'لا توجد بيانات مقارنة.'
   ));
@@ -1172,7 +1171,7 @@ function renderTabs(report = {}){
     `<a class="main" href="#top">الملخص</a>`,
     `<a href="#ration-index">الفهرس</a>`,
     `<a href="#comparison">المقارنة</a>`,
-    `<a href="#priorities">التدخلات</a>`
+    
   ];
 
   for(const x of index){
@@ -1213,7 +1212,7 @@ const displayReport = {
 ${renderExecutiveAll(displayReport, type)}
 <div id="ration-index">${renderRationIndex(displayReport, type)}</div>
 <div id="comparison">${renderAllComparison(displayReport)}</div>
-<div id="priorities">${renderUnifiedPriorities(displayReport)}</div>
+
     ${rationReports}
   `;
 }
