@@ -3428,15 +3428,23 @@ const rows = defs.map(def => {
     (Number.isFinite(target) ? `${Number.isInteger(target) ? target : target.toFixed(def.key === 'mp' ? 0 : 2)} ${def.unit}` : '—')
   );
 
-const state = gaugeStatus(def.kind, current, target);
+const state = def.key === 'dm'
+  ? {
+      key: 'info',
+      label: 'مأكول / متوقع',
+      color: '#64748b',
+      tone: 'info',
+      note: 'المادة الجافة: مأكول / متوقع. راقب المتبقي فقط.'
+    }
+  : gaugeStatus(def.kind, current, target);
         const gaugeState = {
       ...(state || {}),
       metricKey: def.key,
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
-    const comment = def.key === 'dm'
-      ? 'المادة الجافة هنا: المأكول من العليقة / المتوقع من العليقة. ليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ وقرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
-      : smartHint(def.key, '');
+   const comment = def.key === 'dm'
+  ? 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'
+  : smartHint(def.key, '');
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
