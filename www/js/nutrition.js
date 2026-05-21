@@ -2996,6 +2996,16 @@ function gaugeStatus(kind, current, target, low = 0.92, high = 1.08){
     return { key:'na', label:'غير متاح', color:'#94a3b8', note:'لا توجد بيانات كافية' };
   }
 
+ if (kind === 'intake') {
+  return {
+    key: 'info',
+    label: 'مأكول / متوقع',
+    color: '#64748b',
+    tone: 'info',
+    note: 'المادة الجافة هنا مأكول/متوقع وليست حكم نقص أو زيادة.'
+  };
+}
+
  if (kind === 'ceiling') {
   if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
     return { label:'معلومة', color:'#64748b', tone:'info' };
@@ -3021,10 +3031,11 @@ function metricComment(key, state){
 
   const map = {
     dm: {
-      danger: 'إنذار: المأكول أقل من الاحتياج وقد يضغط مباشرة على إنتاج اللبن وحالة الجسم.',
-      good: 'المأكول مناسب ويغطي الاحتياج بدون ضغط واضح على الأداء.',
-      warn: 'المأكول أعلى قليلًا من الاحتياج؛ راجع الهدر وبواقي العليقة.',
-      highDanger: 'المأكول أعلى من المطلوب بوضوح؛ غالبًا هدر اقتصادي أو خطأ في تقدير الكميات.'
+      info: 'المادة الجافة المعروضة هي المأكول المتوقع من العليقة مقارنة بالمتوقع من الحيوان، وليست حكم نقص أو زيادة.',
+      danger: 'المادة الجافة مأكول/متوقع وليست قرار اتزان؛ راجع المتبقي وBunk Score قبل تعديل التركيبة.',
+      good: 'المادة الجافة مأكول/متوقع وليست قرار اتزان؛ الحكم يكون على الطاقة والبروتين والألياف وصحة الكرش.',
+      warn: 'المادة الجافة مأكول/متوقع وليست هدف اتزان؛ الزيادة قد تعكس شهية أعلى أو متبقيًا حسب Bunk Score.',
+      highDanger: 'المادة الجافة مأكول/متوقع وليست سببًا منفردًا لتعديل العليقة.'
     },
 
     nel: {
@@ -3301,7 +3312,7 @@ function formatMurabbikComment(txt = '') {
 } 
 function renderGaugeRows(cards){
   const defs = [
-    { key:'dm',     label:'المادة الجافة',           current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'target'  },
+    { key:'dm',     label:'المادة الجافة المأكولة',  current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'intake'  },
     { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
     { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
@@ -3423,7 +3434,9 @@ const state = gaugeStatus(def.kind, current, target);
       metricKey: def.key,
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
-    const comment = smartHint(def.key, '');
+    const comment = def.key === 'dm'
+      ? 'المادة الجافة هنا مأكول/متوقع وليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ قرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
+      : smartHint(def.key, '');
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
@@ -3451,7 +3464,7 @@ const state = gaugeStatus(def.kind, current, target);
 }</div>
 
           <div style="text-align:left">
-            <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : 'الاحتياج'}</div>
+            <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : (def.kind === 'intake' ? 'المتوقع' : 'الاحتياج')}</div>
             <div style="font-size:15px;font-weight:800;color:#0f172a">${targetCard.value || '—'}</div>
           </div>
         </div>
@@ -3496,7 +3509,12 @@ if(n){
 
   
   const items = [
-    ["المادة الجافة", fmt($("totDM")?.textContent, " كجم")],
+    [
+      "المادة الجافة المأكولة",
+      (fmt($("totDM")?.textContent, "") !== "—" || fmt($("dmiTarget")?.textContent, "") !== "—")
+        ? `${fmt($("totDM")?.textContent, "")} / ${fmt($("dmiTarget")?.textContent, "")} كجم`
+        : "—"
+    ],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
     ["البروتين الخام CP", fmt($("cpPctTotal")?.textContent, "%")],
     ["البروتين الممثل MP", fmt($("mpSupplyG")?.textContent, " جم/يوم")],
@@ -3506,8 +3524,8 @@ if(n){
   n.innerHTML = items.map(([k,v])=>{
     let st = {sym:"—", color:"#64748b"};
 
-    if(k==="المادة الجافة"){
-      st = kpiState(toNum($("totDM")?.textContent), toNum($("dmiTarget")?.textContent), 0.5);
+    if(k==="المادة الجافة المأكولة"){
+      st = {sym:"—", color:"#64748b"};
 
     }else if(k==="البروتين الخام CP"){
       const cpTargetEl = document.getElementById("cpTarget");
@@ -3678,7 +3696,6 @@ if(fcCard){
 }
 
  const pairConfigs = [
-  [['العليقة الحالية','مادة جافة'], ['احتياجات','المادة الجافة'], 'كجم', 0.92, 1.05],
   [['العليقة الحالية','بروتين خام'], ['احتياجات','البروتين الخام'], '%', null, null],
   [['العليقة الحالية','البروتين الممثل'], ['احتياجات','البروتين الممثل'], 'جم', 0.92, 1.08],
   [['العليقة الحالية','ألياف NDF'], ['احتياجات','الألياف NDF'], '%', null, null],
