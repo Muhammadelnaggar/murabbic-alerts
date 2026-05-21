@@ -3194,23 +3194,14 @@ function buildGaugeSvg(kind, current, target, state){
   }
 
   else {
-    // باقي الجوجز: مقياس ثابت حسب نوع المؤشر
-    const isBuffaloSupplyGauge =
-      state?.buffaloGauge === true &&
-      (key === 'dm' || key === 'nel');
-
+    // باقي الجوجز: مقياس تفاعلي حقيقي يبدأ من صفر.
+    // هذا يمنع التصاق كل حالات النقص الشديد في نفس النقطة، ويجعل المؤشر يعبر عن نسبة الإمداد/الاحتياج بدقة.
     const profiles = {
-      dm: isBuffaloSupplyGauge
-        ? { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.05, highWarn: 1.12, max: 1.20 }
-        : { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
-
-      nel: isBuffaloSupplyGauge
-        ? { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.05, highWarn: 1.12, max: 1.20 }
-        : { min: 0.80, lowDanger: 0.92, lowWarn: 0.98, goodMax: 1.05, highWarn: 1.12, max: 1.20 },
-
-      cp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.30 },
-      mp:  { min: 0.80, lowDanger: 0.90, lowWarn: 0.97, goodMax: 1.08, highWarn: 1.18, max: 1.30 },
-      ndf: { min: 0.75, lowDanger: 0.92, lowWarn: 0.97, goodMax: 1.15, highWarn: 1.30, max: 1.45 }
+      dm:  { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
+      nel: { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
+      cp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.40 },
+      mp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.08, highWarn: 1.18, max: 1.40 },
+      ndf: { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.15, highWarn: 1.30, max: 1.50 }
     };
 
     const p = profiles[key] || profiles.dm;
@@ -3253,6 +3244,7 @@ function buildGaugeSvg(kind, current, target, state){
   }
 
   const tip = gaugePoint(cx, cy, r - 8, pos);
+  const ratioText = (valid && kind !== 'dcad') ? `${Math.round(ratio * 100)}%` : '';
 
   const baseLeft = { x: cx - 5, y: cy + 1 };
   const baseRight = { x: cx + 5, y: cy + 1 };
@@ -3269,6 +3261,9 @@ function buildGaugeSvg(kind, current, target, state){
 
       <circle cx="${cx}" cy="${cy}" r="6.5" fill="${ink}"></circle>
       <circle cx="${cx}" cy="${cy}" r="2.6" fill="#ffffff"></circle>
+
+      ${ratioText ? `<text x="${cx}" y="105" text-anchor="middle"
+        font-size="10" font-weight="950" fill="#334155">${ratioText}</text>` : ''}
     </svg>
   `;
 }
