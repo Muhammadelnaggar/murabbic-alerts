@@ -186,7 +186,80 @@ function eventStatus(e = {}){
   if(s.includes('good') || s.includes('ok')) return 'good';
   return 'muted';
 }
+function displayStatusFromAnalysis(e = {}){
+  const a = e?.nutrition?.analysis || {};
+  const n = a.nutrition || {};
+  const t = a.targets || {};
+  const ec = a.economics || {};
 
+  if(String(n.rumenStatus || '').toLowerCase().includes('danger')) return 'danger';
+  if(finite(n.mpBalanceG) && Number(n.mpBalanceG) < -50) return 'danger';
+  if(finite(n.nelActual) && finite(t.nelTarget) && Number(n.nelActual) < Number(t.nelTarget) - 0.5) return 'warn';
+  if(finite(n.starchPctActual) && finite(t.starchMax) && Number(n.starchPctActual) > Number(t.starchMax)) return 'warn';
+  if(finite(n.peNDFPctActual) && finite(t.peNDFMin) && Number(n.peNDFPctActual) < Number(t.peNDFMin)) return 'warn';
+  if(finite(ec.milkMargin) && Number(ec.milkMargin) < 0) return 'warn';
+
+  return 'good';
+}
+
+function buildDisplayIndexFromEvents(events = []){
+  return (Array.isArray(events) ? events : []).map(ev => {
+    const a = ev?.nutrition?.analysis || {};
+    const ctx = ev?.nutrition?.context || {};
+    const stage = eventStage(ev);
+    const decision = buildAutoDecision(a, stage, ctx);
+
+    return {
+      id: ev.id || null,
+      groupName: groupNameFromEvent(ev),
+      stage,
+      stageLabel: stageLabel(stage, ctx),
+      species: String(ctx.species || ''),
+      speciesLabel: speciesLabelFromEvent(ev),
+      eventDate: ev.eventDate || ev.date || null,
+      headCount: Number(ev.groupSize || ctx.headCount || 0) || null,
+      milkTargetKg: num(ctx?.formulationTarget?.milkKg || ctx.avgMilkKg),
+      dmiTarget: a?.targets?.dmiTarget ?? null,
+      dmActual: a?.totals?.dmKg ?? null,
+      nelTarget: a?.targets?.nelTarget ?? null,
+      nelActual: a?.nutrition?.nelActual ?? null,
+      mpTargetG: a?.targets?.mpTargetG ?? null,
+      mpSupplyG: a?.nutrition?.mpSupplyG ?? null,
+      mpBalanceG: a?.nutrition?.mpBalanceG ?? null,
+      ndfPctActual: a?.nutrition?.ndfPctActual ?? null,
+      starchPctActual: a?.nutrition?.starchPctActual ?? null,
+      fatPctActual: a?.nutrition?.fatPctActual ?? null,
+      costPerKgMilk: a?.economics?.costPerKgMilk ?? null,
+      milkMargin: a?.economics?.milkMargin ?? null,
+      reportStatus: displayStatusFromAnalysis(ev),
+      decisionText: decision.title,
+      priorityText: decision.action
+    };
+  });
+}
+
+function buildDisplayExecutive(index = []){
+  const danger = index.filter(x => x.reportStatus === 'danger');
+  const warn = index.filter(x => x.reportStatus === 'warn');
+
+  const highestCost = [...index]
+    .filter(x => finite(x.costPerKgMilk))
+    .sort((a,b) => Number(b.costPerKgMilk) - Number(a.costPerKgMilk))[0] || null;
+
+  const weakestMargin = [...index]
+    .filter(x => finite(x.milkMargin))
+    .sort((a,b) => Number(a.milkMargin) - Number(b.milkMargin))[0] || null;
+
+  return {
+    totalRations: index.length,
+    dangerCount: danger.length,
+    warningCount: warn.length,
+    okCount: index.filter(x => x.reportStatus === 'good').length,
+    firstPriority: danger[0] || warn[0] || weakestMargin || highestCost || index[0] || null,
+    highestCost,
+    weakestMargin
+  };
+}
 function slug(s){
   return String(s || '')
     .trim()
@@ -625,7 +698,7 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
   if(finite(n.nelActual) && finite(t.nelTarget) && Number(n.nelActual) < Number(t.nelTarget) - 0.5){
     return {
       title:'العليقة تحتاج دعم طاقة محسوب.',
-      action:'راجع المادة الجافة أولًا ثم كثافة الطاقة بدون كسر أمان الكرش.'
+      action:'راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.'
     };
   }
 
@@ -657,24 +730,18 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
 }
 
 function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
-  const decision = decisionFromEvent(e);
-  const priority = priorityFromEvent(e);
-  const state = eventStatus(e);
-
-  const fallbackDecision = buildAutoDecision(a, stage, ctx);
-  const decisionText = decision?.value || fallbackDecision.title;
-  const priorityText = priority?.value || priority?.targetText || fallbackDecision.action;
+  const displayDecision = buildAutoDecision(a, stage, ctx);
+  const state = displayStatusFromAnalysis(e);
 
   return `<div class="decision-box">
     <div class="decision-head">
       <div class="decision-title">الحكم التنفيذي</div>
       ${badge(statusText(state), state)}
     </div>
-    <div class="decision-text">${esc(decisionText)}</div>
-    ${priorityText ? `<div class="decision-note"><b>الإجراء الأول:</b> ${esc(priorityText)}</div>` : ''}
+    <div class="decision-text">${esc(displayDecision.title)}</div>
+    <div class="decision-note"><b>الإجراء الأول:</b> ${esc(displayDecision.action)}</div>
   </div>`;
 }
-
 function renderContextBlock(ctx = {}, event = {}, stage = ''){
   const profile = ctx.groupNutritionProfile || {};
   const hom = ctx.homogeneity || {};
@@ -815,7 +882,7 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const dcadVal = n.dcadModel?.dcadMeqKgDM;
 
   const rows = [
-   metricRow('المادة الجافة المأكولة', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
+    metricRow('المادة الجافة المأكولة', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
     metricRow('الطاقة NEL', `${nf(t.nelTarget,2)} Mcal/يوم`, `${nf(n.nelActual,2)} Mcal/يوم`, finite(nelBal) ? `${nf(nelBal,2)} Mcal` : '—', balanceState(nelBal, 0.5), 'الاحتياج والإمداد يومي.'),
     metricRow('البروتين الممثل MP', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), 'الأولوية قبل تعديل CP.'),
     metricRow('البروتين الخام CP', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام.'),
@@ -857,7 +924,7 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
       <div class="decision-note">${esc(rh.instruction)}</div>
     </div>` : ''}
 
-    ${table(['البند','الاحتياج / الحد','الإمداد / الفعلي','الميزان','الحكم','ملاحظة'], rows)}
+   ${table(['البند','المتوقع / الاحتياج / الحد','الإمداد / الفعلي','الفرق','الحكم','ملاحظة'], rows)}
 
     ${mineralHeader}
     ${(macro.length || trace.length || vit.length) ? table(
@@ -915,7 +982,7 @@ function renderActions(a = {}, stage = '', ctx = {}){
   }
 
   if(finite(n.nelActual) && finite(t.nelTarget) && Number(n.nelActual) < Number(t.nelTarget) - 0.5){
-    notes.push('تدخل طاقة: ابدأ بالمادة الجافة ثم كثافة الطاقة مع الحفاظ على أمان الكرش.');
+    notes.push('تدخل طاقة: راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.');
   }
 
   if(finite(n.starchPctActual) && finite(t.starchMax) && Number(n.starchPctActual) > Number(t.starchMax)){
@@ -957,7 +1024,7 @@ function renderOneRation(event = {}, opts = {}){
       <div class="ration-head-grid">
         <div>${renderDecisionBlock(event, a, stage, ctx)}</div>
         <div>
-          ${badge(stageLabel(stage, ctx), eventStatus(event))}
+        ${badge(stageLabel(stage, ctx), displayStatusFromAnalysis(event))}
           ${badge(speciesLabelFromEvent(event), 'muted')}
         </div>
       </div>
@@ -1074,7 +1141,7 @@ function renderAllComparison(report = {}){
   </tr>`);
 
   return section('مقارنة مختصرة بين العلائق', table(
-    ['العليقة','المرحلة','DMI فعلي/هدف','NEL فعلي/هدف','MP فعلي/هدف','ميزان MP','NDF','نشا','تكلفة كجم اللبن','الحكم'],
+   ['العليقة','المرحلة','مأكول/متوقع','طاقة فعلي/احتياج','MP فعلي/احتياج','ميزان MP','NDF','نشا','تكلفة كجم اللبن','الحكم'],
     rows,
     'لا توجد بيانات مقارنة.'
   ));
@@ -1119,6 +1186,13 @@ function renderTabs(report = {}){
 function renderAll(data){
   const report = data.report || {};
   const events = Array.isArray(report.events) ? report.events : [];
+   const displayIndex = buildDisplayIndexFromEvents(events);
+const displayReport = {
+  ...report,
+  index: displayIndex,
+  executive: buildDisplayExecutive(displayIndex),
+  count: displayIndex.length
+};
   const type = data.type || qp.get('type') || '';
   const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
@@ -1135,11 +1209,11 @@ function renderAll(data){
 
   $('content').innerHTML = `
     <div id="top"></div>
-    ${renderTabs(report)}
-    ${renderExecutiveAll(report, type)}
-    <div id="ration-index">${renderRationIndex(report, type)}</div>
-    <div id="comparison">${renderAllComparison(report)}</div>
-    <div id="priorities">${renderUnifiedPriorities(report)}</div>
+  ${renderTabs(displayReport)}
+${renderExecutiveAll(displayReport, type)}
+<div id="ration-index">${renderRationIndex(displayReport, type)}</div>
+<div id="comparison">${renderAllComparison(displayReport)}</div>
+<div id="priorities">${renderUnifiedPriorities(displayReport)}</div>
     ${rationReports}
   `;
 }
