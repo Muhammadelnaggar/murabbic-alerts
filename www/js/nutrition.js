@@ -3406,27 +3406,32 @@ const rows = defs.map(def => {
     `;
   }
 
+  const quickCard = quickCardByKey(def.key);
   const currentCard = findCard(cards, def.current);
   const targetCard = findCard(cards, def.target);
 
-  if (!currentCard || !targetCard) return '';
+  // الأرقام المعتمدة تأتي أولًا من analysisCards لأنها ناتج السيرفر المباشر.
+  // لو advancedCards غير موجودة أو اختلفت عناوينها، لا نخفي الكارت.
+  if (!quickCard && (!currentCard || !targetCard)) return '';
 
-let current = parseMetricNumber(currentCard.value);
-let target = parseMetricNumber(targetCard.value);
+  let current = Number.isFinite(Number(quickCard?.actual))
+    ? Number(quickCard.actual)
+    : parseMetricNumber(currentCard?.value);
 
-// إصلاح خاص فقط بمؤشر البروتين الممثل للجاموس
-// الأرقام الصحيحة تأتي من analysisCards: actual / target
-if (isBuffaloGauge && def.key === 'mp') {
-  const mpQuick = quickCardByKey('mp');
+  let target = Number.isFinite(Number(quickCard?.target))
+    ? Number(quickCard.target)
+    : parseMetricNumber(targetCard?.value);
 
-  if (Number.isFinite(Number(mpQuick?.actual))) {
-    current = Number(mpQuick.actual);
-  }
+  const currentText = String(
+    quickCard?.value ||
+    currentCard?.value ||
+    (Number.isFinite(current) ? `${Number.isInteger(current) ? current : current.toFixed(def.key === 'mp' ? 0 : 2)} ${def.unit}` : '—')
+  );
 
-  if (Number.isFinite(Number(mpQuick?.target))) {
-    target = Number(mpQuick.target);
-  }
-}
+  const targetText = String(
+    targetCard?.value ||
+    (Number.isFinite(target) ? `${Number.isInteger(target) ? target : target.toFixed(def.key === 'mp' ? 0 : 2)} ${def.unit}` : '—')
+  );
 
 const state = gaugeStatus(def.kind, current, target);
         const gaugeState = {
@@ -3435,7 +3440,7 @@ const state = gaugeStatus(def.kind, current, target);
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
     const comment = def.key === 'dm'
-      ? 'المادة الجافة هنا مأكول/متوقع وليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ قرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
+      ? 'المادة الجافة هنا: المأكول من العليقة / المتوقع من العليقة. ليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ وقرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
       : smartHint(def.key, '');
 
     return `
@@ -3448,7 +3453,7 @@ const state = gaugeStatus(def.kind, current, target);
         <div style="display:grid;grid-template-columns:1fr 160px 1fr;align-items:center;gap:8px">
           <div style="text-align:right">
             <div style="font-size:11px;color:#64748b">العليقة الحالية</div>
-            <div style="font-size:15px;font-weight:800;color:#0f172a">${currentCard.value || '—'}</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${currentText || '—'}</div>
           </div>
 
          <div style="display:flex;justify-content:center">${
@@ -3465,7 +3470,7 @@ const state = gaugeStatus(def.kind, current, target);
 
           <div style="text-align:left">
             <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : (def.kind === 'intake' ? 'المتوقع' : 'الاحتياج')}</div>
-            <div style="font-size:15px;font-weight:800;color:#0f172a">${targetCard.value || '—'}</div>
+            <div style="font-size:15px;font-weight:800;color:#0f172a">${targetText || '—'}</div>
           </div>
         </div>
 
