@@ -3111,159 +3111,132 @@ function arcPath(cx, cy, r, fromPos, toPos){
   return `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`;
 }
 
-function buildGaugeSvg(kind, current, target, state){
-  const cx = 80, cy = 84, r = 58;
-  const stroke = 22;
-
-  const green  = '#84d983';
-  const yellow = '#f3c754';
-  const red    = '#ff1a12';
-  const ink    = '#111111';
-  const gray   = '#e5e7eb';
-
+function buildGaugeSvg(kind, current, target, state = {}){
   const c = Number(current);
   const t = Number(target);
-  const valid = Number.isFinite(c) && Number.isFinite(t) && t > 0;
 
-  const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+  const safeNum = (v) => Number.isFinite(Number(v)) ? Number(v) : null;
 
-  const ratio = valid ? (c / t) : null;
-  const key = String(state?.metricKey || '').trim();
+  const ratio =
+    Number.isFinite(c) && Number.isFinite(t) && t > 0
+      ? c / t
+      : null;
 
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+  // خريطة الجوج:
+  // target/intake: 70% يسار — 100% منتصف — 130% يمين
+  // ceiling: 0% يسار — 100% عند نهاية الأخضر — أعلى منه أحمر
   let pos = 0.5;
-  let zones = [];
-  let tickPos = null;
-  let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
-  if (kind === 'dcad') {
-    const layer =
-      state?.speciesLayer ||
-      state?.dcadLayer ||
-      state?.model?.interpretation?.speciesLayer ||
-      '';
+  let greenFrom = 0.40;
+  let greenTo = 0.60;
+  let markerPos = 0.5;
+  let percentText = '';
 
-    const isBuffaloDcad = /buffalo|جاموس/i.test(String(layer || ''));
+  if (ratio != null) {
+    if (kind === 'ceiling') {
+      pos = clamp01(ratio / 1.4);
+      markerPos = clamp01(1 / 1.4);
+      greenFrom = 0;
+      greenTo = markerPos;
+      percentText = `${Math.round(ratio * 100)}%`;
+    } else if (kind === 'intake') {
+      pos = clamp01((ratio - 0.70) / 0.60);
+      markerPos = 0.5;
+      greenFrom = 0.40;
+      greenTo = 0.60;
+      percentText = `${Math.round(ratio * 100)}%`;
+    } else {
+      pos = clamp01((ratio - 0.70) / 0.60);
+      markerPos = 0.5;
+      greenFrom = clamp01((0.92 - 0.70) / 0.60);
+      greenTo = clamp01((1.08 - 0.70) / 0.60);
+      percentText = `${Math.round(ratio * 100)}%`;
+    }
+  }
 
-    const minOk = isBuffaloDcad ? -100 : -50;
-    const maxOk = isBuffaloDcad ? -50  : -10;
+  const cx = 80;
+  const cy = 84;
+  const r = 58;
+  const stroke = 20;
 
-    const scaleMin = isBuffaloDcad ? -130 : -70;
-    const scaleMax = isBuffaloDcad ? 40   : 80;
-
-    const mapDcad = (v) => {
-      const n = Number(v);
-      if (!Number.isFinite(n) || scaleMax <= scaleMin) return 0.5;
-      return clamp01((n - scaleMin) / (scaleMax - scaleMin));
+  const point = (p, rr = r) => {
+    const angle = Math.PI * (1 + p);
+    return {
+      x: cx + rr * Math.cos(angle),
+      y: cy + rr * Math.sin(angle)
     };
+  };
 
-    const minOkPos = mapDcad(minOk);
-    const maxOkPos = mapDcad(maxOk);
+  const arc = (from, to, color) => {
+    const a = clamp01(from);
+    const b = clamp01(to);
+    if (b <= a) return '';
 
-    pos = mapDcad(c);
+    const s = point(a);
+    const e = point(b);
+    const large = (b - a) > 0.5 ? 1 : 0;
 
-    zones = [
-      { from: 0,        to: minOkPos, color: yellow },
-      { from: minOkPos, to: maxOkPos, color: green },
-      { from: maxOkPos, to: 1,        color: red }
-    ];
+    return `<path d="M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
+  };
 
-    tickPos = maxOkPos;
-    tickLabel = 'الحد';
+  const markerOuter = point(markerPos, r + 3);
+  const markerInner = point(markerPos, r - 13);
+
+  const tip = point(pos, r - 9);
+  const angle = Math.PI * (1 + pos);
+  const baseR = 6;
+
+  const baseLeft = {
+    x: cx + baseR * Math.cos(angle - Math.PI / 2),
+    y: cy + baseR * Math.sin(angle - Math.PI / 2)
+  };
+
+  const baseRight = {
+    x: cx + baseR * Math.cos(angle + Math.PI / 2),
+    y: cy + baseR * Math.sin(angle + Math.PI / 2)
+  };
+
+  const red = '#ff1a12';
+  const yellow = '#f3c754';
+  const green = '#84d983';
+  const grey = '#e5e7eb';
+
+  let arcHtml = '';
+
+  if (kind === 'intake') {
+    arcHtml =
+      arc(0, greenFrom, grey) +
+      arc(greenFrom, greenTo, green) +
+      arc(greenTo, 1, grey);
+  } else if (kind === 'ceiling') {
+    arcHtml =
+      arc(0, greenTo, green) +
+      arc(greenTo, 1, red);
+  } else {
+    arcHtml =
+      arc(0, greenFrom, red) +
+      arc(greenFrom, greenTo, green) +
+      arc(greenTo, 1, red);
   }
-
-  else if (!valid) {
-    zones = [{ from: 0, to: 1, color: gray }];
-  }
-
-  else if (kind === 'ceiling') {
-    // النشا والدهن: ثابت 0 → 120% من الحد
-    // أخضر حتى الحد، أصفر 100–108%، أحمر بعد ذلك
-    const maxRatio = 1.20;
-
-    pos = clamp01(ratio / maxRatio);
-
-    const limitPos = clamp01(1 / maxRatio);
-    const warnPos  = clamp01(1.08 / maxRatio);
-
-    zones = [
-      { from: 0,        to: limitPos, color: green },
-      { from: limitPos, to: warnPos,  color: yellow },
-      { from: warnPos,  to: 1,        color: red }
-    ];
-
-    tickPos = limitPos;
-  }
-
-  else {
-    // باقي الجوجز: مقياس تفاعلي حقيقي يبدأ من صفر.
-    // هذا يمنع التصاق كل حالات النقص الشديد في نفس النقطة، ويجعل المؤشر يعبر عن نسبة الإمداد/الاحتياج بدقة.
-    const profiles = {
-      dm:  { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
-      nel: { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
-      cp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.40 },
-      mp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.08, highWarn: 1.18, max: 1.40 },
-      ndf: { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.15, highWarn: 1.30, max: 1.50 }
-    };
-
-    const p = profiles[key] || profiles.dm;
-
-    const map = (x) => {
-      if (!Number.isFinite(Number(x)) || p.max <= p.min) return 0;
-      return clamp01((Number(x) - p.min) / (p.max - p.min));
-    };
-
-    pos = map(ratio);
-
-    zones = [
-      { from: 0,                 to: map(p.lowDanger), color: red },
-      { from: map(p.lowDanger),  to: map(p.lowWarn),   color: yellow },
-      { from: map(p.lowWarn),    to: map(p.goodMax),   color: green },
-      { from: map(p.goodMax),    to: map(p.highWarn),  color: yellow },
-      { from: map(p.highWarn),   to: 1,                color: red }
-    ];
-
-    tickPos = map(1);
-  }
-
-  const arcs = zones.map(z => {
-    if (z.to <= z.from) return '';
-    return `<path d="${arcPath(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
-  }).join('');
-
-  let tick = '';
-  if (tickPos != null) {
-    const a = gaugePoint(cx, cy, r - 15, tickPos);
-    const b = gaugePoint(cx, cy, r + 6, tickPos);
-    const lab = gaugePoint(cx, cy, r + 20, tickPos);
-
-    tick = `
-      <line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"
-        stroke="${ink}" stroke-width="3" stroke-linecap="round" opacity=".65"></line>
-      <text x="${lab.x}" y="${lab.y + 4}" text-anchor="middle"
-        font-size="9" font-weight="900" fill="#475569">${tickLabel}</text>
-    `;
-  }
-
-  const tip = gaugePoint(cx, cy, r - 8, pos);
-  const ratioText = (valid && kind !== 'dcad') ? `${Math.round(ratio * 100)}%` : '';
-
-  const baseLeft = { x: cx - 5, y: cy + 1 };
-  const baseRight = { x: cx + 5, y: cy + 1 };
 
   return `
-    <svg viewBox="0 0 160 108" width="160" height="108" aria-hidden="true">
-      ${arcs}
-      ${tick}
+    <svg viewBox="0 0 160 118" width="160" height="118" aria-hidden="true">
+      ${arcHtml}
+
+      <line x1="${markerOuter.x}" y1="${markerOuter.y}" x2="${markerInner.x}" y2="${markerInner.y}"
+            stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"></line>
 
       <circle cx="${cx}" cy="${cy}" r="35" fill="#ffffff"></circle>
 
       <path d="M ${baseLeft.x} ${baseLeft.y} L ${tip.x} ${tip.y} L ${baseRight.x} ${baseRight.y} Z"
-            fill="${ink}"></path>
+            fill="#111111"></path>
 
-      <circle cx="${cx}" cy="${cy}" r="6.5" fill="${ink}"></circle>
+      <circle cx="${cx}" cy="${cy}" r="6.5" fill="#111111"></circle>
       <circle cx="${cx}" cy="${cy}" r="2.6" fill="#ffffff"></circle>
 
-      ${ratioText ? `<text x="${cx}" y="105" text-anchor="middle"
-        font-size="10" font-weight="950" fill="#334155">${ratioText}</text>` : ''}
+      <text x="${cx}" y="111" text-anchor="middle"
+            font-size="11" font-weight="900" fill="#0f172a">${percentText}</text>
     </svg>
   `;
 }
@@ -3307,7 +3280,7 @@ function formatMurabbikComment(txt = '') {
 } 
 function renderGaugeRows(cards){
   const defs = [
-    { key:'dm',     label:'المادة الجافة المأكولة',  current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'intake'  },
+    { key:'dm',     label:'المادة الجافة المأكولة',  current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           targetLabel:'المتوقع', unit:'كجم', kind:'intake' },
     { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
     { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
@@ -3434,9 +3407,9 @@ const state = gaugeStatus(def.kind, current, target);
       metricKey: def.key,
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
-    const comment = def.key === 'dm'
-      ? 'المادة الجافة هنا: المأكول من العليقة / المتوقع من العليقة. ليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ وقرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
-      : smartHint(def.key, '');
+const comment = def.key === 'dm'
+  ? 'المادة الجافة هنا: المأكول من العليقة / المتوقع من الحيوان. ليست حكم نقص أو زيادة. راقب Bunk Score والمتبقي؛ وقرار الاتزان يكون من الطاقة والبروتين والألياف وصحة الكرش.'
+  : smartHint(def.key, '');
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
