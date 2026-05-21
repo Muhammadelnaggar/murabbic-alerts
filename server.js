@@ -2223,7 +2223,15 @@ const starchActual = num(nutrition.starchPctActual, 1);
         ? 'warn'
         : 'good';
 
-  const dmState = stateFromBalance(dmActual, dmTarget, 5);
+  const dmRatioPct =
+    Number.isFinite(Number(dmActual)) &&
+    Number.isFinite(Number(dmTarget)) &&
+    Number(dmTarget) > 0
+      ? +((Number(dmActual) / Number(dmTarget)) * 100).toFixed(1)
+      : null;
+
+  // DMI في مُرَبِّيك = مأكول/مقدم مقابل المتوقع، وليس احتياجًا غذائيًا للحكم بنقص أو زيادة.
+  const dmState = 'info';
   const nelState = stateFromBalance(nelActual, nelTarget, 5);
   const mpState = stateFromBalance(mpActual, mpTarget, 5);
 
@@ -2240,11 +2248,15 @@ const starchActual = num(nutrition.starchPctActual, 1);
   const ndfState = stateFromBalance(nutrition.ndfPctActual, targets.ndfTarget, 5);
 
   let dmHint =
-    dmState === 'good'
-      ? 'مربيك: المادة الجافة مناسبة. حافظ على انتظام التوزيع.'
-      : Number(dmActual) < Number(dmTarget)
-        ? 'مربيك: المادة الجافة غير كافية. ارفع الكمية تدريجيًا وراجع المتبقي.'
-        : 'مربيك: المادة الجافة زيادة. تأكد أنها مأكولة وليست هدرًا.';
+    Number.isFinite(Number(dmRatioPct))
+      ? (
+          dmRatioPct < 95
+            ? `مربيك: المادة الجافة المقدمة/المأكولة أقل من المتوقع (${dmRatioPct}%). هذا مؤشر شهية أو تقديم، وليس نقص احتياج غذائي بذاته. راقب المتبقي وBunk score.`
+            : dmRatioPct > 120
+              ? `مربيك: المادة الجافة المقدمة/المأكولة أعلى من المتوقع (${dmRatioPct}%). إذا كانت العليقة متزنة والاستجابة اللبنية جيدة فليست مشكلة بذاتها. راقب المتبقي والروث وBCS.`
+              : `مربيك: المادة الجافة المقدمة/المأكولة قريبة من المتوقع (${dmRatioPct}%). الحكم الغذائي يكون من الطاقة والبروتين وأمان الكرش.`
+        )
+      : 'مربيك: المادة الجافة المتوقعة مرجع تشغيل للشهية والتقديم، وليست Target تغذية للحكم بنقص أو زيادة.';
 
   let nelHint =
     nelState === 'good'
@@ -2285,11 +2297,15 @@ const starchActual = num(nutrition.starchPctActual, 1);
       : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
     if (isBuffalo) {
     dmHint =
-      dmState === 'good'
-        ? 'مربيك: المادة الجافة مناسبة للجاموس. حافظ على ثبات الخلطة والمتبقي.'
-        : Number(dmActual) < Number(dmTarget)
-          ? 'مربيك: المادة الجافة أقل من احتياج الجاموس. حسّن جودة الخشن والاستساغة قبل زيادة المركزات.'
-          : 'مربيك: المادة الجافة أعلى من الاحتياج. تأكد أن الزيادة مأكولة وليست فرزًا أو هدرًا.';
+      Number.isFinite(Number(dmRatioPct))
+        ? (
+            dmRatioPct < 95
+              ? `مربيك: المادة الجافة المقدمة/المأكولة للجاموس أقل من المتوقع (${dmRatioPct}%). هذا مؤشر شهية أو تقديم، وليس حكم نقص غذائي بذاته. راقب المتبقي وBunk score.`
+              : dmRatioPct > 120
+                ? `مربيك: المادة الجافة المقدمة/المأكولة للجاموس أعلى من المتوقع (${dmRatioPct}%). إذا كانت العليقة متزنة والاستجابة اللبنية جيدة فليست مشكلة بذاتها. راقب المتبقي والروث وBCS.`
+                : `مربيك: المادة الجافة المقدمة/المأكولة للجاموس قريبة من المتوقع (${dmRatioPct}%). الحكم الغذائي يكون من الطاقة والبروتين وأمان الكرش.`
+          )
+        : 'مربيك: المادة الجافة المتوقعة للجاموس مرجع تشغيل للشهية والتقديم، وليست Target تغذية للحكم بنقص أو زيادة.';
 
     nelHint =
       nelState === 'good'
@@ -2358,10 +2374,6 @@ cpHint =
       return 'مربيك: أصلح صحة الكرش قبل رفع الطاقة أو الحبوب.';
     }
 
-    if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
-      return 'مربيك: ارفع المادة الجافة تدريجيًا قبل تغيير التركيبة.';
-    }
-
     if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
       return 'مربيك: حسّن البروتين الممثل قبل رفع البروتين الخام.';
     }
@@ -2387,8 +2399,6 @@ cpHint =
       priorityText = 'مربيك: خفّض النشا أولًا أو ارفع الخشن الفعّال؛ الجاموس حساس لضغط النشا.';
     } else if (fatHigh) {
       priorityText = 'مربيك: خفّض دهن العليقة أولًا لأنه Limit وليس هدفًا.';
-    } else if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
-      priorityText = 'مربيك: حسّن مأكول الجاموس بالخشن الجيد والاستساغة قبل تعديل المركزات.';
     } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
       priorityText = 'مربيك: حسّن البروتين الممثل للجاموس مع ضبط الطاقة، ولا ترفع CP عشوائيًا.';
     } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
@@ -2400,10 +2410,6 @@ cpHint =
    let decisionText = (() => {
     if (rumenModel?.status === 'danger') {
       return 'مربيك: العليقة تحتاج ضبط صحة الكرش أولًا.';
-    }
-
-    if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
-      return 'مربيك: العليقة آمنة للكرش لكنها لا تغطي المادة الجافة.';
     }
 
     if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
@@ -2427,8 +2433,6 @@ cpHint =
       decisionText = 'مربيك: عليقة الجاموس تتجاوز حد النشا الآمن.';
     } else if (fatHigh) {
       decisionText = 'مربيك: عليقة الجاموس تتجاوز حد الدهون الآمن.';
-    } else if (dmState !== 'good' && Number(dmActual) < Number(dmTarget)) {
-      decisionText = 'مربيك: العليقة آمنة نسبيًا للكرش لكنها لا تغطي مأكول الجاموس.';
     } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
       decisionText = 'مربيك: العليقة تحتاج تحسين بروتين ممثل مناسب للجاموس.';
     } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
@@ -2449,7 +2453,6 @@ cpHint =
         rumenModel?.status === 'danger'
           ? 'danger'
           : (
-              dmState !== 'good' ||
               nelState !== 'good' ||
               mpState !== 'good' ||
               starchHigh ||
@@ -2461,12 +2464,12 @@ cpHint =
 
     {
       key: 'dm',
-      title: 'المادة الجافة',
+      title: 'المادة الجافة المقدمة/المتوقعة',
       value: txt(dmActual, 'كجم', 2),
       actual: dmActual,
       target: dmTarget,
-      targetText: `${txt(dmActual, 'كجم', 2)} / ${txt(dmTarget, 'كجم', 2)} — ${dmHint}`,
-      status: uiStatus(dmState)
+      targetText: `${txt(dmActual, 'كجم', 2)} / المتوقع ${txt(dmTarget, 'كجم', 2)} — ${dmHint}`,
+      status: 'info'
     },
 
     {
@@ -2563,7 +2566,6 @@ cpHint =
         rumenModel?.status === 'danger'
           ? 'danger'
           : (
-              dmState !== 'good' ||
               nelState !== 'good' ||
               mpState !== 'good' ||
               starchHigh ||
@@ -2620,12 +2622,12 @@ cpHint =
   const advancedCards = [
     {
       key: 'dmiTarget',
-      title: 'احتياجات المادة الجافة',
+      title: 'المأكول المتوقع للمادة الجافة',
       value: txt(targets.dmiTarget, 'كجم', 2)
     },
     {
       key: 'totDM',
-      title: 'العليقة الحالية — مادة جافة',
+      title: 'المادة الجافة المقدمة/المأكولة',
       value: txt(totals.dmKg, 'كجم', 2)
     },
 
