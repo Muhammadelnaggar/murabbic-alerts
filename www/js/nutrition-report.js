@@ -1,6 +1,6 @@
-
-      // مُرَبِّيك — تقرير التغذية الاحترافي
+// مُرَبِّيك — تقرير التغذية الاحترافي
 // عرض فقط: يقرأ التحليلات المحفوظة من السيرفر ولا يعيد حساب الاحتياجات أو الإمداد.
+// نسخة منظمة: تقرير شامل افتراضي + فهرس واضح + تبويب/روابط داخلية + كل تحليل العليقة في كتلة واحدة.
 
 const API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';
 
@@ -48,6 +48,10 @@ function num(v){
   return Number.isFinite(n) ? n : null;
 }
 
+function finite(v){
+  return Number.isFinite(Number(v));
+}
+
 function nf(v, d = 2){
   const n = Number(v);
   if(!Number.isFinite(n)) return '—';
@@ -60,32 +64,139 @@ function money(v){
   return `${nf(n, 2)} جنيه`;
 }
 
-function kg(v, d = 2){
-  return `${nf(v, d)} كجم`;
+function kg(v, d = 2){ return `${nf(v, d)} كجم`; }
+function pct(v, d = 1){ return `${nf(v, d)}%`; }
+function g(v, d = 0){ return `${nf(v, d)} جم`; }
+function safe(v){ return (v === null || v === undefined || v === '') ? '—' : String(v); }
+
+function stateWeight(s){
+  const x = String(s || '').toLowerCase();
+  if(x.includes('danger') || x.includes('خطر')) return 1;
+  if(x.includes('warn') || x.includes('watch') || x.includes('مراجعة') || x.includes('متابعة')) return 2;
+  if(x.includes('good') || x.includes('ok') || x.includes('مقبول') || x.includes('مناسب')) return 3;
+  return 4;
 }
 
-function pct(v, d = 1){
-  return `${nf(v, d)}%`;
+function stateClass(state){
+  const s = String(state || '').toLowerCase();
+  if(s.includes('danger') || s.includes('bad') || s.includes('deficit') || s.includes('excess') || s.includes('خطر')) return 'danger';
+  if(s.includes('warn') || s.includes('watch') || s.includes('low') || s.includes('border') || s.includes('مراجعة') || s.includes('متابعة')) return 'warn';
+  if(s.includes('good') || s.includes('ok') || s.includes('مقبول') || s.includes('مناسب')) return 'good';
+  return 'muted';
 }
 
-function g(v, d = 0){
-  return `${nf(v, d)} جم`;
+function statusText(state){
+  const s = String(state || '').toLowerCase();
+  if(s.includes('danger')) return 'خطر';
+  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
+  if(s.includes('good') || s.includes('ok')) return 'مقبول';
+  if(s.includes('deficit')) return 'نقص';
+  if(s.includes('excess')) return 'زيادة';
+  return 'متابعة';
 }
 
-function safe(v){
-  return (v === null || v === undefined || v === '') ? '—' : String(v);
+function badge(text, state = ''){
+  if(!text) return '';
+  return `<span class="status-chip ${stateClass(state || text)}">${esc(text)}</span>`;
 }
 
-function finite(v){
-  return Number.isFinite(Number(v));
+function stageLabel(stage, ctx = {}){
+  const s = String(stage || ctx.groupType || '').toLowerCase();
+  if(s.includes('close')) return 'انتظار الولادة';
+  if(s.includes('far') || s.includes('dry')) return 'جاف بعيد';
+  if(s.includes('lact')) return 'حلاب';
+  if(ctx.closeUp) return 'انتظار الولادة';
+  if(ctx.earlyDry) return 'جاف بعيد';
+  if(Number(ctx.avgMilkKg || 0) > 0) return 'حلاب';
+  return 'غير محدد';
 }
 
-function compact(arr){
-  return (Array.isArray(arr) ? arr : []).filter(Boolean);
+function isLactating(stage, ctx = {}){
+  return stageLabel(stage, ctx) === 'حلاب' || Number(ctx.avgMilkKg || 0) > 0;
+}
+
+function isCloseUp(stage, ctx = {}){
+  return stageLabel(stage, ctx) === 'انتظار الولادة';
+}
+
+function balanceState(balance, tolerance = 0){
+  const n = Number(balance);
+  if(!Number.isFinite(n)) return 'muted';
+  if(n < -Math.abs(tolerance)) return 'danger';
+  if(n > Math.abs(tolerance)) return 'warn';
+  return 'good';
+}
+
+function highLimitState(actual, max){
+  if(!finite(actual) || !finite(max)) return 'muted';
+  return Number(actual) > Number(max) ? 'warn' : 'good';
+}
+
+function minLimitState(actual, min){
+  if(!finite(actual) || !finite(min)) return 'muted';
+  return Number(actual) < Number(min) ? 'warn' : 'good';
+}
+
+function decisionFromEvent(e = {}){
+  const cards = e?.nutrition?.panels?.analysisCards || [];
+  return cards.find(c => String(c?.key || '').toLowerCase() === 'decision') || null;
+}
+
+function priorityFromEvent(e = {}){
+  const cards = e?.nutrition?.panels?.analysisCards || [];
+  return cards.find(c => String(c?.key || '').toLowerCase() === 'priority') || null;
+}
+
+function eventStage(e = {}){
+  const ctx = e?.nutrition?.context || {};
+  if(ctx.closeUp) return 'close_up';
+  if(ctx.earlyDry) return 'far_dry';
+  if(Number(ctx.avgMilkKg || 0) > 0) return 'lactating';
+
+  const gt = String(ctx.groupType || '').toLowerCase();
+  if(gt.includes('close')) return 'close_up';
+  if(gt.includes('far') || gt.includes('dry')) return 'far_dry';
+  if(gt.includes('lact')) return 'lactating';
+
+  const modelStage = String(e?.nutrition?.analysis?.targets?.chapter12EnergyModel?.stage || '').toLowerCase();
+  if(modelStage.includes('close')) return 'close_up';
+  if(modelStage.includes('far') || modelStage.includes('dry')) return 'far_dry';
+
+  return '';
+}
+
+function groupNameFromEvent(e = {}){
+  const ctx = e?.nutrition?.context || {};
+  return String(ctx.groupName || ctx.group || ctx.groupLabel || e.groupName || 'مجموعة تغذية').trim();
+}
+
+function speciesLabelFromEvent(e = {}){
+  const s = String(e?.nutrition?.context?.species || '').toLowerCase();
+  if(s.includes('جاموس') || s.includes('buffalo')) return 'جاموس';
+  if(s.includes('بقر') || s.includes('cow')) return 'أبقار';
+  return safe(e?.nutrition?.context?.species);
+}
+
+function eventStatus(e = {}){
+  const d = decisionFromEvent(e);
+  const p = priorityFromEvent(e);
+  const s = String(d?.status || p?.status || e?.nutrition?.analysis?.nutrition?.rumenStatus || '').toLowerCase();
+  if(s.includes('danger')) return 'danger';
+  if(s.includes('warn') || s.includes('watch')) return 'warn';
+  if(s.includes('good') || s.includes('ok')) return 'good';
+  return 'muted';
+}
+
+function slug(s){
+  return String(s || '')
+    .trim()
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'ration';
 }
 
 /* ============================================================
-   ستايل إضافي للتقرير الاحترافي والطباعة
+   ستايل التقرير والطباعة
 ============================================================ */
 function injectReportStyles(){
   if(document.getElementById('mbkNutritionReportStyle')) return;
@@ -93,6 +204,37 @@ function injectReportStyles(){
   const style = document.createElement('style');
   style.id = 'mbkNutritionReportStyle';
   style.textContent = `
+    html{scroll-behavior:smooth}
+    .report-tabs{
+      position:sticky;
+      top:0;
+      z-index:20;
+      display:flex;
+      gap:8px;
+      overflow:auto;
+      padding:10px 0;
+      margin-bottom:10px;
+      background:rgba(248,250,252,.96);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid #e2e8f0;
+    }
+    .report-tabs a{
+      flex:0 0 auto;
+      text-decoration:none;
+      border:1px solid #dce9df;
+      background:#fff;
+      color:#134e2f;
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:12px;
+      font-weight:950;
+      white-space:nowrap;
+    }
+    .report-tabs a.main{
+      background:#0f5d35;
+      color:#fff;
+      border-color:#0f5d35;
+    }
     .executive-hero{
       display:grid;
       grid-template-columns:1.15fr .85fr;
@@ -135,6 +277,7 @@ function injectReportStyles(){
       background:#ecfdf3;
       color:#166534;
       white-space:nowrap;
+      vertical-align:middle;
     }
     .status-chip.warn{
       background:#fff7ed;
@@ -219,15 +362,11 @@ function injectReportStyles(){
     .ration-block{
       break-inside:auto;
       page-break-inside:auto;
+      scroll-margin-top:90px;
     }
     .ration-break{
       break-before:page;
       page-break-before:always;
-    }
-    .index-grid{
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:9px;
     }
     .priority-list{
       margin:0;
@@ -243,7 +382,8 @@ function injectReportStyles(){
       flex-wrap:wrap;
       margin-top:10px;
     }
-    .screen-actions-row a{
+    .screen-actions-row a,
+    .screen-actions-row button{
       text-decoration:none;
       border-radius:12px;
       padding:9px 12px;
@@ -252,16 +392,37 @@ function injectReportStyles(){
       border:1px solid #dfe9e2;
       color:#134e2f;
       background:#eef7f0;
+      cursor:pointer;
+    }
+    .ration-head-grid{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      align-items:start;
+    }
+    .compact-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:8px;
+    }
+    .analysis-subtitle{
+      font-weight:950;
+      color:#123d2a;
+      margin:14px 0 8px;
+      font-size:14px;
     }
 
     @media(max-width:760px){
       .executive-hero{grid-template-columns:1fr}
       .hero-side{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .index-grid{grid-template-columns:1fr}
-      .metric-table{min-width:720px}
+      .compact-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .metric-table{min-width:760px}
+      .ration-head-grid{grid-template-columns:1fr}
     }
 
     @media print{
+      .report-tabs,
+      .screen-actions-row{display:none !important}
       .executive-hero{grid-template-columns:1.1fr .9fr}
       .hero-main,
       .decision-box{
@@ -270,7 +431,6 @@ function injectReportStyles(){
       }
       .hero-title{font-size:20pt}
       .status-chip{border-radius:0}
-      .screen-actions-row{display:none !important}
       .ration-break{
         break-before:page;
         page-break-before:always;
@@ -282,117 +442,10 @@ function injectReportStyles(){
       }
       .decision-text{font-size:11pt}
       .decision-note{font-size:9pt}
+      .card{break-inside:auto;page-break-inside:auto}
     }
   `;
   document.head.appendChild(style);
-}
-
-/* ============================================================
-   حالات وحكم
-============================================================ */
-function stateClass(state){
-  const s = String(state || '').toLowerCase();
-  if(s.includes('danger') || s.includes('bad') || s.includes('deficit') || s.includes('excess') || s.includes('خطر')) return 'danger';
-  if(s.includes('warn') || s.includes('watch') || s.includes('low') || s.includes('border') || s.includes('مراجعة') || s.includes('متابعة')) return 'warn';
-  if(s.includes('good') || s.includes('ok') || s.includes('مقبول') || s.includes('مناسب')) return '';
-  return 'muted';
-}
-
-function statusText(state){
-  const s = String(state || '').toLowerCase();
-  if(s.includes('danger')) return 'خطر';
-  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
-  if(s.includes('good') || s.includes('ok')) return 'مقبول';
-  if(s.includes('deficit')) return 'نقص';
-  if(s.includes('excess')) return 'زيادة';
-  return 'غير محسوم';
-}
-
-function badge(text, state = ''){
-  if(!text) return '';
-  const cls = stateClass(state || text);
-  return `<span class="status-chip ${cls}">${esc(text)}</span>`;
-}
-
-function stageLabel(stage, ctx = {}){
-  const s = String(stage || ctx.groupType || '').toLowerCase();
-  if(s.includes('close')) return 'انتظار الولادة';
-  if(s.includes('far') || s.includes('dry')) return 'جاف بعيد';
-  if(s.includes('lact')) return 'حلاب';
-  if(ctx.closeUp) return 'انتظار الولادة';
-  if(ctx.earlyDry) return 'جاف بعيد';
-  if(Number(ctx.avgMilkKg || 0) > 0) return 'حلاب';
-  return 'غير محدد';
-}
-
-function isLactating(stage, ctx = {}){
-  return stageLabel(stage, ctx) === 'حلاب' || Number(ctx.avgMilkKg || 0) > 0;
-}
-
-function isCloseUp(stage, ctx = {}){
-  return stageLabel(stage, ctx) === 'انتظار الولادة';
-}
-
-function balanceState(balance, tolerance = 0){
-  const n = Number(balance);
-  if(!Number.isFinite(n)) return 'unknown';
-  if(n < -Math.abs(tolerance)) return 'danger';
-  if(n > Math.abs(tolerance)) return 'warn';
-  return 'good';
-}
-
-function highLimitState(actual, max){
-  if(!finite(actual) || !finite(max)) return 'unknown';
-  return Number(actual) > Number(max) ? 'warn' : 'good';
-}
-
-function minLimitState(actual, min){
-  if(!finite(actual) || !finite(min)) return 'unknown';
-  return Number(actual) < Number(min) ? 'warn' : 'good';
-}
-
-function decisionFromEvent(e = {}){
-  const cards = e?.nutrition?.panels?.analysisCards || [];
-  return cards.find(c => String(c?.key || '').toLowerCase() === 'decision') || null;
-}
-
-function priorityFromEvent(e = {}){
-  const cards = e?.nutrition?.panels?.analysisCards || [];
-  return cards.find(c => String(c?.key || '').toLowerCase() === 'priority') || null;
-}
-
-function eventStage(e = {}){
-  const ctx = e?.nutrition?.context || {};
-  if(ctx.closeUp) return 'close_up';
-  if(ctx.earlyDry) return 'far_dry';
-  if(Number(ctx.avgMilkKg || 0) > 0) return 'lactating';
-  const gt = String(ctx.groupType || '').toLowerCase();
-  if(gt.includes('close')) return 'close_up';
-  if(gt.includes('far') || gt.includes('dry')) return 'far_dry';
-  if(gt.includes('lact')) return 'lactating';
-  return '';
-}
-
-function groupNameFromEvent(e = {}){
-  const ctx = e?.nutrition?.context || {};
-  return String(ctx.groupName || ctx.group || ctx.groupLabel || e.groupName || 'مجموعة تغذية').trim();
-}
-
-function speciesLabelFromEvent(e = {}){
-  const s = String(e?.nutrition?.context?.species || '').toLowerCase();
-  if(s.includes('جاموس') || s.includes('buffalo')) return 'جاموس';
-  if(s.includes('بقر') || s.includes('cow')) return 'أبقار';
-  return safe(e?.nutrition?.context?.species);
-}
-
-function eventStatus(e = {}){
-  const d = decisionFromEvent(e);
-  const p = priorityFromEvent(e);
-  const s = String(d?.status || p?.status || e?.nutrition?.analysis?.nutrition?.rumenStatus || '').toLowerCase();
-  if(s.includes('danger')) return 'danger';
-  if(s.includes('warn') || s.includes('watch')) return 'warn';
-  if(s.includes('good') || s.includes('ok')) return 'good';
-  return 'unknown';
 }
 
 /* ============================================================
@@ -457,8 +510,9 @@ function buildPath(){
   const view = qp.get('view') || '';
   let scope = qp.get('scope') || '';
 
-  if(!scope && view) scope = 'lactating_summary';
-  if(!scope) scope = 'group';
+  // الافتراضي الآن تقرير شامل، حتى لا يفتح المستخدم عليقة واحدة ويتوه.
+  if(!scope && view) scope = 'all';
+  if(!scope) scope = 'all';
 
   const p = new URLSearchParams();
   p.set('scope', scope);
@@ -471,7 +525,7 @@ function buildPath(){
 }
 
 /* ============================================================
-   ملخص الحلاب القديم — محسّن
+   ملخص الحلاب
 ============================================================ */
 function adviceForSummary(groups = [], totals = {}){
   const notes = [];
@@ -554,27 +608,8 @@ function renderSummary(data){
 }
 
 /* ============================================================
-   تقرير منفرد / جزء داخل التقرير الشامل
+   تحليل عليقة واحدة
 ============================================================ */
-function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
-  const decision = decisionFromEvent(e);
-  const priority = priorityFromEvent(e);
-  const state = eventStatus(e);
-
-  const fallbackDecision = buildAutoDecision(a, stage, ctx);
-  const decisionText = decision?.value || fallbackDecision.title;
-  const priorityText = priority?.value || priority?.targetText || fallbackDecision.action;
-
-  return `<div class="decision-box">
-    <div class="decision-head">
-      <div class="decision-title">الحكم التنفيذي</div>
-      ${badge(statusText(state), state)}
-    </div>
-    <div class="decision-text">${esc(decisionText)}</div>
-    ${priorityText ? `<div class="decision-note"><b>الإجراء الأول:</b> ${esc(priorityText)}</div>` : ''}
-  </div>`;
-}
-
 function buildAutoDecision(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
   const t = a.targets || {};
@@ -621,12 +656,31 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
   };
 }
 
+function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
+  const decision = decisionFromEvent(e);
+  const priority = priorityFromEvent(e);
+  const state = eventStatus(e);
+
+  const fallbackDecision = buildAutoDecision(a, stage, ctx);
+  const decisionText = decision?.value || fallbackDecision.title;
+  const priorityText = priority?.value || priority?.targetText || fallbackDecision.action;
+
+  return `<div class="decision-box">
+    <div class="decision-head">
+      <div class="decision-title">الحكم التنفيذي</div>
+      ${badge(statusText(state), state)}
+    </div>
+    <div class="decision-text">${esc(decisionText)}</div>
+    ${priorityText ? `<div class="decision-note"><b>الإجراء الأول:</b> ${esc(priorityText)}</div>` : ''}
+  </div>`;
+}
+
 function renderContextBlock(ctx = {}, event = {}, stage = ''){
   const profile = ctx.groupNutritionProfile || {};
   const hom = ctx.homogeneity || {};
   const ft = ctx.formulationTarget || {};
 
-  return section('بطاقة تعريف العليقة', `<div class="grid">
+  return section('بطاقة تعريف العليقة', `<div class="compact-grid">
     ${kpi('العليقة / المجموعة', ctx.groupName || ctx.group || ctx.groupLabel || '—')}
     ${kpi('المرحلة', stageLabel(stage, ctx))}
     ${kpi('النوع', safe(ctx.species))}
@@ -661,87 +715,157 @@ function metricRow(name, need, supply, balance, state, note = ''){
   </tr>`;
 }
 
-function renderCoreNutrients(a = {}, stage = '', ctx = {}){
+function mineralVal(item, keyG, keyMg){
+  const v = item?.[keyG] ?? item?.[keyMg];
+  return Number.isFinite(Number(v)) ? Number(v) : null;
+}
+
+function mineralStatus(item = {}){
+  const s = String(item.status || '').toLowerCase();
+  if(s.includes('deficit')) return 'danger';
+  if(s.includes('excess')) return 'warn';
+  if(s.includes('warn') || s.includes('watch')) return 'warn';
+  if(s.includes('ok')) return 'good';
+  return 'muted';
+}
+
+function mineralStatusText(item = {}){
+  const s = String(item.status || '').toLowerCase();
+  if(s.includes('deficit')) return 'نقص';
+  if(s.includes('excess')) return 'زيادة';
+  if(s.includes('ok')) return 'مقبول';
+  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
+  return 'متابعة';
+}
+
+function mineralRows(balance = {}, unit = 'g'){
+  const orderMacro = ['Ca','P','Mg','Na','K','Cl','S'];
+  const orderTrace = ['Co','Cu','Fe','I','Mn','Se','Zn'];
+  const order = unit === 'mg' ? orderTrace : orderMacro;
+
+  return order
+    .filter(k => balance && balance[k])
+    .map(k => {
+      const item = balance[k] || {};
+      const required = unit === 'mg'
+        ? mineralVal(item, 'requiredMg', 'requiredG')
+        : mineralVal(item, 'requiredG', 'requiredMg');
+
+      const supplied = unit === 'mg'
+        ? mineralVal(item, 'suppliedMg', 'suppliedG')
+        : mineralVal(item, 'suppliedG', 'suppliedMg');
+
+      const bal = unit === 'mg'
+        ? mineralVal(item, 'balanceMg', 'balanceG')
+        : mineralVal(item, 'balanceG', 'balanceMg');
+
+      const cover = num(item.supplyPctOfRequirement);
+
+      return metricRow(
+        k,
+        required == null ? '—' : `${nf(required, 2)} ${unit}`,
+        supplied == null ? '—' : `${nf(supplied, 2)} ${unit}`,
+        bal == null ? '—' : `${nf(bal, 2)} ${unit}`,
+        mineralStatus(item),
+        Number.isFinite(cover) ? `تغطية ${nf(cover,1)}%` : '—'
+      );
+    });
+}
+
+function vitaminRows(balance = {}){
+  return ['A','D','E']
+    .filter(k => balance && balance[k])
+    .map(k => {
+      const item = balance[k] || {};
+      const required = num(item.requiredIU);
+      const supplied = num(item.suppliedIU);
+      const bal = num(item.balanceIU);
+      const cover = num(item.supplyPctOfRequirement);
+
+      return metricRow(
+        `Vitamin ${k}`,
+        Number.isFinite(required) ? `${nf(required, 0)} IU` : '—',
+        Number.isFinite(supplied) ? `${nf(supplied, 0)} IU` : '—',
+        Number.isFinite(bal) ? `${nf(bal, 0)} IU` : '—',
+        mineralStatus(item),
+        Number.isFinite(cover) ? `تغطية ${nf(cover,1)}%` : '—'
+      );
+    });
+}
+
+function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
   const t = a.targets || {};
   const totals = a.totals || {};
   const e = a.economics || {};
+
+  const supply = n.mineralSupplyModel || {};
+  const vitSupply = n.vitaminSupplyModel || {};
+  const dcad = n.dcadModel || {};
+  const macroBalance = supply?.mineralBalanceModel?.balance || {};
+  const traceBalance = supply?.traceMineralBalanceModel?.balance || {};
+  const vitBalance = vitSupply?.vitaminBalanceModel?.balance || {};
 
   const dmBal = finite(totals.dmKg) && finite(t.dmiTarget) ? Number(totals.dmKg) - Number(t.dmiTarget) : null;
   const nelBal = finite(n.nelActual) && finite(t.nelTarget) ? Number(n.nelActual) - Number(t.nelTarget) : null;
   const mpBal = finite(n.mpBalanceG) ? Number(n.mpBalanceG) : (finite(n.mpSupplyG) && finite(t.mpTargetG) ? Number(n.mpSupplyG) - Number(t.mpTargetG) : null);
 
+  const rh = n.rumenHealthModel || {};
+  const rumenState = rh.status || n.rumenStatus || 'muted';
+  const dcadVal = n.dcadModel?.dcadMeqKgDM;
+
   const rows = [
-    metricRow('المادة الجافة DMI', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', balanceState(dmBal, 0.5), 'مقارنة فعلية يومية بنفس المقياس.'),
-    metricRow('الطاقة NEL', `${nf(t.nelTarget,2)} Mcal/يوم`, `${nf(n.nelActual,2)} Mcal/يوم`, finite(nelBal) ? `${nf(nelBal,2)} Mcal` : '—', balanceState(nelBal, 0.5), 'الاحتياج والإمداد يومي وليس كثافة.'),
+    metricRow('المادة الجافة DMI', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', balanceState(dmBal, 0.5), 'مقارنة يومية بنفس المقياس.'),
+    metricRow('الطاقة NEL', `${nf(t.nelTarget,2)} Mcal/يوم`, `${nf(n.nelActual,2)} Mcal/يوم`, finite(nelBal) ? `${nf(nelBal,2)} Mcal` : '—', balanceState(nelBal, 0.5), 'الاحتياج والإمداد يومي.'),
     metricRow('البروتين الممثل MP', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), 'الأولوية قبل تعديل CP.'),
-    metricRow('البروتين الخام CP', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام وليس بديلًا عن MP.'),
-    metricRow('NDF الكلي', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'يُراجع مع صحة الكرش وليس منفردًا.'),
+    metricRow('البروتين الخام CP', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام.'),
+    metricRow('NDF الكلي', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'يُقرأ مع صحة الكرش.'),
     metricRow('peNDF', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), 'ألياف فعالة للمضغ والاجترار.'),
     metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), 'حد أمان وليس هدفًا للرفع.'),
-    metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'الزيادة قد تضغط هضم الألياف.')
+    metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'الزيادة قد تضغط هضم الألياف.'),
+    metricRow('صحة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', rumenState, rh.reason || n.rumenNote || '—'),
+    metricRow('الخشن من DM', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), 'الخشن ليس رقمًا فقط؛ الفعالية مهمة.'),
+    metricRow('Forage NDF', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'حماية الكرش من مصدر خشن.')
   ];
 
   if(isLactating(stage, ctx)){
-    rows.push(metricRow('تكلفة كجم اللبن', 'أقل أفضل', money(e.costPerKgMilk), '—', 'unknown', 'مؤشر اقتصادي للحلاب فقط.'));
+    rows.push(metricRow('تكلفة كجم اللبن', 'أقل أفضل', money(e.costPerKgMilk), '—', 'muted', 'مؤشر اقتصادي للحلاب.'));
     rows.push(metricRow('هامش لبن-علف/رأس', 'موجب', money(e.milkMargin), '—', finite(e.milkMargin) && Number(e.milkMargin) < 0 ? 'danger' : 'good', 'أهم مؤشر ربحية يومي.'));
+    rows.push(metricRow('إيراد اللبن/رأس', 'حسب السعر', money(e.milkRevenue), '—', 'muted', 'مرتبط بسعر اللبن المدخل.'));
+    rows.push(metricRow('DM / كجم لبن', 'أقل أفضل مع ثبات الصحة', kg(e.dmPerKgMilk,2), '—', 'muted', 'كفاءة تحويل العلف.'));
   }
 
   if(isCloseUp(stage, ctx)){
-    const dcadVal = n.dcadModel?.dcadMeqKgDM;
-    rows.push(metricRow('DCAD', 'نطاق انتظار الولادة', finite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—', '—', finite(dcadVal) && Number(dcadVal) > -50 ? 'warn' : 'good', 'يُراجع مع Ca/Mg وأملاح الأنيون.'));
+    rows.push(metricRow('DCAD انتظار الولادة', 'نطاق انتظار الولادة', finite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—', '—', finite(dcadVal) && Number(dcadVal) > -50 ? 'warn' : 'good', dcad?.note || 'يُراجع مع Ca/Mg وأملاح الأنيون.'));
   }
 
-  return section('لوحة الاحتياج والإمداد', table(
-    ['البند','الاحتياج / الحد','الإمداد / الفعلي','الميزان','الحكم','ملاحظة'],
-    rows,
-    'لا توجد بيانات احتياج وإمداد محفوظة.'
-  ));
-}
+  const macro = mineralRows(macroBalance, 'g');
+  const trace = mineralRows(traceBalance, 'mg');
+  const vit = vitaminRows(vitBalance);
 
-function renderRumen(a = {}){
-  const n = a.nutrition || {};
-  const t = a.targets || {};
-  const rh = n.rumenHealthModel || {};
-  const state = rh.status || n.rumenStatus || '';
+  const mineralHeader = (macro.length || trace.length || vit.length)
+    ? `<div class="analysis-subtitle">المعادن والفيتامينات داخل نفس تحليل العليقة</div>`
+    : '';
 
-  const rows = [
-    metricRow('حالة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', state, rh.reason || n.rumenNote || '—'),
-    metricRow('الخشن من DM', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), 'الخشن ليس رقمًا فقط؛ الفعالية مهمة.'),
-    metricRow('Forage NDF', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'حماية الكرش من مصدر خشن.'),
-    metricRow('peNDF', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), 'ألياف مؤثرة للمضغ واللعاب.'),
-    metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), 'يُفسّر مع الألياف وليس منفردًا.')
-  ];
-
-  return section('صحة الكرش', `
+  return section('تحليل العليقة الكامل', `
     ${rh.instruction ? `<div class="decision-box">
       <div class="decision-head">
         <div class="decision-title">توجيه صحة الكرش</div>
-        ${badge(statusText(state), state)}
+        ${badge(statusText(rumenState), rumenState)}
       </div>
       <div class="decision-text">${esc(rh.title || '—')}</div>
       <div class="decision-note">${esc(rh.instruction)}</div>
     </div>` : ''}
-    ${table(['المؤشر','الهدف / الحد','الفعلي','الفرق','الحكم','التفسير'], rows)}
+
+    ${table(['البند','الاحتياج / الحد','الإمداد / الفعلي','الميزان','الحكم','ملاحظة'], rows)}
+
+    ${mineralHeader}
+    ${(macro.length || trace.length || vit.length) ? table(
+      ['العنصر','الاحتياج','الإمداد','الميزان','الحكم','ملاحظة'],
+      [...macro, ...trace, ...vit],
+      'لا توجد عناصر محفوظة داخل التحليل.'
+    ) : ''}
   `);
-}
-
-function renderEconomics(a = {}, stage = '', ctx = {}){
-  if(!isLactating(stage, ctx)) return '';
-
-  const totals = a.totals || {};
-  const e = a.economics || {};
-
-  const rows = [
-    `<tr><td class="metric-name">تكلفة العلف/رأس/يوم</td><td>${money(totals.totCost)}</td></tr>`,
-    `<tr><td class="metric-name">تكلفة كجم اللبن</td><td>${money(e.costPerKgMilk)}</td></tr>`,
-    `<tr><td class="metric-name">إيراد اللبن/رأس/يوم</td><td>${money(e.milkRevenue)}</td></tr>`,
-    `<tr><td class="metric-name">هامش اللبن بعد العلف/رأس</td><td>${money(e.milkMargin)} ${finite(e.milkMargin) ? badge(Number(e.milkMargin) < 0 ? 'خطر' : 'مقبول', Number(e.milkMargin) < 0 ? 'danger' : 'good') : ''}</td></tr>`,
-    `<tr><td class="metric-name">DM / كجم لبن</td><td>${kg(e.dmPerKgMilk,2)}</td></tr>`,
-    `<tr><td class="metric-name">سعر طن العليقة as-fed</td><td>${money(totals.mixPriceAsFed)}</td></tr>`
-  ];
-
-  return section('الاقتصاد — للحلاب', table(['البند','القيمة'], rows));
 }
 
 function renderRows(rows = []){
@@ -751,6 +875,7 @@ function renderRows(rows = []){
     const cpPct = num(r.cpPct ?? r.cp);
     const ndfPct = num(r.ndfPct ?? r.ndf);
     const starchPct = num(r.starchPct ?? r.starch);
+    const fatPct = num(r.fatPct ?? r.fat ?? r.crudeFatPct);
     const price = num(r.pricePerTon ?? r.pTon ?? r.price ?? r.pTonRaw);
 
     const dmKg = finite(asFed) && finite(dmPct) ? Number(asFed) * Number(dmPct) / 100 : null;
@@ -767,240 +892,18 @@ function renderRows(rows = []){
       <td>${kg(cpKg,2)}</td>
       <td>${kg(ndfKg,2)}</td>
       <td>${kg(starchKg,2)}</td>
+      <td>${pct(fatPct,1)}</td>
       <td>${money(cost)}</td>
     </tr>`;
   });
 
   return section('تركيبة العليقة ومساهمة الخامات', table(
-    ['الخامة','الفئة','as-fed','DM kg','CP kg','NDF kg','نشا kg','تكلفة/رأس'],
+    ['الخامة','الفئة','as-fed','DM kg','CP kg','NDF kg','نشا kg','دهن %','تكلفة/رأس'],
     body,
     'لا توجد خامات محفوظة.'
   ));
 }
 
-/* ============================================================
-   المعادن والفيتامينات — لا حكم بدون بيانات مكتملة
-============================================================ */
-function mineralVal(item, keyG, keyMg){
-  const v = item?.[keyG] ?? item?.[keyMg];
-  return Number.isFinite(Number(v)) ? Number(v) : null;
-}
-
-function completeBalanceItem(item = {}, kind = 'mineral', unit = 'g'){
-  if(!item || typeof item !== 'object') return false;
-
-  const required = kind === 'vitamin'
-    ? num(item.requiredIU)
-    : (unit === 'mg'
-        ? mineralVal(item, 'requiredMg', 'requiredG')
-        : mineralVal(item, 'requiredG', 'requiredMg'));
-
-  const supplied = kind === 'vitamin'
-    ? num(item.suppliedIU)
-    : (unit === 'mg'
-        ? mineralVal(item, 'suppliedMg', 'suppliedG')
-        : mineralVal(item, 'suppliedG', 'suppliedMg'));
-
-  const balance = kind === 'vitamin'
-    ? num(item.balanceIU)
-    : (unit === 'mg'
-        ? mineralVal(item, 'balanceMg', 'balanceG')
-        : mineralVal(item, 'balanceG', 'balanceMg'));
-
-  const cover = num(item.supplyPctOfRequirement);
-
-  return Number.isFinite(required) && Number.isFinite(supplied) && (Number.isFinite(balance) || Number.isFinite(cover));
-}
-
-function itemStatusAr(item = {}, complete = false){
-  if(!complete) return 'بيانات غير مكتملة';
-  const s = String(item.status || '').toLowerCase();
-  if(s.includes('deficit')) return 'نقص';
-  if(s.includes('excess')) return 'زيادة';
-  if(s.includes('ok')) return 'مقبول';
-  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
-  return 'محسوب';
-}
-
-function mineralTableRows(balance = {}, unit = 'g'){
-  const orderMacro = ['Ca','P','Mg','Na','K','Cl','S'];
-  const orderTrace = ['Co','Cu','Fe','I','Mn','Se','Zn'];
-  const order = unit === 'mg' ? orderTrace : orderMacro;
-
-  return order
-    .filter(k => balance && balance[k])
-    .map(k => {
-      const item = balance[k] || {};
-      const complete = completeBalanceItem(item, 'mineral', unit);
-
-      const required = unit === 'mg'
-        ? mineralVal(item, 'requiredMg', 'requiredG')
-        : mineralVal(item, 'requiredG', 'requiredMg');
-
-      const supplied = unit === 'mg'
-        ? mineralVal(item, 'suppliedMg', 'suppliedG')
-        : mineralVal(item, 'suppliedG', 'suppliedMg');
-
-      const bal = unit === 'mg'
-        ? mineralVal(item, 'balanceMg', 'balanceG')
-        : mineralVal(item, 'balanceG', 'balanceMg');
-
-      const cover = num(item.supplyPctOfRequirement);
-      const state = complete ? item.status : 'unknown';
-
-      return `<tr>
-        <td class="metric-name">${esc(k)}</td>
-        <td>${required == null ? '—' : `${nf(required, 2)} ${unit}`}</td>
-        <td>${supplied == null ? '—' : `${nf(supplied, 2)} ${unit}`}</td>
-        <td>${bal == null ? '—' : `${nf(bal, 2)} ${unit}`}</td>
-        <td>${Number.isFinite(cover) ? nf(cover, 1) + '%' : '—'}</td>
-        <td>${badge(itemStatusAr(item, complete), state)}</td>
-      </tr>`;
-    });
-}
-
-function vitaminTableRows(balance = {}){
-  return ['A','D','E']
-    .filter(k => balance && balance[k])
-    .map(k => {
-      const item = balance[k] || {};
-      const complete = completeBalanceItem(item, 'vitamin');
-
-      const required = num(item.requiredIU);
-      const supplied = num(item.suppliedIU);
-      const bal = num(item.balanceIU);
-      const cover = num(item.supplyPctOfRequirement);
-      const state = complete ? item.status : 'unknown';
-
-      return `<tr>
-        <td class="metric-name">${esc(k)}</td>
-        <td>${Number.isFinite(required) ? nf(required, 0) : '—'} IU</td>
-        <td>${Number.isFinite(supplied) ? nf(supplied, 0) : '—'} IU</td>
-        <td>${Number.isFinite(bal) ? nf(bal, 0) : '—'} IU</td>
-        <td>${Number.isFinite(cover) ? nf(cover, 1) + '%' : '—'}</td>
-        <td>${badge(itemStatusAr(item, complete), state)}</td>
-      </tr>`;
-    });
-}
-
-function collectDeficits(balance = {}, kind = 'mineral', unit = 'g'){
-  return Object.entries(balance || {})
-    .filter(([_, v]) => completeBalanceItem(v, kind, unit))
-    .filter(([_, v]) => String(v?.status || '').toLowerCase().includes('deficit'))
-    .map(([k, v]) => ({
-      key: k,
-      cover: num(v.supplyPctOfRequirement)
-    }))
-    .sort((a,b) => (Number(a.cover) || 0) - (Number(b.cover) || 0));
-}
-
-function hasAnyCompleteBalance(balance = {}, kind = 'mineral', unit = 'g'){
-  return Object.values(balance || {}).some(v => completeBalanceItem(v, kind, unit));
-}
-
-function mineralAdvice(macroBalance = {}, traceBalance = {}, vitBalance = {}, close = false){
-  const macroComplete = hasAnyCompleteBalance(macroBalance, 'mineral', 'g');
-  const traceComplete = hasAnyCompleteBalance(traceBalance, 'mineral', 'mg');
-  const vitComplete = hasAnyCompleteBalance(vitBalance, 'vitamin');
-
-  const notes = [];
-
-  if(!macroComplete && !traceComplete && !vitComplete){
-    notes.push('بيانات الإمداد غير مكتملة — لا يمكن الحكم على نقص أو زيادة المعادن/الفيتامينات.');
-    if(close){
-      notes.push('في انتظار الولادة يجب مراجعة DCAD وCa/Mg فقط عند اكتمال بيانات الاحتياج والإمداد.');
-    }
-    return `<ul class="priority-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-  }
-
-  const macroDef = collectDeficits(macroBalance, 'mineral', 'g');
-  const traceDef = collectDeficits(traceBalance, 'mineral', 'mg');
-  const vitDef = collectDeficits(vitBalance, 'vitamin');
-
-  if(macroDef.length){
-    notes.push(`المعادن الكبرى الناقصة: ${macroDef.map(x => x.key).join('، ')}. ابدأ بتصحيح الأقل تغطية فقط.`);
-  }
-
-  if(traceDef.length){
-    notes.push(`العناصر الصغرى الناقصة: ${traceDef.map(x => x.key).join('، ')}. راجع premix المعادن الصغرى ومعدل الإضافة الفعلي.`);
-  }
-
-  if(vitDef.length){
-    notes.push(`الفيتامينات الناقصة: ${vitDef.map(x => x.key).join('، ')}. راجع مصدر A/D/E أو premix الفيتامينات.`);
-  }
-
-  if(close){
-    notes.push('في انتظار الولادة راجع DCAD والكالسيوم والماغنسيوم مع أملاح الأنيون تحت إشراف فني.');
-  }
-
-  if(!notes.length){
-    notes.push('البيانات المكتملة لا تُظهر عجزًا واضحًا في المعادن/الفيتامينات.');
-  }
-
-  return `<ul class="priority-list">${notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-}
-
-function renderMineralsVitamins(a = {}, stage = '', ctx = {}){
-  const n = a.nutrition || {};
-  const supply = n.mineralSupplyModel || {};
-  const vitSupply = n.vitaminSupplyModel || {};
-  const dcad = n.dcadModel || {};
-  const close = isCloseUp(stage, ctx);
-
-  const macroBalance = supply?.mineralBalanceModel?.balance || {};
-  const traceBalance = supply?.traceMineralBalanceModel?.balance || {};
-  const vitBalance = vitSupply?.vitaminBalanceModel?.balance || {};
-
-  const macroRows = mineralTableRows(macroBalance, 'g');
-  const traceRows = mineralTableRows(traceBalance, 'mg');
-  const vitRows = vitaminTableRows(vitBalance);
-
-  const hasComplete =
-    hasAnyCompleteBalance(macroBalance, 'mineral', 'g') ||
-    hasAnyCompleteBalance(traceBalance, 'mineral', 'mg') ||
-    hasAnyCompleteBalance(vitBalance, 'vitamin');
-
-  const dcadVal = num(dcad?.dcadMeqKgDM);
-  const dcadHtml = close
-    ? `<div style="margin-top:12px">
-        ${table(['البند','القيمة','الحكم'], [
-          `<tr>
-            <td class="metric-name">DCAD انتظار الولادة</td>
-            <td>${Number.isFinite(dcadVal) ? `${nf(dcadVal,0)} mEq/kg DM` : '—'}</td>
-            <td>${Number.isFinite(dcadVal) ? badge(dcadVal > -50 ? 'مراجعة' : 'مقبول', dcadVal > -50 ? 'warn' : 'good') : badge('غير مكتمل','unknown')}</td>
-          </tr>`
-        ])}
-      </div>`
-    : '';
-
-  return section('المعادن والفيتامينات', `
-    <div class="small-note" style="margin-bottom:10px">
-      قاعدة مُرَبِّيك: لا يظهر حكم نقص أو زيادة إلا عند اكتمال بيانات الاحتياج + الإمداد + الميزان أو التغطية.
-    </div>
-
-    ${!hasComplete ? `<div class="decision-box">
-      <div class="decision-head">
-        <div class="decision-title">حكم المعادن والفيتامينات</div>
-        ${badge('غير مكتمل','unknown')}
-      </div>
-      <div class="decision-text">بيانات الإمداد غير مكتملة — لا يمكن الحكم.</div>
-      <div class="decision-note">لن يتم اعتبار أي عنصر ناقصًا أو زائدًا حتى تكتمل بيانات الحكم.</div>
-    </div>` : ''}
-
-    ${table(['المعدن الكبير','الاحتياج','الإمداد','الميزان','التغطية','الحكم'], macroRows, 'لا توجد بيانات معادن كبرى محفوظة.')}
-    ${table(['العنصر الصغير','الاحتياج','الإمداد','الميزان','التغطية','الحكم'], traceRows, 'لا توجد بيانات عناصر صغرى محفوظة.')}
-    ${table(['الفيتامين','الاحتياج','الإمداد','الميزان','التغطية','الحكم'], vitRows, 'لا توجد بيانات فيتامينات محفوظة.')}
-    ${dcadHtml}
-
-    <div style="margin-top:12px">
-      ${mineralAdvice(macroBalance, traceBalance, vitBalance, close)}
-    </div>
-  `);
-}
-
-/* ============================================================
-   أولويات التدخل
-============================================================ */
 function renderActions(a = {}, stage = '', ctx = {}){
   const notes = [];
   const n = a.nutrition || {};
@@ -1046,22 +949,26 @@ function renderOneRation(event = {}, opts = {}){
   const rows = nDoc.rows || [];
   const stage = opts.stage || eventStage(event) || ctx.groupType || '';
   const groupName = opts.groupName || groupNameFromEvent(event);
-
+  const id = opts.id || `ration-${slug(groupName)}`;
   const breakClass = opts.pageBreak ? 'ration-break' : '';
 
-  return `<div class="ration-block ${breakClass}">
+  return `<div id="${esc(id)}" class="ration-block ${breakClass}">
     ${section(`تقرير عليقة: ${groupName}`, `
-      ${renderDecisionBlock(event, a, stage, ctx)}
+      <div class="ration-head-grid">
+        <div>${renderDecisionBlock(event, a, stage, ctx)}</div>
+        <div>
+          ${badge(stageLabel(stage, ctx), eventStatus(event))}
+          ${badge(speciesLabelFromEvent(event), 'muted')}
+        </div>
+      </div>
       <div class="screen-actions-row">
-        <a href="nutrition-report.html?scope=group&type=${encodeURIComponent(qp.get('type') || '')}&groupName=${encodeURIComponent(groupName)}">فتح هذه العليقة منفردة</a>
+        <a href="#top">أعلى التقرير</a>
+        <a href="nutrition-report.html?scope=group&type=${encodeURIComponent(qp.get('type') || '')}&groupName=${encodeURIComponent(groupName)}">فتح منفرد</a>
       </div>
     `)}
     ${renderContextBlock(ctx, event, stage)}
-    ${renderCoreNutrients(a, stage, ctx)}
-    ${renderRumen(a)}
-    ${renderEconomics(a, stage, ctx)}
+    ${renderCompleteRationAnalysis(a, stage, ctx)}
     ${renderRows(rows)}
-    ${renderMineralsVitamins(a, stage, ctx)}
     ${renderActions(a, stage, ctx)}
   </div>`;
 }
@@ -1075,7 +982,14 @@ function renderGroup(data){
   $('reportSub').textContent = `${stageLabel(stage, e?.nutrition?.context || {})} — تاريخ التحليل: ${safe(e.eventDate || e.date)} — تقرير عليقة منفردة`;
   $('statusBox').style.display = 'none';
 
-  $('content').innerHTML = renderOneRation(e, { groupName, stage, pageBreak:false });
+  $('content').innerHTML = `
+    <div id="top"></div>
+    <nav class="report-tabs">
+      <a class="main" href="#${esc(`ration-${slug(groupName)}`)}">العليقة</a>
+      <a href="nutrition-report.html?scope=all&type=${encodeURIComponent(qp.get('type') || '')}">كل العلائق</a>
+    </nav>
+    ${renderOneRation(e, { groupName, stage, pageBreak:false })}
+  `;
 }
 
 /* ============================================================
@@ -1094,11 +1008,11 @@ function renderExecutiveAll(report = {}, type = ''){
       <div class="hero-main">
         <h2 class="hero-title">تقرير التغذية الشامل — ${esc(typeLabel)}</h2>
         <div class="hero-desc">
-          هذا التقرير يجمع أحدث تحليل محفوظ لكل عليقة، ويعرض الحكم التنفيذي والفهرس والمقارنة ثم تفاصيل كل عليقة منفردة.
-          الهدف أن تُعرف الأولوية من أول نظرة، بدون تكرار نفس البيانات بأكثر من صيغة.
+          تقرير مفهرس: ملخص تنفيذي، فهرس العلائق، مقارنة مختصرة، ثم كل عليقة بتفاصيلها كاملة.
+          كل المعادن والفيتامينات تظهر داخل تحليل العليقة نفسها، وليس ككيان منفصل.
         </div>
         <div style="margin-top:12px">
-          ${first.groupName ? badge(`الأولوية: ${first.groupName}`, first.reportStatus) : badge('لا توجد أولوية محددة','unknown')}
+          ${first.groupName ? badge(`الأولوية: ${first.groupName}`, first.reportStatus) : badge('متابعة عامة','muted')}
         </div>
       </div>
 
@@ -1112,9 +1026,9 @@ function renderExecutiveAll(report = {}, type = ''){
 
     <div class="cards" style="margin-top:12px">
       ${mini('أول تدخل', first.groupName || '—', first.priorityText || first.decisionText || '—', first.reportStatus)}
-      ${mini('أعلى تكلفة كجم لبن', highCost.groupName || '—', finite(highCost.costPerKgMilk) ? money(highCost.costPerKgMilk) : '—', 'warn')}
+      ${mini('أعلى تكلفة كجم لبن', highCost.groupName || '—', finite(highCost.costPerKgMilk) ? money(highCost.costPerKgMilk) : '—', finite(highCost.costPerKgMilk) ? 'warn' : 'muted')}
       ${mini('أضعف هامش لبن-علف', weak.groupName || '—', finite(weak.milkMargin) ? money(weak.milkMargin) : '—', finite(weak.milkMargin) && Number(weak.milkMargin) < 0 ? 'danger' : 'warn')}
-      ${mini('نمط التقرير', 'مجمّع + قابل للتفصيل', 'يمكن طباعة التقرير كله أو فتح أي عليقة منفردة.')}
+      ${mini('شكل التقرير', 'مفهرس ومبوب', 'اختَر العليقة من الشريط أو الفهرس.')}
     </div>
   `);
 }
@@ -1123,16 +1037,16 @@ function renderRationIndex(report = {}, type = ''){
   const index = Array.isArray(report.index) ? report.index : [];
 
   const rows = index.map((x, i) => {
-    const href = `nutrition-report.html?scope=group&type=${encodeURIComponent(type || x.species || '')}&groupName=${encodeURIComponent(x.groupName || '')}`;
-    return `<tr class="click" onclick="location.href='${href}'">
+    const id = `ration-${slug(x.groupName || `r${i}`)}`;
+    return `<tr>
       <td>${i + 1}</td>
-      <td class="metric-name">${esc(x.groupName || '—')}</td>
+      <td class="metric-name"><a href="#${esc(id)}" style="color:#134e2f;font-weight:950">${esc(x.groupName || '—')}</a></td>
       <td>${esc(x.stageLabel || '—')}</td>
       <td>${esc(x.speciesLabel || '—')}</td>
       <td>${nf(x.headCount,0)}</td>
       <td>${finite(x.milkTargetKg) ? kg(x.milkTargetKg,1) : '—'}</td>
-      <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('غير محسوم','unknown')}</td>
-      <td>${esc(x.priorityText || x.decisionText || '—')}</td>
+      <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
+      <td>${esc(x.priorityText || x.decisionText || 'متابعة دورية')}</td>
     </tr>`;
   });
 
@@ -1156,7 +1070,7 @@ function renderAllComparison(report = {}){
     <td>${pct(x.ndfPctActual,1)}</td>
     <td>${pct(x.starchPctActual,1)}</td>
     <td>${money(x.costPerKgMilk)}</td>
-    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('غير محسوم','unknown')}</td>
+    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
   </tr>`);
 
   return section('مقارنة مختصرة بين العلائق', table(
@@ -1168,16 +1082,13 @@ function renderAllComparison(report = {}){
 
 function renderUnifiedPriorities(report = {}){
   const index = Array.isArray(report.index) ? report.index : [];
-  const sorted = [...index].sort((a, b) => {
-    const w = s => s === 'danger' ? 1 : s === 'warn' ? 2 : s === 'good' ? 3 : 4;
-    return w(a.reportStatus) - w(b.reportStatus);
-  });
+  const sorted = [...index].sort((a, b) => stateWeight(a.reportStatus) - stateWeight(b.reportStatus));
 
   const rows = sorted.slice(0, 8).map((x, i) => `<tr>
     <td>${i + 1}</td>
     <td class="metric-name">${esc(x.groupName || '—')}</td>
     <td>${esc(x.stageLabel || '—')}</td>
-    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('غير محسوم','unknown')}</td>
+    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
     <td>${esc(x.priorityText || x.decisionText || 'متابعة دورية')}</td>
   </tr>`);
 
@@ -1188,11 +1099,27 @@ function renderUnifiedPriorities(report = {}){
   ));
 }
 
+function renderTabs(report = {}){
+  const index = Array.isArray(report.index) ? report.index : [];
+  const links = [
+    `<a class="main" href="#top">الملخص</a>`,
+    `<a href="#ration-index">الفهرس</a>`,
+    `<a href="#comparison">المقارنة</a>`,
+    `<a href="#priorities">التدخلات</a>`
+  ];
+
+  for(const x of index){
+    const id = `ration-${slug(x.groupName || '')}`;
+    links.push(`<a href="#${esc(id)}">${esc(x.groupName || 'عليقة')}</a>`);
+  }
+
+  return `<nav class="report-tabs">${links.join('')}</nav>`;
+}
+
 function renderAll(data){
   const report = data.report || {};
   const events = Array.isArray(report.events) ? report.events : [];
   const type = data.type || qp.get('type') || '';
-
   const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
   $('reportTitle').textContent = `تقرير التغذية الشامل — ${typeLabel}`;
@@ -1202,14 +1129,17 @@ function renderAll(data){
   const rationReports = events.map((ev, i) => renderOneRation(ev, {
     groupName: groupNameFromEvent(ev),
     stage: eventStage(ev),
+    id: `ration-${slug(groupNameFromEvent(ev) || `r${i}`)}`,
     pageBreak: true
   })).join('');
 
   $('content').innerHTML = `
+    <div id="top"></div>
+    ${renderTabs(report)}
     ${renderExecutiveAll(report, type)}
-    ${renderRationIndex(report, type)}
-    ${renderAllComparison(report)}
-    ${renderUnifiedPriorities(report)}
+    <div id="ration-index">${renderRationIndex(report, type)}</div>
+    <div id="comparison">${renderAllComparison(report)}</div>
+    <div id="priorities">${renderUnifiedPriorities(report)}</div>
     ${rationReports}
   `;
 }
@@ -1244,4 +1174,3 @@ async function main(){
 }
 
 main();
-     
