@@ -1917,10 +1917,16 @@ bodyWeight: bw,
     mpTargetG: round(mpTargetG, 0),
     cpReferencePct: round(cpReferencePct),
     cpTarget: round(cpReferencePct),
-    proteinSystem: 'MP',
-    ndfTarget: 30,
-    starchMax: 28,
-    roughageMin: 40
+proteinSystem: 'MP',
+
+// NDF is not returned as a NASEM 2021 nutrient requirement for lactating cows.
+// It must be evaluated in ration / rumen-health logic with peNDF, forage NDF, starch, and DMI.
+ndfTarget: null,
+ndfTargetBasis: 'NOT_NASEM_REQUIREMENT',
+fiberEvaluationBasis: 'RATION_RUMEN_HEALTH_INDICATOR',
+
+starchMax: 28,
+roughageMin: 40
   };
 }
 function computeCowDryMother({
@@ -2101,11 +2107,17 @@ const chapter12VitaminModel = buildChapter12VitaminModel({
     mpTargetG: round(mpTargetG, 0),
    cpReferencePct: round(cpReferencePct),
 cpTarget: round(cpReferencePct),
-    proteinSystem: 'MP',
+proteinSystem: 'MP',
 
-    ndfTarget: isCloseUp ? 34 : 36,
-    starchMax: isCloseUp ? 18 : 16,
-    roughageMin: isCloseUp ? 55 : 60
+// For dry / close-up cows, NDF is used inside NASEM Ch12 Eq 12-1 DMI prediction,
+// not as a standalone NDF requirement target.
+ndfTarget: null,
+ndfTargetBasis: 'USED_INSIDE_NASEM_CH12_DMI_EQUATION_NOT_REQUIREMENT',
+dietNDFPctUsedForDMI: dmiCalc?.inputs?.dietNDFPct ?? null,
+fiberEvaluationBasis: 'RATION_RUMEN_HEALTH_INDICATOR',
+
+starchMax: isCloseUp ? 18 : 16,
+roughageMin: isCloseUp ? 55 : 60
   };
 }
 function computeCowHeifer({
@@ -2211,10 +2223,15 @@ mineralReq.traceMineralRequirementModel = computeNasemTraceMineralRequirements({
     mpTargetG: round(mpTargetG, 0),
     cpReferencePct: round(cpReferencePct),
     cpTarget: round(cpReferencePct),
-    proteinSystem: 'MP',
-    ndfTarget: 32,
-    starchMax: 24,
-    roughageMin: 45
+proteinSystem: 'MP',
+
+// Heifer DMI may use diet NDF when provided, but NDF is not exposed as a fixed requirement target.
+ndfTarget: null,
+ndfTargetBasis: 'HEIFER_DMI_INPUT_OR_RATION_INDICATOR_NOT_REQUIREMENT',
+fiberEvaluationBasis: 'RATION_RUMEN_HEALTH_INDICATOR',
+
+starchMax: 24,
+roughageMin: 45
   };
 }
 
