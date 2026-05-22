@@ -3200,23 +3200,7 @@ function buildGaugeSvg(kind, current, target, state){
   else if (!valid) {
     zones = [{ from: 0, to: 1, color: gray }];
   }
-  else if (kind === 'floor') {
-  const maxRatio = Math.max(1.35, ratio * 1.10);
-
-  pos = clamp01(ratio / maxRatio);
-
-  const dangerPos = clamp01(0.85 / maxRatio);
-  const limitPos  = clamp01(1 / maxRatio);
-
-  zones = [
-    { from: 0,         to: dangerPos, color: red },
-    { from: dangerPos, to: limitPos,  color: yellow },
-    { from: limitPos,  to: 1,         color: green }
-  ];
-
-  tickPos = limitPos;
-  tickLabel = 'حد الأمان';
-}
+ 
   else if (kind === 'ceiling') {
     // النشا والدهن: ثابت 0 → 120% من الحد
     // أخضر حتى الحد، أصفر 100–108%، أحمر بعد ذلك
