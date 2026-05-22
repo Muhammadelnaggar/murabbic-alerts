@@ -3161,96 +3161,111 @@ function buildGaugeSvg(kind, current, target, state){
   let zones = [];
   let tickPos = null;
   let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
-  if (kind === 'dcad') {
-    const layer =
-      state?.speciesLayer ||
-      state?.dcadLayer ||
-      state?.model?.interpretation?.speciesLayer ||
-      '';
+if (kind === 'dcad') {
+  const layer =
+    state?.speciesLayer ||
+    state?.dcadLayer ||
+    state?.model?.interpretation?.speciesLayer ||
+    '';
 
-    const isBuffaloDcad = /buffalo|جاموس/i.test(String(layer || ''));
+  const isBuffaloDcad = /buffalo|جاموس/i.test(String(layer || ''));
 
-    const minOk = isBuffaloDcad ? -100 : -50;
-    const maxOk = isBuffaloDcad ? -50  : -10;
+  const minOk = isBuffaloDcad ? -100 : -50;
+  const maxOk = isBuffaloDcad ? -50  : -10;
 
-    const scaleMin = isBuffaloDcad ? -130 : -70;
-    const scaleMax = isBuffaloDcad ? 40   : 80;
+  const scaleMin = isBuffaloDcad ? -130 : -70;
+  const scaleMax = isBuffaloDcad ? 40   : 80;
 
-    const mapDcad = (v) => {
-      const n = Number(v);
-      if (!Number.isFinite(n) || scaleMax <= scaleMin) return 0.5;
-      return clamp01((n - scaleMin) / (scaleMax - scaleMin));
-    };
+  const mapDcad = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || scaleMax <= scaleMin) return 0.5;
+    return clamp01((n - scaleMin) / (scaleMax - scaleMin));
+  };
 
-    const minOkPos = mapDcad(minOk);
-    const maxOkPos = mapDcad(maxOk);
+  const minOkPos = mapDcad(minOk);
+  const maxOkPos = mapDcad(maxOk);
 
-    pos = mapDcad(c);
+  pos = mapDcad(c);
 
-    zones = [
-      { from: 0,        to: minOkPos, color: yellow },
-      { from: minOkPos, to: maxOkPos, color: green },
-      { from: maxOkPos, to: 1,        color: red }
-    ];
+  zones = [
+    { from: 0,        to: minOkPos, color: yellow },
+    { from: minOkPos, to: maxOkPos, color: green },
+    { from: maxOkPos, to: 1,        color: red }
+  ];
 
-    tickPos = maxOkPos;
-    tickLabel = 'الحد';
-  }
+  tickPos = maxOkPos;
+  tickLabel = 'الحد';
+}
 
-  else if (!valid) {
-    zones = [{ from: 0, to: 1, color: gray }];
-  }
- 
-  else if (kind === 'ceiling') {
-    // النشا والدهن: ثابت 0 → 120% من الحد
-    // أخضر حتى الحد، أصفر 100–108%، أحمر بعد ذلك
-    const maxRatio = 1.20;
+else if (!valid) {
+  zones = [{ from: 0, to: 1, color: gray }];
+}
 
-    pos = clamp01(ratio / maxRatio);
+else if (kind === 'floor') {
+  // مقياس % ثابت من 0 إلى 100.
+  // NDF: الحد المعروض هنا حد أدنى للأمان، وليس هدفًا أو حدًا أعلى.
+  const actualPct = clamp01(c / 100);
+  const limitPct  = clamp01(t / 100);
+  const warnPct   = clamp01((t * 0.85) / 100);
 
-    const limitPos = clamp01(1 / maxRatio);
-    const warnPos  = clamp01(1.08 / maxRatio);
+  pos = actualPct;
 
-    zones = [
-      { from: 0,        to: limitPos, color: green },
-      { from: limitPos, to: warnPos,  color: yellow },
-      { from: warnPos,  to: 1,        color: red }
-    ];
+  zones = [
+    { from: 0,       to: warnPct,  color: red },
+    { from: warnPct, to: limitPct, color: yellow },
+    { from: limitPct,to: 1,        color: green }
+  ];
 
-    tickPos = limitPos;
-  }
+  tickPos = limitPct;
+  tickLabel = 'حد أدنى';
+}
 
-  else {
-    // باقي الجوجز: مقياس تفاعلي حقيقي يبدأ من صفر.
-    // هذا يمنع التصاق كل حالات النقص الشديد في نفس النقطة، ويجعل المؤشر يعبر عن نسبة الإمداد/الاحتياج بدقة.
-    const profiles = {
-      dm:  { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
-      nel: { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
-      cp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.40 },
-      mp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.08, highWarn: 1.18, max: 1.40 },
-      ndf: { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.15, highWarn: 1.30, max: 1.50 }
-    };
+else if (kind === 'ceiling') {
+  // مقياس % ثابت من 0 إلى 100.
+  // النشا والدهون: الحد المعروض هنا حد أقصى.
+  const actualPct = clamp01(c / 100);
+  const limitPct  = clamp01(t / 100);
+  const warnPct   = clamp01(Math.min(t * 1.08, 100) / 100);
 
-    const p = profiles[key] || profiles.dm;
+  pos = actualPct;
 
-    const map = (x) => {
-      if (!Number.isFinite(Number(x)) || p.max <= p.min) return 0;
-      return clamp01((Number(x) - p.min) / (p.max - p.min));
-    };
+  zones = [
+    { from: 0,       to: limitPct, color: green },
+    { from: limitPct,to: warnPct,  color: yellow },
+    { from: warnPct, to: 1,        color: red }
+  ];
 
-    pos = map(ratio);
+  tickPos = limitPct;
+  tickLabel = 'حد أقصى';
+}
 
-    zones = [
-      { from: 0,                 to: map(p.lowDanger), color: red },
-      { from: map(p.lowDanger),  to: map(p.lowWarn),   color: yellow },
-      { from: map(p.lowWarn),    to: map(p.goodMax),   color: green },
-      { from: map(p.goodMax),    to: map(p.highWarn),  color: yellow },
-      { from: map(p.highWarn),   to: 1,                color: red }
-    ];
+else {
+  const profiles = {
+    dm:  { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
+    nel: { min: 0.00, lowDanger: 0.80, lowWarn: 0.92, goodMax: 1.08, highWarn: 1.20, max: 1.40 },
+    cp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.10, highWarn: 1.20, max: 1.40 },
+    mp:  { min: 0.00, lowDanger: 0.85, lowWarn: 0.95, goodMax: 1.08, highWarn: 1.18, max: 1.40 }
+  };
 
-    tickPos = map(1);
-  }
+  const p = profiles[key] || profiles.dm;
 
+  const map = (x) => {
+    if (!Number.isFinite(Number(x)) || p.max <= p.min) return 0;
+    return clamp01((Number(x) - p.min) / (p.max - p.min));
+  };
+
+  pos = map(ratio);
+
+  zones = [
+    { from: 0,                 to: map(p.lowDanger), color: red },
+    { from: map(p.lowDanger),  to: map(p.lowWarn),   color: yellow },
+    { from: map(p.lowWarn),    to: map(p.goodMax),   color: green },
+    { from: map(p.goodMax),    to: map(p.highWarn),  color: yellow },
+    { from: map(p.highWarn),   to: 1,                color: red }
+  ];
+
+  tickPos = map(1);
+}
   const arcs = zones.map(z => {
     if (z.to <= z.from) return '';
     return `<path d="${arcPath(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="${stroke}" stroke-linecap="butt"></path>`;
@@ -3271,7 +3286,10 @@ function buildGaugeSvg(kind, current, target, state){
   }
 
   const tip = gaugePoint(cx, cy, r - 8, pos);
-  const ratioText = (valid && kind !== 'dcad') ? `${Math.round(ratio * 100)}%` : '';
+  const ratioText =
+  valid && (kind === 'floor' || kind === 'ceiling')
+    ? `${Math.round(c)}%`
+    : (valid && kind !== 'dcad' ? `${Math.round(ratio * 100)}%` : '');
 
   const baseLeft = { x: cx - 5, y: cy + 1 };
   const baseRight = { x: cx + 5, y: cy + 1 };
