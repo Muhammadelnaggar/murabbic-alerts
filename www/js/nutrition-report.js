@@ -94,6 +94,77 @@ function statusText(state){
   if(s.includes('good') || s.includes('ok')) return 'متزن';
   return 'معلومة';
 }
+const ADVICE = {
+  energy: {
+    low: 'الطاقة أقل من الاحتياج؛ راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.',
+    high: 'الطاقة أعلى من الاحتياج؛ راجع الزيادة في تكلفة مصادر الطاقة وتجنب الزيادة عن حدود الاحتياج.',
+    ok: 'الطاقة متزنة؛ استمر على نفس التركيب مع متابعة اللبن والاجترار والروث والمتبقي في المعلف.'
+  },
+  mp: {
+    low: 'البروتين الممثل أقل من الاحتياج؛ راجع مصدر البروتين الحقيقي وجودته لتفادي نقص إنتاج اللبن وجودته.',
+    high: 'البروتين الممثل أعلى من الاحتياج؛ راجع التكلفة الزائدة لتجنب ارتفاع تكاليف الإنتاج.',
+    ok: 'البروتين الممثل متزن؛ لا تغيّر مصدر البروتين إلا لسبب اقتصادي أو إنتاجي.'
+  },
+  cp: {
+    low: 'البروتين الخام أقل من المطلوب؛ راجعه مع البروتين الممثل قبل تعديل العليقة.',
+    high: 'البروتين الخام مرتفع؛ لا ترفع البروتين أكثر وراجع الهدر والتكلفة.',
+    ok: 'البروتين الخام مناسب، مع الاعتماد الأساسي على قراءة البروتين الممثل.'
+  },
+  ndf: {
+    low: 'الألياف المتعادلة منخفضة؛ راجع نسبة الخشن وجودته لحماية صحة الكرش.',
+    high: 'الألياف المتعادلة مرتفعة؛ قد تقلل كثافة الطاقة والمأكول مما ينعكس على إنتاج اللبن، راجع جودة الخشن ونسبته.',
+    ok: 'الألياف المتعادلة متزنة؛ تابع الاجترار والروث وثبات اللبن.'
+  },
+  starch: {
+    low: 'النشا منخفض؛ راجع مصادر الحبوب النشوية مع مراجعة اتزان الطاقة الكلية في كارت الطاقة.',
+    high: 'النشا مرتفع؛ راجع الألياف الفعالة وصحة الكرش لتجنب الحموضة.',
+    ok: 'النشا داخل الحد المناسب؛ استمر مع متابعة الروث والاجترار وصحة الكرش.'
+  },
+  fat: {
+    low: 'دهن العليقة منخفض؛ لا ترفعه إلا إذا كانت الطاقة تحتاج دعمًا واضحًا وبعد مراجعة مصادر الطاقة الأخرى.',
+    high: 'دهن العليقة مرتفع؛ راجع مصادر الدهون والزيوت لأنها قد تضغط هضم الألياف وصحة الكرش.',
+    ok: 'دهن العليقة داخل الحد المناسب؛ استمر مع متابعة الروث والاجترار وثبات اللبن.'
+  },
+  pendf: {
+    low: 'الألياف الفعالة أقل من المطلوب؛ راجع طول تقطيع الخشن ومنع فرز الخلطة.',
+    high: 'الألياف الفعالة أعلى من الحد العملي؛ راجع قبول الحيوان للعليقة وكثافة الطاقة.',
+    ok: 'الألياف الفعالة مناسبة؛ تابع الاجترار والروث وثبات اللبن.'
+  },
+  roughage: {
+    low: 'نسبة الخشن منخفضة؛ راجع كمية وجودة الخشن لحماية الكرش.',
+    high: 'نسبة الخشن مرتفعة؛ قد تقلل كثافة الطاقة والمأكول، راجع جودة الخشن ونسبة المركزات.',
+    ok: 'نسبة الخشن مناسبة؛ تابع المتبقي والاجترار والروث.'
+  },
+  forageNdf: {
+    low: 'الألياف المتعادلة من الخشن منخفضة؛ راجع مصدر الخشن وجودته.',
+    high: 'الألياف المتعادلة من الخشن مرتفعة؛ قد تقلل كثافة الطاقة، راجع جودة الخشن ونسبة إضافته.',
+    ok: 'الألياف المتعادلة من الخشن مناسبة؛ تابع صحة الكرش وثبات اللبن.'
+  }
+};
+
+function adviceKind(state, mode = 'balance'){
+  const s = String(state || '').toLowerCase();
+
+  if(mode === 'max'){
+    if(s.includes('warn') || s.includes('danger')) return 'high';
+    return 'ok';
+  }
+
+  if(mode === 'min'){
+    if(s.includes('warn') || s.includes('danger')) return 'low';
+    return 'ok';
+  }
+
+  if(s.includes('danger')) return 'low';
+  if(s.includes('warn')) return 'high';
+  return 'ok';
+}
+
+function mbkAdvice(key, state, mode = 'balance'){
+  const pack = ADVICE[key] || {};
+  const kind = adviceKind(state, mode);
+  return pack[kind] || pack.ok || 'استمر في المتابعة حسب قراءة مُرَبِّيك.';
+}
 function badge(text, state = ''){
   if(!text) return '';
   return `<span class="status-chip ${stateClass(state || text)}">${esc(text)}</span>`;
@@ -882,16 +953,26 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
 
   const rows = [
 metricRow('المادة الجافة المأكولة (DMI)', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
-metricRow('الطاقة الصافية للحليب (NEL)', `${nf(t.nelTarget,2)} ميجا كالوري/يوم`, `${nf(n.nelActual,2)} ميجا كالوري/يوم`, finite(nelBal) ? `${nf(nelBal,2)} ميجا كالوري` : '—', balanceState(nelBal, 0.5), 'راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.'),
-metricRow('البروتين الممثل القابل للاستفادة (MP)', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), 'راجع مصدر البروتين الحقيقي قبل زيادة البروتين الخام.'),
-metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'مؤشر عام يُقرأ مع البروتين الممثل.'),
-metricRow('الألياف المتعادلة (NDF)', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'يُقرأ مع صحة الكرش والألياف الفعالة.'),
-metricRow('الألياف الفعالة للكرش (peNDF)', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), 'راجع طول تقطيع الخشن ومنع فرز الخلطة.'),
-metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), 'راجع الحبوب والألياف الفعالة عند الاقتراب من الحد.'),
-metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'الزيادة قد تضغط هضم الألياف.'),
+
+metricRow('الطاقة الصافية للحليب (NEL)', `${nf(t.nelTarget,2)} ميجا كالوري/يوم`, `${nf(n.nelActual,2)} ميجا كالوري/يوم`, finite(nelBal) ? `${nf(nelBal,2)} ميجا كالوري` : '—', balanceState(nelBal, 0.5), mbkAdvice('energy', balanceState(nelBal, 0.5), 'balance')),
+
+metricRow('البروتين الممثل القابل للاستفادة (MP)', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), mbkAdvice('mp', balanceState(mpBal, 50), 'balance')),
+
+metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), mbkAdvice('cp', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'balance')),
+
+metricRow('الألياف المتعادلة (NDF)', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), mbkAdvice('ndf', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'balance')),
+
+metricRow('الألياف الفعالة للكرش (peNDF)', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), mbkAdvice('pendf', minLimitState(n.peNDFPctActual, t.peNDFMin), 'min')),
+
+metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), mbkAdvice('starch', highLimitState(n.starchPctActual, t.starchMax), 'max')),
+
+metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', mbkAdvice('fat', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'max')),
+
 metricRow('صحة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', rumenState, rh.reason || n.rumenNote || '—'),
-metricRow('نسبة الخشن من المادة الجافة', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), 'الخشن ليس رقمًا فقط؛ الفعالية وطول التقطيع مهمان.'),
-metricRow('الألياف المتعادلة من الخشن (Forage NDF)', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'جزء الألياف المتعادلة القادم من الخامات الخشنة.')
+
+metricRow('نسبة الخشن من المادة الجافة', `حد أدنى ${pct(t.roughageMin,1)}`, pct(n.roughPctDM,1), finite(n.roughPctDM) && finite(t.roughageMin) ? pct(Number(n.roughPctDM) - Number(t.roughageMin),1) : '—', minLimitState(n.roughPctDM, t.roughageMin), mbkAdvice('roughage', minLimitState(n.roughPctDM, t.roughageMin), 'min')),
+
+metricRow('الألياف المتعادلة من الخشن (Forage NDF)', `حد أدنى ${pct(t.forageNDFMin,1)}`, pct(n.forageNDFPctDM,1), finite(n.forageNDFPctDM) && finite(t.forageNDFMin) ? pct(Number(n.forageNDFPctDM) - Number(t.forageNDFMin),1) : '—', minLimitState(n.forageNDFPctDM, t.forageNDFMin), mbkAdvice('forageNdf', minLimitState(n.forageNDFPctDM, t.forageNDFMin), 'min'))
   ];
 
   if(isLactating(stage, ctx)){
@@ -969,45 +1050,6 @@ function renderRows(rows = []){
     'لا توجد خامات محفوظة.'
   ));
 }
-
-function renderActions(a = {}, stage = '', ctx = {}){
-  const notes = [];
-  const n = a.nutrition || {};
-  const t = a.targets || {};
-  const e = a.economics || {};
-
-  if(finite(n.mpBalanceG) && Number(n.mpBalanceG) < -50){
-    notes.push('تدخل بروتيني: راجع MP ومصدر البروتين الحقيقي قبل زيادة CP.');
-  }
-
-  if(finite(n.nelActual) && finite(t.nelTarget) && Number(n.nelActual) < Number(t.nelTarget) - 0.5){
-    notes.push('تدخل طاقة: راجع كثافة الطاقة ومصادرها مع الحفاظ على أمان الكرش.');
-  }
-
-  if(finite(n.starchPctActual) && finite(t.starchMax) && Number(n.starchPctActual) > Number(t.starchMax)){
-    notes.push('تدخل كرش: النشا أعلى من الحد؛ راجع الحبوب والألياف الفعالة.');
-  }
-
-  if(finite(n.peNDFPctActual) && finite(t.peNDFMin) && Number(n.peNDFPctActual) < Number(t.peNDFMin)){
-    notes.push('تدخل ألياف: peNDF أقل من الحد؛ راجع طول تقطيع الخشن ومنع فرز الخلطة.');
-  }
-
-  if(isLactating(stage, ctx) && finite(e.milkMargin) && Number(e.milkMargin) < 0){
-    notes.push('تدخل اقتصادي: الهامش سلبي؛ راجع تكلفة الخامات وسعر اللبن.');
-  }
-
-  if(isCloseUp(stage, ctx) && finite(n.dcadModel?.dcadMeqKgDM) && Number(n.dcadModel.dcadMeqKgDM) > -50){
-    notes.push('تدخل انتظار ولادة: راجع DCAD وأملاح الأنيون تحت إشراف فني.');
-  }
-
-  if(!notes.length){
-    notes.push('لا توجد أولوية تدخل حادة من التحليل المحفوظ.');
-    notes.push('استمر في متابعة اللبن، المتبقي، الروث، والاجترار.');
-  }
-
-  return section('أولويات التدخل', `<ul class="priority-list">${notes.slice(0, 3).map(x => `<li>${esc(x)}</li>`).join('')}</ul>`);
-}
-
 function renderOneRation(event = {}, opts = {}){
   const nDoc = event.nutrition || {};
   const a = nDoc.analysis || {};
@@ -1143,25 +1185,6 @@ function renderAllComparison(report = {}){
   ['العليقة','المرحلة','مأكول/متوقع','الطاقة الصافية للحليب (NEL)','البروتين الممثل (MP)','ميزان البروتين الممثل','الألياف المتعادلة (NDF)','نشا','تكلفة كجم اللبن','قراءة مُرَبِّيك'],
     rows,
     'لا توجد بيانات مقارنة.'
-  ));
-}
-
-function renderUnifiedPriorities(report = {}){
-  const index = Array.isArray(report.index) ? report.index : [];
-  const sorted = [...index].sort((a, b) => stateWeight(a.reportStatus) - stateWeight(b.reportStatus));
-
-  const rows = sorted.slice(0, 8).map((x, i) => `<tr>
-    <td>${i + 1}</td>
-    <td class="metric-name">${esc(x.groupName || '—')}</td>
-    <td>${esc(x.stageLabel || '—')}</td>
-    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
-    <td>${esc(x.priorityText || x.decisionText || 'متابعة دورية')}</td>
-  </tr>`);
-
-  return section('ملخص التدخلات الموحد', table(
-    ['الأولوية','العليقة','المرحلة','الحالة','الإجراء المقترح'],
-    rows,
-    'لا توجد تدخلات محددة.'
   ));
 }
 
