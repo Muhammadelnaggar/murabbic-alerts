@@ -990,7 +990,14 @@ metricRow('البروتين الممثل القابل للاستفادة (MP)', 
 
 metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), mbkAdvice('cp', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'balance')),
 
-metricRow('الألياف المتعادلة (NDF)', pct(t.ndfTarget,1), pct(n.ndfPctActual,1), finite(n.ndfPctActual) && finite(t.ndfTarget) ? pct(Number(n.ndfPctActual) - Number(t.ndfTarget),1) : '—', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), mbkAdvice('ndf', balanceState(finite(n.ndfPctActual) && finite(t.ndfTarget) ? Number(n.ndfPctActual) - Number(t.ndfTarget) : null, 1.5), 'balance')),
+metricRow(
+  'الألياف المتعادلة (NDF)',
+  'مؤشر تركيب عليقة وليس احتياج NASEM مستقل',
+  pct(n.ndfPctActual,1),
+  '—',
+  rumenState || 'muted',
+  'لا تُحكم كنقص/زيادة وحدها؛ تُقرأ مع peNDF وForage NDF والنشا وصحة الكرش.'
+),
 
 metricRow('الألياف الفعالة للكرش (peNDF)', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), mbkAdvice('pendf', minLimitState(n.peNDFPctActual, t.peNDFMin), 'min')),
 
