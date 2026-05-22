@@ -669,7 +669,20 @@ if (mpCard?.balance != null) {
 }
  setNum('mpTargetG', t?.mpTargetG ?? a?.targets?.mpTargetG, '', 0);
 setNum('mpBalanceG', a?.nutrition?.mpBalanceG ?? a?.targets?.mpBalanceG, '', 0);
-  setNum('ndfTarget', t?.ndfTarget ?? a?.targets?.ndfTarget, '', 0);
+ {
+  const carb =
+    a?.nutrition?.carbohydrateSafetyModel ||
+    a?.carbohydrateSafetyModel ||
+    {};
+
+  const minNdf = Number(carb?.minTotalNDFPctDM);
+
+  if (Number.isFinite(minNdf) && minNdf > 0) {
+    setElText('ndfTarget', `${minNdf.toFixed(1)}% حد أمان`);
+  } else {
+    setElText('ndfTarget', 'حد أمان كرش');
+  }
+}
   setNum('starchMax', t?.starchMax ?? a?.targets?.starchMax, '', 0);
 
  {
@@ -3005,7 +3018,21 @@ function gaugeStatus(kind, current, target, low = 0.92, high = 1.08){
     note: 'المادة الجافة هنا مأكول/متوقع وليست حكم نقص أو زيادة.'
   };
 }
+if (kind === 'floor') {
+  if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
+    return { key:'info', label:'قراءة', color:'#64748b', tone:'info', note:'قراءة ألياف العليقة' };
+  }
 
+  if (current < target) {
+    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'NDF أقل من حد أمان الكرش' };
+  }
+
+  if (current < target + 1) {
+    return { key:'warn', label:'قريب من الحد', color:'#d97706', tone:'warn', note:'NDF قريب من حد أمان الكرش' };
+  }
+
+  return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'NDF يغطي حد أمان الكرش' };
+}
  if (kind === 'ceiling') {
   if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
     return { label:'معلومة', color:'#64748b', tone:'info' };
@@ -3059,12 +3086,12 @@ function metricComment(key, state){
       highDanger: 'البروتين الممثل أعلى من الاحتياج بوضوح؛ غالبًا هدر اقتصادي في مصادر بروتين مرتفعة الثمن.'
     },
 
-    ndf: {
-      danger: 'إنذار كرش: الألياف غير كافية، وخطر الحموضة واضطراب الاجترار وانخفاض دهن اللبن يرتفع.',
-      good: 'الألياف متزنة وتدعم الكرش والاجترار.',
-      warn: 'الألياف أعلى من المطلوب؛ قد تقلل استهلاك الطاقة وتضغط على الإنتاج.',
-      highDanger: 'الألياف مرتفعة بوضوح؛ قد تخفض كثافة الطاقة وتحد من إنتاج اللبن.'
-    },
+ndf: {
+  danger: 'إنذار كرش: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.',
+  good: 'NDF يغطي حد أمان الكرش الأدنى. تأثير العليقة على المأكول يظهر في كارت صحة الكرش.',
+  warn: 'NDF قريب من حد أمان الكرش؛ راقب الخشن والفرز وثبات الروث ودهن اللبن.',
+  info: 'NDF قراءة ألياف للعليقة، وليس احتياجًا مستقلًا.'
+},
 
     starch: {
       danger: 'إنذار حموضة: النشا أعلى من الحد الآمن وقد يرفع خطر الحموضة وانخفاض دهن اللبن والعرج.',
@@ -3173,7 +3200,23 @@ function buildGaugeSvg(kind, current, target, state){
   else if (!valid) {
     zones = [{ from: 0, to: 1, color: gray }];
   }
+  else if (kind === 'floor') {
+  const maxRatio = Math.max(1.35, ratio * 1.10);
 
+  pos = clamp01(ratio / maxRatio);
+
+  const dangerPos = clamp01(0.85 / maxRatio);
+  const limitPos  = clamp01(1 / maxRatio);
+
+  zones = [
+    { from: 0,         to: dangerPos, color: red },
+    { from: dangerPos, to: limitPos,  color: yellow },
+    { from: limitPos,  to: 1,         color: green }
+  ];
+
+  tickPos = limitPos;
+  tickLabel = 'حد الأمان';
+}
   else if (kind === 'ceiling') {
     // النشا والدهن: ثابت 0 → 120% من الحد
     // أخضر حتى الحد، أصفر 100–108%، أحمر بعد ذلك
@@ -3311,7 +3354,7 @@ function renderGaugeRows(cards){
     { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
     { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
-    { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'احتياجات الألياف NDF',            unit:'%',       kind:'target'  },
+    { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'حد أمان الكرش الأدنى',            unit:'%',       kind:'floor'  },
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
     { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' },
     { key:'dcad',   label:'DCAD انتظار الولادة',    cardKey:'dcad',                              unit:'mEq/kg DM',                          kind:'dcad'    }
@@ -3496,7 +3539,15 @@ const state = def.key === 'dm'
 }</div>
 
           <div style="text-align:left">
-            <div style="font-size:11px;color:#64748b">${def.kind === 'ceiling' ? 'الحد' : (def.kind === 'intake' ? 'المتوقع' : 'الاحتياج')}</div>
+            <div style="font-size:11px;color:#64748b">${
+  def.kind === 'ceiling'
+    ? 'الحد'
+    : def.kind === 'intake'
+      ? 'المتوقع'
+      : def.kind === 'floor'
+        ? 'حد الأمان'
+        : 'الاحتياج'
+}</div>
             <div style="font-size:15px;font-weight:800;color:#0f172a">${targetText || '—'}</div>
           </div>
         </div>
@@ -3730,7 +3781,6 @@ if(fcCard){
  const pairConfigs = [
   [['العليقة الحالية','بروتين خام'], ['احتياجات','البروتين الخام'], '%', null, null],
   [['العليقة الحالية','البروتين الممثل'], ['احتياجات','البروتين الممثل'], 'جم', 0.92, 1.08],
-  [['العليقة الحالية','ألياف NDF'], ['احتياجات','الألياف NDF'], '%', null, null],
   [['العليقة الحالية','دهن'], ['الحد المسموح','دهن'], '%', null, null],
   [['العليقة الحالية','طاقة'], ['احتياجات','الطاقة'], '', 0.95, 1.06],
 ];
