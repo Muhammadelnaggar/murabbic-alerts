@@ -1795,13 +1795,13 @@ function buildRumenHealthModel({
     status = 'danger';
     score = 45;
     title = 'خطر اضطراب كرش';
-    reason = carb?.note || 'توازن الكربوهيدرات غير آمن: NDF أو النشا خارج حدود الأمان.';
+    reason = 'توازن الخشن والنشا غير آمن: NDF أقل من حد الأمان أو النشا أعلى من الحد.';
     instruction = 'اضبط الخشن والنشا قبل رفع الطاقة أو الحبوب.';
   } else if (carbStatus === 'warn' || carbStatus === 'watch') {
     status = 'watch';
     score = 72;
     title = 'صحة الكرش تحتاج متابعة';
-    reason = carb?.note || 'توازن الألياف والنشا قريب من حدود الأمان.';
+    reason = 'توازن الخشن والنشا قريب من حدود الأمان.';
     instruction = 'راجع الخشن والنشا، ولا ترفع الحبوب قبل التأكد من ثبات الروث والاجترار.';
   }
 
