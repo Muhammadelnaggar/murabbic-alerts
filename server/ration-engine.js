@@ -1326,73 +1326,43 @@ if (!fNDF || !ADF_NDF || !(Number.isFinite(fNDFD) && fNDFD > 0) || !MY) {
     }
   };
 }
-function inferPef(row = {}){
-  const explicit = Number(row.pef);
-  if (Number.isFinite(explicit) && explicit >= 0) return explicit;
 
-  const cat = String(row.cat || '').trim().toLowerCase();
-  const name = String(row.name || row.feedName || '').trim().toLowerCase();
-
-  // المركزات والإضافات لا تُحسب كألياف مؤثرة
-  if (cat === 'conc' || cat === 'add') return 0;
-
-  // افتراض مُرَبِّيك القياسي:
-  // تم احتساب peNDF على أساس أن طول تقطيع الخشن 3–5 سم
-  if (/تبن|قش|straw/.test(name)) return 1.00;
-  if (/hay|دريس/.test(name)) return 0.95;
-  if (/سيلاج|silage/.test(name)) return 0.85;
-  if (/برسيم|green|fresh/.test(name)) return 0.80;
-  if (/pulp|لب بنجر|بنجر/.test(name)) return 0.45;
-
-  // أي خشن غير محدد النوع → افتراض خشن مقطع 3–5 سم
-  if (cat === 'rough') return 0.85;
-
-  return 0;
-}
 function estimateRumenState({
-  starchPct,
-  ndfPctActual,
-  roughPctDM,
-  peNDFPctActual,
-  starchMax,
-  ndfTarget,
-  roughageMin,
-  peNDFMin
+  carbohydrateSafetyModel
 }){
-  const starch = num(starchPct);
-  const ndf = num(ndfPctActual);
-  const rough = num(roughPctDM);
-  const peNDF = num(peNDFPctActual);
+  const carb = carbohydrateSafetyModel || null;
 
-  const starchCeiling = num(starchMax) || 28;
-  const ndfFloor = num(ndfTarget) || 30;
-  const roughFloor = num(roughageMin) || 40;
-  const peNDFFloor = num(peNDFMin) || 18;
+  if (carb && carb.model === 'NASEM_2021_TABLE_5_1') {
+    if (carb.status === 'danger') {
+      return {
+        status: 'danger',
+        note: carb.note,
+        basis: 'NASEM_2021_TABLE_5_1_CARBOHYDRATE_SAFETY'
+      };
+    }
 
-  let status = 'good';
-  let note = 'توازن الكرش جيد';
+    if (carb.status === 'warn' || carb.status === 'watch') {
+      return {
+        status: 'warn',
+        note: carb.note,
+        basis: 'NASEM_2021_TABLE_5_1_CARBOHYDRATE_SAFETY'
+      };
+    }
 
-  if (
-    rough < roughFloor - 3 ||
-    starch > starchCeiling ||
-    peNDF < peNDFFloor - 2
-  ){
-    status = 'danger';
-    note = 'خطر على توازن الكرش: الخشن أو الألياف المؤثرة غير كافيين أو النشا مرتفع';
-  } else if (
-    rough < roughFloor ||
-    ndf < ndfFloor ||
-    peNDF < peNDFFloor
-  ){
-    status = 'warn';
-    note = 'توازن الكرش قريب من الحد ويحتاج مراجعة الخشن والألياف المؤثرة';
+    return {
+      status: 'good',
+      note: carb.note,
+      basis: 'NASEM_2021_TABLE_5_1_CARBOHYDRATE_SAFETY'
+    };
   }
 
-  return {
-    status,
-    note
-  };
+ return {
+  status: 'muted',
+  note: '—',
+  basis: 'MURABBIK_RUMEN_CHECK'
+};
 }
+
 function calcFpcmKg(milkKg, milkFatPct){
   const milk = num(milkKg);
   const fat = num(milkFatPct);
@@ -1467,7 +1437,6 @@ let feedLibraryBaseDEMcal = 0;
 let feedLibraryBaseDEWeightKg = 0;
 let ndfKg = 0;
 let adfKg = 0;
-let peNdfKg = 0;
 let fatKg = 0;
 let faKg = 0;
 let digestibleFaKg = 0;
@@ -1640,7 +1609,7 @@ const ndsf = hasNDSF ? rawNDSF : 0;
 
 const fNDFD = Number(r.fNDFD ?? r.forageNdfDigestibilityPct ?? r.ndfd ?? r.ndfDigestibilityPct);
     const cat = String(r.cat || '').trim();
-    const pef = inferPef(r);
+    
    
     if (!Number.isFinite(Number(r.nel ?? r.nelMcalPerKgDM))) missingNelRows++;
     if (!Number.isFinite(Number(r.ndf ?? r.ndfPct))) missingNdfRows++;
@@ -1810,10 +1779,9 @@ if (mp > 0) {
 } else {
   missingMpRows++;
 }
-    feedLibraryNelMcal += dmItemKg * nel;
-    ndfKg += dmItemKg * (ndf / 100);
+feedLibraryNelMcal += dmItemKg * nel;
+ndfKg += dmItemKg * (ndf / 100);
 adfKg += dmItemKg * (adf / 100);
-peNdfKg += dmItemKg * (ndf / 100) * pef;
 fatKg += dmItemKg * (fat / 100);
 
 const faItemKg = dmItemKg * (fa / 100);
@@ -1945,7 +1913,6 @@ const forageNdfPctDiet = dmKg > 0 ? (forageNdfKg / dmKg) * 100 : 0;
 const weightedForageNdfDigestibilityPct =
   forageNdfdWeightKg > 0 ? (forageNdfdWeightedSum / forageNdfdWeightKg) : null;
 
-const peNDFPctActual = dmKg > 0 ? (peNdfKg / dmKg) * 100 : 0;
 const fatPctActual = dmKg > 0 ? (fatKg / dmKg) * 100 : 0;
 const faPctActual = dmKg > 0 ? (faKg / dmKg) * 100 : 0;
 const digestibleFaPctActual = dmKg > 0 ? (digestibleFaKg / dmKg) * 100 : 0;
@@ -2451,15 +2418,9 @@ note: isBuffalo
   : 'تم تجهيز نموذج البروتين حسب إطار NASEM 2021: CP → RDP/RUP/dRUP → MP/AA'
 }; 
 const rumenState = estimateRumenState({
-  starchPct,
-  ndfPctActual,
-  roughPctDM,
-  peNDFPctActual,
-  starchMax,
-  ndfTarget,
-  roughageMin,
-  peNDFMin
+  carbohydrateSafetyModel
 });
+
 
   return {
     totals: {
@@ -2496,7 +2457,6 @@ const rumenState = estimateRumenState({
       deMcal: round(nasemEnergyModel.deMcalPerKgDM * dmKg),
       meMcal: round(nasemEnergyModel.meMcalPerKgDM * dmKg),
       ndfKg: round(ndfKg),
-      peNdfKg: round(peNdfKg),
       fatKg: round(fatKg),
       faKg: round(faKg),
      digestibleFaKg: round(digestibleFaKg),
@@ -2543,7 +2503,7 @@ dietNDFPct: round(dietNDFPct),
 adfPctActual: round(adfPctActual),
 forageNdfPctDiet: round(forageNdfPctDiet),
 forageNdfDigestibilityPct: weightedForageNdfDigestibilityPct == null ? null : round(weightedForageNdfDigestibilityPct),
-peNDFPctActual: round(peNDFPctActual),
+peNDFPctActual: null,
 fatPctActual: round(fatPctActual),
 faPctActual: round(faPctActual),
 digestibleFaPctActual: round(digestibleFaPctActual),
