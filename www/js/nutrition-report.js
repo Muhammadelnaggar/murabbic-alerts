@@ -564,6 +564,36 @@ function injectReportStyles(){
     }
 
     @media print{
+    @page{
+  size:A4 landscape;
+  margin:8mm;
+}
+
+html, body{
+  width:auto !important;
+  overflow:visible !important;
+}
+
+.table-wrap{
+  overflow:visible !important;
+  width:100% !important;
+}
+
+.metric-table{
+  width:100% !important;
+  min-width:0 !important;
+  table-layout:fixed !important;
+}
+
+.metric-table th,
+.metric-table td{
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+  font-size:7.2pt !important;
+  padding:1.6mm !important;
+  line-height:1.35 !important;
+}
       .report-tabs,
       .screen-actions-row{display:none !important}
       .executive-hero{grid-template-columns:1.1fr .9fr}
