@@ -451,7 +451,7 @@ async function refreshRationAnalysis(rows) {
     economicsCards: []
   };
 
-  applyServerAnalysisToDom({}, window.mbkNutrition.targets || null);
+ resetNutritionAnalysisDom();
 
   try { window.renderNutritionPanels?.(); } catch(_) {}
 
@@ -488,6 +488,50 @@ function setElText(id, val){
   const el = document.getElementById(id);
   if(!el) return;
   el.textContent = (val===null || val===undefined || val==='') ? '—' : String(val);
+}
+function resetNutritionAnalysisDom(){
+  [
+    'totDM',
+    'dmiTarget',
+    'totAsFed',
+    'targetAsFedKg',
+    'totCost',
+    'mixPriceDM',
+    'mixPriceAsFed',
+    'mpSupplyG',
+    'mpDensityGkgDM',
+    'mpTargetG',
+    'mpBalanceG',
+    'cpPctTotal',
+    'cpTarget',
+    'nelActual',
+    'nelTarget',
+    'ndfPctActual',
+    'ndfTarget',
+    'starchMax',
+    'fatPctActual',
+    'costPerKgMilk',
+    'dmPerKgMilk',
+    'milkRevenue',
+    'ecmKg',
+    'fpcmKg',
+    'milkMargin',
+    'fcRatio'
+  ].forEach(id => setElText(id, '—'));
+
+  const rumenHintEl = document.getElementById('rumenHint');
+  if (rumenHintEl) rumenHintEl.innerHTML = '';
+
+  window.mbkNutrition = window.mbkNutrition || {};
+  window.mbkNutrition.serverViewModel = {
+    analysis: {},
+    targets: window.mbkNutrition.targets || {},
+    panels: {
+      analysisCards: [],
+      advancedCards: [],
+      economicsCards: []
+    }
+  };
 }
 function getCentralBar(){
   return (
@@ -3033,18 +3077,47 @@ if (kind === 'floor') {
 
   return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'NDF يغطي حد أمان الكرش' };
 }
- if (kind === 'ceiling') {
+if (kind === 'ceiling') {
   if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
-    return { label:'معلومة', color:'#64748b', tone:'info' };
+    return {
+      key:'info',
+      label:'معلومة',
+      color:'#64748b',
+      tone:'info',
+      note:'قراءة مقارنة بحد الأمان'
+    };
   }
 
-  if (current < target) {
-    return { label:'آمن', color:'#16a34a', tone:'good' };
+  const ratio = current / target;
+
+  if (ratio <= 1) {
+    return {
+      key:'good',
+      label:'آمن',
+      color:'#16a34a',
+      tone:'good',
+      note:'داخل حد الأمان'
+    };
   }
 
-  return { label:'خطر', color:'#dc2626', tone:'danger' };
+  if (ratio <= 1.08) {
+    return {
+      key:'warn',
+      label:'متابعة',
+      color:'#d97706',
+      tone:'warn',
+      note:'تجاوز بسيط لحد الأمان'
+    };
+  }
+
+  return {
+    key:'danger',
+    label:'خطر',
+    color:'#dc2626',
+    tone:'danger',
+    note:'تجاوز واضح لحد الأمان'
+  };
 }
-
   const ratio = current / target;
   if (ratio < low)  return { key:'danger', label:'ناقص', color:'#dc2626', note:'أقل من المطلوب بوضوح' };
   if (ratio <= high) return { key:'good', label:'مناسب', color:'#16a34a', note:'داخل النطاق المناسب' };
@@ -3160,7 +3233,7 @@ function buildGaugeSvg(kind, current, target, state){
   let pos = 0.5;
   let zones = [];
   let tickPos = null;
-  let tickLabel = kind === 'ceiling' ? 'الحد' : 'الهدف';
+  let tickLabel = kind === 'ceiling' ? 'حد الأمان' : 'الهدف';
 if (kind === 'dcad') {
   const layer =
     state?.speciesLayer ||
@@ -3236,7 +3309,7 @@ else if (kind === 'ceiling') {
   ];
 
   tickPos = limitPct;
-  tickLabel = 'حد أقصى';
+  tickLabel = 'حد أمان';
 }
 
 else {
@@ -3357,8 +3430,8 @@ function renderGaugeRows(cards){
     { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
     { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'حد أمان الكرش الأدنى',            unit:'%',       kind:'floor'  },
-    { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'الحد الأقصى للنشا',                unit:'%',       kind:'ceiling' },
-    { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'الحد المسموح به لدهن العليقة',     unit:'%',       kind:'ceiling' },
+    { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'حد الأمان للنشا',                  unit:'%',       kind:'ceiling' },
+    { key:'fat',    label:'دهن العليقة',            current:'العليقة الحالية — دهن',              target:'حد الأمان لدهن العليقة',           unit:'%',       kind:'ceiling' },
     { key:'dcad',   label:'DCAD انتظار الولادة',    cardKey:'dcad',                              unit:'mEq/kg DM',                          kind:'dcad'    }
 ];
 
@@ -3541,13 +3614,13 @@ const state = def.key === 'dm'
 }</div>
 
           <div style="text-align:left">
-            <div style="font-size:11px;color:#64748b">${
+<div style="font-size:11px;color:#64748b">${
   def.kind === 'ceiling'
-    ? 'الحد'
-    : def.kind === 'intake'
-      ? 'المتوقع'
-      : def.kind === 'floor'
-        ? 'حد الأمان'
+    ? 'حد الأمان'
+    : def.kind === 'floor'
+      ? 'حد الأمان'
+      : def.kind === 'intake'
+        ? 'المتوقع'
         : 'الاحتياج'
 }</div>
             <div style="font-size:15px;font-weight:800;color:#0f172a">${targetText || '—'}</div>
