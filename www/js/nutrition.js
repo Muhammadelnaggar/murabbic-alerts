@@ -3433,7 +3433,7 @@ function formatMurabbikComment(txt = '') {
 } 
 function renderGaugeRows(cards){
   const defs = [
-    { key:'dm',     label:'المادة الجافة المأكولة',  current:'العليقة الحالية — مادة جافة',        target:'احتياجات المادة الجافة',           unit:'كجم',     kind:'intake'  },
+   { key:'dm',      label:'قدرة الأكل المتوقعة للحيوان',  current:'العليقة الحالية — مادة جافة',        target:'قدرة الأكل المتوقعة',           unit:'كجم مادة جافة/يوم',     kind:'intake'  },
     { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
     { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
@@ -3557,10 +3557,10 @@ const rows = defs.map(def => {
 const state = def.key === 'dm'
   ? {
       key: 'info',
-      label: 'مأكول / متوقع',
+      label: 'قدرة أكل',
       color: '#64748b',
       tone: 'info',
-      note: 'المادة الجافة: مأكول / متوقع. راقب المتبقي فقط.'
+      note: 'قدرة الأكل المتوقعة للحيوان.'
     }
   : gaugeStatus(def.kind, current, target);
         const gaugeState = {
@@ -3568,8 +3568,8 @@ const state = def.key === 'dm'
       metricKey: def.key,
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
-   const comment = def.key === 'dm'
-  ? 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'
+const comment = def.key === 'dm'
+  ? 'يجب أن يتوفر العلف أمام الحيوانات 24 ساعة يوميًا لضمان الشبع وثبات الإنتاج.'
   : smartHint(def.key, '');
 
     return `
@@ -3673,24 +3673,21 @@ if(n){
   const oldDcadBox = document.getElementById('nutritionDcadCard');
   if (oldDcadBox) oldDcadBox.remove();
 
-  
   const items = [
     [
-      "المادة الجافة المأكولة",
-      (fmt($("totDM")?.textContent, "") !== "—" || fmt($("dmiTarget")?.textContent, "") !== "—")
-        ? `${fmt($("totDM")?.textContent, "")} / ${fmt($("dmiTarget")?.textContent, "")} كجم`
-        : "—"
+      "قدرة الأكل المتوقعة للحيوان",
+      fmt($("dmiTarget")?.textContent, " كجم مادة جافة/يوم")
     ],
     ["المأكول الكلي", fmt($("totAsFed")?.textContent, " كجم")],
     ["البروتين الخام CP", fmt($("cpPctTotal")?.textContent, "%")],
     ["البروتين الممثل MP", fmt($("mpSupplyG")?.textContent, " جم/يوم")],
-    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")],
-
+    ["صحة الكرش", fmt($("fcRatio")?.textContent, "")]
   ];
+
   n.innerHTML = items.map(([k,v])=>{
     let st = {sym:"—", color:"#64748b"};
 
-    if(k==="المادة الجافة المأكولة"){
+    if(k==="قدرة الأكل المتوقعة للحيوان"){
       st = {sym:"—", color:"#64748b"};
 
     }else if(k==="البروتين الخام CP"){
@@ -3708,7 +3705,7 @@ if(n){
     }
 
     const cls = (k === "صحة الكرش") ? "kpi rumen-feature" : "kpi";
-return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
+    return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
   }).join("");
 }
   const e = $("economicKPIs");
