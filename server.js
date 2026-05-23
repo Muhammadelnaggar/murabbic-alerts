@@ -617,7 +617,18 @@ targets: {
       costPerKgMilk: toNumOrNull(a?.economics?.costPerKgMilk),
       dmPerKgMilk: toNumOrNull(a?.economics?.dmPerKgMilk),
       milkRevenue: toNumOrNull(a?.economics?.milkRevenue),
-      milkMargin: toNumOrNull(a?.economics?.milkMargin)
+      milkMargin: toNumOrNull(a?.economics?.milkMargin),
+
+      ecmKg: toNumOrNull(a?.economics?.ecmKg),
+      fpcmKg: toNumOrNull(a?.economics?.fpcmKg),
+
+      feedCostPctOfMilkIncome: toNumOrNull(a?.economics?.feedCostPctOfMilkIncome),
+      iofcPctOfMilkIncome: toNumOrNull(a?.economics?.iofcPctOfMilkIncome),
+
+      feedEfficiencyECM: toNumOrNull(a?.economics?.feedEfficiencyECM),
+      feedEfficiencyFPCM: toNumOrNull(a?.economics?.feedEfficiencyFPCM),
+
+      economicDecision: a?.economics?.economicDecision || null
     },
              inputs: {
       bodyWeightKgUsed: toNumOrNull(a?.inputs?.bodyWeightKgUsed),
@@ -1632,6 +1643,68 @@ const dmPerKgMilk = (milkKg > 0 && rationCore?.totals?.dmKg > 0) ? round2(ration
 const milkRevenue = (milkKg > 0 && milkPriceNum > 0) ? round2(milkKg * milkPriceNum) : null;
 const milkMargin = (milkRevenue != null && totCost != null) ? round2(milkRevenue - totCost) : null;
 
+const ecmKg = round2(rationCore?.economics?.ecmKg ?? rationCore?.economics?.ecm ?? null);
+const fpcmKg = round2(rationCore?.economics?.fpcmKg ?? rationCore?.economics?.fpcm ?? null);
+
+const feedEfficiencyECM =
+  Number.isFinite(Number(ecmKg)) &&
+  Number.isFinite(Number(rationCore?.totals?.dmKg)) &&
+  Number(rationCore.totals.dmKg) > 0
+    ? round2(Number(ecmKg) / Number(rationCore.totals.dmKg))
+    : null;
+
+const feedEfficiencyFPCM =
+  Number.isFinite(Number(fpcmKg)) &&
+  Number.isFinite(Number(rationCore?.totals?.dmKg)) &&
+  Number(rationCore.totals.dmKg) > 0
+    ? round2(Number(fpcmKg) / Number(rationCore.totals.dmKg))
+    : null;
+
+const feedCostPctOfMilkIncome =
+  Number.isFinite(Number(totCost)) &&
+  Number.isFinite(Number(milkRevenue)) &&
+  Number(milkRevenue) > 0
+    ? round2((Number(totCost) / Number(milkRevenue)) * 100)
+    : null;
+
+const iofcPctOfMilkIncome =
+  Number.isFinite(Number(milkMargin)) &&
+  Number.isFinite(Number(milkRevenue)) &&
+  Number(milkRevenue) > 0
+    ? round2((Number(milkMargin) / Number(milkRevenue)) * 100)
+    : null;
+
+const mpSupplyForSafety = Number(rationCore?.nutrition?.mpSupplyG);
+const mpTargetForSafety = Number(targetsCore?.mpTargetG);
+const fatActualForSafety = Number(rationCore?.nutrition?.fatPctActual);
+const carbSafetyStatus = String(rationCore?.nutrition?.carbohydrateSafetyModel?.status || '').toLowerCase();
+
+const economicDecision = buildEconomicDecision({
+  milkRevenue,
+  feedCost: totCost,
+  milkMargin,
+  costPerKgMilk,
+  dmKg: rationCore?.totals?.dmKg,
+  ecmKg,
+  fpcmKg,
+  rationSafety: {
+    rumenUnsafe: rumenHealthModel.status === 'danger',
+    energyDeficit:
+      Number.isFinite(Number(nelActualDay)) &&
+      Number.isFinite(Number(targetsCore?.nel)) &&
+      Number(nelActualDay) < Number(targetsCore.nel) - 0.5,
+    mpDeficit:
+      Number.isFinite(mpSupplyForSafety) &&
+      Number.isFinite(mpTargetForSafety) &&
+      mpSupplyForSafety < mpTargetForSafety - 50,
+    ndfUnsafe: carbSafetyStatus === 'danger',
+    starchUnsafe: carbSafetyStatus === 'danger',
+    fatUnsafe:
+      Number.isFinite(fatActualForSafety) &&
+      fatActualForSafety > 7
+  }
+});
+
   return normalizeNutritionAnalysis({
     totals: {
       asFedKg: rationCore?.totals?.asFedKg ?? null,
@@ -1700,7 +1773,18 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
       costPerKgMilk,
       dmPerKgMilk,
       milkRevenue,
-      milkMargin
+      milkMargin,
+
+      ecmKg,
+      fpcmKg,
+
+      feedCostPctOfMilkIncome,
+      iofcPctOfMilkIncome,
+
+      feedEfficiencyECM,
+      feedEfficiencyFPCM,
+
+      economicDecision
     },
              inputs: {
       bodyWeightKgUsed: runtimeCtx.bodyWeightKgUsed,
@@ -1891,6 +1975,135 @@ function buildRumenHealthModel({
     isBuffaloRumen: !!isBuffaloRumen
   };
 }
+
+function buildEconomicDecision({
+  milkRevenue,
+  feedCost,
+  milkMargin,
+  costPerKgMilk,
+  dmKg,
+  ecmKg,
+  fpcmKg,
+  rationSafety = {}
+} = {}) {
+  const revenue = Number(milkRevenue);
+  const cost = Number(feedCost);
+  const margin = Number(milkMargin);
+  const dm = Number(dmKg);
+  const ecm = Number(ecmKg);
+  const fpcm = Number(fpcmKg);
+
+  const feedCostPctOfMilkIncome =
+    revenue > 0 && Number.isFinite(cost) && cost >= 0
+      ? round2((cost / revenue) * 100)
+      : null;
+
+  const iofcPctOfMilkIncome =
+    revenue > 0 && Number.isFinite(margin)
+      ? round2((margin / revenue) * 100)
+      : null;
+
+  const feedEfficiencyECM =
+    dm > 0 && ecm > 0
+      ? round2(ecm / dm)
+      : null;
+
+  const feedEfficiencyFPCM =
+    dm > 0 && fpcm > 0
+      ? round2(fpcm / dm)
+      : null;
+
+  const hasUnsafeNutrition =
+    rationSafety?.rumenUnsafe === true ||
+    rationSafety?.energyDeficit === true ||
+    rationSafety?.mpDeficit === true ||
+    rationSafety?.ndfUnsafe === true ||
+    rationSafety?.starchUnsafe === true ||
+    rationSafety?.fatUnsafe === true;
+
+  let status = 'good';
+  let title = 'اقتصاد العليقة قوي';
+  let reason = '';
+  let action = 'حافظ على العليقة ولا تخفض التكلفة بطريقة تكسر الطاقة أو البروتين أو أمان الكرش.';
+
+  if (feedCostPctOfMilkIncome == null || iofcPctOfMilkIncome == null) {
+    status = 'warn';
+    title = 'التحليل الاقتصادي غير مكتمل';
+    reason = 'تعذر حساب نسبة تكلفة العلف أو نسبة IOFC من دخل اللبن.';
+    action = 'راجع مدخلات اللبن وسعر اللبن وتكلفة العلف لأنها إلزامية لإصدار قرار اقتصادي كامل.';
+  } else if (feedCostPctOfMilkIncome <= 40) {
+    status = 'good';
+    title = 'اقتصاد العليقة قوي';
+    reason = `تكلفة العلف تمثل ${feedCostPctOfMilkIncome}% من دخل اللبن، وIOFC يمثل ${iofcPctOfMilkIncome}%.`;
+    action = 'العليقة قوية اقتصاديًا. حافظ على الاتزان ولا تخفض تكلفة العلف إذا كان ذلك سيكسر NEL أو MP أو أمان الكرش.';
+  } else if (feedCostPctOfMilkIncome <= 50) {
+    status = 'good';
+    title = 'اقتصاد العليقة مقبول';
+    reason = `تكلفة العلف تمثل ${feedCostPctOfMilkIncome}% من دخل اللبن، وIOFC يمثل ${iofcPctOfMilkIncome}%.`;
+    action = 'الاقتصاد مقبول. يمكن مراجعة الخامات الأعلى تكلفة فقط إذا بقيت الطاقة والبروتين وصحة الكرش داخل الأمان.';
+  } else if (feedCostPctOfMilkIncome <= 60) {
+    status = 'warn';
+    title = 'تحذير اقتصادي: تكلفة العلف مرتفعة نسبيًا';
+    reason = `تكلفة العلف تمثل ${feedCostPctOfMilkIncome}% من دخل اللبن، وIOFC يمثل ${iofcPctOfMilkIncome}%.`;
+    action = 'راجع الخامات الأعلى مساهمة في التكلفة وكفاءة التحويل، ولا تخفض المركزات أو البروتين قبل التأكد من عدم كسر NEL وMP وNDF والنشا والدهن.';
+  } else {
+    status = 'danger';
+    title = 'خطر اقتصادي: تكلفة العلف تلتهم دخل اللبن';
+    reason = `تكلفة العلف تمثل ${feedCostPctOfMilkIncome}% من دخل اللبن، وIOFC يمثل ${iofcPctOfMilkIncome}%.`;
+    action = 'الأولوية تحديد السبب: سعر خامات مرتفع، إنتاج لبن منخفض، أو كفاءة تحويل ضعيفة. أي تعديل اقتصادي يجب أن يمر أولًا على بوابة الاتزان الغذائي وصحة الكرش.';
+  }
+
+  if (Number.isFinite(margin) && margin < 0) {
+    status = 'danger';
+    title = 'خطر اقتصادي: هامش لبن-علف سلبي';
+    reason = `تكلفة العلف أعلى من دخل اللبن اليومي. تكلفة العلف = ${round2(cost)}، دخل اللبن = ${round2(revenue)}.`;
+    action = 'العليقة خاسرة على مستوى اللبن والعلف. راجع تكلفة الخامات وإنتاج اللبن وسعر اللبن فورًا، مع منع أي خفض يضر NEL أو MP أو صحة الكرش.';
+  }
+
+  if (hasUnsafeNutrition && (status === 'good')) {
+    status = 'warn';
+    title = 'الربحية الظاهرة تحتاج حذرًا غذائيًا';
+    action = 'رغم أن المؤشر الاقتصادي مقبول، توجد ملاحظة غذائية قد تؤثر على استمرار الربحية. أصلح أمان الكرش أو الاتزان الغذائي قبل اعتماد العليقة.';
+  }
+
+  return {
+    model: 'MURABBIK_ECONOMIC_DECISION_IOFC_V1',
+    status,
+    title,
+    reason,
+    action,
+    metrics: {
+      feedCostPctOfMilkIncome,
+      iofcPctOfMilkIncome,
+      feedEfficiencyECM,
+      feedEfficiencyFPCM,
+      iofcPerHead: Number.isFinite(margin) ? round2(margin) : null,
+      costPerKgMilk: Number.isFinite(Number(costPerKgMilk)) ? round2(costPerKgMilk) : null
+    },
+    benchmarks: {
+      feedCostPctOfMilkIncome: {
+        strongMax: 40,
+        acceptableMax: 50,
+        warningMax: 60,
+        dangerAbove: 60
+      },
+      iofcPctOfMilkIncome: {
+        strongMin: 60,
+        acceptableMin: 50,
+        warningMin: 40,
+        dangerBelow: 40
+      }
+    },
+    sourceBasis: [
+      'PENN_STATE_IOFC_FEED_COST_40_PERCENT_OR_LESS_OF_MILK_INCOME',
+      'VIRGINIA_TECH_IOFC_MILK_INCOME_MINUS_FEED_COST',
+      'JDS_IOFC_NOT_FEED_COST_ALONE',
+      'WISCONSIN_FEED_EFFICIENCY_READ_WITH_IOFC',
+      'MURABBIK_NUTRITION_SAFETY_GATE'
+    ]
+  };
+}
+
 function buildNutritionPanels(analysis = {}, context = {}) {
   const totals = analysis?.totals || {};
   const nutrition = analysis?.nutrition || {};
