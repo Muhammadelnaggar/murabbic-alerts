@@ -3713,14 +3713,55 @@ return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div cl
 }
   const e = $("economicKPIs");
   if(e){
+    const econ =
+      window.mbkNutrition?.serverViewModel?.analysis?.economics ||
+      window.mbkNutrition?.rationAnalysis?.economics ||
+      {};
+
+    const decision = econ?.economicDecision || null;
+
+    const pctText = (v) =>
+      Number.isFinite(Number(v)) ? (Number(v).toFixed(1) + "%") : "—";
+
+    const decisionClass =
+      decision?.status === "danger" ? "bad" :
+      decision?.status === "warn" ? "warn" :
+      decision?.status === "ok" || decision?.status === "good" ? "ok" :
+      "";
+
+    const decisionBadge =
+      decision?.status === "danger" ? "خطر" :
+      decision?.status === "warn" ? "تحذير" :
+      decision?.status === "ok" || decision?.status === "good" ? "جيد" :
+      "قرار السيرفر";
+
     const items = [
       ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
       ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-      ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
+      ["كفاءة ECM", Number.isFinite(Number(econ.feedEfficiencyECM)) ? (Number(econ.feedEfficiencyECM).toFixed(2) + " كجم ECM/كجم DM") : "—"],
+      ["تكلفة العلف من دخل اللبن", pctText(econ.feedCostPctOfMilkIncome)],
+      ["IOFC من دخل اللبن", pctText(econ.iofcPctOfMilkIncome)],
       ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
       ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
     ];
-    e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+
+    const decisionHtml = decision
+      ? `
+        <div class="kpi rumen-feature ${decisionClass}" style="grid-column:1/-1">
+          <div class="k" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span>قرار مُرَبِّيك الاقتصادي</span>
+            <span class="kpi-badge"><span class="dot"></span><span class="txt">${escapeHtml(decisionBadge)}</span></span>
+          </div>
+          <div class="v" style="font-weight:950;margin-top:6px">${escapeHtml(decision.title || "—")}</div>
+          ${decision.reason ? `<div class="kpi-hint" style="margin-top:7px">${escapeHtml(decision.reason)}</div>` : ""}
+          ${decision.action ? `<div class="kpi-hint" style="margin-top:7px">${escapeHtml(decision.action)}</div>` : ""}
+        </div>
+      `
+      : "";
+
+    e.innerHTML =
+      items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("") +
+      decisionHtml;
   }
 
 const adv = $("advancedKPIs");
