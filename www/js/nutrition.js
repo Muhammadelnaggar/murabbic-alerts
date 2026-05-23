@@ -3715,15 +3715,41 @@ return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div cl
   if(e){
     const serverCards = Array.isArray(P.economicsCards) ? P.economicsCards : [];
 
-    if (serverCards.length) {
-      e.innerHTML = serverCards.map(c => `
-        <div class="kpi">
-          <div class="k">${String(c.title || '—')}</div>
-          <div class="v">${String(c.value || '—')}</div>
-          ${c.benchmark ? `<div class="kpi-hint">${String(c.benchmark)}</div>` : ''}
-          ${c.targetText ? `<div class="kpi-hint">${String(c.targetText)}</div>` : ''}
-        </div>
-      `).join("");
+   if (serverCards.length) {
+  const arText = (v) => String(v || '—')
+    .replaceAll('IOFC', 'هامش اللبن بعد العلف')
+    .replaceAll('ECM', 'لبن مصحح الطاقة')
+    .replaceAll('FPCM', 'لبن مصحح الدهن والبروتين')
+    .replaceAll('DM', 'مادة جافة')
+    .replaceAll('Feed efficiency', 'كفاءة تحويل العلف')
+    .replaceAll('Benchmark', 'المعيار')
+    .replaceAll('as-fed', 'طازج')
+    .replaceAll('kg', 'كجم');
+
+  const shortHint = (txt) => {
+    const s = arText(txt || '')
+      .replace(/^مربيك:\s*/, '')
+      .trim();
+
+    if (!s || s === '—') return '';
+
+    return s
+      .split(/[.،]/)
+      .map(x => x.trim())
+      .filter(Boolean)[0] || '';
+  };
+
+  e.innerHTML = serverCards.map(c => {
+    const hint = shortHint(c.targetText);
+
+    return `
+      <div class="kpi">
+        <div class="k">${arText(c.title)}</div>
+        <div class="v">${arText(c.value)}</div>
+        ${hint ? `<div class="kpi-hint">${hint}</div>` : ''}
+      </div>
+    `;
+  }).join("");
     } else {
       const items = [
         ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
