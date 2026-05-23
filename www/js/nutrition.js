@@ -3711,76 +3711,17 @@ if(n){
 return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div class="v">'+v+'</div><div class="arr" style="color:'+st.color+'">'+st.sym+'</div></div></div>';
   }).join("");
 }
-const e = $("economicKPIs");
-if(e){
-  const econ =
-    window.mbkNutrition?.serverViewModel?.analysis?.economics ||
-    window.mbkNutrition?.rationAnalysis?.economics ||
-    {};
-
-  const decision = econ?.economicDecision || null;
-
-  const safeText = (v) => escapeHtml(v == null || v === '' ? '—' : String(v));
-
-  const moneyText = (v) =>
-    Number.isFinite(Number(v)) ? `${Number(v).toFixed(2)} ج` : '—';
-
-  const pctText = (v) =>
-    Number.isFinite(Number(v)) ? `${Number(v).toFixed(1)}%` : '—';
-
-  const numText = (v, d = 2) =>
-    Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—';
-
-  const cards = [];
-
-  if (decision) {
-    const badge =
-      decision.status === 'danger' ? 'خطر' :
-      decision.status === 'warn' ? 'تحذير' :
-      decision.status === 'ok' || decision.status === 'good' ? 'جيد' :
-      'قرار';
-
-    cards.push(`
-      <div class="kpi rumen-feature" style="grid-column:1/-1">
-        <div class="k">قرار مُرَبِّيك الاقتصادي</div>
-        <div class="v" style="margin-top:6px;font-weight:950">${safeText(decision.title)}</div>
-        ${decision.reason ? `<div class="kpi-hint" style="margin-top:6px">${safeText(decision.reason)}</div>` : ''}
-        ${decision.action ? `<div class="kpi-hint" style="margin-top:6px">${safeText(decision.action)}</div>` : ''}
-        <div class="kpi-hint" style="margin-top:6px">قراءة السيرفر: ${safeText(badge)}</div>
-      </div>
-    `);
+  const e = $("economicKPIs");
+  if(e){
+    const items = [
+      ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+      ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+      ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
+      ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+      ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+    ];
+    e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
   }
-
-  if (Number.isFinite(Number(econ.feedCostPctOfMilkIncome))) {
-    cards.push(`<div class="kpi"><div class="k">تكلفة العلف من دخل اللبن</div><div class="v">${pctText(econ.feedCostPctOfMilkIncome)}</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.iofcPctOfMilkIncome))) {
-    cards.push(`<div class="kpi"><div class="k">IOFC من دخل اللبن</div><div class="v">${pctText(econ.iofcPctOfMilkIncome)}</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.feedEfficiencyECM))) {
-    cards.push(`<div class="kpi"><div class="k">كفاءة ECM</div><div class="v">${numText(econ.feedEfficiencyECM, 2)} كجم ECM / كجم DM</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.costPerKgMilk))) {
-    cards.push(`<div class="kpi"><div class="k">تكلفة كجم لبن</div><div class="v">${numText(econ.costPerKgMilk, 2)} ج/كجم</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.milkMargin))) {
-    cards.push(`<div class="kpi"><div class="k">هامش لبن-علف</div><div class="v">${moneyText(econ.milkMargin)}</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.milkRevenue))) {
-    cards.push(`<div class="kpi"><div class="k">إيراد اللبن</div><div class="v">${moneyText(econ.milkRevenue)}</div></div>`);
-  }
-
-  if (Number.isFinite(Number(econ.dmPerKgMilk))) {
-    cards.push(`<div class="kpi"><div class="k">كفاءة اللبن/DM</div><div class="v">${numText(econ.dmPerKgMilk, 2)} كجم لبن / كجم DM</div></div>`);
-  }
-
-  e.innerHTML = cards.join('');
-}
 
 const adv = $("advancedKPIs");
 if (adv && adv.style.display === "block") {
