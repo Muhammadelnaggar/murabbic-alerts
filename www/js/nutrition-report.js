@@ -1007,7 +1007,7 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
     7;
 
   const rows = [
-metricRow('المادة الجافة المأكولة (DMI)', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
+metricRow('قدرة الأكل / المادة الجافة المأكولة (DMI)', 'قراءة تشغيلية', kg(totals.dmKg,2), '—', 'muted', 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف. الأهم هو اتزان الاحتياجات الفعلية؛ وأي زيادة يأكلها الحيوان حسب الشهية يجب أن يقابلها لبن زيادة.'),
 
 metricRow('الطاقة الصافية للحليب (NEL)', `${nf(t.nelTarget,2)} ميجا كالوري/يوم`, `${nf(n.nelActual,2)} ميجا كالوري/يوم`, finite(nelBal) ? `${nf(nelBal,2)} ميجا كالوري` : '—', balanceState(nelBal, 0.5), mbkAdvice('energy', balanceState(nelBal, 0.5), 'balance')),
 
@@ -1396,7 +1396,7 @@ function renderAllComparison(report = {}){
   const rows = index.map(x => `<tr>
     <td class="metric-name">${esc(x.groupName || '—')}</td>
     <td>${esc(x.stageLabel || '—')}</td>
-    <td>${kg(x.dmActual,2)} / ${kg(x.dmiTarget,2)}</td>
+    <td>${kg(x.dmActual,2)}</td>
     <td>${nf(x.nelActual,2)} / ${nf(x.nelTarget,2)}</td>
     <td>${g(x.mpSupplyG,0)} / ${g(x.mpTargetG,0)}</td>
     <td>${g(x.mpBalanceG,0)}</td>
@@ -1407,7 +1407,7 @@ function renderAllComparison(report = {}){
   </tr>`);
 
   return section('مقارنة مختصرة بين العلائق', table(
-  ['العليقة','المرحلة','مأكول/متوقع','الطاقة الصافية للحليب (NEL)','البروتين الممثل (MP)','ميزان البروتين الممثل','الألياف المتعادلة (NDF)','نشا','تكلفة كجم اللبن','قراءة مُرَبِّيك'],
+   ['العليقة','المرحلة','قدرة أكل / DMI','الطاقة الصافية للحليب (NEL)','البروتين الممثل (MP)','ميزان البروتين الممثل','الألياف المتعادلة (NDF)','نشا','تكلفة كجم اللبن','قراءة مُرَبِّيك'],
     rows,
     'لا توجد بيانات مقارنة.'
   ));
