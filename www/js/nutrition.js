@@ -3067,12 +3067,18 @@ if (kind === 'floor') {
     return { key:'info', label:'قراءة', color:'#64748b', tone:'info', note:'قراءة ألياف العليقة' };
   }
 
-  if (current < target) {
-    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'NDF أقل من حد أمان الكرش' };
+  const highCaution = Math.min(100, target + 20);
+
+  if (current < target * 0.85) {
+    return { key:'danger', label:'خطر', color:'#dc2626', tone:'danger', note:'NDF أقل بوضوح من حد أمان الكرش' };
   }
 
-  if (current < target + 1) {
+  if (current < target) {
     return { key:'warn', label:'قريب من الحد', color:'#d97706', tone:'warn', note:'NDF قريب من حد أمان الكرش' };
+  }
+
+  if (current > highCaution) {
+    return { key:'warn', label:'تنبيه مأكول', color:'#d97706', tone:'warn', note:'NDF يغطي حد الأمان، لكن ارتفاعه قد يضغط المأكول والطاقة حسب جودة وهضمية الخشن' };
   }
 
   return { key:'good', label:'آمن', color:'#16a34a', tone:'good', note:'NDF يغطي حد أمان الكرش' };
@@ -3100,13 +3106,13 @@ if (kind === 'ceiling') {
     };
   }
 
-  if (ratio <= 1.08) {
+  if (ratio <= 1.15) {
     return {
       key:'warn',
       label:'متابعة',
       color:'#d97706',
       tone:'warn',
-      note:'تجاوز بسيط لحد الأمان'
+      note:'تجاوز حد الأمان ويحتاج متابعة قبل اعتباره خطرًا واضحًا'
     };
   }
 
@@ -3160,24 +3166,24 @@ function metricComment(key, state){
     },
 
 ndf: {
-  danger: 'إنذار كرش: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.',
-  good: 'NDF يغطي حد أمان الكرش الأدنى. تأثير العليقة على المأكول يظهر في كارت صحة الكرش.',
-  warn: 'NDF قريب من حد أمان الكرش؛ راقب الخشن والفرز وثبات الروث ودهن اللبن.',
+  danger: 'خطر ألياف: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.',
+  good: 'NDF يغطي حد أمان الكرش الأدنى.',
+  warn: 'تنبيه ألياف: NDF خارج منطقة الأمان البصري؛ إن كان منخفضًا فهناك خطر كرش، وإن كان مرتفعًا فقد يضغط المأكول والطاقة حسب جودة وهضمية الخشن.',
   info: 'NDF قراءة ألياف للعليقة، وليس احتياجًا مستقلًا.'
 },
 
     starch: {
-      danger: 'إنذار حموضة: النشا أعلى من الحد الآمن وقد يرفع خطر الحموضة وانخفاض دهن اللبن والعرج.',
-      good: 'النشا ضمن الحد الآمن للعليقة.',
-      warn: 'النشا قريب من الحد؛ راقب الخشن والألياف المؤثرة وطول التقطيع.',
-      highDanger: 'إنذار حاد: النشا مرتفع بوضوح، وخطر الحموضة واضطراب الكرش أعلى.'
+      danger: 'خطر نشا: النشا تجاوز حد الأمان بوضوح؛ راجع الحبوب وتوازن الخشن قبل اعتماد العليقة.',
+      good: 'النشا داخل حد الأمان للعليقة.',
+      warn: 'متابعة نشا: النشا تجاوز حد الأمان قليلًا؛ راقب توازن الحبوب والخشن وصحة الكرش.',
+      highDanger: 'خطر نشا: النشا مرتفع بوضوح وخطر اضطراب الكرش أعلى.'
     },
 
     fat: {
-      danger: 'إنذار دهن: دهن العليقة أعلى من الحد وقد يثبط تخمر الكرش ويقلل هضم الألياف.',
-      good: 'دهن العليقة ضمن الحد الآمن.',
-      warn: 'الدهن قريب من الحد؛ راجع مصادر الدهون ونسبة الإضافات.',
-      highDanger: 'إنذار حاد: الدهن مرتفع بوضوح وقد يضر تخمر الكرش وهضم الألياف.'
+      danger: 'خطر دهن: دهن العليقة تجاوز حد الأمان بوضوح وقد يؤثر على هضم الألياف.',
+      good: 'دهن العليقة داخل حد الأمان.',
+      warn: 'متابعة دهن: دهن العليقة قريب/أعلى قليلًا من حد الأمان؛ راجع مصدر الدهون قبل الرفع.',
+      highDanger: 'خطر دهن: دهن العليقة مرتفع بوضوح وقد يضر تخمر الكرش وهضم الألياف.'
     }
   };
 
@@ -3275,18 +3281,20 @@ else if (!valid) {
 }
 
 else if (kind === 'floor') {
-  // مقياس % ثابت من 0 إلى 100.
-  // NDF: الحد المعروض هنا حد أدنى للأمان، وليس هدفًا أو حدًا أعلى.
+  // NDF على مقياس % ثابت من 0 إلى 100.
+  // تحت الحد الأدنى خطر، قرب الحد متابعة، بعد الحد منطقة أمان، والارتفاع الكبير تنبيه مأكول لا خطر كرش مباشر.
   const actualPct = clamp01(c / 100);
   const limitPct  = clamp01(t / 100);
-  const warnPct   = clamp01((t * 0.85) / 100);
+  const warnLowPct = clamp01((t * 0.85) / 100);
+  const highCautionPct = clamp01(Math.min(t + 20, 100) / 100);
 
   pos = actualPct;
 
   zones = [
-    { from: 0,       to: warnPct,  color: red },
-    { from: warnPct, to: limitPct, color: yellow },
-    { from: limitPct,to: 1,        color: green }
+    { from: 0,              to: warnLowPct,     color: red },
+    { from: warnLowPct,     to: limitPct,       color: yellow },
+    { from: limitPct,       to: highCautionPct, color: green },
+    { from: highCautionPct, to: 1,              color: yellow }
   ];
 
   tickPos = limitPct;
@@ -3294,18 +3302,18 @@ else if (kind === 'floor') {
 }
 
 else if (kind === 'ceiling') {
-  // مقياس % ثابت من 0 إلى 100.
-  // النشا والدهون: الحد المعروض هنا حد أقصى.
+  // النشا والدهن على مقياس % ثابت من 0 إلى 100.
+  // قبل حد الأمان آمن، بعده متابعة، والخطر يبدأ فقط عند التجاوز الواضح.
   const actualPct = clamp01(c / 100);
   const limitPct  = clamp01(t / 100);
-  const warnPct   = clamp01(Math.min(t * 1.08, 100) / 100);
+  const dangerPct = clamp01(Math.min(t * 1.15, 100) / 100);
 
   pos = actualPct;
 
   zones = [
-    { from: 0,       to: limitPct, color: green },
-    { from: limitPct,to: warnPct,  color: yellow },
-    { from: warnPct, to: 1,        color: red }
+    { from: 0,         to: limitPct,  color: green },
+    { from: limitPct,  to: dangerPct, color: yellow },
+    { from: dangerPct, to: 1,         color: red }
   ];
 
   tickPos = limitPct;
