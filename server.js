@@ -2631,7 +2631,74 @@ ndfHint =
               : 'good'
     }
   ];
+  const economicDecision = economics?.economicDecision || null;
+  const economicMetrics = economicDecision?.metrics || {};
 
+  const feedCostPctOfMilkIncome =
+    Number.isFinite(Number(economics.feedCostPctOfMilkIncome))
+      ? Number(economics.feedCostPctOfMilkIncome)
+      : (
+          Number.isFinite(Number(economicMetrics.feedCostPctOfMilkIncome))
+            ? Number(economicMetrics.feedCostPctOfMilkIncome)
+            : null
+        );
+
+  const iofcPctOfMilkIncome =
+    Number.isFinite(Number(economics.iofcPctOfMilkIncome))
+      ? Number(economics.iofcPctOfMilkIncome)
+      : (
+          Number.isFinite(Number(economicMetrics.iofcPctOfMilkIncome))
+            ? Number(economicMetrics.iofcPctOfMilkIncome)
+            : null
+        );
+
+  const feedEfficiencyECM =
+    Number.isFinite(Number(economics.feedEfficiencyECM))
+      ? Number(economics.feedEfficiencyECM)
+      : (
+          Number.isFinite(Number(economicMetrics.feedEfficiencyECM))
+            ? Number(economicMetrics.feedEfficiencyECM)
+            : null
+        );
+
+  const feedEfficiencyFPCM =
+    Number.isFinite(Number(economics.feedEfficiencyFPCM))
+      ? Number(economics.feedEfficiencyFPCM)
+      : (
+          Number.isFinite(Number(economicMetrics.feedEfficiencyFPCM))
+            ? Number(economicMetrics.feedEfficiencyFPCM)
+            : null
+        );
+
+  const feedCostBand =
+    feedCostPctOfMilkIncome == null
+      ? { status: 'warn', label: 'غير مكتمل' }
+      : feedCostPctOfMilkIncome <= 40
+        ? { status: 'good', label: 'قوي' }
+        : feedCostPctOfMilkIncome <= 50
+          ? { status: 'good', label: 'مقبول' }
+          : feedCostPctOfMilkIncome <= 60
+            ? { status: 'warn', label: 'مرتفع' }
+            : { status: 'danger', label: 'خطر' };
+
+  const iofcBand =
+    iofcPctOfMilkIncome == null
+      ? { status: 'warn', label: 'غير مكتمل' }
+      : iofcPctOfMilkIncome >= 60
+        ? { status: 'good', label: 'قوي' }
+        : iofcPctOfMilkIncome >= 50
+          ? { status: 'good', label: 'مقبول' }
+          : iofcPctOfMilkIncome >= 40
+            ? { status: 'warn', label: 'ضعيف' }
+            : { status: 'danger', label: 'خطر' };
+
+  const safeNutritionGate =
+    economicDecision?.status === 'warn' &&
+    /حذر|غذائي|الكرش|الاتزان/.test(String(economicDecision?.title || economicDecision?.action || ''));
+
+  const economicActionText =
+    String(economicDecision?.action || '').trim() ||
+    'اقرأ الاقتصاد مع الاتزان الغذائي وصحة الكرش قبل أي تعديل في الخامات.';
   const economicsCards = [
     {
       key: 'feedCostPctOfMilkIncome',
