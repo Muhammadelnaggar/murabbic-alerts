@@ -2699,7 +2699,7 @@ ndfHint =
   const economicActionText =
     String(economicDecision?.action || '').trim() ||
     'اقرأ الاقتصاد مع الاتزان الغذائي وصحة الكرش قبل أي تعديل في الخامات.';
-  const econCard = (key, title, value, actual, status, uiHint) => ({
+   const econCard = (key, title, value, actual, status, uiHint) => ({
     key,
     title,
     value,
@@ -2711,49 +2711,59 @@ ndfHint =
     model: economicDecision || null
   });
 
+  const nutritionGateText =
+    safeNutritionGate
+      ? ' عالج التحذير الغذائي قبل الحفظ.'
+      : '';
+
   const feedCostHint =
     feedCostPctOfMilkIncome == null
       ? 'أكمل بيانات اللبن والتكلفة.'
       : feedCostPctOfMilkIncome <= 40
-        ? (
-            safeNutritionGate
-              ? 'التكلفة قوية، لكن اضبط التحذير الغذائي أولًا.'
-              : 'تكلفة قوية؛ حافظ على جودة العليقة.'
-          )
+        ? `تكلفة قوية؛ لا تخفض جودة العليقة.${nutritionGateText}`
         : feedCostPctOfMilkIncome <= 50
-          ? 'تكلفة مقبولة؛ راقب أغلى الخامات.'
+          ? 'مقبولة؛ راجع أغلى خامتين فقط دون كسر الاتزان.'
           : feedCostPctOfMilkIncome <= 60
-            ? 'تكلفة مرتفعة؛ راجع الخامات الأعلى تكلفة.'
-            : 'خطر اقتصادي؛ راجع السعر والإنتاج والتكلفة.';
+            ? 'مرتفعة؛ خفّض التكلفة مع الحفاظ على الطاقة والبروتين والكرش.'
+            : 'خطر اقتصادي؛ راجع سعر اللبن والإنتاج وأغلى الخامات.';
 
   const milkAfterFeedHint =
     iofcPctOfMilkIncome == null
       ? 'أكمل بيانات اللبن والتكلفة.'
       : iofcPctOfMilkIncome >= 60
-        ? (
-            safeNutritionGate
-              ? 'الهامش قوي، لكن الكرش يحتاج ضبط.'
-              : 'هامش قوي بعد خصم العلف.'
-          )
+        ? `هامش قوي؛ يمكن تصحيح العليقة دون خوف من التكلفة.${nutritionGateText}`
         : iofcPctOfMilkIncome >= 50
-          ? 'هامش مقبول؛ تابع التكلفة والإنتاج.'
+          ? 'هامش مقبول؛ لا تزود التكلفة إلا لتحسين واضح.'
           : iofcPctOfMilkIncome >= 40
-            ? 'هامش ضعيف؛ راجع كفاءة العليقة.'
-            : 'خطر ربحية؛ لا تعتمدها قبل المراجعة.';
+            ? 'هامش ضعيف؛ راجع التكلفة وكفاءة التحويل.'
+            : 'خطر ربحية؛ لا تحفظ قبل مراجعة العليقة والسعر.';
 
   const correctedMilkEfficiency =
     feedEfficiencyECM != null
       ? feedEfficiencyECM
       : feedEfficiencyFPCM;
 
+  const correctedMilkStatus =
+    correctedMilkEfficiency == null
+      ? 'warn'
+      : correctedMilkEfficiency >= 1.6
+        ? 'good'
+        : correctedMilkEfficiency >= 1.4
+          ? 'good'
+          : correctedMilkEfficiency >= 1.3
+            ? 'warn'
+            : 'danger';
+
   const correctedMilkHint =
     correctedMilkEfficiency == null
       ? 'يحتاج بيانات اللبن والمادة الجافة.'
-      : (
-          safeNutritionGate
-            ? 'الكفاءة جيدة ظاهريًا، لكن الحكم بعد ضبط الكرش.'
-            : 'كفاءة جيدة؛ اقرأها مع الهامش وصحة الكرش.'
-        );
+      : correctedMilkEfficiency >= 1.6
+        ? `كفاءة ممتازة؛ لا تطارد رفعها قبل ضبط الكرش والبروتين.${nutritionGateText}`
+        : correctedMilkEfficiency >= 1.4
+          ? `كفاءة جيدة؛ حسّنها من الطاقة والكرش لا من تقليل المأكول.${nutritionGateText}`
+          : correctedMilkEfficiency >= 1.3
+            ? 'كفاءة متوسطة؛ راجع جودة الخشن والطاقة والمأكول.'
+            : 'كفاءة ضعيفة؛ راجع المأكول والطاقة وجودة العليقة.';
 
   const costPerKgMilkVal =
     Number.isFinite(Number(economics.costPerKgMilk))
@@ -2763,7 +2773,11 @@ ndfHint =
   const costPerKgMilkHint =
     costPerKgMilkVal == null
       ? 'يحتاج إنتاج اللبن وتكلفة العلف.'
-      : 'مؤشر تكلفة؛ القرار من الهامش وصحة الكرش.';
+      : feedCostPctOfMilkIncome != null && feedCostPctOfMilkIncome <= 40
+        ? 'التكلفة جيدة؛ لا تخفض الجودة لمجرد رقم أقل.'
+        : feedCostPctOfMilkIncome != null && feedCostPctOfMilkIncome > 50
+          ? 'مرتفعة؛ راجع الخامات الأعلى تكلفة.'
+          : 'اقرأها مع الهامش وكفاءة اللبن المصحح.';
 
   const milkMarginVal =
     Number.isFinite(Number(economics.milkMargin))
@@ -2773,11 +2787,13 @@ ndfHint =
   const milkMarginHint =
     milkMarginVal == null
       ? 'يحتاج دخل اللبن وتكلفة العلف.'
-      : (
-          safeNutritionGate
-            ? 'ربحية ظاهرة جيدة، لكن لا تعتمدها قبل ضبط التحذير الغذائي.'
-            : 'هامش جيد؛ ثبّت العليقة وراقب الأسعار.'
-        );
+      : safeNutritionGate
+        ? 'اقتصاديًا جيد؛ القرار الآن غذائي قبل الحفظ.'
+        : iofcPctOfMilkIncome != null && iofcPctOfMilkIncome >= 60
+          ? 'هامش قوي؛ ثبّت العليقة وراقب الأسعار.'
+          : iofcPctOfMilkIncome != null && iofcPctOfMilkIncome >= 50
+            ? 'هامش مقبول؛ راقب التكلفة والإنتاج.'
+            : 'هامش ضعيف؛ راجع العليقة قبل الاعتماد.';
 
   const economicsCards = [
     econCard(
@@ -2803,7 +2819,7 @@ ndfHint =
         ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح / كجم مادة جافة`
         : '—',
       correctedMilkEfficiency,
-      safeNutritionGate ? 'warn' : (correctedMilkEfficiency != null ? 'good' : 'warn'),
+      correctedMilkStatus,
       correctedMilkHint
     ),
     econCard(
