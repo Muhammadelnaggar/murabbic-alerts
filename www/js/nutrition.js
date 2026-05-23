@@ -3713,14 +3713,27 @@ return '<div class="'+cls+'"><div class="k">'+k+'</div><div class="vrow"><div cl
 }
   const e = $("economicKPIs");
   if(e){
-    const items = [
-      ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
-      ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
-      ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
-      ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
-      ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
-    ];
-    e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+    const serverCards = Array.isArray(P.economicsCards) ? P.economicsCards : [];
+
+    if (serverCards.length) {
+      e.innerHTML = serverCards.map(c => `
+        <div class="kpi">
+          <div class="k">${String(c.title || '—')}</div>
+          <div class="v">${String(c.value || '—')}</div>
+          ${c.benchmark ? `<div class="kpi-hint">${String(c.benchmark)}</div>` : ''}
+          ${c.targetText ? `<div class="kpi-hint">${String(c.targetText)}</div>` : ''}
+        </div>
+      `).join("");
+    } else {
+      const items = [
+        ["التكلفة/رأس", fmt($("totCost")?.textContent, "") !== "—" ? (fmt($("totCost")?.textContent, "") + " ج") : "—"],
+        ["تكلفة كجم لبن", fmt($("costPerKgMilk")?.textContent, "") !== "—" ? (fmt($("costPerKgMilk")?.textContent, "") + " ج/كجم") : "—"],
+        ["كفاءة تحويل العلف", fmt($("dmPerKgMilk")?.textContent, "") !== "—" ? ("1 كجم مادة جافة → " + fmt($("dmPerKgMilk")?.textContent, "") + " كجم لبن") : "—"],
+        ["سعر طن العليقة", fmt($("mixPriceAsFed")?.textContent, "") !== "—" ? (fmt($("mixPriceAsFed")?.textContent, "") + " ج/طن as-fed") : "—"],
+        ["هامش لبن-علف", fmt($("milkMargin")?.textContent, "") !== "—" ? (fmt($("milkMargin")?.textContent, "") + " ج") : "—"],
+      ];
+      e.innerHTML = items.map(([k,v])=>('<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>')).join("");
+    }
   }
 
 const adv = $("advancedKPIs");
