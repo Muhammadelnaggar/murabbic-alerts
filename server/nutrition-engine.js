@@ -1829,7 +1829,7 @@ const mpReq = computeNasemMPRequirement({
   pregDays,
   closeUp,
   growth: false,
-  dmi,
+  dmi: mineralDmiUsed,
   ndfPct: 30,
   parity: num(parity, 2),
   species: 'cow',
