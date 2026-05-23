@@ -3056,10 +3056,10 @@ function gaugeStatus(kind, current, target, low = 0.92, high = 1.08){
  if (kind === 'intake') {
   return {
     key: 'info',
-    label: 'مأكول / متوقع',
+    label: 'قدرة أكل',
     color: '#64748b',
     tone: 'info',
-    note: 'المادة الجافة هنا مأكول/متوقع وليست حكم نقص أو زيادة.'
+    note: 'قراءة تشغيلية للشهية وليست احتياجًا أو مقارنة.'
   };
 }
 if (kind === 'floor') {
@@ -3136,12 +3136,12 @@ function metricComment(key, state){
   const s = String(state?.key || '');
 
   const map = {
-    dm: {
-      info: 'المادة الجافة المعروضة هي المأكول المتوقع من العليقة مقارنة بالمتوقع من الحيوان، وليست حكم نقص أو زيادة.',
-      danger: 'المادة الجافة مأكول/متوقع وليست قرار اتزان؛ راجع المتبقي وBunk Score قبل تعديل التركيبة.',
-      good: 'المادة الجافة مأكول/متوقع وليست قرار اتزان؛ الحكم يكون على الطاقة والبروتين والألياف وصحة الكرش.',
-      warn: 'المادة الجافة مأكول/متوقع وليست هدف اتزان؛ الزيادة قد تعكس شهية أعلى أو متبقيًا حسب Bunk Score.',
-      highDanger: 'المادة الجافة مأكول/متوقع وليست سببًا منفردًا لتعديل العليقة.'
+       dm: {
+      info: 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف.',
+      danger: 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف.',
+      good: 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف.',
+      warn: 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف.',
+      highDanger: 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف.'
     },
 
     nel: {
@@ -3569,7 +3569,7 @@ const state = def.key === 'dm'
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
 const comment = def.key === 'dm'
-  ? 'يجب أن يتوفر العلف أمام الحيوانات 24 ساعة يوميًا لضمان الشبع وثبات الإنتاج.'
+  ? 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف. الأهم هو اتزان الاحتياجات الفعلية؛ وأي زيادة يأكلها الحيوان حسب الشهية يجب أن يقابلها لبن زيادة.'
   : smartHint(def.key, '');
 
     return `
@@ -3600,13 +3600,9 @@ const comment = def.key === 'dm'
         background:#f8fafc;
         border:1px solid #e5e7eb;
       ">
-        <div style="font-size:13px;font-weight:950;color:#334155">مأكول / متوقع</div>
-        <div style="font-size:22px;font-weight:950;color:#0f172a">
-          ${
-            Number.isFinite(current) && Number.isFinite(target) && target > 0
-              ? Math.round((current / target) * 100)
-              : '—'
-          }%
+             <div style="font-size:15px;font-weight:950;color:#0f172a">قدرة أكل</div>
+        <div style="font-size:12px;font-weight:850;color:#64748b;line-height:1.6;text-align:center;padding:0 8px">
+          قراءة تشغيلية للشهية وليست احتياجًا أو مقارنة.
         </div>
       </div>
     `
