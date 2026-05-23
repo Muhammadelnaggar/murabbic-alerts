@@ -111,19 +111,19 @@ const ADVICE = {
     ok: 'البروتين الخام مناسب، مع الاعتماد الأساسي على قراءة البروتين الممثل.'
   },
   ndf: {
-    low: 'الألياف المتعادلة منخفضة؛ راجع نسبة الخشن وجودته لحماية صحة الكرش.',
-    high: 'الألياف المتعادلة مرتفعة؛ قد تقلل كثافة الطاقة والمأكول مما ينعكس على إنتاج اللبن، راجع جودة الخشن ونسبته.',
-    ok: 'الألياف المتعادلة متزنة؛ تابع الاجترار والروث وثبات اللبن.'
+    low: 'تحذير ألياف: NDF أقل من حد أمان الكرش الأدنى؛ راجع الخشن قبل زيادة الحبوب.',
+    high: 'NDF يغطي حد أمان الكرش الأدنى. الارتفاع الكبير لا يُحكم كخطر مباشر هنا، لكنه قد يضغط المأكول والطاقة حسب جودة الخشن وهضميته.',
+    ok: 'NDF يغطي حد أمان الكرش الأدنى؛ تابع الاجترار والروث والمتبقي وصحة الكرش.'
   },
   starch: {
-    low: 'النشا منخفض؛ راجع مصادر الحبوب النشوية مع مراجعة اتزان الطاقة الكلية في كارت الطاقة.',
-    high: 'النشا مرتفع؛ راجع الألياف الفعالة وصحة الكرش لتجنب الحموضة.',
-    ok: 'النشا داخل الحد المناسب؛ استمر مع متابعة الروث والاجترار وصحة الكرش.'
+    low: 'النشا أقل من حد الأمان؛ راجعه فقط إذا كان هناك نقص طاقة واضح في كارت الطاقة.',
+    high: 'تحذير نشا: النشا تجاوز حد الأمان؛ راجع الحبوب وتوازن الخشن وصحة الكرش.',
+    ok: 'النشا داخل حد الأمان؛ استمر مع متابعة الروث والاجترار ودهن اللبن.'
   },
   fat: {
-    low: 'دهن العليقة منخفض؛ لا ترفعه إلا إذا كانت الطاقة تحتاج دعمًا واضحًا وبعد مراجعة مصادر الطاقة الأخرى.',
-    high: 'دهن العليقة مرتفع؛ راجع مصادر الدهون والزيوت لأنها قد تضغط هضم الألياف وصحة الكرش.',
-    ok: 'دهن العليقة داخل الحد المناسب؛ استمر مع متابعة الروث والاجترار وثبات اللبن.'
+    low: 'دهن العليقة أقل من حد الأمان؛ لا ترفعه إلا إذا احتاجت الطاقة دعمًا وبعد مراجعة مصادر الطاقة.',
+    high: 'تحذير دهن: دهن العليقة تجاوز حد الأمان؛ راجع مصدر الدهون لأنه قد يؤثر على هضم الألياف وصحة الكرش.',
+    ok: 'دهن العليقة داخل حد الأمان؛ استمر مع متابعة الروث والاجترار وثبات اللبن.'
   },
   pendf: {
     low: 'الألياف الفعالة أقل من المطلوب؛ راجع طول تقطيع الخشن ومنع فرز الخلطة.',
@@ -802,10 +802,15 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
     };
   }
 
-  if(finite(n.starchPctActual) && finite(t.starchMax) && Number(n.starchPctActual) > Number(t.starchMax)){
+  const starchSafetyLimit =
+    num(n.carbohydrateSafetyModel?.starchMaxPctDM) ??
+    num(a.carbohydrateSafetyModel?.starchMaxPctDM) ??
+    num(t.starchMax);
+
+  if(finite(n.starchPctActual) && finite(starchSafetyLimit) && Number(n.starchPctActual) > Number(starchSafetyLimit)){
     return {
       title:'العليقة تحتاج مراجعة النشا وصحة الكرش.',
-      action:'راجع مصدر النشا السريع وارفع الألياف الفعالة إذا لزم.'
+      action:'النشا تجاوز حد الأمان؛ راجع مصدر النشا وتوازن الخشن قبل رفع الطاقة.'
     };
   }
 
@@ -981,6 +986,26 @@ function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const rumenState = rh.status || n.rumenStatus || 'muted';
   const dcadVal = n.dcadModel?.dcadMeqKgDM;
 
+  const carbSafety =
+    n.carbohydrateSafetyModel ||
+    a.carbohydrateSafetyModel ||
+    {};
+
+  const ndfSafetyMin =
+    num(carbSafety.minTotalNDFPctDM) ??
+    num(t.ndfSafetyMin) ??
+    num(t.ndfMin) ??
+    num(t.ndfTarget);
+
+  const starchSafetyLimit =
+    num(carbSafety.starchMaxPctDM) ??
+    num(t.starchMax);
+
+  const fatSafetyLimit =
+    num(t.fatSafeMax) ??
+    num(t.fatMax) ??
+    7;
+
   const rows = [
 metricRow('المادة الجافة المأكولة (DMI)', kg(t.dmiTarget,2), kg(totals.dmKg,2), finite(dmBal) ? kg(dmBal,2) : '—', 'muted', 'المادة الجافة المأكولة الفعلية من العليقة مقارنةً بالمأكول المتوقع للحيوان. اضبط الكمية حسب المتبقي على المعلف وتأكد من الشبع للأبقار.'),
 
@@ -992,18 +1017,38 @@ metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTota
 
 metricRow(
   'الألياف المتعادلة (NDF)',
-  'مؤشر تركيب عليقة وليس احتياج NASEM مستقل',
+  finite(ndfSafetyMin) ? `حد أمان أدنى ${pct(ndfSafetyMin,1)}` : 'حد أمان أدنى للكرش',
   pct(n.ndfPctActual,1),
-  '—',
-  rumenState || 'muted',
-  'لا تُحكم كنقص/زيادة وحدها؛ تُقرأ مع peNDF وForage NDF والنشا وصحة الكرش.'
+  finite(n.ndfPctActual) && finite(ndfSafetyMin)
+    ? pct(Number(n.ndfPctActual) - Number(ndfSafetyMin),1)
+    : '—',
+  minLimitState(n.ndfPctActual, ndfSafetyMin),
+  minLimitState(n.ndfPctActual, ndfSafetyMin) === 'warn'
+    ? mbkAdvice('ndf', 'warn', 'min')
+    : 'NDF يغطي حد أمان الكرش الأدنى. الارتفاع الكبير قد يضغط المأكول والطاقة حسب جودة الخشن وهضميته، ويُقرأ مع صحة الكرش والمأكول.'
 ),
 
-metricRow('الألياف الفعالة للكرش (peNDF)', `حد أدنى ${pct(t.peNDFMin,1)}`, pct(n.peNDFPctActual,1), finite(n.peNDFPctActual) && finite(t.peNDFMin) ? pct(Number(n.peNDFPctActual) - Number(t.peNDFMin),1) : '—', minLimitState(n.peNDFPctActual, t.peNDFMin), mbkAdvice('pendf', minLimitState(n.peNDFPctActual, t.peNDFMin), 'min')),
+metricRow(
+  'النشا',
+  finite(starchSafetyLimit) ? `حد الأمان ${pct(starchSafetyLimit,1)}` : 'حد الأمان',
+  pct(n.starchPctActual,1),
+  finite(n.starchPctActual) && finite(starchSafetyLimit)
+    ? pct(Number(n.starchPctActual) - Number(starchSafetyLimit),1)
+    : '—',
+  highLimitState(n.starchPctActual, starchSafetyLimit),
+  mbkAdvice('starch', highLimitState(n.starchPctActual, starchSafetyLimit), 'max')
+),
 
-metricRow('النشا', `حد أقصى ${pct(t.starchMax,1)}`, pct(n.starchPctActual,1), finite(n.starchPctActual) && finite(t.starchMax) ? pct(Number(n.starchPctActual) - Number(t.starchMax),1) : '—', highLimitState(n.starchPctActual, t.starchMax), mbkAdvice('starch', highLimitState(n.starchPctActual, t.starchMax), 'max')),
-
-metricRow('دهن العليقة', 'حد تشغيلي', pct(n.fatPctActual,1), '—', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', mbkAdvice('fat', finite(n.fatPctActual) && Number(n.fatPctActual) > 7 ? 'warn' : 'good', 'max')),
+metricRow(
+  'دهن العليقة',
+  finite(fatSafetyLimit) ? `حد الأمان ${pct(fatSafetyLimit,1)}` : 'حد الأمان',
+  pct(n.fatPctActual,1),
+  finite(n.fatPctActual) && finite(fatSafetyLimit)
+    ? pct(Number(n.fatPctActual) - Number(fatSafetyLimit),1)
+    : '—',
+  highLimitState(n.fatPctActual, fatSafetyLimit),
+  mbkAdvice('fat', highLimitState(n.fatPctActual, fatSafetyLimit), 'max')
+),
 
 metricRow('صحة الكرش', 'آمن', rh.title || n.rumenStatus || '—', '—', rumenState, rh.reason || n.rumenNote || '—'),
 
