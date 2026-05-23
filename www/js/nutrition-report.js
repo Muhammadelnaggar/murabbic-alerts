@@ -1098,9 +1098,26 @@ function economicRow(name, value, state, note = ''){
   </tr>`;
 }
 
-function renderEconomicAnalysis(a = {}, stage = '', ctx = {}){
+function renderEconomicAnalysis(a = {}, stage = '', ctx = {}, panels = {}){
   const totals = a.totals || {};
   const e = a.economics || {};
+  const serverCards = Array.isArray(panels.economicsCards) ? panels.economicsCards : [];
+
+  if(serverCards.length){
+    const rows = serverCards.map(c => economicRow(
+      c.title || 'مؤشر اقتصادي',
+      c.value || '—',
+      c.status || 'muted',
+      c.uiHint || c.targetText || '—'
+    ));
+
+    return section('التحليل الاقتصادي', table(
+      ['البند','القيمة','قراءة مُرَبِّيك','توصية مُرَبِّيك'],
+      rows,
+      'لا توجد بيانات اقتصادية محفوظة.'
+    ));
+  }
+
   const rows = [];
 
   if(finite(totals.totCost)){
@@ -1108,14 +1125,14 @@ function renderEconomicAnalysis(a = {}, stage = '', ctx = {}){
       'تكلفة العليقة / رأس / يوم',
       money(totals.totCost),
       'muted',
-      'تكلفة يومية مباشرة حسب كميات وأسعار الخامات.'
+      'راجع أغلى الخامات إذا كانت التكلفة تضغط الهامش.'
     ));
   }
 
   if(finite(totals.mixPriceAsFed)){
     rows.push(economicRow(
       'سعر طن العليقة الطازجة',
-      `${nf(totals.mixPriceAsFed, 2)} جنيه / طن as-fed`,
+      `${nf(totals.mixPriceAsFed, 2)} جنيه / طن`,
       'muted',
       'مؤشر لسعر الخلطة كما تُقدّم للحيوان.'
     ));
@@ -1124,19 +1141,52 @@ function renderEconomicAnalysis(a = {}, stage = '', ctx = {}){
   if(finite(totals.mixPriceDM)){
     rows.push(economicRow(
       'سعر طن المادة الجافة',
-      `${nf(totals.mixPriceDM, 2)} جنيه / طن DM`,
+      `${nf(totals.mixPriceDM, 2)} جنيه / طن مادة جافة`,
       'muted',
-      'مؤشر أدق لمقارنة العلائق على أساس المادة الجافة.'
+      'استخدمه للمقارنة العادلة بين العلائق.'
     ));
   }
 
   if(isLactating(stage, ctx)){
+    if(finite(e.feedCostPctOfMilkIncome)){
+      rows.push(economicRow(
+        'تكلفة العلف من دخل اللبن',
+        `${nf(e.feedCostPctOfMilkIncome, 1)}%`,
+        Number(e.feedCostPctOfMilkIncome) <= 40 ? 'good' : (Number(e.feedCostPctOfMilkIncome) <= 60 ? 'warn' : 'danger'),
+        Number(e.feedCostPctOfMilkIncome) <= 40
+          ? 'تكلفة قوية؛ لا تخفض جودة العليقة لمجرد تقليل الرقم.'
+          : 'راجع أغلى الخامات مع الحفاظ على الطاقة والبروتين وصحة الكرش.'
+      ));
+    }
+
+    if(finite(e.iofcPctOfMilkIncome)){
+      rows.push(economicRow(
+        'هامش اللبن بعد العلف',
+        `${nf(e.iofcPctOfMilkIncome, 1)}%`,
+        Number(e.iofcPctOfMilkIncome) >= 60 ? 'good' : (Number(e.iofcPctOfMilkIncome) >= 40 ? 'warn' : 'danger'),
+        Number(e.iofcPctOfMilkIncome) >= 60
+          ? 'هامش قوي؛ يمكن تصحيح التحذير الغذائي دون خوف من التكلفة.'
+          : 'الهامش يحتاج مراجعة التكلفة والإنتاج قبل اعتماد العليقة.'
+      ));
+    }
+
+    if(finite(e.feedEfficiencyECM)){
+      rows.push(economicRow(
+        'كفاءة اللبن المصحح',
+        `${nf(e.feedEfficiencyECM, 2)} كجم لبن مصحح / كجم مادة جافة`,
+        Number(e.feedEfficiencyECM) >= 1.6 ? 'good' : (Number(e.feedEfficiencyECM) >= 1.3 ? 'warn' : 'danger'),
+        Number(e.feedEfficiencyECM) >= 1.6
+          ? 'كفاءة ممتازة؛ لا تطارد رفعها قبل ضبط الكرش والبروتين.'
+          : 'راجع جودة الخشن والطاقة والمأكول لتحسين الكفاءة.'
+      ));
+    }
+
     if(finite(e.costPerKgMilk)){
       rows.push(economicRow(
         'تكلفة كجم اللبن',
-        `${nf(e.costPerKgMilk, 2)} جنيه / كجم لبن`,
+        `${nf(e.costPerKgMilk, 2)} جنيه / كجم`,
         'muted',
-        'مؤشر اقتصادي؛ يُقرأ مع سعر اللبن والهامش وليس كاحتياج غذائي.'
+        'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
       ));
     }
 
@@ -1145,7 +1195,7 @@ function renderEconomicAnalysis(a = {}, stage = '', ctx = {}){
         'إيراد اللبن / رأس / يوم',
         money(e.milkRevenue),
         'muted',
-        'يعتمد على إنتاج اللبن وسعر اللبن المدخل.'
+        'دخل اللبن قبل خصم تكلفة العلف.'
       ));
     }
 
@@ -1156,16 +1206,16 @@ function renderEconomicAnalysis(a = {}, stage = '', ctx = {}){
         Number(e.milkMargin) < 0 ? 'danger' : 'good',
         Number(e.milkMargin) < 0
           ? 'الهامش سلبي؛ راجع سعر اللبن وتكلفة الخامات وتركيب العليقة.'
-          : 'الهامش موجب؛ راقب تغير أسعار الخامات وثبات الإنتاج.'
+          : 'هامش جيد؛ القرار التالي من الاتزان الغذائي وصحة الكرش.'
       ));
     }
 
     if(finite(e.dmPerKgMilk)){
       rows.push(economicRow(
-        'كفاءة المادة الجافة لإنتاج اللبن',
-        `${nf(e.dmPerKgMilk, 2)} كجم لبن / كجم DM`,
+        'مادة جافة لكل كجم لبن',
+        `${nf(e.dmPerKgMilk, 2)} كجم مادة جافة / كجم لبن`,
         'muted',
-        'مؤشر كفاءة تحويل العلف إلى لبن، ويُقرأ مع صحة الكرش والإنتاج.'
+        'مؤشر مساعد؛ اقرأه مع كفاءة اللبن المصحح والهامش.'
       ));
     }
   }
@@ -1239,7 +1289,7 @@ function renderOneRation(event = {}, opts = {}){
     `)}
     ${renderContextBlock(ctx, event, stage)}
     ${renderCompleteRationAnalysis(a, stage, ctx)}
-    ${renderEconomicAnalysis(a, stage, ctx)}
+    ${renderEconomicAnalysis(a, stage, ctx, nDoc.panels || {})}
     ${renderRows(rows)}
    
   </div>`;
