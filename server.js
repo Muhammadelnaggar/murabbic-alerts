@@ -2699,119 +2699,129 @@ ndfHint =
   const economicActionText =
     String(economicDecision?.action || '').trim() ||
     'اقرأ الاقتصاد مع الاتزان الغذائي وصحة الكرش قبل أي تعديل في الخامات.';
+  const econCard = (key, title, value, actual, status, uiHint) => ({
+    key,
+    title,
+    value,
+    actual,
+    target: null,
+    status,
+    uiHint,
+    targetText: uiHint,
+    model: economicDecision || null
+  });
+
+  const feedCostHint =
+    feedCostPctOfMilkIncome == null
+      ? 'أكمل بيانات اللبن والتكلفة.'
+      : feedCostPctOfMilkIncome <= 40
+        ? (
+            safeNutritionGate
+              ? 'التكلفة قوية، لكن اضبط التحذير الغذائي أولًا.'
+              : 'تكلفة قوية؛ حافظ على جودة العليقة.'
+          )
+        : feedCostPctOfMilkIncome <= 50
+          ? 'تكلفة مقبولة؛ راقب أغلى الخامات.'
+          : feedCostPctOfMilkIncome <= 60
+            ? 'تكلفة مرتفعة؛ راجع الخامات الأعلى تكلفة.'
+            : 'خطر اقتصادي؛ راجع السعر والإنتاج والتكلفة.';
+
+  const milkAfterFeedHint =
+    iofcPctOfMilkIncome == null
+      ? 'أكمل بيانات اللبن والتكلفة.'
+      : iofcPctOfMilkIncome >= 60
+        ? (
+            safeNutritionGate
+              ? 'الهامش قوي، لكن الكرش يحتاج ضبط.'
+              : 'هامش قوي بعد خصم العلف.'
+          )
+        : iofcPctOfMilkIncome >= 50
+          ? 'هامش مقبول؛ تابع التكلفة والإنتاج.'
+          : iofcPctOfMilkIncome >= 40
+            ? 'هامش ضعيف؛ راجع كفاءة العليقة.'
+            : 'خطر ربحية؛ لا تعتمدها قبل المراجعة.';
+
+  const correctedMilkEfficiency =
+    feedEfficiencyECM != null
+      ? feedEfficiencyECM
+      : feedEfficiencyFPCM;
+
+  const correctedMilkHint =
+    correctedMilkEfficiency == null
+      ? 'يحتاج بيانات اللبن والمادة الجافة.'
+      : (
+          safeNutritionGate
+            ? 'الكفاءة جيدة ظاهريًا، لكن الحكم بعد ضبط الكرش.'
+            : 'كفاءة جيدة؛ اقرأها مع الهامش وصحة الكرش.'
+        );
+
+  const costPerKgMilkVal =
+    Number.isFinite(Number(economics.costPerKgMilk))
+      ? Number(economics.costPerKgMilk)
+      : null;
+
+  const costPerKgMilkHint =
+    costPerKgMilkVal == null
+      ? 'يحتاج إنتاج اللبن وتكلفة العلف.'
+      : 'مؤشر تكلفة؛ القرار من الهامش وصحة الكرش.';
+
+  const milkMarginVal =
+    Number.isFinite(Number(economics.milkMargin))
+      ? Number(economics.milkMargin)
+      : null;
+
+  const milkMarginHint =
+    milkMarginVal == null
+      ? 'يحتاج دخل اللبن وتكلفة العلف.'
+      : (
+          safeNutritionGate
+            ? 'ربحية ظاهرة جيدة، لكن لا تعتمدها قبل ضبط التحذير الغذائي.'
+            : 'هامش جيد؛ ثبّت العليقة وراقب الأسعار.'
+        );
+
   const economicsCards = [
-    {
-      key: 'feedCostPctOfMilkIncome',
-      title: 'تكلفة العلف من دخل اللبن',
-      value: feedCostPctOfMilkIncome != null
-        ? `${num(feedCostPctOfMilkIncome, 1)}%`
+    econCard(
+      'feedCostPctOfMilkIncome',
+      'تكلفة العلف من دخل اللبن',
+      feedCostPctOfMilkIncome != null ? `${num(feedCostPctOfMilkIncome, 1)}%` : '—',
+      feedCostPctOfMilkIncome,
+      feedCostBand.status,
+      feedCostHint
+    ),
+    econCard(
+      'iofcPctOfMilkIncome',
+      'هامش اللبن بعد العلف',
+      iofcPctOfMilkIncome != null ? `${num(iofcPctOfMilkIncome, 1)}%` : '—',
+      iofcPctOfMilkIncome,
+      iofcBand.status,
+      milkAfterFeedHint
+    ),
+    econCard(
+      'feedEfficiencyECM',
+      'كفاءة اللبن المصحح',
+      correctedMilkEfficiency != null
+        ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح / كجم مادة جافة`
         : '—',
-      actual: feedCostPctOfMilkIncome,
-      target: 40,
-      targetText:
-        feedCostPctOfMilkIncome != null
-          ? (
-              feedCostPctOfMilkIncome <= 40
-                ? `مربيك: تكلفة العلف ${num(feedCostPctOfMilkIncome, 1)}% من دخل اللبن؛ هذا اقتصاد قوي حسب Benchmark تكلفة العلف ≤40%.`
-                : feedCostPctOfMilkIncome <= 50
-                  ? `مربيك: تكلفة العلف ${num(feedCostPctOfMilkIncome, 1)}% من دخل اللبن؛ مقبولة لكنها تحتاج متابعة أغلى الخامات.`
-                  : feedCostPctOfMilkIncome <= 60
-                    ? `مربيك: تكلفة العلف ${num(feedCostPctOfMilkIncome, 1)}% من دخل اللبن؛ مرتفعة نسبيًا. راجع الخامات الأعلى تكلفة بدون كسر NEL أو MP أو أمان الكرش.`
-                    : `مربيك: تكلفة العلف ${num(feedCostPctOfMilkIncome, 1)}% من دخل اللبن؛ خطر اقتصادي. حدّد هل السبب سعر خامات، إنتاج منخفض، أو كفاءة تحويل ضعيفة.`
-            )
-          : 'مربيك: لا تظهر نسبة تكلفة العلف من دخل اللبن إلا بعد اكتمال دخل اللبن وتكلفة العلف.',
-      status: feedCostBand.status,
-      benchmark: 'قوي ≤40%، مقبول 40–50%، تحذير 50–60%، خطر >60%',
-      model: economicDecision || null
-    },
-    {
-      key: 'iofcPctOfMilkIncome',
-      title: 'IOFC من دخل اللبن',
-      value: iofcPctOfMilkIncome != null
-        ? `${num(iofcPctOfMilkIncome, 1)}%`
-        : '—',
-      actual: iofcPctOfMilkIncome,
-      target: 60,
-      targetText:
-        iofcPctOfMilkIncome != null
-          ? (
-              iofcPctOfMilkIncome >= 60
-                ? `مربيك: IOFC ${num(iofcPctOfMilkIncome, 1)}% من دخل اللبن؛ هامش قوي بعد خصم تكلفة العلف.`
-                : iofcPctOfMilkIncome >= 50
-                  ? `مربيك: IOFC ${num(iofcPctOfMilkIncome, 1)}% من دخل اللبن؛ مقبول لكن يحتاج متابعة تكلفة الخامات وثبات الإنتاج.`
-                  : iofcPctOfMilkIncome >= 40
-                    ? `مربيك: IOFC ${num(iofcPctOfMilkIncome, 1)}% من دخل اللبن؛ ضعيف نسبيًا. راجع تكلفة العليقة وكفاءة التحويل.`
-                    : `مربيك: IOFC ${num(iofcPctOfMilkIncome, 1)}% من دخل اللبن؛ خطر ربحية. لا تعتمد العليقة قبل تحديد سبب انخفاض الهامش.`
-            )
-          : 'مربيك: لا يظهر IOFC% إلا بعد اكتمال دخل اللبن وتكلفة العلف.',
-      status: iofcBand.status,
-      benchmark: 'قوي ≥60%، مقبول 50–60%، تحذير 40–50%، خطر <40%',
-      model: economicDecision || null
-    },
-    {
-      key: 'feedEfficiencyECM',
-      title: 'كفاءة تحويل المادة الجافة إلى ECM',
-      value: feedEfficiencyECM != null
-        ? `${num(feedEfficiencyECM, 2)} كجم ECM / كجم DM`
-        : '—',
-      actual: feedEfficiencyECM,
-      target: null,
-      targetText:
-        feedEfficiencyECM != null
-          ? `مربيك: كفاءة ECM = ${num(feedEfficiencyECM, 2)}. تُقرأ مع IOFC وصحة الكرش، ولا تكفي وحدها للحكم على الربحية.`
-          : (
-              feedEfficiencyFPCM != null
-                ? `مربيك: كفاءة FPCM = ${num(feedEfficiencyFPCM, 2)} كجم FPCM / كجم DM. تُقرأ مع IOFC وصحة الكرش.`
-                : 'مربيك: كفاءة التحويل الاقتصادية تحتاج ECM أو FPCM مع المادة الجافة.'
-            ),
-      status:
-        safeNutritionGate
-          ? 'warn'
-          : (
-              feedEfficiencyECM != null || feedEfficiencyFPCM != null
-                ? 'good'
-                : 'warn'
-            ),
-      benchmark: 'Feed efficiency لا تُقرأ منفردة؛ تُقرأ مع IOFC وأمان العليقة.',
-      model: economicDecision || null
-    },
-    {
-      key: 'costPerKgMilk',
-      title: 'تكلفة كجم لبن',
-      value: Number.isFinite(Number(economics.costPerKgMilk))
-        ? `${num(economics.costPerKgMilk, 2)} ج/كجم`
-        : '—',
-      actual: Number.isFinite(Number(economics.costPerKgMilk)) ? Number(economics.costPerKgMilk) : null,
-      target: null,
-      targetText:
-        Number.isFinite(Number(economics.costPerKgMilk))
-          ? `مربيك: تكلفة كجم اللبن = ${num(economics.costPerKgMilk, 2)} ج. لا تُحكم وحدها؛ تُقرأ مع سعر اللبن وIOFC وكفاءة التحويل.`
-          : 'مربيك: تكلفة كجم اللبن لا تظهر إلا مع إنتاج اللبن وتكلفة العلف.',
-      status:
-        feedCostBand.status === 'danger'
-          ? 'danger'
-          : feedCostBand.status === 'warn'
-            ? 'warn'
-            : 'good',
-      benchmark: 'مؤشر مساعد؛ القرار الأساسي من IOFC وتكلفة العلف من دخل اللبن.',
-      model: economicDecision || null
-    },
-    {
-      key: 'milkMargin',
-      title: 'قرار هامش لبن-علف',
-      value: Number.isFinite(Number(economics.milkMargin))
-        ? `${num(economics.milkMargin, 2)} ج`
-        : '—',
-      actual: Number.isFinite(Number(economics.milkMargin)) ? Number(economics.milkMargin) : null,
-      target: null,
-      targetText:
-        economicDecision
-          ? `مربيك: ${economicDecision.title}. ${economicDecision.reason || ''} ${economicActionText}`
-          : 'مربيك: هامش لبن-علف يُقرأ بعد اكتمال دخل اللبن وتكلفة العلف.',
-      status: economicDecision?.status || iofcBand.status,
-      benchmark: 'IOFC = دخل اللبن − تكلفة العلف. القرار النهائي يمر عبر أمان NEL/MP/NDF/starch/fat وصحة الكرش.',
-      model: economicDecision || null
-    }
+      correctedMilkEfficiency,
+      safeNutritionGate ? 'warn' : (correctedMilkEfficiency != null ? 'good' : 'warn'),
+      correctedMilkHint
+    ),
+    econCard(
+      'costPerKgMilk',
+      'تكلفة كجم اللبن',
+      costPerKgMilkVal != null ? `${num(costPerKgMilkVal, 2)} ج/كجم` : '—',
+      costPerKgMilkVal,
+      feedCostBand.status === 'danger' ? 'danger' : feedCostBand.status === 'warn' ? 'warn' : 'good',
+      costPerKgMilkHint
+    ),
+    econCard(
+      'milkMargin',
+      'هامش لبن-علف',
+      milkMarginVal != null ? `${num(milkMarginVal, 2)} ج` : '—',
+      milkMarginVal,
+      economicDecision?.status || iofcBand.status,
+      milkMarginHint
+    )
   ];
 
   const advancedCards = [
