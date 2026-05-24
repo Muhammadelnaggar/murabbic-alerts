@@ -596,7 +596,7 @@ dmiRationEffect: a?.nutrition?.dmiRationEffect || null
 targets: {
   dmiTarget: toNumOrNull(a?.targets?.dmiTarget),
   nelTarget: toNumOrNull(a?.targets?.nelTarget),
-  cpTarget: toNumOrNull(a?.targets?.cpTarget),
+  cpReferencePct: toNumOrNull(a?.targets?.cpReferencePct ?? a?.targets?.cpTarget),
   mpTargetG: toNumOrNull(a?.targets?.mpTargetG),
   ndfTarget: toNumOrNull(a?.targets?.ndfTarget),
   fatTarget: toNumOrNull(a?.targets?.fatTarget),
@@ -1752,7 +1752,7 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   targets: {
   dmiTarget: targetsCore?.dmi ?? null,
   nelTarget: targetsCore?.nel ?? null,
-  cpTarget: targetsCore?.cpTarget ?? null,
+  cpReferencePct: targetsCore?.cpReferencePct ?? targetsCore?.cpTarget ?? null,
   mpTargetG: targetsCore?.mpTargetG ?? null,
   ndfTarget: targetsCore?.ndfTarget ?? null,
   fatTarget: null,
@@ -2547,21 +2547,7 @@ ndfHint =
       targetText: `${txt(mpActual, 'جم/يوم', 0)} / ${txt(mpTarget, 'جم/يوم', 0)} — ${mpHint}`,
       status: uiStatus(mpState)
     },
-        {
-  key: 'cp',
-  title: 'البروتين الخام',
-  value: pctTxt(cpActual, 1),
-  actual: cpActual,
-  target: cpTarget,
-  targetText:
-    isBuffalo &&
-    Number.isFinite(Number(cpIntakeG)) &&
-    Number.isFinite(Number(cpTargetG))
-      ? `${pctTxt(cpActual, 1)} — ${txt(cpIntakeG, 'جم/يوم', 0)} / ${txt(cpTargetG, 'جم/يوم', 0)} — ${cpHint}`
-      : `${pctTxt(cpActual, 1)} / ${pctTxt(cpTarget, 1)} — ${cpHint}`,
-  status: uiStatus(cpState)
-},
-
+      
    {
   key: 'ndf',
   title: 'الألياف NDF',
@@ -2853,17 +2839,6 @@ ndfHint =
     },
 
     {
-      key: 'cpTarget',
-      title: 'احتياجات البروتين الخام',
-      value: txt(targets.cpTarget, '%', 1)
-    },
-    {
-      key: 'cpPctTotal',
-      title: 'العليقة الحالية — بروتين خام',
-      value: txt(nutrition.cpPctTotal, '%', 1)
-    },
-
-    {
       key: 'mpTargetG',
       title: 'احتياجات البروتين الممثل',
       value: txt(targets.mpTargetG, 'جم/يوم', 0)
@@ -3049,12 +3024,15 @@ app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
     const body = req.body || {};
     const ctx = normalizeNutritionContext(body.context || {});
 
-    const built = buildNutritionCentralTargets(ctx);
+const built = buildNutritionCentralTargets(ctx);
+const publicTargets = { ...built.targetsCore };
+publicTargets.cpReferencePct = publicTargets.cpReferencePct ?? publicTargets.cpTarget ?? null;
+delete publicTargets.cpTarget;
 
-    return res.json({
-      ok: true,
-      targets: cleanObj({
-        ...built.targetsCore,
+return res.json({
+  ok: true,
+  targets: cleanObj({
+    ...publicTargets,
         inputs: {
           bodyWeightKgUsed: built.runtimeCtx.bodyWeightKgUsed,
           milkFatPctUsed: built.runtimeCtx.milkFatPctUsed,
