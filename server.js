@@ -3541,7 +3541,360 @@ function buildNutritionReportIndexItem(e = {}) {
     priorityText: priority?.value || priority?.targetText || null
   });
 }
+function finiteSrv(v){
+  return Number.isFinite(Number(v));
+}
 
+function fmtSrv(v, d = 2, suffix = ''){
+  if (!finiteSrv(v)) return '—';
+  const n = Number(v);
+  const txt = Number.isInteger(n) ? String(n) : n.toFixed(d);
+  return suffix ? `${txt} ${suffix}` : txt;
+}
+
+function reportBalanceStatusSrv(balance, tolerance = 0){
+  if (!finiteSrv(balance)) return 'muted';
+  if (Number(balance) < -Math.abs(tolerance)) return 'danger';
+  if (Number(balance) > Math.abs(tolerance)) return 'warn';
+  return 'good';
+}
+
+function reportMinStatusSrv(actual, min){
+  if (!finiteSrv(actual) || !finiteSrv(min)) return 'muted';
+  return Number(actual) < Number(min) ? 'warn' : 'good';
+}
+
+function reportMaxStatusSrv(actual, max){
+  if (!finiteSrv(actual) || !finiteSrv(max)) return 'muted';
+  return Number(actual) > Number(max) ? 'warn' : 'good';
+}
+
+function reportStatusTextSrv(status = ''){
+  const s = String(status || '').toLowerCase();
+  if (s.includes('danger')) return 'تنبيه';
+  if (s.includes('warn') || s.includes('watch')) return 'يحتاج ضبط';
+  if (s.includes('good') || s.includes('ok')) return 'متزن';
+  return 'معلومة';
+}
+
+function reportRowSrv(section, key, label, targetText, actualText, balanceText, status, note){
+  return cleanObj({
+    section,
+    key,
+    label,
+    targetText: targetText || '—',
+    actualText: actualText || '—',
+    balanceText: balanceText || '—',
+    status: status || 'muted',
+    statusText: reportStatusTextSrv(status),
+    note: note || '—'
+  });
+}
+
+function mineralReportRowsSrv(balance = {}, unit = 'g'){
+  const names = {
+    ca: 'كالسيوم',
+    p: 'فوسفور',
+    mg: 'ماغنسيوم',
+    na: 'صوديوم',
+    k: 'بوتاسيوم',
+    cl: 'كلور',
+    s: 'كبريت',
+    co: 'كوبالت',
+    cu: 'نحاس',
+    fe: 'حديد',
+    i: 'يود',
+    mn: 'منجنيز',
+    se: 'سيلينيوم',
+    zn: 'زنك',
+    mo: 'مولبيدنم'
+  };
+
+  return Object.entries(balance || {}).map(([k, item]) => {
+    const required = item?.required ?? item?.requiredG ?? item?.requiredMg ?? item?.target ?? null;
+    const supplied = item?.supplied ?? item?.suppliedG ?? item?.suppliedMg ?? item?.actual ?? null;
+    const bal = item?.balance ?? item?.balanceG ?? item?.balanceMg ??
+      (finiteSrv(required) && finiteSrv(supplied) ? Number(supplied) - Number(required) : null);
+
+    const cover = item?.supplyPctOfRequirement ?? item?.coveragePct ?? null;
+    const status = finiteSrv(cover)
+      ? (Number(cover) < 90 ? 'warn' : (Number(cover) > 130 ? 'warn' : 'good'))
+      : reportBalanceStatusSrv(bal, 0);
+
+    const u = unit === 'mg' ? 'مجم' : 'جم';
+
+    return reportRowSrv(
+      unit === 'mg' ? 'المعادن الصغرى' : 'المعادن الكبرى',
+      `mineral_${k}`,
+      names[String(k).toLowerCase()] || k,
+      fmtSrv(required, unit === 'mg' ? 0 : 2, u),
+      fmtSrv(supplied, unit === 'mg' ? 0 : 2, u),
+      fmtSrv(bal, unit === 'mg' ? 0 : 2, u),
+      status,
+      finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للعنصر.'
+    );
+  });
+}
+
+function vitaminReportRowsSrv(balance = {}){
+  const names = {
+    A: 'فيتامين أ',
+    D: 'فيتامين د',
+    E: 'فيتامين هـ'
+  };
+
+  return Object.entries(balance || {}).map(([k, item]) => {
+    const required = item?.requiredIU ?? item?.required ?? null;
+    const supplied = item?.suppliedIU ?? item?.supplied ?? null;
+    const bal = item?.balanceIU ?? item?.balance ??
+      (finiteSrv(required) && finiteSrv(supplied) ? Number(supplied) - Number(required) : null);
+
+    const cover = item?.supplyPctOfRequirement ?? item?.coveragePct ?? null;
+    const status = finiteSrv(cover)
+      ? (Number(cover) < 90 ? 'warn' : (Number(cover) > 150 ? 'warn' : 'good'))
+      : reportBalanceStatusSrv(bal, 0);
+
+    return reportRowSrv(
+      'الفيتامينات',
+      `vitamin_${k}`,
+      names[k] || `فيتامين ${k}`,
+      fmtSrv(required, 0, 'وحدة دولية'),
+      fmtSrv(supplied, 0, 'وحدة دولية'),
+      fmtSrv(bal, 0, 'وحدة دولية'),
+      status,
+      finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للفيتامين.'
+    );
+  });
+}
+
+function buildNutritionReportDecisionSrv(e = {}){
+  const decision = pickDecisionCardSrv(e);
+  const priority = pickPriorityCardSrv(e);
+  const status = reportStatusFromEventSrv(e);
+
+  return cleanObj({
+    title: decision?.value || decision?.title || priority?.value || 'قراءة مُرَبِّيك جاهزة من السيرفر.',
+    action: priority?.value || priority?.targetText || decision?.targetText || decision?.note || 'راجع صفوف التقرير الجاهزة من السيرفر.',
+    status,
+    statusText: reportStatusTextSrv(status)
+  });
+}
+
+function buildNutritionReportRowsSrv(e = {}){
+  const a = e?.nutrition?.analysis || {};
+  const n = a.nutrition || {};
+  const t = a.targets || {};
+  const totals = a.totals || {};
+  const ec = a.economics || {};
+  const rows = [];
+
+  const nelBal = finiteSrv(n.nelActual) && finiteSrv(t.nelTarget)
+    ? Number(n.nelActual) - Number(t.nelTarget)
+    : null;
+
+  const mpBal = finiteSrv(n.mpBalanceG)
+    ? Number(n.mpBalanceG)
+    : (finiteSrv(n.mpSupplyG) && finiteSrv(t.mpTargetG)
+      ? Number(n.mpSupplyG) - Number(t.mpTargetG)
+      : null);
+
+  rows.push(reportRowSrv(
+    'الاحتياجات الأساسية',
+    'dmi',
+    'قدرة الأكل / المادة الجافة',
+    'قدرة أكل متوقعة',
+    fmtSrv(totals.dmKg, 2, 'كجم'),
+    '—',
+    'muted',
+    'العلف يجب أن يكون متاحًا أمام الحيوانات 24 ساعة يوميًا.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاحتياجات الأساسية',
+    'nel',
+    'الطاقة الصافية للحليب (NEL)',
+    fmtSrv(t.nelTarget, 2, 'Mcal/day'),
+    fmtSrv(n.nelActual, 2, 'Mcal/day'),
+    fmtSrv(nelBal, 2, 'Mcal'),
+    reportBalanceStatusSrv(nelBal, 0.5),
+    'قرار الطاقة مجهز من السيرفر حسب التحليل المحفوظ.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاحتياجات الأساسية',
+    'mp',
+    'البروتين الممثل (MP)',
+    fmtSrv(t.mpTargetG, 0, 'جم/يوم'),
+    fmtSrv(n.mpSupplyG, 0, 'جم/يوم'),
+    fmtSrv(mpBal, 0, 'جم'),
+    reportBalanceStatusSrv(mpBal, 50),
+    'قرار البروتين الممثل مجهز من السيرفر حسب التحليل المحفوظ.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاحتياجات الأساسية',
+    'cp',
+    'البروتين الخام (CP)',
+    fmtSrv(t.cpReferencePct, 1, '% DM'),
+    fmtSrv(n.cpPctTotal, 1, '% DM'),
+    '—',
+    'muted',
+    'يعرض كمرجع تركيبي بجانب MP ولا يستبدل تقييم البروتين الممثل.'
+  ));
+
+  const carb = n.carbohydrateSafetyModel || a.carbohydrateSafetyModel || {};
+  const ndfMin = carb.minTotalNDFPctDM ?? t.ndfSafetyMin ?? t.ndfMin ?? t.ndfTarget;
+  const starchMax = carb.starchMaxPctDM ?? t.starchMax;
+  const fatMax = t.fatSafeMax ?? t.fatMax ?? t.fatTarget;
+
+  rows.push(reportRowSrv(
+    'الألياف والكربوهيدرات والدهون',
+    'ndf',
+    'الألياف المتعادلة (NDF)',
+    finiteSrv(ndfMin) ? `حد أدنى ${fmtSrv(ndfMin, 1, '% DM')}` : 'حد أدنى',
+    fmtSrv(n.ndfPctActual, 1, '% DM'),
+    finiteSrv(n.ndfPctActual) && finiteSrv(ndfMin) ? fmtSrv(Number(n.ndfPctActual) - Number(ndfMin), 1, '%') : '—',
+    reportMinStatusSrv(n.ndfPctActual, ndfMin),
+    'NDF يُقرأ كحد أمان للكرش وليس كحكم زيادة مستقل.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الألياف والكربوهيدرات والدهون',
+    'starch',
+    'النشا',
+    finiteSrv(starchMax) ? `حد أقصى ${fmtSrv(starchMax, 1, '% DM')}` : 'حد أقصى',
+    fmtSrv(n.starchPctActual, 1, '% DM'),
+    finiteSrv(n.starchPctActual) && finiteSrv(starchMax) ? fmtSrv(Number(n.starchPctActual) - Number(starchMax), 1, '%') : '—',
+    reportMaxStatusSrv(n.starchPctActual, starchMax),
+    'قرار النشا مجهز من السيرفر لحماية الكرش.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الألياف والكربوهيدرات والدهون',
+    'fat',
+    'دهن العليقة',
+    finiteSrv(fatMax) ? `حد أقصى ${fmtSrv(fatMax, 1, '% DM')}` : 'حد أقصى',
+    fmtSrv(n.fatPctActual, 1, '% DM'),
+    finiteSrv(n.fatPctActual) && finiteSrv(fatMax) ? fmtSrv(Number(n.fatPctActual) - Number(fatMax), 1, '%') : '—',
+    reportMaxStatusSrv(n.fatPctActual, fatMax),
+    'قرار الدهون مجهز من السيرفر حسب التحليل المحفوظ.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الألياف والكربوهيدرات والدهون',
+    'roughage',
+    'نسبة الخشن من المادة الجافة',
+    finiteSrv(t.roughageMin) ? `حد أدنى ${fmtSrv(t.roughageMin, 1, '% DM')}` : 'حد أدنى',
+    fmtSrv(n.roughPctDM, 1, '% DM'),
+    finiteSrv(n.roughPctDM) && finiteSrv(t.roughageMin) ? fmtSrv(Number(n.roughPctDM) - Number(t.roughageMin), 1, '%') : '—',
+    reportMinStatusSrv(n.roughPctDM, t.roughageMin),
+    'قرار الخشن مجهز من السيرفر.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الألياف والكربوهيدرات والدهون',
+    'forage_ndf',
+    'NDF من الخشن',
+    finiteSrv(t.forageNDFMin) ? `حد أدنى ${fmtSrv(t.forageNDFMin, 1, '% DM')}` : 'حد أدنى',
+    fmtSrv(n.forageNDFPctDM, 1, '% DM'),
+    finiteSrv(n.forageNDFPctDM) && finiteSrv(t.forageNDFMin) ? fmtSrv(Number(n.forageNDFPctDM) - Number(t.forageNDFMin), 1, '%') : '—',
+    reportMinStatusSrv(n.forageNDFPctDM, t.forageNDFMin),
+    'قرار NDF من الخشن مجهز من السيرفر.'
+  ));
+
+  const rh = n.rumenHealthModel || {};
+  rows.push(reportRowSrv(
+    'صحة الكرش',
+    'rumen',
+    'صحة الكرش',
+    'آمن',
+    rh.title || n.rumenStatus || '—',
+    '—',
+    rh.status || n.rumenStatus || 'muted',
+    rh.reason || rh.instruction || n.rumenNote || '—'
+  ));
+
+  const dcadVal = n.dcadModel?.dcadMeqKgDM;
+  if (finiteSrv(dcadVal)) {
+    rows.push(reportRowSrv(
+      'المعادن الكبرى',
+      'dcad',
+      'DCAD',
+      'نطاق انتظار الولادة',
+      fmtSrv(dcadVal, 0, 'meq/kg DM'),
+      '—',
+      Number(dcadVal) > -50 ? 'warn' : 'good',
+      n.dcadModel?.note || 'قرار DCAD مجهز من السيرفر.'
+    ));
+  }
+
+  const mineralSupply = n.mineralSupplyModel || {};
+  rows.push(...mineralReportRowsSrv(mineralSupply?.mineralBalanceModel?.balance || {}, 'g'));
+  rows.push(...mineralReportRowsSrv(mineralSupply?.traceMineralBalanceModel?.balance || {}, 'mg'));
+  rows.push(...vitaminReportRowsSrv(n.vitaminSupplyModel?.vitaminBalanceModel?.balance || {}));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'cost_kg_milk',
+    'تكلفة كجم اللبن',
+    'قراءة اقتصادية',
+    fmtSrv(ec.costPerKgMilk, 2, 'جنيه/كجم'),
+    '—',
+    'muted',
+    'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'milk_margin',
+    'هامش لبن - علف',
+    'هامش موجب',
+    fmtSrv(ec.milkMargin, 2, 'جنيه/رأس/يوم'),
+    '—',
+    finiteSrv(ec.milkMargin) && Number(ec.milkMargin) < 0 ? 'danger' : (finiteSrv(ec.milkMargin) ? 'good' : 'muted'),
+    'قرار الاقتصاد مجهز من السيرفر.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'feed_cost_income',
+    'تكلفة العلف من دخل اللبن',
+    'قراءة اقتصادية',
+    fmtSrv(ec.feedCostPctOfMilkIncome, 1, '%'),
+    '—',
+    finiteSrv(ec.feedCostPctOfMilkIncome)
+      ? (Number(ec.feedCostPctOfMilkIncome) <= 40 ? 'good' : (Number(ec.feedCostPctOfMilkIncome) <= 60 ? 'warn' : 'danger'))
+      : 'muted',
+    'قرار تكلفة العلف من دخل اللبن مجهز من السيرفر.'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'iofc_income',
+    'IOFC من دخل اللبن',
+    'قراءة اقتصادية',
+    fmtSrv(ec.iofcPctOfMilkIncome, 1, '%'),
+    '—',
+    finiteSrv(ec.iofcPctOfMilkIncome)
+      ? (Number(ec.iofcPctOfMilkIncome) >= 60 ? 'good' : (Number(ec.iofcPctOfMilkIncome) >= 40 ? 'warn' : 'danger'))
+      : 'muted',
+    'قرار IOFC مجهز من السيرفر.'
+  ));
+
+  return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
+}
+
+function attachNutritionReportPayloadSrv(e = {}){
+  return cleanObj({
+    ...e,
+    nutrition: {
+      ...(e.nutrition || {}),
+      reportDecision: buildNutritionReportDecisionSrv(e),
+      reportStatus: reportStatusFromEventSrv(e),
+      reportRows: buildNutritionReportRowsSrv(e)
+    }
+  });
+}
 function buildAllNutritionReport(events = []) {
   const latestByKey = new Map();
 
@@ -3565,12 +3918,13 @@ function buildAllNutritionReport(events = []) {
     return eventCreatedMs(b) - eventCreatedMs(a);
   });
 
-  const index = latestEvents.map(buildNutritionReportIndexItem);
+  const reportEvents = latestEvents.map(attachNutritionReportPayloadSrv);
+  const index = reportEvents.map(buildNutritionReportIndexItem);
 
   const danger = index.filter(x => x.reportStatus === 'danger');
   const warn = index.filter(x => x.reportStatus === 'warn');
 
-  const lactatingEvents = latestEvents.filter(e => nutritionStageFromEvent(e) === 'lactating');
+  const lactatingEvents = reportEvents.filter(e => nutritionStageFromEvent(e) === 'lactating');
   const lactatingSummary = buildLactatingNutritionSummary(lactatingEvents);
 
   const highestCost = [...index]
@@ -3590,10 +3944,10 @@ function buildAllNutritionReport(events = []) {
     null;
 
   return cleanObj({
-    count: latestEvents.length,
+   count: reportEvents.length,
     index,
     executive: {
-      totalRations: latestEvents.length,
+     totalRations: reportEvents.length,
       dangerCount: danger.length,
       warningCount: warn.length,
       okCount: index.filter(x => x.reportStatus === 'good').length,
@@ -3602,7 +3956,7 @@ function buildAllNutritionReport(events = []) {
       weakestMargin
     },
     lactatingSummary,
-    events: latestEvents
+   events: reportEvents
   });
 }
 app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
