@@ -2799,13 +2799,13 @@ ndfHint =
     ),
     econCard(
       'feedEfficiencyECM',
-      'كفاءة اللبن المصحح',
-      correctedMilkEfficiency != null
-        ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح / كجم مادة جافة`
-        : '—',
+      'لبن مصحح لكل 1 كجم مادة جافة',
+      correctedMilkEfficiency != null ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح` : '—',
       correctedMilkEfficiency,
       correctedMilkStatus,
-      correctedMilkHint
+      correctedMilkEfficiency != null
+        ? `مقابل كل 1 كجم مادة جافة من العليقة تنتج الحيوانات ${num(correctedMilkEfficiency, 2)} كجم لبن مصحح.`
+        : 'يحتاج بيانات اللبن والمادة الجافة.'
     ),
     econCard(
       'costPerKgMilk',
