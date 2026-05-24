@@ -2198,16 +2198,27 @@ function buildNutritionPanels(analysis = {}, context = {}) {
 
   const pctTxt = (v, d = 1) => txt(v, '%', d);
 
-  const stateFromBalance = (actual, target, tolerancePct = 5) => {
-    const a = Number(actual);
-    const t = Number(target);
-    if (!Number.isFinite(a) || !Number.isFinite(t) || t <= 0) return 'warn';
+const stateFromBalance = (actual, target) => {
+  const a = Number(actual);
+  const t = Number(target);
 
-    const diffPct = ((a - t) / t) * 100;
-    if (Math.abs(diffPct) <= tolerancePct) return 'good';
-    if (diffPct < 0) return 'warn';
-    return 'watch';
-  };
+  if (!Number.isFinite(a) || !Number.isFinite(t) || t <= 0) {
+    return { state: 'warn', ratioPct: null };
+  }
+
+  const ratioPct = (a / t) * 100;
+  const ratioRounded = Number(ratioPct.toFixed(1));
+
+  if (ratioPct >= 95 && ratioPct <= 105) {
+    return { state: 'good', ratioPct: ratioRounded };
+  }
+
+  if (ratioPct > 115) {
+    return { state: 'danger', ratioPct: ratioRounded };
+  }
+
+  return { state: 'warn', ratioPct: ratioRounded };
+};
 
   const uiStatus = (state) => {
     if (state === 'danger') return 'danger';
@@ -2283,8 +2294,14 @@ const starchActual = num(nutrition.starchPctActual, 1);
 
   // DMI في مُرَبِّيك = مأكول/مقدم مقابل المتوقع، وليس احتياجًا غذائيًا للحكم بنقص أو زيادة.
   const dmState = 'info';
-  const nelState = stateFromBalance(nelActual, nelTarget, 5);
-  const mpState = stateFromBalance(mpActual, mpTarget, 5);
+  const nelBalance = stateFromBalance(nelActual, nelTarget);
+  const mpBalance = stateFromBalance(mpActual, mpTarget);
+
+  const nelState = nelBalance.state;
+  const mpState = mpBalance.state;
+
+  const nelRatioPct = nelBalance.ratioPct;
+  const mpRatioPct = mpBalance.ratioPct;
 
   const starchHigh =
     Number.isFinite(Number(starchActual)) &&
@@ -2326,27 +2343,23 @@ const ndfState =
         )
       : 'مربيك: المادة الجافة المتوقعة مرجع تشغيل للشهية والتقديم، وليست Target تغذية للحكم بنقص أو زيادة.';
 
-  let nelHint =
-    nelState === 'good'
-      ? 'مربيك: الطاقة تغطي الاحتياج الحالي. راقب الإنتاج وحالة الجسم.'
-      : Number(nelActual) < Number(nelTarget)
-        ? 'مربيك: الطاقة غير كافية. راجع المادة الجافة أولًا ثم كثافة الطاقة.'
-        : 'مربيك: الطاقة أعلى من الاحتياج. راجع كثافة العليقة والتكلفة قبل اعتماد التركيبة.';
-
-  let mpHint =
-    mpState === 'good'
-      ? 'مربيك: البروتين الممثل يغطي الاحتياج الحالي.'
-      : Number(mpActual) < Number(mpTarget)
-        ? 'مربيك: البروتين الممثل غير كافٍ؛ راجع جودة مصدر البروتين.'
-        : 'مربيك: البروتين الممثل زيادة؛ راجع التكلفة والهدر البروتيني.';
-
-  let cpHint =
-    cpState === 'good'
-      ? 'مربيك: البروتين الخام مقبول كمؤشر عام؛ القرار النهائي من البروتين الممثل.'
-      : Number(cpActual) < Number(cpTarget)
-        ? 'مربيك: البروتين الخام منخفض كمؤشر عام؛ راجع البروتين الممثل قبل زيادته.'
-        : 'مربيك: البروتين الخام زيادة؛ راجع الهدر والتكلفة، ولا تعدّله إلا حسب البروتين الممثل.';
-
+ let nelHint =
+  nelState === 'good'
+    ? `مربيك: الطاقة متزنة${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. استمر على نفس مستوى الطاقة مع متابعة إنتاج اللبن وحالة الجسم؛ لا ترفع كثافة العليقة بدون سبب واضح.`
+    : Number(nelActual) < Number(nelTarget)
+      ? `مربيك: الطاقة أقل من المطلوب${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع أولًا كمية المادة الجافة المقدمة والمأكولة، ثم حسّن كثافة الطاقة بمصدر آمن مع الحفاظ على أمان الكرش وعدم رفع النشا بشكل مفاجئ.`
+      : Number(nelRatioPct) > 115
+        ? `مربيك: الطاقة أعلى من اللازم${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع تكلفة العليقة وقلّل مصادر الطاقة الزائدة تدريجيًا إذا لم يظهر مقابلها إنتاج أو تحسن واضح في حالة الجسم.`
+        : `مربيك: الطاقة أعلى قليلًا من المطلوب${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة فقط، واترك الزيادة إذا كانت مرتبطة بإنتاج أعلى أو حالة جسم تحتاج دعمًا.`;
+ let mpHint =
+  mpState === 'good'
+    ? `مربيك: البروتين الممثل متزن${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
+    : Number(mpActual) < Number(mpTarget)
+      ? `مربيك: البروتين الممثل منخفض${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان. راجع إضافة أو استبدال جزء من البروتين بمصدر عالي الجودة والهضم مثل صويا معاملة، جلوتين ذرة، DDGS جيد، كانولا معالج، أو بروتين bypass حسب المتاح والسعر.`
+      : Number(mpRatioPct) > 115
+        ? `مربيك: البروتين الممثل أعلى من اللازم${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر بدون التأثير على إنتاج اللبن.`
+        : `مربيك: البروتين الممثل أعلى قليلًا من المطلوب${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا ترفع البروتين أكثر؛ راجع التكلفة واترك الزيادة فقط إذا كانت مرتبطة بإنتاج أعلى أو حالة تحتاج دعمًا.`;
+ 
  ndfHint =
   ndfState === 'danger'
     ? 'مربيك: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.'
@@ -2375,38 +2388,24 @@ const ndfState =
           )
         : 'مربيك: المادة الجافة المتوقعة للجاموس مرجع تشغيل للشهية والتقديم، وليست Target تغذية للحكم بنقص أو زيادة.';
 
-    nelHint =
-      nelState === 'good'
-        ? 'مربيك: الطاقة مناسبة لاحتياج الجاموس الحالي.'
-        : Number(nelActual) < Number(nelTarget)
-          ? 'مربيك: الطاقة أقل من احتياج الجاموس. ادعم الطاقة بدون تجاوز حد النشا أو خفض الألياف.'
-          : 'مربيك: الطاقة أعلى من احتياج الجاموس. راجع التكلفة وكثافة العليقة قبل زيادة الحبوب.';
+nelHint =
+  nelState === 'good'
+    ? `مربيك: الطاقة متزنة للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. استمر على نفس مستوى الطاقة مع متابعة اللبن وحالة الجسم، ولا تزود الحبوب بدون سبب واضح.`
+    : Number(nelActual) < Number(nelTarget)
+      ? `مربيك: الطاقة أقل من المطلوب للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع كمية المادة الجافة أولًا، ثم حسّن كثافة الطاقة بدون تجاوز حد النشا أو خفض الألياف الفعالة.`
+      : Number(nelRatioPct) > 115
+        ? `مربيك: الطاقة أعلى من اللازم للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة وقلّل مصادر الطاقة الزائدة تدريجيًا إذا لم يظهر مقابلها إنتاج أو تحسن واضح في حالة الجسم.`
+        : `مربيك: الطاقة أعلى قليلًا من المطلوب للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة فقط، ولا تزود الحبوب إلا إذا كان لها عائد واضح.`;
 
-    mpHint =
-      mpState === 'good'
-        ? 'مربيك: البروتين الممثل مناسب لاحتياج الجاموس.'
-        : Number(mpActual) < Number(mpTarget)
-          ? 'مربيك: البروتين الممثل أقل من احتياج الجاموس. حسّن جودة البروتين مع ضبط الطاقة.'
-          : 'مربيك: البروتين الممثل أعلى من احتياج الجاموس. راجع التكلفة والهدر البروتيني.';
+mpHint =
+  mpState === 'good'
+    ? `مربيك: البروتين الممثل متزن للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
+    : Number(mpActual) < Number(mpTarget)
+      ? `مربيك: البروتين الممثل منخفض للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان. راجع إضافة أو استبدال جزء من البروتين بمصدر عالي الجودة والهضم مثل صويا معاملة، جلوتين ذرة، DDGS جيد، كانولا معالج، أو بروتين bypass حسب المتاح والسعر.`
+      : Number(mpRatioPct) > 115
+        ? `مربيك: البروتين الممثل أعلى من اللازم للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر بدون التأثير على إنتاج اللبن.`
+        : `مربيك: البروتين الممثل أعلى قليلًا من المطلوب للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا ترفع البروتين أكثر؛ راجع التكلفة واترك الزيادة فقط إذا كانت مرتبطة بإنتاج أعلى أو حالة تحتاج دعمًا.`;
 
-cpHint =
-  buffaloCpState === 'good'
-    ? 'مربيك: البروتين الخام قريب من المطلوب للجاموس؛ القرار الأهم الآن من البروتين الممثل والطاقة.'
-    : (
-        buffaloCpState === 'warn'
-          ? 'مربيك: البروتين الخام أقل من المطلوب للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
-          : (
-              buffaloCpState === 'watch'
-                ? 'مربيك: البروتين الخام أعلى من المطلوب للجاموس، لكن لا تخفضه إذا كان البروتين الممثل أو الطاقة ناقصين.'
-                : (
-                    cpState === 'good'
-                      ? 'مربيك: البروتين الخام مناسب كمؤشر للجاموس؛ القرار الأهم من البروتين الممثل والطاقة.'
-                      : Number(cpActual) < Number(cpTarget)
-                        ? 'مربيك: البروتين الخام منخفض كمؤشر للجاموس. لا ترفعه وحده قبل مراجعة الطاقة والبروتين الممثل.'
-                        : 'مربيك: البروتين الخام أعلى من احتياج الجاموس، لكن لا تخفضه إذا كان البروتين الممثل أو الطاقة ناقصين.'
-                  )
-            )
-      );
 
 ndfHint =
   ndfState === 'danger'
