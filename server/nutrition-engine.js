@@ -1,4 +1,5 @@
-// مُرَبِّيك — Nutrition Engine
+
+  // مُرَبِّيك — Nutrition Engine
 // Target-side nutrition requirements engine.
 // Cows: DMI, Energy, MP/EAA, Macro minerals, Trace minerals, and Vitamins
 // are calculated using implemented NASEM 2021 equation pathways.
@@ -1829,7 +1830,7 @@ const mpReq = computeNasemMPRequirement({
   pregDays,
   closeUp,
   growth: false,
-  dmi: mineralDmiUsed,
+  dmi,
   ndfPct: 30,
   parity: num(parity, 2),
   species: 'cow',
