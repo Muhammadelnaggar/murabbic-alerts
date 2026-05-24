@@ -831,16 +831,16 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
 }
 
 function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
-  const displayDecision = buildAutoDecision(a, stage, ctx);
-  const state = displayStatusFromAnalysis(e);
+  const d = e?.nutrition?.reportDecision || {};
+  const state = d.status || e?.nutrition?.reportStatus || 'muted';
 
   return `<div class="decision-box">
     <div class="decision-head">
       <div class="decision-title">قراءة مُرَبِّيك</div>
-      ${badge(statusText(state), state)}
+      ${badge(d.statusText || statusText(state), state)}
     </div>
-    <div class="decision-text">${esc(displayDecision.title)}</div>
-    <div class="decision-note"><b>توصية مُرَبِّيك:</b> ${esc(displayDecision.action)}</div>
+    <div class="decision-text">${esc(d.title || 'قراءة التقرير جاهزة من السيرفر.')}</div>
+    <div class="decision-note"><b>توصية مُرَبِّيك:</b> ${esc(d.action || 'راجع صفوف التقرير الجاهزة من السيرفر.')}</div>
   </div>`;
 }
 function renderContextBlock(ctx = {}, event = {}, stage = ''){
@@ -1003,6 +1003,45 @@ function vitaminRows(balance = {}){
           : nutrientCoverageAdvice(cover, 'vitamin')
       );
     });
+}
+function renderServerReportRows(reportRows = []){
+  const rows = Array.isArray(reportRows) ? reportRows : [];
+
+  if(!rows.length){
+    return section(
+      'تحليل العليقة الكامل',
+      '<div class="small-note">لا توجد صفوف تقرير جاهزة من السيرفر لهذا التحليل.</div>'
+    );
+  }
+
+  const groups = new Map();
+
+  for(const r of rows){
+    const sec = r.section || 'تحليل العليقة';
+    if(!groups.has(sec)) groups.set(sec, []);
+    groups.get(sec).push(r);
+  }
+
+  let html = '';
+
+  for(const [sec, items] of groups.entries()){
+    const body = items.map(r => `<tr>
+      <td class="metric-name">${esc(r.label || r.name || '—')}</td>
+      <td>${esc(r.targetText || '—')}</td>
+      <td>${esc(r.actualText || '—')}</td>
+      <td>${esc(r.balanceText || '—')}</td>
+      <td>${badge(r.statusText || statusText(r.status), r.status || 'muted')}</td>
+      <td>${esc(r.note || '—')}</td>
+    </tr>`);
+
+    html += section(sec, table(
+      ['البند','الاحتياج / الهدف','الفعلي','الفرق','قراءة مُرَبِّيك','توصية / ملاحظة'],
+      body,
+      'لا توجد بيانات.'
+    ));
+  }
+
+  return html;
 }
 function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
@@ -1328,7 +1367,7 @@ function renderOneRation(event = {}, opts = {}){
       <div class="ration-head-grid">
         <div>${renderDecisionBlock(event, a, stage, ctx)}</div>
         <div>
-        ${badge(stageLabel(stage, ctx), displayStatusFromAnalysis(event))}
+       ${badge(stageLabel(stage, ctx), nDoc.reportStatus || nDoc.reportDecision?.status || 'muted')}
           ${badge(speciesLabelFromEvent(event), 'muted')}
         </div>
       </div>
@@ -1338,8 +1377,7 @@ function renderOneRation(event = {}, opts = {}){
       </div>
     `)}
     ${renderContextBlock(ctx, event, stage)}
-    ${renderCompleteRationAnalysis(a, stage, ctx)}
-    ${renderEconomicAnalysis(a, stage, ctx, nDoc.panels || {})}
+   ${renderServerReportRows(nDoc.reportRows || [])}
     ${renderRows(rows)}
    
   </div>`;
@@ -1470,14 +1508,13 @@ function renderTabs(report = {}){
 }
 
 function renderAll(data){
-  const report = data.report || {};
-  const events = Array.isArray(report.events) ? report.events : [];
-   const displayIndex = buildDisplayIndexFromEvents(events);
+const report = data.report || {};
+const events = Array.isArray(report.events) ? report.events : [];
 const displayReport = {
   ...report,
-  index: displayIndex,
-  executive: buildDisplayExecutive(displayIndex),
-  count: displayIndex.length
+  index: Array.isArray(report.index) ? report.index : [],
+  executive: report.executive || {},
+  count: report.count || (Array.isArray(report.index) ? report.index.length : events.length)
 };
   const type = data.type || qp.get('type') || '';
   const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
