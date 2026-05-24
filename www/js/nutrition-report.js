@@ -888,22 +888,59 @@ function mineralVal(item, keyG, keyMg){
   return Number.isFinite(Number(v)) ? Number(v) : null;
 }
 
-function mineralStatus(item = {}){
-  const s = String(item.status || '').toLowerCase();
-  if(s.includes('deficit')) return 'danger';
-  if(s.includes('excess')) return 'warn';
-  if(s.includes('warn') || s.includes('watch')) return 'warn';
-  if(s.includes('ok')) return 'good';
-  return 'muted';
+function nutrientCoverageStatus(cover, type = 'mineral'){
+  const c = Number(cover);
+  if(!Number.isFinite(c)) return 'muted';
+
+  if(type === 'vitamin'){
+    if(c < 95) return 'danger';
+    if(c <= 105) return 'good';
+    if(c <= 150) return 'warn';
+    return 'danger';
+  }
+
+  // minerals: macro + trace
+  if(c < 95) return 'danger';
+  if(c <= 105) return 'good';
+  if(c <= 130) return 'warn';
+  return 'danger';
 }
 
-function mineralStatusText(item = {}){
-  const s = String(item.status || '').toLowerCase();
-  if(s.includes('deficit')) return 'نقص';
-  if(s.includes('excess')) return 'زيادة';
-  if(s.includes('ok')) return 'مقبول';
-  if(s.includes('warn') || s.includes('watch')) return 'مراجعة';
-  return 'متابعة';
+function nutrientCoverageAdvice(cover, type = 'mineral'){
+  const c = Number(cover);
+  if(!Number.isFinite(c)) return 'البيانات غير كافية للحكم؛ راجع اكتمال بيانات الخامات والإضافات.';
+
+  if(type === 'vitamin'){
+    if(c < 95) return 'الفيتامين أقل من المطلوب؛ راجع الإضافة المعدنية/الفيتامينية ومعدل استخدامها.';
+    if(c <= 105) return 'الفيتامين يغطي المطلوب.';
+    if(c <= 150) return 'الفيتامين أعلى من المطلوب غالبًا؛ راجع تكلفة الإضافة وتكرار مصادر الفيتامينات.';
+    return 'الفيتامين أعلى بوضوح؛ راجع الإضافات المتكررة ولا تكرر مصادر الفيتامينات بدون داعٍ.';
+  }
+
+  if(c < 95) return 'العنصر أقل من المطلوب؛ راجع مصدر المعدن أو الإضافة المعدنية قبل اعتماد العليقة.';
+  if(c <= 105) return 'العنصر يغطي المطلوب.';
+  if(c <= 130) return 'العنصر أعلى من المطلوب؛ راجع الزيادة وتكلفة الإضافة، خصوصًا مع تكرار مصادر المعادن.';
+  return 'العنصر أعلى بوضوح؛ يحتاج مراجعة فنية لتجنب زيادة غير ضرورية أو تداخلات معدنية.';
+}
+
+function mineralLabel(k){
+  const labels = {
+    Ca: 'كالسيوم Ca',
+    P: 'فوسفور P',
+    Mg: 'ماغنسيوم Mg',
+    Na: 'صوديوم Na',
+    K: 'بوتاسيوم K',
+    Cl: 'كلوريد Cl',
+    S: 'كبريت S',
+    Co: 'كوبالت Co',
+    Cu: 'نحاس Cu',
+    Fe: 'حديد Fe',
+    I: 'يود I',
+    Mn: 'منجنيز Mn',
+    Se: 'سيلينيوم Se',
+    Zn: 'زنك Zn'
+  };
+  return labels[k] || k;
 }
 
 function mineralRows(balance = {}, unit = 'g'){
@@ -928,14 +965,17 @@ function mineralRows(balance = {}, unit = 'g'){
         : mineralVal(item, 'balanceG', 'balanceMg');
 
       const cover = num(item.supplyPctOfRequirement);
+      const st = nutrientCoverageStatus(cover, 'mineral');
 
       return metricRow(
-        k,
+        mineralLabel(k),
         required == null ? '—' : `${nf(required, 2)} ${unit}`,
         supplied == null ? '—' : `${nf(supplied, 2)} ${unit}`,
         bal == null ? '—' : `${nf(bal, 2)} ${unit}`,
-        mineralStatus(item),
-        Number.isFinite(cover) ? `تغطية ${nf(cover,1)}%` : '—'
+        st,
+        Number.isFinite(cover)
+          ? `تغطية ${nf(cover,1)}%. ${nutrientCoverageAdvice(cover, 'mineral')}`
+          : nutrientCoverageAdvice(cover, 'mineral')
       );
     });
 }
@@ -950,17 +990,20 @@ function vitaminRows(balance = {}){
       const bal = num(item.balanceIU);
       const cover = num(item.supplyPctOfRequirement);
       const label = k === 'A' ? 'فيتامين أ' : (k === 'D' ? 'فيتامين د' : 'فيتامين هـ');
+      const st = nutrientCoverageStatus(cover, 'vitamin');
+
       return metricRow(
         label,
         Number.isFinite(required) ? `${nf(required, 0)} وحدة دولية` : '—',
         Number.isFinite(supplied) ? `${nf(supplied, 0)} وحدة دولية` : '—',
         Number.isFinite(bal) ? `${nf(bal, 0)} وحدة دولية` : '—',
-        mineralStatus(item),
-        Number.isFinite(cover) ? `تغطية ${nf(cover,1)}%` : '—'
+        st,
+        Number.isFinite(cover)
+          ? `تغطية ${nf(cover,1)}%. ${nutrientCoverageAdvice(cover, 'vitamin')}`
+          : nutrientCoverageAdvice(cover, 'vitamin')
       );
     });
 }
-
 function renderCompleteRationAnalysis(a = {}, stage = '', ctx = {}){
   const n = a.nutrition || {};
   const t = a.targets || {};
@@ -1009,7 +1052,7 @@ metricRow('الطاقة الصافية للحليب (NEL)', `${nf(t.nelTarget,2)
 
 metricRow('البروتين الممثل القابل للاستفادة (MP)', g(t.mpTargetG,0), g(n.mpSupplyG,0), g(mpBal,0), balanceState(mpBal, 50), mbkAdvice('mp', balanceState(mpBal, 50), 'balance')),
 
-metricRow('البروتين الخام (CP)', pct(t.cpTarget,1), pct(n.cpPctTotal,1), finite(n.cpPctTotal) && finite(t.cpTarget) ? pct(Number(n.cpPctTotal) - Number(t.cpTarget),1) : '—', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), mbkAdvice('cp', balanceState(finite(n.cpPctTotal) && finite(t.cpTarget) ? Number(n.cpPctTotal) - Number(t.cpTarget) : null, 0.7), 'balance')),
+
 
 metricRow(
   'الألياف المتعادلة (NDF)',
