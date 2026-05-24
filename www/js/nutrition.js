@@ -503,7 +503,6 @@ function resetNutritionAnalysisDom(){
     'mpTargetG',
     'mpBalanceG',
     'cpPctTotal',
-    'cpTarget',
     'nelActual',
     'nelTarget',
     'ndfPctActual',
@@ -662,7 +661,7 @@ const panelByKey = (arr, key) =>
   setNum('mpSupplyG', a?.nutrition?.mpSupplyG, '', 0);
   setNum('mpDensityGkgDM', a?.nutrition?.mpDensityGkgDM, '', 0);
   setNum('cpPctTotal', a?.nutrition?.cpPctTotal, '', 1);
-  setNum('cpTarget', t?.cpTarget ?? a?.targets?.cpTarget, '', 1);
+  
 const dmCard = panelByKey(P.analysisCards, 'dm');
 if (dmCard?.actual != null) {
   setNum('totDM', dmCard.actual, '', 2);
@@ -3435,7 +3434,6 @@ function renderGaugeRows(cards){
   const defs = [
    { key:'dm',      label:'قدرة الأكل المتوقعة للحيوان',  current:'العليقة الحالية — مادة جافة',        target:'قدرة الأكل المتوقعة',           unit:'كجم مادة جافة/يوم',     kind:'intake'  },
     { key:'nel',    label:'الطاقة',                  current:'العليقة الحالية — طاقة',            target:'احتياجات الطاقة',                  unit:'ميجاكال', kind:'target'  },
-    { key:'cp',     label:'البروتين الخام',          current:'العليقة الحالية — بروتين خام',       target:'احتياجات البروتين الخام',          unit:'%',       kind:'target'  },
     { key:'mp',     label:'البروتين الممثل',         current:'العليقة الحالية — البروتين الممثل',  target:'احتياجات البروتين الممثل',         unit:'جم/يوم',  kind:'target'  },
     { key:'ndf',    label:'الألياف NDF',            current:'العليقة الحالية — ألياف NDF',       target:'حد أمان الكرش الأدنى',            unit:'%',       kind:'floor'  },
     { key:'starch', label:'النشا',                  current:'العليقة الحالية — نشا',              target:'حد الأمان للنشا',                  unit:'%',       kind:'ceiling' },
@@ -3687,11 +3685,7 @@ if(n){
       st = {sym:"—", color:"#64748b"};
 
     }else if(k==="البروتين الخام CP"){
-      const cpTargetEl = document.getElementById("cpTarget");
-      const cpTarget = cpTargetEl ? toNum(cpTargetEl.textContent) : NaN;
-      st = Number.isFinite(cpTarget)
-        ? kpiState(toNum($("cpPctTotal")?.textContent), cpTarget, 1.0)
-        : {sym:"—", color:"#64748b"};
+      st = {sym:"—", color:"#64748b"};
 
     }else if(k==="البروتين الممثل MP"){
       st = kpiState(toNum($("mpSupplyG")?.textContent), toNum($("mpTargetG")?.textContent), 50);
@@ -3894,7 +3888,6 @@ if(fcCard){
 }
 
  const pairConfigs = [
-  [['العليقة الحالية','بروتين خام'], ['احتياجات','البروتين الخام'], '%', null, null],
   [['العليقة الحالية','البروتين الممثل'], ['احتياجات','البروتين الممثل'], 'جم', 0.92, 1.08],
   [['العليقة الحالية','دهن'], ['الحد المسموح','دهن'], '%', null, null],
   [['العليقة الحالية','طاقة'], ['احتياجات','الطاقة'], '', 0.95, 1.06],
