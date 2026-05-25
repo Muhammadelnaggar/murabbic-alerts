@@ -3667,19 +3667,87 @@ function vitaminReportRowsSrv(balance = {}){
   });
 }
 
-function buildNutritionReportDecisionSrv(e = {}){
-  const decision = pickDecisionCardSrv(e);
-  const priority = pickPriorityCardSrv(e);
-  const status = reportStatusFromEventSrv(e);
+function reportRowPriorityWeightSrv(r = {}){
+  const status = String(r.status || '').toLowerCase();
+  const key = String(r.key || '').toLowerCase();
+  const section = String(r.section || '').trim();
 
-  return cleanObj({
-    title: decision?.value || decision?.title || priority?.value || 'قراءة مُرَبِّيك جاهزة من السيرفر.',
-    action: priority?.value || priority?.targetText || decision?.targetText || decision?.note || 'راجع صفوف التقرير الجاهزة من السيرفر.',
-    status,
-    statusText: reportStatusTextSrv(status)
-  });
+  let w = 0;
+
+  if (status.includes('danger')) w += 1000;
+  else if (status.includes('warn') || status.includes('watch')) w += 500;
+  else if (status.includes('good')) w += 100;
+  else w += 10;
+
+  // الهامش والاقتصاد لهم أولوية في قراءة التقرير العلوية
+  if (section === 'الاقتصاد') w += 220;
+  if (key.includes('milk_margin')) w += 260;
+  if (key.includes('iofc')) w += 240;
+  if (key.includes('feed_cost')) w += 220;
+  if (key.includes('cost_kg_milk')) w += 180;
+
+  // صحة الكرش ثم الطاقة والبروتين
+  if (section === 'صحة الكرش') w += 170;
+  if (key === 'nel') w += 150;
+  if (key === 'mp') w += 150;
+  if (key === 'starch') w += 130;
+  if (key === 'fat') w += 120;
+  if (key === 'ndf') w += 110;
+
+  return w;
 }
 
+function pickMainReportRowSrv(rows = []){
+  const arr = Array.isArray(rows) ? rows.filter(Boolean) : [];
+  if (!arr.length) return null;
+
+  const bad = arr
+    .filter(r => {
+      const s = String(r.status || '').toLowerCase();
+      return s.includes('danger') || s.includes('warn') || s.includes('watch');
+    })
+    .sort((a, b) => reportRowPriorityWeightSrv(b) - reportRowPriorityWeightSrv(a));
+
+  if (bad.length) return bad[0];
+
+  return [...arr].sort((a, b) => reportRowPriorityWeightSrv(b) - reportRowPriorityWeightSrv(a))[0] || null;
+}
+
+function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
+  const rows = Array.isArray(preparedRows) ? preparedRows : buildNutritionReportRowsSrv(e);
+  const main = pickMainReportRowSrv(rows);
+
+  if (!main) {
+    return cleanObj({
+      title: 'قراءة مُرَبِّيك جاهزة من السيرفر.',
+      action: 'راجع صفوف التقرير الجاهزة من السيرفر.',
+      status: 'muted',
+      statusText: reportStatusTextSrv('muted')
+    });
+  }
+
+  const label = String(main.label || 'البند الرئيسي').trim();
+  const actual = String(main.actualText || '').trim();
+  const status = main.status || 'muted';
+
+  let title = '';
+  let action = String(main.note || '').trim() || 'راجع هذا البند قبل اعتماد العليقة.';
+
+  if (String(main.section || '') === 'الاقتصاد') {
+    title = `قراءة مُرَبِّيك الاقتصادية: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
+  } else {
+    title = `قراءة مُرَبِّيك: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
+  }
+
+  return cleanObj({
+    title,
+    action,
+    status,
+    statusText: reportStatusTextSrv(status),
+    sourceKey: main.key || null,
+    sourceSection: main.section || null
+  });
+}
 function buildNutritionReportRowsSrv(e = {}){
   const a = e?.nutrition?.analysis || {};
   const n = a.nutrition || {};
@@ -3885,13 +3953,16 @@ function buildNutritionReportRowsSrv(e = {}){
 }
 
 function attachNutritionReportPayloadSrv(e = {}){
+  const reportRows = buildNutritionReportRowsSrv(e);
+  const reportDecision = buildNutritionReportDecisionSrv(e, reportRows);
+
   return cleanObj({
     ...e,
     nutrition: {
       ...(e.nutrition || {}),
-      reportDecision: buildNutritionReportDecisionSrv(e),
-      reportStatus: reportStatusFromEventSrv(e),
-      reportRows: buildNutritionReportRowsSrv(e)
+      reportDecision,
+      reportStatus: reportDecision.status || reportStatusFromEventSrv(e),
+      reportRows
     }
   });
 }
