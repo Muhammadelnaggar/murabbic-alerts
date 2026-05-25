@@ -3503,7 +3503,8 @@ function reportStatusFromEventSrv(e = {}) {
   return 'unknown';
 }
 function reportEconomicsMetricsSrv(e = {}){
-  const m = e?.nutrition?.analysis?.economics?.economicDecision?.metrics || {};
+  const ec = e?.nutrition?.analysis?.economics || {};
+  const m = ec?.economicDecision?.metrics || {};
 
   const n = (v) => {
     if (v === null || v === undefined || v === '') return null;
@@ -3512,11 +3513,11 @@ function reportEconomicsMetricsSrv(e = {}){
   };
 
   return {
-    costPerKgMilk: n(m.costPerKgMilk),
-    feedCostPctOfMilkIncome: n(m.feedCostPctOfMilkIncome),
-    iofcPctOfMilkIncome: n(m.iofcPctOfMilkIncome),
-    milkMargin: n(m.iofcPerHead),
-    iofcPerHead: n(m.iofcPerHead)
+    costPerKgMilk: n(m.costPerKgMilk ?? ec.costPerKgMilk),
+    feedCostPctOfMilkIncome: n(m.feedCostPctOfMilkIncome ?? ec.feedCostPctOfMilkIncome),
+    iofcPctOfMilkIncome: n(m.iofcPctOfMilkIncome ?? ec.iofcPctOfMilkIncome),
+    milkMargin: n(m.iofcPerHead ?? ec.milkMargin),
+    iofcPerHead: n(m.iofcPerHead ?? ec.milkMargin)
   };
 }
 function buildNutritionReportIndexItem(e = {}) {
@@ -3814,29 +3815,14 @@ const ec = a.economics || {};
 const rows = [];
 
 // الاقتصاد في التقرير يُقرأ فقط من قرار الاقتصاد النهائي المحفوظ
-const econMetrics = a?.economics?.economicDecision?.metrics || {};
-const costPerKgMilkSrv = finiteSrv(econMetrics.costPerKgMilk)
-  ? Number(econMetrics.costPerKgMilk)
-  : null;
-const feedCostSrv = finiteSrv(econMetrics.feedCost)
-  ? Number(econMetrics.feedCost)
-  : null;
+const ecoReport = reportEconomicsMetricsSrv(e);
 
-const milkRevenueSrv = finiteSrv(econMetrics.milkRevenue)
-  ? Number(econMetrics.milkRevenue)
-  : null;
-
-const milkMarginSrv = finiteSrv(econMetrics.iofcPerHead)
-  ? Number(econMetrics.iofcPerHead)
-  : null;
-
-const feedCostPctSrv = finiteSrv(econMetrics.feedCostPctOfMilkIncome)
-  ? Number(econMetrics.feedCostPctOfMilkIncome)
-  : null;
-
-const iofcPctSrv = finiteSrv(econMetrics.iofcPctOfMilkIncome)
-  ? Number(econMetrics.iofcPctOfMilkIncome)
-  : null;
+const costPerKgMilkSrv = ecoReport.costPerKgMilk;
+const feedCostSrv = a?.totals?.totCost ?? null;
+const milkRevenueSrv = a?.economics?.milkRevenue ?? null;
+const milkMarginSrv = ecoReport.milkMargin;
+const feedCostPctSrv = ecoReport.feedCostPctOfMilkIncome;
+const iofcPctSrv = ecoReport.iofcPctOfMilkIncome;
   const nelBal = finiteSrv(n.nelActual) && finiteSrv(t.nelTarget)
     ? Number(n.nelActual) - Number(t.nelTarget)
     : null;
