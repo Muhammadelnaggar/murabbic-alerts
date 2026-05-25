@@ -3847,7 +3847,8 @@ function buildNutritionReportRowsSrv(e = {}){
   const carb = n.carbohydrateSafetyModel || a.carbohydrateSafetyModel || {};
   const ndfMin = carb.minTotalNDFPctDM ?? t.ndfSafetyMin ?? t.ndfMin ?? t.ndfTarget;
   const starchMax = carb.starchMaxPctDM ?? t.starchMax;
-  const fatMax = t.fatSafeMax ?? t.fatMax ?? t.fatTarget;
+  const fatMaxRaw = t.fatSafeMax ?? t.fatMax ?? t.fatTarget;
+const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw) : 7;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
