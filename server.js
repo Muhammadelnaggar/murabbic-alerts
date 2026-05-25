@@ -1696,7 +1696,12 @@ const economicDecision = buildEconomicDecision({
     mpDeficit:
       Number.isFinite(mpSupplyForSafety) &&
       Number.isFinite(mpTargetForSafety) &&
-      mpSupplyForSafety < mpTargetForSafety - 50,
+      (
+      Number.isFinite(mpSupplyForSafety) &&
+      Number.isFinite(mpTargetForSafety) &&
+      mpTargetForSafety > 0 &&
+  (((mpSupplyForSafety - mpTargetForSafety) / mpTargetForSafety) * 100) < -5
+),
     ndfUnsafe: carbSafetyStatus === 'danger',
     starchUnsafe: carbSafetyStatus === 'danger',
     fatUnsafe:
@@ -3558,7 +3563,41 @@ function reportBalanceStatusSrv(balance, tolerance = 0){
   if (Number(balance) > Math.abs(tolerance)) return 'warn';
   return 'good';
 }
+function reportRatioStatusSrv(actual, target, tolerancePct = 5){
+  if (!finiteSrv(actual) || !finiteSrv(target) || Number(target) === 0) return 'muted';
 
+  const ratioPct = ((Number(actual) - Number(target)) / Number(target)) * 100;
+
+  if (ratioPct < -Math.abs(tolerancePct)) return 'danger';
+  if (ratioPct > Math.abs(tolerancePct)) return 'warn';
+  return 'good';
+}
+function reportCoverageStatusSrv(cover, tolerancePct = 5){
+  if (!finiteSrv(cover)) return 'muted';
+
+  const diffPct = Number(cover) - 100;
+
+  if (diffPct < -Math.abs(tolerancePct)) return 'danger';
+  if (diffPct > Math.abs(tolerancePct)) return 'warn';
+  return 'good';
+}
+
+function reportCoverageBalanceTextSrv(cover){
+  if (!finiteSrv(cover)) return '—';
+
+  const diffPct = Number(cover) - 100;
+  const sign = diffPct > 0 ? '+' : '';
+
+  return `${sign}${diffPct.toFixed(1)}%`;
+}
+function reportRatioBalanceTextSrv(actual, target){
+  if (!finiteSrv(actual) || !finiteSrv(target) || Number(target) === 0) return '—';
+
+  const ratioPct = ((Number(actual) - Number(target)) / Number(target)) * 100;
+  const sign = ratioPct > 0 ? '+' : '';
+
+  return `${sign}${ratioPct.toFixed(1)}%`;
+}
 function reportMinStatusSrv(actual, min){
   if (!finiteSrv(actual) || !finiteSrv(min)) return 'muted';
   return Number(actual) < Number(min) ? 'warn' : 'good';
@@ -3617,10 +3656,7 @@ function mineralReportRowsSrv(balance = {}, unit = 'g'){
       (finiteSrv(required) && finiteSrv(supplied) ? Number(supplied) - Number(required) : null);
 
     const cover = item?.supplyPctOfRequirement ?? item?.coveragePct ?? null;
-    const status = finiteSrv(cover)
-      ? (Number(cover) < 90 ? 'warn' : (Number(cover) > 130 ? 'warn' : 'good'))
-      : reportBalanceStatusSrv(bal, 0);
-
+    const status = reportCoverageStatusSrv(cover, 10);
     const u = unit === 'mg' ? 'مجم' : 'جم';
 
     return reportRowSrv(
@@ -3629,7 +3665,7 @@ function mineralReportRowsSrv(balance = {}, unit = 'g'){
       names[String(k).toLowerCase()] || k,
       fmtSrv(required, unit === 'mg' ? 0 : 2, u),
       fmtSrv(supplied, unit === 'mg' ? 0 : 2, u),
-      fmtSrv(bal, unit === 'mg' ? 0 : 2, u),
+      reportCoverageBalanceTextSrv(cover),
       status,
       finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للعنصر.'
     );
@@ -3650,9 +3686,7 @@ function vitaminReportRowsSrv(balance = {}){
       (finiteSrv(required) && finiteSrv(supplied) ? Number(supplied) - Number(required) : null);
 
     const cover = item?.supplyPctOfRequirement ?? item?.coveragePct ?? null;
-    const status = finiteSrv(cover)
-      ? (Number(cover) < 90 ? 'warn' : (Number(cover) > 150 ? 'warn' : 'good'))
-      : reportBalanceStatusSrv(bal, 0);
+   const status = reportCoverageStatusSrv(cover, 20);
 
     return reportRowSrv(
       'الفيتامينات',
@@ -3660,7 +3694,7 @@ function vitaminReportRowsSrv(balance = {}){
       names[k] || `فيتامين ${k}`,
       fmtSrv(required, 0, 'وحدة دولية'),
       fmtSrv(supplied, 0, 'وحدة دولية'),
-      fmtSrv(bal, 0, 'وحدة دولية'),
+      reportCoverageBalanceTextSrv(cover),
       status,
       finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للفيتامين.'
     );
@@ -3783,8 +3817,8 @@ function buildNutritionReportRowsSrv(e = {}){
     'الطاقة الصافية للحليب (NEL)',
     fmtSrv(t.nelTarget, 2, 'Mcal/day'),
     fmtSrv(n.nelActual, 2, 'Mcal/day'),
-    fmtSrv(nelBal, 2, 'Mcal'),
-    reportBalanceStatusSrv(nelBal, 0.5),
+    reportRatioBalanceTextSrv(n.nelActual, t.nelTarget),
+    reportRatioStatusSrv(n.nelActual, t.nelTarget, 5),
     'قرار الطاقة مجهز من السيرفر حسب التحليل المحفوظ.'
   ));
 
@@ -3794,8 +3828,8 @@ function buildNutritionReportRowsSrv(e = {}){
     'البروتين الممثل (MP)',
     fmtSrv(t.mpTargetG, 0, 'جم/يوم'),
     fmtSrv(n.mpSupplyG, 0, 'جم/يوم'),
-    fmtSrv(mpBal, 0, 'جم'),
-    reportBalanceStatusSrv(mpBal, 50),
+    reportRatioBalanceTextSrv(n.mpSupplyG, t.mpTargetG),
+    reportRatioStatusSrv(n.mpSupplyG, t.mpTargetG, 5),
     'قرار البروتين الممثل مجهز من السيرفر حسب التحليل المحفوظ.'
   ));
 
