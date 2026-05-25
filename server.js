@@ -3187,7 +3187,15 @@ const milkPrice = toNumOrNull(
   nutrition.milkPrice ??
   nutrition.context?.milkPrice
 );
+if (!Number.isFinite(Number(milkPrice)) || Number(milkPrice) <= 0) {
+  return res.status(400).json({
+    ok: false,
+    error: 'milk_price_required',
+    message: 'سعر اللبن إجباري لحساب الهامش و IOFC في تقرير التغذية.'
+  });
+}
 
+context.milkPrice = milkPrice;
 const centralAnalysis = buildNutritionCentralAnalysis({
   rows,
   context,
@@ -3230,10 +3238,11 @@ if (!isGroup && db) {
   ts: nowMs,
   source: '/nutrition.html',
 
-  nutrition: {
+nutrition: {
   mode: nutrition.mode || 'tmr_asfed',
   rows,
   context,
+  milkPrice,
   analysis: centralAnalysis,
   panels: centralPanels
 }
