@@ -3502,10 +3502,27 @@ function reportStatusFromEventSrv(e = {}) {
 
   return 'unknown';
 }
+function reportEconomicsMetricsSrv(e = {}){
+  const m = e?.nutrition?.analysis?.economics?.economicDecision?.metrics || {};
 
+  const n = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  };
+
+  return {
+    costPerKgMilk: n(m.costPerKgMilk),
+    feedCostPctOfMilkIncome: n(m.feedCostPctOfMilkIncome),
+    iofcPctOfMilkIncome: n(m.iofcPctOfMilkIncome),
+    milkMargin: n(m.iofcPerHead),
+    iofcPerHead: n(m.iofcPerHead)
+  };
+}
 function buildNutritionReportIndexItem(e = {}) {
   const ctx = e?.nutrition?.context || {};
   const a = e?.nutrition?.analysis || {};
+  const ecoReport = reportEconomicsMetricsSrv(e);
   const stage = nutritionStageFromEvent(e);
   const species = nutritionSpeciesKeyFromEvent(e);
   const decision = pickDecisionCardSrv(e);
@@ -3538,8 +3555,10 @@ function buildNutritionReportIndexItem(e = {}) {
     ndfPctActual: a?.nutrition?.ndfPctActual ?? null,
     starchPctActual: a?.nutrition?.starchPctActual ?? null,
     fatPctActual: a?.nutrition?.fatPctActual ?? null,
-    costPerKgMilk: a?.economics?.costPerKgMilk ?? null,
-    milkMargin: a?.economics?.milkMargin ?? null,
+    costPerKgMilk: ecoReport.costPerKgMilk,
+    milkMargin: ecoReport.milkMargin,
+    feedCostPctOfMilkIncome: ecoReport.feedCostPctOfMilkIncome,
+    iofcPctOfMilkIncome: ecoReport.iofcPctOfMilkIncome,
     rumenStatus: a?.nutrition?.rumenStatus || null,
     reportStatus: reportStatusFromEventSrv(e),
     decisionText: decision?.value || null,
@@ -3796,7 +3815,9 @@ const rows = [];
 
 // الاقتصاد في التقرير يُقرأ فقط من قرار الاقتصاد النهائي المحفوظ
 const econMetrics = a?.economics?.economicDecision?.metrics || {};
-
+const costPerKgMilkSrv = finiteSrv(econMetrics.costPerKgMilk)
+  ? Number(econMetrics.costPerKgMilk)
+  : null;
 const feedCostSrv = finiteSrv(econMetrics.feedCost)
   ? Number(econMetrics.feedCost)
   : null;
@@ -3968,7 +3989,7 @@ rows.push(reportRowSrv(
   'cost_kg_milk',
   'تكلفة كجم اللبن',
   'قراءة اقتصادية',
-  fmtSrv(ec.costPerKgMilk, 2, 'جنيه/كجم'),
+  fmtSrv(costPerKgMilkSrv, 2, 'جنيه/كجم'),
   '—',
   'muted',
   'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
