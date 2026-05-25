@@ -3760,19 +3760,23 @@ function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
     });
   }
 
-  const label = String(main.label || 'البند الرئيسي').trim();
-  const actual = String(main.actualText || '').trim();
-  const status = main.status || 'muted';
+const label = String(main.label || 'البند الرئيسي').trim();
+const actual = String(main.actualText || '').trim();
+const balance = String(main.balanceText || '').trim();
+const status = main.status || 'muted';
+const section = String(main.section || '').trim();
 
-  let title = '';
-  let action = String(main.note || '').trim() || 'راجع هذا البند قبل اعتماد العليقة.';
+let title = '';
+let action = String(main.note || '').trim() || 'راجع هذا البند قبل اعتماد العليقة.';
 
-  if (String(main.section || '') === 'الاقتصاد') {
-    title = `قراءة مُرَبِّيك الاقتصادية: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
-  } else {
-    title = `قراءة مُرَبِّيك: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
-  }
-
+if (section === 'الاقتصاد') {
+  title = `قراءة مُرَبِّيك الاقتصادية: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
+} else if (section === 'المعادن الكبرى' || section === 'المعادن الصغرى' || section === 'الفيتامينات') {
+  const direction = balance.startsWith('-') ? 'نقص' : (balance.startsWith('+') ? 'زيادة' : 'اتزان');
+  title = `قراءة مُرَبِّيك: ${direction} ${label}${balance && balance !== '—' ? ` (${balance})` : ''}`;
+} else {
+  title = `قراءة مُرَبِّيك: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
+}
   return cleanObj({
     title,
     action,
@@ -3783,12 +3787,35 @@ function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
   });
 }
 function buildNutritionReportRowsSrv(e = {}){
-  const a = e?.nutrition?.analysis || {};
-  const n = a.nutrition || {};
-  const t = a.targets || {};
-  const totals = a.totals || {};
-  const ec = a.economics || {};
-  const rows = [];
+const a = e?.nutrition?.analysis || {};
+const n = a.nutrition || {};
+const t = a.targets || {};
+const totals = a.totals || {};
+const ec = a.economics || {};
+const rows = [];
+
+// الاقتصاد يُحسب في التقرير من نفس قيم السيرفر النهائية
+const feedCostSrv = finiteSrv(totals.totCost) ? Number(totals.totCost) : null;
+const milkRevenueSrv = finiteSrv(ec.milkRevenue) ? Number(ec.milkRevenue) : null;
+
+const milkMarginSrv =
+  finiteSrv(ec.milkMargin)
+    ? Number(ec.milkMargin)
+    : (
+        finiteSrv(milkRevenueSrv) && finiteSrv(feedCostSrv)
+          ? round2(Number(milkRevenueSrv) - Number(feedCostSrv))
+          : null
+      );
+
+const feedCostPctSrv =
+  finiteSrv(feedCostSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
+    ? round2((Number(feedCostSrv) / Number(milkRevenueSrv)) * 100)
+    : null;
+
+const iofcPctSrv =
+  finiteSrv(milkMarginSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
+    ? round2((Number(milkMarginSrv) / Number(milkRevenueSrv)) * 100)
+    : null;
 
   const nelBal = finiteSrv(n.nelActual) && finiteSrv(t.nelTarget)
     ? Number(n.nelActual) - Number(t.nelTarget)
@@ -3848,7 +3875,8 @@ function buildNutritionReportRowsSrv(e = {}){
   const ndfMin = carb.minTotalNDFPctDM ?? t.ndfSafetyMin ?? t.ndfMin ?? t.ndfTarget;
   const starchMax = carb.starchMaxPctDM ?? t.starchMax;
   const fatMaxRaw = t.fatSafeMax ?? t.fatMax ?? t.fatTarget;
-const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw) : 7;
+  const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw) : 7;
+  
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
@@ -3936,54 +3964,53 @@ const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw)
   rows.push(...mineralReportRowsSrv(mineralSupply?.traceMineralBalanceModel?.balance || {}, 'mg'));
   rows.push(...vitaminReportRowsSrv(n.vitaminSupplyModel?.vitaminBalanceModel?.balance || {}));
 
-  rows.push(reportRowSrv(
-    'الاقتصاد',
-    'cost_kg_milk',
-    'تكلفة كجم اللبن',
-    'قراءة اقتصادية',
-    fmtSrv(ec.costPerKgMilk, 2, 'جنيه/كجم'),
-    '—',
-    'muted',
-    'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
-  ));
+rows.push(reportRowSrv(
+  'الاقتصاد',
+  'cost_kg_milk',
+  'تكلفة كجم اللبن',
+  'قراءة اقتصادية',
+  fmtSrv(ec.costPerKgMilk, 2, 'جنيه/كجم'),
+  '—',
+  'muted',
+  'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
+));
 
-  rows.push(reportRowSrv(
-    'الاقتصاد',
-    'milk_margin',
-    'هامش لبن - علف',
-    'هامش موجب',
-    fmtSrv(ec.milkMargin, 2, 'جنيه/رأس/يوم'),
-    '—',
-    finiteSrv(ec.milkMargin) && Number(ec.milkMargin) < 0 ? 'danger' : (finiteSrv(ec.milkMargin) ? 'good' : 'muted'),
-    'قرار الاقتصاد مجهز من السيرفر.'
-  ));
+rows.push(reportRowSrv(
+  'الاقتصاد',
+  'milk_margin',
+  'هامش لبن - علف',
+  'هامش موجب',
+  fmtSrv(milkMarginSrv, 2, 'جنيه/رأس/يوم'),
+  '—',
+  finiteSrv(milkMarginSrv) && Number(milkMarginSrv) < 0 ? 'danger' : (finiteSrv(milkMarginSrv) ? 'good' : 'muted'),
+  'قرار الاقتصاد مجهز من السيرفر.'
+));
 
-  rows.push(reportRowSrv(
-    'الاقتصاد',
-    'feed_cost_income',
-    'تكلفة العلف من دخل اللبن',
-    'قراءة اقتصادية',
-    fmtSrv(ec.feedCostPctOfMilkIncome, 1, '%'),
-    '—',
-    finiteSrv(ec.feedCostPctOfMilkIncome)
-      ? (Number(ec.feedCostPctOfMilkIncome) <= 40 ? 'good' : (Number(ec.feedCostPctOfMilkIncome) <= 60 ? 'warn' : 'danger'))
-      : 'muted',
-    'قرار تكلفة العلف من دخل اللبن مجهز من السيرفر.'
-  ));
+rows.push(reportRowSrv(
+  'الاقتصاد',
+  'feed_cost_income',
+  'تكلفة العلف من دخل اللبن',
+  'قراءة اقتصادية',
+  fmtSrv(feedCostPctSrv, 1, '%'),
+  '—',
+  finiteSrv(feedCostPctSrv)
+    ? (Number(feedCostPctSrv) <= 40 ? 'good' : (Number(feedCostPctSrv) <= 60 ? 'warn' : 'danger'))
+    : 'muted',
+  'قرار تكلفة العلف من دخل اللبن مجهز من السيرفر.'
+));
 
-  rows.push(reportRowSrv(
-    'الاقتصاد',
-    'iofc_income',
-    'IOFC من دخل اللبن',
-    'قراءة اقتصادية',
-    fmtSrv(ec.iofcPctOfMilkIncome, 1, '%'),
-    '—',
-    finiteSrv(ec.iofcPctOfMilkIncome)
-      ? (Number(ec.iofcPctOfMilkIncome) >= 60 ? 'good' : (Number(ec.iofcPctOfMilkIncome) >= 40 ? 'warn' : 'danger'))
-      : 'muted',
-    'قرار IOFC مجهز من السيرفر.'
-  ));
-
+rows.push(reportRowSrv(
+  'الاقتصاد',
+  'iofc_income',
+  'IOFC من دخل اللبن',
+  'قراءة اقتصادية',
+  fmtSrv(iofcPctSrv, 1, '%'),
+  '—',
+  finiteSrv(iofcPctSrv)
+    ? (Number(iofcPctSrv) >= 60 ? 'good' : (Number(iofcPctSrv) >= 40 ? 'warn' : 'danger'))
+    : 'muted',
+  'قرار IOFC مجهز من السيرفر.'
+));
   return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
 }
 
