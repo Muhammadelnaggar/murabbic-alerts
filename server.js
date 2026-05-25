@@ -3795,53 +3795,67 @@ const ec = a.economics || {};
 const rows = [];
 
 // الاقتصاد يُحسب في التقرير من نفس قيم السيرفر النهائية
-const econMetrics = ec?.economicDecision?.metrics || {};
+const econDecision = ec?.economicDecision || a?.economicDecision || {};
+const econMetrics =
+  econDecision?.metrics ||
+  ec?.metrics ||
+  {};
 
-const feedCostSrv = finiteSrv(totals.totCost) ? Number(totals.totCost) : null;
+function econPositive(...vals){
+  for (const v of vals) {
+    if (finiteSrv(v) && Number(v) > 0) return Number(v);
+  }
+  return null;
+}
 
-const milkRevenueSrv =
-  finiteSrv(ec.milkRevenue) && Number(ec.milkRevenue) > 0
-    ? Number(ec.milkRevenue)
-    : null;
+function econNonZero(...vals){
+  for (const v of vals) {
+    if (finiteSrv(v) && Number(v) !== 0) return Number(v);
+  }
+  return null;
+}
+
+const feedCostSrv = econPositive(
+  totals.totCost,
+  ec.feedCost,
+  econMetrics.feedCost
+);
+
+const milkRevenueSrv = econPositive(
+  ec.milkRevenue,
+  econMetrics.milkRevenue
+);
 
 const milkMarginSrv =
-  finiteSrv(ec.milkMargin) && Number(ec.milkMargin) !== 0
-    ? Number(ec.milkMargin)
-    : (
-        finiteSrv(econMetrics.iofcPerHead)
-          ? Number(econMetrics.iofcPerHead)
-          : (
-              finiteSrv(milkRevenueSrv) && finiteSrv(feedCostSrv)
-                ? round2(Number(milkRevenueSrv) - Number(feedCostSrv))
-                : null
-            )
-      );
+  econNonZero(
+    econMetrics.iofcPerHead,
+    econMetrics.milkMargin,
+    ec.milkMargin
+  ) ?? (
+    finiteSrv(milkRevenueSrv) && finiteSrv(feedCostSrv)
+      ? round2(Number(milkRevenueSrv) - Number(feedCostSrv))
+      : null
+  );
 
 const feedCostPctSrv =
-  finiteSrv(ec.feedCostPctOfMilkIncome) && Number(ec.feedCostPctOfMilkIncome) > 0
-    ? Number(ec.feedCostPctOfMilkIncome)
-    : (
-        finiteSrv(econMetrics.feedCostPctOfMilkIncome) && Number(econMetrics.feedCostPctOfMilkIncome) > 0
-          ? Number(econMetrics.feedCostPctOfMilkIncome)
-          : (
-              finiteSrv(feedCostSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
-                ? round2((Number(feedCostSrv) / Number(milkRevenueSrv)) * 100)
-                : null
-            )
-      );
+  econPositive(
+    econMetrics.feedCostPctOfMilkIncome,
+    ec.feedCostPctOfMilkIncome
+  ) ?? (
+    finiteSrv(feedCostSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
+      ? round2((Number(feedCostSrv) / Number(milkRevenueSrv)) * 100)
+      : null
+  );
 
 const iofcPctSrv =
-  finiteSrv(ec.iofcPctOfMilkIncome) && Number(ec.iofcPctOfMilkIncome) > 0
-    ? Number(ec.iofcPctOfMilkIncome)
-    : (
-        finiteSrv(econMetrics.iofcPctOfMilkIncome) && Number(econMetrics.iofcPctOfMilkIncome) > 0
-          ? Number(econMetrics.iofcPctOfMilkIncome)
-          : (
-              finiteSrv(milkMarginSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
-                ? round2((Number(milkMarginSrv) / Number(milkRevenueSrv)) * 100)
-                : null
-            )
-      );
+  econPositive(
+    econMetrics.iofcPctOfMilkIncome,
+    ec.iofcPctOfMilkIncome
+  ) ?? (
+    finiteSrv(milkMarginSrv) && finiteSrv(milkRevenueSrv) && Number(milkRevenueSrv) > 0
+      ? round2((Number(milkMarginSrv) / Number(milkRevenueSrv)) * 100)
+      : null
+  );
   const nelBal = finiteSrv(n.nelActual) && finiteSrv(t.nelTarget)
     ? Number(n.nelActual) - Number(t.nelTarget)
     : null;
