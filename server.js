@@ -4107,6 +4107,79 @@ function buildAllNutritionReport(events = []) {
    events: reportEvents
   });
 }
+app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_disabled'
+      });
+    }
+
+    const tenant = req.userId;
+    const id = String(req.params.id || '').trim();
+
+    if (!id) {
+      return res.status(400).json({
+        ok: false,
+        error: 'event_id_required'
+      });
+    }
+
+    const snap = await db.collection('events').doc(id).get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: 'nutrition_event_not_found'
+      });
+    }
+
+    const event = {
+      id: snap.id,
+      ...(snap.data() || {})
+    };
+
+    const owner = String(event.userId || event.ownerUid || '').trim();
+
+    if (owner !== tenant) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden'
+      });
+    }
+
+    const typeText = String(
+      event.eventTypeNorm ||
+      event.type ||
+      event.eventType ||
+      ''
+    ).toLowerCase();
+
+    if (
+      !typeText.includes('nutrition') &&
+      !String(event.eventType || '').includes('تغذية')
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: 'not_nutrition_event'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      event
+    });
+
+  } catch (e) {
+    console.error('nutrition.event.load error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_event_load_failed',
+      message: e.message || String(e)
+    });
+  }
+});
 app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
   try {
     const tenant = req.userId;
