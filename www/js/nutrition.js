@@ -3179,21 +3179,21 @@ try {
   console.error(e);
 }
 
+try {
+  ensureSavedRationsDropdown();
+} catch(e) {
+  console.error(e);
+}
+
+try {
+  initSavedNutritionRationsDropdown().catch(e => console.error(e));
+} catch(e) {
+  console.error(e);
+}
+
 loadFeedLibrary()
   .then(async ()=>{ 
     try{ filterFeeds(); }catch(e){}
-
-    try {
-      await loadCtxAuto();
-    } catch(e) {
-      console.error(e);
-    }
-
-    try {
-      await initSavedNutritionRationsDropdown();
-    } catch(e) {
-      console.error(e);
-    }
   })
   .catch(err=>{
     console.error(err);
@@ -4813,13 +4813,14 @@ const formIdEl   = document.getElementById('animalId');
     }
 
     Promise.resolve()
-      .then(() => refreshTargets())
-      .then(() => initNutritionUI())
-      .catch(err => {
-        console.error(err);
-        disableSave(true);
-        showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
-      });
+  .then(() => loadCtxAuto())
+  .then(() => initNutritionUI())
+  .then(() => refreshTargets())
+  .catch(err => {
+    console.error(err);
+    disableSave(true);
+    showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
+  });
   });
 }catch(e){
     console.error(e);
