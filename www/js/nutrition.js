@@ -2772,12 +2772,12 @@ async function fetchNutritionEventForEdit(eventId){
 function ensureSavedRationsDropdown(){
   if (document.getElementById('savedNutritionRationsBox')) return;
 
-  const anchor =
-    document.getElementById('feedInputBox') ||
-    document.getElementById('nutritionAnalysisCard') ||
-    document.getElementById('tbl') ||
-    document.querySelector('.card') ||
-    document.body;
+const anchor =
+  document.getElementById('animalInfo')?.closest('.mbk-card, .card, section, div') ||
+  document.getElementById('dateInfo')?.closest('.mbk-card, .card, section, div') ||
+  document.getElementById('nutritionAnalysisCard') ||
+  document.querySelector('.mbk-card, .card') ||
+  document.body;
 
   const box = document.createElement('div');
   box.id = 'savedNutritionRationsBox';
@@ -2817,7 +2817,11 @@ function ensureSavedRationsDropdown(){
     </div>
   `;
 
-  anchor.parentNode.insertBefore(box, anchor);
+ if (anchor && anchor.parentNode) {
+  anchor.parentNode.insertBefore(box, anchor.nextSibling);
+} else {
+  document.body.prepend(box);
+}
 }
 
 function setFieldValue(id, value){
