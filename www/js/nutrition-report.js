@@ -1010,7 +1010,7 @@ function renderServerReportRows(reportRows = []){
   if(!rows.length){
     return section(
       'تحليل العليقة الكامل',
-      '<div class="small-note">لا توجد صفوف تقرير جاهزة من السيرفر لهذا التحليل.</div>'
+      '<div class="small-note">لا توجد صفوف تقرير جاهزة لهذا التحليل.</div>'
     );
   }
 
@@ -1025,6 +1025,26 @@ function renderServerReportRows(reportRows = []){
   let html = '';
 
   for(const [sec, items] of groups.entries()){
+    const isEconomy = String(sec || '').trim() === 'الاقتصاد';
+
+    if(isEconomy){
+      const body = items.map(r => `<tr>
+        <td class="metric-name">${esc(r.label || r.name || '—')}</td>
+        <td>${esc(r.actualText || '—')}</td>
+        <td>${esc(r.balanceText || '—')}</td>
+        <td>${badge(r.statusText || statusText(r.status), r.status || 'muted')}</td>
+        <td>${esc(r.note || '—')}</td>
+      </tr>`);
+
+html += section(sec, table(
+  ['المؤشر','القيمة المالية','النسبة الاقتصادية','قراءة مُرَبِّيك','توجيه مُرَبِّيك'],
+  body,
+  'لا توجد بيانات اقتصادية.'
+));
+
+      continue;
+    }
+
     const body = items.map(r => `<tr>
       <td class="metric-name">${esc(r.label || r.name || '—')}</td>
       <td>${esc(r.targetText || '—')}</td>
