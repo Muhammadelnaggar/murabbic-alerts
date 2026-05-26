@@ -4180,6 +4180,138 @@ app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
     });
   }
 });
+// ============================================================
+//        API: NUTRITION SAVED RATIONS LIST + LOAD ONE
+// ============================================================
+app.get('/api/nutrition/events/list', requireUserId, async (req, res) => {
+  try {
+    const tenant = req.userId;
+
+    const events = await fetchNutritionReportEvents(tenant);
+    const filtered = filterNutritionReportEvents(events, {
+      type: String(req.query.type || '').trim(),
+      stage: String(req.query.stage || '').trim(),
+      groupName: String(req.query.groupName || req.query.group || '').trim()
+    });
+
+    const list = filtered
+      .filter(e => e?.nutrition?.rows && Array.isArray(e.nutrition.rows))
+      .slice(0, 80)
+      .map(e => {
+        const ctx = e?.nutrition?.context || {};
+        const stage = nutritionStageFromEvent(e);
+        const name =
+          nutritionGroupNameFromEvent(e) ||
+          ctx.groupName ||
+          ctx.group ||
+          ctx.groupLabel ||
+          e.animalNumber ||
+          'عليقة محفوظة';
+
+        const speciesKey = nutritionSpeciesKeyFromEvent(e);
+        const speciesLabel =
+          speciesKey === 'buffalo' ? 'جاموس' :
+          speciesKey === 'cows' ? 'أبقار' :
+          String(ctx.species || '');
+
+        const stageLabel =
+          stage === 'lactating' ? 'حلاب' :
+          stage === 'far_dry' ? 'جاف بعيد' :
+          stage === 'close_up' ? 'انتظار ولادة' :
+          'غير محدد';
+
+        return cleanObj({
+          id: e.id,
+          groupName: name,
+          eventDate: e.eventDate || e.date || null,
+          species: speciesLabel || null,
+          stage,
+          stageLabel,
+          headCount: e.groupSize || ctx.headCount || null,
+          avgMilkKg: ctx.avgMilkKg ?? ctx.formulationTarget?.milkKg ?? null,
+          createdAtMs: eventCreatedMs(e)
+        });
+      });
+
+    return res.json({
+      ok: true,
+      count: list.length,
+      events: list
+    });
+
+  } catch (e) {
+    console.error('nutrition.events.list error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_events_list_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+
+app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_disabled'
+      });
+    }
+
+    const tenant = req.userId;
+    const id = String(req.params.id || '').trim();
+
+    if (!id) {
+      return res.status(400).json({
+        ok: false,
+        error: 'event_id_required'
+      });
+    }
+
+    const snap = await db.collection('events').doc(id).get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: 'nutrition_event_not_found'
+      });
+    }
+
+    const event = {
+      id: snap.id,
+      ...(snap.data() || {})
+    };
+
+    const owner = String(event.userId || event.ownerUid || '').trim();
+
+    if (owner !== tenant) {
+      return res.status(403).json({
+        ok: false,
+        error: 'forbidden'
+      });
+    }
+
+    if (!isNutritionSavedEvent(event)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'not_nutrition_event'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      event
+    });
+
+  } catch (e) {
+    console.error('nutrition.event.load error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_event_load_failed',
+      message: e.message || String(e)
+    });
+  }
+});
 app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
   try {
     const tenant = req.userId;
