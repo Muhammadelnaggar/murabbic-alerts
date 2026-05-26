@@ -2772,11 +2772,13 @@ async function fetchNutritionEventForEdit(eventId){
 function ensureSavedRationsDropdown(){
   if (document.getElementById('savedNutritionRationsBox')) return;
 
+const modeEl = document.getElementById('mode');
+
 const anchor =
-  document.getElementById('animalInfo')?.closest('.mbk-card, .card, section, div') ||
-  document.getElementById('dateInfo')?.closest('.mbk-card, .card, section, div') ||
-  document.getElementById('nutritionAnalysisCard') ||
-  document.querySelector('.mbk-card, .card') ||
+  modeEl?.closest('.mbk-card, .card, section, div') ||
+  modeEl?.parentElement ||
+  document.getElementById('feedInputBox') ||
+  document.getElementById('tbl')?.closest('.mbk-card, .card, section, div') ||
   document.body;
 
   const box = document.createElement('div');
@@ -2817,8 +2819,8 @@ const anchor =
     </div>
   `;
 
- if (anchor && anchor.parentNode) {
-  anchor.parentNode.insertBefore(box, anchor.nextSibling);
+if (anchor && anchor.parentNode) {
+  anchor.parentNode.insertBefore(box, anchor);
 } else {
   document.body.prepend(box);
 }
