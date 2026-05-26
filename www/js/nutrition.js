@@ -2714,12 +2714,19 @@ function addEmptyRow(){
 }
 function savedRationLabel(item = {}){
   const species = String(item.species || '').trim();
-  const group = String(item.groupName || '').trim();
+  let group = String(item.groupName || '').trim();
   const date = String(item.eventDate || '').trim();
+
+  if (species) {
+    const re = new RegExp(species, 'g');
+    group = group.replace(re, '').replace(/\s+/g, ' ').trim();
+  }
 
   const label = [species, group]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return [label, date]
     .filter(Boolean)
