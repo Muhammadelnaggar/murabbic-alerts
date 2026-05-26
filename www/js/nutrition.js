@@ -4805,19 +4805,21 @@ const formIdEl   = document.getElementById('animalId');
     formIdEl.disabled = false;
   }
 
-  waitForAuthReady().then(user=>{
-    if(!user){
+  waitForAuthReady().then(user => {
+    if (!user) {
       disableSave(true);
       msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
       return;
     }
-Promise.resolve()
-  .then(() => refreshTargets())
-  .then(() => initNutritionUI())
-  .catch(err => {
-    console.error(err);
-    disableSave(true);
-    showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
+
+    Promise.resolve()
+      .then(() => refreshTargets())
+      .then(() => initNutritionUI())
+      .catch(err => {
+        console.error(err);
+        disableSave(true);
+        showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
+      });
   });
 }catch(e){
     console.error(e);
