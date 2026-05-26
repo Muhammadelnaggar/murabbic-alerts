@@ -2974,22 +2974,26 @@ async function loadSavedNutritionEventIntoPage(eventId){
       'عليقة محفوظة';
   }
 
-  tbody.innerHTML = '';
-  rationItems.length = 0;
-  selectedRation.clear();
+tbody.innerHTML = '';
+rationItems.length = 0;
+selectedRation.clear();
 
-  rows.forEach(r => {
-    const item = normalizeSavedRationRowForUi(r);
-    if (item.name) rationItems.push(item);
-  });
+rows.forEach(r => {
+  const item = normalizeSavedRationRowForUi(r);
+  if (item.name) rationItems.push(item);
+});
 
-  addEmptyRow();
+showFeedUI();
 
-  updateModeUI();
-  updateCtxView();
-  applyDryMilkVisibility();
-  renderRationSummary();
-  recalc();
+tbody.innerHTML = '';
+addEmptyRow();
+
+updateModeUI();
+updateCtxView();
+applyDryMilkVisibility();
+renderRationSummary();
+updateRationActionsUI();
+recalc();
 
   try { await refreshTargets(); } catch(e) {
     console.warn('saved ration refreshTargets failed:', e.message || e);
@@ -3056,7 +3060,14 @@ async function initSavedNutritionRationsDropdown(){
   ensureEditableForMode();
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
-  loadSpeciesFromAnimals();
+loadSpeciesFromAnimals();
+
+try {
+  ensureSavedRationsDropdown();
+} catch(e) {
+  console.error(e);
+}
+
 loadFeedLibrary()
   .then(async ()=>{ 
     try{ filterFeeds(); }catch(e){}
