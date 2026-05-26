@@ -4145,10 +4145,75 @@ app.get('/api/nutrition/events/list', requireUserId, async (req, res) => {
         });
     }
 
+    const wantedAnimalNumber = String(
+      req.query.animalNumber ||
+      req.query.number ||
+      req.query.animalId ||
+      ''
+    ).trim();
+
+    const wantedAnimalKey = String(
+      Number.isFinite(Number(wantedAnimalNumber))
+        ? Number(wantedAnimalNumber)
+        : wantedAnimalNumber
+    ).trim();
+
+    const wantedGroupName = normReportText(
+      req.query.groupName ||
+      req.query.group ||
+      ''
+    );
+
+    const wantedStage = String(
+      req.query.stage ||
+      ''
+    ).trim().toLowerCase();
+
     const events = [...byId.values()]
       .filter(e => Array.isArray(e?.nutrition?.rows) && e.nutrition.rows.length)
+      .filter(e => {
+        if (!wantedAnimalNumber) return true;
+
+        const ctx = e?.nutrition?.context || {};
+
+        const raw = String(
+          e.animalNumber ||
+          e.number ||
+          e.animalId ||
+          ctx.animalNumber ||
+          ctx.number ||
+          ctx.animalId ||
+          ''
+        ).trim();
+
+        const rawKey = String(
+          Number.isFinite(Number(raw))
+            ? Number(raw)
+            : raw
+        ).trim();
+
+        return raw === wantedAnimalNumber || rawKey === wantedAnimalKey;
+      })
+      .filter(e => {
+        if (!wantedGroupName) return true;
+
+        const ctx = e?.nutrition?.context || {};
+        const name = normReportText(
+          nutritionGroupNameFromEvent(e) ||
+          ctx.groupName ||
+          ctx.group ||
+          ctx.groupLabel ||
+          ''
+        );
+
+        return name === wantedGroupName;
+      })
+      .filter(e => {
+        if (!wantedStage) return true;
+        return nutritionStageFromEvent(e) === wantedStage;
+      })
       .sort((a, b) => eventCreatedMs(b) - eventCreatedMs(a))
-      .slice(0, 80);
+      .slice(0, 20);
 
     const list = events.map(e => {
       const n = e.nutrition || {};
