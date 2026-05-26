@@ -2712,13 +2712,18 @@ function addEmptyRow(){
   const cat  = (mode==='split') ? 'rough' : 'conc';
   addRow({ cat });
 }
-  function savedRationLabel(item = {}){
+function savedRationLabel(item = {}){
   const parts = [];
 
   if (item.groupName) parts.push(item.groupName);
   if (item.stageLabel) parts.push(item.stageLabel);
   if (item.species) parts.push(item.species);
   if (item.eventDate) parts.push(item.eventDate);
+
+  const milkPrice = Number(item.milkPrice);
+  if (Number.isFinite(milkPrice) && milkPrice > 0) {
+    parts.push(`سعر اللبن ${milkPrice}`);
+  }
 
   return parts.filter(Boolean).join(' — ') || 'عليقة محفوظة';
 }
