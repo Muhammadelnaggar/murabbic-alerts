@@ -2735,7 +2735,50 @@ async function fetchSavedNutritionEventsList(){
   if (!uid) throw new Error('NO_AUTH');
 
   const API_BASE = window.API_BASE || '';
-  const res = await fetch(`${API_BASE}/api/nutrition/events/list`, {
+
+  const p = qp();
+
+  const currentAnimalNumber = String(
+    window.mbkNutrition?.loadedAnimalContext?.animalNumber ||
+    p.get('animalNumber') ||
+    p.get('number') ||
+    p.get('animalId') ||
+    ''
+  ).trim();
+
+  const currentGroupName = String(
+    window.mbkNutrition?.groupContext?.groupName ||
+    window.mbkNutrition?.groupContext?.group ||
+    window.mbkNutrition?.groupContext?.groupLabel ||
+    p.get('groupName') ||
+    p.get('group') ||
+    ''
+  ).trim();
+
+  const currentStage = String(
+    window.mbkNutrition?.groupContext?.groupType ||
+    p.get('groupType') ||
+    p.get('stage') ||
+    ''
+  ).trim();
+
+  const params = new URLSearchParams();
+
+  if (currentAnimalNumber) {
+    params.set('animalNumber', currentAnimalNumber);
+  } else if (currentGroupName) {
+    params.set('groupName', currentGroupName);
+  }
+
+  if (currentStage) {
+    params.set('stage', currentStage);
+  }
+
+  const url =
+    `${API_BASE}/api/nutrition/events/list` +
+    (params.toString() ? `?${params.toString()}` : '');
+
+  const res = await fetch(url, {
     headers: {
       'X-User-Id': uid
     },
