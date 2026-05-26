@@ -2925,6 +2925,35 @@ async function loadSavedNutritionEventIntoPage(eventId){
     throw new Error('لا توجد خامات محفوظة داخل هذه العليقة.');
   }
 
+  const savedEconomics = nutrition?.analysis?.economics || {};
+
+  const savedMilkKg = Number(
+    ctx.avgMilkKg ??
+    ctx.formulationTarget?.milkKg ??
+    nutrition?.analysis?.inputs?.avgMilkKgUsed ??
+    0
+  );
+
+  const savedMilkRevenue = Number(savedEconomics.milkRevenue);
+
+  const savedMilkPrice =
+    nutrition.milkPrice ??
+    ctx.milkPrice ??
+    nutrition?.analysis?.inputs?.milkPriceUsed ??
+    (
+      Number.isFinite(savedMilkRevenue) &&
+      savedMilkRevenue > 0 &&
+      Number.isFinite(savedMilkKg) &&
+      savedMilkKg > 0
+        ? Number((savedMilkRevenue / savedMilkKg).toFixed(2))
+        : null
+    );
+
+  if (Number.isFinite(Number(savedMilkPrice)) && Number(savedMilkPrice) > 0) {
+    nutrition.milkPrice = Number(savedMilkPrice);
+    ctx.milkPrice = Number(savedMilkPrice);
+  }
+
   window.mbkNutrition = window.mbkNutrition || {};
   window.mbkNutrition.loadedNutritionEvent = event;
   window.mbkNutrition.editNutritionEventId = eventId;
@@ -2938,12 +2967,18 @@ async function loadSavedNutritionEventIntoPage(eventId){
   if (isGroup) {
     window.mbkNutrition.groupContext = {
       ...(window.mbkNutrition.groupContext || {}),
-      ...ctx
+      ...ctx,
+      milkPrice: Number.isFinite(Number(savedMilkPrice)) && Number(savedMilkPrice) > 0
+        ? Number(savedMilkPrice)
+        : ctx.milkPrice
     };
   } else {
     window.mbkNutrition.loadedAnimalContext = {
       ...(window.mbkNutrition.loadedAnimalContext || {}),
-      ...ctx
+      ...ctx,
+      milkPrice: Number.isFinite(Number(savedMilkPrice)) && Number(savedMilkPrice) > 0
+        ? Number(savedMilkPrice)
+        : ctx.milkPrice
     };
   }
 
@@ -2957,7 +2992,15 @@ async function loadSavedNutritionEventIntoPage(eventId){
   setFieldValue('ctxPreg', ctx.pregnancyStatus);
   setFieldValue('ctxMilkFat', ctx.milkFatPct);
   setFieldValue('ctxMilkProtein', ctx.milkProteinPct);
-  setFieldValue('ctxMilkPrice', nutrition.milkPrice ?? ctx.milkPrice);
+
+  if (Number.isFinite(Number(savedMilkPrice)) && Number(savedMilkPrice) > 0) {
+    setFieldValue('ctxMilkPrice', Number(savedMilkPrice));
+    setFieldValue('milkPriceInput', Number(savedMilkPrice));
+  } else {
+    setFieldValue('ctxMilkPrice', nutrition.milkPrice ?? ctx.milkPrice);
+    setFieldValue('milkPriceInput', nutrition.milkPrice ?? ctx.milkPrice);
+  }
+
   setFieldValue('ctxBreed', ctx.breed);
   setFieldValue('ctxBodyWeight', ctx.bodyWeight ?? ctx.bodyWeightKg ?? ctx.groupBodyWeightKg);
   setFieldValue('ctxBCS', ctx.bcs ?? ctx.groupBcs);
@@ -2976,26 +3019,26 @@ async function loadSavedNutritionEventIntoPage(eventId){
       'عليقة محفوظة';
   }
 
-tbody.innerHTML = '';
-rationItems.length = 0;
-selectedRation.clear();
+  tbody.innerHTML = '';
+  rationItems.length = 0;
+  selectedRation.clear();
 
-rows.forEach(r => {
-  const item = normalizeSavedRationRowForUi(r);
-  if (item.name) rationItems.push(item);
-});
+  rows.forEach(r => {
+    const item = normalizeSavedRationRowForUi(r);
+    if (item.name) rationItems.push(item);
+  });
 
-showFeedUI();
+  showFeedUI();
 
-tbody.innerHTML = '';
-addEmptyRow();
+  tbody.innerHTML = '';
+  addEmptyRow();
 
-updateModeUI();
-updateCtxView();
-applyDryMilkVisibility();
-renderRationSummary();
-updateRationActionsUI();
-recalc();
+  updateModeUI();
+  updateCtxView();
+  applyDryMilkVisibility();
+  renderRationSummary();
+  updateRationActionsUI();
+  recalc();
 
   try { await refreshTargets(); } catch(e) {
     console.warn('saved ration refreshTargets failed:', e.message || e);
@@ -3008,7 +3051,6 @@ recalc();
   disableSave(false);
   showCentralMsg('✅ تم تحميل العليقة. عدّل ثم اضغط حفظ.', 'success');
 }
-
 async function initSavedNutritionRationsDropdown(){
   ensureSavedRationsDropdown();
 
