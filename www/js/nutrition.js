@@ -2712,14 +2712,356 @@ function addEmptyRow(){
   const cat  = (mode==='split') ? 'rough' : 'conc';
   addRow({ cat });
 }
+  function savedRationLabel(item = {}){
+  const parts = [];
+
+  if (item.groupName) parts.push(item.groupName);
+  if (item.stageLabel) parts.push(item.stageLabel);
+  if (item.species) parts.push(item.species);
+  if (item.eventDate) parts.push(item.eventDate);
+
+  return parts.filter(Boolean).join(' — ') || 'عليقة محفوظة';
+}
+
+async function fetchSavedNutritionEventsList(){
+  const { auth } = await import('/js/firebase-config.js');
+
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/events/list`, {
+    headers: {
+      'X-User-Id': uid
+    },
+    cache: 'no-store'
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+  }
+
+  return Array.isArray(data.events) ? data.events : [];
+}
+
+async function fetchNutritionEventForEdit(eventId){
+  const { auth } = await import('/js/firebase-config.js');
+
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('NO_AUTH');
+
+  const API_BASE = window.API_BASE || '';
+  const res = await fetch(`${API_BASE}/api/nutrition/event/${encodeURIComponent(eventId)}`, {
+    headers: {
+      'X-User-Id': uid
+    },
+    cache: 'no-store'
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+  }
+
+  return data.event || null;
+}
+
+function ensureSavedRationsDropdown(){
+  if (document.getElementById('savedNutritionRationsBox')) return;
+
+  const anchor =
+    document.getElementById('feedInputBox') ||
+    document.getElementById('nutritionAnalysisCard') ||
+    document.getElementById('tbl') ||
+    document.querySelector('.card') ||
+    document.body;
+
+  const box = document.createElement('div');
+  box.id = 'savedNutritionRationsBox';
+  box.className = 'mbk-card card';
+  box.style.cssText = `
+    margin:10px 0;
+    padding:12px;
+    border:1px solid #dfe9e2;
+    border-radius:16px;
+    background:#ffffff;
+  `;
+
+  box.innerHTML = `
+    <div style="font-weight:950;color:#123d2a;margin-bottom:8px">
+      تحميل عليقة محفوظة للتعديل
+    </div>
+    <select id="savedNutritionRationsSelect" style="
+      width:100%;
+      min-height:42px;
+      border:1px solid #d6e3da;
+      border-radius:12px;
+      padding:8px 10px;
+      font-weight:850;
+      background:#fff;
+      color:#0f172a;
+    ">
+      <option value="">جارٍ تحميل العلائق...</option>
+    </select>
+    <div id="savedNutritionRationsHint" style="
+      margin-top:7px;
+      font-size:12px;
+      font-weight:800;
+      color:#64748b;
+      line-height:1.6;
+    ">
+      اختر عليقة محفوظة لفتحها داخل نفس الصفحة ثم عدّل واحفظ.
+    </div>
+  `;
+
+  anchor.parentNode.insertBefore(box, anchor);
+}
+
+function setFieldValue(id, value){
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  if (value === null || value === undefined) return;
+
+  if (el.type === 'checkbox') {
+    el.checked = !!value;
+    el.value = value ? '1' : '';
+    return;
+  }
+
+  el.value = value;
+}
+
+function normalizeSavedRationRowForUi(r = {}){
+  return {
+    id: r.id || r.feedId || null,
+    feedId: r.feedId || r.id || null,
+
+    name: r.name || r.nameAr || r.feedName || '',
+    nameAr: r.nameAr || r.name || r.feedName || '',
+
+    cat: r.cat || r.category || 'conc',
+
+    dm: r.dm ?? r.dmPct ?? '',
+    dmPct: r.dmPct ?? r.dm ?? '',
+
+    cp: r.cp ?? r.cpPct ?? '',
+    cpPct: r.cpPct ?? r.cp ?? '',
+
+    kg: r.kg ?? r.asFedKg ?? r.amount ?? '',
+    asFedKg: r.asFedKg ?? r.kg ?? r.amount ?? '',
+
+    pct: r.pct ?? '',
+
+    price:
+      r.price ??
+      r.pTon ??
+      r.pTonRaw ??
+      r.pricePerTon ??
+      '',
+
+    pTon:
+      r.pTon ??
+      r.price ??
+      r.pTonRaw ??
+      r.pricePerTon ??
+      '',
+
+    pTonRaw:
+      r.pTonRaw ??
+      r.pTon ??
+      r.price ??
+      r.pricePerTon ??
+      '',
+
+    pricePerTon:
+      r.pricePerTon ??
+      r.pTonRaw ??
+      r.pTon ??
+      r.price ??
+      '',
+
+    pricePerTonDM: r.pricePerTonDM ?? r.pTonDM ?? '',
+    pTonDM: r.pTonDM ?? r.pricePerTonDM ?? '',
+
+    nel: r.nel ?? r.nelMcalPerKgDM ?? null,
+    nelMcalPerKgDM: r.nelMcalPerKgDM ?? r.nel ?? null,
+
+    mp: r.mp ?? r.mpGPerKgDM ?? null,
+    mpGPerKgDM: r.mpGPerKgDM ?? r.mp ?? null,
+
+    ndf: r.ndf ?? r.ndfPct ?? null,
+    ndfPct: r.ndfPct ?? r.ndf ?? null,
+
+    fat: r.fat ?? r.fatPct ?? r.crudeFatPct ?? null,
+    fatPct: r.fatPct ?? r.fat ?? r.crudeFatPct ?? null,
+    crudeFatPct: r.crudeFatPct ?? r.fatPct ?? r.fat ?? null,
+
+    starch: r.starch ?? r.starchPct ?? null,
+    starchPct: r.starchPct ?? r.starch ?? null
+  };
+}
+
+async function loadSavedNutritionEventIntoPage(eventId){
+  if (!eventId) return;
+
+  showCentralMsg('⏳ جارٍ تحميل العليقة المحفوظة...', 'info');
+
+  const event = await fetchNutritionEventForEdit(eventId);
+  const nutrition = event?.nutrition || {};
+  const ctx = nutrition.context || {};
+  const rows = Array.isArray(nutrition.rows) ? nutrition.rows : [];
+
+  if (!rows.length) {
+    throw new Error('لا توجد خامات محفوظة داخل هذه العليقة.');
+  }
+
+  window.mbkNutrition = window.mbkNutrition || {};
+  window.mbkNutrition.loadedNutritionEvent = event;
+  window.mbkNutrition.editNutritionEventId = eventId;
+
+  const isGroup =
+    event?.type === 'nutrition_group' ||
+    event?.eventTypeNorm === 'nutrition_group' ||
+    ctx.groupMode === 'group' ||
+    Number(ctx.headCount || 0) > 1;
+
+  if (isGroup) {
+    window.mbkNutrition.groupContext = {
+      ...(window.mbkNutrition.groupContext || {}),
+      ...ctx
+    };
+  } else {
+    window.mbkNutrition.loadedAnimalContext = {
+      ...(window.mbkNutrition.loadedAnimalContext || {}),
+      ...ctx
+    };
+  }
+
+  setFieldValue('mode', nutrition.mode || 'tmr_asfed');
+  setFieldValue('concKgInput', nutrition.concKg ?? '');
+
+  setFieldValue('ctxSpecies', ctx.species);
+  setFieldValue('ctxDIM', ctx.daysInMilk);
+  setFieldValue('ctxAvgMilk', ctx.avgMilkKg);
+  setFieldValue('ctxDCC', ctx.pregnancyDays);
+  setFieldValue('ctxPreg', ctx.pregnancyStatus);
+  setFieldValue('ctxMilkFat', ctx.milkFatPct);
+  setFieldValue('ctxMilkProtein', ctx.milkProteinPct);
+  setFieldValue('ctxMilkPrice', nutrition.milkPrice ?? ctx.milkPrice);
+  setFieldValue('ctxBreed', ctx.breed);
+  setFieldValue('ctxBodyWeight', ctx.bodyWeight ?? ctx.bodyWeightKg ?? ctx.groupBodyWeightKg);
+  setFieldValue('ctxBCS', ctx.bcs ?? ctx.groupBcs);
+  setFieldValue('ctxParity', ctx.parity ?? ctx.lactationNumber);
+  setFieldValue('ctxDietNDFPct', ctx.dietNDFPct);
+  setFieldValue('ctxEarlyDry', !!ctx.earlyDry);
+  setFieldValue('ctxCloseUp', !!ctx.closeUp);
+
+  const animalInfo = document.getElementById('animalInfo');
+  if (animalInfo) {
+    animalInfo.textContent =
+      ctx.groupName ||
+      ctx.group ||
+      ctx.groupLabel ||
+      event.animalNumber ||
+      'عليقة محفوظة';
+  }
+
+  tbody.innerHTML = '';
+  rationItems.length = 0;
+  selectedRation.clear();
+
+  rows.forEach(r => {
+    const item = normalizeSavedRationRowForUi(r);
+    if (item.name) rationItems.push(item);
+  });
+
+  addEmptyRow();
+
+  updateModeUI();
+  updateCtxView();
+  applyDryMilkVisibility();
+  renderRationSummary();
+  recalc();
+
+  try { await refreshTargets(); } catch(e) {
+    console.warn('saved ration refreshTargets failed:', e.message || e);
+  }
+
+  try { await refreshRationAnalysis(rationItems); } catch(e) {
+    console.warn('saved ration refreshRationAnalysis failed:', e.message || e);
+  }
+
+  disableSave(false);
+  showCentralMsg('✅ تم تحميل العليقة. عدّل ثم اضغط حفظ.', 'success');
+}
+
+async function initSavedNutritionRationsDropdown(){
+  ensureSavedRationsDropdown();
+
+  const sel = document.getElementById('savedNutritionRationsSelect');
+  const hint = document.getElementById('savedNutritionRationsHint');
+
+  if (!sel || sel.dataset.bound === '1') return;
+
+  sel.dataset.bound = '1';
+
+  try {
+    const list = await fetchSavedNutritionEventsList();
+
+    sel.innerHTML = '<option value="">— اختر عليقة محفوظة —</option>';
+
+    list.forEach(item => {
+      const o = document.createElement('option');
+      o.value = item.id;
+      o.textContent = savedRationLabel(item);
+      sel.appendChild(o);
+    });
+
+    if (hint) {
+      hint.textContent = list.length
+        ? `تم العثور على ${list.length} عليقة محفوظة.`
+        : 'لا توجد علائق محفوظة حتى الآن.';
+    }
+
+    sel.disabled = !list.length;
+
+  } catch (e) {
+    console.error(e);
+    sel.innerHTML = '<option value="">تعذر تحميل العلائق</option>';
+    sel.disabled = true;
+    if (hint) hint.textContent = e.message || 'تعذر تحميل العلائق المحفوظة.';
+  }
+
+  sel.addEventListener('change', async () => {
+    const id = String(sel.value || '').trim();
+    if (!id) return;
+
+    try {
+      await loadSavedNutritionEventIntoPage(id);
+    } catch (e) {
+      console.error(e);
+      showCentralMsg('⚠️ تعذر تحميل العليقة المحفوظة.', 'error');
+    }
+  });
+}
   // init
   ensureEditableForMode();
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
   loadSpeciesFromAnimals();
- loadFeedLibrary()
-  .then(()=>{ 
-    try{ filterFeeds(); }catch(e){} 
+loadFeedLibrary()
+  .then(async ()=>{ 
+    try{ filterFeeds(); }catch(e){}
+
+    try {
+      await initSavedNutritionRationsDropdown();
+    } catch(e) {
+      console.error(e);
+    }
   })
   .catch(err=>{
     console.error(err);
