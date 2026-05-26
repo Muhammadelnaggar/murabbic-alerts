@@ -3731,7 +3731,39 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     note: note || '—'
   });
 }
+function reportIofcStatusSrv(pct){
+  const n = Number(pct);
+  if (!Number.isFinite(n)) return 'muted';
+  if (n > 40) return 'good';
+  if (n >= 35) return 'warn';
+  return 'danger';
+}
 
+function reportIofcReadSrv(pct){
+  const n = Number(pct);
+  if (!Number.isFinite(n)) return 'غير مكتمل';
+  if (n > 40) return 'ممتاز';
+  if (n >= 35) return 'متابعة';
+  return 'يحتاج مراجعة';
+}
+
+function reportIofcNoteSrv(pct){
+  const n = Number(pct);
+
+  if (!Number.isFinite(n)) {
+    return 'أكمل سعر اللبن وتكلفة الخامات حتى يظهر هامش اللبن بعد العلف.';
+  }
+
+  if (n > 40) {
+    return 'هامش اللبن بعد العلف ممتاز، ويترك مساحة جيدة لتغطية باقي مصروفات المزرعة وتحقيق الربح.';
+  }
+
+  if (n >= 35) {
+    return 'هامش اللبن بعد العلف مقبول لكنه يحتاج متابعة أسعار الخامات وسعر اللبن والإنتاج.';
+  }
+
+  return 'هامش اللبن بعد العلف منخفض؛ راجع تكلفة العلف أو إنتاج اللبن قبل اعتماد العليقة.';
+}
 function mineralReportRowsSrv(balance = {}, unit = 'g'){
   const names = {
     ca: 'كالسيوم',
@@ -3817,11 +3849,9 @@ function reportRowPriorityWeightSrv(r = {}){
 
   // الهامش والاقتصاد لهم أولوية في قراءة التقرير العلوية
   if (section === 'الاقتصاد') w += 220;
-  if (key.includes('milk_margin')) w += 260;
-  if (key.includes('iofc')) w += 240;
-  if (key.includes('feed_cost')) w += 220;
-  if (key.includes('cost_kg_milk')) w += 180;
-
+  if (key === 'iofc') w += 300;
+  if (key === 'feed_cost_daily') w += 180;
+  if (key === 'milk_revenue') w += 120;
   // صحة الكرش ثم الطاقة والبروتين
   if (section === 'صحة الكرش') w += 170;
   if (key === 'nel') w += 150;
@@ -3855,8 +3885,8 @@ function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
 
   if (!main) {
     return cleanObj({
-      title: 'قراءة مُرَبِّيك جاهزة من السيرفر.',
-      action: 'راجع صفوف التقرير الجاهزة من السيرفر.',
+      title: 'قراءة مُرَبِّيك غير مكتملة.',
+      action: 'راجع بيانات العليقة واللبن والتكلفة قبل اعتماد التقرير.',
       status: 'muted',
       statusText: reportStatusTextSrv('muted')
     });
@@ -4054,50 +4084,35 @@ const iofcPctSrv = ecoReport.iofcPctOfMilkIncome;
 
 rows.push(reportRowSrv(
   'الاقتصاد',
-  'cost_kg_milk',
-  'تكلفة كجم اللبن',
-  'قراءة اقتصادية',
-  fmtSrv(costPerKgMilkSrv, 2, 'جنيه/كجم'),
-  '—',
-  'muted',
-  'لا تُقرأ وحدها؛ القرار من الهامش وصحة العليقة.'
+  'milk_revenue',
+  'دخل اللبن اليومي',
+  'مدخل الحساب',
+  fmtSrv(milkRevenueSrv, 2, 'جنيه/رأس/يوم'),
+  '100% من دخل اللبن',
+  finiteSrv(milkRevenueSrv) ? 'muted' : 'warn',
+  'دخل اللبن اليومي هو أساس حساب هامش اللبن بعد العلف.'
 ));
 
 rows.push(reportRowSrv(
   'الاقتصاد',
-  'milk_margin',
-  'هامش لبن - علف',
-  'هامش موجب',
+  'feed_cost_daily',
+  'تكلفة العلف اليومية',
+  'مدخل الحساب',
+  fmtSrv(feedCostSrv, 2, 'جنيه/رأس/يوم'),
+  finiteSrv(feedCostPctSrv) ? `${Number(feedCostPctSrv).toFixed(1)}% من دخل اللبن` : '—',
+  finiteSrv(feedCostPctSrv) && Number(feedCostPctSrv) > 50 ? 'warn' : (finiteSrv(feedCostPctSrv) ? 'muted' : 'warn'),
+  'تكلفة العلف اليومية هي البند المخصوم من دخل اللبن لحساب IOFC.'
+));
+
+rows.push(reportRowSrv(
+  'الاقتصاد',
+  'iofc',
+  'IOFC — هامش اللبن بعد العلف',
+  'مؤشر الربحية',
   fmtSrv(milkMarginSrv, 2, 'جنيه/رأس/يوم'),
-  '—',
-  finiteSrv(milkMarginSrv) && Number(milkMarginSrv) < 0 ? 'danger' : (finiteSrv(milkMarginSrv) ? 'good' : 'muted'),
-  'قرار الاقتصاد مجهز من السيرفر.'
-));
-
-rows.push(reportRowSrv(
-  'الاقتصاد',
-  'feed_cost_income',
-  'تكلفة العلف من دخل اللبن',
-  'قراءة اقتصادية',
-  fmtSrv(feedCostPctSrv, 1, '%'),
-  '—',
-  finiteSrv(feedCostPctSrv)
-    ? (Number(feedCostPctSrv) <= 40 ? 'good' : (Number(feedCostPctSrv) <= 60 ? 'warn' : 'danger'))
-    : 'muted',
-  'قرار تكلفة العلف من دخل اللبن مجهز من السيرفر.'
-));
-
-rows.push(reportRowSrv(
-  'الاقتصاد',
-  'iofc_income',
-  'IOFC من دخل اللبن',
-  'قراءة اقتصادية',
-  fmtSrv(iofcPctSrv, 1, '%'),
-  '—',
-  finiteSrv(iofcPctSrv)
-    ? (Number(iofcPctSrv) >= 60 ? 'good' : (Number(iofcPctSrv) >= 40 ? 'warn' : 'danger'))
-    : 'muted',
-  'قرار IOFC مجهز من السيرفر.'
+  finiteSrv(iofcPctSrv) ? `${Number(iofcPctSrv).toFixed(1)}% من دخل اللبن` : '—',
+  reportIofcStatusSrv(iofcPctSrv),
+  `${reportIofcReadSrv(iofcPctSrv)} — ${reportIofcNoteSrv(iofcPctSrv)}`
 ));
   return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
 }
