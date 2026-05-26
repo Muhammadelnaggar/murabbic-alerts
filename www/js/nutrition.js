@@ -2735,10 +2735,19 @@ async function fetchSavedNutritionEventsList(){
   if (!uid) throw new Error('NO_AUTH');
 
   const API_BASE = window.API_BASE || '';
-
   const p = qp();
 
-  const currentAnimalNumber = String(
+  const mode = String(p.get('mbkMode') || '').trim().toLowerCase();
+  const nums = parseNumbersList();
+
+  const isGroup =
+    mode === 'group' ||
+    nums.length > 1 ||
+    !!window.mbkNutrition?.groupContext?.groupName ||
+    !!window.mbkNutrition?.groupContext?.group ||
+    !!window.mbkNutrition?.groupContext?.groupLabel;
+
+  const animalNumber = String(
     window.mbkNutrition?.loadedAnimalContext?.animalNumber ||
     p.get('animalNumber') ||
     p.get('number') ||
@@ -2746,7 +2755,7 @@ async function fetchSavedNutritionEventsList(){
     ''
   ).trim();
 
-  const currentGroupName = String(
+  const groupName = String(
     window.mbkNutrition?.groupContext?.groupName ||
     window.mbkNutrition?.groupContext?.group ||
     window.mbkNutrition?.groupContext?.groupLabel ||
@@ -2755,7 +2764,7 @@ async function fetchSavedNutritionEventsList(){
     ''
   ).trim();
 
-  const currentStage = String(
+  const stage = String(
     window.mbkNutrition?.groupContext?.groupType ||
     p.get('groupType') ||
     p.get('stage') ||
@@ -2764,21 +2773,25 @@ async function fetchSavedNutritionEventsList(){
 
   const params = new URLSearchParams();
 
-  if (currentAnimalNumber) {
-    params.set('animalNumber', currentAnimalNumber);
-  } else if (currentGroupName) {
-    params.set('groupName', currentGroupName);
+  if (isGroup) {
+    if (!groupName) {
+      throw new Error('لم يتم تحديد المجموعة بعد.');
+    }
+
+    params.set('groupName', groupName);
+  } else {
+    if (!animalNumber) {
+      throw new Error('لم يتم تحديد رقم الحيوان بعد.');
+    }
+
+    params.set('animalNumber', animalNumber);
   }
 
-  if (currentStage) {
-    params.set('stage', currentStage);
+  if (stage) {
+    params.set('stage', stage);
   }
 
-  const url =
-    `${API_BASE}/api/nutrition/events/list` +
-    (params.toString() ? `?${params.toString()}` : '');
-
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}/api/nutrition/events/list?${params.toString()}`, {
     headers: {
       'X-User-Id': uid
     },
@@ -2791,9 +2804,15 @@ async function fetchSavedNutritionEventsList(){
     throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
   }
 
-  return Array.isArray(data.events) ? data.events : [];
+  const seen = new Set();
+  return (Array.isArray(data.events) ? data.events : []).filter(item => {
+    const id = String(item?.id || '').trim();
+    if (!id) return false;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
-
 async function fetchNutritionEventForEdit(eventId){
   const { auth } = await import('/js/firebase-config.js');
 
@@ -3163,6 +3182,12 @@ try {
 loadFeedLibrary()
   .then(async ()=>{ 
     try{ filterFeeds(); }catch(e){}
+
+    try {
+      await loadCtxAuto();
+    } catch(e) {
+      console.error(e);
+    }
 
     try {
       await initSavedNutritionRationsDropdown();
@@ -4786,14 +4811,13 @@ const formIdEl   = document.getElementById('animalId');
       msgWarn('⚠️ يلزم تسجيل الدخول أولاً.');
       return;
     }
-    Promise.resolve(loadCtxAuto())
-      .then(() => refreshTargets())
-      .then(() => initNutritionUI())
-      .catch(err => {
-        console.error(err);
-        disableSave(true);
-        showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
-      });
+Promise.resolve()
+  .then(() => refreshTargets())
+  .then(() => initNutritionUI())
+  .catch(err => {
+    console.error(err);
+    disableSave(true);
+    showCentralMsg('⚠️ تعذر تهيئة صفحة التغذية.', 'error');
   });
 }catch(e){
     console.error(e);
