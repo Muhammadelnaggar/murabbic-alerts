@@ -2714,13 +2714,14 @@ function addEmptyRow(){
 }
 function savedRationLabel(item = {}){
   const species = String(item.species || '').trim();
-  const stage = String(item.stageLabel || '').trim();
   const group = String(item.groupName || '').trim();
   const date = String(item.eventDate || '').trim();
 
-  const typeStage = [species, stage].filter(Boolean).join(' ');
+  const label = [species, group]
+    .filter(Boolean)
+    .join(' ');
 
-  return [typeStage, group, date]
+  return [label, date]
     .filter(Boolean)
     .join(' / ') || 'عليقة محفوظة';
 }
