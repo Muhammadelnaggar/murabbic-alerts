@@ -2713,21 +2713,17 @@ function addEmptyRow(){
   addRow({ cat });
 }
 function savedRationLabel(item = {}){
-  const parts = [];
+  const species = String(item.species || '').trim();
+  const stage = String(item.stageLabel || '').trim();
+  const group = String(item.groupName || '').trim();
+  const date = String(item.eventDate || '').trim();
 
-  if (item.groupName) parts.push(item.groupName);
-  if (item.stageLabel) parts.push(item.stageLabel);
-  if (item.species) parts.push(item.species);
-  if (item.eventDate) parts.push(item.eventDate);
+  const typeStage = [species, stage].filter(Boolean).join(' ');
 
-  const milkPrice = Number(item.milkPrice);
-  if (Number.isFinite(milkPrice) && milkPrice > 0) {
-    parts.push(`سعر اللبن ${milkPrice}`);
-  }
-
-  return parts.filter(Boolean).join(' — ') || 'عليقة محفوظة';
+  return [typeStage, group, date]
+    .filter(Boolean)
+    .join(' / ') || 'عليقة محفوظة';
 }
-
 async function fetchSavedNutritionEventsList(){
   const { auth } = await import('/js/firebase-config.js');
 
