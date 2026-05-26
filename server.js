@@ -373,20 +373,77 @@ app.get('/api/weather/thi', async (req, res) => {
       });
     }
 
-    const lat = Number(req.query.lat || WEATHER_DEFAULT_LAT);
-    const lon = Number(req.query.lon || WEATHER_DEFAULT_LON);
+    let lat = Number(req.query.lat);
+    let lon = Number(req.query.lon);
 
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,relative_humidity_2m&timezone=auto`;
-
-    const r = await fetch(url, { cache: 'no-store' });
-
-    if (!r.ok) {
-      throw new Error(`open_meteo_${r.status}`);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      lat = WEATHER_DEFAULT_LAT;
     }
 
-    const j = await r.json();
+    if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+      lon = WEATHER_DEFAULT_LON;
+    }
+
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}` +
+      `&longitude=${encodeURIComponent(lon)}` +
+      `&current=temperature_2m,relative_humidity_2m&timezone=auto`;
+
+    let r = null;
+    let j = null;
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4500);
+
+      r = await fetch(url, {
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Murabbik/1.0'
+        }
+      });
+
+      clearTimeout(timer);
+
+      if (!r.ok) {
+        throw new Error(`open_meteo_${r.status}`);
+      }
+
+      j = await r.json();
+    } catch (e) {
+      console.warn('weather.thi upstream failed:', e.message || e);
+
+      if (weatherThiCache.data) {
+        return res.json({
+          ok: true,
+          cached: true,
+          stale: true,
+          warning: 'weather_upstream_failed',
+          ...weatherThiCache.data
+        });
+      }
+
+      return res.json({
+        ok: true,
+        cached: false,
+        fallback: true,
+        warning: 'weather_unavailable',
+        tempC: null,
+        humidity: null,
+        thi: null,
+        status: {
+          level: 'unknown',
+          label: 'غير متاح',
+          severity: 0
+        },
+        source: 'weather-fallback',
+        lat,
+        lon,
+        updatedAt: new Date().toISOString()
+      });
+    }
 
     const tempC = Number(j?.current?.temperature_2m);
     const humidity = Number(j?.current?.relative_humidity_2m);
@@ -414,13 +471,27 @@ app.get('/api/weather/thi', async (req, res) => {
       cached: false,
       ...data
     });
-  } catch (e) {
-    console.error('weather.thi error:', e.message || e);
 
-    return res.status(500).json({
-      ok: false,
-      error: 'weather_thi_failed',
-      message: e.message || String(e)
+  } catch (e) {
+    console.error('weather.thi fatal error:', e.message || e);
+
+    return res.json({
+      ok: true,
+      cached: false,
+      fallback: true,
+      warning: 'weather_route_failed',
+      tempC: null,
+      humidity: null,
+      thi: null,
+      status: {
+        level: 'unknown',
+        label: 'غير متاح',
+        severity: 0
+      },
+      source: 'weather-fallback',
+      lat: WEATHER_DEFAULT_LAT,
+      lon: WEATHER_DEFAULT_LON,
+      updatedAt: new Date().toISOString()
     });
   }
 });
