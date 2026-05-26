@@ -3718,7 +3718,7 @@ function reportStatusTextSrv(status = ''){
   return 'معلومة';
 }
 
-function reportRowSrv(section, key, label, targetText, actualText, balanceText, status, note){
+function reportRowSrv(section, key, label, targetText, actualText, balanceText, status, note, statusTextOverride = null){
   return cleanObj({
     section,
     key,
@@ -3727,7 +3727,7 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     actualText: actualText || '—',
     balanceText: balanceText || '—',
     status: status || 'muted',
-    statusText: reportStatusTextSrv(status),
+    statusText: statusTextOverride || reportStatusTextSrv(status),
     note: note || '—'
   });
 }
@@ -4090,7 +4090,8 @@ rows.push(reportRowSrv(
   fmtSrv(milkRevenueSrv, 2, 'جنيه/رأس/يوم'),
   '100% من دخل اللبن',
   finiteSrv(milkRevenueSrv) ? 'muted' : 'warn',
-  'دخل اللبن اليومي هو أساس حساب هامش اللبن بعد العلف.'
+  'دخل اللبن اليومي هو أساس حساب هامش اللبن بعد العلف.',
+  finiteSrv(milkRevenueSrv) ? 'أساس الحساب' : 'غير مكتمل'
 ));
 
 rows.push(reportRowSrv(
@@ -4101,7 +4102,8 @@ rows.push(reportRowSrv(
   fmtSrv(feedCostSrv, 2, 'جنيه/رأس/يوم'),
   finiteSrv(feedCostPctSrv) ? `${Number(feedCostPctSrv).toFixed(1)}% من دخل اللبن` : '—',
   finiteSrv(feedCostPctSrv) && Number(feedCostPctSrv) > 50 ? 'warn' : (finiteSrv(feedCostPctSrv) ? 'muted' : 'warn'),
-  'تكلفة العلف اليومية هي البند المخصوم من دخل اللبن لحساب IOFC.'
+  'تكلفة العلف اليومية هي البند المخصوم من دخل اللبن لحساب IOFC.',
+  finiteSrv(feedCostPctSrv) ? 'مدخل حساب' : 'غير مكتمل'
 ));
 
 rows.push(reportRowSrv(
@@ -4112,7 +4114,8 @@ rows.push(reportRowSrv(
   fmtSrv(milkMarginSrv, 2, 'جنيه/رأس/يوم'),
   finiteSrv(iofcPctSrv) ? `${Number(iofcPctSrv).toFixed(1)}% من دخل اللبن` : '—',
   reportIofcStatusSrv(iofcPctSrv),
-  `${reportIofcReadSrv(iofcPctSrv)} — ${reportIofcNoteSrv(iofcPctSrv)}`
+  reportIofcNoteSrv(iofcPctSrv),
+  reportIofcReadSrv(iofcPctSrv)
 ));
   return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
 }
