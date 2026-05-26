@@ -632,6 +632,7 @@ targets: {
     },
              inputs: {
       bodyWeightKgUsed: toNumOrNull(a?.inputs?.bodyWeightKgUsed),
+      milkPriceUsed: toNumOrNull(a?.inputs?.milkPriceUsed),
       bodyWeightSource: a?.inputs?.bodyWeightSource || null,
       bcsSource: a?.inputs?.bcsSource || null,
       representativeWarning: a?.inputs?.representativeWarning || null,
@@ -1793,6 +1794,7 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
     },
              inputs: {
       bodyWeightKgUsed: runtimeCtx.bodyWeightKgUsed,
+      milkPriceUsed: milkPriceNum > 0 ? milkPriceNum : null,
       bodyWeightSource: runtimeCtx.bodyWeightSource,
       bcsSource: runtimeCtx.bcsSource,
       representativeWarning: runtimeCtx.representativeWarning,
@@ -4297,7 +4299,48 @@ app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
         error: 'not_nutrition_event'
       });
     }
+const n = event.nutrition || {};
+const ctx = n.context || {};
+const ec = n.analysis?.economics || {};
 
+const milkKgForPrice = Number(
+  ctx.avgMilkKg ??
+  ctx.formulationTarget?.milkKg ??
+  0
+);
+
+const milkRevenueForPrice = Number(ec.milkRevenue);
+
+const resolvedMilkPrice =
+  n.milkPrice ??
+  ctx.milkPrice ??
+  n.analysis?.inputs?.milkPriceUsed ??
+  (
+    Number.isFinite(milkRevenueForPrice) &&
+    milkRevenueForPrice > 0 &&
+    Number.isFinite(milkKgForPrice) &&
+    milkKgForPrice > 0
+      ? Math.round((milkRevenueForPrice / milkKgForPrice) * 100) / 100
+      : null
+  );
+
+if (Number.isFinite(Number(resolvedMilkPrice)) && Number(resolvedMilkPrice) > 0) {
+  event.nutrition = {
+    ...n,
+    milkPrice: Number(resolvedMilkPrice),
+    context: {
+      ...ctx,
+      milkPrice: Number(resolvedMilkPrice)
+    },
+    analysis: {
+      ...(n.analysis || {}),
+      inputs: {
+        ...(n.analysis?.inputs || {}),
+        milkPriceUsed: Number(resolvedMilkPrice)
+      }
+    }
+  };
+}
     return res.json({
       ok: true,
       event
