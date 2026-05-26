@@ -4109,79 +4109,7 @@ function buildAllNutritionReport(events = []) {
    events: reportEvents
   });
 }
-app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        error: 'firestore_disabled'
-      });
-    }
 
-    const tenant = req.userId;
-    const id = String(req.params.id || '').trim();
-
-    if (!id) {
-      return res.status(400).json({
-        ok: false,
-        error: 'event_id_required'
-      });
-    }
-
-    const snap = await db.collection('events').doc(id).get();
-
-    if (!snap.exists) {
-      return res.status(404).json({
-        ok: false,
-        error: 'nutrition_event_not_found'
-      });
-    }
-
-    const event = {
-      id: snap.id,
-      ...(snap.data() || {})
-    };
-
-    const owner = String(event.userId || event.ownerUid || '').trim();
-
-    if (owner !== tenant) {
-      return res.status(403).json({
-        ok: false,
-        error: 'forbidden'
-      });
-    }
-
-    const typeText = String(
-      event.eventTypeNorm ||
-      event.type ||
-      event.eventType ||
-      ''
-    ).toLowerCase();
-
-    if (
-      !typeText.includes('nutrition') &&
-      !String(event.eventType || '').includes('تغذية')
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: 'not_nutrition_event'
-      });
-    }
-
-    return res.json({
-      ok: true,
-      event
-    });
-
-  } catch (e) {
-    console.error('nutrition.event.load error:', e);
-    return res.status(500).json({
-      ok: false,
-      error: 'nutrition_event_load_failed',
-      message: e.message || String(e)
-    });
-  }
-});
 // ============================================================
 //        API: NUTRITION SAVED RATIONS LIST + LOAD ONE
 // ============================================================
@@ -4189,51 +4117,99 @@ app.get('/api/nutrition/events/list', requireUserId, async (req, res) => {
   try {
     const tenant = req.userId;
 
-    const events = await fetchNutritionReportEvents(tenant);
-    const filtered = filterNutritionReportEvents(events, {
-      type: String(req.query.type || '').trim(),
-      stage: String(req.query.stage || '').trim(),
-      groupName: String(req.query.groupName || req.query.group || '').trim()
-    });
+    const byId = new Map();
 
-    const list = filtered
-      .filter(e => e?.nutrition?.rows && Array.isArray(e.nutrition.rows))
-      .slice(0, 80)
-      .map(e => {
-        const ctx = e?.nutrition?.context || {};
-        const stage = nutritionStageFromEvent(e);
-        const name =
-          nutritionGroupNameFromEvent(e) ||
-          ctx.groupName ||
-          ctx.group ||
-          ctx.groupLabel ||
-          e.animalNumber ||
-          'عليقة محفوظة';
+    async function pull(field) {
+      if (!db) return;
 
-        const speciesKey = nutritionSpeciesKeyFromEvent(e);
-        const speciesLabel =
-          speciesKey === 'buffalo' ? 'جاموس' :
-          speciesKey === 'cows' ? 'أبقار' :
-          String(ctx.species || '');
+      const snap = await db.collection('events')
+        .where(field, '==', tenant)
+        .limit(120)
+        .get();
 
-        const stageLabel =
-          stage === 'lactating' ? 'حلاب' :
-          stage === 'far_dry' ? 'جاف بعيد' :
-          stage === 'close_up' ? 'انتظار ولادة' :
-          'غير محدد';
-
-        return cleanObj({
-          id: e.id,
-          groupName: name,
-          eventDate: e.eventDate || e.date || null,
-          species: speciesLabel || null,
-          stage,
-          stageLabel,
-          headCount: e.groupSize || ctx.headCount || null,
-          avgMilkKg: ctx.avgMilkKg ?? ctx.formulationTarget?.milkKg ?? null,
-          createdAtMs: eventCreatedMs(e)
-        });
+      snap.forEach(d => {
+        const e = { id: d.id, ...(d.data() || {}) };
+        if (isNutritionSavedEvent(e)) byId.set(d.id, e);
       });
+    }
+
+    if (db) {
+      await pull('ownerUid');
+      await pull('userId');
+    } else {
+      readJson(eventsPath, [])
+        .filter(e => belongs(e, tenant) || tenantKey(e.ownerUid) === tenantKey(tenant))
+        .filter(isNutritionSavedEvent)
+        .forEach(e => {
+          if (e.id) byId.set(String(e.id), e);
+        });
+    }
+
+    const events = [...byId.values()]
+      .filter(e => Array.isArray(e?.nutrition?.rows) && e.nutrition.rows.length)
+      .sort((a, b) => eventCreatedMs(b) - eventCreatedMs(a))
+      .slice(0, 80);
+
+    const list = events.map(e => {
+      const n = e.nutrition || {};
+      const ctx = n.context || {};
+      const ec = n.analysis?.economics || {};
+      const stage = nutritionStageFromEvent(e);
+
+      const name =
+        nutritionGroupNameFromEvent(e) ||
+        ctx.groupName ||
+        ctx.group ||
+        ctx.groupLabel ||
+        e.animalNumber ||
+        'عليقة محفوظة';
+
+      const speciesKey = nutritionSpeciesKeyFromEvent(e);
+      const speciesLabel =
+        speciesKey === 'buffalo' ? 'جاموس' :
+        speciesKey === 'cows' ? 'أبقار' :
+        String(ctx.species || '');
+
+      const stageLabel =
+        stage === 'lactating' ? 'حلاب' :
+        stage === 'far_dry' ? 'جاف بعيد' :
+        stage === 'close_up' ? 'انتظار ولادة' :
+        'غير محدد';
+
+      const avgMilkKg = toNumOrNull(
+        ctx.avgMilkKg ??
+        ctx.formulationTarget?.milkKg
+      );
+
+      const milkRevenue = toNumOrNull(ec.milkRevenue);
+
+      const milkPrice = toNumOrNull(
+        n.milkPrice ??
+        ctx.milkPrice ??
+        n.analysis?.inputs?.milkPriceUsed ??
+        (
+          Number.isFinite(Number(milkRevenue)) &&
+          Number(milkRevenue) > 0 &&
+          Number.isFinite(Number(avgMilkKg)) &&
+          Number(avgMilkKg) > 0
+            ? Math.round((Number(milkRevenue) / Number(avgMilkKg)) * 100) / 100
+            : null
+        )
+      );
+
+      return cleanObj({
+        id: e.id,
+        groupName: name,
+        eventDate: e.eventDate || e.date || null,
+        species: speciesLabel || null,
+        stage,
+        stageLabel,
+        headCount: e.groupSize || ctx.headCount || null,
+        avgMilkKg,
+        milkPrice,
+        createdAtMs: eventCreatedMs(e)
+      });
+    });
 
     return res.json({
       ok: true,
@@ -4250,7 +4226,6 @@ app.get('/api/nutrition/events/list', requireUserId, async (req, res) => {
     });
   }
 });
-
 app.get('/api/nutrition/event/:id', requireUserId, async (req, res) => {
   try {
     if (!db) {
