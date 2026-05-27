@@ -2454,7 +2454,24 @@ const ndfState =
     fatHigh
       ? 'مربيك: دهن العليقة أعلى من الحد؛ قد يقلل هضم الألياف ويضغط على دهن اللبن.'
       : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
-    if (isBuffalo) {
+  const isDryOrCloseUpDm =
+  !!contextForTargets?.earlyDry ||
+  !!contextForTargets?.closeUp ||
+  /جاف|dry|انتظار|تحضير|close/i.test(String(contextForTargets?.pregnancyStatus || ''));
+
+if (isDryOrCloseUpDm) {
+  dmHint =
+    Number.isFinite(Number(dmRatioPct))
+      ? (
+          dmRatioPct < 95
+            ? `مربيك: المادة الجافة المقدمة أقل من المتوقع (${dmRatioPct}%). راقب توفر العلف في المعلف والمتبقي وحالة الجسم.`
+            : dmRatioPct > 120
+              ? `مربيك: المادة الجافة المقدمة أعلى من المتوقع (${dmRatioPct}%). راجع الكمية المقدمة والمتبقي وحالة الجسم حسب مرحلة الجفاف.`
+              : `مربيك: المادة الجافة المقدمة قريبة من المتوقع (${dmRatioPct}%). الحكم الغذائي يكون من الطاقة والبروتين والمعادن ومرحلة الجفاف.`
+        )
+      : 'مربيك: المادة الجافة المتوقعة مرجع لتقديم العلف ومتابعة المعلف والمتبقي، وليست حكم نقص أو زيادة بذاتها.';
+} else if (isBuffalo) {
+    
     dmHint =
       Number.isFinite(Number(dmRatioPct))
         ? (
