@@ -2454,11 +2454,11 @@ const ndfState =
     fatHigh
       ? 'مربيك: دهن العليقة أعلى من الحد؛ قد يقلل هضم الألياف ويضغط على دهن اللبن.'
       : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
-  const isDryOrCloseUpDm =
-  !!contextForTargets?.earlyDry ||
-  !!contextForTargets?.closeUp ||
-  /جاف|dry|انتظار|تحضير|close/i.test(String(contextForTargets?.pregnancyStatus || ''));
-
+ const dmCtx = analysis?.context || context || ctx || {};
+const isDryOrCloseUpDm =
+  !!dmCtx?.earlyDry ||
+  !!dmCtx?.closeUp ||
+  /جاف|dry|انتظار|تحضير|close/i.test(String(dmCtx?.pregnancyStatus || dmCtx?.groupType || ''));
 if (isDryOrCloseUpDm) {
   dmHint =
     Number.isFinite(Number(dmRatioPct))
