@@ -2874,7 +2874,66 @@ ndfHint =
           : iofcPctOfMilkIncome != null && iofcPctOfMilkIncome >= 50
             ? 'هامش مقبول؛ راقب التكلفة والإنتاج.'
             : 'هامش ضعيف؛ راجع العليقة قبل الاعتماد.';
+  const isDryEconomics =
+  context?.earlyDry === true ||
+  context?.closeUp === true ||
+  /جاف|dry|انتظار|تحضير|close/i.test(String(
+    context?.groupType ||
+    context?.groupName ||
+    context?.pregnancyStatus ||
+    analysis?.targets?.category ||
+    ''
+  ));
 
+const feedCostPerHeadDay =
+  Number.isFinite(Number(totals.totCost))
+    ? Number(totals.totCost)
+    : null;
+
+const mixPriceDmVal =
+  Number.isFinite(Number(totals.mixPriceDM))
+    ? Number(totals.mixPriceDM)
+    : null;
+
+const mixPriceAsFedVal =
+  Number.isFinite(Number(totals.mixPriceAsFed))
+    ? Number(totals.mixPriceAsFed)
+    : null;
+
+if (isDryEconomics) {
+  return {
+    analysisCards,
+    economicsCards: [
+      econCard(
+        'feedCostPerHeadDay',
+        'تكلفة التغذية / رأس / يوم',
+        feedCostPerHeadDay != null ? `${num(feedCostPerHeadDay, 2)} ج/رأس/يوم` : '—',
+        feedCostPerHeadDay,
+        feedCostPerHeadDay != null ? 'good' : 'warn',
+        feedCostPerHeadDay != null
+          ? 'هذه تكلفة التغذية اليومية للحيوان في مرحلة الجفاف أو انتظار الولادة.'
+          : 'أكمل كميات وأسعار الخامات لحساب تكلفة التغذية اليومية.'
+      ),
+      econCard(
+        'mixPriceDM',
+        'سعر طن الخلطة مادة جافة',
+        mixPriceDmVal != null ? `${num(mixPriceDmVal, 0)} ج/طن DM` : '—',
+        mixPriceDmVal,
+        mixPriceDmVal != null ? 'good' : 'warn',
+        'مؤشر تكلفة الخلطة على أساس المادة الجافة.'
+      ),
+      econCard(
+        'mixPriceAsFed',
+        'سعر طن الخلطة طازج',
+        mixPriceAsFedVal != null ? `${num(mixPriceAsFedVal, 0)} ج/طن طازج` : '—',
+        mixPriceAsFedVal,
+        mixPriceAsFedVal != null ? 'good' : 'warn',
+        'مؤشر تكلفة الخلطة كما تُقدَّم في المعلف.'
+      )
+    ],
+    advancedCards
+  };
+}
   const economicsCards = [
     econCard(
       'feedCostPctOfMilkIncome',
