@@ -916,10 +916,14 @@ const dietNDFPct = document.getElementById('ctxDietNDFPct')?.value || '';
   setElText('ctxCloseUp_txt', closeUp ? 'نعم' : 'لا');
 
   // متبقي للولادة
-  const dccNum = dcc!=='' ? Number(dcc) : NaN;
-  const gest = (species==='جاموس') ? 310 : 280;
-  const dtc = Number.isFinite(dccNum) ? (gest - dccNum) : null;
-  setElText('dtcVal', (dtc===null ? '—' : dtc));
+const dccNum = dcc!=='' ? Number(dcc) : NaN;
+const gest = (species==='جاموس') ? 310 : 280;
+const dtc =
+  closeUp && Number.isFinite(dccNum)
+    ? (gest - dccNum)
+    : null;
+
+setElText('dtcVal', (dtc===null ? '—' : dtc));
   try { applyDryMilkVisibility(); } catch(_) {}
 }
 
@@ -1572,8 +1576,36 @@ async function loadCtxFromGroup(numbers, eventDate){
     return diff >= 0 ? diff : null;
   };
 
-  const classifyGroupType = () => {
+const classifyGroupType = () => {
     const p = qp();
+
+    const groupNameText = String(
+      p.get('group') ||
+      p.get('groupName') ||
+      document.getElementById('animalInfo')?.textContent ||
+      ''
+    ).trim().toLowerCase();
+
+    if (
+      groupNameText.includes('انتظار') ||
+      groupNameText.includes('تحضير') ||
+      groupNameText.includes('close')
+    ) return 'close_up';
+
+    if (
+      groupNameText.includes('جاف') ||
+      groupNameText.includes('dry') ||
+      groupNameText.includes('far')
+    ) return 'far_dry';
+
+    if (
+      groupNameText.includes('حلاب') ||
+      groupNameText.includes('عالي') ||
+      groupNameText.includes('متوسط') ||
+      groupNameText.includes('منخفض') ||
+      groupNameText.includes('milk') ||
+      groupNameText.includes('lact')
+    ) return 'lactating';
 
     const urlType = String(
       p.get('groupType') ||
