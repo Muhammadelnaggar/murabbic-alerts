@@ -4435,7 +4435,58 @@ function buildAllNutritionReport(events = []) {
    events: reportEvents
   });
 }
+function nutritionStageLabelSrv(stage = '') {
+  const s = String(stage || '').toLowerCase();
+  if (s === 'lactating') return 'علائق الحلاب';
+  if (s === 'far_dry') return 'علائق الجاف البعيد';
+  if (s === 'close_up') return 'علائق انتظار الولادة';
+  return 'علائق غير مصنفة';
+}
 
+function buildStageSeparatedNutritionReport(events = []) {
+  const buckets = new Map();
+
+  for (const e of events || []) {
+    const stage = nutritionStageFromEvent(e) || 'unknown';
+    const species = nutritionSpeciesKeyFromEvent(e) || 'unknown';
+    const key = `${species}__${stage}`;
+
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        stage,
+        species,
+        title: nutritionStageLabelSrv(stage),
+        showMilkEconomics: stage === 'lactating',
+        events: []
+      });
+    }
+
+    buckets.get(key).events.push(e);
+  }
+
+  const order = { lactating: 1, far_dry: 2, close_up: 3, unknown: 9 };
+
+  const sections = [...buckets.values()]
+    .sort((a, b) => (order[a.stage] || 9) - (order[b.stage] || 9))
+    .map(sec => {
+      const report = buildAllNutritionReport(sec.events);
+      return cleanObj({
+        stage: sec.stage,
+        species: sec.species,
+        title: sec.title,
+        showMilkEconomics: sec.showMilkEconomics,
+        count: report.count || 0,
+        report
+      });
+    })
+    .filter(sec => Number(sec.count || 0) > 0);
+
+  return cleanObj({
+    count: sections.reduce((s, x) => s + Number(x.count || 0), 0),
+    sectioned: true,
+    sections
+  });
+}
 // ============================================================
 //        API: NUTRITION SAVED RATIONS LIST + LOAD ONE
 // ============================================================
@@ -4733,23 +4784,23 @@ app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
     const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
 
     if (scope === 'all') {
-      const report = buildAllNutritionReport(filtered);
+const report = buildStageSeparatedNutritionReport(filtered);
 
-      if (!report.count) {
-        return res.status(404).json({
-          ok: false,
-          error: 'nutrition_report_not_found',
-          message: 'لا توجد علائق تغذية محفوظة مطابقة للتقرير الشامل'
-        });
-      }
+if (!report.count) {
+  return res.status(404).json({
+    ok: false,
+    error: 'nutrition_report_not_found',
+    message: 'لا توجد علائق تغذية محفوظة مطابقة للتقرير الشامل'
+  });
+}
 
-      return res.json({
-        ok: true,
-        scope,
-        type: type || null,
-        count: report.count,
-        report
-      });
+return res.json({
+  ok: true,
+  scope,
+  type: type || null,
+  count: report.count,
+  report
+});
     }
 
     if (scope === 'lactating_summary') {
