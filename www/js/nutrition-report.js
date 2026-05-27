@@ -1396,7 +1396,6 @@ function renderOneRation(event = {}, opts = {}){
         <a href="nutrition-report.html?scope=group&type=${encodeURIComponent(qp.get('type') || '')}&groupName=${encodeURIComponent(groupName)}">فتح منفرد</a>
       </div>
     `)}
-    ${renderContextBlock(ctx, event, stage)}
    ${renderServerReportRows(nDoc.reportRows || [])}
     ${renderRows(rows)}
    
@@ -1528,20 +1527,61 @@ function renderTabs(report = {}){
 }
 
 function renderAll(data){
-const report = data.report || {};
-const events = Array.isArray(report.events) ? report.events : [];
-const displayReport = {
-  ...report,
-  index: Array.isArray(report.index) ? report.index : [],
-  executive: report.executive || {},
-  count: report.count || (Array.isArray(report.index) ? report.index.length : events.length)
-};
+  const report = data.report || {};
   const type = data.type || qp.get('type') || '';
   const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
   $('reportTitle').textContent = `تقرير التغذية الشامل — ${typeLabel}`;
-  $('reportSub').textContent = `عدد العلائق داخل التقرير: ${nf(report.count || events.length,0)} — أحدث تحليل محفوظ لكل عليقة`;
+  $('reportSub').textContent = `عدد العلائق داخل التقرير: ${nf(report.count || 0,0)} — التقرير مقسم حسب مرحلة التغذية`;
   $('statusBox').style.display = 'none';
+
+  if (Array.isArray(report.sections) && report.sections.length) {
+    const html = report.sections.map((sec, si) => {
+      const secReport = sec.report || {};
+      const events = Array.isArray(secReport.events) ? secReport.events : [];
+
+      const displayReport = {
+        ...secReport,
+        index: Array.isArray(secReport.index) ? secReport.index : [],
+        executive: secReport.executive || {},
+        count: secReport.count || events.length
+      };
+
+      const rationReports = events.map((ev, i) => renderOneRation(ev, {
+        groupName: groupNameFromEvent(ev),
+        stage: eventStage(ev),
+        id: `ration-${slug((sec.stage || 'stage') + '-' + (groupNameFromEvent(ev) || `r${i}`))}`,
+        pageBreak: true
+      })).join('');
+
+      return `
+        <section class="card ${si ? 'ration-break' : ''}">
+          <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
+          <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
+        </section>
+
+        ${sec.showMilkEconomics ? renderExecutiveAll(displayReport, type) : ''}
+        ${sec.showMilkEconomics ? `<div id="ration-index-${esc(sec.stage || si)}">${renderRationIndex(displayReport, type)}</div>` : ''}
+        ${sec.showMilkEconomics ? `<div id="comparison-${esc(sec.stage || si)}">${renderAllComparison(displayReport)}</div>` : ''}
+
+        ${rationReports}
+      `;
+    }).join('');
+
+    $('content').innerHTML = `
+      <div id="top"></div>
+      ${html}
+    `;
+    return;
+  }
+
+  const events = Array.isArray(report.events) ? report.events : [];
+  const displayReport = {
+    ...report,
+    index: Array.isArray(report.index) ? report.index : [],
+    executive: report.executive || {},
+    count: report.count || (Array.isArray(report.index) ? report.index.length : events.length)
+  };
 
   const rationReports = events.map((ev, i) => renderOneRation(ev, {
     groupName: groupNameFromEvent(ev),
@@ -1552,15 +1592,13 @@ const displayReport = {
 
   $('content').innerHTML = `
     <div id="top"></div>
-  ${renderTabs(displayReport)}
-${renderExecutiveAll(displayReport, type)}
-<div id="ration-index">${renderRationIndex(displayReport, type)}</div>
-<div id="comparison">${renderAllComparison(displayReport)}</div>
-
+    ${renderTabs(displayReport)}
+    ${renderExecutiveAll(displayReport, type)}
+    <div id="ration-index">${renderRationIndex(displayReport, type)}</div>
+    <div id="comparison">${renderAllComparison(displayReport)}</div>
     ${rationReports}
   `;
 }
-
 /* ============================================================
    تشغيل
 ============================================================ */
