@@ -5540,7 +5540,40 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
         .get();
 
       const evNutAll = evSnapNut.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+const isLactatingNutritionEventForDashboard = (e = {}) => {
+  const ctx = e?.nutrition?.context || {};
+  const groupText = String(
+    ctx.groupType ||
+    ctx.groupName ||
+    ctx.group ||
+    ctx.groupLabel ||
+    e.groupType ||
+    e.groupName ||
+    e.group ||
+    ''
+  ).toLowerCase();
 
+  const isDryOrClose =
+    ctx.earlyDry === true ||
+    ctx.closeUp === true ||
+    /جاف|dry|انتظار|تحضير|close/i.test(groupText) ||
+    /جاف|dry|انتظار|تحضير|close/i.test(String(ctx.pregnancyStatus || ''));
+
+  if (isDryOrClose) return false;
+
+  const milkKg = Number(
+    ctx.avgMilkKg ??
+    ctx.observedAvgMilkKg ??
+    e?.nutrition?.analysis?.economics?.milkRevenue ??
+    0
+  );
+
+  const looksLactating =
+    /حلاب|عالي|متوسط|منخفض|milk|lact/i.test(groupText) ||
+    milkKg > 0;
+
+  return looksLactating;
+};
 const nutritionEvents = evNutAll
   .map(e => {
     const txt = String(e.eventTypeNorm || e.eventType || e.type || '').toLowerCase().trim();
@@ -5563,17 +5596,17 @@ const nutritionEvents = evNutAll
 
     return { ...e, _txt: txt, _ms: ms, _matchesType: matchesType };
   })
-  .filter(e =>
-    (
-      e._txt === 'nutrition' ||
-      e._txt === 'nutrition_group' ||
-      e._txt.includes('nutrition') ||
-      e._txt.includes('تغذية')
-    ) &&
-    e?.nutrition?.analysis &&
-    e._matchesType
-  );
-
+.filter(e =>
+  (
+    e._txt === 'nutrition' ||
+    e._txt === 'nutrition_group' ||
+    e._txt.includes('nutrition') ||
+    e._txt.includes('تغذية')
+  ) &&
+  e?.nutrition?.analysis &&
+  e._matchesType &&
+  isLactatingNutritionEventForDashboard(e)
+);
       const latestByBand = new Map();
 
       for (const e of nutritionEvents) {
