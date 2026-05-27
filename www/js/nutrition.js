@@ -3390,13 +3390,14 @@ function applyDCCRules(){
   const dcc = parseInt(ctxDCC?.value);
   const GL = getGestLen();
 
-  if (!isNaN(dcc)){
-    const dtc = GL - dcc;
-    if (dtcVal) dtcVal.textContent = isFinite(dtc) ? String(dtc) : '—';
-  } else {
-    if (dtcVal) dtcVal.textContent = '—';
-  }
+const closeUpNow = !!ctxCloseUp?.checked;
 
+if (closeUpNow && !isNaN(dcc)){
+  const dtc = GL - dcc;
+  if (dtcVal) dtcVal.textContent = isFinite(dtc) ? String(dtc) : '—';
+} else {
+  if (dtcVal) dtcVal.textContent = '—';
+}
   const p = new URLSearchParams(window.location.search);
   const mode = String(p.get('mbkMode') || '').trim().toLowerCase();
   const nums = parseNumbersList();
