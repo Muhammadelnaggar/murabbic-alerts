@@ -4077,9 +4077,7 @@ const state = def.key === 'dm'
       metricKey: def.key,
       buffaloGauge: isBuffaloGauge && (def.key === 'dm' || def.key === 'nel' || def.key === 'mp')
     };
-const comment = def.key === 'dm'
-  ? 'العلف يجب أن يكون أمام الأبقار 24 ساعة يوميًا لضمان الشبع وعدم إهدار العلف. الأهم هو اتزان الاحتياجات الفعلية؛ وأي زيادة يأكلها الحيوان حسب الشهية يجب أن يقابلها لبن زيادة.'
-  : smartHint(def.key, '');
+const comment = smartHint(def.key, '');
 
     return `
       <div class="mbk-gauge-row" style="background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px 12px 10px;margin:0 0 12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)">
