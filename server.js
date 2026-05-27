@@ -2931,7 +2931,7 @@ if (isDryEconomics) {
         'مؤشر تكلفة الخلطة كما تُقدَّم في المعلف.'
       )
     ],
-    advancedCards
+    advancedCards: []
   };
 }
   const economicsCards = [
