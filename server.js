@@ -3731,6 +3731,87 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     note: note || '—'
   });
 }
+function reportBalanceStateTextSrv(status, balance = null){
+  const s = String(status || '').toLowerCase();
+  const b = Number(balance);
+
+  if (s.includes('good') || s.includes('ok')) return 'كافية';
+  if (Number.isFinite(b) && b < 0) return 'ناقصة';
+  if (Number.isFinite(b) && b > 0) return 'زائدة';
+  if (s.includes('warn') || s.includes('watch') || s.includes('danger')) return 'يحتاج ضبط';
+  return 'غير مكتمل';
+}
+
+function reportMurabbikGuidanceSrv(key, status, balance = null){
+  const k = String(key || '').trim();
+  const s = String(status || '').toLowerCase();
+  const b = Number(balance);
+  const good = s.includes('good') || s.includes('ok');
+
+  if (k === 'dmi') return '—';
+
+  if (k === 'nel') {
+    if (good) return 'ممتاز؛ حافظ على اتزان الطاقة وصحة الكرش.';
+    if (Number.isFinite(b) && b < 0) return 'ارفع كثافة الطاقة في العليقة مع الحفاظ على صحة الكرش؛ نقص الطاقة يؤدي إلى فقد في إنتاج اللبن وجودته وفقد الحالة الجسمانية للحيوان.';
+    if (Number.isFinite(b) && b > 0) return 'اضبط الطاقة في العليقة؛ زيادة الطاقة ترفع تكاليف التغذية بلا داعٍ وقد تسبب سمنة الحيوان.';
+    return 'اضبط توازن الطاقة قبل اعتماد العليقة.';
+  }
+
+  if (k === 'mp') {
+    if (good) return 'ممتاز؛ حافظ على اتزان البروتين الممثل للحفاظ على إنتاج اللبن وجودته وصحة الحيوان والحمل.';
+    if (Number.isFinite(b) && b < 0) return 'نقص البروتين الممثل يؤدي إلى نقص إنتاج اللبن وجودته؛ حسّن مصدر البروتين في العليقة.';
+    if (Number.isFinite(b) && b > 0) return 'زيادة البروتين الممثل تعني رفع التكاليف وتقليص هامش لبن / علف.';
+    return 'اضبط البروتين الممثل قبل اعتماد العليقة.';
+  }
+
+  if (k === 'cp') return '—';
+
+  if (k === 'ndf') {
+    if (good) return 'الألياف المتعادلة داخل حدود احتياجات صحة الكرش؛ زيادتها الكبيرة في الحلاب قد تقلل المأكول والإنتاج.';
+    return 'ارفع الخشن أو حسّن الألياف الفعالة.';
+  }
+
+  if (k === 'starch') {
+    if (good) return 'النشا في حدود أمان الكرش ويمكن زيادته بشرط الحفاظ على صحة الكرش.';
+    return 'زيادة النشا في العليقة دون ألياف فعالة كافية قد تؤدي إلى الحموضة وقلة الدهن في اللبن.';
+  }
+
+  if (k === 'fat') {
+    if (good) return 'الدهون آمنة ولا تهدد كفاءة هضم الألياف وجودة اللبن.';
+    return 'تخطي حدود الأمان في الدهون الحرة في العليقة قد يؤدي إلى تقليل هضم الألياف وقلة الطاقة ودهن اللبن.';
+  }
+
+  if (k === 'roughage') {
+    if (good) return 'ممتاز؛ حافظ على جودة الخشن وطول التقطيع من 3 إلى 5 سم لصحة الكرش وكفاءة الاجترار وإفراز اللعاب.';
+    return 'ارفع نسبة الخشن في العليقة لتحسين الاجترار والهضم وأمان الكرش.';
+  }
+
+  if (k === 'forage_ndf') {
+    if (good) return '—';
+    return 'يجب ألا تقل الألياف المتعادلة من الخشن عن 65% من إجمالي الألياف في العليقة.';
+  }
+
+  if (k === 'dcad') {
+    if (good) return 'حافظ على ديكاد مناسب لمنع حمى اللبن ومشاكل ما بعد الولادة.';
+    return 'راجع أملاح الأنيون والكالسيوم والماغنسيوم واضبط الديكاد؛ خطر حمى اللبن ومشاكل ما بعد الولادة.';
+  }
+
+  if (k.startsWith('mineral_')) {
+    if (good) return '—';
+    if (Number.isFinite(b) && b < 0) return 'زِد مصدر العنصر أو اضبط الإضافة المعدنية.';
+    if (Number.isFinite(b) && b > 0) return 'راجع زيادة العنصر وتداخلاته مع باقي المعادن.';
+    return 'اضبط مصدر الإضافة المعدنية ومعدل الاستخدام.';
+  }
+
+  if (k.startsWith('vitamin_')) {
+    if (good) return '—';
+    if (Number.isFinite(b) && b < 0) return 'زِد مصدر الفيتامين أو اضبط معدل الإضافة.';
+    if (Number.isFinite(b) && b > 0) return 'راجع زيادة الفيتامين وتكرار مصادر الإضافة.';
+    return 'اضبط مصدر الفيتامينات ومعدل الاستخدام.';
+  }
+
+  return '—';
+}
 function reportIofcStatusSrv(pct){
   const n = Number(pct);
   if (!Number.isFinite(n)) return 'muted';
@@ -3793,6 +3874,11 @@ function mineralReportRowsSrv(balance = {}, unit = 'g'){
     const status = reportCoverageStatusSrv(cover, 10);
     const u = unit === 'mg' ? 'مجم' : 'جم';
 
+    let stateText = 'غير مكتمل';
+    if (status === 'good') stateText = 'كافية';
+    else if (Number.isFinite(Number(bal)) && Number(bal) < 0) stateText = 'ناقصة';
+    else if (Number.isFinite(Number(bal)) && Number(bal) > 0) stateText = 'زائدة';
+
     return reportRowSrv(
       unit === 'mg' ? 'المعادن الصغرى' : 'المعادن الكبرى',
       `mineral_${k}`,
@@ -3801,7 +3887,8 @@ function mineralReportRowsSrv(balance = {}, unit = 'g'){
       fmtSrv(supplied, unit === 'mg' ? 0 : 2, u),
       reportCoverageBalanceTextSrv(cover),
       status,
-      finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للعنصر.'
+      reportMurabbikGuidanceSrv(`mineral_${k}`, status, bal),
+      stateText
     );
   });
 }
@@ -3820,7 +3907,12 @@ function vitaminReportRowsSrv(balance = {}){
       (finiteSrv(required) && finiteSrv(supplied) ? Number(supplied) - Number(required) : null);
 
     const cover = item?.supplyPctOfRequirement ?? item?.coveragePct ?? null;
-   const status = reportCoverageStatusSrv(cover, 20);
+    const status = reportCoverageStatusSrv(cover, 20);
+
+    let stateText = 'غير مكتمل';
+    if (status === 'good') stateText = 'كافية';
+    else if (Number.isFinite(Number(bal)) && Number(bal) < 0) stateText = 'ناقصة';
+    else if (Number.isFinite(Number(bal)) && Number(bal) > 0) stateText = 'زائدة';
 
     return reportRowSrv(
       'الفيتامينات',
@@ -3830,7 +3922,8 @@ function vitaminReportRowsSrv(balance = {}){
       fmtSrv(supplied, 0, 'وحدة دولية'),
       reportCoverageBalanceTextSrv(cover),
       status,
-      finiteSrv(cover) ? `تغطية ${fmtSrv(cover, 1, '%')}` : 'يعرض السيرفر الاتزان المحفوظ للفيتامين.'
+      reportMurabbikGuidanceSrv(`vitamin_${k}`, status, bal),
+      stateText
     );
   });
 }
@@ -3945,49 +4038,61 @@ const iofcPctSrv = ecoReport.iofcPctOfMilkIncome;
       ? Number(n.mpSupplyG) - Number(t.mpTargetG)
       : null);
 
-  rows.push(reportRowSrv(
-    'الاحتياجات الأساسية',
-    'dmi',
-    'قدرة الأكل / المادة الجافة',
-    'قدرة أكل متوقعة',
-    fmtSrv(totals.dmKg, 2, 'كجم'),
-    '—',
-    'muted',
-    'العلف يجب أن يكون متاحًا أمام الحيوانات 24 ساعة يوميًا.'
-  ));
+rows.push(reportRowSrv(
+  'الاحتياجات الأساسية',
+  'dmi',
+  'قدرة الأكل / المادة الجافة',
+  'قدرة أكل متوقعة',
+  fmtSrv(totals.dmKg, 2, 'كجم'),
+  '—',
+  'muted',
+  'يجب أن يتوفر العلف في المعلف 24 ساعة يوميًا مع متابعة المعلف والمتبقي.',
+  '—'
+));
+
+ {
+  const status = reportRatioStatusSrv(n.nelActual, t.nelTarget, 5);
 
   rows.push(reportRowSrv(
     'الاحتياجات الأساسية',
     'nel',
-    'الطاقة الصافية للحليب (NEL)',
-    fmtSrv(t.nelTarget, 2, 'Mcal/day'),
-    fmtSrv(n.nelActual, 2, 'Mcal/day'),
+    'الطاقة الصافية للحليب',
+    fmtSrv(t.nelTarget, 2, 'ميجاكالوري/يوم'),
+    fmtSrv(n.nelActual, 2, 'ميجاكالوري/يوم'),
     reportRatioBalanceTextSrv(n.nelActual, t.nelTarget),
-    reportRatioStatusSrv(n.nelActual, t.nelTarget, 5),
-    'قرار الطاقة مجهز من السيرفر حسب التحليل المحفوظ.'
+    status,
+    reportMurabbikGuidanceSrv('nel', status, nelBal),
+    reportBalanceStateTextSrv(status, nelBal)
   ));
+}
+
+{
+  const status = reportRatioStatusSrv(n.mpSupplyG, t.mpTargetG, 5);
 
   rows.push(reportRowSrv(
     'الاحتياجات الأساسية',
     'mp',
-    'البروتين الممثل (MP)',
+    'البروتين الممثل',
     fmtSrv(t.mpTargetG, 0, 'جم/يوم'),
     fmtSrv(n.mpSupplyG, 0, 'جم/يوم'),
     reportRatioBalanceTextSrv(n.mpSupplyG, t.mpTargetG),
-    reportRatioStatusSrv(n.mpSupplyG, t.mpTargetG, 5),
-    'قرار البروتين الممثل مجهز من السيرفر حسب التحليل المحفوظ.'
+    status,
+    reportMurabbikGuidanceSrv('mp', status, mpBal),
+    reportBalanceStateTextSrv(status, mpBal)
   ));
+}
 
-  rows.push(reportRowSrv(
-    'الاحتياجات الأساسية',
-    'cp',
-    'البروتين الخام (CP)',
-    fmtSrv(t.cpReferencePct, 1, '% DM'),
-    fmtSrv(n.cpPctTotal, 1, '% DM'),
-    '—',
-    'muted',
-    'يعرض كمرجع تركيبي بجانب MP ولا يستبدل تقييم البروتين الممثل.'
-  ));
+ rows.push(reportRowSrv(
+  'الاحتياجات الأساسية',
+  'cp',
+  'البروتين الخام',
+  'مؤشر تركيبي فقط',
+  fmtSrv(n.cpPctTotal, 1, '% من المادة الجافة'),
+  '—',
+  'muted',
+  '—',
+  'مؤشر تركيبي'
+));
 
   const carb = n.carbohydrateSafetyModel || a.carbohydrateSafetyModel || {};
   const ndfMin = carb.minTotalNDFPctDM ?? t.ndfSafetyMin ?? t.ndfMin ?? t.ndfTarget;
@@ -3996,60 +4101,100 @@ const iofcPctSrv = ecoReport.iofcPctOfMilkIncome;
   const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw) : 7;
   
 
+ {
+  const status = reportMinStatusSrv(n.ndfPctActual, ndfMin);
+  const bal = finiteSrv(n.ndfPctActual) && finiteSrv(ndfMin)
+    ? Number(n.ndfPctActual) - Number(ndfMin)
+    : null;
+
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'ndf',
-    'الألياف المتعادلة (NDF)',
-    finiteSrv(ndfMin) ? `حد أدنى ${fmtSrv(ndfMin, 1, '% DM')}` : 'حد أدنى',
-    fmtSrv(n.ndfPctActual, 1, '% DM'),
-    finiteSrv(n.ndfPctActual) && finiteSrv(ndfMin) ? fmtSrv(Number(n.ndfPctActual) - Number(ndfMin), 1, '%') : '—',
-    reportMinStatusSrv(n.ndfPctActual, ndfMin),
-    'NDF يُقرأ كحد أمان للكرش وليس كحكم زيادة مستقل.'
+    'الألياف المتعادلة',
+    finiteSrv(ndfMin) ? `حد أدنى ${fmtSrv(ndfMin, 1, '% من المادة الجافة')}` : 'حد أدنى',
+    fmtSrv(n.ndfPctActual, 1, '% من المادة الجافة'),
+    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+    status,
+    reportMurabbikGuidanceSrv('ndf', status, bal),
+    status === 'good' ? 'كافية' : 'منخفضة'
   ));
+}
+
+{
+  const status = reportMaxStatusSrv(n.starchPctActual, starchMax);
+  const bal = finiteSrv(n.starchPctActual) && finiteSrv(starchMax)
+    ? Number(n.starchPctActual) - Number(starchMax)
+    : null;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'starch',
     'النشا',
-    finiteSrv(starchMax) ? `حد أقصى ${fmtSrv(starchMax, 1, '% DM')}` : 'حد أقصى',
-    fmtSrv(n.starchPctActual, 1, '% DM'),
-    finiteSrv(n.starchPctActual) && finiteSrv(starchMax) ? fmtSrv(Number(n.starchPctActual) - Number(starchMax), 1, '%') : '—',
-    reportMaxStatusSrv(n.starchPctActual, starchMax),
-    'قرار النشا مجهز من السيرفر لحماية الكرش.'
+    finiteSrv(starchMax) ? `حد أقصى ${fmtSrv(starchMax, 1, '% من المادة الجافة')}` : 'حد أقصى',
+    fmtSrv(n.starchPctActual, 1, '% من المادة الجافة'),
+    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+    status,
+    reportMurabbikGuidanceSrv('starch', status, bal),
+    status === 'good' ? 'داخل الحد' : 'مرتفع'
   ));
+}
+
+{
+  const status = reportMaxStatusSrv(n.fatPctActual, fatMax);
+  const bal = finiteSrv(n.fatPctActual) && finiteSrv(fatMax)
+    ? Number(n.fatPctActual) - Number(fatMax)
+    : null;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'fat',
     'دهن العليقة',
-    finiteSrv(fatMax) ? `حد أقصى ${fmtSrv(fatMax, 1, '% DM')}` : 'حد أقصى',
-    fmtSrv(n.fatPctActual, 1, '% DM'),
-    finiteSrv(n.fatPctActual) && finiteSrv(fatMax) ? fmtSrv(Number(n.fatPctActual) - Number(fatMax), 1, '%') : '—',
-    reportMaxStatusSrv(n.fatPctActual, fatMax),
-    'قرار الدهون مجهز من السيرفر حسب التحليل المحفوظ.'
+    finiteSrv(fatMax) ? `حد أقصى ${fmtSrv(fatMax, 1, '% من المادة الجافة')}` : 'حد أقصى',
+    fmtSrv(n.fatPctActual, 1, '% من المادة الجافة'),
+    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+    status,
+    reportMurabbikGuidanceSrv('fat', status, bal),
+    status === 'good' ? 'داخل الحد' : 'مرتفعة'
   ));
+}
+
+{
+  const status = reportMinStatusSrv(n.roughPctDM, t.roughageMin);
+  const bal = finiteSrv(n.roughPctDM) && finiteSrv(t.roughageMin)
+    ? Number(n.roughPctDM) - Number(t.roughageMin)
+    : null;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'roughage',
-    'نسبة الخشن من المادة الجافة',
-    finiteSrv(t.roughageMin) ? `حد أدنى ${fmtSrv(t.roughageMin, 1, '% DM')}` : 'حد أدنى',
-    fmtSrv(n.roughPctDM, 1, '% DM'),
-    finiteSrv(n.roughPctDM) && finiteSrv(t.roughageMin) ? fmtSrv(Number(n.roughPctDM) - Number(t.roughageMin), 1, '%') : '—',
-    reportMinStatusSrv(n.roughPctDM, t.roughageMin),
-    'قرار الخشن مجهز من السيرفر.'
+    'الخشن من المادة الجافة',
+    finiteSrv(t.roughageMin) ? `حد أدنى ${fmtSrv(t.roughageMin, 1, '% من المادة الجافة')}` : 'حد أدنى',
+    fmtSrv(n.roughPctDM, 1, '% من المادة الجافة'),
+    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+    status,
+    reportMurabbikGuidanceSrv('roughage', status, bal),
+    status === 'good' ? 'كافٍ' : 'منخفض'
   ));
+}
+
+{
+  const status = reportMinStatusSrv(n.forageNDFPctDM, t.forageNDFMin);
+  const bal = finiteSrv(n.forageNDFPctDM) && finiteSrv(t.forageNDFMin)
+    ? Number(n.forageNDFPctDM) - Number(t.forageNDFMin)
+    : null;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'forage_ndf',
-    'NDF من الخشن',
-    finiteSrv(t.forageNDFMin) ? `حد أدنى ${fmtSrv(t.forageNDFMin, 1, '% DM')}` : 'حد أدنى',
-    fmtSrv(n.forageNDFPctDM, 1, '% DM'),
-    finiteSrv(n.forageNDFPctDM) && finiteSrv(t.forageNDFMin) ? fmtSrv(Number(n.forageNDFPctDM) - Number(t.forageNDFMin), 1, '%') : '—',
-    reportMinStatusSrv(n.forageNDFPctDM, t.forageNDFMin),
-    'قرار NDF من الخشن مجهز من السيرفر.'
+    'ألياف الخشن المتعادلة',
+    finiteSrv(t.forageNDFMin) ? `حد أدنى ${fmtSrv(t.forageNDFMin, 1, '% من المادة الجافة')}` : 'حد أدنى',
+    fmtSrv(n.forageNDFPctDM, 1, '% من المادة الجافة'),
+    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+    status,
+    reportMurabbikGuidanceSrv('forage_ndf', status, bal),
+    status === 'good' ? 'كافٍ' : 'منخفض'
   ));
+}
 
   const rh = n.rumenHealthModel || {};
   rows.push(reportRowSrv(
@@ -4063,20 +4208,22 @@ const iofcPctSrv = ecoReport.iofcPctOfMilkIncome;
     rh.reason || rh.instruction || n.rumenNote || '—'
   ));
 
-  const dcadVal = n.dcadModel?.dcadMeqKgDM;
-  if (finiteSrv(dcadVal)) {
-    rows.push(reportRowSrv(
-      'المعادن الكبرى',
-      'dcad',
-      'DCAD',
-      'نطاق انتظار الولادة',
-      fmtSrv(dcadVal, 0, 'meq/kg DM'),
-      '—',
-      Number(dcadVal) > -50 ? 'warn' : 'good',
-      n.dcadModel?.note || 'قرار DCAD مجهز من السيرفر.'
-    ));
-  }
+const dcadVal = n.dcadModel?.dcadMeqKgDM;
+if (finiteSrv(dcadVal)) {
+  const status = Number(dcadVal) > -50 ? 'warn' : 'good';
 
+  rows.push(reportRowSrv(
+    'المعادن الكبرى',
+    'dcad',
+    'ميزان الكاتيونات والأنيونات الغذائي',
+    'نطاق انتظار الولادة',
+    fmtSrv(dcadVal, 0, 'ملي مكافئ/كجم مادة جافة'),
+    '—',
+    status,
+    reportMurabbikGuidanceSrv('dcad', status, Number(dcadVal)),
+    status === 'good' ? 'مناسب' : 'غير مناسب'
+  ));
+}
   const mineralSupply = n.mineralSupplyModel || {};
   rows.push(...mineralReportRowsSrv(mineralSupply?.mineralBalanceModel?.balance || {}, 'g'));
   rows.push(...mineralReportRowsSrv(mineralSupply?.traceMineralBalanceModel?.balance || {}, 'mg'));
