@@ -3832,15 +3832,37 @@ function reportBalanceStateTextSrv(status, balance = null){
   return 'غير مكتمل';
 }
 
-function reportMurabbikGuidanceSrv(key, status, balance = null){
+function reportMurabbikGuidanceSrv(key, status, balance = null, stage = ''){
   const k = String(key || '').trim();
   const s = String(status || '').toLowerCase();
   const b = Number(balance);
   const good = s.includes('good') || s.includes('ok');
 
-  if (k === 'dmi') return '—';
+  const st = String(stage || '').toLowerCase();
+  const isFarDry = st === 'far_dry';
+  const isCloseUp = st === 'close_up';
+
+  if (k === 'dmi') {
+    if (isCloseUp) return 'يجب أن يتوفر العلف في المعلف 24 ساعة يوميًا مع متابعة المتبقي والشهية؛ أي هبوط في المأكول قبل الولادة يحتاج مراجعة فورية.';
+    if (isFarDry) return 'يجب أن يتوفر العلف في المعلف 24 ساعة يوميًا مع متابعة المتبقي وحالة الجسم، بدون دفع زائد للطاقة.';
+    return '—';
+  }
 
   if (k === 'nel') {
+    if (isCloseUp) {
+      if (good) return 'الطاقة مناسبة لمرحلة انتظار الولادة؛ حافظ على المأكول وثبات الخلطة لتقليل اضطرابات ما بعد الولادة.';
+      if (Number.isFinite(b) && b < 0) return 'الطاقة أقل من الاحتياج في انتظار الولادة؛ راجع كثافة الطاقة مع الحفاظ على أمان الكرش وعدم رفع النشا عشوائيًا.';
+      if (Number.isFinite(b) && b > 0) return 'الطاقة أعلى من الاحتياج في انتظار الولادة؛ راجع كثافة العليقة لتجنب زيادة الحالة الجسمانية واضطرابات الولادة.';
+      return 'اضبط طاقة عليقة انتظار الولادة قبل الاعتماد.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'الطاقة مناسبة للجاف البعيد؛ حافظ على حالة الجسم بدون تسمين زائد.';
+      if (Number.isFinite(b) && b < 0) return 'الطاقة أقل من احتياج الجاف البعيد؛ راجع جودة الخشن وكفاية المادة الجافة.';
+      if (Number.isFinite(b) && b > 0) return 'الطاقة أعلى من احتياج الجاف البعيد؛ قلل كثافة العليقة لتجنب السمنة قبل الدخول في انتظار الولادة.';
+      return 'اضبط طاقة عليقة الجاف البعيد قبل الاعتماد.';
+    }
+
     if (good) return 'ممتاز؛ حافظ على اتزان الطاقة وصحة الكرش.';
     if (Number.isFinite(b) && b < 0) return 'ارفع كثافة الطاقة في العليقة مع الحفاظ على صحة الكرش؛ نقص الطاقة يؤدي إلى فقد في إنتاج اللبن وجودته وفقد الحالة الجسمانية للحيوان.';
     if (Number.isFinite(b) && b > 0) return 'اضبط الطاقة في العليقة؛ زيادة الطاقة ترفع تكاليف التغذية بلا داعٍ وقد تسبب سمنة الحيوان.';
@@ -3848,6 +3870,20 @@ function reportMurabbikGuidanceSrv(key, status, balance = null){
   }
 
   if (k === 'mp') {
+    if (isCloseUp) {
+      if (good) return 'البروتين الممثل مناسب لانتظار الولادة؛ حافظ على جودة البروتين لدعم الجنين واللبأ وبداية الموسم.';
+      if (Number.isFinite(b) && b < 0) return 'البروتين الممثل أقل من الاحتياج في انتظار الولادة؛ راجع جودة مصدر البروتين والهضم دون رفع البروتين الخام عشوائيًا.';
+      if (Number.isFinite(b) && b > 0) return 'البروتين الممثل أعلى من الاحتياج في انتظار الولادة؛ راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر.';
+      return 'اضبط البروتين الممثل في عليقة انتظار الولادة قبل الاعتماد.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'البروتين الممثل مناسب للجاف البعيد؛ حافظ على الاتزان بدون زيادة غير ضرورية في تكلفة البروتين.';
+      if (Number.isFinite(b) && b < 0) return 'البروتين الممثل أقل من احتياج الجاف البعيد؛ راجع جودة مصدر البروتين وكفاية الإمداد.';
+      if (Number.isFinite(b) && b > 0) return 'البروتين الممثل أعلى من احتياج الجاف البعيد؛ راجع مصدر البروتين لتقليل التكلفة والهدر.';
+      return 'اضبط البروتين الممثل في عليقة الجاف البعيد قبل الاعتماد.';
+    }
+
     if (good) return 'ممتاز؛ حافظ على اتزان البروتين الممثل للحفاظ على إنتاج اللبن وجودته وصحة الحيوان والحمل.';
     if (Number.isFinite(b) && b < 0) return 'نقص البروتين الممثل يؤدي إلى نقص إنتاج اللبن وجودته؛ حسّن مصدر البروتين في العليقة.';
     if (Number.isFinite(b) && b > 0) return 'زيادة البروتين الممثل تعني رفع التكاليف وتقليص هامش لبن / علف.';
@@ -3857,45 +3893,107 @@ function reportMurabbikGuidanceSrv(key, status, balance = null){
   if (k === 'cp') return '—';
 
   if (k === 'ndf') {
+    if (isCloseUp) {
+      if (good) return 'الألياف المتعادلة مناسبة لانتظار الولادة؛ حافظ على الخشن الكافي مع منع فرز العليقة.';
+      return 'راجع مستوى وجودة الخشن والألياف الفعالة لحماية الكرش قبل الولادة.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'الألياف المتعادلة مناسبة للجاف البعيد؛ تدعم الشبع وصحة الكرش مع التحكم في الطاقة.';
+      return 'راجع جودة وكمية الخشن لدعم الشبع ومنع زيادة الطاقة في الجاف البعيد.';
+    }
+
     if (good) return 'الألياف المتعادلة داخل حدود احتياجات صحة الكرش؛ زيادتها الكبيرة في الحلاب قد تقلل المأكول والإنتاج.';
     return 'ارفع الخشن أو حسّن الألياف الفعالة.';
   }
 
   if (k === 'starch') {
+    if (isCloseUp) {
+      if (good) return 'النشا داخل حد الأمان لانتظار الولادة؛ حافظ على توازن الحبوب والخشن وثبات الخلطة.';
+      return 'النشا أعلى من حد الأمان في انتظار الولادة؛ راجع الحبوب وتوازن الخشن لتقليل خطر اضطراب الكرش.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'النشا مناسب للجاف البعيد؛ لا ترفع الحبوب بدون احتياج واضح.';
+      return 'النشا أعلى من المناسب للجاف البعيد؛ راجع الحبوب لتجنب زيادة الطاقة والسمنة.';
+    }
+
     if (good) return 'النشا في حدود أمان الكرش ويمكن زيادته بشرط الحفاظ على صحة الكرش.';
     return 'زيادة النشا في العليقة دون ألياف فعالة كافية قد تؤدي إلى الحموضة وقلة الدهن في اللبن.';
   }
 
   if (k === 'fat') {
+    if (isCloseUp) {
+      if (good) return 'دهن العليقة داخل حد الأمان لانتظار الولادة ولا يهدد هضم الألياف.';
+      return 'دهن العليقة أعلى من حد الأمان في انتظار الولادة؛ راجع مصدر الدهون لأنه قد يؤثر على هضم الألياف وصحة الكرش.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'دهن العليقة داخل حد الأمان للجاف البعيد.';
+      return 'دهن العليقة أعلى من حد الأمان للجاف البعيد؛ راجع مصدر الدهون وتكلفة الإضافة.';
+    }
+
     if (good) return 'الدهون آمنة ولا تهدد كفاءة هضم الألياف وجودة اللبن.';
     return 'تخطي حدود الأمان في الدهون الحرة في العليقة قد يؤدي إلى تقليل هضم الألياف وقلة الطاقة ودهن اللبن.';
   }
 
   if (k === 'roughage') {
+    if (isCloseUp) {
+      if (good) return 'الخشن مناسب لانتظار الولادة؛ حافظ على جودة الخشن ومنع الفرز وثبات المعلف.';
+      return 'راجع نسبة الخشن وجودته في انتظار الولادة لحماية الكرش والشهية قبل الولادة.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'الخشن مناسب للجاف البعيد؛ حافظ على الشبع وصحة الكرش والتحكم في الطاقة.';
+      return 'ارفع أو حسّن الخشن في الجاف البعيد لدعم الشبع وتقليل مخاطر السمنة.';
+    }
+
     if (good) return 'ممتاز؛ حافظ على جودة الخشن وطول التقطيع من 3 إلى 5 سم لصحة الكرش وكفاءة الاجترار وإفراز اللعاب.';
     return 'ارفع نسبة الخشن في العليقة لتحسين الاجترار والهضم وأمان الكرش.';
   }
 
   if (k === 'forage_ndf') {
+    if (isCloseUp) {
+      if (good) return 'ألياف الخشن مناسبة لانتظار الولادة؛ تابع جودة الخشن والمتبقي وصحة الكرش.';
+      return 'راجع مصدر الخشن وجودته ونسبة إضافته قبل الولادة.';
+    }
+
+    if (isFarDry) {
+      if (good) return 'ألياف الخشن مناسبة للجاف البعيد وتساعد على الشبع والتحكم في الطاقة.';
+      return 'راجع مصدر الخشن وجودته ونسبة إضافته في الجاف البعيد.';
+    }
+
     if (good) return '—';
     return 'يجب ألا تقل الألياف المتعادلة من الخشن عن 65% من إجمالي الألياف في العليقة.';
   }
 
   if (k === 'dcad') {
-    if (good) return 'حافظ على ديكاد مناسب لمنع حمى اللبن ومشاكل ما بعد الولادة.';
-    return 'راجع أملاح الأنيون والكالسيوم والماغنسيوم واضبط الديكاد؛ خطر حمى اللبن ومشاكل ما بعد الولادة.';
+    if (isCloseUp) {
+      if (good) return 'DCAD مناسب لانتظار الولادة؛ حافظ على توازن أملاح الأنيون والكالسيوم والماغنسيوم لتقليل مخاطر حمى اللبن.';
+      return 'راجع أملاح الأنيون والكالسيوم والماغنسيوم واضبط DCAD؛ هذا بند خاص بانتظار الولادة.';
+    }
+
+    return 'DCAD لا يُعرض كهدف تشغيلي في الجاف البعيد.';
   }
 
   if (k.startsWith('mineral_')) {
-    if (good) return '—';
-    if (Number.isFinite(b) && b < 0) return 'زِد مصدر العنصر أو اضبط الإضافة المعدنية.';
-    if (Number.isFinite(b) && b > 0) return 'راجع زيادة العنصر وتداخلاته مع باقي المعادن.';
+    if (good) {
+      if (isCloseUp) return 'العنصر يغطي احتياج انتظار الولادة؛ حافظ على الاتزان خاصة الكالسيوم والماغنسيوم والعناصر المرتبطة بالمناعة.';
+      if (isFarDry) return 'العنصر يغطي احتياج الجاف البعيد؛ لا تكرر الإضافات بدون سبب.';
+      return '—';
+    }
+    if (Number.isFinite(b) && b < 0) return 'زِد مصدر العنصر أو اضبط الإضافة المعدنية حسب المرحلة.';
+    if (Number.isFinite(b) && b > 0) return 'راجع زيادة العنصر وتداخلاته مع باقي المعادن حسب المرحلة.';
     return 'اضبط مصدر الإضافة المعدنية ومعدل الاستخدام.';
   }
 
   if (k.startsWith('vitamin_')) {
-    if (good) return '—';
-    if (Number.isFinite(b) && b < 0) return 'زِد مصدر الفيتامين أو اضبط معدل الإضافة.';
+    if (good) {
+      if (isCloseUp) return 'الفيتامين يغطي احتياج انتظار الولادة؛ حافظ على الإمداد لدعم المناعة وبداية الموسم.';
+      if (isFarDry) return 'الفيتامين يغطي احتياج الجاف البعيد؛ لا تكرر الإضافات بدون داعٍ.';
+      return '—';
+    }
+    if (Number.isFinite(b) && b < 0) return 'زِد مصدر الفيتامين أو اضبط معدل الإضافة حسب المرحلة.';
     if (Number.isFinite(b) && b > 0) return 'راجع زيادة الفيتامين وتكرار مصادر الإضافة.';
     return 'اضبط مصدر الفيتامينات ومعدل الاستخدام.';
   }
@@ -3935,7 +4033,7 @@ function reportIofcNoteSrv(pct){
 
   return 'هامش اللبن بعد العلف منخفض؛ راجع تكلفة العلف أو إنتاج اللبن قبل اعتماد العليقة.';
 }
-function mineralReportRowsSrv(balance = {}, unit = 'g'){
+function mineralReportRowsSrv(balance = {}, unit = 'g', stage = ''){
   const names = {
     ca: 'كالسيوم',
     p: 'فوسفور',
@@ -3977,13 +4075,13 @@ function mineralReportRowsSrv(balance = {}, unit = 'g'){
       fmtSrv(supplied, unit === 'mg' ? 0 : 2, u),
       reportCoverageBalanceTextSrv(cover),
       status,
-      reportMurabbikGuidanceSrv(`mineral_${k}`, status, bal),
+     reportMurabbikGuidanceSrv(`mineral_${k}`, status, bal, stage),
       stateText
     );
   });
 }
 
-function vitaminReportRowsSrv(balance = {}){
+function vitaminReportRowsSrv(balance = {}, stage = ''){
   const names = {
     A: 'فيتامين أ',
     D: 'فيتامين د',
@@ -4012,7 +4110,7 @@ function vitaminReportRowsSrv(balance = {}){
       fmtSrv(supplied, 0, 'وحدة دولية'),
       reportCoverageBalanceTextSrv(cover),
       status,
-      reportMurabbikGuidanceSrv(`vitamin_${k}`, status, bal),
+      reportMurabbikGuidanceSrv(`vitamin_${k}`, status, bal, stage),
       stateText
     );
   });
@@ -4108,7 +4206,13 @@ const t = a.targets || {};
 const totals = a.totals || {};
 const ec = a.economics || {};
 const rows = [];
+const reportStage = nutritionStageFromEvent(e);
+const isDryReport =
+  reportStage === 'far_dry' ||
+  reportStage === 'close_up';
 
+const guidanceSrv = (key, status, balance = null) =>
+  reportMurabbikGuidanceSrv(key, status, balance, reportStage);
 // الاقتصاد في التقرير يُقرأ فقط من قرار الاقتصاد النهائي المحفوظ
 const ecoReport = reportEconomicsMetricsSrv(e);
 
@@ -4139,19 +4243,19 @@ rows.push(reportRowSrv(
   'يجب أن يتوفر العلف في المعلف 24 ساعة يوميًا مع متابعة المعلف والمتبقي.',
   '—'
 ));
-
+const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاقة الصافية للحليب';
  {
   const status = reportRatioStatusSrv(n.nelActual, t.nelTarget, 5);
 
   rows.push(reportRowSrv(
     'الاحتياجات الأساسية',
     'nel',
-    'الطاقة الصافية للحليب',
+   nelReportLabel,
     fmtSrv(t.nelTarget, 2, 'ميجاكالوري/يوم'),
     fmtSrv(n.nelActual, 2, 'ميجاكالوري/يوم'),
     reportRatioBalanceTextSrv(n.nelActual, t.nelTarget),
     status,
-    reportMurabbikGuidanceSrv('nel', status, nelBal),
+    guidanceSrv('nel', status, nelBal),
     reportBalanceStateTextSrv(status, nelBal)
   ));
 }
@@ -4167,7 +4271,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.mpSupplyG, 0, 'جم/يوم'),
     reportRatioBalanceTextSrv(n.mpSupplyG, t.mpTargetG),
     status,
-    reportMurabbikGuidanceSrv('mp', status, mpBal),
+    guidanceSrv('mp', status, mpBal),
     reportBalanceStateTextSrv(status, mpBal)
   ));
 }
@@ -4205,7 +4309,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.ndfPctActual, 1, '% من المادة الجافة'),
     finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
     status,
-    reportMurabbikGuidanceSrv('ndf', status, bal),
+    guidanceSrv('ndf', status, bal),
     status === 'good' ? 'كافية' : 'منخفضة'
   ));
 }
@@ -4224,7 +4328,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.starchPctActual, 1, '% من المادة الجافة'),
     finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
     status,
-    reportMurabbikGuidanceSrv('starch', status, bal),
+    guidanceSrv('starch', status, bal),
     status === 'good' ? 'داخل الحد' : 'مرتفع'
   ));
 }
@@ -4243,7 +4347,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.fatPctActual, 1, '% من المادة الجافة'),
     finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
     status,
-    reportMurabbikGuidanceSrv('fat', status, bal),
+    guidanceSrv('fat', status, bal),
     status === 'good' ? 'داخل الحد' : 'مرتفعة'
   ));
 }
@@ -4262,7 +4366,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.roughPctDM, 1, '% من المادة الجافة'),
     finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
     status,
-    reportMurabbikGuidanceSrv('roughage', status, bal),
+    guidanceSrv('roughage', status, bal),
     status === 'good' ? 'كافٍ' : 'منخفض'
   ));
 }
@@ -4281,7 +4385,7 @@ rows.push(reportRowSrv(
     fmtSrv(n.forageNDFPctDM, 1, '% من المادة الجافة'),
     finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
     status,
-    reportMurabbikGuidanceSrv('forage_ndf', status, bal),
+    guidanceSrv('forage_ndf', status, bal),
     status === 'good' ? 'كافٍ' : 'منخفض'
   ));
 }
@@ -4299,7 +4403,7 @@ rows.push(reportRowSrv(
   ));
 
 const dcadVal = n.dcadModel?.dcadMeqKgDM;
-if (finiteSrv(dcadVal)) {
+if (reportStage === 'close_up' && finiteSrv(dcadVal)) {
   const status = Number(dcadVal) > -50 ? 'warn' : 'good';
 
   rows.push(reportRowSrv(
@@ -4310,51 +4414,94 @@ if (finiteSrv(dcadVal)) {
     fmtSrv(dcadVal, 0, 'ملي مكافئ/كجم مادة جافة'),
     '—',
     status,
-    reportMurabbikGuidanceSrv('dcad', status, Number(dcadVal)),
+   guidanceSrv('dcad', status, Number(dcadVal)),
     status === 'good' ? 'مناسب' : 'غير مناسب'
   ));
 }
   const mineralSupply = n.mineralSupplyModel || {};
-  rows.push(...mineralReportRowsSrv(mineralSupply?.mineralBalanceModel?.balance || {}, 'g'));
-  rows.push(...mineralReportRowsSrv(mineralSupply?.traceMineralBalanceModel?.balance || {}, 'mg'));
-  rows.push(...vitaminReportRowsSrv(n.vitaminSupplyModel?.vitaminBalanceModel?.balance || {}));
+  rows.push(...mineralReportRowsSrv(mineralSupply?.mineralBalanceModel?.balance || {}, 'g', reportStage));
+rows.push(...mineralReportRowsSrv(mineralSupply?.traceMineralBalanceModel?.balance || {}, 'mg', reportStage));
+rows.push(...vitaminReportRowsSrv(n.vitaminSupplyModel?.vitaminBalanceModel?.balance || {}, reportStage));
 
-rows.push(reportRowSrv(
-  'الاقتصاد',
-  'milk_revenue',
-  'دخل اللبن اليومي',
-  'مدخل الحساب',
-  fmtSrv(milkRevenueSrv, 2, 'جنيه/رأس/يوم'),
-  '100% من دخل اللبن',
-  finiteSrv(milkRevenueSrv) ? 'muted' : 'warn',
-  'دخل اللبن اليومي هو أساس حساب هامش اللبن بعد العلف.',
-  finiteSrv(milkRevenueSrv) ? 'أساس الحساب' : 'غير مكتمل'
-));
+if (isDryReport) {
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'feed_cost_daily',
+    'تكلفة التغذية / رأس / يوم',
+    'تكلفة يومية',
+    fmtSrv(feedCostSrv, 2, 'جنيه/رأس/يوم'),
+    '—',
+    finiteSrv(feedCostSrv) ? 'muted' : 'warn',
+    finiteSrv(feedCostSrv)
+      ? 'هذه تكلفة التغذية اليومية للحيوان في مرحلة الجفاف أو انتظار الولادة.'
+      : 'أكمل كميات وأسعار الخامات لحساب تكلفة التغذية اليومية.',
+    finiteSrv(feedCostSrv) ? 'مدخل حساب' : 'غير مكتمل'
+  ));
 
-rows.push(reportRowSrv(
-  'الاقتصاد',
-  'feed_cost_daily',
-  'تكلفة العلف اليومية',
-  'مدخل الحساب',
-  fmtSrv(feedCostSrv, 2, 'جنيه/رأس/يوم'),
-  finiteSrv(feedCostPctSrv) ? `${Number(feedCostPctSrv).toFixed(1)}% من دخل اللبن` : '—',
-  finiteSrv(feedCostPctSrv) && Number(feedCostPctSrv) > 50 ? 'warn' : (finiteSrv(feedCostPctSrv) ? 'muted' : 'warn'),
-  'تكلفة العلف اليومية هي البند المخصوم من دخل اللبن لحساب IOFC.',
-  finiteSrv(feedCostPctSrv) ? 'مدخل حساب' : 'غير مكتمل'
-));
+  if (finiteSrv(totals.mixPriceDM)) {
+    rows.push(reportRowSrv(
+      'الاقتصاد',
+      'mix_price_dm',
+      'سعر طن الخلطة مادة جافة',
+      'مؤشر تكلفة',
+      fmtSrv(totals.mixPriceDM, 0, 'جنيه/طن مادة جافة'),
+      '—',
+      'muted',
+      'مؤشر تكلفة الخلطة على أساس المادة الجافة.',
+      'معلومة'
+    ));
+  }
 
-rows.push(reportRowSrv(
-  'الاقتصاد',
-  'iofc',
-  'IOFC — هامش اللبن بعد العلف',
-  'مؤشر الربحية',
-  fmtSrv(milkMarginSrv, 2, 'جنيه/رأس/يوم'),
-  finiteSrv(iofcPctSrv) ? `${Number(iofcPctSrv).toFixed(1)}% من دخل اللبن` : '—',
-  reportIofcStatusSrv(iofcPctSrv),
-  reportIofcNoteSrv(iofcPctSrv),
-  reportIofcReadSrv(iofcPctSrv)
-));
-  return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
+  if (finiteSrv(totals.mixPriceAsFed)) {
+    rows.push(reportRowSrv(
+      'الاقتصاد',
+      'mix_price_asfed',
+      'سعر طن الخلطة طازج',
+      'مؤشر تكلفة',
+      fmtSrv(totals.mixPriceAsFed, 0, 'جنيه/طن طازج'),
+      '—',
+      'muted',
+      'مؤشر تكلفة الخلطة كما تُقدَّم في المعلف.',
+      'معلومة'
+    ));
+  }
+} else {
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'milk_revenue',
+    'دخل اللبن اليومي',
+    'مدخل الحساب',
+    fmtSrv(milkRevenueSrv, 2, 'جنيه/رأس/يوم'),
+    '100% من دخل اللبن',
+    finiteSrv(milkRevenueSrv) ? 'muted' : 'warn',
+    'دخل اللبن اليومي هو أساس حساب هامش اللبن بعد العلف.',
+    finiteSrv(milkRevenueSrv) ? 'أساس الحساب' : 'غير مكتمل'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'feed_cost_daily',
+    'تكلفة العلف اليومية',
+    'مدخل الحساب',
+    fmtSrv(feedCostSrv, 2, 'جنيه/رأس/يوم'),
+    finiteSrv(feedCostPctSrv) ? `${Number(feedCostPctSrv).toFixed(1)}% من دخل اللبن` : '—',
+    finiteSrv(feedCostPctSrv) && Number(feedCostPctSrv) > 50 ? 'warn' : (finiteSrv(feedCostPctSrv) ? 'muted' : 'warn'),
+    'تكلفة العلف اليومية هي البند المخصوم من دخل اللبن لحساب IOFC.',
+    finiteSrv(feedCostPctSrv) ? 'مدخل حساب' : 'غير مكتمل'
+  ));
+
+  rows.push(reportRowSrv(
+    'الاقتصاد',
+    'iofc',
+    'IOFC — هامش اللبن بعد العلف',
+    'مؤشر الربحية',
+    fmtSrv(milkMarginSrv, 2, 'جنيه/رأس/يوم'),
+    finiteSrv(iofcPctSrv) ? `${Number(iofcPctSrv).toFixed(1)}% من دخل اللبن` : '—',
+    reportIofcStatusSrv(iofcPctSrv),
+    reportIofcNoteSrv(iofcPctSrv),
+    reportIofcReadSrv(iofcPctSrv)
+  ));
+}  return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
 }
 
 function attachNutritionReportPayloadSrv(e = {}){
