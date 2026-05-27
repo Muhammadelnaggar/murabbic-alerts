@@ -825,7 +825,7 @@ function buildAutoDecision(a = {}, stage = '', ctx = {}){
   }
 
   return {
-    title:'العليقة مقبولة تشغيليًا حسب البيانات المحفوظة.',
+    title:'العليقة مقبولة حسب البيانات.',
     action:'استمر في متابعة اللبن والروث والمتبقي وتغيّر أسعار الخامات.'
   };
 }
@@ -839,8 +839,8 @@ function renderDecisionBlock(e = {}, a = {}, stage = '', ctx = {}){
       <div class="decision-title">قراءة مُرَبِّيك</div>
       ${badge(d.statusText || statusText(state), state)}
     </div>
-    <div class="decision-text">${esc(d.title || 'قراءة التقرير جاهزة من السيرفر.')}</div>
-    <div class="decision-note"><b>توصية مُرَبِّيك:</b> ${esc(d.action || 'راجع صفوف التقرير الجاهزة من السيرفر.')}</div>
+    <div class="decision-text">${esc(d.title || 'قراءة مُرَبِّيك غير مكتملة.')}</div>
+<div class="decision-note"><b>توجيه مُرَبِّيك:</b> ${esc(d.action || 'راجع بيانات العليقة قبل اعتماد التقرير.')}</div>
   </div>`;
 }
 function renderContextBlock(ctx = {}, event = {}, stage = ''){
@@ -1054,11 +1054,11 @@ html += section(sec, table(
       <td>${esc(r.note || '—')}</td>
     </tr>`);
 
-    html += section(sec, table(
-      ['البند','الاحتياج / الهدف','الفعلي','الفرق','قراءة مُرَبِّيك','توصية / ملاحظة'],
-      body,
-      'لا توجد بيانات.'
-    ));
+html += section(sec, table(
+  ['البند','الاحتياج / الهدف','الفعلي','الفرق','الحالة','توجيه مُرَبِّيك'],
+  body,
+  'لا توجد بيانات.'
+));
   }
 
   return html;
