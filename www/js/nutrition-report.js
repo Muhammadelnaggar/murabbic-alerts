@@ -800,7 +800,7 @@ function runPrint(scope){
 }
 
 window.addEventListener('afterprint', clearPrintMode);
-
+window.runPrint = runPrint;
 function renderPrintTools(items = []){
   const clean = Array.isArray(items) ? items.filter(x => x && x.id) : [];
   const options = clean.map(x => `
