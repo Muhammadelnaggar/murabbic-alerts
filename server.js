@@ -3332,19 +3332,33 @@ if (!rows.length) {
 
 const mode = nutrition.mode || 'tmr_asfed';
 const concKg = toNumOrNull(nutrition.concKg);
+
 const milkPrice = toNumOrNull(
   nutrition.milkPrice ??
   nutrition.context?.milkPrice
 );
-if (!Number.isFinite(Number(milkPrice)) || Number(milkPrice) <= 0) {
+
+const isDrySave =
+  context?.earlyDry === true ||
+  context?.closeUp === true ||
+  /جاف|dry|انتظار|تحضير|close/i.test(String(
+    context?.groupType ||
+    context?.groupName ||
+    context?.pregnancyStatus ||
+    ''
+  ));
+
+if (!isDrySave && (!Number.isFinite(Number(milkPrice)) || Number(milkPrice) <= 0)) {
   return res.status(400).json({
     ok: false,
     error: 'milk_price_required',
-    message: 'سعر اللبن إجباري لحساب الهامش و IOFC في تقرير التغذية.'
+    message: 'سعر اللبن إجباري للحلاب فقط لحساب الهامش و IOFC في تقرير التغذية.'
   });
 }
 
-context.milkPrice = milkPrice;
+if (Number.isFinite(Number(milkPrice)) && Number(milkPrice) > 0) {
+  context.milkPrice = milkPrice;
+}
 const centralAnalysis = buildNutritionCentralAnalysis({
   rows,
   context,
