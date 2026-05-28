@@ -579,6 +579,39 @@ function injectReportStyles(){
   color:#64748b;
   margin-bottom:4px;
 }
+.ration-print-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.ration-print-actions button{
+  border:1px solid #dfe9e2;
+  background:#0f5d35;
+  color:#fff;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:950;
+  font-size:12px;
+  cursor:pointer;
+}
+.ration-print-actions button.secondary{
+  background:#eef7f0;
+  color:#134e2f;
+}
+.section-print-actions{
+  margin-top:10px;
+}
+.section-print-actions button{
+  border:1px solid #dfe9e2;
+  background:#0f5d35;
+  color:#fff;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:950;
+  font-size:12px;
+  cursor:pointer;
+}
     @media(max-width:760px){
       .executive-hero{grid-template-columns:1fr}
       .hero-side{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -801,6 +834,27 @@ function runPrint(scope){
 
 window.addEventListener('afterprint', clearPrintMode);
 window.runPrint = runPrint;
+
+function printRationById(id, operational = false){
+  clearPrintMode();
+
+  const el = id ? document.getElementById(id) : null;
+  if(!el){
+    alert('تعذر تحديد العليقة المطلوب طباعتها');
+    return;
+  }
+
+  document.body.classList.add('print-scope-one');
+  el.classList.add('print-selected');
+
+  if(operational){
+    document.body.classList.add('print-mode-operational');
+  }
+
+  setTimeout(() => window.print(), 80);
+}
+
+window.printRationById = printRationById;
 function renderPrintTools(items = []){
   const clean = Array.isArray(items) ? items.filter(x => x && x.id) : [];
   const options = clean.map(x => `
@@ -1531,11 +1585,14 @@ function renderOneRation(event = {}, opts = {}){
             ${badge(stageLabel(stage, ctx), nDoc.reportStatus || nDoc.reportDecision?.status || 'muted')}
             ${badge(speciesLabelFromEvent(event), 'muted')}
           </div>
-        </div>
-        <div class="screen-actions-row">
-          <a href="#top">أعلى التقرير</a>
-          <a href="nutrition-report.html?scope=group&type=${encodeURIComponent(qp.get('type') || '')}&groupName=${encodeURIComponent(groupName)}">فتح منفرد</a>
-        </div>
+<div class="screen-actions-row">
+  <a href="#top">أعلى التقرير</a>
+  <a href="nutrition-report.html?scope=group&type=${encodeURIComponent(qp.get('type') || '')}&groupName=${encodeURIComponent(groupName)}">فتح منفرد</a>
+</div>
+<div class="ration-print-actions no-print">
+  <button type="button" onclick="printRationById('${esc(id)}', false)">طباعة هذه العليقة</button>
+  <button type="button" class="secondary" onclick="printRationById('${esc(id)}', true)">نسخة تشغيل العليقة</button>
+</div>
       `)}
 
       ${renderServerReportRows(nDoc.reportRows || [])}
@@ -1565,7 +1622,6 @@ const printItems = [{
 }];
 $('content').innerHTML = `
   <div id="top"></div>
-  ${renderPrintTools(printItems)}
   <nav class="report-tabs">
       <a class="main" href="#${esc(`ration-${slug(groupName)}`)}">العليقة</a>
       <a href="nutrition-report.html?scope=all&type=${encodeURIComponent(qp.get('type') || '')}">كل العلائق</a>
@@ -1723,9 +1779,14 @@ function renderAll(data){
 return `
         <div class="stage-section" data-stage="${esc(sec.stage || '')}">
         <section class="card ${si ? 'ration-break' : ''}">
-          <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
-          <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
-        </section>
+     <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
+<div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
+${String(sec.stage || '').toLowerCase() === 'lactating' ? `
+  <div class="section-print-actions no-print">
+    <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
+  </div>
+` : ''}
+</section>
 
         ${sec.showMilkEconomics ? renderExecutiveAll(displayReport, type) : ''}
         ${sec.showMilkEconomics ? `<div id="ration-index-${esc(sec.stage || si)}">${renderRationIndex(displayReport, type)}</div>` : ''}
@@ -1736,9 +1797,8 @@ return `
       `;
     }).join('');
 
-   $('content').innerHTML = `
+$('content').innerHTML = `
   <div id="top"></div>
-  ${renderPrintTools(printItems)}
   ${html}
 `;
     return;
@@ -1771,10 +1831,9 @@ const rationReports = events.map((ev, i) => {
   });
 }).join('');
 
-  $('content').innerHTML = `
-    <div id="top"></div>
-    ${renderPrintTools(printItems)}
-    ${renderTabs(displayReport)}
+$('content').innerHTML = `
+  <div id="top"></div>
+  ${renderTabs(displayReport)}
     ${renderExecutiveAll(displayReport, type)}
     <div id="ration-index">${renderRationIndex(displayReport, type)}</div>
     <div id="comparison">${renderAllComparison(displayReport)}</div>
