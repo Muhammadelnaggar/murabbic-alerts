@@ -2445,15 +2445,44 @@ const ndfState =
       ? 'مربيك: NDF يغطي حد أمان الكرش الأدنى. لا نحكم بزيادة NDF كاحتياج مستقل.'
       : 'مربيك: NDF قراءة ألياف للعليقة، وليس احتياجًا مستقلًا.';
 
-  let starchHint =
-    starchHigh
-      ? 'مربيك: النشا أعلى من الحد الآمن. راجع كارت صحة الكرش قبل تعديل الحبوب.'
-      : 'مربيك: النشا داخل الحد. حافظ على توازن الحبوب والخشن.';
+ let starchWarnForUi = starchHigh;
+let fatWarnForUi = fatHigh;
 
-  let fatHint =
-    fatHigh
-      ? 'مربيك: دهن العليقة أعلى من الحد؛ قد يقلل هضم الألياف ويضغط على دهن اللبن.'
-      : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
+let starchHint =
+  starchHigh
+    ? 'مربيك: النشا أعلى من الحد الآمن. راجع كارت صحة الكرش قبل تعديل الحبوب.'
+    : 'مربيك: النشا داخل الحد. حافظ على توازن الحبوب والخشن.';
+
+let fatHint =
+  fatHigh
+    ? 'مربيك: دهن العليقة أعلى من الحد؛ قد يقلل هضم الألياف ويضغط على دهن اللبن.'
+    : 'مربيك: دهن العليقة داخل الحد. لا ترفعه إلا لهدف طاقة واضح.';
+
+if (isBuffalo) {
+  const buffaloRumenSafe =
+    String(rumenModel?.status || '').toLowerCase() === 'good';
+
+  const fatModelStatus =
+    String(nutrition?.fatModel?.status || '').toLowerCase();
+
+  const buffaloFatModelSafe =
+    fatModelStatus === 'ok' ||
+    fatModelStatus === 'good' ||
+    fatModelStatus === 'calculated';
+
+  starchWarnForUi = starchHigh && !buffaloRumenSafe;
+  fatWarnForUi = fatHigh && !buffaloFatModelSafe;
+
+  starchHint =
+    starchWarnForUi
+      ? 'مربيك: النشا يحتاج مراجعة لأن صحة الكرش غير آمنة؛ اضبط الخشن الفعّال وتجانس الخلطة قبل زيادة الحبوب.'
+      : 'مربيك: النشا يُقرأ مع صحة الكرش؛ طالما صحة الكرش آمنة فلا تعدّل الحبوب لمجرد رقم النشا.';
+
+  fatHint =
+    fatWarnForUi
+      ? 'مربيك: دهن العليقة يحتاج مراجعة لأن نموذج الدهون لا يؤكد الأمان؛ راجع مصدر الدهون الغير محمية وتأثيره على هضم الألياف.'
+      : 'مربيك: دهن العليقة مقبول حسب نموذج الدهون الحالي؛ لا ترفعه إلا لهدف طاقة واضح ومصدر دهون محمية مناسب.';
+}
  const dmCtx = analysis?.context || context || ctx || {};
 const isDryOrCloseUpDm =
   !!dmCtx?.earlyDry ||
@@ -2545,10 +2574,10 @@ ndfHint =
     if (isBuffalo) {
     if (rumenModel?.status === 'danger') {
       priorityText = 'مربيك: اضبط أمان كرش الجاموس أولًا؛ لا ترفع الحبوب أو الدهون الآن.';
-    } else if (starchHigh) {
-      priorityText = 'مربيك: خفّض النشا أولًا أو ارفع الخشن الفعّال؛ الجاموس حساس لضغط النشا.';
-    } else if (fatHigh) {
-      priorityText = 'مربيك: خفّض دهن العليقة أولًا لأنه Limit وليس هدفًا.';
+   } else if (starchWarnForUi) {
+  priorityText = 'مربيك: راجع النشا مع صحة الكرش والخشن الفعّال قبل اعتماد العليقة.';
+} else if (fatWarnForUi) {
+  priorityText = 'مربيك: راجع مصدر الدهون وتأثيره على هضم الألياف قبل اعتماد العليقة.';
     } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
       priorityText = 'مربيك: حسّن البروتين الممثل للجاموس مع ضبط الطاقة، ولا ترفع CP عشوائيًا.';
     } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
@@ -2579,10 +2608,10 @@ ndfHint =
     if (isBuffalo) {
     if (rumenModel?.status === 'danger') {
       decisionText = 'مربيك: عليقة الجاموس تحتاج ضبط أمان الكرش أولًا.';
-    } else if (starchHigh) {
-      decisionText = 'مربيك: عليقة الجاموس تتجاوز حد النشا الآمن.';
-    } else if (fatHigh) {
-      decisionText = 'مربيك: عليقة الجاموس تتجاوز حد الدهون الآمن.';
+    } else if (starchWarnForUi) {
+      decisionText = 'مربيك: عليقة الجاموس تحتاج مراجعة النشا مع صحة الكرش.';
+    } else if (fatWarnForUi) {
+      decisionText = 'مربيك: عليقة الجاموس تحتاج مراجعة مصدر الدهون.';
     } else if (mpState !== 'good' && Number(mpActual) < Number(mpTarget)) {
       decisionText = 'مربيك: العليقة تحتاج تحسين بروتين ممثل مناسب للجاموس.';
     } else if (nelState !== 'good' && Number(nelActual) < Number(nelTarget)) {
@@ -2652,27 +2681,26 @@ ndfHint =
   status: uiStatus(ndfState)
 },
     {
-      key: 'starch',
-      title: 'النشا',
-      value: pctTxt(starchActual, 1),
-      actual: starchActual,
-      target: starchMax,
-      targetText: `${pctTxt(starchActual, 1)} / ${pctTxt(starchMax, 1)} — ${starchHint}`,
-      status: starchHigh ? 'warn' : 'good'
-    },
+  key: 'starch',
+  title: 'النشا',
+  value: pctTxt(starchActual, 1),
+  actual: starchActual,
+  target: starchMax,
+  targetText: `${pctTxt(starchActual, 1)} / ${pctTxt(starchMax, 1)} — ${starchHint}`,
+  status: starchWarnForUi ? 'warn' : 'good'
+},
 
-    {
-      key: 'fat',
-      title: 'الدهون',
-      value: pctTxt(fatActual, 1),
-      actual: fatActual,
-      target: fatMax,
-      targetText: `${pctTxt(fatActual, 1)} / ${pctTxt(fatMax, 1)} — ${fatHint}`,
-      status: fatHigh ? 'warn' : 'good'
-    },
-
-    {
-      key: 'rumen',
+ {
+  key: 'fat',
+  title: 'الدهون',
+  value: pctTxt(fatActual, 1),
+  actual: fatActual,
+  target: fatMax,
+  targetText: `${pctTxt(fatActual, 1)} / ${pctTxt(fatMax, 1)} — ${fatHint}`,
+  status: fatWarnForUi ? 'warn' : 'good'
+},
+{
+  key: 'rumen',
       title: 'صحة الكرش',
       value: rumenModel?.displayText || (
         Number.isFinite(rough) && Number.isFinite(conc)
@@ -2702,10 +2730,10 @@ ndfHint =
         rumenModel?.status === 'danger'
           ? 'danger'
           : (
-              nelState !== 'good' ||
-              mpState !== 'good' ||
-              starchHigh ||
-              fatHigh
+             nelState !== 'good' ||
+             mpState !== 'good' ||
+             starchWarnForUi ||
+             fatWarnForUi
             )
               ? 'warn'
               : 'good'
