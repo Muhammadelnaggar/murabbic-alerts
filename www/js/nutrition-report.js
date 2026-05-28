@@ -621,9 +621,12 @@ function injectReportStyles(){
     }
 
 
-body.print-scope-one .stage-section,
-body.print-scope-one .print-all-only{
+body.print-scope-one .stage-section{
   display:none !important;
+}
+
+body.print-scope-one .stage-section.print-stage-selected{
+  display:block !important;
 }
 
 body.print-scope-one .ration-block{
@@ -798,6 +801,9 @@ function clearPrintMode(){
   document.querySelectorAll('.ration-block.print-selected').forEach(el => {
     el.classList.remove('print-selected');
   });
+   document.querySelectorAll('.stage-section.print-stage-selected').forEach(el => {
+  el.classList.remove('print-stage-selected');
+});
 }
 
 function selectedPrintRationId(){
@@ -819,7 +825,10 @@ function runPrint(scope){
 
     document.body.classList.add('print-scope-one');
     el.classList.add('print-selected');
-
+    const stageBox = el.closest('.stage-section');
+if(stageBox){
+  stageBox.classList.add('print-stage-selected');
+}
     if(scope === 'operational'){
       document.body.classList.add('print-mode-operational');
     }
@@ -846,7 +855,10 @@ function printRationById(id, operational = false){
 
   document.body.classList.add('print-scope-one');
   el.classList.add('print-selected');
-
+const stageBox = el.closest('.stage-section');
+if(stageBox){
+  stageBox.classList.add('print-stage-selected');
+}
   if(operational){
     document.body.classList.add('print-mode-operational');
   }
