@@ -612,6 +612,224 @@ function injectReportStyles(){
   font-size:12px;
   cursor:pointer;
 }
+.report-cover{
+  position:relative;
+  overflow:hidden;
+  border:1px solid #dfe9e2;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(20,120,74,.10), transparent 26%),
+    linear-gradient(135deg,#f4fbf6 0%,#ffffff 62%,#eef8f1 100%);
+  border-radius:28px;
+  padding:26px;
+  margin-bottom:16px;
+  box-shadow:0 14px 35px rgba(15,93,53,.08);
+}
+
+.report-cover:after{
+  content:"";
+  position:absolute;
+  width:230px;
+  height:230px;
+  border-radius:50%;
+  background:rgba(15,93,53,.06);
+  left:-70px;
+  bottom:-95px;
+}
+
+.report-cover-head{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:16px;
+  align-items:start;
+}
+
+.report-kicker{
+  font-size:13px;
+  font-weight:950;
+  color:#0f7a45;
+  margin-bottom:8px;
+}
+
+.report-main-title{
+  font-size:34px;
+  font-weight:950;
+  color:#123d2a;
+  line-height:1.25;
+  margin:0;
+  letter-spacing:-.5px;
+}
+
+.report-main-subtitle{
+  margin-top:10px;
+  font-size:14px;
+  font-weight:850;
+  color:#64748b;
+  line-height:1.9;
+}
+
+.report-logo-box{
+  min-width:120px;
+  text-align:center;
+  border:1px solid #dfe9e2;
+  background:rgba(255,255,255,.82);
+  border-radius:22px;
+  padding:12px;
+}
+
+.report-logo-box img{
+  width:54px;
+  height:54px;
+  object-fit:contain;
+  opacity:.9;
+}
+
+.report-logo-box div{
+  margin-top:6px;
+  font-size:11px;
+  font-weight:950;
+  color:#14532d;
+}
+
+.report-meta-strip{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-top:20px;
+}
+
+.report-meta-item{
+  background:#fff;
+  border:1px solid #e1ece4;
+  border-radius:16px;
+  padding:11px 12px;
+}
+
+.report-meta-item span{
+  display:block;
+  color:#64748b;
+  font-size:11px;
+  font-weight:900;
+  margin-bottom:4px;
+}
+
+.report-meta-item b{
+  display:block;
+  color:#102a1f;
+  font-size:14px;
+  font-weight:950;
+}
+
+.executive-panel{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:14px;
+  margin-bottom:16px;
+}
+
+.executive-reading{
+  border:1px solid #dfe9e2;
+  background:#fff;
+  border-radius:24px;
+  padding:18px;
+  box-shadow:0 10px 26px rgba(15,93,53,.06);
+}
+
+.executive-reading h2{
+  margin:0 0 8px;
+  color:#123d2a;
+  font-size:22px;
+  font-weight:950;
+}
+
+.executive-reading p{
+  margin:0;
+  color:#475569;
+  font-size:13px;
+  font-weight:850;
+  line-height:1.9;
+}
+
+.executive-badges{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+
+.executive-score-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+.executive-score{
+  border:1px solid #e1ece4;
+  background:#fbfdfb;
+  border-radius:20px;
+  padding:14px;
+  text-align:center;
+}
+
+.executive-score b{
+  display:block;
+  font-size:28px;
+  font-weight:950;
+  color:#0f7a45;
+  line-height:1;
+}
+
+.executive-score span{
+  display:block;
+  margin-top:8px;
+  font-size:12px;
+  font-weight:950;
+  color:#475569;
+}
+
+.report-section-head{
+  border:1px solid #dfe9e2;
+  background:linear-gradient(135deg,#ffffff,#f5fbf7);
+  border-radius:24px;
+  padding:18px;
+  margin:18px 0 12px;
+}
+
+.report-section-head .section-title{
+  margin:0;
+  padding:0;
+  border:0;
+  font-size:22px;
+}
+
+.report-section-head .small-note{
+  margin-top:6px;
+}
+
+.ration-block > .print-analysis > .card:first-child{
+  border-top:4px solid #0f7a45;
+}
+
+@media print{
+  .report-cover{
+    border-radius:0 !important;
+    box-shadow:none !important;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+
+  .report-main-title{
+    font-size:25pt !important;
+  }
+
+  .executive-panel{
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+}
     @media(max-width:760px){
       .executive-hero{grid-template-columns:1fr}
       .hero-side{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -1658,42 +1876,98 @@ $('content').innerHTML = `
 ============================================================ */
 function renderExecutiveAll(report = {}, type = ''){
   const ex = report.executive || {};
-  const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
+  const typeLabel = String(type).toLowerCase().includes('buffalo')
+    ? 'جاموس'
+    : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
   const first = ex.firstPriority || {};
   const highCost = ex.highestCost || {};
   const weak = ex.weakestMargin || {};
 
-  return section('الملخص التنفيذي', `
-    <div class="executive-hero">
-      <div class="hero-main">
-        <h2 class="hero-title">تقرير التغذية الشامل — ${esc(typeLabel)}</h2>
-        <div class="hero-desc">
-تقرير عملي يلخص العلائق المحفوظة، ثم يعرض مقارنة مختصرة وتفاصيل كل عليقة.
-اقرأ جدول الاتزان أولًا، ثم راجع تركيبة العليقة والخامات.
+  const total = Number(ex.totalRations || report.count || 0) || 0;
+  const danger = Number(ex.dangerCount || 0) || 0;
+  const warn = Number(ex.warningCount || 0) || 0;
+  const ok = Number(ex.okCount || 0) || 0;
+
+  const today = new Date().toLocaleDateString('ar-EG', {
+    year:'numeric',
+    month:'long',
+    day:'numeric'
+  });
+
+  return `
+    <section class="report-cover">
+      <div class="report-cover-head">
+        <div>
+          <div class="report-kicker">مُرَبِّيك لإدارة مزارع الألبان</div>
+          <h1 class="report-main-title">تقرير مُرَبِّيك الشامل للتغذية — ${esc(typeLabel)}</h1>
+          <div class="report-main-subtitle">
+            تقرير تحليلي منظم لعلائق القطيع حسب مرحلة التغذية، يعرض الملخص التنفيذي، فهرس العلائق، المقارنة المختصرة، ثم تفاصيل كل عليقة.
+          </div>
         </div>
-        <div style="margin-top:12px">
-          ${first.groupName ? badge(`تحتاج مراجعة: ${first.groupName}`, first.reportStatus) : badge('معلومة عامة','muted')}
+
+        <div class="report-logo-box">
+          <img src="/images/logo.png" alt="Murabbik">
+          <div>تقرير تغذية</div>
         </div>
       </div>
 
-      <div class="hero-side">
-        ${kpi('عدد العلائق', nf(ex.totalRations,0))}
-${kpi('علائق بها تنبيه', nf(ex.dangerCount,0), '', ex.dangerCount ? 'danger' : 'good')}
-${kpi('علائق تحتاج ضبط', nf(ex.warningCount,0), '', ex.warningCount ? 'warn' : 'good')}
-${kpi('علائق متزنة', nf(ex.okCount,0), '', 'good')}
+      <div class="report-meta-strip">
+        <div class="report-meta-item">
+          <span>نوع التقرير</span>
+          <b>تحليل علائق محفوظة</b>
+        </div>
+        <div class="report-meta-item">
+          <span>النوع</span>
+          <b>${esc(typeLabel)}</b>
+        </div>
+        <div class="report-meta-item">
+          <span>عدد العلائق</span>
+          <b>${nf(total,0)}</b>
+        </div>
+        <div class="report-meta-item">
+          <span>تاريخ الطباعة</span>
+          <b>${esc(today)}</b>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="cards" style="margin-top:12px">
-     ${mini('أهم قراءة الآن', first.groupName || '—', first.priorityText || first.decisionText || '—', first.reportStatus)}
-      ${mini('أعلى تكلفة كجم لبن', highCost.groupName || '—', finite(highCost.costPerKgMilk) ? money(highCost.costPerKgMilk) : '—', finite(highCost.costPerKgMilk) ? 'warn' : 'muted')}
-      ${mini('أضعف هامش لبن-علف', weak.groupName || '—', finite(weak.milkMargin) ? money(weak.milkMargin) : '—', finite(weak.milkMargin) && Number(weak.milkMargin) < 0 ? 'danger' : 'warn')}
-      ${mini('شكل التقرير', 'مفهرس ومبوب', 'اختَر العليقة من الشريط أو الفهرس.')}
-    </div>
-  `);
+    <section class="executive-panel">
+      <div class="executive-reading">
+        <h2>الملخص التنفيذي</h2>
+        <p>
+          يبدأ التقرير بقراءة عامة لحالة العلائق، ثم يوجّهك إلى العليقة الأولى التي تحتاج مراجعة.
+          التفاصيل العلمية والتشغيلية موجودة داخل كل عليقة على حدة.
+        </p>
+
+        <div class="executive-badges">
+          ${first.groupName ? badge(`أولوية المراجعة: ${first.groupName}`, first.reportStatus) : badge('لا توجد أولوية حرجة','good')}
+          ${highCost.groupName ? badge(`أعلى تكلفة: ${highCost.groupName}`, 'warn') : ''}
+          ${weak.groupName ? badge(`أضعف هامش: ${weak.groupName}`, weak.reportStatus || 'warn') : ''}
+        </div>
+      </div>
+
+      <div class="executive-score-grid">
+        <div class="executive-score">
+          <b>${nf(total,0)}</b>
+          <span>عدد العلائق</span>
+        </div>
+        <div class="executive-score">
+          <b>${nf(ok,0)}</b>
+          <span>علائق متزنة</span>
+        </div>
+        <div class="executive-score">
+          <b>${nf(warn,0)}</b>
+          <span>تحتاج ضبط</span>
+        </div>
+        <div class="executive-score">
+          <b>${nf(danger,0)}</b>
+          <span>بها تنبيه</span>
+        </div>
+      </div>
+    </section>
+  `;
 }
-
 function renderRationIndex(report = {}, type = ''){
   const index = Array.isArray(report.index) ? report.index : [];
 
@@ -1742,20 +2016,11 @@ function renderAllComparison(report = {}){
 }
 
 function renderTabs(report = {}){
-  const index = Array.isArray(report.index) ? report.index : [];
-  const links = [
-    `<a class="main" href="#top">الملخص</a>`,
-    `<a href="#ration-index">الفهرس</a>`,
-    `<a href="#comparison">المقارنة</a>`,
-    
-  ];
-
-  for(const x of index){
-    const id = `ration-${slug(x.groupName || '')}`;
-    links.push(`<a href="#${esc(id)}">${esc(x.groupName || 'عليقة')}</a>`);
-  }
-
-  return `<nav class="report-tabs">${links.join('')}</nav>`;
+  return `<nav class="report-tabs no-print">
+    <a class="main" href="#top">بداية التقرير</a>
+    <a href="#ration-index">فهرس العلائق</a>
+    <a href="#comparison">مقارنة مختصرة</a>
+  </nav>`;
 }
 
 function renderAll(data){
@@ -1763,8 +2028,8 @@ function renderAll(data){
   const type = data.type || qp.get('type') || '';
   const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
-  $('reportTitle').textContent = `تقرير التغذية الشامل — ${typeLabel}`;
-  $('reportSub').textContent = `عدد العلائق داخل التقرير: ${nf(report.count || 0,0)} — التقرير مقسم حسب مرحلة التغذية`;
+ $('reportTitle').textContent = `تقرير مُرَبِّيك الشامل للتغذية`;
+ $('reportSub').textContent = `${typeLabel} — تقرير مقسم حسب مرحلة التغذية`;
   $('statusBox').style.display = 'none';
 
   if (Array.isArray(report.sections) && report.sections.length) {
@@ -1801,14 +2066,14 @@ function renderAll(data){
 
 return `
         <div class="stage-section" data-stage="${esc(sec.stage || '')}">
-        <section class="card ${si ? 'ration-break' : ''}">
-     <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
-<div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
-${String(sec.stage || '').toLowerCase() === 'lactating' ? `
-  <div class="section-print-actions no-print">
-    <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
-  </div>
-` : ''}
+<section class="report-section-head ${si ? 'ration-break' : ''}">
+  <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
+  <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
+  ${String(sec.stage || '').toLowerCase() === 'lactating' ? `
+    <div class="section-print-actions no-print">
+      <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
+    </div>
+  ` : ''}
 </section>
 
         ${sec.showMilkEconomics ? renderExecutiveAll(displayReport, type) : ''}
