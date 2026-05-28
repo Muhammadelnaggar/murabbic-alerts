@@ -641,13 +641,24 @@ body.print-scope-lactating .stage-section:not([data-stage="lactating"]){
   display:none !important;
 }
 
-body.print-mode-operational .print-full-only,
-body.print-mode-operational .print-analysis{
-  display:none !important;
+body.print-mode-operational *{
+  visibility:hidden !important;
 }
 
-body.print-mode-operational .print-operation{
+body.print-mode-operational .ration-block.print-selected .print-operation,
+body.print-mode-operational .ration-block.print-selected .print-operation *{
+  visibility:visible !important;
+}
+
+body.print-mode-operational .ration-block.print-selected .print-operation{
   display:block !important;
+  position:absolute !important;
+  top:0 !important;
+  right:0 !important;
+  left:0 !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
 }
 
 body.print-mode-operational .ration-break{
