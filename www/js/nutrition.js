@@ -4718,7 +4718,11 @@ async function saveEvent(e){
   const saveContext = isGroupMode
   ? buildNutritionContextForRequest()
   : readContext();
+ const editNutritionEventId =
+  String(window.mbkNutrition?.editNutritionEventId || '').trim() || null;
+
   const payload = cleanDeep({
+    eventId: editNutritionEventId,
     animalNumber: isGroupMode ? null : animalId,
     eventDate,
     isGroup: isGroupMode,
@@ -4742,14 +4746,27 @@ async function saveEvent(e){
 
   try{
     
-   await saveToServer(payload);
+  const saveResult = await saveToServer(payload);
+
+if (saveResult?.firestoreId) {
+  window.mbkNutrition = window.mbkNutrition || {};
+  window.mbkNutrition.editNutritionEventId = saveResult.firestoreId;
+}
 
 const ctx = saveContext;
 const groupName = String(ctx?.groupName || ctx?.group || ctx?.groupLabel || '').trim();
 
-const successMsg = isGroupMode
-  ? `✅ تم حفظ تغذية مجموعة "${groupName || 'بدون اسم'}"`
-  : `✅ تم حفظ تغذية الحيوان رقم ${animalId}`;
+const successMsg = editNutritionEventId
+  ? (
+      isGroupMode
+        ? `✅ تم تحديث تغذية مجموعة "${groupName || 'بدون اسم'}"`
+        : `✅ تم تحديث تغذية الحيوان رقم ${animalId}`
+    )
+  : (
+      isGroupMode
+        ? `✅ تم حفظ تغذية مجموعة "${groupName || 'بدون اسم'}"`
+        : `✅ تم حفظ تغذية الحيوان رقم ${animalId}`
+    );
 
 showCentralMsg(successMsg, 'success');
 window.dispatchEvent(
