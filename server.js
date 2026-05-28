@@ -3287,9 +3287,9 @@ return res.json({
 // ============================================================
 app.post('/api/nutrition/save', requireUserId, async (req, res) => {
   try {
-    const tenant = req.userId;
-    const body = req.body || {};
-
+const tenant = req.userId;
+const body = req.body || {};
+const editEventId = String(body.eventId || body.id || '').trim();
 const isGroup = !!body.isGroup;
 
 const rawNumber =
@@ -3430,30 +3430,101 @@ nutrition: {
 }
 });
 
-    const localEvents = readJson(eventsPath, []);
-    localEvents.push({ id: localEvents.length + 1, ...doc });
+const localEvents = readJson(eventsPath, []);
+
+if (editEventId) {
+  const idx = localEvents.findIndex(e =>
+    String(e.firestoreId || e.id || '') === editEventId
+  );
+
+  if (idx >= 0) {
+    localEvents[idx] = {
+      ...localEvents[idx],
+      ...doc,
+      firestoreId: editEventId,
+      updatedAt: nowMs,
+      createdAt: localEvents[idx].createdAt || localEvents[idx].ts || nowMs
+    };
     fs.writeFileSync(eventsPath, JSON.stringify(localEvents, null, 2));
+  }
+} else {
+  localEvents.push({ id: localEvents.length + 1, ...doc });
+  fs.writeFileSync(eventsPath, JSON.stringify(localEvents, null, 2));
+}
+let firestoreId = null;
+let updatedExisting = false;
 
-    let firestoreId = null;
+if (db) {
+  const fireDoc = {
+    ...doc,
+    updatedAt: admin.firestore.Timestamp.fromMillis(nowMs)
+  };
 
-    if (db) {
-      const fireDoc = {
-        ...doc,
-        createdAt: admin.firestore.Timestamp.fromMillis(nowMs)
-      };
+  if (editEventId) {
+    const ref = db.collection('events').doc(editEventId);
+    const oldSnap = await ref.get();
 
-      const ref = await db.collection('events').add(fireDoc);
-      firestoreId = ref.id;
+    if (!oldSnap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: 'nutrition_event_not_found',
+        message: 'العليقة المحفوظة غير موجودة.'
+      });
     }
 
-    return res.json({
-      ok: true,
-      saved: true,
-      eventType: 'nutrition',
-      animalNumber,
-      eventDate,
-      firestoreId
-    });
+    const old = oldSnap.data() || {};
+    const oldUserId = String(old.userId || old.ownerUid || '').trim();
+
+    if (oldUserId && oldUserId !== tenant) {
+      return res.status(403).json({
+        ok: false,
+        error: 'nutrition_event_forbidden',
+        message: 'لا يمكن تعديل عليقة لا تخص هذا المستخدم.'
+      });
+    }
+
+    const oldTypeText = [
+      old.type,
+      old.eventTypeNorm,
+      old.eventType
+    ].map(x => String(x || '').toLowerCase()).join(' ');
+
+    const isNutritionDoc =
+      oldTypeText.includes('nutrition') ||
+      oldTypeText.includes('تغذية');
+
+    if (!isNutritionDoc) {
+      return res.status(400).json({
+        ok: false,
+        error: 'not_nutrition_event',
+        message: 'هذه الوثيقة ليست عليقة تغذية.'
+      });
+    }
+
+    await ref.set({
+      ...fireDoc,
+      createdAt: old.createdAt || admin.firestore.Timestamp.fromMillis(nowMs)
+    }, { merge: true });
+
+    firestoreId = editEventId;
+    updatedExisting = true;
+  } else {
+    fireDoc.createdAt = admin.firestore.Timestamp.fromMillis(nowMs);
+
+    const ref = await db.collection('events').add(fireDoc);
+    firestoreId = ref.id;
+  }
+}
+
+return res.json({
+  ok: true,
+  saved: true,
+  updated: updatedExisting,
+  eventType: 'nutrition',
+  animalNumber,
+  eventDate,
+  firestoreId
+});
 
   } catch (e) {
     console.error('nutrition.save error:', e);
