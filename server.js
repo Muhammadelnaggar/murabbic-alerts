@@ -4404,18 +4404,37 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
 
 const dcadVal = n.dcadModel?.dcadMeqKgDM;
 if (reportStage === 'close_up' && finiteSrv(dcadVal)) {
-  const status = Number(dcadVal) > -50 ? 'warn' : 'good';
+  const isBuffaloForDcad =
+    /جاموس|buffalo/i.test(String(
+      e?.nutrition?.context?.species ||
+      n?.dcadModel?.species ||
+      ''
+    ));
+
+  const lowLimit = isBuffaloForDcad ? -100 : -50;
+  const highLimit = isBuffaloForDcad ? -50 : -10;
+  const dcadNum = Number(dcadVal);
+
+  const status =
+    dcadNum >= lowLimit && dcadNum <= highLimit
+      ? 'good'
+      : 'warn';
+
+  const statusText =
+    status === 'good'
+      ? 'مناسب'
+      : (dcadNum > highLimit ? 'أعلى من المطلوب' : 'أقل من المطلوب');
 
   rows.push(reportRowSrv(
     'المعادن الكبرى',
     'dcad',
     'ميزان الكاتيونات والأنيونات الغذائي',
-    'نطاق انتظار الولادة',
-    fmtSrv(dcadVal, 0, 'ملي مكافئ/كجم مادة جافة'),
+    `نطاق انتظار الولادة ${lowLimit} إلى ${highLimit} ملي مكافئ/كجم مادة جافة`,
+    fmtSrv(dcadNum, 0, 'ملي مكافئ/كجم مادة جافة'),
     '—',
     status,
-   guidanceSrv('dcad', status, Number(dcadVal)),
-    status === 'good' ? 'مناسب' : 'غير مناسب'
+    guidanceSrv('dcad', status, dcadNum),
+    statusText
   ));
 }
   const mineralSupply = n.mineralSupplyModel || {};
