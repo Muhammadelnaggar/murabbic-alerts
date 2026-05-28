@@ -879,6 +879,35 @@ function injectReportStyles(){
     }
 
     @media print{
+    body.print-scope-one .report-cover,
+body.print-scope-one .executive-panel,
+body.print-scope-one .report-tabs,
+body.print-scope-one .stage-section > .report-section-head,
+body.print-scope-one .print-footer{
+  display:none !important;
+}
+
+body.print-scope-one .stage-section{
+  display:none !important;
+}
+
+body.print-scope-one .stage-section.print-stage-selected{
+  display:block !important;
+}
+
+body.print-scope-one .ration-block{
+  display:none !important;
+}
+
+body.print-scope-one .ration-block.print-selected{
+  display:block !important;
+  break-before:auto !important;
+  page-break-before:auto !important;
+}
+
+body.print-scope-one .ration-block.print-selected .card:first-child{
+  margin-top:0 !important;
+}
       @page{
         size:A4 landscape;
         margin:8mm;
