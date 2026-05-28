@@ -1020,6 +1020,18 @@ function buildPath(){
 
   return `/api/nutrition/report/latest?${p.toString()}`;
 }
+function hideOldReportHeader(){
+  const title = document.getElementById('reportTitle');
+  const sub = document.getElementById('reportSub');
+  const status = document.getElementById('statusBox');
+
+  if(title) title.style.display = 'none';
+  if(sub) sub.style.display = 'none';
+  if(status) status.style.display = 'none';
+
+  const box = title ? title.closest('.card, .hero, .report-head, section, header') : null;
+  if(box) box.style.display = 'none';
+}
 function clearPrintMode(){
   document.body.classList.remove(
     'print-scope-one',
@@ -2132,7 +2144,8 @@ $('content').innerHTML = `
    تشغيل
 ============================================================ */
 async function main(){
-  injectReportStyles();
+ injectReportStyles();
+hideOldReportHeader();
 
   try{
     const data = await apiGet(buildPath());
